@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="dev.mesbase.system.mapper.AutoCodeExtraMapper">
+<select id="counter" resultMap="dev.mesbase.system.mapper.SysAutoCodeResultMapper.SysAutoCodeResultResult">
+ SELECT * FROM sys_auto_code_result WHERE rule_id=#{ruleId} AND cycle_key=#{cycleKey} FOR UPDATE
+</select>
+</mapper>

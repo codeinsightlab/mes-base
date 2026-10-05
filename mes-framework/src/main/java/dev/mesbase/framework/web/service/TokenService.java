@@ -1,0 +1,18 @@
+package dev.mesbase.framework.web.service;
+import dev.mesbase.common.core.domain.model.LoginUser;import dev.mesbase.common.core.redis.RedisCache;import dev.mesbase.system.service.ISysUserService;
+import org.springframework.stereotype.Service;import org.springframework.core.env.Environment;import jakarta.servlet.http.HttpServletRequest;import java.security.*;import java.util.*;import java.util.concurrent.TimeUnit;
+/** PORT of source Redis sessions: identity-only opaque credentials; permissions refreshed from DB each request. */
+@Service @org.springframework.boot.autoconfigure.condition.ConditionalOnProperty(name="mes.system.enabled",havingValue="true")
+public class TokenService {
+ public static final String PREFIX="mes:system:session:";private final RedisCache cache;private final ISysUserService users;private final int ttl;
+ public TokenService(RedisCache cache,ISysUserService users,Environment e){this.cache=cache;this.users=users;ttl=e.getProperty("token.expire-time",Integer.class,60);if(ttl<1||ttl>1440)throw new IllegalArgumentException("Token lifetime invalid");}
+ public static String hash(String token){try{return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(token.getBytes(java.nio.charset.StandardCharsets.UTF_8)));}catch(NoSuchAlgorithmException e){throw new IllegalStateException(e);}}
+ public record Identity(Long userId,String username,long loginTime,String ip,String browser,String os,long authRevision) implements java.io.Serializable {}
+ public String createToken(LoginUser user,HttpServletRequest request){byte[] bytes=new byte[32];new SecureRandom().nextBytes(bytes);String raw=Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);String digest=hash(raw);cache.setCacheObject(PREFIX+digest,new Identity(user.getUserId(),user.getUsername(),System.currentTimeMillis(),request.getRemoteAddr(),ClientAgent.parse(request.getHeader("User-Agent")).browser(),ClientAgent.parse(request.getHeader("User-Agent")).os(),user.getUser().getAuthRevision()),ttl,TimeUnit.MINUTES);return raw;}
+ public LoginUser getLoginUser(HttpServletRequest request){String header=request.getHeader("Authorization");if(header==null||!header.startsWith("Bearer "))return null;return resolve(header.substring(7));}
+ public LoginUser resolve(String raw){if(!raw.matches("[A-Za-z0-9_-]{43}"))throw denied();String digest=hash(raw);Identity identity=cache.getCacheObject(PREFIX+digest);if(identity==null)throw denied();var user=users.selectUserByUserName(identity.username());if(user==null||!"0".equals(user.getStatus())||!"0".equals(user.getDelFlag())||!user.getUserId().equals(identity.userId())||user.getAuthRevision()!=identity.authRevision())throw denied();var login=new LoginUser(user.getUserId(),user.getDeptId(),user,Set.of());login.setToken(digest);login.setLoginTime(identity.loginTime());login.setIpaddr(identity.ip());login.setBrowser(identity.browser());login.setOs(identity.os());return login;}
+ public void setLoginUser(LoginUser user){/* User/roles remain DB-authoritative; never cache permission snapshots. */}
+ public void delLoginUser(String digest){cache.deleteObject(PREFIX+digest);}
+ public void revokeUser(Long userId){for(String key:cache.keys(PREFIX+"*")){Identity identity=cache.getCacheObject(key);if(identity!=null&&identity.userId().equals(userId))cache.deleteObject(key);}}
+ public int ttlMinutes(){return ttl;}private RuntimeException denied(){return new dev.mesbase.core.error.FoundationException(dev.mesbase.core.error.ErrorCode.UNAUTHENTICATED);}
+}

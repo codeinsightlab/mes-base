@@ -1,0 +1,9 @@
+package dev.mesbase;
+import org.junit.jupiter.api.Test;import static org.junit.jupiter.api.Assertions.*;import java.util.*;import dev.mesbase.framework.persistence.SystemUnit;import dev.mesbase.infrastructure.persistence.*;import org.apache.ibatis.annotations.*;
+/** TEST ONLY H2 transaction semantics; not source-system or live MySQL acceptance. */
+public class SystemUnitEffectsTest {
+ @PersistenceOwner(PersistenceOwner.Kind.PLATFORM) public interface Probe{@Insert("INSERT INTO proof(id)VALUES(#{id})")int add(int id);@Select("SELECT COUNT(*) FROM proof")int count();}
+ SystemUnit unit()throws Exception{var data=new org.springframework.jdbc.datasource.DriverManagerDataSource("jdbc:h2:mem:effects-"+UUID.randomUUID()+";DB_CLOSE_DELAY=-1","sa","");try(var c=data.getConnection();var s=c.createStatement()){s.execute("CREATE TABLE proof(id INT PRIMARY KEY)");}return new SystemUnit(new PlatformPersistence(data,Set.of(Probe.class)));}
+ @Test void effectsSeeCommittedDataAndNestedWorkSharesOneTransaction()throws Exception{var unit=unit();var calls=new ArrayList<String>();unit.run(()->{unit.mapper(Probe.class).add(1);unit.run(()->unit.mapper(Probe.class).add(2));unit.afterCommit(()->{assertEquals(2,unit.run(()->unit.mapper(Probe.class).count()));calls.add("committed");});unit.afterRollback(()->calls.add("rollback"));return null;});assertEquals(List.of("committed"),calls);}
+ @Test void failedCommitCompensatesFilesWithoutPublishingSchedulerEffects()throws Exception{var unit=unit();var calls=new ArrayList<String>();assertThrows(IllegalStateException.class,()->unit.run(()->{unit.mapper(Probe.class).add(1);unit.afterCommit(()->calls.add("scheduled"));unit.afterRollback(()->calls.add("compensated"));throw new IllegalStateException("TEST ONLY");}));assertEquals(List.of("compensated"),calls);assertEquals(0,unit.run(()->unit.mapper(Probe.class).count()));assertThrows(IllegalStateException.class,()->unit.mapper(Probe.class).count());}
+}

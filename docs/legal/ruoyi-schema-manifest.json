@@ -1,0 +1,343 @@
+{
+  "repository": "https://github.com/yangzongzhuan/RuoYi-Vue",
+  "commit": "13db1fcef36bee9ce45d2d636a1d4e8f5ed5bbc3",
+  "sourcePath": "sql/ry_20260417.sql",
+  "sourceBlobSha": "bf2c1a76ada4a6a266b559c2b06851049fd3c2a2",
+  "sourceSha256": "09f26cb52f2768e87f3860200e54ca39a491c373b766ef7cf404c2683bd7ae0b",
+  "license": "MIT",
+  "output": "sql/ruoyi/sys-schema.sql",
+  "outputSha256": "fd800502c11fb38d1e6b478f448a5c5f8b98249e368e7d2f83d7eece1d024d6a",
+  "adaptation": "Extract CREATE TABLE sys_* statements byte-for-byte; omit DROP and INSERT; do not register as Flyway migration for existing custom V1.",
+  "referenceProject": {
+    "path": "/Users/user/work/heri/ktg-mes",
+    "head": "310c6ef1bb37d2533fe893579ba837c353b76926",
+    "readOnly": true,
+    "schemaPath": "sql/ry_20210908.sql",
+    "schemaSha256": "4533a64ee2bb8fa7c5e189531df43bd846b4b7e777e0dd7ff423c452dec7ecca",
+    "tableCount": 17
+  },
+  "tables": [
+    {
+      "table": "sys_dept",
+      "columns": [
+        "dept_id",
+        "parent_id",
+        "ancestors",
+        "dept_name",
+        "order_num",
+        "leader",
+        "phone",
+        "email",
+        "status",
+        "del_flag",
+        "create_by",
+        "create_time",
+        "update_by",
+        "update_time"
+      ],
+      "originalOnlyColumns": [],
+      "officialAdditionalColumns": []
+    },
+    {
+      "table": "sys_user",
+      "columns": [
+        "user_id",
+        "dept_id",
+        "user_name",
+        "nick_name",
+        "user_type",
+        "email",
+        "phonenumber",
+        "sex",
+        "avatar",
+        "password",
+        "status",
+        "del_flag",
+        "login_ip",
+        "login_date",
+        "pwd_update_date",
+        "create_by",
+        "create_time",
+        "update_by",
+        "update_time",
+        "remark"
+      ],
+      "originalOnlyColumns": [],
+      "officialAdditionalColumns": [
+        "pwd_update_date"
+      ]
+    },
+    {
+      "table": "sys_post",
+      "columns": [
+        "post_id",
+        "post_code",
+        "post_name",
+        "post_sort",
+        "status",
+        "create_by",
+        "create_time",
+        "update_by",
+        "update_time",
+        "remark"
+      ],
+      "originalOnlyColumns": [],
+      "officialAdditionalColumns": []
+    },
+    {
+      "table": "sys_role",
+      "columns": [
+        "role_id",
+        "role_name",
+        "role_key",
+        "role_sort",
+        "data_scope",
+        "menu_check_strictly",
+        "dept_check_strictly",
+        "status",
+        "del_flag",
+        "create_by",
+        "create_time",
+        "update_by",
+        "update_time",
+        "remark"
+      ],
+      "originalOnlyColumns": [],
+      "officialAdditionalColumns": []
+    },
+    {
+      "table": "sys_menu",
+      "columns": [
+        "menu_id",
+        "menu_name",
+        "parent_id",
+        "order_num",
+        "path",
+        "component",
+        "query",
+        "route_name",
+        "is_frame",
+        "is_cache",
+        "menu_type",
+        "visible",
+        "status",
+        "perms",
+        "icon",
+        "create_by",
+        "create_time",
+        "update_by",
+        "update_time",
+        "remark"
+      ],
+      "originalOnlyColumns": [],
+      "officialAdditionalColumns": [
+        "route_name"
+      ]
+    },
+    {
+      "table": "sys_user_role",
+      "columns": [
+        "user_id",
+        "role_id"
+      ],
+      "originalOnlyColumns": [],
+      "officialAdditionalColumns": []
+    },
+    {
+      "table": "sys_role_menu",
+      "columns": [
+        "role_id",
+        "menu_id"
+      ],
+      "originalOnlyColumns": [],
+      "officialAdditionalColumns": []
+    },
+    {
+      "table": "sys_role_dept",
+      "columns": [
+        "role_id",
+        "dept_id"
+      ],
+      "originalOnlyColumns": [],
+      "officialAdditionalColumns": []
+    },
+    {
+      "table": "sys_user_post",
+      "columns": [
+        "user_id",
+        "post_id"
+      ],
+      "originalOnlyColumns": [],
+      "officialAdditionalColumns": []
+    },
+    {
+      "table": "sys_oper_log",
+      "columns": [
+        "oper_id",
+        "title",
+        "business_type",
+        "method",
+        "request_method",
+        "operator_type",
+        "oper_name",
+        "dept_name",
+        "oper_url",
+        "oper_ip",
+        "oper_location",
+        "oper_param",
+        "json_result",
+        "status",
+        "error_msg",
+        "oper_time",
+        "cost_time"
+      ],
+      "originalOnlyColumns": [],
+      "officialAdditionalColumns": [
+        "cost_time"
+      ]
+    },
+    {
+      "table": "sys_dict_type",
+      "columns": [
+        "dict_id",
+        "dict_name",
+        "dict_type",
+        "status",
+        "create_by",
+        "create_time",
+        "update_by",
+        "update_time",
+        "remark"
+      ],
+      "originalOnlyColumns": [],
+      "officialAdditionalColumns": []
+    },
+    {
+      "table": "sys_dict_data",
+      "columns": [
+        "dict_code",
+        "dict_sort",
+        "dict_label",
+        "dict_value",
+        "dict_type",
+        "css_class",
+        "list_class",
+        "is_default",
+        "status",
+        "create_by",
+        "create_time",
+        "update_by",
+        "update_time",
+        "remark"
+      ],
+      "originalOnlyColumns": [],
+      "officialAdditionalColumns": []
+    },
+    {
+      "table": "sys_config",
+      "columns": [
+        "config_id",
+        "config_name",
+        "config_key",
+        "config_value",
+        "config_type",
+        "create_by",
+        "create_time",
+        "update_by",
+        "update_time",
+        "remark"
+      ],
+      "originalOnlyColumns": [],
+      "officialAdditionalColumns": []
+    },
+    {
+      "table": "sys_logininfor",
+      "columns": [
+        "info_id",
+        "user_name",
+        "ipaddr",
+        "login_location",
+        "browser",
+        "os",
+        "status",
+        "msg",
+        "login_time"
+      ],
+      "originalOnlyColumns": [],
+      "officialAdditionalColumns": []
+    },
+    {
+      "table": "sys_job",
+      "columns": [
+        "job_id",
+        "job_name",
+        "job_group",
+        "invoke_target",
+        "cron_expression",
+        "misfire_policy",
+        "concurrent",
+        "status",
+        "create_by",
+        "create_time",
+        "update_by",
+        "update_time",
+        "remark"
+      ],
+      "originalOnlyColumns": [],
+      "officialAdditionalColumns": []
+    },
+    {
+      "table": "sys_job_log",
+      "columns": [
+        "job_log_id",
+        "job_name",
+        "job_group",
+        "invoke_target",
+        "job_message",
+        "status",
+        "exception_info",
+        "start_time",
+        "end_time",
+        "create_time"
+      ],
+      "originalOnlyColumns": [],
+      "officialAdditionalColumns": [
+        "start_time",
+        "end_time"
+      ]
+    },
+    {
+      "table": "sys_notice",
+      "columns": [
+        "notice_id",
+        "notice_title",
+        "notice_type",
+        "notice_content",
+        "status",
+        "create_by",
+        "create_time",
+        "update_by",
+        "update_time",
+        "remark"
+      ],
+      "originalOnlyColumns": [],
+      "officialAdditionalColumns": []
+    },
+    {
+      "table": "sys_notice_read",
+      "columns": [
+        "read_id",
+        "notice_id",
+        "user_id",
+        "read_time"
+      ],
+      "originalOnlyColumns": [],
+      "officialAdditionalColumns": [
+        "read_id",
+        "notice_id",
+        "user_id",
+        "read_time"
+      ]
+    }
+  ]
+}

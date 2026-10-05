@@ -1,0 +1,12 @@
+#!/bin/sh
+# User Java21 environment; explicit ignored developer configuration, no embedded credentials.
+set -eu
+ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
+CONFIG="${MES_LOCAL_CONFIG:-$ROOT/target/phase1/application-phase1.yml}"
+JAR="$ROOT/target/mes-base-0.1.0-SNAPSHOT.jar"
+if [ ! -f "$CONFIG" ] || [ ! -f "$JAR" ]; then
+  printf '%s\n' 'Build the backend and prepare the controlled local configuration first.' >&2
+  exit 2
+fi
+if [ -n "${JAVA_HOME:-}" ]; then JAVA_BIN="$JAVA_HOME/bin/java"; else JAVA_BIN=java; fi
+exec "$JAVA_BIN" -jar "$JAR" "--spring.profiles.active=dev" "--spring.config.additional-location=file:$CONFIG" "$@"

@@ -1,0 +1,26 @@
+# Copy to a controlled external YAML and pass --spring.config.additional-location=file:/absolute/path.
+# This example contains no credentials and does not grant permissions or Factory admission.
+mes:
+  runtime:
+    enabled: true
+    factories:
+      - id: A
+        enterprise-id: development
+        code: DEV_A
+        name: 开发工厂 A
+        status: ENABLED
+        datasource-identity: dev_a
+        revision: 1
+        url: ${MES_BUSINESS_A_URL}
+        username: ${MES_BUSINESS_A_USER}
+        password: ${MES_BUSINESS_A_PASSWORD}
+      - id: B
+        enterprise-id: development
+        code: DEV_B
+        name: 开发工厂 B
+        status: ENABLED
+        datasource-identity: dev_b
+        revision: 1
+        url: ${MES_BUSINESS_B_URL}
+        username: ${MES_BUSINESS_B_USER}
+        password: ${MES_BUSINESS_B_PASSWORD}

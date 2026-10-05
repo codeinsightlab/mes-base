@@ -1,0 +1,3 @@
+// MES-CODEGEN: scaffold; review required. RuoYi template pipeline adapted under MIT.
+package ${packageName};
+$body

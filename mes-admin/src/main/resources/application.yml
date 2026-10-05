@@ -1,0 +1,119 @@
+spring:
+  application:
+    name: mes-base
+  profiles:
+    default: dev
+  web:
+    resources:
+      add-mappings: false
+  jackson:
+    time-zone: ${MES_TIME_ZONE:Asia/Shanghai}
+    deserialization:
+      fail-on-unknown-properties: true
+  datasource:
+    type: com.alibaba.druid.pool.DruidDataSource
+    druid:
+      filters: stat,wall
+      initial-size: 0
+      min-idle: 0
+      max-active: 5
+      max-wait: 5000
+      connect-timeout: 5000
+      socket-timeout: 30000
+      time-between-eviction-runs-millis: 60000
+      min-evictable-idle-time-millis: 300000
+      max-evictable-idle-time-millis: 900000
+      validation-query: SELECT 1
+      test-while-idle: true
+      test-on-borrow: false
+      test-on-return: false
+  data:
+    redis:
+      host: ${MES_REDIS_HOST:127.0.0.1}
+      port: ${MES_REDIS_PORT:6379}
+      password: ${MES_REDIS_PASSWORD:}
+      database: ${MES_REDIS_DATABASE:0}
+      timeout: 5s
+  quartz:
+    properties:
+      org:
+        quartz:
+          threadPool:
+            threadCount: 2
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 11MB
+
+server:
+  address: ${MES_SERVER_ADDRESS:127.0.0.1}
+  port: ${MES_PORT:8080}
+  error:
+    include-message: never
+    include-stacktrace: never
+    include-binding-errors: never
+
+mes:
+  storage:
+    type: ${MES_STORAGE_TYPE:local}
+  system:
+    enabled: ${MES_SYSTEM_ENABLED:${mes.platform.enabled:false}}
+    # Blank derives an isolated namespace from the trusted Platform JDBC identity.
+    cache-namespace: ${MES_SYSTEM_CACHE_NAMESPACE:}
+  platform:
+    enabled: ${MES_PLATFORM_ENABLED:false}
+    url: ${MES_PLATFORM_URL:}
+    username: ${MES_PLATFORM_USER:}
+    password: ${MES_PLATFORM_PASSWORD:}
+    migrate: ${MES_PLATFORM_MIGRATE:false}
+    file-root: ${MES_FILE_ROOT:}
+    session-ttl-seconds: 3600
+    max-upload-bytes: 10000000
+  runtime:
+    enabled: ${MES_RUNTIME_ENABLED:false}
+    factories: []
+  codegen:
+    # Developer metadata profile is independent of Factory Runtime bindings.
+    default-datasource: ${MES_CODEGEN_DEFAULT_DATASOURCE:dev}
+    profiles:
+      dev:
+        url: ${MES_CODEGEN_URL:}
+        username: ${MES_CODEGEN_USER:}
+        password: ${MES_CODEGEN_PASSWORD:}
+
+# Source Product infrastructure consumers; external environment values remain outside Git.
+ruoyi:
+  name: MES Base
+  version: 0.1.0
+  profile: ${MES_FILE_ROOT:target/private-files}
+  captcha:
+    enabled: ${MES_CAPTCHA_ENABLED:true}
+    type: char
+    width: 160
+    height: 60
+    font-size: 36
+    length: 4
+    expiration-minutes: 2
+
+token:
+  expire-time: ${MES_TOKEN_EXPIRE_MINUTES:60}
+user:
+  password:
+    min-length: ${MES_PASSWORD_MIN_LENGTH:12}
+    max-length: ${MES_PASSWORD_MAX_LENGTH:128}
+    max-retry-count: 5
+    lock-time: 10
+xss:
+  enabled: true
+  url-patterns: /api/system/*,/api/monitor/*
+  excludes: /api/system/user/profile/updatePwd
+pagehelper:
+  helper-dialect: mysql
+  reasonable: false
+
+# Source Minio configuration keys; values supplied by the deployment owner.
+minio:
+  url: ${MES_MINIO_URL:}
+  access-key: ${MES_MINIO_ACCESS_KEY:}
+  secret-key: ${MES_MINIO_SECRET_KEY:}
+  bucket-name: ${MES_MINIO_BUCKET:}
