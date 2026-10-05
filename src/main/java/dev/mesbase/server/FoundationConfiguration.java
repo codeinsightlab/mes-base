@@ -27,18 +27,19 @@ public class FoundationConfiguration {
     @Bean BusinessPersistence businessPersistence(ConfiguredBusinessPersistenceResolver resolver,RuntimeRegistry registry) { return new DedicatedDatabasePersistence(resolver,registry); }
     @Bean RuntimeRegistry runtimes() { return new RuntimeRegistry(); }
     @Bean FactoryErpConnectionResolver erp() { return new NotConfiguredErpResolver(); }
-    @Bean SecurityFilterChain security(HttpSecurity http,UserDetailsService users) throws Exception {
+    @Bean SecurityFilterChain security(HttpSecurity http,UserDetailsService users,org.springframework.beans.factory.ObjectProvider<dev.mesbase.platform.security.PlatformTokenFilter> tokens) throws Exception {
         var provider=new org.springframework.security.authentication.dao.DaoAuthenticationProvider(users);
         provider.setPasswordEncoder(org.springframework.security.crypto.factory.PasswordEncoderFactories.createDelegatingPasswordEncoder());
         http.authenticationProvider(provider);
+        if(tokens.getIfAvailable()!=null) http.addFilterBefore(tokens.getObject(),org.springframework.security.web.authentication.www.BasicAuthenticationFilter.class);
         return http.csrf(csrf -> csrf.disable()).requestCache(cache -> cache.disable())
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(requests -> requests.anyRequest().permitAll())
             .httpBasic(basic -> basic.authenticationEntryPoint((request,response,error) -> { response.setHeader("WWW-Authenticate","Basic realm=mes-base"); ErrorWriter.write(ErrorCode.UNAUTHENTICATED,request,response); }))
             .formLogin(form -> form.disable()).logout(logout -> logout.disable()).build();
     }
-    @Bean WebMvcConfigurer accessRules(FactorySelectionService selection,AuthorizationService authorization) {
-        return new WebMvcConfigurer() { public void addInterceptors(InterceptorRegistry registry) { registry.addInterceptor(new FoundationAccessInterceptor(selection,authorization)); } };
+    @Bean WebMvcConfigurer accessRules(FactorySelectionService selection,AuthorizationService authorization,org.springframework.beans.factory.ObjectProvider<dev.mesbase.platform.security.PlatformAuthorization> platform) {
+        return new WebMvcConfigurer() { public void addInterceptors(InterceptorRegistry registry) { registry.addInterceptor(new FoundationAccessInterceptor(selection,authorization,platform.getIfAvailable(()->(actor,permission)->false))); } };
     }
     @Bean SmartInitializingSingleton explicitEndpoints(@Qualifier("requestMappingHandlerMapping") RequestMappingHandlerMapping mappings) {
         return () -> mappings.getHandlerMethods().values().forEach(EndpointCatalog::required);

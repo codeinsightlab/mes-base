@@ -1,17 +1,17 @@
-# MES Base — Factory Foundation
+# MES Base — Platform / Factory Foundation
 
-一个独立创建的 Java 21 / Spring Boot 4.1.1 模块化单体。当前只有 Factory Foundation，没有生产业务或前端。
+一个独立创建的 Java 21 / Spring Boot 4.1.1 模块化单体。当前包含 Platform Foundation、Factory Foundation、Codegen 与相邻 Vue3 Base UI；尚无正式 MES 业务。
 
 ## 构建与验收
 
 需要 Java 21、Maven 3.6.3+。在本目录运行：
 
 ```sh
-mvn -s .mvn/settings.xml -B -ntp verify
+mvn -B -ntp verify
 python3 scripts/smoke-packaged.py
 ```
 
-先将 `JAVA_HOME` / `PATH` 指向 Java 21；macOS 可用 `/usr/libexec/java_home -v 21` 找到安装位置。打包启动验证脚本也支持 `MES_JAVA_BIN=/path/to/java`。公开依赖缓存保存在本目录 `.m2/repository`，不继承旧工程的仓库配置。构建产物与原始验证日志在 `target/`。
+先将 `JAVA_HOME` / `PATH` 指向 Java 21；macOS 可用 `/usr/libexec/java_home -v 21` 找到安装位置。打包启动验证脚本也支持 `MES_JAVA_BIN=/path/to/java`。使用标准 Maven 配置及默认用户级依赖缓存（通常为 `~/.m2/repository`）；项目不创建 `.m2/.mvn` 或自定义 Maven mirror。代码、文档、测试与构建产物仍在本项目内。构建产物与原始验证日志在 `target/`。
 
 ## 启动
 
@@ -29,7 +29,7 @@ java -jar target/mes-base-0.1.0-SNAPSHOT.jar --spring.profiles.active=demo --ser
 
 Demo 有 A/B 两个合成 Factory，账号 `visitor` 没有角色，账号 `reader` 只拥有 A 厂的 Foundation 查看权限；二者密码都来自上述本地环境变量。没有固定默认密码、业务表或数据库连接。关闭 demo 后这些账号和工厂均不存在。
 
-当前采用无会话 HTTP Basic，账号有效性由 `UserDetailsService` 决定；角色为空不阻止认证。Basic 是本地基础验收方案，开放部署必须先配置 HTTPS 和真实身份适配器；尚未交付 JWT/SSO/IAM 后台。
+默认/demo 保留无会话 HTTP Basic 验收；显式开启 Platform 后增加数据库身份、可撤销 Bearer 会话与管理后台，角色为空不阻止认证。开放部署必须配置 HTTPS；SSO 尚未交付。
 
 ## HTTP 契约
 
@@ -62,3 +62,12 @@ Demo 有 A/B 两个合成 Factory，账号 `visitor` 没有角色，账号 `read
 
 详细证据和限制见 [迁移报告](docs/reviews/2026-10-05-factory-foundation-migration-report.md)，决策见 [架构索引](docs/architecture/README.md)。
 # mes-base
+
+## Platform / Codegen / Agent 入口
+
+- [Platform 配置与首次管理员](docs/development/platform.md)
+- [Codegen CLI、metadata、生成与接入](docs/development/codegen.md)
+- [mes-crud-codegen Skill](.agents/skills/mes-crud-codegen/SKILL.md)
+- [本轮迁移与验收报告](docs/reviews/2026-10-05-platform-codegen-foundation-report.md)
+
+标准 CRUD 从 AGENTS → Skill → `scripts/mes-codegen` 进入；生成后仍需 Scope/Permission/Resource/Domain/SQL/UI/测试审查。UI 位于相邻 `../mes-base-ui`，不是公司业务页面迁移。

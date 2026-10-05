@@ -75,5 +75,17 @@
       "tracked_diff_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
     }
   ],
-  "evidence_boundary": "Actual local H2 JDBC fixture, embedded Tomcat HTTP tests and packaged default/demo process; no production database, ERP, Redis, deployment or device validation"
+  "evidence_boundary": "Actual local H2 JDBC fixture, embedded Tomcat HTTP tests and packaged default/demo process; no production database, ERP, Redis, deployment or device validation",
+  "final_build_command": "zsh -ic 'mvn -B -ntp verify'",
+  "final_build_environment": "User configured interactive zsh; no JAVA_HOME override, custom settings, wrapper or project-local Maven cache",
+  "final_build_log": "target/validation/verify-user-env.log",
+  "final_smoke_log": "target/validation/smoke-user-env.log",
+  "project_local_maven_config": "REMOVED at user request",
+  "independent_git_operations_observed": {
+    "commits": [
+      "e7a4b35",
+      "5a3ebcc"
+    ],
+    "agent_did_commit_or_push": false
+  }
 }

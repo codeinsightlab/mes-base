@@ -1,6 +1,6 @@
 package dev.mesbase.core.error;
 public enum ErrorCode {
-    BAD_REQUEST(400, "Invalid request"), UNAUTHENTICATED(401, "Authentication required"),
+    RESOURCE_CONFLICT(409, "Resource conflicts with current state"), BAD_REQUEST(400, "Invalid request"), UNAUTHENTICATED(401, "Authentication required"),
     FORBIDDEN(403, "Permission denied"), NOT_FOUND(404, "Resource not found"),
     CONFLICT(409, "Execution binding changed"), UNPROCESSABLE(422, "Request cannot be processed"),
     FACTORY_SCOPE_REQUIRED(400, "Select a factory explicitly"), FACTORY_NOT_FOUND(404, "Factory not found"),

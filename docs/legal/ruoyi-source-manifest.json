@@ -1,0 +1,40 @@
+{
+  "repository": "https://github.com/yangzongzhuan/RuoYi-Vue",
+  "commit": "13db1fcef36bee9ce45d2d636a1d4e8f5ed5bbc3",
+  "license": "MIT",
+  "copyright": "2018 RuoYi",
+  "sourceFiles": [
+    "LICENSE",
+    "ruoyi-generator/src/main/java/com/ruoyi/generator/util/VelocityInitializer.java",
+    "ruoyi-generator/src/main/resources/vm/java/service.java.vm",
+    "ruoyi-generator/src/main/resources/vm/xml/mapper.xml.vm"
+  ],
+  "files": [
+    {
+      "path": "docs/legal/ruoyi-MIT-LICENSE.txt",
+      "sha256": "7296da00ac5dfc56c36e6ac10ce5abdb2900898c101d5c4720d7b6c1254dd993"
+    },
+    {
+      "path": "src/main/resources/codegen/upstream/VelocityInitializer.java.txt",
+      "sha256": "d454e46a38d7e1a0f244e4889be265a1390ecef570d28a85845cfd2e56c914c0"
+    },
+    {
+      "path": "src/main/resources/codegen/upstream/mapper.xml.vm",
+      "sha256": "d03f123db92c1fd395df07ec18b4fe5fdf6bb606c86c0bc563be662dc5c192fb"
+    },
+    {
+      "path": "src/main/resources/codegen/upstream/service.java.vm",
+      "sha256": "fd5003de24ce2915b35d142d4e31c3e3483edd33bd3acd433c39ae634d11b3dc"
+    },
+    {
+      "path": "src/main/resources/META-INF/licenses/ruoyi-MIT-LICENSE.txt",
+      "sha256": "7296da00ac5dfc56c36e6ac10ce5abdb2900898c101d5c4720d7b6c1254dd993"
+    }
+  ],
+  "adaptedFiles": [
+    "src/main/java/dev/mesbase/platform/codegen/RuoyiVelocityInitializer.java",
+    "src/main/resources/codegen/base/service.java.vm",
+    "src/main/resources/codegen/base/mapper.xml.vm"
+  ],
+  "companySourceCopied": false
+}

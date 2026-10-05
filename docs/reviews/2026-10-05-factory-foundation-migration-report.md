@@ -26,7 +26,7 @@
 
 ```text
 mes-base/
-├── pom.xml / .mvn/ / AGENTS.md / README.md
+├── pom.xml / AGENTS.md / README.md
 ├── src/main/java/dev/mesbase/
 │   ├── core/factory, core/security, core/error
 │   ├── platform/execution, platform/web
@@ -39,7 +39,7 @@ mes-base/
 └── docs/architecture/ + docs/reviews/
 ```
 
-55个主Java文件、7个测试Java文件。依赖与构建输出保存在项目内 `.m2/`、`target/`，由Git忽略；公开依赖仅从项目配置的 Maven Central 下载，不沿用公司仓库/凭证配置。Git已初始化main，尚无commit/push。
+55个主Java文件、7个测试Java文件。当前使用标准Maven和默认用户级依赖缓存；target保存在项目内并由Git忽略。初期曾为避免引入环境配置而创建项目内 `.m2/.mvn`，用户确认主动删除后已移除，不再生成；不复制公司仓库/凭证配置。Git已初始化main。本Agent未执行commit/push；末检期间观察到独立操作产生 `e7a4b35`（init）和 `5a3ebcc`（s）两个提交及origin配置，予以保留，不重置。
 
 Java使用本机 Amazon Corretto 21.0.4，Maven实际3.9.10。Spring官方当前Stable为4.1.1、兼容Java17–26，本轮因此选择4.1.1，并验证公开依赖可解析与Java21构建：[官方系统要求](https://docs.spring.io/spring-boot/system-requirements.html)。不沿用旧Java8/Boot2或RuoYi脚手架；MyBatis直接装配，无旧XML或动态数据源框架。
 
@@ -91,7 +91,9 @@ Java使用本机 Amazon Corretto 21.0.4，Maven实际3.9.10。Spring官方当前
 
 ## 6. 真实执行命令与结果
 
-命令工作目录全部为 `/Users/user/work/lixin/mes-base`；`JAVA_HOME`设置为上述Java21安装位置。临时JAR验证只启动本项目随机loopback端口并关闭自己的进程，不操作原服务。
+用户明确说明 `.m2/.mvn` 是主动删除的。已移除项目内依赖缓存、配置及临时构建包装，采用标准 `mvn -B -ntp verify`，依赖放Maven默认用户级仓库。下表历史 `-s .mvn/settings.xml` 命令是当时真实执行记录，不是当前使用说明；标准入口已按用户配置的交互式zsh环境复验：Maven3.9.10 / Java21.0.4，不覆盖JAVA_HOME、不使用自定义settings或本地缓存。普通非交互shell未加载该配置时曾提示JAVA_HOME无效，这是环境加载差异，未修改用户环境配置。
+
+命令工作目录全部为 `/Users/user/work/lixin/mes-base`；早期构建显式设置了Java21；最终构建遵照用户要求加载其正常交互式zsh配置，不覆盖环境变量。临时JAR验证只启动本项目随机loopback端口并关闭自己的进程，不操作原服务。
 
 | 执行 | passed | failed/error | 结果证据 |
 | --- | --- | --- | --- |
@@ -100,8 +102,9 @@ Java使用本机 Amazon Corretto 21.0.4，Maven实际3.9.10。Spring官方当前
 | 同命令（第一轮完整测试） | 39/50 | 3 failures + 8 errors | Mapper代理反射访问受包可见性阻挡；改为委托MyBatis InvocationHandler；`build-tests.log` |
 | 同命令（修复后） | 52/52 | 0/0 | `build-tests-fixed.log` |
 | `JAVA_HOME=<本机Java21> mvn -s .mvn/settings.xml -B -ntp verify` | 54/54 | 0/0 | 补输入/内部错误及池所有权负例；JAR打包成功；`verify.log` |
-| 同`verify`命令（最终） | **55/55** | **0/0** | 增补平台会话跨线程保护；`verify-final.log`、Surefire XML |
-| `MES_JAVA_BIN=<本机Java21/bin/java> python3 scripts/smoke-packaged.py`（最终） | **11/11** | **0** | `packaged-smoke.json`、`smoke-final.log`、default/demo进程日志 |
+| 同`verify`命令（早期最终实现） | 55/55 | 0/0 | 增补平台会话跨线程保护；`verify-final.log` |
+| `zsh -ic 'mvn -B -ntp verify'`（当前标准入口） | **55/55** | **0/0** | 用户配置环境，无变量覆盖/专有settings；`verify-user-env.log`、最终Surefire XML |
+| `zsh -ic 'python3 scripts/smoke-packaged.py'`（当前JAR） | **11/11** | **0** | `packaged-smoke.json`、`smoke-user-env.log`、default/demo进程日志 |
 
 测试计数来自本轮最终Surefire XML，不使用旧工程/审查测试通过数。
 
@@ -158,4 +161,4 @@ Java使用本机 Amazon Corretto 21.0.4，Maven实际3.9.10。Spring官方当前
 | `ADR-005-erp-integration-boundary.md` | ERP Port/连接分离及缺配置失败决策 | 仅未配置测试，无实际ERP调用 |
 | 本迁移报告及verification.json | 输入、执行、测试、状态、风险、后续建议 | 原始验证可定位；只实现新Foundation代码 |
 
-自检：没有空Maven module、不必要业务分层、匿名业务Map、Entity直接返回、吞异常伪造成功、单多厂分叉、默认业务库/默认首厂、无Scope全局缓存或供应商空实现。Map只用于内部注册/授权/索引；HTTP用明确DTO；SQL只出现在新合成测试Mapper；Scope与连接/ERP/用户隔离。未merge、cherry-pick、commit、push、部署或改旧工程。
+自检：没有空Maven module、不必要业务分层、匿名业务Map、Entity直接返回、吞异常伪造成功、单多厂分叉、默认业务库/默认首厂、无Scope全局缓存或供应商空实现。Map只用于内部注册/授权/索引；HTTP用明确DTO；SQL只出现在新合成测试Mapper；Scope与连接/ERP/用户隔离。本Agent未merge、cherry-pick、commit、push、部署或改旧工程；新仓库已存在的独立提交不视作本Agent执行。

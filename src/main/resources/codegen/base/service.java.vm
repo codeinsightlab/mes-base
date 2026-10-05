@@ -1,0 +1,10 @@
+// MES-CODEGEN: adapted from RuoYi service.java.vm (MIT; docs/legal/ruoyi-MIT-LICENSE.txt).
+package ${packageName};
+/** ${functionName} 标准 CRUD。@author ${author} */
+public interface I${ClassName}Service {
+    ${ClassName}PageVo list(${scopeParam}${ClassName}QueryDto query);
+    ${ClassName}Vo detail(${scopeParam}${idType} id);
+    ${ClassName}Vo create(${scopeParam}${ClassName}CreateCommand input);
+    ${ClassName}Vo update(${scopeParam}${idType} id, ${ClassName}UpdateCommand input);
+    void delete(${scopeParam}${idType} id);
+}

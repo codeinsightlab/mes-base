@@ -1,0 +1,21 @@
+#!/bin/sh
+# Stable tool launcher. Inherited user JAVA_HOME/PATH and ordinary Maven configuration.
+set -eu
+ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
+JAR="$ROOT/target/mes-base-0.1.0-SNAPSHOT.jar"
+for arg in "$@"; do
+  if [ "$arg" = "--help" ]; then
+    printf '%s\n' 'mes-platform-admin --username=ACCOUNT [--migrate]; credentials and MES_BOOTSTRAP_PASSWORD via environment. Empty platform only.'
+    exit 0
+  fi
+done
+cd "$ROOT"
+if [ ! -f "$JAR" ] || [ -n "$(find src/main pom.xml -type f -newer "$JAR" -print -quit)" ]; then
+  mvn -B -ntp -DskipTests package >&2
+fi
+if [ -n "${JAVA_HOME:-}" ]; then JAVA_BIN="$JAVA_HOME/bin/java"; else JAVA_BIN=java; fi
+if [ -n "${MES_CODEGEN_DRIVER_CLASSPATH:-}" ]; then
+  exec "$JAVA_BIN" -Dloader.main=dev.mesbase.platform.management.PlatformAdminCli "-Dloader.path=$MES_CODEGEN_DRIVER_CLASSPATH" -cp "$JAR" org.springframework.boot.loader.launch.PropertiesLauncher "$@"
+else
+  exec "$JAVA_BIN" -Dloader.main=dev.mesbase.platform.management.PlatformAdminCli -cp "$JAR" org.springframework.boot.loader.launch.PropertiesLauncher "$@"
+fi

@@ -1,4 +1,4 @@
-# Factory Foundation 架构决策
+# MES Base 架构决策
 
 2026-10-05，状态 Accepted。本阶段仅基础能力，部署及生产验收另行进行。
 
@@ -12,4 +12,6 @@
 
 采用一个 Maven 工程与 package 边界，暂不拆模块或微服务。`server` 负责装配与 HTTP 协议；`core` 定义业务身份、范围与授权 Port；`platform` 是安全/错误/执行桥；`infrastructure` 实现本地目录、缓存键和 JDBC/MyBatis；`integration.erp` 定义独立 ERP Port。Core 不依赖这些实现。
 
-没有完整 IAM 管理、真实外部连接、业务事件、Quartz JobStore、同步业务或前端。ADR 的测试名称对应本轮执行的代码；具体通过数与限制见迁移报告。
+原 Factory 阶段的验收边界见既有报告；本轮新增 Platform 管理、身份会话、Quartz 管理与 Vue3 UI，见 ADR-006 和 Platform/Codegen 报告。仍无真实外部连接、MES 同步领域、持久化 Quartz 集群 JobStore 或生产验收。
+
+- [ADR-006 — Platform / Web Base 与来源](ADR-006-platform-and-web-base.md)

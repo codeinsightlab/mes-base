@@ -1,0 +1,296 @@
+{
+  "date": "2026-10-05",
+  "environment": "User zsh Java21 / Maven3.9.10; installed Node22; isolated H2 + embedded Tomcat + real browser",
+  "statuses": {
+    "PLATFORM_READY": "YES",
+    "CODEGEN_READY": "YES",
+    "SKILL_READY": "YES",
+    "MES_DOMAIN_READY": "NO"
+  },
+  "readinessMeaning": "Requested P0 local foundation / scaffold mechanism acceptance; not production deployment approval",
+  "backend": {
+    "command": "mvn -B -ntp verify",
+    "passed": 80,
+    "failed": 0,
+    "suites": [
+      {
+        "name": "dev.mesbase.ArchitectureBoundaryTest",
+        "tests": "3",
+        "failures": "0",
+        "errors": "0",
+        "skipped": "0"
+      },
+      {
+        "name": "dev.mesbase.AuthorizationPreferenceCacheTest",
+        "tests": "8",
+        "failures": "0",
+        "errors": "0",
+        "skipped": "0"
+      },
+      {
+        "name": "dev.mesbase.CodegenAcceptanceTest",
+        "tests": "6",
+        "failures": "0",
+        "errors": "0",
+        "skipped": "0"
+      },
+      {
+        "name": "dev.mesbase.DedicatedDatabasePersistenceTest",
+        "tests": "20",
+        "failures": "0",
+        "errors": "0",
+        "skipped": "0"
+      },
+      {
+        "name": "dev.mesbase.ExecutionScopeTest",
+        "tests": "6",
+        "failures": "0",
+        "errors": "0",
+        "skipped": "0"
+      },
+      {
+        "name": "dev.mesbase.FactoryScopeTest",
+        "tests": "5",
+        "failures": "0",
+        "errors": "0",
+        "skipped": "0"
+      },
+      {
+        "name": "dev.mesbase.FoundationHttpTest",
+        "tests": "13",
+        "failures": "0",
+        "errors": "0",
+        "skipped": "0"
+      },
+      {
+        "name": "dev.mesbase.PlatformHttpTest",
+        "tests": "6",
+        "failures": "0",
+        "errors": "0",
+        "skipped": "0"
+      },
+      {
+        "name": "dev.mesbase.PlatformServiceTest",
+        "tests": "13",
+        "failures": "0",
+        "errors": "0",
+        "skipped": "0"
+      }
+    ]
+  },
+  "frontend": {
+    "command": "npm run test && npm run build",
+    "passed": 18,
+    "failed": 0,
+    "build": "PASSED; >500kB vendor chunk warning retained"
+  },
+  "packaged": {
+    "command": "/usr/bin/python3 scripts/smoke-packaged.py",
+    "passed": 11,
+    "failed": 0
+  },
+  "codegenCli": {
+    "command": "scripts/verify-codegen-fixture",
+    "testOnly": true,
+    "status": "PASSED",
+    "artifactCount": 16,
+    "table": "gen_demo_config",
+    "files": [
+      {
+        "target": "BACKEND",
+        "path": "/Users/user/work/lixin/mes-base/target/codegen-acceptance/backend/src/main/java/dev/mesbase/modules/testonly/GenDemoConfigEntity.java",
+        "sha256": "aaa6b8032e85acd14b0804c011050587412eca85a83481c221a5eaff3ffee84f"
+      },
+      {
+        "target": "BACKEND",
+        "path": "/Users/user/work/lixin/mes-base/target/codegen-acceptance/backend/src/main/java/dev/mesbase/modules/testonly/GenDemoConfigCreateCommand.java",
+        "sha256": "608a2039c88e71754a0d22041663fda872cc7e7193bc4051efa470b0a26a0b16"
+      },
+      {
+        "target": "BACKEND",
+        "path": "/Users/user/work/lixin/mes-base/target/codegen-acceptance/backend/src/main/java/dev/mesbase/modules/testonly/GenDemoConfigUpdateCommand.java",
+        "sha256": "97402d3915d1dc854c5ea0d9b44327a53bc54510b9250427736837edc96f3b94"
+      },
+      {
+        "target": "BACKEND",
+        "path": "/Users/user/work/lixin/mes-base/target/codegen-acceptance/backend/src/main/java/dev/mesbase/modules/testonly/GenDemoConfigVo.java",
+        "sha256": "6d3dba556ce1cce3635b647e4527735570770dd795e14cee8d873f3d857db2fa"
+      },
+      {
+        "target": "BACKEND",
+        "path": "/Users/user/work/lixin/mes-base/target/codegen-acceptance/backend/src/main/java/dev/mesbase/modules/testonly/GenDemoConfigPageVo.java",
+        "sha256": "205778545240a8455fcb8a0fcefacf3c4b2db39f9d70ec74c2f6085c63a7a36f"
+      },
+      {
+        "target": "BACKEND",
+        "path": "/Users/user/work/lixin/mes-base/target/codegen-acceptance/backend/src/main/java/dev/mesbase/modules/testonly/GenDemoConfigQueryDto.java",
+        "sha256": "ace46a1d34f3482b80f465b6c77a69987fa9dec74d432a008a508f75802a7a93"
+      },
+      {
+        "target": "BACKEND",
+        "path": "/Users/user/work/lixin/mes-base/target/codegen-acceptance/backend/src/main/java/dev/mesbase/modules/testonly/GenDemoConfigPermissions.java",
+        "sha256": "fb4c05da5dbbd86da8e4a469c25d60a022ee91b69803cc5431aea8c338622919"
+      },
+      {
+        "target": "BACKEND",
+        "path": "/Users/user/work/lixin/mes-base/target/codegen-acceptance/backend/src/main/java/dev/mesbase/modules/testonly/GenDemoConfigMapper.java",
+        "sha256": "23b1765b60599241fd5220b8c255f7d298ad2c0913aaa4911c6f7d540fd43af8"
+      },
+      {
+        "target": "BACKEND",
+        "path": "/Users/user/work/lixin/mes-base/target/codegen-acceptance/backend/src/main/resources/dev/mesbase/modules/testonly/GenDemoConfigMapper.xml",
+        "sha256": "3ad9836dfc20af7b80522fa234e1010d6798d28d72d9ae2041621488dfadf640"
+      },
+      {
+        "target": "BACKEND",
+        "path": "/Users/user/work/lixin/mes-base/target/codegen-acceptance/backend/src/main/java/dev/mesbase/modules/testonly/IGenDemoConfigService.java",
+        "sha256": "491dc0f694e7ce214e6c6278a04aa737450015ab55661be5367ce07711fff136"
+      },
+      {
+        "target": "BACKEND",
+        "path": "/Users/user/work/lixin/mes-base/target/codegen-acceptance/backend/src/main/java/dev/mesbase/modules/testonly/GenDemoConfigServiceImpl.java",
+        "sha256": "b083fd708754d88dd50efd26ee7d30ec58a97edad14276d715d4c9d7037d4d45"
+      },
+      {
+        "target": "BACKEND",
+        "path": "/Users/user/work/lixin/mes-base/target/codegen-acceptance/backend/src/main/java/dev/mesbase/modules/testonly/GenDemoConfigController.java",
+        "sha256": "9f79f9839c3579738f8a185971f3e47e44ce75cffdca07c9a122ec06eda665ac"
+      },
+      {
+        "target": "FRONTEND",
+        "path": "/Users/user/work/lixin/mes-base-ui/target/codegen-acceptance/frontend/src/api/testonly/genDemoConfig.ts",
+        "sha256": "1e8ecde28674febe5993c5d005db334f7ae8383fe76b38213551d050dbdebfe4"
+      },
+      {
+        "target": "FRONTEND",
+        "path": "/Users/user/work/lixin/mes-base-ui/target/codegen-acceptance/frontend/src/views/testonly/genDemoConfig/index.vue",
+        "sha256": "4c5d449bc5f46c64504050b8fac7b2a6234e9b7b2f6af29355644e01dc055a3a"
+      },
+      {
+        "target": "PERMISSION",
+        "path": "/Users/user/work/lixin/mes-base/target/codegen-acceptance/backend/docs/generated/testonly/genDemoConfig-permissions.md",
+        "sha256": "f1272ebbaf8210b1433419918e410bbf8c9be1fbbe97b590fe60bc7df709f894"
+      },
+      {
+        "target": "BACKEND",
+        "path": "/Users/user/work/lixin/mes-base/target/codegen-acceptance/backend/src/test/java/dev/mesbase/modules/testonly/GenDemoConfigScaffoldTest.java",
+        "sha256": "d854e11e2e370d9db31be783a5ff48b6431089b5d730638b71f7c3c84d691182"
+      }
+    ],
+    "postprocessedFiles": [
+      {
+        "path": "/Users/user/work/lixin/mes-base/target/codegen-acceptance/backend/src/main/java/dev/mesbase/modules/testonly/GenDemoConfigServiceImpl.java",
+        "generatedSha256": "b083fd708754d88dd50efd26ee7d30ec58a97edad14276d715d4c9d7037d4d45",
+        "postprocessedSha256": "ca25f9e50bc4094ab235838aff51b26e8e1d4987b7c7b1325cbfc47c9c7c5f86"
+      },
+      {
+        "path": "/Users/user/work/lixin/mes-base-ui/target/codegen-acceptance/frontend/src/views/testonly/genDemoConfig/index.vue",
+        "generatedSha256": "4c5d449bc5f46c64504050b8fac7b2a6234e9b7b2f6af29355644e01dc055a3a",
+        "postprocessedSha256": "ff63b3372f1da5c424ee59653c3a29a865eb19d289e379eec2ad180e1bdf75d8"
+      }
+    ],
+    "extraPostprocessFile": "target/codegen-acceptance/backend/src/main/java/dev/mesbase/modules/testonly/GenDemoConfigStatus.java"
+  },
+  "codegenHttp": {
+    "testOnly": true,
+    "passed": 21,
+    "failed": 0,
+    "boundary": "loopback synthetic H2; real generated Controller + Platform authentication"
+  },
+  "skill": {
+    "command": "PYTHONPATH=<temporary-PyYAML> /usr/bin/python3 <skill-creator>/scripts/quick_validate.py .agents/skills/mes-crud-codegen",
+    "result": "Skill is valid!"
+  },
+  "browser": {
+    "status": "PASSED",
+    "flows": [
+      "reader login and A menu",
+      "generated create/edit/filter/reset",
+      "decimal string precision",
+      "delete cancel and confirm",
+      "B permission error with no rows/write buttons",
+      "admin menus/user page/dictionary create/edit/delete",
+      "1440 desktop and 390 mobile; mobile bodyWidth=390"
+    ],
+    "evidenceDir": "docs/reviews/assets/2026-10-05-platform-codegen"
+  },
+  "notVerified": [
+    "real PostgreSQL/MySQL",
+    "production credentials/catalog/runtime",
+    "deployment",
+    "Quartz clustered durable scheduling",
+    "Shared DB runtime",
+    "actual ERP/MES domain"
+  ],
+  "sourceManifest": "docs/legal/ruoyi-source-manifest.json",
+  "companyCodeCopied": false,
+  "oldRepositoriesModified": false,
+  "gitCommitPushDeployment": false,
+  "packagedLicense": "META-INF/licenses/ruoyi-MIT-LICENSE.txt",
+  "packagedArtifactInspection": "PASS: exact upstream MIT, no TEST ONLY server/module/H2",
+  "completionAudit": {
+    "date": "2026-10-05",
+    "scope": "Current delivery, artifact integrity and workspace/runtime closure; not a fresh full acceptance run",
+    "functionalLocalAcceptanceComplete": true,
+    "workspaceClean": false,
+    "versionControlClosed": false,
+    "runtimeClean": true,
+    "freshChecks": [
+      "Skill quick_validate PASSED",
+      "git diff --check PASSED",
+      "16 generated artifact hashes including recorded postprocess hashes PASS",
+      "JAR test-only/H2 exclusion and packaged license PASS",
+      "source/build timestamp consistency PASS",
+      "task process and temporary staging inspection PASS"
+    ],
+    "priorAcceptanceEvidence": {
+      "backend": {
+        "tests": 80,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "frontend": {
+        "passed": 18,
+        "failed": 0,
+        "build": "PASSED"
+      },
+      "codegenHttp": {
+        "passed": 21,
+        "failed": 0
+      },
+      "packaged": {
+        "passed": 11,
+        "failed": 0
+      },
+      "fullSuitesRerunInAudit": false
+    },
+    "backendGit": {
+      "branch": "main",
+      "trackedModifiedPaths": 13,
+      "untrackedFiles": 66,
+      "containsPreexistingChanges": true,
+      "commitPushPerformed": false
+    },
+    "frontendGit": {
+      "path": "/Users/user/work/lixin/mes-base-ui",
+      "isGitRepository": false
+    },
+    "temporaryArtifacts": {
+      "mesPythonHelpersInPrivateTmp": 34,
+      "includesPriorTaskHelpers": true,
+      "upstreamDownloadCacheExists": true,
+      "skillValidatorTempDependenciesExist": true,
+      "deletedInAudit": false
+    },
+    "documentationDiscrepancy": {
+      "path": "/Users/user/work/lixin/mes-base-ui/README.md",
+      "line": 17,
+      "finding": "Manual router registration instruction is stale; authorized menus now register matching compiled components dynamically",
+      "fixedInAudit": false
+    },
+    "projectMavenDirectoriesRestored": false,
+    "businessCodeModifiedInAudit": false,
+    "outcome": "LOCAL_FUNCTIONAL_ACCEPTANCE_COMPLETE; HANDOFF_CLEANUP_PENDING"
+  }
+}

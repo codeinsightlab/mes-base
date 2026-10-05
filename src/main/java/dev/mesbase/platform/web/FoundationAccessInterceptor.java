@@ -11,8 +11,10 @@ import dev.mesbase.core.security.*;
 import dev.mesbase.core.error.*;
 import dev.mesbase.platform.execution.FactoryContext;
 public final class FoundationAccessInterceptor implements HandlerInterceptor {
+    private final dev.mesbase.platform.security.PlatformAuthorization platformAuthorization;
     private final FactorySelectionService selection; private final AuthorizationService authorization;
-    public FoundationAccessInterceptor(FactorySelectionService selection,AuthorizationService authorization) { this.selection=selection; this.authorization=authorization; }
+    public FoundationAccessInterceptor(FactorySelectionService selection,AuthorizationService authorization) { this(selection,authorization,(actor,permission)->false); }
+    public FoundationAccessInterceptor(FactorySelectionService selection,AuthorizationService authorization,dev.mesbase.platform.security.PlatformAuthorization platformAuthorization) {this.selection=selection;this.authorization=authorization;this.platformAuthorization=platformAuthorization;}
     public boolean preHandle(HttpServletRequest request,HttpServletResponse response,Object handler) {
         if(!(handler instanceof HandlerMethod method)) throw new FoundationException(ErrorCode.NOT_FOUND);
         EndpointAccess access=EndpointCatalog.required(method);
@@ -24,9 +26,15 @@ public final class FoundationAccessInterceptor implements HandlerInterceptor {
         Optional<FactoryId> requested;
         try { requested=explicit==null ? Optional.empty() : Optional.of(new FactoryId(explicit)); }
         catch(IllegalArgumentException failure) { throw new FoundationException(ErrorCode.BAD_REQUEST,failure); }
-        var scope=selection.resolve(actor,requested);
+        var scope=access.permissionScope()==EndpointAccess.PermissionScope.PLATFORM && explicit==null
+            ? Optional.<FactoryScope>empty() : selection.resolve(actor,requested);
         scope.ifPresent(FactoryContext::bind);
-        if(access.value()==EndpointAccess.Kind.AUTHORIZED && !authorization.hasPermission(actor,FactoryContext.required(),new Permission(access.permission()))) throw new FoundationException(ErrorCode.FORBIDDEN);
+        if(access.value()==EndpointAccess.Kind.AUTHORIZED) {
+            boolean allowed=access.permissionScope()==EndpointAccess.PermissionScope.PLATFORM
+                ? platformAuthorization.hasPermission(actor,new Permission(access.permission()))
+                : authorization.hasPermission(actor,FactoryContext.required(),new Permission(access.permission()));
+            if(!allowed) throw new FoundationException(ErrorCode.FORBIDDEN);
+        }
         return true;
     }
 }
