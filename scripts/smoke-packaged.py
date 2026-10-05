@@ -28,7 +28,7 @@ def run(profile):
     password = secrets.token_urlsafe(24)
     if profile == "demo":
         environment["MES_DEMO_PASSWORD"] = password
-    command = [JAVA, "-jar", str(JAR), "--server.port=0", "--server.address=127.0.0.1", "--spring.config.location=classpath:/application.properties", "--spring.profiles.active=" + (profile or "default")]
+    command = [JAVA, "-jar", str(JAR), "--server.port=0", "--server.address=127.0.0.1", "--spring.config.location=classpath:/application.yml", "--spring.profiles.active=" + (profile or "default")]
     logfile = OUT / ("packaged-" + (profile or "default") + ".log")
     with logfile.open("w") as stream:
         process = subprocess.Popen(command, cwd=ROOT, env=environment, stdout=stream, stderr=subprocess.STDOUT)

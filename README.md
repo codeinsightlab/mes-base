@@ -69,5 +69,6 @@ Demo 有 A/B 两个合成 Factory，账号 `visitor` 没有角色，账号 `read
 - [Codegen CLI、metadata、生成与接入](docs/development/codegen.md)
 - [mes-crud-codegen Skill](.agents/skills/mes-crud-codegen/SKILL.md)
 - [本轮迁移与验收报告](docs/reviews/2026-10-05-platform-codegen-foundation-report.md)
+- [下一阶段规划与新会话交接](docs/development/next-stage-plan.md)
 
 标准 CRUD 从 AGENTS → Skill → `scripts/mes-codegen` 进入；生成后仍需 Scope/Permission/Resource/Domain/SQL/UI/测试审查。UI 位于相邻 `../mes-base-ui`，不是公司业务页面迁移。

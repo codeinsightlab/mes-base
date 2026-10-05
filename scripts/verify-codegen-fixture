@@ -17,7 +17,7 @@ for directory in [backend,frontend,classes]:
 with tempfile.TemporaryDirectory(prefix='mes-test-only-',dir='/private/tmp') as temp:
  temp=pathlib.Path(temp);database=temp/'business';h2jar=run([java,'-cp',cp,'dev.mesbase.TestOnlyCodegenFixture','--test-only','prepare',str(database)],cwd=ROOT,capture_output=True,text=True).stdout.strip().splitlines()[-1]
  env={k:v for k,v in os.environ.items() if not k.startswith(('MES_','SPRING_')) and k not in ('JAVA_TOOL_OPTIONS','JDK_JAVA_OPTIONS','_JAVA_OPTIONS')}
- env.update(MES_CODEGEN_URL='jdbc:h2:file:'+str(database),MES_CODEGEN_USER='sa',MES_CODEGEN_PASSWORD='',MES_CODEGEN_DEFAULT_DATASOURCE='dev',MES_CODEGEN_DRIVER_CLASSPATH=h2jar,SPRING_CONFIG_LOCATION='classpath:/application.properties')
+ env.update(MES_CODEGEN_URL='jdbc:h2:file:'+str(database),MES_CODEGEN_USER='sa',MES_CODEGEN_PASSWORD='',MES_CODEGEN_DEFAULT_DATASOURCE='dev',MES_CODEGEN_DRIVER_CLASSPATH=h2jar,SPRING_CONFIG_LOCATION='classpath:/application.yml')
  command=[str(ROOT/'scripts/mes-codegen'),'--table=gen_demo_config','--module=testonly','--business-name=合成配置（TEST ONLY）','--scope=FACTORY_SCOPED','--package=dev.mesbase.modules.testonly','--output='+str(backend),'--frontend-root='+str(frontend)]
  dry=run(command+['--dry-run'],cwd=ROOT,env=env,capture_output=True,text=True);manifest=json.loads(dry.stdout);assert manifest['status']=='DRY_RUN';assert not list(backend.rglob('*.java'));assert not list(frontend.rglob('*.vue'))
  emitted=run(command,cwd=ROOT,env=env,capture_output=True,text=True);manifest=json.loads(emitted.stdout);assert manifest['status']=='GENERATED';assert len(manifest['files'])==16

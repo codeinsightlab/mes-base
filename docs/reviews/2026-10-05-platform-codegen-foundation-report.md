@@ -172,3 +172,164 @@ FACTORY_SCOPED SQL 的 list/count/detail/update/delete 有 factory_id 条件，c
 待收尾事项：确定前端版本管理归属；审查并区分后端既有差异与本轮交付后再提交；修正UI路由说明；确认临时文件归属后清理。当前“检查”未授权本次创建Git仓库、commit/push或删除既有临时资料，因此本次仅更新本报告与verification。
 
 第8节真实数据库、部署、Quartz持久调度/崩溃恢复、Shared DB及正式MES领域等边界继续保留；它们不是本轮已验证能力。没有发现构建后业务源码继续变化、生成产物缺失或本任务服务仍在运行的证据。
+
+## 11. 下一阶段交接与Git状态更新（2026-10-05）
+
+用户要求将下一阶段规划写入文件，由新会话依据文档继续工作。执行入口见[下一阶段规划与新会话交接](../development/next-stage-plan.md)，包含环境约定、最少阅读顺序、P0-A收尾、P0-B真实开发数据库与可信运行时装配、P0-C生成闭环、后续领域路线、验收门槛和可直接粘贴的新会话指令。
+
+本次写文档前再次核对：后端`main`/`975a9df4687f882bf251ca09bfb242015d33beff`、前端`main`/`18e372c2e6da0c6ab9738d562f99bf0d5bf3c6ca`，两端`git status --short`均为空，前端已成为Git仓库。因此第10节“后端未提交、前端无Git”是已被后续本地提交取代的历史状态，不再作为当前阻碍；本次未创建仓库、提交或推送，远端和部署状态未核对。
+
+临时资料/路由说明与生产能力限制仍需按新会话实时状态核对。本次仅新增规划、更新README入口及报告/verification交接记录，未修改业务代码，未重跑功能验收，未启动服务或执行下一阶段实施。
+
+
+## 12. P0-A 收尾与 P0-B 独立差距分析（2026-10-05）
+
+### 实时基线及 P0-A 结果
+
+后端 `main` / `975a9df4687f882bf251ca09bfb242015d33beff`，前端 `main` / `18e372c2e6da0c6ab9738d562f99bf0d5bf3c6ca`。执行 `pwd`、`git status --short`、`git branch --show-current`、`git rev-parse HEAD`：前端干净；后端既有 README、报告、verification 修改及未跟踪 next-stage-plan，全部保留，仅追加本轮证据。第10节旧 Git 状态继续作为历史快照。
+
+已修正 UI README 的手工路由说明，并澄清 ADR-006：工具不创建菜单/授权、不修改 router；运行期 `src/router.ts:7` 的 `import.meta.glob` 产生 catalog，`src/lib/dynamicRoutes.ts:4` 根据授权菜单匹配两级已编译组件，先撤销旧路由再安装新路由。平台页面由已有固定路由处理。生成工具成功不等于可访问或有权限。
+
+进程检查使用 `ps -axo pid=,comm=` 与候选 Java/Node 的 `lsof -a -p <pid> -d cwd -Fn`，避免输出命令参数或凭证。没有发现以两端仓库为 cwd 的 Java/Vite 应用；backend cwd 的 Node 为 ChatGPT CUA 工具。该检查不能证明其他 cwd 启动的服务不存在，因此没有按端口/PID管理任何既有服务。
+
+临时清单逐项保存在 verification.nextStageExecution.p0a.temporaryHelpers（路径、UID、大小、SHA256、路径引用）。34 个脚本属于当前用户 UID501，但 UID/前缀不能证明创建任务：其中 mes-migration-schema-preflight.py 引用旧 ktg-mes，mes-migration-read-aggregates.py 没有 Base 路径引用，mes-final-report-write.py 同时引用 Base/旧 MES。其余主要引用 Base。这只是静态归属线索，不执行辅助脚本、不打开旧仓库。两个缓存目录 mes-codegen-upstream / mes-skill-validator 均存在。全部保留；用户未授权删除。target/dist/node_modules 继续保留作为忽略产物，不能充当已提交源码证据。
+
+P0-A 通过，临时资料处置为保留。业务代码未修改。必要检查：
+
+| 实际命令 | 结果与边界 |
+| --- | --- |
+| 两端 pwd / git status --short / git branch --show-current / git rev-parse HEAD | PASS，以上实时基线 |
+| zsh -ic 'java -version && mvn -version' | PASS，Corretto21.0.4 / Maven3.9.10；安装目录名称为3.6.1不代表版本 |
+| zsh -ic 'nvm use 22 >/dev/null && node -v && npm run test -- src/lib/dynamicRoutes.test.ts'（UI） | PASS，Node22.23.1，1 test / 0 failed；验证匹配编译组件及撤销，不是浏览器验收 |
+
+没有业务代码变化，未重跑完整后端 verify、UI test/build 或 packaged smoke。原80/18/21/11项为此前 H2 合成验收，不计成本轮真实数据库证据。
+
+### P0-B 源码差距及可审查装配方案
+
+状态：差距分析完成，真实开发环境待确认，P0-B 未通过；P0-C 尚未执行。没有连接数据库、启动/停止服务或安装数据库。
+
+| 调用链/能力 | 当前源码事实 | 下一步最小实施边界 |
+| --- | --- | --- |
+| 登录→选厂→当前厂权限 | Platform 开启后身份/授权由 PlatformService/SessionService 持久化；Foundation FactoryCatalog 默认空，偏好内存 | 受控配置装配目录，保留无 UserFactory 准入；无需新增厂管理 CRUD/偏好表 |
+| FactoryScope→resolver→Binding→Registry→Dedicated transaction→Owned Mapper | resolver 映射、Registry 默认空；已具备 owner/version/事务固定/无兜底能力 | 显式开发配置适配器只负责可信目录、Binding、独立池装配，复用原持久化实现 |
+| 物理隔离 | Registry 校验 identity owner、revision、池对象，无法识别不同 URL/identity 实际指向同一物理库（ADR-002已记录） | Platform/A/B 三个独立数据库；实际 catalog/schema 与权限负例验证，不能用 identity 名称当物理隔离证明 |
+| Mapper ownership | 注册时要求 BUSINESS，未知 Mapper 不可取 | 从代码中固定可信名单或类型化注册 Port 获取 Mapper，禁止配置 Class.forName/包扫描；TEST ONLY Mapper 留 src/test/target |
+| 数据源生命周期 | Registry 已支持租约排空与 close，Platform 池由 Spring close | 构造失败关闭已建池；全部装配验证完成后发布，不提供热加载/管理 API；关闭只作用本轮自有资源 |
+| 迁移与驱动 | JAR 有 PostgreSQL/Flyway PostgreSQL 模块；V1 clean DDL 在 H2验收；只含内部 catalog revision 初值，无客户seed | 真实确认目标方言后执行首次/重复迁移、重启、约束及管理员重复初始化拒绝；不重写已应用 V1 |
+| Codegen profile | dev profile 独立于 Factory Runtime；双引号与 LIMIT/OFFSET | P0-B通过后按 Skill、真实 metadata 和16文件 manifest验收，不能由 JDBC 连接成功推导SQL兼容 |
+
+建议方案（未实施）：若用户确认 PostgreSQL，使用专用本地实例中的 Platform、Business A、Business B 独立数据库及最小权限账号；loopback 新端口，连接值只放受控环境/忽略配置，不写日志、报告、CLI参数。启动时校验显式厂ID、状态、datasource identity/revision、重复厂/绑定、物理库标识以及可信Mapper；先准备并验证所有独立池，再生成 resolver/registry；任何装配失败整体关闭新资源并失败启动，不回退默认或 Platform。目录按配置重建，偏好重启丢失应显式说明；UI token刷新重新登录仍是原契约。默认环境保持空目录/无业务连接，demo不被开发装配隐式覆盖。此方案不增加 Factory CRUD、连接管理平台、Shared、ERP、正式MES模块。
+
+真实验收待执行：平台迁移/约束/首次管理员/重启数据；角色菜单字典配置、私有文件、注册heartbeat；A/B同ID与业务键、未知/禁用厂、缺Scope/绑定/Mapper、版本冲突、401/403、平台管理员无厂权及配置/日志凭证审查。持久化和UI证据须在真实引擎上的合成开发数据取得，禁止回退H2后标为通过。
+
+集中缺失信息已询问：引擎及版本；专用实例来源/安全配置位置；是否授权创建数据库及启动停止本轮自有DB/后端/UI；独立库/端口/持久卷生命周期。未回答前不操作数据库或用户服务。P0-C依赖P0-B验收，不提前生成正式模块。
+
+
+## 13. 用户纠正迁移目标：RuoYi 三个模块前后端（2026-10-05）
+
+本节依据用户当前明确要求，覆盖第2节与ADR-006对通用 Department/Post/Notice/Online/Monitor 的阶段性 DROP。目标调整为截图中的系统管理、系统监控、系统工具三个完整功能分组，前后端均需交付，再根据实际持久化模型形成DDL并本地启动。公司专有业务、Shared DB、ERP、集群调度仍不在范围；既有 Factory Foundation 和安全模型保留。能力迁移允许按 Vue3/当前平台契约适配，不以恢复旧框架/Redis权限快照/Druid/反射Job为验收要求。
+
+### 官方清单及当前缺口
+
+官方基线为原来源清单中的固定提交 `13db1fcef36bee9ce45d2d636a1d4e8f5ed5bbc3`。本轮通过 GitHub API 读取完整 tree（truncated=false）与 `sql/ry_20260417.sql` 菜单定义；仅用作功能清单证据，未执行或复制其建表/INSERT/账号/角色数据。该固定提交目录不含 ruoyi-ui，前端实现基线需按其官方独立前端来源进一步核实，不能声称已经获取或迁移上游UI。
+
+| 分组 | 功能 | 后端现状 | 前端现状 | 待完成 |
+| --- | --- | --- | --- | --- |
+| 系统管理 | 用户/角色/菜单 | CRUD、密码重置、用户角色/角色菜单授权、PLATFORM/FACTORY独立权限 | 通用管理页与授权/重置操作 | 原版操作级差异待逐项审核；当前不具备完整组织关系、查询/导入导出等功能，不能写成完整迁移 |
+| 系统管理 | 部门/岗位 | 未实现 | 未实现 | 部门树、岗位、受控用户关联及对应页面；组织不授予Factory准入 |
+| 系统管理 | 字典/参数 | CRUD、范围配置、缓存版本 | 管理页 | 完整查询/操作级对照与真实数据库验收 |
+| 系统管理 | 通知公告 | 未实现 | 未实现 | 发布状态/内容展示/管理与资源权限 |
+| 系统管理 | 操作日志/登录日志 | 安全审计与分页读取 | 只读管理页 | 查询、详情、允许的清理/导出能力及权限逐项对照 |
+| 系统监控 | 在线用户 | DB会话存在，但无在线会话管理API | 未实现 | 分页展示安全会话信息、强制注销；严禁暴露token/hash，在线口径必须说明 |
+| 系统监控 | 定时任务 | 注册handler、CRUD/启停/手工执行及执行日志 | 已有任务页/执行按钮/日志页 | 查询及完整任务交互对照；不开放任意反射或提前做集群调度 |
+| 系统监控 | 数据监控/服务监控 | 未实现监控接口 | 未实现 | 基于现有Hikari/真实JVM与OS指标实现等价能力，不把静态样例称实测；敏感URL/SQL/凭证不输出 |
+| 系统监控 | 缓存监控/缓存列表 | 有字典/配置缓存，无监控管理API | 未实现 | 查看实际应用缓存与受控失效；当前没有Redis，不能伪造Redis监控数据，也不为复刻页面自动引入Redis |
+| 系统工具 | 表单构建 | 未实现 | 未实现 | Vue3表单设计、预览和导出，明确是否保存设计及其Schema |
+| 系统工具 | 代码生成 | 已有真实metadata/Service/CLI/16文件产物 | 缺代码生成管理页 | 受控开发profile、表/列配置、预览/生成UI；不接受任意连接或生产路径，由同一Codegen Service执行 |
+| 系统工具 | 系统接口 | 无接口文档页面/契约端点 | 未实现 | 受授权的当前真实API文档与交互，不展示测试或不存在的接口 |
+| 分组导航 | 三个顶层入口 | bootstrap为平铺管理菜单 | shell已支持菜单树，尚未配置三个功能分组 | 随真实已实现功能登记三个目录，不用空页面充当完整迁移 |
+
+源码检查入口：PlatformController / PlatformService / JobService / SessionService / PlatformBootstrap，UI src/lib/platform.ts / views/PlatformPage.vue，CodegenCli / MesCodegenService。以上为源码事实；原80项后端/18项前端/H2/浏览器证据仍只证明此前局部底座。
+
+### DDL与运行边界
+
+现有唯一已实现平台DDL为 `src/main/resources/db/platform/V1__platform.sql`，共15张平台表：sys_user、sys_role、sys_menu、sys_dict_type、sys_dict_data、sys_config、sys_job、sys_oper_log、sys_logininfor、sys_job_log、sys_file、sys_session、sys_user_role、sys_role_menu、platform_catalog_revision。它不包含部门、岗位、公告、生成配置等待实现表，不称为三模块完整DDL。监控快照不必建持久表，表单构建若只预览/导出同样不必造表。后续表由实际模型与选定方言形成增量迁移；不导入官方seed，不改写可能已应用的V1。
+
+先确认隔离数据库环境后，对适合标准CRUD的新增表执行 mes-crud-codegen Skill；部门树/主体关系/敏感生成执行需要受控设计，不能把模型削成普通CRUD以通过工具。完成三模块代码、增量DDL、平台迁移/首次管理员/权限菜单，再用用户Java21/Maven和已安装Node22跑必要门禁与真实浏览器，使用独立端口启动自有服务，不操作未知既有服务。
+
+环境观察：PATH有MySQL客户端；command -v docker / psql 未发现对应命令（不代表磁盘不存在或服务未安装）。尚未确认引擎/实例/凭证，未连接数据库、未启动应用。本轮已集中询问目标隔离DB；数据库确定前可以继续源码差距与契约设计，不能完成真实metadata生成或声称run成功。
+
+命令证据：GitHub API tree与contents读取成功；raw.githubusercontent.com读取SQL出现curl(35) Connection reset，按环境权限重试仍失败，改用官方GitHub contents API成功。未执行下载SQL。两端基线与此前一致，保留已有文档差异。当前仅新增范围纠正与事实报告，未完成新功能迁移。
+
+
+## 14. 指定MySQL测试库与YAML dev/prod装配（2026-10-05）
+
+### 授权及当前运行事实
+
+用户明确提供其MySQL测试实例连接并授权直接创建SQL；后续要求环境参数尽量使用YAML、dev/prod profiles，拒绝把环境清单写在Java配置类。连接验证得到MySQL Community Server 8.0.40，连接使用TLS。没有查询或更改实例其他业务库、用户数据、客户Schema；仅创建本轮独立开发库与专用数据库账号，应用不使用root。
+
+本轮独立库（CHARACTER SET utf8mb4 / COLLATE utf8mb4_bin）：
+
+- `mes_base_dev_20261005_572b2e_platform`（platform）
+- `mes_base_dev_20261005_572b2e_a`（a）
+- `mes_base_dev_20261005_572b2e_b`（b）
+
+建库DDL在自有忽略目录 `target/local-dev/create-databases.sql`；账号只被授予以上三个库的权限。既有 `db/platform/V1__platform.sql` 在独立Platform库通过Flyway首次和重复迁移，没有重写V1；15张平台表与Flyway历史表已建立。还没有部门/岗位/公告等新增模块表，因此不能称三个RuoYi模块完整DDL。
+
+当前服务：本轮后端pid55129，loopback18080，前端Vite loopback15173（自有exec session62279）。UI `http://127.0.0.1:15173` / backend `/health`返回200；开发UI代理显式指向18080。浏览器实际显示登录页，未在本轮重新执行登录后的完整页面CRUD矩阵。服务保留供用户本地查看，停止仅限这两个本轮服务；root不是应用账号。首次平台管理员`dev-admin`已建立，随机合成登录资料在 `target/local-dev/login.json`（0600），不输出密码。
+
+### 配置与代码变更
+
+- `application.properties`迁为`application.yml`；新增`application-dev.yml`/`application-prod.yml`，默认dev。prod要求外部平台URL/账号/密码/文件根，默认不迁移、不带测试连接、无默认账号/业务库。
+- 连接、Factory清单/启用状态、identity/revision、端口、Pool参数、文件根、会话TTL、上传上限、Codegen profiles都在YAML。受控本地连接在忽略的`target/local-dev/application-local.yml`（0600），旧的本轮properties配置已移除。示例 `config/application-runtime.example.yml`仅环境占位符。
+- 删除本轮临时的LocalDevelopmentConfiguration设计，改为通用FactoryRuntimeConfiguration：只根据`mes.runtime.enabled`绑定YAML/构造对象/校验所有者与物理库/关闭池，不用Java profile类定义环境。现阶段物理库探测为MySQL（server_uuid + database）；并未声称PostgreSQL Runtime同等验收。
+- 默认空目录/空resolver/空registry仍保持；Runtime显式开启才装配，必须同时启用Platform，拒绝与demo混用。显式可信BusinessMapperRegistration由代码提供，YAML不能提供class名或包扫描。保留无UserFactory准入、无Scope/绑定/版本/Mapper回退与既有Foundation事务规则。偏好仍内存，重启不承诺持久化。
+- pom加入MySQL JDBC/Flyway MySQL模块；TableMetadata增加受控identifierQuote，JdbcMetadataReader从真实driver取值，Renderer使用MySQL反引号或H2/PostgreSQL双引号，保留参数化SQL。实际16文件MySQL manifest/render通过；真实生成CRUD SQL/UI完整执行仍属P0-C未验收。
+- 启动脚本 `scripts/run-local-backend` 使用用户Java环境与显式外部YAML；fixture/smoke入口同步改为application.yml。前端Vite支持受控loopback代理目标；未改变全局Node。
+
+Factory/Codegen/persistence改动可用Git逐文件回滚；独立开发库/账号/私有文件没有删除，数据库回滚须明确只针对本轮资源，不能把源码回滚当数据恢复。仓库已有README/报告/verification/计划修改保留；过程中发现DefaultMesCodegenService出现本Agent未执行的格式变更，按并行用户编辑保留，未覆盖或声称本轮实现。
+
+### 实际验证与失败修正
+
+| 实际命令/动作 | 最终结果 | 证据边界 |
+| --- | --- | --- |
+| nc -vz -w 5 <用户测试host> 3306；mysql受控defaults-extra-file读取VERSION/TLS并创建独立库 | PASS，MySQL8.0.40 | 真实指定测试实例，仅自有开发库；不是生产验收 |
+| zsh -ic 'mvn -B -ntp verify -Dmes.test.mysql.config=target/local-dev/application-local.yml' | PASS，83 tests，0 failures/errors/skipped | 80既有测试 + 3 opt-in真实MySQL测试；真实迁移/重复迁移/重连约束、A/B同ID/回滚/错误物理绑定/缺Scope/绑定/Mapper、真实metadata/16产物 |
+| UI zsh -ic 'nvm use 22 >/dev/null && npm run test && npm run build' | PASS，18 tests/build | 配置迁移相关回归；保留>500KB chunk提示，不等于三模块页面验收 |
+| zsh -ic '/usr/bin/python3 scripts/smoke-packaged.py' | PASS，11 checks | 最终JAR、loopback default/demo合成HTTP；无生产/真实业务SQL |
+| /usr/bin/python3 target/local-dev/verify-live-http.py | PASS，47 checks | 本地实际JAR→真实MySQL合成开发数据；身份/空角色/选厂/403/撤权/A-B/平台无厂权、角色菜单/字典配置/日志/两种heartbeat/私有文件owner与scope |
+| 后端停止本轮pid并重新启动 + restart script | PASS，3 checks | 重登后配置marker/私有文件持久化，YAML重建A/B目录；偏好不宣称持久化 |
+| zsh -ic '/usr/bin/python3 target/local-dev/verify-config-profile.py' | PASS，3 checks | prod缺外部连接失败；JAR只含三份YAML入口；无废弃local-dev类；没有连接生产 |
+| 两端 git diff --check；受控凭证与docs/日志扫描 | PASS | 密码未写源码/文档/日志，连接/login文件0600；不提供全集环境输出 |
+
+失败与修正：首次Maven被沙箱拒绝写用户现有缓存，审批后使用同一用户缓存成功，没有项目.m2/.mvn/mirror。首轮新增生成测试因macOS临时路径符号链接触发INVALID_REQUEST，改toRealPath。第二轮生成测试因最大1连接被建表连接占用而Hikari超时，先释放建表连接再生成，最终通过。启动现场曾误用尚未包含Runtime的新旧交界JAR（pid49438），该进程已明确停止；随后新Runtime JAR启动/重启通过。YAML迁移后发现target/classes残留旧application.properties进入JAR，精确移除废弃产物后重建，最终JAR检查确认无properties。交互zsh的oh-my-zsh缓存/zcompdump/nice出现沙箱权限提示，Java/Maven/Node命令仍按用户配置正常执行；未修改用户shell配置。
+
+本轮保留合成重启marker配置、admin私有TEST_ONLY文件及安全审计/Job日志作为持久化证据；临时角色/菜单/reader/字典已由验收脚本删除，MySQL测试probe表已由测试清理。没有删除原34个辅助脚本或缓存目录。临时受控验收脚本在自有target中，非正式MES模块，不在生产JAR。
+
+### 工作包状态与未完成边界
+
+P0-B核心真实引擎装配与平台闭环已通过以上验收；禁用厂/运行版本替换/并发完整矩阵仍主要沿用既有Dedicated/Foundation测试，没有全量重跑真实MySQL所有变体。P0-C仅完成MySQLmetadata/引号/16文件基础验证，未运行稳定CLI到真实生成Controller/CRUD SQL/完整浏览器闭环，保持未通过。三个RuoYi通用模块缺项仍按第13节推进，未标记完整迁移；没有新增正式MES领域、Shared、ERP或集群调度，没有提交/推送/部署。
+
+
+## 15. 用户指出字段迁移偏差：官方Schema与Base重建Schema（2026-10-05）
+
+用户询问为何字段没有按RuoYi迁移。此次只读对照官方固定提交的sql/ry_20260417.sql（此前通过官方GitHub API读取）与当前V1__platform.sql；没有修改代码或数据库。
+
+核对结论：现有平台并非保留原字段/语义的RuoYi迁移，而是重建通用职责的简化Schema。官方sys_user有user_id/dept_id/user_name/nick_name/email/phonenumber/sex/avatar/password/status/del_flag/login_ip/login_date/pwd_update_date/create_by/create_time/update_by/update_time/remark等；Base仅id/username/display_name/password_hash/status/created_at。sys_role由role_id/role_name/role_key/role_sort/data_scope等变为id/name/kind/factory_id/status。sys_menu由menu_id/menu_name/component/menu_type/visible/perms/icon等变为id/parent_id/name/path/permission/sort_order/kind。sys_config、sys_job同样改名并删减多项官方字段。不是只替换技术栈或增加Factory范围。
+
+此前ADR与报告记录了REWRITE，但对用户的“迁移RuoYi”目标没有充分解释“重写并简化表结构”的具体后果；不能因底座已运行就认定符合完整迁移期望。Spring/Jakarta/Vue3升级和显式Factory安全适配不能自动证明原用户/菜单/组织/审计字段可删除；禁止复制公司数据/配置也不等于禁止依法复用官方Schema。
+
+纠偏方向：以官方三模块字段与功能语义为对照基线，逐字段标注保留/必要适配/新增及其理由，恢复此前未有充分依据的删减；FactoryScope、平台/厂权限、显式Mapper ownership继续保留，不恢复魔法管理员/任意反射Job/生产seed。此方向尚未实施；已应用V1不重写，数据库重建或破坏性变更需要明确处置范围，优先后续增量迁移。当前测试证明运行和安全边界，不证明官方字段/功能完整迁移。此前P0-B通过仅指简化Base底座的真实引擎装配。
+
+
+## 16. 原项目确认、结构核对与用户暂停（2026-10-05）
+
+用户提供原项目 `/Users/user/work/heri/ktg-mes`，只读核对时 Git master/HEAD `310c6ef1bb37d2533fe893579ba837c353b76926`、工作区干净。其 `sql/ry_20210908.sql` 含17张sys表。已核实官方固定版本 `13db1fcef36bee9ce45d2d636a1d4e8f5ed5bbc3` 的18张sys表包括通知已读表；差异列见 `docs/legal/ruoyi-schema-manifest.json`。原项目Java8/Druid1.2.8；该官方固定版本实际上Boot4.1.0/Druid1.2.28，不能以“官方仍为Boot2/javax”作为简化重写的理由。前述Boot2判断只适用于旧ktg项目。
+
+实际新增：`sql/ruoyi/sys-schema.sql`逐条保留官方CREATE TABLE结构，18表182字段，无DROP/INSERT；来源、哈希及原项目字段比较记录在schema manifest。已在指定远程测试MySQL的独立 `mes_base_dev_20261005_572b2e_ruoyi` 库执行，metadata字段名称/顺序完全一致、各表零行。未覆盖旧V1，未切换应用；这只是结构核对，不是完整迁移或前后端闭环。实际命令 `python3 target/local-dev/verify-ruoyi-schema.py`，结果在同目录 `ruoyi-schema-verification.json`。
+
+Druid改动：Platform/Factory Runtime/管理员CLI接入Druid1.2.28；连接池参数读取 `spring.datasource.druid` YAML，Hikari只保留test scope。新文件 `server/DruidPools.java` 负责属性校验/对象装配/关闭，环境值仍为YAML。原项目Druid master/slave/erp/hr/wms及默认MASTER回退未复制；stat/wall过滤器与监控页面尚未实现，其他有效配置尚未完整迁移。旧环境连接、账号和客户业务值未复制到Base。
+
+本包实际测试 `zsh -ic 'mvn -B -ntp verify -Dmes.test.mysql.config=target/local-dev/application-local.yml'`：83项，失败0/错误0/跳过0，包含真实MySQL Factory Druid连接测试。首次编译失败：管理员CLI仍引用Hikari；将CLI一起接入Druid后通过。首次字段核对断言失败：manifest解析漏识别longblob类型notice_content；DDL原字段未丢失，修正manifest为182列后核对通过。已启动本包packaged smoke，最终结果按verification记录。未重复UI测试（本包无UI代码修改），未完成Druid前后端监控、正式模型/Mapper/API改造、原配置全量有效性核对或P0-C闭环。
+
+用户明确要求暂停并在新任务继续：停止新增实现、数据库写入和服务切换；现有18080/15173查看服务未重启，因此仍为前包版本。所有未提交改动、隔离库及旧临时资料保留；没有提交/推送/部署。用户未接受本轮迁移结果，不将当前产物标记为“完整RuoYi迁移”或验收通过。新任务应从用户完整迁移目标重新确认实施路线，而非沿用最小能力重写作为终态。

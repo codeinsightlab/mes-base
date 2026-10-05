@@ -292,5 +292,1114 @@
     "projectMavenDirectoriesRestored": false,
     "businessCodeModifiedInAudit": false,
     "outcome": "LOCAL_FUNCTIONAL_ACCEPTANCE_COMPLETE; HANDOFF_CLEANUP_PENDING"
+  },
+  "handoffSnapshot": {
+    "date": "2026-10-05",
+    "plan": "docs/development/next-stage-plan.md",
+    "stateCheckedBeforeDocumentationEdit": {
+      "backend": {
+        "path": "/Users/user/work/lixin/mes-base",
+        "branch": "main",
+        "head": "975a9df4687f882bf251ca09bfb242015d33beff",
+        "worktreeClean": true
+      },
+      "frontend": {
+        "path": "/Users/user/work/lixin/mes-base-ui",
+        "branch": "main",
+        "head": "18e372c2e6da0c6ab9738d562f99bf0d5bf3c6ca",
+        "isGitRepository": true,
+        "worktreeClean": true
+      }
+    },
+    "supersedesHistoricalAuditFields": [
+      "completionAudit.backendGit trackedModifiedPaths/untrackedFiles as current blockers",
+      "completionAudit.frontendGit.isGitRepository as current status"
+    ],
+    "nextWork": "P0-A current closure check, then P0-B isolated real development DB/runtime and P0-C real-engine Codegen loop",
+    "targetDatabaseConfirmed": false,
+    "nextStageExecuted": false,
+    "businessCodeModified": false,
+    "servicesStarted": false,
+    "commitPushDeploymentPerformed": false,
+    "remoteDeploymentStatusVerified": false,
+    "verificationInThisHandoff": "Git state and documentation consistency only; existing functional test evidence was not rerun"
+  },
+  "nextStageExecution": {
+    "date": "2026-10-05",
+    "evidenceLevel": "STATIC_AND_TARGETED_UNIT_TEST",
+    "baseline": {
+      "backend": {
+        "branch": "main",
+        "head": "975a9df4687f882bf251ca09bfb242015d33beff",
+        "preexistingModified": [
+          "README.md",
+          "docs/reviews/2026-10-05-platform-codegen-foundation-report.md",
+          "docs/reviews/2026-10-05-platform-codegen-verification.json"
+        ],
+        "preexistingUntracked": [
+          "docs/development/next-stage-plan.md"
+        ]
+      },
+      "frontend": {
+        "branch": "main",
+        "head": "18e372c2e6da0c6ab9738d562f99bf0d5bf3c6ca",
+        "initiallyClean": true
+      }
+    },
+    "p0a": {
+      "status": "PASSED_WITH_RETAINED_TEMPORARY_ARTIFACTS",
+      "routerDocumentationCorrected": true,
+      "temporaryHelpers": [
+        {
+          "path": "/private/tmp/mes-codegen-cli.py",
+          "ownerUid": 501,
+          "bytes": 8481,
+          "sha256": "1c37d563cebd6a9692c90a22e87ec223c7230a5eca7302333542a758bced738c",
+          "pathReferences": [
+            "mes-base",
+            "mes-base-ui"
+          ],
+          "disposition": "RETAINED; creator and deletion authority not established"
+        },
+        {
+          "path": "/private/tmp/mes-codegen-fixes.py",
+          "ownerUid": 501,
+          "bytes": 2051,
+          "sha256": "5c5384935faab75bc8dbea639ed654e79d96bc3404c829e591fa0ecf1b9b8213",
+          "pathReferences": [
+            "mes-base"
+          ],
+          "disposition": "RETAINED; creator and deletion authority not established"
+        },
+        {
+          "path": "/private/tmp/mes-codegen-http-write.py",
+          "ownerUid": 501,
+          "bytes": 3467,
+          "sha256": "697a8506c16c15318e192905b5ffcbd2ddae7ac2cf8fe45a49042c4d44ac7e0f",
+          "pathReferences": [
+            "mes-base"
+          ],
+          "disposition": "RETAINED; creator and deletion authority not established"
+        },
+        {
+          "path": "/private/tmp/mes-codegen-renderer.py",
+          "ownerUid": 501,
+          "bytes": 21860,
+          "sha256": "6f3ce531e3dc1d15b17b3e9e7a40c5415d99dc1b58b192f6b42a8825da750332",
+          "pathReferences": [
+            "mes-base"
+          ],
+          "disposition": "RETAINED; creator and deletion authority not established"
+        },
+        {
+          "path": "/private/tmp/mes-codegen-tests-write.py",
+          "ownerUid": 501,
+          "bytes": 13416,
+          "sha256": "96dd1d34a604a961b01ee7304c2c71aa6c7c6ad289ef11a70e63ad387e825f03",
+          "pathReferences": [
+            "mes-base"
+          ],
+          "disposition": "RETAINED; creator and deletion authority not established"
+        },
+        {
+          "path": "/private/tmp/mes-codegen-write.py",
+          "ownerUid": 501,
+          "bytes": 17134,
+          "sha256": "3ab653ef0913345463cba4ee572811a54ba3df109e45f8026e32148fa6641442",
+          "pathReferences": [
+            "mes-base"
+          ],
+          "disposition": "RETAINED; creator and deletion authority not established"
+        },
+        {
+          "path": "/private/tmp/mes-delivery-finalize.py",
+          "ownerUid": 501,
+          "bytes": 1958,
+          "sha256": "961fe668318a8ec7e1a834eeeee18c7595f38f09ab3e64e1f33c0408d0bf922a",
+          "pathReferences": [
+            "mes-base"
+          ],
+          "disposition": "RETAINED; creator and deletion authority not established"
+        },
+        {
+          "path": "/private/tmp/mes-docs-skill-write.py",
+          "ownerUid": 501,
+          "bytes": 26248,
+          "sha256": "0241e2d7e9dbeef2f848ce72945208ecb87272bbd0fbafca3370e64564f05cef",
+          "pathReferences": [
+            "mes-base",
+            "mes-base-ui",
+            "agents"
+          ],
+          "disposition": "RETAINED; creator and deletion authority not established"
+        },
+        {
+          "path": "/private/tmp/mes-final-acceptance.py",
+          "ownerUid": 501,
+          "bytes": 5187,
+          "sha256": "d17b71b5019104efb9d83b8f51a46caef1a0ff6ca1cb8c4e14bda8de2c3a422d",
+          "pathReferences": [
+            "mes-base",
+            "mes-base-ui"
+          ],
+          "disposition": "RETAINED; creator and deletion authority not established"
+        },
+        {
+          "path": "/private/tmp/mes-final-archive.py",
+          "ownerUid": 501,
+          "bytes": 843,
+          "sha256": "db16c0a32acc4a3d12dc52758b56d1d9ab095a2c8eaafbfb03f8cf5c42cd733c",
+          "pathReferences": [
+            "mes-base"
+          ],
+          "disposition": "RETAINED; creator and deletion authority not established"
+        },
+        {
+          "path": "/private/tmp/mes-final-functional.py",
+          "ownerUid": 501,
+          "bytes": 6687,
+          "sha256": "d7241f0e7edba9810396c12ae66a07a1fec099d55832e41f717d3ac1ea18cbe7",
+          "pathReferences": [
+            "mes-base",
+            "mes-base-ui"
+          ],
+          "disposition": "RETAINED; creator and deletion authority not established"
+        },
+        {
+          "path": "/private/tmp/mes-final-job-proof.py",
+          "ownerUid": 501,
+          "bytes": 1334,
+          "sha256": "76b2de33510a8339765d8c1f8c5265bfb5fc685328e86cc10f4e055cf290f7cb",
+          "pathReferences": [
+            "mes-base"
+          ],
+          "disposition": "RETAINED; creator and deletion authority not established"
+        },
+        {
+          "path": "/private/tmp/mes-final-minor.py",
+          "ownerUid": 501,
+          "bytes": 847,
+          "sha256": "455954eec42d9ca17119abe1ba275558faa73f20d812d217bc5ec0ca0cd52d1e",
+          "pathReferences": [
+            "mes-base",
+            "mes-base-ui"
+          ],
+          "disposition": "RETAINED; creator and deletion authority not established"
+        },
+        {
+          "path": "/private/tmp/mes-final-report-write.py",
+          "ownerUid": 501,
+          "bytes": 26964,
+          "sha256": "36c08690eb453ec6789bc47a4db86e89277a9f23b8af438dc73a76913833c835",
+          "pathReferences": [
+            "mes-base",
+            "mes-base-ui",
+            "ktg-mes",
+            "agents"
+          ],
+          "disposition": "RETAINED; creator and deletion authority not established"
+        },
+        {
+          "path": "/private/tmp/mes-fixture-write.py",
+          "ownerUid": 501,
+          "bytes": 13845,
+          "sha256": "1698f147eba54e59b299e839d6d75501874927fb551930b176c3eab748512392",
+          "pathReferences": [
+            "mes-base",
+            "mes-base-ui"
+          ],
+          "disposition": "RETAINED; creator and deletion authority not established"
+        },
+        {
+          "path": "/private/tmp/mes-launcher-fix.py",
+          "ownerUid": 501,
+          "bytes": 1874,
+          "sha256": "0b4559a87aca309bbe9783ab9c546cd603529c884a1597618c685cfe8470932b",
+          "pathReferences": [
+            "mes-base"
+          ],
+          "disposition": "RETAINED; creator and deletion authority not established"
+        },
+        {
+          "path": "/private/tmp/mes-migration-read-aggregates.py",
+          "ownerUid": 501,
+          "bytes": 1234,
+          "sha256": "52e3be13ac3e5dd27f6cdf32f9e8e789b2a31bd4bf20a9e074a51f9390df83eb",
+          "pathReferences": [],
+          "disposition": "RETAINED; creator and deletion authority not established"
+        },
+        {
+          "path": "/private/tmp/mes-migration-schema-preflight.py",
+          "ownerUid": 501,
+          "bytes": 3137,
+          "sha256": "0c7f9cc14ea73580ab41cedb6e35d98b66ec6ab3bfab26fda9deaaa2a5fbbe26",
+          "pathReferences": [
+            "ktg-mes"
+          ],
+          "disposition": "RETAINED; creator and deletion authority not established"
+        },
+        {
+          "path": "/private/tmp/mes-platform-bootstrap.py",
+          "ownerUid": 501,
+          "bytes": 10050,
+          "sha256": "f7dd6be3fb31d28425b39abc9800fc16d16122032f741c6236d8ff04ca6be921",
+          "pathReferences": [
+            "mes-base"
+          ],
+          "disposition": "RETAINED; creator and deletion authority not established"
+        },
+        {
+          "path": "/private/tmp/mes-platform-fix.py",
+          "ownerUid": 501,
+          "bytes": 4964,
+          "sha256": "e2ce806a751d47149b85187e637bc09902b3094084eb574a9515268970a9216e",
+          "pathReferences": [
+            "mes-base"
+          ],
+          "disposition": "RETAINED; creator and deletion authority not established"
+        },
+        {
+          "path": "/private/tmp/mes-platform-fix3.py",
+          "ownerUid": 501,
+          "bytes": 1423,
+          "sha256": "d78ad41f284580ced2589f5caae42ad1ad534d2ccd446978cb7933a324e7d8b8",
+          "pathReferences": [
+            "mes-base"
+          ],
+          "disposition": "RETAINED; creator and deletion authority not established"
+        },
+        {
+          "path": "/private/tmp/mes-platform-fix4.py",
+          "ownerUid": 501,
+          "bytes": 2138,
+          "sha256": "cae82e951771256eaad6beef5f2b6fbc5d0a74a6019702b7bd577945f2102f0c",
+          "pathReferences": [
+            "mes-base"
+          ],
+          "disposition": "RETAINED; creator and deletion authority not established"
+        },
+        {
+          "path": "/private/tmp/mes-platform-http-tests.py",
+          "ownerUid": 501,
+          "bytes": 7538,
+          "sha256": "11f832f0a294a7d45e5f417030162301d934e3e915704388dfb43663857f2628",
+          "pathReferences": [
+            "mes-base"
+          ],
+          "disposition": "RETAINED; creator and deletion authority not established"
+        },
+        {
+          "path": "/private/tmp/mes-platform-next.py",
+          "ownerUid": 501,
+          "bytes": 28642,
+          "sha256": "c268f1c7bef81e8e7d32d95f3748761ab4e2b0f8dd9ac075c3011244cba02cdf",
+          "pathReferences": [
+            "mes-base"
+          ],
+          "disposition": "RETAINED; creator and deletion authority not established"
+        },
+        {
+          "path": "/private/tmp/mes-platform-registration.py",
+          "ownerUid": 501,
+          "bytes": 4278,
+          "sha256": "3b6327f7a6b6a8b8011a668b587c6fd7e24fc8e32f12b1160eed8b7479d2ad7e",
+          "pathReferences": [
+            "mes-base"
+          ],
+          "disposition": "RETAINED; creator and deletion authority not established"
+        },
+        {
+          "path": "/private/tmp/mes-platform-tests-write.py",
+          "ownerUid": 501,
+          "bytes": 12694,
+          "sha256": "22797a80442b5c03cb97e0394cb51bc512890c4d9277be4c3ab9e5b0939aa1c9",
+          "pathReferences": [
+            "mes-base"
+          ],
+          "disposition": "RETAINED; creator and deletion authority not established"
+        },
+        {
+          "path": "/private/tmp/mes-platform-ui-contract.py",
+          "ownerUid": 501,
+          "bytes": 5507,
+          "sha256": "d9e7b45cc18178122d0c20912a0c28c5d8014b5c0210c0024a262655272ff4d4",
+          "pathReferences": [
+            "mes-base"
+          ],
+          "disposition": "RETAINED; creator and deletion authority not established"
+        },
+        {
+          "path": "/private/tmp/mes-platform-ui-finish.py",
+          "ownerUid": 501,
+          "bytes": 4754,
+          "sha256": "33db1c2199476e99d13fa30d3432a6387cc58f19b551cd95781e81670ceb0a4f",
+          "pathReferences": [
+            "mes-base",
+            "mes-base-ui"
+          ],
+          "disposition": "RETAINED; creator and deletion authority not established"
+        },
+        {
+          "path": "/private/tmp/mes-platform-write.py",
+          "ownerUid": 501,
+          "bytes": 35328,
+          "sha256": "dfa8a15f828f69b4f4bde363071afdb2a5ee469badb4f637a1ef443620d71f51",
+          "pathReferences": [
+            "mes-base"
+          ],
+          "disposition": "RETAINED; creator and deletion authority not established"
+        },
+        {
+          "path": "/private/tmp/mes-ruoyi-engine-adapt.py",
+          "ownerUid": 501,
+          "bytes": 7458,
+          "sha256": "c97038b0bccb97e6cf93929cd60296bed71d87e7d404c775e98c515817063970",
+          "pathReferences": [
+            "mes-base"
+          ],
+          "disposition": "RETAINED; creator and deletion authority not established"
+        },
+        {
+          "path": "/private/tmp/mes-task-fix.py",
+          "ownerUid": 501,
+          "bytes": 1472,
+          "sha256": "b89d2ff7e4ddfa0992270982cecc087f4ebd36650e49b41d0a5f60535c391539",
+          "pathReferences": [
+            "mes-base",
+            "mes-base-ui"
+          ],
+          "disposition": "RETAINED; creator and deletion authority not established"
+        },
+        {
+          "path": "/private/tmp/mes-task-fix2.py",
+          "ownerUid": 501,
+          "bytes": 2202,
+          "sha256": "f39011e0c2a7adb77d7376c05af364038b0415a55c9684e3f87c94936f3b2d61",
+          "pathReferences": [
+            "mes-base"
+          ],
+          "disposition": "RETAINED; creator and deletion authority not established"
+        },
+        {
+          "path": "/private/tmp/mes-ui-tests.py",
+          "ownerUid": 501,
+          "bytes": 8574,
+          "sha256": "71d06c4b3c6f10ba462fa4537d793029ff97c4cb73b29059fe9f31bc5fbfa41f",
+          "pathReferences": [
+            "mes-base",
+            "mes-base-ui"
+          ],
+          "disposition": "RETAINED; creator and deletion authority not established"
+        },
+        {
+          "path": "/private/tmp/mes-ui-write.py",
+          "ownerUid": 501,
+          "bytes": 38670,
+          "sha256": "7a39ab6e14681e4cecfeb39fa185df0a6b66534ab2265f592cc7d106a5d8e990",
+          "pathReferences": [
+            "mes-base",
+            "mes-base-ui"
+          ],
+          "disposition": "RETAINED; creator and deletion authority not established"
+        }
+      ],
+      "retainedDirectories": [
+        "/private/tmp/mes-codegen-upstream",
+        "/private/tmp/mes-skill-validator"
+      ],
+      "processCheck": "ps pid/comm + lsof cwd: no Java/Node application rooted in either repository; one CUA Node tool rooted in backend; does not prove absence of processes launched from other cwd",
+      "servicesStartedStopped": false
+    },
+    "checks": [
+      {
+        "command": "zsh -ic 'java -version && mvn -version'",
+        "status": "PASSED",
+        "java": "Corretto 21.0.4",
+        "maven": "3.9.10"
+      },
+      {
+        "command": "zsh -ic 'nvm use 22 >/dev/null && node -v && npm run test -- src/lib/dynamicRoutes.test.ts'",
+        "status": "PASSED",
+        "node": "22.23.1",
+        "passed": 1,
+        "failed": 0
+      }
+    ],
+    "p0b": {
+      "status": "GAP_ANALYSIS_COMPLETE_ENVIRONMENT_PENDING",
+      "realDatabaseConfirmed": false,
+      "runtimeAdapterImplemented": false
+    },
+    "p0c": {
+      "status": "NOT_RUN_DEPENDS_ON_P0_B",
+      "skillRequiredBeforeGeneration": true
+    },
+    "notRun": [
+      "full backend verify",
+      "full frontend test/build",
+      "packaged smoke",
+      "real DB migration/restart",
+      "real-engine HTTP/SQL/browser acceptance"
+    ],
+    "businessCodeModified": false,
+    "temporaryArtifactsDeleted": false,
+    "commitPushDeploymentPerformed": false
+  },
+  "ruoyiThreeModuleScope": {
+    "date": "2026-10-05",
+    "userRequested": [
+      "system management",
+      "system monitoring",
+      "system tools"
+    ],
+    "status": "CURRENT_STATE_AUDITED_IMPLEMENTATION_PENDING",
+    "officialCommit": "13db1fcef36bee9ce45d2d636a1d4e8f5ed5bbc3",
+    "officialMenuSqlPath": "sql/ry_20260417.sql",
+    "officialMenuSqlSha256": "09f26cb52f2768e87f3860200e54ca39a491c373b766ef7cf404c2683bd7ae0b",
+    "sourceSqlExecuted": false,
+    "sourceSeedCopied": false,
+    "currentPlatformTables": [
+      "sys_user",
+      "sys_role",
+      "sys_menu",
+      "sys_dict_type",
+      "sys_dict_data",
+      "sys_config",
+      "sys_job",
+      "sys_oper_log",
+      "sys_logininfor",
+      "sys_job_log",
+      "sys_file",
+      "sys_session",
+      "sys_user_role",
+      "sys_role_menu",
+      "platform_catalog_revision"
+    ],
+    "fullMigrationComplete": false,
+    "databaseConfirmed": false,
+    "localApplicationStarted": false,
+    "frontendSourceBaselineVerified": false
+  },
+  "mysqlYamlExecution": {
+    "date": "2026-10-05",
+    "engine": "MySQL 8.0.40",
+    "databases": {
+      "platform": "mes_base_dev_20261005_572b2e_platform",
+      "a": "mes_base_dev_20261005_572b2e_a",
+      "b": "mes_base_dev_20261005_572b2e_b"
+    },
+    "createdDedicatedDbUser": true,
+    "applicationUsesRoot": false,
+    "yamlProfiles": [
+      "dev",
+      "prod"
+    ],
+    "credentialFilesIgnoredAnd0600": true,
+    "backendVerify": {
+      "command": "mvn -B -ntp verify -Dmes.test.mysql.config=target/local-dev/application-local.yml",
+      "passed": 83,
+      "failed": 0,
+      "suites": [
+        {
+          "name": "dev.mesbase.ExecutionScopeTest",
+          "tests": "6",
+          "failures": "0",
+          "errors": "0",
+          "skipped": "0"
+        },
+        {
+          "name": "dev.mesbase.CodegenAcceptanceTest",
+          "tests": "6",
+          "failures": "0",
+          "errors": "0",
+          "skipped": "0"
+        },
+        {
+          "name": "dev.mesbase.PlatformHttpTest",
+          "tests": "6",
+          "failures": "0",
+          "errors": "0",
+          "skipped": "0"
+        },
+        {
+          "name": "dev.mesbase.FactoryScopeTest",
+          "tests": "5",
+          "failures": "0",
+          "errors": "0",
+          "skipped": "0"
+        },
+        {
+          "name": "dev.mesbase.MySqlDevelopmentTest",
+          "tests": "3",
+          "failures": "0",
+          "errors": "0",
+          "skipped": "0"
+        },
+        {
+          "name": "dev.mesbase.PlatformServiceTest",
+          "tests": "13",
+          "failures": "0",
+          "errors": "0",
+          "skipped": "0"
+        },
+        {
+          "name": "dev.mesbase.FoundationHttpTest",
+          "tests": "13",
+          "failures": "0",
+          "errors": "0",
+          "skipped": "0"
+        },
+        {
+          "name": "dev.mesbase.DedicatedDatabasePersistenceTest",
+          "tests": "20",
+          "failures": "0",
+          "errors": "0",
+          "skipped": "0"
+        },
+        {
+          "name": "dev.mesbase.AuthorizationPreferenceCacheTest",
+          "tests": "8",
+          "failures": "0",
+          "errors": "0",
+          "skipped": "0"
+        },
+        {
+          "name": "dev.mesbase.ArchitectureBoundaryTest",
+          "tests": "3",
+          "failures": "0",
+          "errors": "0",
+          "skipped": "0"
+        }
+      ]
+    },
+    "frontend": {
+      "testsPassed": 18,
+      "build": "PASS; existing chunk warning"
+    },
+    "packagedSmoke": {
+      "passed": 11,
+      "failed": 0
+    },
+    "realMysqlHttp": {
+      "boundary": "LOCAL_HTTP_REAL_MYSQL_SYNTHETIC_DEVELOPMENT_DATA",
+      "checks": [
+        {
+          "method": "POST",
+          "path": "/api/platform/session",
+          "expected": 200,
+          "actual": 200,
+          "passed": true
+        },
+        {
+          "method": "GET",
+          "path": "/api/foundation/factories",
+          "expected": 401,
+          "actual": 401,
+          "passed": true
+        },
+        {
+          "method": "GET",
+          "path": "/api/foundation/factories",
+          "expected": 200,
+          "actual": 200,
+          "passed": true
+        },
+        {
+          "method": "GET",
+          "path": "/api/foundation/access",
+          "expected": 403,
+          "actual": 403,
+          "passed": true
+        },
+        {
+          "method": "GET",
+          "path": "/api/foundation/context",
+          "expected": 404,
+          "actual": 404,
+          "passed": true
+        },
+        {
+          "method": "POST",
+          "path": "/api/platform/users",
+          "expected": 200,
+          "actual": 200,
+          "passed": true
+        },
+        {
+          "method": "POST",
+          "path": "/api/platform/session",
+          "expected": 200,
+          "actual": 200,
+          "passed": true
+        },
+        {
+          "method": "GET",
+          "path": "/api/foundation/factories",
+          "expected": 200,
+          "actual": 200,
+          "passed": true
+        },
+        {
+          "method": "PUT",
+          "path": "/api/foundation/preference",
+          "expected": 200,
+          "actual": 200,
+          "passed": true
+        },
+        {
+          "method": "GET",
+          "path": "/api/foundation/context",
+          "expected": 200,
+          "actual": 200,
+          "passed": true
+        },
+        {
+          "method": "GET",
+          "path": "/api/foundation/access",
+          "expected": 403,
+          "actual": 403,
+          "passed": true
+        },
+        {
+          "method": "GET",
+          "path": "/api/platform/users",
+          "expected": 403,
+          "actual": 403,
+          "passed": true
+        },
+        {
+          "method": "POST",
+          "path": "/api/platform/roles",
+          "expected": 200,
+          "actual": 200,
+          "passed": true
+        },
+        {
+          "method": "POST",
+          "path": "/api/platform/menus",
+          "expected": 200,
+          "actual": 200,
+          "passed": true
+        },
+        {
+          "method": "PUT",
+          "path": "/api/platform/roles/bc14a37d-5939-4fe0-b568-21a200e17962/menus",
+          "expected": 200,
+          "actual": 200,
+          "passed": true
+        },
+        {
+          "method": "PUT",
+          "path": "/api/platform/users/74441fc8-75ab-432b-9a16-b9f75790abb4/roles",
+          "expected": 200,
+          "actual": 200,
+          "passed": true
+        },
+        {
+          "method": "GET",
+          "path": "/api/foundation/access",
+          "expected": 200,
+          "actual": 200,
+          "passed": true
+        },
+        {
+          "method": "GET",
+          "path": "/api/foundation/access",
+          "expected": 403,
+          "actual": 403,
+          "passed": true
+        },
+        {
+          "method": "PUT",
+          "path": "/api/platform/roles/bc14a37d-5939-4fe0-b568-21a200e17962/menus",
+          "expected": 200,
+          "actual": 200,
+          "passed": true
+        },
+        {
+          "method": "GET",
+          "path": "/api/foundation/access",
+          "expected": 403,
+          "actual": 403,
+          "passed": true
+        },
+        {
+          "method": "GET",
+          "path": "/api/platform/navigation?scope=PLATFORM",
+          "expected": 200,
+          "actual": 200,
+          "passed": true
+        },
+        {
+          "method": "GET",
+          "path": "/api/platform/navigation?scope=FACTORY",
+          "expected": 200,
+          "actual": 200,
+          "passed": true
+        },
+        {
+          "method": "POST",
+          "path": "/api/platform/dict-types",
+          "expected": 200,
+          "actual": 200,
+          "passed": true
+        },
+        {
+          "method": "POST",
+          "path": "/api/platform/dict-data",
+          "expected": 200,
+          "actual": 200,
+          "passed": true
+        },
+        {
+          "method": "GET",
+          "path": "/api/platform/dictionary/dev_check_d3b73c",
+          "expected": 200,
+          "actual": 200,
+          "passed": true
+        },
+        {
+          "method": "POST",
+          "path": "/api/platform/configs",
+          "expected": 200,
+          "actual": 200,
+          "passed": true
+        },
+        {
+          "method": "GET",
+          "path": "/api/platform/config/dev.check.d3b73c",
+          "expected": 200,
+          "actual": 200,
+          "passed": true
+        },
+        {
+          "method": "POST",
+          "path": "/api/platform/jobs",
+          "expected": 200,
+          "actual": 200,
+          "passed": true
+        },
+        {
+          "method": "POST",
+          "path": "/api/platform/jobs/704bc15e-b7ad-4acb-9349-9fbe2fa59565/run",
+          "expected": 200,
+          "actual": 200,
+          "passed": true
+        },
+        {
+          "method": "DELETE",
+          "path": "/api/platform/jobs/704bc15e-b7ad-4acb-9349-9fbe2fa59565",
+          "expected": 200,
+          "actual": 200,
+          "passed": true
+        },
+        {
+          "method": "POST",
+          "path": "/api/platform/jobs",
+          "expected": 200,
+          "actual": 200,
+          "passed": true
+        },
+        {
+          "method": "POST",
+          "path": "/api/platform/jobs/4d09b774-8975-458a-993b-329c57a17529/run",
+          "expected": 200,
+          "actual": 200,
+          "passed": true
+        },
+        {
+          "method": "DELETE",
+          "path": "/api/platform/jobs/4d09b774-8975-458a-993b-329c57a17529",
+          "expected": 200,
+          "actual": 200,
+          "passed": true
+        },
+        {
+          "method": "GET",
+          "path": "/api/platform/audit",
+          "expected": 200,
+          "actual": 200,
+          "passed": true
+        },
+        {
+          "method": "GET",
+          "path": "/api/platform/login-logs",
+          "expected": 200,
+          "actual": 200,
+          "passed": true
+        },
+        {
+          "method": "GET",
+          "path": "/api/platform/job-logs",
+          "expected": 200,
+          "actual": 200,
+          "passed": true
+        },
+        {
+          "method": "POST",
+          "path": "/api/platform/files",
+          "expected": 200,
+          "actual": 200,
+          "passed": true
+        },
+        {
+          "method": "GET",
+          "path": "/api/platform/files/da9e369e-11a1-4182-a0bf-5cacab17498a/content?resource=personal",
+          "expected": 200,
+          "actual": 200,
+          "passed": true
+        },
+        {
+          "method": "GET",
+          "path": "/api/platform/files/da9e369e-11a1-4182-a0bf-5cacab17498a/content?resource=personal",
+          "expected": 404,
+          "actual": 404,
+          "passed": true
+        },
+        {
+          "method": "GET",
+          "path": "/api/platform/files/da9e369e-11a1-4182-a0bf-5cacab17498a/content?resource=personal",
+          "expected": 404,
+          "actual": 404,
+          "passed": true
+        },
+        {
+          "method": "DELETE",
+          "path": "/api/platform/dict-data/9b4638e8-1a1a-49a7-b73c-385273bdf40d",
+          "expected": 204,
+          "actual": 204,
+          "passed": true
+        },
+        {
+          "method": "DELETE",
+          "path": "/api/platform/dict-types/b0d97cfc-9176-4362-a834-b8e459a7959c",
+          "expected": 204,
+          "actual": 204,
+          "passed": true
+        },
+        {
+          "method": "PUT",
+          "path": "/api/platform/users/74441fc8-75ab-432b-9a16-b9f75790abb4/roles",
+          "expected": 200,
+          "actual": 200,
+          "passed": true
+        },
+        {
+          "method": "DELETE",
+          "path": "/api/platform/roles/bc14a37d-5939-4fe0-b568-21a200e17962",
+          "expected": 204,
+          "actual": 204,
+          "passed": true
+        },
+        {
+          "method": "DELETE",
+          "path": "/api/platform/menus/a901a4f2-bb62-4a47-9a5e-2e3033eef98c",
+          "expected": 204,
+          "actual": 204,
+          "passed": true
+        },
+        {
+          "method": "DELETE",
+          "path": "/api/platform/users/74441fc8-75ab-432b-9a16-b9f75790abb4",
+          "expected": 204,
+          "actual": 204,
+          "passed": true
+        },
+        {
+          "method": "GET",
+          "path": "/api/platform/me",
+          "expected": 401,
+          "actual": 401,
+          "passed": true
+        }
+      ],
+      "passed": 47,
+      "failed": 0,
+      "restartMarker": {
+        "configId": "38e268c6-2c21-4a81-81db-0719987244f6",
+        "configKey": "dev.check.d3b73c",
+        "fileId": "da9e369e-11a1-4182-a0bf-5cacab17498a"
+      },
+      "retainedTestData": [
+        "restart config marker",
+        "admin-owned TEST_ONLY private file",
+        "operation/login/job audit evidence"
+      ]
+    },
+    "restart": {
+      "passed": 3,
+      "failed": 0,
+      "boundary": "real MySQL re-login after backend restart; config/private file persisted; factories reloaded from YAML; in-memory preference not claimed durable"
+    },
+    "profile": {
+      "passed": 3,
+      "failed": 0,
+      "checks": [
+        "prod fails without external connection",
+        "only YAML application entrypoints packaged",
+        "obsolete local-dev configuration class absent"
+      ],
+      "productionConnected": false
+    },
+    "businessRuntimePhysicalCheck": "MySQL server_uuid/database; rejects Platform/A/B same physical database",
+    "p0b": "CORE_REAL_ENGINE_ACCEPTANCE_PASSED; full real-engine concurrency/version/disabled matrix not repeated",
+    "p0c": "METADATA_RENDER_ONLY; real generated CRUD SQL/HTTP/browser not yet accepted",
+    "ruoyiThreeModuleMigrationComplete": false,
+    "runningServices": {
+      "backendPid": 55129,
+      "backendPort": 18080,
+      "frontendExecSession": 62279,
+      "frontendPort": 15173,
+      "retainedForUserReview": true
+    },
+    "browser": "Local login page visually verified; logged-in CRUD matrix not repeated",
+    "failuresCorrected": [
+      "sandbox Maven cache permissions",
+      "macOS temporary directory symlink",
+      "test pool connection occupied",
+      "premature old JAR launch stopped",
+      "obsolete generated properties removed from final JAR"
+    ],
+    "preexistingTemporaryFilesDeleted": false,
+    "commitPushDeployment": false
+  },
+  "originalProjectPause": {
+    "status": "PAUSED_BY_USER",
+    "acceptedByUser": false,
+    "originalProject": "/Users/user/work/heri/ktg-mes",
+    "originalHead": "310c6ef1bb37d2533fe893579ba837c353b76926",
+    "originalReadOnly": true,
+    "ddl": "sql/ruoyi/sys-schema.sql",
+    "schemaManifest": "docs/legal/ruoyi-schema-manifest.json",
+    "schemaRealMysql": {
+      "engine": "real remote test MySQL",
+      "database": "mes_base_dev_20261005_572b2e_ruoyi",
+      "tables": 18,
+      "columns": 182,
+      "allColumnsMatchOfficialOrder": true,
+      "allTablesEmpty": true,
+      "activeApplicationSwitched": false,
+      "existingPlatformV1Modified": false
+    },
+    "maven": {
+      "command": "zsh -ic 'mvn -B -ntp verify -Dmes.test.mysql.config=target/local-dev/application-local.yml'",
+      "tests": 83,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "runningReviewServicesRebuilt": false,
+    "notVerified": [
+      "full RuoYi foundational code migration",
+      "Mapper/API on official schema",
+      "three modules complete UI",
+      "all effective original configuration",
+      "Druid stat/wall and monitor UI",
+      "P0-C full database codegen closure"
+    ],
+    "committed": false,
+    "pushed": false,
+    "deployed": false,
+    "packagedSmoke": {
+      "checks": [
+        {
+          "case": "packaging-excludes-test-entities-and-H2",
+          "passed": true
+        },
+        {
+          "profile": "default",
+          "path": "/health",
+          "actor": null,
+          "factory": null,
+          "expected": 200,
+          "actual": 200,
+          "passed": true
+        },
+        {
+          "profile": "default",
+          "path": "/api/foundation/context",
+          "actor": null,
+          "factory": null,
+          "expected": 401,
+          "actual": 401,
+          "passed": true
+        },
+        {
+          "profile": "demo",
+          "path": "/health",
+          "actor": null,
+          "factory": null,
+          "expected": 200,
+          "actual": 200,
+          "passed": true
+        },
+        {
+          "profile": "demo",
+          "path": "/api/foundation/context",
+          "actor": null,
+          "factory": null,
+          "expected": 401,
+          "actual": 401,
+          "passed": true
+        },
+        {
+          "profile": "demo",
+          "path": "/api/foundation/context",
+          "actor": "visitor",
+          "factory": "A",
+          "expected": 200,
+          "actual": 200,
+          "passed": true
+        },
+        {
+          "profile": "demo",
+          "path": "/api/foundation/context",
+          "actor": "visitor",
+          "factory": "B",
+          "expected": 200,
+          "actual": 200,
+          "passed": true
+        },
+        {
+          "profile": "demo",
+          "path": "/api/foundation/access",
+          "actor": "visitor",
+          "factory": "A",
+          "expected": 403,
+          "actual": 403,
+          "passed": true
+        },
+        {
+          "profile": "demo",
+          "path": "/api/foundation/access",
+          "actor": "reader",
+          "factory": "A",
+          "expected": 200,
+          "actual": 200,
+          "passed": true
+        },
+        {
+          "profile": "demo",
+          "path": "/api/foundation/access",
+          "actor": "reader",
+          "factory": "B",
+          "expected": 403,
+          "actual": 403,
+          "passed": true
+        },
+        {
+          "profile": "demo",
+          "path": "/api/foundation/erp/connection",
+          "actor": "reader",
+          "factory": "A",
+          "expected": 422,
+          "actual": 422,
+          "passed": true
+        }
+      ],
+      "passed": 11,
+      "failed": 0,
+      "boundary": "Local packaged Java process; loopback HTTP; synthetic demo accounts; no business JDBC or external ERP in this smoke"
+    }
   }
 }

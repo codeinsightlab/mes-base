@@ -1,6 +1,6 @@
 # Platform Foundation 操作边界
 
-2026-10-05。默认 disabled；Foundation 默认/demo 验收方式保持。显式 MES_PLATFORM_ENABLED=true、MES_PLATFORM_URL/USER/PASSWORD、MES_FILE_ROOT（私有绝对路径）；可选 MES_PLATFORM_MIGRATE=true 执行 clean Flyway。当前 PostgreSQL 驱动随 JAR，Schema 的真实验收在合成 H2；部署前需要目标 DB 联调，不读取公司库。FactoryCatalog / BusinessRuntimeBinding 的默认适配仍为空，需要受信任装配，不由 Platform CRUD 自动注册生产工厂/库。
+2026-10-05。默认 disabled；Foundation 默认/demo 验收方式保持。显式 MES_PLATFORM_ENABLED=true、MES_PLATFORM_URL/USER/PASSWORD、MES_FILE_ROOT（私有绝对路径）；可选 MES_PLATFORM_MIGRATE=true 执行 clean Flyway。当前 PostgreSQL 驱动随 JAR，此前Schema验收在合成H2，现已完成指定MySQL8.0.40独立开发库验收（报告第14节），仍非部署/生产验收。FactoryCatalog / BusinessRuntimeBinding 默认仍为空，显式开启Runtime从YAML受信任装配，不由 Platform CRUD 自动注册生产工厂/库。
 
 ## 首次管理员与登录
 平台空 Schema 不预置账号、角色、菜单。设置受控环境 MES_BOOTSTRAP_PASSWORD（不少于12字符），运行 `scripts/mes-platform-admin --username=<new-name> [--migrate]`；CLI 在平台库事务检查空用户表，首次建立 UUID 平台账号、显式 PLATFORM role 和当前平台管理菜单/权限，无 wildcard、无 factory grant、无 userId1 特权。重复执行拒绝；脚本不打印密码。
@@ -19,3 +19,14 @@ Quartz 管理持久化 Job 与日志，时间调度为内存 Quartz；任务来�
 审计记录 requestId/actorId/factoryId/executionScope/route pattern/result，不记录请求体/密码/token。业务成功与审计失败区分；本地事务与文件系统或外部效果不构成分布式事务。正式留存/清理、SSO/限流与目标部署验收按后续明确需求实施。
 
 UI 相邻 mes-base-ui，Node22，`npm ci && npm run test && npm run build`；本地 dev `/api` proxy 127.0.0.1:8080，不内置身份与业务库。授权菜单可注册已编译 CRUD 视图，不能从服务端任意 URL 导入模块。实际资源约束以后台为准。
+
+
+## YAML 与 dev/prod 配置（2026-10-05）
+
+主入口为 `src/main/resources/application.yml`；默认profile为dev，`application-dev.yml`仅配置本地环境行为，`application-prod.yml`由显式profile启用且要求外部提供平台连接/凭证/文件根。生产迁移默认关闭，不用dev连接兜底。两种profile都不会内置账号、工厂连接或默认业务库。
+
+端口、上传/会话边界、Platform/Business池参数、迁移开关与Codegen开发profile均在YAML。受控外部YAML用 `--spring.config.additional-location=file:/absolute/config.yml` 加载，连接凭证不进入仓库。Runtime列表结构见 `config/application-runtime.example.yml`；该示例只表达配置形状，无凭证。生产凭证通过环境或受控外部文件注入，不能将测试库写进application-prod.yml。
+
+`mes.runtime.enabled=true`时通过通用FactoryRuntime装配器读取YAML的`mes.runtime.factories`，沿用现有resolver/registry/persistence；Java只负责对象装配、pool关闭、物理库唯一性和Mapper ownership校验，不保存环境数据。现阶段物理库验证适配MySQL，不能据此称PostgreSQL Runtime已完成。开启Runtime必须同时启用Platform，不能与synthetic demo混用。可信Mapper由代码注册，不接受YAML中的任意class名/扫描包。
+
+当前本轮外部配置在忽略的`target/local-dev/application-local.yml`（0600），由 `zsh -ic 'scripts/run-local-backend'` 使用；必须先用用户Java21/Maven完成构建。该目录是开发运行资料，不可在准备验证前清空target；凭证需要重新建立时由用户提供受控来源。前端支持 `MES_DEV_API_TARGET=http://127.0.0.1:<backend-port>`，仅loopback，默认8080不变；本轮使用18080与15173，不触碰未知服务。

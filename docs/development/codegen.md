@@ -36,4 +36,9 @@ scripts/verify-codegen-fixture
 
 脚本创建自有临时 H2 metadata（无业务行），一条 CLI 自动放置 Base target 与 UI target，后处理合成状态枚举/中文状态/备注 textarea，再 javac 真实产物和测试骨架、vue-tsc/Vite 真实生成页。`--serve` 需显式合成 MES_TEST_ONLY_PASSWORD，可启动隔离 localhost 验收；不继承 MES_/SPRING_ 生产配置。TEST ONLY Server 与表不进 JAR。测试输出/manifest 在 target/codegen-acceptance 与 target/validation；使用示例不等于 MES 业务已迁入。
 
-现已验证 H2 合成库及 PostgreSQL 兼容 SQL 形状；未做真实 PostgreSQL/MySQL 联调。生成 SQL 当前双引号标识符与 LIMIT/OFFSET，其他方言需先适配并测试，不凭 JDBC 能连接就声明 CRUD 方言兼容。
+现已验证 H2 合成库及 PostgreSQL 兼容 SQL 形状；未做真实 PostgreSQL/MySQL 联调。生成 SQL 按 JDBC metadata 的 identifier quote 渲染（MySQL反引号、H2/PostgreSQL双引号），保留 LIMIT/OFFSET，其他方言需先适配并测试，不凭 JDBC 能连接就声明 CRUD 方言兼容。
+
+
+### YAML profile入口
+
+应用与CLI共享application.yml及dev/prod profiles；推荐外部配置 `--config=file:/absolute/developer.yml`。兼容已有properties开发文件，不强迫用户转换；仓库主配置与本轮受控连接已使用YAML。CLI仍独立于Factory Runtime，启动Codegen不创建池绑定或自动授予菜单/角色。
