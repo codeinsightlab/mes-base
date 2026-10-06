@@ -6,7 +6,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-/** Validates and records the interfaces discovered by the standard MyBatis-Spring scanner. */
+/**
+ * Validates and records the interfaces discovered by the standard MyBatis-Spring scanner.
+ */
 public final class OwnerMapperCatalog {
     private final Map<PersistenceOwner.Kind, Set<Class<?>>> groups = new EnumMap<>(PersistenceOwner.Kind.class);
     private final Set<String> names = new HashSet<>();

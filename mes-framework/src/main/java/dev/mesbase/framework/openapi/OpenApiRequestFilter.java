@@ -13,19 +13,31 @@ import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import dev.mesbase.platform.web.RequestBoundaryFilter;
 
-/** 在专用Security链的最外层覆盖成功、认证拒绝、限流和异常。 */
+/**
+ * 在专用Security链的最外层覆盖成功、认证拒绝、限流和异常。
+ */
 public class OpenApiRequestFilter extends OncePerRequestFilter {
     private static final Logger LOG = LoggerFactory.getLogger("openapi.access");
     private final OpenApiHttp http;
-    public OpenApiRequestFilter(OpenApiHttp http) { this.http = http; }
-    @Override protected boolean shouldNotFilter(HttpServletRequest request) { return !OpenApiHttp.isOpenApi(request); }
-    @Override protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain)
+
+    public OpenApiRequestFilter(OpenApiHttp http) {
+        this.http = http;
+    }
+
+    @Override
+    protected boolean shouldNotFilter(HttpServletRequest request) {
+        return !OpenApiHttp.isOpenApi(request);
+    }
+
+    @Override
+    protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain)
             throws ServletException, IOException {
         long started = System.currentTimeMillis();
         String requestId = RequestBoundaryFilter.requestId(request);
         String previous = MDC.get("requestId");
         request.setAttribute(OpenApiHttp.REQUEST_ID, requestId);
-        response.setHeader("X-Request-Id", requestId); response.setHeader("Cache-Control", "no-store");
+        response.setHeader("X-Request-Id", requestId);
+        response.setHeader("Cache-Control", "no-store");
         MDC.put("requestId", requestId);
         SecurityContextHolder.clearContext();
         try {
@@ -51,11 +63,15 @@ public class OpenApiRequestFilter extends OncePerRequestFilter {
                         safe(request.getRemoteAddr()), failureTrace(failure));
             } finally {
                 SecurityContextHolder.clearContext();
-                if (previous == null) MDC.remove("requestId"); else MDC.put("requestId", previous);
+                if (previous == null) MDC.remove("requestId");
+                else MDC.put("requestId", previous);
             }
         }
     }
-    /** 保留异常链类型和源码位置以定位问题，排除可能含SQL/凭证的异常message。 */
+
+    /**
+     * 保留异常链类型和源码位置以定位问题，排除可能含SQL/凭证的异常message。
+     */
     private String failureTrace(Throwable failure) {
         if (failure == null) return "";
         StringBuilder trace = new StringBuilder();
@@ -67,6 +83,7 @@ public class OpenApiRequestFilter extends OncePerRequestFilter {
         }
         return trace.toString();
     }
+
     private String safe(String text) {
         if (text == null) return "";
         return text.replaceAll("[\r\n\t]", "_").substring(0, Math.min(text.length(), 512));

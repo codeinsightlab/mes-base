@@ -21,6 +21,9 @@ with zipfile.ZipFile(JAR) as artifact:
     names = artifact.namelist()
     assert not any("RuntimeFixture" in n or "FoundationHttpTest" in n or "h2-" in n for n in names)
     assert not any(n.startswith("BOOT-INF/lib/mes-mes-") for n in names)
+    for dependency in ("mssql-jdbc-", "mysql-connector-j-", "postgresql-", "flyway-mysql-",
+                       "flyway-database-postgresql-"):
+        assert any(n.startswith("BOOT-INF/lib/" + dependency) for n in names), dependency
     deferred_paths = ("dev/mesbase/mes/pro/productionmonitor/", "dev/mesbase/mes/pro/personnelanalysis/")
     deferred_types = ("SystemUserLookup.class", "UserLookupQuery.class", "SysUserDisplayExtraMapper.class",
                       "SysUserDisplayExtraMapper.xml")
@@ -44,6 +47,7 @@ with zipfile.ZipFile(JAR) as artifact:
 checks.append({"case": "packaging-excludes-test-entities-and-H2", "passed": True})
 checks.append({"case": "packaging-excludes-legacy-platform-implementation", "passed": True})
 checks.append({"case": "packaging-excludes-deferred-business-features", "passed": True})
+checks.append({"case": "packaging-retains-configured-jdbc-drivers-and-migrations", "passed": True})
 
 def run(profile):
     environment = {key: value for key, value in os.environ.items() if not key.startswith(("SPRING_", "MES_", "SERVER_")) and key not in ("JAVA_TOOL_OPTIONS", "JDK_JAVA_OPTIONS", "_JAVA_OPTIONS")}

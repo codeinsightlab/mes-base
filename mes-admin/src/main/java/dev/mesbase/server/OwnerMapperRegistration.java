@@ -16,7 +16,9 @@ import org.springframework.core.env.Environment;
 import org.springframework.core.type.filter.RegexPatternTypeFilter;
 import org.springframework.util.ClassUtils;
 
-/** One standard MyBatis-Spring scan per owner; validation consumes the same discovery result. */
+/**
+ * One standard MyBatis-Spring scan per owner; validation consumes the same discovery result.
+ */
 final class OwnerMapperRegistration implements BeanDefinitionRegistryPostProcessor {
     private final Environment environment;
     private final Map<PersistenceOwner.Kind, List<String>> roots;
@@ -39,14 +41,15 @@ final class OwnerMapperRegistration implements BeanDefinitionRegistryPostProcess
             var scanner = new ClassPathMapperScanner(registry, environment) {
                 @Override
                 protected boolean isCandidateComponent(AnnotatedBeanDefinition definition) {
-                    if (!super.isCandidateComponent(definition) || definition.getMetadata().getClassName().contains("$")) {
+                    if (!super.isCandidateComponent(definition) || definition.getMetadata().getClassName()
+                            .contains("$")) {
                         return false;
                     }
                     if (kind == PersistenceOwner.Kind.ERP && !environment.getProperty("mes.erp.enabled", Boolean.class, false)) {
                         throw new IllegalArgumentException("ERP Mappers require enabled ERP persistence");
                     }
                     catalog.register(kind, ClassUtils.resolveClassName(definition.getMetadata().getClassName(),
-                        ClassUtils.getDefaultClassLoader()));
+                            ClassUtils.getDefaultClassLoader()));
                     return true;
                 }
             };

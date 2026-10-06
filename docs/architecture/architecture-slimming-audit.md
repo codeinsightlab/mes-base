@@ -543,3 +543,35 @@ Spring 的 [DataSourceTransactionManager](https://docs.spring.io/spring-framewor
 | P1-07 | 根 POM 有 27 个直接依赖，其中 19 个未声明 scope、默认 compile，其余包含 runtime/test。子模块继承父 dependencies，编译边界过宽成立。但 mes-common 当前已经包含 SpringUtils、RedisCache、BaseController、SecurityUtils、PageUtils 等框架代码，并同时承载 dev.mesbase.core 包。依赖下沉应匹配真实消费者；仅改 POM 无法禁止同一模块中 Core 导入合法供 common 使用的 Spring。纯 Core 的编译隔离需要另行明确模块边界，或采用包级架构检查，不能借依赖治理机械搬迁全部历史 common。 |
 
 建议顺序：先对 ThreadLocal 写独立复现测试，同时以小改动统一 Request ID；Mapper 注册单独治理；依赖下沉先盘点消费者、限定目标边界；Service Locator 与当前代理依赖渐进处理。结构问题、可达风险和已执行的运行证据分别记录。
+
+## 13. 2026-10-06 实施：P1 注册、请求状态与依赖优化
+
+用户授权按第 12 节方向实施。没有重构业务规则或恢复已归档分析功能；三工厂归属、事务保护、权限和外部错误协议继续保留。
+
+### 13.1 最终改动
+
+- **P1-01：单次 Mapper 扫描。** `OwnerMapperRegistration` 直接使用标准 `ClassPathMapperScanner`，扫描候选同时交给 `OwnerMapperCatalog` 校验和记录。Catalog 不再自行扫描，也不再注册一层 MapperScannerConfigurer Bean。标准 Scanner / MapperFactoryBean 创建 Spring 代理；保留包重叠、接口重名、旧 owner 注解冲突、ERP 禁用拒绝规则。三组固定包和对应 SessionFactory 没有变。
+- **保留必要的 MyBatis 初始化。** 生产工厂仍通过 `PersistenceFactories.create` 将已发现接口注册到 MyBatis，加载 XML。实际尝试仅等 MapperFactoryBean 初始化后注册，会使 `ManagedDatasourceService` 初始化阶段的程序式平台 Mapper 访问失败；装配测试复现此问题，因此保留提前初始化。它没有重新扫描类路径或重复创建 Spring Bean。程序式 fixture / 独立会话的注册路径仍有效，没有保留失败尝试中新建的 scanned 工厂入口。
+- **P1-02：统一请求 ID。** RequestBoundaryFilter 负责创建并缓存服务器 ID，复用请求属性跨 dispatch 保持身份；OpenApiRequestFilter、OpenApiHttp、ErrorWriter 使用同一 ID。OpenAPI 错误协议、访问日志、SecurityContext 清理保留。客户端 X-Request-Id 不作为服务器 ID。
+- **P1-05 / P1-08：修复请求线程状态。** 边界 Filter 显式参与 ASYNC dispatch，在进入和退出时清理 PageHelper；Scope 清理与分页/MDC 清理采用嵌套 finally，避免一个清理异常跳过另一个。原有嵌套 Scope/MDC 恢复规则保留。没有隐式传播 FactoryScope 到任意后台线程；后台作用域仍须显式通过 withScope 管理。
+- **P1-06：有界清理静态查 Bean。** SysMenuServiceImpl 的权限服务、SysJobController 的执行器改为显式注入，移除这三个 getBean 调用点。Quartz 创建的作业对象、公共静态工具，以及用户/角色/部门 Service 的 getAopProxy 调用仍保留；exposeProxy=true 继续支持现有授权/数据范围拦截。这些剩余消费者作为后续渐进治理项。
+- **P1-07：依赖按消费者下沉。** 根 POM 不再声明供所有子模块继承的直接依赖（27 → 0），自定义版本进入 dependencyManagement，Boot 管理的版本沿用其 BOM。common/system/framework/quartz/generator/admin 显式声明各自依赖；测试依赖只在有测试的模块以 test 声明，驱动与数据库迁移扩展由 admin 以 runtime 装配。没有升级库版本或新增纯 Core 模块。common 仍容纳历史 Spring/Redis/Web/分页工具；Core 包的禁止依赖检查扩展到 MyBatis/PageHelper，增加父 POM 无直接依赖的回归约束。
+
+### 13.2 复现与验证
+
+先新增 RequestStateLifecycleTest，未修复时 3 项均失败：Mapper 前异常留下 Page、模拟 ASYNC 异常留下 Scope、OpenAPI 内外 ID 不同。修复后同一测试 3 项通过，测试检查状态发生在测试清理钩子之前。
+
+新增 AsyncRequestBoundaryHttpTest，实际启动隔离嵌入式 Tomcat，限制为一个 Servlet worker。异步正常响应及异常响应中设置 Scope/Page 后，下一请求在边界 Filter 外观察状态为空，且响应记录证明复用了同一个线程；正常异步响应还验证初始请求属性、ASYNC 属性、MDC 与响应头 ID 一致。2 项通过。此证据覆盖 Servlet REQUEST/ASYNC 生命周期，不替代任意后台执行器或真实业务数据库验收。
+
+新增 MapperRegistrationGuardTest，重名、注解归属冲突、禁用 ERP 时存在外部 Mapper 的 3 项负例通过，断言实际根因，避免将其他启动失败误当作 guard 生效。原生产装配和 H2 三工厂隔离、路由/回滚/固定连接测试继续通过。
+
+| 命令/证据 | 结果 |
+| --- | --- |
+| IDEA 原生 format.sh + 当前 Project code scheme | 本任务涉及的 18 个 Java 文件格式化通过；仓库仍无 scripts/format-java，沿用第 11 节的原生 formatter 临时入口。未格式化其他文件。 |
+| `mvn -B -ntp test` | 完整测试通过；新增真实异步用例随后经定向测试及最终 clean verify 验证。 |
+| `mvn -B -ntp clean verify` | 最终 BUILD SUCCESS；全 reactor 179 项，175 通过、4 个 opt-in 真实 MySQL 用例跳过，0 失败/错误。 |
+| common 的过滤 `dependency:tree` | 查询 MyBatis/Quartz/Flyway/Druid/Velocity，无匹配依赖；没有把 common 宣称为无 Spring 的纯 Core。 |
+| `/usr/bin/python3 scripts/smoke-packaged.py` | 6 项通过；本地隔离 JAR 启动及 HTTP 边界通过；保留 SQL Server/MySQL/PostgreSQL 驱动与 Flyway 扩展，继续排除 H2、测试及归档业务代码。 |
+| `git diff --check` / 构建输入哈希 | 通过；记录的 Java/POM/打包脚本输入在最终构建及检查之间没有漂移。 |
+
+复现、格式化、最终构建、依赖树及打包日志保存到 `target/p1-architecture-optimization/`；打包检查 JSON 在 `target/validation/`。没有连接真实业务/外部数据库、执行真实迁移、重启用户服务，未执行提交/推送/部署。工作期间仓库 HEAD 有其他提交推进，本任务未重置工作区或回退这些提交。

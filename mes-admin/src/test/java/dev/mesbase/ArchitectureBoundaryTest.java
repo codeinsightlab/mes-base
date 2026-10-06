@@ -47,11 +47,12 @@ class ArchitectureBoundaryTest {
     @Test
     void reactorParentDoesNotInjectDependenciesIntoEveryModule() throws Exception {
         var factory = DocumentBuilderFactory.newInstance();
+        factory.setNamespaceAware(true);
         factory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
         var root = factory.newDocumentBuilder().parse(Path.of("pom.xml").toFile()).getDocumentElement();
         int inheritedDependencies = 0;
         for (var child = root.getFirstChild(); child != null; child = child.getNextSibling()) {
-            if ("dependencies".equals(child.getNodeName())) inheritedDependencies++;
+            if ("dependencies".equals(child.getLocalName())) inheritedDependencies++;
         }
         assertEquals(0, inheritedDependencies, "Versions belong in dependencyManagement; modules declare consumers");
     }

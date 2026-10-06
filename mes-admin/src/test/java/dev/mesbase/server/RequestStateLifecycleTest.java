@@ -20,7 +20,9 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-/** TEST ONLY: consecutive dispatches execute on the same test thread. */
+/**
+ * TEST ONLY: consecutive dispatches execute on the same test thread.
+ */
 class RequestStateLifecycleTest {
     @AfterEach
     void isolateTestRunner() {
@@ -33,13 +35,13 @@ class RequestStateLifecycleTest {
     void paginationIsClearedWhenFailurePrecedesMapperAndNextRequestStartsClean() throws Exception {
         var boundary = new RequestBoundaryFilter();
         assertThrows(IllegalStateException.class, () -> boundary.doFilter(new MockHttpServletRequest(),
-            new MockHttpServletResponse(), (request, response) -> {
-                PageHelper.startPage(2, 10);
-                throw new IllegalStateException("TEST ONLY failure before Mapper");
-            }));
+                new MockHttpServletResponse(), (request, response) -> {
+                    PageHelper.startPage(2, 10);
+                    throw new IllegalStateException("TEST ONLY failure before Mapper");
+                }));
         assertNull(PageHelper.getLocalPage());
         boundary.doFilter(new MockHttpServletRequest(), new MockHttpServletResponse(),
-            (request, response) -> assertNull(PageHelper.getLocalPage()));
+                (request, response) -> assertNull(PageHelper.getLocalPage()));
     }
 
     @Test
@@ -48,15 +50,15 @@ class RequestStateLifecycleTest {
         var first = new MockHttpServletRequest();
         first.setDispatcherType(DispatcherType.ASYNC);
         assertThrows(IllegalStateException.class, () -> boundary.doFilter(first,
-            new MockHttpServletResponse(), (request, response) -> {
-                FactoryContext.bind(new FactoryScope(new FactoryId("TEST_ONLY_A")));
-                throw new IllegalStateException("TEST ONLY async failure");
-            }));
+                new MockHttpServletResponse(), (request, response) -> {
+                    FactoryContext.bind(new FactoryScope(new FactoryId("TEST_ONLY_A")));
+                    throw new IllegalStateException("TEST ONLY async failure");
+                }));
         assertTrue(FactoryContext.current().isEmpty());
         var next = new MockHttpServletRequest();
         next.setDispatcherType(DispatcherType.ASYNC);
         boundary.doFilter(next, new MockHttpServletResponse(),
-            (request, response) -> assertTrue(FactoryContext.current().isEmpty()));
+                (request, response) -> assertTrue(FactoryContext.current().isEmpty()));
     }
 
     @Test
@@ -67,13 +69,14 @@ class RequestStateLifecycleTest {
         var openApi = new OpenApiRequestFilter(new OpenApiHttp(json));
         MDC.put("requestId", "TEST_ONLY_outer");
         new RequestBoundaryFilter().doFilter(request, response,
-            (req, res) -> openApi.doFilter(req, res, (innerRequest, innerResponse) -> {
-                assertEquals(request.getAttribute("mes.requestId"), MDC.get("requestId"));
-                throw new IllegalStateException("TEST ONLY internal failure");
-            }));
+                (req, res) -> openApi.doFilter(req, res, (innerRequest, innerResponse) -> {
+                    assertEquals(request.getAttribute("mes.requestId"), MDC.get("requestId"));
+                    throw new IllegalStateException("TEST ONLY internal failure");
+                }));
         assertEquals(500, response.getStatus());
         assertEquals(request.getAttribute("mes.requestId"), response.getHeader("X-Request-Id"));
-        assertEquals(response.getHeader("X-Request-Id"), json.readTree(response.getContentAsString()).get("requestId").asText());
+        assertEquals(response.getHeader("X-Request-Id"), json.readTree(response.getContentAsString()).get("requestId")
+                .asText());
         assertEquals("TEST_ONLY_outer", MDC.get("requestId"));
     }
 }

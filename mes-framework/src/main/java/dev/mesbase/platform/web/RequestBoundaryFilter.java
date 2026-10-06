@@ -56,7 +56,9 @@ public final class RequestBoundaryFilter extends OncePerRequestFilter {
         }
     }
 
-    /** Server-owned request attribute persists across dispatches; client headers are not trusted. */
+    /**
+     * Server-owned request attribute persists across dispatches; client headers are not trusted.
+     */
     public static String requestId(HttpServletRequest request) {
         Object existing = request.getAttribute(REQUEST_ID);
         if (existing instanceof String id && !id.isBlank()) return id;

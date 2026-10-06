@@ -14,25 +14,25 @@ class MapperRegistrationGuardTest {
     @Test
     void rejectsDuplicateNamesBeforeRegistrationCanSilentlySkipThem() {
         rejects("Duplicate Mapper name", Map.of(
-            PersistenceOwner.Kind.PLATFORM, List.of("dev.mesbase.persistencefixture.duplicate.first"),
-            PersistenceOwner.Kind.BUSINESS, List.of("dev.mesbase.persistencefixture.duplicate.second")));
+                PersistenceOwner.Kind.PLATFORM, List.of("dev.mesbase.persistencefixture.duplicate.first"),
+                PersistenceOwner.Kind.BUSINESS, List.of("dev.mesbase.persistencefixture.duplicate.second")));
     }
 
     @Test
     void rejectsLegacyAnnotationConflictingWithPackageOwner() {
         rejects("Mapper annotation conflicts with package", Map.of(
-            PersistenceOwner.Kind.BUSINESS, List.of("dev.mesbase.persistencefixture.conflict")));
+                PersistenceOwner.Kind.BUSINESS, List.of("dev.mesbase.persistencefixture.conflict")));
     }
 
     @Test
     void rejectsExternalMappersWhenErpIsDisabled() {
         rejects("ERP Mappers require enabled ERP persistence", Map.of(
-            PersistenceOwner.Kind.ERP, List.of("dev.mesbase.persistencefixture.erp")));
+                PersistenceOwner.Kind.ERP, List.of("dev.mesbase.persistencefixture.erp")));
     }
 
     private void register(Map<PersistenceOwner.Kind, List<String>> roots) {
         new OwnerMapperRegistration(new MockEnvironment(), roots)
-            .postProcessBeanDefinitionRegistry(new DefaultListableBeanFactory());
+                .postProcessBeanDefinitionRegistry(new DefaultListableBeanFactory());
     }
 
     private void rejects(String expected, Map<PersistenceOwner.Kind, List<String>> roots) {
