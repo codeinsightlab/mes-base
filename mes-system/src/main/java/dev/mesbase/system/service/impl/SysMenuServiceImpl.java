@@ -10,7 +10,6 @@ import dev.mesbase.common.exception.ServiceException;
 import dev.mesbase.common.utils.SecurityUtils;
 import dev.mesbase.common.utils.StringUtils;
 import dev.mesbase.common.utils.bean.BeanValidators;
-import dev.mesbase.common.utils.spring.SpringUtils;
 import dev.mesbase.system.domain.vo.MetaVo;
 import dev.mesbase.system.domain.vo.RouterVo;
 import dev.mesbase.system.mapper.SysMenuMapper;
@@ -42,6 +41,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class SysMenuServiceImpl implements ISysMenuService
 {
     @Autowired private Validator contractValidator;
+    @Autowired private SystemPermissionService permissionService;
     public static final String PREMISSION_STRING = "perms[\"{0}\"]";
 
     @Autowired
@@ -322,7 +322,7 @@ public class SysMenuServiceImpl implements ISysMenuService
 
     private boolean catalogManagementAllowed()
     {
-        var permissions=SpringUtils.getBean(SystemPermissionService.class).permissions(SecurityUtils.getUsername(),null);
+        var permissions=permissionService.permissions(SecurityUtils.getUsername(),null);
         return permissions.contains("system:menu:list")||permissions.contains("system:role:add")||permissions.contains("system:role:edit");
     }
 

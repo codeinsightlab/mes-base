@@ -2,14 +2,18 @@ package dev.mesbase.framework.openapi;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.mesbase.common.core.domain.AjaxResult;
-import dev.mesbase.common.openapi.*;
+import dev.mesbase.common.openapi.OpenApiError;
+import dev.mesbase.common.openapi.OpenApiException;
 import org.springframework.stereotype.Component;
-import jakarta.servlet.http.*;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.beans.factory.annotation.Qualifier;
 import dev.mesbase.platform.web.RequestBoundaryFilter;
 
 @Component
-@org.springframework.boot.autoconfigure.condition.ConditionalOnProperty(name={"mes.system.enabled","open-api.enabled"},havingValue="true")
+@ConditionalOnProperty(name={"mes.system.enabled","open-api.enabled"},havingValue="true")
 public class OpenApiHttp {
     static final String REQUEST_ID = RequestBoundaryFilter.REQUEST_ID;
     static final String IDENTITY = OpenApiHttp.class.getName() + ".identity";
@@ -17,7 +21,7 @@ public class OpenApiHttp {
     static final String FAILURE = OpenApiHttp.class.getName() + ".failure";
     static final String API_CODE = OpenApiHttp.class.getName() + ".apiCode";
     private final ObjectMapper json;
-    public OpenApiHttp(@org.springframework.beans.factory.annotation.Qualifier("openApiJson") ObjectMapper json) { this.json = json; }
+    public OpenApiHttp(@Qualifier("openApiJson") ObjectMapper json) { this.json = json; }
     static String path(HttpServletRequest request) { return request.getRequestURI().substring(request.getContextPath().length()); }
     public static boolean isOpenApi(HttpServletRequest request) {
         String path = path(request); return path.equals("/open-api") || path.startsWith("/open-api/");
@@ -39,6 +43,7 @@ public class OpenApiHttp {
         return result;
     }
     public void error(HttpServletRequest request, HttpServletResponse response, OpenApiError error) throws IOException {
+        response.setHeader("X-Request-Id", RequestBoundaryFilter.requestId(request));
         request.setAttribute(ERROR, error.getCode());
         response.setStatus(error.getStatus());
         response.setContentType("application/json"); response.setCharacterEncoding("UTF-8");

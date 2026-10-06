@@ -6,11 +6,13 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import javax.xml.parsers.DocumentBuilderFactory;
 import org.junit.jupiter.api.Test;
 import org.springframework.web.method.HandlerMethod;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 class ArchitectureBoundaryTest {
     static class Unclassified {
@@ -35,11 +37,23 @@ class ArchitectureBoundaryTest {
                 String source = Files.readString(file);
                 for (String forbidden : List.of("ThreadLocal", "org.springframework",
                         "dev.mesbase.infrastructure", "dev.mesbase.platform",
-                        "dev.mesbase.integration", "com.ktg")) {
+                        "dev.mesbase.integration", "org.apache.ibatis", "org.mybatis", "com.github.pagehelper", "com.ktg")) {
                     assertFalse(source.contains(forbidden), file + " contains " + forbidden);
                 }
             }
         }
+    }
+
+    @Test
+    void reactorParentDoesNotInjectDependenciesIntoEveryModule() throws Exception {
+        var factory = DocumentBuilderFactory.newInstance();
+        factory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
+        var root = factory.newDocumentBuilder().parse(Path.of("pom.xml").toFile()).getDocumentElement();
+        int inheritedDependencies = 0;
+        for (var child = root.getFirstChild(); child != null; child = child.getNextSibling()) {
+            if ("dependencies".equals(child.getNodeName())) inheritedDependencies++;
+        }
+        assertEquals(0, inheritedDependencies, "Versions belong in dependencyManagement; modules declare consumers");
     }
 
     @Test

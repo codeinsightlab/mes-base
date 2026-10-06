@@ -1,11 +1,12 @@
 package dev.mesbase.platform.web;
-import jakarta.servlet.http.*;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import dev.mesbase.core.error.ErrorCode;
 public final class ErrorWriter {
     private ErrorWriter() {}
     public static String requestId(HttpServletRequest request) {
-        Object id=request.getAttribute("mes.requestId"); return id==null ? java.util.UUID.randomUUID().toString() : id.toString();
+        return RequestBoundaryFilter.requestId(request);
     }
     public static ErrorResponse body(ErrorCode code,HttpServletRequest request) { return new ErrorResponse(code.name(),code.safeMessage(),requestId(request)); }
     public static void write(ErrorCode code,HttpServletRequest request,HttpServletResponse response) throws IOException {
