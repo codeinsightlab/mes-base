@@ -8,9 +8,15 @@ import dev.mesbase.common.core.domain.entity.SysDictType;
 import dev.mesbase.common.core.page.TableDataInfo;
 import dev.mesbase.common.enums.BusinessType;
 import dev.mesbase.common.utils.poi.ExcelUtil;
+import dev.mesbase.platform.web.EndpointAccess;
+import dev.mesbase.system.dto.DictTypeForm;
 import dev.mesbase.system.service.ISysDictTypeService;
-
+import dev.mesbase.web.view.PageResultMapper;
+import dev.mesbase.web.view.dict.SysDictTypeAssembler;
+import jakarta.servlet.http.HttpServletResponse;
+import java.util.List;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -22,34 +28,30 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.util.List;
-
-import jakarta.servlet.http.HttpServletResponse;
-
 /**
  * 数据字典信息
  * 
  * @author ruoyi
  */
 @RestController
-@org.springframework.boot.autoconfigure.condition.ConditionalOnProperty(name="mes.system.enabled",havingValue="true")
+@ConditionalOnProperty(name="mes.system.enabled",havingValue="true")
 @RequestMapping("/api/system/dict/type")
 public class SysDictTypeController extends BaseController
 {
     @Autowired
     private ISysDictTypeService dictTypeService;
 
-    @dev.mesbase.platform.web.EndpointAccess(value=dev.mesbase.platform.web.EndpointAccess.Kind.AUTHORIZED,permission="system:dict:list",permissionScope=dev.mesbase.platform.web.EndpointAccess.PermissionScope.PLATFORM)
+    @EndpointAccess(value=EndpointAccess.Kind.AUTHORIZED,permission="system:dict:list",permissionScope=EndpointAccess.PermissionScope.PLATFORM)
     @GetMapping("/list")
     public TableDataInfo list(SysDictType dictType)
     {
         startPage();
         List<SysDictType> list = dictTypeService.selectDictTypeList(dictType);
-        return getDataTable(list);
+        return PageResultMapper.map(list, SysDictTypeAssembler::toResult);
     }
 
     @Log(title = "字典类型", businessType = BusinessType.EXPORT)
-    @dev.mesbase.platform.web.EndpointAccess(value=dev.mesbase.platform.web.EndpointAccess.Kind.AUTHORIZED,permission="system:dict:export",permissionScope=dev.mesbase.platform.web.EndpointAccess.PermissionScope.PLATFORM)
+    @EndpointAccess(value=EndpointAccess.Kind.AUTHORIZED,permission="system:dict:export",permissionScope=EndpointAccess.PermissionScope.PLATFORM)
     @PostMapping("/export")
     public void export(HttpServletResponse response, SysDictType dictType)
     {
@@ -61,20 +63,20 @@ public class SysDictTypeController extends BaseController
     /**
      * 查询字典类型详细
      */
-    @dev.mesbase.platform.web.EndpointAccess(value=dev.mesbase.platform.web.EndpointAccess.Kind.AUTHORIZED,permission="system:dict:query",permissionScope=dev.mesbase.platform.web.EndpointAccess.PermissionScope.PLATFORM)
+    @EndpointAccess(value=EndpointAccess.Kind.AUTHORIZED,permission="system:dict:query",permissionScope=EndpointAccess.PermissionScope.PLATFORM)
     @GetMapping(value = "/{dictId}")
     public AjaxResult getInfo(@PathVariable Long dictId)
     {
-        return AjaxResult.success(dictTypeService.selectDictTypeById(dictId));
+        return AjaxResult.success(SysDictTypeAssembler.toResult(dictTypeService.selectDictTypeById(dictId)));
     }
 
     /**
      * 新增字典类型
      */
-    @dev.mesbase.platform.web.EndpointAccess(value=dev.mesbase.platform.web.EndpointAccess.Kind.AUTHORIZED,permission="system:dict:add",permissionScope=dev.mesbase.platform.web.EndpointAccess.PermissionScope.PLATFORM)
+    @EndpointAccess(value=EndpointAccess.Kind.AUTHORIZED,permission="system:dict:add",permissionScope=EndpointAccess.PermissionScope.PLATFORM)
     @Log(title = "字典类型", businessType = BusinessType.INSERT)
     @PostMapping
-    public AjaxResult add(@Validated @RequestBody dev.mesbase.system.dto.DictTypeForm dictForm)
+    public AjaxResult add(@Validated @RequestBody DictTypeForm dictForm)
     {
         SysDictType dict=dictForm.toEntity();
         dict.setDictId(null);
@@ -89,10 +91,10 @@ public class SysDictTypeController extends BaseController
     /**
      * 修改字典类型
      */
-    @dev.mesbase.platform.web.EndpointAccess(value=dev.mesbase.platform.web.EndpointAccess.Kind.AUTHORIZED,permission="system:dict:edit",permissionScope=dev.mesbase.platform.web.EndpointAccess.PermissionScope.PLATFORM)
+    @EndpointAccess(value=EndpointAccess.Kind.AUTHORIZED,permission="system:dict:edit",permissionScope=EndpointAccess.PermissionScope.PLATFORM)
     @Log(title = "字典类型", businessType = BusinessType.UPDATE)
     @PutMapping
-    public AjaxResult edit(@Validated @RequestBody dev.mesbase.system.dto.DictTypeForm dictForm)
+    public AjaxResult edit(@Validated @RequestBody DictTypeForm dictForm)
     {
         SysDictType dict=dictForm.toEntity();
         if (UserConstants.NOT_UNIQUE.equals(dictTypeService.checkDictTypeUnique(dict)))
@@ -106,7 +108,7 @@ public class SysDictTypeController extends BaseController
     /**
      * 删除字典类型
      */
-    @dev.mesbase.platform.web.EndpointAccess(value=dev.mesbase.platform.web.EndpointAccess.Kind.AUTHORIZED,permission="system:dict:remove",permissionScope=dev.mesbase.platform.web.EndpointAccess.PermissionScope.PLATFORM)
+    @EndpointAccess(value=EndpointAccess.Kind.AUTHORIZED,permission="system:dict:remove",permissionScope=EndpointAccess.PermissionScope.PLATFORM)
     @Log(title = "字典类型", businessType = BusinessType.DELETE)
     @DeleteMapping("/{dictIds}")
     public AjaxResult remove(@PathVariable Long[] dictIds)
@@ -118,7 +120,7 @@ public class SysDictTypeController extends BaseController
     /**
      * 刷新字典缓存
      */
-    @dev.mesbase.platform.web.EndpointAccess(value=dev.mesbase.platform.web.EndpointAccess.Kind.AUTHORIZED,permission="system:dict:remove",permissionScope=dev.mesbase.platform.web.EndpointAccess.PermissionScope.PLATFORM)
+    @EndpointAccess(value=EndpointAccess.Kind.AUTHORIZED,permission="system:dict:remove",permissionScope=EndpointAccess.PermissionScope.PLATFORM)
     @Log(title = "字典类型", businessType = BusinessType.CLEAN)
     @DeleteMapping("/refreshCache")
     public AjaxResult refreshCache()
@@ -131,10 +133,10 @@ public class SysDictTypeController extends BaseController
      * 获取字典选择框列表
      */
     @GetMapping("/optionselect")
-    @dev.mesbase.platform.web.EndpointAccess(value=dev.mesbase.platform.web.EndpointAccess.Kind.AUTHENTICATED,permissionScope=dev.mesbase.platform.web.EndpointAccess.PermissionScope.PLATFORM)
+    @EndpointAccess(value=EndpointAccess.Kind.AUTHENTICATED,permissionScope=EndpointAccess.PermissionScope.PLATFORM)
     public AjaxResult optionselect()
     {
         List<SysDictType> dictTypes = dictTypeService.selectDictTypeAll();
-        return AjaxResult.success(dictTypes);
+        return AjaxResult.success(SysDictTypeAssembler.toResults(dictTypes));
     }
 }

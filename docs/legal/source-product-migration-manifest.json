@@ -4,7 +4,7 @@
   "strategy": "SOURCE_PRODUCT_PORT; no Codegen Skill or CLI invoked",
   "authorization": "User explicitly requested reuse of Source Product infrastructure, prefer its architecture; Codegen ignored during migration.",
   "license": "Source Product root MIT declaration retained with original authors; generic common/framework/system/quartz/backend and Vue product assets PORT, no company environment values or customer data.",
-  "scope": "Phase1 common/framework/system/admin/quartz, source frontend pages/components; MES business excluded",
+  "scope": "Phase1 infrastructure/system plus multi-factory branch managed datasource, sync coordination, production monitor and personnel analysis; external implementations excluded",
   "files": [
     {
       "source": "ktg-common/src/main/java/com/ktg/common/utils/DateUtils.java",
@@ -4253,5 +4253,331 @@
     ],
     "report": "docs/development/MES_BASE_REALIGNMENT_REPORT.md#2026-10-06-前端迁移来源复核与表述纠正",
     "implementationModified": false
+  },
+  "multiFactoryFollowUp": {
+    "sourceBranch": "feat/multi-factory-isolation",
+    "sourceHead": "bdc299dade855177a3e275199ffde6e72310e393",
+    "sourceUiHead": "c082a338f9685ac26a1fa81320c35b45bf3914ad",
+    "scope": [
+      "managed datasource and factory binding",
+      "mes_master_sync distributed coordination",
+      "production monitor",
+      "personnel analysis"
+    ],
+    "externalImplementation": "EXCLUDED; interfaces only",
+    "analyticsStatus": "PORTED_WITH_SOURCE_TESTS; current business schema and real DB/browser acceptance pending",
+    "files": [
+      {
+        "source": "ktg-mes/src/main/java/com/ktg/mes/pro/personnelanalysis/controller/PersonnelAnalysisController.java",
+        "target": "mes-mes/src/main/java/dev/mesbase/mes/pro/personnelanalysis/controller/PersonnelAnalysisController.java",
+        "sourceSha256": "1c53415dd574ee055b6147123a322e3a156119c85ca10536aa6682b07bc55c66",
+        "strategy": "SOURCE_PRODUCT_PORT",
+        "changes": "package/Jakarta/explicit Factory permission and owned business transaction; external implementations excluded"
+      },
+      {
+        "source": "ktg-mes/src/main/java/com/ktg/mes/pro/personnelanalysis/domain/PersonnelAccountRow.java",
+        "target": "mes-mes/src/main/java/dev/mesbase/mes/pro/personnelanalysis/domain/PersonnelAccountRow.java",
+        "sourceSha256": "44901aec876b431a44fe6322e50a9599490824a18d4c227efbf96f91c529fb99",
+        "strategy": "SOURCE_PRODUCT_PORT",
+        "changes": "package/Jakarta/explicit Factory permission and owned business transaction; external implementations excluded"
+      },
+      {
+        "source": "ktg-mes/src/main/java/com/ktg/mes/pro/personnelanalysis/domain/PersonnelAccountVO.java",
+        "target": "mes-mes/src/main/java/dev/mesbase/mes/pro/personnelanalysis/domain/PersonnelAccountVO.java",
+        "sourceSha256": "10736a0957adb605ac561bec5ec4a1ecc43da1f6a63b7bb50cc64751ddb5e802",
+        "strategy": "SOURCE_PRODUCT_PORT",
+        "changes": "package/Jakarta/explicit Factory permission and owned business transaction; external implementations excluded"
+      },
+      {
+        "source": "ktg-mes/src/main/java/com/ktg/mes/pro/personnelanalysis/domain/PersonnelAnalysisQueryDTO.java",
+        "target": "mes-mes/src/main/java/dev/mesbase/mes/pro/personnelanalysis/domain/PersonnelAnalysisQueryDTO.java",
+        "sourceSha256": "923543ae167657ab06abbdcdd125bd065590f3577c4b4f03afb2e42d29a537a8",
+        "strategy": "SOURCE_PRODUCT_PORT",
+        "changes": "package/Jakarta/explicit Factory permission and owned business transaction; external implementations excluded"
+      },
+      {
+        "source": "ktg-mes/src/main/java/com/ktg/mes/pro/personnelanalysis/domain/PersonnelProcessRow.java",
+        "target": "mes-mes/src/main/java/dev/mesbase/mes/pro/personnelanalysis/domain/PersonnelProcessRow.java",
+        "sourceSha256": "6351239324582313d6e71b1efee867fb3ec7e6b950a2360bb62f4e494b7eb849",
+        "strategy": "SOURCE_PRODUCT_PORT",
+        "changes": "package/Jakarta/explicit Factory permission and owned business transaction; external implementations excluded"
+      },
+      {
+        "source": "ktg-mes/src/main/java/com/ktg/mes/pro/personnelanalysis/domain/PersonnelProcessVO.java",
+        "target": "mes-mes/src/main/java/dev/mesbase/mes/pro/personnelanalysis/domain/PersonnelProcessVO.java",
+        "sourceSha256": "20c2f87e4556cc817971584e622fb0c445090d51a5cb5838b40c0e9bb7717aad",
+        "strategy": "SOURCE_PRODUCT_PORT",
+        "changes": "package/Jakarta/explicit Factory permission and owned business transaction; external implementations excluded"
+      },
+      {
+        "source": "ktg-mes/src/main/java/com/ktg/mes/pro/personnelanalysis/domain/PersonnelProductRow.java",
+        "target": "mes-mes/src/main/java/dev/mesbase/mes/pro/personnelanalysis/domain/PersonnelProductRow.java",
+        "sourceSha256": "c1efddf8123a9338e6572d38a3dde507544a1435b8b38f31645a0f709c330cd6",
+        "strategy": "SOURCE_PRODUCT_PORT",
+        "changes": "package/Jakarta/explicit Factory permission and owned business transaction; external implementations excluded"
+      },
+      {
+        "source": "ktg-mes/src/main/java/com/ktg/mes/pro/personnelanalysis/domain/PersonnelProductVO.java",
+        "target": "mes-mes/src/main/java/dev/mesbase/mes/pro/personnelanalysis/domain/PersonnelProductVO.java",
+        "sourceSha256": "c65d8ee0e2f515abe5fd78c4fe19f35adbea5732af04389becb0a264495fcc0c",
+        "strategy": "SOURCE_PRODUCT_PORT",
+        "changes": "package/Jakarta/explicit Factory permission and owned business transaction; external implementations excluded"
+      },
+      {
+        "source": "ktg-mes/src/main/java/com/ktg/mes/pro/personnelanalysis/domain/PersonnelQuery.java",
+        "target": "mes-mes/src/main/java/dev/mesbase/mes/pro/personnelanalysis/domain/PersonnelQuery.java",
+        "sourceSha256": "04da4ff5e0f86da4de2615f26bafa62bc39c673ab4cc25b2fe714968f62ea7f4",
+        "strategy": "SOURCE_PRODUCT_PORT",
+        "changes": "package/Jakarta/explicit Factory permission and owned business transaction; external implementations excluded"
+      },
+      {
+        "source": "ktg-mes/src/main/java/com/ktg/mes/pro/personnelanalysis/domain/PersonnelRange.java",
+        "target": "mes-mes/src/main/java/dev/mesbase/mes/pro/personnelanalysis/domain/PersonnelRange.java",
+        "sourceSha256": "b4d70bbd7c8e49bab752a0410802e14039a09dd0b5f09221e57b7d4941ad554e",
+        "strategy": "SOURCE_PRODUCT_PORT",
+        "changes": "package/Jakarta/explicit Factory permission and owned business transaction; external implementations excluded"
+      },
+      {
+        "source": "ktg-mes/src/main/java/com/ktg/mes/pro/personnelanalysis/domain/PersonnelTrendRow.java",
+        "target": "mes-mes/src/main/java/dev/mesbase/mes/pro/personnelanalysis/domain/PersonnelTrendRow.java",
+        "sourceSha256": "326d83165d81a5c86f6a842e9cd30d4ccb909dfb9af3359e5d59f6d0ed5127d0",
+        "strategy": "SOURCE_PRODUCT_PORT",
+        "changes": "package/Jakarta/explicit Factory permission and owned business transaction; external implementations excluded"
+      },
+      {
+        "source": "ktg-mes/src/main/java/com/ktg/mes/pro/personnelanalysis/domain/PersonnelTrendVO.java",
+        "target": "mes-mes/src/main/java/dev/mesbase/mes/pro/personnelanalysis/domain/PersonnelTrendVO.java",
+        "sourceSha256": "363e170de5287169fa2543fdfd717f14dca275962b37407a90feeb52e0dc53c2",
+        "strategy": "SOURCE_PRODUCT_PORT",
+        "changes": "package/Jakarta/explicit Factory permission and owned business transaction; external implementations excluded"
+      },
+      {
+        "source": "ktg-mes/src/main/java/com/ktg/mes/pro/personnelanalysis/mapper/ProReportingWorkPersonnelExtraMapper.java",
+        "target": "mes-mes/src/main/java/dev/mesbase/mes/pro/personnelanalysis/mapper/ProReportingWorkPersonnelExtraMapper.java",
+        "sourceSha256": "f345dff0ece5b71cbe221281c4e0c1191e888b8eff56adb0615f64dcf2d3ef78",
+        "strategy": "SOURCE_PRODUCT_PORT",
+        "changes": "package/Jakarta/explicit Factory permission and owned business transaction; external implementations excluded"
+      },
+      {
+        "source": "ktg-mes/src/main/java/com/ktg/mes/pro/personnelanalysis/service/PersonnelAnalysisService.java",
+        "target": "mes-mes/src/main/java/dev/mesbase/mes/pro/personnelanalysis/service/PersonnelAnalysisService.java",
+        "sourceSha256": "ceb446fa896db4ea81be7572665eef1fd3d573e711688a8bd858a66334bd1fdf",
+        "strategy": "SOURCE_PRODUCT_PORT",
+        "changes": "package/Jakarta/explicit Factory permission and owned business transaction; external implementations excluded"
+      },
+      {
+        "source": "ktg-mes/src/main/java/com/ktg/mes/pro/personnelanalysis/service/PersonnelAnalysisServiceImpl.java",
+        "target": "mes-mes/src/main/java/dev/mesbase/mes/pro/personnelanalysis/service/PersonnelAnalysisServiceImpl.java",
+        "sourceSha256": "e2d05a8a8b14185b82338a7dc61f5be1c8910a60168fe3e0d58305f84c750d53",
+        "strategy": "SOURCE_PRODUCT_PORT",
+        "changes": "package/Jakarta/explicit Factory permission and owned business transaction; external implementations excluded"
+      },
+      {
+        "source": "ktg-mes/src/main/java/com/ktg/mes/pro/productionmonitor/controller/ProductionMonitorController.java",
+        "target": "mes-mes/src/main/java/dev/mesbase/mes/pro/productionmonitor/controller/ProductionMonitorController.java",
+        "sourceSha256": "0d1c62f95cda287d5bea12bb2e536128a0d860ff7ec3b2ed236db1f50fc1fba1",
+        "strategy": "SOURCE_PRODUCT_PORT",
+        "changes": "package/Jakarta/explicit Factory permission and owned business transaction; external implementations excluded"
+      },
+      {
+        "source": "ktg-mes/src/main/java/com/ktg/mes/pro/productionmonitor/domain/dto/ProductionMonitorQueryDTO.java",
+        "target": "mes-mes/src/main/java/dev/mesbase/mes/pro/productionmonitor/domain/dto/ProductionMonitorQueryDTO.java",
+        "sourceSha256": "ef3967b3ce3a2b0756a3855289cff2d7d18a0c896ae4c1b1f708d1c2e9de1af7",
+        "strategy": "SOURCE_PRODUCT_PORT",
+        "changes": "package/Jakarta/explicit Factory permission and owned business transaction; external implementations excluded"
+      },
+      {
+        "source": "ktg-mes/src/main/java/com/ktg/mes/pro/productionmonitor/domain/dto/ProductionMonitorTimelineQueryDTO.java",
+        "target": "mes-mes/src/main/java/dev/mesbase/mes/pro/productionmonitor/domain/dto/ProductionMonitorTimelineQueryDTO.java",
+        "sourceSha256": "b83817d86eeaca9190a98e0bcf3d7d5f5625ab181db2d90bb4d96a29e71bf303",
+        "strategy": "SOURCE_PRODUCT_PORT",
+        "changes": "package/Jakarta/explicit Factory permission and owned business transaction; external implementations excluded"
+      },
+      {
+        "source": "ktg-mes/src/main/java/com/ktg/mes/pro/productionmonitor/domain/query/ProductionMonitorTimelineQuery.java",
+        "target": "mes-mes/src/main/java/dev/mesbase/mes/pro/productionmonitor/domain/query/ProductionMonitorTimelineQuery.java",
+        "sourceSha256": "7a4beda39694475ff03a403181945174fcb707e4c9ecb2bcd3f84994a3b878e0",
+        "strategy": "SOURCE_PRODUCT_PORT",
+        "changes": "package/Jakarta/explicit Factory permission and owned business transaction; external implementations excluded"
+      },
+      {
+        "source": "ktg-mes/src/main/java/com/ktg/mes/pro/productionmonitor/domain/row/ProductionMonitorAggregateCountRow.java",
+        "target": "mes-mes/src/main/java/dev/mesbase/mes/pro/productionmonitor/domain/row/ProductionMonitorAggregateCountRow.java",
+        "sourceSha256": "96de46d748d215d549db0f900a7242f342996d877dc8368112bd7896e3783846",
+        "strategy": "SOURCE_PRODUCT_PORT",
+        "changes": "package/Jakarta/explicit Factory permission and owned business transaction; external implementations excluded"
+      },
+      {
+        "source": "ktg-mes/src/main/java/com/ktg/mes/pro/productionmonitor/domain/row/ProductionMonitorDefectiveAggregateRow.java",
+        "target": "mes-mes/src/main/java/dev/mesbase/mes/pro/productionmonitor/domain/row/ProductionMonitorDefectiveAggregateRow.java",
+        "sourceSha256": "791f6020eda701769abe0bcc1e9603ce373c0c56471a8882ec69e4a223e33ad3",
+        "strategy": "SOURCE_PRODUCT_PORT",
+        "changes": "package/Jakarta/explicit Factory permission and owned business transaction; external implementations excluded"
+      },
+      {
+        "source": "ktg-mes/src/main/java/com/ktg/mes/pro/productionmonitor/domain/row/ProductionMonitorFlowcardRow.java",
+        "target": "mes-mes/src/main/java/dev/mesbase/mes/pro/productionmonitor/domain/row/ProductionMonitorFlowcardRow.java",
+        "sourceSha256": "6ebf93d026357a249842f3f0a7430827bf94995c9ff218eea4218bf8a04e7cd0",
+        "strategy": "SOURCE_PRODUCT_PORT",
+        "changes": "package/Jakarta/explicit Factory permission and owned business transaction; external implementations excluded"
+      },
+      {
+        "source": "ktg-mes/src/main/java/com/ktg/mes/pro/productionmonitor/domain/row/ProductionMonitorObservedProcessRow.java",
+        "target": "mes-mes/src/main/java/dev/mesbase/mes/pro/productionmonitor/domain/row/ProductionMonitorObservedProcessRow.java",
+        "sourceSha256": "8768b8243e599df263ed24561fd4b6378d3f5b6c14d713903854b9477d3be2e0",
+        "strategy": "SOURCE_PRODUCT_PORT",
+        "changes": "package/Jakarta/explicit Factory permission and owned business transaction; external implementations excluded"
+      },
+      {
+        "source": "ktg-mes/src/main/java/com/ktg/mes/pro/productionmonitor/domain/row/ProductionMonitorReportingAggregateRow.java",
+        "target": "mes-mes/src/main/java/dev/mesbase/mes/pro/productionmonitor/domain/row/ProductionMonitorReportingAggregateRow.java",
+        "sourceSha256": "5942edd0caff4b616f18f14083e2a95ef9add2759e4f2a274a53d7fdb498f774",
+        "strategy": "SOURCE_PRODUCT_PORT",
+        "changes": "package/Jakarta/explicit Factory permission and owned business transaction; external implementations excluded"
+      },
+      {
+        "source": "ktg-mes/src/main/java/com/ktg/mes/pro/productionmonitor/domain/row/ProductionMonitorRouteStepRow.java",
+        "target": "mes-mes/src/main/java/dev/mesbase/mes/pro/productionmonitor/domain/row/ProductionMonitorRouteStepRow.java",
+        "sourceSha256": "718a785e73bdf6a1aab96db7327518f76090c454fe9acdf167dfc2a3024b4383",
+        "strategy": "SOURCE_PRODUCT_PORT",
+        "changes": "package/Jakarta/explicit Factory permission and owned business transaction; external implementations excluded"
+      },
+      {
+        "source": "ktg-mes/src/main/java/com/ktg/mes/pro/productionmonitor/domain/row/ProductionMonitorStatusCountRow.java",
+        "target": "mes-mes/src/main/java/dev/mesbase/mes/pro/productionmonitor/domain/row/ProductionMonitorStatusCountRow.java",
+        "sourceSha256": "50e1bbf95834e933c5cd7e0bde0c5f7ebebca4bb1f215ec4bddd901cb1175531",
+        "strategy": "SOURCE_PRODUCT_PORT",
+        "changes": "package/Jakarta/explicit Factory permission and owned business transaction; external implementations excluded"
+      },
+      {
+        "source": "ktg-mes/src/main/java/com/ktg/mes/pro/productionmonitor/domain/row/ProductionMonitorSummaryRow.java",
+        "target": "mes-mes/src/main/java/dev/mesbase/mes/pro/productionmonitor/domain/row/ProductionMonitorSummaryRow.java",
+        "sourceSha256": "5336f75c678ee1ea1777cab9d776ab30e137806a95ddddee90112c8c3b99f81b",
+        "strategy": "SOURCE_PRODUCT_PORT",
+        "changes": "package/Jakarta/explicit Factory permission and owned business transaction; external implementations excluded"
+      },
+      {
+        "source": "ktg-mes/src/main/java/com/ktg/mes/pro/productionmonitor/domain/row/ProductionMonitorTimelineRow.java",
+        "target": "mes-mes/src/main/java/dev/mesbase/mes/pro/productionmonitor/domain/row/ProductionMonitorTimelineRow.java",
+        "sourceSha256": "21bc04de0c170ab2a639a185ae841543133f50e140480223af068bd0f085c94d",
+        "strategy": "SOURCE_PRODUCT_PORT",
+        "changes": "package/Jakarta/explicit Factory permission and owned business transaction; external implementations excluded"
+      },
+      {
+        "source": "ktg-mes/src/main/java/com/ktg/mes/pro/productionmonitor/domain/row/ProductionMonitorWorkorderRow.java",
+        "target": "mes-mes/src/main/java/dev/mesbase/mes/pro/productionmonitor/domain/row/ProductionMonitorWorkorderRow.java",
+        "sourceSha256": "c69d72e655c5873baefb3afb01aa63ed58d9cb0e4823ead9990608ce458752e3",
+        "strategy": "SOURCE_PRODUCT_PORT",
+        "changes": "package/Jakarta/explicit Factory permission and owned business transaction; external implementations excluded"
+      },
+      {
+        "source": "ktg-mes/src/main/java/com/ktg/mes/pro/productionmonitor/domain/vo/ProductionMonitorAggregateCountVO.java",
+        "target": "mes-mes/src/main/java/dev/mesbase/mes/pro/productionmonitor/domain/vo/ProductionMonitorAggregateCountVO.java",
+        "sourceSha256": "0063d6611b9585939eb55f2958a73109807cfd6306109e4e908e67f97a9e5ccd",
+        "strategy": "SOURCE_PRODUCT_PORT",
+        "changes": "package/Jakarta/explicit Factory permission and owned business transaction; external implementations excluded"
+      },
+      {
+        "source": "ktg-mes/src/main/java/com/ktg/mes/pro/productionmonitor/domain/vo/ProductionMonitorDetailVO.java",
+        "target": "mes-mes/src/main/java/dev/mesbase/mes/pro/productionmonitor/domain/vo/ProductionMonitorDetailVO.java",
+        "sourceSha256": "20b73e97071a1c7de0f7f9f588177241571490646708602b2758fa1f994b11c5",
+        "strategy": "SOURCE_PRODUCT_PORT",
+        "changes": "package/Jakarta/explicit Factory permission and owned business transaction; external implementations excluded"
+      },
+      {
+        "source": "ktg-mes/src/main/java/com/ktg/mes/pro/productionmonitor/domain/vo/ProductionMonitorFlowcardVO.java",
+        "target": "mes-mes/src/main/java/dev/mesbase/mes/pro/productionmonitor/domain/vo/ProductionMonitorFlowcardVO.java",
+        "sourceSha256": "4b08b86baf9f7ee5aa4ef716de4ae5cc00dd0a7475949b8193dcc01b08591c8e",
+        "strategy": "SOURCE_PRODUCT_PORT",
+        "changes": "package/Jakarta/explicit Factory permission and owned business transaction; external implementations excluded"
+      },
+      {
+        "source": "ktg-mes/src/main/java/com/ktg/mes/pro/productionmonitor/domain/vo/ProductionMonitorRiskTag.java",
+        "target": "mes-mes/src/main/java/dev/mesbase/mes/pro/productionmonitor/domain/vo/ProductionMonitorRiskTag.java",
+        "sourceSha256": "208b913cb9482a21b2f81ef8928ddbb0d60073d3d321b58e1994ad5e318a5f2d",
+        "strategy": "SOURCE_PRODUCT_PORT",
+        "changes": "package/Jakarta/explicit Factory permission and owned business transaction; external implementations excluded"
+      },
+      {
+        "source": "ktg-mes/src/main/java/com/ktg/mes/pro/productionmonitor/domain/vo/ProductionMonitorRouteTrackVO.java",
+        "target": "mes-mes/src/main/java/dev/mesbase/mes/pro/productionmonitor/domain/vo/ProductionMonitorRouteTrackVO.java",
+        "sourceSha256": "1db7244242f72f5d59ea4160b09b2ee8cc493d6386ad388b9cf5454234a2f0af",
+        "strategy": "SOURCE_PRODUCT_PORT",
+        "changes": "package/Jakarta/explicit Factory permission and owned business transaction; external implementations excluded"
+      },
+      {
+        "source": "ktg-mes/src/main/java/com/ktg/mes/pro/productionmonitor/domain/vo/ProductionMonitorStatusCountVO.java",
+        "target": "mes-mes/src/main/java/dev/mesbase/mes/pro/productionmonitor/domain/vo/ProductionMonitorStatusCountVO.java",
+        "sourceSha256": "ee2f0a997a2bda7f2e8128b5301b0a5a8fdc8715680cd58749abc4d7430afbd0",
+        "strategy": "SOURCE_PRODUCT_PORT",
+        "changes": "package/Jakarta/explicit Factory permission and owned business transaction; external implementations excluded"
+      },
+      {
+        "source": "ktg-mes/src/main/java/com/ktg/mes/pro/productionmonitor/domain/vo/ProductionMonitorSummaryVO.java",
+        "target": "mes-mes/src/main/java/dev/mesbase/mes/pro/productionmonitor/domain/vo/ProductionMonitorSummaryVO.java",
+        "sourceSha256": "a6fa523c24bc65f65585b05606cb06141aa2fcf8db0bf902e7d7f5e679101c93",
+        "strategy": "SOURCE_PRODUCT_PORT",
+        "changes": "package/Jakarta/explicit Factory permission and owned business transaction; external implementations excluded"
+      },
+      {
+        "source": "ktg-mes/src/main/java/com/ktg/mes/pro/productionmonitor/domain/vo/ProductionMonitorTimelineEventVO.java",
+        "target": "mes-mes/src/main/java/dev/mesbase/mes/pro/productionmonitor/domain/vo/ProductionMonitorTimelineEventVO.java",
+        "sourceSha256": "7487d167caef3aecf8fb2899678cdbceb276f0b280f2ae8a94d29c313de26a0e",
+        "strategy": "SOURCE_PRODUCT_PORT",
+        "changes": "package/Jakarta/explicit Factory permission and owned business transaction; external implementations excluded"
+      },
+      {
+        "source": "ktg-mes/src/main/java/com/ktg/mes/pro/productionmonitor/domain/vo/ProductionMonitorTimelineVO.java",
+        "target": "mes-mes/src/main/java/dev/mesbase/mes/pro/productionmonitor/domain/vo/ProductionMonitorTimelineVO.java",
+        "sourceSha256": "d366678eb7bb494e579502ff3939b6007e76b06aaf4f98ec250c31edef7bf89f",
+        "strategy": "SOURCE_PRODUCT_PORT",
+        "changes": "package/Jakarta/explicit Factory permission and owned business transaction; external implementations excluded"
+      },
+      {
+        "source": "ktg-mes/src/main/java/com/ktg/mes/pro/productionmonitor/domain/vo/ProductionMonitorWorkorderVO.java",
+        "target": "mes-mes/src/main/java/dev/mesbase/mes/pro/productionmonitor/domain/vo/ProductionMonitorWorkorderVO.java",
+        "sourceSha256": "63218d8e021351eb8846025c3f659db31a9fc44c3a677909c0701e5e1bd80039",
+        "strategy": "SOURCE_PRODUCT_PORT",
+        "changes": "package/Jakarta/explicit Factory permission and owned business transaction; external implementations excluded"
+      },
+      {
+        "source": "ktg-mes/src/main/java/com/ktg/mes/pro/productionmonitor/mapper/ProReportingWorkMonitorExtraMapper.java",
+        "target": "mes-mes/src/main/java/dev/mesbase/mes/pro/productionmonitor/mapper/ProReportingWorkMonitorExtraMapper.java",
+        "sourceSha256": "a635a802db7ab5cc636e90abf502c62fd042474ecf6c3609084b0f5e3a640e83",
+        "strategy": "SOURCE_PRODUCT_PORT",
+        "changes": "package/Jakarta/explicit Factory permission and owned business transaction; external implementations excluded"
+      },
+      {
+        "source": "ktg-mes/src/main/java/com/ktg/mes/pro/productionmonitor/mapper/ProWorkorderMonitorExtraMapper.java",
+        "target": "mes-mes/src/main/java/dev/mesbase/mes/pro/productionmonitor/mapper/ProWorkorderMonitorExtraMapper.java",
+        "sourceSha256": "c73947abddbee943fa22b3268d998ec2363e08458813a6140836609fb9c3dcaf",
+        "strategy": "SOURCE_PRODUCT_PORT",
+        "changes": "package/Jakarta/explicit Factory permission and owned business transaction; external implementations excluded"
+      },
+      {
+        "source": "ktg-mes/src/main/java/com/ktg/mes/pro/productionmonitor/mapper/QcDefectiveMonitorExtraMapper.java",
+        "target": "mes-mes/src/main/java/dev/mesbase/mes/pro/productionmonitor/mapper/QcDefectiveMonitorExtraMapper.java",
+        "sourceSha256": "a72641858f909255f379420592d82fdb75e1e1fa392e061a72291428a7adaaaa",
+        "strategy": "SOURCE_PRODUCT_PORT",
+        "changes": "package/Jakarta/explicit Factory permission and owned business transaction; external implementations excluded"
+      },
+      {
+        "source": "ktg-mes/src/main/java/com/ktg/mes/pro/productionmonitor/service/ProductionMonitorService.java",
+        "target": "mes-mes/src/main/java/dev/mesbase/mes/pro/productionmonitor/service/ProductionMonitorService.java",
+        "sourceSha256": "01bcd6ee8452ec6500052872faf116eefa0fc05d1dcfde6d4682d5536df85b70",
+        "strategy": "SOURCE_PRODUCT_PORT",
+        "changes": "package/Jakarta/explicit Factory permission and owned business transaction; external implementations excluded"
+      },
+      {
+        "source": "ktg-mes/src/main/java/com/ktg/mes/pro/productionmonitor/service/impl/ProductionMonitorServiceImpl.java",
+        "target": "mes-mes/src/main/java/dev/mesbase/mes/pro/productionmonitor/service/impl/ProductionMonitorServiceImpl.java",
+        "sourceSha256": "9ced84d1a48053589de7dfe61a50c97ee9895de4fb9855f82b0f9438e753114b",
+        "strategy": "SOURCE_PRODUCT_PORT",
+        "changes": "package/Jakarta/explicit Factory permission and owned business transaction; external implementations excluded"
+      }
+    ],
+    "datasourceSource": "ktg-framework/src/main/java/com/ktg/framework/factory/ManagedDatasourceService.java + ktg-system MfFactory/MfDatasource and scripts/mf-upgrade/sql/001-master-init.sql",
+    "syncSource": "AGENTS.md:1045-1065 + MasterSync/MasterSyncExtraMapper.xml/claim/recoverStale",
+    "credentialMigration": "Existing Base test instance connections imported locally once; no Source Product connection values or records copied"
   }
 }

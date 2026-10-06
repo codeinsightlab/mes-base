@@ -398,3 +398,255 @@ YAML open-api.data-scope.enabled 默认false，可通过MES_OPEN_API_DATA_SCOPE_
 整体缺口明确保留：Source Layout/Navbar/Sidebar/TagsView/Settings及配套外观/交互尚未完整迁入。这是产品迁移缺口；Vue3页面适配和之前API/构建测试通过不能替代它。Factory选择、内存凭证和Scope/权限等行为可以在迁入旧结构时保留，不能据此将全新外壳算作原架构迁移。
 
 方法与边界：读取两端Git状态/HEAD，以sed/cat对照上述实际Source/Base文件，Python统计来源条目；Source只读。同步修正UI README、来源清单和有效交接计划，仅文档变化，执行JSON解析和git diff --check，不重跑前次已通过的构建/HTTP/浏览器门禁。本次没有浏览器截图对比或全119项语义审查，不改变既有各包的实际测试记录。
+
+
+## 2026-10-06 dev/prod配置与临时数据库收尾
+
+### 配置与运行环境
+
+用户要求可运行dev/prod配置、解释异常目录、删除无用代码与过期测试，并建立干净开发库。保留开始时已有dirty工作；期间用户新增提交2467430，本轮未提交/推送/部署，未回退其提交。
+
+默认profile改为dev；application-dev.yml从仓库根导入Git忽略的 `.local/application-dev.yml`，脚本显式加载同一文件。IDE需把Working directory设为仓库根。prod显式激活，数据库/Redis/文件根由部署方提供，迁移默认关闭、验证码强制、密码最少12位；config/application-dev.example.yml与application-prod.example.yml提供完整无凭证模板。prod仅在开发库做本地进程验证，无生产环境或部署结论。
+
+稳定开发系统库mes_base_dev（27表），独立业务库mes_base_dev_business（0表），单Factory=DEV，Codegen只读业务metadata。均从空库开始，运行原V1–V10、不改checksum，不复制phase用户/业务数据。只有通用产品菜单/字典/参数，以及通过空用户表guard创建的admin/显式PLATFORM role/menu授权；平台角色无factoryId，无Factory权限。首管CLI补齐tool前缀授予，使新空库管理员可访问当前Swagger工具，不引入全局通配权限。凭证0600保存在.local/development-admin.json，未写入Git或终端。
+
+16张phase1_legacy_*及phase1_archived_*空归档由scripts/clean-empty-development-archives检查后删除；重复执行移除0表。脚本固定mes_base_dev、先检查所有候选表均为空，非空拒绝；platform_catalog_revision仍被管理员事务guard使用，保留。业务库未建测试探针。HTTP验收产生的登录/操作审计保留为真实开发运行记录，既有QA会话已通过正式在线用户接口撤销。
+
+旧18081 phase JAR已停止，新的正式JAR通过scripts/run-local-backend在18081启动。Redis16379使用原数据迁出target到.local（同版本二进制、私有配置、AOF/RDB），开发使用DB1；UI15174未改源码，代理/health已通过。Java21与标准Maven沿用用户环境。
+
+### 异常目录与退役清单
+
+mes-admin/${project.parent.basedir}保存未展开Maven表达式路径的compiler status；mes-admin/Users保存将绝对路径误作相对路径生成的classes、YAML与licenses。二者无业务源码，已移至target/dev-cleanup归档；当前POM使用maven.multiModuleProjectDirectory，重新verify不再生成。
+
+删除旧简化Platform实现17个Java文件（Controller/Service/Store/Bootstrap/DTO/TokenFilter/Mapper/Rows/条件装配/文件资源策略）及旧DemoConfiguration。保留正式PlatformAdminCli、FileStorage、PlatformAuthorization、PlatformPersistence及Factory Foundation。移除Foundation生产链对旧TokenFilter的引用、旧demo分支；不会通过mes.legacy-test-only或demo恢复另一套正式身份/CRUD系统。
+
+按用户追加要求删除PlatformServiceTest、PlatformHttpTest、TestOnlyCodegenFixture，删除MySqlDevelopmentTest中仅验证旧V1 UUID字段/catalog的迁移方法。两个旧verify-codegen脚本引用退役API、旧单模块classpath、已不存在UI页面，已删除并修正当前指南/计划入口；历史Review不覆盖。保留RuntimeFixture、CodegenAcceptanceTest、真实MySQL业务metadata/隔离可选测试、单/多厂/跨库/跨线程/ownership/权限及Source系统测试。
+
+### 真实数据库清理与恢复
+
+已删除7个本项目mes_base_phase1_*临时schema，列表和SHA256见本次机器验收。每个库在删除前mysqldump --single-transaction --routines --events完整备份并检查成功footer；备份位于.local/backups/20261006-phase，包含CREATE DATABASE/USE，可由授权账号导入恢复。删除前停止旧本项目服务并核对无活动查询；未KILL用户IDE中的Sleep连接。4个旧mes_base_dev_20261005_* schema保留，未访问公司/生产schema或清理其他实例。
+
+### 验证、失败与边界
+
+最终 `mvn -B -ntp verify`（target/dev-cleanup/verify-final-clean.log）80 run / 78 passed / 0 failure / 0 error / 2 skipped；跳过项是显式独立双厂MySQL配置测试，不能对日常dev库造探针。`/usr/bin/python3 scripts/smoke-packaged.py` 4/4：JAR不含H2/Fixture、旧Platform/Demo实现，空装配health200、未认证401。真实dev/prod本地HTTP检查15/15：默认dev导入连接、登录、密码策略5、唯一DEV厂、上下文成功、平台管理员厂业务403、Source用户列表、Swagger工具；prod启动、密码策略12、无验证码登录401；注销后401。切换后新18081登录/单用户核对、在线旧QA会话撤销和15174代理health再通过。真实MySQL核对V1–V10、27系统表、0业务表、phase schema为0；git diff --check通过。未改UI源码、未重复完整浏览器矩阵、未部署prod。
+
+保留的失败记录：初次移动测试时引用本版本不存在的SecurityProperties.DEFAULT_FILTER_ORDER导致编译失败，随后修正且旧实现最终删除；删除旧Mapper后当前MySQL ownership负例仍引用旧Mapper导致一次编译失败，已改用独立RuntimeFixture平台探针；初始账号随机hex密码被MySQL MEDIUM策略拒绝，schema已建但账号未建，补齐复杂度后创建成功。首次HTTP检查误用旧/api/platform/me得到404、误期望缺验证码400但实际401；按当前Controller契约修正检查后15/15，不将脚本错误归因于正式系统失败。
+
+配置/代码恢复用Git差异及target/dev-cleanup/baseline/retired归档；数据库恢复用上述私有完整备份。旧phase配置仍作为历史本地证据保留，不再作为正常启动入口，不能复用已删除schema的旧账号/Token继续操作。
+
+本次文档更新：README的dev/prod/Redis启动方式；platform.md的稳定配置、库和退役行为及本日追加；codegen.md替换过期验收入口；next-stage-plan.md新增本日开发环境交接、保留旧快照并标为历史；本节报告及docs/reviews/2026-10-06-development-cleanup-verification.json记录命令/真实库清单/结果与边界。未改MES业务Domain。
+
+## 2026-10-06 UI 第一轮：Modern Industrial
+
+本工作包 UI FIRST，Phase 1 后端迁移仍 **MIGRATING**。改造相邻 mes-base-ui 当前已迁页面；本 UI 工作包没有修改 Java/Mapper/SQL/Flyway/API/权限模型，没有新增正式 MES Domain、生产指标或依赖，没有提交、推送、部署。原用户工作及其他工作包的后端调整保留。
+
+建立统一 CSS token、浅色工作区/深蓝灰导航、Factory 上下文、Tags、PageHeader/Filter/Toolbar/Table/Dialog/Tree 和 StatusTag。Login 为克制品牌区 + 表单；Home 只显示真实用户/工厂/授权模块。System、Monitor、Quartz、自动编码、OpenAPI、Swagger 接入公共主题；个人资料/文件/消息继承主题。OpenAPI 授权/重置 Secret 移至逐项保留权限的“更多”。头像/Quill/Crontab 内部专项交互未重写。
+
+当前改造前源码快照包含用户 dirty/untracked：31 个改变的页面，v-model、表格标签/prop、权限 code 集合保持；28 个业务 script 原样，另三项为 Login 错误加载/反馈、Home 实际导航、Redis 图表展示与尺寸生命周期。20 个 API 文件及 auth/router/request/menu-query/dynamicRoutes 逐字节相同；Source User/Role/Dept/Menu/Job/AutoCode 只读核对。此结论不等于全 Source Product 迁移已完成。
+
+真实浏览器 1440 已查看 Home/User/Role/Menu/Dept/Post/Dict/Config/Notice、日志/在线/Quartz/Server/Redis/Druid、OpenAPI/AutoCode/Swagger；实际 User 查询/重置/显隐查询/空态/分页、部门必填校验/新增/编辑/停用、删除确认取消、菜单导航、OpenAPI 更多与真实授权目录取消。未提交新凭证/授权、删除、运行任务或强退别人会话。UI 操作当时使用旧 phase 环境；合成根部门 UI视觉验收20261006已编辑（99、停用）属于该历史环境，不能宣称当前干净开发库有此记录。独立 dev/prod 清理工作已切换后端、退役旧数据，UI 工作没有阻止或恢复该清理。
+
+Node22 门禁：`npm run test` 7 文件/27 通过（既有21 + 本轮6），`npm run build` vue-tsc/Vite 通过；已有大 chunk 提示。早期 Tags command 隐式 any 已修复；快照测试曾被额外发现一次的28项数字不作为有效覆盖，改 `.snapshot` 后以27项为准。Login 真实无效登录/密码清理和1920/1280/560布局已验证。
+
+**UI_BACKEND_BLOCKER：** 当前15174代理 health UP，但18081真实登录500；`.local/logs/backend-console.log` 10:50记录 requestId=c95204f2-9c06-45da-9d81-27043e01fc7b，NoClassDefFoundError/ClassNotFoundException: org.apache.ibatis.reflection.ExceptionUtil。当前 JAR 与本地配置已存在；已向用户询问仅重启当前18081运行实例以继续验收，未改后端源码/配置/数据库，也未自行停止其他工作包实例。后台1920/1280、折叠菜单、Tags操作、显隐列/树折叠和末轮修正截图仍待闭环；不把旧环境/单元/构建替代当前环境证明。
+
+规范：相邻 `mes-base-ui/docs/UI_DESIGN_SYSTEM.md` 与前端 AGENTS；10项交付、截图、feature-preservation JSON 和门禁日志在 `/Users/user/work/lixin/mes-base-ui/docs/acceptance/ui-round1/`。敏感UI提交、受限账号浏览器负例、外部设备/部署仍按独立验收边界。整体 Phase 1 状态不变。
+
+
+### 2026-10-06 追加：实际profile直接配置与失效属性修正
+
+用户明确不喜欢环境变量占位符，并要求直接填写标准配置文件。此前为了隔离Git凭证设计的config.import中转层增加入口，已按用户偏好撤销。最终实际值直接位于mes-admin/src/main/resources/application-dev.yml和application-prod.yml，默认dev、prod以spring.profiles.active激活，不存在额外映射或import层。公共application.yml的环境占位符、重复默认端口/连接和无用空JDBC字段移除；config只保留两个无密码example供新机器复制。config里的实际dev/prod副本、.local旧dev副本和旧runtime双厂example删除。
+
+两个含真实连接的profile通过用户批准的git rm --cached取消跟踪，仅索引删除、本地文件保留，.gitignore显式忽略且文件0600；这两项索引删除已暂存，本轮未提交/推送。正常resources打包会把本机配置带入本地JAR，本轮没有发布该JAR。运行脚本不再额外读取MES_LOCAL_CONFIG/additional-location，dev18081已重启为标准profile启动。
+
+用户指定prod暂用同一测试MySQL实例但另建独立库。本轮创建mes_base_prod、mes_base_prod_business及独立mes_base_prod账号，从空库运行V1–V10、创建首个显式PLATFORM admin、移除16张空归档；最终27系统表/0业务表，与dev账号/库/PROD Factory/Redis DB2/文件目录隔离。初始凭证.local/production-test-admin.json，dev不重置。prod测试保持验证码开启和12位密码最小长度；没有真实生产库或生产部署。
+
+用户反馈server.error配置报错。直接读取当前JAR中Spring Boot4.1.1的spring-configuration-metadata，旧server.error.include-message/include-stacktrace/include-binding-errors自4.0被标记deprecation.level=error，replacement为spring.web.error对应键，已修正。server.address/port仍有效，留在实际profile中。公共YAML按依赖metadata审查，未发现其他level=error键。自有mes/ruoyi/open-api/druid配置按真实消费者保留，不将IDE未知提示误判为无用业务字段。
+
+最终mvn -B -ntp verify（target/direct-yaml/verify-standard-profiles.log）80 run /78 passed /2 skipped /0失败，packaged smoke4/4；实际标准dev/prod资源自动加载检查21/21。检查包含真实prod测试账号的验证码登录、密码策略12、唯一PROD厂；双向跨环境Token拒绝、注销，以及dev原有Source/Swagger/Factory403行为。验证码测试只读本次测试生成的自有prod Redis challenge（不关闭验证码策略、不输出验证码/凭证）。两次QA脚本读取了错误captcha字段/按UTF8误解读Redis JDK序列化缓存，均为测试脚本失败，按实际captchaOnOff/JDK String契约修正后通过；非应用配置失败。归档清理首次直接运行遇到本机PATH中的python3架构错误，已改用本机可用/usr/bin/python3并修正launcher，prod清理与幂等重复执行通过。
+
+README启动章节、platform.md配置及本日追加、codegen.md实际profile读取说明、next-stage-plan.md交接均已更新；机器证据新增configurationFollowUp，保留上一阶段快照。没有更改MES Domain、前端或用户dev业务数据。回滚可恢复两个无密码Git入口或target/direct-yaml/baseline，但不要恢复已废弃import路径作为当前启动方式。prod额外库的初始化及授权不等于生产发布。
+
+## 2026-10-06 多工厂分支实现工作包
+
+SOURCE_PRODUCT_PORT 来源 feat/multi-factory-isolation，后端提交 bdc299dade855177a3e275199ffde6e72310e393。新增 V11–V13：mf_factory/mf_datasource、mes_master_sync及管理/分析菜单。原 V1–V10 checksum 保留。DEV/PROD 本项目测试连接分别导入对应系统库，业务密码 AES-256-GCM 加密，独立密钥直接位于私有 profile；不迁 Source 客户连接。工厂目录从 YAML 改为数据库，平台库仍由 YAML 引导启动。
+
+数据源/工厂接口与 Vue3 页面已接入，显式 PLATFORM 管理权限、原分页语义与 revision 冲突检查。列表不返回密码/密文；绑定数据源不能停用/修改/删除；工厂删除检查角色、任务、同步引用。业务池按数据库目录延迟加载，校验物理库归属及 revision，失效不回退默认库。DDL 只导出表结构，缓存位于平台私有目录。菜单迁移不自动修改角色授权；现有管理员缺新权限时返回403。工厂导航按当前 FACTORY 角色菜单读取。
+
+mes_master_sync 位于平台系统库，SyncCoordinator 按 factory_id + sync_key 条件抢占；活动、结束、失败、恢复均校验 run_token / RUNNING。恢复依据数据库活动时间和旧令牌并检查更新行数；后续执行器须分批检查 ownership、更新活动时间，旧令牌失效后停止副作用。AGENTS §8.1 已同步强制约束；未引入 ERP/WMS/外部 MES 执行器、客户连接或远程调用。
+
+生产监控及人员分析 Java/XML/Vue 已迁入 mes-mes，业务 Mapper 显式 BUSINESS 登记，用户展示使用独立平台批量只读查询，禁止跨库 JOIN/写事务。当前 mes.analytics.enabled=false；pro_workorder/pro_reporting_work/qc_defective 等当前表 Schema/状态字典来源已询问用户。未推测建业务表、未执行真实分析 SQL，管理/分析授权页面及窄屏浏览器验收未完成。
+
+### 实际验证
+
+- `mvn -B -ntp verify -Dmes.test.managed.config=mes-admin/src/main/resources/application-dev.yml -Dmes.test.managed.factory=DEV`：target/migration-verify-live.log，BUILD SUCCESS，93项/91通过/2显式双厂fixture跳过。真实 MySQL 管理/同步20项，包括双独立JVM同流一个ACQUIRED/一个BUSY、跨厂同key独立、恢复/旧令牌拒绝、分页及无数据DDL。分析 Source 服务12项单元通过，不是业务SQL验收。
+- UI `npm run test`：7文件/27通过；`npm run build`：vue-tsc/Vite通过，既有chunk提示。日志 target/migration-ui-test.log、migration-ui-build.log。
+- `/usr/bin/python3 scripts/smoke-packaged.py`：4/4，target/migration-packaged-smoke.log。
+- prod测试库基础检查9项通过（target/management-integration/prod.log）；dev HTTP8项通过（http-result.json），含登录、DB工厂目录/选厂、401/403、分析关闭404，未证明授权管理CRUD页面操作。
+
+原本项目18081旧进程和本轮临时18082已停止，scripts/run-local-backend在18081运行新包（本轮PID42637），health200；.local/services.json已更新。另一个既有后端进程保持，prod没有持续启动或部署。未提交/推送。
+
+工具失败修正：测试helper的Druid Wall拒绝Flyway用户变量检查，改为与正式启动一致的直接迁移DataSource，未关闭Wall；helper提取旧jar类出现byIds NoSuchMethodError，重新提取最新包后prod9项通过。文档脚本两次遇到输入编码错误，改用apply_patch完成；没有据此修改业务配置或放宽校验。
+
+### 2026-10-06 用户指定测试管理员密码
+
+按用户明确授权，对 mes_base_dev / mes_base_prod 中已有 admin 做一次性密码重置，未重复创建账号、未改变角色/菜单授权。使用当前 BCrypt 依赖，参数化 SQL、行锁和 auth_revision 条件更新；提交后回读，两库均验证 BCrypt 匹配及 auth_revision 加一，旧会话因此失效。私有凭证记录同步更新并保持0600，本文不记录密码。prod 本次指定密码短于全局最小12位，作为明确授权的一次性维护，不降低后续创建/重置的全局策略。执行辅助程序位于自有 target/admin-reset，无业务代码或配置修改。
+
+dev HTTP登录验证时18081连接被拒绝，未取得本轮实际登录证明；prod亦未启动登录验收。数据库凭证验证已完成，服务运行状态以上述最新检查为准，不能沿用上一节health200作为当前在线证据。
+
+## 2026-10-06 中心库 dev 数据导入：结构核对
+
+用户明确要求读取 ktg-mes 中心库并导入 Base dev，并选择保留两个源工厂、另配独立开发业务库。本次授权是本机开发数据导入例外，不改变产品迁移禁止携带客户数据/真实连接的常规规则；源数据仅进入用户指定 dev 与本机私有备份，不进入 Git/产品 seed/prod。源库只读，prod未修改。实际目标名称为 mes_base_dev，而非连字符 mes-base-dev。
+
+读取 feat/multi-factory-isolation 的 dev 配置定位 mes_master，未连接其 ERP/HR/WMS 配置。真实 information_schema 比对：源39表、目标30表、共同20表。结构与数量证据 target/central-import/comparison.json，冲突聚合 conflicts.json；不输出用户、连接凭据或业务行。
+
+结论：RuoYi 基础 sys_* 字段多数兼容，可以使用显式列 INSERT/批处理 SQL 做适配导入，但不能将整库 mysqldump 原样恢复至 Base，也不能通用 REPLACE/INSERT IGNORE 掩盖冲突。原因：
+
+- 部门、岗位、公告与关联表基础字段一致；已有目标角色/用户使关联 ID 必须审查。字典类型/数据结构一致，但15个字典类型ID、44个字典数据ID冲突，应按dict_type/字典值合并。
+- 用户存在同名admin，须保留本地密码与显式平台权限；源warehouse_code未进入当前Base契约，Base新增auth_revision/pwd_update_date等。6条头像引用超过原目标100字符，V14按真实源metadata扩为150，避免截断。
+- sys_role 的源factory_id是BIGINT NOT NULL，Base为字符串且有kind/scope_key约束；直接默认PLATFORM再写factory_id会违反角色范围检查。源34角色中1个不属于真实源工厂，不能照搬旧userId=1/魔法factoryId=0超级管理员语义。
+- 菜单存在205个ID冲突，源带factory_id，Base带route_name/legacy_id；源630菜单包含未迁业务和外部页面。保留Base已实现菜单，只按明确分析权限映射FACTORY授权，不把厂角色转为平台权限。
+- mf_factory的ID类型不同，源有erp_plant_code，Base需要enterprise_id/revision；源mf_datasource有真实连接/密文，不能复制到开发工厂。源mes_master_sync只有3条无factory_id/updated_at/id旧结构，与分支源码和Base现行按factory+sync_key协调不同，历史水位/运行状态不能直接照搬。
+- 源sys_job的invoke_target/调度状态及qrtz_*属于旧执行环境，不能把旧任务复制成可运行Base任务；大量操作/登录/任务日志不作为干净开发库存。sys_permission/sys_role_permission移动权限、外部erp_item_lot、请求表与代码生成元数据不在当前已实现契约中。
+
+目标库先完整mysqldump备份，再在单事务内导入兼容数据及ID/范围映射。私有备份目录.local/backups/20261006-central-import（0700），target-before.sql、选定源数据快照与SHA256为0600。备份保留现有账号密码，仅本机访问；正式文档不包含业务行或密码。
+
+### 导入结果与真实数据库验收
+
+数据事务已提交：新增用户1749（原admin不变）、FACTORY角色33、用户角色关联1873、角色部门关联3、部门83、岗位4、公告1、字典类型35、字典数据134、普通外观配置1、工厂2。最终用户1750、角色34、字典类型50、字典数据178、用户角色关联1874。复用15个既有字典类型和41个既有字典值；保留Base额外3个字典值及4处既有展示标签差异，不覆盖现有契约。尚未迁入用户warehouse_code契约，该原始字段保留私有快照，不伪造已实现仓库权限。
+
+工厂ID按显式字符串保留为1/2，归现有DEV的enterprise_id，状态DISABLED、datasource_id=NULL；现有DEV保持。没有导入原业务连接/密文，独立开发业务库的配置与启用仍待完成。源一个无真实工厂的角色、2条相关/既有admin用户角色关联未迁入；不引入魔法0/1管理员。源同名admin及其岗位/平台权限保留当前Base版本，指定密码未覆盖。
+
+源554条role-menu授权未原样复制：其不对应当前已实现的工厂分析授权；中心库对4个分析菜单的显式角色授权实际为0。Base不复制旧超级管理员特判，不通过来源账号ID自动赋权。源菜单/移动权限/外部表/任务/Quartz状态/历史日志/同步水位、初始化密码/注册开关等未导入；不能把这份受控兼容数据导入表述为原系统整库功能恢复。
+
+单独应用V14把avatar扩大到实际源150字符，恢复6条长头像引用并逐条验证，不截断字段。Flyway此时发现本轮开始前dev真实版本为12（并非上方早期交接声称13），已按原checksum应用V13/V14；最新实际dev版本14。prod本轮未改，不能用dev版本推定prod同步完成。
+
+真实验收29项通过：数量、原admin BCrypt匹配/平台授权、工厂不绑定源库、无用户角色/用户部门/工厂角色孤儿、未复制任务/同步状态、V14及6条头像、所有源字典type/value均可找到。证据为 docs/reviews/2026-10-06-central-library-import-verification.json，仅含schema/计数/状态，不含个人数据或凭证。`mvn -B -ntp verify` BUILD SUCCESS（target/central-import/verify.log），93项/90通过/3显式真实库fixture跳过；打包smoke4/4（smoke.log）。未改业务Java/前端，未启动服务、未做HTTP/浏览器验收，未提交/推送/部署。
+
+失败保留：源快照首次因LocalDateTime序列化模块未登记而中止，发生在目标数据写入前，修正时间模块后重试。两次导入在最后关联检查遇到MySQL1267排序规则混用（sys_role.factory_id=utf8mb4_unicode_ci，mf_factory.factory_id=utf8mb4_0900_ai_ci），数据事务均回滚；校验SQL改为显式BINARY按Core字符串身份精确比较后通过，未关闭约束、忽略错误或截断数据。最终导入使用有界批量PreparedStatement；验证helper曾遇到javac参数及Map.of数量错误，修正后29项通过。每次重试检查目标仍为原基线才复用备份。
+
+回滚须在停止当前dev写入、确认本次之后无需要保留的新数据后，受控恢复私有target-before.sql（备份时dev V12）；不能直接覆盖后续开发数据。源库只读未修改，prod与源外部系统未访问。
+
+### 2026-10-06 日志页面样例：每类最近100条
+
+用户说明只需少量真实数据查看页面，明确授权操作/登录/任务日志各100条。本节覆盖前文“不导入历史日志”的本轮范围，未恢复全部历史记录。源mes_master按日志时间DESC、源主键DESC各LIMIT100，只读；向mes_base_dev追加300条并保留原记录。操作日志0→100、登录日志17→117、任务日志0→100，事务内检查每表增加100，sys_job数量保持不变。沿用源时间、状态、人员及模块/任务等展示信息；不采集源请求体、响应体、原始异常、任务调用参数，展示摘要标记Source history sample。工厂ID明确映射1/2，新增日志使用目标自动生成ID，不覆盖旧记录，不恢复任务或推进同步水位。
+
+目标库导入前完整备份在.local/backups/20261006-log-samples/target-before.sql；inserted-id-map.json保存300条源/目标ID映射，可按本次目标ID精确回滚，避免覆盖后续开发数据。目录0700、文件0600，SHA256已记录。机器证据追加现有central-library-import-verification.json的logSamples，只包含计数/状态，不含日志内容或凭证。无业务代码/Schema/配置修改，未改prod、源库或外部系统；未做浏览器显示验收，不重复构建无变化的业务代码。
+
+### 2026-10-06 登录态刷新恢复
+
+用户明确要求有效Token在刷新后保持登录，本节替代此前仅内存保存Token的约定。UI新增sessionStorage保存Token/过期时间/选厂偏好，路由进入前重新读取服务端身份、权限、菜单及启用工厂，再恢复仍有效的选厂与原动态页面；不持久化密码或授权数据。过期、401及退出清理，网络失败可重试。根和UI AGENTS同步此约定，无后端业务代码或Schema修改。
+
+UI Node22执行npm run test（10文件51测试）与npm run build通过。实际本机dev浏览器验证/system/config整页刷新保留登录、原页面和DEV选厂，退出后刷新回登录页。异常与过期场景为单元测试证据；prod未启动验收。详细回执与截图在mes-base-ui/docs/acceptance/session-restore/README.md及refresh-preserved.png，构建日志在UI target/session-restore。本次启动自有dev服务：后端18081 health200，UI15174；验证会话已退出。未提交、推送或部署。
+
+### 2026-10-06 验证码条件请求与管理菜单可见性
+
+原登录/注册页面每次加载都请求/api/captchaImage读取验证码、注册开关及密码策略；dev验证码关闭时接口不生成图片，但仍有请求。新增PUBLIC /api/login-options返回显式LoginOptions VO，CaptchaService集中读取同一服务端开关；UI先读配置，只有captchaOnOff=true才请求图片。登录成功后不再额外刷新验证码，失败后重新读开关。原captchaImage接口兼容保留，后端登录验证码校验仍以服务端配置为准。
+
+真实dev数据库确认工厂管理和数据源管理两个菜单已由V13创建，前后端模块均在当前源码与构建内。不可见原因是当前admin平台角色无对应sys_role_menu授权，重启不能补权限。按用户本轮明确授权，事务内补齐system:factory:*与system:datasource:*共10项现有菜单/操作授权，无重复；prod未改。私有精确回滚记录.local/backups/20261006-managed-menu-grants/inserted-grants.json，目录0700/文件0600。不新增默认超级管理员绕过，不修改Flyway历史脚本或赋予工厂业务授权。
+
+mvn -B -ntp verify BUILD SUCCESS：95项，92通过，3项真实库fixture显式跳过；新增2项验证码配置测试。scripts/smoke-packaged.py 4/4。UI Node22 npm run test 11文件54测试通过，npm run build通过。重启本次自有dev后端18081（PID50110），实际/api/login-options返回captchaOnOff=false。真实浏览器登录页无验证码，登录后显示两个菜单；工厂页面加载3条、DEV编辑弹窗打开并取消；数据源页面加载1条并显示当前节点未加载状态。未执行创建/更新/删除、DDL访问或业务连接验收；prod未启动/部署。
+
+截图在mes-base-ui/docs/acceptance/managed-menus/factory.png；验证码关闭时不请求图片与开启时请求图片的分支由UI测试证明，本轮未抓取浏览器网络面板，不把单元请求证据表述为浏览器网络抓包。测试/构建/打包日志在target/login-options以及UI target/session-restore/login-options-*.log。业务代码修改仅验证码设置契约与前端条件请求；管理模块本轮未改。
+
+
+## 2026-10-06 响应投影及隐式基础设施审查
+
+本次为当前 main 未提交工作区的静态源码审查；未修改业务代码，未运行 Maven、HTTP、数据库或 UI 验收。检索 docs/ 内容及目录，doc/、knowledge/ 不存在；本报告已有分层与迁移架构主题，因此追加，保留历史证据。历史测试通过记录不作为本次结论的运行证明。
+
+### SystemResponseAdvice 的用途与问题
+
+实际链路：SysUserController.list/getInfo → ISysUserService 返回实体 → TableDataInfo/AjaxResult 包装 → SystemResponseAdvice.beforeBodyWrite → SystemViews.project → HTTP 序列化。源码注释明确投影排除 password/salt/persistence params；已识别实体转白名单 record，部分 ID 转字符串。因此用途是统一响应投影；结合迁移结构推断，这是为了少改源产品 Controller/Service 的兼容补丁，无法从当前代码证明作者当时的完整动机。
+
+- SystemResponseAdvice（mes-framework/src/main/java/dev/mesbase/framework/web/SystemResponseAdvice.java:3-12）按整个 dev.mesbase.web.controller 包生效，supports 恒为 true，不只作用于 system；还直接修改 TableDataInfo.rows。
+- SystemViews（mes-system/src/main/java/dev/mesbase/system/dto/SystemViews.java:9-60）以 Object + instanceof 分支承担各系统模块投影；Map/List 递归转换，但未知类型原样返回。未遍历任意 record/POJO/数组；不能将其当作完整 Entity 隔离或敏感字段安全边界，也不能据此断言当前所有接口已经泄密。
+- project 中任意递归遇到的 Long 都转字符串，不区分 ID 与数量。TableDataInfo.total 不经该递归，而已识别 VO 的 Long 字段也不会再递归；类型语义依赖容器和命中分支。SysUserView 的 dept/roles、树的 children 使用 Object，削弱编译期契约。
+- AjaxResult 继承 Map，因此经 project 后成为 LinkedHashMap。OpenApiResponseAdvice 另要求 body instanceof AjaxResult；两者是否作用于同一接口、执行顺序及实际结果未验证，不宣称已发生故障。
+
+建议：逐用例在 Service 输出明确 VO，Controller 只做协议包装；ID 精度转换按字段契约表达。待所有响应类型、敏感字段和分页契约覆盖后移除此 Advice；不能直接删除而重新暴露实体。
+
+### 其他需要治理的设计
+
+| 位置 | 当前源码事实 | 判断与建议 |
+| --- | --- | --- |
+| mes-common/.../core/domain/AjaxResult.java:133-147 | error 返回签名仍是 AjaxResult，实际抛 ServiceException；data 参数不参与处理 | 为消除 HTTP200 错误而保留旧调用形式的隐式兼容；改为 Service 显式业务异常，成功包装不负责失败控制流。当前并非仍返回 HTTP200 错误。 |
+| mes-admin/.../controller/system/SysUserController.java:104-174 | 详情编排用户/角色/岗位；新增校验唯一性、编码密码；请求 Form 在 Controller 转 Entity；角色过滤还残留 false ? roles : ... | 业务编排仍留在 Controller；迁入既有代码后应逐用例收回 Service，不靠 Advice 证明分层完成。恒假分支应局部清理。 |
+| mes-framework/.../persistence/SystemUnitAspect.java:16 与 SystemUnit.java:22-66 | 硬编码 Service 包/类开启平台事务，排除一个 run 方法；SystemUnit 用 ThreadLocal 和代理共享 Session | ownership 和共享事务有实际隔离价值，但事务边界依赖包名，移动 Service 可漏织入，查询也进入 transaction。保留保护机制，统一显式用例事务入口及模块登记。 |
+| mes-admin/.../server/AnalyticsConfiguration.java:20-48 | 配置类内又实现 Mapper 动态代理、ThreadLocal、业务事务和具体 Service 切点 | 与 SystemUnit 重复机制但数据库 scope 不同，不能直接混用。让配置只装配，将共用机制收回受控持久化基础设施，保持平台/业务跨库事务拒绝。 |
+
+合理机制需区别对待：FoundationErrorAdvice 做安全 HTTP 异常映射；OpenApiResponseAdvice 做外部协议装饰；OwnedSqlSession 逐次校验注册 Mapper、线程归属、关闭状态及执行权。这些职责不等同于隐藏 Entity→VO 映射，不因出现 Advice/代理/ThreadLocal 就删除。此审查覆盖响应与相关装配、事务、用户入口，不是全系统穷尽审计。
+
+### 本次规则更新与证据边界
+
+AGENTS.md 新增「5.1 Java 导入与类型引用」：所有 Java 生产/测试源码及生成模板显式 import、简单类名；仅实际同名冲突允许全限定名，禁止通配符绕过。包/import 声明与框架类名字符串不属于类型引用。本次未全量重排已有 Java imports，未改 UI 文件、未提交/推送/部署。验证为源码读取、rg 检索及本次文档差异检查；上述风险未作运行复现。
+
+
+## 2026-10-06 显式 Controller 响应契约迁移
+
+本节承接上节审查；用户本轮明确改为 Controller Web 边界做 Result 转换，因此取代上节“Service 返回 HTTP VO”的治理建议。Service/Domain 返回模型不改，不修改 SystemUnit/SystemUnitAspect/AnalyticsConfiguration/FactoryContext/Mapper ownership/异常体系。现有工作区原件在 target/response-migration/baseline，保护文件 SHA256 留存供完成后对照。迁移阶段不调用 Codegen。
+
+### 修改前依赖清单（静态源码）
+
+Advice 覆盖 dev.mesbase.web.controller 整包；仅有 Advice 直接调用 SystemViews，下面的接口是间接依赖。分页依赖 rows 的投影；total 没有被原 Advice 转成字符串。
+
+| Controller / 路由族 | 依赖的响应与递归结构 | 直接移除的影响 |
+| --- | --- | --- |
+| SysUserController /api/system/user | list、详情 data/user、roles/posts、授权角色；roleIds/postIds | 用户实体含 password/salt；部门/角色嵌套及各 ID 转换丢失，BaseEntity 内部状态重新暴露 |
+| SystemSessionController /api/system/info | user | 登录用户实体重新暴露；密码/salt、部门与角色 ID 契约受影响 |
+| SysProfileController /api/system/user/profile | data | 同用户实体；roleGroup/postGroup 字符串不受影响 |
+| SysRoleController /api/system/role | list、详情、optionselect、allocatedList/unallocatedList | SysRole、嵌套数组 menuIds/deptIds，以及授权用户 SysUser 的白名单/ID 丢失 |
+| SysMenuController /api/system/menu | 列表/详情、treeselect、roleMenuTreeselect 的 checkedKeys/menus | 菜单/树 children 递归和 ID 字符串丢失 |
+| SysDeptController /api/system/dept | 列表/排除子部门/详情、treeselect、roleDeptTreeselect 的 checkedKeys/depts | 部门/树 children 递归和 ID 字符串丢失 |
+| SysPostController /api/system/post | 分页、详情、optionselect | 岗位 ID 和 BaseEntity 白名单丢失 |
+| SysDictDataController /api/system/dict/data | 分页、详情、type | dictCode ID 变数值；dictSort 本来是 VO 内数值，应保持 |
+| SysDictTypeController /api/system/dict/type | 分页、详情、optionselect | dictId ID 和内部状态隔离丢失 |
+| SysConfigController /api/system/config | 分页、详情 | configId ID 和内部状态隔离丢失；configKey 字符串不受影响 |
+| SysNoticeController /api/system/notice | 分页、详情 | noticeId ID 和内部状态隔离丢失 |
+| SysAutoCodeRuleController /api/system/autocode/rule | 分页、详情 | ruleId ID 和内部状态隔离丢失；长度等数值保持 |
+| SysAutoCodePartController /api/system/autocode/part | 分页、详情 | partId/ruleId ID 和内部状态隔离丢失；索引/步长等数值保持 |
+| SysMessageController /api/system/message | 分页、详情 | messageId/senderId/recipientId ID 和内部状态隔离丢失 |
+| SystemInboxController /api/system/inbox、/api/mobile/system/message | 分页 rows | 同消息；SSE 是独立事件协议，未被 project 遍历 |
+| SystemFileController /api/platform/files | 分页、裸 metadata/upload | attachmentId/sourceDocId/ownerId ID 和内部状态隔离丢失；fileSize 保留 BigDecimal；download bytes 不变 |
+| SysOperlogController /api/monitor/operlog | 分页 rows | operId ID 和白名单丢失；costTime 保持 Long |
+| SysLogininforController /api/monitor/logininfor | 分页 rows | infoId ID 和白名单丢失 |
+| CacheController /api/monitor/cache | Map 的 dbSize | 原 Long 计数被错误转成字符串；本轮明确改回 Long 数值 |
+
+SystemViews 的 SysUserRole/SysRoleMenu/SysRoleDept/SysUserPost/SysUserRecipientQuery 分支没有当前 HTTP 输出入口；用户收件人查询 Service 实际返回 SysUser。无需为未使用分支创建响应类。
+
+无投影依赖的已检查接口：SystemCaptcha/SysRegister/SysAutoCode 返回已有专用模型或基本类型；ManagedFactory/ManagedDatasource 返回独立 record；OpenApiClient 返回已定义 DTO，创建/重置凭证是 no-store 专用协议；SystemOnline/Druid 返回已有 record；Server 返回监控模型；Swagger 返回静态协议。project 不遍历这些 POJO/record 内部字段。Quartz、MES、generator Controller 不在 Advice 的 basePackages，沿用现有显式 DTO/VO，不扩散调整。字符串/byte[]/void/错误响应也不是实体投影依赖。
+
+迁移保持原白名单字段、日期格式和包装，不重新设计查询、权限、写入/导入导出业务。文件 ID、FactoryId、请求/执行 ID 已为 String，不额外转换。各 Result 以原 Sys*View 字段为基线，用户/角色/部门/树的内部 Object 改为对应 Result/List 的静态类型。
+
+
+### 最终分级方案（2026-10-06，新约束取代全量 Result 方案）
+
+用户在初版实施中暂停并提供新约束，后明确授权继续：普通安全后台 CRUD 不强制复制 Result/VO；敏感、复杂、字段裁剪/转换或外部接口才严格隔离。本节取代前述“一律显式 VO”方案。上一轮已创建 16 组响应模型；最终撤掉 SysConfig、SysNotice 两组，保留 14 组均有下表所述具体理由，而非以“分层完整”作为理由。迁移债务与新增规范明确区分。
+
+曾考虑撤掉字典/规则/日志模型，随后 Schema 与前端源码证明这会引入精度风险：V2 的 dict_id/dict_code/oper_id/info_id 和 V6 的 rule_id 是 BIGINT；前端 src/lib/request.ts 用 JSON.parse，超过 2^53-1 会丢 ID 精度。因此恢复这些接口的显式字符串 ID 契约。中间 9 组的方案及测试属于过渡步骤，不是交付结果。参数 config_id 和公告 notice_id 在 V2 是 INT（INT(5)/INT(4) 为显示宽度），最大值在 JS 安全整数范围，允许直接 Entity；尚未核对真实数据库是否偏离仓库迁移 Schema。
+
+| 最终模型 / 接口 | 必须转换的具体理由 |
+| --- | --- |
+| SysUserResult / SysUserAssembler；用户列表/详情/授权列表、session info、个人资料 | password/salt、内部状态白名单隔离；嵌套角色/部门类型明确，BIGINT ID 字符串 |
+| SysRoleResult、SysDeptResult、SysPostResult 及对应 Assembler | 原实体 roleSort/orderNum/postSort 是 String，现有 el-input-number 需要数值；关联用户表单/选项和 ID 契约保持一致 |
+| SysMenuResult / Assembler、TreeResult / TreeAssembler | 菜单/树父子 ID、角色 checkedKeys 的字符串契约一致；明确 children 类型 |
+| SysDictDataResult、SysDictTypeResult 及对应 Assembler | BIGINT 主键维持字符串，dictSort 仍数值；无全局 Long 转换 |
+| SysAutoCodeRuleResult / Assembler | BIGINT ruleId 字符串精度；maxLength 数值 |
+| SysAutoCodePartResult / Assembler | 不暴露内部 seriaNowNo 运行计数；partId/ruleId 字符串，索引/长度/步长数值 |
+| SysMessageResult / Assembler；消息、inbox、mobile 别名 | 现有移动接口独立响应白名单，去除 deletedFlag/attr*；sender/recipient/message ID 字符串 |
+| SysAttachmentResult / Assembler；文件列表/upload/metadata | 私有资源元数据白名单，去除 attr* 等内部状态；attachment/sourceDoc/owner ID 字符串；fileSize 为 BigDecimal |
+| SysOperLogResult、SysLogininforResult 及对应 Assembler | BIGINT 日志 ID 字符串精度；request/actor 原字符串、costTime 数值，字段继续原白名单 |
+| SysConfig、SysNotice 直接 Entity；列表/详情 | 安全标准后台 CRUD，不新增 Result；保留原字段/日期/分页结构，INT schema ID 从字符串明确恢复数值 |
+
+BaseEntity.getParams/getSearchValue 增加 JsonIgnore，仅排除框架内部查询状态，不改变 Java getter/setter、MyBatis 或 Service 使用。这不是用户密码等敏感字段的主要保护；SysUser 的敏感字段由 Result 本身不存在这些字段保证。Converter 不访问 Service/Mapper/数据库、不处理权限或事务。PageResultMapper 只复用 PageHelper 先取总数再映射 rows，不猜测业务类型。
+
+生产 SystemResponseAdvice 和 SystemViews 已删除，源码及最终 JAR 均无旧类/调用残留；测试源码保留 LegacySystemViews 冻结快照作旧响应 oracle，不注册 Spring、不进生产包。44 个 GET 路由（含树/组合响应/移动别名/裸文件元数据）无 Advice 的 MockMvc 检查、文件上传及缓存计数共 46 项；Result 对照/直接 Entity/分页/数值语义共 18 项。测试为合成数据与 mocked Services，不是 live 数据库或浏览器验收。
+
+### 正式规则与最终验证回执
+
+AGENTS.md 第4/5节对齐 Controller Web 转换与分级 Entity 规则；13.1 CRUD Development、13.2 Domain Business、13.3 Response Contract、13.4 Global Response Rule、13.5 Migration Compatibility 分别明确 Codegen 默认开发入口、非 CRUD Service、后台宽松/敏感及外部严格、禁止全局猜测、迁移优先兼容。保留5.1显式 import 与同名冲突例外。当前迁移未调用 Codegen，未新增业务 CRUD、未迁业务 Service。
+
+最终命令 `zsh -ic 'mvn -B -ntp verify'` BUILD SUCCESS：159项，156通过、3跳过，失败/错误0；含上述64项新增响应测试。`zsh -ic '/usr/bin/python3 scripts/smoke-packaged.py'` 4/4，使用独立临时进程；未重启用户现有dev服务。首次HTTP fixture错误来自模拟List不可修改、字典查询返回错误实体类型，已修正fixture；未因此改变业务逻辑。最终源码/包内容检查：旧生产类/调用0；权限注解与本轮前一致；SystemUnit/SystemUnitAspect/AnalyticsConfiguration/FactoryContext SHA256不变。Mapper ownership/持久化/统一异常代码未修改。`git diff --check` 通过。
+
+唯一有意 HTTP 差异：参数/公告的 configId/noticeId 从字符串恢复为数值；Redis dbSize 从错误的字符串恢复为 Long 数值。其余已识别响应模型的原字段名、包装、BIGINT字符串、日期、树、分页total以及空值保持。SysConfig/SysNotice 不新增 params/searchValue；日志未增加新字段。现有独立 DTO/record 接口保持原样。不宣称所有后台 Entity 自动安全，新增字段与新接口仍需分级审查。
+
+证据 JSON：docs/reviews/2026-10-06-response-contract-verification.json；原始日志 target/response-migration/{compile,verify,smoke}.log。静态扫描并未发现剩余生产 SystemViews/Advice 依赖，也未发现本次保留 Entity 输出带 password/salt/secret；这不是所有未来数据内容的安全保证。未执行真实系统API/DB/浏览器验收、UI build或部署。Service/Mapper/权限/资源范围不变；未提交/推送。回滚只能按本任务的响应文件与对应baseline逐项恢复，不覆盖其他用户改动。

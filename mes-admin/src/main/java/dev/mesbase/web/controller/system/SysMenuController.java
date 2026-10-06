@@ -7,10 +7,14 @@ import dev.mesbase.common.core.domain.AjaxResult;
 import dev.mesbase.common.core.domain.entity.SysMenu;
 import dev.mesbase.common.enums.BusinessType;
 import dev.mesbase.common.utils.StringUtils;
+import dev.mesbase.platform.web.EndpointAccess;
+import dev.mesbase.system.dto.MenuForm;
 import dev.mesbase.system.service.ISysMenuService;
-
+import dev.mesbase.web.view.menu.SysMenuAssembler;
+import dev.mesbase.web.view.tree.TreeAssembler;
+import java.util.List;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -21,15 +25,13 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.util.List;
-
 /**
  * 菜单信息
  * 
  * @author ruoyi
  */
 @RestController
-@org.springframework.boot.autoconfigure.condition.ConditionalOnProperty(name="mes.system.enabled",havingValue="true")
+@ConditionalOnProperty(name="mes.system.enabled",havingValue="true")
 @RequestMapping("/api/system/menu")
 public class SysMenuController extends BaseController
 {
@@ -39,57 +41,57 @@ public class SysMenuController extends BaseController
     /**
      * 获取菜单列表
      */
-    @dev.mesbase.platform.web.EndpointAccess(value=dev.mesbase.platform.web.EndpointAccess.Kind.AUTHORIZED,permission="system:menu:list",permissionScope=dev.mesbase.platform.web.EndpointAccess.PermissionScope.PLATFORM)
+    @EndpointAccess(value=EndpointAccess.Kind.AUTHORIZED,permission="system:menu:list",permissionScope=EndpointAccess.PermissionScope.PLATFORM)
     @GetMapping("/list")
     public AjaxResult list(SysMenu menu)
     {
         List<SysMenu> menus = menuService.selectMenuList(menu, getUserId());
-        return AjaxResult.success(menus);
+        return AjaxResult.success(SysMenuAssembler.toResults(menus));
     }
 
     /**
      * 根据菜单编号获取详细信息
      */
-    @dev.mesbase.platform.web.EndpointAccess(value=dev.mesbase.platform.web.EndpointAccess.Kind.AUTHORIZED,permission="system:menu:query",permissionScope=dev.mesbase.platform.web.EndpointAccess.PermissionScope.PLATFORM)
+    @EndpointAccess(value=EndpointAccess.Kind.AUTHORIZED,permission="system:menu:query",permissionScope=EndpointAccess.PermissionScope.PLATFORM)
     @GetMapping(value = "/{menuId}")
     public AjaxResult getInfo(@PathVariable Long menuId)
     {
-        return AjaxResult.success(menuService.selectMenuById(menuId));
+        return AjaxResult.success(SysMenuAssembler.toResult(menuService.selectMenuById(menuId)));
     }
 
     /**
      * 获取菜单下拉树列表
      */
     @GetMapping("/treeselect")
-    @dev.mesbase.platform.web.EndpointAccess(value=dev.mesbase.platform.web.EndpointAccess.Kind.AUTHENTICATED,permissionScope=dev.mesbase.platform.web.EndpointAccess.PermissionScope.PLATFORM)
+    @EndpointAccess(value=EndpointAccess.Kind.AUTHENTICATED,permissionScope=EndpointAccess.PermissionScope.PLATFORM)
     public AjaxResult treeselect(SysMenu menu)
     {
         List<SysMenu> menus = menuService.selectMenuList(menu, getUserId());
-        return AjaxResult.success(menuService.buildMenuTreeSelect(menus));
+        return AjaxResult.success(TreeAssembler.toResults(menuService.buildMenuTreeSelect(menus)));
     }
 
     /**
      * 加载对应角色菜单列表树
      */
 
-    @dev.mesbase.platform.web.EndpointAccess(value=dev.mesbase.platform.web.EndpointAccess.Kind.AUTHORIZED,permission="system:role:query",permissionScope=dev.mesbase.platform.web.EndpointAccess.PermissionScope.PLATFORM)
+    @EndpointAccess(value=EndpointAccess.Kind.AUTHORIZED,permission="system:role:query",permissionScope=EndpointAccess.PermissionScope.PLATFORM)
     @GetMapping(value = "/roleMenuTreeselect/{roleId}")
     public AjaxResult roleMenuTreeselect(@PathVariable("roleId") Long roleId)
     {
         List<SysMenu> menus = menuService.selectMenuList(getUserId());
         AjaxResult ajax = AjaxResult.success();
-        ajax.put("checkedKeys", menuService.selectMenuListByRoleId(roleId));
-        ajax.put("menus", menuService.buildMenuTreeSelect(menus));
+        ajax.put("checkedKeys", menuService.selectMenuListByRoleId(roleId).stream().map(String::valueOf).toList());
+        ajax.put("menus", TreeAssembler.toResults(menuService.buildMenuTreeSelect(menus)));
         return ajax;
     }
 
     /**
      * 新增菜单
      */
-    @dev.mesbase.platform.web.EndpointAccess(value=dev.mesbase.platform.web.EndpointAccess.Kind.AUTHORIZED,permission="system:menu:add",permissionScope=dev.mesbase.platform.web.EndpointAccess.PermissionScope.PLATFORM)
+    @EndpointAccess(value=EndpointAccess.Kind.AUTHORIZED,permission="system:menu:add",permissionScope=EndpointAccess.PermissionScope.PLATFORM)
     @Log(title = "菜单管理", businessType = BusinessType.INSERT)
     @PostMapping
-    public AjaxResult add(@Validated @RequestBody dev.mesbase.system.dto.MenuForm menuForm)
+    public AjaxResult add(@Validated @RequestBody MenuForm menuForm)
     {
         SysMenu menu=menuForm.toEntity();
         menu.setMenuId(null);
@@ -108,10 +110,10 @@ public class SysMenuController extends BaseController
     /**
      * 修改菜单
      */
-    @dev.mesbase.platform.web.EndpointAccess(value=dev.mesbase.platform.web.EndpointAccess.Kind.AUTHORIZED,permission="system:menu:edit",permissionScope=dev.mesbase.platform.web.EndpointAccess.PermissionScope.PLATFORM)
+    @EndpointAccess(value=EndpointAccess.Kind.AUTHORIZED,permission="system:menu:edit",permissionScope=EndpointAccess.PermissionScope.PLATFORM)
     @Log(title = "菜单管理", businessType = BusinessType.UPDATE)
     @PutMapping
-    public AjaxResult edit(@Validated @RequestBody dev.mesbase.system.dto.MenuForm menuForm)
+    public AjaxResult edit(@Validated @RequestBody MenuForm menuForm)
     {
         SysMenu menu=menuForm.toEntity();
         if(menu.getMenuId()==null)throw new IllegalArgumentException("Menu identifier required");
@@ -134,7 +136,7 @@ public class SysMenuController extends BaseController
     /**
      * 删除菜单
      */
-    @dev.mesbase.platform.web.EndpointAccess(value=dev.mesbase.platform.web.EndpointAccess.Kind.AUTHORIZED,permission="system:menu:remove",permissionScope=dev.mesbase.platform.web.EndpointAccess.PermissionScope.PLATFORM)
+    @EndpointAccess(value=EndpointAccess.Kind.AUTHORIZED,permission="system:menu:remove",permissionScope=EndpointAccess.PermissionScope.PLATFORM)
     @Log(title = "菜单管理", businessType = BusinessType.DELETE)
     @DeleteMapping("/{menuId}")
     public AjaxResult remove(@PathVariable("menuId") Long menuId)

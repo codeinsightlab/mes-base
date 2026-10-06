@@ -7,11 +7,16 @@ import dev.mesbase.common.core.domain.AjaxResult;
 import dev.mesbase.common.core.domain.entity.SysDept;
 import dev.mesbase.common.enums.BusinessType;
 import dev.mesbase.common.utils.StringUtils;
+import dev.mesbase.platform.web.EndpointAccess;
+import dev.mesbase.system.dto.DeptForm;
 import dev.mesbase.system.service.ISysDeptService;
-
+import dev.mesbase.web.view.dept.SysDeptAssembler;
+import dev.mesbase.web.view.tree.TreeAssembler;
+import java.util.Iterator;
+import java.util.List;
 import org.apache.commons.lang3.ArrayUtils;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -22,16 +27,13 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.util.Iterator;
-import java.util.List;
-
 /**
  * 部门信息
  * 
  * @author ruoyi
  */
 @RestController
-@org.springframework.boot.autoconfigure.condition.ConditionalOnProperty(name="mes.system.enabled",havingValue="true")
+@ConditionalOnProperty(name="mes.system.enabled",havingValue="true")
 @RequestMapping("/api/system/dept")
 public class SysDeptController extends BaseController
 {
@@ -41,18 +43,18 @@ public class SysDeptController extends BaseController
     /**
      * 获取部门列表
      */
-    @dev.mesbase.platform.web.EndpointAccess(value=dev.mesbase.platform.web.EndpointAccess.Kind.AUTHORIZED,permission="system:dept:list",permissionScope=dev.mesbase.platform.web.EndpointAccess.PermissionScope.PLATFORM)
+    @EndpointAccess(value=EndpointAccess.Kind.AUTHORIZED,permission="system:dept:list",permissionScope=EndpointAccess.PermissionScope.PLATFORM)
     @GetMapping("/list")
     public AjaxResult list(SysDept dept)
     {
         List<SysDept> depts = deptService.selectDeptList(dept);
-        return AjaxResult.success(depts);
+        return AjaxResult.success(SysDeptAssembler.toResults(depts));
     }
 
     /**
      * 查询部门列表（排除节点）
      */
-    @dev.mesbase.platform.web.EndpointAccess(value=dev.mesbase.platform.web.EndpointAccess.Kind.AUTHORIZED,permission="system:dept:list",permissionScope=dev.mesbase.platform.web.EndpointAccess.PermissionScope.PLATFORM)
+    @EndpointAccess(value=EndpointAccess.Kind.AUTHORIZED,permission="system:dept:list",permissionScope=EndpointAccess.PermissionScope.PLATFORM)
     @GetMapping("/list/exclude/{deptId}")
     public AjaxResult excludeChild(@PathVariable(value = "deptId", required = false) Long deptId)
     {
@@ -67,53 +69,53 @@ public class SysDeptController extends BaseController
                 it.remove();
             }
         }
-        return AjaxResult.success(depts);
+        return AjaxResult.success(SysDeptAssembler.toResults(depts));
     }
 
     /**
      * 根据部门编号获取详细信息
      */
-    @dev.mesbase.platform.web.EndpointAccess(value=dev.mesbase.platform.web.EndpointAccess.Kind.AUTHORIZED,permission="system:dept:query",permissionScope=dev.mesbase.platform.web.EndpointAccess.PermissionScope.PLATFORM)
+    @EndpointAccess(value=EndpointAccess.Kind.AUTHORIZED,permission="system:dept:query",permissionScope=EndpointAccess.PermissionScope.PLATFORM)
     @GetMapping(value = "/{deptId}")
     public AjaxResult getInfo(@PathVariable Long deptId)
     {
         deptService.checkDeptDataScope(deptId);
-        return AjaxResult.success(deptService.selectDeptById(deptId));
+        return AjaxResult.success(SysDeptAssembler.toResult(deptService.selectDeptById(deptId)));
     }
 
     /**
      * 获取部门下拉树列表
      */
     @GetMapping("/treeselect")
-    @dev.mesbase.platform.web.EndpointAccess(value=dev.mesbase.platform.web.EndpointAccess.Kind.AUTHENTICATED,permissionScope=dev.mesbase.platform.web.EndpointAccess.PermissionScope.PLATFORM)
+    @EndpointAccess(value=EndpointAccess.Kind.AUTHENTICATED,permissionScope=EndpointAccess.PermissionScope.PLATFORM)
     public AjaxResult treeselect(SysDept dept)
     {
         List<SysDept> depts = deptService.selectDeptList(dept);
-        return AjaxResult.success(deptService.buildDeptTreeSelect(depts));
+        return AjaxResult.success(TreeAssembler.toResults(deptService.buildDeptTreeSelect(depts)));
     }
 
     /**
      * 加载对应角色部门列表树
      */
 
-    @dev.mesbase.platform.web.EndpointAccess(value=dev.mesbase.platform.web.EndpointAccess.Kind.AUTHENTICATED,permissionScope=dev.mesbase.platform.web.EndpointAccess.PermissionScope.PLATFORM)
+    @EndpointAccess(value=EndpointAccess.Kind.AUTHENTICATED,permissionScope=EndpointAccess.PermissionScope.PLATFORM)
     @GetMapping(value = "/roleDeptTreeselect/{roleId}")
     public AjaxResult roleDeptTreeselect(@PathVariable("roleId") Long roleId)
     {
         List<SysDept> depts = deptService.selectDeptList(new SysDept());
         AjaxResult ajax = AjaxResult.success();
-        ajax.put("checkedKeys", deptService.selectDeptListByRoleId(roleId));
-        ajax.put("depts", deptService.buildDeptTreeSelect(depts));
+        ajax.put("checkedKeys", deptService.selectDeptListByRoleId(roleId).stream().map(String::valueOf).toList());
+        ajax.put("depts", TreeAssembler.toResults(deptService.buildDeptTreeSelect(depts)));
         return ajax;
     }
 
     /**
      * 新增部门
      */
-    @dev.mesbase.platform.web.EndpointAccess(value=dev.mesbase.platform.web.EndpointAccess.Kind.AUTHORIZED,permission="system:dept:add",permissionScope=dev.mesbase.platform.web.EndpointAccess.PermissionScope.PLATFORM)
+    @EndpointAccess(value=EndpointAccess.Kind.AUTHORIZED,permission="system:dept:add",permissionScope=EndpointAccess.PermissionScope.PLATFORM)
     @Log(title = "部门管理", businessType = BusinessType.INSERT)
     @PostMapping
-    public AjaxResult add(@Validated @RequestBody dev.mesbase.system.dto.DeptForm deptForm)
+    public AjaxResult add(@Validated @RequestBody DeptForm deptForm)
     {
         SysDept dept=deptForm.toEntity();
         dept.setDeptId(null);
@@ -128,10 +130,10 @@ public class SysDeptController extends BaseController
     /**
      * 修改部门
      */
-    @dev.mesbase.platform.web.EndpointAccess(value=dev.mesbase.platform.web.EndpointAccess.Kind.AUTHORIZED,permission="system:dept:edit",permissionScope=dev.mesbase.platform.web.EndpointAccess.PermissionScope.PLATFORM)
+    @EndpointAccess(value=EndpointAccess.Kind.AUTHORIZED,permission="system:dept:edit",permissionScope=EndpointAccess.PermissionScope.PLATFORM)
     @Log(title = "部门管理", businessType = BusinessType.UPDATE)
     @PutMapping
-    public AjaxResult edit(@Validated @RequestBody dev.mesbase.system.dto.DeptForm deptForm)
+    public AjaxResult edit(@Validated @RequestBody DeptForm deptForm)
     {
         SysDept dept=deptForm.toEntity();
         Long deptId = dept.getDeptId();
@@ -155,7 +157,7 @@ public class SysDeptController extends BaseController
     /**
      * 删除部门
      */
-    @dev.mesbase.platform.web.EndpointAccess(value=dev.mesbase.platform.web.EndpointAccess.Kind.AUTHORIZED,permission="system:dept:remove",permissionScope=dev.mesbase.platform.web.EndpointAccess.PermissionScope.PLATFORM)
+    @EndpointAccess(value=EndpointAccess.Kind.AUTHORIZED,permission="system:dept:remove",permissionScope=EndpointAccess.PermissionScope.PLATFORM)
     @Log(title = "部门管理", businessType = BusinessType.DELETE)
     @DeleteMapping("/{deptId}")
     public AjaxResult remove(@PathVariable Long deptId)

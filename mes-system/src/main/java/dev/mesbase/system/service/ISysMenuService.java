@@ -14,6 +14,8 @@ import java.util.Set;
  */
 public interface ISysMenuService
 {
+    List<SysMenu> selectFactoryMenuTree(String username,String factoryId);
+
     /**
      * 根据用户查询系统菜单列表
      * 

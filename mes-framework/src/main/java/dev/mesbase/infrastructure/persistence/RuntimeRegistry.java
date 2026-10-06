@@ -20,6 +20,8 @@ public final class RuntimeRegistry implements AutoCloseable {
             Configuration config=new Configuration(new Environment("business",transactionFactory,datasource));
             config.setCacheEnabled(false); config.setLocalCacheScope(LocalCacheScope.STATEMENT);
             config.addInterceptor(new BusinessStatementGuard(verify));
+            var page=new com.github.pagehelper.PageInterceptor();
+            var pagination=new Properties();pagination.setProperty("autoRuntimeDialect","true");pagination.setProperty("reasonable","false");page.setProperties(pagination);config.addInterceptor(page);
             for(Class<?> mapper:mappers) {
                 PersistenceOwner owner=mapper.getAnnotation(PersistenceOwner.class);
                 if(owner==null || owner.value()!=PersistenceOwner.Kind.BUSINESS) throw new IllegalArgumentException("Explicit BUSINESS mapper ownership required");
@@ -55,6 +57,16 @@ public final class RuntimeRegistry implements AutoCloseable {
         catch(RuntimeException | Error failure) { closer.run(); throw failure; }
         current.put(identity,replacement); dedicatedOwners.put(identity,factoryId);
         if(previous!=null) { previous.retired=true; previous.drain(); }
+    }
+    public synchronized boolean contains(BusinessRuntimeBinding binding) {
+        var runtime=current.get(binding.datasourceIdentity());
+        return !closed && runtime!=null && runtime.revision==binding.revision()
+                && binding.factoryId().equals(dedicatedOwners.get(binding.datasourceIdentity()));
+    }
+    /** Remove from acquisition immediately; outstanding leases drain and fail their next version check. */
+    public synchronized void retire(DatasourceIdentity identity) {
+        var runtime=current.remove(identity); dedicatedOwners.remove(identity);
+        if(runtime!=null) { runtime.retired=true; runtime.drain(); }
     }
     public synchronized Lease acquireDedicated(BusinessRuntimeBinding binding) {
         if(closed) throw new FoundationException(ErrorCode.CONFLICT);

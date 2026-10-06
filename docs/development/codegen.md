@@ -3,7 +3,7 @@
 2026-10-05。稳定 API 为 `MesCodegenService.generate(CodegenRequest)`；开发入口为可执行 `scripts/mes-codegen`。使用用户已配置的 Java21/Maven；脚本仅在 JAR 缺失或主源码更新时调用标准 Maven package，不创建 .m2/.mvn。
 
 ## 数据源与命令
-默认配置 `mes.codegen.default-datasource=dev`，dev.url/username/password 来自 MES_CODEGEN_URL/USER/PASSWORD，空 URL 是已知但不可用，不误判未知。外部配置可声明多个 `mes.codegen.profiles.<name>.url/username/password/driver-class-name`；`--config=file:/absolute/developer.properties` 加载，凭证仅环境/受控配置，禁止命令或报告打印。开发 profile 与运行时 Factory 无关。
+默认配置 `mes.codegen.default-datasource=dev`，dev/prod的实际url/username/password直接写入对应application profile的mes.codegen.profiles字段，不再用MES_CODEGEN_*占位符。外部配置可声明多个 `mes.codegen.profiles.<name>.url/username/password/driver-class-name`；`--config=file:/absolute/developer.properties` 加载，凭证仅环境/受控配置，禁止命令或报告打印。开发 profile 与运行时 Factory 无关。
 
 ```sh
 ./scripts/mes-codegen --datasource=business-dev --schema=PUBLIC --table=md_example \
@@ -34,4 +34,4 @@ FACTORY_SCOPED 16 文件：Entity、Mapper、XML、Service、Impl、Controller�
 
 ### YAML profile入口
 
-应用与CLI共享application.yml及dev/prod profiles；推荐外部配置 `--config=file:/absolute/developer.yml`。兼容已有properties开发文件，不强迫用户转换；仓库主配置与本轮受控连接已使用YAML。CLI仍独立于Factory Runtime，启动Codegen不创建池绑定或自动授予菜单/角色。
+应用与CLI共享application.yml及标准dev/prod profiles，默认读取打包的对应资源配置；--config可作为显式额外配置使用。兼容已有properties开发文件，不强迫用户转换；仓库主配置与本轮受控连接已使用YAML。CLI仍独立于Factory Runtime，启动Codegen不创建池绑定或自动授予菜单/角色。

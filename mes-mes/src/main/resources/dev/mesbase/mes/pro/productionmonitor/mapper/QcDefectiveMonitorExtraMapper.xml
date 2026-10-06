@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="dev.mesbase.mes.pro.productionmonitor.mapper.QcDefectiveMonitorExtraMapper">
+    <select id="selectWorkorderAggregates" resultType="dev.mesbase.mes.pro.productionmonitor.domain.row.ProductionMonitorDefectiveAggregateRow">
+        select workorder_code workorderCode,count(*) defectiveRecordCount
+        from qc_defective where workorder_code in
+        <foreach collection="workorderCodes" item="code" open="(" separator="," close=")">#{code}</foreach>
+        group by workorder_code
+    </select>
+</mapper>

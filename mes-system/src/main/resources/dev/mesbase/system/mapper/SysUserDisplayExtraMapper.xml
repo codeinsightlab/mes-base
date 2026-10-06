@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="dev.mesbase.system.mapper.SysUserDisplayExtraMapper">
+    <select id="selectByUserNames" resultType="dev.mesbase.common.core.domain.entity.SysUser">
+        select user_id as userId, user_name as userName, nick_name as nickName from sys_user
+        where user_name in
+        <foreach collection="userNames" item="name" open="(" separator="," close=")">#{name}</foreach>
+    </select>
+    <select id="selectPersonnelUsers" resultType="dev.mesbase.common.core.domain.entity.SysUser">
+        select user_id as userId, user_name as userName, nick_name as nickName, status
+        from sys_user where user_id in
+        <foreach collection="userIds" item="id" open="(" separator="," close=")">#{id}</foreach>
+    </select>
+    <select id="selectPersonnelUserIdsByKeyword" resultType="java.lang.Long">
+        select user_id from sys_user
+        where user_name like concat('%', #{keyword}, '%') or nick_name like concat('%', #{keyword}, '%')
+    </select>
+</mapper>

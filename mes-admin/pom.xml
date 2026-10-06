@@ -8,6 +8,7 @@
     </parent>
     <artifactId>mes-admin</artifactId>
     <dependencies>
+        <dependency><groupId>dev.mesbase</groupId><artifactId>mes-mes</artifactId><version>${project.version}</version></dependency>
         <dependency>
             <groupId>dev.mesbase</groupId>
             <artifactId>mes-quartz</artifactId>
@@ -52,6 +53,7 @@
                 <configuration>
                     <outputDirectory>${maven.multiModuleProjectDirectory}/target</outputDirectory>
                     <mainClass>dev.MesBaseApplication</mainClass>
+                    <excludes><exclude><groupId>org.projectlombok</groupId><artifactId>lombok</artifactId></exclude></excludes>
                 </configuration>
             </plugin>
         </plugins>

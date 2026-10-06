@@ -7,11 +7,16 @@ import dev.mesbase.common.core.domain.AjaxResult;
 import dev.mesbase.common.core.page.TableDataInfo;
 import dev.mesbase.common.enums.BusinessType;
 import dev.mesbase.common.utils.poi.ExcelUtil;
+import dev.mesbase.platform.web.EndpointAccess;
 import dev.mesbase.system.domain.SysPost;
+import dev.mesbase.system.dto.PostForm;
 import dev.mesbase.system.service.ISysPostService;
-
+import dev.mesbase.web.view.PageResultMapper;
+import dev.mesbase.web.view.post.SysPostAssembler;
+import jakarta.servlet.http.HttpServletResponse;
+import java.util.List;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -22,17 +27,13 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.util.List;
-
-import jakarta.servlet.http.HttpServletResponse;
-
 /**
  * 岗位信息操作处理
  * 
  * @author ruoyi
  */
 @RestController
-@org.springframework.boot.autoconfigure.condition.ConditionalOnProperty(name="mes.system.enabled",havingValue="true")
+@ConditionalOnProperty(name="mes.system.enabled",havingValue="true")
 @RequestMapping("/api/system/post")
 public class SysPostController extends BaseController
 {
@@ -42,30 +43,30 @@ public class SysPostController extends BaseController
     /**
      * 获取岗位列表
      */
-    @dev.mesbase.platform.web.EndpointAccess(value=dev.mesbase.platform.web.EndpointAccess.Kind.AUTHORIZED,permission="system:post:list",permissionScope=dev.mesbase.platform.web.EndpointAccess.PermissionScope.PLATFORM)
+    @EndpointAccess(value=EndpointAccess.Kind.AUTHORIZED,permission="system:post:list",permissionScope=EndpointAccess.PermissionScope.PLATFORM)
     @GetMapping("/list")
     public TableDataInfo list(SysPost post)
     {
         startPage();
         List<SysPost> list = postService.selectPostList(post);
-        return getDataTable(list);
+        return PageResultMapper.map(list, SysPostAssembler::toResult);
     }
 
     /**
      * 查询所有有效岗位信息以List方式返回
      * @return
      */
-    @dev.mesbase.platform.web.EndpointAccess(value=dev.mesbase.platform.web.EndpointAccess.Kind.AUTHORIZED,permission="system:post:list",permissionScope=dev.mesbase.platform.web.EndpointAccess.PermissionScope.PLATFORM)
+    @EndpointAccess(value=EndpointAccess.Kind.AUTHORIZED,permission="system:post:list",permissionScope=EndpointAccess.PermissionScope.PLATFORM)
     @GetMapping("/listAll")
     public AjaxResult listAll(){
         SysPost post = new SysPost();
         post.setStatus("0");
         List<SysPost> list = postService.selectPostList(post);
-        return AjaxResult.success(list);
+        return AjaxResult.success(SysPostAssembler.toResults(list));
     }
 
     @Log(title = "岗位管理", businessType = BusinessType.EXPORT)
-    @dev.mesbase.platform.web.EndpointAccess(value=dev.mesbase.platform.web.EndpointAccess.Kind.AUTHORIZED,permission="system:post:export",permissionScope=dev.mesbase.platform.web.EndpointAccess.PermissionScope.PLATFORM)
+    @EndpointAccess(value=EndpointAccess.Kind.AUTHORIZED,permission="system:post:export",permissionScope=EndpointAccess.PermissionScope.PLATFORM)
     @PostMapping("/export")
     public void export(HttpServletResponse response, SysPost post)
     {
@@ -77,20 +78,20 @@ public class SysPostController extends BaseController
     /**
      * 根据岗位编号获取详细信息
      */
-    @dev.mesbase.platform.web.EndpointAccess(value=dev.mesbase.platform.web.EndpointAccess.Kind.AUTHORIZED,permission="system:post:query",permissionScope=dev.mesbase.platform.web.EndpointAccess.PermissionScope.PLATFORM)
+    @EndpointAccess(value=EndpointAccess.Kind.AUTHORIZED,permission="system:post:query",permissionScope=EndpointAccess.PermissionScope.PLATFORM)
     @GetMapping(value = "/{postId}")
     public AjaxResult getInfo(@PathVariable Long postId)
     {
-        return AjaxResult.success(postService.selectPostById(postId));
+        return AjaxResult.success(SysPostAssembler.toResult(postService.selectPostById(postId)));
     }
 
     /**
      * 新增岗位
      */
-    @dev.mesbase.platform.web.EndpointAccess(value=dev.mesbase.platform.web.EndpointAccess.Kind.AUTHORIZED,permission="system:post:add",permissionScope=dev.mesbase.platform.web.EndpointAccess.PermissionScope.PLATFORM)
+    @EndpointAccess(value=EndpointAccess.Kind.AUTHORIZED,permission="system:post:add",permissionScope=EndpointAccess.PermissionScope.PLATFORM)
     @Log(title = "岗位管理", businessType = BusinessType.INSERT)
     @PostMapping
-    public AjaxResult add(@Validated @RequestBody dev.mesbase.system.dto.PostForm postForm)
+    public AjaxResult add(@Validated @RequestBody PostForm postForm)
     {
         SysPost post=postForm.toEntity();
         post.setPostId(null);
@@ -109,10 +110,10 @@ public class SysPostController extends BaseController
     /**
      * 修改岗位
      */
-    @dev.mesbase.platform.web.EndpointAccess(value=dev.mesbase.platform.web.EndpointAccess.Kind.AUTHORIZED,permission="system:post:edit",permissionScope=dev.mesbase.platform.web.EndpointAccess.PermissionScope.PLATFORM)
+    @EndpointAccess(value=EndpointAccess.Kind.AUTHORIZED,permission="system:post:edit",permissionScope=EndpointAccess.PermissionScope.PLATFORM)
     @Log(title = "岗位管理", businessType = BusinessType.UPDATE)
     @PutMapping
-    public AjaxResult edit(@Validated @RequestBody dev.mesbase.system.dto.PostForm postForm)
+    public AjaxResult edit(@Validated @RequestBody PostForm postForm)
     {
         SysPost post=postForm.toEntity();
         if (UserConstants.NOT_UNIQUE.equals(postService.checkPostNameUnique(post)))
@@ -130,7 +131,7 @@ public class SysPostController extends BaseController
     /**
      * 删除岗位
      */
-    @dev.mesbase.platform.web.EndpointAccess(value=dev.mesbase.platform.web.EndpointAccess.Kind.AUTHORIZED,permission="system:post:remove",permissionScope=dev.mesbase.platform.web.EndpointAccess.PermissionScope.PLATFORM)
+    @EndpointAccess(value=EndpointAccess.Kind.AUTHORIZED,permission="system:post:remove",permissionScope=EndpointAccess.PermissionScope.PLATFORM)
     @Log(title = "岗位管理", businessType = BusinessType.DELETE)
     @DeleteMapping("/{postIds}")
     public AjaxResult remove(@PathVariable Long[] postIds)
@@ -142,10 +143,10 @@ public class SysPostController extends BaseController
      * 获取岗位选择框列表
      */
     @GetMapping("/optionselect")
-    @dev.mesbase.platform.web.EndpointAccess(value=dev.mesbase.platform.web.EndpointAccess.Kind.AUTHENTICATED,permissionScope=dev.mesbase.platform.web.EndpointAccess.PermissionScope.PLATFORM)
+    @EndpointAccess(value=EndpointAccess.Kind.AUTHENTICATED,permissionScope=EndpointAccess.PermissionScope.PLATFORM)
     public AjaxResult optionselect()
     {
         List<SysPost> posts = postService.selectPostAll();
-        return AjaxResult.success(posts);
+        return AjaxResult.success(SysPostAssembler.toResults(posts));
     }
 }

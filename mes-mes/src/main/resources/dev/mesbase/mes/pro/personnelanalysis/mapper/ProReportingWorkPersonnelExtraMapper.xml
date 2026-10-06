@@ -1,0 +1,94 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="dev.mesbase.mes.pro.personnelanalysis.mapper.ProReportingWorkPersonnelExtraMapper">
+    <sql id="scope">
+        <where>
+            r.create_time &lt; #{endTime}
+            <if test="startTime != null">and r.create_time &gt;= #{startTime}</if>
+            <if test="userId != null">and r.user_id = #{userId}</if>
+            <if test="processId != null">and r.process_id = #{processId}</if>
+            <if test="itemCode != null and itemCode != ''">and r.item_code = #{itemCode}</if>
+            <if test="accountKeyword != null and accountKeyword != ''">
+                and (
+                <if test="matchingUserIds != null and matchingUserIds.size() &gt; 0">
+                    r.user_id in <foreach collection="matchingUserIds" item="id" open="(" separator="," close=")">#{id}</foreach> or
+                </if>
+                r.user_name like concat('%', #{accountKeyword}, '%')
+                or r.nick_name like concat('%', #{accountKeyword}, '%')
+                )
+            </if>
+        </where>
+    </sql>
+
+    <sql id="accountColumns">
+        r.user_id as userId,
+        count(*) as reportRecordCount,
+        count(distinct date_format(r.create_time, '%Y-%m')) as activeMonths,
+        count(distinct r.process_id) as processCount,
+        count(distinct r.item_code) as productCount,
+        min(r.create_time) as firstReportTime,
+        max(r.create_time) as lastReportTime
+    </sql>
+
+    <select id="selectAccounts" resultType="dev.mesbase.mes.pro.personnelanalysis.domain.PersonnelAccountRow">
+        select <include refid="accountColumns"/>
+        from pro_reporting_work r <include refid="scope"/>
+        group by r.user_id
+        order by lastReportTime desc, r.user_id asc
+    </select>
+
+    <select id="countAccounts" resultType="long">
+        select count(distinct r.user_id)
+        from pro_reporting_work r <include refid="scope"/>
+    </select>
+
+    <select id="selectAccount" resultType="dev.mesbase.mes.pro.personnelanalysis.domain.PersonnelAccountRow">
+        select <include refid="accountColumns"/>
+        from pro_reporting_work r <include refid="scope"/>
+        group by r.user_id
+    </select>
+
+    <select id="selectProcesses" resultType="dev.mesbase.mes.pro.personnelanalysis.domain.PersonnelProcessRow">
+        select r.process_id as processId, max(r.process_code) as processCode,
+               max(r.process_name) as processName,
+               count(*) as reportRecordCount,
+               count(distinct date_format(r.create_time, '%Y-%m')) as activeMonths,
+               count(distinct r.item_code) as productCount,
+               count(distinct r.workorder_code) as workorderCount,
+               max(r.create_time) as lastReportTime
+        from pro_reporting_work r <include refid="scope"/>
+        group by r.process_id
+        order by lastReportTime desc, r.process_id asc
+    </select>
+
+    <select id="selectProducts" resultType="dev.mesbase.mes.pro.personnelanalysis.domain.PersonnelProductRow">
+        select r.item_code as itemCode, max(r.item_name) as itemName,
+               count(*) as reportRecordCount,
+               count(distinct date_format(r.create_time, '%Y-%m')) as activeMonths,
+               count(distinct r.process_id) as processCount,
+               max(r.create_time) as lastReportTime
+        from pro_reporting_work r <include refid="scope"/>
+        group by r.item_code
+        order by lastReportTime desc, r.item_code asc
+    </select>
+
+    <select id="selectTrend" resultType="dev.mesbase.mes.pro.personnelanalysis.domain.PersonnelTrendRow">
+        select date_format(r.create_time, '%Y-%m') as month,
+               count(distinct date(r.create_time)) as activeDayCount,
+               count(*) as reportRecordCount,
+               count(distinct r.process_id) as processCount,
+               count(distinct r.item_code) as productCount
+        from pro_reporting_work r <include refid="scope"/>
+        group by date_format(r.create_time, '%Y-%m')
+        order by month asc
+    </select>
+    <select id="selectFirstRecordTime" resultType="java.time.LocalDateTime">
+        select min(create_time) from pro_reporting_work
+    </select>
+    <select id="selectRecords" resultType="dev.mesbase.mes.pro.personnelanalysis.domain.PersonnelRecordVO">
+      select r.record_id recordId,r.user_id userId,r.create_time createTime,r.user_name userName,r.create_by createBy,
+      r.reporting_work_type reportingWorkType,r.process_code processCode,r.process_name processName,
+      r.item_code itemCode,r.item_name itemName,r.unit_of_measure unitOfMeasure,r.reporting_work_quantity reportingWorkQuantity
+      from pro_reporting_work r <include refid="scope"/> order by r.create_time desc,r.record_id desc
+    </select>
+</mapper>

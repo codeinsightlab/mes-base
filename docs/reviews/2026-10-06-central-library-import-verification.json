@@ -1,0 +1,632 @@
+{
+  "comparison": {
+    "sourceSchema": "mes_master",
+    "targetSchema": "mes_base_dev",
+    "sourceTableCount": 39,
+    "targetTableCount": 30,
+    "sourceOnly": [
+      "erp_item_lot",
+      "gen_table",
+      "gen_table_column",
+      "mf_user_factory",
+      "mf_user_preference",
+      "pro_workorder_request",
+      "qrtz_blob_triggers",
+      "qrtz_calendars",
+      "qrtz_cron_triggers",
+      "qrtz_fired_triggers",
+      "qrtz_job_details",
+      "qrtz_locks",
+      "qrtz_paused_trigger_grps",
+      "qrtz_scheduler_state",
+      "qrtz_simple_triggers",
+      "qrtz_simprop_triggers",
+      "qrtz_triggers",
+      "sys_permission",
+      "sys_role_permission"
+    ],
+    "targetOnly": [
+      "flyway_schema_history",
+      "open_api_client",
+      "open_api_client_api",
+      "platform_catalog_revision",
+      "sys_attachment",
+      "sys_auto_code_part",
+      "sys_auto_code_result",
+      "sys_auto_code_rule",
+      "sys_message",
+      "sys_notice_read"
+    ],
+    "commonTables": [
+      {
+        "table": "mes_master_sync",
+        "sourceRows": 3,
+        "targetRows": 0,
+        "sourceOnlyColumns": [],
+        "targetOnlyColumns": [
+          "id",
+          "factory_id",
+          "updated_at"
+        ],
+        "columnDifferences": {},
+        "sameColumnOrder": false
+      },
+      {
+        "table": "mf_datasource",
+        "sourceRows": 2,
+        "targetRows": 1,
+        "sourceOnlyColumns": [],
+        "targetOnlyColumns": [],
+        "columnDifferences": {
+          "update_time": {
+            "target": [
+              "datetime",
+              "NO",
+              "CURRENT_TIMESTAMP",
+              "DEFAULT_GENERATED on update CURRENT_TIMESTAMP"
+            ],
+            "source": [
+              "datetime",
+              "NO",
+              "CURRENT_TIMESTAMP",
+              "DEFAULT_GENERATED"
+            ]
+          }
+        },
+        "sameColumnOrder": true
+      },
+      {
+        "table": "mf_factory",
+        "sourceRows": 2,
+        "targetRows": 1,
+        "sourceOnlyColumns": [
+          "erp_plant_code"
+        ],
+        "targetOnlyColumns": [
+          "enterprise_id",
+          "revision"
+        ],
+        "columnDifferences": {
+          "factory_id": {
+            "target": [
+              "varchar(64)",
+              "NO",
+              null,
+              ""
+            ],
+            "source": [
+              "bigint",
+              "NO",
+              null,
+              ""
+            ]
+          }
+        },
+        "sameColumnOrder": false
+      },
+      {
+        "table": "sys_config",
+        "sourceRows": 5,
+        "targetRows": 0,
+        "sourceOnlyColumns": [],
+        "targetOnlyColumns": [
+          "legacy_id",
+          "kind",
+          "factory_id",
+          "scope_key"
+        ],
+        "columnDifferences": {},
+        "sameColumnOrder": false
+      },
+      {
+        "table": "sys_dept",
+        "sourceRows": 83,
+        "targetRows": 0,
+        "sourceOnlyColumns": [],
+        "targetOnlyColumns": [],
+        "columnDifferences": {},
+        "sameColumnOrder": true
+      },
+      {
+        "table": "sys_dict_data",
+        "sourceRows": 175,
+        "targetRows": 44,
+        "sourceOnlyColumns": [],
+        "targetOnlyColumns": [],
+        "columnDifferences": {},
+        "sameColumnOrder": true
+      },
+      {
+        "table": "sys_dict_type",
+        "sourceRows": 50,
+        "targetRows": 15,
+        "sourceOnlyColumns": [],
+        "targetOnlyColumns": [],
+        "columnDifferences": {},
+        "sameColumnOrder": true
+      },
+      {
+        "table": "sys_job",
+        "sourceRows": 25,
+        "targetRows": 0,
+        "sourceOnlyColumns": [],
+        "targetOnlyColumns": [
+          "legacy_id",
+          "handler",
+          "running_token",
+          "started_at"
+        ],
+        "columnDifferences": {
+          "execution_scope": {
+            "target": [
+              "varchar(16)",
+              "NO",
+              "PLATFORM",
+              ""
+            ],
+            "source": [
+              "varchar(16)",
+              "YES",
+              null,
+              ""
+            ]
+          },
+          "factory_id": {
+            "target": [
+              "varchar(64)",
+              "YES",
+              null,
+              ""
+            ],
+            "source": [
+              "bigint",
+              "YES",
+              null,
+              ""
+            ]
+          },
+          "status": {
+            "target": [
+              "char(1)",
+              "YES",
+              "0",
+              ""
+            ],
+            "source": [
+              "char(1)",
+              "YES",
+              "1",
+              ""
+            ]
+          }
+        },
+        "sameColumnOrder": false
+      },
+      {
+        "table": "sys_job_log",
+        "sourceRows": 29538,
+        "targetRows": 0,
+        "sourceOnlyColumns": [
+          "job_id",
+          "factory_name"
+        ],
+        "targetOnlyColumns": [
+          "start_time",
+          "end_time",
+          "request_id",
+          "actor_id",
+          "run_token",
+          "cost_time"
+        ],
+        "columnDifferences": {
+          "execution_scope": {
+            "target": [
+              "varchar(16)",
+              "NO",
+              "PLATFORM",
+              ""
+            ],
+            "source": [
+              "varchar(16)",
+              "YES",
+              null,
+              ""
+            ]
+          },
+          "factory_id": {
+            "target": [
+              "varchar(64)",
+              "YES",
+              null,
+              ""
+            ],
+            "source": [
+              "bigint",
+              "YES",
+              null,
+              ""
+            ]
+          }
+        },
+        "sameColumnOrder": false
+      },
+      {
+        "table": "sys_logininfor",
+        "sourceRows": 85709,
+        "targetRows": 16,
+        "sourceOnlyColumns": [],
+        "targetOnlyColumns": [
+          "request_id",
+          "actor_id",
+          "factory_id",
+          "execution_scope"
+        ],
+        "columnDifferences": {
+          "msg": {
+            "target": [
+              "varchar(255)",
+              "YES",
+              "",
+              ""
+            ],
+            "source": [
+              "varchar(500)",
+              "YES",
+              "",
+              ""
+            ]
+          }
+        },
+        "sameColumnOrder": false
+      },
+      {
+        "table": "sys_menu",
+        "sourceRows": 630,
+        "targetRows": 207,
+        "sourceOnlyColumns": [
+          "factory_id"
+        ],
+        "targetOnlyColumns": [
+          "route_name",
+          "legacy_id"
+        ],
+        "columnDifferences": {},
+        "sameColumnOrder": false
+      },
+      {
+        "table": "sys_notice",
+        "sourceRows": 1,
+        "targetRows": 0,
+        "sourceOnlyColumns": [],
+        "targetOnlyColumns": [],
+        "columnDifferences": {},
+        "sameColumnOrder": true
+      },
+      {
+        "table": "sys_oper_log",
+        "sourceRows": 321045,
+        "targetRows": 0,
+        "sourceOnlyColumns": [],
+        "targetOnlyColumns": [
+          "cost_time",
+          "request_id",
+          "actor_id",
+          "factory_id",
+          "execution_scope"
+        ],
+        "columnDifferences": {
+          "method": {
+            "target": [
+              "varchar(200)",
+              "YES",
+              "",
+              ""
+            ],
+            "source": [
+              "varchar(100)",
+              "YES",
+              "",
+              ""
+            ]
+          }
+        },
+        "sameColumnOrder": false
+      },
+      {
+        "table": "sys_post",
+        "sourceRows": 4,
+        "targetRows": 0,
+        "sourceOnlyColumns": [],
+        "targetOnlyColumns": [],
+        "columnDifferences": {},
+        "sameColumnOrder": true
+      },
+      {
+        "table": "sys_role",
+        "sourceRows": 34,
+        "targetRows": 1,
+        "sourceOnlyColumns": [],
+        "targetOnlyColumns": [
+          "legacy_id",
+          "kind",
+          "scope_key"
+        ],
+        "columnDifferences": {
+          "factory_id": {
+            "target": [
+              "varchar(64)",
+              "YES",
+              null,
+              ""
+            ],
+            "source": [
+              "bigint",
+              "NO",
+              "1",
+              ""
+            ]
+          },
+          "role_name": {
+            "target": [
+              "varchar(100)",
+              "YES",
+              null,
+              ""
+            ],
+            "source": [
+              "varchar(30)",
+              "NO",
+              null,
+              ""
+            ]
+          }
+        },
+        "sameColumnOrder": false
+      },
+      {
+        "table": "sys_role_dept",
+        "sourceRows": 3,
+        "targetRows": 0,
+        "sourceOnlyColumns": [],
+        "targetOnlyColumns": [],
+        "columnDifferences": {},
+        "sameColumnOrder": true
+      },
+      {
+        "table": "sys_role_menu",
+        "sourceRows": 554,
+        "targetRows": 92,
+        "sourceOnlyColumns": [],
+        "targetOnlyColumns": [],
+        "columnDifferences": {},
+        "sameColumnOrder": true
+      },
+      {
+        "table": "sys_user",
+        "sourceRows": 1750,
+        "targetRows": 1,
+        "sourceOnlyColumns": [
+          "warehouse_code"
+        ],
+        "targetOnlyColumns": [
+          "pwd_update_date",
+          "legacy_id",
+          "auth_revision"
+        ],
+        "columnDifferences": {
+          "avatar": {
+            "target": [
+              "varchar(100)",
+              "YES",
+              "",
+              ""
+            ],
+            "source": [
+              "varchar(150)",
+              "YES",
+              "",
+              ""
+            ]
+          },
+          "minio_url": {
+            "target": [
+              "varchar(500)",
+              "YES",
+              null,
+              ""
+            ],
+            "source": [
+              "varchar(255)",
+              "YES",
+              null,
+              ""
+            ]
+          },
+          "nick_name": {
+            "target": [
+              "varchar(100)",
+              "NO",
+              null,
+              ""
+            ],
+            "source": [
+              "varchar(30)",
+              "NO",
+              null,
+              ""
+            ]
+          },
+          "user_name": {
+            "target": [
+              "varchar(64)",
+              "NO",
+              null,
+              ""
+            ],
+            "source": [
+              "varchar(30)",
+              "NO",
+              null,
+              ""
+            ]
+          },
+          "wx_open_id": {
+            "target": [
+              "varchar(100)",
+              "YES",
+              null,
+              ""
+            ],
+            "source": [
+              "varchar(64)",
+              "YES",
+              null,
+              ""
+            ]
+          }
+        },
+        "sameColumnOrder": false
+      },
+      {
+        "table": "sys_user_post",
+        "sourceRows": 1,
+        "targetRows": 0,
+        "sourceOnlyColumns": [],
+        "targetOnlyColumns": [],
+        "columnDifferences": {},
+        "sameColumnOrder": true
+      },
+      {
+        "table": "sys_user_role",
+        "sourceRows": 1875,
+        "targetRows": 1,
+        "sourceOnlyColumns": [],
+        "targetOnlyColumns": [],
+        "columnDifferences": {},
+        "sameColumnOrder": true
+      }
+    ]
+  },
+  "conflicts": {
+    "sourceLoginMessages.overTargetLength": 0,
+    "sourceRoles.nullFactory": 0,
+    "sourceRoles.orphanFactory": 1,
+    "sourceSync.running": 0,
+    "sourceUsers.avatarOverTargetLength": 6,
+    "sys_dict_data.dict_code.overlap": 44,
+    "sys_dict_type.dict_id.overlap": 15,
+    "sys_dict_type.dict_type.overlap": 15,
+    "sys_menu.menu_id.overlap": 205,
+    "sys_role.role_id.overlap": 1,
+    "sys_role.role_key.overlap": 0,
+    "sys_user.user_id.overlap": 0,
+    "sys_user.user_name.overlap": 1
+  },
+  "import": {
+    "inserted": {
+      "mf_factory": 2,
+      "sys_config": 1,
+      "sys_dept": 83,
+      "sys_dict_data": 134,
+      "sys_dict_type": 35,
+      "sys_notice": 1,
+      "sys_post": 4,
+      "sys_role": 33,
+      "sys_role_dept": 3,
+      "sys_user": 1749,
+      "sys_user_role": 1873
+    },
+    "preservedOrExcluded": {
+      "avatar_pending_private_snapshot": 6,
+      "config_excluded": 4,
+      "dict_type_reused": 15,
+      "dict_value_reused": 41,
+      "existing_user_post_preserved": 1,
+      "existing_user_preserved": 1,
+      "role_with_no_source_factory": 1,
+      "unported_role_menu": 554,
+      "unported_user_role": 2
+    },
+    "factoryMap": [
+      "1",
+      "2"
+    ],
+    "sourceUsers": 1750,
+    "sourceRoles": 34,
+    "mode": "adapted-dev-data-import; existing admin preserved; factories disabled/unbound"
+  },
+  "verification": {
+    "devFlywayVersion": 14,
+    "preservedExistingDictionaryLabelDifferences": 4,
+    "factoryIdCollations": {
+      "mf_factory": "utf8mb4_0900_ai_ci",
+      "sys_role": "utf8mb4_unicode_ci"
+    },
+    "counts": {
+      "mf_datasource": 1,
+      "mf_factory": 3,
+      "sys_config": 1,
+      "sys_dept": 83,
+      "sys_dict_data": 178,
+      "sys_dict_type": 50,
+      "sys_notice": 1,
+      "sys_post": 4,
+      "sys_role": 34,
+      "sys_role_dept": 3,
+      "sys_user": 1750,
+      "sys_user_role": 1874
+    },
+    "checksPassed": 29,
+    "sourceReadOnly": true,
+    "prodModified": false,
+    "httpOrBrowserAcceptance": "NOT_RUN"
+  },
+  "avatarReferencesRestored": 6,
+  "verificationCommands": {
+    "mvn -B -ntp verify": {
+      "run": 93,
+      "passed": 90,
+      "skipped": 3,
+      "failed": 0
+    },
+    "/usr/bin/python3 scripts/smoke-packaged.py": {
+      "passed": 4,
+      "failed": 0
+    }
+  },
+  "boundaries": {
+    "businessCodeChanged": false,
+    "schemaMigration": "V14 avatar VARCHAR(150)",
+    "prodModified": false,
+    "businessConnectionsImported": false,
+    "jobsLogsSyncStateImported": false,
+    "sourceExplicitAnalyticsRoleGrants": 0,
+    "httpBrowser": "NOT_RUN"
+  },
+  "logSamples": {
+    "tables": {
+      "sys_job_log": {
+        "before": 0,
+        "inserted": 100,
+        "after": 100
+      },
+      "sys_logininfor": {
+        "before": 17,
+        "inserted": 100,
+        "after": 117
+      },
+      "sys_oper_log": {
+        "before": 0,
+        "inserted": 100,
+        "after": 100
+      }
+    },
+    "totalInserted": 300,
+    "sourceReadOnly": true,
+    "jobsRestored": false,
+    "prodModified": false,
+    "selection": "most recent timestamp, then source id; limit 100 per table",
+    "payloadsAndRawExceptionsImported": false,
+    "browserAcceptance": "NOT_RUN"
+  }
+}

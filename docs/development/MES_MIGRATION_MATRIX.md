@@ -1,5 +1,56 @@
 # MES Migration Matrix
 
+## 2026-10-06 范围细化：数据源、生产监控、人员分析与同步协调
+
+用户最新确认覆盖前一节的全分支范围表述：当前主要迁移数据源管理、生产监控和人员分析。外部系统功能不在范围内，Base 暂时只预留外部接口，不实现 ERP/WMS/外部 MES 等连接适配器、远程调用或具体外部同步流程。通用同步协调能力明确纳入：迁入分支 `mes_master_sync` 状态表及其数据库抢占、执行令牌和恢复机制，作为后续系统同步的统一分布式互斥基础；不因其源代码位于 erp 包就整块排除，也不带入 ERP 依赖。
+
+已核对来源 `feat/multi-factory-isolation` / `bdc299dade855177a3e275199ffde6e72310e393`：
+
+- 分支 `AGENTS.md:1045–1065`「定时同步任务并发控制（强制）」。
+- `MasterSync`、`MasterSyncExtraMapper.xml` 及 `MasterDataSyncService.claim/recoverStale`。
+- 源 SQL 的抢占和状态更新实际包含 `factory_id`，因此业务同步互斥键为 `factory_id + sync_key`，不能误迁成全局只按 sync_key 的锁。表的唯一约束、归属与实际 DDL仍需在实现前复核；目前只核对源码契约，没有执行数据库验收。
+
+迁入必须保留的约束：
+
+1. 使用数据库条件更新抢占，仅非 RUNNING 状态可进入运行；受影响行数为 1 才允许执行，失败明确返回正在进行，不等待同流任务。
+2. 每次抢占生成唯一 run_token；进度、完成、失败均校验 factory_id + sync_key + run_token，并验证 RUNNING 状态，防止旧运行覆盖新状态。
+3. 手工、Quartz 和其他同步入口复用同一套协调逻辑；sys_job 只调度，不替代同步互斥。禁止以 JVM 锁、synchronized 或 Quartz concurrent 作为跨节点同步锁。
+4. 保存开始、结束、上次成功、处理数量、错误摘要及必要同步水位；迁移有效字段，不固化源 ITEM/ITEM_LOT 等外部业务类型。
+5. 提供崩溃遗留 RUNNING 的恢复策略。源实现根据 updated_at/started_at 检查租约，通过旧 run_token 和超时条件将旧运行标为 FAILED，然后重新抢占；适配时需验证活动更新时间、恢复竞争与旧执行者令牌失效后的停止行为，不能把状态更新保护当作外部副作用已被隔离。
+6. 通用协调机制不依赖 ERP 厂代码、外部凭据、外部客户端或已实现的同步器；未接入执行器的预留接口明确不可用，不返回假成功。
+
+更新后的顺序：数据源与工厂绑定/持久化 → 通用同步协调基础（可与前者按依赖安排）→ 生产监控 → 人员分析。监控与分析所需本地业务表、查询口径、权限和页面随链路迁移；外部数据只通过预留契约定义来源，不以实现外部同步作为完成本轮的前提。
+
+本轮仅更新迁移范围与源码约束记录，未新增表或同步实现、未修改运行配置、未连接外部系统，未运行迁移功能测试。前一节 ERP 外部实现及其余分支功能的扩展安排由本节收窄，不再作为当前执行范围。
+
+
+## 2026-10-06 用户确认：多工厂分支增量为后续主要迁移范围
+
+用户明确：接下来主要迁移 `feat/multi-factory-isolation`，该分支增量能力均需要。此前只将分支作为隔离设计参考、暂不迁数据源管理后台，以及“正式 MES 能力需另行授权”的阶段限制，不再作为排除本分支功能的依据。迁移采用 SOURCE_PRODUCT_PORT，保留源产品字段、流程和有效行为，按现有工程规则适配；不能用 Base 已有替代实现直接宣告等价完成。
+
+### 固定来源与差分方法
+
+- 来源仓库 `/Users/user/work/heri/ktg-mes`，只读；读取 Git ref，不切换或修改源工作区。
+- 分支 `feat/multi-factory-isolation`，本轮 HEAD `bdc299dade855177a3e275199ffde6e72310e393`。
+- 与当前 `master` 的共同祖先 `7f5226cd8d65b5a703c1f1f3fce35796a68fedeb`；差分使用 `git diff master...feat/multi-factory-isolation`，不是两分支 tip 的简单相减。
+- 静态差分共 341 个变更文件，17,357 行新增、757 行删除。数字是全分支差分，包含文档、测试、脚本等，不是待迁功能数量。没有执行源分支测试，也未证明增量全量链路可运行。
+- 对应前端/PDA版本仍需按调用接口和 Git 历史核对，不假定后端同名分支代表前端同一版本。
+
+### 执行顺序与验收边界
+
+| 顺序 | 增量能力 | 当前证据与迁移要求 |
+| --- | --- | --- |
+| 1 | 工厂管理、数据源管理、工厂与数据源绑定 | 源分支 FactoryController/ManagedDatasourceController → ManagedDatasourceService → MfFactory/MfDatasource Mapper；Base 当前 mes.runtime.factories → InMemoryFactoryCatalog。必须补齐平台库存储、管理 API/页面及运行时装配，YAML 静态目录不算产品功能已迁入。 |
+| 2 | 选厂/偏好、平台与工厂角色、请求授权、会话和缓存隔离 | 对照分支与 Base 已有行为；保留无 UserFactory 准入、权限按当前厂读取、切厂清理、无首厂或默认库兜底。已有隔离基础需验证等价，不整套复制或整套丢弃。 |
+| 3 | 数据源生命周期、版本绑定、Mapper/事务/异步/任务范围、DDL与元数据 | 对照 registry、绑定和任务链路；保留独立平台/业务事务、版本失效及连接错误明确失败；覆盖两厂、跨库、禁用连接和事务负例。 |
+| 4 | ERP连接/同步、工单主数据与请求、归档、生产监控、人员分析及其余 MES/Wheel 增量 | 全部纳入范围，先追真实 API → Service → Mapper/外部契约及页面，按依赖分批 PORT；客户规则抽离不能成为丢弃整个通用功能的理由。外部调用验收与本地/Fixture证据分开。 |
+| 5 | 增量配置、DDL、页面、迁移工具与测试 | 有效配置和 schema 随消费者迁移；测试保留有效场景并适配新契约，过期实现测试与临时探针不照搬。实际连接、公司数据和凭证不复制。 |
+
+开发/生产是运行环境，工厂是业务范围，数据源是存储连接。当前 DEV/PROD 工厂是开发测试装配；后续工厂与数据源管理以平台库记录为权威，配置文件负责平台库与基础环境，避免环境名成为工厂身份规则。
+
+本条是用户范围确认与静态差分记录，不是完成清单。下一实现闭环从工厂与数据源管理开始；各能力必须分别记录已迁入、部分迁入、缺失及实际验收结果。本轮没有修改业务代码、数据库或运行服务，没有提交/推送/部署。
+
+
 > 2026-10-06 当前：Phase 1 全量基础系统迁移持续执行，六模块与 Source 系统页面已接入，整体 MIGRATING。下方 Phase 0 计数/候选矩阵为历史盘点；当前进度以[续接快照](MES_BASE_REALIGNMENT_REPORT.md#2026-10-06-登录隔离与浏览器工作包续接快照)和[验收记录](../reviews/2026-10-06-phase1-verification.json)为准。
 
 2026-10-05；状态：候选策略；common 首包已迁入验证，其余待实施。Source Product=ktg-mes；现有功能默认进入候选。COPY/PORT/REDESIGN/DROP/REVIEW是策略，不用DONE掩盖部分重写。代码复用许可/所有权独立核实，来自旧项目本身不是拒绝理由。
@@ -159,3 +210,13 @@ YES为静态源码存在，PARTIAL为链路未完整关联或非DB接口；Web/P
 | UserTask/微信/PDA/打印业务等 | 原业务单据/渠道/设备能力 | 候选/依赖边界保留；不自动扩展本轮 | 对应业务或设备授权后继续，不写成已迁/已验收 |
 
 当前三个菜单模块和V1–V10完整DDL可查看，新的空隔离MySQL导入426字段比对5/5。整体MIGRATING：尚缺人接手的凭证UI动作/下载artifact及外部实例设备验证。没有新增正式MES Domain，没有使用Codegen，没有Agent提交/推送/部署。
+
+## 2026-10-06 多工厂分支工作包
+
+| 能力 | SOURCE_PRODUCT_PORT 与适配 | 证据与边界 |
+| --- | --- | --- |
+| 数据源/工厂管理 | Source表、AES-GCM、DDL、分页、Vue3；Base字符串FactoryId、revision/enterpriseId | dev/prod真实库迁移；管理/隔离/分页/DDL验证；授权浏览器验收待做 |
+| 同步协调基础 | mes_master_sync / SyncCoordinator；factory_id + sync_key / run_token | 真实MySQL、双JVM抢占、跨厂独立、恢复/旧令牌拒绝通过；外部执行器未迁 |
+| 生产监控 | Source productionmonitor DTO/Service/Mapper/XML/页面 | 9项Source单元通过；当前Schema/字典/真实SQL/UI待验收，默认关闭 |
+| 人员分析 | Source personnelanalysis与记录钻取 | 3项Source单元通过；当前Schema/字典/真实SQL/UI待验收，默认关闭 |
+| ERP/WMS/外部MES实现 | 当前范围排除 | 未引入客户连接/外部调用/具体同步流程 |

@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="dev.mesbase.mes.pro.productionmonitor.mapper.ProReportingWorkMonitorExtraMapper">
+    <select id="selectWorkorderAggregates" resultType="dev.mesbase.mes.pro.productionmonitor.domain.row.ProductionMonitorReportingAggregateRow">
+        select r.workorder_code workorderCode,count(*) reportCount,
+               count(distinct concat(r.xtransfer_no, char(0), r.route_id)) flowcardCount,
+               count(distinct case when r.status=#{fullyStoredStatus} then concat(r.xtransfer_no, char(0), r.route_id) end) fullyStoredFlowcardCount,
+               min(r.create_time) firstReportingTime,max(r.create_time) lastReportingTime
+        from pro_reporting_work r where r.workorder_code in
+        <foreach collection="workorderCodes" item="code" open="(" separator="," close=")">#{code}</foreach>
+        group by r.workorder_code
+    </select>
+    <select id="selectLatestByWorkorderCodes" resultType="dev.mesbase.mes.pro.productionmonitor.domain.row.ProductionMonitorReportingAggregateRow">
+        select workorderCode,lastProcessId,lastProcessCode,lastProcessName,lastUserId,lastUserName,lastNickName,lastReportingTime
+        from (
+            select r.workorder_code workorderCode,r.process_id lastProcessId,r.process_code lastProcessCode,
+                   r.process_name lastProcessName,r.user_id lastUserId,r.user_name lastUserName,r.nick_name lastNickName,
+                   r.create_time lastReportingTime,
+                   row_number() over(partition by r.workorder_code order by r.create_time desc,r.record_id desc) rn
+            from pro_reporting_work r where r.workorder_code in
+            <foreach collection="workorderCodes" item="code" open="(" separator="," close=")">#{code}</foreach>
+        ) latest where rn=1
+    </select>
+    <select id="selectFlowcardsByWorkorderCode" resultType="dev.mesbase.mes.pro.productionmonitor.domain.row.ProductionMonitorFlowcardRow">
+        select xtransfer_no xtransferNo,route_id routeId,max(route_name) routeName,count(*) reportCount,
+               min(create_time) firstReportingTime,max(create_time) lastReportingTime,
+               max(case when status=#{fullyStoredStatus} then 1 else 0 end) fullyStored
+        from pro_reporting_work where workorder_code=#{workorderCode}
+        group by xtransfer_no,route_id order by xtransfer_no,route_id
+    </select>
+    <select id="selectObservedProcesses" resultType="dev.mesbase.mes.pro.productionmonitor.domain.row.ProductionMonitorObservedProcessRow">
+        select observed.process_id processId,observed.process_code processCode,observed.processName,
+               observed.firstReportingTime,observed.lastReportingTime,latest.record_id lastReportingRecordId,
+               observed.reportCount,observed.reportedQuantity
+        from (
+            select process_id,process_code,max(process_name) processName,
+                   min(create_time) firstReportingTime,max(create_time) lastReportingTime,
+                   count(*) reportCount,sum(reporting_work_quantity) reportedQuantity
+            from pro_reporting_work where workorder_code=#{workorderCode} and xtransfer_no=#{xtransferNo} and route_id=#{routeId}
+            group by process_id,process_code
+        ) observed
+        left join (
+            select process_id,process_code,record_id,
+                   row_number() over(partition by process_id,process_code order by create_time desc,record_id desc) rn
+            from pro_reporting_work where workorder_code=#{workorderCode} and xtransfer_no=#{xtransferNo} and route_id=#{routeId}
+        ) latest on latest.process_id &lt;=&gt; observed.process_id
+                 and latest.process_code &lt;=&gt; observed.process_code and latest.rn=1
+        order by observed.firstReportingTime,observed.process_id,observed.process_code
+    </select>
+    <select id="selectTimeline" resultType="dev.mesbase.mes.pro.productionmonitor.domain.row.ProductionMonitorTimelineRow">
+        select r.record_id recordId,r.create_time createTime,r.xtransfer_no xtransferNo,r.route_id routeId,
+               r.route_name routeName,r.process_id processId,r.process_code processCode,r.process_name processName,
+               r.unit_of_measure unitOfMeasure,r.user_id userId,r.user_name userName,r.nick_name nickName,
+               r.reporting_work_quantity reportingWorkQuantity,r.status
+        from pro_reporting_work r where r.workorder_code=#{query.workorderCode}
+        <if test="query.xtransferNo != null and query.xtransferNo != ''">and r.xtransfer_no=#{query.xtransferNo}</if>
+        <if test="query.routeId != null">and r.route_id=#{query.routeId}</if>
+        <if test="query.processId != null">and r.process_id=#{query.processId}</if>
+        <if test="query.processCode != null and query.processCode != ''">and r.process_code=#{query.processCode}</if>
+        order by r.create_time desc,r.record_id desc
+    </select>
+</mapper>

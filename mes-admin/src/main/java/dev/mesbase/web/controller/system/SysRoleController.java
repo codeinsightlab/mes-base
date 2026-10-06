@@ -13,12 +13,18 @@ import dev.mesbase.common.utils.StringUtils;
 import dev.mesbase.common.utils.poi.ExcelUtil;
 import dev.mesbase.framework.web.service.SysPermissionService;
 import dev.mesbase.framework.web.service.TokenService;
+import dev.mesbase.platform.web.EndpointAccess;
 import dev.mesbase.system.domain.SysUserRole;
+import dev.mesbase.system.dto.RoleForm;
 import dev.mesbase.system.service.ISysRoleService;
 import dev.mesbase.system.service.ISysUserService;
-
+import dev.mesbase.web.view.PageResultMapper;
+import dev.mesbase.web.view.role.SysRoleAssembler;
+import dev.mesbase.web.view.user.SysUserAssembler;
+import jakarta.servlet.http.HttpServletResponse;
+import java.util.List;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -29,17 +35,13 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.util.List;
-
-import jakarta.servlet.http.HttpServletResponse;
-
 /**
  * 角色信息
  * 
  * @author ruoyi
  */
 @RestController
-@org.springframework.boot.autoconfigure.condition.ConditionalOnProperty(name="mes.system.enabled",havingValue="true")
+@ConditionalOnProperty(name="mes.system.enabled",havingValue="true")
 @RequestMapping("/api/system/role")
 public class SysRoleController extends BaseController
 {
@@ -56,17 +58,17 @@ public class SysRoleController extends BaseController
     @Autowired
     private ISysUserService userService;
 
-    @dev.mesbase.platform.web.EndpointAccess(value=dev.mesbase.platform.web.EndpointAccess.Kind.AUTHORIZED,permission="system:role:list",permissionScope=dev.mesbase.platform.web.EndpointAccess.PermissionScope.PLATFORM)
+    @EndpointAccess(value=EndpointAccess.Kind.AUTHORIZED,permission="system:role:list",permissionScope=EndpointAccess.PermissionScope.PLATFORM)
     @GetMapping("/list")
     public TableDataInfo list(SysRole role)
     {
         startPage();
         List<SysRole> list = roleService.selectRoleList(role);
-        return getDataTable(list);
+        return PageResultMapper.map(list, SysRoleAssembler::toResult);
     }
 
     @Log(title = "角色管理", businessType = BusinessType.EXPORT)
-    @dev.mesbase.platform.web.EndpointAccess(value=dev.mesbase.platform.web.EndpointAccess.Kind.AUTHORIZED,permission="system:role:export",permissionScope=dev.mesbase.platform.web.EndpointAccess.PermissionScope.PLATFORM)
+    @EndpointAccess(value=EndpointAccess.Kind.AUTHORIZED,permission="system:role:export",permissionScope=EndpointAccess.PermissionScope.PLATFORM)
     @PostMapping("/export")
     public void export(HttpServletResponse response, SysRole role)
     {
@@ -78,21 +80,21 @@ public class SysRoleController extends BaseController
     /**
      * 根据角色编号获取详细信息
      */
-    @dev.mesbase.platform.web.EndpointAccess(value=dev.mesbase.platform.web.EndpointAccess.Kind.AUTHORIZED,permission="system:role:query",permissionScope=dev.mesbase.platform.web.EndpointAccess.PermissionScope.PLATFORM)
+    @EndpointAccess(value=EndpointAccess.Kind.AUTHORIZED,permission="system:role:query",permissionScope=EndpointAccess.PermissionScope.PLATFORM)
     @GetMapping(value = "/{roleId}")
     public AjaxResult getInfo(@PathVariable Long roleId)
     {
         roleService.checkRoleDataScope(roleId);
-        return AjaxResult.success(roleService.selectRoleById(roleId));
+        return AjaxResult.success(SysRoleAssembler.toResult(roleService.selectRoleById(roleId)));
     }
 
     /**
      * 新增角色
      */
-    @dev.mesbase.platform.web.EndpointAccess(value=dev.mesbase.platform.web.EndpointAccess.Kind.AUTHORIZED,permission="system:role:add",permissionScope=dev.mesbase.platform.web.EndpointAccess.PermissionScope.PLATFORM)
+    @EndpointAccess(value=EndpointAccess.Kind.AUTHORIZED,permission="system:role:add",permissionScope=EndpointAccess.PermissionScope.PLATFORM)
     @Log(title = "角色管理", businessType = BusinessType.INSERT)
     @PostMapping
-    public AjaxResult add(@Validated @RequestBody dev.mesbase.system.dto.RoleForm roleForm)
+    public AjaxResult add(@Validated @RequestBody RoleForm roleForm)
     {
         SysRole role=roleForm.toEntity();
         role.setRoleId(null);
@@ -112,10 +114,10 @@ public class SysRoleController extends BaseController
     /**
      * 修改保存角色
      */
-    @dev.mesbase.platform.web.EndpointAccess(value=dev.mesbase.platform.web.EndpointAccess.Kind.AUTHORIZED,permission="system:role:edit",permissionScope=dev.mesbase.platform.web.EndpointAccess.PermissionScope.PLATFORM)
+    @EndpointAccess(value=EndpointAccess.Kind.AUTHORIZED,permission="system:role:edit",permissionScope=EndpointAccess.PermissionScope.PLATFORM)
     @Log(title = "角色管理", businessType = BusinessType.UPDATE)
     @PutMapping
-    public AjaxResult edit(@Validated @RequestBody dev.mesbase.system.dto.RoleForm roleForm)
+    public AjaxResult edit(@Validated @RequestBody RoleForm roleForm)
     {
         SysRole role=roleForm.toEntity();
         // 校验角色是否允许操作
@@ -150,10 +152,10 @@ public class SysRoleController extends BaseController
     /**
      * 修改保存数据权限
      */
-    @dev.mesbase.platform.web.EndpointAccess(value=dev.mesbase.platform.web.EndpointAccess.Kind.AUTHORIZED,permission="system:role:edit",permissionScope=dev.mesbase.platform.web.EndpointAccess.PermissionScope.PLATFORM)
+    @EndpointAccess(value=EndpointAccess.Kind.AUTHORIZED,permission="system:role:edit",permissionScope=EndpointAccess.PermissionScope.PLATFORM)
     @Log(title = "角色管理", businessType = BusinessType.UPDATE)
     @PutMapping("/dataScope")
-    public AjaxResult dataScope(@RequestBody dev.mesbase.system.dto.RoleForm roleForm)
+    public AjaxResult dataScope(@RequestBody RoleForm roleForm)
     {
         SysRole role=roleForm.toEntity();
         roleService.checkRoleAllowed(role);
@@ -164,7 +166,7 @@ public class SysRoleController extends BaseController
     /**
      * 状态修改
      */
-    @dev.mesbase.platform.web.EndpointAccess(value=dev.mesbase.platform.web.EndpointAccess.Kind.AUTHORIZED,permission="system:role:edit",permissionScope=dev.mesbase.platform.web.EndpointAccess.PermissionScope.PLATFORM)
+    @EndpointAccess(value=EndpointAccess.Kind.AUTHORIZED,permission="system:role:edit",permissionScope=EndpointAccess.PermissionScope.PLATFORM)
     @Log(title = "角色管理", businessType = BusinessType.UPDATE)
     @PutMapping("/changeStatus")
     public AjaxResult changeStatus(@RequestBody RoleStatus roleForm)
@@ -179,7 +181,7 @@ public class SysRoleController extends BaseController
     /**
      * 删除角色
      */
-    @dev.mesbase.platform.web.EndpointAccess(value=dev.mesbase.platform.web.EndpointAccess.Kind.AUTHORIZED,permission="system:role:remove",permissionScope=dev.mesbase.platform.web.EndpointAccess.PermissionScope.PLATFORM)
+    @EndpointAccess(value=EndpointAccess.Kind.AUTHORIZED,permission="system:role:remove",permissionScope=EndpointAccess.PermissionScope.PLATFORM)
     @Log(title = "角色管理", businessType = BusinessType.DELETE)
     @DeleteMapping("/{roleIds}")
     public AjaxResult remove(@PathVariable Long[] roleIds)
@@ -190,41 +192,41 @@ public class SysRoleController extends BaseController
     /**
      * 获取角色选择框列表
      */
-    @dev.mesbase.platform.web.EndpointAccess(value=dev.mesbase.platform.web.EndpointAccess.Kind.AUTHORIZED,permission="system:role:query",permissionScope=dev.mesbase.platform.web.EndpointAccess.PermissionScope.PLATFORM)
+    @EndpointAccess(value=EndpointAccess.Kind.AUTHORIZED,permission="system:role:query",permissionScope=EndpointAccess.PermissionScope.PLATFORM)
     @GetMapping("/optionselect")
     public AjaxResult optionselect()
     {
-        return AjaxResult.success(roleService.selectRoleAll());
+        return AjaxResult.success(SysRoleAssembler.toResults(roleService.selectRoleAll()));
     }
 
     /**
      * 查询已分配用户角色列表
      */
-    @dev.mesbase.platform.web.EndpointAccess(value=dev.mesbase.platform.web.EndpointAccess.Kind.AUTHORIZED,permission="system:role:list",permissionScope=dev.mesbase.platform.web.EndpointAccess.PermissionScope.PLATFORM)
+    @EndpointAccess(value=EndpointAccess.Kind.AUTHORIZED,permission="system:role:list",permissionScope=EndpointAccess.PermissionScope.PLATFORM)
     @GetMapping("/authUser/allocatedList")
     public TableDataInfo allocatedList(SysUser user)
     {
         startPage();
         List<SysUser> list = userService.selectAllocatedList(user);
-        return getDataTable(list);
+        return PageResultMapper.map(list, SysUserAssembler::toResult);
     }
 
     /**
      * 查询未分配用户角色列表
      */
-    @dev.mesbase.platform.web.EndpointAccess(value=dev.mesbase.platform.web.EndpointAccess.Kind.AUTHORIZED,permission="system:role:list",permissionScope=dev.mesbase.platform.web.EndpointAccess.PermissionScope.PLATFORM)
+    @EndpointAccess(value=EndpointAccess.Kind.AUTHORIZED,permission="system:role:list",permissionScope=EndpointAccess.PermissionScope.PLATFORM)
     @GetMapping("/authUser/unallocatedList")
     public TableDataInfo unallocatedList(SysUser user)
     {
         startPage();
         List<SysUser> list = userService.selectUnallocatedList(user);
-        return getDataTable(list);
+        return PageResultMapper.map(list, SysUserAssembler::toResult);
     }
 
     /**
      * 取消授权用户
      */
-    @dev.mesbase.platform.web.EndpointAccess(value=dev.mesbase.platform.web.EndpointAccess.Kind.AUTHORIZED,permission="system:role:edit",permissionScope=dev.mesbase.platform.web.EndpointAccess.PermissionScope.PLATFORM)
+    @EndpointAccess(value=EndpointAccess.Kind.AUTHORIZED,permission="system:role:edit",permissionScope=EndpointAccess.PermissionScope.PLATFORM)
     @Log(title = "角色管理", businessType = BusinessType.GRANT)
     @PutMapping("/authUser/cancel")
     public AjaxResult cancelAuthUser(@RequestBody SysUserRole userRole)
@@ -235,7 +237,7 @@ public class SysRoleController extends BaseController
     /**
      * 批量取消授权用户
      */
-    @dev.mesbase.platform.web.EndpointAccess(value=dev.mesbase.platform.web.EndpointAccess.Kind.AUTHORIZED,permission="system:role:edit",permissionScope=dev.mesbase.platform.web.EndpointAccess.PermissionScope.PLATFORM)
+    @EndpointAccess(value=EndpointAccess.Kind.AUTHORIZED,permission="system:role:edit",permissionScope=EndpointAccess.PermissionScope.PLATFORM)
     @Log(title = "角色管理", businessType = BusinessType.GRANT)
     @PutMapping("/authUser/cancelAll")
     public AjaxResult cancelAuthUserAll(Long roleId, Long[] userIds)
@@ -246,7 +248,7 @@ public class SysRoleController extends BaseController
     /**
      * 批量选择用户授权
      */
-    @dev.mesbase.platform.web.EndpointAccess(value=dev.mesbase.platform.web.EndpointAccess.Kind.AUTHORIZED,permission="system:role:edit",permissionScope=dev.mesbase.platform.web.EndpointAccess.PermissionScope.PLATFORM)
+    @EndpointAccess(value=EndpointAccess.Kind.AUTHORIZED,permission="system:role:edit",permissionScope=EndpointAccess.PermissionScope.PLATFORM)
     @Log(title = "角色管理", businessType = BusinessType.GRANT)
     @PutMapping("/authUser/selectAll")
     public AjaxResult selectAuthUserAll(Long roleId, Long[] userIds)

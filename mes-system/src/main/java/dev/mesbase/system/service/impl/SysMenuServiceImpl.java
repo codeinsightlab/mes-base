@@ -112,6 +112,8 @@ public class SysMenuServiceImpl implements ISysMenuService
      * @param userId 用户名称
      * @return 菜单列表
      */
+    public List<SysMenu> selectFactoryMenuTree(String username,String factoryId) { return getChildPerms(menuMapper.selectFactoryMenus(username,factoryId),0); }
+
     @Override
     public List<SysMenu> selectMenuTreeByUserId(Long userId)
     {

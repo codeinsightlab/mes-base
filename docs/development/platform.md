@@ -4,12 +4,14 @@
 
 ## YAML 与装配
 
-通用配置 `mes-admin/src/main/resources/application.yml`，环境配置 application-dev.yml / application-prod.yml，受控外部文件通过 `--spring.config.additional-location=file:/absolute/config.yml` 明确加载。Java Configuration 负责对象装配/校验/关闭，不储存环境连接值。2026-10-06开发环境收尾后，默认dev从仓库根加载 `.local/application-dev.yml`，启动器亦显式加载同一文件；不再依赖target中的phase配置。
+通用配置在mes-admin/src/main/resources/application.yml；真实dev/prod参数直接写在同目录的application-dev.yml / application-prod.yml，两个真实文件留在本机、0600、Git已取消跟踪并忽略。由Spring Boot标准profile自动选择，无spring.config.import转接、无连接环境占位符。默认dev；prod用--spring.profiles.active=prod。首次在新机器使用时，从config里的两个无密码example复制到资源目录、填连接并构建；本地JAR会包含本机profile配置。
+
+Spring Boot 4.1.1有效错误属性为spring.web.error.include-message/include-stacktrace/include-binding-errors，原server.error.*自4.0被标记level=error，已修正。server.address/port仍然有效，直接放在实际profile文件中。
 
 | 配置 | 实际消费者 |
 | --- | --- |
 | mes.system.enabled、mes.platform.* | SystemConfiguration；DruidPools、PlatformPersistence、Flyway |
-| mes.runtime.enabled、mes.runtime.factories | FactoryRuntimeConfiguration；物理库/连接/版本/Mapper 登记校验 |
+| mes.runtime.enabled、mes.runtime.datasource-key | FactoryRuntimeConfiguration；数据库工厂目录、密码解密、物理库/连接/版本/Mapper 登记校验 |
 | spring.datasource.druid.* | DruidPools；stat/wall 真实过滤器与监控 |
 | spring.data.redis.* | Redis 客户端、RedisCache、SystemCacheNamespace |
 | token.expire-time | TokenService；哈希 opaque token 的身份/版本与 TTL |
@@ -19,7 +21,7 @@
 | open-api.* | 外部专用安全链、Token/Lua限流、API目录/授权；业务数据范围开关与独立校验器 |
 | minio.* | 私有存储适配器；未提供外部 MinIO 连接时不伪造成功 |
 
-dev正式开发库为 `mes_base_dev`，业务库为 `mes_base_dev_business`，单开发Factory=DEV；Codegen元数据指向业务库，二者不合库。prod连接由外部提供，迁移默认关闭，模板见 `config/application-prod.example.yml`；本轮只在开发库做本地prod装配验证，未连接生产。前端MES_DEV_API_TARGET只允许loopback；18081/15174，Redis16379 DB1。历史phase验收与日常开发分开记录。
+dev正式开发库为 `mes_base_dev`，业务库为 `mes_base_dev_business`，单开发Factory=DEV；Codegen元数据指向业务库，二者不合库。prod按用户新指令使用同一测试实例的独立mes_base_prod / mes_base_prod_business，独立mes_base_prod账号、PROD厂、Redis DB2及.local/prod-files，迁移默认关闭；其真实连接已填入标准prod资源文件。本轮仅验证prod-profile测试环境，未连接真实生产。前端MES_DEV_API_TARGET只允许loopback；18081/15174，Redis16379 DB1。历史phase验收与日常开发分开记录。
 
 ## 身份、会话与系统对象
 
@@ -88,8 +90,17 @@ Token 是 Source 随机 opaque 凭证。Lua 原子写入摘要记录和当前客
 
 ## 2026-10-06 开发环境与旧代码收尾
 
-真实连接/管理员凭证/临时库备份均在忽略的 `.local/`，目录0700、凭证文件0600；不输出凭证。迁移初始化用 `scripts/mes-platform-admin --username=admin --config=.local/application-dev.yml --migrate`，密码由MES_BOOTSTRAP_PASSWORD受控提供；日常启动migrate=false。清空新开发库中的空迁移归档用 `/usr/bin/python3 scripts/clean-empty-development-archives --mysql-config=.local/mysql-dev.cnf`；脚本固定mes_base_dev并检查每张表无数据，重复执行无副作用，非空归档明确拒绝。
+管理员凭证/临时库备份在忽略的.local（目录0700），真实profile文件在资源目录且0600/Git忽略；不输出凭证。迁移初始化用 `scripts/mes-platform-admin --username=admin --config=mes-admin/src/main/resources/application-dev.yml --migrate`，密码由MES_BOOTSTRAP_PASSWORD受控提供；日常启动migrate=false。清空新开发库中的空迁移归档用 `/usr/bin/python3 scripts/clean-empty-development-archives --mysql-config=.local/mysql-dev.cnf`；脚本固定mes_base_dev并检查每张表无数据，重复执行无副作用，非空归档明确拒绝。
 
-两个异常目录 `mes-admin/${project.parent.basedir}` 与 `mes-admin/Users` 是旧构建路径错误留下的编译产物，已移出源码目录到target/dev-cleanup归档；当前POM使用maven.multiModuleProjectDirectory，复建不再生成。旧的PlatformServiceTest/PlatformHttpTest、V1-only迁移测试、TestOnlyCodegenFixture及旧验收脚本退役；RuntimeFixture及单/多厂、跨库、线程、权限等有效测试保留。Maven测试显式使用test profile，隔离私有dev配置。
+两个异常目录 `mes-admin/${project.parent.basedir}` 与 `mes-admin/Users` 是旧构建路径错误留下的编译产物，已移出源码目录到target/dev-cleanup归档；当前POM使用maven.multiModuleProjectDirectory，复建不再生成。旧demo内置账号及PlatformServiceTest/PlatformHttpTest、V1-only迁移测试、TestOnlyCodegenFixture及旧验收脚本退役；RuntimeFixture及单/多厂、跨库、线程、权限等有效测试保留。Maven测试显式使用test profile，隔离私有dev配置。
 
 7个phase库删除前备份至 `.local/backups/20261006-phase`；原4个旧dev schema保留。详细当前运行证据及失败见迁移报告本日“dev/prod配置与临时数据库收尾”章节。
+
+Redis16379已停止旧phase进程并从旧AOF/RDB恢复到 `.local/redis-runtime`，配置 `.local/redis.conf`，固定本轮版本二进制 `.local/bin/redis-server`，日志 `.local/logs/redis.log`；`scripts/run-local-redis`可单独重启，不占用其他Redis端口。开发后端日志 `.local/logs/backend-console.log`。当前18081已改为正式开发配置，15174代理health通过；旧phase网页Token与新增表单不应继续作为开发库身份或数据使用。
+
+
+## 2026-10-06 配置偏好纠正与失效属性修正
+
+按用户要求撤销额外config导入层。两个标准profile文件直接填写真实值，公共application.yml只留共用设置，清理重复的默认端口/Redis连接/空JDBC及文件根；连接占位符已全部移除。config仅保留两个无密码示例，旧runtime双厂示例删除。git rm --cached仅取消实际profile跟踪、本地文件仍存在；未提交或推送。运行脚本不再使用MES_LOCAL_CONFIG或additional-location，普通Spring属性覆盖仍可显式通过启动参数传入。
+
+prod测试库从空库执行原V1–V10，并经全空检查移除16个归档，得到27系统表/0业务表，单显式PLATFORM admin由标准guard建立，无DEV/PROD厂权限。首次凭证在.local/production-test-admin.json，dev凭证不变。清理脚本只接受两个明确自有schema（默认dev，显式--database mes_base_prod），拒绝非空归档；没有访问未知库。

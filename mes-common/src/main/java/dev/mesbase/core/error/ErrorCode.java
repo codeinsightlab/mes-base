@@ -1,5 +1,6 @@
 package dev.mesbase.core.error;
 public enum ErrorCode {
+    SYNC_RUNNING(409,"同步正在进行"), SYNC_EXECUTION_LOST(409,"同步执行权已失效"),
     RESOURCE_CONFLICT(409, "Resource conflicts with current state"), BAD_REQUEST(400, "Invalid request"), UNAUTHENTICATED(401, "Authentication required"),
     FORBIDDEN(403, "Permission denied"), NOT_FOUND(404, "Resource not found"),
     CONFLICT(409, "Execution binding changed"), UNPROCESSABLE(422, "Request cannot be processed"),

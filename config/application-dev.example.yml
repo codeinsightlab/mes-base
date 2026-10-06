@@ -1,35 +1,42 @@
-# Copy to .local/application-dev.yml; chmod 600. Run from repository root.
-# The actual local file is already prepared on the current development machine.
+# Copy to mes-admin/src/main/resources/application-dev.yml and fill actual server/password values directly.
 mes:
   platform:
-    url: ${MES_PLATFORM_URL}
-    username: ${MES_PLATFORM_USER}
-    password: ${MES_PLATFORM_PASSWORD}
-    file-root: ${MES_FILE_ROOT:.local/files}
-    migrate: false
-  runtime:
     enabled: true
-    factories:
-      - id: DEV
-        enterprise-id: development
-        code: DEV
-        name: 开发工厂
-        status: ENABLED
-        datasource-identity: dev_business
-        revision: 1
-        url: ${MES_BUSINESS_URL}
-        username: ${MES_BUSINESS_USER}
-        password: ${MES_BUSINESS_PASSWORD}
+    migrate: false
+    url: "jdbc:mysql://127.0.0.1:3306/mes_base_dev?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true"
+    username: mes_base_dev
+    password: ""
+    file-root: .local/files
+  system:
+    enabled: true
+  runtime:
+    # 32-byte Base64 AES key. Actual private dev/prod profiles already contain independently generated keys.
+    datasource-key: ""
+    enabled: true
   codegen:
+    default-datasource: dev
     profiles:
       dev:
-        url: ${MES_BUSINESS_URL}
-        username: ${MES_BUSINESS_USER}
-        password: ${MES_BUSINESS_PASSWORD}
+        url: "jdbc:mysql://127.0.0.1:3306/mes_base_dev_business?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true"
+        username: mes_base_dev
+        password: ""
 spring:
   data:
     redis:
-      host: ${MES_REDIS_HOST:127.0.0.1}
-      port: ${MES_REDIS_PORT:6379}
-      password: ${MES_REDIS_PASSWORD}
-      database: ${MES_REDIS_DATABASE:1}
+      host: 127.0.0.1
+      port: 16379
+      password: ""
+      database: 1
+
+server:
+  address: 127.0.0.1
+  port: 18081
+user:
+  password: ""
+ruoyi:
+  profile: .local/files
+  captcha:
+    enabled: false
+logging:
+  level:
+    root: INFO

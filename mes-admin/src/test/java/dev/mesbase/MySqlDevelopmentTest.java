@@ -5,8 +5,8 @@ import dev.mesbase.core.factory.*;
 import dev.mesbase.core.error.FoundationException;
 import dev.mesbase.infrastructure.persistence.*;
 import dev.mesbase.platform.codegen.*;
-import dev.mesbase.server.FactoryRuntimeConfiguration;
-import dev.mesbase.server.FactoryRuntimeConfiguration.FactorySettings;
+
+import dev.mesbase.RuntimeAssemblyFixture.FactorySettings;
 import org.apache.ibatis.annotations.*;
 import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.io.TempDir;
@@ -72,7 +72,7 @@ class MySqlDevelopmentTest {
     }
 
     @Test void distinctRuntimeOwnershipRollbackAndNoFallback() {
-        try(var assembly=FactoryRuntimeConfiguration.prepare(factories,platform,Set.of(ProbeMapper.class),new dev.mesbase.server.DruidPools.Settings(0,0,2,5000,5000,30000,60000,300000,900000,"SELECT 1",true,false,false,"stat,wall"))) {
+        try(var assembly=RuntimeAssemblyFixture.prepare(factories,platform,Set.of(ProbeMapper.class),new dev.mesbase.server.DruidPools.Settings(0,0,2,5000,5000,30000,60000,300000,900000,"SELECT 1",true,false,false,"stat,wall"))) {
             var resolver=new ConfiguredBusinessPersistenceResolver(assembly.catalog(),assembly.bindings());
             var persistence=new DedicatedDatabasePersistence(resolver,assembly.registry());
             var a=new FactoryScope(new FactoryId("A"));var b=new FactoryScope(new FactoryId("B"));
@@ -88,7 +88,7 @@ class MySqlDevelopmentTest {
         }
         var second=factories.get(1);var first=factories.get(0);
         var duplicate=new FactorySettings(second.id(),second.enterpriseId(),second.code(),second.name(),second.status(),second.datasourceIdentity(),1,first.url(),second.username(),second.password());
-        assertThrows(IllegalArgumentException.class,()->FactoryRuntimeConfiguration.prepare(List.of(first,duplicate),platform,Set.of(ProbeMapper.class),new dev.mesbase.server.DruidPools.Settings(0,0,2,5000,5000,30000,60000,300000,900000,"SELECT 1",true,false,false,"stat,wall")));
+        assertThrows(IllegalArgumentException.class,()->RuntimeAssemblyFixture.prepare(List.of(first,duplicate),platform,Set.of(ProbeMapper.class),new dev.mesbase.server.DruidPools.Settings(0,0,2,5000,5000,30000,60000,300000,900000,"SELECT 1",true,false,false,"stat,wall")));
     }
 
     @Test void realMetadataProducesMySqlQuotedManifest() throws Exception {

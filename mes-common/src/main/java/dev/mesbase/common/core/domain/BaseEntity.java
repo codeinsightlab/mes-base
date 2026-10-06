@@ -1,6 +1,7 @@
 package dev.mesbase.common.core.domain;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 
 import java.io.Serializable;
 import java.util.Date;
@@ -39,6 +40,7 @@ public class BaseEntity implements Serializable
     /** 请求参数 */
     private Map<String, Object> params;
 
+    @JsonIgnore
     public String getSearchValue()
     {
         return searchValue;
@@ -99,6 +101,7 @@ public class BaseEntity implements Serializable
         this.remark = remark;
     }
 
+    @JsonIgnore
     public Map<String, Object> getParams()
     {
         if (params == null)

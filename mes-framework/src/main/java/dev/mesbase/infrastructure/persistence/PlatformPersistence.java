@@ -29,6 +29,17 @@ public final class PlatformPersistence {
         }
         sessions=new SqlSessionFactoryBuilder().build(config); transactions=new JdbcTransactionManager(datasource);
     }
+    /** Independent metadata read; never joins a business transaction or opens a platform write unit. */
+    public <T> T readOnly(Function<OwnedSqlSession,T> work) {
+        var page=com.github.pagehelper.PageHelper.getLocalPage();
+        com.github.pagehelper.PageHelper.clearPage();
+        try(var connection=datasource.getConnection()) {
+            connection.setReadOnly(true);
+            var session=new OwnedSqlSession(sessions.openSession(connection),mappers,() -> {});
+            try { return work.apply(session); } finally { session.close(); }
+        } catch(java.sql.SQLException failure) { throw new IllegalStateException("Platform metadata read failed",failure); }
+        finally { com.github.pagehelper.PageHelper.clearPage(); if(page!=null)com.github.pagehelper.PageHelper.setLocalPage(page); }
+    }
     public <T> T transaction(Function<OwnedSqlSession,T> work) {
         if(TransactionSynchronizationManager.isActualTransactionActive()) throw new FoundationException(ErrorCode.CONFLICT);
         return new TransactionTemplate(transactions).execute(status -> {

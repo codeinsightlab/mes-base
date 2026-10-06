@@ -8,16 +8,24 @@ import dev.mesbase.common.core.domain.entity.SysRole;
 import dev.mesbase.common.core.domain.entity.SysUser;
 import dev.mesbase.common.core.page.TableDataInfo;
 import dev.mesbase.common.enums.BusinessType;
-import dev.mesbase.common.utils.SecurityUtils;
+import dev.mesbase.common.utils.PasswordPolicy;
 import dev.mesbase.common.utils.StringUtils;
 import dev.mesbase.common.utils.poi.ExcelUtil;
+import dev.mesbase.platform.web.EndpointAccess;
+import dev.mesbase.system.dto.UserForm;
 import dev.mesbase.system.service.ISysPostService;
 import dev.mesbase.system.service.ISysRoleService;
 import dev.mesbase.system.service.ISysUserService;
-
+import dev.mesbase.web.view.PageResultMapper;
+import dev.mesbase.web.view.post.SysPostAssembler;
+import dev.mesbase.web.view.role.SysRoleAssembler;
+import dev.mesbase.web.view.user.SysUserAssembler;
+import jakarta.servlet.http.HttpServletResponse;
+import java.util.List;
+import java.util.stream.Collectors;
 import org.apache.commons.lang3.ArrayUtils;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -26,13 +34,9 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
-
-import java.util.List;
-import java.util.stream.Collectors;
-
-import jakarta.servlet.http.HttpServletResponse;
 
 /**
  * 用户信息
@@ -40,13 +44,13 @@ import jakarta.servlet.http.HttpServletResponse;
  * @author ruoyi
  */
 @RestController
-@org.springframework.boot.autoconfigure.condition.ConditionalOnProperty(name="mes.system.enabled",havingValue="true")
+@ConditionalOnProperty(name="mes.system.enabled",havingValue="true")
 @RequestMapping("/api/system/user")
 public class SysUserController extends BaseController
 {
     @Autowired
     private ISysUserService userService;
-    @Autowired private dev.mesbase.common.utils.PasswordPolicy passwords;
+    @Autowired private PasswordPolicy passwords;
 
     @Autowired
     private ISysRoleService roleService;
@@ -57,17 +61,17 @@ public class SysUserController extends BaseController
     /**
      * 获取用户列表
      */
-    @dev.mesbase.platform.web.EndpointAccess(value=dev.mesbase.platform.web.EndpointAccess.Kind.AUTHORIZED,permission="system:user:list",permissionScope=dev.mesbase.platform.web.EndpointAccess.PermissionScope.PLATFORM)
+    @EndpointAccess(value=EndpointAccess.Kind.AUTHORIZED,permission="system:user:list",permissionScope=EndpointAccess.PermissionScope.PLATFORM)
     @GetMapping("/list")
     public TableDataInfo list(SysUser user)
     {
         startPage();
         List<SysUser> list = userService.selectUserList(user);
-        return getDataTable(list);
+        return PageResultMapper.map(list, SysUserAssembler::toResult);
     }
 
     @Log(title = "用户管理", businessType = BusinessType.EXPORT)
-    @dev.mesbase.platform.web.EndpointAccess(value=dev.mesbase.platform.web.EndpointAccess.Kind.AUTHORIZED,permission="system:user:export",permissionScope=dev.mesbase.platform.web.EndpointAccess.PermissionScope.PLATFORM)
+    @EndpointAccess(value=EndpointAccess.Kind.AUTHORIZED,permission="system:user:export",permissionScope=EndpointAccess.PermissionScope.PLATFORM)
     @PostMapping("/export")
     public void export(HttpServletResponse response, SysUser user)
     {
@@ -77,9 +81,9 @@ public class SysUserController extends BaseController
     }
 
     @Log(title = "用户管理", businessType = BusinessType.IMPORT)
-    @dev.mesbase.platform.web.EndpointAccess(value=dev.mesbase.platform.web.EndpointAccess.Kind.AUTHORIZED,permission="system:user:import",permissionScope=dev.mesbase.platform.web.EndpointAccess.PermissionScope.PLATFORM)
+    @EndpointAccess(value=EndpointAccess.Kind.AUTHORIZED,permission="system:user:import",permissionScope=EndpointAccess.PermissionScope.PLATFORM)
     @PostMapping("/importData")
-    public AjaxResult importData(MultipartFile file, boolean updateSupport,@org.springframework.web.bind.annotation.RequestParam String initialPassword) throws Exception
+    public AjaxResult importData(MultipartFile file, boolean updateSupport,@RequestParam String initialPassword) throws Exception
     {
         ExcelUtil<SysUser> util = new ExcelUtil<SysUser>(SysUser.class);
         List<SysUser> userList = util.importExcel(file.getInputStream());
@@ -89,7 +93,7 @@ public class SysUserController extends BaseController
     }
 
     @PostMapping("/importTemplate")
-    @dev.mesbase.platform.web.EndpointAccess(value=dev.mesbase.platform.web.EndpointAccess.Kind.AUTHORIZED,permission="system:user:import",permissionScope=dev.mesbase.platform.web.EndpointAccess.PermissionScope.PLATFORM)
+    @EndpointAccess(value=EndpointAccess.Kind.AUTHORIZED,permission="system:user:import",permissionScope=EndpointAccess.PermissionScope.PLATFORM)
     public void importTemplate(HttpServletResponse response)
     {
         ExcelUtil<SysUser> util = new ExcelUtil<SysUser>(SysUser.class);
@@ -99,21 +103,21 @@ public class SysUserController extends BaseController
     /**
      * 根据用户编号获取详细信息
      */
-    @dev.mesbase.platform.web.EndpointAccess(value=dev.mesbase.platform.web.EndpointAccess.Kind.AUTHORIZED,permission="system:user:query",permissionScope=dev.mesbase.platform.web.EndpointAccess.PermissionScope.PLATFORM)
+    @EndpointAccess(value=EndpointAccess.Kind.AUTHORIZED,permission="system:user:query",permissionScope=EndpointAccess.PermissionScope.PLATFORM)
     @GetMapping(value = { "/", "/{userId}" })
     public AjaxResult getInfo(@PathVariable(value = "userId", required = false) Long userId)
     {
         if(userId!=null) userService.checkUserDataScope(userId);
         AjaxResult ajax = AjaxResult.success();
         List<SysRole> roles = roleService.selectRoleAll();
-        ajax.put("roles", false ? roles : roles.stream().filter(r -> !r.isAdmin()).collect(Collectors.toList()));
-        ajax.put("posts", postService.selectPostAll());
+        ajax.put("roles", SysRoleAssembler.toResults(roles.stream().filter(r -> !r.isAdmin()).collect(Collectors.toList())));
+        ajax.put("posts", SysPostAssembler.toResults(postService.selectPostAll()));
         if (StringUtils.isNotNull(userId))
         {
             SysUser sysUser = userService.selectUserById(userId);
-            ajax.put(AjaxResult.DATA_TAG, sysUser);
-            ajax.put("postIds", postService.selectPostListByUserId(userId));
-            ajax.put("roleIds", sysUser.getRoles().stream().map(SysRole::getRoleId).collect(Collectors.toList()));
+            ajax.put(AjaxResult.DATA_TAG, SysUserAssembler.toResult(sysUser));
+            ajax.put("postIds", postService.selectPostListByUserId(userId).stream().map(String::valueOf).toList());
+            ajax.put("roleIds", sysUser.getRoles().stream().map(role -> String.valueOf(role.getRoleId())).collect(Collectors.toList()));
         }
         return ajax;
     }
@@ -121,10 +125,10 @@ public class SysUserController extends BaseController
     /**
      * 新增用户
      */
-    @dev.mesbase.platform.web.EndpointAccess(value=dev.mesbase.platform.web.EndpointAccess.Kind.AUTHORIZED,permission="system:user:add",permissionScope=dev.mesbase.platform.web.EndpointAccess.PermissionScope.PLATFORM)
+    @EndpointAccess(value=EndpointAccess.Kind.AUTHORIZED,permission="system:user:add",permissionScope=EndpointAccess.PermissionScope.PLATFORM)
     @Log(title = "用户管理", businessType = BusinessType.INSERT)
     @PostMapping
-    public AjaxResult add(@Validated @RequestBody dev.mesbase.system.dto.UserForm userForm)
+    public AjaxResult add(@Validated @RequestBody UserForm userForm)
     {
         SysUser user=userForm.toEntity();
         user.setUserId(null);
@@ -150,10 +154,10 @@ public class SysUserController extends BaseController
     /**
      * 修改用户
      */
-    @dev.mesbase.platform.web.EndpointAccess(value=dev.mesbase.platform.web.EndpointAccess.Kind.AUTHORIZED,permission="system:user:edit",permissionScope=dev.mesbase.platform.web.EndpointAccess.PermissionScope.PLATFORM)
+    @EndpointAccess(value=EndpointAccess.Kind.AUTHORIZED,permission="system:user:edit",permissionScope=EndpointAccess.PermissionScope.PLATFORM)
     @Log(title = "用户管理", businessType = BusinessType.UPDATE)
     @PutMapping
-    public AjaxResult edit(@Validated @RequestBody dev.mesbase.system.dto.UserForm userForm)
+    public AjaxResult edit(@Validated @RequestBody UserForm userForm)
     {
         SysUser user=userForm.toEntity();
         userService.checkUserAllowed(user);
@@ -175,7 +179,7 @@ public class SysUserController extends BaseController
     /**
      * 删除用户
      */
-    @dev.mesbase.platform.web.EndpointAccess(value=dev.mesbase.platform.web.EndpointAccess.Kind.AUTHORIZED,permission="system:user:remove",permissionScope=dev.mesbase.platform.web.EndpointAccess.PermissionScope.PLATFORM)
+    @EndpointAccess(value=EndpointAccess.Kind.AUTHORIZED,permission="system:user:remove",permissionScope=EndpointAccess.PermissionScope.PLATFORM)
     @Log(title = "用户管理", businessType = BusinessType.DELETE)
     @DeleteMapping("/{userIds}")
     public AjaxResult remove(@PathVariable Long[] userIds)
@@ -190,10 +194,10 @@ public class SysUserController extends BaseController
     /**
      * 重置密码
      */
-    @dev.mesbase.platform.web.EndpointAccess(value=dev.mesbase.platform.web.EndpointAccess.Kind.AUTHORIZED,permission="system:user:resetPwd",permissionScope=dev.mesbase.platform.web.EndpointAccess.PermissionScope.PLATFORM)
+    @EndpointAccess(value=EndpointAccess.Kind.AUTHORIZED,permission="system:user:resetPwd",permissionScope=EndpointAccess.PermissionScope.PLATFORM)
     @Log(title = "用户管理", businessType = BusinessType.UPDATE)
     @PutMapping("/resetPwd")
-    public AjaxResult resetPwd(@RequestBody dev.mesbase.system.dto.UserForm userForm)
+    public AjaxResult resetPwd(@RequestBody UserForm userForm)
     {
         SysUser user=userForm.toEntity();
         userService.checkUserAllowed(user);
@@ -206,10 +210,10 @@ public class SysUserController extends BaseController
     /**
      * 状态修改
      */
-    @dev.mesbase.platform.web.EndpointAccess(value=dev.mesbase.platform.web.EndpointAccess.Kind.AUTHORIZED,permission="system:user:edit",permissionScope=dev.mesbase.platform.web.EndpointAccess.PermissionScope.PLATFORM)
+    @EndpointAccess(value=EndpointAccess.Kind.AUTHORIZED,permission="system:user:edit",permissionScope=EndpointAccess.PermissionScope.PLATFORM)
     @Log(title = "用户管理", businessType = BusinessType.UPDATE)
     @PutMapping("/changeStatus")
-    public AjaxResult changeStatus(@RequestBody dev.mesbase.system.dto.UserForm userForm)
+    public AjaxResult changeStatus(@RequestBody UserForm userForm)
     {
         SysUser user=userForm.toEntity();
         userService.checkUserAllowed(user);
@@ -221,7 +225,7 @@ public class SysUserController extends BaseController
     /**
      * 根据用户编号获取授权角色
      */
-    @dev.mesbase.platform.web.EndpointAccess(value=dev.mesbase.platform.web.EndpointAccess.Kind.AUTHORIZED,permission="system:user:query",permissionScope=dev.mesbase.platform.web.EndpointAccess.PermissionScope.PLATFORM)
+    @EndpointAccess(value=EndpointAccess.Kind.AUTHORIZED,permission="system:user:query",permissionScope=EndpointAccess.PermissionScope.PLATFORM)
     @GetMapping("/authRole/{userId}")
     public AjaxResult authRole(@PathVariable("userId") Long userId)
     {
@@ -229,15 +233,15 @@ public class SysUserController extends BaseController
         AjaxResult ajax = AjaxResult.success();
         SysUser user = userService.selectUserById(userId);
         List<SysRole> roles = roleService.selectRolesByUserId(userId);
-        ajax.put("user", user);
-        ajax.put("roles", false ? roles : roles.stream().filter(r -> !r.isAdmin()).collect(Collectors.toList()));
+        ajax.put("user", SysUserAssembler.toResult(user));
+        ajax.put("roles", SysRoleAssembler.toResults(roles.stream().filter(r -> !r.isAdmin()).collect(Collectors.toList())));
         return ajax;
     }
 
     /**
      * 用户授权角色
      */
-    @dev.mesbase.platform.web.EndpointAccess(value=dev.mesbase.platform.web.EndpointAccess.Kind.AUTHORIZED,permission="system:user:edit",permissionScope=dev.mesbase.platform.web.EndpointAccess.PermissionScope.PLATFORM)
+    @EndpointAccess(value=EndpointAccess.Kind.AUTHORIZED,permission="system:user:edit",permissionScope=EndpointAccess.PermissionScope.PLATFORM)
     @Log(title = "用户管理", businessType = BusinessType.GRANT)
     @PutMapping("/authRole")
     public AjaxResult insertAuthRole(Long userId, Long[] roleIds)

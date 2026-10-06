@@ -6,10 +6,15 @@ import dev.mesbase.common.core.domain.AjaxResult;
 import dev.mesbase.common.core.page.TableDataInfo;
 import dev.mesbase.common.enums.BusinessType;
 import dev.mesbase.common.utils.poi.ExcelUtil;
+import dev.mesbase.platform.web.EndpointAccess;
 import dev.mesbase.system.domain.SysOperLog;
 import dev.mesbase.system.service.ISysOperLogService;
-
+import dev.mesbase.web.view.PageResultMapper;
+import dev.mesbase.web.view.log.SysOperLogAssembler;
+import jakarta.servlet.http.HttpServletResponse;
+import java.util.List;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -18,34 +23,30 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.util.List;
-
-import jakarta.servlet.http.HttpServletResponse;
-
 /**
  * 操作日志记录
  * 
  * @author ruoyi
  */
 @RestController
-@org.springframework.boot.autoconfigure.condition.ConditionalOnProperty(name="mes.system.enabled",havingValue="true")
+@ConditionalOnProperty(name="mes.system.enabled",havingValue="true")
 @RequestMapping("/api/monitor/operlog")
 public class SysOperlogController extends BaseController
 {
     @Autowired
     private ISysOperLogService operLogService;
 
-    @dev.mesbase.platform.web.EndpointAccess(value=dev.mesbase.platform.web.EndpointAccess.Kind.AUTHORIZED,permission="monitor:operlog:list",permissionScope=dev.mesbase.platform.web.EndpointAccess.PermissionScope.PLATFORM)
+    @EndpointAccess(value=EndpointAccess.Kind.AUTHORIZED,permission="monitor:operlog:list",permissionScope=EndpointAccess.PermissionScope.PLATFORM)
     @GetMapping("/list")
     public TableDataInfo list(SysOperLog operLog)
     {
         startPage();
         List<SysOperLog> list = operLogService.selectOperLogList(operLog);
-        return getDataTable(list);
+        return PageResultMapper.map(list, SysOperLogAssembler::toResult);
     }
 
     @Log(title = "操作日志", businessType = BusinessType.EXPORT)
-    @dev.mesbase.platform.web.EndpointAccess(value=dev.mesbase.platform.web.EndpointAccess.Kind.AUTHORIZED,permission="monitor:operlog:export",permissionScope=dev.mesbase.platform.web.EndpointAccess.PermissionScope.PLATFORM)
+    @EndpointAccess(value=EndpointAccess.Kind.AUTHORIZED,permission="monitor:operlog:export",permissionScope=EndpointAccess.PermissionScope.PLATFORM)
     @PostMapping("/export")
     public void export(HttpServletResponse response, SysOperLog operLog)
     {
@@ -55,7 +56,7 @@ public class SysOperlogController extends BaseController
     }
 
     @Log(title = "操作日志", businessType = BusinessType.DELETE)
-    @dev.mesbase.platform.web.EndpointAccess(value=dev.mesbase.platform.web.EndpointAccess.Kind.AUTHORIZED,permission="monitor:operlog:remove",permissionScope=dev.mesbase.platform.web.EndpointAccess.PermissionScope.PLATFORM)
+    @EndpointAccess(value=EndpointAccess.Kind.AUTHORIZED,permission="monitor:operlog:remove",permissionScope=EndpointAccess.PermissionScope.PLATFORM)
     @DeleteMapping("/{operIds}")
     public AjaxResult remove(@PathVariable Long[] operIds)
     {
@@ -63,7 +64,7 @@ public class SysOperlogController extends BaseController
     }
 
     @Log(title = "操作日志", businessType = BusinessType.CLEAN)
-    @dev.mesbase.platform.web.EndpointAccess(value=dev.mesbase.platform.web.EndpointAccess.Kind.AUTHORIZED,permission="monitor:operlog:remove",permissionScope=dev.mesbase.platform.web.EndpointAccess.PermissionScope.PLATFORM)
+    @EndpointAccess(value=EndpointAccess.Kind.AUTHORIZED,permission="monitor:operlog:remove",permissionScope=EndpointAccess.PermissionScope.PLATFORM)
     @DeleteMapping("/clean")
     public AjaxResult clean()
     {

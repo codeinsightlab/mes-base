@@ -1,12 +1,12 @@
 # MES Base
 
-Java21 / Spring Boot4.1.1 的模块化单体，正在将 Source Product 的通用基础系统 COPY/PORT 到 Base。系统管理、系统监控、系统工具和已有 Factory Foundation 已接入；当前 Phase1 仍有浏览器验收边界，未迁正式 MES Domain，未部署。
+Java21 / Spring Boot4.1.1 的模块化单体，正在将 Source Product 能力 COPY/PORT 到 Base。系统管理、系统监控、系统工具、工厂/数据源管理与同步协调已接入；生产监控和人员分析代码已迁入，当前业务 Schema、真实 SQL 与页面验收尚未完成，未部署。
 
 ## 当前入口
 
 UI `http://127.0.0.1:15174` → 本轮后端 `127.0.0.1:18081`。用户请求的 admin 已经正式创建，具有显式 PLATFORM 角色；凭证不写文档。原 `15173/18080` 服务保留。
 
-应用在本机，数据库是用户指定的远程测试 MySQL8.0.40：`mes_base_dev` 为系统开发库，`mes_base_dev_business` 为独立工厂业务库。Redis 使用 `127.0.0.1:16379` 的 DB 1。真实连接保存在 Git 忽略且权限为0600的 `.local/application-dev.yml`，不随 Maven target 清理。
+应用在本机，数据库是用户指定的远程测试 MySQL8.0.40：`mes_base_dev` 为系统开发库，`mes_base_dev_business` 为独立工厂业务库。Redis 使用 `127.0.0.1:16379` 的 DB 1。真实连接保存在 Git 忽略且权限为0600的 `mes-admin/src/main/resources/application-dev.yml`，不随 Maven target 清理。
 
 - [当前规划与续接入口](docs/development/next-stage-plan.md)
 - [迁移报告、实际命令和失败](docs/development/MES_BASE_REALIGNMENT_REPORT.md)
@@ -24,6 +24,7 @@ UI `http://127.0.0.1:15174` → 本轮后端 `127.0.0.1:18081`。用户请求的
 | mes-framework | 认证、会话、验证码、密码锁、数据范围、审计、私有文件及 Factory 安全/持久化桥 |
 | mes-quartz | Source 任务/日志、Cron、受控执行、数据库 claim/run token、恢复 |
 | mes-generator | 既有生成实现保留，迁移阶段没有调用 Codegen Skill 或 CLI |
+| mes-mes | Source 生产监控和人员分析；业务 Schema 验收前默认关闭 |
 | mes-admin | 启动类 dev.MesBaseApplication、Controller、YAML 消费/对象装配及 Flyway |
 
 UI 位于相邻 `../mes-base-ui`，Vue3/TypeScript/Router4/Pinia/Element Plus/Vite。Source 查询、字段、表单、组织岗位关联、角色菜单、字典参数、公告消息、日志、监控和工具页已 PORT；API 与实际浏览器完成项分别记录。
@@ -35,19 +36,23 @@ UI 位于相邻 `../mes-base-ui`，Vue3/TypeScript/Router4/Pinia/Element Plus/Vi
 ```sh
 mvn -B -ntp verify
 /usr/bin/python3 scripts/smoke-packaged.py
-zsh -ic 'scripts/run-local-backend'
+scripts/run-local-redis
+# 另一终端
+scripts/run-local-backend
 ```
 
-启动器默认18081，显式加载 `.local/application-dev.yml`；可用 `MES_LOCAL_PORT` / `MES_LOCAL_CONFIG` 覆盖。从仓库根目录直接运行 `java -jar target/mes-base-0.1.0-SNAPSHOT.jar` 或 IDE 的 `dev.MesBaseApplication`，默认 dev，也会加载该文件。IDE Working directory 必须设为仓库根。初始开发管理员凭证在 `.local/development-admin.json`，不写入 Git。Redis16379需运行；当前 Redis 进程仍使用历史 target/phase1 运行目录，清理整个 target 前须先迁移其运行目录。
-
-prod 显式激活，数据库/Redis/文件目录必须由部署方提供，迁移默认关闭、验证码开启、密码最少12字符。完整外部配置模板在 `config/application-prod.example.yml`：
+实际环境参数直接写在 `mes-admin/src/main/resources/application-dev.yml` 和 `application-prod.yml`，没有环境变量占位符或config.import转接。默认dev，prod通过 `--spring.profiles.active=prod` 激活。两个真实配置在本机保留、权限0600，并已取消Git跟踪；新机器从config/application-dev.example.yml与application-prod.example.yml复制到相应资源路径并填入连接，再构建。
 
 ```sh
-java -jar target/mes-base-0.1.0-SNAPSHOT.jar --spring.profiles.active=prod \
-  --spring.config.additional-location=file:/absolute/private/application-prod.yml
+# dev已在18081运行；先构建再启动以应用资源配置修改
+scripts/run-local-backend
+# prod配置默认8080；当前连接同一测试实例的独立prod测试库
+java -jar target/mes-base-0.1.0-SNAPSHOT.jar --spring.profiles.active=prod
 ```
 
-prod 本轮仅在开发数据库上做本地启动验证，不代表生产部署。旧简化平台实现及专用测试已退役，正式JAR只包含Source系统链路；Factory/ownership等当前回归测试保留。
+dev系统/业务库为mes_base_dev / mes_base_dev_business，prod测试系统/业务库为mes_base_prod / mes_base_prod_business，分别使用独立账号、DEV/PROD厂、Redis DB1/DB2和文件目录。初始管理员凭证分别在.local/development-admin.json与.local/production-test-admin.json；prod仍启用验证码和12位密码。Redis16379由scripts/run-local-redis启动。本地JAR包含本机环境配置，只作本地运行产物，本轮未部署生产。
+
+工厂与业务连接由系统库 `mf_factory` / `mf_datasource` 管理，不再在 YAML 创建。配置仍直接填写平台库、Redis、文件目录及 `mes.runtime.datasource-key`（32 字节 Base64 密钥）；业务密码加密保存，更换密钥必须迁移密文。新增管理权限需显式分配，平台角色不会自动获得工厂业务权限。`mes.analytics.enabled=false`，待当前业务表和状态字典核对后再启用。
 
 仅验证空装配时明确避开 dev/prod：
 
@@ -75,7 +80,7 @@ YAML `open-api.data-scope.enabled` 默认 false（环境变量 MES_OPEN_API_DATA
 
 ## SQL 与来源
 
-Flyway 为 platform V1 + system V2–V10。导出命令直接合并当前迁移，不另维护第二套字段：
+Flyway 为 platform V1 + system V2–V14；V11 为工厂/数据源，V12 为同步协调，V13 为管理与分析权限菜单，V14 按源库实际结构扩大头像字段。导出命令直接合并当前迁移，不另维护第二套字段：
 
 ```sh
 /usr/bin/python3 scripts/export-phase1-sql.py

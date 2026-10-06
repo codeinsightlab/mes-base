@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Local packaged-JAR smoke. Synthetic credentials remain in memory; no old services are touched."""
+"""Local packaged-JAR smoke without developer connections or test accounts."""
 import io
 import json
 import os

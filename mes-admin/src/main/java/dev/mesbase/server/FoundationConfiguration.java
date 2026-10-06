@@ -58,7 +58,7 @@ public class FoundationConfiguration {
     }
 
     @Bean
-    BusinessPersistence businessPersistence(ConfiguredBusinessPersistenceResolver resolver, RuntimeRegistry registry) {
+    BusinessPersistence businessPersistence(BusinessPersistenceResolver resolver, RuntimeRegistry registry) {
         return new DedicatedDatabasePersistence(resolver, registry);
     }
 

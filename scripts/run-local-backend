@@ -1,13 +1,12 @@
 #!/bin/sh
-# User Java21 environment; explicit ignored developer configuration, no embedded credentials.
+# User Java21 environment; standard packaged application-dev.yml profile.
 set -eu
 ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
-CONFIG="${MES_LOCAL_CONFIG:-$ROOT/.local/application-dev.yml}"
 JAR="$ROOT/target/mes-base-0.1.0-SNAPSHOT.jar"
-if [ ! -f "$CONFIG" ] || [ ! -f "$JAR" ]; then
-  printf '%s\n' 'Build the backend and prepare the controlled local configuration first.' >&2
+if [ ! -f "$JAR" ]; then
+  printf '%s\n' 'Build the backend with the local dev/prod configuration first.' >&2
   exit 2
 fi
 if [ -n "${JAVA_HOME:-}" ]; then JAVA_BIN="$JAVA_HOME/bin/java"; else JAVA_BIN=java; fi
 cd "$ROOT"
-exec "$JAVA_BIN" -jar "$JAR" "--spring.profiles.active=dev" "--server.port=${MES_LOCAL_PORT:-18081}" "--server.address=127.0.0.1" "--spring.config.additional-location=file:$CONFIG" "$@"
+exec "$JAVA_BIN" -jar "$JAR" "--spring.profiles.active=dev" "--server.port=${MES_LOCAL_PORT:-18081}" "--server.address=127.0.0.1" "$@"

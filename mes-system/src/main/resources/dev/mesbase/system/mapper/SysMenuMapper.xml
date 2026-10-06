@@ -4,6 +4,15 @@
 		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="dev.mesbase.system.mapper.SysMenuMapper">
 
+    <select id="selectFactoryMenus" resultMap="SysMenuResult">
+        select distinct m.menu_id,m.menu_name,m.parent_id,m.order_num,m.path,m.component,m.`query`,m.is_frame,m.is_cache,m.menu_type,m.visible,m.status,m.perms,m.icon,m.create_time
+        from sys_menu m join sys_role_menu rm on m.menu_id=rm.menu_id
+        join sys_user_role ur on ur.role_id=rm.role_id join sys_role r on r.role_id=ur.role_id
+        join sys_user u on u.user_id=ur.user_id
+        where u.user_name=#{username} and u.status='0' and u.del_flag='0'
+        and r.status='0' and r.del_flag='0' and r.kind='FACTORY' and r.factory_id=#{factoryId}
+        and m.status='0' and m.menu_type in ('M','C') order by m.parent_id,m.order_num
+    </select>
 	<resultMap type="SysMenu" id="SysMenuResult">
 		<id     property="menuId"         column="menu_id"        />
 		<result property="menuName"       column="menu_name"      />

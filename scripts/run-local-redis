@@ -1,0 +1,12 @@
+#!/bin/sh
+# Private local Redis prepared under .local; never replaces another machine-wide instance.
+set -eu
+ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
+CONFIG="${MES_LOCAL_REDIS_CONFIG:-$ROOT/.local/redis.conf}"
+REDIS_BIN="${MES_LOCAL_REDIS_BIN:-$ROOT/.local/bin/redis-server}"
+if [ ! -f "$CONFIG" ] || [ ! -x "$REDIS_BIN" ]; then
+  printf '%s\n' 'Prepare the private Redis configuration and executable under .local first.' >&2
+  exit 2
+fi
+cd "$ROOT"
+exec "$REDIS_BIN" "$CONFIG"
