@@ -1,5 +1,7 @@
 package dev.mesbase;
 import java.util.*;import java.nio.file.*;
+
+import dev.MesBaseApplication;
 import org.springframework.boot.SpringApplication;import org.springframework.boot.test.context.TestConfiguration;import org.springframework.context.annotation.*;
 import dev.mesbase.core.factory.*;import dev.mesbase.infrastructure.catalog.*;import dev.mesbase.infrastructure.persistence.*;
 import dev.mesbase.platform.management.*;import dev.mesbase.platform.management.PlatformContracts.*;import dev.mesbase.infrastructure.platform.PlatformRows.*;
@@ -11,7 +13,7 @@ public final class TestOnlyCodegenFixture {
   String mode=args[1];Path database=Path.of(args[2]).toAbsolutePath().normalize();businessUrl="jdbc:h2:file:"+database+";DB_CLOSE_DELAY=-1";
   if(mode.equals("prepare")){try(var c=java.sql.DriverManager.getConnection(businessUrl,"sa","");var s=c.createStatement()){s.execute(CodegenAcceptanceTest.DDL);}System.out.println(org.h2.Driver.class.getProtectionDomain().getCodeSource().getLocation().toURI().getPath());return;}
   if(!mode.equals("serve"))throw new IllegalArgumentException("Unknown TEST ONLY mode");
-  var app=new SpringApplication(dev.mesbase.server.MesBaseApplication.class,Fixture.class);
+  var app=new SpringApplication(MesBaseApplication.class,Fixture.class);
   var context=app.run("--spring.config.location=classpath:/application.yml","--spring.profiles.active=default","--server.address=127.0.0.1","--server.port=0","--mes.platform.enabled=true","--mes.platform.url=jdbc:h2:mem:TEST_ONLY_UI_PLATFORM_"+UUID.randomUUID()+";DB_CLOSE_DELAY=-1","--mes.platform.username=sa","--mes.platform.password=","--mes.platform.migrate=true","--mes.platform.file-root="+database.getParent().resolve("files"));
   System.out.println("TEST_ONLY_READY_PORT="+context.getEnvironment().getProperty("local.server.port"));
  }

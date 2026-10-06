@@ -12,6 +12,11 @@ import dev.mesbase.core.error.*;
 @RestControllerAdvice
 public final class FoundationErrorAdvice {
     private static final Logger LOG=LoggerFactory.getLogger(FoundationErrorAdvice.class);
+    @ExceptionHandler(org.springframework.web.context.request.async.AsyncRequestNotUsableException.class)
+    public void asyncResponseClosed(org.springframework.web.context.request.async.AsyncRequestNotUsableException failure,HttpServletRequest request) {
+        LOG.info("Async response no longer writable requestId={}",ErrorWriter.requestId(request));
+        LOG.debug("Async response exception chain requestId={}",ErrorWriter.requestId(request),failure);
+    }
     @ExceptionHandler(dev.mesbase.common.exception.ServiceException.class)
     public ResponseEntity<ErrorResponse> sourceBusiness(dev.mesbase.common.exception.ServiceException failure,HttpServletRequest request){LOG.warn("Source business rejection requestId={}",ErrorWriter.requestId(request));int status=failure.getCode()!=null&&failure.getCode()==401?401:failure.getCode()!=null&&failure.getCode()==403?403:422;String message=failure.getMessage()==null?"当前操作不可执行":failure.getMessage();if(message.length()>500)message=message.substring(0,500);return ResponseEntity.status(status).body(new ErrorResponse(status==422?"BUSINESS_REJECTED":status==401?"UNAUTHENTICATED":"FORBIDDEN",message,ErrorWriter.requestId(request)));}
     @ExceptionHandler(FoundationException.class)

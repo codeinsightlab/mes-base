@@ -3,7 +3,7 @@
   "sourceHead": "310c6ef1bb37d2533fe893579ba837c353b76926",
   "strategy": "SOURCE_PRODUCT_PORT; no Codegen Skill or CLI invoked",
   "authorization": "User explicitly requested reuse of Source Product infrastructure, prefer its architecture; Codegen ignored during migration.",
-  "license": "MIT declaration in Source Product root LICENSE; retained original authors and license; only selected generic utilities, no customer data/configuration.",
+  "license": "Source Product root MIT declaration retained with original authors; generic common/framework/system/quartz/backend and Vue product assets PORT, no company environment values or customer data.",
   "scope": "Phase1 common/framework/system/admin/quartz, source frontend pages/components; MES business excluded",
   "files": [
     {
@@ -310,7 +310,7 @@
       "source": "ktg-common/src/main/java/com/ktg/common/core/redis/RedisCache.java",
       "target": "mes-common/src/main/java/dev/mesbase/common/core/redis/RedisCache.java",
       "sourceSha256": "b0ec0d0aec23a6f9d5a71086ee501dab739beef46757bb61b823bc88dfba806a",
-      "targetSha256": "21acb2ff62d3f80679666453a731ab8175a7d4ca6d6c79fc7491f12fec15b6b0",
+      "targetSha256": "9b5713d7d48023042814a33429eef4eecae6ad86c048cd9b2f40a4a3458d4a6e",
       "strategy": "PORT",
       "changes": [
         "Source Product generic contracts retained; namespace, Java21/Boot4/Jakarta, explicit DTO/VO, ownership, permissions, safe errors and integration boundaries adapted as recorded in migration matrix."
@@ -370,7 +370,7 @@
       "source": "ktg-common/src/main/java/com/ktg/common/utils/SecurityUtils.java",
       "target": "mes-common/src/main/java/dev/mesbase/common/utils/SecurityUtils.java",
       "sourceSha256": "9c88752de0942c61f0616092e044c702b83f94339e48ae039053ab2c035d1a39",
-      "targetSha256": "c20540ecc3f5d206fe1221c73775cffc14741153947ebbcbcfac9253fa4154d7",
+      "targetSha256": "40190589a535026f8252ed1244eedeb873d79e105e50b96e868530652de35fd3",
       "strategy": "PORT",
       "changes": [
         "Source Product generic contracts retained; namespace, Java21/Boot4/Jakarta, explicit DTO/VO, ownership, permissions, safe errors and integration boundaries adapted as recorded in migration matrix."
@@ -710,7 +710,7 @@
       "source": "ktg-system/src/main/resources/mapper/system/SysMenuMapper.xml",
       "target": "mes-system/src/main/resources/dev/mesbase/system/mapper/SysMenuMapper.xml",
       "sourceSha256": "0ebff0e5780c1c3c94d3ad691705f6a7a01960c28a5574110b1359e73551a4fd",
-      "targetSha256": "83e019a8ccdc2b7669997029159e4206df5f5ffd70d4d7975936e525075d6fa3",
+      "targetSha256": "76c8e5064fdae3e74b296ac5b91a998760353c94a868695d7407ec658bbfb1de",
       "strategy": "PORT",
       "changes": [
         "Source Product generic contracts retained; namespace, Java21/Boot4/Jakarta, explicit DTO/VO, ownership, permissions, safe errors and integration boundaries adapted as recorded in migration matrix."
@@ -810,7 +810,7 @@
       "source": "ktg-system/src/main/resources/mapper/system/SysRoleMapper.xml",
       "target": "mes-system/src/main/resources/dev/mesbase/system/mapper/SysRoleMapper.xml",
       "sourceSha256": "e60306650568613543c21e0e1a612bc717adafa99d0805b10fac840f46271e33",
-      "targetSha256": "2fe00d9694d8a8e164f55e30e532d70ed76a7304609729b00f643c34ff45ef4e",
+      "targetSha256": "0c3bcf57e40ba552a20a17436bbb4e89fba891ea4e2d30e565111f71d091dc23",
       "strategy": "PORT",
       "changes": [
         "Source Product generic contracts retained; namespace, Java21/Boot4/Jakarta, explicit DTO/VO, ownership, permissions, safe errors and integration boundaries adapted as recorded in migration matrix."
@@ -850,7 +850,7 @@
       "source": "ktg-system/src/main/resources/mapper/system/SysUserMapper.xml",
       "target": "mes-system/src/main/resources/dev/mesbase/system/mapper/SysUserMapper.xml",
       "sourceSha256": "3d29b64d5a993a746e5aa5cc276681bcab3ad96ef848ee2d1d00504460a58498",
-      "targetSha256": "a77cbea3303b72c1057f3759ae21db634519ca24e09b50b9fec41fbe39c01dc9",
+      "targetSha256": "49ab5cfe447ec88a46dd50777d8c846cab196164adf54c48df544b0385bf0f0a",
       "strategy": "PORT",
       "changes": [
         "Source Product generic contracts retained; namespace, Java21/Boot4/Jakarta, explicit DTO/VO, ownership, permissions, safe errors and integration boundaries adapted as recorded in migration matrix."
@@ -900,7 +900,7 @@
       "source": "ktg-system/src/main/java/com/ktg/system/service/ISysConfigService.java",
       "target": "mes-system/src/main/java/dev/mesbase/system/service/ISysConfigService.java",
       "sourceSha256": "b9d25ba3300e6e2474d2187060e4d5cdc317f7e390b619c9528e1da341ae14ba",
-      "targetSha256": "a2e6400e072ffc4f6afe7a20ff8e999f663673184446e0a597a0e25e39368109",
+      "targetSha256": "6e0e3092ddf20153d2efdcbea0986d15e594dc2687d5b0b5fe91faa52a2999a5",
       "strategy": "PORT",
       "changes": [
         "Source Product generic contracts retained; namespace, Java21/Boot4/Jakarta, explicit DTO/VO, ownership, permissions, safe errors and integration boundaries adapted as recorded in migration matrix."
@@ -1010,7 +1010,7 @@
       "source": "ktg-system/src/main/java/com/ktg/system/service/impl/SysConfigServiceImpl.java",
       "target": "mes-system/src/main/java/dev/mesbase/system/service/impl/SysConfigServiceImpl.java",
       "sourceSha256": "82dd2f996b106a4be2bed923c1091b0189b336fcce9628250a73267c3d8e35c2",
-      "targetSha256": "81af94d5df3a85dc62b98826a44a8df24ee276ed24eb841a14c57377d38565c8",
+      "targetSha256": "eec9182f9a0a141130122bb256c13b1efc387d6f1fa27695ed4b9f87716c2f31",
       "strategy": "PORT",
       "changes": [
         "Source Product generic contracts retained; namespace, Java21/Boot4/Jakarta, explicit DTO/VO, ownership, permissions, safe errors and integration boundaries adapted as recorded in migration matrix."
@@ -1060,7 +1060,7 @@
       "source": "ktg-system/src/main/java/com/ktg/system/service/impl/SysMenuServiceImpl.java",
       "target": "mes-system/src/main/java/dev/mesbase/system/service/impl/SysMenuServiceImpl.java",
       "sourceSha256": "2f8a2a25fd28664485d6c9d78c8c18a0f6241e2ce29f70f53d463412aa50a39d",
-      "targetSha256": "676f4d45c32a774e6d30ee05646fe4ab135bface518b0da75059fd89f5ff28a2",
+      "targetSha256": "01c056a87c54b709973775d4f63d1022f48d09ef27bdec2610142175ee6559a8",
       "strategy": "PORT",
       "changes": [
         "Source Product generic contracts retained; namespace, Java21/Boot4/Jakarta, explicit DTO/VO, ownership, permissions, safe errors and integration boundaries adapted as recorded in migration matrix."
@@ -1100,7 +1100,7 @@
       "source": "ktg-system/src/main/java/com/ktg/system/service/impl/SysRoleServiceImpl.java",
       "target": "mes-system/src/main/java/dev/mesbase/system/service/impl/SysRoleServiceImpl.java",
       "sourceSha256": "9e874ef0cb811bb43a0c8b91c22525a5f7008cbc26a073aa5b9d7e8c36fedbd6",
-      "targetSha256": "92f49c47796bfc9be5e2fabaaed8599971c02e365a7b67e22e5008438805ebc8",
+      "targetSha256": "7923334a78ace09a7aabd63f835ccfa23ef111d58c824953465e4bbf770ffe94",
       "strategy": "PORT",
       "changes": [
         "Source Product generic contracts retained; namespace, Java21/Boot4/Jakarta, explicit DTO/VO, ownership, permissions, safe errors and integration boundaries adapted as recorded in migration matrix."
@@ -1110,7 +1110,7 @@
       "source": "ktg-system/src/main/java/com/ktg/system/service/impl/SysUserServiceImpl.java",
       "target": "mes-system/src/main/java/dev/mesbase/system/service/impl/SysUserServiceImpl.java",
       "sourceSha256": "7e4c94577c53b35e5855432a71742a17dfef77125ff404564ba9c23fb65367d8",
-      "targetSha256": "f477ad7bc4b13bf02a563a60d457c15f24bf9d61e1314e41ed0279f9e722ebd1",
+      "targetSha256": "23a28608d305981184c4c7d38917c71cb5f5271eebc3c2d57de03d99668d29b8",
       "strategy": "PORT",
       "changes": [
         "Source Product generic contracts retained; namespace, Java21/Boot4/Jakarta, explicit DTO/VO, ownership, permissions, safe errors and integration boundaries adapted as recorded in migration matrix."
@@ -1130,7 +1130,7 @@
       "source": "ktg-admin/src/main/java/com/ktg/web/controller/system/SysConfigController.java",
       "target": "mes-admin/src/main/java/dev/mesbase/web/controller/system/SysConfigController.java",
       "sourceSha256": "68607d29e4b6798eb7843e791f7a0376fc02e836dc9dfd2734fc758e7c1b624c",
-      "targetSha256": "f2b82ec9e6584244cae4523f6bcd3fe2a90cbc00ea39a48e67ab67e725a103bd",
+      "targetSha256": "018a807173ada1c777656c24fe432fdf054d3256bf5cc871291d52092fe08765",
       "strategy": "PORT",
       "changes": [
         "Source Product generic contracts retained; namespace, Java21/Boot4/Jakarta, explicit DTO/VO, ownership, permissions, safe errors and integration boundaries adapted as recorded in migration matrix."
@@ -1140,7 +1140,7 @@
       "source": "ktg-admin/src/main/java/com/ktg/web/controller/system/SysDeptController.java",
       "target": "mes-admin/src/main/java/dev/mesbase/web/controller/system/SysDeptController.java",
       "sourceSha256": "1127ba56f87f98b928493330a8b781e5d9f81cf6f912b76125c13b9d8cfe8f8c",
-      "targetSha256": "83e6f8fbc2aa04fafadded1fdbf6055c73c3605ec90199b5089240d226cded49",
+      "targetSha256": "acb618cf0d14e63fcc9fd57c783a678a9ea404716144238d420ed3338945dce7",
       "strategy": "PORT",
       "changes": [
         "Source Product generic contracts retained; namespace, Java21/Boot4/Jakarta, explicit DTO/VO, ownership, permissions, safe errors and integration boundaries adapted as recorded in migration matrix."
@@ -1150,7 +1150,7 @@
       "source": "ktg-admin/src/main/java/com/ktg/web/controller/system/SysDictDataController.java",
       "target": "mes-admin/src/main/java/dev/mesbase/web/controller/system/SysDictDataController.java",
       "sourceSha256": "11008e8d36cdb9959682a41490bd52bdde97694e1c8dab0654bd3758c43616e1",
-      "targetSha256": "f5187fb5103675fe5b7f3546545b4a2c6c662d1fcec4a496b7d57b1931d6dd3a",
+      "targetSha256": "598005dc8dd4dd8be6f3cadcf764473c25e58b4c220b7c7cba3412cbeb2708ce",
       "strategy": "PORT",
       "changes": [
         "Source Product generic contracts retained; namespace, Java21/Boot4/Jakarta, explicit DTO/VO, ownership, permissions, safe errors and integration boundaries adapted as recorded in migration matrix."
@@ -1160,7 +1160,7 @@
       "source": "ktg-admin/src/main/java/com/ktg/web/controller/system/SysDictTypeController.java",
       "target": "mes-admin/src/main/java/dev/mesbase/web/controller/system/SysDictTypeController.java",
       "sourceSha256": "b8adf503aed881f2025d197b7b51ab710b895e8b275fd392a02db41a3d9aa75f",
-      "targetSha256": "61f27d102e05c1d1abe5da2fb233bafa2a80f88382d78be545275a2de9f8c18e",
+      "targetSha256": "06ffb516aee75e59db44fc04c649c768f2140a1b381bcf312e3cedbcba3843d2",
       "strategy": "PORT",
       "changes": [
         "Source Product generic contracts retained; namespace, Java21/Boot4/Jakarta, explicit DTO/VO, ownership, permissions, safe errors and integration boundaries adapted as recorded in migration matrix."
@@ -1170,7 +1170,7 @@
       "source": "ktg-admin/src/main/java/com/ktg/web/controller/system/SysMenuController.java",
       "target": "mes-admin/src/main/java/dev/mesbase/web/controller/system/SysMenuController.java",
       "sourceSha256": "92d4674a37fc00a837707306f03d7965e8c66cd0a52ba310c24d3ee769a9e77b",
-      "targetSha256": "b48d9addfc2faf3cb4dcf5ee787b1c730721ecfe374f981aa31aec0a98d5ba06",
+      "targetSha256": "fb3772699482d2f8f339bb8a76a45e73b2e8fa929fcbe6b7cd3701872df96827",
       "strategy": "PORT",
       "changes": [
         "Source Product generic contracts retained; namespace, Java21/Boot4/Jakarta, explicit DTO/VO, ownership, permissions, safe errors and integration boundaries adapted as recorded in migration matrix."
@@ -1180,7 +1180,7 @@
       "source": "ktg-admin/src/main/java/com/ktg/web/controller/system/SysNoticeController.java",
       "target": "mes-admin/src/main/java/dev/mesbase/web/controller/system/SysNoticeController.java",
       "sourceSha256": "a4cbd1abb69b491cd235e78ec7ba0cb29253261dc895adb4d70f805dfbbf84fd",
-      "targetSha256": "6c4f43702f72c1813c8831f19f50f605a4a80cc9be102e2174999fb75c15c8c0",
+      "targetSha256": "3baf2801a4eb8d718573b20215d3b7975c63e06ab6039f9eeaab6085b4e20ff6",
       "strategy": "PORT",
       "changes": [
         "Source Product generic contracts retained; namespace, Java21/Boot4/Jakarta, explicit DTO/VO, ownership, permissions, safe errors and integration boundaries adapted as recorded in migration matrix."
@@ -1190,7 +1190,7 @@
       "source": "ktg-admin/src/main/java/com/ktg/web/controller/system/SysPostController.java",
       "target": "mes-admin/src/main/java/dev/mesbase/web/controller/system/SysPostController.java",
       "sourceSha256": "726109ac92c4852d4330d50837d48acc63b7f55262aaafaca092be9beb39e4f2",
-      "targetSha256": "9ae43a2175d7da10df079f1cef6162fefe2ff1baba3636a88038e62944e0f7e9",
+      "targetSha256": "55f1245aa8b8ab5ea556a9427123f59fed1055fe6f9c239585ec3d27de548ef3",
       "strategy": "PORT",
       "changes": [
         "Source Product generic contracts retained; namespace, Java21/Boot4/Jakarta, explicit DTO/VO, ownership, permissions, safe errors and integration boundaries adapted as recorded in migration matrix."
@@ -1200,7 +1200,7 @@
       "source": "ktg-admin/src/main/java/com/ktg/web/controller/system/SysUserController.java",
       "target": "mes-admin/src/main/java/dev/mesbase/web/controller/system/SysUserController.java",
       "sourceSha256": "771d0913af020e4ed9c7cab5d2b48f20655f9dfed4af2cf57810a16d011f8da3",
-      "targetSha256": "183fb1523ad3cf3c321caafba7f7a4b45ce66cc422f33e1a02d0dc51d7185aaf",
+      "targetSha256": "d379dbf69889a429b312ef909e5063cf3c94bbd0f0f043e6640cd62e5deb2c30",
       "strategy": "PORT",
       "changes": [
         "Source Product generic contracts retained; namespace, Java21/Boot4/Jakarta, explicit DTO/VO, ownership, permissions, safe errors and integration boundaries adapted as recorded in migration matrix."
@@ -1212,7 +1212,7 @@
       "sourceHead": "923d50ce35287c71ac7d1455bccbbfb8068e8e8a",
       "target": "/Users/user/work/lixin/mes-base-ui/src/views/system/user/index.vue",
       "sourceSha256": "819ea118f06641ccfbd0e33621db8bccf515b944b9664b17c0aab3d849086b08",
-      "targetSha256": "faa660b399ab21b18c4f51fe59fafdfbc914d8c32ca6a6e6397c6e38b498a4a4",
+      "targetSha256": "6f62aaad859e400b2e401fa9aa8692e7982c06937c9a9c4ebca17ea085102554",
       "strategy": "PORT",
       "changes": [
         "Source fields, queries and workflows retained; Vue3/Element Plus/Pinia/private transport and permission contracts adapted."
@@ -1224,7 +1224,7 @@
       "sourceHead": "923d50ce35287c71ac7d1455bccbbfb8068e8e8a",
       "target": "/Users/user/work/lixin/mes-base-ui/src/views/system/user/authRole.vue",
       "sourceSha256": "057479a47e61ae7deb31ef16becfdad177e8e5f61ca671d539ef951962a9f025",
-      "targetSha256": "a2baaa138d669e5008524dc724ab75581eb41865683f89b142b00eec5240c40b",
+      "targetSha256": "42df4fec8250560d7c28c0674cdd1618dff893ea67521344c1cfb57c8acdf40e",
       "strategy": "PORT",
       "changes": [
         "Source fields, queries and workflows retained; Vue3/Element Plus/Pinia/private transport and permission contracts adapted."
@@ -1248,7 +1248,7 @@
       "sourceHead": "923d50ce35287c71ac7d1455bccbbfb8068e8e8a",
       "target": "/Users/user/work/lixin/mes-base-ui/src/views/system/user/profile/resetPwd.vue",
       "sourceSha256": "9b940a1cafa91e1f1c953003d45776bf9723acc5ed7e964284359d4138ef1e0e",
-      "targetSha256": "1b409f3ecb9d4798de5e64127bb8084fc034bff3c2f7db1e4037afb45c87f351",
+      "targetSha256": "5c674150cdff31af623bcc16d5d5501887e2fd4593865ac8132c3a0fb02a4c72",
       "strategy": "PORT",
       "changes": [
         "Source fields, queries and workflows retained; Vue3/Element Plus/Pinia/private transport and permission contracts adapted."
@@ -1284,7 +1284,7 @@
       "sourceHead": "923d50ce35287c71ac7d1455bccbbfb8068e8e8a",
       "target": "/Users/user/work/lixin/mes-base-ui/src/views/system/dept/index.vue",
       "sourceSha256": "95efb14983bfcadca2aff2957b18643503786603c3b280af517bdfe4c81cd718",
-      "targetSha256": "d35e8857370aa82f19fad757189499e00d6748c0665c9b8fcde0e9517ab1cb3c",
+      "targetSha256": "192f8e94bde90397e8f13e5f41d0a0ebb87ccf39955e94bf60443c394e767ebf",
       "strategy": "PORT",
       "changes": [
         "Source fields, queries and workflows retained; Vue3/Element Plus/Pinia/private transport and permission contracts adapted."
@@ -1296,7 +1296,7 @@
       "sourceHead": "923d50ce35287c71ac7d1455bccbbfb8068e8e8a",
       "target": "/Users/user/work/lixin/mes-base-ui/src/views/system/post/index.vue",
       "sourceSha256": "c3f57431e232ee8e08e7dd6ea7d2ab7eb5c27121d78cce9fd51351a7c9703539",
-      "targetSha256": "344af5f1756a70feccfaad67a024d84034b7b1ca2a8999d59922d079bece68ce",
+      "targetSha256": "eae8e6592185566280d7229f916609896cc44f77453108a23e8c6f5da66ce83e",
       "strategy": "PORT",
       "changes": [
         "Source fields, queries and workflows retained; Vue3/Element Plus/Pinia/private transport and permission contracts adapted."
@@ -1308,7 +1308,7 @@
       "sourceHead": "923d50ce35287c71ac7d1455bccbbfb8068e8e8a",
       "target": "/Users/user/work/lixin/mes-base-ui/src/views/system/role/index.vue",
       "sourceSha256": "9cc7337da152d21f3e4ee6c4f8a3a39e812a939808fc3a766279afa0022f3145",
-      "targetSha256": "8a9cdce906d29fb55e8031097fa9a7fe14e35f7e5abbefdf8adccd7c7257685a",
+      "targetSha256": "8d0460de986f171e896ab8ec21e5083bbade20cf2e6b25d27a1a389921a1b03b",
       "strategy": "PORT",
       "changes": [
         "Source fields, queries and workflows retained; Vue3/Element Plus/Pinia/private transport and permission contracts adapted."
@@ -1320,7 +1320,7 @@
       "sourceHead": "923d50ce35287c71ac7d1455bccbbfb8068e8e8a",
       "target": "/Users/user/work/lixin/mes-base-ui/src/views/system/role/authUser.vue",
       "sourceSha256": "4390cdc9319e523f9f4a2ce3d255289e4be794638203e8905cd93294861fa284",
-      "targetSha256": "23ae7a03cddaf07c7aa79337c94acddc5a396551c711b8e0565638a8df615411",
+      "targetSha256": "ee6b6c4e14d52e1f0e031450e29e51c76866ccd59985f357c0f025e15e653bd5",
       "strategy": "PORT",
       "changes": [
         "Source fields, queries and workflows retained; Vue3/Element Plus/Pinia/private transport and permission contracts adapted."
@@ -1344,7 +1344,7 @@
       "sourceHead": "923d50ce35287c71ac7d1455bccbbfb8068e8e8a",
       "target": "/Users/user/work/lixin/mes-base-ui/src/views/system/menu/index.vue",
       "sourceSha256": "4e7c93b17fa7e9ef669d093ab0e2590d8565d4b83b8fa739380be3243723b368",
-      "targetSha256": "01060d87ea980ce796d127a78170a3a4cf6cbebec97a87e0c1c6681fe8818939",
+      "targetSha256": "047359985255ec994fbfec7126df15c42e33c40958498730a46f1e0889ed86a8",
       "strategy": "PORT",
       "changes": [
         "Source fields, queries and workflows retained; Vue3/Element Plus/Pinia/private transport and permission contracts adapted."
@@ -1356,7 +1356,7 @@
       "sourceHead": "923d50ce35287c71ac7d1455bccbbfb8068e8e8a",
       "target": "/Users/user/work/lixin/mes-base-ui/src/views/system/dict/index.vue",
       "sourceSha256": "990fdd0315cbaffb65926b896b38f8f0a0e11975c02c7a886008cf3ad5ed47e5",
-      "targetSha256": "c6a54c011df8f8f909f08203858ead4de6dbe686b1950694bfaf7ce952e28623",
+      "targetSha256": "a0c9f8939943474ea72f9dea206982ad4e3616d99ba89deb1eba27f0ee6290d4",
       "strategy": "PORT",
       "changes": [
         "Source fields, queries and workflows retained; Vue3/Element Plus/Pinia/private transport and permission contracts adapted."
@@ -1368,7 +1368,7 @@
       "sourceHead": "923d50ce35287c71ac7d1455bccbbfb8068e8e8a",
       "target": "/Users/user/work/lixin/mes-base-ui/src/views/system/dict/data.vue",
       "sourceSha256": "784adc374f92354239ba2cc814c0d62d915829ca653413b2b07358c4df3e02f8",
-      "targetSha256": "e74e0406b069ae59e3a37ae53f8a35f77adef975356e90bddb687505abdcde40",
+      "targetSha256": "37a60ed528877351c5bfb8e097d1645810a93130c2f41416d3158b77a2866c5e",
       "strategy": "PORT",
       "changes": [
         "Source fields, queries and workflows retained; Vue3/Element Plus/Pinia/private transport and permission contracts adapted."
@@ -1380,7 +1380,7 @@
       "sourceHead": "923d50ce35287c71ac7d1455bccbbfb8068e8e8a",
       "target": "/Users/user/work/lixin/mes-base-ui/src/views/system/config/index.vue",
       "sourceSha256": "ccb09c0038c641ac14e7c485d59055411937bae9ecd3d789ccaf934b5d2fad94",
-      "targetSha256": "453171911d6605dea10f3690a28e0c671207a6fa0a09363018c4c56615287aa8",
+      "targetSha256": "eacc5fcf83433678395cc1981cc72c786f14537c944fcc5cd249e225af7dd08c",
       "strategy": "PORT",
       "changes": [
         "Source fields, queries and workflows retained; Vue3/Element Plus/Pinia/private transport and permission contracts adapted."
@@ -1392,7 +1392,7 @@
       "sourceHead": "923d50ce35287c71ac7d1455bccbbfb8068e8e8a",
       "target": "/Users/user/work/lixin/mes-base-ui/src/views/system/notice/index.vue",
       "sourceSha256": "c0e9c32ba414f737260166ec26ba364e79620fb4f92f8827dceca497cfda3fa0",
-      "targetSha256": "fd3560f316a90ea52937db5289bf078a8b7e184ed36a6fd5f6f5e3f9f14ba03b",
+      "targetSha256": "7648ad2a8c3d3ff9d814657cbb6d1a87a8282a80e10788b4d2e7f2ff88818d7b",
       "strategy": "PORT",
       "changes": [
         "Source fields, queries and workflows retained; Vue3/Element Plus/Pinia/private transport and permission contracts adapted."
@@ -1404,7 +1404,7 @@
       "sourceHead": "923d50ce35287c71ac7d1455bccbbfb8068e8e8a",
       "target": "/Users/user/work/lixin/mes-base-ui/src/views/monitor/logininfor/index.vue",
       "sourceSha256": "05ba9a3ba5e016e189abfa186e8e8fe3c8f1ed36d6651e018dc02c72ca7c75ea",
-      "targetSha256": "925366c2588299ca3bf2cdfd2c6e5e70fdd3d5b595d798141832a821109ec4b8",
+      "targetSha256": "91a2063da22e198b213704b1718caccc343569602e5ad01710c2219bd502ba1f",
       "strategy": "PORT",
       "changes": [
         "Source fields, queries and workflows retained; Vue3/Element Plus/Pinia/private transport and permission contracts adapted."
@@ -1416,7 +1416,7 @@
       "sourceHead": "923d50ce35287c71ac7d1455bccbbfb8068e8e8a",
       "target": "/Users/user/work/lixin/mes-base-ui/src/views/monitor/operlog/index.vue",
       "sourceSha256": "d196c7a8e2c5f1fc7e6f5dc2550fc4a553823f54c4ad071658b74e79418fe179",
-      "targetSha256": "4799ae7427b1f1a197dead490f6fb8dcc15778e76fe47fb0db6d88159b040555",
+      "targetSha256": "9a57d78640ef5df06a9faf05349b4bdec13510e273fb4194cb84d0eb31458eea",
       "strategy": "PORT",
       "changes": [
         "Source fields, queries and workflows retained; Vue3/Element Plus/Pinia/private transport and permission contracts adapted."
@@ -1428,7 +1428,7 @@
       "sourceHead": "923d50ce35287c71ac7d1455bccbbfb8068e8e8a",
       "target": "/Users/user/work/lixin/mes-base-ui/src/views/monitor/online/index.vue",
       "sourceSha256": "af198479568de6ec8d38cea9dd5f6bac99486fc7b97618347011fc0010f8c7a5",
-      "targetSha256": "36bbd5dd44d0539685c87f35617492b68573f13f1b89f83d7b32fb9d41f78e5a",
+      "targetSha256": "b653a5269a8f3bccd75c3a06091bd62b35ad84c5645481b0edc5c4d4bceee6b6",
       "strategy": "PORT",
       "changes": [
         "Source fields, queries and workflows retained; Vue3/Element Plus/Pinia/private transport and permission contracts adapted."
@@ -1440,7 +1440,7 @@
       "sourceHead": "923d50ce35287c71ac7d1455bccbbfb8068e8e8a",
       "target": "/Users/user/work/lixin/mes-base-ui/src/views/monitor/job/index.vue",
       "sourceSha256": "c06bb15fe08234acfcc690256080db0a8e4435a28666f4a3d5a97df12c7f1b10",
-      "targetSha256": "5c1d02f5db7af0c7b45cc8a8fcc69914cb000b6387f14da29afbc869c8e9c8a5",
+      "targetSha256": "b0d33cb5adf97c8e2e23d6a2fc08c6b7f4e3b0bf4f0df22f3d5219109e2b114b",
       "strategy": "PORT",
       "changes": [
         "Source fields, queries and workflows retained; Vue3/Element Plus/Pinia/private transport and permission contracts adapted."
@@ -1452,7 +1452,7 @@
       "sourceHead": "923d50ce35287c71ac7d1455bccbbfb8068e8e8a",
       "target": "/Users/user/work/lixin/mes-base-ui/src/views/monitor/job/log.vue",
       "sourceSha256": "b4d148898c0dc1f24ce6609219c7f0657728c8f7a5825a5e3cd566c3023034c1",
-      "targetSha256": "bd69a8c26c72171fcd2516092e7f252a996c869f1d1574daaedeb98d1bb30789",
+      "targetSha256": "4eee07a94eedf7a5c780a14937fa06c2b25f63f40573766d45e1631d7f02130e",
       "strategy": "PORT",
       "changes": [
         "Source fields, queries and workflows retained; Vue3/Element Plus/Pinia/private transport and permission contracts adapted."
@@ -1464,7 +1464,7 @@
       "sourceHead": "923d50ce35287c71ac7d1455bccbbfb8068e8e8a",
       "target": "/Users/user/work/lixin/mes-base-ui/src/views/monitor/druid/index.vue",
       "sourceSha256": "ce8d7a276f94862d0812f4869e3924350a91ed34f4ed3ddc2882d679fb66a66f",
-      "targetSha256": "1d3e9cc04cd43edee662d7123b80eb2c464d65e3673ecd0a108cfc5e621f7781",
+      "targetSha256": "3aaaf8dcae25b966811faedbba1b5761ab656fe4542206a056e953669f2e371a",
       "strategy": "PORT",
       "changes": [
         "Source fields, queries and workflows retained; Vue3/Element Plus/Pinia/private transport and permission contracts adapted."
@@ -1476,7 +1476,7 @@
       "sourceHead": "923d50ce35287c71ac7d1455bccbbfb8068e8e8a",
       "target": "/Users/user/work/lixin/mes-base-ui/src/views/monitor/server/index.vue",
       "sourceSha256": "f9a6df4a92aeda27dc3f8d44105453d8cc53e28acfb5c6ae6f1ba2a47694dbb6",
-      "targetSha256": "7a8f437d5554a85c8ce6583bb504e0268ca60ce574f06bd20ced178c415d1e37",
+      "targetSha256": "5ebb700eb6667ca3878419b5961b77ad073501267696d8b3021e95eb62e5aa4c",
       "strategy": "PORT",
       "changes": [
         "Source fields, queries and workflows retained; Vue3/Element Plus/Pinia/private transport and permission contracts adapted."
@@ -1488,7 +1488,7 @@
       "sourceHead": "923d50ce35287c71ac7d1455bccbbfb8068e8e8a",
       "target": "/Users/user/work/lixin/mes-base-ui/src/views/monitor/cache/index.vue",
       "sourceSha256": "6020d5e58a6c711383d4f7c9ab7d84cf73d1230387d537508233ac2226c602d5",
-      "targetSha256": "3c19529a2b65d4a604ee563bae61a0d2fae3eccb066d6526b27ce5fa0eb9ec9e",
+      "targetSha256": "05785cd6afea59e5b424fffa81f794c1fddf9c3e7e357eef61b28e4280a6fea8",
       "strategy": "PORT",
       "changes": [
         "Source fields, queries and workflows retained; Vue3/Element Plus/Pinia/private transport and permission contracts adapted."
@@ -1596,7 +1596,7 @@
       "sourceHead": "923d50ce35287c71ac7d1455bccbbfb8068e8e8a",
       "target": "/Users/user/work/lixin/mes-base-ui/src/api/system/dict/type.ts",
       "sourceSha256": "ee9d29f71d90954c5c78d5088ac8a339f673e6bf1aafbffa1c8adc8d86c09e98",
-      "targetSha256": "8f412cb9972d780608b726c8f885addd7ead1b0d8b36ae6475b256f10fdd5a7f",
+      "targetSha256": "f22494061faf462da5b5163b3597e6540ccd93f62b07fb121c9608e3d1b4b1ab",
       "strategy": "PORT",
       "changes": [
         "Source fields, queries and workflows retained; Vue3/Element Plus/Pinia/private transport and permission contracts adapted."
@@ -1716,7 +1716,7 @@
       "sourceHead": "923d50ce35287c71ac7d1455bccbbfb8068e8e8a",
       "target": "/Users/user/work/lixin/mes-base-ui/src/components/DictTag/index.vue",
       "sourceSha256": "ff5439fb4061ef17bf6db55a48d2fc9d9420cdad4760571a5326beafb24a91c5",
-      "targetSha256": "09082cab980f810909caad8da61cf116b891a4ec14087d7770ea34298b449727",
+      "targetSha256": "ff839a70aa1ec957f8d3edc26934936cc62cd3c3ed9b6c64b09e89c2b8afe6de",
       "strategy": "PORT",
       "changes": [
         "Source fields, queries and workflows retained; Vue3/Element Plus/Pinia/private transport and permission contracts adapted."
@@ -1886,7 +1886,7 @@
       "source": "ktg-system/src/main/java/com/ktg/system/service/impl/SysMessageServiceImpl.java",
       "target": "mes-system/src/main/java/dev/mesbase/system/service/impl/SysMessageServiceImpl.java",
       "sourceSha256": "f803dc003690089415219e7295e642d78e7ff7b98b874824758440360d3027f8",
-      "targetSha256": "69c8aef0ec1517c91196f909c5c27fcc13d7db553ecc52e3d61efd7ab8c4c774",
+      "targetSha256": "c71eace70e99ea32f3e7bd8f4e3bd3daf201c6a388fb43cf510bd2c36bd86b63",
       "strategy": "PORT",
       "changes": [
         "Source Product generic contracts retained; namespace, Java21/Boot4/Jakarta, explicit DTO/VO, ownership, permissions, safe errors and integration boundaries adapted as recorded in migration matrix."
@@ -2018,7 +2018,7 @@
       "sourceHead": "923d50ce35287c71ac7d1455bccbbfb8068e8e8a",
       "target": "/Users/user/work/lixin/mes-base-ui/src/views/system/message/index.vue",
       "sourceSha256": "f5ab0ca167db8ecd4ed940e0c1d0dec2d84a8c491949bd0977222e00cdc24f67",
-      "targetSha256": "9d6d28c16891dd9cd397cbb325a3bcaaf0ba6161a4e83e3a9574aa141abfb32c",
+      "targetSha256": "afa096e852b7dd716d4f12e32299b4eca020971665a9a2d94adca461f7fa4f20",
       "strategy": "PORT",
       "changes": [
         "Source fields, queries and workflows retained; Vue3/Element Plus/Pinia/private transport and permission contracts adapted."
@@ -2042,7 +2042,7 @@
       "sourceHead": "923d50ce35287c71ac7d1455bccbbfb8068e8e8a",
       "target": "/Users/user/work/lixin/mes-base-ui/src/components/FileUpload/index.vue",
       "sourceSha256": "2390433e04b2f417a5345bf0a3e0cc43a306cd5793d2c9fd2310e9c97ceeec28",
-      "targetSha256": "b8f26c3281ce50608d4253a4a2ceaf02de678d9131309f48f25c389e98342031",
+      "targetSha256": "13c9a0ea5efc12c6b3b89a8bd3210794d83161e9503855903cd1739008804b3b",
       "strategy": "PORT",
       "changes": [
         "Source fields, queries and workflows retained; Vue3/Element Plus/Pinia/private transport and permission contracts adapted."
@@ -2054,7 +2054,7 @@
       "sourceHead": "923d50ce35287c71ac7d1455bccbbfb8068e8e8a",
       "target": "/Users/user/work/lixin/mes-base-ui/src/components/ImageUpload/index.vue",
       "sourceSha256": "27504f62f820366347b5136b6565622026c038b614ec8add81b25886df810d96",
-      "targetSha256": "bea9d1e8634c7460aac16a3b6e8158370c44b2dce3f9fcf6158d930f751cb39c",
+      "targetSha256": "bb677d93e301be2f13282dbfa99782e48a8471d28fb09d97485dc3f0700213d0",
       "strategy": "PORT",
       "changes": [
         "Source fields, queries and workflows retained; Vue3/Element Plus/Pinia/private transport and permission contracts adapted."
@@ -2214,7 +2214,7 @@
       "source": "ktg-system/src/main/resources/mapper/system/SysUserRecipientExtraMapper.xml",
       "target": "mes-system/src/main/resources/dev/mesbase/system/mapper/SysUserRecipientExtraMapper.xml",
       "sourceSha256": "859ca12942e20828abe794902a80c4225867ccd4636e5c76d972baf1463a531c",
-      "targetSha256": "35c6d71d81895105d8bf1723285273cc2fa7b19e179cf1536105205ab84ef1ca",
+      "targetSha256": "c97f298a979707ff8a94d8ce920220e2a3c9d1f4b9551bf799f03b99ca95aec8",
       "strategy": "PORT",
       "changes": [
         "Source Product generic contracts retained; namespace, Java21/Boot4/Jakarta, explicit DTO/VO, ownership, permissions, safe errors and integration boundaries adapted as recorded in migration matrix."
@@ -2234,7 +2234,7 @@
       "source": "ktg-system/src/main/java/com/ktg/system/service/impl/SysAttachmentServiceImpl.java",
       "target": "mes-system/src/main/java/dev/mesbase/system/service/impl/SysAttachmentServiceImpl.java",
       "sourceSha256": "e9c7c104e1696484f87195dfbe5c19b2e69f2c1b52db39c5d4bd041f3cca7679",
-      "targetSha256": "a4343a7de4924d4b051c13556fe524ff8cbca7e4a63c29ba8279643ef57644af",
+      "targetSha256": "2136dd70f5e38eaae537745e6eac3959e28d5632a88106742765840aef729e19",
       "strategy": "PORT",
       "changes": [
         "Source Product generic contracts retained; namespace, Java21/Boot4/Jakarta, explicit DTO/VO, ownership, permissions, safe errors and integration boundaries adapted as recorded in migration matrix."
@@ -2254,7 +2254,7 @@
       "source": "ktg-framework/src/main/java/com/ktg/framework/web/service/SysLoginService.java",
       "target": "mes-framework/src/main/java/dev/mesbase/framework/web/service/SysLoginService.java",
       "sourceSha256": "76d932a4a337f6e9ff8faa70a19be71a6014af1a02a3fee704ffa163c7c9f631",
-      "targetSha256": "cd7f5e223b93c94637f2cf7a0eee764f6d76021807f662a98d8e070506d17745",
+      "targetSha256": "8df04d0ef7204497750c682c0f878cfdc2050fde80b4541f510a68cb2a8e1e88",
       "strategy": "PORT",
       "changes": [
         "Source Product generic contracts retained; namespace, Java21/Boot4/Jakarta, explicit DTO/VO, ownership, permissions, safe errors and integration boundaries adapted as recorded in migration matrix."
@@ -2274,7 +2274,7 @@
       "source": "ktg-framework/src/main/java/com/ktg/framework/web/service/TokenService.java",
       "target": "mes-framework/src/main/java/dev/mesbase/framework/web/service/TokenService.java",
       "sourceSha256": "0dbecca92d554a592e86ee38e6d595ae49aa4d4388126d7bf786995c7297deb6",
-      "targetSha256": "45728ed6c1c5953fa5e7162194c5cd810f8697411ba217bf6fc7b891f08c8b6d",
+      "targetSha256": "36d2a241f0d7f8495e17aee72cc70a14872e15a9aaec5b5aa0cf9bb200364cad",
       "strategy": "PORT",
       "changes": [
         "Source Product generic contracts retained; namespace, Java21/Boot4/Jakarta, explicit DTO/VO, ownership, permissions, safe errors and integration boundaries adapted as recorded in migration matrix."
@@ -2284,7 +2284,7 @@
       "source": "ktg-framework/src/main/java/com/ktg/framework/web/domain/Server.java",
       "target": "mes-framework/src/main/java/dev/mesbase/framework/web/domain/Server.java",
       "sourceSha256": "e4ff9b9a5039eeeba60286f7468cd3296379b03e9af62815ae64192124c2aa3a",
-      "targetSha256": "11f35caa5cf0045f75e220aa57e505db83351e61a852634bd411279b3ec7e9e5",
+      "targetSha256": "fd5823eecebf492bb8bd669e644c4a1a65310ceba065142093f2218b28ce69f3",
       "strategy": "PORT",
       "changes": [
         "Source Product generic contracts retained; namespace, Java21/Boot4/Jakarta, explicit DTO/VO, ownership, permissions, safe errors and integration boundaries adapted as recorded in migration matrix."
@@ -2344,7 +2344,7 @@
       "source": "ktg-framework/src/main/java/com/ktg/framework/aspectj/DataScopeAspect.java",
       "target": "mes-framework/src/main/java/dev/mesbase/framework/aspectj/DataScopeAspect.java",
       "sourceSha256": "74f840b8a6f796cb25b1e44e78e70fd9853489067f957dc6664451fefe51ae7d",
-      "targetSha256": "6c15641cd19b8844cc3125e36a59a57b806f3aab8784926989741c773d2f51bc",
+      "targetSha256": "cef9261c01e4cf1505c7ee0363f158b0632a330bc20730153ac4844df05d3e4a",
       "strategy": "PORT",
       "changes": [
         "Source Product generic contracts retained; namespace, Java21/Boot4/Jakarta, explicit DTO/VO, ownership, permissions, safe errors and integration boundaries adapted as recorded in migration matrix."
@@ -2354,7 +2354,7 @@
       "source": "ktg-quartz/src/main/resources/mapper/quartz/SysJobLogMapper.xml",
       "target": "mes-quartz/src/main/resources/dev/mesbase/quartz/mapper/SysJobLogMapper.xml",
       "sourceSha256": "010d615964d8056430685154cee22dc9fdab62efc944f9bdcace61a7cec25c8e",
-      "targetSha256": "d6a3b7621e0364dd05b90aabc9b1f1fa187062f29ecad845738c44fdcaeb6b51",
+      "targetSha256": "9337ec1d963ce0d4e76c4319a7902416daec9502dc74b135a6313481ab26366a",
       "strategy": "PORT",
       "changes": [
         "Source Product generic contracts retained; namespace, Java21/Boot4/Jakarta, explicit DTO/VO, ownership, permissions, safe errors and integration boundaries adapted as recorded in migration matrix."
@@ -2444,7 +2444,7 @@
       "source": "ktg-quartz/src/main/java/com/ktg/quartz/controller/SysJobController.java",
       "target": "mes-quartz/src/main/java/dev/mesbase/quartz/controller/SysJobController.java",
       "sourceSha256": "e13646f0eae5e0439ee7c2100410d6812888246c7950dbf0374c47e965ec8679",
-      "targetSha256": "b83e023b3697277bac245aba71398d32f1ff11fc13ad31083f75e85a756a875e",
+      "targetSha256": "c66f65f87fd898d7566246413d047bbb223cf0a39fa17c8322bdfbf3cd3971fe",
       "strategy": "PORT",
       "changes": [
         "Source Product generic contracts retained; namespace, Java21/Boot4/Jakarta, explicit DTO/VO, ownership, permissions, safe errors and integration boundaries adapted as recorded in migration matrix."
@@ -2454,7 +2454,7 @@
       "source": "ktg-quartz/src/main/java/com/ktg/quartz/controller/SysJobLogController.java",
       "target": "mes-quartz/src/main/java/dev/mesbase/quartz/controller/SysJobLogController.java",
       "sourceSha256": "705e8be3a36685985c1a3c77952480601da0f3809535fdfb234a02e8442d095a",
-      "targetSha256": "a02661735fdb4ccb75802995d53a748969397c304831a7d59917af80e6433742",
+      "targetSha256": "f1f2b708357d1bd8e2738961f7ad16565d60c4c7a8a2aafd612494e54779c76a",
       "strategy": "PORT",
       "changes": [
         "Source Product generic contracts retained; namespace, Java21/Boot4/Jakarta, explicit DTO/VO, ownership, permissions, safe errors and integration boundaries adapted as recorded in migration matrix."
@@ -2514,7 +2514,7 @@
       "source": "ktg-quartz/src/main/java/com/ktg/quartz/domain/SysJobLog.java",
       "target": "mes-quartz/src/main/java/dev/mesbase/quartz/domain/SysJobLog.java",
       "sourceSha256": "4b09153a32ef7b321103cf2db0ec285d2e9ddb83a1a45cdde3c87eaf3894d415",
-      "targetSha256": "425f6fbd83dbeefa175ac3e43fcc37de557ae2b89b44be4940d2b8872839c73a",
+      "targetSha256": "3315396a32ceb4ec81e9e54c6a66ffddd1fe490dbbd4a4cc8b1e1e5d2bb0631d",
       "strategy": "PORT",
       "changes": [
         "Source Product generic contracts retained; namespace, Java21/Boot4/Jakarta, explicit DTO/VO, ownership, permissions, safe errors and integration boundaries adapted as recorded in migration matrix."
@@ -2544,7 +2544,7 @@
       "source": "ktg-admin/src/main/java/com/ktg/web/controller/system/SysRoleController.java",
       "target": "mes-admin/src/main/java/dev/mesbase/web/controller/system/SysRoleController.java",
       "sourceSha256": "a474fd6e06e94b3a7245b77060f5b1f1c7bf070d862b7da0f8ffbc3e3ddeb568",
-      "targetSha256": "386dd594cb9c259415b69de8317d2f945da54d0fcf5aa3ca9d1ba304b33b83af",
+      "targetSha256": "3c2443cb008d7053966c6bee043991a51fd84f25cbe6a9e71f34af141a38ada8",
       "strategy": "PORT",
       "changes": [
         "Source Product generic contracts retained; namespace, Java21/Boot4/Jakarta, explicit DTO/VO, ownership, permissions, safe errors and integration boundaries adapted as recorded in migration matrix."
@@ -2556,7 +2556,7 @@
       "sourceHead": "923d50ce35287c71ac7d1455bccbbfb8068e8e8a",
       "target": "/Users/user/work/lixin/mes-base-ui/src/App.vue",
       "sourceSha256": "e10b985b040b7ead936b6d713372c3f5c88559c5c797ceaf073b21b8f99857a2",
-      "targetSha256": "215324d886538eba1bc8c2929ba97e3cbeb82b92457a1b6fc2b5bbc557e01d17",
+      "targetSha256": "0e61b34623b82ddaa9476b2aa163519d2dec4be65fbefeb6df870987472de7ee",
       "strategy": "PORT",
       "changes": [
         "Source fields, queries and workflows retained; Vue3/Element Plus/Pinia/private transport and permission contracts adapted."
@@ -2568,7 +2568,7 @@
       "sourceHead": "923d50ce35287c71ac7d1455bccbbfb8068e8e8a",
       "target": "/Users/user/work/lixin/mes-base-ui/src/main.ts",
       "sourceSha256": "1b7266f9508716063cddb1c880239bf1cc8d6cbb0f8c8f4f502df3e0aeafbb8f",
-      "targetSha256": "fdfef38a3c775528339129c56d7b81acf7c08cf0131fb64a308cdd76ce0e6af1",
+      "targetSha256": "e1decd1b6c8846bb9dc1683484677df78239ab3fe9475a1ac50d494bc369e3f1",
       "strategy": "PORT",
       "changes": [
         "Source fields, queries and workflows retained; Vue3/Element Plus/Pinia/private transport and permission contracts adapted."
@@ -2652,7 +2652,7 @@
       "sourceHead": "923d50ce35287c71ac7d1455bccbbfb8068e8e8a",
       "target": "/Users/user/work/lixin/mes-base-ui/src/views/Login.vue",
       "sourceSha256": "74fa44999fe696b81d6802bb5ae86848cf52a71b9cfed0fa048933900cda7d5f",
-      "targetSha256": "010d41aad44d879cda088ea6026fe2964b6500d0eb750f32e37fce8ec035d25f",
+      "targetSha256": "00b0a172cffd6696da8c45e223dce7e197989385408f960fa3e2987992bb750e",
       "strategy": "PORT",
       "changes": [
         "Source fields, queries and workflows retained; Vue3/Element Plus/Pinia/private transport and permission contracts adapted."
@@ -3185,6 +3185,390 @@
       "changes": [
         "Source fields, queries and workflows retained; Vue3/Element Plus/Pinia/private transport and permission contracts adapted."
       ]
+    },
+    {
+      "source": "ktg-common/src/main/java/com/ktg/common/core/domain/entity/SysAutoCodePart.java",
+      "target": "mes-common/src/main/java/dev/mesbase/common/core/domain/entity/SysAutoCodePart.java",
+      "sourceSha256": "62e0fd709ef02064b94f4d288346d6acfb3466d33200636c65a19a3526419684",
+      "targetSha256": "1719d6413e90672c2acd163ded328394f3a7afa4a88ddafc41f70d6184671700",
+      "strategy": "PORT",
+      "changes": [
+        "Source Product generic contracts retained; namespace, Java21/Boot4/Jakarta, explicit DTO/VO, ownership, permissions, safe errors and integration boundaries adapted as recorded in migration matrix."
+      ]
+    },
+    {
+      "source": "ktg-common/src/main/java/com/ktg/common/core/domain/entity/SysAutoCodeRule.java",
+      "target": "mes-common/src/main/java/dev/mesbase/common/core/domain/entity/SysAutoCodeRule.java",
+      "sourceSha256": "000d28f9cc101c69bc1e3e97861334c8b462d46cb0a511eb4839a245a1bed5bf",
+      "targetSha256": "25fe3aaa7aeb2d9d97c882d7d96503792d8dd138828ee08d7a2ca07ac8da771b",
+      "strategy": "PORT",
+      "changes": [
+        "Source Product generic contracts retained; namespace, Java21/Boot4/Jakarta, explicit DTO/VO, ownership, permissions, safe errors and integration boundaries adapted as recorded in migration matrix."
+      ]
+    },
+    {
+      "source": "ktg-common/src/main/java/com/ktg/common/core/domain/entity/SysAutoCodeResult.java",
+      "target": "mes-common/src/main/java/dev/mesbase/common/core/domain/entity/SysAutoCodeResult.java",
+      "sourceSha256": "de5752a808836d032f964186fc418563cfa717951f3459a916f20eca2c737a31",
+      "targetSha256": "5ecc5b5e947fda5c75de933a87fd9de099936addf111cd2e15f140ea94a102f0",
+      "strategy": "PORT",
+      "changes": [
+        "Source Product generic contracts retained; namespace, Java21/Boot4/Jakarta, explicit DTO/VO, ownership, permissions, safe errors and integration boundaries adapted as recorded in migration matrix."
+      ]
+    },
+    {
+      "source": "ktg-common/src/main/java/com/ktg/common/core/domain/model/RegisterBody.java",
+      "target": "mes-common/src/main/java/dev/mesbase/common/core/domain/model/RegisterBody.java",
+      "sourceSha256": "dab08a06bd0d218f1b79053b6021236a9e71fc528d4d0e16fa85b90c3d02e889",
+      "targetSha256": "6b530514f30e3055a701dbddb4bf30e3e88e0354694494af65a8d8cb4f8938bd",
+      "strategy": "PORT",
+      "changes": [
+        "Source Product generic contracts retained; namespace, Java21/Boot4/Jakarta, explicit DTO/VO, ownership, permissions, safe errors and integration boundaries adapted as recorded in migration matrix."
+      ]
+    },
+    {
+      "source": "ktg-common/src/main/java/com/ktg/common/enums/CycleMethodMnum.java",
+      "target": "mes-common/src/main/java/dev/mesbase/common/enums/CycleMethodMnum.java",
+      "sourceSha256": "4dc49435e1c94cbb036fd7bd9cce34699a49871793976af633ea2848ef670528",
+      "targetSha256": "d202997182aea93b7fad46b87b5441bee062b82a62983210272ae0d1d65783bd",
+      "strategy": "PORT",
+      "changes": [
+        "Source Product generic contracts retained; namespace, Java21/Boot4/Jakarta, explicit DTO/VO, ownership, permissions, safe errors and integration boundaries adapted as recorded in migration matrix."
+      ]
+    },
+    {
+      "source": "ktg-common/src/main/java/com/ktg/common/enums/PartTypeEnum.java",
+      "target": "mes-common/src/main/java/dev/mesbase/common/enums/PartTypeEnum.java",
+      "sourceSha256": "800a13ca423ad481a06a5fc995a23b8ad12d89d88f6541e2fbfb52c1c317a4ae",
+      "targetSha256": "3a1a6a729d04dc3b00168601a9fab268fe52c320effd7f8c5a7c716f2f031077",
+      "strategy": "PORT",
+      "changes": [
+        "Source Product generic contracts retained; namespace, Java21/Boot4/Jakarta, explicit DTO/VO, ownership, permissions, safe errors and integration boundaries adapted as recorded in migration matrix."
+      ]
+    },
+    {
+      "source": "ktg-system/src/main/resources/mapper/system/SysAutoCodePartMapper.xml",
+      "target": "mes-system/src/main/resources/dev/mesbase/system/mapper/SysAutoCodePartMapper.xml",
+      "sourceSha256": "c84b39d130a7c7b2575fbefdaaac32be340719f7d8a4108ccce4eb3ceab21704",
+      "targetSha256": "26e9bf5f502ac821af1fccfb5237533e5afdd25af8448bbd6e7c67d5cb5c1e6a",
+      "strategy": "PORT",
+      "changes": [
+        "Source Product generic contracts retained; namespace, Java21/Boot4/Jakarta, explicit DTO/VO, ownership, permissions, safe errors and integration boundaries adapted as recorded in migration matrix."
+      ]
+    },
+    {
+      "source": "ktg-system/src/main/resources/mapper/system/SysAutoCodeResultMapper.xml",
+      "target": "mes-system/src/main/resources/dev/mesbase/system/mapper/SysAutoCodeResultMapper.xml",
+      "sourceSha256": "bb0d16132d15ae60eb04d7a9affbaf0423846cbe8bfaea3f37f6a9b17840a783",
+      "targetSha256": "35560914a02e7ba1525b8f6b9a650c6f7d8a39ebcdad01e24a16f8962c76a58a",
+      "strategy": "PORT",
+      "changes": [
+        "Source Product generic contracts retained; namespace, Java21/Boot4/Jakarta, explicit DTO/VO, ownership, permissions, safe errors and integration boundaries adapted as recorded in migration matrix."
+      ]
+    },
+    {
+      "source": "ktg-system/src/main/resources/mapper/system/SysAutoCodeRuleMapper.xml",
+      "target": "mes-system/src/main/resources/dev/mesbase/system/mapper/SysAutoCodeRuleMapper.xml",
+      "sourceSha256": "01c3b001545c388621c6ab8ca1df8af74835091a18346baceed4a1c0be3a0248",
+      "targetSha256": "aef3294568a9dbcd3ed31fc5bc8c5f0df5ebbf42b1b5d2db06bd8510a9864bbd",
+      "strategy": "PORT",
+      "changes": [
+        "Source Product generic contracts retained; namespace, Java21/Boot4/Jakarta, explicit DTO/VO, ownership, permissions, safe errors and integration boundaries adapted as recorded in migration matrix."
+      ]
+    },
+    {
+      "source": "ktg-system/src/main/java/com/ktg/system/mapper/SysAutoCodeRuleMapper.java",
+      "target": "mes-system/src/main/java/dev/mesbase/system/mapper/SysAutoCodeRuleMapper.java",
+      "sourceSha256": "1c394918ce3a6ab109a54925a83e89a6164944146bbd241e45a57a203fdef92b",
+      "targetSha256": "0686c813593f23f577609cb1549c4ebd9aba9d7fa84698093b5fc3a78dee4bff",
+      "strategy": "PORT",
+      "changes": [
+        "Source Product generic contracts retained; namespace, Java21/Boot4/Jakarta, explicit DTO/VO, ownership, permissions, safe errors and integration boundaries adapted as recorded in migration matrix."
+      ]
+    },
+    {
+      "source": "ktg-system/src/main/java/com/ktg/system/mapper/SysAutoCodePartMapper.java",
+      "target": "mes-system/src/main/java/dev/mesbase/system/mapper/SysAutoCodePartMapper.java",
+      "sourceSha256": "fea602c80aa8a9ef9fcbcca9bd045a7bd746ca94fa028b95da384d2ddc0ae65e",
+      "targetSha256": "264ecc66d291d9e45be6d0c3dd3ed74f0ee13a491222653a3a12594347fcdc37",
+      "strategy": "PORT",
+      "changes": [
+        "Source Product generic contracts retained; namespace, Java21/Boot4/Jakarta, explicit DTO/VO, ownership, permissions, safe errors and integration boundaries adapted as recorded in migration matrix."
+      ]
+    },
+    {
+      "source": "ktg-system/src/main/java/com/ktg/system/mapper/SysAutoCodeResultMapper.java",
+      "target": "mes-system/src/main/java/dev/mesbase/system/mapper/SysAutoCodeResultMapper.java",
+      "sourceSha256": "c3591c9bcef9cfd520fddd441eab29072544ce380b8aeb139e82e3d4ae71a5ee",
+      "targetSha256": "ff9a00be54f30c03582fa153bf61f7aa42463c73794984e19bafd83442d26493",
+      "strategy": "PORT",
+      "changes": [
+        "Source Product generic contracts retained; namespace, Java21/Boot4/Jakarta, explicit DTO/VO, ownership, permissions, safe errors and integration boundaries adapted as recorded in migration matrix."
+      ]
+    },
+    {
+      "source": "ktg-system/src/main/java/com/ktg/system/service/IAutoCodePartService.java",
+      "target": "mes-system/src/main/java/dev/mesbase/system/service/IAutoCodePartService.java",
+      "sourceSha256": "717fe2cefc169944e6175df2a445f918bce96d9ba42e3ec4f6303ee18bc56cf1",
+      "targetSha256": "861b48990cf2af3b8a9faf8bc2dfb70e00ec06dc2abfa58875fed6e3c346917b",
+      "strategy": "PORT",
+      "changes": [
+        "Source Product generic contracts retained; namespace, Java21/Boot4/Jakarta, explicit DTO/VO, ownership, permissions, safe errors and integration boundaries adapted as recorded in migration matrix."
+      ]
+    },
+    {
+      "source": "ktg-system/src/main/java/com/ktg/system/service/IAutoCodeRuleService.java",
+      "target": "mes-system/src/main/java/dev/mesbase/system/service/IAutoCodeRuleService.java",
+      "sourceSha256": "c176ce77737cbadcd4f32bb4f33258cd5d0d014714591b20f0b21de3b7feb0a9",
+      "targetSha256": "55c6cef235743828f807db0f094a00e18133061be22f109ddefaeb35699878b7",
+      "strategy": "PORT",
+      "changes": [
+        "Source Product generic contracts retained; namespace, Java21/Boot4/Jakarta, explicit DTO/VO, ownership, permissions, safe errors and integration boundaries adapted as recorded in migration matrix."
+      ]
+    },
+    {
+      "source": "ktg-system/src/main/java/com/ktg/system/service/IAutoCodeResultService.java",
+      "target": "mes-system/src/main/java/dev/mesbase/system/service/IAutoCodeResultService.java",
+      "sourceSha256": "8874a4a0d08f3dab01b098d5623d13c9a90f3a42b0f2e6c1e35c5ba9b90cad50",
+      "targetSha256": "ec7985092b567fdcf26d77da4fedc27289062458bcd85e5bd7524b5ad2533da9",
+      "strategy": "PORT",
+      "changes": [
+        "Source Product generic contracts retained; namespace, Java21/Boot4/Jakarta, explicit DTO/VO, ownership, permissions, safe errors and integration boundaries adapted as recorded in migration matrix."
+      ]
+    },
+    {
+      "source": "ktg-system/src/main/java/com/ktg/system/service/impl/SysAutoCodeRuleServiceImpl.java",
+      "target": "mes-system/src/main/java/dev/mesbase/system/service/impl/SysAutoCodeRuleServiceImpl.java",
+      "sourceSha256": "a995fcdbbb3eb2fb3d2046ca123f5a4dda2a0a0099575ead60420ccfa1c57f9d",
+      "targetSha256": "cb26225118812e2d26caf1b63f5dcf3557f03dda03bdc5dba2852b3478f6bc9a",
+      "strategy": "PORT",
+      "changes": [
+        "Source Product generic contracts retained; namespace, Java21/Boot4/Jakarta, explicit DTO/VO, ownership, permissions, safe errors and integration boundaries adapted as recorded in migration matrix."
+      ]
+    },
+    {
+      "source": "ktg-system/src/main/java/com/ktg/system/service/impl/SysAutoCodePartServiceImpl.java",
+      "target": "mes-system/src/main/java/dev/mesbase/system/service/impl/SysAutoCodePartServiceImpl.java",
+      "sourceSha256": "3062e0bacb5239e404438966135140a44229b7136c2041a84306f4407c84290d",
+      "targetSha256": "588f90ec3e8f5dba44a1bedd15b3166f90b0b40426ff1a00957d9e8b3f22c646",
+      "strategy": "PORT",
+      "changes": [
+        "Source Product generic contracts retained; namespace, Java21/Boot4/Jakarta, explicit DTO/VO, ownership, permissions, safe errors and integration boundaries adapted as recorded in migration matrix."
+      ]
+    },
+    {
+      "source": "ktg-system/src/main/java/com/ktg/system/service/impl/SysAutoCodeResultServiceImpl.java",
+      "target": "mes-system/src/main/java/dev/mesbase/system/service/impl/SysAutoCodeResultServiceImpl.java",
+      "sourceSha256": "8eb47e2ff55a0f3941999a284fffafba3c0539abbd9ce70e0bf46ec0902168bd",
+      "targetSha256": "bf4b22b0761228df87f637f039e8275b4934c051c579f3b5b54d7d6fc144c723",
+      "strategy": "PORT",
+      "changes": [
+        "Source Product generic contracts retained; namespace, Java21/Boot4/Jakarta, explicit DTO/VO, ownership, permissions, safe errors and integration boundaries adapted as recorded in migration matrix."
+      ]
+    },
+    {
+      "source": "ktg-system/src/main/java/com/ktg/system/strategy/PartTypeTemplate.java",
+      "target": "mes-system/src/main/java/dev/mesbase/system/strategy/PartTypeTemplate.java",
+      "sourceSha256": "e5822195b0a9dd840050576f99b5427f6f0ecd15177141b2e5913f39238d0505",
+      "targetSha256": "1dafb3129255f99cdd3d46fecdd3c95f498f80dbf793ecf2183eb3df1aab56f0",
+      "strategy": "PORT",
+      "changes": [
+        "Source Product generic contracts retained; namespace, Java21/Boot4/Jakarta, explicit DTO/VO, ownership, permissions, safe errors and integration boundaries adapted as recorded in migration matrix."
+      ]
+    },
+    {
+      "source": "ktg-system/src/main/java/com/ktg/system/strategy/PartTypeSerialNoHandler.java",
+      "target": "mes-system/src/main/java/dev/mesbase/system/strategy/PartTypeSerialNoHandler.java",
+      "sourceSha256": "1974b34df97d1b4f55accd1e13712f40d746d943047e346981fe1135fe5126e9",
+      "targetSha256": "2ea8bb91b1e81e7f45eb841321d6586b65c415484e78f2ae0bf92b1ac0746b6a",
+      "strategy": "PORT",
+      "changes": [
+        "Source Product generic contracts retained; namespace, Java21/Boot4/Jakarta, explicit DTO/VO, ownership, permissions, safe errors and integration boundaries adapted as recorded in migration matrix."
+      ]
+    },
+    {
+      "source": "ktg-system/src/main/java/com/ktg/system/strategy/PartTypeNowDateHandler.java",
+      "target": "mes-system/src/main/java/dev/mesbase/system/strategy/PartTypeNowDateHandler.java",
+      "sourceSha256": "df6bb971395a2f9c5db7063c451240414aef34b18f32ef424110495d6110e2ca",
+      "targetSha256": "1d63d0cff3c3be190157f086a031268b0eea51aad673b14e318336fb902d3a98",
+      "strategy": "PORT",
+      "changes": [
+        "Source Product generic contracts retained; namespace, Java21/Boot4/Jakarta, explicit DTO/VO, ownership, permissions, safe errors and integration boundaries adapted as recorded in migration matrix."
+      ]
+    },
+    {
+      "source": "ktg-system/src/main/java/com/ktg/system/strategy/PartTypeHandler.java",
+      "target": "mes-system/src/main/java/dev/mesbase/system/strategy/PartTypeHandler.java",
+      "sourceSha256": "ea41f1236046ff8c4f0a41da4c955036d7fdb658ffb11a0f7cbaddb1e75609c0",
+      "targetSha256": "f8feea89f65b1e3cb01cadead2fc1efccebe15040b618ad05790f56694edb224",
+      "strategy": "PORT",
+      "changes": [
+        "Source Product generic contracts retained; namespace, Java21/Boot4/Jakarta, explicit DTO/VO, ownership, permissions, safe errors and integration boundaries adapted as recorded in migration matrix."
+      ]
+    },
+    {
+      "source": "ktg-system/src/main/java/com/ktg/system/strategy/PartTypeFixCharHandler.java",
+      "target": "mes-system/src/main/java/dev/mesbase/system/strategy/PartTypeFixCharHandler.java",
+      "sourceSha256": "f948f65e97881e3cbd65cee7417c716b342a8c4438e4a899dbd696b38d68e5af",
+      "targetSha256": "853063149b4d53e7b80540d90961fba855c1cbae5b3f4f4804351d9376f53633",
+      "strategy": "PORT",
+      "changes": [
+        "Source Product generic contracts retained; namespace, Java21/Boot4/Jakarta, explicit DTO/VO, ownership, permissions, safe errors and integration boundaries adapted as recorded in migration matrix."
+      ]
+    },
+    {
+      "source": "ktg-system/src/main/java/com/ktg/system/strategy/PartTypeInputCharHandler.java",
+      "target": "mes-system/src/main/java/dev/mesbase/system/strategy/PartTypeInputCharHandler.java",
+      "sourceSha256": "cc0ff77477baffbc6a832da9bb41c65f343a794bb38e77421375ee8c612f890a",
+      "targetSha256": "937310a00425b1f2989c6e6f974b0d276f7d9c0ac357b8c431c439067c86b217",
+      "strategy": "PORT",
+      "changes": [
+        "Source Product generic contracts retained; namespace, Java21/Boot4/Jakarta, explicit DTO/VO, ownership, permissions, safe errors and integration boundaries adapted as recorded in migration matrix."
+      ]
+    },
+    {
+      "source": "ktg-framework/src/main/java/com/ktg/framework/web/service/SysRegisterService.java",
+      "target": "mes-framework/src/main/java/dev/mesbase/framework/web/service/SysRegisterService.java",
+      "sourceSha256": "30596738732a389eaa883e7a350ba07fa5e55c935a9b63678be83121248bcd98",
+      "targetSha256": "6c36b97fe998fc8337335125ad54a19b2fe43d5ac54e3e316612a0ff836c5532",
+      "strategy": "PORT",
+      "changes": [
+        "Source Product generic contracts retained; namespace, Java21/Boot4/Jakarta, explicit DTO/VO, ownership, permissions, safe errors and integration boundaries adapted as recorded in migration matrix."
+      ]
+    },
+    {
+      "source": "ktg-admin/src/main/java/com/ktg/web/controller/system/SysAutoCodeController.java",
+      "target": "mes-admin/src/main/java/dev/mesbase/web/controller/system/SysAutoCodeController.java",
+      "sourceSha256": "967f7506eeae1e3f5198ce36ed948a5b636ae409a205fb5dfc285d45d97a5448",
+      "targetSha256": "4f60b221d48b107debbb23cf6cbac0531d4aa03c6785dc43681807e18aadf152",
+      "strategy": "PORT",
+      "changes": [
+        "Source Product generic contracts retained; namespace, Java21/Boot4/Jakarta, explicit DTO/VO, ownership, permissions, safe errors and integration boundaries adapted as recorded in migration matrix."
+      ]
+    },
+    {
+      "source": "ktg-admin/src/main/java/com/ktg/web/controller/system/SysAutoCodePartController.java",
+      "target": "mes-admin/src/main/java/dev/mesbase/web/controller/system/SysAutoCodePartController.java",
+      "sourceSha256": "ac766902e078b8996d876efe93ebb5ba48fdea53b5f6f4854378b7a67993c093",
+      "targetSha256": "f35f81a8207f18c221c21a0807a2969fc947c88b8657ddb76b79b197fffa3da0",
+      "strategy": "PORT",
+      "changes": [
+        "Source Product generic contracts retained; namespace, Java21/Boot4/Jakarta, explicit DTO/VO, ownership, permissions, safe errors and integration boundaries adapted as recorded in migration matrix."
+      ]
+    },
+    {
+      "source": "ktg-admin/src/main/java/com/ktg/web/controller/system/SysRegisterController.java",
+      "target": "mes-admin/src/main/java/dev/mesbase/web/controller/system/SysRegisterController.java",
+      "sourceSha256": "6c1707f965fe9dbc1a1bf58f625d8bc7ad8dbe3f808a9172f8329d4dc3a4225c",
+      "targetSha256": "7d23ce7bdb4c4f6a27b6bd5e7ad0dfee46eada12f8339796eb0275e820bc50f0",
+      "strategy": "PORT",
+      "changes": [
+        "Source Product generic contracts retained; namespace, Java21/Boot4/Jakarta, explicit DTO/VO, ownership, permissions, safe errors and integration boundaries adapted as recorded in migration matrix."
+      ]
+    },
+    {
+      "source": "ktg-admin/src/main/java/com/ktg/web/controller/system/SysAutoCodeRuleController.java",
+      "target": "mes-admin/src/main/java/dev/mesbase/web/controller/system/SysAutoCodeRuleController.java",
+      "sourceSha256": "18747d2147abb4a43c50e681b2020f9a35588ef8722704ee9c3820321edefde8",
+      "targetSha256": "cdf22258d280826082c6e571b5c074f19a57dc0d3075ff778d0979bf4e06139b",
+      "strategy": "PORT",
+      "changes": [
+        "Source Product generic contracts retained; namespace, Java21/Boot4/Jakarta, explicit DTO/VO, ownership, permissions, safe errors and integration boundaries adapted as recorded in migration matrix."
+      ]
+    },
+    {
+      "source": "ktg-admin/src/main/java/com/ktg/web/controller/tool/SwaggerController.java",
+      "target": "mes-admin/src/main/java/dev/mesbase/web/controller/tool/SwaggerController.java",
+      "sourceSha256": "62dc93149ea35400eaf9fed7029b0250fdb2ee1bef58a5294740646b7ea3d2b3",
+      "targetSha256": "8793e53755ac834bed0b2aa1c0590d2b95fafad57e6fd0d4f9e003aff4c7abaf",
+      "strategy": "PORT",
+      "changes": [
+        "Source Product generic contracts retained; namespace, Java21/Boot4/Jakarta, explicit DTO/VO, ownership, permissions, safe errors and integration boundaries adapted as recorded in migration matrix."
+      ]
+    },
+    {
+      "sourceProduct": "/Users/user/work/heri/ktg-mes-ui",
+      "source": "src/components/SvgIcon/index.vue",
+      "sourceHead": "923d50ce35287c71ac7d1455bccbbfb8068e8e8a",
+      "target": "/Users/user/work/lixin/mes-base-ui/src/components/SvgIcon/index.vue",
+      "sourceSha256": "7a10b86a4093cf927d3c047dddcf073e2f8ea3ddba61ff1631f619fce2c3caca",
+      "targetSha256": "bee1bf13650d28f337dd2769b9aa8759ad7f9b7dbe1f69ae07cca8f3346f68d2",
+      "strategy": "PORT",
+      "changes": [
+        "Source fields, queries and workflows retained; Vue3/Element Plus/Pinia/private transport and permission contracts adapted."
+      ]
+    },
+    {
+      "sourceProduct": "/Users/user/work/heri/ktg-mes-ui",
+      "source": "src/api/system/autocode/part.js",
+      "sourceHead": "923d50ce35287c71ac7d1455bccbbfb8068e8e8a",
+      "target": "/Users/user/work/lixin/mes-base-ui/src/api/system/autocode/part.ts",
+      "sourceSha256": "6e36e13637b2ced946bb8509fd16a365e94c7cc1e0a9ac13518c7968eeb1341c",
+      "targetSha256": "f4314205581a53715526adf24bc11f5800f6b81f1d912c5a8cfb58c8b020cab1",
+      "strategy": "PORT",
+      "changes": [
+        "Source fields, queries and workflows retained; Vue3/Element Plus/Pinia/private transport and permission contracts adapted."
+      ]
+    },
+    {
+      "sourceProduct": "/Users/user/work/heri/ktg-mes-ui",
+      "source": "src/api/system/autocode/rule.js",
+      "sourceHead": "923d50ce35287c71ac7d1455bccbbfb8068e8e8a",
+      "target": "/Users/user/work/lixin/mes-base-ui/src/api/system/autocode/rule.ts",
+      "sourceSha256": "cb11b91bb644d52d6313e01c3f55b9879821e491bdcee65a26cf30d08535e943",
+      "targetSha256": "4223c60c74c22096fab1de037e1e681e4af6367712b445827c8ae4f4b6fee5b6",
+      "strategy": "PORT",
+      "changes": [
+        "Source fields, queries and workflows retained; Vue3/Element Plus/Pinia/private transport and permission contracts adapted."
+      ]
+    },
+    {
+      "sourceProduct": "/Users/user/work/heri/ktg-mes-ui",
+      "source": "src/views/Register.vue",
+      "sourceHead": "923d50ce35287c71ac7d1455bccbbfb8068e8e8a",
+      "target": "/Users/user/work/lixin/mes-base-ui/src/views/Register.vue",
+      "sourceSha256": "6f11439c45f19cc55f3e64aa11d84413261c30a4fe735145d3a8c82e81d190b3",
+      "targetSha256": "055622b02a34bd153702a279593cae95efb85940af561fc768fc02a7cbd9a92a",
+      "strategy": "PORT",
+      "changes": [
+        "Source fields, queries and workflows retained; Vue3/Element Plus/Pinia/private transport and permission contracts adapted."
+      ]
+    },
+    {
+      "sourceProduct": "/Users/user/work/heri/ktg-mes-ui",
+      "source": "src/views/system/autocode/index.vue",
+      "sourceHead": "923d50ce35287c71ac7d1455bccbbfb8068e8e8a",
+      "target": "/Users/user/work/lixin/mes-base-ui/src/views/system/autocode/index.vue",
+      "sourceSha256": "cff63020f224c3e507892ba3f97187cece7918c2d065a3f81d52a5532dc84a02",
+      "targetSha256": "f3eeb3bda8d0545b356ff728f2a1c6842147aa200611bf342f3a7efc89e39233",
+      "strategy": "PORT",
+      "changes": [
+        "Source fields, queries and workflows retained; Vue3/Element Plus/Pinia/private transport and permission contracts adapted."
+      ]
+    },
+    {
+      "sourceProduct": "/Users/user/work/heri/ktg-mes-ui",
+      "source": "src/views/system/autocode/part.vue",
+      "sourceHead": "923d50ce35287c71ac7d1455bccbbfb8068e8e8a",
+      "target": "/Users/user/work/lixin/mes-base-ui/src/views/system/autocode/part.vue",
+      "sourceSha256": "6bf41ede098d50f4792d78e2195552e885af79bab47fb79a2d0a9b4d3547857e",
+      "targetSha256": "3d4cec09324ada032e1e2a9fe6bb54c0635c5fe7a61d226cd354d53493e6ca9f",
+      "strategy": "PORT",
+      "changes": [
+        "Source fields, queries and workflows retained; Vue3/Element Plus/Pinia/private transport and permission contracts adapted."
+      ]
+    },
+    {
+      "sourceProduct": "/Users/user/work/heri/ktg-mes-ui",
+      "source": "src/views/tool/swagger/index.vue",
+      "sourceHead": "923d50ce35287c71ac7d1455bccbbfb8068e8e8a",
+      "target": "/Users/user/work/lixin/mes-base-ui/src/views/tool/swagger/index.vue",
+      "sourceSha256": "51264131f27dcd28fff7d03c5091ee0d552599ea5e1826457c517e8f21731b75",
+      "targetSha256": "798c8528c9ea3acb48d7538671d94bb9f11519076513872fa77316328d455d8f",
+      "strategy": "PORT",
+      "changes": [
+        "Source fields, queries and workflows retained; Vue3/Element Plus/Pinia/private transport and permission contracts adapted."
+      ]
     }
   ],
   "licenseSha256": "260f185d34ec6ed36f686367335b7daae181c5cad80372fcd06304281882078d",
@@ -3213,6 +3597,24 @@
       "version": "9.0.3",
       "license": "Apache-2.0",
       "source": "https://github.com/minio/minio-java/releases/tag/9.0.3"
+    },
+    {
+      "name": "FileSaver",
+      "version": "2.0.5",
+      "license": "MIT",
+      "source": "https://github.com/eligrey/FileSaver.js/tree/v2.0.5"
+    },
+    {
+      "name": "Springdoc OpenAPI WebMVC API",
+      "version": "3.0.3",
+      "license": "Apache-2.0",
+      "source": "https://github.com/springdoc/springdoc-openapi/tree/v3.0.3"
+    },
+    {
+      "name": "Swagger UI Dist",
+      "version": "5.33.1",
+      "license": "Apache-2.0",
+      "source": "https://github.com/swagger-api/swagger-ui/tree/v5.33.1"
     }
   ]
 }

@@ -1,6 +1,6 @@
 package dev.mesbase.server;
 import dev.mesbase.common.core.domain.entity.*;import dev.mesbase.common.core.redis.RedisCache;
-import dev.mesbase.quartz.mapper.*;import dev.mesbase.system.service.*;import dev.mesbase.system.mapper.*;
+import dev.mesbase.quartz.mapper.*;import dev.mesbase.system.openapi.mapper.*;import dev.mesbase.system.service.*;import dev.mesbase.system.mapper.*;
 import dev.mesbase.framework.persistence.*;import dev.mesbase.infrastructure.persistence.*;
 import org.springframework.context.annotation.*;import org.springframework.core.env.Environment;import javax.sql.DataSource;
 @Configuration @org.springframework.boot.autoconfigure.condition.ConditionalOnProperty(name="mes.system.enabled",havingValue="true")
@@ -8,13 +8,16 @@ public class SystemConfiguration {
  @Bean(destroyMethod="close") DataSource platformDataSource(Environment e){return DruidPools.create(DruidPools.settings(e),"platform",e.getRequiredProperty("mes.platform.url"),e.getRequiredProperty("mes.platform.username"),e.getRequiredProperty("mes.platform.password"));}
  @Bean PlatformPersistence platformPersistence(DataSource source,Environment e){
   if(e.getProperty("mes.platform.migrate",Boolean.class,false))org.flywaydb.core.Flyway.configure().dataSource(new org.springframework.jdbc.datasource.DriverManagerDataSource(e.getRequiredProperty("mes.platform.url"),e.getRequiredProperty("mes.platform.username"),e.getRequiredProperty("mes.platform.password"))).locations("classpath:db/platform","classpath:db/system").load().migrate();
-  return new PlatformPersistence(source,java.util.Set.of(AutoCodeExtraMapper.class,SysAutoCodeRuleMapper.class,SysAutoCodePartMapper.class,SysAutoCodeResultMapper.class,SysMessageMapper.class,SysAttachmentMapper.class,SysJobMapper.class,SysJobLogMapper.class,JobClaimMapper.class,SysUserRecipientExtraMapper.class,SysLogininforMapper.class,SysOperLogMapper.class,SysPostMapper.class,SysDictTypeMapper.class,SysUserPostMapper.class,SysConfigMapper.class,SysRoleMenuMapper.class,SysNoticeMapper.class,SysMenuMapper.class,SysRoleMapper.class,SysDictDataMapper.class,SysDeptMapper.class,SysRoleDeptMapper.class,SysUserMapper.class,SysUserRoleMapper.class),c->{
-   c.getTypeAliasRegistry().registerAliases("dev.mesbase.common.core.domain.entity");c.getTypeAliasRegistry().registerAliases("dev.mesbase.system.domain");c.getTypeAliasRegistry().registerAliases("dev.mesbase.quartz.domain");
+  return new PlatformPersistence(source,java.util.Set.of(OpenApiClientMapper.class,OpenApiClientExtraMapper.class,OpenApiClientApiMapper.class,AutoCodeExtraMapper.class,SysAutoCodeRuleMapper.class,SysAutoCodePartMapper.class,SysAutoCodeResultMapper.class,SysMessageMapper.class,SysAttachmentMapper.class,SysJobMapper.class,SysJobLogMapper.class,JobClaimMapper.class,SysUserRecipientExtraMapper.class,SysLogininforMapper.class,SysOperLogMapper.class,SysPostMapper.class,SysDictTypeMapper.class,SysUserPostMapper.class,SysConfigMapper.class,SysRoleMenuMapper.class,SysNoticeMapper.class,SysMenuMapper.class,SysRoleMapper.class,SysDictDataMapper.class,SysDeptMapper.class,SysRoleDeptMapper.class,SysUserMapper.class,SysUserRoleMapper.class),c->{
+   c.getTypeAliasRegistry().registerAliases("dev.mesbase.common.core.domain.entity");c.getTypeAliasRegistry().registerAliases("dev.mesbase.system.domain");c.getTypeAliasRegistry().registerAliases("dev.mesbase.system.openapi.domain");c.getTypeAliasRegistry().registerAliases("dev.mesbase.quartz.domain");
    var page=new com.github.pagehelper.PageInterceptor();var settings=new java.util.Properties();settings.setProperty("helperDialect",e.getProperty("pagehelper.helper-dialect","mysql"));settings.setProperty("reasonable",e.getProperty("pagehelper.reasonable","false"));page.setProperties(settings);c.addInterceptor(page);
   });
  }
  @Bean dev.mesbase.framework.security.SystemTokenFilter systemTokens(dev.mesbase.framework.web.service.TokenService t){return new dev.mesbase.framework.security.SystemTokenFilter(t);}
  @Bean org.springframework.boot.web.servlet.FilterRegistrationBean<dev.mesbase.framework.security.SystemTokenFilter> systemTokenRegistration(dev.mesbase.framework.security.SystemTokenFilter f){var r=new org.springframework.boot.web.servlet.FilterRegistrationBean<>(f);r.setEnabled(false);return r;}
+ @Bean OpenApiClientMapper openApiClientMapper(SystemUnit u){return u.mapper(OpenApiClientMapper.class);}
+ @Bean OpenApiClientExtraMapper openApiClientExtraMapper(SystemUnit u){return u.mapper(OpenApiClientExtraMapper.class);}
+ @Bean OpenApiClientApiMapper openApiClientApiMapper(SystemUnit u){return u.mapper(OpenApiClientApiMapper.class);}
  @Bean SysJobMapper sysJobMapper(SystemUnit u){return u.mapper(SysJobMapper.class);}
  @Bean SysJobLogMapper sysJobLogMapper(SystemUnit u){return u.mapper(SysJobLogMapper.class);}
  @Bean JobClaimMapper jobClaimMapper(SystemUnit u){return u.mapper(JobClaimMapper.class);}

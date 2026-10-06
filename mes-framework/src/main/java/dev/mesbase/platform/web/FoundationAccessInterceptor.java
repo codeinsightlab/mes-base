@@ -21,6 +21,15 @@ public final class FoundationAccessInterceptor implements HandlerInterceptor {
         if(access.value()==EndpointAccess.Kind.PUBLIC) return true;
         Authentication authentication=SecurityContextHolder.getContext().getAuthentication();
         if(authentication==null || !authentication.isAuthenticated() || authentication instanceof AnonymousAuthenticationToken) throw new FoundationException(ErrorCode.UNAUTHENTICATED);
+        if(authentication.getPrincipal() instanceof dev.mesbase.common.openapi.OpenApiPrincipal) {
+            // External API grants were checked by the preceding dedicated interceptor.
+            // Never resolve an external appKey as an internal SysUser or implicit factory preference.
+            if(!dev.mesbase.framework.openapi.OpenApiHttp.isOpenApi(request)
+                    || access.value()!=EndpointAccess.Kind.AUTHENTICATED
+                    || access.permissionScope()!=EndpointAccess.PermissionScope.PLATFORM)
+                throw new FoundationException(ErrorCode.FORBIDDEN);
+            return true;
+        }
         AuthenticatedActor actor=new AuthenticatedActor(authentication.getName());
         String explicit=request.getHeader("X-Factory-Id");
         Optional<FactoryId> requested;

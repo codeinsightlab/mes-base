@@ -9,4 +9,4 @@ if [ ! -f "$CONFIG" ] || [ ! -f "$JAR" ]; then
   exit 2
 fi
 if [ -n "${JAVA_HOME:-}" ]; then JAVA_BIN="$JAVA_HOME/bin/java"; else JAVA_BIN=java; fi
-exec "$JAVA_BIN" -jar "$JAR" "--spring.profiles.active=dev" "--spring.config.additional-location=file:$CONFIG" "$@"
+exec "$JAVA_BIN" -jar "$JAR" "--spring.profiles.active=dev" "--server.port=${MES_LOCAL_PORT:-18081}" "--server.address=127.0.0.1" "--spring.config.additional-location=file:$CONFIG" "$@"

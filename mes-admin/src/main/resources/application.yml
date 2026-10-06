@@ -2,7 +2,7 @@ spring:
   application:
     name: mes-base
   profiles:
-    default: dev
+      active: dev
   web:
     resources:
       add-mappings: false
@@ -71,7 +71,7 @@ mes:
     max-upload-bytes: 10000000
   runtime:
     enabled: ${MES_RUNTIME_ENABLED:false}
-    factories: []
+    factories: [ ]
   codegen:
     # Developer metadata profile is independent of Factory Runtime bindings.
     default-datasource: ${MES_CODEGEN_DEFAULT_DATASOURCE:dev}
@@ -117,3 +117,23 @@ minio:
   access-key: ${MES_MINIO_ACCESS_KEY:}
   secret-key: ${MES_MINIO_SECRET_KEY:}
   bucket-name: ${MES_MINIO_BUCKET:}
+
+# Source Swagger PORT: disable the SDK's unclassified MVC endpoints and public UI.
+# The application exposes only its own tool:swagger:view endpoint; UI lives in Base UI.
+springdoc:
+  enable-default-api-docs: false
+  swagger-ui:
+    enabled: false
+  paths-to-match: /api/**,/health
+  packages-to-scan: dev.mesbase.web.controller,dev.mesbase.quartz.controller,dev.mesbase.server
+
+# SOURCE_PRODUCT_PORT: external application authentication and API grants; no route assumptions.
+open-api:
+  enabled: ${MES_OPEN_API_ENABLED:true}
+  namespace: ${MES_OPEN_API_NAMESPACE:base}
+  token-ttl-seconds: ${MES_OPEN_API_TOKEN_TTL_SECONDS:7200}
+  rate-window-seconds: ${MES_OPEN_API_RATE_WINDOW_SECONDS:60}
+  token-rate-limit: ${MES_OPEN_API_TOKEN_RATE_LIMIT:20}
+  api-rate-limit: ${MES_OPEN_API_RATE_LIMIT:120}
+  data-scope:
+    enabled: ${MES_OPEN_API_DATA_SCOPE_ENABLED:false}

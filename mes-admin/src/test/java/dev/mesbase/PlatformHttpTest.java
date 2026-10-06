@@ -3,9 +3,10 @@ import org.junit.jupiter.api.*;import static org.junit.jupiter.api.Assertions.*;
 import org.springframework.boot.test.context.SpringBootTest;import org.springframework.boot.test.context.TestConfiguration;import org.springframework.context.annotation.*;import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.test.context.DynamicPropertySource;import org.springframework.test.context.DynamicPropertyRegistry;import org.springframework.core.env.Environment;
 import java.net.*;import java.net.http.*;import java.util.*;
-import dev.mesbase.server.MesBaseApplication;import dev.mesbase.core.factory.*;import dev.mesbase.infrastructure.catalog.*;import dev.mesbase.platform.management.*;import dev.mesbase.platform.management.PlatformContracts.*;import dev.mesbase.infrastructure.platform.PlatformRows.*;
+import dev.MesBaseApplication;import dev.mesbase.core.factory.*;import dev.mesbase.infrastructure.catalog.*;import dev.mesbase.platform.management.*;import dev.mesbase.platform.management.PlatformContracts.*;import dev.mesbase.infrastructure.platform.PlatformRows.*;
 /** TEST ONLY actual HTTP + DB-backed identity/grants + new error model. Isolated embedded Tomcat/H2. */
-@SpringBootTest(classes={MesBaseApplication.class,PlatformHttpTest.Fixture.class},webEnvironment=SpringBootTest.WebEnvironment.RANDOM_PORT)
+@SpringBootTest(classes={MesBaseApplication.class,PlatformHttpTest.Fixture.class},
+ webEnvironment=SpringBootTest.WebEnvironment.RANDOM_PORT,properties={"mes.runtime.enabled=false"})
 class PlatformHttpTest {
  @DynamicPropertySource static void properties(DynamicPropertyRegistry p){p.add("spring.datasource.druid.filters",()->"stat");p.add("mes.legacy-test-only",()->"true");p.add("mes.system.enabled",()->"false");p.add("mes.platform.enabled",()->"true");p.add("mes.platform.url",()->"jdbc:h2:mem:platform-http-test-"+UUID.randomUUID()+";DB_CLOSE_DELAY=-1");p.add("mes.platform.username",()->"sa");p.add("mes.platform.password",()->"");p.add("mes.platform.migrate",()->"true");p.add("mes.platform.file-root",()->System.getProperty("java.io.tmpdir")+"/mes-platform-http-test-files-"+UUID.randomUUID());}
  @TestConfiguration static class Fixture {

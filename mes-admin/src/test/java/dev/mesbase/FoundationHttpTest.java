@@ -14,7 +14,7 @@ import java.net.*;
 import java.net.http.*;
 import java.util.*;
 import java.util.concurrent.*;
-import dev.mesbase.server.MesBaseApplication;
+import dev.MesBaseApplication;
 import dev.mesbase.core.factory.*;
 import dev.mesbase.core.security.*;
 import dev.mesbase.core.error.*;
@@ -23,7 +23,9 @@ import dev.mesbase.infrastructure.security.InMemoryRoleAuthorization;
 import dev.mesbase.platform.web.*;
 import dev.mesbase.platform.execution.FactoryContext;
 /** TEST ONLY accounts and failure endpoint. Actual embedded Tomcat and HTTP security chain. */
-@SpringBootTest(classes={MesBaseApplication.class,FoundationHttpTest.Fixture.class,FoundationHttpTest.FailureController.class},webEnvironment=SpringBootTest.WebEnvironment.RANDOM_PORT)
+@SpringBootTest(classes={MesBaseApplication.class,FoundationHttpTest.Fixture.class,FoundationHttpTest.FailureController.class},
+    webEnvironment=SpringBootTest.WebEnvironment.RANDOM_PORT,
+    properties={"mes.system.enabled=false","mes.platform.enabled=false","mes.runtime.enabled=false"})
 class FoundationHttpTest {
     @TestConfiguration
     static class Fixture {

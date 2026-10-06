@@ -56,6 +56,9 @@ public class Server
      * 磁盘相关信息
      */
     private List<SysFile> sysFiles = new LinkedList<SysFile>();
+    private String diskSource = "OSHI";
+
+    public String getDiskSource() { return diskSource; }
 
     public Cpu getCpu()
     {
@@ -188,7 +191,7 @@ public class Server
     /**
      * 设置磁盘信息
      */
-    private void setSysFiles(OperatingSystem os)
+    private void setSysFiles(OperatingSystem os) throws java.io.IOException
     {
         FileSystem fileSystem = os.getFileSystem();
         List<OSFileStore> fsArray = fileSystem.getFileStores();
@@ -206,6 +209,25 @@ public class Server
             sysFile.setUsed(convertFileSize(used));
             sysFile.setUsage(Arith.mul(Arith.div(used, total, 4), 100));
             sysFiles.add(sysFile);
+        }
+        if (sysFiles.isEmpty())
+        {
+            // Some macOS process environments deny DiskArbitration; measure the
+            // real application volume through JDK instead of presenting fake zeroes.
+            var path = java.nio.file.Path.of(System.getProperty("user.dir")).toRealPath();
+            var store = java.nio.file.Files.getFileStore(path);
+            long total = store.getTotalSpace(), free = store.getUsableSpace();
+            if (total <= 0) throw new java.io.IOException("Application volume capacity unavailable");
+            var file = new SysFile();
+            file.setDirName(path.toString());
+            file.setSysTypeName(store.type());
+            file.setTypeName(store.name());
+            file.setTotal(convertFileSize(total));
+            file.setFree(convertFileSize(free));
+            file.setUsed(convertFileSize(total - free));
+            file.setUsage(Arith.mul(Arith.div(total - free, total, 4), 100));
+            sysFiles.add(file);
+            diskSource = "JAVA_NIO_APPLICATION_VOLUME";
         }
     }
 

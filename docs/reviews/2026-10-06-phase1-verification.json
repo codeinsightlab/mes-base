@@ -2,20 +2,21 @@
   "phase": "Phase 1 Source Product full system migration",
   "date": "2026-10-06",
   "status": "MIGRATING",
-  "backendHead": "975a9df4687f882bf251ca09bfb242015d33beff",
-  "frontendHead": "18e372c2e6da0c6ab9738d562f99bf0d5bf3c6ca",
+  "backendHead": "e292789a2f7bac4519e93685adf955428ade61ab",
+  "frontendHead": "d2b19714cb5018d07fa3171b76585eab45b325ce",
   "engine": "MySQL 8.0.40",
   "databaseMode": "own isolated schemas with synthetic project data",
   "runtime": {
     "backend": "http://127.0.0.1:18081",
     "web": "http://127.0.0.1:15174",
-    "jar": "target/phase1/phase1-runtime-16.jar",
-    "backendLog": "target/phase1/backend-24.log",
+    "jar": "target/phase1/phase1-runtime-18.jar",
+    "backendLog": "target/phase1/backend-28.log",
     "webLog": "target/phase1/ui-runtime-4.log",
     "peer": "http://127.0.0.1:18082",
     "peerJar": "target/phase1/phase1-runtime-14.jar",
     "peerLog": "target/phase1/backend-peer-4.log",
-    "redis": "loopback:16379"
+    "redis": "loopback:16379",
+    "peerState": "stopped after isolation and retry acceptance; files and schema preserved"
   },
   "testResults": [
     {
@@ -911,6 +912,899 @@
           "passed": true
         }
       ]
+    },
+    {
+      "name": "scoped-security",
+      "mode": "real remote test MySQL, own synthetic identities and local HTTP",
+      "passed": 59,
+      "total": 59,
+      "evidence": "target/phase1/acceptance-scoped-security.json",
+      "cases": [
+        {
+          "case": "requested platform administrator login",
+          "status": 200,
+          "expected": 200,
+          "passed": true,
+          "requestId": "30f85698-f006-4dde-a3a3-3f27bef40ae7"
+        },
+        {
+          "case": "new empty role identity through formal Source interface",
+          "status": 200,
+          "expected": 200,
+          "passed": true,
+          "requestId": "71f3c98b-07f9-441f-8632-b55b97481840"
+        },
+        {
+          "case": "no UserFactory admission needed for login",
+          "status": 200,
+          "expected": 200,
+          "passed": true,
+          "requestId": "79aba115-b81f-475a-a6e0-943ae35d21bc"
+        },
+        {
+          "case": "empty role authenticated identity",
+          "status": 200,
+          "expected": 200,
+          "passed": true,
+          "requestId": "f67f8a58-eae5-4fd3-af62-ee378cb2631a"
+        },
+        {
+          "case": "empty role permission set",
+          "passed": true
+        },
+        {
+          "case": "empty role protected user API rejection",
+          "status": 403,
+          "expected": 403,
+          "passed": true,
+          "requestId": "1833850d-2a4c-4401-b75d-a296e0949b76"
+        },
+        {
+          "case": "empty role may list enabled factories",
+          "status": 200,
+          "expected": 200,
+          "passed": true,
+          "requestId": "94a6f406-67ce-489a-ab08-acc6ae0c149c"
+        },
+        {
+          "case": "empty role can explicitly select enabled Factory",
+          "status": 200,
+          "expected": 200,
+          "passed": true,
+          "requestId": "67d2385f-3509-4492-830a-9cc8d7046e99"
+        },
+        {
+          "case": "selection does not invent permissions",
+          "passed": true
+        },
+        {
+          "case": "platform administrator selects Factory without factory business grants",
+          "status": 200,
+          "expected": 200,
+          "passed": true,
+          "requestId": "02e7bfca-cfe7-4cbb-9803-6d1894283dcc"
+        },
+        {
+          "case": "platform administrator is not Factory administrator",
+          "passed": true
+        },
+        {
+          "case": "explicit manager can discover unassigned menus",
+          "status": 200,
+          "expected": 200,
+          "passed": true,
+          "requestId": "6b8947b6-6008-43d2-a5da-3498e5d05da7"
+        },
+        {
+          "case": "browser-created unassigned menu discoverable",
+          "passed": true
+        },
+        {
+          "case": "Source platform role with explicit dictionary grants",
+          "status": 200,
+          "expected": 200,
+          "passed": true,
+          "requestId": "fbe742f0-ec16-48f0-bd8a-7d001ba28aaf"
+        },
+        {
+          "case": "Source role catalog",
+          "status": 200,
+          "expected": 200,
+          "passed": true,
+          "requestId": "ced23aaa-7efd-42dc-979f-af035dcf51e3"
+        },
+        {
+          "case": "bind role through Source user authorization",
+          "status": 200,
+          "expected": 200,
+          "passed": true,
+          "requestId": "a6af949b-017a-44f7-80f3-324bc320e3e4"
+        },
+        {
+          "case": "same existing credential sees new dictionary grant",
+          "status": 200,
+          "expected": 200,
+          "passed": true,
+          "requestId": "9749c72d-969e-4d4b-8098-5da0db3e0efc"
+        },
+        {
+          "case": "dictionary grant does not give user administration",
+          "status": 403,
+          "expected": 403,
+          "passed": true,
+          "requestId": "edcde276-877f-470c-ade7-1ec4db1c7eaf"
+        },
+        {
+          "case": "Source role self DataScope update",
+          "status": 200,
+          "expected": 200,
+          "passed": true,
+          "requestId": "59fdfb21-622e-4fd0-8988-3eb089339b4c"
+        },
+        {
+          "case": "real SQL self scope",
+          "status": 200,
+          "expected": 200,
+          "passed": true,
+          "requestId": "f79d2bba-3cff-4994-a86e-5c53c5438750"
+        },
+        {
+          "case": "self DataScope returns only current identity",
+          "passed": true
+        },
+        {
+          "case": "client cannot inject DataScope SQL",
+          "status": 200,
+          "expected": 200,
+          "passed": true,
+          "requestId": "91d41b49-18e3-46e6-b289-a6b49eb1ded3"
+        },
+        {
+          "case": "DataScope injection still returns only self",
+          "passed": true
+        },
+        {
+          "case": "own identity detail remains in self scope",
+          "status": 200,
+          "expected": 200,
+          "passed": true,
+          "requestId": "4f4e122f-1ee9-47dc-8c92-d53e1e7f711f"
+        },
+        {
+          "case": "foreign identity detail denied by resource scope",
+          "status": 403,
+          "expected": 403,
+          "passed": true,
+          "requestId": "aa8db671-1b0b-4703-9483-04d04c866e83"
+        },
+        {
+          "case": "foreign user role details denied by resource scope",
+          "status": 403,
+          "expected": 403,
+          "passed": true,
+          "requestId": "eae5c07c-ea77-4e54-b20c-2df374e51ad7"
+        },
+        {
+          "case": "foreign status change denied before update",
+          "status": 403,
+          "expected": 403,
+          "passed": true,
+          "requestId": "1ffdbf4d-6bbe-4bb9-9359-a56962a26600"
+        },
+        {
+          "case": "explicit factory role creation",
+          "status": 200,
+          "expected": 200,
+          "passed": true,
+          "requestId": "cf2af1fd-66bf-49ea-a54b-6476a12f39af"
+        },
+        {
+          "case": "factory role lookup",
+          "status": 200,
+          "expected": 200,
+          "passed": true,
+          "requestId": "e5d2f1ac-dceb-4966-84fb-31ec2713ee8a"
+        },
+        {
+          "case": "Factory kind and ownership survive actual persistence",
+          "passed": true
+        },
+        {
+          "case": "replace platform role with explicit Factory role",
+          "status": 200,
+          "expected": 200,
+          "passed": true,
+          "requestId": "c4ac60e3-447b-4dd3-afeb-da3e934278ef"
+        },
+        {
+          "case": "Factory role cannot grant platform API despite identical permission code",
+          "status": 403,
+          "expected": 403,
+          "passed": true,
+          "requestId": "ac0deede-adc7-446e-a678-c971d21a347e"
+        },
+        {
+          "case": "Factory A gets only its scoped grant",
+          "status": 200,
+          "expected": 200,
+          "passed": true,
+          "requestId": "c1b0918a-688d-48c8-8029-dd1e033e00e3"
+        },
+        {
+          "case": "same token Factory B does not reuse Factory A permissions",
+          "status": 200,
+          "expected": 200,
+          "passed": true,
+          "requestId": "cec1c8a0-df72-4cd3-862a-38832309fee9"
+        },
+        {
+          "case": "current Factory is read on every request",
+          "passed": true
+        },
+        {
+          "case": "disable own synthetic test account",
+          "status": 200,
+          "expected": 200,
+          "passed": true,
+          "requestId": "e071f3e5-6f10-4281-ba69-e944d159b7e2"
+        },
+        {
+          "case": "status update revokes old credential",
+          "status": 401,
+          "expected": 401,
+          "passed": true,
+          "requestId": "133b8712-8007-4339-9c7a-8b0de7e4b175"
+        },
+        {
+          "case": "disabled account cannot log in",
+          "status": 401,
+          "expected": 401,
+          "passed": true,
+          "requestId": "f8bfb7ad-b4bf-4386-8e3e-8f7cb60a5749"
+        },
+        {
+          "case": "reenable same test account",
+          "status": 200,
+          "expected": 200,
+          "passed": true,
+          "requestId": "5e23b99f-e4fb-4b56-a5aa-720ebcaf18ed"
+        },
+        {
+          "case": "old credential stays invalid after reenabling",
+          "status": 401,
+          "expected": 401,
+          "passed": true,
+          "requestId": "20a3fdf9-30e2-49f9-a174-240f75a6cbdf"
+        },
+        {
+          "case": "enabled account creates fresh credential",
+          "status": 200,
+          "expected": 200,
+          "passed": true,
+          "requestId": "91d247c4-bd60-4fb5-b4d0-b88777969276"
+        },
+        {
+          "case": "password reset through formal Source interface",
+          "status": 200,
+          "expected": 200,
+          "passed": true,
+          "requestId": "19dbd4ae-fdc8-4518-8ea9-c88597df471f"
+        },
+        {
+          "case": "password reset revokes prior credential",
+          "status": 401,
+          "expected": 401,
+          "passed": true,
+          "requestId": "cca81a14-403b-46c5-b84b-4d0de3c3a24d"
+        },
+        {
+          "case": "old password rejected after reset",
+          "status": 401,
+          "expected": 401,
+          "passed": true,
+          "requestId": "93d7f120-b47e-4887-ba6f-f31384d00b1e"
+        },
+        {
+          "case": "reset password login",
+          "status": 200,
+          "expected": 200,
+          "passed": true,
+          "requestId": "c229cf29-5a95-43eb-8a95-91e5fc5b6e2d"
+        },
+        {
+          "case": "Redis online Source sessions",
+          "status": 200,
+          "expected": 200,
+          "passed": true,
+          "requestId": "8429af0d-76d2-424c-95a4-797504383e8f"
+        },
+        {
+          "case": "online list contains digest and metadata only",
+          "passed": true
+        },
+        {
+          "case": "force logout current synthetic credential",
+          "status": 200,
+          "expected": 200,
+          "passed": true,
+          "requestId": "34ab54df-8c11-4bb4-a3c4-93dfd9292604"
+        },
+        {
+          "case": "forced credential cannot be reused",
+          "status": 401,
+          "expected": 401,
+          "passed": true,
+          "requestId": "49f3ecbf-9ceb-440e-ae2e-e79c311bed33"
+        },
+        {
+          "case": "bounded password retry 1",
+          "status": 401,
+          "expected": 401,
+          "passed": true,
+          "requestId": "6c0828d5-9401-4e2c-8c19-432bead83298"
+        },
+        {
+          "case": "bounded password retry 2",
+          "status": 401,
+          "expected": 401,
+          "passed": true,
+          "requestId": "d271ffac-9469-45dc-bd35-4a444ca4e71d"
+        },
+        {
+          "case": "bounded password retry 3",
+          "status": 401,
+          "expected": 401,
+          "passed": true,
+          "requestId": "d0e70ad0-4eb5-4cd6-b287-ad37381cccc7"
+        },
+        {
+          "case": "bounded password retry 4",
+          "status": 401,
+          "expected": 401,
+          "passed": true,
+          "requestId": "0f6f985e-fc5e-4046-8a3e-57d8a02d56f3"
+        },
+        {
+          "case": "bounded password retry 5",
+          "status": 401,
+          "expected": 401,
+          "passed": true,
+          "requestId": "fca16463-37bb-4f80-a89b-e59ad9843c7e"
+        },
+        {
+          "case": "correct password still denied while locked",
+          "status": 401,
+          "expected": 401,
+          "passed": true,
+          "requestId": "ffc7d8bc-4477-4734-b1a9-d83dec264800"
+        },
+        {
+          "case": "database-equivalent username case cannot bypass account retry lock",
+          "status": 401,
+          "expected": 401,
+          "passed": true,
+          "requestId": "25290969-a218-4295-9142-da3352046495"
+        },
+        {
+          "case": "peer identity is not locked by main database retries",
+          "passed": true
+        },
+        {
+          "case": "retry lock consumes YAML 10-minute expiry",
+          "passed": true
+        },
+        {
+          "case": "isolated lock cleanup restores only synthetic test identity",
+          "status": 200,
+          "expected": 200,
+          "passed": true,
+          "requestId": "652794e0-9271-4cb2-88b6-7292714f2b58"
+        }
+      ]
+    },
+    {
+      "name": "quartz-schedule",
+      "mode": "real cron plus test-only synthetic interrupted claim",
+      "passed": 23,
+      "total": 23,
+      "evidence": "target/phase1/acceptance-quartz-schedule.json",
+      "cases": [
+        {
+          "case": "administrator actual login",
+          "status": 200,
+          "expected": 200,
+          "passed": true,
+          "requestId": "b314200d-6682-459f-9237-7e8ae29a6b4d"
+        },
+        {
+          "case": "create own paused Quartz task",
+          "status": 200,
+          "expected": 200,
+          "passed": true,
+          "requestId": "9e150681-1f10-4ecc-b44b-fc873b9dbeb0"
+        },
+        {
+          "case": "find own Source task",
+          "status": 200,
+          "expected": 200,
+          "passed": true,
+          "requestId": "a1bc121b-f051-49fa-b545-c75a97624507"
+        },
+        {
+          "case": "paused task cannot execute",
+          "status": 409,
+          "expected": 409,
+          "passed": true,
+          "requestId": "1cef9c28-c7f1-4899-8229-b323c166f0ac"
+        },
+        {
+          "case": "enable actual scheduler",
+          "status": 200,
+          "expected": 200,
+          "passed": true,
+          "requestId": "b1d009f5-e88d-45e7-b704-e43091eace91"
+        },
+        {
+          "case": "manual run reloads canonical task",
+          "status": 200,
+          "expected": 200,
+          "passed": true,
+          "requestId": "a474be03-98e0-45da-acfb-1867c3d285fd"
+        },
+        {
+          "case": "activate frequent cron after isolated manual run",
+          "status": 200,
+          "expected": 200,
+          "passed": true,
+          "requestId": "eda2212f-6568-4983-8187-c66b8ebfc8a3"
+        },
+        {
+          "case": "read actual execution log",
+          "status": 200,
+          "expected": 200,
+          "passed": true,
+          "requestId": "02776b4d-4cbb-40e0-aa32-fddb24656abc"
+        },
+        {
+          "case": "Quartz cron really fired",
+          "passed": true
+        },
+        {
+          "case": "manual request really executed",
+          "passed": true
+        },
+        {
+          "case": "Source log retains timing and owned execution",
+          "passed": true
+        },
+        {
+          "case": "pause only own scheduled test task",
+          "status": 200,
+          "expected": 200,
+          "passed": true,
+          "requestId": "bface3dc-3cbb-4e98-b9b3-d2d72e4d799e"
+        },
+        {
+          "case": "completed task claim released",
+          "status": 200,
+          "expected": 200,
+          "passed": true,
+          "requestId": "bfeb6283-5677-4773-b2ed-9e82e14f6735"
+        },
+        {
+          "case": "paused state clean",
+          "passed": true
+        },
+        {
+          "case": "test-only interrupted claim injected on own task",
+          "passed": true
+        },
+        {
+          "case": "recovery requires user assertion of process death",
+          "status": 400,
+          "expected": 400,
+          "passed": true,
+          "requestId": "c67b14d5-d9c5-4e09-bf8d-5cc4381da191"
+        },
+        {
+          "case": "young claim cannot be recovered",
+          "status": 409,
+          "expected": 409,
+          "passed": true,
+          "requestId": "96ad6a15-f414-4a40-b43b-ad37bb04dd43"
+        },
+        {
+          "case": "age only the own synthetic interrupted claim",
+          "passed": true
+        },
+        {
+          "case": "wrong run token cannot release claim",
+          "status": 409,
+          "expected": 409,
+          "passed": true,
+          "requestId": "6d3054e1-2e47-45ae-8873-c71035eb9724"
+        },
+        {
+          "case": "matching paused expired claim recovers",
+          "status": 200,
+          "expected": 200,
+          "passed": true,
+          "requestId": "8f9d2885-a661-443b-8c97-e6750c6a8bac"
+        },
+        {
+          "case": "recovery cannot be replayed",
+          "status": 409,
+          "expected": 409,
+          "passed": true,
+          "requestId": "3d494ce7-4e70-4554-989e-460d22f1213b"
+        },
+        {
+          "case": "recovery outcome real Source log",
+          "status": 200,
+          "expected": 200,
+          "passed": true,
+          "requestId": "8be92353-d57d-4085-a911-31ee22503ba3"
+        },
+        {
+          "case": "recovery records UNKNOWN instead of success",
+          "passed": true
+        }
+      ]
+    },
+    {
+      "name": "prior-quartz-claim",
+      "mode": "only own prior synthetic claim; UTC session and formal recovery",
+      "passed": 1,
+      "total": 1,
+      "evidence": "target/phase1/acceptance-prior-quartz-claim.json",
+      "cases": [
+        {
+          "case": "close only prior own synthetic interrupted Quartz claim",
+          "jobId": "103",
+          "paused": true,
+          "previousClaimPresent": true,
+          "recoveryStatus": 200,
+          "passed": true
+        }
+      ]
+    },
+    {
+      "name": "registration",
+      "mode": "real remote MySQL, controlled Source registration setting restored",
+      "passed": 29,
+      "total": 29,
+      "evidence": "target/phase1/acceptance-registration.json",
+      "cases": [
+        {
+          "case": "existing platform administrator",
+          "status": 200,
+          "expected": 200,
+          "passed": true,
+          "requestId": "467de4ff-d109-4e79-b299-92675d0a5a13"
+        },
+        {
+          "case": "public Source captcha and registration metadata",
+          "status": 200,
+          "expected": 200,
+          "passed": true,
+          "requestId": "7d74cb3e-e157-4c6e-aaac-cfadd6634aba"
+        },
+        {
+          "case": "public metadata exposes exact YAML policy and closed registration",
+          "passed": true
+        },
+        {
+          "case": "disabled registration fails before mutation",
+          "status": 422,
+          "expected": 422,
+          "passed": true,
+          "requestId": "e57bd3d7-7b2e-4c58-8311-7b4430504351"
+        },
+        {
+          "case": "caller cannot inject roles or Factory into public registration",
+          "status": 400,
+          "expected": 400,
+          "passed": true,
+          "requestId": "e20832b5-e8b0-40cd-82af-124ec92ebb81"
+        },
+        {
+          "case": "read own generic registration setting",
+          "status": 200,
+          "expected": 200,
+          "passed": true,
+          "requestId": "444dedf6-5b29-47d3-9d7e-ddca7a22eb3e"
+        },
+        {
+          "case": "create disabled own registration setting",
+          "status": 200,
+          "expected": 200,
+          "passed": true,
+          "requestId": "e49bf6a0-20e5-4093-975c-9775f1064229"
+        },
+        {
+          "case": "find created setting",
+          "status": 200,
+          "expected": 200,
+          "passed": true,
+          "requestId": "83a6d678-c547-489b-bb13-84510a542f55"
+        },
+        {
+          "case": "enable only own isolated Source registration setting",
+          "status": 200,
+          "expected": 200,
+          "passed": true,
+          "requestId": "5b6f3240-0a47-4b47-81f8-33768f8bbaf3"
+        },
+        {
+          "case": "enabled public metadata",
+          "status": 200,
+          "expected": 200,
+          "passed": true,
+          "requestId": "0a16c431-5e65-4f94-a51c-63a3fea35940"
+        },
+        {
+          "case": "registration switch is consumed",
+          "passed": true
+        },
+        {
+          "case": "Source username minimum length",
+          "status": 400,
+          "expected": 400,
+          "passed": true,
+          "requestId": "4a66140b-eb19-48ef-88fa-f7b1a398edb2"
+        },
+        {
+          "case": "shared YAML password length enforced",
+          "status": 422,
+          "expected": 422,
+          "passed": true,
+          "requestId": "14c414de-31a5-4174-acc9-f674bb63d9fc"
+        },
+        {
+          "case": "BCrypt UTF8 byte bound enforced",
+          "status": 422,
+          "expected": 422,
+          "passed": true,
+          "requestId": "4d3a5b5e-1f1d-4ea9-8db9-0c728a64eaa6"
+        },
+        {
+          "case": "Source XSS account validation preserved",
+          "status": 422,
+          "expected": 422,
+          "passed": true,
+          "requestId": "e20ecb3e-355e-4cc8-919d-b5a238ceecf6"
+        },
+        {
+          "case": "public Source register persists synthetic account",
+          "status": 200,
+          "expected": 200,
+          "passed": true,
+          "requestId": "b4b64694-96c2-4048-a31e-7a906162c4b0"
+        },
+        {
+          "case": "case-equivalent duplicate account rejected",
+          "status": 422,
+          "expected": 422,
+          "passed": true,
+          "requestId": "a1dd6f6d-3141-4558-94b7-8f38df913ef8"
+        },
+        {
+          "case": "registered identity can log in",
+          "status": 200,
+          "expected": 200,
+          "passed": true,
+          "requestId": "84b1dce4-9bf0-4b8f-aa0e-4efb4ecb7bba"
+        },
+        {
+          "case": "registered authenticated identity",
+          "status": 200,
+          "expected": 200,
+          "passed": true,
+          "requestId": "3dfbbe19-76ac-4a38-ad5f-df3a95084916"
+        },
+        {
+          "case": "registration has no implicit role or permission",
+          "passed": true
+        },
+        {
+          "case": "registered identity has no system administration",
+          "status": 403,
+          "expected": 403,
+          "passed": true,
+          "requestId": "b5e13ed5-0350-48c3-b73f-a2f5dcc0c1f6"
+        },
+        {
+          "case": "no UserFactory admission required for factory choices",
+          "status": 200,
+          "expected": 200,
+          "passed": true,
+          "requestId": "a0c90653-b691-40ea-8cd4-ee081c4b44aa"
+        },
+        {
+          "case": "actual persisted registered fields",
+          "status": 200,
+          "expected": 200,
+          "passed": true,
+          "requestId": "70255c98-c0c3-4202-80b2-675ff0013fa4"
+        },
+        {
+          "case": "Source defaults and server role absence preserved",
+          "passed": true
+        },
+        {
+          "case": "Source registration audit persisted",
+          "status": 200,
+          "expected": 200,
+          "passed": true,
+          "requestId": "fccb16dc-6da0-4546-bc68-10647810465f"
+        },
+        {
+          "case": "registration has safe audit and correlation",
+          "passed": true
+        },
+        {
+          "case": "restore prior registration setting",
+          "status": 200,
+          "expected": 200,
+          "passed": true,
+          "requestId": "f2fcf015-1761-43e6-83dc-d5c110160ec2"
+        },
+        {
+          "case": "restored public metadata",
+          "status": 200,
+          "expected": 200,
+          "passed": true,
+          "requestId": "b1482652-edfa-4fe8-96c1-6824819ed773"
+        },
+        {
+          "case": "default closed state restored",
+          "passed": true
+        }
+      ]
+    },
+    {
+      "name": "captcha",
+      "mode": "real PNG/Redis one-use API harness; captcha temporarily enabled on own main only",
+      "passed": 21,
+      "total": 21,
+      "evidence": "target/phase1/acceptance-captcha.json",
+      "cases": [
+        {
+          "case": "captcha-required login cannot omit challenge",
+          "status": 401,
+          "expected": 401,
+          "passed": true,
+          "requestId": "f018c650-21a7-4ec5-b2cf-05908a6f6dc1"
+        },
+        {
+          "case": "real one-use captcha image",
+          "status": 200,
+          "expected": 200,
+          "passed": true,
+          "requestId": "11569334-92ad-4acf-9a0a-909ced979dc5"
+        },
+        {
+          "case": "actual PNG image and UUID delivered",
+          "passed": true
+        },
+        {
+          "case": "wrong captcha rejected",
+          "status": 401,
+          "expected": 401,
+          "passed": true,
+          "requestId": "5b108160-c36c-464c-aaf7-e19dd1c887ab"
+        },
+        {
+          "case": "failed captcha consumed exactly once",
+          "status": 401,
+          "expected": 401,
+          "passed": true,
+          "requestId": "9393c083-d580-4f48-ac50-f9c7ce4a9aa6"
+        },
+        {
+          "case": "real one-use captcha image",
+          "status": 200,
+          "expected": 200,
+          "passed": true,
+          "requestId": "3582649a-580c-4ef4-97d5-a4430c38e77d"
+        },
+        {
+          "case": "actual PNG image and UUID delivered",
+          "passed": true
+        },
+        {
+          "case": "valid generated captcha permits login",
+          "status": 200,
+          "expected": 200,
+          "passed": true,
+          "requestId": "8bfb580a-43ac-4249-b461-9e0658d672e1"
+        },
+        {
+          "case": "successful captcha cannot replay",
+          "status": 401,
+          "expected": 401,
+          "passed": true,
+          "requestId": "6c8d7473-b78e-4591-9317-842313ec56a5"
+        },
+        {
+          "case": "captcha-authenticated identity remains authenticated",
+          "status": 200,
+          "expected": 200,
+          "passed": true,
+          "requestId": "186e458c-9a30-4c5c-a721-ff79e7d885d3"
+        },
+        {
+          "case": "real one-use captcha image",
+          "status": 200,
+          "expected": 200,
+          "passed": true,
+          "requestId": "e742c173-1113-4028-b044-bcc3caa51b3b"
+        },
+        {
+          "case": "actual PNG image and UUID delivered",
+          "passed": true
+        },
+        {
+          "case": "administrator with real test captcha",
+          "status": 200,
+          "expected": 200,
+          "passed": true,
+          "requestId": "f74f93b5-e27b-4994-aee8-72e75cddfca4"
+        },
+        {
+          "case": "find own registration switch",
+          "status": 200,
+          "expected": 200,
+          "passed": true,
+          "requestId": "b15f74de-554e-4a52-a17c-dd737bdc0f80"
+        },
+        {
+          "case": "enable only own test registration switch",
+          "status": 200,
+          "expected": 200,
+          "passed": true,
+          "requestId": "5fbda8ef-6dc9-4318-89cf-0c15cb374d2e"
+        },
+        {
+          "case": "registration also requires captcha",
+          "status": 401,
+          "expected": 401,
+          "passed": true,
+          "requestId": "d0eabc71-36c2-451b-972e-3eb0cab7a863"
+        },
+        {
+          "case": "real one-use captcha image",
+          "status": 200,
+          "expected": 200,
+          "passed": true,
+          "requestId": "968add81-7594-416f-8833-5ffe8c5d4edf"
+        },
+        {
+          "case": "actual PNG image and UUID delivered",
+          "passed": true
+        },
+        {
+          "case": "valid captcha registration succeeds",
+          "status": 200,
+          "expected": 200,
+          "passed": true,
+          "requestId": "5e8ee1f0-13e7-4de3-ad14-18a0cb693a3c"
+        },
+        {
+          "case": "registration captcha cannot be reused",
+          "status": 401,
+          "expected": 401,
+          "passed": true,
+          "requestId": "85cbf235-6970-4b92-8a6a-4939fd1ea730"
+        },
+        {
+          "case": "restore own registration switch",
+          "status": 200,
+          "expected": 200,
+          "passed": true,
+          "requestId": "0700462d-1299-4055-b2ea-a9fa917357e0"
+        }
+      ]
     }
   ],
   "regression": {
@@ -926,9 +1820,9 @@
       "tests": 21,
       "failed": 0,
       "build": "passed",
-      "log": "target/phase1/ui-check-6.log",
-      "latestCheck": "target/phase1/ui-check-7.log",
-      "latestCheckStatus": "running"
+      "log": "target/phase1/ui-check-8.log",
+      "latestCheck": "target/phase1/ui-check-8.log",
+      "latestCheckStatus": "passed"
     },
     "latestBackendVerify": {
       "run": 93,
@@ -936,17 +1830,16 @@
       "failed": 0,
       "errors": 0,
       "skipped": 3,
-      "log": "target/phase1/verify-9.log",
+      "log": "target/phase1/verify-11.log",
       "command": "zsh -ic 'mvn -B -ntp verify'"
     }
   },
   "unverified": [
-    "complete browser matrix; credential input handoffs pending",
-    "latest UI final build and packaged smoke",
-    "latest Factory role roundtrip/security and retry lock",
-    "Quartz recovery (synthetic interrupted claim) and UI task workflow",
+    "remaining browser workflows and user credential handoffs",
+    "packaged smoke for final source",
     "external Minio instance",
-    "deployment and production"
+    "deployment and production",
+    "full infrastructure inventory disposition (registration/OpenAPI/Swagger not presumed complete)"
   ],
   "boundaries": [
     "No Codegen Skill or CLI used for migration",
@@ -963,19 +1856,34 @@
       "jar": "target/phase1/phase1-runtime-10.jar",
       "backendLog": "target/phase1/backend-17.log",
       "webLog": "target/phase1/ui-runtime-4.log"
+    },
+    {
+      "backend": "http://127.0.0.1:18081",
+      "web": "http://127.0.0.1:15174",
+      "jar": "target/phase1/phase1-runtime-16.jar",
+      "backendLog": "target/phase1/backend-24.log",
+      "webLog": "target/phase1/ui-runtime-4.log",
+      "peer": "http://127.0.0.1:18082",
+      "peerJar": "target/phase1/phase1-runtime-14.jar",
+      "peerLog": "target/phase1/backend-peer-4.log",
+      "redis": "loopback:16379"
+    },
+    {
+      "backend": "http://127.0.0.1:18081",
+      "web": "http://127.0.0.1:15174",
+      "jar": "target/phase1/phase1-runtime-17.jar",
+      "backendLog": "target/phase1/backend-25.log",
+      "webLog": "target/phase1/ui-runtime-4.log",
+      "peer": "http://127.0.0.1:18082",
+      "peerJar": "target/phase1/phase1-runtime-14.jar",
+      "peerLog": "target/phase1/backend-peer-4.log",
+      "redis": "loopback:16379",
+      "backendPid": 20258,
+      "peerState": "stopped after isolation and retry acceptance; files and schema preserved"
     }
   ],
   "executionState": "RESUMED_BY_USER",
-  "inProgress": [
-    {
-      "name": "Source Factory role kind persistence",
-      "previousFailure": "scoped-security-3: FACTORY creation persisted as PLATFORM/null; own erroneous test account/role disabled; mapper insert fixed; verify-9 passed; full real rerun pending"
-    },
-    {
-      "name": "Quartz schedule and recovery",
-      "previousFailure": "quartz-schedule-2: actual manual/cron succeeded; test expected endTime instead of canonical stopTime; own task paused by finally; script corrected"
-    }
-  ],
+  "inProgress": [],
   "browserCompleted": [
     {
       "case": "Source user edit department/post/nickname",
@@ -990,6 +1898,26 @@
     {
       "case": "DictSelect actual normal/disabled database labels",
       "passed": true
+    }
+  ],
+  "gitHistory": [
+    {
+      "backendHead": "975a9df4687f882bf251ca09bfb242015d33beff",
+      "frontendHead": "18e372c2e6da0c6ab9738d562f99bf0d5bf3c6ca",
+      "state": "previous pre-commit snapshot"
+    }
+  ],
+  "closedFailures": [
+    {
+      "case": "database equivalent username case bypassed retry lock",
+      "before": "target/phase1/acceptance-lock-case-before.json",
+      "correction": "retry identity is canonical persisted username",
+      "after": "target/phase1/acceptance-scoped-security.json"
+    },
+    {
+      "case": "Quartz test injected CST claim while JDBC used UTC",
+      "correction": "CLI sets own session timezone UTC; no global setting changed",
+      "after": "target/phase1/acceptance-quartz-schedule.json"
     }
   ]
 }

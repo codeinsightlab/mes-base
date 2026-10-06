@@ -276,3 +276,42 @@ UI在 `/Users/user/work/lixin/mes-base-ui` 沿用 `.nvmrc` Node22，`MES_DEV_API
 3. 继续浏览器 User状态/既有角色分配、Excel导出与模板/导入、Notice富文本私有媒体、Message/Inbox、文件上传下载与确认取消、Quartz创建启停执行日志、监控真实数据、Profile及窄屏错误重试。新密码/认证凭证由用户填写并提交（浏览器工具要求）；用户先前回答“稍后操作”，不能当作已完成。
 4. 最终 verify、packaged smoke、Node22 test/build；Source只读Git/hash和原DefaultMesCodegenService基线字节保护核对。刷新 source-product-migration-manifest 的新增源码/哈希/安全PORT理由；DDL独立脚本需补齐V6–V8；校正README/Platform/架构及本矩阵的过时快照。
 5. 所有 Backend+Frontend+DB+Permission+真实操作通过才将对应功能 VERIFIED。外部Minio实例、部署/生产、Shared DB和集群尚未验证；不新增这些范围，不迁正式MES领域。
+
+
+## 2026-10-06 续接：安全与 Quartz 工作包验收
+
+实时 Git：后端 main/e292789a2f7bac4519e93685adf955428ade61ab；前端 main/d2b19714cb5018d07fa3171b76585eab45b325ce。用户已建立新的迁移提交基线；本次未提交、推送或重置。开始时后端仅 SysLoginService 规范账号锁键修正未提交，前端干净。上一节 HEAD/运行版本为之前快照。
+
+**结果：** scoped-security-5 59/59；quartz-schedule-4 23/23。前者覆盖厂角色 kind/factoryId 持久化、无 UserFactory 登录/选厂、PLATFORM/FACTORY及当前厂权限、Self SQL范围、越界用户ID、禁用/重置/注销撤销、跨库独立密码锁和YAML 10分钟TTL。证据为本地应用连接用户指定远程测试 MySQL上的自有合成数据，不是本地MySQL实例或生产验收。
+
+实际失败及修正：相同 MySQL 用户的大小写输入能避开按输入名称创建的密码锁；修正用持久化 userName。规范及大写变体均401，peer同名账号200，before JSON保留。scoped-security-4前段通过后因测试错误假定private YAML URL为独立行失败；按JDBC URL本身提取后5号完整通过，不输出配置。Quartz3的matching claim恢复409来自测试SQL会话SYSTEM/CST和JDBC UTC差异；CLI在自己会话设置UTC后4号通过，未改全局数据库时区。
+
+Quartz实际立即执行和Cron均有成功日志；伪造handler/group不生效。仅向自己新建的暂停任务注入合成中断claim，验证死亡确认、年龄、matching token、重放和RECOVERED_UNKNOWN。此前自己的暂停任务103残留合成claim也以同token正式恢复，acceptance-prior-quartz-claim.json通过；未清理其他任务。不能把这一实验写成真实进程崩溃或集群证据。
+
+实际命令：
+```sh
+zsh -ic 'mvn -B -ntp verify'
+/usr/bin/python3 target/phase1/accept-scoped-security.py
+/usr/bin/python3 target/phase1/accept-quartz-schedule.py
+# UI目录
+zsh -ic 'nvm use 22 >/dev/null && npm run test && npm run build'
+```
+
+verify-10：93 run/90 passed/0 failed/0 errors/3 skipped；ui-check-7：21/21和vue-tsc/Vite通过，保留大chunk提示。自有main18081/PID20258/session28074现为runtime17/backend-25.log，V1–V8校验及启动通过。自己的peer18082/session41695已正常停止，schema及文件保留；原18080/15173未停止。
+
+下一步：剩余浏览器流程、通用基础设施处置、最终smoke、来源清单、独立DDL与配置/架构文档。整体MIGRATING；未把API通过当全部UI通过，Minio外部实例、部署/生产尚未验证。文档更新脚本首次误用JSON checks键产生KeyError、写入前退出；核实真实regression键后修正，没有覆盖旧证据。
+
+
+## 2026-10-06 注册与框架兼容工作包
+
+SOURCE_PRODUCT_PORT：RegisterBody、SysRegisterService、SysRegisterController及Source register.vue字段和确认/验证码/成功回登录流程迁入。保留 `sys.account.registerUser` 参数开关，缺失或非true关闭；登录前仅公开开关、验证码及同一YAML密码政策。注册不接受角色/部门/岗位/Factory输入，不发放角色或权限；账号XSS校验、唯一性、注册审计和插入处于明确SystemUnit。前端新增/register公共路由、密码确认和精确政策读取，关闭状态已实际浏览器验证；注册填写与提交UI仍待用户交接。
+
+真实远程测试MySQL/localHTTP：registration-1 29/29，captcha-2 21/21。命令 `/usr/bin/python3 target/phase1/accept-registration.py`、`/usr/bin/python3 target/phase1/accept-captcha.py`。只短时开启自己schema的Source注册参数并finally恢复false。验证码测试只为自己的main进程CLI覆盖 `--ruoyi.captcha.enabled=true`，实际PNG、错误/正确一次性消费及重放401、登录与注册共享验证码均通过；API harness只读自己生成的短期Redis挑战，不输出或保存答案，不是浏览器验证码操作。captcha-1失败是测试假定UTF8存储：Source RedisCache实际JDK String序列化；按已知String原语头与限定字节长度解码后2号通过，不反序列化任意对象。验收后自己的main恢复原dev YAML，prod默认验证码仍启用。
+
+首个管理员CLI去掉独立硬编码12字符规则，调用已有PasswordPolicy消费相同YAML与UTF8限制；已有账号未重置。Source用户角色页原返回/user/user导致404，修为/system/user，实际幂等保存回到用户列表通过，既有角色未扩大。Source公共下载接回原项目固定file-saver2.0.5及对应TS声明，Excel/私有文件统一使用成熟实现，浏览器下载重验继续；没有仅因HTTP导出成功先宣布浏览器下载成功。第一次npm安装因沙箱不能写用户既有缓存失败，按工具审批用原Node22正常安装通过，未改缓存权限/全局Node。
+
+浏览器刷新断开SSE时，通用异常handler曾尝试向不可写的text/event-stream输出JSON，产生二次转换错误。新增明确AsyncRequestNotUsableException分支，仅记录requestId及debug异常链，不重写已不可用响应；其他业务异常仍真实HTTP错误。依据[Spring7.0.9默认异常处理](https://docs.spring.io/spring-framework/docs/7.0.9/javadoc-api/org/springframework/web/servlet/mvc/support/DefaultHandlerExceptionResolver.html#handleAsyncRequestNotUsableException(org.springframework.web.context.request.async.AsyncRequestNotUsableException,jakarta.servlet.http.HttpServletRequest,jakarta.servlet.http.HttpServletResponse,java.lang.Object))，真实刷新重验待继续。
+
+macOS下OSHI/DiskArbitration读卷失败时，Server以JDK实际读取应用所在卷容量，返回明确diskSource；UI显示“当前应用所在卷”，不伪装全部挂载卷，也不填假0。该兼容分支保留Source字段，需要运行及UI验证。
+
+verify-11（同标准Maven命令）93/0fail/0error/3skip；ui-check-8（同Node22test/build命令）21/21和build通过。稳定runtime18，backend-26启动通过，27为临时验证码开启实验；28为恢复原dev配置后的当前main（18081）。Source只读，生成器未调用，没有新MES业务。浏览器剩余流程、最终smoke/DDL/来源与规划矩阵继续，整体MIGRATING。

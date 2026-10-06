@@ -10,8 +10,8 @@
 | [ADR-004](ADR-004-business-persistence-topology.md) | Dedicated 实现、Shared 契约与验收计划 |
 | [ADR-005](ADR-005-erp-integration-boundary.md) | 独立 ERP 连接边界与未配置失败 |
 
-采用一个 Maven 工程与 package 边界，暂不拆模块或微服务。`server` 负责装配与 HTTP 协议；`core` 定义业务身份、范围与授权 Port；`platform` 是安全/错误/执行桥；`infrastructure` 实现本地目录、缓存键和 JDBC/MyBatis；`integration.erp` 定义独立 ERP Port。Core 不依赖这些实现。
+2026-10-06 Source Product PORT 后采用一个 Maven reactor、六个模块和一套 Core，不拆微服务。mes-admin/common/framework/system/quartz/generator 沿用 Source 模块职责；具体目录以根 README 为准。`server` 负责装配与 HTTP 协议；`core` 定义业务身份、范围与授权 Port；`platform` 是安全/错误/执行桥；`infrastructure` 实现本地目录、缓存键和 JDBC/MyBatis；`integration.erp` 定义独立 ERP Port。Core 不依赖这些实现。
 
-原 Factory 阶段的验收边界见既有报告；本轮新增 Platform 管理、身份会话、Quartz 管理与 Vue3 UI，见 ADR-006 和 Platform/Codegen 报告。仍无真实外部连接、MES 同步领域、持久化 Quartz 集群 JobStore 或生产验收。
+原 Factory 阶段的验收边界见既有报告；本轮新增 Platform 管理、身份会话、Quartz 管理与 Vue3 UI，见 ADR-006 和 Platform/Codegen 报告。本轮已连接用户指定远程测试 MySQL 的隔离 Schema 和私有 Redis。仍无 MES 同步领域、实际ERP调用、持久化 Quartz集群JobStore或生产验收。
 
 - [ADR-006 — Platform / Web Base 与来源](ADR-006-platform-and-web-base.md)

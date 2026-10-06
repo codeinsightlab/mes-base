@@ -37,3 +37,12 @@ Quartz 引擎复用，调度仅管理时间；DB 抢占 + run token，任务名 
 ## 2026-10-05 Source Product纠偏（取代先前迁移取舍）
 
 ktg-mes不再仅为参考：源代码、有效配置、Schema与Vue2页面产品资产默认进入COPY/PORT候选。架构优先沿用原RuoYi模块和三层；现有Base分包可以替换，安全约束按行为保留。去除专有身份/数据/Secret/连接值，核所有权与来源，不因为来自旧项目而整块重写。迁移阶段忽略Codegen Skill，只有后续新增开发使用；先基础设施/系统设置，业务仅模块级清单。本ADR旧“只重建表职责”“旧页面不能迁”“无当前价值DROP”的内容均由此次用户方向覆盖。具体问题/建议/依赖见docs/development/MES_BASE_REALIGNMENT_REPORT.md。
+
+
+## 2026-10-06 Source Product PORT 的实际落点
+
+此前单模块、Department/Post/Notice/Online DROP、只重建官方字段、DB token、不能迁旧页面等取舍属于历史，已被 SourceProduct 全量基础系统授权覆盖。当前六模块及 Source Sys表/字段/分页/页面流程正式接入；旧简化链路默认关闭、旧表归档，不新建双主系统。
+
+认证仍使用安全opaque Bearer；Redis按平台DB命名空间存哈希身份/版本，权限每次查DB，未照搬 JWT里持久化LoginUser授权快照。Source平台DataScope保留，FactoryScope/PLATFORM-FACTORY角色/Mapperownership/owner resource policy继续独立。成功协议可沿用Source AjaxResult/rows，失败维持真实HTTP+requestId。
+
+Boot4无法直接运行Source旧Springfox/公共iframe：PORT到Springdoc3.0.3与Vue3SwaggerUI5.33.1。SDK默认MVC端点关闭，只登记显式tool:swagger:view控制器。暂停Quartz仍允许授权manual运行，所有入口共用DBclaim。源码/实际API/浏览器与部署证据分开，验收仍在进行；详情见当前功能矩阵和Phase1 JSON。

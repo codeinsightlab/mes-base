@@ -2,6 +2,7 @@ package dev.mesbase.framework.security;
 import dev.mesbase.framework.web.service.TokenService;import jakarta.servlet.*;import jakarta.servlet.http.*;import org.springframework.web.filter.OncePerRequestFilter;
 public final class SystemTokenFilter extends OncePerRequestFilter {
  private final TokenService tokens;public SystemTokenFilter(TokenService tokens){this.tokens=tokens;}
+ @Override protected boolean shouldNotFilter(HttpServletRequest request){return dev.mesbase.framework.openapi.OpenApiHttp.isOpenApi(request);}
  @Override protected boolean shouldNotFilterAsyncDispatch(){return false;}
  protected void doFilterInternal(HttpServletRequest request,HttpServletResponse response,FilterChain chain)throws java.io.IOException,ServletException {
   request.setAttribute("mes.authScheme", "Bearer");

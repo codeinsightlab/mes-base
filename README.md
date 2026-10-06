@@ -1,74 +1,69 @@
-# MES Base — Platform / Factory Foundation
+# MES Base
 
-一个独立创建的 Java 21 / Spring Boot 4.1.1 模块化单体。当前包含 Platform Foundation、Factory Foundation、Codegen 与相邻 Vue3 Base UI；尚无正式 MES 业务。
+Java21 / Spring Boot4.1.1 的模块化单体，正在将 Source Product 的通用基础系统 COPY/PORT 到 Base。系统管理、系统监控、系统工具和已有 Factory Foundation 已接入；当前 Phase1 仍有浏览器验收边界，未迁正式 MES Domain，未部署。
 
-## 构建与验收
+## 当前入口
 
-需要 Java 21、Maven 3.6.3+。在本目录运行：
+UI `http://127.0.0.1:15174` → 本轮后端 `127.0.0.1:18081`。用户请求的 admin 已经正式创建，具有显式 PLATFORM 角色；凭证不写文档。原 `15173/18080` 服务保留。
+
+应用在本机，数据库是用户指定的远程测试 MySQL8.0.40，使用本轮独立的 `mes_base_phase1_*` Schema；Redis 是本轮私有实例 `127.0.0.1:16379`。这不是本地 MySQL 实例或生产证据。
+
+- [当前规划与续接入口](docs/development/next-stage-plan.md)
+- [迁移报告、实际命令和失败](docs/development/MES_BASE_REALIGNMENT_REPORT.md)
+- [逐功能迁移矩阵](docs/development/MES_MIGRATION_MATRIX.md)
+- [实际验收记录](docs/reviews/2026-10-06-phase1-verification.json)
+- [配置和操作边界](docs/development/platform.md)
+- [SQL 导出入口](sql/README.md)
+
+## 模块与页面
+
+| 模块 | 当前职责 |
+| --- | --- |
+| mes-common | Source 公共对象、Excel、Redis、字典及字符串等工具 |
+| mes-system | SysUser/Dept/Post/Role/Menu/Dict/Config/Notice/Message/Attachment/AutoCode 的 Source 字段、Service、Mapper/XML |
+| mes-framework | 认证、会话、验证码、密码锁、数据范围、审计、私有文件及 Factory 安全/持久化桥 |
+| mes-quartz | Source 任务/日志、Cron、受控执行、数据库 claim/run token、恢复 |
+| mes-generator | 既有生成实现保留，迁移阶段没有调用 Codegen Skill 或 CLI |
+| mes-admin | 启动类 dev.MesBaseApplication、Controller、YAML 消费/对象装配及 Flyway |
+
+UI 位于相邻 `../mes-base-ui`，Vue3/TypeScript/Router4/Pinia/Element Plus/Vite。Source 查询、字段、表单、组织岗位关联、角色菜单、字典参数、公告消息、日志、监控和工具页已 PORT；API 与实际浏览器完成项分别记录。
+
+## 构建与本轮隔离启动
+
+沿用用户 Java21 和标准 Maven，不创建项目 `.m2/.mvn` 或私有 mirror：
 
 ```sh
 mvn -B -ntp verify
-python3 scripts/smoke-packaged.py
+/usr/bin/python3 scripts/smoke-packaged.py
+zsh -ic 'scripts/run-local-backend'
 ```
 
-先将 `JAVA_HOME` / `PATH` 指向 Java 21；macOS 可用 `/usr/libexec/java_home -v 21` 找到安装位置。打包启动验证脚本也支持 `MES_JAVA_BIN=/path/to/java`。使用标准 Maven 配置及默认用户级依赖缓存（通常为 `~/.m2/repository`）；项目不创建 `.m2/.mvn` 或自定义 Maven mirror。代码、文档、测试与构建产物仍在本项目内。构建产物与原始验证日志在 `target/`。
+启动器默认端口18081，显式 dev 和已存在的 `target/phase1/application-phase1.yml`（忽略、0600），可用 `MES_LOCAL_PORT` / `MES_LOCAL_CONFIG` 指定。此受控文件包含本轮隔离连接、Redis、私有文件根和可信 Factory Runtime 映射，不应清空 target 后直接续跑。
 
-## 启动
+工作区默认 profile/dev 连接有用户本轮调整；裸 `java -jar` 不等于已验收启动方式。本轮数据库测试显式使用隔离外部 YAML，未连接后来写入 dev 的其他 Schema。启动前先检查端口/进程所有权，不能停止原服务。打包产物含当前工作区配置，未作为部署包交付。
+
+仅验证空装配时明确避开 dev/prod：
 
 ```sh
-java -jar target/mes-base-0.1.0-SNAPSHOT.jar --server.port=0
+java -jar target/mes-base-0.1.0-SNAPSHOT.jar --spring.profiles.active=default --server.port=0
 ```
 
-默认只绑定 loopback；端口默认 8080，`--server.port=0` 使用空闲端口，适合避免影响现有服务。默认无账号、无工厂、无业务库和 ERP 连接，`/health` 返回进程存活状态，其他接口按分类要求认证。
+## 正式契约
 
-可显式开启本地合成 demo：先在当前进程环境自行设置不少于 12 字符的新 `MES_DEMO_PASSWORD`，再运行：
+Source 系统接口成功沿用 AjaxResult/TableDataInfo；Foundation、会话、私有文件按各自明确 DTO 返回。所有失败是真实 HTTP 状态及 `errorCode/message/requestId`，前端按真实契约适配。服务端生成 X-Request-Id，审计不采集请求体、凭证或令牌。
+
+`/api/platform/session` 是正式登录/注销入口；`/api/system/**` 是唯一正式可写系统对象链路。旧简化 CRUD 默认关闭、旧表重命名归档保存。Redis 会话按平台数据库命名空间保存哈希键和身份/版本；权限每请求读取，无长寿命 Token 权限快照。
+
+认证、选厂、平台权限、厂业务权限分别处理，无 User↔Factory 准入绑定，无 userId=1 特权。HTTP 显式分类；平台与业务 Mapper ownership 分开。缺 Scope/连接/版本不回退平台库或首库。文件下载/预览必须证明 owner+scope+resource，公告图片绑定真实 noticeId；无公共裸 URL。
+
+Quartz 保留 Cron/启停/手动运行/日志。暂停只禁止自动触发，授权用户可执行一次；目标是受控登记任务，执行须 DB claim/run token。多节点 cron fire 永久去重与集群 JobStore 未交付。Shared DB、ERP 实际调用、微信/PDA渠道及正式 MES Domain 未自动扩展。
+
+## SQL 与来源
+
+Flyway 为 platform V1 + system V2–V9。导出命令直接合并当前迁移，不另维护第二套字段：
 
 ```sh
-java -jar target/mes-base-0.1.0-SNAPSHOT.jar --spring.profiles.active=demo --server.port=0
+/usr/bin/python3 scripts/export-phase1-sql.py
 ```
 
-Demo 有 A/B 两个合成 Factory，账号 `visitor` 没有角色，账号 `reader` 只拥有 A 厂的 Foundation 查看权限；二者密码都来自上述本地环境变量。没有固定默认密码、业务表或数据库连接。关闭 demo 后这些账号和工厂均不存在。
-
-默认/demo 保留无会话 HTTP Basic 验收；显式开启 Platform 后增加数据库身份、可撤销 Bearer 会话与管理后台，角色为空不阻止认证。开放部署必须配置 HTTPS；SSO 尚未交付。
-
-## HTTP 契约
-
-成功返回明确 DTO 或 DTO 数组，错误使用真实 HTTP 状态及 `errorCode/message/requestId`；不采用 AjaxResult。所有返回都有服务端生成的 `X-Request-Id`，客户端同名值不决定服务端关联标识。
-
-| 方法 | 路径 | 分类 | Factory 语义 |
-| --- | --- | --- | --- |
-| GET | `/health` | PUBLIC | 无 Scope，仅进程存活 |
-| GET | `/api/foundation/factories?offset=0&limit=20` | AUTHENTICATED | 启用 Factory 选项，limit 最大 100 |
-| GET | `/api/foundation/context` | AUTHENTICATED | 可返回空 factoryId；空角色可建立 Scope |
-| PUT | `/api/foundation/preference` | AUTHENTICATED | `{"factoryId":"A"}`；只保存本人偏好 |
-| GET | `/api/foundation/access` | AUTHORIZED | 当前厂 `foundation:access:read` |
-| GET | `/api/foundation/erp/connection` | AUTHORIZED | 当前厂 `foundation:erp:inspect`；未配置明确 422 |
-| ANY | `/error` | PUBLIC | 安全错误出口；直接访问返回 500 |
-
-请求 `X-Factory-Id` 明确选厂；缺少时仅恢复仍存在且启用的本人偏好。没有首厂或编号 1 回退；AUTHORIZED 缺 Scope 返回 400，无当前厂 Permission 返回 403。业务库和 ERP 解析完全独立于选厂，不自动授予权限。
-
-## 实现与边界
-
-单个 Maven module，以 `dev.mesbase.core`、`platform`、`infrastructure`、`integration.erp`、`server` 划分职责。Core 不引用 Spring、ThreadLocal 或具体基础设施。
-
-- Factory/不可变 Scope、独立 Actor/Role/Permission 契约、有效偏好恢复。
-- 上下文嵌套/异常恢复、PLATFORM/FACTORY 任务、受控 executor 及 CallerRuns 身份/范围清理。
-- Dedicated JDBC/MyBatis 运行时、明确 Mapper 归属、独立平台/业务 SqlSessionFactory 与事务管理器、版本与所有者校验、旧池按 lease 排空。
-- 平台/业务结构化缓存键契约；未提供 Redis 或缓存存储。
-- ERP NOT_CONFIGURED 与最小 Port；未实现供应商调用。
-- Shared DB 只交付契约与测试计划，尚无共享库实现；不能将多个厂配置到独立库适配器的同一身份来替代它。
-
-运行时注册为受信任的程序装配 API，不是面向客户端的数据源管理接口。默认 Spring 装配的 resolver 和 registry 都为空；需要独立配置适配器注册 pool、Mapper 和 Factory binding 后才能执行业务持久化。独立库用真实 H2 JDBC 的 TEST ONLY probe 验证，没有在主代码中创建 probe 表或模拟工单。
-
-详细证据和限制见 [迁移报告](docs/reviews/2026-10-05-factory-foundation-migration-report.md)，决策见 [架构索引](docs/architecture/README.md)。
-# mes-base
-
-## Platform / Codegen / Agent 入口
-
-- [Platform 配置与首次管理员](docs/development/platform.md)
-- [Codegen CLI、metadata、生成与接入](docs/development/codegen.md)
-- [mes-crud-codegen Skill](.agents/skills/mes-crud-codegen/SKILL.md)
-- [本轮迁移与验收报告](docs/reviews/2026-10-05-platform-codegen-foundation-report.md)
-- [下一阶段规划与新会话交接](docs/development/next-stage-plan.md)
-
-标准 CRUD 从 AGENTS → Skill → `scripts/mes-codegen` 进入；生成后仍需 Scope/Permission/Resource/Domain/SQL/UI/测试审查。UI 位于相邻 `../mes-base-ui`，不是公司业务页面迁移。
+输出 `target/phase1/sql/mysql-phase1.sql` 和 SHA256 清单。只用于空的隔离库，包含通用产品菜单/字典，无账号或公司业务数据。手工导入不写 Flyway 历史，后续须 `mes.platform.migrate=false`；优先空库应用 Flyway 初始化。许可与逐文件来源位于 docs/legal，Source 仓库只读。
