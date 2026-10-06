@@ -12,7 +12,6 @@ import java.util.List;
  * @author ruoyi
  */
 @Mapper
-@dev.mesbase.infrastructure.persistence.PersistenceOwner(dev.mesbase.infrastructure.persistence.PersistenceOwner.Kind.PLATFORM)
 public interface SysDictTypeMapper {
     /**
      * 根据条件分页查询字典类型

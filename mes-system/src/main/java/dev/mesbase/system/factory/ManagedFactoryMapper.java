@@ -1,8 +1,10 @@
 package dev.mesbase.system.factory;
-import dev.mesbase.infrastructure.persistence.PersistenceOwner;
-import org.apache.ibatis.annotations.*;
+import org.apache.ibatis.annotations.Select;
+import org.apache.ibatis.annotations.Insert;
+import org.apache.ibatis.annotations.Update;
+import org.apache.ibatis.annotations.Delete;
+import org.apache.ibatis.annotations.Param;
 import java.util.List;
-@PersistenceOwner(PersistenceOwner.Kind.PLATFORM)
 public interface ManagedFactoryMapper {
  @Select("SELECT "+COLUMNS+" FROM mf_factory ORDER BY factory_id") List<ManagedFactory> all();
  String COLUMNS="factory_id,enterprise_id,factory_code,factory_name,datasource_id,status,revision";

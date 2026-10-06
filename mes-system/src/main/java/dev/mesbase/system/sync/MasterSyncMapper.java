@@ -1,7 +1,8 @@
 package dev.mesbase.system.sync;
-import dev.mesbase.infrastructure.persistence.PersistenceOwner;
-import org.apache.ibatis.annotations.*;
-@PersistenceOwner(PersistenceOwner.Kind.PLATFORM)
+import org.apache.ibatis.annotations.Select;
+import org.apache.ibatis.annotations.Insert;
+import org.apache.ibatis.annotations.Update;
+import org.apache.ibatis.annotations.Param;
 public interface MasterSyncMapper {
  String COLUMNS="id,factory_id,sync_key,status,run_token,started_at,updated_at,finished_at,last_success_at,cursor_time,processed_count,error_message";
  @Insert("INSERT IGNORE INTO mes_master_sync(factory_id,sync_key) VALUES(#{factory},#{key})") int ensure(@Param("factory") String factory,@Param("key") String key);

@@ -19,9 +19,8 @@ public final class RuntimeRegistry implements AutoCloseable {
         Runtime(DatasourceIdentity identity,long revision,DataSource datasource,Runnable closePool,Set<Class<?>> mappers) {
             this.identity=identity; this.revision=revision; this.datasource=datasource; this.closePool=closePool; this.mappers=Set.copyOf(mappers);
             for (Class<?> mapper : mappers) {
-                PersistenceOwner owner = mapper.getAnnotation(PersistenceOwner.class);
-                if (owner == null || owner.value() != PersistenceOwner.Kind.BUSINESS)
-                    throw new IllegalArgumentException("Explicit BUSINESS mapper ownership required");
+                if (!MapperPackages.matches(mapper, PersistenceOwner.Kind.BUSINESS))
+                    throw new IllegalArgumentException("BUSINESS mapper package required");
             }
         }
         void drain() { if(retired && leases==0 && !poolClosed) { poolClosed=true; closePool.run(); } }

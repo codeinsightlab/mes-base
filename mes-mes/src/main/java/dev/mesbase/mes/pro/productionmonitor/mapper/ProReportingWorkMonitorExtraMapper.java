@@ -10,7 +10,6 @@ import org.apache.ibatis.annotations.Param;
 import java.util.List;
 
 @Mapper
-@dev.mesbase.infrastructure.persistence.PersistenceOwner(dev.mesbase.infrastructure.persistence.PersistenceOwner.Kind.BUSINESS)
 public interface ProReportingWorkMonitorExtraMapper {
     List<ProductionMonitorReportingAggregateRow> selectWorkorderAggregates(@Param("workorderCodes") List<String> workorderCodes,
                                                                            @Param("fullyStoredStatus") String fullyStoredStatus);

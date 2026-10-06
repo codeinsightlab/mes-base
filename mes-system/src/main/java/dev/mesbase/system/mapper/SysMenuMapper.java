@@ -11,7 +11,6 @@ import java.util.List;
  *
  * @author ruoyi
  */
-@dev.mesbase.infrastructure.persistence.PersistenceOwner(dev.mesbase.infrastructure.persistence.PersistenceOwner.Kind.PLATFORM)
 public interface SysMenuMapper
 {
  @org.apache.ibatis.annotations.Select("<script>SELECT DISTINCT m.perms FROM sys_menu m JOIN sys_role_menu rm ON m.menu_id=rm.menu_id JOIN sys_user_role ur ON ur.role_id=rm.role_id JOIN sys_role r ON r.role_id=ur.role_id JOIN sys_user u ON u.user_id=ur.user_id WHERE u.user_name=#{username} AND u.status='0' AND u.del_flag='0' AND r.status='0' AND r.del_flag='0' AND m.status='0' <choose><when test='factoryId != null'>AND r.kind='FACTORY' AND r.factory_id=#{factoryId}</when><otherwise>AND r.kind='PLATFORM' AND r.factory_id IS NULL</otherwise></choose></script>")

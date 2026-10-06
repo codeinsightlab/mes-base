@@ -1,0 +1,19 @@
+package dev.mesbase.external.${systemName};
+
+import dev.mesbase.infrastructure.persistence.ErpSource;
+import org.springframework.stereotype.Component;
+
+/** Replace query/result types using the verified external contract. */
+@Component
+@ErpSource("hr")
+public final class ${AdapterName} {
+    private final ${MapperName} mapper;
+
+    public ${AdapterName}(${MapperName} mapper) {
+        this.mapper = mapper;
+    }
+
+    public ${ResultType} query(${QueryType} query) {
+        return mapper.query(query);
+    }
+}

@@ -10,7 +10,6 @@ import java.util.List;
  * @author yinjinlu
  * @date 2022-07-26
  */
-@dev.mesbase.infrastructure.persistence.PersistenceOwner(dev.mesbase.infrastructure.persistence.PersistenceOwner.Kind.PLATFORM)
 public interface SysAttachmentMapper 
 {
     SysAttachment findByFileId(String fileId);

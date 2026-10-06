@@ -10,7 +10,6 @@ import java.util.List;
  * @author yinjinlu
  * @date 2023-03-06
  */
-@dev.mesbase.infrastructure.persistence.PersistenceOwner(dev.mesbase.infrastructure.persistence.PersistenceOwner.Kind.PLATFORM)
 public interface SysMessageMapper 
 {
     /**

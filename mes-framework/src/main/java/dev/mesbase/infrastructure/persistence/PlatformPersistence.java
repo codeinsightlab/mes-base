@@ -27,9 +27,8 @@ public final class PlatformPersistence {
     public PlatformPersistence(DataSource source, Set<Class<?>> mappers, Consumer<Configuration> setup) {
         this.mappers = Set.copyOf(mappers);
         mappers.forEach(type -> {
-            PersistenceOwner owner = type.getAnnotation(PersistenceOwner.class);
-            if (owner == null || owner.value() != PersistenceOwner.Kind.PLATFORM)
-                throw new IllegalArgumentException("Explicit PLATFORM mapper ownership required");
+            if (!MapperPackages.matches(type, PersistenceOwner.Kind.PLATFORM))
+                throw new IllegalArgumentException("PLATFORM mapper package required");
         });
         transactions = new OwnedTransactionManager(source);
         sessions = PersistenceFactories.create(source, mappers, setup, transactions::verifyAccess);

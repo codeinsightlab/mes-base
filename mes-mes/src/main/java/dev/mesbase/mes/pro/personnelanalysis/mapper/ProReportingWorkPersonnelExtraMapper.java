@@ -1,9 +1,13 @@
 package dev.mesbase.mes.pro.personnelanalysis.mapper;
 
-import dev.mesbase.mes.pro.personnelanalysis.domain.*;
+import dev.mesbase.mes.pro.personnelanalysis.domain.PersonnelProcessRow;
+import dev.mesbase.mes.pro.personnelanalysis.domain.PersonnelTrendRow;
+import dev.mesbase.mes.pro.personnelanalysis.domain.PersonnelQuery;
+import dev.mesbase.mes.pro.personnelanalysis.domain.PersonnelAccountRow;
+import dev.mesbase.mes.pro.personnelanalysis.domain.PersonnelProductRow;
+import dev.mesbase.mes.pro.personnelanalysis.domain.PersonnelRecordVO;
 import java.util.List;
 
-@dev.mesbase.infrastructure.persistence.PersistenceOwner(dev.mesbase.infrastructure.persistence.PersistenceOwner.Kind.BUSINESS)
 public interface ProReportingWorkPersonnelExtraMapper {
     java.util.List<dev.mesbase.mes.pro.personnelanalysis.domain.PersonnelRecordVO> selectRecords(dev.mesbase.mes.pro.personnelanalysis.domain.PersonnelQuery query);
 

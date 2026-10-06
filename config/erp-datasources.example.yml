@@ -1,0 +1,21 @@
+# Copy selected entries into the local profile. Replace placeholders before enabling.
+# Each id is independent of FactoryScope; all use erpSqlSessionFactory.
+mes:
+  erp:
+    enabled: false
+    datasources:
+      erp-main:
+        url: jdbc:sqlserver://HOST:1433;DatabaseName=DATABASE
+        username: ""
+        password: ""
+        driver-class-name: com.microsoft.sqlserver.jdbc.SQLServerDriver
+      hr:
+        url: jdbc:sqlserver://HOST:1433;DatabaseName=DATABASE
+        username: ""
+        password: ""
+        driver-class-name: com.microsoft.sqlserver.jdbc.SQLServerDriver
+      wms:
+        url: jdbc:sqlserver://HOST:1433;DatabaseName=DATABASE
+        username: ""
+        password: ""
+        driver-class-name: com.microsoft.sqlserver.jdbc.SQLServerDriver

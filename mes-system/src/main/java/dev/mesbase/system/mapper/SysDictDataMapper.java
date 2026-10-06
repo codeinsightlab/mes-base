@@ -11,7 +11,6 @@ import java.util.List;
  * 
  * @author ktg
  */
-@dev.mesbase.infrastructure.persistence.PersistenceOwner(dev.mesbase.infrastructure.persistence.PersistenceOwner.Kind.PLATFORM)
 public interface SysDictDataMapper
 {
     /**

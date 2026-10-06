@@ -1,8 +1,10 @@
 package dev.mesbase.system.factory;
-import dev.mesbase.infrastructure.persistence.PersistenceOwner;
-import org.apache.ibatis.annotations.*;
+import org.apache.ibatis.annotations.Select;
+import org.apache.ibatis.annotations.Insert;
+import org.apache.ibatis.annotations.Update;
+import org.apache.ibatis.annotations.Delete;
+import org.apache.ibatis.annotations.Param;
 import java.util.List;
-@PersistenceOwner(PersistenceOwner.Kind.PLATFORM)
 public interface ManagedDatasourceMapper {
  @Select("SELECT "+COLUMNS+" FROM mf_datasource ORDER BY datasource_id") List<ManagedDatasource> all();
  String COLUMNS="datasource_id,datasource_name,db_host,db_port,db_name,db_username,password_cipher,status,revision";

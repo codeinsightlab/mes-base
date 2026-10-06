@@ -4,7 +4,7 @@
   <groupId>dev.mesbase</groupId><artifactId>mes-base</artifactId><packaging>pom</packaging><version>0.1.0-SNAPSHOT</version>
   <name>MES Base</name><modules><module>mes-common</module><module>mes-system</module><module>mes-framework</module><module>mes-quartz</module><module>mes-generator</module><module>mes-mes</module>
         <module>mes-admin</module></modules>
-  <properties><java.version>21</java.version><mybatis.version>3.5.19</mybatis.version></properties>
+  <properties><java.version>21</java.version><mybatis.version>3.5.19</mybatis.version><spotless.version>2.43.0</spotless.version></properties>
   <dependencies>
     <dependency><groupId>org.projectlombok</groupId><artifactId>lombok</artifactId><optional>true</optional></dependency>
     <dependency><groupId>org.springframework.boot</groupId><artifactId>spring-boot-starter-webmvc</artifactId></dependency>
@@ -28,5 +28,46 @@
     <dependency><groupId>org.flywaydb</groupId><artifactId>flyway-mysql</artifactId><scope>runtime</scope></dependency>
   <dependency><groupId>org.springframework.boot</groupId><artifactId>spring-boot-starter-aspectj</artifactId></dependency>
     <dependency><groupId>com.github.penggle</groupId><artifactId>kaptcha</artifactId><version>2.3.2</version></dependency><dependency><groupId>org.springframework.boot</groupId><artifactId>spring-boot-starter-data-redis</artifactId></dependency><dependency><groupId>com.github.pagehelper</groupId><artifactId>pagehelper</artifactId><version>6.1.1</version></dependency><dependency><groupId>org.apache.poi</groupId><artifactId>poi-ooxml</artifactId><version>5.5.1</version></dependency><dependency><groupId>com.fasterxml.jackson.core</groupId><artifactId>jackson-databind</artifactId></dependency><dependency><groupId>com.github.oshi</groupId><artifactId>oshi-core</artifactId><version>6.9.1</version></dependency></dependencies>
-  
+  <build>
+    <plugins>
+      <plugin>
+        <groupId>com.diffplug.spotless</groupId>
+        <artifactId>spotless-maven-plugin</artifactId>
+        <version>${spotless.version}</version>
+        <configuration>
+          <java>
+            <importOrder>
+              <order>java,javax,org,com,</order>
+            </importOrder>
+            <removeUnusedImports />
+            <formatAnnotations />
+          </java>
+          <formats>
+            <format>
+              <includes>
+                <include>src/**/*.java</include>
+                <include>src/**/*.xml</include>
+                <include>src/**/*.yml</include>
+                <include>src/**/*.yaml</include>
+                <include>src/**/*.properties</include>
+                <include>src/**/*.sql</include>
+                <include>docs/**/*.md</include>
+              </includes>
+              <trimTrailingWhitespace />
+              <endWithNewline />
+            </format>
+          </formats>
+        </configuration>
+        <executions>
+          <execution>
+            <id>spotless-check</id>
+            <phase>verify</phase>
+            <goals>
+              <goal>check</goal>
+            </goals>
+          </execution>
+        </executions>
+      </plugin>
+    </plugins>
+  </build>
 </project>

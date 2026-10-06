@@ -9,7 +9,6 @@ import java.util.List;
  * 
  * @author ruoyi
  */
-@dev.mesbase.infrastructure.persistence.PersistenceOwner(dev.mesbase.infrastructure.persistence.PersistenceOwner.Kind.PLATFORM)
 public interface SysRoleMenuMapper
 {
     /**

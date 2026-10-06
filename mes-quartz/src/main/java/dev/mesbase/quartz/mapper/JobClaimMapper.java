@@ -1,6 +1,8 @@
 package dev.mesbase.quartz.mapper;
-import org.apache.ibatis.annotations.*;
-@dev.mesbase.infrastructure.persistence.PersistenceOwner(dev.mesbase.infrastructure.persistence.PersistenceOwner.Kind.PLATFORM)
+import org.apache.ibatis.annotations.Select;
+import org.apache.ibatis.annotations.Insert;
+import org.apache.ibatis.annotations.Update;
+import org.apache.ibatis.annotations.Param;
 public interface JobClaimMapper {
  @Update("UPDATE sys_job SET running_token=#{token},started_at=CURRENT_TIMESTAMP WHERE job_id=#{id} AND running_token IS NULL AND (status='0' OR (#{manual} AND status='1'))")int claim(@Param("id")Long id,@Param("token")String token,@Param("manual")boolean manual);
  @Update("UPDATE sys_job SET running_token=NULL,started_at=NULL WHERE job_id=#{id} AND running_token=#{token}")int release(@Param("id")Long id,@Param("token")String token);

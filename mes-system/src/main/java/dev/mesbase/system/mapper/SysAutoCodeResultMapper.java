@@ -4,7 +4,6 @@ import dev.mesbase.common.core.domain.entity.SysAutoCodeResult;
 
 import java.util.List;
 
-@dev.mesbase.infrastructure.persistence.PersistenceOwner(dev.mesbase.infrastructure.persistence.PersistenceOwner.Kind.PLATFORM)
 public interface SysAutoCodeResultMapper {
     public List<SysAutoCodeResult> selectSysAutoCodeResultList(SysAutoCodeResult sysAutoCodeResult);
 

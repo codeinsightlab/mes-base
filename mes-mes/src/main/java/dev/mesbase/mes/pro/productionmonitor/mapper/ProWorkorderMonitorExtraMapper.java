@@ -13,7 +13,6 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 @Mapper
-@dev.mesbase.infrastructure.persistence.PersistenceOwner(dev.mesbase.infrastructure.persistence.PersistenceOwner.Kind.BUSINESS)
 public interface ProWorkorderMonitorExtraMapper {
     ProductionMonitorSummaryRow selectSummary(@Param("query") ProductionMonitorQueryDTO query,
                                                @Param("today") LocalDate today,
