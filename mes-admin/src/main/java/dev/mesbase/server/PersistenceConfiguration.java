@@ -44,7 +44,8 @@ public class PersistenceConfiguration {
         DruidDataSource source = DruidPools.create(DruidPools.settings(env), "platform", env.getRequiredProperty("mes.platform.url"), env.getRequiredProperty("mes.platform.username"), env.getRequiredProperty("mes.platform.password"));
         try {
             if (env.getProperty("mes.platform.migrate", Boolean.class, false))
-                Flyway.configure().dataSource(source).locations("classpath:db/platform", "classpath:db/system").load().migrate();
+                Flyway.configure().dataSource(source).locations("classpath:db/platform", "classpath:db/system").load()
+                        .migrate();
             return source;
         } catch (RuntimeException | Error failure) {
             source.close();
@@ -58,8 +59,10 @@ public class PersistenceConfiguration {
     }
 
     @Bean
-    SqlSessionFactory platformSqlSessionFactory(@Qualifier("platformDataSource") DataSource source, @Qualifier("platformTransactionManager") OwnedTransactionManager manager) {
-        return PersistenceFactories.scanned(source, configuration -> {
+    SqlSessionFactory platformSqlSessionFactory(@Qualifier("platformDataSource") DataSource source,
+                                                @Qualifier("platformTransactionManager") OwnedTransactionManager manager,
+                                                OwnerMapperCatalog catalog) {
+        return PersistenceFactories.create(source, catalog.types(PersistenceOwner.Kind.PLATFORM), configuration -> {
             configuration.getTypeAliasRegistry().registerAliases("dev.mesbase.common.core.domain.entity");
             configuration.getTypeAliasRegistry().registerAliases("dev.mesbase.system.domain");
             configuration.getTypeAliasRegistry().registerAliases("dev.mesbase.system.openapi.domain");
@@ -69,7 +72,9 @@ public class PersistenceConfiguration {
     }
 
     @Bean
-    PlatformPersistence platformPersistence(@Qualifier("platformSqlSessionFactory") SqlSessionFactory factory, @Qualifier("platformTransactionManager") OwnedTransactionManager manager, OwnerMapperCatalog catalog) {
+    PlatformPersistence platformPersistence(@Qualifier("platformSqlSessionFactory") SqlSessionFactory factory,
+                                            @Qualifier("platformTransactionManager") OwnedTransactionManager manager,
+                                            OwnerMapperCatalog catalog) {
         return new PlatformPersistence(factory, manager, catalog.types(PersistenceOwner.Kind.PLATFORM));
     }
 
@@ -89,12 +94,16 @@ public class PersistenceConfiguration {
     }
 
     @Bean
-    SqlSessionFactory businessSqlSessionFactory(FactoryBusinessDataSource source, @Qualifier("businessTransactionManager") OwnedTransactionManager manager) {
-        return PersistenceFactories.scanned(source, PersistenceFactories::pagination, manager::verifyAccess);
+    SqlSessionFactory businessSqlSessionFactory(FactoryBusinessDataSource source,
+                                                @Qualifier("businessTransactionManager") OwnedTransactionManager manager,
+                                                OwnerMapperCatalog catalog) {
+        return PersistenceFactories.create(source, catalog.types(PersistenceOwner.Kind.BUSINESS), PersistenceFactories::pagination, manager::verifyAccess);
     }
 
     @Bean
-    BusinessPersistence businessPersistence(@Qualifier("businessSqlSessionFactory") SqlSessionFactory factory, @Qualifier("businessTransactionManager") OwnedTransactionManager manager, OwnerMapperCatalog catalog) {
+    BusinessPersistence businessPersistence(@Qualifier("businessSqlSessionFactory") SqlSessionFactory factory,
+                                            @Qualifier("businessTransactionManager") OwnedTransactionManager manager,
+                                            OwnerMapperCatalog catalog) {
         return new DedicatedDatabasePersistence(factory, manager, catalog.types(PersistenceOwner.Kind.BUSINESS));
     }
 
@@ -104,16 +113,20 @@ public class PersistenceConfiguration {
         @Bean(destroyMethod = "close")
         DataSource erpDataSource(Environment env) {
             Map<String, ErpConnectionProperties> configured = Binder.get(env).bind("mes.erp.datasources",
-                Bindable.mapOf(String.class, ErpConnectionProperties.class))
-                .orElseThrow(() -> new IllegalArgumentException("ERP datasource map is required"));
+                            Bindable.mapOf(String.class, ErpConnectionProperties.class))
+                    .orElseThrow(() -> new IllegalArgumentException("ERP datasource map is required"));
             Map<String, DataSource> pools = new LinkedHashMap<>();
             try {
                 configured.forEach((id, connection) -> pools.put(id, DruidPools.create(DruidPools.settings(env),
-                    "erp-" + id, connection.url(), connection.username(), connection.password(), connection.driverClassName())));
+                        "erp-" + id, connection.url(), connection.username(), connection.password(), connection.driverClassName())));
                 return new ErpRoutingDataSource(pools);
             } catch (RuntimeException | Error failure) {
-                for (DataSource pool : pools.values()) try { ((DruidDataSource) pool).close(); }
-                catch (RuntimeException cleanup) { failure.addSuppressed(cleanup); }
+                for (DataSource pool : pools.values())
+                    try {
+                        ((DruidDataSource) pool).close();
+                    } catch (RuntimeException cleanup) {
+                        failure.addSuppressed(cleanup);
+                    }
                 throw failure;
             }
         }
@@ -124,20 +137,28 @@ public class PersistenceConfiguration {
                         || password == null || driverClassName == null || driverClassName.isBlank())
                     throw new IllegalArgumentException("ERP connection requires explicit url, username, password and driver class");
             }
-            @Override public String toString() { return "ErpConnectionProperties[REDACTED]"; }
+
+            @Override
+            public String toString() {
+                return "ErpConnectionProperties[REDACTED]";
+            }
         }
+
         @Bean
         ErpSourceAspect erpSourceAspect() {
             return new ErpSourceAspect();
         }
+
         @Bean
         OwnedTransactionManager erpTransactionManager(@Qualifier("erpDataSource") DataSource source) {
             return new OwnedTransactionManager(source);
         }
 
         @Bean
-        SqlSessionFactory erpSqlSessionFactory(@Qualifier("erpDataSource") DataSource source, @Qualifier("erpTransactionManager") OwnedTransactionManager manager) {
-            return PersistenceFactories.scanned(source, PersistenceFactories::pagination, manager::verifyAccess);
+        SqlSessionFactory erpSqlSessionFactory(@Qualifier("erpDataSource") DataSource source,
+                                               @Qualifier("erpTransactionManager") OwnedTransactionManager manager,
+                                               OwnerMapperCatalog catalog) {
+            return PersistenceFactories.create(source, catalog.types(PersistenceOwner.Kind.ERP), PersistenceFactories::pagination, manager::verifyAccess);
         }
     }
 }

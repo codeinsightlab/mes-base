@@ -11,19 +11,11 @@ import org.apache.ibatis.session.SqlSessionFactory;
 import org.mybatis.spring.SqlSessionFactoryBean;
 
 public final class PersistenceFactories {
-    private PersistenceFactories() {}
+    private PersistenceFactories() {
+    }
+
     public static SqlSessionFactory create(DataSource source, Set<Class<?>> mappers,
-            Consumer<Configuration> setup, Runnable verify) {
-        return build(source, mappers, setup, verify);
-    }
-
-    /** MapperFactoryBean registers production interfaces and XML with this factory. */
-    public static SqlSessionFactory scanned(DataSource source, Consumer<Configuration> setup, Runnable verify) {
-        return build(source, Set.of(), setup, verify);
-    }
-
-    private static SqlSessionFactory build(DataSource source, Set<Class<?>> mappers,
-            Consumer<Configuration> setup, Runnable verify) {
+                                           Consumer<Configuration> setup, Runnable verify) {
         try {
             Configuration configuration = new Configuration();
             configuration.setCacheEnabled(false);
@@ -35,8 +27,11 @@ public final class PersistenceFactories {
             factory.setDataSource(source);
             factory.setConfiguration(configuration);
             return factory.getObject();
-        } catch (Exception failure) { throw new IllegalStateException("Persistence factory initialization failed", failure); }
+        } catch (Exception failure) {
+            throw new IllegalStateException("Persistence factory initialization failed", failure);
+        }
     }
+
     public static void pagination(Configuration configuration) {
         PageInterceptor page = new PageInterceptor();
         Properties properties = new Properties();
