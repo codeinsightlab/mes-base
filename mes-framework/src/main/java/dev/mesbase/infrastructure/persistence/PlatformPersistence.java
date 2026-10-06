@@ -1,50 +1,69 @@
 package dev.mesbase.infrastructure.persistence;
-import javax.sql.DataSource;
+
+import com.github.pagehelper.PageHelper;
+import java.sql.SQLException;
 import java.util.Set;
-import java.util.Properties;
+import java.util.function.Consumer;
 import java.util.function.Function;
-import org.apache.ibatis.mapping.Environment;
-import org.apache.ibatis.session.*;
-import org.apache.ibatis.transaction.managed.ManagedTransactionFactory;
-import org.springframework.jdbc.datasource.DataSourceUtils;
-import org.springframework.jdbc.support.JdbcTransactionManager;
-import org.springframework.transaction.support.*;
-import dev.mesbase.core.error.*;
-/** Separate PLATFORM SqlSessionFactory and local transaction manager. No business fallback. */
+import java.util.function.Supplier;
+import javax.sql.DataSource;
+import org.apache.ibatis.session.Configuration;
+import org.apache.ibatis.session.ExecutorType;
+import org.apache.ibatis.session.SqlSession;
+import org.apache.ibatis.session.SqlSessionFactory;
+import org.apache.ibatis.session.defaults.DefaultSqlSession;
+import org.apache.ibatis.transaction.jdbc.JdbcTransaction;
+import org.mybatis.spring.SqlSessionTemplate;
+import org.springframework.transaction.support.TransactionTemplate;
+
+/** Programmatic infrastructure/CLI operations share the standard Spring platform manager. */
 public final class PlatformPersistence {
-    private final DataSource datasource; private final Set<Class<?>> mappers;
-    private final SqlSessionFactory sessions; private final JdbcTransactionManager transactions;
-    public PlatformPersistence(DataSource datasource,Set<Class<?>> mappers) {
-        this(datasource,mappers,configuration -> {});
-    }
-    public PlatformPersistence(DataSource datasource,Set<Class<?>> mappers,java.util.function.Consumer<Configuration> setup) {
-        this.datasource=datasource; this.mappers=Set.copyOf(mappers);
-        ManagedTransactionFactory factory=new ManagedTransactionFactory(); Properties p=new Properties();p.setProperty("closeConnection","false");factory.setProperties(p);
-        Configuration config=new Configuration(new Environment("platform",factory,datasource)); config.setCacheEnabled(false); config.setLocalCacheScope(LocalCacheScope.STATEMENT);
-        setup.accept(config);
-        for(Class<?> mapper:mappers) {
-            var owner=mapper.getAnnotation(PersistenceOwner.class);
-            if(owner==null || owner.value()!=PersistenceOwner.Kind.PLATFORM) throw new IllegalArgumentException("Explicit PLATFORM mapper ownership required");
-            config.addMapper(mapper);
-        }
-        sessions=new SqlSessionFactoryBuilder().build(config); transactions=new JdbcTransactionManager(datasource);
-    }
-    /** Independent metadata read; never joins a business transaction or opens a platform write unit. */
-    public <T> T readOnly(Function<OwnedSqlSession,T> work) {
-        var page=com.github.pagehelper.PageHelper.getLocalPage();
-        com.github.pagehelper.PageHelper.clearPage();
-        try(var connection=datasource.getConnection()) {
-            connection.setReadOnly(true);
-            var session=new OwnedSqlSession(sessions.openSession(connection),mappers,() -> {});
-            try { return work.apply(session); } finally { session.close(); }
-        } catch(java.sql.SQLException failure) { throw new IllegalStateException("Platform metadata read failed",failure); }
-        finally { com.github.pagehelper.PageHelper.clearPage(); if(page!=null)com.github.pagehelper.PageHelper.setLocalPage(page); }
-    }
-    public <T> T transaction(Function<OwnedSqlSession,T> work) {
-        if(TransactionSynchronizationManager.isActualTransactionActive()) throw new FoundationException(ErrorCode.CONFLICT);
-        return new TransactionTemplate(transactions).execute(status -> {
-            var session=new OwnedSqlSession(sessions.openSession(DataSourceUtils.getConnection(datasource)),mappers,() -> {});
-            try { return work.apply(session); } finally { session.close(); }
+    private final Set<Class<?>> mappers;
+    private final SqlSessionFactory sessions;
+    private final SqlSessionTemplate template;
+    private final OwnedTransactionManager transactions;
+    private final SpringCommitActions effects = new SpringCommitActions();
+    public PlatformPersistence(DataSource source, Set<Class<?>> mappers) { this(source, mappers, c -> {}); }
+    public PlatformPersistence(DataSource source, Set<Class<?>> mappers, Consumer<Configuration> setup) {
+        this.mappers = Set.copyOf(mappers);
+        mappers.forEach(type -> {
+            PersistenceOwner owner = type.getAnnotation(PersistenceOwner.class);
+            if (owner == null || owner.value() != PersistenceOwner.Kind.PLATFORM)
+                throw new IllegalArgumentException("Explicit PLATFORM mapper ownership required");
         });
+        transactions = new OwnedTransactionManager(source);
+        sessions = PersistenceFactories.create(source, mappers, setup, transactions::verifyAccess);
+        template = new SqlSessionTemplate(sessions);
     }
+    public PlatformPersistence(SqlSessionFactory sessions, OwnedTransactionManager transactions, Set<Class<?>> mappers) {
+        this.sessions = sessions; this.transactions = transactions; this.mappers = Set.copyOf(mappers);
+        template = new SqlSessionTemplate(sessions);
+    }
+    public SqlSessionFactory sessionFactory() { return sessions; }
+    public OwnedTransactionManager transactionManager() { return transactions; }
+    public <T> T mapper(Class<T> type) { return template.getMapper(type); }
+    public <T> T run(Supplier<T> work) { return new TransactionTemplate(transactions).execute(status -> work.get()); }
+    public <T> T transaction(Function<OwnedSqlSession, T> work) {
+        return run(() -> owned(template, transactions::verifyAccess, work));
+    }
+    /** Deliberately independent metadata read, including while a business transaction is active. */
+    public <T> T readOnly(Function<OwnedSqlSession, T> work) {
+        // Separate short JDBC connection avoids joining or replacing the business transaction.
+        var page = PageHelper.getLocalPage();
+        PageHelper.clearPage();
+        try (var connection = sessions.getConfiguration().getEnvironment().getDataSource().getConnection()) {
+            connection.setReadOnly(true);
+            try (var session = new DefaultSqlSession(sessions.getConfiguration(), sessions.getConfiguration().newExecutor(new JdbcTransaction(connection), ExecutorType.SIMPLE), true)) {
+                // Metadata reads use the dedicated session but skip the write-unit guard.
+                return PersistenceReadContext.independent(transactions, () -> owned(session, () -> {}, work));
+            }
+        } catch (SQLException failure) { throw new IllegalStateException("Platform metadata read failed", failure); }
+        finally { PageHelper.clearPage(); if (page != null) PageHelper.setLocalPage(page); }
+    }
+    private <T> T owned(SqlSession session, Runnable verify, Function<OwnedSqlSession,T> work) {
+        OwnedSqlSession owned = new OwnedSqlSession(session, mappers, verify);
+        try { return work.apply(owned); } finally { owned.expire(); }
+    }
+    public void afterCommit(Runnable action) { effects.afterCommit(action); }
+    public void afterRollback(Runnable action) { effects.afterRollback(action); }
 }

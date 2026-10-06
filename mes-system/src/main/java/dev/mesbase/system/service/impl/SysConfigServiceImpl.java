@@ -5,46 +5,51 @@ import dev.mesbase.common.constant.UserConstants;
 import dev.mesbase.common.core.redis.RedisCache;
 import dev.mesbase.common.core.text.Convert;
 import dev.mesbase.common.exception.ServiceException;
+import dev.mesbase.common.utils.SecurityUtils;
 import dev.mesbase.common.utils.StringUtils;
+import dev.mesbase.common.utils.bean.BeanValidators;
+import dev.mesbase.core.error.ErrorCode;
+import dev.mesbase.core.error.FoundationException;
 import dev.mesbase.system.domain.SysConfig;
 import dev.mesbase.system.mapper.SysConfigMapper;
 import dev.mesbase.system.service.ISysConfigService;
-
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Service;
-
+import dev.mesbase.system.service.SystemPermissionService;
+import jakarta.validation.Validator;
 import java.util.Collection;
 import java.util.List;
-
-import jakarta.annotation.PostConstruct;
+import java.util.Set;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * 参数配置 服务层实现
- * 
+ *
  * @author ruoyi
  */
 @Service
-@org.springframework.boot.autoconfigure.condition.ConditionalOnProperty(name="mes.system.enabled",havingValue="true")
+@ConditionalOnProperty(name="mes.system.enabled",havingValue="true")
 public class SysConfigServiceImpl implements ISysConfigService
 {
-    @org.springframework.beans.factory.annotation.Autowired private jakarta.validation.Validator contractValidator;
+    @Autowired private Validator contractValidator;
     @Autowired
     private SysConfigMapper configMapper;
 
     @Autowired
     private RedisCache redisCache;
-    @Autowired private dev.mesbase.system.service.SystemPermissionService permissions;
+    @Autowired private SystemPermissionService permissions;
     @Override public String selectClientConfigByKey(String key) {
-        if(!java.util.Set.of("sys.account.captchaOnOff","sys.index.skinName","sys.account.registerUser","sys.user.avatar.maxSize").contains(key)
-            && !permissions.granted(dev.mesbase.common.utils.SecurityUtils.getUsername(),null,"system:config:query"))
-            throw new dev.mesbase.core.error.FoundationException(dev.mesbase.core.error.ErrorCode.FORBIDDEN);
+        if(!Set.of("sys.account.captchaOnOff","sys.index.skinName","sys.account.registerUser","sys.user.avatar.maxSize").contains(key)
+            && !permissions.granted(SecurityUtils.getUsername(),null,"system:config:query"))
+            throw new FoundationException(ErrorCode.FORBIDDEN);
         return selectConfigByKey(key);
     }
 
     /**
      * 项目启动时，初始化参数到缓存
      */
-    
+
     public void init()
     {
         loadingConfigCache();
@@ -52,7 +57,7 @@ public class SysConfigServiceImpl implements ISysConfigService
 
     /**
      * 查询参数配置信息
-     * 
+     *
      * @param configId 参数配置ID
      * @return 参数配置信息
      */
@@ -66,7 +71,7 @@ public class SysConfigServiceImpl implements ISysConfigService
 
     /**
      * 根据键名查询参数配置信息
-     * 
+     *
      * @param configKey 参数key
      * @return 参数键值
      */
@@ -91,7 +96,7 @@ public class SysConfigServiceImpl implements ISysConfigService
 
     /**
      * 获取验证码开关
-     * 
+     *
      * @return true开启，false关闭
      */
     @Override
@@ -107,7 +112,7 @@ public class SysConfigServiceImpl implements ISysConfigService
 
     /**
      * 查询参数配置列表
-     * 
+     *
      * @param config 参数配置信息
      * @return 参数配置集合
      */
@@ -119,14 +124,15 @@ public class SysConfigServiceImpl implements ISysConfigService
 
     /**
      * 新增参数配置
-     * 
+     *
      * @param config 参数配置信息
      * @return 结果
      */
     @Override
+    @Transactional(transactionManager="platformTransactionManager", rollbackFor=Exception.class)
     public int insertConfig(SysConfig config)
     {
-        dev.mesbase.common.utils.bean.BeanValidators.validateWithException(contractValidator,config);
+        BeanValidators.validateWithException(contractValidator,config);
         int row = configMapper.insertConfig(config);
         if (row > 0)
         {
@@ -137,15 +143,16 @@ public class SysConfigServiceImpl implements ISysConfigService
 
     /**
      * 修改参数配置
-     * 
+     *
      * @param config 参数配置信息
      * @return 结果
      */
     @Override
+    @Transactional(transactionManager="platformTransactionManager", rollbackFor=Exception.class)
     public int updateConfig(SysConfig config)
     {
-        dev.mesbase.common.utils.bean.BeanValidators.validateWithException(contractValidator,config);
-        var previous=selectConfigById(config.getConfigId());if(previous==null)throw new dev.mesbase.core.error.FoundationException(dev.mesbase.core.error.ErrorCode.NOT_FOUND);
+        BeanValidators.validateWithException(contractValidator,config);
+        var previous=selectConfigById(config.getConfigId());if(previous==null)throw new FoundationException(ErrorCode.NOT_FOUND);
         redisCache.deleteObject(getCacheKey(previous.getConfigKey()));
         int row = configMapper.updateConfig(config);
         if (row > 0)
@@ -157,10 +164,11 @@ public class SysConfigServiceImpl implements ISysConfigService
 
     /**
      * 批量删除参数信息
-     * 
+     *
      * @param configIds 需要删除的参数ID
      */
     @Override
+    @Transactional(transactionManager="platformTransactionManager", rollbackFor=Exception.class)
     public void deleteConfigByIds(Long[] configIds)
     {
         for (Long configId : configIds)
@@ -202,6 +210,7 @@ public class SysConfigServiceImpl implements ISysConfigService
      * 重置参数缓存数据
      */
     @Override
+    @Transactional(transactionManager="platformTransactionManager", rollbackFor=Exception.class)
     public void resetConfigCache()
     {
         clearConfigCache();
@@ -210,7 +219,7 @@ public class SysConfigServiceImpl implements ISysConfigService
 
     /**
      * 校验参数键名是否唯一
-     * 
+     *
      * @param config 参数配置信息
      * @return 结果
      */
@@ -228,7 +237,7 @@ public class SysConfigServiceImpl implements ISysConfigService
 
     /**
      * 设置cache key
-     * 
+     *
      * @param configKey 参数键
      * @return 缓存键key
      */

@@ -1,14 +1,24 @@
 package dev.mesbase.server;
 
-import dev.mesbase.core.factory.*;
-import dev.mesbase.infrastructure.persistence.*;
-import org.springframework.beans.factory.ObjectProvider;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
-import org.springframework.context.annotation.*;
-import org.springframework.core.env.Environment;
-
+import dev.mesbase.core.factory.Factory;
+import dev.mesbase.core.factory.FactoryCatalog;
+import dev.mesbase.core.factory.FactoryId;
+import dev.mesbase.infrastructure.persistence.BusinessPersistenceResolver;
+import dev.mesbase.infrastructure.persistence.OwnerMapperCatalog;
+import dev.mesbase.infrastructure.persistence.PersistenceOwner;
+import dev.mesbase.infrastructure.persistence.PlatformPersistence;
+import dev.mesbase.infrastructure.persistence.RuntimeRegistry;
+import dev.mesbase.server.managed.DatasourcePasswordCipher;
+import dev.mesbase.server.managed.ManagedDatasourceService;
+import java.nio.file.Path;
+import java.util.List;
+import java.util.Optional;
 import javax.sql.DataSource;
-import java.util.*;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.core.env.Environment;
 
 /** Database-managed Factory catalog and lazy node-local runtimes; no YAML factory authority. */
 @Configuration
@@ -16,22 +26,22 @@ import java.util.*;
 @ConditionalOnProperty(name="mes.runtime.enabled",havingValue="true")
 public class FactoryRuntimeConfiguration {
     @Bean(destroyMethod="close") RuntimeRegistry runtimeRegistry() { return new RuntimeRegistry(); }
-    @Bean dev.mesbase.server.managed.ManagedDatasourceService managedDatasources(Environment env,
-            dev.mesbase.framework.persistence.SystemUnit unit, PlatformPersistence persistence,
-            DataSource platformDataSource, RuntimeRegistry registry,
-            ObjectProvider<BusinessMapperRegistration> registrations) {
+    @Bean ManagedDatasourceService managedDatasources(Environment env,
+            PlatformPersistence persistence,
+            @Qualifier("platformDataSource") DataSource platformDataSource, RuntimeRegistry registry,
+            OwnerMapperCatalog catalog) {
         if(!env.getProperty("mes.platform.enabled",Boolean.class,false)) throw new IllegalArgumentException("Factory Runtime requires explicit Platform persistence");
         var key=env.getRequiredProperty("mes.runtime.datasource-key");
-        var mappers=new HashSet<Class<?>>();registrations.orderedStream().forEach(r -> mappers.add(r.mapper()));
-        return new dev.mesbase.server.managed.ManagedDatasourceService(persistence,unit,
-            new dev.mesbase.server.managed.DatasourcePasswordCipher(key),registry,platformDataSource,DruidPools.settings(env),mappers,java.nio.file.Path.of(env.getRequiredProperty("mes.platform.file-root")).resolve("managed-ddl"));
+        var mappers=catalog.types(PersistenceOwner.Kind.BUSINESS);
+        return new ManagedDatasourceService(persistence,
+            new DatasourcePasswordCipher(key),registry,platformDataSource,DruidPools.settings(env),mappers,Path.of(env.getRequiredProperty("mes.platform.file-root")).resolve("managed-ddl"));
     }
-    @Bean FactoryCatalog runtimeCatalog(dev.mesbase.server.managed.ManagedDatasourceService service) {
+    @Bean FactoryCatalog runtimeCatalog(ManagedDatasourceService service) {
         return new FactoryCatalog() {
             public Optional<Factory> find(FactoryId id) { return service.find(id); }
             public List<Factory> enabled(int offset,int limit) { return service.enabled(offset,limit); }
         };
     }
-    @Bean BusinessPersistenceResolver runtimeResolver(dev.mesbase.server.managed.ManagedDatasourceService service) { return service::resolve; }
+    @Bean BusinessPersistenceResolver runtimeResolver(ManagedDatasourceService service) { return service::resolve; }
 
 }

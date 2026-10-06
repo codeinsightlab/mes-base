@@ -21,7 +21,12 @@ with zipfile.ZipFile(JAR) as artifact:
     names = artifact.namelist()
     assert not any("RuntimeFixture" in n or "FoundationHttpTest" in n or "h2-" in n for n in names)
     legacy_classes = ("PlatformConfiguration.class", "LegacyPlatformCondition.class", "PlatformTokenFilter.class",
-                      "DemoConfiguration.class", "PlatformController.class", "PlatformMapper.class", "PlatformRows.class", "PlatformService.class")
+                      "DemoConfiguration.class", "PlatformController.class", "PlatformMapper.class", "PlatformRows.class", "PlatformService.class",
+                      "SystemUnit.class", "SystemUnit$Work.class", "SystemUnitAspect.class", "AnalyticsConfiguration.class",
+                      "AnalyticsConfiguration$AnalyticsUnit.class", "AnalyticsConfiguration$AnalyticsAspect.class",
+                      "BusinessMapperRegistration.class", "PlatformMapperRegistration.class", "BusinessStatementGuard.class",
+                      "ErpAdapter.class", "ErpProvider.class", "ErpConnectionBinding.class", "FactoryErpConnectionResolver.class",
+                      "NotConfiguredErpResolver.class", "IntegrationNotConfiguredException.class")
     assert not any(n.endswith(legacy_classes) for n in names)
     for name in names:
         if name.startswith("BOOT-INF/lib/mes-") and name.endswith(".jar"):

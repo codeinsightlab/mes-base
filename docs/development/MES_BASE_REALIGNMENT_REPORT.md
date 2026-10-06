@@ -650,3 +650,49 @@ AGENTS.md 第4/5节对齐 Controller Web 转换与分级 Entity 规则；13.1 CR
 唯一有意 HTTP 差异：参数/公告的 configId/noticeId 从字符串恢复为数值；Redis dbSize 从错误的字符串恢复为 Long 数值。其余已识别响应模型的原字段名、包装、BIGINT字符串、日期、树、分页total以及空值保持。SysConfig/SysNotice 不新增 params/searchValue；日志未增加新字段。现有独立 DTO/record 接口保持原样。不宣称所有后台 Entity 自动安全，新增字段与新接口仍需分级审查。
 
 证据 JSON：docs/reviews/2026-10-06-response-contract-verification.json；原始日志 target/response-migration/{compile,verify,smoke}.log。静态扫描并未发现剩余生产 SystemViews/Advice 依赖，也未发现本次保留 Entity 输出带 password/salt/secret；这不是所有未来数据内容的安全保证。未执行真实系统API/DB/浏览器验收、UI build或部署。Service/Mapper/权限/资源范围不变；未提交/推送。回滚只能按本任务的响应文件与对应baseline逐项恢复，不覆盖其他用户改动。
+
+### SystemConfiguration 与事务封装复核（2026-10-06）
+
+本轮仅源码审查及知识追加，不修改业务代码。Base 基线 29eeec4；源项目 ktg-mes 当前干净工作树确认为 feat/multi-factory-isolation，提交 bdc299da。已有 application-dev.yml 修改不读取、不处理。未运行构建、测试或数据库验证。
+
+SystemConfiguration 是系统模块的 Spring 装配入口：平台数据源/迁移、平台 Mapper、认证授权、文件存储、缓存预热、调度及同步协调。装配入口本身合理；平台/业务数据库和 Mapper 归属隔离也有必要。但大量 Mapper 手工 Bean 与 SystemUnit 代理、包名事务切面，是 Base 新增实现，不能归因于源分支原有设计。
+
+| 项目 | 源分支 | 当前 Base |
+| --- | --- | --- |
+| 平台事务 | MfDataSourceConfig.masterTransactionManager：Spring DataSourceTransactionManager；SysUserServiceImpl 等显式 @Transactional | PlatformPersistence 内部创建 JdbcTransactionManager + TransactionTemplate；SystemUnitAspect 按包名覆盖公开 Service 方法 |
+| MyBatis 集成 | SqlSessionFactoryBean + MfMapperScanConfig，沿用 MyBatis-Spring | SqlSessionFactoryBuilder + 手工 Mapper Bean + SystemUnit/OwnedSqlSession 代理 |
+| 多厂事务身份 | BusinessTransactionManager 继承 Spring 管理器，只扩展 begin/suspend/resume/cleanup 的工厂路由身份绑定 | DedicatedDatabasePersistence 保留 Scope、binding、lease 与 session 校验，并使用 Spring TransactionTemplate/同步回调 |
+| 提交回调 | 可使用 Spring TransactionSynchronization | SystemUnit 自维护 committed/rolledBack 列表；AnalyticsUnit 另有 ThreadLocal/session/代理实现 |
+
+结论：Base 没有自行实现 JDBC 提交/回滚，底层已经是 Spring；过重之处在 Spring 上方重复实现的系统 Service 事务与 Mapper 生命周期。普通系统 CRUD 的 SystemUnit 包名切面和逐 Mapper 装配缺少必须另造机制的证据，建议收敛为具名平台事务管理器、MyBatis-Spring 和显式 Service 事务边界。FactoryScope、数据库归属、事务内工厂身份不变、连接版本及失效校验应保留，通过框架扩展点承载，不应随封装一起删除。程序式 TransactionTemplate 本身是标准 Spring 用法，并非过度设计。
+
+源码风险：SystemUnit.run 第23行在嵌套时直接执行 action，没有为内层失败标记 rollback-only。如果内层跨 Service 调用写入后抛异常，外层捕获并正常返回，外层模板可能提交内层写入；这与参与同一事务的 Spring REQUIRED 内层边界语义不同。此为源码推导，未执行复现。SystemUnitEffectsTest 现有两个测试覆盖成功嵌套和顶层失败，不覆盖吞掉内层异常、REQUIRES_NEW 或事务属性。切面还将包内公开查询默认纳入事务；包外 Service 则不会自动命中。
+
+不能仅添加 @Transactional：PlatformPersistence.transaction 第44行拒绝已有活动事务，内部管理器也不是具名 Spring Bean；现有 Mapper 依赖 SystemUnit 当前 session。后续整改须同时替换装配、session 集成和事务边界，验证回滚、嵌套/挂起恢复、提交回调及跨厂/跨库拒绝。当前仅提出建议，不实施该架构调整。
+
+源码入口：mes-admin/.../server/SystemConfiguration.java；mes-framework/.../framework/persistence/{SystemUnit,SystemUnitAspect}.java；mes-framework/.../infrastructure/persistence/{PlatformPersistence,DedicatedDatabasePersistence,OwnedSqlSession}.java；mes-admin/.../server/AnalyticsConfiguration.java。源分支对照：ktg-framework/.../factory/{MfDataSourceConfig,BusinessTransactionManager,MfMapperScanConfig,MapperDatasourceInterceptor}.java；ktg-system/.../service/impl/SysUserServiceImpl.java。
+
+框架依据：[MyBatis-Spring 事务](https://mybatis.org/spring/transactions.html)、[SqlSessionTemplate](https://mybatis.org/spring/sqlsession.html)、[Spring 事务传播](https://docs.spring.io/spring-framework/reference/data-access/transaction/declarative/tx-propagation.html)、[TransactionSynchronization](https://docs.spring.io/spring-framework/docs/current/javadoc-api/org/springframework/transaction/support/TransactionSynchronization.html)。这些能力支持收敛方向，不代表依赖兼容性或整改后的运行行为已经验收。
+
+进一步核对 Mapper 维护方式：源分支 MfMapperScanConfig 使用 ClassPathMapperScanner 自动注册 Mapper 并绑定 master/business/erp SqlSessionFactory，不需要逐个编写 @Bean。但并非完全没有人工清单：MASTER 来自 mf-master-mappers.txt，ERP 是显式类名集合，未命中两者的 Mapper 默认归 BUSINESS。因此可复用扫描与标准集成方式，不宜照搬未分类默认业务库的规则。Base 已有 PersistenceOwner 注解，可作为扫描分类依据，缺少归属或归属非法时启动失败；新增 Mapper 只在自身声明归属，无须再改中央 Set、逐 Mapper Bean 或 BusinessMapperRegistration。该方向是后续整改建议，本轮未实施。
+
+源分支三类库进一步核对：装配层按 Catalog 将 Mapper/XML 分配到 master/business/erp 三个 SqlSessionFactory。master 直接使用配置的中心库 DataSource；business 和 erp 是独立 session 工厂但共用 FactoryDataSource 路由器。执行层 MapperDatasourceInterceptor 优先读取 Mapper 方法上的 @DataSource，其次接口注解，缺省 BUSINESS；BUSINESS 根据 FactoryContext 和受管绑定选业务连接，ERP/HR/WMS/EXTERNAL_MES 选择对应配置外部连接。ErpItemSourceMapper、ItemLotSourceExtraMapper 同时进入 ERP Catalog 并标注 @DataSource(ERP)。外部连接在此实现中来自独立配置，不等于每厂业务库绑定。历史 MASTER/SLAVE 路由标记被转换为 BUSINESS，不能用 @DataSource(MASTER) 推断中心库归属。事务执行前及连接获取时验证数据源身份，冲突拒绝。以上仅为当前源码事实；未验证真实数据库路由。
+
+SessionFactory 数量不等于连接用途数量：master 会话工厂绑定固定中心库；business 与 erp 会话工厂都绑定同一 FactoryDataSource，后者按用途选择 BUSINESS/ERP/HR/WMS/EXTERNAL_MES 实际连接。ERP Catalog 只隔离两个指定 ERP Mapper；HR/WMS Mapper 不在该集合，装配到 businessSqlSessionFactory，再靠 @DataSource(HR/WMS) 路由外部库。因此该分支的 businessSqlSessionFactory 命名不意味着其中 Mapper 都访问业务库，erpSqlSessionFactory 也不是统一的外部库工厂。HR/WMS 有生产 Mapper 使用；本轮搜索 EXTERNAL_MES 注解仅发现集成测试使用，不能据此宣称已有生产外部 MES SQL 调用。独立 session 工厂并不意味着跨库本地事务安全；运行时身份冲突校验仍生效。
+
+
+### 三库装配整改交付（2026-10-06，取代前述仅审查建议）
+
+用户授权以提供的SQL Server连接装配外部ERP，优先参考feat/multi-factory-isolation的合理实现，并取消重复封装和手工Mapper绑定。源分支的MyBatis-Spring扫描、具名Spring事务管理器及begin/suspend/resume/cleanup身份绑定方式被沿用；Base按用户决定用PersistenceOwner取代Catalog清单，并将ERP固定为独立数据源/会话工厂，不沿用business工厂承载HR/WMS外部路由的方式。
+
+生产装配：PersistenceConfiguration分别提供platform/business/erpSqlSessionFactory及对应事务管理器。ERP启用时共三个工厂，未启用时两个；业务工厂只创建一次，FactoryBusinessDataSource按当前Factory租借版本化业务池。RuntimeRegistry只维护池/归属/版本/租约，不再为每个池创建SqlSessionFactory。OwnerMapperRegistration自动扫描Mapper并按自身PersistenceOwner.PLATFORM/BUSINESS/ERP注册标准MapperFactoryBean；无缺省归属、中央类清单、逐Mapper Bean或额外用途注解。新增Mapper只声明归属及SQL，不修改SystemConfiguration。生成器也不再生成PlatformMapperRegistration配置，生成Java通过显式import输出。
+
+SystemUnit、SystemUnitAspect、AnalyticsConfiguration（含AnalyticsUnit/Aspect）、BusinessMapperRegistration、PlatformMapperRegistration已删除。普通Service写入用例显式@Transactional，分析查询使用businessTransactionManager只读事务；SpringCommitActions用TransactionSynchronization处理副作用。OwnedTransactionManager只扩展数据库/工厂身份保护，传播与rollback-only由Spring处理。PlatformPersistence/BusinessPersistence保留既有基础设施、CLI及生成骨架程序式入口，使用标准Spring模板和同一会话工厂；不再保存自定义当前session或另造嵌套事务。独立平台元数据读取仍有明确只读连接边界，禁止更新，不借用业务事务连接。同步run_token、Quartz抢占、私有文件ownership、权限和连接版本校验保持。
+
+另移除只有NOT_CONFIGURED的ERP provider/连接解析/空Adapter模型及Foundation ERP占位检查接口；该接口现在404，未新增ERP业务HTTP入口。外部凭证和连接仍独立于FactoryScope。通用application.yml默认关闭ERP；开发profile仅新增optional本地配置导入，原用户未提交的其它配置内容保留。用户提供的真实连接参数只写入Git忽略的.local/erp.yml（0600），不写通用配置、报告或验收JSON。增加MyBatis-Spring4.0.0及Boot管理的SQLServer JDBC驱动；依赖选择依据官方Spring7兼容表 https://mybatis.org/spring/ 。未新增HR/WMS/EXTERNAL_MES类型。
+
+最终验证：标准 `zsh -ic 'mvn -B -ntp verify'` BUILD SUCCESS，跨模块165项：162通过、3跳过、0失败/错误。包含既有20项Dedicated数据库隔离测试、4项扫描/装配测试、2项真实Spring提交/嵌套rollback-only测试、3项生成Java导入测试和既有64项响应fixture。装配测试证明三个合成H2库互不混用、A/B厂路由、缺Scope拒绝、事务内切厂拒绝、跨库Mapper拒绝及REQUIRES_NEW后恢复；另直接加载生产PersistenceConfiguration，证明标准工厂与现有Mapper可装配。既有生成器测试实际编译/运行生成的CRUD骨架。
+
+真实外部连接：TCP端口探测成功；只读SELECT1探针在建立JDBC连接时因TLS协议协商失败（SQLState08S01），未建立连接、未执行SQL、未读取业务数据。未关闭加密/跳过证书或调整JVM协议策略；因此真实ERP联调未通过。未执行ERP业务写入、外部同步流程、真实多节点/多厂生产数据库验收或UI验证，未重启用户dev服务，未提交/推送/部署。
+
+最终打包smoke 4/4通过，含已删除类在主JAR及模块JAR中无残留；显式import扫描0违规，git diff --check通过。打包验收与静态检查见 docs/reviews/2026-10-06-persistence-verification.json；原始最终日志保存target/validation/persistence-{verify,smoke}.log。只清除了本轮删除源码对应的过期生成.class文件，未清理其它target证据。回滚按本轮持久化/装配/Service事务文件、对应文档规则和本地ERP导入逐项恢复，保护用户原有开发配置修改。ADR-004/005按时间线追加修订；platform/codegen操作文档及AGENTS与当前装配一致。

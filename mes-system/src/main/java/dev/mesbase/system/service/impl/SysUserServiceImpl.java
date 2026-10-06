@@ -5,57 +5,61 @@ import dev.mesbase.common.constant.UserConstants;
 import dev.mesbase.common.core.domain.entity.SysRole;
 import dev.mesbase.common.core.domain.entity.SysUser;
 import dev.mesbase.common.exception.ServiceException;
+import dev.mesbase.common.utils.PasswordPolicy;
 import dev.mesbase.common.utils.SecurityUtils;
 import dev.mesbase.common.utils.StringUtils;
 import dev.mesbase.common.utils.bean.BeanValidators;
 import dev.mesbase.common.utils.spring.SpringUtils;
+import dev.mesbase.core.error.ErrorCode;
+import dev.mesbase.core.error.FoundationException;
 import dev.mesbase.system.domain.SysPost;
 import dev.mesbase.system.domain.SysUserPost;
+import dev.mesbase.system.domain.SysUserRecipientQuery;
 import dev.mesbase.system.domain.SysUserRole;
 import dev.mesbase.system.mapper.SysPostMapper;
 import dev.mesbase.system.mapper.SysRoleMapper;
 import dev.mesbase.system.mapper.SysUserMapper;
 import dev.mesbase.system.mapper.SysUserPostMapper;
+import dev.mesbase.system.mapper.SysUserRecipientExtraMapper;
 import dev.mesbase.system.mapper.SysUserRoleMapper;
 import dev.mesbase.system.service.ISysConfigService;
 import dev.mesbase.system.service.ISysUserService;
-
+import jakarta.validation.Validator;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.CollectionUtils;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.stream.Collectors;
-
-import jakarta.validation.Validator;
-
 /**
  * 用户 业务层处理
- * 
+ *
  * @author ruoyi
  */
 @Service
-@org.springframework.boot.autoconfigure.condition.ConditionalOnProperty(name="mes.system.enabled",havingValue="true")
+@ConditionalOnProperty(name="mes.system.enabled",havingValue="true")
 public class SysUserServiceImpl implements ISysUserService
 {
-    @org.springframework.beans.factory.annotation.Autowired private jakarta.validation.Validator contractValidator;
+    @Autowired private Validator contractValidator;
     private static final Logger log = LoggerFactory.getLogger(SysUserServiceImpl.class);
     @Autowired
     protected Validator validator;
     @Autowired
     private SysUserMapper userMapper;
-    @Autowired private dev.mesbase.common.utils.PasswordPolicy passwords;
-    @Autowired private dev.mesbase.system.mapper.SysRoleMapper linkedRoles;
-    @Autowired private dev.mesbase.system.mapper.SysPostMapper linkedPosts;
-    @Autowired private dev.mesbase.system.mapper.SysUserRecipientExtraMapper recipientUserMapper;
+    @Autowired private PasswordPolicy passwords;
+    @Autowired private SysRoleMapper linkedRoles;
+    @Autowired private SysPostMapper linkedPosts;
+    @Autowired private SysUserRecipientExtraMapper recipientUserMapper;
 
     @Override
     @DataScope(deptAlias="d",userAlias="u")
-    public List<SysUser> selectRecipientUsers(dev.mesbase.system.domain.SysUserRecipientQuery query) {
+    public List<SysUser> selectRecipientUsers(SysUserRecipientQuery query) {
         return recipientUserMapper.selectUsers(query);
     }
     @Autowired
@@ -71,7 +75,7 @@ public class SysUserServiceImpl implements ISysUserService
 
     /**
      * 根据条件分页查询用户列表
-     * 
+     *
      * @param user 用户信息
      * @return 用户信息集合信息
      */
@@ -84,7 +88,7 @@ public class SysUserServiceImpl implements ISysUserService
 
     /**
      * 根据条件分页查询已分配用户角色列表
-     * 
+     *
      * @param user 用户信息
      * @return 用户信息集合信息
      */
@@ -97,7 +101,7 @@ public class SysUserServiceImpl implements ISysUserService
 
     /**
      * 根据条件分页查询未分配用户角色列表
-     * 
+     *
      * @param user 用户信息
      * @return 用户信息集合信息
      */
@@ -110,7 +114,7 @@ public class SysUserServiceImpl implements ISysUserService
 
     /**
      * 通过用户名查询用户
-     * 
+     *
      * @param userName 用户名
      * @return 用户对象信息
      */
@@ -128,7 +132,7 @@ public class SysUserServiceImpl implements ISysUserService
 
     /**
      * 通过用户ID查询用户
-     * 
+     *
      * @param userId 用户ID
      * @return 用户对象信息
      */
@@ -140,7 +144,7 @@ public class SysUserServiceImpl implements ISysUserService
 
     /**
      * 查询用户所属角色组
-     * 
+     *
      * @param userName 用户名
      * @return 结果
      */
@@ -157,7 +161,7 @@ public class SysUserServiceImpl implements ISysUserService
 
     /**
      * 查询用户所属岗位组
-     * 
+     *
      * @param userName 用户名
      * @return 结果
      */
@@ -174,7 +178,7 @@ public class SysUserServiceImpl implements ISysUserService
 
     /**
      * 校验用户名称是否唯一
-     * 
+     *
      * @param userName 用户名称
      * @return 结果
      */
@@ -227,7 +231,7 @@ public class SysUserServiceImpl implements ISysUserService
 
     /**
      * 校验用户是否允许操作
-     * 
+     *
      * @param user 用户信息
      */
     @Override
@@ -241,7 +245,7 @@ public class SysUserServiceImpl implements ISysUserService
 
     /**
      * 校验用户是否有数据权限
-     * 
+     *
      * @param userId 用户id
      */
     @Override
@@ -249,7 +253,7 @@ public class SysUserServiceImpl implements ISysUserService
     {
         if (userId == null)
         {
-            throw new dev.mesbase.core.error.FoundationException(dev.mesbase.core.error.ErrorCode.BAD_REQUEST);
+            throw new FoundationException(ErrorCode.BAD_REQUEST);
         }
         if (!SysUser.isAdmin(SecurityUtils.getUserId()))
         {
@@ -265,15 +269,17 @@ public class SysUserServiceImpl implements ISysUserService
 
     /**
      * 新增保存用户信息
-     * 
+     *
      * @param user 用户信息
      * @return 结果
      */
     @Override
-    
+
+    @Transactional(transactionManager="platformTransactionManager", rollbackFor=Exception.class)
+
     public int insertUser(SysUser user)
     {
-        dev.mesbase.common.utils.bean.BeanValidators.validateWithException(contractValidator,user);
+        BeanValidators.validateWithException(contractValidator,user);
         user.setUserId(null);
         // 新增用户信息
         int rows = userMapper.insertUser(user);
@@ -286,11 +292,12 @@ public class SysUserServiceImpl implements ISysUserService
 
     /**
      * 注册用户信息
-     * 
+     *
      * @param user 用户信息
      * @return 结果
      */
     @Override
+    @Transactional(transactionManager="platformTransactionManager", rollbackFor=Exception.class)
     public boolean registerUser(SysUser user)
     {
         return userMapper.insertUser(user) > 0;
@@ -298,15 +305,17 @@ public class SysUserServiceImpl implements ISysUserService
 
     /**
      * 修改保存用户信息
-     * 
+     *
      * @param user 用户信息
      * @return 结果
      */
     @Override
-    
+
+    @Transactional(transactionManager="platformTransactionManager", rollbackFor=Exception.class)
+
     public int updateUser(SysUser user)
     {
-        dev.mesbase.common.utils.bean.BeanValidators.validateWithException(contractValidator,user);
+        BeanValidators.validateWithException(contractValidator,user);
         Long userId = user.getUserId();
         // 删除用户与角色关联
         userRoleMapper.deleteUserRoleByUserId(userId);
@@ -321,12 +330,14 @@ public class SysUserServiceImpl implements ISysUserService
 
     /**
      * 用户授权角色
-     * 
+     *
      * @param userId 用户ID
      * @param roleIds 角色组
      */
     @Override
-    
+
+    @Transactional(transactionManager="platformTransactionManager", rollbackFor=Exception.class)
+
     public void insertUserAuth(Long userId, Long[] roleIds)
     {
         if(userMapper.selectUserById(userId)==null)throw new ServiceException("用户不存在");
@@ -336,11 +347,12 @@ public class SysUserServiceImpl implements ISysUserService
 
     /**
      * 修改用户状态
-     * 
+     *
      * @param user 用户信息
      * @return 结果
      */
     @Override
+    @Transactional(transactionManager="platformTransactionManager", rollbackFor=Exception.class)
     public int updateUserStatus(SysUser user)
     {
         return userMapper.updateUser(user);
@@ -348,11 +360,12 @@ public class SysUserServiceImpl implements ISysUserService
 
     /**
      * 修改用户基本信息
-     * 
+     *
      * @param user 用户信息
      * @return 结果
      */
     @Override
+    @Transactional(transactionManager="platformTransactionManager", rollbackFor=Exception.class)
     public int updateUserProfile(SysUser user)
     {
         return userMapper.updateUser(user);
@@ -360,13 +373,14 @@ public class SysUserServiceImpl implements ISysUserService
 
     /**
      * 修改用户头像
-     * 
+     *
      * @param userName 用户名
      * @param avatar 头像地址
      * @param minioUrl minio访问地址
      * @return 结果
      */
     @Override
+    @Transactional(transactionManager="platformTransactionManager", rollbackFor=Exception.class)
     public boolean updateUserAvatar(String userName, String avatar, String minioUrl)
     {
         return userMapper.updateUserAvatar(userName, avatar, minioUrl) > 0;
@@ -374,11 +388,12 @@ public class SysUserServiceImpl implements ISysUserService
 
     /**
      * 重置用户密码
-     * 
+     *
      * @param user 用户信息
      * @return 结果
      */
     @Override
+    @Transactional(transactionManager="platformTransactionManager", rollbackFor=Exception.class)
     public int resetPwd(SysUser user)
     {
         return userMapper.updateUser(user);
@@ -386,12 +401,13 @@ public class SysUserServiceImpl implements ISysUserService
 
     /**
      * 重置用户密码
-     * 
+     *
      * @param userName 用户名
      * @param password 密码
      * @return 结果
      */
     @Override
+    @Transactional(transactionManager="platformTransactionManager", rollbackFor=Exception.class)
     public int resetUserPwd(String userName, String password)
     {
         return userMapper.resetUserPwd(userName, password);
@@ -399,9 +415,10 @@ public class SysUserServiceImpl implements ISysUserService
 
     /**
      * 新增用户角色信息
-     * 
+     *
      * @param user 用户对象
      */
+    @Transactional(transactionManager="platformTransactionManager", rollbackFor=Exception.class)
     public void insertUserRole(SysUser user)
     {
         Long[] roles = user.getRoleIds();
@@ -426,9 +443,10 @@ public class SysUserServiceImpl implements ISysUserService
 
     /**
      * 新增用户岗位信息
-     * 
+     *
      * @param user 用户对象
      */
+    @Transactional(transactionManager="platformTransactionManager", rollbackFor=Exception.class)
     public void insertUserPost(SysUser user)
     {
         Long[] posts = user.getPostIds();
@@ -453,10 +471,11 @@ public class SysUserServiceImpl implements ISysUserService
 
     /**
      * 新增用户角色信息
-     * 
+     *
      * @param userId 用户ID
      * @param roleIds 角色组
      */
+    @Transactional(transactionManager="platformTransactionManager", rollbackFor=Exception.class)
     public void insertUserRole(Long userId, Long[] roleIds)
     {
         if (StringUtils.isNotNull(roleIds))
@@ -480,12 +499,14 @@ public class SysUserServiceImpl implements ISysUserService
 
     /**
      * 通过用户ID删除用户
-     * 
+     *
      * @param userId 用户ID
      * @return 结果
      */
     @Override
-    
+
+    @Transactional(transactionManager="platformTransactionManager", rollbackFor=Exception.class)
+
     public int deleteUserById(Long userId)
     {
         // 删除用户与角色关联
@@ -497,12 +518,14 @@ public class SysUserServiceImpl implements ISysUserService
 
     /**
      * 批量删除用户信息
-     * 
+     *
      * @param userIds 需要删除的用户ID
      * @return 结果
      */
     @Override
-    
+
+    @Transactional(transactionManager="platformTransactionManager", rollbackFor=Exception.class)
+
     public int deleteUserByIds(Long[] userIds)
     {
         for (Long userId : userIds)
@@ -519,13 +542,14 @@ public class SysUserServiceImpl implements ISysUserService
 
     /**
      * 导入用户数据
-     * 
+     *
      * @param userList 用户数据列表
      * @param isUpdateSupport 是否更新支持，如果已存在，则进行更新数据
      * @param operName 操作用户
      * @return 结果
      */
     @Override
+    @Transactional(transactionManager="platformTransactionManager", rollbackFor=Exception.class)
     public String importUser(List<SysUser> userList, Boolean isUpdateSupport, String operName){throw new ServiceException("用户导入必须显式提供本次初始密码");}
     @Override public String importUser(List<SysUser> userList, Boolean isUpdateSupport, String operName,String initialPassword)
     {
@@ -573,7 +597,7 @@ public class SysUserServiceImpl implements ISysUserService
                 failureNum++;
                 String msg = "<br/>" + failureNum + "、账号 " + user.getUserName() + " 导入失败：";
                 failureMsg.append(msg + "字段或关系校验失败");
-                log.warn("User import rejected requestId={} type={}",org.slf4j.MDC.get("requestId"),e.getClass().getSimpleName());
+                log.warn("User import rejected requestId={} type={}",MDC.get("requestId"),e.getClass().getSimpleName());
             }
         }
         if (failureNum > 0)

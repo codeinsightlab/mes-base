@@ -1,15 +1,49 @@
 package dev.mesbase.server.managed;
 
-import dev.mesbase.core.error.*;
-import dev.mesbase.core.factory.*;
-import dev.mesbase.framework.persistence.SystemUnit;
-import dev.mesbase.infrastructure.persistence.*;
-import dev.mesbase.server.DruidPools;
-import dev.mesbase.system.factory.*;
-import jakarta.validation.constraints.*;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.github.pagehelper.Page;
+import com.github.pagehelper.PageHelper;
+import dev.mesbase.core.error.ErrorCode;
+import dev.mesbase.core.error.FoundationException;
+import dev.mesbase.core.factory.Factory;
+import dev.mesbase.core.factory.FactoryId;
+import dev.mesbase.core.factory.FactoryScope;
+import dev.mesbase.core.factory.FactoryStatus;
+import dev.mesbase.infrastructure.persistence.BusinessRuntimeBinding;
+import dev.mesbase.infrastructure.persistence.DatasourceIdentity;
+import dev.mesbase.infrastructure.persistence.PlatformPersistence;
+import dev.mesbase.infrastructure.persistence.RuntimeRegistry;
+import dev.mesbase.server.DruidPools;
+import dev.mesbase.system.factory.ManagedDatasource;
+import dev.mesbase.system.factory.ManagedDatasourceMapper;
+import dev.mesbase.system.factory.ManagedFactory;
+import dev.mesbase.system.factory.ManagedFactoryMapper;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Pattern;
+import jakarta.validation.constraints.Size;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
+import java.nio.file.attribute.PosixFilePermissions;
+import java.sql.SQLException;
+import java.time.Instant;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.Set;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Function;
+import java.util.function.Supplier;
 import javax.sql.DataSource;
-import java.util.*;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 /** SOURCE_PRODUCT_PORT: ManagedDatasourceService. Platform records own configuration; pools are node-local. */
 public final class ManagedDatasourceService {
@@ -33,7 +67,7 @@ public final class ManagedDatasourceService {
     public record FactoryView(String factoryId,String enterpriseId,String factoryCode,String factoryName,
             Long datasourceId,String status,long revision,String datasourceName) {}
     private final PlatformPersistence persistence;
-    private final SystemUnit unit;
+
     private final ManagedDatasourceMapper sources;
     private final ManagedFactoryMapper factories;
     private final DatasourcePasswordCipher cipher;
@@ -41,16 +75,16 @@ public final class ManagedDatasourceService {
     private final DataSource platform;
     private final DruidPools.Settings settings;
     private final Set<Class<?>> mappers;
-    private final java.nio.file.Path ddlRoot;
+    private final Path ddlRoot;
     private final String nodeId="node-"+UUID.randomUUID();
     private final Map<DatasourceIdentity,String> physical=new HashMap<>();
-    private record DdlCache(long revision,java.time.Instant at,DdlView view) {}
-    private final java.util.concurrent.ConcurrentHashMap<Long,DdlCache> ddlCache=new java.util.concurrent.ConcurrentHashMap<>();
+    private record DdlCache(long revision,Instant at,DdlView view) {}
+    private final ConcurrentHashMap<Long,DdlCache> ddlCache=new ConcurrentHashMap<>();
 
-    public ManagedDatasourceService(PlatformPersistence persistence,SystemUnit unit,DatasourcePasswordCipher cipher,
-            RuntimeRegistry registry,DataSource platform,DruidPools.Settings settings,Set<Class<?>> mappers,java.nio.file.Path ddlRoot) {
-        this.persistence=persistence;this.unit=unit;this.sources=unit.mapper(ManagedDatasourceMapper.class);
-        this.factories=unit.mapper(ManagedFactoryMapper.class);this.cipher=cipher;this.registry=registry;
+    public ManagedDatasourceService(PlatformPersistence persistence,DatasourcePasswordCipher cipher,
+            RuntimeRegistry registry,DataSource platform,DruidPools.Settings settings,Set<Class<?>> mappers,Path ddlRoot) {
+        this.persistence=persistence;this.sources=persistence.mapper(ManagedDatasourceMapper.class);
+        this.factories=persistence.mapper(ManagedFactoryMapper.class);this.cipher=cipher;this.registry=registry;
         this.platform=platform;this.settings=settings;this.mappers=Set.copyOf(mappers);this.ddlRoot=ddlRoot.toAbsolutePath().normalize();
     }
     private static void changed(int count){if(count!=1)throw new FoundationException(ErrorCode.RESOURCE_CONFLICT);}
@@ -66,18 +100,18 @@ public final class ManagedDatasourceService {
     private String generatedAt(ManagedDatasource row) {
         var cached=ddlCache.get(row.datasourceId());if(cached!=null&&cached.revision()==row.revision())return cached.at().toString();
         var file=ddlRoot.resolve("datasource-"+row.datasourceId()+"-r"+row.revision()+".sql");
-        try {return java.nio.file.Files.isRegularFile(file)?java.nio.file.Files.getLastModifiedTime(file).toInstant().toString():null;}
-        catch(java.io.IOException ex){throw new IllegalStateException("DDL snapshot metadata read failed",ex);}
+        try {return Files.isRegularFile(file)?Files.getLastModifiedTime(file).toInstant().toString():null;}
+        catch(IOException ex){throw new IllegalStateException("DDL snapshot metadata read failed",ex);}
     }
     private static FactoryView view(ManagedFactory f,String datasourceName){return new FactoryView(f.factoryId(),f.enterpriseId(),f.factoryCode(),f.factoryName(),f.datasourceId(),f.status(),f.revision(),datasourceName);}
-    private <T> com.github.pagehelper.Page<T> page(int pageNum,int pageSize,java.util.function.Supplier<List<T>> query) {
+    private <T> Page<T> page(int pageNum,int pageSize,Supplier<List<T>> query) {
         if(pageNum<1||pageSize<1||pageSize>100)throw new FoundationException(ErrorCode.BAD_REQUEST);
-        var rows=unit.run(()->{com.github.pagehelper.PageHelper.startPage(pageNum,pageSize);try{return query.get();}finally{com.github.pagehelper.PageHelper.clearPage();}});
-        if(!(rows instanceof com.github.pagehelper.Page<?>))throw new IllegalStateException("Platform pagination interceptor required");
-        return (com.github.pagehelper.Page<T>)rows;
+        var rows=persistence.run(()->{PageHelper.startPage(pageNum,pageSize);try{return query.get();}finally{PageHelper.clearPage();}});
+        if(!(rows instanceof Page<?>))throw new IllegalStateException("Platform pagination interceptor required");
+        return (Page<T>)rows;
     }
-    private static <T,R> com.github.pagehelper.Page<R> mapPage(com.github.pagehelper.Page<T> source,java.util.function.Function<T,R> view) {
-        var result=new com.github.pagehelper.Page<R>(source.getPageNum(),source.getPageSize());result.setTotal(source.getTotal());source.forEach(row->result.add(view.apply(row)));return result;
+    private static <T,R> Page<R> mapPage(Page<T> source,Function<T,R> view) {
+        var result=new Page<R>(source.getPageNum(),source.getPageSize());result.setTotal(source.getTotal());source.forEach(row->result.add(view.apply(row)));return result;
     }
     public synchronized List<DatasourceView> pageSources(int pageNum,int pageSize) {
         var rows=page(pageNum,pageSize,sources::all);var bindings=new HashMap<Long,ManagedFactory>();
@@ -97,8 +131,8 @@ public final class ManagedDatasourceService {
         return rows.stream().map(row->view(row,bySource.get(row.datasourceId()))).toList();}
     public synchronized DatasourceView detail(long id){ManagedDatasource row=persistence.readOnly(s->required(s.mapper(ManagedDatasourceMapper.class).find(id)));return view(row,persistence.readOnly(s->s.mapper(ManagedFactoryMapper.class).byDatasource(id)));}
     public DatasourceView save(DatasourceForm form,boolean creating){
-        if(form.password()!=null&&form.password().getBytes(java.nio.charset.StandardCharsets.UTF_8).length>512)throw new FoundationException(ErrorCode.BAD_REQUEST);
-        long id=unit.run(()->{
+        if(form.password()!=null&&form.password().getBytes(StandardCharsets.UTF_8).length>512)throw new FoundationException(ErrorCode.BAD_REQUEST);
+        long id=persistence.run(()->{
             ManagedDatasource old=null;
             if(creating){if(form.datasourceId()!=null)throw new FoundationException(ErrorCode.BAD_REQUEST);}
             else{if(form.datasourceId()==null||form.revision()==null)throw new FoundationException(ErrorCode.BAD_REQUEST);old=locked(form.datasourceId());editable(old);if(old.revision()!=form.revision())throw new FoundationException(ErrorCode.RESOURCE_CONFLICT);}
@@ -106,21 +140,21 @@ public final class ManagedDatasourceService {
             if(password==null)throw new FoundationException(ErrorCode.BAD_REQUEST);
             var row=new ManagedDatasource(form.datasourceId(),form.datasourceName(),form.dbHost(),form.dbPort(),form.dbName(),form.dbUsername(),password,"DISABLED",old==null?1:old.revision());
             if(creating){changed(sources.insert(row));return sources.insertedId();}
-            changed(sources.update(row));unit.afterCommit(()->retire(row.datasourceId()));return row.datasourceId();
+            changed(sources.update(row));persistence.afterCommit(()->retire(row.datasourceId()));return row.datasourceId();
         });return detail(id);
     }
     public DatasourceView status(long id,boolean enabled){
-        unit.run(()->{
+        persistence.run(()->{
             var old=locked(id);
             if(!enabled&&factories.bound(id)!=0)throw new FoundationException(ErrorCode.RESOURCE_CONFLICT);
             String next=enabled?"ENABLED":"DISABLED";
             if(!next.equals(old.status())){
                 changed(sources.update(new ManagedDatasource(id,old.datasourceName(),old.dbHost(),old.dbPort(),old.dbName(),old.dbUsername(),old.passwordCipher(),next,old.revision())));
-                unit.afterCommit(()->retire(id));
+                persistence.afterCommit(()->retire(id));
             }return null;
         });return detail(id);
     }
-    public void delete(long id){unit.run(()->{var row=locked(id);editable(row);changed(sources.delete(id,row.revision()));unit.afterCommit(()->retire(id));return null;});}
+    public void delete(long id){persistence.run(()->{var row=locked(id);editable(row);changed(sources.delete(id,row.revision()));persistence.afterCommit(()->retire(id));return null;});}
     public List<FactoryView> factoryList(int offset,int limit){bounds(offset,limit);
         var rows=persistence.readOnly(s->s.mapper(ManagedFactoryMapper.class).list(offset,limit));
         var ids=rows.stream().map(ManagedFactory::datasourceId).filter(Objects::nonNull).distinct().toList();
@@ -131,7 +165,7 @@ public final class ManagedDatasourceService {
     public FactoryView factory(String id){var f=factoryRecord(id);String name=f.datasourceId()==null?null:persistence.readOnly(s->required(s.mapper(ManagedDatasourceMapper.class).find(f.datasourceId()))).datasourceName();return view(f,name);}
     private ManagedFactory factoryRecord(String id){return persistence.readOnly(s->required(s.mapper(ManagedFactoryMapper.class).find(id)));}
     public FactoryView saveFactory(FactoryForm form,boolean creating){
-        unit.run(()->{
+        persistence.run(()->{
             // Serialize competing binds and datasource disable through the datasource row lock.
             if(form.datasourceId()!=null&& !"ENABLED".equals(locked(form.datasourceId()).status()))throw new FoundationException(ErrorCode.RESOURCE_CONFLICT);
             var old=factories.find(form.factoryId());
@@ -139,14 +173,14 @@ public final class ManagedDatasourceService {
             if(!creating){required(old);if(form.revision()==null||old.revision()!=form.revision())throw new FoundationException(ErrorCode.RESOURCE_CONFLICT);}
             var row=new ManagedFactory(form.factoryId(),form.enterpriseId(),form.factoryCode(),form.factoryName(),form.datasourceId(),form.status(),creating?1:old.revision());
             if(creating)changed(factories.insert(row));else changed(factories.update(row));
-            if(old!=null&&old.datasourceId()!=null)unit.afterCommit(()->retire(old.datasourceId()));
+            if(old!=null&&old.datasourceId()!=null)persistence.afterCommit(()->retire(old.datasourceId()));
             return null;
         });return factory(form.factoryId());
     }
-    public void deleteFactory(String id,long revision){unit.run(()->{
+    public void deleteFactory(String id,long revision){persistence.run(()->{
         var old=required(factories.find(id));
         if(factories.roles(id)!=0||factories.jobs(id)!=0||factories.syncStates(id)!=0)throw new FoundationException(ErrorCode.RESOURCE_CONFLICT);
-        changed(factories.delete(id,revision));if(old.datasourceId()!=null)unit.afterCommit(()->retire(old.datasourceId()));return null;
+        changed(factories.delete(id,revision));if(old.datasourceId()!=null)persistence.afterCommit(()->retire(old.datasourceId()));return null;
     });}
     public Optional<Factory> find(FactoryId id){return persistence.readOnly(s->Optional.ofNullable(s.mapper(ManagedFactoryMapper.class).find(id.value()))).map(ManagedDatasourceService::core);}
     public List<Factory> enabled(int offset,int limit){bounds(offset,limit);return persistence.readOnly(s->s.mapper(ManagedFactoryMapper.class).enabled(offset,limit)).stream().map(ManagedDatasourceService::core).toList();}
@@ -157,12 +191,12 @@ public final class ManagedDatasourceService {
         if(!"ENABLED".equals(row.status()))throw new FoundationException(ErrorCode.RUNTIME_NOT_CONFIGURED);
         var cached=ddlCache.get(id);if(!refresh&&cached!=null&&cached.revision()==row.revision())return cached.view();
         var file=ddlRoot.resolve("datasource-"+id+"-r"+row.revision()+".sql");
-        if(!refresh&&java.nio.file.Files.isRegularFile(file)) {
+        if(!refresh&&Files.isRegularFile(file)) {
             try {
-                if(java.nio.file.Files.size(file)>16*1024*1024)throw new FoundationException(ErrorCode.UNPROCESSABLE);
-                var result=new DdlView(java.nio.file.Files.readString(file),file.getFileName().toString());
-                ddlCache.put(id,new DdlCache(row.revision(),java.nio.file.Files.getLastModifiedTime(file).toInstant(),result));return result;
-            }catch(java.io.IOException ex){throw new IllegalStateException("DDL snapshot read failed",ex);}
+                if(Files.size(file)>16*1024*1024)throw new FoundationException(ErrorCode.UNPROCESSABLE);
+                var result=new DdlView(Files.readString(file),file.getFileName().toString());
+                ddlCache.put(id,new DdlCache(row.revision(),Files.getLastModifiedTime(file).toInstant(),result));return result;
+            }catch(IOException ex){throw new IllegalStateException("DDL snapshot read failed",ex);}
         }
         var pool=DruidPools.create(settings,"ddl-managed-"+id,row.jdbcUrl(),row.dbUsername(),cipher.decrypt(row.passwordCipher()));
         try {
@@ -172,14 +206,14 @@ public final class ManagedDatasourceService {
             String sql=DatasourceDdlWriter.write(definitions);
             if(sql.length()>16*1024*1024)throw new FoundationException(ErrorCode.UNPROCESSABLE);
             try {
-                java.nio.file.Files.createDirectories(ddlRoot);
-                java.nio.file.Files.setPosixFilePermissions(ddlRoot,java.nio.file.attribute.PosixFilePermissions.fromString("rwx------"));
-                var temporary=java.nio.file.Files.createTempFile(ddlRoot,"snapshot-",".sql");
-                try {java.nio.file.Files.writeString(temporary,sql);java.nio.file.Files.setPosixFilePermissions(temporary,java.nio.file.attribute.PosixFilePermissions.fromString("rw-------"));java.nio.file.Files.move(temporary,file,java.nio.file.StandardCopyOption.REPLACE_EXISTING,java.nio.file.StandardCopyOption.ATOMIC_MOVE);}
-                finally {java.nio.file.Files.deleteIfExists(temporary);}
-            }catch(java.io.IOException ex){throw new IllegalStateException("DDL snapshot write failed",ex);}
-            var result=new DdlView(sql,"datasource-"+id+"-r"+row.revision()+".sql");ddlCache.put(id,new DdlCache(row.revision(),java.time.Instant.now(),result));return result;
-        }catch(java.sql.SQLException ex){throw new FoundationException(ErrorCode.RUNTIME_NOT_CONFIGURED,ex);}finally{pool.close();}
+                Files.createDirectories(ddlRoot);
+                Files.setPosixFilePermissions(ddlRoot,PosixFilePermissions.fromString("rwx------"));
+                var temporary=Files.createTempFile(ddlRoot,"snapshot-",".sql");
+                try {Files.writeString(temporary,sql);Files.setPosixFilePermissions(temporary,PosixFilePermissions.fromString("rw-------"));Files.move(temporary,file,StandardCopyOption.REPLACE_EXISTING,StandardCopyOption.ATOMIC_MOVE);}
+                finally {Files.deleteIfExists(temporary);}
+            }catch(IOException ex){throw new IllegalStateException("DDL snapshot write failed",ex);}
+            var result=new DdlView(sql,"datasource-"+id+"-r"+row.revision()+".sql");ddlCache.put(id,new DdlCache(row.revision(),Instant.now(),result));return result;
+        }catch(SQLException ex){throw new FoundationException(ErrorCode.RUNTIME_NOT_CONFIGURED,ex);}finally{pool.close();}
     }
     private static void bounds(int offset,int limit){if(offset<0||limit<1||limit>100)throw new FoundationException(ErrorCode.BAD_REQUEST);}
     public synchronized BusinessRuntimeBinding resolve(FactoryScope scope){
@@ -191,7 +225,7 @@ public final class ManagedDatasourceService {
         var binding=new BusinessRuntimeBinding(scope.factoryId(),identity(source.datasourceId()),source.revision());
         if(!registry.contains(binding)){
             // A version change during an active business unit must fail instead of loading another pool.
-            if(org.springframework.transaction.support.TransactionSynchronizationManager.isActualTransactionActive())throw new FoundationException(ErrorCode.CONFLICT);
+            if(TransactionSynchronizationManager.isActualTransactionActive())throw new FoundationException(ErrorCode.CONFLICT);
             var pool=DruidPools.create(settings,"business-managed-"+source.datasourceId(),source.jdbcUrl(),source.dbUsername(),cipher.decrypt(source.passwordCipher()));
             boolean transferred=false;
             try{
@@ -209,6 +243,6 @@ public final class ManagedDatasourceService {
         try(var c=ds.getConnection();var st=c.prepareStatement("SELECT @@server_uuid,DATABASE()");var rs=st.executeQuery()){
             if(!rs.next()||rs.getString(1)==null||rs.getString(2)==null)throw new FoundationException(ErrorCode.RUNTIME_NOT_CONFIGURED);
             return rs.getString(1)+"/"+rs.getString(2);
-        }catch(java.sql.SQLException ex){throw new FoundationException(ErrorCode.RUNTIME_NOT_CONFIGURED,ex);}
+        }catch(SQLException ex){throw new FoundationException(ErrorCode.RUNTIME_NOT_CONFIGURED,ex);}
     }
 }

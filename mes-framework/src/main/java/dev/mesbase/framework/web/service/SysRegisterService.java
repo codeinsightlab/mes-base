@@ -5,7 +5,7 @@ import dev.mesbase.common.core.domain.entity.SysUser;
 import dev.mesbase.common.core.domain.model.RegisterBody;
 import dev.mesbase.common.exception.ServiceException;
 import dev.mesbase.common.utils.PasswordPolicy;
-import dev.mesbase.framework.persistence.SystemUnit;
+import dev.mesbase.infrastructure.persistence.PlatformPersistence;
 import dev.mesbase.system.domain.SysLogininfor;
 import dev.mesbase.system.service.ISysConfigService;
 import dev.mesbase.system.service.ISysLogininforService;
@@ -25,11 +25,11 @@ public class SysRegisterService {
     private final CaptchaService captcha;
     private final PasswordPolicy passwords;
     private final Validator validator;
-    private final SystemUnit unit;
+    private final PlatformPersistence unit;
 
     public SysRegisterService(ISysUserService users, ISysConfigService config,
             ISysLogininforService audit, CaptchaService captcha, PasswordPolicy passwords,
-            Validator validator, SystemUnit unit) {
+            Validator validator, PlatformPersistence unit) {
         this.users = users;
         this.config = config;
         this.audit = audit;

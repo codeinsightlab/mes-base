@@ -4,35 +4,47 @@ import com.github.pagehelper.Page;
 import com.github.pagehelper.PageHelper;
 import com.github.pagehelper.page.PageParams;
 import dev.mesbase.common.core.domain.entity.SysUser;
-import dev.mesbase.platform.execution.FactoryContext;
+import dev.mesbase.core.factory.FactoryId;
+import dev.mesbase.core.factory.FactoryScope;
+import dev.mesbase.framework.persistence.SystemUserLookup;
 import dev.mesbase.mes.pro.domain.PageResult;
-import dev.mesbase.mes.pro.personnelanalysis.domain.*;
+import dev.mesbase.mes.pro.personnelanalysis.domain.PersonnelAccountRow;
+import dev.mesbase.mes.pro.personnelanalysis.domain.PersonnelAccountVO;
+import dev.mesbase.mes.pro.personnelanalysis.domain.PersonnelAnalysisQueryDTO;
+import dev.mesbase.mes.pro.personnelanalysis.domain.PersonnelQuery;
+import dev.mesbase.mes.pro.personnelanalysis.domain.PersonnelTrendRow;
+import dev.mesbase.mes.pro.personnelanalysis.domain.PersonnelTrendVO;
 import dev.mesbase.mes.pro.personnelanalysis.mapper.ProReportingWorkPersonnelExtraMapper;
 import dev.mesbase.mes.pro.personnelanalysis.service.PersonnelAnalysisServiceImpl;
+import dev.mesbase.platform.execution.FactoryContext;
 import dev.mesbase.system.domain.dto.UserLookupQuery;
-import dev.mesbase.system.mapper.SysUserDisplayExtraMapper;
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-import org.mockito.ArgumentCaptor;
-import org.apache.ibatis.session.RowBounds;
 import java.time.LocalDateTime;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Properties;
-import static org.junit.jupiter.api.Assertions.*;
+import org.apache.ibatis.session.RowBounds;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 class PersonnelAnalysisServiceTest {
     private final ProReportingWorkPersonnelExtraMapper reporting = mock(ProReportingWorkPersonnelExtraMapper.class);
-    private final SysUserDisplayExtraMapper users = mock(SysUserDisplayExtraMapper.class);
+    private final SystemUserLookup users = mock(SystemUserLookup.class);
     private PersonnelAnalysisServiceImpl service;
 
     @BeforeEach
     void setUp() {
-        FactoryContext.bind(new dev.mesbase.core.factory.FactoryScope(new dev.mesbase.core.factory.FactoryId("1")));
+        FactoryContext.bind(new FactoryScope(new FactoryId("1")));
         service = new PersonnelAnalysisServiceImpl(reporting, users);
     }
 

@@ -56,7 +56,7 @@ ID 操作必须校验资源所属 Scope/主体；不信任客户端 userId/userN
 ### 8.1 同步任务分布式互斥（强制）
 
 来源：ktg-mes `feat/multi-factory-isolation` 的 AGENTS「定时同步任务并发控制」及 `mes_master_sync` 实现。Base
-迁入通用同步协调基础；当前外部系统仅预留接口，不实现外部连接、调用或具体外部同步流程。
+迁入通用同步协调基础；2026-10-06用户授权增加独立ERP SQL Server连接装配；不实现具体外部同步流程或业务写入。
 
 - 所有新增或改造的可重复执行同步任务，使用 `mes_master_sync`
   数据库状态表统一跨节点抢占。工厂同步流以 `factory_id + sync_key` 唯一标识，并由数据库唯一约束保证；不能退化为跨厂全局锁。
@@ -74,7 +74,7 @@ ID 操作必须校验资源所属 Scope/主体；不信任客户端 userId/userN
 
 ## 9. 数据库 / SQL / Ownership
 
-Platform/Master、Business、External 分开；Mapper 显式归属和 SessionFactory 登记，缺 Scope/连接/版本不回退平台、首库或默认
+Platform/Master、Business、ERP 分开；Mapper以自身PersistenceOwner唯一声明归属，自动扫描绑定三个对应SqlSessionFactory，不维护中央类清单或逐Mapper Bean。Service使用具名Spring事务；缺 Scope/连接/版本不回退平台、首库或默认
 Business。独立库仍保留 Factory 业务身份；Shared DB 未实现，启用须通过 ADR-004 行范围验收。参数化 SQL、固定/受控排序、分页数量边界、避免
 N+1；unique/reference/聚合/cache/import/export 都需范围审查。业务 cache 缺 Scope 不能全局回退。复用标准 Mapper，复杂查询/局部业务更新放
 ExtraMapper，不污染生成 CRUD；授权决策在 Service。新 CRUD 物理删除，不能批量更改历史表契约。Schema 来自真实

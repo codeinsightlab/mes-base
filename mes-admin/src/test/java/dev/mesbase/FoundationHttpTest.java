@@ -1,27 +1,50 @@
 package dev.mesbase;
-import org.junit.jupiter.api.*;
-import static org.junit.jupiter.api.Assertions.*;
+
+import dev.MesBaseApplication;
+import dev.mesbase.core.error.ErrorCode;
+import dev.mesbase.core.error.FoundationException;
+import dev.mesbase.core.factory.Factory;
+import dev.mesbase.core.factory.FactoryCatalog;
+import dev.mesbase.core.factory.FactoryId;
+import dev.mesbase.core.factory.FactoryStatus;
+import dev.mesbase.core.security.AuthenticatedActor;
+import dev.mesbase.core.security.Permission;
+import dev.mesbase.core.security.Role;
+import dev.mesbase.infrastructure.catalog.InMemoryFactoryCatalog;
+import dev.mesbase.infrastructure.security.InMemoryRoleAuthorization;
+import dev.mesbase.platform.execution.FactoryContext;
+import dev.mesbase.platform.web.EndpointAccess;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.nio.charset.StandardCharsets;
+import java.time.Duration;
+import java.util.Base64;
+import java.util.List;
+import java.util.Set;
+import java.util.UUID;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Primary;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.env.Environment;
-import org.springframework.security.core.userdetails.*;
+import org.springframework.security.core.userdetails.User;
+import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.provisioning.InMemoryUserDetailsManager;
-import org.springframework.web.bind.annotation.*;
-import java.net.*;
-import java.net.http.*;
-import java.util.*;
-import java.util.concurrent.*;
-import dev.MesBaseApplication;
-import dev.mesbase.core.factory.*;
-import dev.mesbase.core.security.*;
-import dev.mesbase.core.error.*;
-import dev.mesbase.infrastructure.catalog.*;
-import dev.mesbase.infrastructure.security.InMemoryRoleAuthorization;
-import dev.mesbase.platform.web.*;
-import dev.mesbase.platform.execution.FactoryContext;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RestController;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
+
 /** TEST ONLY accounts and failure endpoint. Actual embedded Tomcat and HTTP security chain. */
 @SpringBootTest(classes={MesBaseApplication.class,FoundationHttpTest.Fixture.class,FoundationHttpTest.FailureController.class},
     webEnvironment=SpringBootTest.WebEnvironment.RANDOM_PORT,
@@ -44,7 +67,7 @@ class FoundationHttpTest {
                 User.withUsername("disabled").password("{noop}test-only-valid-password").authorities(List.of()).disabled(true).build());
         }
     }
-    static void grantReader(InMemoryRoleAuthorization auth) { auth.replace(new AuthenticatedActor("reader"),List.of(new Role("test-only-role-A",new FactoryId("A"),Set.of(new Permission("foundation:access:read"),new Permission("foundation:erp:inspect"))))); }
+    static void grantReader(InMemoryRoleAuthorization auth) { auth.replace(new AuthenticatedActor("reader"),List.of(new Role("test-only-role-A",new FactoryId("A"),Set.of(new Permission("foundation:access:read"))))); }
     @RestController
     static class FailureController {
         @GetMapping("/test-only/failure/{kind}") @EndpointAccess(EndpointAccess.Kind.AUTHENTICATED)
@@ -61,8 +84,8 @@ class FoundationHttpTest {
     @Autowired InMemoryRoleAuthorization authorization;
     private final HttpClient client=HttpClient.newHttpClient();
     private HttpResponse<String> request(String path,String actor,String factory,String method,String body) throws Exception {
-        var builder=HttpRequest.newBuilder(URI.create("http://127.0.0.1:"+environment.getProperty("local.server.port")+path)).timeout(java.time.Duration.ofSeconds(10));
-        if(actor!=null) builder.header("Authorization","Basic "+Base64.getEncoder().encodeToString((actor+":test-only-valid-password").getBytes(java.nio.charset.StandardCharsets.UTF_8)));
+        var builder=HttpRequest.newBuilder(URI.create("http://127.0.0.1:"+environment.getProperty("local.server.port")+path)).timeout(Duration.ofSeconds(10));
+        if(actor!=null) builder.header("Authorization","Basic "+Base64.getEncoder().encodeToString((actor+":test-only-valid-password").getBytes(StandardCharsets.UTF_8)));
         if(factory!=null) builder.header("X-Factory-Id",factory);
         if(body!=null) builder.header("Content-Type","application/json");
         return client.send(builder.method(method,body==null ? HttpRequest.BodyPublishers.noBody() : HttpRequest.BodyPublishers.ofString(body)).build(),HttpResponse.BodyHandlers.ofString());
@@ -85,7 +108,7 @@ class FoundationHttpTest {
     }
     @Test void invalidScopeUnknownScopeAndDisabledScopeUseRealErrors() throws Exception { error(get("/api/foundation/context","visitor","bad factory"),400,"BAD_REQUEST");error(get("/api/foundation/context","visitor","unknown"),404,"FACTORY_NOT_FOUND");error(get("/api/foundation/context","visitor","C"),422,"FACTORY_DISABLED"); }
     @Test void accountsAreAuthenticatedIndependentlyFromRoles() throws Exception { error(get("/api/foundation/context","unknown-account","A"),401,"UNAUTHENTICATED");error(get("/api/foundation/context","disabled","A"),401,"UNAUTHENTICATED"); }
-    @Test void erpNotConfiguredFailsExplicitly() throws Exception { error(get("/api/foundation/erp/connection","reader","A"),422,"INTEGRATION_NOT_CONFIGURED"); }
+    @Test void removedPlaceholderErpEndpointIsNotPublished() throws Exception { assertEquals(404,get("/api/foundation/erp/connection","reader","A").statusCode()); }
     @Test void permissionsAreNotCachedInUserSessionAndRevocationTakesEffect() throws Exception {
         try { assertEquals(200,get("/api/foundation/access","reader","A").statusCode());authorization.replace(new AuthenticatedActor("reader"),List.of());error(get("/api/foundation/access","reader","A"),403,"FORBIDDEN"); }
         finally { grantReader(authorization); }
@@ -102,7 +125,7 @@ class FoundationHttpTest {
     }
     @Test void wrongPasswordIs401AndInternalArgumentFailureIs500() throws Exception {
         var uri=URI.create("http://127.0.0.1:"+environment.getProperty("local.server.port")+"/api/foundation/context");
-        var request=HttpRequest.newBuilder(uri).header("Authorization","Basic "+Base64.getEncoder().encodeToString("visitor:test-only-wrong-password".getBytes(java.nio.charset.StandardCharsets.UTF_8))).GET().build();
+        var request=HttpRequest.newBuilder(uri).header("Authorization","Basic "+Base64.getEncoder().encodeToString("visitor:test-only-wrong-password".getBytes(StandardCharsets.UTF_8))).GET().build();
         error(client.send(request,HttpResponse.BodyHandlers.ofString()),401,"UNAUTHENTICATED");
         error(get("/test-only/failure/programming-error","visitor","A"),500,"INTERNAL_ERROR");
     }

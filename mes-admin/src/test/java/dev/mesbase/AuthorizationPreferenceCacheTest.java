@@ -1,15 +1,31 @@
 package dev.mesbase;
-import org.junit.jupiter.api.*;
-import static org.junit.jupiter.api.Assertions.*;
-import java.util.*;
-import dev.mesbase.core.factory.*;
-import dev.mesbase.core.security.*;
-import dev.mesbase.core.error.*;
-import dev.mesbase.infrastructure.catalog.*;
-import dev.mesbase.infrastructure.security.*;
-import dev.mesbase.infrastructure.cache.*;
-import dev.mesbase.integration.erp.*;
+
+import dev.mesbase.core.error.FoundationException;
+import dev.mesbase.core.factory.Factory;
+import dev.mesbase.core.factory.FactoryId;
+import dev.mesbase.core.factory.FactoryPreference;
+import dev.mesbase.core.factory.FactorySelectionService;
+import dev.mesbase.core.factory.FactoryStatus;
+import dev.mesbase.core.security.AuthenticatedActor;
+import dev.mesbase.core.security.Permission;
+import dev.mesbase.core.security.Role;
+import dev.mesbase.infrastructure.cache.BusinessCache;
+import dev.mesbase.infrastructure.cache.PlatformCache;
+import dev.mesbase.infrastructure.catalog.InMemoryFactoryCatalog;
+import dev.mesbase.infrastructure.catalog.InMemoryFactoryPreference;
+import dev.mesbase.infrastructure.security.InMemoryRoleAuthorization;
 import dev.mesbase.platform.execution.FactoryContext;
+import java.util.List;
+import java.util.Optional;
+import java.util.Set;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Test;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
 class AuthorizationPreferenceCacheTest {
     @AfterEach void clean() { FactoryContext.clear(); }
     private FactorySelectionService selection(FactoryPreference preferences) {
@@ -43,5 +59,4 @@ class AuthorizationPreferenceCacheTest {
         var business=new BusinessCache("test-only","synthetic-enterprise");assertNotEquals(business.key(RuntimeFixture.A,"probe","same"),business.key(RuntimeFixture.B,"probe","same"));assertThrows(FoundationException.class,() -> business.key(null,"probe","same"));assertThrows(FoundationException.class,() -> business.currentKey("probe","same"));
         assertNotEquals(new PlatformCache("test-only","synthetic-enterprise").key("probe","same"),business.key(RuntimeFixture.A,"probe","same"));
     }
-    @Test void erpMissingConfigurationFailsWithStableCode() { assertEquals(ErrorCode.INTEGRATION_NOT_CONFIGURED,assertThrows(IntegrationNotConfiguredException.class,() -> new NotConfiguredErpResolver().resolve(RuntimeFixture.A)).code()); }
 }

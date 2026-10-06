@@ -5,14 +5,23 @@ import com.github.pagehelper.PageInfo;
 import dev.mesbase.common.core.domain.entity.SysUser;
 import dev.mesbase.common.enums.UserStatus;
 import dev.mesbase.common.exception.ServiceException;
-import dev.mesbase.platform.execution.FactoryContext;
+import dev.mesbase.framework.persistence.SystemUserLookup;
 import dev.mesbase.mes.pro.domain.PageResult;
-import dev.mesbase.mes.pro.personnelanalysis.domain.*;
+import dev.mesbase.mes.pro.personnelanalysis.domain.PersonnelAccountRow;
+import dev.mesbase.mes.pro.personnelanalysis.domain.PersonnelAccountVO;
+import dev.mesbase.mes.pro.personnelanalysis.domain.PersonnelAnalysisQueryDTO;
+import dev.mesbase.mes.pro.personnelanalysis.domain.PersonnelProcessRow;
+import dev.mesbase.mes.pro.personnelanalysis.domain.PersonnelProcessVO;
+import dev.mesbase.mes.pro.personnelanalysis.domain.PersonnelProductRow;
+import dev.mesbase.mes.pro.personnelanalysis.domain.PersonnelProductVO;
+import dev.mesbase.mes.pro.personnelanalysis.domain.PersonnelQuery;
+import dev.mesbase.mes.pro.personnelanalysis.domain.PersonnelRange;
+import dev.mesbase.mes.pro.personnelanalysis.domain.PersonnelRecordVO;
+import dev.mesbase.mes.pro.personnelanalysis.domain.PersonnelTrendRow;
+import dev.mesbase.mes.pro.personnelanalysis.domain.PersonnelTrendVO;
 import dev.mesbase.mes.pro.personnelanalysis.mapper.ProReportingWorkPersonnelExtraMapper;
+import dev.mesbase.platform.execution.FactoryContext;
 import dev.mesbase.system.domain.dto.UserLookupQuery;
-import dev.mesbase.system.mapper.SysUserDisplayExtraMapper;
-import org.springframework.stereotype.Service;
-
 import java.time.LocalDateTime;
 import java.time.YearMonth;
 import java.time.format.DateTimeFormatter;
@@ -22,15 +31,19 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
-@org.springframework.boot.autoconfigure.condition.ConditionalOnProperty(name="mes.analytics.enabled",havingValue="true")
+@ConditionalOnProperty(name="mes.analytics.enabled",havingValue="true")
 @Service
+@Transactional(transactionManager="businessTransactionManager",readOnly=true)
 public class PersonnelAnalysisServiceImpl implements PersonnelAnalysisService {
     private static final DateTimeFormatter TIME_FORMAT = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
     private final ProReportingWorkPersonnelExtraMapper reporting;
-    private final SysUserDisplayExtraMapper users;
+    private final SystemUserLookup users;
 
-    public PersonnelAnalysisServiceImpl(ProReportingWorkPersonnelExtraMapper reporting, SysUserDisplayExtraMapper users) {
+    public PersonnelAnalysisServiceImpl(ProReportingWorkPersonnelExtraMapper reporting, SystemUserLookup users) {
         this.reporting = reporting;
         this.users = users;
     }

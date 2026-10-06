@@ -1,23 +1,24 @@
 package dev.mesbase.system.service.impl;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.mesbase.common.constant.Constants;
 import dev.mesbase.common.constant.UserConstants;
 import dev.mesbase.common.core.domain.TreeSelect;
 import dev.mesbase.common.core.domain.entity.SysMenu;
 import dev.mesbase.common.core.domain.entity.SysRole;
-import dev.mesbase.common.core.domain.entity.SysUser;
+import dev.mesbase.common.exception.ServiceException;
 import dev.mesbase.common.utils.SecurityUtils;
 import dev.mesbase.common.utils.StringUtils;
+import dev.mesbase.common.utils.bean.BeanValidators;
+import dev.mesbase.common.utils.spring.SpringUtils;
 import dev.mesbase.system.domain.vo.MetaVo;
 import dev.mesbase.system.domain.vo.RouterVo;
 import dev.mesbase.system.mapper.SysMenuMapper;
 import dev.mesbase.system.mapper.SysRoleMapper;
 import dev.mesbase.system.mapper.SysRoleMenuMapper;
 import dev.mesbase.system.service.ISysMenuService;
-
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Service;
-
+import dev.mesbase.system.service.SystemPermissionService;
+import jakarta.validation.Validator;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
@@ -26,17 +27,21 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * 菜单 业务层处理
- * 
+ *
  * @author ruoyi
  */
 @Service
-@org.springframework.boot.autoconfigure.condition.ConditionalOnProperty(name="mes.system.enabled",havingValue="true")
+@ConditionalOnProperty(name="mes.system.enabled",havingValue="true")
 public class SysMenuServiceImpl implements ISysMenuService
 {
-    @org.springframework.beans.factory.annotation.Autowired private jakarta.validation.Validator contractValidator;
+    @Autowired private Validator contractValidator;
     public static final String PREMISSION_STRING = "perms[\"{0}\"]";
 
     @Autowired
@@ -50,7 +55,7 @@ public class SysMenuServiceImpl implements ISysMenuService
 
     /**
      * 根据用户查询系统菜单列表
-     * 
+     *
      * @param userId 用户ID
      * @return 菜单列表
      */
@@ -62,7 +67,7 @@ public class SysMenuServiceImpl implements ISysMenuService
 
     /**
      * 查询系统菜单列表
-     * 
+     *
      * @param menu 菜单信息
      * @return 菜单列表
      */
@@ -85,7 +90,7 @@ public class SysMenuServiceImpl implements ISysMenuService
 
     /**
      * 根据用户ID查询权限
-     * 
+     *
      * @param userId 用户ID
      * @return 权限列表
      */
@@ -108,7 +113,7 @@ public class SysMenuServiceImpl implements ISysMenuService
 
     /**
      * 根据用户ID查询菜单
-     * 
+     *
      * @param userId 用户名称
      * @return 菜单列表
      */
@@ -131,7 +136,7 @@ public class SysMenuServiceImpl implements ISysMenuService
 
     /**
      * 根据角色ID查询菜单树信息
-     * 
+     *
      * @param roleId 角色ID
      * @return 选中菜单列表
      */
@@ -144,7 +149,7 @@ public class SysMenuServiceImpl implements ISysMenuService
 
     /**
      * 构建前端路由所需要的菜单
-     * 
+     *
      * @param menus 菜单列表
      * @return 路由列表
      */
@@ -202,7 +207,7 @@ public class SysMenuServiceImpl implements ISysMenuService
 
     /**
      * 构建前端所需要树结构
-     * 
+     *
      * @param menus 菜单列表
      * @return 树结构列表
      */
@@ -234,7 +239,7 @@ public class SysMenuServiceImpl implements ISysMenuService
 
     /**
      * 构建前端所需要下拉树结构
-     * 
+     *
      * @param menus 菜单列表
      * @return 下拉树结构列表
      */
@@ -247,7 +252,7 @@ public class SysMenuServiceImpl implements ISysMenuService
 
     /**
      * 根据菜单ID查询信息
-     * 
+     *
      * @param menuId 菜单ID
      * @return 菜单信息
      */
@@ -259,7 +264,7 @@ public class SysMenuServiceImpl implements ISysMenuService
 
     /**
      * 是否存在菜单子节点
-     * 
+     *
      * @param menuId 菜单ID
      * @return 结果
      */
@@ -272,7 +277,7 @@ public class SysMenuServiceImpl implements ISysMenuService
 
     /**
      * 查询菜单使用数量
-     * 
+     *
      * @param menuId 菜单ID
      * @return 结果
      */
@@ -285,57 +290,60 @@ public class SysMenuServiceImpl implements ISysMenuService
 
     /**
      * 新增保存菜单信息
-     * 
+     *
      * @param menu 菜单信息
      * @return 结果
      */
     @Override
+    @Transactional(transactionManager="platformTransactionManager", rollbackFor=Exception.class)
     public int insertMenu(SysMenu menu)
     {
         menu.setMenuId(null);
-        dev.mesbase.common.utils.bean.BeanValidators.validateWithException(contractValidator,menu);
+        BeanValidators.validateWithException(contractValidator,menu);
         validateMenu(menu);
         return menuMapper.insertMenu(menu);
     }
 
     /**
      * 修改保存菜单信息
-     * 
+     *
      * @param menu 菜单信息
      * @return 结果
      */
     @Override
+    @Transactional(transactionManager="platformTransactionManager", rollbackFor=Exception.class)
     public int updateMenu(SysMenu menu)
     {
-        dev.mesbase.common.utils.bean.BeanValidators.validateWithException(contractValidator,menu);
-        if(menu.getMenuId()==null||menuMapper.selectMenuById(menu.getMenuId())==null)throw new dev.mesbase.common.exception.ServiceException("菜单不存在");
+        BeanValidators.validateWithException(contractValidator,menu);
+        if(menu.getMenuId()==null||menuMapper.selectMenuById(menu.getMenuId())==null)throw new ServiceException("菜单不存在");
         validateMenu(menu);
         return menuMapper.updateMenu(menu);
     }
 
     private boolean catalogManagementAllowed()
     {
-        var permissions=dev.mesbase.common.utils.spring.SpringUtils.getBean(dev.mesbase.system.service.SystemPermissionService.class).permissions(SecurityUtils.getUsername(),null);
+        var permissions=SpringUtils.getBean(SystemPermissionService.class).permissions(SecurityUtils.getUsername(),null);
         return permissions.contains("system:menu:list")||permissions.contains("system:role:add")||permissions.contains("system:role:edit");
     }
 
     private void validateMenu(SysMenu menu)
     {
-        if(menu.getParentId()==null||menu.getParentId()<0||menu.getOrderNum()<0||!java.util.Set.of("M","C","F").contains(menu.getMenuType()))throw new dev.mesbase.common.exception.ServiceException("菜单类型、上级或排序不合法");
-        for(String flag:java.util.List.of(menu.getIsFrame()==null?"":menu.getIsFrame(),menu.getIsCache()==null?"":menu.getIsCache(),menu.getVisible()==null?"":menu.getVisible(),menu.getStatus()==null?"":menu.getStatus()))if(!java.util.Set.of("0","1").contains(flag))throw new dev.mesbase.common.exception.ServiceException("菜单状态不合法");
-        Long parent=menu.getParentId();var visited=new java.util.HashSet<Long>();if(menu.getMenuId()!=null)visited.add(menu.getMenuId());
-        while(parent!=0L){if(!visited.add(parent))throw new dev.mesbase.common.exception.ServiceException("上级菜单不能为自身或子菜单");var row=menuMapper.selectMenuById(parent);if(row==null||"F".equals(row.getMenuType()))throw new dev.mesbase.common.exception.ServiceException("上级菜单不存在或不能包含子项");parent=row.getParentId();}
-        String component=menu.getComponent();if(component!=null&&!component.isBlank()&&!component.matches("[A-Za-z][A-Za-z0-9_/-]{0,199}"))throw new dev.mesbase.common.exception.ServiceException("组件必须为已编译页面的路径");
-        if(menu.getQuery()!=null&&!menu.getQuery().isBlank()){if(menu.getQuery().length()>255)throw new dev.mesbase.common.exception.ServiceException("路由参数过长");try{if(!new com.fasterxml.jackson.databind.ObjectMapper().readTree(menu.getQuery()).isObject())throw new IllegalArgumentException();}catch(Exception invalid){throw new dev.mesbase.common.exception.ServiceException("路由参数必须为JSON对象");}}
+        if(menu.getParentId()==null||menu.getParentId()<0||menu.getOrderNum()<0||!Set.of("M","C","F").contains(menu.getMenuType()))throw new ServiceException("菜单类型、上级或排序不合法");
+        for(String flag:List.of(menu.getIsFrame()==null?"":menu.getIsFrame(),menu.getIsCache()==null?"":menu.getIsCache(),menu.getVisible()==null?"":menu.getVisible(),menu.getStatus()==null?"":menu.getStatus()))if(!Set.of("0","1").contains(flag))throw new ServiceException("菜单状态不合法");
+        Long parent=menu.getParentId();var visited=new HashSet<Long>();if(menu.getMenuId()!=null)visited.add(menu.getMenuId());
+        while(parent!=0L){if(!visited.add(parent))throw new ServiceException("上级菜单不能为自身或子菜单");var row=menuMapper.selectMenuById(parent);if(row==null||"F".equals(row.getMenuType()))throw new ServiceException("上级菜单不存在或不能包含子项");parent=row.getParentId();}
+        String component=menu.getComponent();if(component!=null&&!component.isBlank()&&!component.matches("[A-Za-z][A-Za-z0-9_/-]{0,199}"))throw new ServiceException("组件必须为已编译页面的路径");
+        if(menu.getQuery()!=null&&!menu.getQuery().isBlank()){if(menu.getQuery().length()>255)throw new ServiceException("路由参数过长");try{if(!new ObjectMapper().readTree(menu.getQuery()).isObject())throw new IllegalArgumentException();}catch(Exception invalid){throw new ServiceException("路由参数必须为JSON对象");}}
     }
 
     /**
      * 删除菜单管理信息
-     * 
+     *
      * @param menuId 菜单ID
      * @return 结果
      */
     @Override
+    @Transactional(transactionManager="platformTransactionManager", rollbackFor=Exception.class)
     public int deleteMenuById(Long menuId)
     {
         return menuMapper.deleteMenuById(menuId);
@@ -343,7 +351,7 @@ public class SysMenuServiceImpl implements ISysMenuService
 
     /**
      * 校验菜单名称是否唯一
-     * 
+     *
      * @param menu 菜单信息
      * @return 结果
      */
@@ -361,7 +369,7 @@ public class SysMenuServiceImpl implements ISysMenuService
 
     /**
      * 获取路由名称
-     * 
+     *
      * @param menu 菜单信息
      * @return 路由名称
      */
@@ -378,7 +386,7 @@ public class SysMenuServiceImpl implements ISysMenuService
 
     /**
      * 获取路由地址
-     * 
+     *
      * @param menu 菜单信息
      * @return 路由地址
      */
@@ -406,7 +414,7 @@ public class SysMenuServiceImpl implements ISysMenuService
 
     /**
      * 获取组件信息
-     * 
+     *
      * @param menu 菜单信息
      * @return 组件信息
      */
@@ -430,7 +438,7 @@ public class SysMenuServiceImpl implements ISysMenuService
 
     /**
      * 是否为菜单内部跳转
-     * 
+     *
      * @param menu 菜单信息
      * @return 结果
      */
@@ -442,7 +450,7 @@ public class SysMenuServiceImpl implements ISysMenuService
 
     /**
      * 是否为内链组件
-     * 
+     *
      * @param menu 菜单信息
      * @return 结果
      */
@@ -453,7 +461,7 @@ public class SysMenuServiceImpl implements ISysMenuService
 
     /**
      * 是否为parent_view组件
-     * 
+     *
      * @param menu 菜单信息
      * @return 结果
      */
@@ -464,7 +472,7 @@ public class SysMenuServiceImpl implements ISysMenuService
 
     /**
      * 根据父节点的ID获取所有子节点
-     * 
+     *
      * @param list 分类表
      * @param parentId 传入的父节点ID
      * @return String
@@ -487,7 +495,7 @@ public class SysMenuServiceImpl implements ISysMenuService
 
     /**
      * 递归列表
-     * 
+     *
      * @param list
      * @param t
      */
@@ -533,7 +541,7 @@ public class SysMenuServiceImpl implements ISysMenuService
 
     /**
      * 内链域名特殊字符替换
-     * 
+     *
      * @return
      */
     public String innerLinkReplaceEach(String path)

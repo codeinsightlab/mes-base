@@ -4,13 +4,15 @@
 
 ## YAML 与装配
 
-通用配置在mes-admin/src/main/resources/application.yml；真实dev/prod参数直接写在同目录的application-dev.yml / application-prod.yml，两个真实文件留在本机、0600、Git已取消跟踪并忽略。由Spring Boot标准profile自动选择，无spring.config.import转接、无连接环境占位符。默认dev；prod用--spring.profiles.active=prod。首次在新机器使用时，从config里的两个无密码example复制到资源目录、填连接并构建；本地JAR会包含本机profile配置。
+通用配置在mes-admin/src/main/resources/application.yml；真实dev/prod参数直接写在同目录的application-dev.yml / application-prod.yml，现有文件按工作区状态保留，本轮不改变其跟踪方式。由Spring Boot标准profile自动选择，中心库与业务库保留现有profile配置。2026-10-06起，dev通过可选Spring配置导入读取Git忽略的.local/erp.yml，仅该本地文件保存用户提供的ERP连接；通用配置默认关闭ERP。默认dev；prod用--spring.profiles.active=prod。首次在新机器使用时，从config里的两个无密码example复制到资源目录、填连接并构建；本地JAR会包含本机profile配置。
 
 Spring Boot 4.1.1有效错误属性为spring.web.error.include-message/include-stacktrace/include-binding-errors，原server.error.*自4.0被标记level=error，已修正。server.address/port仍然有效，直接放在实际profile文件中。
 
 | 配置 | 实际消费者 |
 | --- | --- |
-| mes.system.enabled、mes.platform.* | SystemConfiguration；DruidPools、PlatformPersistence、Flyway |
+| mes.system.enabled、mes.platform.* | PersistenceConfiguration；DruidPools、PlatformPersistence、Flyway |
+| mes.erp.enabled、mes.erp.* | 独立SQL Server数据源、erpSqlSessionFactory、erpTransactionManager；启用时必需配置完整 |
+| mes.persistence.mapper-packages | 默认dev.mesbase；按Mapper自身PersistenceOwner自动分类注册，缺归属启动失败 |
 | mes.runtime.enabled、mes.runtime.datasource-key | FactoryRuntimeConfiguration；数据库工厂目录、密码解密、物理库/连接/版本/Mapper 登记校验 |
 | spring.datasource.druid.* | DruidPools；stat/wall 真实过滤器与监控 |
 | spring.data.redis.* | Redis 客户端、RedisCache、SystemCacheNamespace |
@@ -104,3 +106,14 @@ Redis16379已停止旧phase进程并从旧AOF/RDB恢复到 `.local/redis-runtime
 按用户要求撤销额外config导入层。两个标准profile文件直接填写真实值，公共application.yml只留共用设置，清理重复的默认端口/Redis连接/空JDBC及文件根；连接占位符已全部移除。config仅保留两个无密码示例，旧runtime双厂示例删除。git rm --cached仅取消实际profile跟踪、本地文件仍存在；未提交或推送。运行脚本不再使用MES_LOCAL_CONFIG或additional-location，普通Spring属性覆盖仍可显式通过启动参数传入。
 
 prod测试库从空库执行原V1–V10，并经全空检查移除16个归档，得到27系统表/0业务表，单显式PLATFORM admin由标准guard建立，无DEV/PROD厂权限。首次凭证在.local/production-test-admin.json，dev凭证不变。清理脚本只接受两个明确自有schema（默认dev，显式--database mes_base_prod），拒绝非空归档；没有访问未知库。
+
+
+## 三库会话工厂与 Spring 事务（2026-10-06）
+
+PersistenceOwner.PLATFORM/BUSINESS/ERP 分别绑定 platformSqlSessionFactory/businessSqlSessionFactory/erpSqlSessionFactory。ERP启用后共三个工厂；未启用时不创建ERP连接。业务会话工厂只有一个，通过FactoryBusinessDataSource在Spring事务开始时租借当前厂的版本化连接池；RuntimeRegistry只管理池，不为每个池创建会话工厂。没有HR/WMS/外部MES类型和按方法切数据库的第二套注解。
+
+Mapper在自身声明归属，自动注册标准MyBatis-Spring MapperFactoryBean；无逐Mapper Bean、中央类清单或Registration记录。Service写入用例使用具名@Transactional，分析查询使用businessTransactionManager只读事务。OwnedTransactionManager沿用源分支扩展Spring事务生命周期的方式，只维护库身份/厂身份和租约；传播、回滚、挂起恢复由Spring负责。跨库事务和直接跨库Mapper访问拒绝；中心元数据查询使用显式独立只读连接，不能执行更新。提交/回滚副作用使用Spring TransactionSynchronization。
+
+SystemUnit、SystemUnitAspect、AnalyticsUnit/Aspect及手工注册配置已移除。PlatformPersistence/BusinessPersistence程序式入口仅供既有基础设施、CLI和生成骨架兼容，底层同样使用Spring事务与共享会话工厂，不再自行管理嵌套事务。同步run_token、任务抢占、文件ownership、权限与连接版本校验保留。旧Foundation ERP占位接口及只有NOT_CONFIGURED的解析/Adapter模型移除；本阶段仅装配ERP SQL连接，不实现ERP业务流程、API或同步执行器。
+
+用户提供的SQL Server连接仅进入.local/erp.yml（0600），不进入本文件或通用配置。连接探针只尝试SELECT 1：TCP可达，JDBC因TLS协议协商失败，未执行SQL；未修改加密、证书或JVM协议策略。H2三库测试不等于该ERP库已联调通过。

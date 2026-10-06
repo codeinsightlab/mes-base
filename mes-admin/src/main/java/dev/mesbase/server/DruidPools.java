@@ -1,6 +1,7 @@
 package dev.mesbase.server;
 
 import com.alibaba.druid.pool.DruidDataSource;
+import java.sql.SQLException;
 import org.springframework.boot.context.properties.bind.Bindable;
 import org.springframework.boot.context.properties.bind.Binder;
 import org.springframework.core.env.Environment;
@@ -26,7 +27,11 @@ public final class DruidPools {
                 .orElseThrow(() -> new IllegalArgumentException("Druid YAML settings required"));
     }
     public static DruidDataSource create(Settings s, String name, String url, String user, String password) {
+        return create(s, name, url, user, password, null);
+    }
+    public static DruidDataSource create(Settings s, String name, String url, String user, String password, String driver) {
         var pool=new DruidDataSource();
+        if (driver != null) pool.setDriverClassName(driver);
         pool.setName(name);pool.setUrl(url);pool.setUsername(user);pool.setPassword(password);
         pool.setInitialSize(s.initialSize());pool.setMinIdle(s.minIdle());pool.setMaxActive(s.maxActive());
         pool.setMaxWait(s.maxWait());pool.setConnectTimeout(s.connectTimeout());pool.setSocketTimeout(s.socketTimeout());
@@ -36,6 +41,6 @@ public final class DruidPools {
         pool.setValidationQuery(s.validationQuery());pool.setTestWhileIdle(s.testWhileIdle());
         pool.setTestOnBorrow(s.testOnBorrow());pool.setTestOnReturn(s.testOnReturn());
         try { if(s.filters()==null||!s.filters().matches("(stat|wall)(,(stat|wall))*"))throw new IllegalArgumentException("Only registered Druid filters allowed");pool.setFilters(s.filters());pool.init(); return pool; }
-        catch(java.sql.SQLException failure) { pool.close();throw new IllegalStateException("Druid pool initialization failed",failure); }
+        catch(SQLException failure) { pool.close();throw new IllegalStateException("Druid pool initialization failed",failure); }
     }
 }

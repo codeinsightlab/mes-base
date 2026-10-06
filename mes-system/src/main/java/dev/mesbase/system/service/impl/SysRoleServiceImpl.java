@@ -7,44 +7,54 @@ import dev.mesbase.common.core.domain.entity.SysUser;
 import dev.mesbase.common.exception.ServiceException;
 import dev.mesbase.common.utils.SecurityUtils;
 import dev.mesbase.common.utils.StringUtils;
+import dev.mesbase.common.utils.bean.BeanValidators;
 import dev.mesbase.common.utils.spring.SpringUtils;
+import dev.mesbase.core.error.ErrorCode;
+import dev.mesbase.core.error.FoundationException;
+import dev.mesbase.core.factory.FactoryCatalog;
+import dev.mesbase.core.factory.FactoryId;
+import dev.mesbase.core.factory.FactoryStatus;
 import dev.mesbase.system.domain.SysRoleDept;
 import dev.mesbase.system.domain.SysRoleMenu;
 import dev.mesbase.system.domain.SysUserRole;
+import dev.mesbase.system.mapper.SysDeptMapper;
+import dev.mesbase.system.mapper.SysMenuMapper;
 import dev.mesbase.system.mapper.SysRoleDeptMapper;
 import dev.mesbase.system.mapper.SysRoleMapper;
 import dev.mesbase.system.mapper.SysRoleMenuMapper;
+import dev.mesbase.system.mapper.SysUserMapper;
 import dev.mesbase.system.mapper.SysUserRoleMapper;
 import dev.mesbase.system.service.ISysRoleService;
-
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-
+import jakarta.validation.Validator;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * 角色 业务层处理
- * 
+ *
  * @author ruoyi
  */
 @Service
-@org.springframework.boot.autoconfigure.condition.ConditionalOnProperty(name="mes.system.enabled",havingValue="true")
+@ConditionalOnProperty(name="mes.system.enabled",havingValue="true")
 public class SysRoleServiceImpl implements ISysRoleService
 {
-    @org.springframework.beans.factory.annotation.Autowired private jakarta.validation.Validator contractValidator;
+    @Autowired private Validator contractValidator;
     @Autowired
     private SysRoleMapper roleMapper;
-    @Autowired private dev.mesbase.core.factory.FactoryCatalog factories;
-    @Autowired private dev.mesbase.system.mapper.SysMenuMapper menus;
-    private void scope(SysRole role){if(role.getKind()==null||!java.util.Set.of("PLATFORM","FACTORY").contains(role.getKind()))throw new ServiceException("请选择角色类型");
+    @Autowired private FactoryCatalog factories;
+    @Autowired private SysMenuMapper menus;
+    private void scope(SysRole role){if(role.getKind()==null||!Set.of("PLATFORM","FACTORY").contains(role.getKind()))throw new ServiceException("请选择角色类型");
         if("PLATFORM".equals(role.getKind())&&role.getFactoryId()!=null)throw new ServiceException("平台角色不能绑定工厂");
-        if("FACTORY".equals(role.getKind())){if(role.getFactoryId()==null)throw new ServiceException("工厂角色必须绑定工厂");var factory=factories.find(new dev.mesbase.core.factory.FactoryId(role.getFactoryId())).orElseThrow(()->new ServiceException("工厂不存在"));if(factory.status()!=dev.mesbase.core.factory.FactoryStatus.ENABLED)throw new ServiceException("工厂已停用");}
-        if(role.getRoleId()!=null){var before=roleMapper.selectRoleById(role.getRoleId());if(before==null)throw new dev.mesbase.core.error.FoundationException(dev.mesbase.core.error.ErrorCode.NOT_FOUND);if(!java.util.Objects.equals(before.getKind(),role.getKind())||!java.util.Objects.equals(before.getFactoryId(),role.getFactoryId()))throw new ServiceException("角色范围创建后不能改变");}
+        if("FACTORY".equals(role.getKind())){if(role.getFactoryId()==null)throw new ServiceException("工厂角色必须绑定工厂");var factory=factories.find(new FactoryId(role.getFactoryId())).orElseThrow(()->new ServiceException("工厂不存在"));if(factory.status()!=FactoryStatus.ENABLED)throw new ServiceException("工厂已停用");}
+        if(role.getRoleId()!=null){var before=roleMapper.selectRoleById(role.getRoleId());if(before==null)throw new FoundationException(ErrorCode.NOT_FOUND);if(!Objects.equals(before.getKind(),role.getKind())||!Objects.equals(before.getFactoryId(),role.getFactoryId()))throw new ServiceException("角色范围创建后不能改变");}
     }
 
     @Autowired
@@ -55,12 +65,12 @@ public class SysRoleServiceImpl implements ISysRoleService
 
     @Autowired
     private SysRoleDeptMapper roleDeptMapper;
-    @Autowired private dev.mesbase.system.mapper.SysDeptMapper departments;
-    @Autowired private dev.mesbase.system.mapper.SysUserMapper users;
+    @Autowired private SysDeptMapper departments;
+    @Autowired private SysUserMapper users;
 
     /**
      * 根据条件分页查询角色数据
-     * 
+     *
      * @param role 角色信息
      * @return 角色数据集合信息
      */
@@ -73,7 +83,7 @@ public class SysRoleServiceImpl implements ISysRoleService
 
     /**
      * 根据用户ID查询角色
-     * 
+     *
      * @param userId 用户ID
      * @return 角色列表
      */
@@ -98,7 +108,7 @@ public class SysRoleServiceImpl implements ISysRoleService
 
     /**
      * 根据用户ID查询权限
-     * 
+     *
      * @param userId 用户ID
      * @return 权限列表
      */
@@ -119,7 +129,7 @@ public class SysRoleServiceImpl implements ISysRoleService
 
     /**
      * 查询所有角色
-     * 
+     *
      * @return 角色列表
      */
     @Override
@@ -130,7 +140,7 @@ public class SysRoleServiceImpl implements ISysRoleService
 
     /**
      * 根据用户ID获取角色选择框列表
-     * 
+     *
      * @param userId 用户ID
      * @return 选中角色ID列表
      */
@@ -142,7 +152,7 @@ public class SysRoleServiceImpl implements ISysRoleService
 
     /**
      * 通过角色ID查询角色
-     * 
+     *
      * @param roleId 角色ID
      * @return 角色对象信息
      */
@@ -154,25 +164,25 @@ public class SysRoleServiceImpl implements ISysRoleService
 
     /**
      * 校验角色名称是否唯一
-     * 
+     *
      * @param role 角色信息
      * @return 结果
      */
     @Override
-    public String checkRoleNameUnique(SysRole role){var query=new SysRole();query.setKind(role.getKind());query.setFactoryId(role.getFactoryId());return roleMapper.selectRoleList(query).stream().anyMatch(r->r.getRoleName().equals(role.getRoleName())&&!java.util.Objects.equals(r.getRoleId(),role.getRoleId()))?UserConstants.NOT_UNIQUE:UserConstants.UNIQUE;}
+    public String checkRoleNameUnique(SysRole role){var query=new SysRole();query.setKind(role.getKind());query.setFactoryId(role.getFactoryId());return roleMapper.selectRoleList(query).stream().anyMatch(r->r.getRoleName().equals(role.getRoleName())&&!Objects.equals(r.getRoleId(),role.getRoleId()))?UserConstants.NOT_UNIQUE:UserConstants.UNIQUE;}
 
     /**
      * 校验角色权限是否唯一
-     * 
+     *
      * @param role 角色信息
      * @return 结果
      */
     @Override
-    public String checkRoleKeyUnique(SysRole role){var query=new SysRole();query.setKind(role.getKind());query.setFactoryId(role.getFactoryId());return roleMapper.selectRoleList(query).stream().anyMatch(r->r.getRoleKey().equals(role.getRoleKey())&&!java.util.Objects.equals(r.getRoleId(),role.getRoleId()))?UserConstants.NOT_UNIQUE:UserConstants.UNIQUE;}
+    public String checkRoleKeyUnique(SysRole role){var query=new SysRole();query.setKind(role.getKind());query.setFactoryId(role.getFactoryId());return roleMapper.selectRoleList(query).stream().anyMatch(r->r.getRoleKey().equals(role.getRoleKey())&&!Objects.equals(r.getRoleId(),role.getRoleId()))?UserConstants.NOT_UNIQUE:UserConstants.UNIQUE;}
 
     /**
      * 校验角色是否允许操作
-     * 
+     *
      * @param role 角色信息
      */
     @Override
@@ -186,7 +196,7 @@ public class SysRoleServiceImpl implements ISysRoleService
 
     /**
      * 校验角色是否有数据权限
-     * 
+     *
      * @param roleId 角色id
      */
     @Override
@@ -206,7 +216,7 @@ public class SysRoleServiceImpl implements ISysRoleService
 
     /**
      * 通过角色ID查询角色使用数量
-     * 
+     *
      * @param roleId 角色ID
      * @return 结果
      */
@@ -218,16 +228,18 @@ public class SysRoleServiceImpl implements ISysRoleService
 
     /**
      * 新增保存角色信息
-     * 
+     *
      * @param role 角色信息
      * @return 结果
      */
     @Override
-    
+
+    @Transactional(transactionManager="platformTransactionManager", rollbackFor=Exception.class)
+
     public int insertRole(SysRole role)
     {
         role.setRoleId(null);
-        dev.mesbase.common.utils.bean.BeanValidators.validateWithException(contractValidator,role);
+        BeanValidators.validateWithException(contractValidator,role);
         scope(role);
         // 新增角色信息
         roleMapper.insertRole(role);
@@ -236,15 +248,17 @@ public class SysRoleServiceImpl implements ISysRoleService
 
     /**
      * 修改保存角色信息
-     * 
+     *
      * @param role 角色信息
      * @return 结果
      */
     @Override
-    
+
+    @Transactional(transactionManager="platformTransactionManager", rollbackFor=Exception.class)
+
     public int updateRole(SysRole role)
     {
-        dev.mesbase.common.utils.bean.BeanValidators.validateWithException(contractValidator,role);
+        BeanValidators.validateWithException(contractValidator,role);
         scope(role);
         // 修改角色信息
         roleMapper.updateRole(role);
@@ -255,27 +269,28 @@ public class SysRoleServiceImpl implements ISysRoleService
 
     /**
      * 修改角色状态
-     * 
+     *
      * @param role 角色信息
      * @return 结果
      */
     @Override
+    @Transactional(transactionManager="platformTransactionManager", rollbackFor=Exception.class)
     public int updateRoleStatus(SysRole role)
     {
-        if(role.getStatus()==null||!java.util.Set.of("0","1").contains(role.getStatus()))throw new ServiceException("角色状态不合法");var saved=roleMapper.selectRoleById(role.getRoleId());if(saved==null)throw new dev.mesbase.core.error.FoundationException(dev.mesbase.core.error.ErrorCode.NOT_FOUND);saved.setStatus(role.getStatus());saved.setUpdateBy(role.getUpdateBy());return roleMapper.updateRole(saved);
+        if(role.getStatus()==null||!Set.of("0","1").contains(role.getStatus()))throw new ServiceException("角色状态不合法");var saved=roleMapper.selectRoleById(role.getRoleId());if(saved==null)throw new FoundationException(ErrorCode.NOT_FOUND);saved.setStatus(role.getStatus());saved.setUpdateBy(role.getUpdateBy());return roleMapper.updateRole(saved);
     }
 
     /**
      * 修改数据权限信息
-     * 
+     *
      * @param role 角色信息
      * @return 结果
      */
     @Override
-    
+
     public int authDataScope(SysRole role)
     {
-        scope(role);if(role.getDataScope()==null||!java.util.Set.of("1","2","3","4","5").contains(role.getDataScope()))throw new ServiceException("数据范围不合法");
+        scope(role);if(role.getDataScope()==null||!Set.of("1","2","3","4","5").contains(role.getDataScope()))throw new ServiceException("数据范围不合法");
         // 修改角色信息
         roleMapper.updateRole(role);
         // 删除角色与部门关联
@@ -286,9 +301,10 @@ public class SysRoleServiceImpl implements ISysRoleService
 
     /**
      * 新增角色菜单信息
-     * 
+     *
      * @param role 角色对象
      */
+    @Transactional(transactionManager="platformTransactionManager", rollbackFor=Exception.class)
     public int insertRoleMenu(SysRole role)
     {
         int rows = 1;
@@ -314,6 +330,7 @@ public class SysRoleServiceImpl implements ISysRoleService
      *
      * @param role 角色对象
      */
+    @Transactional(transactionManager="platformTransactionManager", rollbackFor=Exception.class)
     public int insertRoleDept(SysRole role)
     {
         int rows = 1;
@@ -336,12 +353,14 @@ public class SysRoleServiceImpl implements ISysRoleService
 
     /**
      * 通过角色ID删除角色
-     * 
+     *
      * @param roleId 角色ID
      * @return 结果
      */
     @Override
-    
+
+    @Transactional(transactionManager="platformTransactionManager", rollbackFor=Exception.class)
+
     public int deleteRoleById(Long roleId)
     {
         // 删除角色与菜单关联
@@ -353,12 +372,14 @@ public class SysRoleServiceImpl implements ISysRoleService
 
     /**
      * 批量删除角色信息
-     * 
+     *
      * @param roleIds 需要删除的角色ID
      * @return 结果
      */
     @Override
-    
+
+    @Transactional(transactionManager="platformTransactionManager", rollbackFor=Exception.class)
+
     public int deleteRoleByIds(Long[] roleIds)
     {
         for (Long roleId : roleIds)
@@ -380,11 +401,12 @@ public class SysRoleServiceImpl implements ISysRoleService
 
     /**
      * 取消授权用户角色
-     * 
+     *
      * @param userRole 用户和角色关联信息
      * @return 结果
      */
     @Override
+    @Transactional(transactionManager="platformTransactionManager", rollbackFor=Exception.class)
     public int deleteAuthUser(SysUserRole userRole)
     {
         return userRoleMapper.deleteUserRoleInfo(userRole);
@@ -392,12 +414,13 @@ public class SysRoleServiceImpl implements ISysRoleService
 
     /**
      * 批量取消授权用户角色
-     * 
+     *
      * @param roleId 角色ID
      * @param userIds 需要取消授权的用户数据ID
      * @return 结果
      */
     @Override
+    @Transactional(transactionManager="platformTransactionManager", rollbackFor=Exception.class)
     public int deleteAuthUsers(Long roleId, Long[] userIds)
     {
         return userRoleMapper.deleteUserRoleInfos(roleId, userIds);
@@ -405,12 +428,13 @@ public class SysRoleServiceImpl implements ISysRoleService
 
     /**
      * 批量选择授权用户角色
-     * 
+     *
      * @param roleId 角色ID
      * @param userIds 需要授权的用户数据ID
      * @return 结果
      */
     @Override
+    @Transactional(transactionManager="platformTransactionManager", rollbackFor=Exception.class)
     public int insertAuthUsers(Long roleId, Long[] userIds)
     {
         if(roleMapper.selectRoleById(roleId)==null)throw new ServiceException("角色不存在");

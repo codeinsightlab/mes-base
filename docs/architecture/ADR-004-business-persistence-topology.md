@@ -31,3 +31,8 @@ Dedicated registry 预登记 Factory owner，防止无行过滤的适配器误�
 7. 投产目标 DB 方言、执行计划、索引、分页上限和负例真实执行；没有这些证据前共享库保持 DESIGNED。
 
 以上是尚未执行的计划，不列入55项通过结果。SQLite/MySQL/PostgreSQL等具体生产部署及多企业 SaaS 本轮未交付。
+
+
+## 2026-10-06 修订：标准 Spring/MyBatis-Spring 装配
+
+用户明确要求优先参考源分支并减少手工绑定。Dedicated的安全边界保留，生产装配改为一个businessSqlSessionFactory和一个按Factory路由的数据源；版本化RuntimeRegistry只管理连接池。事务管理器扩展Spring生命周期锁定Factory/连接身份，MyBatis-Spring负责session，Service显式@Transactional。既有回调契约留给基础设施/CLI/生成骨架兼容，不要求业务Service再增加Port才能使用Mapper。Shared仍未实现，不因这次装配变化宣称共享库行范围隔离成立。

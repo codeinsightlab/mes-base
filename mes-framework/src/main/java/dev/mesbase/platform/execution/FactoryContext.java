@@ -1,9 +1,12 @@
 package dev.mesbase.platform.execution;
+
+import dev.mesbase.core.error.ErrorCode;
+import dev.mesbase.core.error.FoundationException;
 import dev.mesbase.core.factory.FactoryScope;
-import dev.mesbase.core.error.*;
-import java.util.Optional;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.function.Supplier;
+
 /** Thread bridge only. Domain code receives an explicit FactoryScope. */
 public final class FactoryContext {
     private static final ThreadLocal<FactoryScope> CURRENT=new ThreadLocal<>();
@@ -20,6 +23,13 @@ public final class FactoryContext {
         try { return action.get(); } finally { if(before==null) clear(); else bind(before); }
     }
     public static void runWithScope(FactoryScope scope, Runnable action) { withScope(scope,() -> { action.run(); return null; }); }
+    public static final class Pin implements AutoCloseable {
+        private final FactoryScope previous;
+        private boolean closed;
+        private Pin(FactoryScope scope) { previous=PINNED.get(); check(scope); PINNED.set(scope); }
+        public void close() { if (!closed) { closed=true; if(previous==null)PINNED.remove();else PINNED.set(previous); } }
+    }
+    public static Pin pinCurrent() { return new Pin(required()); }
     /** Used by infrastructure for an entire business transaction, including commit/rollback. */
     public static <T> T pinned(FactoryScope scope, Supplier<T> action) {
         if(!required().equals(scope)) throw new FoundationException(ErrorCode.CONFLICT);

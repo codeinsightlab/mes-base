@@ -1,7 +1,11 @@
 package dev.mesbase.infrastructure.persistence;
+
+import dev.mesbase.core.error.ErrorCode;
+import dev.mesbase.core.error.FoundationException;
+import java.lang.reflect.Proxy;
 import java.util.Set;
 import org.apache.ibatis.session.SqlSession;
-import dev.mesbase.core.error.*;
+
 /** No raw connection, SQL string or SqlSession escapes to services. */
 public final class OwnedSqlSession {
     private final SqlSession delegate; private final Set<Class<?>> mappers; private final Runnable verify;
@@ -11,11 +15,12 @@ public final class OwnedSqlSession {
     public <T> T mapper(Class<T> type) {
         check(); if(!mappers.contains(type)) throw new FoundationException(ErrorCode.FORBIDDEN);
         T mapper=delegate.getMapper(type);
-        return type.cast(java.lang.reflect.Proxy.newProxyInstance(type.getClassLoader(),new Class<?>[]{type},(proxy,method,args) -> {
+        return type.cast(Proxy.newProxyInstance(type.getClassLoader(),new Class<?>[]{type},(proxy,method,args) -> {
             check();
-            return java.lang.reflect.Proxy.getInvocationHandler(mapper).invoke(mapper,method,args);
+            return Proxy.getInvocationHandler(mapper).invoke(mapper,method,args);
         }));
     }
     private void check() { if(closed || Thread.currentThread()!=ownerThread) throw new FoundationException(ErrorCode.CONFLICT); verify.run(); }
-    void close() { closed=true; delegate.close(); }
+    void expire() { closed=true; }
+    void close() { expire(); delegate.close(); }
 }

@@ -3,14 +3,14 @@ package dev.mesbase.system.service.impl;
 import dev.mesbase.common.core.domain.entity.SysAutoCodeResult;
 import dev.mesbase.system.mapper.SysAutoCodeResultMapper;
 import dev.mesbase.system.service.IAutoCodeResultService;
-
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Service;
-
 import java.util.List;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
-@org.springframework.boot.autoconfigure.condition.ConditionalOnProperty(name="mes.system.enabled",havingValue="true")
+@ConditionalOnProperty(name="mes.system.enabled",havingValue="true")
 public class SysAutoCodeResultServiceImpl implements IAutoCodeResultService {
 
     @Autowired
@@ -22,11 +22,13 @@ public class SysAutoCodeResultServiceImpl implements IAutoCodeResultService {
     }
 
     @Override
+    @Transactional(transactionManager="platformTransactionManager", rollbackFor=Exception.class)
     public void saveAutoCodeResult(SysAutoCodeResult sysAutoCodeResult) {
         sysAutoCodeResultMapper.add(sysAutoCodeResult);
     }
 
     @Override
+    @Transactional(transactionManager="platformTransactionManager", rollbackFor=Exception.class)
     public void updateAutoCodeResult(SysAutoCodeResult sysAutoCodeResult) {
         sysAutoCodeResultMapper.updateAutoCodeResult(sysAutoCodeResult);
     }

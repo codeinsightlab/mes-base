@@ -2,31 +2,35 @@ package dev.mesbase.quartz.service.impl;
 
 import dev.mesbase.common.constant.ScheduleConstants;
 import dev.mesbase.common.exception.job.TaskException;
+import dev.mesbase.common.utils.SecurityUtils;
+import dev.mesbase.core.error.ErrorCode;
+import dev.mesbase.core.error.FoundationException;
+import dev.mesbase.infrastructure.persistence.PlatformPersistence;
 import dev.mesbase.quartz.domain.SysJob;
 import dev.mesbase.quartz.mapper.SysJobMapper;
 import dev.mesbase.quartz.service.ISysJobService;
+import dev.mesbase.quartz.util.ControlledJobRunner;
 import dev.mesbase.quartz.util.CronUtils;
 import dev.mesbase.quartz.util.ScheduleUtils;
-
-import org.quartz.JobDataMap;
+import dev.mesbase.quartz.util.SchedulerEffect;
+import java.util.List;
+import java.util.UUID;
 import org.quartz.JobKey;
 import org.quartz.Scheduler;
 import org.quartz.SchedulerException;
+import org.slf4j.MDC;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.List;
-
-import jakarta.annotation.PostConstruct;
-
 /**
  * 定时任务调度信息 服务层
- * 
+ *
  * @author ruoyi
  */
 @Service
-@org.springframework.boot.autoconfigure.condition.ConditionalOnProperty(name="mes.system.enabled",havingValue="true")
+@ConditionalOnProperty(name="mes.system.enabled",havingValue="true")
 public class SysJobServiceImpl implements ISysJobService
 {
     @Autowired
@@ -34,15 +38,16 @@ public class SysJobServiceImpl implements ISysJobService
 
     @Autowired
     private SysJobMapper jobMapper;
-    @Autowired private dev.mesbase.framework.persistence.SystemUnit unit;
-    @Autowired private dev.mesbase.quartz.util.ControlledJobRunner runner;
-    private void after(dev.mesbase.quartz.util.SchedulerEffect effect){unit.afterCommit(()->{try{effect.run();}catch(Exception failure){throw new dev.mesbase.core.error.FoundationException(dev.mesbase.core.error.ErrorCode.EXECUTION_UNKNOWN,failure);}});}
-    private SysJob required(Long id){var j=jobMapper.selectJobById(id);if(j==null)throw new dev.mesbase.core.error.FoundationException(dev.mesbase.core.error.ErrorCode.NOT_FOUND);return j;}
+    @Autowired private PlatformPersistence unit;
+    @Autowired private ControlledJobRunner runner;
+    private void after(SchedulerEffect effect){unit.afterCommit(()->{try{effect.run();}catch(Exception failure){throw new FoundationException(ErrorCode.EXECUTION_UNKNOWN,failure);}});}
+    private SysJob required(Long id){var j=jobMapper.selectJobById(id);if(j==null)throw new FoundationException(ErrorCode.NOT_FOUND);return j;}
 
     /**
      * 项目启动时，初始化定时器 主要是防止手动修改数据库导致未同步到定时任务处理（注：不能手动修改数据库ID和任务组名，否则会导致脏数据）
      */
-    
+
+    @Transactional(transactionManager="platformTransactionManager", rollbackFor=Exception.class)
     public void init() throws SchedulerException, TaskException
     {
         scheduler.clear();
@@ -55,7 +60,7 @@ public class SysJobServiceImpl implements ISysJobService
 
     /**
      * 获取quartz调度器的计划任务列表
-     * 
+     *
      * @param job 调度信息
      * @return
      */
@@ -67,7 +72,7 @@ public class SysJobServiceImpl implements ISysJobService
 
     /**
      * 通过调度任务ID查询调度信息
-     * 
+     *
      * @param jobId 调度任务ID
      * @return 调度任务对象信息
      */
@@ -79,10 +84,11 @@ public class SysJobServiceImpl implements ISysJobService
 
     /**
      * 暂停任务
-     * 
+     *
      * @param job 调度信息
      */
     @Override
+    @Transactional(transactionManager="platformTransactionManager", rollbackFor=Exception.class)
     public int pauseJob(SysJob job) throws SchedulerException
     {
         Long jobId = job.getJobId();
@@ -98,10 +104,11 @@ public class SysJobServiceImpl implements ISysJobService
 
     /**
      * 恢复任务
-     * 
+     *
      * @param job 调度信息
      */
     @Override
+    @Transactional(transactionManager="platformTransactionManager", rollbackFor=Exception.class)
     public int resumeJob(SysJob job) throws SchedulerException
     {
         Long jobId = job.getJobId();
@@ -117,16 +124,17 @@ public class SysJobServiceImpl implements ISysJobService
 
     /**
      * 删除任务后，所对应的trigger也将被删除
-     * 
+     *
      * @param job 调度信息
      */
     @Override
+    @Transactional(transactionManager="platformTransactionManager", rollbackFor=Exception.class)
     public int deleteJob(SysJob job) throws SchedulerException
     {
         Long jobId = job.getJobId();
         String jobGroup = job.getJobGroup();
         int rows = jobMapper.deleteJobById(jobId);
-        if(rows!=1)throw new dev.mesbase.core.error.FoundationException(dev.mesbase.core.error.ErrorCode.RESOURCE_CONFLICT);
+        if(rows!=1)throw new FoundationException(ErrorCode.RESOURCE_CONFLICT);
         if (rows > 0)
         {
             after(()->scheduler.deleteJob(ScheduleUtils.getJobKey(jobId, jobGroup)));
@@ -136,11 +144,12 @@ public class SysJobServiceImpl implements ISysJobService
 
     /**
      * 批量删除调度信息
-     * 
+     *
      * @param jobIds 需要删除的任务ID
      * @return 结果
      */
     @Override
+    @Transactional(transactionManager="platformTransactionManager", rollbackFor=Exception.class)
     public void deleteJobByIds(Long[] jobIds) throws SchedulerException
     {
         for (Long jobId : jobIds)
@@ -152,10 +161,11 @@ public class SysJobServiceImpl implements ISysJobService
 
     /**
      * 任务调度状态修改
-     * 
+     *
      * @param job 调度信息
      */
     @Override
+    @Transactional(transactionManager="platformTransactionManager", rollbackFor=Exception.class)
     public int changeStatus(SysJob job) throws SchedulerException
     {
         int rows = 0;
@@ -168,27 +178,28 @@ public class SysJobServiceImpl implements ISysJobService
         {
             rows = pauseJob(job);
         }
-        if(rows==0)throw new dev.mesbase.core.error.FoundationException(dev.mesbase.core.error.ErrorCode.BAD_REQUEST);return rows;
+        if(rows==0)throw new FoundationException(ErrorCode.BAD_REQUEST);return rows;
     }
 
     /**
      * 立即运行任务
-     * 
+     *
      * @param job 调度信息
      */
     @Override
     public void run(SysJob job) throws SchedulerException
     {
-        String requestId=org.slf4j.MDC.get("requestId");
-        runner.run(job.getJobId(),String.valueOf(dev.mesbase.common.utils.SecurityUtils.getUserId()),requestId==null?java.util.UUID.randomUUID().toString():requestId);
+        String requestId=MDC.get("requestId");
+        runner.run(job.getJobId(),String.valueOf(SecurityUtils.getUserId()),requestId==null?UUID.randomUUID().toString():requestId);
     }
 
     /**
      * 新增任务
-     * 
+     *
      * @param job 调度信息 调度信息
      */
     @Override
+    @Transactional(transactionManager="platformTransactionManager", rollbackFor=Exception.class)
     public int insertJob(SysJob job) throws SchedulerException, TaskException
     {
         runner.validate(job);
@@ -203,10 +214,11 @@ public class SysJobServiceImpl implements ISysJobService
 
     /**
      * 更新任务的时间表达式
-     * 
+     *
      * @param job 调度信息
      */
     @Override
+    @Transactional(transactionManager="platformTransactionManager", rollbackFor=Exception.class)
     public int updateJob(SysJob job) throws SchedulerException, TaskException
     {
         runner.validate(job);
@@ -221,10 +233,11 @@ public class SysJobServiceImpl implements ISysJobService
 
     /**
      * 更新任务
-     * 
+     *
      * @param job 任务对象
      * @param jobGroup 任务组名
      */
+    @Transactional(transactionManager="platformTransactionManager", rollbackFor=Exception.class)
     public void updateSchedulerJob(SysJob job, String jobGroup) throws SchedulerException, TaskException
     {
         Long jobId = job.getJobId();
@@ -240,7 +253,7 @@ public class SysJobServiceImpl implements ISysJobService
 
     /**
      * 校验cron表达式是否有效
-     * 
+     *
      * @param cronExpression 表达式
      * @return 结果
      */

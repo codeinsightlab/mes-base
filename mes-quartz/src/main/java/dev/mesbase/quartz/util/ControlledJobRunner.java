@@ -1,18 +1,34 @@
 package dev.mesbase.quartz.util;
-import dev.mesbase.framework.persistence.SystemUnit;import dev.mesbase.quartz.mapper.*;import dev.mesbase.quartz.domain.SysJob;import dev.mesbase.core.factory.*;import dev.mesbase.core.error.*;import dev.mesbase.platform.execution.ExecutionScope;
+
+import dev.mesbase.core.error.ErrorCode;
+import dev.mesbase.core.error.FoundationException;
+import dev.mesbase.core.factory.FactoryCatalog;
+import dev.mesbase.core.factory.FactoryId;
+import dev.mesbase.core.factory.FactoryScope;
+import dev.mesbase.core.factory.FactoryStatus;
+import dev.mesbase.infrastructure.persistence.PlatformPersistence;
+import dev.mesbase.platform.execution.ExecutionScope;
+import dev.mesbase.platform.execution.FactoryContext;
+import dev.mesbase.quartz.domain.SysJob;
+import dev.mesbase.quartz.mapper.JobClaimMapper;
+import dev.mesbase.quartz.mapper.SysJobMapper;
+import java.util.Date;
+import java.util.Set;
+import java.util.UUID;
+
 public final class ControlledJobRunner {
- private final SystemUnit unit;private final FactoryCatalog factories;
- public ControlledJobRunner(SystemUnit unit,FactoryCatalog factories){this.unit=unit;this.factories=factories;}
- public void validate(SysJob job){boolean platform="platform-heartbeat".equals(job.getInvokeTarget()),factory="factory-heartbeat".equals(job.getInvokeTarget());if(!platform&&!factory)throw new FoundationException(ErrorCode.UNPROCESSABLE);if(job.getJobName()==null||job.getJobName().isBlank()||job.getJobName().length()>64||job.getJobGroup()==null||!job.getJobGroup().matches("[A-Za-z0-9_-]{1,64}")||!CronUtils.isValid(job.getCronExpression())||!java.util.Set.of("0","1","2","3").contains(job.getMisfirePolicy())||!java.util.Set.of("0","1").contains(job.getConcurrent()))throw new FoundationException(ErrorCode.BAD_REQUEST);if(platform){if(!"PLATFORM".equals(job.getExecutionScope())||job.getFactoryId()!=null&&!job.getFactoryId().isBlank())throw new FoundationException(ErrorCode.BAD_REQUEST);job.setFactoryId(null);}else{if(!"FACTORY".equals(job.getExecutionScope())||job.getFactoryId()==null)throw new FoundationException(ErrorCode.FACTORY_SCOPE_REQUIRED);var f=factories.find(new FactoryId(job.getFactoryId())).orElseThrow(()->new FoundationException(ErrorCode.FACTORY_NOT_FOUND));if(f.status()!=FactoryStatus.ENABLED)throw new FoundationException(ErrorCode.FACTORY_DISABLED);}}
- public void run(Long id){run(id,"SCHEDULER",java.util.UUID.randomUUID().toString(),false);}
+ private final PlatformPersistence unit;private final FactoryCatalog factories;
+ public ControlledJobRunner(PlatformPersistence unit,FactoryCatalog factories){this.unit=unit;this.factories=factories;}
+ public void validate(SysJob job){boolean platform="platform-heartbeat".equals(job.getInvokeTarget()),factory="factory-heartbeat".equals(job.getInvokeTarget());if(!platform&&!factory)throw new FoundationException(ErrorCode.UNPROCESSABLE);if(job.getJobName()==null||job.getJobName().isBlank()||job.getJobName().length()>64||job.getJobGroup()==null||!job.getJobGroup().matches("[A-Za-z0-9_-]{1,64}")||!CronUtils.isValid(job.getCronExpression())||!Set.of("0","1","2","3").contains(job.getMisfirePolicy())||!Set.of("0","1").contains(job.getConcurrent()))throw new FoundationException(ErrorCode.BAD_REQUEST);if(platform){if(!"PLATFORM".equals(job.getExecutionScope())||job.getFactoryId()!=null&&!job.getFactoryId().isBlank())throw new FoundationException(ErrorCode.BAD_REQUEST);job.setFactoryId(null);}else{if(!"FACTORY".equals(job.getExecutionScope())||job.getFactoryId()==null)throw new FoundationException(ErrorCode.FACTORY_SCOPE_REQUIRED);var f=factories.find(new FactoryId(job.getFactoryId())).orElseThrow(()->new FoundationException(ErrorCode.FACTORY_NOT_FOUND));if(f.status()!=FactoryStatus.ENABLED)throw new FoundationException(ErrorCode.FACTORY_DISABLED);}}
+ public void run(Long id){run(id,"SCHEDULER",UUID.randomUUID().toString(),false);}
  public void run(Long id,String actor,String requestId){run(id,actor,requestId,true);}
- private void run(Long id,String actor,String requestId,boolean manual){String token=java.util.UUID.randomUUID().toString();var job=unit.run(()->{if(unit.mapper(JobClaimMapper.class).claim(id,token,manual)!=1){if(unit.mapper(SysJobMapper.class).selectJobById(id)==null)throw new FoundationException(ErrorCode.NOT_FOUND);throw new FoundationException(ErrorCode.RESOURCE_CONFLICT);}var current=unit.mapper(SysJobMapper.class).selectJobById(id);validate(current);return current;});java.util.Date started=new java.util.Date();long clock=System.nanoTime();
-  RuntimeException failure=null;String outcome="SUCCEEDED";try{var scope="PLATFORM".equals(job.getExecutionScope())?ExecutionScope.platform():ExecutionScope.factory(new FactoryScope(new FactoryId(job.getFactoryId())));scope.run(()->{if("FACTORY".equals(job.getExecutionScope()))dev.mesbase.platform.execution.FactoryContext.required();else if(dev.mesbase.platform.execution.FactoryContext.current().isPresent())throw new FoundationException(ErrorCode.CONFLICT);});}catch(RuntimeException e){failure=e;outcome="UNKNOWN";}
-  final String result=outcome;try{unit.run(()->{if(unit.mapper(JobClaimMapper.class).release(id,token)!=1)throw new FoundationException(ErrorCode.RESOURCE_CONFLICT);unit.mapper(JobClaimMapper.class).log(job.getJobName(),job.getJobGroup(),job.getInvokeTarget(),result,"SUCCEEDED".equals(result)?"0":"1",requestId,actor,job.getFactoryId(),job.getExecutionScope(),token,started,new java.util.Date(),Math.max(0,(System.nanoTime()-clock)/1_000_000L));return null;});}catch(RuntimeException log){if(failure!=null)log.addSuppressed(failure);throw log;}if(failure!=null)throw failure;
+ private void run(Long id,String actor,String requestId,boolean manual){String token=UUID.randomUUID().toString();var job=unit.run(()->{if(unit.mapper(JobClaimMapper.class).claim(id,token,manual)!=1){if(unit.mapper(SysJobMapper.class).selectJobById(id)==null)throw new FoundationException(ErrorCode.NOT_FOUND);throw new FoundationException(ErrorCode.RESOURCE_CONFLICT);}var current=unit.mapper(SysJobMapper.class).selectJobById(id);validate(current);return current;});Date started=new Date();long clock=System.nanoTime();
+  RuntimeException failure=null;String outcome="SUCCEEDED";try{var scope="PLATFORM".equals(job.getExecutionScope())?ExecutionScope.platform():ExecutionScope.factory(new FactoryScope(new FactoryId(job.getFactoryId())));scope.run(()->{if("FACTORY".equals(job.getExecutionScope()))FactoryContext.required();else if(FactoryContext.current().isPresent())throw new FoundationException(ErrorCode.CONFLICT);});}catch(RuntimeException e){failure=e;outcome="UNKNOWN";}
+  final String result=outcome;try{unit.run(()->{if(unit.mapper(JobClaimMapper.class).release(id,token)!=1)throw new FoundationException(ErrorCode.RESOURCE_CONFLICT);unit.mapper(JobClaimMapper.class).log(job.getJobName(),job.getJobGroup(),job.getInvokeTarget(),result,"SUCCEEDED".equals(result)?"0":"1",requestId,actor,job.getFactoryId(),job.getExecutionScope(),token,started,new Date(),Math.max(0,(System.nanoTime()-clock)/1_000_000L));return null;});}catch(RuntimeException log){if(failure!=null)log.addSuppressed(failure);throw log;}if(failure!=null)throw failure;
  }
  public void recover(Long id,String token,boolean confirmedDead,String actor,String requestId){
   if(!confirmedDead||token==null||!token.matches("[a-f0-9-]{36}"))throw new FoundationException(ErrorCode.BAD_REQUEST);
-  unit.run(()->{var job=unit.mapper(SysJobMapper.class).selectJobById(id);if(job==null)throw new FoundationException(ErrorCode.NOT_FOUND);if(unit.mapper(JobClaimMapper.class).recover(id,token)!=1)throw new FoundationException(ErrorCode.RESOURCE_CONFLICT);unit.mapper(JobClaimMapper.class).log(job.getJobName(),job.getJobGroup(),job.getInvokeTarget(),"RECOVERED_UNKNOWN","1",requestId,actor,job.getFactoryId(),job.getExecutionScope(),token,null,new java.util.Date(),0);return null;});
+  unit.run(()->{var job=unit.mapper(SysJobMapper.class).selectJobById(id);if(job==null)throw new FoundationException(ErrorCode.NOT_FOUND);if(unit.mapper(JobClaimMapper.class).recover(id,token)!=1)throw new FoundationException(ErrorCode.RESOURCE_CONFLICT);unit.mapper(JobClaimMapper.class).log(job.getJobName(),job.getJobGroup(),job.getInvokeTarget(),"RECOVERED_UNKNOWN","1",requestId,actor,job.getFactoryId(),job.getExecutionScope(),token,null,new Date(),0);return null;});
  }
  public JobClaimMapper.RunState state(Long id){return unit.run(()->{var state=unit.mapper(JobClaimMapper.class).state(id);if(state==null)throw new FoundationException(ErrorCode.NOT_FOUND);return state;});}
 }

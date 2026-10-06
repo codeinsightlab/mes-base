@@ -3,26 +3,28 @@ package dev.mesbase.system.service.impl;
 import dev.mesbase.common.constant.UserConstants;
 import dev.mesbase.common.exception.ServiceException;
 import dev.mesbase.common.utils.StringUtils;
+import dev.mesbase.common.utils.bean.BeanValidators;
 import dev.mesbase.system.domain.SysPost;
 import dev.mesbase.system.mapper.SysPostMapper;
 import dev.mesbase.system.mapper.SysUserPostMapper;
 import dev.mesbase.system.service.ISysPostService;
-
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Service;
-
+import jakarta.validation.Validator;
 import java.util.List;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * 岗位信息 服务层处理
- * 
+ *
  * @author ruoyi
  */
 @Service
-@org.springframework.boot.autoconfigure.condition.ConditionalOnProperty(name="mes.system.enabled",havingValue="true")
+@ConditionalOnProperty(name="mes.system.enabled",havingValue="true")
 public class SysPostServiceImpl implements ISysPostService
 {
-    @org.springframework.beans.factory.annotation.Autowired private jakarta.validation.Validator contractValidator;
+    @Autowired private Validator contractValidator;
     @Autowired
     private SysPostMapper postMapper;
 
@@ -31,7 +33,7 @@ public class SysPostServiceImpl implements ISysPostService
 
     /**
      * 查询岗位信息集合
-     * 
+     *
      * @param post 岗位信息
      * @return 岗位信息集合
      */
@@ -43,7 +45,7 @@ public class SysPostServiceImpl implements ISysPostService
 
     /**
      * 查询所有岗位
-     * 
+     *
      * @return 岗位列表
      */
     @Override
@@ -54,7 +56,7 @@ public class SysPostServiceImpl implements ISysPostService
 
     /**
      * 通过岗位ID查询岗位信息
-     * 
+     *
      * @param postId 岗位ID
      * @return 角色对象信息
      */
@@ -66,7 +68,7 @@ public class SysPostServiceImpl implements ISysPostService
 
     /**
      * 根据用户ID获取岗位选择框列表
-     * 
+     *
      * @param userId 用户ID
      * @return 选中岗位ID列表
      */
@@ -78,7 +80,7 @@ public class SysPostServiceImpl implements ISysPostService
 
     /**
      * 校验岗位名称是否唯一
-     * 
+     *
      * @param post 岗位信息
      * @return 结果
      */
@@ -96,7 +98,7 @@ public class SysPostServiceImpl implements ISysPostService
 
     /**
      * 校验岗位编码是否唯一
-     * 
+     *
      * @param post 岗位信息
      * @return 结果
      */
@@ -114,7 +116,7 @@ public class SysPostServiceImpl implements ISysPostService
 
     /**
      * 通过岗位ID查询岗位使用数量
-     * 
+     *
      * @param postId 岗位ID
      * @return 结果
      */
@@ -126,11 +128,12 @@ public class SysPostServiceImpl implements ISysPostService
 
     /**
      * 删除岗位信息
-     * 
+     *
      * @param postId 岗位ID
      * @return 结果
      */
     @Override
+    @Transactional(transactionManager="platformTransactionManager", rollbackFor=Exception.class)
     public int deletePostById(Long postId)
     {
         return postMapper.deletePostById(postId);
@@ -138,11 +141,12 @@ public class SysPostServiceImpl implements ISysPostService
 
     /**
      * 批量删除岗位信息
-     * 
+     *
      * @param postIds 需要删除的岗位ID
      * @return 结果
      */
     @Override
+    @Transactional(transactionManager="platformTransactionManager", rollbackFor=Exception.class)
     public int deletePostByIds(Long[] postIds)
     {
         for (Long postId : postIds)
@@ -158,27 +162,29 @@ public class SysPostServiceImpl implements ISysPostService
 
     /**
      * 新增保存岗位信息
-     * 
+     *
      * @param post 岗位信息
      * @return 结果
      */
     @Override
+    @Transactional(transactionManager="platformTransactionManager", rollbackFor=Exception.class)
     public int insertPost(SysPost post)
     {
-        dev.mesbase.common.utils.bean.BeanValidators.validateWithException(contractValidator,post);
+        BeanValidators.validateWithException(contractValidator,post);
         return postMapper.insertPost(post);
     }
 
     /**
      * 修改保存岗位信息
-     * 
+     *
      * @param post 岗位信息
      * @return 结果
      */
     @Override
+    @Transactional(transactionManager="platformTransactionManager", rollbackFor=Exception.class)
     public int updatePost(SysPost post)
     {
-        dev.mesbase.common.utils.bean.BeanValidators.validateWithException(contractValidator,post);
+        BeanValidators.validateWithException(contractValidator,post);
         return postMapper.updatePost(post);
     }
 }

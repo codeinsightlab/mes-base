@@ -3,21 +3,41 @@ package dev.mesbase.system.openapi.service;
 import com.github.pagehelper.Page;
 import com.github.pagehelper.PageHelper;
 import dev.mesbase.common.exception.ServiceException;
-import dev.mesbase.common.openapi.*;
+import dev.mesbase.common.openapi.OpenApiError;
+import dev.mesbase.common.openapi.OpenApiException;
+import dev.mesbase.common.openapi.OpenApiPrincipal;
 import dev.mesbase.common.utils.SecurityUtils;
-import dev.mesbase.system.openapi.domain.*;
-import dev.mesbase.system.openapi.dto.*;
-import dev.mesbase.system.openapi.mapper.*;
-import dev.mesbase.system.openapi.vo.*;
+import dev.mesbase.system.openapi.domain.OpenApiClient;
+import dev.mesbase.system.openapi.domain.OpenApiClientApi;
+import dev.mesbase.system.openapi.domain.OpenApiClientStatus;
+import dev.mesbase.system.openapi.domain.OpenApiCredentialChange;
+import dev.mesbase.system.openapi.dto.OpenApiAuthorizationQuery;
+import dev.mesbase.system.openapi.dto.OpenApiClientApisRequest;
+import dev.mesbase.system.openapi.dto.OpenApiClientCreateRequest;
+import dev.mesbase.system.openapi.dto.OpenApiClientIdRequest;
+import dev.mesbase.system.openapi.dto.OpenApiClientListRequest;
+import dev.mesbase.system.openapi.dto.OpenApiClientStatusRequest;
+import dev.mesbase.system.openapi.dto.OpenApiCredentialRequest;
+import dev.mesbase.system.openapi.dto.OpenApiTokenCheck;
+import dev.mesbase.system.openapi.mapper.OpenApiClientApiMapper;
+import dev.mesbase.system.openapi.mapper.OpenApiClientExtraMapper;
+import dev.mesbase.system.openapi.mapper.OpenApiClientMapper;
+import dev.mesbase.system.openapi.vo.OpenApiClientPageVo;
+import dev.mesbase.system.openapi.vo.OpenApiClientVo;
+import dev.mesbase.system.openapi.vo.OpenApiSecretVo;
+import java.security.SecureRandom;
+import java.util.Base64;
+import java.util.Date;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.stream.Collectors;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
-
-import java.security.SecureRandom;
-import java.util.*;
-import java.util.stream.Collectors;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
-@org.springframework.boot.autoconfigure.condition.ConditionalOnProperty(name={"mes.system.enabled","open-api.enabled"},havingValue="true")
+@ConditionalOnProperty(name={"mes.system.enabled","open-api.enabled"},havingValue="true")
 public class OpenApiClientService {
     private final OpenApiClientMapper clients;
     private final OpenApiClientExtraMapper extra;
@@ -29,6 +49,8 @@ public class OpenApiClientService {
                                 OpenApiClientApiMapper grants, PasswordEncoder encoder) {
         this.clients = clients; this.extra = extra; this.grants = grants; this.encoder = encoder;
     }
+
+    @Transactional(transactionManager="platformTransactionManager", rollbackFor=Exception.class)
 
     public OpenApiSecretVo create(OpenApiClientCreateRequest request) {
         OpenApiClient entity = new OpenApiClient();
@@ -60,6 +82,8 @@ public class OpenApiClientService {
 
     public OpenApiClientVo detail(Long clientId) { return toVo(required(clientId)); }
 
+    @Transactional(transactionManager="platformTransactionManager", rollbackFor=Exception.class)
+
     public void changeStatus(OpenApiClientStatusRequest request) {
         OpenApiClientStatus status = OpenApiClientStatus.fromCode(request.getStatus());
         lock(request.getClientId());
@@ -67,6 +91,8 @@ public class OpenApiClientService {
         change.setStatus(status.getCode());
         requireUpdated(extra.changeCredentials(change));
     }
+
+    @Transactional(transactionManager="platformTransactionManager", rollbackFor=Exception.class)
 
     public OpenApiSecretVo resetSecret(OpenApiClientIdRequest request) {
         OpenApiClient client = lock(request.getClientId());
@@ -81,6 +107,8 @@ public class OpenApiClientService {
         required(clientId);
         return grants.selectList(grantFilter(clientId)).stream().map(OpenApiClientApi::getApiCode).collect(Collectors.toList());
     }
+
+    @Transactional(transactionManager="platformTransactionManager", rollbackFor=Exception.class)
 
     public void replaceApis(OpenApiClientApisRequest request) {
         // 与启停/重置共用行锁，避免并发替换授权产生半份配置。

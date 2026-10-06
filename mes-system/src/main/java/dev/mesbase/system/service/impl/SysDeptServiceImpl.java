@@ -10,29 +10,34 @@ import dev.mesbase.common.core.text.Convert;
 import dev.mesbase.common.exception.ServiceException;
 import dev.mesbase.common.utils.SecurityUtils;
 import dev.mesbase.common.utils.StringUtils;
+import dev.mesbase.common.utils.bean.BeanValidators;
 import dev.mesbase.common.utils.spring.SpringUtils;
+import dev.mesbase.core.error.ErrorCode;
+import dev.mesbase.core.error.FoundationException;
 import dev.mesbase.system.mapper.SysDeptMapper;
 import dev.mesbase.system.mapper.SysRoleMapper;
 import dev.mesbase.system.service.ISysDeptService;
-
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Service;
-
+import jakarta.validation.Validator;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
 import java.util.stream.Collectors;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * 部门管理 服务实现
- * 
+ *
  * @author ruoyi
  */
 @Service
-@org.springframework.boot.autoconfigure.condition.ConditionalOnProperty(name="mes.system.enabled",havingValue="true")
+@ConditionalOnProperty(name="mes.system.enabled",havingValue="true")
 public class SysDeptServiceImpl implements ISysDeptService
 {
-    @org.springframework.beans.factory.annotation.Autowired private jakarta.validation.Validator contractValidator;
+    @Autowired private Validator contractValidator;
     @Autowired
     private SysDeptMapper deptMapper;
 
@@ -41,7 +46,7 @@ public class SysDeptServiceImpl implements ISysDeptService
 
     /**
      * 查询部门管理数据
-     * 
+     *
      * @param dept 部门信息
      * @return 部门信息集合
      */
@@ -54,7 +59,7 @@ public class SysDeptServiceImpl implements ISysDeptService
 
     /**
      * 构建前端所需要树结构
-     * 
+     *
      * @param depts 部门列表
      * @return 树结构列表
      */
@@ -85,7 +90,7 @@ public class SysDeptServiceImpl implements ISysDeptService
 
     /**
      * 构建前端所需要下拉树结构
-     * 
+     *
      * @param depts 部门列表
      * @return 下拉树结构列表
      */
@@ -98,7 +103,7 @@ public class SysDeptServiceImpl implements ISysDeptService
 
     /**
      * 根据角色ID查询部门树信息
-     * 
+     *
      * @param roleId 角色ID
      * @return 选中部门列表
      */
@@ -111,7 +116,7 @@ public class SysDeptServiceImpl implements ISysDeptService
 
     /**
      * 根据部门ID查询信息
-     * 
+     *
      * @param deptId 部门ID
      * @return 部门信息
      */
@@ -123,7 +128,7 @@ public class SysDeptServiceImpl implements ISysDeptService
 
     /**
      * 根据ID查询所有子部门（正常状态）
-     * 
+     *
      * @param deptId 部门ID
      * @return 子部门数
      */
@@ -135,7 +140,7 @@ public class SysDeptServiceImpl implements ISysDeptService
 
     /**
      * 是否存在子节点
-     * 
+     *
      * @param deptId 部门ID
      * @return 结果
      */
@@ -148,7 +153,7 @@ public class SysDeptServiceImpl implements ISysDeptService
 
     /**
      * 查询部门是否存在用户
-     * 
+     *
      * @param deptId 部门ID
      * @return 结果 true 存在 false 不存在
      */
@@ -161,7 +166,7 @@ public class SysDeptServiceImpl implements ISysDeptService
 
     /**
      * 校验部门名称是否唯一
-     * 
+     *
      * @param dept 部门信息
      * @return 结果
      */
@@ -179,7 +184,7 @@ public class SysDeptServiceImpl implements ISysDeptService
 
     /**
      * 校验部门是否有数据权限
-     * 
+     *
      * @param deptId 部门id
      */
     @Override
@@ -199,14 +204,15 @@ public class SysDeptServiceImpl implements ISysDeptService
 
     /**
      * 新增保存部门信息
-     * 
+     *
      * @param dept 部门信息
      * @return 结果
      */
     @Override
+    @Transactional(transactionManager="platformTransactionManager", rollbackFor=Exception.class)
     public int insertDept(SysDept dept)
     {
-        dev.mesbase.common.utils.bean.BeanValidators.validateWithException(contractValidator,dept);
+        BeanValidators.validateWithException(contractValidator,dept);
         if(dept.getParentId()==null)throw new ServiceException("请选择上级部门");
         if(dept.getParentId()==0L){dept.setAncestors("0");return deptMapper.insertDept(dept);}
         SysDept info = deptMapper.selectDeptById(dept.getParentId());
@@ -222,20 +228,21 @@ public class SysDeptServiceImpl implements ISysDeptService
 
     /**
      * 修改保存部门信息
-     * 
+     *
      * @param dept 部门信息
      * @return 结果
      */
     @Override
+    @Transactional(transactionManager="platformTransactionManager", rollbackFor=Exception.class)
     public int updateDept(SysDept dept)
     {
-        dev.mesbase.common.utils.bean.BeanValidators.validateWithException(contractValidator,dept);
+        BeanValidators.validateWithException(contractValidator,dept);
         if(dept.getParentId()==null)throw new ServiceException("请选择上级部门");
-        SysDept existing=deptMapper.selectDeptById(dept.getDeptId());if(existing==null)throw new dev.mesbase.core.error.FoundationException(dev.mesbase.core.error.ErrorCode.NOT_FOUND);
+        SysDept existing=deptMapper.selectDeptById(dept.getDeptId());if(existing==null)throw new FoundationException(ErrorCode.NOT_FOUND);
         if(dept.getParentId().equals(dept.getDeptId()))throw new ServiceException("上级部门不能为本部门");
         SysDept newParentDept = deptMapper.selectDeptById(dept.getParentId());
         if(dept.getParentId()!=0L && newParentDept==null)throw new ServiceException("上级部门不存在");
-        if(newParentDept!=null && java.util.Arrays.asList(newParentDept.getAncestors().split(",")).contains(dept.getDeptId().toString()))throw new ServiceException("上级部门不能为子部门");
+        if(newParentDept!=null && Arrays.asList(newParentDept.getAncestors().split(",")).contains(dept.getDeptId().toString()))throw new ServiceException("上级部门不能为子部门");
         if(dept.getParentId()==0L){dept.setAncestors("0");updateDeptChildren(dept.getDeptId(),"0",existing.getAncestors());}
         SysDept oldDept = deptMapper.selectDeptById(dept.getDeptId());
         if (StringUtils.isNotNull(newParentDept) && StringUtils.isNotNull(oldDept))
@@ -257,7 +264,7 @@ public class SysDeptServiceImpl implements ISysDeptService
 
     /**
      * 修改该部门的父级部门状态
-     * 
+     *
      * @param dept 当前部门
      */
     private void updateParentDeptStatusNormal(SysDept dept)
@@ -269,11 +276,12 @@ public class SysDeptServiceImpl implements ISysDeptService
 
     /**
      * 修改子元素关系
-     * 
+     *
      * @param deptId 被修改的部门ID
      * @param newAncestors 新的父ID集合
      * @param oldAncestors 旧的父ID集合
      */
+    @Transactional(transactionManager="platformTransactionManager", rollbackFor=Exception.class)
     public void updateDeptChildren(Long deptId, String newAncestors, String oldAncestors)
     {
         List<SysDept> children = deptMapper.selectChildrenDeptById(deptId);
@@ -289,11 +297,12 @@ public class SysDeptServiceImpl implements ISysDeptService
 
     /**
      * 删除部门管理信息
-     * 
+     *
      * @param deptId 部门ID
      * @return 结果
      */
     @Override
+    @Transactional(transactionManager="platformTransactionManager", rollbackFor=Exception.class)
     public int deleteDeptById(Long deptId)
     {
         return deptMapper.deleteDeptById(deptId);

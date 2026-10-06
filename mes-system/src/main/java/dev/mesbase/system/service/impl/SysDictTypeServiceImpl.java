@@ -6,31 +6,30 @@ import dev.mesbase.common.core.domain.entity.SysDictType;
 import dev.mesbase.common.exception.ServiceException;
 import dev.mesbase.common.utils.DictUtils;
 import dev.mesbase.common.utils.StringUtils;
+import dev.mesbase.common.utils.bean.BeanValidators;
 import dev.mesbase.system.mapper.SysDictDataMapper;
 import dev.mesbase.system.mapper.SysDictTypeMapper;
 import dev.mesbase.system.service.ISysDictTypeService;
-
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-
+import jakarta.validation.Validator;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
-
-import jakarta.annotation.PostConstruct;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * 字典 业务层处理
- * 
+ *
  * @author ruoyi
  */
 @Service
-@org.springframework.boot.autoconfigure.condition.ConditionalOnProperty(name="mes.system.enabled",havingValue="true")
+@ConditionalOnProperty(name="mes.system.enabled",havingValue="true")
 public class SysDictTypeServiceImpl implements ISysDictTypeService
 {
-    @org.springframework.beans.factory.annotation.Autowired private jakarta.validation.Validator contractValidator;
+    @Autowired private Validator contractValidator;
     @Autowired
     private SysDictTypeMapper dictTypeMapper;
 
@@ -40,7 +39,7 @@ public class SysDictTypeServiceImpl implements ISysDictTypeService
     /**
      * 项目启动时，初始化字典到缓存
      */
-    
+
     public void init()
     {
         loadingDictCache();
@@ -48,7 +47,7 @@ public class SysDictTypeServiceImpl implements ISysDictTypeService
 
     /**
      * 根据条件分页查询字典类型
-     * 
+     *
      * @param dictType 字典类型信息
      * @return 字典类型集合信息
      */
@@ -60,7 +59,7 @@ public class SysDictTypeServiceImpl implements ISysDictTypeService
 
     /**
      * 根据所有字典类型
-     * 
+     *
      * @return 字典类型集合信息
      */
     @Override
@@ -71,7 +70,7 @@ public class SysDictTypeServiceImpl implements ISysDictTypeService
 
     /**
      * 根据字典类型查询字典数据
-     * 
+     *
      * @param dictType 字典类型
      * @return 字典数据集合信息
      */
@@ -94,7 +93,7 @@ public class SysDictTypeServiceImpl implements ISysDictTypeService
 
     /**
      * 根据字典类型ID查询信息
-     * 
+     *
      * @param dictId 字典类型ID
      * @return 字典类型
      */
@@ -106,7 +105,7 @@ public class SysDictTypeServiceImpl implements ISysDictTypeService
 
     /**
      * 根据字典类型查询信息
-     * 
+     *
      * @param dictType 字典类型
      * @return 字典类型
      */
@@ -118,10 +117,11 @@ public class SysDictTypeServiceImpl implements ISysDictTypeService
 
     /**
      * 批量删除字典类型信息
-     * 
+     *
      * @param dictIds 需要删除的字典ID
      */
     @Override
+    @Transactional(transactionManager="platformTransactionManager", rollbackFor=Exception.class)
     public void deleteDictTypeByIds(Long[] dictIds)
     {
         for (Long dictId : dictIds)
@@ -164,6 +164,7 @@ public class SysDictTypeServiceImpl implements ISysDictTypeService
      * 重置字典缓存数据
      */
     @Override
+    @Transactional(transactionManager="platformTransactionManager", rollbackFor=Exception.class)
     public void resetDictCache()
     {
         clearDictCache();
@@ -172,14 +173,15 @@ public class SysDictTypeServiceImpl implements ISysDictTypeService
 
     /**
      * 新增保存字典类型信息
-     * 
+     *
      * @param dict 字典类型信息
      * @return 结果
      */
     @Override
+    @Transactional(transactionManager="platformTransactionManager", rollbackFor=Exception.class)
     public int insertDictType(SysDictType dict)
     {
-        dev.mesbase.common.utils.bean.BeanValidators.validateWithException(contractValidator,dict);
+        BeanValidators.validateWithException(contractValidator,dict);
         int row = dictTypeMapper.insertDictType(dict);
         if (row > 0)
         {
@@ -190,15 +192,17 @@ public class SysDictTypeServiceImpl implements ISysDictTypeService
 
     /**
      * 修改保存字典类型信息
-     * 
+     *
      * @param dict 字典类型信息
      * @return 结果
      */
     @Override
-    
+
+    @Transactional(transactionManager="platformTransactionManager", rollbackFor=Exception.class)
+
     public int updateDictType(SysDictType dict)
     {
-        dev.mesbase.common.utils.bean.BeanValidators.validateWithException(contractValidator,dict);
+        BeanValidators.validateWithException(contractValidator,dict);
         SysDictType oldDict = dictTypeMapper.selectDictTypeById(dict.getDictId());
         dictDataMapper.updateDictDataType(oldDict.getDictType(), dict.getDictType());
         int row = dictTypeMapper.updateDictType(dict);
@@ -212,7 +216,7 @@ public class SysDictTypeServiceImpl implements ISysDictTypeService
 
     /**
      * 校验字典类型称是否唯一
-     * 
+     *
      * @param dict 字典类型
      * @return 结果
      */

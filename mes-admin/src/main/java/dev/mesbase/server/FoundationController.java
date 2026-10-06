@@ -1,12 +1,21 @@
 package dev.mesbase.server;
-import org.springframework.web.bind.annotation.*;
-import org.springframework.security.core.Authentication;
-import jakarta.validation.Valid;
-import jakarta.validation.constraints.*;
-import java.util.List;
+
 import dev.mesbase.core.security.AuthenticatedActor;
 import dev.mesbase.platform.web.EndpointAccess;
-import static dev.mesbase.platform.web.EndpointAccess.Kind.*;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Pattern;
+import java.util.List;
+import org.springframework.security.core.Authentication;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+import static dev.mesbase.platform.web.EndpointAccess.Kind.AUTHENTICATED;
+import static dev.mesbase.platform.web.EndpointAccess.Kind.AUTHORIZED;
+import static dev.mesbase.platform.web.EndpointAccess.Kind.PUBLIC;
+
 @RestController
 public final class FoundationController {
     public record HealthView(String status) {}
@@ -23,6 +32,4 @@ public final class FoundationController {
     public FoundationService.ScopeView preference(Authentication actor,@Valid @RequestBody PreferenceRequest request) { return service.remember(new AuthenticatedActor(actor.getName()),request.factoryId()); }
     @GetMapping("/api/foundation/access") @EndpointAccess(value=AUTHORIZED,permission="foundation:access:read")
     public FoundationService.AccessView access() { return service.access(); }
-    @GetMapping("/api/foundation/erp/connection") @EndpointAccess(value=AUTHORIZED,permission="foundation:erp:inspect")
-    public void erp() { service.inspectErp(); }
 }

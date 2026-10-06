@@ -1,28 +1,47 @@
 package dev.mesbase.server;
 
-import org.springframework.context.annotation.*;
+import dev.mesbase.core.error.ErrorCode;
+import dev.mesbase.core.factory.FactoryCatalog;
+import dev.mesbase.core.factory.FactoryPreference;
+import dev.mesbase.core.factory.FactorySelectionService;
+import dev.mesbase.core.security.AuthorizationService;
+import dev.mesbase.framework.security.SystemTokenFilter;
+import dev.mesbase.infrastructure.catalog.InMemoryFactoryCatalog;
+import dev.mesbase.infrastructure.catalog.InMemoryFactoryPreference;
+import dev.mesbase.infrastructure.persistence.BusinessPersistence;
+import dev.mesbase.infrastructure.persistence.BusinessPersistenceResolver;
+import dev.mesbase.infrastructure.persistence.ConfiguredBusinessPersistenceResolver;
+import dev.mesbase.infrastructure.persistence.DedicatedDatabasePersistence;
+import dev.mesbase.infrastructure.persistence.RuntimeRegistry;
+import dev.mesbase.platform.security.PlatformAuthorization;
+import dev.mesbase.platform.web.EndpointCatalog;
+import dev.mesbase.platform.web.ErrorWriter;
+import dev.mesbase.platform.web.FoundationAccessInterceptor;
+import java.util.List;
+import java.util.Map;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.SmartInitializingSingleton;
 import org.springframework.beans.factory.annotation.Qualifier;
-import org.springframework.web.servlet.config.annotation.*;
-import org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerMapping;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.core.env.Environment;
+import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
-import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.config.http.SessionCreationPolicy;
-import org.springframework.security.core.userdetails.*;
-import dev.mesbase.core.factory.*;
-import dev.mesbase.core.security.*;
-import dev.mesbase.infrastructure.catalog.*;
-import dev.mesbase.infrastructure.persistence.*;
-import dev.mesbase.integration.erp.*;
-import dev.mesbase.platform.web.*;
-import dev.mesbase.core.error.ErrorCode;
-
-import java.util.List;
+import org.springframework.security.core.userdetails.UserDetailsService;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
+import org.springframework.security.crypto.factory.PasswordEncoderFactories;
+import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.www.BasicAuthenticationFilter;
+import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
+import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
+import org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerMapping;
 
 @Configuration
 public class FoundationConfiguration {
     @Bean
-    @org.springframework.boot.autoconfigure.condition.ConditionalOnProperty(name = "mes.runtime.enabled", havingValue = "false", matchIfMissing = true)
+    @ConditionalOnProperty(name = "mes.runtime.enabled", havingValue = "false", matchIfMissing = true)
     FactoryCatalog factoryCatalog() {
         return new InMemoryFactoryCatalog(List.of());
     }
@@ -33,13 +52,13 @@ public class FoundationConfiguration {
     }
 
     @Bean
-    @org.springframework.boot.autoconfigure.condition.ConditionalOnProperty(name = "mes.system.enabled", havingValue = "false", matchIfMissing = true)
+    @ConditionalOnProperty(name = "mes.system.enabled", havingValue = "false", matchIfMissing = true)
     AuthorizationService authorization() {
         return (actor, scope, permission) -> false;
     }
 
     @Bean
-    @org.springframework.boot.autoconfigure.condition.ConditionalOnProperty(name = "mes.system.enabled", havingValue = "false", matchIfMissing = true)
+    @ConditionalOnProperty(name = "mes.system.enabled", havingValue = "false", matchIfMissing = true)
     UserDetailsService users() {
         return name -> {
             throw new UsernameNotFoundException("Account not found");
@@ -52,34 +71,31 @@ public class FoundationConfiguration {
     }
 
     @Bean
-    @org.springframework.boot.autoconfigure.condition.ConditionalOnProperty(name = "mes.runtime.enabled", havingValue = "false", matchIfMissing = true)
+    @ConditionalOnProperty(name = "mes.runtime.enabled", havingValue = "false", matchIfMissing = true)
     ConfiguredBusinessPersistenceResolver persistenceResolver(FactoryCatalog catalog) {
-        return new ConfiguredBusinessPersistenceResolver(catalog, java.util.Map.of());
+        return new ConfiguredBusinessPersistenceResolver(catalog, Map.of());
     }
 
     @Bean
+    @ConditionalOnProperty(name="mes.system.enabled",havingValue="false",matchIfMissing=true)
     BusinessPersistence businessPersistence(BusinessPersistenceResolver resolver, RuntimeRegistry registry) {
         return new DedicatedDatabasePersistence(resolver, registry);
     }
 
     @Bean
-    @org.springframework.boot.autoconfigure.condition.ConditionalOnProperty(name = "mes.runtime.enabled", havingValue = "false", matchIfMissing = true)
+    @ConditionalOnProperty(name = "mes.runtime.enabled", havingValue = "false", matchIfMissing = true)
     RuntimeRegistry runtimes() {
         return new RuntimeRegistry();
     }
 
-    @Bean
-    FactoryErpConnectionResolver erp() {
-        return new NotConfiguredErpResolver();
-    }
 
     @Bean
-    SecurityFilterChain security(HttpSecurity http, UserDetailsService users, org.springframework.beans.factory.ObjectProvider<dev.mesbase.framework.security.SystemTokenFilter> systemTokens, org.springframework.core.env.Environment env) throws Exception {
-        var provider = new org.springframework.security.authentication.dao.DaoAuthenticationProvider(users);
-        provider.setPasswordEncoder(org.springframework.security.crypto.factory.PasswordEncoderFactories.createDelegatingPasswordEncoder());
+    SecurityFilterChain security(HttpSecurity http, UserDetailsService users, ObjectProvider<SystemTokenFilter> systemTokens, Environment env) throws Exception {
+        var provider = new DaoAuthenticationProvider(users);
+        provider.setPasswordEncoder(PasswordEncoderFactories.createDelegatingPasswordEncoder());
         http.authenticationProvider(provider);
         if (systemTokens.getIfAvailable() != null)
-            http.addFilterBefore(systemTokens.getObject(), org.springframework.security.web.authentication.www.BasicAuthenticationFilter.class);
+            http.addFilterBefore(systemTokens.getObject(), BasicAuthenticationFilter.class);
         if (env.getProperty("mes.system.enabled", Boolean.class, false)) http.httpBasic(basic -> basic.disable());
         else http.httpBasic(basic -> basic.authenticationEntryPoint((request, response, error) -> {
             response.setHeader("WWW-Authenticate", "Basic realm=mes-base");
@@ -92,7 +108,7 @@ public class FoundationConfiguration {
     }
 
     @Bean
-    WebMvcConfigurer accessRules(FactorySelectionService selection, AuthorizationService authorization, org.springframework.beans.factory.ObjectProvider<dev.mesbase.platform.security.PlatformAuthorization> platform) {
+    WebMvcConfigurer accessRules(FactorySelectionService selection, AuthorizationService authorization, ObjectProvider<PlatformAuthorization> platform) {
         return new WebMvcConfigurer() {
             public void addInterceptors(InterceptorRegistry registry) {
                 registry.addInterceptor(new FoundationAccessInterceptor(selection, authorization, platform.getIfAvailable(() -> (actor, permission) -> false)));

@@ -1,33 +1,28 @@
 package dev.mesbase.infrastructure.persistence;
+
+import dev.mesbase.core.error.ErrorCode;
+import dev.mesbase.core.error.FoundationException;
+import dev.mesbase.core.factory.FactoryId;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
 import javax.sql.DataSource;
-import java.util.*;
-import org.apache.ibatis.mapping.Environment;
-import org.apache.ibatis.session.*;
-import org.apache.ibatis.transaction.managed.ManagedTransactionFactory;
-import org.springframework.jdbc.support.JdbcTransactionManager;
-import dev.mesbase.core.error.*;
+
 /** Node-local owner of versioned pools; replacements drain borrowed units of work. */
 public final class RuntimeRegistry implements AutoCloseable {
     static final class Runtime {
         final DatasourceIdentity identity; final long revision; final DataSource datasource;
-        final Runnable closePool; final Set<Class<?>> mappers; final SqlSessionFactory sessions;
-        final JdbcTransactionManager transactions;
+        final Runnable closePool; final Set<Class<?>> mappers;
         int leases; boolean retired; boolean poolClosed;
-        Runtime(DatasourceIdentity identity,long revision,DataSource datasource,Runnable closePool,Set<Class<?>> mappers,Runnable verify) {
+        Runtime(DatasourceIdentity identity,long revision,DataSource datasource,Runnable closePool,Set<Class<?>> mappers) {
             this.identity=identity; this.revision=revision; this.datasource=datasource; this.closePool=closePool; this.mappers=Set.copyOf(mappers);
-            ManagedTransactionFactory transactionFactory=new ManagedTransactionFactory();
-            Properties properties=new Properties(); properties.setProperty("closeConnection","false"); transactionFactory.setProperties(properties);
-            Configuration config=new Configuration(new Environment("business",transactionFactory,datasource));
-            config.setCacheEnabled(false); config.setLocalCacheScope(LocalCacheScope.STATEMENT);
-            config.addInterceptor(new BusinessStatementGuard(verify));
-            var page=new com.github.pagehelper.PageInterceptor();
-            var pagination=new Properties();pagination.setProperty("autoRuntimeDialect","true");pagination.setProperty("reasonable","false");page.setProperties(pagination);config.addInterceptor(page);
-            for(Class<?> mapper:mappers) {
-                PersistenceOwner owner=mapper.getAnnotation(PersistenceOwner.class);
-                if(owner==null || owner.value()!=PersistenceOwner.Kind.BUSINESS) throw new IllegalArgumentException("Explicit BUSINESS mapper ownership required");
-                config.addMapper(mapper);
+            for (Class<?> mapper : mappers) {
+                PersistenceOwner owner = mapper.getAnnotation(PersistenceOwner.class);
+                if (owner == null || owner.value() != PersistenceOwner.Kind.BUSINESS)
+                    throw new IllegalArgumentException("Explicit BUSINESS mapper ownership required");
             }
-            sessions=new SqlSessionFactoryBuilder().build(config); transactions=new JdbcTransactionManager(datasource);
         }
         void drain() { if(retired && leases==0 && !poolClosed) { poolClosed=true; closePool.run(); } }
     }
@@ -39,9 +34,9 @@ public final class RuntimeRegistry implements AutoCloseable {
         public void close() { synchronized(RuntimeRegistry.this) { if(!released) { released=true; runtime.leases--; runtime.drain(); } } }
     }
     private final Map<DatasourceIdentity,Runtime> current=new HashMap<>();
-    private final Map<DatasourceIdentity,dev.mesbase.core.factory.FactoryId> dedicatedOwners=new HashMap<>(); private boolean closed;
+    private final Map<DatasourceIdentity,FactoryId> dedicatedOwners=new HashMap<>(); private boolean closed;
     /** A prepared pool transfers ownership only on success. Failed preparations are closed. */
-    public synchronized void registerDedicated(dev.mesbase.core.factory.FactoryId factoryId,DatasourceIdentity identity,long revision,DataSource datasource,Runnable closer,Set<Class<?>> mappers) {
+    public synchronized void registerDedicated(FactoryId factoryId,DatasourceIdentity identity,long revision,DataSource datasource,Runnable closer,Set<Class<?>> mappers) {
         Objects.requireNonNull(factoryId); Objects.requireNonNull(identity); Objects.requireNonNull(datasource); Objects.requireNonNull(closer); Objects.requireNonNull(mappers);
         for(Runtime existing:current.values()) {
             if(existing.datasource==datasource) throw new FoundationException(ErrorCode.CONFLICT);
@@ -53,10 +48,13 @@ public final class RuntimeRegistry implements AutoCloseable {
         Runtime previous=current.get(identity);
         if(previous!=null && previous.revision>=revision) { closer.run(); throw new FoundationException(ErrorCode.CONFLICT); }
         Runtime replacement;
-        try { replacement=new Runtime(identity,revision,datasource,closer,mappers,() -> DedicatedDatabasePersistence.verifyStatement(identity,revision)); }
+        try { replacement=new Runtime(identity,revision,datasource,closer,mappers); }
         catch(RuntimeException | Error failure) { closer.run(); throw failure; }
         current.put(identity,replacement); dedicatedOwners.put(identity,factoryId);
         if(previous!=null) { previous.retired=true; previous.drain(); }
+    }
+    public synchronized Set<Class<?>> mapperTypes() {
+        Set<Class<?>> result = new HashSet<>(); current.values().forEach(runtime -> result.addAll(runtime.mappers)); return Set.copyOf(result);
     }
     public synchronized boolean contains(BusinessRuntimeBinding binding) {
         var runtime=current.get(binding.datasourceIdentity());
