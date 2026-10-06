@@ -4587,5 +4587,6 @@
     "datasourceSource": "ktg-framework/src/main/java/com/ktg/framework/factory/ManagedDatasourceService.java + ktg-system MfFactory/MfDatasource and scripts/mf-upgrade/sql/001-master-init.sql",
     "syncSource": "AGENTS.md:1045-1065 + MasterSync/MasterSyncExtraMapper.xml/claim/recoverStale",
     "credentialMigration": "Existing Base test instance connections imported locally once; no Source Product connection values or records copied"
-  }
+  },
+  "currentScope": "2026-10-06: foundation/system infrastructure active; production monitor and personnel analysis deferred and archived outside active source/build."
 }

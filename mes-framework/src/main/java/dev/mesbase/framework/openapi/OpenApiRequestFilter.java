@@ -9,7 +9,7 @@ import org.springframework.web.filter.OncePerRequestFilter;
 import jakarta.servlet.*;
 import jakarta.servlet.http.*;
 import java.io.IOException;
-import java.util.UUID;
+import dev.mesbase.platform.web.RequestBoundaryFilter;
 
 /** 在专用Security链的最外层覆盖成功、认证拒绝、限流和异常。 */
 public class OpenApiRequestFilter extends OncePerRequestFilter {
@@ -20,7 +20,7 @@ public class OpenApiRequestFilter extends OncePerRequestFilter {
     @Override protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain)
             throws ServletException, IOException {
         long started = System.currentTimeMillis();
-        String requestId = UUID.randomUUID().toString();
+        String requestId = RequestBoundaryFilter.requestId(request);
         String previous = MDC.get("requestId");
         request.setAttribute(OpenApiHttp.REQUEST_ID, requestId);
         response.setHeader("X-Request-Id", requestId); response.setHeader("Cache-Control", "no-store");

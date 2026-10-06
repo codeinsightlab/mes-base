@@ -48,9 +48,6 @@ spring:
 mes:
   erp:
     enabled: false
-  analytics:
-    # Enable only after the current business schema and source status dictionaries are verified.
-    enabled: false
   storage:
     type: local
   system:

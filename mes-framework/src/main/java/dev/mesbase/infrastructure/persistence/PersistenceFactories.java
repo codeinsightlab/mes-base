@@ -14,6 +14,16 @@ public final class PersistenceFactories {
     private PersistenceFactories() {}
     public static SqlSessionFactory create(DataSource source, Set<Class<?>> mappers,
             Consumer<Configuration> setup, Runnable verify) {
+        return build(source, mappers, setup, verify);
+    }
+
+    /** MapperFactoryBean registers production interfaces and XML with this factory. */
+    public static SqlSessionFactory scanned(DataSource source, Consumer<Configuration> setup, Runnable verify) {
+        return build(source, Set.of(), setup, verify);
+    }
+
+    private static SqlSessionFactory build(DataSource source, Set<Class<?>> mappers,
+            Consumer<Configuration> setup, Runnable verify) {
         try {
             Configuration configuration = new Configuration();
             configuration.setCacheEnabled(false);

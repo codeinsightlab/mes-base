@@ -8,7 +8,6 @@
     </parent>
     <artifactId>mes-admin</artifactId>
     <dependencies>
-        <dependency><groupId>dev.mesbase</groupId><artifactId>mes-mes</artifactId><version>${project.version}</version></dependency>
         <dependency>
             <groupId>dev.mesbase</groupId>
             <artifactId>mes-quartz</artifactId>

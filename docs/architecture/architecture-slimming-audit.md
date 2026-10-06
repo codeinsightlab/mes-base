@@ -486,3 +486,60 @@ system=true 时 Basic 关闭、SystemTokenFilter 插入，其 XSS/内部 token/O
 JAR 条目名检查同时证实 application-dev.yml/application-prod.yml 被打包；敏感字面量只做存在性统计，不输出值、有效性或连接细节，见 P1-10。本地产物生成成功不等于适合公开分发。
 未运行前端 build/UI（本轮未改 UI）、真实 MySQL/SQL Server/Redis/MinIO、实际异步跨请求污染复现或生产部署；没有提交/推送，也没有重启用户服务。
 回滚只恢复本轮四个删除文件、SystemConfiguration/application.yml/两个架构测试/smoke 及对应审计/ADR/来源清单追加，不使用 reset/clean 覆盖原有工作。
+
+## 10. 2026-10-06 补充：复用 Spring 标准数据源路由
+
+用户追问数据源切换为何自实现后，补充核对 Spring 官方 API。此前“路由职责必要、当前有装配调用”的事实，不足以证明整套自定义路由实现必要。
+
+当前 ErpRoutingDataSource 继承 AbstractDataSource，自行保存连接池映射、查找目标池并转发 getConnection。
+Spring 的 [AbstractRoutingDataSource](https://docs.spring.io/spring-framework/docs/current/javadoc-api/org/springframework/jdbc/datasource/lookup/AbstractRoutingDataSource.html) 已提供 targetDataSources、determineCurrentLookupKey、连接转发和已解析池映射；通用选库部分应优先复用。
+这是强烈建议简化的补充候选，不能只以“有调用者”认定现有实现合理。
+
+项目额外语义仍需明确保留或以测试证明等价：事务内换标识立即拒绝、跨 owner 事务拒绝、上下文异常恢复、连接池关闭，以及禁止请求凭证覆盖配置身份。
+Spring 的 [DataSourceTransactionManager](https://docs.spring.io/spring-framework/docs/current/javadoc-api/org/springframework/jdbc/datasource/DataSourceTransactionManager.html) 已管理线程绑定连接和事务生命周期；连接绑定本身不等于校验应用层标识中途变化。
+采用标准路由时应不设置默认目标、关闭 lenient fallback，并明确拒绝缺失标识；仅设置 lenientFallback=false 仍允许 null 标识使用已配置默认库。
+
+业务 Factory 路由另有版本/租约/旧池生命周期，不能直接推断与固定 ERP 连接映射完全等价，须分别审查。
+本次仅更新架构判断和官方依据，未修改业务或基础设施 Java 代码、未实施替换、未运行新的等价性测试；现有第 9 节验证快照保持历史含义。
+
+## 11. 2026-10-06 补充：生产监控与人员分析后置
+
+用户明确决定：当前集中建设基础架构，撤出过早接入的生产监控与人员分析，后续业务接入时重新审查。本节覆盖此前保留这两项分析业务的范围结论。
+
+- 移除整个 `mes-mes` 模块、父 POM 模块注册、admin 依赖及 `mes.analytics.enabled` 开关；当前 Maven 为 6 个 JAR 模块加父 POM，生产 business Mapper 数量为 0。
+- 移除前端两项业务页面、组件和 API；保留混合回归中的基础组件用例，会话恢复验证使用 TEST ONLY 权限。系统监控、工作区、工厂/数据源、同步协调与三工厂隔离基础保留。ECharts 仍供系统缓存监控使用。
+- 追踪并移除基础模块中仅为人员分析存在的 `SystemUserLookup`、`UserLookupQuery`、`SysUserDisplayExtraMapper` 和 XML，避免业务依赖留在基础设施里。
+- 基础装配测试不再要求人员分析 Mapper 存在，改为验证生产业务 Mapper 为空；已有独立 TEST ONLY 探针继续验证 Factory A/B 路由、事务固定、跨 owner 拒绝与 ERP 隔离。没有为维持扫描计数增加生产业务探针。
+- 保留 V13 原文件；新增 V15 前向迁移清理功能菜单、功能权限及角色菜单关联，仅删除已空的迁移创建生产分组，保留工厂/数据源及其他菜单。没有修改真实数据库或删除业务数据。已有实例应用 V15 前仍可能保留旧菜单。
+
+备份见 [归档说明](../../migration-backups/2026-10-06-deferred-production-analytics/README.md)。`source.tar.gz` 中有 66 个功能文件和 10 个接入快照，`manifest.json` 记录仓库 HEAD、SHA-256 与文件用途；全部 76 项重新读取归档并校验哈希。包含原许可及迁移来源快照，不包含私有配置、凭证或业务数据，不参与构建。接入快照供审查，不能直接覆盖当前配置与历史迁移。
+
+实际验证：
+
+| 验证 | 结果 / 边界 |
+| --- | --- |
+| IDEA 原生 formatter，当前 `.idea/codeStyles/Project.xml` | 3 个修改/新增 Java 文件格式化通过。仓库目前不存在 `scripts/format-java`；本次直接调用已安装 IDEA `format.sh`，使用独立临时配置与从当前 Project 导出的同一 code scheme，未新增或替换仓库工具。 |
+| `mvn -B -ntp test` | 通过；随后对最终源码执行干净 verify，排除删除源码的残留 class。 |
+| `mvn -B -ntp clean verify` | BUILD SUCCESS；160 项，156 通过、4 个 opt-in 真实 MySQL 用例跳过，无失败或错误。 |
+| V13 → V15 菜单迁移 fixture | 2 项通过，实际执行迁移资源；验证空分组撤回、共享分组/自定义菜单/基础管理及业务标记保留、角色菜单无孤儿。仅 H2 MySQL mode，不等于真实 MySQL 迁移验收。 |
+| `/usr/bin/python3 scripts/smoke-packaged.py` | 5 项通过；安装包不含 mes-mes、业务类/Mapper 或人员查询适配器，隔离启动检查通过。未重启用户服务。 |
+| UI Node 22：`npm test` / `npm run build` | 17 套、82 项测试通过；类型检查与生产构建通过。src 与 dist 均无两项业务引用。既有大 chunk 警告仍在。 |
+| UI `npm run lint` | 未通过：41 个已有错误、1 个警告。本次修改的组件回归测试单独 lint 通过；sessionRestore 原始归档快照复现同一第 8 行错误。其他报错文件没有在本任务中修改。没有扩大本次范围修复用户工作。 |
+| `python3 scripts/export-phase1-sql.py` | 导出 V1..V15 的有序 SQL，通过版本连续性检查；未执行导入。 |
+| 两仓库 `git diff --check` / 备份 / 原有工作 | 通过；除本任务明确改动的报告与会话测试，原有脏文件哈希保持不变。未提交、推送或部署。 |
+
+日志与原有工作哈希快照保存于 `target/deferred-business-removal/`，打包检查详情位于 `target/validation/`。未来业务恢复必须重新审查 Schema/SQL、Factory 与权限、响应契约和页面，不能将归档或原业务单元测试当作当前业务验收。
+
+## 12. 2026-10-06 补充：五组 P1 判断复核
+
+本次只复核当前源码与 POM，未修改生产代码、配置或测试，未执行新的污染复现测试。业务撤出没有自动消除以下基础设施问题。
+
+| 项目 | 当前证据与结论 |
+| --- | --- |
+| P1-01 | OwnerMapperCatalog 构造器扫描固定包，OwnerMapperRegistration 随后注册 MapperScannerConfigurer 再扫同包；PersistenceFactories.create 再 addMapper。两次类路径扫描与职责耦合已确认；addMapper 是 MyBatis 内部注册，不能算第三次扫描或据此认定重复 Spring Bean。归属、重名、ERP 开关及类型集合消费者仍须保留。 |
+| P1-02 | RequestBoundaryFilter 创建 UUID 写入 mes.requestId、响应头和 MDC；OpenApiRequestFilter 独立创建 UUID 写入 OpenApiHttp.REQUEST_ID，并覆盖响应头和 MDC。双 ID 已确认，OpenAPI 过滤器仍负责错误协议、访问日志和 SecurityContext 清理。统一 ID 可作为独立小改动，保留这些职责。 |
+| P1-05 / P1-08 | FactoryContext 为普通 ThreadLocal，RequestBoundaryFilter 同步 finally 清理/恢复；未发现同线程 A→B 异步异常污染的完整验证，不能宣称已证实跨厂泄漏。PageUtils.startPage 设置状态，请求边界未统一 clearPage；SystemFileController.list 先 startPage，随后 SysAttachmentServiceImpl.list 的 policy 可在调用 Mapper 前抛错，是实际可触发的异常路径。需要先执行同线程异常退出与下一请求测试，再修复；测试自身 @AfterEach 的 clearPage 不能作为生产清理证据。 |
+| P1-06 | SpringUtils.getBean 仍用于 DictUtils、MessageUtils、菜单权限及 Quartz 执行入口；用户/角色/部门 Service 仍用 getAopProxy(this)，其实现依赖 AopContext.currentProxy；启动类 exposeProxy=true。隐式依赖已确认，应逐消费者迁移并保持授权/数据范围拦截，不能直接删除工具或代理开关。 |
+| P1-07 | 根 POM 有 27 个直接依赖，其中 19 个未声明 scope、默认 compile，其余包含 runtime/test。子模块继承父 dependencies，编译边界过宽成立。但 mes-common 当前已经包含 SpringUtils、RedisCache、BaseController、SecurityUtils、PageUtils 等框架代码，并同时承载 dev.mesbase.core 包。依赖下沉应匹配真实消费者；仅改 POM 无法禁止同一模块中 Core 导入合法供 common 使用的 Spring。纯 Core 的编译隔离需要另行明确模块边界，或采用包级架构检查，不能借依赖治理机械搬迁全部历史 common。 |
+
+建议顺序：先对 ThreadLocal 写独立复现测试，同时以小改动统一 Request ID；Mapper 注册单独治理；依赖下沉先盘点消费者、限定目标边界；Service Locator 与当前代理依赖渐进处理。结构问题、可达风险和已执行的运行证据分别记录。

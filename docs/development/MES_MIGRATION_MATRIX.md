@@ -1,5 +1,12 @@
 # MES Migration Matrix
 
+## 2026-10-06 当前范围：基础架构先行，业务分析后置
+
+用户决定撤出生产监控和人员分析。两项能力的后端 `mes-mes`、前端页面/API 及专属测试已归档到 `migration-backups/2026-10-06-deferred-production-analytics/`，不再参与构建或 Mapper 扫描。V15 撤销菜单和角色菜单关联；V13 保留原样。此前关于继续迁入或默认关闭这两项能力的内容属于历史记录，由本节覆盖。
+
+当前保留工厂/数据源、权限/资源隔离、系统监控、同步协调和三工厂持久化基础。隔离与事务验证继续使用独立 TEST ONLY 探针，不能依赖尚未接入的业务。后续恢复需重新审查业务 Schema、SQL、权限、Factory 范围及页面契约；归档不是验收通过。
+
+
 ## 2026-10-06 范围细化：数据源、生产监控、人员分析与同步协调
 
 用户最新确认覆盖前一节的全分支范围表述：当前主要迁移数据源管理、生产监控和人员分析。外部系统功能不在范围内，Base 暂时只预留外部接口，不实现 ERP/WMS/外部 MES 等连接适配器、远程调用或具体外部同步流程。通用同步协调能力明确纳入：迁入分支 `mes_master_sync` 状态表及其数据库抢占、执行令牌和恢复机制，作为后续系统同步的统一分布式互斥基础；不因其源代码位于 erp 包就整块排除，也不带入 ERP 依赖。
@@ -217,6 +224,6 @@ YES为静态源码存在，PARTIAL为链路未完整关联或非DB接口；Web/P
 | --- | --- | --- |
 | 数据源/工厂管理 | Source表、AES-GCM、DDL、分页、Vue3；Base字符串FactoryId、revision/enterpriseId | dev/prod真实库迁移；管理/隔离/分页/DDL验证；授权浏览器验收待做 |
 | 同步协调基础 | mes_master_sync / SyncCoordinator；factory_id + sync_key / run_token | 真实MySQL、双JVM抢占、跨厂独立、恢复/旧令牌拒绝通过；外部执行器未迁 |
-| 生产监控 | Source productionmonitor DTO/Service/Mapper/XML/页面 | 9项Source单元通过；当前Schema/字典/真实SQL/UI待验收，默认关闭 |
-| 人员分析 | Source personnelanalysis与记录钻取 | 3项Source单元通过；当前Schema/字典/真实SQL/UI待验收，默认关闭 |
+| 生产监控 | Source productionmonitor DTO/Service/Mapper/XML/页面 | DEFERRED_ARCHIVED；已从运行产品撤出，源码与原测试备份，未来重新审查 |
+| 人员分析 | Source personnelanalysis与记录钻取 | DEFERRED_ARCHIVED；已从运行产品撤出，源码与原测试备份，未来重新审查 |
 | ERP/WMS/外部MES实现 | 当前范围排除 | 未引入客户连接/外部调用/具体同步流程 |

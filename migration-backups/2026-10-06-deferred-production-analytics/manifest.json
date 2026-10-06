@@ -1,0 +1,466 @@
+{
+  "date": "2026-10-06",
+  "status": "DEFERRED_ARCHIVED",
+  "repositories": {
+    "/Users/user/work/lixin/mes-base": "66180a5e4dc8d782bf393de1ce893ab4a627e798",
+    "/Users/user/work/lixin/mes-base-ui": "ffca60eed318fe019d52fec876ded7c86674b51c"
+  },
+  "entries": [
+    {
+      "path": "mes-base/mes-mes/pom.xml",
+      "sha256": "15de276d35e75988c712acefc01f990200e5763dbf56491eef3380c2eb358194",
+      "bytes": 527,
+      "role": "feature_source"
+    },
+    {
+      "path": "mes-base/mes-mes/src/test/java/dev/mesbase/mes/pro/personnelanalysis/PersonnelAnalysisServiceTest.java",
+      "sha256": "c9494b0a6441c19c40f4bedb4af7bcc546ec3efe2b908d7d1955c901b8923b6c",
+      "bytes": 6149,
+      "role": "feature_source"
+    },
+    {
+      "path": "mes-base/mes-mes/src/test/java/dev/mesbase/mes/pro/productionmonitor/service/impl/ProductionMonitorServiceImplTest.java",
+      "sha256": "30c1fa4b74453fc28e8208a33c471ddfad56b36477e708288b952f84f579d02b",
+      "bytes": 17287,
+      "role": "feature_source"
+    },
+    {
+      "path": "mes-base/mes-mes/src/main/resources/dev/mesbase/mes/pro/personnelanalysis/mapper/ProReportingWorkPersonnelExtraMapper.xml",
+      "sha256": "f63fea46ef94434ba05e1bd98cd35c1972267fba1c4204b50afb70c207460091",
+      "bytes": 4894,
+      "role": "feature_source"
+    },
+    {
+      "path": "mes-base/mes-mes/src/main/resources/dev/mesbase/mes/pro/productionmonitor/mapper/QcDefectiveMonitorExtraMapper.xml",
+      "sha256": "08b69d6d15174b453583803e011b45ca6bc4c43a5487a82d617663eae1eeb4f8",
+      "bytes": 677,
+      "role": "feature_source"
+    },
+    {
+      "path": "mes-base/mes-mes/src/main/resources/dev/mesbase/mes/pro/productionmonitor/mapper/ProWorkorderMonitorExtraMapper.xml",
+      "sha256": "a02e2d4286c9c4a49cf7542eccb68bd5eb439653df68664ff16a52c721ad13e4",
+      "bytes": 14825,
+      "role": "feature_source"
+    },
+    {
+      "path": "mes-base/mes-mes/src/main/resources/dev/mesbase/mes/pro/productionmonitor/mapper/ProReportingWorkMonitorExtraMapper.xml",
+      "sha256": "1ba08babc54a0a016ff7762864ee5a52bf726292f9893927e62c1627352b7ee9",
+      "bytes": 5028,
+      "role": "feature_source"
+    },
+    {
+      "path": "mes-base/mes-mes/src/main/java/dev/mesbase/mes/pro/personnelanalysis/mapper/ProReportingWorkPersonnelExtraMapper.java",
+      "sha256": "ca5ada3275c0b38e1954b6e17c681ffba8f70a290d8e2555835e8d4c7a8d80bd",
+      "bytes": 1160,
+      "role": "feature_source"
+    },
+    {
+      "path": "mes-base/mes-mes/src/main/java/dev/mesbase/mes/pro/personnelanalysis/controller/PersonnelAnalysisController.java",
+      "sha256": "40e1dd879333a8b4f8bc2888c95d2566eb77a27aced0046445ccaa5dd74eb141",
+      "bytes": 4079,
+      "role": "feature_source"
+    },
+    {
+      "path": "mes-base/mes-mes/src/main/java/dev/mesbase/mes/pro/personnelanalysis/service/PersonnelAnalysisService.java",
+      "sha256": "0cb41b79bd3eac43e3340206cb3a63454e82dd6537bd04ac171bac4bc7193031",
+      "bytes": 782,
+      "role": "feature_source"
+    },
+    {
+      "path": "mes-base/mes-mes/src/main/java/dev/mesbase/mes/pro/personnelanalysis/service/PersonnelAnalysisServiceImpl.java",
+      "sha256": "77ee2bec3bbdd430f54e541ce85b22cbd4cd0ce147e452077095c34719ccc68a",
+      "bytes": 12384,
+      "role": "feature_source"
+    },
+    {
+      "path": "mes-base/mes-mes/src/main/java/dev/mesbase/mes/pro/personnelanalysis/domain/PersonnelProductVO.java",
+      "sha256": "67e4b0745e537c85c03722639eb5f7e4494c5fb365bf77c3d7951ab47697aca9",
+      "bytes": 348,
+      "role": "feature_source"
+    },
+    {
+      "path": "mes-base/mes-mes/src/main/java/dev/mesbase/mes/pro/personnelanalysis/domain/PersonnelProcessRow.java",
+      "sha256": "be977fb1a859de794ab772a0014886798f77fcf6352d949523fade2074a86efc",
+      "bytes": 416,
+      "role": "feature_source"
+    },
+    {
+      "path": "mes-base/mes-mes/src/main/java/dev/mesbase/mes/pro/personnelanalysis/domain/PersonnelAccountVO.java",
+      "sha256": "601a3f103caec396f5100eb72eb973f8de7dadf18430ca91e0c732c1cc99c096",
+      "bytes": 680,
+      "role": "feature_source"
+    },
+    {
+      "path": "mes-base/mes-mes/src/main/java/dev/mesbase/mes/pro/personnelanalysis/domain/PersonnelTrendVO.java",
+      "sha256": "f78c752933fa4c0fb387367ca89e05c07cb231d2b0f556097d4e4c6eb0b9e186",
+      "bytes": 307,
+      "role": "feature_source"
+    },
+    {
+      "path": "mes-base/mes-mes/src/main/java/dev/mesbase/mes/pro/personnelanalysis/domain/PersonnelTrendRow.java",
+      "sha256": "59706b7806ba6bd50be2c783d4935233eb9b733959f3055ede67fde41c5267ad",
+      "bytes": 274,
+      "role": "feature_source"
+    },
+    {
+      "path": "mes-base/mes-mes/src/main/java/dev/mesbase/mes/pro/personnelanalysis/domain/PersonnelAnalysisQueryDTO.java",
+      "sha256": "a4971b184773a499c3925e57d05160bfd5fb38f503e647c34ae7b11007cfee1c",
+      "bytes": 514,
+      "role": "feature_source"
+    },
+    {
+      "path": "mes-base/mes-mes/src/main/java/dev/mesbase/mes/pro/personnelanalysis/domain/PersonnelProcessVO.java",
+      "sha256": "a1fb77284789069f7a4bfe70f588cec4c3c1ec890c07052405c61bfb559848ea",
+      "bytes": 415,
+      "role": "feature_source"
+    },
+    {
+      "path": "mes-base/mes-mes/src/main/java/dev/mesbase/mes/pro/personnelanalysis/domain/PersonnelQuery.java",
+      "sha256": "d4729cb984983e2adbf475e9fa53dfcbad329e6ac000be5776c9d849b4a4e28c",
+      "bytes": 534,
+      "role": "feature_source"
+    },
+    {
+      "path": "mes-base/mes-mes/src/main/java/dev/mesbase/mes/pro/personnelanalysis/domain/PersonnelAccountRow.java",
+      "sha256": "d87e0a54b7f9a07861316249353e45b5116577cddab97abe0c2799f68e0ef2c5",
+      "bytes": 390,
+      "role": "feature_source"
+    },
+    {
+      "path": "mes-base/mes-mes/src/main/java/dev/mesbase/mes/pro/personnelanalysis/domain/PersonnelRange.java",
+      "sha256": "4b18b40e3a0a63ad49b05ae1ad9bae81943a69b739a6bd3a41ebae95526a46e5",
+      "bytes": 994,
+      "role": "feature_source"
+    },
+    {
+      "path": "mes-base/mes-mes/src/main/java/dev/mesbase/mes/pro/personnelanalysis/domain/PersonnelProductRow.java",
+      "sha256": "c586a44a60528319159435a0bff989f2e9e4a56eada3b8c9ae1dadfbb6ae574d",
+      "bytes": 349,
+      "role": "feature_source"
+    },
+    {
+      "path": "mes-base/mes-mes/src/main/java/dev/mesbase/mes/pro/personnelanalysis/domain/PersonnelRecordVO.java",
+      "sha256": "4160ee75d2dd02c04dea94a10d1081bfec7c4ff6117482306f2b1275a8d8c0cb",
+      "bytes": 338,
+      "role": "feature_source"
+    },
+    {
+      "path": "mes-base/mes-mes/src/main/java/dev/mesbase/mes/pro/productionmonitor/mapper/QcDefectiveMonitorExtraMapper.java",
+      "sha256": "c566c8f53be7c1ee8d8cb05837963857213772ea97726049a40b8d1887ac7c8b",
+      "bytes": 453,
+      "role": "feature_source"
+    },
+    {
+      "path": "mes-base/mes-mes/src/main/java/dev/mesbase/mes/pro/productionmonitor/mapper/ProReportingWorkMonitorExtraMapper.java",
+      "sha256": "601401ced410a5f34cb70020712dfd6422e75e4e1fbad444a103d3c3edf5b6bf",
+      "bytes": 1757,
+      "role": "feature_source"
+    },
+    {
+      "path": "mes-base/mes-mes/src/main/java/dev/mesbase/mes/pro/productionmonitor/mapper/ProWorkorderMonitorExtraMapper.java",
+      "sha256": "79485bd742658343c07016f6fa208a73de341ff1dad26772b866834b3294a908",
+      "bytes": 3280,
+      "role": "feature_source"
+    },
+    {
+      "path": "mes-base/mes-mes/src/main/java/dev/mesbase/mes/pro/productionmonitor/controller/ProductionMonitorController.java",
+      "sha256": "f90ae293b458d898afd0735bafecfb3a5c300962434e50b087a1230054432bc4",
+      "bytes": 4294,
+      "role": "feature_source"
+    },
+    {
+      "path": "mes-base/mes-mes/src/main/java/dev/mesbase/mes/pro/productionmonitor/service/ProductionMonitorService.java",
+      "sha256": "3c7662c4246dcf923d22344eef9cd811381021862da093512fbbf0abfba571de",
+      "bytes": 1129,
+      "role": "feature_source"
+    },
+    {
+      "path": "mes-base/mes-mes/src/main/java/dev/mesbase/mes/pro/productionmonitor/service/impl/ProductionMonitorServiceImpl.java",
+      "sha256": "46d1b4f78d47c03b7544e79d9958e5c8fd66c423f3ac16004c546e9c1580a6b1",
+      "bytes": 29714,
+      "role": "feature_source"
+    },
+    {
+      "path": "mes-base/mes-mes/src/main/java/dev/mesbase/mes/pro/productionmonitor/domain/dto/ProductionMonitorQueryDTO.java",
+      "sha256": "827af91c42929266e8b48b43933b78c2325f3b02a5e9ab509b906aa015cb025e",
+      "bytes": 760,
+      "role": "feature_source"
+    },
+    {
+      "path": "mes-base/mes-mes/src/main/java/dev/mesbase/mes/pro/productionmonitor/domain/dto/ProductionMonitorTimelineQueryDTO.java",
+      "sha256": "10e5d0f16e89cbffa43e81b42f5ec27609686491c306955249d7cf0c3446ec54",
+      "bytes": 435,
+      "role": "feature_source"
+    },
+    {
+      "path": "mes-base/mes-mes/src/main/java/dev/mesbase/mes/pro/productionmonitor/domain/vo/ProductionMonitorStatusCountVO.java",
+      "sha256": "68aca2db79c88d9f4d9c0c6f0349d2f7cdd5f2054d6edde05f1f7b3e5edbc9ac",
+      "bytes": 219,
+      "role": "feature_source"
+    },
+    {
+      "path": "mes-base/mes-mes/src/main/java/dev/mesbase/mes/pro/productionmonitor/domain/vo/ProductionMonitorRouteTrackVO.java",
+      "sha256": "e6763b487c0eec9f47e3fbe9490a3f8c6a63dcf266c9b19ba0482f9ab02f6355",
+      "bytes": 1281,
+      "role": "feature_source"
+    },
+    {
+      "path": "mes-base/mes-mes/src/main/java/dev/mesbase/mes/pro/productionmonitor/domain/vo/ProductionMonitorWorkorderVO.java",
+      "sha256": "4f7be1b48384236adf51acdc64ccabea2af067f9ad371703a1317ac53d36780e",
+      "bytes": 1196,
+      "role": "feature_source"
+    },
+    {
+      "path": "mes-base/mes-mes/src/main/java/dev/mesbase/mes/pro/productionmonitor/domain/vo/ProductionMonitorAggregateCountVO.java",
+      "sha256": "b4f4f4fd8e1a8809398ef8b468aee16ad9508ce5542a82091ee1621d4a9221d0",
+      "bytes": 266,
+      "role": "feature_source"
+    },
+    {
+      "path": "mes-base/mes-mes/src/main/java/dev/mesbase/mes/pro/productionmonitor/domain/vo/ProductionMonitorTimelineEventVO.java",
+      "sha256": "20c6d00af503b9f86f5a730255a8c299ee73141e8b376c4934e31593867da61f",
+      "bytes": 662,
+      "role": "feature_source"
+    },
+    {
+      "path": "mes-base/mes-mes/src/main/java/dev/mesbase/mes/pro/productionmonitor/domain/vo/ProductionMonitorSummaryVO.java",
+      "sha256": "bb6fdf6db3d7a714d62c3223dad54dfb778aaccff33d97b6a7abca31c47246d4",
+      "bytes": 823,
+      "role": "feature_source"
+    },
+    {
+      "path": "mes-base/mes-mes/src/main/java/dev/mesbase/mes/pro/productionmonitor/domain/vo/ProductionMonitorDetailVO.java",
+      "sha256": "3c2ca82f43f38b8a30534402eb3f699a738f6360292a2c24351d5bf2045c7b6b",
+      "bytes": 1515,
+      "role": "feature_source"
+    },
+    {
+      "path": "mes-base/mes-mes/src/main/java/dev/mesbase/mes/pro/productionmonitor/domain/vo/ProductionMonitorRiskTag.java",
+      "sha256": "584f1c788d9c145486f772768e92f7a5aa44f70ddbeab1bc013e16826963be9b",
+      "bytes": 865,
+      "role": "feature_source"
+    },
+    {
+      "path": "mes-base/mes-mes/src/main/java/dev/mesbase/mes/pro/productionmonitor/domain/vo/ProductionMonitorFlowcardVO.java",
+      "sha256": "479435d3b9d484fb40bbd4a6c9824c1d60eb0aaf5ad10044124c0e74ab97e5ab",
+      "bytes": 404,
+      "role": "feature_source"
+    },
+    {
+      "path": "mes-base/mes-mes/src/main/java/dev/mesbase/mes/pro/productionmonitor/domain/vo/ProductionMonitorTimelineVO.java",
+      "sha256": "fcc139f85e48bd5e59ff41a5781511ddaf3d5dc0de2cf0a1436e8721fe856b17",
+      "bytes": 274,
+      "role": "feature_source"
+    },
+    {
+      "path": "mes-base/mes-mes/src/main/java/dev/mesbase/mes/pro/productionmonitor/domain/row/ProductionMonitorWorkorderRow.java",
+      "sha256": "0be45f1775a907b0ecbc5d9476d1b1eca3e1406dcc7fd7c3912384d749248690",
+      "bytes": 822,
+      "role": "feature_source"
+    },
+    {
+      "path": "mes-base/mes-mes/src/main/java/dev/mesbase/mes/pro/productionmonitor/domain/row/ProductionMonitorReportingAggregateRow.java",
+      "sha256": "0a48cc1ea2ec9ad8cdb3a13384b5390a9da0f3d7fa40040b5af24e993e559051",
+      "bytes": 603,
+      "role": "feature_source"
+    },
+    {
+      "path": "mes-base/mes-mes/src/main/java/dev/mesbase/mes/pro/productionmonitor/domain/row/ProductionMonitorTimelineRow.java",
+      "sha256": "05878edb27bfd13f2830e4b698e501b8fbe6e6a2ab04b7123fc939bc33f379c7",
+      "bytes": 628,
+      "role": "feature_source"
+    },
+    {
+      "path": "mes-base/mes-mes/src/main/java/dev/mesbase/mes/pro/productionmonitor/domain/row/ProductionMonitorSummaryRow.java",
+      "sha256": "c13e6fbbfce3c83de0c09f34be2b6c403edaaba55cf72429a82bb25c105ce815",
+      "bytes": 411,
+      "role": "feature_source"
+    },
+    {
+      "path": "mes-base/mes-mes/src/main/java/dev/mesbase/mes/pro/productionmonitor/domain/row/ProductionMonitorAggregateCountRow.java",
+      "sha256": "e7be40e06ff12f16d95f270863d0c83f66de6757c14627fb4f6e034bf0e3eedc",
+      "bytes": 242,
+      "role": "feature_source"
+    },
+    {
+      "path": "mes-base/mes-mes/src/main/java/dev/mesbase/mes/pro/productionmonitor/domain/row/ProductionMonitorFlowcardRow.java",
+      "sha256": "4f171181e4eb8c9b803f56f534fa8a08cab79093372c5bdac90ec189cfa9293c",
+      "bytes": 406,
+      "role": "feature_source"
+    },
+    {
+      "path": "mes-base/mes-mes/src/main/java/dev/mesbase/mes/pro/productionmonitor/domain/row/ProductionMonitorStatusCountRow.java",
+      "sha256": "983a7da6f6955487227313be5832f117951ce183759964ea7685b93cfa4319e7",
+      "bytes": 190,
+      "role": "feature_source"
+    },
+    {
+      "path": "mes-base/mes-mes/src/main/java/dev/mesbase/mes/pro/productionmonitor/domain/row/ProductionMonitorRouteStepRow.java",
+      "sha256": "dd45ef369d6b55412025ac2e9639c593c7d770f995a2a6991bc51fafe854ecad",
+      "bytes": 255,
+      "role": "feature_source"
+    },
+    {
+      "path": "mes-base/mes-mes/src/main/java/dev/mesbase/mes/pro/productionmonitor/domain/row/ProductionMonitorDefectiveAggregateRow.java",
+      "sha256": "3cc9e529445f39203b0940dc324fb0bc369d2311a1413983eb3accae2269589f",
+      "bytes": 215,
+      "role": "feature_source"
+    },
+    {
+      "path": "mes-base/mes-mes/src/main/java/dev/mesbase/mes/pro/productionmonitor/domain/row/ProductionMonitorObservedProcessRow.java",
+      "sha256": "6a9037b2e9d65b748eae3731ed640d6c1f4c834c126482afce3d42728fa056ca",
+      "bytes": 494,
+      "role": "feature_source"
+    },
+    {
+      "path": "mes-base/mes-mes/src/main/java/dev/mesbase/mes/pro/productionmonitor/domain/query/ProductionMonitorTimelineQuery.java",
+      "sha256": "762153c666a49fcaf99eacc287e62cde72576371f6ec3f420521d0e9c5360c51",
+      "bytes": 288,
+      "role": "feature_source"
+    },
+    {
+      "path": "mes-base/mes-mes/src/main/java/dev/mesbase/mes/pro/domain/PageResult.java",
+      "sha256": "08602c21259f643e1efa595aac82b652e9d04891ffd2b55fe9912dfc539eb727",
+      "bytes": 314,
+      "role": "feature_source"
+    },
+    {
+      "path": "mes-base/mes-mes/src/main/java/dev/mesbase/mes/enumeration/DicEnums.java",
+      "sha256": "6a4c5f63c01203cc14407a84d06ca2fa5abd02f71507efc9fb0d6ace14682bc2",
+      "bytes": 317,
+      "role": "feature_source"
+    },
+    {
+      "path": "mes-base-ui/src/views/mes/pro/productionMonitor/constants.js",
+      "sha256": "f03a9c80120a0a206b8a9198962dae04b77ab559e5326b745c6dd804aa1363ca",
+      "bytes": 494,
+      "role": "feature_source"
+    },
+    {
+      "path": "mes-base-ui/src/views/mes/pro/productionMonitor/index.vue",
+      "sha256": "7cdde1476d1c245e88b5f60a096486f4ad1ecd1a964790126e1cb2bbab4ec763",
+      "bytes": 28266,
+      "role": "feature_source"
+    },
+    {
+      "path": "mes-base-ui/src/views/mes/pro/productionMonitor/components/WorkorderFlowcards.vue",
+      "sha256": "c548db8b197c3bb2c8da31584241fdfe9c8967ead58c70bfd2bf9da72bb24bf6",
+      "bytes": 9216,
+      "role": "feature_source"
+    },
+    {
+      "path": "mes-base-ui/src/views/mes/pro/productionMonitor/components/WorkorderDetail.vue",
+      "sha256": "49c4adb156ad563d9f04095fb95184297592a88159052202b4c7ab743e2aeb65",
+      "bytes": 10106,
+      "role": "feature_source"
+    },
+    {
+      "path": "mes-base-ui/src/views/mes/pro/productionMonitor/components/WorkorderTimeline.vue",
+      "sha256": "fef2863aa4b13925b6b97e2f6b81542691bb296f2fba05e324f955f8c412a931",
+      "bytes": 9399,
+      "role": "feature_source"
+    },
+    {
+      "path": "mes-base-ui/src/views/mes/pro/personnelAnalysis/index.vue",
+      "sha256": "ea28883830f0b2b6f073c07e454bd178d3b4b014cec5585065b4a7b8a8c94d63",
+      "bytes": 23652,
+      "role": "feature_source"
+    },
+    {
+      "path": "mes-base-ui/src/api/pro/productionMonitor.ts",
+      "sha256": "a6d648d09eac0fe92e0e138ef1f21e33ef4e05fe88ed8ddf3275cf247e4729a5",
+      "bytes": 912,
+      "role": "feature_source"
+    },
+    {
+      "path": "mes-base-ui/src/api/pro/personnelAnalysis.ts",
+      "sha256": "faa4667a77b3f35e1bdc5eee374c8b2bbb4996e34444f4e493dc115dce0b503d",
+      "bytes": 975,
+      "role": "feature_source"
+    },
+    {
+      "path": "mes-base/pom.xml",
+      "sha256": "7eb59875faf603cdfa5017422ecb226854a1280d69645240a320bb3089e9e9dd",
+      "bytes": 4189,
+      "role": "integration_context"
+    },
+    {
+      "path": "mes-base/mes-admin/pom.xml",
+      "sha256": "919c88e60eb7b62da35f36a08a309dace25e86374d491bcdf0b393ec0bc88a44",
+      "bytes": 2734,
+      "role": "integration_context"
+    },
+    {
+      "path": "mes-base/mes-admin/src/main/resources/application.yml",
+      "sha256": "70c806d2cb6a82b9116ca1141f9f5ffe009a403d92666e5d1c19cce57c2dd22c",
+      "bytes": 2921,
+      "role": "integration_context"
+    },
+    {
+      "path": "mes-base/mes-admin/src/main/resources/db/system/V13__factory_analytics_capabilities.sql",
+      "sha256": "1e507bf6763f857d0dae4ec0fc4ced3ff0725ec2fc04bce457b1958929319642",
+      "bytes": 4399,
+      "role": "integration_context"
+    },
+    {
+      "path": "mes-base/mes-admin/src/test/java/dev/mesbase/server/InfrastructureContextTest.java",
+      "sha256": "a1af5f3e97670c0be0e914e9885d7b446bd48fc4b40f4b220a8fd2b1c92f6435",
+      "bytes": 8504,
+      "role": "integration_context"
+    },
+    {
+      "path": "mes-base/mes-admin/src/test/java/dev/mesbase/server/PersistenceAssemblyTest.java",
+      "sha256": "93e43bf7e0a960b273d021f452c53a8d55e0ac992008d246dcd93379c0c4efc5",
+      "bytes": 9709,
+      "role": "integration_context"
+    },
+    {
+      "path": "mes-base/docs/legal/source-product-MIT-LICENSE.txt",
+      "sha256": "260f185d34ec6ed36f686367335b7daae181c5cad80372fcd06304281882078d",
+      "bytes": 1069,
+      "role": "integration_context"
+    },
+    {
+      "path": "mes-base/docs/legal/source-product-migration-manifest.json",
+      "sha256": "441745657fac3fa948c384972fc3f3a1850a55df76a9b1f18751d6dc182e7ab2",
+      "bytes": 279878,
+      "role": "integration_context"
+    },
+    {
+      "path": "mes-base-ui/tests/eslintRegression.test.ts",
+      "sha256": "c6eacee39bf48a37de2f48267a508c660a6a232041dac0c48382754acfc6e4c8",
+      "bytes": 5017,
+      "role": "integration_context"
+    },
+    {
+      "path": "mes-base-ui/tests/sessionRestore.test.ts",
+      "sha256": "4e3958ddda09c71888a7b24c4964a959bbc8fc6c5b494562b058a545b2755bf9",
+      "bytes": 4984,
+      "role": "integration_context"
+    },
+    {
+      "path": "mes-base/mes-framework/src/main/java/dev/mesbase/framework/persistence/SystemUserLookup.java",
+      "sha256": "2836b97f29bbb2a20e5d5816e21cce713b53beef46817a52c3a43ced46d0b209",
+      "bytes": 1049,
+      "role": "feature_source"
+    },
+    {
+      "path": "mes-base/mes-system/src/main/java/dev/mesbase/system/domain/dto/UserLookupQuery.java",
+      "sha256": "fda6f1341e8c21f5d70d2ffc6d628f77ae2978cea763b3c5f8e9f668408d81c9",
+      "bytes": 183,
+      "role": "feature_source"
+    },
+    {
+      "path": "mes-base/mes-system/src/main/java/dev/mesbase/system/mapper/SysUserDisplayExtraMapper.java",
+      "sha256": "e6713f23801b1a77b6125af5b979b7b1f246c36e8c56b4c8d5e31b6da193079a",
+      "bytes": 559,
+      "role": "feature_source"
+    },
+    {
+      "path": "mes-base/mes-system/src/main/resources/dev/mesbase/system/mapper/SysUserDisplayExtraMapper.xml",
+      "sha256": "260a5131237dcea99348ee94e1263f9b80e73fdad96a1fc3612b91680ce410fd",
+      "bytes": 1132,
+      "role": "feature_source"
+    }
+  ]
+}

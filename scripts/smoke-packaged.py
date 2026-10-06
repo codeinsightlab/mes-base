@@ -20,6 +20,10 @@ checks = []
 with zipfile.ZipFile(JAR) as artifact:
     names = artifact.namelist()
     assert not any("RuntimeFixture" in n or "FoundationHttpTest" in n or "h2-" in n for n in names)
+    assert not any(n.startswith("BOOT-INF/lib/mes-mes-") for n in names)
+    deferred_paths = ("dev/mesbase/mes/pro/productionmonitor/", "dev/mesbase/mes/pro/personnelanalysis/")
+    deferred_types = ("SystemUserLookup.class", "UserLookupQuery.class", "SysUserDisplayExtraMapper.class",
+                      "SysUserDisplayExtraMapper.xml")
     legacy_classes = ("PlatformConfiguration.class", "LegacyPlatformCondition.class", "PlatformTokenFilter.class",
                       "DemoConfiguration.class", "PlatformController.class", "PlatformMapper.class", "PlatformRows.class", "PlatformService.class",
                       "SystemUnit.class", "SystemUnit$Work.class", "SystemUnitAspect.class", "AnalyticsConfiguration.class",
@@ -34,8 +38,12 @@ with zipfile.ZipFile(JAR) as artifact:
         if name.startswith("BOOT-INF/lib/mes-") and name.endswith(".jar"):
             with zipfile.ZipFile(io.BytesIO(artifact.read(name))) as module:
                 assert not any(n.endswith(legacy_classes) for n in module.namelist())
+                assert not any(n.startswith(deferred_paths) or n.endswith(deferred_types)
+                               for n in module.namelist())
+    assert not any(any(path in n for path in deferred_paths) or n.endswith(deferred_types) for n in names)
 checks.append({"case": "packaging-excludes-test-entities-and-H2", "passed": True})
 checks.append({"case": "packaging-excludes-legacy-platform-implementation", "passed": True})
+checks.append({"case": "packaging-excludes-deferred-business-features", "passed": True})
 
 def run(profile):
     environment = {key: value for key, value in os.environ.items() if not key.startswith(("SPRING_", "MES_", "SERVER_")) and key not in ("JAVA_TOOL_OPTIONS", "JDK_JAVA_OPTIONS", "_JAVA_OPTIONS")}

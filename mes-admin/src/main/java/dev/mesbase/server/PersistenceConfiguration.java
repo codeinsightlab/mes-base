@@ -58,8 +58,8 @@ public class PersistenceConfiguration {
     }
 
     @Bean
-    SqlSessionFactory platformSqlSessionFactory(@Qualifier("platformDataSource") DataSource source, @Qualifier("platformTransactionManager") OwnedTransactionManager manager, OwnerMapperCatalog catalog) {
-        return PersistenceFactories.create(source, catalog.types(PersistenceOwner.Kind.PLATFORM), configuration -> {
+    SqlSessionFactory platformSqlSessionFactory(@Qualifier("platformDataSource") DataSource source, @Qualifier("platformTransactionManager") OwnedTransactionManager manager) {
+        return PersistenceFactories.scanned(source, configuration -> {
             configuration.getTypeAliasRegistry().registerAliases("dev.mesbase.common.core.domain.entity");
             configuration.getTypeAliasRegistry().registerAliases("dev.mesbase.system.domain");
             configuration.getTypeAliasRegistry().registerAliases("dev.mesbase.system.openapi.domain");
@@ -89,8 +89,8 @@ public class PersistenceConfiguration {
     }
 
     @Bean
-    SqlSessionFactory businessSqlSessionFactory(FactoryBusinessDataSource source, @Qualifier("businessTransactionManager") OwnedTransactionManager manager, OwnerMapperCatalog catalog) {
-        return PersistenceFactories.create(source, catalog.types(PersistenceOwner.Kind.BUSINESS), PersistenceFactories::pagination, manager::verifyAccess);
+    SqlSessionFactory businessSqlSessionFactory(FactoryBusinessDataSource source, @Qualifier("businessTransactionManager") OwnedTransactionManager manager) {
+        return PersistenceFactories.scanned(source, PersistenceFactories::pagination, manager::verifyAccess);
     }
 
     @Bean
@@ -136,8 +136,8 @@ public class PersistenceConfiguration {
         }
 
         @Bean
-        SqlSessionFactory erpSqlSessionFactory(@Qualifier("erpDataSource") DataSource source, @Qualifier("erpTransactionManager") OwnedTransactionManager manager, OwnerMapperCatalog catalog) {
-            return PersistenceFactories.create(source, catalog.types(PersistenceOwner.Kind.ERP), PersistenceFactories::pagination, manager::verifyAccess);
+        SqlSessionFactory erpSqlSessionFactory(@Qualifier("erpDataSource") DataSource source, @Qualifier("erpTransactionManager") OwnedTransactionManager manager) {
+            return PersistenceFactories.scanned(source, PersistenceFactories::pagination, manager::verifyAccess);
         }
     }
 }

@@ -6,11 +6,12 @@ import dev.mesbase.common.openapi.*;
 import org.springframework.stereotype.Component;
 import jakarta.servlet.http.*;
 import java.io.IOException;
+import dev.mesbase.platform.web.RequestBoundaryFilter;
 
 @Component
 @org.springframework.boot.autoconfigure.condition.ConditionalOnProperty(name={"mes.system.enabled","open-api.enabled"},havingValue="true")
 public class OpenApiHttp {
-    static final String REQUEST_ID = OpenApiHttp.class.getName() + ".requestId";
+    static final String REQUEST_ID = RequestBoundaryFilter.REQUEST_ID;
     static final String IDENTITY = OpenApiHttp.class.getName() + ".identity";
     static final String ERROR = OpenApiHttp.class.getName() + ".error";
     static final String FAILURE = OpenApiHttp.class.getName() + ".failure";

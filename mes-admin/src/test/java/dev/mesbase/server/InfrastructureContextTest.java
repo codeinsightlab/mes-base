@@ -11,6 +11,8 @@ import dev.mesbase.framework.openapi.OpenApiTokenService;
 import dev.mesbase.framework.openapi.OpenApiWebConfig;
 import dev.mesbase.framework.security.SystemTokenFilter;
 import dev.mesbase.framework.web.service.TokenService;
+import dev.mesbase.infrastructure.persistence.OwnerMapperCatalog;
+import dev.mesbase.infrastructure.persistence.PersistenceOwner;
 import dev.mesbase.infrastructure.persistence.RuntimeRegistry;
 import dev.mesbase.platform.web.RequestBoundaryFilter;
 import dev.mesbase.quartz.service.impl.SysJobServiceImpl;
@@ -149,7 +151,7 @@ class InfrastructureContextTest {
             assertEquals(1, context.getBeansOfType(AuthorizationService.class).size());
             assertEquals(1, context.getBeansOfType(RuntimeRegistry.class).size());
             assertTrue(context.containsBean("sysUserMapper"));
-            assertTrue(context.containsBean("proReportingWorkPersonnelExtraMapper"));
+            assertTrue(context.getBean(OwnerMapperCatalog.class).types(PersistenceOwner.Kind.BUSINESS).isEmpty());
 
             var chains = context.getBeansOfType(SecurityFilterChain.class);
             assertEquals(2, chains.size());

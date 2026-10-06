@@ -128,6 +128,16 @@ SystemUnit、SystemUnitAspect、AnalyticsUnit/Aspect及手工注册配置已移�
 
 Druid 监控 Controller 明确注入 `platformDataSource`，保持现有平台池监控契约；业务与 ERP 路由池不能通过单个 DruidDataSource 强制转换注入。三库场景无需设置全局 @Primary。
 
+### 2026-10-06 多数据源监控与工作台范围扩展
+
+上述平台池契约保留于旧 Druid 接口；新增 `/api/monitor/druid/sources`（分页目录）与 `/api/monitor/druid/snapshot`（按受控 sourceId 读取单池）经 DruidMonitorService 覆盖 platform、business:<id> 和 external:<配置标识>。外部 WMS/HR/ERP 等复用已配置 Druid 池，不增加 SessionFactory；RuntimeRegistry 只观察当前有效业务池，不为监控创建连接或加载业务池。未初始化、停用、未绑定明确返回状态而非假零。两接口均要求平台 monitor:druid:list，工厂同名权限不能越权。
+
+快照为本节点 UUID/时间、连接池指标、对应方言的参数化 SQL 模板及 Wall 计数白名单；不暴露连接 URL/账号/密码、SQL 参数或原异常。统计开关缺失明确表达。此能力不等于数据库服务器全局监控或多节点聚合，Web/Spring 统计也未迁入。
+
+SystemSessionController.info 增加 workspaces 有效角色范围摘要，不存入长期 Token；SystemPermissionService 经 SysRoleMapper 查询有效角色，再用 ManagedFactoryMapper.enabledIds 的参数化批量查询筛选启用工厂，最多两次查询。避免真实开发库 sys_role.factory_id 的 utf8mb4_unicode_ci 与 mf_factory.factory_id 的 utf8mb4_0900_ai_ci 直接 JOIN 产生 MySQL 1267；不修改 Schema。可选工厂不是角色授权证明。
+
+2026-10-06 18:37 标准 Maven verify 加显式 WorkspaceAccessMySqlTest 开发配置通过；180 项中 177 通过、3 未 opt-in 跳过，打包 smoke 4 通过。当前浏览器可见中心、ERP 和未初始化业务三源；五池隔离由 H2 fixture 验证，真实 HR/WMS 和 SQLServer 业务连通未验证。实现、RCA、UI 三档证据与边界追加于 mes-base-ui/docs/acceptance/ui-industrial-upgrade/ROUND2.md。
+
 
 ### 固定包扫描与外部连接注解（2026-10-06，当前接入规范）
 
