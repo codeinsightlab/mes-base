@@ -117,3 +117,13 @@ Mapper在自身声明归属，自动注册标准MyBatis-Spring MapperFactoryBean
 SystemUnit、SystemUnitAspect、AnalyticsUnit/Aspect及手工注册配置已移除。PlatformPersistence/BusinessPersistence程序式入口仅供既有基础设施、CLI和生成骨架兼容，底层同样使用Spring事务与共享会话工厂，不再自行管理嵌套事务。同步run_token、任务抢占、文件ownership、权限与连接版本校验保留。旧Foundation ERP占位接口及只有NOT_CONFIGURED的解析/Adapter模型移除；本阶段仅装配ERP SQL连接，不实现ERP业务流程、API或同步执行器。
 
 用户提供的SQL Server连接仅进入.local/erp.yml（0600），不进入本文件或通用配置。连接探针只尝试SELECT 1：TCP可达，JDBC因TLS协议协商失败，未执行SQL；未修改加密、证书或JVM协议策略。H2三库测试不等于该ERP库已联调通过。
+
+### 外部多数据源接入模板（2026-10-06）
+
+外部连接统一使用 `PersistenceOwner.Kind.ERP` 和一个 `erpSqlSessionFactory`。`mes.erp.datasources` 以 `erp-main`、`hr`、`wms` 等字符串标识登记连接，标识不是新的 PersistenceOwner 枚举，也不由 FactoryScope 推导。配置模板见 `config/erp-datasources.example.yml`，Adapter 和 Mapper 模板见 `docs/development/templates/erp/`；请求/结果类型与 SQL 必须来自后续真实外部契约，模板不创建外部业务表或同步流程。
+
+接入时填写连接配置、给 Mapper 声明 ERP 归属，再在 Adapter 内用 `ErpTransactions.execute("erp-main", () -> mapper.query(query))`。Mapper 自动扫描，无需改中央清单。类型放在同包时使用简单类名，跨包时在顶部添加显式 import。连接标识由服务端配置/规则决定，不能把客户端任意标识直接作为连接授权。
+
+`ErpTransactions` 仅在 Spring TransactionTemplate 获取连接前选择标识。事务开始后固定该连接；同标识嵌套按 Spring REQUIRED 处理，不同标识嵌套明确拒绝；事务结束或异常后恢复并清理线程上下文。缺少标识、未知连接和 ERP 未启用均不得回退默认库。切到另一外部库需结束前一事务，再分别调用入口；不能把多库操作当成原子事务。同步任务仍需独立遵守 run_token 与恢复约束。
+
+Druid 监控 Controller 明确注入 `platformDataSource`，保持现有平台池监控契约；业务与 ERP 路由池不能通过单个 DruidDataSource 强制转换注入。三库场景无需设置全局 @Primary。

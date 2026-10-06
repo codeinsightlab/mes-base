@@ -24,3 +24,9 @@
 用户明确提供外部ERP数据库连接并要求三个会话工厂分别对应中心/业务/ERP库。ERP数据源来自独立配置，不由FactoryScope推导；PersistenceOwner.ERP自动将Mapper绑定到erpSqlSessionFactory，与平台和业务事务管理器分开。取消只有NOT_CONFIGURED的ErpProvider、FactoryErpConnectionResolver/Binding、空ErpAdapter及始终返回未配置的Foundation连接检查API，避免占位框架与真实SQL装配双轨维护。原测试记录仅表示当时占位行为，不表示当前接口继续存在。
 
 当前只接入连接装配，通用配置默认关闭；启用但缺配置时启动失败。真实连接参数在Git忽略的本地配置中，不进ADR。无外部ERP业务Mapper/流程、组织映射、HTTP调用或写入；今后外部业务仍须使用明确Adapter边界，不让Core依赖外部持久化Entity。各本地事务不能承诺跨库原子性。本轮TCP连接可达，JDBC只读探针受TLS协议协商阻断，未建立连接/执行SQL；不宣称ERP联调成功。
+
+## 2026-10-06 修订：一个外部工厂，多个显式连接标识
+
+按用户要求，外部 ERP/HR/WMS 等连接使用统一 ERP ownership 和单个 erpSqlSessionFactory。连接配置改为 mes.erp.datasources 的标识映射；ErpRoutingDataSource 在 Spring 事务开始时固定选中的池，ErpTransactions 仅用 TransactionTemplate 提供选择入口。不存在默认连接；缺标识或未知标识明确失败；活动事务内不同标识切换拒绝。连接选择与 FactoryScope 无绑定关系。新增外部 Mapper 自动扫描，不增加中央绑定、类型枚举或新会话工厂。
+
+接入模板在 config/erp-datasources.example.yml 与 docs/development/templates/erp/，不实现外部业务 SQL。DruidController 显式绑定平台数据源，解决启用第三数据源后的单 Bean 注入歧义。三数据源生产装配测试验证监控仍指向平台池；多标识真实 H2 测试验证路由、回滚、嵌套和线程隔离。真实外部数据库验证边界保持上述记录。

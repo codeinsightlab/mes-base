@@ -696,3 +696,13 @@ SystemUnit、SystemUnitAspect、AnalyticsConfiguration（含AnalyticsUnit/Aspect
 真实外部连接：TCP端口探测成功；只读SELECT1探针在建立JDBC连接时因TLS协议协商失败（SQLState08S01），未建立连接、未执行SQL、未读取业务数据。未关闭加密/跳过证书或调整JVM协议策略；因此真实ERP联调未通过。未执行ERP业务写入、外部同步流程、真实多节点/多厂生产数据库验收或UI验证，未重启用户dev服务，未提交/推送/部署。
 
 最终打包smoke 4/4通过，含已删除类在主JAR及模块JAR中无残留；显式import扫描0违规，git diff --check通过。打包验收与静态检查见 docs/reviews/2026-10-06-persistence-verification.json；原始最终日志保存target/validation/persistence-{verify,smoke}.log。只清除了本轮删除源码对应的过期生成.class文件，未清理其它target证据。回滚按本轮持久化/装配/Service事务文件、对应文档规则和本地ERP导入逐项恢复，保护用户原有开发配置修改。ADR-004/005按时间线追加修订；platform/codegen操作文档及AGENTS与当前装配一致。
+
+### 启动注入修复与外部多连接模板（2026-10-06）
+
+DruidController 原构造器按 DataSource 类型注入，三库启用后有三个候选 Bean，导致启动失败。已显式 @Qualifier("platformDataSource")，保持平台池监控契约；编译已启用 parameters，根因是缺少明确归属。PersistenceAssemblyTest 加载生产装配配置与该 Controller，启用三套数据源并校验监控池为 platform。检查生产 DataSource 消费处，其他装配入口已有显式 qualifier。
+
+外部连接统一 PersistenceOwner.ERP，通过 mes.erp.datasources 标识映射与 ErpRoutingDataSource 共用第三个 SqlSessionFactory。ErpTransactions 以标准 Spring TransactionTemplate 在取连接前选择标识；缺标识/未知连接明确失败，事务内换标识拒绝，异常后清理。配置及 Adapter/Mapper 模板位于 config/erp-datasources.example.yml、docs/development/templates/erp/；没有新增外部业务领域、表或业务 SQL。原本地私有 ERP 配置已调整为映射结构，未记录凭证。
+
+标准 Maven verify 成功，最终计数见 docs/reviews/2026-10-06-persistence-verification.json。新增4项 H2 路由测试覆盖三标识、无默认库、事务固定身份、嵌套/REQUIRES_NEW恢复、回滚与线程隔离。打包启动smoke 4/4通过（默认无业务连接配置）；三数据源装配与该 Controller 的证据来自定向生产配置测试。日志 target/validation/startup-routing-verify.log。未重启用户开发服务，未重新尝试真实ERP JDBC；真实数据库联调仍未通过，不宣称实际dev完整启动已验证。
+
+2026-10-06 用户澄清续做范围为外部多数据源路由实现。重新核对当前代码：ERP 工厂绑定 ErpRoutingDataSource，读取 mes.erp.datasources 映射，按标识切换；所有外部 Mapper 仍为 ERP ownership。再次执行 ErpRoutingTest、PersistenceAssemblyTest，共8项全部通过，日志 target/validation/external-routing-confirm.log；结构化记录追加 external_routing_revalidation。此轮未新增业务代码、未操作用户开发进程、未执行真实外部业务 SQL。
