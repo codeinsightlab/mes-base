@@ -1925,6 +1925,10 @@
     {
       "source": "ktg-system/src/main/java/com/ktg/system/service/ISysAttachmentService.java",
       "target": "mes-system/src/main/java/dev/mesbase/system/service/ISysAttachmentService.java",
+      "currentStatus": "REMOVED_UNUSED",
+      "removedAt": "2026-10-06",
+      "removalReason": "Unused legacy interface; the current private attachment service does not implement or reference it.",
+      "architectureAudit": "docs/architecture/architecture-slimming-audit.md#4-dead-code-candidates",
       "sourceSha256": "7360f263d7972736b35defea4e4fcd38a25bb20c40d199cf169ebe8530da10f1",
       "targetSha256": "6729d7151967bb07a27290d34fa3b78ab99459a6985b41956f15b413db1328d2",
       "strategy": "PORT",
@@ -1955,6 +1959,10 @@
     {
       "source": "ktg-common/src/main/java/com/ktg/common/utils/html/HTMLFilter.java",
       "target": "mes-common/src/main/java/dev/mesbase/common/utils/html/HTMLFilter.java",
+      "currentStatus": "REMOVED_UNUSED",
+      "removedAt": "2026-10-06",
+      "removalReason": "Unused legacy sanitizer; all active callers already use RichTextSanitizer through EscapeUtil or directly.",
+      "architectureAudit": "docs/architecture/architecture-slimming-audit.md#4-dead-code-candidates",
       "sourceSha256": "27af38d5628162ba7d1efd05d8708fdf3f2b37dfccdf2e10d7453518b9e6479c",
       "targetSha256": "322fc614e98d5e2c4386e0d6662f93e6878d9b168bbfb026a633073c4bc9d634",
       "strategy": "PORT",

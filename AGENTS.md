@@ -112,6 +112,8 @@ launcher 可调用标准 Maven。`mvn -B -ntp verify`；涉及打包启动再执
 （本机可用 `/usr/bin/python3`）。UI 使用 .nvmrc 已安装 Node，不改全局默认；执行 test/build。TEST ONLY 业务探针在 src/test 或自有
 target，不包装为生产领域。
 
+每次代码或配置改动都必须审查关联的测试、调用链、配置入口和生成模板。若本次改动使关联测试、旧入口、兼容分支、适配器或其他链路内容失效，必须在同一任务中删除或替换这些已废弃内容，不得为了维持表面通过而遗留无效代码或失真的测试。删除前保留仍验证业务行为、权限、隔离、事务和错误边界的测试，并将它们迁移到新的真实入口。
+
 ## 11. Git / 工作区
 
 只改当前任务；不重置、不覆盖用户修改、不危险清理，不顺手重构/升级。确认目标路径，旧公司项目只读。提交/推送/部署需对应授权；本地构建不是部署。
@@ -165,18 +167,19 @@ Scaffold；必须检查查询、Toolbar、表格/列顺序、枚举/日期/精�
 
 ## Java code style
 
-Java formatting is repository-controlled by `.editorconfig`, `config/java-formatter.xml`, and the parent Maven POM's Spotless configuration. The formatter follows the project's IDEA-like four-space Java style; do not rely on personal IDEA settings or invent an alternative formatter.
+Java formatting is repository-controlled by `.editorconfig` and `.idea/codeStyles/Project.xml`, using the IntelliJ IDEA native formatter. Generated and hand-written Java should follow IDEA's normal readable style as closely as possible; do not rely on a personal alternative formatter.
+
+Avoid long lines and compressed statements. Keep one logical statement per line. Wrap long method declarations, parameter lists, annotations, calls, chained calls, conditions, generic types, and lambdas at readable boundaries. Do not join multiple fields, statements, or blocks onto one line merely to reduce file length. Prefer the existing IDEA-style line breaks and four-space indentation over dense code.
 
 After modifying Java files, run from the repository root:
 
 ```sh
-mvn -B -ntp spotless:apply
-mvn -B -ntp spotless:check
+./scripts/format-java path/to/Changed.java
 mvn -B -ntp test
 git diff --check
 ```
 
-Spotless checks the configured Java source set. Do not reformat unrelated Java files in a task. A task must not be reported complete if `spotless:check` or `git diff --check` fails.
+The formatter script formats only the Java files passed to it; do not reformat unrelated Java files in a task. A task must not be reported complete if formatting, tests, or `git diff --check` fails.
 
 Install repository Git hooks once with `./scripts/install-git-hooks`. The pre-commit hook formats only staged Java files and re-stages them; the pre-push hook checks formatting without modifying files. Hooks are local safeguards and do not replace a remote CI/protected-branch check.
 

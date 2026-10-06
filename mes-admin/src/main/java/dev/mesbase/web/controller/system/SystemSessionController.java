@@ -39,7 +39,7 @@ public class SystemSessionController {
  @DeleteMapping("/api/platform/session") @EndpointAccess(value=EndpointAccess.Kind.AUTHENTICATED,permissionScope=EndpointAccess.PermissionScope.PLATFORM)
  public void logout(){tokens.delLoginUser(SecurityUtils.getLoginUser().getToken());}
  @GetMapping("/api/system/info") @EndpointAccess(value=EndpointAccess.Kind.AUTHENTICATED,permissionScope=EndpointAccess.PermissionScope.PLATFORM)
- public AjaxResult info(){var a=AjaxResult.success();a.put("user",SysUserAssembler.toResult(SecurityUtils.getLoginUser().getUser()));a.put("passwordPolicy",passwords.view());a.put("permissions",permissions.permissions(SecurityUtils.getUsername(),null));return a;}
+ public AjaxResult info(){var a=AjaxResult.success();a.put("user",SysUserAssembler.toResult(SecurityUtils.getLoginUser().getUser()));a.put("passwordPolicy",passwords.view());a.put("permissions",permissions.permissions(SecurityUtils.getUsername(),null));a.put("workspaces",permissions.workspaces(SecurityUtils.getUsername()));return a;}
  @GetMapping("/api/system/factory-navigation") @EndpointAccess(EndpointAccess.Kind.AUTHENTICATED)
  public Object factoryNavigation(){return new FactoryNavigation(permissions.permissions(SecurityUtils.getUsername(),FactoryContext.required().factoryId().value()),menus.buildMenus(menus.selectFactoryMenuTree(SecurityUtils.getUsername(),FactoryContext.required().factoryId().value())));}
  public record FactoryNavigation(Set<String> permissions,List<RouterVo> menus){}

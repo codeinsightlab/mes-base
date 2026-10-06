@@ -29,7 +29,6 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.context.annotation.Primary;
 import org.springframework.core.env.Environment;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
@@ -95,7 +94,7 @@ public class SystemConfiguration {
     }
 
     @Bean
-    SyncCoordinator syncCoordinator(PlatformPersistence u, PlatformPersistence p, FactoryCatalog f) {
+    SyncCoordinator syncCoordinator(PlatformPersistence p, FactoryCatalog f) {
         return new SyncCoordinator(p, f);
     }
 
@@ -105,7 +104,6 @@ public class SystemConfiguration {
     }
 
     @Bean
-    @Primary
     UserDetailsService systemAccounts(ISysUserService users) {
         return name -> {
             var user = users.selectUserByUserName(name);
@@ -116,7 +114,6 @@ public class SystemConfiguration {
     }
 
     @Bean
-    @Primary
     AuthorizationService factoryAuthorization(SystemPermissionService p) {
         return (actor, scope, permission) -> p.granted(actor.id(), scope.factoryId().value(), permission.code());
     }

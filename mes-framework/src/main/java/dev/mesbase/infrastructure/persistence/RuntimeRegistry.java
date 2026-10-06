@@ -7,6 +7,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import javax.sql.DataSource;
 
@@ -59,6 +60,10 @@ public final class RuntimeRegistry implements AutoCloseable {
         var runtime=current.get(binding.datasourceIdentity());
         return !closed && runtime!=null && runtime.revision==binding.revision()
                 && binding.factoryId().equals(dedicatedOwners.get(binding.datasourceIdentity()));
+    }
+    /** Observation only: never creates a pool or acquires a connection/lease. */
+    public synchronized Optional<DataSource> observedDatasource(BusinessRuntimeBinding binding) {
+        return contains(binding) ? Optional.of(current.get(binding.datasourceIdentity()).datasource) : Optional.empty();
     }
     /** Remove from acquisition immediately; outstanding leases drain and fail their next version check. */
     public synchronized void retire(DatasourceIdentity identity) {

@@ -36,3 +36,8 @@ Dedicated registry 预登记 Factory owner，防止无行过滤的适配器误�
 ## 2026-10-06 修订：标准 Spring/MyBatis-Spring 装配
 
 用户明确要求优先参考源分支并减少手工绑定。Dedicated的安全边界保留，生产装配改为一个businessSqlSessionFactory和一个按Factory路由的数据源；版本化RuntimeRegistry只管理连接池。事务管理器扩展Spring生命周期锁定Factory/连接身份，MyBatis-Spring负责session，Service显式@Transactional。既有回调契约留给基础设施/CLI/生成骨架兼容，不要求业务Service再增加Port才能使用Mapper。Shared仍未实现，不因这次装配变化宣称共享库行范围隔离成立。
+
+## 2026-10-06 架构瘦身：设计计划不保留空接口
+
+删除没有实现、注册或调用者的 `SharedDatabasePersistence` 占位接口及嵌套 ScopedIdentity。Shared 仍是 DESIGNED，以上行范围验收计划和 Dedicated 防跨厂共池限制继续有效。
+`FactoryOwned` 仍被生成器使用，保留。删除空接口不会启用 Shared、修改当前业务路由或事务；今后实现必须先满足本 ADR 的验收条件。证据见 [Architecture Slimming Audit](architecture-slimming-audit.md)。

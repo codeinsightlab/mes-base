@@ -19,3 +19,8 @@
 `FactoryScopeTest` 验证绑定、缺 Scope、嵌套、异常和事务 pin；`ExecutionScopeTest` 验证 PLATFORM、Factory 必填、工作线程、CallerRuns、身份清理、关闭拒绝。`ArchitectureBoundaryTest` 检查 Core 不引用 ThreadLocal/框架/实现。
 
 尚未实现持久调度、节点崩溃恢复、JobStore、消息投递或业务事件。未来跨线程业务事件必须显式带 FactoryId。当前以一个 Enterprise 的本地部署为范围；多企业身份与目录裁剪另需设计。
+
+## 2026-10-06 架构瘦身：未接入的 Enterprise 类型
+
+上述 Enterprise record 是早期值对象设计记录。当前 Factory/平台目录使用 `enterpriseId` 字段，没有任何生产、测试、Bean、配置或外部契约引用 Enterprise Java 类型。
+本轮删除该未接入 record，企业归属字段、FactoryScope 和目录行为保持不变；不实现多企业业务。证据及验证见 [Architecture Slimming Audit](architecture-slimming-audit.md)。

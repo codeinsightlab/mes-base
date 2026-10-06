@@ -9,6 +9,9 @@ import dev.mesbase.common.core.domain.AjaxResult;
 import dev.mesbase.core.error.ErrorCode;
 import dev.mesbase.core.error.FoundationException;
 import dev.mesbase.platform.web.EndpointAccess;
+import dev.mesbase.server.monitor.DruidMonitorService;
+import dev.mesbase.server.monitor.DruidMonitorService.SourcePage;
+import dev.mesbase.server.monitor.DruidMonitorService.Snapshot;
 import java.util.Comparator;
 import javax.sql.DataSource;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -21,9 +24,23 @@ import org.springframework.web.bind.annotation.RestController;
 @ConditionalOnProperty(name = "mes.system.enabled", havingValue = "true")
 public class DruidController {
     private final DruidDataSource source;
+    private final DruidMonitorService monitor;
 
-    public DruidController(@Qualifier("platformDataSource") DataSource source) {
+    public DruidController(@Qualifier("platformDataSource") DataSource source, DruidMonitorService monitor) {
         this.source = (DruidDataSource) source;
+        this.monitor = monitor;
+    }
+
+    @GetMapping("/api/monitor/druid/sources")
+    @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED, permission = "monitor:druid:list", permissionScope = EndpointAccess.PermissionScope.PLATFORM)
+    public SourcePage sources(@RequestParam(defaultValue="1") int pageNum, @RequestParam(defaultValue="20") int pageSize) {
+        return monitor.sources(pageNum, pageSize);
+    }
+
+    @GetMapping("/api/monitor/druid/snapshot")
+    @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED, permission = "monitor:druid:list", permissionScope = EndpointAccess.PermissionScope.PLATFORM)
+    public Snapshot snapshot(@RequestParam String sourceId, @RequestParam(defaultValue="100") int limit) {
+        return monitor.snapshot(sourceId, limit);
     }
 
     public record Pool(String name, int activeCount, int poolingCount, long connectCount, long closeCount,
@@ -50,7 +67,7 @@ public class DruidController {
 
     private String template(String sql) {
         try {
-            return ParameterizedOutputVisitorUtils.parameterize(sql, DbType.mysql);
+            return ParameterizedOutputVisitorUtils.parameterize(sql, DbType.of(source.getDbType()));
         } catch (RuntimeException unsupported) {
             return "无法显示此SQL模板";
         }

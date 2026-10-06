@@ -26,7 +26,9 @@ with zipfile.ZipFile(JAR) as artifact:
                       "AnalyticsConfiguration$AnalyticsUnit.class", "AnalyticsConfiguration$AnalyticsAspect.class",
                       "BusinessMapperRegistration.class", "PlatformMapperRegistration.class", "BusinessStatementGuard.class",
                       "ErpAdapter.class", "ErpProvider.class", "ErpConnectionBinding.class", "FactoryErpConnectionResolver.class",
-                      "NotConfiguredErpResolver.class", "IntegrationNotConfiguredException.class", "ErpTransactions.class")
+                      "NotConfiguredErpResolver.class", "IntegrationNotConfiguredException.class", "ErpTransactions.class",
+                      "HTMLFilter.class", "ISysAttachmentService.class", "SharedDatabasePersistence.class",
+                      "SharedDatabasePersistence$ScopedIdentity.class", "Enterprise.class")
     assert not any(n.endswith(legacy_classes) for n in names)
     for name in names:
         if name.startswith("BOOT-INF/lib/mes-") and name.endswith(".jar"):
@@ -37,7 +39,13 @@ checks.append({"case": "packaging-excludes-legacy-platform-implementation", "pas
 
 def run(profile):
     environment = {key: value for key, value in os.environ.items() if not key.startswith(("SPRING_", "MES_", "SERVER_")) and key not in ("JAVA_TOOL_OPTIONS", "JDK_JAVA_OPTIONS", "_JAVA_OPTIONS")}
-    command = [JAVA, "-jar", str(JAR), "--server.port=0", "--server.address=127.0.0.1", "--spring.config.location=classpath:/application.yml", "--spring.profiles.active=" + (profile or "default")]
+    command = [
+        JAVA, "-jar", str(JAR), "--server.port=0", "--server.address=127.0.0.1",
+        "--spring.config.location=classpath:/application.yml",
+        "--spring.profiles.active=" + (profile or "default"),
+        "--logging.level.org.springframework.boot.web.servlet=DEBUG",
+        "--logging.level.org.springframework.security.web.DefaultSecurityFilterChain=DEBUG",
+    ]
     logfile = OUT / ("packaged-" + (profile or "default") + ".log")
     with logfile.open("w") as stream:
         process = subprocess.Popen(command, cwd=ROOT, env=environment, stdout=stream, stderr=subprocess.STDOUT)

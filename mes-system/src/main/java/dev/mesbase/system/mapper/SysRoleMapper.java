@@ -1,6 +1,9 @@
 package dev.mesbase.system.mapper;
 
 import dev.mesbase.common.core.domain.entity.SysRole;
+import dev.mesbase.system.domain.WorkspaceRoleScope;
+import org.apache.ibatis.annotations.Select;
+import org.apache.ibatis.annotations.Param;
 
 import java.util.List;
 
@@ -11,6 +14,9 @@ import java.util.List;
  */
 public interface SysRoleMapper
 {
+    @Select("SELECT DISTINCT r.kind,r.factory_id FROM sys_role r JOIN sys_user_role ur ON ur.role_id=r.role_id JOIN sys_user u ON u.user_id=ur.user_id WHERE u.user_name=#{username} AND u.status='0' AND u.del_flag='0' AND r.status='0' AND r.del_flag='0' AND ((r.kind='PLATFORM' AND r.factory_id IS NULL) OR (r.kind='FACTORY' AND r.factory_id IS NOT NULL))")
+    List<WorkspaceRoleScope> selectWorkspaceScopes(@Param("username") String username);
+
     /**
      * 根据条件分页查询角色数据
      *

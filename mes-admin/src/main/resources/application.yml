@@ -60,11 +60,9 @@ mes:
   platform:
     enabled: false
     migrate: false
-    session-ttl-seconds: 3600
     max-upload-bytes: 10000000
   runtime:
     enabled: false
-    factories: [ ]
   codegen:
     # Developer metadata profile is independent of Factory Runtime bindings.
     default-datasource: dev
@@ -94,10 +92,6 @@ xss:
   enabled: true
   url-patterns: /api/system/*,/api/monitor/*
   excludes: /api/system/user/profile/updatePwd
-pagehelper:
-  helper-dialect: mysql
-  reasonable: false
-
 # Source Minio configuration keys; values supplied by the deployment owner.
 minio:
   url: ""

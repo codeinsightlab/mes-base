@@ -129,6 +129,7 @@ public final class ManagedDatasourceService {
         var bindings=persistence.readOnly(s->s.mapper(ManagedFactoryMapper.class).byDatasources(rows.stream().map(ManagedDatasource::datasourceId).toList()));
         var bySource=new HashMap<Long,ManagedFactory>();bindings.forEach(f->bySource.put(f.datasourceId(),f));
         return rows.stream().map(row->view(row,bySource.get(row.datasourceId()))).toList();}
+    public long countSources(){return persistence.readOnly(s->s.mapper(ManagedDatasourceMapper.class).count());}
     public synchronized DatasourceView detail(long id){ManagedDatasource row=persistence.readOnly(s->required(s.mapper(ManagedDatasourceMapper.class).find(id)));return view(row,persistence.readOnly(s->s.mapper(ManagedFactoryMapper.class).byDatasource(id)));}
     public DatasourceView save(DatasourceForm form,boolean creating){
         if(form.password()!=null&&form.password().getBytes(StandardCharsets.UTF_8).length>512)throw new FoundationException(ErrorCode.BAD_REQUEST);

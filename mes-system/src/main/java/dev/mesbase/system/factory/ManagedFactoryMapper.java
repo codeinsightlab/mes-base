@@ -6,6 +6,7 @@ import org.apache.ibatis.annotations.Delete;
 import org.apache.ibatis.annotations.Param;
 import java.util.List;
 public interface ManagedFactoryMapper {
+ @Select("<script>SELECT factory_id FROM mf_factory WHERE status='ENABLED' AND factory_id IN <foreach collection='ids' item='id' open='(' separator=',' close=')'>#{id}</foreach></script>") List<String> enabledIds(@Param("ids") List<String> ids);
  @Select("SELECT "+COLUMNS+" FROM mf_factory ORDER BY factory_id") List<ManagedFactory> all();
  String COLUMNS="factory_id,enterprise_id,factory_code,factory_name,datasource_id,status,revision";
  @Select("SELECT "+COLUMNS+" FROM mf_factory ORDER BY factory_id LIMIT #{limit} OFFSET #{offset}") List<ManagedFactory> list(@Param("offset") int offset,@Param("limit") int limit);
@@ -17,7 +18,7 @@ public interface ManagedFactoryMapper {
  @Select("SELECT count(*) FROM sys_role WHERE factory_id=#{id}") int roles(String id);
  @Select("SELECT count(*) FROM mes_master_sync WHERE factory_id=#{id}") int syncStates(String id);
  @Select("SELECT count(*) FROM sys_job WHERE factory_id=#{id}") int jobs(String id);
- @Select("<script>SELECT "+COLUMNS+" FROM mf_factory WHERE datasource_id IN <foreach collection='ids' item='id' open='(' separator=',' close=')'>#{id}</foreach></script>") List<ManagedFactory> byDatasources(@Param("ids") java.util.List<Long> ids);
+ @Select("<script>SELECT "+COLUMNS+" FROM mf_factory WHERE datasource_id IN <foreach collection='ids' item='id' open='(' separator=',' close=')'>#{id}</foreach></script>") List<ManagedFactory> byDatasources(@Param("ids") List<Long> ids);
  @Select("SELECT "+COLUMNS+" FROM mf_factory WHERE datasource_id=#{id}") ManagedFactory byDatasource(long id);
  @Select("SELECT count(*) FROM mf_factory WHERE datasource_id=#{id}") int bound(long id);
 }

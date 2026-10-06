@@ -1,6 +1,7 @@
 package dev.mesbase.server;
 
 import dev.mesbase.web.controller.monitor.DruidController;
+import dev.mesbase.server.monitor.DruidMonitorService;
 import dev.mesbase.common.core.domain.AjaxResult;
 import dev.mesbase.core.factory.FactoryId;
 import dev.mesbase.core.factory.FactoryScope;
@@ -99,7 +100,7 @@ class PersistenceAssemblyTest {
                 "mes.erp.datasources.erp-main.username", "sa",
                 "mes.erp.datasources.erp-main.password", "",
                 "mes.erp.datasources.erp-main.driver-class-name", "org.h2.Driver")));
-            context.register(PersistenceConfiguration.class, DruidController.class);
+            context.register(PersistenceConfiguration.class, DruidMonitorService.class, DruidController.class);
             context.refresh();
             assertEquals(3,context.getBeansOfType(SqlSessionFactory.class).size());
             assertEquals(3,context.getBeansOfType(DataSource.class).size());

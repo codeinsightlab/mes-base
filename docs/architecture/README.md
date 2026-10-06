@@ -15,3 +15,8 @@
 原 Factory 阶段的验收边界见既有报告；本轮新增 Platform 管理、身份会话、Quartz 管理与 Vue3 UI，见 ADR-006 和 Platform/Codegen 报告。本轮已连接用户指定远程测试 MySQL 的隔离 Schema 和私有 Redis。仍无 MES 同步领域、实际ERP调用、持久化 Quartz集群JobStore或生产验收。
 
 - [ADR-006 — Platform / Web Base 与来源](ADR-006-platform-and-web-base.md)
+
+## 2026-10-06 当前结构与瘦身审计
+
+上面的六模块及 `integration.erp` Port 描述是早期迁入记录，已由当前代码取代。当前是七个 JAR 模块：common/system/framework/quartz/generator/mes/admin；生产 Mapper 按固定包绑定 platform/business/erp 三组工厂，ERP 多连接由 `@ErpSource` 与独立路由数据源负责。
+未接入的 Enterprise/Shared 占位已删除，ADR-001/004 保留历史与未来验收边界。真实隐式请求链、Bean/Context/依赖清单、删减证据及待决事项见 [Architecture Slimming Audit](architecture-slimming-audit.md)。

@@ -1,8 +1,0 @@
-#!/bin/sh
-set -eu
-
-repo_root=$(git rev-parse --show-toplevel)
-cd "$repo_root"
-
-echo "Checking Java formatting before push..."
-mvn -B -ntp spotless:check

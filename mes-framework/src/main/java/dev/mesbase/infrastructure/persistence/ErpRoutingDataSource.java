@@ -20,6 +20,8 @@ public final class ErpRoutingDataSource extends AbstractDataSource implements Tr
         sources.keySet().forEach(ErpSourceContext::validate);
         this.sources = Map.copyOf(sources);
     }
+    /** Read-only view of already configured pools, independent of transaction routing. */
+    public Map<String, DataSource> configuredSources() { return sources; }
     private Selection selected() {
         Selection selected = (Selection) TransactionSynchronizationManager.getResource(key);
         if (selected == null) throw new FoundationException(ErrorCode.INTEGRATION_NOT_CONFIGURED);
