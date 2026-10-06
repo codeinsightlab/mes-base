@@ -36,6 +36,9 @@
         <version>${spotless.version}</version>
         <configuration>
           <java>
+            <googleJavaFormat>
+              <version>1.19.2</version>
+            </googleJavaFormat>
             <importOrder>
               <order>java,javax,org,com,</order>
             </importOrder>

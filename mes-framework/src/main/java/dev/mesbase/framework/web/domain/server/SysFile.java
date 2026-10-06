@@ -2,7 +2,7 @@ package dev.mesbase.framework.web.domain.server;
 
 /**
  * 系统文件相关信息
- * 
+ *
  * @author ruoyi
  */
 public class SysFile

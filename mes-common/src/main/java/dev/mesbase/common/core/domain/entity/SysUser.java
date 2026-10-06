@@ -19,7 +19,7 @@ import jakarta.validation.constraints.*;
 
 /**
  * 用户对象 sys_user
- * 
+ *
  * @author ktg
  */
 public class SysUser extends BaseEntity

@@ -6,15 +6,15 @@ import java.util.List;
 
 /**
  * 消息Mapper接口
- * 
+ *
  * @author yinjinlu
  * @date 2023-03-06
  */
-public interface SysMessageMapper 
+public interface SysMessageMapper
 {
     /**
      * 查询消息
-     * 
+     *
      * @param messageId 消息主键
      * @return 消息
      */
@@ -22,7 +22,7 @@ public interface SysMessageMapper
 
     /**
      * 查询消息列表
-     * 
+     *
      * @param sysMessage 消息
      * @return 消息集合
      */
@@ -30,7 +30,7 @@ public interface SysMessageMapper
 
     /**
      * 新增消息
-     * 
+     *
      * @param sysMessage 消息
      * @return 结果
      */
@@ -38,7 +38,7 @@ public interface SysMessageMapper
 
     /**
      * 修改消息
-     * 
+     *
      * @param sysMessage 消息
      * @return 结果
      */
@@ -46,7 +46,7 @@ public interface SysMessageMapper
 
     /**
      * 删除消息
-     * 
+     *
      * @param messageId 消息主键
      * @return 结果
      */
@@ -54,7 +54,7 @@ public interface SysMessageMapper
 
     /**
      * 批量删除消息
-     * 
+     *
      * @param messageIds 需要删除的数据主键集合
      * @return 结果
      */

@@ -28,7 +28,7 @@ import jakarta.servlet.http.HttpServletResponse;
 
 /**
  * 参数配置 信息操作处理
- * 
+ *
  * @author ruoyi
  */
 @RestController

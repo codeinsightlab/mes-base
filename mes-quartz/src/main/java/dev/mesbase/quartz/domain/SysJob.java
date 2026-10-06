@@ -18,7 +18,7 @@ import jakarta.validation.constraints.Size;
 
 /**
  * 定时任务调度表 sys_job
- * 
+ *
  * @author ruoyi
  */
 public class SysJob extends BaseEntity

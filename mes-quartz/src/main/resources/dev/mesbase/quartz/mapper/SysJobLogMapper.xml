@@ -22,12 +22,12 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 <result property="stopTime" column="end_time"/>
 <result property="costTime" column="cost_time"/>
 </resultMap>
-	
+
 	<sql id="selectJobLogVo">
-        select request_id,actor_id,factory_id,execution_scope,run_token,start_time,end_time,cost_time,job_log_id, job_name, job_group, invoke_target, job_message, status, exception_info, create_time 
+        select request_id,actor_id,factory_id,execution_scope,run_token,start_time,end_time,cost_time,job_log_id, job_name, job_group, invoke_target, job_message, status, exception_info, create_time
 		from sys_job_log
     </sql>
-	
+
 	<select id="selectJobLogList" parameterType="SysJobLog" resultMap="SysJobLogResult">
 		<include refid="selectJobLogVo"/>
 		<where>
@@ -51,31 +51,31 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 			</if>
 		</where>
 	</select>
-	
+
 	<select id="selectJobLogAll" resultMap="SysJobLogResult">
 		<include refid="selectJobLogVo"/>
 	</select>
-	
+
 	<select id="selectJobLogById" parameterType="Long" resultMap="SysJobLogResult">
 		<include refid="selectJobLogVo"/>
 		where job_log_id = #{jobLogId}
 	</select>
-	
+
 	<delete id="deleteJobLogById" parameterType="Long">
  		delete from sys_job_log where job_log_id = #{jobLogId}
  	</delete>
- 	
+
  	<delete id="deleteJobLogByIds" parameterType="Long">
  		delete from sys_job_log where job_log_id in
  		<foreach collection="array" item="jobLogId" open="(" separator="," close=")">
  			#{jobLogId}
-        </foreach> 
+        </foreach>
  	</delete>
- 	
+
  	<update id="cleanJobLog">
         truncate table sys_job_log
     </update>
- 	
+
  	<insert id="insertJobLog" parameterType="SysJobLog">
  		insert into sys_job_log(
  			<if test="jobLogId != null and jobLogId != 0">job_log_id,</if>
@@ -116,4 +116,4 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 		</where>
 		order by create_time desc limit 1
 	</select>
-</mapper> 
+</mapper>

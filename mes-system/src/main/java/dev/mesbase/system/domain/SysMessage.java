@@ -11,7 +11,7 @@ import java.util.Date;
 
 /**
  * 消息对象 sys_message
- * 
+ *
  * @author yinjinlu
  * @date 2023-03-06
  */
@@ -91,174 +91,174 @@ public class SysMessage extends BaseEntity
     /** 预留字段4 */
     private Long attr4;
 
-    public void setMessageId(Long messageId) 
+    public void setMessageId(Long messageId)
     {
         this.messageId = messageId;
     }
 
-    public Long getMessageId() 
+    public Long getMessageId()
     {
         return messageId;
     }
-    public void setMessageType(String messageType) 
+    public void setMessageType(String messageType)
     {
         this.messageType = messageType;
     }
 
-    public String getMessageType() 
+    public String getMessageType()
     {
         return messageType;
     }
-    public void setMessageLevel(String messageLevel) 
+    public void setMessageLevel(String messageLevel)
     {
         this.messageLevel = messageLevel;
     }
 
-    public String getMessageLevel() 
+    public String getMessageLevel()
     {
         return messageLevel;
     }
-    public void setMessageTitle(String messageTitle) 
+    public void setMessageTitle(String messageTitle)
     {
         this.messageTitle = messageTitle;
     }
 
-    public String getMessageTitle() 
+    public String getMessageTitle()
     {
         return messageTitle;
     }
-    public void setMessageContent(String messageContent) 
+    public void setMessageContent(String messageContent)
     {
         this.messageContent = messageContent;
     }
 
-    public String getMessageContent() 
+    public String getMessageContent()
     {
         return messageContent;
     }
-    public void setSenderId(Long senderId) 
+    public void setSenderId(Long senderId)
     {
         this.senderId = senderId;
     }
 
-    public Long getSenderId() 
+    public Long getSenderId()
     {
         return senderId;
     }
-    public void setSenderName(String senderName) 
+    public void setSenderName(String senderName)
     {
         this.senderName = senderName;
     }
 
-    public String getSenderName() 
+    public String getSenderName()
     {
         return senderName;
     }
-    public void setSenderNick(String senderNick) 
+    public void setSenderNick(String senderNick)
     {
         this.senderNick = senderNick;
     }
 
-    public String getSenderNick() 
+    public String getSenderNick()
     {
         return senderNick;
     }
-    public void setRecipientId(Long recipientId) 
+    public void setRecipientId(Long recipientId)
     {
         this.recipientId = recipientId;
     }
 
-    public Long getRecipientId() 
+    public Long getRecipientId()
     {
         return recipientId;
     }
-    public void setRecipientName(String recipientName) 
+    public void setRecipientName(String recipientName)
     {
         this.recipientName = recipientName;
     }
 
-    public String getRecipientName() 
+    public String getRecipientName()
     {
         return recipientName;
     }
-    public void setRecipientNick(String recipientNick) 
+    public void setRecipientNick(String recipientNick)
     {
         this.recipientNick = recipientNick;
     }
 
-    public String getRecipientNick() 
+    public String getRecipientNick()
     {
         return recipientNick;
     }
-    public void setProcessTime(Date processTime) 
+    public void setProcessTime(Date processTime)
     {
         this.processTime = processTime;
     }
 
-    public Date getProcessTime() 
+    public Date getProcessTime()
     {
         return processTime;
     }
-    public void setCallBack(String callBack) 
+    public void setCallBack(String callBack)
     {
         this.callBack = callBack;
     }
 
-    public String getCallBack() 
+    public String getCallBack()
     {
         return callBack;
     }
-    public void setStatus(String status) 
+    public void setStatus(String status)
     {
         this.status = status;
     }
 
-    public String getStatus() 
+    public String getStatus()
     {
         return status;
     }
-    public void setDeletedFlag(String deletedFlag) 
+    public void setDeletedFlag(String deletedFlag)
     {
         this.deletedFlag = deletedFlag;
     }
 
-    public String getDeletedFlag() 
+    public String getDeletedFlag()
     {
         return deletedFlag;
     }
-    public void setAttr1(String attr1) 
+    public void setAttr1(String attr1)
     {
         this.attr1 = attr1;
     }
 
-    public String getAttr1() 
+    public String getAttr1()
     {
         return attr1;
     }
-    public void setAttr2(String attr2) 
+    public void setAttr2(String attr2)
     {
         this.attr2 = attr2;
     }
 
-    public String getAttr2() 
+    public String getAttr2()
     {
         return attr2;
     }
-    public void setAttr3(Long attr3) 
+    public void setAttr3(Long attr3)
     {
         this.attr3 = attr3;
     }
 
-    public Long getAttr3() 
+    public Long getAttr3()
     {
         return attr3;
     }
-    public void setAttr4(Long attr4) 
+    public void setAttr4(Long attr4)
     {
         this.attr4 = attr4;
     }
 
-    public Long getAttr4() 
+    public Long getAttr4()
     {
         return attr4;
     }

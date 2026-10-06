@@ -6,7 +6,7 @@ import java.util.Arrays;
 
 /**
  * 文件上传 误异常类
- * 
+ *
  * @author ktg
  */
 public class InvalidExtensionException extends java.io.IOException

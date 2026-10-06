@@ -11,7 +11,7 @@ import java.math.BigDecimal;
 
 /**
  * 附件对象 sys_attachment
- * 
+ *
  * @author yinjinlu
  * @date 2022-07-26
  */
@@ -70,120 +70,120 @@ public class SysAttachment extends BaseEntity
     /** 预留字段4 */
     private Long attr4;
 
-    public void setAttachmentId(Long attachmentId) 
+    public void setAttachmentId(Long attachmentId)
     {
         this.attachmentId = attachmentId;
     }
 
-    public Long getAttachmentId() 
+    public Long getAttachmentId()
     {
         return attachmentId;
     }
-    public void setSourceDocId(Long sourceDocId) 
+    public void setSourceDocId(Long sourceDocId)
     {
         this.sourceDocId = sourceDocId;
     }
 
-    public Long getSourceDocId() 
+    public Long getSourceDocId()
     {
         return sourceDocId;
     }
-    public void setSourceDocType(String sourceDocType) 
+    public void setSourceDocType(String sourceDocType)
     {
         this.sourceDocType = sourceDocType;
     }
 
-    public String getSourceDocType() 
+    public String getSourceDocType()
     {
         return sourceDocType;
     }
-    public void setFileUrl(String fileUrl) 
+    public void setFileUrl(String fileUrl)
     {
         this.fileUrl = fileUrl;
     }
 
-    public String getFileUrl() 
+    public String getFileUrl()
     {
         return fileUrl;
     }
-    public void setBasePath(String basePath) 
+    public void setBasePath(String basePath)
     {
         this.basePath = basePath;
     }
 
-    public String getBasePath() 
+    public String getBasePath()
     {
         return basePath;
     }
-    public void setFileName(String fileName) 
+    public void setFileName(String fileName)
     {
         this.fileName = fileName;
     }
 
-    public String getFileName() 
+    public String getFileName()
     {
         return fileName;
     }
-    public void setOrignalName(String orignalName) 
+    public void setOrignalName(String orignalName)
     {
         this.orignalName = orignalName;
     }
 
-    public String getOrignalName() 
+    public String getOrignalName()
     {
         return orignalName;
     }
-    public void setFileType(String fileType) 
+    public void setFileType(String fileType)
     {
         this.fileType = fileType;
     }
 
-    public String getFileType() 
+    public String getFileType()
     {
         return fileType;
     }
-    public void setFileSize(BigDecimal fileSize) 
+    public void setFileSize(BigDecimal fileSize)
     {
         this.fileSize = fileSize;
     }
 
-    public BigDecimal getFileSize() 
+    public BigDecimal getFileSize()
     {
         return fileSize;
     }
-    public void setAttr1(String attr1) 
+    public void setAttr1(String attr1)
     {
         this.attr1 = attr1;
     }
 
-    public String getAttr1() 
+    public String getAttr1()
     {
         return attr1;
     }
-    public void setAttr2(String attr2) 
+    public void setAttr2(String attr2)
     {
         this.attr2 = attr2;
     }
 
-    public String getAttr2() 
+    public String getAttr2()
     {
         return attr2;
     }
-    public void setAttr3(Long attr3) 
+    public void setAttr3(Long attr3)
     {
         this.attr3 = attr3;
     }
 
-    public Long getAttr3() 
+    public Long getAttr3()
     {
         return attr3;
     }
-    public void setAttr4(Long attr4) 
+    public void setAttr4(Long attr4)
     {
         this.attr4 = attr4;
     }
 
-    public Long getAttr4() 
+    public Long getAttr4()
     {
         return attr4;
     }

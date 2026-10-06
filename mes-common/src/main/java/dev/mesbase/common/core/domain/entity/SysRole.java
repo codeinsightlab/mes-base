@@ -12,7 +12,7 @@ import jakarta.validation.constraints.Size;
 
 /**
  * 角色表 sys_role
- * 
+ *
  * @author ruoyi
  */
 public class SysRole extends BaseEntity
@@ -208,7 +208,7 @@ public class SysRole extends BaseEntity
     {
         this.deptIds = deptIds;
     }
-    
+
     @Override
     public String toString() {
         return new ToStringBuilder(this,ToStringStyle.MULTI_LINE_STYLE)

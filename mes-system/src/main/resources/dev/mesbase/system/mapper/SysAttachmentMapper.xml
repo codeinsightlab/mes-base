@@ -3,7 +3,7 @@
 PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="dev.mesbase.system.mapper.SysAttachmentMapper">
-    
+
     <resultMap type="SysAttachment" id="SysAttachmentResult">
         <result property="fileId" column="file_id"/>
         <result property="ownerId" column="owner_id"/>
@@ -37,7 +37,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         <include refid="selectSysAttachmentVo"/>
         <where>
             AND owner_id=#{ownerId} AND resource=#{resource}
-            <choose><when test="factoryId!=null">AND factory_id=#{factoryId}</when><otherwise>AND factory_id IS NULL</otherwise></choose>  
+            <choose><when test="factoryId!=null">AND factory_id=#{factoryId}</when><otherwise>AND factory_id IS NULL</otherwise></choose>
             <if test="sourceDocId != null "> and source_doc_id = #{sourceDocId}</if>
             <if test="sourceDocType != null  and sourceDocType != ''"> and source_doc_type = #{sourceDocType}</if>
             <if test="fileUrl != null  and fileUrl != ''"> and file_url = #{fileUrl}</if>
@@ -48,12 +48,12 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
             <if test="fileSize != null "> and file_size = #{fileSize}</if>
         </where>
     </select>
-    
+
     <select id="selectSysAttachmentByAttachmentId" parameterType="Long" resultMap="SysAttachmentResult">
         <include refid="selectSysAttachmentVo"/>
         where attachment_id = #{attachmentId}
     </select>
-        
+
     <insert id="insertSysAttachment" parameterType="SysAttachment" useGeneratedKeys="true" keyProperty="attachmentId">
         insert into sys_attachment
         <trim prefix="(" suffix=")" suffixOverrides=",">file_id,owner_id,factory_id,resource,
@@ -125,7 +125,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     </delete>
 
     <delete id="deleteSysAttachmentByAttachmentIds" parameterType="String">
-        delete from sys_attachment where attachment_id in 
+        delete from sys_attachment where attachment_id in
         <foreach item="attachmentId" collection="array" open="(" separator="," close=")">
             #{attachmentId}
         </foreach>

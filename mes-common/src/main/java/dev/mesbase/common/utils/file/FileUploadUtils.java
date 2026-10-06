@@ -124,7 +124,7 @@ public class FileUploadUtils {
      * @return 文件名称
      * @throws Exception
      */
-    
+
 
     /**
      * 自定义bucketName配置上传到Minio服务器
@@ -133,9 +133,9 @@ public class FileUploadUtils {
      * @return 文件名称
      * @throws Exception
      */
-    
 
-    
+
+
 
 
     /**
@@ -230,5 +230,5 @@ public class FileUploadUtils {
         return extension;
     }
 
-    
+
 }

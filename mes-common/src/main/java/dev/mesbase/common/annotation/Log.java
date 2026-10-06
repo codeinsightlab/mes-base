@@ -11,7 +11,7 @@ import java.lang.annotation.Target;
 
 /**
  * 自定义操作日志记录注解
- * 
+ *
  * @author ruoyi
  *
  */
@@ -21,7 +21,7 @@ import java.lang.annotation.Target;
 public @interface Log
 {
     /**
-     * 模块 
+     * 模块
      */
     public String title() default "";
 

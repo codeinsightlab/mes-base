@@ -3,7 +3,7 @@
 PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="dev.mesbase.system.mapper.SysMessageMapper">
-    
+
     <resultMap type="SysMessage" id="SysMessageResult">
         <result property="messageId"    column="message_id"    />
         <result property="messageType"    column="message_type"    />
@@ -37,7 +37,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 
     <select id="selectSysMessageList" parameterType="SysMessage" resultMap="SysMessageResult">
         <include refid="selectSysMessageVo"/>
-        <where>  
+        <where>
             <if test="messageType != null  and messageType != ''"> and message_type = #{messageType}</if>
             <if test="messageLevel != null  and messageLevel != ''"> and message_level = #{messageLevel}</if>
             <if test="messageTitle != null  and messageTitle != ''"> and message_title = #{messageTitle}</if>
@@ -55,12 +55,12 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         </where>
         order by create_time desc
     </select>
-    
+
     <select id="selectSysMessageByMessageId" parameterType="Long" resultMap="SysMessageResult">
         <include refid="selectSysMessageVo"/>
         where message_id = #{messageId}
     </select>
-        
+
     <insert id="insertSysMessage" parameterType="SysMessage" useGeneratedKeys="true" keyProperty="messageId">
         insert into sys_message
         <trim prefix="(" suffix=")" suffixOverrides=",">
@@ -150,7 +150,7 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
     </delete>
 
     <delete id="deleteSysMessageByMessageIds" parameterType="String">
-        delete from sys_message where message_id in 
+        delete from sys_message where message_id in
         <foreach item="messageId" collection="array" open="(" separator="," close=")">
             #{messageId}
         </foreach>
