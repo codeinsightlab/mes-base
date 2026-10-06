@@ -10,14 +10,14 @@
   --module=masterdata --business-name='示例配置' --scope=FACTORY_SCOPED --dry-run
 ```
 
-确认 JSON metadata/manifest 后删除 --dry-run。默认后端根为 cwd（必须 Base），前端根为相邻 mes-base-ui；`--output` / `--frontend-root` 指定绝对验收目录；`--package=dev.mesbase.modules.masterdata`、`--author` 可选。GLOBAL package 也可 dev.mesbase.platform.*；所有名称/路径被检查。`--overwrite` 只替换带生成标识的旧文件，不能覆盖无标识用户文件，但会替换带标识的后处理代码，使用前须审查工作区。
+确认 JSON metadata/manifest 后删除 --dry-run。默认后端根为 cwd（必须 Base），前端根为相邻 mes-base-ui；`--output` / `--frontend-root` 指定绝对验收目录；`--package=dev.mesbase.modules.masterdata`、`--author` 可选。GLOBAL package 必须 dev.mesbase.platform.*，FACTORY_SCOPED 必须 dev.mesbase.modules.*；所有名称/路径被检查。`--overwrite` 只替换带生成标识的旧文件，不能覆盖无标识用户文件，但会替换带标识的后处理代码，使用前须审查工作区。
 
 stdout 仅安全 JSON，stderr 为稳定错误码，失败 exit2；UNKNOWN_DATASOURCE / DATASOURCE_UNAVAILABLE / TABLE_NOT_FOUND / UNSUPPORTED_SCHEMA / OUTPUT_CONFLICT / OUTPUT_FAILURE 区分。额外开发 JDBC driver 可用 MES_CODEGEN_DRIVER_CLASSPATH；它不是运行时库绑定。生产 JAR 不带 H2。
 
 ## Metadata 与产物
 只用 JDBC DatabaseMetaData 的 tables/columns/PK/index/importedKeys；getIndexInfo 使用 approximate=true，不运行应用业务 SQL、不读取数据行。类型映射 Long/Integer/String/BigDecimal/LocalDateTime/LocalDate/Boolean；记录 nullable/default/comment/index/unique。单主键 Long/Integer/String，无外键；FACTORY_SCOPED 必须非空字符串 factory_id，非 PK unique 必须含该列。secret/password/token/credential/private_key 与未知主体/引用字段拒绝；复合 PK、未知类型、其他复杂表 Domain First。
 
-FACTORY_SCOPED 16 文件：Entity、Mapper、XML、Service、Impl、Controller、Query/Create/Update DTO、VO、PageVO、Permission、Test 骨架、API TS、Vue、permission Markdown。GLOBAL 同样通过 PersistenceOwner 自动扫描，不额外生成 Mapper 注册配置。Bigint/decimal 响应字符串防前端精度丢失；状态仅原值，需要 Agent 依据真实语义抽取枚举与 options。
+FACTORY_SCOPED 16 文件：Entity、Mapper、XML、Service、Impl、Controller、Query/Create/Update DTO、VO、PageVO、Permission、Test 骨架、API TS、Vue、permission Markdown。GLOBAL 通过固定 platform 包自动扫描，FACTORY_SCOPED 通过固定 modules 包自动扫描，Mapper 不生成 PersistenceOwner 注解，不额外生成 Mapper 注册配置。Bigint/decimal 响应字符串防前端精度丢失；状态仅原值，需要 Agent 依据真实语义抽取枚举与 options。
 
 按两根目录预检冲突/路径/符号链接 → 临时渲染 → 发布 Backend/Frontend → 哈希 manifest → 清理。普通失败回滚本次发布；进程崩溃不能保证两个仓库跨目录原子发布，需要依据 manifest 复核。Dry-run 不创建输出。
 

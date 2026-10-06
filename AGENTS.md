@@ -23,7 +23,7 @@ factoryId；FACTORY 角色必须所属厂。权限按每次请求当前厂读取
 ## 4. Controller / Service / Mapper
 
 Controller 收参、基础校验、HTTP View 转换和协议返回；不做业务。Service 编排、规则、状态转换、事务和外部协调；Mapper 数据访问，不做授权决策。默认单
-Service，只有长期真实复杂协调才拆分。外部主动调用经 Port/Adapter，Adapter 不访问 Mapper/编排业务。
+Service，只有长期真实复杂协调才拆分。外部主动调用经 Port/Adapter，Adapter 不编排业务、不访问平台/业务 Mapper；外部 SQL 访问 Adapter 仅可访问第9.1节规定的 external Mapper。
 
 ## 5. Domain / DTO / VO / Persistence
 
@@ -74,11 +74,35 @@ ID 操作必须校验资源所属 Scope/主体；不信任客户端 userId/userN
 
 ## 9. 数据库 / SQL / Ownership
 
-Platform/Master、Business、ERP 分开；Mapper以自身PersistenceOwner唯一声明归属，自动扫描绑定三个对应SqlSessionFactory，不维护中央类清单或逐Mapper Bean。Service使用具名Spring事务；缺 Scope/连接/版本不回退平台、首库或默认
+Platform/Master、Business、ERP 分开；Mapper按固定包自动扫描绑定三个对应SqlSessionFactory：system/quartz/platform为平台，mes/modules为业务，external为外部；不逐Mapper声明PersistenceOwner，不维护中央类清单或逐Mapper Bean。只有ERP工厂按连接标识路由，外部访问类/方法用ErpSource声明标识，在Spring事务开始前选择并固定连接。Service使用具名Spring事务；缺 Scope/连接/版本不回退平台、首库或默认
 Business。独立库仍保留 Factory 业务身份；Shared DB 未实现，启用须通过 ADR-004 行范围验收。参数化 SQL、固定/受控排序、分页数量边界、避免
 N+1；unique/reference/聚合/cache/import/export 都需范围审查。业务 cache 缺 Scope 不能全局回退。复用标准 Mapper，复杂查询/局部业务更新放
 ExtraMapper，不污染生成 CRUD；授权决策在 Service。新 CRUD 物理删除，不能批量更改历史表契约。Schema 来自真实
 metadata；新迁移不带客户数据/seed。
+
+### 9.1 固定包与 SessionFactory 归属（强制，2026-10-06 用户要求）
+
+后续新增、迁移、重构及生成模板统一遵守以下固定包约束，包及其子包决定 Mapper 的 SessionFactory 归属：
+
+| SessionFactory | 固定扫描包 |
+| --- | --- |
+| `platformSqlSessionFactory` | `dev.mesbase.system`、`dev.mesbase.quartz`、`dev.mesbase.platform` |
+| `businessSqlSessionFactory` | `dev.mesbase.mes`、`dev.mesbase.modules` |
+| `erpSqlSessionFactory` | `dev.mesbase.external` |
+
+- Mapper 接口按 `*Mapper` 命名，放进对应包即自动注册；使用标准 MyBatis-Spring 包扫描。禁止新增逐 Mapper 配置、中央类清单、手工 Mapper Bean 或要求生产 Mapper 标注 `PersistenceOwner`。
+- 扫描包不得重叠，同名 Mapper 或旧归属注解与包冲突必须明确失败；禁止通过缺省归属或默认 SessionFactory 掩盖错误。`PersistenceOwner` 仅保留已有程序式 fixture 的兼容校验，不作为后续生产扫描依据。
+- 中心库固定连接；业务库保留按当前 Factory 选择连接及版本/租约校验；外部连接共用一个 ERP 工厂。禁止按 ERP/HR/WMS 连接另建 SessionFactory，或把外部 Mapper 放进业务包实现旁路。
+- 生成器同样遵守包约束：`GLOBAL` 使用 `dev.mesbase.platform.*`，`FACTORY_SCOPED` 使用 `dev.mesbase.modules.*`；不生成 Mapper 归属注解或注册清单。
+
+### 9.2 外部连接选择与 Spring 事务（强制，2026-10-06 用户要求）
+
+- 只有 ERP 工厂按外部连接标识路由。连接在 `mes.erp.datasources` 下配置，以 `erp-main`、`hr`、`wms` 等字符串标识区分；不为这些标识增加 PersistenceOwner 枚举，不由 FactoryScope 推导连接。
+- 外部访问类/方法用 `@ErpSource("hr")` 声明连接，优先类级声明供整类复用，必要时方法级覆盖。Mapper 仅由包确定工厂，不要求逐个标注外部连接；方法直接调用 Mapper，禁止恢复生产 `ErpTransactions.execute(...)` 回调选库入口。
+- 连接选择必须先于 Spring 获取事务连接。沿用注解组合的具名 Spring 事务与选库切面；传播、提交、回滚及挂起恢复由 Spring 管理，禁止另造事务框架。使用可代理的类及 public 方法，经 Spring 代理调用；不得依赖同类自调用触发选库或事务。
+- 事务期间固定连接身份，嵌套不同连接标识及跨平台/业务/ERP 事务明确拒绝；异常、结束和挂起恢复时正确清理/恢复上下文。缺少标识、未知连接、缺配置不得回退首库或默认库；多外部库操作不能宣称本地原子事务。
+- 标识来自服务端声明/受控配置，不接受客户端任意数据库选择。新增连接配置不要求修改已有 Mapper 注册或为每个连接创建工厂。
+- 接入沿用 `config/erp-datasources.example.yml` 与 `docs/development/templates/erp/`；修改扫描或路由必须验证包归属、三工厂隔离、注解先于事务、事务内换库拒绝、回滚及异常清理。Fixture 通过不等于真实外部数据库联调通过。
 
 ## 10. 测试 / 验收
 

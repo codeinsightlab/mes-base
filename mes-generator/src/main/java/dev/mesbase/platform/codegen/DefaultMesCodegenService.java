@@ -1,8 +1,13 @@
 package dev.mesbase.platform.codegen;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Locale;
+import java.util.Set;
 
-import static dev.mesbase.platform.codegen.CodegenException.Code.*;
+import static dev.mesbase.platform.codegen.CodegenException.Code.INVALID_REQUEST;
+import static dev.mesbase.platform.codegen.CodegenException.Code.UNSUPPORTED_SCHEMA;
 
 /**
  * RuoYi metadata/model/Velocity/file classification flow adapted to Base.
@@ -54,6 +59,8 @@ public final class DefaultMesCodegenService implements MesCodegenService {
                     throw new CodegenException(UNSUPPORTED_SCHEMA);
             }
         } else if (factory.isPresent()) throw new CodegenException(UNSUPPORTED_SCHEMA);
+        String packageRoot = request.scope() == CodegenRequest.ScopeKind.FACTORY_SCOPED ? "dev.mesbase.modules." : "dev.mesbase.platform.";
+        if (!request.packageName().startsWith(packageRoot)) throw new CodegenException(INVALID_REQUEST);
         List<String> warnings = new ArrayList<>();
         warnings.add("Scaffold requires Factory/Permission/Resource/Domain/SQL/UI review; no automatic grants, runtime binding or production acceptance.");
         if (table.columns().stream().anyMatch(c -> c.name().toLowerCase(Locale.ROOT).endsWith("status")))

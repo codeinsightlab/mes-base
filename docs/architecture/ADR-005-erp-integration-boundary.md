@@ -30,3 +30,10 @@
 按用户要求，外部 ERP/HR/WMS 等连接使用统一 ERP ownership 和单个 erpSqlSessionFactory。连接配置改为 mes.erp.datasources 的标识映射；ErpRoutingDataSource 在 Spring 事务开始时固定选中的池，ErpTransactions 仅用 TransactionTemplate 提供选择入口。不存在默认连接；缺标识或未知标识明确失败；活动事务内不同标识切换拒绝。连接选择与 FactoryScope 无绑定关系。新增外部 Mapper 自动扫描，不增加中央绑定、类型枚举或新会话工厂。
 
 接入模板在 config/erp-datasources.example.yml 与 docs/development/templates/erp/，不实现外部业务 SQL。DruidController 显式绑定平台数据源，解决启用第三数据源后的单 Bean 注入歧义。三数据源生产装配测试验证监控仍指向平台池；多标识真实 H2 测试验证路由、回滚、嵌套和线程隔离。真实外部数据库验证边界保持上述记录。
+
+
+## 2026-10-06 修订：固定包归属和声明式外部连接
+
+用户认为逐 Mapper 归属与每次回调选库繁琐，明确提出固定包扫描。采用三个互斥包集合：system/quartz/platform 归平台、mes/modules 归业务、external 归 ERP。标准 MapperScannerConfigurer 各自绑定对应 SqlSessionFactory，不按每个 Mapper 创建注册代码。生产 Mapper 的重复 PersistenceOwner 注解移除，生成器按 Scope 强制正确包并不生成归属注解。
+
+外部访问类/方法用 ErpSource 声明连接标识，注解组合 Spring 的 erpTransactionManager 事务，选库切面在事务拦截器之前执行。类级注解可供整类复用；方法可以覆盖，但事务中的嵌套不同标识拒绝。该设计避免 Mapper 调用发生时连接早已取得的问题，连接归属与会话工厂归属分开。ERP之外仍不按外部标识路由。旧 ErpTransactions 回调入口退役；缺配置、固定身份、异常清理及跨库事务拒绝规则不变。

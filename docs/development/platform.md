@@ -12,7 +12,7 @@ Spring Boot 4.1.1有效错误属性为spring.web.error.include-message/include-s
 | --- | --- |
 | mes.system.enabled、mes.platform.* | PersistenceConfiguration；DruidPools、PlatformPersistence、Flyway |
 | mes.erp.enabled、mes.erp.* | 独立SQL Server数据源、erpSqlSessionFactory、erpTransactionManager；启用时必需配置完整 |
-| mes.persistence.mapper-packages | 默认dev.mesbase；按Mapper自身PersistenceOwner自动分类注册，缺归属启动失败 |
+| Mapper固定包 | system/quartz/platform→平台；mes/modules→业务；external→ERP；不按单个Mapper配置 |
 | mes.runtime.enabled、mes.runtime.datasource-key | FactoryRuntimeConfiguration；数据库工厂目录、密码解密、物理库/连接/版本/Mapper 登记校验 |
 | spring.datasource.druid.* | DruidPools；stat/wall 真实过滤器与监控 |
 | spring.data.redis.* | Redis 客户端、RedisCache、SystemCacheNamespace |
@@ -108,7 +108,7 @@ Redis16379已停止旧phase进程并从旧AOF/RDB恢复到 `.local/redis-runtime
 prod测试库从空库执行原V1–V10，并经全空检查移除16个归档，得到27系统表/0业务表，单显式PLATFORM admin由标准guard建立，无DEV/PROD厂权限。首次凭证在.local/production-test-admin.json，dev凭证不变。清理脚本只接受两个明确自有schema（默认dev，显式--database mes_base_prod），拒绝非空归档；没有访问未知库。
 
 
-## 三库会话工厂与 Spring 事务（2026-10-06）
+## 三库会话工厂与 Spring 事务（2026-10-06，以下旧入口由文末固定包修订取代）
 
 PersistenceOwner.PLATFORM/BUSINESS/ERP 分别绑定 platformSqlSessionFactory/businessSqlSessionFactory/erpSqlSessionFactory。ERP启用后共三个工厂；未启用时不创建ERP连接。业务会话工厂只有一个，通过FactoryBusinessDataSource在Spring事务开始时租借当前厂的版本化连接池；RuntimeRegistry只管理池，不为每个池创建会话工厂。没有HR/WMS/外部MES类型和按方法切数据库的第二套注解。
 
@@ -127,3 +127,18 @@ SystemUnit、SystemUnitAspect、AnalyticsUnit/Aspect及手工注册配置已移�
 `ErpTransactions` 仅在 Spring TransactionTemplate 获取连接前选择标识。事务开始后固定该连接；同标识嵌套按 Spring REQUIRED 处理，不同标识嵌套明确拒绝；事务结束或异常后恢复并清理线程上下文。缺少标识、未知连接和 ERP 未启用均不得回退默认库。切到另一外部库需结束前一事务，再分别调用入口；不能把多库操作当成原子事务。同步任务仍需独立遵守 run_token 与恢复约束。
 
 Druid 监控 Controller 明确注入 `platformDataSource`，保持现有平台池监控契约；业务与 ERP 路由池不能通过单个 DruidDataSource 强制转换注入。三库场景无需设置全局 @Primary。
+
+
+### 固定包扫描与外部连接注解（2026-10-06，当前接入规范）
+
+| SessionFactory | 自动扫描包及其子包 |
+| --- | --- |
+| platformSqlSessionFactory | dev.mesbase.system / dev.mesbase.quartz / dev.mesbase.platform |
+| businessSqlSessionFactory | dev.mesbase.mes / dev.mesbase.modules |
+| erpSqlSessionFactory | dev.mesbase.external |
+
+Mapper 按 `*Mapper` 接口命名，放入对应包即可，平台/业务/外部 Mapper 均无需 PersistenceOwner 注解或新增注册。使用标准 MyBatis-Spring MapperScannerConfigurer，包根不得重叠，旧归属注解与包冲突会启动失败。PersistenceOwner 仅保留程序式旧 fixture 的兼容校验，不是生产扫描依据。旧 mes.persistence.mapper-packages 属性退出接入方式。
+
+外部连接仍在 mes.erp.datasources 下配置。外部访问类使用 `@ErpSource("hr")`，类内方法直接调用 Mapper；需要不同标识的入口可在方法上覆盖为 `@ErpSource("wms")`。该注解组合标准具名 Spring @Transactional，连接选择切面先于事务拦截器；不需要再写 transactions.execute。旧 ErpTransactions 从生产代码移除，只存在于低层路由测试辅助代码。模板见 docs/development/templates/erp/。只有 ERP 会话工厂识别此连接选择，平台固定、业务仍按 Factory 路由。
+
+使用可代理的非 final 类和 public 方法，通过 Spring 注入的代理调用；同类自调用不触发新的连接注解或事务。事务已开始后不允许变更连接标识，缺标识/未配置标识明确失败；不同外部库的操作不能作为一个本地原子事务。连接标识由服务端声明，不接收客户端任意数据库选择。

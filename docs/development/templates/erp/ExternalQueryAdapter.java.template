@@ -6,7 +6,7 @@ import org.springframework.stereotype.Component;
 /** Replace query/result types using the verified external contract. */
 @Component
 @ErpSource("hr")
-public final class ${AdapterName} {
+public class ${AdapterName} {
     private final ${MapperName} mapper;
 
     public ${AdapterName}(${MapperName} mapper) {

@@ -26,7 +26,7 @@ with zipfile.ZipFile(JAR) as artifact:
                       "AnalyticsConfiguration$AnalyticsUnit.class", "AnalyticsConfiguration$AnalyticsAspect.class",
                       "BusinessMapperRegistration.class", "PlatformMapperRegistration.class", "BusinessStatementGuard.class",
                       "ErpAdapter.class", "ErpProvider.class", "ErpConnectionBinding.class", "FactoryErpConnectionResolver.class",
-                      "NotConfiguredErpResolver.class", "IntegrationNotConfiguredException.class")
+                      "NotConfiguredErpResolver.class", "IntegrationNotConfiguredException.class", "ErpTransactions.class")
     assert not any(n.endswith(legacy_classes) for n in names)
     for name in names:
         if name.startswith("BOOT-INF/lib/mes-") and name.endswith(".jar"):

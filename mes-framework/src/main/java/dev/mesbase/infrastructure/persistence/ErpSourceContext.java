@@ -1,7 +1,6 @@
 package dev.mesbase.infrastructure.persistence;
 
 import java.util.Objects;
-import java.util.function.Supplier;
 import dev.mesbase.core.error.ErrorCode;
 import dev.mesbase.core.error.FoundationException;
 
@@ -17,11 +16,6 @@ final class ErpSourceContext {
         String id = CURRENT.get();
         if (id == null) throw new FoundationException(ErrorCode.INTEGRATION_NOT_CONFIGURED);
         return id;
-    }
-    static <T> T withSource(String id, Supplier<T> work) {
-        String previous = select(id);
-        try { return work.get(); }
-        finally { restore(previous); }
     }
     static String select(String id) {
         validate(id);

@@ -706,3 +706,16 @@ DruidController 原构造器按 DataSource 类型注入，三库启用后有三�
 标准 Maven verify 成功，最终计数见 docs/reviews/2026-10-06-persistence-verification.json。新增4项 H2 路由测试覆盖三标识、无默认库、事务固定身份、嵌套/REQUIRES_NEW恢复、回滚与线程隔离。打包启动smoke 4/4通过（默认无业务连接配置）；三数据源装配与该 Controller 的证据来自定向生产配置测试。日志 target/validation/startup-routing-verify.log。未重启用户开发服务，未重新尝试真实ERP JDBC；真实数据库联调仍未通过，不宣称实际dev完整启动已验证。
 
 2026-10-06 用户澄清续做范围为外部多数据源路由实现。重新核对当前代码：ERP 工厂绑定 ErpRoutingDataSource，读取 mes.erp.datasources 映射，按标识切换；所有外部 Mapper 仍为 ERP ownership。再次执行 ErpRoutingTest、PersistenceAssemblyTest，共8项全部通过，日志 target/validation/external-routing-confirm.log；结构化记录追加 external_routing_revalidation。此轮未新增业务代码、未操作用户开发进程、未执行真实外部业务 SQL。
+
+
+### 固定包扫描与声明式外部路由交付（2026-10-06）
+
+按用户新偏好用固定包决定会话工厂归属。MapperPackages 定义平台(system/quartz/platform)、业务(mes/modules)、外部(external)三个互斥包集合，标准 MapperScannerConfigurer 分别绑定对应工厂；不逐 Mapper 写归属注解，不登记中央类清单。生产 Mapper 的重复归属注解移除；OwnerMapperCatalog 按包整理兼容基础设施所需集合，拒绝包重叠、同名 Mapper 和旧注解与包冲突。程序式测试 fixture 的旧 PersistenceOwner 校验保留，不参与生产扫描。
+
+默认采用外部访问类/方法的 ErpSource 标识，类级声明可以复用整个类，方法可覆盖。注解组合具名 Spring @Transactional，选择切面先于事务拦截器执行；Mapper 直接调用，不再传回调。ErpTransactions 移出生产，仅低层路由测试辅助类保留；打包检查明确排除此旧生产类。缺配置失败、事务内换标识拒绝、跨库事务拒绝、Factory/租约身份规则保留。ErpSourceAnnotationTest 用实际 Spring 代理/H2 验证选择发生在取连接前、类级复用、方法覆盖、嵌套冲突、回滚和异常清理。
+
+生成器不再发出 PersistenceOwner 注解，按 Scope 限定 GLOBAL 为 platform 包、FACTORY_SCOPED 为 modules 包；CLI 默认包也按 Scope 选择。生成的骨架验收断言改为包归属；Java 导入同步显式化。模板不提供外部业务表、客户 SQL 或运行数据。
+
+标准不带参数的 Maven verify 被范围外既有 Spotless 格式问题阻断；未格式化无关文件。限定 Spotless 到本轮相关源码后 verify BUILD SUCCESS：170项，167通过、3跳过、0失败/错误。打包启动smoke 4/4通过，生产 JAR 无 ErpTransactions 类；git diff --check 通过。日志 target/validation/fixed-package-verify.log 与 unrestricted-spotless-failure.log。未重启用户服务、未运行真实外部业务 SQL、未提交/推送/部署。
+
+文档同步：AGENTS.md 第9节改为固定包与注解约束；platform.md 追加“固定包扫描与外部连接注解”当前接入规范；codegen.md 更新 Scope/包约束与生成行为；ADR-005 追加本日“固定包归属和声明式外部连接”决策与时机原因，旧记录保留时间线。结构化验证记录追加 fixed_packages_and_declarative_erp。业务流程未增加，变更为持久化装配、连接选择与生成骨架。

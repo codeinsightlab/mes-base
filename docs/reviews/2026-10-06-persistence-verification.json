@@ -86,5 +86,36 @@
     "errors": 0,
     "boundary": "H2 routing and production Spring assembly; no live ERP business SQL",
     "log": "target/validation/external-routing-confirm.log"
+  },
+  "fixed_packages_and_declarative_erp": {
+    "date": "2026-10-06",
+    "mapper_registration": "Standard MyBatis-Spring MapperScannerConfigurer per fixed package group",
+    "platform_packages": [
+      "dev.mesbase.system",
+      "dev.mesbase.quartz",
+      "dev.mesbase.platform"
+    ],
+    "business_packages": [
+      "dev.mesbase.mes",
+      "dev.mesbase.modules"
+    ],
+    "erp_packages": [
+      "dev.mesbase.external"
+    ],
+    "selection": "ErpSource annotation on external access class/method; ordered before standard Spring transaction interceptor",
+    "tests": 170,
+    "passed": 167,
+    "skipped": 3,
+    "failures": 0,
+    "errors": 0,
+    "verify": "PASSED with Spotless restricted to task source files",
+    "unrestricted_verify": "FAILED on pre-existing out-of-scope Spotless format violations",
+    "packaged_smoke": {
+      "passed": 4,
+      "failed": 0,
+      "obsolete_production_ErpTransactions": "ABSENT"
+    },
+    "live_erp_sql": "NOT_TESTED",
+    "user_service_restarted": false
   }
 }
