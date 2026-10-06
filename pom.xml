@@ -36,9 +36,9 @@
         <version>${spotless.version}</version>
         <configuration>
           <java>
-            <googleJavaFormat>
-              <version>1.19.2</version>
-            </googleJavaFormat>
+            <eclipse>
+              <file>${maven.multiModuleProjectDirectory}/config/java-formatter.xml</file>
+            </eclipse>
             <importOrder>
               <order>java,javax,org,com,</order>
             </importOrder>

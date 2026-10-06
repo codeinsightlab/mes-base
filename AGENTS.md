@@ -163,6 +163,23 @@ Scaffold；必须检查查询、Toolbar、表格/列顺序、枚举/日期/精�
 只读真实契约，不新增 AjaxResult/rows/data
 多结构兜底。按用户2026-10-06要求保存刷新登录态，浏览器只保存Token/有效期/选厂偏好，不保存密码或权限；恢复须重新校验服务端身份与授权，过期/401/注销清除。选厂清除旧授权、数据和对话框，过期响应不回填。
 
+## Java code style
+
+Java formatting is repository-controlled by `.editorconfig`, `config/java-formatter.xml`, and the parent Maven POM's Spotless configuration. The formatter follows the project's IDEA-like four-space Java style; do not rely on personal IDEA settings or invent an alternative formatter.
+
+After modifying Java files, run from the repository root:
+
+```sh
+mvn -B -ntp spotless:apply
+mvn -B -ntp spotless:check
+mvn -B -ntp test
+git diff --check
+```
+
+Spotless checks the configured Java source set. Do not reformat unrelated Java files in a task. A task must not be reported complete if `spotless:check` or `git diff --check` fails.
+
+Install repository Git hooks once with `./scripts/install-git-hooks`. The pre-commit hook formats only staged Java files and re-stages them; the pre-push hook checks formatting without modifying files. Hooks are local safeguards and do not replace a remote CI/protected-branch check.
+
 ## 16. clean-room / Source Product
 
 clean-room 不等于禁止复用旧项目。通用源码、有效配置键、Schema和页面产品资产默认进入迁移候选；按所有权/授权/许可核对来源，保留许可及修改记录，无法确认的部分标
