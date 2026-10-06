@@ -1,0 +1,33 @@
+# Production owner supplies these environment values or replaces them in a private file.
+# java -jar target/mes-base-0.1.0-SNAPSHOT.jar --spring.profiles.active=prod \
+#   --spring.config.additional-location=file:/absolute/private/application-prod.yml
+server:
+  address: ${MES_SERVER_ADDRESS:127.0.0.1}
+  port: ${MES_PORT:8080}
+mes:
+  system:
+    enabled: true
+  platform:
+    enabled: true
+    url: ${MES_PLATFORM_URL}
+    username: ${MES_PLATFORM_USER}
+    password: ${MES_PLATFORM_PASSWORD}
+    file-root: ${MES_FILE_ROOT}
+    migrate: false
+  runtime:
+    # Enable only with a separately supplied trusted factories list and business connections.
+    enabled: false
+spring:
+  data:
+    redis:
+      host: ${MES_REDIS_HOST}
+      port: ${MES_REDIS_PORT:6379}
+      password: ${MES_REDIS_PASSWORD}
+      database: ${MES_REDIS_DATABASE:0}
+ruoyi:
+  profile: ${MES_FILE_ROOT}
+  captcha:
+    enabled: true
+user:
+  password:
+    min-length: 12

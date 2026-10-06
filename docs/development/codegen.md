@@ -26,18 +26,11 @@ FACTORY_SCOPED 16 文件：Entity、Mapper、XML、Service、Impl、Controller�
 
 生成权限 `module:entity:read/create/update/delete` 明确声明，不自动建菜单/角色/授权。菜单对应 `/module/lowerCamelEntity` 的 Base UI 编译视图；动态 Router 只从编译 catalog 选择。审核 DTO/VO、输入/状态规则、唯一性/事务、资源 ID/关联范围、SQL/索引、UI、测试后才能交付。标准单表复用生成 Mapper；复杂业务新增 ExtraMapper。引用、聚合、cache/import/export 未生成，不能声称已实现隔离。
 
-## 可复现 TEST ONLY 验收
+## 当前验收入口（2026-10-06更新）
 
-```sh
-mvn -B -ntp verify
-# 使用 UI 所需已安装 Node22，Maven仍为用户环境
-scripts/verify-codegen-fixture
-```
+`mvn -B -ntp verify` 保留CodegenAcceptanceTest的metadata/生成产物/冲突/范围等当前测试。旧 `scripts/verify-codegen-fixture` / `scripts/verify-codegen-http` 与TestOnlyCodegenFixture依赖已退役Platform API、旧单模块classpath与旧UI页面，现已删除。旧运行记录仅作历史证据，不能作为当前命令或当前端到端验收结论。
 
-脚本创建自有临时 H2 metadata（无业务行），一条 CLI 自动放置 Base target 与 UI target，后处理合成状态枚举/中文状态/备注 textarea，再 javac 真实产物和测试骨架、vue-tsc/Vite 真实生成页。`--serve` 需显式合成 MES_TEST_ONLY_PASSWORD，可启动隔离 localhost 验收；不继承 MES_/SPRING_ 生产配置。TEST ONLY Server 与表不进 JAR。测试输出/manifest 在 target/codegen-acceptance 与 target/validation；使用示例不等于 MES 业务已迁入。
-
-现已验证 H2 合成库及 PostgreSQL 兼容 SQL 形状；未做真实 PostgreSQL/MySQL 联调。生成 SQL 按 JDBC metadata 的 identifier quote 渲染（MySQL反引号、H2/PostgreSQL双引号），保留 LIMIT/OFFSET，其他方言需先适配并测试，不凭 JDBC 能连接就声明 CRUD 方言兼容。
-
+真实MySQL metadata/runtime测试仍须显式、独立、可销毁的双厂测试配置；不会默认对日常开发库建探针表。新开发库的业务schema为空，本次未生成新的CRUD，也未调用Codegen Skill。
 
 ### YAML profile入口
 

@@ -2,21 +2,25 @@
   "phase": "Phase 1 Source Product full system migration",
   "date": "2026-10-06",
   "status": "MIGRATING",
-  "backendHead": "e292789a2f7bac4519e93685adf955428ade61ab",
+  "backendHead": "4891535f735b18ca87918d8bcff1546663a53d02",
   "frontendHead": "d2b19714cb5018d07fa3171b76585eab45b325ce",
   "engine": "MySQL 8.0.40",
-  "databaseMode": "own isolated schemas with synthetic project data",
+  "databaseMode": "local applications connecting user remote test MySQL8.0.40; own schemas and synthetic data; not local engine/deployment/production",
   "runtime": {
     "backend": "http://127.0.0.1:18081",
     "web": "http://127.0.0.1:15174",
-    "jar": "target/phase1/phase1-runtime-18.jar",
-    "backendLog": "target/phase1/backend-28.log",
+    "jar": "target/phase1/phase1-runtime-23.jar",
+    "backendLog": "target/phase1/backend-34.log",
     "webLog": "target/phase1/ui-runtime-4.log",
     "peer": "http://127.0.0.1:18082",
-    "peerJar": "target/phase1/phase1-runtime-14.jar",
-    "peerLog": "target/phase1/backend-peer-4.log",
+    "peerJar": "target/phase1/phase1-runtime-22.jar",
+    "peerLog": "target/phase1/backend-peer-5.log",
     "redis": "loopback:16379",
-    "peerState": "stopped after isolation and retry acceptance; files and schema preserved"
+    "peerState": "stopped after OpenAPI collision isolation; all probe clients disabled; schema/files preserved",
+    "backendPid": 76918,
+    "backendSession": 70052,
+    "originalBackendPid": 55129,
+    "originalFrontendPid": 52881
   },
   "testResults": [
     {
@@ -1805,6 +1809,1192 @@
           "requestId": "0700462d-1299-4055-b2ea-a9fa917357e0"
         }
       ]
+    },
+    {
+      "name": "acceptance-notice-ownership",
+      "mode": "real-mysql-synthetic-data-local-http",
+      "passed": 24,
+      "total": 24,
+      "cases": [
+        {
+          "case": "existing administrator",
+          "status": 200,
+          "expected": 200,
+          "passed": true,
+          "requestId": "c3bce76f-231c-41ce-bd18-5ff8bf1fc264"
+        },
+        {
+          "case": "create own unprivileged notice reader",
+          "status": 200,
+          "expected": 200,
+          "passed": true,
+          "requestId": "96e18a60-5475-458e-9912-1e32ea3be6cc"
+        },
+        {
+          "case": "empty role login",
+          "status": 200,
+          "expected": 200,
+          "passed": true,
+          "requestId": "e119a778-fe40-4fea-a89f-e61a5943ac15"
+        },
+        {
+          "case": "reader own identity",
+          "status": 200,
+          "expected": 200,
+          "passed": true,
+          "requestId": "1d2bc774-45ee-422e-b50f-371ddb2a4beb"
+        },
+        {
+          "case": "actual private notice image upload",
+          "status": 200,
+          "expected": 200,
+          "passed": true,
+          "requestId": "0e643e7f-ac4e-46c3-88f5-74a150c6d823"
+        },
+        {
+          "case": "actual file signature and byte length retained",
+          "passed": true
+        },
+        {
+          "case": "unpublished attachment cannot be read by another identity",
+          "status": 404,
+          "expected": 404,
+          "passed": true,
+          "requestId": "6cc7983a-d485-497a-bbda-64380caa7394"
+        },
+        {
+          "case": "Source notice create retains attachment without false permission denial",
+          "status": 200,
+          "expected": 200,
+          "passed": true,
+          "requestId": "bd949a19-8974-4ec8-9971-66b52b2a8c04"
+        },
+        {
+          "case": "actual notice persisted",
+          "status": 200,
+          "expected": 200,
+          "passed": true,
+          "requestId": "3001114d-0b3b-4a66-8b83-d7c7ebd16907"
+        },
+        {
+          "case": "attachment real notice binding",
+          "status": 200,
+          "expected": 200,
+          "passed": true,
+          "requestId": "6f74ac29-fe17-46d9-b6aa-3a77019ed5ac"
+        },
+        {
+          "case": "resource binding points to actual Source notice",
+          "passed": true
+        },
+        {
+          "case": "published attachment still requires notice query permission",
+          "status": 404,
+          "expected": 404,
+          "passed": true,
+          "requestId": "d1a841eb-2803-4970-94b0-24bac5d73bb0"
+        },
+        {
+          "case": "explicit Source menu catalog",
+          "status": 200,
+          "expected": 200,
+          "passed": true,
+          "requestId": "c4ee9e7f-99f8-4e3c-8816-086d5578fda8"
+        },
+        {
+          "case": "create own minimal notice query role",
+          "status": 200,
+          "expected": 200,
+          "passed": true,
+          "requestId": "2dd31475-edcf-4d1a-81ef-a22feef9a1b4"
+        },
+        {
+          "case": "own Source role persisted",
+          "status": 200,
+          "expected": 200,
+          "passed": true,
+          "requestId": "324e93b7-f04e-4e26-8283-af23ce0e5a25"
+        },
+        {
+          "case": "explicitly authorize own synthetic reader",
+          "status": 200,
+          "expected": 200,
+          "passed": true,
+          "requestId": "a21da5d3-e51c-4b6a-8143-ca396462cda4"
+        },
+        {
+          "case": "published image read under current notice query permission",
+          "status": 200,
+          "expected": 200,
+          "passed": true,
+          "requestId": "be6d37d9-9826-4f81-b3ec-000c6457940e"
+        },
+        {
+          "case": "download is exact uploaded bytes",
+          "passed": true
+        },
+        {
+          "case": "read permission cannot upload media",
+          "status": 403,
+          "expected": 403,
+          "passed": true,
+          "requestId": "0994c930-d546-4ed1-9e58-5e73e999dc9d"
+        },
+        {
+          "case": "wrong resource label cannot bypass metadata",
+          "status": 404,
+          "expected": 404,
+          "passed": true,
+          "requestId": "ede11a3a-35f5-4380-9e0f-de8d4340c4be"
+        },
+        {
+          "case": "bound media cannot be deleted independently",
+          "status": 403,
+          "expected": 403,
+          "passed": true,
+          "requestId": "3b74ecc1-1db4-461a-a638-ac7d38310682"
+        },
+        {
+          "case": "Source notice edit remains usable",
+          "status": 200,
+          "expected": 200,
+          "passed": true,
+          "requestId": "846612e7-be65-43ed-8da8-c729c0a78512"
+        },
+        {
+          "case": "remove only synthetic reader role binding",
+          "status": 200,
+          "expected": 200,
+          "passed": true,
+          "requestId": "0ef077df-4c48-4509-a0ba-bee46d8dfeed"
+        },
+        {
+          "case": "same token no longer reads published media after role revocation",
+          "status": 404,
+          "expected": 404,
+          "passed": true,
+          "requestId": "178f89bc-bd73-4bde-8b88-cd1efcde1af3"
+        }
+      ]
+    },
+    {
+      "name": "acceptance-quartz-schedule",
+      "mode": "real-mysql-synthetic-data-local-http",
+      "passed": 26,
+      "total": 26,
+      "cases": [
+        {
+          "case": "administrator actual login",
+          "status": 200,
+          "expected": 200,
+          "passed": true,
+          "requestId": "cd0bb9aa-afae-43af-9cfa-e4eb89abde1a"
+        },
+        {
+          "case": "create own paused Quartz task",
+          "status": 200,
+          "expected": 200,
+          "passed": true,
+          "requestId": "50e61b40-7426-40db-ab1e-193fa31889e3"
+        },
+        {
+          "case": "find own Source task",
+          "status": 200,
+          "expected": 200,
+          "passed": true,
+          "requestId": "0bf4dd1d-3141-4513-a0e4-6796762acb95"
+        },
+        {
+          "case": "Source paused task can execute once explicitly",
+          "status": 200,
+          "expected": 200,
+          "passed": true,
+          "requestId": "63720cae-3a13-40e7-83b9-317f95b858a4"
+        },
+        {
+          "case": "manual execution retains paused scheduling status",
+          "status": 200,
+          "expected": 200,
+          "passed": true,
+          "requestId": "84717bca-5981-470d-9c1e-e40f09ca6e5e"
+        },
+        {
+          "case": "paused manual run does not enable scheduler",
+          "passed": true
+        },
+        {
+          "case": "enable actual scheduler",
+          "status": 200,
+          "expected": 200,
+          "passed": true,
+          "requestId": "146daa61-2fca-4208-a043-0d0e04b9b30d"
+        },
+        {
+          "case": "manual run reloads canonical task",
+          "status": 200,
+          "expected": 200,
+          "passed": true,
+          "requestId": "6907db10-d4cd-4d2a-95c6-55f1c24a9763"
+        },
+        {
+          "case": "activate frequent cron after isolated manual run",
+          "status": 200,
+          "expected": 200,
+          "passed": true,
+          "requestId": "1de5c28e-e043-418d-90f1-2a4bb71e73ce"
+        },
+        {
+          "case": "read actual execution log",
+          "status": 200,
+          "expected": 200,
+          "passed": true,
+          "requestId": "4394adfc-293e-4d6f-86dd-1bde54cdbc57"
+        },
+        {
+          "case": "Quartz cron really fired",
+          "passed": true
+        },
+        {
+          "case": "manual request really executed",
+          "passed": true
+        },
+        {
+          "case": "Source log retains timing and owned execution",
+          "passed": true
+        },
+        {
+          "case": "pause only own scheduled test task",
+          "status": 200,
+          "expected": 200,
+          "passed": true,
+          "requestId": "e4a971ca-b6a4-45d0-969e-fd5e64b49341"
+        },
+        {
+          "case": "completed task claim released",
+          "status": 200,
+          "expected": 200,
+          "passed": true,
+          "requestId": "0f702dad-74b6-40d0-ba84-48fbf4290a67"
+        },
+        {
+          "case": "paused state clean",
+          "passed": true
+        },
+        {
+          "case": "test-only interrupted claim injected on own task",
+          "passed": true
+        },
+        {
+          "case": "recovery requires user assertion of process death",
+          "status": 400,
+          "expected": 400,
+          "passed": true,
+          "requestId": "197c09c1-5eea-41e4-91bf-8ebaa032619e"
+        },
+        {
+          "case": "active claim blocks paused manual execution",
+          "status": 409,
+          "expected": 409,
+          "passed": true,
+          "requestId": "6b1c222c-7ea4-4af2-af10-e814897bc756"
+        },
+        {
+          "case": "young claim cannot be recovered",
+          "status": 409,
+          "expected": 409,
+          "passed": true,
+          "requestId": "c9a09060-c983-48ca-8d20-a7451acf3cf3"
+        },
+        {
+          "case": "age only the own synthetic interrupted claim",
+          "passed": true
+        },
+        {
+          "case": "wrong run token cannot release claim",
+          "status": 409,
+          "expected": 409,
+          "passed": true,
+          "requestId": "49605573-2804-4797-89e3-6df07ed50258"
+        },
+        {
+          "case": "matching paused expired claim recovers",
+          "status": 200,
+          "expected": 200,
+          "passed": true,
+          "requestId": "33b4bccb-6654-41ad-860c-6c4a49d427e3"
+        },
+        {
+          "case": "recovery cannot be replayed",
+          "status": 409,
+          "expected": 409,
+          "passed": true,
+          "requestId": "914f5349-c7bd-4115-a970-c5ae59c01a6c"
+        },
+        {
+          "case": "recovery outcome real Source log",
+          "status": 200,
+          "expected": 200,
+          "passed": true,
+          "requestId": "c6f0fdc6-146c-4ebe-a21e-f0d3c153f7f7"
+        },
+        {
+          "case": "recovery records UNKNOWN instead of success",
+          "passed": true
+        }
+      ]
+    },
+    {
+      "name": "acceptance-swagger",
+      "mode": "real-mysql-synthetic-data-local-http",
+      "passed": 21,
+      "total": 21,
+      "cases": [
+        {
+          "case": "administrator formal login",
+          "passed": true,
+          "actual": 200,
+          "expected": 200,
+          "requestId": "f670275c-4c45-4d63-8e43-2a33739058f0"
+        },
+        {
+          "case": "Swagger document anonymous request rejected",
+          "passed": true,
+          "actual": 401,
+          "expected": 401,
+          "requestId": "e034dd69-dd97-41dc-8914-b93eadbaf6df"
+        },
+        {
+          "case": "root current permission metadata",
+          "passed": true,
+          "actual": 200,
+          "expected": 200,
+          "requestId": "0c5eeaaf-43c3-4c52-b96c-254659ea0473"
+        },
+        {
+          "case": "new tool menu does not grant existing roles automatically",
+          "passed": true,
+          "actual": 403,
+          "expected": 403,
+          "requestId": "28c4410c-2f37-4c47-8a18-9070bd754faa"
+        },
+        {
+          "case": "Source system tool catalog",
+          "passed": true,
+          "actual": 200,
+          "expected": 200,
+          "requestId": "8e611059-2b70-43b6-9e69-b045e3d1ece7"
+        },
+        {
+          "case": "own administrator role contract",
+          "passed": true,
+          "actual": 200,
+          "expected": 200,
+          "requestId": "07462c0a-8565-4c80-8852-baa896f2a275"
+        },
+        {
+          "case": "administrator role remains explicit platform scope",
+          "passed": true
+        },
+        {
+          "case": "explicitly assign migrated Swagger capability to own admin role",
+          "passed": true,
+          "actual": 200,
+          "expected": 200,
+          "requestId": "23a3b314-c744-4948-8139-70553c92cd95"
+        },
+        {
+          "case": "existing role menu bindings all preserved",
+          "passed": true
+        },
+        {
+          "case": "authorized actual Swagger document",
+          "passed": true,
+          "actual": 200,
+          "expected": 200,
+          "requestId": "14cf02ff-1678-4898-83e4-b61fd58850c3"
+        },
+        {
+          "case": "document generated by OpenAPI SDK",
+          "passed": true
+        },
+        {
+          "case": "Source user department and Quartz routes documented",
+          "passed": true
+        },
+        {
+          "case": "actual Source user request fields described",
+          "passed": true
+        },
+        {
+          "case": "OpenAPI does not expose runtime configuration credentials",
+          "passed": true
+        },
+        {
+          "case": "SDK public route remains absent /v3/api-docs",
+          "passed": true,
+          "actual": 404,
+          "expected": 404,
+          "requestId": "9b0d413f-9f3a-4916-91f8-cf213ed7e0b2"
+        },
+        {
+          "case": "SDK public route remains absent /v3/api-docs/swagger-config",
+          "passed": true,
+          "actual": 404,
+          "expected": 404,
+          "requestId": "7e7871f5-d27b-4d4b-ab7e-87e123175c31"
+        },
+        {
+          "case": "SDK public route remains absent /swagger-ui/index.html",
+          "passed": true,
+          "actual": 404,
+          "expected": 404,
+          "requestId": "f4516ba3-b4fa-4fce-b9c7-d1818854ce26"
+        },
+        {
+          "case": "existing unprivileged identity login",
+          "passed": true,
+          "actual": 200,
+          "expected": 200,
+          "requestId": "40f57538-1ffd-46aa-aa42-79116c0f08d2"
+        },
+        {
+          "case": "empty role identity cannot access system interface document",
+          "passed": true,
+          "actual": 403,
+          "expected": 403,
+          "requestId": "4bc2954c-885b-4b41-bcf0-914408cabee5"
+        },
+        {
+          "case": "admin permissions updated on current request",
+          "passed": true,
+          "actual": 200,
+          "expected": 200,
+          "requestId": "c38a0cfa-3160-4f17-a142-431672aa4625"
+        },
+        {
+          "case": "permission appears without Factory role",
+          "passed": true
+        }
+      ]
+    },
+    {
+      "name": "acceptance-openapi",
+      "mode": "real-mysql-synthetic-data-local-http",
+      "passed": 71,
+      "total": 71,
+      "cases": [
+        {
+          "case": "admin formal login",
+          "passed": true,
+          "status": 200,
+          "expected": 200,
+          "requestId": "dcf78a70-018b-4ddb-9576-6e0ed0904832"
+        },
+        {
+          "case": "empty role formal login",
+          "passed": true,
+          "status": 200,
+          "expected": 200,
+          "requestId": "2e48bb21-f921-40f9-b1e6-138711827e2c"
+        },
+        {
+          "case": "client management anonymous denied",
+          "passed": true,
+          "status": 401,
+          "expected": 401,
+          "requestId": "ad0214f7-09f3-4f17-8661-6c046545af03"
+        },
+        {
+          "case": "client management empty role denied",
+          "passed": true,
+          "status": 403,
+          "expected": 403,
+          "requestId": "fe114738-1ffd-46b4-8801-0789b59a2119"
+        },
+        {
+          "case": "admin current permission metadata",
+          "passed": true,
+          "status": 200,
+          "expected": 200,
+          "requestId": "e1d3eae5-b419-462d-a7ec-3b252bf64c6b"
+        },
+        {
+          "case": "Source menu actual catalog",
+          "passed": true,
+          "status": 200,
+          "expected": 200,
+          "requestId": "c17dc3d9-869e-4f16-bd78-d6bbbb3e6238"
+        },
+        {
+          "case": "own root role metadata",
+          "passed": true,
+          "status": 200,
+          "expected": 200,
+          "requestId": "c761b93e-a9be-4d1a-b608-db487eea96ba"
+        },
+        {
+          "case": "admin remains PLATFORM with no Factory binding",
+          "passed": true
+        },
+        {
+          "case": "explicit grant own administrator OpenAPI capabilities",
+          "passed": true,
+          "status": 200,
+          "expected": 200,
+          "requestId": "a76d79c5-45b4-4483-ae96-1610bef0a3f9"
+        },
+        {
+          "case": "all existing role/menu grants preserved",
+          "passed": true
+        },
+        {
+          "case": "registered actual OpenAPI catalog",
+          "passed": true,
+          "status": 200,
+          "expected": 200,
+          "requestId": "05270619-c5de-4fa6-ae57-9b7bc9be8a55"
+        },
+        {
+          "case": "catalog has only five generic Source endpoints and no route domain",
+          "passed": true
+        },
+        {
+          "case": "Base data scope verification default off",
+          "passed": true,
+          "status": 200,
+          "expected": 200,
+          "requestId": "7221454b-ab03-4972-b52a-f04c5b454399"
+        },
+        {
+          "case": "data-scope state confirms disabled",
+          "passed": true
+        },
+        {
+          "case": "invalid client name real 400",
+          "passed": true,
+          "status": 400,
+          "expected": 400,
+          "requestId": "90d8bb98-ef46-4192-b322-7a750b8666ad"
+        },
+        {
+          "case": "create synthetic Source app default disabled",
+          "passed": true,
+          "status": 200,
+          "expected": 200,
+          "requestId": "326340b2-cfc1-4b3d-a01b-eb25ed0b46ba"
+        },
+        {
+          "case": "random Source credential format preserved",
+          "passed": true
+        },
+        {
+          "case": "owned MySQL stores hash only, disabled and version1",
+          "passed": true
+        },
+        {
+          "case": "Source client detail",
+          "passed": true,
+          "status": 200,
+          "expected": 200,
+          "requestId": "2c3f3605-9bcd-4f0c-bdcd-46a08810f354"
+        },
+        {
+          "case": "management detail has Source fields and no secret material",
+          "passed": true
+        },
+        {
+          "case": "Source paginated query",
+          "passed": true,
+          "status": 200,
+          "expected": 200,
+          "requestId": "d4f58265-985e-4ea4-bc2a-5052515c5037"
+        },
+        {
+          "case": "Source list/total contract and appKey query",
+          "passed": true
+        },
+        {
+          "case": "page size bounded",
+          "passed": true,
+          "status": 400,
+          "expected": 400,
+          "requestId": "0c82607b-ba65-45a0-9338-58ef64795829"
+        },
+        {
+          "case": "invalid client status Source business rejection422",
+          "passed": true,
+          "status": 422,
+          "expected": 422,
+          "requestId": "e2450352-daf6-4bd3-985a-45a7d883732e"
+        },
+        {
+          "case": "disabled client cannot issue token",
+          "passed": true,
+          "status": 401,
+          "expected": 401,
+          "requestId": "eecc1e88-d117-4935-afc9-b2c67942de17"
+        },
+        {
+          "case": "enable own synthetic app",
+          "passed": true,
+          "status": 200,
+          "expected": 200,
+          "requestId": "993b6d3e-7d36-42f4-adbe-610e9d0b8240"
+        },
+        {
+          "case": "wrong secret cannot issue token",
+          "passed": true,
+          "status": 401,
+          "expected": 401,
+          "requestId": "e95ae41d-593e-4a8e-8218-a0fefc1d1702"
+        },
+        {
+          "case": "Source external token issue",
+          "passed": true,
+          "status": 200,
+          "expected": 200,
+          "requestId": "ecedbf64-3b0c-4b9d-b8cc-98e5b825cf44"
+        },
+        {
+          "case": "token response has TTL, no-store and server request ID",
+          "passed": true
+        },
+        {
+          "case": "no API grant rejects actual diagnostics",
+          "passed": true,
+          "status": 403,
+          "expected": 403,
+          "requestId": "3a94112c-d2a0-468e-b9ae-18f6b456ffd4"
+        },
+        {
+          "case": "grant only selected Source APIs",
+          "passed": true,
+          "status": 200,
+          "expected": 200,
+          "requestId": "7133fdad-5200-4838-b105-3f45bd121f28"
+        },
+        {
+          "case": "authorized diagnostics ping with Base data scope off",
+          "passed": true,
+          "status": 200,
+          "expected": 200,
+          "requestId": "6f81fc6a-8a7b-4b04-ace7-97604fd76231"
+        },
+        {
+          "case": "actual diagnostic UTC response",
+          "passed": true
+        },
+        {
+          "case": "second Source controller independent grant",
+          "passed": true,
+          "status": 200,
+          "expected": 200,
+          "requestId": "fe726b85-fb5e-46fd-89c1-0b1481a9ea3a"
+        },
+        {
+          "case": "ungranted Source API remains forbidden",
+          "passed": true,
+          "status": 403,
+          "expected": 403,
+          "requestId": "e62e2ce2-e02d-4f02-bf5a-bc1a98a6d226"
+        },
+        {
+          "case": "actual current capabilities intersection",
+          "passed": true,
+          "status": 200,
+          "expected": 200,
+          "requestId": "05b51c94-7f64-4615-8122-9609a61c938d"
+        },
+        {
+          "case": "capabilities only selected registered codes",
+          "passed": true
+        },
+        {
+          "case": "atomic concurrent issuance returns same valid token",
+          "passed": true
+        },
+        {
+          "case": "token digest key has owning DB identity and safe record",
+          "passed": true
+        },
+        {
+          "case": "Redis expiry consumes YAML TTL",
+          "passed": true
+        },
+        {
+          "case": "revoke selected API using formal management",
+          "passed": true,
+          "status": 200,
+          "expected": 200,
+          "requestId": "af435523-2815-4bcd-8660-bfc2ec3e55a6"
+        },
+        {
+          "case": "same token sees grant revoke on next request",
+          "passed": true,
+          "status": 403,
+          "expected": 403,
+          "requestId": "87f4512f-3dc8-4545-99ba-1518caa8ea71"
+        },
+        {
+          "case": "remaining grant still valid",
+          "passed": true,
+          "status": 200,
+          "expected": 200,
+          "requestId": "0604feef-5ae0-4052-a2e2-622a0d6f0f9c"
+        },
+        {
+          "case": "external token cannot enter internal system API",
+          "passed": true,
+          "status": 401,
+          "expected": 401,
+          "requestId": "bb8e50e3-0d1b-4223-8ab1-b2fbc2a2f6ff"
+        },
+        {
+          "case": "internal user token cannot enter external API",
+          "passed": true,
+          "status": 401,
+          "expected": 401,
+          "requestId": "90b679e6-50a9-4a97-a085-028a79ac88bf"
+        },
+        {
+          "case": "malformed external token real 401",
+          "passed": true,
+          "status": 401,
+          "expected": 401,
+          "requestId": "a3d406e9-4c05-4e14-8a9c-2bd956ec9cd1"
+        },
+        {
+          "case": "disable increments credential version",
+          "passed": true,
+          "status": 200,
+          "expected": 200,
+          "requestId": "95676370-e57b-45cb-ac44-315848e262f3"
+        },
+        {
+          "case": "disabled client immediately invalidates old token",
+          "passed": true,
+          "status": 401,
+          "expected": 401,
+          "requestId": "87dd5683-1f56-44b2-9168-03215baa97d6"
+        },
+        {
+          "case": "re-enable own app",
+          "passed": true,
+          "status": 200,
+          "expected": 200,
+          "requestId": "e2fc499a-03bb-4469-ac77-4ccf5e7af468"
+        },
+        {
+          "case": "new token after credential version changed",
+          "passed": true,
+          "status": 200,
+          "expected": 200,
+          "requestId": "19e74b11-05e3-4f44-bc84-3d599ae21322"
+        },
+        {
+          "case": "re-enable does not resurrect old token",
+          "passed": true
+        },
+        {
+          "case": "old version token remains rejected",
+          "passed": true,
+          "status": 401,
+          "expected": 401,
+          "requestId": "323fca58-719a-413d-b9fd-698227cb6879"
+        },
+        {
+          "case": "one-time Source secret rotation",
+          "passed": true,
+          "status": 200,
+          "expected": 200,
+          "requestId": "df98f894-8b0f-45ad-a351-f72127c3cfb2"
+        },
+        {
+          "case": "Source reset preserves appKey and changes secret",
+          "passed": true
+        },
+        {
+          "case": "old secret is immediately rejected",
+          "passed": true,
+          "status": 401,
+          "expected": 401,
+          "requestId": "b55121e3-fca7-47bb-a917-285f22bff523"
+        },
+        {
+          "case": "rotation invalidates previously issued token",
+          "passed": true,
+          "status": 401,
+          "expected": 401,
+          "requestId": "2bdf898c-ce04-4045-9cdd-1369373f1dc9"
+        },
+        {
+          "case": "new secret issues usable external token",
+          "passed": true,
+          "status": 200,
+          "expected": 200,
+          "requestId": "41d4e3ae-343e-4f14-8269-db3587ec5cc0"
+        },
+        {
+          "case": "revoke current external token",
+          "passed": true,
+          "status": 200,
+          "expected": 200,
+          "requestId": "cdd48c5b-1654-4537-80aa-5f3d664d24b1"
+        },
+        {
+          "case": "revoked token rejected on next request",
+          "passed": true,
+          "status": 401,
+          "expected": 401,
+          "requestId": "53e78090-bbbd-47f3-8e2f-e9e076c3d68c"
+        },
+        {
+          "case": "new token after explicit revoke",
+          "passed": true,
+          "status": 200,
+          "expected": 200,
+          "requestId": "bd365bd2-208c-4dec-8f21-a4753ed5a406"
+        },
+        {
+          "case": "revoked token not reused by idempotent issue",
+          "passed": true
+        },
+        {
+          "case": "grant one diagnostics API for limit probe",
+          "passed": true,
+          "status": 200,
+          "expected": 200,
+          "requestId": "0c7cc860-4dfd-4ccf-8f3f-a4278b942c86"
+        },
+        {
+          "case": "API rate limit real429 with stable error",
+          "passed": true,
+          "successfulCalls": 119
+        },
+        {
+          "case": "token issuance IP/client limit real429",
+          "passed": true
+        },
+        {
+          "case": "actual SDK external API contract",
+          "passed": true,
+          "status": 200,
+          "expected": 200,
+          "requestId": "a8664e73-8c06-4281-803e-efa63efda06b"
+        },
+        {
+          "case": "external token/diagnostics and management documented",
+          "passed": true
+        },
+        {
+          "case": "SDK declares distinct external Bearer scheme",
+          "passed": true
+        },
+        {
+          "case": "real MySQL Source columns match exactly",
+          "passed": true
+        },
+        {
+          "case": "access log excludes secrets and tokens",
+          "passed": true
+        },
+        {
+          "case": "server request trace present in safe OpenAPI access log",
+          "passed": true
+        },
+        {
+          "case": "acceptance ends with synthetic client disabled",
+          "passed": true,
+          "status": 200,
+          "expected": 200,
+          "requestId": "a1841bf2-64d6-4b57-989b-8b980bbce1e6"
+        }
+      ]
+    },
+    {
+      "name": "acceptance-openapi-isolation",
+      "mode": "real-mysql-two-own-schemas-shared-redis-local-http",
+      "passed": 29,
+      "total": 29,
+      "cases": [
+        {
+          "case": "18081 POST /api/platform/session 200",
+          "passed": true
+        },
+        {
+          "case": "18082 POST /api/platform/session 200",
+          "passed": true
+        },
+        {
+          "case": "18082 GET /api/system/menu/list 200",
+          "passed": true
+        },
+        {
+          "case": "18082 GET /api/system/role/100 200",
+          "passed": true
+        },
+        {
+          "case": "18082 PUT /api/system/role 200",
+          "passed": true
+        },
+        {
+          "case": "peer role grants retain all previous bindings",
+          "passed": true
+        },
+        {
+          "case": "peer grant remains PLATFORM",
+          "passed": true
+        },
+        {
+          "case": "18081 PUT /api/system/open-api/clients/status 200",
+          "passed": true
+        },
+        {
+          "case": "18081 PUT /api/system/open-api/clients/apis 200",
+          "passed": true
+        },
+        {
+          "case": "18081 POST /open-api/token 200",
+          "passed": true
+        },
+        {
+          "case": "18081 GET /open-api/v1/verification/ping 200",
+          "passed": true
+        },
+        {
+          "case": "18082 GET /api/system/open-api/clients 200",
+          "passed": true
+        },
+        {
+          "case": "18082 POST /api/system/open-api/clients 200",
+          "passed": true
+        },
+        {
+          "case": "18082 POST /api/system/open-api/clients 200",
+          "passed": true
+        },
+        {
+          "case": "18082 PUT /api/system/open-api/clients/status 200",
+          "passed": true
+        },
+        {
+          "case": "18082 PUT /api/system/open-api/clients/status 200",
+          "passed": true
+        },
+        {
+          "case": "18082 PUT /api/system/open-api/clients/status 200",
+          "passed": true
+        },
+        {
+          "case": "18082 PUT /api/system/open-api/clients/status 200",
+          "passed": true
+        },
+        {
+          "case": "18082 PUT /api/system/open-api/clients/status 200",
+          "passed": true
+        },
+        {
+          "case": "18082 PUT /api/system/open-api/clients/status 200",
+          "passed": true
+        },
+        {
+          "case": "18082 PUT /api/system/open-api/clients/apis 200",
+          "passed": true
+        },
+        {
+          "case": "two databases deliberately contain same clientID/version/grant",
+          "passed": true
+        },
+        {
+          "case": "18082 GET /open-api/v1/verification/ping 401",
+          "passed": true
+        },
+        {
+          "case": "same Redis and colliding identity cannot reuse main token in peer",
+          "passed": true
+        },
+        {
+          "case": "18081 GET /open-api/v1/verification/ping 200",
+          "passed": true
+        },
+        {
+          "case": "18081 PUT /api/system/open-api/clients/status 200",
+          "passed": true
+        },
+        {
+          "case": "18081 PUT /api/system/open-api/clients/apis 200",
+          "passed": true
+        },
+        {
+          "case": "18082 PUT /api/system/open-api/clients/status 200",
+          "passed": true
+        },
+        {
+          "case": "both collision test clients left disabled",
+          "passed": true
+        }
+      ]
+    },
+    {
+      "name": "acceptance-openapi-boundaries",
+      "mode": "real-mysql-synthetic-data-local-http",
+      "passed": 18,
+      "total": 18,
+      "cases": [
+        {
+          "case": "root current runtime23",
+          "passed": true,
+          "status": 200,
+          "expected": 200
+        },
+        {
+          "case": "existing synthetic empty role account",
+          "passed": true,
+          "status": 200,
+          "expected": 200
+        },
+        {
+          "case": "synthetic canonical user metadata",
+          "passed": true,
+          "status": 200,
+          "expected": 200
+        },
+        {
+          "case": "save original user role bindings",
+          "passed": true,
+          "status": 200,
+          "expected": 200
+        },
+        {
+          "case": "lookup explicit Source list menu",
+          "passed": true,
+          "status": 200,
+          "expected": 200
+        },
+        {
+          "case": "create synthetic list-only platform role",
+          "passed": true,
+          "status": 200,
+          "expected": 200
+        },
+        {
+          "case": "lookup saved role",
+          "passed": true,
+          "status": 200,
+          "expected": 200
+        },
+        {
+          "case": "temporarily assign explicit list-only role",
+          "passed": true,
+          "status": 200,
+          "expected": 200
+        },
+        {
+          "case": "list-only role can list Source apps",
+          "passed": true,
+          "status": 200,
+          "expected": 200
+        },
+        {
+          "case": "list-only role can read page data-scope state",
+          "passed": true,
+          "status": 200,
+          "expected": 200
+        },
+        {
+          "case": "list-only role cannot read client details",
+          "passed": true,
+          "status": 403,
+          "expected": 403
+        },
+        {
+          "case": "list-only role cannot grant external APIs",
+          "passed": true,
+          "status": 403,
+          "expected": 403
+        },
+        {
+          "case": "restore original empty role bindings",
+          "passed": true,
+          "status": 200,
+          "expected": 200
+        },
+        {
+          "case": "restored empty role again cannot list clients",
+          "passed": true,
+          "status": 403,
+          "expected": 403
+        },
+        {
+          "case": "enable own synthetic client for malformed credential probes",
+          "passed": true,
+          "status": 200,
+          "expected": 200
+        },
+        {
+          "case": "long UTF8 wrong secret safely rejects without HTTP500",
+          "passed": true,
+          "status": 401,
+          "expected": 401
+        },
+        {
+          "case": "missing credentials real400",
+          "passed": true,
+          "status": 400,
+          "expected": 400
+        },
+        {
+          "case": "leave malformed credential probe client disabled",
+          "passed": true,
+          "status": 200,
+          "expected": 200
+        }
+      ]
+    },
+    {
+      "name": "acceptance-sql-export-v10",
+      "mode": "real-mysql-empty-owned-schema-manual-import-metadata",
+      "passed": 5,
+      "total": 5,
+      "schema": "mes_base_phase1_sql_20261006_c57ad0",
+      "columnCount": 426,
+      "cases": [
+        {
+          "case": "standalone V1-V10 SQL imported into own empty MySQL schema",
+          "passed": true
+        },
+        {
+          "case": "actual columns types defaults match running schema",
+          "passed": true
+        },
+        {
+          "case": "Source users empty after standalone import",
+          "passed": true
+        },
+        {
+          "case": "Source roles empty after standalone import",
+          "passed": true
+        },
+        {
+          "case": "all three Source system menu modules present",
+          "passed": true
+        }
+      ]
+    },
+    {
+      "name": "OpenApiDataScopeVerificationTest",
+      "mode": "unit-no-MES-domain",
+      "passed": 7,
+      "total": 7,
+      "log": "target/phase1/verify-22.log"
+    },
+    {
+      "name": "openapi-missing-policy",
+      "mode": "real-startup-own-db-negative",
+      "passed": 1,
+      "total": 1,
+      "expected": "startup rejected when data-scope enabled without unique validator",
+      "log": "target/phase1/openapi-missing-policy.log"
     }
   ],
   "regression": {
@@ -1820,26 +3010,35 @@
       "tests": 21,
       "failed": 0,
       "build": "passed",
-      "log": "target/phase1/ui-check-8.log",
-      "latestCheck": "target/phase1/ui-check-8.log",
+      "log": "target/phase1/ui-check-12.log",
+      "latestCheck": "target/phase1/ui-check-12.log",
       "latestCheckStatus": "passed"
     },
     "latestBackendVerify": {
-      "run": 93,
-      "passed": 90,
+      "run": 100,
+      "passed": 97,
       "failed": 0,
       "errors": 0,
       "skipped": 3,
-      "log": "target/phase1/verify-11.log",
+      "log": "target/phase1/verify-22.log",
       "command": "zsh -ic 'mvn -B -ntp verify'"
+    },
+    "packagedSmoke": {
+      "passed": 11,
+      "failed": 0,
+      "total": 11,
+      "log": "target/phase1/smoke-6.log",
+      "command": "zsh -ic '/usr/bin/python3 scripts/smoke-packaged.py'"
     }
   },
   "unverified": [
-    "remaining browser workflows and user credential handoffs",
-    "packaged smoke for final source",
-    "external Minio instance",
-    "deployment and production",
-    "full infrastructure inventory disposition (registration/OpenAPI/Swagger not presumed complete)"
+    "browser credential creation/reset/registration/import final submissions require user handoff",
+    "browser download artifact (API bytes/OOXML separately passed)",
+    "external MinIO instance/PDA/wechat channels",
+    "Redis Cluster/deployment/production",
+    "formal MES data scope enabled with real business policy/database",
+    "server JDK fallback branch not induced; real OSHI mount listing verified",
+    "Source UserTask requires business documents; generator and domain remain postponed"
   ],
   "boundaries": [
     "No Codegen Skill or CLI used for migration",
@@ -1880,10 +3079,24 @@
       "redis": "loopback:16379",
       "backendPid": 20258,
       "peerState": "stopped after isolation and retry acceptance; files and schema preserved"
+    },
+    {
+      "backend": "http://127.0.0.1:18081",
+      "web": "http://127.0.0.1:15174",
+      "jar": "target/phase1/phase1-runtime-18.jar",
+      "backendLog": "target/phase1/backend-28.log",
+      "webLog": "target/phase1/ui-runtime-4.log",
+      "peer": "http://127.0.0.1:18082",
+      "peerJar": "target/phase1/phase1-runtime-14.jar",
+      "peerLog": "target/phase1/backend-peer-4.log",
+      "redis": "loopback:16379",
+      "peerState": "stopped after isolation and retry acceptance; files and schema preserved"
     }
   ],
-  "executionState": "RESUMED_BY_USER",
-  "inProgress": [],
+  "executionState": "RESUMED_AUTHORIZED_WORK_PACKAGES_COMPLETED_WITH_UI_HANDOFF_PENDING",
+  "inProgress": [
+    "remaining browser credential handoff and artifact proof"
+  ],
   "browserCompleted": [
     {
       "case": "Source user edit department/post/nickname",
@@ -1898,6 +3111,133 @@
     {
       "case": "DictSelect actual normal/disabled database labels",
       "passed": true
+    },
+    {
+      "case": "Source user status disable and restore",
+      "passed": true,
+      "image": "target/phase1/browser-user-disabled.png"
+    },
+    {
+      "case": "Source existing-role idempotent save returns canonical user list",
+      "passed": true
+    },
+    {
+      "case": "Source register disabled UI and public route",
+      "passed": true,
+      "image": "target/phase1/browser-registration-closed.png"
+    },
+    {
+      "case": "Source import file picker and initial-password handoff form",
+      "passed": true,
+      "scope": "file selection only; import not submitted",
+      "image": "target/phase1/browser-user-import-selected.png"
+    },
+    {
+      "case": "Own synthetic private file actual browser upload and metadata",
+      "passed": true,
+      "image": "target/phase1/browser-file-uploaded.png"
+    },
+    {
+      "case": "Private file delete cancelled; own file remains",
+      "passed": true
+    },
+    {
+      "case": "Source Notice create and reload private image",
+      "passed": true,
+      "screenshot": "browser-notice-private-media.png"
+    },
+    {
+      "case": "Paused Source Quartz task explicit manual execution",
+      "passed": true,
+      "jobId": "105"
+    },
+    {
+      "case": "Source Quartz job log route and correlated persisted success detail",
+      "passed": true,
+      "screenshot": "browser-quartz-log.png"
+    },
+    {
+      "case": "Server Monitor displays real macOS CPU memory Java21 and OSHI APFS volumes",
+      "passed": true,
+      "evidence": "browser server page: 10 cores,32 GB,Java21.0.4,eight APFS rows; no fixture"
+    },
+    {
+      "case": "Source system interfaces render actual OpenAPI and Source user operations",
+      "passed": true,
+      "evidence": "tool/swagger real OpenAPI3.1 controllers and PUT POST GET DELETE Source routes"
+    },
+    {
+      "case": "Cache Monitor reads own Redis8.2.10 port16379 real INFO and key count",
+      "passed": true,
+      "evidence": "actual RedisVersion,16379,76 keys,AOF enabled"
+    },
+    {
+      "case": "Druid UI shows real platform pool parameterized SQL counts and WallFilter counts",
+      "passed": true,
+      "evidence": "platform pool,SQL228 executions,295 wall checks;0 violations;no connection secrets"
+    },
+    {
+      "case": "Source message form and recipient selector persist self-addressed notice",
+      "passed": true,
+      "evidence": "admin105 recipient;ordinary notification title and rich content;no callback"
+    },
+    {
+      "case": "My inbox shows self-owned persisted message and reads rich detail then marks read",
+      "passed": true,
+      "evidence": "browser self105 exacttitle one row and已读 after查看"
+    },
+    {
+      "case": "AutoCode UI preview26 generate26 next preview27 on own platform rule",
+      "passed": true,
+      "evidence": "QA_PLATFORM_218096;only explicitgenerate increments;no MESconsumer"
+    },
+    {
+      "case": "Source AutoCode part detail loads fixed-prefix and counter fields and closes to list",
+      "passed": true,
+      "evidence": "parts/2 real PREFIX+COUNTER rows;close returns/system/autocode"
+    },
+    {
+      "case": "Source own profile form idempotent save succeeds",
+      "passed": true,
+      "evidence": "admin nickname/mobile/email/sex SourceDTO;no credential change"
+    },
+    {
+      "case": "Source avatar actual crop200 upload and authenticated private image render",
+      "passed": true,
+      "evidence": "own admin105 syntheticPNG;200x200 blob authenticated preview"
+    },
+    {
+      "case": "Source OpenAPI actual list/detail and independent data-scope state",
+      "passed": true,
+      "url": "http://127.0.0.1:15174/system/openApiClient",
+      "evidence": "docs/reviews/assets/2026-10-06-phase1/browser-openapi-detail.png"
+    },
+    {
+      "case": "Source OpenAPI API grant groups show actual catalog and current grants",
+      "passed": true,
+      "evidence": "docs/reviews/assets/2026-10-06-phase1/browser-openapi-grants.png",
+      "boundary": "read-only; no browser permission grant submitted"
+    },
+    {
+      "case": "Source OpenAPI create form name/remark/default-disabled and cancel",
+      "passed": true,
+      "boundary": "credential creation not submitted in browser; actual API create/reset covered separately"
+    },
+    {
+      "case": "Source operation log actual detail, actor/method/time and empty request/response payloads",
+      "passed": true,
+      "evidence": "docs/reviews/assets/2026-10-06-phase1/browser-operation-log.png"
+    },
+    {
+      "case": "Source login log admin query returns actual login/request/browser/OS status records",
+      "passed": true,
+      "evidence": "docs/reviews/assets/2026-10-06-phase1/browser-login-log.png"
+    },
+    {
+      "case": "Source online users shows DB-scoped Redis sessions and hashed session IDs",
+      "passed": true,
+      "evidence": "docs/reviews/assets/2026-10-06-phase1/browser-online-users.png",
+      "boundary": "read-only; no other session forcibly logged out"
     }
   ],
   "gitHistory": [
@@ -1905,6 +3245,12 @@
       "backendHead": "975a9df4687f882bf251ca09bfb242015d33beff",
       "frontendHead": "18e372c2e6da0c6ab9738d562f99bf0d5bf3c6ca",
       "state": "previous pre-commit snapshot"
+    },
+    {
+      "date": "2026-10-06",
+      "backendHead": "4891535f735b18ca87918d8bcff1546663a53d02",
+      "frontendHead": "d2b19714cb5018d07fa3171b76585eab45b325ce",
+      "reason": "user created local backend commit during authorized migration; agent did not commit"
     }
   ],
   "closedFailures": [
@@ -1918,6 +3264,66 @@
       "case": "Quartz test injected CST claim while JDBC used UTC",
       "correction": "CLI sets own session timezone UTC; no global setting changed",
       "after": "target/phase1/acceptance-quartz-schedule.json"
+    },
+    {
+      "case": "PORT missed annotated generic API code getter",
+      "before": "target/phase1/verify-19.log",
+      "correction": "equivalent JavaBean getter/setter expanded",
+      "after": "target/phase1/verify-22.log"
+    },
+    {
+      "case": "OpenAPI acceptance expected400 for Source enum business rejection422",
+      "before": "target/phase1/acceptance-openapi-first-attempt.json",
+      "correction": "test expectation aligned with current SourceBusiness protocol; no runtime behavior changed",
+      "after": "target/phase1/acceptance-openapi.json"
+    },
+    {
+      "case": "notice edit permission queried with numeric ID instead of canonical username",
+      "correction": "server canonical username passed to permission service",
+      "after": "target/phase1/acceptance-notice-ownership.json"
+    },
+    {
+      "case": "list page data-scope metadata required detail permission",
+      "correction": "metadata endpoint uses list permission; list-only role/denied details and grant verified",
+      "after": "target/phase1/acceptance-openapi-boundaries.json"
     }
-  ]
+  ],
+  "browserPartial": [
+    {
+      "case": "Private file browser download artifact",
+      "passed": false,
+      "status": "NOT_VERIFIED"
+    }
+  ],
+  "openApiDecision": {
+    "dataScopeEnabledByDefault": false,
+    "switch": "open-api.data-scope.enabled / MES_OPEN_API_DATA_SCOPE_ENABLED",
+    "authentication": "mandatory separate external principal",
+    "apiAuthorization": "mandatory current DB grants",
+    "enabledWithoutPolicy": "startup fails; exactly one OpenApiDataScopeValidator required",
+    "routeDependency": "not ported; no ProRoute or route scope table",
+    "factoryResourceOwnership": "retained; optional business validator cannot provide default factory/datasource"
+  },
+  "userCredentialHandoff": {
+    "url": "http://127.0.0.1:15174/system/user",
+    "tab": "6",
+    "userName": "qa_ui_user_20261006",
+    "exists": false,
+    "departmentId": "200",
+    "postIds": [
+      "2"
+    ],
+    "roleIds": [],
+    "passwordEnteredByAgent": false,
+    "submittedByAgent": false,
+    "screenshot": "docs/reviews/assets/2026-10-06-phase1/browser-user-create-handoff.png"
+  },
+  "sourceProduct": {
+    "backendHead": "310c6ef1bb37d2533fe893579ba837c353b76926",
+    "frontendHead": "923d50ce35287c71ac7d1455bccbbfb8068e8e8a",
+    "backendStatus": "clean; read only",
+    "frontendStatus": "original dirty openApiClient page preserved; port uses committed HEAD",
+    "manifestEntries": 392,
+    "targetHashesVerified": true
+  }
 }

@@ -4,7 +4,6 @@ import dev.mesbase.common.core.domain.AjaxResult;
 import dev.mesbase.system.openapi.dto.*;
 import dev.mesbase.framework.openapi.OpenApiCatalogService;
 import dev.mesbase.system.openapi.service.OpenApiClientService;
-import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import jakarta.validation.Valid;
 import jakarta.servlet.http.HttpServletResponse;
@@ -56,7 +55,7 @@ public class OpenApiClientController {
     }
 
     @GetMapping("/data-scope")
-    @dev.mesbase.platform.web.EndpointAccess(value=dev.mesbase.platform.web.EndpointAccess.Kind.AUTHORIZED,permission="system:openApiClient:query",permissionScope=dev.mesbase.platform.web.EndpointAccess.PermissionScope.PLATFORM)
+    @dev.mesbase.platform.web.EndpointAccess(value=dev.mesbase.platform.web.EndpointAccess.Kind.AUTHORIZED,permission="system:openApiClient:list",permissionScope=dev.mesbase.platform.web.EndpointAccess.PermissionScope.PLATFORM)
     public AjaxResult dataScope() {
         return AjaxResult.success(new DataScopeStatus(verification.isEnabled()));
     }

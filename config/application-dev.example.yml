@@ -1,0 +1,35 @@
+# Copy to .local/application-dev.yml; chmod 600. Run from repository root.
+# The actual local file is already prepared on the current development machine.
+mes:
+  platform:
+    url: ${MES_PLATFORM_URL}
+    username: ${MES_PLATFORM_USER}
+    password: ${MES_PLATFORM_PASSWORD}
+    file-root: ${MES_FILE_ROOT:.local/files}
+    migrate: false
+  runtime:
+    enabled: true
+    factories:
+      - id: DEV
+        enterprise-id: development
+        code: DEV
+        name: 开发工厂
+        status: ENABLED
+        datasource-identity: dev_business
+        revision: 1
+        url: ${MES_BUSINESS_URL}
+        username: ${MES_BUSINESS_USER}
+        password: ${MES_BUSINESS_PASSWORD}
+  codegen:
+    profiles:
+      dev:
+        url: ${MES_BUSINESS_URL}
+        username: ${MES_BUSINESS_USER}
+        password: ${MES_BUSINESS_PASSWORD}
+spring:
+  data:
+    redis:
+      host: ${MES_REDIS_HOST:127.0.0.1}
+      port: ${MES_REDIS_PORT:6379}
+      password: ${MES_REDIS_PASSWORD}
+      database: ${MES_REDIS_DATABASE:1}

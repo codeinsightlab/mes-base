@@ -14,6 +14,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 
 @RestController
+@io.swagger.v3.oas.annotations.security.SecurityScheme(name="OpenApiBearer",type=io.swagger.v3.oas.annotations.enums.SecuritySchemeType.HTTP,scheme="bearer",description="外部应用 Token，与后台用户 Token 分离")
 @Tag(name = "应用认证")
 @RequestMapping("/open-api/token")
 @org.springframework.boot.autoconfigure.condition.ConditionalOnProperty(name={"mes.system.enabled","open-api.enabled"},havingValue="true")
@@ -31,6 +32,7 @@ public class OpenApiTokenController {
     }
     @dev.mesbase.platform.web.EndpointAccess(value=dev.mesbase.platform.web.EndpointAccess.Kind.AUTHENTICATED,permissionScope=dev.mesbase.platform.web.EndpointAccess.PermissionScope.PLATFORM)
     @PostMapping("/revoke")
+    @io.swagger.v3.oas.annotations.security.SecurityRequirement(name="OpenApiBearer")
     @Operation(summary = "撤销当前 Token", description = "携带当前访问 Token。撤销后该 Token 无法继续调用，需重新申请。")
     @ApiResponse(responseCode = "200", description = "成功，data 为 null",
             content = @Content(mediaType = "application/json", schema = @Schema(implementation = OpenApiDocumentResponse.EmptyResponse.class)))

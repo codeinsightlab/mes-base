@@ -2,7 +2,7 @@ spring:
   application:
     name: mes-base
   profiles:
-      active: dev
+    default: dev
   web:
     resources:
       add-mappings: false
@@ -124,8 +124,8 @@ springdoc:
   enable-default-api-docs: false
   swagger-ui:
     enabled: false
-  paths-to-match: /api/**,/health
-  packages-to-scan: dev.mesbase.web.controller,dev.mesbase.quartz.controller,dev.mesbase.server
+  paths-to-match: /api/**,/health,/open-api/**
+  packages-to-scan: dev.mesbase.web.controller,dev.mesbase.quartz.controller,dev.mesbase.server,dev.mesbase.framework.openapi
 
 # SOURCE_PRODUCT_PORT: external application authentication and API grants; no route assumptions.
 open-api:

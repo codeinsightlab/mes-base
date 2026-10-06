@@ -4,7 +4,7 @@
 
 ## YAML 与装配
 
-通用配置 `mes-admin/src/main/resources/application.yml`，环境配置 application-dev.yml / application-prod.yml，受控外部文件通过 `--spring.config.additional-location=file:/absolute/config.yml` 明确加载。Java Configuration 负责对象装配/校验/关闭，不储存环境连接值。本轮运行须显式 dev + target/phase1/application-phase1.yml，不能以工作区裸启动命令代替。
+通用配置 `mes-admin/src/main/resources/application.yml`，环境配置 application-dev.yml / application-prod.yml，受控外部文件通过 `--spring.config.additional-location=file:/absolute/config.yml` 明确加载。Java Configuration 负责对象装配/校验/关闭，不储存环境连接值。2026-10-06开发环境收尾后，默认dev从仓库根加载 `.local/application-dev.yml`，启动器亦显式加载同一文件；不再依赖target中的phase配置。
 
 | 配置 | 实际消费者 |
 | --- | --- |
@@ -16,9 +16,10 @@
 | user.password.*、ruoyi.captcha.* | PasswordPolicy、密码重试锁、CaptchaService、登录/注册 |
 | xss.* | 通用输入/XSS 防护及富文本服务端净化 |
 | springdoc.* | SDK 构建文档；默认 SDK MVC 入口关闭，显式授权 Controller 对外 |
+| open-api.* | 外部专用安全链、Token/Lua限流、API目录/授权；业务数据范围开关与独立校验器 |
 | minio.* | 私有存储适配器；未提供外部 MinIO 连接时不伪造成功 |
 
-prod 连接由外部提供，迁移默认关闭；本轮未启用 prod。工作区 dev/default profile 有用户调整，未经其隔离验收，连接值不抄入本文。所有本轮测试只使用自有 mes_base_phase1_* Schema，未连接其他默认库。前端 MES_DEV_API_TARGET 只允许 loopback；本轮18081/15174，Redis16379，旧18080/15173保留。
+dev正式开发库为 `mes_base_dev`，业务库为 `mes_base_dev_business`，单开发Factory=DEV；Codegen元数据指向业务库，二者不合库。prod连接由外部提供，迁移默认关闭，模板见 `config/application-prod.example.yml`；本轮只在开发库做本地prod装配验证，未连接生产。前端MES_DEV_API_TARGET只允许loopback；18081/15174，Redis16379 DB1。历史phase验收与日常开发分开记录。
 
 ## 身份、会话与系统对象
 
@@ -26,7 +27,7 @@ prod 连接由外部提供，迁移默认关闭；本轮未启用 prod。工作�
 
 POST /api/platform/session 为正式入口，Source userName 字段由适配层与 username 登录请求对应；成功返回 accessToken/expiresAt，DELETE 注销。Redis key 按平台 DB 身份命名空间隔离，令牌仅存哈希身份和会话版本；禁用、重置密码、强退撤销，当前角色/权限每次请求查 DB。重试锁使用数据库规范化的 Source userName，大小写/重音等价身份不能绕过。注册 /api/system/register 仅当 sys.account.registerUser 显式 true 才开，不能自行赋角色或 Token；验证码一次消费。dev 密码最小长度默认5，prod默认12，UTF8 BCrypt 最大72字节，UI读取服务端策略。
 
-/api/system/** 是 Source 系统正式可写链路。旧简化 Platform 用户/角色/菜单/字典/配置/Job API 默认关闭，仅隔离历史 Fixture 测试显式打开；V2 保存旧表，不存在两套正式可写系统对象。源字段/分页/导入导出沿用 Source 成功结构，失败真实 HTTP+requestId；不用 HTTP200 冒充失败。
+/api/system/** 是 Source 系统正式可写链路。2026-10-06旧简化Platform用户/角色/菜单/字典/配置/Job实现和专用测试已删除，生产不再接受mes.legacy-test-only开关。V1–V10迁移不改checksum；新开发库从空库运行迁移，仅经空表检查移除phase1_legacy_*归档，历史非空归档不删。源字段/分页/导入导出沿用 Source 成功结构，失败真实 HTTP+requestId；不用 HTTP200 冒充失败。
 
 PLATFORM role 无 factoryId，FACTORY role 必須绑定有效厂。有效空角色身份可登录、选启用厂和 AUTHENTICATED；AUTHORIZED 缺当前范围权限拒绝。Source DataScope 是平台组织数据范围，不能当 Factory 准入。本人/外部 ID 校验在后端；数据权限 SQL 片段由受控服务生成，客户端 params 注入拒绝。无 User↔Factory绑定、首厂回退或跨厂权限缓存。
 
@@ -40,7 +41,7 @@ PLATFORM role 无 factoryId，FACTORY role 必須绑定有效厂。有效空角�
 
 自动编码保留 Source rule/part/result 和完整组成页面。预览不占号，生成必须 POST；平台事务下规则/计数行锁、周期隔离和溢出拒绝，不用 JVM 锁。当前仅平台编号工具，无 Factory/MES编号消费者。
 
-/api/tool/swagger/json 使用 tool:swagger:view 平台权限，由 Springdoc3.0.3 SDK生成实际 DTO/Controller 契约。/v3/api-docs 和公共 Swagger UI 未登记；Vue3 SwaggerUI5.33.1同源当前会话请求，无外部 validator或认证持久化。
+/api/tool/swagger/json 使用 tool:swagger:view 平台权限，由 Springdoc3.0.3 SDK生成实际 DTO/Controller 契约。/v3/api-docs 和公共 Swagger UI 未登记；Vue3 SwaggerUI5.33.1同源请求，无外部 validator或认证持久化。系统接口携带内部会话；外部 /open-api/** 只接受独立 OpenApiBearer，不自动携带后台 Token/选厂头。
 
 ## Quartz 与真实监控
 
@@ -52,8 +53,43 @@ Server Monitor读取本机OSHI/JDK；OSHI无挂载时只标明应用所在卷的
 
 ## SQL、验收与后续
 
-Flyway V1–V9包含 Source完整 sys_* 与范围/会话/附件/编码扩展，旧表归档保存。scripts/export-phase1-sql.py输出原迁移的有序SQL和哈希，不另维护字段；已在新的空独立MySQL库导入并比对真实metadata。SQL不创建用户/角色。手工导入无Flyway history，之后 migrate=false；空库Flyway方式优先。
+Flyway V1–V10包含 Source完整 sys_* 与范围/会话/附件/编码扩展，旧表归档保存。scripts/export-phase1-sql.py输出原迁移的有序SQL和哈希，不另维护字段；已在新的空独立MySQL库导入并比对真实metadata。SQL不创建用户/角色。手工导入无Flyway history，之后 migrate=false；空库Flyway方式优先。
 
 mvn -B -ntp verify；涉及打包再 /usr/bin/python3 scripts/smoke-packaged.py；UI Node22 npm run test / npm run build。Foundation/PlatformHttp测试显式关闭真实Runtime以隔离用户默认profile。测试源码、Fixture、真实API、浏览器、部署分别记录。浏览器新凭证/导入提交需要用户接手，下载产物尚未取得，不能标记全量验收完成。
 
-OpenApi客户端/Token通用部分仍为候选；其Route授权/DataScopeGuard直接依赖未迁ProRoute，需随对应Domain分离并复用新Factory约束，不能用旧route存在性判断替代资源范围。UserTask查询真实仓储/报工单据，随MES业务后置。微信/PDA需要实际渠道配置与设备验收，Generator按授权保留后置。
+OpenAPI通用链路已迁入并通过真实数据库/API验收；Route授权/旧DataScopeGuard依赖ProRoute，按用户本轮决定从Base解耦，具体范围由未来MES校验器表达。UserTask查询真实仓储/报工单据，随MES业务后置。微信/PDA需要实际渠道配置与设备验收，Generator按授权保留后置。
+
+## OpenAPI：客户端、API 授权与可选数据范围
+
+Source 为 common/openapi、system/openapi、framework/openapi 与 OpenApiClientController/页面，DDL 来自 Source sql/openapi/20260930-open-api-platform.sql。通用字段、DTO/VO、行锁、版本撤销、Redis Lua、当前 MVC 目录和分组页面沿用；Java21/Boot4/Jakarta、JavaBean、Security7 专用链与平台持久化归属是 PORT 部分。前端 Source 工作文件有用户修改，因此读取提交 HEAD 的页面，不覆盖或使用其未提交内容。
+
+后台管理 `/api/system/open-api/clients` 的 list/query/add/edit/reset/authorize 是独立 PLATFORM 权限。新菜单不自动赋权；本轮只通过正式 Role API 给自有管理员角色追加这些菜单，原菜单绑定全部保留。创建默认禁用，Secret 只在创建/重置响应展示，SQL 仅保存 BCrypt 摘要。列表和详情没有 Secret/hash。后台通用 @Log 不采集凭证返回。
+
+外部身份为 OpenApiPrincipal，不是 SysUser/LoginUser。专用链只匹配 /open-api/**；Source @OpenApiEndpoint 的 API code 在当前 DB 授权后才调用。内部用户 Token 无法进入此链，外部 Token 无法进入 /api/system/**；没有凭 appKey 查询内部账号、默认厂或长寿命角色缓存。未来 Factory 业务仍须显式 FactoryScope、可信 Mapper/数据库与资源范围策略。
+
+```yaml
+open-api:
+  enabled: ${MES_OPEN_API_ENABLED:true}
+  namespace: ${MES_OPEN_API_NAMESPACE:base}
+  token-ttl-seconds: ${MES_OPEN_API_TOKEN_TTL_SECONDS:7200}
+  rate-window-seconds: ${MES_OPEN_API_RATE_WINDOW_SECONDS:60}
+  token-rate-limit: ${MES_OPEN_API_TOKEN_RATE_LIMIT:20}
+  api-rate-limit: ${MES_OPEN_API_RATE_LIMIT:120}
+  data-scope:
+    enabled: ${MES_OPEN_API_DATA_SCOPE_ENABLED:false}
+```
+
+配置统一放 application.yml，dev/prod 可用环境或受控外部 YAML 覆盖。`data-scope.enabled=false` 只关闭业务范围扩展；身份、客户端状态/凭证版本、API code 授权、限流仍执行。开启时必须安装唯一 `OpenApiDataScopeValidator` Bean，缺失或重复使启动失败。校验器接收已验证外部身份、API code、实际请求与 HandlerMethod；不要求工艺/路线字段，不能访问默认业务库补缺。Source `@OpenApiDataScopeIgnore` 仅用于不读业务数据的诊断方法，不豁免认证、API授权和限流。当前没有正式MES实现或开启状态的业务数据库验收；7项定向测试证明安装策略的调用/拒绝/诊断豁免，真实启动证明缺策略开启失败。
+
+Token 是 Source 随机 opaque 凭证。Lua 原子写入摘要记录和当前客户端恢复材料：有效期内重复申请返回同 Token 并重置TTL，普通 API 不续期；禁用/启用/重置递增数据库版本，旧 Token 下一请求失效；撤销删除摘要键。为保留 Source 重复申请语义，受控 Redis 的客户端记录含恢复用 Token，SQL/日志不存明文 Token 或 Secret。Redis 所有键附当前平台 DB 身份，不靠 namespace 字符串冒充隔离；本轮实际同Redis、同clientId/版本/授权的双库负例通过。未验证Redis Cluster部署。
+
+通用实际接口是 diagnostics.ping/client/capabilities 和 verification.ping/client（共5个code）。capabilities只列当前已授权且仍注册的接口；不提供 MES 单据、工艺或用户数据。成功沿用 Source code/msg/data/requestId；外部错误 HTTP400/401/403/429/503/500 与 errorCode/msg/data/requestId 对应，401带WWW-Authenticate，响应no-store。当前操作关联ID和安全日志有实际证据，无请求体/凭证/Token采集。
+
+
+## 2026-10-06 开发环境与旧代码收尾
+
+真实连接/管理员凭证/临时库备份均在忽略的 `.local/`，目录0700、凭证文件0600；不输出凭证。迁移初始化用 `scripts/mes-platform-admin --username=admin --config=.local/application-dev.yml --migrate`，密码由MES_BOOTSTRAP_PASSWORD受控提供；日常启动migrate=false。清空新开发库中的空迁移归档用 `/usr/bin/python3 scripts/clean-empty-development-archives --mysql-config=.local/mysql-dev.cnf`；脚本固定mes_base_dev并检查每张表无数据，重复执行无副作用，非空归档明确拒绝。
+
+两个异常目录 `mes-admin/${project.parent.basedir}` 与 `mes-admin/Users` 是旧构建路径错误留下的编译产物，已移出源码目录到target/dev-cleanup归档；当前POM使用maven.multiModuleProjectDirectory，复建不再生成。旧的PlatformServiceTest/PlatformHttpTest、V1-only迁移测试、TestOnlyCodegenFixture及旧验收脚本退役；RuntimeFixture及单/多厂、跨库、线程、权限等有效测试保留。Maven测试显式使用test profile，隔离私有dev配置。
+
+7个phase库删除前备份至 `.local/backups/20261006-phase`；原4个旧dev schema保留。详细当前运行证据及失败见迁移报告本日“dev/prod配置与临时数据库收尾”章节。

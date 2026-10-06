@@ -1,11 +1,10 @@
 #!/usr/bin/env python3
 """Local packaged-JAR smoke. Synthetic credentials remain in memory; no old services are touched."""
-import base64
+import io
 import json
 import os
 from pathlib import Path
 import re
-import secrets
 import subprocess
 import time
 import urllib.request
@@ -21,13 +20,18 @@ checks = []
 with zipfile.ZipFile(JAR) as artifact:
     names = artifact.namelist()
     assert not any("RuntimeFixture" in n or "FoundationHttpTest" in n or "h2-" in n for n in names)
+    legacy_classes = ("PlatformConfiguration.class", "LegacyPlatformCondition.class", "PlatformTokenFilter.class",
+                      "DemoConfiguration.class", "PlatformController.class", "PlatformMapper.class", "PlatformRows.class", "PlatformService.class")
+    assert not any(n.endswith(legacy_classes) for n in names)
+    for name in names:
+        if name.startswith("BOOT-INF/lib/mes-") and name.endswith(".jar"):
+            with zipfile.ZipFile(io.BytesIO(artifact.read(name))) as module:
+                assert not any(n.endswith(legacy_classes) for n in module.namelist())
 checks.append({"case": "packaging-excludes-test-entities-and-H2", "passed": True})
+checks.append({"case": "packaging-excludes-legacy-platform-implementation", "passed": True})
 
 def run(profile):
     environment = {key: value for key, value in os.environ.items() if not key.startswith(("SPRING_", "MES_", "SERVER_")) and key not in ("JAVA_TOOL_OPTIONS", "JDK_JAVA_OPTIONS", "_JAVA_OPTIONS")}
-    password = secrets.token_urlsafe(24)
-    if profile == "demo":
-        environment["MES_DEMO_PASSWORD"] = password
     command = [JAVA, "-jar", str(JAR), "--server.port=0", "--server.address=127.0.0.1", "--spring.config.location=classpath:/application.yml", "--spring.profiles.active=" + (profile or "default")]
     logfile = OUT / ("packaged-" + (profile or "default") + ".log")
     with logfile.open("w") as stream:
@@ -46,13 +50,8 @@ def run(profile):
                 time.sleep(0.2)
             if port is None:
                 raise RuntimeError("Packaged application readiness timeout")
-            def check(path, expected, actor=None, factory=None):
-                headers = {}
-                if actor:
-                    headers["Authorization"] = "Basic " + base64.b64encode((actor + ":" + password).encode()).decode()
-                if factory:
-                    headers["X-Factory-Id"] = factory
-                request = urllib.request.Request("http://127.0.0.1:" + str(port) + path, headers=headers)
+            def check(path, expected):
+                request = urllib.request.Request("http://127.0.0.1:" + str(port) + path)
                 try:
                     response = urllib.request.urlopen(request, timeout=5)
                 except urllib.error.HTTPError as failure:
@@ -65,16 +64,9 @@ def run(profile):
                 assert correlation
                 if actual >= 400:
                     assert payload["requestId"] == correlation
-                checks.append({"profile": profile or "default", "path": path, "actor": actor, "factory": factory, "expected": expected, "actual": actual, "passed": True})
+                checks.append({"profile": profile or "default", "path": path, "expected": expected, "actual": actual, "passed": True})
             check("/health", 200)
             check("/api/foundation/context", 401)
-            if profile == "demo":
-                check("/api/foundation/context", 200, "visitor", "A")
-                check("/api/foundation/context", 200, "visitor", "B")
-                check("/api/foundation/access", 403, "visitor", "A")
-                check("/api/foundation/access", 200, "reader", "A")
-                check("/api/foundation/access", 403, "reader", "B")
-                check("/api/foundation/erp/connection", 422, "reader", "A")
         finally:
             process.terminate()
             try:
@@ -84,7 +76,6 @@ def run(profile):
                 process.wait(timeout=5)
 
 run(None)
-run("demo")
-result = {"checks": checks, "passed": len(checks), "failed": 0, "boundary": "Local packaged Java process; loopback HTTP; synthetic demo accounts; no business JDBC or external ERP in this smoke"}
+result = {"checks": checks, "passed": len(checks), "failed": 0, "boundary": "Local packaged Java process; loopback HTTP; no test accounts or business JDBC or external ERP in this smoke"}
 (OUT / "packaged-smoke.json").write_text(json.dumps(result, ensure_ascii=False, indent=2) + "\n")
 print(json.dumps({"passed": result["passed"], "failed": result["failed"]}))

@@ -6,7 +6,7 @@ Java21 / Spring Boot4.1.1 的模块化单体，正在将 Source Product 的通�
 
 UI `http://127.0.0.1:15174` → 本轮后端 `127.0.0.1:18081`。用户请求的 admin 已经正式创建，具有显式 PLATFORM 角色；凭证不写文档。原 `15173/18080` 服务保留。
 
-应用在本机，数据库是用户指定的远程测试 MySQL8.0.40，使用本轮独立的 `mes_base_phase1_*` Schema；Redis 是本轮私有实例 `127.0.0.1:16379`。这不是本地 MySQL 实例或生产证据。
+应用在本机，数据库是用户指定的远程测试 MySQL8.0.40：`mes_base_dev` 为系统开发库，`mes_base_dev_business` 为独立工厂业务库。Redis 使用 `127.0.0.1:16379` 的 DB 1。真实连接保存在 Git 忽略且权限为0600的 `.local/application-dev.yml`，不随 Maven target 清理。
 
 - [当前规划与续接入口](docs/development/next-stage-plan.md)
 - [迁移报告、实际命令和失败](docs/development/MES_BASE_REALIGNMENT_REPORT.md)
@@ -20,7 +20,7 @@ UI `http://127.0.0.1:15174` → 本轮后端 `127.0.0.1:18081`。用户请求的
 | 模块 | 当前职责 |
 | --- | --- |
 | mes-common | Source 公共对象、Excel、Redis、字典及字符串等工具 |
-| mes-system | SysUser/Dept/Post/Role/Menu/Dict/Config/Notice/Message/Attachment/AutoCode 的 Source 字段、Service、Mapper/XML |
+| mes-system | SysUser/Dept/Post/Role/Menu/Dict/Config/Notice/Message/Attachment/AutoCode、OpenAPI 客户端的 Source 字段、Service、Mapper/XML |
 | mes-framework | 认证、会话、验证码、密码锁、数据范围、审计、私有文件及 Factory 安全/持久化桥 |
 | mes-quartz | Source 任务/日志、Cron、受控执行、数据库 claim/run token、恢复 |
 | mes-generator | 既有生成实现保留，迁移阶段没有调用 Codegen Skill 或 CLI |
@@ -28,7 +28,7 @@ UI `http://127.0.0.1:15174` → 本轮后端 `127.0.0.1:18081`。用户请求的
 
 UI 位于相邻 `../mes-base-ui`，Vue3/TypeScript/Router4/Pinia/Element Plus/Vite。Source 查询、字段、表单、组织岗位关联、角色菜单、字典参数、公告消息、日志、监控和工具页已 PORT；API 与实际浏览器完成项分别记录。
 
-## 构建与本轮隔离启动
+## 构建与 dev/prod 启动
 
 沿用用户 Java21 和标准 Maven，不创建项目 `.m2/.mvn` 或私有 mirror：
 
@@ -38,9 +38,16 @@ mvn -B -ntp verify
 zsh -ic 'scripts/run-local-backend'
 ```
 
-启动器默认端口18081，显式 dev 和已存在的 `target/phase1/application-phase1.yml`（忽略、0600），可用 `MES_LOCAL_PORT` / `MES_LOCAL_CONFIG` 指定。此受控文件包含本轮隔离连接、Redis、私有文件根和可信 Factory Runtime 映射，不应清空 target 后直接续跑。
+启动器默认18081，显式加载 `.local/application-dev.yml`；可用 `MES_LOCAL_PORT` / `MES_LOCAL_CONFIG` 覆盖。从仓库根目录直接运行 `java -jar target/mes-base-0.1.0-SNAPSHOT.jar` 或 IDE 的 `dev.MesBaseApplication`，默认 dev，也会加载该文件。IDE Working directory 必须设为仓库根。初始开发管理员凭证在 `.local/development-admin.json`，不写入 Git。Redis16379需运行；当前 Redis 进程仍使用历史 target/phase1 运行目录，清理整个 target 前须先迁移其运行目录。
 
-工作区默认 profile/dev 连接有用户本轮调整；裸 `java -jar` 不等于已验收启动方式。本轮数据库测试显式使用隔离外部 YAML，未连接后来写入 dev 的其他 Schema。启动前先检查端口/进程所有权，不能停止原服务。打包产物含当前工作区配置，未作为部署包交付。
+prod 显式激活，数据库/Redis/文件目录必须由部署方提供，迁移默认关闭、验证码开启、密码最少12字符。完整外部配置模板在 `config/application-prod.example.yml`：
+
+```sh
+java -jar target/mes-base-0.1.0-SNAPSHOT.jar --spring.profiles.active=prod \
+  --spring.config.additional-location=file:/absolute/private/application-prod.yml
+```
+
+prod 本轮仅在开发数据库上做本地启动验证，不代表生产部署。旧简化平台实现及专用测试已退役，正式JAR只包含Source系统链路；Factory/ownership等当前回归测试保留。
 
 仅验证空装配时明确避开 dev/prod：
 
@@ -50,7 +57,7 @@ java -jar target/mes-base-0.1.0-SNAPSHOT.jar --spring.profiles.active=default --
 
 ## 正式契约
 
-Source 系统接口成功沿用 AjaxResult/TableDataInfo；Foundation、会话、私有文件按各自明确 DTO 返回。所有失败是真实 HTTP 状态及 `errorCode/message/requestId`，前端按真实契约适配。服务端生成 X-Request-Id，审计不采集请求体、凭证或令牌。
+Source 系统接口成功沿用 AjaxResult/TableDataInfo；Foundation、会话、私有文件按各自明确 DTO 返回。所有失败是真实 HTTP 状态并带 requestId；内部错误用 `errorCode/message/requestId`，外部 OpenAPI 沿用 Source 的 `errorCode/msg/data/requestId`，前端按真实契约适配。服务端生成 X-Request-Id，审计不采集请求体、凭证或令牌。
 
 `/api/platform/session` 是正式登录/注销入口；`/api/system/**` 是唯一正式可写系统对象链路。旧简化 CRUD 默认关闭、旧表重命名归档保存。Redis 会话按平台数据库命名空间保存哈希键和身份/版本；权限每请求读取，无长寿命 Token 权限快照。
 
@@ -58,9 +65,17 @@ Source 系统接口成功沿用 AjaxResult/TableDataInfo；Foundation、会话�
 
 Quartz 保留 Cron/启停/手动运行/日志。暂停只禁止自动触发，授权用户可执行一次；目标是受控登记任务，执行须 DB claim/run token。多节点 cron fire 永久去重与集群 JobStore 未交付。Shared DB、ERP 实际调用、微信/PDA渠道及正式 MES Domain 未自动扩展。
 
+## 外部 OpenAPI
+
+`/system/openApiClient` 是 Source 应用管理页，`/api/system/open-api/clients` 是后台管理接口。保留源表 open_api_client / open_api_client_api 的字段、默认禁用、一次性 Secret、启停/重置递增凭证版本、分组接口授权。Source 工艺范围管理后置，没有复制 ProRoute。
+
+`POST /open-api/token` 用 appKey/appSecret 换外部 Token，`POST /open-api/token/revoke` 撤销当前 Token；`/open-api/v1/diagnostics/**` 与 verification/** 为实际通用诊断接口。外部 Token 不取得后台用户或 Factory 权限；API 授权和当前客户端状态每次请求读取。Redis 使用平台 DB 身份命名空间，支持 Source 的有效期内重复申请复用/续期。
+
+YAML `open-api.data-scope.enabled` 默认 false（环境变量 MES_OPEN_API_DATA_SCOPE_ENABLED）。开关只控制业务数据范围扩展，保留认证/API 授权；启用必须提供唯一 OpenApiDataScopeValidator，否则启动失败。未来 MES 可按工艺、仓库、产品等实际规则实现，不绑定工艺概念，也不能用此开关放宽 Factory/Mapper/resource ownership。完整配置与响应契约见 [Platform 指南](docs/development/platform.md)。
+
 ## SQL 与来源
 
-Flyway 为 platform V1 + system V2–V9。导出命令直接合并当前迁移，不另维护第二套字段：
+Flyway 为 platform V1 + system V2–V10。导出命令直接合并当前迁移，不另维护第二套字段：
 
 ```sh
 /usr/bin/python3 scripts/export-phase1-sql.py

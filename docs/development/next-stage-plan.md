@@ -4,15 +4,23 @@
 
 ## 方向纠偏后的有效计划
 
-用户已恢复执行，目标是 Source Product 基础系统全量 COPY/PORT，迁移阶段忽略 Codegen。六个 Maven 模块及完整 Source 系统页面已迁入；当前整体 **MIGRATING**，继续真实数据库、权限和浏览器验收，不重扫整个系统、不进入正式 MES Domain。
+用户已恢复执行，目标是 Source Product 基础系统全量 COPY/PORT，迁移阶段忽略 Codegen。六个 Maven 模块及 Source 系统/监控页面已接入；2026-10-06复核确认前端外壳、导航/标签、路由、会话和登录外观仍有既有Base自写实现，Source Layout/Navbar/TagsView/Settings未完整迁入，不能称整个前端沿用原架构迁移完成。当前整体 **MIGRATING**，继续真实数据库、权限和浏览器验收，不重扫整个系统、不进入正式 MES Domain。
 
-本次续接实时基线：后端 main/e292789a、前端 main/d2b1971；本轮runtime18（18081）。安全真实数据库工作包59/59、Quartz实际调度及合成恢复23/23通过。完整浏览器矩阵和剩余通用基础设施继续执行，见[新验收记录](MES_BASE_REALIGNMENT_REPORT.md#2026-10-06-续接安全与-quartz-工作包验收)。
+最新实时基线：后端 main/4891535f735b18ca87918d8bcff1546663a53d02（用户期间新增提交）、前端 main/d2b19714cb5018d07fa3171b76585eab45b325ce；Agent未提交/推送/部署。用户启动类、profile/dev连接等调整保留；不能reset旧HEAD或裸启动未知Schema。
 
-注册/框架工作包已接入并完成实际API验收：注册29/29、开启验证码的一次性消费21/21，实验开关已恢复。后端verify-11、UI ui-check-8通过；浏览器导出、文件、监控和凭证交接继续，见[框架工作包](MES_BASE_REALIGNMENT_REPORT.md#2026-10-06-注册与框架兼容工作包)。
+本轮后端 runtime23/18081/backend-34.log，UI15174，Redis16379；原18080/15173保留。数据库是用户远程测试MySQL8.0.40，独立mes_base_phase1_*合成库。当前菜单系统管理/系统监控/系统工具及OpenAPI页面可查看；admin105仍显式PLATFORM，无Factory准入绑定。
 
-当前查看入口：UI `http://127.0.0.1:15174` → 本轮后端18081；原15173/18080仍为旧运行现场。用户指定的 `admin` 已创建（userId105），平台角色显式分配，实际登录通过；凭证不写文档。测试数据库是用户提供的远程测试 MySQL 8.0.40，本地应用连接本轮独立 schema；不能称本地 MySQL 实例或生产证据。
+本次工作包：安全59、注册29、验证码21；公告24、Quartz26、Swagger21；OpenAPI71+双库29+最小权限/输入18、数据范围策略7；V1–V10导出426字段/新空库5。最新标准Maven verify-22总100/97通过/3跳过，UI ui-check-12为21+build，packaged smoke-6为11。实际API、浏览器、Fixture、外部/生产边界分别记录，旧包没有统一重复到最新runtime。
 
-最新工作包、失败、运行版本与准确续接步骤见[报告当前执行快照](MES_BASE_REALIGNMENT_REPORT.md#2026-10-06-登录隔离与浏览器工作包续接快照)和[机器验收记录](../reviews/2026-10-06-phase1-verification.json)。本文下方旧“9工具类/未迁系统”的有效计划已由本节取代；历史 Codegen 门槛不再适用于迁移。
+OpenAPI按用户新决定：Source客户端/Token/API授权PORT，业务数据范围YAML默认关闭，开启需唯一通用MES校验器；没有ProRoute依赖/工艺范围页面。迁移仍忽略Codegen。SourceUI有原有OpenApiClient修改，新PORT使用提交HEAD，Source不改。
+
+当前规划顺序：已具备条件的基础设施/API工作包完成 → 补齐已确认的Source前端布局/导航/标签/设置迁移缺口，并完成相应交互验收 → 用户接手浏览器新凭证/重置/注册/导入提交，取得下载artifact后复核 → 汇总Phase1验收；MinIO/PDA/微信/集群/正式MES范围按实际授权/实例触发，不拿Fixture补生产证据。不要先开新MES Domain。前端来源复核见迁移报告“2026-10-06 前端迁移来源复核与表述纠正”，页面PORT不能替代完整外壳迁移。
+
+tab6已恢复用户新增表单：qa_ui_user_20261006、部门200、岗位2、空角色/正常/空密码；只读查询尚不存在。此前用户答复“稍后操作”不等于已保存，不能自动填写或提交新密码。tab7保留OpenAPI页面作为可见迁移入口。
+
+详细过程、失败、命令、服务处置和未验证项见[最新工作包报告](MES_BASE_REALIGNMENT_REPORT.md#2026-10-06-公告任务系统工具与-openapi-工作包验收)及[机器验收](../reviews/2026-10-06-phase1-verification.json)。本轮所有私有配置/身份在target，不能打印、清空或作为公司数据复制。
+
+> 下方第1–8节是2026-10-05初始P0/Codegen历史规划，保留追溯；其中“本轮只写规划/不迁Source/Codegen优先”不适用于当前Phase1。当前执行以本节和用户最新指令为准。
 
 ## 1. 下一阶段目标
 
@@ -293,3 +301,9 @@ P0-B核心验收通过：83项后端（其中3项真实MySQL）、18项UI/build�
 实际失败与处置：Druid wall 拒绝自动编码列表原 WHERE 1=1，已改 Source XML 的 where 结构，未放宽SQL防火墙；新任务控制器变量名与Druid SDK getter编译失败已修复；首次初始化V7重复添加Source原有start_time失败，仅在本轮自有空库确认无DDL应用后清除失败历史记录并重新迁移，原失败日志保留。UI一次启动误用全局Node18失败后明确切Node22；CHOKIDAR环境值没有使Vite8刷新旧模块，改显式 MES_DEV_WATCH_POLLING=true 的 watch消费者并仅重启本轮UI。组件加载/API响应异步导致过早读取DOM/填入查询框，已改为等待可见目标并限定弹窗；不能将这些尝试当作通过。
 
 剩余边界：完整浏览器矩阵、最新回归/打包 smoke、Source权限/会话撤销/锁、SSE、任务调度恢复、外部Minio实例、部署/生产。状态按实际证据逐项更新，不能提前宣告Phase1完成。
+
+### 2026-10-06 本轮工作包结束与下一步
+
+公告/任务/系统工具/SQL包完成，OpenAPI通用链路已PORT并完成真实API/双库/最小权限/策略开关验收；全Phase1仍MIGRATING。六模块/三菜单/426字段DDL和Source页面有可查看入口；SourceRoute/UserTask不伪装为通用已完成能力。
+
+续接先看本页有效计划和最新报告/JSON，核对两端实时HEAD、私有配置存在与服务归属。无需重跑所有旧历史包；当前代码/环境改变后按影响补验证。先检查qa_ui_user_20261006是否已由用户保存，再核对关联部门/岗位/空角色与实际登录；密码不从聊天收集。下载artifact、人接手凭证UI动作/外部实例未验收不得标完成。只管理本轮服务，不提交/推送/部署，不删除旧临时证据。

@@ -71,18 +71,6 @@ class MySqlDevelopmentTest {
         platform.close();
     }
 
-    @Test void migrationRepeatRestartAndConstraints() throws Exception {
-        var flyway=org.flywaydb.core.Flyway.configure().dataSource(platform).locations("classpath:db/platform").load();
-        flyway.migrate();assertEquals(0,flyway.migrate().migrationsExecuted);
-        try(var connection=platform.getConnection();var statement=connection.createStatement()) {
-            assertThrows(java.sql.SQLException.class,()->statement.execute("INSERT INTO sys_role(id,name,kind,factory_id,status) VALUES ('TEST_ONLY_INVALID','invalid','PLATFORM','A','ENABLED')"));
-        }
-        try(var restarted=pool(properties.getProperty("mes.platform.url"));var connection=restarted.getConnection();
-                var query=connection.prepareStatement("SELECT revision FROM platform_catalog_revision WHERE id=1");var rows=query.executeQuery()) {
-            assertTrue(rows.next());assertTrue(rows.getLong(1)>=0);
-        }
-    }
-
     @Test void distinctRuntimeOwnershipRollbackAndNoFallback() {
         try(var assembly=FactoryRuntimeConfiguration.prepare(factories,platform,Set.of(ProbeMapper.class),new dev.mesbase.server.DruidPools.Settings(0,0,2,5000,5000,30000,60000,300000,900000,"SELECT 1",true,false,false,"stat,wall"))) {
             var resolver=new ConfiguredBusinessPersistenceResolver(assembly.catalog(),assembly.bindings());
@@ -95,7 +83,7 @@ class MySqlDevelopmentTest {
             assertEquals("A",persistence.transaction(a,s->s.mapper(ProbeMapper.class).read("A")));
             assertThrows(FoundationException.class,()->persistence.transaction(null,s->null));
             assertThrows(FoundationException.class,()->persistence.transaction(new FactoryScope(new FactoryId("missing")),s->null));
-            assertThrows(FoundationException.class,()->persistence.transaction(a,s->s.mapper(dev.mesbase.infrastructure.platform.PlatformMapper.class)));
+            assertThrows(FoundationException.class,()->persistence.transaction(a,s->s.mapper(RuntimeFixture.PlatformMapper.class)));
             resolver.replace(Map.of());assertThrows(FoundationException.class,()->persistence.transaction(a,s->null));
         }
         var second=factories.get(1);var first=factories.get(0);

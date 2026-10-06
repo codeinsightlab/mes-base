@@ -315,3 +315,86 @@ SOURCE_PRODUCT_PORT：RegisterBody、SysRegisterService、SysRegisterController�
 macOS下OSHI/DiskArbitration读卷失败时，Server以JDK实际读取应用所在卷容量，返回明确diskSource；UI显示“当前应用所在卷”，不伪装全部挂载卷，也不填假0。该兼容分支保留Source字段，需要运行及UI验证。
 
 verify-11（同标准Maven命令）93/0fail/0error/3skip；ui-check-8（同Node22test/build命令）21/21和build通过。稳定runtime18，backend-26启动通过，27为临时验证码开启实验；28为恢复原dev配置后的当前main（18081）。Source只读，生成器未调用，没有新MES业务。浏览器剩余流程、最终smoke/DDL/来源与规划矩阵继续，整体MIGRATING。
+
+## 2026-10-06 公告、任务、系统工具与 OpenAPI 工作包验收
+
+### 实时基线和用户修改
+
+续接时后端 main/e292789a、UI main/d2b1971；期间检测到用户新增后端本地提交，当前 main/4891535f735b18ca87918d8bcff1546663a53d02，UI HEAD不变。Agent没有执行commit/push/deploy。用户将启动类移动为 dev.MesBaseApplication，并调整默认profile/dev连接；这些修改保留，POM适配启动类，HTTP测试显式关闭真实Runtime/System以保护用户环境。本轮应用始终加载私有 target/phase1/application-phase1.yml，不访问后来写入工作区dev的其他Schema。当前剩余差异继续保留，不能reset到续接旧HEAD。
+
+Source后端 master/310c6ef1bb37d2533fe893579ba837c353b76926干净；Source UI master/923d50ce35287c71ac7d1455bccbbfb8068e8e8a有原有 src/views/system/openApiClient/index.vue 修改。Source只读，OpenAPI页面/API实际从git show HEAD读取，逐文件来源清单记录HEAD哈希；当前清单392项，目标哈希一致。生成器实现与前包基线字节一致，迁移没有调用Codegen Skill/CLI。PDA/外部服务未宣称完成。
+
+### 公告、Quartz、Swagger、SQL
+
+公告媒体写权限错误地用userId匹配按username设计的授权服务，导致admin403；SysAttachmentServiceImpl两处改为服务端username。真实PNG上传/绑定公告、已发布/未发布、非owner当前查询权限、权限撤销、错误资源和绑定后删除拒绝共24/24；浏览器公告13与私有图片保存/回读。不是公共图片URL。
+
+Source暂停任务仍允许授权手动执行一次。DB claim统一入口增加manual参数，调度只领status0，手动允许status0/1，已有runToken仍409；新工作包26/26，前23/23快照保留。UI日志路由改为Source实际 /monitor/job-log/index?jobId=105；浏览器实际执行暂停任务105一次并看到成功日志21。该任务仍暂停；未交付集群JobStore/fire永久去重。
+
+系统工具补Source系统接口菜单/tool:swagger:view和Springdoc3.0.3/SwaggerUI5.33.1。SDK默认MVC入口关闭，显式受授权的 /api/tool/swagger/json 才提供文档；初包21/21，浏览器显示实际OpenAPI3.1和Source DTO。外部接口加入独立OpenApiBearer，Swagger外部请求不自动携带后台Token/选厂头，代理只到明确loopback目标。
+
+scripts/export-phase1-sql.py直接导出当前有序迁移/哈希，最新V1–V10导出为 target/phase1/sql/mysql-phase1.sql。真实测试MySQL8.0.40上新建自有空Schema mes_base_phase1_sql_20261006_c57ad0并导入，426字段的类型/默认值/可空/Extra/顺序与运行库一致，用户/角色为空，三模块菜单存在，5/5。首次V1–V8检查暴露缺系统工具菜单，失败及随后V9/V10结果保留。手工导入没有Flyway history，不能随后开启migrate重放；空库Flyway优先。
+
+### OpenAPI 的 Source PORT 与用户本轮决定
+
+用户明确要求迁移OpenAPI，Base放宽业务数据范围、预留验证开关，未来范围不绑定工艺。迁入common/openapi、system/openapi、framework/openapi、OpenApiClientController及Source提交中的Vue/API；52份Java/XML初次PORT后适配4份Source配置、安全链和通用策略扩展。保留Source表 open_api_client / open_api_client_api 的原字段、DTO/VO、分页、默认禁用、一次性Secret、行锁、启停/重置的credential_version、Redis Lua、当前MVC API目录和分组授权。Lombok展开为等价JavaBean；没有重新定义业务字段或生成CRUD。V10无账号、凭证或公司seed，无ProRoute/路线授权表。
+
+后台管理是显式PLATFORM list/query/add/edit/reset/authorize；新菜单不自动赋角色，测试通过正式Role API给自有角色100追加，所有已有菜单绑定保留，仍PLATFORM且无factoryId。外部客户端不是内部SysUser/Role，专用 /open-api/** 安全链保留客户端认证、当前API授权和限流；不能用内部Token调用，不能用外部Token进入系统管理。Foundation/Mapper/资源归属没有转成appKey内部账号或首厂兜底。
+
+YAML open-api.data-scope.enabled 默认false，可通过MES_OPEN_API_DATA_SCOPE_ENABLED/受控外部YAML开启。仅控制通用业务数据范围策略；开启必须提供唯一OpenApiDataScopeValidator Bean，否则启动失败。策略接收可信外部身份、API code、请求和HandlerMethod，未来MES可按实际领域表达范围。Source诊断方法的DataScopeIgnore仅跳过不读取业务数据的范围验证，认证/授权/限流不豁免。当前没有正式MES业务校验器或已开启的业务数据库闭环；纯策略调用/拒绝/诊断豁免7/7，真实缺策略开启启动失败符合预期。
+
+真实API包71/71覆盖创建/查询/分页/默认禁用、hash-only、无Secret详情、启停/重置/版本即时撤销、显式API授权和当前capabilities、8并发请求同Token复用、TTL、令牌撤销后不复用、内部/外部身份隔离、429与安全requestId、日志无Secret/Token、Source真实metadata/SDK。Source为重复申请复用同Token，受控Redis客户端记录保存恢复材料；SQL/日志不存明文Secret/Token，不能把此链误写成内部会话的hash-only value。普通API不续期，当前DB版本/权限每次检查。
+
+双库29/29：同一Redis上刻意构造同clientId/credential_version/API授权，mainToken在main成功、peer401，再回main成功；不是靠不存在client来宣称隔离。peer18082验收后停止，两个客户端均禁用，库/文件保留。补包18/18：list-only平台角色可读列表及页面开关，但详情/授权403；恢复原空角色后再次403；超长UTF8错误Secret401、缺凭证400，最终客户端禁用。新合成Role无用户绑定，不删除测试证据。
+
+浏览器已核对实际列表/详情、开关关闭、两组五个API/current grants、新建名称/备注/默认禁用表单和取消；没有自动提交浏览器新凭证或赋权保存。Secret创建/重置和授权保存的实际后端链路由独立API包验证；浏览器这些敏感提交仍未验证。截图见 docs/reviews/assets/2026-10-06-phase1/browser-openapi-detail.png、browser-openapi-grants.png。
+
+### 实际命令与结果
+
+| 工作包 | 实际命令 | 最新结果/证据 |
+| --- | --- | --- |
+| 标准后端门禁 | zsh -ic 'mvn -B -ntp verify' | verify-22.log：总100，97通过、0失败/错误、3跳过（framework7+admin93） |
+| UI门禁 | zsh -ic 'nvm use 22 >/dev/null && npm run test && npm run build' | ui-check-12.log：21/21，vue-tsc/Vite通过；已有大chunk提示保留 |
+| 当前打包smoke | zsh -ic '/usr/bin/python3 scripts/smoke-packaged.py' | smoke-6.log：11/11；当前runtime23/新启动类 |
+| 公告 ownership | /usr/bin/python3 target/phase1/accept-notice-ownership.py | notice-ownership-3.log，24/24 |
+| Quartz调度/恢复/暂停手动 | /usr/bin/python3 target/phase1/accept-quartz-schedule.py | quartz-schedule-5.log，26/26 |
+| Swagger | /usr/bin/python3 target/phase1/accept-swagger.py | swagger-1.log，21/21；随后OpenAPI71包复核外部SDK |
+| OpenAPI | /usr/bin/python3 target/phase1/accept-openapi.py | openapi-2.log，71/71，runtime22 |
+| OpenAPI双库 | /usr/bin/python3 target/phase1/accept-openapi-isolation.py | openapi-isolation-1.log，29/29，runtime22 |
+| OpenAPI最小权限/输入 | /usr/bin/python3 target/phase1/accept-openapi-boundaries.py | openapi-boundaries-1.log，18/18，runtime23 |
+| 开关缺策略负例 | java -jar target/phase1/phase1-runtime-22.jar --server.port=0 --server.address=127.0.0.1 --spring.profiles.active=dev --spring.config.additional-location=file:target/phase1/application-phase1.yml --open-api.data-scope.enabled=true | openapi-missing-policy.log：预期失败，未开始服务 |
+| SQL导出/空库metadata比对 | /usr/bin/python3 scripts/export-phase1-sql.py；/usr/bin/python3 target/phase1/verify-sql-export.py | sql-export-3.log，5/5，V1–V10/426字段 |
+| 生成器保留 | 基线DefaultMesCodegenService与mes-generator当前文件逐字节/SHA256比较 | acceptance-codegen-preservation.json；未调用生成工具 |
+
+所有HTTP/SQL为本机应用连接用户远程测试MySQL、独立Schema和合成数据；不是本地MySQL实例、部署或生产验收。早期包仍按原版本/时间记录，不把所有旧包写成最新runtime重新跑过。最后仅页面开关查询权限调整，runtime23补包18证明，未重复全71矩阵。
+
+失败保留：verify-19的PORT展开漏泛型类型注解字段getter，补getApiCodes/setApiCodes后verify-20/21/22通过。OpenAPI首包把Source业务枚举非法状态预期写成400，实际422符合当前SourceBusiness契约；保留first-attempt JSON，修正验收预期后71/71，没有为了测试改Source失败语义。notice首两包分别连接尚未启动服务、缺必需role布尔字段；随后24/24。verify-14缓存权限、15–17默认profile/真实runtime继承测试环境问题记录保留，显式测试隔离后18及当前22通过。浏览器冷依赖优化/Vite重启导致内存Token清空后重新登录，未认作后台认证失败；新凭证表单已重备。
+
+### 浏览器、当前运行与未验证边界
+
+当前记录补用户状态关/开、原角色保存回用户页、关闭注册提示、导入file chooser取消、私有文件上传/删除取消、公告私有PNG、暂停任务手动/日志、Server真实OSHI8卷、Redis INFO、Druid真实SQL/Wall、本人站内消息发送/已读、编码预览/生成/组成、本人资料同值保存和合成头像裁剪上传、操作日志详情安全空参数、登录查询与在线会话。API成功与浏览器完成分别记录。Source日志未采集请求/响应体；没有为验证强退其他会话。
+
+浏览器导出/私有文件下载两次未获得工具download artifact（NOT_VERIFIED），实际API已验OOXML/文件字节，不能互相冒充。用户创建/重置密码/注册/导入最终提交仍需用户亲自完成。qa_ui_user_20261006最后只读查询不存在；tab6已重备昵称/部门200/岗位2/空角色/正常/空密码表单，标handoff，无新密码输入或提交。MinIO实例、PDA设备/微信渠道、Redis Cluster、正式MES数据范围、集群调度、部署/生产未验证；Source UserTask依赖业务单据后置，Generator保持后置。整体Phase1仍MIGRATING，不把敏感UI步骤写成通过。
+
+当前本轮后端18081 PID76918/TTY70052：runtime23、backend-34.log；启动命令 zsh -ic 'exec java -jar target/phase1/phase1-runtime-23.jar --server.port=18081 --server.address=127.0.0.1 --spring.profiles.active=dev --spring.config.additional-location=file:target/phase1/application-phase1.yml'。UI15174/Node22/ui-runtime-4.log、Redis16379仍运行供查看；peer18082已停止。原18080 PID55129/15173 PID52881未动。只停止已证明属于本轮的服务，不能按端口杀原服务。私有身份/连接文件0600，路径仅作续接，不在文档输出内容。
+
+回滚本轮未提交差异须先核对新HEAD/用户修改；已应用V10不能改写旧版本或删除表掩盖历史，使用后续迁移。保留旧Schema、target脚本/失败/截图；未经用户授权不删除。README/UI README/platform/SQL指南、来源许可、矩阵/盘点/规划和机器验收同步更新；业务领域没有修改。
+
+## 2026-10-06 前端迁移来源复核与表述纠正
+
+用户询问“前端没有迁移是自己重构的吗”。本次只核对源码与纠正文档，没有修改前端实现、启动/停止服务或提交。实时后端main/4891535f、前端main/d2b1971及原有工作区差异均保留。
+
+源码结论：当前前端是**Source系统页面PORT + 既有Base自写框架**，没有完整沿用Source前端架构。此前“前端已迁入”“完整Source系统页面”等概括不能作为整体前端迁移完成的证明。
+
+| 范围 | 本次直接证据 | 准确结论 |
+| --- | --- | --- |
+| 用户管理页面 | Source与Base的src/views/system/user/index.vue均包含部门树、原查询字段、同顺序表格、增改/导入导出/授权弹窗；Base保留Options API并将slot-scope/.sync/.native等适配到Vue3 | 该页面确有旧源码迁入，不是用通用CrudPage重新生成；本次抽样不等于全功能逐项验收 |
+| 分页及表格工具 | Source与Base的src/components/Pagination/index.vue、RightToolbar/index.vue结构和方法对应，事件/图标/Element Plus语法调整 | 通用组件中有直接PORT |
+| 主布局、导航与标签 | Source src/layout/index.vue组合Sidebar/Navbar/TagsView/AppMain/RightPanel/Settings；Base src/App.vue直接实现app-shell/aside/header和简单tags，src/components/SidebarNode.vue为新递归组件，当前无src/layout | 主外壳是Base自写实现，Source布局组件及完整折叠/设置/标签交互未迁入 |
+| 路由及状态管理 | Source src/store/modules/app.js/settings.js/tagsView.js/permission.js与layout组件配套；Base使用src/router.ts、lib/dynamicRoutes.ts和stores/auth.ts | Router4/Pinia对应实现由Base重写，不能称Source模块直接搬迁 |
+| 登录外观和请求基础 | Base src/views/Login.vue为script setup登录卡片，src/utils/request.ts调用自有lib/request、systemPlugin.ts提供兼容接口 | 沿用部分Source输入/验证码/接口契约，但外观和底层实现有重新实现部分 |
+
+来源清单有119条前端关联项，原来统一标PORT且使用同一通用changes描述；路径和SHA256只能证明所比较的文件及当前字节，不能证明实现继承或功能完整。App.vue和Login.vue现按已证实的Base重写标REDESIGN、Source仅作为比较依据；请求包装器注明Base传输上的Source契约适配。其他未逐项复核项不因此次抽样自动取得完整迁移结论。
+
+整体缺口明确保留：Source Layout/Navbar/Sidebar/TagsView/Settings及配套外观/交互尚未完整迁入。这是产品迁移缺口；Vue3页面适配和之前API/构建测试通过不能替代它。Factory选择、内存凭证和Scope/权限等行为可以在迁入旧结构时保留，不能据此将全新外壳算作原架构迁移。
+
+方法与边界：读取两端Git状态/HEAD，以sed/cat对照上述实际Source/Base文件，Python统计来源条目；Source只读。同步修正UI README、来源清单和有效交接计划，仅文档变化，执行JSON解析和git diff --check，不重跑前次已通过的构建/HTTP/浏览器门禁。本次没有浏览器截图对比或全119项语义审查，不改变既有各包的实际测试记录。

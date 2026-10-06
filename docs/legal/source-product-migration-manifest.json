@@ -2557,10 +2557,11 @@
       "target": "/Users/user/work/lixin/mes-base-ui/src/App.vue",
       "sourceSha256": "e10b985b040b7ead936b6d713372c3f5c88559c5c797ceaf073b21b8f99857a2",
       "targetSha256": "0e61b34623b82ddaa9476b2aa163519d2dec4be65fbefeb6df870987472de7ee",
-      "strategy": "PORT",
+      "strategy": "REDESIGN",
       "changes": [
-        "Source fields, queries and workflows retained; Vue3/Element Plus/Pinia/private transport and permission contracts adapted."
-      ]
+        "Existing Base App implements its own shell/sidebar/header/tags; Source App/layout is not fully ported. Classification corrected by direct code comparison on 2026-10-06; target implementation unchanged."
+      ],
+      "sourceRole": "comparison reference, not inherited layout implementation"
     },
     {
       "sourceProduct": "/Users/user/work/heri/ktg-mes-ui",
@@ -2607,7 +2608,7 @@
       "targetSha256": "18b365b6de1679c70f5e94df65d6a765bfb517c636d5b0333d56d340e550cab3",
       "strategy": "PORT",
       "changes": [
-        "Source fields, queries and workflows retained; Vue3/Element Plus/Pinia/private transport and permission contracts adapted."
+        "Source request parameter and response contracts adapted on top of existing Base lib/request transport; not a direct port of Source Axios implementation."
       ]
     },
     {
@@ -2653,10 +2654,11 @@
       "target": "/Users/user/work/lixin/mes-base-ui/src/views/Login.vue",
       "sourceSha256": "74fa44999fe696b81d6802bb5ae86848cf52a71b9cfed0fa048933900cda7d5f",
       "targetSha256": "00b0a172cffd6696da8c45e223dce7e197989385408f960fa3e2987992bb750e",
-      "strategy": "PORT",
+      "strategy": "REDESIGN",
       "changes": [
-        "Source fields, queries and workflows retained; Vue3/Element Plus/Pinia/private transport and permission contracts adapted."
-      ]
+        "Base script-setup login card and auth store retained; Source input/captcha/registration contracts adapted, original Source login appearance and implementation not copied. Classification corrected on 2026-10-06; target implementation unchanged."
+      ],
+      "sourceRole": "authentication capability and contract reference; UI implementation rewritten"
     },
     {
       "sourceProduct": "/Users/user/work/heri/ktg-mes-ui",
@@ -3564,10 +3566,608 @@
       "sourceHead": "923d50ce35287c71ac7d1455bccbbfb8068e8e8a",
       "target": "/Users/user/work/lixin/mes-base-ui/src/views/tool/swagger/index.vue",
       "sourceSha256": "51264131f27dcd28fff7d03c5091ee0d552599ea5e1826457c517e8f21731b75",
-      "targetSha256": "798c8528c9ea3acb48d7538671d94bb9f11519076513872fa77316328d455d8f",
+      "targetSha256": "03c157b5298133d4e99a44515210dc5392fdbd177826db721840225c95ed61f7",
       "strategy": "PORT",
       "changes": [
         "Source fields, queries and workflows retained; Vue3/Element Plus/Pinia/private transport and permission contracts adapted."
+      ]
+    },
+    {
+      "source": "ktg-common/src/main/java/com/ktg/common/openapi/OpenApiError.java",
+      "target": "mes-common/src/main/java/dev/mesbase/common/openapi/OpenApiError.java",
+      "sourceSha256": "d8b8dd501d22a8fee3287d27c9522a7a021c00015b7e2ac90942f32c4efa8c8f",
+      "targetSha256": "bc72ed8d66e2aa863c40b8675448486269729127b09a1bc264a4db51ea3cd2ea",
+      "strategy": "PORT",
+      "changes": [
+        "Source Product generic contracts retained; namespace, Java21/Boot4/Jakarta, explicit DTO/VO, ownership, permissions, safe errors and integration boundaries adapted as recorded in migration matrix."
+      ]
+    },
+    {
+      "source": "ktg-common/src/main/java/com/ktg/common/openapi/OpenApiPrincipal.java",
+      "target": "mes-common/src/main/java/dev/mesbase/common/openapi/OpenApiPrincipal.java",
+      "sourceSha256": "24bc56a1432c80644a9f21c9ebc3885a75a0baf8db4b5ce2483c542bf72317d9",
+      "targetSha256": "4565e5b28f63c71120ee71720f18e310f0082e66a6c6bd76111a537bca74a83b",
+      "strategy": "PORT",
+      "changes": [
+        "Source Product generic contracts retained; namespace, Java21/Boot4/Jakarta, explicit DTO/VO, ownership, permissions, safe errors and integration boundaries adapted as recorded in migration matrix."
+      ]
+    },
+    {
+      "source": "ktg-common/src/main/java/com/ktg/common/openapi/OpenApiEndpoint.java",
+      "target": "mes-common/src/main/java/dev/mesbase/common/openapi/OpenApiEndpoint.java",
+      "sourceSha256": "f3c9c12ec637e1a52ff46e1656b93c1efef9f28c82e8a54afbe5a4fcca86cb4d",
+      "targetSha256": "296ac26da89613344874971cfdeab6f253c50fc8ba0505abe332b65177f15be0",
+      "strategy": "PORT",
+      "changes": [
+        "Source Product generic contracts retained; namespace, Java21/Boot4/Jakarta, explicit DTO/VO, ownership, permissions, safe errors and integration boundaries adapted as recorded in migration matrix."
+      ]
+    },
+    {
+      "source": "ktg-common/src/main/java/com/ktg/common/openapi/OpenApiDataScopeIgnore.java",
+      "target": "mes-common/src/main/java/dev/mesbase/common/openapi/OpenApiDataScopeIgnore.java",
+      "sourceSha256": "af1fa0ec4b02aa2eba0084843ff47b80fd8d55b57411f9a9fa17e1f868c83f6f",
+      "targetSha256": "6d46f227ca5f482a68c2a20c1c0752814d5bba570054e7605323c9ab026ad910",
+      "strategy": "PORT",
+      "changes": [
+        "Source Product generic contracts retained; namespace, Java21/Boot4/Jakarta, explicit DTO/VO, ownership, permissions, safe errors and integration boundaries adapted as recorded in migration matrix."
+      ]
+    },
+    {
+      "source": "ktg-common/src/main/java/com/ktg/common/openapi/OpenApiException.java",
+      "target": "mes-common/src/main/java/dev/mesbase/common/openapi/OpenApiException.java",
+      "sourceSha256": "a99ee675ba02335926d9a9e717a20c8af3444fb43436385986fe2a289c03fe77",
+      "targetSha256": "5d9c4751a406c639add50ccbaf8e4ac59c48d5b5942b63fbf63cc784602f3ea5",
+      "strategy": "PORT",
+      "changes": [
+        "Source Product generic contracts retained; namespace, Java21/Boot4/Jakarta, explicit DTO/VO, ownership, permissions, safe errors and integration boundaries adapted as recorded in migration matrix."
+      ]
+    },
+    {
+      "source": "ktg-system/src/main/resources/mapper/openapi/OpenApiClientExtraMapper.xml",
+      "target": "mes-system/src/main/resources/dev/mesbase/system/openapi/mapper/OpenApiClientExtraMapper.xml",
+      "sourceSha256": "46ad6077884b9ae20f612d13031ac7690fe8e5662b6af565b6afa69ed636da26",
+      "targetSha256": "9308cd538179b2d01a3757ff9ee0437b8ade3a4fb3d1aa2acf2300290ae78e06",
+      "strategy": "PORT",
+      "changes": [
+        "Source Product generic contracts retained; namespace, Java21/Boot4/Jakarta, explicit DTO/VO, ownership, permissions, safe errors and integration boundaries adapted as recorded in migration matrix."
+      ]
+    },
+    {
+      "source": "ktg-system/src/main/resources/mapper/openapi/OpenApiClientApiMapper.xml",
+      "target": "mes-system/src/main/resources/dev/mesbase/system/openapi/mapper/OpenApiClientApiMapper.xml",
+      "sourceSha256": "910aea491a4ce268ad7a640b36ea3504397fd0d2cdfc4e05db696706e0cd5a66",
+      "targetSha256": "c94d67db3edf140e2e9692284aa8eacd8d5a74a41f253e8aa78e7fc192730d62",
+      "strategy": "PORT",
+      "changes": [
+        "Source Product generic contracts retained; namespace, Java21/Boot4/Jakarta, explicit DTO/VO, ownership, permissions, safe errors and integration boundaries adapted as recorded in migration matrix."
+      ]
+    },
+    {
+      "source": "ktg-system/src/main/resources/mapper/openapi/OpenApiClientMapper.xml",
+      "target": "mes-system/src/main/resources/dev/mesbase/system/openapi/mapper/OpenApiClientMapper.xml",
+      "sourceSha256": "8cd3992aa371ffdf02d3605ba1dde37cd232edbe370dcb056eb72af0a557a40f",
+      "targetSha256": "49c01a9c4cd4901faac1ddec4b44976da28bb2df02155d963ea05c5bd0aefd44",
+      "strategy": "PORT",
+      "changes": [
+        "Source Product generic contracts retained; namespace, Java21/Boot4/Jakarta, explicit DTO/VO, ownership, permissions, safe errors and integration boundaries adapted as recorded in migration matrix."
+      ]
+    },
+    {
+      "source": "ktg-system/src/main/java/com/ktg/system/openapi/dto/OpenApiCredentialRequest.java",
+      "target": "mes-system/src/main/java/dev/mesbase/system/openapi/dto/OpenApiCredentialRequest.java",
+      "sourceSha256": "4e68fc349729614e94fdf8d42fe9c128316a34a513f1bcfc6c49fdc0e0d370cf",
+      "targetSha256": "852877a8f220540f7d52fa7c9ddc3921fd956a52ce399597966448df34fea7d7",
+      "strategy": "PORT",
+      "changes": [
+        "Source Product generic contracts retained; namespace, Java21/Boot4/Jakarta, explicit DTO/VO, ownership, permissions, safe errors and integration boundaries adapted as recorded in migration matrix."
+      ]
+    },
+    {
+      "source": "ktg-system/src/main/java/com/ktg/system/openapi/dto/OpenApiClientIdRequest.java",
+      "target": "mes-system/src/main/java/dev/mesbase/system/openapi/dto/OpenApiClientIdRequest.java",
+      "sourceSha256": "c5a570662b3f192af4b756d52d7368cf76a3c7639235f98163631afa53b48949",
+      "targetSha256": "fd6cccfdca884cffef0e1bec2ce4ad68a13a4b4b056a3462894fa39ffaa9d7b5",
+      "strategy": "PORT",
+      "changes": [
+        "Source Product generic contracts retained; namespace, Java21/Boot4/Jakarta, explicit DTO/VO, ownership, permissions, safe errors and integration boundaries adapted as recorded in migration matrix."
+      ]
+    },
+    {
+      "source": "ktg-system/src/main/java/com/ktg/system/openapi/dto/OpenApiAuthorizationQuery.java",
+      "target": "mes-system/src/main/java/dev/mesbase/system/openapi/dto/OpenApiAuthorizationQuery.java",
+      "sourceSha256": "d6b9556143a6de83312650eea98fe0cd3edab26e5f6adff11a4d234a7edebf10",
+      "targetSha256": "7a63b203af044fd4ea8b56d836415ea0b2235194ef344cdde22e895b5b9a7cce",
+      "strategy": "PORT",
+      "changes": [
+        "Source Product generic contracts retained; namespace, Java21/Boot4/Jakarta, explicit DTO/VO, ownership, permissions, safe errors and integration boundaries adapted as recorded in migration matrix."
+      ]
+    },
+    {
+      "source": "ktg-system/src/main/java/com/ktg/system/openapi/dto/OpenApiClientApisRequest.java",
+      "target": "mes-system/src/main/java/dev/mesbase/system/openapi/dto/OpenApiClientApisRequest.java",
+      "sourceSha256": "7b33bcb33a25b971ed1b91c4ab610d916682c8b84b37e60bc5d5550cc2342cc8",
+      "targetSha256": "42a9de8e0dddc43ddafe62d19415986bce6663a27d7b1c7fcda4f7b738aa4962",
+      "strategy": "PORT",
+      "changes": [
+        "Source Product generic contracts retained; namespace, Java21/Boot4/Jakarta, explicit DTO/VO, ownership, permissions, safe errors and integration boundaries adapted as recorded in migration matrix."
+      ]
+    },
+    {
+      "source": "ktg-system/src/main/java/com/ktg/system/openapi/dto/OpenApiClientStatusRequest.java",
+      "target": "mes-system/src/main/java/dev/mesbase/system/openapi/dto/OpenApiClientStatusRequest.java",
+      "sourceSha256": "351917f17dc5dd37b6096a507af3a78fdc445f35bc8f391efd6da9112fe8019c",
+      "targetSha256": "ff938f8fb77d43b63c1d65b9f6d456b8a2522cb12c9a4366593fc9916cffec98",
+      "strategy": "PORT",
+      "changes": [
+        "Source Product generic contracts retained; namespace, Java21/Boot4/Jakarta, explicit DTO/VO, ownership, permissions, safe errors and integration boundaries adapted as recorded in migration matrix."
+      ]
+    },
+    {
+      "source": "ktg-system/src/main/java/com/ktg/system/openapi/dto/OpenApiTokenCheck.java",
+      "target": "mes-system/src/main/java/dev/mesbase/system/openapi/dto/OpenApiTokenCheck.java",
+      "sourceSha256": "c6a8f8d0f552501c0301c268fa5b8f05e4f091dd22569003d2ce7daabc175e56",
+      "targetSha256": "20b035bc5cf8b4ad2130b4e2d1fd364e5eb6a80721379c4306fd0424d2d5acd7",
+      "strategy": "PORT",
+      "changes": [
+        "Source Product generic contracts retained; namespace, Java21/Boot4/Jakarta, explicit DTO/VO, ownership, permissions, safe errors and integration boundaries adapted as recorded in migration matrix."
+      ]
+    },
+    {
+      "source": "ktg-system/src/main/java/com/ktg/system/openapi/dto/OpenApiClientListRequest.java",
+      "target": "mes-system/src/main/java/dev/mesbase/system/openapi/dto/OpenApiClientListRequest.java",
+      "sourceSha256": "c2c6bed1b5d751e30575a6d92a075e68f4917839f090db170e4cee6fdc37a3ab",
+      "targetSha256": "195534e5aec10f493bf457b12b8a23244c4d4d5ba2e32f0f7ba821d9c1679575",
+      "strategy": "PORT",
+      "changes": [
+        "Source Product generic contracts retained; namespace, Java21/Boot4/Jakarta, explicit DTO/VO, ownership, permissions, safe errors and integration boundaries adapted as recorded in migration matrix."
+      ]
+    },
+    {
+      "source": "ktg-system/src/main/java/com/ktg/system/openapi/dto/OpenApiClientCreateRequest.java",
+      "target": "mes-system/src/main/java/dev/mesbase/system/openapi/dto/OpenApiClientCreateRequest.java",
+      "sourceSha256": "a614930d106d605826f8b0a8923f9c6b5d1de2703e0d6bdfe96c2f186d59d2ce",
+      "targetSha256": "0380825ee621ee41d364f7157853e06903c482beb5dd3a2d0faf761011b2bb24",
+      "strategy": "PORT",
+      "changes": [
+        "Source Product generic contracts retained; namespace, Java21/Boot4/Jakarta, explicit DTO/VO, ownership, permissions, safe errors and integration boundaries adapted as recorded in migration matrix."
+      ]
+    },
+    {
+      "source": "ktg-system/src/main/java/com/ktg/system/openapi/vo/OpenApiClientVo.java",
+      "target": "mes-system/src/main/java/dev/mesbase/system/openapi/vo/OpenApiClientVo.java",
+      "sourceSha256": "369b773c47a68a59c8e74a70f85ce46f95f624050fa9e525799cb018c181028e",
+      "targetSha256": "e2133407a3e09c0a2d154a7baa4a328edb6569454ab221c82af04114dc44b26a",
+      "strategy": "PORT",
+      "changes": [
+        "Source Product generic contracts retained; namespace, Java21/Boot4/Jakarta, explicit DTO/VO, ownership, permissions, safe errors and integration boundaries adapted as recorded in migration matrix."
+      ]
+    },
+    {
+      "source": "ktg-system/src/main/java/com/ktg/system/openapi/vo/OpenApiSecretVo.java",
+      "target": "mes-system/src/main/java/dev/mesbase/system/openapi/vo/OpenApiSecretVo.java",
+      "sourceSha256": "55425f56c46fd7deabcec07660fb619e1732c56dacf64439db132b3161988570",
+      "targetSha256": "d56356475776a17a28c807309661cf4b71ec96902d4b835077cb1914412ecece",
+      "strategy": "PORT",
+      "changes": [
+        "Source Product generic contracts retained; namespace, Java21/Boot4/Jakarta, explicit DTO/VO, ownership, permissions, safe errors and integration boundaries adapted as recorded in migration matrix."
+      ]
+    },
+    {
+      "source": "ktg-system/src/main/java/com/ktg/system/openapi/vo/OpenApiClientPageVo.java",
+      "target": "mes-system/src/main/java/dev/mesbase/system/openapi/vo/OpenApiClientPageVo.java",
+      "sourceSha256": "c91c1818b8c8b98f5192828c14f17a4bb2ac80f0836871c7faf635918ce558f9",
+      "targetSha256": "7284b3fec7aad621f140ac2bdd6002cbf27725ef05a7d955fc76b2b5b0defbfe",
+      "strategy": "PORT",
+      "changes": [
+        "Source Product generic contracts retained; namespace, Java21/Boot4/Jakarta, explicit DTO/VO, ownership, permissions, safe errors and integration boundaries adapted as recorded in migration matrix."
+      ]
+    },
+    {
+      "source": "ktg-system/src/main/java/com/ktg/system/openapi/mapper/OpenApiClientMapper.java",
+      "target": "mes-system/src/main/java/dev/mesbase/system/openapi/mapper/OpenApiClientMapper.java",
+      "sourceSha256": "92e77d892205b72a450a793e85071f788f803b0633615f932cbe0cc2fb8b050c",
+      "targetSha256": "5fe894088b3b3d2c9e076ecb0a3a02273dd757b0d3b272c00e8784c895cf3c9d",
+      "strategy": "PORT",
+      "changes": [
+        "Source Product generic contracts retained; namespace, Java21/Boot4/Jakarta, explicit DTO/VO, ownership, permissions, safe errors and integration boundaries adapted as recorded in migration matrix."
+      ]
+    },
+    {
+      "source": "ktg-system/src/main/java/com/ktg/system/openapi/mapper/OpenApiClientExtraMapper.java",
+      "target": "mes-system/src/main/java/dev/mesbase/system/openapi/mapper/OpenApiClientExtraMapper.java",
+      "sourceSha256": "d870ef913e090a1c556aadb8141f51f5b648c5db0bc1b8a3e9ef65613b6b3fdf",
+      "targetSha256": "1da5d3c91c6ed71f67fd8bd5aeba8321179415029a02856c167fe4496bda7864",
+      "strategy": "PORT",
+      "changes": [
+        "Source Product generic contracts retained; namespace, Java21/Boot4/Jakarta, explicit DTO/VO, ownership, permissions, safe errors and integration boundaries adapted as recorded in migration matrix."
+      ]
+    },
+    {
+      "source": "ktg-system/src/main/java/com/ktg/system/openapi/mapper/OpenApiClientApiMapper.java",
+      "target": "mes-system/src/main/java/dev/mesbase/system/openapi/mapper/OpenApiClientApiMapper.java",
+      "sourceSha256": "d155873ce7e74fb47c0e0a3b43a7341111f74ba6979e2bb7fff1df23a114bbb8",
+      "targetSha256": "65cfdc9b424807edec2fe264c2b37c15a85ee61a3214b1cc241605789fe3f0d9",
+      "strategy": "PORT",
+      "changes": [
+        "Source Product generic contracts retained; namespace, Java21/Boot4/Jakarta, explicit DTO/VO, ownership, permissions, safe errors and integration boundaries adapted as recorded in migration matrix."
+      ]
+    },
+    {
+      "source": "ktg-system/src/main/java/com/ktg/system/openapi/service/OpenApiClientService.java",
+      "target": "mes-system/src/main/java/dev/mesbase/system/openapi/service/OpenApiClientService.java",
+      "sourceSha256": "7062efc30cf5ffaa6a4c0fc3a7bc4530b0ae1ac6edf0e576bddddc114966dc7a",
+      "targetSha256": "68c08a451afae047b7e0331426e681a6506e52306f7bbd21fccbf7887c07f59b",
+      "strategy": "PORT",
+      "changes": [
+        "Source Product generic contracts retained; namespace, Java21/Boot4/Jakarta, explicit DTO/VO, ownership, permissions, safe errors and integration boundaries adapted as recorded in migration matrix."
+      ]
+    },
+    {
+      "source": "ktg-system/src/main/java/com/ktg/system/openapi/domain/OpenApiClientStatus.java",
+      "target": "mes-system/src/main/java/dev/mesbase/system/openapi/domain/OpenApiClientStatus.java",
+      "sourceSha256": "a3e279936964e7d064143392f86014b558496c1f8cd5344f81f5a2369bf058e6",
+      "targetSha256": "be4d6061a14e751e486db7440dc26207afdc69841974b78907e73e463934051e",
+      "strategy": "PORT",
+      "changes": [
+        "Source Product generic contracts retained; namespace, Java21/Boot4/Jakarta, explicit DTO/VO, ownership, permissions, safe errors and integration boundaries adapted as recorded in migration matrix."
+      ]
+    },
+    {
+      "source": "ktg-system/src/main/java/com/ktg/system/openapi/domain/OpenApiClientApi.java",
+      "target": "mes-system/src/main/java/dev/mesbase/system/openapi/domain/OpenApiClientApi.java",
+      "sourceSha256": "d3c6875133eed0fd84692975d5de87cc3eb8b8dcfa140aa2974550fcbb53870a",
+      "targetSha256": "1a52d3e32f75d4684b58322353f8c6a282a4f0207d52dd2eb7026fabd3b66293",
+      "strategy": "PORT",
+      "changes": [
+        "Source Product generic contracts retained; namespace, Java21/Boot4/Jakarta, explicit DTO/VO, ownership, permissions, safe errors and integration boundaries adapted as recorded in migration matrix."
+      ]
+    },
+    {
+      "source": "ktg-system/src/main/java/com/ktg/system/openapi/domain/OpenApiClient.java",
+      "target": "mes-system/src/main/java/dev/mesbase/system/openapi/domain/OpenApiClient.java",
+      "sourceSha256": "3bb0d48071ebc886218143a132aec46927f7d23cbf638fda80587490a89e4ca7",
+      "targetSha256": "9070006c6c0642116f2f7f99065360e9702c257df7c5361ba0c160f4f1bf721e",
+      "strategy": "PORT",
+      "changes": [
+        "Source Product generic contracts retained; namespace, Java21/Boot4/Jakarta, explicit DTO/VO, ownership, permissions, safe errors and integration boundaries adapted as recorded in migration matrix."
+      ]
+    },
+    {
+      "source": "ktg-system/src/main/java/com/ktg/system/openapi/domain/OpenApiCredentialChange.java",
+      "target": "mes-system/src/main/java/dev/mesbase/system/openapi/domain/OpenApiCredentialChange.java",
+      "sourceSha256": "333a58572eafae5d18d812d960e3877b96dbec2864ff1430ab86c55404ca2b78",
+      "targetSha256": "7fe30e926f8ab0fa6e6f24527fe9cb274344ce0ca6d30c807ec733cab93b62ea",
+      "strategy": "PORT",
+      "changes": [
+        "Source Product generic contracts retained; namespace, Java21/Boot4/Jakarta, explicit DTO/VO, ownership, permissions, safe errors and integration boundaries adapted as recorded in migration matrix."
+      ]
+    },
+    {
+      "source": "ktg-framework/src/main/java/com/ktg/framework/openapi/OpenApiClientTokenRecord.java",
+      "target": "mes-framework/src/main/java/dev/mesbase/framework/openapi/OpenApiClientTokenRecord.java",
+      "sourceSha256": "91c3b37fd3e6c68cd30271c9fa0acb8c1e9032e8613ab10f2e09a5400c528e95",
+      "targetSha256": "f8189abb0859dbd076814d879448cf07e981574be3213457e7f9e5c8fe8793c8",
+      "strategy": "PORT",
+      "changes": [
+        "Source Product generic contracts retained; namespace, Java21/Boot4/Jakarta, explicit DTO/VO, ownership, permissions, safe errors and integration boundaries adapted as recorded in migration matrix."
+      ]
+    },
+    {
+      "source": "ktg-framework/src/main/java/com/ktg/framework/openapi/OpenApiSecurityConfig.java",
+      "target": "mes-framework/src/main/java/dev/mesbase/framework/openapi/OpenApiSecurityConfig.java",
+      "sourceSha256": "bfdfdeb5671e313d87219cdb55b24df427e941657b4e1bac9c5a171f2834a4ac",
+      "targetSha256": "56c7e701974aa32ec0d5d48d3f10301f958449d5a99c1400486a887d09e45354",
+      "strategy": "PORT",
+      "changes": [
+        "Source Product generic contracts retained; namespace, Java21/Boot4/Jakarta, explicit DTO/VO, ownership, permissions, safe errors and integration boundaries adapted as recorded in migration matrix."
+      ]
+    },
+    {
+      "source": "ktg-framework/src/main/java/com/ktg/framework/openapi/OpenApiDiagnosticsController.java",
+      "target": "mes-framework/src/main/java/dev/mesbase/framework/openapi/OpenApiDiagnosticsController.java",
+      "sourceSha256": "4976669ba4c9dcdafcae7ecd937c3b3a67178d6281e8cbb7836f4b8eb2f69b17",
+      "targetSha256": "e2493c0e626e6bc22f2a1283fe2da57b35f4575ef09d40e4509ec5dde58c707b",
+      "strategy": "PORT",
+      "changes": [
+        "Source Product generic contracts retained; namespace, Java21/Boot4/Jakarta, explicit DTO/VO, ownership, permissions, safe errors and integration boundaries adapted as recorded in migration matrix."
+      ]
+    },
+    {
+      "source": "ktg-framework/src/main/java/com/ktg/framework/openapi/OpenApiExceptionResolver.java",
+      "target": "mes-framework/src/main/java/dev/mesbase/framework/openapi/OpenApiExceptionResolver.java",
+      "sourceSha256": "7ab4f74b9f3d089a52ea4a2b4048373123e4b037650c6a10f2a7e2dd400fc8f2",
+      "targetSha256": "fc2227308d830d361c90f11f350416105a0ae0d2c772ae6cdc1b07b28eac9540",
+      "strategy": "PORT",
+      "changes": [
+        "Source Product generic contracts retained; namespace, Java21/Boot4/Jakarta, explicit DTO/VO, ownership, permissions, safe errors and integration boundaries adapted as recorded in migration matrix."
+      ]
+    },
+    {
+      "source": "ktg-framework/src/main/java/com/ktg/framework/openapi/OpenApiDocumentResponse.java",
+      "target": "mes-framework/src/main/java/dev/mesbase/framework/openapi/OpenApiDocumentResponse.java",
+      "sourceSha256": "bd931f8fc4605e92059a88f0803836c1c34ac772d33eb43374588c281a7f528c",
+      "targetSha256": "10fec333c513b1a12aab373c19d7550ba24af3f262baacee170870c17c8d9980",
+      "strategy": "PORT",
+      "changes": [
+        "Source Product generic contracts retained; namespace, Java21/Boot4/Jakarta, explicit DTO/VO, ownership, permissions, safe errors and integration boundaries adapted as recorded in migration matrix."
+      ]
+    },
+    {
+      "source": "ktg-framework/src/main/java/com/ktg/framework/openapi/OpenApiTokenService.java",
+      "target": "mes-framework/src/main/java/dev/mesbase/framework/openapi/OpenApiTokenService.java",
+      "sourceSha256": "9bb08b354d9261b87f987ea0f9b31d8d3b14954ca21d607a4db18465eab46371",
+      "targetSha256": "d809677f46f94a2b67c22a57c38364e60433b28d95126a633b03cdbd65e1818a",
+      "strategy": "PORT",
+      "changes": [
+        "Source Product generic contracts retained; namespace, Java21/Boot4/Jakarta, explicit DTO/VO, ownership, permissions, safe errors and integration boundaries adapted as recorded in migration matrix."
+      ]
+    },
+    {
+      "source": "ktg-framework/src/main/java/com/ktg/framework/openapi/OpenApiErrors.java",
+      "target": "mes-framework/src/main/java/dev/mesbase/framework/openapi/OpenApiErrors.java",
+      "sourceSha256": "3392d37c596ec85d1f8527eaae5b23c3e5ebb74570bf0f350050d66a243f36a0",
+      "targetSha256": "a8420da6bdd7eb83ab44aa656a5f19d1b8c27e31bd2d90dedbccde94708fb959",
+      "strategy": "PORT",
+      "changes": [
+        "Source Product generic contracts retained; namespace, Java21/Boot4/Jakarta, explicit DTO/VO, ownership, permissions, safe errors and integration boundaries adapted as recorded in migration matrix."
+      ]
+    },
+    {
+      "source": "ktg-framework/src/main/java/com/ktg/framework/openapi/OpenApiClientIdentityVo.java",
+      "target": "mes-framework/src/main/java/dev/mesbase/framework/openapi/OpenApiClientIdentityVo.java",
+      "sourceSha256": "2cd58d1dfb2aeec4fceb5bd456f87fbf9c88d54e6382b6e335d9d36a431316d8",
+      "targetSha256": "bfd55605025ecde38d46693906f40eb1e09ed0cae9ff48c66d7ff034713894fc",
+      "strategy": "PORT",
+      "changes": [
+        "Source Product generic contracts retained; namespace, Java21/Boot4/Jakarta, explicit DTO/VO, ownership, permissions, safe errors and integration boundaries adapted as recorded in migration matrix."
+      ]
+    },
+    {
+      "source": "ktg-framework/src/main/java/com/ktg/framework/openapi/OpenApiRateLimiter.java",
+      "target": "mes-framework/src/main/java/dev/mesbase/framework/openapi/OpenApiRateLimiter.java",
+      "sourceSha256": "f03b7c3cf0a07195893a019330b8f859127ba0210fc10a64a5370899c5bc426e",
+      "targetSha256": "4d052c3c5932933774fda56d031034fb4fbf337d750100932f918c64e437f07c",
+      "strategy": "PORT",
+      "changes": [
+        "Source Product generic contracts retained; namespace, Java21/Boot4/Jakarta, explicit DTO/VO, ownership, permissions, safe errors and integration boundaries adapted as recorded in migration matrix."
+      ]
+    },
+    {
+      "source": "ktg-framework/src/main/java/com/ktg/framework/openapi/OpenApiWebConfig.java",
+      "target": "mes-framework/src/main/java/dev/mesbase/framework/openapi/OpenApiWebConfig.java",
+      "sourceSha256": "c75fcc423cdcc0c27f4b113f95661d37cb255cb0b76cd1a21ebee6aa73f77b33",
+      "targetSha256": "bbda4fc6646ae2bb96e5d9dbbbe115d02330a14853b3b8ba15734639cfcf6025",
+      "strategy": "PORT",
+      "changes": [
+        "Source Product generic contracts retained; namespace, Java21/Boot4/Jakarta, explicit DTO/VO, ownership, permissions, safe errors and integration boundaries adapted as recorded in migration matrix."
+      ]
+    },
+    {
+      "source": "ktg-framework/src/main/java/com/ktg/framework/openapi/OpenApiInvocation.java",
+      "target": "mes-framework/src/main/java/dev/mesbase/framework/openapi/OpenApiInvocation.java",
+      "sourceSha256": "352a1b8426efbc0416896d2f9632ab2214c0a9add6a40674a8d6e64621eb8e1c",
+      "targetSha256": "bb0d69cc792feee792b76987021b63a1b73911570ddf92010b25c0995b327811",
+      "strategy": "PORT",
+      "changes": [
+        "Source Product generic contracts retained; namespace, Java21/Boot4/Jakarta, explicit DTO/VO, ownership, permissions, safe errors and integration boundaries adapted as recorded in migration matrix."
+      ]
+    },
+    {
+      "source": "ktg-framework/src/main/java/com/ktg/framework/openapi/OpenApiResponseAdvice.java",
+      "target": "mes-framework/src/main/java/dev/mesbase/framework/openapi/OpenApiResponseAdvice.java",
+      "sourceSha256": "dc78576032738748c35032a2af0855ded55ca705b16b41b85b7c1e1f246d96b9",
+      "targetSha256": "74f4f12b4b9090116a1745d7eedc7764298499a1bdd2ec8641405039d0b06db1",
+      "strategy": "PORT",
+      "changes": [
+        "Source Product generic contracts retained; namespace, Java21/Boot4/Jakarta, explicit DTO/VO, ownership, permissions, safe errors and integration boundaries adapted as recorded in migration matrix."
+      ]
+    },
+    {
+      "source": "ktg-framework/src/main/java/com/ktg/framework/openapi/OpenApiPingVo.java",
+      "target": "mes-framework/src/main/java/dev/mesbase/framework/openapi/OpenApiPingVo.java",
+      "sourceSha256": "634beb468e6e979a6457d6ec9399e64a547d28d3e452d14df569650291126988",
+      "targetSha256": "96667b684688ecafba71fd241519e1dc3102b72de25d60d9d946cddb85a932c6",
+      "strategy": "PORT",
+      "changes": [
+        "Source Product generic contracts retained; namespace, Java21/Boot4/Jakarta, explicit DTO/VO, ownership, permissions, safe errors and integration boundaries adapted as recorded in migration matrix."
+      ]
+    },
+    {
+      "source": "ktg-framework/src/main/java/com/ktg/framework/openapi/OpenApiCapabilitiesVo.java",
+      "target": "mes-framework/src/main/java/dev/mesbase/framework/openapi/OpenApiCapabilitiesVo.java",
+      "sourceSha256": "98a3f1faacfd9cc9e21a238123e10b2566fe42a6cd06515b1ddd43be3e5c43b3",
+      "targetSha256": "2d3cfdafc832baf3437a9f815cdb50bd005d8d8929e8c240225ad95ab8d76aad",
+      "strategy": "PORT",
+      "changes": [
+        "Source Product generic contracts retained; namespace, Java21/Boot4/Jakarta, explicit DTO/VO, ownership, permissions, safe errors and integration boundaries adapted as recorded in migration matrix."
+      ]
+    },
+    {
+      "source": "ktg-framework/src/main/java/com/ktg/framework/openapi/OpenApiRequestFilter.java",
+      "target": "mes-framework/src/main/java/dev/mesbase/framework/openapi/OpenApiRequestFilter.java",
+      "sourceSha256": "7b4dea5ab1a9521419b004cb7fe8995f5ed073b1f29c4bc5eda7843b728eac7c",
+      "targetSha256": "3e931e2a45c1849b44b9e4a8381f4969f0bb34c6094cdaed32d4b033f3d7303f",
+      "strategy": "PORT",
+      "changes": [
+        "Source Product generic contracts retained; namespace, Java21/Boot4/Jakarta, explicit DTO/VO, ownership, permissions, safe errors and integration boundaries adapted as recorded in migration matrix."
+      ]
+    },
+    {
+      "source": "ktg-framework/src/main/java/com/ktg/framework/openapi/OpenApiCatalogVo.java",
+      "target": "mes-framework/src/main/java/dev/mesbase/framework/openapi/OpenApiCatalogVo.java",
+      "sourceSha256": "7c97e367e4956ad145dfe6a6821c3682e0c55812f7745f4fa0e499494b02fb7b",
+      "targetSha256": "d665bf451ef5a7accd2a07565f504bb802f31d630ab6860e490f91f28d730223",
+      "strategy": "PORT",
+      "changes": [
+        "Source Product generic contracts retained; namespace, Java21/Boot4/Jakarta, explicit DTO/VO, ownership, permissions, safe errors and integration boundaries adapted as recorded in migration matrix."
+      ]
+    },
+    {
+      "source": "ktg-framework/src/main/java/com/ktg/framework/openapi/OpenApiTokenVo.java",
+      "target": "mes-framework/src/main/java/dev/mesbase/framework/openapi/OpenApiTokenVo.java",
+      "sourceSha256": "4b667506a445195fd7d537df8edc59ed92ea17de175c5539c6a0b2540a27f582",
+      "targetSha256": "9bf0e01da5ffef1f67f948139ebf9f981fac728976be839dff466675a6118001",
+      "strategy": "PORT",
+      "changes": [
+        "Source Product generic contracts retained; namespace, Java21/Boot4/Jakarta, explicit DTO/VO, ownership, permissions, safe errors and integration boundaries adapted as recorded in migration matrix."
+      ]
+    },
+    {
+      "source": "ktg-framework/src/main/java/com/ktg/framework/openapi/OpenApiCatalogService.java",
+      "target": "mes-framework/src/main/java/dev/mesbase/framework/openapi/OpenApiCatalogService.java",
+      "sourceSha256": "35003bf66e85d1f8238f70129a4c074e9f3fe31fda2962899249a65c055e4e89",
+      "targetSha256": "346f956edce442f3d335ed7bf1446cc66178127163661354efb3b5d659825e0e",
+      "strategy": "PORT",
+      "changes": [
+        "Source Product generic contracts retained; namespace, Java21/Boot4/Jakarta, explicit DTO/VO, ownership, permissions, safe errors and integration boundaries adapted as recorded in migration matrix."
+      ]
+    },
+    {
+      "source": "ktg-framework/src/main/java/com/ktg/framework/openapi/OpenApiDiagnosticsService.java",
+      "target": "mes-framework/src/main/java/dev/mesbase/framework/openapi/OpenApiDiagnosticsService.java",
+      "sourceSha256": "7ebeca1c8ffff257893f27fcd5820b76df762be1742d31600c347bebccd369a0",
+      "targetSha256": "bb260cbb38883cbaf99cb16aa3cfd15707aa3d3b9f48d103337aa38f0c2b0288",
+      "strategy": "PORT",
+      "changes": [
+        "Source Product generic contracts retained; namespace, Java21/Boot4/Jakarta, explicit DTO/VO, ownership, permissions, safe errors and integration boundaries adapted as recorded in migration matrix."
+      ]
+    },
+    {
+      "source": "ktg-framework/src/main/java/com/ktg/framework/openapi/OpenApiHttp.java",
+      "target": "mes-framework/src/main/java/dev/mesbase/framework/openapi/OpenApiHttp.java",
+      "sourceSha256": "000516803f6e98734c4766a39700df6ade39d878a5766a2affb4c60a820bbf8e",
+      "targetSha256": "6b826fd38392043cc0649918e1ca52aee1bc1ef47bf0936a1a870d0375bc6bc0",
+      "strategy": "PORT",
+      "changes": [
+        "Source Product generic contracts retained; namespace, Java21/Boot4/Jakarta, explicit DTO/VO, ownership, permissions, safe errors and integration boundaries adapted as recorded in migration matrix."
+      ]
+    },
+    {
+      "source": "ktg-framework/src/main/java/com/ktg/framework/openapi/OpenApiAuthentication.java",
+      "target": "mes-framework/src/main/java/dev/mesbase/framework/openapi/OpenApiAuthentication.java",
+      "sourceSha256": "8c7a3f9d00cb0cc97afda0f65ba2b7fe108ddf380dc22dfd6129dac25aaa6730",
+      "targetSha256": "e2059311e361427170448bae4b5cdc6e1d6fc91050cf7ea3dff715e03e2ce76c",
+      "strategy": "PORT",
+      "changes": [
+        "Source Product generic contracts retained; namespace, Java21/Boot4/Jakarta, explicit DTO/VO, ownership, permissions, safe errors and integration boundaries adapted as recorded in migration matrix."
+      ]
+    },
+    {
+      "source": "ktg-framework/src/main/java/com/ktg/framework/openapi/OpenApiVerificationController.java",
+      "target": "mes-framework/src/main/java/dev/mesbase/framework/openapi/OpenApiVerificationController.java",
+      "sourceSha256": "99610465b83136ea4e718b22a608a0c1d50bc61ba7d9d4c881cf1e16887b34e5",
+      "targetSha256": "9554c2a8ba03128718296bdc744d7569cdb2857b59066fa4407bf3ff08645487",
+      "strategy": "PORT",
+      "changes": [
+        "Source Product generic contracts retained; namespace, Java21/Boot4/Jakarta, explicit DTO/VO, ownership, permissions, safe errors and integration boundaries adapted as recorded in migration matrix."
+      ]
+    },
+    {
+      "source": "ktg-framework/src/main/java/com/ktg/framework/openapi/OpenApiAuthenticationFilter.java",
+      "target": "mes-framework/src/main/java/dev/mesbase/framework/openapi/OpenApiAuthenticationFilter.java",
+      "sourceSha256": "dd2dcc40d0c545ad05bba948f01f9e9edc3f33bdc8141c181c05ba86b8b6587a",
+      "targetSha256": "15437a516becb6566bc31971ef95088436229fa9566aabe0f3aae7eb9576aecb",
+      "strategy": "PORT",
+      "changes": [
+        "Source Product generic contracts retained; namespace, Java21/Boot4/Jakarta, explicit DTO/VO, ownership, permissions, safe errors and integration boundaries adapted as recorded in migration matrix."
+      ]
+    },
+    {
+      "source": "ktg-framework/src/main/java/com/ktg/framework/openapi/OpenApiAuthorizationInterceptor.java",
+      "target": "mes-framework/src/main/java/dev/mesbase/framework/openapi/OpenApiAuthorizationInterceptor.java",
+      "sourceSha256": "bdb06dac844dee146a09ed7e9c60e7fe9012eb28c5aa321b155629e67df84a8c",
+      "targetSha256": "649f3513ec3baa579b3199b2b4bacd5eeab7c9ce3134481cb81e91f563342895",
+      "strategy": "PORT",
+      "changes": [
+        "Source Product generic contracts retained; namespace, Java21/Boot4/Jakarta, explicit DTO/VO, ownership, permissions, safe errors and integration boundaries adapted as recorded in migration matrix."
+      ]
+    },
+    {
+      "source": "ktg-framework/src/main/java/com/ktg/framework/openapi/OpenApiTokenController.java",
+      "target": "mes-framework/src/main/java/dev/mesbase/framework/openapi/OpenApiTokenController.java",
+      "sourceSha256": "b68af970fcfd42a8f360a4d84f00799bcf705a6d076c69e2f5b7213ae28c14e1",
+      "targetSha256": "603a46406be391fa58d1e67cd34bf2b7efd2d44d3cf9715db4f6f358befc5ed3",
+      "strategy": "PORT",
+      "changes": [
+        "Source Product generic contracts retained; namespace, Java21/Boot4/Jakarta, explicit DTO/VO, ownership, permissions, safe errors and integration boundaries adapted as recorded in migration matrix."
+      ]
+    },
+    {
+      "source": "ktg-framework/src/main/java/com/ktg/framework/openapi/OpenApiTokenRecord.java",
+      "target": "mes-framework/src/main/java/dev/mesbase/framework/openapi/OpenApiTokenRecord.java",
+      "sourceSha256": "78e480e967569812e19cae6ce92130a4a9c7c4b3db613a50e3ad233e269d2faf",
+      "targetSha256": "42f314b266d51493268dc266440a3eb75e71a0179114a39230e01e859eb5d726",
+      "strategy": "PORT",
+      "changes": [
+        "Source Product generic contracts retained; namespace, Java21/Boot4/Jakarta, explicit DTO/VO, ownership, permissions, safe errors and integration boundaries adapted as recorded in migration matrix."
+      ]
+    },
+    {
+      "source": "ktg-framework/src/main/java/com/ktg/framework/openapi/OpenApiMappingVo.java",
+      "target": "mes-framework/src/main/java/dev/mesbase/framework/openapi/OpenApiMappingVo.java",
+      "sourceSha256": "b7a091710f916f88bbc8ef832600c3148f282192894e755212fe382e60e67515",
+      "targetSha256": "aea4c5b5cc52c934557a5d8a696355290e0cb266a9b4c2d76b59f44efad7c0a5",
+      "strategy": "PORT",
+      "changes": [
+        "Source Product generic contracts retained; namespace, Java21/Boot4/Jakarta, explicit DTO/VO, ownership, permissions, safe errors and integration boundaries adapted as recorded in migration matrix."
+      ]
+    },
+    {
+      "source": "ktg-framework/src/main/java/com/ktg/framework/openapi/OpenApiProperties.java",
+      "target": "mes-framework/src/main/java/dev/mesbase/framework/openapi/OpenApiProperties.java",
+      "sourceSha256": "931a7c198a0257bd5251e24625bf50ce516d87d92c1101921128c0bfae381640",
+      "targetSha256": "0bfad53b283102a8112404942bf7eb61119eec123ab3132795012919cfd0db3b",
+      "strategy": "PORT",
+      "changes": [
+        "Source Product generic contracts retained; namespace, Java21/Boot4/Jakarta, explicit DTO/VO, ownership, permissions, safe errors and integration boundaries adapted as recorded in migration matrix."
+      ]
+    },
+    {
+      "source": "ktg-admin/src/main/java/com/ktg/web/controller/system/OpenApiClientController.java",
+      "target": "mes-admin/src/main/java/dev/mesbase/web/controller/system/OpenApiClientController.java",
+      "sourceSha256": "b40cf9c82969402b49ba03e4575da9cf5ba99afdb8243625a2eea85a3eef5a51",
+      "targetSha256": "f314626017f92322121d28857a360c35614c438dafe7eac4ea2f1b3cefc17105",
+      "strategy": "PORT",
+      "changes": [
+        "Source Product generic contracts retained; namespace, Java21/Boot4/Jakarta, explicit DTO/VO, ownership, permissions, safe errors and integration boundaries adapted as recorded in migration matrix."
+      ]
+    },
+    {
+      "sourceProduct": "/Users/user/work/heri/ktg-mes-ui",
+      "source": "src/api/system/openApiClient.js",
+      "sourceHead": "923d50ce35287c71ac7d1455bccbbfb8068e8e8a",
+      "target": "/Users/user/work/lixin/mes-base-ui/src/api/system/openApiClient.ts",
+      "sourceSha256": "b26a2a0354a9bc88010733d00dbe61b6dedd0fe976477f54d8a216c541dd4e24",
+      "targetSha256": "33342cdbe076a24459fcbbe628f8cad640a70f2af6e45916dc4b66117bea3520",
+      "strategy": "PORT",
+      "changes": [
+        "Source fields, queries and workflows retained; Vue3/Element Plus/Pinia/private transport and permission contracts adapted.",
+        "Generic API grants retained; Vue3 adapted; legacy route scope replaced by read-only generic data-scope state per user decision."
+      ],
+      "sourceReadMode": "committed HEAD; dirty Source working file preserved"
+    },
+    {
+      "sourceProduct": "/Users/user/work/heri/ktg-mes-ui",
+      "source": "src/views/system/openApiClient/index.vue",
+      "sourceHead": "923d50ce35287c71ac7d1455bccbbfb8068e8e8a",
+      "target": "/Users/user/work/lixin/mes-base-ui/src/views/system/openApiClient/index.vue",
+      "sourceSha256": "d8e41515b6cf1fa700cb3cf0a0a70ad70453db72b7aff5c6d913370f3f4d1e4e",
+      "targetSha256": "a111cf38dc85fcbe2b8df88a958cc26ac6b2754219fcfa7f67dda6c1c5469bf0",
+      "strategy": "PORT",
+      "changes": [
+        "Source fields, queries and workflows retained; Vue3/Element Plus/Pinia/private transport and permission contracts adapted.",
+        "Generic API grants retained; Vue3 adapted; legacy route scope replaced by read-only generic data-scope state per user decision."
+      ],
+      "sourceReadMode": "committed HEAD; dirty Source working file preserved"
+    },
+    {
+      "source": "sql/openapi/20260930-open-api-platform.sql",
+      "target": "mes-admin/src/main/resources/db/system/V10__source_openapi.sql",
+      "sourceSha256": "f5d2129182db2180338e15be2616368a28e866bd21186a3b7c709cd93298fb89",
+      "targetSha256": "2f86b23d3d51f455132e1c8d9beaaaaf0300348b5d731520e5abd778a95f1958",
+      "strategy": "PORT",
+      "changes": [
+        "Exact generic client/API grant columns retained; no company data; Base generic management menus with no role grants; route table excluded."
       ]
     }
   ],
@@ -3616,5 +4216,42 @@
       "license": "Apache-2.0",
       "source": "https://github.com/swagger-api/swagger-ui/tree/v5.33.1"
     }
-  ]
+  ],
+  "openApiDecision": {
+    "date": "2026-10-06",
+    "authentication": "mandatory external principal",
+    "apiAuthorization": "mandatory current database grants",
+    "businessDataScope": "optional generic MES validator; YAML defaults off; enabled without one validator fails",
+    "routeDependency": "deferred; no ProRoute imported"
+  },
+  "frontendProvenanceAudit": {
+    "date": "2026-10-06",
+    "evidenceLevel": "static source comparison only; sampled, not full UI equivalence acceptance",
+    "finding": "Source system pages coexist with rewritten Base shell/router/state/login/transport; full Source frontend architecture migration incomplete.",
+    "sourceAssociatedEntries": 119,
+    "countMeaning": "Reference mappings, not a count of completed source-code ports.",
+    "directlyCompared": [
+      "src/App.vue",
+      "src/layout/index.vue",
+      "src/views/system/user/index.vue",
+      "src/components/Pagination/index.vue",
+      "src/components/RightToolbar/index.vue",
+      "src/router.ts",
+      "src/views/Login.vue",
+      "src/utils/request.ts",
+      "src/utils/systemPlugin.ts"
+    ],
+    "remainingSourceLayout": [
+      "Layout",
+      "Navbar",
+      "Sidebar",
+      "TagsView",
+      "AppMain",
+      "Settings",
+      "RightPanel",
+      "associated app/settings/tagsView/permission state behavior"
+    ],
+    "report": "docs/development/MES_BASE_REALIGNMENT_REPORT.md#2026-10-06-前端迁移来源复核与表述纠正",
+    "implementationModified": false
+  }
 }

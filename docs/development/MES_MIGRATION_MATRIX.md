@@ -140,3 +140,22 @@ YES为静态源码存在，PARTIAL为链路未完整关联或非DB接口；Web/P
 实际失败与处置：Druid wall 拒绝自动编码列表原 WHERE 1=1，已改 Source XML 的 where 结构，未放宽SQL防火墙；新任务控制器变量名与Druid SDK getter编译失败已修复；首次初始化V7重复添加Source原有start_time失败，仅在本轮自有空库确认无DDL应用后清除失败历史记录并重新迁移，原失败日志保留。UI一次启动误用全局Node18失败后明确切Node22；CHOKIDAR环境值没有使Vite8刷新旧模块，改显式 MES_DEV_WATCH_POLLING=true 的 watch消费者并仅重启本轮UI。组件加载/API响应异步导致过早读取DOM/填入查询框，已改为等待可见目标并限定弹窗；不能将这些尝试当作通过。
 
 剩余边界：完整浏览器矩阵、最新回归/打包 smoke、Source权限/会话撤销/锁、SSE、任务调度恢复、外部Minio实例、部署/生产。状态按实际证据逐项更新，不能提前宣告Phase1完成。
+
+## 2026-10-06 当前迁移与验收状态
+
+此表覆盖上方Phase0历史“Base NO/未关联”结论，不删除历史盘点。来源/差异见source-product-migration-manifest.json，详细命令见MES_BASE_REALIGNMENT_REPORT最新工作包。
+
+| 功能 | Source → 当前Base | 策略/实际证据 | 当前边界 |
+| --- | --- | --- | --- |
+| Common/Framework/YAML/认证 | ktg-common/ktg-framework → mes-common/mes-framework/admin | SOURCE_PRODUCT_PORT；Java21/Jakarta/Redis/验证码/注册/密码锁；安全59、注册29、验证码21通过 | 浏览器新凭证提交待用户；未部署 |
+| 系统组织/用户/角色/菜单/字典/参数 | Source实体/Mapper/XML/Controller/完整Vue → 对应system/API | Source字段与交互保留；CRUD26、权限/范围59、实际动态路由/字典/组织/岗位编辑 | 用户创建密码/重置/导入最终UI提交未完成；已有API证明分别列 |
+| 公告/附件/消息/个人工作区 | SourceSysNotice/Attachment/Message与本人inbox/profile | notice24、Excel/API11、SSE34；真实私有PNG/本人消息已读/资料和合成头像 | 浏览器下载artifact未取得；MinIO实例未验证 |
+| 自动编码 | SourceRule/Part/Result → Source页面与行锁编号 | API17+24并发；浏览器预览/生成/组成 | 平台工具；无MES编号消费者 |
+| Quartz/JobLog | SourceSysJob/日志/cron/启停/手动 → 受控DBclaim | 最新26/26；暂停手动运行及实际日志浏览器通过 | RAMJobStore单节点；集群能力未扩展 |
+| Server/Cache/Druid | Source监控页面 → 实际OSHI/Redis/Druid | 本机OSHI8卷、Redis INFO、真实SQL/Wall浏览器；有授权无凭证 | JDK应用卷fallback未诱导运行；非生产监控 |
+| 系统工具/Swagger | Sourcetool/swagger/menu → Springdoc3.0.3+SwaggerUI5.33.1 | 21/21及外部SDK复核，实际浏览器OpenAPI3.1 | Generator保留后置；不算Codegen运行 |
+| F-214/216/217/218 OpenAPI通用 | Sourcecommon/system/framework/OpenApiClientController/提交Vue/API → Base | SOURCE_PRODUCT_PORT；原client/API表字段；71+29+18真实API，7定向，浏览器列表/详情/两组目录 | 浏览器新Secret/赋权提交未自动执行；数据范围默认关闭 |
+| F-215 Source路线范围 | Route授权/旧DataScopeGuard依赖ProRoute | 用户明确选择通用可选MES校验器开关，开启缺策略失败；未迁工艺 | 按未来领域实现范围；不迁Source路线表/业务依赖 |
+| UserTask/微信/PDA/打印业务等 | 原业务单据/渠道/设备能力 | 候选/依赖边界保留；不自动扩展本轮 | 对应业务或设备授权后继续，不写成已迁/已验收 |
+
+当前三个菜单模块和V1–V10完整DDL可查看，新的空隔离MySQL导入426字段比对5/5。整体MIGRATING：尚缺人接手的凭证UI动作/下载artifact及外部实例设备验证。没有新增正式MES Domain，没有使用Codegen，没有Agent提交/推送/部署。

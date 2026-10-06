@@ -16,6 +16,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 @Tag(name = "平台诊断")
+@io.swagger.v3.oas.annotations.security.SecurityRequirement(name="OpenApiBearer")
 @OpenApiEndpoint(description = "平台诊断")
 @RestController
 @RequestMapping("/open-api/v1/diagnostics")

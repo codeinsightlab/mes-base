@@ -22,7 +22,6 @@ import java.util.List;
 @Configuration
 public class FoundationConfiguration {
     @Bean
-    @Profile("!demo")
     @org.springframework.boot.autoconfigure.condition.ConditionalOnProperty(name = "mes.runtime.enabled", havingValue = "false", matchIfMissing = true)
     FactoryCatalog factoryCatalog() {
         return new InMemoryFactoryCatalog(List.of());
@@ -34,14 +33,12 @@ public class FoundationConfiguration {
     }
 
     @Bean
-    @Profile("!demo")
     @org.springframework.boot.autoconfigure.condition.ConditionalOnProperty(name = "mes.system.enabled", havingValue = "false", matchIfMissing = true)
     AuthorizationService authorization() {
         return (actor, scope, permission) -> false;
     }
 
     @Bean
-    @Profile("!demo")
     @org.springframework.boot.autoconfigure.condition.ConditionalOnProperty(name = "mes.system.enabled", havingValue = "false", matchIfMissing = true)
     UserDetailsService users() {
         return name -> {
@@ -77,12 +74,10 @@ public class FoundationConfiguration {
     }
 
     @Bean
-    SecurityFilterChain security(HttpSecurity http, UserDetailsService users, org.springframework.beans.factory.ObjectProvider<dev.mesbase.platform.security.PlatformTokenFilter> tokens, org.springframework.beans.factory.ObjectProvider<dev.mesbase.framework.security.SystemTokenFilter> systemTokens, org.springframework.core.env.Environment env) throws Exception {
+    SecurityFilterChain security(HttpSecurity http, UserDetailsService users, org.springframework.beans.factory.ObjectProvider<dev.mesbase.framework.security.SystemTokenFilter> systemTokens, org.springframework.core.env.Environment env) throws Exception {
         var provider = new org.springframework.security.authentication.dao.DaoAuthenticationProvider(users);
         provider.setPasswordEncoder(org.springframework.security.crypto.factory.PasswordEncoderFactories.createDelegatingPasswordEncoder());
         http.authenticationProvider(provider);
-        if (tokens.getIfAvailable() != null)
-            http.addFilterBefore(tokens.getObject(), org.springframework.security.web.authentication.www.BasicAuthenticationFilter.class);
         if (systemTokens.getIfAvailable() != null)
             http.addFilterBefore(systemTokens.getObject(), org.springframework.security.web.authentication.www.BasicAuthenticationFilter.class);
         if (env.getProperty("mes.system.enabled", Boolean.class, false)) http.httpBasic(basic -> basic.disable());
