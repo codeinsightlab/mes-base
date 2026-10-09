@@ -1,6 +1,7 @@
 package dev.mesbase.platform.web;
 
-import jakarta.servlet.http.*;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.web.servlet.HandlerInterceptor;
 import org.springframework.web.method.HandlerMethod;
 import org.springframework.security.core.Authentication;
@@ -9,13 +10,21 @@ import org.springframework.security.authentication.AnonymousAuthenticationToken;
 
 import java.util.Optional;
 
-import dev.mesbase.core.factory.*;
-import dev.mesbase.core.security.*;
-import dev.mesbase.core.error.*;
+import dev.mesbase.core.factory.FactoryId;
+import dev.mesbase.core.factory.FactoryScope;
+import dev.mesbase.core.security.AuthenticatedActor;
+import dev.mesbase.core.security.AuthorizationService;
+import dev.mesbase.core.factory.FactorySelectionService;
+import dev.mesbase.core.security.Permission;
+import dev.mesbase.core.error.ErrorCode;
+import dev.mesbase.core.error.FoundationException;
+import dev.mesbase.common.openapi.OpenApiPrincipal;
+import dev.mesbase.framework.openapi.OpenApiHttp;
 import dev.mesbase.platform.execution.FactoryContext;
+import dev.mesbase.platform.security.PlatformAuthorization;
 
 public final class FoundationAccessInterceptor implements HandlerInterceptor {
-    private final dev.mesbase.platform.security.PlatformAuthorization platformAuthorization;
+    private final PlatformAuthorization platformAuthorization;
     private final FactorySelectionService selection;
     private final AuthorizationService authorization;
 
@@ -23,7 +32,8 @@ public final class FoundationAccessInterceptor implements HandlerInterceptor {
         this(selection, authorization, (actor, permission) -> false);
     }
 
-    public FoundationAccessInterceptor(FactorySelectionService selection, AuthorizationService authorization, dev.mesbase.platform.security.PlatformAuthorization platformAuthorization) {
+    public FoundationAccessInterceptor(FactorySelectionService selection, AuthorizationService authorization,
+                                       PlatformAuthorization platformAuthorization) {
         this.selection = selection;
         this.authorization = authorization;
         this.platformAuthorization = platformAuthorization;
@@ -36,10 +46,10 @@ public final class FoundationAccessInterceptor implements HandlerInterceptor {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         if (authentication == null || !authentication.isAuthenticated() || authentication instanceof AnonymousAuthenticationToken)
             throw new FoundationException(ErrorCode.UNAUTHENTICATED);
-        if (authentication.getPrincipal() instanceof dev.mesbase.common.openapi.OpenApiPrincipal) {
+        if (authentication.getPrincipal() instanceof OpenApiPrincipal) {
             // External API grants were checked by the preceding dedicated interceptor.
             // Never resolve an external appKey as an internal SysUser or implicit factory preference.
-            if (!dev.mesbase.framework.openapi.OpenApiHttp.isOpenApi(request)
+            if (!OpenApiHttp.isOpenApi(request)
                     || access.value() != EndpointAccess.Kind.AUTHENTICATED
                     || access.permissionScope() != EndpointAccess.PermissionScope.PLATFORM)
                 throw new FoundationException(ErrorCode.FORBIDDEN);

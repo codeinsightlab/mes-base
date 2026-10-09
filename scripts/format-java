@@ -23,6 +23,33 @@ for file in "$@"; do
         *) echo "Expected an existing Java source file: $file" >&2; exit 2 ;;
     esac
 done
+if [ -n "$mode" ]; then
+    # Older IDEA builds can hang during -dry shutdown. Compare formatted copies
+    # instead, retaining the same native formatter and never touching sources.
+    exec /usr/bin/python3 - "$root/scripts/format-java" "$@" <<'PY'
+from pathlib import Path
+import shutil
+import subprocess
+import sys
+import tempfile
+
+with tempfile.TemporaryDirectory(prefix="mes-base-format-check-") as directory:
+    pairs = []
+    for index, name in enumerate(sys.argv[2:]):
+        source = Path(name)
+        copy = Path(directory) / str(index) / source.name
+        copy.parent.mkdir(parents=True)
+        shutil.copyfile(source, copy)
+        pairs.append((source, copy))
+    subprocess.run([sys.argv[1], *[str(copy) for _, copy in pairs]], check=True)
+    changed = [str(source) for source, copy in pairs
+               if source.read_bytes() != copy.read_bytes()]
+    if changed:
+        print("Java formatting required:\n" + "\n".join(changed), file=sys.stderr)
+        sys.exit(1)
+    print(f"Java formatting check passed ({len(pairs)} files).")
+PY
+fi
 # Separate formatter state avoids interrupting an already running IDE.
 formatter_state=$(mktemp -d "${TMPDIR:-/tmp}/mes-base-format.XXXXXX")
 cat > "$formatter_state/idea.properties" <<PROPERTIES
@@ -31,7 +58,4 @@ idea.system.path=$formatter_state/system
 idea.log.path=$formatter_state/log
 PROPERTIES
 export IDEA_PROPERTIES="$formatter_state/idea.properties"
-if [ -n "$mode" ]; then
-    exec "$formatter" "$mode" -s "$root/.idea/codeStyles/Project.xml" -charset UTF-8 "$@"
-fi
 exec "$formatter" -s "$root/.idea/codeStyles/Project.xml" -charset UTF-8 "$@"

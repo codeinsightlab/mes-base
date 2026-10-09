@@ -66,7 +66,8 @@ public final class FactoryBusinessDataSource extends AbstractDataSource implemen
     @Override
     public Connection getConnection() throws SQLException {
         verify();
-        return ((Selection) TransactionSynchronizationManager.getResource(key)).lease().runtime().datasource.getConnection();
+        return ((Selection) TransactionSynchronizationManager.getResource(key)).lease()
+                .runtime().datasource.getConnection();
     }
 
     @Override
