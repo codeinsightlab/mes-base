@@ -1,6 +1,0 @@
-package dev.mesbase.external.${systemName};
-
-public interface ${MapperName} {
-    // Implement parameterized SQL in matching Mapper XML using verified schema.
-    ${ResultType} query(${QueryType} query);
-}

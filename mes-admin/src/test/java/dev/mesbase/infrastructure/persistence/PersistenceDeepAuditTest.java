@@ -11,7 +11,6 @@ import dev.mesbase.platform.web.RequestBoundaryFilter;
 import java.lang.reflect.Field;
 import java.sql.Connection;
 import java.sql.SQLException;
-import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.Executors;
@@ -36,7 +35,9 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-/** TEST ONLY H2 characterization. Assertions preserve current behavior, including defects. */
+/**
+ * TEST ONLY H2 characterization. Assertions preserve current behavior, including defects.
+ */
 class PersistenceDeepAuditTest {
     private static final FactoryScope A = new FactoryScope(new FactoryId("AUDIT_A"));
     private static final FactoryScope B = new FactoryScope(new FactoryId("AUDIT_B"));
@@ -104,7 +105,8 @@ class PersistenceDeepAuditTest {
             source = new FactoryBusinessDataSource(scope -> binding(scope, scope.equals(A) ? revision : 1), registry);
             manager = new OwnedTransactionManager(source);
             var factory = PersistenceFactories.create(source, Set.of(BusinessMapper.class),
-                    configuration -> {}, manager::verifyAccess);
+                    configuration -> {
+                    }, manager::verifyAccess);
             mapper = new SqlSessionTemplate(factory).getMapper(BusinessMapper.class);
         }
 
@@ -125,10 +127,8 @@ class PersistenceDeepAuditTest {
         assertFalse(TransactionSynchronizationManager.isActualTransactionActive());
         assertFalse(TransactionSynchronizationManager.isSynchronizationActive());
         assertNull(local(FactoryContext.class, "PINNED"));
-        assertNull(local(ErpSourceContext.class, "PINNED"));
         assertFalse(PersistenceReadContext.active());
         FactoryContext.clear();
-        ErpSourceContext.restore(null);
         PageHelper.clearPage();
     }
 
@@ -183,32 +183,9 @@ class PersistenceDeepAuditTest {
     }
 
     @Test
-    void erpSelectionRejectsSwitchAndBusinessOwnerEvenWithRequiresNew() throws Exception {
-        try (var f = new Fixture(); var hr = pool("HR"); var wms = pool("WMS");
-             var erp = new ErpRoutingDataSource(Map.of("hr", hr, "wms", wms))) {
-            var manager = new OwnedTransactionManager(erp);
-            ErpSourceContext.select("hr");
-            new TransactionTemplate(manager).execute(status -> {
-                assertThrows(FoundationException.class, () -> ErpSourceContext.select("wms"));
-                assertEquals("hr", ErpSourceContext.required());
-                return null;
-            });
-            f.run(A, () -> {
-                var nested = new TransactionTemplate(manager);
-                nested.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
-                assertThrows(FoundationException.class, () -> nested.execute(status -> null));
-                return null;
-            });
-            ErpSourceContext.restore(null);
-        }
-    }
-
-    @Test
-    void sameThreadRequestsLeaveAllFiveStateFamiliesCleanOnExceptions() throws Exception {
-        try (var f = new Fixture(); var p = pool("PLATFORM"); var hr = pool("HR");
-             var erp = new ErpRoutingDataSource(Map.of("hr", hr))) {
+    void sameThreadRequestsLeavePersistenceStateCleanOnExceptions() throws Exception {
+        try (var f = new Fixture(); var p = pool("PLATFORM")) {
             var platform = new PlatformPersistence(p, Set.of(PlatformMapper.class));
-            var erpManager = new OwnedTransactionManager(erp);
             var boundary = new RequestBoundaryFilter();
             assertThrows(IllegalStateException.class,
                     () -> boundary.doFilter(new MockHttpServletRequest(), new MockHttpServletResponse(),
@@ -222,12 +199,6 @@ class PersistenceDeepAuditTest {
                                     assertEquals("A", f.mapper.label());
                                     return null;
                                 });
-                                String previous = ErpSourceContext.select("hr");
-                                try {
-                                    new TransactionTemplate(erpManager).execute(status -> null);
-                                } finally {
-                                    ErpSourceContext.restore(previous);
-                                }
                                 PageHelper.startPage(2, 10);
                                 throw new IllegalStateException("TEST ONLY request failure");
                             }));
@@ -235,8 +206,6 @@ class PersistenceDeepAuditTest {
                     (request, response) -> {
                         assertTrue(FactoryContext.current().isEmpty());
                         assertNull(local(FactoryContext.class, "PINNED"));
-                        assertNull(local(ErpSourceContext.class, "CURRENT"));
-                        assertNull(local(ErpSourceContext.class, "PINNED"));
                         assertFalse(PersistenceReadContext.active());
                         assertTrue(TransactionSynchronizationManager.getResourceMap().isEmpty());
                         assertNull(PageHelper.getLocalPage());

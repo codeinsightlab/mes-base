@@ -41,3 +41,22 @@ Dedicated registry 预登记 Factory owner，防止无行过滤的适配器误�
 
 删除没有实现、注册或调用者的 `SharedDatabasePersistence` 占位接口及嵌套 ScopedIdentity。Shared 仍是 DESIGNED，以上行范围验收计划和 Dedicated 防跨厂共池限制继续有效。
 `FactoryOwned` 仍被生成器使用，保留。删除空接口不会启用 Shared、修改当前业务路由或事务；今后实现必须先满足本 ADR 的验收条件。证据见 [Architecture Slimming Audit](architecture-slimming-audit.md)。
+
+## 2026-10-09 决定：只保留中心库与多业务库
+
+用户明确收敛 Base：只有 masterSqlSessionFactory/businessSqlSessionFactory，配套 masterDataSource/businessDataSource 和 masterTransactionManager/businessTransactionManager。中心库固定连接，业务入口按 Factory 解析独立的版本化池；只支持分库模式，不启用共享库。
+
+不保留 ERP/HR/WMS 或其他外部数据库概念、第三 owner、配置、选源注解、工厂与接入模板。ADR-005 外部连接决定被本决定取代。PlatformPersistence/PLATFORM 仍表达中心库上的平台权限和持久化语义，不增加第三库；配置沿用 mes.platform.*。
+
+保留 Dedicated 的 Factory/版本/租约/缓存前 guard、双向跨中心业务事务拒绝、Spring 挂起恢复、回滚和池生命周期保护。删除外部专属测试，中心/业务混合测试迁移为双入口验收；不为满足数量断言删除隔离或错误边界用例。OpenAPI 消费者身份、Redis与文件存储继续独立于 JDBC 拓扑。
+
+实现证据：PersistenceConfiguration、MapperPackages、OwnerMapperRegistration；PersistenceAssemblyTest 对生产装配的精确 Bean 名称/数量以及中心 + 两个 Factory fixture 读写边界验收。此次不改变业务 Schema、字段、权限、业务流程或 ktg-mes。真实多厂部署和生产验收未执行。
+
+### 2026-10-09 验收收据
+
+- `mvn -B -ntp test` 与 `mvn -B -ntp verify` 均通过；全 reactor 共 182 项（framework 7、generator 3、admin 172），178 通过，4 个未 opt-in 真实 MySQL 测试跳过，0 失败/错误。
+- IDEA 原生格式化与 `scripts/format-java --check`：37 个本次修改 Java 文件通过；仓库原缺该 launcher，本轮补齐，复用既有 Project.xml，使用临时独立 IDE state，不影响用户正在运行的 IDEA。
+- `/usr/bin/python3 scripts/smoke-packaged.py`：6 个检查通过。产物不含已删除外部类/SQL Server driver（含内嵌模块 JAR 检查），隔离 packaged loopback 启动通过；不使用用户开发配置。
+- UI：Node22.23.1，`npm test` 82 项通过，`npm run build` 通过；已存在的 deep 语法和大 bundle 提示保留。两个仓库 `git diff --check` 通过。
+- 中途测试失败为旧三 TM 数量断言与监控 Mock 未提供缺失项错误，已更新为新双入口事实并完成复跑；业务/中心隔离、回滚、Scope/版本/租约和异常清理用例继续运行。
+- 结构化收据：`target/validation/two-factory-convergence.json`。未做真实多厂数据库、生产部署或浏览器验收；未提交/推送，未重启用户服务。修改基础设施装配、关联事务 Bean 引用及监控类型，没有修改业务 SQL、Schema 或业务流程。

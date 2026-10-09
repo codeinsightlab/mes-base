@@ -18,10 +18,10 @@ import org.springframework.transaction.annotation.Transactional;
  * @author ktg
  */
 @Service
-@ConditionalOnProperty(name="mes.system.enabled",havingValue="true")
-public class SysDictDataServiceImpl implements ISysDictDataService
-{
-    @Autowired private Validator contractValidator;
+@ConditionalOnProperty(name = "mes.system.enabled", havingValue = "true")
+public class SysDictDataServiceImpl implements ISysDictDataService {
+    @Autowired
+    private Validator contractValidator;
     @Autowired
     private SysDictDataMapper dictDataMapper;
 
@@ -32,21 +32,19 @@ public class SysDictDataServiceImpl implements ISysDictDataService
      * @return 字典数据集合信息
      */
     @Override
-    public List<SysDictData> selectDictDataList(SysDictData dictData)
-    {
+    public List<SysDictData> selectDictDataList(SysDictData dictData) {
         return dictDataMapper.selectDictDataList(dictData);
     }
 
     /**
      * 根据字典类型和字典键值查询字典数据信息
      *
-     * @param dictType 字典类型
+     * @param dictType  字典类型
      * @param dictValue 字典键值
      * @return 字典标签
      */
     @Override
-    public String selectDictLabel(String dictType, String dictValue)
-    {
+    public String selectDictLabel(String dictType, String dictValue) {
         return dictDataMapper.selectDictLabel(dictType, dictValue);
     }
 
@@ -57,8 +55,7 @@ public class SysDictDataServiceImpl implements ISysDictDataService
      * @return 字典数据
      */
     @Override
-    public SysDictData selectDictDataById(Long dictCode)
-    {
+    public SysDictData selectDictDataById(Long dictCode) {
         return dictDataMapper.selectDictDataById(dictCode);
     }
 
@@ -68,11 +65,9 @@ public class SysDictDataServiceImpl implements ISysDictDataService
      * @param dictCodes 需要删除的字典数据ID
      */
     @Override
-    @Transactional(transactionManager="platformTransactionManager", rollbackFor=Exception.class)
-    public void deleteDictDataByIds(Long[] dictCodes)
-    {
-        for (Long dictCode : dictCodes)
-        {
+    @Transactional(transactionManager = "masterTransactionManager", rollbackFor = Exception.class)
+    public void deleteDictDataByIds(Long[] dictCodes) {
+        for (Long dictCode : dictCodes) {
             SysDictData data = selectDictDataById(dictCode);
             dictDataMapper.deleteDictDataById(dictCode);
             List<SysDictData> dictDatas = dictDataMapper.selectDictDataByType(data.getDictType());
@@ -87,13 +82,11 @@ public class SysDictDataServiceImpl implements ISysDictDataService
      * @return 结果
      */
     @Override
-    @Transactional(transactionManager="platformTransactionManager", rollbackFor=Exception.class)
-    public int insertDictData(SysDictData data)
-    {
-        BeanValidators.validateWithException(contractValidator,data);
+    @Transactional(transactionManager = "masterTransactionManager", rollbackFor = Exception.class)
+    public int insertDictData(SysDictData data) {
+        BeanValidators.validateWithException(contractValidator, data);
         int row = dictDataMapper.insertDictData(data);
-        if (row > 0)
-        {
+        if (row > 0) {
             List<SysDictData> dictDatas = dictDataMapper.selectDictDataByType(data.getDictType());
             DictUtils.setDictCache(data.getDictType(), dictDatas);
         }
@@ -107,13 +100,11 @@ public class SysDictDataServiceImpl implements ISysDictDataService
      * @return 结果
      */
     @Override
-    @Transactional(transactionManager="platformTransactionManager", rollbackFor=Exception.class)
-    public int updateDictData(SysDictData data)
-    {
-        BeanValidators.validateWithException(contractValidator,data);
+    @Transactional(transactionManager = "masterTransactionManager", rollbackFor = Exception.class)
+    public int updateDictData(SysDictData data) {
+        BeanValidators.validateWithException(contractValidator, data);
         int row = dictDataMapper.updateDictData(data);
-        if (row > 0)
-        {
+        if (row > 0) {
             List<SysDictData> dictDatas = dictDataMapper.selectDictDataByType(data.getDictType());
             DictUtils.setDictCache(data.getDictType(), dictDatas);
         }

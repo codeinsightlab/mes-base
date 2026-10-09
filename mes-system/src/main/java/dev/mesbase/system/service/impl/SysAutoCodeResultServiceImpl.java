@@ -10,7 +10,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
-@ConditionalOnProperty(name="mes.system.enabled",havingValue="true")
+@ConditionalOnProperty(name = "mes.system.enabled", havingValue = "true")
 public class SysAutoCodeResultServiceImpl implements IAutoCodeResultService {
 
     @Autowired
@@ -22,13 +22,13 @@ public class SysAutoCodeResultServiceImpl implements IAutoCodeResultService {
     }
 
     @Override
-    @Transactional(transactionManager="platformTransactionManager", rollbackFor=Exception.class)
+    @Transactional(transactionManager = "masterTransactionManager", rollbackFor = Exception.class)
     public void saveAutoCodeResult(SysAutoCodeResult sysAutoCodeResult) {
         sysAutoCodeResultMapper.add(sysAutoCodeResult);
     }
 
     @Override
-    @Transactional(transactionManager="platformTransactionManager", rollbackFor=Exception.class)
+    @Transactional(transactionManager = "masterTransactionManager", rollbackFor = Exception.class)
     public void updateAutoCodeResult(SysAutoCodeResult sysAutoCodeResult) {
         sysAutoCodeResultMapper.updateAutoCodeResult(sysAutoCodeResult);
     }

@@ -1,5 +1,7 @@
 # `dev.mesbase.server` 包审查
 
+> 历史快照：本报告的三类会话工厂/ERP 路由描述已被 2026-10-09 双入口决定取代。当前装配见 [ADR-004](../architecture/ADR-004-business-persistence-topology.md#2026-10-09-决定只保留中心库与多业务库)。保留本报告原始证据，不回写历史结果。
+
 审查日期：2026-10-06  
 范围：`mes-admin/src/main/java/dev/mesbase/server` 及其直接测试/配置引用  
 性质：静态代码与仓库文档审查；未删除或修改业务代码，未据此宣称运行时淘汰完成。

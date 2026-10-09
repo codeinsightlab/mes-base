@@ -46,8 +46,6 @@ spring:
       max-request-size: 11MB
 
 mes:
-  erp:
-    enabled: false
   storage:
     type: local
   system:

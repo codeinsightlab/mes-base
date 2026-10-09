@@ -20,13 +20,14 @@ import org.springframework.transaction.annotation.Transactional;
  * @author ruoyi
  */
 @Service
-@ConditionalOnProperty(name="mes.system.enabled",havingValue="true")
-public class SysNoticeServiceImpl implements ISysNoticeService
-{
-    @Autowired private Validator contractValidator;
+@ConditionalOnProperty(name = "mes.system.enabled", havingValue = "true")
+public class SysNoticeServiceImpl implements ISysNoticeService {
+    @Autowired
+    private Validator contractValidator;
     @Autowired
     private SysNoticeMapper noticeMapper;
-    @Autowired private SysAttachmentServiceImpl attachments;
+    @Autowired
+    private SysAttachmentServiceImpl attachments;
 
     /**
      * 查询公告信息
@@ -35,8 +36,7 @@ public class SysNoticeServiceImpl implements ISysNoticeService
      * @return 公告信息
      */
     @Override
-    public SysNotice selectNoticeById(Long noticeId)
-    {
+    public SysNotice selectNoticeById(Long noticeId) {
         return noticeMapper.selectNoticeById(noticeId);
     }
 
@@ -47,8 +47,7 @@ public class SysNoticeServiceImpl implements ISysNoticeService
      * @return 公告集合
      */
     @Override
-    public List<SysNotice> selectNoticeList(SysNotice notice)
-    {
+    public List<SysNotice> selectNoticeList(SysNotice notice) {
         return noticeMapper.selectNoticeList(notice);
     }
 
@@ -59,11 +58,13 @@ public class SysNoticeServiceImpl implements ISysNoticeService
      * @return 结果
      */
     @Override
-    @Transactional(transactionManager="platformTransactionManager", rollbackFor=Exception.class)
-    public int insertNotice(SysNotice notice)
-    {
-        BeanValidators.validateWithException(contractValidator,notice);
-        notice.setNoticeContent(RichTextSanitizer.clean(notice.getNoticeContent()));int rows=noticeMapper.insertNotice(notice);attachments.bindNotice(notice.getNoticeId(),notice.getNoticeContent());return rows;
+    @Transactional(transactionManager = "masterTransactionManager", rollbackFor = Exception.class)
+    public int insertNotice(SysNotice notice) {
+        BeanValidators.validateWithException(contractValidator, notice);
+        notice.setNoticeContent(RichTextSanitizer.clean(notice.getNoticeContent()));
+        int rows = noticeMapper.insertNotice(notice);
+        attachments.bindNotice(notice.getNoticeId(), notice.getNoticeContent());
+        return rows;
     }
 
     /**
@@ -73,11 +74,15 @@ public class SysNoticeServiceImpl implements ISysNoticeService
      * @return 结果
      */
     @Override
-    @Transactional(transactionManager="platformTransactionManager", rollbackFor=Exception.class)
-    public int updateNotice(SysNotice notice)
-    {
-        BeanValidators.validateWithException(contractValidator,notice);
-        if(noticeMapper.selectNoticeById(notice.getNoticeId())==null)throw new FoundationException(ErrorCode.NOT_FOUND);notice.setNoticeContent(RichTextSanitizer.clean(notice.getNoticeContent()));int rows=noticeMapper.updateNotice(notice);attachments.bindNotice(notice.getNoticeId(),notice.getNoticeContent());return rows;
+    @Transactional(transactionManager = "masterTransactionManager", rollbackFor = Exception.class)
+    public int updateNotice(SysNotice notice) {
+        BeanValidators.validateWithException(contractValidator, notice);
+        if (noticeMapper.selectNoticeById(notice.getNoticeId()) == null)
+            throw new FoundationException(ErrorCode.NOT_FOUND);
+        notice.setNoticeContent(RichTextSanitizer.clean(notice.getNoticeContent()));
+        int rows = noticeMapper.updateNotice(notice);
+        attachments.bindNotice(notice.getNoticeId(), notice.getNoticeContent());
+        return rows;
     }
 
     /**
@@ -87,9 +92,8 @@ public class SysNoticeServiceImpl implements ISysNoticeService
      * @return 结果
      */
     @Override
-    @Transactional(transactionManager="platformTransactionManager", rollbackFor=Exception.class)
-    public int deleteNoticeById(Long noticeId)
-    {
+    @Transactional(transactionManager = "masterTransactionManager", rollbackFor = Exception.class)
+    public int deleteNoticeById(Long noticeId) {
         return noticeMapper.deleteNoticeById(noticeId);
     }
 
@@ -100,9 +104,8 @@ public class SysNoticeServiceImpl implements ISysNoticeService
      * @return 结果
      */
     @Override
-    @Transactional(transactionManager="platformTransactionManager", rollbackFor=Exception.class)
-    public int deleteNoticeByIds(Long[] noticeIds)
-    {
+    @Transactional(transactionManager = "masterTransactionManager", rollbackFor = Exception.class)
+    public int deleteNoticeByIds(Long[] noticeIds) {
         return noticeMapper.deleteNoticeByIds(noticeIds);
     }
 }

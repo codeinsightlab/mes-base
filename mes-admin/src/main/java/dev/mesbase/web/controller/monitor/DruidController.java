@@ -26,20 +26,21 @@ public class DruidController {
     private final DruidDataSource source;
     private final DruidMonitorService monitor;
 
-    public DruidController(@Qualifier("platformDataSource") DataSource source, DruidMonitorService monitor) {
+    public DruidController(@Qualifier("masterDataSource") DataSource source, DruidMonitorService monitor) {
         this.source = (DruidDataSource) source;
         this.monitor = monitor;
     }
 
     @GetMapping("/api/monitor/druid/sources")
     @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED, permission = "monitor:druid:list", permissionScope = EndpointAccess.PermissionScope.PLATFORM)
-    public SourcePage sources(@RequestParam(defaultValue="1") int pageNum, @RequestParam(defaultValue="20") int pageSize) {
+    public SourcePage sources(@RequestParam(defaultValue = "1") int pageNum,
+                              @RequestParam(defaultValue = "20") int pageSize) {
         return monitor.sources(pageNum, pageSize);
     }
 
     @GetMapping("/api/monitor/druid/snapshot")
     @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED, permission = "monitor:druid:list", permissionScope = EndpointAccess.PermissionScope.PLATFORM)
-    public Snapshot snapshot(@RequestParam String sourceId, @RequestParam(defaultValue="100") int limit) {
+    public Snapshot snapshot(@RequestParam String sourceId, @RequestParam(defaultValue = "100") int limit) {
         return monitor.snapshot(sourceId, limit);
     }
 
@@ -62,7 +63,10 @@ public class DruidController {
     public AjaxResult sql(@RequestParam(defaultValue = "100") int limit) {
         if (limit < 1 || limit > 100)
             throw new FoundationException(ErrorCode.BAD_REQUEST);
-        return AjaxResult.success(source.getSqlStatMap().values().stream().sorted(Comparator.comparingLong(JdbcSqlStat::getExecuteCount).reversed()).limit(limit).map(s -> new Sql(String.valueOf(s.getId()), template(s.getSql()), String.valueOf(s.getExecuteCount()), String.valueOf(s.getErrorCount()), String.valueOf(s.getExecuteMillisTotal()), String.valueOf(s.getExecuteMillisMax()), String.valueOf(s.getUpdateCount()), String.valueOf(s.getFetchRowCount()))).toList());
+        return AjaxResult.success(source.getSqlStatMap().values().stream()
+                .sorted(Comparator.comparingLong(JdbcSqlStat::getExecuteCount).reversed()).limit(limit)
+                .map(s -> new Sql(String.valueOf(s.getId()), template(s.getSql()), String.valueOf(s.getExecuteCount()), String.valueOf(s.getErrorCount()), String.valueOf(s.getExecuteMillisTotal()), String.valueOf(s.getExecuteMillisMax()), String.valueOf(s.getUpdateCount()), String.valueOf(s.getFetchRowCount())))
+                .toList());
     }
 
     private String template(String sql) {

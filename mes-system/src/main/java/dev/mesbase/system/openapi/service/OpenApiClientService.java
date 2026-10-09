@@ -37,7 +37,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
-@ConditionalOnProperty(name={"mes.system.enabled","open-api.enabled"},havingValue="true")
+@ConditionalOnProperty(name = {"mes.system.enabled", "open-api.enabled"}, havingValue = "true")
 public class OpenApiClientService {
     private final OpenApiClientMapper clients;
     private final OpenApiClientExtraMapper extra;
@@ -47,10 +47,13 @@ public class OpenApiClientService {
 
     public OpenApiClientService(OpenApiClientMapper clients, OpenApiClientExtraMapper extra,
                                 OpenApiClientApiMapper grants, PasswordEncoder encoder) {
-        this.clients = clients; this.extra = extra; this.grants = grants; this.encoder = encoder;
+        this.clients = clients;
+        this.extra = extra;
+        this.grants = grants;
+        this.encoder = encoder;
     }
 
-    @Transactional(transactionManager="platformTransactionManager", rollbackFor=Exception.class)
+    @Transactional(transactionManager = "masterTransactionManager", rollbackFor = Exception.class)
 
     public OpenApiSecretVo create(OpenApiClientCreateRequest request) {
         OpenApiClient entity = new OpenApiClient();
@@ -80,9 +83,11 @@ public class OpenApiClientService {
         }
     }
 
-    public OpenApiClientVo detail(Long clientId) { return toVo(required(clientId)); }
+    public OpenApiClientVo detail(Long clientId) {
+        return toVo(required(clientId));
+    }
 
-    @Transactional(transactionManager="platformTransactionManager", rollbackFor=Exception.class)
+    @Transactional(transactionManager = "masterTransactionManager", rollbackFor = Exception.class)
 
     public void changeStatus(OpenApiClientStatusRequest request) {
         OpenApiClientStatus status = OpenApiClientStatus.fromCode(request.getStatus());
@@ -92,7 +97,7 @@ public class OpenApiClientService {
         requireUpdated(extra.changeCredentials(change));
     }
 
-    @Transactional(transactionManager="platformTransactionManager", rollbackFor=Exception.class)
+    @Transactional(transactionManager = "masterTransactionManager", rollbackFor = Exception.class)
 
     public OpenApiSecretVo resetSecret(OpenApiClientIdRequest request) {
         OpenApiClient client = lock(request.getClientId());
@@ -105,10 +110,11 @@ public class OpenApiClientService {
 
     public List<String> apiCodes(Long clientId) {
         required(clientId);
-        return grants.selectList(grantFilter(clientId)).stream().map(OpenApiClientApi::getApiCode).collect(Collectors.toList());
+        return grants.selectList(grantFilter(clientId)).stream().map(OpenApiClientApi::getApiCode)
+                .collect(Collectors.toList());
     }
 
-    @Transactional(transactionManager="platformTransactionManager", rollbackFor=Exception.class)
+    @Transactional(transactionManager = "masterTransactionManager", rollbackFor = Exception.class)
 
     public void replaceApis(OpenApiClientApisRequest request) {
         // 与启停/重置共用行锁，避免并发替换授权产生半份配置。
@@ -121,7 +127,9 @@ public class OpenApiClientService {
         String operator = SecurityUtils.getUsername();
         for (String apiCode : new LinkedHashSet<>(request.getApiCodes())) {
             OpenApiClientApi grant = grantFilter(request.getClientId());
-            grant.setApiCode(apiCode); grant.setCreateBy(operator); grant.setCreateTime(new Date());
+            grant.setApiCode(apiCode);
+            grant.setCreateBy(operator);
+            grant.setCreateTime(new Date());
             requireUpdated(grants.insert(grant));
         }
     }
@@ -149,43 +157,64 @@ public class OpenApiClientService {
     private boolean enabled(OpenApiClient client) {
         return Integer.valueOf(OpenApiClientStatus.ENABLED.getCode()).equals(client.getStatus());
     }
+
     private OpenApiPrincipal principal(OpenApiClient client) {
         return new OpenApiPrincipal(client.getClientId(), client.getAppKey(), client.getCredentialVersion());
     }
+
     private OpenApiClient required(Long id) {
         OpenApiClient client = clients.selectById(id);
         if (client == null) throw new ServiceException("client不存在");
         return client;
     }
+
     private OpenApiClient lock(Long id) {
         OpenApiClient client = extra.lockById(id);
         if (client == null) throw new ServiceException("client不存在");
         return client;
     }
+
     private OpenApiCredentialChange change(Long clientId) {
         OpenApiCredentialChange change = new OpenApiCredentialChange();
-        change.setClientId(clientId); change.setUpdateBy(SecurityUtils.getUsername()); return change;
+        change.setClientId(clientId);
+        change.setUpdateBy(SecurityUtils.getUsername());
+        return change;
     }
+
     private OpenApiClientApi grantFilter(Long clientId) {
-        OpenApiClientApi filter = new OpenApiClientApi(); filter.setClientId(clientId); return filter;
+        OpenApiClientApi filter = new OpenApiClientApi();
+        filter.setClientId(clientId);
+        return filter;
     }
+
     private void requireUpdated(int rows) {
         if (rows != 1) throw new ServiceException("client操作未保存");
     }
+
     private String randomValue(int length) {
-        byte[] bytes = new byte[length]; random.nextBytes(bytes);
+        byte[] bytes = new byte[length];
+        random.nextBytes(bytes);
         return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
     }
+
     private OpenApiSecretVo secretVo(OpenApiClient client, String secret) {
         OpenApiSecretVo vo = new OpenApiSecretVo();
-        vo.setClientId(client.getClientId()); vo.setAppKey(client.getAppKey()); vo.setAppSecret(secret); return vo;
+        vo.setClientId(client.getClientId());
+        vo.setAppKey(client.getAppKey());
+        vo.setAppSecret(secret);
+        return vo;
     }
+
     private OpenApiClientVo toVo(OpenApiClient client) {
         OpenApiClientVo vo = new OpenApiClientVo();
-        vo.setClientId(client.getClientId()); vo.setAppKey(client.getAppKey());
-        vo.setClientName(client.getClientName()); vo.setStatus(client.getStatus());
+        vo.setClientId(client.getClientId());
+        vo.setAppKey(client.getAppKey());
+        vo.setClientName(client.getClientName());
+        vo.setStatus(client.getStatus());
         vo.setStatusName(OpenApiClientStatus.fromCode(client.getStatus()).getName());
-        vo.setRemark(client.getRemark()); vo.setCreateTime(client.getCreateTime()); vo.setUpdateTime(client.getUpdateTime());
+        vo.setRemark(client.getRemark());
+        vo.setCreateTime(client.getCreateTime());
+        vo.setUpdateTime(client.getUpdateTime());
         return vo;
     }
 }

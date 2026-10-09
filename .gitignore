@@ -3,3 +3,8 @@ target/
 *.iml
 .env
 .local/
+
+# Private local profiles; publish only config/*.example.yml.
+/mes-admin/src/main/resources/application-dev.yml
+/mes-admin/src/main/resources/application-prod.yml
+docs/.DS_Store

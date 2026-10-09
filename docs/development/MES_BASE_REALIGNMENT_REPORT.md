@@ -726,3 +726,16 @@ DruidController 原构造器按 DataSource 类型注入，三库启用后有三�
 标准不带参数的 Maven verify 被范围外既有 Spotless 格式问题阻断；未格式化无关文件。限定 Spotless 到本轮相关源码后 verify BUILD SUCCESS：170项，167通过、3跳过、0失败/错误。打包启动smoke 4/4通过，生产 JAR 无 ErpTransactions 类；git diff --check 通过。日志 target/validation/fixed-package-verify.log 与 unrestricted-spotless-failure.log。未重启用户服务、未运行真实外部业务 SQL、未提交/推送/部署。
 
 文档同步：AGENTS.md 第9节改为固定包与注解约束；platform.md 追加“固定包扫描与外部连接注解”当前接入规范；codegen.md 更新 Scope/包约束与生成行为；ADR-005 追加本日“固定包归属和声明式外部连接”决策与时机原因，旧记录保留时间线。结构化验证记录追加 fixed_packages_and_declarative_erp。业务流程未增加，变更为持久化装配、连接选择与生成骨架。
+
+## 2026-10-09 持久化收敛
+
+本轮用户新要求取代此前三工厂和外部连接接入规范：只保留中心库 + Factory 多业务库，工厂名 masterSqlSessionFactory/businessSqlSessionFactory。移除外部选源、ERP owner/装配/模板/SQL Server 驱动；监控 UI 同步仅显示中心与业务池。历史 Source Product 审查不修改，当前规范见 ADR-004 与 AGENTS 第 9 节。未修改业务 SQL、业务流程或 ktg-mes。
+
+### 2026-10-09 验收收据
+
+- `mvn -B -ntp test` 与 `mvn -B -ntp verify` 均通过；全 reactor 共 182 项（framework 7、generator 3、admin 172），178 通过，4 个未 opt-in 真实 MySQL 测试跳过，0 失败/错误。
+- IDEA 原生格式化与 `scripts/format-java --check`：37 个本次修改 Java 文件通过；仓库原缺该 launcher，本轮补齐，复用既有 Project.xml，使用临时独立 IDE state，不影响用户正在运行的 IDEA。
+- `/usr/bin/python3 scripts/smoke-packaged.py`：6 个检查通过。产物不含已删除外部类/SQL Server driver（含内嵌模块 JAR 检查），隔离 packaged loopback 启动通过；不使用用户开发配置。
+- UI：Node22.23.1，`npm test` 82 项通过，`npm run build` 通过；已存在的 deep 语法和大 bundle 提示保留。两个仓库 `git diff --check` 通过。
+- 中途测试失败为旧三 TM 数量断言与监控 Mock 未提供缺失项错误，已更新为新双入口事实并完成复跑；业务/中心隔离、回滚、Scope/版本/租约和异常清理用例继续运行。
+- 结构化收据：`target/validation/two-factory-convergence.json`。未做真实多厂数据库、生产部署或浏览器验收；未提交/推送，未重启用户服务。修改基础设施装配、关联事务 Bean 引用及监控类型，没有修改业务 SQL、Schema 或业务流程。

@@ -1,18 +1,19 @@
+> 当前持久化规范：2026-10-09 收敛为中心库 + 多业务库；只有 masterSqlSessionFactory/businessSqlSessionFactory。下方 2026-10-06 的三工厂与外部源章节为历史记录，已被文末修订取代。
+
 # Source 系统与 Factory Foundation 操作边界
 
 2026-10-06，Phase1 MIGRATING。本文按当前 Source Product 链路更新；此前简化 UUID Platform CRUD/数据库会话/全局配置缓存说明已被迁移替代。实际命令、版本、失败和未验证项见 [报告](MES_BASE_REALIGNMENT_REPORT.md) 与 [验收 JSON](../reviews/2026-10-06-phase1-verification.json)。
 
 ## YAML 与装配
 
-通用配置在mes-admin/src/main/resources/application.yml；真实dev/prod参数直接写在同目录的application-dev.yml / application-prod.yml，现有文件按工作区状态保留，本轮不改变其跟踪方式。由Spring Boot标准profile自动选择，中心库与业务库保留现有profile配置。2026-10-06起，dev通过可选Spring配置导入读取Git忽略的.local/erp.yml，仅该本地文件保存用户提供的ERP连接；通用配置默认关闭ERP。默认dev；prod用--spring.profiles.active=prod。首次在新机器使用时，从config里的两个无密码example复制到资源目录、填连接并构建；本地JAR会包含本机profile配置。
+通用配置在mes-admin/src/main/resources/application.yml；真实dev/prod参数直接写在同目录的application-dev.yml / application-prod.yml，现有文件按工作区状态保留，本轮不改变其跟踪方式。由Spring Boot标准profile自动选择，中心库与业务库保留现有profile配置。2026-10-09 起不再导入本地 ERP 配置，只装配中心库与 Factory 业务库。默认dev；prod用--spring.profiles.active=prod。首次在新机器使用时，从config里的两个无密码example复制到资源目录、填连接并构建；本地JAR会包含本机profile配置。
 
 Spring Boot 4.1.1有效错误属性为spring.web.error.include-message/include-stacktrace/include-binding-errors，原server.error.*自4.0被标记level=error，已修正。server.address/port仍然有效，直接放在实际profile文件中。
 
 | 配置 | 实际消费者 |
 | --- | --- |
 | mes.system.enabled、mes.platform.* | PersistenceConfiguration；DruidPools、PlatformPersistence、Flyway |
-| mes.erp.enabled、mes.erp.* | 独立SQL Server数据源、erpSqlSessionFactory、erpTransactionManager；启用时必需配置完整 |
-| Mapper固定包 | system/quartz/platform→平台；mes/modules→业务；external→ERP；不按单个Mapper配置 |
+| Mapper固定包 | system/quartz/platform→中心；mes/modules→业务；不按单个Mapper配置 |
 | mes.runtime.enabled、mes.runtime.datasource-key | FactoryRuntimeConfiguration；数据库工厂目录、密码解密、物理库/连接/版本/Mapper 登记校验 |
 | spring.datasource.druid.* | DruidPools；stat/wall 真实过滤器与监控 |
 | spring.data.redis.* | Redis 客户端、RedisCache、SystemCacheNamespace |
@@ -152,3 +153,15 @@ Mapper 按 `*Mapper` 接口命名，放入对应包即可，平台/业务/外部
 外部连接仍在 mes.erp.datasources 下配置。外部访问类使用 `@ErpSource("hr")`，类内方法直接调用 Mapper；需要不同标识的入口可在方法上覆盖为 `@ErpSource("wms")`。该注解组合标准具名 Spring @Transactional，连接选择切面先于事务拦截器；不需要再写 transactions.execute。旧 ErpTransactions 从生产代码移除，只存在于低层路由测试辅助代码。模板见 docs/development/templates/erp/。只有 ERP 会话工厂识别此连接选择，平台固定、业务仍按 Factory 路由。
 
 使用可代理的非 final 类和 public 方法，通过 Spring 注入的代理调用；同类自调用不触发新的连接注解或事务。事务已开始后不允许变更连接标识，缺标识/未配置标识明确失败；不同外部库的操作不能作为一个本地原子事务。连接标识由服务端声明，不接收客户端任意数据库选择。
+
+## 2026-10-09：中心库 + 多业务库（当前规范）
+
+生产只创建 masterDataSource、businessDataSource 两个入口，分别绑定 masterSqlSessionFactory/businessSqlSessionFactory 与 masterTransactionManager/businessTransactionManager。mes.platform.* 配置键、平台权限和 PLATFORM 角色语义保留；master 表示同一个中心库，不增加别名工厂。
+
+businessDataSource 为 FactoryBusinessDataSource，一个入口按 Factory 在 RuntimeRegistry 中租借对应版本的独立池。工厂数量可以为 1 或 N；不是把全部业务库压成一个物理库。缺范围拒绝，事务内切厂/跨中心业务拒绝；既有缓存前 guard、版本失效、租约排空、回滚和异常恢复继续有效。当前不支持共享业务库。
+
+移除 mes.erp 配置、外部源/选源注解、路由器、第三工厂/TM、SQL Server 驱动和外部接入模板。旧 .local/erp.yml 不再导入；用户私有文件没有删除或采集。该文件若仍在磁盘，仅是用户保存的数据，不属于运行时配置入口。
+
+Druid sources/snapshot 仅列中心库 platform 与 business:<id>；PLATFORM/BUSINESS 是监控 API 和权限的现有语义。监控不借业务连接、不创建业务池；未加载/停用继续明确返回状态。UI 同步移除 EXTERNAL 类型，权限、过期响应隔离和 SQL 脱敏保留。OpenAPI、Redis、私有存储与通用同步协调不属于被删除的外部数据库框架。
+
+验证结果见 ADR-004 的 2026-10-09 修订及本轮验收收据；历史章节链接到已删除模板不再是接入入口。

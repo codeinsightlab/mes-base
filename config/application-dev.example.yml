@@ -4,13 +4,13 @@ mes:
     enabled: true
     migrate: false
     url: "jdbc:mysql://127.0.0.1:3306/mes_base_dev?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true"
-    username: mes_base_dev
+    username: your-db-user
     password: ""
     file-root: .local/files
   system:
     enabled: true
   runtime:
-    # 32-byte Base64 AES key. Actual private dev/prod profiles already contain independently generated keys.
+    # 32-byte Base64 AES key. Generate separately per environment; changing an existing key requires ciphertext migration.
     datasource-key: ""
     enabled: true
   codegen:
@@ -18,7 +18,7 @@ mes:
     profiles:
       dev:
         url: "jdbc:mysql://127.0.0.1:3306/mes_base_dev_business?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true"
-        username: mes_base_dev
+        username: your-db-user
         password: ""
 spring:
   data:

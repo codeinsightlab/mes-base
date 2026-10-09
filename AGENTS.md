@@ -1,6 +1,6 @@
 # MES Base 工程规则
 
-状态 Active；2026-10-05。执行非简单工程任务先读 `/Users/user/Documents/agents/AGENTS.md`
+状态 Active；2026-10-09。执行非简单工程任务先读 `/Users/user/Documents/agents/AGENTS.md`
 并按实际栈路由，读取目标目录更具体规则。用户当前授权优先，保护已有工作。
 
 ## 1. 项目目标
@@ -23,7 +23,7 @@ factoryId；FACTORY 角色必须所属厂。权限按每次请求当前厂读取
 ## 4. Controller / Service / Mapper
 
 Controller 收参、基础校验、HTTP View 转换和协议返回；不做业务。Service 编排、规则、状态转换、事务和外部协调；Mapper 数据访问，不做授权决策。默认单
-Service，只有长期真实复杂协调才拆分。外部主动调用经 Port/Adapter，Adapter 不编排业务、不访问平台/业务 Mapper；外部 SQL 访问 Adapter 仅可访问第9.1节规定的 external Mapper。
+Service，只有长期真实复杂协调才拆分。外部主动调用经 Port/Adapter，Adapter 不编排业务、不访问平台/业务 Mapper。
 
 ## 5. Domain / DTO / VO / Persistence
 
@@ -37,9 +37,9 @@ Service，只有长期真实复杂协调才拆分。外部主动调用经 Port/A
 全限定类名代替正常导入，也不得以通配符导入规避显式导入。唯一例外是当前文件实际存在同名类型冲突：保留一个简单类名，仅对发生冲突的类型使用全限定名。包声明、import
 声明以及配置/反射/AOP 所需的类名字符串不属于类引用。新增或修改 Java 文件时检查此规则；不因本规则覆盖无关的已有改动。
 
-## 6. 外部系统
+## 6. Base 边界（2026-10-09 用户要求）
 
-Adapter DTO 不泄漏 Core。ERP/WMS/Equipment 外部凭证、连接与 Factory 位置独立；未配置明确失败。不得因复制旧项目引入客户单据、URL、固定厂或供应商规则。
+当前 Base 只提供中心库 + 按 Factory 隔离的多业务库。不装配 ERP、HR、WMS 或其他外部数据库，不保留外部源枚举、选源注解、连接模板或第三个会话工厂。未来真实集成需求另立有边界任务，不能预建占位框架。OpenAPI 外部消费者身份与私有存储属于已有产品能力，不等于外部数据库路由。
 
 ## 7. 权限 / Resource Scope
 
@@ -56,7 +56,7 @@ ID 操作必须校验资源所属 Scope/主体；不信任客户端 userId/userN
 ### 8.1 同步任务分布式互斥（强制）
 
 来源：ktg-mes `feat/multi-factory-isolation` 的 AGENTS「定时同步任务并发控制」及 `mes_master_sync` 实现。Base
-迁入通用同步协调基础；2026-10-06用户授权增加独立ERP SQL Server连接装配；不实现具体外部同步流程或业务写入。
+迁入通用同步协调基础；只保留通用协调机制，不装配外部连接或具体同步流程。
 
 - 所有新增或改造的可重复执行同步任务，使用 `mes_master_sync`
   数据库状态表统一跨节点抢占。工厂同步流以 `factory_id + sync_key` 唯一标识，并由数据库唯一约束保证；不能退化为跨厂全局锁。
@@ -72,37 +72,28 @@ ID 操作必须校验资源所属 Scope/主体；不信任客户端 userId/userN
   ERP 厂代码、外部客户端或固定外部业务类型；未配置执行器明确失败，不返回假成功。
 - 验收必须覆盖多节点同流竞争只有一个执行者、不同工厂互不阻塞、各入口共用抢占、旧令牌更新被拒绝、崩溃超时恢复及恢复后旧执行者停止。测试与真实数据库证据分别记录。
 
-## 9. 数据库 / SQL / Ownership
+## 9. 数据库 / SQL / Ownership（2026-10-09 用户要求）
 
-Platform/Master、Business、ERP 分开；Mapper按固定包自动扫描绑定三个对应SqlSessionFactory：system/quartz/platform为平台，mes/modules为业务，external为外部；不逐Mapper声明PersistenceOwner，不维护中央类清单或逐Mapper Bean。只有ERP工厂按连接标识路由，外部访问类/方法用ErpSource声明标识，在Spring事务开始前选择并固定连接。Service使用具名Spring事务；缺 Scope/连接/版本不回退平台、首库或默认
-Business。独立库仍保留 Factory 业务身份；Shared DB 未实现，启用须通过 ADR-004 行范围验收。参数化 SQL、固定/受控排序、分页数量边界、避免
-N+1；unique/reference/聚合/cache/import/export 都需范围审查。业务 cache 缺 Scope 不能全局回退。复用标准 Mapper，复杂查询/局部业务更新放
-ExtraMapper，不污染生成 CRUD；授权决策在 Service。新 CRUD 物理删除，不能批量更改历史表契约。Schema 来自真实
-metadata；新迁移不带客户数据/seed。
+架构只采用中心库 + 多业务库的分库模式。生产只装配两个 DataSource 入口、两个 SqlSessionFactory 和两个 Spring 事务管理器；物理业务池按 Factory 动态租借，不按池新增会话工厂。缺 Scope、连接或版本明确失败，不回退中心库、首库或默认业务库。跨中心/业务事务及事务内切厂明确拒绝。
 
-### 9.1 固定包与 SessionFactory 归属（强制，2026-10-06 用户要求）
+业务版本/租约、退休池排空、缓存前 statement guard 和异常清理继续保留。参数化 SQL、受控排序、分页边界及避免 N+1；unique/reference/聚合/cache/import/export 都需范围审查。业务 cache 缺 Scope 不能全局回退。复杂查询放 ExtraMapper，授权决策在 Service。新 CRUD 物理删除；Schema 来自真实 metadata，不带客户数据/seed。
 
-后续新增、迁移、重构及生成模板统一遵守以下固定包约束，包及其子包决定 Mapper 的 SessionFactory 归属：
+### 9.1 固定包与 SessionFactory 归属
 
-| SessionFactory | 固定扫描包 |
-| --- | --- |
-| `platformSqlSessionFactory` | `dev.mesbase.system`、`dev.mesbase.quartz`、`dev.mesbase.platform` |
-| `businessSqlSessionFactory` | `dev.mesbase.mes`、`dev.mesbase.modules` |
-| `erpSqlSessionFactory` | `dev.mesbase.external` |
+| SessionFactory | DataSource | TransactionManager | 固定扫描包 |
+| --- | --- | --- | --- |
+| `masterSqlSessionFactory` | `masterDataSource` | `masterTransactionManager` | `dev.mesbase.system`、`dev.mesbase.quartz`、`dev.mesbase.platform` |
+| `businessSqlSessionFactory` | `businessDataSource` | `businessTransactionManager` | `dev.mesbase.mes`、`dev.mesbase.modules` |
 
-- Mapper 接口按 `*Mapper` 命名，放进对应包即自动注册；使用标准 MyBatis-Spring 包扫描。禁止新增逐 Mapper 配置、中央类清单、手工 Mapper Bean 或要求生产 Mapper 标注 `PersistenceOwner`。
-- 扫描包不得重叠，同名 Mapper 或旧归属注解与包冲突必须明确失败；禁止通过缺省归属或默认 SessionFactory 掩盖错误。`PersistenceOwner` 仅保留已有程序式 fixture 的兼容校验，不作为后续生产扫描依据。
-- 中心库固定连接；业务库保留按当前 Factory 选择连接及版本/租约校验；外部连接共用一个 ERP 工厂。禁止按 ERP/HR/WMS 连接另建 SessionFactory，或把外部 Mapper 放进业务包实现旁路。
-- 生成器同样遵守包约束：`GLOBAL` 使用 `dev.mesbase.platform.*`，`FACTORY_SCOPED` 使用 `dev.mesbase.modules.*`；不生成 Mapper 归属注解或注册清单。
+Mapper 按 `*Mapper` 命名，固定包及其子包自动扫描。禁止逐 Mapper 配置、中央类清单、手工 Mapper Bean 或要求生产 Mapper 标注 PersistenceOwner。包不得重叠，重复名称及旧归属注解冲突明确失败。PersistenceOwner 只保留 PLATFORM/BUSINESS 的既有程序式 fixture 校验；PLATFORM 是中心库平台语义，不是第三个库。
 
-### 9.2 外部连接选择与 Spring 事务（强制，2026-10-06 用户要求）
+生成器 GLOBAL 使用 dev.mesbase.platform.*，FACTORY_SCOPED 使用 dev.mesbase.modules.*；不生成 Mapper 归属注解或注册清单。不存在 external 扫描组或 ERP 连接选择入口。
 
-- 只有 ERP 工厂按外部连接标识路由。连接在 `mes.erp.datasources` 下配置，以 `erp-main`、`hr`、`wms` 等字符串标识区分；不为这些标识增加 PersistenceOwner 枚举，不由 FactoryScope 推导连接。
-- 外部访问类/方法用 `@ErpSource("hr")` 声明连接，优先类级声明供整类复用，必要时方法级覆盖。Mapper 仅由包确定工厂，不要求逐个标注外部连接；方法直接调用 Mapper，禁止恢复生产 `ErpTransactions.execute(...)` 回调选库入口。
-- 连接选择必须先于 Spring 获取事务连接。沿用注解组合的具名 Spring 事务与选库切面；传播、提交、回滚及挂起恢复由 Spring 管理，禁止另造事务框架。使用可代理的类及 public 方法，经 Spring 代理调用；不得依赖同类自调用触发选库或事务。
-- 事务期间固定连接身份，嵌套不同连接标识及跨平台/业务/ERP 事务明确拒绝；异常、结束和挂起恢复时正确清理/恢复上下文。缺少标识、未知连接、缺配置不得回退首库或默认库；多外部库操作不能宣称本地原子事务。
-- 标识来自服务端声明/受控配置，不接受客户端任意数据库选择。新增连接配置不要求修改已有 Mapper 注册或为每个连接创建工厂。
-- 接入沿用 `config/erp-datasources.example.yml` 与 `docs/development/templates/erp/`；修改扫描或路由必须验证包归属、三工厂隔离、注解先于事务、事务内换库拒绝、回滚及异常清理。Fixture 通过不等于真实外部数据库联调通过。
+### 9.2 Spring 事务与验收
+
+Service 使用具名 Spring 事务；传播、提交、回滚和挂起恢复由 Spring 管理。业务事务固定 Factory 与连接身份，不能跨线程传 Session。不自动拆分跨库事务，不宣称中心库和业务库本地原子提交。中心 metadata 独立只读窗口保留既有受控入口和只读防护。
+
+修改装配、扫描或路由时，验证两个工厂/入口的确切 Bean 名称及数量、中心/业务 Mapper 归属、不同 Factory 独立库、缺 Scope 拒绝、跨库事务双向拒绝、版本失效、回滚、挂起恢复、池关闭与异常清理。Fixture 通过不等于真实多厂数据库验收。
 
 ## 10. 测试 / 验收
 

@@ -1,3 +1,5 @@
+> 状态：Superseded（2026-10-09）。以下为历史决定，不再是当前接入规范。当前中心 + 多业务库决定见 ADR-004；本 ADR 保留追溯，不保留生产外部实现。
+
 # ADR-005：ERP 连接独立解析，未配置明确失败
 
 - 日期：2026-10-05；状态：Accepted；2026-10-06下述修订取代原占位解析实现。
@@ -37,3 +39,7 @@
 用户认为逐 Mapper 归属与每次回调选库繁琐，明确提出固定包扫描。采用三个互斥包集合：system/quartz/platform 归平台、mes/modules 归业务、external 归 ERP。标准 MapperScannerConfigurer 各自绑定对应 SqlSessionFactory，不按每个 Mapper 创建注册代码。生产 Mapper 的重复 PersistenceOwner 注解移除，生成器按 Scope 强制正确包并不生成归属注解。
 
 外部访问类/方法用 ErpSource 声明连接标识，注解组合 Spring 的 erpTransactionManager 事务，选库切面在事务拦截器之前执行。类级注解可供整类复用；方法可以覆盖，但事务中的嵌套不同标识拒绝。该设计避免 Mapper 调用发生时连接早已取得的问题，连接归属与会话工厂归属分开。ERP之外仍不按外部标识路由。旧 ErpTransactions 回调入口退役；缺配置、固定身份、异常清理及跨库事务拒绝规则不变。
+
+## 2026-10-09：外部数据库框架退出 Base
+
+按用户要求移除 ERP/HR/WMS 及其他外部数据库装配，不保留第三个 PersistenceOwner、SqlSessionFactory、TransactionManager、选源注解、连接配置或模板。历史规则和验证只描述当时快照；新集成需求须另行明确授权和设计，不恢复占位框架。中心库与 Factory 业务库规范见 ADR-004。

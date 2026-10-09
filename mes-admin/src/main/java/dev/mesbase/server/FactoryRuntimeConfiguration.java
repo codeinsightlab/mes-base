@@ -20,28 +20,49 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.env.Environment;
 
-/** Database-managed Factory catalog and lazy node-local runtimes; no YAML factory authority. */
+/**
+ * Database-managed Factory catalog and lazy node-local runtimes; no YAML factory authority.
+ */
 @Configuration
 
-@ConditionalOnProperty(name="mes.runtime.enabled",havingValue="true")
+@ConditionalOnProperty(name = "mes.runtime.enabled", havingValue = "true")
 public class FactoryRuntimeConfiguration {
-    @Bean(destroyMethod="close") RuntimeRegistry runtimeRegistry() { return new RuntimeRegistry(); }
-    @Bean ManagedDatasourceService managedDatasources(Environment env,
-            PlatformPersistence persistence,
-            @Qualifier("platformDataSource") DataSource platformDataSource, RuntimeRegistry registry,
-            OwnerMapperCatalog catalog) {
-        if(!env.getProperty("mes.platform.enabled",Boolean.class,false)) throw new IllegalArgumentException("Factory Runtime requires explicit Platform persistence");
-        var key=env.getRequiredProperty("mes.runtime.datasource-key");
-        var mappers=catalog.types(PersistenceOwner.Kind.BUSINESS);
-        return new ManagedDatasourceService(persistence,
-            new DatasourcePasswordCipher(key),registry,platformDataSource,DruidPools.settings(env),mappers,Path.of(env.getRequiredProperty("mes.platform.file-root")).resolve("managed-ddl"));
+    @Bean(destroyMethod = "close")
+    RuntimeRegistry runtimeRegistry() {
+        return new RuntimeRegistry();
     }
-    @Bean FactoryCatalog runtimeCatalog(ManagedDatasourceService service) {
+
+    @Bean
+    ManagedDatasourceService managedDatasources(Environment env,
+                                                PlatformPersistence persistence,
+                                                @Qualifier("masterDataSource") DataSource masterDataSource,
+                                                RuntimeRegistry registry,
+                                                OwnerMapperCatalog catalog) {
+        if (!env.getProperty("mes.platform.enabled", Boolean.class, false))
+            throw new IllegalArgumentException("Factory Runtime requires explicit Platform persistence");
+        var key = env.getRequiredProperty("mes.runtime.datasource-key");
+        var mappers = catalog.types(PersistenceOwner.Kind.BUSINESS);
+        return new ManagedDatasourceService(persistence,
+                new DatasourcePasswordCipher(key), registry, masterDataSource, DruidPools.settings(env), mappers, Path.of(env.getRequiredProperty("mes.platform.file-root"))
+                .resolve("managed-ddl"));
+    }
+
+    @Bean
+    FactoryCatalog runtimeCatalog(ManagedDatasourceService service) {
         return new FactoryCatalog() {
-            public Optional<Factory> find(FactoryId id) { return service.find(id); }
-            public List<Factory> enabled(int offset,int limit) { return service.enabled(offset,limit); }
+            public Optional<Factory> find(FactoryId id) {
+                return service.find(id);
+            }
+
+            public List<Factory> enabled(int offset, int limit) {
+                return service.enabled(offset, limit);
+            }
         };
     }
-    @Bean BusinessPersistenceResolver runtimeResolver(ManagedDatasourceService service) { return service::resolve; }
+
+    @Bean
+    BusinessPersistenceResolver runtimeResolver(ManagedDatasourceService service) {
+        return service::resolve;
+    }
 
 }

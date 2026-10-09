@@ -1,0 +1,6 @@
+#!/bin/sh
+set -eu
+cd "$(git rev-parse --show-toplevel)"
+/usr/bin/python3 scripts/check-private-config.py --staged
+/usr/bin/python3 scripts/java-git-hook.py commit
+git diff --cached --check

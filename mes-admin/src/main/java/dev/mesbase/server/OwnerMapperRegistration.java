@@ -45,18 +45,14 @@ final class OwnerMapperRegistration implements BeanDefinitionRegistryPostProcess
                             .contains("$")) {
                         return false;
                     }
-                    if (kind == PersistenceOwner.Kind.ERP && !environment.getProperty("mes.erp.enabled", Boolean.class, false)) {
-                        throw new IllegalArgumentException("ERP Mappers require enabled ERP persistence");
-                    }
                     catalog.register(kind, ClassUtils.resolveClassName(definition.getMetadata().getClassName(),
                             ClassUtils.getDefaultClassLoader()));
                     return true;
                 }
             };
             scanner.setSqlSessionFactoryBeanName(switch (kind) {
-                case PLATFORM -> "platformSqlSessionFactory";
+                case PLATFORM -> "masterSqlSessionFactory";
                 case BUSINESS -> "businessSqlSessionFactory";
-                case ERP -> "erpSqlSessionFactory";
             });
             scanner.setExcludeFilters(List.of(new RegexPatternTypeFilter(Pattern.compile("^(?!.*Mapper$).*$"))));
             scanner.registerFilters();

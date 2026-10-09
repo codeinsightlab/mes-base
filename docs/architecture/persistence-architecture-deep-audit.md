@@ -1,3 +1,5 @@
+> 2026-10-09：以下为当时架构快照。当前持久化已收敛为中心库 + Factory 多业务库；外部连接、第三工厂及相关测试退出，中心工厂名改为 masterSqlSessionFactory。当前规范与验收见 ADR-004 的 2026-10-09 修订。历史结论不作为现行接入规则。
+
 # Persistence Architecture Deep Audit
 
 审查日期：2026-10-06（Asia/Shanghai）。对象：`mes-base` 当前工作区，HEAD `1c881fe0d56bc625841817652e0c5fcbd6eb4ecd`，**包含审查前已有的未提交修改**，不是该 commit 的纯净快照。

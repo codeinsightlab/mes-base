@@ -21,9 +21,11 @@ with zipfile.ZipFile(JAR) as artifact:
     names = artifact.namelist()
     assert not any("RuntimeFixture" in n or "FoundationHttpTest" in n or "h2-" in n for n in names)
     assert not any(n.startswith("BOOT-INF/lib/mes-mes-") for n in names)
-    for dependency in ("mssql-jdbc-", "mysql-connector-j-", "postgresql-", "flyway-mysql-",
-                       "flyway-database-postgresql-"):
+    assert not any(n.startswith(("BOOT-INF/lib/postgresql-",
+                                 "BOOT-INF/lib/flyway-database-postgresql-")) for n in names)
+    for dependency in ("mysql-connector-j-", "flyway-mysql-"):
         assert any(n.startswith("BOOT-INF/lib/" + dependency) for n in names), dependency
+    assert not any(n.startswith("BOOT-INF/lib/mssql-jdbc-") for n in names)
     deferred_paths = ("dev/mesbase/mes/pro/productionmonitor/", "dev/mesbase/mes/pro/personnelanalysis/")
     deferred_types = ("SystemUserLookup.class", "UserLookupQuery.class", "SysUserDisplayExtraMapper.class",
                       "SysUserDisplayExtraMapper.xml")
@@ -33,7 +35,8 @@ with zipfile.ZipFile(JAR) as artifact:
                       "AnalyticsConfiguration$AnalyticsUnit.class", "AnalyticsConfiguration$AnalyticsAspect.class",
                       "BusinessMapperRegistration.class", "PlatformMapperRegistration.class", "BusinessStatementGuard.class",
                       "ErpAdapter.class", "ErpProvider.class", "ErpConnectionBinding.class", "FactoryErpConnectionResolver.class",
-                      "NotConfiguredErpResolver.class", "IntegrationNotConfiguredException.class", "ErpTransactions.class",
+                      "NotConfiguredErpResolver.class", "IntegrationNotConfiguredException.class", "ErpTransactions.class", "ErpSource.class", "ErpSourceAspect.class",
+                      "ErpSourceContext.class", "ErpRoutingDataSource.class", "PersistenceConfiguration$ErpPersistence.class",
                       "HTMLFilter.class", "ISysAttachmentService.class", "SharedDatabasePersistence.class",
                       "SharedDatabasePersistence$ScopedIdentity.class", "Enterprise.class")
     assert not any(n.endswith(legacy_classes) for n in names)
@@ -101,6 +104,6 @@ def run(profile):
                 process.wait(timeout=5)
 
 run(None)
-result = {"checks": checks, "passed": len(checks), "failed": 0, "boundary": "Local packaged Java process; loopback HTTP; no test accounts or business JDBC or external ERP in this smoke"}
+result = {"checks": checks, "passed": len(checks), "failed": 0, "boundary": "Local packaged Java process; loopback HTTP; no test accounts or business JDBC in this smoke"}
 (OUT / "packaged-smoke.json").write_text(json.dumps(result, ensure_ascii=False, indent=2) + "\n")
 print(json.dumps({"passed": result["passed"], "failed": result["failed"]}))

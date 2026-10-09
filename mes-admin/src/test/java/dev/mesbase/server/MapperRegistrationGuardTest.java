@@ -24,12 +24,6 @@ class MapperRegistrationGuardTest {
                 PersistenceOwner.Kind.BUSINESS, List.of("dev.mesbase.persistencefixture.conflict")));
     }
 
-    @Test
-    void rejectsExternalMappersWhenErpIsDisabled() {
-        rejects("ERP Mappers require enabled ERP persistence", Map.of(
-                PersistenceOwner.Kind.ERP, List.of("dev.mesbase.persistencefixture.erp")));
-    }
-
     private void register(Map<PersistenceOwner.Kind, List<String>> roots) {
         new OwnerMapperRegistration(new MockEnvironment(), roots)
                 .postProcessBeanDefinitionRegistry(new DefaultListableBeanFactory());

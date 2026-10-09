@@ -1,0 +1,37 @@
+#!/bin/sh
+# Use the installed IntelliJ native formatter and repository settings, only for supplied files.
+set -eu
+if [ "$#" -eq 0 ]; then
+    echo "Usage: scripts/format-java [--check] path/to/Changed.java ..." >&2
+    exit 2
+fi
+root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
+idea_home=${MES_IDEA_HOME:-/Applications/IntelliJ IDEA.app}
+formatter="$idea_home/Contents/bin/format.sh"
+if [ ! -x "$formatter" ]; then
+    echo "IntelliJ formatter unavailable; set MES_IDEA_HOME to its application path." >&2
+    exit 1
+fi
+mode=""
+if [ "$1" = "--check" ]; then
+    mode="-dry"
+    shift
+fi
+for file in "$@"; do
+    case "$file" in
+        *.java) test -f "$file" ;;
+        *) echo "Expected an existing Java source file: $file" >&2; exit 2 ;;
+    esac
+done
+# Separate formatter state avoids interrupting an already running IDE.
+formatter_state=$(mktemp -d "${TMPDIR:-/tmp}/mes-base-format.XXXXXX")
+cat > "$formatter_state/idea.properties" <<PROPERTIES
+idea.config.path=$formatter_state/config
+idea.system.path=$formatter_state/system
+idea.log.path=$formatter_state/log
+PROPERTIES
+export IDEA_PROPERTIES="$formatter_state/idea.properties"
+if [ -n "$mode" ]; then
+    exec "$formatter" "$mode" -s "$root/.idea/codeStyles/Project.xml" -charset UTF-8 "$@"
+fi
+exec "$formatter" -s "$root/.idea/codeStyles/Project.xml" -charset UTF-8 "$@"

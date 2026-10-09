@@ -269,7 +269,7 @@ public class SysMenuServiceImpl implements ISysMenuService {
      * @return 结果
      */
     @Override
-    @Transactional(transactionManager = "platformTransactionManager", rollbackFor = Exception.class)
+    @Transactional(transactionManager = "masterTransactionManager", rollbackFor = Exception.class)
     public int insertMenu(SysMenu menu) {
         menu.setMenuId(null);
         BeanValidators.validateWithException(contractValidator, menu);
@@ -284,7 +284,7 @@ public class SysMenuServiceImpl implements ISysMenuService {
      * @return 结果
      */
     @Override
-    @Transactional(transactionManager = "platformTransactionManager", rollbackFor = Exception.class)
+    @Transactional(transactionManager = "masterTransactionManager", rollbackFor = Exception.class)
     public int updateMenu(SysMenu menu) {
         BeanValidators.validateWithException(contractValidator, menu);
         if (menu.getMenuId() == null || menuMapper.selectMenuById(menu.getMenuId()) == null)
@@ -333,7 +333,7 @@ public class SysMenuServiceImpl implements ISysMenuService {
      * @return 结果
      */
     @Override
-    @Transactional(transactionManager = "platformTransactionManager", rollbackFor = Exception.class)
+    @Transactional(transactionManager = "masterTransactionManager", rollbackFor = Exception.class)
     public int deleteMenuById(Long menuId) {
         return menuMapper.deleteMenuById(menuId);
     }

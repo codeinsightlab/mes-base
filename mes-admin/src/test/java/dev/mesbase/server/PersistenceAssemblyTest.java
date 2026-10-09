@@ -8,8 +8,6 @@ import dev.mesbase.core.factory.FactoryScope;
 import dev.mesbase.infrastructure.persistence.BusinessPersistenceResolver;
 import dev.mesbase.infrastructure.persistence.BusinessRuntimeBinding;
 import dev.mesbase.infrastructure.persistence.DatasourceIdentity;
-import dev.mesbase.infrastructure.persistence.ErpRoutingDataSource;
-import dev.mesbase.infrastructure.persistence.ErpTransactions;
 import dev.mesbase.infrastructure.persistence.FactoryBusinessDataSource;
 import dev.mesbase.infrastructure.persistence.OwnedTransactionManager;
 import dev.mesbase.infrastructure.persistence.OwnerMapperCatalog;
@@ -18,7 +16,6 @@ import dev.mesbase.infrastructure.persistence.PersistenceOwner;
 import dev.mesbase.infrastructure.persistence.RuntimeRegistry;
 import dev.mesbase.persistencefixture.business.BusinessProbeMapper;
 import dev.mesbase.persistencefixture.platform.CenterProbeMapper;
-import dev.mesbase.persistencefixture.erp.ErpProbeMapper;
 import dev.mesbase.platform.execution.FactoryContext;
 import org.springframework.beans.factory.support.DefaultListableBeanFactory;
 import org.springframework.mock.env.MockEnvironment;
@@ -42,7 +39,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * TEST ONLY three independent H2 databases; no external ERP business data.
+ * TEST ONLY center plus two independent Factory H2 databases.
  */
 class PersistenceAssemblyTest {
     private DataSource pool(String label) throws Exception {
@@ -58,9 +55,8 @@ class PersistenceAssemblyTest {
     }
 
     @Test
-    void scannersRegisterThreeOwnersWithoutCentralMapperBeansAndFactoryRoutingIsIsolated() throws Exception {
+    void scannersRegisterTwoOwnersWithoutCentralMapperBeansAndFactoryRoutingIsIsolated() throws Exception {
         var center = pool("center");
-        var erp = new ErpRoutingDataSource(Map.of("erp-main", pool("erp")));
         var a = pool("A");
         var b = pool("B");
         var scopeA = new FactoryScope(new FactoryId("A"));
@@ -76,22 +72,16 @@ class PersistenceAssemblyTest {
                     .equals(scopeA.factoryId()) ? bindA : bindB, registry);
             var platformManager = new OwnedTransactionManager(center);
             var businessManager = new OwnedTransactionManager(business);
-            var erpManager = new OwnedTransactionManager(erp);
-            var erpTransactions = new ErpTransactions(erpManager);
             context.getEnvironment().getPropertySources()
-                    .addFirst(new MapPropertySource("fixture", Map.of("mes.erp.enabled", true, "mes.persistence.mapper-packages", "dev.mesbase.persistencefixture")));
-            context.addBeanFactoryPostProcessor(new OwnerMapperRegistration(context.getEnvironment(), Map.of(PersistenceOwner.Kind.PLATFORM, List.of("dev.mesbase.persistencefixture.platform"), PersistenceOwner.Kind.BUSINESS, List.of("dev.mesbase.persistencefixture.business"), PersistenceOwner.Kind.ERP, List.of("dev.mesbase.persistencefixture.erp"))));
-            context.registerBean("platformSqlSessionFactory", SqlSessionFactory.class, () -> PersistenceFactories.create(center, Set.of(CenterProbeMapper.class), c -> {
+                    .addFirst(new MapPropertySource("fixture", Map.of("mes.persistence.mapper-packages", "dev.mesbase.persistencefixture")));
+            context.addBeanFactoryPostProcessor(new OwnerMapperRegistration(context.getEnvironment(), Map.of(PersistenceOwner.Kind.PLATFORM, List.of("dev.mesbase.persistencefixture.platform"), PersistenceOwner.Kind.BUSINESS, List.of("dev.mesbase.persistencefixture.business"))));
+            context.registerBean("masterSqlSessionFactory", SqlSessionFactory.class, () -> PersistenceFactories.create(center, Set.of(CenterProbeMapper.class), c -> {
             }, platformManager::verifyAccess));
             context.registerBean("businessSqlSessionFactory", SqlSessionFactory.class, () -> PersistenceFactories.create(business, Set.of(BusinessProbeMapper.class), c -> {
             }, businessManager::verifyAccess));
-            context.registerBean("erpSqlSessionFactory", SqlSessionFactory.class, () -> PersistenceFactories.create(erp, Set.of(ErpProbeMapper.class), c -> {
-            }, erpManager::verifyAccess));
             context.refresh();
-            assertEquals(3, context.getBeansOfType(SqlSessionFactory.class).size());
+            assertEquals(2, context.getBeansOfType(SqlSessionFactory.class).size());
             assertEquals("center", context.getBean(CenterProbeMapper.class).label());
-            assertEquals("erp", erpTransactions.execute("erp-main", () -> context.getBean(ErpProbeMapper.class)
-                    .label()));
             assertThrows(RuntimeException.class, () -> context.getBean(BusinessProbeMapper.class).label());
             var tx = new TransactionTemplate(businessManager);
             assertEquals("A", FactoryContext.withScope(scopeA, () -> tx.execute(status -> context.getBean(BusinessProbeMapper.class)
@@ -101,15 +91,19 @@ class PersistenceAssemblyTest {
             FactoryContext.withScope(scopeA, () -> tx.execute(status -> {
                 assertThrows(RuntimeException.class, () -> FactoryContext.bind(scopeB));
                 assertThrows(RuntimeException.class, () -> context.getBean(CenterProbeMapper.class).label());
-                assertThrows(RuntimeException.class, () -> context.getBean(ErpProbeMapper.class).label());
-                assertThrows(RuntimeException.class, () -> erpTransactions.execute("erp-main", () -> context.getBean(ErpProbeMapper.class)
-                        .label()));
                 var nested = new TransactionTemplate(businessManager);
                 nested.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
                 assertEquals("A", nested.execute(inner -> context.getBean(BusinessProbeMapper.class).label()));
                 assertEquals("A", context.getBean(BusinessProbeMapper.class).label());
                 return null;
             }));
+            new TransactionTemplate(platformManager).execute(status -> {
+                assertThrows(RuntimeException.class, () -> FactoryContext.withScope(scopeA,
+                        () -> context.getBean(BusinessProbeMapper.class).label()));
+                assertThrows(RuntimeException.class, () -> FactoryContext.withScope(scopeA,
+                        () -> tx.execute(inner -> context.getBean(BusinessProbeMapper.class).label())));
+                return null;
+            });
             assertTrue(FactoryContext.current().isEmpty());
         }
     }
@@ -127,21 +121,19 @@ class PersistenceAssemblyTest {
             context.registerBean(BusinessPersistenceResolver.class, () -> scope -> {
                 throw new IllegalStateException("TEST ONLY no Factory connection");
             });
-            context.getEnvironment().getPropertySources().addFirst(new MapPropertySource("erp-fixture", Map.of(
-                    "mes.erp.enabled", true,
-                    "mes.erp.datasources.erp-main.url", "jdbc:h2:mem:" + UUID.randomUUID(),
-                    "mes.erp.datasources.erp-main.username", "sa",
-                    "mes.erp.datasources.erp-main.password", "",
-                    "mes.erp.datasources.erp-main.driver-class-name", "org.h2.Driver")));
             context.register(PersistenceConfiguration.class, DruidMonitorService.class, DruidController.class);
             context.refresh();
-            assertEquals(3, context.getBeansOfType(SqlSessionFactory.class).size());
-            assertEquals(3, context.getBeansOfType(DataSource.class).size());
+            assertEquals(Set.of("masterSqlSessionFactory", "businessSqlSessionFactory"),
+                    context.getBeansOfType(SqlSessionFactory.class).keySet());
+            assertEquals(Set.of("masterDataSource", "businessDataSource"),
+                    context.getBeansOfType(DataSource.class).keySet());
+            assertEquals(Set.of("masterTransactionManager", "businessTransactionManager"),
+                    context.getBeansOfType(OwnedTransactionManager.class).keySet());
             var stats = context.getBean(DruidController.class).stats();
             assertEquals("platform", ((DruidController.Pool) stats.get(AjaxResult.DATA_TAG)).name());
             assertTrue(context.containsBean("sysUserMapper"));
             assertTrue(context.getBean(OwnerMapperCatalog.class).types(PersistenceOwner.Kind.BUSINESS).isEmpty());
-            assertTrue(context.containsBean("platformTransactionManager"));
+            assertTrue(context.containsBean("masterTransactionManager"));
             assertTrue(context.containsBean("businessTransactionManager"));
         }
     }

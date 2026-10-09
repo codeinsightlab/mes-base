@@ -30,7 +30,9 @@ public class SysAutoCodeGenerationServiceImpl {
     private final AutoCodeExtraMapper extra;
     private final PartTypeHandler handler;
 
-    public SysAutoCodeGenerationServiceImpl(IAutoCodeRuleService rules, IAutoCodePartService parts, SysAutoCodeResultMapper results, AutoCodeExtraMapper extra, PartTypeHandler handler) {
+    public SysAutoCodeGenerationServiceImpl(IAutoCodeRuleService rules, IAutoCodePartService parts,
+                                            SysAutoCodeResultMapper results, AutoCodeExtraMapper extra,
+                                            PartTypeHandler handler) {
         this.rules = rules;
         this.parts = parts;
         this.results = results;
@@ -38,7 +40,7 @@ public class SysAutoCodeGenerationServiceImpl {
         this.handler = handler;
     }
 
-    @Transactional(transactionManager = "platformTransactionManager", rollbackFor = Exception.class)
+    @Transactional(transactionManager = "masterTransactionManager", rollbackFor = Exception.class)
     public String generate(String ruleCode, String inputCharacter) {
         return execute(ruleCode, inputCharacter, true);
     }
@@ -67,7 +69,8 @@ public class SysAutoCodeGenerationServiceImpl {
         int next = 0;
         if (!serial.isEmpty()) {
             try {
-                next = previous == null ? serial.get(0).getSeriaStartNo() : Math.addExact(previous.getLastSerialNo(), serial.get(0).getSeriaStep());
+                next = previous == null ? serial.get(0)
+                        .getSeriaStartNo() : Math.addExact(previous.getLastSerialNo(), serial.get(0).getSeriaStep());
             } catch (ArithmeticException e) {
                 throw new ServiceException("流水号已耗尽");
             }

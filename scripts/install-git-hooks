@@ -1,0 +1,5 @@
+#!/bin/sh
+set -eu
+cd "$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"
+git config core.hooksPath .githooks
+echo 'Installed repository pre-commit and pre-push hooks.'

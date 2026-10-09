@@ -21,10 +21,10 @@ import org.springframework.transaction.annotation.Transactional;
  * @author ruoyi
  */
 @Service
-@ConditionalOnProperty(name="mes.system.enabled",havingValue="true")
-public class SysPostServiceImpl implements ISysPostService
-{
-    @Autowired private Validator contractValidator;
+@ConditionalOnProperty(name = "mes.system.enabled", havingValue = "true")
+public class SysPostServiceImpl implements ISysPostService {
+    @Autowired
+    private Validator contractValidator;
     @Autowired
     private SysPostMapper postMapper;
 
@@ -38,8 +38,7 @@ public class SysPostServiceImpl implements ISysPostService
      * @return 岗位信息集合
      */
     @Override
-    public List<SysPost> selectPostList(SysPost post)
-    {
+    public List<SysPost> selectPostList(SysPost post) {
         return postMapper.selectPostList(post);
     }
 
@@ -49,8 +48,7 @@ public class SysPostServiceImpl implements ISysPostService
      * @return 岗位列表
      */
     @Override
-    public List<SysPost> selectPostAll()
-    {
+    public List<SysPost> selectPostAll() {
         return postMapper.selectPostAll();
     }
 
@@ -61,8 +59,7 @@ public class SysPostServiceImpl implements ISysPostService
      * @return 角色对象信息
      */
     @Override
-    public SysPost selectPostById(Long postId)
-    {
+    public SysPost selectPostById(Long postId) {
         return postMapper.selectPostById(postId);
     }
 
@@ -73,8 +70,7 @@ public class SysPostServiceImpl implements ISysPostService
      * @return 选中岗位ID列表
      */
     @Override
-    public List<Long> selectPostListByUserId(Long userId)
-    {
+    public List<Long> selectPostListByUserId(Long userId) {
         return postMapper.selectPostListByUserId(userId);
     }
 
@@ -85,12 +81,10 @@ public class SysPostServiceImpl implements ISysPostService
      * @return 结果
      */
     @Override
-    public String checkPostNameUnique(SysPost post)
-    {
+    public String checkPostNameUnique(SysPost post) {
         Long postId = StringUtils.isNull(post.getPostId()) ? -1L : post.getPostId();
         SysPost info = postMapper.checkPostNameUnique(post.getPostName());
-        if (StringUtils.isNotNull(info) && info.getPostId().longValue() != postId.longValue())
-        {
+        if (StringUtils.isNotNull(info) && info.getPostId().longValue() != postId.longValue()) {
             return UserConstants.NOT_UNIQUE;
         }
         return UserConstants.UNIQUE;
@@ -103,12 +97,10 @@ public class SysPostServiceImpl implements ISysPostService
      * @return 结果
      */
     @Override
-    public String checkPostCodeUnique(SysPost post)
-    {
+    public String checkPostCodeUnique(SysPost post) {
         Long postId = StringUtils.isNull(post.getPostId()) ? -1L : post.getPostId();
         SysPost info = postMapper.checkPostCodeUnique(post.getPostCode());
-        if (StringUtils.isNotNull(info) && info.getPostId().longValue() != postId.longValue())
-        {
+        if (StringUtils.isNotNull(info) && info.getPostId().longValue() != postId.longValue()) {
             return UserConstants.NOT_UNIQUE;
         }
         return UserConstants.UNIQUE;
@@ -121,8 +113,7 @@ public class SysPostServiceImpl implements ISysPostService
      * @return 结果
      */
     @Override
-    public int countUserPostById(Long postId)
-    {
+    public int countUserPostById(Long postId) {
         return userPostMapper.countUserPostById(postId);
     }
 
@@ -133,9 +124,8 @@ public class SysPostServiceImpl implements ISysPostService
      * @return 结果
      */
     @Override
-    @Transactional(transactionManager="platformTransactionManager", rollbackFor=Exception.class)
-    public int deletePostById(Long postId)
-    {
+    @Transactional(transactionManager = "masterTransactionManager", rollbackFor = Exception.class)
+    public int deletePostById(Long postId) {
         return postMapper.deletePostById(postId);
     }
 
@@ -146,14 +136,11 @@ public class SysPostServiceImpl implements ISysPostService
      * @return 结果
      */
     @Override
-    @Transactional(transactionManager="platformTransactionManager", rollbackFor=Exception.class)
-    public int deletePostByIds(Long[] postIds)
-    {
-        for (Long postId : postIds)
-        {
+    @Transactional(transactionManager = "masterTransactionManager", rollbackFor = Exception.class)
+    public int deletePostByIds(Long[] postIds) {
+        for (Long postId : postIds) {
             SysPost post = selectPostById(postId);
-            if (countUserPostById(postId) > 0)
-            {
+            if (countUserPostById(postId) > 0) {
                 throw new ServiceException(String.format("%1$s已分配,不能删除", post.getPostName()));
             }
         }
@@ -167,10 +154,9 @@ public class SysPostServiceImpl implements ISysPostService
      * @return 结果
      */
     @Override
-    @Transactional(transactionManager="platformTransactionManager", rollbackFor=Exception.class)
-    public int insertPost(SysPost post)
-    {
-        BeanValidators.validateWithException(contractValidator,post);
+    @Transactional(transactionManager = "masterTransactionManager", rollbackFor = Exception.class)
+    public int insertPost(SysPost post) {
+        BeanValidators.validateWithException(contractValidator, post);
         return postMapper.insertPost(post);
     }
 
@@ -181,10 +167,9 @@ public class SysPostServiceImpl implements ISysPostService
      * @return 结果
      */
     @Override
-    @Transactional(transactionManager="platformTransactionManager", rollbackFor=Exception.class)
-    public int updatePost(SysPost post)
-    {
-        BeanValidators.validateWithException(contractValidator,post);
+    @Transactional(transactionManager = "masterTransactionManager", rollbackFor = Exception.class)
+    public int updatePost(SysPost post) {
+        BeanValidators.validateWithException(contractValidator, post);
         return postMapper.updatePost(post);
     }
 }
