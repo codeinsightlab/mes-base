@@ -19,7 +19,7 @@
 | --- | --- | --- | --- |
 | 1 | 私有配置取消跟踪 + 加入 .gitignore | `git ls-files` 无两个 profile（exit 1）；`git check-ignore -v` 命中 `.gitignore:8/9`；`git ls-tree -r HEAD`、`origin/main`、全部 `for-each-ref` 引用树均 0 命中；本地文件保留且权限 `0600` | **确认** |
 | 2 | 历史凭据已清除（5 个值） | 从本地两个 profile 提取 **5 个非空凭据值**（password / datasource-key），对 `git cat-file --batch-all-objects` 全量 **2,592 对象 / 1,298 blob（含不可达）** 扫描：**0 命中**。另：`git log --all -- <profile>` = 0，reflog 空、无 stash | **确认** |
-| 3 | 无其它明文凭据残留 | 全库 yml/yaml/properties/resources/config 路径下 30 处非空 `password/datasource-key/secret-key/access-key` 行**全部为 `${...}` 占位或变量引用**（含历史 `verify-codegen-http` 的 `password=os.environ[...]`、旧 `smoke-packaged.py` 的运行时随机口令） | **确认（无真实字面量）** |
+| 3 | 无其它明文凭据残留 | 该检查**与具体值无关**：枚举对象库中**所有**含非空 `password/datasource-key/secret-key/access-key` 字面量的 blob（15 个），经逐条辨明**全部是 `${...}` 占位或变量引用**——含历史 `verify-codegen-http` 的 `password=os.environ[...]`（缺变量即 `SystemExit`）、旧 `smoke-packaged.py` 的运行时随机口令。故**不存在任何**历史明文凭据，与值是否轮换无关 | **确认（无真实字面量）** |
 | 4 | 示例配置账号改为占位符 | `HEAD:config/application-{dev,prod}.example.yml`：`username: your-db-user`，`password: ""`，`datasource-key: ""` | **确认** |
 | 5 | 防复发：守卫 + hooks + 安装脚本 | `scripts/check-private-config.py`、`java-git-hook.py`、`format-java`、`install-git-hooks`、`.githooks/pre-commit|pre-push` 均在提交内；`core.hooksPath=.githooks`。**实跑守卫三种模式均 exit 0**：无参（索引）、`--staged`、`--revision HEAD`。pre-commit 对部分暂存 Java 明确拒绝自动重暂存 | **确认** |
 | 6 | 无用依赖移除 | `mes-admin/pom.xml` 仅剩 `flyway-core` + `flyway-mysql`；全仓 pom `postgresql` 0 命中。**独立复跑 `scripts/smoke-packaged.py`：passed 6 / failed 0**，断言含「排除 postgresql / 保留 mysql + flyway-mysql」 | **确认** |
