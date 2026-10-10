@@ -18,8 +18,6 @@ import dev.mesbase.core.factory.FactorySelectionService;
 import dev.mesbase.core.security.Permission;
 import dev.mesbase.core.error.ErrorCode;
 import dev.mesbase.core.error.FoundationException;
-import dev.mesbase.common.openapi.OpenApiPrincipal;
-import dev.mesbase.framework.openapi.OpenApiHttp;
 import dev.mesbase.platform.execution.FactoryContext;
 import dev.mesbase.platform.security.PlatformAuthorization;
 
@@ -46,15 +44,6 @@ public final class FoundationAccessInterceptor implements HandlerInterceptor {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         if (authentication == null || !authentication.isAuthenticated() || authentication instanceof AnonymousAuthenticationToken)
             throw new FoundationException(ErrorCode.UNAUTHENTICATED);
-        if (authentication.getPrincipal() instanceof OpenApiPrincipal) {
-            // External API grants were checked by the preceding dedicated interceptor.
-            // Never resolve an external appKey as an internal SysUser or implicit factory preference.
-            if (!OpenApiHttp.isOpenApi(request)
-                    || access.value() != EndpointAccess.Kind.AUTHENTICATED
-                    || access.permissionScope() != EndpointAccess.PermissionScope.PLATFORM)
-                throw new FoundationException(ErrorCode.FORBIDDEN);
-            return true;
-        }
         AuthenticatedActor actor = new AuthenticatedActor(authentication.getName());
         String explicit = request.getHeader("X-Factory-Id");
         Optional<FactoryId> requested;

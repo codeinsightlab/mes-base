@@ -165,3 +165,39 @@ businessDataSource 为 FactoryBusinessDataSource，一个入口按 Factory 在 R
 Druid sources/snapshot 仅列中心库 platform 与 business:<id>；PLATFORM/BUSINESS 是监控 API 和权限的现有语义。监控不借业务连接、不创建业务池；未加载/停用继续明确返回状态。UI 同步移除 EXTERNAL 类型，权限、过期响应隔离和 SQL 脱敏保留。OpenAPI、Redis、私有存储与通用同步协调不属于被删除的外部数据库框架。
 
 验证结果见 ADR-004 的 2026-10-09 修订及本轮验收收据；历史章节链接到已删除模板不再是接入入口。
+
+
+### 2026-10-10 OpenAPI 仅基础设施可选模块
+
+本节取代此前 OpenAPI 客户端、Token、授权及数据范围接入说明；历史验收仅证明当时版本，不代表当前产品能力。
+
+**SOURCE_PRODUCT_PORT 审查：** Source 的 `ktg-common/.../openapi/OpenApiEndpoint.java` 定义接口标识；`ktg-framework/.../openapi/OpenApiCatalogService.java` 只读取 MVC HandlerMapping；`ktg-admin/.../OpenApiDocumentationConfig.java` 混合了文档、旧令牌安全声明、错误协议及报表占位符处理。当前 Base 原迁移分散在 common/framework/system/admin，且客户端 Controller、授权 Mapper、专用安全链和 Foundation 外部身份分支彼此强耦合，不符合本次基础设施范围。
+
+**保留：** 独立 `mes-openapi/pom.xml`，包 `dev.mesbase.openapi`，迁移方法/类元数据及目录模型、MVC 实时发现；目录按合法声明与 `/open-api/v1/**` 筛选；文档 OperationCustomizer 为已声明的方法补充元数据。动态引用指依赖与开关控制装配，目录每次读取当前已注册映射，不做任意反射调用、插件热加载或自动暴露内部 Controller。
+
+**舍弃：** 旧消费者应用管理、Secret/Token、API grants、工艺路由授权、SysUser/角色/菜单关联、数据权限策略及绕过注解、旧 Filter/Interceptor/ResponseAdvice、诊断/verification HTTP 接口及客户端管理 UI。没有迁移 MES 业务 API，没有新增外部数据库或 SessionFactory。
+
+**使用：** `mvn -B -ntp -Popenapi verify` 将可选模块放入 admin 依赖；宿主项目也可直接引入 `dev.mesbase:mes-openapi:${project.version}`。运行设置 `open-api.enabled=true` 后由 Boot AutoConfiguration.imports 加载，无需修改宿主扫描包。不引入依赖或关闭开关均不装配。模块无公开 Controller、GroupedOpenApi Bean、安全链、Mapper、Redis 或用户依赖。文档仅补充宿主已有受控 Swagger 入口元数据；Base 仍关闭 Springdoc 默认公共文档路由。
+
+```java
+import dev.mesbase.openapi.OpenApiEndpoint;
+
+// 后续实际接口还必须按宿主规则声明 EndpointAccess，独立设计认证、授权及 Request/Response。
+@OpenApiEndpoint(value = "example.read", description = "接口描述")
+```
+
+**数据库兼容：** V10 已应用的 checksum 不变；V16 删除旧 OpenAPI 菜单及 sys_role_menu 关联。历史 open_api_client/open_api_client_api 数据表保留为无运行时引用的遗留数据，未自动销毁客户端记录。旧客户端 Token 将不再由应用接受。未执行真实数据库迁移；若需要销毁遗留表另做数据审查。
+
+**验证：** OpenApiInfrastructureTest 覆盖默认/显式关闭、独立于 system 启用、空目录、实时注册/撤销映射、内部路径/非法标识/漏标排除及文档元数据。InfrastructureContextTest 保留双 DataSource/SessionFactory/事务管理器、单内部安全链及 Quartz 关闭证明；RequestStateLifecycleTest 保留请求 ID/MDC、分页和 Factory 异常清理。测试及打包结果见本节后续回执；Fixture 不等于真实数据库或业务验收。
+
+**2026-10-10 验证回执：**
+
+- `mvn -B -ntp test`、`mvn -B -ntp clean verify`、`mvn -B -ntp -Popenapi verify` 均通过。最新 Surefire 共 187 项，183 通过、4 个真实 MySQL opt-in 用例跳过；其中动态装配/目录 2 项及 V16 H2 迁移 1 项通过。
+- 默认包 `/usr/bin/python3 scripts/smoke-packaged.py` 10/10；启用包 `... --openapi` 11/11。真实本地 Java 进程证明默认不含模块、启用包包含模块并自动装配；旧 Token/诊断与公共分组文档均 404，health 200、受保护上下文 401。无业务 JDBC 或测试账号。
+- 首次启用包因为 GroupedOpenApi Bean 注册未分类 openapiYaml 路由，被 EndpointCatalog 启动检查拒绝；已删除该 Bean，只保留受控宿主入口的 OperationCustomizer，重跑 verify 与打包 smoke 通过。未放宽端点启动检查。
+- 独立模块打包包含 Source Product MIT 许可；补许可后 `mvn -B -ntp -Popenapi -DskipTests package` 通过（此前测试已通过）。
+- IDEA 仅格式化本次 12 个 Java 文件，格式检查通过；Git hooks 已安装；后端与 UI `git diff --check` 通过。用户既有 codegen/CrudPage 工作未覆盖。
+- UI `npm run test` 最新 84/84；构建曾被并行 CRUD 工作中的测试类型错误阻断，最终结果见下条回执。
+- 未执行真实 MySQL V16 迁移、提交、推送或部署；历史客户端数据未销毁。回滚代码/模块配置需同时恢复旧 UI 和权限链，已执行数据库迁移的环境需另行审查，不能默认恢复旧授权。
+
+- 最终 UI `npm run build` 通过（Vue/TypeScript 检查与 Vite 生产构建）；此前并行测试类型错误已由工作区其他改动解决，本任务未修改该 CRUD 测试。现有 bundle 体积提示仍保留，未顺手优化。

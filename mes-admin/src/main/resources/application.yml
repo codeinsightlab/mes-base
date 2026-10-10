@@ -101,15 +101,8 @@ springdoc:
   swagger-ui:
     enabled: false
   paths-to-match: /api/**,/health,/open-api/**
-  packages-to-scan: dev.mesbase.web.controller,dev.mesbase.quartz.controller,dev.mesbase.server,dev.mesbase.framework.openapi
+  packages-to-scan: dev.mesbase.web.controller,dev.mesbase.quartz.controller,dev.mesbase.server
 
-# SOURCE_PRODUCT_PORT: external application authentication and API grants; no route assumptions.
+# Optional infrastructure only. Package with -Popenapi and explicitly enable at runtime.
 open-api:
-  enabled: true
-  namespace: base
-  token-ttl-seconds: 7200
-  rate-window-seconds: 60
-  token-rate-limit: 20
-  api-rate-limit: 120
-  data-scope:
-    enabled: false
+  enabled: false

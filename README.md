@@ -77,15 +77,13 @@ Quartz 保留 Cron/启停/手动运行/日志。暂停只禁止自动触发，�
 
 ## 外部 OpenAPI
 
-`/system/openApiClient` 是 Source 应用管理页，`/api/system/open-api/clients` 是后台管理接口。保留源表 open_api_client / open_api_client_api 的字段、默认禁用、一次性 Secret、启停/重置递增凭证版本、分组接口授权。Source 工艺范围管理后置，没有复制 ProRoute。
+OpenAPI 仅保留可选基础设施模块 `mes-openapi`：接口元数据声明、从当前 MVC 注册表动态发现目录、Springdoc 文档元数据。构建 `mvn -B -ntp -Popenapi verify` 才把模块加入 admin 的运行依赖；运行时 `open-api.enabled=true` 才装配，默认关闭。模块不依赖内部用户、角色、菜单、Factory 权限或业务数据库，不注册公开 HTTP 入口。
 
-`POST /open-api/token` 用 appKey/appSecret 换外部 Token，`POST /open-api/token/revoke` 撤销当前 Token；`/open-api/v1/diagnostics/**` 与 verification/** 为实际通用诊断接口。外部 Token 不取得后台用户或 Factory 权限；API 授权和当前客户端状态每次请求读取。Redis 使用平台 DB 身份命名空间，支持 Source 的有效期内重复申请复用/续期。
-
-YAML `open-api.data-scope.enabled` 默认 false（环境变量 MES_OPEN_API_DATA_SCOPE_ENABLED）。开关只控制业务数据范围扩展，保留认证/API 授权；启用必须提供唯一 OpenApiDataScopeValidator，否则启动失败。未来 MES 可按工艺、仓库、产品等实际规则实现，不绑定工艺概念，也不能用此开关放宽 Factory/Mapper/resource ownership。完整配置与响应契约见 [Platform 指南](docs/development/platform.md)。
+旧客户端管理、Token、API 授权、数据权限、诊断/verification 及 UI 已退役。后续业务接口必须另立任务并保留宿主的显式访问控制；声明注解不会授予访问权。迁移证据与使用方式见 [Platform 指南](docs/development/platform.md#2026-10-10-openapi-仅基础设施可选模块)。
 
 ## SQL 与来源
 
-Flyway 为 platform V1 + system V2–V15；V11 为工厂/数据源，V12 为同步协调，V13 为管理与分析权限菜单，V14 按源库实际结构扩大头像字段，V15 移除两项分析功能的菜单与角色菜单关联，保留工厂/数据源管理。导出命令直接合并当前迁移，不另维护第二套字段：
+Flyway 为 platform V1 + system V2–V16；V11 为工厂/数据源，V12 为同步协调，V13 为管理与分析权限菜单，V14 按源库实际结构扩大头像字段，V15 移除两项分析功能的菜单与角色菜单关联，保留工厂/数据源管理。导出命令直接合并当前迁移，不另维护第二套字段：
 
 ```sh
 /usr/bin/python3 scripts/export-phase1-sql.py

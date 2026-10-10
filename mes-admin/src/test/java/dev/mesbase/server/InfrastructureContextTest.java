@@ -2,13 +2,6 @@ package dev.mesbase.server;
 
 import dev.mesbase.common.core.redis.SystemCacheNamespace;
 import dev.mesbase.core.security.AuthorizationService;
-import dev.mesbase.framework.openapi.OpenApiAuthenticationFilter;
-import dev.mesbase.framework.openapi.OpenApiHttp;
-import dev.mesbase.framework.openapi.OpenApiRateLimiter;
-import dev.mesbase.framework.openapi.OpenApiRequestFilter;
-import dev.mesbase.framework.openapi.OpenApiSecurityConfig;
-import dev.mesbase.framework.openapi.OpenApiTokenService;
-import dev.mesbase.framework.openapi.OpenApiWebConfig;
 import dev.mesbase.framework.security.SystemTokenFilter;
 import dev.mesbase.framework.web.service.TokenService;
 import dev.mesbase.infrastructure.persistence.OwnerMapperCatalog;
@@ -16,7 +9,6 @@ import dev.mesbase.infrastructure.persistence.PersistenceOwner;
 import dev.mesbase.infrastructure.persistence.RuntimeRegistry;
 import dev.mesbase.platform.web.RequestBoundaryFilter;
 import dev.mesbase.quartz.service.impl.SysJobServiceImpl;
-import dev.mesbase.system.openapi.service.OpenApiClientService;
 import dev.mesbase.system.service.ISysConfigService;
 import dev.mesbase.system.service.ISysDictTypeService;
 import dev.mesbase.system.service.ISysUserService;
@@ -97,11 +89,6 @@ class InfrastructureContextTest {
         }
 
         @Bean
-        OpenApiClientService clients() {
-            return mock(OpenApiClientService.class);
-        }
-
-        @Bean
         RedisConnectionFactory redisConnections() {
             return mock(RedisConnectionFactory.class);
         }
@@ -113,7 +100,7 @@ class InfrastructureContextTest {
     }
 
     @Test
-    void productionInfrastructureCreatesTwoOwnersTwoSecurityChainsAndClosesQuartz() throws Exception {
+    void productionInfrastructureCreatesTwoOwnersOneSecurityChainAndClosesQuartz() throws Exception {
         Scheduler scheduler;
         try (var context = new AnnotationConfigWebApplicationContext()) {
             context.setServletContext(new MockServletContext());
@@ -134,8 +121,7 @@ class InfrastructureContextTest {
             context.register(FixtureDependencies.class, FoundationConfiguration.class,
                     PersistenceConfiguration.class, FactoryRuntimeConfiguration.class,
                     SystemConfiguration.class, SystemRedisConfiguration.class,
-                    OpenApiSecurityConfig.class, OpenApiWebConfig.class, OpenApiTokenService.class,
-                    OpenApiRateLimiter.class, OpenApiHttp.class, SystemCacheNamespace.class,
+                    SystemCacheNamespace.class,
                     RequestBoundaryFilter.class);
             context.refresh();
 
@@ -149,20 +135,16 @@ class InfrastructureContextTest {
             assertTrue(context.getBean(OwnerMapperCatalog.class).types(PersistenceOwner.Kind.BUSINESS).isEmpty());
 
             var chains = context.getBeansOfType(SecurityFilterChain.class);
-            assertEquals(2, chains.size());
+            assertEquals(1, chains.size());
             assertEquals(1, chains.get("security").getFilters().stream()
                     .filter(SystemTokenFilter.class::isInstance).count());
-            assertEquals(1, chains.get("openApiSecurity").getFilters().stream()
-                    .filter(OpenApiRequestFilter.class::isInstance).count());
-            assertEquals(1, chains.get("openApiSecurity").getFilters().stream()
-                    .filter(OpenApiAuthenticationFilter.class::isInstance).count());
             var registration = context.getBean("systemTokenRegistration", FilterRegistrationBean.class);
             assertFalse(registration.isEnabled());
             assertSame(context.getBean(SystemTokenFilter.class), registration.getFilter());
             assertTrue(context.getBean("xss", FilterRegistrationBean.class).isEnabled());
             assertEquals(1, context.getBeansOfType(RequestBoundaryFilter.class).size());
             verifyNoInteractions(context.getBean(ISysUserService.class),
-                    context.getBean(SystemPermissionService.class), context.getBean(OpenApiClientService.class));
+                    context.getBean(SystemPermissionService.class));
 
             scheduler = context.getBean(Scheduler.class);
             assertTrue(scheduler.isStarted());

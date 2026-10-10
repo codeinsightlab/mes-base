@@ -6,6 +6,7 @@ import os
 from pathlib import Path
 import re
 import subprocess
+import sys
 import time
 import urllib.request
 import urllib.error
@@ -16,9 +17,11 @@ JAR = ROOT / "target/mes-base-0.1.0-SNAPSHOT.jar"
 OUT = ROOT / "target/validation"
 OUT.mkdir(parents=True, exist_ok=True)
 JAVA = os.environ.get("MES_JAVA_BIN", "java")
+WITH_OPENAPI = "--openapi" in sys.argv[1:]
 checks = []
 with zipfile.ZipFile(JAR) as artifact:
     names = artifact.namelist()
+    assert any(n.startswith("BOOT-INF/lib/mes-openapi-") for n in names) == WITH_OPENAPI
     assert not any("RuntimeFixture" in n or "FoundationHttpTest" in n or "h2-" in n for n in names)
     assert not any(n.startswith("BOOT-INF/lib/mes-mes-") for n in names)
     assert not any(n.startswith(("BOOT-INF/lib/postgresql-",
@@ -43,10 +46,14 @@ with zipfile.ZipFile(JAR) as artifact:
     for name in names:
         if name.startswith("BOOT-INF/lib/mes-") and name.endswith(".jar"):
             with zipfile.ZipFile(io.BytesIO(artifact.read(name))) as module:
+                assert not any(n.startswith(("dev/mesbase/common/openapi/", "dev/mesbase/framework/openapi/",
+                                             "dev/mesbase/system/openapi/")) for n in module.namelist())
                 assert not any(n.endswith(legacy_classes) for n in module.namelist())
                 assert not any(n.startswith(deferred_paths) or n.endswith(deferred_types)
                                for n in module.namelist())
     assert not any(any(path in n for path in deferred_paths) or n.endswith(deferred_types) for n in names)
+    assert not any(n.endswith("OpenApiClientController.class") for n in names)
+checks.append({"case": "optional-openapi-dependency-and-retired-permissions", "passed": True})
 checks.append({"case": "packaging-excludes-test-entities-and-H2", "passed": True})
 checks.append({"case": "packaging-excludes-legacy-platform-implementation", "passed": True})
 checks.append({"case": "packaging-excludes-deferred-business-features", "passed": True})
@@ -58,9 +65,12 @@ def run(profile):
         JAVA, "-jar", str(JAR), "--server.port=0", "--server.address=127.0.0.1",
         "--spring.config.location=classpath:/application.yml",
         "--spring.profiles.active=" + (profile or "default"),
+        "--open-api.enabled=" + str(WITH_OPENAPI).lower(),
         "--logging.level.org.springframework.boot.web.servlet=DEBUG",
         "--logging.level.org.springframework.security.web.DefaultSecurityFilterChain=DEBUG",
     ]
+    if WITH_OPENAPI:
+        command.append("--debug")
     logfile = OUT / ("packaged-" + (profile or "default") + ".log")
     with logfile.open("w") as stream:
         process = subprocess.Popen(command, cwd=ROOT, env=environment, stdout=stream, stderr=subprocess.STDOUT)
@@ -95,6 +105,12 @@ def run(profile):
                 checks.append({"profile": profile or "default", "path": path, "expected": expected, "actual": actual, "passed": True})
             check("/health", 200)
             check("/api/foundation/context", 401)
+            check("/open-api/token", 404)
+            check("/open-api/v1/diagnostics/ping", 404)
+            check("/v3/api-docs/open-api", 404)
+            if WITH_OPENAPI:
+                assert "OpenApiAutoConfiguration matched:" in logfile.read_text()
+                checks.append({"case": "openapi-auto-configuration-enabled-without-system", "passed": True})
         finally:
             process.terminate()
             try:

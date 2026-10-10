@@ -65,6 +65,18 @@
             <scope>runtime</scope>
         </dependency>
     </dependencies>
+    <profiles>
+        <profile>
+            <id>openapi</id>
+            <dependencies>
+                <dependency>
+                    <groupId>dev.mesbase</groupId>
+                    <artifactId>mes-openapi</artifactId>
+                    <version>${project.version}</version>
+                </dependency>
+            </dependencies>
+        </profile>
+    </profiles>
     <build>
         <directory>${maven.multiModuleProjectDirectory}/target/mes-admin</directory>
         <finalName>mes-base-${project.version}</finalName>

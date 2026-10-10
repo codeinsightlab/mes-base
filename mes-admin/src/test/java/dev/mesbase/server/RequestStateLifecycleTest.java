@@ -1,11 +1,8 @@
 package dev.mesbase.server;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.github.pagehelper.PageHelper;
 import dev.mesbase.core.factory.FactoryId;
 import dev.mesbase.core.factory.FactoryScope;
-import dev.mesbase.framework.openapi.OpenApiHttp;
-import dev.mesbase.framework.openapi.OpenApiRequestFilter;
 import dev.mesbase.platform.execution.FactoryContext;
 import dev.mesbase.platform.web.RequestBoundaryFilter;
 import jakarta.servlet.DispatcherType;
@@ -62,21 +59,16 @@ class RequestStateLifecycleTest {
     }
 
     @Test
-    void openApiErrorUsesBoundaryIdAndRestoresCallerMdc() throws Exception {
+    void failureKeepsBoundaryIdAndRestoresCallerMdc() throws Exception {
         var request = new MockHttpServletRequest("GET", "/open-api/TEST_ONLY");
         var response = new MockHttpServletResponse();
-        var json = new ObjectMapper();
-        var openApi = new OpenApiRequestFilter(new OpenApiHttp(json));
         MDC.put("requestId", "TEST_ONLY_outer");
-        new RequestBoundaryFilter().doFilter(request, response,
-                (req, res) -> openApi.doFilter(req, res, (innerRequest, innerResponse) -> {
+        assertThrows(IllegalStateException.class, () -> new RequestBoundaryFilter().doFilter(request, response,
+                (req, res) -> {
                     assertEquals(request.getAttribute("mes.requestId"), MDC.get("requestId"));
                     throw new IllegalStateException("TEST ONLY internal failure");
                 }));
-        assertEquals(500, response.getStatus());
         assertEquals(request.getAttribute("mes.requestId"), response.getHeader("X-Request-Id"));
-        assertEquals(response.getHeader("X-Request-Id"), json.readTree(response.getContentAsString()).get("requestId")
-                .asText());
         assertEquals("TEST_ONLY_outer", MDC.get("requestId"));
     }
 }

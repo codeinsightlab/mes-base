@@ -14,3 +14,7 @@ Source SwaggerController/tool/swagger 页面使用 Source permission/menu产品�
 注册、文件、公告、Quartz 等字段和流程保持 Source 来源，Java21/Jakarta、DTO与资源/权限、安全HTTP适配是修改部分。新调试/验收数据只在本轮隔离Schema和私有target中；无Source公司seed或环境值。
 
 OpenAPI Source 原有 Lombok 注解展开为等价 JavaBean/构造器，没有引入新 Lombok 依赖或调用 Codegen。业务数据范围按用户本轮决定迁为通用校验器开关，Source 工艺依赖没有迁入。源 UI OpenApiClient 工作文件有未提交修改，实际使用固定 HEAD 内容；来源清单记录该读取方式和对应哈希。
+
+## 2026-10-10 OpenAPI 基础设施拆包
+
+仅迁移 OpenApiEndpoint、MVC catalog 与目录模型至独立 mes-openapi；旧客户端/Token/授权/数据范围/UI 退役。模块沿用 Springdoc 3.0.3，没有增加 SDK 版本；源码来源与修改范围见 platform.md 的同日章节。Source Product MIT 原文随独立 JAR 放入 META-INF/licenses/source-product-MIT-LICENSE.txt，宿主原有许可继续保留。此前权限与 UI 说明仅为历史迁移证据。

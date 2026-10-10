@@ -59,7 +59,6 @@ public class PersistenceConfiguration {
         return PersistenceFactories.create(source, catalog.types(PersistenceOwner.Kind.PLATFORM), configuration -> {
             configuration.getTypeAliasRegistry().registerAliases("dev.mesbase.common.core.domain.entity");
             configuration.getTypeAliasRegistry().registerAliases("dev.mesbase.system.domain");
-            configuration.getTypeAliasRegistry().registerAliases("dev.mesbase.system.openapi.domain");
             configuration.getTypeAliasRegistry().registerAliases("dev.mesbase.quartz.domain");
             PersistenceFactories.pagination(configuration);
         }, manager::verifyAccess);
