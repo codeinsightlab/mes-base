@@ -9,6 +9,7 @@ import dev.mesbase.common.core.domain.model.LoginUser;
 import dev.mesbase.system.domain.WorkspaceRoleScope;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Objects;
 import java.util.function.Supplier;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.context.request.RequestContextHolder;
@@ -69,7 +70,8 @@ public class SystemPermissionService {
                 }
             }
         }
-        for (String values : cached(new CacheKey("grants", user, factory), () -> List.copyOf(menus.selectScopedPermissions(user, factory)))) {
+        for (String values : cached(new CacheKey("grants", user, factory), () -> menus.selectScopedPermissions(user, factory)
+                .stream().filter(Objects::nonNull).filter(value -> !value.isBlank()).toList())) {
             if (values != null) {
                 for (String p : values.split(",")) {
                     p = p.trim();

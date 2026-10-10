@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="dev.mesbase.system.mapper.SessionAccountMapper">
+    <!-- A compact account fence and current roles, never password/contact/full user columns. -->
+    <select id="account" resultMap="dev.mesbase.system.mapper.SysUserMapper.SysUserResult">
+        SELECT u.user_id,u.user_name,u.dept_id,u.auth_revision,u.status,u.del_flag,u.nick_name,u.avatar,u.user_type,
+               r.role_id,r.role_name,r.role_key,r.role_sort,r.data_scope,r.kind,r.factory_id,
+               r.status AS role_status,r.del_flag AS role_del_flag
+        FROM sys_user u
+        LEFT JOIN sys_user_role ur ON ur.user_id=u.user_id
+        LEFT JOIN sys_role r ON r.role_id=ur.role_id AND r.status='0' AND r.del_flag='0'
+        WHERE u.user_id=#{userId}
+    </select>
+    <select id="revision" resultType="long">SELECT auth_revision FROM sys_user WHERE user_id=#{userId}</select>
+    <select id="revisions" resultType="dev.mesbase.system.mapper.SessionAccountMapper$Revocation">
+        SELECT user_id,auth_revision AS revision,0 AS attempts FROM sys_user WHERE user_id IN
+        <foreach collection="ids" item="id" open="(" separator="," close=")">#{id}</foreach>
+    </select>
+    <select id="userId" resultType="long">SELECT user_id FROM sys_user WHERE user_name=#{username}</select>
+    <insert id="enqueue">
+        INSERT INTO sys_session_revocation(user_id,revision)
+        SELECT user_id,auth_revision FROM sys_user WHERE user_id IN
+        <foreach collection="ids" item="id" open="(" separator="," close=")">#{id}</foreach>
+        ON DUPLICATE KEY UPDATE
+        attempts=CASE WHEN VALUES(revision)>revision THEN 0 ELSE attempts END,
+        last_attempt=CASE WHEN VALUES(revision)>revision THEN NULL ELSE last_attempt END,
+        last_error=CASE WHEN VALUES(revision)>revision THEN NULL ELSE last_error END,
+        next_attempt_at=CASE WHEN VALUES(revision)>revision THEN CURRENT_TIMESTAMP ELSE next_attempt_at END,
+        revision=GREATEST(revision,VALUES(revision))
+    </insert>
+    <select id="pending" resultType="dev.mesbase.system.mapper.SessionAccountMapper$Revocation">
+        SELECT user_id,revision,attempts FROM sys_session_revocation
+        WHERE next_attempt_at &lt;= CURRENT_TIMESTAMP
+        ORDER BY next_attempt_at,user_id LIMIT 100
+    </select>
+    <delete id="delivered">DELETE FROM sys_session_revocation WHERE user_id=#{userId} AND revision=#{revision}</delete>
+    <update id="failed">
+        UPDATE sys_session_revocation SET attempts=attempts+1,last_attempt=CURRENT_TIMESTAMP,
+        last_error='Session revocation delivery or acknowledgement failed',
+        next_attempt_at=GREATEST(next_attempt_at,TIMESTAMPADD(SECOND,#{delaySeconds},CURRENT_TIMESTAMP)) WHERE user_id=#{userId} AND revision=#{revision}
+    </update>
+</mapper>

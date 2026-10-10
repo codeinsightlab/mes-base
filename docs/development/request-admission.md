@@ -17,11 +17,13 @@
 
 `SystemCacheNamespace` 保持中心 DB 隔离。逻辑键为 `mes:system:session:v2:<digest>` hash、`mes:system:user-sessions:<userId>` sorted set、`mes:system:session-epoch:<userId>` 撤销下界。索引跟随最后会话到期。ISSUE/LOGOUT/REVOKE Lua 顺序化登录、注销与撤销，只访问该用户索引，不扫描全部在线会话。在线监控既有 bounded SCAN 仅用于展示。
 
-禁用/状态改变、删除、改密在同一中心事务增加认证版本并写 `sys_session_revocation`，提交后删除旧版本会话。角色/菜单/数据权限修改不改变认证版本，无需重新登录。新版本登录不会被延迟旧交付误删，回滚不交付 Redis。注销/强退删除对应会话和索引项。
+禁用/状态改变、删除、改密在同一中心事务增加认证版本并写 `sys_session_revocation`，提交后删除旧版本会话。表内记录表示“尚未持久确认完成”，不一定表示 Redis 撤销失败：提交后成功也不立即开启确认事务，后台再次幂等交付并按版本确认删除。角色/菜单/数据权限修改不改变认证版本，无需重新登录。新版本登录不会被延迟旧交付误删，回滚不交付 Redis。注销/强退删除对应会话和索引项。
 
-DB/Redis 不天然原子：提交后 Redis 失败返回 `SESSION_REVOCATION_PENDING`，明确“账号变更已保存，撤销待重试”，不能误称 DB 回滚。精简 DB fence 在交付失败窗口仍拒绝旧会话；已准入请求不重新验账号版本。后台默认每 5 秒重试，按 userId+revision 条件确认，不覆盖新事件，不依赖 TTL；配置 `mes.system.session-revocation-retry-ms` 可调整。Redis 故障明确失败，不伪造注销成功。
+DB/Redis 不天然原子：提交后 Redis 失败返回 `SESSION_REVOCATION_PENDING`，明确“账号变更已保存，撤销待重试”，不能误称 DB 回滚。精简 DB fence 在交付失败窗口仍拒绝旧会话；已准入请求不重新验账号版本。后台默认每 5 秒重试，按 userId+revision 条件确认，不覆盖新事件，不依赖 TTL；配置 `mes.system.session-revocation-retry-ms` 可调整。V20 增加 next_attempt_at 与排序索引，每轮最多 100 条到期记录，按 next_attempt_at/user_id 稳定排序；失败按 5/10/20/40/80/160/300 秒退避，最高 300 秒，使用数据库时钟。新 revision 入队重置失败信息与处理时间，同版本或较旧入队不重置；旧失败更新也必须匹配版本。批量入队去重、每 500 ID 参数化读取版本，空集合不操作、空 ID/缺失账号明确失败并由调用方账号事务回滚。既有批量删除未发现集合总上限，此处限制 SQL 批大小，不增加产品限额。Redis 故障明确失败，不伪造注销成功。
 
-新增 `V19__indexed_session_revocation.sql` 随正常部署应用，本轮未执行真实库迁移。v2 不读取旧 Redis 会话格式，部署后已有会话需重新登录；废弃的空 setLoginUser/revokeUser 兼容入口已删除。Lua 验证使用自有单节点 Redis，未验证 Redis Cluster 多键脚本部署。
+新增 `V19__indexed_session_revocation.sql` 及后续 `V20__session_revocation_retry_schedule.sql` 随正常部署按序应用，本轮未执行真实库迁移。v2 不读取旧 Redis 会话格式，部署后已有会话需重新登录；废弃的空 setLoginUser/revokeUser 兼容入口已删除。Lua 验证使用自有单节点 Redis，未验证 Redis Cluster 多键脚本部署。
+
+epoch 无 TTL：它是用户认证版本的发行下界，不能因最后一个会话到期或账号删除就直接消失，否则延迟到达的旧版本发行可能重新写入。数据库准入 fence 是另一重保护，不替代当前 Redis 发行保证。当前每个曾发行/撤销的用户保留一个小键，没有自动删除策略；后续清理必须证明旧发行已终止、账号 ID 不复用且版本不回退，不能随意增加 TTL。本轮不改变此策略或登录会话数量语义。Lua 在大单用户索引下会阻塞其他请求，隔离容量测量与适用边界见实施验收报告新增章节。
 
 ## 配置与池
 

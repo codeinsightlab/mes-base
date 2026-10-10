@@ -29,6 +29,8 @@ import dev.mesbase.system.service.impl.SysMenuServiceImpl;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Arrays;
+import java.util.HashSet;
 import java.util.Set;
 import java.util.UUID;
 import java.util.Optional;
@@ -56,6 +58,27 @@ import static org.mockito.Mockito.times;
  * TEST ONLY: real mapper SQL in isolated H2; no live role grants.
  */
 class RoleScopePermissionTest {
+    @Test
+    void nullableDirectoryPermissionsDoNotBreakSessionPermissionSnapshot() {
+        var menus = mock(SysMenuMapper.class);
+        var service = new SystemPermissionService(menus, mock(SysRoleMapper.class), mock(ManagedFactoryMapper.class));
+        var grants = new HashSet<>(Arrays.asList(null, "", "   ", "system:role:list", " business:order:read , "));
+        when(menus.selectScopedPermissions("fixture", null)).thenReturn(grants);
+        when(menus.selectScopedPermissions("fixture", "A")).thenReturn(grants);
+        when(menus.selectMenuList(any())).thenReturn(List.of(menu(1L, 0L, "system", "system:role:list"),
+                menu(2L, 0L, "pro", null)));
+        RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(new MockHttpServletRequest()));
+        try {
+            assertEquals(Set.of("system:role:list", "business:order:read"), service.permissions("fixture", null));
+            assertEquals(Set.of("business:order:read"), service.permissions("fixture", "A"));
+            assertEquals(Set.of("business:order:read"), service.permissions("fixture", "A"));
+            verify(menus, times(1)).selectScopedPermissions("fixture", "A");
+            assertFalse(service.grantedFactory("fixture", "A", "system:role:list"));
+        } finally {
+            RequestContextHolder.resetRequestAttributes();
+        }
+    }
+
     @Test
     void literalNullFactoryDoesNotCollideWithPlatformPermissionCacheKey() {
         var menus = mock(SysMenuMapper.class);
@@ -126,13 +149,15 @@ class RoleScopePermissionTest {
             sql.execute("INSERT INTO sys_role VALUES(1,'PLATFORM',NULL,'0','0'),(2,'FACTORY','F1','0','0'),(3,'PLATFORM',NULL,'1','0'),(4,'PLATFORM',NULL,'0','0')");
             sql.execute("INSERT INTO sys_user_role VALUES(1,1),(2,2),(3,3),(4,4)");
             sql.execute("INSERT INTO sys_menu(menu_id,parent_id,path,menu_type,perms,status) VALUES "
-                    + "(1,0,'system','M','','0'),(2,1,'role','C','system:role:list','0'),"
-                    + "(3,0,'pro','M','','0'),(4,3,'order','C','business:order:read','0'),"
+                    + "(1,0,'system','M',NULL,'0'),(2,1,'role','C','system:role:list','0'),"
+                    + "(3,0,'pro','M','   ','0'),(4,3,'order','C','business:order:read','0'),"
                     + "(5,1,'#','F','custom:platform:action','0'),(6,3,'other','C','business:other:read','0')");
             sql.execute("INSERT INTO sys_role_menu VALUES(1,3),(1,4),(1,2),(1,1),(2,3),(2,6),(2,2),(2,5),(3,4),(4,1),(4,2),(4,5)");
         }
         var persistence = new PlatformPersistence(source, Set.of(SysMenuMapper.class), configuration ->
                 configuration.getTypeAliasRegistry().registerAliases("dev.mesbase.common.core.domain.entity"));
+        assertEquals(Set.of("system:role:list", "business:order:read"),
+                persistence.mapper(SysMenuMapper.class).selectScopedPermissions("platform", null));
         var roles = mock(SysRoleMapper.class);
         when(roles.selectWorkspaceScopes("platform")).thenReturn(List.of(new WorkspaceRoleScope("PLATFORM", null)));
         when(roles.selectWorkspaceScopes("platformOnly")).thenReturn(List.of(new WorkspaceRoleScope("PLATFORM", null)));

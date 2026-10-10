@@ -16,6 +16,9 @@ import dev.mesbase.system.service.SessionRevocationService;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
+import java.sql.Timestamp;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.sql.Connection;
 import org.apache.ibatis.executor.statement.StatementHandler;
 import org.apache.ibatis.plugin.Interceptor;
@@ -33,6 +36,7 @@ import org.springframework.mock.env.MockEnvironment;
 import org.springframework.mock.web.MockHttpServletRequest;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -45,6 +49,11 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.never;
+import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.Mockito.verifyNoInteractions;
 
 /**
  * TEST ONLY: actual compact mapper/outbox SQL against isolated H2; no real account data.
@@ -76,6 +85,10 @@ class SessionAdmissionTest {
                 + "data_scope VARCHAR(1),kind VARCHAR(10),factory_id VARCHAR(30),status VARCHAR(1),del_flag VARCHAR(1))");
         jdbc.execute("CREATE TABLE sys_user_role(user_id BIGINT,role_id BIGINT)");
         jdbc.execute(Files.readString(Path.of("mes-admin/src/main/resources/db/system/V19__indexed_session_revocation.sql")));
+        for (String sql : Files.readString(Path.of("mes-admin/src/main/resources/db/system/V20__session_revocation_retry_schedule.sql"))
+                .split(";")) {
+            if (!sql.isBlank()) jdbc.execute(sql);
+        }
         jdbc.execute("INSERT INTO sys_user VALUES(42,'fixture',7,1,'0','0','Fixture','', '00','TEST ONLY secret',NULL)");
         jdbc.execute("INSERT INTO sys_role VALUES(8,'Factory','fixture',1,'4','FACTORY','A','0','0')");
         jdbc.execute("INSERT INTO sys_user_role VALUES(42,8)");
@@ -174,6 +187,7 @@ class SessionAdmissionTest {
         revocations.retryPending();
         assertEquals(1, f.jdbc().queryForObject("SELECT attempts FROM sys_session_revocation", Integer.class));
         reset(redis);
+        f.jdbc().update("UPDATE sys_session_revocation SET next_attempt_at=CURRENT_TIMESTAMP");
         revocations.retryPending();
         assertEquals(List.of(), f.accounts().pending());
         verify(redis).revoke(42, 2);
@@ -184,5 +198,128 @@ class SessionAdmissionTest {
         });
         assertEquals(0, f.accounts().delivered(42, 2));
         assertNotNull(f.accounts().pending().getFirst());
+    }
+
+    @Test
+    void boundedFairRetriesAdvancePastPersistentFailuresAndNewRevisionResetsBackoff() throws Exception {
+        var f = fixture();
+        var redis = mock(UserSessionStore.class);
+        var revocations = new SessionRevocationService(f.accounts(), redis, f.platform().transactionManager());
+        for (long id = 100; id < 350; id++) {
+            f.jdbc().update("INSERT INTO sys_session_revocation(user_id,revision) VALUES(?,1)", id);
+            if (id < 200) doThrow(new IllegalStateException("TEST ONLY persistent failure")).when(redis).revoke(id, 1);
+        }
+        revocations.retryPending();
+        assertEquals(100, f.accounts().pending().size());
+        assertEquals(200, f.accounts().pending().getFirst().userId());
+        revocations.retryPending();
+        revocations.retryPending();
+        assertEquals(100, f.jdbc().queryForObject("SELECT COUNT(*) FROM sys_session_revocation", Integer.class));
+        assertEquals(List.of(), f.accounts().pending());
+        f.jdbc().update("INSERT INTO sys_user(user_id,auth_revision) VALUES(100,2)");
+        f.jdbc().update("UPDATE sys_session_revocation SET attempts=20,next_attempt_at=? WHERE user_id=100",
+                Timestamp.from(Instant.now().plusSeconds(300)));
+        f.platform().run(() -> {
+            revocations.enqueue(List.of(100L));
+            return null;
+        });
+        var latest = f.accounts().pending().getFirst();
+        assertEquals(2, latest.revision());
+        assertEquals(0, latest.attempts());
+        assertEquals(0, f.accounts().delivered(100, 1));
+        assertEquals(0, f.accounts().failed(100, 1, 300));
+        assertEquals(0, f.accounts().pending().getFirst().attempts());
+        // Two consumers can hold the same batch; delivery is idempotent and acknowledgement is conditional.
+        var second = new SessionRevocationService(f.accounts(), redis, f.platform().transactionManager());
+        var held = f.accounts().pending().getFirst();
+        second.retryPending();
+        redis.revoke(held.userId(), held.revision());
+        assertEquals(0, f.accounts().delivered(held.userId(), held.revision()));
+    }
+
+    @Test
+    void batchVersionsAreBoundedDeduplicatedAndMissingAccountsRollback() throws Exception {
+        var f = fixture();
+        var accounts = spy(f.accounts());
+        var redis = mock(UserSessionStore.class);
+        var revocations = new SessionRevocationService(accounts, redis, f.platform().transactionManager());
+        var ids = new ArrayList<Long>();
+        for (long id = 100; id < 1101; id++) {
+            f.jdbc().update("INSERT INTO sys_user(user_id,auth_revision) VALUES(?,1)", id);
+            ids.add(id);
+        }
+        ids.add(100L);
+        f.platform().run(() -> {
+            revocations.enqueue(ids);
+            return null;
+        });
+        verify(accounts, times(3)).revisions(anyList());
+        verify(accounts, never()).revision(anyLong());
+        assertEquals(1001, f.jdbc().queryForObject("SELECT COUNT(*) FROM sys_session_revocation", Integer.class));
+        verify(redis, times(1001)).revoke(anyLong(), anyLong());
+        reset(redis);
+        f.platform().run(() -> {
+            revocations.enqueue(List.of());
+            return null;
+        });
+        verifyNoInteractions(redis);
+        assertThrows(IllegalArgumentException.class, () -> f.platform().run(() -> {
+            revocations.enqueue(null);
+            return null;
+        }));
+        assertThrows(IllegalArgumentException.class, () -> f.platform().run(() -> {
+            revocations.enqueue(Arrays.asList(42L, null));
+            return null;
+        }));
+        assertThrows(IllegalArgumentException.class, () -> f.platform().run(() -> {
+            f.jdbc().update("UPDATE sys_user SET auth_revision=2 WHERE user_id=42");
+            revocations.enqueue(List.of(42L, 99999L));
+            return null;
+        }));
+        assertEquals(1, f.accounts().revision(42));
+        verifyNoInteractions(redis);
+        assertThrows(IllegalArgumentException.class, () -> f.platform()
+                .run(() -> {
+                    revocations.enqueueUsername("missing");
+                    return null;
+                }));
+    }
+
+    @Test
+    void failureBackoffIsCappedAndSameVersionDoesNotResetIt() throws Exception {
+        var f = fixture();
+        var redis = mock(UserSessionStore.class);
+        f.accounts().enqueue(List.of(42L));
+        f.jdbc().update("UPDATE sys_session_revocation SET attempts=20");
+        doThrow(new IllegalStateException("TEST ONLY failure")).when(redis).revoke(42, 1);
+        new SessionRevocationService(f.accounts(), redis, f.platform().transactionManager()).retryPending();
+        Timestamp next = f.jdbc().queryForObject("SELECT next_attempt_at FROM sys_session_revocation", Timestamp.class);
+        Timestamp now = f.jdbc().queryForObject("SELECT CURRENT_TIMESTAMP", Timestamp.class);
+        assertTrue(next.getTime() - now.getTime() >= 299000);
+        assertTrue(next.getTime() - now.getTime() <= 300000);
+        f.accounts().enqueue(List.of(42L));
+        assertEquals(next, f.jdbc()
+                .queryForObject("SELECT next_attempt_at FROM sys_session_revocation", Timestamp.class));
+        assertEquals(21, f.jdbc().queryForObject("SELECT attempts FROM sys_session_revocation", Integer.class));
+    }
+
+    @Test
+    void redisSuccessButAcknowledgementFailureRemainsRecoverable() throws Exception {
+        var f = fixture();
+        var accounts = spy(f.accounts());
+        var redis = mock(UserSessionStore.class);
+        f.accounts().enqueue(List.of(42L));
+        doThrow(new IllegalStateException("TEST ONLY acknowledgement unavailable")).when(accounts).delivered(42, 1);
+        var revocations = new SessionRevocationService(accounts, redis, f.platform().transactionManager());
+        revocations.retryPending();
+        verify(redis).revoke(42, 1);
+        assertEquals(1, f.jdbc().queryForObject("SELECT attempts FROM sys_session_revocation", Integer.class));
+        assertEquals("Session revocation delivery or acknowledgement failed",
+                f.jdbc().queryForObject("SELECT last_error FROM sys_session_revocation", String.class));
+        reset(accounts);
+        f.jdbc().update("UPDATE sys_session_revocation SET next_attempt_at=CURRENT_TIMESTAMP");
+        revocations.retryPending();
+        assertEquals(List.of(), f.accounts().pending());
+        verify(redis, times(2)).revoke(42, 1);
     }
 }
