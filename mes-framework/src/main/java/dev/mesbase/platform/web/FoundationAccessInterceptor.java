@@ -40,7 +40,9 @@ public final class FoundationAccessInterceptor implements HandlerInterceptor {
         if (!(handler instanceof HandlerMethod method)) throw new FoundationException(ErrorCode.NOT_FOUND);
         String path = request.getRequestURI().substring(request.getContextPath().length());
         EndpointAccess access = EndpointCatalog.required(method, path);
-        if (access.value() == EndpointAccess.Kind.PUBLIC) return true;
+        if (access.value() == EndpointAccess.Kind.PUBLIC) {
+            return true;
+        }
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         if (authentication == null || !authentication.isAuthenticated() || authentication instanceof AnonymousAuthenticationToken)
             throw new FoundationException(ErrorCode.UNAUTHENTICATED);
