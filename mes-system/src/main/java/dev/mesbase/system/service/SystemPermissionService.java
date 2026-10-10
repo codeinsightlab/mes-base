@@ -5,6 +5,14 @@ import dev.mesbase.common.core.domain.entity.SysMenu;
 import dev.mesbase.system.mapper.SysRoleMapper;
 import dev.mesbase.system.factory.ManagedFactoryMapper;
 
+import dev.mesbase.common.core.domain.model.LoginUser;
+import dev.mesbase.system.domain.WorkspaceRoleScope;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.function.Supplier;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -28,28 +36,31 @@ public class SystemPermissionService {
     public record WorkspaceAccess(boolean platform, boolean platformBusiness, List<String> factoryIds) {
     }
 
+    private record CacheKey(String kind, String user, String factory) {
+    }
+
     public WorkspaceAccess workspaces(String username) {
-        var scopes = roles.selectWorkspaceScopes(username);
+        var scopes = roleScopes(username);
         var factoryIds = scopes.stream().filter(scope -> "FACTORY".equals(scope.kind())).map(scope -> scope.factoryId())
                 .distinct().sorted().toList();
         // These legacy columns have different collations. Bind IDs rather than joining text columns.
         var enabled = factoryIds.isEmpty() ? Set.<String>of() : Set.copyOf(factories.enabledIds(factoryIds));
         boolean platform = scopes.stream().anyMatch(scope -> "PLATFORM".equals(scope.kind()));
-        boolean platformBusiness = platform && !scopedPermissions(username, null, true).isEmpty();
+        boolean platformBusiness = platform && !cached(new CacheKey("platform-business", username, null), () -> scopedPermissions(username, null, true)).isEmpty();
         return new WorkspaceAccess(platform, platformBusiness,
                 factoryIds.stream().filter(enabled::contains).toList());
     }
 
     public Set<String> permissions(String user, String factory) {
-        return scopedPermissions(user, factory, factory != null);
+        return cached(new CacheKey("permissions", user, factory), () -> scopedPermissions(user, factory, factory != null));
     }
 
     private Set<String> scopedPermissions(String user, String factory, boolean businessOnly) {
         var result = new HashSet<String>();
         var platformCodes = new HashSet<String>();
         if (businessOnly) {
-            var allMenus = menus.selectMenuList(new SysMenu());
-            var policy = new MenuScopePolicy(allMenus);
+            var allMenus = menuCatalog();
+            var policy = menuPolicy();
             for (var menu : allMenus) {
                 if (policy.platform(menu) && menu.getPerms() != null) {
                     for (String code : menu.getPerms().split(",")) {
@@ -58,7 +69,7 @@ public class SystemPermissionService {
                 }
             }
         }
-        for (String values : menus.selectScopedPermissions(user, factory)) {
+        for (String values : cached(new CacheKey("grants", user, factory), () -> List.copyOf(menus.selectScopedPermissions(user, factory)))) {
             if (values != null) {
                 for (String p : values.split(",")) {
                     p = p.trim();
@@ -73,7 +84,7 @@ public class SystemPermissionService {
     }
 
     public boolean hasPlatformRole(String user) {
-        return roles.selectWorkspaceScopes(user).stream().anyMatch(scope -> "PLATFORM".equals(scope.kind()));
+        return roleScopes(user).stream().anyMatch(scope -> "PLATFORM".equals(scope.kind()));
     }
 
     public boolean grantedPlatform(String user, String permission) {
@@ -85,4 +96,46 @@ public class SystemPermissionService {
         var permissions = permissions(user, factory);
         return permissions.contains(permission);
     }
+
+    public List<SysMenu> menuCatalog() {
+        return cached("menu-catalog", () -> List.copyOf(menus.selectMenuList(new SysMenu())));
+    }
+
+    public MenuScopePolicy menuPolicy() {
+        return cached("menu-policy", () -> new MenuScopePolicy(menuCatalog()));
+    }
+
+    private List<WorkspaceRoleScope> roleScopes(String username) {
+        return cached(new CacheKey("roles", username, null), () -> {
+            var authentication = SecurityContextHolder.getContext().getAuthentication();
+            if (authentication != null && authentication.getPrincipal() instanceof LoginUser login
+                    && username.equals(login.getUsername()) && login.getUser().getRoles() != null) {
+                return login.getUser().getRoles().stream()
+                        .filter(role -> "0".equals(role.getStatus()) && "0".equals(role.getDelFlag()))
+                        .map(role -> new WorkspaceRoleScope(role.getKind(), role.getFactoryId())).toList();
+            }
+            return List.copyOf(roles.selectWorkspaceScopes(username));
+        });
+    }
+
+    @SuppressWarnings("unchecked")
+    private <T> T cached(Object key, Supplier<T> load) {
+        if (!(RequestContextHolder.getRequestAttributes() instanceof ServletRequestAttributes attributes))
+            return load.get();
+        var request = attributes.getRequest();
+        String attribute = SystemPermissionService.class.getName();
+        synchronized (request) {
+            Map<Object, Object> values = (Map<Object, Object>) request.getAttribute(attribute);
+            if (values == null) {
+                values = new HashMap<>();
+                request.setAttribute(attribute, values);
+            }
+            if (values.containsKey(key)) return (T) values.get(key);
+            // Loading a permission set also loads nested catalog/grant entries in the same request map.
+            T result = load.get();
+            values.put(key, result);
+            return result;
+        }
+    }
+
 }

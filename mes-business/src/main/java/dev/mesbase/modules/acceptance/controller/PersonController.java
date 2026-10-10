@@ -36,7 +36,7 @@ import org.springframework.web.bind.annotation.RestController;
  */
 @RestController
 @RequestMapping("/api/acceptance/person")
-@ConditionalOnProperty(name = "mes.codegen.person-review.enabled", havingValue = "true")
+@ConditionalOnProperty(name = "mes.system.enabled", havingValue = "true")
 public class PersonController {
     private final IPersonService service;
 

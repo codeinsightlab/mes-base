@@ -113,7 +113,7 @@ public class SysMenuServiceImpl implements ISysMenuService {
      */
     public List<SysMenu> selectFactoryMenuTree(String username, String factoryId) {
         if (factoryId == null || factoryId.isBlank()) throw new ServiceException("请选择工厂");
-        var policy = new MenuScopePolicy(menuMapper.selectMenuList(new SysMenu()));
+        var policy = permissionService.menuPolicy();
         return getChildPerms(menuMapper.selectFactoryMenus(username, factoryId).stream()
                 .filter(menu -> !policy.platform(menu)).toList(), 0);
     }
@@ -123,7 +123,7 @@ public class SysMenuServiceImpl implements ISysMenuService {
         if (!Set.of("PLATFORM", "FACTORY").contains(kind)) throw new ServiceException("Invalid role kind");
         var rows = selectMenuList(query, userId);
         if ("PLATFORM".equals(kind)) return rows;
-        var policy = new MenuScopePolicy(menuMapper.selectMenuList(new SysMenu()));
+        var policy = permissionService.menuPolicy();
         return rows.stream().filter(menu -> !policy.platform(menu)).toList();
     }
 

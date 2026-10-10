@@ -5,6 +5,10 @@ description: 为 MES Base 的已有单表生成 MyBatis Mapper/XML/Example、Spr
 
 # MES CRUD Codegen
 
+## 2026-10-11 项目配置入口
+
+本项目配置调用使用 `./scripts/mes-business-codegen docs/development/codegen-config.review.yaml target/business-codegen/preview.json`。先确认配置中的连接、选表、命名、输出、模板、权限、事务、条件注解、菜单与执行策略；缺项明确失败。tables 为空表示所选数据库范围内全部表，非空只选列出的表；artifacts 独立选择。先构建最新应用再运行该脚本，不启动生产 Spring 服务。默认项目配置是 dry-run/fail；不得为消除冲突擅自改为覆盖。需要审查产物时可显式创建隔离配置副本，仅修改输出到自有 target、切换 write，并说明与原配置的差异。菜单 SQL 更新已有、插入缺失，保留 ID/角色关系，不自动执行。旧 CLI 下文参数说明只适用于旧入口，不能替代该配置。
+
 在 mes-base 根使用 `./scripts/mes-codegen`，先读根 AGENTS.md；参数、Schema 支持范围与证据见 [Codegen 使用说明](../../../docs/development/codegen.md)。持久化使用 MBG MyBatis3 / XMLMAPPER，上层模板使用项目 Spring 事务与 Base UI，不手写替代生成器。
 
 ## 范围与位置

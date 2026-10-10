@@ -167,6 +167,8 @@ Skill 入口：`.agents/skills/mes-crud-codegen/SKILL.md`；配置/CLI 详见 do
 
 ### 14.1 基础生成范围与目标位置（2026-10-10 用户约定）
 
+2026-10-11 配置入口：项目参数由 `docs/development/codegen-config.review.yaml` 显式提供，Agent 使用 `scripts/mes-business-codegen CONFIG_YAML REPORT_JSON`。先读取配置，不能自行填隐藏项目默认值或改用户配置。`selection.tables: []` 表示全量，非空只生成列出的表；产物选择独立。无下划线的模块包段取配置 fallback（本项目 business）。配置项必须明确提供，schema/关闭的条件注解可显式 null；可选 tableOverrides 不控制选表。菜单 SQL 使用 add-or-update，保留菜单 ID 和角色绑定，仅生成不执行。当前旧 `scripts/mes-codegen` 为旧 CLI，尚未移除其默认值；不得用它代替新配置入口。
+
 2026-10-11 用户补充：生成器不得按 user_id、owner_id、password、secret 等字段名猜测业务语义并拒绝生成。生成准入仅判断实际生成能力与结构支持；敏感响应、主体及资源授权规则由使用方在生成后审查。
 
 mes-codegen 只生成基础单表持久化与后台 CRUD。持久化复用 MyBatis Generator 的 MyBatis3 / XMLMAPPER：Entity、Example/Criteria、Mapper + XML；Service/Controller 必须同步调用该真实生成接口，分页复用 PageHelper，不新增注解 SQL、锁查询、业务状态规则或无必要的 ExtraMapper。

@@ -26,6 +26,11 @@ import org.mybatis.generator.config.TableConfiguration;
  */
 final class MyBatisPersistenceRenderer {
     List<Artifact> render(CodegenRequest request, TableMetadata metadata, String className) {
+        return render(request, metadata, className, null);
+    }
+
+    List<Artifact> render(CodegenRequest request, TableMetadata metadata, String className,
+                          CodegenTemplateOptions options) {
         Context context = new Context(ModelType.FLAT);
         context.setId("mes-codegen");
         context.setTargetRuntime("MyBatis3");
@@ -35,16 +40,19 @@ final class MyBatisPersistenceRenderer {
         comments.addProperty("suppressAllComments", "true");
         context.setCommentGeneratorConfiguration(comments);
         var model = new JavaModelGeneratorConfiguration();
-        model.setTargetPackage(request.packageName() + ".domain");
+        model.setTargetPackage(request.packageName() + "." + (options == null ? "domain" : options.packages()
+                .get("domain")));
         model.setTargetProject("src/main/java");
         context.setJavaModelGeneratorConfiguration(model);
         var client = new JavaClientGeneratorConfiguration();
         client.setConfigurationType("XMLMAPPER");
-        client.setTargetPackage(request.packageName() + ".dao");
+        client.setTargetPackage(request.packageName() + "." + (options == null ? "dao" : options.packages()
+                .get("dao")));
         client.setTargetProject("src/main/java");
         context.setJavaClientGeneratorConfiguration(client);
         var sqlMap = new SqlMapGeneratorConfiguration();
-        sqlMap.setTargetPackage(request.packageName() + ".dao");
+        sqlMap.setTargetPackage(request.packageName() + "." + (options == null ? "dao" : options.packages()
+                .get("dao")));
         sqlMap.setTargetProject("src/main/resources");
         context.setSqlMapGeneratorConfiguration(sqlMap);
         var plugin = new PluginConfiguration();

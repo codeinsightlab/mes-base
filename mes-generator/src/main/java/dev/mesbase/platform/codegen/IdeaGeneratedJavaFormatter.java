@@ -13,10 +13,10 @@ import java.util.function.UnaryOperator;
 /**
  * Formats staged Java with the repository's native IDEA formatter before publishing or hashing.
  */
-final class IdeaGeneratedJavaFormatter implements UnaryOperator<List<Artifact>> {
+public final class IdeaGeneratedJavaFormatter implements UnaryOperator<List<Artifact>> {
     private final Path launcher;
 
-    IdeaGeneratedJavaFormatter(Path launcher) {
+    public IdeaGeneratedJavaFormatter(Path launcher) {
         this.launcher = launcher.toAbsolutePath().normalize();
     }
 

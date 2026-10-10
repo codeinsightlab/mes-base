@@ -3,6 +3,8 @@ package dev.mesbase.platform.codegen;
 import dev.mesbase.platform.codegen.ScaffoldWriter.Artifact;
 import dev.mesbase.platform.codegen.TableMetadata.Column;
 import java.io.StringWriter;
+import java.nio.file.Files;
+import java.io.IOException;
 import java.sql.Types;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -25,17 +27,30 @@ import static dev.mesbase.platform.codegen.CodegenResult.Target.PERMISSION;
  */
 public final class RuoyiTemplateRenderer {
     private final VelocityEngine engine;
+    private final CodegenTemplateOptions options;
 
     public RuoyiTemplateRenderer() {
+        this(null);
+    }
+
+    public RuoyiTemplateRenderer(CodegenTemplateOptions options) {
+        this.options = options;
         engine = RuoyiVelocityInitializer.initialize();
     }
 
     private String merge(String template, Map<String, Object> model) {
         try {
             var out = new StringWriter();
-            engine.getTemplate("codegen/base/" + template, "UTF-8").merge(new VelocityContext(model), out);
+            if (options == null) {
+                engine.getTemplate("codegen/base/" + template, "UTF-8").merge(new VelocityContext(model), out);
+            } else {
+                var file = options.templateRoot().resolve(template).normalize();
+                if (!file.startsWith(options.templateRoot()))
+                    throw new CodegenException(CodegenException.Code.INVALID_REQUEST);
+                engine.evaluate(new VelocityContext(model), out, template, Files.readString(file));
+            }
             return out.toString();
-        } catch (RuntimeException e) {
+        } catch (IOException | RuntimeException e) {
             throw new CodegenException(CodegenException.Code.TEMPLATE_FAILURE, e);
         }
     }
@@ -57,11 +72,11 @@ public final class RuoyiTemplateRenderer {
         return Character.toUpperCase(s.charAt(0)) + s.substring(1);
     }
 
-    private static String validation(Column c, boolean required) {
+    private String validation(Column c, boolean required) {
         String a = required ? (c.javaType()
                 .equals("String") ? "@jakarta.validation.constraints.NotBlank " : "@jakarta.validation.constraints.NotNull ") : "";
         if (c.javaType().equals("String"))
-            a += "@jakarta.validation.constraints.Size(max=" + Math.min(c.size(), 10000) + ") ";
+            a += "@jakarta.validation.constraints.Size(max=" + Math.min(c.size(), options == null ? 10000 : options.stringLengthLimit()) + ") ";
         if (c.javaType().equals("java.math.BigDecimal"))
             a += "@jakarta.validation.constraints.Digits(integer=" + Math.max(1, c.size() - c.scale()) + ",fraction=" + c.scale() + ") ";
         return a;
@@ -90,14 +105,15 @@ public final class RuoyiTemplateRenderer {
     private void emitJava(List<Artifact> out, Map<String, Object> context, String subpackage,
                           String name, String template) {
         String rootPackage = (String) context.get("rootPackage");
+        if (options != null) subpackage = options.packages().get(subpackage).replace('.', '/');
         context.put("packageName", rootPackage + "." + subpackage.replace('/', '.'));
         context.put("body", JavaSourceImports.explicit(merge(template, context)));
         out.add(new Artifact(BACKEND, "src/main/java/" + rootPackage.replace('.', '/')
                 + "/" + subpackage + "/" + name + ".java", merge("java.vm", context)));
     }
 
-    private static boolean auditColumn(Column column) {
-        return Set.of("create_by", "create_time", "update_by", "update_time")
+    private boolean auditColumn(Column column) {
+        return (options == null ? Set.of("create_by", "create_time", "update_by", "update_time") : Set.copyOf(options.auditFields()))
                 .contains(column.name().toLowerCase(Locale.ROOT));
     }
 
@@ -142,6 +158,26 @@ public final class RuoyiTemplateRenderer {
                 Map.of("code", "delete", "label", "删除")));
         ctx.put("scoped", scoped);
         ctx.put("permissionScope", scoped ? "factory" : "platform");
+        ctx.put("conditionalEnabled", true);
+        ctx.put("conditionalProperty", scoped ? "mes.system.enabled" : "mes.platform.enabled");
+        ctx.put("conditionalValue", "true");
+        ctx.put("pageDefault", 20);
+        ctx.put("pageMaximum", 100);
+        ctx.put("batchDeleteMaximum", 100);
+        ctx.put("frontendApiImport", "@/api/" + r.moduleName() + "/" + name);
+        ctx.put("pageComponent", r.moduleName() + "/" + name + "/index");
+        ctx.put("crudComponent", "@/components/CrudPage.vue");
+        ctx.put("requestModule", "@/lib/request");
+        ctx.put("fieldTypesModule", "@/lib/crud");
+        ctx.put("menuTable", "sys_menu");
+        ctx.put("parentId", 0);
+        ctx.put("directoryOrder", 0);
+        ctx.put("pageOrder", 0);
+        ctx.put("menuIcon", "list");
+        ctx.put("frontendIcon", "List");
+        ctx.put("createdBy", "codegen");
+        ctx.put("migrateLegacyPermissions", true);
+        ctx.put("batchDeleteAction", "delete");
         ctx.put("idType", pk.javaType());
         ctx.put("pkField", pk.javaField());
         ctx.put("sqlPk", string(t.sqlIdentifier(pk.name())));
@@ -153,6 +189,24 @@ public final class RuoyiTemplateRenderer {
         boolean hasLongText = t.columns().stream().anyMatch(c -> c.jdbcType() == Types.LONGVARCHAR);
         ctx.put("selectByExampleMethod", hasLongText ? "selectByExampleWithBLOBs" : "selectByExample");
         ctx.put("updateByPrimaryKeyMethod", hasLongText ? "updateByPrimaryKeyWithBLOBs" : "updateByPrimaryKey");
+        if (options != null) {
+            ctx.putAll(options.variables());
+            for (var entry : options.packages().entrySet()) {
+                switch (entry.getKey()) {
+                    case "domain" -> ctx.put("domainPackage", p + "." + entry.getValue());
+                    case "dao" -> ctx.put("daoPackage", p + "." + entry.getValue());
+                    case "service" -> ctx.put("servicePackage", p + "." + entry.getValue());
+                    case "controller" -> ctx.put("controllerPackage", p + "." + entry.getValue());
+                    default -> {
+                    }
+                }
+            }
+            ctx.put("scoped", "factory".equals(ctx.get("permissionScope")));
+            route = (String) ctx.get("route");
+            perm = (String) ctx.get("permission");
+        }
+        ctx.put("responsePackage", p + "." + (options == null ? "controller.vo" : options.packages()
+                .get("controller/vo")));
         ctx.put("createFields", create.stream().map(c -> field(c, !c.nullable())).toList());
         ctx.put("editFields", writable.stream().map(c -> field(c, !c.nullable())).toList());
         ctx.put("queryFields", writable.stream().filter(c -> c.jdbcType() != Types.LONGVARCHAR)
@@ -162,7 +216,7 @@ public final class RuoyiTemplateRenderer {
                 "stringValue", !viewType(c).equals(entityType(c)))).toList());
         List<Artifact> out = new ArrayList<>();
         String dir = p.replace('.', '/') + "/";
-        out.addAll(new MyBatisPersistenceRenderer().render(r, t, n));
+        out.addAll(new MyBatisPersistenceRenderer().render(r, t, n, options));
         ctx.put("commandName", n + "CreateCommand");
         ctx.put("commandFields", ctx.get("createFields"));
         emitJava(out, ctx, "domain", n + "CreateCommand", "command.java.vm");
@@ -192,16 +246,16 @@ public final class RuoyiTemplateRenderer {
                         .matches("Integer|Double|Float") ? "number" : c.javaType()
                         .equals("Boolean") ? "boolean" : "text", "readonly", (c.primaryKey() && c.autoIncrement() || auditColumn(c)), "searchable", !auditColumn(c) && c.javaType()
                         .equals("String") && c.javaField()
-                        .matches("(?i).*(code|name)$"), "maxLength", Math.min(c.size(), 10000), "required", !c.nullable()))
+                        .matches("(?i).*(code|name)$"), "maxLength", Math.min(c.size(), options == null ? 10000 : options.stringLengthLimit()), "required", !c.nullable()))
                 .toList());
         ctx.put("writableFields", create.stream().map(Column::javaField).toList());
         ctx.put("updateFields", writable.stream().map(Column::javaField).toList());
-        out.add(new Artifact(FRONTEND, "src/api/" + r.moduleName() + "/" + name + ".ts", merge("api.ts.vm", ctx)));
-        out.add(new Artifact(FRONTEND, "src/views/" + r.moduleName() + "/" + name + "/index.vue", merge("index.vue.vm", ctx)));
-        out.add(new Artifact(FRONTEND, "src/menus/" + r.moduleName() + "/" + name + ".json", merge("menu.json.vm", ctx)));
-        out.add(new Artifact(PERMISSION, "docs/generated/" + r.moduleName() + "/" + name + "-menu.sql", merge("menu.sql.vm", ctx)));
+        out.add(new Artifact(FRONTEND, options == null ? "src/api/" + r.moduleName() + "/" + name + ".ts" : options.frontendApi(), merge("api.ts.vm", ctx)));
+        out.add(new Artifact(FRONTEND, options == null ? "src/views/" + r.moduleName() + "/" + name + "/index.vue" : options.frontendPage(), merge("index.vue.vm", ctx)));
+        out.add(new Artifact(FRONTEND, options == null ? "src/menus/" + r.moduleName() + "/" + name + ".json" : options.frontendMenu(), merge("menu.json.vm", ctx)));
+        out.add(new Artifact(PERMISSION, options == null ? "docs/generated/" + r.moduleName() + "/" + name + "-menu.sql" : options.menuSql(), merge("menu.sql.vm", ctx)));
         out.add(new Artifact(PERMISSION, "docs/generated/" + r.moduleName() + "/" + name + "-permissions.md", "<!-- MES-CODEGEN -->\n# " + r.businessName() + "\n\nScope: " + r.scope() + "; Mapper owner: " + ownership + "\n\nPath: `" + route + "`\n\n" + List.of("read", "create", "update", "delete")
-                .stream().map(x -> "- `" + perm + ":" + x + "`\n")
+                .stream().map(x -> "- `" + ctx.get("permission") + ":" + x + "`\n")
                 .collect(Collectors.joining()) + "\nMenu INSERT SQL is generated beside this file for reviewed center-database execution; no automatic execution or role grants. Mapper ownership follows its fixed package; no Mapper annotation or central registration is required.\n"));
         ctx.put("ownership", ownership);
         ctx.put("body", JavaSourceImports.explicit(merge("scaffold-test.java.vm", ctx)));

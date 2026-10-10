@@ -29,11 +29,11 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * 生产工单 HTTP 接口，响应转换显式发生在 Web 边界。
+ * 生产工单表 HTTP 接口，响应转换显式发生在 Web 边界。
  */
 @RestController
 @RequestMapping("/api/pro/pro-workorder")
-@ConditionalOnProperty(name = "mes.system.enabled", havingValue = "true")
+@ConditionalOnProperty(name = "mes.business.enabled", havingValue = "true")
 public class ProWorkorderController {
     private final IProWorkorderService service;
 

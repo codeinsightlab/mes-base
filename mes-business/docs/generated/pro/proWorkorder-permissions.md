@@ -1,5 +1,5 @@
 <!-- MES-CODEGEN -->
-# 生产工单
+# 生产工单表
 
 Scope: FACTORY_SCOPED; Mapper owner: BUSINESS
 

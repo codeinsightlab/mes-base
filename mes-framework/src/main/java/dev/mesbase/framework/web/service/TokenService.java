@@ -1,52 +1,75 @@
 package dev.mesbase.framework.web.service;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import dev.mesbase.common.core.domain.entity.SysUser;
 import dev.mesbase.common.core.domain.model.LoginUser;
-import dev.mesbase.common.core.redis.RedisCache;
-import dev.mesbase.system.service.ISysUserService;
-import org.springframework.stereotype.Service;
-import org.springframework.core.env.Environment;
+import dev.mesbase.common.core.redis.UserSessionStore;
+import dev.mesbase.core.error.ErrorCode;
+import dev.mesbase.core.error.FoundationException;
+import dev.mesbase.system.mapper.SessionAccountMapper;
 import jakarta.servlet.http.HttpServletRequest;
-
-import java.security.*;
-import java.util.*;
-import java.util.concurrent.TimeUnit;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.security.SecureRandom;
+import java.time.Instant;
+import java.util.Base64;
+import java.util.HexFormat;
+import java.util.Set;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.core.env.Environment;
+import org.springframework.stereotype.Service;
 
 /**
- * PORT of source Redis sessions: identity-only opaque credentials; permissions refreshed from DB each request.
+ * SOURCE_PRODUCT_PORT: Redis identity restoration; current roles are request-local, never persisted permissions.
  */
 @Service
-@org.springframework.boot.autoconfigure.condition.ConditionalOnProperty(name = "mes.system.enabled", havingValue = "true")
+@ConditionalOnProperty(name = "mes.system.enabled", havingValue = "true")
 public class TokenService {
-    public static final String PREFIX = "mes:system:session:";
-    private final RedisCache cache;
-    private final ISysUserService users;
+    public static final String PREFIX = UserSessionStore.PREFIX;
+    private final UserSessionStore sessions;
+    private final SessionAccountMapper accounts;
+    private final ObjectMapper json = new ObjectMapper();
     private final int ttl;
 
-    public TokenService(RedisCache cache, ISysUserService users, Environment e) {
-        this.cache = cache;
-        this.users = users;
-        ttl = e.getProperty("token.expire-time", Integer.class, 60);
+    public TokenService(UserSessionStore sessions, SessionAccountMapper accounts, Environment environment) {
+        this.sessions = sessions;
+        this.accounts = accounts;
+        ttl = environment.getProperty("token.expire-time", Integer.class, 60);
         if (ttl < 1 || ttl > 1440) throw new IllegalArgumentException("Token lifetime invalid");
     }
 
     public static String hash(String token) {
         try {
-            return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(token.getBytes(java.nio.charset.StandardCharsets.UTF_8)));
-        } catch (NoSuchAlgorithmException e) {
-            throw new IllegalStateException(e);
+            return HexFormat.of()
+                    .formatHex(MessageDigest.getInstance("SHA-256").digest(token.getBytes(StandardCharsets.UTF_8)));
+        } catch (NoSuchAlgorithmException impossible) {
+            throw new IllegalStateException(impossible);
         }
     }
 
-    public record Identity(Long userId, String username, long loginTime, String ip, String browser, String os,
-                           long authRevision) implements java.io.Serializable {
+    public record Identity(Long userId, String username, Long deptId, String nickName, String avatar,
+                           long loginTime, String ip, String browser, String os, long authRevision) {
     }
 
     public String createToken(LoginUser user, HttpServletRequest request) {
+        // Fence a login racing with a committed account change before publishing to Redis.
+        SysUser current = accounts.account(user.getUserId());
+        valid(current, user.getUserId(), user.getUsername(), user.getUser().getAuthRevision());
         byte[] bytes = new byte[32];
         new SecureRandom().nextBytes(bytes);
         String raw = Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
-        String digest = hash(raw);
-        cache.setCacheObject(PREFIX + digest, new Identity(user.getUserId(), user.getUsername(), System.currentTimeMillis(), request.getRemoteAddr(), ClientAgent.parse(request.getHeader("User-Agent")).browser(), ClientAgent.parse(request.getHeader("User-Agent")).os(), user.getUser().getAuthRevision()), ttl, TimeUnit.MINUTES);
+        ClientAgent agent = ClientAgent.parse(request.getHeader("User-Agent"));
+        Identity identity = new Identity(user.getUserId(), user.getUsername(), user.getDeptId(),
+                user.getUser().getNickName(), user.getUser().getAvatar(), System.currentTimeMillis(),
+                request.getRemoteAddr(), agent.browser(), agent.os(), user.getUser().getAuthRevision());
+        try {
+            if (!sessions.issue(hash(raw), identity.userId(), identity.authRevision(), json.writeValueAsString(identity),
+                    Instant.now().plusSeconds(ttl * 60L))) throw denied();
+        } catch (JsonProcessingException impossible) {
+            throw new IllegalStateException(impossible);
+        }
         return raw;
     }
 
@@ -56,15 +79,26 @@ public class TokenService {
         return resolve(header.substring(7));
     }
 
+    public Identity identity(String digest) {
+        String payload = sessions.read(digest);
+        if (payload == null) return null;
+        try {
+            return json.readValue(payload, Identity.class);
+        } catch (JsonProcessingException invalid) {
+            throw denied();
+        }
+    }
+
     public LoginUser resolve(String raw) {
         if (!raw.matches("[A-Za-z0-9_-]{43}")) throw denied();
         String digest = hash(raw);
-        Identity identity = cache.getCacheObject(PREFIX + digest);
+        Identity identity = identity(digest);
         if (identity == null) throw denied();
-        var user = users.selectUserByUserName(identity.username());
-        if (user == null || !"0".equals(user.getStatus()) || !"0".equals(user.getDelFlag()) || !user.getUserId().equals(identity.userId()) || user.getAuthRevision() != identity.authRevision())
-            throw denied();
-        var login = new LoginUser(user.getUserId(), user.getDeptId(), user, Set.of());
+        // One password-free admission query loads current roles and the durable account fence.
+        // It also rejects stale credentials when DB committed but Redis delivery is pending.
+        SysUser user = accounts.account(identity.userId());
+        valid(user, identity.userId(), identity.username(), identity.authRevision());
+        LoginUser login = new LoginUser(user.getUserId(), user.getDeptId(), user, Set.of());
         login.setToken(digest);
         login.setLoginTime(identity.loginTime());
         login.setIpaddr(identity.ip());
@@ -73,24 +107,21 @@ public class TokenService {
         return login;
     }
 
-    public void setLoginUser(LoginUser user) {/* User/roles remain DB-authoritative; never cache permission snapshots. */}
-
-    public void delLoginUser(String digest) {
-        cache.deleteObject(PREFIX + digest);
+    private static void valid(SysUser user, Long id, String username, long revision) {
+        if (user == null || !"0".equals(user.getStatus()) || !"0".equals(user.getDelFlag())
+                || !id.equals(user.getUserId()) || !username.equals(user.getUserName()) || revision != user.getAuthRevision())
+            throw denied();
     }
 
-    public void revokeUser(Long userId) {
-        for (String key : cache.keys(PREFIX + "*")) {
-            Identity identity = cache.getCacheObject(key);
-            if (identity != null && identity.userId().equals(userId)) cache.deleteObject(key);
-        }
+    public void delLoginUser(String digest) {
+        sessions.logout(digest);
     }
 
     public int ttlMinutes() {
         return ttl;
     }
 
-    private RuntimeException denied() {
-        return new dev.mesbase.core.error.FoundationException(dev.mesbase.core.error.ErrorCode.UNAUTHENTICATED);
+    private static FoundationException denied() {
+        return new FoundationException(ErrorCode.UNAUTHENTICATED);
     }
 }

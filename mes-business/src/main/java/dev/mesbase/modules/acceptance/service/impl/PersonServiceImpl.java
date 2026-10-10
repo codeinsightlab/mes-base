@@ -25,7 +25,7 @@ import org.springframework.transaction.annotation.Transactional;
  * 人员 CRUD：规则与事务由 Service 负责，Mapper 通过 MyBatis-Spring 注入。
  */
 @Service
-@ConditionalOnProperty(name = "mes.codegen.person-review.enabled", havingValue = "true")
+@ConditionalOnProperty(name = "mes.system.enabled", havingValue = "true")
 public class PersonServiceImpl implements IPersonService {
     private final PersonMapper mapper;
 

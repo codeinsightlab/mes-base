@@ -56,11 +56,6 @@ public final class DefaultMesCodegenService implements MesCodegenService {
         Set<String> fields = new HashSet<>();
         for (var c : table.columns()) {
             if (!fields.add(c.javaField())) throw new CodegenException(UNSUPPORTED_SCHEMA);
-            if (c.name().toLowerCase(Locale.ROOT).matches(".*(password|secret|token|credential|private_key).*"))
-                throw new CodegenException(UNSUPPORTED_SCHEMA);
-            if (Set.of("user_id", "user_name", "file_id", "external_id", "owner_id", "password", "password_hash", "secret", "access_token", "created_by", "updated_by")
-                    .contains(c.name().toLowerCase(Locale.ROOT)))
-                throw new CodegenException(UNSUPPORTED_SCHEMA);
         }
         if (table.columns().stream().noneMatch(column -> !column.primaryKey())) {
             throw new CodegenException(UNSUPPORTED_SCHEMA);

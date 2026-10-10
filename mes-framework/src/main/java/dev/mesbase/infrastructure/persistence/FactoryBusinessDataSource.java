@@ -1,5 +1,6 @@
 package dev.mesbase.infrastructure.persistence;
 
+import dev.mesbase.core.factory.FactoryScope;
 import dev.mesbase.core.error.ErrorCode;
 import dev.mesbase.core.error.FoundationException;
 import dev.mesbase.platform.execution.FactoryContext;
@@ -35,8 +36,7 @@ public final class FactoryBusinessDataSource extends AbstractDataSource implemen
     public void verify() {
         Selection selected = (Selection) TransactionSynchronizationManager.getResource(key);
         if (selected == null) throw new FoundationException(ErrorCode.FACTORY_SCOPE_REQUIRED);
-        if (!selected.binding().factoryId().equals(FactoryContext.required().factoryId())
-                || !selected.binding().equals(resolver.resolve(FactoryContext.required())))
+        if (!selected.binding().factoryId().equals(FactoryContext.required().factoryId()))
             throw new FoundationException(ErrorCode.CONFLICT);
         selected.lease().verify(selected.binding());
     }
@@ -49,6 +49,8 @@ public final class FactoryBusinessDataSource extends AbstractDataSource implemen
 
     public void resume(Object state) {
         Selection selected = (Selection) state;
+        // Restore the suspended transaction's scope, never pin an unrelated scope left by suspended work.
+        FactoryContext.bind(new FactoryScope(selected.binding().factoryId()));
         TransactionSynchronizationManager.bindResource(key, new Selection(selected.binding(), selected.lease(), FactoryContext.pinCurrent()));
     }
 

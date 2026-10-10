@@ -7,7 +7,7 @@ import jakarta.validation.constraints.Size;
 import java.time.LocalDateTime;
 
 /**
- * 生产工单写入参数，字段来自已审查的表结构。
+ * 生产工单表写入参数，字段来自已审查的表结构。
  */
 public record ProWorkorderUpdateCommand(
         @NotBlank @Size(max = 64) String workorderCode,

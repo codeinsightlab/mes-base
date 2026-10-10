@@ -25,12 +25,14 @@ import dev.mesbase.system.mapper.SysUserRoleMapper;
 import dev.mesbase.system.service.ISysConfigService;
 import dev.mesbase.system.service.ISysUserService;
 import jakarta.validation.Validator;
+import java.util.Arrays;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
+import dev.mesbase.system.service.SessionRevocationService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
@@ -45,6 +47,8 @@ import org.springframework.util.CollectionUtils;
 @Service
 @ConditionalOnProperty(name = "mes.system.enabled", havingValue = "true")
 public class SysUserServiceImpl implements ISysUserService {
+    @Autowired
+    private SessionRevocationService revocations;
     @Autowired
     private Validator contractValidator;
     private static final Logger log = LoggerFactory.getLogger(SysUserServiceImpl.class);
@@ -306,7 +310,10 @@ public class SysUserServiceImpl implements ISysUserService {
         userPostMapper.deleteUserPostByUserId(userId);
         // 新增用户与岗位管理
         insertUserPost(user);
-        return userMapper.updateUser(user);
+        int changed = userMapper.updateUser(user);
+        if (changed > 0 && (StringUtils.isNotEmpty(user.getPassword()) || StringUtils.isNotEmpty(user.getStatus())))
+            revocations.enqueue(List.of(user.getUserId()));
+        return changed;
     }
 
     /**
@@ -334,7 +341,10 @@ public class SysUserServiceImpl implements ISysUserService {
     @Override
     @Transactional(transactionManager = "masterTransactionManager", rollbackFor = Exception.class)
     public int updateUserStatus(SysUser user) {
-        return userMapper.updateUser(user);
+        int changed = userMapper.updateUser(user);
+        if (changed > 0 && (StringUtils.isNotEmpty(user.getPassword()) || StringUtils.isNotEmpty(user.getStatus())))
+            revocations.enqueue(List.of(user.getUserId()));
+        return changed;
     }
 
     /**
@@ -346,7 +356,10 @@ public class SysUserServiceImpl implements ISysUserService {
     @Override
     @Transactional(transactionManager = "masterTransactionManager", rollbackFor = Exception.class)
     public int updateUserProfile(SysUser user) {
-        return userMapper.updateUser(user);
+        int changed = userMapper.updateUser(user);
+        if (changed > 0 && (StringUtils.isNotEmpty(user.getPassword()) || StringUtils.isNotEmpty(user.getStatus())))
+            revocations.enqueue(List.of(user.getUserId()));
+        return changed;
     }
 
     /**
@@ -372,7 +385,10 @@ public class SysUserServiceImpl implements ISysUserService {
     @Override
     @Transactional(transactionManager = "masterTransactionManager", rollbackFor = Exception.class)
     public int resetPwd(SysUser user) {
-        return userMapper.updateUser(user);
+        int changed = userMapper.updateUser(user);
+        if (changed > 0 && (StringUtils.isNotEmpty(user.getPassword()) || StringUtils.isNotEmpty(user.getStatus())))
+            revocations.enqueue(List.of(user.getUserId()));
+        return changed;
     }
 
     /**
@@ -385,7 +401,9 @@ public class SysUserServiceImpl implements ISysUserService {
     @Override
     @Transactional(transactionManager = "masterTransactionManager", rollbackFor = Exception.class)
     public int resetUserPwd(String userName, String password) {
-        return userMapper.resetUserPwd(userName, password);
+        int changed = userMapper.resetUserPwd(userName, password);
+        if (changed > 0) revocations.enqueueUsername(userName);
+        return changed;
     }
 
     /**
@@ -475,7 +493,9 @@ public class SysUserServiceImpl implements ISysUserService {
         userRoleMapper.deleteUserRoleByUserId(userId);
         // 删除用户与岗位表
         userPostMapper.deleteUserPostByUserId(userId);
-        return userMapper.deleteUserById(userId);
+        int changed = userMapper.deleteUserById(userId);
+        if (changed > 0) revocations.enqueue(List.of(userId));
+        return changed;
     }
 
     /**
@@ -497,7 +517,9 @@ public class SysUserServiceImpl implements ISysUserService {
         userRoleMapper.deleteUserRole(userIds);
         // 删除用户与岗位关联
         userPostMapper.deleteUserPost(userIds);
-        return userMapper.deleteUserByIds(userIds);
+        int changed = userMapper.deleteUserByIds(userIds);
+        if (changed > 0) revocations.enqueue(Arrays.asList(userIds));
+        return changed;
     }
 
     /**

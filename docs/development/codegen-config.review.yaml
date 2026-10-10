@@ -70,7 +70,7 @@ backend:
   conditional:
     # false 表示不生成条件注解；此时 property/value 显式为 null。
     enabled: true
-    property: "mes.system.enabled"
+    property: "mes.business.enabled"
     value: "true"
   permission:
     # 不从 backendModule 自动推断，也不关联物理数据库名。
@@ -110,11 +110,23 @@ menu:
   migrateLegacyPermissions: false
 
 execution:
-  mode: "dry-run"
-  overwrite: "fail"
+  # dry-run：读取表结构、生成内容并预检目标文件，不写入生成代码；仍会写调用时指定的 JSON 报告。
+  # write：全部预检通过后才写入生成文件；生成的菜单 SQL 仍需人工审查、另行执行。
+  # 注意：dry-run 同样检查覆盖策略，已有文件内容不同也会报 FAILED_PREFLIGHT / OUTPUT_CONFLICT。
+  mode: "write"
+  # fail：新文件允许生成；已有文件内容完全相同则保留；内容不同则拒绝本轮发布。
+  # replace-generated：仅当已有文件和新内容都带 MES-CODEGEN 标记时，允许覆盖不同内容。
+  # 该选项会覆盖生成文件中的手工修改，不做增量合并；没有生成标记的不同内容仍会拒绝。
+  # 正式重新生成已有代码：mode 改为 write，overwrite 改为 replace-generated，并先审查已有修改。
+  # 仅查看覆盖后的预期产物：保留 dry-run，改为 replace-generated；不会实际覆盖代码。
+  # 想先生成一份可查看的文件：复制本配置，将 backendRoot/frontendRoot 改到独立的 target 目录，
+  # 再使用 write + fail；不要为了查看效果直接覆盖前后端项目中的现有代码。
+  overwrite: "replace-generated"
   formatJava: true
   formatter: "scripts/format-java"
   # 批量预检全部完成后才发布，避免后面的表失败留下半套产物。
+  # 报告 supported 表示表结构支持生成；rejected 中 <output> / OUTPUT_CONFLICT 表示输出冲突，
+  # 不表示另外一张表不支持。FAILED_PREFLIGHT 时，本轮不会发布任何生成文件。
   publication: "preflight-all"
   unsupportedTable: "fail"
 

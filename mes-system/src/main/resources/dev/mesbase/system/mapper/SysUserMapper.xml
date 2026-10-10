@@ -224,10 +224,6 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
  		where user_id = #{userId}
 	</update>
 
-	<update id="updateUserStatus" parameterType="SysUser">
- 		update sys_user set status = #{status} where user_id = #{userId}
-	</update>
-
 	<update id="updateUserAvatar" parameterType="SysUser">
  		update sys_user set avatar = #{avatar}, minio_url = #{minioUrl} where user_name = #{userName}
 	</update>
@@ -241,11 +237,11 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 	</update>
 
 	<delete id="deleteUserById" parameterType="Long">
-		update sys_user set del_flag = '2' where user_id = #{userId}
+		update sys_user set auth_revision=auth_revision+1,del_flag = '2' where user_id = #{userId}
  	</delete>
 
  	<delete id="deleteUserByIds" parameterType="Long">
- 		update sys_user set del_flag = '2' where user_id in
+        update sys_user set auth_revision=auth_revision+1,del_flag = '2' where user_id in
  		<foreach collection="array" item="userId" open="(" separator="," close=")">
  			#{userId}
         </foreach>

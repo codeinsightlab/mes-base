@@ -269,3 +269,25 @@ CrudPage 区分无读取权限与空结果：没有 read 时显示“当前范�
 按用户要求删除 DefaultMesCodegenService 的敏感关键词和主体/引用字段名拒绝逻辑；user_id、owner_id、password、secret、access_token 等按真实 metadata 作为普通字段生成。上文 CLI 审查中这两种拒绝策略为整改前事实，本节取代其现行结论。保留类型、单主键、命名冲突及外键等实际能力校验，不改变既有审计字段策略。AGENTS 与 Skill 同步边界。新增合成 H2 表的生成、字段保留及产出 Java 编译回归；未修改业务表或执行真实业务生成。验证：两份 Java 经 IDEA formatter；mvn -B -ntp verify 为 BUILD SUCCESS，CodegenAcceptanceTest 13/13（含真实生成 Java 编译）通过。首轮测试断言忽略 H2 大写 metadata，修正后通过。本次修改文件 diff --check 通过；全仓检查受其他改动 SysUserMapper.xml 第248行缩进空白影响，未修改该文件。
 
 打包 smoke：scripts/smoke-packaged.py 未通过，/open-api/token 返回401，与脚本预期不符；涉及当前其他安全入口改动，未修改相关代码或测试。本次生成器验证通过不代表全仓最终验收完成。
+
+### 2026-10-11 mes-business 配置读取与批量调用入口
+
+入口代码为 mes-business 的 modules/codegen/BusinessCodegenConfiguration、BusinessCodegenRunner、BusinessCodegenCli；只作为开发工具，不注册 HTTP Controller、运行期 Service 或定时任务。mes-business 显式依赖 mes-generator，参数适配调用 ConfiguredCodegenService，不重写 MBG 或通过修改生成文件替代模板。
+
+使用：先 `mvn -B -ntp verify` 构建，然后 `./scripts/mes-business-codegen docs/development/codegen-config.review.yaml target/business-codegen/preview.json`。配置路径、仓库根和报告路径传给独立 PropertiesLauncher 主类；不启动用户服务。脚本按构建实际 JAR 文件查找，不写死版本号；不自动构建，构建最新后执行。
+
+当前新入口读取配置的明确值和推导策略：连接 profile、schema、全量/指定/排除表、指定产物、模块前缀与 fallback、表注释显示名、包与输出布局、模板目录、HTTP 路由、事务、条件注解、权限、审计字段、长度与分页/批删限制、UI 引用、菜单及执行策略。缺必要项报错（包括必须显式声明的 null schema），未支持的策略报错，不静默忽略。四种 CRUD 操作和 MyBatis3/XMLMAPPER 是当前明确支持的生成能力，不声称支持任意动作或持久化框架。
+
+新生成入口不限制 Java 包为 dev.mesbase，测试用 sample.generated 包实际生成并编译；项目模板仍引用 Base 的 EndpointAccess、CrudPage 等应用契约，换项目必须提供适配的模板。旧 CodegenCli 路径保留且仍有历史默认值，不宣称旧入口已经完成配置迁移。
+
+全量使用 JDBC metadata 枚举所选库的 TABLE，不采样业务行；先校验所有表，结构不支持时记录 FAILED_PREFLIGHT，禁止任何表发布。所有产物统一 writer 预检及回滚。dry-run 检查已有文件冲突；冲突不会为了预览而自动切换覆盖策略。后端、前端、菜单、测试与 persistence 可独立筛选；backend 分组是 Service/Controller/请求响应模型，persistence 单独选择，frontend 分组是 API 与页面，menu 分组含菜单 JSON、SQL 和权限说明。
+
+菜单模板调整为 UPDATE 已有＋INSERT 缺失。目录按 parent/path/type，页面与按钮按 permission/type 定位，保留 menu_id 与角色关系。重跑会更新配置决定的名称、路径、component、图标、排序和父级。需串行执行；没有新增唯一约束，不承诺并发重跑的防重效果。菜单 SQL 从不自动在真实中心库执行。
+
+实际开发库预览：原配置 tables=[]、artifacts=[all]、dry-run、fail、无表覆盖；读取到 pro_workorder，模块 pro，显示名来自表注释“生产工单表”，包 dev.mesbase.modules.pro，API /api/pro/pro-workorder，权限 business:pro:workorder。已有生成代码与新产物冲突，报告记录 OUTPUT_CONFLICT，未覆盖原代码。
+
+为代码审查创建 target/business-codegen/isolated-review.yaml，仅将输出改到 target/business-codegen/generated/{backend,frontend} 并改为 write；其他值沿用用户配置。实际生成结果及文件 manifest 在 target/business-codegen/generated-report.json。样例来自真实 metadata，不读取业务数据；生成的 SQL 未执行。
+
+验证：BusinessCodegenRunnerTest 覆盖全量/指定、可配置 fallback/包/开关/分页、产出 Java 编译、缺参数、部分产物、批量失败不发布，以及菜单 SQL 首次新增/再次更新/保持角色绑定。菜单执行证据来自合成 H2；不能当作真实中心库执行证明。验收命令与最后结果追加于下方。
+
+本轮最终验收：任务 Java 文件经 IDEA formatter；`mvn -B -ntp verify` BUILD SUCCESS，BusinessCodegenRunnerTest 5/5（含生成 Java 编译与 H2 菜单重跑）通过；`scripts/smoke-packaged.py` 10/10；`git diff --check` 通过。真实开发连接只读取 metadata，全量为1张表；原配置预检按 fail 策略拒绝已有代码冲突。隔离配置实际生成20个文件；没有执行真实菜单 SQL、角色赋权或重启用户服务。未修改前端运行代码，因此未运行新的 UI 构建；UI 生成模板变化由产物检查覆盖，不宣称真实页面验收。
