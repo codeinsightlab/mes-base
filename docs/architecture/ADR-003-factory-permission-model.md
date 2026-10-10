@@ -23,3 +23,11 @@
 `AuthorizationPreferenceCacheTest` 验证空角色选厂、A/B 分离、撤权、无默认、偏好失效和缓存范围。`FoundationHttpTest` 在真实嵌入 Tomcat 上发 HTTP，验证匿名/错误凭证/停用账号401、空角色200、按厂403、偏好不授予权限、并发/撤权、输入400、未配置422、409/500安全消息和关联ID。不是只检查注解，也不是 MockMvc。
 
 未实现生产用户库/密码策略、HTTPS部署、限流、持久审计、统一第三方身份或复杂对象 ownership。本阶段没有实际业务对象；新增业务接口仍必须做对象所属范围和相应 Service 授权，不能靠本次 Foundation 测试替代。
+
+## 2026-10-10 修订：持久偏好与业务厂默认选择
+
+用户明确修改前述“无偏好保留空 Scope”策略。显式 X-Factory-Id 仍优先，非法值明确失败；其次恢复有效启用偏好；否则从启用且绑定启用业务数据源的工厂中选默认。一个候选直接选，多候选按工厂 ID 最小值选择，纯数字使用 DECIMAL(65,0) 比较（2 小于 10），同数值按原字符串排序。兼容旧字符串 ID：数字优先，其余按中心库字符串排序。零候选为空；不制造编号 0/1，不回退中心库，不绕过版本、连接或业务路由校验。默认选择不覆盖历史偏好，只有本人手动选择才保存。
+
+SOURCE_PRODUCT_PORT：迁入 Source 中心库 mf_user_preference 参数化 upsert 与认证主体归属；Factory ID 从 BIGINT 适配 Base VARCHAR(64)。生产偏好按受信任 LoginUser.userId 保存，重命名不丢失，不接受客户端 userId。system 禁用 fixture 保留内存实现。持久读写使用 masterTransactionManager，Mapper 按 system 固定包自动归中心库。
+
+登录、刷新与候选变更查询服务端 context；浏览器 factoryId 不替代服务端决策。切换先清旧权限，PUT 保存成功后加载新厂权限，revision 拒绝注销/切换后的旧响应。选厂不创建角色或权限；无角色仍只能访问 AUTHENTICATED。

@@ -4,13 +4,31 @@
 		"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="dev.mesbase.system.mapper.SysMenuMapper">
 
+    <select id="selectScopedPermissions" resultType="String">
+        SELECT DISTINCT m.perms
+        FROM sys_menu m JOIN sys_role_menu rm ON m.menu_id=rm.menu_id
+        JOIN sys_user_role ur ON ur.role_id=rm.role_id JOIN sys_role r ON r.role_id=ur.role_id
+        JOIN sys_user u ON u.user_id=ur.user_id
+        WHERE u.user_name=#{username} AND u.status='0' AND u.del_flag='0'
+          AND r.status='0' AND r.del_flag='0' AND m.status='0'
+        <choose>
+            <when test="factoryId != null">
+                AND ((r.kind='PLATFORM' AND r.factory_id IS NULL)
+                     OR (r.kind='FACTORY' AND r.factory_id=#{factoryId}))
+            </when>
+            <otherwise>AND r.kind='PLATFORM' AND r.factory_id IS NULL</otherwise>
+        </choose>
+    </select>
+
     <select id="selectFactoryMenus" resultMap="SysMenuResult">
         select distinct m.menu_id,m.menu_name,m.parent_id,m.order_num,m.path,m.component,m.`query`,m.is_frame,m.is_cache,m.menu_type,m.visible,m.status,m.perms,m.icon,m.create_time
         from sys_menu m join sys_role_menu rm on m.menu_id=rm.menu_id
         join sys_user_role ur on ur.role_id=rm.role_id join sys_role r on r.role_id=ur.role_id
         join sys_user u on u.user_id=ur.user_id
         where u.user_name=#{username} and u.status='0' and u.del_flag='0'
-        and r.status='0' and r.del_flag='0' and r.kind='FACTORY' and r.factory_id=#{factoryId}
+        and r.status='0' and r.del_flag='0'
+        and ((r.kind='PLATFORM' and r.factory_id is null)
+             or (r.kind='FACTORY' and r.factory_id=#{factoryId}))
         and m.status='0' and m.menu_type in ('M','C') order by m.parent_id,m.order_num
     </select>
 	<resultMap type="SysMenu" id="SysMenuResult">

@@ -1,6 +1,7 @@
 package dev.mesbase.system.service;
 
 import dev.mesbase.system.mapper.SysMenuMapper;
+import dev.mesbase.common.core.domain.entity.SysMenu;
 import dev.mesbase.system.mapper.SysRoleMapper;
 import dev.mesbase.system.factory.ManagedFactoryMapper;
 
@@ -39,10 +40,21 @@ public class SystemPermissionService {
 
     public Set<String> permissions(String user, String factory) {
         var result = new HashSet<String>();
+        var platformCodes = new HashSet<String>();
+        if (factory != null) {
+            var allMenus = menus.selectMenuList(new SysMenu());
+            var policy = new MenuScopePolicy(allMenus);
+            for (var menu : allMenus) {
+                if (policy.platform(menu) && menu.getPerms() != null) {
+                    platformCodes.addAll(List.of(menu.getPerms().split(",")));
+                }
+            }
+        }
         for (String values : menus.selectScopedPermissions(user, factory)) {
             if (values != null) {
                 for (String p : values.split(",")) {
-                    if (!p.isBlank()) {
+                    if (!p.isBlank() && (factory == null ||
+                            !MenuScopePolicy.platformPermission(p) && !platformCodes.contains(p))) {
                         result.add(p);
                     }
                 }
@@ -52,6 +64,7 @@ public class SystemPermissionService {
     }
 
     public boolean granted(String user, String factory, String permission) {
+        if (factory == null || factory.isBlank()) return false;
         var permissions = permissions(user, factory);
         return permissions.contains(permission);
     }

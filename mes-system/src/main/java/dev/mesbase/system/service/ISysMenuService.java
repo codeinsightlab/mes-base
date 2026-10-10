@@ -12,9 +12,12 @@ import java.util.Set;
  *
  * @author ruoyi
  */
-public interface ISysMenuService
-{
-    List<SysMenu> selectFactoryMenuTree(String username,String factoryId);
+public interface ISysMenuService {
+    List<SysMenu> selectAssignableMenus(SysMenu query, Long userId, String kind);
+
+    List<SysMenu> selectAssignableRoleMenus(Long userId, Long roleId);
+
+    List<SysMenu> selectFactoryMenuTree(String username, String factoryId);
 
     /**
      * 根据用户查询系统菜单列表
@@ -27,7 +30,7 @@ public interface ISysMenuService
     /**
      * 根据用户查询系统菜单列表
      *
-     * @param menu 菜单信息
+     * @param menu   菜单信息
      * @param userId 用户ID
      * @return 菜单列表
      */

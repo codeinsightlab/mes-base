@@ -3,6 +3,8 @@ package dev.mesbase.system.service.impl;
 import dev.mesbase.common.annotation.DataScope;
 import dev.mesbase.common.constant.UserConstants;
 import dev.mesbase.common.core.domain.entity.SysRole;
+import dev.mesbase.common.core.domain.entity.SysMenu;
+import dev.mesbase.system.service.MenuScopePolicy;
 import dev.mesbase.common.core.domain.entity.SysUser;
 import dev.mesbase.common.exception.ServiceException;
 import dev.mesbase.common.utils.SecurityUtils;
@@ -323,11 +325,18 @@ public class SysRoleServiceImpl implements ISysRoleService {
      */
     @Transactional(transactionManager = "masterTransactionManager", rollbackFor = Exception.class)
     public int insertRoleMenu(SysRole role) {
+        if (role.getKind() == null || !Set.of("PLATFORM", "FACTORY").contains(role.getKind())) {
+            throw new ServiceException("请选择角色类型");
+        }
         int rows = 1;
         // 新增用户与角色管理
         List<SysRoleMenu> list = new ArrayList<SysRoleMenu>();
+        var policy = new MenuScopePolicy(menus.selectMenuList(new SysMenu()));
         for (Long menuId : role.getMenuIds() == null ? new Long[0] : role.getMenuIds()) {
-            if (menus.selectMenuById(menuId) == null) throw new ServiceException("菜单不存在");
+            var menu = policy.require(menuId);
+            if ("FACTORY".equals(role.getKind()) && policy.platform(menu)) {
+                throw new ServiceException("工厂角色只能分配业务权限");
+            }
             SysRoleMenu rm = new SysRoleMenu();
             rm.setRoleId(role.getRoleId());
             rm.setMenuId(menuId);

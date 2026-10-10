@@ -201,3 +201,11 @@ import dev.mesbase.openapi.OpenApiEndpoint;
 - 未执行真实 MySQL V16 迁移、提交、推送或部署；历史客户端数据未销毁。回滚代码/模块配置需同时恢复旧 UI 和权限链，已执行数据库迁移的环境需另行审查，不能默认恢复旧授权。
 
 - 最终 UI `npm run build` 通过（Vue/TypeScript 检查与 Vite 生产构建）；此前并行测试类型错误已由工作区其他改动解决，本任务未修改该 CRUD 测试。现有 bundle 体积提示仍保留，未顺手优化。
+
+## 2026-10-10 工厂偏好迁移与默认选择
+
+中心库新增 V17__factory_user_preference.sql，不带 seed 或菜单 SQL；应用前执行现有 Flyway 中心库迁移流程。system 启用自动装配持久偏好，表缺失明确失败，不退回内存掩盖迁移遗漏。GET /api/foundation/context 使用认证身份恢复偏好或默认厂；PUT /api/foundation/preference 只接收 factoryId，通过当前用户 ID 参数化 upsert。登录、刷新恢复服务端上下文，手工切换持久化后加载厂菜单/权限。
+
+默认规则见 ADR-003 新修订：有效启用偏好优先，否则从启用厂且绑定启用业务库中选择工厂 ID 最小值（纯数字按数值），零候选为空。候选查询只读中心 metadata，不初始化业务池；业务请求继续校验路由版本/租约。本次未执行真实数据库迁移。
+
+验收记录：本次后端迁移定向 4/4、前端 113 项和 build、打包 smoke 10/10；最新全量后端测试受其他任务 RoleScopePermissionTest fixture 错误阻塞，详见工厂迁移报告。真实数据库迁移及浏览器交互未验。部分源码进入同工作区其他任务提交，但 V17 尚未提交；部署必须包含 schema 与全套偏好链路。

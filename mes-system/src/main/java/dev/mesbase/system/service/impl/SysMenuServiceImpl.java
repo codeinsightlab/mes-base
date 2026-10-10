@@ -17,6 +17,7 @@ import dev.mesbase.system.mapper.SysRoleMapper;
 import dev.mesbase.system.mapper.SysRoleMenuMapper;
 import dev.mesbase.system.service.ISysMenuService;
 import dev.mesbase.system.service.SystemPermissionService;
+import dev.mesbase.system.service.MenuScopePolicy;
 import jakarta.validation.Validator;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -111,7 +112,26 @@ public class SysMenuServiceImpl implements ISysMenuService {
      * @return 菜单列表
      */
     public List<SysMenu> selectFactoryMenuTree(String username, String factoryId) {
-        return getChildPerms(menuMapper.selectFactoryMenus(username, factoryId), 0);
+        if (factoryId == null || factoryId.isBlank()) throw new ServiceException("请选择工厂");
+        var policy = new MenuScopePolicy(menuMapper.selectMenuList(new SysMenu()));
+        return getChildPerms(menuMapper.selectFactoryMenus(username, factoryId).stream()
+                .filter(menu -> !policy.platform(menu)).toList(), 0);
+    }
+
+    @Override
+    public List<SysMenu> selectAssignableMenus(SysMenu query, Long userId, String kind) {
+        if (!Set.of("PLATFORM", "FACTORY").contains(kind)) throw new ServiceException("Invalid role kind");
+        var rows = selectMenuList(query, userId);
+        if ("PLATFORM".equals(kind)) return rows;
+        var policy = new MenuScopePolicy(menuMapper.selectMenuList(new SysMenu()));
+        return rows.stream().filter(menu -> !policy.platform(menu)).toList();
+    }
+
+    @Override
+    public List<SysMenu> selectAssignableRoleMenus(Long userId, Long roleId) {
+        var role = roleMapper.selectRoleById(roleId);
+        if (role == null) throw new ServiceException("Role does not exist");
+        return selectAssignableMenus(new SysMenu(), userId, role.getKind());
     }
 
     @Override

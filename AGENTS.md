@@ -18,7 +18,7 @@ Spring/ThreadLocal/具体基础设施，也不依赖 SysUser/SysRole 持久化 E
 
 Scope 只含 FactoryId；不等于 Permission、DataSource 或 ERP Connection。无 UserFactory 准入：有效空角色账号可登录、选择启用
 Factory 和访问 AUTHENTICATED；AUTHORIZED 缺权限拒绝。偏好只是 UX，不授予权限。显式选厂优先，其次恢复有效偏好；无有效偏好时，仅从启用工厂且绑定启用业务库的候选中自动选择：一个选它，多个选工厂 ID 最小者。纯数字 ID 按数值比较，其他 ID 按字符串排序，数字 ID 优先；同数值以原 ID 排序作稳定裁决。零候选保持空 Scope，不使用魔法 0/1 或回退中心库。PLATFORM 角色显式 kind、无
-factoryId；FACTORY 角色必须所属厂。权限按每次请求当前厂读取，不进长寿命 Token/跨厂缓存。
+factoryId；FACTORY 角色必须所属厂。平台角色可持有任意权限，其业务权限在选定的启用工厂上下文中生效；工厂角色仅可持有业务权限，且仅在所属工厂生效。工厂业务授权合并平台角色业务权限与当前工厂角色业务权限，不向工厂角色开放平台授权。权限按每次请求当前厂读取，不进长寿命 Token/跨厂缓存。
 
 ## 4. Controller / Service / Mapper
 
@@ -43,7 +43,7 @@ Service，只有长期真实复杂协调才拆分。外部主动调用经 Port/A
 
 ## 7. 权限 / Resource Scope
 
-HTTP 每个方法显式 PUBLIC/AUTHENTICATED/AUTHORIZED；缺注解启动失败。标准 CRUD 默认 AUTHORIZED，平台与厂权限独立。后端是最终边界，前端隐藏不等于授权。带
+HTTP 每个方法显式 PUBLIC/AUTHENTICATED/AUTHORIZED；缺注解启动失败。标准 CRUD 默认 AUTHORIZED，平台操作只认平台角色；业务操作在当前工厂上下文使用平台角色业务权限与所属工厂角色业务权限的并集。后端是最终边界，前端隐藏不等于授权。带
 ID 操作必须校验资源所属 Scope/主体；不信任客户端 userId/userName/factoryId。文件必须 owner + scope + resource
 证明，不能公共裸路径下载；新资源必须提供服务端 policy。
 

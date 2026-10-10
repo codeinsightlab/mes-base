@@ -162,3 +162,15 @@ Java使用本机 Amazon Corretto 21.0.4，Maven实际3.9.10。Spring官方当前
 | 本迁移报告及verification.json | 输入、执行、测试、状态、风险、后续建议 | 原始验证可定位；只实现新Foundation代码 |
 
 自检：没有空Maven module、不必要业务分层、匿名业务Map、Entity直接返回、吞异常伪造成功、单多厂分叉、默认业务库/默认首厂、无Scope全局缓存或供应商空实现。Map只用于内部注册/授权/索引；HTTP用明确DTO；SQL只出现在新合成测试Mapper；Scope与连接/ERP/用户隔离。本Agent未merge、cherry-pick、commit、push、部署或改旧工程；新仓库已存在的独立提交不视作本Agent执行。
+
+## 2026-10-10 SOURCE_PRODUCT_PORT：mf_user_preference
+
+只读审查 Source FactoryAccessService、MfUserPreference/Mapper/XML、FactoryController、utils/factory.js 和 master-init SQL。Source 当前认证 userId 保存偏好，登录恢复有效偏好；无偏好先配置默认 1，再首启用厂。PORT 持久 upsert、可信主体和恢复链，舍弃固定 1/首厂回退，按用户确认改为启用业务绑定候选的工厂 ID 最小值，纯数字按数值比较。选厂不授予权限，不增加 UserFactory 准入。
+
+后端新增持久适配、V17 schema、默认候选 ExtraMapper；前端登录/刷新以服务端 context 为准，手工选择保存偏好、清旧权限并拒绝旧响应。旧报告保留时间线，本节及 ADR-003 修订覆盖旧默认规则。不复制 Source 配置、连接、客户数据或 mf.default-factory-id。
+
+隔离 H2 MySQL-mode 测试验证真实 Mapper XML/upsert、账号改名恢复、用户归属拒绝、具名事务代理和回滚、数字排序（含超长数字）、单厂/零厂、停用厂/库与无绑定排除；Core 验证有效偏好和显式优先、默认不覆盖偏好、不授予权限。前端覆盖服务端恢复而非本地列表第一页、持久化失败、并发切换与注销旧响应。Fixture 不代表真实 MySQL/部署验收。
+
+验证回执（2026-10-10）：IDEA format-java 完成任务修改的 Java 文件；mvn -B -ntp verify 在 15:37 的工作区快照通过，打包 smoke 10/10。补充直接执行 V17 SQL 的测试后，15:39 全量 mvn test：本次 FactoryPreferenceMigrationTest 4/4 通过（包含 V17 H2 schema、持久 XML 与事务）；mes-admin 总 186 项、4 跳过、1 错误，错误为另一个任务新增 RoleScopePermissionTest 的 fixture INSERT 缺少 sys_menu.menu_name。其文件不属本次迁移，未修改；当前全量验收仍受阻。之前一次并行构建遇到 PlatformPersistence 类缺失，重跑未重现。
+
+前端 npm run test：21 文件、113 项通过；npm run build 通过；两仓 git diff --check 通过。浏览器 cua.getState 超时，真实 UI 交互未验；真实 MySQL/Flyway 应用未执行。未发起本轮提交或推送；同工作区其他任务的 849dd4f 提交已包含部分后端迁移源码，V17 和补验文件仍需一起处理，不能只部署那个提交。
