@@ -91,6 +91,7 @@ class PersistenceDeepAuditTest {
         final HikariDataSource a;
         final HikariDataSource b;
         volatile long revision = 1;
+        final AtomicInteger admissions = new AtomicInteger();
         final FactoryBusinessDataSource source;
         final OwnedTransactionManager manager;
         final BusinessMapper mapper;
@@ -102,7 +103,10 @@ class PersistenceDeepAuditTest {
                     1, a, a::close, Set.of(BusinessMapper.class));
             registry.registerDedicated(B.factoryId(), binding(B, 1).datasourceIdentity(),
                     1, b, b::close, Set.of(BusinessMapper.class));
-            source = new FactoryBusinessDataSource(scope -> binding(scope, scope.equals(A) ? revision : 1), registry);
+            source = new FactoryBusinessDataSource(scope -> {
+                admissions.incrementAndGet();
+                return binding(scope, scope.equals(A) ? revision : 1);
+            }, registry);
             manager = new OwnedTransactionManager(source);
             var factory = PersistenceFactories.create(source, Set.of(BusinessMapper.class),
                     configuration -> {
@@ -139,6 +143,52 @@ class PersistenceDeepAuditTest {
             return ((ThreadLocal<?>) field.get(null)).get();
         } catch (ReflectiveOperationException failure) {
             throw new AssertionError(failure);
+        }
+    }
+
+    @Test
+    void admittedLeaseCanAcquireFirstConnectionAfterRetirementAndFactoryOwnerCannotChangeUntilDrain() throws Exception {
+        try (var f = new Fixture()) {
+            FactoryContext.bind(A);
+            f.source.begin();
+            try {
+                f.registry.retire(binding(A, 1).datasourceIdentity());
+                assertFalse(f.a.isClosed());
+                try (var candidate = pool("new-owner")) {
+                    assertThrows(FoundationException.class, () -> f.registry.registerDedicated(
+                            B.factoryId(), binding(A, 1).datasourceIdentity(), 2, candidate,
+                            candidate::close, Set.of(BusinessMapper.class)));
+                    assertTrue(candidate.isClosed());
+                }
+                try (var connection = f.source.getConnection(); var sql = connection.createStatement();
+                     var rows = sql.executeQuery("SELECT label FROM audit_marker")) {
+                    assertTrue(rows.next());
+                    assertEquals("A", rows.getString(1));
+                }
+            } finally {
+                f.source.end();
+            }
+            assertTrue(f.a.isClosed());
+        }
+    }
+
+    @Test
+    void sqlCacheHitsCommitAndNestedRequiredDoNotRequeryMetadataButIndependentTransactionsDo() throws Exception {
+        try (var f = new Fixture()) {
+            f.run(A, () -> {
+                for (int i = 0; i < 5; i++) assertEquals("A", f.mapper.label());
+                f.run(A, () -> f.mapper.label());
+                assertEquals(1, f.admissions.get());
+                var independent = new TransactionTemplate(f.manager);
+                independent.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+                independent.execute(status -> f.mapper.label());
+                assertEquals(2, f.admissions.get());
+                assertEquals("A", f.mapper.label());
+                return null;
+            });
+            assertEquals(2, f.admissions.get());
+            f.run(A, () -> f.mapper.label());
+            assertEquals(3, f.admissions.get());
         }
     }
 
@@ -215,15 +265,15 @@ class PersistenceDeepAuditTest {
     }
 
     @Test
-    void refreshInvalidatesOldTransactionDrainsPoolAndNewThreadUsesV2() throws Exception {
+    void refreshAllowsOldTransactionDrainsPoolAndNewThreadUsesV2() throws Exception {
         try (var f = new Fixture(); var next = pool("A_V2"); var workers = Executors.newSingleThreadExecutor()) {
-            assertThrows(FoundationException.class, () -> f.run(A, () -> {
+            f.run(A, () -> {
                 assertEquals("A", f.mapper.label());
                 f.registry.registerDedicated(A.factoryId(), binding(A, 2).datasourceIdentity(),
                         2, next, next::close, Set.of(BusinessMapper.class));
                 f.revision = 2;
                 assertFalse(f.a.isClosed());
-                assertThrows(RuntimeException.class, f.mapper::label);
+                assertEquals("A", f.mapper.label());
                 try {
                     assertEquals("A_V2", workers.submit(() -> f.run(A, f.mapper::label)).get(5, TimeUnit.SECONDS));
                 } catch (Exception failure) {
@@ -231,61 +281,79 @@ class PersistenceDeepAuditTest {
                 }
                 assertFalse(f.a.isClosed());
                 return null;
-            }));
+            });
             assertTrue(f.a.isClosed());
             assertEquals("A_V2", f.run(A, f.mapper::label));
         }
     }
 
     @Test
-    void suspendedBusinessResumesWithWrongContextPinBeforeNextStatementDetectsConflict() throws Exception {
+    void suspendedBusinessRestoresOriginalScopeBeforeNextStatement() throws Exception {
         try (var f = new Fixture()) {
-            assertThrows(IllegalStateException.class, () -> f.run(A, () -> {
+            f.run(A, () -> {
                 var paused = new TransactionTemplate(f.manager);
                 paused.setPropagationBehavior(TransactionDefinition.PROPAGATION_NOT_SUPPORTED);
                 paused.execute(status -> {
                     FactoryContext.bind(B);
                     return null;
                 });
-                assertEquals(B, FactoryContext.required());
-                assertThrows(RuntimeException.class, f.mapper::label);
-                assertThrows(FoundationException.class, () -> FactoryContext.bind(A));
-                assertThrows(FoundationException.class, f.manager::verifyAccess);
-                // Rollback avoids commit with this intentionally inconsistent state.
-                throw new IllegalStateException("TEST ONLY rollback resumed mismatch");
-            }));
+                assertEquals(A, FactoryContext.required());
+                assertEquals("A", f.mapper.label());
+                assertThrows(FoundationException.class, () -> FactoryContext.bind(B));
+                return null;
+            });
         }
     }
 
     @Test
-    void retiredPoolCanBeRegisteredAgainThenOldLeaseClosesNewActivePool() throws Exception {
+    void retiredPoolCannotBeRegisteredAgainAndOldLeaseClosesOnlyItsPool() throws Exception {
         try (var f = new Fixture()) {
             var old = f.registry.acquireDedicated(binding(A, 1));
             f.registry.retire(binding(A, 1).datasourceIdentity());
             assertFalse(f.a.isClosed());
-            f.registry.registerDedicated(A.factoryId(), binding(A, 2).datasourceIdentity(),
-                    2, f.a, f.a::close, Set.of(BusinessMapper.class));
-            assertTrue(f.registry.contains(binding(A, 2)));
+            assertThrows(FoundationException.class, () -> f.registry.registerDedicated(A.factoryId(), binding(A, 2).datasourceIdentity(),
+                    2, f.a, f.a::close, Set.of(BusinessMapper.class)));
+            assertFalse(f.a.isClosed());
             old.close();
             assertTrue(f.a.isClosed());
-            assertTrue(f.registry.contains(binding(A, 2)));
+            assertFalse(f.registry.contains(binding(A, 2)));
         }
     }
 
     @Test
-    void failedPoolClosureIsMarkedClosedAndNeverRetried() throws Exception {
+    void oldPoolCloseFailureDoesNotInvalidatePublishedReplacementAndRetriesCleanup() throws Exception {
+        try (var previous = pool("old"); var replacement = pool("new"); var registry = new RuntimeRegistry()) {
+            var attempts = new AtomicInteger();
+            registry.registerDedicated(A.factoryId(), binding(A, 1).datasourceIdentity(), 1, previous, () -> {
+                if (attempts.incrementAndGet() == 1) throw new IllegalStateException("TEST ONLY close failure");
+                previous.close();
+            }, Set.of(BusinessMapper.class));
+            registry.registerDedicated(A.factoryId(), binding(A, 2).datasourceIdentity(), 2, replacement,
+                    replacement::close, Set.of(BusinessMapper.class));
+            assertTrue(registry.contains(binding(A, 2)));
+            assertFalse(replacement.isClosed());
+            assertFalse(previous.isClosed());
+            registry.retryRetired();
+            assertTrue(previous.isClosed());
+            assertFalse(replacement.isClosed());
+        }
+    }
+
+    @Test
+    void failedPoolClosureRemainsTrackedAndCanBeRetried() throws Exception {
         try (var p = pool("closure")) {
             var registry = new RuntimeRegistry();
             var attempts = new AtomicInteger();
             registry.registerDedicated(A.factoryId(), binding(A, 1).datasourceIdentity(), 1,
                     p, () -> {
-                        attempts.incrementAndGet();
-                        throw new IllegalStateException("TEST ONLY close failure");
+                        if (attempts.incrementAndGet() == 1)
+                            throw new IllegalStateException("TEST ONLY close failure");
+                        p.close();
                     }, Set.of(BusinessMapper.class));
             assertThrows(IllegalStateException.class, registry::close);
             registry.close();
-            assertEquals(1, attempts.get());
-            assertFalse(p.isClosed());
+            assertEquals(2, attempts.get());
+            assertTrue(p.isClosed());
         }
     }
 

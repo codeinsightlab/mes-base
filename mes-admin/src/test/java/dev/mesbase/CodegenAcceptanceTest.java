@@ -205,6 +205,47 @@ class CodegenAcceptanceTest {
     }
 
     @Test
+    void generatesFieldsWithoutInferringBusinessMeaningFromNames() throws Exception {
+        List<String> columns = List.of("user_id", "user_name", "file_id", "external_id", "owner_id",
+                "password", "password_hash", "secret", "access_token", "created_by", "updated_by",
+                "credential", "private_key", "token_count");
+        try (var connection = pool.getConnection(); var statement = connection.createStatement()) {
+            statement.execute("CREATE TABLE gen_named_fields (id BIGINT PRIMARY KEY, "
+                    + String.join(", ", columns.stream().map(column -> column + " VARCHAR(40)").toList())
+                    + ")");
+        }
+        var original = request(null, false);
+        var named = new CodegenRequest(original.datasource(), original.schema(), "gen_named_fields",
+                original.moduleName(), original.businessName(), original.packageName(), original.author(),
+                original.scope(), original.overwritePolicy(), false, original.backendRoot(), original.frontendRoot());
+        var result = generator.generate(named);
+        assertEquals(CodegenResult.Status.GENERATED, result.status());
+        String xml = Files.readString(backend.resolve(
+                "src/main/resources/dev/mesbase/modules/testonly/dao/GenNamedFieldsMapper.xml"));
+        String command = Files.readString(backend.resolve(
+                "src/main/java/dev/mesbase/modules/testonly/domain/GenNamedFieldsCreateCommand.java"));
+        for (String column : columns) {
+            String metadataName = result.metadata().columns().stream()
+                    .filter(field -> field.name().equalsIgnoreCase(column)).findFirst().orElseThrow().name();
+            assertTrue(xml.contains(metadataName), "Mapper must retain schema column " + column);
+            assertTrue(command.contains(result.metadata().columns().stream()
+                            .filter(field -> field.name().equalsIgnoreCase(column)).findFirst().orElseThrow().javaField()),
+                    "Create command must retain field " + column);
+        }
+        Path classes = temp.resolve("named-field-classes");
+        Files.createDirectories(classes);
+        var compiler = ToolProvider.getSystemJavaCompiler();
+        try (var manager = compiler.getStandardFileManager(null, null, null);
+             var files = Files.walk(backend.resolve("src/main/java"))) {
+            var units = manager.getJavaFileObjectsFromPaths(
+                    files.filter(file -> file.toString().endsWith(".java")).toList());
+            assertTrue(compiler.getTask(null, manager, null,
+                    List.of("-classpath", System.getProperty("java.class.path"), "-d", classes.toString()),
+                    null, units).call(), "Generated named-field Java must compile");
+        }
+    }
+
+    @Test
     void unknownUnavailableMissingTableAreDistinctAndSafe() {
         assertEquals(Code.UNKNOWN_DATASOURCE, assertThrows(CodegenException.class, () -> generator.generate(request("missing", true))).code());
         var offline = assertThrows(CodegenException.class, () -> generator.generate(request("offline", true)));

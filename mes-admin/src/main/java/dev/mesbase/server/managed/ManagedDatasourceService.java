@@ -45,6 +45,7 @@ import java.util.function.Function;
 import java.util.function.Supplier;
 import javax.sql.DataSource;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
+import org.springframework.scheduling.annotation.Scheduled;
 
 /**
  * SOURCE_PRODUCT_PORT: ManagedDatasourceService. Platform records own configuration; pools are node-local.
@@ -92,7 +93,12 @@ public final class ManagedDatasourceService {
     private final Set<Class<?>> mappers;
     private final Path ddlRoot;
     private final String nodeId = "node-" + UUID.randomUUID();
-    private final Map<DatasourceIdentity, String> physical = new HashMap<>();
+
+    private record PoolVersion(DatasourceIdentity identity, long revision) {
+    }
+
+    private final ConcurrentHashMap<PoolVersion, String> physical = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<Long, BusinessRuntimeBinding> initialized = new ConcurrentHashMap<>();
 
     private record DdlCache(long revision, Instant at, DdlView view) {
     }
@@ -303,7 +309,9 @@ public final class ManagedDatasourceService {
             var row = new ManagedFactory(form.factoryId(), form.enterpriseId(), form.factoryCode(), form.factoryName(), form.datasourceId(), form.status(), creating ? 1 : old.revision());
             if (creating) changed(factories.insert(row));
             else changed(factories.update(row));
-            if (old != null && old.datasourceId() != null) persistence.afterCommit(() -> retire(old.datasourceId()));
+            if (old != null && old.datasourceId() != null
+                    && (!Objects.equals(old.datasourceId(), row.datasourceId()) || !Objects.equals(old.status(), row.status())))
+                persistence.afterCommit(() -> retire(old.datasourceId()));
             return null;
         });
         return factory(form.factoryId());
@@ -396,7 +404,7 @@ public final class ManagedDatasourceService {
         if (offset < 0 || limit < 1 || limit > 100) throw new FoundationException(ErrorCode.BAD_REQUEST);
     }
 
-    public synchronized BusinessRuntimeBinding resolve(FactoryScope scope) {
+    public BusinessRuntimeBinding resolve(FactoryScope scope) {
         var f = factoryRecord(scope.factoryId().value());
         if (!"ENABLED".equals(f.status())) throw new FoundationException(ErrorCode.FACTORY_DISABLED);
         if (f.datasourceId() == null) throw new FoundationException(ErrorCode.RUNTIME_NOT_CONFIGURED);
@@ -405,22 +413,36 @@ public final class ManagedDatasourceService {
         if (!"ENABLED".equals(source.status())) throw new FoundationException(ErrorCode.RUNTIME_NOT_CONFIGURED);
         var binding = new BusinessRuntimeBinding(scope.factoryId(), identity(source.datasourceId()), source.revision());
         if (!registry.contains(binding)) {
-            // A version change during an active business unit must fail instead of loading another pool.
-            if (TransactionSynchronizationManager.isActualTransactionActive())
-                throw new FoundationException(ErrorCode.CONFLICT);
-            var pool = DruidPools.create(settings, "business-managed-" + source.datasourceId(), source.jdbcUrl(), source.dbUsername(), cipher.decrypt(source.passwordCipher()));
-            boolean transferred = false;
-            try {
-                String database = physicalIdentity(pool);
-                if (database.equals(physicalIdentity(platform)) || physical.entrySet().stream()
-                        .anyMatch(e -> !e.getKey().equals(binding.datasourceIdentity()) && e.getValue()
-                                .equals(database))) throw new FoundationException(ErrorCode.RESOURCE_CONFLICT);
-                registry.retire(binding.datasourceIdentity());
-                registry.registerDedicated(binding.factoryId(), binding.datasourceIdentity(), binding.revision(), pool, pool::close, mappers);
-                transferred = true;
-                physical.put(binding.datasourceIdentity(), database);
-            } finally {
-                if (!transferred) pool.close();
+            // Only cold preparation/publication is serialized; hot admission reads do not share this lock.
+            synchronized (this) {
+                if (!registry.contains(binding)) {
+                    var current = factoryRecord(scope.factoryId().value());
+                    var latest = persistence.readOnly(s -> required(s.mapper(ManagedDatasourceMapper.class)
+                            .find(source.datasourceId())));
+                    if (!"ENABLED".equals(current.status()) || !Objects.equals(current.datasourceId(), source.datasourceId())
+                            || !"ENABLED".equals(latest.status()) || latest.revision() != source.revision())
+                        throw new FoundationException(ErrorCode.CONFLICT);
+                    var pool = DruidPools.create(settings, "business-managed-" + source.datasourceId(), source.jdbcUrl(), source.dbUsername(), cipher.decrypt(source.passwordCipher()));
+                    boolean transferred = false;
+                    try {
+                        String database = physicalIdentity(pool);
+                        if (database.equals(physicalIdentity(platform)) || physical.entrySet().stream()
+                                .anyMatch(e -> !e.getKey().identity()
+                                        .equals(binding.datasourceIdentity()) && e.getValue().equals(database)))
+                            throw new FoundationException(ErrorCode.RESOURCE_CONFLICT);
+                        registry.retire(binding.datasourceIdentity());
+                        var version = new PoolVersion(binding.datasourceIdentity(), binding.revision());
+                        registry.registerDedicated(binding.factoryId(), binding.datasourceIdentity(), binding.revision(), pool, () -> {
+                            pool.close();
+                            physical.remove(version);
+                        }, mappers);
+                        transferred = true;
+                        physical.put(version, database);
+                        initialized.put(source.datasourceId(), binding);
+                    } finally {
+                        if (!transferred) pool.close();
+                    }
+                }
             }
         }
         return binding;
@@ -428,7 +450,31 @@ public final class ManagedDatasourceService {
 
     private synchronized void retire(long id) {
         registry.retire(identity(id));
-        physical.remove(identity(id));
+        initialized.remove(id);
+    }
+
+    /**
+     * Cross-node changes retire idle pools too; admission itself always reads the center directly.
+     */
+    @Scheduled(fixedDelayString = "${mes.datasource.reconcile-ms:5000}")
+    public void reconcileInitializedPools() {
+        registry.retryRetired();
+        Map<Long, BusinessRuntimeBinding> observed = Map.copyOf(initialized);
+        if (observed.isEmpty()) return;
+        var ids = List.copyOf(observed.keySet());
+        var bindings = persistence.readOnly(s -> s.mapper(ManagedFactoryMapper.class).byDatasources(ids));
+        var configurations = persistence.readOnly(s -> s.mapper(ManagedDatasourceMapper.class).byIds(ids));
+        for (var entry : observed.entrySet()) {
+            long id = entry.getKey();
+            BusinessRuntimeBinding old = entry.getValue();
+            boolean valid = bindings.stream().anyMatch(f -> Objects.equals(f.datasourceId(), id)
+                    && f.factoryId().equals(old.factoryId().value()) && "ENABLED".equals(f.status()))
+                    && configurations.stream().anyMatch(d -> d.datasourceId() == id
+                    && d.revision() == old.revision() && "ENABLED".equals(d.status()));
+            if (!valid) synchronized (this) {
+                if (old.equals(initialized.get(id))) retire(id);
+            }
+        }
     }
 
     private static String physicalIdentity(DataSource ds) {

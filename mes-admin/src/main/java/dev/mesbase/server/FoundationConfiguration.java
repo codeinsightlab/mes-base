@@ -14,20 +14,22 @@ import dev.mesbase.infrastructure.persistence.ConfiguredBusinessPersistenceResol
 import dev.mesbase.infrastructure.persistence.DedicatedDatabasePersistence;
 import dev.mesbase.infrastructure.persistence.RuntimeRegistry;
 import dev.mesbase.platform.security.PlatformAuthorization;
-import dev.mesbase.platform.web.EndpointCatalog;
 import dev.mesbase.platform.web.ErrorWriter;
 import dev.mesbase.platform.web.FoundationAccessInterceptor;
 import java.util.List;
 import java.util.Map;
 import org.springframework.beans.factory.ObjectProvider;
-import org.springframework.beans.factory.SmartInitializingSingleton;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.env.Environment;
+import jakarta.servlet.DispatcherType;
+import dev.mesbase.platform.web.PublicEndpointMatcher;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
+import org.springframework.security.config.annotation.web.configurers.RequestCacheConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
@@ -91,22 +93,36 @@ public class FoundationConfiguration {
 
 
     @Bean
+    PublicEndpointMatcher publicEndpoints(
+            @Qualifier("requestMappingHandlerMapping") ObjectProvider<RequestMappingHandlerMapping> mappings) {
+        return new PublicEndpointMatcher(mappings);
+    }
+
+    @Bean
     SecurityFilterChain security(HttpSecurity http, UserDetailsService users,
-                                 ObjectProvider<SystemTokenFilter> systemTokens, Environment env) throws Exception {
+                                 ObjectProvider<SystemTokenFilter> systemTokens, Environment env,
+                                 PublicEndpointMatcher publicEndpoints) throws Exception {
         var provider = new DaoAuthenticationProvider(users);
         provider.setPasswordEncoder(PasswordEncoderFactories.createDelegatingPasswordEncoder());
         http.authenticationProvider(provider);
         if (systemTokens.getIfAvailable() != null)
             http.addFilterBefore(systemTokens.getObject(), BasicAuthenticationFilter.class);
-        if (env.getProperty("mes.system.enabled", Boolean.class, false)) http.httpBasic(basic -> basic.disable());
+        if (env.getProperty("mes.system.enabled", Boolean.class, false))
+            http.httpBasic(AbstractHttpConfigurer::disable);
         else http.httpBasic(basic -> basic.authenticationEntryPoint((request, response, error) -> {
             response.setHeader("WWW-Authenticate", "Basic realm=mes-base");
             ErrorWriter.write(ErrorCode.UNAUTHENTICATED, request, response);
         }));
-        return http.csrf(csrf -> csrf.disable()).requestCache(cache -> cache.disable())
+        return http.csrf(AbstractHttpConfigurer::disable).requestCache(RequestCacheConfigurer::disable)
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-                .authorizeHttpRequests(requests -> requests.anyRequest().permitAll())
-                .formLogin(form -> form.disable()).logout(logout -> logout.disable()).build();
+                .exceptionHandling(errors -> errors
+                        .authenticationEntryPoint((request, response, failure) -> ErrorWriter.write(ErrorCode.UNAUTHENTICATED, request, response))
+                        .accessDeniedHandler((request, response, failure) -> ErrorWriter.write(ErrorCode.FORBIDDEN, request, response)))
+                .authorizeHttpRequests(requests -> requests
+                        .dispatcherTypeMatchers(DispatcherType.ERROR).permitAll()
+                        .requestMatchers(publicEndpoints).permitAll()
+                        .anyRequest().authenticated())
+                .formLogin(AbstractHttpConfigurer::disable).logout(AbstractHttpConfigurer::disable).build();
     }
 
     @Bean
@@ -119,10 +135,4 @@ public class FoundationConfiguration {
         };
     }
 
-    @Bean
-    SmartInitializingSingleton explicitEndpoints(
-            @Qualifier("requestMappingHandlerMapping") RequestMappingHandlerMapping mappings) {
-        return () -> mappings.getHandlerMethods().forEach((mapping, handler) ->
-                mapping.getPatternValues().forEach(path -> EndpointCatalog.required(handler, path)));
-    }
 }

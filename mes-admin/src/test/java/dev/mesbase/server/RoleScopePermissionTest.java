@@ -46,10 +46,69 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
+
+import static org.mockito.Mockito.times;
+
+
 /**
  * TEST ONLY: real mapper SQL in isolated H2; no live role grants.
  */
 class RoleScopePermissionTest {
+    @Test
+    void literalNullFactoryDoesNotCollideWithPlatformPermissionCacheKey() {
+        var menus = mock(SysMenuMapper.class);
+        var service = new SystemPermissionService(menus, mock(SysRoleMapper.class), mock(ManagedFactoryMapper.class));
+        when(menus.selectMenuList(any())).thenReturn(List.of(menu(1L, 0L, "system", "system:role:list")));
+        when(menus.selectScopedPermissions("fixture", null)).thenReturn(Set.of("system:role:list"));
+        when(menus.selectScopedPermissions("fixture", "null")).thenReturn(Set.of("business:order:read"));
+        RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(new MockHttpServletRequest()));
+        try {
+            assertEquals(Set.of("system:role:list"), service.permissions("fixture", null));
+            assertEquals(Set.of("business:order:read"), service.permissions("fixture", "null"));
+        } finally {
+            RequestContextHolder.resetRequestAttributes();
+        }
+    }
+
+    @Test
+    void authorizationIsSharedWithinRequestAndRequeriedForNextRequest() {
+        var menus = mock(SysMenuMapper.class);
+        var roles = mock(SysRoleMapper.class);
+        var service = new SystemPermissionService(menus, roles, mock(ManagedFactoryMapper.class));
+        when(menus.selectMenuList(any())).thenReturn(List.of(menu(1L, 0L, "pro", "business:order:read")));
+        when(menus.selectScopedPermissions("fixture", "A")).thenReturn(Set.of("business:order:read"));
+        var role = new SysRole();
+        role.setKind("PLATFORM");
+        role.setStatus("0");
+        role.setDelFlag("0");
+        var user = new SysUser();
+        user.setUserName("fixture");
+        user.setRoles(List.of(role));
+        SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken(
+                new LoginUser(user, Set.of()), null, List.of()));
+        try {
+            RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(new MockHttpServletRequest()));
+            assertTrue(service.hasPlatformRole("fixture"));
+            assertTrue(service.grantedFactory("fixture", "A", "business:order:read"));
+            when(menus.selectScopedPermissions("fixture", "A")).thenReturn(Set.of());
+            assertTrue(service.grantedFactory("fixture", "A", "business:order:read"));
+            service.menuCatalog();
+            service.menuPolicy();
+            service.menuPolicy();
+            verify(menus, times(1)).selectScopedPermissions("fixture", "A");
+            verify(menus, times(1)).selectMenuList(any());
+            verify(roles, never()).selectWorkspaceScopes(any());
+            RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(new MockHttpServletRequest()));
+            assertFalse(service.grantedFactory("fixture", "A", "business:order:read"));
+            verify(menus, times(2)).selectScopedPermissions("fixture", "A");
+        } finally {
+            RequestContextHolder.resetRequestAttributes();
+            SecurityContextHolder.clearContext();
+        }
+    }
+
     @Test
     void platformBusinessGrantsApplyToSelectedFactoriesWithoutFactoryRoleEscalation() throws Exception {
         var source = new DriverManagerDataSource("jdbc:h2:mem:" + UUID.randomUUID() + ";MODE=MySQL;DB_CLOSE_DELAY=-1", "sa", "");
@@ -100,9 +159,11 @@ class RoleScopePermissionTest {
         assertAuthorizationChain(service);
         var navigation = new SysMenuServiceImpl();
         ReflectionTestUtils.setField(navigation, "menuMapper", persistence.mapper(SysMenuMapper.class));
+        ReflectionTestUtils.setField(navigation, "permissionService", service);
         assertEquals(List.of("pro"), navigation.selectFactoryMenuTree("platform", "F1").stream()
                 .map(SysMenu::getPath).toList());
         var catalogPermissions = mock(SystemPermissionService.class);
+        when(catalogPermissions.menuPolicy()).thenReturn(service.menuPolicy());
         when(catalogPermissions.permissions("fixture", null)).thenReturn(Set.of("system:role:add"));
         ReflectionTestUtils.setField(navigation, "permissionService", catalogPermissions);
         var user = new SysUser();
