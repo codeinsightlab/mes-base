@@ -199,3 +199,67 @@ Base 的问题是把重复 guard 与昂贵的重新解析绑定在一起，同�
 本报告上文保留旧开发环境测量。改造后 ProWorkorderRequestBudgetTest 在独立 H2 中执行真实 Token filter、请求授权、工单 Controller/Service/Mapper 和 Spring 事务：每个暖分页固定 **6 次中心 SELECT + 2 次业务 SELECT**，没有完整用户/密码读取。中心预算为精简账号及当前角色 1、入口工厂 1、全菜单 1、当前权限 1、事务准入绑定 2；事务内 SQL/缓存/提交 guard 不再触发 resolver。25 次循环中 5 次预热、20 次计时，结果见 target/validation/pro-workorder-request-budget.json。
 
 这是 synthetic Redis payload + H2、无 HTTP socket 的 fixture；不能与上文开发库 HTTP 延迟直接比较或宣称真实接口降低到 fixture 毫秒数。本轮没有重启用户服务、执行真实迁移或生产查询；同环境 HTTP 改造前后延迟仍未验证。规则、恢复与部署边界见 [请求准入](../development/request-admission.md)。
+
+## 2026-10-11 开发工单字段审查与 10 万条 fake 数据
+
+用户明确授权读取 dev 业务库并新增约 10 万条 fake 工单。通过已有本地 MySQL
+凭据文件访问真实数据库，核对中心库 DEV 工厂启用且绑定启用数据源 1，数据库为
+`mes_base_dev_business`。本轮未修改业务代码、配置、Schema、中心数据或其他业务表，
+未重启服务，保留已有请求准入报告的未提交修改。
+
+### 字段与样本事实
+
+`SHOW CREATE TABLE` 和 information_schema 确认共 34 个字段、InnoDB；没有该表的
+触发器或关联外键声明。缺少外键声明不能证明应用层没有关联规则。
+
+| 字段组 | 实际约束与生成方式 |
+| --- | --- |
+| workorder_id | BIGINT 自增主键；插入时不赋值 |
+| workorder_code / workorder_name | 必填 VARCHAR(64/255)；使用批次前缀和六位序号，名称显式 FAKE |
+| order_source / source_code | 来源类型必填；28 个样本全部 PLAN、来源单据全 NULL，保持样本值 |
+| product_id / product_code / product_name / product_spc / unit_of_measure | 前三项与单位必填，规格可空；完整复制对应样本组合，不生成虚构产品 ID；样本含 15 种产品组合、单位 01/02/03 |
+| quantity / quantity_produced / quantity_changed / quantity_scheduled | DOUBLE(14,2)，quantity 必填；四数量同乘 0.50–2.00 倍并保留两位小数，不创造新状态规则；样本排产数量全 0 |
+| client_id / client_code / client_name | 样本全 NULL，保持空，不生成客户引用 |
+| batch_code / remark | 写入精确批次标记；remark 记录来源工单 ID，便于追踪和删除 |
+| request_date / finish_date / transaction_date | 需求日期必填，其余可空；普通样本平移需求与完成/审核日期，保留原相对间隔；特殊日期另见下文 |
+| parent_id / ancestors | 样本全部根工单 0 / '0'，保持根节点，不伪造父子树 |
+| status | 可空、默认 PREPARE，但样本实际为 '1'、'2'、'3'、'y'；按样本频率复制，不推断每个值的业务含义 |
+| attr1 / attr2 / attr3 / attr4 | 保留对应样本值，不解释预留字段的业务意义 |
+| create_by / create_time / update_by / update_time | 创建/更新人 fake_seed；构造明确的创建/更新日期，原样本 create_time 全 NULL |
+| mo_id | 必填 VARCHAR(39)，唯一索引 pro_workorder_pk；生成新的 UUID，仅为 fake 标识，不代表真实 ERP 工单 |
+
+原 28 行状态分布：1=10、2=13、3=3、y=2；数量 10–500000。
+两条 y 样本的需求/完成日期为 `1900-01-01 / 9998-12-31`。
+第一次普通日期平移触发 MySQL 1441 日期溢出，事务断开回滚后实查仍为 28 行；
+随后修正 SQL 保留这组特殊日期，其审核日期单独生成在目标日期窗口内。
+这些值是样本事实，未证明特殊日期的业务含义；finish_date 有值也不能据此宣称已完工。
+
+### 插入与独立核验
+
+- 精确批次：`FAKE-WO-20261011-5F9C2A`。
+- 执行方式：临时数字表与原 28 条模板轮转组合，单次 INSERT SELECT；一个事务中检查
+  受影响行数、唯一值与数量/日期基础一致性后 COMMIT。不新增永久辅助表、不关闭唯一约束。
+- 实际新增 **100000** 行；提交后独立连接复查总行数 **100028**。
+- 新行 ID：**1073865–1173864**；工单编码和 mo_id 的 distinct 数均为 100000。
+- 新行状态：1=35712、2=46431、3=10715、y=7142。
+- 普通需求日期：2025-10-12 至 2026-10-11，覆盖 365 天；另有 7142 条保留特殊日期。
+- 新数量范围 5–1000000；数量非正、已生产/调整/排产大于数量、完成日期早于需求日期、
+  父工单与祖先异常的检查结果均为 0。产品字段组合与来源模板不匹配为 0。
+- 原有 28 条记录按原始 ID 集合重新 SELECT，逐字比较插入前 TSV，全字段完全一致。
+
+### 本地证据与回滚边界
+
+产物在未纳入版本管理的 `.local/backups/20261011-pro-workorder-fake-100k/`：
+`before.sql`、`original-rows.tsv`、`insert.sql`、`insert-result.tsv`、
+`verification.tsv`、`manifest.json`、`rollback.sql`。
+mysqldump 初次因客户端默认导出 masking policies 而遭权限拒绝；使用
+`--skip-masking-policies --single-transaction --no-tablespaces --set-gtid-purged=OFF`
+重新完成原表备份，未提升数据库权限。
+
+rollback.sql 仅按精确 batch_code、fake_seed 创建人和本批工单号前缀删除，尚未执行。
+未来若为 fake 工单新增关联数据，删除前还需审查关联记录。不要直接恢复整表覆盖后来变更。
+insert.sql 包含原行数和批次未存在断言，不能直接重跑累加。
+
+已验证的是 dev 数据库直接写入和 SQL 数据核验，不是 UI/API 创建流程或生产验收，
+未调用 ERP，也未执行 HTTP 压测。本次没有 Java/配置改动，未运行 Maven；后续性能测量
+须标明表已从 28 行增至 100028 行，不能继续沿用上文小数据量测量作为当前性能结论。

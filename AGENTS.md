@@ -17,17 +17,25 @@ Spring/ThreadLocal/具体基础设施，也不依赖 SysUser/SysRole 持久化 E
 ## 3. FactoryScope
 
 Scope 只含 FactoryId；不等于 Permission、DataSource 或 ERP Connection。无 UserFactory 准入：有效空角色账号可登录、选择启用
-Factory 和访问 AUTHENTICATED；AUTHORIZED 缺权限拒绝。偏好只是 UX，不授予权限。显式选厂优先，其次恢复有效偏好；无有效偏好时，仅从启用工厂且绑定启用业务库的候选中自动选择：一个选它，多个选工厂 ID 最小者。纯数字 ID 按数值比较，其他 ID 按字符串排序，数字 ID 优先；同数值以原 ID 排序作稳定裁决。零候选保持空 Scope，不使用魔法 0/1 或回退中心库。PLATFORM 角色显式 kind、无
-factoryId；FACTORY 角色必须所属厂。平台角色可持有任意权限，其业务权限在选定的启用工厂上下文中生效；工厂角色仅可持有业务权限，且仅在所属工厂生效。工厂业务授权合并平台角色业务权限与当前工厂角色业务权限，不向工厂角色开放平台授权。权限按每次请求当前厂读取，不进长寿命 Token/跨厂缓存。
+Factory 和访问 AUTHENTICATED；AUTHORIZED 缺权限拒绝。偏好只是
+UX，不授予权限。显式选厂优先，其次恢复有效偏好；无有效偏好时，仅从启用工厂且绑定启用业务库的候选中自动选择：一个选它，多个选工厂
+ID 最小者。纯数字 ID 按数值比较，其他 ID 按字符串排序，数字 ID 优先；同数值以原 ID 排序作稳定裁决。零候选保持空 Scope，不使用魔法
+0/1 或回退中心库。PLATFORM 角色显式 kind、无
+factoryId；FACTORY
+角色必须所属厂。平台角色可持有任意权限，其业务权限在选定的启用工厂上下文中生效；工厂角色仅可持有业务权限，且仅在所属工厂生效。工厂业务授权合并平台角色业务权限与当前工厂角色业务权限，不向工厂角色开放平台授权。权限按每次请求当前厂读取，不进长寿命
+Token/跨厂缓存。
 
 ## 4. Controller / Service / Mapper
 
-Controller 收参、基础校验、HTTP View 转换和协议返回；不做业务。Service 编排、规则、状态转换、事务和外部协调；Mapper 数据访问，不做授权决策。默认单
+Controller 收参、基础校验、HTTP View 转换和协议返回；不做业务。Service 编排、规则、状态转换、事务和外部协调；Mapper
+数据访问，不做授权决策。默认单
 Service，只有长期真实复杂协调才拆分。外部主动调用经 Port/Adapter，Adapter 不编排业务、不访问平台/业务 Mapper。
 
 ## 5. Domain / DTO / VO / Persistence
 
-响应契约按消费者与风险分级：普通内部后台 CRUD 可直接返回经审查安全的 Entity；敏感/复杂接口及外部消费者必须隔离响应模型。Service 返回 Entity/Domain/Business DTO/Query Model，业务语义与状态由 Service 定义；需要 Entity/Domain→HTTP Result/VO 时在 Controller 的 Web 边界转换，通用 Service 不依赖 Web Result。禁止业务匿名 Map /
+响应契约按消费者与风险分级：普通内部后台 CRUD 可直接返回经审查安全的 Entity；敏感/复杂接口及外部消费者必须隔离响应模型。Service
+返回 Entity/Domain/Business DTO/Query Model，业务语义与状态由 Service 定义；需要 Entity/Domain→HTTP Result/VO 时在
+Controller 的 Web 边界转换，通用 Service 不依赖 Web Result。禁止业务匿名 Map /
 条件散参，允许索引集合和框架元数据 Map。字段来源、赋值、使用清楚；不能用字段兜底掩盖契约。可选字段不因文档或假想业务变必填。
 
 ### 5.1 Java 导入与类型引用（2026-10-06，用户要求）
@@ -39,21 +47,30 @@ Service，只有长期真实复杂协调才拆分。外部主动调用经 Port/A
 
 ## 6. Base 边界（2026-10-09 用户要求）
 
-当前 Base 只提供中心库 + 按 Factory 隔离的多业务库。不装配 ERP、HR、WMS 或其他外部数据库，不保留外部源枚举、选源注解、连接模板或第三个会话工厂。未来真实集成需求另立有边界任务，不能预建占位框架。OpenAPI 外部消费者身份与私有存储属于已有产品能力，不等于外部数据库路由。
+当前 Base 只提供中心库 + 按 Factory 隔离的多业务库。不装配 ERP、HR、WMS
+或其他外部数据库，不保留外部源枚举、选源注解、连接模板或第三个会话工厂。未来真实集成需求另立有边界任务，不能预建占位框架。OpenAPI
+外部消费者身份与私有存储属于已有产品能力，不等于外部数据库路由。
 
 ## 7. 权限 / Resource Scope
 
-HTTP 每个方法显式 PUBLIC/AUTHENTICATED/AUTHORIZED；缺注解启动失败。标准 CRUD 默认 AUTHORIZED，平台操作只认平台角色；业务操作在当前工厂上下文使用平台角色业务权限与所属工厂角色业务权限的并集。后端是最终边界，前端隐藏不等于授权。带
+HTTP 每个方法显式 PUBLIC/AUTHENTICATED/AUTHORIZED；缺注解启动失败。标准 CRUD 默认
+AUTHORIZED，平台操作只认平台角色；业务操作在当前工厂上下文使用平台角色业务权限与所属工厂角色业务权限的并集。后端是最终边界，前端隐藏不等于授权。带
 ID 操作必须校验资源所属 Scope/主体；不信任客户端 userId/userName/factoryId。文件必须 owner + scope + resource
 证明，不能公共裸路径下载；新资源必须提供服务端 policy。
 
 ### 7.1 URL 范围与请求上下文（2026-10-10 用户确认）
 
-前端有已选 Factory 时，所有请求携带 X-Factory-Id；该请求头不决定接口归属，也不授予权限。后端去掉 /api 前缀后，按完整路径段 /system、/tool、/monitor 识别平台管理接口：有效 PLATFORM 角色必需，AUTHORIZED 还需对应平台权限。平台接口不因请求头绑定 FactoryContext 或业务数据库；业务接口解析有效 Factory 上下文，按平台业务权限与当前厂 FACTORY 权限并集授权，仍保持分库与资源隔离。
+前端有已选 Factory 时，所有请求携带 X-Factory-Id；该请求头不决定接口归属，也不授予权限。后端去掉 /api 前缀后，按完整路径段
+/system、/tool、/monitor 识别平台管理接口：有效 PLATFORM 角色必需，AUTHORIZED 还需对应平台权限。平台接口不因请求头绑定
+FactoryContext 或业务数据库；业务接口解析有效 Factory 上下文，按平台业务权限与当前厂 FACTORY 权限并集授权，仍保持分库与资源隔离。
 
-会话 /api/session、个人 /api/personal、公共登录后读取 /api/common 是明确的共享入口，AUTHENTICATED 不要求平台角色；既有私有文件 /api/platform/files 保持引用地址稳定，归个人资源入口，继续验证 owner/resource，不从请求头切换资源范围。/api/factory/navigation 属业务上下文。EndpointScopePolicy 是 HTTP 路径范围入口，启动检查 URL 与 EndpointAccess 声明一致；平台管理不能声明 PUBLIC，共享入口不能承载管理权限接口。菜单按解析后的完整 URL 分类，按钮继承父菜单；不按权限字符串前缀猜范围。
+会话 /api/session、个人 /api/personal、公共登录后读取 /api/common 是明确的共享入口，AUTHENTICATED 不要求平台角色；既有私有文件
+/api/platform/files 保持引用地址稳定，归个人资源入口，继续验证 owner/resource，不从请求头切换资源范围。/api/factory/navigation
+属业务上下文。EndpointScopePolicy 是 HTTP 路径范围入口，启动检查 URL 与 EndpointAccess 声明一致；平台管理不能声明
+PUBLIC，共享入口不能承载管理权限接口。菜单按解析后的完整 URL 分类，按钮继承父菜单；不按权限字符串前缀猜范围。
 
-代码生成器只负责代码生成及自身生成契约，不替 MES 执行业务控制，不限制用户的平台/业务模块名或自动改写模块归属；使用方负责生成结果与应用 URL、权限、数据库规则的一致性审查。
+代码生成器只负责代码生成及自身生成契约，不替 MES 执行业务控制，不限制用户的平台/业务模块名或自动改写模块归属；使用方负责生成结果与应用
+URL、权限、数据库规则的一致性审查。
 
 ## 8. 事务 / 幂等 / UNKNOWN
 
@@ -84,32 +101,45 @@ ID 操作必须校验资源所属 Scope/主体；不信任客户端 userId/userN
 
 ### 2026-10-11 用户决定：请求准入与固定事务
 
-此决定优先于旧 ADR 的逐 SQL/提交前重新查询管理配置要求。随机 Bearer 与绝对有效期不变；Redis 只存安全身份字段，不缓存完整用户 Entity、角色或权限。请求入口一次读取无密码的账号状态/认证版本及当前角色，部门范围必需字段保留；当前权限和菜单分类在请求内复用，不建立长期权限缓存。禁用、删除、改密在账号事务内写入用户索引撤销 outbox，提交后交付 Redis，失败明确返回已提交/待重试并持续恢复；账号版本准入防止交付失败放行旧会话。注销直接撤销对应会话，不扫描全部在线会话。
+此决定优先于旧 ADR 的逐 SQL/提交前重新查询管理配置要求。随机 Bearer 与绝对有效期不变；Redis 只存安全身份字段，不缓存完整用户
+Entity、角色或权限。请求入口一次读取无密码的账号状态/认证版本及当前角色，部门范围必需字段保留；当前权限和菜单分类在请求内复用，不建立长期权限缓存。禁用、删除、改密在账号事务内写入用户索引撤销
+outbox，提交后交付 Redis，失败明确返回已提交/待重试并持续恢复；账号版本准入防止交付失败放行旧会话。注销直接撤销对应会话，不扫描全部在线会话。
 
-已通过入口的身份及已取得的授权不因后来管理变更撤销。业务事务 begin 重新解析有效工厂/业务连接并取得固定租约；事务内、缓存返回前及提交前只检查固定身份、线程/会话归属与租约，不查询最新管理配置。每个新独立事务重新准入，禁止事务内切厂/切库及中心业务混用。退休池停止新租约，已有租约（包括尚未取连接者）继续完成，归还后关闭；关闭失败保留跟踪供重试。普通工厂名称等编辑不退休池。跨节点新准入直接查中心，已初始化池定期核对退休，不依赖 Redis 元数据失效。真正切库可能出现旧事务写旧库、新事务写新库的重叠，本阶段不承诺在线迁库一致性。
+已通过入口的身份及已取得的授权不因后来管理变更撤销。业务事务 begin
+重新解析有效工厂/业务连接并取得固定租约；事务内、缓存返回前及提交前只检查固定身份、线程/会话归属与租约，不查询最新管理配置。每个新独立事务重新准入，禁止事务内切厂/切库及中心业务混用。退休池停止新租约，已有租约（包括尚未取连接者）继续完成，归还后关闭；关闭失败保留跟踪供重试。普通工厂名称等编辑不退休池。跨节点新准入直接查中心，已初始化池定期核对退休，不依赖
+Redis 元数据失效。真正切库可能出现旧事务写旧库、新事务写新库的重叠，本阶段不承诺在线迁库一致性。
 
-不同 HTTP 请求可并发选不同工厂；前端在读取响应头和响应体后均拒绝过期上下文，旧 401 不得清除新身份/新选厂。Quartz 真实执行器和 OpenAPI 消费者迁移不在本轮范围。
+不同 HTTP 请求可并发选不同工厂；前端在读取响应头和响应体后均拒绝过期上下文，旧 401 不得清除新身份/新选厂。Quartz 真实执行器和
+OpenAPI 消费者迁移不在本轮范围。
 
-架构只采用中心库 + 多业务库的分库模式。生产只装配两个 DataSource 入口、两个 SqlSessionFactory 和两个 Spring 事务管理器；物理业务池按 Factory 动态租借，不按池新增会话工厂。缺 Scope、连接或版本明确失败，不回退中心库、首库或默认业务库。跨中心/业务事务及事务内切厂明确拒绝。
+架构只采用中心库 + 多业务库的分库模式。生产只装配两个 DataSource 入口、两个 SqlSessionFactory 和两个 Spring 事务管理器；物理业务池按
+Factory 动态租借，不按池新增会话工厂。缺 Scope、连接或版本明确失败，不回退中心库、首库或默认业务库。跨中心/业务事务及事务内切厂明确拒绝。
 
-业务版本/租约、退休池排空、缓存前 statement guard 和异常清理继续保留。参数化 SQL、受控排序、分页边界及避免 N+1；unique/reference/聚合/cache/import/export 都需范围审查。业务 cache 缺 Scope 不能全局回退。复杂查询放 ExtraMapper，授权决策在 Service。新 CRUD 物理删除；Schema 来自真实 metadata，不带客户数据/seed。
+业务版本/租约、退休池排空、缓存前 statement guard 和异常清理继续保留。参数化 SQL、受控排序、分页边界及避免
+N+1；unique/reference/聚合/cache/import/export 都需范围审查。业务 cache 缺 Scope 不能全局回退。ExtraMapper 仅用于跨表关联查询，单表操作禁止新增 Extra，授权决策在
+Service。新 CRUD 物理删除；Schema 来自真实 metadata，不带客户数据/seed。
 
 ### 9.1 固定包与 SessionFactory 归属
 
-| SessionFactory | DataSource | TransactionManager | 固定扫描包 |
-| --- | --- | --- | --- |
-| `masterSqlSessionFactory` | `masterDataSource` | `masterTransactionManager` | `dev.mesbase.system`、`dev.mesbase.quartz`、`dev.mesbase.platform` |
-| `businessSqlSessionFactory` | `businessDataSource` | `businessTransactionManager` | `dev.mesbase.mes`、`dev.mesbase.modules` |
+| SessionFactory              | DataSource           | TransactionManager           | 固定扫描包                                                            |
+|-----------------------------|----------------------|------------------------------|------------------------------------------------------------------|
+| `masterSqlSessionFactory`   | `masterDataSource`   | `masterTransactionManager`   | `dev.mesbase.system`、`dev.mesbase.quartz`、`dev.mesbase.platform` |
+| `businessSqlSessionFactory` | `businessDataSource` | `businessTransactionManager` | `dev.mesbase.mes`、`dev.mesbase.modules`                          |
 
-Mapper 按 `*Mapper` 命名，固定包及其子包自动扫描。禁止逐 Mapper 配置、中央类清单、手工 Mapper Bean 或要求生产 Mapper 标注 PersistenceOwner。包不得重叠，重复名称及旧归属注解冲突明确失败。PersistenceOwner 只保留 PLATFORM/BUSINESS 的既有程序式 fixture 校验；PLATFORM 是中心库平台语义，不是第三个库。
+Mapper 按 `*Mapper` 命名，固定包及其子包自动扫描。禁止逐 Mapper 配置、中央类清单、手工 Mapper Bean 或要求生产 Mapper 标注
+PersistenceOwner。包不得重叠，重复名称及旧归属注解冲突明确失败。PersistenceOwner 只保留 PLATFORM/BUSINESS 的既有程序式
+fixture 校验；PLATFORM 是中心库平台语义，不是第三个库。
 
-生成器 GLOBAL 使用 dev.mesbase.platform.*，FACTORY_SCOPED 使用 dev.mesbase.modules.*；不生成 Mapper 归属注解或注册清单。不存在 external 扫描组或 ERP 连接选择入口。
+生成器 GLOBAL 使用 dev.mesbase.platform.*，FACTORY_SCOPED 使用 dev.mesbase.modules.*；不生成 Mapper 归属注解或注册清单。不存在
+external 扫描组或 ERP 连接选择入口。
 
 ### 9.2 Spring 事务与验收
 
-Service 使用具名 Spring 事务；传播、提交、回滚和挂起恢复由 Spring 管理。业务事务固定 Factory 与连接身份，不能跨线程传 Session。不自动拆分跨库事务，不宣称中心库和业务库本地原子提交。中心 metadata 独立只读窗口保留既有受控入口和只读防护。
+Service 使用具名 Spring 事务；传播、提交、回滚和挂起恢复由 Spring 管理。业务事务固定 Factory 与连接身份，不能跨线程传
+Session。不自动拆分跨库事务，不宣称中心库和业务库本地原子提交。中心 metadata 独立只读窗口保留既有受控入口和只读防护。
 
-修改装配、扫描或路由时，验证两个工厂/入口的确切 Bean 名称及数量、中心/业务 Mapper 归属、不同 Factory 独立库、缺 Scope 拒绝、跨库事务双向拒绝、版本失效、回滚、挂起恢复、池关闭与异常清理。Fixture 通过不等于真实多厂数据库验收。
+修改装配、扫描或路由时，验证两个工厂/入口的确切 Bean 名称及数量、中心/业务 Mapper 归属、不同 Factory 独立库、缺 Scope
+拒绝、跨库事务双向拒绝、版本失效、回滚、挂起恢复、池关闭与异常清理。Fixture 通过不等于真实多厂数据库验收。
 
 ## 10. 测试 / 验收
 
@@ -136,29 +166,66 @@ command/passed/failed、风险和未验证边界；可复用判断依个人治�
 COPY / PORT，必要时局部重构；REDESIGN / DROP 必须有具体证据。迁移记录 SOURCE_PRODUCT_PORT 即可，不需申请 Codegen
 例外。仅在后续新增功能开发阶段，适合表驱动的标准 CRUD 优先调用 mes-crud-codegen Skill，并完成业务、SQL、权限及 UI 审查。
 
+### 13.0 新业务建模与实施顺序（2026-10-11 用户约定）
+
+每次接入新业务，Agent 先根据用户
+prompt、已确认上下文和现有模型完成建模并判断复杂度，再建表、生成或实现代码。用户已提供完整模型时严格沿用，不擅自改表名、字段、关系、类型、必填性或状态语义；有具体冲突或关键缺失时指出并补齐必要信息，不以个人偏好重做模型。用户没有完整模型时，Agent
+负责形成满足当前需求的最小模型，说明实体、字段、关系、关键规则与实现路径，不预建假想业务。
+
+- 建表可以在获授权的目标库执行，也可以先在项目内保存可审查的 `.sql` 建表文件；写 SQL
+  文件不等于已执行建表，不因新增业务授权自动修改未授权的数据库。表和每个字段必须有非空、有业务含义的数据库 COMMENT，不能只写
+  SQL 行注释或重复名称。沿用当前数据库方言与迁移目录约定。
+- 新业务表保留必要主键；除主键外只允许新增普通索引，不擅自新增 UNIQUE
+  索引/约束、外键约束或其他数据库业务约束。逻辑关系在模型中表达，不因不建物理外键而省略关系设计。若并发唯一性或幂等性必须依赖数据库约束，先明确冲突并请用户决定，不用无约束的“先查再插”宣称并发安全。此规则不删除已有约束，也不覆盖第
+  8.1 节既有同步基础设施的唯一约束。
+- **简单业务：** 基础列表、搜索、详情和增改删，没有跨表一致性、状态流转或复杂协调；完成模型及可读取的真实 metadata 后直接调用
+  mes-crud-codegen Skill，不能重复手写整套 CRUD。生成后仍完成接口、权限、SQL 和 UI 审查。
+- **复杂业务：** 有状态规则、跨表一致性、流程、聚合或外部协调时，按第 13.2 节在业务模块建立小而明确的业务边界；真实状态、规则和行为放入相应领域模型/策略，Service
+  编排用例和事务，不在 Controller 或通用生成器中塞业务规则。纯复杂查询使用 Query Service，不机械增加 Aggregate/Domain
+  Service。
+- **共同后端要求：** 不管业务简单或复杂，生成能力支持的表都生成完整基础后端（persistence + backend），提供可复用的单表
+  Service 给本业务及其他业务编排；复杂业务不能作为跳过生成、重写基础 CRUD 的理由。前端按需要选择：可以不生成，也可以生成后暂不使用；不生成前端不意味着省略后端。
+- **混合业务：** 各表基础持久化/CRUD 复用生成器，复杂行为在该业务边界中实现。尽量创建一个代表当前业务用例的业务
+  Service，通过构造注入聚合生成的基础 Service 编排，负责规则、顺序和事务；不按每张表重复建立业务编排层，不增加只有转发的包装
+  Service。基础 Service 不依赖编排 Service，不建立循环调用；共同业务规则不能只存在于可被绕过的入口。生成普通编辑/删除入口不等于允许绕过状态规则，应限制或替换这些入口；避免两套
+  Mapper 或 CRUD 实现。当前生成器只支持单表，主子表协调仍由业务 Service 完成。
+
 ### 13.1 CRUD Development
 
-新增单表、常规主子表及列表/搜索/详情/增改删，以项目约定的 RuoYi Codegen 和 mes-crud-codegen Skill 为默认入口，不作为最后兜底。已有生成能力覆盖时，禁止从零重复手写整套前后端 CRUD。生成后允许移动文件、调整命名、补充业务/Factory/权限规则与前端视觉优化，仍须完成契约和安全验收；不让工具定义产品字段。
+新增单表及常规主子表的基础单表部分，以 mes-crud-codegen Skill 为默认入口，不作为最后兜底；主子表关系和跨表事务不属于自动生成能力。已有生成能力覆盖时，禁止从零重复手写整套前后端
+CRUD。生成后允许移动文件、调整命名、补充业务/Factory/权限规则与前端视觉优化，仍须完成契约和安全验收；不让工具定义产品字段。
 
 ### 13.2 Domain Business
 
-生产监控、排产、报工聚合、工单进度、复杂统计、流程、OpenAPI 及跨表规则等非标准 CRUD，建立明确业务 Service/Query Service/Application Service，不强塞进生成 CRUD。Service 负责规则、业务编排和事务，按需要返回 Entity/Business DTO/Query Model/Domain Model，不依赖 HTTP Result。仅有明确状态、规则和行为时引入 Domain Service/Aggregate，不机械创造 Domain 层。Controller 不承担跨 Service 业务编排。
+生产监控、排产、报工聚合、工单进度、复杂统计、流程、OpenAPI 及跨表规则等非标准 CRUD，尽量建立一个代表业务用例的业务
+Service/Query Service/Application Service，聚合生成的基础 Service 编排，不强塞进生成 CRUD。Service 负责规则、业务编排和事务，按需要返回
+Entity/Business DTO/Query Model/Domain Model，不依赖 HTTP Result。仅有明确状态、规则和行为时引入 Domain
+Service/Aggregate，不机械创造 Domain 层。Controller 不承担跨 Service 业务编排。
 
 ### 13.3 Response Contract
 
-- **内部后台标准 CRUD：** 经审查不含敏感字段、不暴露内部持久化状态、前端结构基本一致且无明显契约风险的 Entity，可以直接返回；不强制 Result/VO，不为形式分层复制模型。
-- **敏感/复杂接口：** 包含 password/salt/secret 等敏感字段、字段裁剪、多表聚合、模型重组或明确 ID/状态/枚举转换时，必须使用 Result/VO 白名单，Controller 显式转换。认证及一次性凭证使用已授权专用协议，不混入普通响应。
-- **小程序/ToC/Public/OpenAPI/合作方接口：** 必须独立 Request/Response DTO，禁止直接暴露 Persistence Entity；审查隐私、权限、数据范围、内部数据库结构、ID 精度、状态枚举、版本兼容及契约稳定性。外部契约不得随数据库结构任意变化。
+- **内部后台标准 CRUD：** 经审查不含敏感字段、不暴露内部持久化状态、前端结构基本一致且无明显契约风险的 Entity，可以直接返回；不强制
+  Result/VO，不为形式分层复制模型。
+- **敏感/复杂接口：** 包含 password/salt/secret 等敏感字段、字段裁剪、多表聚合、模型重组或明确 ID/状态/枚举转换时，必须使用
+  Result/VO 白名单，Controller 显式转换。认证及一次性凭证使用已授权专用协议，不混入普通响应。
+- **小程序/ToC/Public/OpenAPI/合作方接口：** 必须独立 Request/Response DTO，禁止直接暴露 Persistence
+  Entity；审查隐私、权限、数据范围、内部数据库结构、ID 精度、状态枚举、版本兼容及契约稳定性。外部契约不得随数据库结构任意变化。
 
-只在需要转换时引入 Converter/Assembler：简单同语义复制允许 BeanUtils.copyProperties，目标不定义敏感字段，ID 等特殊字段显式赋值；重复/复杂映射按领域组织。转换器仅转换模型，不查询数据库、不调用 Service、不做业务判断、不管理事务。分页转换保留原 PageHelper 总数再转换 rows；集合工具不猜测业务类型。
+只在需要转换时引入 Converter/Assembler：简单同语义复制允许 BeanUtils.copyProperties，目标不定义敏感字段，ID
+等特殊字段显式赋值；重复/复杂映射按领域组织。转换器仅转换模型，不查询数据库、不调用 Service、不做业务判断、不管理事务。分页转换保留原
+PageHelper 总数再转换 rows；集合工具不猜测业务类型。
 
 ### 13.4 Global Response Rule
 
-禁止新增全局业务 ResponseAdvice/AOP 隐式替换响应模型，禁止 Object project(Object) 通过 instanceof 集中猜测业务响应，禁止全局递归 Long→String。ID 类型与语义转换由接口的显式契约决定，数量/总数/耗时保持数值。框架标准协议处理仅在有明确架构理由时允许，不承担业务 View 投影。敏感字段不得仅依靠 JsonIgnore 或运行时类型分支隔离。
+禁止新增全局业务 ResponseAdvice/AOP 隐式替换响应模型，禁止 Object project(Object) 通过 instanceof 集中猜测业务响应，禁止全局递归
+Long→String。ID 类型与语义转换由接口的显式契约决定，数量/总数/耗时保持数值。框架标准协议处理仅在有明确架构理由时允许，不承担业务
+View 投影。敏感字段不得仅依靠 JsonIgnore 或运行时类型分支隔离。
 
 ### 13.5 Migration Compatibility
 
-旧 MES 迁移与新增开发采用不同规则：迁移尽量原样 COPY/PORT，行为兼容优先，在权限、Factory 隔离、事务和安全不退化的前提下保持接口，不要求一次性理想化重写，不调用 Codegen 替代已有产品。历史结构记录为 migration debt，按有边界任务逐步治理；不新增隐式基础设施。新增开发遵守上述 Base 规则，不复制旧的不良模式。兼容目标不得用于豁免安全/隔离要求。
+旧 MES 迁移与新增开发采用不同规则：迁移尽量原样 COPY/PORT，行为兼容优先，在权限、Factory 隔离、事务和安全不退化的前提下保持接口，不要求一次性理想化重写，不调用
+Codegen 替代已有产品。历史结构记录为 migration debt，按有边界任务逐步治理；不新增隐式基础设施。新增开发遵守上述 Base
+规则，不复制旧的不良模式。兼容目标不得用于豁免安全/隔离要求。
 
 ## 14. Skill / 工具边界
 
@@ -167,15 +234,51 @@ Skill 入口：`.agents/skills/mes-crud-codegen/SKILL.md`；配置/CLI 详见 do
 
 ### 14.1 基础生成范围与目标位置（2026-10-10 用户约定）
 
-2026-10-11 配置入口：项目参数由 `docs/development/codegen-config.review.yaml` 显式提供，Agent 使用 `scripts/mes-business-codegen CONFIG_YAML REPORT_JSON`。先读取配置，不能自行填隐藏项目默认值或改用户配置。`selection.tables: []` 表示全量，非空只生成列出的表；产物选择独立。无下划线的模块包段取配置 fallback（本项目 business）。配置项必须明确提供，schema/关闭的条件注解可显式 null；可选 tableOverrides 不控制选表。菜单 SQL 使用 add-or-update，保留菜单 ID 和角色绑定，仅生成不执行。当前旧 `scripts/mes-codegen` 为旧 CLI，尚未移除其默认值；不得用它代替新配置入口。
+2026-10-11 配置入口：项目参数由 `docs/development/codegen-config.review.yaml` 显式提供，Agent
+使用 `scripts/mes-business-codegen CONFIG_YAML REPORT_JSON`
+。先读取配置，不能自行填隐藏项目默认值或改用户配置。`selection.tables: []` 表示全量，非空只生成列出的表；产物选择独立。无下划线的模块包段取配置
+fallback（本项目 business）。配置项必须明确提供，schema/关闭的条件注解可显式 null；可选 tableOverrides 不控制选表。菜单 SQL 使用
+add-or-update，保留菜单 ID 和角色绑定，仅生成不执行。当前旧 `scripts/mes-codegen` 为旧 CLI，尚未移除其默认值；不得用它代替新配置入口。
 
-2026-10-11 用户补充：生成器不得按 user_id、owner_id、password、secret 等字段名猜测业务语义并拒绝生成。生成准入仅判断实际生成能力与结构支持；敏感响应、主体及资源授权规则由使用方在生成后审查。
+2026-10-11 用户补充：生成器不得按 user_id、owner_id、password、secret
+等字段名猜测业务语义并拒绝生成。生成准入仅判断实际生成能力与结构支持；敏感响应、主体及资源授权规则由使用方在生成后审查。
 
-mes-codegen 只生成基础单表持久化与后台 CRUD。持久化复用 MyBatis Generator 的 MyBatis3 / XMLMAPPER：Entity、Example/Criteria、Mapper + XML；Service/Controller 必须同步调用该真实生成接口，分页复用 PageHelper，不新增注解 SQL、锁查询、业务状态规则或无必要的 ExtraMapper。
+mes-codegen 只生成基础单表持久化与后台 CRUD。持久化复用 MyBatis Generator 的 MyBatis3 /
+XMLMAPPER：Entity、Example/Criteria、Mapper + XML；Service/Controller 必须同步调用该真实生成接口，分页复用 PageHelper，不新增注解
+SQL、锁查询或业务状态规则，不生成 ExtraMapper。
 
-默认承载 Maven 模块为 `mes-business`。`--output` 指定后端仓库根，`--backend-module` 指定根下目标模块（默认 mes-business），`--package` 指定 Java 包；`--module` 是页面/API功能模块，不等于 Maven 模块；未指定时取表名首个 `_` 前的部分，没有 `_` 时使用 `business`，显式指定优先。默认 scope 为 FACTORY_SCOPED，默认包 `dev.mesbase.modules.<module>`；GLOBAL 显式选择并使用 `dev.mesbase.platform.<module>`。可生成到其他承载模块用于后续拆包，但必须保持第 9.1 节的固定包与 SessionFactory 归属；新 Maven 模块的创建、依赖接入另行显式处理，不随任意生成命令自动改变 reactor 或数据库拓扑。
+**Extra 边界（2026-10-11 用户确认）：** 所有单表操作必须复用生成的 Mapper/XML/Example，不得生成或手写 ExtraMapper、Extra XML，也不得通过改名为 DAO/Repository/自定义 Mapper 绕过。查询复杂、条件多、批量、单表统计或业务状态复杂都不是新增 Extra 的理由；单表业务规则由 Service/领域策略编排。生成能力不足时修补通用生成机制及相关测试，不能只为某个业务表另写单表 Extra。只有确需跨表关联（如 JOIN 或涉及其他表的关联子查询）才允许新增 ExtraMapper/XML；该 Extra 只承担跨表查询，不复制单表 CRUD，也不承担授权或业务编排。业务 Service 调用多个表的生成 Service 不等于需要 Extra；当前生成器不会自动生成跨表 Extra。
 
-业务隔离依赖按当前 Factory 路由的独立业务库。基础生成器不要求表含 factory_id，不注入 Factory 字段、Mapper/Service Factory 参数或 SQL Factory 谓词；若真实表本来有该字段，按普通 Schema 字段处理。缺 Scope 拒绝、连接/版本与事务内切厂保护继续由既有基础设施负责。范围选项只决定包归属、事务管理器及 HTTP 权限范围，不构造表内租户业务。Example 仅供服务端使用，不直接绑定 HTTP 请求中的 SQL 条件/排序字符串；业务开发负责批量写入条件和业务约束。
+配置是项目参数取值的唯一来源，Agent 必须读取用户修改后的配置，不从旧 CLI 默认值补齐。必要参数组为
+source、selection、naming、output、templates、backend、fields、limits、frontend、menu、execution；完整字段和注释见 `docs/development/codegen-config.review.yaml`
+。本项目配置可被用户指定的其他配置替代，生成器不硬编码 MES 项目取值。
+
+`output.backendRoot/backendModule/javaPackage/frontendRoot` 决定前后端位置，当前项目承载模块为
+mes-business；`naming.module` 决定 API/页面功能模块，与 Maven 模块、数据库名不同。table-prefix 策略取首个分隔符前缀，无分隔符用显式
+fallback（本项目 business），tableOverrides.module 优先。业务配置使用 `dev.mesbase.modules.<module>`
+、businessTransactionManager、factory 权限范围；平台配置使用 `dev.mesbase.platform.<module>`
+、masterTransactionManager、platform 权限范围，仍须匹配第 7.1/9.1 节。可生成到其他承载模块用于拆包；创建新 Maven
+模块和接入依赖另行处理，生成命令不改变 reactor 或数据库拓扑。
+
+调用：先 `mvn -B -ntp verify` 构建最新 JAR，再 `./scripts/mes-business-codegen CONFIG_YAML REPORT_JSON`
+。执行行为由配置决定，不由报告文件名决定；当前用户配置可能已是 write/replace-generated，不得假定一定预览。预览需明确
+dry-run；新增代码用 write/fail；重新生成已有文件用获授权的 write/replace-generated，会覆盖生成文件中的手工修改。需要审查副本可复制配置并输出到独立
+target 目录。不得为了消除冲突自动改变覆盖策略。
+
+业务隔离依赖按当前 Factory 路由的独立业务库。基础生成器不要求表含 factory_id，不注入 Factory 字段、Mapper/Service Factory
+参数或 SQL Factory 谓词；若真实表本来有该字段，按普通 Schema 字段处理。缺 Scope
+拒绝、连接/版本与事务内切厂保护继续由既有基础设施负责。范围选项只决定包归属、事务管理器及 HTTP 权限范围，不构造表内租户业务。Example
+仅供服务端使用，不直接绑定 HTTP 请求中的 SQL 条件/排序字符串；业务开发负责批量写入条件和业务约束。
+
+### 14.2 生成权限与菜单 SQL（2026-10-11 整理）
+
+本项目权限为 `<承载模块标识>:<完整表名下划线转冒号>:read/create/update/delete`。mes-business 对应 business，mes-erp 对应
+erp；由配置 `backend.permission.prefix/resource` 显式表达，不由生成器猜物理数据库或偷偷填默认值。表名前缀不截取、不转驼峰；例如
+business:pro:workorder:read。Java 常量、Controller、Vue、菜单声明和 SQL 一致。单删、批删共享 delete 权限。
+
+生成中心库 sys_menu 目录/页面/四操作的 add-or-update SQL，位置取 output.menuSql（本项目承载模块 docs/generated/<module>/*
+-menu.sql）。更新已有、插入缺失，保留菜单 ID 和角色关联，不硬编码 ID，不自动执行或写角色授权。SQL
+串行执行；运行前审查重名及定位条件，不承诺没有唯一约束时并发执行防重。
 
 ## 15. UI Base
 
@@ -186,9 +289,14 @@ Scaffold；必须检查查询、Toolbar、表格/列顺序、枚举/日期/精�
 
 ## Java code style
 
-Java formatting is repository-controlled by `.editorconfig` and `.idea/codeStyles/Project.xml`, using the IntelliJ IDEA native formatter. Generated and hand-written Java should follow IDEA's normal readable style as closely as possible; do not rely on a personal alternative formatter.
+Java formatting is repository-controlled by `.editorconfig` and `.idea/codeStyles/Project.xml`, using the IntelliJ IDEA
+native formatter. Generated and hand-written Java should follow IDEA's normal readable style as closely as possible; do
+not rely on a personal alternative formatter.
 
-Avoid long lines and compressed statements. Keep one logical statement per line. Wrap long method declarations, parameter lists, annotations, calls, chained calls, conditions, generic types, and lambdas at readable boundaries. Do not join multiple fields, statements, or blocks onto one line merely to reduce file length. Prefer the existing IDEA-style line breaks and four-space indentation over dense code.
+Avoid long lines and compressed statements. Keep one logical statement per line. Wrap long method declarations,
+parameter lists, annotations, calls, chained calls, conditions, generic types, and lambdas at readable boundaries. Do
+not join multiple fields, statements, or blocks onto one line merely to reduce file length. Prefer the existing
+IDEA-style line breaks and four-space indentation over dense code.
 
 After modifying Java files, run from the repository root:
 
@@ -198,8 +306,8 @@ mvn -B -ntp test
 git diff --check
 ```
 
-The formatter script formats only the Java files passed to it; do not reformat unrelated Java files in a task. A task must not be reported complete if formatting, tests, or `git diff --check` fails.
-
+The formatter script formats only the Java files passed to it; do not reformat unrelated Java files in a task. A task
+must not be reported complete if formatting, tests, or `git diff --check` fails.
 
 ## 16. clean-room / Source Product
 
@@ -208,20 +316,16 @@ REVIEW。不得带入公司身份、客户/生产数据、Secret、内部账号�
 Factory/权限/ownership 行为，允许更换实现和分包；拒绝默认库兜底、HTTP200错误、任意反射 Job。AGENTS 定规则、Skill
 定开发工作流、工具执行，不能用架构或工具反过来定义迁移产品。
 
-### 14.2 生成权限与菜单 SQL（2026-10-10 用户要求）
-
-标准 CRUD 权限为 `<承载模块标识>:<完整表名>:read/create/update/delete`。`mes-business` 使用 `business`，`mes-erp` 使用 `erp`，只移除模块名开头的 `mes-`；完整表名不截取下划线前缀、不转换驼峰、不替换为物理数据库名；权限中的 `_` 统一替换为 `:`，例如 `business:pro:workorder:read`。`--module` 继续决定 API/页面目录，不再决定权限前缀。Java 常量、Controller、Vue 页面、菜单声明与菜单 SQL 使用同一生成值。
-
-同时生成中心库 `sys_menu` 目录/页面/四操作的 INSERT SQL，置于承载模块 `docs/generated/<module>/*-menu.sql`，作为可审查产物，不自动迁移或执行，不写角色授权。使用当前 Source Product 菜单列及数据库生成 ID，不硬编码菜单 ID；运行前审查已有目录/页面是否重名，串行重跑不重复插入。
-
-
 ## 业务人员 / 部门 / 岗位嵌入组件（2026-10-10）
 
 业务模块需要人员、部门、岗位搜索或选择时，优先复用 mes-base-ui 的
 `src/components/business/directory/PersonnelSelect.vue`、`DepartmentSelect.vue`、`PostSelect.vue`。
-接口统一为 `/api/business/directory/{personnel|departments|posts}` 与 `/{id}`，仅提供 GET 列表和单个查询；禁止在这组能力中增加新增、修改、删除或角色分配。
+接口统一为 `/api/business/directory/{personnel|departments|posts}` 与 `/{id}`，仅提供 GET
+列表和单个查询；禁止在这组能力中增加新增、修改、删除或角色分配。
 复用中心库 sys_user/sys_dept/sys_post 的平台 Mapper，使用 masterTransactionManager 只读事务；不新增表、不复制目录到业务库。
-HTTP 授权使用当前工厂的 business:directory:{personnel|department|post}:read 权限，不能让组件调用平台管理 API 或要求 system 权限。
-中心目录为跨厂共享引用，不表示人员所属工厂；不能把选厂过滤误称为目录行隔离。人员只暴露编号、名称、人员编码和部门编号，禁止返回密码、联系方式、角色等 SysUser 敏感字段。
+HTTP 授权使用当前工厂的 business:directory:{personnel|department|post}:read 权限，不能让组件调用平台管理 API 或要求
+system 权限。
+中心目录为跨厂共享引用，不表示人员所属工厂；不能把选厂过滤误称为目录行隔离。人员只暴露编号、名称、人员编码和部门编号，禁止返回密码、联系方式、角色等
+SysUser 敏感字段。
 组件 ID 使用字符串，切厂/撤权清理已选项与候选数据、拒绝过期响应。平台管理页面保持原有管理能力。
 契约与使用方式见 mes-base 的 docs/development/business-directory.md。

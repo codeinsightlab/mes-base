@@ -1,6 +1,44 @@
 # MES Codegen 使用说明
 
-2026-10-10 更新。稳定 API 为 `MesCodegenService.generate(CodegenRequest)`；开发入口为可执行 `scripts/mes-codegen`。使用用户已配置的 Java21/Maven；脚本仅在 JAR 缺失或主源码更新时调用标准 Maven package，不创建 .m2/.mvn。
+## 当前调用与新业务流程（2026-10-11）
+
+新增业务使用 mes-crud-codegen Skill，通过 `scripts/mes-business-codegen CONFIG_YAML REPORT_JSON` 读取显式 YAML，调用 ConfiguredCodegenService。旧 `scripts/mes-codegen` 及下方旧参数说明保留为历史入口，不用于替代用户当前配置。
+
+先按 AGENTS 第 13.0 节建模和判断复杂度：用户已有完整模型就沿用；否则 Agent 补齐当前需求所需的最小模型。新表与每列必须有数据库 COMMENT，主键外新增索引只用普通索引，不擅自增加 UNIQUE/外键。可先保存项目 `.sql`，实际建表按授权执行；生成器只读取实际存在的表 metadata，不执行建表 SQL。
+
+不管简单或复杂业务，生成能力支持的表都生成完整基础后端，提供基础 Service 给其他业务编排。复杂业务尽量创建一个代表业务用例的 Service，聚合生成的 Service，负责业务规则及事务；需要真实状态规则时引入小领域。当前不自动生成主子表协调，不能用生成编辑入口绕过状态规则，不增加纯转发包装或循环依赖。
+
+前端按需要生成或暂不使用。只生成后端通常配置 selection.artifacts: [persistence, backend, test]；至少包含 persistence 与 backend，单独 backend 不含 Mapper/XML/Entity/Example。需要前端/菜单时增加 frontend/menu 或使用 [all]，不因不生成页面而省略后端。
+
+Extra 使用规则：单表操作必须复用生成的 Mapper/XML/Example，禁止另建 ExtraMapper/Extra XML 或以 DAO/Repository 改名重复实现。单表统计、批量、复杂条件及状态规则不属于例外，生成能力缺失修补通用生成机制和测试。仅跨表关联查询（JOIN 或涉及其他表的关联子查询）允许自定义 Extra，不能把单表 CRUD 放进去；业务 Service 聚合多个基础 Service 不需要 Extra。当前生成器不自动生成跨表 Extra。下方历史“复杂业务新增 ExtraMapper”及“标准单表能力无法表达可用 Extra”的表述均由此规则替代。
+
+从后端仓库根调用：
+
+```sh
+mvn -B -ntp verify
+./scripts/mes-business-codegen docs/development/codegen-config.review.yaml target/business-codegen/report.json
+```
+
+命令第二个参数只是报告位置。运行前读取配置的实际 execution；用户当前配置可能是 write/replace-generated，不得把名为 preview.json 的报告当成预览开关。
+
+| 配置 | 含义 |
+| --- | --- |
+| selection.tables: [] | 所选库全部表；新功能只需目标表时明确填列表 |
+| selection.tables: [pro_workorder] | 仅选该表；tableOverrides 不参与选表 |
+| execution.mode: dry-run | 渲染和预检，不发布代码；仍写报告，仍检查文件冲突 |
+| write + fail | 生成新文件，相同内容保留，不同内容拒绝 |
+| write + replace-generated | 覆盖带生成标记的文件，手工修改也会被替换 |
+| 独立 target 输出配置副本 | 写可审查副本，保留原项目文件及用户配置 |
+
+所有项目取值以用户指定配置为准；完整参数与注释见 [配置文件](codegen-config.review.yaml)，不能从旧 CLI 隐含默认值补齐。模块取命名策略和 fallback，无 `_` 本项目 fallback 为 business，可配置。持久化/backend/frontend/menu/test 可独立选择，backend 不包含 persistence。缺项、不支持表或冲突时全批预检失败，不发布半套文件。
+
+菜单 SQL 更新已有、插入缺失，保留菜单 ID 和角色绑定；只生成，不自动执行、赋权或重启服务。生成后的工程与业务验收见 AGENTS 第 10/14/15 节；真实生成器入口实现及证据见本文末尾“mes-business 配置读取与批量调用入口”。
+
+本次整理仅更新 AGENTS、Skill 与本说明，没有修改生成器、业务代码或用户配置，没有执行建表/生成/服务重启。以下时间线保留当时事实，历史默认值、INSERT 和 Factory 字段描述不作为当前规则；以本节和 AGENTS 当前约定为准。
+
+## 历史入口及实现时间线
+
+2026-10-10 入口：API 为 `MesCodegenService.generate(CodegenRequest)`；开发入口为 `scripts/mes-codegen`。旧脚本仅在 JAR 缺失或主源码更新时调用标准 Maven package；当前新脚本需先构建。
 
 ## 数据源与命令
 默认配置 `mes.codegen.default-datasource=dev`，dev/prod的实际url/username/password直接写入对应application profile的mes.codegen.profiles字段，不再用MES_CODEGEN_*占位符。外部配置可声明多个 `mes.codegen.profiles.<name>.url/username/password/driver-class-name`；`--config=/absolute/developer.properties` 加载，凭证仅环境/受控配置，禁止命令或报告打印。开发 profile 与运行时 Factory 无关。
