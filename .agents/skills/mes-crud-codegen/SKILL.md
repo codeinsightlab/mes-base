@@ -41,4 +41,4 @@ description: 为 MES Base 的已有单表生成 MyBatis Mapper/XML/Example、Spr
   --backend-module=mes-erp --package=dev.mesbase.modules.erp.masterdata --dry-run
 ```
 
-支持单主键 Long/Integer/String 的普通单表；具体类型及敏感/引用字段拒绝范围见使用说明。`--config=/absolute/developer.properties` 加载受控开发配置，不输出凭证。骨架测试与 person Mock 验收不建生产表、连接或角色。
+支持单主键 Long/Integer/String 的普通单表；具体类型及外键等结构支持范围见使用说明。不得根据 user_id、owner_id、password 等字段名推断业务含义而拒绝生成；敏感响应与主体/资源授权由使用方在生成后审查。`--config=/absolute/developer.properties` 加载受控开发配置，不输出凭证。骨架测试与 person Mock 验收不建生产表、连接或角色。

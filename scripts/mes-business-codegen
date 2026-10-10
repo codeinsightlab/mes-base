@@ -1,0 +1,20 @@
+#!/bin/sh
+# Project adapter: explicit configuration, no production Spring application is started.
+set -eu
+ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
+if [ "$#" -ne 2 ]; then
+    echo 'Usage: scripts/mes-business-codegen CONFIG_YAML REPORT_JSON' >&2
+    exit 2
+fi
+CONFIG=$1
+REPORT=$2
+cd "$ROOT"
+set -- "$ROOT"/target/mes-base-*.jar
+if [ "$#" -ne 1 ] || [ ! -f "$1" ]; then
+    echo 'Build the packaged application first; exactly one target/mes-base-*.jar is required.' >&2
+    exit 2
+fi
+JAR=$1
+if [ -n "${JAVA_HOME:-}" ]; then JAVA_BIN="$JAVA_HOME/bin/java"; else JAVA_BIN=java; fi
+exec "$JAVA_BIN" -Dloader.main=dev.mesbase.modules.codegen.BusinessCodegenCli -cp "$JAR" \
+    org.springframework.boot.loader.launch.PropertiesLauncher "$CONFIG" "$ROOT" "$REPORT"

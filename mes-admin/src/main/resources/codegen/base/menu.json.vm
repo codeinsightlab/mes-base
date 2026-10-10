@@ -3,10 +3,10 @@
   "id": "${moduleName}:${className}",
   "name": "${functionName}",
   "path": "/${moduleName}/${className}",
-  "component": "${moduleName}/${className}/index",
+  "component": "${pageComponent}",
   "permission": "${permission}:read",
   "permissionScope": "${permissionScope}",
   "kind": "MENU",
-  "icon": "List",
+  "icon": "${frontendIcon}",
   "children": []
 }

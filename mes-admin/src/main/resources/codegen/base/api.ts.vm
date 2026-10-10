@@ -1,5 +1,5 @@
 // MES-CODEGEN: RuoYi API module pattern adapted to typed Base contracts.
-import { request } from '@/lib/request'
+import { request } from '${requestModule}'
 
 export interface ${ClassName}Vo {
   [key: string]: unknown;

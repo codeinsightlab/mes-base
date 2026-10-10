@@ -1,5 +1,7 @@
 # ADR-004：同一 Core，Dedicated 实现与 Shared 契约
 
+> 2026-10-11 修订：仅中心 + 分厂独立业务库，两组生产 SessionFactory/TM、固定包扫描保持。事务 begin 最新准入，事务内固定 factory/binding/lease，不因管理 revision 变化主动中止；退休池已有租约继续，拒绝新租约，排空关闭。以修订 ADR-002 与 [请求准入](../development/request-admission.md) 为准；Shared 历史计划不是当前能力。
+
 - 日期：2026-10-05；状态：Accepted（Shared implementation pending）。
 - 来源问题：单厂逻辑被机械分叉为多厂代码，或只改数据源映射就宣称共享库，会掩盖跨厂同号数据和缺行级过滤。
 - 旧系统行为：独立库路由可以表达，多数业务 SQL 未普遍带厂条件；解除连接唯一性不足以获得共享库隔离。这里不复制 SQL 或 Schema。

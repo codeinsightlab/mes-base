@@ -1,8 +1,8 @@
 <!-- MES-CODEGEN: Base Design System; shared CRUD interactions and explicit field contract. -->
 <script setup lang="ts">
-import CrudPage from '@/components/CrudPage.vue'
-import { api } from '@/api/${moduleName}/${className}'
-import type { Field } from '@/lib/crud'
+import CrudPage from '${crudComponent}'
+import { api } from '${frontendApiImport}'
+import type { Field } from '${fieldTypesModule}'
 
 const fields: Field[] = [
 #foreach($field in $fields)

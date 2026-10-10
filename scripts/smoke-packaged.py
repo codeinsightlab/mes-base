@@ -105,9 +105,10 @@ def run(profile):
                 checks.append({"profile": profile or "default", "path": path, "expected": expected, "actual": actual, "passed": True})
             check("/health", 200)
             check("/api/foundation/context", 401)
-            check("/open-api/token", 404)
-            check("/open-api/v1/diagnostics/ping", 404)
-            check("/v3/api-docs/open-api", 404)
+            # Absent/non-MVC routes are now protected by the default authenticated chain.
+            check("/open-api/token", 401)
+            check("/open-api/v1/diagnostics/ping", 401)
+            check("/v3/api-docs/open-api", 401)
             if WITH_OPENAPI:
                 assert "OpenApiAutoConfiguration matched:" in logfile.read_text()
                 checks.append({"case": "openapi-auto-configuration-enabled-without-system", "passed": True})

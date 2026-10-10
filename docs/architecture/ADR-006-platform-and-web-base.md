@@ -1,5 +1,7 @@
 # ADR-006 — Platform / Web Base 与 RuoYi 来源
 
+> 2026-10-11：生产 opaque Bearer 保持，Redis 身份改为白名单 v2。当前角色与部门范围在一次精简账号查询加载，权限及菜单分类请求内复用；禁用/删除/改密使用中心 outbox + 用户索引 Redis 撤销并恢复。默认 SecurityFilterChain 必须认证，PUBLIC 按 EndpointAccess 的 URL/方法生成，漏配启动失败；不恢复 userId=1。详见 [请求准入](../development/request-admission.md)，旧全局 permitAll/无效撤销占位不再适用。
+
 2026-10-05，Accepted。本轮明确授权 Platform + Codegen；保留已实现 Factory Foundation。
 
 ## 来源与许可

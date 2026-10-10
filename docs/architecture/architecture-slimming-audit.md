@@ -1,6 +1,101 @@
+> 2026-10-11 实施更新：用户决定已落实为随机 Bearer、安全 Redis 身份、请求内当前授权复用、事务 begin 准入及固定租约、退休池排空与可恢复会话撤销。后文审查阶段的 Token/撤销/事务生命周期待决事项已被本次决定取代；历史证据保留。当前链路与验证边界见 [请求准入](../development/request-admission.md)。没有引入 Redis metadata 缓存，真实 MySQL 多实例及同环境 HTTP 性能对测尚未完成。
+
 > 2026-10-09：以下为当时架构快照。当前持久化已收敛为中心库 + Factory 多业务库；外部连接、第三工厂及相关测试退出，中心工厂名改为 masterSqlSessionFactory。当前规范与验收见 ADR-004 的 2026-10-09 修订。历史结论不作为现行接入规则。
 
 # Architecture Slimming Audit
+
+## 2026-10-11：ktg-mes 与 Base 基础能力差异清单（只读复核）
+
+本节是当前差异清单，后文 2026-10-06 内容仍为历史证据。依据用户要求对照源项目，不实施改造。Base main / 560600b，ktg-mes master / 42a81cc5；以工作区源码为准，Base FoundationConfiguration 有既有未提交修改，未覆盖。未运行两边测试、真实 Redis/数据库、性能对测或生产验证。用户已选择维持 ktg-mes 每请求读取当前授权，不推进 Redis 长期权限快照；已接受入口校验后的请求继续完成。数据源快照生命周期及真正切库的执行细节仍需明确。
+
+分类：**保留**＝用户已明确的 Base 产品边界；**沿用/适配**＝优先复用源机制，仍需按新栈接入；**整改**＝当前具体问题；**待定**＝会改变可观察行为，列入下方决策项；**缺口**＝现有模块或骨架不代表完整能力。不得把本节建议直接当作已修改的工程规则。
+
+| 编号 | 能力 | ktg-mes 当前实现 | Base 当前实现 | 来源判断及处理 | 证据 |
+| --- | --- | --- | --- | --- | --- |
+| A01 | Token 形式 | JWT，内含 Redis 会话标识 | 随机 opaque Bearer，Redis 键使用 Token 摘要 | Base 历史 ADR 的重新设计，不是新技术栈必需；待定是否完整恢复 JWT | E01 |
+| A02 | 会话恢复 | Redis 恢复 LoginUser；缓存角色与权限清空 | Redis 身份摘要，再查账号、状态和 authRevision | 用户倾向源项目身份快照；沿用/适配，移除普通请求完整账号查询前明确撤销语义 | E01 |
+| A03 | 会话有效期 | verifyToken 在剩余有效期阈值内刷新 TTL | 固定 TTL，setLoginUser 为空 | 可沿用滑动续期；须同步前端 expiresAt，不能后端续期前端仍按旧期限退出 | E01、E11 |
+| A04 | 禁用、删除、改密失效 | TokenService 本身不逐请求查当前账号；不能保证上述操作后立即拒绝所有旧 Token | 每请求校验账号及 revision；revokeUser 仅声明，生产调用搜索未发现调用方 | 已进入请求继续执行已确定；后续请求是否立即拒绝待定。源项目未提供完整保证，不能标为直接迁入能力 | E01 |
+| A05 | Spring Security 默认边界 | 公开入口白名单，其余 authenticated；JWT filter | filter 恢复身份，Security anyRequest permitAll，MVC 拦截器执行认证 | 沿用源项目默认认证边界并适配新版 SecurityFilterChain；现状并非所有 MVC 接口匿名，但非 MVC 入口须另查覆盖 | E02 |
+| A06 | 接口权限声明 | EnableGlobalMethodSecurity＋PreAuthorize 等 | EndpointAccess＋启动 EndpointCatalog 检查＋MVC 授权 | 不属于 Boot 升级必需；保留显式声明、启动漏配失败，是否替换表达机制不与首轮性能调整捆绑 | E02、E03 |
+| A07 | 授权生命周期 | 每请求加载当前厂角色、权限、部门范围，请求内副本 | 每次权限服务调用读取中心库；未形成等价统一请求授权快照 | 沿用每请求读取、请求内复用；不做 Redis 长期权限缓存 | E04 |
+| A08 | 超级管理员 | userId=1 合成管理员及全权限等分支 | SysUser.isAdmin 返回 false；显式平台角色授权 | 用户规则，保留，不恢复特殊 ID 绕过 | E04、E12 |
+| A09 | 平台/工厂角色 | 当前厂角色为主，特殊管理员另行处理 | PLATFORM 与 FACTORY 显式 kind，平台业务权限与当前厂权限合并 | 用户规则，保留；快照须表达合并后的正确授权集合 | E04、E12 |
+| A10 | 接口范围 | 多个路径特例，平台免选厂主要针对特殊管理员 | /system、/tool、/monitor 完整路径段；共享入口另处理 | 用户规则，保留；不让 X-Factory-Id 决定平台归属 | E03、E05 |
+| A11 | 菜单范围 | 当前厂角色菜单，缺等价统一 URL 分类 | 完整 URL 分类，按钮继承父菜单；工厂角色不能持有平台权限 | 保留用户规则；全菜单每次重建为实现成本，可整改而不删除分类 | E04、E03 |
+| A12 | 部门数据权限 | FactoryDataScope 读取当前厂部门范围；旧 DataScope 机制参与查询 | 平台 DataScopeAspect 仅使用启用 PLATFORM 角色 | 存在语义差异；不得认为功能权限合并即部门行权限合并。新增业务部门行过滤需求单独定义 | E04、E12 |
+| F01 | 工厂 ID / Scope | Long ID；执行 Snapshot 含 ERP 厂码及数据源绑定 | FactoryId 字符串；FactoryScope 仅 FactoryId | 用户规则，保留；数据源快照放基础设施，不扩充 Scope | E05、E06 |
+| F02 | 默认工厂 | 偏好或配置 default-factory-id=1，再列表首项 | 有效偏好，否则启用且绑定启用业务库候选的确定性最小 ID | 用户规则，保留，不恢复魔法默认 ID | E05 |
+| F03 | 选厂准入 | 不要求该厂角色；选厂与操作授权分离 | 同样分离，空角色仍可登录/选厂 | 共同行为，保留；选厂成功不表示有业务权限 | E05、E04 |
+| D01 | 数据库域 | 中心/业务会话工厂，并有 ERP、HR、WMS 等路由用途 | 中心库＋独立工厂业务库，两个生产会话工厂/事务管理器 | 用户边界，保留；不恢复外部数据库占位装配 | E06、现行 AGENTS §9 |
+| D02 | Mapper 归属 | MfMapperCatalog 中心 Mapper 清单＋用途解析 | 固定包扫描 master/system/quartz/platform，business/mes/modules | 用户边界，保留自动包扫描，不恢复逐 Mapper 清单 | E06、现行 AGENTS §9.1 |
+| D03 | 路由绑定生命周期 | HTTP 入口建绑定 Snapshot，resolve 优先复用 | 事务 begin 建绑定，verify 又查最新中心配置 | 适配快照；建议以事务为租约/绑定边界，入口身份授权仍为请求级。新独立事务、长任务新批次重新准入 | E06 |
+| D04 | 元数据缓存 | Redis hash＋generation＋提交后失效 | resolver 每次查工厂、数据源，再检查 registry | 沿用缓存思路需补并发发布及失效失败语义；不照搬“300 秒必定刷新”假设 | E07 |
+| D05 | 事务中配置变化 | 已建立快照不重读最新配置 | SQL/借连接/提交多处重新解析；旧租约退休后拒绝 | 普通在途沿原绑定完成方向已接受；整改昂贵重读与撤销策略，保留固定身份检查 | E06 |
+| D06 | 普通工厂编辑 | 工厂修改失效 metadata，不一律关闭其池 | saveFactory 更新后无条件退休旧 datasourceId | 整改：名字等非绑定变更不应退休池，仍处理真正绑定/状态变化 | E06 |
+| D07 | 旧池管理 | 替换/移除关闭池，没有等价应用级 lease | 停止新获取、旧 lease 排空；verify 又拒绝旧 runtime | 保留 lease 排空，允许已准入普通事务完成；不能把 Druid.close 当作在途完成保证 | E06 |
+| D08 | 真正切库 | 新快照可用新库、旧快照可能继续旧库 | 旧事务通常在后续验证失败，但验证与提交有窗口 | 严格无新旧写入重叠不是两者已有保证；待定切库是否需要维护/排空流程 | E06 |
+| D09 | 重复物理库 | 配置唯一约束，历史存在中心/业务同物理库情况 | 用 server UUID＋database 识别并拒绝重复库 | 用户分库规则，保留；并非事务快照性能问题 | E06 |
+| T01 | 单事务固定身份 | Spring BusinessTransactionManager 固定绑定，挂起恢复 | Spring OwnedTransactionManager 固定绑定/owner，挂起恢复 | 共同行为，保留标准 Spring 事务生命周期；不自行手写提交回滚 | E08 |
+| T02 | 中心/业务混用 | 业务事务下中心 Mapper 路径与反向访问保护不对称 | owner/statement guard 双向拒绝；metadata 有受控只读窗口 | 保留“一个本地事务一个库”；允许用例分阶段访问两库，不能把 Spring REQUIRES_NEW 等同于已支持跨 owner 调用 | E08 |
+| T03 | 无事务查询 | 部分列表无 Service 事务；MyBatis 会话仍检查连接身份 | 业务连接必须存在事务 Selection，列表具名只读事务 | 首轮保留只读事务；无事务能力为独立契约扩展，不靠删注解减少重复 resolver | E06、E08 |
+| T04 | MyBatis 缓存前校验 | MapperDatasourceInterceptor 在 Executor 调用前路由并固定会话身份 | PersistenceStatementGuard 在 Executor 查询/更新前校验 | 共同行为，保留；即便命中缓存也不能越库/越厂，不要求每次中心 I/O | E08 |
+| X01 | 异步上下文 | 指定线程池 decorator 传播工厂 Snapshot；不覆盖所有执行器 | ExecutionScope 传播 FactoryScope，清除并恢复认证上下文 | 适配；不跨线程传 Session，不让系统任务隐式继承用户权限 | E09 |
+| X02 | Quartz 执行能力 | JobInvokeUtil 反射调用真实目标 | ControlledJobRunner 只允许 platform/factory heartbeat | 缺口；保留不允许任意反射的规则，真实任务用明确注册执行器接入，不能称完整迁移 | E09 |
+| X03 | 同步协调 | mes_master_sync、factory/sync_key、run_token 及具体业务执行 | SyncCoordinator 有通用抢占/进度/恢复；没有等价完整业务同步器 | 保留通用机制，不迁客户/外部同步业务；新批次重新准入 | E09 |
+| R01 | 文件访问 | CommonController 有按 resource 路径下载接口 | 私有附件 ID＋owner/resource/scope 校验，稳定个人入口 | 用户规则，保留；源项目该路径不能证明具备等价资源授权 | E10 |
+| R02 | OpenAPI 消费者 | 独立客户端认证、Token、API 授权链 | mes-openapi 只注册目录与文档 metadata | 缺口，单独迁移任务；不能用模块名称或已有页面证明消费者链已具备 | E10 |
+| C01 | CRUD 生成 | 旧产品 RuoYi 风格接口、生成模板 | MBG Mapper/XML/Example＋具名 Service 事务＋统一 Vue3 CrudPage | 用户已经明确的生成规范，保留；旧功能迁移仍优先 PORT，不用 codegen 重造 | 现行 AGENTS §13–15、E11 |
+| C02 | 前端及响应 | 源 Vue2/RuoYi 页面与接口契约 | Vue3/统一 Shell；迁入旧接口与新基础 CRUD 各有显式契约 | 技术适配及用户 UI 要求，保留；不新增多结构兜底或隐式全局投影 | E11、现行 AGENTS §13.3–13.5 |
+| C03 | Java/框架版本 | 旧 Security configure、javax 等 API | Java21、新版 Boot/Security、Jakarta API | 必要适配；不能机械复制已移除 API，但不因此重写产品规则 | 两边 pom.xml、E02 |
+
+### 需要用户决定的清单
+
+1. **Token 形式：** 维持 ktg-mes 的请求授权机制已确定；是否同时恢复 JWT/会话 ID 形式尚未明确。推荐源格式优先，但它不是权限实时性的前提。
+2. **账号撤销：** 当前请求继续完成已确定。推荐禁用/删除/改密后撤销该用户 Redis 会话，使后续请求拒绝；这超出当前源 TokenService 本身的保证，需要单独落实可靠撤销，而不是保留每请求完整用户查询。
+3. **路由准入：** 推荐 Spring 事务级绑定/租约，新独立事务及长任务新批次重新准入；若选择整个 HTTP 请求沿用同一旧绑定，需要显式接受请求内第二事务仍用旧库的行为。
+4. **切库窗口：** 推荐真正换物理库采用停止新业务准入、排空旧写事务后开放新库；普通改名无需此流程。若允许写入重叠，需明确迁移数据的一致性责任。
+5. **能力缺口范围：** Quartz 真实执行器、OpenAPI 消费者链单独立项；不捆绑进身份/路由性能改造。
+
+授权表达机制及部门行级数据范围先保留当前可证明行为，不要求用户为首轮优化额外选择。新增菜单和权限经下次请求查询生效；已打开前端是否自动刷新菜单仍是单独 UI 行为，不能以服务端权限实时查询证明页面自动刷新。
+
+### 源码证据索引
+
+E01：源 `ktg-framework/.../web/service/TokenService.java` getLoginUser、refreshToken、verifyToken；Base `mes-framework/.../framework/web/service/TokenService.java` createToken、resolve、revokeUser。源 refreshToken 159–170 行明确清空角色/权限。
+
+E02：源 `ktg-framework/.../config/SecurityConfig.java` configure 与 EnableGlobalMethodSecurity；Base `mes-admin/.../server/FoundationConfiguration.java` security，`mes-framework/.../framework/security/SystemTokenFilter.java`。
+
+E03：Base `mes-framework/.../platform/web/EndpointScopePolicy.java`、`EndpointCatalog.java`、`FoundationAccessInterceptor.java`；`mes-system/.../service/MenuScopePolicy.java`。
+
+E04：源 `ktg-framework/.../factory/FactoryAuthorizationService.java`；Base `mes-system/.../service/SystemPermissionService.java`、`mapper/SysMenuMapper.xml` selectScopedPermissions、`SysRoleServiceImpl.java`。
+
+E05：源 `ktg-system/.../service/FactoryAccessService.java`、`ktg-framework/.../factory/FactoryRequestInterceptor.java`；Base `mes-common/.../core/factory/FactorySelectionService.java`，`mes-admin/.../server/managed/ManagedDatasourceService.java` defaultFactory。
+
+E06：源 `ktg-framework/.../factory/ManagedDatasourceService.java`、`DatasourceRuntimeRegistry.java`、`MfMapperScanConfig.java`；Base `mes-framework/.../infrastructure/persistence/FactoryBusinessDataSource.java`、`RuntimeRegistry.java`，`mes-admin/.../server/managed/ManagedDatasourceService.java` resolve、saveFactory、physicalIdentity。
+
+E07：源 `ktg-system/.../service/FactoryMetadataCache.java` read、PUBLISH、invalidateAfterCommit；竞争结果忽略和 hash TTL 续期的风险详见 `../reviews/2026-10-11-pro-workorder-latency-review.md` 的外部审查复核章节。
+
+E08：源 `ktg-framework/.../factory/BusinessTransactionManager.java`、`FactoryDataSource.java` check/enterMapper、`MapperDatasourceInterceptor.java`；Base `mes-framework/.../infrastructure/persistence/OwnedTransactionManager.java`、`PersistenceStatementGuard.java`；Base 工单 `mes-business/.../modules/pro/service/impl/ProWorkorderServiceImpl.java`。
+
+E09：源 `ktg-framework/.../config/ThreadPoolConfig.java`、`ktg-common/.../factory/FactoryContext.java`、`ktg-quartz/.../util/JobInvokeUtil.java`、`ktg-mes/.../erp/lot/service/MasterDataSyncService.java`；Base `mes-framework/.../platform/execution/ExecutionScope.java`、`framework/sync/SyncCoordinator.java`、`mes-quartz/.../util/ControlledJobRunner.java`。
+
+E10：源 `ktg-admin/.../controller/common/CommonController.java`、`ktg-framework/.../openapi/OpenApiSecurityConfig.java`；Base `mes-admin/.../controller/system/SystemFileController.java`、`mes-system/.../service/impl/SysAttachmentServiceImpl.java`、`mes-openapi/.../OpenApiAutoConfiguration.java`。
+
+E11：Base UI `src/stores/auth.ts`、`package.json`；生成规范 `../development/codegen.md`，目录组件规范 `../development/business-directory.md`；UI 快照过期保护不能替代实时菜单刷新证明。
+
+E12：Base `mes-common/.../common/core/domain/entity/SysUser.java` isAdmin；`mes-framework/.../framework/aspectj/DataScopeAspect.java` 仅选启用平台角色；源 FactoryAuthorizationService/FactoryDataScope。
+
+所有 Base 路径根为 `/Users/user/work/lixin/mes-base`；源路径根为 `/Users/user/work/heri/ktg-mes`；UI 根为 `/Users/user/work/lixin/mes-base-ui`。`...` 是包路径缩写，具体 Java 包前缀分别为 dev/mesbase 和 com/ktg。
+
+### 改造与验收顺序
+
+- 先认证/会话完整闭环：登录、恢复、续期、注销、禁用/改密及并发撤销；检查旧客户端契约与安全链公开入口。关联 SourceMigrationSecurityTest，并补充迁移后真实入口测试。
+- 再请求授权快照：平台/工厂角色并集、撤权、新增授权、切厂、共享入口、部门范围。关联 RoleScopePermissionTest、MenuScopePolicyTest、EndpointScopePolicyTest。
+- 再路由快照/租约：两库固定归属、事务切厂拒绝、双向跨库拒绝、挂起恢复、普通编辑不退休、旧池排空、新事务重新准入。关联 SpringTransactionEffectsTest、Runtime fixture 与 ManagedRuntimeMySqlTest；fixture 与真实多厂证据分开。
+- 最后缓存和性能：元数据失效竞争、Redis 故障及多节点传播，以及相同请求/数据样本的中心查询预算和延迟。原 16 中心 SELECT 仅是已有报告的采样，不是本轮重新测量。
+- 每批同步调整 AGENTS、ADR 和失效的测试/兼容入口；不以本节建议直接覆盖原规则。无关工作区修改保留。
+
+本轮只更新文档，git diff --check 用于文档空白检查；未执行 Maven/UI 测试、服务重启、数据库写入或部署。
 
 审查日期：2026-10-06。基线：`main` / `342bf4d`，包括任务开始时用户已有的暂存修改。
 项目实际名称和路径为 `mes-base`。本轮只检查架构及基础设施，不判断 MES 业务逻辑、SQL、API 或页面是否正确。

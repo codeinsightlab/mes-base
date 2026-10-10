@@ -15,7 +15,7 @@
 stdout 仅安全 JSON，stderr 为稳定错误码，失败 exit2；UNKNOWN_DATASOURCE / DATASOURCE_UNAVAILABLE / TABLE_NOT_FOUND / UNSUPPORTED_SCHEMA / OUTPUT_CONFLICT / OUTPUT_FAILURE 区分。额外开发 JDBC driver 可用 MES_CODEGEN_DRIVER_CLASSPATH；它不是运行时库绑定。生产 JAR 不带 H2。
 
 ## Metadata 与产物
-只用 JDBC DatabaseMetaData 的 tables/columns/PK/index/importedKeys；getIndexInfo 使用 approximate=true，不运行应用业务 SQL、不读取数据行。类型映射 Long/Integer/String/BigDecimal/LocalDateTime/LocalDate/Boolean；记录 nullable/default/comment/index/unique。单主键 Long/Integer/String，无外键；业务库按当前 Factory 路由隔离，不要求 factory_id 或复合 unique。secret/password/token/credential/private_key 与未知主体/引用字段拒绝；复合 PK、未知类型、其他复杂表 Domain First。
+只用 JDBC DatabaseMetaData 的 tables/columns/PK/index/importedKeys；getIndexInfo 使用 approximate=true，不运行应用业务 SQL、不读取数据行。类型映射 Long/Integer/String/BigDecimal/LocalDateTime/LocalDate/Boolean；记录 nullable/default/comment/index/unique。单主键 Long/Integer/String，无外键；业务库按当前 Factory 路由隔离，不要求 factory_id 或复合 unique。不按字段名推断敏感、主体或引用业务并拒绝生成；响应字段及授权由使用方审查。复合 PK、未知类型、外键等超出当前结构支持的表明确拒绝。
 
 GLOBAL / FACTORY_SCOPED 20 文件：MBG Entity、Example/Criteria、Mapper、XML，以及 Service、Impl、Controller、Query/Create/Update DTO、业务 Page、VO、PageVO、Permission、Test 骨架、API TS、Vue、菜单 JSON、permission Markdown、中心库菜单 INSERT SQL。GLOBAL 通过固定 platform 包自动扫描，FACTORY_SCOPED 通过固定 modules 包自动扫描，Mapper 不生成 PersistenceOwner 注解，不额外生成 Mapper 注册配置。Bigint/decimal 响应字符串防前端精度丢失；状态仅原值，需要 Agent 依据真实语义抽取枚举与 options。
 
@@ -239,3 +239,33 @@ CrudPage 区分无读取权限与空结果：没有 read 时显示“当前范�
 同步移除 person/pro_workorder 的既有生成残留；工单 XML 中用户已删除的 DISTINCT 及其他排版修改保留，不执行整套覆盖再生成。定向测试通过真实 MBG 渲染检查普通及长文本生成产物，并编译生成的 Java；普通查询继续由既有 Mapper 执行测试验收。
 
 验证：5 个改动 Java 文件经 IDEA 原生格式化；生成定向测试 13 项通过，`mvn -B -ntp verify` BUILD SUCCESS，packaged smoke 10 passed / 0 failed，`git diff --check` 通过。本轮未执行数据库写入或重启用户服务。
+
+### 2026-10-11 CLI 必填、默认值与固定约定审查
+
+只读核对 CodegenCli、CodegenRequest、CodegenProfiles、DefaultMesCodegenService、RuoyiTemplateRenderer、MyBatisPersistenceRenderer、scripts/mes-codegen 及实际模板；未生成或修改业务代码，未读取连接凭证或业务数据。
+
+- CLI 必填只有 --table、--business-name。--datasource 可省略，但必须配置有效 mes.codegen.default-datasource 及对应连接 profile；当前公共 application.yml 的默认 profile 名为 dev。不是在生成器中写死物理库名。
+- 可选值：--module 默认取首个下划线前缀，无前缀用 business；--scope 默认 FACTORY_SCOPED；--backend-module 默认 mes-business；--package 默认 dev.mesbase.modules.<module> 或 dev.mesbase.platform.<module>；--output 直接 CLI 默认 cwd，但脚本先 cd 后端根；--frontend-root 默认后端根相邻 mes-base-ui；--author 默认 MES Base；--schema 默认未指定；--config 默认未指定。
+- 开关：--dry-run、--overwrite、--format-java、--help。默认拒绝覆盖；脚本自动开启 IDEA 格式化。无 --model 参数。CodegenCli 自身 help 把 scope 写成必填外观，与实际默认行为不一致。
+- 固定工程耦合：Java 包必须属于 modules/platform 根且与 scope 对应；事务管理器固定 businessTransactionManager/masterTransactionManager；生成接口固定 /api/<module>/<表名下划线转连字符>；权限取承载模块去掉 mes- 前缀＋完整表名下划线转冒号＋四操作；包层次固定 controller/service/service.impl/dao/domain。
+- 固定模板约定：分页默认20、最大100；批删最大100且复用 delete 权限；字符串校验上限 min(metadata长度,10000)；菜单 SQL 写中心 sys_menu，顶级 parent_id=0、目录/页面 order_num=0、list 图标、codegen 创建人，并含旧权限名 UPDATE。没有自定义父菜单、图标、API 根或权限覆盖参数。
+- 字段策略：create_by/create_time/update_by/update_time 被固定识别为审计字段，不进入普通写入字段；敏感字段名匹配直接拒绝；user_id/user_name/file_id/external_id/owner_id/created_by/updated_by 等固定名单也拒绝整表。后者把资源/业务猜测用于生成准入，应按“纯基础生成器”边界重新评估，不能宣称全部是 JDBC 元数据限制。
+- 持久化固定 MBG MyBatis3/XMLMAPPER，单主键仅 Long/Integer/String；有外键 metadata 的表拒绝；不生成 distinct。SQL 不带 catalog/schema，保留字才加标识符引号。表名与字段来自真实 metadata，没有固定 person/pro_workorder 表或 acceptance 模块。
+- launcher 固定 target/mes-base-0.1.0-SNAPSHOT.jar，版本或打包名称变化时会失效；这是工具路径硬编码，值得整改。路径/名称校验及不自动装配 Maven 模块仍按当前工具边界处理。
+
+证据边界：本节为静态审查，git diff --check 仅验证文档空白；未执行新的生成、编译、数据库或 UI 验收。
+
+### 2026-10-11 person 审查样例路由与 admin 权限定位
+
+源码审查：`mes-business/src/main/java/dev/mesbase/modules/acceptance/controller/PersonController.java` 声明 `/api/acceptance/person`，Controller 与 `service/impl/PersonServiceImpl.java` 均要求 `mes.codegen.person-review.enabled=true`。当前资源 YAML 未声明该开关；缺省条件不成立，不注册 Controller/Service，因此默认运行时没有对应 MVC 路由。主应用扫描 `dev.mesbase`，mes-admin 已依赖 mes-business，源码中未发现扫描包或模块依赖遗漏。
+
+`No mapping for GET /api/acceptance/person` 表示 MVC 未找到处理器；此时未进入 `FoundationAccessInterceptor.preHandle` 的方法授权判断，不能归因于 admin 缺权限。若通过外部配置启用并重启，该 URL 归业务范围，GET 要求有效 Factory 上下文和 `business:person:read` 权限；登录用户名 admin 不决定路由是否注册，也不替代显式授权。
+
+证据边界：本次只检查源码、配置与已有日志，未读取当前服务的有效 Environment，未复现 HTTP、执行测试、重启服务、启用样例或修改业务代码。外部配置、环境变量或启动参数可能覆盖资源 YAML；文档中的默认关闭结论不能替代当前进程条件评估。该样例来源为 H2 metadata fixture，启用开关不证明目标业务库已有 person 表。
+
+
+### 2026-10-11 取消字段名业务黑名单
+
+按用户要求删除 DefaultMesCodegenService 的敏感关键词和主体/引用字段名拒绝逻辑；user_id、owner_id、password、secret、access_token 等按真实 metadata 作为普通字段生成。上文 CLI 审查中这两种拒绝策略为整改前事实，本节取代其现行结论。保留类型、单主键、命名冲突及外键等实际能力校验，不改变既有审计字段策略。AGENTS 与 Skill 同步边界。新增合成 H2 表的生成、字段保留及产出 Java 编译回归；未修改业务表或执行真实业务生成。验证：两份 Java 经 IDEA formatter；mvn -B -ntp verify 为 BUILD SUCCESS，CodegenAcceptanceTest 13/13（含真实生成 Java 编译）通过。首轮测试断言忽略 H2 大写 metadata，修正后通过。本次修改文件 diff --check 通过；全仓检查受其他改动 SysUserMapper.xml 第248行缩进空白影响，未修改该文件。
+
+打包 smoke：scripts/smoke-packaged.py 未通过，/open-api/token 返回401，与脚本预期不符；涉及当前其他安全入口改动，未修改相关代码或测试。本次生成器验证通过不代表全仓最终验收完成。

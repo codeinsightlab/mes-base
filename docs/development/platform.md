@@ -2,6 +2,8 @@
 
 # Source 系统与 Factory Foundation 操作边界
 
+2026-10-11 认证与路由准入已更新：随机 Bearer + 安全 Redis 身份、逐请求当前授权及请求内复用、中心 outbox 撤销恢复、固定事务租约、新事务重新准入。旧“逐 SQL/提交前查询最新管理版本并撤销在途操作”不再适用。完整链路、键、部署格式变化及验证边界见 [请求准入](request-admission.md)。其他产品权限、资源、生成器及数据库归属规则保持。
+
 2026-10-06，Phase1 MIGRATING。本文按当前 Source Product 链路更新；此前简化 UUID Platform CRUD/数据库会话/全局配置缓存说明已被迁移替代。实际命令、版本、失败和未验证项见 [报告](MES_BASE_REALIGNMENT_REPORT.md) 与 [验收 JSON](../reviews/2026-10-06-phase1-verification.json)。
 
 ## YAML 与装配
@@ -239,3 +241,63 @@ HTTP 范围改由 EndpointScopePolicy 按 /system、/tool、/monitor 完整路�
 验证：启动/运行路径一致性、三前缀与路径边界、平台有无工厂请求头均不绑定业务上下文、平台角色与具体权限分别校验、非平台角色管理拒绝、个人入口免平台角色、业务缺范围拒绝和真实 MyBatis 合并权限测试。测试与构建结果见本轮回执；未重启用户 8081 服务，未保存角色、执行 SQL 或改变实际授权。前后端接口契约需同步生效。
 
 本轮最终验证（2026-10-10）：受影响 Java 使用 scripts/format-java 的 IDEA 原生格式化；mvn -B -ntp verify 于 16:06 BUILD SUCCESS；scripts/smoke-packaged.py 10 passed / 0 failed。UI npm test 22 文件 / 117 项通过，npm run build 通过，受影响请求/API/Auth 文件定向 ESLint 与两仓库 git diff --check 通过。路由迁移初次验证发现旧消息路径 fixture 导致 404，已迁移到实际个人消息入口后完整 verify 通过。上述 HTTP/SQL 使用隔离 fixture，不代表用户 8081 运行中的服务已经升级。
+
+
+### 2026-10-11：改造前登录 Token 链路的历史核对
+
+本轮仅静态读取当前 Base 与 `/Users/user/work/heri/ktg-mes` 的源码，未修改认证代码、配置、服务或 Redis 状态，未执行登录/注销采样。
+
+Base 实际链路为 POST /api/session → SystemSessionController → SysLoginService（验证码、Redis 重试锁、当前账号/密码/状态检查、登录日志）→ TokenService.createToken。它用 SecureRandom 生成32字节，再编码为43字符的无 padding Base64URL Token；Redis 的 mes:system:session:<SHA-256(Token)>（经现有数据库命名空间封装）只保存 Identity 和 TTL，原始 Token 返回客户端，不是 JWT。响应 accessToken/expiresAt；UI 保存 Token/有效期/选厂偏好，后续带 Authorization: Bearer。
+
+每次请求 SystemTokenFilter → TokenService.resolve：格式校验、哈希、Redis 查身份，再通过用户 Service/Mapper 读取当前账号，校验启用/未删除、userId、authRevision；重新构造 LoginUser 放到 Spring SecurityContext。FoundationAccessInterceptor 另做 URL 范围、当前厂及真实权限检查；Token 不包含权限。DELETE /api/session 删除当前摘要会话。当前默认 TTL60分钟（可配置），没有 ktg-mes 的 verifyToken/refreshToken 滑动续期，setLoginUser 保留为空实现。
+
+### 2026-10-11：Redis 会话快照历史评估（已由实现取代）
+
+> 当前已实现 v2 白名单身份、一次精简账号/角色 fence 和可恢复用户索引撤销；下文保留改造前证据，不是待执行规则。
+
+用户提出入口直接从 Redis 获取用户作为本次请求身份快照。方向合理：登录仍校验数据库账号和密码，普通请求从 Redis 恢复经过裁剪的会话身份，不必每次关联查询完整 SysUser。会话不缓存长期角色/权限，不携带固定工厂或数据库绑定；接口授权与业务路由仍按各自生命周期处理。
+
+前提是补齐账号变更到会话失效的链路。当前 auth_revision 在改密、状态变更时更新；TokenService.resolve 靠每请求查询数据库发现变化。若去掉该查询而只读取旧会话，数据库中的 revision 不会自动让 Redis 会话失效。现有 revokeUser 遍历全部会话，不能直接作为规模化失效方案；应有用户会话索引或明确的账号版本校验机制，并处理登录与撤销并发。
+
+注销删除当前会话；改密、禁用、删除等账号变更须使后续请求拒绝旧会话。数据库提交与 Redis 失效并非原子事务，提交后失效失败需要明确报错、可靠补偿和可接受的生效窗口，不能声称天然即时撤销。Redis 不可用或会话缺失时拒绝认证，不静默改走另一套身份路径。
+
+缓存模型应排除 password、联系方式和持久化角色对象等不必要字段；如确有部门字段参与数据范围，需明确部门变更的刷新策略。请求身份快照不等于长期权限快照，也不等于数据源 metadata 缓存。保持现有 Bearer 格式即可采用此方案，JWT 不是必要条件。
+
+本节记录建议及源码核对，未修改认证实现、规则或数据库；未验证改造后的撤销、并发或性能行为。
+
+### 2026-10-11：长期授权快照历史提案（未实施，已撤销）
+
+> 用户最终决定每请求查询当前角色/权限，仅请求内复用；明确不实施 Redis 长期权限缓存或全局授权 generation。下方提案不再作为实施要求。
+
+用户进一步要求 Token 有效期间正常请求从 Redis 取得身份与权限，新增菜单、调整授权时明确刷新机制，并允许已完成入口校验的请求执行完毕。现行“不缓存权限、每请求读取数据库”规则应在实施时同步修改；本节为方案评估，不表示已实施。
+
+源码事实：Base SystemPermissionService 每次读取角色/权限，业务授权另读取全菜单作 URL 分类；未发现角色、菜单、用户角色变更与授权 Redis 缓存失效的完整链路。ktg-mes TokenService.refreshToken 清空缓存角色/权限，FactoryAuthorizationService.authorize 每请求读取当前工厂角色、菜单权限和部门范围，且明确不回写共享 Redis 登录权限。源项目角色/菜单更新主要写数据库，因此其当前业务授权新鲜度来自重新查询，不能复制后宣称已有 Redis 授权更新机制。
+
+建议首版采用全局授权 generation：Redis 会话保存安全身份；授权快照独立按 userId + PLATFORM 或 FACTORY/factoryId 缓存，并带 generation。平台授权快照保留有效平台角色标志；工厂快照按既有规则合并平台业务权限和当前工厂角色业务权限。不得把单个 Token 的权限集合用于所有工厂。
+
+入口只读取 Redis 会话、当前 generation 与对应快照；命中同版本后，本次请求复用不可变授权结果。缓存缺失或版本变化才查询数据库重建。重建前后必须检查 generation，发布以版本比较保护，版本已变则丢弃重试；权限集合、角色标志与可见菜单需保持同一版本。使用纯 Redis 获取不能证明快照绝对新鲜：数据库提交到 generation 更新之间仍有窗口，必须单独定义失效生效边界。
+
+失效入口覆盖：用户角色分配/撤销、角色菜单分配、角色启停/删除/范围变更、菜单权限或路径/父级/状态/可见性变更，以及实际参与数据权限的部门关系变化。数据库成功提交后推进全局 generation；回滚不推进。全局版本避免遍历用户和在线 Token，代价是一次管理变更后所有用户的旧授权快照陆续重建；如实测规模不适合，再细化用户/工厂版本，不预建复杂依赖索引。
+
+新增菜单本身不授予用户权限；给角色绑定且用户持有该有效角色后，下一次成功校验新版本的请求重建并生效。授权变更不要求重新登录。账号禁用、删除、改密仍通过独立会话撤销机制处理，不仅靠授权缓存过期。
+
+数据库与 Redis 双写失败需有可恢复的持久失效记录与重试，并明确失效未完成的管理操作状态；不能仅 afterCommit 执行 INCR、失败后等待 TTL 而宣称变更已全面生效。直接 SQL 修改不经过这些入口，必须执行明确的刷新流程。Redis 丢失 generation 时不能恢复成可能匹配旧快照的默认版本。
+
+前端也需识别服务端授权版本变化并刷新身份/菜单/按钮权限，清理撤权页面及旧请求结果；仅改变后端缓存不会自动刷新已打开的页面。无需以 WebSocket 推送作为首版前提。本轮只核对源码并追加方案，未运行改造后的缓存/并发/性能验证。
+
+当前 ktg-mes 是 UUID 会话标识＋HS512 签名 JWT；JWT 中引用 UUID，Redis 按 UUID 保存会话；JwtAuthenticationTokenFilter 在 getLoginUser 后 verifyToken，临近到期刷新 Redis TTL。当前源代码 refreshToken 已清空 cached.user.roles/roleIds 和 cached.permissions，因此不能以“源项目必须缓存长期权限”证明更换 JWT 的必要性。
+
+结论：Base 复用了 Redis 会话职责和若干 Source 类名，但 Token 格式、存储模型、请求校验及续期语义均已改造，属于认证 REDESIGN，而非纯 COPY/PORT。ADR-006 有另选 opaque Bearer 的历史记录；其中“数据库 SHA-256 hash”的早期描述不能作为当前 Redis 实现的事实。TokenService 的 PORT 注释和空 setLoginUser 兼容方法容易掩盖上述差异。是否恢复源方案或保留当前方案需按用户确定的范围单独处理，本轮没有实施变更。
+
+
+### 2026-10-11：改造前 Security 配置差异
+
+> 当前已改为显式 PUBLIC 方法放行、其余 authenticated；下文 anyRequest().permitAll() 是改造前事实，不能作为现行接入说明。
+
+针对用户提供的 ktg-mes SecurityConfig，重新核对 Base 的 FoundationConfiguration.security：当前入口为 @Bean SecurityFilterChain，禁用 formLogin/CSRF/requestCache，STATELESS；mes.system.enabled=true 时禁用 Basic。SystemTokenFilter 放在 BasicAuthenticationFilter 前恢复身份。
+
+最重要的差异不是配置语法，而是 Base 使用 anyRequest().permitAll()，Spring Security 的请求授权阶段不做 ktg-mes 的默认 authenticated 限制；PUBLIC/AUTHENTICATED/AUTHORIZED 移到 EndpointAccess + MVC FoundationAccessInterceptor，EndpointCatalog 在启动期要求 MVC 方法显式声明。已有 MVC 方法仍做认证/权限校验，不能把 permitAll 等同于所有 API 都能匿名访问；但它不是源项目 filter 层默认需登录的等价迁移，也不能单靠 MVC 检查证明其他 Servlet/filter 入口覆盖。
+
+注销改为 DELETE /api/session 调用 TokenService 删除 Redis 会话，不通过 Spring LogoutFilter；JWT 过滤器已被随机凭证 SystemTokenFilter 替换。此次所搜生产目录未发现源项目 CorsFilter 注册或 EnableMethodSecurity/@PreAuthorize 方法授权装配；源项目公开业务/静态资源名单未原样照搬。旧 Controller 中 PreAuthorize import 不证明原授权机制仍在运行。
+
+源码判断：Base 确实改变了安全职责划分，不仅升级配置写法。若回归来源结构，可由 Spring Security 负责明确公开入口及其余请求 authenticated，MVC/方法授权负责平台角色、当前厂和具体权限；认证协议是否回归 JWT 是独立决定。本轮没有修改实现，也未进行运行验证。

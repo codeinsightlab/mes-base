@@ -2,10 +2,8 @@
  * ${functionNameJavaDoc} CRUD：规则与事务由 Service 负责，Mapper 通过 MyBatis-Spring 注入。
  */
 @org.springframework.stereotype.Service
-#if($scoped)
-@org.springframework.boot.autoconfigure.condition.ConditionalOnProperty(name = "mes.system.enabled", havingValue = "true")
-#else
-@org.springframework.boot.autoconfigure.condition.ConditionalOnProperty(name = "mes.platform.enabled", havingValue = "true")
+#if($conditionalEnabled)
+@org.springframework.boot.autoconfigure.condition.ConditionalOnProperty(name = "${conditionalProperty}", havingValue = "${conditionalValue}")
 #end
 public class ${ClassName}ServiceImpl implements ${servicePackage}.I${ClassName}Service {
     private final ${daoPackage}.${ClassName}Mapper mapper;
@@ -18,8 +16,8 @@ public class ${ClassName}ServiceImpl implements ${servicePackage}.I${ClassName}S
     @org.springframework.transaction.annotation.Transactional(transactionManager = "${transactionManager}", readOnly = true)
     public ${domainPackage}.${ClassName}Page selectPage(${domainPackage}.${ClassName}QueryDto query) {
         int offset = query.offset() == null ? 0 : query.offset();
-        int limit = query.limit() == null ? 20 : query.limit();
-        if (offset < 0 || limit < 1 || limit > 100) {
+        int limit = query.limit() == null ? ${pageDefault} : query.limit();
+        if (offset < 0 || limit < 1 || limit > ${pageMaximum}) {
             throw new dev.mesbase.core.error.FoundationException(dev.mesbase.core.error.ErrorCode.BAD_REQUEST);
         }
         ${domainPackage}.${ClassName}Example example = new ${domainPackage}.${ClassName}Example();
@@ -74,7 +72,7 @@ public class ${ClassName}ServiceImpl implements ${servicePackage}.I${ClassName}S
     @Override
     @org.springframework.transaction.annotation.Transactional(transactionManager = "${transactionManager}", rollbackFor = Exception.class)
     public void deleteByIds(java.util.List<${idType}> ids) {
-        if (ids == null || ids.isEmpty() || ids.size() > 100 || ids.stream().anyMatch(java.util.Objects::isNull)
+        if (ids == null || ids.isEmpty() || ids.size() > ${batchDeleteMaximum} || ids.stream().anyMatch(java.util.Objects::isNull)
                 || new java.util.HashSet<>(ids).size() != ids.size()) {
             throw new dev.mesbase.core.error.FoundationException(dev.mesbase.core.error.ErrorCode.BAD_REQUEST);
         }

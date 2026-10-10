@@ -3,10 +3,8 @@
  */
 @org.springframework.web.bind.annotation.RestController
 @org.springframework.web.bind.annotation.RequestMapping("${route}")
-#if($scoped)
-@org.springframework.boot.autoconfigure.condition.ConditionalOnProperty(name = "mes.system.enabled", havingValue = "true")
-#else
-@org.springframework.boot.autoconfigure.condition.ConditionalOnProperty(name = "mes.platform.enabled", havingValue = "true")
+#if($conditionalEnabled)
+@org.springframework.boot.autoconfigure.condition.ConditionalOnProperty(name = "${conditionalProperty}", havingValue = "${conditionalValue}")
 #end
 public class ${ClassName}Controller {
     private final ${servicePackage}.I${ClassName}Service service;
@@ -18,9 +16,9 @@ public class ${ClassName}Controller {
     @org.springframework.web.bind.annotation.GetMapping
     @dev.mesbase.platform.web.EndpointAccess(value = dev.mesbase.platform.web.EndpointAccess.Kind.AUTHORIZED,
             permission = ${ClassName}Permissions.READ#if(!$scoped), permissionScope = dev.mesbase.platform.web.EndpointAccess.PermissionScope.PLATFORM#end)
-    public ${controllerPackage}.vo.${ClassName}PageVo list(@jakarta.validation.Valid @org.springframework.web.bind.annotation.ModelAttribute ${domainPackage}.${ClassName}QueryDto query) {
+    public ${responsePackage}.${ClassName}PageVo list(@jakarta.validation.Valid @org.springframework.web.bind.annotation.ModelAttribute ${domainPackage}.${ClassName}QueryDto query) {
         ${domainPackage}.${ClassName}Page page = service.selectPage(query);
-        return new ${controllerPackage}.vo.${ClassName}PageVo(
+        return new ${responsePackage}.${ClassName}PageVo(
                 page.items().stream().map(${ClassName}Controller::toView).toList(),
                 page.total(), page.offset(), page.limit());
     }
@@ -28,21 +26,21 @@ public class ${ClassName}Controller {
     @org.springframework.web.bind.annotation.GetMapping("/{id}")
     @dev.mesbase.platform.web.EndpointAccess(value = dev.mesbase.platform.web.EndpointAccess.Kind.AUTHORIZED,
             permission = ${ClassName}Permissions.READ#if(!$scoped), permissionScope = dev.mesbase.platform.web.EndpointAccess.PermissionScope.PLATFORM#end)
-    public ${controllerPackage}.vo.${ClassName}Vo detail(@org.springframework.web.bind.annotation.PathVariable ${idType} id) {
+    public ${responsePackage}.${ClassName}Vo detail(@org.springframework.web.bind.annotation.PathVariable ${idType} id) {
         return toView(service.selectById(id));
     }
 
     @org.springframework.web.bind.annotation.PostMapping
     @dev.mesbase.platform.web.EndpointAccess(value = dev.mesbase.platform.web.EndpointAccess.Kind.AUTHORIZED,
             permission = ${ClassName}Permissions.CREATE#if(!$scoped), permissionScope = dev.mesbase.platform.web.EndpointAccess.PermissionScope.PLATFORM#end)
-    public ${controllerPackage}.vo.${ClassName}Vo create(@jakarta.validation.Valid @org.springframework.web.bind.annotation.RequestBody ${domainPackage}.${ClassName}CreateCommand input) {
+    public ${responsePackage}.${ClassName}Vo create(@jakarta.validation.Valid @org.springframework.web.bind.annotation.RequestBody ${domainPackage}.${ClassName}CreateCommand input) {
         return toView(service.insert(input));
     }
 
     @org.springframework.web.bind.annotation.PutMapping("/{id}")
     @dev.mesbase.platform.web.EndpointAccess(value = dev.mesbase.platform.web.EndpointAccess.Kind.AUTHORIZED,
             permission = ${ClassName}Permissions.UPDATE#if(!$scoped), permissionScope = dev.mesbase.platform.web.EndpointAccess.PermissionScope.PLATFORM#end)
-    public ${controllerPackage}.vo.${ClassName}Vo update(@org.springframework.web.bind.annotation.PathVariable ${idType} id,
+    public ${responsePackage}.${ClassName}Vo update(@org.springframework.web.bind.annotation.PathVariable ${idType} id,
             @jakarta.validation.Valid @org.springframework.web.bind.annotation.RequestBody ${domainPackage}.${ClassName}UpdateCommand input) {
         return toView(service.updateById(id, input));
     }
@@ -52,13 +50,13 @@ public class ${ClassName}Controller {
     @dev.mesbase.platform.web.EndpointAccess(value = dev.mesbase.platform.web.EndpointAccess.Kind.AUTHORIZED,
             permission = ${ClassName}Permissions.DELETE#if(!$scoped), permissionScope = dev.mesbase.platform.web.EndpointAccess.PermissionScope.PLATFORM#end)
     public void delete(@org.springframework.web.bind.annotation.RequestBody
-            @jakarta.validation.constraints.NotEmpty @jakarta.validation.constraints.Size(max = 100)
+            @jakarta.validation.constraints.NotEmpty @jakarta.validation.constraints.Size(max = ${batchDeleteMaximum})
             java.util.List<@jakarta.validation.constraints.NotNull ${idType}> ids) {
         service.deleteByIds(ids);
     }
 
-    private static ${controllerPackage}.vo.${ClassName}Vo toView(${domainPackage}.${ClassName}Entity row) {
-        return new ${controllerPackage}.vo.${ClassName}Vo(
+    private static ${responsePackage}.${ClassName}Vo toView(${domainPackage}.${ClassName}Entity row) {
+        return new ${responsePackage}.${ClassName}Vo(
 #foreach($field in $viewFields)
                 row.${field.getter}()#if($field.stringValue) == null ? null : row.${field.getter}().toString()#end#if($foreach.hasNext),#end
 #end
