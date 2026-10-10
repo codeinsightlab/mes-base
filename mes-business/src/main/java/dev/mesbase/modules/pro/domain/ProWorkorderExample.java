@@ -8,8 +8,6 @@ import java.util.List;
 public class ProWorkorderExample {
     protected String orderByClause;
 
-    protected boolean distinct;
-
     protected List<Criteria> oredCriteria;
 
     public ProWorkorderExample() {
@@ -22,14 +20,6 @@ public class ProWorkorderExample {
 
     public String getOrderByClause() {
         return orderByClause;
-    }
-
-    public void setDistinct(boolean distinct) {
-        this.distinct = distinct;
-    }
-
-    public boolean isDistinct() {
-        return distinct;
     }
 
     public List<Criteria> getOredCriteria() {
@@ -62,7 +52,6 @@ public class ProWorkorderExample {
     public void clear() {
         oredCriteria.clear();
         orderByClause = null;
-        distinct = false;
     }
 
     protected abstract static class GeneratedCriteria {

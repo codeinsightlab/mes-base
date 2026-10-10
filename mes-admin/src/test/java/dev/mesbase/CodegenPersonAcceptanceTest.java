@@ -55,6 +55,12 @@ class CodegenPersonAcceptanceTest {
         assertFalse(mapper.contains("factory"));
         String xml = Files.readString(root.resolve(
                 "backend/mes-business/src/main/resources/dev/mesbase/modules/acceptance/dao/PersonMapper.xml"));
+        assertFalse(xml.contains("distinct"));
+        String example = Files.readString(root.resolve(
+                "backend/mes-business/src/main/java/dev/mesbase/modules/acceptance/domain/PersonExample.java"));
+        assertFalse(example.contains("distinct"));
+        assertFalse(example.contains("setDistinct"));
+        assertFalse(example.contains("isDistinct"));
         assertTrue(xml.contains("from person"));
         assertTrue(xml.contains("insert into person"));
         assertTrue(xml.contains("update person"));

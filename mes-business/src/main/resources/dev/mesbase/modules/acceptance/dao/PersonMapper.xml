@@ -69,9 +69,6 @@
   </sql>
   <select id="selectByExample" parameterType="dev.mesbase.modules.acceptance.domain.PersonExample" resultMap="BaseResultMap">
     select
-    <if test="distinct">
-      distinct
-    </if>
     <include refid="Base_Column_List" />
     from person
     <if test="_parameter != null">

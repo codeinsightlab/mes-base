@@ -201,3 +201,15 @@ Factory/权限/ownership 行为，允许更换实现和分包；拒绝默认库�
 标准 CRUD 权限为 `<承载模块标识>:<完整表名>:read/create/update/delete`。`mes-business` 使用 `business`，`mes-erp` 使用 `erp`，只移除模块名开头的 `mes-`；完整表名不截取下划线前缀、不转换驼峰、不替换为物理数据库名；权限中的 `_` 统一替换为 `:`，例如 `business:pro:workorder:read`。`--module` 继续决定 API/页面目录，不再决定权限前缀。Java 常量、Controller、Vue 页面、菜单声明与菜单 SQL 使用同一生成值。
 
 同时生成中心库 `sys_menu` 目录/页面/四操作的 INSERT SQL，置于承载模块 `docs/generated/<module>/*-menu.sql`，作为可审查产物，不自动迁移或执行，不写角色授权。使用当前 Source Product 菜单列及数据库生成 ID，不硬编码菜单 ID；运行前审查已有目录/页面是否重名，串行重跑不重复插入。
+
+
+## 业务人员 / 部门 / 岗位嵌入组件（2026-10-10）
+
+业务模块需要人员、部门、岗位搜索或选择时，优先复用 mes-base-ui 的
+`src/components/business/directory/PersonnelSelect.vue`、`DepartmentSelect.vue`、`PostSelect.vue`。
+接口统一为 `/api/business/directory/{personnel|departments|posts}` 与 `/{id}`，仅提供 GET 列表和单个查询；禁止在这组能力中增加新增、修改、删除或角色分配。
+复用中心库 sys_user/sys_dept/sys_post 的平台 Mapper，使用 masterTransactionManager 只读事务；不新增表、不复制目录到业务库。
+HTTP 授权使用当前工厂的 business:directory:{personnel|department|post}:read 权限，不能让组件调用平台管理 API 或要求 system 权限。
+中心目录为跨厂共享引用，不表示人员所属工厂；不能把选厂过滤误称为目录行隔离。人员只暴露编号、名称、人员编码和部门编号，禁止返回密码、联系方式、角色等 SysUser 敏感字段。
+组件 ID 使用字符串，切厂/撤权清理已选项与候选数据、拒绝过期响应。平台管理页面保持原有管理能力。
+契约与使用方式见 mes-base 的 docs/development/business-directory.md。

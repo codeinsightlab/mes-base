@@ -500,6 +500,15 @@ class CodegenAcceptanceTest {
         var longText = new TableMetadata(table.catalog(), table.schema(), table.table(), table.comment(),
                 columns, table.indexes(), table.references(), table.identifierQuote(), table.sqlKeywords());
         for (var artifact : new RuoyiTemplateRenderer().render(request(null, false), longText)) {
+            if (artifact.relativePath().endsWith("Mapper.xml")) {
+                assertTrue(artifact.content().contains("selectByExampleWithBLOBs"));
+                assertFalse(artifact.content().contains("distinct"));
+            }
+            if (artifact.relativePath().endsWith("Example.java")) {
+                assertFalse(artifact.content().contains("distinct"));
+                assertFalse(artifact.content().contains("setDistinct"));
+                assertFalse(artifact.content().contains("isDistinct"));
+            }
             if (artifact.target() != CodegenResult.Target.BACKEND) {
                 continue;
             }

@@ -7,8 +7,6 @@ import java.util.List;
 public class PersonExample {
     protected String orderByClause;
 
-    protected boolean distinct;
-
     protected List<Criteria> oredCriteria;
 
     public PersonExample() {
@@ -21,14 +19,6 @@ public class PersonExample {
 
     public String getOrderByClause() {
         return orderByClause;
-    }
-
-    public void setDistinct(boolean distinct) {
-        this.distinct = distinct;
-    }
-
-    public boolean isDistinct() {
-        return distinct;
     }
 
     public List<Criteria> getOredCriteria() {
@@ -61,7 +51,6 @@ public class PersonExample {
     public void clear() {
         oredCriteria.clear();
         orderByClause = null;
-        distinct = false;
     }
 
     protected abstract static class GeneratedCriteria {

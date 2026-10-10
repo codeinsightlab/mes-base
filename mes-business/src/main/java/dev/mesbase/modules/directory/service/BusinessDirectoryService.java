@@ -62,8 +62,9 @@ public class BusinessDirectoryService {
     @Transactional(transactionManager = "masterTransactionManager", readOnly = true)
     public SysUser personnel(Long id) {
         var row = users.selectUserById(id);
-        if (row == null || !"0".equals(row.getDelFlag()) || !"0".equals(row.getStatus()))
+        if (row == null || !"0".equals(row.getDelFlag()) || !"0".equals(row.getStatus())) {
             throw new FoundationException(ErrorCode.NOT_FOUND);
+        }
         return row;
     }
 
@@ -87,7 +88,9 @@ public class BusinessDirectoryService {
 
     private SysPost requirePost(Long id) {
         var row = posts.selectPostById(id);
-        if (row == null || !"0".equals(row.getStatus())) throw new FoundationException(ErrorCode.NOT_FOUND);
+        if (row == null || !"0".equals(row.getStatus())) {
+            throw new FoundationException(ErrorCode.NOT_FOUND);
+        }
         return row;
     }
 
@@ -97,7 +100,7 @@ public class BusinessDirectoryService {
         }
         try {
             var result = PageHelper.<T>offsetPage(query.pageOffset(), query.pageLimit()).setOrderBy(order)
-                    .doSelectPage(() -> select.get());
+                    .<T>doSelectPage(() -> select.get());
             return new DirectoryPage<>(List.copyOf(result), result.getTotal(), query.pageOffset(), query.pageLimit());
         } finally {
             PageHelper.clearPage();

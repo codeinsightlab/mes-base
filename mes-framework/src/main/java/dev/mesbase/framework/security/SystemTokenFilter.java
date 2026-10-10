@@ -16,7 +16,8 @@ import org.springframework.web.filter.OncePerRequestFilter;
 public final class SystemTokenFilter extends OncePerRequestFilter {
     private final TokenService tokens;
 
-    public SystemTokenFilter(TokenService tokens) {
+    public SystemTokenFilter(TokenService tokens)
+    {
         this.tokens = tokens;
     }
 

@@ -97,17 +97,14 @@
     </where>
   </sql>
   <sql id="Base_Column_List">
-    workorder_id, workorder_code, workorder_name, order_source, source_code, product_id, 
-    product_code, product_name, product_spc, unit_of_measure, quantity, quantity_produced, 
-    quantity_changed, quantity_scheduled, client_id, client_code, client_name, batch_code, 
-    request_date, parent_id, ancestors, finish_date, status, remark, attr1, attr2, attr3, 
+    workorder_id, workorder_code, workorder_name, order_source, source_code, product_id,
+    product_code, product_name, product_spc, unit_of_measure, quantity, quantity_produced,
+    quantity_changed, quantity_scheduled, client_id, client_code, client_name, batch_code,
+    request_date, parent_id, ancestors, finish_date, status, remark, attr1, attr2, attr3,
     attr4, create_by, create_time, update_by, update_time, transaction_date, mo_id
   </sql>
   <select id="selectByExample" parameterType="dev.mesbase.modules.pro.domain.ProWorkorderExample" resultMap="BaseResultMap">
     select
-    <if test="distinct">
-      distinct
-    </if>
     <include refid="Base_Column_List" />
     from pro_workorder
     <if test="_parameter != null">
@@ -118,7 +115,7 @@
     </if>
   </select>
   <select id="selectByPrimaryKey" parameterType="Long" resultMap="BaseResultMap">
-    select 
+    select
     <include refid="Base_Column_List" />
     from pro_workorder
     where workorder_id = #{workorderId,jdbcType=BIGINT}
@@ -134,28 +131,28 @@
     </if>
   </delete>
   <insert id="insert" keyColumn="workorder_id" keyProperty="workorderId" parameterType="dev.mesbase.modules.pro.domain.ProWorkorderEntity" useGeneratedKeys="true">
-    insert into pro_workorder (workorder_code, workorder_name, order_source, 
-      source_code, product_id, product_code, 
-      product_name, product_spc, unit_of_measure, 
-      quantity, quantity_produced, quantity_changed, 
-      quantity_scheduled, client_id, client_code, 
-      client_name, batch_code, request_date, 
-      parent_id, ancestors, finish_date, 
-      status, remark, attr1, 
-      attr2, attr3, attr4, 
-      create_by, create_time, update_by, 
+    insert into pro_workorder (workorder_code, workorder_name, order_source,
+      source_code, product_id, product_code,
+      product_name, product_spc, unit_of_measure,
+      quantity, quantity_produced, quantity_changed,
+      quantity_scheduled, client_id, client_code,
+      client_name, batch_code, request_date,
+      parent_id, ancestors, finish_date,
+      status, remark, attr1,
+      attr2, attr3, attr4,
+      create_by, create_time, update_by,
       update_time, transaction_date, mo_id
       )
-    values (#{workorderCode,jdbcType=VARCHAR}, #{workorderName,jdbcType=VARCHAR}, #{orderSource,jdbcType=VARCHAR}, 
-      #{sourceCode,jdbcType=VARCHAR}, #{productId,jdbcType=BIGINT}, #{productCode,jdbcType=VARCHAR}, 
-      #{productName,jdbcType=VARCHAR}, #{productSpc,jdbcType=VARCHAR}, #{unitOfMeasure,jdbcType=VARCHAR}, 
-      #{quantity,jdbcType=DOUBLE}, #{quantityProduced,jdbcType=DOUBLE}, #{quantityChanged,jdbcType=DOUBLE}, 
-      #{quantityScheduled,jdbcType=DOUBLE}, #{clientId,jdbcType=BIGINT}, #{clientCode,jdbcType=VARCHAR}, 
-      #{clientName,jdbcType=VARCHAR}, #{batchCode,jdbcType=VARCHAR}, #{requestDate,jdbcType=TIMESTAMP}, 
-      #{parentId,jdbcType=BIGINT}, #{ancestors,jdbcType=VARCHAR}, #{finishDate,jdbcType=TIMESTAMP}, 
-      #{status,jdbcType=VARCHAR}, #{remark,jdbcType=VARCHAR}, #{attr1,jdbcType=VARCHAR}, 
-      #{attr2,jdbcType=VARCHAR}, #{attr3,jdbcType=INTEGER}, #{attr4,jdbcType=INTEGER}, 
-      #{createBy,jdbcType=VARCHAR}, #{createTime,jdbcType=TIMESTAMP}, #{updateBy,jdbcType=VARCHAR}, 
+    values (#{workorderCode,jdbcType=VARCHAR}, #{workorderName,jdbcType=VARCHAR}, #{orderSource,jdbcType=VARCHAR},
+      #{sourceCode,jdbcType=VARCHAR}, #{productId,jdbcType=BIGINT}, #{productCode,jdbcType=VARCHAR},
+      #{productName,jdbcType=VARCHAR}, #{productSpc,jdbcType=VARCHAR}, #{unitOfMeasure,jdbcType=VARCHAR},
+      #{quantity,jdbcType=DOUBLE}, #{quantityProduced,jdbcType=DOUBLE}, #{quantityChanged,jdbcType=DOUBLE},
+      #{quantityScheduled,jdbcType=DOUBLE}, #{clientId,jdbcType=BIGINT}, #{clientCode,jdbcType=VARCHAR},
+      #{clientName,jdbcType=VARCHAR}, #{batchCode,jdbcType=VARCHAR}, #{requestDate,jdbcType=TIMESTAMP},
+      #{parentId,jdbcType=BIGINT}, #{ancestors,jdbcType=VARCHAR}, #{finishDate,jdbcType=TIMESTAMP},
+      #{status,jdbcType=VARCHAR}, #{remark,jdbcType=VARCHAR}, #{attr1,jdbcType=VARCHAR},
+      #{attr2,jdbcType=VARCHAR}, #{attr3,jdbcType=INTEGER}, #{attr4,jdbcType=INTEGER},
+      #{createBy,jdbcType=VARCHAR}, #{createTime,jdbcType=TIMESTAMP}, #{updateBy,jdbcType=VARCHAR},
       #{updateTime,jdbcType=TIMESTAMP}, #{transactionDate,jdbcType=TIMESTAMP}, #{moId,jdbcType=VARCHAR}
       )
   </insert>

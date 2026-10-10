@@ -230,3 +230,12 @@ CrudPage 区分无读取权限与空结果：没有 read 时显示“当前范�
 浏览器 admin 的当前工厂 DEV 上未取得本页读取权限，旧视图“暂无记录”已替换为明确权限提示。用户确认业务权限分配在平台角色；后端工厂权限查询明确要求 FACTORY + 当前 factory_id，不补充 PLATFORM 权限。角色分配页允许勾选这些业务菜单与实际生效规则不一致。是否扩展平台角色业务授权或限制跨范围分配，等待用户选择，不自动扩展授权边界。
 
 本轮验证：改动 Java 经 IDEA formatter；mvn -B -ntp verify 为 BUILD SUCCESS，packaged smoke 10 项通过；新增旧权限迁移/菜单 ID 保持测试后，CodegenAcceptanceTest 定向测试再次通过。前端 21 文件/109 项通过，build、定向 ESLint 与两仓库 diff --check 通过。最终 20 个生成文件 SHA256 与清单一致。无读取权限截图在 UI docs/acceptance/ui-industrial-upgrade/workorder-permission-denied.png。未重启用户服务，未宣称真实工单 CRUD 验收通过。
+
+
+### 2026-10-10 基础单表不生成 DISTINCT
+
+按用户约定，基础生成代码不提供 DISTINCT 查询开关。MBG 插件在 Java/XML DOM 生成阶段移除 Example 的 distinct 字段、setDistinct/isDistinct 与 clear 中的复位语句，同时移除普通及 BLOB 列表查询的 `<if test="distinct">`。不改物理表、条件、排序或分页；特殊业务去重由对应业务查询明确实现。
+
+同步移除 person/pro_workorder 的既有生成残留；工单 XML 中用户已删除的 DISTINCT 及其他排版修改保留，不执行整套覆盖再生成。定向测试通过真实 MBG 渲染检查普通及长文本生成产物，并编译生成的 Java；普通查询继续由既有 Mapper 执行测试验收。
+
+验证：5 个改动 Java 文件经 IDEA 原生格式化；生成定向测试 13 项通过，`mvn -B -ntp verify` BUILD SUCCESS，packaged smoke 10 passed / 0 failed，`git diff --check` 通过。本轮未执行数据库写入或重启用户服务。
