@@ -315,3 +315,17 @@ mvn -B -ntp -pl mes-admin -am test \
 用户重新决定清除历史中的测试密码和主密钥，本节更新此前“未重写历史”的状态。已从本地历史及 Codex 差异快照移除两个私有 profile 的历史版本；GitHub main 经 force-with-lease 更新并通过 API 核验，最终为 `43e6532`。本地 main 为 `261b0af`，保留原本地20/远端18个提交，本地额外2个提交和暂存改动未推送。两个本地 profile 的内容保持，暂存条目保持；没有轮换凭据、修改业务源码或重启服务。本文仅追加记录，未重新暂存。
 
 核验扫描全部本地 Git blob（包括不可达对象）：1,294 个对象，5 个实际历史凭据值均无命中；私有文件路径在历史及各引用树中不存在。旧 reflog/不可达对象已清理，临时镜像和敏感替换规则已删除。中途 YAML 匹配曾误识别密码策略块，最终按单行标量规则重新清理并修正远端；最新树相对原版仅删除两个私有 profile，密码策略保持。收据位于 `target/validation/git-history-credential-cleanup.json`。GitHub 不可达缓存及其他人的克隆未核实，不宣称全平台物理擦除。
+
+
+### 5.7 2026-10-09 基础建设阶段判断与业务准入
+
+本次为数据源/事务链路静态复查及阶段建议，不改业务代码，不运行服务或真实数据库测试，不代替全产品验收。建议停止无边界的基础扩建，冻结中心库 + Factory 独立业务库的架构，开始一个业务试点；真实双厂验收完成前，不宣称基础层已生产验收。
+
+- 真实验收缺口：前轮默认测试中四个真实 MySQL opt-in 用例跳过。首个业务试点须覆盖双厂同号数据隔离、Scope/权限负例、回滚、事务内切厂拒绝、双向跨库事务拒绝、连接失效、切厂后 UI 旧响应不回填。Fixture/CI 不能代替真实证据。
+- 业务 Schema 升级：中心库有 Flyway 入口；ManagedDatasourceService.resolve 未检查业务 Schema 版本，连接 revision 不等于表结构版本。随首批业务表提供版本化 DDL、逐厂执行记录及版本不匹配处理，不先建设通用迁移平台。
+- 中心库热路径：PersistenceStatementGuard → FactoryBusinessDataSource.verify → ManagedDatasourceService.resolve；resolver 每次读取中心库工厂和数据源记录，开销随业务 SQL 数量增长，中心库故障会阻断校验。属于源码事实，无压测结论；按试点实测定向优化，保留授权/版本失效保证，不直接引入无失效策略的长期缓存。
+- 跨厂阻塞：resolve 是整个 Service 的 synchronized 方法，锁内包含建池及真实连接探测，某厂首次加载慢时可能阻塞其他厂 resolver 和同锁的列表/详情。属可定位性能瑕疵，未压测；多厂并发试点前定向处理。RuntimeRegistry 亦在同步区关闭池，生命周期调整需一起审查。
+- 密钥运维：cipher 使用单一环境密钥，未见 key-id 多版本轮换协议。正式上线前明确备份、恢复及密文迁移操作；历史清理不等于密钥轮换。
+- 生成器/UI 对齐随业务接入完成；旧功能优先 Source Product COPY/PORT，新增标准 CRUD 再使用生成器。格式/FQN 存量和文档漂移随触及处理，不作为无限扩建 Base 的理由。
+
+先选依赖少的现有基础资料业务，交付 Schema → Service/Mapper → 权限/Factory → API → 当前 CrudPage → 双厂真实验收闭环，再扩展工单和复杂流程。本建议不提前恢复生产分析、共享业务库或外部数据库框架。证据：PersistenceConfiguration、ManagedDatasourceService.resolve、FactoryBusinessDataSource.verify、PersistenceStatementGuard、RuntimeRegistry、DatasourcePasswordCipher。
