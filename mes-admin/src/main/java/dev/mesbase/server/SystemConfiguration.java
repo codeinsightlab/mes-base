@@ -2,6 +2,9 @@ package dev.mesbase.server;
 
 import dev.mesbase.common.core.domain.model.LoginUser;
 import dev.mesbase.core.factory.FactoryCatalog;
+import dev.mesbase.core.factory.FactoryPreference;
+import dev.mesbase.infrastructure.catalog.DatabaseFactoryPreference;
+import dev.mesbase.system.factory.MfUserPreferenceMapper;
 import dev.mesbase.core.security.AuthorizationService;
 import dev.mesbase.framework.security.SystemTokenFilter;
 import dev.mesbase.framework.sync.SyncCoordinator;
@@ -38,6 +41,11 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 @Configuration
 @ConditionalOnProperty(name = "mes.system.enabled", havingValue = "true")
 public class SystemConfiguration {
+
+    @Bean
+    FactoryPreference persistentFactoryPreference(MfUserPreferenceMapper preferences) {
+        return new DatabaseFactoryPreference(preferences);
+    }
 
     @Bean
     SystemTokenFilter systemTokens(TokenService t) {

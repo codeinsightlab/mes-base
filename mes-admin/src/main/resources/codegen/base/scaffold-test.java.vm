@@ -1,0 +1,25 @@
+/** TEST ONLY: scaffold contracts; add real business and database acceptance. */
+public class ${ClassName}ScaffoldTest {
+    @org.junit.jupiter.api.Test
+    void contractsStayScoped() {
+        org.junit.jupiter.api.Assertions.assertEquals(
+                dev.mesbase.infrastructure.persistence.PersistenceOwner.Kind.${ownership},
+                dev.mesbase.infrastructure.persistence.MapperPackages.owner(${daoPackage}.${ClassName}Mapper.class));
+        for (java.lang.reflect.Method method : ${controllerPackage}.${ClassName}Controller.class.getDeclaredMethods()) {
+            if (!java.lang.reflect.Modifier.isPublic(method.getModifiers())) {
+                continue;
+            }
+            dev.mesbase.platform.web.EndpointAccess access = method.getAnnotation(dev.mesbase.platform.web.EndpointAccess.class);
+            org.junit.jupiter.api.Assertions.assertNotNull(access);
+            org.junit.jupiter.api.Assertions.assertEquals(dev.mesbase.platform.web.EndpointAccess.Kind.AUTHORIZED, access.value());
+        }
+        for (java.lang.reflect.Method method : ${servicePackage}.impl.${ClassName}ServiceImpl.class.getDeclaredMethods()) {
+            if (!java.lang.reflect.Modifier.isPublic(method.getModifiers())) {
+                continue;
+            }
+            org.springframework.transaction.annotation.Transactional transaction = method.getAnnotation(org.springframework.transaction.annotation.Transactional.class);
+            org.junit.jupiter.api.Assertions.assertNotNull(transaction);
+            org.junit.jupiter.api.Assertions.assertEquals("${transactionManager}", transaction.transactionManager());
+        }
+    }
+}

@@ -1,0 +1,11 @@
+/**
+ * ${functionNameJavaDoc}分页查询条件。
+ */
+public record ${ClassName}QueryDto(
+        @jakarta.validation.constraints.Min(0) Integer offset,
+        @jakarta.validation.constraints.Min(1) @jakarta.validation.constraints.Max(100) Integer limit#if(!$queryFields.isEmpty()),#end
+#foreach($field in $queryFields)
+        ${field.queryValidation}${field.type} ${field.name}#if($foreach.hasNext),#end
+#end
+) {
+}

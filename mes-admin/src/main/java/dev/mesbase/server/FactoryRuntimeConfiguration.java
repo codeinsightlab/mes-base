@@ -54,6 +54,10 @@ public class FactoryRuntimeConfiguration {
                 return service.find(id);
             }
 
+            public Optional<Factory> defaultFactory() {
+                return service.defaultFactory();
+            }
+
             public List<Factory> enabled(int offset, int limit) {
                 return service.enabled(offset, limit);
             }

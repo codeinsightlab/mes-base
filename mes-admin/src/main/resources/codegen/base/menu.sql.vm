@@ -1,0 +1,32 @@
+-- MES-CODEGEN: run in the center database after review; no role grants.
+-- Directory path follows --module; permission prefix follows --backend-module.
+#if($legacyPermission != $permission)
+-- Rename this table's previous permissions while preserving menu IDs and role bindings.
+#foreach($action in $menuActions)
+UPDATE sys_menu SET perms = '${permission}:${action.code}'
+WHERE perms = '${legacyPermission}:${action.code}';
+#end
+
+#end
+INSERT INTO sys_menu (menu_name, parent_id, order_num, path, menu_type, icon, create_by, create_time)
+SELECT '${menuDirectorySql}', 0, 0, '${moduleName}', 'M', 'list', 'codegen', CURRENT_TIMESTAMP
+WHERE NOT EXISTS (
+    SELECT 1 FROM sys_menu WHERE parent_id = 0 AND path = '${moduleName}' AND menu_type = 'M'
+);
+
+INSERT INTO sys_menu (menu_name, parent_id, order_num, path, component, menu_type, perms, icon, create_by, create_time)
+SELECT '${menuNameSql}', directory.menu_id, 0, '${className}', '${moduleName}/${className}/index',
+       'C', '${permission}:read', 'list', 'codegen', CURRENT_TIMESTAMP
+FROM sys_menu directory
+WHERE directory.parent_id = 0 AND directory.path = '${moduleName}' AND directory.menu_type = 'M'
+  AND NOT EXISTS (SELECT 1 FROM sys_menu WHERE perms = '${permission}:read' AND menu_type = 'C');
+
+#foreach($action in $menuActions)
+INSERT INTO sys_menu (menu_name, parent_id, order_num, path, menu_type, perms, create_by, create_time)
+SELECT '${menuNameSql}${action.label}', page.menu_id, ${foreach.index}, '#', 'F', '${permission}:${action.code}',
+       'codegen', CURRENT_TIMESTAMP
+FROM sys_menu page
+WHERE page.perms = '${permission}:read' AND page.menu_type = 'C'
+  AND NOT EXISTS (SELECT 1 FROM sys_menu WHERE perms = '${permission}:${action.code}' AND menu_type = 'F');
+
+#end

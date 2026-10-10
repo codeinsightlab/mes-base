@@ -329,3 +329,9 @@ mvn -B -ntp -pl mes-admin -am test \
 - 生成器/UI 对齐随业务接入完成；旧功能优先 Source Product COPY/PORT，新增标准 CRUD 再使用生成器。格式/FQN 存量和文档漂移随触及处理，不作为无限扩建 Base 的理由。
 
 先选依赖少的现有基础资料业务，交付 Schema → Service/Mapper → 权限/Factory → API → 当前 CrudPage → 双厂真实验收闭环，再扩展工单和复杂流程。本建议不提前恢复生产分析、共享业务库或外部数据库框架。证据：PersistenceConfiguration、ManagedDatasourceService.resolve、FactoryBusinessDataSource.verify、PersistenceStatementGuard、RuntimeRegistry、DatasourcePasswordCipher。
+
+### 2026-10-10 用户决定移除本地钩子与后端 GitHub 工作流
+
+按用户要求删除后端 .githooks、.github，以及不再使用的 scripts/install-git-hooks、scripts/java-git-hook.py；清除本仓库 core.hooksPath。AGENTS、README 和 Java code style 文档删除安装/自动检查要求。历史整改记录保留为当时证据，不再代表现行自动门禁。IDEA formatter、手动测试与独立 check-private-config.py 检查工具保留。
+
+验证：core.hooksPath 无配置，默认 .git/hooks 仅有 .sample 文件，无活动提交/推送钩子；当前规则与开发文档无失效脚本引用，git diff --check 通过。未修改业务代码，未操作暂存区，未提交或推送；远端已存在的工作流需本轮删除提交推送后才移除。

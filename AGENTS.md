@@ -17,7 +17,7 @@ Spring/ThreadLocal/具体基础设施，也不依赖 SysUser/SysRole 持久化 E
 ## 3. FactoryScope
 
 Scope 只含 FactoryId；不等于 Permission、DataSource 或 ERP Connection。无 UserFactory 准入：有效空角色账号可登录、选择启用
-Factory 和访问 AUTHENTICATED；AUTHORIZED 缺权限拒绝。偏好只是 UX，不能选首厂或魔法 0/1。PLATFORM 角色显式 kind、无
+Factory 和访问 AUTHENTICATED；AUTHORIZED 缺权限拒绝。偏好只是 UX，不授予权限。显式选厂优先，其次恢复有效偏好；无有效偏好时，仅从启用工厂且绑定启用业务库的候选中自动选择：一个选它，多个选工厂 ID 最小者。纯数字 ID 按数值比较，其他 ID 按字符串排序，数字 ID 优先；同数值以原 ID 排序作稳定裁决。零候选保持空 Scope，不使用魔法 0/1 或回退中心库。PLATFORM 角色显式 kind、无
 factoryId；FACTORY 角色必须所属厂。权限按每次请求当前厂读取，不进长寿命 Token/跨厂缓存。
 
 ## 4. Controller / Service / Mapper
@@ -149,6 +149,14 @@ COPY / PORT，必要时局部重构；REDESIGN / DROP 必须有具体证据。�
 新增开发功能先检查适用 Skill；迁移工作不调用 Codegen Skill。Skill 调用底层工具而不重实现工具，完成后仍需项目测试/业务审查，不能跳过架构约束。开发期仓库
 Skill 入口：`.agents/skills/mes-crud-codegen/SKILL.md`；配置/CLI 详见 docs/development/codegen.md。
 
+### 14.1 基础生成范围与目标位置（2026-10-10 用户约定）
+
+mes-codegen 只生成基础单表持久化与后台 CRUD。持久化复用 MyBatis Generator 的 MyBatis3 / XMLMAPPER：Entity、Example/Criteria、Mapper + XML；Service/Controller 必须同步调用该真实生成接口，分页复用 PageHelper，不新增注解 SQL、锁查询、业务状态规则或无必要的 ExtraMapper。
+
+默认承载 Maven 模块为 `mes-business`。`--output` 指定后端仓库根，`--backend-module` 指定根下目标模块（默认 mes-business），`--package` 指定 Java 包；`--module` 是页面/API功能模块，不等于 Maven 模块；未指定时取表名首个 `_` 前的部分，没有 `_` 时使用 `business`，显式指定优先。默认 scope 为 FACTORY_SCOPED，默认包 `dev.mesbase.modules.<module>`；GLOBAL 显式选择并使用 `dev.mesbase.platform.<module>`。可生成到其他承载模块用于后续拆包，但必须保持第 9.1 节的固定包与 SessionFactory 归属；新 Maven 模块的创建、依赖接入另行显式处理，不随任意生成命令自动改变 reactor 或数据库拓扑。
+
+业务隔离依赖按当前 Factory 路由的独立业务库。基础生成器不要求表含 factory_id，不注入 Factory 字段、Mapper/Service Factory 参数或 SQL Factory 谓词；若真实表本来有该字段，按普通 Schema 字段处理。缺 Scope 拒绝、连接/版本与事务内切厂保护继续由既有基础设施负责。范围选项只决定包归属、事务管理器及 HTTP 权限范围，不构造表内租户业务。Example 仅供服务端使用，不直接绑定 HTTP 请求中的 SQL 条件/排序字符串；业务开发负责批量写入条件和业务约束。
+
 ## 15. UI Base
 
 复用 mes-base-ui 的统一 Shell/CrudPage/request/dict/permission，不为每页创造视觉体系。代码生成页只是 Functional
@@ -172,7 +180,6 @@ git diff --check
 
 The formatter script formats only the Java files passed to it; do not reformat unrelated Java files in a task. A task must not be reported complete if formatting, tests, or `git diff --check` fails.
 
-Install repository Git hooks once with `./scripts/install-git-hooks`. The pre-commit hook formats only staged Java files and re-stages them; the pre-push hook checks formatting without modifying files. Hooks are local safeguards and do not replace a remote CI/protected-branch check.
 
 ## 16. clean-room / Source Product
 
@@ -180,3 +187,9 @@ clean-room 不等于禁止复用旧项目。通用源码、有效配置键、Sch
 REVIEW。不得带入公司身份、客户/生产数据、Secret、内部账号、真实连接值、客户专用规则或不应复用的公司资产；混合实现先抽离专有部分，不整块舍弃功能。保留
 Factory/权限/ownership 行为，允许更换实现和分包；拒绝默认库兜底、HTTP200错误、任意反射 Job。AGENTS 定规则、Skill
 定开发工作流、工具执行，不能用架构或工具反过来定义迁移产品。
+
+### 14.2 生成权限与菜单 SQL（2026-10-10 用户要求）
+
+标准 CRUD 权限为 `<承载模块标识>:<完整表名>:read/create/update/delete`。`mes-business` 使用 `business`，`mes-erp` 使用 `erp`，只移除模块名开头的 `mes-`；完整表名不截取下划线前缀、不转换驼峰、不替换为物理数据库名；权限中的 `_` 统一替换为 `:`，例如 `business:pro:workorder:read`。`--module` 继续决定 API/页面目录，不再决定权限前缀。Java 常量、Controller、Vue 页面、菜单声明与菜单 SQL 使用同一生成值。
+
+同时生成中心库 `sys_menu` 目录/页面/四操作的 INSERT SQL，置于承载模块 `docs/generated/<module>/*-menu.sql`，作为可审查产物，不自动迁移或执行，不写角色授权。使用当前 Source Product 菜单列及数据库生成 ID，不硬编码菜单 ID；运行前审查已有目录/页面是否重名，串行重跑不重复插入。

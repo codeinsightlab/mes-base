@@ -1,0 +1,12 @@
+{
+  "_generatedBy": "MES-CODEGEN",
+  "id": "${moduleName}:${className}",
+  "name": "${functionName}",
+  "path": "/${moduleName}/${className}",
+  "component": "${moduleName}/${className}/index",
+  "permission": "${permission}:read",
+  "permissionScope": "${permissionScope}",
+  "kind": "MENU",
+  "icon": "List",
+  "children": []
+}

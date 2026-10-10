@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="dev.mesbase.system.factory.MfUserPreferenceMapper">
+    <resultMap id="Preference" type="dev.mesbase.system.factory.MfUserPreference">
+        <constructor>
+            <idArg column="user_id" javaType="java.lang.Long"/>
+            <arg column="last_factory_id" javaType="java.lang.String"/>
+        </constructor>
+    </resultMap>
+    <select id="selectById" resultMap="Preference">
+        SELECT user_id, last_factory_id FROM mf_user_preference WHERE user_id = #{userId}
+    </select>
+    <insert id="save">
+        INSERT INTO mf_user_preference(user_id, last_factory_id) VALUES(#{userId}, #{lastFactoryId})
+        ON DUPLICATE KEY UPDATE last_factory_id = #{lastFactoryId}
+    </insert>
+</mapper>

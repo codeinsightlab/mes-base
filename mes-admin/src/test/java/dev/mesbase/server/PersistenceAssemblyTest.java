@@ -11,6 +11,7 @@ import dev.mesbase.infrastructure.persistence.DatasourceIdentity;
 import dev.mesbase.infrastructure.persistence.FactoryBusinessDataSource;
 import dev.mesbase.infrastructure.persistence.OwnedTransactionManager;
 import dev.mesbase.infrastructure.persistence.OwnerMapperCatalog;
+import dev.mesbase.modules.acceptance.dao.PersonMapper;
 import dev.mesbase.infrastructure.persistence.PersistenceFactories;
 import dev.mesbase.infrastructure.persistence.PersistenceOwner;
 import dev.mesbase.infrastructure.persistence.RuntimeRegistry;
@@ -132,7 +133,13 @@ class PersistenceAssemblyTest {
             var stats = context.getBean(DruidController.class).stats();
             assertEquals("platform", ((DruidController.Pool) stats.get(AjaxResult.DATA_TAG)).name());
             assertTrue(context.containsBean("sysUserMapper"));
-            assertTrue(context.getBean(OwnerMapperCatalog.class).types(PersistenceOwner.Kind.BUSINESS).isEmpty());
+            assertTrue(context.containsBean("personMapper"));
+            assertTrue(context.getBean("businessSqlSessionFactory", SqlSessionFactory.class)
+                    .getConfiguration().hasMapper(PersonMapper.class));
+            assertTrue(!context.getBean("masterSqlSessionFactory", SqlSessionFactory.class)
+                    .getConfiguration().hasMapper(PersonMapper.class));
+            assertTrue(context.getBean(OwnerMapperCatalog.class).types(PersistenceOwner.Kind.BUSINESS)
+                    .contains(PersonMapper.class));
             assertTrue(context.containsBean("masterTransactionManager"));
             assertTrue(context.containsBean("businessTransactionManager"));
         }
@@ -149,6 +156,6 @@ class PersistenceAssemblyTest {
         new OwnerMapperRegistration(new MockEnvironment()).postProcessBeanDefinitionRegistry(registry);
         var catalog = registry.getBean(OwnerMapperCatalog.class);
         assertTrue(catalog.types(PersistenceOwner.Kind.PLATFORM).size() > 20);
-        assertTrue(catalog.types(PersistenceOwner.Kind.BUSINESS).isEmpty());
+        assertTrue(catalog.types(PersistenceOwner.Kind.BUSINESS).contains(PersonMapper.class));
     }
 }

@@ -1,0 +1,9 @@
+/**
+ * ${functionNameJavaDoc}写入参数，字段来自已审查的表结构。
+ */
+public record ${commandName}(
+#foreach($field in $commandFields)
+        ${field.validation}${field.type} ${field.name}#if($foreach.hasNext),#end
+#end
+) {
+}

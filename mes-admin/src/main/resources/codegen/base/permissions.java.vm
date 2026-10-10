@@ -1,0 +1,9 @@
+public final class ${ClassName}Permissions {
+    public static final String READ = "${permission}:read";
+    public static final String CREATE = "${permission}:create";
+    public static final String UPDATE = "${permission}:update";
+    public static final String DELETE = "${permission}:delete";
+
+    private ${ClassName}Permissions() {
+    }
+}

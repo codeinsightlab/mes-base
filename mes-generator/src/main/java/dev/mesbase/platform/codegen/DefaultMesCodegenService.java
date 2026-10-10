@@ -5,6 +5,8 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
+import java.util.function.UnaryOperator;
+import dev.mesbase.platform.codegen.ScaffoldWriter.Artifact;
 
 import static dev.mesbase.platform.codegen.CodegenException.Code.INVALID_REQUEST;
 import static dev.mesbase.platform.codegen.CodegenException.Code.UNSUPPORTED_SCHEMA;
@@ -17,9 +19,15 @@ public final class DefaultMesCodegenService implements MesCodegenService {
     private final JdbcMetadataReader metadata;
     private final RuoyiTemplateRenderer renderer;
     private final ScaffoldWriter writer;
+    private final UnaryOperator<List<Artifact>> javaFormatter;
 
     public DefaultMesCodegenService(CodegenProfiles profiles) {
+        this(profiles, UnaryOperator.identity());
+    }
+
+    DefaultMesCodegenService(CodegenProfiles profiles, UnaryOperator<List<Artifact>> javaFormatter) {
         this.profiles = profiles;
+        this.javaFormatter = javaFormatter;
         metadata = new JdbcMetadataReader();
         renderer = new RuoyiTemplateRenderer();
         writer = new ScaffoldWriter();
@@ -31,34 +39,32 @@ public final class DefaultMesCodegenService implements MesCodegenService {
         JdbcMetadataReader.identifier(request.tableName());
         JdbcMetadataReader.identifier(request.moduleName());
         if (!request.moduleName().matches("[a-z][a-z0-9_]{0,62}")) throw new CodegenException(INVALID_REQUEST);
-        if (request.packageName() == null || !request.packageName().matches("dev\\.mesbase\\.(modules|platform)\\.[a-z][a-z0-9]*(\\.[a-z][a-z0-9]*)*") || request.businessName() == null || request.businessName().isBlank() || request.businessName().length() > 100 || request.author() == null || request.author().length() > 100)
+        if (request.packageName() == null || !request.packageName()
+                .matches("dev\\.mesbase\\.(modules|platform)\\.[a-z][a-z0-9]*(\\.[a-z][a-z0-9]*)*") || request.businessName() == null || request.businessName()
+                .isBlank() || request.businessName().length() > 100 || request.author() == null || request.author()
+                .length() > 100)
             throw new CodegenException(INVALID_REQUEST);
         ScaffoldWriter.checkRoot(request.backendRoot());
+        ScaffoldWriter.checkRoot(request.targetBackendRoot());
         ScaffoldWriter.checkRoot(request.frontendRoot());
         String datasource = profiles.name(request.datasource());
         var table = metadata.read(profiles.datasource(datasource), request.schema(), request.tableName());
         var pk = table.columns().stream().filter(TableMetadata.Column::primaryKey).toList();
-        if (pk.size() != 1 || !Set.of("Long", "Integer", "String").contains(pk.getFirst().javaType()) || !table.references().isEmpty())
+        if (pk.size() != 1 || !Set.of("Long", "Integer", "String")
+                .contains(pk.getFirst().javaType()) || !table.references().isEmpty())
             throw new CodegenException(UNSUPPORTED_SCHEMA);
         Set<String> fields = new HashSet<>();
         for (var c : table.columns()) {
             if (!fields.add(c.javaField())) throw new CodegenException(UNSUPPORTED_SCHEMA);
             if (c.name().toLowerCase(Locale.ROOT).matches(".*(password|secret|token|credential|private_key).*"))
                 throw new CodegenException(UNSUPPORTED_SCHEMA);
-            if (c.name().toLowerCase(Locale.ROOT).endsWith("_id") && !c.primaryKey() && !c.name().equalsIgnoreCase("factory_id"))
-                throw new CodegenException(UNSUPPORTED_SCHEMA);
-            if (Set.of("user_id", "user_name", "file_id", "external_id", "owner_id", "password", "password_hash", "secret", "access_token", "created_by", "updated_by").contains(c.name().toLowerCase(Locale.ROOT)))
+            if (Set.of("user_id", "user_name", "file_id", "external_id", "owner_id", "password", "password_hash", "secret", "access_token", "created_by", "updated_by")
+                    .contains(c.name().toLowerCase(Locale.ROOT)))
                 throw new CodegenException(UNSUPPORTED_SCHEMA);
         }
-        var factory = table.columns().stream().filter(c -> c.name().equalsIgnoreCase("factory_id")).findFirst();
-        if (request.scope() == CodegenRequest.ScopeKind.FACTORY_SCOPED) {
-            if (factory.isEmpty() || !factory.get().javaType().equals("String") || factory.get().nullable() || factory.get().size() > 64 || factory.get().primaryKey())
-                throw new CodegenException(UNSUPPORTED_SCHEMA);
-            for (var idx : table.indexes()) {
-                if (idx.unique() && !idx.columns().equals(List.of(pk.getFirst().name())) && idx.columns().stream().noneMatch(x -> x.equalsIgnoreCase("factory_id")))
-                    throw new CodegenException(UNSUPPORTED_SCHEMA);
-            }
-        } else if (factory.isPresent()) throw new CodegenException(UNSUPPORTED_SCHEMA);
+        if (table.columns().stream().noneMatch(column -> !column.primaryKey())) {
+            throw new CodegenException(UNSUPPORTED_SCHEMA);
+        }
         String packageRoot = request.scope() == CodegenRequest.ScopeKind.FACTORY_SCOPED ? "dev.mesbase.modules." : "dev.mesbase.platform.";
         if (!request.packageName().startsWith(packageRoot)) throw new CodegenException(INVALID_REQUEST);
         List<String> warnings = new ArrayList<>();
@@ -66,7 +72,7 @@ public final class DefaultMesCodegenService implements MesCodegenService {
         if (table.columns().stream().anyMatch(c -> c.name().toLowerCase(Locale.ROOT).endsWith("status")))
             warnings.add("Status semantics are not inferred from numeric values; define a reviewed enum/dictionary before delivery.");
         warnings.add("Frontend permission state comes from server navigation; long IDs/decimals are transported as strings. No import/export/cache/aggregation generated.");
-        var files = writer.write(renderer.render(request, table), request);
+        var files = writer.write(javaFormatter.apply(renderer.render(request, table)), request);
         return new CodegenResult(request.dryRun() ? CodegenResult.Status.DRY_RUN : CodegenResult.Status.GENERATED, datasource, table.table(), table, files, List.copyOf(warnings));
     }
 }

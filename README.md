@@ -6,7 +6,6 @@ Java21 / Spring Boot4.1.1 的模块化单体，正在将 Source Product 能力 C
 
 2026-10-09：先完成 Base 基础；业务接入阶段再统一生成器与现有 UI/分页契约。生成器及 `CrudPage` 暂作为待改造资产，不是当前生产页面的标准。复核结论、已整改项和待用户审查项见 [架构评审行动复核](docs/reviews/2026-10-09-architecture-review-actions.md#五2026-10-09-复核与整改当前有效)。
 
-两个仓库新增 CI 配置，后端 verify/隔离打包 smoke，前端 test/build；远端 CI 尚未运行。本地 Git 防护按 `./scripts/install-git-hooks` 安装：禁止跟踪私有 profile/提交配置中的非空凭据字面量，使用 IDEA 格式化 Java，部分暂存 Java 明确拒绝自动重暂存。配置检查不证明历史凭据已处置。
 
 ## 当前入口
 

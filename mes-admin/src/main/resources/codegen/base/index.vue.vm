@@ -1,12 +1,33 @@
-<!-- MES-CODEGEN: functional scaffold; shared Base UI and explicit field contract. -->
+<!-- MES-CODEGEN: Base Design System; shared CRUD interactions and explicit field contract. -->
 <script setup lang="ts">
 import CrudPage from '@/components/CrudPage.vue'
 import { api } from '@/api/${moduleName}/${className}'
 import type { Field } from '@/lib/crud'
+
 const fields: Field[] = [
 #foreach($field in $fields)
-  { key: '${field.name}', label: '${field.label}', kind: '${field.kind}', readonly: ${field.readonly}, required: ${field.required}, maxLength: ${field.size} },
+  {
+    key: '${field.name}',
+    label: '${field.label}',
+    kind: '${field.kind}',
+    readonly: ${field.readonly},
+    required: ${field.required},
+    searchable: ${field.searchable},
+    maxLength: ${field.maxLength}
+  }#if($foreach.hasNext),#end
 #end
 ]
 </script>
-<template><CrudPage title="${functionNameHtml}" permission="${permission}" permission-scope="${permissionScope}" :api="api" :fields="fields" id-key="${pkField}" /></template>
+
+<template>
+  <CrudPage
+    title="${functionNameHtml}"
+    permission="${permission}"
+#if(!$scoped)
+    permission-scope="platform"
+#end
+    :api="api"
+    :fields="fields"
+    id-key="${pkField}"
+  />
+</template>

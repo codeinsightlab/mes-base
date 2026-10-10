@@ -47,6 +47,7 @@ public class FoundationConfiguration {
     }
 
     @Bean
+    @ConditionalOnProperty(name = "mes.system.enabled", havingValue = "false", matchIfMissing = true)
     FactoryPreference preferences() {
         return new InMemoryFactoryPreference();
     }
@@ -77,7 +78,7 @@ public class FoundationConfiguration {
     }
 
     @Bean
-    @ConditionalOnProperty(name="mes.system.enabled",havingValue="false",matchIfMissing=true)
+    @ConditionalOnProperty(name = "mes.system.enabled", havingValue = "false", matchIfMissing = true)
     BusinessPersistence businessPersistence(BusinessPersistenceResolver resolver, RuntimeRegistry registry) {
         return new DedicatedDatabasePersistence(resolver, registry);
     }
@@ -90,7 +91,8 @@ public class FoundationConfiguration {
 
 
     @Bean
-    SecurityFilterChain security(HttpSecurity http, UserDetailsService users, ObjectProvider<SystemTokenFilter> systemTokens, Environment env) throws Exception {
+    SecurityFilterChain security(HttpSecurity http, UserDetailsService users,
+                                 ObjectProvider<SystemTokenFilter> systemTokens, Environment env) throws Exception {
         var provider = new DaoAuthenticationProvider(users);
         provider.setPasswordEncoder(PasswordEncoderFactories.createDelegatingPasswordEncoder());
         http.authenticationProvider(provider);
@@ -108,7 +110,8 @@ public class FoundationConfiguration {
     }
 
     @Bean
-    WebMvcConfigurer accessRules(FactorySelectionService selection, AuthorizationService authorization, ObjectProvider<PlatformAuthorization> platform) {
+    WebMvcConfigurer accessRules(FactorySelectionService selection, AuthorizationService authorization,
+                                 ObjectProvider<PlatformAuthorization> platform) {
         return new WebMvcConfigurer() {
             public void addInterceptors(InterceptorRegistry registry) {
                 registry.addInterceptor(new FoundationAccessInterceptor(selection, authorization, platform.getIfAvailable(() -> (actor, permission) -> false)));
@@ -117,7 +120,8 @@ public class FoundationConfiguration {
     }
 
     @Bean
-    SmartInitializingSingleton explicitEndpoints(@Qualifier("requestMappingHandlerMapping") RequestMappingHandlerMapping mappings) {
+    SmartInitializingSingleton explicitEndpoints(
+            @Qualifier("requestMappingHandlerMapping") RequestMappingHandlerMapping mappings) {
         return () -> mappings.getHandlerMethods().values().forEach(EndpointCatalog::required);
     }
 }

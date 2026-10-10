@@ -1,0 +1,95 @@
+/**
+ * ${functionNameJavaDoc} CRUD：规则与事务由 Service 负责，Mapper 通过 MyBatis-Spring 注入。
+ */
+@org.springframework.stereotype.Service
+#if($scoped)
+@org.springframework.boot.autoconfigure.condition.ConditionalOnProperty(name = "mes.system.enabled", havingValue = "true")
+#else
+@org.springframework.boot.autoconfigure.condition.ConditionalOnProperty(name = "mes.platform.enabled", havingValue = "true")
+#end
+public class ${ClassName}ServiceImpl implements ${servicePackage}.I${ClassName}Service {
+    private final ${daoPackage}.${ClassName}Mapper mapper;
+
+    public ${ClassName}ServiceImpl(${daoPackage}.${ClassName}Mapper mapper) {
+        this.mapper = mapper;
+    }
+
+    @Override
+    @org.springframework.transaction.annotation.Transactional(transactionManager = "${transactionManager}", readOnly = true)
+    public ${domainPackage}.${ClassName}Page selectPage(${domainPackage}.${ClassName}QueryDto query) {
+        int offset = query.offset() == null ? 0 : query.offset();
+        int limit = query.limit() == null ? 20 : query.limit();
+        if (offset < 0 || limit < 1 || limit > 100) {
+            throw new dev.mesbase.core.error.FoundationException(dev.mesbase.core.error.ErrorCode.BAD_REQUEST);
+        }
+        ${domainPackage}.${ClassName}Example example = new ${domainPackage}.${ClassName}Example();
+        ${domainPackage}.${ClassName}Example.Criteria criteria = example.createCriteria();
+#foreach($field in $queryFields)
+        if (query.${field.name}() != null) {
+            criteria.${field.criteriaMethod}(#if($field.string)"%" + query.${field.name}() + "%"#else query.${field.name}()#end);
+        }
+#end
+        example.setOrderByClause("${sqlPk}");
+        try (com.github.pagehelper.Page<${domainPackage}.${ClassName}Entity> page = com.github.pagehelper.PageHelper.offsetPage(offset, limit)) {
+            java.util.List<${domainPackage}.${ClassName}Entity> rows = mapper.${selectByExampleMethod}(example);
+            return new ${domainPackage}.${ClassName}Page(rows, page.getTotal(), offset, limit);
+        } finally {
+            com.github.pagehelper.PageHelper.clearPage();
+        }
+    }
+
+    @Override
+    @org.springframework.transaction.annotation.Transactional(transactionManager = "${transactionManager}", readOnly = true)
+    public ${domainPackage}.${ClassName}Entity selectById(${idType} id) {
+        return requireRecord(id);
+    }
+
+    @Override
+    @org.springframework.transaction.annotation.Transactional(transactionManager = "${transactionManager}", rollbackFor = Exception.class)
+    public ${domainPackage}.${ClassName}Entity insert(${domainPackage}.${ClassName}CreateCommand input) {
+        ${domainPackage}.${ClassName}Entity row = new ${domainPackage}.${ClassName}Entity();
+#foreach($field in $createFields)
+        row.${field.setter}(input.${field.name}());
+#end
+        if (mapper.insert(row) != 1) {
+            throw new dev.mesbase.core.error.FoundationException(dev.mesbase.core.error.ErrorCode.RESOURCE_CONFLICT);
+        }
+        return requireRecord(row.get${pkField.substring(0,1).toUpperCase()}${pkField.substring(1)}());
+    }
+
+    @Override
+    @org.springframework.transaction.annotation.Transactional(transactionManager = "${transactionManager}", rollbackFor = Exception.class)
+    public ${domainPackage}.${ClassName}Entity updateById(${idType} id, ${domainPackage}.${ClassName}UpdateCommand input) {
+        ${domainPackage}.${ClassName}Entity row = requireRecord(id);
+        row.set${pkField.substring(0,1).toUpperCase()}${pkField.substring(1)}(id);
+#foreach($field in $editFields)
+        row.${field.setter}(input.${field.name}());
+#end
+        if (mapper.${updateByPrimaryKeyMethod}(row) != 1) {
+            throw new dev.mesbase.core.error.FoundationException(dev.mesbase.core.error.ErrorCode.RESOURCE_CONFLICT);
+        }
+        return requireRecord(id);
+    }
+
+    @Override
+    @org.springframework.transaction.annotation.Transactional(transactionManager = "${transactionManager}", rollbackFor = Exception.class)
+    public void deleteByIds(java.util.List<${idType}> ids) {
+        if (ids == null || ids.isEmpty() || ids.size() > 100 || ids.stream().anyMatch(java.util.Objects::isNull)
+                || new java.util.HashSet<>(ids).size() != ids.size()) {
+            throw new dev.mesbase.core.error.FoundationException(dev.mesbase.core.error.ErrorCode.BAD_REQUEST);
+        }
+        ${domainPackage}.${ClassName}Example example = new ${domainPackage}.${ClassName}Example();
+        example.createCriteria().and${pkField.substring(0,1).toUpperCase()}${pkField.substring(1)}In(ids);
+        if (mapper.deleteByExample(example) != ids.size()) {
+            throw new dev.mesbase.core.error.FoundationException(dev.mesbase.core.error.ErrorCode.RESOURCE_CONFLICT);
+        }
+    }
+
+    private ${domainPackage}.${ClassName}Entity requireRecord(${idType} id) {
+        ${domainPackage}.${ClassName}Entity row = mapper.selectByPrimaryKey(id);
+        if (row == null) {
+            throw new dev.mesbase.core.error.FoundationException(dev.mesbase.core.error.ErrorCode.NOT_FOUND);
+        }
+        return row;
+    }
+}

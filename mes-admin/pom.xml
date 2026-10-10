@@ -10,6 +10,11 @@
     <dependencies>
         <dependency>
             <groupId>dev.mesbase</groupId>
+            <artifactId>mes-business</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>dev.mesbase</groupId>
             <artifactId>mes-quartz</artifactId>
             <version>${project.version}</version>
         </dependency>
