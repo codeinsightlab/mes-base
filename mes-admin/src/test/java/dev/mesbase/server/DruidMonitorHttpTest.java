@@ -81,7 +81,15 @@ class DruidMonitorHttpTest {
 
         @Bean
         PlatformAuthorization testPlatformGrants() {
-            return (actor, permission) -> "reader".equals(actor.id()) && "monitor:druid:list".equals(permission.code());
+            return new PlatformAuthorization() {
+                public boolean hasPermission(AuthenticatedActor actor, Permission permission) {
+                    return "reader".equals(actor.id()) && "monitor:druid:list".equals(permission.code());
+                }
+
+                public boolean hasPlatformRole(AuthenticatedActor actor) {
+                    return "reader".equals(actor.id());
+                }
+            };
         }
 
         @Bean

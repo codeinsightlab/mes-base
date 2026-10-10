@@ -13,6 +13,17 @@ import dev.mesbase.system.mapper.SysMenuMapper;
 import dev.mesbase.system.mapper.SysRoleMapper;
 import dev.mesbase.system.mapper.SysRoleMenuMapper;
 import dev.mesbase.system.service.SystemPermissionService;
+import dev.mesbase.system.domain.WorkspaceRoleScope;
+import dev.mesbase.core.factory.FactoryId;
+import dev.mesbase.core.factory.FactoryScope;
+import dev.mesbase.core.factory.FactorySelectionService;
+import dev.mesbase.core.error.FoundationException;
+import dev.mesbase.platform.execution.FactoryContext;
+import dev.mesbase.platform.web.EndpointAccess;
+import dev.mesbase.platform.web.FoundationAccessInterceptor;
+import org.springframework.mock.web.MockHttpServletRequest;
+import org.springframework.mock.web.MockHttpServletResponse;
+import org.springframework.web.method.HandlerMethod;
 import dev.mesbase.system.service.impl.SysRoleServiceImpl;
 import dev.mesbase.system.service.impl.SysMenuServiceImpl;
 import java.nio.file.Files;
@@ -20,6 +31,7 @@ import java.nio.file.Path;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
+import java.util.Optional;
 import org.junit.jupiter.api.Test;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
 import org.springframework.test.util.ReflectionTestUtils;
@@ -27,6 +39,7 @@ import org.springframework.test.util.ReflectionTestUtils;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -50,19 +63,26 @@ class RoleScopePermissionTest {
             sql.execute("CREATE TABLE sys_role(role_id BIGINT,kind VARCHAR(10),factory_id VARCHAR(30),status VARCHAR(1),del_flag VARCHAR(1))");
             sql.execute("CREATE TABLE sys_user_role(user_id BIGINT,role_id BIGINT)");
             sql.execute("CREATE TABLE sys_role_menu(role_id BIGINT,menu_id BIGINT)");
-            sql.execute("INSERT INTO sys_user VALUES(1,'platform','0','0'),(2,'factory','0','0'),(3,'disabled','0','0')");
-            sql.execute("INSERT INTO sys_role VALUES(1,'PLATFORM',NULL,'0','0'),(2,'FACTORY','F1','0','0'),(3,'PLATFORM',NULL,'1','0')");
-            sql.execute("INSERT INTO sys_user_role VALUES(1,1),(2,2),(3,3)");
+            sql.execute("INSERT INTO sys_user VALUES(1,'platform','0','0'),(2,'factory','0','0'),(3,'disabled','0','0'),(4,'platformOnly','0','0')");
+            sql.execute("INSERT INTO sys_role VALUES(1,'PLATFORM',NULL,'0','0'),(2,'FACTORY','F1','0','0'),(3,'PLATFORM',NULL,'1','0'),(4,'PLATFORM',NULL,'0','0')");
+            sql.execute("INSERT INTO sys_user_role VALUES(1,1),(2,2),(3,3),(4,4)");
             sql.execute("INSERT INTO sys_menu(menu_id,parent_id,path,menu_type,perms,status) VALUES "
                     + "(1,0,'system','M','','0'),(2,1,'role','C','system:role:list','0'),"
                     + "(3,0,'pro','M','','0'),(4,3,'order','C','business:order:read','0'),"
                     + "(5,1,'#','F','custom:platform:action','0'),(6,3,'other','C','business:other:read','0')");
-            sql.execute("INSERT INTO sys_role_menu VALUES(1,3),(1,4),(1,2),(1,1),(2,3),(2,6),(2,2),(2,5),(3,4)");
+            sql.execute("INSERT INTO sys_role_menu VALUES(1,3),(1,4),(1,2),(1,1),(2,3),(2,6),(2,2),(2,5),(3,4),(4,1),(4,2),(4,5)");
         }
         var persistence = new PlatformPersistence(source, Set.of(SysMenuMapper.class), configuration ->
                 configuration.getTypeAliasRegistry().registerAliases("dev.mesbase.common.core.domain.entity"));
+        var roles = mock(SysRoleMapper.class);
+        when(roles.selectWorkspaceScopes("platform")).thenReturn(List.of(new WorkspaceRoleScope("PLATFORM", null)));
+        when(roles.selectWorkspaceScopes("platformOnly")).thenReturn(List.of(new WorkspaceRoleScope("PLATFORM", null)));
         var service = new SystemPermissionService(persistence.mapper(SysMenuMapper.class),
-                mock(SysRoleMapper.class), mock(ManagedFactoryMapper.class));
+                roles, mock(ManagedFactoryMapper.class));
+        assertTrue(service.workspaces("platform").platformBusiness());
+        assertEquals(List.of(), service.workspaces("platform").factoryIds());
+        assertFalse(service.workspaces("platformOnly").platformBusiness());
+        assertFalse(service.workspaces("disabled").platformBusiness());
         assertEquals(Set.of("system:role:list", "business:order:read"), service.permissions("platform", null));
         assertEquals(Set.of("business:order:read"), service.permissions("platform", "F1"));
         assertEquals(Set.of("business:order:read"), service.permissions("platform", "F2"));
@@ -70,7 +90,14 @@ class RoleScopePermissionTest {
         assertEquals(Set.of(), service.permissions("factory", "F2"));
         assertEquals(Set.of(), service.permissions("factory", null));
         assertEquals(Set.of(), service.permissions("disabled", "F1"));
-        assertFalse(service.granted("platform", null, "business:order:read"));
+        assertTrue(service.grantedPlatform("platform", "system:role:list"));
+        assertTrue(service.grantedPlatform("platform", "business:order:read"));
+        assertFalse(service.grantedPlatform("factory", "system:role:list"));
+        assertFalse(service.grantedPlatform("disabled", "system:role:list"));
+        assertFalse(service.grantedFactory("platform", "F1", "system:role:list"));
+        assertFalse(service.grantedFactory("platform", "", "business:order:read"));
+        assertFalse(service.grantedFactory("platform", null, "business:order:read"));
+        assertAuthorizationChain(service);
         var navigation = new SysMenuServiceImpl();
         ReflectionTestUtils.setField(navigation, "menuMapper", persistence.mapper(SysMenuMapper.class));
         assertEquals(List.of("pro"), navigation.selectFactoryMenuTree("platform", "F1").stream()
@@ -87,6 +114,56 @@ class RoleScopePermissionTest {
             assertEquals(6, navigation.selectAssignableMenus(new SysMenu(), 1L, "PLATFORM").size());
         } finally {
             SecurityContextHolder.clearContext();
+        }
+    }
+
+    private static void assertAuthorizationChain(SystemPermissionService service) throws Exception {
+        var selection = mock(FactorySelectionService.class);
+        when(selection.resolve(any(), any())).thenAnswer(invocation -> {
+            Optional<FactoryId> requested = invocation.getArgument(1);
+            return requested.map(FactoryScope::new);
+        });
+        var configuration = new SystemConfiguration();
+        var interceptor = new FoundationAccessInterceptor(selection,
+                configuration.factoryAuthorization(service), configuration.platformAuthorization(service));
+        var endpoints = new PermissionEndpoints();
+        var platform = new HandlerMethod(endpoints, PermissionEndpoints.class.getMethod("platform"));
+        var business = new HandlerMethod(endpoints, PermissionEndpoints.class.getMethod("business"));
+        SecurityContextHolder.getContext().setAuthentication(
+                new UsernamePasswordAuthenticationToken("platform", "TEST ONLY", List.of()));
+        try {
+            var request = new MockHttpServletRequest("GET", "/api/system/role");
+            var response = new MockHttpServletResponse();
+            assertTrue(interceptor.preHandle(request, response, platform));
+            request.setRequestURI("/api/pro/order");
+            assertThrows(FoundationException.class, () -> interceptor.preHandle(request, response, business));
+            request.addHeader("X-Factory-Id", "F1");
+            request.setRequestURI("/api/system/role");
+            assertTrue(interceptor.preHandle(request, response, platform));
+            request.setRequestURI("/api/pro/order");
+            assertTrue(interceptor.preHandle(request, response, business));
+            FactoryContext.clear();
+            request.removeHeader("X-Factory-Id");
+            request.addHeader("X-Factory-Id", "F2");
+            assertTrue(interceptor.preHandle(request, response, business));
+            SecurityContextHolder.getContext().setAuthentication(
+                    new UsernamePasswordAuthenticationToken("factory", "TEST ONLY", List.of()));
+            request.setRequestURI("/api/system/role");
+            assertThrows(FoundationException.class, () -> interceptor.preHandle(request, response, platform));
+        } finally {
+            FactoryContext.clear();
+            SecurityContextHolder.clearContext();
+        }
+    }
+
+    public static class PermissionEndpoints {
+        @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED, permission = "system:role:list",
+                permissionScope = EndpointAccess.PermissionScope.PLATFORM)
+        public void platform() {
+        }
+
+        @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED, permission = "business:order:read")
+        public void business() {
         }
     }
 

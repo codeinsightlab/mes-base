@@ -47,6 +47,14 @@ HTTP 每个方法显式 PUBLIC/AUTHENTICATED/AUTHORIZED；缺注解启动失败�
 ID 操作必须校验资源所属 Scope/主体；不信任客户端 userId/userName/factoryId。文件必须 owner + scope + resource
 证明，不能公共裸路径下载；新资源必须提供服务端 policy。
 
+### 7.1 URL 范围与请求上下文（2026-10-10 用户确认）
+
+前端有已选 Factory 时，所有请求携带 X-Factory-Id；该请求头不决定接口归属，也不授予权限。后端去掉 /api 前缀后，按完整路径段 /system、/tool、/monitor 识别平台管理接口：有效 PLATFORM 角色必需，AUTHORIZED 还需对应平台权限。平台接口不因请求头绑定 FactoryContext 或业务数据库；业务接口解析有效 Factory 上下文，按平台业务权限与当前厂 FACTORY 权限并集授权，仍保持分库与资源隔离。
+
+会话 /api/session、个人 /api/personal、公共登录后读取 /api/common 是明确的共享入口，AUTHENTICATED 不要求平台角色；既有私有文件 /api/platform/files 保持引用地址稳定，归个人资源入口，继续验证 owner/resource，不从请求头切换资源范围。/api/factory/navigation 属业务上下文。EndpointScopePolicy 是 HTTP 路径范围入口，启动检查 URL 与 EndpointAccess 声明一致；平台管理不能声明 PUBLIC，共享入口不能承载管理权限接口。菜单按解析后的完整 URL 分类，按钮继承父菜单；不按权限字符串前缀猜范围。
+
+代码生成器只负责代码生成及自身生成契约，不替 MES 执行业务控制，不限制用户的平台/业务模块名或自动改写模块归属；使用方负责生成结果与应用 URL、权限、数据库规则的一致性审查。
+
 ## 8. 事务 / 幂等 / UNKNOWN
 
 本地事务不能回滚外部 HTTP；外部命令结果区分 SUCCEEDED/REJECTED/UNKNOWN。保留原异常链及 requestId，对外安全真实 HTTP

@@ -33,8 +33,9 @@ public class SystemRedisConfiguration {
         var r = new FilterRegistrationBean<>(new XssFilter());
         r.setEnabled(env.getProperty("xss.enabled", Boolean.class, true));
         r.setOrder(Ordered.HIGHEST_PRECEDENCE + 30);
-        r.addUrlPatterns(env.getProperty("xss.url-patterns", "/api/system/*,/api/monitor/*").split(","));
-        r.addInitParameter("excludes", env.getProperty("xss.excludes", "/api/system/user/profile/updatePwd"));
+        r.addUrlPatterns(env.getProperty("xss.url-patterns", "/api/system/*,/api/monitor/*,/api/personal/*,/api/common/*")
+                .split(","));
+        r.addInitParameter("excludes", env.getProperty("xss.excludes", "/api/personal/profile/updatePwd"));
         return r;
     }
 }

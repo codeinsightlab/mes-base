@@ -75,7 +75,9 @@ public class SysAttachmentServiceImpl {
         if (row == null || !Objects.equals(row.getFactoryId(), factory(scope)) || !resource.equals(row.getResource()))
             throw new FoundationException(ErrorCode.NOT_FOUND);
         boolean owned = row.getOwnerId().equals(SecurityUtils.getUserId());
-        boolean notice = "notice-media".equals(resource) && scope == null && row.getSourceDocId() != null && notices.selectNoticeById(row.getSourceDocId()) != null && permissions.granted(SecurityUtils.getUsername(), null, "system:notice:query");
+        boolean notice = "notice-media".equals(resource) && scope == null && row.getSourceDocId() != null
+                && notices.selectNoticeById(row.getSourceDocId()) != null
+                && permissions.grantedPlatform(SecurityUtils.getUsername(), "system:notice:query");
         if (!owned && !notice) throw new FoundationException(ErrorCode.NOT_FOUND);
         return row;
     }
@@ -158,7 +160,8 @@ public class SysAttachmentServiceImpl {
 
     private boolean canEditNotice() {
         String user = SecurityUtils.getUsername();
-        return permissions.granted(user, null, "system:notice:add") || permissions.granted(user, null, "system:notice:edit");
+        return permissions.grantedPlatform(user, "system:notice:add")
+                || permissions.grantedPlatform(user, "system:notice:edit");
     }
 
     private static String sniff(byte[] b) {

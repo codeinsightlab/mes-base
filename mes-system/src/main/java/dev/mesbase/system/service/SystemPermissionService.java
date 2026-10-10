@@ -25,7 +25,7 @@ public class SystemPermissionService {
         this.factories = factories;
     }
 
-    public record WorkspaceAccess(boolean platform, List<String> factoryIds) {
+    public record WorkspaceAccess(boolean platform, boolean platformBusiness, List<String> factoryIds) {
     }
 
     public WorkspaceAccess workspaces(String username) {
@@ -34,27 +34,36 @@ public class SystemPermissionService {
                 .distinct().sorted().toList();
         // These legacy columns have different collations. Bind IDs rather than joining text columns.
         var enabled = factoryIds.isEmpty() ? Set.<String>of() : Set.copyOf(factories.enabledIds(factoryIds));
-        return new WorkspaceAccess(scopes.stream().anyMatch(scope -> "PLATFORM".equals(scope.kind())),
+        boolean platform = scopes.stream().anyMatch(scope -> "PLATFORM".equals(scope.kind()));
+        boolean platformBusiness = platform && !scopedPermissions(username, null, true).isEmpty();
+        return new WorkspaceAccess(platform, platformBusiness,
                 factoryIds.stream().filter(enabled::contains).toList());
     }
 
     public Set<String> permissions(String user, String factory) {
+        return scopedPermissions(user, factory, factory != null);
+    }
+
+    private Set<String> scopedPermissions(String user, String factory, boolean businessOnly) {
         var result = new HashSet<String>();
         var platformCodes = new HashSet<String>();
-        if (factory != null) {
+        if (businessOnly) {
             var allMenus = menus.selectMenuList(new SysMenu());
             var policy = new MenuScopePolicy(allMenus);
             for (var menu : allMenus) {
                 if (policy.platform(menu) && menu.getPerms() != null) {
-                    platformCodes.addAll(List.of(menu.getPerms().split(",")));
+                    for (String code : menu.getPerms().split(",")) {
+                        platformCodes.add(code.trim());
+                    }
                 }
             }
         }
         for (String values : menus.selectScopedPermissions(user, factory)) {
             if (values != null) {
                 for (String p : values.split(",")) {
-                    if (!p.isBlank() && (factory == null ||
-                            !MenuScopePolicy.platformPermission(p) && !platformCodes.contains(p))) {
+                    p = p.trim();
+                    if (!p.isBlank() && (!businessOnly ||
+                            !platformCodes.contains(p))) {
                         result.add(p);
                     }
                 }
@@ -63,7 +72,15 @@ public class SystemPermissionService {
         return Set.copyOf(result);
     }
 
-    public boolean granted(String user, String factory, String permission) {
+    public boolean hasPlatformRole(String user) {
+        return roles.selectWorkspaceScopes(user).stream().anyMatch(scope -> "PLATFORM".equals(scope.kind()));
+    }
+
+    public boolean grantedPlatform(String user, String permission) {
+        return permissions(user, null).contains(permission);
+    }
+
+    public boolean grantedFactory(String user, String factory, String permission) {
         if (factory == null || factory.isBlank()) return false;
         var permissions = permissions(user, factory);
         return permissions.contains(permission);

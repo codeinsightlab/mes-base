@@ -3,7 +3,7 @@ package dev.mesbase.system.service;
 import dev.mesbase.common.core.domain.entity.SysMenu;
 import dev.mesbase.common.exception.ServiceException;
 import java.util.HashMap;
-import java.util.Arrays;
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -21,27 +21,21 @@ public final class MenuScopePolicy {
 
     public boolean platform(SysMenu menu) {
         Set<Long> visited = new HashSet<>();
+        List<String> parts = new ArrayList<>();
         while (menu != null) {
             if (!visited.add(menu.getMenuId())) throw new ServiceException("Menu hierarchy contains a cycle");
-            if (menu.getPerms() != null && Arrays.stream(menu.getPerms().split(","))
-                    .map(String::trim).anyMatch(MenuScopePolicy::platformPermission)) return true;
             String path = menu.getPath();
             if (path != null && !path.equals("#") && !path.isBlank()) {
-                if (platformPrefix(path.startsWith("/") ? path.substring(1) : path, "/")) return true;
-                if (path.startsWith("/")) return false;
+                parts.add(0, path);
+                if (path.startsWith("/")) break;
             }
             menu = menus.get(menu.getParentId());
         }
-        return false;
-    }
-
-    public static boolean platformPermission(String code) {
-        return platformPrefix(code, ":");
-    }
-
-    private static boolean platformPrefix(String value, String separator) {
+        String path = String.join("/", parts);
+        if (path.startsWith("/")) path = path.substring(1);
+        String resolved = path;
         return List.of("system", "tool", "monitor").stream()
-                .anyMatch(prefix -> value.equals(prefix) || value.startsWith(prefix + separator));
+                .anyMatch(prefix -> resolved.equals(prefix) || resolved.startsWith(prefix + "/"));
     }
 
     public SysMenu require(Long id) {

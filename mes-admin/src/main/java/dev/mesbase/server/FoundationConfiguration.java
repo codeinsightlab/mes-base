@@ -122,6 +122,7 @@ public class FoundationConfiguration {
     @Bean
     SmartInitializingSingleton explicitEndpoints(
             @Qualifier("requestMappingHandlerMapping") RequestMappingHandlerMapping mappings) {
-        return () -> mappings.getHandlerMethods().values().forEach(EndpointCatalog::required);
+        return () -> mappings.getHandlerMethods().forEach((mapping, handler) ->
+                mapping.getPatternValues().forEach(path -> EndpointCatalog.required(handler, path)));
     }
 }

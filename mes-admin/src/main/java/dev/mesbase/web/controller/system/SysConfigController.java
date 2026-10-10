@@ -68,15 +68,6 @@ public class SysConfigController extends BaseController {
     }
 
     /**
-     * 根据参数键名查询参数值
-     */
-    @GetMapping(value = "/configKey/{configKey}")
-    @EndpointAccess(value = EndpointAccess.Kind.AUTHENTICATED, permissionScope = EndpointAccess.PermissionScope.PLATFORM)
-    public AjaxResult getConfigKey(@PathVariable String configKey) {
-        return AjaxResult.success((Object) configService.selectClientConfigByKey(configKey));
-    }
-
-    /**
      * 新增参数配置
      */
     @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED, permission = "system:config:add", permissionScope = EndpointAccess.PermissionScope.PLATFORM)

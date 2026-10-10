@@ -85,8 +85,8 @@ user:
     lock-time: 10
 xss:
   enabled: true
-  url-patterns: /api/system/*,/api/monitor/*
-  excludes: /api/system/user/profile/updatePwd
+  url-patterns: /api/system/*,/api/monitor/*,/api/personal/*,/api/common/*
+  excludes: /api/personal/profile/updatePwd
 # Source Minio configuration keys; values supplied by the deployment owner.
 minio:
   url: ""

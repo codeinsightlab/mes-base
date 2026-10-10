@@ -11,7 +11,6 @@ import org.springframework.security.authentication.AnonymousAuthenticationToken;
 import java.util.Optional;
 
 import dev.mesbase.core.factory.FactoryId;
-import dev.mesbase.core.factory.FactoryScope;
 import dev.mesbase.core.security.AuthenticatedActor;
 import dev.mesbase.core.security.AuthorizationService;
 import dev.mesbase.core.factory.FactorySelectionService;
@@ -39,24 +38,32 @@ public final class FoundationAccessInterceptor implements HandlerInterceptor {
 
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) {
         if (!(handler instanceof HandlerMethod method)) throw new FoundationException(ErrorCode.NOT_FOUND);
-        EndpointAccess access = EndpointCatalog.required(method);
+        String path = request.getRequestURI().substring(request.getContextPath().length());
+        EndpointAccess access = EndpointCatalog.required(method, path);
         if (access.value() == EndpointAccess.Kind.PUBLIC) return true;
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         if (authentication == null || !authentication.isAuthenticated() || authentication instanceof AnonymousAuthenticationToken)
             throw new FoundationException(ErrorCode.UNAUTHENTICATED);
         AuthenticatedActor actor = new AuthenticatedActor(authentication.getName());
-        String explicit = request.getHeader("X-Factory-Id");
-        Optional<FactoryId> requested;
-        try {
-            requested = explicit == null ? Optional.empty() : Optional.of(new FactoryId(explicit));
-        } catch (IllegalArgumentException failure) {
-            throw new FoundationException(ErrorCode.BAD_REQUEST, failure);
+        boolean platform = EndpointScopePolicy.scope(path) == EndpointAccess.PermissionScope.PLATFORM;
+        if (platform) {
+            FactoryContext.clear();
+            if (EndpointScopePolicy.platformManagement(path) && !platformAuthorization.hasPlatformRole(actor)) {
+                throw new FoundationException(ErrorCode.FORBIDDEN);
+            }
+        } else {
+            String explicit = request.getHeader("X-Factory-Id");
+            Optional<FactoryId> requested;
+            try {
+                requested = explicit == null ? Optional.empty() : Optional.of(new FactoryId(explicit));
+            } catch (IllegalArgumentException failure) {
+                throw new FoundationException(ErrorCode.BAD_REQUEST, failure);
+            }
+            var scope = selection.resolve(actor, requested);
+            scope.ifPresent(FactoryContext::bind);
         }
-        var scope = access.permissionScope() == EndpointAccess.PermissionScope.PLATFORM && explicit == null
-                ? Optional.<FactoryScope>empty() : selection.resolve(actor, requested);
-        scope.ifPresent(FactoryContext::bind);
         if (access.value() == EndpointAccess.Kind.AUTHORIZED) {
-            boolean allowed = access.permissionScope() == EndpointAccess.PermissionScope.PLATFORM
+            boolean allowed = platform
                     ? platformAuthorization.hasPermission(actor, new Permission(access.permission()))
                     : authorization.hasPermission(actor, FactoryContext.required(), new Permission(access.permission()));
             if (!allowed) throw new FoundationException(ErrorCode.FORBIDDEN);

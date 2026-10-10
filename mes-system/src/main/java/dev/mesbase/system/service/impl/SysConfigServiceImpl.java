@@ -45,7 +45,7 @@ public class SysConfigServiceImpl implements ISysConfigService {
     public String selectClientConfigByKey(String key) {
         if (!Set.of("sys.account.captchaOnOff", "sys.index.skinName", "sys.account.registerUser", "sys.user.avatar.maxSize")
                 .contains(key)
-                && !permissions.granted(SecurityUtils.getUsername(), null, "system:config:query"))
+                && !permissions.grantedPlatform(SecurityUtils.getUsername(), "system:config:query"))
             throw new FoundationException(ErrorCode.FORBIDDEN);
         return selectConfigByKey(key);
     }

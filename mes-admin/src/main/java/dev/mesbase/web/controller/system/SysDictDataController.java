@@ -6,17 +6,14 @@ import dev.mesbase.common.core.domain.AjaxResult;
 import dev.mesbase.common.core.domain.entity.SysDictData;
 import dev.mesbase.common.core.page.TableDataInfo;
 import dev.mesbase.common.enums.BusinessType;
-import dev.mesbase.common.utils.StringUtils;
 import dev.mesbase.common.utils.poi.ExcelUtil;
 import dev.mesbase.platform.web.EndpointAccess;
 import dev.mesbase.system.dto.DictDataForm;
 import dev.mesbase.system.service.ISysDictDataService;
-import dev.mesbase.system.service.ISysDictTypeService;
 import dev.mesbase.web.view.PageResultMapper;
 import dev.mesbase.web.view.dict.SysDictDataAssembler;
 import jakarta.servlet.http.HttpServletResponse;
 
-import java.util.ArrayList;
 import java.util.List;
 
 import org.springframework.beans.factory.annotation.Autowired;
@@ -44,8 +41,6 @@ public class SysDictDataController extends BaseController {
     @Autowired
     private ISysDictDataService dictDataService;
 
-    @Autowired
-    private ISysDictTypeService dictTypeService;
 
     @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED, permission = "system:dict:list", permissionScope = EndpointAccess.PermissionScope.PLATFORM)
     @GetMapping("/list")
@@ -71,19 +66,6 @@ public class SysDictDataController extends BaseController {
     @GetMapping(value = "/{dictCode}")
     public AjaxResult getInfo(@PathVariable Long dictCode) {
         return AjaxResult.success(SysDictDataAssembler.toResult(dictDataService.selectDictDataById(dictCode)));
-    }
-
-    /**
-     * 根据字典类型查询字典数据信息
-     */
-    @GetMapping(value = "/type/{dictType}")
-    @EndpointAccess(value = EndpointAccess.Kind.AUTHENTICATED, permissionScope = EndpointAccess.PermissionScope.PLATFORM)
-    public AjaxResult dictType(@PathVariable String dictType) {
-        List<SysDictData> data = dictTypeService.selectDictDataByType(dictType);
-        if (StringUtils.isNull(data)) {
-            data = new ArrayList<SysDictData>();
-        }
-        return AjaxResult.success(SysDictDataAssembler.toResults(data));
     }
 
     /**

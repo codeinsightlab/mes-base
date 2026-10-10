@@ -41,6 +41,7 @@ import dev.mesbase.web.controller.monitor.SysOperlogController;
 import dev.mesbase.web.controller.system.SysAutoCodePartController;
 import dev.mesbase.web.controller.system.SysAutoCodeRuleController;
 import dev.mesbase.web.controller.system.SysConfigController;
+import dev.mesbase.web.controller.system.CommonReferenceController;
 import dev.mesbase.web.controller.system.SysDeptController;
 import dev.mesbase.web.controller.system.SysDictDataController;
 import dev.mesbase.web.controller.system.SysDictTypeController;
@@ -94,7 +95,9 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 
-/** Standalone MVC fixture: real Controllers and serialization, mocked services, no response Advice. */
+/**
+ * Standalone MVC fixture: real Controllers and serialization, mocked services, no response Advice.
+ */
 class SystemResponseHttpTest {
     private final ObjectMapper json = new ObjectMapper();
     private MockMvc mvc;
@@ -135,27 +138,29 @@ class SystemResponseHttpTest {
                 Arguments.of("system/user/authRole/1", "/user/userId"),
                 Arguments.of("system/role/authUser/allocatedList", "/rows/0/userId"),
                 Arguments.of("system/role/authUser/unallocatedList", "/rows/0/userId"),
-                Arguments.of("system/dict/data/type/fixture", "/data/0/dictCode"),
-                Arguments.of("system/inbox", "/rows/0/messageId"),
-                Arguments.of("mobile/system/message/getMyMessage", "/rows/0/messageId"),
+                Arguments.of("common/dict/fixture", "/data/0/dictCode"),
+                Arguments.of("personal/inbox", "/rows/0/messageId"),
+                Arguments.of("personal/inbox/getMyMessage", "/rows/0/messageId"),
                 Arguments.of("platform/files?resource=avatar", "/rows/0/attachmentId"),
                 Arguments.of("platform/files/fixture?resource=avatar", "/attachmentId"),
-                Arguments.of("system/user/profile", "/data/userId"),
-                Arguments.of("system/info", "/user/userId"),
+                Arguments.of("personal/profile", "/data/userId"),
+                Arguments.of("session/info", "/user/userId"),
                 Arguments.of("monitor/operlog/list", "/rows/0/operId"),
                 Arguments.of("monitor/logininfor/list", "/rows/0/infoId"));
     }
 
-    @BeforeEach void setup() throws Exception {
+    @BeforeEach
+    void setup() throws Exception {
         SysUser user = SystemResponseContractTest.sample(SysUser.class);
         user.setDept(SystemResponseContractTest.sample(SysDept.class));
         user.setRoles(List.of(SystemResponseContractTest.sample(SysRole.class)));
         user.setPassword("fixture-password-never-return");
         user.setSalt("fixture-salt-never-return");
-        SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken(new LoginUser(user, Set.of()), "unused"));
+        SecurityContextHolder.getContext()
+                .setAuthentication(new UsernamePasswordAuthenticationToken(new LoginUser(user, Set.of()), "unused"));
         var session = new SystemSessionController(stub(TokenService.class), stub(SystemPermissionService.class), stub(ISysMenuService.class), stub(SysLoginService.class));
         ReflectionTestUtils.setField(session, "passwords", stub(PasswordPolicy.class));
-        mvc = MockMvcBuilders.standaloneSetup(wired(SysUserController.class),
+        mvc = MockMvcBuilders.standaloneSetup(wired(SysUserController.class), new CommonReferenceController(stub(ISysConfigService.class), stub(ISysDictTypeService.class)),
                 wired(SysRoleController.class),
                 wired(SysDeptController.class),
                 wired(SysMenuController.class),
@@ -175,12 +180,14 @@ class SystemResponseHttpTest {
                 session).build();
     }
 
-    @AfterEach void clearContext() {
+    @AfterEach
+    void clearContext() {
         PageHelper.clearPage();
         SecurityContextHolder.clearContext();
     }
 
-    @ParameterizedTest(name = "{0}") @MethodSource("routes")
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("routes")
     void everyReviewedGetUsesAnExplicitContractWithoutAdvice(String path, String idPath) throws Exception {
         var response = mvc.perform(get("/api/" + path)).andReturn().getResponse();
         assertEquals(200, response.getStatus(), response.getContentAsString());
@@ -199,8 +206,10 @@ class SystemResponseHttpTest {
         }
     }
 
-    @Test void uploadReturnsOnlyTheExplicitFileWhitelist() throws Exception {
-        var response = mvc.perform(multipart("/api/platform/files").file(new MockMultipartFile("file", "fixture.png", "image/png", new byte[]{1})).param("resource", "avatar")).andReturn().getResponse();
+    @Test
+    void uploadReturnsOnlyTheExplicitFileWhitelist() throws Exception {
+        var response = mvc.perform(multipart("/api/platform/files").file(new MockMultipartFile("file", "fixture.png", "image/png", new byte[]{1}))
+                .param("resource", "avatar")).andReturn().getResponse();
         assertEquals(200, response.getStatus());
         JsonNode value = json.readTree(response.getContentAsString());
         assertTrue(value.get("attachmentId").isTextual());
@@ -209,7 +218,8 @@ class SystemResponseHttpTest {
         SystemResponseContractTest.rejectInternalFields(value);
     }
 
-    @Test void cacheSizeIsANumericCountWithoutAnyBusinessProjection() throws Exception {
+    @Test
+    void cacheSizeIsANumericCountWithoutAnyBusinessProjection() throws Exception {
         RedisConnection connection = mock(RedisConnection.class);
         when(connection.info()).thenReturn(new Properties());
         when(connection.info("commandstats")).thenReturn(new Properties());
@@ -222,7 +232,8 @@ class SystemResponseHttpTest {
         });
         CacheController controller = new CacheController();
         ReflectionTestUtils.setField(controller, "redisTemplate", template);
-        var response = MockMvcBuilders.standaloneSetup(controller).build().perform(get("/api/monitor/cache")).andReturn().getResponse();
+        var response = MockMvcBuilders.standaloneSetup(controller).build().perform(get("/api/monitor/cache"))
+                .andReturn().getResponse();
         assertEquals(200, response.getStatus());
         JsonNode size = json.readTree(response.getContentAsString()).at("/data/dbSize");
         assertTrue(size.isIntegralNumber());
@@ -231,7 +242,9 @@ class SystemResponseHttpTest {
 
     private <T> T wired(Class<T> type) throws Exception {
         T controller = type.getConstructor().newInstance();
-        for (Field field : type.getDeclaredFields()) if (field.isAnnotationPresent(Autowired.class)) ReflectionTestUtils.setField(controller, field.getName(), stub(field.getType()));
+        for (Field field : type.getDeclaredFields())
+            if (field.isAnnotationPresent(Autowired.class))
+                ReflectionTestUtils.setField(controller, field.getName(), stub(field.getType()));
         return controller;
     }
 
@@ -239,10 +252,14 @@ class SystemResponseHttpTest {
         return mock(type, invocation -> {
             String method = invocation.getMethod().getName();
             Class<?> returned = invocation.getMethod().getReturnType();
-            if (method.equals("selectDictDataByType")) return List.of(SystemResponseContractTest.sample(SysDictData.class));
-            if (method.equals("profile")) return new SysProfileService.Profile(SystemResponseContractTest.sample(SysUser.class), "role-fixture", "post-fixture");
-            if (method.equals("selectPostListByUserId") || method.equals("selectDeptListByRoleId") || method.equals("selectMenuListByRoleId")) return List.of(9007199254740993L);
-            if (method.equals("buildDeptTreeSelect") || method.equals("buildMenuTreeSelect")) return List.of(SystemResponseContractTest.sample(TreeSelect.class));
+            if (method.equals("selectDictDataByType"))
+                return List.of(SystemResponseContractTest.sample(SysDictData.class));
+            if (method.equals("profile"))
+                return new SysProfileService.Profile(SystemResponseContractTest.sample(SysUser.class), "role-fixture", "post-fixture");
+            if (method.equals("selectPostListByUserId") || method.equals("selectDeptListByRoleId") || method.equals("selectMenuListByRoleId"))
+                return List.of(9007199254740993L);
+            if (method.equals("buildDeptTreeSelect") || method.equals("buildMenuTreeSelect"))
+                return List.of(SystemResponseContractTest.sample(TreeSelect.class));
             Class<?> row = null;
             if (type == ISysUserService.class) row = SysUser.class;
             if (type == ISysRoleService.class) row = SysRole.class;

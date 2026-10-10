@@ -209,3 +209,33 @@ import dev.mesbase.openapi.OpenApiEndpoint;
 默认规则见 ADR-003 新修订：有效启用偏好优先，否则从启用厂且绑定启用业务库中选择工厂 ID 最小值（纯数字按数值），零候选为空。候选查询只读中心 metadata，不初始化业务池；业务请求继续校验路由版本/租约。本次未执行真实数据库迁移。
 
 验收记录：本次后端迁移定向 4/4、前端 113 项和 build、打包 smoke 10/10；最新全量后端测试受其他任务 RoleScopePermissionTest fixture 错误阻塞，详见工厂迁移报告。真实数据库迁移及浏览器交互未验。部分源码进入同工作区其他任务提交，但 V17 尚未提交；部署必须包含 schema 与全套偏好链路。
+
+### 2026-10-10 平台角色可持有业务权限
+
+用户确认的新规则：PLATFORM 角色不绑定工厂，可持有平台和业务权限；业务操作必须具备有效工厂上下文，实际数据仍按该工厂独立库路由。FACTORY 角色只允许分配业务权限，只在所属工厂生效。当前工厂授权为平台角色业务权限与所属工厂角色业务权限的并集，平台操作仍只认可 PLATFORM 角色；不授予所有权限、不绕过 EndpointAccess、不复制权限到长寿命 Token。
+
+SysMenuMapper 的 XML 查询同步合并 PLATFORM + 当前 FACTORY 角色；SystemPermissionService 排除平台菜单/权限，SysMenuService 的工厂导航排除平台菜单。MenuScopePolicy 以 system/tool/monitor 路径段、父节点及平台权限前缀判定平台菜单，按钮继承上层范围。角色菜单保存按同一规则拒绝 FACTORY 分配平台菜单，原有错误绑定在运行时不能获得平台权限。菜单分配树按角色类型返回：PLATFORM 全部可分配菜单，FACTORY 仅业务菜单。前端切换类型清空旧勾选并重新查询，拒绝迟到的其他类型响应。现有角色菜单绑定与菜单权限名称没有自动迁移或赋权。
+
+修改入口：SysMenuMapper.java/XML、SystemPermissionService、MenuScopePolicy、SysRoleServiceImpl、SysMenuServiceImpl/ISysMenuService、SysMenuController；UI system/menu API 和 system/role 页面。AGENTS 同步角色规则。默认工作台选择仍沿用已有角色 workspace 契约，本轮不由可选工厂推断新授权。
+
+验证：修改 Java 使用仓库 IDEA formatter；mvn -B -ntp verify BUILD SUCCESS，packaged smoke 10 项通过，最终 RoleScopePermissionTest 定向测试再次通过。隔离 H2 使用实际 MyBatis SQL 覆盖平台业务权限跨选定工厂、工厂角色越厂拒绝、平台权限错误绑定拒绝、停用角色、缺工厂上下文及菜单分配限制；不是对真实角色执行赋权。UI 22 文件/115 项测试、build、定向 ESLint 与两仓库 diff --check 通过。真实浏览器只验证平台角色规则提示并取消编辑，截图 UI docs/acceptance/ui-industrial-upgrade/role-platform-business-permissions.png；未保存角色、执行菜单 SQL、重启用户 8081 后端或宣称真实业务 CRUD 通过。
+
+### 2026-10-10 首页权限回归修复
+
+真实浏览器首页五个监控请求均展示“当前范围没有此操作权限”；前端已经按平台权限放行请求。根因是 SystemConfiguration.platformAuthorization 调用 granted(user, null, permission)，但上一轮将 null 工厂上下文直接拒绝，误伤所有平台检查（包含参数设置、附件等调用）。将含糊的 granted(user, factory, permission) 替换为 grantedPlatform 与 grantedFactory，并迁移全部调用入口（SystemConfiguration、SysConfigServiceImpl、SysAttachmentServiceImpl）：平台只查询有效 PLATFORM 角色的实际授权；业务缺少或空白工厂 ID 仍拒绝，业务入口仍由 FactoryScope 和 EndpointAccess 校验。新增平台允许、无授权/停用拒绝、工厂角色不能获取平台权限及越厂拒绝的回归断言。
+
+同时 workspaces 增加 platformBusiness：按有效 PLATFORM 角色实际持有的业务权限计算，沿用 MenuScopePolicy 排除平台菜单及平台按钮权限。首页业务工作台选择和当前工厂提示据此接受平台业务权限；factoryIds 仍只描述有效 FACTORY 角色绑定，不将可选工厂当作权限。业务工作台继续为明确标记的示例数据，没有新增业务授权或真实指标查询。平台监控仍按独立平台权限读取。
+
+验证结果与运行边界见本轮回执；用户持有的 8081 服务未由 agent 重启，服务端新契约与权限修复须重启后生效。
+
+### 2026-10-10 URL 范围统一与共享入口迁移
+
+HTTP 范围改由 EndpointScopePolicy 按 /system、/tool、/monitor 完整路径段判断；EndpointAccess 仍声明访问级别与操作权限，并在启动时与每个映射 URL 校验一致。平台管理要求有效 PLATFORM 角色；AUTHORIZED 另查实际授权。前端所有请求（包括 SSE）在有选厂时携带 X-Factory-Id；平台/个人/公共读取入口清除业务 FactoryContext，不解析该请求头为数据范围。业务接口才解析有效选厂并按平台业务权限与当前厂角色权限并集校验。菜单按完整父子路径解析范围，移除权限名称前缀推断；按钮继承路径，绝对路径从自身根重新判定。
+
+迁移：/api/platform/session → /api/session；/api/system/info → /api/session/info；/api/system/getRouters → /api/session/menus；/api/system/factory-navigation → /api/factory/navigation；/api/system/user/profile → /api/personal/profile；消息入口 → /api/personal/inbox；字典类型数据与客户端配置读取 → /api/common/dict/{type}、/api/common/config/{key}。旧映射删除，调用方、协议测试、SSE 注册路径与过滤配置同步迁移。共享配置仍由 Service 限制允许键或检查实际权限。私有文件 /api/platform/files 是已有个人资源契约，地址保持稳定以保护数据库/富文本中的引用，owner/resource 校验保留且不绑定业务工厂。
+
+生成器本轮没有改动：用户明确其只负责纯代码生成，不承担整个 MES 的业务控制；撤回拟添加的模块名限制与路由改写。生成结果进入 MES 时仍须满足 MES 的运行规则。AGENTS 同步此边界。
+
+验证：启动/运行路径一致性、三前缀与路径边界、平台有无工厂请求头均不绑定业务上下文、平台角色与具体权限分别校验、非平台角色管理拒绝、个人入口免平台角色、业务缺范围拒绝和真实 MyBatis 合并权限测试。测试与构建结果见本轮回执；未重启用户 8081 服务，未保存角色、执行 SQL 或改变实际授权。前后端接口契约需同步生效。
+
+本轮最终验证（2026-10-10）：受影响 Java 使用 scripts/format-java 的 IDEA 原生格式化；mvn -B -ntp verify 于 16:06 BUILD SUCCESS；scripts/smoke-packaged.py 10 passed / 0 failed。UI npm test 22 文件 / 117 项通过，npm run build 通过，受影响请求/API/Auth 文件定向 ESLint 与两仓库 git diff --check 通过。路由迁移初次验证发现旧消息路径 fixture 导致 404，已迁移到实际个人消息入口后完整 verify 通过。上述 HTTP/SQL 使用隔离 fixture，不代表用户 8081 运行中的服务已经升级。

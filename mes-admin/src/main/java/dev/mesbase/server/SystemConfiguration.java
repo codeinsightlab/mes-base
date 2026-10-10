@@ -14,6 +14,8 @@ import dev.mesbase.infrastructure.platform.LocalPrivateFileStorage;
 import dev.mesbase.infrastructure.platform.MinioPrivateFileStorage;
 import dev.mesbase.platform.management.FileStorage;
 import dev.mesbase.platform.security.PlatformAuthorization;
+import dev.mesbase.core.security.AuthenticatedActor;
+import dev.mesbase.core.security.Permission;
 import dev.mesbase.quartz.service.ISysJobService;
 import dev.mesbase.quartz.service.impl.SysJobServiceImpl;
 import dev.mesbase.quartz.util.ControlledJobRunner;
@@ -123,11 +125,19 @@ public class SystemConfiguration {
 
     @Bean
     AuthorizationService factoryAuthorization(SystemPermissionService p) {
-        return (actor, scope, permission) -> p.granted(actor.id(), scope.factoryId().value(), permission.code());
+        return (actor, scope, permission) -> p.grantedFactory(actor.id(), scope.factoryId().value(), permission.code());
     }
 
     @Bean
     PlatformAuthorization platformAuthorization(SystemPermissionService p) {
-        return (actor, permission) -> p.granted(actor.id(), null, permission.code());
+        return new PlatformAuthorization() {
+            public boolean hasPermission(AuthenticatedActor actor, Permission permission) {
+                return p.grantedPlatform(actor.id(), permission.code());
+            }
+
+            public boolean hasPlatformRole(AuthenticatedActor actor) {
+                return p.hasPlatformRole(actor.id());
+            }
+        };
     }
 }
