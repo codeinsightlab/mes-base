@@ -1,6 +1,7 @@
 package dev.mesbase.system.service;
 
 import dev.mesbase.system.mapper.SysMenuMapper;
+import dev.mesbase.common.exception.ServiceException;
 import dev.mesbase.common.core.domain.entity.SysMenu;
 import dev.mesbase.system.mapper.SysRoleMapper;
 import dev.mesbase.system.factory.ManagedFactoryMapper;
@@ -47,42 +48,69 @@ public class SystemPermissionService {
         // These legacy columns have different collations. Bind IDs rather than joining text columns.
         var enabled = factoryIds.isEmpty() ? Set.<String>of() : Set.copyOf(factories.enabledIds(factoryIds));
         boolean platform = scopes.stream().anyMatch(scope -> "PLATFORM".equals(scope.kind()));
-        boolean platformBusiness = platform && !cached(new CacheKey("platform-business", username, null), () -> scopedPermissions(username, null, true)).isEmpty();
+        boolean platformBusiness = platform && !cached(new CacheKey("platform-business", username, null), () -> platformBusinessPermissions(username)).isEmpty();
         return new WorkspaceAccess(platform, platformBusiness,
                 factoryIds.stream().filter(enabled::contains).toList());
     }
 
     public Set<String> permissions(String user, String factory) {
-        return cached(new CacheKey("permissions", user, factory), () -> scopedPermissions(user, factory, factory != null));
+        return cached(new CacheKey("permissions", user, factory), () -> scopedPermissions(user, factory));
     }
 
-    private Set<String> scopedPermissions(String user, String factory, boolean businessOnly) {
+    private Set<String> scopedPermissions(String user, String factory) {
         var result = new HashSet<String>();
-        var platformCodes = new HashSet<String>();
-        if (businessOnly) {
-            var allMenus = menuCatalog();
-            var policy = menuPolicy();
-            for (var menu : allMenus) {
-                if (policy.platform(menu) && menu.getPerms() != null) {
-                    for (String code : menu.getPerms().split(",")) {
-                        platformCodes.add(code.trim());
-                    }
-                }
-            }
-        }
         for (String values : cached(new CacheKey("grants", user, factory), () -> menus.selectScopedPermissions(user, factory)
                 .stream().filter(Objects::nonNull).filter(value -> !value.isBlank()).toList())) {
             if (values != null) {
                 for (String p : values.split(",")) {
                     p = p.trim();
-                    if (!p.isBlank() && (!businessOnly ||
-                            !platformCodes.contains(p))) {
+                    if (!p.isBlank()) {
                         result.add(p);
                     }
                 }
             }
         }
         return Set.copyOf(result);
+    }
+
+    private Set<String> platformBusinessPermissions(String username) {
+        var allowed = new HashSet<String>();
+        var policy = menuPolicy();
+        for (var menu : menuCatalog())
+            if (!policy.platform(menu) && menu.getPerms() != null)
+                for (String code : menu.getPerms().split(",")) if (!code.isBlank()) allowed.add(code.trim());
+        var grants = new HashSet<>(permissions(username, null));
+        grants.retainAll(allowed);
+        return Set.copyOf(grants);
+    }
+
+    private volatile Map<String, Boolean> endpointScopes = Map.of();
+
+    public void installEndpointScopes(Map<String, Boolean> scopes) {
+        endpointScopes = Map.copyOf(scopes);
+        validateMenuAuthorization();
+    }
+
+    /**
+     * Management/startup audit only, never called from business request authorization.
+     */
+    public void validateMenuAuthorization() {
+        List<SysMenu> rows = menus.selectMenuList(new SysMenu());
+        var policy = new MenuScopePolicy(rows);
+        var codes = new HashMap<>(endpointScopes);
+        for (var menu : rows) {
+            boolean platform = policy.platform(menu);
+            if (menu.getPerms() != null) for (String code : menu.getPerms().split(",")) {
+                code = code.trim();
+                if (code.isEmpty()) continue;
+                Boolean previous = codes.putIfAbsent(code, platform);
+                if (previous != null && previous != platform)
+                    throw new ServiceException("权限码跨平台/业务范围复用: " + code);
+            }
+        }
+        for (Long id : menus.selectFactoryAssignedMenuIds())
+            if (policy.platform(policy.require(id)))
+                throw new ServiceException("工厂角色存在平台菜单授权，需修正菜单编号: " + id);
     }
 
     public boolean hasPlatformRole(String user) {
@@ -133,7 +161,7 @@ public class SystemPermissionService {
                 request.setAttribute(attribute, values);
             }
             if (values.containsKey(key)) return (T) values.get(key);
-            // Loading a permission set also loads nested catalog/grant entries in the same request map.
+            // Nested grant entries share this request map; menu catalog is loaded only by navigation/management.
             T result = load.get();
             values.put(key, result);
             return result;

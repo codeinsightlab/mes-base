@@ -24,6 +24,9 @@ import dev.mesbase.platform.web.FoundationAccessInterceptor;
 import dev.mesbase.platform.web.RequestBoundaryFilter;
 import dev.mesbase.server.managed.DatasourcePasswordCipher;
 import dev.mesbase.server.managed.ManagedDatasourceService;
+import dev.mesbase.server.managed.FactoryMetadataCache;
+import dev.mesbase.system.factory.RoutingMetadataMapper;
+import dev.mesbase.common.core.redis.RoutingMetadataStore;
 import dev.mesbase.system.factory.ManagedDatasourceMapper;
 import dev.mesbase.system.factory.ManagedFactoryMapper;
 import dev.mesbase.system.mapper.SessionAccountMapper;
@@ -67,6 +70,9 @@ import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.clearInvocations;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.times;
 
 /**
  * TEST ONLY: real entry/permission/router/workorder SQL, H2 and synthetic Redis payload; no HTTP/network timing claim.
@@ -87,7 +93,7 @@ class ProWorkorderRequestBudgetTest {
     }
 
     @Test
-    void warmPageUsesSixCenterAndTwoBusinessStatements() throws Exception {
+    void warmPageUsesTwoCenterAndTwoBusinessStatementsWithoutMetadataOrMenuQueries() throws Exception {
         var center = source();
         var business = source();
         var jdbc = new JdbcTemplate(center);
@@ -118,7 +124,7 @@ class ProWorkorderRequestBudgetTest {
         var centerSql = new Statements();
         var businessSql = new Statements();
         var platform = new PlatformPersistence(center, Set.of(SessionAccountMapper.class, SysUserMapper.class,
-                SysMenuMapper.class, SysRoleMapper.class, ManagedFactoryMapper.class, ManagedDatasourceMapper.class), c -> {
+                SysMenuMapper.class, SysRoleMapper.class, ManagedFactoryMapper.class, ManagedDatasourceMapper.class, RoutingMetadataMapper.class), c -> {
             c.getTypeAliasRegistry().registerAliases("dev.mesbase.common.core.domain.entity");
             c.addInterceptor(centerSql);
         });
@@ -136,8 +142,10 @@ class ProWorkorderRequestBudgetTest {
         try (var registry = new RuntimeRegistry()) {
             registry.registerDedicated(new FactoryId("A"), new DatasourceIdentity("managed-1"), 1, business, () -> {
             }, Set.of(ProWorkorderMapper.class));
+            var routingStore = RoutingCacheFixture.store();
+            var metadata = new FactoryMetadataCache(platform, routingStore);
             var managed = new ManagedDatasourceService(platform, mock(DatasourcePasswordCipher.class), registry,
-                    center, null, Set.of(ProWorkorderMapper.class), Path.of("target/TEST-ONLY-unused-ddl"));
+                    center, null, Set.of(ProWorkorderMapper.class), Path.of("target/TEST-ONLY-unused-ddl"), metadata);
             var source = new FactoryBusinessDataSource(managed::resolve, registry);
             var manager = new OwnedTransactionManager(source);
             var factory = PersistenceFactories.create(source, Set.of(ProWorkorderMapper.class), c -> {
@@ -157,7 +165,7 @@ class ProWorkorderRequestBudgetTest {
             };
             var configuration = new SystemConfiguration();
             var access = new FoundationAccessInterceptor(new FactorySelectionService(catalog, new InMemoryFactoryPreference()),
-                    configuration.factoryAuthorization(permissions), configuration.platformAuthorization(permissions));
+                    configuration.factoryAuthorization(permissions), configuration.platformAuthorization(permissions), managed::admit);
             Object[] arguments = new Object[ProWorkorderQueryDto.class.getRecordComponents().length];
             arguments[0] = 0;
             arguments[1] = 20;
@@ -169,6 +177,7 @@ class ProWorkorderRequestBudgetTest {
                 request.addHeader("Authorization", "Bearer " + raw);
                 request.addHeader("X-Factory-Id", "A");
                 var response = new MockHttpServletResponse();
+                clearInvocations(sessions, routingStore);
                 centerSql.queries.clear();
                 businessSql.queries.clear();
                 RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(request));
@@ -181,7 +190,14 @@ class ProWorkorderRequestBudgetTest {
                                 assertEquals(1, page.total());
                             }));
                     assertEquals(200, response.getStatus());
-                    assertEquals(6, centerSql.queries.size(), centerSql.queries.toString());
+                    verify(sessions, times(1)).read(anyString());
+                    verify(routingStore, times(1)).read(anyString());
+                    if (i == 0) assertEquals(3, centerSql.queries.size(), centerSql.queries.toString());
+                    else assertEquals(2, centerSql.queries.size(), centerSql.queries.toString());
+                    assertTrue(centerSql.queries.stream()
+                            .noneMatch(sql -> sql.contains("m.parent_id") || sql.contains("selectMenuVo")));
+                    if (i > 0) assertTrue(centerSql.queries.stream()
+                            .noneMatch(sql -> sql.contains("mf_factory") || sql.contains("mf_datasource")));
                     assertEquals(2, businessSql.queries.size(), businessSql.queries.toString());
                     assertTrue(centerSql.queries.stream().noneMatch(sql -> sql.toLowerCase().contains("u.password")));
                     if (i >= 5) times.add((System.nanoTime() - start) / 1_000_000.0);
@@ -193,7 +209,7 @@ class ProWorkorderRequestBudgetTest {
             times.sort(Comparator.naturalOrder());
             Files.createDirectories(Path.of("target/validation"));
             Files.writeString(Path.of("target/validation/pro-workorder-request-budget.json"),
-                    "{\"evidence\":\"H2 production chain fixture, synthetic Redis payload, no socket\",\"samples\":20,\"centerQueries\":6,\"businessQueries\":2,\"p50Ms\":" + times.get(9) + ",\"p95Ms\":" + times.get(18) + "}");
+                    "{\"evidence\":\"H2 production chain fixture, synthetic Redis payload, no socket\",\"samples\":20,\"centerQueries\":2,\"businessQueries\":2,\"p50Ms\":" + times.get(9) + ",\"p95Ms\":" + times.get(18) + "}");
         }
     }
 }

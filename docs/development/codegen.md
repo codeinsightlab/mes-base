@@ -6,11 +6,11 @@
 
 先按 AGENTS 第 13.0 节建模和判断复杂度：用户已有完整模型就沿用；否则 Agent 补齐当前需求所需的最小模型。新表与每列必须有数据库 COMMENT，主键外新增索引只用普通索引，不擅自增加 UNIQUE/外键。可先保存项目 `.sql`，实际建表按授权执行；生成器只读取实际存在的表 metadata，不执行建表 SQL。
 
-不管简单或复杂业务，生成能力支持的表都生成完整基础后端，提供基础 Service 给其他业务编排。复杂业务尽量创建一个代表业务用例的 Service，聚合生成的 Service，负责业务规则及事务；需要真实状态规则时引入小领域。当前不自动生成主子表协调，不能用生成编辑入口绕过状态规则，不增加纯转发包装或循环依赖。
+表设计完成后，不管简单或复杂都生成完整基础后端；先保存 SQL 的情况待实际建表后读取 metadata 生成，不支持结构明确报告并完善生成机制。简单业务使用生成 CRUD；纯数据访问可直接调用生成的 Mapper。即使仅操作单表，只要包含业务校验、状态转换、计算或副作用，就由对应业务 Service 封装；聚合 Service 调用这些业务能力编排流程、协调结果及事务，不能直接改表绕过规则。不强制经过生成 CRUD Service，不增加纯转发包装或循环依赖。需要真实状态规则时引入小领域；当前不自动生成主子表协调，不能用生成编辑入口绕过状态规则。规则只描述职责，不代表项目已有特定业务模块。
 
 前端按需要生成或暂不使用。只生成后端通常配置 selection.artifacts: [persistence, backend, test]；至少包含 persistence 与 backend，单独 backend 不含 Mapper/XML/Entity/Example。需要前端/菜单时增加 frontend/menu 或使用 [all]，不因不生成页面而省略后端。
 
-Extra 使用规则：单表操作必须复用生成的 Mapper/XML/Example，禁止另建 ExtraMapper/Extra XML 或以 DAO/Repository 改名重复实现。单表统计、批量、复杂条件及状态规则不属于例外，生成能力缺失修补通用生成机制和测试。仅跨表关联查询（JOIN 或涉及其他表的关联子查询）允许自定义 Extra，不能把单表 CRUD 放进去；业务 Service 聚合多个基础 Service 不需要 Extra。当前生成器不自动生成跨表 Extra。下方历史“复杂业务新增 ExtraMapper”及“标准单表能力无法表达可用 Extra”的表述均由此规则替代。
+Extra 使用规则：单表操作必须复用生成的 Mapper/XML/Example，禁止另建 ExtraMapper/Extra XML 或以 DAO/Repository 改名重复实现。单表统计、批量、复杂条件及状态规则不属于例外，生成能力缺失修补通用生成机制和测试。仅跨表关联查询（JOIN 或涉及其他表的关联子查询）允许自定义 Extra，不能把单表 CRUD 放进去；业务 Service 分别调用多个生成 Mapper 不需要 Extra。当前生成器不自动生成跨表 Extra。下方历史“复杂业务新增 ExtraMapper”及“标准单表能力无法表达可用 Extra”的表述均由此规则替代。
 
 从后端仓库根调用：
 

@@ -1,6 +1,6 @@
 # ADR-004：同一 Core，Dedicated 实现与 Shared 契约
 
-> 2026-10-11 修订：仅中心 + 分厂独立业务库，两组生产 SessionFactory/TM、固定包扫描保持。事务 begin 最新准入，事务内固定 factory/binding/lease，不因管理 revision 变化主动中止；退休池已有租约继续，拒绝新租约，排空关闭。以修订 ADR-002 与 [请求准入](../development/request-admission.md) 为准；Shared 历史计划不是当前能力。
+> 2026-10-11 修订：仅中心 + 分厂独立业务库，两组生产 SessionFactory/TM、固定包扫描保持。HTTP 入口缓存有效绑定并固定快照，事务 begin 复用快照（非 HTTP 独立事务最新准入），事务内固定 factory/binding/lease，不因管理 revision 变化主动中止；退休池仅已有事务租约继续，拒绝新租约并排空关闭；请求快照不保留池资源，缓存采用固定 TTL、提交淘汰和短暂不一致语义。以修订 ADR-002 与 [请求准入](../development/request-admission.md) 为准；Shared 历史计划不是当前能力。
 
 - 日期：2026-10-05；状态：Accepted（Shared implementation pending）。
 - 来源问题：单厂逻辑被机械分叉为多厂代码，或只改数据源映射就宣称共享库，会掩盖跨厂同号数据和缺行级过滤。

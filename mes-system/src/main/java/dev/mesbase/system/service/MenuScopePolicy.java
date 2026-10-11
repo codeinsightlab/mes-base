@@ -25,7 +25,7 @@ public final class MenuScopePolicy {
         while (menu != null) {
             if (!visited.add(menu.getMenuId())) throw new ServiceException("Menu hierarchy contains a cycle");
             String path = menu.getPath();
-            if (path != null && !path.equals("#") && !path.isBlank()) {
+            if (!"F".equals(menu.getMenuType()) && path != null && !path.equals("#") && !path.isBlank()) {
                 parts.add(0, path);
                 if (path.startsWith("/")) break;
             }
@@ -33,6 +33,8 @@ public final class MenuScopePolicy {
         }
         String path = String.join("/", parts);
         if (path.startsWith("/")) path = path.substring(1);
+        if (path.equals("api")) path = "";
+        else if (path.startsWith("api/")) path = path.substring(4);
         String resolved = path;
         return List.of("system", "tool", "monitor").stream()
                 .anyMatch(prefix -> resolved.equals(prefix) || resolved.startsWith(prefix + "/"));

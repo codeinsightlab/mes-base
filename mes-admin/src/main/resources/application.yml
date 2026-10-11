@@ -62,6 +62,10 @@ mes:
     # Developer metadata profile is independent of Factory Runtime bindings.
     default-datasource: dev
 
+  datasource:
+    # 每条工厂/数据源绑定缓存独立过期，命中不续期。
+    metadata-ttl-seconds: 300
+
 # Source Product infrastructure settings shared by the direct dev/prod YAML files.
 ruoyi:
   name: MES Base

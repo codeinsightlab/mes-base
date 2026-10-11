@@ -1,5 +1,7 @@
 # 认证、授权与路由改造验收
 
+> 现行路由规则见文末“后续实施：路由缓存简化”。同日先前的代际、持久失效和请求 reservation 为历史记录，已被最新用户决定取代；账号安全撤销机制保留。
+
 2026-10-11。已完成实现和规则同步；真实部署联调与同环境 HTTP 性能对测尚未验收。当前行为见 [请求准入](../development/request-admission.md)。
 
 ## 改动与保留
@@ -134,3 +136,140 @@ epoch 仍无 TTL：其值是账号版本的发行下界。会话到期或账号�
 结论：本轮三项机制修复与容量测量可接受，未发现需要重新设计的新增阻断问题。到期时间排序与失败退避解决已发现的固定用户 ID 饥饿；较新版本重置等待，旧确认/失败更新按版本隔离；批量版本查询保留账号事务一致性。记录含义与数据库已提交的错误语义已澄清。保留 Lua、暂不限制登录数量的结论与测量局限相符，不等于生产容量安全证明。
 
 保留边界：300 秒是退避上限，不是全队列完成时间保证，仍受轮询、积压、实例调度和故障持续时间影响。1,001 个账号只有 3 次版本查询，但另有 3 次批量入队与 1,001 次提交后同步 Redis 撤销；大批量账号操作的 HTTP 耗时并未由此验收，不应描述成总计只有 3 次 I/O。真实 MySQL 的 V20 迁移、索引计划和顺序赋值语义仍须部署前验证。此次只补充回执评价，`git diff --check` 通过。
+
+## 2026-10-11 实施：业务授权与路由元数据缓存
+
+> 历史记录：下述路由代际、V21 运行依赖、持久失效交付、防回填及请求 reservation 保证已由同日后续“路由缓存简化”用户决定取代；不再作为现行约束。账号安全与授权规则仍有效。
+
+本节覆盖前文“业务每请求读取全菜单”“HTTP 事务 begin 重读工厂/数据源”“6+2 查询预算”的当前实现结论，保留历史测试时间线。来源为用户本轮明确决定及 ktg-mes FactoryAccessService.executionContext / FactoryMetadataCache / ManagedDatasourceService 的只读机制参考，不迁入 ERP、默认库、JWT 或外部源。
+
+### 实际改动及产品边界
+
+- `SystemPermissionService.scopedPermissions` 不再读取全菜单或扣除平台菜单代码；当前账号/有效角色及按厂权限继续逐请求查询，请求内复用。URL 平台管理须 PLATFORM 角色、对应平台权限，工厂业务使用平台业务权限与所属工厂角色权限并集；共享/私有资源及部门 dataScope 不变，无编号1绕过。
+- 菜单归属仍用于导航、角色分配及启动/菜单编辑事务审查。按钮继承父菜单（忽略按钮自身 URL），/api 前缀按完整路径剥离。启动结合实际 AUTHORIZED URL 审查权限码跨范围复用，并检查所有非删除工厂角色的平台菜单授权（含当前停用角色）。发现问题明确报错，不自动删授权；真实存量数据本轮未审查。角色分配原约束保留。之前可能被静默过滤的错误配置现在会阻止启动，这是明确的迁移行为变化。
+- `RoutingMetadataStore` 用共享 namespace hash 缓存路由必需定义（passwordCipher 保持加密），一次 Lua 读取代际/epoch/payload，命中不查工厂/数据源。缺失用 `RoutingMetadataMapper.definition` 一次 JOIN 加载、CAS 发布；不存在的请求工厂 ID 不写共享 hash，避免任意 ID 使缓存无限增长。多个同时 miss 可各自读取 DB，但同代际发布等价，失效/重建后旧读取发布被拒。没有缓存运行对象或权限。
+- V21 `sys_routing_metadata` 是中心配置代际/失效交付确认单行。管理增改删、启停、解绑与推进代际同事务，提交后统一 Redis 失效；失败仍有持久未确认意图，后台 5 秒重送/条件确认。TTL 300 秒仅兜底，旧确认不确认新代际、旧失败不覆盖新记录。
+- 已有精简账号/角色 SELECT 同时投影最低路由代际到 `AdmissionAccount`，不是新增 authRevision，也不进入 Redis 身份。Redis READ 原子清空低于该代际的内容，因此 DB 提交后失效失败也不能让后续请求用旧缓存准入。没有新增独立 HTTP 中心查询；非 HTTP 无该投影时独立读取代际。Redis 读/发布失败或连续 CAS 冲突拒绝 503，无本地旧值兜底。
+- 提交后失效失败为 503/ROUTING_INVALIDATION_PENDING，配置已经保存，不应重复提交；不宣称回滚或 DB/Redis 原子。成功提交后也保留意图到后台持久确认。退休回调先于可能失败的失效回调，Redis 故障不能跳过本节点池退休。
+- `BusinessRequestSnapshot` 存于 HTTP 请求属性，Core Scope 不变。入口保留版本 reservation，但不建池/取连接；Spring begin 复用快照懒取租约，事务/SQL/cache guard 不读新管理配置。同 HTTP 多事务及 REQUIRES_NEW 使用原快照，非 HTTP 独立事务新准入。请求结束/ASYNC onComplete 释放 reservation，异常及线程 Scope/PageHelper 清理保留。
+- `RuntimeRegistry` 按具体 runtime 保留使用资格；旧池退休不影响已有 snapshot/lease，甚至旧冷快照在新版本出现后也能创建退休池而不替换新 current。同版本停用再启用也创建新 active 池，新请求不加入旧退休池；旧 poolId 的关闭不会删除新池物理证据。旧 owner 的 reservation（尚未建池也算）和 lease 未排空不移交同数据源身份。
+- Managed 准备采用版本分段锁，同组并发只建 1 池；物理 JDBC 检查在短全局发布锁外，发布原子检查跨源物理库重复。失败准备关闭未发布池。普通工厂名称编辑失效 metadata 而不退休池；绑定/状态/版本变化退休，后台核对负责跨节点闲池回收。2 DataSource / 2 SessionFactory / 2 TM 和固定包扫描不变。
+
+随机 Bearer、有效期/不续期、会话撤销、每请求账号/角色/权限、资源 owner/scope、部门范围、前端选厂/旧响应保护均未改。本轮没有改变前端实现、Quartz 真实执行器或 OpenAPI 消费者，也没有建设在线迁库系统。切库允许在途旧请求写旧库、新请求写新库的重叠，需部署/运维另行安排。
+
+### 请求预算与性能证据边界
+
+条件：有效 Bearer、显式 X-Factory-Id、metadata 命中、池已暖、工单分页 offset=0/limit=20，非空结果。
+
+| 情况 | Redis 正常调用 | 中心 SELECT | 业务 SELECT |
+| --- | --- | --- | --- |
+| 暖工单分页 | 会话 read 1；路由 READ Lua 1 | 2：账号/角色/最低代际 1，当前厂权限 1 | 2：count + list |
+| metadata 首次 miss | 上述 + PUBLISH Lua 1 | 上述 + 工厂/数据源 JOIN 1 | 暖池仍 2 |
+| 冷池/缺显式选厂/非 HTTP | 不能套用暖请求预算 | 无头可能多偏好读 1；default miss 多候选和定义；非 HTTP 多代际读 | 冷池 JDBC 初始化与 server_uuid/DATABASE 探测另计 |
+
+`ProWorkorderRequestBudgetTest` 执行实际 TokenService/SystemTokenFilter/入口授权/Managed 快照/事务/分页 Mapper，并逐请求断言 Redis 调用与真实 StatementHandler SQL；首请求 3 中心、后续 2 中心，业务均 2，无完整用户密码/全菜单/暖 metadata SQL。相对同链路原 6+2 去除 4 次中心 SELECT。原最初 16+2 是旧开发库 HTTP 证据，不能直接与新 H2 样本比较耗时。
+
+最终结果与测试命令在下方记录。JSON 为 target/validation/pro-workorder-request-budget.json；H2+synthetic Redis、无 HTTP socket，耗时含 JVM/fixture 调度，仅回归参考，不是真实服务延迟证明。单独的隔离 Redis 用例证明真实 Lua，而不把预算 fixture 说成真实 Redis/多厂 MySQL 性能。
+
+### 新增和保留验证
+
+- RoutingMetadataRedisTest：自有随机 loopback Redis、临时目录、两个独立连接；失效传播、迟到回填 CAS、控制 hash 消失重建、延迟旧失效、事务回滚不交付、提交后失效失败持久恢复、最低代际清旧缓存、旧确认/失败不影响新代际、读/发布故障无 fallback。DB 为 H2。
+- ManagedColdPoolTest：真实 Managed 准备/锁路径，Druid 与物理 JDBC probe 为 mock；16 并发请求仅创建 1 池；旧冷 snapshot 在新版本之后仍能完成并关闭旧池；同版本重新准入不使用退休池，旧池独立关闭；探测失败关闭未发布池。
+- RequestSnapshotTransactionTest：两个独立 H2 库，真实 Spring begin/suspend/resume/commit/rollback/cleanup；退休后第一次连接、同请求多事务/REQUIRES_NEW、异常回滚、切厂拒绝、A/B 并发、请求异常/ASYNC 完成释放及冷 owner 移交拒绝。
+- RoleScopePermissionTest：真实按角色/厂 Mapper SQL、合并权限及后续撤权、业务授权没有全菜单调用、URL 平台负例、历史错误授权拒绝、跨范围同码拒绝、按钮父归属、分配/导航保留。
+- 原 DedicatedDatabasePersistenceTest、PersistenceDeepAuditTest、SessionAdmissionTest、安全 HTTP、资源/部门范围、装配与生成器测试继续通过，没有删除隔离/事务负例以降低测试要求。ManagedRuntimeMySqlTest 的旧 resolve 建池断言已迁到真实 begin；真实 MySQL opt-in 没有启用。
+
+### 部署前要求与未验证边界
+
+V21 是新的中心迁移文件，仅新增恢复状态表/单行；未执行真实迁移。运行新代码前须按序准备 V21，缺表不提供旧结构兼容。共享中心库的各节点须相同 namespace/JDBC URL 表示；不同环境/项目须使用独立 mes.system.cache-namespace。所有管理写节点须升级并推进代际，旧节点/人工 SQL 不具备即时失效协议；混合版本上线、备份回退或手工绕过需受控安排，不能用 TTL 宣称一致。
+
+未验证：真实 MySQL V21/SQL 计划、多节点部署、真实管理变更/池故障、真实同环境 HTTP 延迟、新旧库数据一致性、Redis Cluster/故障转移/备份恢复、浏览器/UI。没有访问/修改生产、执行真实迁移、重启用户服务、Git 提交/推送。前端源码未改，本轮不重跑 UI test/build；旧响应保护原验收不等于此次浏览器重测。packaged smoke 用 system/platform/runtime=false 的隔离默认进程，无真实 Redis/JDBC，不代替 system=true 的部署验收。
+
+开始/当前后端 main/7fb750199d7088ce2145c5f78750260c15f2d363；参考 ktg-mes master/42a81cc577dc77b05a6a67f6be0a9466e40784e1，参考 application.yml 已有修改只读。既有 Codegen Skill/codegen 文档、AGENTS 和性能报告修改保留，本轮只追加/修改相关规则段；没有写 application.yml。工作开始曾记录配置 dirty，最终该文件未显示差异，来源无法由本轮工具确定，不将其变化算作本轮实现。前端工作区清洁。
+
+### 本轮最终执行结果
+
+- IDEA 定向格式化及 `./scripts/format-java --check`：30 个本轮修改/新增 Java 文件通过（检查日志 `/tmp/mes-route-format-check-complete.log`）；没有格式化无关 Java。
+- 定向最终池/事务/预算回归：`mvn -B -ntp test -Dtest=ManagedColdPoolTest,RequestSnapshotTransactionTest,ProWorkorderRequestBudgetTest,PersistenceDeepAuditTest,DedicatedDatabasePersistenceTest -Dsurefire.failIfNoSpecifiedTests=false`：41 项通过，0 失败/错误/跳过，含同版本重新准入；日志 `/tmp/mes-route-versions2.log`。后续仅补齐程序式注册的冷 reservation owner 保护与未知工厂不入缓存，再由最终全量 verify 覆盖。
+- `mvn -B -ntp test -Dmes.test.redis=true`：242 项，238 通过、4 个真实 MySQL opt-in 跳过、0 失败/错误；日志 `/tmp/mes-route-test-final.log`。这是同版本重新准入补充前的全量 test，最终补充由下一条 verify 覆盖，不能将这一条说成最终源码的单独 test 复跑。
+- 最终 `mvn -B -ntp verify -Dmes.test.redis=true`：243 项，239 通过、4 个真实 MySQL opt-in 跳过、0 失败/错误，BUILD SUCCESS；日志 `/tmp/mes-route-verify-final-retry.log`。包括最终缓存未知 ID 不发布、同版本新旧池、Lua 与事务用例，verify 已执行 Maven test 阶段及最终打包。
+- 真实隔离 Redis：8.10.2，自有临时端口/目录、禁用持久化，两个独立 Lettuce 客户端，RoutingMetadataRedisTest 通过。未接触用户现有 Redis；另包含既有会话 Lua 验证。与 H2 中心事务混合，不能称为真实 MySQL 多实例验收。
+- `/usr/bin/python3 scripts/smoke-packaged.py`：10 通过、0 失败；日志 `/tmp/mes-route-smoke-final-retry.log`，产物 target/validation/packaged-smoke.json。自有默认隔离进程执行 loopback HTTP，未重启用户服务。
+- 两仓 `git diff --check` 通过；结束后端 HEAD 仍 7fb750199d7088ce2145c5f78750260c15f2d363，前端工作区清洁；未执行 Git 写操作。
+- 最终工单 fixture 20 次样本（5 次预热之外）：p50 4.560ms、p95 6.943ms；实际预算 Redis 逻辑调用 2、中心 SELECT 2、业务 SELECT 2。逻辑调用不是 Redis 脚本内部命令数；脚本首次加载/失败重试可增加 wire 命令。无真实 HTTP/Redis/MySQL 时延对测，不对外承诺该毫秒数。
+
+首次全量验证暴露 InfrastructureContextTest 的“权限服务零调用”旧断言（启动现在审查 catalog），最初角色用例仍期待业务权限集合的旧菜单减法；均迁移到真实新入口和 URL 负例。冷池 fixture 初版 mock Connection 与 DruidPooledConnection 协变返回不符，已修正。最终运行不保留这些失真断言。上述迭代失败不算通过证据。
+
+补充最终回执核对：此前一次完整 verify 在最后追加“未知工厂不写共享 hash”的测试断言编译前启动，因此不把那次通过作为新增断言的覆盖证据。重新完整 verify（/tmp/mes-route-verify-receipt.log）中新增 RoutingMetadataRedisTest（含 UNKNOWN 断言）通过，但已有 RedisRevocationCapacityTest 执行约 3499 秒并在新版本会话存活检查失败；用例会话绝对有效期为 600 秒，结果与长时间运行跨越到期相符，未据此修改会话实现或放宽断言，也未证明具体系统暂停原因。随后不改源码再次完整 verify（最终日志 /tmp/mes-route-verify-final-retry.log）约 49.6 秒通过，243 项/4 跳过，UNKNOWN 断言已编译并通过；最终打包 smoke 10/10。容量失败和之前通过均保留，最终结论采用本次覆盖完整源码的重跑。
+
+### 同日独立复核：是否过度设计
+
+只读核对 V21、RoutingMetadataMapper、FactoryMetadataCache 和 RoutingMetadataStore，
+没有重新运行测试。单行 generation 是跨节点路由配置版本的持久事实；
+delivered_generation 表达 Redis 交付确认，两者职责不同。请求账号准入顺带读取
+generation，保证失效交付失败时新请求仍可拒绝旧缓存；后台交付不承担中止已准入请求。
+因此新增单行表本身不判为过度设计；无独立请求 SQL 不代表代际投影没有数据库成本。
+epoch 防 Redis hash 过期/删除后，同代际旧发布混入新缓存实例，不只是重复数据库版本。
+
+发现可收敛行为：changed 成功失效不立即持久确认，后台再 invalidate；脚本条件
+g<=ARGV[1] 在同代际重复交付也 DEL 整个 hash 并更换 epoch。提交后新请求刚填好的
+暖缓存会被随后确认重试再次清空；多节点重复交付或确认失败可重复产生冷缓存和 CAS
+冲突。建议同代际且已有合法 epoch 的交付幂等，只有代际落后/状态缺失才清空重建；
+需保留 hash 丢失重建和迟到旧发布防护测试，不直接把所有 <= 机械改为 <。
+
+全局单行代际及整 hash 失效会使一个工厂修改影响其他工厂缓存，也串行化管理写入，
+目前管理低频可接受，不据此提前拆分每工厂版本或引入通用事件框架。固定 5 秒轮询
+每实例重复读取属于有限维护成本；持续失败应审查退避和日志限频。当前建议是保留
+最小持久代际/恢复机制，优化重复失效；未证明真实性能、MySQL 多实例或全部池并发正确性。
+
+## 2026-10-11 后续实施：路由缓存简化
+
+用户确认低频配置接受短暂 DB/缓存不一致。本节取代此前路由代际、V21 运行依赖、持久失效、防回填和请求 reservation 约束；账号安全撤销不变。SOURCE_PRODUCT_PORT：保留请求内绑定与节点池方向，不照搬 ktg-mes 的 hash 共用 TTL 或 generation Lua。
+
+### 删除及保留
+
+- 删除 AdmissionAccount 与账号 SQL 的路由代际投影，复用原 SysUserResult 的精简无密码查询。RoutingMetadataMapper 只保留绑定 JOIN，默认候选及定义也合为一次 JOIN；旧 ManagedFactoryExtraMapper/XML 删除，默认选择测试迁到真实新入口。
+- RoutingMetadataStore 删除 generation/epoch/Redis Lua；FactoryMetadataCache 删除代际推进、确认/失败/轮询恢复与确认事务；删除 ROUTING_INVALIDATION_PENDING。不新增路由 outbox 或框架。
+- 删除 RuntimeRegistry.Reservation、registerReserved、hasVersion 及历史冷池保留。请求只保存 binding 与懒取租约函数，删除专为 reservation 释放存在的 AsyncListener。已取得事务租约才保护旧池，包括尚未取 JDBC 连接者。新活动版本拒绝旧候选替换；请求尚未开事务不保证能取得旧池。
+- 保留平台 URL/角色证明、业务权限合并、资源归属、业务授权去全菜单、Redis 身份、每请求账号/角色/权限、authRevision、会话撤销 outbox/Lua/恢复、V19/V20 中文备注和有效期。两个 DS/SF/TM、固定扫描、无默认回退、双向跨库、挂起恢复、异常清理保留。
+- 暖池直接租借；同数据源身份分段锁冷创建，失败候选只关闭一次，关闭失败可重试。仅已有租约排空关闭；同版本新旧池独立，旧池关闭不删除新实例物理证据。普通名称编辑不退休池。
+
+### 缓存及管理变更语义
+
+Redis string 独立键 `factory-routing:entry:binding:<id>` 与 `factory-routing:entry:default`，沿用 SystemCacheNamespace 项目/环境隔离。显式基础配置 `mes.datasource.metadata-ttl-seconds: 300`。每条 SET 单独带固定 TTL，GET 不续期，其他键写入不延长旧键。未知 ID/无默认候选不缓存；只存定义与加密 cipher，不存明文密码、运行资源或授权。
+
+审查 ManagedDatasourceService.save/status/delete/saveFactory/deleteFactory：原事务注册提交后淘汰，数据源变更查询相关绑定厂列表，工厂变更按自身 ID，全部清理 default；回滚不淘汰。淘汰失败记录 ERROR，接口返回原修改成功结果，不伪装回滚、不鼓励重复提交。不保证全节点立即生效。允许旧读取在淘汰后回填，TTL 从回填发布时间起算，300 秒不是从管理提交起算的绝对收敛上限，也不限制在途请求寿命。Redis 读/发布失败 503，缓存过期后 DB 失败明确失败；无本地过期兜底。
+
+旧租约完成不受管理变化干涉。退休池不接受新租约；旧快照不阻止退休关闭，也不保证新事务成功。短暂缓存仍启用时可能创建新的活动池，原跨节点池核对及条目过期使其收敛，不承诺即时停用或在线迁库。真正切库仍可能有新旧库写入重叠。
+
+### 查询预算与链路
+
+入口 Redis 恢复身份 → 中心精简账号/角色准入 → Redis 定义（miss 一次 JOIN）→ 请求授权并保存 binding → Spring begin 取池租约 → SQL/固定身份 guard → completion 归还/排空。
+
+显式 Factory、AUTHORIZED 工单页、暖池，不含后台维护和启动审查：
+
+| 元数据状态 | Redis 逻辑往返 | 中心 SELECT | 业务 SELECT |
+| --- | --- | --- | --- |
+| 命中 | 2：身份 HGET + 定义 GET | 2：账号/角色 + 当前权限 | 2：count + page |
+| 未命中 | 3：上述 GET + SET 带 TTL | 3：上述查询 + 绑定 JOIN | 2 |
+
+请求内与事务 begin 不重复 metadata I/O。偏好可另加中心查询，default miss 一次 JOIN；非 HTTP 独立事务不读路由代际。冷池另计 JDBC 建连与业务/中心各一次物理身份探测；定期池核对 2 次中心查询另计。ProWorkorderRequestBudgetTest 首请求断言中心 3 次，后续 2 次，并拒绝全菜单、密码字段及重复配置查询。
+
+### 迁移、工作区与部署边界
+
+后端 main/7fb750199d7088ce2145c5f78750260c15f2d363；UI main/6702f527be7c0e58acf424255eacbe0b196a5799（干净、未修改）；ktg-mes master/42a81cc577dc77b05a6a67f6be0a9466e40784e1 只读，原 application.yml 修改未触碰。原 codegen/Skill、独立架构/过度设计审查等工作区改动保留。
+
+V21 此前新增未跟踪，Git 全历史无该文件提交；此前执行记录只有 H2，未执行真实迁移。但不能在禁止访问用户真实数据库的范围内确认是否由他人手工应用，因此按用户要求保留原文件、不重写可能已应用迁移、不新增 DROP。代码和测试无该表依赖；新安装执行完整历史迁移仍会建立无用途历史表。确认全部目标环境未应用后才可另行移除文件；真实表清理另行授权。本轮没有真实迁移、用户服务重启、提交/推送、前端修改或生产访问。
+
+### 实际验证
+
+- IDEA 定向格式化及 `--check`：15 个 Java 通过，日志 `/tmp/mes-routing-simple-format-check.log`。
+- 首次定向失败：拆除投影时填错 SysUser 类型路径；改为复用原结果映射。重跑定向 27 项通过，日志 `/tmp/mes-routing-simple-target2.log`。其后补充关闭失败重试测试，由最终 verify 覆盖。
+- 首次 `clean verify` 失败：装配要求的显式 TTL 配置缺失；基础 YAML 补齐后重跑，未放宽配置要求。日志 `/tmp/mes-routing-simple-verify.log`。
+- 最终 `mvn -B -ntp verify -Dmes.test.redis=true`：全 reactor 250 项，246 通过、4 个 MySQL opt-in 跳过，0 失败/错误。以本次命令日志 `/tmp/mes-routing-simple-verify-final.log` 为证据，不混入其他运行的 XML 报告。
+- 自有 loopback Redis、两个独立 Lettuce 客户端：独立 TTL、命中/其他写入不续期、提交淘汰/回滚、失败后过期、允许回填、未知 ID、读取/发布故障及过期后 DB 故障通过；数据库为 H2。会话真实 Lua/容量测试通过，安全撤销没有误删。
+- ManagedColdPoolTest 5 项通过：16 并发创建 1 池、旧候选拒绝/清理、同版本租约排空、探测失败、关闭失败重试且不影响活动池。RequestSnapshotTransactionTest 3 项及既有 20 项分库/13 项深审、权限/HTTP/会话专项通过。
+- `/usr/bin/python3 scripts/smoke-packaged.py`：10/10，日志 `/tmp/mes-routing-simple-smoke.log`。自有默认 loopback 进程，无真实 Redis/JDBC，不重启用户服务。
+- 工单 H2/synthetic Redis 预算 2 中心 + 2 业务；20 个计时样本 p50 4.644ms、p95 16.662ms。仅 Fixture 回归，不与早期 HTTP 16+2/一秒实测计算提升幅度。
+- 两仓 `git diff --check` 通过。真实 MySQL/执行计划、多实例服务部署、Redis Cluster/故障转移/备份恢复、真实同环境 HTTP 性能与浏览器/UI 未验证。
+- 额外检查最终 JAR 及嵌套模块：AdmissionAccount、RuntimeRegistry.Reservation、旧 ManagedFactoryExtraMapper/XML 均不存在，基础 YAML 包含显式 300 秒 TTL。执行期间出现的其他工作区改动（包括 FoundationInitializationTest）未覆盖，测试计数以最终命令日志为准。

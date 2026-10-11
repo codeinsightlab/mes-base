@@ -10,6 +10,9 @@ import dev.mesbase.core.factory.FactoryId;
 import dev.mesbase.core.factory.FactoryScope;
 import dev.mesbase.core.factory.FactoryStatus;
 import dev.mesbase.infrastructure.persistence.BusinessRuntimeBinding;
+import dev.mesbase.infrastructure.persistence.BusinessPersistenceResolver;
+import dev.mesbase.infrastructure.persistence.BusinessRequestSnapshot;
+import dev.mesbase.system.factory.FactoryExecutionMetadata;
 import dev.mesbase.infrastructure.persistence.DatasourceIdentity;
 import dev.mesbase.infrastructure.persistence.PlatformPersistence;
 import dev.mesbase.infrastructure.persistence.RuntimeRegistry;
@@ -18,7 +21,6 @@ import dev.mesbase.system.factory.ManagedDatasource;
 import dev.mesbase.system.factory.ManagedDatasourceMapper;
 import dev.mesbase.system.factory.ManagedFactory;
 import dev.mesbase.system.factory.ManagedFactoryMapper;
-import dev.mesbase.system.factory.ManagedFactoryExtraMapper;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
@@ -41,6 +43,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Function;
 import java.util.function.Supplier;
 import javax.sql.DataSource;
@@ -82,6 +85,8 @@ public final class ManagedDatasourceService {
                               Long datasourceId, String status, long revision, String datasourceName) {
     }
 
+    private final FactoryMetadataCache metadata;
+    private final Object[] preparationLocks = new Object[64];
     private final PlatformPersistence persistence;
 
     private final ManagedDatasourceMapper sources;
@@ -94,7 +99,7 @@ public final class ManagedDatasourceService {
     private final Path ddlRoot;
     private final String nodeId = "node-" + UUID.randomUUID();
 
-    private record PoolVersion(DatasourceIdentity identity, long revision) {
+    private record PoolVersion(DatasourceIdentity identity, long revision, UUID poolId) {
     }
 
     private final ConcurrentHashMap<PoolVersion, String> physical = new ConcurrentHashMap<>();
@@ -107,7 +112,9 @@ public final class ManagedDatasourceService {
 
     public ManagedDatasourceService(PlatformPersistence persistence, DatasourcePasswordCipher cipher,
                                     RuntimeRegistry registry, DataSource platform, DruidPools.Settings settings,
-                                    Set<Class<?>> mappers, Path ddlRoot) {
+                                    Set<Class<?>> mappers, Path ddlRoot, FactoryMetadataCache metadata) {
+        this.metadata = Objects.requireNonNull(metadata);
+        for (int i = 0; i < preparationLocks.length; i++) preparationLocks[i] = new Object();
         this.persistence = persistence;
         this.sources = persistence.mapper(ManagedDatasourceMapper.class);
         this.factories = persistence.mapper(ManagedFactoryMapper.class);
@@ -240,10 +247,12 @@ public final class ManagedDatasourceService {
             var row = new ManagedDatasource(form.datasourceId(), form.datasourceName(), form.dbHost(), form.dbPort(), form.dbName(), form.dbUsername(), password, "DISABLED", old == null ? 1 : old.revision());
             if (creating) {
                 changed(sources.insert(row));
+                metadata.changed(List.of());
                 return sources.insertedId();
             }
             changed(sources.update(row));
             persistence.afterCommit(() -> retire(row.datasourceId()));
+            metadata.changed(boundFactoryIds(row.datasourceId()));
             return row.datasourceId();
         });
         return detail(id);
@@ -257,6 +266,7 @@ public final class ManagedDatasourceService {
             if (!next.equals(old.status())) {
                 changed(sources.update(new ManagedDatasource(id, old.datasourceName(), old.dbHost(), old.dbPort(), old.dbName(), old.dbUsername(), old.passwordCipher(), next, old.revision())));
                 persistence.afterCommit(() -> retire(id));
+                metadata.changed(boundFactoryIds(id));
             }
             return null;
         });
@@ -269,6 +279,7 @@ public final class ManagedDatasourceService {
             editable(row);
             changed(sources.delete(id, row.revision()));
             persistence.afterCommit(() -> retire(id));
+            metadata.changed(boundFactoryIds(id));
             return null;
         });
     }
@@ -312,6 +323,7 @@ public final class ManagedDatasourceService {
             if (old != null && old.datasourceId() != null
                     && (!Objects.equals(old.datasourceId(), row.datasourceId()) || !Objects.equals(old.status(), row.status())))
                 persistence.afterCommit(() -> retire(old.datasourceId()));
+            metadata.changed(List.of(form.factoryId()));
             return null;
         });
         return factory(form.factoryId());
@@ -324,19 +336,17 @@ public final class ManagedDatasourceService {
                 throw new FoundationException(ErrorCode.RESOURCE_CONFLICT);
             changed(factories.delete(id, revision));
             if (old.datasourceId() != null) persistence.afterCommit(() -> retire(old.datasourceId()));
+            metadata.changed(List.of(id));
             return null;
         });
     }
 
     public Optional<Factory> defaultFactory() {
-        return persistence.readOnly(s -> Optional.ofNullable(
-                        s.mapper(ManagedFactoryExtraMapper.class).defaultBusinessFactory()))
-                .map(ManagedDatasourceService::core);
+        return Optional.ofNullable(metadata.defaultDefinition()).map(value -> core(value.factory()));
     }
 
     public Optional<Factory> find(FactoryId id) {
-        return persistence.readOnly(s -> Optional.ofNullable(s.mapper(ManagedFactoryMapper.class).find(id.value())))
-                .map(ManagedDatasourceService::core);
+        return Optional.ofNullable(metadata.definition(id.value())).map(row -> core(row.factory()));
     }
 
     public List<Factory> enabled(int offset, int limit) {
@@ -404,57 +414,91 @@ public final class ManagedDatasourceService {
         if (offset < 0 || limit < 1 || limit > 100) throw new FoundationException(ErrorCode.BAD_REQUEST);
     }
 
-    public BusinessRuntimeBinding resolve(FactoryScope scope) {
-        var f = factoryRecord(scope.factoryId().value());
-        if (!"ENABLED".equals(f.status())) throw new FoundationException(ErrorCode.FACTORY_DISABLED);
-        if (f.datasourceId() == null) throw new FoundationException(ErrorCode.RUNTIME_NOT_CONFIGURED);
-        var source = persistence.readOnly(s -> required(s.mapper(ManagedDatasourceMapper.class)
-                .find(f.datasourceId())));
-        if (!"ENABLED".equals(source.status())) throw new FoundationException(ErrorCode.RUNTIME_NOT_CONFIGURED);
-        var binding = new BusinessRuntimeBinding(scope.factoryId(), identity(source.datasourceId()), source.revision());
-        if (!registry.contains(binding)) {
-            // Only cold preparation/publication is serialized; hot admission reads do not share this lock.
-            synchronized (this) {
-                if (!registry.contains(binding)) {
-                    var current = factoryRecord(scope.factoryId().value());
-                    var latest = persistence.readOnly(s -> required(s.mapper(ManagedDatasourceMapper.class)
-                            .find(source.datasourceId())));
-                    if (!"ENABLED".equals(current.status()) || !Objects.equals(current.datasourceId(), source.datasourceId())
-                            || !"ENABLED".equals(latest.status()) || latest.revision() != source.revision())
-                        throw new FoundationException(ErrorCode.CONFLICT);
-                    var pool = DruidPools.create(settings, "business-managed-" + source.datasourceId(), source.jdbcUrl(), source.dbUsername(), cipher.decrypt(source.passwordCipher()));
-                    boolean transferred = false;
-                    try {
-                        String database = physicalIdentity(pool);
-                        if (database.equals(physicalIdentity(platform)) || physical.entrySet().stream()
-                                .anyMatch(e -> !e.getKey().identity()
-                                        .equals(binding.datasourceIdentity()) && e.getValue().equals(database)))
-                            throw new FoundationException(ErrorCode.RESOURCE_CONFLICT);
-                        registry.retire(binding.datasourceIdentity());
-                        var version = new PoolVersion(binding.datasourceIdentity(), binding.revision());
-                        registry.registerDedicated(binding.factoryId(), binding.datasourceIdentity(), binding.revision(), pool, () -> {
-                            pool.close();
-                            physical.remove(version);
-                        }, mappers);
-                        transferred = true;
-                        physical.put(version, database);
-                        initialized.put(source.datasourceId(), binding);
-                    } finally {
-                        if (!transferred) pool.close();
-                    }
-                }
-            }
-        }
-        return binding;
+    private static BusinessRuntimeBinding binding(FactoryExecutionMetadata definition) {
+        if (definition == null) throw new FoundationException(ErrorCode.FACTORY_NOT_FOUND);
+        if (!"ENABLED".equals(definition.factoryStatus())) throw new FoundationException(ErrorCode.FACTORY_DISABLED);
+        var source = definition.datasource();
+        if (source == null || !"ENABLED".equals(source.status()))
+            throw new FoundationException(ErrorCode.RUNTIME_NOT_CONFIGURED);
+        return new BusinessRuntimeBinding(new FactoryId(definition.factoryId()), identity(source.datasourceId()), source.revision());
     }
 
-    private synchronized void retire(long id) {
-        registry.retire(identity(id));
-        initialized.remove(id);
+    public BusinessRuntimeBinding resolve(FactoryScope scope) {
+        return BusinessRequestSnapshot.current(scope).map(BusinessRequestSnapshot::binding)
+                .orElseGet(() -> binding(metadata.definition(scope.factoryId().value())));
+    }
+
+    public void admit(FactoryScope scope) {
+        if (BusinessRequestSnapshot.current(scope).isPresent()) return;
+        var definition = metadata.definition(scope.factoryId().value());
+        var binding = binding(definition);
+        BusinessRequestSnapshot.install(new BusinessRequestSnapshot(binding, () -> acquire(binding, definition.datasource())));
+    }
+
+    public BusinessPersistenceResolver.Acquisition begin(FactoryScope scope) {
+        var definition = metadata.definition(scope.factoryId().value());
+        var binding = binding(definition);
+        return new BusinessPersistenceResolver.Acquisition(binding, acquire(binding, definition.datasource()));
+    }
+
+    private RuntimeRegistry.Lease acquire(BusinessRuntimeBinding binding, ManagedDatasource source) {
+        if (registry.contains(binding)) return registry.acquireDedicated(binding);
+        var lock = preparationLocks[Math.floorMod(binding.datasourceIdentity().hashCode(), preparationLocks.length)];
+        synchronized (lock) {
+            if (registry.contains(binding)) return registry.acquireDedicated(binding);
+            var pool = DruidPools.create(settings, "business-managed-" + source.datasourceId() + "-r" + source.revision(),
+                    source.jdbcUrl(), source.dbUsername(), cipher.decrypt(source.passwordCipher()));
+            var closed = new AtomicBoolean();
+            Runnable closeCandidate = () -> {
+                if (closed.compareAndSet(false, true)) {
+                    try {
+                        pool.close();
+                    } catch (RuntimeException | Error failure) {
+                        closed.set(false);
+                        throw failure;
+                    }
+                }
+            };
+            boolean transferred = false;
+            try {
+                String database = physicalIdentity(pool);
+                if (database.equals(physicalIdentity(platform)))
+                    throw new FoundationException(ErrorCode.RESOURCE_CONFLICT);
+                var version = new PoolVersion(binding.datasourceIdentity(), binding.revision(), UUID.randomUUID());
+                synchronized (physical) {
+                    if (physical.entrySet().stream()
+                            .anyMatch(e -> !e.getKey().identity().equals(binding.datasourceIdentity())
+                                    && e.getValue().equals(database)))
+                        throw new FoundationException(ErrorCode.RESOURCE_CONFLICT);
+                    registry.registerDedicated(binding.factoryId(), binding.datasourceIdentity(), binding.revision(), pool, () -> {
+                        closeCandidate.run();
+                        physical.remove(version);
+                    }, mappers);
+                    transferred = true;
+                    physical.put(version, database);
+                }
+                initialized.put(source.datasourceId(), binding);
+                return registry.acquireDedicated(binding);
+            } finally {
+                if (!transferred) closeCandidate.run();
+            }
+        }
+    }
+
+    private List<String> boundFactoryIds(long id) {
+        return factories.byDatasources(List.of(id)).stream().map(ManagedFactory::factoryId).toList();
+    }
+
+    private void retire(long id) {
+        var lock = preparationLocks[Math.floorMod(identity(id).hashCode(), preparationLocks.length)];
+        synchronized (lock) {
+            registry.retire(identity(id));
+            initialized.remove(id);
+        }
     }
 
     /**
-     * Cross-node changes retire idle pools too; admission itself always reads the center directly.
+     * Cross-node reconciliation retires idle pools; request admission uses fixed-TTL shared metadata.
      */
     @Scheduled(fixedDelayString = "${mes.datasource.reconcile-ms:5000}")
     public void reconcileInitializedPools() {

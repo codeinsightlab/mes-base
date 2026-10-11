@@ -3,6 +3,7 @@ package dev.mesbase.platform.web;
 import com.github.pagehelper.PageHelper;
 import dev.mesbase.core.error.FoundationException;
 import dev.mesbase.platform.execution.FactoryContext;
+import dev.mesbase.infrastructure.persistence.BusinessRequestSnapshot;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -46,6 +47,7 @@ public final class RequestBoundaryFilter extends OncePerRequestFilter {
             ErrorWriter.write(failure.code(), request, response);
         } finally {
             try {
+                BusinessRequestSnapshot.finish(request);
                 FactoryContext.clear();
                 previous.ifPresent(FactoryContext::bind);
             } finally {

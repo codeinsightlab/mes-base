@@ -13,6 +13,8 @@ import dev.mesbase.system.mapper.SysMenuMapper;
 import dev.mesbase.system.mapper.SysRoleMapper;
 import dev.mesbase.system.mapper.SysRoleMenuMapper;
 import dev.mesbase.system.service.SystemPermissionService;
+import dev.mesbase.system.service.MenuScopePolicy;
+import java.util.Map;
 import dev.mesbase.system.domain.WorkspaceRoleScope;
 import dev.mesbase.core.factory.FactoryId;
 import dev.mesbase.core.factory.FactoryScope;
@@ -70,10 +72,11 @@ class RoleScopePermissionTest {
         RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(new MockHttpServletRequest()));
         try {
             assertEquals(Set.of("system:role:list", "business:order:read"), service.permissions("fixture", null));
-            assertEquals(Set.of("business:order:read"), service.permissions("fixture", "A"));
-            assertEquals(Set.of("business:order:read"), service.permissions("fixture", "A"));
+            assertEquals(Set.of("business:order:read", "system:role:list"), service.permissions("fixture", "A"));
+            assertEquals(Set.of("business:order:read", "system:role:list"), service.permissions("fixture", "A"));
             verify(menus, times(1)).selectScopedPermissions("fixture", "A");
-            assertFalse(service.grantedFactory("fixture", "A", "system:role:list"));
+            assertTrue(service.grantedFactory("fixture", "A", "system:role:list"));
+            verify(menus, never()).selectMenuList(any());
         } finally {
             RequestContextHolder.resetRequestAttributes();
         }
@@ -117,6 +120,7 @@ class RoleScopePermissionTest {
             assertTrue(service.grantedFactory("fixture", "A", "business:order:read"));
             when(menus.selectScopedPermissions("fixture", "A")).thenReturn(Set.of());
             assertTrue(service.grantedFactory("fixture", "A", "business:order:read"));
+            verify(menus, never()).selectMenuList(any());
             service.menuCatalog();
             service.menuPolicy();
             service.menuPolicy();
@@ -168,8 +172,14 @@ class RoleScopePermissionTest {
         assertFalse(service.workspaces("platformOnly").platformBusiness());
         assertFalse(service.workspaces("disabled").platformBusiness());
         assertEquals(Set.of("system:role:list", "business:order:read"), service.permissions("platform", null));
-        assertEquals(Set.of("business:order:read"), service.permissions("platform", "F1"));
-        assertEquals(Set.of("business:order:read"), service.permissions("platform", "F2"));
+        assertEquals(Set.of("business:order:read", "system:role:list"), service.permissions("platform", "F1"));
+        assertEquals(Set.of("business:order:read", "system:role:list"), service.permissions("platform", "F2"));
+        // Legacy invalid assignments are rejected explicitly, not silently filtered per request.
+        assertThrows(ServiceException.class, service::validateMenuAuthorization);
+        try (var c = source.getConnection(); var sql = c.createStatement()) {
+            sql.execute("DELETE FROM sys_role_menu WHERE role_id=2 AND menu_id IN (2,5)");
+        }
+        service.validateMenuAuthorization();
         assertEquals(Set.of("business:other:read"), service.permissions("factory", "F1"));
         assertEquals(Set.of(), service.permissions("factory", "F2"));
         assertEquals(Set.of(), service.permissions("factory", null));
@@ -178,7 +188,7 @@ class RoleScopePermissionTest {
         assertTrue(service.grantedPlatform("platform", "business:order:read"));
         assertFalse(service.grantedPlatform("factory", "system:role:list"));
         assertFalse(service.grantedPlatform("disabled", "system:role:list"));
-        assertFalse(service.grantedFactory("platform", "F1", "system:role:list"));
+        assertTrue(service.grantedFactory("platform", "F1", "system:role:list"));
         assertFalse(service.grantedFactory("platform", "", "business:order:read"));
         assertFalse(service.grantedFactory("platform", null, "business:order:read"));
         assertAuthorizationChain(service);
@@ -274,6 +284,25 @@ class RoleScopePermissionTest {
         role.setMenuIds(new Long[]{2L, 3L});
         service.insertRoleMenu(role);
         verify(bindings).batchRoleMenu(any());
+    }
+
+    @Test
+    void menuAuditRejectsCrossScopeCodesAndButtonsInheritParentDespiteOwnPath() {
+        var platform = menu(1L, 0L, "/api/system", "");
+        var button = menu(2L, 1L, "/pro/ignored", "shared:action");
+        button.setMenuType("F");
+        var business = menu(3L, 0L, "systematic", "shared:action");
+        var policy = new MenuScopePolicy(List.of(platform, button, business));
+        assertTrue(policy.platform(button));
+        assertFalse(policy.platform(business));
+        var menus = mock(SysMenuMapper.class);
+        when(menus.selectMenuList(any())).thenReturn(List.of(platform, button, business));
+        var service = new SystemPermissionService(menus, mock(SysRoleMapper.class), mock(ManagedFactoryMapper.class));
+        assertThrows(ServiceException.class, service::validateMenuAuthorization);
+        when(menus.selectMenuList(any())).thenReturn(List.of(platform, button));
+        when(menus.selectFactoryAssignedMenuIds()).thenReturn(List.of());
+        assertThrows(ServiceException.class, () -> service.installEndpointScopes(Map.of("shared:action", false)));
+        service.installEndpointScopes(Map.of("shared:action", true));
     }
 
     private static SysMenu menu(Long id, Long parent, String path, String permission) {

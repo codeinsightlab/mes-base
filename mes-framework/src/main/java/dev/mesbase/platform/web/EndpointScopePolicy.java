@@ -20,6 +20,14 @@ public final class EndpointScopePolicy {
         return matches(relative(path), SHARED);
     }
 
+    /**
+     * Factory discovery and selection do not require a business database binding.
+     */
+    public static boolean factorySelection(String path) {
+        return List.of("/foundation/factories", "/foundation/context", "/foundation/preference")
+                .contains(relative(path));
+    }
+
     public static EndpointAccess.PermissionScope scope(String path) {
         return platformManagement(path) || shared(path)
                 ? EndpointAccess.PermissionScope.PLATFORM : EndpointAccess.PermissionScope.FACTORY;

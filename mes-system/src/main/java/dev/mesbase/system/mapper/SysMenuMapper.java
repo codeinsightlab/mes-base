@@ -13,6 +13,8 @@ import java.util.Set;
  * @author ruoyi
  */
 public interface SysMenuMapper {
+    List<Long> selectFactoryAssignedMenuIds();
+
     Set<String> selectScopedPermissions(@Param("username") String username,
                                         @Param("factoryId") String factoryId);
 

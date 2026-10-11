@@ -12,7 +12,7 @@
 
 偏好仅表示本人上次选择。显式请求选厂优先；无显式值时恢复仍存在/启用的偏好，否则保留空 Scope。未知/停用显式厂明确失败。不存在编号1或首启用厂回退。本人身份来自认证上下文，不接受 userId 代传。
 
-生产使用随机 opaque Bearer；system=false 的隔离 fixture 保留 stateless Basic、空默认账号与拒绝授权。Redis 身份快照不含密码/角色/权限；每个请求一次读取无密码的账号 fence 和当前角色，当前部门编号及角色 dataScope 保留。权限、角色证明与全菜单 URL 分类在请求属性内复用，下一请求重新查中心；授权改变无需重新登录。authRevision 仅用于账号状态/删除/密码变更，不用于角色或菜单权限版本。PLATFORM 业务权限与当前厂 FACTORY 权限并集、空范围拒绝、无 userId=1 特例保持。
+生产使用随机 opaque Bearer；system=false 的隔离 fixture 保留 stateless Basic、空默认账号与拒绝授权。Redis 身份快照不含密码/角色/权限；每个请求一次读取无密码的账号 fence 和当前角色，当前部门编号及角色 dataScope 保留。权限与角色证明在请求属性内复用；全菜单 URL 分类只在导航/角色分配/启动和菜单编辑审查中执行，下一请求重新查中心；授权改变无需重新登录。authRevision 仅用于账号状态/删除/密码变更，不用于角色或菜单权限版本。PLATFORM 业务权限与当前厂 FACTORY 权限并集、空范围拒绝、无 userId=1 特例保持。
 
 禁用、删除、改密在同一中心事务写 sys_session_revocation；提交后按用户会话索引原子撤销旧认证版本，失败记录可恢复并返回 SESSION_REVOCATION_PENDING（账号变更已提交）。后台重试条件确认对应版本后删除记录；DB fence 在 Redis 交付失败窗口仍拒绝旧会话。登录发布与撤销通过 Redis Lua epoch 顺序化，更新版本的新会话不被延迟旧事件删除。退出仅删除本会话。不是跨 DB/Redis 原子提交；已通过入口的请求不重新撤销。会话绝对有效期不续期，v2 格式启用后原旧格式会话需要重新登录。
 
@@ -33,3 +33,13 @@
 SOURCE_PRODUCT_PORT：迁入 Source 中心库 mf_user_preference 参数化 upsert 与认证主体归属；Factory ID 从 BIGINT 适配 Base VARCHAR(64)。生产偏好按受信任 LoginUser.userId 保存，重命名不丢失，不接受客户端 userId。system 禁用 fixture 保留内存实现。持久读写使用 masterTransactionManager，Mapper 按 system 固定包自动归中心库。
 
 登录、刷新与候选变更查询服务端 context；浏览器 factoryId 不替代服务端决策。切换先清旧权限，PUT 保存成功后加载新厂权限，revision 拒绝注销/切换后的旧响应。选厂不创建角色或权限；无角色仍只能访问 AUTHENTICATED。
+
+## 2026-10-11 修订：取消业务授权全菜单读取
+
+接口 URL 是请求范围边界，去 /api 后完整段 /system、/tool、/monitor 为平台管理；共享个人入口与资源证明保持。平台管理需有效 PLATFORM 角色及声明权限，业务使用平台业务授权与当前工厂授权并集。授权结果仅请求内缓存，不缓存到长寿命 Redis。
+
+取消业务权限集合的菜单范围减法：历史错误 FACTORY→平台菜单授权改为启动/管理校验显式拒绝，权限码跨平台/业务 URL 或菜单范围复用同样拒绝。按钮忽略自身路径，继承父菜单归属，/api 前缀按完整段剥离。未自动修改真实授权，部署需核查；不能把新校验引起的启动失败解释为路由故障。RoleScopePermissionTest 验证真实 SQL、错误授权、菜单分配和 URL 平台负例。
+
+## 2026-10-11 路由缓存简化边界
+
+路由代际和请求 reservation 被固定 TTL 缓存决定取代；本 ADR 的账号状态/认证版本准入、会话撤销 outbox、每请求角色/权限、平台 URL 与资源边界保持。菜单分类不回到业务请求热路径。

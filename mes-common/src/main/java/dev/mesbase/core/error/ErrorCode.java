@@ -7,6 +7,7 @@ public enum ErrorCode {
     CONFLICT(409, "Execution binding changed"), UNPROCESSABLE(422, "Request cannot be processed"),
     FACTORY_SCOPE_REQUIRED(400, "Select a factory explicitly"), FACTORY_NOT_FOUND(404, "Factory not found"),
     FACTORY_DISABLED(422, "Factory is disabled"), RUNTIME_NOT_CONFIGURED(422, "Business runtime is not configured"),
+    ROUTING_METADATA_UNAVAILABLE(503, "路由元数据暂时不可用，请稍后重试"),
     AUTHENTICATION_UNAVAILABLE(503, "认证服务暂时不可用，请稍后重试"),
     SESSION_REVOCATION_PENDING(503, "账号变更已保存，会话撤销待重试；旧会话准入已拒绝"),
     EXECUTION_UNKNOWN(503, "Database saved; scheduler result UNKNOWN. Retry synchronization or check task logs"), INTERNAL_ERROR(500, "Internal server error");

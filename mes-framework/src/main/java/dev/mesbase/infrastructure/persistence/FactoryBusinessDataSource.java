@@ -28,9 +28,21 @@ public final class FactoryBusinessDataSource extends AbstractDataSource implemen
     }
 
     public void begin() {
-        BusinessRuntimeBinding binding = resolver.resolve(FactoryContext.required());
-        RuntimeRegistry.Lease lease = registry.acquireDedicated(binding);
-        TransactionSynchronizationManager.bindResource(key, new Selection(binding, lease, FactoryContext.pinCurrent()));
+        var snapshot = BusinessRequestSnapshot.current(FactoryContext.required());
+        BusinessPersistenceResolver.Acquisition acquired = snapshot
+                .map(value -> new BusinessPersistenceResolver.Acquisition(value.binding(), value.acquire()))
+                .orElseGet(() -> resolver.begin(FactoryContext.required(), registry));
+        BusinessRuntimeBinding binding = acquired.binding();
+        RuntimeRegistry.Lease lease = acquired.lease();
+        FactoryContext.Pin pin = null;
+        try {
+            pin = FactoryContext.pinCurrent();
+            TransactionSynchronizationManager.bindResource(key, new Selection(binding, lease, pin));
+        } catch (RuntimeException | Error failure) {
+            if (pin != null) pin.close();
+            lease.close();
+            throw failure;
+        }
     }
 
     public void verify() {

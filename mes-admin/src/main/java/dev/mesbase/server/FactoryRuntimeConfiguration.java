@@ -10,7 +10,14 @@ import dev.mesbase.infrastructure.persistence.PlatformPersistence;
 import dev.mesbase.infrastructure.persistence.RuntimeRegistry;
 import dev.mesbase.server.managed.DatasourcePasswordCipher;
 import dev.mesbase.server.managed.ManagedDatasourceService;
+import dev.mesbase.server.managed.FactoryMetadataCache;
+import dev.mesbase.common.core.redis.RoutingMetadataStore;
+import dev.mesbase.common.core.redis.SystemCacheNamespace;
+import org.springframework.data.redis.core.StringRedisTemplate;
+import dev.mesbase.core.factory.FactoryScope;
+import dev.mesbase.infrastructure.persistence.BusinessRuntimeBinding;
 import java.nio.file.Path;
+import java.time.Duration;
 import java.util.List;
 import java.util.Optional;
 import javax.sql.DataSource;
@@ -33,18 +40,29 @@ public class FactoryRuntimeConfiguration {
     }
 
     @Bean
+    RoutingMetadataStore routingMetadataStore(StringRedisTemplate redis, SystemCacheNamespace namespace,
+                                              Environment env) {
+        return new RoutingMetadataStore(redis, namespace, Duration.ofSeconds(env.getRequiredProperty("mes.datasource.metadata-ttl-seconds", Long.class)));
+    }
+
+    @Bean
+    FactoryMetadataCache factoryMetadataCache(PlatformPersistence persistence, RoutingMetadataStore store) {
+        return new FactoryMetadataCache(persistence, store);
+    }
+
+    @Bean
     ManagedDatasourceService managedDatasources(Environment env,
                                                 PlatformPersistence persistence,
                                                 @Qualifier("masterDataSource") DataSource masterDataSource,
                                                 RuntimeRegistry registry,
-                                                OwnerMapperCatalog catalog) {
+                                                OwnerMapperCatalog catalog, FactoryMetadataCache metadata) {
         if (!env.getProperty("mes.platform.enabled", Boolean.class, false))
             throw new IllegalArgumentException("Factory Runtime requires explicit Platform persistence");
         var key = env.getRequiredProperty("mes.runtime.datasource-key");
         var mappers = catalog.types(PersistenceOwner.Kind.BUSINESS);
         return new ManagedDatasourceService(persistence,
                 new DatasourcePasswordCipher(key), registry, masterDataSource, DruidPools.settings(env), mappers, Path.of(env.getRequiredProperty("mes.platform.file-root"))
-                .resolve("managed-ddl"));
+                .resolve("managed-ddl"), metadata);
     }
 
     @Bean
@@ -66,7 +84,15 @@ public class FactoryRuntimeConfiguration {
 
     @Bean
     BusinessPersistenceResolver runtimeResolver(ManagedDatasourceService service) {
-        return service::resolve;
+        return new BusinessPersistenceResolver() {
+            public BusinessRuntimeBinding resolve(FactoryScope scope) {
+                return service.resolve(scope);
+            }
+
+            public Acquisition begin(FactoryScope scope, RuntimeRegistry registry) {
+                return service.begin(scope);
+            }
+        };
     }
 
 }

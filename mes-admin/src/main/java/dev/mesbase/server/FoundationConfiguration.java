@@ -2,6 +2,8 @@ package dev.mesbase.server;
 
 import dev.mesbase.core.error.ErrorCode;
 import dev.mesbase.core.factory.FactoryCatalog;
+import dev.mesbase.server.managed.ManagedDatasourceService;
+import org.springframework.beans.factory.ObjectProvider;
 import dev.mesbase.core.factory.FactoryPreference;
 import dev.mesbase.core.factory.FactorySelectionService;
 import dev.mesbase.core.security.AuthorizationService;
@@ -18,7 +20,6 @@ import dev.mesbase.platform.web.ErrorWriter;
 import dev.mesbase.platform.web.FoundationAccessInterceptor;
 import java.util.List;
 import java.util.Map;
-import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
@@ -127,10 +128,12 @@ public class FoundationConfiguration {
 
     @Bean
     WebMvcConfigurer accessRules(FactorySelectionService selection, AuthorizationService authorization,
-                                 ObjectProvider<PlatformAuthorization> platform) {
+                                 ObjectProvider<PlatformAuthorization> platform,
+                                 ObjectProvider<ManagedDatasourceService> managed) {
         return new WebMvcConfigurer() {
             public void addInterceptors(InterceptorRegistry registry) {
-                registry.addInterceptor(new FoundationAccessInterceptor(selection, authorization, platform.getIfAvailable(() -> (actor, permission) -> false)));
+                registry.addInterceptor(new FoundationAccessInterceptor(selection, authorization, platform.getIfAvailable(() -> (actor, permission) -> false),
+                        managed.getIfAvailable() == null ? null : managed.getObject()::admit));
             }
         };
     }

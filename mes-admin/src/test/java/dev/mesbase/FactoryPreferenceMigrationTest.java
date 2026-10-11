@@ -14,7 +14,7 @@ import dev.mesbase.core.security.Permission;
 import dev.mesbase.infrastructure.catalog.InMemoryFactoryPreference;
 import dev.mesbase.infrastructure.security.InMemoryRoleAuthorization;
 import dev.mesbase.infrastructure.catalog.DatabaseFactoryPreference;
-import dev.mesbase.system.factory.ManagedFactoryExtraMapper;
+import dev.mesbase.system.factory.RoutingMetadataMapper;
 import dev.mesbase.system.factory.MfUserPreferenceMapper;
 import java.util.List;
 import java.nio.charset.StandardCharsets;
@@ -115,25 +115,25 @@ class FactoryPreferenceMigrationTest {
     void defaultUsesEnabledBusinessBindingsAndNumericFactoryIdRatherThanDatasourceId() throws Exception {
         var fixture = fixture();
         var jdbc = fixture.jdbc();
-        jdbc.execute("CREATE TABLE mf_datasource (datasource_id BIGINT PRIMARY KEY, status VARCHAR(16))");
+        jdbc.execute("CREATE TABLE mf_datasource (datasource_id BIGINT PRIMARY KEY, status VARCHAR(16), datasource_name VARCHAR(64), db_host VARCHAR(64), db_port INT, db_name VARCHAR(64), db_username VARCHAR(64), password_cipher VARCHAR(64), revision BIGINT)");
         jdbc.execute("CREATE TABLE mf_factory (factory_id VARCHAR(64) PRIMARY KEY, enterprise_id VARCHAR(64), factory_code VARCHAR(64), factory_name VARCHAR(128), datasource_id BIGINT, status VARCHAR(16), revision BIGINT)");
-        var mapper = fixture.sessions().getMapper(ManagedFactoryExtraMapper.class);
-        assertEquals(null, mapper.defaultBusinessFactory());
-        jdbc.update("INSERT INTO mf_datasource VALUES (100, 'ENABLED'), (1, 'ENABLED'), (2, 'DISABLED')");
+        var mapper = fixture.sessions().getMapper(RoutingMetadataMapper.class);
+        assertEquals(null, mapper.defaultDefinition());
+        jdbc.update("INSERT INTO mf_datasource(datasource_id,status) VALUES (100, 'ENABLED'), (1, 'ENABLED'), (2, 'DISABLED')");
         insert(jdbc, "10", 1L, "ENABLED");
-        assertEquals("10", mapper.defaultBusinessFactory().factoryId());
+        assertEquals("10", mapper.defaultDefinition().factoryId());
         insert(jdbc, "2", 100L, "ENABLED");
         insert(jdbc, "1", 2L, "ENABLED");
         insert(jdbc, "0", null, "ENABLED");
         insert(jdbc, "00", 1L, "DISABLED");
         insert(jdbc, "A", 1L, "ENABLED");
-        assertEquals("2", mapper.defaultBusinessFactory().factoryId());
+        assertEquals("2", mapper.defaultDefinition().factoryId());
         insert(jdbc, "9999999999999999999999999999999999999999999999999999999999999999", 1L, "ENABLED");
-        assertEquals("2", mapper.defaultBusinessFactory().factoryId());
+        assertEquals("2", mapper.defaultDefinition().factoryId());
         jdbc.update("UPDATE mf_datasource SET status='DISABLED' WHERE datasource_id=100");
-        assertEquals("10", mapper.defaultBusinessFactory().factoryId());
+        assertEquals("10", mapper.defaultDefinition().factoryId());
         jdbc.update("UPDATE mf_datasource SET status='DISABLED'");
-        assertEquals(null, mapper.defaultBusinessFactory());
+        assertEquals(null, mapper.defaultDefinition());
     }
 
     @Test
@@ -192,7 +192,7 @@ class FactoryPreferenceMigrationTest {
         source.setURL("jdbc:h2:mem:" + System.nanoTime() + ";MODE=MySQL;DB_CLOSE_DELAY=-1");
         var configuration = new Configuration();
         configuration.addMapper(MfUserPreferenceMapper.class);
-        configuration.addMapper(ManagedFactoryExtraMapper.class);
+        configuration.addMapper(RoutingMetadataMapper.class);
         var bean = new SqlSessionFactoryBean();
         bean.setDataSource(source);
         bean.setConfiguration(configuration);

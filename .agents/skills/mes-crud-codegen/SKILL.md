@@ -19,10 +19,10 @@ mvn -B -ntp verify
 ## 模型与生成范围
 
 - 用户模型优先。无完整模型时由 Agent 按 AGENTS 建模，表与每列提供数据库 COMMENT，主键外仅新增普通索引。建表 SQL 的保存、执行和真实 metadata 读取是不同步骤，不擅自对真实库执行 DDL。
-- 简单和复杂业务都为生成能力支持的表生成完整基础后端，供其他业务复用；跨表协调、状态规则和业务动作尽量由一个代表业务用例的 Service 聚合生成的基础 Service 编排，需要时引入小领域。生成入口不能绕过业务规则。前端可以不生成，也可以生成后暂不使用。
+- 表设计完成后，无论简单或复杂都生成完整基础后端；真实表未建时先保存 SQL，建表后读取 metadata 生成。结构超出能力须明确报告并完善生成机制，不静默手写替代。简单业务用生成 CRUD；纯数据访问可直接调用生成 Mapper。包含业务校验、状态转换、计算或副作用的能力，即使单表也由对应业务 Service 实现；聚合 Service 调用这些能力协调流程与事务，不能直接改表绕过规则。不强制经过生成 CRUD Service，不增加纯转发层，需要时引入小领域。前端可不生成或生成后暂不使用。
 - 当前结构支持单主键 Long/Integer/String 的单表，不支持复合主键、未知类型或实际物理外键。不得根据 user_id、owner_id、password 等字段名推断业务并拒绝整表；敏感响应及主体/资源授权由使用方审查。
 - 复用 MBG MyBatis3/XMLMAPPER 生成 Entity、Example/Criteria、Mapper/XML，上层 Spring Service/Controller 与真实 Mapper 同步；分页用 PageHelper，不生成 DISTINCT、注解 SQL、锁查询、Factory 字段或谓词。
-- 单表操作一律复用生成的 Mapper/XML/Example，禁止生成或手写 ExtraMapper/Extra XML，不能以自定义 DAO/Repository 改名绕过。条件复杂、单表统计、批量或状态规则均不构成例外；能力不足修补通用生成机制，不只补某个表。只有跨表关联查询允许 Extra，且不复制单表 CRUD；生成器不自动生成跨表 Extra，Service 聚合多个生成 Service 也不要求 Extra。
+- 单表操作一律复用生成的 Mapper/XML/Example，禁止生成或手写 ExtraMapper/Extra XML，不能以自定义 DAO/Repository 改名绕过。条件复杂、单表统计、批量或状态规则均不构成例外；能力不足修补通用生成机制，不只补某个表。只有跨表关联查询允许 Extra，且不复制单表 CRUD；生成器不自动生成跨表 Extra，业务 Service 分别调用多个生成 Mapper 也不要求 Extra。
 - 目标目录/包、事务、HTTP 路由/范围、权限和 UI 引用由配置显式提供。Base 使用方核对固定包扫描、平台 URL 及双库约定；生成器不改 Maven reactor、不装配连接、不授予角色。
 
 ## 工作流

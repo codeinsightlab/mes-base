@@ -1,5 +1,8 @@
 # Copy to mes-admin/src/main/resources/application-dev.yml and fill actual server/password values directly.
 mes:
+  datasource:
+    # 每条工厂/数据源绑定缓存独立过期，命中不续期。
+    metadata-ttl-seconds: 300
   platform:
     enabled: true
     migrate: false

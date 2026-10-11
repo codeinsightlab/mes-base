@@ -294,7 +294,9 @@ public class SysMenuServiceImpl implements ISysMenuService {
         menu.setMenuId(null);
         BeanValidators.validateWithException(contractValidator, menu);
         validateMenu(menu);
-        return menuMapper.insertMenu(menu);
+        int changed = menuMapper.insertMenu(menu);
+        permissionService.validateMenuAuthorization();
+        return changed;
     }
 
     /**
@@ -310,7 +312,9 @@ public class SysMenuServiceImpl implements ISysMenuService {
         if (menu.getMenuId() == null || menuMapper.selectMenuById(menu.getMenuId()) == null)
             throw new ServiceException("菜单不存在");
         validateMenu(menu);
-        return menuMapper.updateMenu(menu);
+        int changed = menuMapper.updateMenu(menu);
+        permissionService.validateMenuAuthorization();
+        return changed;
     }
 
     private boolean catalogManagementAllowed() {
@@ -355,7 +359,9 @@ public class SysMenuServiceImpl implements ISysMenuService {
     @Override
     @Transactional(transactionManager = "masterTransactionManager", rollbackFor = Exception.class)
     public int deleteMenuById(Long menuId) {
-        return menuMapper.deleteMenuById(menuId);
+        int changed = menuMapper.deleteMenuById(menuId);
+        permissionService.validateMenuAuthorization();
+        return changed;
     }
 
     /**

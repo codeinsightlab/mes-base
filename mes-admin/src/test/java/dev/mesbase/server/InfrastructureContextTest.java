@@ -46,6 +46,8 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.verify;
+import static org.mockito.ArgumentMatchers.anyMap;
 
 /**
  * TEST ONLY production infrastructure with H2 pools and mocked business/Redis dependencies.
@@ -145,8 +147,8 @@ class InfrastructureContextTest {
             assertSame(context.getBean(SystemTokenFilter.class), registration.getFilter());
             assertTrue(context.getBean("xss", FilterRegistrationBean.class).isEnabled());
             assertEquals(1, context.getBeansOfType(RequestBoundaryFilter.class).size());
-            verifyNoInteractions(context.getBean(ISysUserService.class),
-                    context.getBean(SystemPermissionService.class));
+            verifyNoInteractions(context.getBean(ISysUserService.class));
+            verify(context.getBean(SystemPermissionService.class)).installEndpointScopes(anyMap());
 
             scheduler = context.getBean(Scheduler.class);
             assertTrue(scheduler.isStarted());

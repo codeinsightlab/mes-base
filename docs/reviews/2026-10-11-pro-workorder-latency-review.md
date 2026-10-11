@@ -1,5 +1,9 @@
 # 生产工单分页接口耗时审查
 
+> 现行路由规则见文末“后续实施：低频路由配置简单缓存”。先前强一致设计仅保留历史证据，已由最新用户决定取代。
+
+本轮简化验收：独立条目固定 TTL 300 秒，命中不续期；提交淘汰、失败日志/正常成功结果、允许旧回填，过期或 Redis 读取故障明确失败。删除路由代际/epoch/CAS/恢复/账号投影与请求 reservation；保留账号安全撤销与事务租约。暖工单 Redis 2/中心 2/业务 2，miss Redis 3/中心 3/业务 2，绑定与默认筛选均一次 JOIN。最终 verify 250 项（246 通过、4 MySQL 跳过），IDEA 15 Java、smoke 10/10 通过。H2 p50 4.644ms/p95 16.662ms 不是实际 HTTP 提升证明。详细变更、首次失败修复与 V21 保留依据见请求准入实施报告文末。
+
 日期：2026-10-11；范围：`GET /api/pro/pro-workorder?offset=0&limit=20`。
 本轮仅审查与运行采样，未修改业务代码、配置、数据库结构或业务数据，未启动/重启服务。
 保留任务开始前的所有未提交修改。此前同类基础设施风险见
@@ -263,3 +267,108 @@ insert.sql 包含原行数和批次未存在断言，不能直接重跑累加。
 已验证的是 dev 数据库直接写入和 SQL 数据核验，不是 UI/API 创建流程或生产验收，
 未调用 ERP，也未执行 HTTP 压测。本次没有 Java/配置改动，未运行 Maven；后续性能测量
 须标明表已从 28 行增至 100028 行，不能继续沿用上文小数据量测量作为当前性能结论。
+
+## 2026-10-11：ktg-mes 普通分页请求的静态查询预算
+
+只读核对旧项目 HEAD `42a81cc5` 当前源码，以 GET `/mes/pro/workorder/list`、
+有效登录 Token、显式 `X-Factory-Id`、工厂/数据源 Redis 缓存命中及业务池已加载为前提。
+以下为调用链推导，不是实际 HTTP/SQL 计数；排除登录、首次建池、连接校验和监控请求。
+
+| 分支 | 中心 SELECT | 业务 SELECT | 正常 Redis 调用 |
+| --- | --- | --- | --- |
+| 普通用户 | 3：当前厂角色、当前厂菜单权限、部门数据范围 | 2：分页 count 与列表 | 5：会话 GET 1，工厂与数据源各 generation Lua + HGET 2 |
+| 超级管理员（SysUser.isAdmin） | 2：角色与部门范围；菜单权限直接使用通配授权 | 2：分页 count 与列表 | 同上 5 |
+
+没有显式选厂头时，FactoryAccessService.context 会额外查一次用户选厂偏好；
+正常非空元数据的工厂和数据源缓存都未命中时，额外增加 2 次中心 SELECT 和
+2 次发布 Lua。缓存发布设置整体 Redis hash TTL 300 秒，命中读取不续期。
+Token 接近续期阈值（源码常量 20 分钟）时，额外写一次 Redis 会话；
+普通权限注解从请求内 LoginUser 检查，不再次查询数据库。
+
+关键证据：旧项目 TokenService.getLoginUser/refreshToken；
+FactoryRequestInterceptor.preHandle；FactoryAccessService.executionContext/context；
+FactoryAuthorizationService.authorize；FactoryRoleService.userRoles/userMenus/departments；
+FactoryRoleExtraMapper.xml 三条查询；SysPermissionService.getMenuPermission；
+FactoryMetadataCache.read；ManagedDatasourceService.resolve/datasource；
+ProWorkorderController.list → ProWorkorderServiceImpl.selectProWorkorderList → Mapper。
+
+当前 ktg-mes 的 Redis 会话明确移除角色和权限，工厂角色/权限仍每请求读取，
+不能描述为“Token 有效期内全部授权只从 Redis 获取”。它减少中心读取的重要机制是
+工厂/数据源 Redis 元数据缓存及请求内路由快照。Base 的 6 次预算另包含实时账号/版本
+读取和全菜单分类，工厂/数据源则未使用相同元数据缓存。两者语义有差异，不能仅按数字
+直接替换。此前口头将完整 Redis 授权快照视为当前 ktg-mes 方案的说法需要更正。
+
+未启动或修改旧项目，未执行真实接口、数据库或 Redis 操作；未修改业务代码和配置。
+
+### 同日补充：Base 平台列表与业务列表的路径差异
+
+以 SysRoleController.list 的 AUTHORIZED 平台分页作对照：Redis 身份及精简账号/角色
+准入仍共用，但 FoundationAccessInterceptor 的平台分支不解析 FactoryScope，平台角色
+从本请求准入加载的角色复用；SystemPermissionService.permissions(user, null) 不进入
+businessOnly 分支，不加载全菜单分类；中心列表直接使用 master 入口，无业务绑定解析。
+常规非空分页可静态推导为 1 次账号/角色 + 1 次权限 + 2 次分页 SELECT，合计约 4 次
+中心 SELECT；没有实际请求计数验证，不将该数推广到所有系统接口。
+
+工单分页已验证的隔离预算为 6 次中心 + 2 次业务 SELECT，其中多出的入口工厂、
+全菜单分类、事务工厂及数据源共 4 次中心读取解释了结构差异。相同授权规则并不要求
+相同数据库路径或耗时；两种列表的数据量、SQL、网络距离和连接池冷热也须分别测量。
+中心库后台任务持续借连接使其更可能处于暖状态，业务池可能空闲；这是源码支持的
+候选解释，尚无截图对应的计时/池指标证明。保留当前配置修改，未调整或重启服务。
+
+### 同日补充：请求快照、缓存与内存池的职责
+
+用户质疑逐请求全菜单分类、重复工厂校验，以及已加载池仍读取数据库配置。
+复核 ktg-mes FactoryAccessService.executionContext：工厂与数据源从
+FactoryMetadataCache 读取，启用绑定生成不可变 Snapshot(factoryId, datasourceId,
+datasourceRevision)，另含该旧项目 ERP 编码（不建议迁入 Base）。其
+ManagedDatasourceService.resolve 优先使用 Snapshot；datasource(binding) 按数据源
+ID/版本查 registry.peek，命中直接返回池。Base 已加载池也复用，但 begin 调用 resolver
+仍先读取工厂与数据源，故复用池不等于复用绑定元数据。
+
+对用户建议的评价（方案建议，未实施）：
+
+- HTTP 平台/业务归属由 URL 确定，两边均可按对应角色范围和显式操作权限授权。
+  每请求全菜单分类不是 URL 规则的必然要求；菜单归属与业务角色授权限制仍需在配置入口
+  落实，但不必由每个业务请求读取完整菜单实现。若取消请求分类，需同时审查已有错误
+  授权与同权限码跨 URL 复用行为，不能把当前“菜单分类也参与业务许可”的行为变化隐藏。
+- 工厂/数据源元数据可以缓存，修改提交后统一失效，并在请求内复用绑定快照。
+  缓存必须覆盖工厂绑定、启停、数据源连接与版本的变更入口；多实例共享失效结果。
+  数据库提交与 Redis 失效之间并非原子操作，失败应明确可恢复；TTL 只能兜底，不能称为
+  立即失效保证。ktg-mes 使用 generation 防旧读取回填和 300 秒 TTL，失效失败上抛，
+  此类事务后异常并不撤销已提交的数据库配置。本轮不宣称其具有持久失效补偿。
+- 连接池是节点内运行资源，不放入 Redis；其配置元数据可以放 Redis。
+  加入管理不等于立即建池；首次实际访问懒加载，后续相同绑定/版本复用。
+  暖池最终借连接与中心池相似，但业务入口仍需选择正确池，并处理配置版本变化。
+- 已准入请求/事务使用固定租约完成；新请求从有效缓存生成新绑定，配置变化时旧池
+  按 Base 已有退休排空机制处理，禁止缓存失效立即关闭仍有事务使用的池。
+  保留 Core FactoryScope 仅含 FactoryId，绑定快照放执行/基础设施上下文，不机械复制
+  旧项目 Scope 携带 ERP 字段的实现。
+
+结论：用户建议有源码依据；动态路由必需，但每请求重复中心读取不是动态路由的必然
+成本。仅审查并追加结论，未修改运行实现，未验证真实性能或缓存失效并发行为。
+
+## 2026-10-11 实施更新：授权去全菜单与缓存绑定快照
+
+> 历史记录：下述路由代际、V21 运行依赖、持久失效交付、防回填及请求 reservation 保证已由同日后续“路由缓存简化”用户决定取代；不再作为现行约束。账号安全与授权规则仍有效。
+
+本节取代上述方案建议/6+2 的当前实现状态，历史真实 16+2 与当时数据量/网络环境证据保留。本次已实施，不是只读方案：业务动作按 URL 范围授权，取消逐请求全菜单减法；菜单分类留给导航/角色分配/启动及菜单编辑审查。发现工厂角色错误平台菜单或跨范围权限码复用时明确拒绝启动/编辑，不自动改真实授权。
+
+新增 Redis 路由元数据及 V21 中心持久代际/失效确认，工厂/数据源变更同事务推进代际，提交后失效/恢复。代际通过既有账号/角色查询带入请求，Redis READ 原子拒绝较旧 metadata，失效失败不能只等待 TTL；旧回填验证代际+随机 epoch。读/发布失败 503，失效失败为“已保存，待恢复”，不声称 DB 回滚。缓存只含路由定义和加密 cipher；请求 snapshot/版本 reservation 在入口固定，事务复用，暖池无 metadata 查询。
+
+最新实际生产类链路预算（H2/模拟会话及路由 Redis、非真实服务）：显式选厂+缓存命中+暖池的工单分页 **2 次中心 SELECT + 2 次业务 SELECT**，Redis session read 1 + metadata READ Lua 1。中心是账号/角色/路由最低代际 1、权限 1；首次 metadata miss 另加 JOIN 1 与发布 Lua 1。默认选厂、冷池、非 HTTP 的额外成本不能隐藏在此预算内。旧同链路 6+2 减少 4 次中心 SELECT；不能用 fixture 耗时计算相对旧真实 HTTP 的速度倍数。
+
+旧请求及事务保持原 binding/租约；旧快照尚未取连接也保留使用资格。同请求多个事务复用原快照，新请求采用新配置。同版本重新启用的新请求不加入退休池；旧池及物理证据按 pool instance 排空。名称编辑不退休池，冷准备按版本分段锁，实际连接探测不持全局 resolver 锁，16 并发冷请求 fixture 只建一池。
+
+详细实现、真实隔离 Redis/Fixture/打包验证及未验证部署边界见 [请求准入实施追加报告](2026-10-11-request-admission-implementation.md) 的“业务授权与路由元数据缓存”。规则同步到 AGENTS、ADR-002/003/004、request-admission；未执行真实迁移、服务重启、提交/推送，也未重新访问真实开发/生产 HTTP/数据库。
+
+最终验收：IDEA 定向格式/检查 30 Java 通过；最终 verify 243 项（239 通过、4 MySQL opt-in 跳过、无失败/错误）；真实隔离 Redis Lua/双客户端故障验证通过；packaged smoke 10/10；两仓 diff --check 通过。最新 H2 fixture p50 4.560ms / p95 6.943ms，仅为回归样本，不是实际 HTTP 优化幅度。V21、真实现存错误授权审查及同环境性能仍需部署前单独验收。
+
+最终回执再次完整重跑 verify 通过（/tmp/mes-route-verify-final-retry.log），覆盖后来追加的未知工厂 ID 缓存断言；一次长时间运行中的既有 Redis 容量用例跨越 600 秒会话有效期并失败，详情已记入实施报告，不隐藏这次运行失败，也不把其耗时作为路由性能证据。
+
+## 2026-10-11 后续实施：低频路由配置简单缓存
+
+最新用户决定取代上节强一致协议。删除路由代际/epoch/CAS/持久恢复/账号投影/请求 reservation，保留每请求身份授权、安全会话撤销与事务租约。元数据改为独立 string 键，固定显式 TTL 300 秒，GET 不续期、其他键不延长旧键；默认候选和绑定定义也合为一次 JOIN，旧独立 selector 移除。
+
+提交后淘汰相关厂及 default；失败记录 ERROR 并返回配置已保存的正常结果，接受旧值到期及并发回填。TTL 从发布时起算，不能宣称提交后固定 300 秒内必然全节点一致。Redis 读/发布及过期后 DB 故障明确拒绝，没有持久失效协议。旧快照不保留池使用资格，已取得事务租约完成并排空；不同节点缓存短暂不一致不放松账号安全。
+
+暖工单 Redis 2/中心 2/业务 2，miss Redis 3/中心 3/业务 2。最终 verify 250 项（246 通过、4 MySQL 跳过），IDEA 15 Java、smoke 10/10 通过。H2/synthetic Redis p50 4.644ms、p95 16.662ms 不是实际 HTTP 提升证明。V21 外部应用状态无法在本轮真实 DB 禁止访问的边界内确认，保留原历史迁移、运行不依赖该表、不执行真实删表。具体源码、首次失败修复及验证边界见请求准入实施报告“后续实施：路由缓存简化”。

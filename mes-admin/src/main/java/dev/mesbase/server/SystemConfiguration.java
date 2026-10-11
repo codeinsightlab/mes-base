@@ -26,6 +26,11 @@ import dev.mesbase.system.service.SystemPermissionService;
 import java.nio.file.Path;
 import java.util.Properties;
 import java.util.Set;
+import java.util.HashMap;
+import dev.mesbase.platform.web.EndpointAccess;
+import dev.mesbase.platform.web.EndpointCatalog;
+import dev.mesbase.platform.web.EndpointScopePolicy;
+import org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerMapping;
 import org.quartz.Scheduler;
 import org.quartz.SchedulerException;
 import org.quartz.impl.StdSchedulerFactory;
@@ -33,6 +38,7 @@ import org.springframework.beans.factory.SmartInitializingSingleton;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.core.env.Environment;
@@ -45,6 +51,25 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 @EnableScheduling
 @ConditionalOnProperty(name = "mes.system.enabled", havingValue = "true")
 public class SystemConfiguration {
+
+    @Bean
+    SmartInitializingSingleton auditAuthorizationCatalog(SystemPermissionService permissions,
+                                                         @Qualifier("requestMappingHandlerMapping") RequestMappingHandlerMapping mappings) {
+        return () -> {
+            var scopes = new HashMap<String, Boolean>();
+            mappings.getHandlerMethods().forEach((mapping, method) -> {
+                for (String path : mapping.getPatternValues()) {
+                    var access = EndpointCatalog.required(method, path);
+                    if (access.value() != EndpointAccess.Kind.AUTHORIZED) continue;
+                    boolean platform = EndpointScopePolicy.scope(path) == EndpointAccess.PermissionScope.PLATFORM;
+                    Boolean previous = scopes.putIfAbsent(access.permission(), platform);
+                    if (previous != null && previous != platform)
+                        throw new IllegalStateException("Endpoint permission is shared across platform/business scopes: " + access.permission());
+                }
+            });
+            permissions.installEndpointScopes(scopes);
+        };
+    }
 
     @Bean
     FactoryPreference persistentFactoryPreference(MfUserPreferenceMapper preferences) {
