@@ -113,6 +113,7 @@ class InfrastructureContextTest {
             }
             context.getEnvironment().getPropertySources().addFirst(new MapPropertySource("TEST ONLY", Map.ofEntries(
                     Map.entry("mes.system.enabled", true),
+                    Map.entry("open-api.enabled", false),
                     Map.entry("mes.platform.enabled", true),
                     Map.entry("mes.platform.migrate", false),
                     Map.entry("mes.platform.url", "jdbc:h2:mem:" + UUID.randomUUID()),

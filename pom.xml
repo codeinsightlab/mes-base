@@ -17,7 +17,6 @@
         <module>mes-framework</module>
         <module>mes-quartz</module>
         <module>mes-generator</module>
-        <module>mes-openapi</module>
         <module>mes-business</module>
         <module>mes-admin</module>
     </modules>

@@ -299,3 +299,37 @@ V21 此前新增未跟踪，Git 全历史无该文件提交；此前执行记录
 - Node v22.23.1：`npm run test` 132 通过，`npm run build` 通过（既有 bundle 大小提示）；8 个变更前端文件定向 ESLint 通过。新增请求专用码/普通 422 区分、旧错误不干扰新上下文、登录和刷新保留身份、重新选厂及零候选回归。
 - IDEA 9 个变更 Java 定向格式化与 `--check` 通过；`scripts/smoke-packaged.py` 自有隔离进程 10/10；两仓 `git diff --check` 通过。
 - 尚未验证用户服务编译重启后的真实浏览器闭环与真实 MySQL 新 SQL；未重启用户服务、修改真实数据库、手工淘汰缓存、提交或推送。用户已有配置、密码工具和性能报告改动保留。回滚范围为本节列出的代码/测试/规则变更，无数据库迁移。
+
+## 2026-10-12 用户要求恢复 OpenAPI 移除部分
+
+### 目标与来源
+
+用户明确指出没有确认移除客户端管理、密钥/Token、API 授权、独立外部认证链与管理页面，要求回滚这些移除部分。
+恢复使用本仓库已迁入版本：后端 `1c2ada6^`、前端 `cef3072^`，不回退整个提交，不改变此前请求准入/路由缓存/工厂恢复工作。
+
+### 修改范围
+
+- 恢复 common/system/framework/admin 的客户端模型、DTO/VO、Mapper/XML、具名 Spring 事务 Service、客户端 Controller、Redis Token/Lua、限流、API grants、独立外部 SecurityFilterChain、数据范围策略开关与目录/诊断。
+- 恢复前端 OpenAPI 应用页面与 API、侧栏图标。一次性 Secret 只在创建/重置时展示，关闭/离开即清空；不保存到浏览器存储。
+- SystemTokenFilter 跳过完整 /open-api 路径段；FoundationAccessInterceptor 明确处理外部 OpenApiPrincipal，禁止把 appKey 当成后台用户或解析其选厂偏好。EndpointCatalog 校验独立外部入口声明，不将其划到 MES 工厂授权链。平台/工厂权限规则与双库拓扑不变。
+- 删除被取代的 mes-openapi 仅文档模块/reactor/profile 与重复元数据模型，标准构建包含完整实现，运行仍由 mes.system.enabled/open-api.enabled 控制。当前已有 open-api.enabled 取值保留，补齐原限流/TTL/namespace/data-scope 配置。
+- 按当前单表 Extra 规则，旧 OpenApiClientExtraMapper 的三种单表访问并入主 Mapper/XML；Service 仍承担凭证规则与事务。没有调用 Codegen 替代源产品迁移，没有创建第二套单表 CRUD。
+- V10、V16 等历史迁移字节不改。新增 V22 恢复 OpenAPI 菜单/五个按钮，保留客户端及 API grants；V16 已删除的角色关联无法推断，不自动授权，部署后须管理员重新分配。
+- 替换旧退役/仅文档验证为恢复验证，更新打包检查确认恢复 Controller 存在且不残留单表 Extra。Source Product MIT 随 framework JAR 及文档保留。README、两仓 AGENTS、Platform 指南、依赖来源文档同步；历史退役结论标明已由用户恢复决定取代。
+
+### 验证与限制
+
+- 定向 OpenApiRestorationTest：生产 Spring Security/Service/Mapper XML，私有 loopback Redis，H2 中心表，内部身份为明确 synthetic fixture。覆盖应用默认禁用、启用、Token 发行、逐 API 授权与授权撤销、两种 Token 互不通用、撤销 Token、停用及重新启用旧 Token 拒绝、重置 Secret 后凭证/Token 失效、目录与敏感字段裁剪。
+- OpenApiDataScopeVerificationTest 7 项：关闭策略仍保留授权，启用要求唯一策略、策略调用/拒绝及诊断豁免。V16→V22 补偿及重复执行测试：菜单恢复、不重复、不销毁客户端/API grants、不自动补发角色授权。
+- 首轮恢复编译通过；显式 import 整理时遗漏 JDK 注解及静态导入，已补齐并重跑。新增前端 fixture 的 Vue Options 类型编译错误已修正；不放宽类型检查。
+- 首次打包 smoke 在并发构建窗口读取不到目标 JAR，重试后 10/10；为排除被删除类的增量构建残留，最终执行 clean verify 并重新检查打包。
+- 真实 MySQL、用户运行服务重启后的浏览器菜单/客户端流程、多实例 Redis/生产部署未验收；未执行真实迁移、重启用户服务、提交或推送。
+- 工作期间发现外部追加 next-stage-plan、architecture-review 及 multi-node-deployment-review 文档，保留其内容；不把外部审查证据归入本轮验证。回滚只涉及本节实现/配置/新迁移/测试/文档，无真实数据库回滚。
+
+### 本轮最终检查结果
+
+- `mvn -B -ntp -Dmes.test.redis=true clean verify`：259 项，255 通过、4 项真实 MySQL 跳过，0 失败/错误；日志 `/tmp/mes-openapi-restore-clean-verify.log`。
+- IDEA 定向格式化及 `--check`：62 个 Java 文件通过。日志 `/tmp/mes-openapi-final-format-check.log`。
+- Node v22.23.1：`npm run test` 134 项通过；`npm run build` 通过，既有大 bundle 提示保留；恢复页面/API/回归测试定向 ESLint 通过。
+- 最终 `/usr/bin/python3 scripts/smoke-packaged.py`：10/10，自有隔离启动进程，不连接用户数据库或重启用户服务；检查最终标准 JAR 包含客户端 Controller、恢复后的认证实现，且不残留仅文档模块或单表 Extra。
+- 两仓 `git diff --check` 通过。仅完成代码恢复和本地隔离验证；部署须应用 V22、重新分配相关平台菜单权限并重启用户后端，再验收真实页面。

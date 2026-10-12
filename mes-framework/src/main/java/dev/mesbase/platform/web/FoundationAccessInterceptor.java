@@ -21,6 +21,8 @@ import dev.mesbase.core.security.Permission;
 import dev.mesbase.core.error.ErrorCode;
 import dev.mesbase.core.error.FoundationException;
 import dev.mesbase.platform.execution.FactoryContext;
+import dev.mesbase.common.openapi.OpenApiPrincipal;
+import dev.mesbase.framework.openapi.OpenApiHttp;
 import dev.mesbase.platform.security.PlatformAuthorization;
 
 public final class FoundationAccessInterceptor implements HandlerInterceptor {
@@ -56,6 +58,15 @@ public final class FoundationAccessInterceptor implements HandlerInterceptor {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         if (authentication == null || !authentication.isAuthenticated() || authentication instanceof AnonymousAuthenticationToken)
             throw new FoundationException(ErrorCode.UNAUTHENTICATED);
+        if (authentication.getPrincipal() instanceof OpenApiPrincipal) {
+            // The dedicated interceptor already checks current client/API grants.
+            // External identity must never resolve an internal user's factory preference.
+            if (!OpenApiHttp.isOpenApi(request)
+                    || access.value() != EndpointAccess.Kind.AUTHENTICATED
+                    || access.permissionScope() != EndpointAccess.PermissionScope.PLATFORM)
+                throw new FoundationException(ErrorCode.FORBIDDEN);
+            return true;
+        }
         AuthenticatedActor actor = new AuthenticatedActor(authentication.getName());
         boolean platform = EndpointScopePolicy.scope(path) == EndpointAccess.PermissionScope.PLATFORM;
         if (platform) {

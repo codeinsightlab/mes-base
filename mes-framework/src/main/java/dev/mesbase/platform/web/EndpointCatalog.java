@@ -13,7 +13,11 @@ public final class EndpointCatalog {
             throw new IllegalStateException("Platform administration cannot be public: " + path);
         }
         if (access.value() != EndpointAccess.Kind.PUBLIC) {
-            if (EndpointScopePolicy.scope(path) != access.permissionScope()) {
+            boolean external = path.equals("/open-api") || path.startsWith("/open-api/");
+            if (external && (access.value() != EndpointAccess.Kind.AUTHENTICATED
+                    || access.permissionScope() != EndpointAccess.PermissionScope.PLATFORM))
+                throw new IllegalStateException("External endpoints require dedicated authenticated access: " + path);
+            if (!external && EndpointScopePolicy.scope(path) != access.permissionScope()) {
                 throw new IllegalStateException("URL scope conflicts with EndpointAccess: " + path);
             }
             if (EndpointScopePolicy.shared(path) && access.value() != EndpointAccess.Kind.AUTHENTICATED) {

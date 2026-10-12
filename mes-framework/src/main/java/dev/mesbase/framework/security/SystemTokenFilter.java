@@ -1,6 +1,7 @@
 package dev.mesbase.framework.security;
 
 import dev.mesbase.core.error.FoundationException;
+import dev.mesbase.framework.openapi.OpenApiHttp;
 import dev.mesbase.core.error.ErrorCode;
 import org.springframework.dao.DataAccessException;
 import dev.mesbase.common.core.domain.model.LoginUser;
@@ -21,6 +22,11 @@ public final class SystemTokenFilter extends OncePerRequestFilter {
 
     public SystemTokenFilter(TokenService tokens) {
         this.tokens = tokens;
+    }
+
+    @Override
+    protected boolean shouldNotFilter(HttpServletRequest request) {
+        return OpenApiHttp.isOpenApi(request);
     }
 
     @Override

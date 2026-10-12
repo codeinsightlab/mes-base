@@ -398,3 +398,22 @@ String restoredPassword = cipher.decrypt(encryptedPassword);
 本次未取得用户数据库客户端的实际密码，也未取得所述 IDEA 成功查询时的进程配置，不能确认那次查询使用的地址、启动时间或连接池状态。若预期连接当前 YAML 的目标，应使用该目标中对应账号的有效明文密码；如果预期连接旧目标，则应校对 URL。不能用 `encrypt` 或 `decrypt` 修正这种目标/凭据不匹配。
 
 验证未输出密码、密钥、完整 JDBC URL 或账号名。只执行身份只读查询，未修改数据库、配置、代码或启停服务；只追加本节，未运行 Maven 全量测试。
+
+## 2026-10-12 OpenAPI 客户端能力恢复（当前有效）
+
+用户明确要求回滚移除部分，本节取代 2026-10-10 的仅元数据模块结论及 2026-10-12 早期“完整能力后置”的范围说明；保留原文作为历史。
+恢复来源是后端 `1c2ada6^` 与前端 `cef3072^` 的已迁入版本。客户端管理、一次性 Secret、Redis Token、接口授权、独立外部认证链、管理页面与平台诊断均恢复。
+
+实现归属恢复为 common/openapi、system/openapi（中心 Mapper/XML/Service）、framework/openapi（外部认证/协议）与 admin 平台 Controller。
+删除被取代的仅文档 mes-openapi 模块、reactor 项和 -Popenapi profile，标准构建即可包含实现，不保留两份同名 Catalog Bean。
+按当前单表 Extra 规则，将旧 OpenApiClientExtraMapper 的查凭证、锁行及版本更新方法并入 OpenApiClientMapper/XML，不恢复单表 Extra；行为仍由业务 Service 和具名 Spring 事务承载。
+启用条件是 `mes.system.enabled=true` 与 `open-api.enabled=true`；现有应用开关取值保留，补齐原 namespace/TTL/限流/data-scope 配置。
+启用后 `/api/system/open-api/clients` 仍要求平台角色及相应 system:openApiClient 权限；外部 `/open-api/**` 只使用独立 OpenApiPrincipal/API grants，不作为 SysUser、不解析用户偏好或 X-Factory-Id。
+
+新建应用默认禁用，Secret 仅创建/重置时返回并设置 no-store；列表/详情不返回 secretHash。启停/重置递增凭证版本，后续外部请求校验当前客户端状态/版本；API 授权逐请求读取，撤销后不再放行。
+`POST /open-api/token` 用 appKey/appSecret 发行随机 oa_ Token；有效期内重复申请复用并刷新申请有效期，普通接口不续期；`POST /open-api/token/revoke` 撤销当前 Token。这套协议与内部随机 Bearer 不互通。
+数据范围开关仅影响业务扩展校验，不关闭凭证/API 授权/限流。打开 data-scope 时仍要求唯一 OpenApiDataScopeValidator；没有具体业务范围时保持关闭，不迁入客户工艺实体或默认业务库兜底。
+
+V10/V16 历史迁移保持原样；新增 V22 恢复系统目录下 OpenAPI 页面及五个按钮权限，保留客户端/授权数据，不猜测 V16 已删除角色关联。
+部署后需管理员重新分配菜单权限；V22 不自动赋予任何角色或外部客户端权限。本轮仅写迁移文件，未执行真实迁移。
+验证与未验证边界见请求准入实施报告的 2026-10-12 OpenAPI 恢复记录。

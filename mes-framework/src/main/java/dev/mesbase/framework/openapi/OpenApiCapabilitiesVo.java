@@ -1,0 +1,17 @@
+package dev.mesbase.framework.openapi;
+
+import io.swagger.v3.oas.annotations.media.Schema;
+import java.util.List;
+
+public class OpenApiCapabilitiesVo {
+    @Schema(description = "已授权且实际注册的接口标识，不代表全量业务数据权限", required = true)
+    private final List<String> apiCodes;
+
+    public List<String> getApiCodes() {
+        return apiCodes;
+    }
+
+    public OpenApiCapabilitiesVo(List<String> apiCodes) {
+        this.apiCodes = apiCodes;
+    }
+}

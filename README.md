@@ -76,9 +76,9 @@ Quartz 保留 Cron/启停/手动运行/日志。暂停只禁止自动触发，�
 
 ## 外部 OpenAPI
 
-OpenAPI 仅保留可选基础设施模块 `mes-openapi`：接口元数据声明、从当前 MVC 注册表动态发现目录、Springdoc 文档元数据。构建 `mvn -B -ntp -Popenapi verify` 才把模块加入 admin 的运行依赖；运行时 `open-api.enabled=true` 才装配，默认关闭。模块不依赖内部用户、角色、菜单、Factory 权限或业务数据库，不注册公开 HTTP 入口。
+OpenAPI 恢复 Source Product 的客户端管理、Secret/Token、API 授权、独立外部认证链及管理页面。代码随标准构建打包，以 `mes.system.enabled=true` 与 `open-api.enabled=true` 启用，不再使用 `-Popenapi`。
 
-旧客户端管理、Token、API 授权、数据权限、诊断/verification 及 UI 已退役。后续业务接口必须另立任务并保留宿主的显式访问控制；声明注解不会授予访问权。迁移证据与使用方式见 [Platform 指南](docs/development/platform.md#2026-10-10-openapi-仅基础设施可选模块)。
+客户端、授权存中心库；外部应用身份与后台用户身份独立，后台 Token 与 OpenAPI Token 不互通。V22 补偿 V16 删除的菜单，历史角色授权需重新审查分配，不自动授予。具体 MES 业务接口及业务数据范围按实际需求接入。详见 [Platform 指南](docs/development/platform.md)。
 
 ## SQL 与来源
 
