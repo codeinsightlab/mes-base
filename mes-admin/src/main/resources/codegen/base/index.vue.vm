@@ -30,6 +30,7 @@ const fields: Field[] = [
 #if($generateSync)
     ref="page"
 #end
+    table-key="${permission}:list"
     title="${functionNameHtml}"
     permission="${permission}"
     list-action="${listAction}"

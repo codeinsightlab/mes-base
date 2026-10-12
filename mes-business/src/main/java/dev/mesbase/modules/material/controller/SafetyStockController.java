@@ -1,4 +1,4 @@
-// MES-CODEGEN: scaffold; review required. RuoYi template pipeline adapted under MIT.
+// MES-CODEGEN: scaffold; review required.
 package dev.mesbase.modules.material.controller;
 
 import dev.mesbase.modules.material.controller.vo.SafetyStockPageVo;
@@ -10,6 +10,8 @@ import dev.mesbase.modules.material.domain.SafetyStockQueryDto;
 import dev.mesbase.modules.material.domain.SafetyStockUpdateCommand;
 import dev.mesbase.modules.material.service.ISafetyStockService;
 import dev.mesbase.platform.web.EndpointAccess;
+import dev.mesbase.platform.execution.FactoryContext;
+import dev.mesbase.modules.material.sync.SafetyStockSyncResult;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
@@ -69,7 +71,7 @@ public class SafetyStockController {
     @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED,
             permission = SafetyStockPermissions.UPDATE)
     public SafetyStockVo update(@PathVariable Long id,
-            @Valid @RequestBody SafetyStockUpdateCommand input) {
+                                @Valid @RequestBody SafetyStockUpdateCommand input) {
         return toView(service.updateById(id, input));
     }
 
@@ -78,8 +80,8 @@ public class SafetyStockController {
     @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED,
             permission = SafetyStockPermissions.DELETE)
     public void delete(@RequestBody
-            @NotEmpty @Size(max = 100)
-            List<@NotNull Long> ids) {
+                       @NotEmpty @Size(max = 100)
+                       List<@NotNull Long> ids) {
         service.deleteByIds(ids);
     }
 
@@ -93,5 +95,10 @@ public class SafetyStockController {
                 row.getStatus()
         );
     }
-}
 
+    @PostMapping("/actions/sync")
+    @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED, permission = SafetyStockPermissions.SYNC)
+    public SafetyStockSyncResult sync() {
+        return service.sync(FactoryContext.required());
+    }
+}

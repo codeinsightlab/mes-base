@@ -13,4 +13,10 @@ public interface I${ClassName}Service {
     ${domainPackage}.${ClassName}Entity updateById(${idType} id, ${domainPackage}.${ClassName}UpdateCommand input);
 
     void deleteByIds(java.util.List<${idType}> ids);
+#if($generateSync)
+    ${syncPackage}.${ClassName}SyncResult sync(dev.mesbase.core.factory.FactoryScope scope);
+
+    ${syncPackage}.${ClassName}SyncResult upsert(dev.mesbase.core.factory.FactoryScope scope,
+            java.util.List<${syncPackage}.External${ClassName}> inputs);
+#end
 }

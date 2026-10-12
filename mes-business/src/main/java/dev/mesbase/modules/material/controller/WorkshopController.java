@@ -1,4 +1,4 @@
-// MES-CODEGEN: scaffold; review required. RuoYi template pipeline adapted under MIT.
+// MES-CODEGEN: scaffold; review required.
 package dev.mesbase.modules.material.controller;
 
 import dev.mesbase.modules.material.controller.vo.WorkshopPageVo;
@@ -10,6 +10,8 @@ import dev.mesbase.modules.material.domain.WorkshopQueryDto;
 import dev.mesbase.modules.material.domain.WorkshopUpdateCommand;
 import dev.mesbase.modules.material.service.IWorkshopService;
 import dev.mesbase.platform.web.EndpointAccess;
+import dev.mesbase.platform.execution.FactoryContext;
+import dev.mesbase.modules.material.sync.WorkshopSyncResult;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
@@ -69,7 +71,7 @@ public class WorkshopController {
     @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED,
             permission = WorkshopPermissions.UPDATE)
     public WorkshopVo update(@PathVariable Long id,
-            @Valid @RequestBody WorkshopUpdateCommand input) {
+                             @Valid @RequestBody WorkshopUpdateCommand input) {
         return toView(service.updateById(id, input));
     }
 
@@ -78,8 +80,8 @@ public class WorkshopController {
     @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED,
             permission = WorkshopPermissions.DELETE)
     public void delete(@RequestBody
-            @NotEmpty @Size(max = 100)
-            List<@NotNull Long> ids) {
+                       @NotEmpty @Size(max = 100)
+                       List<@NotNull Long> ids) {
         service.deleteByIds(ids);
     }
 
@@ -93,5 +95,10 @@ public class WorkshopController {
                 row.getRemark()
         );
     }
-}
 
+    @PostMapping("/actions/sync")
+    @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED, permission = WorkshopPermissions.SYNC)
+    public WorkshopSyncResult sync() {
+        return service.sync(FactoryContext.required());
+    }
+}

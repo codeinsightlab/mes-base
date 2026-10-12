@@ -55,6 +55,15 @@ public class ${ClassName}Controller {
         service.deleteByIds(ids);
     }
 
+#if($generateSync)
+    @org.springframework.web.bind.annotation.PostMapping("/actions/sync")
+    @dev.mesbase.platform.web.EndpointAccess(value = dev.mesbase.platform.web.EndpointAccess.Kind.AUTHORIZED,
+            permission = ${ClassName}Permissions.SYNC)
+    public ${syncPackage}.${ClassName}SyncResult sync() {
+        return service.sync(dev.mesbase.platform.execution.FactoryContext.required());
+    }
+#end
+
     private static ${responsePackage}.${ClassName}Vo toView(${domainPackage}.${ClassName}Entity row) {
         return new ${responsePackage}.${ClassName}Vo(
 #foreach($field in $viewFields)

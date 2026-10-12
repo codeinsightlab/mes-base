@@ -37,7 +37,7 @@ import org.springframework.core.io.FileSystemResource;
 import org.springframework.jdbc.datasource.init.ScriptUtils;
 import java.sql.SQLException;
 import java.sql.Types;
-import dev.mesbase.platform.codegen.RuoyiTemplateRenderer;
+import dev.mesbase.platform.codegen.BusinessTemplateRenderer;
 import java.lang.reflect.InvocationTargetException;
 import java.net.URLClassLoader;
 import java.net.URL;
@@ -549,7 +549,7 @@ class CodegenAcceptanceTest {
                 column.autoIncrement(), column.defaultValue(), column.comment()) : column).toList();
         var longText = new TableMetadata(table.catalog(), table.schema(), table.table(), table.comment(),
                 columns, table.indexes(), table.references(), table.identifierQuote(), table.sqlKeywords());
-        for (var artifact : new RuoyiTemplateRenderer().render(request(null, false), longText)) {
+        for (var artifact : new BusinessTemplateRenderer().render(request(null, false), longText)) {
             if (artifact.relativePath().endsWith("Mapper.xml")) {
                 assertTrue(artifact.content().contains("selectByExampleWithBLOBs"));
                 assertFalse(artifact.content().contains("distinct"));
@@ -586,7 +586,7 @@ class CodegenAcceptanceTest {
                         false, true, false, null, null)), List.of(), List.of(), "`", Set.of("VENDOR_KEYWORD"));
         assertEquals("name", table.sqlIdentifier("name"));
         assertEquals("`VENDOR_KEYWORD`", table.sqlIdentifier("vendor_keyword").toUpperCase());
-        var files = new RuoyiTemplateRenderer().render(request(null, false), table);
+        var files = new BusinessTemplateRenderer().render(request(null, false), table);
         String xml = files.stream().filter(file -> file.relativePath().endsWith("Mapper.xml"))
                 .findFirst().orElseThrow().content();
         assertTrue(xml.contains("from `ORDER`"));

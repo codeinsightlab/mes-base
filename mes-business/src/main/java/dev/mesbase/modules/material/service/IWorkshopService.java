@@ -1,11 +1,14 @@
-// MES-CODEGEN: scaffold; review required. RuoYi template pipeline adapted under MIT.
+// MES-CODEGEN: scaffold; review required.
 package dev.mesbase.modules.material.service;
 
+import dev.mesbase.core.factory.FactoryScope;
 import dev.mesbase.modules.material.domain.WorkshopCreateCommand;
 import dev.mesbase.modules.material.domain.WorkshopEntity;
 import dev.mesbase.modules.material.domain.WorkshopPage;
 import dev.mesbase.modules.material.domain.WorkshopQueryDto;
 import dev.mesbase.modules.material.domain.WorkshopUpdateCommand;
+import dev.mesbase.modules.material.sync.ExternalWorkshop;
+import dev.mesbase.modules.material.sync.WorkshopSyncResult;
 import java.util.List;
 
 /**
@@ -23,5 +26,10 @@ public interface IWorkshopService {
     WorkshopEntity updateById(Long id, WorkshopUpdateCommand input);
 
     void deleteByIds(List<Long> ids);
+
+    WorkshopSyncResult sync(FactoryScope scope);
+
+    WorkshopSyncResult upsert(FactoryScope scope,
+                              List<ExternalWorkshop> inputs);
 }
 

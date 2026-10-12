@@ -1,26 +1,41 @@
-// MES-CODEGEN: scaffold; review required. RuoYi template pipeline adapted under MIT.
+// MES-CODEGEN: scaffold; review required.
 package dev.mesbase.modules.material.service.impl;
 
 import com.github.pagehelper.Page;
 import com.github.pagehelper.PageHelper;
 import dev.mesbase.core.error.ErrorCode;
 import dev.mesbase.core.error.FoundationException;
+import dev.mesbase.core.factory.FactoryScope;
+import dev.mesbase.framework.sync.SyncCoordinator;
+import dev.mesbase.infrastructure.cache.BusinessCacheProcessor;
+import dev.mesbase.infrastructure.cache.annotation.BusinessCacheEvict.Scope;
+import dev.mesbase.infrastructure.cache.annotation.BusinessCache;
+import dev.mesbase.infrastructure.cache.annotation.BusinessCacheEvict;
 import dev.mesbase.modules.material.dao.WorkstationMapper;
 import dev.mesbase.modules.material.domain.WorkstationCreateCommand;
 import dev.mesbase.modules.material.domain.WorkstationEntity;
 import dev.mesbase.modules.material.domain.WorkstationExample;
 import dev.mesbase.modules.material.domain.WorkstationPage;
 import dev.mesbase.modules.material.domain.WorkstationQueryDto;
+import dev.mesbase.modules.material.domain.WorkstationResource;
 import dev.mesbase.modules.material.domain.WorkstationUpdateCommand;
+import dev.mesbase.modules.material.service.BasicDataRules;
 import dev.mesbase.modules.material.service.IWorkstationService;
+import dev.mesbase.modules.material.sync.ExternalWorkstation;
+import dev.mesbase.modules.material.sync.UnconfiguredWorkstationQueryAdapter;
+import dev.mesbase.modules.material.sync.WorkstationQueryPort;
+import dev.mesbase.modules.material.sync.WorkstationSyncResult;
 import dev.mesbase.platform.execution.FactoryContext;
+import jakarta.validation.Validator;
+import java.time.Duration;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
-import org.springframework.stereotype.Service;
-import dev.mesbase.modules.material.service.BasicDataRules;
 import org.springframework.dao.DuplicateKeyException;
+import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
@@ -32,13 +47,29 @@ public class WorkstationServiceImpl implements IWorkstationService {
     private final WorkstationMapper mapper;
     private final BasicDataRules rules;
 
-    public WorkstationServiceImpl(WorkstationMapper mapper, BasicDataRules rules) {
+    private final WorkstationQueryPort query;
+    private final SyncCoordinator coordinator;
+    private final ObjectProvider<IWorkstationService> self;
+    private final Validator validator;
+    private final BusinessCacheProcessor caches;
+
+    public WorkstationServiceImpl(WorkstationMapper mapper, BasicDataRules rules
+            , ObjectProvider<WorkstationQueryPort> queries, SyncCoordinator coordinator,
+                                  ObjectProvider<IWorkstationService> self, Validator validator,
+                                  BusinessCacheProcessor caches
+    ) {
         this.mapper = mapper;
         this.rules = rules;
+        this.query = queries.getIfAvailable(UnconfiguredWorkstationQueryAdapter::new);
+        this.coordinator = coordinator;
+        this.self = self;
+        this.validator = validator;
+        this.caches = caches;
     }
 
     @Override
     @Transactional(transactionManager = "businessTransactionManager", readOnly = true)
+    @BusinessCache(business = WorkstationResource.PREFIX, type = BusinessCache.Type.LIST)
     public WorkstationPage selectPage(WorkstationQueryDto query) {
         int offset = query.offset() == null ? 0 : query.offset();
         int limit = query.limit() == null ? 20 : query.limit();
@@ -74,12 +105,14 @@ public class WorkstationServiceImpl implements IWorkstationService {
 
     @Override
     @Transactional(transactionManager = "businessTransactionManager", readOnly = true)
+    @BusinessCache(business = WorkstationResource.PREFIX, type = BusinessCache.Type.DETAIL)
     public WorkstationEntity selectById(Long id) {
         return requireRecord(id);
     }
 
     @Override
     @Transactional(transactionManager = "businessTransactionManager", rollbackFor = Exception.class)
+    @BusinessCacheEvict(business = WorkstationResource.PREFIX, scope = BusinessCacheEvict.Scope.LIST)
     public WorkstationEntity insert(WorkstationCreateCommand input) {
         WorkstationEntity row = new WorkstationEntity();
         row.setFactoryId(FactoryContext.required().factoryId().value());
@@ -97,6 +130,7 @@ public class WorkstationServiceImpl implements IWorkstationService {
 
     @Override
     @Transactional(transactionManager = "businessTransactionManager", rollbackFor = Exception.class)
+    @BusinessCacheEvict(business = WorkstationResource.PREFIX, scope = BusinessCacheEvict.Scope.LIST_AND_DETAIL)
     public WorkstationEntity updateById(Long id, WorkstationUpdateCommand input) {
         WorkstationEntity row = requireRecord(id);
         row.setId(id);
@@ -114,6 +148,7 @@ public class WorkstationServiceImpl implements IWorkstationService {
 
     @Override
     @Transactional(transactionManager = "businessTransactionManager", rollbackFor = Exception.class)
+    @BusinessCacheEvict(business = WorkstationResource.PREFIX, scope = BusinessCacheEvict.Scope.LIST_AND_DETAIL)
     public void deleteByIds(List<Long> ids) {
         if (ids == null || ids.isEmpty() || ids.size() > 100 || ids.stream().anyMatch(Objects::isNull)
                 || new HashSet<>(ids).size() != ids.size()) {
@@ -153,5 +188,98 @@ public class WorkstationServiceImpl implements IWorkstationService {
         }
         return row;
     }
-}
 
+    public WorkstationSyncResult sync(FactoryScope scope) {
+        if (!FactoryContext.required().equals(scope)) {
+            throw new FoundationException(ErrorCode.CONFLICT);
+        }
+        var inputs = query.query(scope, 1000);
+        var run = coordinator.claim(scope, "codegen.workstation", Duration.ofMinutes(5));
+        try {
+            coordinator.progress(run, 0);
+            var result = self.getObject().upsert(scope, inputs);
+            coordinator.progress(run, result.fetched());
+            coordinator.succeed(run, null);
+            return result;
+        } catch (RuntimeException failure) {
+            try {
+                coordinator.fail(run);
+            } catch (RuntimeException deliveryFailure) {
+                failure.addSuppressed(deliveryFailure);
+            }
+            throw failure;
+        }
+    }
+
+    @Transactional(transactionManager = "businessTransactionManager", rollbackFor = Exception.class)
+    public WorkstationSyncResult upsert(FactoryScope scope,
+                                        List<ExternalWorkstation> inputs) {
+        if (!FactoryContext.required().equals(scope)) {
+            throw new FoundationException(ErrorCode.CONFLICT);
+        }
+        if (inputs == null || inputs.size() > 1000) {
+            throw new FoundationException(ErrorCode.BAD_REQUEST);
+        }
+        var keys = new HashSet<String>();
+        for (var input : inputs) {
+            if (input == null || !validator.validate(input).isEmpty() || !keys.add(input.code())) {
+                throw new FoundationException(ErrorCode.BAD_REQUEST);
+            }
+        }
+        if (inputs.isEmpty()) return new WorkstationSyncResult(0, 0, 0, 0);
+        var example = new WorkstationExample();
+        example.createCriteria().andCodeIn(List.copyOf(keys))
+                .andFactoryIdEqualTo(scope.factoryId().value())
+        ;
+        var existing = new HashMap<String, WorkstationEntity>();
+        for (var row : mapper.selectByExample(example)) {
+            if (existing.put(row.getCode(), row) != null) {
+                throw new FoundationException(ErrorCode.RESOURCE_CONFLICT);
+            }
+        }
+        int created = 0;
+        int updated = 0;
+        int skipped = 0;
+        for (var input : inputs) {
+            var row = existing.get(input.code());
+            if (row != null && same(row, input)) {
+                skipped++;
+                continue;
+            }
+            boolean insert = row == null;
+            if (insert) {
+                row = new WorkstationEntity();
+                row.setFactoryId(scope.factoryId().value());
+            }
+            row.setCode(input.code());
+            row.setName(input.name());
+            row.setWorkshopId(input.workshopId());
+            row.setStatus(input.status());
+            row.setRemark(input.remark());
+            rules.validate(row);
+            int affected;
+            try {
+                affected = insert ? mapper.insertSelective(row) : mapper.updateByPrimaryKey(row);
+            } catch (DuplicateKeyException failure) {
+                throw new FoundationException(ErrorCode.RESOURCE_CONFLICT, failure);
+            }
+            if (affected != 1) throw new FoundationException(ErrorCode.RESOURCE_CONFLICT);
+            if (insert) created++;
+            else updated++;
+        }
+        if (updated > 0) caches.evict(WorkstationResource.PREFIX, Scope.LIST_AND_DETAIL);
+        else if (created > 0) caches.evict(WorkstationResource.PREFIX, Scope.LIST);
+        return new WorkstationSyncResult(inputs.size(), created, updated, skipped);
+    }
+
+    private static boolean same(WorkstationEntity row, ExternalWorkstation input) {
+        return true
+                && Objects.deepEquals(row.getCode(), input.code())
+                && Objects.deepEquals(row.getName(), input.name())
+                && Objects.deepEquals(row.getWorkshopId(), input.workshopId())
+                && Objects.deepEquals(row.getStatus(), input.status())
+                && Objects.deepEquals(row.getRemark(), input.remark())
+                ;
+    }
+
+}

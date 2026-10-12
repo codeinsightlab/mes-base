@@ -17,6 +17,12 @@ public class ${ClassName}ScaffoldTest {
             if (!java.lang.reflect.Modifier.isPublic(method.getModifiers())) {
                 continue;
             }
+#if($generateSync)
+            if (method.getName().equals("sync")) {
+                org.junit.jupiter.api.Assertions.assertNull(method.getAnnotation(org.springframework.transaction.annotation.Transactional.class));
+                continue;
+            }
+#end
             org.springframework.transaction.annotation.Transactional transaction = method.getAnnotation(org.springframework.transaction.annotation.Transactional.class);
             org.junit.jupiter.api.Assertions.assertNotNull(transaction);
             org.junit.jupiter.api.Assertions.assertEquals("${transactionManager}", transaction.transactionManager());
@@ -57,7 +63,7 @@ public class ${ClassName}ScaffoldTest {
 #if($generateSync)
     @org.junit.jupiter.api.Test
     void synchronizationHasIndependentAuthorizationAndExplicitDefaultFailure() throws Exception {
-        var access = ${controllerPackage}.${ClassName}SyncController.class.getDeclaredMethod("sync")
+        var access = ${controllerPackage}.${ClassName}Controller.class.getDeclaredMethod("sync")
                 .getAnnotation(dev.mesbase.platform.web.EndpointAccess.class);
         org.junit.jupiter.api.Assertions.assertEquals(${controllerPackage}.${ClassName}Permissions.SYNC, access.permission());
         org.junit.jupiter.api.Assertions.assertEquals(dev.mesbase.platform.web.EndpointAccess.Kind.AUTHORIZED, access.value());

@@ -1,6 +1,7 @@
-// MES-CODEGEN: scaffold; review required. RuoYi template pipeline adapted under MIT.
+// MES-CODEGEN: scaffold; review required.
 package dev.mesbase.modules.material.domain;
 
+import dev.mesbase.infrastructure.cache.BusinessCacheQuery;
 import jakarta.validation.constraints.Digits;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
@@ -17,6 +18,20 @@ public record SafetyStockQueryDto(
         @Digits(integer = 14, fraction = 4) BigDecimal minQty,
         @Digits(integer = 14, fraction = 4) BigDecimal maxQty,
         @Size(max = 16) String status
-) {
+) implements BusinessCacheQuery {
+    @Override
+    public int cacheOffset() {
+        return offset == null ? 0 : offset;
+    }
+
+    @Override
+    public int cacheLimit() {
+        return limit == null ? 20 : limit;
+    }
+
+    @Override
+    public String cacheSort() {
+        return "id";
+    }
 }
 

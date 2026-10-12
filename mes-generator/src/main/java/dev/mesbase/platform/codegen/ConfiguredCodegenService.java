@@ -33,7 +33,7 @@ public final class ConfiguredCodegenService {
                 throw new CodegenException(CodegenException.Code.INVALID_REQUEST);
             }
             validate(plan.metadata());
-            for (Artifact artifact : new RuoyiTemplateRenderer(plan.templates()).render(request, plan.metadata())) {
+            for (Artifact artifact : new BusinessTemplateRenderer(plan.templates()).render(request, plan.metadata())) {
                 if (targets.contains("all") || targets.contains(group(artifact))) artifacts.add(artifact);
             }
         }

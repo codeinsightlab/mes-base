@@ -24,7 +24,9 @@ import dev.mesbase.modules.material.service.BasicDataRules;
 import dev.mesbase.modules.material.service.IMaterialService;
 import dev.mesbase.modules.material.service.impl.MaterialServiceImpl;
 import dev.mesbase.modules.material.sync.ExternalMaterial;
-import dev.mesbase.modules.material.sync.MaterialSyncWriter;
+import dev.mesbase.modules.material.sync.MaterialQueryPort;
+import dev.mesbase.framework.sync.SyncCoordinator;
+import org.springframework.beans.factory.ObjectProvider;
 import dev.mesbase.platform.execution.FactoryContext;
 import com.github.pagehelper.PageHelper;
 import jakarta.validation.Validation;
@@ -285,7 +287,7 @@ class BusinessCacheIntegrationTest {
 
     @Test
     void syncCreatedUpdatedSkippedAndRollbackFollowDynamicEviction() {
-        var writer = context.getBean(MaterialSyncWriter.class);
+        var writer = context.getBean(IMaterialService.class);
         var input = new ExternalMaterial("M", "name", null, null, "PCS", "ITEM", "ENABLED", null, null);
         when(context.getBean(BasicDataRules.class).unitId("PCS")).thenReturn(1L);
         seed();
@@ -572,14 +574,16 @@ class BusinessCacheIntegrationTest {
         }
 
         @Bean
-        MaterialServiceImpl material(MaterialMapper mapper, BasicDataRules rules) {
-            return new MaterialServiceImpl(mapper, rules);
+        SyncCoordinator coordinator() {
+            return mock(SyncCoordinator.class);
         }
 
         @Bean
-        MaterialSyncWriter writer(MaterialMapper mapper, BasicDataRules rules, BusinessCacheProcessor caches) {
-            return new MaterialSyncWriter(mapper, Validation.buildDefaultValidatorFactory()
-                    .getValidator(), rules, caches);
+        MaterialServiceImpl material(MaterialMapper mapper, BasicDataRules rules,
+                                     ObjectProvider<MaterialQueryPort> queries, SyncCoordinator coordinator,
+                                     ObjectProvider<IMaterialService> self, BusinessCacheProcessor caches) {
+            return new MaterialServiceImpl(mapper, rules, queries, coordinator, self,
+                    Validation.buildDefaultValidatorFactory().getValidator(), caches);
         }
 
         @Bean

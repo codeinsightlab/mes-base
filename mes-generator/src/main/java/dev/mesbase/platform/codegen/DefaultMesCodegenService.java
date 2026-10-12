@@ -12,12 +12,12 @@ import static dev.mesbase.platform.codegen.CodegenException.Code.INVALID_REQUEST
 import static dev.mesbase.platform.codegen.CodegenException.Code.UNSUPPORTED_SCHEMA;
 
 /**
- * RuoYi metadata/model/Velocity/file classification flow adapted to Base.
+ * Metadata-driven business generation with explicitly configured templates and classified artifacts.
  */
 public final class DefaultMesCodegenService implements MesCodegenService {
     private final CodegenProfiles profiles;
     private final JdbcMetadataReader metadata;
-    private final RuoyiTemplateRenderer renderer;
+    private final BusinessTemplateRenderer renderer;
     private final ScaffoldWriter writer;
     private final UnaryOperator<List<Artifact>> javaFormatter;
 
@@ -29,7 +29,7 @@ public final class DefaultMesCodegenService implements MesCodegenService {
         this.profiles = profiles;
         this.javaFormatter = javaFormatter;
         metadata = new JdbcMetadataReader();
-        renderer = new RuoyiTemplateRenderer();
+        renderer = new BusinessTemplateRenderer();
         writer = new ScaffoldWriter();
     }
 

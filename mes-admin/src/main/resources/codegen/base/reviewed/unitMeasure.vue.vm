@@ -1,0 +1,30 @@
+<!-- MES-CODEGEN: generated foundation with reviewed SIMPLE business fields. -->
+<script setup lang="ts">
+import { computed, ref } from 'vue'
+import CrudPage from '@/components/CrudPage.vue'
+#if($generateSync)
+import SyncButton from '@/components/business/SyncButton.vue'
+#end
+import { api } from '${frontendApiImport}'
+#if($generateSync)
+import { sync } from '${frontendApiImport}'
+#end
+import type { Field } from '@/lib/crud'
+const page = ref<InstanceType<typeof CrudPage> | null>(null)
+const fields = computed<Field[]>(() => [
+  { key: 'id', label: '编号', kind: 'text', readonly: true },
+  { key: 'code', label: '单位编码', kind: 'text', required: true, searchable: true, maxLength: 64 },
+  { key: 'name', label: '单位名称', kind: 'text', required: true, searchable: true, maxLength: 255 },
+  { key: 'symbol', label: '符号', kind: 'text', required: false, searchable: false, maxLength: 32 },
+  { key: 'status', label: '状态', kind: 'select', required: true, searchable: false, maxLength: 500, options: [{ label: '启用', value: 'ENABLED', tone: 'success' }, { label: '停用', value: 'DISABLED', tone: 'info' }], defaultValue: 'ENABLED' },
+])
+</script>
+<template>
+  <CrudPage table-key="${permission}:list" list-action="${listAction}" detail-action="${queryAction}" ref="page" title="计量单位" permission="${permission}" :api="api" :fields="fields" id-key="id">
+#if($generateSync)
+    <template #toolbar>
+      <SyncButton permission="business:unit:measure:sync" scope="factory" :run="sync" @completed="page?.load()" />
+    </template>
+#end
+  </CrudPage>
+</template>

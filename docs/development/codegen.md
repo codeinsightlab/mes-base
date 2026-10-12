@@ -493,3 +493,31 @@ CrudPage 区分无读取权限与空结果：没有 read 时显示“当前范�
 - 使用验收测试依赖 classpath 编译真实 metadata 生成的全部 Java（含生成测试），通过。
 - `/usr/bin/python3 scripts/smoke-packaged.py`：10 passed / 0 failed。
 - 仅在隔离 target 写入产物，未重新生成覆盖正式 Material/MaterialCategory 的业务代码。前端模板本轮未改；未把生成成功/编译通过当成真实业务库运行验收。
+
+### 2026-10-12：中性命名、主 Service 同步与个人列配置
+
+渲染类统一命名 `BusinessTemplateRenderer`，调用方和测试同步迁移。历史审查中的旧类名保留为当时证据，
+MIT 来源声明仍在 legal 文档。生成文件头不再宣称使用 RuoYi 产品流水线。
+
+开启 generateSync 时，主 IService/ServiceImpl 提供 sync 和 upsert，主 Controller 承载原
+`/actions/sync` 接口及独立同步权限。不再生成 SyncService、SyncController、SyncWriter。
+sync 不开启写事务：先读取来源，再通过 SyncCoordinator 抢占，调用 ObjectProvider 获取主 Service
+的 Spring 代理执行带具名事务的 upsert。动态缓存淘汰保留提交后回调。来源 DTO/QueryPort、未配置
+适配器和结果类型保留明确的输入契约。
+
+重生成的发布器在同一预检/回滚流程中删除带 MES-CODEGEN 标记的三个废弃类；无标记文件拒绝，
+dry-run 仅报告 removed=true。删除精确限定本业务旧生成路径，失败恢复原文件。
+
+可选 tableOverrides.frontendTemplate 指向模板根下的完整 Vue 模板；可选
+serviceImplementationTemplate/controllerTemplate/externalInputTemplate/resourceTemplate 指向完整 Java 模板。
+路径必须相对且符合对应 `.vue.vm`/`.java.vm` 扩展名，禁止越界。六个已有基础业务的 reviewed 模板保留
+经审查的关联选择和 BasicDataRules，而后由生成器发布；通用默认模板仍负责新业务。
+这类项目完整模板具有固定包和业务契约，调整模块/包/字段时也必须审查这些显式覆盖模板。
+
+列表模板无条件生成 `${permission}:list` tableKey 并复用 CrudPage 通用列配置能力。
+存储、API、URL 规则及最小接入见 [个人列配置](table-preferences.md)。
+
+本次正式重生成记录：`docs/generated/codegen/2026-10-12-column-preferences.json`，对应显式配置同目录
+`.yaml`，只选择 backend/frontend/test。六业务 126 项产物（含 18 个废弃类删除）；随后全量测试、
+前端构建和 clean package 通过。clean 不能省略，否则删除的旧 Java 源码对应的 class 可能仍留在旧
+构建目录并进入 JAR。按用户要求，后续真实页面验收由用户自行完成。

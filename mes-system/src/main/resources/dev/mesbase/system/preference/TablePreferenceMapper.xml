@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="dev.mesbase.system.preference.TablePreferenceMapper">
+    <sql id="identity">
+        factory_id = #{owner.factoryId} AND user_id = #{owner.userId}
+        AND url = #{key.url} AND table_key = #{key.tableKey}
+    </sql>
+    <select id="selectColumns" resultType="string">
+        SELECT columns_json FROM sys_user_table_preference WHERE <include refid="identity"/>
+    </select>
+    <insert id="upsert">
+        INSERT INTO sys_user_table_preference (factory_id, user_id, url, table_key, columns_json, create_time, update_time)
+        VALUES (#{owner.factoryId}, #{owner.userId}, #{key.url}, #{key.tableKey}, #{json}, CURRENT_TIMESTAMP(6), CURRENT_TIMESTAMP(6))
+        ON DUPLICATE KEY UPDATE columns_json = #{json}, update_time = CURRENT_TIMESTAMP(6)
+    </insert>
+    <delete id="delete">
+        DELETE FROM sys_user_table_preference WHERE <include refid="identity"/>
+    </delete>
+</mapper>

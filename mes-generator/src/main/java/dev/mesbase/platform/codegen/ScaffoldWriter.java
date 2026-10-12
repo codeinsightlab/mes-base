@@ -1,11 +1,22 @@
 package dev.mesbase.platform.codegen;
 
-import java.nio.file.*;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
+import java.nio.charset.StandardCharsets;
 import java.io.IOException;
-import java.util.*;
-import java.security.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.HexFormat;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 
-import static dev.mesbase.platform.codegen.CodegenException.Code.*;
+import static dev.mesbase.platform.codegen.CodegenException.Code.INVALID_REQUEST;
+import static dev.mesbase.platform.codegen.CodegenException.Code.OUTPUT_CONFLICT;
+import static dev.mesbase.platform.codegen.CodegenException.Code.OUTPUT_FAILURE;
 
 import dev.mesbase.platform.codegen.CodegenRequest.OverwritePolicy;
 
@@ -13,7 +24,10 @@ import dev.mesbase.platform.codegen.CodegenRequest.OverwritePolicy;
  * Preflight both repos, stage, then publish; rollback writes on local failure, cleanup always.
  */
 public final class ScaffoldWriter {
-    public record Artifact(CodegenResult.Target target, String relativePath, String content) {
+    public record Artifact(CodegenResult.Target target, String relativePath, String content, boolean removed) {
+        public Artifact(CodegenResult.Target target, String relativePath, String content) {
+            this(target, relativePath, content, false);
+        }
     }
 
     public List<CodegenResult.GeneratedFile> write(List<Artifact> artifacts, CodegenRequest request) {
@@ -26,15 +40,30 @@ public final class ScaffoldWriter {
             Path p = root.resolve(artifact.relativePath()).normalize();
             if (!p.startsWith(root) || p.equals(root)) throw new CodegenException(INVALID_REQUEST);
             noLinks(p);
+            if (artifact.removed() && !Files.exists(p)) continue;
             if (paths.put(p, artifact) != null) throw new CodegenException(OUTPUT_CONFLICT);
-            byte[] bytes = artifact.content().getBytes(java.nio.charset.StandardCharsets.UTF_8);
+            if (artifact.removed()) {
+                try {
+                    byte[] original = Files.readAllBytes(p);
+                    if (request.overwritePolicy() != OverwritePolicy.REPLACE_GENERATED
+                            || !new String(original, StandardCharsets.UTF_8).contains("MES-CODEGEN")) {
+                        throw new CodegenException(OUTPUT_CONFLICT);
+                    }
+                    originals.put(p, original);
+                    manifest.add(new CodegenResult.GeneratedFile(artifact.target(), p.toString(), hash(original), true));
+                } catch (IOException failure) {
+                    throw new CodegenException(OUTPUT_FAILURE, failure);
+                }
+                continue;
+            }
+            byte[] bytes = artifact.content().getBytes(StandardCharsets.UTF_8);
             manifest.add(new CodegenResult.GeneratedFile(artifact.target(), p.toString(), hash(bytes)));
             if (Files.exists(p)) {
                 try {
                     byte[] original = Files.readAllBytes(p);
                     if (Arrays.equals(original, bytes)) continue;
                     if (request.overwritePolicy() != OverwritePolicy.REPLACE_GENERATED || !artifact.content()
-                            .contains("MES-CODEGEN") || !new String(original, java.nio.charset.StandardCharsets.UTF_8).contains("MES-CODEGEN"))
+                            .contains("MES-CODEGEN") || !new String(original, StandardCharsets.UTF_8).contains("MES-CODEGEN"))
                         throw new CodegenException(OUTPUT_CONFLICT);
                     originals.put(p, original);
                 } catch (IOException e) {
@@ -50,7 +79,10 @@ public final class ScaffoldWriter {
             staging = Files.createTempDirectory("mes-codegen-");
             int i = 0;
             for (var entry : paths.entrySet()) {
-                Files.writeString(staging.resolve(Integer.toString(i++)), entry.getValue().content());
+                if (!entry.getValue().removed()) {
+                    Files.writeString(staging.resolve(Integer.toString(i)), entry.getValue().content());
+                }
+                i++;
             }
             i = 0;
             for (var entry : paths.entrySet()) {
@@ -62,6 +94,12 @@ public final class ScaffoldWriter {
                 }
                 if (originals.containsKey(dest) && !Arrays.equals(originals.get(dest), Files.readAllBytes(dest)))
                     throw new CodegenException(OUTPUT_CONFLICT);
+                if (entry.getValue().removed()) {
+                    Files.delete(dest);
+                    written.add(dest);
+                    i++;
+                    continue;
+                }
                 createDirectories(dest.getParent(), createdDirs);
                 Path prepared = Files.createTempFile(dest.getParent(), ".mes-codegen-", ".tmp");
                 try {

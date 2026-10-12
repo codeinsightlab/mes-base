@@ -22,7 +22,7 @@ import dev.mesbase.infrastructure.persistence.OwnedTransactionManager;
 import dev.mesbase.infrastructure.persistence.PersistenceFactories;
 import dev.mesbase.infrastructure.persistence.PlatformPersistence;
 import dev.mesbase.infrastructure.persistence.RuntimeRegistry;
-import dev.mesbase.modules.material.controller.MaterialSyncController;
+import dev.mesbase.modules.material.controller.MaterialController;
 import dev.mesbase.modules.material.controller.MaterialPermissions;
 import dev.mesbase.modules.material.service.BasicDataRules;
 import jakarta.validation.Validation;
@@ -36,8 +36,8 @@ import dev.mesbase.modules.material.dao.SafetyStockMapper;
 import dev.mesbase.modules.material.dao.MaterialMapper;
 import dev.mesbase.modules.material.sync.ExternalMaterial;
 import dev.mesbase.modules.material.sync.MaterialQueryPort;
-import dev.mesbase.modules.material.sync.MaterialSyncService;
-import dev.mesbase.modules.material.sync.MaterialSyncWriter;
+import dev.mesbase.modules.material.service.impl.MaterialServiceImpl;
+import dev.mesbase.modules.material.service.IMaterialService;
 import dev.mesbase.infrastructure.cache.BusinessCacheProcessor;
 import dev.mesbase.modules.material.sync.UnconfiguredMaterialQueryAdapter;
 import dev.mesbase.platform.execution.FactoryContext;
@@ -149,7 +149,7 @@ class MaterialSyncHttpTest {
     @EnableWebMvc
     @EnableWebSecurity
     @EnableTransactionManagement
-    @Import({MaterialSyncController.class, MaterialSyncService.class, MaterialSyncWriter.class, BasicDataRules.class,
+    @Import({MaterialController.class, MaterialServiceImpl.class, BasicDataRules.class,
             FoundationErrorAdvice.class})
     static class Web implements WebMvcConfigurer {
         @Bean
@@ -320,7 +320,7 @@ class MaterialSyncHttpTest {
                     .andExpect(jsonPath("errorCode").value("ERP_SYNC_NOT_CONFIGURED"));
             assertEquals(0, fixture.calls);
             assertEquals(0, fixture.business.get("A").queryForObject("SELECT COUNT(*) FROM material", Integer.class));
-            assertThrows(FoundationException.class, () -> context.getBean(MaterialSyncService.class)
+            assertThrows(FoundationException.class, () -> context.getBean(IMaterialService.class)
                     .sync(new FactoryScope(new FactoryId("A"))));
         }
     }

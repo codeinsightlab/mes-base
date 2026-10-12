@@ -1,4 +1,4 @@
-// MES-CODEGEN: scaffold; review required. RuoYi template pipeline adapted under MIT.
+// MES-CODEGEN: scaffold; review required.
 package dev.mesbase.modules.material.controller;
 
 import dev.mesbase.modules.material.controller.vo.MaterialCategoryPageVo;
@@ -10,6 +10,8 @@ import dev.mesbase.modules.material.domain.MaterialCategoryQueryDto;
 import dev.mesbase.modules.material.domain.MaterialCategoryUpdateCommand;
 import dev.mesbase.modules.material.service.IMaterialCategoryService;
 import dev.mesbase.platform.web.EndpointAccess;
+import dev.mesbase.platform.execution.FactoryContext;
+import dev.mesbase.modules.material.sync.MaterialCategorySyncResult;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
@@ -69,7 +71,7 @@ public class MaterialCategoryController {
     @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED,
             permission = MaterialCategoryPermissions.UPDATE)
     public MaterialCategoryVo update(@PathVariable Long id,
-            @Valid @RequestBody MaterialCategoryUpdateCommand input) {
+                                     @Valid @RequestBody MaterialCategoryUpdateCommand input) {
         return toView(service.updateById(id, input));
     }
 
@@ -78,8 +80,8 @@ public class MaterialCategoryController {
     @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED,
             permission = MaterialCategoryPermissions.DELETE)
     public void delete(@RequestBody
-            @NotEmpty @Size(max = 100)
-            List<@NotNull Long> ids) {
+                       @NotEmpty @Size(max = 100)
+                       List<@NotNull Long> ids) {
         service.deleteByIds(ids);
     }
 
@@ -95,5 +97,10 @@ public class MaterialCategoryController {
                 row.getRemark()
         );
     }
-}
 
+    @PostMapping("/actions/sync")
+    @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED, permission = MaterialCategoryPermissions.SYNC)
+    public MaterialCategorySyncResult sync() {
+        return service.sync(FactoryContext.required());
+    }
+}

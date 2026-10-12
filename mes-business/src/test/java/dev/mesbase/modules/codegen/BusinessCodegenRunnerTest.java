@@ -18,6 +18,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import dev.mesbase.common.core.redis.RedisCache;
+import dev.mesbase.framework.sync.SyncCoordinator;
 import dev.mesbase.core.factory.FactoryId;
 import dev.mesbase.core.factory.FactoryScope;
 import dev.mesbase.infrastructure.cache.BusinessCacheAspect;
@@ -162,12 +163,12 @@ class BusinessCodegenRunnerTest {
             context.registerBean(BusinessCacheAspect.class, () -> new BusinessCacheAspect(caches, manager));
             context.registerBean(Validator.class, () -> Validation.buildDefaultValidatorFactory().getValidator());
             var serviceType = loader.loadClass(root + "service.impl.MaterialCategoryServiceImpl");
-            var writerType = loader.loadClass(root + "sync.MaterialCategorySyncWriter");
+            var writerType = loader.loadClass(root + "service.impl.MaterialCategoryServiceImpl");
             context.registerBeanDefinition("service", new RootBeanDefinition(serviceType));
-            context.registerBeanDefinition("writer", new RootBeanDefinition(writerType));
+            context.registerBean(SyncCoordinator.class, () -> mock(SyncCoordinator.class));
             context.refresh();
             FactoryContext.bind(new FactoryScope(new FactoryId("TEST_ONLY")));
-            Object service = context.getBean("service"), writer = context.getBean("writer");
+            Object service = context.getBean("service"), writer = service;
             var input = loader.loadClass(root + "sync.ExternalMaterialCategory");
             var upsert = writerType.getMethod("upsert", FactoryScope.class, List.class);
             Object first = input.getConstructors()[0].newInstance("C1", "分类一");
@@ -231,6 +232,39 @@ class BusinessCodegenRunnerTest {
     }
 
     @Test
+    void explicitReviewedFrontendTemplatePreservesBusinessContentAndOrdinaryCrudColumnSettings() throws Exception {
+        var configured = config("[person]", "write");
+        Path templates = temporary.resolve("templates");
+        Path original = repository().resolve(configured.templates().root());
+        try (var files = Files.walk(original)) {
+            for (Path source : files.filter(Files::isRegularFile).toList()) {
+                Path output = templates.resolve(original.relativize(source));
+                Files.createDirectories(output.getParent());
+                Files.copy(source, output);
+            }
+        }
+        Path reviewed = templates.resolve("reviewed/fixture.vue.vm");
+        Files.createDirectories(reviewed.getParent());
+        Files.writeString(reviewed, Files.readString(original.resolve("index.vue.vm")) + "\n<!-- TEST ONLY reviewed business fields retained -->\n");
+        Path file = temporary.resolve("configuration.yaml");
+        String yaml = Files.readString(file)
+                .replace("root: \"mes-admin/src/main/resources/codegen/base\"", "root: \"" + templates + "\"");
+        yaml += "\ntableOverrides:\n  person:\n    module: common\n    displayName: 人员\n    frontendTemplate: reviewed/fixture.vue.vm\n";
+        Files.writeString(file, yaml);
+        var runner = new BusinessCodegenRunner();
+        var report = runner.run(BusinessCodegenConfiguration.read(file), repository(), source());
+        assertEquals("GENERATED", report.status());
+        String page = Files.readString(temporary.resolve("frontend/src/views/common/person/index.vue"));
+        assertTrue(page.contains("reviewed business fields retained"));
+        assertTrue(page.contains("table-key=\"business:person:list\""));
+        assertFalse(page.contains("SyncButton"));
+        Files.writeString(file, yaml.replace("reviewed/fixture.vue.vm", "../outside.vue.vm"));
+        assertThrows(IllegalArgumentException.class,
+                () -> runner.run(BusinessCodegenConfiguration.read(file), repository(), source()));
+        assertEquals(page, Files.readString(temporary.resolve("frontend/src/views/common/person/index.vue")));
+    }
+
+    @Test
     void allTablesPreviewAndExplicitTableWriteUseConfiguration() throws Exception {
         var source = source();
         var all = new BusinessCodegenRunner().run(config("[]", "dry-run"), repository(), source);
@@ -246,6 +280,8 @@ class BusinessCodegenRunnerTest {
         assertTrue(controller.contains("sample.feature.enabled"));
         String service = Files.readString(backend.resolve("src/main/java/sample/generated/common/service/impl/PersonServiceImpl.java"));
         assertTrue(service.contains("? 7 :"));
+        assertTrue(Files.readString(temporary.resolve("frontend/src/views/common/person/index.vue"))
+                .contains("table-key=\"business:person:list\""));
         Path classes = temporary.resolve("compiled");
         Files.createDirectories(classes);
         var compiler = ToolProvider.getSystemJavaCompiler();
@@ -336,8 +372,8 @@ class BusinessCodegenRunnerTest {
         var enabled = BusinessCodegenConfiguration.read(file);
         Files.writeString(file, Files.readString(file).replace("mode: \"write\"", "mode: \"dry-run\""));
         var preview = runner.run(BusinessCodegenConfiguration.read(file), repository(), data);
-        assertEquals("DRY_RUN", preview.status());
-        assertEquals(7, preview.files().stream().filter(artifact -> artifact.path().contains("/sync/")
+        assertEquals("DRY_RUN", preview.status(), preview.rejected().toString());
+        assertEquals(4, preview.files().stream().filter(artifact -> artifact.path().contains("/sync/")
                 || artifact.path().endsWith("SyncController.java")).count());
         var generated = runner.run(enabled, repository(), data);
         assertEquals("GENERATED", generated.status());
@@ -367,8 +403,10 @@ class BusinessCodegenRunnerTest {
         assertFalse(Files.readString(temporary.resolve("frontend/src/api/common/person.ts")).contains("/actions/sync"));
         assertFalse(Files.readString(backend.resolve("src/main/java/sample/generated/common/controller/PersonPermissions.java"))
                 .contains("SYNC"));
-        // The existing writer overwrites but does not delete independent historical files.
-        assertTrue(Files.exists(backend.resolve("src/main/java/sample/generated/common/sync/PersonSyncService.java")));
+        // Disabling sync also removes its methods from the ordinary Service.
+        assertFalse(Files.exists(backend.resolve("src/main/java/sample/generated/common/sync/PersonSyncService.java")));
+        assertFalse(Files.readString(backend.resolve("src/main/java/sample/generated/common/service/impl/PersonServiceImpl.java"))
+                .contains("self.getObject().upsert"));
     }
 
     @Test
@@ -416,7 +454,34 @@ class BusinessCodegenRunnerTest {
         String service = Files.readString(javaRoot.resolve("service/impl/PersonServiceImpl.java"));
         assertTrue(service.contains("andFactoryIdEqualTo"));
         assertTrue(service.contains("row.setFactoryId(FactoryContext.required().factoryId().value())"));
-        assertTrue(Files.readString(javaRoot.resolve("sync/PersonSyncWriter.java"))
+        assertTrue(Files.readString(javaRoot.resolve("service/impl/PersonServiceImpl.java"))
                 .contains("andFactoryIdEqualTo(scope.factoryId().value())"));
     }
+
+    @Test
+    void regenerationRemovesOnlyMarkedLegacySyncClassesAndPreviewDoesNotDelete() throws Exception {
+        var data = source();
+        var configuration = config("[person]", "write");
+        var runner = new BusinessCodegenRunner();
+        assertEquals("GENERATED", runner.run(configuration, repository(), data).status());
+        Path legacy = temporary.resolve("backend/mes-business/src/main/java/sample/generated/common/sync/PersonSyncService.java");
+        Files.createDirectories(legacy.getParent());
+        Files.writeString(legacy, "// MES-CODEGEN: obsolete\nclass PersonSyncService {}\n");
+        Path yaml = temporary.resolve("configuration.yaml");
+        String writing = Files.readString(yaml).replace("overwrite: \"fail\"", "overwrite: \"replace-generated\"");
+        Files.writeString(yaml, writing.replace("mode: \"write\"", "mode: \"dry-run\""));
+        var preview = runner.run(BusinessCodegenConfiguration.read(yaml), repository(), data);
+        assertEquals("DRY_RUN", preview.status(), preview.rejected().toString());
+        assertTrue(Files.exists(legacy));
+        assertTrue(preview.files().stream()
+                .anyMatch(file -> file.path().endsWith("/sync/PersonSyncService.java") && file.removed()));
+        Files.writeString(yaml, writing);
+        assertEquals("GENERATED", runner.run(BusinessCodegenConfiguration.read(yaml), repository(), data).status());
+        assertFalse(Files.exists(legacy));
+        Files.writeString(legacy, "// user-owned class\nclass PersonSyncService {}\n");
+        assertEquals("FAILED_PREFLIGHT", runner.run(BusinessCodegenConfiguration.read(yaml), repository(), data)
+                .status());
+        assertTrue(Files.readString(legacy).contains("user-owned"));
+    }
+
 }

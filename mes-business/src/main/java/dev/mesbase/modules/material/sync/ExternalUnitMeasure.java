@@ -1,4 +1,4 @@
-// MES-CODEGEN: scaffold; review required. RuoYi template pipeline adapted under MIT.
+// MES-CODEGEN: scaffold; review required.
 package dev.mesbase.modules.material.sync;
 
 import jakarta.validation.constraints.NotBlank;

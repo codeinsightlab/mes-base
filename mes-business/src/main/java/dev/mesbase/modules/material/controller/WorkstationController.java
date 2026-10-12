@@ -1,4 +1,4 @@
-// MES-CODEGEN: scaffold; review required. RuoYi template pipeline adapted under MIT.
+// MES-CODEGEN: scaffold; review required.
 package dev.mesbase.modules.material.controller;
 
 import dev.mesbase.modules.material.controller.vo.WorkstationPageVo;
@@ -10,6 +10,8 @@ import dev.mesbase.modules.material.domain.WorkstationQueryDto;
 import dev.mesbase.modules.material.domain.WorkstationUpdateCommand;
 import dev.mesbase.modules.material.service.IWorkstationService;
 import dev.mesbase.platform.web.EndpointAccess;
+import dev.mesbase.platform.execution.FactoryContext;
+import dev.mesbase.modules.material.sync.WorkstationSyncResult;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
@@ -69,7 +71,7 @@ public class WorkstationController {
     @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED,
             permission = WorkstationPermissions.UPDATE)
     public WorkstationVo update(@PathVariable Long id,
-            @Valid @RequestBody WorkstationUpdateCommand input) {
+                                @Valid @RequestBody WorkstationUpdateCommand input) {
         return toView(service.updateById(id, input));
     }
 
@@ -78,8 +80,8 @@ public class WorkstationController {
     @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED,
             permission = WorkstationPermissions.DELETE)
     public void delete(@RequestBody
-            @NotEmpty @Size(max = 100)
-            List<@NotNull Long> ids) {
+                       @NotEmpty @Size(max = 100)
+                       List<@NotNull Long> ids) {
         service.deleteByIds(ids);
     }
 
@@ -94,5 +96,10 @@ public class WorkstationController {
                 row.getRemark()
         );
     }
-}
 
+    @PostMapping("/actions/sync")
+    @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED, permission = WorkstationPermissions.SYNC)
+    public WorkstationSyncResult sync() {
+        return service.sync(FactoryContext.required());
+    }
+}

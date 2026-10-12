@@ -6,8 +6,12 @@ import dev.mesbase.core.factory.FactoryId;
 import dev.mesbase.core.factory.FactoryScope;
 import dev.mesbase.framework.sync.SyncCoordinator;
 import dev.mesbase.modules.material.sync.MaterialQueryPort;
-import dev.mesbase.modules.material.sync.MaterialSyncService;
-import dev.mesbase.modules.material.sync.MaterialSyncWriter;
+import dev.mesbase.modules.material.service.impl.MaterialServiceImpl;
+import dev.mesbase.modules.material.service.IMaterialService;
+import dev.mesbase.modules.material.dao.MaterialMapper;
+import dev.mesbase.modules.material.service.BasicDataRules;
+import dev.mesbase.infrastructure.cache.BusinessCacheProcessor;
+import jakarta.validation.Validator;
 import dev.mesbase.modules.material.sync.TestMaterialQueryAdapter;
 import dev.mesbase.modules.material.sync.UnconfiguredMaterialQueryAdapter;
 import dev.mesbase.platform.execution.FactoryContext;
@@ -44,12 +48,14 @@ class MaterialSyncBoundaryTest {
     void noPortBeanUsesFallbackAndNeverCallsMaterialWriter() {
         var beans = new DefaultListableBeanFactory();
         var coordinator = mock(SyncCoordinator.class);
-        var writer = mock(MaterialSyncWriter.class);
+        var writer = mock(IMaterialService.class);
+        beans.registerSingleton("mainService", writer);
         var run = new SyncCoordinator.Run(scope, "codegen.material", "TEST_ONLY_RUN");
         when(coordinator.claim(eq(scope), eq("codegen.material"), any())).thenReturn(run);
         FactoryContext.bind(scope);
-        var failure = assertThrows(FoundationException.class, () -> new MaterialSyncService(
-                beans.getBeanProvider(MaterialQueryPort.class), coordinator, writer).sync(scope));
+        var failure = assertThrows(FoundationException.class, () -> new MaterialServiceImpl(mock(MaterialMapper.class), mock(BasicDataRules.class),
+                beans.getBeanProvider(MaterialQueryPort.class), coordinator, beans.getBeanProvider(IMaterialService.class),
+                mock(Validator.class), mock(BusinessCacheProcessor.class)).sync(scope));
         assertEquals("暂未接入 ERP 物料查询接口", failure.getMessage());
         verifyNoInteractions(writer, coordinator);
     }
@@ -59,14 +65,16 @@ class MaterialSyncBoundaryTest {
         var beans = new DefaultListableBeanFactory();
         beans.registerSingleton("test", new TestMaterialQueryAdapter());
         var coordinator = mock(SyncCoordinator.class);
-        var writer = mock(MaterialSyncWriter.class);
+        var writer = mock(IMaterialService.class);
+        beans.registerSingleton("mainService", writer);
         var run = new SyncCoordinator.Run(scope, "codegen.material", "TEST_ONLY_RUN");
         when(coordinator.claim(eq(scope), eq("codegen.material"), any())).thenReturn(run);
         doThrow(new FoundationException(ErrorCode.SYNC_EXECUTION_LOST)).when(coordinator).progress(eq(run), anyLong());
         doThrow(new FoundationException(ErrorCode.SYNC_EXECUTION_LOST)).when(coordinator).fail(run);
         FactoryContext.bind(scope);
-        var failure = assertThrows(FoundationException.class, () -> new MaterialSyncService(
-                beans.getBeanProvider(MaterialQueryPort.class), coordinator, writer).sync(scope));
+        var failure = assertThrows(FoundationException.class, () -> new MaterialServiceImpl(mock(MaterialMapper.class), mock(BasicDataRules.class),
+                beans.getBeanProvider(MaterialQueryPort.class), coordinator, beans.getBeanProvider(IMaterialService.class),
+                mock(Validator.class), mock(BusinessCacheProcessor.class)).sync(scope));
         assertEquals(ErrorCode.SYNC_EXECUTION_LOST, failure.code());
         assertEquals(1, failure.getSuppressed().length);
         verifyNoInteractions(writer);

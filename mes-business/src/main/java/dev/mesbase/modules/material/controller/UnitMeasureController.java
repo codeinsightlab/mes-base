@@ -1,4 +1,4 @@
-// MES-CODEGEN: scaffold; review required. RuoYi template pipeline adapted under MIT.
+// MES-CODEGEN: scaffold; review required.
 package dev.mesbase.modules.material.controller;
 
 import dev.mesbase.modules.material.controller.vo.UnitMeasurePageVo;
@@ -10,6 +10,8 @@ import dev.mesbase.modules.material.domain.UnitMeasureQueryDto;
 import dev.mesbase.modules.material.domain.UnitMeasureUpdateCommand;
 import dev.mesbase.modules.material.service.IUnitMeasureService;
 import dev.mesbase.platform.web.EndpointAccess;
+import dev.mesbase.platform.execution.FactoryContext;
+import dev.mesbase.modules.material.sync.UnitMeasureSyncResult;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
@@ -69,7 +71,7 @@ public class UnitMeasureController {
     @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED,
             permission = UnitMeasurePermissions.UPDATE)
     public UnitMeasureVo update(@PathVariable Long id,
-            @Valid @RequestBody UnitMeasureUpdateCommand input) {
+                                @Valid @RequestBody UnitMeasureUpdateCommand input) {
         return toView(service.updateById(id, input));
     }
 
@@ -78,8 +80,8 @@ public class UnitMeasureController {
     @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED,
             permission = UnitMeasurePermissions.DELETE)
     public void delete(@RequestBody
-            @NotEmpty @Size(max = 100)
-            List<@NotNull Long> ids) {
+                       @NotEmpty @Size(max = 100)
+                       List<@NotNull Long> ids) {
         service.deleteByIds(ids);
     }
 
@@ -93,5 +95,10 @@ public class UnitMeasureController {
                 row.getStatus()
         );
     }
-}
 
+    @PostMapping("/actions/sync")
+    @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED, permission = UnitMeasurePermissions.SYNC)
+    public UnitMeasureSyncResult sync() {
+        return service.sync(FactoryContext.required());
+    }
+}

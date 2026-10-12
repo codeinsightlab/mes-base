@@ -68,7 +68,7 @@ class CodegenSyncAcceptanceTest {
     }
 
     @Test
-    void generatedDefaultStartsAndWriterUsesARealSpringTransaction() throws Exception {
+    void generatedDefaultStartsAndMainServiceUsesARealSpringTransaction() throws Exception {
         temporary = temporary.toRealPath();
         var source = new DriverManagerDataSource("jdbc:h2:mem:" + UUID.randomUUID() + ";MODE=MySQL;DB_CLOSE_DELAY=-1", "sa", "");
         var jdbc = new JdbcTemplate(source);
@@ -102,8 +102,8 @@ class CodegenSyncAcceptanceTest {
             var catalog = new InMemoryFactoryCatalog(List.of(new Factory(scope.factoryId(), "TEST", "A", "TEST ONLY", FactoryStatus.ENABLED)));
             var binding = new BusinessRuntimeBinding(scope.factoryId(), new DatasourceIdentity("TEST_ONLY"), 1);
             var mapperType = loader.loadClass(root + ".dao.SyncProbeMapper");
-            var writerType = loader.loadClass(root + ".sync.SyncProbeSyncWriter");
-            var serviceType = loader.loadClass(root + ".sync.SyncProbeSyncService");
+            var writerType = loader.loadClass(root + ".service.impl.SyncProbeServiceImpl");
+            var serviceType = loader.loadClass(root + ".service.impl.SyncProbeServiceImpl");
             var inputType = loader.loadClass(root + ".sync.ExternalSyncProbe");
             registry.registerDedicated(scope.factoryId(), binding.datasourceIdentity(), 1, source, () -> {
             }, Set.of(mapperType));
@@ -128,18 +128,19 @@ class CodegenSyncAcceptanceTest {
                 var mapperBean = new RootBeanDefinition(mapperType);
                 mapperBean.setInstanceSupplier(() -> mapper);
                 context.registerBeanDefinition("mapper", mapperBean);
-                context.registerBeanDefinition("writer", new RootBeanDefinition(writerType));
                 context.registerBeanDefinition("service", new RootBeanDefinition(serviceType));
                 context.refresh();
-                Object writer = context.getBean("writer"), service = context.getBean("service");
+                Object service = context.getBean("service"), writer = service;
                 assertTrue(AopUtils.isAopProxy(writer));
                 FactoryContext.bind(scope);
-                var failure = assertThrows(InvocationTargetException.class, () -> serviceType.getMethod("sync", FactoryScope.class)
+                var failure = assertThrows(InvocationTargetException.class, () -> loader.loadClass(root + ".service.ISyncProbeService")
+                        .getMethod("sync", FactoryScope.class)
                         .invoke(service, scope));
                 assertEquals(ErrorCode.ERP_SYNC_NOT_CONFIGURED, ((FoundationException) failure.getCause()).code());
                 verifyNoInteractions(coordinator);
                 assertEquals(0, jdbc.queryForObject("SELECT COUNT(*) FROM sync_probe", Integer.class));
-                var upsert = writerType.getMethod("upsert", FactoryScope.class, List.class);
+                var upsert = loader.loadClass(root + ".service.ISyncProbeService")
+                        .getMethod("upsert", FactoryScope.class, List.class);
                 var ctor = inputType.getConstructors()[0];
                 Object first = ctor.newInstance("S001", "first", "OLD", new BigDecimal("1.0"));
                 Object result = upsert.invoke(writer, scope, List.of(first));

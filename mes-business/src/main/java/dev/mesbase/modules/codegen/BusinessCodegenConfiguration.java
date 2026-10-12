@@ -80,7 +80,9 @@ public record BusinessCodegenConfiguration(Integer version, Source source, Selec
     public record Sync(String matchKey, Integer batchMaximum) {
     }
 
-    public record TableOverride(String module, String displayName, String syncMatchKey, String serverScopeColumn) {
+    public record TableOverride(String module, String displayName, String syncMatchKey, String serverScopeColumn,
+                                String frontendTemplate, String serviceImplementationTemplate,
+                                String controllerTemplate, String externalInputTemplate, String resourceTemplate) {
     }
 
     public static BusinessCodegenConfiguration read(Path file) throws IOException {
@@ -133,7 +135,8 @@ public record BusinessCodegenConfiguration(Integer version, Source source, Selec
         for (var component : record.getClass().getRecordComponents()) {
             String name = component.getName();
             boolean optional = name.equals("tableOverrides") || name.equals("generateSync") || name.equals("sync")
-                    || record instanceof TableOverride && (name.equals("syncMatchKey") || name.equals("serverScopeColumn"))
+                    || record instanceof TableOverride && (name.equals("syncMatchKey") || name.equals("serverScopeColumn") || name.equals("frontendTemplate") || name.equals("serviceImplementationTemplate")
+                    || name.equals("controllerTemplate") || name.equals("externalInputTemplate") || name.equals("resourceTemplate"))
                     || record instanceof Strategy && name.equals("fallback")
                     && !"displayName".equals(path.substring(path.lastIndexOf('.') + 1));
             require(values.containsKey(name) || optional, path + "." + name);
@@ -159,7 +162,8 @@ public record BusinessCodegenConfiguration(Integer version, Source source, Selec
                 throw new IllegalArgumentException("Invalid configuration: " + path, failure);
             }
             boolean nullable = name.equals("tableOverrides") || name.equals("schema") || name.equals("sync")
-                    || record instanceof TableOverride && (name.equals("syncMatchKey") || name.equals("serverScopeColumn"))
+                    || record instanceof TableOverride && (name.equals("syncMatchKey") || name.equals("serverScopeColumn") || name.equals("frontendTemplate") || name.equals("serviceImplementationTemplate")
+                    || name.equals("controllerTemplate") || name.equals("externalInputTemplate") || name.equals("resourceTemplate"))
                     || record instanceof Strategy && name.equals("fallback")
                     || record instanceof Conditional && (name.equals("property") || name.equals("value"));
             require(value != null || nullable, path + "." + name);

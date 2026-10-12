@@ -1,4 +1,4 @@
-// MES-CODEGEN: scaffold; review required. RuoYi template pipeline adapted under MIT.
+// MES-CODEGEN: scaffold; review required.
 package dev.mesbase.modules.material.controller;
 
 import dev.mesbase.modules.material.controller.vo.MaterialPageVo;
@@ -10,6 +10,8 @@ import dev.mesbase.modules.material.domain.MaterialQueryDto;
 import dev.mesbase.modules.material.domain.MaterialUpdateCommand;
 import dev.mesbase.modules.material.service.IMaterialService;
 import dev.mesbase.platform.web.EndpointAccess;
+import dev.mesbase.platform.execution.FactoryContext;
+import dev.mesbase.modules.material.sync.MaterialSyncResult;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
@@ -69,7 +71,7 @@ public class MaterialController {
     @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED,
             permission = MaterialPermissions.UPDATE)
     public MaterialVo update(@PathVariable Long id,
-            @Valid @RequestBody MaterialUpdateCommand input) {
+                             @Valid @RequestBody MaterialUpdateCommand input) {
         return toView(service.updateById(id, input));
     }
 
@@ -78,8 +80,8 @@ public class MaterialController {
     @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED,
             permission = MaterialPermissions.DELETE)
     public void delete(@RequestBody
-            @NotEmpty @Size(max = 100)
-            List<@NotNull Long> ids) {
+                       @NotEmpty @Size(max = 100)
+                       List<@NotNull Long> ids) {
         service.deleteByIds(ids);
     }
 
@@ -98,5 +100,10 @@ public class MaterialController {
                 row.getExternalCode()
         );
     }
-}
 
+    @PostMapping("/actions/sync")
+    @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED, permission = MaterialPermissions.SYNC)
+    public MaterialSyncResult sync() {
+        return service.sync(FactoryContext.required());
+    }
+}

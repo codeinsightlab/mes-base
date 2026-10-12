@@ -33,7 +33,7 @@ public final class IdeaGeneratedJavaFormatter implements UnaryOperator<List<Arti
             List<String> command = new ArrayList<>();
             command.add(launcher.toString());
             for (Artifact artifact : artifacts) {
-                if (artifact.relativePath().endsWith(".java")) {
+                if (!artifact.removed() && artifact.relativePath().endsWith(".java")) {
                     Path source = staging.resolve(artifact.relativePath());
                     Files.createDirectories(source.getParent());
                     Files.writeString(source, artifact.content());
@@ -51,7 +51,7 @@ public final class IdeaGeneratedJavaFormatter implements UnaryOperator<List<Arti
             }
             List<Artifact> formatted = new ArrayList<>();
             for (Artifact artifact : artifacts) {
-                formatted.add(artifact.relativePath().endsWith(".java")
+                formatted.add(!artifact.removed() && artifact.relativePath().endsWith(".java")
                         ? new Artifact(artifact.target(), artifact.relativePath(),
                         Files.readString(staging.resolve(artifact.relativePath())))
                         : artifact);

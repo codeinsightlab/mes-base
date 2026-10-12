@@ -176,31 +176,63 @@ tableOverrides:
     syncMatchKey: "index_code"
 
   material_category:
+    # 保留已审查的字段、引用选择和业务交互，页面变更由生成命令发布。
+    frontendTemplate: "reviewed/materialCategory.vue.vm"
+    serviceImplementationTemplate: "reviewed/MaterialCategoryServiceImpl.java.vm"
+    controllerTemplate: "reviewed/MaterialCategoryController.java.vm"
+    externalInputTemplate: "reviewed/ExternalMaterialCategory.java.vm"
     module: material
     displayName: 物料产品分类
     syncMatchKey: code
     serverScopeColumn: factory_id
   unit_measure:
+    # 保留已审查的字段、引用选择和业务交互，页面变更由生成命令发布。
+    frontendTemplate: "reviewed/unitMeasure.vue.vm"
+    serviceImplementationTemplate: "reviewed/UnitMeasureServiceImpl.java.vm"
+    controllerTemplate: "reviewed/UnitMeasureController.java.vm"
+    externalInputTemplate: "reviewed/ExternalUnitMeasure.java.vm"
     module: material
     displayName: 计量单位
     syncMatchKey: code
     serverScopeColumn: factory_id
   workshop:
+    # 保留已审查的字段、引用选择和业务交互，页面变更由生成命令发布。
+    frontendTemplate: "reviewed/workshop.vue.vm"
+    serviceImplementationTemplate: "reviewed/WorkshopServiceImpl.java.vm"
+    controllerTemplate: "reviewed/WorkshopController.java.vm"
+    externalInputTemplate: "reviewed/ExternalWorkshop.java.vm"
     module: material
     displayName: 车间
     syncMatchKey: code
     serverScopeColumn: factory_id
   workstation:
+    # 保留已审查的字段、引用选择和业务交互，页面变更由生成命令发布。
+    frontendTemplate: "reviewed/workstation.vue.vm"
+    serviceImplementationTemplate: "reviewed/WorkstationServiceImpl.java.vm"
+    controllerTemplate: "reviewed/WorkstationController.java.vm"
+    externalInputTemplate: "reviewed/ExternalWorkstation.java.vm"
     module: material
     displayName: 工作站
     syncMatchKey: code
     serverScopeColumn: factory_id
   material:
+    # 保留已审查的字段、引用选择和业务交互，页面变更由生成命令发布。
+    frontendTemplate: "reviewed/material.vue.vm"
+    serviceImplementationTemplate: "reviewed/MaterialServiceImpl.java.vm"
+    controllerTemplate: "reviewed/MaterialController.java.vm"
+    externalInputTemplate: "reviewed/ExternalMaterial.java.vm"
+    # 保留既有非生成资源常量，内容一致时才允许发布，不能覆盖无标记文件。
+    resourceTemplate: "reviewed/MaterialResource.java.vm"
     module: material
     displayName: 物料产品
     syncMatchKey: code
     serverScopeColumn: factory_id
   safety_stock:
+    # 保留已审查的字段、引用选择和业务交互，页面变更由生成命令发布。
+    frontendTemplate: "reviewed/safetyStock.vue.vm"
+    serviceImplementationTemplate: "reviewed/SafetyStockServiceImpl.java.vm"
+    controllerTemplate: "reviewed/SafetyStockController.java.vm"
+    externalInputTemplate: "reviewed/ExternalSafetyStock.java.vm"
     module: material
     displayName: 安全库存配置
     syncMatchKey: material_id
