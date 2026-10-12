@@ -1,0 +1,7066 @@
+{
+  "review_date": "2026-10-12",
+  "source_root": "/Users/user/work/heri/ktg-mes",
+  "source_head": "42a81cc577dc77b05a6a67f6be0a9466e40784e1",
+  "scope": "ktg-mes only; ktg-wheel excluded; Source database never accessed",
+  "evidence_level": "STATIC_SOURCE",
+  "source_schema": "scripts/mf-upgrade/sql/009-new-factory-business-init.sql; repository snapshot, not live metadata",
+  "source_schema_sha256": "a3200c488a82242ad009a0f86fceac9dc3bd26943a85a03d362bc46c544c9918",
+  "modules": {
+    "accidentalhandle": {
+      "controllers": 1,
+      "service_impls": 1
+    },
+    "aspect": {
+      "controllers": 0,
+      "service_impls": 0
+    },
+    "bigdatawallcontrol": {
+      "controllers": 1,
+      "service_impls": 1
+    },
+    "cal": {
+      "controllers": 7,
+      "service_impls": 8
+    },
+    "chat": {
+      "controllers": 1,
+      "service_impls": 1
+    },
+    "check": {
+      "controllers": 1,
+      "service_impls": 1
+    },
+    "config": {
+      "controllers": 0,
+      "service_impls": 0
+    },
+    "controller": {
+      "controllers": 9,
+      "service_impls": 0
+    },
+    "dashboard": {
+      "controllers": 13,
+      "service_impls": 10
+    },
+    "dv": {
+      "controllers": 9,
+      "service_impls": 9
+    },
+    "echarts": {
+      "controllers": 1,
+      "service_impls": 1
+    },
+    "enumeration": {
+      "controllers": 0,
+      "service_impls": 0
+    },
+    "erp": {
+      "controllers": 9,
+      "service_impls": 8
+    },
+    "erpapi": {
+      "controllers": 6,
+      "service_impls": 12
+    },
+    "fd": {
+      "controllers": 2,
+      "service_impls": 2
+    },
+    "hr": {
+      "controllers": 0,
+      "service_impls": 1
+    },
+    "info": {
+      "controllers": 2,
+      "service_impls": 0
+    },
+    "mail": {
+      "controllers": 1,
+      "service_impls": 0
+    },
+    "manager": {
+      "controllers": 0,
+      "service_impls": 0
+    },
+    "mapper": {
+      "controllers": 0,
+      "service_impls": 0
+    },
+    "md": {
+      "controllers": 30,
+      "service_impls": 22
+    },
+    "migration": {
+      "controllers": 0,
+      "service_impls": 0
+    },
+    "mobileentry": {
+      "controllers": 1,
+      "service_impls": 1
+    },
+    "mobilepermission": {
+      "controllers": 1,
+      "service_impls": 1
+    },
+    "model": {
+      "controllers": 0,
+      "service_impls": 0
+    },
+    "mqtt": {
+      "controllers": 0,
+      "service_impls": 0
+    },
+    "notification": {
+      "controllers": 0,
+      "service_impls": 1
+    },
+    "pallet": {
+      "controllers": 3,
+      "service_impls": 3
+    },
+    "pm": {
+      "controllers": 7,
+      "service_impls": 6
+    },
+    "print": {
+      "controllers": 6,
+      "service_impls": 5
+    },
+    "pro": {
+      "controllers": 42,
+      "service_impls": 41
+    },
+    "proreporterp": {
+      "controllers": 0,
+      "service_impls": 0
+    },
+    "proreportingbuckle": {
+      "controllers": 0,
+      "service_impls": 0
+    },
+    "qc": {
+      "controllers": 18,
+      "service_impls": 18
+    },
+    "qcSpecialProductInspection": {
+      "controllers": 1,
+      "service_impls": 1
+    },
+    "report": {
+      "controllers": 1,
+      "service_impls": 1
+    },
+    "service": {
+      "controllers": 0,
+      "service_impls": 9
+    },
+    "so": {
+      "controllers": 9,
+      "service_impls": 8
+    },
+    "sqlserver": {
+      "controllers": 0,
+      "service_impls": 0
+    },
+    "timedtask": {
+      "controllers": 0,
+      "service_impls": 1
+    },
+    "tm": {
+      "controllers": 2,
+      "service_impls": 2
+    },
+    "validation": {
+      "controllers": 0,
+      "service_impls": 0
+    },
+    "wm": {
+      "controllers": 42,
+      "service_impls": 34
+    },
+    "workeroption": {
+      "controllers": 1,
+      "service_impls": 1
+    }
+  },
+  "controller_inventory": [
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/accidentalhandle/controller/AccidentalDeletionReportController.java",
+      "routes": [
+        [
+          "Request",
+          "\"/mes/pro/accidentalDeletionReport\")"
+        ],
+        [
+          "Get",
+          "\"/checkoutPassword/{password}\")"
+        ],
+        [
+          "Get",
+          "\"/accidentalDeletionProbuckle/{itemCode}/{xtransferNo}\")"
+        ],
+        [
+          "Get",
+          "\"/accidentalDeletionProMaterial/{xtransferNo}/{docNo}\")"
+        ],
+        [
+          "Get",
+          "\"/accidentalDeletionReport/{docNo}/{xtransferNo}\")"
+        ],
+        [
+          "Get",
+          "\"/accidentalDeletionReportMaterial/{docNo}/{xtransferNo}\")"
+        ],
+        [
+          "Get",
+          "\"/accidentalDeletionProRouteBrokenStep/{before_item_code}/{before_lot_code}\")"
+        ],
+        [
+          "Delete",
+          "\"/deleteProbuckle/{id}\")"
+        ],
+        [
+          "Delete",
+          "\"/deleteProMaterial/{id}\")"
+        ],
+        [
+          "Delete",
+          "\"/deleteProReportingWork/{recordId}\")"
+        ],
+        [
+          "Delete",
+          "\"/deleteProReportingWorkMaterial/{recordId}\")"
+        ],
+        [
+          "Delete",
+          "\"/deleteRouteBrokenStep/{id}\")"
+        ],
+        [
+          "Delete",
+          "\"/deleteProbuckleAll\")"
+        ],
+        [
+          "Delete",
+          "\"/deleteProMaterialAll\")"
+        ],
+        [
+          "Delete",
+          "\"/deleteProReportingWorkAll\")"
+        ],
+        [
+          "Delete",
+          "\"/deleteProReportingWorkMaterialAll\")"
+        ],
+        [
+          "Delete",
+          "\"/deleteRouteBrokenStepAll\")"
+        ],
+        [
+          "Get",
+          "\"/moReceipts/{itemCode}/{lotCode}\")"
+        ],
+        [
+          "Get",
+          "\"/selectIssueReceipt/{xtransferNo}/{docNo}\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/bigdatawallcontrol/controller/BigdataMonthlyProductionSummaryController.java",
+      "routes": [
+        [
+          "Request",
+          "\"/mes/bigdatawallcontrol\")"
+        ],
+        [
+          "Get",
+          "\"/list\")"
+        ],
+        [
+          "Post",
+          "\"/export\")"
+        ],
+        [
+          "Get",
+          "value = \"/{seqNo}\")"
+        ],
+        [
+          "Delete",
+          "\"/{seqNos}\")"
+        ],
+        [
+          "Post",
+          "\"/importData\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/cal/controller/CalCalendarController.java",
+      "routes": [
+        [
+          "Request",
+          "\"/mes/cal/calendar\")"
+        ],
+        [
+          "Get",
+          "\"/list\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/cal/controller/CalHolidayController.java",
+      "routes": [
+        [
+          "Request",
+          "\"/mes/cal/calholiday\")"
+        ],
+        [
+          "Get",
+          "\"/list\")"
+        ],
+        [
+          "Post",
+          "\"/export\")"
+        ],
+        [
+          "Get",
+          "value = \"/{holidayId}\")"
+        ],
+        [
+          "Delete",
+          "\"/{holidayIds}\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/cal/controller/CalPlanController.java",
+      "routes": [
+        [
+          "Request",
+          "\"/mes/cal/calplan\")"
+        ],
+        [
+          "Get",
+          "\"/list\")"
+        ],
+        [
+          "Post",
+          "\"/export\")"
+        ],
+        [
+          "Get",
+          "value = \"/{planId}\")"
+        ],
+        [
+          "Delete",
+          "\"/{planIds}\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/cal/controller/CalPlanTeamController.java",
+      "routes": [
+        [
+          "Request",
+          "\"/mes/cal/planteam\")"
+        ],
+        [
+          "Get",
+          "\"/list\")"
+        ],
+        [
+          "Post",
+          "\"/export\")"
+        ],
+        [
+          "Get",
+          "value = \"/{recordId}\")"
+        ],
+        [
+          "Delete",
+          "\"/{recordIds}\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/cal/controller/CalShiftController.java",
+      "routes": [
+        [
+          "Request",
+          "\"/mes/cal/shift\")"
+        ],
+        [
+          "Get",
+          "\"/list\")"
+        ],
+        [
+          "Post",
+          "\"/export\")"
+        ],
+        [
+          "Get",
+          "value = \"/{shiftId}\")"
+        ],
+        [
+          "Delete",
+          "\"/{shiftIds}\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/cal/controller/CalTeamController.java",
+      "routes": [
+        [
+          "Request",
+          "\"/mes/cal/team\")"
+        ],
+        [
+          "Get",
+          "\"/list\")"
+        ],
+        [
+          "Get",
+          "\"/listAll\")"
+        ],
+        [
+          "Post",
+          "\"/export\")"
+        ],
+        [
+          "Get",
+          "value = \"/{teamId}\")"
+        ],
+        [
+          "Delete",
+          "\"/{teamIds}\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/cal/controller/CalTeamMemberController.java",
+      "routes": [
+        [
+          "Request",
+          "\"/mes/cal/teammember\")"
+        ],
+        [
+          "Get",
+          "\"/list\")"
+        ],
+        [
+          "Post",
+          "\"/export\")"
+        ],
+        [
+          "Get",
+          "value = \"/{memberId}\")"
+        ],
+        [
+          "Delete",
+          "\"/{memberIds}\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/chat/controller/ChatController.java",
+      "routes": [
+        [
+          "Request",
+          "\"/mes/chat\")"
+        ],
+        [
+          "Get",
+          "\"/getUserInfo\")"
+        ],
+        [
+          "Post",
+          "\"/sendMessage\")"
+        ],
+        [
+          "Get",
+          "\"/getMessage\")"
+        ],
+        [
+          "Get",
+          "\"/getEmotion\")"
+        ],
+        [
+          "Post",
+          "\"/uploadImage\")"
+        ],
+        [
+          "Post",
+          "\"/uploadVoice\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/check/controller/CheckInRecordController.java",
+      "routes": [
+        [
+          "Request",
+          "\"/mes/check/checkInRecord\")"
+        ],
+        [
+          "Post",
+          "\"/save\")"
+        ],
+        [
+          "Get",
+          "\"/findByUserId\")"
+        ],
+        [
+          "Get",
+          "\"/findByUserIdAndCheckInTimeBetween/{startDate}/{todayEnd}\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/controller/mobile/FlowRetrospectController.java",
+      "routes": [
+        [
+          "Request",
+          "\"/mes/mobile/flow-retrospect\")"
+        ],
+        [
+          "Get",
+          "\"/getTicketInformation\")"
+        ],
+        [
+          "Post",
+          "\"/selectReportDefective\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/controller/mobile/InBoundRequestsController.java",
+      "routes": [
+        [
+          "Request",
+          "\"/mes/mobile/in-bound-requests\")"
+        ],
+        [
+          "Get",
+          "\"/getInBoundRequestsRange\")"
+        ],
+        [
+          "Get",
+          "\"/getTicketInformation\")"
+        ],
+        [
+          "Post",
+          "\"/createMoReceiptRequisition\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/controller/mobile/MineSalaryController.java",
+      "routes": [
+        [
+          "Request",
+          "\"/mes-mobile/mine-salary\")"
+        ],
+        [
+          "Get",
+          "\"/getSalary\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/controller/mobile/TransferAuditController.java",
+      "routes": [
+        [
+          "Request",
+          "\"/mes/mobile/transfer-audit\")"
+        ],
+        [
+          "Get",
+          "\"/getTransferAudit\")"
+        ],
+        [
+          "Get",
+          "\"/getApplyStorageInfo\")"
+        ],
+        [
+          "Post",
+          "\"/createMoReceipt\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/controller/mobile/TransferController.java",
+      "routes": [
+        [
+          "Request",
+          "\"/mes/mobile/transfer\")"
+        ],
+        [
+          "Get",
+          "\"/detail\")"
+        ],
+        [
+          "Get",
+          "\"/order/detail\")"
+        ],
+        [
+          "Get",
+          "\"/receivePending\")"
+        ],
+        [
+          "Get",
+          "\"/permission-summary\")"
+        ],
+        [
+          "Get",
+          "\"/myActionList\")"
+        ],
+        [
+          "Post",
+          "\"/confirm\")"
+        ],
+        [
+          "Post",
+          "\"/receiveBatch\")"
+        ],
+        [
+          "Post",
+          "\"/order/outConfirm\")"
+        ],
+        [
+          "Post",
+          "\"/order/receiveConfirm\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/controller/mobile/WorkReportController.java",
+      "routes": [
+        [
+          "Request",
+          "\"/mes/mobile/work-report\")"
+        ],
+        [
+          "Post",
+          "\"/add\")"
+        ],
+        [
+          "Get",
+          "\"/getTicketInformation\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/controller/web/AssignWorkController.java",
+      "routes": [
+        [
+          "Request",
+          "\"/mes/sys/assign-work\")"
+        ],
+        [
+          "Get",
+          "\"/lists\")"
+        ],
+        [
+          "Post",
+          "\"/insert\")"
+        ],
+        [
+          "Delete",
+          "\"/delete/{ids}\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/controller/web/FinanceDetailController.java",
+      "routes": [
+        [
+          "Request",
+          "\"/mes/fd/fdFinanceDetail\")"
+        ],
+        [
+          "Get",
+          "\"/selectList\")"
+        ],
+        [
+          "Get",
+          "\"/selectRelateInfo\")"
+        ],
+        [
+          "Get",
+          "\"/erpSynchronizedData\")"
+        ],
+        [
+          "Post",
+          "\"/oldExport\")"
+        ],
+        [
+          "Post",
+          "\"/export\")"
+        ],
+        [
+          "Post",
+          "\"/oldExportSummary\")"
+        ],
+        [
+          "Post",
+          "\"/exportSummary\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/controller/web/WorkReportController.java",
+      "routes": [
+        [
+          "Request",
+          "\"/mes/pro/reportingWork\")"
+        ],
+        [
+          "Get",
+          "\"/list\")"
+        ],
+        [
+          "Post",
+          "\"/mobile\")"
+        ],
+        [
+          "Get",
+          "\"/{recordId}\")"
+        ],
+        [
+          "Delete",
+          "\"/{recordId}\")"
+        ],
+        [
+          "Get",
+          "\"/workorder\")"
+        ],
+        [
+          "Get",
+          "\"/route\")"
+        ],
+        [
+          "Get",
+          "\"/latestBuckleRoute\")"
+        ],
+        [
+          "Get",
+          "\"/process\")"
+        ],
+        [
+          "Get",
+          "\"/processAll\")"
+        ],
+        [
+          "Put",
+          "\"/quantity\")"
+        ],
+        [
+          "Get",
+          "\"/quantity\")"
+        ],
+        [
+          "Post",
+          "\"/export\")"
+        ],
+        [
+          "Put",
+          "\"/auditing\")"
+        ],
+        [
+          "Put",
+          "\"/settlement\")"
+        ],
+        [
+          "Post",
+          "\"/mergeQuantityExports\")"
+        ],
+        [
+          "Post",
+          "\"/selectReportWorkByDate\")"
+        ],
+        [
+          "Post",
+          "\"/selectReportDefective\")"
+        ],
+        [
+          "Get",
+          "\"/selectReportNumberByStatus/{item}/{lot}\")"
+        ],
+        [
+          "Put",
+          "\"/forcedFinish\")"
+        ],
+        [
+          "Get",
+          "\"/showStorageData\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/dashboard/controller/BigDataDashboardOutputValueController.java",
+      "routes": [
+        [
+          "Get",
+          "\"/bigdatadashboard/output-value/recent-12-months\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/dashboard/controller/BigDataDashboardSafetyCrossController.java",
+      "routes": [
+        [
+          "Get",
+          "\"/bigdatadashboard/safety-cross\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/dashboard/controller/BigDataDashboardWeatherController.java",
+      "routes": [
+        [
+          "Get",
+          "\"/bigdatadashboard/weather\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/dashboard/controller/BigdataMonthlyForecastController.java",
+      "routes": [
+        [
+          "Request",
+          "\"/bigdatadashboard/forecast\")"
+        ],
+        [
+          "Get",
+          "\"/list\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/dashboard/controller/DashboardController.java",
+      "routes": [
+        [
+          "Get",
+          "\"/bigdatadashboard\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/dashboard/controller/DashboardImageController.java",
+      "routes": [
+        [
+          "Request",
+          "\"/mes/dashboard/image\")"
+        ],
+        [
+          "Get",
+          "\"/list\")"
+        ],
+        [
+          "Get",
+          "\"/{id}\")"
+        ],
+        [
+          "Delete",
+          "\"/{ids}\")"
+        ],
+        [
+          "Put",
+          "\"/changeStatus\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/dashboard/controller/OutputValueController.java",
+      "routes": [
+        [
+          "Request",
+          "\"/mes/dashboard/output-value\")"
+        ],
+        [
+          "Get",
+          "\"/list\")"
+        ],
+        [
+          "Get",
+          "\"/{id}\")"
+        ],
+        [
+          "Delete",
+          "\"/{ids}\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/dashboard/controller/SafetyEventController.java",
+      "routes": [
+        [
+          "Request",
+          "\"/mes/safety-event\")"
+        ],
+        [
+          "Get",
+          "\"/list\")"
+        ],
+        [
+          "Get",
+          "\"/{id}\")"
+        ],
+        [
+          "Delete",
+          "\"/{ids}\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/dashboard/controller/SimulationDefectiveController.java",
+      "routes": [
+        [
+          "Request",
+          "\"/bigdatadashboard/qc\")"
+        ],
+        [
+          "Get",
+          "\"/list\")"
+        ],
+        [
+          "Post",
+          "\"/export\")"
+        ],
+        [
+          "Get",
+          "value = \"/{id}\")"
+        ],
+        [
+          "Delete",
+          "\"/{ids}\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/dashboard/controller/SimulationProcessProductionController.java",
+      "routes": [
+        [
+          "Request",
+          "\"/bigdatadashboard/jc\")"
+        ],
+        [
+          "Get",
+          "\"/list\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/dashboard/controller/SimulationPurchaseCompletionController.java",
+      "routes": [
+        [
+          "Request",
+          "\"/bigdatadashboard/purchase\")"
+        ],
+        [
+          "Get",
+          "\"/list\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/dashboard/controller/SimulationStaffController.java",
+      "routes": [
+        [
+          "Request",
+          "\"/bigdatadashboard/yg\")"
+        ],
+        [
+          "Get",
+          "\"/list\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/dashboard/controller/SimulationWipController.java",
+      "routes": [
+        [
+          "Request",
+          "\"/bigdatadashboard/wip\")"
+        ],
+        [
+          "Get",
+          "\"/auto/list\")"
+        ],
+        [
+          "Get",
+          "\"/auto/list\")"
+        ],
+        [
+          "Get",
+          "\"/list\")"
+        ],
+        [
+          "Post",
+          "\"/updateSort\")"
+        ],
+        [
+          "Post",
+          "\"/updateCell\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/dv/controller/DvCheckMachineryController.java",
+      "routes": [
+        [
+          "Request",
+          "\"/mes/dv/checkmachinery\")"
+        ],
+        [
+          "Get",
+          "\"/list\")"
+        ],
+        [
+          "Post",
+          "\"/export\")"
+        ],
+        [
+          "Get",
+          "value = \"/{recordId}\")"
+        ],
+        [
+          "Delete",
+          "\"/{recordIds}\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/dv/controller/DvCheckPlanController.java",
+      "routes": [
+        [
+          "Request",
+          "\"/mes/dv/checkplan\")"
+        ],
+        [
+          "Get",
+          "\"/list\")"
+        ],
+        [
+          "Post",
+          "\"/export\")"
+        ],
+        [
+          "Get",
+          "value = \"/{planId}\")"
+        ],
+        [
+          "Delete",
+          "\"/{planIds}\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/dv/controller/DvCheckSubjectController.java",
+      "routes": [
+        [
+          "Request",
+          "\"/mes/dv/checksubject\")"
+        ],
+        [
+          "Get",
+          "\"/list\")"
+        ],
+        [
+          "Post",
+          "\"/export\")"
+        ],
+        [
+          "Get",
+          "value = \"/{recordId}\")"
+        ],
+        [
+          "Delete",
+          "\"/{recordIds}\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/dv/controller/DvMachineryController.java",
+      "routes": [
+        [
+          "Request",
+          "\"/mes/dv/machinery\")"
+        ],
+        [
+          "Get",
+          "\"/list\")"
+        ],
+        [
+          "Post",
+          "\"/export\")"
+        ],
+        [
+          "Get",
+          "value = \"/{machineryId}\")"
+        ],
+        [
+          "Delete",
+          "\"/{machineryIds}\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/dv/controller/DvMachineryTypeController.java",
+      "routes": [
+        [
+          "Request",
+          "\"/mes/dv/machinerytype\")"
+        ],
+        [
+          "Get",
+          "\"/list\")"
+        ],
+        [
+          "Post",
+          "\"/export\")"
+        ],
+        [
+          "Get",
+          "value = \"/{machineryTypeId}\")"
+        ],
+        [
+          "Delete",
+          "\"/{machineryTypeIds}\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/dv/controller/DvRepairController.java",
+      "routes": [
+        [
+          "Request",
+          "\"/mes/dv/repair\")"
+        ],
+        [
+          "Get",
+          "\"/list\")"
+        ],
+        [
+          "Post",
+          "\"/export\")"
+        ],
+        [
+          "Get",
+          "value = \"/{repairId}\")"
+        ],
+        [
+          "Delete",
+          "\"/{repairIds}\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/dv/controller/DvRepairLineController.java",
+      "routes": [
+        [
+          "Request",
+          "\"/mes/dv/repairline\")"
+        ],
+        [
+          "Get",
+          "\"/list\")"
+        ],
+        [
+          "Post",
+          "\"/export\")"
+        ],
+        [
+          "Get",
+          "value = \"/{lineId}\")"
+        ],
+        [
+          "Delete",
+          "\"/{lineIds}\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/dv/controller/DvSubjectController.java",
+      "routes": [
+        [
+          "Request",
+          "\"/mes/dv/dvsubject\")"
+        ],
+        [
+          "Get",
+          "\"/list\")"
+        ],
+        [
+          "Post",
+          "\"/export\")"
+        ],
+        [
+          "Get",
+          "value = \"/{subjectId}\")"
+        ],
+        [
+          "Delete",
+          "\"/{subjectIds}\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/dv/controller/MobileDeviceController.java",
+      "routes": [
+        [
+          "Request",
+          "\"/mes/mobile/device\")"
+        ],
+        [
+          "Get",
+          "\"/list\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/echarts/controller/EchartsController.java",
+      "routes": [
+        [
+          "Request",
+          "\"/mes/echartsShow\")"
+        ],
+        [
+          "Get",
+          "\"/getWorkorderCount\")"
+        ],
+        [
+          "Get",
+          "\"/salesNumbers\")"
+        ],
+        [
+          "Get",
+          "\"/getMount\")"
+        ],
+        [
+          "Get",
+          "\"/getRouteList\")"
+        ],
+        [
+          "Get",
+          "\"/getProRouteProcess\")"
+        ],
+        [
+          "Get",
+          "\"/getProProcess\")"
+        ],
+        [
+          "Get",
+          "\"/getMainDefect\")"
+        ],
+        [
+          "Get",
+          "\"/getPeopleAttendance\")"
+        ],
+        [
+          "Get",
+          "\"/getOEE\")"
+        ],
+        [
+          "Get",
+          "\"/getPPM\")"
+        ],
+        [
+          "Get",
+          "\"/getDayDefective\")"
+        ],
+        [
+          "Get",
+          "\"/getDeviceStatus\")"
+        ],
+        [
+          "Get",
+          "\"/getPlan\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/erp/controller/ErpIssueReceiptController.java",
+      "routes": [
+        [
+          "Request",
+          "\"/mes/erp/issueReceipt\")"
+        ],
+        [
+          "Get",
+          "\"/list\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/erp/controller/ErpItemController.java",
+      "routes": [
+        [
+          "Request",
+          "\"mes/erp/item\")"
+        ],
+        [
+          "Get",
+          "\"/list\")"
+        ],
+        [
+          "Post",
+          "\"/export\")"
+        ],
+        [
+          "Get",
+          "value = \"/{itemId}\")"
+        ],
+        [
+          "Delete",
+          "\"/{itemIds}\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/erp/controller/ErpItemWarehouseBinController.java",
+      "routes": [
+        [
+          "Request",
+          "\"/mes/erp/itemWarehouseBin\")"
+        ],
+        [
+          "Get",
+          "\"/list\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/erp/controller/ErpMoController.java",
+      "routes": [
+        [
+          "Request",
+          "\"mes/erp/mo\")"
+        ],
+        [
+          "Get",
+          "\"/getMoDocNo/{itemCode}\")"
+        ],
+        [
+          "Get",
+          "\"/getErpModRemainQtyPer\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/erp/controller/ErpMoReceiptDController.java",
+      "routes": [
+        [
+          "Request",
+          "\"/mes/erp/moReceipt\")"
+        ],
+        [
+          "Get",
+          "\"/list\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/erp/controller/ErpMoReceiptRequistionDController.java",
+      "routes": [
+        [
+          "Request",
+          "\"/mes/erp/moReceiptRequistion\")"
+        ],
+        [
+          "Get",
+          "\"/list\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/erp/controller/ErpWorkOrderController.java",
+      "routes": [
+        [
+          "Request",
+          "\"/mes/erp/workorder\")"
+        ],
+        [
+          "Get",
+          "\"/list\")"
+        ],
+        [
+          "Get",
+          "\"/{workorderCode}\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/erp/lot/controller/WorkorderMasterDataController.java",
+      "routes": [
+        [
+          "Request",
+          "\"/mes/md/workorder-master\")"
+        ],
+        [
+          "Get",
+          "\"/items\")"
+        ],
+        [
+          "Get",
+          "\"/lots\")"
+        ],
+        [
+          "Get",
+          "\"/workshops\")"
+        ],
+        [
+          "Get",
+          "\"/sync-status\")"
+        ],
+        [
+          "Post",
+          "\"/sync-items\")"
+        ],
+        [
+          "Post",
+          "\"/sync-lots\")"
+        ],
+        [
+          "Post",
+          "\"/sync-bom\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/erp/production/controller/ItemProductionController.java",
+      "routes": [
+        [
+          "Request",
+          "\"/mes/md/workorder-master/production\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/erpapi/controller/IssueReceiptController.java",
+      "routes": [
+        [
+          "Request",
+          "\"/mes/oapi/issueReceipt\")"
+        ],
+        [
+          "Post",
+          "\"/insert5600/{docNo}/{itemCode}/{itemLotCode}/{qty}\")"
+        ],
+        [
+          "Post",
+          "\"/insert5705/{docNo}/{itemCode}/{qty}\")"
+        ],
+        [
+          "Post",
+          "\"/insert5704/{docNo}/{itemCode}/{qty}\")"
+        ],
+        [
+          "Get",
+          "\"/workorder\")"
+        ],
+        [
+          "Get",
+          "\"/queryMoDocNo\")"
+        ],
+        [
+          "Get",
+          "\"/warehouseBin\")"
+        ],
+        [
+          "Get",
+          "\"/getMaterialByDocNo\")"
+        ],
+        [
+          "Get",
+          "\"/getTest\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/erpapi/controller/ItemWarehouseBinController.java",
+      "routes": [
+        [
+          "Request",
+          "\"/mes/oapi/warehouseBin\")"
+        ],
+        [
+          "Get",
+          "\"/read\")"
+        ],
+        [
+          "Get",
+          "\"/query/{itemCode}/{warehouseCode}/{pageSize}/{pageNo}\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/erpapi/controller/OapiMoReceiptRequistionController.java",
+      "routes": [
+        [
+          "Request",
+          "\"/mes/oapi/moReceiptRequistion\")"
+        ],
+        [
+          "Post",
+          "\"/insert5901\")"
+        ],
+        [
+          "Get",
+          "\"/getItemInfo\")"
+        ],
+        [
+          "Get",
+          "\"/getProBuckleInfo\")"
+        ],
+        [
+          "Post",
+          "\"/batchInsertDocNo5901\")"
+        ],
+        [
+          "Post",
+          "\"/mergeInsertDocNo5901\")"
+        ],
+        [
+          "Get",
+          "\"/getMoReceiptRequistionList\")"
+        ],
+        [
+          "Get",
+          "\"/getWarehouseList\")"
+        ],
+        [
+          "Get",
+          "\"/getProReceiptMergeInfo\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/erpapi/controller/OapiTransferDocController.java",
+      "routes": [
+        [
+          "Request",
+          "\"/mes/oapi/transferDoc\")"
+        ],
+        [
+          "Post",
+          "\"/insert1602/{docNo}\")"
+        ],
+        [
+          "Get",
+          "\"/{docNo}\")"
+        ],
+        [
+          "Put",
+          "\"/confirm/{docNo}\")"
+        ],
+        [
+          "Get",
+          "\"/getTransferDocInfo\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/erpapi/controller/ScrapDocController.java",
+      "routes": [
+        [
+          "Request",
+          "\"/mes/oapi/scrapDoc\")"
+        ],
+        [
+          "Post",
+          "\"/insert1F05/{docNo}\")"
+        ],
+        [
+          "Get",
+          "\"/getScrapDocInof\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/erpapi/controller/TransactionDocController.java",
+      "routes": [
+        [
+          "Request",
+          "\"/mes/oapi/transactionDoc\")"
+        ],
+        [
+          "Post",
+          "\"/insert/{total}/{firstQuantity}/{par}\")"
+        ],
+        [
+          "Post",
+          "\"/unionBarcode/{newLotCode}\")"
+        ],
+        [
+          "Get",
+          "\"/getNewLotCode/{item}/{lot}\")"
+        ],
+        [
+          "Get",
+          "\"/checkLotCodeRemain/{item}/{lot}\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/fd/controller/InvoiceRegisterController.java",
+      "routes": [
+        [
+          "Request",
+          "\"/mes/fc/InvoiceRegister\")"
+        ],
+        [
+          "Get",
+          "\"/list\")"
+        ],
+        [
+          "Post",
+          "\"/export\")"
+        ],
+        [
+          "Get",
+          "value = \"/{id}\")"
+        ],
+        [
+          "Delete",
+          "\"/{ids}\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/fd/controller/OldFinanceDetailController.java",
+      "routes": [
+        [
+          "Request",
+          "\"/mes/fd/text/fdFinanceDetail\")"
+        ],
+        [
+          "Get",
+          "\"/selectList\")"
+        ],
+        [
+          "Get",
+          "\"/selectRelateInfo\")"
+        ],
+        [
+          "Get",
+          "\"/erpSynchronizedData\")"
+        ],
+        [
+          "Post",
+          "\"/export\")"
+        ],
+        [
+          "Post",
+          "\"/exportSummary\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/info/controller/LegacyNumberLookupController.java",
+      "routes": [
+        [
+          "Request",
+          "\"/wheel/info/lookup\")"
+        ],
+        [
+          "Get",
+          "\"/list\")"
+        ],
+        [
+          "Get",
+          "\"/hot-keywords\")"
+        ],
+        [
+          "Get",
+          "\"/{id}\")"
+        ],
+        [
+          "Post",
+          "\"/batch/select\")"
+        ],
+        [
+          "Post",
+          "\"/insert\") @Log(title=\"编号查询\",businessType=BusinessType.INSERT)"
+        ],
+        [
+          "Put",
+          "\"/update\") @Log(title=\"编号查询\",businessType=BusinessType.UPDATE)"
+        ],
+        [
+          "Delete",
+          "\"/{ids}\") @Log(title=\"编号查询\",businessType=BusinessType.DELETE)"
+        ],
+        [
+          "Post",
+          "\"/export\")"
+        ],
+        [
+          "Post",
+          "\"/download-template\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/info/controller/NumberLookupController.java",
+      "routes": [
+        [
+          "Request",
+          "\"/mes/info/lookup\")"
+        ],
+        [
+          "Get",
+          "\"/list\")"
+        ],
+        [
+          "Get",
+          "\"/hot-keywords\")"
+        ],
+        [
+          "Get",
+          "\"/{id}\")"
+        ],
+        [
+          "Post",
+          "\"/batch/select\")"
+        ],
+        [
+          "Post",
+          "\"/insert\") @Log(title=\"编号查询\",businessType=BusinessType.INSERT)"
+        ],
+        [
+          "Put",
+          "\"/update\") @Log(title=\"编号查询\",businessType=BusinessType.UPDATE)"
+        ],
+        [
+          "Delete",
+          "\"/{ids}\") @Log(title=\"编号查询\",businessType=BusinessType.DELETE)"
+        ],
+        [
+          "Post",
+          "\"/export\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/mail/Controller/MailController.java",
+      "routes": [
+        [
+          "Request",
+          "\"/mes/mail\")"
+        ],
+        [
+          "Request",
+          "\"/sendTextMail\")"
+        ],
+        [
+          "Request",
+          "\"/sendFilesMail\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/md/controller/HeatTreatmentParamTemplateController.java",
+      "routes": [
+        [
+          "Request",
+          "\"/mes/heat-treatment/param-template\")"
+        ],
+        [
+          "Get",
+          "\"/list\")"
+        ],
+        [
+          "Post",
+          "\"/export\")"
+        ],
+        [
+          "Get",
+          "\"/{templateId}\")"
+        ],
+        [
+          "Delete",
+          "\"/{templateIds}\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/md/controller/HeatTreatmentRecordController.java",
+      "routes": [
+        [
+          "Get",
+          "\"/mes/heat-treatment/list\")"
+        ],
+        [
+          "Get",
+          "\"/mes/heat-treatment/status-options\")"
+        ],
+        [
+          "Get",
+          "\"/mes/heat-treatment/device-status\")"
+        ],
+        [
+          "Get",
+          "\"/mes/heat-treatment/{id}\")"
+        ],
+        [
+          "Get",
+          "\"/mes/heat-treatment/trace\")"
+        ],
+        [
+          "Get",
+          "\"/mes/heat-treatment/traceability\")"
+        ],
+        [
+          "Get",
+          "\"/mes/heat-treatment/traceability/lifecycle\")"
+        ],
+        [
+          "Post",
+          "\"/mes/heat-treatment/{id}/void\")"
+        ],
+        [
+          "Post",
+          "\"/mes/heat-treatment/{id}/remark\")"
+        ],
+        [
+          "Post",
+          "\"/mes/heat-treatment\")"
+        ],
+        [
+          "Delete",
+          "\"/mes/heat-treatment/{ids}\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/md/controller/InspectionBoardController.java",
+      "routes": [
+        [
+          "Request",
+          "\"/bigdatadashboard/inspection-board\")"
+        ],
+        [
+          "Get",
+          "\"/realtime\")"
+        ],
+        [
+          "Get",
+          "\"/statistics\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/md/controller/InspectionRecordController.java",
+      "routes": [
+        [
+          "Get",
+          "\"/md/inspectionRecord/list\")"
+        ],
+        [
+          "Post",
+          "\"/md/inspectionRecord/export\")"
+        ],
+        [
+          "Get",
+          "value = \"/md/inspectionRecord/{id}\")"
+        ],
+        [
+          "Post",
+          "\"/md/inspectionRecord\")"
+        ],
+        [
+          "Put",
+          "\"/md/inspectionRecord\")"
+        ],
+        [
+          "Delete",
+          "\"/md/inspectionRecord/{ids}\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/md/controller/ItemTypeController.java",
+      "routes": [
+        [
+          "Request",
+          "\"/mes/md/itemtype\")"
+        ],
+        [
+          "Get",
+          "\"/list\")"
+        ],
+        [
+          "Get",
+          "\"/list/exclude/{itemTypeId}\")"
+        ],
+        [
+          "Get",
+          "value = \"/{itemTypeId}\")"
+        ],
+        [
+          "Get",
+          "\"/treeselect\")"
+        ],
+        [
+          "Delete",
+          "\"/{itemTypeId}\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/md/controller/MdClientController.java",
+      "routes": [
+        [
+          "Request",
+          "\"/mes/md/client\")"
+        ],
+        [
+          "Get",
+          "\"/list\")"
+        ],
+        [
+          "Post",
+          "\"/export\")"
+        ],
+        [
+          "Get",
+          "value = \"/{clientId}\")"
+        ],
+        [
+          "Delete",
+          "\"/{clientIds}\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/md/controller/MdItemController.java",
+      "routes": [
+        [
+          "Request",
+          "\"/mes/md/mditem\")"
+        ],
+        [
+          "Get",
+          "\"/list\")"
+        ],
+        [
+          "Get",
+          "value = \"/{itemId}\")"
+        ],
+        [
+          "Delete",
+          "\"/{itemIds}\")"
+        ],
+        [
+          "Get",
+          "\"/getMdItemInfo/{itemCode}\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/md/controller/MdProductBomController.java",
+      "routes": [
+        [
+          "Request",
+          "\"/mes/md/bom\")"
+        ],
+        [
+          "Get",
+          "\"/list\")"
+        ],
+        [
+          "Post",
+          "\"/export\")"
+        ],
+        [
+          "Get",
+          "value = \"/{bomId}\")"
+        ],
+        [
+          "Delete",
+          "\"/{bomIds}\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/md/controller/MdProductSOPMobController.java",
+      "routes": [
+        [
+          "Request",
+          "\"/mobile/md/sop\")"
+        ],
+        [
+          "Get",
+          "\"/list\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/md/controller/MdProductSopController.java",
+      "routes": [
+        [
+          "Request",
+          "\"/mes/md/sop\")"
+        ],
+        [
+          "Get",
+          "\"/list\")"
+        ],
+        [
+          "Post",
+          "\"/export\")"
+        ],
+        [
+          "Get",
+          "value = \"/{sopId}\")"
+        ],
+        [
+          "Delete",
+          "\"/{sopIds}\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/md/controller/MdUnitMeasureController.java",
+      "routes": [
+        [
+          "Request",
+          "\"/mes/md/unitmeasure\")"
+        ],
+        [
+          "Get",
+          "\"/list\")"
+        ],
+        [
+          "Get",
+          "\"/listprimary\")"
+        ],
+        [
+          "Get",
+          "{\"/selectall\", \"/cache\"})"
+        ],
+        [
+          "Post",
+          "\"/export\")"
+        ],
+        [
+          "Get",
+          "value = \"/{measureId}\")"
+        ],
+        [
+          "Delete",
+          "\"/{measureIds}\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/md/controller/MdVendorController.java",
+      "routes": [
+        [
+          "Request",
+          "\"/mes/md/vendor\")"
+        ],
+        [
+          "Get",
+          "\"/list\")"
+        ],
+        [
+          "Post",
+          "\"/export\")"
+        ],
+        [
+          "Get",
+          "value = \"/{vendorId}\")"
+        ],
+        [
+          "Delete",
+          "\"/{vendorIds}\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/md/controller/MdWorkshopController.java",
+      "routes": [
+        [
+          "Request",
+          "\"/mes/md/workshop\")"
+        ],
+        [
+          "Get",
+          "\"/list\")"
+        ],
+        [
+          "Get",
+          "\"/listAll\")"
+        ],
+        [
+          "Post",
+          "\"/export\")"
+        ],
+        [
+          "Get",
+          "value = \"/{workshopId}\")"
+        ],
+        [
+          "Delete",
+          "\"/{workshopIds}\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/md/controller/MdWorkstationController.java",
+      "routes": [
+        [
+          "Request",
+          "\"/mes/md/workstation\")"
+        ],
+        [
+          "Get",
+          "\"/list\")"
+        ],
+        [
+          "Post",
+          "\"/export\")"
+        ],
+        [
+          "Get",
+          "value = \"/{workstationId}\")"
+        ],
+        [
+          "Delete",
+          "\"/{workstationIds}\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/md/controller/MdWorkstationMachineController.java",
+      "routes": [
+        [
+          "Request",
+          "\"/mes/md/workstationmachine\")"
+        ],
+        [
+          "Get",
+          "\"/list\")"
+        ],
+        [
+          "Post",
+          "\"/export\")"
+        ],
+        [
+          "Get",
+          "value = \"/{recordId}\")"
+        ],
+        [
+          "Delete",
+          "\"/{recordIds}\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/md/controller/MdWorkstationMobController.java",
+      "routes": [
+        [
+          "Request",
+          "\"/mobile/md/workstation\")"
+        ],
+        [
+          "Get",
+          "\"/getWorkstationList\")"
+        ],
+        [
+          "Get",
+          "\"/getMyWorkstation\")"
+        ],
+        [
+          "Put",
+          ")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/md/controller/MdWorkstationToolController.java",
+      "routes": [
+        [
+          "Request",
+          "\"/mes/md/workstationtool\")"
+        ],
+        [
+          "Get",
+          "\"/list\")"
+        ],
+        [
+          "Post",
+          "\"/export\")"
+        ],
+        [
+          "Get",
+          "value = \"/{recordId}\")"
+        ],
+        [
+          "Delete",
+          "\"/{recordIds}\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/md/controller/MdWorkstationWorkerController.java",
+      "routes": [
+        [
+          "Request",
+          "\"/mes/md/workstationworker\")"
+        ],
+        [
+          "Get",
+          "\"/list\")"
+        ],
+        [
+          "Post",
+          "\"/export\")"
+        ],
+        [
+          "Get",
+          "value = \"/{recordId}\")"
+        ],
+        [
+          "Delete",
+          "\"/{recordIds}\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/md/controller/MesTransferActionDefController.java",
+      "routes": [
+        [
+          "Request",
+          "\"/md/def\")"
+        ],
+        [
+          "Get",
+          "\"/list\")"
+        ],
+        [
+          "Post",
+          "\"/export\")"
+        ],
+        [
+          "Get",
+          "value = \"/{id}\")"
+        ],
+        [
+          "Delete",
+          "\"/{ids}\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/md/controller/MesTransferActionLogController.java",
+      "routes": [
+        [
+          "Request",
+          "\"/md/log\")"
+        ],
+        [
+          "Get",
+          "\"/list\")"
+        ],
+        [
+          "Post",
+          "\"/export\")"
+        ],
+        [
+          "Get",
+          "value = \"/{id}\")"
+        ],
+        [
+          "Delete",
+          "\"/{ids}\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/md/controller/MesTransferConfigActionController.java",
+      "routes": [
+        [
+          "Request",
+          "\"/md/action\")"
+        ],
+        [
+          "Get",
+          "\"/list\")"
+        ],
+        [
+          "Post",
+          "\"/export\")"
+        ],
+        [
+          "Get",
+          "value = \"/{id}\")"
+        ],
+        [
+          "Delete",
+          "\"/{ids}\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/md/controller/MesTransferConfigAggregateController.java",
+      "routes": [
+        [
+          "Request",
+          "\"/md/config/aggregate\")"
+        ],
+        [
+          "Get",
+          "\"/{id}\")"
+        ],
+        [
+          "Delete",
+          "\"/{ids}\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/md/controller/MesTransferConfigController.java",
+      "routes": [
+        [
+          "Request",
+          "\"/md/config\")"
+        ],
+        [
+          "Get",
+          "\"/list\")"
+        ],
+        [
+          "Post",
+          "\"/export\")"
+        ],
+        [
+          "Get",
+          "value = \"/{id}\")"
+        ],
+        [
+          "Delete",
+          "\"/{ids}\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/md/controller/MesTransferConfigOptionController.java",
+      "routes": [
+        [
+          "Request",
+          "\"/mes/md/transfer/config\")"
+        ],
+        [
+          "Get",
+          "\"/options\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/md/controller/MesTransferRecordController.java",
+      "routes": [
+        [
+          "Request",
+          "\"/md/record\")"
+        ],
+        [
+          "Get",
+          "\"/list\")"
+        ],
+        [
+          "Post",
+          "\"/export\")"
+        ],
+        [
+          "Get",
+          "value = \"/{id}\")"
+        ],
+        [
+          "Delete",
+          "\"/{ids}\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/md/controller/MesTransferSceneDefController.java",
+      "routes": [
+        [
+          "Request",
+          "\"/md/sceneDef\")"
+        ],
+        [
+          "Get",
+          "\"/list\")"
+        ],
+        [
+          "Post",
+          "\"/export\")"
+        ],
+        [
+          "Get",
+          "value = \"/{id}\")"
+        ],
+        [
+          "Delete",
+          "\"/{ids}\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/md/controller/mobile/MdItemMobController.java",
+      "routes": [
+        [
+          "Request",
+          "\"/mobile/md/item\")"
+        ],
+        [
+          "Get",
+          "\"/list\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/md/controller/mobile/MdVendorMobController.java",
+      "routes": [
+        [
+          "Request",
+          "\"/mobile/md/vendor\")"
+        ],
+        [
+          "Get",
+          "\"/list\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/md/controller/mobile/MobileHeatTreatmentController.java",
+      "routes": [
+        [
+          "Get",
+          "\"/mobile/heat-treatment/list\")"
+        ],
+        [
+          "Post",
+          "\"/mobile/heat-treatment/create\")"
+        ],
+        [
+          "Get",
+          "\"/mobile/heat-treatment/my-running\")"
+        ],
+        [
+          "Get",
+          "\"/mobile/heat-treatment/my-recent\")"
+        ],
+        [
+          "Get",
+          "\"/mobile/heat-treatment/equipment-list\")"
+        ],
+        [
+          "Get",
+          "\"/mobile/heat-treatment/product-info\")"
+        ],
+        [
+          "Get",
+          "\"/mobile/heat-treatment/product-info-list\")"
+        ],
+        [
+          "Get",
+          "\"/mobile/heat-treatment/{id}\")"
+        ],
+        [
+          "Get",
+          "\"/mobile/heat-treatment/param-template\")"
+        ],
+        [
+          "Get",
+          "\"/mobile/heat-treatment/{id}/params\")"
+        ],
+        [
+          "Post",
+          "\"/mobile/heat-treatment/{id}/params\")"
+        ],
+        [
+          "Post",
+          "\"/mobile/heat-treatment/{id}/program-no\")"
+        ],
+        [
+          "Post",
+          "\"/mobile/heat-treatment/{id}/bind-item\")"
+        ],
+        [
+          "Post",
+          "\"/mobile/heat-treatment/{id}/bind-items\")"
+        ],
+        [
+          "Post",
+          "\"/mobile/heat-treatment/{id}/start\")"
+        ],
+        [
+          "Post",
+          "\"/mobile/heat-treatment/{id}/upload-photo\")"
+        ],
+        [
+          "Post",
+          "\"/mobile/heat-treatment/{id}/reminder\")"
+        ],
+        [
+          "Post",
+          "\"/mobile/heat-treatment/{id}/remark\")"
+        ],
+        [
+          "Post",
+          "\"/mobile/heat-treatment/{id}/finish\")"
+        ],
+        [
+          "Post",
+          "\"/mobile/heat-treatment/{id}/transfer-next\")"
+        ],
+        [
+          "Post",
+          "\"/mobile/heat-treatment/{id}/void\")"
+        ],
+        [
+          "Post",
+          "\"/mobile/heat-treatment/{id}/cancel\")"
+        ],
+        [
+          "Get",
+          "\"/mobile/heat-treatment/trace\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/md/controller/mobile/MobileInspectionRecordController.java",
+      "routes": [
+        [
+          "Request",
+          "\"/mobile/inspection\")"
+        ],
+        [
+          "Post",
+          "\"/submit\")"
+        ],
+        [
+          "Get",
+          "\"/detail\")"
+        ],
+        [
+          "Post",
+          "\"/result\")"
+        ],
+        [
+          "Get",
+          "\"/my-submit-list\")"
+        ],
+        [
+          "Get",
+          "\"/my-inspect-list\")"
+        ],
+        [
+          "Get",
+          "\"/queue-list\")"
+        ],
+        [
+          "Get",
+          "\"/queue-count\")"
+        ],
+        [
+          "Get",
+          "\"/pendingList\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/mobileentry/controller/MobileBusinessEntryController.java",
+      "routes": [
+        [
+          "Request",
+          "\"/mes/mobile/entry\")"
+        ],
+        [
+          "Get",
+          "\"/buttons\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/mobilepermission/controller/AuthController.java",
+      "routes": [
+        [
+          "Request",
+          "\"/mes/auth\")"
+        ],
+        [
+          "Get",
+          "\"/current-permissions\")"
+        ],
+        [
+          "Get",
+          "\"/all-permissions\")"
+        ],
+        [
+          "Post",
+          "\"/save-permissions\")"
+        ],
+        [
+          "Post",
+          "\"/update-permission\")"
+        ],
+        [
+          "Get",
+          "\"/get-roles\")"
+        ],
+        [
+          "Get",
+          "\"/get-all-role-permissions\")"
+        ],
+        [
+          "Delete",
+          "\"/delete-role-permission/{roleId}\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/pallet/mobile/controller/InventoryController.java",
+      "routes": [
+        [
+          "Request",
+          "\"/mes/mobile/inventory\")"
+        ],
+        [
+          "Get",
+          "\"/list\")"
+        ],
+        [
+          "Post",
+          "\"/export\")"
+        ],
+        [
+          "Post",
+          "\"/update\")"
+        ],
+        [
+          "Post",
+          "\"/outbound\")"
+        ],
+        [
+          "Post",
+          "\"/supplier\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/pallet/mobile/controller/InventoryDetailsController.java",
+      "routes": [
+        [
+          "Request",
+          "\"/mes/mobile/inventory/details\")"
+        ],
+        [
+          "Post",
+          "\"/insert\")"
+        ],
+        [
+          "Get",
+          "\"/list\")"
+        ],
+        [
+          "Post",
+          "\"/export\")"
+        ],
+        [
+          "Put",
+          "\"/update\")"
+        ],
+        [
+          "Delete",
+          "\"/{ids}\")"
+        ],
+        [
+          "Get",
+          "value = \"/{id}\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/pallet/mobile/controller/InventoryMailController.java",
+      "routes": [
+        [
+          "Request",
+          "\"/mes/mobile/inventory/mail\")"
+        ],
+        [
+          "Get",
+          "\"/select\")"
+        ],
+        [
+          "Post",
+          "\"/insert\")"
+        ],
+        [
+          "Delete",
+          "\"/{ids}\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/pm/controller/AQKCController.java",
+      "routes": [
+        [
+          "Request",
+          "\"/mes/pm/aqkc\")"
+        ],
+        [
+          "Get",
+          "\"/list\")"
+        ],
+        [
+          "Get",
+          "\"/{itemCode}\")"
+        ],
+        [
+          "Delete",
+          "\"/{itemCodes}\")"
+        ],
+        [
+          "Post",
+          "\"/export\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/pm/controller/BarcodeController.java",
+      "routes": [
+        [
+          "Request",
+          "\"/mes/pm/Barcode\")"
+        ],
+        [
+          "Get",
+          "\"/{workorderCode}\")"
+        ],
+        [
+          "Get",
+          "\"/QRCode/{content}\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/pm/controller/MRPCalculationController.java",
+      "routes": [
+        [
+          "Request",
+          "\"/mes/pm/mrpCalculation\")"
+        ],
+        [
+          "Get",
+          "\"/list\")"
+        ],
+        [
+          "Get",
+          "\"/{id}\")"
+        ],
+        [
+          "Delete",
+          "\"/{id}\")"
+        ],
+        [
+          "Get",
+          "\"/planService\")"
+        ],
+        [
+          "Post",
+          "\"/importTemplate\")"
+        ],
+        [
+          "Post",
+          "\"/importData\")"
+        ],
+        [
+          "Post",
+          "\"/export\")"
+        ],
+        [
+          "Delete",
+          "\"/delByTime\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/pm/controller/MinimumPurchaseController.java",
+      "routes": [
+        [
+          "Request",
+          "\"/mes/pm/minimumPurchase\")"
+        ],
+        [
+          "Post",
+          ")"
+        ],
+        [
+          "Delete",
+          "\"/{ids}\")"
+        ],
+        [
+          "Get",
+          "\"/{id}\")"
+        ],
+        [
+          "Get",
+          "\"/list\")"
+        ],
+        [
+          "Post",
+          "\"/importTemplate\")"
+        ],
+        [
+          "Post",
+          "\"/importData\")"
+        ],
+        [
+          "Post",
+          "\"/export\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/pm/controller/PlanMonthController.java",
+      "routes": [
+        [
+          "Request",
+          "\"/mes/pm/planMonth\")"
+        ],
+        [
+          "Get",
+          "\"/list\")"
+        ],
+        [
+          "Get",
+          "\"/{planMonthId}\")"
+        ],
+        [
+          "Delete",
+          "\"/{planMonthIds}\")"
+        ],
+        [
+          "Post",
+          "\"/list\")"
+        ],
+        [
+          "Post",
+          "\"/importTemplate\")"
+        ],
+        [
+          "Post",
+          "\"/importData\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/pm/controller/PlanNeedController.java",
+      "routes": [
+        [
+          "Request",
+          "\"/mes/pm/planNeed\")"
+        ],
+        [
+          "Get",
+          "\"/list\")"
+        ],
+        [
+          "Post",
+          "\"/export\")"
+        ],
+        [
+          "Get",
+          "value = \"/{planNeedId}\")"
+        ],
+        [
+          "Delete",
+          "\"/{planNeedIds}\")"
+        ],
+        [
+          "Post",
+          "\"/importTemplate\")"
+        ],
+        [
+          "Post",
+          "\"/importData\")"
+        ],
+        [
+          "Get",
+          "\"/run\")"
+        ],
+        [
+          "Put",
+          "\"/{planNeedId}\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/pm/controller/WorkOrderDemandController.java",
+      "routes": [
+        [
+          "Request",
+          "\"/mes/pm/workOrderDemand\")"
+        ],
+        [
+          "Get",
+          "\"/list\")"
+        ],
+        [
+          "Get",
+          "\"/{id}\")"
+        ],
+        [
+          "Delete",
+          "\"/del/{id}\")"
+        ],
+        [
+          "Post",
+          "\"/export\")"
+        ],
+        [
+          "Delete",
+          "\"/delByTime\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/print/controller/MoReceiptController.java",
+      "routes": [
+        [
+          "Request",
+          "\"/mes/print/moReceipt\")"
+        ],
+        [
+          "Get",
+          "\"/{docNo}\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/print/controller/MoReceiptRequistionController.java",
+      "routes": [
+        [
+          "Request",
+          "\"/mes/print/moReceiptRequistion\")"
+        ],
+        [
+          "Get",
+          "\"/{docNo}\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/print/controller/PurchaseArrivalController.java",
+      "routes": [
+        [
+          "Request",
+          "\"/mes/print/purchaseArrival\")"
+        ],
+        [
+          "Get",
+          "\"/{docNo}\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/print/controller/SrmBarCodeDetailController.java",
+      "routes": [
+        [
+          "Request",
+          "\"/mes/print/barcodeDetail\")"
+        ],
+        [
+          "Post",
+          "\"/save\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/print/controller/TransferDocController.java",
+      "routes": [
+        [
+          "Request",
+          "\"/mes/print/transferDoc\")"
+        ],
+        [
+          "Get",
+          "\"/{docNo}\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/print/controller/WorkOrderRequestionController.java",
+      "routes": [
+        [
+          "Request",
+          "\"/mes/print/workOrderRequestion\")"
+        ],
+        [
+          "Get",
+          "\"/{workOrderNo}\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/pro/brokenstep/controller/BrokenStepDataController.java",
+      "routes": [
+        [
+          "Request",
+          "\"/mes/pro/broken-step-data\")"
+        ],
+        [
+          "Get",
+          "\"/list\")"
+        ],
+        [
+          "Get",
+          "\"/{brokenStepId}\")"
+        ],
+        [
+          "Get",
+          "\"/maintenance\")"
+        ],
+        [
+          "Delete",
+          "\"/issue-material/batch\")"
+        ],
+        [
+          "Delete",
+          "\"/buckle/batch\")"
+        ],
+        [
+          "Delete",
+          "\"/broken-step/batch\")"
+        ],
+        [
+          "Put",
+          "\"/work\")"
+        ],
+        [
+          "Put",
+          "\"/material\")"
+        ],
+        [
+          "Delete",
+          "\"/work/{recordId}\")"
+        ],
+        [
+          "Delete",
+          "\"/work/batch/{recordIds}\")"
+        ],
+        [
+          "Delete",
+          "\"/material/{recordId}\")"
+        ],
+        [
+          "Delete",
+          "\"/material/batch/{recordIds}\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/pro/controller/CutToolTempleController.java",
+      "routes": [
+        [
+          "Request",
+          "\"/mes/pro/cutToolTemple\")"
+        ],
+        [
+          "Post",
+          "\"/importData\")"
+        ],
+        [
+          "Post",
+          "\"/exportTemplate\")"
+        ],
+        [
+          "Get",
+          "\"/getTemplate\")"
+        ],
+        [
+          "Get",
+          "\"/cascadeSelector\")"
+        ],
+        [
+          "Put",
+          "\"/updateMonthlyTasks\")"
+        ],
+        [
+          "Post",
+          "\"/summaryCutTool\")"
+        ],
+        [
+          "Post",
+          "\"/totalSummaryCutTool\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/pro/controller/CuttersQuotaController.java",
+      "routes": [
+        [
+          "Request",
+          "\"/mes/pro/cuttersQuota\")"
+        ],
+        [
+          "Get",
+          "\"/list\")"
+        ],
+        [
+          "Post",
+          "\"/add\")"
+        ],
+        [
+          "Delete",
+          "\"/delete/{ids}\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/pro/controller/HiPrintTemplateController.java",
+      "routes": [
+        [
+          "Request",
+          "\"/mes/pro/hiprintTemplate\")"
+        ],
+        [
+          "Post",
+          "\"/insertSingle\")"
+        ],
+        [
+          "Get",
+          "\"/getTemplateObject\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/pro/controller/ProAntirustCycleController.java",
+      "routes": [
+        [
+          "Request",
+          "\"/mes/pro/antirust\")"
+        ],
+        [
+          "Post",
+          "\"/update/data\")"
+        ],
+        [
+          "Get",
+          "\"/list\")"
+        ],
+        [
+          "Post",
+          "\"/export\")"
+        ],
+        [
+          "Get",
+          "value = \"/{id}\")"
+        ],
+        [
+          "Post",
+          "\"/insert\")"
+        ],
+        [
+          "Put",
+          "\"/update\")"
+        ],
+        [
+          "Delete",
+          "\"/{ids}\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/pro/controller/ProAntirustCycleLocalController.java",
+      "routes": [
+        [
+          "Request",
+          "\"/mes/pro/antirust/local\")"
+        ],
+        [
+          "Post",
+          "\"/insert\")"
+        ],
+        [
+          "Get",
+          "\"/select\")"
+        ],
+        [
+          "Put",
+          "\"/update\")"
+        ],
+        [
+          "Get",
+          "value = \"/{id}\")"
+        ],
+        [
+          "Post",
+          "\"/export\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/pro/controller/ProAntirustCycleMailController.java",
+      "routes": [
+        [
+          "Request",
+          "\"/mes/pro/antirust/mail\")"
+        ],
+        [
+          "Get",
+          "\"/select\")"
+        ],
+        [
+          "Post",
+          "\"/insert\")"
+        ],
+        [
+          "Delete",
+          "\"/{ids}\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/pro/controller/ProFeedbackController.java",
+      "routes": [
+        [
+          "Request",
+          "\"/mes/pro/feedback\")"
+        ],
+        [
+          "Get",
+          "\"/list\")"
+        ],
+        [
+          "Post",
+          "\"/export\")"
+        ],
+        [
+          "Get",
+          "value = \"/{recordId}\")"
+        ],
+        [
+          "Delete",
+          "\"/{recordIds}\")"
+        ],
+        [
+          "Put",
+          "\"/{recordId}\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/pro/controller/ProProcessContentController.java",
+      "routes": [
+        [
+          "Request",
+          "\"/mes/pro/processcontent\")"
+        ],
+        [
+          "Get",
+          "\"/list\")"
+        ],
+        [
+          "Post",
+          "\"/export\")"
+        ],
+        [
+          "Get",
+          "value = \"/{contentId}\")"
+        ],
+        [
+          "Delete",
+          "\"/{contentIds}\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/pro/controller/ProProcessController.java",
+      "routes": [
+        [
+          "Request",
+          "\"/mes/pro/process\")"
+        ],
+        [
+          "Get",
+          "\"/list\")"
+        ],
+        [
+          "Get",
+          "\"/optionList\")"
+        ],
+        [
+          "Get",
+          "\"/listAll\")"
+        ],
+        [
+          "Post",
+          "\"/export\")"
+        ],
+        [
+          "Get",
+          "value = \"/{processId}\")"
+        ],
+        [
+          "Post",
+          "\"/batchAdd\")"
+        ],
+        [
+          "Post",
+          "\"/generate\")"
+        ],
+        [
+          "Post",
+          "\"/updateProReportUnitByUnitTime\")"
+        ],
+        [
+          "Delete",
+          "\"/{processIds}\")"
+        ],
+        [
+          "Post",
+          "\"/importData\")"
+        ],
+        [
+          "Post",
+          "\"/importTemplate\")"
+        ],
+        [
+          "Get",
+          "\"/inspected/{processId}\")"
+        ],
+        [
+          "Get",
+          "\"/manual/{processId}\")"
+        ],
+        [
+          "Get",
+          "\"/getRouteProcessByQuery\")"
+        ],
+        [
+          "Get",
+          "\"/getProcessInsepctionOrderByByProcessId/{processId}\")"
+        ],
+        [
+          "Get",
+          "\"/inspectedById/{id}\")"
+        ],
+        [
+          "Post",
+          "\"/addinspection\")"
+        ],
+        [
+          "Put",
+          "\"/updateProcessInspection\")"
+        ],
+        [
+          "Delete",
+          "\"/delProcessInspection/{ids}\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/pro/controller/ProProcessUserController.java",
+      "routes": [
+        [
+          "Request",
+          "\"/mes/pro/processUser\")"
+        ],
+        [
+          "Get",
+          "\"/list\")"
+        ],
+        [
+          "Delete",
+          "\"/{userId}\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/pro/controller/ProRouteController.java",
+      "routes": [
+        [
+          "Request",
+          "\"/mes/pro/proroute\")"
+        ],
+        [
+          "Get",
+          "\"/list\")"
+        ],
+        [
+          "Get",
+          "\"/optionList\")"
+        ],
+        [
+          "Post",
+          "\"/export\")"
+        ],
+        [
+          "Get",
+          "value = \"/{routeId}\")"
+        ],
+        [
+          "Post",
+          "\"/routeCodes\")"
+        ],
+        [
+          "Delete",
+          "\"/{routeIds}\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/pro/controller/ProRouteProcessController.java",
+      "routes": [
+        [
+          "Request",
+          "\"/mes/pro/routeprocess\")"
+        ],
+        [
+          "Get",
+          "\"/list\")"
+        ],
+        [
+          "Get",
+          "\"/listProductProcess/{productId}\")"
+        ],
+        [
+          "Post",
+          "\"/export\")"
+        ],
+        [
+          "Get",
+          "value = \"/{recordId}\")"
+        ],
+        [
+          "Delete",
+          "\"/{recordIds}\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/pro/controller/ProRouteProductBomController.java",
+      "routes": [
+        [
+          "Request",
+          "\"/mes/pro/routeproductbom\")"
+        ],
+        [
+          "Get",
+          "\"/list\")"
+        ],
+        [
+          "Post",
+          "\"/export\")"
+        ],
+        [
+          "Get",
+          "value = \"/{recordId}\")"
+        ],
+        [
+          "Delete",
+          "\"/{recordIds}\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/pro/controller/ProRouteProductController.java",
+      "routes": [
+        [
+          "Request",
+          "\"/mes/pro/routeproduct\")"
+        ],
+        [
+          "Get",
+          "\"/list\")"
+        ],
+        [
+          "Post",
+          "\"/export\")"
+        ],
+        [
+          "Get",
+          "value = \"/{recordId}\")"
+        ],
+        [
+          "Put",
+          "\"/move\")"
+        ],
+        [
+          "Delete",
+          "\"/{recordIds}\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/pro/controller/ProTaskController.java",
+      "routes": [
+        [
+          "Request",
+          "\"/mes/pro/protask\")"
+        ],
+        [
+          "Get",
+          "\"/list\")"
+        ],
+        [
+          "Post",
+          "\"/export\")"
+        ],
+        [
+          "Get",
+          "value = \"/{taskId}\")"
+        ],
+        [
+          "Get",
+          "\"/listGanttTaskList\")"
+        ],
+        [
+          "Delete",
+          "\"/{taskIds}\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/pro/controller/ProTaskIssueController.java",
+      "routes": [
+        [
+          "Request",
+          "\"/mes/pro/taskissue\")"
+        ],
+        [
+          "Get",
+          "\"/list\")"
+        ],
+        [
+          "Post",
+          "\"/export\")"
+        ],
+        [
+          "Get",
+          "value = \"/{recordId}\")"
+        ],
+        [
+          "Delete",
+          "\"/{recordIds}\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/pro/controller/ProTaskMobController.java",
+      "routes": [
+        [
+          "Request",
+          "\"/mobile/pro/protask\")"
+        ],
+        [
+          "Get",
+          "\"/getlist\")"
+        ],
+        [
+          "Get",
+          "\"/getTaskList\")"
+        ],
+        [
+          "Get",
+          "value = \"/{taskId}\")"
+        ],
+        [
+          "Post",
+          "\"/change\")"
+        ],
+        [
+          "Post",
+          "\"/feedback\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/pro/controller/ProTransConsumeController.java",
+      "routes": [
+        [
+          "Request",
+          "\"/mes/pro/transconsume\")"
+        ],
+        [
+          "Get",
+          "\"/list\")"
+        ],
+        [
+          "Post",
+          "\"/export\")"
+        ],
+        [
+          "Get",
+          "value = \"/{recordId}\")"
+        ],
+        [
+          "Delete",
+          "\"/{recordIds}\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/pro/controller/ProTransOrderController.java",
+      "routes": [
+        [
+          "Request",
+          "\"/mes/pro/transorder\")"
+        ],
+        [
+          "Get",
+          "\"/list\")"
+        ],
+        [
+          "Post",
+          "\"/export\")"
+        ],
+        [
+          "Get",
+          "value = \"/{transOrderId}\")"
+        ],
+        [
+          "Delete",
+          "\"/{transOrderIds}\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/pro/controller/ProWorkorderBomController.java",
+      "routes": [
+        [
+          "Request",
+          "\"/mes/pro/workorderbom\")"
+        ],
+        [
+          "Get",
+          "\"/list\")"
+        ],
+        [
+          "Post",
+          "\"/export\")"
+        ],
+        [
+          "Get",
+          "value = \"/{lineId}\")"
+        ],
+        [
+          "Delete",
+          "\"/{lineIds}\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/pro/controller/ProWorkorderController.java",
+      "routes": [
+        [
+          "Request",
+          "\"/mes/pro/workorder\")"
+        ],
+        [
+          "Get",
+          "\"/list\")"
+        ],
+        [
+          "Get",
+          "\"/optionList\")"
+        ],
+        [
+          "Post",
+          "\"/export\")"
+        ],
+        [
+          "Get",
+          "value = \"/{workorderId}\")"
+        ],
+        [
+          "Delete",
+          "\"/{workorderIds}\")"
+        ],
+        [
+          "Get",
+          "\"/listItems\")"
+        ],
+        [
+          "Put",
+          "\"/{workorderId}\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/pro/controller/ProXtransferCountController.java",
+      "routes": [
+        [
+          "Request",
+          "\"/mes/pro/xtransferCount\")"
+        ],
+        [
+          "Get",
+          "\"/list\")"
+        ],
+        [
+          "Post",
+          "\"/export\")"
+        ],
+        [
+          "Get",
+          "value = \"/{recordId}\")"
+        ],
+        [
+          "Delete",
+          "\"/{recordIds}\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/pro/controller/ProcessExternalMappingController.java",
+      "routes": [
+        [
+          "Request",
+          "\"/process-external-mapping\")"
+        ],
+        [
+          "Get",
+          "\"/list\")"
+        ],
+        [
+          "Post",
+          "\"/add\")"
+        ],
+        [
+          "Delete",
+          "\"/delete\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/pro/controller/ProcessFileManagementController.java",
+      "routes": [
+        [
+          "Request",
+          "\"/mes/pro/processFileManagement\")"
+        ],
+        [
+          "Get",
+          "\"/getProcessFileManagementList\")"
+        ],
+        [
+          "Get",
+          "\"/getFileAssetsList\")"
+        ],
+        [
+          "Post",
+          "\"/add\")"
+        ],
+        [
+          "Post",
+          "\"/addProcessFileRelation\")"
+        ],
+        [
+          "Get",
+          "\"/getFileAssetsByStoragePath\")"
+        ],
+        [
+          "Get",
+          "\"/getProcessFile/{fileId}\")"
+        ],
+        [
+          "Get",
+          "\"/getProcessFileByProcessId/{processId}\")"
+        ],
+        [
+          "Get",
+          "\"/accessFile\")"
+        ],
+        [
+          "Get",
+          "\"/downloadFile\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/pro/controller/ProductionInboundConfirmController.java",
+      "routes": [
+        [
+          "Request",
+          "\"/mes/pro/inbound-confirm\")"
+        ],
+        [
+          "Get",
+          "\"/list\")"
+        ],
+        [
+          "Get",
+          "\"/{id}\")"
+        ],
+        [
+          "Get",
+          "\"/approved-material-issues\")"
+        ],
+        [
+          "Delete",
+          "\"/{id}\")"
+        ],
+        [
+          "Put",
+          "\"/{id}/approve\")"
+        ],
+        [
+          "Put",
+          "\"/{id}/recheck\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/pro/controller/ProductionInboundReceiptConfirmController.java",
+      "routes": [
+        [
+          "Request",
+          "\"/mes/pro/inbound-receipt-confirm\")"
+        ],
+        [
+          "Get",
+          "\"/list\")"
+        ],
+        [
+          "Get",
+          "\"/{id}\")"
+        ],
+        [
+          "Get",
+          "\"/approved-requests\")"
+        ],
+        [
+          "Get",
+          "\"/warehouses\")"
+        ],
+        [
+          "Put",
+          "\"/{id}/approve\")"
+        ],
+        [
+          "Put",
+          "\"/{id}/recheck\")"
+        ],
+        [
+          "Delete",
+          "\"/{id}\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/pro/controller/ProductionMaterialIssueConfirmController.java",
+      "routes": [
+        [
+          "Request",
+          "\"/mes/pro/material-issue-confirm\")"
+        ],
+        [
+          "Get",
+          "\"/list\")"
+        ],
+        [
+          "Get",
+          "\"/{id}\")"
+        ],
+        [
+          "Get",
+          "\"/route-options/{workorderId}\")"
+        ],
+        [
+          "Get",
+          "\"/material-requirements/{workorderId}\")"
+        ],
+        [
+          "Put",
+          "\"/{id}\")"
+        ],
+        [
+          "Put",
+          "\"/{id}/approve\")"
+        ],
+        [
+          "Put",
+          "\"/{id}/recheck\")"
+        ],
+        [
+          "Delete",
+          "\"/{id}\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/pro/controller/mobile/ProFeedBackMobController.java",
+      "routes": [
+        [
+          "Request",
+          "\"/mobile/pro/feedback\")"
+        ],
+        [
+          "Get",
+          "\"/list\")"
+        ],
+        [
+          "Get",
+          "\"/listUnApproved\")"
+        ],
+        [
+          "Get",
+          "\"/listApproved\")"
+        ],
+        [
+          "Delete",
+          "\"/{recordIds}\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/pro/controller/mobile/ProProcessMobController.java",
+      "routes": [
+        [
+          "Request",
+          "\"/mobile/pro/process\")"
+        ],
+        [
+          "Get",
+          "\"/getProcessList\")"
+        ],
+        [
+          "Get",
+          "value = \"/{processId}\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/pro/controller/mobile/ProTaskIssueMobController.java",
+      "routes": [
+        [
+          "Request",
+          "\"/mobile/pro/taskissue\")"
+        ],
+        [
+          "Get",
+          "\"getSopList\")"
+        ],
+        [
+          "Get",
+          "\"/getlist\")"
+        ],
+        [
+          "Get",
+          "\"/getReserveIssueList\")"
+        ],
+        [
+          "Post",
+          "\"/add\")"
+        ],
+        [
+          "Post",
+          "\"/addIssue\")"
+        ],
+        [
+          "Post",
+          "\"/{recordId}\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/pro/controller/mobile/ProTransOrderMobController.java",
+      "routes": [
+        [
+          "Request",
+          "\"/mobile/pro/transorder\")"
+        ],
+        [
+          "Get",
+          "\"/getList\")"
+        ],
+        [
+          "Get",
+          "\"/getInfo\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/pro/controller/mobile/ProcessTraceabilityMobController.java",
+      "routes": [
+        [
+          "Request",
+          "\"/mes/mobile/pro/processTraceability\")"
+        ],
+        [
+          "Get",
+          "\"/getTicketInformation\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/pro/personnelanalysis/controller/PersonnelAnalysisController.java",
+      "routes": [
+        [
+          "Request",
+          "\"/mes/pro/personnel-analysis\")"
+        ],
+        [
+          "Get",
+          "\"/accounts\")"
+        ],
+        [
+          "Get",
+          "\"/accounts/{userId}/overview\")"
+        ],
+        [
+          "Get",
+          "\"/accounts/{userId}/processes\")"
+        ],
+        [
+          "Get",
+          "\"/accounts/{userId}/products\")"
+        ],
+        [
+          "Get",
+          "\"/accounts/{userId}/trend\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/pro/plan/controller/MonthlyPlanController.java",
+      "routes": [
+        [
+          "Request",
+          "\"/mes/pro/monthly-plan\")"
+        ],
+        [
+          "Get",
+          "\"/list\")"
+        ],
+        [
+          "Get",
+          "\"/{id}\")"
+        ],
+        [
+          "Post",
+          "\"/batch-preview\")"
+        ],
+        [
+          "Post",
+          "\"/batch-import\")"
+        ],
+        [
+          "Delete",
+          "\"/{ids}\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/pro/productionmonitor/controller/ProductionMonitorController.java",
+      "routes": [
+        [
+          "Request",
+          "\"/mes/pro/production-monitor\")"
+        ],
+        [
+          "Get",
+          "\"/summary\")"
+        ],
+        [
+          "Get",
+          "\"/workorders\")"
+        ],
+        [
+          "Get",
+          "\"/workorders/{workorderId}\")"
+        ],
+        [
+          "Get",
+          "\"/workorders/{workorderId}/timeline\")"
+        ],
+        [
+          "Get",
+          "\"/workorders/{workorderId}/flowcards/{xtransferNo}/routes/{routeId}\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/pro/request/controller/MobileWorkorderRequestController.java",
+      "routes": [
+        [
+          "Request",
+          "\"/mobile/workorder-request\") @RequiredArgsConstructor"
+        ],
+        [
+          "Put",
+          "\"/visibility\") public AjaxResult visibility(@Valid @RequestBody WorkorderRequestVisibilityForm form) {"
+        ],
+        [
+          "Get",
+          "\"/{id}\") public AjaxResult detail(@PathVariable Long id) {return AjaxResult.success(service.myDetail(id));}"
+        ],
+        [
+          "Get",
+          "\"/items\") public TableDataInfo items(@Valid MasterDataQuery query) {"
+        ],
+        [
+          "Get",
+          "\"/lots\") public TableDataInfo lots(@Valid MasterDataQuery query) {"
+        ],
+        [
+          "Get",
+          "\"/workshops\") public TableDataInfo workshops(@Valid MasterDataQuery query) {"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/pro/request/controller/WorkorderRequestController.java",
+      "routes": [
+        [
+          "Request",
+          "\"/mes/pro/workorder-request\")"
+        ],
+        [
+          "Get",
+          "\"/items\")"
+        ],
+        [
+          "Get",
+          "\"/material-items\")"
+        ],
+        [
+          "Get",
+          "\"/{id}/materials\")"
+        ],
+        [
+          "Get",
+          "\"/capability\")"
+        ],
+        [
+          "Get",
+          "\"/{id}\")"
+        ],
+        [
+          "Put",
+          "\"/{id}\")"
+        ],
+        [
+          "Post",
+          "\"/{id}/approve\")"
+        ],
+        [
+          "Post",
+          "\"/{id}/reject\")"
+        ],
+        [
+          "Post",
+          "\"/{id}/void\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/pro/stepinspection/controller/MobileStepInspectionController.java",
+      "routes": [
+        [
+          "Request",
+          "\"/mes/mobile/step-inspection\")"
+        ],
+        [
+          "Get",
+          "\"/context\")"
+        ],
+        [
+          "Get",
+          "\"/processes\")"
+        ],
+        [
+          "Get",
+          "\"/steps\")"
+        ],
+        [
+          "Post",
+          "\"/submit\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/pro/stepinspection/controller/ProProcessStepController.java",
+      "routes": [
+        [
+          "Request",
+          "\"/mes/pro/process-step\")"
+        ],
+        [
+          "Get",
+          "\"/list\")"
+        ],
+        [
+          "Get",
+          "\"/{stepId}\")"
+        ],
+        [
+          "Post",
+          "\"/copy/{stepId}\")"
+        ],
+        [
+          "Delete",
+          "\"/{stepIds}\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/pro/stepinspection/controller/StepInspectionController.java",
+      "routes": [
+        [
+          "Request",
+          "\"/mes/pro/step-inspection\")"
+        ],
+        [
+          "Get",
+          "\"/config/list\")"
+        ],
+        [
+          "Get",
+          "\"/config/{configId}\")"
+        ],
+        [
+          "Post",
+          "\"/config\")"
+        ],
+        [
+          "Put",
+          "\"/config\")"
+        ],
+        [
+          "Post",
+          "\"/copy/{configId}\")"
+        ],
+        [
+          "Get",
+          "\"/config/candidates\")"
+        ],
+        [
+          "Post",
+          "\"/config/copy\")"
+        ],
+        [
+          "Delete",
+          "\"/config/{configIds}\")"
+        ],
+        [
+          "Get",
+          "\"/entry-config\")"
+        ],
+        [
+          "Get",
+          "\"/context\")"
+        ],
+        [
+          "Get",
+          "\"/process/{processId}/steps\")"
+        ],
+        [
+          "Post",
+          "\"/submit\")"
+        ],
+        [
+          "Post",
+          "\"/records\")"
+        ],
+        [
+          "Get",
+          "\"/records\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/pro/stepinspection/controller/StepInspectionRecordController.java",
+      "routes": [
+        [
+          "Request",
+          "\"/mes/pro/step-inspection-record\")"
+        ],
+        [
+          "Get",
+          "\"/list\")"
+        ],
+        [
+          "Get",
+          "\"/{submissionNo}\")"
+        ],
+        [
+          "Put",
+          "\"/edit\")"
+        ],
+        [
+          "Delete",
+          "\"/{recordIds}\")"
+        ],
+        [
+          "Post",
+          "\"/export\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/qc/controller/QcDefectController.java",
+      "routes": [
+        [
+          "Request",
+          "\"/mes/qc/qcdefect\")"
+        ],
+        [
+          "Get",
+          "\"/list\")"
+        ],
+        [
+          "Post",
+          "\"/export\")"
+        ],
+        [
+          "Get",
+          "value = \"/{defectId}\")"
+        ],
+        [
+          "Delete",
+          "\"/{defectIds}\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/qc/controller/QcDefectRecordController.java",
+      "routes": [
+        [
+          "Request",
+          "\"/mes/qc/defectrecord\")"
+        ],
+        [
+          "Get",
+          "\"/list\")"
+        ],
+        [
+          "Post",
+          "\"/export\")"
+        ],
+        [
+          "Get",
+          "value = \"/{recordId}\")"
+        ],
+        [
+          "Delete",
+          "\"/{recordIds}\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/qc/controller/QcDefectiveCauseController.java",
+      "routes": [
+        [
+          "Request",
+          "\"/mes/qc/defectiveCause\")"
+        ],
+        [
+          "Get",
+          "\"/list\")"
+        ],
+        [
+          "Get",
+          "\"/{recordId}\")"
+        ],
+        [
+          "Get",
+          "\"/{processId}/{type}\")"
+        ],
+        [
+          "Delete",
+          "\"/{recordId}\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/qc/controller/QcDefectiveController.java",
+      "routes": [
+        [
+          "Request",
+          "\"/qc/defective\")"
+        ],
+        [
+          "Get",
+          "\"/list\")"
+        ],
+        [
+          "Post",
+          "\"/export\")"
+        ],
+        [
+          "Get",
+          "value = \"/{recordId}\")"
+        ],
+        [
+          "Delete",
+          "\"/{recordId}\")"
+        ],
+        [
+          "Post",
+          "\"/scrap\")"
+        ],
+        [
+          "Get",
+          "\"/defective\")"
+        ],
+        [
+          "Get",
+          "\"/getTicketInformation\")"
+        ],
+        [
+          "Get",
+          "\"/getRouteProcess/{itemCode}\")"
+        ],
+        [
+          "Get",
+          "\"/getDefectiveList/{workorderId}/{materialItemCode}/{xtransferNo}\")"
+        ],
+        [
+          "Post",
+          "\"/updateProReportWorkMaterial\")"
+        ],
+        [
+          "Get",
+          "\"/getworkorderCodeByWorkorderId/{workorderId}\")"
+        ],
+        [
+          "Post",
+          "\"/supplementMaterial/{workOrderCode}/{itemCode}/{itemLotCode}/{xTransferNo}\")"
+        ],
+        [
+          "Get",
+          "\"/getMaterialInfoList/{docNo}/{xtransferNo}\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/qc/controller/QcDefectiveResponsibleUserController.java",
+      "routes": [
+        [
+          "Request",
+          "\"/qc/defectiveResponsibleUser\")"
+        ],
+        [
+          "Request",
+          "\"/getUser/{qcDefectiveId}\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/qc/controller/QcDefectiveUserController.java",
+      "routes": [
+        [
+          "Request",
+          "\"/qc/defectiveUser\")"
+        ],
+        [
+          "Get",
+          "\"/getUser/{qcDefectiveId}\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/qc/controller/QcIndexController.java",
+      "routes": [
+        [
+          "Request",
+          "\"/mes/qc/qcindex\")"
+        ],
+        [
+          "Get",
+          "\"/list\")"
+        ],
+        [
+          "Post",
+          "\"/export\")"
+        ],
+        [
+          "Get",
+          "value = \"/{indexId}\")"
+        ],
+        [
+          "Delete",
+          "\"/{indexIds}\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/qc/controller/QcIpqcController.java",
+      "routes": [
+        [
+          "Request",
+          "\"/mes/qc/ipqc\")"
+        ],
+        [
+          "Get",
+          "\"/list\")"
+        ],
+        [
+          "Post",
+          "\"/export\")"
+        ],
+        [
+          "Get",
+          "value = \"/{ipqcId}\")"
+        ],
+        [
+          "Delete",
+          "\"/{ipqcIds}\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/qc/controller/QcIpqcLineController.java",
+      "routes": [
+        [
+          "Request",
+          "\"/mes/qc/ipqcline\")"
+        ],
+        [
+          "Get",
+          "\"/list\")"
+        ],
+        [
+          "Post",
+          "\"/export\")"
+        ],
+        [
+          "Get",
+          "value = \"/{lineId}\")"
+        ],
+        [
+          "Delete",
+          "\"/{lineIds}\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/qc/controller/QcIqcController.java",
+      "routes": [
+        [
+          "Request",
+          "\"/mes/qc/iqc\")"
+        ],
+        [
+          "Get",
+          "\"/list\")"
+        ],
+        [
+          "Post",
+          "\"/export\")"
+        ],
+        [
+          "Get",
+          "value = \"/{iqcId}\")"
+        ],
+        [
+          "Delete",
+          "\"/{iqcIds}\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/qc/controller/QcIqcLineController.java",
+      "routes": [
+        [
+          "Request",
+          "\"/mes/qc/iqcline\")"
+        ],
+        [
+          "Get",
+          "\"/list\")"
+        ],
+        [
+          "Post",
+          "\"/export\")"
+        ],
+        [
+          "Get",
+          "value = \"/{lineId}\")"
+        ],
+        [
+          "Delete",
+          "\"/{lineIds}\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/qc/controller/QcOqcController.java",
+      "routes": [
+        [
+          "Request",
+          "\"/mes/qc/oqc\")"
+        ],
+        [
+          "Get",
+          "\"/list\")"
+        ],
+        [
+          "Post",
+          "\"/export\")"
+        ],
+        [
+          "Get",
+          "value = \"/{oqcId}\")"
+        ],
+        [
+          "Delete",
+          "\"/{oqcIds}\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/qc/controller/QcOqcLineController.java",
+      "routes": [
+        [
+          "Request",
+          "\"/mes/qc/oqcline\")"
+        ],
+        [
+          "Get",
+          "\"/list\")"
+        ],
+        [
+          "Post",
+          "\"/export\")"
+        ],
+        [
+          "Get",
+          "value = \"/{lineId}\")"
+        ],
+        [
+          "Delete",
+          "\"/{lineIds}\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/qc/controller/QcProcessInspectionItemsController.java",
+      "routes": [
+        [
+          "Request",
+          "\"mes/qc/processInspectionItems\")"
+        ],
+        [
+          "Get",
+          "\"getProcessInspectionItems/{itemCode}/{xtransferNo}\")"
+        ],
+        [
+          "Get",
+          "\"/getRouteAndProcess/{workOrder}/{xtransferNo}\")"
+        ],
+        [
+          "Get",
+          "\"/getProProcessInspection/{processId}\")"
+        ],
+        [
+          "Get",
+          "\"/getUserAndProcessInfo/{processId}\")"
+        ],
+        [
+          "Get",
+          "\"/getDeviceProcessByProcessName/{processId}\")"
+        ],
+        [
+          "Put",
+          "\"/addProRouteProcessUserInspection\")"
+        ],
+        [
+          "Get",
+          "\"/getItemCodeAndItemName/{itemCode}\")"
+        ],
+        [
+          "Get",
+          "\"/getInspectionAll\")"
+        ],
+        [
+          "Delete",
+          "\"/deleteItem/{inspectionIds}\")"
+        ],
+        [
+          "Post",
+          "\"/export\")"
+        ],
+        [
+          "Get",
+          "\"/getChartStatus\")"
+        ],
+        [
+          "Get",
+          "\"/getChartMeasuringInstrument\")"
+        ],
+        [
+          "Get",
+          "\"/getInspectionRouteInfo/{routeId}\")"
+        ],
+        [
+          "Get",
+          "\"/getInspectionProcessInfo/{processId}\")"
+        ],
+        [
+          "Post",
+          "\"/getInspectionPdsInfo\")"
+        ],
+        [
+          "Post",
+          "\"/addSpcLog\")"
+        ],
+        [
+          "Post",
+          "\"/getSpclog\")"
+        ],
+        [
+          "Get",
+          "\"/processCapability/flowCards\")"
+        ],
+        [
+          "Post",
+          "\"/processCapability/dimensions\")"
+        ],
+        [
+          "Post",
+          "\"/processCapability/ppk\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/qc/controller/QcTemplateController.java",
+      "routes": [
+        [
+          "Request",
+          "\"/mes/qc/qctemplate\")"
+        ],
+        [
+          "Get",
+          "\"/list\")"
+        ],
+        [
+          "Post",
+          "\"/export\")"
+        ],
+        [
+          "Get",
+          "value = \"/{templateId}\")"
+        ],
+        [
+          "Delete",
+          "\"/{templateIds}\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/qc/controller/QcTemplateIndexController.java",
+      "routes": [
+        [
+          "Request",
+          "\"/mes/qc/templateindex\")"
+        ],
+        [
+          "Get",
+          "\"/list\")"
+        ],
+        [
+          "Post",
+          "\"/export\")"
+        ],
+        [
+          "Get",
+          "value = \"/{recordId}\")"
+        ],
+        [
+          "Delete",
+          "\"/{recordIds}\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/qc/controller/QcTemplateIndexMobController.java",
+      "routes": [
+        [
+          "Request",
+          "\"/mobile/qc/templateindex\")"
+        ],
+        [
+          "Get",
+          "\"/getLines\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/qc/controller/QcTemplateProductController.java",
+      "routes": [
+        [
+          "Request",
+          "\"/mes/qc/templateproduct\")"
+        ],
+        [
+          "Get",
+          "\"/list\")"
+        ],
+        [
+          "Post",
+          "\"/export\")"
+        ],
+        [
+          "Get",
+          "value = \"/{recordId}\")"
+        ],
+        [
+          "Delete",
+          "\"/{recordIds}\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/qcSpecialProductInspection/controller/QcSpecialProductInspectionController.java",
+      "routes": [
+        [
+          "Request",
+          "\"/system/specialInspection\")"
+        ],
+        [
+          "Get",
+          "\"/list\")"
+        ],
+        [
+          "Get",
+          "\"/{id}\")"
+        ],
+        [
+          "Post",
+          "\"/spc\")"
+        ],
+        [
+          "Post",
+          "\"/exportSpc\")"
+        ],
+        [
+          "Post",
+          "\"/importTemplate\")"
+        ],
+        [
+          "Post",
+          "\"/exportTemplate\")"
+        ],
+        [
+          "Post",
+          "\"/importData\")"
+        ],
+        [
+          "Delete",
+          "\"/{ids}\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/report/controller/UreportFileTblController.java",
+      "routes": [
+        [
+          "Request",
+          "\"/ureportM\")"
+        ],
+        [
+          "Get",
+          "\"/list\")"
+        ],
+        [
+          "Post",
+          "\"/export\")"
+        ],
+        [
+          "Get",
+          "value = \"/{id}\")"
+        ],
+        [
+          "Delete",
+          "\"/{ids}\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/so/customerProductPrice/controller/SoCustomerProductPriceController.java",
+      "routes": [
+        [
+          "Request",
+          "\"/so/customerProductPrice\")"
+        ],
+        [
+          "Get",
+          "\"/list\")"
+        ],
+        [
+          "Post",
+          "\"/export\")"
+        ],
+        [
+          "Get",
+          "value = \"/{id}\")"
+        ],
+        [
+          "Delete",
+          "\"/{ids}\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/so/goodsInfo/controller/GoodsInfoController.java",
+      "routes": [
+        [
+          "Request",
+          "\"/so/goodsInfo\")"
+        ],
+        [
+          "Get",
+          "\"/list\")"
+        ],
+        [
+          "Post",
+          "\"/export\")"
+        ],
+        [
+          "Get",
+          "value = \"/{goodsId}\")"
+        ],
+        [
+          "Delete",
+          "\"/{goodsIds}\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/so/inquiry/controller/SoInquirySupplierController.java",
+      "routes": [
+        [
+          "Request",
+          "\"/so/inquiry_supplier\")"
+        ],
+        [
+          "Get",
+          "\"/list\")"
+        ],
+        [
+          "Get",
+          "\"/{id}\")"
+        ],
+        [
+          "Delete",
+          "\"/{ids}\")"
+        ],
+        [
+          "Post",
+          "\"/export\")"
+        ],
+        [
+          "Get",
+          "\"/alllist\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/so/inquiry/controller/SoPurchaseInquiryController.java",
+      "routes": [
+        [
+          "Request",
+          "\"/so/inquiry\")"
+        ],
+        [
+          "Get",
+          "\"/list\")"
+        ],
+        [
+          "Get",
+          "\"/{id}\")"
+        ],
+        [
+          "Delete",
+          "\"/{ids}\")"
+        ],
+        [
+          "Post",
+          "\"/export\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/so/salecheckinfo/controller/SaleCheckInfoController.java",
+      "routes": [
+        [
+          "Request",
+          "\"/so/SaleCheckInfo\")"
+        ],
+        [
+          "Post",
+          "\"/insert\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/so/salesCustomer/controller/SoCustomerController.java",
+      "routes": [
+        [
+          "Request",
+          "\"/so/customer\")"
+        ],
+        [
+          "Get",
+          "\"/list\")"
+        ],
+        [
+          "Get",
+          "\"/{id}\")"
+        ],
+        [
+          "Delete",
+          "\"/{ids}\")"
+        ],
+        [
+          "Post",
+          "\"/export\")"
+        ],
+        [
+          "Get",
+          "\"/clickCustomerNamelist\")"
+        ],
+        [
+          "Get",
+          "\"/clicklist\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/so/salesOrderRecipients/controller/SoOrderRecipientController.java",
+      "routes": [
+        [
+          "Request",
+          "\"/mes/so/salesOrderRecipients\")"
+        ],
+        [
+          "Get",
+          "\"/list\")"
+        ],
+        [
+          "Get",
+          "\"/allList\")"
+        ],
+        [
+          "Get",
+          "\"/checkUserIdExists\")"
+        ],
+        [
+          "Get",
+          "\"/{userId}\")"
+        ],
+        [
+          "Delete",
+          "\"/{userIds}\")"
+        ],
+        [
+          "Post",
+          "\"/export\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/so/salesorder/controller/SalOrderController.java",
+      "routes": [
+        [
+          "Request",
+          "\"/so/salesorder\")"
+        ],
+        [
+          "Get",
+          "\"/list\")"
+        ],
+        [
+          "Get",
+          "\"/clicklist\")"
+        ],
+        [
+          "Get",
+          "\"/getOwnerUserNames\")"
+        ],
+        [
+          "Get",
+          "\"/getByOrderNo\")"
+        ],
+        [
+          "Post",
+          "\"/export\")"
+        ],
+        [
+          "Get",
+          "value = \"/{id}\")"
+        ],
+        [
+          "Put",
+          "\"/updateEmailInfo\")"
+        ],
+        [
+          "Delete",
+          "\"/{ids}\")"
+        ],
+        [
+          "Get",
+          "\"/generate\")"
+        ],
+        [
+          "Post",
+          "\"/sendMail\")"
+        ],
+        [
+          "Post",
+          "value = \"/sendMultipleEmail\", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)"
+        ],
+        [
+          "Get",
+          "\"/getEmailByOrderNo\")"
+        ],
+        [
+          "Put",
+          "\"/batchUpdateAuditStatus\")"
+        ],
+        [
+          "Delete",
+          "\"/deleteByOrderNo\")"
+        ],
+        [
+          "Post",
+          "\"/sendLink\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/so/salesorderline/controller/OrderGoodsController.java",
+      "routes": [
+        [
+          "Request",
+          "\"/so/salesorderline\")"
+        ],
+        [
+          "Get",
+          "\"/list\")"
+        ],
+        [
+          "Get",
+          "\"/listByOrderNo\")"
+        ],
+        [
+          "Post",
+          "\"/export\")"
+        ],
+        [
+          "Get",
+          "value = \"/{id}\")"
+        ],
+        [
+          "Delete",
+          "\"/{ids}\")"
+        ],
+        [
+          "Delete",
+          "\"/single/{id}\")"
+        ],
+        [
+          "Post",
+          "\"/batch\")"
+        ],
+        [
+          "Get",
+          "\"/checkOrderUsed\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/tm/controller/TmToolController.java",
+      "routes": [
+        [
+          "Request",
+          "\"/mes/tm/tool\")"
+        ],
+        [
+          "Get",
+          "\"/list\")"
+        ],
+        [
+          "Post",
+          "\"/export\")"
+        ],
+        [
+          "Get",
+          "value = \"/{toolId}\")"
+        ],
+        [
+          "Delete",
+          "\"/{toolIds}\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/tm/controller/TmToolTypeController.java",
+      "routes": [
+        [
+          "Request",
+          "\"/mes/tm/tooltype\")"
+        ],
+        [
+          "Get",
+          "\"/list\")"
+        ],
+        [
+          "Get",
+          "\"/listAll\")"
+        ],
+        [
+          "Post",
+          "\"/export\")"
+        ],
+        [
+          "Get",
+          "value = \"/{toolTypeId}\")"
+        ],
+        [
+          "Delete",
+          "\"/{toolTypeIds}\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/wm/controller/WmBarcodeConfigController.java",
+      "routes": [
+        [
+          "Request",
+          "\"/mes/wm/barcodeconfig\")"
+        ],
+        [
+          "Get",
+          "\"/list\")"
+        ],
+        [
+          "Post",
+          "\"/export\")"
+        ],
+        [
+          "Get",
+          "value = \"/{configId}\")"
+        ],
+        [
+          "Delete",
+          "\"/{configIds}\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/wm/controller/WmBarcodeController.java",
+      "routes": [
+        [
+          "Request",
+          "\"/mes/wm/barcode\")"
+        ],
+        [
+          "Get",
+          "\"/list\")"
+        ],
+        [
+          "Post",
+          "\"/export\")"
+        ],
+        [
+          "Get",
+          "value = \"/{barcodeId}\")"
+        ],
+        [
+          "Delete",
+          "\"/{barcodeIds}\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/wm/controller/WmIssueHeaderController.java",
+      "routes": [
+        [
+          "Request",
+          "\"/mes/wm/issueheader\")"
+        ],
+        [
+          "Get",
+          "\"/list\")"
+        ],
+        [
+          "Post",
+          "\"/export\")"
+        ],
+        [
+          "Get",
+          "value = \"/{issueId}\")"
+        ],
+        [
+          "Delete",
+          "\"/{issueIds}\")"
+        ],
+        [
+          "Put",
+          "\"/{issueId}\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/wm/controller/WmIssueLineController.java",
+      "routes": [
+        [
+          "Request",
+          "\"/mes/wm/issueline\")"
+        ],
+        [
+          "Get",
+          "\"/list\")"
+        ],
+        [
+          "Post",
+          "\"/export\")"
+        ],
+        [
+          "Get",
+          "value = \"/{lineId}\")"
+        ],
+        [
+          "Delete",
+          "\"/{lineIds}\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/wm/controller/WmItemConsumeController.java",
+      "routes": [
+        [
+          "Request",
+          "\"/mes/wm/itemconsume\")"
+        ],
+        [
+          "Get",
+          "\"/list\")"
+        ],
+        [
+          "Post",
+          "\"/export\")"
+        ],
+        [
+          "Get",
+          "value = \"/{recordId}\")"
+        ],
+        [
+          "Delete",
+          "\"/{recordIds}\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/wm/controller/WmItemConsumeLineController.java",
+      "routes": [
+        [
+          "Request",
+          "\"/mes/wm/itemconsumeline\")"
+        ],
+        [
+          "Get",
+          "\"/list\")"
+        ],
+        [
+          "Post",
+          "\"/export\")"
+        ],
+        [
+          "Get",
+          "value = \"/{lineId}\")"
+        ],
+        [
+          "Delete",
+          "\"/{lineIds}\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/wm/controller/WmItemRecptController.java",
+      "routes": [
+        [
+          "Request",
+          "\"/mes/wm/itemrecpt\")"
+        ],
+        [
+          "Get",
+          "\"/list\")"
+        ],
+        [
+          "Post",
+          "\"/export\")"
+        ],
+        [
+          "Get",
+          "value = \"/{recptId}\")"
+        ],
+        [
+          "Put",
+          "\"/confirm\")"
+        ],
+        [
+          "Put",
+          "\"/{recptId}\")"
+        ],
+        [
+          "Delete",
+          "\"/{recptIds}\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/wm/controller/WmItemRecptLineController.java",
+      "routes": [
+        [
+          "Request",
+          "\"/mes/wm/itemrecptline\")"
+        ],
+        [
+          "Get",
+          "\"/list\")"
+        ],
+        [
+          "Post",
+          "\"/export\")"
+        ],
+        [
+          "Get",
+          "value = \"/{lineId}\")"
+        ],
+        [
+          "Delete",
+          "\"/{lineIds}\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/wm/controller/WmMaterialStockController.java",
+      "routes": [
+        [
+          "Request",
+          "\"/mes/wm/wmstock\")"
+        ],
+        [
+          "Get",
+          "\"/list\")"
+        ],
+        [
+          "Post",
+          "\"/export\")"
+        ],
+        [
+          "Get",
+          "value = \"/{materialStockId}\")"
+        ],
+        [
+          "Delete",
+          "\"/{materialStockIds}\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/wm/controller/WmPackageController.java",
+      "routes": [
+        [
+          "Request",
+          "\"/mes/wm/package\")"
+        ],
+        [
+          "Get",
+          "\"/list\")"
+        ],
+        [
+          "Post",
+          "\"/export\")"
+        ],
+        [
+          "Get",
+          "value = \"/{packageId}\")"
+        ],
+        [
+          "Put",
+          "\"/addsub\")"
+        ],
+        [
+          "Delete",
+          "\"/{packageIds}\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/wm/controller/WmPackageLineController.java",
+      "routes": [
+        [
+          "Request",
+          "\"/mes/wm/packageline\")"
+        ],
+        [
+          "Get",
+          "\"/list\")"
+        ],
+        [
+          "Post",
+          "\"/export\")"
+        ],
+        [
+          "Get",
+          "value = \"/{lineId}\")"
+        ],
+        [
+          "Delete",
+          "\"/{lineIds}\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/wm/controller/WmProductProduceController.java",
+      "routes": [
+        [
+          "Request",
+          "\"/mes/wm/productproduce\")"
+        ],
+        [
+          "Get",
+          "\"/list\")"
+        ],
+        [
+          "Post",
+          "\"/export\")"
+        ],
+        [
+          "Get",
+          "value = \"/{recordId}\")"
+        ],
+        [
+          "Delete",
+          "\"/{recordIds}\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/wm/controller/WmProductProduceLineController.java",
+      "routes": [
+        [
+          "Request",
+          "\"/mes/wm/productproduceline\")"
+        ],
+        [
+          "Get",
+          "\"/list\")"
+        ],
+        [
+          "Post",
+          "\"/export\")"
+        ],
+        [
+          "Get",
+          "value = \"/{lineId}\")"
+        ],
+        [
+          "Delete",
+          "\"/{lineIds}\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/wm/controller/WmProductRecptController.java",
+      "routes": [
+        [
+          "Request",
+          "\"/mes/wm/productrecpt\")"
+        ],
+        [
+          "Get",
+          "\"/list\")"
+        ],
+        [
+          "Post",
+          "\"/export\")"
+        ],
+        [
+          "Get",
+          "value = \"/{recptId}\")"
+        ],
+        [
+          "Delete",
+          "\"/{recptIds}\")"
+        ],
+        [
+          "Put",
+          "\"/{recptId}\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/wm/controller/WmProductRecptLineController.java",
+      "routes": [
+        [
+          "Request",
+          "\"/mes/wm/productrecptline\")"
+        ],
+        [
+          "Get",
+          "\"/list\")"
+        ],
+        [
+          "Post",
+          "\"/export\")"
+        ],
+        [
+          "Get",
+          "value = \"/{lineId}\")"
+        ],
+        [
+          "Delete",
+          "\"/{lineIds}\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/wm/controller/WmProductSalseController.java",
+      "routes": [
+        [
+          "Request",
+          "\"/mes/wm/productsalse\")"
+        ],
+        [
+          "Get",
+          "\"/list\")"
+        ],
+        [
+          "Post",
+          "\"/export\")"
+        ],
+        [
+          "Get",
+          "value = \"/{salseId}\")"
+        ],
+        [
+          "Delete",
+          "\"/{salseIds}\")"
+        ],
+        [
+          "Put",
+          "\"/{salseId}\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/wm/controller/WmProductSalseLineController.java",
+      "routes": [
+        [
+          "Request",
+          "\"/mes/wm/productsalseline\")"
+        ],
+        [
+          "Get",
+          "\"/list\")"
+        ],
+        [
+          "Post",
+          "\"/export\")"
+        ],
+        [
+          "Get",
+          "value = \"/{lineId}\")"
+        ],
+        [
+          "Delete",
+          "\"/{lineIds}\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/wm/controller/WmRtIssueController.java",
+      "routes": [
+        [
+          "Request",
+          "\"/mes/wm/rtissue\")"
+        ],
+        [
+          "Get",
+          "\"/list\")"
+        ],
+        [
+          "Post",
+          "\"/export\")"
+        ],
+        [
+          "Get",
+          "value = \"/{rtId}\")"
+        ],
+        [
+          "Delete",
+          "\"/{rtIds}\")"
+        ],
+        [
+          "Put",
+          "\"/{rtId}\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/wm/controller/WmRtIssueLineController.java",
+      "routes": [
+        [
+          "Request",
+          "\"/mes/wm/rtissueline\")"
+        ],
+        [
+          "Get",
+          "\"/list\")"
+        ],
+        [
+          "Post",
+          "\"/export\")"
+        ],
+        [
+          "Get",
+          "value = \"/{lineId}\")"
+        ],
+        [
+          "Delete",
+          "\"/{lineIds}\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/wm/controller/WmRtSalseController.java",
+      "routes": [
+        [
+          "Request",
+          "\"/mes/wm/rtsalse\")"
+        ],
+        [
+          "Get",
+          "\"/list\")"
+        ],
+        [
+          "Post",
+          "\"/export\")"
+        ],
+        [
+          "Get",
+          "value = \"/{rtId}\")"
+        ],
+        [
+          "Delete",
+          "\"/{rtIds}\")"
+        ],
+        [
+          "Put",
+          "\"/{rtId}\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/wm/controller/WmRtSalseLineController.java",
+      "routes": [
+        [
+          "Request",
+          "\"/mes/wm/rtsalseline\")"
+        ],
+        [
+          "Get",
+          "\"/list\")"
+        ],
+        [
+          "Post",
+          "\"/export\")"
+        ],
+        [
+          "Get",
+          "value = \"/{lineId}\")"
+        ],
+        [
+          "Delete",
+          "\"/{lineIds}\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/wm/controller/WmRtVendorController.java",
+      "routes": [
+        [
+          "Request",
+          "\"/mes/wm/rtvendor\")"
+        ],
+        [
+          "Get",
+          "\"/list\")"
+        ],
+        [
+          "Post",
+          "\"/export\")"
+        ],
+        [
+          "Get",
+          "value = \"/{rtId}\")"
+        ],
+        [
+          "Delete",
+          "\"/{rtIds}\")"
+        ],
+        [
+          "Put",
+          "\"/{rtId}\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/wm/controller/WmRtVendorLineController.java",
+      "routes": [
+        [
+          "Request",
+          "\"/mes/wm/rtvendorline\")"
+        ],
+        [
+          "Get",
+          "\"/list\")"
+        ],
+        [
+          "Post",
+          "\"/export\")"
+        ],
+        [
+          "Get",
+          "value = \"/{lineId}\")"
+        ],
+        [
+          "Delete",
+          "\"/{lineIds}\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/wm/controller/WmSnController.java",
+      "routes": [
+        [
+          "Request",
+          "\"/mes/wm/sn\")"
+        ],
+        [
+          "Get",
+          "\"/list\")"
+        ],
+        [
+          "Get",
+          "\"/listSn\")"
+        ],
+        [
+          "Post",
+          "\"/export\")"
+        ],
+        [
+          "Get",
+          "value = \"/{snId}\")"
+        ],
+        [
+          "Delete",
+          "\"/{snIds}\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/wm/controller/WmStockTakingController.java",
+      "routes": [
+        [
+          "Request",
+          "\"/mes/wm/stocktaking\")"
+        ],
+        [
+          "Get",
+          "\"/list\")"
+        ],
+        [
+          "Get",
+          "value = \"/{takingId}\")"
+        ],
+        [
+          "Delete",
+          "\"/{takingIds}\")"
+        ],
+        [
+          "Put",
+          "\"/{takingId}\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/wm/controller/WmStockTakingLineController.java",
+      "routes": [
+        [
+          "Request",
+          "\"/mes/wm/stocktakingline\")"
+        ],
+        [
+          "Get",
+          "\"/list\")"
+        ],
+        [
+          "Post",
+          "\"/export\")"
+        ],
+        [
+          "Get",
+          "value = \"/{lineId}\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/wm/controller/WmStockTakingResultController.java",
+      "routes": [
+        [
+          "Request",
+          "\"/wm/stocktakingresult\")"
+        ],
+        [
+          "Get",
+          "\"/list\")"
+        ],
+        [
+          "Post",
+          "\"/export\")"
+        ],
+        [
+          "Get",
+          "value = \"/{resultId}\")"
+        ],
+        [
+          "Delete",
+          "\"/{resultIds}\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/wm/controller/WmStorageAreaController.java",
+      "routes": [
+        [
+          "Request",
+          "\"/mes/wm/area\")"
+        ],
+        [
+          "Get",
+          "\"/list\")"
+        ],
+        [
+          "Post",
+          "\"/export\")"
+        ],
+        [
+          "Get",
+          "value = \"/{areaId}\")"
+        ],
+        [
+          "Delete",
+          "\"/{areaIds}\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/wm/controller/WmStorageLocationController.java",
+      "routes": [
+        [
+          "Request",
+          "\"/mes/wm/location\")"
+        ],
+        [
+          "Get",
+          "\"/list\")"
+        ],
+        [
+          "Post",
+          "\"/export\")"
+        ],
+        [
+          "Get",
+          "value = \"/{locationId}\")"
+        ],
+        [
+          "Delete",
+          "\"/{locationIds}\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/wm/controller/WmTransferController.java",
+      "routes": [
+        [
+          "Request",
+          "\"/mes/wm/transfer\")"
+        ],
+        [
+          "Get",
+          "\"/outlist\")"
+        ],
+        [
+          "Get",
+          "\"/list\")"
+        ],
+        [
+          "Post",
+          "\"/export\")"
+        ],
+        [
+          "Get",
+          "value = \"/{transferId}\")"
+        ],
+        [
+          "Get",
+          "value = \"/wmtransfer/{docNo}\")"
+        ],
+        [
+          "Put",
+          "\"/wmtransfer\")"
+        ],
+        [
+          "Delete",
+          "\"/{transferIds}\")"
+        ],
+        [
+          "Delete",
+          "\"/wmtransfer/{docNos}\")"
+        ],
+        [
+          "Put",
+          "\"/{transferId}\")"
+        ],
+        [
+          "Post",
+          "\"/createTransferDoc\")"
+        ],
+        [
+          "Delete",
+          "\"/wmtransferDparam/{param}\")"
+        ],
+        [
+          "Get",
+          "\"/wmplant\")"
+        ],
+        [
+          "Get",
+          "\"/wmemployee\")"
+        ],
+        [
+          "Get",
+          "\"/adminUnit/list\")"
+        ],
+        [
+          "Get",
+          "\"/WmDoc/list\")"
+        ],
+        [
+          "Get",
+          "\"/WmWarehouses/list\")"
+        ],
+        [
+          "Get",
+          "\"/generateDocCode\")"
+        ],
+        [
+          "Get",
+          "\"/generateDocCode\")"
+        ],
+        [
+          "Get",
+          "\"listItemData\")"
+        ],
+        [
+          "Get",
+          "\"/unit/{unitId}\")"
+        ],
+        [
+          "Get",
+          "\"/listUnits\")"
+        ],
+        [
+          "Get",
+          "\"/itemHouseInfo/{itemCode}\")"
+        ],
+        [
+          "Get",
+          "\"/listBins\")"
+        ],
+        [
+          "Get",
+          "\"/listBinsNOBin\")"
+        ],
+        [
+          "Get",
+          "\"/listItemLot\")"
+        ],
+        [
+          "Get",
+          "\"/adjacent\")"
+        ],
+        [
+          "Post",
+          "\"/approve\")"
+        ],
+        [
+          "Post",
+          "\"/unapprove\")"
+        ],
+        [
+          "Post",
+          "\"/discard\")"
+        ],
+        [
+          "Get",
+          "\"/bom\")"
+        ],
+        [
+          "Get",
+          "\"/workorderinfo\")"
+        ],
+        [
+          "Get",
+          "\"/info/inventoryDetails\")"
+        ],
+        [
+          "Get",
+          "\"/bomQuery\")"
+        ],
+        [
+          "Get",
+          "\"/info/workorderitems\")"
+        ],
+        [
+          "Get",
+          "\"/listBinsByWarehouse/{warehouseCode}\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/wm/controller/WmTransferLineController.java",
+      "routes": [
+        [
+          "Request",
+          "\"/mes/wm/transferline\")"
+        ],
+        [
+          "Get",
+          "\"/list\")"
+        ],
+        [
+          "Post",
+          "\"/export\")"
+        ],
+        [
+          "Get",
+          "value = \"/{lineId}\")"
+        ],
+        [
+          "Delete",
+          "\"/{lineIds}\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/wm/controller/WmWarehouseController.java",
+      "routes": [
+        [
+          "Request",
+          "\"/mes/wm/warehouse\")"
+        ],
+        [
+          "Get",
+          "\"/list\")"
+        ],
+        [
+          "Get",
+          "\"/getTreeList\")"
+        ],
+        [
+          "Post",
+          "\"/export\")"
+        ],
+        [
+          "Get",
+          "value = \"/{warehouseId}\")"
+        ],
+        [
+          "Delete",
+          "\"/{warehouseIds}\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/wm/controller/mobile/WmIssueLineMobController.java",
+      "routes": [
+        [
+          "Request",
+          "\"/mobile/wm/issueline\")"
+        ],
+        [
+          "Get",
+          "\"/list\")"
+        ],
+        [
+          "Get",
+          "value = \"/{lineId}\")"
+        ],
+        [
+          "Delete",
+          "\"/{lineIds}\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/wm/controller/mobile/WmIssueMobController.java",
+      "routes": [
+        [
+          "Request",
+          "\"/mobile/wm/issueheader\")"
+        ],
+        [
+          "Get",
+          "\"/list\")"
+        ],
+        [
+          "Get",
+          "value = \"/{issueId}\")"
+        ],
+        [
+          "Delete",
+          "\"/{issueIds}\")"
+        ],
+        [
+          "Put",
+          "\"/{issueId}\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/wm/controller/mobile/WmItemRecptLineMobController.java",
+      "routes": [
+        [
+          "Request",
+          "\"/mobile/wm/itemrecptline\")"
+        ],
+        [
+          "Get",
+          "\"/list\")"
+        ],
+        [
+          "Get",
+          "value = \"/{lineId}\")"
+        ],
+        [
+          "Delete",
+          "\"/{lineIds}\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/wm/controller/mobile/WmItemRecptMobController.java",
+      "routes": [
+        [
+          "Request",
+          "\"/mobile/wm/itemrecpt\")"
+        ],
+        [
+          "Get",
+          "value = \"/{recptId}\")"
+        ],
+        [
+          "Delete",
+          "\"/{recptIds}\")"
+        ],
+        [
+          "Put",
+          "\"/{recptId}\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/wm/controller/mobile/WmMaterialStockMobController.java",
+      "routes": [
+        [
+          "Request",
+          "\"/mobile/wm/wmstock\")"
+        ],
+        [
+          "Get",
+          "\"/list\")"
+        ],
+        [
+          "Get",
+          "value = \"/{materialStockId}\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/wm/controller/mobile/WmRtIssueLineMobController.java",
+      "routes": [
+        [
+          "Request",
+          "\"/mobile/wm/rtissueline\")"
+        ],
+        [
+          "Get",
+          "\"/list\")"
+        ],
+        [
+          "Get",
+          "value = \"/{lineId}\")"
+        ],
+        [
+          "Delete",
+          "\"/{lineIds}\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/wm/controller/mobile/WmRtIssueMobController.java",
+      "routes": [
+        [
+          "Request",
+          "\"/mobile/wm/rtissue\")"
+        ],
+        [
+          "Get",
+          "\"/list\")"
+        ],
+        [
+          "Get",
+          "value = \"/{rtId}\")"
+        ],
+        [
+          "Delete",
+          "\"/{rtIds}\")"
+        ],
+        [
+          "Put",
+          "\"/{rtId}\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/wm/controller/mobile/WmRtVendorLineMobController.java",
+      "routes": [
+        [
+          "Request",
+          "\"/mobile/wm/rtvendorline\")"
+        ],
+        [
+          "Get",
+          "\"/list\")"
+        ],
+        [
+          "Get",
+          "value = \"/{lineId}\")"
+        ],
+        [
+          "Delete",
+          "\"/{lineIds}\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/wm/controller/mobile/WmRtVendorMobController.java",
+      "routes": [
+        [
+          "Request",
+          "\"/mobile/wm/rtvendor\")"
+        ],
+        [
+          "Get",
+          "\"/list\")"
+        ],
+        [
+          "Get",
+          "value = \"/{rtId}\")"
+        ],
+        [
+          "Put",
+          "\"/{rtId}\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/wm/controller/mobile/WmWarehouseMobController.java",
+      "routes": [
+        [
+          "Request",
+          "\"/mobile/wm/warehouse\")"
+        ],
+        [
+          "Get",
+          "\"/getTreeList\")"
+        ]
+      ]
+    },
+    {
+      "file": "ktg-mes/src/main/java/com/ktg/mes/workeroption/controller/WorkerOptionController.java",
+      "routes": [
+        [
+          "Request",
+          "\"/mes/workeroption\")"
+        ],
+        [
+          "Post",
+          "\"/uploadOptionPic\")"
+        ],
+        [
+          "Post",
+          "\"/deleteImg\")"
+        ]
+      ]
+    }
+  ],
+  "simple_reviewed_files": [
+    {
+      "file": "/Users/user/work/heri/ktg-mes/ktg-mes/src/main/java/com/ktg/mes/md/controller/MdUnitMeasureController.java",
+      "sha256": "e747eefac8e412cb2a424a6d286888d6374b4eafbfd251fe1b8e25d776075b0e"
+    },
+    {
+      "file": "/Users/user/work/heri/ktg-mes/ktg-mes/src/main/java/com/ktg/mes/md/service/impl/MdUnitMeasureServiceImpl.java",
+      "sha256": "5ec33cf77f362771d946afec49ed3640004622d842859aec817c5f7bc4aab13b"
+    },
+    {
+      "file": "/Users/user/work/heri/ktg-mes/ktg-mes/src/main/java/com/ktg/mes/md/domain/MdUnitMeasure.java",
+      "sha256": "8ab6c633830fd646f35644f9088369fe20026df95711a95d58ada9a2b1827b95"
+    },
+    {
+      "file": "/Users/user/work/heri/ktg-mes/ktg-mes/src/main/resources/mapper/md/MdUnitMeasureMapper.xml",
+      "sha256": "a17a9dc491e89f7be808e90907f477a6ca22b0af432901c978f9abf62e87cea5"
+    },
+    {
+      "file": "/Users/user/work/heri/ktg-mes-ui/src/views/mes/md/unitmeasure/index.vue",
+      "sha256": "fbc3219f57e4f74c35e90c88959330aa32e59470b3897b90d97bb8fd86bfb50e"
+    },
+    {
+      "file": "/Users/user/work/heri/ktg-mes/ktg-mes/src/main/java/com/ktg/mes/md/controller/MdWorkshopController.java",
+      "sha256": "727132e9e814b66cc3d99c2657bdc4694dfacb5b962d51335378ef7fe0553e56"
+    },
+    {
+      "file": "/Users/user/work/heri/ktg-mes/ktg-mes/src/main/java/com/ktg/mes/md/service/impl/MdWorkshopServiceImpl.java",
+      "sha256": "bc709ed5971637d4a5fcfe5e28864387b0fb449d6f21095831c39a94fdaaf8b1"
+    },
+    {
+      "file": "/Users/user/work/heri/ktg-mes/ktg-mes/src/main/java/com/ktg/mes/md/domain/MdWorkshop.java",
+      "sha256": "b796a2f050b89d49cc8f55479e05f2287b40a404226c1a92b0f23d6eaa0f0a5a"
+    },
+    {
+      "file": "/Users/user/work/heri/ktg-mes/ktg-mes/src/main/resources/mapper/md/MdWorkshopMapper.xml",
+      "sha256": "c5516d2fb2db2e175fd398b9640fe7b1188cdfc91e1173291de74754fde6801a"
+    },
+    {
+      "file": "/Users/user/work/heri/ktg-mes-ui/src/views/mes/md/workshop/index.vue",
+      "sha256": "b79659f4981893aafcf9e4c09eae7c634313560dc967ddc9b2e79037fa95edea"
+    },
+    {
+      "file": "/Users/user/work/heri/ktg-mes/ktg-mes/src/main/java/com/ktg/mes/qc/controller/QcIndexController.java",
+      "sha256": "0aae84c1dd0d82847a465f8b42c1df3e02769ce50494dc25143f5f055bdcf7e8"
+    },
+    {
+      "file": "/Users/user/work/heri/ktg-mes/ktg-mes/src/main/java/com/ktg/mes/qc/service/impl/QcIndexServiceImpl.java",
+      "sha256": "e13b9b490e2acbc8fb715fb38b4b2bf6a270caac4a0d58dca89c372fdcd8f5ba"
+    },
+    {
+      "file": "/Users/user/work/heri/ktg-mes/ktg-mes/src/main/java/com/ktg/mes/qc/domain/QcIndex.java",
+      "sha256": "6d52d1d21cf2caaf6c8a44fb57ffb94dcb86b7401ccae7181439110333d4b6b6"
+    },
+    {
+      "file": "/Users/user/work/heri/ktg-mes/ktg-mes/src/main/resources/mapper/qc/QcIndexMapper.xml",
+      "sha256": "22cb76bc23c085ae9853e6fdb4ac3a2f4f795437c184c2ddfe7f1760cf1c0467"
+    },
+    {
+      "file": "/Users/user/work/heri/ktg-mes-ui/src/views/mes/qc/qcindex/index.vue",
+      "sha256": "92269f340b6f5975c7a30abdb4012dd15f7ea289e77d460ec9f30ab2721959ed"
+    },
+    {
+      "file": "/Users/user/work/heri/ktg-mes/ktg-mes/src/main/java/com/ktg/mes/qc/controller/QcDefectController.java",
+      "sha256": "1e825d4e877e829d9ab38860eb53cd5ce618b4f1b240bac4ba9532a1e7f19cec"
+    },
+    {
+      "file": "/Users/user/work/heri/ktg-mes/ktg-mes/src/main/java/com/ktg/mes/qc/service/impl/QcDefectServiceImpl.java",
+      "sha256": "9600d021869e290e36ce8c9c92c3cb818bc7e3900fc66997e8f35737cfde051a"
+    },
+    {
+      "file": "/Users/user/work/heri/ktg-mes/ktg-mes/src/main/java/com/ktg/mes/qc/domain/QcDefect.java",
+      "sha256": "0c240d4840d7c5b0ff86ec99c0e3da713671a9021b7c87f602840659567828bd"
+    },
+    {
+      "file": "/Users/user/work/heri/ktg-mes/ktg-mes/src/main/resources/mapper/qc/QcDefectMapper.xml",
+      "sha256": "2af15ceb23d06bb7e3830b87984f452317dff0d4362bb2ca7acca11a8a15fa06"
+    },
+    {
+      "file": "/Users/user/work/heri/ktg-mes-ui/src/views/mes/qc/qcdefect/index.vue",
+      "sha256": "4c37b26d882a8c776d4d693a2238265bf745fd00220bc518227bf10223ca37ea"
+    },
+    {
+      "file": "/Users/user/work/heri/ktg-mes/ktg-mes/src/main/java/com/ktg/mes/dv/controller/DvSubjectController.java",
+      "sha256": "c709f61eb9ec7725c6c763815660f119cad768c19e2e852826352f1042577f8e"
+    },
+    {
+      "file": "/Users/user/work/heri/ktg-mes/ktg-mes/src/main/java/com/ktg/mes/dv/service/impl/DvSubjectServiceImpl.java",
+      "sha256": "0ebcbba49500af6f6520843398a5e3cff83a81e63425baaa47c87a812231a05d"
+    },
+    {
+      "file": "/Users/user/work/heri/ktg-mes/ktg-mes/src/main/java/com/ktg/mes/dv/domain/DvSubject.java",
+      "sha256": "0e04d9d4878a9114ed40ade91219bea93b4850ec6227107c537af6e65426c59e"
+    },
+    {
+      "file": "/Users/user/work/heri/ktg-mes/ktg-mes/src/main/resources/mapper/dv/DvSubjectMapper.xml",
+      "sha256": "17870db29c0b549d62894dd341164f6d0d1b1e0df9c076c8709f9a56be7847e0"
+    },
+    {
+      "file": "/Users/user/work/heri/ktg-mes-ui/src/views/mes/dv/subject/index.vue",
+      "sha256": "7ab6bdc39b4232d294230916cb5793d141a16890602bb9aab5c54ba7cada11ee"
+    }
+  ],
+  "source_business_table_inventory": [
+    "6630862",
+    "6630865",
+    "6630867",
+    "bigdata_daily_production_detail",
+    "bigdata_monthly_production_summary",
+    "cal_holiday",
+    "cal_plan",
+    "cal_plan_team",
+    "cal_shift",
+    "cal_team",
+    "cal_team_member",
+    "cal_teamshift",
+    "dashboard_image",
+    "db_test",
+    "dv_check_machinery",
+    "dv_check_plan",
+    "dv_check_subject",
+    "dv_machinery",
+    "dv_machinery_type",
+    "dv_repair",
+    "dv_repair_line",
+    "dv_subject",
+    "erp_item",
+    "erp_item_lot",
+    "erp_item_production",
+    "erp_mo_d",
+    "fd_finance_detail",
+    "fd_invoice_register",
+    "file_assets",
+    "finance_material_bad",
+    "finance_material_bad_copy1",
+    "inspection_record",
+    "inspection_records",
+    "md_client",
+    "md_item",
+    "md_item_type",
+    "md_product_bom",
+    "md_product_sop",
+    "md_produt_sop",
+    "md_unit_measure",
+    "md_vendor",
+    "md_workshop",
+    "md_workstation",
+    "md_workstation_machine",
+    "md_workstation_tool",
+    "md_workstation_worker",
+    "mes_equipment",
+    "mes_heat_treatment_param_record",
+    "mes_heat_treatment_param_submit",
+    "mes_heat_treatment_param_template",
+    "mes_heat_treatment_photo",
+    "mes_heat_treatment_record",
+    "mes_output_value",
+    "mes_safety_event",
+    "mes_transfer_action_def",
+    "mes_transfer_action_log",
+    "mes_transfer_config",
+    "mes_transfer_config_action",
+    "mes_transfer_record",
+    "mes_transfer_scene_def",
+    "mqttTemporary",
+    "pallet_inventory",
+    "pallet_inventory_details",
+    "pallet_inventory_mail",
+    "pm_minimum_purchase",
+    "pm_mrp_calculation",
+    "pm_plan_need",
+    "pm_work_order_demand",
+    "pro_andon_record",
+    "pro_antirust_cycle",
+    "pro_antirust_cycle_local",
+    "pro_antirust_cycle_mail",
+    "pro_buckle",
+    "pro_cut_tool_template",
+    "pro_cutters_quota",
+    "pro_device_process",
+    "pro_feedback",
+    "pro_hiprint_template",
+    "pro_inbound_confirm",
+    "pro_inbound_receipt_confirm",
+    "pro_material",
+    "pro_material_issue_confirm",
+    "pro_material_issue_confirm_detail",
+    "pro_monthly_plan",
+    "pro_process",
+    "pro_process_content",
+    "pro_process_inspection",
+    "pro_process_step",
+    "pro_process_user",
+    "pro_receipt_merge",
+    "pro_reporting_work",
+    "pro_reporting_work_copy1",
+    "pro_reporting_work_copy2",
+    "pro_reporting_work_material",
+    "pro_route",
+    "pro_route_broken_step",
+    "pro_route_process",
+    "pro_route_process_user_inspection",
+    "pro_route_product",
+    "pro_route_product_bom",
+    "pro_shutdown_record",
+    "pro_step_inspection_config",
+    "pro_step_inspection_record",
+    "pro_task",
+    "pro_task_issue",
+    "pro_trans_consume",
+    "pro_trans_order",
+    "pro_user_workstation",
+    "pro_workorder",
+    "pro_workorder_archive_batch",
+    "pro_workorder_bom",
+    "pro_workorder_history",
+    "pro_workorder_request",
+    "pro_workrecord",
+    "pro_xtransfer_count",
+    "process_external_mapping",
+    "process_file_relation",
+    "qc_defect",
+    "qc_defect_record",
+    "qc_defective",
+    "qc_defective_cause",
+    "qc_defective_item_supplier",
+    "qc_defective_material_export_order",
+    "qc_defective_responsible_user",
+    "qc_defective_user",
+    "qc_defective_work_export_order",
+    "qc_index",
+    "qc_ipqc",
+    "qc_ipqc_line",
+    "qc_iqc",
+    "qc_iqc_defect",
+    "qc_iqc_line",
+    "qc_oqc",
+    "qc_oqc_line",
+    "qc_special_product_inspection",
+    "qc_template",
+    "qc_template_index",
+    "qc_template_product",
+    "sale_check_info",
+    "simulation_process_production",
+    "spc_log_operation",
+    "sys_assign_work",
+    "sys_attachment",
+    "sys_auto_code_part",
+    "sys_auto_code_result",
+    "sys_auto_code_rule",
+    "sys_message",
+    "temp_name",
+    "test_tab",
+    "tm_tool",
+    "tm_tool_type",
+    "ureport_file_tbl",
+    "wm_barcode",
+    "wm_barcode_config",
+    "wm_issue_header",
+    "wm_issue_line",
+    "wm_item_consume",
+    "wm_item_consume_line",
+    "wm_item_recpt",
+    "wm_item_recpt_line",
+    "wm_material_stock",
+    "wm_package",
+    "wm_package_line",
+    "wm_pback_header",
+    "wm_pback_line",
+    "wm_product_produce",
+    "wm_product_produce_line",
+    "wm_product_recpt",
+    "wm_product_recpt_line",
+    "wm_product_salse",
+    "wm_product_salse_line",
+    "wm_rt_issue",
+    "wm_rt_issue_line",
+    "wm_rt_salse",
+    "wm_rt_salse_line",
+    "wm_rt_vendor",
+    "wm_rt_vendor_line",
+    "wm_sn",
+    "wm_storage_area",
+    "wm_storage_location",
+    "wm_transaction",
+    "wm_transfer",
+    "wm_transfer_line",
+    "wm_warehouse"
+  ],
+  "license": "Existing docs/legal/source-product-MIT-LICENSE.txt retained; adapted schema, no source data or credentials copied",
+  "round2_review": {
+    "review_date": "2026-10-12",
+    "authority": "User round2 request: necessity -> Source capability complexity -> reuse; review only",
+    "source_head": "42a81cc577dc77b05a6a67f6be0a9466e40784e1",
+    "evidence_level": "STATIC_SOURCE_AND_PRIMARY_REFERENCES",
+    "review_document": "docs/migration/MES_CAPABILITY_REVIEW.md",
+    "read_only_database_boundary": "No database connections or writes during round2; prior schema receipts remain historical",
+    "five_table_decisions": {
+      "md_unit_measure": "REVIEW / RECONSIDER",
+      "md_workshop": "REVIEW / RECONSIDER",
+      "qc_index": "REVIEW / RECONSIDER",
+      "qc_defect": "REVIEW / RECONSIDER",
+      "dv_subject": "REVIEW / DROP_CANDIDATE / DEFER_MAINTENANCE_EXTENSION"
+    },
+    "reviewed_files": [
+      {
+        "file": "/Users/user/work/heri/ktg-mes/ktg-mes/src/main/java/com/ktg/mes/md/cache/UnitMeasureCache.java",
+        "sha256": "960e1bf092b00e0e6689cc1a1e934ac5992e6a34d4f8c9f9ee96a03ab6247ee4"
+      },
+      {
+        "file": "/Users/user/work/heri/ktg-mes/ktg-mes/src/main/java/com/ktg/mes/md/cache/UnitMeasureCacheAspect.java",
+        "sha256": "8446f686529c6676f7d9cbd908867dccfa4a5ba5e63e8812aa9c09987b7fe5fd"
+      },
+      {
+        "file": "/Users/user/work/heri/ktg-mes/ktg-mes/src/main/java/com/ktg/mes/md/service/impl/MdUnitMeasureServiceImpl.java",
+        "sha256": "5ec33cf77f362771d946afec49ed3640004622d842859aec817c5f7bc4aab13b"
+      },
+      {
+        "file": "/Users/user/work/heri/ktg-mes/ktg-mes/src/main/java/com/ktg/mes/md/controller/MdWorkshopController.java",
+        "sha256": "727132e9e814b66cc3d99c2657bdc4694dfacb5b962d51335378ef7fe0553e56"
+      },
+      {
+        "file": "/Users/user/work/heri/ktg-mes/ktg-mes/src/main/java/com/ktg/mes/md/controller/MdWorkstationController.java",
+        "sha256": "5c5a628c5924a472fe5d5b5f8cd3b88767210d60f877911e3c356a03c5166fe3"
+      },
+      {
+        "file": "/Users/user/work/heri/ktg-mes/ktg-mes/src/main/java/com/ktg/mes/md/controller/MdItemController.java",
+        "sha256": "68f6f55fd65aacd6692e6c79394802b6fbb2599f75a0be3df13d7cedf871239a"
+      },
+      {
+        "file": "/Users/user/work/heri/ktg-mes/ktg-mes/src/main/java/com/ktg/mes/md/domain/MdItem.java",
+        "sha256": "6bcd0e29fbbc389f8770c7e7d82c6eb28e00ced7722742b5b214a7bbbb4e81bb"
+      },
+      {
+        "file": "/Users/user/work/heri/ktg-mes/ktg-mes/src/main/java/com/ktg/mes/pro/service/impl/ProProcessServiceImpl.java",
+        "sha256": "dba3c33e371e0114b1e487ff349e02677bc45107c52642f9ee79fdae3e8de2c7"
+      },
+      {
+        "file": "/Users/user/work/heri/ktg-mes/ktg-mes/src/main/java/com/ktg/mes/pro/service/impl/ProRouteProcessServiceImpl.java",
+        "sha256": "2be1d5cc0c82ab4207286d6439051c31e405a626d22f42ec12bb46bda99231d9"
+      },
+      {
+        "file": "/Users/user/work/heri/ktg-mes/ktg-mes/src/main/java/com/ktg/mes/pro/controller/ProWorkorderController.java",
+        "sha256": "4159e73b73d0d78bf29e7fb54583cfc61f713e435a57055c8975b93e5e8941a0"
+      },
+      {
+        "file": "/Users/user/work/heri/ktg-mes/ktg-mes/src/main/java/com/ktg/mes/pro/service/impl/ProWorkorderServiceImpl.java",
+        "sha256": "4baa1a69e118336f7b5fccf1d77c97d00f2c883abdf029945f2765687e8463f3"
+      },
+      {
+        "file": "/Users/user/work/heri/ktg-mes/ktg-mes/src/main/java/com/ktg/mes/pro/service/impl/ProReportingWorkServiceImpl.java",
+        "sha256": "ce55aafb4476900370fca4da15c893b8216931c4eb4ecbd3e9112c3443ee20c8"
+      },
+      {
+        "file": "/Users/user/work/heri/ktg-mes/ktg-mes/src/main/java/com/ktg/mes/service/mobile/impl/WorkReportMobileServiceImpl.java",
+        "sha256": "94dbd8d024aa5fee8669741aa4c2646f53ec0e30cf799f8d184d511e374a931a"
+      },
+      {
+        "file": "/Users/user/work/heri/ktg-mes/ktg-mes/src/main/java/com/ktg/mes/controller/mobile/WorkReportController.java",
+        "sha256": "87f0630f403a30ff63ed03fa78a5b997854cabf2d549992350104f4ec9ebdfd2"
+      },
+      {
+        "file": "/Users/user/work/heri/ktg-mes/ktg-mes/src/main/java/com/ktg/mes/qc/controller/QcTemplateIndexController.java",
+        "sha256": "203b1faf4d350bd5e35419ae61794c37448f5938ceb313aeb3fcc5535b797702"
+      },
+      {
+        "file": "/Users/user/work/heri/ktg-mes/ktg-mes/src/main/java/com/ktg/mes/qc/domain/QcTemplateIndex.java",
+        "sha256": "f23b7d58af75ee63db0e46563d03a00899801450eb079eb76f7b56872c2be522"
+      },
+      {
+        "file": "/Users/user/work/heri/ktg-mes/ktg-mes/src/main/java/com/ktg/mes/qc/controller/QcTemplateProductController.java",
+        "sha256": "81117f25edd9b1c5c3adb799e4c2f2ff1f4fce8cf1f243245936acab4b40573e"
+      },
+      {
+        "file": "/Users/user/work/heri/ktg-mes/ktg-mes/src/main/java/com/ktg/mes/qc/controller/QcIqcController.java",
+        "sha256": "045192b442887addff3cf877c69d8a83b20f63bcde33af8adf5e6740bce86bda"
+      },
+      {
+        "file": "/Users/user/work/heri/ktg-mes/ktg-mes/src/main/java/com/ktg/mes/qc/controller/QcIpqcController.java",
+        "sha256": "b8326e109ab3bacd19c7fe0355e3b1c1bf842be2feaa8f8ddd569ee91fb1bf89"
+      },
+      {
+        "file": "/Users/user/work/heri/ktg-mes/ktg-mes/src/main/java/com/ktg/mes/qc/controller/QcDefectRecordController.java",
+        "sha256": "b9f27906c41fd7893c85d501aa20e4944fe7d29971aa1a4c51d32f5c1dea0096"
+      },
+      {
+        "file": "/Users/user/work/heri/ktg-mes/ktg-mes/src/main/java/com/ktg/mes/qc/domain/QcDefectRecord.java",
+        "sha256": "7a49bfe79b6195d9a8b1991c7d095186f535f3d6dcc825d9f3551b6bf793d244"
+      },
+      {
+        "file": "/Users/user/work/heri/ktg-mes/ktg-mes/src/main/java/com/ktg/mes/qc/controller/QcDefectController.java",
+        "sha256": "1e825d4e877e829d9ab38860eb53cd5ce618b4f1b240bac4ba9532a1e7f19cec"
+      },
+      {
+        "file": "/Users/user/work/heri/ktg-mes/ktg-mes/src/main/java/com/ktg/mes/qc/service/impl/QcDefectServiceImpl.java",
+        "sha256": "9600d021869e290e36ce8c9c92c3cb818bc7e3900fc66997e8f35737cfde051a"
+      },
+      {
+        "file": "/Users/user/work/heri/ktg-mes/ktg-mes/src/main/java/com/ktg/mes/dv/domain/DvSubject.java",
+        "sha256": "0e04d9d4878a9114ed40ade91219bea93b4850ec6227107c537af6e65426c59e"
+      },
+      {
+        "file": "/Users/user/work/heri/ktg-mes/ktg-mes/src/main/java/com/ktg/mes/dv/controller/DvCheckPlanController.java",
+        "sha256": "36ffd3d8f84a5512c777860d6b4720e52a25fb8afea546cadfd8f283fabffd78"
+      },
+      {
+        "file": "/Users/user/work/heri/ktg-mes/ktg-mes/src/main/java/com/ktg/mes/dv/controller/DvCheckSubjectController.java",
+        "sha256": "97323b05132fd557a706c13e7c589bca6cc84f0e4f5676cd4d9ac27ab9627074"
+      },
+      {
+        "file": "/Users/user/work/heri/ktg-mes/ktg-mes/src/main/java/com/ktg/mes/dv/controller/DvRepairLineController.java",
+        "sha256": "15050004909c0148bcb59fb0a12bd227178d65d68233e381ff9773383f8f0d8f"
+      },
+      {
+        "file": "/Users/user/work/heri/ktg-mes/ktg-mes/src/main/java/com/ktg/mes/pro/service/impl/ProductionMaterialIssueServiceImpl.java",
+        "sha256": "b7f00851ae7edce9be02b95b8ac80d4a91384de7335b771351706104ad5b5825"
+      },
+      {
+        "file": "/Users/user/work/heri/ktg-mes/ktg-mes/src/main/java/com/ktg/mes/pro/service/impl/ProductionInboundReceiptConfirmServiceImpl.java",
+        "sha256": "9e811dc51a32ece765e4240ee7594fa5940143d23ed6318e7aa66b2f7c26cc0e"
+      },
+      {
+        "file": "/Users/user/work/heri/ktg-mes/ktg-mes/src/main/java/com/ktg/mes/wm/service/impl/WmTransactionServiceImpl.java",
+        "sha256": "0c0099470e77a89dc5b75bcf0530f56b96e7239d38988d37b8aa8950e52e4026"
+      },
+      {
+        "file": "/Users/user/work/heri/ktg-mes/ktg-mes/src/main/java/com/ktg/mes/md/service/impl/InspectionRecordServiceImpl.java",
+        "sha256": "da635b64a5d8eb2d18f77721b8a8ba7b7f2504edb4db90cd54733793ec3be930"
+      },
+      {
+        "file": "/Users/user/work/heri/ktg-mes/ktg-mes/src/main/java/com/ktg/mes/pro/stepinspection/service/impl/StepInspectionServiceImpl.java",
+        "sha256": "6674eea74350231fec38dbdc3832e2f1568a03de7f220b88b5ec726af2bc83be"
+      },
+      {
+        "file": "/Users/user/work/heri/ktg-mes/ktg-mes/src/main/java/com/ktg/mes/service/transfer/impl/TransferApplicationServiceImpl.java",
+        "sha256": "e3c9763aea3c4e2e9e75dd37e37e0041fb0f7019bb8879b3875e4b976f4ede09"
+      },
+      {
+        "file": "/Users/user/work/heri/ktg-mes/ktg-mes/src/main/java/com/ktg/mes/md/service/impl/HeatTreatmentServiceImpl.java",
+        "sha256": "93c9dc36edbcb1538989a383d7f86f447abb3bbefcc90592714075456ac20553"
+      },
+      {
+        "file": "/Users/user/work/heri/ktg-mes/ktg-mes/src/main/java/com/ktg/mes/pro/controller/mobile/ProcessTraceabilityMobController.java",
+        "sha256": "f3ea36bda72594c479436b392d40bbe3806f0e05c8c9592a3c565bf29b0c6b47"
+      },
+      {
+        "file": "/Users/user/work/heri/ktg-mes/ktg-mes/src/main/java/com/ktg/mes/dashboard/service/impl/SimulationWipServiceImpl.java",
+        "sha256": "a83d5e609782037508d2c0db0714582d5ec96e956e0c714b3a829d9a68b2ab3a"
+      },
+      {
+        "file": "/Users/user/work/heri/ktg-mes/ktg-mes/src/main/resources/mapper/md/MdUnitMeasureMapper.xml",
+        "sha256": "a17a9dc491e89f7be808e90907f477a6ca22b0af432901c978f9abf62e87cea5"
+      },
+      {
+        "file": "/Users/user/work/heri/ktg-mes/ktg-mes/src/main/resources/mapper/md/MdWorkshopMapper.xml",
+        "sha256": "c5516d2fb2db2e175fd398b9640fe7b1188cdfc91e1173291de74754fde6801a"
+      },
+      {
+        "file": "/Users/user/work/heri/ktg-mes/ktg-mes/src/main/resources/mapper/md/MdWorkstationMapper.xml",
+        "sha256": "5297783a5da7e4ca2a716f6c0a8c2d6a8ba9fd20fcd6340369cbc00cf61bc0d0"
+      },
+      {
+        "file": "/Users/user/work/heri/ktg-mes/ktg-mes/src/main/resources/mapper/md/MdItemMapper.xml",
+        "sha256": "199a2f642f684a4e08ca9fa7f2fbb2ef5c3ba0b8bdb9593ffa16cdaf2374f2fe"
+      },
+      {
+        "file": "/Users/user/work/heri/ktg-mes/ktg-mes/src/main/resources/mapper/qc/QcIndexMapper.xml",
+        "sha256": "22cb76bc23c085ae9853e6fdb4ac3a2f4f795437c184c2ddfe7f1760cf1c0467"
+      },
+      {
+        "file": "/Users/user/work/heri/ktg-mes/ktg-mes/src/main/resources/mapper/qc/QcDefectMapper.xml",
+        "sha256": "2af15ceb23d06bb7e3830b87984f452317dff0d4362bb2ca7acca11a8a15fa06"
+      },
+      {
+        "file": "/Users/user/work/heri/ktg-mes/ktg-mes/src/main/resources/mapper/dv/DvSubjectMapper.xml",
+        "sha256": "17870db29c0b549d62894dd341164f6d0d1b1e0df9c076c8709f9a56be7847e0"
+      },
+      {
+        "file": "/Users/user/work/heri/ktg-mes/ktg-mes/src/main/resources/mapper/dv/DvCheckSubjectMapper.xml",
+        "sha256": "600e3be3c58644816f798ad5bf53a6509910dd5115710e8baec9c6ccc239d482"
+      },
+      {
+        "file": "/Users/user/work/heri/ktg-mes/ktg-mes/src/main/resources/mapper/dv/DvRepairLineMapper.xml",
+        "sha256": "c97cfcfdd478bd1858d8b8e49f41edeb9cf3dd50023a94462cc3109e3c61fe52"
+      },
+      {
+        "file": "/Users/user/work/heri/ktg-mes/ktg-mes/src/main/resources/mapper/erp/ErpItemSourceMapper.xml",
+        "sha256": "fd7a2edbd26b9d220b563948969ce88075821567e2f0cb50abb4bbea9b0dbcbb"
+      },
+      {
+        "file": "/Users/user/work/heri/ktg-mes/ktg-mes/src/main/resources/mapper/erp/ErpWorkOrderMapper.xml",
+        "sha256": "bd7a13296e7136dbbe6b47f18dffdafdc86b123a5f0b637f951e4e2d5ea122c1"
+      },
+      {
+        "file": "/Users/user/work/heri/ktg-mes/ktg-mes/src/main/resources/mapper/pro/ProRouteMapper.xml",
+        "sha256": "8a6fcf4b7bbf90b8b1f52aad5500cd0110671c15f65468a52c2eee785687de6c"
+      },
+      {
+        "file": "/Users/user/work/heri/ktg-mes/ktg-mes/src/main/resources/mapper/pro/ProRouteProcessMapper.xml",
+        "sha256": "b018dd0b3c12a42f914bd3c0622d094dd9dea1a995a0e1960d0b21dc9a33b91c"
+      },
+      {
+        "file": "/Users/user/work/heri/ktg-mes-ui/src/api/mes/md/unitmeasure.js",
+        "sha256": "47657b3abaa3edd3401b0a62f64cafb4b32c8b246631fbc2a6e5988b0d860a3c"
+      },
+      {
+        "file": "/Users/user/work/heri/ktg-mes-ui/src/views/mes/md/unitmeasure/index.vue",
+        "sha256": "fbc3219f57e4f74c35e90c88959330aa32e59470b3897b90d97bb8fd86bfb50e"
+      },
+      {
+        "file": "/Users/user/work/heri/ktg-mes-ui/src/views/mes/md/workshop/index.vue",
+        "sha256": "b79659f4981893aafcf9e4c09eae7c634313560dc967ddc9b2e79037fa95edea"
+      },
+      {
+        "file": "/Users/user/work/heri/ktg-mes-ui/src/views/mes/md/workstation/index.vue",
+        "sha256": "e7a78a5bad380a4b7ff5b60b1269a2753fafc5edcd98e15926c6319c1eca3d9a"
+      },
+      {
+        "file": "/Users/user/work/heri/ktg-mes-ui/src/views/mes/md/mditem/index.vue",
+        "sha256": "20771977bed11cea59671dc97f504f7336abfe119a48012d98f87feec5efe4d4"
+      },
+      {
+        "file": "/Users/user/work/heri/ktg-mes-ui/src/views/mes/qc/qctemplate/templateindex.vue",
+        "sha256": "38bed73695c799460bf4bec37191b49079ef8ca7d3d81531f2138d7565a251a8"
+      },
+      {
+        "file": "/Users/user/work/heri/ktg-mes-ui/src/views/mes/qc/iqc/iqcline.vue",
+        "sha256": "97aa3682ec3dc42e514449604ca44c0e9c92768388b1f14bda556acc5bcf2658"
+      },
+      {
+        "file": "/Users/user/work/heri/ktg-mes-ui/src/views/mes/qc/ipqc/line.vue",
+        "sha256": "a8b72007f8a2aee9f4c7fe81580d96979dd505e866206a41487cffbf6a9ebbe3"
+      },
+      {
+        "file": "/Users/user/work/heri/ktg-mes-ui/src/views/mes/qc/oqc/line.vue",
+        "sha256": "50fc98b8b94a4a1a3b82c8b825b931dda91009234e013baa56e69e299de4ca3f"
+      },
+      {
+        "file": "/Users/user/work/heri/ktg-mes-ui/src/views/mes/qc/defectrecord/index.vue",
+        "sha256": "e4eb0f9d683b2bc4d5e114f23267263b189b0bec6094c4a45be8092cf2d586af"
+      },
+      {
+        "file": "/Users/user/work/heri/ktg-mes-ui/src/views/mes/qc/qcdefect/index.vue",
+        "sha256": "4c37b26d882a8c776d4d693a2238265bf745fd00220bc518227bf10223ca37ea"
+      },
+      {
+        "file": "/Users/user/work/heri/ktg-mes-ui/src/views/mes/dv/checkplan/subject.vue",
+        "sha256": "cd06a2617eabca395acafe5627ffa5cc74930b1b1e63bc58d4224a425445082b"
+      },
+      {
+        "file": "/Users/user/work/heri/ktg-mes-ui/src/views/mes/dv/repair/line.vue",
+        "sha256": "c447e31a13e18279dd431bcbf860d72557b04533d4822610add4c56fc1206ff3"
+      },
+      {
+        "file": "/Users/user/work/heri/ktg-mes/ktg-mes/src/main/java/com/ktg/mes/service/impl/FinancialManagementServiceImpl.java",
+        "sha256": "d1bcaa4547ee245c35703ab1f8cca77e4a5387ef3c472d594a0faa20f5c3fa9c"
+      },
+      {
+        "file": "/Users/user/work/heri/ktg-mes/ktg-mes/src/main/java/com/ktg/mes/erpapi/service/impl/IssueReceiptServiceImpl.java",
+        "sha256": "758c220ce96591896763dc6b13a7df76af5116a74b23689ede91dcf6e0ab6037"
+      }
+    ],
+    "bounded_negative_evidence": {
+      "qc_defect_service_references": [
+        "ktg-mes/src/main/java/com/ktg/mes/qc/controller/QcDefectController.java",
+        "ktg-mes/src/main/java/com/ktg/mes/qc/service/IQcDefectService.java",
+        "ktg-mes/src/main/java/com/ktg/mes/qc/service/impl/QcDefectServiceImpl.java"
+      ],
+      "qc_defect_integration": "No stable dictionary ID link found in audited main module/UI; QcDefectRecord stores name/level/quantity; external consumers UNKNOWN",
+      "change_rate_java_xml_occurrences": [
+        {
+          "file": "ktg-mes/src/main/java/com/ktg/mes/md/service/impl/MdUnitMeasureServiceImpl.java",
+          "line": 42
+        },
+        {
+          "file": "ktg-mes/src/main/java/com/ktg/mes/md/domain/MdUnitMeasure.java",
+          "line": 114
+        },
+        {
+          "file": "ktg-mes/src/main/java/com/ktg/mes/md/domain/MdUnitMeasure.java",
+          "line": 172
+        },
+        {
+          "file": "ktg-mes/src/main/resources/mapper/md/MdUnitMeasureMapper.xml",
+          "line": 13
+        },
+        {
+          "file": "ktg-mes/src/main/resources/mapper/md/MdUnitMeasureMapper.xml",
+          "line": 27
+        },
+        {
+          "file": "ktg-mes/src/main/resources/mapper/md/MdUnitMeasureMapper.xml",
+          "line": 37
+        },
+        {
+          "file": "ktg-mes/src/main/resources/mapper/md/MdUnitMeasureMapper.xml",
+          "line": 58
+        },
+        {
+          "file": "ktg-mes/src/main/resources/mapper/md/MdUnitMeasureMapper.xml",
+          "line": 96
+        }
+      ],
+      "unit_conversion": "Storage and VO projection confirmed; runtime reporting/inventory conversion chain NOT_PROVEN"
+    },
+    "reality_basis": {
+      "method": "Project scope judgment, not empirical industry prevalence or mandatory standard entity model",
+      "sources": [
+        {
+          "title": "OPC Foundation ISA-95 summary",
+          "url": "https://reference.opcfoundation.org/specs/OPC-10030/4.2.3",
+          "retrieved": "2026-10-12"
+        },
+        {
+          "title": "ISA-95 public overview",
+          "url": "https://www.isa.org/standards-and-publications/isa-standards/isa-95-standard",
+          "retrieved": "2026-10-12"
+        }
+      ]
+    },
+    "not_verified": [
+      "Actual site usage",
+      "Source DB metadata/data",
+      "Source tests/runtime/UI",
+      "All external dictionary consumers",
+      "Full disposition/reinspection lifecycle",
+      "Cross-node idempotency and external consistency"
+    ],
+    "validation": {
+      "capability_matrix": "PASSED: 29 rows; necessity/complexity/strategy/decision enums and reuse admission checks",
+      "document_links_and_whitespace": "PASSED",
+      "source_and_source_ui_git_status_unchanged": "PASSED",
+      "existing_business_ddl_and_five_converter_hashes_unchanged": "PASSED",
+      "database_operations": "NONE",
+      "maven_or_ui_tests": "NOT_RUN_REVIEW_DOCUMENTS_ONLY"
+    },
+    "gap_reclassification": {
+      "Routing Version Freeze": "COMMON_GAP",
+      "Unified WIP minimum quantity/process-state semantics": "CORE_GAP",
+      "Generic Batch Genealogy": "OPTIONAL_GAP",
+      "Quality Disposition Loop": "REVIEW"
+    }
+  }
+}

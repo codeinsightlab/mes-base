@@ -17,6 +17,7 @@ JAR = ROOT / "target/mes-base-0.1.0-SNAPSHOT.jar"
 OUT = ROOT / "target/validation"
 OUT.mkdir(parents=True, exist_ok=True)
 JAVA = os.environ.get("MES_JAVA_BIN", "java")
+WITH_DOCS = "--openapi-docs" in sys.argv[1:]
 checks = []
 with zipfile.ZipFile(JAR) as artifact:
     names = artifact.namelist()
@@ -63,7 +64,7 @@ def run(profile):
         JAVA, "-jar", str(JAR), "--server.port=0", "--server.address=127.0.0.1",
         "--spring.config.location=classpath:/application.yml",
         "--spring.profiles.active=" + (profile or "default"),
-        "--open-api.enabled=false",
+        "--open-api.enabled=" + str(WITH_DOCS).lower(),
         "--logging.level.org.springframework.boot.web.servlet=DEBUG",
         "--logging.level.org.springframework.security.web.DefaultSecurityFilterChain=DEBUG",
     ]
@@ -104,7 +105,15 @@ def run(profile):
             # Absent/non-MVC routes are now protected by the default authenticated chain.
             check("/open-api/token", 401)
             check("/open-api/v1/diagnostics/ping", 401)
-            check("/v3/api-docs/open-api", 401)
+            check("/v3/api-docs/open-api", 200 if WITH_DOCS else 401)
+            if WITH_DOCS:
+                for path in ("/openapi-docs/", "/openapi-docs/app.js", "/openapi-docs/style.css", "/openapi-docs/logo.svg"):
+                    with urllib.request.urlopen("http://127.0.0.1:" + str(port) + path, timeout=5) as response:
+                        assert response.status == 200
+                        assert response.headers.get("Content-Security-Policy")
+                        payload = response.read()
+                        assert payload
+                    checks.append({"path": path, "passed": True})
         finally:
             process.terminate()
             try:

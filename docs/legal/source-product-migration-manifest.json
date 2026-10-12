@@ -4177,6 +4177,36 @@
       "changes": [
         "Exact generic client/API grant columns retained; no company data; Base generic management menus with no role grants; route table excluded."
       ]
+    },
+    {
+      "source": "ktg-admin/src/main/resources/static/openapi-docs/index.html",
+      "target": "mes-admin/src/main/resources/static/openapi-docs/index.html",
+      "sourceSha256": "04cb04569f1cb893cfde2f7ddf66e38fe0332c61c19858306518fbd065d455c4",
+      "targetSha256": "758d5021fb211500d932effd939dde7e495a30bddb1e8410065bfcb3e584b42e",
+      "strategy": "SOURCE_PRODUCT_PORT",
+      "changes": [
+        "2026-10-12: restore read-only developer documentation, replace company identity with MES Base, replace source company logo with an owned SVG; schema is generated from current registered external endpoints."
+      ]
+    },
+    {
+      "source": "ktg-admin/src/main/resources/static/openapi-docs/app.js",
+      "target": "mes-admin/src/main/resources/static/openapi-docs/app.js",
+      "sourceSha256": "5a57ff08ee7094ad3667b6f715295c6062c5c869b30db732b9baf894d886d425",
+      "targetSha256": "d1dcd9009956422986c6c8019dc954a87755458301d0f66b2a5582b72f3a4c90",
+      "strategy": "SOURCE_PRODUCT_PORT",
+      "changes": [
+        "2026-10-12: restore read-only developer documentation, replace company identity with MES Base, replace source company logo with an owned SVG; schema is generated from current registered external endpoints."
+      ]
+    },
+    {
+      "source": "ktg-admin/src/main/resources/static/openapi-docs/style.css",
+      "target": "mes-admin/src/main/resources/static/openapi-docs/style.css",
+      "sourceSha256": "11fad1e2888e8b7435e7fb30e7f40e83f94405c8019058758e6b92f41a16845e",
+      "targetSha256": "11fad1e2888e8b7435e7fb30e7f40e83f94405c8019058758e6b92f41a16845e",
+      "strategy": "SOURCE_PRODUCT_PORT",
+      "changes": [
+        "2026-10-12: restore read-only developer documentation, replace company identity with MES Base, replace source company logo with an owned SVG; schema is generated from current registered external endpoints."
+      ]
     }
   ],
   "licenseSha256": "260f185d34ec6ed36f686367335b7daae181c5cad80372fcd06304281882078d",

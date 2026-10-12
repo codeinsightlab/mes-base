@@ -227,3 +227,9 @@ YES为静态源码存在，PARTIAL为链路未完整关联或非DB接口；Web/P
 | 生产监控 | Source productionmonitor DTO/Service/Mapper/XML/页面 | DEFERRED_ARCHIVED；已从运行产品撤出，源码与原测试备份，未来重新审查 |
 | 人员分析 | Source personnelanalysis与记录钻取 | DEFERRED_ARCHIVED；已从运行产品撤出，源码与原测试备份，未来重新审查 |
 | ERP/WMS/外部MES实现 | 当前范围排除 | 未引入客户连接/外部调用/具体同步流程 |
+
+## 2026-10-12：业务阶段决策入口
+
+本轮不全量迁旧Java/Vue。按Business Capability重新筛选，简单能力迁Schema后续Codegen，复杂能力只审查，
+DROP须具体理由，GAP只记录。新的[业务迁移矩阵](../migration/MES_BUSINESS_MIGRATION_MATRIX.md)
+是本阶段入口；这里保留早期候选/迁移历史，不把历史PORT策略当作当前业务实施结论。

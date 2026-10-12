@@ -169,3 +169,10 @@
 | UserTask/微信/PDA/打印业务等 | 原业务单据/渠道/设备能力 | 候选/依赖边界保留；不自动扩展本轮 | 对应业务或设备授权后继续，不写成已迁/已验收 |
 
 当前三个菜单模块和V1–V10完整DDL可查看，新的空隔离MySQL导入426字段比对5/5。整体MIGRATING：尚缺人接手的凭证UI动作/下载artifact及外部实例设备验证。没有新增正式MES Domain，没有使用Codegen，没有Agent提交/推送/部署。
+
+## 2026-10-12：业务能力迁移第一轮
+
+新的业务阶段按能力筛选，不沿用历史全量PORT候选作为实施授权。当前分类、五个简单能力建表、
+复杂业务和GAP分别维护在[业务迁移矩阵](../migration/MES_BUSINESS_MIGRATION_MATRIX.md)、
+[Schema审查](../migration/SIMPLE_SCHEMA_REVIEW.md)、[复杂业务backlog](../migration/COMPLEX_BUSINESS_BACKLOG.md)
+和[GAP](../migration/MES_BUSINESS_GAP.md)。本文件前文保留为历史盘点；SCHEMA_READY不等于业务验收。

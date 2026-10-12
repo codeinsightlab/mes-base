@@ -333,3 +333,14 @@ V21 此前新增未跟踪，Git 全历史无该文件提交；此前执行记录
 - Node v22.23.1：`npm run test` 134 项通过；`npm run build` 通过，既有大 bundle 提示保留；恢复页面/API/回归测试定向 ESLint 通过。
 - 最终 `/usr/bin/python3 scripts/smoke-packaged.py`：10/10，自有隔离启动进程，不连接用户数据库或重启用户服务；检查最终标准 JAR 包含客户端 Controller、恢复后的认证实现，且不残留仅文档模块或单表 Extra。
 - 两仓 `git diff --check` 通过。仅完成代码恢复和本地隔离验证；部署须应用 V22、重新分配相关平台菜单权限并重启用户后端，再验收真实页面。
+
+
+## 2026-10-12 OpenAPI 页面与开发者文档补齐
+
+- 修正前端 `system/openApiClient` 授权弹窗复选行固定高度导致的内容重叠；操作列统一 flex 对齐、间距与按钮尺寸。真实浏览器核对三项操作均为 20px 高且顶部一致，授权选项无重叠；未保存授权、创建应用、重置凭证或切换应用状态。
+- 从 Source Product 迁入只读 `/openapi-docs/#start` 页面，替换公司名称及 logo，保留来源/许可记录；接入 Vite 与 Nginx 代理及页面入口。后端显式公开文档资源和专用契约，实际外部 API 认证/授权保持不变。专用 Springdoc delegate 在路径过滤阶段仅接受 `/open-api/`，不修改全局分组配置。
+- 用户首次重启后，真实浏览器已验证快速开始、认证、错误码、接口搜索与详情，契约包含 Token 和三项诊断接口。文档不执行 API、不保存凭证。页面证据在 `assets/2026-10-12-openapi/`。
+- 后续错误响应示例修正曾因原始 Schema 泛型导致编译失败，已改用显式 `Schema<?>`；清除 code/msg 的成功示例，并使用 OpenAPI 3.1 类型集合表达固定 null 的错误 data。加强的 HTTP 负例发现全局路径配置能纳入内部注解接口，已通过 delegate 路径过滤修正。最终真实嵌入式 HTTP 测试验证内部路径不进入外部文档、错误字段示例及静态资源/调用权限边界。
+- 最终 `mvn -B -ntp -Dmes.test.redis=true verify`：260 项，256 通过，4 项真实 MySQL 跳过，0 失败/错误；日志 `/tmp/mes-openapi-docs-verify-fixed.log`。IDEA 四文件格式检查通过。`scripts/smoke-packaged.py --openapi-docs`：14/14，自有隔离进程；日志 `/tmp/mes-openapi-docs-fixed-smoke.log`。
+- 本轮前端 test 134 项、build、页面及代理相关定向 ESLint 通过；两仓 diff 检查通过。现有 bundle 大小提示保留。
+- 最新后端泛型、错误字段及路径过滤修正尚未由用户重新加载到 8081；隔离 HTTP/打包检查不替代该运行服务验收。未操作真实数据库、重启用户服务、提交或推送。外部新增业务迁移与功能清单修改保留。回滚仅限本节文档页面、代理、专用文档后端及 UI 样式/测试，既有 OpenAPI 恢复不属于本节回滚范围。

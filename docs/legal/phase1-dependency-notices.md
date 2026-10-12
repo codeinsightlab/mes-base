@@ -25,3 +25,8 @@ OpenAPI Source 原有 Lombok 注解展开为等价 JavaBean/构造器，没有�
 采用已迁入的 Java21/Boot4/Security7/MyBatis/Vue3 版本，不从源公司工作区带入新配置、数据或 Secret，不增加依赖版本。
 撤销仅文档模块的 reactor/profile 与重复目录模型，恢复到原 common/system/framework/admin 归属；Source Product MIT 许可保留在文档并随 framework JAR 打包。
 2026-10-10 的退役说明为历史记录，由本节恢复决定取代；不改 V10/V16 的历史校验和。
+
+### 2026-10-12 开发者文档资源补迁
+
+迁入 Source 的只读 openapi-docs HTML/JS/CSS，来源与 SHA256 追加到 source-product-migration-manifest.json。
+公司名称已替换，原公司 logo 未迁入；SVG 为本项目新建资源。Boot4 文档入口/只读安全链沿用源思路，使用现有 Springdoc3 SDK，不引入外部 CDN 或额外依赖。

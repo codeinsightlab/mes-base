@@ -417,3 +417,18 @@ String restoredPassword = cipher.decrypt(encryptedPassword);
 V10/V16 历史迁移保持原样；新增 V22 恢复系统目录下 OpenAPI 页面及五个按钮权限，保留客户端/授权数据，不猜测 V16 已删除角色关联。
 部署后需管理员重新分配菜单权限；V22 不自动赋予任何角色或外部客户端权限。本轮仅写迁移文件，未执行真实迁移。
 验证与未验证边界见请求准入实施报告的 2026-10-12 OpenAPI 恢复记录。
+
+### 2026-10-12 补齐开发者文档与管理页异常修复
+
+恢复 Source Product `ktg-admin/src/main/resources/static/openapi-docs/{index.html,app.js,style.css}` 的只读开发者文档。
+入口 `/openapi-docs/#start`，启动说明、认证、错误码、接口搜索及契约详情均保留；公司名称替换为 MES Base，原公司 logo 不复制，使用本项目 SVG。
+文档唯一网络请求为匿名 GET `/v3/api-docs/open-api`，不申请 Token、不保存凭证、不提供在线执行。
+
+独立文档安全链仅允许六个确定 GET 资源（页面、JS/CSS/SVG、外部 JSON），其他方法和文档目录下其他路径拒绝。
+外部契约以 Springdoc SDK delegate 生成，只收录 Token Controller 或明确 OpenApiEndpoint；不注册额外 GroupedOpenApi 默认路由，不开放内部 Swagger/后台接口。
+HTTP 方法显式 PUBLIC；只读文档可见不表示应用获得接口调用权。SDK 契约、错误码和例子取当前实现，不静态硬编码业务 API。
+Vite 与部署 Nginx 模板补入文档/精确 schema 代理；应用管理工具栏新增“API 接入文档”链接。
+
+管理页接口授权多行 Checkbox 改为自动高度，保持弹窗 body 滚动及固定底部；列表时间列适当加宽。
+这是原恢复版本未完整适配当前 Element Plus 默认高度导致的显示异常，不修改权限保存与凭证业务。
+实际浏览器验证与测试记录见实施报告；后端新增 Controller 必须重新编译加载后才能访问文档入口。
