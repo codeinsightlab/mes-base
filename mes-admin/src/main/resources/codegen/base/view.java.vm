@@ -1,9 +1,0 @@
-/**
- * ${functionNameJavaDoc}接口响应白名单。
- */
-public record ${ClassName}Vo(
-#foreach($field in $viewFields)
-        ${field.type} ${field.name}#if($foreach.hasNext),#end
-#end
-) {
-}

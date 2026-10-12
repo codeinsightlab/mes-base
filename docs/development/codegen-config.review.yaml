@@ -69,7 +69,7 @@ output:
 
 templates:
   # 当前项目模板位置；未来换项目显式换模板包和其中的依赖引用。
-  root: "mes-admin/src/main/resources/codegen/base"
+  root: "mes-generator/src/main/resources/codegen/base"
   # MBG 持久化输出机制，仍是生成器自身的技术能力。
   persistence: "mybatis3-xmlmapper"
 
@@ -181,7 +181,7 @@ tableOverrides:
     serviceImplementationTemplate: "reviewed/MaterialCategoryServiceImpl.java.vm"
     controllerTemplate: "reviewed/MaterialCategoryController.java.vm"
     externalInputTemplate: "reviewed/ExternalMaterialCategory.java.vm"
-    module: material
+    module: basic
     displayName: 物料产品分类
     syncMatchKey: code
     serverScopeColumn: factory_id
@@ -191,7 +191,7 @@ tableOverrides:
     serviceImplementationTemplate: "reviewed/UnitMeasureServiceImpl.java.vm"
     controllerTemplate: "reviewed/UnitMeasureController.java.vm"
     externalInputTemplate: "reviewed/ExternalUnitMeasure.java.vm"
-    module: material
+    module: basic
     displayName: 计量单位
     syncMatchKey: code
     serverScopeColumn: factory_id
@@ -201,7 +201,7 @@ tableOverrides:
     serviceImplementationTemplate: "reviewed/WorkshopServiceImpl.java.vm"
     controllerTemplate: "reviewed/WorkshopController.java.vm"
     externalInputTemplate: "reviewed/ExternalWorkshop.java.vm"
-    module: material
+    module: basic
     displayName: 车间
     syncMatchKey: code
     serverScopeColumn: factory_id
@@ -211,7 +211,7 @@ tableOverrides:
     serviceImplementationTemplate: "reviewed/WorkstationServiceImpl.java.vm"
     controllerTemplate: "reviewed/WorkstationController.java.vm"
     externalInputTemplate: "reviewed/ExternalWorkstation.java.vm"
-    module: material
+    module: basic
     displayName: 工作站
     syncMatchKey: code
     serverScopeColumn: factory_id
@@ -223,7 +223,7 @@ tableOverrides:
     externalInputTemplate: "reviewed/ExternalMaterial.java.vm"
     # 保留既有非生成资源常量，内容一致时才允许发布，不能覆盖无标记文件。
     resourceTemplate: "reviewed/MaterialResource.java.vm"
-    module: material
+    module: basic
     displayName: 物料产品
     syncMatchKey: code
     serverScopeColumn: factory_id
@@ -233,7 +233,7 @@ tableOverrides:
     serviceImplementationTemplate: "reviewed/SafetyStockServiceImpl.java.vm"
     controllerTemplate: "reviewed/SafetyStockController.java.vm"
     externalInputTemplate: "reviewed/ExternalSafetyStock.java.vm"
-    module: material
+    module: basic
     displayName: 安全库存配置
     syncMatchKey: material_id
     serverScopeColumn: factory_id

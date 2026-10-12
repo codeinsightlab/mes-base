@@ -12,6 +12,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import org.apache.velocity.VelocityContext;
 import org.apache.velocity.app.VelocityEngine;
@@ -26,6 +27,7 @@ import static dev.mesbase.platform.codegen.CodegenResult.Target.PERMISSION;
  * MIT upstream attribution: docs/legal/ruoyi-MIT-LICENSE.txt. Base-specific contracts replace legacy Entity APIs.
  */
 public final class BusinessTemplateRenderer {
+    private static final Pattern PACKAGE_DECLARATION = Pattern.compile("(?m)^\\s*package\\s+([\\w.$]+)\\s*;");
     private final VelocityEngine engine;
     private final CodegenTemplateOptions options;
 
@@ -110,8 +112,13 @@ public final class BusinessTemplateRenderer {
         String rendered = merge(template, context);
         boolean completeSource = rendered.startsWith("package ") || rendered.startsWith("// MES-CODEGEN") && rendered.contains("\npackage ");
         context.put("body", completeSource ? "" : JavaSourceImports.explicit(rendered));
+        String source = completeSource ? rendered : merge("java.vm", context);
+        var declaration = PACKAGE_DECLARATION.matcher(source);
+        if (!declaration.find() || !context.get("packageName").equals(declaration.group(1)) || declaration.find()) {
+            throw new CodegenException(CodegenException.Code.TEMPLATE_FAILURE);
+        }
         out.add(new Artifact(BACKEND, "src/main/java/" + rootPackage.replace('.', '/')
-                + "/" + subpackage + "/" + name + ".java", completeSource ? rendered : merge("java.vm", context)));
+                + "/" + subpackage + "/" + name + ".java", source));
     }
 
     private boolean auditColumn(Column column) {
@@ -199,6 +206,7 @@ public final class BusinessTemplateRenderer {
         ctx.put("daoPackage", p + ".dao");
         ctx.put("servicePackage", p + ".service");
         ctx.put("controllerPackage", p + ".controller");
+        ctx.put("serviceImplementationPackage", p + ".service.impl");
         ctx.put("transactionManager", scoped ? "businessTransactionManager" : "masterTransactionManager");
         boolean hasLongText = t.columns().stream().anyMatch(c -> c.jdbcType() == Types.LONGVARCHAR);
         ctx.put("selectByExampleMethod", hasLongText ? "selectByExampleWithBLOBs" : "selectByExample");
@@ -211,6 +219,7 @@ public final class BusinessTemplateRenderer {
                     case "dao" -> ctx.put("daoPackage", p + "." + entry.getValue());
                     case "service" -> ctx.put("servicePackage", p + "." + entry.getValue());
                     case "controller" -> ctx.put("controllerPackage", p + "." + entry.getValue());
+                    case "service/impl" -> ctx.put("serviceImplementationPackage", p + "." + entry.getValue());
                     default -> {
                     }
                 }

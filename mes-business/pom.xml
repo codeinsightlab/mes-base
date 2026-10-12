@@ -16,11 +16,6 @@
         </dependency>
         <dependency>
             <groupId>dev.mesbase</groupId>
-            <artifactId>mes-generator</artifactId>
-            <version>${project.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>dev.mesbase</groupId>
             <artifactId>mes-framework</artifactId>
             <version>${project.version}</version>
         </dependency>

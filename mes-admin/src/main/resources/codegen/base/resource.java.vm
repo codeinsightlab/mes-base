@@ -1,7 +1,0 @@
-/** Shared permission resource and business cache namespace; excludes operation suffixes. */
-public final class ${ClassName}Resource {
-    public static final String PREFIX = "${permission}";
-
-    private ${ClassName}Resource() {
-    }
-}

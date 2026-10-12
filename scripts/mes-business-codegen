@@ -16,5 +16,5 @@ if [ "$#" -ne 1 ] || [ ! -f "$1" ]; then
 fi
 JAR=$1
 if [ -n "${JAVA_HOME:-}" ]; then JAVA_BIN="$JAVA_HOME/bin/java"; else JAVA_BIN=java; fi
-exec "$JAVA_BIN" -Dloader.main=dev.mesbase.modules.codegen.BusinessCodegenCli -cp "$JAR" \
+exec "$JAVA_BIN" -Dloader.main=dev.mesbase.platform.codegen.BusinessCodegenCli -cp "$JAR" \
     org.springframework.boot.loader.launch.PropertiesLauncher "$CONFIG" "$ROOT" "$REPORT"

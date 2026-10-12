@@ -1,4 +1,0 @@
-/** External query contract; map source data to schema-derived typed input. No persistence access here. */
-public interface ${ClassName}QueryPort {
-    java.util.List<External${ClassName}> query(dev.mesbase.core.factory.FactoryScope scope, int maximum);
-}

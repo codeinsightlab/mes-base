@@ -1,2 +1,0 @@
-public record ${ClassName}SyncResult(int fetched, int created, int updated, int skipped) {
-}

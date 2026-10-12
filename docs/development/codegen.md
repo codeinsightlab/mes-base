@@ -425,7 +425,7 @@ CrudPage 区分无读取权限与空结果：没有 read 时显示“当前范�
 
 ### 2026-10-11 mes-business 配置读取与批量调用入口
 
-入口代码为 mes-business 的 modules/codegen/BusinessCodegenConfiguration、BusinessCodegenRunner、BusinessCodegenCli；只作为开发工具，不注册 HTTP Controller、运行期 Service 或定时任务。mes-business 显式依赖 mes-generator，参数适配调用 ConfiguredCodegenService，不重写 MBG 或通过修改生成文件替代模板。
+（2026-10-12 后续迁移已替代此入口归属，见文末。）入口代码为 mes-business 的 modules/codegen/BusinessCodegenConfiguration、BusinessCodegenRunner、BusinessCodegenCli；只作为开发工具，不注册 HTTP Controller、运行期 Service 或定时任务。mes-business 显式依赖 mes-generator，参数适配调用 ConfiguredCodegenService，不重写 MBG 或通过修改生成文件替代模板。
 
 使用：先 `mvn -B -ntp verify` 构建，然后 `./scripts/mes-business-codegen docs/development/codegen-config.review.yaml target/business-codegen/preview.json`。配置路径、仓库根和报告路径传给独立 PropertiesLauncher 主类；不启动用户服务。脚本按构建实际 JAR 文件查找，不写死版本号；不自动构建，构建最新后执行。
 
@@ -521,3 +521,57 @@ serviceImplementationTemplate/controllerTemplate/externalInputTemplate/resourceT
 `.yaml`，只选择 backend/frontend/test。六业务 126 项产物（含 18 个废弃类删除）；随后全量测试、
 前端构建和 clean package 通过。clean 不能省略，否则删除的旧 Java 源码对应的 class 可能仍留在旧
 构建目录并进入 JAR。按用户要求，后续真实页面验收由用户自行完成。
+
+### 2026-10-12：修改 javaPackage 后的完整模板包名不一致（源码检查）
+
+用户将 output.javaPackage 改为 `dev.mesbase.business.{module}`。BusinessCodegenRunner:97 正确展开
+配置，并用于 CodegenRequest.packageName。BusinessTemplateRenderer.emitJava:107–114 依配置计算
+目标路径及 packageName，但对已有 package 声明的完整源码模板直接输出 rendered，未核对声明是否
+与目标路径一致。
+
+reviewed/MaterialCategoryController.java.vm:2 以及其余 reviewed Java 模板固定写入
+`dev.mesbase.modules.material` 的 package 和生成类型 import，因此输出到新的 business 路径仍声明
+旧 modules 包。当前新目录的 MaterialCategoryController 和 ServiceImpl 已静态确认同样问题。
+这是上轮引入完整业务覆盖模板时遗漏的配置兼容性；前述“固定包”描述不能视为合理豁免。
+
+正确的修复范围包括：完整模板的 package 使用 packageName，各生成类型 import 使用对应
+controller/domain/dao/service/response/sync 包变量，并在发布前校验 Java 声明包与输出路径一致。
+此外 BasicDataRules 是现有手写业务类，依赖旧 Entity/Mapper；只改生成类型 import 后，新包 Entity
+与其规则签名仍需单独核对，不能宣称包名更改等于整个业务模块已迁移。当前 Mapper 自动扫描仍使用
+项目固定包，新的 dev.mesbase.business 包是否装配不属于此次包声明检查的已验证结果。
+
+本节仅记录源码诊断；未修改生成器、模板、用户配置或新生成文件，未运行本轮编译或重新生成。
+
+### 2026-10-12：修复包参数化并集中生成器归属
+
+前节仅诊断的问题现已修复：所有 reviewed Java 模板的 package 使用 `${packageName}`；生成类型 import
+分别使用 domainPackage、daoPackage、servicePackage、responsePackage、controllerPackage、syncPackage。
+EndpointAccess、FactoryContext 等基础设施 import 保留真实固定包。BasicDataRules 按业务 service 包引用；
+如果完整业务迁入另一个根包，该手写规则及应用 Mapper/组件扫描仍需一起迁移，生成器不代替应用配置扫描。
+发布前校验 Java package 声明与输出路径一致，完整模板写错包时 TEMPLATE_FAILURE，整批不写文件。
+
+CLI、BusinessCodegenConfiguration、BusinessCodegenRunner 及其配置/集成测试迁入 mes-generator，
+统一 `dev.mesbase.platform.codegen` 包。模板资源（含 47 个 .vm）也从 mes-admin 迁入
+`mes-generator/src/main/resources/codegen`，classpath 模板名称不变。项目配置只更新 templates.root；
+用户设置的 output.javaPackage 等参数保留。scripts/mes-business-codegen 使用新的 loader.main。
+检查 scripts 下 .py 文件，没有旧业务 codegen 入口引用，故未修改无关 Python 文件。
+
+按用户授权从 HEAD 恢复生成测试误删的 233 个 mes-business 文件，再执行上述迁移；不回滚其他修改。
+不完整的未跟踪测试生成输出（6 个 XML 与 6 个测试）保存在
+`/private/tmp/mes-codegen-test-output-yjutc1w3`，移出编译路径，内容未删除。
+新增生成回归覆盖六个 reviewed 业务模板、同步开关、新根包及不同子包配置，并保留固定基础设施 import。
+生成验证使用独立 target 目录，不在本次任务中把旧业务整体迁入新包，也不修改业务数据库或菜单。
+
+验证结果：`mvn -B -ntp clean verify` 全 reactor 通过；迁移后的 CLI 按当前项目配置复制到隔离输出
+目录生成六张表，报告 GENERATED / 0 rejected，所有 Java package 与路径一致，MaterialCategoryController
+的业务 import 实际为 dev.mesbase.business.material.*，固定 EndpointAccess import 不变。
+产物位于 `target/package-import-generation`，报告 `target/package-import-generation-report.json`。
+`/usr/bin/python3 scripts/smoke-packaged.py` 为 10 passed / 0 failed。打包核对 CLI 与 47 个 .vm 模板仅归属
+mes-generator，不再位于 mes-business 或 mes-admin 的资源目录。mes-business 不再依赖 mes-generator。
+本次通过的是当前恢复后的项目及生成工具编译/测试；隔离生成的新根包业务尚未做完整运行期迁移，
+不宣称其 BasicDataRules、Mapper 扫描及组件装配已迁入新根包。未执行视觉验收、数据库写入或部署。
+
+后续工作区出现再次正式生成的 dev.mesbase.business 业务源码：一次整仓 compile 实际因新包缺少
+BasicDataRules 失败。这不同于前述恢复后 clean verify 的通过结果，不能用旧结果声称新业务产物通过。
+用户随后明确本轮只保证生成器，正式代码生成由用户操作；不继续迁移业务规则/Mapper 扫描，不修改
+新生成业务文件。最终验证限定 mes-generator 及其上游依赖；本次修复不会自动迁移使用方的业务包。

@@ -1,4 +1,0 @@
-// MES-CODEGEN: scaffold; review required.
-package ${packageName};
-
-$body
