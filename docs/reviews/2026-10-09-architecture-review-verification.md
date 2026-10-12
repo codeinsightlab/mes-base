@@ -446,3 +446,35 @@ F1/F2 采用第 8 节独立复审结论；F3、N2 及真实联调/生产证据�
 本任务仅追加本节，保留第 9 节整改回执及此前 FAIL 时间线；未修改业务代码、生成器、配置或 AGENTS，未提交或推送。
 
 **结束检查（2026-10-12T07:40:43+08:00）：** 两仓 HEAD/分支、dirty 状态与 R2 一致；除本报告由本任务追加外，逐文件 hash 无变化，没有外部并发修改导致证据失效。原报告 69,194 字节完整保留；两仓 staged/unstaged `git diff --check` 均 exit 0。详情见 `final-workspace-check.json`。
+
+
+## 11. 2026-10-12 N1 关闭与普通业务开发限定放行
+
+**CONDITIONAL PASS：可以开始简单 CRUD 和单业务库内 Service 编排开发。** 当前公共配置已实际补齐 N1，本轮独立验证通过；结束本轮基础准入审查，不要求继续扩建基础设施。此结论是业务开发准入，不是实际环境部署或生产上线认证。第 8、10 节 FAIL 及第 9 节整改记录原文保留。
+
+### 11.1 固定版本与独立验证
+
+快照 **R3：2026-10-12 07:42:44 +08:00**。后端 main / `3293c6e9782ce198303f3f0de3ca83fa4cc1e2e6`、前端 main / `6702f527be7c0e58acf424255eacbe0b196a5799`，开始时两仓均 clean。相对 R2，只有公共 application.yml 和历史报告变化；Java、测试、生成器、AGENTS 与前端文件内容未变，既有独立证据在相同源码范围内仍适用。
+
+`mes-admin/src/main/resources/application.yml:65–67` 现已显式提供 `mes.datasource.metadata-ttl-seconds: 300`，两个环境示例也保留同值。公共文件 SHA-256 为 `77746cc6c322952a74e6dd4af37343537ba79e706884da7c1fd6efb6e6239cff`。
+
+所有构建在自有 `/private/tmp/mes-base-n1-close-20261012/mes-base` 运行，641 个文件复制前后 hash 一致，没有复制旧 target 或私有环境配置；前端建立 223 文件清单。未改原仓实现、配置、生成器或 AGENTS，未访问真实数据库、执行迁移/repair、重启用户服务、提交或推送。
+
+| 实际验证 | 结果 |
+| --- | --- |
+| 新副本 `mvn -B -ntp verify -Dmes.test.redis=true` | **BUILD SUCCESS，250 项：246 pass、0 failure/error、4 MySQL skip。** 未提供临时 TTL 覆盖参数；独立 Redis 测试执行，详情 `verify.log`、`test-counts.json`。 |
+| InfrastructureContextTest 原失败入口 | **通过**。从公共 application.yml 加载 TTL，开启 runtime 并装配生产配置；H2/Mock 依赖的证据等级不变，不能当作真实 MySQL 部署验收。 |
+| 新 JAR 公共配置与源码比较 | `BOOT-INF/classes/application.yml` 与 R3 源文件逐字节一致，包含 TTL=300；`packaged-config-check.json`，排除第 10 节已有 JAR 与源码不一致的问题。 |
+| `/usr/bin/python3 scripts/smoke-packaged.py` | **10/10，通过**；使用本轮新 JAR、自有随机端口进程，`smoke.log`。smoke 默认 runtime=false；runtime 参数装配由上一项测试证明，不能互相替代。 |
+| 前端 test/build | 本次未重跑；文件 hash 与第 8 节独立验证版本完全一致，沿用其 127 项通过及 build 成功，不宣称本轮新执行。 |
+
+### 11.2 开发范围与后续安排
+
+- **简单 CRUD：放行。** 先确定真实需求和最小模型，保存可审查建表 SQL；获得可读取 metadata 后，按现有 Skill 生成基础后端，再审查接口、权限、SQL 和页面契约。写 SQL 文件不等于授权执行真实建表。
+- **单业务库内 Service 编排：放行。** 状态、校验和业务能力由对应业务 Service 承载；编排复用生成持久化，不绕过规则，不把跨中心/业务库操作宣称本地原子事务。
+- **真实环境联调：尚未验收。** 准备授权的开发 MySQL/Redis 与工厂绑定；旧环境先核对 V19/V20 已应用校验和，再验证真实启动、选厂、权限负例、CRUD 和事务回滚。不能直接执行 repair。
+- **生产上线：另行验收。** 仍需真实多厂数据库/池恢复、浏览器登录切厂、部署参数和连接容量、账号撤销故障恢复等实际环境证据。
+
+F1 已关闭、F2 被新方案取代、**N1 本轮关闭**。F3 响应体超时为 P2 后续整改；N2 是旧环境升级阶段门禁。二者均不要求先于普通业务编码全部完成。下一步应围绕首个真实业务模块完成一个可验证流程，不重新开启全仓基础建设。
+
+**结束检查（2026-10-12T07:44:22+08:00）：** 两仓 HEAD/分支与 R3 一致，除本报告追加外，逐文件 hash 无变化；无外部并发改动导致证据失效。前端 clean，后端仅本报告 dirty；原报告 74,745 字节完整保留。两仓 staged/unstaged `git diff --check` 均通过；详细清单见 `final-workspace-check.json`。本次仅更新审查报告。

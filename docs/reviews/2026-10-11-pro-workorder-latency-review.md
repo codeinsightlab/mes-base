@@ -347,6 +347,53 @@ ID/版本查 registry.peek，命中直接返回池。Base 已加载池也复用�
 结论：用户建议有源码依据；动态路由必需，但每请求重复中心读取不是动态路由的必然
 成本。仅审查并追加结论，未修改运行实现，未验证真实性能或缓存失效并发行为。
 
+## 2026-10-12 远程数据库与 JDBC 公共开销取样
+
+用户反馈所有接口仍偏慢。本轮只读使用已有 dev MySQL 凭据文件，未输出凭据、用户数据、
+连接地址或 Token；未修改服务、数据库配置、Schema、业务数据或重启用户服务。
+浏览器状态读取超时，未取得已认证业务 HTTP 分段证据，不将下述探针冒充完整接口测量。
+
+### 实际观测
+
+- 用户 backend 8081 正在运行；本地 /health 连续 6 次为 34.8、3.1、1.5、2.0、1.5、1.6ms。
+  后五次暖请求证明本地 HTTP 基础开销小，不证明带身份/权限接口同样快。
+- dev 数据库为远程连接。mysql 客户端同一连接 SELECT 1：首个含连接建立 214.3ms；
+  后续 10 次 17.3–31.1ms，中位 18.6ms。这是客户端往返，不能拆成纯网络 RTT/服务端执行时间。
+- dev pro_workorder 仍有 100028 行。独立 COUNT(*) 三次客户端耗时
+  143.5、177.9、166.4ms。只解释工单分页的一部分，不能解释所有接口。
+
+### JDBC 对照探针（不是运行服务配置变更）
+
+通过运行 JVM classpath 核对使用 mysql-connector-j 9.7.0、Druid 1.2.28。
+临时 /tmp/MesJdbcLatencyProbe.java 使用同版本驱动、同 dev 连接、独立暖池，
+只 SELECT 1 及切换本连接 readOnly/autoCommit/commit 状态，无业务写入。
+对照 useLocalSessionState=false/true，各操作 5 次平均，日志
+/tmp/mes-jdbc-latency-probe.log：
+
+| 操作 | false 平均 ms | true 平均 ms |
+| --- | --- | --- |
+| 直接 JDBC isReadOnly | 48.6 | 约 0 |
+| Druid 借连接、SELECT 1、归还 | 29.2 | 18.3 |
+| Druid 只读事务、SELECT 1、提交与状态恢复 | 294.7 | 116.9 |
+
+直接 JDBC SELECT 1 对照自身也波动（49.8/67.0ms），直接 JDBC 事务为
+266.7/276.6ms，所以不能把上述池差异当作严格可归因的线上加速比例。
+但通过本地实际 Connector/J ConnectionImpl 字节码确认：isReadOnly 默认会在
+useLocalSessionState=false 且 readOnlyPropagatesToServer=true 时查询
+@@session.transaction_read_only；true 分支复用连接本地状态。
+多条业务 SELECT 的预算没有统计这种驱动状态读取以及 SET/COMMIT 的额外通信。
+工单 Service 是 Spring 只读事务，OwnedTransactionManager 仍调用标准 begin/commit/cleanup；
+元数据独立窗口还会 setReadOnly(true)。这些是需要进一步实测的公共开销候选，
+不由 H2 查询预算或本文探针证明其在每个真实接口中的精确数量。
+
+### 下一步与边界
+
+优先取得真实已认证 HTTP 的身份恢复、账号查询、权限查询、池借用、事务准备、SQL、
+提交及归还分段计时，确认运行 JVM 使用的配置与当前源码一致。再对 JDBC 状态复用
+做受控对照，审查 SQL 是否绕过 JDBC 修改会话状态，不关闭服务器只读防护、事务、权限
+或跨厂检查来换速度。工单 COUNT 另审查索引/执行计划。未改运行配置、未执行 Maven，
+本轮仅追加观测，未确认所有接口慢的唯一根因，也未承诺几十毫秒可达。
+
 ## 2026-10-11 实施更新：授权去全菜单与缓存绑定快照
 
 > 历史记录：下述路由代际、V21 运行依赖、持久失效交付、防回填及请求 reservation 保证已由同日后续“路由缓存简化”用户决定取代；不再作为现行约束。账号安全与授权规则仍有效。
