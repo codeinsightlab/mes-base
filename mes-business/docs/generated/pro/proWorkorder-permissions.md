@@ -5,7 +5,8 @@ Scope: FACTORY_SCOPED; Mapper owner: BUSINESS
 
 Path: `/api/pro/pro-workorder`
 
-- `business:pro:workorder:read`
+- `business:pro:workorder:list`
+- `business:pro:workorder:query`
 - `business:pro:workorder:create`
 - `business:pro:workorder:update`
 - `business:pro:workorder:delete`

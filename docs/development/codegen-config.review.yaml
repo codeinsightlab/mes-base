@@ -21,7 +21,7 @@ source:
 selection:
   # [] 表示全部表；[pro_workorder] 表示只生成这张表。
   # [pro_workorder, person] 表示只生成列出的表。
-  tables: [material_category, unit_measure, workstation, workshop, material, safety_stock]
+  tables: []
   # 全量生成时明确跳过的表；默认草案为空，不猜测哪些属于业务表。
   # 排除 Flyway 迁移历史技术表，防止生成其 CRUD/同步接口。
   excludeTables: [flyway_business_schema_history]

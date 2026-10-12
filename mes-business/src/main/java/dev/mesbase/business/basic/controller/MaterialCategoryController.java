@@ -31,7 +31,7 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * 物料产品分类 HTTP 接口，响应转换显式发生在 Web 边界。123123213
+ * 物料产品分类 HTTP 接口，响应转换显式发生在 Web 边界。
  */
 @RestController
 @RequestMapping("/api/basic/material-category")

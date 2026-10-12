@@ -5,7 +5,8 @@ Scope: FACTORY_SCOPED; Mapper owner: BUSINESS
 
 Path: `/api/dv/dv-subject`
 
-- `business:dv:subject:read`
+- `business:dv:subject:list`
+- `business:dv:subject:query`
 - `business:dv:subject:create`
 - `business:dv:subject:update`
 - `business:dv:subject:delete`

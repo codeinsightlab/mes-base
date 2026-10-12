@@ -5,7 +5,8 @@ Scope: FACTORY_SCOPED; Mapper owner: BUSINESS
 
 Path: `/api/qc/qc-index`
 
-- `business:qc:index:read`
+- `business:qc:index:list`
+- `business:qc:index:query`
 - `business:qc:index:create`
 - `business:qc:index:update`
 - `business:qc:index:delete`

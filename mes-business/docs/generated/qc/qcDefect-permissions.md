@@ -5,7 +5,8 @@ Scope: FACTORY_SCOPED; Mapper owner: BUSINESS
 
 Path: `/api/qc/qc-defect`
 
-- `business:qc:defect:read`
+- `business:qc:defect:list`
+- `business:qc:defect:query`
 - `business:qc:defect:create`
 - `business:qc:defect:update`
 - `business:qc:defect:delete`
