@@ -54,7 +54,7 @@ output:
   backendModule: "mes-business"
   frontendRoot: "../mes-base-ui"
   # {module} 等占位符是配置插值，不是生成器内置 MES 包规则。
-  javaPackage: "dev.mesbase.modules.{module}"
+  javaPackage: "dev.mesbase.business.{module}"
   packages:
     domain: "domain"
     mapper: "dao"
