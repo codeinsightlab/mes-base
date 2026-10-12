@@ -170,7 +170,7 @@ class FoundationHttpTest {
         var response = get("/api/foundation/context", "visitor", null);
         assertEquals(200, response.statusCode());
         assertTrue(response.body().contains("null"));
-        error(get("/api/foundation/access", "visitor", null), 400, "FACTORY_SCOPE_REQUIRED");
+        error(get("/api/foundation/access", "visitor", null), 422, "FACTORY_SELECTION_REQUIRED");
     }
 
     @Test
@@ -192,8 +192,8 @@ class FoundationHttpTest {
     @Test
     void invalidScopeUnknownScopeAndDisabledScopeUseRealErrors() throws Exception {
         error(get("/api/foundation/context", "visitor", "bad factory"), 400, "BAD_REQUEST");
-        error(get("/api/foundation/context", "visitor", "unknown"), 404, "FACTORY_NOT_FOUND");
-        error(get("/api/foundation/context", "visitor", "C"), 422, "FACTORY_DISABLED");
+        error(get("/api/foundation/context", "visitor", "unknown"), 422, "FACTORY_SELECTION_REQUIRED");
+        error(get("/api/foundation/context", "visitor", "C"), 422, "FACTORY_SELECTION_REQUIRED");
     }
 
     @Test

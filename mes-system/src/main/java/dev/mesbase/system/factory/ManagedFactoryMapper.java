@@ -20,7 +20,7 @@ public interface ManagedFactoryMapper {
     @Select("SELECT " + COLUMNS + " FROM mf_factory ORDER BY factory_id LIMIT #{limit} OFFSET #{offset}")
     List<ManagedFactory> list(@Param("offset") int offset, @Param("limit") int limit);
 
-    @Select("SELECT " + COLUMNS + " FROM mf_factory WHERE status='ENABLED' ORDER BY factory_id LIMIT #{limit} OFFSET #{offset}")
+    @Select("SELECT " + COLUMNS + " FROM mf_factory WHERE status='ENABLED' AND EXISTS (SELECT 1 FROM mf_datasource d WHERE d.datasource_id=mf_factory.datasource_id AND d.status='ENABLED') ORDER BY factory_id LIMIT #{limit} OFFSET #{offset}")
     List<ManagedFactory> enabled(@Param("offset") int offset, @Param("limit") int limit);
 
     @Select("SELECT " + COLUMNS + " FROM mf_factory WHERE factory_id=#{id}")

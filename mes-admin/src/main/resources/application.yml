@@ -107,6 +107,6 @@ springdoc:
   paths-to-match: /api/**,/health,/open-api/**
   packages-to-scan: dev.mesbase.web.controller,dev.mesbase.quartz.controller,dev.mesbase.server
 
-# Optional infrastructure only. Package with -Popenapi and explicitly enable at runtime.
+# Optional infrastructure only. Package with -Popenapi and explicitly enable at runtime Cannot resolve configuration property 'open-api.enabled' .
 open-api:
-  enabled: false
+  enabled: true

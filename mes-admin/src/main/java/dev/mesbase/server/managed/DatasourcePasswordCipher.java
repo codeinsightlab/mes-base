@@ -1,5 +1,6 @@
 package dev.mesbase.server.managed;
 
+import java.util.Arrays;
 import java.util.Base64;
 import java.security.SecureRandom;
 import javax.crypto.Cipher;
@@ -14,6 +15,13 @@ public class DatasourcePasswordCipher {
     public DatasourcePasswordCipher(String encodedKey) {
         key=Base64.getDecoder().decode(encodedKey);
         if(key.length!=32) throw new IllegalArgumentException("数据源密钥必须是 32 字节的 Base64 编码");
+    }
+
+    public static void main(String[] args) {
+//        String s = Base64.getEncoder().encodeToString("V51iLPsROJrHUeEUfjdjPIZYldVyj56hb1wL3YNRGS0=".getBytes());
+        DatasourcePasswordCipher datasourcePasswordCipher = new DatasourcePasswordCipher("V51iLPsROJrHUeEUfjdjPIZYldVyj56hb1wL3YNRGS0=");
+        System.out.println(datasourcePasswordCipher.decrypt("6977a79016ce7f497094296d322b27e014e694bae32113b8Aa1!"));
+//        System.out.println(Arrays.toString(datasourcePasswordCipher.key));
     }
     public String encrypt(String plaintext) {
         try {

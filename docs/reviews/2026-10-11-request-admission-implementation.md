@@ -273,3 +273,29 @@ V21 此前新增未跟踪，Git 全历史无该文件提交；此前执行记录
 - 工单 H2/synthetic Redis 预算 2 中心 + 2 业务；20 个计时样本 p50 4.644ms、p95 16.662ms。仅 Fixture 回归，不与早期 HTTP 16+2/一秒实测计算提升幅度。
 - 两仓 `git diff --check` 通过。真实 MySQL/执行计划、多实例服务部署、Redis Cluster/故障转移/备份恢复、真实同环境 HTTP 性能与浏览器/UI 未验证。
 - 额外检查最终 JAR 及嵌套模块：AdmissionAccount、RuntimeRegistry.Reservation、旧 ManagedFactoryExtraMapper/XML 均不存在，基础 YAML 包含显式 300 秒 TTL。执行期间出现的其他工作区改动（包括 FoundationInitializationTest）未覆盖，测试计数以最终命令日志为准。
+
+## 2026-10-12 失效选厂恢复与候选列表整改
+
+用户确认：以专用异常码进入选厂页面，避免恢复流程扩大；首页和选厂页复用候选请求，候选必须是启用且绑定启用数据源的工厂。
+
+此前只读核查中心数据：当前 admin 的偏好为工厂 2，该工厂启用但 datasource_id 为空，JOIN 投影的 datasource 为空与数据库状态一致。
+这项事实能解释当前 binding 的 null，不能据此认定 Redis 淘汰失败；本轮未完成对应 Redis 条目的读比对，未手工清缓存或修改用户偏好。
+另一个账号在离开页面后工厂被停用是用户报告的触发场景，不将两者混作同一条已复现数据库记录。
+
+### 修改范围与行为
+
+- 新增 `ErrorCode.FACTORY_SELECTION_REQUIRED`，HTTP 为 422。ErrorWriter/Advice 仅将业务 URL 范围的工厂缺失、删除、停用、未配置运行时转成该码；内部原因和异常链不变。
+- request 只识别此专用码；读取错误响应体后先校验当前身份/工厂/revision，旧错误不能打断新上下文。普通业务 422、403、503 不触发选厂。
+- Auth 保留 Token/有效期及平台授权，清空失效工厂 ID、业务菜单/权限并递增上下文版本。登录/恢复期间出现此码不注销，Router/App 进入 `/select-factory`。
+- 选厂页和原首页恢复流程复用 `loadFactoryOptions()` 及 `/api/foundation/factories`。选定可用工厂后回工作台，不重放失败请求；零候选可暂不选厂进入平台/个人工作台。
+- ManagedFactoryMapper.enabled 在分页前过滤 ENABLED 工厂与已绑定 ENABLED 数据源。后台管理 all/list 不变；未绑定、悬空引用、数据源停用及工厂停用不出现在候选中。
+- 两仓 AGENTS 与请求准入文档同步恢复契约。不修改 Schema、迁移、缓存 TTL/淘汰策略、租约或授权边界，不修改生成器。
+
+### 验证与边界
+
+- 第一次 `mvn -B -ntp test` 失败于 BusinessDirectoryTest 的旧缺厂 HTTP 400 断言；替换为专用 422 契约并保留权限/初始化负例，未放宽行为校验。
+- 最终 `mvn -B -ntp -Dmes.test.redis=true verify`：253 项，249 通过、4 个真实 MySQL opt-in 跳过，0 失败/错误。日志 `/tmp/mes-factory-recovery-verify.log`。
+- 新增/扩展 HTTP 契约、禁用/删除后重新选择、候选 SQL 在分页前过滤（H2）、普通错误不映射、内部原因保留；既有分库/事务/授权/隔离 Redis 验证通过。
+- Node v22.23.1：`npm run test` 132 通过，`npm run build` 通过（既有 bundle 大小提示）；8 个变更前端文件定向 ESLint 通过。新增请求专用码/普通 422 区分、旧错误不干扰新上下文、登录和刷新保留身份、重新选厂及零候选回归。
+- IDEA 9 个变更 Java 定向格式化与 `--check` 通过；`scripts/smoke-packaged.py` 自有隔离进程 10/10；两仓 `git diff --check` 通过。
+- 尚未验证用户服务编译重启后的真实浏览器闭环与真实 MySQL 新 SQL；未重启用户服务、修改真实数据库、手工淘汰缓存、提交或推送。用户已有配置、密码工具和性能报告改动保留。回滚范围为本节列出的代码/测试/规则变更，无数据库迁移。

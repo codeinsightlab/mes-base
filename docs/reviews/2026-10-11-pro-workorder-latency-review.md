@@ -394,6 +394,96 @@ useLocalSessionState=false 且 readOnlyPropagatesToServer=true 时查询
 或跨厂检查来换速度。工单 COUNT 另审查索引/执行计划。未改运行配置、未执行 Maven，
 本轮仅追加观测，未确认所有接口慢的唯一根因，也未承诺几十毫秒可达。
 
+### 同日进一步收敛：中心库实际 Mapper 与执行计划
+
+用户明确工单与其他接口延迟一致，下一步聚焦中心公共链路，不用 10 万行工单解释全局。
+/tmp/MesCenterQueryProbe.java 使用运行 JVM classpath 的实际 PlatformPersistence、
+SessionAccountMapper/SysUserMapper/SysRoleMapper/SysMenuMapper 和 XML，独立 Druid 单连接
+暖池、生产 MyBatis 配置；读取 dev 中有效样本账号及平台权限，不发行会话、不打印
+身份/权限数据，未修改用户服务。测试不是完整身份过滤器/HTTP 请求。
+
+重要修正：dev 公共中心 JDBC URL 显式 useSSL=false，初版探针未沿用此参数；
+后续 /tmp/mes-center-query-probe-actual-url.log 已按实际 dev YAML URL 重测。
+确认 probe 与 dev YAML 的中心主机/数据库一致，不代表运行 JVM 配置已完整核实。
+服务 PID 从 9505 变为 17295，非本轮操作，不混用为同一进程 HTTP 测量。
+
+在实际 dev URL、useLocalSessionState=false 的独立生产 Mapper 链中：
+- 账号 Mapper 10 次 p50 22.1ms，权限 Mapper p50 44.8ms。
+- 账号＋权限 10 次配对 p50 55.5ms，范围 44.2–114.3ms。
+- MySQL 同连接 Questions 差值扣除统计自身后恰好 20 条语句/10 对调用。
+  未发现普通中心 SELECT 每次隐含 isReadOnly 状态查询；上一节驱动只读事务探针不能
+  推广为所有账号/权限查询的共同根因。ClientPreparedStatement 对只读安全查询会跳过
+  部分 isReadOnly 检查，源码字节码亦支持该差异。
+- EXPLAIN ANALYZE 样本：账号 root actual end 0.0238ms（客户端24.6ms），
+  权限 root actual end 0.656ms（客户端27.2ms）。服务端 SQL 执行并不重；
+  客户端时间包含往返/驱动/收取等，不能直接将全部差值命名为纯网络延迟。
+
+useLocalSessionState=true 对照：账号/权限单项 p50 19.7/21.9ms，但后面的配对
+p50 升至 215.5ms、最大831.0ms，语句数仍20；独立 metadata readOnly 操作也有明显
+波动。因此现有串行小样本不能证明该选项对真实中心请求有收益，不建议据上一节
+294.7→116.9 的结果直接修改项目 JDBC 参数。需要排查波动并取得真实请求阶段计时。
+
+浏览器读取恢复可用，但实际5173页处于登录状态，已请求用户登录以继续角色/菜单
+中心接口测量。尚未解释真实约300ms中剩余阶段，也没有以探针结果宣布问题解决。
+仅文档追加，未修改运行代码/配置，未重启服务或执行 Maven。
+
+同 PID 阶段另取公共入口：8081 /api/login-options 连续 6 次 HTTP 200，
+58.0、52.8、35.1、24.8、24.1、31.5ms；/health 为 2.1–5.4ms。
+经 5173 代理的 login-options 三次也是200，35.0–48.0ms，直连同期39.4–43.8ms。
+所以本地代理和所有公共接口不呈现固定300ms，但不能推广到已认证中心管理接口。
+实际角色/菜单等 HTTP 请求仍需已登录浏览器后继续定位，当前不宣称300ms问题已解决。
+
+### 同日已登录角色列表：运行 JVM 等待取样
+
+用户完成内置浏览器登录后，真实打开5173/system/role，角色列表显示29条。
+通过页面刷新按钮触发读取，采集用户8081进程17295的20秒JFR profile（自动结束），
+SocketRead阈值1ms，无请求体/凭证记录；原始文件 /tmp/mes-center-live.jfr，
+筛选事件 /tmp/mes-center-live-events.json。仅短时诊断记录，未改业务代码、配置，未重启。
+浏览器只读evaluate不能访问performance API，故本轮没有浏览器waterfall/精确HTTP总耗时。
+
+六个角色查询线程各观察到4次MySQL读取（账号、权限、PageHelper count、列表），
+累计SocketRead等待366.2、378.5、413.7、442.9、537.5、770.9ms；另一个线程含5次读取，
+不能统一视作严格一请求四SQL样本。页面其他自动请求及用户活动亦可能在记录窗口内。
+代表线程exec-10依次126.7、81.0、94.2、111.8ms，合计413.7ms。
+实际SocketRead端点与此前dev探针数据库地址一致。没有把SocketRead直接命名为纯网络RTT，
+它包含等待服务端结果/传输及可能的调度暂停；不能仅凭该事件区分网络与数据库负载。
+
+记录窗口仅一次GC暂停21.8ms，JVM user/system CPU总体低；HTTP线程仅观察到一次22.4ms
+ThreadPark，没有发现连接池/Java锁等待足以解释上述几百毫秒的证据。Redis主要在Netty线程，
+不能由HTTP线程未出现Redis SocketRead推导Redis零成本。前面EXPLAIN ANALYZE是独立样本，
+未与每一条live SQL逐条关联，不宣称全部live SQL服务端执行都已测量。
+
+只读核对进程启动类型：JDWP=true、IDEA runtime agent=true、debugger instrumentation
+agent=true。独立Mapper探针没有相同调试代理，因此它和live JVM并非完全受控对照。
+调试代理是待排除因素，不能据此断言Debug就是根因；JFR也引入少量观测开销。
+建议同配置Run/Debug对照及关联服务端statement计时，不先修改授权或JDBC选项。
+用户选择“暂时保留Debug，先看当前结论”，本轮不切换/重启用户服务。
+
+当前结论：中心真实请求的明显时间消耗发生在数据库结果读取等待，已定位到阶段，
+尚未证明唯一成因；不能用工单行数解释，也不支持继续增加路由/权限缓存以试错。
+
+### 同日 ktg-mes 中心角色链路及导出对照
+
+静态对比当前 ktg-mes：超级管理员平台角色页会在 FactoryRequestInterceptor 跳过
+工厂授权装载，PermissionService.hasPermi 也直接许可，TokenService 从Redis取身份，
+没有Base同等的逐请求账号版本fence。标准非空分页通常只需count/list两条中心SQL；
+Base为账号/角色、权限、count/list四条。两套列表SQL均为sys_role关联user_role/user/dept、
+distinct与排序，PageHelper分页；未发现Base列表SQL结构足以解释五倍差距的证据。
+两套配置有池数量/驱动版本差异，不能用配置大小证明暖请求原因。
+
+旧项目已读取profile的master JDBC地址均与Base dev地址不同，属于配置事实，不证明
+用户实际比较部署采用这些profile。用户补充ktg非管理员同样快，因此管理员捷径不能
+作为主要原因，需要同网络/实例/连接配置的实际对照，当前不判定MySQL引擎故障。
+
+按用户授权导出当前Base开发中心库（完整结构＋数据，不含业务工单库）：
+.local/backups/20261012-center-performance/mes-base-center.sql，651263字节，33张InnoDB表；
+源清单与DDL表清单一致，无视图/trigger/routine/event。使用single-transaction、
+skip-add-drop-table、no-tablespaces等只读导出；无CREATE DATABASE/USE/DROP TABLE，权限600。
+SHA-256：33cf61699de5203b8649633491d05cb8d52162ab000e7b32923137f1165bd102。
+manifest.json与README记录对照方式；未导入目标、未修改配置、未重启用户服务。
+为避免同名sys_*冲突，建议导入ktg所在MySQL的新空测试库，继续用Base代码对比，
+不要将Base schema覆盖现有ktg数据库或用ktg代码查询Base结构。
+
 ## 2026-10-11 实施更新：授权去全菜单与缓存绑定快照
 
 > 历史记录：下述路由代际、V21 运行依赖、持久失效交付、防回填及请求 reservation 保证已由同日后续“路由缓存简化”用户决定取代；不再作为现行约束。账号安全与授权规则仍有效。

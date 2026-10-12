@@ -35,6 +35,29 @@ import static org.mockito.Mockito.mock;
  */
 class ManagedAdmissionTest {
     @Test
+    void selectionOptionsRequireEnabledFactoryAndEnabledBoundDatasourceBeforePagination() {
+        var source = new DriverManagerDataSource("jdbc:h2:mem:" + UUID.randomUUID()
+                + ";MODE=MySQL;DB_CLOSE_DELAY=-1", "sa", "");
+        var jdbc = new JdbcTemplate(source);
+        jdbc.execute("CREATE TABLE mf_factory(factory_id VARCHAR(64),enterprise_id VARCHAR(64),factory_code VARCHAR(32),"
+                + "factory_name VARCHAR(64),datasource_id BIGINT,status VARCHAR(16),revision BIGINT)");
+        jdbc.execute("CREATE TABLE mf_datasource(datasource_id BIGINT,status VARCHAR(16))");
+        jdbc.execute("INSERT INTO mf_datasource VALUES(1,'ENABLED'),(2,'DISABLED')");
+        jdbc.execute("INSERT INTO mf_factory VALUES"
+                + "('A',NULL,NULL,'Unbound',NULL,'ENABLED',1),"
+                + "('B',NULL,NULL,'Disabled source',2,'ENABLED',1),"
+                + "('C',NULL,NULL,'Missing source',3,'ENABLED',1),"
+                + "('D',NULL,NULL,'Disabled factory',1,'DISABLED',1),"
+                + "('E',NULL,NULL,'Eligible',1,'ENABLED',1)");
+        var platform = new PlatformPersistence(source, Set.of(ManagedFactoryMapper.class));
+        assertEquals(List.of("E"), platform.readOnly(session -> session.mapper(ManagedFactoryMapper.class)
+                .enabled(0, 1)).stream().map(row -> row.factoryId()).toList());
+        assertEquals(5, platform.readOnly(session -> session.mapper(ManagedFactoryMapper.class).all()).size());
+        jdbc.update("UPDATE mf_datasource SET status='DISABLED' WHERE datasource_id=1");
+        assertTrue(platform.readOnly(session -> session.mapper(ManagedFactoryMapper.class).enabled(0, 20)).isEmpty());
+    }
+
+    @Test
     void nameEditKeepsPoolAndRemoteUnbindRetiresItWhileExistingLeaseCompletes() throws Exception {
         var source = new DriverManagerDataSource("jdbc:h2:mem:" + UUID.randomUUID()
                 + ";MODE=MySQL;DB_CLOSE_DELAY=-1", "sa", "");

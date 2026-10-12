@@ -122,17 +122,38 @@ class FoundationInitializationTest {
         http.perform(get("/api/foundation/context")).andExpect(status().isOk())
                 .andExpect(jsonPath("$.factoryId").value("unbound"));
         http.perform(get("/api/foundation/access")).andExpect(status().isUnprocessableEntity())
-                .andExpect(jsonPath("$.errorCode").value("RUNTIME_NOT_CONFIGURED"));
+                .andExpect(jsonPath("$.errorCode").value("FACTORY_SELECTION_REQUIRED"));
         addFactory("bound");
         http.perform(get("/api/foundation/access").header("X-Factory-Id", "bound"))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.factoryId").value("bound"));
     }
 
     @Test
+    void disabledOrDeletedSelectionCanRecoverWithoutReplayingBusinessRequest() throws Exception {
+        addFactory("bound");
+        factories.add(new Factory(new FactoryId("disabled"), "TEST ONLY", "disabled", "Disabled", FactoryStatus.DISABLED));
+        var http = http("platform");
+        for (String oldFactory : List.of("disabled", "deleted")) {
+            http.perform(get("/api/foundation/access").header("X-Factory-Id", oldFactory))
+                    .andExpect(status().isUnprocessableEntity())
+                    .andExpect(jsonPath("$.errorCode").value("FACTORY_SELECTION_REQUIRED"));
+            http.perform(get("/api/foundation/factories")).andExpect(status().isOk());
+            http.perform(put("/api/foundation/preference")
+                            .principal(SecurityContextHolder.getContext().getAuthentication())
+                            .contentType("application/json").content("{\"factoryId\":\"bound\"}"))
+                    .andExpect(status().isOk());
+        }
+        assertEquals(0, admissions.get());
+        http.perform(get("/api/foundation/access").header("X-Factory-Id", "bound"))
+                .andExpect(status().isOk());
+        assertEquals(1, admissions.get());
+    }
+
+    @Test
     void missingFactoryStillRejectsBusinessAuthorization() throws Exception {
         http("empty-role").perform(get("/api/foundation/access"))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.errorCode").value("FACTORY_SCOPE_REQUIRED"));
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.errorCode").value("FACTORY_SELECTION_REQUIRED"));
         assertEquals(0, admissions.get());
     }
 
@@ -149,7 +170,7 @@ class FoundationInitializationTest {
         http("empty-role").perform(get("/api/test-only/business")
                         .header("X-Factory-Id", "unbound"))
                 .andExpect(status().isUnprocessableEntity())
-                .andExpect(jsonPath("$.errorCode").value("RUNTIME_NOT_CONFIGURED"));
+                .andExpect(jsonPath("$.errorCode").value("FACTORY_SELECTION_REQUIRED"));
         assertEquals(1, admissions.get());
     }
 

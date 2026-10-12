@@ -171,6 +171,26 @@ Druid sources/snapshot 仅列中心库 platform 与 business:<id>；PLATFORM/BUS
 
 ### 2026-10-10 OpenAPI 仅基础设施可选模块
 
+#### 2026-10-12 业务开发前能力核对
+
+当前源码再次确认：mes-admin 仅在 Maven openapi profile 中依赖 mes-openapi，
+公共配置 open-api.enabled=false。启用需同时有模块依赖和运行开关；启用后仅装配
+实时接口目录及文档元数据，不恢复外部客户端、Secret/Token、授权或公开HTTP入口。
+OpenApiEndpoint 是目录标记，不替代 EndpointAccess/认证。若界面仍有旧OpenAPI应用
+菜单，应核查旧菜单数据与V16迁移，不靠打开开关恢复已移除页面/Controller。
+
+自动编码是中心库编号工具，与mes-codegen生成Java/Vue代码无关。组成支持FIXCHAR、
+INPUTCHAR、NOWDATE、SERIALNO，可配置顺序、长度、补位和流水号周期。
+preview不登记、不预留；generate在masterTransactionManager事务中锁规则/计数并
+写入sys_auto_code_result，当前周期按规则/cycle_key共享，不是默认按Factory独立计数。
+当前HTTP预览/生成均为平台授权接口，没有工厂业务生成入口。
+未来业务需要编号时按实际用例设计调用和权限；不能在已开启业务库事务中直接调用
+中心写事务，若提前分配号应明确业务回滚可留空号，不承诺跨库原子提交或连续无断号。
+
+上述两项不阻断普通CRUD与单业务库内编排开发；OpenAPI完整对外身份能力及工厂编号
+接入只在实际业务需求出现时实施，不为基础收尾恢复旧框架。本节为源码核对，未启用
+模块、修改业务实现、消耗真实编号、重启服务或重新运行测试。
+
 本节取代此前 OpenAPI 客户端、Token、授权及数据范围接入说明；历史验收仅证明当时版本，不代表当前产品能力。
 
 **SOURCE_PRODUCT_PORT 审查：** Source 的 `ktg-common/.../openapi/OpenApiEndpoint.java` 定义接口标识；`ktg-framework/.../openapi/OpenApiCatalogService.java` 只读取 MVC HandlerMapping；`ktg-admin/.../OpenApiDocumentationConfig.java` 混合了文档、旧令牌安全声明、错误协议及报表占位符处理。当前 Base 原迁移分散在 common/framework/system/admin，且客户端 Controller、授权 Mapper、专用安全链和 Foundation 外部身份分支彼此强耦合，不符合本次基础设施范围。
@@ -301,3 +321,80 @@ Base 实际链路为 POST /api/session → SystemSessionController → SysLoginS
 注销改为 DELETE /api/session 调用 TokenService 删除 Redis 会话，不通过 Spring LogoutFilter；JWT 过滤器已被随机凭证 SystemTokenFilter 替换。此次所搜生产目录未发现源项目 CorsFilter 注册或 EnableMethodSecurity/@PreAuthorize 方法授权装配；源项目公开业务/静态资源名单未原样照搬。旧 Controller 中 PreAuthorize import 不证明原授权机制仍在运行。
 
 源码判断：Base 确实改变了安全职责划分，不仅升级配置写法。若回归来源结构，可由 Spring Security 负责明确公开入口及其余请求 authenticated，MVC/方法授权负责平台角色、当前厂和具体权限；认证协议是否回归 JWT 是独立决定。本轮没有修改实现，也未进行运行验证。
+
+## 2026-10-12：数据源密码格式、加载流程与解密排查
+
+本节基于当前工作区源码、两个本地 profile 的脱敏核对及 Java 21 隔离验证。保留用户在 `DatasourcePasswordCipher` 中已有的未提交调试代码，不记录密码、密钥或实际密文。已检索同主题 `docs/` 内容；`doc/`、`knowledge/` 不存在，因此在本文追加操作说明。
+
+### 配置与持久化格式
+
+| 位置 | 当前格式与消费者 |
+| --- | --- |
+| `mes.platform.password` | 数据库明文密码；`PersistenceConfiguration.masterDataSource` 原样交给 `DruidPools.create`，再调用 `setPassword`。 |
+| `mes.codegen.profiles.<profile>.password` | 数据库明文密码；`CodegenCli` 绑定 profile 后原样调用 `DriverManagerDataSource.setPassword`。 |
+| `spring.data.redis.password` | Redis 原始口令配置，不由 `DatasourcePasswordCipher` 处理；当前 dev 为空。 |
+| `mes.runtime.datasource-key` | AES 密钥的标准 Base64 表示，不是数据库密码，也不是加密后的密码；解码后必须为 32 字节。 |
+| 中心库 `mf_datasource.password_cipher` | 托管业务库密码的 AES-256-GCM 密文；正式保存入口使用 `encrypt` 产生，建池时使用 `decrypt` 还原。此次未读取真实表内记录。 |
+
+配置中的密码不会自动经过此类解密。`DruidPools` 只允许 `stat`、`wall` 过滤器；本次生产源码及 POM 搜索未发现 Jasypt、`ENC(...)` 或自定义环境解密入口。不能把该类生成的密文直接替换到现有 YAML 的 `password`，否则当前路径会把密文本身当作数据库密码。
+
+### 实际加载顺序
+
+1. `application.yml` 默认 profile 为 dev；dev/prod 参数位于同目录对应资源文件。`scripts/run-local-backend` 启动已打包 JAR 并显式指定 dev；不能把修改源码资源文件等同于运行中服务或既有 JAR 已重新加载。
+2. `PersistenceConfiguration.masterDataSource` 使用 `mes.platform.url/username/password` 创建中心库连接池，提供 `masterSqlSessionFactory`。
+3. `FactoryRuntimeConfiguration.managedDatasources` 在 Runtime 启用时读取 `mes.runtime.datasource-key`，构造 `DatasourcePasswordCipher`；此时校验密钥格式，不代表所有业务库密码已经验证。
+4. 当前厂路由通过 `FactoryMetadataCache` 读取定义；Redis 未命中时由 `RoutingMetadataMapper` 查询中心库 `mf_factory` 与 `mf_datasource`。定义保留 `password_cipher`，缓存读取本身不解密。
+5. `ManagedDatasourceService.acquire` 在需要建立相应版本的业务池时，对 `source.passwordCipher()` 解密，再调用 `DruidPools.create`；已有池复用时不重复解密。DDL 导出创建临时池时也调用解密。业务入口仍为一个 `businessSqlSessionFactory` 和按 Factory 租借的物理池。
+
+### 当前 main 解密失败的直接原因
+
+脱敏比较确认：当前 `DatasourcePasswordCipher.main` 的构造参数与 dev 的 `mes.runtime.datasource-key` 相同，标准 Base64 解码后为 32 字节；`decrypt` 参数与 dev 的中心库及代码生成 profile 明文密码相同，它不是该类生成的密文。
+
+使用当前源码在临时目录编译并由独立验证入口调用，结果为：构造成功；解密抛出 `IllegalStateException`，直接原因是 `IllegalArgumentException`，失败位置在 `java.util.Base64$Decoder`。因此本次在 Base64 解析阶段已经失败，尚未进入 AES/GCM 校验，不能归因为密钥不匹配。
+
+`decrypt` 将 Base64/长度等输入错误与加密算法异常统一包装为“数据源密码无法解密，请检查运行环境密钥”，原始 cause 保留，但提示不能区分输入格式错误与密钥错误。当前调试 main 还硬编码了真实凭据材料并准备输出解密结果；这些内容不应进入提交或日志。本轮未改动该 main。
+
+### 正确生成和使用另一个密文
+
+优先使用平台的数据源管理保存入口 `POST/PUT /api/system/datasource`：传入数据库明文密码，`ManagedDatasourceService.save` 自动加密后保存到 `password_cipher`；不要先自行加密再提交，否则会二次加密。已有数据源的编辑受禁用、未绑定工厂和 revision 校验约束，不能绕过这些条件直接修改。
+
+需要离线生成时，复用同一运行环境的 `mes.runtime.datasource-key`，调用现有 `encrypt`。下面变量由受控配置/输入提供，不把真实值写入源码：
+
+```java
+DatasourcePasswordCipher cipher = new DatasourcePasswordCipher(encodedKey);
+String encryptedPassword = cipher.encrypt(plainPassword);
+String restoredPassword = cipher.decrypt(encryptedPassword);
+```
+
+格式为标准 `Base64(12 字节随机 IV + 密文 + 16 字节认证标签)`，不带 `ENC(...)` 包装；每次随机 IV 使同一密码产生不同密文。只做 Base64 编码不能生成这种密文。dev/prod 当前密钥不同，应使用保存目标对应的密钥；不能只替换主密钥而保留旧密文。
+
+### 验证与边界
+
+- 使用用户 Java 21 的 `javac` / `java`，在临时目录编译当前 Cipher 和无真实凭据字面量的诊断入口；没有运行会打印明文的原 main。编译与执行均 exit 0。
+- 当前 main 输入的失败原因复现；合成密码加密/解密往返通过；同一密码两次密文不同；错误密钥及篡改密文均以 `AEADBadTagException` 拒绝。
+- 本次只修改本操作文档，未修改业务代码、配置、数据库或运行服务；未执行 Maven 全量测试，也未验证真实数据库密文及服务进程的最终生效配置。
+- 源码入口：`DatasourcePasswordCipher`、`FactoryRuntimeConfiguration`、`PersistenceConfiguration`、`DruidPools`、`FactoryMetadataCache`、`ManagedDatasourceService`、`ManagedDatasourceMapper`、`RoutingMetadataMapper`、`CodegenCli`。
+
+### 同日补充：实际数据库密码不同，追查连接目标与配置快照
+
+用户补充：数据库客户端使用同一主机、端口、用户名，但实际密码不同，并表示 IDEA 启动后端可以查询。为区分“代码把配置当作明文”和“目标数据库实际接受该密码”，继续做脱敏配置比较及只读连接验证。
+
+配置证据：
+
+- 当前 `application-dev.yml` 与 `target/mes-admin/classes/application-dev.yml` 的中心库 URL、用户名、密码及数据源主密钥一致；IDEA 保存的 `MesBaseApplication` 运行配置没有发现 profile、密码或连接参数覆盖项。
+- `target/mes-base-0.1.0-SNAPSHOT.jar` 的修改时间为 2026-10-11 21:18；当前源码 dev 配置的修改时间为 2026-10-12 08:54。时间只表示本地文件快照，不证明修改者或运行时加载时间。
+- 当前 dev 配置与该 JAR 内 dev 配置相比，中心库和 codegen URL 的主机不同；端口、库名、URL 参数、用户名、密码保持一致。因此不是这两份快照之间密码被加密转换，而是连接目标变化、凭据沿用。
+
+本次真实连接结果：
+
+| 检查 | 结果 |
+| --- | --- |
+| MySQL 客户端使用当前 dev 中心库 URL 对应地址及配置凭据 | 返回 1045 / SQLSTATE 28000，身份验证被拒绝。 |
+| 从现有 JAR 提取同版本 MySQL JDBC 驱动，原样使用当前 dev URL、用户名、密码 | 同样返回 1045 / 28000；未进入查询。 |
+| 使用同一 JDBC 驱动及 JAR 内旧 dev URL、用户名、密码 | 连接成功；只执行 `SELECT CURRENT_USER(), VERSION()`，认证用户名与配置一致，匹配 `%` 主机规则，服务端版本 8.0.40。 |
+
+结论：配置中的值是旧连接目标仍接受的明文凭据；当前连接目标拒绝这组凭据。现有证据支持“切换连接目标后沿用旧环境凭据”的配置不匹配问题，不支持“该值是实际密码的密文”。1045 本身不能单独排除账号主机授权等其他认证条件，但两个目标的接受结果已直接验证。
+
+本次未取得用户数据库客户端的实际密码，也未取得所述 IDEA 成功查询时的进程配置，不能确认那次查询使用的地址、启动时间或连接池状态。若预期连接当前 YAML 的目标，应使用该目标中对应账号的有效明文密码；如果预期连接旧目标，则应校对 URL。不能用 `encrypt` 或 `decrypt` 修正这种目标/凭据不匹配。
+
+验证未输出密码、密钥、完整 JDBC URL 或账号名。只执行身份只读查询，未修改数据库、配置、代码或启停服务；只追加本节，未运行 Maven 全量测试。

@@ -181,7 +181,9 @@ class BusinessDirectoryTest {
                 .andExpect(status().isForbidden());
         http.perform(get("/api/business/directory/departments").header("X-Factory-Id", "F1"))
                 .andExpect(status().isOk());
-        http.perform(get("/api/business/directory/departments")).andExpect(status().isBadRequest());
+        http.perform(get("/api/business/directory/departments"))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.errorCode").value("FACTORY_SELECTION_REQUIRED"));
     }
 
     @Test

@@ -5,6 +5,7 @@ public enum ErrorCode {
     RESOURCE_CONFLICT(409, "Resource conflicts with current state"), BAD_REQUEST(400, "Invalid request"), UNAUTHENTICATED(401, "Authentication required"),
     FORBIDDEN(403, "Permission denied"), NOT_FOUND(404, "Resource not found"),
     CONFLICT(409, "Execution binding changed"), UNPROCESSABLE(422, "Request cannot be processed"),
+    FACTORY_SELECTION_REQUIRED(422, "当前工厂不可用，请重新选择工厂"),
     FACTORY_SCOPE_REQUIRED(400, "Select a factory explicitly"), FACTORY_NOT_FOUND(404, "Factory not found"),
     FACTORY_DISABLED(422, "Factory is disabled"), RUNTIME_NOT_CONFIGURED(422, "Business runtime is not configured"),
     ROUTING_METADATA_UNAVAILABLE(503, "路由元数据暂时不可用，请稍后重试"),
