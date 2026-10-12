@@ -1,15 +1,15 @@
 // MES-CODEGEN: scaffold; review required.
 package dev.mesbase.business.material;
 
-import dev.mesbase.business.material.controller.MaterialCategoryController;
-import dev.mesbase.business.material.controller.MaterialCategoryPermissions;
-import dev.mesbase.business.material.dao.MaterialCategoryMapper;
-import dev.mesbase.business.material.domain.MaterialCategoryCreateCommand;
-import dev.mesbase.business.material.domain.MaterialCategoryQueryDto;
-import dev.mesbase.business.material.domain.MaterialCategoryResource;
-import dev.mesbase.business.material.domain.MaterialCategoryUpdateCommand;
-import dev.mesbase.business.material.service.impl.MaterialCategoryServiceImpl;
-import dev.mesbase.business.material.sync.UnconfiguredMaterialCategoryQueryAdapter;
+import dev.mesbase.business.basic.controller.MaterialCategoryController;
+import dev.mesbase.business.basic.controller.MaterialCategoryPermissions;
+import dev.mesbase.business.basic.dao.MaterialCategoryMapper;
+import dev.mesbase.business.basic.domain.MaterialCategoryCreateCommand;
+import dev.mesbase.business.basic.domain.MaterialCategoryQueryDto;
+import dev.mesbase.business.basic.domain.MaterialCategoryResource;
+import dev.mesbase.business.basic.domain.MaterialCategoryUpdateCommand;
+import dev.mesbase.business.basic.service.impl.MaterialCategoryServiceImpl;
+import dev.mesbase.business.basic.sync.UnconfiguredMaterialCategoryQueryAdapter;
 import dev.mesbase.core.error.ErrorCode;
 import dev.mesbase.core.error.FoundationException;
 import dev.mesbase.core.factory.FactoryId;

@@ -1,15 +1,16 @@
 // MES-CODEGEN: scaffold; review required.
 package dev.mesbase.business.material;
 
-import dev.mesbase.business.material.controller.UnitMeasureController;
-import dev.mesbase.business.material.controller.UnitMeasurePermissions;
-import dev.mesbase.business.material.dao.UnitMeasureMapper;
-import dev.mesbase.business.material.domain.UnitMeasureCreateCommand;
-import dev.mesbase.business.material.domain.UnitMeasureQueryDto;
-import dev.mesbase.business.material.domain.UnitMeasureResource;
-import dev.mesbase.business.material.domain.UnitMeasureUpdateCommand;
-import dev.mesbase.business.material.service.impl.UnitMeasureServiceImpl;
-import dev.mesbase.business.material.sync.UnconfiguredUnitMeasureQueryAdapter;
+
+import dev.mesbase.business.basic.controller.UnitMeasureController;
+import dev.mesbase.business.basic.controller.UnitMeasurePermissions;
+import dev.mesbase.business.basic.dao.UnitMeasureMapper;
+import dev.mesbase.business.basic.domain.UnitMeasureCreateCommand;
+import dev.mesbase.business.basic.domain.UnitMeasureQueryDto;
+import dev.mesbase.business.basic.domain.UnitMeasureResource;
+import dev.mesbase.business.basic.domain.UnitMeasureUpdateCommand;
+import dev.mesbase.business.basic.service.impl.UnitMeasureServiceImpl;
+import dev.mesbase.business.basic.sync.UnconfiguredUnitMeasureQueryAdapter;
 import dev.mesbase.core.error.ErrorCode;
 import dev.mesbase.core.error.FoundationException;
 import dev.mesbase.core.factory.FactoryId;

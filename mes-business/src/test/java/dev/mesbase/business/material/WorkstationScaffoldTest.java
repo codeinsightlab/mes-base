@@ -1,15 +1,16 @@
 // MES-CODEGEN: scaffold; review required.
 package dev.mesbase.business.material;
 
-import dev.mesbase.business.material.controller.WorkstationController;
-import dev.mesbase.business.material.controller.WorkstationPermissions;
-import dev.mesbase.business.material.dao.WorkstationMapper;
-import dev.mesbase.business.material.domain.WorkstationCreateCommand;
-import dev.mesbase.business.material.domain.WorkstationQueryDto;
-import dev.mesbase.business.material.domain.WorkstationResource;
-import dev.mesbase.business.material.domain.WorkstationUpdateCommand;
-import dev.mesbase.business.material.service.impl.WorkstationServiceImpl;
-import dev.mesbase.business.material.sync.UnconfiguredWorkstationQueryAdapter;
+
+import dev.mesbase.business.basic.controller.WorkstationController;
+import dev.mesbase.business.basic.controller.WorkstationPermissions;
+import dev.mesbase.business.basic.dao.WorkstationMapper;
+import dev.mesbase.business.basic.domain.WorkstationCreateCommand;
+import dev.mesbase.business.basic.domain.WorkstationQueryDto;
+import dev.mesbase.business.basic.domain.WorkstationResource;
+import dev.mesbase.business.basic.domain.WorkstationUpdateCommand;
+import dev.mesbase.business.basic.service.impl.WorkstationServiceImpl;
+import dev.mesbase.business.basic.sync.UnconfiguredWorkstationQueryAdapter;
 import dev.mesbase.core.error.ErrorCode;
 import dev.mesbase.core.error.FoundationException;
 import dev.mesbase.core.factory.FactoryId;

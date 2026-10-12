@@ -1,15 +1,15 @@
 // MES-CODEGEN: scaffold; review required.
 package dev.mesbase.business.material;
 
-import dev.mesbase.business.material.controller.SafetyStockController;
-import dev.mesbase.business.material.controller.SafetyStockPermissions;
-import dev.mesbase.business.material.dao.SafetyStockMapper;
-import dev.mesbase.business.material.domain.SafetyStockCreateCommand;
-import dev.mesbase.business.material.domain.SafetyStockQueryDto;
-import dev.mesbase.business.material.domain.SafetyStockResource;
-import dev.mesbase.business.material.domain.SafetyStockUpdateCommand;
-import dev.mesbase.business.material.service.impl.SafetyStockServiceImpl;
-import dev.mesbase.business.material.sync.UnconfiguredSafetyStockQueryAdapter;
+import dev.mesbase.business.basic.controller.SafetyStockController;
+import dev.mesbase.business.basic.controller.SafetyStockPermissions;
+import dev.mesbase.business.basic.dao.SafetyStockMapper;
+import dev.mesbase.business.basic.domain.SafetyStockCreateCommand;
+import dev.mesbase.business.basic.domain.SafetyStockQueryDto;
+import dev.mesbase.business.basic.domain.SafetyStockResource;
+import dev.mesbase.business.basic.domain.SafetyStockUpdateCommand;
+import dev.mesbase.business.basic.service.impl.SafetyStockServiceImpl;
+import dev.mesbase.business.basic.sync.UnconfiguredSafetyStockQueryAdapter;
 import dev.mesbase.core.error.ErrorCode;
 import dev.mesbase.core.error.FoundationException;
 import dev.mesbase.core.factory.FactoryId;
@@ -20,12 +20,13 @@ import dev.mesbase.infrastructure.cache.annotation.BusinessCacheEvict;
 import dev.mesbase.infrastructure.persistence.MapperPackages;
 import dev.mesbase.infrastructure.persistence.PersistenceOwner;
 import dev.mesbase.platform.web.EndpointAccess;
-import java.lang.reflect.Method;
-import java.lang.reflect.Modifier;
-import java.util.List;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.util.List;
 
 /**
  * TEST ONLY: scaffold contracts; add real business and database acceptance.
