@@ -17,7 +17,11 @@ public record BusinessCodegenConfiguration(Integer version, Source source, Selec
                                            Naming naming, Output output, Templates templates, Backend backend,
                                            Fields fields,
                                            Limits limits, Frontend frontend, Menu menu, Execution execution,
-                                           Map<String, TableOverride> tableOverrides) {
+                                           Map<String, TableOverride> tableOverrides, Boolean generateSync, Sync sync) {
+    public BusinessCodegenConfiguration {
+        generateSync = Boolean.TRUE.equals(generateSync);
+    }
+
     public record Source(String connectionConfig, String datasource, String schema) {
     }
 
@@ -73,7 +77,10 @@ public record BusinessCodegenConfiguration(Integer version, Source source, Selec
                             String publication, String unsupportedTable) {
     }
 
-    public record TableOverride(String module, String displayName) {
+    public record Sync(String matchKey, Integer batchMaximum) {
+    }
+
+    public record TableOverride(String module, String displayName, String syncMatchKey, String serverScopeColumn) {
     }
 
     public static BusinessCodegenConfiguration read(Path file) throws IOException {
@@ -85,8 +92,16 @@ public record BusinessCodegenConfiguration(Integer version, Source source, Selec
         }
         BusinessCodegenConfiguration config = new JsonMapper().convertValue(document, BusinessCodegenConfiguration.class);
         require(config != null && Integer.valueOf(1).equals(config.version()), "version");
+        Object flag = ((Map<?, ?>) document).get("generateSync");
+        require(!((Map<?, ?>) document).containsKey("generateSync") || flag instanceof Boolean, "generateSync");
         requireDeclaredKeys(config, document, "configuration");
         requireFields(config, "configuration");
+        if (config.generateSync()) {
+            require(config.sync() != null, "sync");
+            require(config.sync().batchMaximum() > 0 && config.sync().batchMaximum() <= 10000, "sync.batchMaximum");
+            require("factory".equals(config.backend().permission()
+                    .scope()), "generateSync currently requires factory scope");
+        }
         require("table-prefix".equals(config.naming.module.strategy), "naming.module.strategy");
         require("table-pascal-case".equals(config.naming.className.strategy), "naming.className.strategy");
         require("table-comment".equals(config.naming.displayName.strategy)
@@ -116,7 +131,8 @@ public record BusinessCodegenConfiguration(Integer version, Source source, Selec
         Map<?, ?> values = (Map<?, ?>) document;
         for (var component : record.getClass().getRecordComponents()) {
             String name = component.getName();
-            boolean optional = name.equals("tableOverrides")
+            boolean optional = name.equals("tableOverrides") || name.equals("generateSync") || name.equals("sync")
+                    || record instanceof TableOverride && (name.equals("syncMatchKey") || name.equals("serverScopeColumn"))
                     || record instanceof Strategy && name.equals("fallback")
                     && !"displayName".equals(path.substring(path.lastIndexOf('.') + 1));
             require(values.containsKey(name) || optional, path + "." + name);
@@ -141,7 +157,8 @@ public record BusinessCodegenConfiguration(Integer version, Source source, Selec
             } catch (ReflectiveOperationException failure) {
                 throw new IllegalArgumentException("Invalid configuration: " + path, failure);
             }
-            boolean nullable = name.equals("tableOverrides") || name.equals("schema")
+            boolean nullable = name.equals("tableOverrides") || name.equals("schema") || name.equals("sync")
+                    || record instanceof TableOverride && (name.equals("syncMatchKey") || name.equals("serverScopeColumn"))
                     || record instanceof Strategy && name.equals("fallback")
                     || record instanceof Conditional && (name.equals("property") || name.equals("value"));
             require(value != null || nullable, path + "." + name);

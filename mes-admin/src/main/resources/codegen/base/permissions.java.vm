@@ -4,6 +4,10 @@ public final class ${ClassName}Permissions {
     public static final String UPDATE = "${permission}:update";
     public static final String DELETE = "${permission}:delete";
 
+#if($generateSync)
+    public static final String SYNC = "${permission}:sync";
+#end
+
     private ${ClassName}Permissions() {
     }
 }

@@ -4,7 +4,7 @@ package dev.mesbase.modules.pro.controller.vo;
 import java.time.LocalDateTime;
 
 /**
- * 生产工单表接口响应白名单。
+ * 生产工单接口响应白名单。
  */
 public record ProWorkorderVo(
         String workorderId,

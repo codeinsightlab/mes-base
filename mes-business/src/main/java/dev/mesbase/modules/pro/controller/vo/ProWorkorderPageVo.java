@@ -4,7 +4,7 @@ package dev.mesbase.modules.pro.controller.vo;
 import java.util.List;
 
 /**
- * 生产工单表分页响应。
+ * 生产工单分页响应。
  */
 public record ProWorkorderPageVo(
         List<ProWorkorderVo> items,

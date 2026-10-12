@@ -3,6 +3,14 @@
 # 不包含数据库凭证，不执行菜单 SQL，不授予角色。
 version: 1
 
+# 默认 false；历史配置缺少此项也按 false。当前用户要求本次全量覆盖时生成同步，因此显式开启。
+generateSync: true
+sync:
+  # 物理列名，不猜业务字段；每表可用 tableOverrides.<table>.syncMatchKey 覆盖。
+  # primary-key 是显式选择 metadata 主键的技术策略，接 ERP 前须确认其来源标识映射；不会自动采用。
+  matchKey: "code"
+  batchMaximum: 1000
+
 source:
   # 引用已有开发连接配置中的 profile，不等于运行时工厂或数据库名称。
   connectionConfig: "mes-admin/src/main/resources/application-dev.yml"
@@ -13,9 +21,10 @@ source:
 selection:
   # [] 表示全部表；[pro_workorder] 表示只生成这张表。
   # [pro_workorder, person] 表示只生成列出的表。
-  tables: []
+  tables: [material_category, unit_measure, workstation, workshop, material, safety_stock]
   # 全量生成时明确跳过的表；默认草案为空，不猜测哪些属于业务表。
-  excludeTables: []
+  # 排除 Flyway 迁移历史技术表，防止生成其 CRUD/同步接口。
+  excludeTables: [flyway_business_schema_history]
   # 与表选择独立：all 表示所有产物；也可指定 persistence/backend/frontend/menu/test。
   artifacts: [all]
 
@@ -100,7 +109,7 @@ frontend:
 menu:
   table: "sys_menu"
   parentId: 0
-  directoryName: "{module}"
+  directoryName: "基础数据"
   directoryOrder: 0
   pageOrder: 0
   icon: "list"
@@ -138,3 +147,61 @@ execution:
 #  person:
 #    module: "business"
 #    displayName: "人员"
+
+# 本次六张业务表的同步匹配键；均明确选择本表的业务编码，不使用 ERP 编号覆盖 MES 自增主键。
+tableOverrides:
+  dv_subject:
+    module: "dv"
+    displayName: "设备点检保养项目"
+    syncMatchKey: "subject_code"
+  md_unit_measure:
+    module: "md"
+    displayName: "计量单位"
+    syncMatchKey: "measure_code"
+  md_workshop:
+    module: "md"
+    displayName: "车间"
+    syncMatchKey: "workshop_code"
+  pro_workorder:
+    module: "pro"
+    displayName: "生产工单"
+    syncMatchKey: "workorder_code"
+  qc_defect:
+    module: "qc"
+    displayName: "质量缺陷"
+    syncMatchKey: "defect_code"
+  qc_index:
+    module: "qc"
+    displayName: "质量检测项"
+    syncMatchKey: "index_code"
+
+  material_category:
+    module: material
+    displayName: 物料产品分类
+    syncMatchKey: code
+    serverScopeColumn: factory_id
+  unit_measure:
+    module: material
+    displayName: 计量单位
+    syncMatchKey: code
+    serverScopeColumn: factory_id
+  workshop:
+    module: material
+    displayName: 车间
+    syncMatchKey: code
+    serverScopeColumn: factory_id
+  workstation:
+    module: material
+    displayName: 工作站
+    syncMatchKey: code
+    serverScopeColumn: factory_id
+  material:
+    module: material
+    displayName: 物料产品
+    syncMatchKey: code
+    serverScopeColumn: factory_id
+  safety_stock:
+    module: material
+    displayName: 安全库存配置
+    syncMatchKey: material_id
+    serverScopeColumn: factory_id

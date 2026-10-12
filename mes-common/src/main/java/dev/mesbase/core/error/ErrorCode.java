@@ -1,6 +1,8 @@
 package dev.mesbase.core.error;
 
 public enum ErrorCode {
+    SYNC_QUERY_NOT_IMPLEMENTED(422, "暂未接入外部同步查询接口"),
+    ERP_SYNC_NOT_CONFIGURED(422, "暂未接入 ERP 物料查询接口"),
     SYNC_RUNNING(409, "同步正在进行"), SYNC_EXECUTION_LOST(409, "同步执行权已失效"),
     RESOURCE_CONFLICT(409, "Resource conflicts with current state"), BAD_REQUEST(400, "Invalid request"), UNAUTHENTICATED(401, "Authentication required"),
     FORBIDDEN(403, "Permission denied"), NOT_FOUND(404, "Resource not found"),

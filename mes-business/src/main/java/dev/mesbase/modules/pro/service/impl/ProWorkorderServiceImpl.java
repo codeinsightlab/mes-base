@@ -21,7 +21,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * 生产工单表 CRUD：规则与事务由 Service 负责，Mapper 通过 MyBatis-Spring 注入。
+ * 生产工单 CRUD：规则与事务由 Service 负责，Mapper 通过 MyBatis-Spring 注入。
  */
 @Service
 @ConditionalOnProperty(name = "mes.business.enabled", havingValue = "true")

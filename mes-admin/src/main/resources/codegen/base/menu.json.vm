@@ -8,5 +8,9 @@
   "permissionScope": "${permissionScope}",
   "kind": "MENU",
   "icon": "${frontendIcon}",
+#if($generateSync)
+  "children": [{ "id": "${moduleName}:${className}:sync", "name": "同步", "path": "#", "kind": "BUTTON", "permission": "${permission}:sync", "permissionScope": "${permissionScope}" }]
+#else
   "children": []
+#end
 }

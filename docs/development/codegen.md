@@ -1,5 +1,120 @@
 # MES Codegen 使用说明
 
+## 可选同步生成与统一配置（2026-10-12）
+
+正式参数入口唯一为 `docs/development/codegen-config.review.yaml`。本项目没有生成配置网页、配置数据库表或独立下载接口；YAML 就是持久配置，BusinessCodegenCli/Runner 与 Java API 读取并传递同一参数。dry-run 与 write 共用 metadata、模板和格式化流水线，报告文件名不是开关。
+
+- `generateSync`：布尔值，工具默认 false，历史缺参也为 false；当前统一配置按用户要求显式 true。
+- `sync.matchKey`：物理列名；`primary-key` 表示明确选择 metadata 主键，不自动把 ERP 编号当 MES 自增 ID。可用 `tableOverrides.<table>.syncMatchKey` 覆盖。开启时配置必需，字段不存在、不是 String/Long/Integer 或被审计字段排除则预检拒绝，不写半套文件。匹配列来自配置和真实 metadata，不猜 code/name/status/externalId。
+- `sync.batchMaximum`：明确的批次上限，当前 1000，范围 1..10000。当前同步生成支持 FACTORY_SCOPED；平台 CRUD 不受影响，平台同步需另行解决其协调协议，不能用默认工厂兜底。
+- `selection.excludeTables`：现有排除选项；按用户确认加入 `flyway_business_schema_history`，值存在统一配置，不在工具代码硬编码技术表黑名单。
+- 标准 CRUD 仍有四权限；开启时增加 `<permission>:sync`，Java 常量、独立 Controller、API、按钮、菜单 SQL/声明及权限文档一致。SQL add-or-update，保留菜单 ID/角色关联，只生成不执行。
+
+开启时额外生成：External DTO（字段仅来自 Schema）、QueryPort、默认未接入 Adapter、SyncResult、SyncService、SyncWriter、SyncController 共七个 Java 文件。默认 Adapter 不注册为竞争 Bean，ObjectProvider 在没有真实 Port Bean 时选择默认；未来注册单个具体 Port Bean（或明确 Primary）即可替换。默认返回 422 / SYNC_QUERY_NOT_IMPLEMENTED，明确“暂未接入外部同步查询接口”，不返回空列表/假成功。
+
+查询先在本地写事务之外完成；默认查询失败不写业务数据或同步状态。外部查询可并发，查询成功后复用 SyncCoordinator 按当前 Factory＋表标识抢占，抢占成功才执行写批次。SyncWriter 为独立 Spring Bean，具名事务实际经代理调用；字段/批内重复键校验、一次 IN 匹配、已存在重复键拒绝、按匹配键新增/变化更新/相同跳过、Nullable 清空和检查受影响行数。生成器不推断状态枚举；业务状态和映射规则由使用方补齐。没有新增 ExtraMapper 或第二套 SQL。
+
+前端复用 `components/business/SyncButton.vue`：独立权限、确认、loading/防重复、取消不请求、四计数提示、成功刷新、真实错误和切厂/离开后的迟到结果处理。false 产物没有同步 import、注入、API、常量、按钮或 loading；当前手写 Material 能力仍保留，未因工具默认 false 而删除。
+
+旧 Java API 构造器保持默认 false，新 CodegenRequest 支持 generateSync/syncMatchKey；旧 CLI 增加 `--generate-sync=true|false --sync-match-key=COLUMN`，但本项目仍只用统一 YAML 入口，不从旧 CLI 填隐藏项目默认值。
+
+### 覆盖与关闭开关的实际行为
+
+ScaffoldWriter 采用预检＋覆盖带 MES-CODEGEN 标记文件，不做增量合并，也没有独立文件的历史清理/所有权清单机制。因此 true→false 的新产物不含同步，但旧七个独立 Java 文件不会自动删除，可能仍参与编译/装配。必须审查后逐个移除下列已生成文件；不删除业务数据、手写 Material、整个业务目录，也不自动撤销数据库菜单/权限。清理旧源文件后须检查旧 class/JAR 残留（必要时保留自有报告/备份后 clean build）。
+
+以下清单仅来自本次实际发布 JSON，不扫描手写业务：
+
+- `dv_subject`：
+  - `mes-business/src/main/java/dev/mesbase/modules/dv/sync/ExternalDvSubject.java`
+  - `mes-business/src/main/java/dev/mesbase/modules/dv/sync/DvSubjectQueryPort.java`
+  - `mes-business/src/main/java/dev/mesbase/modules/dv/sync/UnconfiguredDvSubjectQueryAdapter.java`
+  - `mes-business/src/main/java/dev/mesbase/modules/dv/sync/DvSubjectSyncResult.java`
+  - `mes-business/src/main/java/dev/mesbase/modules/dv/sync/DvSubjectSyncWriter.java`
+  - `mes-business/src/main/java/dev/mesbase/modules/dv/sync/DvSubjectSyncService.java`
+  - `mes-business/src/main/java/dev/mesbase/modules/dv/controller/DvSubjectSyncController.java`
+
+- `md_unit_measure`：
+  - `mes-business/src/main/java/dev/mesbase/modules/md/sync/ExternalMdUnitMeasure.java`
+  - `mes-business/src/main/java/dev/mesbase/modules/md/sync/MdUnitMeasureQueryPort.java`
+  - `mes-business/src/main/java/dev/mesbase/modules/md/sync/UnconfiguredMdUnitMeasureQueryAdapter.java`
+  - `mes-business/src/main/java/dev/mesbase/modules/md/sync/MdUnitMeasureSyncResult.java`
+  - `mes-business/src/main/java/dev/mesbase/modules/md/sync/MdUnitMeasureSyncWriter.java`
+  - `mes-business/src/main/java/dev/mesbase/modules/md/sync/MdUnitMeasureSyncService.java`
+  - `mes-business/src/main/java/dev/mesbase/modules/md/controller/MdUnitMeasureSyncController.java`
+  - `mes-business/src/main/java/dev/mesbase/modules/md/sync/ExternalMdWorkshop.java`
+  - `mes-business/src/main/java/dev/mesbase/modules/md/sync/MdWorkshopQueryPort.java`
+  - `mes-business/src/main/java/dev/mesbase/modules/md/sync/UnconfiguredMdWorkshopQueryAdapter.java`
+  - `mes-business/src/main/java/dev/mesbase/modules/md/sync/MdWorkshopSyncResult.java`
+  - `mes-business/src/main/java/dev/mesbase/modules/md/sync/MdWorkshopSyncWriter.java`
+  - `mes-business/src/main/java/dev/mesbase/modules/md/sync/MdWorkshopSyncService.java`
+  - `mes-business/src/main/java/dev/mesbase/modules/md/controller/MdWorkshopSyncController.java`
+
+- `md_workshop`：
+  - `mes-business/src/main/java/dev/mesbase/modules/md/sync/ExternalMdUnitMeasure.java`
+  - `mes-business/src/main/java/dev/mesbase/modules/md/sync/MdUnitMeasureQueryPort.java`
+  - `mes-business/src/main/java/dev/mesbase/modules/md/sync/UnconfiguredMdUnitMeasureQueryAdapter.java`
+  - `mes-business/src/main/java/dev/mesbase/modules/md/sync/MdUnitMeasureSyncResult.java`
+  - `mes-business/src/main/java/dev/mesbase/modules/md/sync/MdUnitMeasureSyncWriter.java`
+  - `mes-business/src/main/java/dev/mesbase/modules/md/sync/MdUnitMeasureSyncService.java`
+  - `mes-business/src/main/java/dev/mesbase/modules/md/controller/MdUnitMeasureSyncController.java`
+  - `mes-business/src/main/java/dev/mesbase/modules/md/sync/ExternalMdWorkshop.java`
+  - `mes-business/src/main/java/dev/mesbase/modules/md/sync/MdWorkshopQueryPort.java`
+  - `mes-business/src/main/java/dev/mesbase/modules/md/sync/UnconfiguredMdWorkshopQueryAdapter.java`
+  - `mes-business/src/main/java/dev/mesbase/modules/md/sync/MdWorkshopSyncResult.java`
+  - `mes-business/src/main/java/dev/mesbase/modules/md/sync/MdWorkshopSyncWriter.java`
+  - `mes-business/src/main/java/dev/mesbase/modules/md/sync/MdWorkshopSyncService.java`
+  - `mes-business/src/main/java/dev/mesbase/modules/md/controller/MdWorkshopSyncController.java`
+
+- `pro_workorder`：
+  - `mes-business/src/main/java/dev/mesbase/modules/pro/sync/ExternalProWorkorder.java`
+  - `mes-business/src/main/java/dev/mesbase/modules/pro/sync/ProWorkorderQueryPort.java`
+  - `mes-business/src/main/java/dev/mesbase/modules/pro/sync/UnconfiguredProWorkorderQueryAdapter.java`
+  - `mes-business/src/main/java/dev/mesbase/modules/pro/sync/ProWorkorderSyncResult.java`
+  - `mes-business/src/main/java/dev/mesbase/modules/pro/sync/ProWorkorderSyncWriter.java`
+  - `mes-business/src/main/java/dev/mesbase/modules/pro/sync/ProWorkorderSyncService.java`
+  - `mes-business/src/main/java/dev/mesbase/modules/pro/controller/ProWorkorderSyncController.java`
+
+- `qc_defect`：
+  - `mes-business/src/main/java/dev/mesbase/modules/qc/sync/ExternalQcDefect.java`
+  - `mes-business/src/main/java/dev/mesbase/modules/qc/sync/QcDefectQueryPort.java`
+  - `mes-business/src/main/java/dev/mesbase/modules/qc/sync/UnconfiguredQcDefectQueryAdapter.java`
+  - `mes-business/src/main/java/dev/mesbase/modules/qc/sync/QcDefectSyncResult.java`
+  - `mes-business/src/main/java/dev/mesbase/modules/qc/sync/QcDefectSyncWriter.java`
+  - `mes-business/src/main/java/dev/mesbase/modules/qc/sync/QcDefectSyncService.java`
+  - `mes-business/src/main/java/dev/mesbase/modules/qc/controller/QcDefectSyncController.java`
+  - `mes-business/src/main/java/dev/mesbase/modules/qc/sync/ExternalQcIndex.java`
+  - `mes-business/src/main/java/dev/mesbase/modules/qc/sync/QcIndexQueryPort.java`
+  - `mes-business/src/main/java/dev/mesbase/modules/qc/sync/UnconfiguredQcIndexQueryAdapter.java`
+  - `mes-business/src/main/java/dev/mesbase/modules/qc/sync/QcIndexSyncResult.java`
+  - `mes-business/src/main/java/dev/mesbase/modules/qc/sync/QcIndexSyncWriter.java`
+  - `mes-business/src/main/java/dev/mesbase/modules/qc/sync/QcIndexSyncService.java`
+  - `mes-business/src/main/java/dev/mesbase/modules/qc/controller/QcIndexSyncController.java`
+
+- `qc_index`：
+  - `mes-business/src/main/java/dev/mesbase/modules/qc/sync/ExternalQcDefect.java`
+  - `mes-business/src/main/java/dev/mesbase/modules/qc/sync/QcDefectQueryPort.java`
+  - `mes-business/src/main/java/dev/mesbase/modules/qc/sync/UnconfiguredQcDefectQueryAdapter.java`
+  - `mes-business/src/main/java/dev/mesbase/modules/qc/sync/QcDefectSyncResult.java`
+  - `mes-business/src/main/java/dev/mesbase/modules/qc/sync/QcDefectSyncWriter.java`
+  - `mes-business/src/main/java/dev/mesbase/modules/qc/sync/QcDefectSyncService.java`
+  - `mes-business/src/main/java/dev/mesbase/modules/qc/controller/QcDefectSyncController.java`
+  - `mes-business/src/main/java/dev/mesbase/modules/qc/sync/ExternalQcIndex.java`
+  - `mes-business/src/main/java/dev/mesbase/modules/qc/sync/QcIndexQueryPort.java`
+  - `mes-business/src/main/java/dev/mesbase/modules/qc/sync/UnconfiguredQcIndexQueryAdapter.java`
+  - `mes-business/src/main/java/dev/mesbase/modules/qc/sync/QcIndexSyncResult.java`
+  - `mes-business/src/main/java/dev/mesbase/modules/qc/sync/QcIndexSyncWriter.java`
+  - `mes-business/src/main/java/dev/mesbase/modules/qc/sync/QcIndexSyncService.java`
+  - `mes-business/src/main/java/dev/mesbase/modules/qc/controller/QcIndexSyncController.java`
+
+### 当前六表生成结果
+
+使用统一 YAML：selection.tables=[]、排除 Flyway、generateSync=true、write/replace-generated。真实业务库读取 metadata 后预检 6 supported / 0 rejected，实际发布 162 个产物。匹配键为 dv_subject.subject_code、md_unit_measure.measure_code、md_workshop.workshop_code、pro_workorder.workorder_code、qc_defect.defect_code、qc_index.index_code，均明确配置并经 metadata 校验。
+
+报告 `target/codegen-sync/generated.json`；20 个已有目标文件的覆盖前备份在 `target/codegen-sync/backup/manifest.json`。未对真实业务表或菜单执行 INSERT/UPDATE/DDL，不授予角色，不重启用户服务，不提交/推送。
+
+注意普通索引不保证与其他 CRUD 入口的并发唯一性；真实 ERP 实现仍需审查匹配键的来源映射、数据库排序/大小写规则及业务状态约束。重复现存键明确拒绝，不能据此承诺跨节点 exactly-once 或生产验收。
+
+
 ## 当前调用与新业务流程（2026-10-11）
 
 新增业务使用 mes-crud-codegen Skill，通过 `scripts/mes-business-codegen CONFIG_YAML REPORT_JSON` 读取显式 YAML，调用 ConfiguredCodegenService。旧 `scripts/mes-codegen` 及下方旧参数说明保留为历史入口，不用于替代用户当前配置。
@@ -329,3 +444,15 @@ CrudPage 区分无读取权限与空结果：没有 read 时显示“当前范�
 验证：BusinessCodegenRunnerTest 覆盖全量/指定、可配置 fallback/包/开关/分页、产出 Java 编译、缺参数、部分产物、批量失败不发布，以及菜单 SQL 首次新增/再次更新/保持角色绑定。菜单执行证据来自合成 H2；不能当作真实中心库执行证明。验收命令与最后结果追加于下方。
 
 本轮最终验收：任务 Java 文件经 IDEA formatter；`mvn -B -ntp verify` BUILD SUCCESS，BusinessCodegenRunnerTest 5/5（含生成 Java 编译与 H2 菜单重跑）通过；`scripts/smoke-packaged.py` 10/10；`git diff --check` 通过。真实开发连接只读取 metadata，全量为1张表；原配置预检按 fail 策略拒绝已有代码冲突。隔离配置实际生成20个文件；没有执行真实菜单 SQL、角色赋权或重启用户服务。未修改前端运行代码，因此未运行新的 UI 构建；UI 生成模板变化由产物检查覆盖，不宣称真实页面验收。
+
+
+### 2026-10-12 同步开关与六表覆盖后的最终验证
+
+- `mvn -B -ntp -Dmes.test.redis=true verify`：275 项，271 通过、4 项真实 MySQL 跳过，0 失败/错误；最终日志 `/tmp/mes-sync-final-verify.log`。
+- BusinessCodegenRunnerTest：历史缺参/默认 false、true 的七文件/按钮/权限产物、预览与发布清单及哈希一致、false 新产物无引用、旧独立文件未被自动删除、错误匹配键拒绝全批发布、技术表排除均通过。
+- CodegenSyncAcceptanceTest：没有 code/name/status/externalId 的真实 H2 表，生成 Java 真正编译；默认 Service 装配启动、未接入异常、无协调/业务写入；实际 Spring 代理的 Writer 验证新增/重复跳过/变化更新/Nullable 清空/中途 SQL 失败整批回滚。
+- 现有 Material 的 HTTP/H2 范围、权限、两厂隔离、新增/更新/跳过/回滚测试继续通过；生产 TEST Adapter 与旧 Resolver/Properties 已从打包业务模块中确认不存在，七个 SyncController（手写 Material＋六表生成）存在。
+- 覆盖后前端 140 项测试、build 和生成页/API/共享按钮定向 ESLint 通过；日志 `/tmp/mes-sync-regenerated-ui-test.log`、`/tmp/mes-sync-regenerated-ui-build.log`、`/tmp/mes-sync-generated-ui-lint.log`。确认、权限、防重复、成功刷新、取消、未接入真实提示、切厂迟到响应行为均保持。
+- IDEA 161 个相关/生成 Java 文件格式检查通过；两仓 diff 检查通过。首次生成运行测试因 macOS 临时目录符号链接被工具安全拒绝，改用真实路径后通过，没有放宽路径保护。
+- 最终 packaged smoke 14/14：`/tmp/mes-sync-final-smoke2.log`。首次 smoke 出现 Logback/AOP 类加载异常；检查嵌套依赖确认对应类存在，未改变依赖，原样重跑通过且 JAR 哈希前后相同；未证明首次异常根因，不把它冒充实现修复。
+- 真实业务库只读取 metadata，实际外部 ERP、真实 MySQL 写入、运行中 8081 服务的最新代码、菜单 SQL/角色授予和浏览器同步闭环未验收。未重启用户服务、执行真实迁移或业务写入、提交/推送。原有外部 MasterSyncMapper 修改保留，不计入本轮改动。

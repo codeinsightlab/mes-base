@@ -105,7 +105,7 @@ public final class RuoyiTemplateRenderer {
     private void emitJava(List<Artifact> out, Map<String, Object> context, String subpackage,
                           String name, String template) {
         String rootPackage = (String) context.get("rootPackage");
-        if (options != null) subpackage = options.packages().get(subpackage).replace('.', '/');
+        if (options != null) subpackage = options.packages().getOrDefault(subpackage, subpackage).replace('.', '/');
         context.put("packageName", rootPackage + "." + subpackage.replace('/', '.'));
         context.put("body", JavaSourceImports.explicit(merge(template, context)));
         out.add(new Artifact(BACKEND, "src/main/java/" + rootPackage.replace('.', '/')
@@ -132,14 +132,23 @@ public final class RuoyiTemplateRenderer {
         String n = cap(JdbcMetadataReader.camel(r.tableName())), p = r.packageName(), name = JdbcMetadataReader.camel(r.tableName()), route = "/api/" + r.moduleName() + "/" + r.tableName()
                 .replace('_', '-').toLowerCase(Locale.ROOT), perm = permissionNamespace(r) + ":" + r.tableName()
                 .replace('_', ':');
+        String scopeColumnName = options == null ? null : (String) options.variables().get("serverScopeColumn");
+        Column scopeColumn = scopeColumnName == null ? null : t.columns().stream()
+                .filter(column -> column.name().equalsIgnoreCase(scopeColumnName)).findFirst()
+                .orElseThrow(() -> new CodegenException(CodegenException.Code.INVALID_REQUEST));
+        if (scopeColumn != null && (!scoped || scopeColumn.nullable() || !scopeColumn.javaType().equals("String"))) {
+            throw new CodegenException(CodegenException.Code.INVALID_REQUEST);
+        }
         List<Column> writable = t.columns().stream()
-                .filter(c -> !c.primaryKey() && !auditColumn(c)).toList();
+                .filter(c -> !c.primaryKey() && !auditColumn(c) && c != scopeColumn).toList();
         List<Column> create = new ArrayList<>();
         if (!pk.autoIncrement()) create.add(pk);
         create.addAll(writable);
         Map<String, Object> ctx = new HashMap<>();
         ctx.put("packageName", p);
         ctx.put("rootPackage", p);
+        ctx.put("serverScope", scopeColumn != null);
+        if (scopeColumn != null) ctx.put("scopeField", field(scopeColumn, true));
         ctx.put("ClassName", n);
         ctx.put("className", name);
         ctx.put("functionName", string(r.businessName()));
@@ -158,6 +167,8 @@ public final class RuoyiTemplateRenderer {
                 Map.of("code", "delete", "label", "删除")));
         ctx.put("scoped", scoped);
         ctx.put("permissionScope", scoped ? "factory" : "platform");
+        ctx.put("generateSync", r.generateSync());
+        ctx.put("syncBatchMaximum", 1000);
         ctx.put("conditionalEnabled", true);
         ctx.put("conditionalProperty", scoped ? "mes.system.enabled" : "mes.platform.enabled");
         ctx.put("conditionalValue", "true");
@@ -214,6 +225,35 @@ public final class RuoyiTemplateRenderer {
         ctx.put("viewFields", t.columns().stream().map(c -> Map.of(
                 "name", c.javaField(), "type", viewType(c), "getter", "get" + cap(c.javaField()),
                 "stringValue", !viewType(c).equals(entityType(c)))).toList());
+        ctx.put("generateSync", r.generateSync());
+        if (r.generateSync()) {
+            if (!scoped) throw new CodegenException(CodegenException.Code.INVALID_REQUEST);
+            Column syncKey = SyncGeneration.validate(t, r.syncMatchKey());
+            ctx.put("syncTaskKey", "codegen." + r.tableName());
+            if (!syncKey.primaryKey() && !writable.contains(syncKey)) {
+                throw new CodegenException(CodegenException.Code.INVALID_SYNC_KEY);
+            }
+            List<Column> inputs = new ArrayList<>(create);
+            if (!inputs.contains(syncKey)) inputs.addFirst(syncKey);
+            ctx.put("syncInputFields", inputs.stream()
+                    .map(column -> field(column, !column.nullable() || column == syncKey)).toList());
+            ctx.put("syncWritableFields", writable.stream().map(column -> {
+                Map<String, Object> values = new HashMap<>(field(column, !column.nullable()));
+                values.put("decimal", column.javaType().equals("java.math.BigDecimal"));
+                return values;
+            }).toList());
+            ctx.put("syncKey", field(syncKey, true));
+            ctx.put("syncKeyIn", "and" + cap(syncKey.javaField()) + "In");
+            ctx.put("syncHasInputPk", !pk.autoIncrement() || syncKey.primaryKey());
+            ctx.put("pkGetter", "get" + cap(pk.javaField()));
+            ctx.put("pkSetter", "set" + cap(pk.javaField()));
+            ctx.put("syncPackage", p + "." + (options == null ? "sync" : options.packages()
+                    .getOrDefault("sync", "sync")));
+            var actions = new ArrayList<>(List.of(Map.of("code", "read", "label", "查询"),
+                    Map.of("code", "create", "label", "新增"), Map.of("code", "update", "label", "修改"),
+                    Map.of("code", "delete", "label", "删除"), Map.of("code", "sync", "label", "同步")));
+            ctx.put("menuActions", actions);
+        }
         List<Artifact> out = new ArrayList<>();
         String dir = p.replace('.', '/') + "/";
         out.addAll(new MyBatisPersistenceRenderer().render(r, t, n, options));
@@ -233,6 +273,17 @@ public final class RuoyiTemplateRenderer {
         emitJava(out, ctx, "service", "I" + n + "Service", "service.java.vm");
         emitJava(out, ctx, "service/impl", n + "ServiceImpl", "service-impl.java.vm");
         emitJava(out, ctx, "controller", n + "Controller", "controller.java.vm");
+        if (r.generateSync()) {
+            ctx.put("commandName", "External" + n);
+            ctx.put("commandFields", ctx.get("syncInputFields"));
+            emitJava(out, ctx, "sync", "External" + n, "command.java.vm");
+            emitJava(out, ctx, "sync", n + "QueryPort", "sync-port.java.vm");
+            emitJava(out, ctx, "sync", "Unconfigured" + n + "QueryAdapter", "sync-placeholder.java.vm");
+            emitJava(out, ctx, "sync", n + "SyncResult", "sync-result.java.vm");
+            emitJava(out, ctx, "sync", n + "SyncWriter", "sync-writer.java.vm");
+            emitJava(out, ctx, "sync", n + "SyncService", "sync-service.java.vm");
+            emitJava(out, ctx, "controller", n + "SyncController", "sync-controller.java.vm");
+        }
         ctx.put("pkField", pk.javaField());
         ctx.put("fields", t.columns().stream()
                 .map(c -> Map.of("name", c.javaField(), "type", Set.of("String", "Long", "java.math.BigDecimal")
@@ -244,7 +295,7 @@ public final class RuoyiTemplateRenderer {
                         .equals("java.time.LocalDate") ? "date" : c.javaType()
                         .startsWith("java.time") ? "datetime" : c.javaType()
                         .matches("Integer|Double|Float") ? "number" : c.javaType()
-                        .equals("Boolean") ? "boolean" : "text", "readonly", (c.primaryKey() && c.autoIncrement() || auditColumn(c)), "searchable", !auditColumn(c) && c.javaType()
+                        .equals("Boolean") ? "boolean" : "text", "readonly", (c.primaryKey() && c.autoIncrement() || auditColumn(c) || c == scopeColumn), "searchable", !auditColumn(c) && c.javaType()
                         .equals("String") && c.javaField()
                         .matches("(?i).*(code|name)$"), "maxLength", Math.min(c.size(), options == null ? 10000 : options.stringLengthLimit()), "required", !c.nullable()))
                 .toList());
@@ -254,7 +305,7 @@ public final class RuoyiTemplateRenderer {
         out.add(new Artifact(FRONTEND, options == null ? "src/views/" + r.moduleName() + "/" + name + "/index.vue" : options.frontendPage(), merge("index.vue.vm", ctx)));
         out.add(new Artifact(FRONTEND, options == null ? "src/menus/" + r.moduleName() + "/" + name + ".json" : options.frontendMenu(), merge("menu.json.vm", ctx)));
         out.add(new Artifact(PERMISSION, options == null ? "docs/generated/" + r.moduleName() + "/" + name + "-menu.sql" : options.menuSql(), merge("menu.sql.vm", ctx)));
-        out.add(new Artifact(PERMISSION, "docs/generated/" + r.moduleName() + "/" + name + "-permissions.md", "<!-- MES-CODEGEN -->\n# " + r.businessName() + "\n\nScope: " + r.scope() + "; Mapper owner: " + ownership + "\n\nPath: `" + route + "`\n\n" + List.of("read", "create", "update", "delete")
+        out.add(new Artifact(PERMISSION, "docs/generated/" + r.moduleName() + "/" + name + "-permissions.md", "<!-- MES-CODEGEN -->\n# " + r.businessName() + "\n\nScope: " + r.scope() + "; Mapper owner: " + ownership + "\n\nPath: `" + route + "`\n\n" + (r.generateSync() ? List.of("read", "create", "update", "delete", "sync") : List.of("read", "create", "update", "delete"))
                 .stream().map(x -> "- `" + ctx.get("permission") + ":" + x + "`\n")
                 .collect(Collectors.joining()) + "\nMenu INSERT SQL is generated beside this file for reviewed center-database execution; no automatic execution or role grants. Mapper ownership follows its fixed package; no Mapper annotation or central registration is required.\n"));
         ctx.put("ownership", ownership);

@@ -10,7 +10,7 @@ public record CodegenRequest(
         String datasource, String schema, String tableName, String moduleName,
         String businessName, String packageName, String author, ScopeKind scope,
         OverwritePolicy overwritePolicy, boolean dryRun, Path backendRoot, Path frontendRoot,
-        String backendModule) {
+        String backendModule, boolean generateSync, String syncMatchKey) {
     public CodegenRequest {
         if (moduleName == null || moduleName.isBlank()) {
             moduleName = defaultModule(tableName);
@@ -25,6 +25,14 @@ public record CodegenRequest(
         JdbcMetadataReader.identifier(tableName);
         int separator = tableName.indexOf('_');
         return separator > 0 ? tableName.substring(0, separator).toLowerCase(Locale.ROOT) : "business";
+    }
+
+    public CodegenRequest(String datasource, String schema, String tableName, String moduleName,
+                          String businessName, String packageName, String author, ScopeKind scope,
+                          OverwritePolicy overwritePolicy, boolean dryRun, Path backendRoot, Path frontendRoot,
+                          String backendModule) {
+        this(datasource, schema, tableName, moduleName, businessName, packageName, author, scope,
+                overwritePolicy, dryRun, backendRoot, frontendRoot, backendModule, false, null);
     }
 
     public CodegenRequest(String datasource, String schema, String tableName, String moduleName,

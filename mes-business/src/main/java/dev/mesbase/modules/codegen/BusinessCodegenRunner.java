@@ -9,6 +9,7 @@ import dev.mesbase.platform.codegen.ConfiguredCodegenService;
 import dev.mesbase.platform.codegen.IdeaGeneratedJavaFormatter;
 import dev.mesbase.platform.codegen.JdbcMetadataReader;
 import dev.mesbase.platform.codegen.TableMetadata;
+import dev.mesbase.platform.codegen.SyncGeneration;
 import dev.mesbase.platform.codegen.ScaffoldWriter.Artifact;
 import java.io.IOException;
 import java.nio.file.Path;
@@ -32,7 +33,7 @@ import org.springframework.jdbc.datasource.DriverManagerDataSource;
  */
 public final class BusinessCodegenRunner {
     public record TablePlan(String table, String module, String displayName, String javaPackage,
-                            String apiPath, String permission) {
+                            String apiPath, String permission, String syncMatchKey) {
     }
 
     public record RejectedTable(String table, String errorCode) {
@@ -98,16 +99,24 @@ public final class BusinessCodegenRunner {
                 String permission = config.backend().permission().prefix() + ":"
                         + expand(config.backend().permission().resource(), tableName, module);
                 boolean factory = "factory".equals(config.backend().permission().scope());
+                String syncKey = config.generateSync() ? config.sync().matchKey() : null;
+                if (config.generateSync() && config.tableOverrides() != null && config.tableOverrides()
+                        .containsKey(tableName)
+                        && config.tableOverrides().get(tableName).syncMatchKey() != null) {
+                    syncKey = config.tableOverrides().get(tableName).syncMatchKey();
+                }
+                if (config.generateSync()) SyncGeneration.validate(table, syncKey);
                 var request = new CodegenRequest(config.source().datasource(), config.source().schema(), tableName,
                         module, displayName, javaPackage, config.naming().author(),
                         factory ? CodegenRequest.ScopeKind.FACTORY_SCOPED : CodegenRequest.ScopeKind.GLOBAL,
                         "fail".equals(config.execution().overwrite()) ? CodegenRequest.OverwritePolicy.FAIL
                                 : CodegenRequest.OverwritePolicy.REPLACE_GENERATED,
                         true, root.resolve(config.output().backendRoot()).normalize(),
-                        root.resolve(config.output().frontendRoot()).normalize(), config.output().backendModule());
+                        root.resolve(config.output().frontendRoot()).normalize(), config.output()
+                        .backendModule(), config.generateSync(), syncKey);
                 var options = options(config, root, tableName, module, apiPath, permission);
                 plans.add(new ConfiguredCodegenService.Plan(request, table, options));
-                descriptions.add(new TablePlan(tableName, module, displayName, javaPackage, apiPath, permission));
+                descriptions.add(new TablePlan(tableName, module, displayName, javaPackage, apiPath, permission, syncKey));
             } catch (CodegenException failure) {
                 rejected.add(new RejectedTable(tableName, failure.code().name()));
             }
@@ -118,7 +127,7 @@ public final class BusinessCodegenRunner {
                 var r = plan.request();
                 return new ConfiguredCodegenService.Plan(new CodegenRequest(r.datasource(), r.schema(), r.tableName(),
                         r.moduleName(), r.businessName(), r.packageName(), r.author(), r.scope(), r.overwritePolicy(),
-                        false, r.backendRoot(), r.frontendRoot(), r.backendModule()), plan.metadata(), plan.templates());
+                        false, r.backendRoot(), r.frontendRoot(), r.backendModule(), r.generateSync(), r.syncMatchKey()), plan.metadata(), plan.templates());
             }).toList();
         }
         UnaryOperator<List<Artifact>> formatter = config.execution().formatJava()
@@ -162,6 +171,11 @@ public final class BusinessCodegenRunner {
         Map<String, String> packages = Map.of("domain", p.domain(), "dao", p.mapper(), "service", p.service(),
                 "service/impl", p.serviceImplementation(), "controller", p.controller(), "controller/vo", p.response());
         Map<String, Object> variables = new HashMap<>();
+        var tableOverride = c.tableOverrides() == null ? null : c.tableOverrides().get(table);
+        if (tableOverride != null && tableOverride.serverScopeColumn() != null) {
+            variables.put("serverScopeColumn", tableOverride.serverScopeColumn());
+        }
+        variables.put("syncBatchMaximum", c.generateSync() ? c.sync().batchMaximum() : 1000);
         variables.put("route", apiPath);
         variables.put("permission", permission);
         variables.put("permissionScope", c.backend().permission().scope());

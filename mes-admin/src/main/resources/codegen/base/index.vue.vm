@@ -3,6 +3,12 @@
 import CrudPage from '${crudComponent}'
 import { api } from '${frontendApiImport}'
 import type { Field } from '${fieldTypesModule}'
+#if($generateSync)
+import { ref } from 'vue'
+import { sync } from '${frontendApiImport}'
+import SyncButton from '@/components/business/SyncButton.vue'
+const page = ref<InstanceType<typeof CrudPage> | null>(null)
+#end
 
 const fields: Field[] = [
 #foreach($field in $fields)
@@ -21,6 +27,9 @@ const fields: Field[] = [
 
 <template>
   <CrudPage
+#if($generateSync)
+    ref="page"
+#end
     title="${functionNameHtml}"
     permission="${permission}"
 #if(!$scoped)
@@ -29,5 +38,13 @@ const fields: Field[] = [
     :api="api"
     :fields="fields"
     id-key="${pkField}"
+#if($generateSync)
+  >
+    <template #toolbar>
+      <SyncButton permission="${permission}:sync" scope="${permissionScope}" :run="sync" @completed="page?.load()" />
+    </template>
+  </CrudPage>
+#else
   />
+#end
 </template>

@@ -8,6 +8,8 @@ public final class ProWorkorderPermissions {
     public static final String UPDATE = "business:pro:workorder:update";
     public static final String DELETE = "business:pro:workorder:delete";
 
+    public static final String SYNC = "business:pro:workorder:sync";
+
     private ProWorkorderPermissions() {
     }
 }

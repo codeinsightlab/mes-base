@@ -255,7 +255,7 @@ add-or-update，保留菜单 ID 和角色绑定，仅生成不执行。当前旧
 2026-10-11 用户补充：生成器不得按 user_id、owner_id、password、secret
 等字段名猜测业务语义并拒绝生成。生成准入仅判断实际生成能力与结构支持；敏感响应、主体及资源授权规则由使用方在生成后审查。
 
-mes-codegen 只生成基础单表持久化与后台 CRUD。持久化复用 MyBatis Generator 的 MyBatis3 /
+mes-codegen 默认生成基础单表持久化与后台 CRUD；可选 `generateSync` 生成同步脚手架，默认 false，历史配置缺参同样为 false。开启时必须显式配置 `sync.matchKey/batchMaximum`，可用 `tableOverrides.<table>.syncMatchKey` 指定物理匹配列；同步输入仅来自真实 Schema，不猜 code/name/status 等业务字段。默认查询实现明确抛未接入异常，不产生示例业务数据。当前同步生成只支持 Factory 范围及 String/Long/Integer 单匹配键，复杂业务规则由使用方审查。持久化复用 MyBatis Generator 的 MyBatis3 /
 XMLMAPPER：Entity、Example/Criteria、Mapper + XML；Service/Controller 必须同步调用该真实生成接口，分页复用 PageHelper，不新增注解
 SQL、锁查询或业务状态规则，不生成 ExtraMapper。
 
@@ -357,3 +357,12 @@ SysUser 敏感字段。
 标准构建包含实现，`mes.system.enabled` 与 `open-api.enabled` 控制启用。客户端/授权使用中心库，外部身份不作为 SysUser，不解析后台选厂偏好、不接入内部角色授权。
 具体 MES API 与业务范围策略按需求接入，不暴露内部 CRUD，不新增外部数据库或第三套 SessionFactory。
 保留已应用迁移文件；V22 补偿 V16 菜单删除，不猜测或自动补发已删除角色授权，不执行真实迁移除非得到授权。
+
+
+## 2026-10-12 可选同步生成与统一配置
+
+正式生成唯一参数入口继续为 `docs/development/codegen-config.review.yaml`；不得另建业务专属默认配置或从旧 CLI 补项目参数。`selection.excludeTables` 排除技术表，当前明确排除 `flyway_business_schema_history`。用户授权的当前配置为 `generateSync: true`、全量业务表、`write/replace-generated`；这是本次项目取值，不是生成器默认值。
+
+生成的同步 Service 直接使用本表 QueryPort，默认未接入实现不是 Spring Bean，由 ObjectProvider 在没有真实实现时选择，避免默认与真实 Bean 竞争。外部只读查询先完成；未接入时不写业务库或同步状态。查询完成后复用已有 SyncCoordinator 抢占，成功抢占后才进入独立 Spring 代理的 SyncWriter 写事务。只读查询可并发，写入批次受已有协调协议约束。同步权限为当前生成权限前缀追加 `:sync`，菜单 SQL 同步 add-or-update、不自动执行或授予角色。现有手写 Material 同步保留 `material:sync`，Test Adapter 只在测试源目录。
+
+生成器目前只覆盖/发布文件，不跟踪和删除历史独立文件。true 改 false 后的新产物无同步引用，但旧的 SyncController、External DTO、QueryPort、未接入 Adapter、SyncResult、SyncService、SyncWriter 必须逐文件审查移除；禁止扫描删除手写业务目录或宣称自动清理。具体六表文件清单与验证见 `docs/development/codegen.md` 的同步章节。

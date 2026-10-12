@@ -22,6 +22,9 @@ public class ${ClassName}ServiceImpl implements ${servicePackage}.I${ClassName}S
         }
         ${domainPackage}.${ClassName}Example example = new ${domainPackage}.${ClassName}Example();
         ${domainPackage}.${ClassName}Example.Criteria criteria = example.createCriteria();
+#if($serverScope)
+        criteria.and${scopeField.name.substring(0,1).toUpperCase()}${scopeField.name.substring(1)}EqualTo(dev.mesbase.platform.execution.FactoryContext.required().factoryId().value());
+#end
 #foreach($field in $queryFields)
         if (query.${field.name}() != null) {
             criteria.${field.criteriaMethod}(#if($field.string)"%" + query.${field.name}() + "%"#else query.${field.name}()#end);
@@ -46,6 +49,9 @@ public class ${ClassName}ServiceImpl implements ${servicePackage}.I${ClassName}S
     @org.springframework.transaction.annotation.Transactional(transactionManager = "${transactionManager}", rollbackFor = Exception.class)
     public ${domainPackage}.${ClassName}Entity insert(${domainPackage}.${ClassName}CreateCommand input) {
         ${domainPackage}.${ClassName}Entity row = new ${domainPackage}.${ClassName}Entity();
+#if($serverScope)
+        row.${scopeField.setter}(dev.mesbase.platform.execution.FactoryContext.required().factoryId().value());
+#end
 #foreach($field in $createFields)
         row.${field.setter}(input.${field.name}());
 #end
@@ -77,7 +83,12 @@ public class ${ClassName}ServiceImpl implements ${servicePackage}.I${ClassName}S
             throw new dev.mesbase.core.error.FoundationException(dev.mesbase.core.error.ErrorCode.BAD_REQUEST);
         }
         ${domainPackage}.${ClassName}Example example = new ${domainPackage}.${ClassName}Example();
-        example.createCriteria().and${pkField.substring(0,1).toUpperCase()}${pkField.substring(1)}In(ids);
+        for (var id : ids) requireRecord(id);
+        example.createCriteria().and${pkField.substring(0,1).toUpperCase()}${pkField.substring(1)}In(ids)
+#if($serverScope)
+                .and${scopeField.name.substring(0,1).toUpperCase()}${scopeField.name.substring(1)}EqualTo(dev.mesbase.platform.execution.FactoryContext.required().factoryId().value())
+#end
+                ;
         if (mapper.deleteByExample(example) != ids.size()) {
             throw new dev.mesbase.core.error.FoundationException(dev.mesbase.core.error.ErrorCode.RESOURCE_CONFLICT);
         }
@@ -85,7 +96,7 @@ public class ${ClassName}ServiceImpl implements ${servicePackage}.I${ClassName}S
 
     private ${domainPackage}.${ClassName}Entity requireRecord(${idType} id) {
         ${domainPackage}.${ClassName}Entity row = mapper.selectByPrimaryKey(id);
-        if (row == null) {
+        if (row == null#if($serverScope) || !dev.mesbase.platform.execution.FactoryContext.required().factoryId().value().equals(row.${scopeField.getter}())#end) {
             throw new dev.mesbase.core.error.FoundationException(dev.mesbase.core.error.ErrorCode.NOT_FOUND);
         }
         return row;

@@ -9,7 +9,7 @@ import dev.mesbase.modules.pro.domain.ProWorkorderUpdateCommand;
 import java.util.List;
 
 /**
- * 生产工单表 CRUD 用例。
+ * 生产工单 CRUD 用例。
  *
  * @author MES Base
  */

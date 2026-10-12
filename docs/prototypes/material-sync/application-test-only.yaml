@@ -1,0 +1,5 @@
+# Historical TEST bindings removed. Material sync requires mes.material.enabled=true.
+# Default port explicitly rejects ERP queries; test adapters now exist only in test sources.
+mes:
+  material:
+    enabled: true

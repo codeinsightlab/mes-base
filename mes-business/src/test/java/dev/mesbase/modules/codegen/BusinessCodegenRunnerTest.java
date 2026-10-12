@@ -143,4 +143,99 @@ class BusinessCodegenRunnerTest {
             }
         }
     }
+
+    @Test
+    void historicalConfigSyncTogglePreviewAndWriteShareTheSameOutput() throws Exception {
+        var data = source();
+        var old = config("[person]", "write");
+        assertFalse(old.generateSync());
+        var runner = new BusinessCodegenRunner();
+        var ordinary = runner.run(old, repository(), data);
+        assertEquals("GENERATED", ordinary.status());
+        assertTrue(ordinary.files().stream().noneMatch(file -> file.path().contains("Sync")));
+        Path file = temporary.resolve("configuration.yaml");
+        String base = Files.readString(file).replace("overwrite: \"fail\"", "overwrite: \"replace-generated\"");
+        Files.writeString(file, base + "\ngenerateSync: true\nsync:\n  matchKey: name\n  batchMaximum: 1000\n");
+        var enabled = BusinessCodegenConfiguration.read(file);
+        Files.writeString(file, Files.readString(file).replace("mode: \"write\"", "mode: \"dry-run\""));
+        var preview = runner.run(BusinessCodegenConfiguration.read(file), repository(), data);
+        assertEquals("DRY_RUN", preview.status());
+        assertEquals(7, preview.files().stream().filter(artifact -> artifact.path().contains("/sync/")
+                || artifact.path().endsWith("SyncController.java")).count());
+        var generated = runner.run(enabled, repository(), data);
+        assertEquals("GENERATED", generated.status());
+        assertEquals(preview.files(), generated.files());
+        Path backend = temporary.resolve("backend/mes-business");
+        String page = Files.readString(temporary.resolve("frontend/src/views/common/person/index.vue"));
+        assertTrue(page.contains("<SyncButton"));
+        assertTrue(page.contains("business:person:sync"));
+        assertTrue(Files.readString(backend.resolve("docs/generated/common/person-menu.sql"))
+                .contains("business:person:sync"));
+        Path classes = temporary.resolve("sync-compiled");
+        Files.createDirectories(classes);
+        var compiler = ToolProvider.getSystemJavaCompiler();
+        try (var manager = compiler.getStandardFileManager(null, null, null); var paths = Files.walk(backend.resolve("src/main/java"))) {
+            assertTrue(compiler.getTask(null, manager, null,
+                    List.of("-classpath", System.getProperty("java.class.path"), "-d", classes.toString()), null,
+                    manager.getJavaFileObjectsFromPaths(paths.filter(path -> path.toString().endsWith(".java"))
+                            .toList())).call());
+        }
+        Files.writeString(file, base + "\ngenerateSync: false\n");
+        var disabled = runner.run(BusinessCodegenConfiguration.read(file), repository(), data);
+        assertEquals("GENERATED", disabled.status());
+        assertTrue(disabled.files().stream().noneMatch(artifact -> artifact.path().contains("/sync/") || artifact.path()
+                .endsWith("SyncController.java")));
+        assertFalse(Files.readString(temporary.resolve("frontend/src/views/common/person/index.vue"))
+                .contains("SyncButton"));
+        assertFalse(Files.readString(temporary.resolve("frontend/src/api/common/person.ts")).contains("/actions/sync"));
+        assertFalse(Files.readString(backend.resolve("src/main/java/sample/generated/common/controller/PersonPermissions.java"))
+                .contains("SYNC"));
+        // The existing writer overwrites but does not delete independent historical files.
+        assertTrue(Files.exists(backend.resolve("src/main/java/sample/generated/common/sync/PersonSyncService.java")));
+    }
+
+    @Test
+    void unknownMatchKeyRejectsPublicationAndTechnicalTablesCanBeExcluded() throws Exception {
+        var data = source();
+        config("[]", "write");
+        Path file = temporary.resolve("configuration.yaml");
+        String base = Files.readString(file);
+        Files.writeString(file, base + "\ngenerateSync: true\nsync:\n  matchKey: missing_column\n  batchMaximum: 1000\n");
+        var report = new BusinessCodegenRunner().run(BusinessCodegenConfiguration.read(file), repository(), data);
+        assertEquals("FAILED_PREFLIGHT", report.status());
+        assertTrue(report.rejected().stream().allMatch(table -> table.errorCode().equals("INVALID_SYNC_KEY")));
+        assertFalse(Files.exists(temporary.resolve("backend")));
+        try (var connection = data.getConnection(); var statement = connection.createStatement()) {
+            statement.execute("CREATE TABLE flyway_business_schema_history(installed_rank INT PRIMARY KEY, description VARCHAR(50))");
+        }
+        Files.writeString(file, base.replace("excludeTables: []", "excludeTables: [flyway_business_schema_history]"));
+        report = new BusinessCodegenRunner().run(BusinessCodegenConfiguration.read(file), repository(), data);
+        assertEquals("GENERATED", report.status());
+        assertEquals(2, report.tables().size());
+        assertTrue(report.tables().stream()
+                .noneMatch(table -> table.table().equalsIgnoreCase("flyway_business_schema_history")));
+    }
+
+
+    @Test
+    void explicitScopeColumnIsServerOwnedInCommandsCrudAndSync() throws Exception {
+        var data = source();
+        try (var connection = data.getConnection(); var statement = connection.createStatement()) {
+            statement.execute("ALTER TABLE person ADD factory_id VARCHAR(64) NOT NULL DEFAULT 'TEST_ONLY'");
+        }
+        config("[person]", "write");
+        Path file = temporary.resolve("configuration.yaml");
+        String base = Files.readString(file) + "\ntableOverrides:\n  person:\n    module: common\n    displayName: 人员\n    serverScopeColumn: factory_id\n";
+        Files.writeString(file, base + "\ngenerateSync: true\nsync:\n  matchKey: name\n  batchMaximum: 1000\n");
+        var report = new BusinessCodegenRunner().run(BusinessCodegenConfiguration.read(file), repository(), data);
+        assertEquals("GENERATED", report.status());
+        Path javaRoot = temporary.resolve("backend/mes-business/src/main/java/sample/generated/common");
+        assertFalse(Files.readString(javaRoot.resolve("domain/PersonCreateCommand.java")).contains("factoryId"));
+        assertFalse(Files.readString(javaRoot.resolve("sync/ExternalPerson.java")).contains("factoryId"));
+        String service = Files.readString(javaRoot.resolve("service/impl/PersonServiceImpl.java"));
+        assertTrue(service.contains("andFactoryIdEqualTo"));
+        assertTrue(service.contains("row.setFactoryId(FactoryContext.required().factoryId().value())"));
+        assertTrue(Files.readString(javaRoot.resolve("sync/PersonSyncWriter.java"))
+                .contains("andFactoryIdEqualTo(scope.factoryId().value())"));
+    }
 }

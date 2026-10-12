@@ -1,0 +1,18 @@
+@org.springframework.web.bind.annotation.RestController
+#if($conditionalEnabled)
+@org.springframework.boot.autoconfigure.condition.ConditionalOnProperty(name = "${conditionalProperty}", havingValue = "${conditionalValue}")
+#end
+public class ${ClassName}SyncController {
+    private final ${syncPackage}.${ClassName}SyncService service;
+
+    public ${ClassName}SyncController(${syncPackage}.${ClassName}SyncService service) {
+        this.service = service;
+    }
+
+    @org.springframework.web.bind.annotation.PostMapping("${route}/actions/sync")
+    @dev.mesbase.platform.web.EndpointAccess(value = dev.mesbase.platform.web.EndpointAccess.Kind.AUTHORIZED,
+            permission = ${ClassName}Permissions.SYNC)
+    public ${syncPackage}.${ClassName}SyncResult sync() {
+        return service.sync(dev.mesbase.platform.execution.FactoryContext.required());
+    }
+}

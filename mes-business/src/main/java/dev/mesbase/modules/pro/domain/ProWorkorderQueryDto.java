@@ -8,7 +8,7 @@ import java.time.LocalDateTime;
 import org.springframework.format.annotation.DateTimeFormat;
 
 /**
- * 生产工单表分页查询条件。
+ * 生产工单分页查询条件。
  */
 public record ProWorkorderQueryDto(
         @Min(0) Integer offset,

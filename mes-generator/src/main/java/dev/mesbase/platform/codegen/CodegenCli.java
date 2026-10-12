@@ -50,7 +50,7 @@ public final class CodegenCli {
         try {
             Map<String, String> flags = parse(args);
             if (flags.containsKey("help")) {
-                System.out.println("mes-codegen --table=TABLE [--module=MODULE] --business-name=NAME --scope=GLOBAL|FACTORY_SCOPED [--datasource=PROFILE] [--schema=SCHEMA] [--package=dev.mesbase.modules.MODULE] [--backend-module=mes-business] [--author=NAME] [--dry-run] [--overwrite] [--output=BACKEND_ROOT] [--frontend-root=FRONTEND_ROOT] [--config=PATH] [--format-java]");
+                System.out.println("mes-codegen --table=TABLE [--module=MODULE] --business-name=NAME --scope=GLOBAL|FACTORY_SCOPED [--datasource=PROFILE] [--schema=SCHEMA] [--package=dev.mesbase.modules.MODULE] [--backend-module=mes-business] [--author=NAME] [--dry-run] [--overwrite] [--output=BACKEND_ROOT] [--frontend-root=FRONTEND_ROOT] [--config=PATH] [--format-java] [--generate-sync=true|false --sync-match-key=COLUMN]");
                 return 0;
             }
             var app = new SpringApplication(ToolConfiguration.class);
@@ -96,7 +96,7 @@ public final class CodegenCli {
                         .normalize();
                 Path frontend = Path.of(flags.getOrDefault("frontend-root", backend.resolveSibling("mes-base-ui")
                         .toString()));
-                var request = new CodegenRequest(flags.get("datasource"), flags.get("schema"), required(flags, "table"), module, required(flags, "business-name"), flags.get("package"), flags.getOrDefault("author", "MES Base"), CodegenRequest.ScopeKind.valueOf(flags.getOrDefault("scope", "FACTORY_SCOPED")), flags.containsKey("overwrite") ? CodegenRequest.OverwritePolicy.REPLACE_GENERATED : CodegenRequest.OverwritePolicy.FAIL, flags.containsKey("dry-run"), backend, frontend, flags.getOrDefault("backend-module", "mes-business"));
+                var request = new CodegenRequest(flags.get("datasource"), flags.get("schema"), required(flags, "table"), module, required(flags, "business-name"), flags.get("package"), flags.getOrDefault("author", "MES Base"), CodegenRequest.ScopeKind.valueOf(flags.getOrDefault("scope", "FACTORY_SCOPED")), flags.containsKey("overwrite") ? CodegenRequest.OverwritePolicy.REPLACE_GENERATED : CodegenRequest.OverwritePolicy.FAIL, flags.containsKey("dry-run"), backend, frontend, flags.getOrDefault("backend-module", "mes-business"), syncFlag(flags), flags.get("sync-match-key"));
                 var profiles = new CodegenProfiles(settings.defaultDatasource(), sources);
                 MesCodegenService generator = flags.containsKey("format-java")
                         ? new DefaultMesCodegenService(profiles, new IdeaGeneratedJavaFormatter(
@@ -115,6 +115,12 @@ public final class CodegenCli {
         }
     }
 
+    private static boolean syncFlag(Map<String, String> flags) {
+        String value = flags.getOrDefault("generate-sync", "false");
+        if (!Set.of("true", "false").contains(value)) throw new CodegenException(CodegenException.Code.INVALID_REQUEST);
+        return Boolean.parseBoolean(value);
+    }
+
     private static String required(Map<String, String> flags, String key) {
         String value = flags.get(key);
         if (value == null || value.isBlank()) throw new CodegenException(CodegenException.Code.INVALID_REQUEST);
@@ -122,7 +128,7 @@ public final class CodegenCli {
     }
 
     private static Map<String, String> parse(String[] args) {
-        Set<String> allowed = Set.of("help", "table", "module", "business-name", "scope", "datasource", "schema", "package", "author", "dry-run", "overwrite", "output", "frontend-root", "config", "format-java", "backend-module");
+        Set<String> allowed = Set.of("help", "table", "module", "business-name", "scope", "datasource", "schema", "package", "author", "dry-run", "overwrite", "output", "frontend-root", "config", "format-java", "backend-module", "generate-sync", "sync-match-key");
         Set<String> switches = Set.of("help", "dry-run", "overwrite", "format-java");
         Map<String, String> flags = new HashMap<>();
         for (int i = 0; i < args.length; i++) {
