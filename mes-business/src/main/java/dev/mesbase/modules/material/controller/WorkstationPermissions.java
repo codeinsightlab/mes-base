@@ -3,7 +3,8 @@ package dev.mesbase.modules.material.controller;
 
 
 public final class WorkstationPermissions {
-    public static final String READ = "business:workstation:read";
+    public static final String LIST = "business:workstation:list";
+    public static final String QUERY = "business:workstation:query";
     public static final String CREATE = "business:workstation:create";
     public static final String UPDATE = "business:workstation:update";
     public static final String DELETE = "business:workstation:delete";

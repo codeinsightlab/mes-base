@@ -32,6 +32,8 @@ const fields: Field[] = [
 #end
     title="${functionNameHtml}"
     permission="${permission}"
+    list-action="${listAction}"
+    detail-action="${queryAction}"
 #if(!$scoped)
     permission-scope="platform"
 #end

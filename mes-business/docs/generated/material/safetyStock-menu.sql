@@ -13,61 +13,71 @@ UPDATE sys_menu SET menu_name = '安全库存配置', order_num = 0, path = 'saf
     component = 'material/safetyStock/index', icon = 'list',
     parent_id = (SELECT directory.menu_id FROM (SELECT menu_id FROM sys_menu
         WHERE parent_id = 0 AND path = 'material' AND menu_type = 'M') directory)
-WHERE perms = 'business:safety:stock:read' AND menu_type = 'C';
+WHERE perms = 'business:safety:stock:list' AND menu_type = 'C';
 INSERT INTO sys_menu (menu_name, parent_id, order_num, path, component, menu_type, perms, icon, create_by, create_time)
 SELECT '安全库存配置', directory.menu_id, 0, 'safetyStock', 'material/safetyStock/index',
-       'C', 'business:safety:stock:read', 'list', 'codegen', CURRENT_TIMESTAMP
+       'C', 'business:safety:stock:list', 'list', 'codegen', CURRENT_TIMESTAMP
 FROM sys_menu directory
 WHERE directory.parent_id = 0 AND directory.path = 'material' AND directory.menu_type = 'M'
-  AND NOT EXISTS (SELECT 1 FROM sys_menu WHERE perms = 'business:safety:stock:read' AND menu_type = 'C');
+  AND NOT EXISTS (SELECT 1 FROM sys_menu WHERE perms = 'business:safety:stock:list' AND menu_type = 'C');
 
-UPDATE sys_menu SET menu_name = '安全库存配置查询', order_num = 0, path = '#',
+UPDATE sys_menu SET menu_name = '安全库存配置列表', order_num = 0, path = '#',
     parent_id = (SELECT page.menu_id FROM (SELECT menu_id FROM sys_menu
-        WHERE perms = 'business:safety:stock:read' AND menu_type = 'C') page)
-WHERE perms = 'business:safety:stock:read' AND menu_type = 'F';
+        WHERE perms = 'business:safety:stock:list' AND menu_type = 'C') page)
+WHERE perms = 'business:safety:stock:list' AND menu_type = 'F';
 INSERT INTO sys_menu (menu_name, parent_id, order_num, path, menu_type, perms, create_by, create_time)
-SELECT '安全库存配置查询', page.menu_id, 0, '#', 'F', 'business:safety:stock:read',
+SELECT '安全库存配置列表', page.menu_id, 0, '#', 'F', 'business:safety:stock:list',
        'codegen', CURRENT_TIMESTAMP
 FROM sys_menu page
-WHERE page.perms = 'business:safety:stock:read' AND page.menu_type = 'C'
-  AND NOT EXISTS (SELECT 1 FROM sys_menu WHERE perms = 'business:safety:stock:read' AND menu_type = 'F');
-UPDATE sys_menu SET menu_name = '安全库存配置新增', order_num = 1, path = '#',
+WHERE page.perms = 'business:safety:stock:list' AND page.menu_type = 'C'
+  AND NOT EXISTS (SELECT 1 FROM sys_menu WHERE perms = 'business:safety:stock:list' AND menu_type = 'F');
+UPDATE sys_menu SET menu_name = '安全库存配置详情', order_num = 1, path = '#',
     parent_id = (SELECT page.menu_id FROM (SELECT menu_id FROM sys_menu
-        WHERE perms = 'business:safety:stock:read' AND menu_type = 'C') page)
+        WHERE perms = 'business:safety:stock:list' AND menu_type = 'C') page)
+WHERE perms = 'business:safety:stock:query' AND menu_type = 'F';
+INSERT INTO sys_menu (menu_name, parent_id, order_num, path, menu_type, perms, create_by, create_time)
+SELECT '安全库存配置详情', page.menu_id, 1, '#', 'F', 'business:safety:stock:query',
+       'codegen', CURRENT_TIMESTAMP
+FROM sys_menu page
+WHERE page.perms = 'business:safety:stock:list' AND page.menu_type = 'C'
+  AND NOT EXISTS (SELECT 1 FROM sys_menu WHERE perms = 'business:safety:stock:query' AND menu_type = 'F');
+UPDATE sys_menu SET menu_name = '安全库存配置新增', order_num = 2, path = '#',
+    parent_id = (SELECT page.menu_id FROM (SELECT menu_id FROM sys_menu
+        WHERE perms = 'business:safety:stock:list' AND menu_type = 'C') page)
 WHERE perms = 'business:safety:stock:create' AND menu_type = 'F';
 INSERT INTO sys_menu (menu_name, parent_id, order_num, path, menu_type, perms, create_by, create_time)
-SELECT '安全库存配置新增', page.menu_id, 1, '#', 'F', 'business:safety:stock:create',
+SELECT '安全库存配置新增', page.menu_id, 2, '#', 'F', 'business:safety:stock:create',
        'codegen', CURRENT_TIMESTAMP
 FROM sys_menu page
-WHERE page.perms = 'business:safety:stock:read' AND page.menu_type = 'C'
+WHERE page.perms = 'business:safety:stock:list' AND page.menu_type = 'C'
   AND NOT EXISTS (SELECT 1 FROM sys_menu WHERE perms = 'business:safety:stock:create' AND menu_type = 'F');
-UPDATE sys_menu SET menu_name = '安全库存配置修改', order_num = 2, path = '#',
+UPDATE sys_menu SET menu_name = '安全库存配置修改', order_num = 3, path = '#',
     parent_id = (SELECT page.menu_id FROM (SELECT menu_id FROM sys_menu
-        WHERE perms = 'business:safety:stock:read' AND menu_type = 'C') page)
+        WHERE perms = 'business:safety:stock:list' AND menu_type = 'C') page)
 WHERE perms = 'business:safety:stock:update' AND menu_type = 'F';
 INSERT INTO sys_menu (menu_name, parent_id, order_num, path, menu_type, perms, create_by, create_time)
-SELECT '安全库存配置修改', page.menu_id, 2, '#', 'F', 'business:safety:stock:update',
+SELECT '安全库存配置修改', page.menu_id, 3, '#', 'F', 'business:safety:stock:update',
        'codegen', CURRENT_TIMESTAMP
 FROM sys_menu page
-WHERE page.perms = 'business:safety:stock:read' AND page.menu_type = 'C'
+WHERE page.perms = 'business:safety:stock:list' AND page.menu_type = 'C'
   AND NOT EXISTS (SELECT 1 FROM sys_menu WHERE perms = 'business:safety:stock:update' AND menu_type = 'F');
-UPDATE sys_menu SET menu_name = '安全库存配置删除', order_num = 3, path = '#',
+UPDATE sys_menu SET menu_name = '安全库存配置删除', order_num = 4, path = '#',
     parent_id = (SELECT page.menu_id FROM (SELECT menu_id FROM sys_menu
-        WHERE perms = 'business:safety:stock:read' AND menu_type = 'C') page)
+        WHERE perms = 'business:safety:stock:list' AND menu_type = 'C') page)
 WHERE perms = 'business:safety:stock:delete' AND menu_type = 'F';
 INSERT INTO sys_menu (menu_name, parent_id, order_num, path, menu_type, perms, create_by, create_time)
-SELECT '安全库存配置删除', page.menu_id, 3, '#', 'F', 'business:safety:stock:delete',
+SELECT '安全库存配置删除', page.menu_id, 4, '#', 'F', 'business:safety:stock:delete',
        'codegen', CURRENT_TIMESTAMP
 FROM sys_menu page
-WHERE page.perms = 'business:safety:stock:read' AND page.menu_type = 'C'
+WHERE page.perms = 'business:safety:stock:list' AND page.menu_type = 'C'
   AND NOT EXISTS (SELECT 1 FROM sys_menu WHERE perms = 'business:safety:stock:delete' AND menu_type = 'F');
-UPDATE sys_menu SET menu_name = '安全库存配置同步', order_num = 4, path = '#',
+UPDATE sys_menu SET menu_name = '安全库存配置同步', order_num = 5, path = '#',
     parent_id = (SELECT page.menu_id FROM (SELECT menu_id FROM sys_menu
-        WHERE perms = 'business:safety:stock:read' AND menu_type = 'C') page)
+        WHERE perms = 'business:safety:stock:list' AND menu_type = 'C') page)
 WHERE perms = 'business:safety:stock:sync' AND menu_type = 'F';
 INSERT INTO sys_menu (menu_name, parent_id, order_num, path, menu_type, perms, create_by, create_time)
-SELECT '安全库存配置同步', page.menu_id, 4, '#', 'F', 'business:safety:stock:sync',
+SELECT '安全库存配置同步', page.menu_id, 5, '#', 'F', 'business:safety:stock:sync',
        'codegen', CURRENT_TIMESTAMP
 FROM sys_menu page
-WHERE page.perms = 'business:safety:stock:read' AND page.menu_type = 'C'
+WHERE page.perms = 'business:safety:stock:list' AND page.menu_type = 'C'
   AND NOT EXISTS (SELECT 1 FROM sys_menu WHERE perms = 'business:safety:stock:sync' AND menu_type = 'F');

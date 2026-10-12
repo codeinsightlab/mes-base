@@ -38,6 +38,7 @@ import dev.mesbase.modules.material.sync.ExternalMaterial;
 import dev.mesbase.modules.material.sync.MaterialQueryPort;
 import dev.mesbase.modules.material.sync.MaterialSyncService;
 import dev.mesbase.modules.material.sync.MaterialSyncWriter;
+import dev.mesbase.infrastructure.cache.BusinessCacheProcessor;
 import dev.mesbase.modules.material.sync.UnconfiguredMaterialQueryAdapter;
 import dev.mesbase.platform.execution.FactoryContext;
 import dev.mesbase.platform.web.FoundationAccessInterceptor;
@@ -151,6 +152,11 @@ class MaterialSyncHttpTest {
     @Import({MaterialSyncController.class, MaterialSyncService.class, MaterialSyncWriter.class, BasicDataRules.class,
             FoundationErrorAdvice.class})
     static class Web implements WebMvcConfigurer {
+        @Bean
+        BusinessCacheProcessor businessCaches() {
+            return mock(BusinessCacheProcessor.class);
+        }
+
         @Bean(destroyMethod = "close")
         Fixture fixture() throws Exception {
             return new Fixture();

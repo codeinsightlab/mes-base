@@ -3,7 +3,8 @@ package dev.mesbase.modules.material.controller;
 
 
 public final class SafetyStockPermissions {
-    public static final String READ = "business:safety:stock:read";
+    public static final String LIST = "business:safety:stock:list";
+    public static final String QUERY = "business:safety:stock:query";
     public static final String CREATE = "business:safety:stock:create";
     public static final String UPDATE = "business:safety:stock:update";
     public static final String DELETE = "business:safety:stock:delete";

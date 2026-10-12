@@ -5,7 +5,8 @@ Scope: FACTORY_SCOPED; Mapper owner: BUSINESS
 
 Path: `/api/material/safety-stock`
 
-- `business:safety:stock:read`
+- `business:safety:stock:list`
+- `business:safety:stock:query`
 - `business:safety:stock:create`
 - `business:safety:stock:update`
 - `business:safety:stock:delete`

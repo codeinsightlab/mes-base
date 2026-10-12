@@ -43,7 +43,7 @@ public class SafetyStockController {
 
     @GetMapping
     @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED,
-            permission = SafetyStockPermissions.READ)
+            permission = SafetyStockPermissions.LIST)
     public SafetyStockPageVo list(@Valid @ModelAttribute SafetyStockQueryDto query) {
         SafetyStockPage page = service.selectPage(query);
         return new SafetyStockPageVo(
@@ -53,7 +53,7 @@ public class SafetyStockController {
 
     @GetMapping("/{id}")
     @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED,
-            permission = SafetyStockPermissions.READ)
+            permission = SafetyStockPermissions.QUERY)
     public SafetyStockVo detail(@PathVariable Long id) {
         return toView(service.selectById(id));
     }
@@ -69,7 +69,7 @@ public class SafetyStockController {
     @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED,
             permission = SafetyStockPermissions.UPDATE)
     public SafetyStockVo update(@PathVariable Long id,
-                                @Valid @RequestBody SafetyStockUpdateCommand input) {
+            @Valid @RequestBody SafetyStockUpdateCommand input) {
         return toView(service.updateById(id, input));
     }
 
@@ -78,8 +78,8 @@ public class SafetyStockController {
     @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED,
             permission = SafetyStockPermissions.DELETE)
     public void delete(@RequestBody
-                       @NotEmpty @Size(max = 100)
-                       List<@NotNull Long> ids) {
+            @NotEmpty @Size(max = 100)
+            List<@NotNull Long> ids) {
         service.deleteByIds(ids);
     }
 

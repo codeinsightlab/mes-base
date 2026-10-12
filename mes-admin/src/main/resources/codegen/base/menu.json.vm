@@ -4,7 +4,7 @@
   "name": "${functionName}",
   "path": "/${moduleName}/${className}",
   "component": "${pageComponent}",
-  "permission": "${permission}:read",
+  "permission": "${permission}:${listAction}",
   "permissionScope": "${permissionScope}",
   "kind": "MENU",
   "icon": "${frontendIcon}",

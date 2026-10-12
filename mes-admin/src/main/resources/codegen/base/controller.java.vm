@@ -15,7 +15,7 @@ public class ${ClassName}Controller {
 
     @org.springframework.web.bind.annotation.GetMapping
     @dev.mesbase.platform.web.EndpointAccess(value = dev.mesbase.platform.web.EndpointAccess.Kind.AUTHORIZED,
-            permission = ${ClassName}Permissions.READ#if(!$scoped), permissionScope = dev.mesbase.platform.web.EndpointAccess.PermissionScope.PLATFORM#end)
+            permission = ${ClassName}Permissions.${listPermissionConstant}#if(!$scoped), permissionScope = dev.mesbase.platform.web.EndpointAccess.PermissionScope.PLATFORM#end)
     public ${responsePackage}.${ClassName}PageVo list(@jakarta.validation.Valid @org.springframework.web.bind.annotation.ModelAttribute ${domainPackage}.${ClassName}QueryDto query) {
         ${domainPackage}.${ClassName}Page page = service.selectPage(query);
         return new ${responsePackage}.${ClassName}PageVo(
@@ -25,7 +25,7 @@ public class ${ClassName}Controller {
 
     @org.springframework.web.bind.annotation.GetMapping("/{id}")
     @dev.mesbase.platform.web.EndpointAccess(value = dev.mesbase.platform.web.EndpointAccess.Kind.AUTHORIZED,
-            permission = ${ClassName}Permissions.READ#if(!$scoped), permissionScope = dev.mesbase.platform.web.EndpointAccess.PermissionScope.PLATFORM#end)
+            permission = ${ClassName}Permissions.${queryPermissionConstant}#if(!$scoped), permissionScope = dev.mesbase.platform.web.EndpointAccess.PermissionScope.PLATFORM#end)
     public ${responsePackage}.${ClassName}Vo detail(@org.springframework.web.bind.annotation.PathVariable ${idType} id) {
         return toView(service.selectById(id));
     }

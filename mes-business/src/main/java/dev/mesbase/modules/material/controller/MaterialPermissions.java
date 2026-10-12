@@ -2,13 +2,16 @@
 package dev.mesbase.modules.material.controller;
 
 
-public final class MaterialPermissions {
-    public static final String READ = "business:material:read";
-    public static final String CREATE = "business:material:create";
-    public static final String UPDATE = "business:material:update";
-    public static final String DELETE = "business:material:delete";
+import dev.mesbase.modules.material.domain.MaterialResource;
 
-    public static final String SYNC = "business:material:sync";
+public final class MaterialPermissions {
+    public static final String LIST = MaterialResource.PREFIX + ":list";
+    public static final String QUERY = MaterialResource.PREFIX + ":query";
+    public static final String CREATE = MaterialResource.PREFIX + ":create";
+    public static final String UPDATE = MaterialResource.PREFIX + ":update";
+    public static final String DELETE = MaterialResource.PREFIX + ":delete";
+
+    public static final String SYNC = MaterialResource.PREFIX + ":sync";
 
     private MaterialPermissions() {
     }

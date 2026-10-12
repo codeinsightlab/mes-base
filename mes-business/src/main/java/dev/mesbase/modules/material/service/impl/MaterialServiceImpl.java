@@ -1,6 +1,8 @@
 // MES-CODEGEN: scaffold; review required. RuoYi template pipeline adapted under MIT.
 package dev.mesbase.modules.material.service.impl;
 
+import dev.mesbase.infrastructure.cache.annotation.BusinessCache;
+import dev.mesbase.infrastructure.cache.annotation.BusinessCacheEvict;
 import com.github.pagehelper.Page;
 import com.github.pagehelper.PageHelper;
 import dev.mesbase.core.error.ErrorCode;
@@ -8,6 +10,7 @@ import dev.mesbase.core.error.FoundationException;
 import dev.mesbase.modules.material.dao.MaterialMapper;
 import dev.mesbase.modules.material.domain.MaterialCreateCommand;
 import dev.mesbase.modules.material.domain.MaterialEntity;
+import dev.mesbase.modules.material.domain.MaterialResource;
 import dev.mesbase.modules.material.domain.MaterialExample;
 import dev.mesbase.modules.material.domain.MaterialPage;
 import dev.mesbase.modules.material.domain.MaterialQueryDto;
@@ -39,6 +42,7 @@ public class MaterialServiceImpl implements IMaterialService {
 
     @Override
     @Transactional(transactionManager = "businessTransactionManager", readOnly = true)
+    @BusinessCache(business = MaterialResource.PREFIX, type = BusinessCache.Type.LIST)
     public MaterialPage selectPage(MaterialQueryDto query) {
         int offset = query.offset() == null ? 0 : query.offset();
         int limit = query.limit() == null ? 20 : query.limit();
@@ -86,12 +90,14 @@ public class MaterialServiceImpl implements IMaterialService {
 
     @Override
     @Transactional(transactionManager = "businessTransactionManager", readOnly = true)
+    @BusinessCache(business = MaterialResource.PREFIX, type = BusinessCache.Type.DETAIL)
     public MaterialEntity selectById(Long id) {
         return requireRecord(id);
     }
 
     @Override
     @Transactional(transactionManager = "businessTransactionManager", rollbackFor = Exception.class)
+    @BusinessCacheEvict(business = MaterialResource.PREFIX, scope = BusinessCacheEvict.Scope.LIST)
     public MaterialEntity insert(MaterialCreateCommand input) {
         MaterialEntity row = new MaterialEntity();
         row.setFactoryId(FactoryContext.required().factoryId().value());
@@ -113,6 +119,7 @@ public class MaterialServiceImpl implements IMaterialService {
 
     @Override
     @Transactional(transactionManager = "businessTransactionManager", rollbackFor = Exception.class)
+    @BusinessCacheEvict(business = MaterialResource.PREFIX, scope = BusinessCacheEvict.Scope.LIST_AND_DETAIL)
     public MaterialEntity updateById(Long id, MaterialUpdateCommand input) {
         MaterialEntity row = requireRecord(id);
         row.setId(id);
@@ -134,6 +141,7 @@ public class MaterialServiceImpl implements IMaterialService {
 
     @Override
     @Transactional(transactionManager = "businessTransactionManager", rollbackFor = Exception.class)
+    @BusinessCacheEvict(business = MaterialResource.PREFIX, scope = BusinessCacheEvict.Scope.LIST_AND_DETAIL)
     public void deleteByIds(List<Long> ids) {
         if (ids == null || ids.isEmpty() || ids.size() > 100 || ids.stream().anyMatch(Objects::isNull)
                 || new HashSet<>(ids).size() != ids.size()) {

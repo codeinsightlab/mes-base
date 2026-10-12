@@ -1,11 +1,14 @@
 // MES-CODEGEN: scaffold; review required. RuoYi template pipeline adapted under MIT.
 package dev.mesbase.modules.material.sync;
 
+import dev.mesbase.infrastructure.cache.BusinessCacheProcessor;
+import dev.mesbase.infrastructure.cache.annotation.BusinessCacheEvict.Scope;
 import dev.mesbase.core.error.ErrorCode;
 import dev.mesbase.core.error.FoundationException;
 import dev.mesbase.core.factory.FactoryScope;
 import dev.mesbase.modules.material.dao.MaterialMapper;
 import dev.mesbase.modules.material.domain.MaterialEntity;
+import dev.mesbase.modules.material.domain.MaterialResource;
 import dev.mesbase.modules.material.domain.MaterialExample;
 import dev.mesbase.platform.execution.FactoryContext;
 import jakarta.validation.Validator;
@@ -28,11 +31,14 @@ public class MaterialSyncWriter {
     private final MaterialMapper mapper;
     private final Validator validator;
     private final BasicDataRules rules;
+    private final BusinessCacheProcessor caches;
 
-    public MaterialSyncWriter(MaterialMapper mapper, Validator validator, BasicDataRules rules) {
+    public MaterialSyncWriter(MaterialMapper mapper, Validator validator, BasicDataRules rules,
+                              BusinessCacheProcessor caches) {
         this.mapper = mapper;
         this.validator = validator;
         this.rules = rules;
+        this.caches = caches;
     }
 
     @Transactional(transactionManager = "businessTransactionManager", rollbackFor = Exception.class)
@@ -95,6 +101,8 @@ public class MaterialSyncWriter {
             if (insert) created++;
             else updated++;
         }
+        if (updated > 0) caches.evict(MaterialResource.PREFIX, Scope.LIST_AND_DETAIL);
+        else if (created > 0) caches.evict(MaterialResource.PREFIX, Scope.LIST);
         return new MaterialSyncResult(inputs.size(), created, updated, skipped);
     }
 

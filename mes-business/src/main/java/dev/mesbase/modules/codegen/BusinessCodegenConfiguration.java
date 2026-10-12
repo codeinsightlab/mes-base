@@ -107,7 +107,8 @@ public record BusinessCodegenConfiguration(Integer version, Source source, Selec
         require("table-comment".equals(config.naming.displayName.strategy)
                 && "table-name".equals(config.naming.displayName.fallback), "naming.displayName");
         require("mybatis3-xmlmapper".equals(config.templates.persistence), "templates.persistence");
-        require(List.of("read", "create", "update", "delete").equals(config.backend.permission.actions)
+        require((List.of("read", "create", "update", "delete").equals(config.backend.permission.actions)
+                || List.of("list", "query", "create", "update", "delete").equals(config.backend.permission.actions))
                 && "delete".equals(config.backend.permission.batchDeleteAction), "backend.permission.actions");
         require(List.of("factory", "platform").contains(config.backend.permission.scope), "backend.permission.scope");
         require(List.of("dry-run", "write").contains(config.execution.mode), "execution.mode");

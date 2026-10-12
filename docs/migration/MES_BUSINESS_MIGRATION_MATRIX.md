@@ -1,6 +1,11 @@
 # MES Business Migration Matrix
 
-> 2026-10-12 第二轮：当前产品迁移决定以[MES_CAPABILITY_REVIEW](MES_CAPABILITY_REVIEW.md)为准。
+> **2026-10-12 第一批实施：用户已批准六项按 SIMPLE 迁入，ERP_SYNC 全部启用。**
+> 当前决定和验收见 [SIMPLE_BUSINESS_MIGRATION_ACCEPTANCE](SIMPLE_BUSINESS_MIGRATION_ACCEPTANCE.md)。
+> 第二轮审查保留为历史；其中对本批六项的 DEFER/REDESIGN 不再决定本轮范围，其他业务未获本轮实施授权。
+
+
+> 历史第二轮：当时产品迁移决定以[MES_CAPABILITY_REVIEW](MES_CAPABILITY_REVIEW.md)为准。
 > 五张已建表均重新进入REVIEW；SCHEMA_READY只保留建表技术事实。
 > 下文首轮GENERATE/ADAPT_SCHEMA结论已撤回，不能作为继续建表/Codegen的授权。
 
@@ -23,12 +28,12 @@ Backend 路径以 Source 的 `ktg-mes/src/main/java/com/ktg/mes/` 为前缀；Ma
 
 | Capability | Source Tables | Source Backend | Complexity | Strategy | Schema Action | Status | Notes |
 |---|---|---|---|---|---|---|---|
-| Unit Of Measure / 单位语义与目录投影 | md_unit_measure；ERP UNIT来源 | MdUnitMeasureServiceImpl、UnitMeasureCache/Aspect及单位Store | MODERATE | DEFER | 既有表暂留，停止Schema锁定 | REVIEW / RECONSIDER | 当前表有技术SCHEMA_READY记录；权威来源与换算执行用途未证明 |
-| Workshop / 可选生产组织层级 | md_workshop及工作站/ERP引用 | MdWorkshopController、MdWorkstationController、IssueReceiptServiceImpl | MODERATE | DEFER | 既有表暂留，不强制层级 | REVIEW / RECONSIDER | Factory→WorkCenter可形成最小资源布局；首轮适配决定撤回 |
+| Unit Of Measure / 计量单位 | md_unit_measure | MdUnitMeasureController、单位下拉 | SIMPLE | ADAPT_SCHEMA / GENERATE | unit_measure；V2 | IMPLEMENTED / ACCEPTED | 用户已批准；ERP_SYNC；不迁换算 |
+| Workshop / 可选组织层级 | md_workshop | MdWorkshopController | SIMPLE | ADAPT_SCHEMA / GENERATE | workshop；V2 | IMPLEMENTED / ACCEPTED | workshop_id 可空；ERP_SYNC |
 | Quality Inspection Model / 含检测项 | qc_index, qc_template_index/product及检验头/行 | QcTemplateIndexController→QcIpqcController→QcDefectRecordController | COMPLEX | REDESIGN | 既有qc_index暂留，质量整体定模型 | REVIEW / RECONSIDER | 检测配置CRUD只是复杂质量执行的一部分，暂停独立生成 |
 | Defect Management / 字典接入候选 | qc_defect；执行记录为qc_defect_record及不良申报 | QcDefectController；缺陷执行消费者未找到稳定字典引用 | UNKNOWN | DEFER | 既有qc_defect暂留 | REVIEW / RECONSIDER | 字典自身CRUD仍简单；不能用孤立目录证明质量能力或迁移准入 |
 | Equipment Maintenance / 含点检项目 | dv_subject, dv_check_plan/machinery/subject, dv_repair/line | DvCheckPlanController及点检项目选择页面 | COMPLEX | DEFER | 既有dv_subject暂留，默认范围不迁 | REVIEW / DROP_CANDIDATE | 属可选设备维护能力，不能因表已建就纳入默认MES |
-| Material / Product 基础资料及分类 | md_item, md_item_type, erp_item, erp_item_production | md/MdItemController, MdItemServiceImpl, ItemTypeServiceImpl；erp/ErpItemServiceImpl | COMPLEX | REDESIGN | 本轮不建表 | BACKLOG | 资料 CRUD 可后续拆出生成；当前创建同时分类赋值、条码写入，安全库存编辑有规则；分类是层级树 |
+| Material / Product 简化投影 | md_item | MdItemController、物料页面 | SIMPLE | ADAPT_SCHEMA / GENERATE | material；V2 | IMPLEMENTED / ACCEPTED | 不迁 BOM/条码/库存执行；分类与安全库存单独维护；ERP_SYNC |
 | Product BOM / SOP | md_product_bom, md_product_sop | md/MdProductBomServiceImpl, MdProductSopServiceImpl | UNKNOWN | REVIEW | 不建表 | REVIEW_REQUIRED | 有产品/组件/文件依赖；未深审替代料、版本和删除一致性，不能凭名称判简单 |
 | Client / Vendor 基础档案 | md_client, md_vendor | md/MdClientServiceImpl, MdVendorServiceImpl；erp/ErpSupplierServiceImpl | UNKNOWN | REVIEW | 不建表 | REVIEW_REQUIRED | 基础档案可生成候选；先区分通用联系资料与 ERP 同步来源，不全搬供应商连接 |
 | Operation / Process | pro_process, pro_process_user, pro_process_content, pro_process_inspection, qc_defective_cause, process_file_relation, process_external_mapping | pro/ProProcessServiceImpl, ProcessFileManagementServiceImpl, ProcessExternalMappingServiceImpl | COMPLEX | REDESIGN | 不建表 | BACKLOG | 新增复制人员/不良原因并绑定固定 admin；临时单价有效期、检验与文件关联混入工序 |
@@ -109,3 +114,16 @@ GAP 见 [MES_BUSINESS_GAP](MES_BUSINESS_GAP.md)。
 
 没有修改五表DDL/Converter或任何数据库。复杂能力的现实必要性与后续分析优先级以第二轮审查为准，
 不能继续用“Source有此功能”或“表简单”决定默认迁移。
+
+## 2026-10-12 用户批准的第一批 SIMPLE 实施
+
+| MODULE | SOURCE_TABLE | TARGET_TABLE | Complexity | Strategy | Sync | Status |
+|---|---|---|---|---|---|---|
+| 物料产品分类 | md_item_type | material_category | SIMPLE | ADAPT_SCHEMA / GENERATE | ERP_SYNC=true；人工 CRUD 可独立使用 | IMPLEMENTED / ACCEPTED |
+| 计量单位 | md_unit_measure | unit_measure | SIMPLE | ADAPT_SCHEMA / GENERATE | ERP_SYNC=true；人工 CRUD 可独立使用 | IMPLEMENTED / ACCEPTED |
+| 工作站 | md_workstation | workstation | SIMPLE | ADAPT_SCHEMA / GENERATE | ERP_SYNC=true；人工 CRUD 可独立使用 | IMPLEMENTED / ACCEPTED |
+| 车间 | md_workshop | workshop | SIMPLE | ADAPT_SCHEMA / GENERATE | ERP_SYNC=true；人工 CRUD 可独立使用 | IMPLEMENTED / ACCEPTED |
+| 物料产品 | md_item | material | SIMPLE | ADAPT_SCHEMA / GENERATE | ERP_SYNC=true；人工 CRUD 可独立使用 | IMPLEMENTED / ACCEPTED |
+| 安全库存 | md_item.safe_stock_flag/min_stock/max_stock | safety_stock | SIMPLE | ADAPT_SCHEMA / GENERATE | ERP_SYNC=true；人工 CRUD 可独立使用 | IMPLEMENTED / ACCEPTED |
+
+当前六项的 Schema、规则、权限、Converter 和证据逐项见验收报告。Workshop 的 OPTIONAL 指组织层级可省略，不表示本轮暂缓；安全库存暂放基础数据，因为当前只维护物料阈值，不实施 MRP。

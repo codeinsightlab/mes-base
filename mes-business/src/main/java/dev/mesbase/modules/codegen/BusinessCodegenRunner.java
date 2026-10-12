@@ -178,6 +178,7 @@ public final class BusinessCodegenRunner {
         variables.put("syncBatchMaximum", c.generateSync() ? c.sync().batchMaximum() : 1000);
         variables.put("route", apiPath);
         variables.put("permission", permission);
+        variables.put("separateQueryPermission", c.backend().permission().actions().contains("list"));
         variables.put("permissionScope", c.backend().permission().scope());
         variables.put("transactionManager", c.backend().transactionManager());
         variables.put("conditionalEnabled", c.backend().conditional().enabled());

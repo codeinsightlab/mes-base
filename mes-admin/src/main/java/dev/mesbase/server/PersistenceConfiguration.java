@@ -1,6 +1,7 @@
 package dev.mesbase.server;
 
 import com.alibaba.druid.pool.DruidDataSource;
+import dev.mesbase.infrastructure.cache.BusinessCacheAspect;
 import dev.mesbase.infrastructure.persistence.BusinessPersistence;
 import dev.mesbase.infrastructure.persistence.BusinessPersistenceResolver;
 import dev.mesbase.infrastructure.persistence.DedicatedDatabasePersistence;
@@ -25,7 +26,7 @@ import org.springframework.core.env.Environment;
 import org.springframework.transaction.annotation.EnableTransactionManagement;
 
 @Configuration
-@EnableTransactionManagement(proxyTargetClass = true)
+@EnableTransactionManagement(proxyTargetClass = true, order = BusinessCacheAspect.TRANSACTION_ORDER)
 @ConditionalOnProperty(name = "mes.system.enabled", havingValue = "true")
 public class PersistenceConfiguration {
     @Bean

@@ -43,7 +43,7 @@ public class MaterialCategoryController {
 
     @GetMapping
     @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED,
-            permission = MaterialCategoryPermissions.READ)
+            permission = MaterialCategoryPermissions.LIST)
     public MaterialCategoryPageVo list(@Valid @ModelAttribute MaterialCategoryQueryDto query) {
         MaterialCategoryPage page = service.selectPage(query);
         return new MaterialCategoryPageVo(
@@ -53,7 +53,7 @@ public class MaterialCategoryController {
 
     @GetMapping("/{id}")
     @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED,
-            permission = MaterialCategoryPermissions.READ)
+            permission = MaterialCategoryPermissions.QUERY)
     public MaterialCategoryVo detail(@PathVariable Long id) {
         return toView(service.selectById(id));
     }
@@ -69,7 +69,7 @@ public class MaterialCategoryController {
     @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED,
             permission = MaterialCategoryPermissions.UPDATE)
     public MaterialCategoryVo update(@PathVariable Long id,
-                                     @Valid @RequestBody MaterialCategoryUpdateCommand input) {
+            @Valid @RequestBody MaterialCategoryUpdateCommand input) {
         return toView(service.updateById(id, input));
     }
 
@@ -78,8 +78,8 @@ public class MaterialCategoryController {
     @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED,
             permission = MaterialCategoryPermissions.DELETE)
     public void delete(@RequestBody
-                       @NotEmpty @Size(max = 100)
-                       List<@NotNull Long> ids) {
+            @NotEmpty @Size(max = 100)
+            List<@NotNull Long> ids) {
         service.deleteByIds(ids);
     }
 

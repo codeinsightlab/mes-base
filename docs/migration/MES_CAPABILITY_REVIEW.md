@@ -1,5 +1,10 @@
 # MES Capability Review
 
+> **2026-10-12 第一批实施：用户已批准六项按 SIMPLE 迁入，ERP_SYNC 全部启用。**
+> 当前决定和验收见 [SIMPLE_BUSINESS_MIGRATION_ACCEPTANCE](SIMPLE_BUSINESS_MIGRATION_ACCEPTANCE.md)。
+> 第二轮审查保留为历史；其中对本批六项的 DEFER/REDESIGN 不再决定本轮范围，其他业务未获本轮实施授权。
+
+
 2026-10-12；第二轮，仅审查与修正迁移决策。Source为`/Users/user/work/heri/ktg-mes`的
 `master / 42a81cc577dc77b05a6a67f6be0a9466e40784e1`，排除`ktg-wheel`。
 必要页面只读核对`/Users/user/work/heri/ktg-mes-ui`。本轮没有数据库连接、DDL、Codegen、
@@ -34,20 +39,20 @@ E编号指向第6节的实际Source入口；“一轮入口”只表示已识别
 
 | Capability | Source Evidence | MES Necessity | Reality Reason | Source Complexity | Dependencies | Strategy | Decision |
 |---|---|---|---|---|---|---|---|
-| Material / Product执行投影 | E04、ERP物料来源XML、MdItem Entity | CORE | 工艺员/作业员在派工、报工识别生产对象、规格和数量单位；没有它会混淆执行对象。ERP/PLM可权威维护，MES保存执行所需投影；跨行业通用。不是复制完整物料主数据系统。 | COMPLEX | 单位语义、工艺、BOM、条码、ERP来源 | REDESIGN | REDESIGN_LATER |
+| Material / Product执行投影 | E04、ERP物料来源XML、MdItem Entity | CORE | 工艺员/作业员在派工、报工识别生产对象、规格和数量单位；没有它会混淆执行对象。ERP/PLM可权威维护，MES保存执行所需投影；跨行业通用。不是复制完整物料主数据系统。 | SIMPLE | 单位语义、工艺、BOM、条码、ERP来源 | ADAPT_SCHEMA / GENERATE | IMPLEMENTED / ACCEPTED |
 | Operation执行定义 | E05、pro_process及人员/检验/内容关联 | CORE | 工艺员定义要做的作业，作业员按工序执行、班组长看进度；没有作业身份无法定位报工。MES需要可执行定义，工艺权威可来自PLM；普遍适用，但计件单价不是核心。 | COMPLEX | 人员、Routing、检测、文件 | REDESIGN | REDESIGN_LATER |
 | Routing / 执行顺序 | E06、pro_route/process/product/BOM | CORE | 工艺员/班组长在工单下达及转序确定先做什么、何时可做下一步；缺少后进度和完工无依据。MES负责采用执行顺序，复杂路线可由上游提供；简单生产可只有一步。 | COMPLEX | 产品、Operation、WorkOrder、Reporting | REDESIGN | REDESIGN_LATER |
 | WorkOrder / Job Execution | E07、E08及pro_task | CORE | 计划员下达、班组长派工、作业员执行、生产主管关闭；没有执行任务就无法对应计划与现场结果。ERP可产生需求，MES负责现场执行状态；多数制造通用。 | COMPLEX | Routing、产品、数量、任务、Reporting | REDESIGN | REDESIGN_LATER |
 | Production Reporting | E09、E10、移动WorkReportController | CORE | 作业员在工序完成时记录实际人/时间/产出，班组长核对进度；缺少后只有计划没有执行事实。MES主责，工资只是下游用途；多数生产方式适用，采集方式可人工或设备。 | COMPLEX | 工单、工序、材料可用量、WIP、质量、入库 | REDESIGN | REDESIGN_LATER |
 | 基础WIP / 工序进度 | E09.executeMaterial、E10状态更新、E22 | CORE | 班组长/作业员在待加工、加工、待转序和完工时核对剩余量与所在工序；没有它无法判断下一步及避免重复累计。MES主责；基础语义通用，全仓位库存台账并非默认要求。 | COMPLEX | 工单、Reporting、Routing、投入/产出 | REDESIGN | REDESIGN_LATER |
 | 基础Execution Traceability | E09执行事实、E20批次查询、E18关联记录 | CORE | 生产/质量人员在异常追查时回答哪个对象由谁何时在哪道工序生产；缺少后无法解释报工与异常来源。MES保留执行关联；批次/序列号粒度按产品确定，不强制复杂谱系。 | COMPLEX | 工单、工序、执行对象、报工、质量结果 | REDESIGN | REDESIGN_LATER |
-| 执行资源 / WorkCenter身份 | E03、MdWorkstation及机器/人员/工装关联 | CORE | 班组长派工、作业员报工要定位实际执行单元；没有它无法分辨现场资源与产能归属。MES负责执行资源引用，人员/资产可外部权威；可用Factory→WorkCenter，不强制Workshop层级。 | COMPLEX | 工序、人员、设备；Source还混入线边库和条码 | REDESIGN | REDESIGN_LATER |
+| 工作站基础执行位置 | E03、md_workstation | CORE | 用户批准的简单位置目录，供未来执行引用；不迁设备/人员/线边库/条码。统一术语 Workstation，车间可选。 | SIMPLE | 可选 Workshop | ADAPT_SCHEMA / GENERATE | IMPLEMENTED / ACCEPTED |
 | Quality Inspection定义与执行 | E11、E12、E13、E23、E26 | COMMON | 质量工程师配置要求，检验员在来料/工序/完工检验记录结果；缺少后MES无法挂接检测依据与结果。MES执行、QMS可供规则；常见，但完整IQC/OQC、SPC和审批体系不是所有基础MES必需。 | COMPLEX | 产品、工序/工步、模板、阈值、单据、缺陷、通知 | REDESIGN | REDESIGN_LATER |
 | Defect Management / 不良事实 | E13、QcDefectiveServiceImpl、E10 | COMMON | 检验员/作业员发现不良，质量/生产人员核对缺陷数量与影响；缺少后良品/不良及原因难解释。MES记录执行事实，QMS可负责处置；常见，不默认迁责任扣款。 | COMPLEX | 检验单/行、工序、报工、材料、不良申报 | REDESIGN | REDESIGN_LATER |
 | 缺陷分类目录（质量域子能力） | E14；执行记录未找到qc_defect ID引用 | COMMON | 质量工程师统一缺陷描述便于录入与统计；缺少目录仍可记录文本缺陷，但分类一致性下降。可由QMS供码表；常见辅助能力，须先确定质量执行如何引用。 | UNKNOWN | 质量定义、缺陷记录/分类契约 | DEFER | REVIEW |
-| Unit Of Measure语义/目录投影 | E01、ERP UNIT来源、前端单位Store | COMMON | 物料/工艺人员及作业员在录入数量和检测值时使用单位，避免数量口径混淆；没有本地维护页面仍可使用权威投影。ERP可唯一权威；单位语义通用，独立主数据表不是必需。 | MODERATE | Material、BOM、检测、报工；缓存/双来源 | DEFER | REVIEW |
+| Unit Of Measure语义/目录投影 | E01、ERP UNIT来源、前端单位Store | COMMON | 物料/工艺人员及作业员在录入数量和检测值时使用单位，避免数量口径混淆；没有本地维护页面仍可使用权威投影。ERP可唯一权威；单位语义通用，独立主数据表不是必需。 | SIMPLE | Material、BOM、检测、报工；缓存/双来源 | ADAPT_SCHEMA / GENERATE | IMPLEMENTED / ACCEPTED |
 | 通用单位换算能力 | change_rate仅确认存储/VO/表单使用 | OPTIONAL | 工程员在不同计量口径之间转换时需要规则；单单位生产不用转换。权威宜与ERP/物料规则一致，MES只在真实执行需要时使用；不是多数项目默认要一个全局换算引擎。 | UNKNOWN | 物料专属换算、精度、有效期、权威来源 | DEFER | DEFER |
-| Workshop / 可选生产组织层级 | E02、E03、E25；workshop页面 | OPTIONAL | 多车间主管按车间分组资源与报表；单层工厂可直接按WorkCenter组织，缺少Workshop不破坏执行。MES可保留组织投影，部门不是同一概念；层级需求随工厂规模变化。 | MODERATE | Factory、WorkCenter、部门；Source ERP仓库/组织绑定 | DEFER | DEFER |
+| Workshop / 可选生产组织层级 | E02、E03、E25；workshop页面 | OPTIONAL | 多车间主管按车间分组资源与报表；单层工厂可直接按WorkCenter组织，缺少Workshop不破坏执行。MES可保留组织投影，部门不是同一概念；层级需求随工厂规模变化。 | SIMPLE | Factory、WorkCenter、部门；Source ERP仓库/组织绑定 | ADAPT_SCHEMA / GENERATE | IMPLEMENTED / ACCEPTED |
 | 物料投入/领用执行事实 | E16、E09数量前置、E25 | COMMON | 配料员/作业员在开工和投料时核对实际投入，生产/质量人员追查材料来源；缺少后材料相关数量/追溯不足。MES存执行事实，ERP/WMS可负责领料单及库账；材料敏感流程常见，非所有报工入口都须领料单。 | COMPLEX | BOM用量、批次、工单、库存、ERP命令 | REDESIGN | REDESIGN_LATER |
 | Production Receipt / 产出移交 | E17、E09末序入库 | COMMON | 生产/仓库人员在完工交接时确认产出与移交对象；缺少后完工与仓库收货可能脱节。MES记录产出/移交，ERP/WMS可开入库单；常见，ERP 5A00创建/审核不等于核心完工。 | COMPLEX | Reporting、工单、批次、仓库资格、ERP核对 | REDESIGN | REDESIGN_LATER |
 | BOM / 作业指导引用 | MdProductBom、MdProductSop；E04、E07 | COMMON | 工艺员给出用料和作业要求，作业员生产时查看；缺少后执行依据不足。PLM/ERP可维护，MES需任务引用/投影；常见，完整BOM编辑与版本管理不必默认由MES主责。 | UNKNOWN | 产品、投入规则、文件及执行依据 | DEFER | REVIEW |
@@ -219,3 +224,16 @@ GAP值是后续分析必要性，不是本轮建表授权；不能从“架构�
 已验证：Source静态调用链/字段/页面、引用检索范围、本文证据链接及DDL/Converter未改。
 未验证：现场实际使用、生产metadata/数据、Source测试/HTTP/UI运行、完整复检/处置链、外部消费者、跨节点并发。
 未运行Maven/UI测试：本轮只改审查文档，不修改任何实现；首轮构建记录仍是历史记录，不宣称本轮重验通过。
+
+## 2026-10-12 用户批准的第一批 SIMPLE 实施
+
+| MODULE | SOURCE_TABLE | TARGET_TABLE | Complexity | Strategy | Sync | Status |
+|---|---|---|---|---|---|---|
+| 物料产品分类 | md_item_type | material_category | SIMPLE | ADAPT_SCHEMA / GENERATE | ERP_SYNC=true；人工 CRUD 可独立使用 | IMPLEMENTED / ACCEPTED |
+| 计量单位 | md_unit_measure | unit_measure | SIMPLE | ADAPT_SCHEMA / GENERATE | ERP_SYNC=true；人工 CRUD 可独立使用 | IMPLEMENTED / ACCEPTED |
+| 工作站 | md_workstation | workstation | SIMPLE | ADAPT_SCHEMA / GENERATE | ERP_SYNC=true；人工 CRUD 可独立使用 | IMPLEMENTED / ACCEPTED |
+| 车间 | md_workshop | workshop | SIMPLE | ADAPT_SCHEMA / GENERATE | ERP_SYNC=true；人工 CRUD 可独立使用 | IMPLEMENTED / ACCEPTED |
+| 物料产品 | md_item | material | SIMPLE | ADAPT_SCHEMA / GENERATE | ERP_SYNC=true；人工 CRUD 可独立使用 | IMPLEMENTED / ACCEPTED |
+| 安全库存 | md_item.safe_stock_flag/min_stock/max_stock | safety_stock | SIMPLE | ADAPT_SCHEMA / GENERATE | ERP_SYNC=true；人工 CRUD 可独立使用 | IMPLEMENTED / ACCEPTED |
+
+当前六项的 Schema、规则、权限、Converter 和证据逐项见验收报告。Workshop 的 OPTIONAL 指组织层级可省略，不表示本轮暂缓；安全库存暂放基础数据，因为当前只维护物料阈值，不实施 MRP。

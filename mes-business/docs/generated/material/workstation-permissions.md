@@ -5,7 +5,8 @@ Scope: FACTORY_SCOPED; Mapper owner: BUSINESS
 
 Path: `/api/material/workstation`
 
-- `business:workstation:read`
+- `business:workstation:list`
+- `business:workstation:query`
 - `business:workstation:create`
 - `business:workstation:update`
 - `business:workstation:delete`

@@ -118,3 +118,10 @@ LOADER_PATH=/absolute/path/to/h2.jar ./scripts/mes-business-codegen \
 - 正式生成器同步能力及六表覆盖生成独立记录于 `docs/development/codegen.md`。旧物料专用 codegen.yaml 和其孤立 H2 metadata launcher 已删除，避免形成第二个正式参数入口；测试仍保留真实 H2 metadata/SQL 验证。
 
 - 后续调整最终验证：覆盖后的 Maven verify 275 项（271 通过、4 个真实 MySQL 跳过），前端 140 项＋build；生产 JAR 无 TEST Adapter/旧 Resolver。仍未对用户运行服务或真实 ERP 执行物料同步。完整生成参数、六表产物和关闭清理限制见 `docs/development/codegen.md`。
+
+
+## 2026-10-12 第一批 SIMPLE 实施取代原型模型
+
+正式 Material 已用当前 Base Codegen 读取实际开发 MySQL metadata 生成，Schema 以 db/business/V2__simple_business_capabilities.sql 为准；旧 schema.sql/application-test-only.yaml 仅是原型历史，不作为部署输入。
+新增 factory_id、category_id、unit_id、ITEM/PRODUCT 和厂内唯一约束；标准外部 DTO 的 unitCode/categoryCode 在 SyncWriter 映射本地 ID。MaterialSyncButton/sync.ts 旧独立壳已删除，正式页面直接使用统一 SyncButton 与生成 API；权限为 business:material:list/query/create/update/delete/sync。
+MaterialSyncHttpTest 已迁到新表与 QueryPort.query 契约，保留两厂、create/skip/update、NULL 清空、权限、未配置、重复来源拒绝及事务回滚测试；TEST 启动入口仅在 src/test/java/dev/simplefixture，用于本轮独立端口实际 MySQL/browser 验收，不进入正式 JAR。完整结果见迁移验收报告。

@@ -70,8 +70,10 @@ class CodegenPersonAcceptanceTest {
         assertFalse(xml.contains("public.person"));
         assertTrue(service.contains("example.setOrderByClause(\"id\")"));
         String permissions = Files.readString(javaRoot.resolve("controller/PersonPermissions.java"));
+        assertTrue(Files.readString(javaRoot.resolve("domain/PersonResource.java")).contains("business:person"));
+        assertTrue(permissions.contains("PersonResource.PREFIX"));
         for (String action : new String[]{"read", "create", "update", "delete"}) {
-            assertTrue(permissions.contains("business:person:" + action));
+            assertTrue(permissions.contains("\":" + action + "\""));
         }
         String sql = Files.readString(root.resolve("backend/mes-business/docs/generated/acceptance/person-menu.sql"));
         assertTrue(sql.contains("INSERT INTO sys_menu"));

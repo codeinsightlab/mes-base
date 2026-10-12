@@ -269,7 +269,7 @@ class CodegenAcceptanceTest {
     @Test
     void filesPlacedWithManifestNoCredentialsAndOverwriteConflictIsAtomic() throws Exception {
         var result = generator.generate(request(null, false));
-        assertEquals(20, result.files().size());
+        assertEquals(21, result.files().size());
         assertTrue(result.files().stream()
                 .anyMatch(f -> f.path().startsWith(frontend.toString()) && f.path().endsWith("index.vue")));
         assertTrue(result.files().stream().anyMatch(f -> f.path().endsWith("Mapper.xml")));
@@ -413,6 +413,12 @@ class CodegenAcceptanceTest {
         assertFalse(mapper.contains("@PersistenceOwner"));
         assertTrue(controller.contains("PermissionScope.PLATFORM"));
         assertFalse(controller.contains("FactoryContext.required"));
+        assertTrue(result.files().stream().noneMatch(file -> file.path().endsWith("Resource.java")));
+        for (var file : result.files()) {
+            if (file.path().endsWith("ServiceImpl.java") || file.path().endsWith("QueryDto.java")) {
+                assertFalse(Files.readString(Path.of(file.path())).contains("BusinessCache"));
+            }
+        }
         Path classes = temp.toRealPath().resolve("global-classes");
         Files.createDirectories(classes);
         var compiler = ToolProvider.getSystemJavaCompiler();
@@ -523,7 +529,10 @@ class CodegenAcceptanceTest {
         assertFalse(mapper.contains("@Select"));
         String permissions = Files.readString(backend.getParent().resolve(
                 "mes-erp/src/main/java/dev/mesbase/modules/erp/catalog/controller/GenDemoConfigPermissions.java"));
-        assertTrue(permissions.contains("erp:gen:demo:config:read"));
+        assertTrue(permissions.contains("GenDemoConfigResource.PREFIX + \":read\""));
+        assertTrue(Files.readString(backend.getParent().resolve(
+                        "mes-erp/src/main/java/dev/mesbase/modules/erp/catalog/domain/GenDemoConfigResource.java"))
+                .contains("erp:gen:demo:config"));
         assertFalse(permissions.contains("erp:config:read"));
         var invalid = new CodegenRequest(base.datasource(), base.schema(), base.tableName(), base.moduleName(),
                 base.businessName(), base.packageName(), base.author(), base.scope(), base.overwritePolicy(),

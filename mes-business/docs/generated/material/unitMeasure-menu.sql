@@ -13,61 +13,71 @@ UPDATE sys_menu SET menu_name = '计量单位', order_num = 0, path = 'unitMeasu
     component = 'material/unitMeasure/index', icon = 'list',
     parent_id = (SELECT directory.menu_id FROM (SELECT menu_id FROM sys_menu
         WHERE parent_id = 0 AND path = 'material' AND menu_type = 'M') directory)
-WHERE perms = 'business:unit:measure:read' AND menu_type = 'C';
+WHERE perms = 'business:unit:measure:list' AND menu_type = 'C';
 INSERT INTO sys_menu (menu_name, parent_id, order_num, path, component, menu_type, perms, icon, create_by, create_time)
 SELECT '计量单位', directory.menu_id, 0, 'unitMeasure', 'material/unitMeasure/index',
-       'C', 'business:unit:measure:read', 'list', 'codegen', CURRENT_TIMESTAMP
+       'C', 'business:unit:measure:list', 'list', 'codegen', CURRENT_TIMESTAMP
 FROM sys_menu directory
 WHERE directory.parent_id = 0 AND directory.path = 'material' AND directory.menu_type = 'M'
-  AND NOT EXISTS (SELECT 1 FROM sys_menu WHERE perms = 'business:unit:measure:read' AND menu_type = 'C');
+  AND NOT EXISTS (SELECT 1 FROM sys_menu WHERE perms = 'business:unit:measure:list' AND menu_type = 'C');
 
-UPDATE sys_menu SET menu_name = '计量单位查询', order_num = 0, path = '#',
+UPDATE sys_menu SET menu_name = '计量单位列表', order_num = 0, path = '#',
     parent_id = (SELECT page.menu_id FROM (SELECT menu_id FROM sys_menu
-        WHERE perms = 'business:unit:measure:read' AND menu_type = 'C') page)
-WHERE perms = 'business:unit:measure:read' AND menu_type = 'F';
+        WHERE perms = 'business:unit:measure:list' AND menu_type = 'C') page)
+WHERE perms = 'business:unit:measure:list' AND menu_type = 'F';
 INSERT INTO sys_menu (menu_name, parent_id, order_num, path, menu_type, perms, create_by, create_time)
-SELECT '计量单位查询', page.menu_id, 0, '#', 'F', 'business:unit:measure:read',
+SELECT '计量单位列表', page.menu_id, 0, '#', 'F', 'business:unit:measure:list',
        'codegen', CURRENT_TIMESTAMP
 FROM sys_menu page
-WHERE page.perms = 'business:unit:measure:read' AND page.menu_type = 'C'
-  AND NOT EXISTS (SELECT 1 FROM sys_menu WHERE perms = 'business:unit:measure:read' AND menu_type = 'F');
-UPDATE sys_menu SET menu_name = '计量单位新增', order_num = 1, path = '#',
+WHERE page.perms = 'business:unit:measure:list' AND page.menu_type = 'C'
+  AND NOT EXISTS (SELECT 1 FROM sys_menu WHERE perms = 'business:unit:measure:list' AND menu_type = 'F');
+UPDATE sys_menu SET menu_name = '计量单位详情', order_num = 1, path = '#',
     parent_id = (SELECT page.menu_id FROM (SELECT menu_id FROM sys_menu
-        WHERE perms = 'business:unit:measure:read' AND menu_type = 'C') page)
+        WHERE perms = 'business:unit:measure:list' AND menu_type = 'C') page)
+WHERE perms = 'business:unit:measure:query' AND menu_type = 'F';
+INSERT INTO sys_menu (menu_name, parent_id, order_num, path, menu_type, perms, create_by, create_time)
+SELECT '计量单位详情', page.menu_id, 1, '#', 'F', 'business:unit:measure:query',
+       'codegen', CURRENT_TIMESTAMP
+FROM sys_menu page
+WHERE page.perms = 'business:unit:measure:list' AND page.menu_type = 'C'
+  AND NOT EXISTS (SELECT 1 FROM sys_menu WHERE perms = 'business:unit:measure:query' AND menu_type = 'F');
+UPDATE sys_menu SET menu_name = '计量单位新增', order_num = 2, path = '#',
+    parent_id = (SELECT page.menu_id FROM (SELECT menu_id FROM sys_menu
+        WHERE perms = 'business:unit:measure:list' AND menu_type = 'C') page)
 WHERE perms = 'business:unit:measure:create' AND menu_type = 'F';
 INSERT INTO sys_menu (menu_name, parent_id, order_num, path, menu_type, perms, create_by, create_time)
-SELECT '计量单位新增', page.menu_id, 1, '#', 'F', 'business:unit:measure:create',
+SELECT '计量单位新增', page.menu_id, 2, '#', 'F', 'business:unit:measure:create',
        'codegen', CURRENT_TIMESTAMP
 FROM sys_menu page
-WHERE page.perms = 'business:unit:measure:read' AND page.menu_type = 'C'
+WHERE page.perms = 'business:unit:measure:list' AND page.menu_type = 'C'
   AND NOT EXISTS (SELECT 1 FROM sys_menu WHERE perms = 'business:unit:measure:create' AND menu_type = 'F');
-UPDATE sys_menu SET menu_name = '计量单位修改', order_num = 2, path = '#',
+UPDATE sys_menu SET menu_name = '计量单位修改', order_num = 3, path = '#',
     parent_id = (SELECT page.menu_id FROM (SELECT menu_id FROM sys_menu
-        WHERE perms = 'business:unit:measure:read' AND menu_type = 'C') page)
+        WHERE perms = 'business:unit:measure:list' AND menu_type = 'C') page)
 WHERE perms = 'business:unit:measure:update' AND menu_type = 'F';
 INSERT INTO sys_menu (menu_name, parent_id, order_num, path, menu_type, perms, create_by, create_time)
-SELECT '计量单位修改', page.menu_id, 2, '#', 'F', 'business:unit:measure:update',
+SELECT '计量单位修改', page.menu_id, 3, '#', 'F', 'business:unit:measure:update',
        'codegen', CURRENT_TIMESTAMP
 FROM sys_menu page
-WHERE page.perms = 'business:unit:measure:read' AND page.menu_type = 'C'
+WHERE page.perms = 'business:unit:measure:list' AND page.menu_type = 'C'
   AND NOT EXISTS (SELECT 1 FROM sys_menu WHERE perms = 'business:unit:measure:update' AND menu_type = 'F');
-UPDATE sys_menu SET menu_name = '计量单位删除', order_num = 3, path = '#',
+UPDATE sys_menu SET menu_name = '计量单位删除', order_num = 4, path = '#',
     parent_id = (SELECT page.menu_id FROM (SELECT menu_id FROM sys_menu
-        WHERE perms = 'business:unit:measure:read' AND menu_type = 'C') page)
+        WHERE perms = 'business:unit:measure:list' AND menu_type = 'C') page)
 WHERE perms = 'business:unit:measure:delete' AND menu_type = 'F';
 INSERT INTO sys_menu (menu_name, parent_id, order_num, path, menu_type, perms, create_by, create_time)
-SELECT '计量单位删除', page.menu_id, 3, '#', 'F', 'business:unit:measure:delete',
+SELECT '计量单位删除', page.menu_id, 4, '#', 'F', 'business:unit:measure:delete',
        'codegen', CURRENT_TIMESTAMP
 FROM sys_menu page
-WHERE page.perms = 'business:unit:measure:read' AND page.menu_type = 'C'
+WHERE page.perms = 'business:unit:measure:list' AND page.menu_type = 'C'
   AND NOT EXISTS (SELECT 1 FROM sys_menu WHERE perms = 'business:unit:measure:delete' AND menu_type = 'F');
-UPDATE sys_menu SET menu_name = '计量单位同步', order_num = 4, path = '#',
+UPDATE sys_menu SET menu_name = '计量单位同步', order_num = 5, path = '#',
     parent_id = (SELECT page.menu_id FROM (SELECT menu_id FROM sys_menu
-        WHERE perms = 'business:unit:measure:read' AND menu_type = 'C') page)
+        WHERE perms = 'business:unit:measure:list' AND menu_type = 'C') page)
 WHERE perms = 'business:unit:measure:sync' AND menu_type = 'F';
 INSERT INTO sys_menu (menu_name, parent_id, order_num, path, menu_type, perms, create_by, create_time)
-SELECT '计量单位同步', page.menu_id, 4, '#', 'F', 'business:unit:measure:sync',
+SELECT '计量单位同步', page.menu_id, 5, '#', 'F', 'business:unit:measure:sync',
        'codegen', CURRENT_TIMESTAMP
 FROM sys_menu page
-WHERE page.perms = 'business:unit:measure:read' AND page.menu_type = 'C'
+WHERE page.perms = 'business:unit:measure:list' AND page.menu_type = 'C'
   AND NOT EXISTS (SELECT 1 FROM sys_menu WHERE perms = 'business:unit:measure:sync' AND menu_type = 'F');

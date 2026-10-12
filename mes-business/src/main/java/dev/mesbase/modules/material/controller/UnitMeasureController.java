@@ -43,7 +43,7 @@ public class UnitMeasureController {
 
     @GetMapping
     @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED,
-            permission = UnitMeasurePermissions.READ)
+            permission = UnitMeasurePermissions.LIST)
     public UnitMeasurePageVo list(@Valid @ModelAttribute UnitMeasureQueryDto query) {
         UnitMeasurePage page = service.selectPage(query);
         return new UnitMeasurePageVo(
@@ -53,7 +53,7 @@ public class UnitMeasureController {
 
     @GetMapping("/{id}")
     @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED,
-            permission = UnitMeasurePermissions.READ)
+            permission = UnitMeasurePermissions.QUERY)
     public UnitMeasureVo detail(@PathVariable Long id) {
         return toView(service.selectById(id));
     }
@@ -69,7 +69,7 @@ public class UnitMeasureController {
     @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED,
             permission = UnitMeasurePermissions.UPDATE)
     public UnitMeasureVo update(@PathVariable Long id,
-                                @Valid @RequestBody UnitMeasureUpdateCommand input) {
+            @Valid @RequestBody UnitMeasureUpdateCommand input) {
         return toView(service.updateById(id, input));
     }
 
@@ -78,8 +78,8 @@ public class UnitMeasureController {
     @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED,
             permission = UnitMeasurePermissions.DELETE)
     public void delete(@RequestBody
-                       @NotEmpty @Size(max = 100)
-                       List<@NotNull Long> ids) {
+            @NotEmpty @Size(max = 100)
+            List<@NotNull Long> ids) {
         service.deleteByIds(ids);
     }
 

@@ -43,7 +43,7 @@ public class WorkstationController {
 
     @GetMapping
     @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED,
-            permission = WorkstationPermissions.READ)
+            permission = WorkstationPermissions.LIST)
     public WorkstationPageVo list(@Valid @ModelAttribute WorkstationQueryDto query) {
         WorkstationPage page = service.selectPage(query);
         return new WorkstationPageVo(
@@ -53,7 +53,7 @@ public class WorkstationController {
 
     @GetMapping("/{id}")
     @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED,
-            permission = WorkstationPermissions.READ)
+            permission = WorkstationPermissions.QUERY)
     public WorkstationVo detail(@PathVariable Long id) {
         return toView(service.selectById(id));
     }
@@ -69,7 +69,7 @@ public class WorkstationController {
     @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED,
             permission = WorkstationPermissions.UPDATE)
     public WorkstationVo update(@PathVariable Long id,
-                                @Valid @RequestBody WorkstationUpdateCommand input) {
+            @Valid @RequestBody WorkstationUpdateCommand input) {
         return toView(service.updateById(id, input));
     }
 
@@ -78,8 +78,8 @@ public class WorkstationController {
     @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED,
             permission = WorkstationPermissions.DELETE)
     public void delete(@RequestBody
-                       @NotEmpty @Size(max = 100)
-                       List<@NotNull Long> ids) {
+            @NotEmpty @Size(max = 100)
+            List<@NotNull Long> ids) {
         service.deleteByIds(ids);
     }
 

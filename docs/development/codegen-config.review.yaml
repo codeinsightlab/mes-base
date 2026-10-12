@@ -86,7 +86,7 @@ backend:
     prefix: "business"
     resource: "{tableNameColon}"
     scope: "factory"
-    actions: [read, create, update, delete]
+    actions: [list, query, create, update, delete]
     # 单删、批删均使用 delete 权限。
     batchDeleteAction: "delete"
 

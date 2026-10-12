@@ -14,6 +14,10 @@ public class ${ClassName}ServiceImpl implements ${servicePackage}.I${ClassName}S
 
     @Override
     @org.springframework.transaction.annotation.Transactional(transactionManager = "${transactionManager}", readOnly = true)
+#if($scoped)
+    @dev.mesbase.infrastructure.cache.annotation.BusinessCache(business = ${domainPackage}.${ClassName}Resource.PREFIX,
+            type = dev.mesbase.infrastructure.cache.annotation.BusinessCache.Type.LIST)
+#end
     public ${domainPackage}.${ClassName}Page selectPage(${domainPackage}.${ClassName}QueryDto query) {
         int offset = query.offset() == null ? 0 : query.offset();
         int limit = query.limit() == null ? ${pageDefault} : query.limit();
@@ -41,12 +45,20 @@ public class ${ClassName}ServiceImpl implements ${servicePackage}.I${ClassName}S
 
     @Override
     @org.springframework.transaction.annotation.Transactional(transactionManager = "${transactionManager}", readOnly = true)
+#if($scoped)
+    @dev.mesbase.infrastructure.cache.annotation.BusinessCache(business = ${domainPackage}.${ClassName}Resource.PREFIX,
+            type = dev.mesbase.infrastructure.cache.annotation.BusinessCache.Type.DETAIL)
+#end
     public ${domainPackage}.${ClassName}Entity selectById(${idType} id) {
         return requireRecord(id);
     }
 
     @Override
     @org.springframework.transaction.annotation.Transactional(transactionManager = "${transactionManager}", rollbackFor = Exception.class)
+#if($scoped)
+    @dev.mesbase.infrastructure.cache.annotation.BusinessCacheEvict(business = ${domainPackage}.${ClassName}Resource.PREFIX,
+            scope = dev.mesbase.infrastructure.cache.annotation.BusinessCacheEvict.Scope.LIST)
+#end
     public ${domainPackage}.${ClassName}Entity insert(${domainPackage}.${ClassName}CreateCommand input) {
         ${domainPackage}.${ClassName}Entity row = new ${domainPackage}.${ClassName}Entity();
 #if($serverScope)
@@ -63,6 +75,10 @@ public class ${ClassName}ServiceImpl implements ${servicePackage}.I${ClassName}S
 
     @Override
     @org.springframework.transaction.annotation.Transactional(transactionManager = "${transactionManager}", rollbackFor = Exception.class)
+#if($scoped)
+    @dev.mesbase.infrastructure.cache.annotation.BusinessCacheEvict(business = ${domainPackage}.${ClassName}Resource.PREFIX,
+            scope = dev.mesbase.infrastructure.cache.annotation.BusinessCacheEvict.Scope.LIST_AND_DETAIL)
+#end
     public ${domainPackage}.${ClassName}Entity updateById(${idType} id, ${domainPackage}.${ClassName}UpdateCommand input) {
         ${domainPackage}.${ClassName}Entity row = requireRecord(id);
         row.set${pkField.substring(0,1).toUpperCase()}${pkField.substring(1)}(id);
@@ -77,6 +93,10 @@ public class ${ClassName}ServiceImpl implements ${servicePackage}.I${ClassName}S
 
     @Override
     @org.springframework.transaction.annotation.Transactional(transactionManager = "${transactionManager}", rollbackFor = Exception.class)
+#if($scoped)
+    @dev.mesbase.infrastructure.cache.annotation.BusinessCacheEvict(business = ${domainPackage}.${ClassName}Resource.PREFIX,
+            scope = dev.mesbase.infrastructure.cache.annotation.BusinessCacheEvict.Scope.LIST_AND_DETAIL)
+#end
     public void deleteByIds(java.util.List<${idType}> ids) {
         if (ids == null || ids.isEmpty() || ids.size() > ${batchDeleteMaximum} || ids.stream().anyMatch(java.util.Objects::isNull)
                 || new java.util.HashSet<>(ids).size() != ids.size()) {

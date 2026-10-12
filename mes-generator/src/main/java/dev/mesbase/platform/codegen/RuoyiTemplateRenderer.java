@@ -167,6 +167,7 @@ public final class RuoyiTemplateRenderer {
                 Map.of("code", "delete", "label", "删除")));
         ctx.put("scoped", scoped);
         ctx.put("permissionScope", scoped ? "factory" : "platform");
+        ctx.put("separateQueryPermission", false);
         ctx.put("generateSync", r.generateSync());
         ctx.put("syncBatchMaximum", 1000);
         ctx.put("conditionalEnabled", true);
@@ -216,6 +217,19 @@ public final class RuoyiTemplateRenderer {
             route = (String) ctx.get("route");
             perm = (String) ctx.get("permission");
         }
+        boolean separateQuery = Boolean.TRUE.equals(ctx.get("separateQueryPermission"));
+        ctx.put("listAction", separateQuery ? "list" : "read");
+        ctx.put("queryAction", separateQuery ? "query" : "read");
+        ctx.put("listPermissionConstant", separateQuery ? "LIST" : "READ");
+        ctx.put("queryPermissionConstant", separateQuery ? "QUERY" : "READ");
+        var menuActions = new ArrayList<Map<String, String>>();
+        if (separateQuery) {
+            menuActions.add(Map.of("code", "list", "label", "列表"));
+            menuActions.add(Map.of("code", "query", "label", "详情"));
+        } else menuActions.add(Map.of("code", "read", "label", "查询"));
+        menuActions.addAll(List.of(Map.of("code", "create", "label", "新增"), Map.of("code", "update", "label", "修改"), Map.of("code", "delete", "label", "删除")));
+        if (r.generateSync()) menuActions.add(Map.of("code", "sync", "label", "同步"));
+        ctx.put("menuActions", menuActions);
         ctx.put("responsePackage", p + "." + (options == null ? "controller.vo" : options.packages()
                 .get("controller/vo")));
         ctx.put("createFields", create.stream().map(c -> field(c, !c.nullable())).toList());
@@ -249,10 +263,7 @@ public final class RuoyiTemplateRenderer {
             ctx.put("pkSetter", "set" + cap(pk.javaField()));
             ctx.put("syncPackage", p + "." + (options == null ? "sync" : options.packages()
                     .getOrDefault("sync", "sync")));
-            var actions = new ArrayList<>(List.of(Map.of("code", "read", "label", "查询"),
-                    Map.of("code", "create", "label", "新增"), Map.of("code", "update", "label", "修改"),
-                    Map.of("code", "delete", "label", "删除"), Map.of("code", "sync", "label", "同步")));
-            ctx.put("menuActions", actions);
+
         }
         List<Artifact> out = new ArrayList<>();
         String dir = p.replace('.', '/') + "/";
@@ -267,6 +278,9 @@ public final class RuoyiTemplateRenderer {
         emitJava(out, ctx, "domain", n + "Page", "page.java.vm");
         emitJava(out, ctx, "controller/vo", n + "Vo", "view.java.vm");
         emitJava(out, ctx, "controller/vo", n + "PageVo", "page-view.java.vm");
+        if (Boolean.TRUE.equals(ctx.get("scoped"))) {
+            emitJava(out, ctx, "domain", n + "Resource", "resource.java.vm");
+        }
         emitJava(out, ctx, "controller", n + "Permissions", "permissions.java.vm");
 
         String ownership = scoped ? "BUSINESS" : "PLATFORM";
@@ -305,8 +319,8 @@ public final class RuoyiTemplateRenderer {
         out.add(new Artifact(FRONTEND, options == null ? "src/views/" + r.moduleName() + "/" + name + "/index.vue" : options.frontendPage(), merge("index.vue.vm", ctx)));
         out.add(new Artifact(FRONTEND, options == null ? "src/menus/" + r.moduleName() + "/" + name + ".json" : options.frontendMenu(), merge("menu.json.vm", ctx)));
         out.add(new Artifact(PERMISSION, options == null ? "docs/generated/" + r.moduleName() + "/" + name + "-menu.sql" : options.menuSql(), merge("menu.sql.vm", ctx)));
-        out.add(new Artifact(PERMISSION, "docs/generated/" + r.moduleName() + "/" + name + "-permissions.md", "<!-- MES-CODEGEN -->\n# " + r.businessName() + "\n\nScope: " + r.scope() + "; Mapper owner: " + ownership + "\n\nPath: `" + route + "`\n\n" + (r.generateSync() ? List.of("read", "create", "update", "delete", "sync") : List.of("read", "create", "update", "delete"))
-                .stream().map(x -> "- `" + ctx.get("permission") + ":" + x + "`\n")
+        out.add(new Artifact(PERMISSION, "docs/generated/" + r.moduleName() + "/" + name + "-permissions.md", "<!-- MES-CODEGEN -->\n# " + r.businessName() + "\n\nScope: " + r.scope() + "; Mapper owner: " + ownership + "\n\nPath: `" + route + "`\n\n" + menuActions.stream()
+                .map(action -> action.get("code")).map(x -> "- `" + ctx.get("permission") + ":" + x + "`\n")
                 .collect(Collectors.joining()) + "\nMenu INSERT SQL is generated beside this file for reviewed center-database execution; no automatic execution or role grants. Mapper ownership follows its fixed package; no Mapper annotation or central registration is required.\n"));
         ctx.put("ownership", ownership);
         ctx.put("body", JavaSourceImports.explicit(merge("scaffold-test.java.vm", ctx)));

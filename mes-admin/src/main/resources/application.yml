@@ -58,6 +58,10 @@ mes:
     max-upload-bytes: 10000000
   runtime:
     enabled: false
+  business:
+    cache:
+      # 所有业务数据缓存的统一有效期（秒）。
+      ttl-seconds: 300
   codegen:
     # Developer metadata profile is independent of Factory Runtime bindings.
     default-datasource: dev

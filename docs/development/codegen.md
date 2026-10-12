@@ -456,3 +456,40 @@ CrudPage 区分无读取权限与空结果：没有 read 时显示“当前范�
 - IDEA 161 个相关/生成 Java 文件格式检查通过；两仓 diff 检查通过。首次生成运行测试因 macOS 临时目录符号链接被工具安全拒绝，改用真实路径后通过，没有放宽路径保护。
 - 最终 packaged smoke 14/14：`/tmp/mes-sync-final-smoke2.log`。首次 smoke 出现 Logback/AOP 类加载异常；检查嵌套依赖确认对应类存在，未改变依赖，原样重跑通过且 JAR 哈希前后相同；未证明首次异常根因，不把它冒充实现修复。
 - 真实业务库只读取 metadata，实际外部 ERP、真实 MySQL 写入、运行中 8081 服务的最新代码、菜单 SQL/角色授予和浏览器同步闭环未验收。未重启用户服务、执行真实迁移或业务写入、提交/推送。原有外部 MasterSyncMapper 修改保留，不计入本轮改动。
+
+
+## 2026-10-12 第一批 SIMPLE：显式范围列与分离查询权限
+
+当前配置仅选择 material_category/unit_measure/workstation/workshop/material/safety_stock，全部 generateSync=true。此前 md/qc/dv/pro 六表覆盖记录是历史生成器试验，不表示这些业务已获本批迁移授权；旧 MdUnitMeasure/MdWorkshop 生成产物已由精简模型替换。
+
+`tableOverrides.<table>.serverScopeColumn` 是可选显式配置；存在时要求实际非空 String 列且 factory 范围，写入与同步输入排除此列，服务端从 FactoryContext 赋值，并生成 scoped Example 与 ID 范围校验。未提供时不自动猜 factory_id。列匹配兼容 JDBC metadata 大小写。
+
+`backend.permission.actions` 支持 `[read, create, update, delete]` 和 `[list, query, create, update, delete]`；本批按用户请求使用后者。generateSync=true 独立追加 sync；false 的新输出没有同步产物。菜单、Controller、Permissions、前端 CrudPage list/detail action 和文档一致。生成 ScaffoldTest 包含独立同步权限和未配置失败合同。
+
+本批人工 CRUD 和同步共用 BasicDataRules；分类树、引用/删除、状态和库存上下限在业务模块后处理，不写入通用模板。Material 外部关系编码→本地 ID 映射同样属于业务后处理。真实执行和边界见 docs/migration/SIMPLE_BUSINESS_MIGRATION_ACCEPTANCE.md。
+
+## 2026-10-12 通用业务缓存模板接入
+
+以已验证的 Material 实现为依据，Factory 范围的基础 CRUD 现在自动接入 `mes-framework` 的通用业务缓存处理器；Global/platform 生成结果不添加业务缓存依赖。此行为属于当前 Base 模板能力，不添加隐藏连接配置或缓存 key 拼接代码。
+
+- 新增 `resource.java.vm`，生成领域侧 `<ClassName>Resource.PREFIX`。取值直接复用最终配置解析后的权限资源前缀（prefix + 完整表名下划线转冒号，不含操作）。如 `material_category` 得到 `business:material:category`，不使用页面 module 名替代资源名。权限、缓存注解及同步淘汰共用该常量，Service 不依赖 Controller。
+- `query.java.vm`：业务查询实现 `BusinessCacheQuery`，暴露有效 offset、配置中的 pageDefault 和实际主键排序；原筛选字段全部保留。平台查询不实现该接口。
+- `service-impl.java.vm`：业务 selectPage/selectById 添加 LIST/DETAIL 注解；insert 淘汰 LIST，updateById/deleteByIds 淘汰 LIST_AND_DETAIL。原业务事务管理器、分页和 Mapper/Example 调用不变，内部 requireRecord 仍直接查询，不以自调用绕过缓存代理。
+- `sync-writer.java.vm`：注入同一 BusinessCacheProcessor；实际更新计数大于 0 淘汰列表与全部详情，仅新增淘汰列表，全跳过不登记。调用仍在 Spring 写事务内，提交后才生效，回滚不淘汰；默认外部查询未接入的显式失败保持。
+- `permissions.java.vm`：业务权限由 Resource.PREFIX 拼接操作，最终权限字符串不变；平台权限保持原形式。
+- `scaffold-test.java.vm`：业务生成测试覆盖查询参数约定、完整资源前缀及各操作缓存注解/范围。基础业务产物增加一个 Resource 文件；同步产物仍按 generateSync 独立选择。
+
+缓存本身的 offset < 100、TTL、类型恢复、工厂/资源隔离、提交后时机及 SCAN 规则见 [business-cache.md](business-cache.md)。若后处理增加用户/部门/主体数据权限或详情裁剪，需在使用方审查缓存隔离，不能认为生成注解已经解决该类业务权限差异。
+
+验证采用实际生成后的 Java 编译、Mapper XML 和 H2 SQL，通过 Spring 代理执行生成的 Service/SyncWriter；缓存连接为明确标记的内存 Redis fixture，证明序列化字节及淘汰调用，不冒充生产 Redis。测试以 material_category 验证完整资源前缀，并以数据库字段临时变化证明列表/详情确实命中缓存。覆盖手工增改删、同步新增/更新/跳过及外层事务回滚，保留既有不同工厂、SQL、事务和默认查询未配置的验收。
+
+本轮使用用户配置的副本，仅选 material_category，输出到独立 target/business-cache-template，保持原配置、前端源码及现有物料业务实现。未执行菜单 SQL、真实表 DDL、业务写入、部署、提交或推送。
+
+### 本轮验证结果
+
+- Java 原生格式化及 `git diff --check` 通过。
+- `mvn -B -ntp test` 与 `mvn -B -ntp verify` 全 reactor 通过。BusinessCodegenRunnerTest 9 项，包括生成物料分类后实际编译、缓存命中类型恢复、Spring 代理下增改删及同步淘汰/回滚；既有 CodegenAcceptanceTest、CodegenSyncAcceptanceTest、CodegenPersonAcceptanceTest 保持通过。Global 负例确认不生成 Resource/BusinessCache 依赖。
+- 最新 JAR 执行 `./scripts/mes-business-codegen target/business-cache-template/configuration.yaml target/business-cache-template/report.json`：真实 metadata 1 supported、0 rejected，GENERATED，共 28 个产物。Resource.PREFIX 实际为 business:material:category。
+- 使用验收测试依赖 classpath 编译真实 metadata 生成的全部 Java（含生成测试），通过。
+- `/usr/bin/python3 scripts/smoke-packaged.py`：10 passed / 0 failed。
+- 仅在隔离 target 写入产物，未重新生成覆盖正式 Material/MaterialCategory 的业务代码。前端模板本轮未改；未把生成成功/编译通过当成真实业务库运行验收。

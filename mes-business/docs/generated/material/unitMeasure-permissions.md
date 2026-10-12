@@ -5,7 +5,8 @@ Scope: FACTORY_SCOPED; Mapper owner: BUSINESS
 
 Path: `/api/material/unit-measure`
 
-- `business:unit:measure:read`
+- `business:unit:measure:list`
+- `business:unit:measure:query`
 - `business:unit:measure:create`
 - `business:unit:measure:update`
 - `business:unit:measure:delete`

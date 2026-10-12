@@ -7,5 +7,21 @@ public record ${ClassName}QueryDto(
 #foreach($field in $queryFields)
         ${field.queryValidation}${field.type} ${field.name}#if($foreach.hasNext),#end
 #end
-) {
+)#if($scoped) implements dev.mesbase.infrastructure.cache.BusinessCacheQuery#end {
+#if($scoped)
+    @Override
+    public int cacheOffset() {
+        return offset == null ? 0 : offset;
+    }
+
+    @Override
+    public int cacheLimit() {
+        return limit == null ? ${pageDefault} : limit;
+    }
+
+    @Override
+    public String cacheSort() {
+        return "${sqlPk}";
+    }
+#end
 }

@@ -1,5 +1,8 @@
 package dev.mesbase;
 
+import dev.mesbase.common.core.redis.RedisCache;
+import dev.mesbase.infrastructure.cache.BusinessCacheProcessor;
+import dev.mesbase.infrastructure.persistence.SpringCommitActions;
 import dev.mesbase.core.error.ErrorCode;
 import dev.mesbase.core.error.FoundationException;
 import dev.mesbase.core.factory.Factory;
@@ -48,6 +51,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verifyNoInteractions;
 
 /**
@@ -117,6 +122,9 @@ class CodegenSyncAcceptanceTest {
                 context.registerBean("businessTransactionManager", OwnedTransactionManager.class, () -> manager);
                 context.registerBean(Validator.class, validators::getValidator);
                 context.registerBean(SyncCoordinator.class, () -> coordinator);
+                var redis = mock(RedisCache.class);
+                var caches = new BusinessCacheProcessor(redis, new SpringCommitActions(), context.getEnvironment());
+                context.registerBean(BusinessCacheProcessor.class, () -> caches);
                 var mapperBean = new RootBeanDefinition(mapperType);
                 mapperBean.setInstanceSupplier(() -> mapper);
                 context.registerBeanDefinition("mapper", mapperBean);
@@ -147,6 +155,9 @@ class CodegenSyncAcceptanceTest {
                 assertThrows(InvocationTargetException.class, () -> upsert.invoke(writer, scope, List.of(valid, bad)));
                 assertEquals(1, jdbc.queryForObject("SELECT COUNT(*) FROM sync_probe", Integer.class));
                 assertThrows(InvocationTargetException.class, () -> upsert.invoke(writer, scope, List.of(first, first)));
+                String prefix = caches.prefix("business:sync:probe");
+                verify(redis, times(2)).deleteByPattern(prefix + "list:*");
+                verify(redis, times(1)).deleteByPattern(prefix + "detail:*");
             }
         } finally {
             FactoryContext.clear();

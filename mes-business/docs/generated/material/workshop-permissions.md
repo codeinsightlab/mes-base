@@ -5,7 +5,8 @@ Scope: FACTORY_SCOPED; Mapper owner: BUSINESS
 
 Path: `/api/material/workshop`
 
-- `business:workshop:read`
+- `business:workshop:list`
+- `business:workshop:query`
 - `business:workshop:create`
 - `business:workshop:update`
 - `business:workshop:delete`

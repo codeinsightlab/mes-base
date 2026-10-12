@@ -43,7 +43,7 @@ public class WorkshopController {
 
     @GetMapping
     @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED,
-            permission = WorkshopPermissions.READ)
+            permission = WorkshopPermissions.LIST)
     public WorkshopPageVo list(@Valid @ModelAttribute WorkshopQueryDto query) {
         WorkshopPage page = service.selectPage(query);
         return new WorkshopPageVo(
@@ -53,7 +53,7 @@ public class WorkshopController {
 
     @GetMapping("/{id}")
     @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED,
-            permission = WorkshopPermissions.READ)
+            permission = WorkshopPermissions.QUERY)
     public WorkshopVo detail(@PathVariable Long id) {
         return toView(service.selectById(id));
     }
@@ -69,7 +69,7 @@ public class WorkshopController {
     @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED,
             permission = WorkshopPermissions.UPDATE)
     public WorkshopVo update(@PathVariable Long id,
-                             @Valid @RequestBody WorkshopUpdateCommand input) {
+            @Valid @RequestBody WorkshopUpdateCommand input) {
         return toView(service.updateById(id, input));
     }
 
@@ -78,8 +78,8 @@ public class WorkshopController {
     @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED,
             permission = WorkshopPermissions.DELETE)
     public void delete(@RequestBody
-                       @NotEmpty @Size(max = 100)
-                       List<@NotNull Long> ids) {
+            @NotEmpty @Size(max = 100)
+            List<@NotNull Long> ids) {
         service.deleteByIds(ids);
     }
 

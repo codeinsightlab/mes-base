@@ -5,7 +5,8 @@ Scope: FACTORY_SCOPED; Mapper owner: BUSINESS
 
 Path: `/api/material/material-category`
 
-- `business:material:category:read`
+- `business:material:category:list`
+- `business:material:category:query`
 - `business:material:category:create`
 - `business:material:category:update`
 - `business:material:category:delete`

@@ -6,10 +6,13 @@
 public class ${ClassName}SyncWriter {
     private final ${daoPackage}.${ClassName}Mapper mapper;
     private final jakarta.validation.Validator validator;
+    private final dev.mesbase.infrastructure.cache.BusinessCacheProcessor caches;
 
-    public ${ClassName}SyncWriter(${daoPackage}.${ClassName}Mapper mapper, jakarta.validation.Validator validator) {
+    public ${ClassName}SyncWriter(${daoPackage}.${ClassName}Mapper mapper, jakarta.validation.Validator validator,
+                                   dev.mesbase.infrastructure.cache.BusinessCacheProcessor caches) {
         this.mapper = mapper;
         this.validator = validator;
+        this.caches = caches;
     }
 
     @org.springframework.transaction.annotation.Transactional(transactionManager = "${transactionManager}", rollbackFor = Exception.class)
@@ -71,6 +74,13 @@ public class ${ClassName}SyncWriter {
             if (affected != 1) throw new dev.mesbase.core.error.FoundationException(dev.mesbase.core.error.ErrorCode.RESOURCE_CONFLICT);
             if (insert) created++;
             else updated++;
+        }
+        if (updated > 0) {
+            caches.evict(${domainPackage}.${ClassName}Resource.PREFIX,
+                    dev.mesbase.infrastructure.cache.annotation.BusinessCacheEvict.Scope.LIST_AND_DETAIL);
+        } else if (created > 0) {
+            caches.evict(${domainPackage}.${ClassName}Resource.PREFIX,
+                    dev.mesbase.infrastructure.cache.annotation.BusinessCacheEvict.Scope.LIST);
         }
         return new ${ClassName}SyncResult(inputs.size(), created, updated, skipped);
     }
