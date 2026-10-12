@@ -1,6 +1,23 @@
 # MES Codegen 使用说明
 
+## 当前生成器构建与启动入口（2026-10-12）
+
+生成器代码、模板及配置处理均在 mes-generator。独立构建命令：
+
+```sh
+mvn -B -ntp -pl mes-generator -am verify
+./scripts/mes-business-codegen docs/development/codegen-config.review.yaml target/business-codegen/report.json
+```
+
+脚本使用 `mes-generator/target/mes-generator-*-cli.jar`，不再依赖整个 MES 应用 JAR 或启动应用。
+模块保留普通 JAR 供应用复用，并额外产出 cli classifier 的可执行 JAR，包含 metadata 所需的
+MySQL JDBC 驱动。配置仍是唯一参数来源；mode/overwrite 取当前 YAML，不自动生成或覆盖业务代码。
+以下日期化记录中的旧打包应用入口属于历史行为。
+
+
 ## 可选同步生成与统一配置（2026-10-12）
+
+以下为当时的生成记录；当前同步合入主 Service/Controller，模板统一与模块归属以文末最新记录为准。
 
 正式参数入口唯一为 `docs/development/codegen-config.review.yaml`。本项目没有生成配置网页、配置数据库表或独立下载接口；YAML 就是持久配置，BusinessCodegenCli/Runner 与 Java API 读取并传递同一参数。dry-run 与 write 共用 metadata、模板和格式化流水线，报告文件名不是开关。
 
@@ -575,3 +592,24 @@ mes-generator，不再位于 mes-business 或 mes-admin 的资源目录。mes-bu
 BasicDataRules 失败。这不同于前述恢复后 clean verify 的通过结果，不能用旧结果声称新业务产物通过。
 用户随后明确本轮只保证生成器，正式代码生成由用户操作；不继续迁移业务规则/Mapper 扫描，不修改
 新生成业务文件。最终验证限定 mes-generator 及其上游依赖；本次修复不会自动迁移使用方的业务包。
+
+### 2026-10-12：用户最终确认统一通用模板（替代 reviewed 覆盖）
+
+所有代码生成统一使用 codegen/base 通用模板。通用能力不满足需求时修改通用模板与测试，不复制一套
+按业务命名的模板。此前 reviewed 是为保留六个已审查业务交互而增加的覆盖层，带入了 BasicDataRules
+等未由通用生成器提供的依赖；本轮按用户确认删除目录及其覆盖机制，不继续保留这套平行实现。
+
+TableOverride 仅保留 module、displayName、syncMatchKey、serverScopeColumn；配置中的五种模板路径
+覆盖属性移除，旧覆盖属性明确拒绝，不静默接受。用户修改的模块名、包名与其他参数保留。
+模板统一由 templates.root 定位，不存在每表专属模板选取。Java 输出拒绝空模板，以及 package 与
+输出路径不一致的模板；回归测试编译六种表名、开关同步两种情况的通用生成源码，验证新根包和
+自定义子包 import，保证生成 Service 不依赖 BasicDataRules 等物料专用类。
+
+生成器额外产出可执行 `-cli.jar`；普通 JAR 继续供应用复用，脚本直接运行独立 CLI，生成器更新不再
+要求整个业务应用先能编译。正式业务生成由用户执行，本轮不再重生成或迁移业务源码。
+
+最终验证：`mvn -B -ntp -pl mes-generator -am verify` 通过（生成器 17 项测试全部通过），其中通用
+模板对六种表名 × 同步开关两种情况共 12 组生成源码执行真实 Java 编译，通过新根包与自定义子包
+引用检查。独立 CLI JAR 启动及非法参数退出码检查通过，包含 MySQL 驱动且没有 reviewed 资源；
+`sh -n scripts/mes-business-codegen`、`git diff --check` 通过。该启动检查未执行业务生成。
+最新状态只声明生成器及其上游依赖验证通过，不使用此前整仓快照结果替代用户当前业务源码状态。

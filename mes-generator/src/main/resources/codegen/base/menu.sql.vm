@@ -1,0 +1,41 @@
+-- MES-CODEGEN: reviewed add-or-update menu SQL; no role grants.
+-- Keep existing menu IDs and role bindings. Execute serially in the configured menu database.
+#if($migrateLegacyPermissions && $legacyPermission != $permission)
+#foreach($action in $menuActions)
+UPDATE ${menuTable} SET perms = '${permission}:${action.code}'
+WHERE perms = '${legacyPermission}:${action.code}';
+#end
+#end
+
+UPDATE ${menuTable} SET menu_name = '${menuDirectorySql}', order_num = ${directoryOrder}, icon = '${menuIcon}'
+WHERE parent_id = ${parentId} AND path = '${moduleName}' AND menu_type = 'M';
+INSERT INTO ${menuTable} (menu_name, parent_id, order_num, path, menu_type, icon, create_by, create_time)
+SELECT '${menuDirectorySql}', ${parentId}, ${directoryOrder}, '${moduleName}', 'M', '${menuIcon}', '${createdBy}', CURRENT_TIMESTAMP
+WHERE NOT EXISTS (
+    SELECT 1 FROM ${menuTable} WHERE parent_id = ${parentId} AND path = '${moduleName}' AND menu_type = 'M'
+);
+
+UPDATE ${menuTable} SET menu_name = '${menuNameSql}', order_num = ${pageOrder}, path = '${className}',
+    component = '${pageComponent}', icon = '${menuIcon}',
+    parent_id = (SELECT directory.menu_id FROM (SELECT menu_id FROM ${menuTable}
+        WHERE parent_id = ${parentId} AND path = '${moduleName}' AND menu_type = 'M') directory)
+WHERE perms = '${permission}:${listAction}' AND menu_type = 'C';
+INSERT INTO ${menuTable} (menu_name, parent_id, order_num, path, component, menu_type, perms, icon, create_by, create_time)
+SELECT '${menuNameSql}', directory.menu_id, ${pageOrder}, '${className}', '${pageComponent}',
+       'C', '${permission}:${listAction}', '${menuIcon}', '${createdBy}', CURRENT_TIMESTAMP
+FROM ${menuTable} directory
+WHERE directory.parent_id = ${parentId} AND directory.path = '${moduleName}' AND directory.menu_type = 'M'
+  AND NOT EXISTS (SELECT 1 FROM ${menuTable} WHERE perms = '${permission}:${listAction}' AND menu_type = 'C');
+
+#foreach($action in $menuActions)
+UPDATE ${menuTable} SET menu_name = '${menuNameSql}${action.label}', order_num = ${foreach.index}, path = '#',
+    parent_id = (SELECT page.menu_id FROM (SELECT menu_id FROM ${menuTable}
+        WHERE perms = '${permission}:${listAction}' AND menu_type = 'C') page)
+WHERE perms = '${permission}:${action.code}' AND menu_type = 'F';
+INSERT INTO ${menuTable} (menu_name, parent_id, order_num, path, menu_type, perms, create_by, create_time)
+SELECT '${menuNameSql}${action.label}', page.menu_id, ${foreach.index}, '#', 'F', '${permission}:${action.code}',
+       '${createdBy}', CURRENT_TIMESTAMP
+FROM ${menuTable} page
+WHERE page.perms = '${permission}:${listAction}' AND page.menu_type = 'C'
+  AND NOT EXISTS (SELECT 1 FROM ${menuTable} WHERE perms = '${permission}:${action.code}' AND menu_type = 'F');
+#end

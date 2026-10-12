@@ -232,7 +232,7 @@ class BusinessCodegenRunnerTest {
     }
 
     @Test
-    void explicitReviewedFrontendTemplatePreservesBusinessContentAndOrdinaryCrudColumnSettings() throws Exception {
+    void configuredTemplateRootPreservesOrdinaryCrudColumnSettings() throws Exception {
         var configured = config("[person]", "write");
         Path templates = temporary.resolve("templates");
         Path original = repository().resolve(configured.templates().root());
@@ -243,24 +243,21 @@ class BusinessCodegenRunnerTest {
                 Files.copy(source, output);
             }
         }
-        Path reviewed = templates.resolve("reviewed/fixture.vue.vm");
-        Files.createDirectories(reviewed.getParent());
-        Files.writeString(reviewed, Files.readString(original.resolve("index.vue.vm")) + "\n<!-- TEST ONLY reviewed business fields retained -->\n");
+        Path customPage = templates.resolve("index.vue.vm");
+        Files.writeString(customPage, Files.readString(original.resolve("index.vue.vm")) + "\n<!-- TEST ONLY configured template root -->\n");
         Path file = temporary.resolve("configuration.yaml");
         String yaml = Files.readString(file)
                 .replace("root: \"mes-generator/src/main/resources/codegen/base\"", "root: \"" + templates + "\"");
-        yaml += "\ntableOverrides:\n  person:\n    module: common\n    displayName: 人员\n    frontendTemplate: reviewed/fixture.vue.vm\n";
         Files.writeString(file, yaml);
         var runner = new BusinessCodegenRunner();
         var report = runner.run(BusinessCodegenConfiguration.read(file), repository(), source());
         assertEquals("GENERATED", report.status());
         String page = Files.readString(temporary.resolve("frontend/src/views/common/person/index.vue"));
-        assertTrue(page.contains("reviewed business fields retained"));
+        assertTrue(page.contains("configured template root"));
         assertTrue(page.contains("table-key=\"business:person:list\""));
         assertFalse(page.contains("SyncButton"));
-        Files.writeString(file, yaml.replace("reviewed/fixture.vue.vm", "../outside.vue.vm"));
-        assertThrows(IllegalArgumentException.class,
-                () -> runner.run(BusinessCodegenConfiguration.read(file), repository(), source()));
+        Files.writeString(file, yaml + "\ntableOverrides:\n  person:\n    module: common\n    displayName: 人员\n    frontendTemplate: removed.vue.vm\n");
+        assertThrows(IllegalArgumentException.class, () -> BusinessCodegenConfiguration.read(file));
         assertEquals(page, Files.readString(temporary.resolve("frontend/src/views/common/person/index.vue")));
     }
 

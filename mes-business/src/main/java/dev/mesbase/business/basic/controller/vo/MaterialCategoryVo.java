@@ -1,0 +1,19 @@
+// MES-CODEGEN: scaffold; review required.
+package dev.mesbase.business.basic.controller.vo;
+
+
+/**
+ * 物料产品分类接口响应白名单。
+ */
+public record MaterialCategoryVo(
+        String id,
+        String factoryId,
+        String code,
+        String name,
+        String parentId,
+        Integer sort,
+        String status,
+        String remark
+) {
+}
+

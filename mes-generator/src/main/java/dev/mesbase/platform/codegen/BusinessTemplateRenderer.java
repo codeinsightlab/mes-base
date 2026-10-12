@@ -110,6 +110,9 @@ public final class BusinessTemplateRenderer {
         if (options != null) subpackage = options.packages().getOrDefault(subpackage, subpackage).replace('.', '/');
         context.put("packageName", rootPackage + "." + subpackage.replace('/', '.'));
         String rendered = merge(template, context);
+        if (rendered.isBlank()) {
+            throw new CodegenException(CodegenException.Code.TEMPLATE_FAILURE);
+        }
         boolean completeSource = rendered.startsWith("package ") || rendered.startsWith("// MES-CODEGEN") && rendered.contains("\npackage ");
         context.put("body", completeSource ? "" : JavaSourceImports.explicit(rendered));
         String source = completeSource ? rendered : merge("java.vm", context);
@@ -290,7 +293,7 @@ public final class BusinessTemplateRenderer {
         emitJava(out, ctx, "controller/vo", n + "Vo", "view.java.vm");
         emitJava(out, ctx, "controller/vo", n + "PageVo", "page-view.java.vm");
         if (Boolean.TRUE.equals(ctx.get("scoped"))) {
-            emitJava(out, ctx, "domain", n + "Resource", (String) ctx.getOrDefault("resourceTemplate", "resource.java.vm"));
+            emitJava(out, ctx, "domain", n + "Resource", "resource.java.vm");
         }
         emitJava(out, ctx, "controller", n + "Permissions", "permissions.java.vm");
 
@@ -305,12 +308,12 @@ public final class BusinessTemplateRenderer {
         }
         String ownership = scoped ? "BUSINESS" : "PLATFORM";
         emitJava(out, ctx, "service", "I" + n + "Service", "service.java.vm");
-        emitJava(out, ctx, "service/impl", n + "ServiceImpl", (String) ctx.getOrDefault("serviceImplementationTemplate", "service-impl.java.vm"));
-        emitJava(out, ctx, "controller", n + "Controller", (String) ctx.getOrDefault("controllerTemplate", "controller.java.vm"));
+        emitJava(out, ctx, "service/impl", n + "ServiceImpl", "service-impl.java.vm");
+        emitJava(out, ctx, "controller", n + "Controller", "controller.java.vm");
         if (r.generateSync()) {
             ctx.put("commandName", "External" + n);
             ctx.put("commandFields", ctx.get("syncInputFields"));
-            emitJava(out, ctx, "sync", "External" + n, (String) ctx.getOrDefault("externalInputTemplate", "command.java.vm"));
+            emitJava(out, ctx, "sync", "External" + n, "command.java.vm");
             emitJava(out, ctx, "sync", n + "QueryPort", "sync-port.java.vm");
             emitJava(out, ctx, "sync", "Unconfigured" + n + "QueryAdapter", "sync-placeholder.java.vm");
             emitJava(out, ctx, "sync", n + "SyncResult", "sync-result.java.vm");
@@ -333,7 +336,7 @@ public final class BusinessTemplateRenderer {
         ctx.put("writableFields", create.stream().map(Column::javaField).toList());
         ctx.put("updateFields", writable.stream().map(Column::javaField).toList());
         out.add(new Artifact(FRONTEND, options == null ? "src/api/" + r.moduleName() + "/" + name + ".ts" : options.frontendApi(), merge("api.ts.vm", ctx)));
-        out.add(new Artifact(FRONTEND, options == null ? "src/views/" + r.moduleName() + "/" + name + "/index.vue" : options.frontendPage(), merge((String) ctx.getOrDefault("frontendPageTemplate", "index.vue.vm"), ctx)));
+        out.add(new Artifact(FRONTEND, options == null ? "src/views/" + r.moduleName() + "/" + name + "/index.vue" : options.frontendPage(), merge("index.vue.vm", ctx)));
         out.add(new Artifact(FRONTEND, options == null ? "src/menus/" + r.moduleName() + "/" + name + ".json" : options.frontendMenu(), merge("menu.json.vm", ctx)));
         out.add(new Artifact(PERMISSION, options == null ? "docs/generated/" + r.moduleName() + "/" + name + "-menu.sql" : options.menuSql(), merge("menu.sql.vm", ctx)));
         out.add(new Artifact(PERMISSION, "docs/generated/" + r.moduleName() + "/" + name + "-permissions.md", "<!-- MES-CODEGEN -->\n# " + r.businessName() + "\n\nScope: " + r.scope() + "; Mapper owner: " + ownership + "\n\nPath: `" + route + "`\n\n" + menuActions.stream()

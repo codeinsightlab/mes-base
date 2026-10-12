@@ -9,12 +9,11 @@ fi
 CONFIG=$1
 REPORT=$2
 cd "$ROOT"
-set -- "$ROOT"/target/mes-base-*.jar
+set -- "$ROOT"/mes-generator/target/mes-generator-*-cli.jar
 if [ "$#" -ne 1 ] || [ ! -f "$1" ]; then
-    echo 'Build the packaged application first; exactly one target/mes-base-*.jar is required.' >&2
+    echo 'Build the generator first: mvn -B -ntp -pl mes-generator -am verify; exactly one mes-generator/target/*-cli.jar is required.' >&2
     exit 2
 fi
 JAR=$1
 if [ -n "${JAVA_HOME:-}" ]; then JAVA_BIN="$JAVA_HOME/bin/java"; else JAVA_BIN=java; fi
-exec "$JAVA_BIN" -Dloader.main=dev.mesbase.platform.codegen.BusinessCodegenCli -cp "$JAR" \
-    org.springframework.boot.loader.launch.PropertiesLauncher "$CONFIG" "$ROOT" "$REPORT"
+exec "$JAVA_BIN" -jar "$JAR" "$CONFIG" "$ROOT" "$REPORT"

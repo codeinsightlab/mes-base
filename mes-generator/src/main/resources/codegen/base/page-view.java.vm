@@ -1,0 +1,10 @@
+/**
+ * ${functionNameJavaDoc}分页响应。
+ */
+public record ${ClassName}PageVo(
+        java.util.List<${ClassName}Vo> items,
+        long total,
+        int offset,
+        int limit
+) {
+}

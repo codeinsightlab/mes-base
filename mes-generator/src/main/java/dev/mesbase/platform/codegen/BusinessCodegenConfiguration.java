@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.HashSet;
 import java.util.Map;
 import org.yaml.snakeyaml.LoaderOptions;
 import org.yaml.snakeyaml.Yaml;
@@ -80,9 +81,7 @@ public record BusinessCodegenConfiguration(Integer version, Source source, Selec
     public record Sync(String matchKey, Integer batchMaximum) {
     }
 
-    public record TableOverride(String module, String displayName, String syncMatchKey, String serverScopeColumn,
-                                String frontendTemplate, String serviceImplementationTemplate,
-                                String controllerTemplate, String externalInputTemplate, String resourceTemplate) {
+    public record TableOverride(String module, String displayName, String syncMatchKey, String serverScopeColumn) {
     }
 
     public static BusinessCodegenConfiguration read(Path file) throws IOException {
@@ -132,11 +131,13 @@ public record BusinessCodegenConfiguration(Integer version, Source source, Selec
     private static void requireDeclaredKeys(Object record, Object document, String path) {
         require(document instanceof Map<?, ?>, path);
         Map<?, ?> values = (Map<?, ?>) document;
+        var declared = new HashSet<String>();
+        for (var component : record.getClass().getRecordComponents()) declared.add(component.getName());
+        for (Object key : values.keySet()) require(declared.contains(key), path + "." + key);
         for (var component : record.getClass().getRecordComponents()) {
             String name = component.getName();
             boolean optional = name.equals("tableOverrides") || name.equals("generateSync") || name.equals("sync")
-                    || record instanceof TableOverride && (name.equals("syncMatchKey") || name.equals("serverScopeColumn") || name.equals("frontendTemplate") || name.equals("serviceImplementationTemplate")
-                    || name.equals("controllerTemplate") || name.equals("externalInputTemplate") || name.equals("resourceTemplate"))
+                    || record instanceof TableOverride
                     || record instanceof Strategy && name.equals("fallback")
                     && !"displayName".equals(path.substring(path.lastIndexOf('.') + 1));
             require(values.containsKey(name) || optional, path + "." + name);
@@ -148,6 +149,14 @@ public record BusinessCodegenConfiguration(Integer version, Source source, Selec
             }
             if (value != null && value.getClass().isRecord()) {
                 requireDeclaredKeys(value, values.get(name), path + "." + name);
+            } else if (value instanceof Map<?, ?> entries && name.equals("tableOverrides")) {
+                require(values.get(name) instanceof Map<?, ?>, path + "." + name);
+                var documents = (Map<?, ?>) values.get(name);
+                for (var entry : entries.entrySet()) {
+                    require(entry.getValue() != null, path + "." + name + "." + entry.getKey());
+                    requireDeclaredKeys(entry.getValue(), documents.get(entry.getKey()), path + "." + name + "." + entry.getKey());
+                    requireFields(entry.getValue(), path + "." + name + "." + entry.getKey());
+                }
             }
         }
     }
@@ -162,8 +171,7 @@ public record BusinessCodegenConfiguration(Integer version, Source source, Selec
                 throw new IllegalArgumentException("Invalid configuration: " + path, failure);
             }
             boolean nullable = name.equals("tableOverrides") || name.equals("schema") || name.equals("sync")
-                    || record instanceof TableOverride && (name.equals("syncMatchKey") || name.equals("serverScopeColumn") || name.equals("frontendTemplate") || name.equals("serviceImplementationTemplate")
-                    || name.equals("controllerTemplate") || name.equals("externalInputTemplate") || name.equals("resourceTemplate"))
+                    || record instanceof TableOverride
                     || record instanceof Strategy && name.equals("fallback")
                     || record instanceof Conditional && (name.equals("property") || name.equals("value"));
             require(value != null || nullable, path + "." + name);

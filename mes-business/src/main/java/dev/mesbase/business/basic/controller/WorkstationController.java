@@ -1,0 +1,107 @@
+// MES-CODEGEN: scaffold; review required.
+package dev.mesbase.business.basic.controller;
+
+import dev.mesbase.business.basic.controller.vo.WorkstationPageVo;
+import dev.mesbase.business.basic.controller.vo.WorkstationVo;
+import dev.mesbase.business.basic.domain.WorkstationCreateCommand;
+import dev.mesbase.business.basic.domain.WorkstationEntity;
+import dev.mesbase.business.basic.domain.WorkstationPage;
+import dev.mesbase.business.basic.domain.WorkstationQueryDto;
+import dev.mesbase.business.basic.domain.WorkstationUpdateCommand;
+import dev.mesbase.business.basic.service.IWorkstationService;
+import dev.mesbase.business.basic.sync.WorkstationSyncResult;
+import dev.mesbase.platform.execution.FactoryContext;
+import dev.mesbase.platform.web.EndpointAccess;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotEmpty;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
+import java.util.List;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.ModelAttribute;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.ResponseStatus;
+import org.springframework.web.bind.annotation.RestController;
+
+/**
+ * 工作站 HTTP 接口，响应转换显式发生在 Web 边界。
+ */
+@RestController
+@RequestMapping("/api/basic/workstation")
+@ConditionalOnProperty(name = "mes.business.enabled", havingValue = "true")
+public class WorkstationController {
+    private final IWorkstationService service;
+
+    public WorkstationController(IWorkstationService service) {
+        this.service = service;
+    }
+
+    @GetMapping
+    @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED,
+            permission = WorkstationPermissions.LIST)
+    public WorkstationPageVo list(@Valid @ModelAttribute WorkstationQueryDto query) {
+        WorkstationPage page = service.selectPage(query);
+        return new WorkstationPageVo(
+                page.items().stream().map(WorkstationController::toView).toList(),
+                page.total(), page.offset(), page.limit());
+    }
+
+    @GetMapping("/{id}")
+    @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED,
+            permission = WorkstationPermissions.QUERY)
+    public WorkstationVo detail(@PathVariable Long id) {
+        return toView(service.selectById(id));
+    }
+
+    @PostMapping
+    @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED,
+            permission = WorkstationPermissions.CREATE)
+    public WorkstationVo create(@Valid @RequestBody WorkstationCreateCommand input) {
+        return toView(service.insert(input));
+    }
+
+    @PutMapping("/{id}")
+    @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED,
+            permission = WorkstationPermissions.UPDATE)
+    public WorkstationVo update(@PathVariable Long id,
+                                @Valid @RequestBody WorkstationUpdateCommand input) {
+        return toView(service.updateById(id, input));
+    }
+
+    @DeleteMapping
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED,
+            permission = WorkstationPermissions.DELETE)
+    public void delete(@RequestBody
+                       @NotEmpty @Size(max = 100)
+                       List<@NotNull Long> ids) {
+        service.deleteByIds(ids);
+    }
+
+    @PostMapping("/actions/sync")
+    @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED,
+            permission = WorkstationPermissions.SYNC)
+    public WorkstationSyncResult sync() {
+        return service.sync(FactoryContext.required());
+    }
+
+    private static WorkstationVo toView(WorkstationEntity row) {
+        return new WorkstationVo(
+                row.getId() == null ? null : row.getId().toString(),
+                row.getFactoryId(),
+                row.getCode(),
+                row.getName(),
+                row.getWorkshopId() == null ? null : row.getWorkshopId().toString(),
+                row.getStatus(),
+                row.getRemark()
+        );
+    }
+}
+

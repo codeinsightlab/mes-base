@@ -165,18 +165,6 @@ public final class BusinessCodegenRunner {
         if (tableOverride != null && tableOverride.serverScopeColumn() != null) {
             variables.put("serverScopeColumn", tableOverride.serverScopeColumn());
         }
-        if (tableOverride != null && tableOverride.frontendTemplate() != null) {
-            String template = tableOverride.frontendTemplate();
-            BusinessCodegenConfiguration.require(template.matches("[A-Za-z0-9][A-Za-z0-9_./-]*\\.vue\\.vm")
-                    && !template.contains(".."), "tableOverrides.frontendTemplate");
-            variables.put("frontendPageTemplate", template);
-        }
-        if (tableOverride != null) {
-            putJavaTemplate(variables, "serviceImplementationTemplate", tableOverride.serviceImplementationTemplate());
-            putJavaTemplate(variables, "controllerTemplate", tableOverride.controllerTemplate());
-            putJavaTemplate(variables, "externalInputTemplate", tableOverride.externalInputTemplate());
-            putJavaTemplate(variables, "resourceTemplate", tableOverride.resourceTemplate());
-        }
         variables.put("syncBatchMaximum", c.generateSync() ? c.sync().batchMaximum() : 1000);
         variables.put("route", apiPath);
         variables.put("permission", permission);
@@ -210,13 +198,6 @@ public final class BusinessCodegenRunner {
         return new CodegenTemplateOptions(root.resolve(c.templates().root()).normalize(), variables, packages,
                 c.fields().audit(), c.fields().maxStringValidationLength(), api, page,
                 expand(c.output().frontendMenu(), table, module), expand(c.output().menuSql(), table, module));
-    }
-
-    private static void putJavaTemplate(Map<String, Object> variables, String key, String template) {
-        if (template == null) return;
-        BusinessCodegenConfiguration.require(template.matches("[A-Za-z0-9][A-Za-z0-9_./-]*\\.java\\.vm")
-                && !template.contains(".."), "tableOverrides." + key);
-        variables.put(key, template);
     }
 
 }

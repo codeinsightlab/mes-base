@@ -1,0 +1,76 @@
+/** TEST ONLY: scaffold contracts; add real business and database acceptance. */
+public class ${ClassName}ScaffoldTest {
+    @org.junit.jupiter.api.Test
+    void contractsStayScoped() {
+        org.junit.jupiter.api.Assertions.assertEquals(
+                dev.mesbase.infrastructure.persistence.PersistenceOwner.Kind.${ownership},
+                dev.mesbase.infrastructure.persistence.MapperPackages.owner(${daoPackage}.${ClassName}Mapper.class));
+        for (java.lang.reflect.Method method : ${controllerPackage}.${ClassName}Controller.class.getDeclaredMethods()) {
+            if (!java.lang.reflect.Modifier.isPublic(method.getModifiers())) {
+                continue;
+            }
+            dev.mesbase.platform.web.EndpointAccess access = method.getAnnotation(dev.mesbase.platform.web.EndpointAccess.class);
+            org.junit.jupiter.api.Assertions.assertNotNull(access);
+            org.junit.jupiter.api.Assertions.assertEquals(dev.mesbase.platform.web.EndpointAccess.Kind.AUTHORIZED, access.value());
+        }
+        for (java.lang.reflect.Method method : ${servicePackage}.impl.${ClassName}ServiceImpl.class.getDeclaredMethods()) {
+            if (!java.lang.reflect.Modifier.isPublic(method.getModifiers())) {
+                continue;
+            }
+#if($generateSync)
+            if (method.getName().equals("sync")) {
+                org.junit.jupiter.api.Assertions.assertNull(method.getAnnotation(org.springframework.transaction.annotation.Transactional.class));
+                continue;
+            }
+#end
+            org.springframework.transaction.annotation.Transactional transaction = method.getAnnotation(org.springframework.transaction.annotation.Transactional.class);
+            org.junit.jupiter.api.Assertions.assertNotNull(transaction);
+            org.junit.jupiter.api.Assertions.assertEquals("${transactionManager}", transaction.transactionManager());
+        }
+    }
+
+#if($scoped)
+    @org.junit.jupiter.api.Test
+    void cacheContractsUseTheFullPermissionResource() throws Exception {
+        var service = ${servicePackage}.impl.${ClassName}ServiceImpl.class;
+        var list = service.getMethod("selectPage", ${domainPackage}.${ClassName}QueryDto.class)
+                .getAnnotation(dev.mesbase.infrastructure.cache.annotation.BusinessCache.class);
+        org.junit.jupiter.api.Assertions.assertNotNull(list);
+        org.junit.jupiter.api.Assertions.assertEquals(${domainPackage}.${ClassName}Resource.PREFIX, list.business());
+        org.junit.jupiter.api.Assertions.assertEquals(dev.mesbase.infrastructure.cache.annotation.BusinessCache.Type.LIST, list.type());
+        org.junit.jupiter.api.Assertions.assertTrue(dev.mesbase.infrastructure.cache.BusinessCacheQuery.class
+                .isAssignableFrom(${domainPackage}.${ClassName}QueryDto.class));
+        var detail = service.getMethod("selectById", ${idType}.class)
+                .getAnnotation(dev.mesbase.infrastructure.cache.annotation.BusinessCache.class);
+        org.junit.jupiter.api.Assertions.assertNotNull(detail);
+        org.junit.jupiter.api.Assertions.assertEquals(${domainPackage}.${ClassName}Resource.PREFIX, detail.business());
+        org.junit.jupiter.api.Assertions.assertEquals(dev.mesbase.infrastructure.cache.annotation.BusinessCache.Type.DETAIL, detail.type());
+        var create = service.getMethod("insert", ${domainPackage}.${ClassName}CreateCommand.class)
+                .getAnnotation(dev.mesbase.infrastructure.cache.annotation.BusinessCacheEvict.class);
+        org.junit.jupiter.api.Assertions.assertNotNull(create);
+        org.junit.jupiter.api.Assertions.assertEquals(dev.mesbase.infrastructure.cache.annotation.BusinessCacheEvict.Scope.LIST, create.scope());
+        var update = service.getMethod("updateById", ${idType}.class, ${domainPackage}.${ClassName}UpdateCommand.class)
+                .getAnnotation(dev.mesbase.infrastructure.cache.annotation.BusinessCacheEvict.class);
+        var delete = service.getMethod("deleteByIds", java.util.List.class)
+                .getAnnotation(dev.mesbase.infrastructure.cache.annotation.BusinessCacheEvict.class);
+        org.junit.jupiter.api.Assertions.assertNotNull(update);
+        org.junit.jupiter.api.Assertions.assertNotNull(delete);
+        org.junit.jupiter.api.Assertions.assertEquals(dev.mesbase.infrastructure.cache.annotation.BusinessCacheEvict.Scope.LIST_AND_DETAIL, update.scope());
+        org.junit.jupiter.api.Assertions.assertEquals(update.scope(), delete.scope());
+    }
+#end
+
+#if($generateSync)
+    @org.junit.jupiter.api.Test
+    void synchronizationHasIndependentAuthorizationAndExplicitDefaultFailure() throws Exception {
+        var access = ${controllerPackage}.${ClassName}Controller.class.getDeclaredMethod("sync")
+                .getAnnotation(dev.mesbase.platform.web.EndpointAccess.class);
+        org.junit.jupiter.api.Assertions.assertEquals(${controllerPackage}.${ClassName}Permissions.SYNC, access.permission());
+        org.junit.jupiter.api.Assertions.assertEquals(dev.mesbase.platform.web.EndpointAccess.Kind.AUTHORIZED, access.value());
+        var scope = new dev.mesbase.core.factory.FactoryScope(new dev.mesbase.core.factory.FactoryId("TEST_ONLY"));
+        var failure = org.junit.jupiter.api.Assertions.assertThrows(dev.mesbase.core.error.FoundationException.class,
+                () -> new ${syncPackage}.Unconfigured${ClassName}QueryAdapter().query(scope, ${syncBatchMaximum}));
+        org.junit.jupiter.api.Assertions.assertEquals(dev.mesbase.core.error.ErrorCode.ERP_SYNC_NOT_CONFIGURED, failure.code());
+    }
+#end
+}
