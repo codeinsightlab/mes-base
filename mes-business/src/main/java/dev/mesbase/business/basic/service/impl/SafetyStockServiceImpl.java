@@ -33,6 +33,8 @@ import java.util.Objects;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
+import dev.mesbase.business.basic.service.BasicDataRules;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
@@ -42,18 +44,20 @@ import org.springframework.transaction.annotation.Transactional;
 @ConditionalOnProperty(name = "mes.business.enabled", havingValue = "true")
 public class SafetyStockServiceImpl implements ISafetyStockService {
     private final SafetyStockMapper mapper;
+    private final BasicDataRules rules;
     private final SafetyStockQueryPort query;
     private final SyncCoordinator coordinator;
     private final ObjectProvider<ISafetyStockService> self;
     private final Validator validator;
     private final BusinessCacheProcessor caches;
 
-    public SafetyStockServiceImpl(SafetyStockMapper mapper,
-            ObjectProvider<SafetyStockQueryPort> queries,
-            SyncCoordinator coordinator,
-            ObjectProvider<ISafetyStockService> self,
-            Validator validator, BusinessCacheProcessor caches) {
+    public SafetyStockServiceImpl(SafetyStockMapper mapper, BasicDataRules rules,
+                                  ObjectProvider<SafetyStockQueryPort> queries,
+                                  SyncCoordinator coordinator,
+                                  ObjectProvider<ISafetyStockService> self,
+                                  Validator validator, BusinessCacheProcessor caches) {
         this.mapper = mapper;
+        this.rules = rules;
         this.query = queries.getIfAvailable(UnconfiguredSafetyStockQueryAdapter::new);
         this.coordinator = coordinator;
         this.self = self;
@@ -75,13 +79,13 @@ public class SafetyStockServiceImpl implements ISafetyStockService {
         SafetyStockExample.Criteria criteria = example.createCriteria();
         criteria.andFactoryIdEqualTo(FactoryContext.required().factoryId().value());
         if (query.materialId() != null) {
-            criteria.andMaterialIdEqualTo( query.materialId());
+            criteria.andMaterialIdEqualTo(query.materialId());
         }
         if (query.minQty() != null) {
-            criteria.andMinQtyEqualTo( query.minQty());
+            criteria.andMinQtyEqualTo(query.minQty());
         }
         if (query.maxQty() != null) {
-            criteria.andMaxQtyEqualTo( query.maxQty());
+            criteria.andMaxQtyEqualTo(query.maxQty());
         }
         if (query.status() != null) {
             criteria.andStatusLike("%" + query.status() + "%");
@@ -114,7 +118,8 @@ public class SafetyStockServiceImpl implements ISafetyStockService {
         row.setMinQty(input.minQty());
         row.setMaxQty(input.maxQty());
         row.setStatus(input.status());
-        if (mapper.insert(row) != 1) {
+        rules.validate(row);
+        if (insertUnique(row) != 1) {
             throw new FoundationException(ErrorCode.RESOURCE_CONFLICT);
         }
         return requireRecord(row.getId());
@@ -131,7 +136,8 @@ public class SafetyStockServiceImpl implements ISafetyStockService {
         row.setMinQty(input.minQty());
         row.setMaxQty(input.maxQty());
         row.setStatus(input.status());
-        if (mapper.updateByPrimaryKey(row) != 1) {
+        rules.validate(row);
+        if (updateUnique(row) != 1) {
             throw new FoundationException(ErrorCode.RESOURCE_CONFLICT);
         }
         return requireRecord(id);
@@ -146,13 +152,30 @@ public class SafetyStockServiceImpl implements ISafetyStockService {
                 || new HashSet<>(ids).size() != ids.size()) {
             throw new FoundationException(ErrorCode.BAD_REQUEST);
         }
+        rules.deletingSafetyStock(ids);
         SafetyStockExample example = new SafetyStockExample();
         for (var id : ids) requireRecord(id);
         example.createCriteria().andIdIn(ids)
                 .andFactoryIdEqualTo(FactoryContext.required().factoryId().value())
-                ;
+        ;
         if (mapper.deleteByExample(example) != ids.size()) {
             throw new FoundationException(ErrorCode.RESOURCE_CONFLICT);
+        }
+    }
+
+    private int insertUnique(SafetyStockEntity row) {
+        try {
+            return mapper.insert(row);
+        } catch (DuplicateKeyException failure) {
+            throw new FoundationException(ErrorCode.RESOURCE_CONFLICT, failure);
+        }
+    }
+
+    private int updateUnique(SafetyStockEntity row) {
+        try {
+            return mapper.updateByPrimaryKey(row);
+        } catch (DuplicateKeyException failure) {
+            throw new FoundationException(ErrorCode.RESOURCE_CONFLICT, failure);
         }
     }
 
@@ -163,6 +186,7 @@ public class SafetyStockServiceImpl implements ISafetyStockService {
         }
         return row;
     }
+
     public SafetyStockSyncResult sync(FactoryScope scope) {
         if (!FactoryContext.required().equals(scope)) {
             throw new FoundationException(ErrorCode.CONFLICT);
@@ -187,7 +211,7 @@ public class SafetyStockServiceImpl implements ISafetyStockService {
 
     @Transactional(transactionManager = "businessTransactionManager", rollbackFor = Exception.class)
     public SafetyStockSyncResult upsert(FactoryScope scope,
-                                       List<ExternalSafetyStock> inputs) {
+                                        List<ExternalSafetyStock> inputs) {
         if (!FactoryContext.required().equals(scope)) {
             throw new FoundationException(ErrorCode.CONFLICT);
         }
@@ -204,7 +228,7 @@ public class SafetyStockServiceImpl implements ISafetyStockService {
         var example = new SafetyStockExample();
         example.createCriteria().andMaterialIdIn(List.copyOf(keys))
                 .andFactoryIdEqualTo(scope.factoryId().value())
-                ;
+        ;
         var existing = new HashMap<Long, SafetyStockEntity>();
         for (var row : mapper.selectByExample(example)) {
             if (existing.put(row.getMaterialId(), row) != null) {
@@ -229,7 +253,13 @@ public class SafetyStockServiceImpl implements ISafetyStockService {
             row.setMinQty(input.minQty());
             row.setMaxQty(input.maxQty());
             row.setStatus(input.status());
-            int affected = insert ? mapper.insertSelective(row) : mapper.updateByPrimaryKey(row);
+            rules.validate(row);
+            int affected;
+            try {
+                affected = insert ? mapper.insertSelective(row) : mapper.updateByPrimaryKey(row);
+            } catch (DuplicateKeyException failure) {
+                throw new FoundationException(ErrorCode.RESOURCE_CONFLICT, failure);
+            }
             if (affected != 1) throw new FoundationException(ErrorCode.RESOURCE_CONFLICT);
             if (insert) created++;
             else updated++;
@@ -247,9 +277,9 @@ public class SafetyStockServiceImpl implements ISafetyStockService {
     private static boolean same(SafetyStockEntity row, ExternalSafetyStock input) {
         return Objects.deepEquals(row.getMaterialId(), input.materialId())
                 && (row.getMinQty() == null ? input.minQty() == null
-                    : input.minQty() != null && row.getMinQty().compareTo(input.minQty()) == 0)
+                : input.minQty() != null && row.getMinQty().compareTo(input.minQty()) == 0)
                 && (row.getMaxQty() == null ? input.maxQty() == null
-                    : input.maxQty() != null && row.getMaxQty().compareTo(input.maxQty()) == 0)
+                : input.maxQty() != null && row.getMaxQty().compareTo(input.maxQty()) == 0)
                 && Objects.deepEquals(row.getStatus(), input.status());
     }
 }

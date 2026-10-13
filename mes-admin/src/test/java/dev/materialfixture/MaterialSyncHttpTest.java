@@ -22,24 +22,24 @@ import dev.mesbase.infrastructure.persistence.OwnedTransactionManager;
 import dev.mesbase.infrastructure.persistence.PersistenceFactories;
 import dev.mesbase.infrastructure.persistence.PlatformPersistence;
 import dev.mesbase.infrastructure.persistence.RuntimeRegistry;
-import dev.mesbase.modules.material.controller.MaterialController;
-import dev.mesbase.modules.material.controller.MaterialPermissions;
-import dev.mesbase.modules.material.service.BasicDataRules;
+import dev.mesbase.business.basic.controller.MaterialController;
+import dev.mesbase.business.basic.controller.MaterialPermissions;
+import dev.mesbase.business.basic.service.BasicDataRules;
 import jakarta.validation.Validation;
 import jakarta.validation.Validator;
 import org.apache.ibatis.session.SqlSessionFactory;
-import dev.mesbase.modules.material.dao.MaterialCategoryMapper;
-import dev.mesbase.modules.material.dao.UnitMeasureMapper;
-import dev.mesbase.modules.material.dao.WorkshopMapper;
-import dev.mesbase.modules.material.dao.WorkstationMapper;
-import dev.mesbase.modules.material.dao.SafetyStockMapper;
-import dev.mesbase.modules.material.dao.MaterialMapper;
-import dev.mesbase.modules.material.sync.ExternalMaterial;
-import dev.mesbase.modules.material.sync.MaterialQueryPort;
-import dev.mesbase.modules.material.service.impl.MaterialServiceImpl;
-import dev.mesbase.modules.material.service.IMaterialService;
+import dev.mesbase.business.basic.dao.MaterialCategoryMapper;
+import dev.mesbase.business.basic.dao.UnitMeasureMapper;
+import dev.mesbase.business.basic.dao.WorkshopMapper;
+import dev.mesbase.business.basic.dao.WorkstationMapper;
+import dev.mesbase.business.basic.dao.SafetyStockMapper;
+import dev.mesbase.business.basic.dao.MaterialMapper;
+import dev.mesbase.business.basic.sync.ExternalMaterial;
+import dev.mesbase.business.basic.sync.MaterialQueryPort;
+import dev.mesbase.business.basic.service.impl.MaterialServiceImpl;
+import dev.mesbase.business.basic.service.IMaterialService;
 import dev.mesbase.infrastructure.cache.BusinessCacheProcessor;
-import dev.mesbase.modules.material.sync.UnconfiguredMaterialQueryAdapter;
+import dev.mesbase.business.basic.sync.UnconfiguredMaterialQueryAdapter;
 import dev.mesbase.platform.execution.FactoryContext;
 import dev.mesbase.platform.web.FoundationAccessInterceptor;
 import dev.mesbase.platform.web.FoundationErrorAdvice;
@@ -278,7 +278,7 @@ class MaterialSyncHttpTest {
     }
 
     static void sync(MockMvc mvc, String factory, int created, int updated, int skipped) throws Exception {
-        mvc.perform(post("/api/material/material/actions/sync").header("Authorization", "Bearer TEST_ALLOW")
+        mvc.perform(post("/api/basic/material/actions/sync").header("Authorization", "Bearer TEST_ALLOW")
                         .header("X-Factory-Id", factory))
                 .andExpect(status().isOk()).andExpect(jsonPath("fetched").value(created + updated + skipped))
                 .andExpect(jsonPath("created").value(created)).andExpect(jsonPath("updated").value(updated))
@@ -294,7 +294,7 @@ class MaterialSyncHttpTest {
             sync(mvc, "A", 0, 0, 2);
             sync(mvc, "B", 2, 0, 0);
             var old = fixture.data.getFirst();
-            fixture.data = List.of(new ExternalMaterial(old.code(), "测试更新", null, old.categoryCode(), old.unitCode(), old.materialType(), old.status(), old.externalId(), old.externalCode()), fixture.data.get(1));
+            fixture.data = List.of(new ExternalMaterial(old.code(), "测试更新", null, old.categoryId(), old.unitId(), old.materialType(), old.status(), old.externalId(), old.externalCode()), fixture.data.get(1));
             sync(mvc, "A", 0, 1, 1);
             assertEquals(2, fixture.business.get("A").queryForObject("SELECT COUNT(*) FROM material", Integer.class));
             assertEquals("测试更新", fixture.business.get("A")
@@ -311,10 +311,10 @@ class MaterialSyncHttpTest {
         try (var context = context()) {
             var mvc = mvc(context);
             var fixture = context.getBean(Fixture.class);
-            mvc.perform(post("/api/material/material/actions/sync").header("Authorization", "Bearer TEST_DENY")
+            mvc.perform(post("/api/basic/material/actions/sync").header("Authorization", "Bearer TEST_DENY")
                             .header("X-Factory-Id", "A"))
                     .andExpect(status().isForbidden()).andExpect(jsonPath("errorCode").value("FORBIDDEN"));
-            mvc.perform(post("/api/material/material/actions/sync").header("Authorization", "Bearer TEST_ALLOW")
+            mvc.perform(post("/api/basic/material/actions/sync").header("Authorization", "Bearer TEST_ALLOW")
                             .header("X-Factory-Id", "C"))
                     .andExpect(status().isUnprocessableEntity())
                     .andExpect(jsonPath("errorCode").value("ERP_SYNC_NOT_CONFIGURED"));
@@ -330,14 +330,14 @@ class MaterialSyncHttpTest {
         try (var context = context()) {
             var fixture = context.getBean(Fixture.class);
             var mvc = mvc(context);
-            fixture.data = List.of(new ExternalMaterial("Z001", "valid", null, null, "PCS", "ITEM", "ENABLED", "1", "1"),
-                    new ExternalMaterial("Z002", "DB_REJECT", null, null, "PCS", "ITEM", "ENABLED", "2", "2"));
-            mvc.perform(post("/api/material/material/actions/sync").header("Authorization", "Bearer TEST_ALLOW")
+            fixture.data = List.of(new ExternalMaterial("Z001", "valid", null, null, 1L, "ITEM", "ENABLED", "1", "1"),
+                    new ExternalMaterial("Z002", "DB_REJECT", null, null, 1L, "ITEM", "ENABLED", "2", "2"));
+            mvc.perform(post("/api/basic/material/actions/sync").header("Authorization", "Bearer TEST_ALLOW")
                             .header("X-Factory-Id", "A"))
                     .andExpect(status().isInternalServerError());
             assertEquals(0, fixture.business.get("A").queryForObject("SELECT COUNT(*) FROM material", Integer.class));
             fixture.data = List.of(fixture.data.getFirst(), fixture.data.getFirst());
-            mvc.perform(post("/api/material/material/actions/sync").header("Authorization", "Bearer TEST_ALLOW")
+            mvc.perform(post("/api/basic/material/actions/sync").header("Authorization", "Bearer TEST_ALLOW")
                             .header("X-Factory-Id", "A"))
                     .andExpect(status().isBadRequest());
             assertEquals(0, fixture.business.get("A").queryForObject("SELECT COUNT(*) FROM material", Integer.class));

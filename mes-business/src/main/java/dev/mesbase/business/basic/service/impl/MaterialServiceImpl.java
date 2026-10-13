@@ -33,7 +33,10 @@ import java.util.Objects;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
+import dev.mesbase.business.basic.service.BasicDataRules;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.annotation.Isolation;
 
 /**
  * 物料产品 CRUD：规则与事务由 Service 负责，Mapper 通过 MyBatis-Spring 注入。
@@ -42,18 +45,20 @@ import org.springframework.transaction.annotation.Transactional;
 @ConditionalOnProperty(name = "mes.business.enabled", havingValue = "true")
 public class MaterialServiceImpl implements IMaterialService {
     private final MaterialMapper mapper;
+    private final BasicDataRules rules;
     private final MaterialQueryPort query;
     private final SyncCoordinator coordinator;
     private final ObjectProvider<IMaterialService> self;
     private final Validator validator;
     private final BusinessCacheProcessor caches;
 
-    public MaterialServiceImpl(MaterialMapper mapper,
-            ObjectProvider<MaterialQueryPort> queries,
-            SyncCoordinator coordinator,
-            ObjectProvider<IMaterialService> self,
-            Validator validator, BusinessCacheProcessor caches) {
+    public MaterialServiceImpl(MaterialMapper mapper, BasicDataRules rules,
+                               ObjectProvider<MaterialQueryPort> queries,
+                               SyncCoordinator coordinator,
+                               ObjectProvider<IMaterialService> self,
+                               Validator validator, BusinessCacheProcessor caches) {
         this.mapper = mapper;
+        this.rules = rules;
         this.query = queries.getIfAvailable(UnconfiguredMaterialQueryAdapter::new);
         this.coordinator = coordinator;
         this.self = self;
@@ -84,10 +89,10 @@ public class MaterialServiceImpl implements IMaterialService {
             criteria.andSpecificationLike("%" + query.specification() + "%");
         }
         if (query.categoryId() != null) {
-            criteria.andCategoryIdEqualTo( query.categoryId());
+            criteria.andCategoryIdEqualTo(query.categoryId());
         }
         if (query.unitId() != null) {
-            criteria.andUnitIdEqualTo( query.unitId());
+            criteria.andUnitIdEqualTo(query.unitId());
         }
         if (query.materialType() != null) {
             criteria.andMaterialTypeLike("%" + query.materialType() + "%");
@@ -119,7 +124,7 @@ public class MaterialServiceImpl implements IMaterialService {
     }
 
     @Override
-    @Transactional(transactionManager = "businessTransactionManager", rollbackFor = Exception.class)
+    @Transactional(transactionManager = "businessTransactionManager", isolation = Isolation.READ_COMMITTED, rollbackFor = Exception.class)
     @BusinessCacheEvict(business = MaterialResource.PREFIX,
             scope = BusinessCacheEvict.Scope.LIST)
     public MaterialEntity insert(MaterialCreateCommand input) {
@@ -134,14 +139,15 @@ public class MaterialServiceImpl implements IMaterialService {
         row.setStatus(input.status());
         row.setExternalId(input.externalId());
         row.setExternalCode(input.externalCode());
-        if (mapper.insert(row) != 1) {
+        rules.validate(row);
+        if (insertUnique(row) != 1) {
             throw new FoundationException(ErrorCode.RESOURCE_CONFLICT);
         }
         return requireRecord(row.getId());
     }
 
     @Override
-    @Transactional(transactionManager = "businessTransactionManager", rollbackFor = Exception.class)
+    @Transactional(transactionManager = "businessTransactionManager", isolation = Isolation.READ_COMMITTED, rollbackFor = Exception.class)
     @BusinessCacheEvict(business = MaterialResource.PREFIX,
             scope = BusinessCacheEvict.Scope.LIST_AND_DETAIL)
     public MaterialEntity updateById(Long id, MaterialUpdateCommand input) {
@@ -156,14 +162,15 @@ public class MaterialServiceImpl implements IMaterialService {
         row.setStatus(input.status());
         row.setExternalId(input.externalId());
         row.setExternalCode(input.externalCode());
-        if (mapper.updateByPrimaryKey(row) != 1) {
+        rules.validate(row);
+        if (updateUnique(row) != 1) {
             throw new FoundationException(ErrorCode.RESOURCE_CONFLICT);
         }
         return requireRecord(id);
     }
 
     @Override
-    @Transactional(transactionManager = "businessTransactionManager", rollbackFor = Exception.class)
+    @Transactional(transactionManager = "businessTransactionManager", isolation = Isolation.READ_COMMITTED, rollbackFor = Exception.class)
     @BusinessCacheEvict(business = MaterialResource.PREFIX,
             scope = BusinessCacheEvict.Scope.LIST_AND_DETAIL)
     public void deleteByIds(List<Long> ids) {
@@ -171,13 +178,30 @@ public class MaterialServiceImpl implements IMaterialService {
                 || new HashSet<>(ids).size() != ids.size()) {
             throw new FoundationException(ErrorCode.BAD_REQUEST);
         }
+        rules.deletingMaterial(ids);
         MaterialExample example = new MaterialExample();
         for (var id : ids) requireRecord(id);
         example.createCriteria().andIdIn(ids)
                 .andFactoryIdEqualTo(FactoryContext.required().factoryId().value())
-                ;
+        ;
         if (mapper.deleteByExample(example) != ids.size()) {
             throw new FoundationException(ErrorCode.RESOURCE_CONFLICT);
+        }
+    }
+
+    private int insertUnique(MaterialEntity row) {
+        try {
+            return mapper.insert(row);
+        } catch (DuplicateKeyException failure) {
+            throw new FoundationException(ErrorCode.RESOURCE_CONFLICT, failure);
+        }
+    }
+
+    private int updateUnique(MaterialEntity row) {
+        try {
+            return mapper.updateByPrimaryKey(row);
+        } catch (DuplicateKeyException failure) {
+            throw new FoundationException(ErrorCode.RESOURCE_CONFLICT, failure);
         }
     }
 
@@ -188,6 +212,7 @@ public class MaterialServiceImpl implements IMaterialService {
         }
         return row;
     }
+
     public MaterialSyncResult sync(FactoryScope scope) {
         if (!FactoryContext.required().equals(scope)) {
             throw new FoundationException(ErrorCode.CONFLICT);
@@ -210,9 +235,9 @@ public class MaterialServiceImpl implements IMaterialService {
         }
     }
 
-    @Transactional(transactionManager = "businessTransactionManager", rollbackFor = Exception.class)
+    @Transactional(transactionManager = "businessTransactionManager", isolation = Isolation.READ_COMMITTED, rollbackFor = Exception.class)
     public MaterialSyncResult upsert(FactoryScope scope,
-                                       List<ExternalMaterial> inputs) {
+                                     List<ExternalMaterial> inputs) {
         if (!FactoryContext.required().equals(scope)) {
             throw new FoundationException(ErrorCode.CONFLICT);
         }
@@ -229,7 +254,7 @@ public class MaterialServiceImpl implements IMaterialService {
         var example = new MaterialExample();
         example.createCriteria().andCodeIn(List.copyOf(keys))
                 .andFactoryIdEqualTo(scope.factoryId().value())
-                ;
+        ;
         var existing = new HashMap<String, MaterialEntity>();
         for (var row : mapper.selectByExample(example)) {
             if (existing.put(row.getCode(), row) != null) {
@@ -259,7 +284,13 @@ public class MaterialServiceImpl implements IMaterialService {
             row.setStatus(input.status());
             row.setExternalId(input.externalId());
             row.setExternalCode(input.externalCode());
-            int affected = insert ? mapper.insertSelective(row) : mapper.updateByPrimaryKey(row);
+            rules.validate(row);
+            int affected;
+            try {
+                affected = insert ? mapper.insertSelective(row) : mapper.updateByPrimaryKey(row);
+            } catch (DuplicateKeyException failure) {
+                throw new FoundationException(ErrorCode.RESOURCE_CONFLICT, failure);
+            }
             if (affected != 1) throw new FoundationException(ErrorCode.RESOURCE_CONFLICT);
             if (insert) created++;
             else updated++;

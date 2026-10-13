@@ -1,9 +1,9 @@
 package dev.simplefixture;
 
 import dev.MesBaseApplication;
-import dev.mesbase.modules.material.sync.ExternalMaterial;
-import dev.mesbase.modules.material.sync.MaterialQueryPort;
-import dev.mesbase.modules.material.sync.UnconfiguredMaterialQueryAdapter;
+import dev.mesbase.business.basic.sync.ExternalMaterial;
+import dev.mesbase.business.basic.sync.MaterialQueryPort;
+import dev.mesbase.business.basic.sync.UnconfiguredMaterialQueryAdapter;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
@@ -36,7 +36,7 @@ public class SimpleBusinessAcceptanceLauncher {
                     throw new IllegalStateException("TEST ONLY source unavailable", failure);
                 }
                 return List.of(new ExternalMaterial("TEST-MES-001", name, "TEST ONLY", null,
-                        "TEST-UOM", "ITEM", "ENABLED", "TEST-ERP-001", "ERP-TEST-M001"));
+                        1L, "ITEM", "ENABLED", "TEST-ERP-001", "ERP-TEST-M001"));
             };
         }
     }

@@ -1,4 +1,7 @@
 package dev.mesbase;
+import java.util.function.UnaryOperator;
+import dev.mesbase.platform.codegen.JdbcMetadataReader;
+import dev.mesbase.platform.codegen.ConfiguredCodegenService;
 
 import dev.mesbase.common.core.redis.RedisCache;
 import dev.mesbase.infrastructure.cache.BusinessCacheProcessor;
@@ -18,9 +21,7 @@ import dev.mesbase.infrastructure.persistence.FactoryBusinessDataSource;
 import dev.mesbase.infrastructure.persistence.OwnedTransactionManager;
 import dev.mesbase.infrastructure.persistence.PersistenceFactories;
 import dev.mesbase.infrastructure.persistence.RuntimeRegistry;
-import dev.mesbase.platform.codegen.CodegenProfiles;
 import dev.mesbase.platform.codegen.CodegenRequest;
-import dev.mesbase.platform.codegen.DefaultMesCodegenService;
 import dev.mesbase.platform.execution.FactoryContext;
 import jakarta.validation.Validation;
 import jakarta.validation.Validator;
@@ -74,11 +75,11 @@ class CodegenSyncAcceptanceTest {
         var jdbc = new JdbcTemplate(source);
         jdbc.execute("CREATE TABLE sync_probe(id BIGINT AUTO_INCREMENT PRIMARY KEY,sku VARCHAR(32) NOT NULL,"
                 + "label VARCHAR(80) NOT NULL,payload VARCHAR(64),amount DECIMAL(18,6),CHECK(label <> 'DB_REJECT'))");
-        String root = "dev.mesbase.modules.synctest";
+        String root = "dev.mesbase.business.synctest";
         var request = new CodegenRequest("test", null, "sync_probe", "synctest", "TEST ONLY", root, "TEST ONLY",
                 CodegenRequest.ScopeKind.FACTORY_SCOPED, CodegenRequest.OverwritePolicy.FAIL, false,
                 temporary, temporary.resolve("frontend"), "mes-business", true, "sku");
-        new DefaultMesCodegenService(new CodegenProfiles("test", Map.of("test", source))).generate(request);
+        new ConfiguredCodegenService().generate(List.of(new ConfiguredCodegenService.Plan(request, new JdbcMetadataReader().read(source, null, "sync_probe"), null)), Set.of("all"), UnaryOperator.identity());
         Path backend = request.targetBackendRoot(), classes = temporary.resolve("classes");
         Files.createDirectories(classes);
         var compiler = ToolProvider.getSystemJavaCompiler();

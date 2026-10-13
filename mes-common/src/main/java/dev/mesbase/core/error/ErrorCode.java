@@ -1,6 +1,15 @@
 package dev.mesbase.core.error;
 
 public enum ErrorCode {
+    ROUTING_FROZEN(409, "已发布路线内容已冻结，请创建新版本"),
+    ROUTING_REVISION_CONFLICT(409, "记录已被修改，请刷新后重试"),
+    ROUTING_REFERENCE_INVALID(422, "路线引用必须属于当前工厂且处于启用状态"),
+    ROUTING_STEPS_INVALID(400, "步骤须连续排序、工序不重复且最多一个关键点"),
+    ROUTING_PUBLISH_INCOMPLETE(422, "发布前请至少关联一个物料产品和一个工序步骤"),
+    OPERATION_REFERENCED(409, "工序已被工艺路线引用，不能删除"),
+    MATERIAL_ROUTING_REFERENCED(409, "物料产品已被工艺路线引用，不能删除"),
+    ERP_ROUTING_NOT_CONFIGURED(422, "暂未配置工艺路线 ERP 同步数据来源"),
+    ERP_OPERATION_NOT_CONFIGURED(422, "暂未配置工序 ERP 同步数据来源"),
     SYNC_QUERY_NOT_IMPLEMENTED(422, "暂未接入外部同步查询接口"),
     ERP_SYNC_NOT_CONFIGURED(422, "暂未接入 ERP 物料查询接口"),
     SYNC_RUNNING(409, "同步正在进行"), SYNC_EXECUTION_LOST(409, "同步执行权已失效"),

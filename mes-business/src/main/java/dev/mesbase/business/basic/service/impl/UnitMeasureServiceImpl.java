@@ -33,6 +33,8 @@ import java.util.Objects;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
+import dev.mesbase.business.basic.service.BasicDataRules;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
@@ -42,18 +44,20 @@ import org.springframework.transaction.annotation.Transactional;
 @ConditionalOnProperty(name = "mes.business.enabled", havingValue = "true")
 public class UnitMeasureServiceImpl implements IUnitMeasureService {
     private final UnitMeasureMapper mapper;
+    private final BasicDataRules rules;
     private final UnitMeasureQueryPort query;
     private final SyncCoordinator coordinator;
     private final ObjectProvider<IUnitMeasureService> self;
     private final Validator validator;
     private final BusinessCacheProcessor caches;
 
-    public UnitMeasureServiceImpl(UnitMeasureMapper mapper,
-            ObjectProvider<UnitMeasureQueryPort> queries,
-            SyncCoordinator coordinator,
-            ObjectProvider<IUnitMeasureService> self,
-            Validator validator, BusinessCacheProcessor caches) {
+    public UnitMeasureServiceImpl(UnitMeasureMapper mapper, BasicDataRules rules,
+                                  ObjectProvider<UnitMeasureQueryPort> queries,
+                                  SyncCoordinator coordinator,
+                                  ObjectProvider<IUnitMeasureService> self,
+                                  Validator validator, BusinessCacheProcessor caches) {
         this.mapper = mapper;
+        this.rules = rules;
         this.query = queries.getIfAvailable(UnconfiguredUnitMeasureQueryAdapter::new);
         this.coordinator = coordinator;
         this.self = self;
@@ -114,7 +118,8 @@ public class UnitMeasureServiceImpl implements IUnitMeasureService {
         row.setName(input.name());
         row.setSymbol(input.symbol());
         row.setStatus(input.status());
-        if (mapper.insert(row) != 1) {
+        rules.validate(row);
+        if (insertUnique(row) != 1) {
             throw new FoundationException(ErrorCode.RESOURCE_CONFLICT);
         }
         return requireRecord(row.getId());
@@ -131,7 +136,8 @@ public class UnitMeasureServiceImpl implements IUnitMeasureService {
         row.setName(input.name());
         row.setSymbol(input.symbol());
         row.setStatus(input.status());
-        if (mapper.updateByPrimaryKey(row) != 1) {
+        rules.validate(row);
+        if (updateUnique(row) != 1) {
             throw new FoundationException(ErrorCode.RESOURCE_CONFLICT);
         }
         return requireRecord(id);
@@ -146,13 +152,30 @@ public class UnitMeasureServiceImpl implements IUnitMeasureService {
                 || new HashSet<>(ids).size() != ids.size()) {
             throw new FoundationException(ErrorCode.BAD_REQUEST);
         }
+        rules.deletingUnitMeasure(ids);
         UnitMeasureExample example = new UnitMeasureExample();
         for (var id : ids) requireRecord(id);
         example.createCriteria().andIdIn(ids)
                 .andFactoryIdEqualTo(FactoryContext.required().factoryId().value())
-                ;
+        ;
         if (mapper.deleteByExample(example) != ids.size()) {
             throw new FoundationException(ErrorCode.RESOURCE_CONFLICT);
+        }
+    }
+
+    private int insertUnique(UnitMeasureEntity row) {
+        try {
+            return mapper.insert(row);
+        } catch (DuplicateKeyException failure) {
+            throw new FoundationException(ErrorCode.RESOURCE_CONFLICT, failure);
+        }
+    }
+
+    private int updateUnique(UnitMeasureEntity row) {
+        try {
+            return mapper.updateByPrimaryKey(row);
+        } catch (DuplicateKeyException failure) {
+            throw new FoundationException(ErrorCode.RESOURCE_CONFLICT, failure);
         }
     }
 
@@ -163,6 +186,7 @@ public class UnitMeasureServiceImpl implements IUnitMeasureService {
         }
         return row;
     }
+
     public UnitMeasureSyncResult sync(FactoryScope scope) {
         if (!FactoryContext.required().equals(scope)) {
             throw new FoundationException(ErrorCode.CONFLICT);
@@ -187,7 +211,7 @@ public class UnitMeasureServiceImpl implements IUnitMeasureService {
 
     @Transactional(transactionManager = "businessTransactionManager", rollbackFor = Exception.class)
     public UnitMeasureSyncResult upsert(FactoryScope scope,
-                                       List<ExternalUnitMeasure> inputs) {
+                                        List<ExternalUnitMeasure> inputs) {
         if (!FactoryContext.required().equals(scope)) {
             throw new FoundationException(ErrorCode.CONFLICT);
         }
@@ -204,7 +228,7 @@ public class UnitMeasureServiceImpl implements IUnitMeasureService {
         var example = new UnitMeasureExample();
         example.createCriteria().andCodeIn(List.copyOf(keys))
                 .andFactoryIdEqualTo(scope.factoryId().value())
-                ;
+        ;
         var existing = new HashMap<String, UnitMeasureEntity>();
         for (var row : mapper.selectByExample(example)) {
             if (existing.put(row.getCode(), row) != null) {
@@ -229,7 +253,13 @@ public class UnitMeasureServiceImpl implements IUnitMeasureService {
             row.setName(input.name());
             row.setSymbol(input.symbol());
             row.setStatus(input.status());
-            int affected = insert ? mapper.insertSelective(row) : mapper.updateByPrimaryKey(row);
+            rules.validate(row);
+            int affected;
+            try {
+                affected = insert ? mapper.insertSelective(row) : mapper.updateByPrimaryKey(row);
+            } catch (DuplicateKeyException failure) {
+                throw new FoundationException(ErrorCode.RESOURCE_CONFLICT, failure);
+            }
             if (affected != 1) throw new FoundationException(ErrorCode.RESOURCE_CONFLICT);
             if (insert) created++;
             else updated++;

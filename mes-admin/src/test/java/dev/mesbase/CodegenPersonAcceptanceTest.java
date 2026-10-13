@@ -41,23 +41,23 @@ class CodegenPersonAcceptanceTest {
                 "--module=acceptance", "--business-name=人员", "--overwrite",
                 "--output=" + root.resolve("backend"), "--frontend-root=" + frontend};
         assertEquals(0, CodegenCli.run(arguments));
-        Path javaRoot = root.resolve("backend/mes-business/src/main/java/dev/mesbase/modules/acceptance");
+        Path javaRoot = root.resolve("backend/mes-business/src/main/java/dev/mesbase/business/acceptance");
         String service = Files.readString(javaRoot.resolve("service/impl/PersonServiceImpl.java"));
         assertTrue(service.contains("private final PersonMapper mapper;"));
         assertTrue(service.contains("@Transactional(transactionManager = \"businessTransactionManager\""));
         assertFalse(service.contains("persistence.transaction("));
         assertFalse(service.contains("PersonVo"));
         assertFalse(service.contains("public final class PersonServiceImpl"));
-        assertTrue(service.contains("package dev.mesbase.modules.acceptance.service.impl;\n\nimport "));
+        assertTrue(service.contains("package dev.mesbase.business.acceptance.service.impl;\n\nimport "));
         String controller = Files.readString(javaRoot.resolve("controller/PersonController.java"));
         assertTrue(controller.contains("private static PersonVo toView(PersonEntity row)"));
         String mapper = Files.readString(javaRoot.resolve("dao/PersonMapper.java"));
         assertFalse(mapper.contains("factory"));
         String xml = Files.readString(root.resolve(
-                "backend/mes-business/src/main/resources/dev/mesbase/modules/acceptance/dao/PersonMapper.xml"));
+                "backend/mes-business/src/main/resources/dev/mesbase/business/acceptance/dao/PersonMapper.xml"));
         assertFalse(xml.contains("distinct"));
         String example = Files.readString(root.resolve(
-                "backend/mes-business/src/main/java/dev/mesbase/modules/acceptance/domain/PersonExample.java"));
+                "backend/mes-business/src/main/java/dev/mesbase/business/acceptance/domain/PersonExample.java"));
         assertFalse(example.contains("distinct"));
         assertFalse(example.contains("setDistinct"));
         assertFalse(example.contains("isDistinct"));

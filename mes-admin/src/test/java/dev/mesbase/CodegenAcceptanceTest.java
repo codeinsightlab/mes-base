@@ -1,4 +1,7 @@
 package dev.mesbase;
+import java.util.function.UnaryOperator;
+import dev.mesbase.platform.codegen.JdbcMetadataReader;
+import dev.mesbase.platform.codegen.ConfiguredCodegenService;
 
 import dev.mesbase.infrastructure.persistence.FactoryBusinessDataSource;
 import dev.mesbase.infrastructure.persistence.OwnedTransactionManager;
@@ -300,7 +303,7 @@ class CodegenAcceptanceTest {
 
     @Test
     void generatedBackendCompilesAndDatabaseRoutedCrudExecutesWithoutFactoryFields() throws Exception {
-        generator.generate(request(null, false));
+        generateConfiguredRuntime(request(null, false));
         Path classes = temp.toRealPath().resolve("classes");
         Files.createDirectory(classes);
         var compiler = ToolProvider.getSystemJavaCompiler();
@@ -318,7 +321,7 @@ class CodegenAcceptanceTest {
             }
         }
         try (var loader = new URLClassLoader(new URL[]{classes.toUri().toURL()}, getClass().getClassLoader()); var registry = new RuntimeRegistry()) {
-            String root = "dev.mesbase.modules.testonly.";
+            String root = "dev.mesbase.business.testonly.";
             String prefix = root + "domain.GenDemoConfig";
             Thread.currentThread().setContextClassLoader(loader);
             Class<?> mapper = loader.loadClass(root + "dao.GenDemoConfigMapper"), serviceType = loader.loadClass(root + "service.impl.GenDemoConfigServiceImpl"), create = loader.loadClass(prefix + "CreateCommand"), update = loader.loadClass(prefix + "UpdateCommand"), query = loader.loadClass(prefix + "QueryDto");
@@ -676,4 +679,14 @@ class CodegenAcceptanceTest {
         context.refresh();
         return context;
     }
+    private CodegenResult generateConfiguredRuntime(CodegenRequest original) {
+        var request = new CodegenRequest(original.datasource(), original.schema(), original.tableName(), original.moduleName(),
+                original.businessName(), "dev.mesbase.business.testonly", original.author(), original.scope(),
+                original.overwritePolicy(), original.dryRun(), original.backendRoot(), original.frontendRoot());
+        var metadata = new JdbcMetadataReader().read(pool, request.schema(), request.tableName());
+        var files = new ConfiguredCodegenService().generate(List.of(new ConfiguredCodegenService.Plan(request, metadata, null)),
+                Set.of("all"), UnaryOperator.identity());
+        return new CodegenResult(CodegenResult.Status.GENERATED, "business-dev", metadata.table(), metadata, files, List.of());
+    }
+
 }

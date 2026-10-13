@@ -1,5 +1,17 @@
 package dev.mesbase.server;
 
+import dev.mesbase.infrastructure.cache.BusinessCacheProcessor;
+
+import jakarta.validation.Validator;
+
+import dev.mesbase.business.pro.service.IProWorkorderService;
+
+import dev.mesbase.framework.sync.SyncCoordinator;
+
+import dev.mesbase.business.pro.sync.ProWorkorderQueryPort;
+
+import org.springframework.beans.factory.support.DefaultListableBeanFactory;
+
 import dev.mesbase.common.core.domain.model.LoginUser;
 import dev.mesbase.common.core.redis.UserSessionStore;
 import dev.mesbase.core.factory.Factory;
@@ -16,10 +28,10 @@ import dev.mesbase.infrastructure.persistence.OwnedTransactionManager;
 import dev.mesbase.infrastructure.persistence.PersistenceFactories;
 import dev.mesbase.infrastructure.persistence.PlatformPersistence;
 import dev.mesbase.infrastructure.persistence.RuntimeRegistry;
-import dev.mesbase.modules.pro.controller.ProWorkorderController;
-import dev.mesbase.modules.pro.dao.ProWorkorderMapper;
-import dev.mesbase.modules.pro.domain.ProWorkorderQueryDto;
-import dev.mesbase.modules.pro.service.impl.ProWorkorderServiceImpl;
+import dev.mesbase.business.pro.controller.ProWorkorderController;
+import dev.mesbase.business.pro.dao.ProWorkorderMapper;
+import dev.mesbase.business.pro.domain.ProWorkorderQueryDto;
+import dev.mesbase.business.pro.service.impl.ProWorkorderServiceImpl;
 import dev.mesbase.platform.web.FoundationAccessInterceptor;
 import dev.mesbase.platform.web.RequestBoundaryFilter;
 import dev.mesbase.server.managed.DatasourcePasswordCipher;
@@ -108,13 +120,13 @@ class ProWorkorderRequestBudgetTest {
         jdbc.execute("INSERT INTO sys_user(user_id,user_name,nick_name,dept_id,status,del_flag) VALUES(42,'fixture','Fixture',7,'0','0')");
         jdbc.execute("INSERT INTO sys_role(role_id,role_name,role_key,role_sort,status,del_flag,kind,factory_id) VALUES(8,'Fixture','fixture',1,'0','0','FACTORY','A')");
         jdbc.execute("INSERT INTO sys_user_role VALUES(42,8)");
-        jdbc.execute("INSERT INTO sys_menu(menu_id,menu_name,parent_id,path,menu_type,perms,status) VALUES(1,'Fixture',0,'pro','C','business:pro:workorder:read','0')");
+        jdbc.execute("INSERT INTO sys_menu(menu_id,menu_name,parent_id,path,menu_type,perms,status) VALUES(1,'Fixture',0,'pro','C','business:pro:workorder:list','0')");
         jdbc.execute("INSERT INTO sys_role_menu VALUES(8,1)");
         jdbc.execute("CREATE TABLE mf_factory(factory_id VARCHAR(64),enterprise_id VARCHAR(64),factory_code VARCHAR(32),factory_name VARCHAR(64),datasource_id BIGINT,status VARCHAR(16),revision BIGINT)");
         jdbc.execute("CREATE TABLE mf_datasource(datasource_id BIGINT,datasource_name VARCHAR(64),db_host VARCHAR(64),db_port INT,db_name VARCHAR(64),db_username VARCHAR(64),password_cipher VARCHAR(64),status VARCHAR(16),revision BIGINT)");
         jdbc.execute("INSERT INTO mf_factory VALUES('A','TEST ONLY','A','TEST ONLY',1,'ENABLED',1)");
         jdbc.execute("INSERT INTO mf_datasource VALUES(1,'TEST ONLY','invalid.test',3306,'TEST_ONLY','TEST_ONLY','TEST_ONLY','ENABLED',1)");
-        String mapperXml = Files.readString(Path.of("mes-business/src/main/resources/dev/mesbase/modules/pro/dao/ProWorkorderMapper.xml"));
+        String mapperXml = Files.readString(Path.of("mes-business/src/main/resources/dev/mesbase/business/pro/dao/ProWorkorderMapper.xml"));
         var columns = Pattern.compile("column=\"([^\"]+)\" jdbcType=\"([^\"]+)\"").matcher(mapperXml);
         var definitions = new ArrayList<String>();
         while (columns.find()) definitions.add(columns.group(1) + " " + (columns.group(2)
@@ -152,7 +164,7 @@ class ProWorkorderRequestBudgetTest {
                 PersistenceFactories.pagination(c);
                 c.addInterceptor(businessSql);
             }, manager::verifyAccess);
-            var controller = new ProWorkorderController(new ProWorkorderServiceImpl(new SqlSessionTemplate(factory).getMapper(ProWorkorderMapper.class)));
+            var controller = new ProWorkorderController(new ProWorkorderServiceImpl(new SqlSessionTemplate(factory).getMapper(ProWorkorderMapper.class), new DefaultListableBeanFactory().getBeanProvider(ProWorkorderQueryPort.class), mock(SyncCoordinator.class), new DefaultListableBeanFactory().getBeanProvider(IProWorkorderService.class), mock(Validator.class), mock(BusinessCacheProcessor.class)));
             var permissions = new SystemPermissionService(platform.mapper(SysMenuMapper.class), platform.mapper(SysRoleMapper.class), platform.mapper(ManagedFactoryMapper.class));
             FactoryCatalog catalog = new FactoryCatalog() {
                 public Optional<Factory> find(FactoryId id) {

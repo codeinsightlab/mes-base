@@ -1,0 +1,298 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- MES-CODEGEN: MyBatis Generator standard single-table persistence. -->
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="dev.mesbase.business.production.dao.RoutingMapper">
+  <resultMap id="BaseResultMap" type="dev.mesbase.business.production.domain.RoutingEntity">
+    <id column="id" jdbcType="BIGINT" property="id" />
+    <result column="factory_id" jdbcType="VARCHAR" property="factoryId" />
+    <result column="code" jdbcType="VARCHAR" property="code" />
+    <result column="name" jdbcType="VARCHAR" property="name" />
+    <result column="version" jdbcType="INTEGER" property="version" />
+    <result column="status" jdbcType="VARCHAR" property="status" />
+    <result column="description" jdbcType="VARCHAR" property="description" />
+    <result column="external_id" jdbcType="VARCHAR" property="externalId" />
+    <result column="source_version" jdbcType="VARCHAR" property="sourceVersion" />
+    <result column="revision" jdbcType="INTEGER" property="revision" />
+    <result column="published_at" jdbcType="TIMESTAMP" property="publishedAt" />
+  </resultMap>
+  <sql id="Example_Where_Clause">
+    <where>
+      <foreach collection="oredCriteria" item="criteria" separator="or">
+        <if test="criteria.valid">
+          <trim prefix="(" prefixOverrides="and" suffix=")">
+            <foreach collection="criteria.criteria" item="criterion">
+              <choose>
+                <when test="criterion.noValue">
+                  and ${criterion.condition}
+                </when>
+                <when test="criterion.singleValue">
+                  and ${criterion.condition} #{criterion.value}
+                </when>
+                <when test="criterion.betweenValue">
+                  and ${criterion.condition} #{criterion.value} and #{criterion.secondValue}
+                </when>
+                <when test="criterion.listValue">
+                  and ${criterion.condition}
+                  <foreach close=")" collection="criterion.value" item="listItem" open="(" separator=",">
+                    #{listItem}
+                  </foreach>
+                </when>
+              </choose>
+            </foreach>
+          </trim>
+        </if>
+      </foreach>
+    </where>
+  </sql>
+  <sql id="Update_By_Example_Where_Clause">
+    <where>
+      <foreach collection="example.oredCriteria" item="criteria" separator="or">
+        <if test="criteria.valid">
+          <trim prefix="(" prefixOverrides="and" suffix=")">
+            <foreach collection="criteria.criteria" item="criterion">
+              <choose>
+                <when test="criterion.noValue">
+                  and ${criterion.condition}
+                </when>
+                <when test="criterion.singleValue">
+                  and ${criterion.condition} #{criterion.value}
+                </when>
+                <when test="criterion.betweenValue">
+                  and ${criterion.condition} #{criterion.value} and #{criterion.secondValue}
+                </when>
+                <when test="criterion.listValue">
+                  and ${criterion.condition}
+                  <foreach close=")" collection="criterion.value" item="listItem" open="(" separator=",">
+                    #{listItem}
+                  </foreach>
+                </when>
+              </choose>
+            </foreach>
+          </trim>
+        </if>
+      </foreach>
+    </where>
+  </sql>
+  <sql id="Base_Column_List">
+    id, factory_id, code, name, version, status, description, external_id, source_version, 
+    revision, published_at
+  </sql>
+  <select id="selectByExample" parameterType="dev.mesbase.business.production.domain.RoutingExample" resultMap="BaseResultMap">
+    select
+    <include refid="Base_Column_List" />
+    from routing
+    <if test="_parameter != null">
+      <include refid="Example_Where_Clause" />
+    </if>
+    <if test="orderByClause != null">
+      order by ${orderByClause}
+    </if>
+  </select>
+  <select id="selectByPrimaryKey" parameterType="Long" resultMap="BaseResultMap">
+    select 
+    <include refid="Base_Column_List" />
+    from routing
+    where id = #{id,jdbcType=BIGINT}
+  </select>
+  <delete id="deleteByPrimaryKey" parameterType="Long">
+    delete from routing
+    where id = #{id,jdbcType=BIGINT}
+  </delete>
+  <delete id="deleteByExample" parameterType="dev.mesbase.business.production.domain.RoutingExample">
+    delete from routing
+    <if test="_parameter != null">
+      <include refid="Example_Where_Clause" />
+    </if>
+  </delete>
+  <insert id="insert" keyColumn="id" keyProperty="id" parameterType="dev.mesbase.business.production.domain.RoutingEntity" useGeneratedKeys="true">
+    insert into routing (factory_id, code, name, 
+      version, status, description, 
+      external_id, source_version, revision, 
+      published_at)
+    values (#{factoryId,jdbcType=VARCHAR}, #{code,jdbcType=VARCHAR}, #{name,jdbcType=VARCHAR}, 
+      #{version,jdbcType=INTEGER}, #{status,jdbcType=VARCHAR}, #{description,jdbcType=VARCHAR}, 
+      #{externalId,jdbcType=VARCHAR}, #{sourceVersion,jdbcType=VARCHAR}, #{revision,jdbcType=INTEGER}, 
+      #{publishedAt,jdbcType=TIMESTAMP})
+  </insert>
+  <insert id="insertSelective" keyColumn="id" keyProperty="id" parameterType="dev.mesbase.business.production.domain.RoutingEntity" useGeneratedKeys="true">
+    insert into routing
+    <trim prefix="(" suffix=")" suffixOverrides=",">
+      <if test="factoryId != null">
+        factory_id,
+      </if>
+      <if test="code != null">
+        code,
+      </if>
+      <if test="name != null">
+        name,
+      </if>
+      <if test="version != null">
+        version,
+      </if>
+      <if test="status != null">
+        status,
+      </if>
+      <if test="description != null">
+        description,
+      </if>
+      <if test="externalId != null">
+        external_id,
+      </if>
+      <if test="sourceVersion != null">
+        source_version,
+      </if>
+      <if test="revision != null">
+        revision,
+      </if>
+      <if test="publishedAt != null">
+        published_at,
+      </if>
+    </trim>
+    <trim prefix="values (" suffix=")" suffixOverrides=",">
+      <if test="factoryId != null">
+        #{factoryId,jdbcType=VARCHAR},
+      </if>
+      <if test="code != null">
+        #{code,jdbcType=VARCHAR},
+      </if>
+      <if test="name != null">
+        #{name,jdbcType=VARCHAR},
+      </if>
+      <if test="version != null">
+        #{version,jdbcType=INTEGER},
+      </if>
+      <if test="status != null">
+        #{status,jdbcType=VARCHAR},
+      </if>
+      <if test="description != null">
+        #{description,jdbcType=VARCHAR},
+      </if>
+      <if test="externalId != null">
+        #{externalId,jdbcType=VARCHAR},
+      </if>
+      <if test="sourceVersion != null">
+        #{sourceVersion,jdbcType=VARCHAR},
+      </if>
+      <if test="revision != null">
+        #{revision,jdbcType=INTEGER},
+      </if>
+      <if test="publishedAt != null">
+        #{publishedAt,jdbcType=TIMESTAMP},
+      </if>
+    </trim>
+  </insert>
+  <select id="countByExample" parameterType="dev.mesbase.business.production.domain.RoutingExample" resultType="java.lang.Long">
+    select count(*) from routing
+    <if test="_parameter != null">
+      <include refid="Example_Where_Clause" />
+    </if>
+  </select>
+  <update id="updateByExampleSelective" parameterType="map">
+    update routing
+    <set>
+      <if test="row.id != null">
+        id = #{row.id,jdbcType=BIGINT},
+      </if>
+      <if test="row.factoryId != null">
+        factory_id = #{row.factoryId,jdbcType=VARCHAR},
+      </if>
+      <if test="row.code != null">
+        code = #{row.code,jdbcType=VARCHAR},
+      </if>
+      <if test="row.name != null">
+        name = #{row.name,jdbcType=VARCHAR},
+      </if>
+      <if test="row.version != null">
+        version = #{row.version,jdbcType=INTEGER},
+      </if>
+      <if test="row.status != null">
+        status = #{row.status,jdbcType=VARCHAR},
+      </if>
+      <if test="row.description != null">
+        description = #{row.description,jdbcType=VARCHAR},
+      </if>
+      <if test="row.externalId != null">
+        external_id = #{row.externalId,jdbcType=VARCHAR},
+      </if>
+      <if test="row.sourceVersion != null">
+        source_version = #{row.sourceVersion,jdbcType=VARCHAR},
+      </if>
+      <if test="row.revision != null">
+        revision = #{row.revision,jdbcType=INTEGER},
+      </if>
+      <if test="row.publishedAt != null">
+        published_at = #{row.publishedAt,jdbcType=TIMESTAMP},
+      </if>
+    </set>
+    <if test="example != null">
+      <include refid="Update_By_Example_Where_Clause" />
+    </if>
+  </update>
+  <update id="updateByExample" parameterType="map">
+    update routing
+    set id = #{row.id,jdbcType=BIGINT},
+      factory_id = #{row.factoryId,jdbcType=VARCHAR},
+      code = #{row.code,jdbcType=VARCHAR},
+      name = #{row.name,jdbcType=VARCHAR},
+      version = #{row.version,jdbcType=INTEGER},
+      status = #{row.status,jdbcType=VARCHAR},
+      description = #{row.description,jdbcType=VARCHAR},
+      external_id = #{row.externalId,jdbcType=VARCHAR},
+      source_version = #{row.sourceVersion,jdbcType=VARCHAR},
+      revision = #{row.revision,jdbcType=INTEGER},
+      published_at = #{row.publishedAt,jdbcType=TIMESTAMP}
+    <if test="example != null">
+      <include refid="Update_By_Example_Where_Clause" />
+    </if>
+  </update>
+  <update id="updateByPrimaryKeySelective" parameterType="dev.mesbase.business.production.domain.RoutingEntity">
+    update routing
+    <set>
+      <if test="factoryId != null">
+        factory_id = #{factoryId,jdbcType=VARCHAR},
+      </if>
+      <if test="code != null">
+        code = #{code,jdbcType=VARCHAR},
+      </if>
+      <if test="name != null">
+        name = #{name,jdbcType=VARCHAR},
+      </if>
+      <if test="version != null">
+        version = #{version,jdbcType=INTEGER},
+      </if>
+      <if test="status != null">
+        status = #{status,jdbcType=VARCHAR},
+      </if>
+      <if test="description != null">
+        description = #{description,jdbcType=VARCHAR},
+      </if>
+      <if test="externalId != null">
+        external_id = #{externalId,jdbcType=VARCHAR},
+      </if>
+      <if test="sourceVersion != null">
+        source_version = #{sourceVersion,jdbcType=VARCHAR},
+      </if>
+      <if test="revision != null">
+        revision = #{revision,jdbcType=INTEGER},
+      </if>
+      <if test="publishedAt != null">
+        published_at = #{publishedAt,jdbcType=TIMESTAMP},
+      </if>
+    </set>
+    where id = #{id,jdbcType=BIGINT}
+  </update>
+  <update id="updateByPrimaryKey" parameterType="dev.mesbase.business.production.domain.RoutingEntity">
+    update routing
+    set factory_id = #{factoryId,jdbcType=VARCHAR},
+      code = #{code,jdbcType=VARCHAR},
+      name = #{name,jdbcType=VARCHAR},
+      version = #{version,jdbcType=INTEGER},
+      status = #{status,jdbcType=VARCHAR},
+      description = #{description,jdbcType=VARCHAR},
+      external_id = #{externalId,jdbcType=VARCHAR},
+      source_version = #{sourceVersion,jdbcType=VARCHAR},
+      revision = #{revision,jdbcType=INTEGER},
+      published_at = #{publishedAt,jdbcType=TIMESTAMP}
+    where id = #{id,jdbcType=BIGINT}
+  </update>
+</mapper>

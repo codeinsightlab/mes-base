@@ -33,6 +33,8 @@ import java.util.Objects;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
+import dev.mesbase.business.basic.service.BasicDataRules;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
@@ -42,18 +44,20 @@ import org.springframework.transaction.annotation.Transactional;
 @ConditionalOnProperty(name = "mes.business.enabled", havingValue = "true")
 public class WorkshopServiceImpl implements IWorkshopService {
     private final WorkshopMapper mapper;
+    private final BasicDataRules rules;
     private final WorkshopQueryPort query;
     private final SyncCoordinator coordinator;
     private final ObjectProvider<IWorkshopService> self;
     private final Validator validator;
     private final BusinessCacheProcessor caches;
 
-    public WorkshopServiceImpl(WorkshopMapper mapper,
-            ObjectProvider<WorkshopQueryPort> queries,
-            SyncCoordinator coordinator,
-            ObjectProvider<IWorkshopService> self,
-            Validator validator, BusinessCacheProcessor caches) {
+    public WorkshopServiceImpl(WorkshopMapper mapper, BasicDataRules rules,
+                               ObjectProvider<WorkshopQueryPort> queries,
+                               SyncCoordinator coordinator,
+                               ObjectProvider<IWorkshopService> self,
+                               Validator validator, BusinessCacheProcessor caches) {
         this.mapper = mapper;
+        this.rules = rules;
         this.query = queries.getIfAvailable(UnconfiguredWorkshopQueryAdapter::new);
         this.coordinator = coordinator;
         this.self = self;
@@ -114,7 +118,8 @@ public class WorkshopServiceImpl implements IWorkshopService {
         row.setName(input.name());
         row.setStatus(input.status());
         row.setRemark(input.remark());
-        if (mapper.insert(row) != 1) {
+        rules.validate(row);
+        if (insertUnique(row) != 1) {
             throw new FoundationException(ErrorCode.RESOURCE_CONFLICT);
         }
         return requireRecord(row.getId());
@@ -131,7 +136,8 @@ public class WorkshopServiceImpl implements IWorkshopService {
         row.setName(input.name());
         row.setStatus(input.status());
         row.setRemark(input.remark());
-        if (mapper.updateByPrimaryKey(row) != 1) {
+        rules.validate(row);
+        if (updateUnique(row) != 1) {
             throw new FoundationException(ErrorCode.RESOURCE_CONFLICT);
         }
         return requireRecord(id);
@@ -146,13 +152,30 @@ public class WorkshopServiceImpl implements IWorkshopService {
                 || new HashSet<>(ids).size() != ids.size()) {
             throw new FoundationException(ErrorCode.BAD_REQUEST);
         }
+        rules.deletingWorkshop(ids);
         WorkshopExample example = new WorkshopExample();
         for (var id : ids) requireRecord(id);
         example.createCriteria().andIdIn(ids)
                 .andFactoryIdEqualTo(FactoryContext.required().factoryId().value())
-                ;
+        ;
         if (mapper.deleteByExample(example) != ids.size()) {
             throw new FoundationException(ErrorCode.RESOURCE_CONFLICT);
+        }
+    }
+
+    private int insertUnique(WorkshopEntity row) {
+        try {
+            return mapper.insert(row);
+        } catch (DuplicateKeyException failure) {
+            throw new FoundationException(ErrorCode.RESOURCE_CONFLICT, failure);
+        }
+    }
+
+    private int updateUnique(WorkshopEntity row) {
+        try {
+            return mapper.updateByPrimaryKey(row);
+        } catch (DuplicateKeyException failure) {
+            throw new FoundationException(ErrorCode.RESOURCE_CONFLICT, failure);
         }
     }
 
@@ -163,6 +186,7 @@ public class WorkshopServiceImpl implements IWorkshopService {
         }
         return row;
     }
+
     public WorkshopSyncResult sync(FactoryScope scope) {
         if (!FactoryContext.required().equals(scope)) {
             throw new FoundationException(ErrorCode.CONFLICT);
@@ -187,7 +211,7 @@ public class WorkshopServiceImpl implements IWorkshopService {
 
     @Transactional(transactionManager = "businessTransactionManager", rollbackFor = Exception.class)
     public WorkshopSyncResult upsert(FactoryScope scope,
-                                       List<ExternalWorkshop> inputs) {
+                                     List<ExternalWorkshop> inputs) {
         if (!FactoryContext.required().equals(scope)) {
             throw new FoundationException(ErrorCode.CONFLICT);
         }
@@ -204,7 +228,7 @@ public class WorkshopServiceImpl implements IWorkshopService {
         var example = new WorkshopExample();
         example.createCriteria().andCodeIn(List.copyOf(keys))
                 .andFactoryIdEqualTo(scope.factoryId().value())
-                ;
+        ;
         var existing = new HashMap<String, WorkshopEntity>();
         for (var row : mapper.selectByExample(example)) {
             if (existing.put(row.getCode(), row) != null) {
@@ -229,7 +253,13 @@ public class WorkshopServiceImpl implements IWorkshopService {
             row.setName(input.name());
             row.setStatus(input.status());
             row.setRemark(input.remark());
-            int affected = insert ? mapper.insertSelective(row) : mapper.updateByPrimaryKey(row);
+            rules.validate(row);
+            int affected;
+            try {
+                affected = insert ? mapper.insertSelective(row) : mapper.updateByPrimaryKey(row);
+            } catch (DuplicateKeyException failure) {
+                throw new FoundationException(ErrorCode.RESOURCE_CONFLICT, failure);
+            }
             if (affected != 1) throw new FoundationException(ErrorCode.RESOURCE_CONFLICT);
             if (insert) created++;
             else updated++;

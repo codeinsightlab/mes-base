@@ -5,7 +5,7 @@ import dev.mesbase.core.security.AuthorizationService;
 import dev.mesbase.framework.security.SystemTokenFilter;
 import dev.mesbase.framework.web.service.TokenService;
 import dev.mesbase.infrastructure.persistence.OwnerMapperCatalog;
-import dev.mesbase.modules.acceptance.dao.PersonMapper;
+import dev.mesbase.business.basic.dao.MaterialMapper;
 import dev.mesbase.infrastructure.persistence.PersistenceOwner;
 import dev.mesbase.infrastructure.persistence.RuntimeRegistry;
 import dev.mesbase.platform.web.RequestBoundaryFilter;
@@ -137,7 +137,7 @@ class InfrastructureContextTest {
             assertEquals(1, context.getBeansOfType(RuntimeRegistry.class).size());
             assertTrue(context.containsBean("sysUserMapper"));
             assertTrue(context.getBean(OwnerMapperCatalog.class).types(PersistenceOwner.Kind.BUSINESS)
-                    .contains(PersonMapper.class));
+                    .contains(MaterialMapper.class));
 
             var chains = context.getBeansOfType(SecurityFilterChain.class);
             assertEquals(1, chains.size());

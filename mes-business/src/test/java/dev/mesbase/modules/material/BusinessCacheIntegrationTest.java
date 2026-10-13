@@ -13,18 +13,18 @@ import dev.mesbase.infrastructure.cache.annotation.BusinessCacheEvict;
 import dev.mesbase.infrastructure.cache.annotation.BusinessCacheEvict.Scope;
 import dev.mesbase.infrastructure.persistence.OwnedTransactionManager;
 import dev.mesbase.infrastructure.persistence.SpringCommitActions;
-import dev.mesbase.modules.material.dao.MaterialMapper;
-import dev.mesbase.modules.material.domain.MaterialCreateCommand;
-import dev.mesbase.modules.material.domain.MaterialEntity;
-import dev.mesbase.modules.material.domain.MaterialExample;
-import dev.mesbase.modules.material.domain.MaterialPage;
-import dev.mesbase.modules.material.domain.MaterialQueryDto;
-import dev.mesbase.modules.material.domain.MaterialUpdateCommand;
-import dev.mesbase.modules.material.service.BasicDataRules;
-import dev.mesbase.modules.material.service.IMaterialService;
-import dev.mesbase.modules.material.service.impl.MaterialServiceImpl;
-import dev.mesbase.modules.material.sync.ExternalMaterial;
-import dev.mesbase.modules.material.sync.MaterialQueryPort;
+import dev.mesbase.business.basic.dao.MaterialMapper;
+import dev.mesbase.business.basic.domain.MaterialCreateCommand;
+import dev.mesbase.business.basic.domain.MaterialEntity;
+import dev.mesbase.business.basic.domain.MaterialExample;
+import dev.mesbase.business.basic.domain.MaterialPage;
+import dev.mesbase.business.basic.domain.MaterialQueryDto;
+import dev.mesbase.business.basic.domain.MaterialUpdateCommand;
+import dev.mesbase.business.basic.service.BasicDataRules;
+import dev.mesbase.business.basic.service.IMaterialService;
+import dev.mesbase.business.basic.service.impl.MaterialServiceImpl;
+import dev.mesbase.business.basic.sync.ExternalMaterial;
+import dev.mesbase.business.basic.sync.MaterialQueryPort;
 import dev.mesbase.framework.sync.SyncCoordinator;
 import org.springframework.beans.factory.ObjectProvider;
 import dev.mesbase.platform.execution.FactoryContext;
@@ -288,8 +288,8 @@ class BusinessCacheIntegrationTest {
     @Test
     void syncCreatedUpdatedSkippedAndRollbackFollowDynamicEviction() {
         var writer = context.getBean(IMaterialService.class);
-        var input = new ExternalMaterial("M", "name", null, null, "PCS", "ITEM", "ENABLED", null, null);
-        when(context.getBean(BasicDataRules.class).unitId("PCS")).thenReturn(1L);
+        var input = new ExternalMaterial("M", "name", null, null, 1L, "ITEM", "ENABLED", null, null);
+
         seed();
         when(mapper.selectByExample(any())).thenReturn(List.of());
         assertEquals(1, writer.upsert(scope("A"), List.of(input)).created());
