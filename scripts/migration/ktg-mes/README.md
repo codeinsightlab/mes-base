@@ -1,6 +1,6 @@
 # Source → Base 最小验证 SQL
 
-2026-10-12。本轮只保存五份单表 `INSERT INTO ... SELECT ...`，未执行真实数据转换。
+2026-10-12。历史首轮保存五份单表 `INSERT INTO ... SELECT ...`，未执行真实数据转换。
 不是生产升级入口，也没有建立 ETL/迁移框架。来源及字段映射见
 [Schema 审查](../../../docs/migration/SIMPLE_SCHEMA_REVIEW.md)。
 
@@ -32,3 +32,9 @@
 导入后核对行数、主键集合、每个字段映射、主单位引用、工厂身份、重复编码及精度差异。
 真实数据转换通过也只证明测试副本映射；不等于 API、权限、并发或生产业务验收。
 本轮验证只使用事务内合成输入并回滚，未留存测试业务记录。
+
+## 2026-10-13 当前转换范围
+
+Quality = DEFERRED。quality-index.sql 与 quality-defect.sql 已删除，不再提供检测项或缺陷转换。
+此前两份映射及合成验证属于 HISTORICAL，Source 证据保留在 docs/migration，不能继续作为正式转换断言。
+其他转换脚本保持原有范围和执行前提。

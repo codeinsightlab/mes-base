@@ -1,9 +1,8 @@
-// MES-CODEGEN: scaffold; review required.
 package dev.mesbase.business.production.domain;
 
 
 /**
- * Shared permission resource and business cache namespace; excludes operation suffixes.
+ * Business cache namespace; independent of HTTP action permissions.
  */
 public final class RoutingResource {
     public static final String PREFIX = "business:routing";

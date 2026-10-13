@@ -11,7 +11,7 @@ import dev.mesbase.infrastructure.persistence.DatasourceIdentity;
 import dev.mesbase.infrastructure.persistence.FactoryBusinessDataSource;
 import dev.mesbase.infrastructure.persistence.OwnedTransactionManager;
 import dev.mesbase.infrastructure.persistence.OwnerMapperCatalog;
-import dev.mesbase.business.qc.dao.QcDefectMapper;
+import dev.mesbase.business.basic.dao.MaterialMapper;
 import dev.mesbase.infrastructure.persistence.MapperPackages;
 import dev.mesbase.modules.persistencefixture.LegacyScanProbeMapper;
 import dev.mesbase.infrastructure.persistence.PersistenceFactories;
@@ -134,13 +134,13 @@ class PersistenceAssemblyTest {
             var stats = context.getBean(DruidController.class).stats();
             assertEquals("platform", ((DruidController.Pool) stats.get(AjaxResult.DATA_TAG)).name());
             assertTrue(context.containsBean("sysUserMapper"));
-            assertTrue(context.containsBean("qcDefectMapper"));
+            assertTrue(context.containsBean("materialMapper"));
             assertTrue(context.getBean("businessSqlSessionFactory", SqlSessionFactory.class)
-                    .getConfiguration().hasMapper(QcDefectMapper.class));
+                    .getConfiguration().hasMapper(MaterialMapper.class));
             assertTrue(!context.getBean("masterSqlSessionFactory", SqlSessionFactory.class)
-                    .getConfiguration().hasMapper(QcDefectMapper.class));
+                    .getConfiguration().hasMapper(MaterialMapper.class));
             assertTrue(context.getBean(OwnerMapperCatalog.class).types(PersistenceOwner.Kind.BUSINESS)
-                    .contains(QcDefectMapper.class));
+                    .contains(MaterialMapper.class));
             assertTrue(context.containsBean("masterTransactionManager"));
             assertTrue(context.containsBean("businessTransactionManager"));
         }
@@ -157,13 +157,13 @@ class PersistenceAssemblyTest {
         new OwnerMapperRegistration(new MockEnvironment()).postProcessBeanDefinitionRegistry(registry);
         var catalog = registry.getBean(OwnerMapperCatalog.class);
         assertTrue(catalog.types(PersistenceOwner.Kind.PLATFORM).size() > 20);
-        assertTrue(catalog.types(PersistenceOwner.Kind.BUSINESS).contains(QcDefectMapper.class));
+        assertTrue(catalog.types(PersistenceOwner.Kind.BUSINESS).contains(MaterialMapper.class));
     }
 
     @Test
     void businessRootHasExactBoundaryAndOldPackagesAreNoLongerRegistered() {
         assertEquals(List.of("dev.mesbase.business"), MapperPackages.ROOTS.get(PersistenceOwner.Kind.BUSINESS));
-        assertEquals(PersistenceOwner.Kind.BUSINESS, MapperPackages.owner(QcDefectMapper.class));
+        assertEquals(PersistenceOwner.Kind.BUSINESS, MapperPackages.owner(MaterialMapper.class));
         assertThrows(IllegalArgumentException.class, () -> MapperPackages.owner(LegacyScanProbeMapper.class));
         assertTrue(!MapperPackages.contains("dev.mesbase.businessSimilar", "dev.mesbase.business"));
         var registry = new DefaultListableBeanFactory();

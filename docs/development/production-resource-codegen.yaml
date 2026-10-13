@@ -11,7 +11,7 @@ source:
   schema: null
 
 selection:
-  tables: [equipment, personnel]
+  tables: [equipment]
   excludeTables: [flyway_business_schema_history]
   artifacts: [all]
 
@@ -105,8 +105,4 @@ tableOverrides:
   equipment:
     module: basic
     displayName: 设备
-    serverScopeColumn: factory_id
-  personnel:
-    module: resource
-    displayName: 生产人员
     serverScopeColumn: factory_id

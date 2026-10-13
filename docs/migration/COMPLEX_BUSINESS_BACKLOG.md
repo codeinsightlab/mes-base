@@ -1,3 +1,5 @@
+> 当前 Quality 决定（2026-10-13）：DEFERRED；历史质检表与验证证据仅作 HISTORICAL。详见本文末尾。
+
 # Complex Business Backlog
 
 > 第二轮现实必要性/当前范围/优先级以[MES_CAPABILITY_REVIEW](MES_CAPABILITY_REVIEW.md)为准。
@@ -127,3 +129,25 @@ Source 根目录：`/Users/user/work/heri/ktg-mes`；下列路径相对其
 不能把整个Defect Management的复杂性当作已存在字典耦合。dv_subject是点检/保养项目，
 不是生产Operation。Workshop层级可选，独立单位主数据/通用换算需权威与用途证明。
 这些是迁移决策修正，不是本轮实现方案或开工授权。
+
+
+## 2026-10-13 Operation / Routing 阶段闭合
+
+工序定义与路线版本/步骤/多产品已落地：四表生成基础 persistence，生命周期、顺序、引用和可选同步由业务 Service 实现，验收见 [联合报告](OPERATION_ROUTING_REVIEW.md)。后续 backlog 收敛为真实执行绑定、资源资格、BOM/质量执行、来源 Adapter 和复杂路线；不再将本批定义维护当成未实现，也不把它扩展为已完成的 WorkOrder/Reporting/WIP。
+
+## 2026-10-13：撤回提前实现的 Quality（当前决定）
+
+Quality = **DEFERRED / NOT_IMPLEMENTED**。`qc_index`、`qc_defect` =
+**REMOVED_FROM_CURRENT_BASE**。Previous：GENERATE / SCHEMA_READY → REVIEW / RECONSIDER；
+Current：移除简单 CRUD、同步占位、前端页面/菜单和 Source → Base Converter。
+旧表结构、映射验证、Source 引用与审查结论均为 **HISTORICAL**，不再构成当前迁移准入或正式转换断言。
+撤回原因：Quality 必须等生产执行模型稳定以后整体设计；简单表不等于简单领域。
+
+生产主链优先：Operation → Routing → RoutingVersion / RoutingNode / RoutingEdge → WorkOrder →
+ProductionExecution / Reporting → Basic WIP → Completion。该顺序是后续实施方向，
+不是对当前未实现环节的验收声明；本轮保留已有生产及资源工作区改动。
+主链稳定后再审查 Inspection Definition / Plan / Requirement / Execution / Result、Defect /
+Defect Record、Disposition / Rework / Scrap / Release 与 RoutingNode / RoutingVersion、
+WorkOrder、ProductionExecution、Reporting 的关系。现在不确定最终表名或 Schema，不保留 Quality 空壳。
+
+执行文件清单、数据库证据与验证边界见 [Quality 撤回回执](QUALITY_EARLY_IMPLEMENTATION_REMOVAL.md)。

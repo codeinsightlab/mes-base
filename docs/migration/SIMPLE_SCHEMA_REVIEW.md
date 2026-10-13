@@ -1,3 +1,5 @@
+> 当前 Quality 决定（2026-10-13）：DEFERRED；历史质检表与验证证据仅作 HISTORICAL。详见本文末尾。
+
 # 第一轮简单业务 Schema 审查
 
 > 第二轮状态：五表全部REVIEW / RECONSIDER，具体见[MES_CAPABILITY_REVIEW](MES_CAPABILITY_REVIEW.md)。
@@ -130,3 +132,20 @@ history=`flyway_business_schema_history`，现存非空测试库baselineVersion=
 单位权威与换算用途、Workshop层级、Quality模板/执行/缺陷关系以及设备维护边界，
 在[MES_CAPABILITY_REVIEW](MES_CAPABILITY_REVIEW.md)分别重审。
 五表物理暂留；不改已应用Flyway、不删表、不继续Codegen。无最终Schema保留决定。
+
+## 2026-10-13：撤回提前实现的 Quality（当前决定）
+
+Quality = **DEFERRED / NOT_IMPLEMENTED**。`qc_index`、`qc_defect` =
+**REMOVED_FROM_CURRENT_BASE**。Previous：GENERATE / SCHEMA_READY → REVIEW / RECONSIDER；
+Current：移除简单 CRUD、同步占位、前端页面/菜单和 Source → Base Converter。
+旧表结构、映射验证、Source 引用与审查结论均为 **HISTORICAL**，不再构成当前迁移准入或正式转换断言。
+撤回原因：Quality 必须等生产执行模型稳定以后整体设计；简单表不等于简单领域。
+
+生产主链优先：Operation → Routing → RoutingVersion / RoutingNode / RoutingEdge → WorkOrder →
+ProductionExecution / Reporting → Basic WIP → Completion。该顺序是后续实施方向，
+不是对当前未实现环节的验收声明；本轮保留已有生产及资源工作区改动。
+主链稳定后再审查 Inspection Definition / Plan / Requirement / Execution / Result、Defect /
+Defect Record、Disposition / Rework / Scrap / Release 与 RoutingNode / RoutingVersion、
+WorkOrder、ProductionExecution、Reporting 的关系。现在不确定最终表名或 Schema，不保留 Quality 空壳。
+
+执行文件清单、数据库证据与验证边界见 [Quality 撤回回执](QUALITY_EARLY_IMPLEMENTATION_REMOVAL.md)。

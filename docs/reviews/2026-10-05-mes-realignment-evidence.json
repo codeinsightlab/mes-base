@@ -56739,5 +56739,11 @@
       "wheelVariant": false,
       "backendCompleteness": "STATIC_CHAIN"
     }
-  ]
+  ],
+  "quality_status_2026_10_13": {
+    "status": "DEFERRED",
+    "evidence": "HISTORICAL_SOURCE_OR_ARCHIVE",
+    "current_early_quality_implementation": "REMOVED_FROM_CURRENT_BASE",
+    "note": "Source evidence and archived reviews remain historical; no current Quality capability or schema approval."
+  }
 }

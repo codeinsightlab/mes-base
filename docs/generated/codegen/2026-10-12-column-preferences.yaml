@@ -1,3 +1,4 @@
+# HISTORICAL：2026-10-12 生成配置快照；Quality 已于 2026-10-13 DEFERRED，不得据此重新生成质检。
 # 项目配置：由 scripts/mes-business-codegen 读取，旧 scripts/mes-codegen 不读取此格式。
 # 本文件显式记录 MES Base 项目取值；生成器不得内置这些项目默认值。
 # 不包含数据库凭证，不执行菜单 SQL，不授予角色。

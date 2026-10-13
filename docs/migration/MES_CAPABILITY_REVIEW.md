@@ -1,3 +1,5 @@
+> 当前 Quality 决定（2026-10-13）：DEFERRED；历史质检表与验证证据仅作 HISTORICAL。详见本文末尾。
+
 # MES Capability Review
 
 > **2026-10-12 第一批实施：用户已批准六项按 SIMPLE 迁入，ERP_SYNC 全部启用。**
@@ -245,3 +247,37 @@ GAP值是后续分析必要性，不是本轮建表授权；不能从“架构�
 Equipment、Personnel 均为 CODEGEN_PLUS_EXTRA；Extra 只承担状态、编码唯一冲突、工作站引用/删除限制和可选账号有效性校验。
 班组真实来源仅有1条、排班关联为零，本轮 DEFER；同步、设备维护与 HR 能力继续不迁。
 真实来源、Schema、Converter、MySQL/API/UI 证据详见 [PRODUCTION_RESOURCE_REVIEW](PRODUCTION_RESOURCE_REVIEW.md) 与 [验证记录](PRODUCTION_RESOURCE_VERIFICATION.json)。旧整体领域 COMPLEX 判断仍保留，不代表本轮建设完整资源域。
+
+
+## 2026-10-13 后续撤回：生产操作人员直接引用系统用户
+
+| 能力 | Previous（历史） | Current |
+|---|---|---|
+| Equipment | CODEGEN_PLUS_EXTRA / ACCEPTED | KEEP，设备实现/Schema/UI/权限与转换保持完整 |
+| Personnel独立投影 | CODEGEN_PLUS_EXTRA / ACCEPTED，V5创建、转换157条/拒绝1条 | REMOVED / NOT_BASE_DEFAULT，新增V6撤回，不抹去历史 |
+| Production Operator Identity | 曾考虑sys_user与投影关联 | SYS_USER；后续执行/报工直接引用明确user_id及必要历史姓名快照 |
+
+当前未证明操作人员与登录用户有足够业务差异；独立投影增加两套身份、同步和状态一致性成本。无账号、外协、HR非1:1、独立技能资质等真实需求出现后才重新评估，不保留壳子。
+现行决定及撤回验收见 [PRODUCTION_RESOURCE_REVIEW](PRODUCTION_RESOURCE_REVIEW.md)；旧Source/审查证据保留，既有中心用户只读目录仍可用于生产用户选择。
+
+
+## 2026-10-13 Operation / Routing 定义能力实施
+
+Operation 的最小工序定义已用 Codegen + 校验/引用规则落地；Routing 保留多产品与线性步骤，增加最小版本/发布冻结协议。真实 Source 转换、双业务库 API 和现有 5173 浏览器验证见 [OPERATION_ROUTING_REVIEW](OPERATION_ROUTING_REVIEW.md)。ERP_SYNCABLE 不要求 ERP 配置，实际 ERP Adapter 仍 DEFERRED；工序执行、人员/资源资格、WorkOrder/Reporting/WIP 不由本批定义能力冒充完成。
+
+## 2026-10-13：撤回提前实现的 Quality（当前决定）
+
+Quality = **DEFERRED / NOT_IMPLEMENTED**。`qc_index`、`qc_defect` =
+**REMOVED_FROM_CURRENT_BASE**。Previous：GENERATE / SCHEMA_READY → REVIEW / RECONSIDER；
+Current：移除简单 CRUD、同步占位、前端页面/菜单和 Source → Base Converter。
+旧表结构、映射验证、Source 引用与审查结论均为 **HISTORICAL**，不再构成当前迁移准入或正式转换断言。
+撤回原因：Quality 必须等生产执行模型稳定以后整体设计；简单表不等于简单领域。
+
+生产主链优先：Operation → Routing → RoutingVersion / RoutingNode / RoutingEdge → WorkOrder →
+ProductionExecution / Reporting → Basic WIP → Completion。该顺序是后续实施方向，
+不是对当前未实现环节的验收声明；本轮保留已有生产及资源工作区改动。
+主链稳定后再审查 Inspection Definition / Plan / Requirement / Execution / Result、Defect /
+Defect Record、Disposition / Rework / Scrap / Release 与 RoutingNode / RoutingVersion、
+WorkOrder、ProductionExecution、Reporting 的关系。现在不确定最终表名或 Schema，不保留 Quality 空壳。
+
+执行文件清单、数据库证据与验证边界见 [Quality 撤回回执](QUALITY_EARLY_IMPLEMENTATION_REMOVAL.md)。

@@ -210,9 +210,10 @@ public class OperationServiceImpl implements IOperationService {
 
     public ProductionSyncResult sync(FactoryScope scope) {
         if (!FactoryContext.required().equals(scope)) throw new FoundationException(ErrorCode.CONFLICT);
-        var inputs = query.query(scope, 1000);
         var run = coordinator.claim(scope, "operation.erp", Duration.ofMinutes(5));
         try {
+            coordinator.progress(run, 0);
+            var inputs = query.query(scope, 1000);
             coordinator.progress(run, 0);
             var result = self.getObject().upsert(scope, inputs);
             coordinator.progress(run, result.fetched());

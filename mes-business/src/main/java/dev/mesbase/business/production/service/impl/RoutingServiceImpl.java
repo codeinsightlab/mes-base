@@ -467,9 +467,10 @@ public class RoutingServiceImpl implements IRoutingService {
 
     public ProductionSyncResult sync(FactoryScope scope) {
         if (!FactoryContext.required().equals(scope)) throw new FoundationException(ErrorCode.CONFLICT);
-        var inputs = query.query(scope, 100);
         var run = coordinator.claim(scope, "routing.erp", Duration.ofMinutes(5));
         try {
+            coordinator.progress(run, 0);
+            var inputs = query.query(scope, 100);
             coordinator.progress(run, 0);
             var result = self.getObject().upsert(scope, inputs);
             coordinator.progress(run, result.fetched());

@@ -1196,5 +1196,18 @@
     "round2_database_operations": "NONE",
     "ddl_and_converters_changed": false,
     "repeated_round1_tests": "NOT_RUN_DOCUMENT_REVIEW_ONLY"
+  },
+  "quality_decision_2026_10_13": {
+    "status": "DEFERRED",
+    "implementation": "NOT_IMPLEMENTED",
+    "previous": "GENERATE / SCHEMA_READY -> REVIEW / RECONSIDER",
+    "current": {
+      "qc_index": "REMOVED_FROM_CURRENT_BASE",
+      "qc_defect": "REMOVED_FROM_CURRENT_BASE"
+    },
+    "decision_reason": "Quality 必须等生产执行模型稳定以后整体设计。",
+    "historical_evidence": "Existing quality schema, mapping assertions and Source evidence are HISTORICAL, not current conversion acceptance.",
+    "converters": "REMOVED",
+    "evidence": "docs/migration/QUALITY_EARLY_IMPLEMENTATION_REMOVAL.md"
   }
 }

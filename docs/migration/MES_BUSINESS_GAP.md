@@ -1,3 +1,5 @@
+> 当前 Quality 决定（2026-10-13）：DEFERRED；历史质检表与验证证据仅作 HISTORICAL。详见本文末尾。
+
 # MES Business Gap
 
 > 当前分类见本文第二轮章节及[MES_CAPABILITY_REVIEW](MES_CAPABILITY_REVIEW.md)。
@@ -39,3 +41,25 @@ GAP是具体通用能力的缺口，不能把Source已有质量、WIP查询或�
 
 值得以后补的是最小执行正确性/进度/记录依据；高级版本发布、全谱系和全质量处置需具体业务需求。
 “未证明”不是运行缺陷报告，也不是Source现场不存在的证据。
+
+
+## 2026-10-13 路线版本冻结进展
+
+Base 已实现确切版本行、草稿/发布/停用、发布后的产品与工序编码/名称/工艺要求快照、新版本与复制，且经过真实 MySQL/API/UI 验证，见 [联合报告](OPERATION_ROUTING_REVIEW.md)。因此定义侧版本冻结已闭合；执行侧 WorkOrder 保存确切 routingId/version、历史执行引用迁移仍待下一轮。原 Source GAP 事实保留，不据此声称 Source 现场缺少所有快照或 Base 已完成执行闭环。
+
+## 2026-10-13：撤回提前实现的 Quality（当前决定）
+
+Quality = **DEFERRED / NOT_IMPLEMENTED**。`qc_index`、`qc_defect` =
+**REMOVED_FROM_CURRENT_BASE**。Previous：GENERATE / SCHEMA_READY → REVIEW / RECONSIDER；
+Current：移除简单 CRUD、同步占位、前端页面/菜单和 Source → Base Converter。
+旧表结构、映射验证、Source 引用与审查结论均为 **HISTORICAL**，不再构成当前迁移准入或正式转换断言。
+撤回原因：Quality 必须等生产执行模型稳定以后整体设计；简单表不等于简单领域。
+
+生产主链优先：Operation → Routing → RoutingVersion / RoutingNode / RoutingEdge → WorkOrder →
+ProductionExecution / Reporting → Basic WIP → Completion。该顺序是后续实施方向，
+不是对当前未实现环节的验收声明；本轮保留已有生产及资源工作区改动。
+主链稳定后再审查 Inspection Definition / Plan / Requirement / Execution / Result、Defect /
+Defect Record、Disposition / Rework / Scrap / Release 与 RoutingNode / RoutingVersion、
+WorkOrder、ProductionExecution、Reporting 的关系。现在不确定最终表名或 Schema，不保留 Quality 空壳。
+
+执行文件清单、数据库证据与验证边界见 [Quality 撤回回执](QUALITY_EARLY_IMPLEMENTATION_REMOVAL.md)。

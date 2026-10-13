@@ -1,3 +1,5 @@
+> 当前 Quality 决定（2026-10-13）：DEFERRED；历史质检表与验证证据仅作 HISTORICAL。详见本文末尾。
+
 # 第一批简单业务迁移验收
 
 2026-10-12；用户批准的六项 SIMPLE，采用当前 Base Codegen，不复制 Source CRUD。
@@ -133,3 +135,20 @@ Source 只读，使用 `ktg-mes` 的 Schema 快照、Java 规则与 `ktg-mes-ui`
 首次使用了指向另一开发实例的旧 `.local/mysql-dev.cnf`，新增菜单已事务撤销；后续中心与业务库均按当前 application-dev.yml/Codegen 实际地址核对，未改现有 Factory 绑定。Factory A 使用已有工厂 1，B 为本次独立临时验收工厂。
 开发中心库串行应用基础数据菜单，并向开发平台管理员授予本批权限用于 UI 验收；菜单脚本本身不含角色授权。未提交、推送、部署或重启用户原有服务。
 既有 V1 历史表未删除，未处理质量/设备/工单代码。真实 ERP、多节点同步恢复、批量性能和生产环境不在本轮证明范围。逻辑引用检查没有物理 FK 的全路径数据库约束，未来非 Service 写入入口须继续遵守同一规则。
+
+## 2026-10-13：撤回提前实现的 Quality（当前决定）
+
+Quality = **DEFERRED / NOT_IMPLEMENTED**。`qc_index`、`qc_defect` =
+**REMOVED_FROM_CURRENT_BASE**。Previous：GENERATE / SCHEMA_READY → REVIEW / RECONSIDER；
+Current：移除简单 CRUD、同步占位、前端页面/菜单和 Source → Base Converter。
+旧表结构、映射验证、Source 引用与审查结论均为 **HISTORICAL**，不再构成当前迁移准入或正式转换断言。
+撤回原因：Quality 必须等生产执行模型稳定以后整体设计；简单表不等于简单领域。
+
+生产主链优先：Operation → Routing → RoutingVersion / RoutingNode / RoutingEdge → WorkOrder →
+ProductionExecution / Reporting → Basic WIP → Completion。该顺序是后续实施方向，
+不是对当前未实现环节的验收声明；本轮保留已有生产及资源工作区改动。
+主链稳定后再审查 Inspection Definition / Plan / Requirement / Execution / Result、Defect /
+Defect Record、Disposition / Rework / Scrap / Release 与 RoutingNode / RoutingVersion、
+WorkOrder、ProductionExecution、Reporting 的关系。现在不确定最终表名或 Schema，不保留 Quality 空壳。
+
+执行文件清单、数据库证据与验证边界见 [Quality 撤回回执](QUALITY_EARLY_IMPLEMENTATION_REMOVAL.md)。

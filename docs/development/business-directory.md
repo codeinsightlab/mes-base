@@ -28,13 +28,13 @@ import { ref } from 'vue'
 import PersonnelSelect from '@/components/business/directory/PersonnelSelect.vue'
 import DepartmentSelect from '@/components/business/directory/DepartmentSelect.vue'
 import PostSelect from '@/components/business/directory/PostSelect.vue'
-const personnelId = ref<string | null>(null)
+const operatorUserId = ref<string | null>(null)
 const departmentId = ref<string | null>(null)
 const postId = ref<string | null>(null)
 </script>
 <template>
   <DepartmentSelect v-model="departmentId" />
-  <PersonnelSelect v-model="personnelId" :department-id="departmentId ?? undefined" />
+  <PersonnelSelect v-model="operatorUserId" :department-id="departmentId ?? undefined" />
   <PostSelect v-model="postId" />
 </template>
 ```
@@ -74,3 +74,9 @@ IDEA 格式化、全 reactor `mvn -B -ntp -DskipTests compile` 和 diff 检查�
 分页/搜索、独立权限、缺厂 422、非 GET 405 和分页限制。原始日志为
 /private/tmp/directory-restore-test.log；独立测试不等于完整 Maven 测试或真实数据库验收。
 未重启服务、执行数据库迁移或部署，保留其他生成器及工作区改动。
+
+
+## 2026-10-13 生产操作人员身份统一
+
+Production Operator = SYS_USER。本目录的 personnel 仅是已有URL/组件的兼容名称，返回id就是sys_user.user_id；没有personnel_id，也不创建人员业务表。
+后续报工、执行及分派直接保存明确的 operator_user_id / reporter_user_id；需要时在业务事实保存姓名快照，不维护第二套人员事实。共享目录与原测试继续保留，独立 `/api/resource/personnel` CRUD 已撤回。

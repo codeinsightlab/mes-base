@@ -1,5 +1,13 @@
 # MES Base 工程规则
 
+## 2026-10-13 用户确认：生产操作人员身份
+
+Production Operator = sys_user。当前 Base 不维护独立 Personnel 主数据，不建立 User → Personnel → Factory 链路。
+后续 ProductionExecution / Reporting / WorkOrderAssignment 直接引用 operator_user_id、reporter_user_id、created_by_user_id 等明确系统用户标识；Factory 授权继续使用既有 User → Role → Factory → Permission 规则。
+需要历史姓名稳定时，业务事实可保存 operator_name_snapshot / reporter_name_snapshot；快照不是可维护的人员主数据。
+仅在无账号现场人员、HR与账号非1:1、外协/临时人员、独立技能资质、自然人与账号生命周期分离或多账号映射等真实需求被证明后重新评估，不预留人员壳子。
+既有 /api/business/directory/personnel 与 PersonnelSelect 是直接读取 sys_user 的兼容只读目录，ID就是 user_id，不代表已撤回的独立业务表。
+
 状态 Active；2026-10-09。执行非简单工程任务先读 `/Users/user/Documents/agents/AGENTS.md`
 并按实际栈路由，读取目标目录更具体规则。用户当前授权优先，保护已有工作。
 

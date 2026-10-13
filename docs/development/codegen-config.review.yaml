@@ -24,7 +24,7 @@ selection:
   tables: []
   # 全量生成时明确跳过的表；默认草案为空，不猜测哪些属于业务表。
   # 排除 Flyway 迁移历史技术表，防止生成其 CRUD/同步接口。
-  excludeTables: [flyway_business_schema_history]
+  excludeTables: [flyway_business_schema_history, qc_index, qc_defect]
   # 与表选择独立：all 表示所有产物；也可指定 persistence/backend/frontend/menu/test。
   artifacts: [all]
 
@@ -164,7 +164,7 @@ execution:
 #    module: "business"
 #    displayName: "人员"
 
-# 本次六张业务表的同步匹配键；均明确选择本表的业务编码，不使用 ERP 编号覆盖 MES 自增主键。
+# 当前保留业务表的同步匹配键；均明确选择本表的业务编码，不使用 ERP 编号覆盖 MES 自增主键。
 tableOverrides:
   dv_subject:
     module: "dv"
@@ -182,14 +182,6 @@ tableOverrides:
     module: "pro"
     displayName: "生产工单"
     syncMatchKey: "workorder_code"
-  qc_defect:
-    module: "qc"
-    displayName: "质量缺陷"
-    syncMatchKey: "defect_code"
-  qc_index:
-    module: "qc"
-    displayName: "质量检测项"
-    syncMatchKey: "index_code"
 
   material_category:
     module: basic

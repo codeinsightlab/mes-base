@@ -40,6 +40,7 @@ import jakarta.validation.Validation;
 import jakarta.validation.Validator;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
@@ -152,6 +153,7 @@ class OperationRoutingMySqlTest {
         centerJdbc.update("INSERT INTO mf_factory(factory_id,enterprise_id,factory_code,factory_name,status,revision) VALUES(?,?,?,?,'ENABLED',1)",
                 FACTORY, "TEST_ONLY", FACTORY, "TEST ONLY 同步 MySQL 验收");
         final String[] stage = {"first"};
+        final int[] queries = {0, 0};
         try (var registry = new RuntimeRegistry(); var context = new AnnotationConfigApplicationContext()) {
             registry.registerDedicated(id, identity, 1, business, () -> {
             }, MAPPERS);
@@ -160,13 +162,23 @@ class OperationRoutingMySqlTest {
                     .withProperty("mes.business.enabled", "true").getPropertySources().get("mockProperties"));
             context.registerBean(FactoryBusinessDataSource.class, () -> source);
             context.registerBean(SyncCoordinator.class, () -> new SyncCoordinator(platform, catalog));
-            context.registerBean(OperationQueryPort.class, () -> (selected, maximum) -> List.of(
-                    new ExternalOperation("TEST-EXT-1", "TEST-OR-MYSQL-OP1", "TEST ONLY 工序", "原工艺要求", "ENABLED"),
-                    new ExternalOperation("TEST-EXT-2", "TEST-OR-MYSQL-OP2", "TEST ONLY 后序", null, "ENABLED")));
-            context.registerBean(RoutingQueryPort.class, () -> (selected, maximum) -> List.of(new ExternalRouting(
-                    "TEST-EXT-ROUTE", "TEST-OR-MYSQL-ROUTE", "TEST ONLY " + stage[0], null, stage[0],
-                    List.of("TEST-OR-MYSQL-PRODUCT"), List.of(new ExternalRoutingStep(1, "TEST-OR-MYSQL-OP1", true, null),
-                    new ExternalRoutingStep(2, "TEST-OR-MYSQL-OP2", false, null)))));
+            context.registerBean(OperationQueryPort.class, () -> (selected, maximum) -> {
+                queries[0]++;
+                if ("lost".equals(stage[0])) {
+                    centerJdbc.update("UPDATE mes_master_sync SET run_token=? WHERE factory_id=? AND sync_key='operation.erp' AND status='RUNNING'",
+                            "TEST_ONLY_REPLACEMENT_RUN", FACTORY);
+                }
+                return List.of(
+                        new ExternalOperation("TEST-EXT-1", "TEST-OR-MYSQL-OP1", "TEST ONLY 工序", "原工艺要求", "ENABLED"),
+                        new ExternalOperation("TEST-EXT-2", "TEST-OR-MYSQL-OP2", "TEST ONLY 后序", null, "ENABLED"));
+            });
+            context.registerBean(RoutingQueryPort.class, () -> (selected, maximum) -> {
+                queries[1]++;
+                return List.of(new ExternalRouting(
+                        "TEST-EXT-ROUTE", "TEST-OR-MYSQL-ROUTE", "TEST ONLY " + stage[0], null, stage[0],
+                        List.of("TEST-OR-MYSQL-PRODUCT"), List.of(new ExternalRoutingStep(1, "TEST-OR-MYSQL-OP1", true, null),
+                        new ExternalRoutingStep(2, "TEST-OR-MYSQL-OP2", false, null))));
+            });
             context.register(Config.class);
             context.refresh();
             FactoryContext.bind(scope);
@@ -175,8 +187,19 @@ class OperationRoutingMySqlTest {
             jdbc.update("INSERT INTO material(factory_id,code,name,unit_id,material_type,status) VALUES(?,?,?,?,'PRODUCT','ENABLED')", FACTORY, "TEST-OR-MYSQL-PRODUCT", "TEST ONLY", unit);
             var operations = context.getBean(IOperationService.class);
             var routes = context.getBean(IRoutingService.class);
+            var coordinator = context.getBean(SyncCoordinator.class);
+            var operationRun = coordinator.claim(scope, "operation.erp", Duration.ofMinutes(5));
+            assertEquals(ErrorCode.SYNC_RUNNING, assertThrows(FoundationException.class,
+                    () -> operations.sync(scope)).code());
+            assertEquals(0, queries[0]);
+            coordinator.fail(operationRun);
             assertEquals(2, operations.sync(scope).created());
             assertEquals(2, operations.sync(scope).skipped());
+            var routingRun = coordinator.claim(scope, "routing.erp", Duration.ofMinutes(5));
+            assertEquals(ErrorCode.SYNC_RUNNING, assertThrows(FoundationException.class,
+                    () -> routes.sync(scope)).code());
+            assertEquals(0, queries[1]);
+            coordinator.fail(routingRun);
             assertEquals(1, routes.sync(scope).created());
             assertEquals(1, routes.sync(scope).skipped());
             Long routeId = jdbc.queryForObject("SELECT id FROM routing WHERE factory_id=? AND code=? AND version=1", Long.class, FACTORY, "TEST-OR-MYSQL-ROUTE");
@@ -199,6 +222,12 @@ class OperationRoutingMySqlTest {
             assertEquals("TEST ONLY first", routes.detail(routeId).routing().getName());
             assertEquals(1, jdbc.queryForObject("SELECT COUNT(*) FROM routing WHERE factory_id=? AND version=2 AND status='DRAFT'", Integer.class, FACTORY));
             assertEquals("SUCCEEDED", centerJdbc.queryForObject("SELECT status FROM mes_master_sync WHERE factory_id=? AND sync_key='routing.erp'", String.class, FACTORY));
+            stage[0] = "lost";
+            assertEquals(ErrorCode.SYNC_EXECUTION_LOST, assertThrows(FoundationException.class,
+                    () -> operations.sync(scope)).code());
+            assertEquals("TEST ONLY 改名", operations.selectById(op.getId()).getName());
+            assertEquals("TEST_ONLY_REPLACEMENT_RUN", centerJdbc.queryForObject(
+                    "SELECT run_token FROM mes_master_sync WHERE factory_id=? AND sync_key='operation.erp'", String.class, FACTORY));
         } finally {
             FactoryContext.clear();
             // Only this fixture's exact factory rows are disposable; source-converted rows remain untouched.

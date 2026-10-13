@@ -1,3 +1,5 @@
+> 当前 Quality 决定（2026-10-13）：DEFERRED；历史质检表与验证证据仅作 HISTORICAL。详见本文末尾。
+
 # MES Business Migration Matrix
 
 > **2026-10-12 第一批实施：用户已批准六项按 SIMPLE 迁入，ERP_SYNC 全部启用。**
@@ -30,8 +32,8 @@ Backend 路径以 Source 的 `ktg-mes/src/main/java/com/ktg/mes/` 为前缀；Ma
 |---|---|---|---|---|---|---|---|
 | Unit Of Measure / 计量单位 | md_unit_measure | MdUnitMeasureController、单位下拉 | SIMPLE | ADAPT_SCHEMA / GENERATE | unit_measure；V2 | IMPLEMENTED / ACCEPTED | 用户已批准；ERP_SYNC；不迁换算 |
 | Workshop / 可选组织层级 | md_workshop | MdWorkshopController | SIMPLE | ADAPT_SCHEMA / GENERATE | workshop；V2 | IMPLEMENTED / ACCEPTED | workshop_id 可空；ERP_SYNC |
-| Quality Inspection Model / 含检测项 | qc_index, qc_template_index/product及检验头/行 | QcTemplateIndexController→QcIpqcController→QcDefectRecordController | COMPLEX | REDESIGN | 既有qc_index暂留，质量整体定模型 | REVIEW / RECONSIDER | 检测配置CRUD只是复杂质量执行的一部分，暂停独立生成 |
-| Defect Management / 字典接入候选 | qc_defect；执行记录为qc_defect_record及不良申报 | QcDefectController；缺陷执行消费者未找到稳定字典引用 | UNKNOWN | DEFER | 既有qc_defect暂留 | REVIEW / RECONSIDER | 字典自身CRUD仍简单；不能用孤立目录证明质量能力或迁移准入 |
+| Quality Inspection Model / 含检测项 | qc_index, qc_template_index/product及检验头/行 | QcTemplateIndexController→QcIpqcController→QcDefectRecordController | COMPLEX | REDESIGN | REMOVED_FROM_CURRENT_BASE；Quality DEFERRED | REVIEW / RECONSIDER | 检测配置CRUD只是复杂质量执行的一部分，暂停独立生成 |
+| Defect Management / 字典接入候选 | qc_defect；执行记录为qc_defect_record及不良申报 | QcDefectController；缺陷执行消费者未找到稳定字典引用 | UNKNOWN | DEFER | REMOVED_FROM_CURRENT_BASE；Quality DEFERRED | REVIEW / RECONSIDER | 字典自身CRUD仍简单；不能用孤立目录证明质量能力或迁移准入 |
 | Equipment Maintenance / 含点检项目 | dv_subject, dv_check_plan/machinery/subject, dv_repair/line | DvCheckPlanController及点检项目选择页面 | COMPLEX | DEFER | 既有dv_subject暂留，默认范围不迁 | REVIEW / DROP_CANDIDATE | 属可选设备维护能力，不能因表已建就纳入默认MES |
 | Material / Product 简化投影 | md_item | MdItemController、物料页面 | SIMPLE | ADAPT_SCHEMA / GENERATE | material；V2 | IMPLEMENTED / ACCEPTED | 不迁 BOM/条码/库存执行；分类与安全库存单独维护；ERP_SYNC |
 | Product BOM / SOP | md_product_bom, md_product_sop | md/MdProductBomServiceImpl, MdProductSopServiceImpl | UNKNOWN | REVIEW | 不建表 | REVIEW_REQUIRED | 有产品/组件/文件依赖；未深审替代料、版本和删除一致性，不能凭名称判简单 |
@@ -127,3 +129,42 @@ GAP 见 [MES_BUSINESS_GAP](MES_BUSINESS_GAP.md)。
 | 安全库存 | md_item.safe_stock_flag/min_stock/max_stock | safety_stock | SIMPLE | ADAPT_SCHEMA / GENERATE | ERP_SYNC=true；人工 CRUD 可独立使用 | IMPLEMENTED / ACCEPTED |
 
 当前六项的 Schema、规则、权限、Converter 和证据逐项见验收报告。Workshop 的 OPTIONAL 指组织层级可省略，不表示本轮暂缓；安全库存暂放基础数据，因为当前只维护物料阈值，不实施 MRP。
+
+
+## 2026-10-13 后续撤回：生产操作人员直接引用系统用户
+
+| 能力 | Previous（历史） | Current |
+|---|---|---|
+| Equipment | CODEGEN_PLUS_EXTRA / ACCEPTED | KEEP，设备实现/Schema/UI/权限与转换保持完整 |
+| Personnel独立投影 | CODEGEN_PLUS_EXTRA / ACCEPTED，V5创建、转换157条/拒绝1条 | REMOVED / NOT_BASE_DEFAULT，新增V6撤回，不抹去历史 |
+| Production Operator Identity | 曾考虑sys_user与投影关联 | SYS_USER；后续执行/报工直接引用明确user_id及必要历史姓名快照 |
+
+当前未证明操作人员与登录用户有足够业务差异；独立投影增加两套身份、同步和状态一致性成本。无账号、外协、HR非1:1、独立技能资质等真实需求出现后才重新评估，不保留壳子。
+现行决定及撤回验收见 [PRODUCTION_RESOURCE_REVIEW](PRODUCTION_RESOURCE_REVIEW.md)；旧Source/审查证据保留，既有中心用户只读目录仍可用于生产用户选择。
+
+
+## 2026-10-13 Operation + Routing 联合落地
+
+| 能力 | 当前 Base 模型 | 实现方式 | 本轮状态 | 后续边界 |
+| --- | --- | --- | --- | --- |
+| Operation 定义 | operation | CODEGEN_PLUS_EXTRA | IMPLEMENTED / MYSQL_API_UI_ACCEPTED | 人员/质量/工资与资源资格关系不随定义迁入 |
+| Routing 定义与版本 | routing + routing_step + routing_product | CODEGEN_PLUS_EXTRA | IMPLEMENTED / MYSQL_API_UI_ACCEPTED | WorkOrder 必须绑定确切 id/version；执行迁移 DEFERRED |
+
+历史整体 COMPLEX/BACKLOG 判断保留为审查时间线；本批只闭合经过联合审查的最小定义能力。Schema、Converter、范围/冻结/同步与分级证据见 [OPERATION_ROUTING_REVIEW](OPERATION_ROUTING_REVIEW.md)。未增加单表 ExtraMapper，未进入 WorkOrder/Reporting/WIP。
+
+## 2026-10-13：撤回提前实现的 Quality（当前决定）
+
+Quality = **DEFERRED / NOT_IMPLEMENTED**。`qc_index`、`qc_defect` =
+**REMOVED_FROM_CURRENT_BASE**。Previous：GENERATE / SCHEMA_READY → REVIEW / RECONSIDER；
+Current：移除简单 CRUD、同步占位、前端页面/菜单和 Source → Base Converter。
+旧表结构、映射验证、Source 引用与审查结论均为 **HISTORICAL**，不再构成当前迁移准入或正式转换断言。
+撤回原因：Quality 必须等生产执行模型稳定以后整体设计；简单表不等于简单领域。
+
+生产主链优先：Operation → Routing → RoutingVersion / RoutingNode / RoutingEdge → WorkOrder →
+ProductionExecution / Reporting → Basic WIP → Completion。该顺序是后续实施方向，
+不是对当前未实现环节的验收声明；本轮保留已有生产及资源工作区改动。
+主链稳定后再审查 Inspection Definition / Plan / Requirement / Execution / Result、Defect /
+Defect Record、Disposition / Rework / Scrap / Release 与 RoutingNode / RoutingVersion、
+WorkOrder、ProductionExecution、Reporting 的关系。现在不确定最终表名或 Schema，不保留 Quality 空壳。
+
+执行文件清单、数据库证据与验证边界见 [Quality 撤回回执](QUALITY_EARLY_IMPLEMENTATION_REMOVAL.md)。

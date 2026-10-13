@@ -1,7 +1,5 @@
-<!-- MES-CODEGEN: 本批次合并权限说明。 -->
 
 <!-- 来源：docs/generated/basic/material-permissions.md -->
-<!-- MES-CODEGEN -->
 # 物料产品
 
 Scope: FACTORY_SCOPED; Mapper owner: BUSINESS
@@ -18,7 +16,6 @@ Path: `/api/basic/material`
 Menu INSERT SQL is generated beside this file for reviewed center-database execution; no automatic execution or role grants. Mapper ownership follows its fixed package; no Mapper annotation or central registration is required.
 
 <!-- 来源：docs/generated/basic/materialCategory-permissions.md -->
-<!-- MES-CODEGEN -->
 # 物料产品分类
 
 Scope: FACTORY_SCOPED; Mapper owner: BUSINESS
@@ -35,7 +32,6 @@ Path: `/api/basic/material-category`
 Menu INSERT SQL is generated beside this file for reviewed center-database execution; no automatic execution or role grants. Mapper ownership follows its fixed package; no Mapper annotation or central registration is required.
 
 <!-- 来源：docs/generated/basic/safetyStock-permissions.md -->
-<!-- MES-CODEGEN -->
 # 安全库存配置
 
 Scope: FACTORY_SCOPED; Mapper owner: BUSINESS
@@ -52,7 +48,6 @@ Path: `/api/basic/safety-stock`
 Menu INSERT SQL is generated beside this file for reviewed center-database execution; no automatic execution or role grants. Mapper ownership follows its fixed package; no Mapper annotation or central registration is required.
 
 <!-- 来源：docs/generated/basic/unitMeasure-permissions.md -->
-<!-- MES-CODEGEN -->
 # 计量单位
 
 Scope: FACTORY_SCOPED; Mapper owner: BUSINESS
@@ -69,7 +64,6 @@ Path: `/api/basic/unit-measure`
 Menu INSERT SQL is generated beside this file for reviewed center-database execution; no automatic execution or role grants. Mapper ownership follows its fixed package; no Mapper annotation or central registration is required.
 
 <!-- 来源：docs/generated/basic/workshop-permissions.md -->
-<!-- MES-CODEGEN -->
 # 车间
 
 Scope: FACTORY_SCOPED; Mapper owner: BUSINESS
@@ -86,7 +80,6 @@ Path: `/api/basic/workshop`
 Menu INSERT SQL is generated beside this file for reviewed center-database execution; no automatic execution or role grants. Mapper ownership follows its fixed package; no Mapper annotation or central registration is required.
 
 <!-- 来源：docs/generated/basic/workstation-permissions.md -->
-<!-- MES-CODEGEN -->
 # 工作站
 
 Scope: FACTORY_SCOPED; Mapper owner: BUSINESS
@@ -103,7 +96,6 @@ Path: `/api/basic/workstation`
 Menu INSERT SQL is generated beside this file for reviewed center-database execution; no automatic execution or role grants. Mapper ownership follows its fixed package; no Mapper annotation or central registration is required.
 
 <!-- 来源：docs/generated/dv/dvSubject-permissions.md -->
-<!-- MES-CODEGEN -->
 # 设备点检保养项目
 
 Scope: FACTORY_SCOPED; Mapper owner: BUSINESS
@@ -120,7 +112,6 @@ Path: `/api/dv/dv-subject`
 Menu INSERT SQL is generated beside this file for reviewed center-database execution; no automatic execution or role grants. Mapper ownership follows its fixed package; no Mapper annotation or central registration is required.
 
 <!-- 来源：docs/generated/md/mdUnitMeasure-permissions.md -->
-<!-- MES-CODEGEN -->
 # 计量单位
 
 Scope: FACTORY_SCOPED; Mapper owner: BUSINESS
@@ -137,7 +128,6 @@ Path: `/api/md/md-unit-measure`
 Menu INSERT SQL is generated beside this file for reviewed center-database execution; no automatic execution or role grants. Mapper ownership follows its fixed package; no Mapper annotation or central registration is required.
 
 <!-- 来源：docs/generated/md/mdWorkshop-permissions.md -->
-<!-- MES-CODEGEN -->
 # 车间
 
 Scope: FACTORY_SCOPED; Mapper owner: BUSINESS
@@ -154,7 +144,6 @@ Path: `/api/md/md-workshop`
 Menu INSERT SQL is generated beside this file for reviewed center-database execution; no automatic execution or role grants. Mapper ownership follows its fixed package; no Mapper annotation or central registration is required.
 
 <!-- 来源：docs/generated/pro/proWorkorder-permissions.md -->
-<!-- MES-CODEGEN -->
 # 生产工单
 
 Scope: FACTORY_SCOPED; Mapper owner: BUSINESS
@@ -167,39 +156,5 @@ Path: `/api/pro/pro-workorder`
 - `business:pro:workorder:update`
 - `business:pro:workorder:delete`
 - `business:pro:workorder:sync`
-
-Menu INSERT SQL is generated beside this file for reviewed center-database execution; no automatic execution or role grants. Mapper ownership follows its fixed package; no Mapper annotation or central registration is required.
-
-<!-- 来源：docs/generated/qc/qcDefect-permissions.md -->
-<!-- MES-CODEGEN -->
-# 质量缺陷
-
-Scope: FACTORY_SCOPED; Mapper owner: BUSINESS
-
-Path: `/api/qc/qc-defect`
-
-- `business:qc:defect:list`
-- `business:qc:defect:query`
-- `business:qc:defect:create`
-- `business:qc:defect:update`
-- `business:qc:defect:delete`
-- `business:qc:defect:sync`
-
-Menu INSERT SQL is generated beside this file for reviewed center-database execution; no automatic execution or role grants. Mapper ownership follows its fixed package; no Mapper annotation or central registration is required.
-
-<!-- 来源：docs/generated/qc/qcIndex-permissions.md -->
-<!-- MES-CODEGEN -->
-# 质量检测项
-
-Scope: FACTORY_SCOPED; Mapper owner: BUSINESS
-
-Path: `/api/qc/qc-index`
-
-- `business:qc:index:list`
-- `business:qc:index:query`
-- `business:qc:index:create`
-- `business:qc:index:update`
-- `business:qc:index:delete`
-- `business:qc:index:sync`
 
 Menu INSERT SQL is generated beside this file for reviewed center-database execution; no automatic execution or role grants. Mapper ownership follows its fixed package; no Mapper annotation or central registration is required.

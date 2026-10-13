@@ -3,7 +3,7 @@
 # 不包含数据库凭证，不执行菜单 SQL，不授予角色。
 version: 1
 
-# 默认 false；历史配置缺少此项也按 false。当前用户要求本次全量覆盖时生成同步，因此显式开启。
+# 本批同步由主业务 Service 实现；不生成可绕过生命周期的单表同步入口。
 generateSync: false
 sync:
   # 物理列名，不猜业务字段；每表可用 tableOverrides.<table>.syncMatchKey 覆盖。
@@ -36,7 +36,7 @@ naming:
     separator: "_"
     # 无分隔符时使用的模块/包段，可修改；本项目约定值为 business。
     # person -> dev.mesbase.modules.business；改为 common 后包段为 common。
-    # 此值应由配置提供，未来实现不能在生成器中暗藏 business 默认值。
+    # 本批显式归入 production，不改变其他业务的模块取值。
     fallback: "production"
   # 表名按下划线转 PascalCase：pro_workorder -> ProWorkorder。
   # 类名和字段名由技术命名规则转换，不逐个强制手工输入。
@@ -122,7 +122,7 @@ menu:
   parentId: 0
   directoryName: "生产基础"
   # 目录路由标识，独立于 API/Java/页面所属模块；相同 parentId + directoryPath 共用一个目录。
-  # 固定 basic：所有生成业务页归入同一个“基础数据”；不会按 basic/dv/md/pro/qc 分建同名目录。
+  # 本批统一归入“生产基础”，不改变现有基础数据目录。
   # 按模块分别建目录时可改为 "{module}"；旧配置不填写此项时保留按模块建目录的行为。
   # 修改目录路径会调整生成页面的父目录，不自动删除旧目录，也不新增角色授权。
   directoryPath: "production"

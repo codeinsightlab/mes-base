@@ -1,3 +1,5 @@
+> 2026-10-13：本文质检引用为 HISTORICAL / DEFERRED；当前 qc_index、qc_defect 提前实现已移除。
+
 # MES Base Realignment Report
 
 ## 2026-10-06 当前范围：基础架构先行，业务分析后置

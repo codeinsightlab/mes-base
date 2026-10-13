@@ -1,3 +1,5 @@
+> 2026-10-13：Quality = DEFERRED。本文所有 qc_index / qc_defect / QcIndex / QcDefect 生成与扫描记录为 HISTORICAL；当前质检代码已删除，扫描测试使用 MaterialMapper。
+
 # MES Codegen 使用说明
 
 ## 当前生成器构建与启动入口（2026-10-12）

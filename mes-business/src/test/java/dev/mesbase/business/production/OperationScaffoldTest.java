@@ -1,4 +1,3 @@
-// MES-CODEGEN: scaffold; review required.
 package dev.mesbase.business.production;
 
 import dev.mesbase.business.production.controller.OperationController;
@@ -53,7 +52,7 @@ public class OperationScaffoldTest {
     }
 
     @Test
-    void cacheContractsUseTheFullPermissionResource() throws Exception {
+    void cacheContractsUseTheOperationNamespace() throws Exception {
         var service = OperationServiceImpl.class;
         var list = service.getMethod("selectPage", OperationQueryDto.class)
                 .getAnnotation(BusinessCache.class);
