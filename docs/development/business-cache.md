@@ -137,3 +137,23 @@ Redis 读取/写入或缓存 payload 恢复失败记录 WARN，继续原数据�
 用户随后授权修改生成模板。Factory 业务 CRUD 现在生成 Resource.PREFIX、缓存查询参数约定、列表/详情注解及增改删淘汰；同步 Writer 复用提交后动态淘汰。命名来自配置中的完整权限资源前缀：material_category → business:material:category，不以 module 或方法名推断。平台 CRUD 不接入业务缓存。
 
 此前“未修改生成器/模板”的记录是前一轮实现边界；本轮按新授权更新模板，未重新生成覆盖已有物料业务代码。模板文件、生成运行测试与隔离输出说明见 [codegen.md](codegen.md) 的同日“通用业务缓存模板接入”章节。
+
+### 2026-10-13 当前 Redis key 静态梳理
+
+- 实际 Redis 前缀由 SystemCacheNamespace 构造：`mes:[named:<配置名>:]db:<中心库 JDBC URL 的 SHA-256>:`。
+  可选配置名不会替代数据库摘要；相同 URL、相同配置名、相同 Redis DB 的部署会共享命名空间。
+  结构化 CacheKey/PlatformCache/BusinessCache 不是当前注解缓存写入 Redis 的调用链。
+- 业务缓存后缀为 `business:factory:<工厂ID的Base64URL>:resource:<资源字符串长度>:<资源>:list:<SHA-256>`
+  或 `detail:<ID的Base64URL>`。例如工厂 A、物料分类 ID 1：
+  `mes:db:<摘要>:business:factory:QQ:resource:26:business:material:category:detail:MQ`。
+  资源长度边界防止嵌套资源前缀的批量淘汰相互影响。
+- 列表摘要包含所有方法参数和有效 offset/limit/sort；JSON 属性和 Map key 排序后计算摘要。
+  仅 offset 0–99 缓存；业务缓存只在只读事务中读写，统一 TTL 300 秒，命中不续期。
+  当前不是语义归一化查询：参数 null 与显式默认值仍可能生成不同 key，产生重复缓存但不会误命中。
+- 详情不缓存 null；缓存命中按方法泛型返回类型恢复。业务 key 不包含用户 ID，适用于同厂用户
+  得到相同业务结果的查询；含用户数据权限的查询需要额外范围隔离。新增提交后删列表，修改/删除
+  提交后删列表及全部详情；SCAN 删除限制当前命名空间、工厂和资源。
+- 同一外层前缀还承载会话/用户会话索引/撤销版本、登录重试、验证码、参数、字典、OpenAPI Token/限流
+  和 `factory-routing:entry:*` 路由元数据。TTL 按用途配置，参数/字典的无 timeout 写入没有自动 TTL；
+  业务的 300 秒不影响其他用途。个人列配置存中心数据库，不在 Redis。
+- 本次仅检查源码、当前配置和生成业务样例，没有连接 Redis、执行缓存测试或修改业务代码。
