@@ -1208,6 +1208,19 @@
     "decision_reason": "Quality 必须等生产执行模型稳定以后整体设计。",
     "historical_evidence": "Existing quality schema, mapping assertions and Source evidence are HISTORICAL, not current conversion acceptance.",
     "converters": "REMOVED",
-    "evidence": "docs/migration/QUALITY_EARLY_IMPLEMENTATION_REMOVAL.md"
+    "evidence": "docs/migration/QUALITY_EARLY_IMPLEMENTATION_REMOVAL.md",
+    "verification": {
+      "business_mysql": "V7 applied and validated on both dev databases; both quality tables absent; unrelated row counts/DDL unchanged",
+      "center_mysql": "14 menus and 14 grants removed by transactional V25 SQL; existing V14 Flyway history unchanged",
+      "backend": "mvn verify PASSED; assembly and removal fixture tests PASSED",
+      "frontend": "158 tests PASSED; build PASSED; actual compiled catalog excludes quality routes",
+      "packaged": "10 smoke checks PASSED; no quality classes/XML/package directories",
+      "startup": "dev profile health=200 on temporary 18091; process stopped",
+      "not_verified": [
+        "Production deployment",
+        "Source real-data conversion",
+        "Live browser business acceptance"
+      ]
+    }
   }
 }

@@ -49,9 +49,9 @@ WHERE o.process_id IS NULL OR s.order_num IS NULL OR s.order_num<0
               WHERE TRIM(duplicate_operation.process_code)=TRIM(o.process_code)
                 AND duplicate_operation.process_id<>o.process_id);
 INSERT INTO conversion_reject
-SELECT 'ROUTING',route_id,'DUPLICATE_SEQUENCE_OR_OPERATION'
+SELECT 'ROUTING',route_id,'DUPLICATE_SOURCE_ORDER'
 FROM source_operation_routing.pro_route_process
-GROUP BY route_id HAVING COUNT(*)<>COUNT(DISTINCT order_num) OR COUNT(*)<>COUNT(DISTINCT process_id);
+GROUP BY route_id HAVING COUNT(*)<>COUNT(DISTINCT order_num);
 INSERT INTO conversion_reject
 SELECT 'ROUTING',route_id,'TOO_MANY_STEPS_OR_KEY_POINTS'
 FROM source_operation_routing.pro_route_process
@@ -79,14 +79,21 @@ SELECT @target_factory,TRIM(r.route_code),TRIM(r.route_name),1,'DRAFT',NULLIF(r.
 FROM source_operation_routing.pro_route r
 WHERE NOT EXISTS (SELECT 1 FROM conversion_reject x WHERE x.entity_type='ROUTING' AND x.source_id=r.route_id);
 
-INSERT INTO routing_step(routing_id,sequence,operation_id,operation_code,operation_name,is_key,description)
-SELECT r.id,s.normalized_sequence,o.id,NULL,NULL,IF(s.key_flag='Y',TRUE,FALSE),NULLIF(s.remark,'')
+INSERT INTO routing_node(routing_id,node_code,display_order,operation_id,operation_code,operation_name,is_key,description)
+SELECT r.id,CONCAT('SRC_',s.record_id),s.normalized_sequence,o.id,NULL,NULL,IF(s.key_flag='Y',TRUE,FALSE),NULLIF(s.remark,'')
 FROM (SELECT original.*,ROW_NUMBER() OVER(PARTITION BY route_id ORDER BY order_num,record_id) normalized_sequence
       FROM source_operation_routing.pro_route_process original) s
 JOIN source_operation_routing.pro_route sr ON sr.route_id=s.route_id
 JOIN routing r ON r.factory_id=@target_factory AND r.code=TRIM(sr.route_code) AND r.version=1
 JOIN source_operation_routing.pro_process so ON so.process_id=s.process_id
 JOIN operation o ON o.factory_id=@target_factory AND o.code=TRIM(so.process_code);
+
+-- 来源排序仅用于转换相邻关系；最终执行拓扑只读连接边。
+INSERT INTO routing_edge(routing_id,from_node_id,to_node_id)
+SELECT routing_id,previous_id,id
+FROM (SELECT n.routing_id,n.id,LAG(n.id) OVER(PARTITION BY n.routing_id ORDER BY n.display_order,n.node_code) previous_id
+      FROM routing_node n JOIN routing r ON r.id=n.routing_id WHERE r.factory_id=@target_factory) ordered_nodes
+WHERE previous_id IS NOT NULL;
 
 INSERT INTO routing_product(routing_id,material_id,material_code,material_name)
 SELECT r.id,m.id,NULL,NULL
@@ -100,5 +107,7 @@ SELECT 'CONVERSION_REJECT' result,entity_type,source_id,reason
 FROM conversion_reject ORDER BY entity_type,source_id,reason;
 SELECT 'OPERATION_COUNT' result,COUNT(*) count FROM operation WHERE factory_id=@target_factory;
 SELECT 'ROUTING_COUNT' result,COUNT(*) count FROM routing WHERE factory_id=@target_factory;
-SELECT 'STEP_COUNT' result,COUNT(*) count FROM routing_step s JOIN routing r ON r.id=s.routing_id WHERE r.factory_id=@target_factory;
+SELECT 'NODE_COUNT' result,COUNT(*) count FROM routing_node s JOIN routing r ON r.id=s.routing_id WHERE r.factory_id=@target_factory;
 SELECT 'PRODUCT_COUNT' result,COUNT(*) count FROM routing_product p JOIN routing r ON r.id=p.routing_id WHERE r.factory_id=@target_factory;
+
+SELECT 'EDGE_COUNT' result,COUNT(*) count FROM routing_edge e JOIN routing r ON r.id=e.routing_id WHERE r.factory_id=@target_factory;

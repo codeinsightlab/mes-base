@@ -21,14 +21,20 @@ import java.util.List;
 import java.util.Objects;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
-import dev.mesbase.business.production.dao.RoutingStepMapper;
+import dev.mesbase.business.production.dao.RoutingNodeMapper;
+import dev.mesbase.business.production.dao.RoutingEdgeMapper;
+import dev.mesbase.business.production.domain.RoutingEdgeEntity;
+import dev.mesbase.business.production.domain.RoutingEdgeExample;
+import dev.mesbase.business.production.domain.RoutingEdgeCommand;
+import dev.mesbase.business.production.domain.RoutingGraph;
+import dev.mesbase.business.production.service.RoutingGraphValidator;
 import dev.mesbase.business.production.dao.RoutingProductMapper;
 import dev.mesbase.business.production.dao.OperationMapper;
 import dev.mesbase.business.basic.dao.MaterialMapper;
 import dev.mesbase.business.basic.domain.MaterialExample;
 import dev.mesbase.business.basic.domain.MaterialEntity;
-import dev.mesbase.business.production.domain.RoutingStepEntity;
-import dev.mesbase.business.production.domain.RoutingStepExample;
+import dev.mesbase.business.production.domain.RoutingNodeEntity;
+import dev.mesbase.business.production.domain.RoutingNodeExample;
 import dev.mesbase.business.production.domain.RoutingProductEntity;
 import dev.mesbase.business.production.domain.RoutingProductExample;
 import dev.mesbase.business.production.domain.OperationExample;
@@ -36,7 +42,7 @@ import dev.mesbase.business.production.domain.OperationEntity;
 import dev.mesbase.business.production.domain.RoutingDetail;
 import dev.mesbase.business.production.domain.RoutingReference;
 import dev.mesbase.business.production.domain.RoutingContentCommand;
-import dev.mesbase.business.production.domain.RoutingStepCommand;
+import dev.mesbase.business.production.domain.RoutingNodeCommand;
 import dev.mesbase.business.production.domain.RoutingCopyCommand;
 import dev.mesbase.business.production.service.RoutingReferenceRules;
 import dev.mesbase.business.production.sync.RoutingQueryPort;
@@ -57,6 +63,7 @@ import java.util.HashMap;
 import java.util.Set;
 import java.util.Locale;
 import java.util.Comparator;
+import java.util.stream.Collectors;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
@@ -66,7 +73,8 @@ import org.springframework.transaction.annotation.Transactional;
 @ConditionalOnProperty(name = "mes.business.enabled", havingValue = "true")
 public class RoutingServiceImpl implements IRoutingService {
     private final RoutingMapper mapper;
-    private final RoutingStepMapper steps;
+    private final RoutingNodeMapper nodes;
+    private final RoutingEdgeMapper edges;
     private final RoutingProductMapper products;
     private final OperationMapper operations;
     private final MaterialMapper materials;
@@ -77,12 +85,14 @@ public class RoutingServiceImpl implements IRoutingService {
     private final Validator validator;
     private final BusinessCacheProcessor caches;
 
-    public RoutingServiceImpl(RoutingMapper mapper, RoutingStepMapper steps, RoutingProductMapper products,
+    public RoutingServiceImpl(RoutingMapper mapper, RoutingNodeMapper nodes, RoutingEdgeMapper edges,
+                              RoutingProductMapper products,
                               OperationMapper operations, MaterialMapper materials, RoutingReferenceRules references,
                               ObjectProvider<RoutingQueryPort> queries, SyncCoordinator coordinator,
                               ObjectProvider<IRoutingService> self, Validator validator,
                               BusinessCacheProcessor caches) {
-        this.steps = steps;
+        this.nodes = nodes;
+        this.edges = edges;
         this.products = products;
         this.operations = operations;
         this.materials = materials;
@@ -182,9 +192,12 @@ public class RoutingServiceImpl implements IRoutingService {
             var row = requireRecord(id);
             touch(id, row.getRevision(), true);
         }
-        var stepFilter = new RoutingStepExample();
+        var stepFilter = new RoutingNodeExample();
         stepFilter.createCriteria().andRoutingIdIn(ids);
-        steps.deleteByExample(stepFilter);
+        var edgeFilter = new RoutingEdgeExample();
+        edgeFilter.createCriteria().andRoutingIdIn(ids);
+        edges.deleteByExample(edgeFilter);
+        nodes.deleteByExample(stepFilter);
         var productFilter = new RoutingProductExample();
         productFilter.createCriteria().andRoutingIdIn(ids);
         products.deleteByExample(productFilter);
@@ -203,7 +216,7 @@ public class RoutingServiceImpl implements IRoutingService {
             rollbackFor = Exception.class)
     public RoutingDetail saveContent(Long id, RoutingContentCommand input) {
         var row = touch(id, input.revision(), true);
-        replaceContent(row, input.materialIds(), input.steps());
+        replaceContent(row, input.materialIds(), input.nodes(), input.edges());
         return detailRows(row);
     }
 
@@ -212,15 +225,15 @@ public class RoutingServiceImpl implements IRoutingService {
     public RoutingEntity publish(Long id, Integer revision) {
         var row = touch(id, revision, true);
         var detail = detailRows(row);
-        if (detail.products().isEmpty() || detail.steps().isEmpty()) {
+        if (detail.products().isEmpty() || detail.nodes().isEmpty()) {
             throw new FoundationException(ErrorCode.ROUTING_PUBLISH_INCOMPLETE);
         }
-        validateSteps(detail.steps().stream().map(step -> new RoutingStepCommand(step.getSequence(),
-                step.getOperationId(), step.getIsKey(), step.getDescription())).toList());
+        var graph = graph(detail);
+        RoutingGraphValidator.validate(graph.nodes(), graph.edges(), true);
         var materialRows = references.lockMaterials(detail.products().stream()
                 .map(RoutingProductEntity::getMaterialId).sorted().toList(), true);
-        var operationRows = references.lockOperations(detail.steps().stream()
-                .map(RoutingStepEntity::getOperationId).sorted().toList(), true);
+        var operationRows = references.lockOperations(detail.nodes().stream()
+                .map(RoutingNodeEntity::getOperationId).distinct().sorted().toList(), true);
         var materialIndex = new HashMap<Long, MaterialEntity>();
         for (var material : materialRows) materialIndex.put(material.getId(), material);
         var operationIndex = new HashMap<Long, OperationEntity>();
@@ -232,12 +245,12 @@ public class RoutingServiceImpl implements IRoutingService {
             product.setMaterialName(material.getName());
             changed(products.updateByPrimaryKey(product));
         }
-        for (var step : detail.steps()) {
+        for (var step : detail.nodes()) {
             var operation = operationIndex.get(step.getOperationId());
             step.setOperationCode(operation.getCode());
             step.setOperationName(operation.getName());
             step.setOperationDescription(operation.getDescription());
-            changed(steps.updateByPrimaryKey(step));
+            changed(nodes.updateByPrimaryKey(step));
         }
         row.setStatus("PUBLISHED");
         row.setPublishedAt(LocalDateTime.now());
@@ -293,57 +306,87 @@ public class RoutingServiceImpl implements IRoutingService {
             row.setSourceVersion(source.getSourceVersion());
         }
         insertRow(row);
+        var graph = graph(sourceDetail);
         replaceContent(row, sourceDetail.products().stream().map(RoutingProductEntity::getMaterialId).toList(),
-                sourceDetail.steps().stream().map(step -> new RoutingStepCommand(step.getSequence(),
-                        step.getOperationId(), step.getIsKey(), step.getDescription())).toList());
+                graph.nodes(), graph.edges());
         return row;
     }
 
-    private void replaceContent(RoutingEntity parent, List<Long> materialIds, List<RoutingStepCommand> input) {
+    private void replaceContent(RoutingEntity parent, List<Long> materialIds, List<RoutingNodeCommand> input,
+                                List<RoutingEdgeCommand> connections) {
         if (!"DRAFT".equals(parent.getStatus())) throw new FoundationException(ErrorCode.ROUTING_FROZEN);
         if (materialIds == null || materialIds.size() > 100 || materialIds.stream().anyMatch(Objects::isNull)
                 || new HashSet<>(materialIds).size() != materialIds.size())
             throw new FoundationException(ErrorCode.BAD_REQUEST);
-        validateSteps(input);
+        RoutingGraphValidator.validate(input, connections, false);
         references.lockMaterials(materialIds.stream().sorted().toList(), true);
-        references.lockOperations(input.stream().map(RoutingStepCommand::operationId).sorted().toList(), true);
-        var stepFilter = new RoutingStepExample();
-        stepFilter.createCriteria().andRoutingIdEqualTo(parent.getId());
+        references.lockOperations(input.stream().map(RoutingNodeCommand::operationId).distinct().sorted()
+                .toList(), true);
+        var existing = detailRows(parent).nodes();
+        var nodeIndex = new HashMap<String, RoutingNodeEntity>();
+        for (var node : existing) nodeIndex.put(node.getNodeCode(), node);
+        var edgeFilter = new RoutingEdgeExample();
+        edgeFilter.createCriteria().andRoutingIdEqualTo(parent.getId());
+        edges.deleteByExample(edgeFilter);
+        var retained = input.stream().map(RoutingNodeCommand::nodeCode).collect(Collectors.toSet());
+        var removed = existing.stream().filter(node -> !retained.contains(node.getNodeCode()))
+                .map(RoutingNodeEntity::getId).toList();
+        if (!removed.isEmpty()) {
+            var filter = new RoutingNodeExample();
+            filter.createCriteria().andRoutingIdEqualTo(parent.getId()).andIdIn(removed);
+            if (nodes.deleteByExample(filter) != removed.size())
+                throw new FoundationException(ErrorCode.RESOURCE_CONFLICT);
+        }
         var productFilter = new RoutingProductExample();
         productFilter.createCriteria().andRoutingIdEqualTo(parent.getId());
-        steps.deleteByExample(stepFilter);
         products.deleteByExample(productFilter);
         for (Long material : materialIds) {
-            var row = new RoutingProductEntity();
-            row.setRoutingId(parent.getId());
-            row.setMaterialId(material);
-            changed(products.insert(row));
+            var product = new RoutingProductEntity();
+            product.setRoutingId(parent.getId());
+            product.setMaterialId(material);
+            changed(products.insert(product));
         }
+        // At most 100 nodes and 400 edges; generated Mapper writes remain inside the parent CAS transaction.
         for (var item : input) {
-            var row = new RoutingStepEntity();
-            row.setRoutingId(parent.getId());
-            row.setSequence(item.sequence());
-            row.setOperationId(item.operationId());
-            row.setIsKey(item.isKey());
-            row.setDescription(item.description());
-            changed(steps.insert(row));
+            var node = nodeIndex.get(item.nodeCode());
+            boolean inserting = node == null;
+            if (inserting) node = new RoutingNodeEntity();
+            node.setRoutingId(parent.getId());
+            node.setNodeCode(item.nodeCode());
+            node.setOperationId(item.operationId());
+            node.setIsKey(item.isKey());
+            node.setDescription(item.description());
+            node.setDisplayOrder(item.displayOrder());
+            if (inserting) changed(nodes.insert(node));
+            else changed(nodes.updateByPrimaryKey(node));
+            nodeIndex.put(item.nodeCode(), node);
+        }
+        for (var item : connections) {
+            var edge = new RoutingEdgeEntity();
+            edge.setRoutingId(parent.getId());
+            edge.setFromNodeId(nodeIndex.get(item.fromNodeCode()).getId());
+            edge.setToNodeId(nodeIndex.get(item.toNodeCode()).getId());
+            changed(edges.insert(edge));
         }
         dirty();
     }
 
-    private void validateSteps(List<RoutingStepCommand> input) {
-        if (input == null || input.size() > 100) throw new FoundationException(ErrorCode.ROUTING_STEPS_INVALID);
-        var sequences = new HashSet<Integer>();
-        var ids = new HashSet<Long>();
-        int keyCount = 0;
-        for (var step : input) {
-            if (step == null || !validator.validate(step).isEmpty() || step.sequence() > input.size()
-                    || !sequences.add(step.sequence()) || !ids.add(step.operationId())) {
-                throw new FoundationException(ErrorCode.ROUTING_STEPS_INVALID);
-            }
-            if (step.isKey()) keyCount++;
+    private RoutingGraph graph(RoutingDetail detail) {
+        var index = new HashMap<Long, String>();
+        for (var node : detail.nodes()) {
+            if (!Objects.equals(node.getRoutingId(), detail.routing().getId()))
+                throw new FoundationException(ErrorCode.ROUTING_GRAPH_INVALID);
+            index.put(node.getId(), node.getNodeCode());
         }
-        if (keyCount > 1) throw new FoundationException(ErrorCode.ROUTING_STEPS_INVALID);
+        var commands = detail.nodes().stream().map(node -> new RoutingNodeCommand(node.getNodeCode(),
+                node.getOperationId(), node.getIsKey(), node.getDescription(), node.getDisplayOrder())).toList();
+        var connections = detail.edges().stream().map(edge -> {
+            if (!Objects.equals(edge.getRoutingId(), detail.routing().getId()))
+                throw new FoundationException(ErrorCode.ROUTING_GRAPH_INVALID);
+            return new RoutingEdgeCommand(index.get(edge.getFromNodeId()), index.get(edge.getToNodeId()));
+        }).toList();
+        RoutingGraphValidator.validate(commands, connections, false);
+        return new RoutingGraph(commands, connections);
     }
 
     private RoutingEntity touch(Long id, Integer revision, boolean draftOnly) {
@@ -363,12 +406,12 @@ public class RoutingServiceImpl implements IRoutingService {
     }
 
     private RoutingDetail detailRows(RoutingEntity row) {
-        var stepFilter = new RoutingStepExample();
+        var stepFilter = new RoutingNodeExample();
         stepFilter.createCriteria().andRoutingIdEqualTo(row.getId());
-        stepFilter.setOrderByClause("sequence");
-        List<RoutingStepEntity> stepRows;
-        try (Page<RoutingStepEntity> page = PageHelper.offsetPage(0, 101, false)) {
-            stepRows = steps.selectByExample(stepFilter);
+        stepFilter.setOrderByClause("display_order, node_code");
+        List<RoutingNodeEntity> stepRows;
+        try (Page<RoutingNodeEntity> page = PageHelper.offsetPage(0, 101, false)) {
+            stepRows = nodes.selectByExample(stepFilter);
         } finally {
             PageHelper.clearPage();
         }
@@ -386,7 +429,7 @@ public class RoutingServiceImpl implements IRoutingService {
             if (!stepRows.isEmpty()) {
                 var filter = new OperationExample();
                 filter.createCriteria().andFactoryIdEqualTo(factory())
-                        .andIdIn(stepRows.stream().map(RoutingStepEntity::getOperationId).toList());
+                        .andIdIn(stepRows.stream().map(RoutingNodeEntity::getOperationId).toList());
                 var index = new HashMap<Long, OperationEntity>();
                 for (var op : operations.selectByExample(filter)) index.put(op.getId(), op);
                 for (var step : stepRows) {
@@ -413,7 +456,18 @@ public class RoutingServiceImpl implements IRoutingService {
                 }
             }
         }
-        return new RoutingDetail(row, productRows, stepRows);
+        var edgeFilter = new RoutingEdgeExample();
+        edgeFilter.createCriteria().andRoutingIdEqualTo(row.getId());
+        List<RoutingEdgeEntity> edgeRows;
+        try (Page<RoutingEdgeEntity> page = PageHelper.offsetPage(0, 401, false)) {
+            edgeRows = edges.selectByExample(edgeFilter);
+        } finally {
+            PageHelper.clearPage();
+        }
+        if (edgeRows.size() > 400) throw new FoundationException(ErrorCode.ROUTING_GRAPH_INVALID);
+        var detail = new RoutingDetail(row, productRows, stepRows, edgeRows);
+        graph(detail);
+        return detail;
     }
 
     private String factory() {
@@ -499,7 +553,7 @@ public class RoutingServiceImpl implements IRoutingService {
                 throw new FoundationException(ErrorCode.BAD_REQUEST);
             }
             input.productCodes().forEach(code -> materialCodes.add(code.strip()));
-            input.steps().forEach(step -> operationCodes.add(step.operationCode().strip()));
+            input.graph().nodes().forEach(node -> operationCodes.add(node.operationCode().strip()));
         }
         if (inputs.isEmpty()) return new ProductionSyncResult(0, 0, 0, 0);
         // Two bounded set queries replace one external/code lookup per step or product.
@@ -523,15 +577,19 @@ public class RoutingServiceImpl implements IRoutingService {
         // Each route has at most 100 products/steps; maximum batch is 100 routes, one local transaction.
         for (var input : inputs) {
             var ids = input.productCodes().stream().map(code -> materialIndex.get(key(code))).toList();
-            var commands = input.steps().stream().map(step -> new RoutingStepCommand(step.sequence(),
-                    operationIndex.get(key(step.operationCode())), step.isKey(), step.description())).toList();
+            var graph = input.graph();
+            var commands = graph.nodes().stream().map(node -> new RoutingNodeCommand(node.nodeCode(),
+                            operationIndex.get(key(node.operationCode())), node.isKey(), node.description(), node.displayOrder()))
+                    .toList();
+            var connections = graph.edges().stream()
+                    .map(edge -> new RoutingEdgeCommand(edge.fromNodeCode(), edge.toNodeCode())).toList();
             if (ids.stream().anyMatch(Objects::isNull) || commands.stream()
-                    .anyMatch(step -> step.operationId() == null)) {
+                    .anyMatch(node -> node.operationId() == null)) {
                 throw new FoundationException(ErrorCode.ROUTING_REFERENCE_INVALID);
             }
-            validateSteps(commands);
+            RoutingGraphValidator.validate(commands, connections, false);
             var old = latest(input.code().strip());
-            if (old != null && same(old, input, ids, commands)) {
+            if (old != null && same(old, input, ids, commands, connections)) {
                 skipped++;
                 continue;
             }
@@ -551,7 +609,7 @@ public class RoutingServiceImpl implements IRoutingService {
             row.setSourceVersion(input.sourceVersion());
             if (insert) insertRow(row);
             else saveRow(row);
-            replaceContent(row, ids, commands);
+            replaceContent(row, ids, commands, connections);
             if (insert) created++;
             else updated++;
         }
@@ -559,7 +617,7 @@ public class RoutingServiceImpl implements IRoutingService {
     }
 
     private boolean same(RoutingEntity row, ExternalRouting input, List<Long> materialIds,
-                         List<RoutingStepCommand> commands) {
+                         List<RoutingNodeCommand> commands, List<RoutingEdgeCommand> connections) {
         if (!Objects.equals(row.getName(), input.name()
                 .strip()) || !Objects.equals(row.getDescription(), input.description())
                 || !Objects.equals(row.getExternalId(), input.externalId())
@@ -567,10 +625,13 @@ public class RoutingServiceImpl implements IRoutingService {
         var detail = detailRows(row);
         if (!detail.products().stream().map(RoutingProductEntity::getMaterialId).sorted().toList()
                 .equals(materialIds.stream().sorted().toList())) return false;
-        var actual = detail.steps().stream()
-                .map(step -> new RoutingStepCommand(step.getSequence(), step.getOperationId(),
-                        step.getIsKey(), step.getDescription())).toList();
-        return actual.equals(commands.stream().sorted(Comparator.comparing(RoutingStepCommand::sequence)).toList());
+        var actual = graph(detail);
+        var nodeOrder = Comparator.comparing(RoutingNodeCommand::nodeCode);
+        var edgeOrder = Comparator.comparing(RoutingEdgeCommand::fromNodeCode)
+                .thenComparing(RoutingEdgeCommand::toNodeCode);
+        return actual.nodes().stream().sorted(nodeOrder).toList().equals(commands.stream().sorted(nodeOrder).toList())
+                && actual.edges().stream().sorted(edgeOrder).toList()
+                .equals(connections.stream().sorted(edgeOrder).toList());
     }
 
     private String key(String code) {

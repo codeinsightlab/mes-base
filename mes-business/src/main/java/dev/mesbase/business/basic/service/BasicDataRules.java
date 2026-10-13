@@ -4,6 +4,7 @@ import dev.mesbase.core.error.ErrorCode;
 import dev.mesbase.core.error.FoundationException;
 import dev.mesbase.platform.execution.FactoryContext;
 import java.util.List;
+import dev.mesbase.business.wm.service.StockReferenceRules;
 import java.util.HashSet;
 import java.util.Set;
 import org.springframework.stereotype.Component;
@@ -35,6 +36,7 @@ import dev.mesbase.business.basic.domain.SafetyStockExample;
 @Component
 @ConditionalOnProperty(name = "mes.business.enabled", havingValue = "true")
 public class BasicDataRules {
+    private final ObjectProvider<StockReferenceRules> stock;
     private final ObjectProvider<RoutingReferenceRules> routing;
     private final EquipmentReferenceRules equipment;
     private final MaterialMapper material;
@@ -47,7 +49,8 @@ public class BasicDataRules {
     public BasicDataRules(MaterialMapper material, MaterialCategoryMapper materialCategory,
                           UnitMeasureMapper unitMeasure, WorkstationMapper workstation, WorkshopMapper workshop,
                           SafetyStockMapper safetyStock, ObjectProvider<RoutingReferenceRules> routing,
-                          EquipmentReferenceRules equipment) {
+                          EquipmentReferenceRules equipment, ObjectProvider<StockReferenceRules> stock) {
+        this.stock = stock;
         this.equipment = equipment;
         this.routing = routing;
         this.material = material;
@@ -161,6 +164,9 @@ public class BasicDataRules {
     }
 
     public void deletingMaterial(List<Long> ids) {
+        // EXTRA_CODE_REASON: material deletion cannot orphan inventory references.
+        var stockRules = stock.getIfAvailable();
+        if (stockRules != null) stockRules.deletingMaterials(ids);
         var references = routing.getIfAvailable();
         if (references != null) references.deletingMaterials(ids);
         var safetyStockRefs = new SafetyStockExample();

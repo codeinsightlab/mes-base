@@ -158,6 +158,8 @@ CONVERSION_REJECT：路线 sourceId=45 因非法步骤引用整条拒绝；步�
 
 实际使用用户维护的 5173 → 8081 服务完成 62 个基础检查、14 个范围/引用/删除补充检查、8 个只读身份写入负例，全部通过；另验证唯一键并发及工艺要求冻结。人工 TEST ONLY 数据与真实 Source 转换证据分开。
 
+最终同步顺序调整经用户编译重启后，再完成 4 个运行服务检查：Operation/Routing 同流 RUNNING 均在来源查询前返回 409 / SYNC_RUNNING；未配置来源均返回各自专用 422，真实中心同步状态变为 FAILED，无遗留 RUNNING。测试状态按精确 run_token 清理。
+
 Operation：创建/编辑/查询/删除、两工厂独立数据、厂内重复编码、非法状态/Factory 伪造、过期 revision、引用删除拒绝、sync 403 与 NOT_CONFIGURED。
 Routing：创建、内容保存/重排、草稿编辑、空发布拒绝、发布冻结、复制、下一版本、已有草稿拒绝、非法/跨厂引用、原子回滚、删除限制、停用/恢复、sync 403 与 NOT_CONFIGURED。只读身份对 update/delete/publish/copy/version/sync 均 403。
 
@@ -179,6 +181,10 @@ Routing：创建、内容保存/重排、草稿编辑、空发布拒绝、发布
 
 初次“资源不存在或不在当前范围”发生于后端尚未加载新增路由；用户重启后 Operation/Routing 列表返回 200。后续旧进程出现业务超时及共享入口 500，未取得异常原因证据；新进程恢复后，无工厂头的发现/上下文、列偏好与只读登录恢复均为 200，重新完成 UI。未将 Factory 数量推定为原因，未为此修改通用基础设施。
 
+最终同步修改经用户再次编译重启后，4 个同步检查通过，但随后两厂的新列表查询、详情和 `/api/foundation/context` 又出现 `500 / INTERNAL_ERROR`。只读进程检查确认：8081 进程 13:03:42 启动，运行的 `target/mes-base-0.1.0-SNAPSHOT.jar` 在 13:18:21 被后续构建改写，且进程仍打开多个构建时期的 JAR 文件。运行中覆盖 JAR 可能影响延迟类加载；尚未取得当前异常栈，不把这一推断写为已确认根因。当前运行服务的最终读接口复验待恢复，先前 API/UI 通过记录保留其发生时点。
+
+用户确认自行重启并恢复后，再通过现有 5173 → 8081 完成 15 项最终读取检查：Factory 1 / SIMPLE_B 的无缓存新查询、列表、存在记录的详情以及带工厂头和无工厂头的发现/上下文全部通过。真实浏览器重新打开已发布 v2，冻结提示、历史工艺要求和只读字段正常，见 [恢复后的路线详情](operation-routing-restored.png)。本次运行异常已恢复并闭合复验；没有取得原异常栈，覆盖运行 JAR 仍记录为可能原因，不宣称已证明根因。此次仅更新证据，不重建 JAR 或重启服务。
+
 用户补充授权尝试在同一数据源绑定新测试工厂。真实中心库 `uk_factory_datasource` 拒绝复用，未创建 TEST_OR_SHARED，未删除约束或改绑现有工厂。当前候选实际为 3 个；本批双工厂验收使用 1 与 SIMPLE_B 的独立业务库。未自行启动/重启用户开发服务；不新增持久开发端口。
 
 ### 测试与无效入口清理
@@ -192,3 +198,70 @@ Routing：创建、内容保存/重排、草稿编辑、空发布拒绝、发布
 本批闭合的是定义、线性顺序、多产品、版本与冻结、范围/引用及可选同步入口。源规则复用与未迁复杂性沿用上文，继续 DEFERRED：WorkOrder/Reporting/WIP 实现、执行引用迁移、资源资格关系、默认路线、分支/并行/返工、质量/BOM/工资、真实 ERP Adapter、生产发布与 Source 写入。
 
 打包启动 smoke 未运行：用户明确要求使用既有服务、不自行启动服务；Maven verify 的打包与测试不能代替独立 packaged smoke。测试使用的自有副本保留供复验；回滚需审查当前业务数据，不能直接 DROP 已使用表或改已执行 Flyway checksum。
+
+### 检查回执
+
+- `mvn -B -ntp -Dmes.test.redis=true -Dmes.test.operation.mysql=true verify`：BUILD SUCCESS，376 条，372 通过、4 个其他 MySQL opt-in 检查未开启而跳过，0 failure/error；本批 OperationRoutingMySqlTest 实际执行通过。
+- Node 22：`npm test` 160 通过；`npm run build` 通过；本批 API/页面/顺序规则/request 与相关测试的 eslint 通过。既有大 chunk 警告保留。
+- IDEA formatter 最终校验 74 个本批 Java 文件及双仓库 `git diff --check` 通过；已被任务外库存功能继续修改的 ErrorCode 不纳入本次最终格式检查，不格式化并行工作。
+- 测试账号及只读角色已停用，浏览器恢复管理员和原 Factory 1；分页/范围负例已精确清理。
+- 汇总证据：[OPERATION_ROUTING_EVIDENCE.json](OPERATION_ROUTING_EVIDENCE.json)。未经本 Agent 提交/推送/部署；任务中 HEAD 有外部提交变化，既有及并行改动均保留。
+
+## 2026-10-13 第二批：Routing Definition Graph（完成本地验收）
+
+### CURRENT_MODEL / TARGET_MODEL / KEEP / ADAPT / REMOVE
+
+当前一条 `routing` 行已代表 `(factory_id, code, version)` 的明确版本；继续 KEEP，不增加 `routing_version`。KEEP Operation、RoutingProduct、DRAFT/PUBLISHED/DISABLED、独立操作权限、当前 Factory、revision、同步抢占及发布快照。ADAPT Routing 内容、发布、复制、新版本、同步和 Converter 为 Node + Edge。REMOVE 正式 Step Entity/Example/Mapper/XML/VO/内容契约与 UI 上下移执行关系；`ExternalRoutingStep` 仅作为明确要求保留的 LINEAR 来源输入，转换后不持久化 Step。
+
+目标为 `operation + routing + routing_product + routing_node + routing_edge`。同一 Operation 可出现于不同节点，节点唯一键是 `(routing_id,node_code)`，边唯一键是 `(routing_id,from_node_id,to_node_id)`，两项按本轮用户明确要求建立；不建物理外键。节点编码使用大小写敏感的字母/数字/下划线/短横线；`display_order` 是 UI 提示。保存保留相同 node_code 的节点 ID，复制/新版本分配新 ID 并重映射边，客户端不能提交其他路线的节点主键来改绑定。
+
+### ROUTING_STEP_MIGRATION / GRAPH_RULES
+
+V3/V4 不修改。新增 V9 创建 Node/Edge，将旧步骤 ID、引用和全部快照原样复制，以旧 sequence 相邻关系生成边。开发库 8 步 → 8 节点/4 边，SIMPLE_B 0 → 0/0，Source 转换副本 524 步 → 524 节点/481 边；快照差异、非法边均 0。已备份旧路线相关数据；V9 阶段保留旧表，直到 Graph API/UI 验证完成。
+
+Graph 验收后执行 V10：旧步骤与节点引用/快照不一致时明确失败，防止 V9 后旧服务继续写入造成静默丢失。四个验收 Schema 均到 V10，旧表及临时校验过程均为 0，Node/Edge 数量未变，Flyway validate 通过。正式模型不再保留 routing_step。旧 Step 生成配置同步删除，当前配置为 `docs/development/routing-graph-codegen.yaml`，生成完整后端到审查副本，仅 8 个 Entity/Example/Mapper/XML 持久化文件发布到业务模块；没有发布 Node/Edge 技术 CRUD。通用用户配置未修改。
+
+每版本上限 100 产品、100 节点、400 边；无自环、重复边、跨路线端点或环。沿用最多一个关键点，允许重复 Operation 与多个入口/出口。草稿允许暂时孤立节点，发布须至少一个产品和节点；多节点发布拒绝孤立节点，单节点合法。不引入只能单入口/出口的约束。服务端一次父级 CAS 事务完成校验、节点/边和产品保存，错误回滚修订号及所有内容。发布冻结产品、节点、边及工序快照；新版本和复制保留完整拓扑。
+
+### ERP_SYNC_GRAPH / SOURCE_CONVERTER
+
+ExternalRouting 明确二选一：LINEAR steps 或 GRAPH nodes/edges，禁止混合输入。LINEAR 按来源序号排序生成相邻边，允许 10/20 等非连续来源序号；GRAPH 保留明确连接。仍使用现有协调器与独立业务写事务，已发布来源变化只创建新草稿，不重写发布图。未配置来源继续明确失败。
+
+Converter 将每条 Source 路线独立转为节点与相邻边，不按名称合并路线。同一来源重复工序不再自动拒绝，来源排序歧义仍拒绝。当前冻结 Source 副本未找到可确认的同产品共同前后段候选。用户本轮补充“你来造数据吧，我也提供不了”，历史 workaround 验收调整为明确 SYNTHETIC：两条线性路径 `N10→N20→N30A→N40`、`N10→N20→N30B→N40` 由人工明确映射到一张分支汇合图，不宣称是真实历史案例。真实旧路线若需合并仍为 `MANUAL_GRAPH_MAPPING_REQUIRED`，Source 不写入。
+
+### LINEAR_RESULT / BRANCH_RESULT / MERGE_RESULT / VERSION_BEHAVIOR / PUBLISH_FREEZE
+
+正式 MySQL/Spring Service 与真实 API Fixture 均通过：LINEAR 为 4 节点/3 边，BRANCH 为 4 节点/3 边，BRANCH+MERGE 为 5 节点/5 边。重复工序节点合法；修改显示排序不改变拓扑且保留原节点 ID。复制及新版本生成新节点 ID，按 node_code 重映射全部边；原发布图及快照不变，下一版本可修改草稿。数据库 Node/Edge 唯一性、CAS 并发一成功一 409、非法图全量回滚、跨路线物理边拒绝、孤立发布拒绝和单节点合法均得到验证。多入口/多出口规则由纯规则测试覆盖，不把它当作执行调度证明。
+
+### MYSQL_RESULT / API_RESULT / UI_RESULT
+
+V9/V10 真实 MySQL 迁移通过；新建隔离转换库执行新版 Converter，得到 587 Operation、43 Routing、524 Node、481 Edge、46 Product，原坏路线 45 及坏来源步骤 565 继续拒绝。无非法图引用或空表/列中文 COMMENT。
+
+用户编译重启后，现有 5173 → 8081 完成 80 项 Graph API 检查，全部通过；另有并发写入 [200,409]。退役后再完成两厂及浏览器创建图的 8 项读取复验。测试 Session 过期时重新登录，不修改会话准入规则。
+
+真实浏览器创建 `TEST-GRAPH-UI-20261013`：5 个节点、5 条连接；测试工序在不同节点复用。实际操作节点新增/选择/删除（关联边同步移除）、连接新增/删除、成环拒绝、保存后重新读取、发布只读和创建 v2 完整拓扑。发布版本 ID=23，新版本 ID=24；V10 后重新打开发布图正常。真实读取 LINEAR/BRANCH/MERGE，反向 display_order 的线性图仍按 Edge 显示正确依赖。
+
+1280/1440/1920 图预览均可读；保持统一 Shell/抽屉、白底 SVG，不引入图框架或技术菜单。验收后恢复默认 viewport、管理员和 Factory 1。截图：[1280 草稿](routing-graph-draft-1280.png)、[1440 草稿](routing-graph-draft-1440.png)、[1920 草稿](routing-graph-draft-1920.png)、[已发布汇合图](routing-graph-published-1440.png)、[v2 草稿](routing-graph-version2-1440.png)、[线性](routing-graph-linear-1440.png)、[分支](routing-graph-branch-1440.png)。
+
+最终视觉复核将长图从整体缩小调整为保留节点尺寸、横纵滚动，避免长路线文字随 viewBox 缩成不可读小字；调整后再次通过 171 个前端测试、build、eslint 并真实复查三档宽度：[最终 1280](routing-graph-final-1280.png)、[最终 1440](routing-graph-final-1440.png)、[最终 1920](routing-graph-final-1920.png)。本次浏览器实际图为 5 节点/5 边，不把未实际创建的 100 节点长图写为浏览器验收。
+
+### 本批检查回执
+
+- `mvn -B -ntp -Dmes.test.redis=true -Dmes.test.operation.mysql=true verify`：387 条，382 通过、5 个其他 MySQL opt-in 检查跳过，0 failure/error，BUILD SUCCESS。
+- V10 后 `mvn -B -ntp -Dmes.test.operation.mysql=true -Dtest=OperationRoutingMySqlTest -Dsurefire.failIfNoSpecifiedTests=false test` 再次通过，证明图生命周期及 synthetic ERP 写入不依赖旧表；没有重新打包或重启运行服务。
+- Node 22：171 个前端测试通过，build 与本批 eslint 通过；24 个 Java 文件 IDEA format/check 与双仓库 diff 检查通过。
+- 汇总：[ROUTING_GRAPH_EVIDENCE.json](ROUTING_GRAPH_EVIDENCE.json)；用户授权构造案例：[ROUTING_GRAPH_SYNTHETIC_MAPPING.json](ROUTING_GRAPH_SYNTHETIC_MAPPING.json)。负例临时草稿及 B 厂临时工序精确清理，明确 TEST ONLY 的发布图/版本保留供回看；未更改用户的原路线或 Source。
+- 旧表退役后不能直接运行旧 Step 程序；回退需停写、核对本批新 Graph 数据并按迁移前备份制定恢复方案，不能把分支强行按显示序号压成线性路线。未提交、推送或部署，保留任务外并行修改；生产与真实 ERP Adapter 不在本次验收范围。
+
+### DEFERRED_EXECUTION_SEMANTICS
+
+WorkOrder 执行、ProductionExecution、并行调度、AND/OR/XOR Join、条件、动态分支、返工、循环、运行 Token，以及节点工作站/设备资格均不实施。未来 WorkOrder 直接引用确切 `routing.id`，不用另加 RoutingVersion 表；人员直接引用 sys_user，沿用当前账号授权规则。
+
+
+## 2026-10-13 验收库位置纠正（等待目标确认）
+
+用户明确要求真实验收及本次转换结果使用已经配置的验收库。此前另建 `mes_base_graph_conversion_20261013` / `mes_base_oproute_conversion_20261013` 完成转换，未绑定到配置工厂，导致现有页面无法复验转换数据；这是本次验收位置选择错误，不将隔离转换库称为用户配置验收环境。AGENTS 第 10 节新增此项约束。
+
+当前中心配置实际有两个同名 `mes_base_dev_business`：工厂 1（老厂）对应 192.168.18.25:3306；工厂 DEV（开发工厂）对应 110.42.227.83:3306。工厂 2（公司测试环境）未绑定数据源。已发起目标确认，确认前不写入任一候选库。
+
+对工厂 1 的只读预检查：与转换批次的工序编码冲突 0、路线编码及版本冲突 0；缺少 45 个被路线引用的产品及两个来源计量单位。落库必须补齐这些依赖、按编码映射目标主键并保留已有数据；禁止原样复制子表 ID。未修改业务代码，尚未将转换结果写入配置验收库。

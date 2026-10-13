@@ -1,0 +1,50 @@
+-- 领料出库单基础资料；本轮不执行库存扣减、报工或外部出库。
+-- 工单、物料、仓库和路线为逻辑引用；不建立物理外键或业务唯一约束。
+CREATE TABLE mes_material_issue (
+    id BIGINT NOT NULL AUTO_INCREMENT COMMENT '领料出库单本地主键',
+    factory_id VARCHAR(64) NOT NULL COMMENT '所属工厂标识，由服务端当前上下文填写',
+    issue_no VARCHAR(64) NOT NULL COMMENT 'MES领料出库单编号，不代表外部单据主键',
+    workorder_id BIGINT NULL COMMENT '本地生产工单主键，逻辑引用当前业务库工单',
+    workorder_code VARCHAR(64) NULL COMMENT '生产工单编号快照，有本地工单时由服务端填写',
+    product_id BIGINT NULL COMMENT '产出产品主键，逻辑引用本厂物料产品资料',
+    product_code VARCHAR(64) NULL COMMENT '产出品号快照，不等于明细材料品号',
+    flow_card_no VARCHAR(128) NULL COMMENT '来源流程卡号，普通业务字符串，不自动生成',
+    routing_id BIGINT NULL COMMENT '执行工艺确切版本主键，引用已发布的路线版本',
+    issue_time DATETIME NULL COMMENT '领料业务发生时间，空值表示尚未提供',
+    status VARCHAR(16) NOT NULL DEFAULT 'DRAFT' COMMENT '资料状态，DRAFT草稿，RECORDED已记录，不表示外部审核状态',
+    remark VARCHAR(500) NULL COMMENT '领料出库单备注',
+    create_by VARCHAR(64) NULL COMMENT '创建人系统用户标识，由服务端填写',
+    create_time DATETIME NULL COMMENT '创建时间，由服务端填写',
+    update_by VARCHAR(64) NULL COMMENT '最后修改人系统用户标识，由服务端填写',
+    update_time DATETIME NULL COMMENT '最后修改时间，由服务端填写',
+    PRIMARY KEY (id),
+    KEY idx_issue_no (factory_id, issue_no),
+    KEY idx_issue_workorder (factory_id, workorder_id),
+    KEY idx_issue_workorder_code (factory_id, workorder_code),
+    KEY idx_issue_routing (factory_id, routing_id),
+    KEY idx_issue_flow_card (factory_id, flow_card_no)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='MES领料出库单';
+
+CREATE TABLE mes_material_issue_item (
+    id BIGINT NOT NULL AUTO_INCREMENT COMMENT '领料出库明细本地主键',
+    factory_id VARCHAR(64) NOT NULL COMMENT '所属工厂标识，由服务端当前上下文填写',
+    issue_id BIGINT NOT NULL COMMENT '所属本地领料出库单主键',
+    material_id BIGINT NOT NULL COMMENT '领用材料主键，逻辑引用本厂物料产品资料',
+    material_code VARCHAR(64) NULL COMMENT '领用材料品号快照，由服务端从物料资料填写',
+    batch_no VARCHAR(128) NULL COMMENT '来源材料批次号，普通字符串，不校验编码规则',
+    quantity DECIMAL(18,4) NOT NULL COMMENT '本次领料数量，不等于生产或报工数量',
+    unit_id BIGINT NULL COMMENT '本次领料计量单位主键，空值表示未提供',
+    unit_code VARCHAR(64) NULL COMMENT '本次领料单位编码快照，由服务端填写',
+    warehouse_id BIGINT NULL COMMENT '领料来源仓库主键，空值表示未提供',
+    warehouse_code VARCHAR(64) NULL COMMENT '来源仓库编码快照，由服务端填写',
+    remark VARCHAR(500) NULL COMMENT '领料明细备注',
+    create_by VARCHAR(64) NULL COMMENT '创建人系统用户标识，由服务端填写',
+    create_time DATETIME NULL COMMENT '创建时间，由服务端填写',
+    update_by VARCHAR(64) NULL COMMENT '最后修改人系统用户标识，由服务端填写',
+    update_time DATETIME NULL COMMENT '最后修改时间，由服务端填写',
+    PRIMARY KEY (id),
+    KEY idx_issue_item_parent (factory_id, issue_id),
+    KEY idx_issue_item_material_batch (factory_id, material_code, batch_no),
+    KEY idx_issue_item_material (factory_id, material_id),
+    KEY idx_issue_item_warehouse (factory_id, warehouse_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='MES领料出库单明细';

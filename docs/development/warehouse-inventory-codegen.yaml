@@ -1,0 +1,102 @@
+# 仓库／库存新增生成配置；仅选择两表，write/fail，不覆盖已有手工实现。
+# 库存同步生成基础单键脚手架后，业务实现改为物料＋仓库复合键。
+version: 1
+generateSync: true
+sync:
+  matchKey: "code"
+  batchMaximum: 1000
+source:
+  connectionConfig: "mes-admin/src/main/resources/application-dev.yml"
+  datasource: "dev"
+  schema: null
+selection:
+  tables: [wm_warehouse, wm_inventory]
+  excludeTables: [flyway_business_schema_history, qc_index, qc_defect]
+  artifacts: [all]
+naming:
+  module:
+    strategy: "table-prefix"
+    separator: "_"
+    fallback: "business"
+  className:
+    strategy: "table-pascal-case"
+  displayName:
+    strategy: "table-comment"
+    fallback: "table-name"
+  author: "MES Base"
+output:
+  backendRoot: "."
+  backendModule: "mes-business"
+  frontendRoot: "../mes-base-ui"
+  javaPackage: "dev.mesbase.business.{module}"
+  packages:
+    domain: "domain"
+    mapper: "dao"
+    service: "service"
+    serviceImplementation: "service.impl"
+    controller: "controller"
+    response: "controller.vo"
+  frontendApi: "src/api/{module}/{classNameCamel}.ts"
+  frontendPage: "src/views/{module}/{classNameCamel}/index.vue"
+  frontendMenu: "src/menus/{module}/{classNameCamel}.json"
+  menuSql: "docs/generated/{module}/{classNameCamel}-menu.sql"
+  documents:
+    mode: "merged"
+    sql: "docs/generated/wm/stock-menu.sql"
+    markdown: "docs/generated/wm/stock-permissions.md"
+templates:
+  root: "mes-generator/src/main/resources/codegen/base"
+  persistence: "mybatis3-xmlmapper"
+backend:
+  apiPath: "/api/{module}/{tableNameKebab}"
+  transactionManager: "businessTransactionManager"
+  conditional:
+    enabled: true
+    property: "mes.business.enabled"
+    value: "true"
+  permission:
+    prefix: "business"
+    resource: "{tableNameColon}"
+    scope: "factory"
+    actions: [list, query, create, update, delete]
+    batchDeleteAction: "delete"
+fields:
+  audit: [create_by, create_time, update_by, update_time]
+  maxStringValidationLength: 10000
+limits:
+  pageDefault: 20
+  pageMaximum: 100
+  batchDeleteMaximum: 100
+frontend:
+  crudComponent: "@/components/CrudPage.vue"
+  requestModule: "@/lib/request"
+  fieldTypesModule: "@/lib/crud"
+menu:
+  table: "sys_menu"
+  parentId: 0
+  directoryName: "物料库存"
+  directoryPath: "stock"
+  directoryOrder: 1
+  pageOrder: 0
+  icon: "list"
+  frontendIcon: "List"
+  createdBy: "codegen"
+  migrateLegacyPermissions: false
+execution:
+  mode: "write"
+  overwrite: "fail"
+  formatJava: false
+  formatter: "scripts/format-java"
+  publication: "preflight-all"
+  unsupportedTable: "fail"
+tableOverrides:
+  wm_warehouse:
+    module: wm
+    displayName: 仓库管理
+    syncMatchKey: code
+    serverScopeColumn: factory_id
+  wm_inventory:
+    module: wm
+    displayName: 库存管理
+    syncMatchKey: material_id
+    serverScopeColumn: factory_id

@@ -1,0 +1,65 @@
+{
+  "date": "2026-10-13",
+  "warehouse": "IMPLEMENTED",
+  "inventory": "IMPLEMENTED",
+  "codegen": {
+    "status": "GENERATED",
+    "supported": 2,
+    "rejected": 0,
+    "configuration": "docs/development/warehouse-inventory-codegen.yaml"
+  },
+  "database": {
+    "businessFlywayV8": "PASSED",
+    "warehouseInventoryMetadata": "PASSED",
+    "uniqueKeys": "PASSED",
+    "physicalForeignKeys": 0,
+    "centerMenuSql": "EXECUTED_DIRECTLY",
+    "centerFlywayV26": "NOT_RUN",
+    "centerUnexpectedApplied": [
+      15,
+      16
+    ],
+    "centerFailedVersion": 17,
+    "openApiMenuRestoration": "V22_SQL_EXECUTED_DIRECTLY",
+    "originalRoleGrantRecovery": "UNVERIFIED",
+    "businessBFlywayV8": "PASSED_USER_AUTHORIZED_TARGET_8",
+    "realSeparateBusinessDatabases": "A_ROWS_1_EACH_B_ROWS_0_EACH"
+  },
+  "checks": {
+    "mavenVerify": "PASSED",
+    "mavenRun": 384,
+    "mavenSkipped": 9,
+    "stockHttpH2": 5,
+    "stockLiveMySqlRollback": 1,
+    "smoke": 10,
+    "uiTests": 168,
+    "uiBuild": "PASSED",
+    "newFilesLint": "PASSED",
+    "sharedCrudPageExistingLintErrors": 40,
+    "sharedCrudPageExistingLintWarnings": 9,
+    "newLintMessagesInSharedComponent": 0,
+    "javaFormat": "PASSED",
+    "diffCheck": "PASSED"
+  },
+  "live": {
+    "temporaryFrontend": "http://127.0.0.1:15175",
+    "temporaryBackend": "http://127.0.0.1:18082",
+    "authenticatedApi": "CREATE_QUERY_UPDATE_DUPLICATE_SYNC_FALLBACK_PASSED",
+    "browser": "DESKTOP_PASSED_WITH_USER_EXCLUSIONS",
+    "erp": "NOT_CONFIGURED",
+    "delete": "NOT_RUN_USER_REQUEST_TO_RETAIN",
+    "restrictedAccount": "NOT_RUN_COMPONENT_AND_HTTP_FIXTURE_ONLY",
+    "narrow390": "NOT_PASSED_GLOBAL_SHELL_OR_TOOL_LIMITATION"
+  },
+  "deferred": [
+    "WAREHOUSE_LOCATION",
+    "BATCH_INVENTORY"
+  ],
+  "retainedTestRecords": {
+    "factory": "1",
+    "warehouseId": "9",
+    "inventoryId": "9",
+    "warehouseCode": "QA_STOCK_20261013",
+    "materialId": "3"
+  }
+}

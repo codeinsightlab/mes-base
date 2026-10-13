@@ -10,6 +10,7 @@ import java.util.List;
 public record RoutingContentCommand(
         @NotNull @Min(0) Integer revision,
         @NotNull @Size(max = 100) List<@NotNull Long> materialIds,
-        @NotNull @Size(max = 100) List<@NotNull @Valid RoutingStepCommand> steps
+        @NotNull @Size(max = 100) List<@NotNull @Valid RoutingNodeCommand> nodes,
+        @NotNull @Size(max = 400) List<@NotNull @Valid RoutingEdgeCommand> edges
 ) {
 }

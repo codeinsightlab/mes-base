@@ -2,6 +2,6 @@
 public class Unconfigured${ClassName}QueryAdapter implements ${ClassName}QueryPort {
     @Override
     public java.util.List<External${ClassName}> query(dev.mesbase.core.factory.FactoryScope scope, int maximum) {
-        throw new dev.mesbase.core.error.FoundationException(dev.mesbase.core.error.ErrorCode.ERP_SYNC_NOT_CONFIGURED);
+        throw new dev.mesbase.core.error.FoundationException(dev.mesbase.core.error.ErrorCode.SYNC_QUERY_NOT_IMPLEMENTED);
     }
 }

@@ -5,11 +5,11 @@ import dev.mesbase.business.basic.domain.MaterialEntity;
 import dev.mesbase.business.basic.domain.MaterialExample;
 import dev.mesbase.business.production.dao.OperationMapper;
 import dev.mesbase.business.production.dao.RoutingProductMapper;
-import dev.mesbase.business.production.dao.RoutingStepMapper;
+import dev.mesbase.business.production.dao.RoutingNodeMapper;
 import dev.mesbase.business.production.domain.OperationEntity;
 import dev.mesbase.business.production.domain.OperationExample;
 import dev.mesbase.business.production.domain.RoutingProductExample;
-import dev.mesbase.business.production.domain.RoutingStepExample;
+import dev.mesbase.business.production.domain.RoutingNodeExample;
 import dev.mesbase.core.error.ErrorCode;
 import dev.mesbase.core.error.FoundationException;
 import dev.mesbase.platform.execution.FactoryContext;
@@ -25,14 +25,14 @@ import org.springframework.stereotype.Component;
 public class RoutingReferenceRules {
     private final OperationMapper operations;
     private final MaterialMapper materials;
-    private final RoutingStepMapper steps;
+    private final RoutingNodeMapper nodes;
     private final RoutingProductMapper products;
 
     public RoutingReferenceRules(OperationMapper operations, MaterialMapper materials,
-                                 RoutingStepMapper steps, RoutingProductMapper products) {
+                                 RoutingNodeMapper nodes, RoutingProductMapper products) {
         this.operations = operations;
         this.materials = materials;
-        this.steps = steps;
+        this.nodes = nodes;
         this.products = products;
     }
 
@@ -73,9 +73,9 @@ public class RoutingReferenceRules {
 
     public void deletingOperations(List<Long> ids) {
         lockOperations(ids, false);
-        var filter = new RoutingStepExample();
+        var filter = new RoutingNodeExample();
         filter.createCriteria().andOperationIdIn(ids);
-        if (steps.countByExample(filter) > 0) {
+        if (nodes.countByExample(filter) > 0) {
             throw new FoundationException(ErrorCode.OPERATION_REFERENCED);
         }
     }

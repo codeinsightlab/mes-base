@@ -4,9 +4,17 @@ import dev.mesbase.business.basic.dao.MaterialMapper;
 import dev.mesbase.business.production.dao.OperationMapper;
 import dev.mesbase.business.production.dao.RoutingMapper;
 import dev.mesbase.business.production.dao.RoutingProductMapper;
-import dev.mesbase.business.production.dao.RoutingStepMapper;
+import dev.mesbase.business.production.dao.RoutingNodeMapper;
+import dev.mesbase.business.production.dao.RoutingEdgeMapper;
 import dev.mesbase.business.production.domain.OperationUpdateCommand;
 import dev.mesbase.business.production.domain.RoutingUpdateCommand;
+import dev.mesbase.business.production.domain.RoutingCreateCommand;
+import dev.mesbase.business.production.domain.RoutingCopyCommand;
+import dev.mesbase.business.production.domain.RoutingContentCommand;
+import dev.mesbase.business.production.domain.RoutingNodeCommand;
+import dev.mesbase.business.production.domain.RoutingEdgeCommand;
+import dev.mesbase.business.production.sync.ExternalRoutingNode;
+import dev.mesbase.business.production.sync.ExternalRoutingEdge;
 import dev.mesbase.business.production.service.IOperationService;
 import dev.mesbase.business.production.service.IRoutingService;
 import dev.mesbase.business.production.service.RoutingReferenceRules;
@@ -45,6 +53,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
+import java.util.ArrayList;
+import java.util.concurrent.Executors;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Future;
+import org.springframework.dao.DuplicateKeyException;
 import org.apache.ibatis.session.SqlSessionFactory;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Test;
@@ -68,7 +81,7 @@ import static org.mockito.Mockito.mock;
 class OperationRoutingMySqlTest {
     static final String FACTORY = "TEST_OR_MYSQL";
     static final Set<Class<?>> MAPPERS = Set.of(OperationMapper.class, RoutingMapper.class,
-            RoutingStepMapper.class, RoutingProductMapper.class, MaterialMapper.class);
+            RoutingNodeMapper.class, RoutingEdgeMapper.class, RoutingProductMapper.class, MaterialMapper.class);
 
     static DriverManagerDataSource source(Path file, String expected) throws Exception {
         var settings = new Properties();
@@ -110,8 +123,13 @@ class OperationRoutingMySqlTest {
         }
 
         @Bean
-        RoutingStepMapper steps(SqlSessionFactory sessions) {
-            return new SqlSessionTemplate(sessions).getMapper(RoutingStepMapper.class);
+        RoutingNodeMapper nodes(SqlSessionFactory sessions) {
+            return new SqlSessionTemplate(sessions).getMapper(RoutingNodeMapper.class);
+        }
+
+        @Bean
+        RoutingEdgeMapper edges(SqlSessionFactory sessions) {
+            return new SqlSessionTemplate(sessions).getMapper(RoutingEdgeMapper.class);
         }
 
         @Bean
@@ -174,6 +192,14 @@ class OperationRoutingMySqlTest {
             });
             context.registerBean(RoutingQueryPort.class, () -> (selected, maximum) -> {
                 queries[1]++;
+                if ("graph".equals(stage[0])) return List.of(new ExternalRouting(
+                        "TEST-EXT-ROUTE", "TEST-OR-MYSQL-ROUTE", "TEST ONLY graph", null, "graph",
+                        List.of("TEST-OR-MYSQL-PRODUCT"), null,
+                        List.of("N10", "N20", "N30A", "N30B", "N40").stream().map(code ->
+                                new ExternalRoutingNode(code, "TEST-OR-MYSQL-OP1", false, null, 0)).toList(),
+                        mergeEdges().stream()
+                                .map(edge -> new ExternalRoutingEdge(edge.fromNodeCode(), edge.toNodeCode()))
+                                .toList()));
                 return List.of(new ExternalRouting(
                         "TEST-EXT-ROUTE", "TEST-OR-MYSQL-ROUTE", "TEST ONLY " + stage[0], null, stage[0],
                         List.of("TEST-OR-MYSQL-PRODUCT"), List.of(new ExternalRoutingStep(1, "TEST-OR-MYSQL-OP1", true, null),
@@ -195,6 +221,9 @@ class OperationRoutingMySqlTest {
             coordinator.fail(operationRun);
             assertEquals(2, operations.sync(scope).created());
             assertEquals(2, operations.sync(scope).skipped());
+            Long operationId = jdbc.queryForObject("SELECT id FROM operation WHERE factory_id=? AND code=?", Long.class, FACTORY, "TEST-OR-MYSQL-OP1");
+            Long materialId = jdbc.queryForObject("SELECT id FROM material WHERE factory_id=? AND code=?", Long.class, FACTORY, "TEST-OR-MYSQL-PRODUCT");
+            verifyGraphs(routes, jdbc, operationId, materialId);
             var routingRun = coordinator.claim(scope, "routing.erp", Duration.ofMinutes(5));
             assertEquals(ErrorCode.SYNC_RUNNING, assertThrows(FoundationException.class,
                     () -> routes.sync(scope)).code());
@@ -206,11 +235,11 @@ class OperationRoutingMySqlTest {
             var published = routes.publish(routeId, 0);
             assertEquals("PUBLISHED", published.getStatus());
             var frozen = routes.detail(routeId);
-            assertEquals("原工艺要求", frozen.steps().getFirst().getOperationDescription());
-            var op = operations.selectById(frozen.steps().getFirst().getOperationId());
+            assertEquals("原工艺要求", frozen.nodes().getFirst().getOperationDescription());
+            var op = operations.selectById(frozen.nodes().getFirst().getOperationId());
             operations.updateById(op.getId(), new OperationUpdateCommand(op.getCode(), "TEST ONLY 改名", "新工艺要求", "ENABLED", 0, op.getExternalId(), op.getRevision()));
-            assertEquals("原工艺要求", routes.detail(routeId).steps().getFirst().getOperationDescription());
-            assertEquals("TEST ONLY 工序", routes.detail(routeId).steps().getFirst().getOperationName());
+            assertEquals("原工艺要求", routes.detail(routeId).nodes().getFirst().getOperationDescription());
+            assertEquals("TEST ONLY 工序", routes.detail(routeId).nodes().getFirst().getOperationName());
             assertEquals(ErrorCode.ROUTING_FROZEN, assertThrows(FoundationException.class,
                     () -> routes.updateById(routeId, new RoutingUpdateCommand("绕过", null, published.getRevision()))).code());
             assertEquals(ErrorCode.OPERATION_REFERENCED, assertThrows(FoundationException.class,
@@ -220,8 +249,17 @@ class OperationRoutingMySqlTest {
             assertEquals(1, routes.sync(scope).skipped());
             assertEquals("PUBLISHED", routes.detail(routeId).routing().getStatus());
             assertEquals("TEST ONLY first", routes.detail(routeId).routing().getName());
-            assertEquals(1, jdbc.queryForObject("SELECT COUNT(*) FROM routing WHERE factory_id=? AND version=2 AND status='DRAFT'", Integer.class, FACTORY));
+            assertEquals(1, jdbc.queryForObject("SELECT COUNT(*) FROM routing WHERE factory_id=? AND code='TEST-OR-MYSQL-ROUTE' AND version=2 AND status='DRAFT'", Integer.class, FACTORY));
             assertEquals("SUCCEEDED", centerJdbc.queryForObject("SELECT status FROM mes_master_sync WHERE factory_id=? AND sync_key='routing.erp'", String.class, FACTORY));
+            Long versionTwo = jdbc.queryForObject("SELECT id FROM routing WHERE factory_id=? AND code='TEST-OR-MYSQL-ROUTE' AND version=2", Long.class, FACTORY);
+            routes.publish(versionTwo, routes.detail(versionTwo).routing().getRevision());
+            stage[0] = "graph";
+            assertEquals(1, routes.sync(scope).created());
+            assertEquals(1, routes.sync(scope).skipped());
+            Long versionThree = jdbc.queryForObject("SELECT id FROM routing WHERE factory_id=? AND code='TEST-OR-MYSQL-ROUTE' AND version=3", Long.class, FACTORY);
+            assertEquals(5, routes.detail(versionThree).nodes().size());
+            assertEquals(5, routes.detail(versionThree).edges().size());
+            assertEquals(2, routes.detail(versionTwo).nodes().size());
             stage[0] = "lost";
             assertEquals(ErrorCode.SYNC_EXECUTION_LOST, assertThrows(FoundationException.class,
                     () -> operations.sync(scope)).code());
@@ -231,7 +269,8 @@ class OperationRoutingMySqlTest {
         } finally {
             FactoryContext.clear();
             // Only this fixture's exact factory rows are disposable; source-converted rows remain untouched.
-            jdbc.update("DELETE s FROM routing_step s JOIN routing r ON r.id=s.routing_id WHERE r.factory_id=?", FACTORY);
+            jdbc.update("DELETE e FROM routing_edge e JOIN routing r ON r.id=e.routing_id WHERE r.factory_id=?", FACTORY);
+            jdbc.update("DELETE s FROM routing_node s JOIN routing r ON r.id=s.routing_id WHERE r.factory_id=?", FACTORY);
             jdbc.update("DELETE p FROM routing_product p JOIN routing r ON r.id=p.routing_id WHERE r.factory_id=?", FACTORY);
             jdbc.update("DELETE FROM routing WHERE factory_id=?", FACTORY);
             jdbc.update("DELETE FROM operation WHERE factory_id=?", FACTORY);
@@ -240,5 +279,84 @@ class OperationRoutingMySqlTest {
             centerJdbc.update("DELETE FROM mes_master_sync WHERE factory_id=?", FACTORY);
             centerJdbc.update("DELETE FROM mf_factory WHERE factory_id=? AND factory_code=?", FACTORY, FACTORY);
         }
+    }
+
+    static List<RoutingEdgeCommand> mergeEdges() {
+        return List.of(new RoutingEdgeCommand("N10", "N20"), new RoutingEdgeCommand("N20", "N30A"),
+                new RoutingEdgeCommand("N20", "N30B"), new RoutingEdgeCommand("N30A", "N40"),
+                new RoutingEdgeCommand("N30B", "N40"));
+    }
+
+    static void verifyGraphs(IRoutingService routes, JdbcTemplate jdbc, Long operation,
+                             Long material) throws Exception {
+        var nodes = List.of("N10", "N20", "N30A", "N30B", "N40").stream()
+                .map(code -> new RoutingNodeCommand(code, operation, false, null, 0)).toList();
+        var cases = List.of(
+                new RoutingContentCommand(0, List.of(material), List.of(nodes.get(0), nodes.get(1), nodes.get(2), nodes.get(4)),
+                        List.of(new RoutingEdgeCommand("N10", "N20"), new RoutingEdgeCommand("N20", "N30A"), new RoutingEdgeCommand("N30A", "N40"))),
+                new RoutingContentCommand(0, List.of(material), nodes.subList(0, 4), mergeEdges().subList(0, 3)),
+                new RoutingContentCommand(0, List.of(material), nodes, mergeEdges()));
+        var names = List.of("LINEAR", "BRANCH", "MERGE");
+        for (int i = 0; i < cases.size(); i++) {
+            var route = routes.insert(new RoutingCreateCommand("TEST-OR-MYSQL-" + names.get(i), "TEST ONLY " + names.get(i), null));
+            var saved = routes.saveContent(route.getId(), cases.get(i));
+            assertEquals(cases.get(i).nodes().size(), saved.nodes().size());
+            assertEquals(cases.get(i).edges().size(), saved.edges().size());
+            var published = routes.publish(route.getId(), saved.routing().getRevision());
+            assertEquals(ErrorCode.ROUTING_FROZEN, assertThrows(FoundationException.class,
+                    () -> routes.saveContent(route.getId(), new RoutingContentCommand(published.getRevision(), List.of(material), nodes, mergeEdges()))).code());
+            var copy = routes.copy(route.getId(), new RoutingCopyCommand(published.getRevision(), "TEST-OR-MYSQL-" + names.get(i) + "-COPY", "TEST ONLY COPY"));
+            assertEquals(cases.get(i).edges().size(), routes.detail(copy.getId()).edges().size());
+            var next = routes.newVersion(route.getId(), routes.detail(route.getId()).routing().getRevision());
+            assertEquals(cases.get(i).nodes().size(), routes.detail(next.getId()).nodes().size());
+            assertEquals(cases.get(i).edges().size(), routes.detail(next.getId()).edges().size());
+        }
+        var draft = routes.insert(new RoutingCreateCommand("TEST-OR-MYSQL-INVALID", "TEST ONLY INVALID", null));
+        for (var edges : List.of(List.of(new RoutingEdgeCommand("N10", "N10")),
+                List.of(new RoutingEdgeCommand("N10", "N20"), new RoutingEdgeCommand("N20", "N10")),
+                List.of(new RoutingEdgeCommand("N10", "N20"), new RoutingEdgeCommand("N10", "N20")),
+                List.of(new RoutingEdgeCommand("N10", "foreign")))) {
+            assertEquals(ErrorCode.ROUTING_GRAPH_INVALID, assertThrows(FoundationException.class,
+                    () -> routes.saveContent(draft.getId(), new RoutingContentCommand(0, List.of(material), nodes, edges))).code());
+            assertEquals(0, routes.detail(draft.getId()).routing().getRevision());
+            assertEquals(0, routes.detail(draft.getId()).nodes().size());
+        }
+        var content = new RoutingContentCommand(0, List.of(material), nodes, mergeEdges());
+        try (var workers = Executors.newFixedThreadPool(2)) {
+            var start = new CountDownLatch(1);
+            var results = new ArrayList<Future<Integer>>();
+            for (int i = 0; i < 2; i++)
+                results.add(workers.submit(() -> {
+                    FactoryContext.bind(new FactoryScope(new FactoryId(FACTORY)));
+                    try {
+                        start.await();
+                        routes.saveContent(draft.getId(), content);
+                        return 200;
+                    } catch (FoundationException failure) {
+                        assertEquals(ErrorCode.ROUTING_REVISION_CONFLICT, failure.code());
+                        return 409;
+                    } finally {
+                        FactoryContext.clear();
+                    }
+                }));
+            start.countDown();
+            assertEquals(List.of(200, 409), List.of(results.get(0).get(), results.get(1).get()).stream().sorted()
+                    .toList());
+        }
+        var saved = routes.detail(draft.getId());
+        assertEquals(1, saved.routing().getRevision());
+        assertThrows(DuplicateKeyException.class, () -> jdbc.update("INSERT INTO routing_node(routing_id,node_code,operation_id) SELECT routing_id,node_code,operation_id FROM routing_node WHERE routing_id=? LIMIT 1", draft.getId()));
+        assertThrows(DuplicateKeyException.class, () -> jdbc.update("INSERT INTO routing_edge(routing_id,from_node_id,to_node_id) SELECT routing_id,from_node_id,to_node_id FROM routing_edge WHERE routing_id=? LIMIT 1", draft.getId()));
+        var foreign = routes.insert(new RoutingCreateCommand("TEST-OR-MYSQL-FOREIGN", "TEST ONLY FOREIGN", null));
+        routes.saveContent(foreign.getId(), new RoutingContentCommand(0, List.of(material), nodes.subList(0, 1), List.of()));
+        Long foreignNode = routes.detail(foreign.getId()).nodes().getFirst().getId();
+        jdbc.update("INSERT INTO routing_edge(routing_id,from_node_id,to_node_id) VALUES(?,?,?)", draft.getId(), saved.nodes()
+                .getFirst().getId(), foreignNode);
+        assertEquals(ErrorCode.ROUTING_GRAPH_INVALID, assertThrows(FoundationException.class,
+                () -> routes.publish(draft.getId(), 1)).code());
+        jdbc.update("DELETE FROM routing_edge WHERE routing_id=? AND to_node_id=?", draft.getId(), foreignNode);
+        var isolated = routes.insert(new RoutingCreateCommand("TEST-OR-MYSQL-ISOLATED", "TEST ONLY ISOLATED", null));
+        routes.saveContent(isolated.getId(), new RoutingContentCommand(0, List.of(material), nodes, List.of()));
+        assertEquals(ErrorCode.ROUTING_GRAPH_INVALID, assertThrows(FoundationException.class, () -> routes.publish(isolated.getId(), 1)).code());
     }
 }

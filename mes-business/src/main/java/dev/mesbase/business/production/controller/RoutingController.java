@@ -17,7 +17,9 @@ import dev.mesbase.business.production.domain.RoutingDetail;
 import dev.mesbase.business.production.domain.RoutingReference;
 import dev.mesbase.business.production.controller.vo.RoutingDetailVo;
 import dev.mesbase.business.production.controller.vo.RoutingProductVo;
-import dev.mesbase.business.production.controller.vo.RoutingStepVo;
+import dev.mesbase.business.production.controller.vo.RoutingNodeVo;
+import dev.mesbase.business.production.controller.vo.RoutingEdgeVo;
+import java.util.HashMap;
 import dev.mesbase.business.production.controller.vo.RoutingReferenceVo;
 import dev.mesbase.business.production.sync.ProductionSyncResult;
 import dev.mesbase.platform.execution.FactoryContext;
@@ -156,13 +158,17 @@ public class RoutingController {
     }
 
     private static RoutingDetailVo detailView(RoutingDetail detail) {
+        var nodeCodes = new HashMap<Long, String>();
+        for (var node : detail.nodes()) nodeCodes.put(node.getId(), node.getNodeCode());
         return new RoutingDetailVo(toView(detail.routing()),
                 detail.products().stream().map(row -> new RoutingProductVo(row.getId().toString(),
                         row.getMaterialId().toString(), row.getMaterialCode(), row.getMaterialName())).toList(),
-                detail.steps().stream().map(row -> new RoutingStepVo(row.getId().toString(),
-                                row.getOperationId().toString(), row.getSequence(), row.getOperationCode(),
+                detail.nodes().stream().map(row -> new RoutingNodeVo(row.getId().toString(), row.getNodeCode(),
+                                row.getOperationId().toString(), row.getDisplayOrder(), row.getOperationCode(),
                                 row.getOperationName(), row.getOperationDescription(), row.getIsKey(), row.getDescription()))
-                        .toList());
+                        .toList(),
+                detail.edges().stream().map(row -> new RoutingEdgeVo(row.getId().toString(),
+                        nodeCodes.get(row.getFromNodeId()), nodeCodes.get(row.getToNodeId()))).toList());
     }
 
     private static RoutingVo toView(RoutingEntity row) {

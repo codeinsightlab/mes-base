@@ -138,7 +138,7 @@ class CodegenSyncAcceptanceTest {
                 var failure = assertThrows(InvocationTargetException.class, () -> loader.loadClass(root + ".service.ISyncProbeService")
                         .getMethod("sync", FactoryScope.class)
                         .invoke(service, scope));
-                assertEquals(ErrorCode.ERP_SYNC_NOT_CONFIGURED, ((FoundationException) failure.getCause()).code());
+                assertEquals(ErrorCode.SYNC_QUERY_NOT_IMPLEMENTED, ((FoundationException) failure.getCause()).code());
                 verifyNoInteractions(coordinator);
                 assertEquals(0, jdbc.queryForObject("SELECT COUNT(*) FROM sync_probe", Integer.class));
                 var upsert = loader.loadClass(root + ".service.ISyncProbeService")

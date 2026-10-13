@@ -1,0 +1,283 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- MES-CODEGEN: MyBatis Generator standard single-table persistence. -->
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="dev.mesbase.business.production.dao.RoutingNodeMapper">
+  <resultMap id="BaseResultMap" type="dev.mesbase.business.production.domain.RoutingNodeEntity">
+    <id column="id" jdbcType="BIGINT" property="id" />
+    <result column="routing_id" jdbcType="BIGINT" property="routingId" />
+    <result column="node_code" jdbcType="VARCHAR" property="nodeCode" />
+    <result column="operation_id" jdbcType="BIGINT" property="operationId" />
+    <result column="operation_code" jdbcType="VARCHAR" property="operationCode" />
+    <result column="operation_name" jdbcType="VARCHAR" property="operationName" />
+    <result column="operation_description" jdbcType="VARCHAR" property="operationDescription" />
+    <result column="is_key" jdbcType="BIT" property="isKey" />
+    <result column="description" jdbcType="VARCHAR" property="description" />
+    <result column="display_order" jdbcType="INTEGER" property="displayOrder" />
+  </resultMap>
+  <sql id="Example_Where_Clause">
+    <where>
+      <foreach collection="oredCriteria" item="criteria" separator="or">
+        <if test="criteria.valid">
+          <trim prefix="(" prefixOverrides="and" suffix=")">
+            <foreach collection="criteria.criteria" item="criterion">
+              <choose>
+                <when test="criterion.noValue">
+                  and ${criterion.condition}
+                </when>
+                <when test="criterion.singleValue">
+                  and ${criterion.condition} #{criterion.value}
+                </when>
+                <when test="criterion.betweenValue">
+                  and ${criterion.condition} #{criterion.value} and #{criterion.secondValue}
+                </when>
+                <when test="criterion.listValue">
+                  and ${criterion.condition}
+                  <foreach close=")" collection="criterion.value" item="listItem" open="(" separator=",">
+                    #{listItem}
+                  </foreach>
+                </when>
+              </choose>
+            </foreach>
+          </trim>
+        </if>
+      </foreach>
+    </where>
+  </sql>
+  <sql id="Update_By_Example_Where_Clause">
+    <where>
+      <foreach collection="example.oredCriteria" item="criteria" separator="or">
+        <if test="criteria.valid">
+          <trim prefix="(" prefixOverrides="and" suffix=")">
+            <foreach collection="criteria.criteria" item="criterion">
+              <choose>
+                <when test="criterion.noValue">
+                  and ${criterion.condition}
+                </when>
+                <when test="criterion.singleValue">
+                  and ${criterion.condition} #{criterion.value}
+                </when>
+                <when test="criterion.betweenValue">
+                  and ${criterion.condition} #{criterion.value} and #{criterion.secondValue}
+                </when>
+                <when test="criterion.listValue">
+                  and ${criterion.condition}
+                  <foreach close=")" collection="criterion.value" item="listItem" open="(" separator=",">
+                    #{listItem}
+                  </foreach>
+                </when>
+              </choose>
+            </foreach>
+          </trim>
+        </if>
+      </foreach>
+    </where>
+  </sql>
+  <sql id="Base_Column_List">
+    id, routing_id, node_code, operation_id, operation_code, operation_name, operation_description, 
+    is_key, description, display_order
+  </sql>
+  <select id="selectByExample" parameterType="dev.mesbase.business.production.domain.RoutingNodeExample" resultMap="BaseResultMap">
+    select
+    <include refid="Base_Column_List" />
+    from routing_node
+    <if test="_parameter != null">
+      <include refid="Example_Where_Clause" />
+    </if>
+    <if test="orderByClause != null">
+      order by ${orderByClause}
+    </if>
+  </select>
+  <select id="selectByPrimaryKey" parameterType="Long" resultMap="BaseResultMap">
+    select 
+    <include refid="Base_Column_List" />
+    from routing_node
+    where id = #{id,jdbcType=BIGINT}
+  </select>
+  <delete id="deleteByPrimaryKey" parameterType="Long">
+    delete from routing_node
+    where id = #{id,jdbcType=BIGINT}
+  </delete>
+  <delete id="deleteByExample" parameterType="dev.mesbase.business.production.domain.RoutingNodeExample">
+    delete from routing_node
+    <if test="_parameter != null">
+      <include refid="Example_Where_Clause" />
+    </if>
+  </delete>
+  <insert id="insert" keyColumn="id" keyProperty="id" parameterType="dev.mesbase.business.production.domain.RoutingNodeEntity" useGeneratedKeys="true">
+    insert into routing_node (routing_id, node_code, operation_id, 
+      operation_code, operation_name, operation_description, 
+      is_key, description, display_order
+      )
+    values (#{routingId,jdbcType=BIGINT}, #{nodeCode,jdbcType=VARCHAR}, #{operationId,jdbcType=BIGINT}, 
+      #{operationCode,jdbcType=VARCHAR}, #{operationName,jdbcType=VARCHAR}, #{operationDescription,jdbcType=VARCHAR}, 
+      #{isKey,jdbcType=BIT}, #{description,jdbcType=VARCHAR}, #{displayOrder,jdbcType=INTEGER}
+      )
+  </insert>
+  <insert id="insertSelective" keyColumn="id" keyProperty="id" parameterType="dev.mesbase.business.production.domain.RoutingNodeEntity" useGeneratedKeys="true">
+    insert into routing_node
+    <trim prefix="(" suffix=")" suffixOverrides=",">
+      <if test="routingId != null">
+        routing_id,
+      </if>
+      <if test="nodeCode != null">
+        node_code,
+      </if>
+      <if test="operationId != null">
+        operation_id,
+      </if>
+      <if test="operationCode != null">
+        operation_code,
+      </if>
+      <if test="operationName != null">
+        operation_name,
+      </if>
+      <if test="operationDescription != null">
+        operation_description,
+      </if>
+      <if test="isKey != null">
+        is_key,
+      </if>
+      <if test="description != null">
+        description,
+      </if>
+      <if test="displayOrder != null">
+        display_order,
+      </if>
+    </trim>
+    <trim prefix="values (" suffix=")" suffixOverrides=",">
+      <if test="routingId != null">
+        #{routingId,jdbcType=BIGINT},
+      </if>
+      <if test="nodeCode != null">
+        #{nodeCode,jdbcType=VARCHAR},
+      </if>
+      <if test="operationId != null">
+        #{operationId,jdbcType=BIGINT},
+      </if>
+      <if test="operationCode != null">
+        #{operationCode,jdbcType=VARCHAR},
+      </if>
+      <if test="operationName != null">
+        #{operationName,jdbcType=VARCHAR},
+      </if>
+      <if test="operationDescription != null">
+        #{operationDescription,jdbcType=VARCHAR},
+      </if>
+      <if test="isKey != null">
+        #{isKey,jdbcType=BIT},
+      </if>
+      <if test="description != null">
+        #{description,jdbcType=VARCHAR},
+      </if>
+      <if test="displayOrder != null">
+        #{displayOrder,jdbcType=INTEGER},
+      </if>
+    </trim>
+  </insert>
+  <select id="countByExample" parameterType="dev.mesbase.business.production.domain.RoutingNodeExample" resultType="java.lang.Long">
+    select count(*) from routing_node
+    <if test="_parameter != null">
+      <include refid="Example_Where_Clause" />
+    </if>
+  </select>
+  <update id="updateByExampleSelective" parameterType="map">
+    update routing_node
+    <set>
+      <if test="row.id != null">
+        id = #{row.id,jdbcType=BIGINT},
+      </if>
+      <if test="row.routingId != null">
+        routing_id = #{row.routingId,jdbcType=BIGINT},
+      </if>
+      <if test="row.nodeCode != null">
+        node_code = #{row.nodeCode,jdbcType=VARCHAR},
+      </if>
+      <if test="row.operationId != null">
+        operation_id = #{row.operationId,jdbcType=BIGINT},
+      </if>
+      <if test="row.operationCode != null">
+        operation_code = #{row.operationCode,jdbcType=VARCHAR},
+      </if>
+      <if test="row.operationName != null">
+        operation_name = #{row.operationName,jdbcType=VARCHAR},
+      </if>
+      <if test="row.operationDescription != null">
+        operation_description = #{row.operationDescription,jdbcType=VARCHAR},
+      </if>
+      <if test="row.isKey != null">
+        is_key = #{row.isKey,jdbcType=BIT},
+      </if>
+      <if test="row.description != null">
+        description = #{row.description,jdbcType=VARCHAR},
+      </if>
+      <if test="row.displayOrder != null">
+        display_order = #{row.displayOrder,jdbcType=INTEGER},
+      </if>
+    </set>
+    <if test="example != null">
+      <include refid="Update_By_Example_Where_Clause" />
+    </if>
+  </update>
+  <update id="updateByExample" parameterType="map">
+    update routing_node
+    set id = #{row.id,jdbcType=BIGINT},
+      routing_id = #{row.routingId,jdbcType=BIGINT},
+      node_code = #{row.nodeCode,jdbcType=VARCHAR},
+      operation_id = #{row.operationId,jdbcType=BIGINT},
+      operation_code = #{row.operationCode,jdbcType=VARCHAR},
+      operation_name = #{row.operationName,jdbcType=VARCHAR},
+      operation_description = #{row.operationDescription,jdbcType=VARCHAR},
+      is_key = #{row.isKey,jdbcType=BIT},
+      description = #{row.description,jdbcType=VARCHAR},
+      display_order = #{row.displayOrder,jdbcType=INTEGER}
+    <if test="example != null">
+      <include refid="Update_By_Example_Where_Clause" />
+    </if>
+  </update>
+  <update id="updateByPrimaryKeySelective" parameterType="dev.mesbase.business.production.domain.RoutingNodeEntity">
+    update routing_node
+    <set>
+      <if test="routingId != null">
+        routing_id = #{routingId,jdbcType=BIGINT},
+      </if>
+      <if test="nodeCode != null">
+        node_code = #{nodeCode,jdbcType=VARCHAR},
+      </if>
+      <if test="operationId != null">
+        operation_id = #{operationId,jdbcType=BIGINT},
+      </if>
+      <if test="operationCode != null">
+        operation_code = #{operationCode,jdbcType=VARCHAR},
+      </if>
+      <if test="operationName != null">
+        operation_name = #{operationName,jdbcType=VARCHAR},
+      </if>
+      <if test="operationDescription != null">
+        operation_description = #{operationDescription,jdbcType=VARCHAR},
+      </if>
+      <if test="isKey != null">
+        is_key = #{isKey,jdbcType=BIT},
+      </if>
+      <if test="description != null">
+        description = #{description,jdbcType=VARCHAR},
+      </if>
+      <if test="displayOrder != null">
+        display_order = #{displayOrder,jdbcType=INTEGER},
+      </if>
+    </set>
+    where id = #{id,jdbcType=BIGINT}
+  </update>
+  <update id="updateByPrimaryKey" parameterType="dev.mesbase.business.production.domain.RoutingNodeEntity">
+    update routing_node
+    set routing_id = #{routingId,jdbcType=BIGINT},
+      node_code = #{nodeCode,jdbcType=VARCHAR},
+      operation_id = #{operationId,jdbcType=BIGINT},
+      operation_code = #{operationCode,jdbcType=VARCHAR},
+      operation_name = #{operationName,jdbcType=VARCHAR},
+      operation_description = #{operationDescription,jdbcType=VARCHAR},
+      is_key = #{isKey,jdbcType=BIT},
+      description = #{description,jdbcType=VARCHAR},
+      display_order = #{displayOrder,jdbcType=INTEGER}
+    where id = #{id,jdbcType=BIGINT}
+  </update>
+</mapper>

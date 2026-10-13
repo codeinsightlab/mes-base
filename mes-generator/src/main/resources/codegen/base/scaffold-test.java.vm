@@ -70,7 +70,7 @@ public class ${ClassName}ScaffoldTest {
         var scope = new dev.mesbase.core.factory.FactoryScope(new dev.mesbase.core.factory.FactoryId("TEST_ONLY"));
         var failure = org.junit.jupiter.api.Assertions.assertThrows(dev.mesbase.core.error.FoundationException.class,
                 () -> new ${syncPackage}.Unconfigured${ClassName}QueryAdapter().query(scope, ${syncBatchMaximum}));
-        org.junit.jupiter.api.Assertions.assertEquals(dev.mesbase.core.error.ErrorCode.ERP_SYNC_NOT_CONFIGURED, failure.code());
+        org.junit.jupiter.api.Assertions.assertEquals(dev.mesbase.core.error.ErrorCode.SYNC_QUERY_NOT_IMPLEMENTED, failure.code());
     }
 #end
 }

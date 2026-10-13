@@ -151,3 +151,10 @@ Defect Record、Disposition / Rework / Scrap / Release 与 RoutingNode / Routing
 WorkOrder、ProductionExecution、Reporting 的关系。现在不确定最终表名或 Schema，不保留 Quality 空壳。
 
 执行文件清单、数据库证据与验证边界见 [Quality 撤回回执](QUALITY_EARLY_IMPLEMENTATION_REMOVAL.md)。
+
+
+## 2026-10-13 Routing 静态 DAG 定义闭合
+
+Routing 定义已从线性步骤升级为 Node + Edge，LINEAR / BRANCH / MERGE 经真实 MySQL、Service、API 和浏览器验证；V9 迁移旧步骤，验收后 V10 退役旧表，不保留两套执行拓扑事实。一条 routing 行仍代表确切版本，未新增 RoutingVersion 表，未来 WorkOrder 引用 routing.id/version。产品、节点、边及工序快照共同冻结，复制/下一版本及 LINEAR/GRAPH 同步均适配完整图。
+
+定义侧 Graph = COMPLETE（本地验收），执行侧并行调度、Join/Gateway、条件、返工、Token 与资源资格继续 DEFERRED，不等于 ProductionExecution 已实现。Source 不自动合并路线；用户授权的 workaround 案例明确为 SYNTHETIC。证据见 [联合审查第二批](OPERATION_ROUTING_REVIEW.md)、[Graph 验收](ROUTING_GRAPH_EVIDENCE.json)。旧步骤专用生成配置和运行代码退役，当前新表生成配置为 docs/development/routing-graph-codegen.yaml。

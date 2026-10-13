@@ -5,6 +5,7 @@ import java.util.List;
 public record RoutingDetail(
         RoutingEntity routing,
         List<RoutingProductEntity> products,
-        List<RoutingStepEntity> steps
+        List<RoutingNodeEntity> nodes,
+        List<RoutingEdgeEntity> edges
 ) {
 }

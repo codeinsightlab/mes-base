@@ -1,10 +1,14 @@
 package dev.mesbase.core.error;
 
 public enum ErrorCode {
+    ROUTING_GRAPH_INVALID(422, "路线拓扑无效：请检查节点、连接、环路及孤立节点"),
+    STOCK_REFERENCE_INVALID(422, "物料和仓库必须存在且属于当前工厂"),
+    WAREHOUSE_REFERENCED(409, "仓库已被库存引用，不能删除"),
+    MATERIAL_INVENTORY_REFERENCED(409, "物料已被库存引用，不能删除"),
+    STOCK_KEY_DUPLICATE(409, "当前工厂已有相同仓库编码或物料仓库库存记录"),
     ROUTING_FROZEN(409, "已发布路线内容已冻结，请创建新版本"),
     ROUTING_REVISION_CONFLICT(409, "记录已被修改，请刷新后重试"),
     ROUTING_REFERENCE_INVALID(422, "路线引用必须属于当前工厂且处于启用状态"),
-    ROUTING_STEPS_INVALID(400, "步骤须连续排序、工序不重复且最多一个关键点"),
     ROUTING_PUBLISH_INCOMPLETE(422, "发布前请至少关联一个物料产品和一个工序步骤"),
     OPERATION_REFERENCED(409, "工序已被工艺路线引用，不能删除"),
     MATERIAL_ROUTING_REFERENCED(409, "物料产品已被工艺路线引用，不能删除"),
