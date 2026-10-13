@@ -1,5 +1,4 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- MES-CODEGEN: MyBatis Generator standard single-table persistence. -->
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="dev.mesbase.business.production.dao.RoutingStepMapper">
   <resultMap id="BaseResultMap" type="dev.mesbase.business.production.domain.RoutingStepEntity">
@@ -9,6 +8,7 @@
     <result column="operation_id" jdbcType="BIGINT" property="operationId" />
     <result column="operation_code" jdbcType="VARCHAR" property="operationCode" />
     <result column="operation_name" jdbcType="VARCHAR" property="operationName" />
+    <result column="operation_description" jdbcType="VARCHAR" property="operationDescription" />
     <result column="is_key" jdbcType="BIT" property="isKey" />
     <result column="description" jdbcType="VARCHAR" property="description" />
   </resultMap>
@@ -71,7 +71,8 @@
     </where>
   </sql>
   <sql id="Base_Column_List">
-    id, routing_id, sequence, operation_id, operation_code, operation_name, is_key, description
+    id, routing_id, sequence, operation_id, operation_code, operation_name, operation_description,
+    is_key, description
   </sql>
   <select id="selectByExample" parameterType="dev.mesbase.business.production.domain.RoutingStepExample" resultMap="BaseResultMap">
     select
@@ -85,7 +86,7 @@
     </if>
   </select>
   <select id="selectByPrimaryKey" parameterType="Long" resultMap="BaseResultMap">
-    select 
+    select
     <include refid="Base_Column_List" />
     from routing_step
     where id = #{id,jdbcType=BIGINT}
@@ -101,12 +102,12 @@
     </if>
   </delete>
   <insert id="insert" keyColumn="id" keyProperty="id" parameterType="dev.mesbase.business.production.domain.RoutingStepEntity" useGeneratedKeys="true">
-    insert into routing_step (routing_id, sequence, operation_id, 
-      operation_code, operation_name, is_key, 
-      description)
-    values (#{routingId,jdbcType=BIGINT}, #{sequence,jdbcType=INTEGER}, #{operationId,jdbcType=BIGINT}, 
-      #{operationCode,jdbcType=VARCHAR}, #{operationName,jdbcType=VARCHAR}, #{isKey,jdbcType=BIT}, 
-      #{description,jdbcType=VARCHAR})
+    insert into routing_step (routing_id, sequence, operation_id,
+      operation_code, operation_name, operation_description,
+      is_key, description)
+    values (#{routingId,jdbcType=BIGINT}, #{sequence,jdbcType=INTEGER}, #{operationId,jdbcType=BIGINT},
+      #{operationCode,jdbcType=VARCHAR}, #{operationName,jdbcType=VARCHAR}, #{operationDescription,jdbcType=VARCHAR},
+      #{isKey,jdbcType=BIT}, #{description,jdbcType=VARCHAR})
   </insert>
   <insert id="insertSelective" keyColumn="id" keyProperty="id" parameterType="dev.mesbase.business.production.domain.RoutingStepEntity" useGeneratedKeys="true">
     insert into routing_step
@@ -125,6 +126,9 @@
       </if>
       <if test="operationName != null">
         operation_name,
+      </if>
+      <if test="operationDescription != null">
+        operation_description,
       </if>
       <if test="isKey != null">
         is_key,
@@ -148,6 +152,9 @@
       </if>
       <if test="operationName != null">
         #{operationName,jdbcType=VARCHAR},
+      </if>
+      <if test="operationDescription != null">
+        #{operationDescription,jdbcType=VARCHAR},
       </if>
       <if test="isKey != null">
         #{isKey,jdbcType=BIT},
@@ -184,6 +191,9 @@
       <if test="row.operationName != null">
         operation_name = #{row.operationName,jdbcType=VARCHAR},
       </if>
+      <if test="row.operationDescription != null">
+        operation_description = #{row.operationDescription,jdbcType=VARCHAR},
+      </if>
       <if test="row.isKey != null">
         is_key = #{row.isKey,jdbcType=BIT},
       </if>
@@ -203,6 +213,7 @@
       operation_id = #{row.operationId,jdbcType=BIGINT},
       operation_code = #{row.operationCode,jdbcType=VARCHAR},
       operation_name = #{row.operationName,jdbcType=VARCHAR},
+      operation_description = #{row.operationDescription,jdbcType=VARCHAR},
       is_key = #{row.isKey,jdbcType=BIT},
       description = #{row.description,jdbcType=VARCHAR}
     <if test="example != null">
@@ -227,6 +238,9 @@
       <if test="operationName != null">
         operation_name = #{operationName,jdbcType=VARCHAR},
       </if>
+      <if test="operationDescription != null">
+        operation_description = #{operationDescription,jdbcType=VARCHAR},
+      </if>
       <if test="isKey != null">
         is_key = #{isKey,jdbcType=BIT},
       </if>
@@ -243,6 +257,7 @@
       operation_id = #{operationId,jdbcType=BIGINT},
       operation_code = #{operationCode,jdbcType=VARCHAR},
       operation_name = #{operationName,jdbcType=VARCHAR},
+      operation_description = #{operationDescription,jdbcType=VARCHAR},
       is_key = #{isKey,jdbcType=BIT},
       description = #{description,jdbcType=VARCHAR}
     where id = #{id,jdbcType=BIGINT}

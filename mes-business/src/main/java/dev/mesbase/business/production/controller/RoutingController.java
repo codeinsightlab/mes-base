@@ -1,4 +1,3 @@
-// MES-CODEGEN: scaffold; review required.
 package dev.mesbase.business.production.controller;
 
 import dev.mesbase.business.production.controller.vo.RoutingPageVo;
@@ -161,8 +160,9 @@ public class RoutingController {
                 detail.products().stream().map(row -> new RoutingProductVo(row.getId().toString(),
                         row.getMaterialId().toString(), row.getMaterialCode(), row.getMaterialName())).toList(),
                 detail.steps().stream().map(row -> new RoutingStepVo(row.getId().toString(),
-                        row.getOperationId().toString(), row.getSequence(), row.getOperationCode(),
-                        row.getOperationName(), row.getIsKey(), row.getDescription())).toList());
+                                row.getOperationId().toString(), row.getSequence(), row.getOperationCode(),
+                                row.getOperationName(), row.getOperationDescription(), row.getIsKey(), row.getDescription()))
+                        .toList());
     }
 
     private static RoutingVo toView(RoutingEntity row) {

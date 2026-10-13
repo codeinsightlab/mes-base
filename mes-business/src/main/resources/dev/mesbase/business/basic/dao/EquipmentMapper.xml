@@ -1,0 +1,250 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- MES-CODEGEN: MyBatis Generator standard single-table persistence. -->
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="dev.mesbase.business.basic.dao.EquipmentMapper">
+  <resultMap id="BaseResultMap" type="dev.mesbase.business.basic.domain.EquipmentEntity">
+    <id column="id" jdbcType="BIGINT" property="id" />
+    <result column="factory_id" jdbcType="VARCHAR" property="factoryId" />
+    <result column="code" jdbcType="VARCHAR" property="code" />
+    <result column="name" jdbcType="VARCHAR" property="name" />
+    <result column="model" jdbcType="VARCHAR" property="model" />
+    <result column="workstation_id" jdbcType="BIGINT" property="workstationId" />
+    <result column="status" jdbcType="VARCHAR" property="status" />
+    <result column="remark" jdbcType="VARCHAR" property="remark" />
+  </resultMap>
+  <sql id="Example_Where_Clause">
+    <where>
+      <foreach collection="oredCriteria" item="criteria" separator="or">
+        <if test="criteria.valid">
+          <trim prefix="(" prefixOverrides="and" suffix=")">
+            <foreach collection="criteria.criteria" item="criterion">
+              <choose>
+                <when test="criterion.noValue">
+                  and ${criterion.condition}
+                </when>
+                <when test="criterion.singleValue">
+                  and ${criterion.condition} #{criterion.value}
+                </when>
+                <when test="criterion.betweenValue">
+                  and ${criterion.condition} #{criterion.value} and #{criterion.secondValue}
+                </when>
+                <when test="criterion.listValue">
+                  and ${criterion.condition}
+                  <foreach close=")" collection="criterion.value" item="listItem" open="(" separator=",">
+                    #{listItem}
+                  </foreach>
+                </when>
+              </choose>
+            </foreach>
+          </trim>
+        </if>
+      </foreach>
+    </where>
+  </sql>
+  <sql id="Update_By_Example_Where_Clause">
+    <where>
+      <foreach collection="example.oredCriteria" item="criteria" separator="or">
+        <if test="criteria.valid">
+          <trim prefix="(" prefixOverrides="and" suffix=")">
+            <foreach collection="criteria.criteria" item="criterion">
+              <choose>
+                <when test="criterion.noValue">
+                  and ${criterion.condition}
+                </when>
+                <when test="criterion.singleValue">
+                  and ${criterion.condition} #{criterion.value}
+                </when>
+                <when test="criterion.betweenValue">
+                  and ${criterion.condition} #{criterion.value} and #{criterion.secondValue}
+                </when>
+                <when test="criterion.listValue">
+                  and ${criterion.condition}
+                  <foreach close=")" collection="criterion.value" item="listItem" open="(" separator=",">
+                    #{listItem}
+                  </foreach>
+                </when>
+              </choose>
+            </foreach>
+          </trim>
+        </if>
+      </foreach>
+    </where>
+  </sql>
+  <sql id="Base_Column_List">
+    id, factory_id, code, name, model, workstation_id, status, remark
+  </sql>
+  <select id="selectByExample" parameterType="dev.mesbase.business.basic.domain.EquipmentExample" resultMap="BaseResultMap">
+    select
+    <include refid="Base_Column_List" />
+    from equipment
+    <if test="_parameter != null">
+      <include refid="Example_Where_Clause" />
+    </if>
+    <if test="orderByClause != null">
+      order by ${orderByClause}
+    </if>
+  </select>
+  <select id="selectByPrimaryKey" parameterType="Long" resultMap="BaseResultMap">
+    select 
+    <include refid="Base_Column_List" />
+    from equipment
+    where id = #{id,jdbcType=BIGINT}
+  </select>
+  <delete id="deleteByPrimaryKey" parameterType="Long">
+    delete from equipment
+    where id = #{id,jdbcType=BIGINT}
+  </delete>
+  <delete id="deleteByExample" parameterType="dev.mesbase.business.basic.domain.EquipmentExample">
+    delete from equipment
+    <if test="_parameter != null">
+      <include refid="Example_Where_Clause" />
+    </if>
+  </delete>
+  <insert id="insert" keyColumn="id" keyProperty="id" parameterType="dev.mesbase.business.basic.domain.EquipmentEntity" useGeneratedKeys="true">
+    insert into equipment (factory_id, code, name, 
+      model, workstation_id, status, 
+      remark)
+    values (#{factoryId,jdbcType=VARCHAR}, #{code,jdbcType=VARCHAR}, #{name,jdbcType=VARCHAR}, 
+      #{model,jdbcType=VARCHAR}, #{workstationId,jdbcType=BIGINT}, #{status,jdbcType=VARCHAR}, 
+      #{remark,jdbcType=VARCHAR})
+  </insert>
+  <insert id="insertSelective" keyColumn="id" keyProperty="id" parameterType="dev.mesbase.business.basic.domain.EquipmentEntity" useGeneratedKeys="true">
+    insert into equipment
+    <trim prefix="(" suffix=")" suffixOverrides=",">
+      <if test="factoryId != null">
+        factory_id,
+      </if>
+      <if test="code != null">
+        code,
+      </if>
+      <if test="name != null">
+        name,
+      </if>
+      <if test="model != null">
+        model,
+      </if>
+      <if test="workstationId != null">
+        workstation_id,
+      </if>
+      <if test="status != null">
+        status,
+      </if>
+      <if test="remark != null">
+        remark,
+      </if>
+    </trim>
+    <trim prefix="values (" suffix=")" suffixOverrides=",">
+      <if test="factoryId != null">
+        #{factoryId,jdbcType=VARCHAR},
+      </if>
+      <if test="code != null">
+        #{code,jdbcType=VARCHAR},
+      </if>
+      <if test="name != null">
+        #{name,jdbcType=VARCHAR},
+      </if>
+      <if test="model != null">
+        #{model,jdbcType=VARCHAR},
+      </if>
+      <if test="workstationId != null">
+        #{workstationId,jdbcType=BIGINT},
+      </if>
+      <if test="status != null">
+        #{status,jdbcType=VARCHAR},
+      </if>
+      <if test="remark != null">
+        #{remark,jdbcType=VARCHAR},
+      </if>
+    </trim>
+  </insert>
+  <select id="countByExample" parameterType="dev.mesbase.business.basic.domain.EquipmentExample" resultType="java.lang.Long">
+    select count(*) from equipment
+    <if test="_parameter != null">
+      <include refid="Example_Where_Clause" />
+    </if>
+  </select>
+  <update id="updateByExampleSelective" parameterType="map">
+    update equipment
+    <set>
+      <if test="row.id != null">
+        id = #{row.id,jdbcType=BIGINT},
+      </if>
+      <if test="row.factoryId != null">
+        factory_id = #{row.factoryId,jdbcType=VARCHAR},
+      </if>
+      <if test="row.code != null">
+        code = #{row.code,jdbcType=VARCHAR},
+      </if>
+      <if test="row.name != null">
+        name = #{row.name,jdbcType=VARCHAR},
+      </if>
+      <if test="row.model != null">
+        model = #{row.model,jdbcType=VARCHAR},
+      </if>
+      <if test="row.workstationId != null">
+        workstation_id = #{row.workstationId,jdbcType=BIGINT},
+      </if>
+      <if test="row.status != null">
+        status = #{row.status,jdbcType=VARCHAR},
+      </if>
+      <if test="row.remark != null">
+        remark = #{row.remark,jdbcType=VARCHAR},
+      </if>
+    </set>
+    <if test="example != null">
+      <include refid="Update_By_Example_Where_Clause" />
+    </if>
+  </update>
+  <update id="updateByExample" parameterType="map">
+    update equipment
+    set id = #{row.id,jdbcType=BIGINT},
+      factory_id = #{row.factoryId,jdbcType=VARCHAR},
+      code = #{row.code,jdbcType=VARCHAR},
+      name = #{row.name,jdbcType=VARCHAR},
+      model = #{row.model,jdbcType=VARCHAR},
+      workstation_id = #{row.workstationId,jdbcType=BIGINT},
+      status = #{row.status,jdbcType=VARCHAR},
+      remark = #{row.remark,jdbcType=VARCHAR}
+    <if test="example != null">
+      <include refid="Update_By_Example_Where_Clause" />
+    </if>
+  </update>
+  <update id="updateByPrimaryKeySelective" parameterType="dev.mesbase.business.basic.domain.EquipmentEntity">
+    update equipment
+    <set>
+      <if test="factoryId != null">
+        factory_id = #{factoryId,jdbcType=VARCHAR},
+      </if>
+      <if test="code != null">
+        code = #{code,jdbcType=VARCHAR},
+      </if>
+      <if test="name != null">
+        name = #{name,jdbcType=VARCHAR},
+      </if>
+      <if test="model != null">
+        model = #{model,jdbcType=VARCHAR},
+      </if>
+      <if test="workstationId != null">
+        workstation_id = #{workstationId,jdbcType=BIGINT},
+      </if>
+      <if test="status != null">
+        status = #{status,jdbcType=VARCHAR},
+      </if>
+      <if test="remark != null">
+        remark = #{remark,jdbcType=VARCHAR},
+      </if>
+    </set>
+    where id = #{id,jdbcType=BIGINT}
+  </update>
+  <update id="updateByPrimaryKey" parameterType="dev.mesbase.business.basic.domain.EquipmentEntity">
+    update equipment
+    set factory_id = #{factoryId,jdbcType=VARCHAR},
+      code = #{code,jdbcType=VARCHAR},
+      name = #{name,jdbcType=VARCHAR},
+      model = #{model,jdbcType=VARCHAR},
+      workstation_id = #{workstationId,jdbcType=BIGINT},
+      status = #{status,jdbcType=VARCHAR},
+      remark = #{remark,jdbcType=VARCHAR}
+    where id = #{id,jdbcType=BIGINT}
+  </update>
+</mapper>

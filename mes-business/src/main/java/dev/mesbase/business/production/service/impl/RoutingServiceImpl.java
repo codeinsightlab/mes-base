@@ -1,4 +1,3 @@
-// MES-CODEGEN: scaffold; review required.
 package dev.mesbase.business.production.service.impl;
 
 import com.github.pagehelper.Page;
@@ -237,6 +236,7 @@ public class RoutingServiceImpl implements IRoutingService {
             var operation = operationIndex.get(step.getOperationId());
             step.setOperationCode(operation.getCode());
             step.setOperationName(operation.getName());
+            step.setOperationDescription(operation.getDescription());
             changed(steps.updateByPrimaryKey(step));
         }
         row.setStatus("PUBLISHED");
@@ -394,6 +394,7 @@ public class RoutingServiceImpl implements IRoutingService {
                     if (op != null) {
                         step.setOperationCode(op.getCode());
                         step.setOperationName(op.getName());
+                        step.setOperationDescription(op.getDescription());
                     }
                 }
             }

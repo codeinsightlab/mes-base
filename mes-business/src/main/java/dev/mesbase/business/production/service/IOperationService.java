@@ -1,4 +1,3 @@
-// MES-CODEGEN: scaffold; review required.
 package dev.mesbase.business.production.service;
 
 import dev.mesbase.business.production.domain.OperationCreateCommand;

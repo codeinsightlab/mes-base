@@ -14,6 +14,8 @@ public class RoutingStepEntity {
 
     private String operationName;
 
+    private String operationDescription;
+
     private Boolean isKey;
 
     private String description;
@@ -64,6 +66,14 @@ public class RoutingStepEntity {
 
     public void setOperationName(String operationName) {
         this.operationName = operationName;
+    }
+
+    public String getOperationDescription() {
+        return operationDescription;
+    }
+
+    public void setOperationDescription(String operationDescription) {
+        this.operationDescription = operationDescription;
     }
 
     public Boolean getIsKey() {

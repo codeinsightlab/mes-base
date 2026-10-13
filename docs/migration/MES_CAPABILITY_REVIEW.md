@@ -237,3 +237,11 @@ GAP值是后续分析必要性，不是本轮建表授权；不能从“架构�
 | 安全库存 | md_item.safe_stock_flag/min_stock/max_stock | safety_stock | SIMPLE | ADAPT_SCHEMA / GENERATE | ERP_SYNC=true；人工 CRUD 可独立使用 | IMPLEMENTED / ACCEPTED |
 
 当前六项的 Schema、规则、权限、Converter 和证据逐项见验收报告。Workshop 的 OPTIONAL 指组织层级可省略，不表示本轮暂缓；安全库存暂放基础数据，因为当前只维护物料阈值，不实施 MRP。
+
+
+## 2026-10-13 Production Resource 基础投影落地
+
+本轮将设备执行身份从完整设备/维护复杂领域中拆出最小目录，并增加独立于登录账号的生产人员投影。
+Equipment、Personnel 均为 CODEGEN_PLUS_EXTRA；Extra 只承担状态、编码唯一冲突、工作站引用/删除限制和可选账号有效性校验。
+班组真实来源仅有1条、排班关联为零，本轮 DEFER；同步、设备维护与 HR 能力继续不迁。
+真实来源、Schema、Converter、MySQL/API/UI 证据详见 [PRODUCTION_RESOURCE_REVIEW](PRODUCTION_RESOURCE_REVIEW.md) 与 [验证记录](PRODUCTION_RESOURCE_VERIFICATION.json)。旧整体领域 COMPLEX 判断仍保留，不代表本轮建设完整资源域。

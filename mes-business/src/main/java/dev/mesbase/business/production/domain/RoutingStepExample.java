@@ -474,6 +474,76 @@ public class RoutingStepExample {
             return (Criteria) this;
         }
 
+        public Criteria andOperationDescriptionIsNull() {
+            addCriterion("operation_description is null");
+            return (Criteria) this;
+        }
+
+        public Criteria andOperationDescriptionIsNotNull() {
+            addCriterion("operation_description is not null");
+            return (Criteria) this;
+        }
+
+        public Criteria andOperationDescriptionEqualTo(String value) {
+            addCriterion("operation_description =", value, "operationDescription");
+            return (Criteria) this;
+        }
+
+        public Criteria andOperationDescriptionNotEqualTo(String value) {
+            addCriterion("operation_description <>", value, "operationDescription");
+            return (Criteria) this;
+        }
+
+        public Criteria andOperationDescriptionGreaterThan(String value) {
+            addCriterion("operation_description >", value, "operationDescription");
+            return (Criteria) this;
+        }
+
+        public Criteria andOperationDescriptionGreaterThanOrEqualTo(String value) {
+            addCriterion("operation_description >=", value, "operationDescription");
+            return (Criteria) this;
+        }
+
+        public Criteria andOperationDescriptionLessThan(String value) {
+            addCriterion("operation_description <", value, "operationDescription");
+            return (Criteria) this;
+        }
+
+        public Criteria andOperationDescriptionLessThanOrEqualTo(String value) {
+            addCriterion("operation_description <=", value, "operationDescription");
+            return (Criteria) this;
+        }
+
+        public Criteria andOperationDescriptionLike(String value) {
+            addCriterion("operation_description like", value, "operationDescription");
+            return (Criteria) this;
+        }
+
+        public Criteria andOperationDescriptionNotLike(String value) {
+            addCriterion("operation_description not like", value, "operationDescription");
+            return (Criteria) this;
+        }
+
+        public Criteria andOperationDescriptionIn(List<String> values) {
+            addCriterion("operation_description in", values, "operationDescription");
+            return (Criteria) this;
+        }
+
+        public Criteria andOperationDescriptionNotIn(List<String> values) {
+            addCriterion("operation_description not in", values, "operationDescription");
+            return (Criteria) this;
+        }
+
+        public Criteria andOperationDescriptionBetween(String value1, String value2) {
+            addCriterion("operation_description between", value1, value2, "operationDescription");
+            return (Criteria) this;
+        }
+
+        public Criteria andOperationDescriptionNotBetween(String value1, String value2) {
+            addCriterion("operation_description not between", value1, value2, "operationDescription");
+            return (Criteria) this;
+        }
+
         public Criteria andIsKeyIsNull() {
             addCriterion("is_key is null");
             return (Criteria) this;

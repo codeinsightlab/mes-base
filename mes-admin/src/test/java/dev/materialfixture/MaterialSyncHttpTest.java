@@ -25,6 +25,7 @@ import dev.mesbase.infrastructure.persistence.RuntimeRegistry;
 import dev.mesbase.business.basic.controller.MaterialController;
 import dev.mesbase.business.basic.controller.MaterialPermissions;
 import dev.mesbase.business.basic.service.BasicDataRules;
+import dev.mesbase.business.basic.service.EquipmentReferenceRules;
 import jakarta.validation.Validation;
 import jakarta.validation.Validator;
 import org.apache.ibatis.session.SqlSessionFactory;
@@ -152,6 +153,12 @@ class MaterialSyncHttpTest {
     @Import({MaterialController.class, MaterialServiceImpl.class, BasicDataRules.class,
             FoundationErrorAdvice.class})
     static class Web implements WebMvcConfigurer {
+        @Bean
+        EquipmentReferenceRules equipmentReferences() {
+            // This fixture exposes material synchronization, never resource assignment/deletion.
+            return mock(EquipmentReferenceRules.class);
+        }
+
         @Bean
         BusinessCacheProcessor businessCaches() {
             return mock(BusinessCacheProcessor.class);

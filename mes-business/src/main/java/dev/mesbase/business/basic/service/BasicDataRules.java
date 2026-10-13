@@ -36,6 +36,7 @@ import dev.mesbase.business.basic.domain.SafetyStockExample;
 @ConditionalOnProperty(name = "mes.business.enabled", havingValue = "true")
 public class BasicDataRules {
     private final ObjectProvider<RoutingReferenceRules> routing;
+    private final EquipmentReferenceRules equipment;
     private final MaterialMapper material;
     private final MaterialCategoryMapper materialCategory;
     private final UnitMeasureMapper unitMeasure;
@@ -45,7 +46,9 @@ public class BasicDataRules {
 
     public BasicDataRules(MaterialMapper material, MaterialCategoryMapper materialCategory,
                           UnitMeasureMapper unitMeasure, WorkstationMapper workstation, WorkshopMapper workshop,
-                          SafetyStockMapper safetyStock, ObjectProvider<RoutingReferenceRules> routing) {
+                          SafetyStockMapper safetyStock, ObjectProvider<RoutingReferenceRules> routing,
+                          EquipmentReferenceRules equipment) {
+        this.equipment = equipment;
         this.routing = routing;
         this.material = material;
         this.materialCategory = materialCategory;
@@ -181,6 +184,7 @@ public class BasicDataRules {
     }
 
     public void deletingWorkstation(List<Long> ids) {
+        equipment.deletingWorkstations(ids);
     }
 
     public void deletingWorkshop(List<Long> ids) {

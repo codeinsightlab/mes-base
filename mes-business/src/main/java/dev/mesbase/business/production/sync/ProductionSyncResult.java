@@ -1,4 +1,3 @@
-// MES-CODEGEN: reviewed lifecycle extension of the generated scaffold.
 package dev.mesbase.business.production.sync;
 
 

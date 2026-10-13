@@ -1,4 +1,5 @@
 package dev.mesbase;
+
 import java.util.function.UnaryOperator;
 import dev.mesbase.platform.codegen.JdbcMetadataReader;
 import dev.mesbase.platform.codegen.ConfiguredCodegenService;

@@ -1,4 +1,3 @@
-// MES-CODEGEN: scaffold; review required.
 package dev.mesbase.business.production.service.impl;
 
 import com.github.pagehelper.Page;
@@ -101,7 +100,7 @@ public class OperationServiceImpl implements IOperationService {
         if (query.revision() != null) {
             criteria.andRevisionEqualTo(query.revision());
         }
-        example.setOrderByClause("id");
+        example.setOrderByClause("sort, id");
         try (Page<OperationEntity> page = PageHelper.offsetPage(offset, limit)) {
             List<OperationEntity> rows = mapper.selectByExample(example);
             return new OperationPage(rows, page.getTotal(), offset, limit);

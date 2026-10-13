@@ -1,4 +1,3 @@
-// MES-CODEGEN: scaffold; review required.
 package dev.mesbase.business.production.controller;
 
 import dev.mesbase.business.production.controller.vo.OperationPageVo;

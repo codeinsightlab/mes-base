@@ -1,4 +1,5 @@
 package dev.mesbase;
+
 import java.util.function.UnaryOperator;
 import dev.mesbase.platform.codegen.JdbcMetadataReader;
 import dev.mesbase.platform.codegen.ConfiguredCodegenService;
@@ -679,6 +680,7 @@ class CodegenAcceptanceTest {
         context.refresh();
         return context;
     }
+
     private CodegenResult generateConfiguredRuntime(CodegenRequest original) {
         var request = new CodegenRequest(original.datasource(), original.schema(), original.tableName(), original.moduleName(),
                 original.businessName(), "dev.mesbase.business.testonly", original.author(), original.scope(),

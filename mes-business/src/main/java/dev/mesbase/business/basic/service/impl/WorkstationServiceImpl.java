@@ -1,4 +1,3 @@
-// MES-CODEGEN: scaffold; review required.
 package dev.mesbase.business.basic.service.impl;
 
 import com.github.pagehelper.Page;
@@ -36,6 +35,7 @@ import org.springframework.stereotype.Service;
 import dev.mesbase.business.basic.service.BasicDataRules;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.annotation.Isolation;
 
 /**
  * 工作站 CRUD：规则与事务由 Service 负责，Mapper 通过 MyBatis-Spring 注入。
@@ -149,7 +149,7 @@ public class WorkstationServiceImpl implements IWorkstationService {
     }
 
     @Override
-    @Transactional(transactionManager = "businessTransactionManager", rollbackFor = Exception.class)
+    @Transactional(transactionManager = "businessTransactionManager", isolation = Isolation.READ_COMMITTED, rollbackFor = Exception.class)
     @BusinessCacheEvict(business = WorkstationResource.PREFIX,
             scope = BusinessCacheEvict.Scope.LIST_AND_DETAIL)
     public void deleteByIds(List<Long> ids) {
