@@ -6,7 +6,7 @@ package dev.mesbase.business.production.controller.vo;
  */
 public record OperationVo(
         String id,
-        String factoryId,
+
         String code,
         String name,
         String description,

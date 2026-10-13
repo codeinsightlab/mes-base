@@ -94,7 +94,7 @@ public class OperationController {
     private static OperationVo toView(OperationEntity row) {
         return new OperationVo(
                 row.getId() == null ? null : row.getId().toString(),
-                row.getFactoryId(),
+
                 row.getCode(),
                 row.getName(),
                 row.getDescription(),

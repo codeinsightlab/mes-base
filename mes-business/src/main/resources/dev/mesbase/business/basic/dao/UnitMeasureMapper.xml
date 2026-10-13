@@ -4,7 +4,6 @@
 <mapper namespace="dev.mesbase.business.basic.dao.UnitMeasureMapper">
   <resultMap id="BaseResultMap" type="dev.mesbase.business.basic.domain.UnitMeasureEntity">
     <id column="id" jdbcType="BIGINT" property="id" />
-    <result column="factory_id" jdbcType="VARCHAR" property="factoryId" />
     <result column="code" jdbcType="VARCHAR" property="code" />
     <result column="name" jdbcType="VARCHAR" property="name" />
     <result column="symbol" jdbcType="VARCHAR" property="symbol" />
@@ -69,7 +68,7 @@
     </where>
   </sql>
   <sql id="Base_Column_List">
-    id, factory_id, code, name, symbol, status
+    id, code, name, symbol, status
   </sql>
   <select id="selectByExample" parameterType="dev.mesbase.business.basic.domain.UnitMeasureExample" resultMap="BaseResultMap">
     select
@@ -99,17 +98,14 @@
     </if>
   </delete>
   <insert id="insert" keyColumn="id" keyProperty="id" parameterType="dev.mesbase.business.basic.domain.UnitMeasureEntity" useGeneratedKeys="true">
-    insert into unit_measure (factory_id, code, name, 
-      symbol, status)
-    values (#{factoryId,jdbcType=VARCHAR}, #{code,jdbcType=VARCHAR}, #{name,jdbcType=VARCHAR}, 
-      #{symbol,jdbcType=VARCHAR}, #{status,jdbcType=VARCHAR})
+    insert into unit_measure (code, name, symbol, 
+      status)
+    values (#{code,jdbcType=VARCHAR}, #{name,jdbcType=VARCHAR}, #{symbol,jdbcType=VARCHAR}, 
+      #{status,jdbcType=VARCHAR})
   </insert>
   <insert id="insertSelective" keyColumn="id" keyProperty="id" parameterType="dev.mesbase.business.basic.domain.UnitMeasureEntity" useGeneratedKeys="true">
     insert into unit_measure
     <trim prefix="(" suffix=")" suffixOverrides=",">
-      <if test="factoryId != null">
-        factory_id,
-      </if>
       <if test="code != null">
         code,
       </if>
@@ -124,9 +120,6 @@
       </if>
     </trim>
     <trim prefix="values (" suffix=")" suffixOverrides=",">
-      <if test="factoryId != null">
-        #{factoryId,jdbcType=VARCHAR},
-      </if>
       <if test="code != null">
         #{code,jdbcType=VARCHAR},
       </if>
@@ -153,9 +146,6 @@
       <if test="row.id != null">
         id = #{row.id,jdbcType=BIGINT},
       </if>
-      <if test="row.factoryId != null">
-        factory_id = #{row.factoryId,jdbcType=VARCHAR},
-      </if>
       <if test="row.code != null">
         code = #{row.code,jdbcType=VARCHAR},
       </if>
@@ -176,7 +166,6 @@
   <update id="updateByExample" parameterType="map">
     update unit_measure
     set id = #{row.id,jdbcType=BIGINT},
-      factory_id = #{row.factoryId,jdbcType=VARCHAR},
       code = #{row.code,jdbcType=VARCHAR},
       name = #{row.name,jdbcType=VARCHAR},
       symbol = #{row.symbol,jdbcType=VARCHAR},
@@ -188,9 +177,6 @@
   <update id="updateByPrimaryKeySelective" parameterType="dev.mesbase.business.basic.domain.UnitMeasureEntity">
     update unit_measure
     <set>
-      <if test="factoryId != null">
-        factory_id = #{factoryId,jdbcType=VARCHAR},
-      </if>
       <if test="code != null">
         code = #{code,jdbcType=VARCHAR},
       </if>
@@ -208,8 +194,7 @@
   </update>
   <update id="updateByPrimaryKey" parameterType="dev.mesbase.business.basic.domain.UnitMeasureEntity">
     update unit_measure
-    set factory_id = #{factoryId,jdbcType=VARCHAR},
-      code = #{code,jdbcType=VARCHAR},
+    set code = #{code,jdbcType=VARCHAR},
       name = #{name,jdbcType=VARCHAR},
       symbol = #{symbol,jdbcType=VARCHAR},
       status = #{status,jdbcType=VARCHAR}

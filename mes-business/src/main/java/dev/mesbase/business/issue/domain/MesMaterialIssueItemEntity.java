@@ -7,8 +7,6 @@ import java.time.LocalDateTime;
 public class MesMaterialIssueItemEntity {
     private Long id;
 
-    private String factoryId;
-
     private Long issueId;
 
     private Long materialId;
@@ -43,14 +41,6 @@ public class MesMaterialIssueItemEntity {
 
     public void setId(Long id) {
         this.id = id;
-    }
-
-    public String getFactoryId() {
-        return factoryId;
-    }
-
-    public void setFactoryId(String factoryId) {
-        this.factoryId = factoryId;
     }
 
     public Long getIssueId() {

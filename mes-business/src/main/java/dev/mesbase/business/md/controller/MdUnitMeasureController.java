@@ -1,4 +1,3 @@
-// MES-CODEGEN: scaffold; review required.
 package dev.mesbase.business.md.controller;
 
 import dev.mesbase.business.md.controller.vo.MdUnitMeasurePageVo;
@@ -95,7 +94,7 @@ public class MdUnitMeasureController {
     private static MdUnitMeasureVo toView(MdUnitMeasureEntity row) {
         return new MdUnitMeasureVo(
                 row.getMeasureId() == null ? null : row.getMeasureId().toString(),
-                row.getFactoryId(),
+
                 row.getMeasureCode(),
                 row.getMeasureName(),
                 row.getPrimaryFlag(),

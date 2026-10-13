@@ -1,4 +1,3 @@
-// MES-CODEGEN: scaffold; review required.
 package dev.mesbase.business.basic.controller.vo;
 
 
@@ -7,7 +6,7 @@ package dev.mesbase.business.basic.controller.vo;
  */
 public record MaterialCategoryVo(
         String id,
-        String factoryId,
+
         String code,
         String name,
         String parentId,

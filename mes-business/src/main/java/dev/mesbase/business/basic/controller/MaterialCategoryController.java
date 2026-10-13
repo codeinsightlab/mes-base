@@ -1,4 +1,3 @@
-// MES-CODEGEN: scaffold; review required.
 package dev.mesbase.business.basic.controller;
 
 import dev.mesbase.business.basic.controller.vo.MaterialCategoryPageVo;
@@ -95,7 +94,7 @@ public class MaterialCategoryController {
     private static MaterialCategoryVo toView(MaterialCategoryEntity row) {
         return new MaterialCategoryVo(
                 row.getId() == null ? null : row.getId().toString(),
-                row.getFactoryId(),
+
                 row.getCode(),
                 row.getName(),
                 row.getParentId() == null ? null : row.getParentId().toString(),

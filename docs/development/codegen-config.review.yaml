@@ -3,8 +3,9 @@
 # 不包含数据库凭证，不执行菜单 SQL，不授予角色。
 version: 1
 
-# 默认 false；历史配置缺少此项也按 false。当前用户要求本次全量覆盖时生成同步，因此显式开启。
-generateSync: true
+# 2026-10-13 用户决定：后续暂只生成基础 CRUD，不生成同步代码、接口、按钮或权限。
+# 工具默认 false；保留 sync 参数供未来明确开启时使用，当前不会参与生成。
+generateSync: false
 sync:
   # 物理列名，不猜业务字段；每表可用 tableOverrides.<table>.syncMatchKey 覆盖。
   # primary-key 是显式选择 metadata 主键的技术策略，接 ERP 前须确认其来源标识映射；不会自动采用。
@@ -24,7 +25,8 @@ selection:
   tables: []
   # 全量生成时明确跳过的表；默认草案为空，不猜测哪些属于业务表。
   # 排除 Flyway 迁移历史技术表，防止生成其 CRUD/同步接口。
-  excludeTables: [flyway_business_schema_history, qc_index, qc_defect]
+  # pro_workorder 为已退役的 Source 结构，不能重新生成旧技术工单入口。
+  excludeTables: [flyway_business_schema_history, qc_index, qc_defect, pro_workorder]
   # 与表选择独立：all 表示所有产物；也可指定 persistence/backend/frontend/menu/test。
   artifacts: [all]
 
@@ -187,29 +189,23 @@ tableOverrides:
     module: basic
     displayName: 物料产品分类
     syncMatchKey: code
-    serverScopeColumn: factory_id
   unit_measure:
     module: basic
     displayName: 计量单位
     syncMatchKey: code
-    serverScopeColumn: factory_id
   workshop:
     module: basic
     displayName: 车间
     syncMatchKey: code
-    serverScopeColumn: factory_id
   workstation:
     module: basic
     displayName: 工作站
     syncMatchKey: code
-    serverScopeColumn: factory_id
   material:
     module: basic
     displayName: 物料产品
     syncMatchKey: code
-    serverScopeColumn: factory_id
   safety_stock:
     module: basic
     displayName: 安全库存配置
     syncMatchKey: material_id
-    serverScopeColumn: factory_id

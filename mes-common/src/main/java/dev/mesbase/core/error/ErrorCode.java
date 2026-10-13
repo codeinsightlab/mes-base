@@ -1,6 +1,8 @@
 package dev.mesbase.core.error;
 
 public enum ErrorCode {
+    WORKORDER_INVALID(422, "工单、批次数量、工艺引用或完整路径不符合规则"),
+    BATCH_ROUTE_FROZEN(409, "路径已锁定、正在出库或结果待核实，禁止更改"),
     ROUTING_GRAPH_INVALID(422, "路线拓扑无效：请检查节点、连接、环路及孤立节点"),
     STOCK_REFERENCE_INVALID(422, "物料和仓库必须存在且属于当前工厂"),
     WAREHOUSE_REFERENCED(409, "仓库已被库存引用，不能删除"),

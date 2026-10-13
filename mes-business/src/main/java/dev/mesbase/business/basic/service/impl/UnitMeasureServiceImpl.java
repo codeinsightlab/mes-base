@@ -1,4 +1,3 @@
-// MES-CODEGEN: scaffold; review required.
 package dev.mesbase.business.basic.service.impl;
 
 import com.github.pagehelper.Page;
@@ -77,7 +76,6 @@ public class UnitMeasureServiceImpl implements IUnitMeasureService {
         }
         UnitMeasureExample example = new UnitMeasureExample();
         UnitMeasureExample.Criteria criteria = example.createCriteria();
-        criteria.andFactoryIdEqualTo(FactoryContext.required().factoryId().value());
         if (query.code() != null) {
             criteria.andCodeLike("%" + query.code() + "%");
         }
@@ -113,7 +111,7 @@ public class UnitMeasureServiceImpl implements IUnitMeasureService {
             scope = BusinessCacheEvict.Scope.LIST)
     public UnitMeasureEntity insert(UnitMeasureCreateCommand input) {
         UnitMeasureEntity row = new UnitMeasureEntity();
-        row.setFactoryId(FactoryContext.required().factoryId().value());
+
         row.setCode(input.code());
         row.setName(input.name());
         row.setSymbol(input.symbol());
@@ -156,7 +154,7 @@ public class UnitMeasureServiceImpl implements IUnitMeasureService {
         UnitMeasureExample example = new UnitMeasureExample();
         for (var id : ids) requireRecord(id);
         example.createCriteria().andIdIn(ids)
-                .andFactoryIdEqualTo(FactoryContext.required().factoryId().value())
+                
         ;
         if (mapper.deleteByExample(example) != ids.size()) {
             throw new FoundationException(ErrorCode.RESOURCE_CONFLICT);
@@ -181,7 +179,7 @@ public class UnitMeasureServiceImpl implements IUnitMeasureService {
 
     private UnitMeasureEntity requireRecord(Long id) {
         UnitMeasureEntity row = mapper.selectByPrimaryKey(id);
-        if (row == null || !FactoryContext.required().factoryId().value().equals(row.getFactoryId())) {
+        if (row == null) {
             throw new FoundationException(ErrorCode.NOT_FOUND);
         }
         return row;
@@ -227,7 +225,7 @@ public class UnitMeasureServiceImpl implements IUnitMeasureService {
         if (inputs.isEmpty()) return new UnitMeasureSyncResult(0, 0, 0, 0);
         var example = new UnitMeasureExample();
         example.createCriteria().andCodeIn(List.copyOf(keys))
-                .andFactoryIdEqualTo(scope.factoryId().value())
+                
         ;
         var existing = new HashMap<String, UnitMeasureEntity>();
         for (var row : mapper.selectByExample(example)) {
@@ -247,7 +245,7 @@ public class UnitMeasureServiceImpl implements IUnitMeasureService {
             boolean insert = row == null;
             if (insert) {
                 row = new UnitMeasureEntity();
-                row.setFactoryId(scope.factoryId().value());
+
             }
             row.setCode(input.code());
             row.setName(input.name());

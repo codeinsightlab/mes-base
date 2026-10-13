@@ -7,6 +7,7 @@ import dev.mesbase.business.issue.domain.MesMaterialIssueExample;
 import dev.mesbase.business.issue.domain.MesMaterialIssueItemEntity;
 import dev.mesbase.business.issue.domain.MesMaterialIssueItemExample;
 import java.math.BigDecimal;
+import dev.mesbase.acceptance.AcceptanceBusinessDatabase;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Map;
@@ -30,13 +31,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class MaterialIssueMySqlTest {
     @Test
     void metadataAndCrudPreserveSixDecimalPlacesWithoutGuessedUniqueKeys() throws Exception {
-        Map<?, ?> root = new Yaml().load(Files.readString(Path.of("mes-admin/src/main/resources/application-dev.yml")));
-        Map<?, ?> mes = (Map<?, ?>) root.get("mes");
-        Map<?, ?> codegen = (Map<?, ?>) mes.get("codegen");
-        Map<?, ?> profiles = (Map<?, ?>) codegen.get("profiles");
-        Map<?, ?> profile = (Map<?, ?>) profiles.get("dev");
-        var source = new DriverManagerDataSource((String) profile.get("url"),
-                (String) profile.get("username"), (String) profile.get("password"));
+        var source = AcceptanceBusinessDatabase.source();
         var config = new Configuration(new Environment("LIVE MYSQL ROLLBACK ONLY", new JdbcTransactionFactory(), source));
         config.addMapper(MesMaterialIssueMapper.class);
         config.addMapper(MesMaterialIssueItemMapper.class);
@@ -44,7 +39,7 @@ class MaterialIssueMySqlTest {
         String scope = "TEST_ISSUE_" + UUID.randomUUID();
         try (var session = sessions.openSession(false)) {
             var connection = session.getConnection();
-            assertEquals("mes_base_dev_business", connection.getCatalog());
+            assertEquals("mes_base_dev_business_simple_b", connection.getCatalog());
             try (var statement = connection.createStatement()) {
                 try (var rows = statement.executeQuery("SELECT COLUMN_COMMENT FROM information_schema.columns WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME IN ('mes_material_issue','mes_material_issue_item')")) {
                     int count = 0;
@@ -52,7 +47,7 @@ class MaterialIssueMySqlTest {
                         assertTrue(rows.getString(1) != null && !rows.getString(1).isBlank());
                         count++;
                     }
-                    assertEquals(32, count);
+                    assertEquals(30, count);
                 }
                 try (var indexes = statement.executeQuery("SELECT COUNT(*) FROM information_schema.statistics WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME IN ('mes_material_issue','mes_material_issue_item') AND NON_UNIQUE=0 AND INDEX_NAME<>'PRIMARY'")) {
                     indexes.next();
@@ -62,12 +57,12 @@ class MaterialIssueMySqlTest {
             var headers = session.getMapper(MesMaterialIssueMapper.class);
             var items = session.getMapper(MesMaterialIssueItemMapper.class);
             var header = new MesMaterialIssueEntity();
-            header.setFactoryId(scope);
-            header.setIssueNo("TEST_ONLY");
+
+            header.setIssueNo(scope);
             header.setStatus("DRAFT");
             assertEquals(1, headers.insert(header));
             var item = new MesMaterialIssueItemEntity();
-            item.setFactoryId(scope);
+
             item.setIssueId(header.getId());
             item.setMaterialId(999999999L);
             item.setMaterialCode("TEST_ONLY");
@@ -81,7 +76,7 @@ class MaterialIssueMySqlTest {
             assertEquals(1, items.updateByPrimaryKey(item));
             assertEquals(new BigDecimal("1.000001"), items.selectByPrimaryKey(item.getId()).getQuantity());
             var filter = new MesMaterialIssueItemExample();
-            filter.createCriteria().andFactoryIdEqualTo(scope).andIssueIdEqualTo(header.getId());
+            filter.createCriteria().andIssueIdEqualTo(header.getId());
             assertEquals(2, items.countByExample(filter));
             assertEquals(2, items.deleteByExample(filter));
             assertEquals(1, headers.deleteByPrimaryKey(header.getId()));
@@ -89,7 +84,7 @@ class MaterialIssueMySqlTest {
         }
         try (var session = sessions.openSession()) {
             var filter = new MesMaterialIssueExample();
-            filter.createCriteria().andFactoryIdEqualTo(scope);
+            filter.createCriteria().andIssueNoEqualTo(scope);
             assertEquals(0, session.getMapper(MesMaterialIssueMapper.class).countByExample(filter));
         }
     }

@@ -78,7 +78,6 @@ public class OperationServiceImpl implements IOperationService {
         }
         OperationExample example = new OperationExample();
         OperationExample.Criteria criteria = example.createCriteria();
-        criteria.andFactoryIdEqualTo(FactoryContext.required().factoryId().value());
         if (query.code() != null) {
             criteria.andCodeLike("%" + query.code() + "%");
         }
@@ -123,7 +122,7 @@ public class OperationServiceImpl implements IOperationService {
             scope = BusinessCacheEvict.Scope.LIST)
     public OperationEntity insert(OperationCreateCommand input) {
         OperationEntity row = new OperationEntity();
-        row.setFactoryId(FactoryContext.required().factoryId().value());
+
         row.setCode(input.code());
         row.setName(input.name());
         row.setDescription(input.description());
@@ -157,7 +156,7 @@ public class OperationServiceImpl implements IOperationService {
         row.setRevision(input.revision() + 1);
         validate(row);
         var expected = new OperationExample();
-        expected.createCriteria().andIdEqualTo(id).andFactoryIdEqualTo(row.getFactoryId())
+        expected.createCriteria().andIdEqualTo(id)
                 .andRevisionEqualTo(input.revision());
         if (updateUnique(row, expected) != 1) {
             throw new FoundationException(ErrorCode.ROUTING_REVISION_CONFLICT);
@@ -178,7 +177,7 @@ public class OperationServiceImpl implements IOperationService {
         for (var id : ids) requireRecord(id);
         references.deletingOperations(ids);
         example.createCriteria().andIdIn(ids)
-                .andFactoryIdEqualTo(FactoryContext.required().factoryId().value())
+                
         ;
         if (mapper.deleteByExample(example) != ids.size()) {
             throw new FoundationException(ErrorCode.RESOURCE_CONFLICT);
@@ -245,11 +244,19 @@ public class OperationServiceImpl implements IOperationService {
         }
         if (inputs.isEmpty()) return new ProductionSyncResult(0, 0, 0, 0);
         var filter = new OperationExample();
-        filter.createCriteria().andFactoryIdEqualTo(scope.factoryId().value()).andCodeIn(List.copyOf(keys));
+        filter.createCriteria().andCodeIn(List.copyOf(keys));
         // Lock existing definitions before reading the revision used by this write.
         var lock = new OperationEntity();
-        lock.setFactoryId(scope.factoryId().value());
-        mapper.updateByExampleSelective(lock, filter);
+
+        for (var reference : mapper.selectByExample(filter).stream()
+                .sorted((left, right) -> left.getId().compareTo(right.getId())).toList()) {
+            lock.setId(reference.getId());
+            var rowFilter = new OperationExample();
+            rowFilter.createCriteria().andIdEqualTo(reference.getId());
+            if (mapper.updateByExampleSelective(lock, rowFilter) != 1) {
+                throw new FoundationException(ErrorCode.NOT_FOUND);
+            }
+        }
         var existing = new HashMap<String, OperationEntity>();
         for (var row : mapper.selectByExample(filter)) existing.put(row.getCode().toLowerCase(Locale.ROOT), row);
         int created = 0, updated = 0, skipped = 0;
@@ -265,7 +272,7 @@ public class OperationServiceImpl implements IOperationService {
             boolean insert = row == null;
             if (insert) {
                 row = new OperationEntity();
-                row.setFactoryId(scope.factoryId().value());
+
                 row.setSort(0);
                 row.setRevision(0);
             } else row.setRevision(row.getRevision() + 1);
@@ -286,13 +293,13 @@ public class OperationServiceImpl implements IOperationService {
 
     private OperationExample filterById(OperationEntity row) {
         var filter = new OperationExample();
-        filter.createCriteria().andIdEqualTo(row.getId()).andFactoryIdEqualTo(row.getFactoryId());
+        filter.createCriteria().andIdEqualTo(row.getId());
         return filter;
     }
 
     private OperationEntity requireRecord(Long id) {
         OperationEntity row = mapper.selectByPrimaryKey(id);
-        if (row == null || !FactoryContext.required().factoryId().value().equals(row.getFactoryId())) {
+        if (row == null) {
             throw new FoundationException(ErrorCode.NOT_FOUND);
         }
         return row;

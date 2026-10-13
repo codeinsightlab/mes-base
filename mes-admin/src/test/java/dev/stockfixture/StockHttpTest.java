@@ -119,10 +119,13 @@ class StockHttpTest {
                 var jdbc = new JdbcTemplate(source);
                 for (String name : List.of("V2__simple_business_capabilities.sql", "V8__warehouse_inventory.sql")) {
                     String ddl = Files.readString(Path.of("mes-admin/src/main/resources/db/business/" + name))
-                            .replace(") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT=", ") COMMENT ");
+                            .replace(") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT=", ") COMMENT ")
+                    .replaceAll("(?m)^\\s*factory_id [^\\n]+\\n", "")
+                    .replace("factory_id,", "")
+                    .replace("factory_id, ", "");
                     for (String statement : ddl.split(";")) if (!statement.isBlank()) jdbc.execute(statement);
                 }
-                jdbc.update("INSERT INTO material(id,factory_id,code,name,unit_id,material_type,status) VALUES(1,?,'M1','物料一',1,'ITEM','ENABLED'),(2,'OTHER','M2','越厂物料',1,'ITEM','ENABLED')", id);
+                jdbc.update("INSERT INTO material(id,code,name,unit_id,material_type,status) VALUES(1,'M1','物料一',1,'ITEM','ENABLED')");
                 business.put(id, jdbc);
                 var identity = new DatasourceIdentity("TEST_ONLY_" + id);
                 var factoryId = new FactoryId(id);
@@ -339,7 +342,7 @@ class StockHttpTest {
             var m = mvc(c);
             var f = c.getBean(Fixture.class);
             f.business.get("A")
-                    .update("INSERT INTO wm_warehouse(factory_id,code,name,status) VALUES('A','W1','一仓','ENABLED'),('A','W2','二仓','ENABLED'),('OTHER','W3','越厂仓','ENABLED')");
+                    .update("INSERT INTO wm_warehouse(code,name,status) VALUES('W1','一仓','ENABLED'),('W2','二仓','ENABLED')");
             f.inputs = List.of(external(1, "1.2"), external(2, "2.3"));
             m.perform(post(I + "/actions/sync").header("Authorization", "Bearer FULL").header("X-Factory-Id", "A"))
                     .andExpect(status().isOk()).andExpect(jsonPath("created").value(2));
@@ -386,7 +389,7 @@ class StockHttpTest {
                 var m = mvc(c);
                 var f = c.getBean(Fixture.class);
                 f.business.get("A")
-                        .update("INSERT INTO wm_warehouse(factory_id,code,name,status) VALUES('A','W1','一仓','ENABLED'),('A','W2','二仓','ENABLED')");
+                        .update("INSERT INTO wm_warehouse(code,name,status) VALUES('W1','一仓','ENABLED'),('W2','二仓','ENABLED')");
                 f.inputs = List.of(external(1, "1"), external(2, "2"));
                 f.loseAt = loseAt;
                 m.perform(post(I + "/actions/sync").header("Authorization", "Bearer FULL").header("X-Factory-Id", "A"))

@@ -1,4 +1,3 @@
-// MES-CODEGEN: scaffold; review required.
 package dev.mesbase.business.basic.service.impl;
 
 import com.github.pagehelper.Page;
@@ -77,7 +76,6 @@ public class SafetyStockServiceImpl implements ISafetyStockService {
         }
         SafetyStockExample example = new SafetyStockExample();
         SafetyStockExample.Criteria criteria = example.createCriteria();
-        criteria.andFactoryIdEqualTo(FactoryContext.required().factoryId().value());
         if (query.materialId() != null) {
             criteria.andMaterialIdEqualTo(query.materialId());
         }
@@ -113,7 +111,7 @@ public class SafetyStockServiceImpl implements ISafetyStockService {
             scope = BusinessCacheEvict.Scope.LIST)
     public SafetyStockEntity insert(SafetyStockCreateCommand input) {
         SafetyStockEntity row = new SafetyStockEntity();
-        row.setFactoryId(FactoryContext.required().factoryId().value());
+
         row.setMaterialId(input.materialId());
         row.setMinQty(input.minQty());
         row.setMaxQty(input.maxQty());
@@ -156,7 +154,7 @@ public class SafetyStockServiceImpl implements ISafetyStockService {
         SafetyStockExample example = new SafetyStockExample();
         for (var id : ids) requireRecord(id);
         example.createCriteria().andIdIn(ids)
-                .andFactoryIdEqualTo(FactoryContext.required().factoryId().value())
+                
         ;
         if (mapper.deleteByExample(example) != ids.size()) {
             throw new FoundationException(ErrorCode.RESOURCE_CONFLICT);
@@ -181,7 +179,7 @@ public class SafetyStockServiceImpl implements ISafetyStockService {
 
     private SafetyStockEntity requireRecord(Long id) {
         SafetyStockEntity row = mapper.selectByPrimaryKey(id);
-        if (row == null || !FactoryContext.required().factoryId().value().equals(row.getFactoryId())) {
+        if (row == null) {
             throw new FoundationException(ErrorCode.NOT_FOUND);
         }
         return row;
@@ -227,7 +225,7 @@ public class SafetyStockServiceImpl implements ISafetyStockService {
         if (inputs.isEmpty()) return new SafetyStockSyncResult(0, 0, 0, 0);
         var example = new SafetyStockExample();
         example.createCriteria().andMaterialIdIn(List.copyOf(keys))
-                .andFactoryIdEqualTo(scope.factoryId().value())
+                
         ;
         var existing = new HashMap<Long, SafetyStockEntity>();
         for (var row : mapper.selectByExample(example)) {
@@ -247,7 +245,7 @@ public class SafetyStockServiceImpl implements ISafetyStockService {
             boolean insert = row == null;
             if (insert) {
                 row = new SafetyStockEntity();
-                row.setFactoryId(scope.factoryId().value());
+
             }
             row.setMaterialId(input.materialId());
             row.setMinQty(input.minQty());

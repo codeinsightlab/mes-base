@@ -4,7 +4,6 @@
 <mapper namespace="dev.mesbase.business.issue.dao.MesMaterialIssueMapper">
   <resultMap id="BaseResultMap" type="dev.mesbase.business.issue.domain.MesMaterialIssueEntity">
     <id column="id" jdbcType="BIGINT" property="id" />
-    <result column="factory_id" jdbcType="VARCHAR" property="factoryId" />
     <result column="issue_no" jdbcType="VARCHAR" property="issueNo" />
     <result column="workorder_id" jdbcType="BIGINT" property="workorderId" />
     <result column="workorder_code" jdbcType="VARCHAR" property="workorderCode" />
@@ -79,9 +78,8 @@
     </where>
   </sql>
   <sql id="Base_Column_List">
-    id, factory_id, issue_no, workorder_id, workorder_code, product_id, product_code, 
-    flow_card_no, routing_id, issue_time, status, remark, create_by, create_time, update_by, 
-    update_time
+    id, issue_no, workorder_id, workorder_code, product_id, product_code, flow_card_no, 
+    routing_id, issue_time, status, remark, create_by, create_time, update_by, update_time
   </sql>
   <select id="selectByExample" parameterType="dev.mesbase.business.issue.domain.MesMaterialIssueExample" resultMap="BaseResultMap">
     select
@@ -111,25 +109,20 @@
     </if>
   </delete>
   <insert id="insert" keyColumn="id" keyProperty="id" parameterType="dev.mesbase.business.issue.domain.MesMaterialIssueEntity" useGeneratedKeys="true">
-    insert into mes_material_issue (factory_id, issue_no, workorder_id, 
-      workorder_code, product_id, product_code, 
-      flow_card_no, routing_id, issue_time, 
-      status, remark, create_by, 
-      create_time, update_by, update_time
-      )
-    values (#{factoryId,jdbcType=VARCHAR}, #{issueNo,jdbcType=VARCHAR}, #{workorderId,jdbcType=BIGINT}, 
-      #{workorderCode,jdbcType=VARCHAR}, #{productId,jdbcType=BIGINT}, #{productCode,jdbcType=VARCHAR}, 
-      #{flowCardNo,jdbcType=VARCHAR}, #{routingId,jdbcType=BIGINT}, #{issueTime,jdbcType=TIMESTAMP}, 
-      #{status,jdbcType=VARCHAR}, #{remark,jdbcType=VARCHAR}, #{createBy,jdbcType=VARCHAR}, 
-      #{createTime,jdbcType=TIMESTAMP}, #{updateBy,jdbcType=VARCHAR}, #{updateTime,jdbcType=TIMESTAMP}
-      )
+    insert into mes_material_issue (issue_no, workorder_id, workorder_code, 
+      product_id, product_code, flow_card_no, 
+      routing_id, issue_time, status, 
+      remark, create_by, create_time, 
+      update_by, update_time)
+    values (#{issueNo,jdbcType=VARCHAR}, #{workorderId,jdbcType=BIGINT}, #{workorderCode,jdbcType=VARCHAR}, 
+      #{productId,jdbcType=BIGINT}, #{productCode,jdbcType=VARCHAR}, #{flowCardNo,jdbcType=VARCHAR}, 
+      #{routingId,jdbcType=BIGINT}, #{issueTime,jdbcType=TIMESTAMP}, #{status,jdbcType=VARCHAR}, 
+      #{remark,jdbcType=VARCHAR}, #{createBy,jdbcType=VARCHAR}, #{createTime,jdbcType=TIMESTAMP}, 
+      #{updateBy,jdbcType=VARCHAR}, #{updateTime,jdbcType=TIMESTAMP})
   </insert>
   <insert id="insertSelective" keyColumn="id" keyProperty="id" parameterType="dev.mesbase.business.issue.domain.MesMaterialIssueEntity" useGeneratedKeys="true">
     insert into mes_material_issue
     <trim prefix="(" suffix=")" suffixOverrides=",">
-      <if test="factoryId != null">
-        factory_id,
-      </if>
       <if test="issueNo != null">
         issue_no,
       </if>
@@ -174,9 +167,6 @@
       </if>
     </trim>
     <trim prefix="values (" suffix=")" suffixOverrides=",">
-      <if test="factoryId != null">
-        #{factoryId,jdbcType=VARCHAR},
-      </if>
       <if test="issueNo != null">
         #{issueNo,jdbcType=VARCHAR},
       </if>
@@ -233,9 +223,6 @@
       <if test="row.id != null">
         id = #{row.id,jdbcType=BIGINT},
       </if>
-      <if test="row.factoryId != null">
-        factory_id = #{row.factoryId,jdbcType=VARCHAR},
-      </if>
       <if test="row.issueNo != null">
         issue_no = #{row.issueNo,jdbcType=VARCHAR},
       </if>
@@ -286,7 +273,6 @@
   <update id="updateByExample" parameterType="map">
     update mes_material_issue
     set id = #{row.id,jdbcType=BIGINT},
-      factory_id = #{row.factoryId,jdbcType=VARCHAR},
       issue_no = #{row.issueNo,jdbcType=VARCHAR},
       workorder_id = #{row.workorderId,jdbcType=BIGINT},
       workorder_code = #{row.workorderCode,jdbcType=VARCHAR},
@@ -308,9 +294,6 @@
   <update id="updateByPrimaryKeySelective" parameterType="dev.mesbase.business.issue.domain.MesMaterialIssueEntity">
     update mes_material_issue
     <set>
-      <if test="factoryId != null">
-        factory_id = #{factoryId,jdbcType=VARCHAR},
-      </if>
       <if test="issueNo != null">
         issue_no = #{issueNo,jdbcType=VARCHAR},
       </if>
@@ -358,8 +341,7 @@
   </update>
   <update id="updateByPrimaryKey" parameterType="dev.mesbase.business.issue.domain.MesMaterialIssueEntity">
     update mes_material_issue
-    set factory_id = #{factoryId,jdbcType=VARCHAR},
-      issue_no = #{issueNo,jdbcType=VARCHAR},
+    set issue_no = #{issueNo,jdbcType=VARCHAR},
       workorder_id = #{workorderId,jdbcType=BIGINT},
       workorder_code = #{workorderCode,jdbcType=VARCHAR},
       product_id = #{productId,jdbcType=BIGINT},

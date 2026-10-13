@@ -6,7 +6,7 @@ import dev.mesbase.business.issue.dao.MesMaterialIssueItemMapper;
 import dev.mesbase.business.basic.dao.UnitMeasureMapper;
 import dev.mesbase.business.production.dao.RoutingMapper;
 import dev.mesbase.business.production.dao.RoutingProductMapper;
-import dev.mesbase.business.pro.dao.ProWorkorderMapper;
+import dev.mesbase.business.production.dao.WorkorderMapper;
 import dev.mesbase.business.issue.controller.MesMaterialIssueController;
 import dev.mesbase.business.issue.controller.MesMaterialIssueItemController;
 import dev.mesbase.business.issue.service.impl.MesMaterialIssueServiceImpl;
@@ -86,7 +86,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * TEST ONLY: real generated SQL, HTTP authorization and transactions; two separate H2 databases.
  */
 class MaterialIssueHttpTest {
-    static final Set<Class<?>> MAPPERS = Set.of(MaterialMapper.class, UnitMeasureMapper.class, WmWarehouseMapper.class, RoutingMapper.class, RoutingProductMapper.class, ProWorkorderMapper.class, MesMaterialIssueMapper.class, MesMaterialIssueItemMapper.class);
+    static final Set<Class<?>> MAPPERS = Set.of(MaterialMapper.class, UnitMeasureMapper.class, WmWarehouseMapper.class, RoutingMapper.class, RoutingProductMapper.class, WorkorderMapper.class, MesMaterialIssueMapper.class, MesMaterialIssueItemMapper.class);
 
     static class Fixture implements AutoCloseable {
         final RuntimeRegistry registry = new RuntimeRegistry();
@@ -102,20 +102,23 @@ class MaterialIssueHttpTest {
                 var jdbc = new JdbcTemplate(source);
                 for (String name : List.of("V2__simple_business_capabilities.sql", "V3__operation_routing.sql", "V8__warehouse_inventory.sql", "V11__material_issue.sql", "V12__material_issue_quantity_precision.sql")) {
                     String ddl = Files.readString(Path.of("mes-admin/src/main/resources/db/business/" + name))
-                            .replace(") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT=", ") COMMENT ");
+                            .replace(") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT=", ") COMMENT ")
+                    .replaceAll("(?m)^\\s*factory_id [^\\n]+\\n", "")
+                    .replace("factory_id,", "")
+                    .replace("factory_id, ", "");
                     for (String statement : ddl.split(";")) if (!statement.isBlank()) jdbc.execute(statement);
                 }
-                jdbc.update("INSERT INTO material(id,factory_id,code,name,unit_id,material_type,status) VALUES(1,?,'M1','物料一',1,'ITEM','ENABLED'),(2,'OTHER','M2','越厂物料',1,'ITEM','ENABLED')", id);
-                String xml = Files.readString(Path.of("mes-business/src/main/resources/dev/mesbase/business/pro/dao/ProWorkorderMapper.xml"));
+                jdbc.update("INSERT INTO material(id,code,name,unit_id,material_type,status) VALUES(1,'M1','物料一',1,'ITEM','ENABLED')");
+                String xml = Files.readString(Path.of("mes-business/src/main/resources/dev/mesbase/business/production/dao/WorkorderMapper.xml"));
                 var matches = Pattern.compile("column=\"([^\"]+)\" jdbcType=\"([^\"]+)\"").matcher(xml);
                 var columns = new ArrayList<String>();
                 while (matches.find())
                     columns.add(matches.group(1) + " " + ("VARCHAR".equals(matches.group(2)) ? "VARCHAR(255)" : matches.group(2)));
-                jdbc.execute("CREATE TABLE pro_workorder(" + String.join(",", columns) + ")");
-                jdbc.update("INSERT INTO pro_workorder(workorder_id,workorder_code,product_code) VALUES(1,'WO1','M1')");
-                jdbc.update("INSERT INTO unit_measure(id,factory_id,code,name,status) VALUES(1,?,'KG','千克','ENABLED')", id);
-                jdbc.update("INSERT INTO wm_warehouse(id,factory_id,code,name,status) VALUES(1,?,'W1','验收仓库','ENABLED')", id);
-                jdbc.update("INSERT INTO routing(id,factory_id,code,name,version,status,revision,published_at) VALUES(1,?,'R1','已发布版本',1,'PUBLISHED',0,CURRENT_TIMESTAMP),(2,?,'R1','草稿版本',2,'DRAFT',0,NULL)", id, id);
+                jdbc.execute("CREATE TABLE workorder(" + String.join(",", columns) + ")");
+                jdbc.update("INSERT INTO workorder(id,code,product_id,routing_id) VALUES(1,'WO1',1,1)");
+                jdbc.update("INSERT INTO unit_measure(id,code,name,status) VALUES(1,'KG','千克','ENABLED')");
+                jdbc.update("INSERT INTO wm_warehouse(id,code,name,status) VALUES(1,'W1','验收仓库','ENABLED')");
+                jdbc.update("INSERT INTO routing(id,code,name,version,status,revision,published_at) VALUES(1,'R1','已发布版本',1,'PUBLISHED',0,CURRENT_TIMESTAMP),(2,'R1','草稿版本',2,'DRAFT',0,NULL)");
                 jdbc.update("INSERT INTO routing_product(routing_id,material_id,material_code,material_name) VALUES(1,1,'M1','产品')");
                 business.put(id, jdbc);
                 var identity = new DatasourceIdentity("TEST_ONLY_" + id);
@@ -207,8 +210,8 @@ class MaterialIssueHttpTest {
         }
 
         @Bean
-        ProWorkorderMapper mapperProWorkorderMapper(SqlSessionFactory f) {
-            return new SqlSessionTemplate(f).getMapper(ProWorkorderMapper.class);
+        WorkorderMapper mapperWorkorderMapper(SqlSessionFactory f) {
+            return new SqlSessionTemplate(f).getMapper(WorkorderMapper.class);
         }
 
         @Bean

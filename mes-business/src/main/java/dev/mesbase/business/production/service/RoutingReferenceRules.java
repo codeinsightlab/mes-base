@@ -43,11 +43,19 @@ public class RoutingReferenceRules {
     public List<OperationEntity> lockOperations(List<Long> ids, boolean enabled) {
         if (ids.isEmpty()) return List.of();
         var filter = new OperationExample();
-        filter.createCriteria().andFactoryIdEqualTo(factory()).andIdIn(ids);
+        filter.createCriteria().andIdIn(ids);
         // Same-value UPDATE takes a database row lock without a second persistence implementation.
         var lock = new OperationEntity();
-        lock.setFactoryId(factory());
-        operations.updateByExampleSelective(lock, filter);
+
+        for (var reference : operations.selectByExample(filter).stream()
+                .sorted((left, right) -> left.getId().compareTo(right.getId())).toList()) {
+            lock.setId(reference.getId());
+            var rowFilter = new OperationExample();
+            rowFilter.createCriteria().andIdEqualTo(reference.getId());
+            if (operations.updateByExampleSelective(lock, rowFilter) != 1) {
+                throw new FoundationException(ErrorCode.NOT_FOUND);
+            }
+        }
         var rows = operations.selectByExample(filter);
         if (rows.size() != ids.size() || enabled && rows.stream()
                 .anyMatch(row -> !"ENABLED".equals(row.getStatus()))) {
@@ -59,10 +67,18 @@ public class RoutingReferenceRules {
     public List<MaterialEntity> lockMaterials(List<Long> ids, boolean enabled) {
         if (ids.isEmpty()) return List.of();
         var filter = new MaterialExample();
-        filter.createCriteria().andFactoryIdEqualTo(factory()).andIdIn(ids);
+        filter.createCriteria().andIdIn(ids);
         var lock = new MaterialEntity();
-        lock.setFactoryId(factory());
-        materials.updateByExampleSelective(lock, filter);
+
+        for (var reference : materials.selectByExample(filter).stream()
+                .sorted((left, right) -> left.getId().compareTo(right.getId())).toList()) {
+            lock.setId(reference.getId());
+            var rowFilter = new MaterialExample();
+            rowFilter.createCriteria().andIdEqualTo(reference.getId());
+            if (materials.updateByExampleSelective(lock, rowFilter) != 1) {
+                throw new FoundationException(ErrorCode.NOT_FOUND);
+            }
+        }
         var rows = materials.selectByExample(filter);
         if (rows.size() != ids.size() || enabled && rows.stream()
                 .anyMatch(row -> !"ENABLED".equals(row.getStatus()))) {

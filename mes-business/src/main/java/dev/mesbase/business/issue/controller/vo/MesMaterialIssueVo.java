@@ -1,4 +1,3 @@
-// MES-CODEGEN: scaffold; review required.
 package dev.mesbase.business.issue.controller.vo;
 
 import java.time.LocalDateTime;
@@ -8,7 +7,7 @@ import java.time.LocalDateTime;
  */
 public record MesMaterialIssueVo(
         String id,
-        String factoryId,
+
         String issueNo,
         String workorderId,
         String workorderCode,

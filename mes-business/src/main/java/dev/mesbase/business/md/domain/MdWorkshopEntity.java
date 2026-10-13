@@ -7,8 +7,6 @@ import java.time.LocalDateTime;
 public class MdWorkshopEntity {
     private Long workshopId;
 
-    private String factoryId;
-
     private String workshopCode;
 
     private String workshopName;
@@ -37,14 +35,6 @@ public class MdWorkshopEntity {
 
     public void setWorkshopId(Long workshopId) {
         this.workshopId = workshopId;
-    }
-
-    public String getFactoryId() {
-        return factoryId;
-    }
-
-    public void setFactoryId(String factoryId) {
-        this.factoryId = factoryId;
     }
 
     public String getWorkshopCode() {

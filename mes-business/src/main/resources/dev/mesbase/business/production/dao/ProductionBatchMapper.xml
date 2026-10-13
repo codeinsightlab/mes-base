@@ -1,0 +1,313 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- MES-CODEGEN: MyBatis Generator standard single-table persistence. -->
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="dev.mesbase.business.production.dao.ProductionBatchMapper">
+  <resultMap id="BaseResultMap" type="dev.mesbase.business.production.domain.ProductionBatchEntity">
+    <id column="id" jdbcType="BIGINT" property="id" />
+    <result column="workorder_id" jdbcType="BIGINT" property="workorderId" />
+    <result column="batch_no" jdbcType="VARCHAR" property="batchNo" />
+    <result column="planned_qty" jdbcType="DECIMAL" property="plannedQty" />
+    <result column="status" jdbcType="VARCHAR" property="status" />
+    <result column="route_status" jdbcType="VARCHAR" property="routeStatus" />
+    <result column="issue_command_id" jdbcType="VARCHAR" property="issueCommandId" />
+    <result column="locked_at" jdbcType="TIMESTAMP" property="lockedAt" />
+    <result column="revision" jdbcType="INTEGER" property="revision" />
+    <result column="remark" jdbcType="VARCHAR" property="remark" />
+    <result column="create_time" jdbcType="TIMESTAMP" property="createTime" />
+    <result column="update_time" jdbcType="TIMESTAMP" property="updateTime" />
+  </resultMap>
+  <sql id="Example_Where_Clause">
+    <where>
+      <foreach collection="oredCriteria" item="criteria" separator="or">
+        <if test="criteria.valid">
+          <trim prefix="(" prefixOverrides="and" suffix=")">
+            <foreach collection="criteria.criteria" item="criterion">
+              <choose>
+                <when test="criterion.noValue">
+                  and ${criterion.condition}
+                </when>
+                <when test="criterion.singleValue">
+                  and ${criterion.condition} #{criterion.value}
+                </when>
+                <when test="criterion.betweenValue">
+                  and ${criterion.condition} #{criterion.value} and #{criterion.secondValue}
+                </when>
+                <when test="criterion.listValue">
+                  and ${criterion.condition}
+                  <foreach close=")" collection="criterion.value" item="listItem" open="(" separator=",">
+                    #{listItem}
+                  </foreach>
+                </when>
+              </choose>
+            </foreach>
+          </trim>
+        </if>
+      </foreach>
+    </where>
+  </sql>
+  <sql id="Update_By_Example_Where_Clause">
+    <where>
+      <foreach collection="example.oredCriteria" item="criteria" separator="or">
+        <if test="criteria.valid">
+          <trim prefix="(" prefixOverrides="and" suffix=")">
+            <foreach collection="criteria.criteria" item="criterion">
+              <choose>
+                <when test="criterion.noValue">
+                  and ${criterion.condition}
+                </when>
+                <when test="criterion.singleValue">
+                  and ${criterion.condition} #{criterion.value}
+                </when>
+                <when test="criterion.betweenValue">
+                  and ${criterion.condition} #{criterion.value} and #{criterion.secondValue}
+                </when>
+                <when test="criterion.listValue">
+                  and ${criterion.condition}
+                  <foreach close=")" collection="criterion.value" item="listItem" open="(" separator=",">
+                    #{listItem}
+                  </foreach>
+                </when>
+              </choose>
+            </foreach>
+          </trim>
+        </if>
+      </foreach>
+    </where>
+  </sql>
+  <sql id="Base_Column_List">
+    id, workorder_id, batch_no, planned_qty, status, route_status, issue_command_id, 
+    locked_at, revision, remark, create_time, update_time
+  </sql>
+  <select id="selectByExample" parameterType="dev.mesbase.business.production.domain.ProductionBatchExample" resultMap="BaseResultMap">
+    select
+    <include refid="Base_Column_List" />
+    from production_batch
+    <if test="_parameter != null">
+      <include refid="Example_Where_Clause" />
+    </if>
+    <if test="orderByClause != null">
+      order by ${orderByClause}
+    </if>
+  </select>
+  <select id="selectByPrimaryKey" parameterType="Long" resultMap="BaseResultMap">
+    select 
+    <include refid="Base_Column_List" />
+    from production_batch
+    where id = #{id,jdbcType=BIGINT}
+  </select>
+  <delete id="deleteByPrimaryKey" parameterType="Long">
+    delete from production_batch
+    where id = #{id,jdbcType=BIGINT}
+  </delete>
+  <delete id="deleteByExample" parameterType="dev.mesbase.business.production.domain.ProductionBatchExample">
+    delete from production_batch
+    <if test="_parameter != null">
+      <include refid="Example_Where_Clause" />
+    </if>
+  </delete>
+  <insert id="insert" keyColumn="id" keyProperty="id" parameterType="dev.mesbase.business.production.domain.ProductionBatchEntity" useGeneratedKeys="true">
+    insert into production_batch (workorder_id, batch_no, planned_qty, 
+      status, route_status, issue_command_id, 
+      locked_at, revision, remark, 
+      create_time, update_time)
+    values (#{workorderId,jdbcType=BIGINT}, #{batchNo,jdbcType=VARCHAR}, #{plannedQty,jdbcType=DECIMAL}, 
+      #{status,jdbcType=VARCHAR}, #{routeStatus,jdbcType=VARCHAR}, #{issueCommandId,jdbcType=VARCHAR}, 
+      #{lockedAt,jdbcType=TIMESTAMP}, #{revision,jdbcType=INTEGER}, #{remark,jdbcType=VARCHAR}, 
+      #{createTime,jdbcType=TIMESTAMP}, #{updateTime,jdbcType=TIMESTAMP})
+  </insert>
+  <insert id="insertSelective" keyColumn="id" keyProperty="id" parameterType="dev.mesbase.business.production.domain.ProductionBatchEntity" useGeneratedKeys="true">
+    insert into production_batch
+    <trim prefix="(" suffix=")" suffixOverrides=",">
+      <if test="workorderId != null">
+        workorder_id,
+      </if>
+      <if test="batchNo != null">
+        batch_no,
+      </if>
+      <if test="plannedQty != null">
+        planned_qty,
+      </if>
+      <if test="status != null">
+        status,
+      </if>
+      <if test="routeStatus != null">
+        route_status,
+      </if>
+      <if test="issueCommandId != null">
+        issue_command_id,
+      </if>
+      <if test="lockedAt != null">
+        locked_at,
+      </if>
+      <if test="revision != null">
+        revision,
+      </if>
+      <if test="remark != null">
+        remark,
+      </if>
+      <if test="createTime != null">
+        create_time,
+      </if>
+      <if test="updateTime != null">
+        update_time,
+      </if>
+    </trim>
+    <trim prefix="values (" suffix=")" suffixOverrides=",">
+      <if test="workorderId != null">
+        #{workorderId,jdbcType=BIGINT},
+      </if>
+      <if test="batchNo != null">
+        #{batchNo,jdbcType=VARCHAR},
+      </if>
+      <if test="plannedQty != null">
+        #{plannedQty,jdbcType=DECIMAL},
+      </if>
+      <if test="status != null">
+        #{status,jdbcType=VARCHAR},
+      </if>
+      <if test="routeStatus != null">
+        #{routeStatus,jdbcType=VARCHAR},
+      </if>
+      <if test="issueCommandId != null">
+        #{issueCommandId,jdbcType=VARCHAR},
+      </if>
+      <if test="lockedAt != null">
+        #{lockedAt,jdbcType=TIMESTAMP},
+      </if>
+      <if test="revision != null">
+        #{revision,jdbcType=INTEGER},
+      </if>
+      <if test="remark != null">
+        #{remark,jdbcType=VARCHAR},
+      </if>
+      <if test="createTime != null">
+        #{createTime,jdbcType=TIMESTAMP},
+      </if>
+      <if test="updateTime != null">
+        #{updateTime,jdbcType=TIMESTAMP},
+      </if>
+    </trim>
+  </insert>
+  <select id="countByExample" parameterType="dev.mesbase.business.production.domain.ProductionBatchExample" resultType="java.lang.Long">
+    select count(*) from production_batch
+    <if test="_parameter != null">
+      <include refid="Example_Where_Clause" />
+    </if>
+  </select>
+  <update id="updateByExampleSelective" parameterType="map">
+    update production_batch
+    <set>
+      <if test="row.id != null">
+        id = #{row.id,jdbcType=BIGINT},
+      </if>
+      <if test="row.workorderId != null">
+        workorder_id = #{row.workorderId,jdbcType=BIGINT},
+      </if>
+      <if test="row.batchNo != null">
+        batch_no = #{row.batchNo,jdbcType=VARCHAR},
+      </if>
+      <if test="row.plannedQty != null">
+        planned_qty = #{row.plannedQty,jdbcType=DECIMAL},
+      </if>
+      <if test="row.status != null">
+        status = #{row.status,jdbcType=VARCHAR},
+      </if>
+      <if test="row.routeStatus != null">
+        route_status = #{row.routeStatus,jdbcType=VARCHAR},
+      </if>
+      <if test="row.issueCommandId != null">
+        issue_command_id = #{row.issueCommandId,jdbcType=VARCHAR},
+      </if>
+      <if test="row.lockedAt != null">
+        locked_at = #{row.lockedAt,jdbcType=TIMESTAMP},
+      </if>
+      <if test="row.revision != null">
+        revision = #{row.revision,jdbcType=INTEGER},
+      </if>
+      <if test="row.remark != null">
+        remark = #{row.remark,jdbcType=VARCHAR},
+      </if>
+      <if test="row.createTime != null">
+        create_time = #{row.createTime,jdbcType=TIMESTAMP},
+      </if>
+      <if test="row.updateTime != null">
+        update_time = #{row.updateTime,jdbcType=TIMESTAMP},
+      </if>
+    </set>
+    <if test="example != null">
+      <include refid="Update_By_Example_Where_Clause" />
+    </if>
+  </update>
+  <update id="updateByExample" parameterType="map">
+    update production_batch
+    set id = #{row.id,jdbcType=BIGINT},
+      workorder_id = #{row.workorderId,jdbcType=BIGINT},
+      batch_no = #{row.batchNo,jdbcType=VARCHAR},
+      planned_qty = #{row.plannedQty,jdbcType=DECIMAL},
+      status = #{row.status,jdbcType=VARCHAR},
+      route_status = #{row.routeStatus,jdbcType=VARCHAR},
+      issue_command_id = #{row.issueCommandId,jdbcType=VARCHAR},
+      locked_at = #{row.lockedAt,jdbcType=TIMESTAMP},
+      revision = #{row.revision,jdbcType=INTEGER},
+      remark = #{row.remark,jdbcType=VARCHAR},
+      create_time = #{row.createTime,jdbcType=TIMESTAMP},
+      update_time = #{row.updateTime,jdbcType=TIMESTAMP}
+    <if test="example != null">
+      <include refid="Update_By_Example_Where_Clause" />
+    </if>
+  </update>
+  <update id="updateByPrimaryKeySelective" parameterType="dev.mesbase.business.production.domain.ProductionBatchEntity">
+    update production_batch
+    <set>
+      <if test="workorderId != null">
+        workorder_id = #{workorderId,jdbcType=BIGINT},
+      </if>
+      <if test="batchNo != null">
+        batch_no = #{batchNo,jdbcType=VARCHAR},
+      </if>
+      <if test="plannedQty != null">
+        planned_qty = #{plannedQty,jdbcType=DECIMAL},
+      </if>
+      <if test="status != null">
+        status = #{status,jdbcType=VARCHAR},
+      </if>
+      <if test="routeStatus != null">
+        route_status = #{routeStatus,jdbcType=VARCHAR},
+      </if>
+      <if test="issueCommandId != null">
+        issue_command_id = #{issueCommandId,jdbcType=VARCHAR},
+      </if>
+      <if test="lockedAt != null">
+        locked_at = #{lockedAt,jdbcType=TIMESTAMP},
+      </if>
+      <if test="revision != null">
+        revision = #{revision,jdbcType=INTEGER},
+      </if>
+      <if test="remark != null">
+        remark = #{remark,jdbcType=VARCHAR},
+      </if>
+      <if test="createTime != null">
+        create_time = #{createTime,jdbcType=TIMESTAMP},
+      </if>
+      <if test="updateTime != null">
+        update_time = #{updateTime,jdbcType=TIMESTAMP},
+      </if>
+    </set>
+    where id = #{id,jdbcType=BIGINT}
+  </update>
+  <update id="updateByPrimaryKey" parameterType="dev.mesbase.business.production.domain.ProductionBatchEntity">
+    update production_batch
+    set workorder_id = #{workorderId,jdbcType=BIGINT},
+      batch_no = #{batchNo,jdbcType=VARCHAR},
+      planned_qty = #{plannedQty,jdbcType=DECIMAL},
+      status = #{status,jdbcType=VARCHAR},
+      route_status = #{routeStatus,jdbcType=VARCHAR},
+      issue_command_id = #{issueCommandId,jdbcType=VARCHAR},
+      locked_at = #{lockedAt,jdbcType=TIMESTAMP},
+      revision = #{revision,jdbcType=INTEGER},
+      remark = #{remark,jdbcType=VARCHAR},
+      create_time = #{createTime,jdbcType=TIMESTAMP},
+      update_time = #{updateTime,jdbcType=TIMESTAMP}
+    where id = #{id,jdbcType=BIGINT}
+  </update>
+</mapper>

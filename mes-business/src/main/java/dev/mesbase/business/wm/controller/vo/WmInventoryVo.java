@@ -7,7 +7,7 @@ import java.time.LocalDateTime;
  */
 public record WmInventoryVo(
         String id,
-        String factoryId,
+
         String materialId,
         String warehouseId,
         String materialName,

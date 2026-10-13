@@ -1,4 +1,3 @@
-// MES-CODEGEN: scaffold; review required.
 package dev.mesbase.business.md.domain;
 
 import dev.mesbase.infrastructure.cache.BusinessCacheQuery;
@@ -14,7 +13,7 @@ import java.math.BigDecimal;
 public record MdUnitMeasureQueryDto(
         @Min(0) Integer offset,
         @Min(1) @Max(100) Integer limit,
-        @Size(max=64) String factoryId,
+
         @Size(max=64) String measureCode,
         @Size(max=255) String measureName,
         @Size(max=1) String primaryFlag,

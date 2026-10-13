@@ -81,7 +81,6 @@ public class WmWarehouseServiceImpl implements IWmWarehouseService {
         }
         WmWarehouseExample example = new WmWarehouseExample();
         WmWarehouseExample.Criteria criteria = example.createCriteria();
-        criteria.andFactoryIdEqualTo(FactoryContext.required().factoryId().value());
         if (query.code() != null) {
             criteria.andCodeLike("%" + query.code() + "%");
         }
@@ -117,7 +116,7 @@ public class WmWarehouseServiceImpl implements IWmWarehouseService {
             scope = BusinessCacheEvict.Scope.LIST)
     public WmWarehouseEntity insert(WmWarehouseCreateCommand input) {
         WmWarehouseEntity row = new WmWarehouseEntity();
-        row.setFactoryId(FactoryContext.required().factoryId().value());
+
         row.setCode(input.code());
         row.setName(input.name());
         row.setStatus(input.status());
@@ -162,7 +161,7 @@ public class WmWarehouseServiceImpl implements IWmWarehouseService {
         WmWarehouseExample example = new WmWarehouseExample();
         for (var id : ids) requireRecord(id);
         example.createCriteria().andIdIn(ids)
-                .andFactoryIdEqualTo(FactoryContext.required().factoryId().value())
+                
         ;
         if (mapper.deleteByExample(example) != ids.size()) {
             throw new FoundationException(ErrorCode.RESOURCE_CONFLICT);
@@ -171,7 +170,7 @@ public class WmWarehouseServiceImpl implements IWmWarehouseService {
 
     private WmWarehouseEntity requireRecord(Long id) {
         WmWarehouseEntity row = mapper.selectByPrimaryKey(id);
-        if (row == null || !FactoryContext.required().factoryId().value().equals(row.getFactoryId())) {
+        if (row == null) {
             throw new FoundationException(ErrorCode.NOT_FOUND);
         }
         return row;
@@ -227,7 +226,7 @@ public class WmWarehouseServiceImpl implements IWmWarehouseService {
         if (inputs.isEmpty()) return new WmWarehouseSyncResult(0, 0, 0, 0);
         var example = new WmWarehouseExample();
         example.createCriteria().andCodeIn(List.copyOf(keys))
-                .andFactoryIdEqualTo(scope.factoryId().value())
+                
         ;
         var existing = new HashMap<String, WmWarehouseEntity>();
         for (var row : mapper.selectByExample(example)) {
@@ -249,7 +248,7 @@ public class WmWarehouseServiceImpl implements IWmWarehouseService {
             boolean insert = row == null;
             if (insert) {
                 row = new WmWarehouseEntity();
-                row.setFactoryId(scope.factoryId().value());
+
             }
             row.setCode(input.code());
             row.setName(input.name());

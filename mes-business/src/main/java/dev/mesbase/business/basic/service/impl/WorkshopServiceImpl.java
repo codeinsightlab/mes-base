@@ -1,4 +1,3 @@
-// MES-CODEGEN: scaffold; review required.
 package dev.mesbase.business.basic.service.impl;
 
 import com.github.pagehelper.Page;
@@ -77,7 +76,6 @@ public class WorkshopServiceImpl implements IWorkshopService {
         }
         WorkshopExample example = new WorkshopExample();
         WorkshopExample.Criteria criteria = example.createCriteria();
-        criteria.andFactoryIdEqualTo(FactoryContext.required().factoryId().value());
         if (query.code() != null) {
             criteria.andCodeLike("%" + query.code() + "%");
         }
@@ -113,7 +111,7 @@ public class WorkshopServiceImpl implements IWorkshopService {
             scope = BusinessCacheEvict.Scope.LIST)
     public WorkshopEntity insert(WorkshopCreateCommand input) {
         WorkshopEntity row = new WorkshopEntity();
-        row.setFactoryId(FactoryContext.required().factoryId().value());
+
         row.setCode(input.code());
         row.setName(input.name());
         row.setStatus(input.status());
@@ -156,7 +154,7 @@ public class WorkshopServiceImpl implements IWorkshopService {
         WorkshopExample example = new WorkshopExample();
         for (var id : ids) requireRecord(id);
         example.createCriteria().andIdIn(ids)
-                .andFactoryIdEqualTo(FactoryContext.required().factoryId().value())
+                
         ;
         if (mapper.deleteByExample(example) != ids.size()) {
             throw new FoundationException(ErrorCode.RESOURCE_CONFLICT);
@@ -181,7 +179,7 @@ public class WorkshopServiceImpl implements IWorkshopService {
 
     private WorkshopEntity requireRecord(Long id) {
         WorkshopEntity row = mapper.selectByPrimaryKey(id);
-        if (row == null || !FactoryContext.required().factoryId().value().equals(row.getFactoryId())) {
+        if (row == null) {
             throw new FoundationException(ErrorCode.NOT_FOUND);
         }
         return row;
@@ -227,7 +225,7 @@ public class WorkshopServiceImpl implements IWorkshopService {
         if (inputs.isEmpty()) return new WorkshopSyncResult(0, 0, 0, 0);
         var example = new WorkshopExample();
         example.createCriteria().andCodeIn(List.copyOf(keys))
-                .andFactoryIdEqualTo(scope.factoryId().value())
+                
         ;
         var existing = new HashMap<String, WorkshopEntity>();
         for (var row : mapper.selectByExample(example)) {
@@ -247,7 +245,7 @@ public class WorkshopServiceImpl implements IWorkshopService {
             boolean insert = row == null;
             if (insert) {
                 row = new WorkshopEntity();
-                row.setFactoryId(scope.factoryId().value());
+
             }
             row.setCode(input.code());
             row.setName(input.name());

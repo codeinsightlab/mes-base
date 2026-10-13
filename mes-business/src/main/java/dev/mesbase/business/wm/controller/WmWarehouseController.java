@@ -1,4 +1,3 @@
-// MES-CODEGEN: scaffold; review required.
 package dev.mesbase.business.wm.controller;
 
 import dev.mesbase.business.wm.controller.vo.WmWarehousePageVo;
@@ -95,7 +94,7 @@ public class WmWarehouseController {
     private static WmWarehouseVo toView(WmWarehouseEntity row) {
         return new WmWarehouseVo(
                 row.getId() == null ? null : row.getId().toString(),
-                row.getFactoryId(),
+
                 row.getCode(),
                 row.getName(),
                 row.getStatus(),

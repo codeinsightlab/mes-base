@@ -54,7 +54,6 @@ public class EquipmentServiceImpl implements IEquipmentService {
         }
         EquipmentExample example = new EquipmentExample();
         EquipmentExample.Criteria criteria = example.createCriteria();
-        criteria.andFactoryIdEqualTo(FactoryContext.required().factoryId().value());
         if (query.code() != null) {
             criteria.andCodeLike("%" + query.code() + "%");
         }
@@ -96,7 +95,7 @@ public class EquipmentServiceImpl implements IEquipmentService {
             scope = BusinessCacheEvict.Scope.LIST)
     public EquipmentEntity insert(EquipmentCreateCommand input) {
         EquipmentEntity row = new EquipmentEntity();
-        row.setFactoryId(FactoryContext.required().factoryId().value());
+
         row.setCode(input.code());
         row.setName(input.name());
         row.setModel(input.model());
@@ -154,7 +153,7 @@ public class EquipmentServiceImpl implements IEquipmentService {
         EquipmentExample example = new EquipmentExample();
         for (var id : ids) requireRecord(id);
         example.createCriteria().andIdIn(ids)
-                .andFactoryIdEqualTo(FactoryContext.required().factoryId().value())
+                
         ;
         if (mapper.deleteByExample(example) != ids.size()) {
             throw new FoundationException(ErrorCode.RESOURCE_CONFLICT);
@@ -165,7 +164,7 @@ public class EquipmentServiceImpl implements IEquipmentService {
         if (!Set.of("ENABLED", "DISABLED").contains(row.getStatus()))
             throw new FoundationException(ErrorCode.BAD_REQUEST);
         var example = new EquipmentExample();
-        var criteria = example.createCriteria().andFactoryIdEqualTo(row.getFactoryId()).andCodeEqualTo(row.getCode());
+        var criteria = example.createCriteria().andCodeEqualTo(row.getCode());
         if (row.getId() != null) criteria.andIdNotEqualTo(row.getId());
         if (mapper.countByExample(example) > 0) throw new FoundationException(ErrorCode.RESOURCE_CONFLICT);
         if (row.getWorkstationId() != null) references.lockWorkstations(List.of(row.getWorkstationId()));
@@ -173,7 +172,7 @@ public class EquipmentServiceImpl implements IEquipmentService {
 
     private EquipmentEntity requireRecord(Long id) {
         EquipmentEntity row = mapper.selectByPrimaryKey(id);
-        if (row == null || !FactoryContext.required().factoryId().value().equals(row.getFactoryId())) {
+        if (row == null) {
             throw new FoundationException(ErrorCode.NOT_FOUND);
         }
         return row;

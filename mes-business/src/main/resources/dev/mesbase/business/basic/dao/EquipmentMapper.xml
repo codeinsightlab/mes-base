@@ -4,7 +4,6 @@
 <mapper namespace="dev.mesbase.business.basic.dao.EquipmentMapper">
   <resultMap id="BaseResultMap" type="dev.mesbase.business.basic.domain.EquipmentEntity">
     <id column="id" jdbcType="BIGINT" property="id" />
-    <result column="factory_id" jdbcType="VARCHAR" property="factoryId" />
     <result column="code" jdbcType="VARCHAR" property="code" />
     <result column="name" jdbcType="VARCHAR" property="name" />
     <result column="model" jdbcType="VARCHAR" property="model" />
@@ -71,7 +70,7 @@
     </where>
   </sql>
   <sql id="Base_Column_List">
-    id, factory_id, code, name, model, workstation_id, status, remark
+    id, code, name, model, workstation_id, status, remark
   </sql>
   <select id="selectByExample" parameterType="dev.mesbase.business.basic.domain.EquipmentExample" resultMap="BaseResultMap">
     select
@@ -101,19 +100,16 @@
     </if>
   </delete>
   <insert id="insert" keyColumn="id" keyProperty="id" parameterType="dev.mesbase.business.basic.domain.EquipmentEntity" useGeneratedKeys="true">
-    insert into equipment (factory_id, code, name, 
-      model, workstation_id, status, 
-      remark)
-    values (#{factoryId,jdbcType=VARCHAR}, #{code,jdbcType=VARCHAR}, #{name,jdbcType=VARCHAR}, 
-      #{model,jdbcType=VARCHAR}, #{workstationId,jdbcType=BIGINT}, #{status,jdbcType=VARCHAR}, 
-      #{remark,jdbcType=VARCHAR})
+    insert into equipment (code, name, model, 
+      workstation_id, status, remark
+      )
+    values (#{code,jdbcType=VARCHAR}, #{name,jdbcType=VARCHAR}, #{model,jdbcType=VARCHAR}, 
+      #{workstationId,jdbcType=BIGINT}, #{status,jdbcType=VARCHAR}, #{remark,jdbcType=VARCHAR}
+      )
   </insert>
   <insert id="insertSelective" keyColumn="id" keyProperty="id" parameterType="dev.mesbase.business.basic.domain.EquipmentEntity" useGeneratedKeys="true">
     insert into equipment
     <trim prefix="(" suffix=")" suffixOverrides=",">
-      <if test="factoryId != null">
-        factory_id,
-      </if>
       <if test="code != null">
         code,
       </if>
@@ -134,9 +130,6 @@
       </if>
     </trim>
     <trim prefix="values (" suffix=")" suffixOverrides=",">
-      <if test="factoryId != null">
-        #{factoryId,jdbcType=VARCHAR},
-      </if>
       <if test="code != null">
         #{code,jdbcType=VARCHAR},
       </if>
@@ -169,9 +162,6 @@
       <if test="row.id != null">
         id = #{row.id,jdbcType=BIGINT},
       </if>
-      <if test="row.factoryId != null">
-        factory_id = #{row.factoryId,jdbcType=VARCHAR},
-      </if>
       <if test="row.code != null">
         code = #{row.code,jdbcType=VARCHAR},
       </if>
@@ -198,7 +188,6 @@
   <update id="updateByExample" parameterType="map">
     update equipment
     set id = #{row.id,jdbcType=BIGINT},
-      factory_id = #{row.factoryId,jdbcType=VARCHAR},
       code = #{row.code,jdbcType=VARCHAR},
       name = #{row.name,jdbcType=VARCHAR},
       model = #{row.model,jdbcType=VARCHAR},
@@ -212,9 +201,6 @@
   <update id="updateByPrimaryKeySelective" parameterType="dev.mesbase.business.basic.domain.EquipmentEntity">
     update equipment
     <set>
-      <if test="factoryId != null">
-        factory_id = #{factoryId,jdbcType=VARCHAR},
-      </if>
       <if test="code != null">
         code = #{code,jdbcType=VARCHAR},
       </if>
@@ -238,8 +224,7 @@
   </update>
   <update id="updateByPrimaryKey" parameterType="dev.mesbase.business.basic.domain.EquipmentEntity">
     update equipment
-    set factory_id = #{factoryId,jdbcType=VARCHAR},
-      code = #{code,jdbcType=VARCHAR},
+    set code = #{code,jdbcType=VARCHAR},
       name = #{name,jdbcType=VARCHAR},
       model = #{model,jdbcType=VARCHAR},
       workstation_id = #{workstationId,jdbcType=BIGINT},

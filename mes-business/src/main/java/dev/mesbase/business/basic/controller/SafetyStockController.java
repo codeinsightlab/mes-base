@@ -1,4 +1,3 @@
-// MES-CODEGEN: scaffold; review required.
 package dev.mesbase.business.basic.controller;
 
 import dev.mesbase.business.basic.controller.vo.SafetyStockPageVo;
@@ -95,7 +94,7 @@ public class SafetyStockController {
     private static SafetyStockVo toView(SafetyStockEntity row) {
         return new SafetyStockVo(
                 row.getId() == null ? null : row.getId().toString(),
-                row.getFactoryId(),
+
                 row.getMaterialId() == null ? null : row.getMaterialId().toString(),
                 row.getMinQty() == null ? null : row.getMinQty().toString(),
                 row.getMaxQty() == null ? null : row.getMaxQty().toString(),

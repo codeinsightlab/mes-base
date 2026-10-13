@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="dev.mesbase.business.production.dao.WorkOrderExtraMapper">
+ <select id="publishedForProduct" resultMap="dev.mesbase.business.production.dao.RoutingMapper.BaseResultMap">
+  SELECT r.id,r.code,r.name,r.version,r.status,r.description,r.external_id,r.source_version,r.revision,r.published_at
+  FROM routing r JOIN routing_product p ON p.routing_id=r.id
+  JOIN material m ON m.id=p.material_id
+  WHERE m.id=#{productId}
+   AND m.material_type='PRODUCT' AND m.status='ENABLED' AND r.status='PUBLISHED'
+   <if test="search != null and search != ''">AND (r.code LIKE CONCAT('%',#{search},'%') OR r.name LIKE CONCAT('%',#{search},'%'))</if>
+  ORDER BY r.code,r.version DESC,r.id LIMIT 100
+ </select>
+</mapper>

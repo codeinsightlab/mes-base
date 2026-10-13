@@ -1,4 +1,3 @@
-// MES-CODEGEN: scaffold; review required.
 package dev.mesbase.business.dv.controller;
 
 import dev.mesbase.business.dv.controller.vo.DvSubjectPageVo;
@@ -95,7 +94,7 @@ public class DvSubjectController {
     private static DvSubjectVo toView(DvSubjectEntity row) {
         return new DvSubjectVo(
                 row.getSubjectId() == null ? null : row.getSubjectId().toString(),
-                row.getFactoryId(),
+
                 row.getSubjectCode(),
                 row.getSubjectName(),
                 row.getSubjectType(),

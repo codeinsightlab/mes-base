@@ -1,4 +1,3 @@
-// MES-CODEGEN: scaffold; review required.
 package dev.mesbase.business.basic.service.impl;
 
 import com.github.pagehelper.Page;
@@ -77,7 +76,6 @@ public class MaterialCategoryServiceImpl implements IMaterialCategoryService {
         }
         MaterialCategoryExample example = new MaterialCategoryExample();
         MaterialCategoryExample.Criteria criteria = example.createCriteria();
-        criteria.andFactoryIdEqualTo(FactoryContext.required().factoryId().value());
         if (query.code() != null) {
             criteria.andCodeLike("%" + query.code() + "%");
         }
@@ -119,7 +117,7 @@ public class MaterialCategoryServiceImpl implements IMaterialCategoryService {
             scope = BusinessCacheEvict.Scope.LIST)
     public MaterialCategoryEntity insert(MaterialCategoryCreateCommand input) {
         MaterialCategoryEntity row = new MaterialCategoryEntity();
-        row.setFactoryId(FactoryContext.required().factoryId().value());
+
         row.setCode(input.code());
         row.setName(input.name());
         row.setParentId(input.parentId());
@@ -166,7 +164,7 @@ public class MaterialCategoryServiceImpl implements IMaterialCategoryService {
         MaterialCategoryExample example = new MaterialCategoryExample();
         for (var id : ids) requireRecord(id);
         example.createCriteria().andIdIn(ids)
-                .andFactoryIdEqualTo(FactoryContext.required().factoryId().value())
+                
         ;
         if (mapper.deleteByExample(example) != ids.size()) {
             throw new FoundationException(ErrorCode.RESOURCE_CONFLICT);
@@ -191,7 +189,7 @@ public class MaterialCategoryServiceImpl implements IMaterialCategoryService {
 
     private MaterialCategoryEntity requireRecord(Long id) {
         MaterialCategoryEntity row = mapper.selectByPrimaryKey(id);
-        if (row == null || !FactoryContext.required().factoryId().value().equals(row.getFactoryId())) {
+        if (row == null) {
             throw new FoundationException(ErrorCode.NOT_FOUND);
         }
         return row;
@@ -237,7 +235,7 @@ public class MaterialCategoryServiceImpl implements IMaterialCategoryService {
         if (inputs.isEmpty()) return new MaterialCategorySyncResult(0, 0, 0, 0);
         var example = new MaterialCategoryExample();
         example.createCriteria().andCodeIn(List.copyOf(keys))
-                .andFactoryIdEqualTo(scope.factoryId().value())
+                
         ;
         var existing = new HashMap<String, MaterialCategoryEntity>();
         for (var row : mapper.selectByExample(example)) {
@@ -257,7 +255,7 @@ public class MaterialCategoryServiceImpl implements IMaterialCategoryService {
             boolean insert = row == null;
             if (insert) {
                 row = new MaterialCategoryEntity();
-                row.setFactoryId(scope.factoryId().value());
+
             }
             row.setCode(input.code());
             row.setName(input.name());

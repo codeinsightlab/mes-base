@@ -1,4 +1,3 @@
-// MES-CODEGEN: scaffold; review required.
 package dev.mesbase.business.md.domain;
 
 import jakarta.validation.constraints.Digits;
@@ -10,7 +9,7 @@ import java.math.BigDecimal;
  * 计量单位写入参数，字段来自已审查的表结构。
  */
 public record MdUnitMeasureUpdateCommand(
-        @NotBlank @Size(max=64) String factoryId,
+
         @NotBlank @Size(max=64) String measureCode,
         @NotBlank @Size(max=255) String measureName,
         @NotBlank @Size(max=1) String primaryFlag,

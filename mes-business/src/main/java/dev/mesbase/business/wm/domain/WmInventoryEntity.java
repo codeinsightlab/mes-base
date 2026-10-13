@@ -7,8 +7,6 @@ import java.time.LocalDateTime;
 public class WmInventoryEntity {
     private Long id;
 
-    private String factoryId;
-
     private Long materialId;
 
     private Long warehouseId;
@@ -35,14 +33,6 @@ public class WmInventoryEntity {
 
     public void setId(Long id) {
         this.id = id;
-    }
-
-    public String getFactoryId() {
-        return factoryId;
-    }
-
-    public void setFactoryId(String factoryId) {
-        this.factoryId = factoryId;
     }
 
     public Long getMaterialId() {

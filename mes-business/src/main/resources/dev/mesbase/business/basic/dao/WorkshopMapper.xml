@@ -4,7 +4,6 @@
 <mapper namespace="dev.mesbase.business.basic.dao.WorkshopMapper">
   <resultMap id="BaseResultMap" type="dev.mesbase.business.basic.domain.WorkshopEntity">
     <id column="id" jdbcType="BIGINT" property="id" />
-    <result column="factory_id" jdbcType="VARCHAR" property="factoryId" />
     <result column="code" jdbcType="VARCHAR" property="code" />
     <result column="name" jdbcType="VARCHAR" property="name" />
     <result column="status" jdbcType="VARCHAR" property="status" />
@@ -69,7 +68,7 @@
     </where>
   </sql>
   <sql id="Base_Column_List">
-    id, factory_id, code, name, status, remark
+    id, code, name, status, remark
   </sql>
   <select id="selectByExample" parameterType="dev.mesbase.business.basic.domain.WorkshopExample" resultMap="BaseResultMap">
     select
@@ -99,17 +98,14 @@
     </if>
   </delete>
   <insert id="insert" keyColumn="id" keyProperty="id" parameterType="dev.mesbase.business.basic.domain.WorkshopEntity" useGeneratedKeys="true">
-    insert into workshop (factory_id, code, name, 
-      status, remark)
-    values (#{factoryId,jdbcType=VARCHAR}, #{code,jdbcType=VARCHAR}, #{name,jdbcType=VARCHAR}, 
-      #{status,jdbcType=VARCHAR}, #{remark,jdbcType=VARCHAR})
+    insert into workshop (code, name, status, 
+      remark)
+    values (#{code,jdbcType=VARCHAR}, #{name,jdbcType=VARCHAR}, #{status,jdbcType=VARCHAR}, 
+      #{remark,jdbcType=VARCHAR})
   </insert>
   <insert id="insertSelective" keyColumn="id" keyProperty="id" parameterType="dev.mesbase.business.basic.domain.WorkshopEntity" useGeneratedKeys="true">
     insert into workshop
     <trim prefix="(" suffix=")" suffixOverrides=",">
-      <if test="factoryId != null">
-        factory_id,
-      </if>
       <if test="code != null">
         code,
       </if>
@@ -124,9 +120,6 @@
       </if>
     </trim>
     <trim prefix="values (" suffix=")" suffixOverrides=",">
-      <if test="factoryId != null">
-        #{factoryId,jdbcType=VARCHAR},
-      </if>
       <if test="code != null">
         #{code,jdbcType=VARCHAR},
       </if>
@@ -153,9 +146,6 @@
       <if test="row.id != null">
         id = #{row.id,jdbcType=BIGINT},
       </if>
-      <if test="row.factoryId != null">
-        factory_id = #{row.factoryId,jdbcType=VARCHAR},
-      </if>
       <if test="row.code != null">
         code = #{row.code,jdbcType=VARCHAR},
       </if>
@@ -176,7 +166,6 @@
   <update id="updateByExample" parameterType="map">
     update workshop
     set id = #{row.id,jdbcType=BIGINT},
-      factory_id = #{row.factoryId,jdbcType=VARCHAR},
       code = #{row.code,jdbcType=VARCHAR},
       name = #{row.name,jdbcType=VARCHAR},
       status = #{row.status,jdbcType=VARCHAR},
@@ -188,9 +177,6 @@
   <update id="updateByPrimaryKeySelective" parameterType="dev.mesbase.business.basic.domain.WorkshopEntity">
     update workshop
     <set>
-      <if test="factoryId != null">
-        factory_id = #{factoryId,jdbcType=VARCHAR},
-      </if>
       <if test="code != null">
         code = #{code,jdbcType=VARCHAR},
       </if>
@@ -208,8 +194,7 @@
   </update>
   <update id="updateByPrimaryKey" parameterType="dev.mesbase.business.basic.domain.WorkshopEntity">
     update workshop
-    set factory_id = #{factoryId,jdbcType=VARCHAR},
-      code = #{code,jdbcType=VARCHAR},
+    set code = #{code,jdbcType=VARCHAR},
       name = #{name,jdbcType=VARCHAR},
       status = #{status,jdbcType=VARCHAR},
       remark = #{remark,jdbcType=VARCHAR}

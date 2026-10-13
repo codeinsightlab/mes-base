@@ -1,4 +1,3 @@
-// MES-CODEGEN: scaffold; review required.
 package dev.mesbase.business.md.controller.vo;
 
 import java.time.LocalDateTime;
@@ -8,7 +7,7 @@ import java.time.LocalDateTime;
  */
 public record MdWorkshopVo(
         String workshopId,
-        String factoryId,
+
         String workshopCode,
         String workshopName,
         String area,

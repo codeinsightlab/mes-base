@@ -117,7 +117,6 @@ public class RoutingServiceImpl implements IRoutingService {
         }
         RoutingExample example = new RoutingExample();
         RoutingExample.Criteria criteria = example.createCriteria();
-        criteria.andFactoryIdEqualTo(FactoryContext.required().factoryId().value());
         if (query.code() != null) {
             criteria.andCodeLike("%" + query.code() + "%");
         }
@@ -159,7 +158,7 @@ public class RoutingServiceImpl implements IRoutingService {
             rollbackFor = Exception.class)
     public RoutingEntity insert(RoutingCreateCommand input) {
         var row = new RoutingEntity();
-        row.setFactoryId(factory());
+
         row.setCode(input.code().strip());
         row.setName(input.name().strip());
         row.setDescription(input.description());
@@ -202,7 +201,7 @@ public class RoutingServiceImpl implements IRoutingService {
         productFilter.createCriteria().andRoutingIdIn(ids);
         products.deleteByExample(productFilter);
         var filter = new RoutingExample();
-        filter.createCriteria().andFactoryIdEqualTo(factory()).andIdIn(ids).andStatusEqualTo("DRAFT");
+        filter.createCriteria().andIdIn(ids).andStatusEqualTo("DRAFT");
         if (mapper.deleteByExample(filter) != ids.size()) throw new FoundationException(ErrorCode.RESOURCE_CONFLICT);
         dirty();
     }
@@ -294,7 +293,7 @@ public class RoutingServiceImpl implements IRoutingService {
     private RoutingEntity cloneVersion(RoutingEntity source, String code, String name, int version, boolean copy) {
         var sourceDetail = detailRows(source);
         var row = new RoutingEntity();
-        row.setFactoryId(factory());
+
         row.setCode(code);
         row.setName(name);
         row.setVersion(version);
@@ -428,7 +427,7 @@ public class RoutingServiceImpl implements IRoutingService {
         if ("DRAFT".equals(row.getStatus())) {
             if (!stepRows.isEmpty()) {
                 var filter = new OperationExample();
-                filter.createCriteria().andFactoryIdEqualTo(factory())
+                filter.createCriteria()
                         .andIdIn(stepRows.stream().map(RoutingNodeEntity::getOperationId).toList());
                 var index = new HashMap<Long, OperationEntity>();
                 for (var op : operations.selectByExample(filter)) index.put(op.getId(), op);
@@ -443,7 +442,7 @@ public class RoutingServiceImpl implements IRoutingService {
             }
             if (!productRows.isEmpty()) {
                 var filter = new MaterialExample();
-                filter.createCriteria().andFactoryIdEqualTo(factory())
+                filter.createCriteria()
                         .andIdIn(productRows.stream().map(RoutingProductEntity::getMaterialId).toList());
                 var index = new HashMap<Long, MaterialEntity>();
                 for (var material : materials.selectByExample(filter)) index.put(material.getId(), material);
@@ -476,19 +475,19 @@ public class RoutingServiceImpl implements IRoutingService {
 
     private RoutingExample byId(Long id) {
         var filter = new RoutingExample();
-        filter.createCriteria().andFactoryIdEqualTo(factory()).andIdEqualTo(id);
+        filter.createCriteria().andIdEqualTo(id);
         return filter;
     }
 
     private RoutingEntity requireRecord(Long id) {
         var row = mapper.selectByPrimaryKey(id);
-        if (row == null || !factory().equals(row.getFactoryId())) throw new FoundationException(ErrorCode.NOT_FOUND);
+        if (row == null) throw new FoundationException(ErrorCode.NOT_FOUND);
         return row;
     }
 
     private RoutingEntity latest(String code) {
         var filter = new RoutingExample();
-        filter.createCriteria().andFactoryIdEqualTo(factory()).andCodeEqualTo(code);
+        filter.createCriteria().andCodeEqualTo(code);
         filter.setOrderByClause("version desc");
         try (Page<RoutingEntity> page = PageHelper.offsetPage(0, 1, false)) {
             return mapper.selectByExample(filter).stream().findFirst().orElse(null);
@@ -558,19 +557,35 @@ public class RoutingServiceImpl implements IRoutingService {
         if (inputs.isEmpty()) return new ProductionSyncResult(0, 0, 0, 0);
         // Two bounded set queries replace one external/code lookup per step or product.
         var materialFilter = new MaterialExample();
-        materialFilter.createCriteria().andFactoryIdEqualTo(factory())
+        materialFilter.createCriteria()
                 .andCodeIn(List.copyOf(materialCodes));
         var materialLock = new MaterialEntity();
-        materialLock.setFactoryId(factory());
-        materials.updateByExampleSelective(materialLock, materialFilter);
+
+        for (var reference : materials.selectByExample(materialFilter).stream()
+                .sorted((left, right) -> left.getId().compareTo(right.getId())).toList()) {
+            materialLock.setId(reference.getId());
+            var rowFilter = new MaterialExample();
+            rowFilter.createCriteria().andIdEqualTo(reference.getId());
+            if (materials.updateByExampleSelective(materialLock, rowFilter) != 1) {
+                throw new FoundationException(ErrorCode.NOT_FOUND);
+            }
+        }
         var materialIndex = new HashMap<String, Long>();
         for (var row : materials.selectByExample(materialFilter)) materialIndex.put(key(row.getCode()), row.getId());
         var operationFilter = new OperationExample();
-        operationFilter.createCriteria().andFactoryIdEqualTo(factory())
+        operationFilter.createCriteria()
                 .andCodeIn(List.copyOf(operationCodes));
         var operationLock = new OperationEntity();
-        operationLock.setFactoryId(factory());
-        operations.updateByExampleSelective(operationLock, operationFilter);
+
+        for (var reference : operations.selectByExample(operationFilter).stream()
+                .sorted((left, right) -> left.getId().compareTo(right.getId())).toList()) {
+            operationLock.setId(reference.getId());
+            var rowFilter = new OperationExample();
+            rowFilter.createCriteria().andIdEqualTo(reference.getId());
+            if (operations.updateByExampleSelective(operationLock, rowFilter) != 1) {
+                throw new FoundationException(ErrorCode.NOT_FOUND);
+            }
+        }
         var operationIndex = new HashMap<String, Long>();
         for (var row : operations.selectByExample(operationFilter)) operationIndex.put(key(row.getCode()), row.getId());
         int created = 0, updated = 0, skipped = 0;
@@ -597,7 +612,7 @@ public class RoutingServiceImpl implements IRoutingService {
             RoutingEntity row;
             if (insert) {
                 row = new RoutingEntity();
-                row.setFactoryId(factory());
+
                 row.setCode(input.code().strip());
                 row.setVersion(old == null ? 1 : old.getVersion() + 1);
                 row.setStatus("DRAFT");
@@ -643,10 +658,10 @@ public class RoutingServiceImpl implements IRoutingService {
         if (limit < 1 || limit > 100 || search != null && search.length() > 255)
             throw new FoundationException(ErrorCode.BAD_REQUEST);
         var filter = new OperationExample();
-        var criteria = filter.createCriteria().andFactoryIdEqualTo(factory()).andStatusEqualTo("ENABLED");
+        var criteria = filter.createCriteria().andStatusEqualTo("ENABLED");
         if (search != null && !search.isBlank()) {
             criteria.andCodeLike("%" + search + "%");
-            filter.or().andFactoryIdEqualTo(factory()).andStatusEqualTo("ENABLED").andNameLike("%" + search + "%");
+            filter.or().andStatusEqualTo("ENABLED").andNameLike("%" + search + "%");
         }
         filter.setOrderByClause("code");
         try (Page<OperationEntity> page = PageHelper.offsetPage(0, limit, false)) {
@@ -662,10 +677,10 @@ public class RoutingServiceImpl implements IRoutingService {
         if (limit < 1 || limit > 100 || search != null && search.length() > 255)
             throw new FoundationException(ErrorCode.BAD_REQUEST);
         var filter = new MaterialExample();
-        var criteria = filter.createCriteria().andFactoryIdEqualTo(factory()).andStatusEqualTo("ENABLED");
+        var criteria = filter.createCriteria().andStatusEqualTo("ENABLED");
         if (search != null && !search.isBlank()) {
             criteria.andCodeLike("%" + search + "%");
-            filter.or().andFactoryIdEqualTo(factory()).andStatusEqualTo("ENABLED").andNameLike("%" + search + "%");
+            filter.or().andStatusEqualTo("ENABLED").andNameLike("%" + search + "%");
         }
         filter.setOrderByClause("code");
         try (Page<MaterialEntity> page = PageHelper.offsetPage(0, limit, false)) {

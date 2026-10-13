@@ -140,6 +140,14 @@ Factory 动态租借，不按池新增会话工厂。缺 Scope、连接或版本
 N+1；unique/reference/聚合/cache/import/export 都需范围审查。业务 cache 缺 Scope 不能全局回退。ExtraMapper 仅用于跨表关联查询，单表操作禁止新增 Extra，授权决策在
 Service。新 CRUD 物理删除；Schema 来自真实 metadata，不带客户数据/seed。
 
+### 9.0 业务表不保存工厂字段（2026-10-13 用户确认）
+
+当前 Base 的业务隔离只采用按 Factory 路由的独立业务库，不叠加表内租户隔离。业务表不得保存 `factory_id` 或用于同一隔离目的的工厂编码等替代字段；业务 Entity、请求／响应 DTO、页面及业务 SQL 不再携带、填写、比较或过滤这些字段。不能以“防御性校验”或“可能配错库”为由重复建立行级工厂隔离。
+
+当前库内的关联对象存在性、产品／工单一致性、确切工艺版本和父子单据一致性仍须校验。请求选厂、权限、固定事务租约、跨库事务拒绝及按 Factory 隔离的缓存继续由基础设施负责；跨厂可以有相同本地主键，不能将其视为跨厂引用或要求全局唯一。
+
+本决定针对业务库的业务表。中心库的工厂主数据、数据源绑定、工厂角色／偏好及 `mes_master_sync` 的工厂协调键属于管理或基础设施语义，保留必要工厂标识，不因本规则删除。既有业务表和代码通过新增正式迁移及重新生成／适配治理；不改写已执行迁移，不覆盖手工规则或并行改动。
+
 ### 9.1 固定包与 SessionFactory 归属
 
 | SessionFactory              | DataSource           | TransactionManager           | 固定扫描包                                                            |
@@ -300,8 +308,8 @@ fallback（本项目 business），tableOverrides.module 优先。业务配置�
 dry-run；新增代码用 write/fail；重新生成已有文件用获授权的 write/replace-generated，会覆盖生成文件中的手工修改。需要审查副本可复制配置并输出到独立
 target 目录。不得为了消除冲突自动改变覆盖策略。
 
-业务隔离依赖按当前 Factory 路由的独立业务库。基础生成器不要求表含 factory_id，不注入 Factory 字段、Mapper/Service Factory
-参数或 SQL Factory 谓词；若真实表本来有该字段，按普通 Schema 字段处理。缺 Scope
+业务隔离依赖按当前 Factory 路由的独立业务库。本项目业务表不含 factory_id；生成配置不使用 serverScopeColumn 建立表内隔离，不注入 Factory 字段、Mapper/Service Factory
+参数或 SQL Factory 谓词。通用生成器仍按真实 metadata 工作，不按字段名拒绝其他项目的表；本项目使用方须先按第 9.0 节治理已有工厂字段，不继续生成冗余行级隔离。缺 Scope
 拒绝、连接/版本与事务内切厂保护继续由既有基础设施负责。范围选项只决定包归属、事务管理器及 HTTP 权限范围，不构造表内租户业务。Example
 仅供服务端使用，不直接绑定 HTTP 请求中的 SQL 条件/排序字符串；业务开发负责批量写入条件和业务约束。
 
@@ -384,7 +392,9 @@ SysUser 敏感字段。
 
 ## 2026-10-12 可选同步生成与统一配置
 
-正式生成唯一参数入口继续为 `docs/development/codegen-config.review.yaml`；不得另建业务专属默认配置或从旧 CLI 补项目参数。`selection.excludeTables` 排除技术表，当前明确排除 `flyway_business_schema_history`。用户授权的当前配置为 `generateSync: true`、全量业务表、`write/replace-generated`；这是本次项目取值，不是生成器默认值。
+正式生成唯一参数入口继续为 `docs/development/codegen-config.review.yaml`；不得另建业务专属默认配置或从旧 CLI 补项目参数。`selection.excludeTables` 排除技术表，当前明确排除 `flyway_business_schema_history`。2026-10-12 用户授权时为 `generateSync: true`、全量业务表、`write/replace-generated`；同步开关已由下述新决定取代，表选择及覆盖策略仍由实际配置决定。
+
+2026-10-13 用户决定：当前及后续生成暂不生成同步相关内容，正式配置和开发期业务配置保持 `generateSync: false`，以后需要时再明确开启。此决定只关闭后续生成，不要求删除既有同步业务或协调框架，不自动重新生成已有文件。
 
 生成的同步 Service 直接使用本表 QueryPort，默认未接入实现不是 Spring Bean，由 ObjectProvider 在没有真实实现时选择，避免默认与真实 Bean 竞争。外部只读查询先完成；未接入时不写业务库或同步状态。查询完成后复用已有 SyncCoordinator 抢占，成功抢占后才进入独立 Spring 代理的 SyncWriter 写事务。只读查询可并发，写入批次受已有协调协议约束。同步权限为当前生成权限前缀追加 `:sync`，菜单 SQL 同步 add-or-update、不自动执行或授予角色。现有手写 Material 同步保留 `material:sync`，Test Adapter 只在测试源目录。
 

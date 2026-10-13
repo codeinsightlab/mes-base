@@ -51,7 +51,6 @@ public class MesMaterialIssueServiceImpl implements IMesMaterialIssueService {
         }
         MesMaterialIssueExample example = new MesMaterialIssueExample();
         MesMaterialIssueExample.Criteria criteria = example.createCriteria();
-        criteria.andFactoryIdEqualTo(FactoryContext.required().factoryId().value());
         if (query.issueNo() != null) {
             criteria.andIssueNoLike("%" + query.issueNo() + "%");
         }
@@ -105,7 +104,7 @@ public class MesMaterialIssueServiceImpl implements IMesMaterialIssueService {
             scope = BusinessCacheEvict.Scope.LIST)
     public MesMaterialIssueEntity insert(MesMaterialIssueCreateCommand input) {
         MesMaterialIssueEntity row = new MesMaterialIssueEntity();
-        row.setFactoryId(FactoryContext.required().factoryId().value());
+
         row.setIssueNo(input.issueNo());
         row.setWorkorderId(input.workorderId());
         row.setWorkorderCode(input.workorderCode());
@@ -162,7 +161,7 @@ public class MesMaterialIssueServiceImpl implements IMesMaterialIssueService {
         MesMaterialIssueExample example = new MesMaterialIssueExample();
         for (var id : ids) requireRecord(id);
         example.createCriteria().andIdIn(ids)
-                .andFactoryIdEqualTo(FactoryContext.required().factoryId().value())
+                
         ;
         if (mapper.deleteByExample(example) != ids.size()) {
             throw new FoundationException(ErrorCode.RESOURCE_CONFLICT);
@@ -171,7 +170,7 @@ public class MesMaterialIssueServiceImpl implements IMesMaterialIssueService {
 
     private MesMaterialIssueEntity requireRecord(Long id) {
         MesMaterialIssueEntity row = mapper.selectByPrimaryKey(id);
-        if (row == null || !FactoryContext.required().factoryId().value().equals(row.getFactoryId())) {
+        if (row == null) {
             throw new FoundationException(ErrorCode.NOT_FOUND);
         }
         return row;

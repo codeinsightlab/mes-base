@@ -81,7 +81,6 @@ public class WmInventoryServiceImpl implements IWmInventoryService {
         }
         WmInventoryExample example = new WmInventoryExample();
         WmInventoryExample.Criteria criteria = example.createCriteria();
-        criteria.andFactoryIdEqualTo(FactoryContext.required().factoryId().value());
         if (query.materialId() != null) {
             criteria.andMaterialIdEqualTo(query.materialId());
         }
@@ -125,7 +124,7 @@ public class WmInventoryServiceImpl implements IWmInventoryService {
             scope = BusinessCacheEvict.Scope.LIST)
     public WmInventoryEntity insert(WmInventoryCreateCommand input) {
         WmInventoryEntity row = new WmInventoryEntity();
-        row.setFactoryId(FactoryContext.required().factoryId().value());
+
         row.setMaterialId(input.materialId());
         row.setWarehouseId(input.warehouseId());
         row.setQuantity(input.quantity());
@@ -173,7 +172,7 @@ public class WmInventoryServiceImpl implements IWmInventoryService {
         WmInventoryExample example = new WmInventoryExample();
         for (var id : ids) requireRecord(id);
         example.createCriteria().andIdIn(ids)
-                .andFactoryIdEqualTo(FactoryContext.required().factoryId().value())
+                
         ;
         if (mapper.deleteByExample(example) != ids.size()) {
             throw new FoundationException(ErrorCode.RESOURCE_CONFLICT);
@@ -182,7 +181,7 @@ public class WmInventoryServiceImpl implements IWmInventoryService {
 
     private WmInventoryEntity requireRecord(Long id) {
         WmInventoryEntity row = mapper.selectByPrimaryKey(id);
-        if (row == null || !FactoryContext.required().factoryId().value().equals(row.getFactoryId())) {
+        if (row == null) {
             throw new FoundationException(ErrorCode.NOT_FOUND);
         }
         return row;
@@ -240,7 +239,7 @@ public class WmInventoryServiceImpl implements IWmInventoryService {
         if (inputs.isEmpty()) return new WmInventorySyncResult(0, 0, 0, 0);
         var example = new WmInventoryExample();
         example.createCriteria().andMaterialIdIn(keys.stream().map(StockKey::materialId).distinct().toList())
-                .andFactoryIdEqualTo(scope.factoryId().value())
+                
         ;
         var existing = new HashMap<StockKey, WmInventoryEntity>();
         for (var row : mapper.selectByExample(example)) {
@@ -263,7 +262,7 @@ public class WmInventoryServiceImpl implements IWmInventoryService {
             boolean insert = row == null;
             if (insert) {
                 row = new WmInventoryEntity();
-                row.setFactoryId(scope.factoryId().value());
+
             }
             row.setMaterialId(input.materialId());
             row.setWarehouseId(input.warehouseId());

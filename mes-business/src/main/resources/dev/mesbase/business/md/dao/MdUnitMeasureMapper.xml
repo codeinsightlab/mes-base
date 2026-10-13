@@ -4,7 +4,6 @@
 <mapper namespace="dev.mesbase.business.md.dao.MdUnitMeasureMapper">
   <resultMap id="BaseResultMap" type="dev.mesbase.business.md.domain.MdUnitMeasureEntity">
     <id column="measure_id" jdbcType="BIGINT" property="measureId" />
-    <result column="factory_id" jdbcType="VARCHAR" property="factoryId" />
     <result column="measure_code" jdbcType="VARCHAR" property="measureCode" />
     <result column="measure_name" jdbcType="VARCHAR" property="measureName" />
     <result column="primary_flag" jdbcType="CHAR" property="primaryFlag" />
@@ -76,8 +75,8 @@
     </where>
   </sql>
   <sql id="Base_Column_List">
-    measure_id, factory_id, measure_code, measure_name, primary_flag, primary_id, change_rate, 
-    enable_flag, remark, create_by, create_time, update_by, update_time
+    measure_id, measure_code, measure_name, primary_flag, primary_id, change_rate, enable_flag, 
+    remark, create_by, create_time, update_by, update_time
   </sql>
   <select id="selectByExample" parameterType="dev.mesbase.business.md.domain.MdUnitMeasureExample" resultMap="BaseResultMap">
     select
@@ -107,23 +106,18 @@
     </if>
   </delete>
   <insert id="insert" keyColumn="measure_id" keyProperty="measureId" parameterType="dev.mesbase.business.md.domain.MdUnitMeasureEntity" useGeneratedKeys="true">
-    insert into md_unit_measure (factory_id, measure_code, measure_name, 
-      primary_flag, primary_id, change_rate, 
-      enable_flag, remark, create_by, 
-      create_time, update_by, update_time
-      )
-    values (#{factoryId,jdbcType=VARCHAR}, #{measureCode,jdbcType=VARCHAR}, #{measureName,jdbcType=VARCHAR}, 
-      #{primaryFlag,jdbcType=CHAR}, #{primaryId,jdbcType=BIGINT}, #{changeRate,jdbcType=DECIMAL}, 
-      #{enableFlag,jdbcType=CHAR}, #{remark,jdbcType=VARCHAR}, #{createBy,jdbcType=VARCHAR}, 
-      #{createTime,jdbcType=TIMESTAMP}, #{updateBy,jdbcType=VARCHAR}, #{updateTime,jdbcType=TIMESTAMP}
-      )
+    insert into md_unit_measure (measure_code, measure_name, primary_flag, 
+      primary_id, change_rate, enable_flag, 
+      remark, create_by, create_time, 
+      update_by, update_time)
+    values (#{measureCode,jdbcType=VARCHAR}, #{measureName,jdbcType=VARCHAR}, #{primaryFlag,jdbcType=CHAR}, 
+      #{primaryId,jdbcType=BIGINT}, #{changeRate,jdbcType=DECIMAL}, #{enableFlag,jdbcType=CHAR}, 
+      #{remark,jdbcType=VARCHAR}, #{createBy,jdbcType=VARCHAR}, #{createTime,jdbcType=TIMESTAMP}, 
+      #{updateBy,jdbcType=VARCHAR}, #{updateTime,jdbcType=TIMESTAMP})
   </insert>
   <insert id="insertSelective" keyColumn="measure_id" keyProperty="measureId" parameterType="dev.mesbase.business.md.domain.MdUnitMeasureEntity" useGeneratedKeys="true">
     insert into md_unit_measure
     <trim prefix="(" suffix=")" suffixOverrides=",">
-      <if test="factoryId != null">
-        factory_id,
-      </if>
       <if test="measureCode != null">
         measure_code,
       </if>
@@ -159,9 +153,6 @@
       </if>
     </trim>
     <trim prefix="values (" suffix=")" suffixOverrides=",">
-      <if test="factoryId != null">
-        #{factoryId,jdbcType=VARCHAR},
-      </if>
       <if test="measureCode != null">
         #{measureCode,jdbcType=VARCHAR},
       </if>
@@ -209,9 +200,6 @@
       <if test="row.measureId != null">
         measure_id = #{row.measureId,jdbcType=BIGINT},
       </if>
-      <if test="row.factoryId != null">
-        factory_id = #{row.factoryId,jdbcType=VARCHAR},
-      </if>
       <if test="row.measureCode != null">
         measure_code = #{row.measureCode,jdbcType=VARCHAR},
       </if>
@@ -253,7 +241,6 @@
   <update id="updateByExample" parameterType="map">
     update md_unit_measure
     set measure_id = #{row.measureId,jdbcType=BIGINT},
-      factory_id = #{row.factoryId,jdbcType=VARCHAR},
       measure_code = #{row.measureCode,jdbcType=VARCHAR},
       measure_name = #{row.measureName,jdbcType=VARCHAR},
       primary_flag = #{row.primaryFlag,jdbcType=CHAR},
@@ -272,9 +259,6 @@
   <update id="updateByPrimaryKeySelective" parameterType="dev.mesbase.business.md.domain.MdUnitMeasureEntity">
     update md_unit_measure
     <set>
-      <if test="factoryId != null">
-        factory_id = #{factoryId,jdbcType=VARCHAR},
-      </if>
       <if test="measureCode != null">
         measure_code = #{measureCode,jdbcType=VARCHAR},
       </if>
@@ -313,8 +297,7 @@
   </update>
   <update id="updateByPrimaryKey" parameterType="dev.mesbase.business.md.domain.MdUnitMeasureEntity">
     update md_unit_measure
-    set factory_id = #{factoryId,jdbcType=VARCHAR},
-      measure_code = #{measureCode,jdbcType=VARCHAR},
+    set measure_code = #{measureCode,jdbcType=VARCHAR},
       measure_name = #{measureName,jdbcType=VARCHAR},
       primary_flag = #{primaryFlag,jdbcType=CHAR},
       primary_id = #{primaryId,jdbcType=BIGINT},

@@ -1,4 +1,3 @@
-// MES-CODEGEN: scaffold; review required.
 package dev.mesbase.business.issue.controller;
 
 import dev.mesbase.business.issue.controller.vo.MesMaterialIssueItemPageVo;
@@ -87,7 +86,7 @@ public class MesMaterialIssueItemController {
     private static MesMaterialIssueItemVo toView(MesMaterialIssueItemEntity row) {
         return new MesMaterialIssueItemVo(
                 row.getId() == null ? null : row.getId().toString(),
-                row.getFactoryId(),
+
                 row.getIssueId() == null ? null : row.getIssueId().toString(),
                 row.getMaterialId() == null ? null : row.getMaterialId().toString(),
                 row.getMaterialCode(),

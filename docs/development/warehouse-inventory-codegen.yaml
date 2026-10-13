@@ -1,7 +1,7 @@
 # 仓库／库存新增生成配置；仅选择两表，write/fail，不覆盖已有手工实现。
-# 库存同步生成基础单键脚手架后，业务实现改为物料＋仓库复合键。
+# 2026-10-13：后续暂不生成同步；既有库存同步的复合键业务实现不受此开关影响。
 version: 1
-generateSync: true
+generateSync: false
 sync:
   matchKey: "code"
   batchMaximum: 1000
@@ -94,9 +94,7 @@ tableOverrides:
     module: wm
     displayName: 仓库管理
     syncMatchKey: code
-    serverScopeColumn: factory_id
   wm_inventory:
     module: wm
     displayName: 库存管理
     syncMatchKey: material_id
-    serverScopeColumn: factory_id

@@ -6,8 +6,6 @@ import java.math.BigDecimal;
 public class SafetyStockEntity {
     private Long id;
 
-    private String factoryId;
-
     private Long materialId;
 
     private BigDecimal minQty;
@@ -22,14 +20,6 @@ public class SafetyStockEntity {
 
     public void setId(Long id) {
         this.id = id;
-    }
-
-    public String getFactoryId() {
-        return factoryId;
-    }
-
-    public void setFactoryId(String factoryId) {
-        this.factoryId = factoryId;
     }
 
     public Long getMaterialId() {

@@ -4,8 +4,6 @@ package dev.mesbase.business.basic.domain;
 public class MaterialEntity {
     private Long id;
 
-    private String factoryId;
-
     private String code;
 
     private String name;
@@ -30,14 +28,6 @@ public class MaterialEntity {
 
     public void setId(Long id) {
         this.id = id;
-    }
-
-    public String getFactoryId() {
-        return factoryId;
-    }
-
-    public void setFactoryId(String factoryId) {
-        this.factoryId = factoryId;
     }
 
     public String getCode() {

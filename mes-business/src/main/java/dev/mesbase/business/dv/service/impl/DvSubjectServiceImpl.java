@@ -1,4 +1,3 @@
-// MES-CODEGEN: scaffold; review required.
 package dev.mesbase.business.dv.service.impl;
 
 import com.github.pagehelper.Page;
@@ -73,9 +72,6 @@ public class DvSubjectServiceImpl implements IDvSubjectService {
         }
         DvSubjectExample example = new DvSubjectExample();
         DvSubjectExample.Criteria criteria = example.createCriteria();
-        if (query.factoryId() != null) {
-            criteria.andFactoryIdLike("%" + query.factoryId() + "%");
-        }
         if (query.subjectCode() != null) {
             criteria.andSubjectCodeLike("%" + query.subjectCode() + "%");
         }
@@ -120,7 +116,7 @@ public class DvSubjectServiceImpl implements IDvSubjectService {
             scope = BusinessCacheEvict.Scope.LIST)
     public DvSubjectEntity insert(DvSubjectCreateCommand input) {
         DvSubjectEntity row = new DvSubjectEntity();
-        row.setFactoryId(input.factoryId());
+
         row.setSubjectCode(input.subjectCode());
         row.setSubjectName(input.subjectName());
         row.setSubjectType(input.subjectType());
@@ -141,7 +137,7 @@ public class DvSubjectServiceImpl implements IDvSubjectService {
     public DvSubjectEntity updateById(Long id, DvSubjectUpdateCommand input) {
         DvSubjectEntity row = requireRecord(id);
         row.setSubjectId(id);
-        row.setFactoryId(input.factoryId());
+
         row.setSubjectCode(input.subjectCode());
         row.setSubjectName(input.subjectName());
         row.setSubjectType(input.subjectType());
@@ -240,7 +236,7 @@ public class DvSubjectServiceImpl implements IDvSubjectService {
             if (insert) {
                 row = new DvSubjectEntity();
             }
-            row.setFactoryId(input.factoryId());
+
             row.setSubjectCode(input.subjectCode());
             row.setSubjectName(input.subjectName());
             row.setSubjectType(input.subjectType());
@@ -264,8 +260,7 @@ public class DvSubjectServiceImpl implements IDvSubjectService {
     }
 
     private static boolean same(DvSubjectEntity row, ExternalDvSubject input) {
-        return Objects.deepEquals(row.getFactoryId(), input.factoryId())
-                && Objects.deepEquals(row.getSubjectCode(), input.subjectCode())
+        return Objects.deepEquals(row.getSubjectCode(), input.subjectCode())
                 && Objects.deepEquals(row.getSubjectName(), input.subjectName())
                 && Objects.deepEquals(row.getSubjectType(), input.subjectType())
                 && Objects.deepEquals(row.getSubjectContent(), input.subjectContent())

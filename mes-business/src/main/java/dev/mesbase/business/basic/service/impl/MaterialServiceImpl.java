@@ -1,4 +1,3 @@
-// MES-CODEGEN: scaffold; review required.
 package dev.mesbase.business.basic.service.impl;
 
 import com.github.pagehelper.Page;
@@ -78,7 +77,6 @@ public class MaterialServiceImpl implements IMaterialService {
         }
         MaterialExample example = new MaterialExample();
         MaterialExample.Criteria criteria = example.createCriteria();
-        criteria.andFactoryIdEqualTo(FactoryContext.required().factoryId().value());
         if (query.code() != null) {
             criteria.andCodeLike("%" + query.code() + "%");
         }
@@ -129,7 +127,7 @@ public class MaterialServiceImpl implements IMaterialService {
             scope = BusinessCacheEvict.Scope.LIST)
     public MaterialEntity insert(MaterialCreateCommand input) {
         MaterialEntity row = new MaterialEntity();
-        row.setFactoryId(FactoryContext.required().factoryId().value());
+
         row.setCode(input.code());
         row.setName(input.name());
         row.setSpecification(input.specification());
@@ -182,7 +180,7 @@ public class MaterialServiceImpl implements IMaterialService {
         MaterialExample example = new MaterialExample();
         for (var id : ids) requireRecord(id);
         example.createCriteria().andIdIn(ids)
-                .andFactoryIdEqualTo(FactoryContext.required().factoryId().value())
+                
         ;
         if (mapper.deleteByExample(example) != ids.size()) {
             throw new FoundationException(ErrorCode.RESOURCE_CONFLICT);
@@ -207,7 +205,7 @@ public class MaterialServiceImpl implements IMaterialService {
 
     private MaterialEntity requireRecord(Long id) {
         MaterialEntity row = mapper.selectByPrimaryKey(id);
-        if (row == null || !FactoryContext.required().factoryId().value().equals(row.getFactoryId())) {
+        if (row == null) {
             throw new FoundationException(ErrorCode.NOT_FOUND);
         }
         return row;
@@ -253,7 +251,7 @@ public class MaterialServiceImpl implements IMaterialService {
         if (inputs.isEmpty()) return new MaterialSyncResult(0, 0, 0, 0);
         var example = new MaterialExample();
         example.createCriteria().andCodeIn(List.copyOf(keys))
-                .andFactoryIdEqualTo(scope.factoryId().value())
+                
         ;
         var existing = new HashMap<String, MaterialEntity>();
         for (var row : mapper.selectByExample(example)) {
@@ -273,7 +271,7 @@ public class MaterialServiceImpl implements IMaterialService {
             boolean insert = row == null;
             if (insert) {
                 row = new MaterialEntity();
-                row.setFactoryId(scope.factoryId().value());
+
             }
             row.setCode(input.code());
             row.setName(input.name());

@@ -7,8 +7,6 @@ import java.time.LocalDateTime;
 public class MdUnitMeasureEntity {
     private Long measureId;
 
-    private String factoryId;
-
     private String measureCode;
 
     private String measureName;
@@ -37,14 +35,6 @@ public class MdUnitMeasureEntity {
 
     public void setMeasureId(Long measureId) {
         this.measureId = measureId;
-    }
-
-    public String getFactoryId() {
-        return factoryId;
-    }
-
-    public void setFactoryId(String factoryId) {
-        this.factoryId = factoryId;
     }
 
     public String getMeasureCode() {

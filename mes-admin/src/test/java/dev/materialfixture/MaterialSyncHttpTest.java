@@ -113,14 +113,17 @@ class MaterialSyncHttpTest {
                     factory("A"), factory("B"), factory("C")));
             Map<FactoryId, BusinessRuntimeBinding> bindings = new HashMap<>();
             String ddl = Files.readString(Path.of("mes-admin/src/main/resources/db/business/V2__simple_business_capabilities.sql"))
-                    .replace(") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT=", ") COMMENT ");
+                    .replace(") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT=", ") COMMENT ")
+                    .replaceAll("(?m)^\\s*factory_id [^\\n]+\\n", "")
+                    .replace("factory_id,", "")
+                    .replace("factory_id, ", "");
             for (String id : List.of("A", "B", "C")) {
                 var source = source();
                 var jdbc = new JdbcTemplate(source);
                 for (String statement : ddl.split(";")) {
                     if (!statement.isBlank()) jdbc.execute(statement);
                 }
-                jdbc.execute("INSERT INTO unit_measure(factory_id,code,name,status) VALUES('" + id + "','PCS','件','ENABLED'),('" + id + "','KG','千克','ENABLED')");
+                jdbc.execute("INSERT INTO unit_measure(code,name,status) VALUES('PCS','件','ENABLED'),('KG','千克','ENABLED')");
                 jdbc.execute("ALTER TABLE material ADD CONSTRAINT fixture_reject_name CHECK(name <> 'DB_REJECT')");
                 business.put(id, jdbc);
                 var identity = new DatasourceIdentity("TEST_ONLY_" + id);

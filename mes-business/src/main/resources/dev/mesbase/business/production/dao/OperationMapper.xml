@@ -4,7 +4,6 @@
 <mapper namespace="dev.mesbase.business.production.dao.OperationMapper">
   <resultMap id="BaseResultMap" type="dev.mesbase.business.production.domain.OperationEntity">
     <id column="id" jdbcType="BIGINT" property="id" />
-    <result column="factory_id" jdbcType="VARCHAR" property="factoryId" />
     <result column="code" jdbcType="VARCHAR" property="code" />
     <result column="name" jdbcType="VARCHAR" property="name" />
     <result column="description" jdbcType="VARCHAR" property="description" />
@@ -72,7 +71,7 @@
     </where>
   </sql>
   <sql id="Base_Column_List">
-    id, factory_id, code, name, description, status, sort, external_id, revision
+    id, code, name, description, status, sort, external_id, revision
   </sql>
   <select id="selectByExample" parameterType="dev.mesbase.business.production.domain.OperationExample" resultMap="BaseResultMap">
     select
@@ -102,19 +101,16 @@
     </if>
   </delete>
   <insert id="insert" keyColumn="id" keyProperty="id" parameterType="dev.mesbase.business.production.domain.OperationEntity" useGeneratedKeys="true">
-    insert into operation (factory_id, code, name, 
-      description, status, sort, 
-      external_id, revision)
-    values (#{factoryId,jdbcType=VARCHAR}, #{code,jdbcType=VARCHAR}, #{name,jdbcType=VARCHAR}, 
-      #{description,jdbcType=VARCHAR}, #{status,jdbcType=VARCHAR}, #{sort,jdbcType=INTEGER}, 
-      #{externalId,jdbcType=VARCHAR}, #{revision,jdbcType=INTEGER})
+    insert into operation (code, name, description, 
+      status, sort, external_id, 
+      revision)
+    values (#{code,jdbcType=VARCHAR}, #{name,jdbcType=VARCHAR}, #{description,jdbcType=VARCHAR}, 
+      #{status,jdbcType=VARCHAR}, #{sort,jdbcType=INTEGER}, #{externalId,jdbcType=VARCHAR}, 
+      #{revision,jdbcType=INTEGER})
   </insert>
   <insert id="insertSelective" keyColumn="id" keyProperty="id" parameterType="dev.mesbase.business.production.domain.OperationEntity" useGeneratedKeys="true">
     insert into operation
     <trim prefix="(" suffix=")" suffixOverrides=",">
-      <if test="factoryId != null">
-        factory_id,
-      </if>
       <if test="code != null">
         code,
       </if>
@@ -138,9 +134,6 @@
       </if>
     </trim>
     <trim prefix="values (" suffix=")" suffixOverrides=",">
-      <if test="factoryId != null">
-        #{factoryId,jdbcType=VARCHAR},
-      </if>
       <if test="code != null">
         #{code,jdbcType=VARCHAR},
       </if>
@@ -176,9 +169,6 @@
       <if test="row.id != null">
         id = #{row.id,jdbcType=BIGINT},
       </if>
-      <if test="row.factoryId != null">
-        factory_id = #{row.factoryId,jdbcType=VARCHAR},
-      </if>
       <if test="row.code != null">
         code = #{row.code,jdbcType=VARCHAR},
       </if>
@@ -208,7 +198,6 @@
   <update id="updateByExample" parameterType="map">
     update operation
     set id = #{row.id,jdbcType=BIGINT},
-      factory_id = #{row.factoryId,jdbcType=VARCHAR},
       code = #{row.code,jdbcType=VARCHAR},
       name = #{row.name,jdbcType=VARCHAR},
       description = #{row.description,jdbcType=VARCHAR},
@@ -223,9 +212,6 @@
   <update id="updateByPrimaryKeySelective" parameterType="dev.mesbase.business.production.domain.OperationEntity">
     update operation
     <set>
-      <if test="factoryId != null">
-        factory_id = #{factoryId,jdbcType=VARCHAR},
-      </if>
       <if test="code != null">
         code = #{code,jdbcType=VARCHAR},
       </if>
@@ -252,8 +238,7 @@
   </update>
   <update id="updateByPrimaryKey" parameterType="dev.mesbase.business.production.domain.OperationEntity">
     update operation
-    set factory_id = #{factoryId,jdbcType=VARCHAR},
-      code = #{code,jdbcType=VARCHAR},
+    set code = #{code,jdbcType=VARCHAR},
       name = #{name,jdbcType=VARCHAR},
       description = #{description,jdbcType=VARCHAR},
       status = #{status,jdbcType=VARCHAR},

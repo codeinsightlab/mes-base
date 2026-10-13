@@ -1,4 +1,3 @@
-// MES-CODEGEN: scaffold; review required.
 package dev.mesbase.business.md.service.impl;
 
 import com.github.pagehelper.Page;
@@ -73,9 +72,6 @@ public class MdWorkshopServiceImpl implements IMdWorkshopService {
         }
         MdWorkshopExample example = new MdWorkshopExample();
         MdWorkshopExample.Criteria criteria = example.createCriteria();
-        if (query.factoryId() != null) {
-            criteria.andFactoryIdLike("%" + query.factoryId() + "%");
-        }
         if (query.workshopCode() != null) {
             criteria.andWorkshopCodeLike("%" + query.workshopCode() + "%");
         }
@@ -120,7 +116,7 @@ public class MdWorkshopServiceImpl implements IMdWorkshopService {
             scope = BusinessCacheEvict.Scope.LIST)
     public MdWorkshopEntity insert(MdWorkshopCreateCommand input) {
         MdWorkshopEntity row = new MdWorkshopEntity();
-        row.setFactoryId(input.factoryId());
+
         row.setWorkshopCode(input.workshopCode());
         row.setWorkshopName(input.workshopName());
         row.setArea(input.area());
@@ -141,7 +137,7 @@ public class MdWorkshopServiceImpl implements IMdWorkshopService {
     public MdWorkshopEntity updateById(Long id, MdWorkshopUpdateCommand input) {
         MdWorkshopEntity row = requireRecord(id);
         row.setWorkshopId(id);
-        row.setFactoryId(input.factoryId());
+
         row.setWorkshopCode(input.workshopCode());
         row.setWorkshopName(input.workshopName());
         row.setArea(input.area());
@@ -240,7 +236,7 @@ public class MdWorkshopServiceImpl implements IMdWorkshopService {
             if (insert) {
                 row = new MdWorkshopEntity();
             }
-            row.setFactoryId(input.factoryId());
+
             row.setWorkshopCode(input.workshopCode());
             row.setWorkshopName(input.workshopName());
             row.setArea(input.area());
@@ -264,8 +260,7 @@ public class MdWorkshopServiceImpl implements IMdWorkshopService {
     }
 
     private static boolean same(MdWorkshopEntity row, ExternalMdWorkshop input) {
-        return Objects.deepEquals(row.getFactoryId(), input.factoryId())
-                && Objects.deepEquals(row.getWorkshopCode(), input.workshopCode())
+        return Objects.deepEquals(row.getWorkshopCode(), input.workshopCode())
                 && Objects.deepEquals(row.getWorkshopName(), input.workshopName())
                 && (row.getArea() == null ? input.area() == null
                     : input.area() != null && row.getArea().compareTo(input.area()) == 0)

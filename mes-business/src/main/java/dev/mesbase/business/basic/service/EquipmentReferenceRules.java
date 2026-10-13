@@ -29,10 +29,18 @@ public class EquipmentReferenceRules {
     public void lockWorkstations(List<Long> ids) {
         String factory = FactoryContext.required().factoryId().value();
         var filter = new WorkstationExample();
-        filter.createCriteria().andFactoryIdEqualTo(factory).andIdIn(ids);
+        filter.createCriteria().andIdIn(ids);
         var lock = new WorkstationEntity();
-        lock.setFactoryId(factory);
-        workstations.updateByExampleSelective(lock, filter);
+
+        for (var reference : workstations.selectByExample(filter).stream()
+                .sorted((left, right) -> left.getId().compareTo(right.getId())).toList()) {
+            lock.setId(reference.getId());
+            var rowFilter = new WorkstationExample();
+            rowFilter.createCriteria().andIdEqualTo(reference.getId());
+            if (workstations.updateByExampleSelective(lock, rowFilter) != 1) {
+                throw new FoundationException(ErrorCode.NOT_FOUND);
+            }
+        }
         if (workstations.countByExample(filter) != ids.size()) {
             throw new FoundationException(ErrorCode.NOT_FOUND);
         }
@@ -41,7 +49,7 @@ public class EquipmentReferenceRules {
     public void deletingWorkstations(List<Long> ids) {
         lockWorkstations(ids);
         var filter = new EquipmentExample();
-        filter.createCriteria().andFactoryIdEqualTo(FactoryContext.required().factoryId().value())
+        filter.createCriteria()
                 .andWorkstationIdIn(ids);
         if (equipment.countByExample(filter) > 0) {
             throw new FoundationException(ErrorCode.RESOURCE_CONFLICT);

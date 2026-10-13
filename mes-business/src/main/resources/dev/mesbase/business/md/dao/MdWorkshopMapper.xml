@@ -4,7 +4,6 @@
 <mapper namespace="dev.mesbase.business.md.dao.MdWorkshopMapper">
   <resultMap id="BaseResultMap" type="dev.mesbase.business.md.domain.MdWorkshopEntity">
     <id column="workshop_id" jdbcType="BIGINT" property="workshopId" />
-    <result column="factory_id" jdbcType="VARCHAR" property="factoryId" />
     <result column="workshop_code" jdbcType="VARCHAR" property="workshopCode" />
     <result column="workshop_name" jdbcType="VARCHAR" property="workshopName" />
     <result column="area" jdbcType="DECIMAL" property="area" />
@@ -76,8 +75,8 @@
     </where>
   </sql>
   <sql id="Base_Column_List">
-    workshop_id, factory_id, workshop_code, workshop_name, area, charge, dept_id, enable_flag, 
-    remark, create_by, create_time, update_by, update_time
+    workshop_id, workshop_code, workshop_name, area, charge, dept_id, enable_flag, remark, 
+    create_by, create_time, update_by, update_time
   </sql>
   <select id="selectByExample" parameterType="dev.mesbase.business.md.domain.MdWorkshopExample" resultMap="BaseResultMap">
     select
@@ -107,23 +106,18 @@
     </if>
   </delete>
   <insert id="insert" keyColumn="workshop_id" keyProperty="workshopId" parameterType="dev.mesbase.business.md.domain.MdWorkshopEntity" useGeneratedKeys="true">
-    insert into md_workshop (factory_id, workshop_code, workshop_name, 
-      area, charge, dept_id, 
-      enable_flag, remark, create_by, 
-      create_time, update_by, update_time
-      )
-    values (#{factoryId,jdbcType=VARCHAR}, #{workshopCode,jdbcType=VARCHAR}, #{workshopName,jdbcType=VARCHAR}, 
-      #{area,jdbcType=DECIMAL}, #{charge,jdbcType=VARCHAR}, #{deptId,jdbcType=BIGINT}, 
-      #{enableFlag,jdbcType=CHAR}, #{remark,jdbcType=VARCHAR}, #{createBy,jdbcType=VARCHAR}, 
-      #{createTime,jdbcType=TIMESTAMP}, #{updateBy,jdbcType=VARCHAR}, #{updateTime,jdbcType=TIMESTAMP}
-      )
+    insert into md_workshop (workshop_code, workshop_name, area, 
+      charge, dept_id, enable_flag, 
+      remark, create_by, create_time, 
+      update_by, update_time)
+    values (#{workshopCode,jdbcType=VARCHAR}, #{workshopName,jdbcType=VARCHAR}, #{area,jdbcType=DECIMAL}, 
+      #{charge,jdbcType=VARCHAR}, #{deptId,jdbcType=BIGINT}, #{enableFlag,jdbcType=CHAR}, 
+      #{remark,jdbcType=VARCHAR}, #{createBy,jdbcType=VARCHAR}, #{createTime,jdbcType=TIMESTAMP}, 
+      #{updateBy,jdbcType=VARCHAR}, #{updateTime,jdbcType=TIMESTAMP})
   </insert>
   <insert id="insertSelective" keyColumn="workshop_id" keyProperty="workshopId" parameterType="dev.mesbase.business.md.domain.MdWorkshopEntity" useGeneratedKeys="true">
     insert into md_workshop
     <trim prefix="(" suffix=")" suffixOverrides=",">
-      <if test="factoryId != null">
-        factory_id,
-      </if>
       <if test="workshopCode != null">
         workshop_code,
       </if>
@@ -159,9 +153,6 @@
       </if>
     </trim>
     <trim prefix="values (" suffix=")" suffixOverrides=",">
-      <if test="factoryId != null">
-        #{factoryId,jdbcType=VARCHAR},
-      </if>
       <if test="workshopCode != null">
         #{workshopCode,jdbcType=VARCHAR},
       </if>
@@ -209,9 +200,6 @@
       <if test="row.workshopId != null">
         workshop_id = #{row.workshopId,jdbcType=BIGINT},
       </if>
-      <if test="row.factoryId != null">
-        factory_id = #{row.factoryId,jdbcType=VARCHAR},
-      </if>
       <if test="row.workshopCode != null">
         workshop_code = #{row.workshopCode,jdbcType=VARCHAR},
       </if>
@@ -253,7 +241,6 @@
   <update id="updateByExample" parameterType="map">
     update md_workshop
     set workshop_id = #{row.workshopId,jdbcType=BIGINT},
-      factory_id = #{row.factoryId,jdbcType=VARCHAR},
       workshop_code = #{row.workshopCode,jdbcType=VARCHAR},
       workshop_name = #{row.workshopName,jdbcType=VARCHAR},
       area = #{row.area,jdbcType=DECIMAL},
@@ -272,9 +259,6 @@
   <update id="updateByPrimaryKeySelective" parameterType="dev.mesbase.business.md.domain.MdWorkshopEntity">
     update md_workshop
     <set>
-      <if test="factoryId != null">
-        factory_id = #{factoryId,jdbcType=VARCHAR},
-      </if>
       <if test="workshopCode != null">
         workshop_code = #{workshopCode,jdbcType=VARCHAR},
       </if>
@@ -313,8 +297,7 @@
   </update>
   <update id="updateByPrimaryKey" parameterType="dev.mesbase.business.md.domain.MdWorkshopEntity">
     update md_workshop
-    set factory_id = #{factoryId,jdbcType=VARCHAR},
-      workshop_code = #{workshopCode,jdbcType=VARCHAR},
+    set workshop_code = #{workshopCode,jdbcType=VARCHAR},
       workshop_name = #{workshopName,jdbcType=VARCHAR},
       area = #{area,jdbcType=DECIMAL},
       charge = #{charge,jdbcType=VARCHAR},

@@ -4,7 +4,6 @@
 <mapper namespace="dev.mesbase.business.basic.dao.MaterialCategoryMapper">
   <resultMap id="BaseResultMap" type="dev.mesbase.business.basic.domain.MaterialCategoryEntity">
     <id column="id" jdbcType="BIGINT" property="id" />
-    <result column="factory_id" jdbcType="VARCHAR" property="factoryId" />
     <result column="code" jdbcType="VARCHAR" property="code" />
     <result column="name" jdbcType="VARCHAR" property="name" />
     <result column="parent_id" jdbcType="BIGINT" property="parentId" />
@@ -71,7 +70,7 @@
     </where>
   </sql>
   <sql id="Base_Column_List">
-    id, factory_id, code, name, parent_id, sort, status, remark
+    id, code, name, parent_id, sort, status, remark
   </sql>
   <select id="selectByExample" parameterType="dev.mesbase.business.basic.domain.MaterialCategoryExample" resultMap="BaseResultMap">
     select
@@ -101,19 +100,16 @@
     </if>
   </delete>
   <insert id="insert" keyColumn="id" keyProperty="id" parameterType="dev.mesbase.business.basic.domain.MaterialCategoryEntity" useGeneratedKeys="true">
-    insert into material_category (factory_id, code, name, 
-      parent_id, sort, status, 
-      remark)
-    values (#{factoryId,jdbcType=VARCHAR}, #{code,jdbcType=VARCHAR}, #{name,jdbcType=VARCHAR}, 
-      #{parentId,jdbcType=BIGINT}, #{sort,jdbcType=INTEGER}, #{status,jdbcType=VARCHAR}, 
-      #{remark,jdbcType=VARCHAR})
+    insert into material_category (code, name, parent_id, 
+      sort, status, remark
+      )
+    values (#{code,jdbcType=VARCHAR}, #{name,jdbcType=VARCHAR}, #{parentId,jdbcType=BIGINT}, 
+      #{sort,jdbcType=INTEGER}, #{status,jdbcType=VARCHAR}, #{remark,jdbcType=VARCHAR}
+      )
   </insert>
   <insert id="insertSelective" keyColumn="id" keyProperty="id" parameterType="dev.mesbase.business.basic.domain.MaterialCategoryEntity" useGeneratedKeys="true">
     insert into material_category
     <trim prefix="(" suffix=")" suffixOverrides=",">
-      <if test="factoryId != null">
-        factory_id,
-      </if>
       <if test="code != null">
         code,
       </if>
@@ -134,9 +130,6 @@
       </if>
     </trim>
     <trim prefix="values (" suffix=")" suffixOverrides=",">
-      <if test="factoryId != null">
-        #{factoryId,jdbcType=VARCHAR},
-      </if>
       <if test="code != null">
         #{code,jdbcType=VARCHAR},
       </if>
@@ -169,9 +162,6 @@
       <if test="row.id != null">
         id = #{row.id,jdbcType=BIGINT},
       </if>
-      <if test="row.factoryId != null">
-        factory_id = #{row.factoryId,jdbcType=VARCHAR},
-      </if>
       <if test="row.code != null">
         code = #{row.code,jdbcType=VARCHAR},
       </if>
@@ -198,7 +188,6 @@
   <update id="updateByExample" parameterType="map">
     update material_category
     set id = #{row.id,jdbcType=BIGINT},
-      factory_id = #{row.factoryId,jdbcType=VARCHAR},
       code = #{row.code,jdbcType=VARCHAR},
       name = #{row.name,jdbcType=VARCHAR},
       parent_id = #{row.parentId,jdbcType=BIGINT},
@@ -212,9 +201,6 @@
   <update id="updateByPrimaryKeySelective" parameterType="dev.mesbase.business.basic.domain.MaterialCategoryEntity">
     update material_category
     <set>
-      <if test="factoryId != null">
-        factory_id = #{factoryId,jdbcType=VARCHAR},
-      </if>
       <if test="code != null">
         code = #{code,jdbcType=VARCHAR},
       </if>
@@ -238,8 +224,7 @@
   </update>
   <update id="updateByPrimaryKey" parameterType="dev.mesbase.business.basic.domain.MaterialCategoryEntity">
     update material_category
-    set factory_id = #{factoryId,jdbcType=VARCHAR},
-      code = #{code,jdbcType=VARCHAR},
+    set code = #{code,jdbcType=VARCHAR},
       name = #{name,jdbcType=VARCHAR},
       parent_id = #{parentId,jdbcType=BIGINT},
       sort = #{sort,jdbcType=INTEGER},

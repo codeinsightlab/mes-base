@@ -1,4 +1,3 @@
-// MES-CODEGEN: scaffold; review required.
 package dev.mesbase.business.dv.domain;
 
 import dev.mesbase.infrastructure.cache.BusinessCacheQuery;
@@ -12,7 +11,7 @@ import jakarta.validation.constraints.Size;
 public record DvSubjectQueryDto(
         @Min(0) Integer offset,
         @Min(1) @Max(100) Integer limit,
-        @Size(max=64) String factoryId,
+
         @Size(max=64) String subjectCode,
         @Size(max=255) String subjectName,
         @Size(max=64) String subjectType,

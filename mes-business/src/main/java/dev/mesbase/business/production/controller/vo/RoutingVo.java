@@ -7,7 +7,7 @@ import java.time.LocalDateTime;
  */
 public record RoutingVo(
         String id,
-        String factoryId,
+
         String code,
         String name,
         Integer version,

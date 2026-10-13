@@ -69,11 +69,19 @@ public class StockReferenceRules {
     private void lockMaterials(List<Long> ids) {
         if (ids.isEmpty()) return;
         var filter = new MaterialExample();
-        filter.createCriteria().andFactoryIdEqualTo(factory()).andIdIn(ids);
+        filter.createCriteria().andIdIn(ids);
         // Existing generated same-value UPDATE acquires row locks shared with reference deletion.
         var lock = new MaterialEntity();
-        lock.setFactoryId(factory());
-        materials.updateByExampleSelective(lock, filter);
+
+        for (var reference : materials.selectByExample(filter).stream()
+                .sorted((left, right) -> left.getId().compareTo(right.getId())).toList()) {
+            lock.setId(reference.getId());
+            var rowFilter = new MaterialExample();
+            rowFilter.createCriteria().andIdEqualTo(reference.getId());
+            if (materials.updateByExampleSelective(lock, rowFilter) != 1) {
+                throw new FoundationException(ErrorCode.NOT_FOUND);
+            }
+        }
         if (materials.countByExample(filter) != ids.size())
             throw new FoundationException(ErrorCode.STOCK_REFERENCE_INVALID);
     }
@@ -81,10 +89,18 @@ public class StockReferenceRules {
     private void lockWarehouses(List<Long> ids) {
         if (ids.isEmpty()) return;
         var filter = new WmWarehouseExample();
-        filter.createCriteria().andFactoryIdEqualTo(factory()).andIdIn(ids);
+        filter.createCriteria().andIdIn(ids);
         var lock = new WmWarehouseEntity();
-        lock.setFactoryId(factory());
-        warehouses.updateByExampleSelective(lock, filter);
+
+        for (var reference : warehouses.selectByExample(filter).stream()
+                .sorted((left, right) -> left.getId().compareTo(right.getId())).toList()) {
+            lock.setId(reference.getId());
+            var rowFilter = new WmWarehouseExample();
+            rowFilter.createCriteria().andIdEqualTo(reference.getId());
+            if (warehouses.updateByExampleSelective(lock, rowFilter) != 1) {
+                throw new FoundationException(ErrorCode.NOT_FOUND);
+            }
+        }
         if (warehouses.countByExample(filter) != ids.size())
             throw new FoundationException(ErrorCode.STOCK_REFERENCE_INVALID);
     }
@@ -92,10 +108,10 @@ public class StockReferenceRules {
     public List<WmInventoryItem> describe(List<WmInventoryEntity> rows) {
         if (rows.isEmpty()) return List.of();
         var materialFilter = new MaterialExample();
-        materialFilter.createCriteria().andFactoryIdEqualTo(factory())
+        materialFilter.createCriteria()
                 .andIdIn(rows.stream().map(WmInventoryEntity::getMaterialId).distinct().toList());
         var warehouseFilter = new WmWarehouseExample();
-        warehouseFilter.createCriteria().andFactoryIdEqualTo(factory())
+        warehouseFilter.createCriteria()
                 .andIdIn(rows.stream().map(WmInventoryEntity::getWarehouseId).distinct().toList());
         var materialNames = materials.selectByExample(materialFilter).stream()
                 .collect(Collectors.toMap(MaterialEntity::getId, row -> row.getCode() + " · " + row.getName()));
@@ -108,7 +124,7 @@ public class StockReferenceRules {
     public void deletingWarehouses(List<Long> ids) {
         lockWarehouses(ids);
         var filter = new WmInventoryExample();
-        filter.createCriteria().andFactoryIdEqualTo(factory()).andWarehouseIdIn(ids);
+        filter.createCriteria().andWarehouseIdIn(ids);
         if (inventories.countByExample(filter) > 0)
             throw new FoundationException(ErrorCode.WAREHOUSE_REFERENCED);
     }
@@ -116,7 +132,7 @@ public class StockReferenceRules {
     public void deletingMaterials(List<Long> ids) {
         lockMaterials(ids);
         var filter = new WmInventoryExample();
-        filter.createCriteria().andFactoryIdEqualTo(factory()).andMaterialIdIn(ids);
+        filter.createCriteria().andMaterialIdIn(ids);
         if (inventories.countByExample(filter) > 0)
             throw new FoundationException(ErrorCode.MATERIAL_INVENTORY_REFERENCED);
     }

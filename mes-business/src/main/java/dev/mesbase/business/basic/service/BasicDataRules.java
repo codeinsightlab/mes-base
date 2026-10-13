@@ -76,7 +76,7 @@ public class BasicDataRules {
     public void validate(MaterialEntity row) {
         status(row.getStatus());
         var example = new MaterialExample();
-        var criteria = example.createCriteria().andFactoryIdEqualTo(factory()).andCodeEqualTo(row.getCode());
+        var criteria = example.createCriteria().andCodeEqualTo(row.getCode());
         if (row.getId() != null) criteria.andIdNotEqualTo(row.getId());
         reject(material.countByExample(example) > 0);
         requireUnit(row.getUnitId());
@@ -88,7 +88,7 @@ public class BasicDataRules {
     public void validate(MaterialCategoryEntity row) {
         status(row.getStatus());
         var example = new MaterialCategoryExample();
-        var criteria = example.createCriteria().andFactoryIdEqualTo(factory()).andCodeEqualTo(row.getCode());
+        var criteria = example.createCriteria().andCodeEqualTo(row.getCode());
         if (row.getId() != null) criteria.andIdNotEqualTo(row.getId());
         reject(materialCategory.countByExample(example) > 0);
         if (row.getSort() == null || row.getSort() < 0) throw new FoundationException(ErrorCode.BAD_REQUEST);
@@ -105,7 +105,7 @@ public class BasicDataRules {
     public void validate(UnitMeasureEntity row) {
         status(row.getStatus());
         var example = new UnitMeasureExample();
-        var criteria = example.createCriteria().andFactoryIdEqualTo(factory()).andCodeEqualTo(row.getCode());
+        var criteria = example.createCriteria().andCodeEqualTo(row.getCode());
         if (row.getId() != null) criteria.andIdNotEqualTo(row.getId());
         reject(unitMeasure.countByExample(example) > 0);
     }
@@ -113,7 +113,7 @@ public class BasicDataRules {
     public void validate(WorkstationEntity row) {
         status(row.getStatus());
         var example = new WorkstationExample();
-        var criteria = example.createCriteria().andFactoryIdEqualTo(factory()).andCodeEqualTo(row.getCode());
+        var criteria = example.createCriteria().andCodeEqualTo(row.getCode());
         if (row.getId() != null) criteria.andIdNotEqualTo(row.getId());
         reject(workstation.countByExample(example) > 0);
         if (row.getWorkshopId() != null) requireWorkshop(row.getWorkshopId());
@@ -122,7 +122,7 @@ public class BasicDataRules {
     public void validate(WorkshopEntity row) {
         status(row.getStatus());
         var example = new WorkshopExample();
-        var criteria = example.createCriteria().andFactoryIdEqualTo(factory()).andCodeEqualTo(row.getCode());
+        var criteria = example.createCriteria().andCodeEqualTo(row.getCode());
         if (row.getId() != null) criteria.andIdNotEqualTo(row.getId());
         reject(workshop.countByExample(example) > 0);
     }
@@ -130,7 +130,7 @@ public class BasicDataRules {
     public void validate(SafetyStockEntity row) {
         status(row.getStatus());
         var example = new SafetyStockExample();
-        var criteria = example.createCriteria().andFactoryIdEqualTo(factory())
+        var criteria = example.createCriteria()
                 .andMaterialIdEqualTo(row.getMaterialId());
         if (row.getId() != null) criteria.andIdNotEqualTo(row.getId());
         reject(safetyStock.countByExample(example) > 0);
@@ -141,25 +141,25 @@ public class BasicDataRules {
 
     public MaterialEntity requireMaterial(Long id) {
         var row = id == null ? null : material.selectByPrimaryKey(id);
-        if (row == null || !factory().equals(row.getFactoryId())) throw new FoundationException(ErrorCode.NOT_FOUND);
+        if (row == null) throw new FoundationException(ErrorCode.NOT_FOUND);
         return row;
     }
 
     public MaterialCategoryEntity requireCategory(Long id) {
         var row = id == null ? null : materialCategory.selectByPrimaryKey(id);
-        if (row == null || !factory().equals(row.getFactoryId())) throw new FoundationException(ErrorCode.NOT_FOUND);
+        if (row == null) throw new FoundationException(ErrorCode.NOT_FOUND);
         return row;
     }
 
     public UnitMeasureEntity requireUnit(Long id) {
         var row = id == null ? null : unitMeasure.selectByPrimaryKey(id);
-        if (row == null || !factory().equals(row.getFactoryId())) throw new FoundationException(ErrorCode.NOT_FOUND);
+        if (row == null) throw new FoundationException(ErrorCode.NOT_FOUND);
         return row;
     }
 
     public WorkshopEntity requireWorkshop(Long id) {
         var row = id == null ? null : workshop.selectByPrimaryKey(id);
-        if (row == null || !factory().equals(row.getFactoryId())) throw new FoundationException(ErrorCode.NOT_FOUND);
+        if (row == null) throw new FoundationException(ErrorCode.NOT_FOUND);
         return row;
     }
 
@@ -170,22 +170,22 @@ public class BasicDataRules {
         var references = routing.getIfAvailable();
         if (references != null) references.deletingMaterials(ids);
         var safetyStockRefs = new SafetyStockExample();
-        safetyStockRefs.createCriteria().andFactoryIdEqualTo(factory()).andMaterialIdIn(ids);
+        safetyStockRefs.createCriteria().andMaterialIdIn(ids);
         reject(safetyStock.countByExample(safetyStockRefs) > 0);
     }
 
     public void deletingMaterialCategory(List<Long> ids) {
         var materialRefs = new MaterialExample();
-        materialRefs.createCriteria().andFactoryIdEqualTo(factory()).andCategoryIdIn(ids);
+        materialRefs.createCriteria().andCategoryIdIn(ids);
         reject(material.countByExample(materialRefs) > 0);
         var materialCategoryRefs = new MaterialCategoryExample();
-        materialCategoryRefs.createCriteria().andFactoryIdEqualTo(factory()).andParentIdIn(ids);
+        materialCategoryRefs.createCriteria().andParentIdIn(ids);
         reject(materialCategory.countByExample(materialCategoryRefs) > 0);
     }
 
     public void deletingUnitMeasure(List<Long> ids) {
         var materialRefs = new MaterialExample();
-        materialRefs.createCriteria().andFactoryIdEqualTo(factory()).andUnitIdIn(ids);
+        materialRefs.createCriteria().andUnitIdIn(ids);
         reject(material.countByExample(materialRefs) > 0);
     }
 
@@ -195,7 +195,7 @@ public class BasicDataRules {
 
     public void deletingWorkshop(List<Long> ids) {
         var workstationRefs = new WorkstationExample();
-        workstationRefs.createCriteria().andFactoryIdEqualTo(factory()).andWorkshopIdIn(ids);
+        workstationRefs.createCriteria().andWorkshopIdIn(ids);
         reject(workstation.countByExample(workstationRefs) > 0);
     }
 

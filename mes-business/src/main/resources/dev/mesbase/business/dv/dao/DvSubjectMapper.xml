@@ -4,7 +4,6 @@
 <mapper namespace="dev.mesbase.business.dv.dao.DvSubjectMapper">
   <resultMap id="BaseResultMap" type="dev.mesbase.business.dv.domain.DvSubjectEntity">
     <id column="subject_id" jdbcType="BIGINT" property="subjectId" />
-    <result column="factory_id" jdbcType="VARCHAR" property="factoryId" />
     <result column="subject_code" jdbcType="VARCHAR" property="subjectCode" />
     <result column="subject_name" jdbcType="VARCHAR" property="subjectName" />
     <result column="subject_type" jdbcType="VARCHAR" property="subjectType" />
@@ -76,8 +75,8 @@
     </where>
   </sql>
   <sql id="Base_Column_List">
-    subject_id, factory_id, subject_code, subject_name, subject_type, subject_content, 
-    subject_standard, enable_flag, remark, create_by, create_time, update_by, update_time
+    subject_id, subject_code, subject_name, subject_type, subject_content, subject_standard, 
+    enable_flag, remark, create_by, create_time, update_by, update_time
   </sql>
   <select id="selectByExample" parameterType="dev.mesbase.business.dv.domain.DvSubjectExample" resultMap="BaseResultMap">
     select
@@ -107,23 +106,18 @@
     </if>
   </delete>
   <insert id="insert" keyColumn="subject_id" keyProperty="subjectId" parameterType="dev.mesbase.business.dv.domain.DvSubjectEntity" useGeneratedKeys="true">
-    insert into dv_subject (factory_id, subject_code, subject_name, 
-      subject_type, subject_content, subject_standard, 
-      enable_flag, remark, create_by, 
-      create_time, update_by, update_time
-      )
-    values (#{factoryId,jdbcType=VARCHAR}, #{subjectCode,jdbcType=VARCHAR}, #{subjectName,jdbcType=VARCHAR}, 
-      #{subjectType,jdbcType=VARCHAR}, #{subjectContent,jdbcType=VARCHAR}, #{subjectStandard,jdbcType=VARCHAR}, 
-      #{enableFlag,jdbcType=CHAR}, #{remark,jdbcType=VARCHAR}, #{createBy,jdbcType=VARCHAR}, 
-      #{createTime,jdbcType=TIMESTAMP}, #{updateBy,jdbcType=VARCHAR}, #{updateTime,jdbcType=TIMESTAMP}
-      )
+    insert into dv_subject (subject_code, subject_name, subject_type, 
+      subject_content, subject_standard, enable_flag, 
+      remark, create_by, create_time, 
+      update_by, update_time)
+    values (#{subjectCode,jdbcType=VARCHAR}, #{subjectName,jdbcType=VARCHAR}, #{subjectType,jdbcType=VARCHAR}, 
+      #{subjectContent,jdbcType=VARCHAR}, #{subjectStandard,jdbcType=VARCHAR}, #{enableFlag,jdbcType=CHAR}, 
+      #{remark,jdbcType=VARCHAR}, #{createBy,jdbcType=VARCHAR}, #{createTime,jdbcType=TIMESTAMP}, 
+      #{updateBy,jdbcType=VARCHAR}, #{updateTime,jdbcType=TIMESTAMP})
   </insert>
   <insert id="insertSelective" keyColumn="subject_id" keyProperty="subjectId" parameterType="dev.mesbase.business.dv.domain.DvSubjectEntity" useGeneratedKeys="true">
     insert into dv_subject
     <trim prefix="(" suffix=")" suffixOverrides=",">
-      <if test="factoryId != null">
-        factory_id,
-      </if>
       <if test="subjectCode != null">
         subject_code,
       </if>
@@ -159,9 +153,6 @@
       </if>
     </trim>
     <trim prefix="values (" suffix=")" suffixOverrides=",">
-      <if test="factoryId != null">
-        #{factoryId,jdbcType=VARCHAR},
-      </if>
       <if test="subjectCode != null">
         #{subjectCode,jdbcType=VARCHAR},
       </if>
@@ -209,9 +200,6 @@
       <if test="row.subjectId != null">
         subject_id = #{row.subjectId,jdbcType=BIGINT},
       </if>
-      <if test="row.factoryId != null">
-        factory_id = #{row.factoryId,jdbcType=VARCHAR},
-      </if>
       <if test="row.subjectCode != null">
         subject_code = #{row.subjectCode,jdbcType=VARCHAR},
       </if>
@@ -253,7 +241,6 @@
   <update id="updateByExample" parameterType="map">
     update dv_subject
     set subject_id = #{row.subjectId,jdbcType=BIGINT},
-      factory_id = #{row.factoryId,jdbcType=VARCHAR},
       subject_code = #{row.subjectCode,jdbcType=VARCHAR},
       subject_name = #{row.subjectName,jdbcType=VARCHAR},
       subject_type = #{row.subjectType,jdbcType=VARCHAR},
@@ -272,9 +259,6 @@
   <update id="updateByPrimaryKeySelective" parameterType="dev.mesbase.business.dv.domain.DvSubjectEntity">
     update dv_subject
     <set>
-      <if test="factoryId != null">
-        factory_id = #{factoryId,jdbcType=VARCHAR},
-      </if>
       <if test="subjectCode != null">
         subject_code = #{subjectCode,jdbcType=VARCHAR},
       </if>
@@ -313,8 +297,7 @@
   </update>
   <update id="updateByPrimaryKey" parameterType="dev.mesbase.business.dv.domain.DvSubjectEntity">
     update dv_subject
-    set factory_id = #{factoryId,jdbcType=VARCHAR},
-      subject_code = #{subjectCode,jdbcType=VARCHAR},
+    set subject_code = #{subjectCode,jdbcType=VARCHAR},
       subject_name = #{subjectName,jdbcType=VARCHAR},
       subject_type = #{subjectType,jdbcType=VARCHAR},
       subject_content = #{subjectContent,jdbcType=VARCHAR},

@@ -105,4 +105,3 @@ tableOverrides:
   equipment:
     module: basic
     displayName: 设备
-    serverScopeColumn: factory_id

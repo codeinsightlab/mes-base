@@ -4,7 +4,6 @@
 <mapper namespace="dev.mesbase.business.production.dao.RoutingMapper">
   <resultMap id="BaseResultMap" type="dev.mesbase.business.production.domain.RoutingEntity">
     <id column="id" jdbcType="BIGINT" property="id" />
-    <result column="factory_id" jdbcType="VARCHAR" property="factoryId" />
     <result column="code" jdbcType="VARCHAR" property="code" />
     <result column="name" jdbcType="VARCHAR" property="name" />
     <result column="version" jdbcType="INTEGER" property="version" />
@@ -74,8 +73,8 @@
     </where>
   </sql>
   <sql id="Base_Column_List">
-    id, factory_id, code, name, version, status, description, external_id, source_version, 
-    revision, published_at
+    id, code, name, version, status, description, external_id, source_version, revision, 
+    published_at
   </sql>
   <select id="selectByExample" parameterType="dev.mesbase.business.production.domain.RoutingExample" resultMap="BaseResultMap">
     select
@@ -105,21 +104,18 @@
     </if>
   </delete>
   <insert id="insert" keyColumn="id" keyProperty="id" parameterType="dev.mesbase.business.production.domain.RoutingEntity" useGeneratedKeys="true">
-    insert into routing (factory_id, code, name, 
-      version, status, description, 
-      external_id, source_version, revision, 
-      published_at)
-    values (#{factoryId,jdbcType=VARCHAR}, #{code,jdbcType=VARCHAR}, #{name,jdbcType=VARCHAR}, 
-      #{version,jdbcType=INTEGER}, #{status,jdbcType=VARCHAR}, #{description,jdbcType=VARCHAR}, 
-      #{externalId,jdbcType=VARCHAR}, #{sourceVersion,jdbcType=VARCHAR}, #{revision,jdbcType=INTEGER}, 
-      #{publishedAt,jdbcType=TIMESTAMP})
+    insert into routing (code, name, version, 
+      status, description, external_id, 
+      source_version, revision, published_at
+      )
+    values (#{code,jdbcType=VARCHAR}, #{name,jdbcType=VARCHAR}, #{version,jdbcType=INTEGER}, 
+      #{status,jdbcType=VARCHAR}, #{description,jdbcType=VARCHAR}, #{externalId,jdbcType=VARCHAR}, 
+      #{sourceVersion,jdbcType=VARCHAR}, #{revision,jdbcType=INTEGER}, #{publishedAt,jdbcType=TIMESTAMP}
+      )
   </insert>
   <insert id="insertSelective" keyColumn="id" keyProperty="id" parameterType="dev.mesbase.business.production.domain.RoutingEntity" useGeneratedKeys="true">
     insert into routing
     <trim prefix="(" suffix=")" suffixOverrides=",">
-      <if test="factoryId != null">
-        factory_id,
-      </if>
       <if test="code != null">
         code,
       </if>
@@ -149,9 +145,6 @@
       </if>
     </trim>
     <trim prefix="values (" suffix=")" suffixOverrides=",">
-      <if test="factoryId != null">
-        #{factoryId,jdbcType=VARCHAR},
-      </if>
       <if test="code != null">
         #{code,jdbcType=VARCHAR},
       </if>
@@ -193,9 +186,6 @@
       <if test="row.id != null">
         id = #{row.id,jdbcType=BIGINT},
       </if>
-      <if test="row.factoryId != null">
-        factory_id = #{row.factoryId,jdbcType=VARCHAR},
-      </if>
       <if test="row.code != null">
         code = #{row.code,jdbcType=VARCHAR},
       </if>
@@ -231,7 +221,6 @@
   <update id="updateByExample" parameterType="map">
     update routing
     set id = #{row.id,jdbcType=BIGINT},
-      factory_id = #{row.factoryId,jdbcType=VARCHAR},
       code = #{row.code,jdbcType=VARCHAR},
       name = #{row.name,jdbcType=VARCHAR},
       version = #{row.version,jdbcType=INTEGER},
@@ -248,9 +237,6 @@
   <update id="updateByPrimaryKeySelective" parameterType="dev.mesbase.business.production.domain.RoutingEntity">
     update routing
     <set>
-      <if test="factoryId != null">
-        factory_id = #{factoryId,jdbcType=VARCHAR},
-      </if>
       <if test="code != null">
         code = #{code,jdbcType=VARCHAR},
       </if>
@@ -283,8 +269,7 @@
   </update>
   <update id="updateByPrimaryKey" parameterType="dev.mesbase.business.production.domain.RoutingEntity">
     update routing
-    set factory_id = #{factoryId,jdbcType=VARCHAR},
-      code = #{code,jdbcType=VARCHAR},
+    set code = #{code,jdbcType=VARCHAR},
       name = #{name,jdbcType=VARCHAR},
       version = #{version,jdbcType=INTEGER},
       status = #{status,jdbcType=VARCHAR},

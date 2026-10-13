@@ -1,4 +1,3 @@
-// MES-CODEGEN: scaffold; review required.
 package dev.mesbase.business.md.service.impl;
 
 import com.github.pagehelper.Page;
@@ -73,9 +72,6 @@ public class MdUnitMeasureServiceImpl implements IMdUnitMeasureService {
         }
         MdUnitMeasureExample example = new MdUnitMeasureExample();
         MdUnitMeasureExample.Criteria criteria = example.createCriteria();
-        if (query.factoryId() != null) {
-            criteria.andFactoryIdLike("%" + query.factoryId() + "%");
-        }
         if (query.measureCode() != null) {
             criteria.andMeasureCodeLike("%" + query.measureCode() + "%");
         }
@@ -120,7 +116,7 @@ public class MdUnitMeasureServiceImpl implements IMdUnitMeasureService {
             scope = BusinessCacheEvict.Scope.LIST)
     public MdUnitMeasureEntity insert(MdUnitMeasureCreateCommand input) {
         MdUnitMeasureEntity row = new MdUnitMeasureEntity();
-        row.setFactoryId(input.factoryId());
+
         row.setMeasureCode(input.measureCode());
         row.setMeasureName(input.measureName());
         row.setPrimaryFlag(input.primaryFlag());
@@ -141,7 +137,7 @@ public class MdUnitMeasureServiceImpl implements IMdUnitMeasureService {
     public MdUnitMeasureEntity updateById(Long id, MdUnitMeasureUpdateCommand input) {
         MdUnitMeasureEntity row = requireRecord(id);
         row.setMeasureId(id);
-        row.setFactoryId(input.factoryId());
+
         row.setMeasureCode(input.measureCode());
         row.setMeasureName(input.measureName());
         row.setPrimaryFlag(input.primaryFlag());
@@ -240,7 +236,7 @@ public class MdUnitMeasureServiceImpl implements IMdUnitMeasureService {
             if (insert) {
                 row = new MdUnitMeasureEntity();
             }
-            row.setFactoryId(input.factoryId());
+
             row.setMeasureCode(input.measureCode());
             row.setMeasureName(input.measureName());
             row.setPrimaryFlag(input.primaryFlag());
@@ -264,8 +260,7 @@ public class MdUnitMeasureServiceImpl implements IMdUnitMeasureService {
     }
 
     private static boolean same(MdUnitMeasureEntity row, ExternalMdUnitMeasure input) {
-        return Objects.deepEquals(row.getFactoryId(), input.factoryId())
-                && Objects.deepEquals(row.getMeasureCode(), input.measureCode())
+        return Objects.deepEquals(row.getMeasureCode(), input.measureCode())
                 && Objects.deepEquals(row.getMeasureName(), input.measureName())
                 && Objects.deepEquals(row.getPrimaryFlag(), input.primaryFlag())
                 && Objects.deepEquals(row.getPrimaryId(), input.primaryId())

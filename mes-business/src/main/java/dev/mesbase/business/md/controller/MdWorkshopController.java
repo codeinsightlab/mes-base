@@ -1,4 +1,3 @@
-// MES-CODEGEN: scaffold; review required.
 package dev.mesbase.business.md.controller;
 
 import dev.mesbase.business.md.controller.vo.MdWorkshopPageVo;
@@ -95,7 +94,7 @@ public class MdWorkshopController {
     private static MdWorkshopVo toView(MdWorkshopEntity row) {
         return new MdWorkshopVo(
                 row.getWorkshopId() == null ? null : row.getWorkshopId().toString(),
-                row.getFactoryId(),
+
                 row.getWorkshopCode(),
                 row.getWorkshopName(),
                 row.getArea() == null ? null : row.getArea().toString(),

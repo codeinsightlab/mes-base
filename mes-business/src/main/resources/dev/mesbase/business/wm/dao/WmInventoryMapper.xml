@@ -4,7 +4,6 @@
 <mapper namespace="dev.mesbase.business.wm.dao.WmInventoryMapper">
   <resultMap id="BaseResultMap" type="dev.mesbase.business.wm.domain.WmInventoryEntity">
     <id column="id" jdbcType="BIGINT" property="id" />
-    <result column="factory_id" jdbcType="VARCHAR" property="factoryId" />
     <result column="material_id" jdbcType="BIGINT" property="materialId" />
     <result column="warehouse_id" jdbcType="BIGINT" property="warehouseId" />
     <result column="quantity" jdbcType="DECIMAL" property="quantity" />
@@ -75,8 +74,8 @@
     </where>
   </sql>
   <sql id="Base_Column_List">
-    id, factory_id, material_id, warehouse_id, quantity, available_quantity, status, 
-    remark, create_by, create_time, update_by, update_time
+    id, material_id, warehouse_id, quantity, available_quantity, status, remark, create_by, 
+    create_time, update_by, update_time
   </sql>
   <select id="selectByExample" parameterType="dev.mesbase.business.wm.domain.WmInventoryExample" resultMap="BaseResultMap">
     select
@@ -106,21 +105,18 @@
     </if>
   </delete>
   <insert id="insert" keyColumn="id" keyProperty="id" parameterType="dev.mesbase.business.wm.domain.WmInventoryEntity" useGeneratedKeys="true">
-    insert into wm_inventory (factory_id, material_id, warehouse_id, 
-      quantity, available_quantity, status, 
-      remark, create_by, create_time, 
-      update_by, update_time)
-    values (#{factoryId,jdbcType=VARCHAR}, #{materialId,jdbcType=BIGINT}, #{warehouseId,jdbcType=BIGINT}, 
-      #{quantity,jdbcType=DECIMAL}, #{availableQuantity,jdbcType=DECIMAL}, #{status,jdbcType=VARCHAR}, 
-      #{remark,jdbcType=VARCHAR}, #{createBy,jdbcType=VARCHAR}, #{createTime,jdbcType=TIMESTAMP}, 
-      #{updateBy,jdbcType=VARCHAR}, #{updateTime,jdbcType=TIMESTAMP})
+    insert into wm_inventory (material_id, warehouse_id, quantity, 
+      available_quantity, status, remark, 
+      create_by, create_time, update_by, 
+      update_time)
+    values (#{materialId,jdbcType=BIGINT}, #{warehouseId,jdbcType=BIGINT}, #{quantity,jdbcType=DECIMAL}, 
+      #{availableQuantity,jdbcType=DECIMAL}, #{status,jdbcType=VARCHAR}, #{remark,jdbcType=VARCHAR}, 
+      #{createBy,jdbcType=VARCHAR}, #{createTime,jdbcType=TIMESTAMP}, #{updateBy,jdbcType=VARCHAR}, 
+      #{updateTime,jdbcType=TIMESTAMP})
   </insert>
   <insert id="insertSelective" keyColumn="id" keyProperty="id" parameterType="dev.mesbase.business.wm.domain.WmInventoryEntity" useGeneratedKeys="true">
     insert into wm_inventory
     <trim prefix="(" suffix=")" suffixOverrides=",">
-      <if test="factoryId != null">
-        factory_id,
-      </if>
       <if test="materialId != null">
         material_id,
       </if>
@@ -153,9 +149,6 @@
       </if>
     </trim>
     <trim prefix="values (" suffix=")" suffixOverrides=",">
-      <if test="factoryId != null">
-        #{factoryId,jdbcType=VARCHAR},
-      </if>
       <if test="materialId != null">
         #{materialId,jdbcType=BIGINT},
       </if>
@@ -200,9 +193,6 @@
       <if test="row.id != null">
         id = #{row.id,jdbcType=BIGINT},
       </if>
-      <if test="row.factoryId != null">
-        factory_id = #{row.factoryId,jdbcType=VARCHAR},
-      </if>
       <if test="row.materialId != null">
         material_id = #{row.materialId,jdbcType=BIGINT},
       </if>
@@ -241,7 +231,6 @@
   <update id="updateByExample" parameterType="map">
     update wm_inventory
     set id = #{row.id,jdbcType=BIGINT},
-      factory_id = #{row.factoryId,jdbcType=VARCHAR},
       material_id = #{row.materialId,jdbcType=BIGINT},
       warehouse_id = #{row.warehouseId,jdbcType=BIGINT},
       quantity = #{row.quantity,jdbcType=DECIMAL},
@@ -259,9 +248,6 @@
   <update id="updateByPrimaryKeySelective" parameterType="dev.mesbase.business.wm.domain.WmInventoryEntity">
     update wm_inventory
     <set>
-      <if test="factoryId != null">
-        factory_id = #{factoryId,jdbcType=VARCHAR},
-      </if>
       <if test="materialId != null">
         material_id = #{materialId,jdbcType=BIGINT},
       </if>
@@ -297,8 +283,7 @@
   </update>
   <update id="updateByPrimaryKey" parameterType="dev.mesbase.business.wm.domain.WmInventoryEntity">
     update wm_inventory
-    set factory_id = #{factoryId,jdbcType=VARCHAR},
-      material_id = #{materialId,jdbcType=BIGINT},
+    set material_id = #{materialId,jdbcType=BIGINT},
       warehouse_id = #{warehouseId,jdbcType=BIGINT},
       quantity = #{quantity,jdbcType=DECIMAL},
       available_quantity = #{availableQuantity,jdbcType=DECIMAL},

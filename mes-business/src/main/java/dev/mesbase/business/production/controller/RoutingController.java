@@ -157,7 +157,7 @@ public class RoutingController {
         return new RoutingReferenceVo(row.id().toString(), row.code(), row.name());
     }
 
-    private static RoutingDetailVo detailView(RoutingDetail detail) {
+    static RoutingDetailVo detailView(RoutingDetail detail) {
         var nodeCodes = new HashMap<Long, String>();
         for (var node : detail.nodes()) nodeCodes.put(node.getId(), node.getNodeCode());
         return new RoutingDetailVo(toView(detail.routing()),
@@ -174,7 +174,7 @@ public class RoutingController {
     private static RoutingVo toView(RoutingEntity row) {
         return new RoutingVo(
                 row.getId() == null ? null : row.getId().toString(),
-                row.getFactoryId(),
+
                 row.getCode(),
                 row.getName(),
                 row.getVersion(),

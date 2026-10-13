@@ -412,7 +412,7 @@ class BusinessCacheIntegrationTest {
     private static MaterialEntity row(Long id, String name) {
         var row = new MaterialEntity();
         row.setId(id);
-        row.setFactoryId(FactoryContext.required().factoryId().value());
+
         row.setCode("M");
         row.setName(name);
         row.setUnitId(1L);

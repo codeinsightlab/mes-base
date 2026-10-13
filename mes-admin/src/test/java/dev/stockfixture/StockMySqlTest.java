@@ -7,6 +7,7 @@ import dev.mesbase.business.wm.domain.WmInventoryExample;
 import dev.mesbase.business.wm.domain.WmWarehouseEntity;
 import dev.mesbase.business.wm.domain.WmWarehouseExample;
 import java.math.BigDecimal;
+import dev.mesbase.acceptance.AcceptanceBusinessDatabase;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.sql.Connection;
@@ -31,9 +32,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 class StockMySqlTest {
     @Test
     void realMetadataDecimalAndUniqueKeys() throws Exception {
-        Map<String, Object> root = new Yaml().load(Files.readString(Path.of("mes-admin/src/main/resources/application-dev.yml")));
-        Map<?, ?> mes = (Map<?, ?>) root.get("mes"), codegen = (Map<?, ?>) mes.get("codegen"), profiles = (Map<?, ?>) codegen.get("profiles"), profile = (Map<?, ?>) profiles.get("dev");
-        var source = new DriverManagerDataSource((String) profile.get("url"), (String) profile.get("username"), (String) profile.get("password"));
+        var source = AcceptanceBusinessDatabase.source();
         var configuration = new Configuration(new Environment("LIVE MYSQL ROLLBACK ONLY", new JdbcTransactionFactory(), source));
         configuration.addMapper(WmWarehouseMapper.class);
         configuration.addMapper(WmInventoryMapper.class);
@@ -44,14 +43,14 @@ class StockMySqlTest {
             var warehouses = session.getMapper(WmWarehouseMapper.class);
             var inventories = session.getMapper(WmInventoryMapper.class);
             var warehouse = new WmWarehouseEntity();
-            warehouse.setFactoryId(scope);
-            warehouse.setCode("W1");
+
+            warehouse.setCode(scope);
             warehouse.setName("事务回滚验收仓库");
             warehouse.setStatus("ENABLED");
             assertEquals(1, warehouses.insert(warehouse));
             assertThrows(RuntimeException.class, () -> warehouses.insert(warehouse));
             var stock = new WmInventoryEntity();
-            stock.setFactoryId(scope);
+
             stock.setMaterialId(999999999L);
             stock.setWarehouseId(warehouse.getId());
             stock.setQuantity(new BigDecimal("99999999999999.1234"));
@@ -62,13 +61,13 @@ class StockMySqlTest {
             stock.setId(null);
             assertThrows(RuntimeException.class, () -> inventories.insert(stock));
             var filter = new WmInventoryExample();
-            filter.createCriteria().andFactoryIdEqualTo(scope).andWarehouseIdEqualTo(warehouse.getId());
+            filter.createCriteria().andWarehouseIdEqualTo(warehouse.getId());
             assertEquals(1, inventories.countByExample(filter));
             session.rollback();
         }
         try (var session = factory.openSession()) {
             var filter = new WmWarehouseExample();
-            filter.createCriteria().andFactoryIdEqualTo(scope);
+            filter.createCriteria().andCodeEqualTo(scope);
             assertEquals(0, session.getMapper(WmWarehouseMapper.class).countByExample(filter));
         }
     }

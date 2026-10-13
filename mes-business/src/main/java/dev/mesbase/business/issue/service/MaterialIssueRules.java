@@ -8,7 +8,9 @@ import dev.mesbase.business.issue.domain.MesMaterialIssueEntity;
 import dev.mesbase.business.issue.domain.MesMaterialIssueExample;
 import dev.mesbase.business.issue.domain.MesMaterialIssueItemEntity;
 import dev.mesbase.business.issue.domain.MesMaterialIssueItemExample;
-import dev.mesbase.business.pro.dao.ProWorkorderMapper;
+import dev.mesbase.business.production.dao.WorkorderMapper;
+import dev.mesbase.business.production.domain.WorkorderEntity;
+import dev.mesbase.business.production.domain.WorkorderExample;
 import dev.mesbase.business.production.dao.RoutingMapper;
 import dev.mesbase.business.production.dao.RoutingProductMapper;
 import dev.mesbase.business.production.domain.RoutingProductExample;
@@ -35,13 +37,13 @@ public class MaterialIssueRules {
     private final MaterialMapper materials;
     private final UnitMeasureMapper units;
     private final WmWarehouseMapper warehouses;
-    private final ProWorkorderMapper workorders;
+    private final WorkorderMapper workorders;
     private final RoutingMapper routings;
     private final RoutingProductMapper routingProducts;
 
     public MaterialIssueRules(MesMaterialIssueMapper issues, MesMaterialIssueItemMapper items,
                               MaterialMapper materials, UnitMeasureMapper units, WmWarehouseMapper warehouses,
-                              ProWorkorderMapper workorders, RoutingMapper routings,
+                              WorkorderMapper workorders, RoutingMapper routings,
                               RoutingProductMapper routingProducts) {
         this.issues = issues;
         this.items = items;
@@ -66,20 +68,30 @@ public class MaterialIssueRules {
         require(row.getIssueNo() != null && !row.getIssueNo().isBlank());
         if (row.getProductId() != null) {
             var product = materials.selectByPrimaryKey(row.getProductId());
-            require(product != null && factory().equals(product.getFactoryId()));
+            require(product != null);
             row.setProductCode(product.getCode());
         }
         if (row.getWorkorderId() != null) {
-            // pro_workorder has no factory column: the fixed business database is its scope.
+            // WorkOrder belongs to the request-pinned business database.
+            var filter = new WorkorderExample();
+            filter.createCriteria().andIdEqualTo(row.getWorkorderId());
+            var lock = new WorkorderEntity();
+            lock.setId(row.getWorkorderId());
+            require(workorders.updateByExampleSelective(lock, filter) == 1);
             var workorder = workorders.selectByPrimaryKey(row.getWorkorderId());
             require(workorder != null);
-            require(row.getProductId() == null || Objects.equals(row.getProductCode(), workorder.getProductCode()));
-            row.setWorkorderCode(workorder.getWorkorderCode());
-            row.setProductCode(workorder.getProductCode());
+            require(row.getProductId() == null || Objects.equals(row.getProductId(), workorder.getProductId()));
+            require(row.getRoutingId() == null || Objects.equals(row.getRoutingId(), workorder.getRoutingId()));
+            var product = materials.selectByPrimaryKey(workorder.getProductId());
+            require(product != null);
+            row.setProductId(product.getId());
+            row.setProductCode(product.getCode());
+            row.setWorkorderCode(workorder.getCode());
+            row.setRoutingId(workorder.getRoutingId());
         }
         if (row.getRoutingId() != null) {
             var routing = routings.selectByPrimaryKey(row.getRoutingId());
-            require(routing != null && factory().equals(routing.getFactoryId())
+            require(routing != null
                     && routing.getPublishedAt() != null);
             // A previously published disabled version is still a stable historical reference.
             if (row.getProductCode() != null && !row.getProductCode().isBlank()) {
@@ -97,37 +109,39 @@ public class MaterialIssueRules {
         require(row.getQuantity().signum() > 0 && row.getQuantity().scale() <= 6
                 && row.getQuantity().precision() - row.getQuantity().scale() <= 14);
         var material = materials.selectByPrimaryKey(row.getMaterialId());
-        require(material != null && factory().equals(material.getFactoryId()));
+        require(material != null);
         row.setMaterialCode(material.getCode());
         row.setUnitCode(null);
         if (row.getUnitId() != null) {
             var unit = units.selectByPrimaryKey(row.getUnitId());
-            require(unit != null && factory().equals(unit.getFactoryId()));
+            require(unit != null);
             row.setUnitCode(unit.getCode());
         }
         row.setWarehouseCode(null);
         if (row.getWarehouseId() != null) {
             var warehouse = warehouses.selectByPrimaryKey(row.getWarehouseId());
-            require(warehouse != null && factory().equals(warehouse.getFactoryId()));
+            require(warehouse != null);
             row.setWarehouseCode(warehouse.getCode());
         }
     }
 
     public void lockIssues(List<Long> ids) {
-        var filter = new MesMaterialIssueExample();
-        filter.createCriteria().andFactoryIdEqualTo(factory()).andIdIn(ids.stream().distinct().sorted().toList());
-        // Generated same-value UPDATE serializes child creation with parent deletion.
-        var lock = new MesMaterialIssueEntity();
-        lock.setFactoryId(factory());
-        if (issues.updateByExampleSelective(lock, filter) != ids.stream().distinct().count()) {
-            throw new FoundationException(ErrorCode.NOT_FOUND);
+        // Administrative batches are bounded to 100; each PK update preserves its own ID.
+        for (Long id : ids.stream().distinct().sorted().toList()) {
+            var filter = new MesMaterialIssueExample();
+            filter.createCriteria().andIdEqualTo(id);
+            var lock = new MesMaterialIssueEntity();
+            lock.setId(id);
+            if (issues.updateByExampleSelective(lock, filter) != 1) {
+                throw new FoundationException(ErrorCode.NOT_FOUND);
+            }
         }
     }
 
     public void deletingIssues(List<Long> ids) {
         lockIssues(ids);
         var filter = new MesMaterialIssueItemExample();
-        filter.createCriteria().andFactoryIdEqualTo(factory()).andIssueIdIn(ids);
+        filter.createCriteria().andIssueIdIn(ids);
         if (items.countByExample(filter) != 0) {
             throw new FoundationException(ErrorCode.RESOURCE_CONFLICT);
         }

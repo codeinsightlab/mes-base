@@ -93,8 +93,6 @@ tableOverrides:
   mes_material_issue:
     module: issue
     displayName: 领料出库单
-    serverScopeColumn: factory_id
   mes_material_issue_item:
     module: issue
     displayName: 领料出库明细
-    serverScopeColumn: factory_id

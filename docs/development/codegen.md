@@ -23,7 +23,7 @@ MySQL JDBC 驱动。配置仍是唯一参数来源；mode/overwrite 取当前 YA
 
 正式参数入口唯一为 `docs/development/codegen-config.review.yaml`。本项目没有生成配置网页、配置数据库表或独立下载接口；YAML 就是持久配置，BusinessCodegenCli/Runner 与 Java API 读取并传递同一参数。dry-run 与 write 共用 metadata、模板和格式化流水线，报告文件名不是开关。
 
-- `generateSync`：布尔值，工具默认 false，历史缺参也为 false；当前统一配置按用户要求显式 true。
+- `generateSync`：布尔值，工具默认 false，历史缺参也为 false；2026-10-12 统一配置曾按用户要求显式 true，2026-10-13 已改为 false，见文末最新决定。
 - `sync.matchKey`：物理列名；`primary-key` 表示明确选择 metadata 主键，不自动把 ERP 编号当 MES 自增 ID。可用 `tableOverrides.<table>.syncMatchKey` 覆盖。开启时配置必需，字段不存在、不是 String/Long/Integer 或被审计字段排除则预检拒绝，不写半套文件。匹配列来自配置和真实 metadata，不猜 code/name/status/externalId。
 - `sync.batchMaximum`：明确的批次上限，当前 1000，范围 1..10000。当前同步生成支持 FACTORY_SCOPED；平台 CRUD 不受影响，平台同步需另行解决其协调协议，不能用默认工厂兜底。
 - `selection.excludeTables`：现有排除选项；按用户确认加入 `flyway_business_schema_history`，值存在统一配置，不在工具代码硬编码技术表黑名单。
@@ -821,3 +821,23 @@ TEST ONLY H2 验证跨模块两表在 per-table 和 merged 下均生成一个父
 
 最终验证：`mvn -B -ntp -pl mes-generator -am verify` 通过，生成器 30 项测试全部通过。
 四个修改 Java 文件的 IDEA 格式化、`git diff --check` 通过，最新 CLI JAR 已重建。
+
+### 2026-10-13：暂时关闭后续同步生成
+
+用户决定后续暂不生成同步相关内容。正式配置
+`docs/development/codegen-config.review.yaml` 和仓库／库存开发配置均改为
+`generateSync: false`；其他开发期业务配置原已为 false。保留现有 sync 参数供将来明确
+开启时使用，false 时不读取同步匹配键，不生成同步 DTO／Port／Adapter、Service 方法、
+Controller 接口、前端 API／按钮或同步权限。工具自身缺参默认 false，无需修改生成机制。
+历史生成记录及 `docs/generated/` 下的历史配置快照保留，不作为当前执行配置。
+
+本轮只改生成配置、此说明及 AGENTS 中的当前决定，没有重新生成或删除既有业务代码，
+没有删除同步协调框架、修改数据库、执行菜单 SQL 或操作用户服务。将来重生成既有文件
+仍遵循生成归属标记和覆盖策略；关闭开关本身不自动清理历史产物。
+
+实际配置通过 BusinessCodegenConfiguration.read 读取，五份开发执行配置均为 false。
+定向回归 `mvn -B -ntp -pl mes-generator -am
+-Dtest=BusinessCodegenRunnerTest#historicalConfigSyncTogglePreviewAndWriteShareTheSameOutput
+-Dsurefire.failIfNoSpecifiedTests=false test` 通过（1项），以 TEST ONLY H2 验证关闭后生成产物
+无同步路径、前端按钮／接口、同步权限及主 Service 同步调用。`git diff --check` 通过。
+未执行正式生成或真实数据库验收。

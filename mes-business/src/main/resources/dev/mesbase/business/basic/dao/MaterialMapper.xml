@@ -4,7 +4,6 @@
 <mapper namespace="dev.mesbase.business.basic.dao.MaterialMapper">
   <resultMap id="BaseResultMap" type="dev.mesbase.business.basic.domain.MaterialEntity">
     <id column="id" jdbcType="BIGINT" property="id" />
-    <result column="factory_id" jdbcType="VARCHAR" property="factoryId" />
     <result column="code" jdbcType="VARCHAR" property="code" />
     <result column="name" jdbcType="VARCHAR" property="name" />
     <result column="specification" jdbcType="VARCHAR" property="specification" />
@@ -74,8 +73,8 @@
     </where>
   </sql>
   <sql id="Base_Column_List">
-    id, factory_id, code, name, specification, category_id, unit_id, material_type, status, 
-    external_id, external_code
+    id, code, name, specification, category_id, unit_id, material_type, status, external_id, 
+    external_code
   </sql>
   <select id="selectByExample" parameterType="dev.mesbase.business.basic.domain.MaterialExample" resultMap="BaseResultMap">
     select
@@ -105,21 +104,18 @@
     </if>
   </delete>
   <insert id="insert" keyColumn="id" keyProperty="id" parameterType="dev.mesbase.business.basic.domain.MaterialEntity" useGeneratedKeys="true">
-    insert into material (factory_id, code, name, 
-      specification, category_id, unit_id, 
-      material_type, status, external_id, 
-      external_code)
-    values (#{factoryId,jdbcType=VARCHAR}, #{code,jdbcType=VARCHAR}, #{name,jdbcType=VARCHAR}, 
-      #{specification,jdbcType=VARCHAR}, #{categoryId,jdbcType=BIGINT}, #{unitId,jdbcType=BIGINT}, 
-      #{materialType,jdbcType=VARCHAR}, #{status,jdbcType=VARCHAR}, #{externalId,jdbcType=VARCHAR}, 
-      #{externalCode,jdbcType=VARCHAR})
+    insert into material (code, name, specification, 
+      category_id, unit_id, material_type, 
+      status, external_id, external_code
+      )
+    values (#{code,jdbcType=VARCHAR}, #{name,jdbcType=VARCHAR}, #{specification,jdbcType=VARCHAR}, 
+      #{categoryId,jdbcType=BIGINT}, #{unitId,jdbcType=BIGINT}, #{materialType,jdbcType=VARCHAR}, 
+      #{status,jdbcType=VARCHAR}, #{externalId,jdbcType=VARCHAR}, #{externalCode,jdbcType=VARCHAR}
+      )
   </insert>
   <insert id="insertSelective" keyColumn="id" keyProperty="id" parameterType="dev.mesbase.business.basic.domain.MaterialEntity" useGeneratedKeys="true">
     insert into material
     <trim prefix="(" suffix=")" suffixOverrides=",">
-      <if test="factoryId != null">
-        factory_id,
-      </if>
       <if test="code != null">
         code,
       </if>
@@ -149,9 +145,6 @@
       </if>
     </trim>
     <trim prefix="values (" suffix=")" suffixOverrides=",">
-      <if test="factoryId != null">
-        #{factoryId,jdbcType=VARCHAR},
-      </if>
       <if test="code != null">
         #{code,jdbcType=VARCHAR},
       </if>
@@ -193,9 +186,6 @@
       <if test="row.id != null">
         id = #{row.id,jdbcType=BIGINT},
       </if>
-      <if test="row.factoryId != null">
-        factory_id = #{row.factoryId,jdbcType=VARCHAR},
-      </if>
       <if test="row.code != null">
         code = #{row.code,jdbcType=VARCHAR},
       </if>
@@ -231,7 +221,6 @@
   <update id="updateByExample" parameterType="map">
     update material
     set id = #{row.id,jdbcType=BIGINT},
-      factory_id = #{row.factoryId,jdbcType=VARCHAR},
       code = #{row.code,jdbcType=VARCHAR},
       name = #{row.name,jdbcType=VARCHAR},
       specification = #{row.specification,jdbcType=VARCHAR},
@@ -248,9 +237,6 @@
   <update id="updateByPrimaryKeySelective" parameterType="dev.mesbase.business.basic.domain.MaterialEntity">
     update material
     <set>
-      <if test="factoryId != null">
-        factory_id = #{factoryId,jdbcType=VARCHAR},
-      </if>
       <if test="code != null">
         code = #{code,jdbcType=VARCHAR},
       </if>
@@ -283,8 +269,7 @@
   </update>
   <update id="updateByPrimaryKey" parameterType="dev.mesbase.business.basic.domain.MaterialEntity">
     update material
-    set factory_id = #{factoryId,jdbcType=VARCHAR},
-      code = #{code,jdbcType=VARCHAR},
+    set code = #{code,jdbcType=VARCHAR},
       name = #{name,jdbcType=VARCHAR},
       specification = #{specification,jdbcType=VARCHAR},
       category_id = #{categoryId,jdbcType=BIGINT},

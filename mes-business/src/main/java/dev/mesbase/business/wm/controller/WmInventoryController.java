@@ -103,7 +103,7 @@ public class WmInventoryController {
     private static WmInventoryVo toView(WmInventoryEntity row, String materialName, String warehouseName) {
         return new WmInventoryVo(
                 row.getId() == null ? null : row.getId().toString(),
-                row.getFactoryId(),
+
                 row.getMaterialId() == null ? null : row.getMaterialId().toString(),
                 row.getWarehouseId() == null ? null : row.getWarehouseId().toString(),
                 materialName,

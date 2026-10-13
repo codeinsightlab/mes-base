@@ -6,8 +6,6 @@ import java.time.LocalDateTime;
 public class DvSubjectEntity {
     private Long subjectId;
 
-    private String factoryId;
-
     private String subjectCode;
 
     private String subjectName;
@@ -36,14 +34,6 @@ public class DvSubjectEntity {
 
     public void setSubjectId(Long subjectId) {
         this.subjectId = subjectId;
-    }
-
-    public String getFactoryId() {
-        return factoryId;
-    }
-
-    public void setFactoryId(String factoryId) {
-        this.factoryId = factoryId;
     }
 
     public String getSubjectCode() {

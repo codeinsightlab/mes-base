@@ -77,7 +77,6 @@ public class WorkstationServiceImpl implements IWorkstationService {
         }
         WorkstationExample example = new WorkstationExample();
         WorkstationExample.Criteria criteria = example.createCriteria();
-        criteria.andFactoryIdEqualTo(FactoryContext.required().factoryId().value());
         if (query.code() != null) {
             criteria.andCodeLike("%" + query.code() + "%");
         }
@@ -116,7 +115,7 @@ public class WorkstationServiceImpl implements IWorkstationService {
             scope = BusinessCacheEvict.Scope.LIST)
     public WorkstationEntity insert(WorkstationCreateCommand input) {
         WorkstationEntity row = new WorkstationEntity();
-        row.setFactoryId(FactoryContext.required().factoryId().value());
+
         row.setCode(input.code());
         row.setName(input.name());
         row.setWorkshopId(input.workshopId());
@@ -161,7 +160,7 @@ public class WorkstationServiceImpl implements IWorkstationService {
         WorkstationExample example = new WorkstationExample();
         for (var id : ids) requireRecord(id);
         example.createCriteria().andIdIn(ids)
-                .andFactoryIdEqualTo(FactoryContext.required().factoryId().value())
+                
         ;
         if (mapper.deleteByExample(example) != ids.size()) {
             throw new FoundationException(ErrorCode.RESOURCE_CONFLICT);
@@ -186,7 +185,7 @@ public class WorkstationServiceImpl implements IWorkstationService {
 
     private WorkstationEntity requireRecord(Long id) {
         WorkstationEntity row = mapper.selectByPrimaryKey(id);
-        if (row == null || !FactoryContext.required().factoryId().value().equals(row.getFactoryId())) {
+        if (row == null) {
             throw new FoundationException(ErrorCode.NOT_FOUND);
         }
         return row;
@@ -232,7 +231,7 @@ public class WorkstationServiceImpl implements IWorkstationService {
         if (inputs.isEmpty()) return new WorkstationSyncResult(0, 0, 0, 0);
         var example = new WorkstationExample();
         example.createCriteria().andCodeIn(List.copyOf(keys))
-                .andFactoryIdEqualTo(scope.factoryId().value())
+                
         ;
         var existing = new HashMap<String, WorkstationEntity>();
         for (var row : mapper.selectByExample(example)) {
@@ -252,7 +251,7 @@ public class WorkstationServiceImpl implements IWorkstationService {
             boolean insert = row == null;
             if (insert) {
                 row = new WorkstationEntity();
-                row.setFactoryId(scope.factoryId().value());
+
             }
             row.setCode(input.code());
             row.setName(input.name());
