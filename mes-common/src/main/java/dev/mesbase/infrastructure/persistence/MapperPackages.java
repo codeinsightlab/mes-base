@@ -9,7 +9,7 @@ import java.util.Map;
 public final class MapperPackages {
     public static final Map<PersistenceOwner.Kind, List<String>> ROOTS = Map.of(
             PersistenceOwner.Kind.PLATFORM, List.of("dev.mesbase.system", "dev.mesbase.quartz", "dev.mesbase.platform"),
-            PersistenceOwner.Kind.BUSINESS, List.of("dev.mesbase.mes", "dev.mesbase.modules"));
+            PersistenceOwner.Kind.BUSINESS, List.of("dev.mesbase.business"));
 
     private MapperPackages() {
     }

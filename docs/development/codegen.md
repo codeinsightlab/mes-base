@@ -613,3 +613,114 @@ TableOverride 仅保留 module、displayName、syncMatchKey、serverScopeColumn�
 引用检查。独立 CLI JAR 启动及非法参数退出码检查通过，包含 MySQL 驱动且没有 reviewed 资源；
 `sh -n scripts/mes-business-codegen`、`git diff --check` 通过。该启动检查未执行业务生成。
 最新状态只声明生成器及其上游依赖验证通过，不使用此前整仓快照结果替代用户当前业务源码状态。
+
+### 2026-10-12：生成器性能审查（未实施优化）
+
+审查入口为独立 CLI → BusinessCodegenRunner → JdbcMetadataReader → ConfiguredCodegenService
+→ BusinessTemplateRenderer / MyBatisPersistenceRenderer → IdeaGeneratedJavaFormatter → ScaffoldWriter。
+性能部分只审查，不修改生成器实现，不重新生成用户业务代码。
+
+本地 TEST ONLY H2（MySQL 模式）建立六张表，每表 20 列，通用模板产出 168 个文件，其中
+114 个 Java 文件。探针位于 mes-generator/target/perf，写入仅限独立临时目录；原始结果
+保存在 /private/tmp/codegen-perf-output.log 与 /private/tmp/codegen-perf-single.log。
+这是一次本机样本，不代表真实 MySQL、网络连接或生产规模吞吐。
+
+| 阶段 | 耗时 |
+| --- | ---: |
+| 六表 metadata 读取 | 18.16 ms |
+| 六表首次模板渲染 | 237.60 ms |
+| 同 JVM 后续两轮渲染 | 75.00 / 57.21 ms |
+| 114 个 Java 文件 IDEA 格式化 | 13505.43 ms |
+| 输出预检 | 22.79 ms |
+| 首次写入 | 79.75 ms |
+| 内容不变再次写入 | 37.01 ms |
+| 单个极小 Java 文件 IDEA 格式化（独立调用） | 13361.94 ms |
+
+本样本格式化占首次完整流水线约 97%。格式化已经是整批一次启动，不能误判为每个文件
+都启动进程；scripts/format-java 每次使用新的 IDEA config/system/log 临时目录，独立小文件
+测量也接近 13 秒，支持启动开销主导的判断。尚未测量 IDEA 启动内部各阶段及多次运行分布。
+
+发现与建议，按收益及正确性排序：
+
+1. **优先修复零 Java 的调用。** IdeaGeneratedJavaFormatter.apply 无条件启动 launcher，
+   当前端或菜单单独生成时命令没有 Java 参数，脚本退出失败。探针传入纯前端 Artifact
+   实际得到 TEMPLATE_FAILURE。建议没有待格式化 Java 时原样返回，补充对应回归。
+2. **减少重复格式化。** 内容不变仍先执行完整格式化。可评估以未格式化内容、模板及
+   格式化配置/工具版本建立可验证的批次指纹，复用已格式化结果；不能跳过手工修改检查、
+   覆盖策略或 SHA 一致性校验，不能换用其他 formatter 来规避仓库规范。首次生成仍需格式化。
+3. **按产物范围渲染。** ConfiguredCodegenService 在完整 render 后才按 targets 筛选，
+   frontend-only 等模式仍构造 MBG 和后端 Java。建议把目标选择前移，保持预览、下载、写入一致。
+4. **批次内复用模板。** 每表新建 BusinessTemplateRenderer/VelocityEngine；外部模板
+   每次 Files.readString + engine.evaluate 重新解析。可按模板根目录在本批次复用引擎及解析结果；
+   不建立会忽略模板修改的永久缓存。实测渲染低于格式化，本项优先级低于前两项。
+5. **批次内复用 metadata 连接。** DriverManagerDataSource 不池化，JdbcMetadataReader
+   每表单独 getConnection，多表选择还可能先独立列出表。建议在单轮读取中复用连接及共同
+   metadata，不能跨轮缓存过期 Schema。真实远程 MySQL/TLS 收益本轮未测量。
+6. **降低无变化写入 I/O。** ScaffoldWriter 预检后仍暂存无变化产物，发布时才跳过。
+   可在保持预检、回滚和发布一致性前提下减少暂存；样本仅 37 ms，不是首要瓶颈。
+
+建议先加入 metadata/render/format/preflight/write 阶段计时，再以相同样本比较优化收益。
+本次未实施上述建议，未做视觉验收、正式业务生成或真实数据库性能验收。
+
+### 2026-10-12：业务 Mapper 扫描包调整
+
+按用户要求，MapperPackages 的 BUSINESS 固定根包改为 dev.mesbase.business；
+旧 dev.mesbase.mes 与 dev.mesbase.modules 不再作为业务扫描根。中心库根包保持原归属。
+生成器当前用户配置已采用 dev.mesbase.business.{module}，本轮不改其配置及业务产物。
+PersistenceAssemblyTest 对真实生产扫描及 SessionFactory 归属改用新包 QcDefectMapper，
+新增 TEST ONLY 旧包 Mapper 负例，避免回归测试依赖已经移除的旧业务。
+
+验证：`mvn -B -ntp -DskipTests compile` 全 reactor 通过，三个修改/新增 Java 文件的 IDEA
+格式化通过，`git diff --check` 通过。常规 `mvn -B -ntp test` 的定向执行在 mes-business
+testCompile 阶段失败：旧 modules 业务测试引用了当前已移除的类，未进入 admin 测试。
+没有修改或删除用户迁移中的其他业务测试。
+
+为验证本次扫描修改，使用 dependency:build-classpath 得到测试依赖，移除已安装的项目 JAR，
+优先加载当前 reactor 的 target/classes，通过 javac 单独编译 PersistenceAssemblyTest、
+MapperRegistrationGuardTest 与其 TEST ONLY fixtures，再执行七个测试方法；七项全部通过，
+包含真实 Spring 上下文、两套 SessionFactory/事务管理器、双工厂 H2 隔离、扫描根边界与冲突检查。
+独立执行证据为 /private/tmp/business-scan-isolated-test.log；这不等于完整 Maven 测试通过，
+也不等于真实业务数据库验收。临时执行器位于 target/business-scan-check，不进入生产代码。
+
+### 2026-10-13：重复生成优化、API 引用修复与前端产物清理
+
+用户授权实施优化，并明确问题是页面 import 未对应实际生成的 API 文件。只修改通用生成器，
+不正式重新生成业务代码；隔离样例留在 mes-generator/target 与独立临时目录。
+
+- BusinessCodegenRunner 启用本地格式化缓存，位于 mes-generator/target/java-format-cache。
+  key 包含原始 Java 内容、相对路径、launcher 内容、仓库格式化设置、IDEA build/启动脚本、
+  安装内 JAR 文件属性及 Java 环境。输出摘要校验失败或缓存读写失败降级到原生格式化。
+  缓存不保存用户目标文件，不跳过 ScaffoldWriter 的覆盖策略、生成标记和内容冲突预检。
+  上限为 512 条 / 64 MiB，单条超过 4 MiB 不缓存；删掉此目录可强制重新格式化。
+- 没有待格式化 Java（纯前端、菜单或仅删除项）时直接返回，不再启动无参数脚本。
+  新增/变化的 Java 仍整批执行原生 IDEA formatter，未替换仓库规定的格式化工具。
+- targets 在渲染阶段生效，不再先生成全部产物再筛选。同一批次按模板根目录复用
+  VelocityEngine 与解析结果，新一轮重新建立引擎，模板编辑不会永久失效。
+- 页面 frontendApiImport 统一由真正的 frontendApi 产物路径派生，移除 runner 内重复推导。
+  原先直接构造 CodegenTemplateOptions 时，文件生成到自定义位置但页面沿用默认 API import；
+  现支持 .ts/.js 扩展名统一处理，API 模板为 .js 输出移除 TypeScript 语法，默认仍为 .ts。
+  页面中 API 与 sync 的导入使用同一路径，旧 frontendApiImport 变量不会造成产物脱节。
+  Controller 与 API 的 HTTP 路径依旧来自同一个 route，未发现当前默认配置 Mapping 不一致。
+
+同样的六表 / 114 Java 文件本机 TEST ONLY 样例：本次首次格式化为 18513.20 ms，第二次以
+新的 formatter 实例复用缓存为 82.61 ms，结果逐 Artifact 比较完全一致。纯前端格式化已返回 OK。
+首次渲染本次 498.84 ms，后两轮 80.99 / 80.70 ms；不能据此声称冷启动渲染比历史样本更快。
+原始证据为 /private/tmp/codegen-opt-perf.log。首次/失效后仍支付 IDEA 启动成本，未测真实远程
+MySQL；metadata 的逐表连接及输出暂存本轮未优化。
+
+随后按用户要求实际删除 mes-base-ui 中全部带 MES-CODEGEN 标记的生产产物：19 个页面、
+19 个 API、19 份菜单声明，共 57 个文件，并清理 46 个空目录。删除旧 codegen-person 预览
+源码 5 个文件及 npm 入口；三个旧生成预览 target 目录也移出工作区。不只移除控件或路由。
+操作前备份为 /var/folders/_x/q9z54zbj5ks99ftdkdfjr1m00000gn/T/mes-ui-generated-cleanup-zc_kr83b，
+其中 generated-files.tar.gz 与 manifest.json 保留源码清单。前端源目录生成标记检查剩余 0 个。
+
+依赖已删除业务页的测试改为直接验证通用 CrudPage/request/SyncButton，保留列表数据、工厂头、
+编辑详情查询、同步刷新、取消、权限与迟到响应边界，不把手写页面冒充生成器产物。
+保留 src/api/business/directory.ts：它是手写的只读人员/部门/岗位选择 API，供三种选择器复用，
+属于通用业务目录基础设施，不是生成器产物。未修改后端业务、数据库菜单或生产部署。
+
+验证：生成器及上游 Maven verify、IDEA 格式化与 diff 检查；前端 Node 22 下 npm test 为
+28 个测试文件 / 150 项全部通过，npm build 通过。隔离生成的 .ts/.js API 使用 Node 执行，
+七种调用的 URL、HTTP 方法及删除 body 与生成 Controller 契约一致，页面 import 对应实际文件；
+隔离 .vue 样例通过 vue-tsc（JS 样例配置 allowJs）与 Vite 构建。保留十二组通用 Java 样例编译测试。
+未进行视觉验收、真实 HTTP/数据库验收或正式业务重生成；被删除业务页面待用户自行生成恢复。

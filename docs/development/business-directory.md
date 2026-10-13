@@ -58,3 +58,19 @@ const postId = ref<string | null>(null)
 - TEST ONLY 浏览器预览复用正式组件，确认人员单项回显、部门分页/选择、切厂清空、撤权禁用；1440 和390宽度未出现组件溢出。
 - 预览启动：UI 仓库用 Node22 执行 `npx vite --config tests/business-directory-preview/vite.config.ts`，端口18193。该入口只在 tests 中，不注册生产路由、不调用真实数据库。
 - 真实8081服务未重启、中心库迁移未执行、角色未赋权、真实数据库接口未验收。
+
+### 2026-10-13：从 Git 恢复误删的后端目录接口
+
+用户保留前端 src/api/business/directory.ts，但后端对应源码已随旧业务包删除。
+Git 删除提交为 dc873b82e5c9795d6ef2393ac005ca03e7aff727；从其父版本恢复原路径下五个文件：
+BusinessDirectoryController、DirectoryOption、DirectoryPage、DirectoryQuery、BusinessDirectoryService。
+原包 dev.mesbase.modules.directory 保留，没有重新生成或重写这条接口，也未恢复其他已删除业务。
+该能力没有自己的 Mapper；仍复用中心库 SysUser/Dept/Post Mapper 和 masterTransactionManager，
+不改变当前业务 Mapper 根包 dev.mesbase.business。
+
+IDEA 格式化、全 reactor `mvn -B -ntp -DskipTests compile` 和 diff 检查通过。
+原 BusinessDirectoryTest 通过独立编译/执行四项测试，加载当前 reactor classes 与真实 Spring
+事务代理、MockMvc、中心 Mapper/XML 和 H2，覆盖六个只读接口、字段白名单、启停过滤、
+分页/搜索、独立权限、缺厂 422、非 GET 405 和分页限制。原始日志为
+/private/tmp/directory-restore-test.log；独立测试不等于完整 Maven 测试或真实数据库验收。
+未重启服务、执行数据库迁移或部署，保留其他生成器及工作区改动。

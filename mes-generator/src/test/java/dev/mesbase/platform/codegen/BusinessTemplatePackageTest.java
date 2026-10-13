@@ -100,6 +100,57 @@ class BusinessTemplatePackageTest {
     }
 
     @Test
+    void pageImportsActualConfiguredApiFileForBothExtensionsAndIgnoresStaleVariable() throws Exception {
+        for (String extension : List.of("ts", "js")) {
+            var base = options(templates(), Map.of("frontendApiImport", "@/api/stale", "route", "/api/custom/person"));
+            var configured = new CodegenTemplateOptions(base.templateRoot(), base.variables(), base.packages(),
+                    base.auditFields(), base.stringLengthLimit(), "src/api/custom/person." + extension,
+                    "src/views/custom/person.vue", base.frontendMenu(), base.menuSql());
+            var artifacts = new BusinessTemplateRenderer(configured).render(request("person", true), metadata("person"));
+            String page = artifacts.stream().filter(artifact -> artifact.relativePath().endsWith(".vue"))
+                    .findFirst().orElseThrow().content();
+            String api = artifacts.stream().filter(artifact -> artifact.relativePath().equals(configured.frontendApi()))
+                    .findFirst().orElseThrow().content();
+            assertTrue(page.contains("import { api } from '@/api/custom/person'"));
+            assertTrue(page.contains("import { sync } from '@/api/custom/person'"));
+            assertFalse(page.contains("@/api/stale"));
+            assertEquals(extension.equals("ts"), api.contains("export interface PersonVo"));
+            if (extension.equals("js")) {
+                assertFalse(api.contains("request<"));
+                assertFalse(api.contains(": string"));
+            }
+            String controller = artifacts.stream()
+                    .filter(artifact -> artifact.relativePath().endsWith("PersonController.java"))
+                    .findFirst().orElseThrow().content();
+            assertTrue(controller.contains("@RequestMapping(\"/api/custom/person\")"));
+            assertTrue(api.contains("'/api/custom/person'"));
+            assertTrue(api.contains("'/api/custom/person/' + encodeURIComponent(id)"));
+            assertTrue(controller.contains("@GetMapping(\"/{id}\")"));
+            assertTrue(controller.contains("@PutMapping(\"/{id}\")"));
+            assertTrue(controller.contains("@DeleteMapping"));
+            assertTrue(api.contains("method: 'DELETE', body: ids"));
+            assertTrue(api.contains("'/api/custom/person/actions/sync'"));
+            assertTrue(controller.contains("@PostMapping(\"/actions/sync\")"));
+        }
+    }
+
+    @Test
+    void frontendOnlyDoesNotReadBackendTemplatesAndMenuIsIndependent() throws Exception {
+        Path root = temporary.resolve("frontend-templates");
+        Files.createDirectories(root);
+        for (String name : List.of("api.ts.vm", "index.vue.vm", "menu.json.vm", "menu.sql.vm")) {
+            Files.copy(templates().resolve(name), root.resolve(name));
+        }
+        var renderer = new BusinessTemplateRenderer(options(root, Map.of()));
+        var frontend = renderer.render(request("person", false), metadata("person"), Set.of("frontend"));
+        assertEquals(2, frontend.size());
+        assertTrue(frontend.stream().allMatch(artifact -> artifact.target() == CodegenResult.Target.FRONTEND));
+        var menu = renderer.render(request("person", false), metadata("person"), Set.of("menu"));
+        assertEquals(3, menu.size());
+        assertTrue(menu.stream().noneMatch(artifact -> artifact.relativePath().endsWith(".java")));
+    }
+
+    @Test
     void staleCompleteSourcePackageRejectsTheEntirePlanBeforePublication() throws Exception {
         Path custom = temporary.resolve("templates");
         Files.createDirectories(custom);

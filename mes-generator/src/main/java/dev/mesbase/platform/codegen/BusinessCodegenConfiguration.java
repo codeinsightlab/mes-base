@@ -40,7 +40,10 @@ public record BusinessCodegenConfiguration(Integer version, Source source, Selec
 
     public record Output(String backendRoot, String backendModule, String frontendRoot, String javaPackage,
                          Packages packages, String frontendApi, String frontendPage, String frontendMenu,
-                         String menuSql) {
+                         String menuSql, Documents documents) {
+    }
+
+    public record Documents(String mode, String sql, String markdown) {
     }
 
     public record Packages(String domain, String mapper, String service, String serviceImplementation,
@@ -97,6 +100,14 @@ public record BusinessCodegenConfiguration(Integer version, Source source, Selec
         require(!((Map<?, ?>) document).containsKey("generateSync") || flag instanceof Boolean, "generateSync");
         requireDeclaredKeys(config, document, "configuration");
         requireFields(config, "configuration");
+        if (config.output().documents() != null) {
+            Documents documents = config.output().documents();
+            require(List.of("per-table", "merged").contains(documents.mode()), "output.documents.mode");
+            if ("merged".equals(documents.mode())) {
+                requireDocumentPath(documents.sql(), ".sql", "output.documents.sql");
+                requireDocumentPath(documents.markdown(), ".md", "output.documents.markdown");
+            }
+        }
         if (config.generateSync()) {
             require(config.sync() != null, "sync");
             require(config.sync().batchMaximum() > 0 && config.sync().batchMaximum() <= 10000, "sync.batchMaximum");
@@ -137,6 +148,8 @@ public record BusinessCodegenConfiguration(Integer version, Source source, Selec
         for (var component : record.getClass().getRecordComponents()) {
             String name = component.getName();
             boolean optional = name.equals("tableOverrides") || name.equals("generateSync") || name.equals("sync")
+                    || record instanceof Output && name.equals("documents")
+                    || record instanceof Documents && !name.equals("mode")
                     || record instanceof TableOverride
                     || record instanceof Strategy && name.equals("fallback")
                     && !"displayName".equals(path.substring(path.lastIndexOf('.') + 1));
@@ -171,6 +184,8 @@ public record BusinessCodegenConfiguration(Integer version, Source source, Selec
                 throw new IllegalArgumentException("Invalid configuration: " + path, failure);
             }
             boolean nullable = name.equals("tableOverrides") || name.equals("schema") || name.equals("sync")
+                    || record instanceof Output && name.equals("documents")
+                    || record instanceof Documents && !name.equals("mode")
                     || record instanceof TableOverride
                     || record instanceof Strategy && name.equals("fallback")
                     || record instanceof Conditional && (name.equals("property") || name.equals("value"));
@@ -182,5 +197,11 @@ public record BusinessCodegenConfiguration(Integer version, Source source, Selec
 
     public static void require(boolean accepted, String field) {
         if (!accepted) throw new IllegalArgumentException("Invalid or missing configuration: " + field);
+    }
+
+    private static void requireDocumentPath(String value, String suffix, String field) {
+        require(value != null && value.endsWith(suffix) && !value.contains("{") && !value.contains("}"), field);
+        Path path = Path.of(value);
+        require(!path.isAbsolute() && !path.normalize().startsWith("..") && !path.normalize().toString().isBlank(), field);
     }
 }

@@ -11,7 +11,9 @@ import dev.mesbase.infrastructure.persistence.DatasourceIdentity;
 import dev.mesbase.infrastructure.persistence.FactoryBusinessDataSource;
 import dev.mesbase.infrastructure.persistence.OwnedTransactionManager;
 import dev.mesbase.infrastructure.persistence.OwnerMapperCatalog;
-import dev.mesbase.modules.acceptance.dao.PersonMapper;
+import dev.mesbase.business.qc.dao.QcDefectMapper;
+import dev.mesbase.infrastructure.persistence.MapperPackages;
+import dev.mesbase.modules.persistencefixture.LegacyScanProbeMapper;
 import dev.mesbase.infrastructure.persistence.PersistenceFactories;
 import dev.mesbase.infrastructure.persistence.PersistenceOwner;
 import dev.mesbase.infrastructure.persistence.RuntimeRegistry;
@@ -116,8 +118,7 @@ class PersistenceAssemblyTest {
                 context.getEnvironment().getPropertySources().addLast(source);
             context.getEnvironment().getPropertySources().addFirst(new MapPropertySource("fixture", Map.of(
                     "mes.system.enabled", true, "mes.platform.enabled", true, "mes.platform.migrate", false,
-                    "mes.platform.url", "jdbc:h2:mem:" + UUID.randomUUID(), "mes.platform.username", "sa", "mes.platform.password", "",
-                    "mes.persistence.mapper-packages", "dev.mesbase.system,dev.mesbase.quartz,dev.mesbase.mes")));
+                    "mes.platform.url", "jdbc:h2:mem:" + UUID.randomUUID(), "mes.platform.username", "sa", "mes.platform.password", "")));
             context.registerBean(RuntimeRegistry.class, RuntimeRegistry::new);
             context.registerBean(BusinessPersistenceResolver.class, () -> scope -> {
                 throw new IllegalStateException("TEST ONLY no Factory connection");
@@ -133,13 +134,13 @@ class PersistenceAssemblyTest {
             var stats = context.getBean(DruidController.class).stats();
             assertEquals("platform", ((DruidController.Pool) stats.get(AjaxResult.DATA_TAG)).name());
             assertTrue(context.containsBean("sysUserMapper"));
-            assertTrue(context.containsBean("personMapper"));
+            assertTrue(context.containsBean("qcDefectMapper"));
             assertTrue(context.getBean("businessSqlSessionFactory", SqlSessionFactory.class)
-                    .getConfiguration().hasMapper(PersonMapper.class));
+                    .getConfiguration().hasMapper(QcDefectMapper.class));
             assertTrue(!context.getBean("masterSqlSessionFactory", SqlSessionFactory.class)
-                    .getConfiguration().hasMapper(PersonMapper.class));
+                    .getConfiguration().hasMapper(QcDefectMapper.class));
             assertTrue(context.getBean(OwnerMapperCatalog.class).types(PersistenceOwner.Kind.BUSINESS)
-                    .contains(PersonMapper.class));
+                    .contains(QcDefectMapper.class));
             assertTrue(context.containsBean("masterTransactionManager"));
             assertTrue(context.containsBean("businessTransactionManager"));
         }
@@ -156,6 +157,21 @@ class PersistenceAssemblyTest {
         new OwnerMapperRegistration(new MockEnvironment()).postProcessBeanDefinitionRegistry(registry);
         var catalog = registry.getBean(OwnerMapperCatalog.class);
         assertTrue(catalog.types(PersistenceOwner.Kind.PLATFORM).size() > 20);
-        assertTrue(catalog.types(PersistenceOwner.Kind.BUSINESS).contains(PersonMapper.class));
+        assertTrue(catalog.types(PersistenceOwner.Kind.BUSINESS).contains(QcDefectMapper.class));
     }
+
+    @Test
+    void businessRootHasExactBoundaryAndOldPackagesAreNoLongerRegistered() {
+        assertEquals(List.of("dev.mesbase.business"), MapperPackages.ROOTS.get(PersistenceOwner.Kind.BUSINESS));
+        assertEquals(PersistenceOwner.Kind.BUSINESS, MapperPackages.owner(QcDefectMapper.class));
+        assertThrows(IllegalArgumentException.class, () -> MapperPackages.owner(LegacyScanProbeMapper.class));
+        assertTrue(!MapperPackages.contains("dev.mesbase.businessSimilar", "dev.mesbase.business"));
+        var registry = new DefaultListableBeanFactory();
+        new OwnerMapperRegistration(new MockEnvironment()).postProcessBeanDefinitionRegistry(registry);
+        var catalog = registry.getBean(OwnerMapperCatalog.class);
+        assertTrue(catalog.types(PersistenceOwner.Kind.BUSINESS).stream()
+                .allMatch(type -> MapperPackages.contains(type.getPackageName(), "dev.mesbase.business")));
+        assertTrue(!registry.containsBeanDefinition("legacyScanProbeMapper"));
+    }
+
 }

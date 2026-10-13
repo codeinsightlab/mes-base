@@ -122,11 +122,11 @@ public final class BusinessCodegenRunner {
         }
         UnaryOperator<List<Artifact>> formatter = config.execution().formatJava()
                 ? new IdeaGeneratedJavaFormatter(root.resolve(config.execution()
-                .formatter())) : UnaryOperator.identity();
+                .formatter()), root.resolve("mes-generator/target/java-format-cache")) : UnaryOperator.identity();
         List<CodegenResult.GeneratedFile> files;
         try {
             files = new ConfiguredCodegenService().generate(plans, Set.copyOf(config.selection()
-                    .artifacts()), formatter);
+                    .artifacts()), formatter, config.output().documents());
         } catch (CodegenException failure) {
             rejected.add(new RejectedTable("<output>", failure.code().name()));
             files = List.of();
@@ -193,7 +193,6 @@ public final class BusinessCodegenRunner {
         variables.put("migrateLegacyPermissions", c.menu().migrateLegacyPermissions());
         String api = expand(c.output().frontendApi(), table, module);
         String page = expand(c.output().frontendPage(), table, module);
-        variables.put("frontendApiImport", "@/" + api.replaceFirst("^src/", "").replaceFirst("\\.ts$", ""));
         variables.put("pageComponent", page.replaceFirst("^src/views/", "").replaceFirst("\\.vue$", ""));
         return new CodegenTemplateOptions(root.resolve(c.templates().root()).normalize(), variables, packages,
                 c.fields().audit(), c.fields().maxStringValidationLength(), api, page,

@@ -137,13 +137,13 @@ Service。新 CRUD 物理删除；Schema 来自真实 metadata，不带客户数
 | SessionFactory              | DataSource           | TransactionManager           | 固定扫描包                                                            |
 |-----------------------------|----------------------|------------------------------|------------------------------------------------------------------|
 | `masterSqlSessionFactory`   | `masterDataSource`   | `masterTransactionManager`   | `dev.mesbase.system`、`dev.mesbase.quartz`、`dev.mesbase.platform` |
-| `businessSqlSessionFactory` | `businessDataSource` | `businessTransactionManager` | `dev.mesbase.mes`、`dev.mesbase.modules`                          |
+| `businessSqlSessionFactory` | `businessDataSource` | `businessTransactionManager` | `dev.mesbase.business`                          |
 
 Mapper 按 `*Mapper` 命名，固定包及其子包自动扫描。禁止逐 Mapper 配置、中央类清单、手工 Mapper Bean 或要求生产 Mapper 标注
 PersistenceOwner。包不得重叠，重复名称及旧归属注解冲突明确失败。PersistenceOwner 只保留 PLATFORM/BUSINESS 的既有程序式
 fixture 校验；PLATFORM 是中心库平台语义，不是第三个库。
 
-生成器 GLOBAL 使用 dev.mesbase.platform.*，FACTORY_SCOPED 使用 dev.mesbase.modules.*；不生成 Mapper 归属注解或注册清单。不存在
+生成器 GLOBAL 使用 dev.mesbase.platform.*，FACTORY_SCOPED 使用 dev.mesbase.business.*；不生成 Mapper 归属注解或注册清单。不存在
 external 扫描组或 ERP 连接选择入口。
 
 ### 9.2 Spring 事务与验收

@@ -1,6 +1,7 @@
-// MES-CODEGEN: RuoYi API module pattern adapted to typed Base contracts.
+// MES-CODEGEN: API 与生成的 Controller 使用同一请求契约。
 import { request } from '${requestModule}'
 
+#if($typescriptApi)
 export interface ${ClassName}Vo {
   [key: string]: unknown;
 #foreach($field in $fields)
@@ -18,30 +19,33 @@ export interface Page {
 export type CreateCommand = Pick<${ClassName}Vo, #foreach($field in $writableFields)'${field}'#if($foreach.hasNext) | #end#end>
 export type UpdateCommand = Pick<${ClassName}Vo, #foreach($field in $updateFields)'${field}'#if($foreach.hasNext) | #end#end>
 
-const removeIds = (ids: string[]) =>
-  request<void>('${route}', { method: 'DELETE', body: ids, scope: '${permissionScope}' })
+#end
+const removeIds = (ids#if($typescriptApi): string[]#end) =>
+  request#if($typescriptApi)<void>#end('${route}', { method: 'DELETE', body: ids, scope: '${permissionScope}' })
 
 export const api = {
-  list: (query: Record<string, string | number>) =>
-    request<Page>('${route}', { query, scope: '${permissionScope}' }),
+  list: (query#if($typescriptApi): Record<string, string | number>#end) =>
+    request#if($typescriptApi)<Page>#end('${route}', { query, scope: '${permissionScope}' }),
 
-  detail: (id: string) =>
-    request<${ClassName}Vo>('${route}/' + encodeURIComponent(id), { scope: '${permissionScope}' }),
+  detail: (id#if($typescriptApi): string#end) =>
+    request#if($typescriptApi)<${ClassName}Vo>#end('${route}/' + encodeURIComponent(id), { scope: '${permissionScope}' }),
 
-  create: (body: unknown) =>
-    request<${ClassName}Vo>('${route}', { method: 'POST', body, scope: '${permissionScope}' }),
+  create: (body#if($typescriptApi): unknown#end) =>
+    request#if($typescriptApi)<${ClassName}Vo>#end('${route}', { method: 'POST', body, scope: '${permissionScope}' }),
 
-  update: (id: string, body: unknown) =>
-    request<${ClassName}Vo>('${route}/' + encodeURIComponent(id), {
+  update: (id#if($typescriptApi): string#end, body#if($typescriptApi): unknown#end) =>
+    request#if($typescriptApi)<${ClassName}Vo>#end('${route}/' + encodeURIComponent(id), {
       method: 'PUT', body, scope: '${permissionScope}'
     }),
 
-  remove: (id: string) => removeIds([id]),
+  remove: (id#if($typescriptApi): string#end) => removeIds([id]),
 
   delids: removeIds
 }
 
 #if($generateSync)
+#if($typescriptApi)
 export interface SyncResult { fetched: number; created: number; updated: number; skipped: number }
-export const sync = () => request<SyncResult>('${route}/actions/sync', { method: 'POST', scope: '${permissionScope}' })
+#end
+export const sync = () => request#if($typescriptApi)<SyncResult>#end('${route}/actions/sync', { method: 'POST', scope: '${permissionScope}' })
 #end

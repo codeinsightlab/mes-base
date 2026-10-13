@@ -66,6 +66,17 @@ output:
   frontendPage: "src/views/{module}/{classNameCamel}/index.vue"
   frontendMenu: "src/menus/{module}/{classNameCamel}.json"
   menuSql: "docs/generated/{module}/{classNameCamel}-menu.sql"
+  # SQL / Markdown 文档输出模式（前后端代码与菜单 JSON 不受影响）：
+  # per-table：按表分别输出 SQL / Markdown，保持原实现；SQL 使用上面的 menuSql 路径。
+  # merged：本次所选表的 SQL 合并为一个 .sql，权限说明合并为一个 .md，二者独立输出。
+  # 切回分开输出：把下面 mode 改为 "per-table"，sql / markdown 两个合并路径将不使用。
+  # 使用合并输出：mode 设为 "merged"，并分别指定 sql / markdown 路径（不能含表或模块占位符）。
+  # 路径相对于 backendRoot/backendModule；未配置 documents 时兼容原来的 per-table 模式。
+  # 仅改变本次生成产物，不自动删除此前按表输出的文档，不自动执行 SQL。
+  documents:
+    mode: "merged"
+    sql: "docs/generated/all-menu.sql"
+    markdown: "docs/generated/all-permissions.md"
 
 templates:
   # 当前项目模板位置；未来换项目显式换模板包和其中的依赖引用。

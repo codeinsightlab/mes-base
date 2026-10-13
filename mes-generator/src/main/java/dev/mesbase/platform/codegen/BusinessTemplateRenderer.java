@@ -3,8 +3,6 @@ package dev.mesbase.platform.codegen;
 import dev.mesbase.platform.codegen.ScaffoldWriter.Artifact;
 import dev.mesbase.platform.codegen.TableMetadata.Column;
 import java.io.StringWriter;
-import java.nio.file.Files;
-import java.io.IOException;
 import java.sql.Types;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -36,8 +34,12 @@ public final class BusinessTemplateRenderer {
     }
 
     public BusinessTemplateRenderer(CodegenTemplateOptions options) {
+        this(options, VelocityTemplateInitializer.initialize(options == null ? null : options.templateRoot()));
+    }
+
+    BusinessTemplateRenderer(CodegenTemplateOptions options, VelocityEngine engine) {
         this.options = options;
-        engine = VelocityTemplateInitializer.initialize();
+        this.engine = engine;
     }
 
     private String merge(String template, Map<String, Object> model) {
@@ -49,10 +51,10 @@ public final class BusinessTemplateRenderer {
                 var file = options.templateRoot().resolve(template).normalize();
                 if (!file.startsWith(options.templateRoot()))
                     throw new CodegenException(CodegenException.Code.INVALID_REQUEST);
-                engine.evaluate(new VelocityContext(model), out, template, Files.readString(file));
+                engine.getTemplate(template, "UTF-8").merge(new VelocityContext(model), out);
             }
             return out.toString();
-        } catch (IOException | RuntimeException e) {
+        } catch (RuntimeException e) {
             throw new CodegenException(CodegenException.Code.TEMPLATE_FAILURE, e);
         }
     }
@@ -138,7 +140,15 @@ public final class BusinessTemplateRenderer {
         return value.replace("\\", "\\\\").replace("'", "''");
     }
 
+    private static boolean selected(Set<String> targets, String group) {
+        return targets.contains("all") || targets.contains(group);
+    }
+
     public List<Artifact> render(CodegenRequest r, TableMetadata t) {
+        return render(r, t, Set.of("all"));
+    }
+
+    public List<Artifact> render(CodegenRequest r, TableMetadata t, Set<String> targets) {
         boolean scoped = r.scope() == CodegenRequest.ScopeKind.FACTORY_SCOPED;
         Column pk = t.columns().stream().filter(Column::primaryKey).findFirst().orElseThrow();
         String n = cap(JdbcMetadataReader.camel(r.tableName())), p = r.packageName(), name = JdbcMetadataReader.camel(r.tableName()), route = "/api/" + r.moduleName() + "/" + r.tableName()
@@ -231,6 +241,13 @@ public final class BusinessTemplateRenderer {
             route = (String) ctx.get("route");
             perm = (String) ctx.get("permission");
         }
+        String frontendApi = options == null ? "src/api/" + r.moduleName() + "/" + name + ".ts" : options.frontendApi();
+        if (!frontendApi.startsWith("src/") || frontendApi.contains("..")
+                || !frontendApi.matches("[A-Za-z0-9_/-]+\\.(ts|js)")) {
+            throw new CodegenException(CodegenException.Code.INVALID_REQUEST);
+        }
+        ctx.put("frontendApiImport", "@/" + frontendApi.substring(4).replaceFirst("\\.(ts|js)$", ""));
+        ctx.put("typescriptApi", frontendApi.endsWith(".ts"));
         boolean separateQuery = Boolean.TRUE.equals(ctx.get("separateQueryPermission"));
         ctx.put("listAction", separateQuery ? "list" : "read");
         ctx.put("queryAction", separateQuery ? "query" : "read");
@@ -281,42 +298,47 @@ public final class BusinessTemplateRenderer {
         }
         List<Artifact> out = new ArrayList<>();
         String dir = p.replace('.', '/') + "/";
-        out.addAll(new MyBatisPersistenceRenderer().render(r, t, n, options));
-        ctx.put("commandName", n + "CreateCommand");
-        ctx.put("commandFields", ctx.get("createFields"));
-        emitJava(out, ctx, "domain", n + "CreateCommand", "command.java.vm");
-        ctx.put("commandName", n + "UpdateCommand");
-        ctx.put("commandFields", ctx.get("editFields"));
-        emitJava(out, ctx, "domain", n + "UpdateCommand", "command.java.vm");
-        emitJava(out, ctx, "domain", n + "QueryDto", "query.java.vm");
-        emitJava(out, ctx, "domain", n + "Page", "page.java.vm");
-        emitJava(out, ctx, "controller/vo", n + "Vo", "view.java.vm");
-        emitJava(out, ctx, "controller/vo", n + "PageVo", "page-view.java.vm");
-        if (Boolean.TRUE.equals(ctx.get("scoped"))) {
-            emitJava(out, ctx, "domain", n + "Resource", "resource.java.vm");
-        }
-        emitJava(out, ctx, "controller", n + "Permissions", "permissions.java.vm");
-
-        for (var obsolete : List.of("sync/" + n + "SyncService", "sync/" + n + "SyncWriter",
-                "controller/" + n + "SyncController")) {
-            int separator = obsolete.lastIndexOf('/');
-            String ownerPackage = obsolete.substring(0, separator);
-            if (options != null)
-                ownerPackage = options.packages().getOrDefault(ownerPackage, ownerPackage).replace('.', '/');
-            out.add(new Artifact(BACKEND, "src/main/java/" + dir + ownerPackage
-                    + "/" + obsolete.substring(separator + 1) + ".java", "", true));
+        if (selected(targets, "persistence")) {
+            out.addAll(new MyBatisPersistenceRenderer().render(r, t, n, options));
         }
         String ownership = scoped ? "BUSINESS" : "PLATFORM";
-        emitJava(out, ctx, "service", "I" + n + "Service", "service.java.vm");
-        emitJava(out, ctx, "service/impl", n + "ServiceImpl", "service-impl.java.vm");
-        emitJava(out, ctx, "controller", n + "Controller", "controller.java.vm");
-        if (r.generateSync()) {
-            ctx.put("commandName", "External" + n);
-            ctx.put("commandFields", ctx.get("syncInputFields"));
-            emitJava(out, ctx, "sync", "External" + n, "command.java.vm");
-            emitJava(out, ctx, "sync", n + "QueryPort", "sync-port.java.vm");
-            emitJava(out, ctx, "sync", "Unconfigured" + n + "QueryAdapter", "sync-placeholder.java.vm");
-            emitJava(out, ctx, "sync", n + "SyncResult", "sync-result.java.vm");
+        if (selected(targets, "backend")) {
+            ctx.put("commandName", n + "CreateCommand");
+            ctx.put("commandFields", ctx.get("createFields"));
+            emitJava(out, ctx, "domain", n + "CreateCommand", "command.java.vm");
+            ctx.put("commandName", n + "UpdateCommand");
+            ctx.put("commandFields", ctx.get("editFields"));
+            emitJava(out, ctx, "domain", n + "UpdateCommand", "command.java.vm");
+            emitJava(out, ctx, "domain", n + "QueryDto", "query.java.vm");
+            emitJava(out, ctx, "domain", n + "Page", "page.java.vm");
+            emitJava(out, ctx, "controller/vo", n + "Vo", "view.java.vm");
+            emitJava(out, ctx, "controller/vo", n + "PageVo", "page-view.java.vm");
+            if (Boolean.TRUE.equals(ctx.get("scoped"))) {
+                emitJava(out, ctx, "domain", n + "Resource", "resource.java.vm");
+            }
+            emitJava(out, ctx, "controller", n + "Permissions", "permissions.java.vm");
+
+            for (var obsolete : List.of("sync/" + n + "SyncService", "sync/" + n + "SyncWriter",
+                    "controller/" + n + "SyncController")) {
+                int separator = obsolete.lastIndexOf('/');
+                String ownerPackage = obsolete.substring(0, separator);
+                if (options != null)
+                    ownerPackage = options.packages().getOrDefault(ownerPackage, ownerPackage).replace('.', '/');
+                out.add(new Artifact(BACKEND, "src/main/java/" + dir + ownerPackage
+                        + "/" + obsolete.substring(separator + 1) + ".java", "", true));
+            }
+
+            emitJava(out, ctx, "service", "I" + n + "Service", "service.java.vm");
+            emitJava(out, ctx, "service/impl", n + "ServiceImpl", "service-impl.java.vm");
+            emitJava(out, ctx, "controller", n + "Controller", "controller.java.vm");
+            if (r.generateSync()) {
+                ctx.put("commandName", "External" + n);
+                ctx.put("commandFields", ctx.get("syncInputFields"));
+                emitJava(out, ctx, "sync", "External" + n, "command.java.vm");
+                emitJava(out, ctx, "sync", n + "QueryPort", "sync-port.java.vm");
+                emitJava(out, ctx, "sync", "Unconfigured" + n + "QueryAdapter", "sync-placeholder.java.vm");
+                emitJava(out, ctx, "sync", n + "SyncResult", "sync-result.java.vm");
+            }
         }
         ctx.put("pkField", pk.javaField());
         ctx.put("fields", t.columns().stream()
@@ -335,17 +357,23 @@ public final class BusinessTemplateRenderer {
                 .toList());
         ctx.put("writableFields", create.stream().map(Column::javaField).toList());
         ctx.put("updateFields", writable.stream().map(Column::javaField).toList());
-        out.add(new Artifact(FRONTEND, options == null ? "src/api/" + r.moduleName() + "/" + name + ".ts" : options.frontendApi(), merge("api.ts.vm", ctx)));
-        out.add(new Artifact(FRONTEND, options == null ? "src/views/" + r.moduleName() + "/" + name + "/index.vue" : options.frontendPage(), merge("index.vue.vm", ctx)));
-        out.add(new Artifact(FRONTEND, options == null ? "src/menus/" + r.moduleName() + "/" + name + ".json" : options.frontendMenu(), merge("menu.json.vm", ctx)));
-        out.add(new Artifact(PERMISSION, options == null ? "docs/generated/" + r.moduleName() + "/" + name + "-menu.sql" : options.menuSql(), merge("menu.sql.vm", ctx)));
-        out.add(new Artifact(PERMISSION, "docs/generated/" + r.moduleName() + "/" + name + "-permissions.md", "<!-- MES-CODEGEN -->\n# " + r.businessName() + "\n\nScope: " + r.scope() + "; Mapper owner: " + ownership + "\n\nPath: `" + route + "`\n\n" + menuActions.stream()
-                .map(action -> action.get("code")).map(x -> "- `" + ctx.get("permission") + ":" + x + "`\n")
-                .collect(Collectors.joining()) + "\nMenu INSERT SQL is generated beside this file for reviewed center-database execution; no automatic execution or role grants. Mapper ownership follows its fixed package; no Mapper annotation or central registration is required.\n"));
-        ctx.put("ownership", ownership);
-        ctx.put("body", JavaSourceImports.explicit(merge("scaffold-test.java.vm", ctx)));
-        ctx.put("packageName", p);
-        out.add(new Artifact(BACKEND, "src/test/java/" + dir + n + "ScaffoldTest.java", merge("java.vm", ctx)));
+        if (selected(targets, "frontend")) {
+            out.add(new Artifact(FRONTEND, frontendApi, merge("api.ts.vm", ctx)));
+            out.add(new Artifact(FRONTEND, options == null ? "src/views/" + r.moduleName() + "/" + name + "/index.vue" : options.frontendPage(), merge("index.vue.vm", ctx)));
+        }
+        if (selected(targets, "menu")) {
+            out.add(new Artifact(FRONTEND, options == null ? "src/menus/" + r.moduleName() + "/" + name + ".json" : options.frontendMenu(), merge("menu.json.vm", ctx)));
+            out.add(new Artifact(PERMISSION, options == null ? "docs/generated/" + r.moduleName() + "/" + name + "-menu.sql" : options.menuSql(), merge("menu.sql.vm", ctx)));
+            out.add(new Artifact(PERMISSION, "docs/generated/" + r.moduleName() + "/" + name + "-permissions.md", "<!-- MES-CODEGEN -->\n# " + r.businessName() + "\n\nScope: " + r.scope() + "; Mapper owner: " + ownership + "\n\nPath: `" + route + "`\n\n" + menuActions.stream()
+                    .map(action -> action.get("code")).map(x -> "- `" + ctx.get("permission") + ":" + x + "`\n")
+                    .collect(Collectors.joining()) + "\nMenu INSERT SQL is generated beside this file for reviewed center-database execution; no automatic execution or role grants. Mapper ownership follows its fixed package; no Mapper annotation or central registration is required.\n"));
+        }
+        if (selected(targets, "test")) {
+            ctx.put("ownership", ownership);
+            ctx.put("body", JavaSourceImports.explicit(merge("scaffold-test.java.vm", ctx)));
+            ctx.put("packageName", p);
+            out.add(new Artifact(BACKEND, "src/test/java/" + dir + n + "ScaffoldTest.java", merge("java.vm", ctx)));
+        }
         return List.copyOf(out);
     }
 }
