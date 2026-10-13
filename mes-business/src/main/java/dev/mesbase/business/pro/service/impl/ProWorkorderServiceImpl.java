@@ -391,8 +391,8 @@ public class ProWorkorderServiceImpl implements IProWorkorderService {
     }
 
     private static boolean same(ProWorkorderEntity row, ExternalProWorkorder input) {
-        return true
-                && Objects.deepEquals(row.getWorkorderCode(), input.workorderCode())
+        return
+                &&Objects.deepEquals(row.getWorkorderCode(), input.workorderCode())
                 && Objects.deepEquals(row.getWorkorderName(), input.workorderName())
                 && Objects.deepEquals(row.getOrderSource(), input.orderSource())
                 && Objects.deepEquals(row.getSourceCode(), input.sourceCode())
@@ -421,7 +421,7 @@ public class ProWorkorderServiceImpl implements IProWorkorderService {
                 && Objects.deepEquals(row.getAttr4(), input.attr4())
                 && Objects.deepEquals(row.getTransactionDate(), input.transactionDate())
                 && Objects.deepEquals(row.getMoId(), input.moId())
-                ;
+        ;
     }
 }
 

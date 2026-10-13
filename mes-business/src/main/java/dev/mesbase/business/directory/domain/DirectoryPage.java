@@ -1,4 +1,4 @@
-package dev.mesbase.modules.directory.domain;
+package dev.mesbase.business.directory.domain;
 
 import java.util.List;
 

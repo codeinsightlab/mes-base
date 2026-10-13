@@ -497,10 +497,12 @@ class BusinessCodegenRunnerTest {
         var runner = new BusinessCodegenRunner();
         var original = runner.run(config("[person, pro_sample]", "dry-run"), repository(), source());
         assertEquals("DRY_RUN", original.status());
-        assertEquals(4, original.files().stream().filter(file -> file.target() == CodegenResult.Target.PERMISSION).count());
+        assertEquals(4, original.files().stream().filter(file -> file.target() == CodegenResult.Target.PERMISSION)
+                .count());
         var explicit = runner.run(documentConfig("per-table", "dry-run"), repository(), source());
         assertEquals("DRY_RUN", explicit.status());
-        assertEquals(4, explicit.files().stream().filter(file -> file.target() == CodegenResult.Target.PERMISSION).count());
+        assertEquals(4, explicit.files().stream().filter(file -> file.target() == CodegenResult.Target.PERMISSION)
+                .count());
         assertTrue(explicit.files().stream().noneMatch(file -> file.path().endsWith("all-menu.sql")));
     }
 
@@ -514,8 +516,10 @@ class BusinessCodegenRunnerTest {
         var generated = runner.run(documentConfig("merged", "write"), repository(), data);
         assertEquals("GENERATED", generated.status(), generated.rejected().toString());
         assertEquals(preview.files(), generated.files());
-        assertEquals(2, generated.files().stream().filter(file -> file.target() == CodegenResult.Target.PERMISSION).count());
-        assertEquals(2, generated.files().stream().filter(file -> file.target() == CodegenResult.Target.FRONTEND).count());
+        assertEquals(2, generated.files().stream().filter(file -> file.target() == CodegenResult.Target.PERMISSION)
+                .count());
+        assertEquals(2, generated.files().stream().filter(file -> file.target() == CodegenResult.Target.FRONTEND)
+                .count());
         Path root = temporary.resolve("backend/mes-business/docs/generated");
         String sql = Files.readString(root.resolve("all-menu.sql"));
         String markdown = Files.readString(root.resolve("all-permissions.md"));

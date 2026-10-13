@@ -202,6 +202,7 @@ public record BusinessCodegenConfiguration(Integer version, Source source, Selec
     private static void requireDocumentPath(String value, String suffix, String field) {
         require(value != null && value.endsWith(suffix) && !value.contains("{") && !value.contains("}"), field);
         Path path = Path.of(value);
-        require(!path.isAbsolute() && !path.normalize().startsWith("..") && !path.normalize().toString().isBlank(), field);
+        require(!path.isAbsolute() && !path.normalize().startsWith("..") && !path.normalize().toString()
+                .isBlank(), field);
     }
 }

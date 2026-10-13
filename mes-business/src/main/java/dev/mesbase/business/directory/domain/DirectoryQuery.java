@@ -1,4 +1,4 @@
-package dev.mesbase.modules.directory.domain;
+package dev.mesbase.business.directory.domain;
 
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;

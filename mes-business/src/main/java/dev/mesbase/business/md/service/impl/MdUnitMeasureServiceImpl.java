@@ -265,8 +265,8 @@ public class MdUnitMeasureServiceImpl implements IMdUnitMeasureService {
     }
 
     private static boolean same(MdUnitMeasureEntity row, ExternalMdUnitMeasure input) {
-        return true
-                && Objects.deepEquals(row.getFactoryId(), input.factoryId())
+        return
+                &&Objects.deepEquals(row.getFactoryId(), input.factoryId())
                 && Objects.deepEquals(row.getMeasureCode(), input.measureCode())
                 && Objects.deepEquals(row.getMeasureName(), input.measureName())
                 && Objects.deepEquals(row.getPrimaryFlag(), input.primaryFlag())
@@ -275,7 +275,7 @@ public class MdUnitMeasureServiceImpl implements IMdUnitMeasureService {
                 : input.changeRate() != null && row.getChangeRate().compareTo(input.changeRate()) == 0)
                 && Objects.deepEquals(row.getEnableFlag(), input.enableFlag())
                 && Objects.deepEquals(row.getRemark(), input.remark())
-                ;
+        ;
     }
 }
 

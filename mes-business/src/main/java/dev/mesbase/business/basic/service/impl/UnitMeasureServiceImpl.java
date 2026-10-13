@@ -246,12 +246,12 @@ public class UnitMeasureServiceImpl implements IUnitMeasureService {
     }
 
     private static boolean same(UnitMeasureEntity row, ExternalUnitMeasure input) {
-        return true
-                && Objects.deepEquals(row.getCode(), input.code())
+        return
+                &&Objects.deepEquals(row.getCode(), input.code())
                 && Objects.deepEquals(row.getName(), input.name())
                 && Objects.deepEquals(row.getSymbol(), input.symbol())
                 && Objects.deepEquals(row.getStatus(), input.status())
-                ;
+        ;
     }
 }
 

@@ -1,4 +1,4 @@
-package dev.mesbase.modules.directory.controller;
+package dev.mesbase.business.directory.controller;
 
 /**
  * Only public reference fields; never serialize the platform persistence entities.

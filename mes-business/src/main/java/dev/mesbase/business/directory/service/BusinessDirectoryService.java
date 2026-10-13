@@ -1,21 +1,22 @@
-package dev.mesbase.modules.directory.service;
+package dev.mesbase.business.directory.service;
 
 import com.github.pagehelper.PageHelper;
+import dev.mesbase.business.directory.domain.DirectoryPage;
+import dev.mesbase.business.directory.domain.DirectoryQuery;
 import dev.mesbase.common.core.domain.entity.SysDept;
 import dev.mesbase.common.core.domain.entity.SysUser;
 import dev.mesbase.core.error.ErrorCode;
 import dev.mesbase.core.error.FoundationException;
-import dev.mesbase.modules.directory.domain.DirectoryPage;
-import dev.mesbase.modules.directory.domain.DirectoryQuery;
 import dev.mesbase.system.domain.SysPost;
 import dev.mesbase.system.mapper.SysDeptMapper;
 import dev.mesbase.system.mapper.SysPostMapper;
 import dev.mesbase.system.mapper.SysUserMapper;
-import java.util.List;
-import java.util.function.Supplier;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.util.List;
+import java.util.function.Supplier;
 
 /**
  * Shared center directory reached through narrowly authorized business capabilities.

@@ -265,8 +265,8 @@ public class DvSubjectServiceImpl implements IDvSubjectService {
     }
 
     private static boolean same(DvSubjectEntity row, ExternalDvSubject input) {
-        return true
-                && Objects.deepEquals(row.getFactoryId(), input.factoryId())
+        return
+                &&Objects.deepEquals(row.getFactoryId(), input.factoryId())
                 && Objects.deepEquals(row.getSubjectCode(), input.subjectCode())
                 && Objects.deepEquals(row.getSubjectName(), input.subjectName())
                 && Objects.deepEquals(row.getSubjectType(), input.subjectType())
@@ -274,7 +274,7 @@ public class DvSubjectServiceImpl implements IDvSubjectService {
                 && Objects.deepEquals(row.getSubjectStandard(), input.subjectStandard())
                 && Objects.deepEquals(row.getEnableFlag(), input.enableFlag())
                 && Objects.deepEquals(row.getRemark(), input.remark())
-                ;
+        ;
     }
 }
 

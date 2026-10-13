@@ -1,20 +1,17 @@
-package dev.mesbase.modules.directory.controller;
+package dev.mesbase.business.directory.controller;
 
+import dev.mesbase.business.directory.domain.DirectoryPage;
+import dev.mesbase.business.directory.domain.DirectoryQuery;
+import dev.mesbase.business.directory.service.BusinessDirectoryService;
 import dev.mesbase.common.core.domain.entity.SysDept;
 import dev.mesbase.common.core.domain.entity.SysUser;
-import dev.mesbase.modules.directory.domain.DirectoryPage;
-import dev.mesbase.modules.directory.domain.DirectoryQuery;
-import dev.mesbase.modules.directory.service.BusinessDirectoryService;
 import dev.mesbase.platform.web.EndpointAccess;
 import dev.mesbase.system.domain.SysPost;
 import jakarta.validation.Valid;
-import java.util.function.Function;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.ModelAttribute;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.function.Function;
 
 @RestController
 @RequestMapping("/api/business/directory")

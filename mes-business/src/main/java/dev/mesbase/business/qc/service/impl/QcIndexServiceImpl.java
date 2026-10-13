@@ -253,14 +253,14 @@ public class QcIndexServiceImpl implements IQcIndexService {
     }
 
     private static boolean same(QcIndexEntity row, ExternalQcIndex input) {
-        return true
-                && Objects.deepEquals(row.getFactoryId(), input.factoryId())
+        return
+                &&Objects.deepEquals(row.getFactoryId(), input.factoryId())
                 && Objects.deepEquals(row.getIndexCode(), input.indexCode())
                 && Objects.deepEquals(row.getIndexName(), input.indexName())
                 && Objects.deepEquals(row.getIndexType(), input.indexType())
                 && Objects.deepEquals(row.getQcTool(), input.qcTool())
                 && Objects.deepEquals(row.getRemark(), input.remark())
-                ;
+        ;
     }
 }
 

@@ -724,3 +724,37 @@ MySQL；metadata 的逐表连接及输出暂存本轮未优化。
 七种调用的 URL、HTTP 方法及删除 body 与生成 Controller 契约一致，页面 import 对应实际文件；
 隔离 .vue 样例通过 vue-tsc（JS 样例配置 allowJs）与 Vite 构建。保留十二组通用 Java 样例编译测试。
 未进行视觉验收、真实 HTTP/数据库验收或正式业务重生成；被删除业务页面待用户自行生成恢复。
+
+### 2026-10-13：SQL / Markdown 的逐表与合并输出
+
+`output.documents` 为可选配置：缺省或 `mode: per-table` 保持原有逐表产物；
+`mode: merged` 把本批次所选表的 SQL 合并为一个 `.sql`，权限文档合并为一个 `.md`。
+两种格式独立合并，前后端源码和每表菜单 JSON 不合并。合并在统一生成服务的全批次
+预检前执行，仍遵循 dry-run、覆盖策略、生成标记检查和冲突时整批不发布的原约定。
+内容按原产物相对路径稳定排序，保留各表完整内容及来源说明；合并 SQL 不自动执行。
+
+当前 `docs/development/codegen-config.review.yaml` 已设为：
+
+```yaml
+output:
+  # 其他原有输出参数保留。
+  documents:
+    mode: merged
+    sql: docs/generated/all-menu.sql
+    markdown: docs/generated/all-permissions.md
+```
+
+路径相对于 `backendRoot/backendModule`，本项目实际为
+`mes-business/docs/generated/all-menu.sql` 与 `mes-business/docs/generated/all-permissions.md`。
+切回分开输出只需把 `mode` 改为 `per-table`，合并路径随之不使用，逐表 SQL 路径仍取
+`output.menuSql`。配置旁已补充完整中文注释，包括旧配置兼容、禁止合并路径使用表/模块
+占位符以及不自动删除以前逐表输出的文件。仅修改当前配置，没有正式运行用户的生成命令。
+
+针对性测试覆盖旧配置与显式逐表模式、跨模块两表合并、预览/写入 manifest 相同、菜单 JSON
+继续独立输出、合并 SQL 在 TEST ONLY H2 连续执行两次仍保留正确菜单数量，以及输出冲突
+不发布任何其他产物、非法模式/扩展名/越界路径/占位符明确拒绝。H2 验证不代表真实 MySQL
+执行或中心库迁移；本轮没有数据库写入、业务重生成、视觉验证或部署。
+
+最终验证：`mvn -B -ntp -pl mes-generator -am verify` 通过，生成器 27 项测试全部通过；
+四个修改 Java 文件的 IDEA 格式化和 `git diff --check` 通过。当前项目配置通过生成器实际
+解析，读到 `mode=merged` 及两条预期合并路径。没有运行配置中的 write 生成入口。

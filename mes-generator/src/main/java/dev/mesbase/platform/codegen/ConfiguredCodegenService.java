@@ -27,7 +27,7 @@ public final class ConfiguredCodegenService {
     }
 
     public List<CodegenResult.GeneratedFile> generate(List<Plan> plans, Set<String> targets,
-                                                     UnaryOperator<List<Artifact>> formatter, Documents documents) {
+                                                      UnaryOperator<List<Artifact>> formatter, Documents documents) {
         if (plans.isEmpty()) return List.of();
         List<Artifact> artifacts = new ArrayList<>();
         CodegenRequest first = plans.getFirst().request();
