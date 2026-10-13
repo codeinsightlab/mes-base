@@ -121,6 +121,11 @@ menu:
   table: "sys_menu"
   parentId: 0
   directoryName: "基础数据"
+  # 目录路由标识，独立于 API/Java/页面所属模块；相同 parentId + directoryPath 共用一个目录。
+  # 固定 basic：所有生成业务页归入同一个“基础数据”；不会按 basic/dv/md/pro/qc 分建同名目录。
+  # 按模块分别建目录时可改为 "{module}"；旧配置不填写此项时保留按模块建目录的行为。
+  # 修改目录路径会调整生成页面的父目录，不自动删除旧目录，也不新增角色授权。
+  directoryPath: "basic"
   directoryOrder: 0
   pageOrder: 0
   icon: "list"

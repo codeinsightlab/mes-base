@@ -7,6 +7,10 @@ import dev.mesbase.platform.codegen.TableMetadata.Column;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.sql.Types;
+import java.math.BigDecimal;
+import java.net.URL;
+import java.net.URLClassLoader;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -94,6 +98,83 @@ class BusinessTemplatePackageTest {
                                     List.of("-classpath", System.getProperty("java.class.path"), "-d", classes.toString()), null,
                                     manager.getJavaFileObjectsFromPaths(files.filter(Files::isRegularFile).toList())).call(),
                             table + " sync=" + sync);
+                }
+            }
+        }
+    }
+
+    @Test
+    void syncComparisonCompilesAndPreservesEqualityForEmptySingleAndDecimalFields() throws Exception {
+        Column id = metadata("person").columns().getFirst();
+        Column code = metadata("person").columns().get(1);
+        Column audit = new Column("create_by", "createBy", Types.VARCHAR, "String", 64, 0, true,
+                false, false, null, "创建人");
+        Column amount = new Column("amount", "amount", Types.DECIMAL, "java.math.BigDecimal", 18, 2, true,
+                false, false, null, "数量");
+        Column name = new Column("name", "name", Types.VARCHAR, "String", 64, 0, true,
+                false, false, null, "名称");
+        var variants = List.of(List.of(id, audit), List.of(id, code), List.of(id, amount, code, name),
+                List.of(id, code, name, amount));
+        for (int variant = 0; variant < variants.size(); variant++) {
+            var base = request("person", true);
+            var configured = new CodegenRequest(base.datasource(), base.schema(), base.tableName(), base.moduleName(),
+                    base.businessName(), base.packageName(), base.author(), base.scope(), base.overwritePolicy(),
+                    base.dryRun(), base.backendRoot(), base.frontendRoot(), base.backendModule(), true, "id");
+            var options = options(templates(), Map.of());
+            options = new CodegenTemplateOptions(options.templateRoot(), options.variables(), options.packages(),
+                    List.of("create_by"), options.stringLengthLimit(), options.frontendApi(), options.frontendPage(),
+                    options.frontendMenu(), options.menuSql());
+            var table = new TableMetadata(null, null, "person", "比较测试", variants.get(variant), List.of(), List.of());
+            var artifacts = new BusinessTemplateRenderer(options).render(configured, table);
+            String service = artifacts.stream()
+                    .filter(artifact -> artifact.relativePath().endsWith("PersonServiceImpl.java"))
+                    .findFirst().orElseThrow().content();
+            String same = service.substring(service.indexOf("private static boolean same("));
+            assertEquals(variant == 0, same.contains("return true;"));
+            assertFalse(same.contains("return true\n"));
+            Path sources = temporary.resolve("comparison/" + variant + "/sources");
+            Path classes = temporary.resolve("comparison/" + variant + "/classes");
+            Files.createDirectories(classes);
+            for (Artifact artifact : artifacts) {
+                if (artifact.removed() || !artifact.relativePath().startsWith("src/main/java/")
+                        || !artifact.relativePath().endsWith(".java")) continue;
+                Path file = sources.resolve(artifact.relativePath());
+                Files.createDirectories(file.getParent());
+                Files.writeString(file, artifact.content());
+            }
+            var compiler = ToolProvider.getSystemJavaCompiler();
+            try (var manager = compiler.getStandardFileManager(null, null, null); var files = Files.walk(sources)) {
+                assertTrue(compiler.getTask(null, manager, null,
+                        List.of("-classpath", System.getProperty("java.class.path"), "-d", classes.toString()), null,
+                        manager.getJavaFileObjectsFromPaths(files.filter(Files::isRegularFile).toList())).call());
+            }
+            try (var loader = new URLClassLoader(new URL[]{classes.toUri().toURL()}, getClass().getClassLoader())) {
+                Class<?> entity = loader.loadClass("sample.business.material.model.PersonEntity");
+                Class<?> external = loader.loadClass("sample.business.material.source.ExternalPerson");
+                Class<?> implementation = loader.loadClass("sample.business.material.usecase.impl.PersonServiceImpl");
+                var components = external.getRecordComponents();
+                List<Object> arguments = new ArrayList<>();
+                var row = entity.getConstructor().newInstance();
+                for (var component : components) {
+                    Object value = component.getType() == Long.class ? 1L : component.getType() == BigDecimal.class
+                            ? new BigDecimal("1.00") : "TEST";
+                    arguments.add(value);
+                    Object rowValue = value instanceof BigDecimal ? new BigDecimal("1.0") : value;
+                    String setter = "set" + Character.toUpperCase(component.getName().charAt(0)) + component.getName()
+                            .substring(1);
+                    entity.getMethod(setter, component.getType()).invoke(row, rowValue);
+                }
+                var input = external.getDeclaredConstructors()[0].newInstance(arguments.toArray());
+                var comparison = implementation.getDeclaredMethod("same", entity, external);
+                comparison.setAccessible(true);
+                assertEquals(true, comparison.invoke(null, row, input));
+                if (variant != 0) {
+                    Column first = variants.get(variant).get(1);
+                    String setter = "set" + Character.toUpperCase(first.javaField().charAt(0)) + first.javaField()
+                            .substring(1);
+                    entity.getMethod(setter, first == amount ? BigDecimal.class : String.class)
+                            .invoke(row, new Object[]{null});
+                    assertEquals(false, comparison.invoke(null, row, input));
                 }
             }
         }

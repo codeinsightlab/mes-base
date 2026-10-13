@@ -252,14 +252,12 @@ public class QcDefectServiceImpl implements IQcDefectService {
     }
 
     private static boolean same(QcDefectEntity row, ExternalQcDefect input) {
-        return true
-                && Objects.deepEquals(row.getFactoryId(), input.factoryId())
+        return Objects.deepEquals(row.getFactoryId(), input.factoryId())
                 && Objects.deepEquals(row.getDefectCode(), input.defectCode())
                 && Objects.deepEquals(row.getDefectName(), input.defectName())
                 && Objects.deepEquals(row.getIndexType(), input.indexType())
                 && Objects.deepEquals(row.getDefectLevel(), input.defectLevel())
-                && Objects.deepEquals(row.getRemark(), input.remark())
-                ;
+                && Objects.deepEquals(row.getRemark(), input.remark());
     }
 }
 

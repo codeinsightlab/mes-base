@@ -183,6 +183,7 @@ public final class BusinessTemplateRenderer {
         ctx.put("permission", perm);
         ctx.put("legacyPermission", permissionNamespace(r) + ":" + r.tableName());
         ctx.put("menuDirectorySql", sqlLiteral(r.moduleName()));
+        ctx.put("menuDirectoryPath", r.moduleName());
         ctx.put("menuNameSql", sqlLiteral(r.businessName()));
         ctx.put("menuActions", List.of(Map.of("code", "read", "label", "查询"),
                 Map.of("code", "create", "label", "新增"), Map.of("code", "update", "label", "修改"),
@@ -240,6 +241,10 @@ public final class BusinessTemplateRenderer {
             ctx.put("scoped", "factory".equals(ctx.get("permissionScope")));
             route = (String) ctx.get("route");
             perm = (String) ctx.get("permission");
+        }
+        if (!(ctx.get("menuDirectoryPath") instanceof String directoryPath)
+                || !directoryPath.matches("[A-Za-z0-9_-]+")) {
+            throw new CodegenException(CodegenException.Code.INVALID_REQUEST);
         }
         String frontendApi = options == null ? "src/api/" + r.moduleName() + "/" + name + ".ts" : options.frontendApi();
         if (!frontendApi.startsWith("src/") || frontendApi.contains("..")

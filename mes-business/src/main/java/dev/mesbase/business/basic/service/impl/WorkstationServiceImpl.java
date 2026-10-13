@@ -251,13 +251,11 @@ public class WorkstationServiceImpl implements IWorkstationService {
     }
 
     private static boolean same(WorkstationEntity row, ExternalWorkstation input) {
-        return true
-                && Objects.deepEquals(row.getCode(), input.code())
+        return Objects.deepEquals(row.getCode(), input.code())
                 && Objects.deepEquals(row.getName(), input.name())
                 && Objects.deepEquals(row.getWorkshopId(), input.workshopId())
                 && Objects.deepEquals(row.getStatus(), input.status())
-                && Objects.deepEquals(row.getRemark(), input.remark())
-                ;
+                && Objects.deepEquals(row.getRemark(), input.remark());
     }
 }
 

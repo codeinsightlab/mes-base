@@ -275,8 +275,7 @@ public class MaterialServiceImpl implements IMaterialService {
     }
 
     private static boolean same(MaterialEntity row, ExternalMaterial input) {
-        return true
-                && Objects.deepEquals(row.getCode(), input.code())
+        return Objects.deepEquals(row.getCode(), input.code())
                 && Objects.deepEquals(row.getName(), input.name())
                 && Objects.deepEquals(row.getSpecification(), input.specification())
                 && Objects.deepEquals(row.getCategoryId(), input.categoryId())
@@ -284,8 +283,7 @@ public class MaterialServiceImpl implements IMaterialService {
                 && Objects.deepEquals(row.getMaterialType(), input.materialType())
                 && Objects.deepEquals(row.getStatus(), input.status())
                 && Objects.deepEquals(row.getExternalId(), input.externalId())
-                && Objects.deepEquals(row.getExternalCode(), input.externalCode())
-                ;
+                && Objects.deepEquals(row.getExternalCode(), input.externalCode());
     }
 }
 

@@ -8,6 +8,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.Optional;
 
 /**
  * Shared menu classification for role assignment and factory navigation.
@@ -41,8 +42,10 @@ public final class MenuScopePolicy {
     }
 
     public SysMenu require(Long id) {
-        SysMenu menu = menus.get(id);
-        if (menu == null) throw new ServiceException("Menu does not exist");
-        return menu;
+        return find(id).orElseThrow(() -> new ServiceException("Menu does not exist"));
+    }
+
+    public Optional<SysMenu> find(Long id) {
+        return Optional.ofNullable(menus.get(id));
     }
 }

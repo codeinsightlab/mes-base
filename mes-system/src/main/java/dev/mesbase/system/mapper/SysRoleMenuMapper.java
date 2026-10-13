@@ -9,15 +9,8 @@ import java.util.List;
  *
  * @author ruoyi
  */
-public interface SysRoleMenuMapper
-{
-    /**
-     * 查询菜单使用数量
-     *
-     * @param menuId 菜单ID
-     * @return 结果
-     */
-    public int checkMenuExistRole(Long menuId);
+public interface SysRoleMenuMapper {
+
 
     /**
      * 通过角色ID删除角色和菜单关联
@@ -26,6 +19,11 @@ public interface SysRoleMenuMapper
      * @return 结果
      */
     public int deleteRoleMenuByRoleId(Long roleId);
+
+    /**
+     * 删除菜单对应的角色关联，不删除角色。
+     */
+    int deleteRoleMenuByMenuId(Long menuId);
 
     /**
      * 批量删除角色菜单关联信息

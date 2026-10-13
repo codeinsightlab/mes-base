@@ -245,12 +245,10 @@ public class WorkshopServiceImpl implements IWorkshopService {
     }
 
     private static boolean same(WorkshopEntity row, ExternalWorkshop input) {
-        return true
-                && Objects.deepEquals(row.getCode(), input.code())
+        return Objects.deepEquals(row.getCode(), input.code())
                 && Objects.deepEquals(row.getName(), input.name())
                 && Objects.deepEquals(row.getStatus(), input.status())
-                && Objects.deepEquals(row.getRemark(), input.remark())
-                ;
+                && Objects.deepEquals(row.getRemark(), input.remark());
     }
 }
 

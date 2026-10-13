@@ -264,8 +264,7 @@ public class MdWorkshopServiceImpl implements IMdWorkshopService {
     }
 
     private static boolean same(MdWorkshopEntity row, ExternalMdWorkshop input) {
-        return true
-                && Objects.deepEquals(row.getFactoryId(), input.factoryId())
+        return Objects.deepEquals(row.getFactoryId(), input.factoryId())
                 && Objects.deepEquals(row.getWorkshopCode(), input.workshopCode())
                 && Objects.deepEquals(row.getWorkshopName(), input.workshopName())
                 && (row.getArea() == null ? input.area() == null
@@ -273,8 +272,7 @@ public class MdWorkshopServiceImpl implements IMdWorkshopService {
                 && Objects.deepEquals(row.getCharge(), input.charge())
                 && Objects.deepEquals(row.getDeptId(), input.deptId())
                 && Objects.deepEquals(row.getEnableFlag(), input.enableFlag())
-                && Objects.deepEquals(row.getRemark(), input.remark())
-                ;
+                && Objects.deepEquals(row.getRemark(), input.remark());
     }
 }
 

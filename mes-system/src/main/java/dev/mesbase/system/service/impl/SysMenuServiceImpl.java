@@ -270,17 +270,6 @@ public class SysMenuServiceImpl implements ISysMenuService {
         return result > 0 ? true : false;
     }
 
-    /**
-     * 查询菜单使用数量
-     *
-     * @param menuId 菜单ID
-     * @return 结果
-     */
-    @Override
-    public boolean checkMenuExistRole(Long menuId) {
-        int result = roleMenuMapper.checkMenuExistRole(menuId);
-        return result > 0 ? true : false;
-    }
 
     /**
      * 新增保存菜单信息
@@ -359,6 +348,8 @@ public class SysMenuServiceImpl implements ISysMenuService {
     @Override
     @Transactional(transactionManager = "masterTransactionManager", rollbackFor = Exception.class)
     public int deleteMenuById(Long menuId) {
+        if (hasChildByMenuId(menuId)) throw new ServiceException("存在子菜单，不允许删除");
+        roleMenuMapper.deleteRoleMenuByMenuId(menuId);
         int changed = menuMapper.deleteMenuById(menuId);
         permissionService.validateMenuAuthorization();
         return changed;

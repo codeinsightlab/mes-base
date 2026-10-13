@@ -257,14 +257,12 @@ public class MaterialCategoryServiceImpl implements IMaterialCategoryService {
     }
 
     private static boolean same(MaterialCategoryEntity row, ExternalMaterialCategory input) {
-        return true
-                && Objects.deepEquals(row.getCode(), input.code())
+        return Objects.deepEquals(row.getCode(), input.code())
                 && Objects.deepEquals(row.getName(), input.name())
                 && Objects.deepEquals(row.getParentId(), input.parentId())
                 && Objects.deepEquals(row.getSort(), input.sort())
                 && Objects.deepEquals(row.getStatus(), input.status())
-                && Objects.deepEquals(row.getRemark(), input.remark())
-                ;
+                && Objects.deepEquals(row.getRemark(), input.remark());
     }
 }
 

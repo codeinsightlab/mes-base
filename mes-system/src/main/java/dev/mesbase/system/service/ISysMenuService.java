@@ -100,13 +100,6 @@ public interface ISysMenuService {
      */
     public boolean hasChildByMenuId(Long menuId);
 
-    /**
-     * 查询菜单是否存在角色
-     *
-     * @param menuId 菜单ID
-     * @return 结果 true 存在 false 不存在
-     */
-    public boolean checkMenuExistRole(Long menuId);
 
     /**
      * 新增保存菜单信息

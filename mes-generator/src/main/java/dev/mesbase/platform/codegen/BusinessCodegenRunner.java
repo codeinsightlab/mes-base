@@ -185,6 +185,8 @@ public final class BusinessCodegenRunner {
         variables.put("menuTable", c.menu().table());
         variables.put("parentId", c.menu().parentId());
         variables.put("menuDirectorySql", literal(expand(c.menu().directoryName(), table, module)));
+        variables.put("menuDirectoryPath", c.menu().directoryPath() == null ? module
+                : expand(c.menu().directoryPath(), table, module));
         variables.put("directoryOrder", c.menu().directoryOrder());
         variables.put("pageOrder", c.menu().pageOrder());
         variables.put("menuIcon", literal(c.menu().icon()));

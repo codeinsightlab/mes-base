@@ -74,7 +74,7 @@ public record BusinessCodegenConfiguration(Integer version, Source source, Selec
 
     public record Menu(String table, Long parentId, String directoryName, Integer directoryOrder,
                        Integer pageOrder, String icon, String frontendIcon, String createdBy,
-                       Boolean migrateLegacyPermissions) {
+                       Boolean migrateLegacyPermissions, String directoryPath) {
     }
 
     public record Execution(String mode, String overwrite, Boolean formatJava, String formatter,
@@ -150,6 +150,7 @@ public record BusinessCodegenConfiguration(Integer version, Source source, Selec
             boolean optional = name.equals("tableOverrides") || name.equals("generateSync") || name.equals("sync")
                     || record instanceof Output && name.equals("documents")
                     || record instanceof Documents && !name.equals("mode")
+                    || record instanceof Menu && name.equals("directoryPath")
                     || record instanceof TableOverride
                     || record instanceof Strategy && name.equals("fallback")
                     && !"displayName".equals(path.substring(path.lastIndexOf('.') + 1));
@@ -186,6 +187,7 @@ public record BusinessCodegenConfiguration(Integer version, Source source, Selec
             boolean nullable = name.equals("tableOverrides") || name.equals("schema") || name.equals("sync")
                     || record instanceof Output && name.equals("documents")
                     || record instanceof Documents && !name.equals("mode")
+                    || record instanceof Menu && name.equals("directoryPath")
                     || record instanceof TableOverride
                     || record instanceof Strategy && name.equals("fallback")
                     || record instanceof Conditional && (name.equals("property") || name.equals("value"));

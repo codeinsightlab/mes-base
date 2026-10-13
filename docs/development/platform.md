@@ -432,3 +432,33 @@ Vite 与部署 Nginx 模板补入文档/精确 schema 代理；应用管理工�
 管理页接口授权多行 Checkbox 改为自动高度，保持弹窗 body 滚动及固定底部；列表时间列适当加宽。
 这是原恢复版本未完整适配当前 Element Plus 默认高度导致的显示异常，不修改权限保存与凭证业务。
 实际浏览器验证与测试记录见实施报告；后端新增 Controller 必须重新编译加载后才能访问文档入口。
+
+### 2026-10-13：删除菜单的关联清理与启动审查容错
+
+用户在清理菜单后遇到 MenuScopePolicy.require / Menu does not exist 导致启动失败。
+根因是 SystemPermissionService.installEndpointScopes 的启动审查读取 sys_role_menu 中工厂角色
+的菜单 ID，但已删除菜单的历史关联仍被当作有效菜单强制解析。require 也用于新授权写入，
+不能通过全局关闭它的存在性校验来解决。
+
+本轮新增 MenuScopePolicy.find，启动/管理审查跳过不存在菜单的历史关联并记录数量警告；
+权限读取原有 SQL 内连接 sys_menu，失效关联不会授予权限。仍存在的工厂角色平台菜单授权、
+跨平台/业务重复权限码、层级循环继续拒绝；新建/修改角色明确提交不存在菜单时仍由 require
+拒绝。没有通过猜测把缺失菜单归为业务菜单，也没有全局放宽授权。
+
+正常菜单删除现在允许菜单已分配给角色：Controller 移除“已分配不能删除”拦截，Service 使用
+原 masterTransactionManager 事务删除对应 sys_role_menu 关联及菜单，并继续审查真实授权。
+不删除角色、用户或其他菜单关联。有子菜单仍拒绝，Service 也保留该保护；审查或数据库失败时
+菜单与关联一起回滚。删除已废弃的 checkMenuExistRole 接口/实现/Mapper 查询，避免留下失效分支。
+直接 SQL 删除历史菜单的孤儿关联不会在启动时自动清理数据库，只忽略其无效授权。
+
+验证：全 reactor 生产源码 `mvn -B -ntp -DskipTests compile` 通过。`mvn -B -ntp test`
+在旧 mes-business 测试编译阶段失败，测试仍引用已移除的 dev.mesbase.modules.dv/material/md/pro/qc
+类，保留用户现有业务与生成器改动，未以删除这些测试来伪造整仓通过。
+
+隔离编译执行 MenuDeletionTest、RoleScopePermissionTest、MenuScopePolicyTest 共 12 项全部通过；
+加载当前 reactor classes、实际中心 Mapper/XML、H2 与 Spring 事务代理，验证包含孤儿关联的
+Spring 上下文启动、权限不扩大、真实 Controller → Service 删除、角色保留、其他关联保留、
+事务回滚、子菜单保护及显式不存在菜单授权拒绝。新增测试在 src/test，临时执行器仅在
+ target/menu-deletion-check，原始日志 /private/tmp/menu-delete-focused-test.log。
+Java IDEA 格式化与 diff 检查通过。未执行真实数据库清理、重启服务或部署；不声明实际应用
+已启动或完整 Maven 测试已通过，用户需加载新编译产物后重启验证原故障。

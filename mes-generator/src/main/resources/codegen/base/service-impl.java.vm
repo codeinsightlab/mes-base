@@ -233,16 +233,23 @@ public class ${ClassName}ServiceImpl implements ${servicePackage}.I${ClassName}S
     }
 
     private static boolean same(${domainPackage}.${ClassName}Entity row, ${syncPackage}.External${ClassName} input) {
-        return true
-#foreach($field in $syncWritableFields)
-#if($field.decimal)
-                && (row.${field.getter}() == null ? input.${field.name}() == null
-                    : input.${field.name}() != null && row.${field.getter}().compareTo(input.${field.name}()) == 0)
+#if($syncWritableFields.isEmpty())
+        return true;
 #else
-                && java.util.Objects.deepEquals(row.${field.getter}(), input.${field.name}())
+#foreach($field in $syncWritableFields)
+#if($foreach.first)
+#set($comparisonPrefix = "        return")
+#else
+#set($comparisonPrefix = "                &&")
+#end
+#if($field.decimal)
+${comparisonPrefix} (row.${field.getter}() == null ? input.${field.name}() == null
+                    : input.${field.name}() != null && row.${field.getter}().compareTo(input.${field.name}()) == 0)#if($foreach.last);#end
+#else
+${comparisonPrefix} java.util.Objects.deepEquals(row.${field.getter}(), input.${field.name}())#if($foreach.last);#end
 #end
 #end
-                ;
+#end
     }
 #end
 }

@@ -21,10 +21,13 @@ import java.util.Set;
 
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 @Service
 @ConditionalOnProperty(name = "mes.system.enabled", havingValue = "true")
 public class SystemPermissionService {
+    private static final Logger LOG = LoggerFactory.getLogger(SystemPermissionService.class);
     private final SysMenuMapper menus;
     private final SysRoleMapper roles;
     private final ManagedFactoryMapper factories;
@@ -108,9 +111,17 @@ public class SystemPermissionService {
                     throw new ServiceException("权限码跨平台/业务范围复用: " + code);
             }
         }
-        for (Long id : menus.selectFactoryAssignedMenuIds())
-            if (policy.platform(policy.require(id)))
+        int missing = 0;
+        for (Long id : menus.selectFactoryAssignedMenuIds()) {
+            var menu = policy.find(id);
+            if (menu.isEmpty()) {
+                missing++;
+                continue;
+            }
+            if (policy.platform(menu.get()))
                 throw new ServiceException("工厂角色存在平台菜单授权，需修正菜单编号: " + id);
+        }
+        if (missing > 0) LOG.warn("菜单授权审查跳过 {} 个已删除菜单的工厂角色历史关联，失效关联不授予权限", missing);
     }
 
     public boolean hasPlatformRole(String user) {

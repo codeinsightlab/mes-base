@@ -245,14 +245,12 @@ public class SafetyStockServiceImpl implements ISafetyStockService {
     }
 
     private static boolean same(SafetyStockEntity row, ExternalSafetyStock input) {
-        return true
-                && Objects.deepEquals(row.getMaterialId(), input.materialId())
+        return Objects.deepEquals(row.getMaterialId(), input.materialId())
                 && (row.getMinQty() == null ? input.minQty() == null
                     : input.minQty() != null && row.getMinQty().compareTo(input.minQty()) == 0)
                 && (row.getMaxQty() == null ? input.maxQty() == null
                     : input.maxQty() != null && row.getMaxQty().compareTo(input.maxQty()) == 0)
-                && Objects.deepEquals(row.getStatus(), input.status())
-                ;
+                && Objects.deepEquals(row.getStatus(), input.status());
     }
 }
 

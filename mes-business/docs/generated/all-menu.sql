@@ -2,7 +2,8 @@
 
 -- 来源：docs/generated/basic/material-menu.sql
 -- MES-CODEGEN: reviewed add-or-update menu SQL; no role grants.
--- Keep existing menu IDs and role bindings. Execute serially in the configured menu database.
+-- 保留已有菜单 ID 和角色绑定，请在配置的菜单数据库串行执行。
+-- 目录按 parentId + directoryPath 定位，显示名称不作为目录唯一标识。
 
 UPDATE sys_menu SET menu_name = '基础数据', order_num = 0, icon = 'list'
 WHERE parent_id = 0 AND path = 'basic' AND menu_type = 'M';
@@ -87,7 +88,8 @@ WHERE page.perms = 'business:material:list' AND page.menu_type = 'C'
 
 -- 来源：docs/generated/basic/materialCategory-menu.sql
 -- MES-CODEGEN: reviewed add-or-update menu SQL; no role grants.
--- Keep existing menu IDs and role bindings. Execute serially in the configured menu database.
+-- 保留已有菜单 ID 和角色绑定，请在配置的菜单数据库串行执行。
+-- 目录按 parentId + directoryPath 定位，显示名称不作为目录唯一标识。
 
 UPDATE sys_menu SET menu_name = '基础数据', order_num = 0, icon = 'list'
 WHERE parent_id = 0 AND path = 'basic' AND menu_type = 'M';
@@ -172,7 +174,8 @@ WHERE page.perms = 'business:material:category:list' AND page.menu_type = 'C'
 
 -- 来源：docs/generated/basic/safetyStock-menu.sql
 -- MES-CODEGEN: reviewed add-or-update menu SQL; no role grants.
--- Keep existing menu IDs and role bindings. Execute serially in the configured menu database.
+-- 保留已有菜单 ID 和角色绑定，请在配置的菜单数据库串行执行。
+-- 目录按 parentId + directoryPath 定位，显示名称不作为目录唯一标识。
 
 UPDATE sys_menu SET menu_name = '基础数据', order_num = 0, icon = 'list'
 WHERE parent_id = 0 AND path = 'basic' AND menu_type = 'M';
@@ -257,7 +260,8 @@ WHERE page.perms = 'business:safety:stock:list' AND page.menu_type = 'C'
 
 -- 来源：docs/generated/basic/unitMeasure-menu.sql
 -- MES-CODEGEN: reviewed add-or-update menu SQL; no role grants.
--- Keep existing menu IDs and role bindings. Execute serially in the configured menu database.
+-- 保留已有菜单 ID 和角色绑定，请在配置的菜单数据库串行执行。
+-- 目录按 parentId + directoryPath 定位，显示名称不作为目录唯一标识。
 
 UPDATE sys_menu SET menu_name = '基础数据', order_num = 0, icon = 'list'
 WHERE parent_id = 0 AND path = 'basic' AND menu_type = 'M';
@@ -342,7 +346,8 @@ WHERE page.perms = 'business:unit:measure:list' AND page.menu_type = 'C'
 
 -- 来源：docs/generated/basic/workshop-menu.sql
 -- MES-CODEGEN: reviewed add-or-update menu SQL; no role grants.
--- Keep existing menu IDs and role bindings. Execute serially in the configured menu database.
+-- 保留已有菜单 ID 和角色绑定，请在配置的菜单数据库串行执行。
+-- 目录按 parentId + directoryPath 定位，显示名称不作为目录唯一标识。
 
 UPDATE sys_menu SET menu_name = '基础数据', order_num = 0, icon = 'list'
 WHERE parent_id = 0 AND path = 'basic' AND menu_type = 'M';
@@ -427,7 +432,8 @@ WHERE page.perms = 'business:workshop:list' AND page.menu_type = 'C'
 
 -- 来源：docs/generated/basic/workstation-menu.sql
 -- MES-CODEGEN: reviewed add-or-update menu SQL; no role grants.
--- Keep existing menu IDs and role bindings. Execute serially in the configured menu database.
+-- 保留已有菜单 ID 和角色绑定，请在配置的菜单数据库串行执行。
+-- 目录按 parentId + directoryPath 定位，显示名称不作为目录唯一标识。
 
 UPDATE sys_menu SET menu_name = '基础数据', order_num = 0, icon = 'list'
 WHERE parent_id = 0 AND path = 'basic' AND menu_type = 'M';
@@ -512,26 +518,27 @@ WHERE page.perms = 'business:workstation:list' AND page.menu_type = 'C'
 
 -- 来源：docs/generated/dv/dvSubject-menu.sql
 -- MES-CODEGEN: reviewed add-or-update menu SQL; no role grants.
--- Keep existing menu IDs and role bindings. Execute serially in the configured menu database.
+-- 保留已有菜单 ID 和角色绑定，请在配置的菜单数据库串行执行。
+-- 目录按 parentId + directoryPath 定位，显示名称不作为目录唯一标识。
 
 UPDATE sys_menu SET menu_name = '基础数据', order_num = 0, icon = 'list'
-WHERE parent_id = 0 AND path = 'dv' AND menu_type = 'M';
+WHERE parent_id = 0 AND path = 'basic' AND menu_type = 'M';
 INSERT INTO sys_menu (menu_name, parent_id, order_num, path, menu_type, icon, create_by, create_time)
-SELECT '基础数据', 0, 0, 'dv', 'M', 'list', 'codegen', CURRENT_TIMESTAMP
+SELECT '基础数据', 0, 0, 'basic', 'M', 'list', 'codegen', CURRENT_TIMESTAMP
 WHERE NOT EXISTS (
-    SELECT 1 FROM sys_menu WHERE parent_id = 0 AND path = 'dv' AND menu_type = 'M'
+    SELECT 1 FROM sys_menu WHERE parent_id = 0 AND path = 'basic' AND menu_type = 'M'
 );
 
 UPDATE sys_menu SET menu_name = '设备点检保养项目', order_num = 0, path = 'dvSubject',
     component = 'dv/dvSubject/index', icon = 'list',
     parent_id = (SELECT directory.menu_id FROM (SELECT menu_id FROM sys_menu
-        WHERE parent_id = 0 AND path = 'dv' AND menu_type = 'M') directory)
+        WHERE parent_id = 0 AND path = 'basic' AND menu_type = 'M') directory)
 WHERE perms = 'business:dv:subject:list' AND menu_type = 'C';
 INSERT INTO sys_menu (menu_name, parent_id, order_num, path, component, menu_type, perms, icon, create_by, create_time)
 SELECT '设备点检保养项目', directory.menu_id, 0, 'dvSubject', 'dv/dvSubject/index',
        'C', 'business:dv:subject:list', 'list', 'codegen', CURRENT_TIMESTAMP
 FROM sys_menu directory
-WHERE directory.parent_id = 0 AND directory.path = 'dv' AND directory.menu_type = 'M'
+WHERE directory.parent_id = 0 AND directory.path = 'basic' AND directory.menu_type = 'M'
   AND NOT EXISTS (SELECT 1 FROM sys_menu WHERE perms = 'business:dv:subject:list' AND menu_type = 'C');
 
 UPDATE sys_menu SET menu_name = '设备点检保养项目列表', order_num = 0, path = '#',
@@ -597,26 +604,27 @@ WHERE page.perms = 'business:dv:subject:list' AND page.menu_type = 'C'
 
 -- 来源：docs/generated/md/mdUnitMeasure-menu.sql
 -- MES-CODEGEN: reviewed add-or-update menu SQL; no role grants.
--- Keep existing menu IDs and role bindings. Execute serially in the configured menu database.
+-- 保留已有菜单 ID 和角色绑定，请在配置的菜单数据库串行执行。
+-- 目录按 parentId + directoryPath 定位，显示名称不作为目录唯一标识。
 
 UPDATE sys_menu SET menu_name = '基础数据', order_num = 0, icon = 'list'
-WHERE parent_id = 0 AND path = 'md' AND menu_type = 'M';
+WHERE parent_id = 0 AND path = 'basic' AND menu_type = 'M';
 INSERT INTO sys_menu (menu_name, parent_id, order_num, path, menu_type, icon, create_by, create_time)
-SELECT '基础数据', 0, 0, 'md', 'M', 'list', 'codegen', CURRENT_TIMESTAMP
+SELECT '基础数据', 0, 0, 'basic', 'M', 'list', 'codegen', CURRENT_TIMESTAMP
 WHERE NOT EXISTS (
-    SELECT 1 FROM sys_menu WHERE parent_id = 0 AND path = 'md' AND menu_type = 'M'
+    SELECT 1 FROM sys_menu WHERE parent_id = 0 AND path = 'basic' AND menu_type = 'M'
 );
 
 UPDATE sys_menu SET menu_name = '计量单位', order_num = 0, path = 'mdUnitMeasure',
     component = 'md/mdUnitMeasure/index', icon = 'list',
     parent_id = (SELECT directory.menu_id FROM (SELECT menu_id FROM sys_menu
-        WHERE parent_id = 0 AND path = 'md' AND menu_type = 'M') directory)
+        WHERE parent_id = 0 AND path = 'basic' AND menu_type = 'M') directory)
 WHERE perms = 'business:md:unit:measure:list' AND menu_type = 'C';
 INSERT INTO sys_menu (menu_name, parent_id, order_num, path, component, menu_type, perms, icon, create_by, create_time)
 SELECT '计量单位', directory.menu_id, 0, 'mdUnitMeasure', 'md/mdUnitMeasure/index',
        'C', 'business:md:unit:measure:list', 'list', 'codegen', CURRENT_TIMESTAMP
 FROM sys_menu directory
-WHERE directory.parent_id = 0 AND directory.path = 'md' AND directory.menu_type = 'M'
+WHERE directory.parent_id = 0 AND directory.path = 'basic' AND directory.menu_type = 'M'
   AND NOT EXISTS (SELECT 1 FROM sys_menu WHERE perms = 'business:md:unit:measure:list' AND menu_type = 'C');
 
 UPDATE sys_menu SET menu_name = '计量单位列表', order_num = 0, path = '#',
@@ -682,26 +690,27 @@ WHERE page.perms = 'business:md:unit:measure:list' AND page.menu_type = 'C'
 
 -- 来源：docs/generated/md/mdWorkshop-menu.sql
 -- MES-CODEGEN: reviewed add-or-update menu SQL; no role grants.
--- Keep existing menu IDs and role bindings. Execute serially in the configured menu database.
+-- 保留已有菜单 ID 和角色绑定，请在配置的菜单数据库串行执行。
+-- 目录按 parentId + directoryPath 定位，显示名称不作为目录唯一标识。
 
 UPDATE sys_menu SET menu_name = '基础数据', order_num = 0, icon = 'list'
-WHERE parent_id = 0 AND path = 'md' AND menu_type = 'M';
+WHERE parent_id = 0 AND path = 'basic' AND menu_type = 'M';
 INSERT INTO sys_menu (menu_name, parent_id, order_num, path, menu_type, icon, create_by, create_time)
-SELECT '基础数据', 0, 0, 'md', 'M', 'list', 'codegen', CURRENT_TIMESTAMP
+SELECT '基础数据', 0, 0, 'basic', 'M', 'list', 'codegen', CURRENT_TIMESTAMP
 WHERE NOT EXISTS (
-    SELECT 1 FROM sys_menu WHERE parent_id = 0 AND path = 'md' AND menu_type = 'M'
+    SELECT 1 FROM sys_menu WHERE parent_id = 0 AND path = 'basic' AND menu_type = 'M'
 );
 
 UPDATE sys_menu SET menu_name = '车间', order_num = 0, path = 'mdWorkshop',
     component = 'md/mdWorkshop/index', icon = 'list',
     parent_id = (SELECT directory.menu_id FROM (SELECT menu_id FROM sys_menu
-        WHERE parent_id = 0 AND path = 'md' AND menu_type = 'M') directory)
+        WHERE parent_id = 0 AND path = 'basic' AND menu_type = 'M') directory)
 WHERE perms = 'business:md:workshop:list' AND menu_type = 'C';
 INSERT INTO sys_menu (menu_name, parent_id, order_num, path, component, menu_type, perms, icon, create_by, create_time)
 SELECT '车间', directory.menu_id, 0, 'mdWorkshop', 'md/mdWorkshop/index',
        'C', 'business:md:workshop:list', 'list', 'codegen', CURRENT_TIMESTAMP
 FROM sys_menu directory
-WHERE directory.parent_id = 0 AND directory.path = 'md' AND directory.menu_type = 'M'
+WHERE directory.parent_id = 0 AND directory.path = 'basic' AND directory.menu_type = 'M'
   AND NOT EXISTS (SELECT 1 FROM sys_menu WHERE perms = 'business:md:workshop:list' AND menu_type = 'C');
 
 UPDATE sys_menu SET menu_name = '车间列表', order_num = 0, path = '#',
@@ -767,26 +776,27 @@ WHERE page.perms = 'business:md:workshop:list' AND page.menu_type = 'C'
 
 -- 来源：docs/generated/pro/proWorkorder-menu.sql
 -- MES-CODEGEN: reviewed add-or-update menu SQL; no role grants.
--- Keep existing menu IDs and role bindings. Execute serially in the configured menu database.
+-- 保留已有菜单 ID 和角色绑定，请在配置的菜单数据库串行执行。
+-- 目录按 parentId + directoryPath 定位，显示名称不作为目录唯一标识。
 
 UPDATE sys_menu SET menu_name = '基础数据', order_num = 0, icon = 'list'
-WHERE parent_id = 0 AND path = 'pro' AND menu_type = 'M';
+WHERE parent_id = 0 AND path = 'basic' AND menu_type = 'M';
 INSERT INTO sys_menu (menu_name, parent_id, order_num, path, menu_type, icon, create_by, create_time)
-SELECT '基础数据', 0, 0, 'pro', 'M', 'list', 'codegen', CURRENT_TIMESTAMP
+SELECT '基础数据', 0, 0, 'basic', 'M', 'list', 'codegen', CURRENT_TIMESTAMP
 WHERE NOT EXISTS (
-    SELECT 1 FROM sys_menu WHERE parent_id = 0 AND path = 'pro' AND menu_type = 'M'
+    SELECT 1 FROM sys_menu WHERE parent_id = 0 AND path = 'basic' AND menu_type = 'M'
 );
 
 UPDATE sys_menu SET menu_name = '生产工单', order_num = 0, path = 'proWorkorder',
     component = 'pro/proWorkorder/index', icon = 'list',
     parent_id = (SELECT directory.menu_id FROM (SELECT menu_id FROM sys_menu
-        WHERE parent_id = 0 AND path = 'pro' AND menu_type = 'M') directory)
+        WHERE parent_id = 0 AND path = 'basic' AND menu_type = 'M') directory)
 WHERE perms = 'business:pro:workorder:list' AND menu_type = 'C';
 INSERT INTO sys_menu (menu_name, parent_id, order_num, path, component, menu_type, perms, icon, create_by, create_time)
 SELECT '生产工单', directory.menu_id, 0, 'proWorkorder', 'pro/proWorkorder/index',
        'C', 'business:pro:workorder:list', 'list', 'codegen', CURRENT_TIMESTAMP
 FROM sys_menu directory
-WHERE directory.parent_id = 0 AND directory.path = 'pro' AND directory.menu_type = 'M'
+WHERE directory.parent_id = 0 AND directory.path = 'basic' AND directory.menu_type = 'M'
   AND NOT EXISTS (SELECT 1 FROM sys_menu WHERE perms = 'business:pro:workorder:list' AND menu_type = 'C');
 
 UPDATE sys_menu SET menu_name = '生产工单列表', order_num = 0, path = '#',
@@ -852,26 +862,27 @@ WHERE page.perms = 'business:pro:workorder:list' AND page.menu_type = 'C'
 
 -- 来源：docs/generated/qc/qcDefect-menu.sql
 -- MES-CODEGEN: reviewed add-or-update menu SQL; no role grants.
--- Keep existing menu IDs and role bindings. Execute serially in the configured menu database.
+-- 保留已有菜单 ID 和角色绑定，请在配置的菜单数据库串行执行。
+-- 目录按 parentId + directoryPath 定位，显示名称不作为目录唯一标识。
 
 UPDATE sys_menu SET menu_name = '基础数据', order_num = 0, icon = 'list'
-WHERE parent_id = 0 AND path = 'qc' AND menu_type = 'M';
+WHERE parent_id = 0 AND path = 'basic' AND menu_type = 'M';
 INSERT INTO sys_menu (menu_name, parent_id, order_num, path, menu_type, icon, create_by, create_time)
-SELECT '基础数据', 0, 0, 'qc', 'M', 'list', 'codegen', CURRENT_TIMESTAMP
+SELECT '基础数据', 0, 0, 'basic', 'M', 'list', 'codegen', CURRENT_TIMESTAMP
 WHERE NOT EXISTS (
-    SELECT 1 FROM sys_menu WHERE parent_id = 0 AND path = 'qc' AND menu_type = 'M'
+    SELECT 1 FROM sys_menu WHERE parent_id = 0 AND path = 'basic' AND menu_type = 'M'
 );
 
 UPDATE sys_menu SET menu_name = '质量缺陷', order_num = 0, path = 'qcDefect',
     component = 'qc/qcDefect/index', icon = 'list',
     parent_id = (SELECT directory.menu_id FROM (SELECT menu_id FROM sys_menu
-        WHERE parent_id = 0 AND path = 'qc' AND menu_type = 'M') directory)
+        WHERE parent_id = 0 AND path = 'basic' AND menu_type = 'M') directory)
 WHERE perms = 'business:qc:defect:list' AND menu_type = 'C';
 INSERT INTO sys_menu (menu_name, parent_id, order_num, path, component, menu_type, perms, icon, create_by, create_time)
 SELECT '质量缺陷', directory.menu_id, 0, 'qcDefect', 'qc/qcDefect/index',
        'C', 'business:qc:defect:list', 'list', 'codegen', CURRENT_TIMESTAMP
 FROM sys_menu directory
-WHERE directory.parent_id = 0 AND directory.path = 'qc' AND directory.menu_type = 'M'
+WHERE directory.parent_id = 0 AND directory.path = 'basic' AND directory.menu_type = 'M'
   AND NOT EXISTS (SELECT 1 FROM sys_menu WHERE perms = 'business:qc:defect:list' AND menu_type = 'C');
 
 UPDATE sys_menu SET menu_name = '质量缺陷列表', order_num = 0, path = '#',
@@ -937,26 +948,27 @@ WHERE page.perms = 'business:qc:defect:list' AND page.menu_type = 'C'
 
 -- 来源：docs/generated/qc/qcIndex-menu.sql
 -- MES-CODEGEN: reviewed add-or-update menu SQL; no role grants.
--- Keep existing menu IDs and role bindings. Execute serially in the configured menu database.
+-- 保留已有菜单 ID 和角色绑定，请在配置的菜单数据库串行执行。
+-- 目录按 parentId + directoryPath 定位，显示名称不作为目录唯一标识。
 
 UPDATE sys_menu SET menu_name = '基础数据', order_num = 0, icon = 'list'
-WHERE parent_id = 0 AND path = 'qc' AND menu_type = 'M';
+WHERE parent_id = 0 AND path = 'basic' AND menu_type = 'M';
 INSERT INTO sys_menu (menu_name, parent_id, order_num, path, menu_type, icon, create_by, create_time)
-SELECT '基础数据', 0, 0, 'qc', 'M', 'list', 'codegen', CURRENT_TIMESTAMP
+SELECT '基础数据', 0, 0, 'basic', 'M', 'list', 'codegen', CURRENT_TIMESTAMP
 WHERE NOT EXISTS (
-    SELECT 1 FROM sys_menu WHERE parent_id = 0 AND path = 'qc' AND menu_type = 'M'
+    SELECT 1 FROM sys_menu WHERE parent_id = 0 AND path = 'basic' AND menu_type = 'M'
 );
 
 UPDATE sys_menu SET menu_name = '质量检测项', order_num = 0, path = 'qcIndex',
     component = 'qc/qcIndex/index', icon = 'list',
     parent_id = (SELECT directory.menu_id FROM (SELECT menu_id FROM sys_menu
-        WHERE parent_id = 0 AND path = 'qc' AND menu_type = 'M') directory)
+        WHERE parent_id = 0 AND path = 'basic' AND menu_type = 'M') directory)
 WHERE perms = 'business:qc:index:list' AND menu_type = 'C';
 INSERT INTO sys_menu (menu_name, parent_id, order_num, path, component, menu_type, perms, icon, create_by, create_time)
 SELECT '质量检测项', directory.menu_id, 0, 'qcIndex', 'qc/qcIndex/index',
        'C', 'business:qc:index:list', 'list', 'codegen', CURRENT_TIMESTAMP
 FROM sys_menu directory
-WHERE directory.parent_id = 0 AND directory.path = 'qc' AND directory.menu_type = 'M'
+WHERE directory.parent_id = 0 AND directory.path = 'basic' AND directory.menu_type = 'M'
   AND NOT EXISTS (SELECT 1 FROM sys_menu WHERE perms = 'business:qc:index:list' AND menu_type = 'C');
 
 UPDATE sys_menu SET menu_name = '质量检测项列表', order_num = 0, path = '#',

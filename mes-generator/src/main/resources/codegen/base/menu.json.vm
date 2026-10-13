@@ -2,7 +2,7 @@
   "_generatedBy": "MES-CODEGEN",
   "id": "${moduleName}:${className}",
   "name": "${functionName}",
-  "path": "/${moduleName}/${className}",
+  "path": "/${menuDirectoryPath}/${className}",
   "component": "${pageComponent}",
   "permission": "${permission}:${listAction}",
   "permissionScope": "${permissionScope}",
