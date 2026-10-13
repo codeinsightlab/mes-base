@@ -12,11 +12,11 @@ import jakarta.validation.constraints.Size;
 public record WorkstationQueryDto(
         @Min(0) Integer offset,
         @Min(1) @Max(100) Integer limit,
-        @Size(max = 64) String code,
-        @Size(max = 255) String name,
+        @Size(max=64) String code,
+        @Size(max=255) String name,
         Long workshopId,
-        @Size(max = 16) String status,
-        @Size(max = 500) String remark
+        @Size(max=16) String status,
+        @Size(max=500) String remark
 ) implements BusinessCacheQuery {
     @Override
     public int cacheOffset() {

@@ -21,8 +21,7 @@ public interface MaterialCategoryMapper {
 
     MaterialCategoryEntity selectByPrimaryKey(Long id);
 
-    int updateByExampleSelective(@Param("row") MaterialCategoryEntity row,
-                                 @Param("example") MaterialCategoryExample example);
+    int updateByExampleSelective(@Param("row") MaterialCategoryEntity row, @Param("example") MaterialCategoryExample example);
 
     int updateByExample(@Param("row") MaterialCategoryEntity row, @Param("example") MaterialCategoryExample example);
 

@@ -27,9 +27,7 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.springframework.transaction.annotation.Transactional;
 
-/**
- * TEST ONLY: scaffold contracts; add real business and database acceptance.
- */
+/** TEST ONLY: scaffold contracts; add real business and database acceptance. */
 public class WorkshopScaffoldTest {
     @Test
     void contractsStayScoped() {

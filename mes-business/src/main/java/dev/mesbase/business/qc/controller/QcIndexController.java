@@ -71,7 +71,7 @@ public class QcIndexController {
     @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED,
             permission = QcIndexPermissions.UPDATE)
     public QcIndexVo update(@PathVariable Long id,
-                            @Valid @RequestBody QcIndexUpdateCommand input) {
+            @Valid @RequestBody QcIndexUpdateCommand input) {
         return toView(service.updateById(id, input));
     }
 
@@ -80,8 +80,8 @@ public class QcIndexController {
     @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED,
             permission = QcIndexPermissions.DELETE)
     public void delete(@RequestBody
-                       @NotEmpty @Size(max = 100)
-                       List<@NotNull Long> ids) {
+            @NotEmpty @Size(max = 100)
+            List<@NotNull Long> ids) {
         service.deleteByIds(ids);
     }
 

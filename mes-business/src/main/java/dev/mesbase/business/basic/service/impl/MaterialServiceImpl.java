@@ -49,10 +49,10 @@ public class MaterialServiceImpl implements IMaterialService {
     private final BusinessCacheProcessor caches;
 
     public MaterialServiceImpl(MaterialMapper mapper,
-                               ObjectProvider<MaterialQueryPort> queries,
-                               SyncCoordinator coordinator,
-                               ObjectProvider<IMaterialService> self,
-                               Validator validator, BusinessCacheProcessor caches) {
+            ObjectProvider<MaterialQueryPort> queries,
+            SyncCoordinator coordinator,
+            ObjectProvider<IMaterialService> self,
+            Validator validator, BusinessCacheProcessor caches) {
         this.mapper = mapper;
         this.query = queries.getIfAvailable(UnconfiguredMaterialQueryAdapter::new);
         this.coordinator = coordinator;
@@ -84,10 +84,10 @@ public class MaterialServiceImpl implements IMaterialService {
             criteria.andSpecificationLike("%" + query.specification() + "%");
         }
         if (query.categoryId() != null) {
-            criteria.andCategoryIdEqualTo(query.categoryId());
+            criteria.andCategoryIdEqualTo( query.categoryId());
         }
         if (query.unitId() != null) {
-            criteria.andUnitIdEqualTo(query.unitId());
+            criteria.andUnitIdEqualTo( query.unitId());
         }
         if (query.materialType() != null) {
             criteria.andMaterialTypeLike("%" + query.materialType() + "%");
@@ -175,7 +175,7 @@ public class MaterialServiceImpl implements IMaterialService {
         for (var id : ids) requireRecord(id);
         example.createCriteria().andIdIn(ids)
                 .andFactoryIdEqualTo(FactoryContext.required().factoryId().value())
-        ;
+                ;
         if (mapper.deleteByExample(example) != ids.size()) {
             throw new FoundationException(ErrorCode.RESOURCE_CONFLICT);
         }
@@ -188,7 +188,6 @@ public class MaterialServiceImpl implements IMaterialService {
         }
         return row;
     }
-
     public MaterialSyncResult sync(FactoryScope scope) {
         if (!FactoryContext.required().equals(scope)) {
             throw new FoundationException(ErrorCode.CONFLICT);
@@ -213,7 +212,7 @@ public class MaterialServiceImpl implements IMaterialService {
 
     @Transactional(transactionManager = "businessTransactionManager", rollbackFor = Exception.class)
     public MaterialSyncResult upsert(FactoryScope scope,
-                                     List<ExternalMaterial> inputs) {
+                                       List<ExternalMaterial> inputs) {
         if (!FactoryContext.required().equals(scope)) {
             throw new FoundationException(ErrorCode.CONFLICT);
         }
@@ -230,7 +229,7 @@ public class MaterialServiceImpl implements IMaterialService {
         var example = new MaterialExample();
         example.createCriteria().andCodeIn(List.copyOf(keys))
                 .andFactoryIdEqualTo(scope.factoryId().value())
-        ;
+                ;
         var existing = new HashMap<String, MaterialEntity>();
         for (var row : mapper.selectByExample(example)) {
             if (existing.put(row.getCode(), row) != null) {
@@ -276,8 +275,8 @@ public class MaterialServiceImpl implements IMaterialService {
     }
 
     private static boolean same(MaterialEntity row, ExternalMaterial input) {
-        return
-                &&Objects.deepEquals(row.getCode(), input.code())
+        return true
+                && Objects.deepEquals(row.getCode(), input.code())
                 && Objects.deepEquals(row.getName(), input.name())
                 && Objects.deepEquals(row.getSpecification(), input.specification())
                 && Objects.deepEquals(row.getCategoryId(), input.categoryId())
@@ -286,7 +285,7 @@ public class MaterialServiceImpl implements IMaterialService {
                 && Objects.deepEquals(row.getStatus(), input.status())
                 && Objects.deepEquals(row.getExternalId(), input.externalId())
                 && Objects.deepEquals(row.getExternalCode(), input.externalCode())
-        ;
+                ;
     }
 }
 

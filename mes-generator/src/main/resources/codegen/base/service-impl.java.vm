@@ -233,7 +233,7 @@ public class ${ClassName}ServiceImpl implements ${servicePackage}.I${ClassName}S
     }
 
     private static boolean same(${domainPackage}.${ClassName}Entity row, ${syncPackage}.External${ClassName} input) {
-        return
+        return true
 #foreach($field in $syncWritableFields)
 #if($field.decimal)
                 && (row.${field.getter}() == null ? input.${field.name}() == null

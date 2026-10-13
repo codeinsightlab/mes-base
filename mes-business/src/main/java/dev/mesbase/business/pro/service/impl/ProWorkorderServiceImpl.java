@@ -49,10 +49,10 @@ public class ProWorkorderServiceImpl implements IProWorkorderService {
     private final BusinessCacheProcessor caches;
 
     public ProWorkorderServiceImpl(ProWorkorderMapper mapper,
-                                   ObjectProvider<ProWorkorderQueryPort> queries,
-                                   SyncCoordinator coordinator,
-                                   ObjectProvider<IProWorkorderService> self,
-                                   Validator validator, BusinessCacheProcessor caches) {
+            ObjectProvider<ProWorkorderQueryPort> queries,
+            SyncCoordinator coordinator,
+            ObjectProvider<IProWorkorderService> self,
+            Validator validator, BusinessCacheProcessor caches) {
         this.mapper = mapper;
         this.query = queries.getIfAvailable(UnconfiguredProWorkorderQueryAdapter::new);
         this.coordinator = coordinator;
@@ -86,7 +86,7 @@ public class ProWorkorderServiceImpl implements IProWorkorderService {
             criteria.andSourceCodeLike("%" + query.sourceCode() + "%");
         }
         if (query.productId() != null) {
-            criteria.andProductIdEqualTo(query.productId());
+            criteria.andProductIdEqualTo( query.productId());
         }
         if (query.productCode() != null) {
             criteria.andProductCodeLike("%" + query.productCode() + "%");
@@ -101,19 +101,19 @@ public class ProWorkorderServiceImpl implements IProWorkorderService {
             criteria.andUnitOfMeasureLike("%" + query.unitOfMeasure() + "%");
         }
         if (query.quantity() != null) {
-            criteria.andQuantityEqualTo(query.quantity());
+            criteria.andQuantityEqualTo( query.quantity());
         }
         if (query.quantityProduced() != null) {
-            criteria.andQuantityProducedEqualTo(query.quantityProduced());
+            criteria.andQuantityProducedEqualTo( query.quantityProduced());
         }
         if (query.quantityChanged() != null) {
-            criteria.andQuantityChangedEqualTo(query.quantityChanged());
+            criteria.andQuantityChangedEqualTo( query.quantityChanged());
         }
         if (query.quantityScheduled() != null) {
-            criteria.andQuantityScheduledEqualTo(query.quantityScheduled());
+            criteria.andQuantityScheduledEqualTo( query.quantityScheduled());
         }
         if (query.clientId() != null) {
-            criteria.andClientIdEqualTo(query.clientId());
+            criteria.andClientIdEqualTo( query.clientId());
         }
         if (query.clientCode() != null) {
             criteria.andClientCodeLike("%" + query.clientCode() + "%");
@@ -125,16 +125,16 @@ public class ProWorkorderServiceImpl implements IProWorkorderService {
             criteria.andBatchCodeLike("%" + query.batchCode() + "%");
         }
         if (query.requestDate() != null) {
-            criteria.andRequestDateEqualTo(query.requestDate());
+            criteria.andRequestDateEqualTo( query.requestDate());
         }
         if (query.parentId() != null) {
-            criteria.andParentIdEqualTo(query.parentId());
+            criteria.andParentIdEqualTo( query.parentId());
         }
         if (query.ancestors() != null) {
             criteria.andAncestorsLike("%" + query.ancestors() + "%");
         }
         if (query.finishDate() != null) {
-            criteria.andFinishDateEqualTo(query.finishDate());
+            criteria.andFinishDateEqualTo( query.finishDate());
         }
         if (query.status() != null) {
             criteria.andStatusLike("%" + query.status() + "%");
@@ -149,13 +149,13 @@ public class ProWorkorderServiceImpl implements IProWorkorderService {
             criteria.andAttr2Like("%" + query.attr2() + "%");
         }
         if (query.attr3() != null) {
-            criteria.andAttr3EqualTo(query.attr3());
+            criteria.andAttr3EqualTo( query.attr3());
         }
         if (query.attr4() != null) {
-            criteria.andAttr4EqualTo(query.attr4());
+            criteria.andAttr4EqualTo( query.attr4());
         }
         if (query.transactionDate() != null) {
-            criteria.andTransactionDateEqualTo(query.transactionDate());
+            criteria.andTransactionDateEqualTo( query.transactionDate());
         }
         if (query.moId() != null) {
             criteria.andMoIdLike("%" + query.moId() + "%");
@@ -272,7 +272,7 @@ public class ProWorkorderServiceImpl implements IProWorkorderService {
         ProWorkorderExample example = new ProWorkorderExample();
         for (var id : ids) requireRecord(id);
         example.createCriteria().andWorkorderIdIn(ids)
-        ;
+                ;
         if (mapper.deleteByExample(example) != ids.size()) {
             throw new FoundationException(ErrorCode.RESOURCE_CONFLICT);
         }
@@ -285,7 +285,6 @@ public class ProWorkorderServiceImpl implements IProWorkorderService {
         }
         return row;
     }
-
     public ProWorkorderSyncResult sync(FactoryScope scope) {
         if (!FactoryContext.required().equals(scope)) {
             throw new FoundationException(ErrorCode.CONFLICT);
@@ -310,7 +309,7 @@ public class ProWorkorderServiceImpl implements IProWorkorderService {
 
     @Transactional(transactionManager = "businessTransactionManager", rollbackFor = Exception.class)
     public ProWorkorderSyncResult upsert(FactoryScope scope,
-                                         List<ExternalProWorkorder> inputs) {
+                                       List<ExternalProWorkorder> inputs) {
         if (!FactoryContext.required().equals(scope)) {
             throw new FoundationException(ErrorCode.CONFLICT);
         }
@@ -326,7 +325,7 @@ public class ProWorkorderServiceImpl implements IProWorkorderService {
         if (inputs.isEmpty()) return new ProWorkorderSyncResult(0, 0, 0, 0);
         var example = new ProWorkorderExample();
         example.createCriteria().andWorkorderCodeIn(List.copyOf(keys))
-        ;
+                ;
         var existing = new HashMap<String, ProWorkorderEntity>();
         for (var row : mapper.selectByExample(example)) {
             if (existing.put(row.getWorkorderCode(), row) != null) {
@@ -391,8 +390,8 @@ public class ProWorkorderServiceImpl implements IProWorkorderService {
     }
 
     private static boolean same(ProWorkorderEntity row, ExternalProWorkorder input) {
-        return
-                &&Objects.deepEquals(row.getWorkorderCode(), input.workorderCode())
+        return true
+                && Objects.deepEquals(row.getWorkorderCode(), input.workorderCode())
                 && Objects.deepEquals(row.getWorkorderName(), input.workorderName())
                 && Objects.deepEquals(row.getOrderSource(), input.orderSource())
                 && Objects.deepEquals(row.getSourceCode(), input.sourceCode())
@@ -421,7 +420,7 @@ public class ProWorkorderServiceImpl implements IProWorkorderService {
                 && Objects.deepEquals(row.getAttr4(), input.attr4())
                 && Objects.deepEquals(row.getTransactionDate(), input.transactionDate())
                 && Objects.deepEquals(row.getMoId(), input.moId())
-        ;
+                ;
     }
 }
 

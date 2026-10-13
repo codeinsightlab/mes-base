@@ -26,10 +26,9 @@ public interface IWorkshopService {
     WorkshopEntity updateById(Long id, WorkshopUpdateCommand input);
 
     void deleteByIds(List<Long> ids);
-
     WorkshopSyncResult sync(FactoryScope scope);
 
     WorkshopSyncResult upsert(FactoryScope scope,
-                              List<ExternalWorkshop> inputs);
+            List<ExternalWorkshop> inputs);
 }
 

@@ -26,10 +26,9 @@ public interface IQcDefectService {
     QcDefectEntity updateById(Long id, QcDefectUpdateCommand input);
 
     void deleteByIds(List<Long> ids);
-
     QcDefectSyncResult sync(FactoryScope scope);
 
     QcDefectSyncResult upsert(FactoryScope scope,
-                              List<ExternalQcDefect> inputs);
+            List<ExternalQcDefect> inputs);
 }
 

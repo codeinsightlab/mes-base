@@ -71,7 +71,7 @@ public class QcDefectController {
     @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED,
             permission = QcDefectPermissions.UPDATE)
     public QcDefectVo update(@PathVariable Long id,
-                             @Valid @RequestBody QcDefectUpdateCommand input) {
+            @Valid @RequestBody QcDefectUpdateCommand input) {
         return toView(service.updateById(id, input));
     }
 
@@ -80,8 +80,8 @@ public class QcDefectController {
     @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED,
             permission = QcDefectPermissions.DELETE)
     public void delete(@RequestBody
-                       @NotEmpty @Size(max = 100)
-                       List<@NotNull Long> ids) {
+            @NotEmpty @Size(max = 100)
+            List<@NotNull Long> ids) {
         service.deleteByIds(ids);
     }
 

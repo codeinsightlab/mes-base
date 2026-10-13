@@ -12,12 +12,12 @@ import jakarta.validation.constraints.Size;
 public record QcIndexQueryDto(
         @Min(0) Integer offset,
         @Min(1) @Max(100) Integer limit,
-        @Size(max = 64) String factoryId,
-        @Size(max = 64) String indexCode,
-        @Size(max = 255) String indexName,
-        @Size(max = 64) String indexType,
-        @Size(max = 255) String qcTool,
-        @Size(max = 500) String remark
+        @Size(max=64) String factoryId,
+        @Size(max=64) String indexCode,
+        @Size(max=255) String indexName,
+        @Size(max=64) String indexType,
+        @Size(max=255) String qcTool,
+        @Size(max=500) String remark
 ) implements BusinessCacheQuery {
     @Override
     public int cacheOffset() {

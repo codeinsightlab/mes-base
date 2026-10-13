@@ -26,10 +26,9 @@ public interface IQcIndexService {
     QcIndexEntity updateById(Long id, QcIndexUpdateCommand input);
 
     void deleteByIds(List<Long> ids);
-
     QcIndexSyncResult sync(FactoryScope scope);
 
     QcIndexSyncResult upsert(FactoryScope scope,
-                             List<ExternalQcIndex> inputs);
+            List<ExternalQcIndex> inputs);
 }
 

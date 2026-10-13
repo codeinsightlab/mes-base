@@ -71,7 +71,7 @@ public class UnitMeasureController {
     @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED,
             permission = UnitMeasurePermissions.UPDATE)
     public UnitMeasureVo update(@PathVariable Long id,
-                                @Valid @RequestBody UnitMeasureUpdateCommand input) {
+            @Valid @RequestBody UnitMeasureUpdateCommand input) {
         return toView(service.updateById(id, input));
     }
 
@@ -80,8 +80,8 @@ public class UnitMeasureController {
     @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED,
             permission = UnitMeasurePermissions.DELETE)
     public void delete(@RequestBody
-                       @NotEmpty @Size(max = 100)
-                       List<@NotNull Long> ids) {
+            @NotEmpty @Size(max = 100)
+            List<@NotNull Long> ids) {
         service.deleteByIds(ids);
     }
 

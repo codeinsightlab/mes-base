@@ -49,10 +49,10 @@ public class QcIndexServiceImpl implements IQcIndexService {
     private final BusinessCacheProcessor caches;
 
     public QcIndexServiceImpl(QcIndexMapper mapper,
-                              ObjectProvider<QcIndexQueryPort> queries,
-                              SyncCoordinator coordinator,
-                              ObjectProvider<IQcIndexService> self,
-                              Validator validator, BusinessCacheProcessor caches) {
+            ObjectProvider<QcIndexQueryPort> queries,
+            SyncCoordinator coordinator,
+            ObjectProvider<IQcIndexService> self,
+            Validator validator, BusinessCacheProcessor caches) {
         this.mapper = mapper;
         this.query = queries.getIfAvailable(UnconfiguredQcIndexQueryAdapter::new);
         this.coordinator = coordinator;
@@ -157,7 +157,7 @@ public class QcIndexServiceImpl implements IQcIndexService {
         QcIndexExample example = new QcIndexExample();
         for (var id : ids) requireRecord(id);
         example.createCriteria().andIndexIdIn(ids)
-        ;
+                ;
         if (mapper.deleteByExample(example) != ids.size()) {
             throw new FoundationException(ErrorCode.RESOURCE_CONFLICT);
         }
@@ -170,7 +170,6 @@ public class QcIndexServiceImpl implements IQcIndexService {
         }
         return row;
     }
-
     public QcIndexSyncResult sync(FactoryScope scope) {
         if (!FactoryContext.required().equals(scope)) {
             throw new FoundationException(ErrorCode.CONFLICT);
@@ -195,7 +194,7 @@ public class QcIndexServiceImpl implements IQcIndexService {
 
     @Transactional(transactionManager = "businessTransactionManager", rollbackFor = Exception.class)
     public QcIndexSyncResult upsert(FactoryScope scope,
-                                    List<ExternalQcIndex> inputs) {
+                                       List<ExternalQcIndex> inputs) {
         if (!FactoryContext.required().equals(scope)) {
             throw new FoundationException(ErrorCode.CONFLICT);
         }
@@ -211,7 +210,7 @@ public class QcIndexServiceImpl implements IQcIndexService {
         if (inputs.isEmpty()) return new QcIndexSyncResult(0, 0, 0, 0);
         var example = new QcIndexExample();
         example.createCriteria().andIndexCodeIn(List.copyOf(keys))
-        ;
+                ;
         var existing = new HashMap<String, QcIndexEntity>();
         for (var row : mapper.selectByExample(example)) {
             if (existing.put(row.getIndexCode(), row) != null) {
@@ -253,14 +252,14 @@ public class QcIndexServiceImpl implements IQcIndexService {
     }
 
     private static boolean same(QcIndexEntity row, ExternalQcIndex input) {
-        return
-                &&Objects.deepEquals(row.getFactoryId(), input.factoryId())
+        return true
+                && Objects.deepEquals(row.getFactoryId(), input.factoryId())
                 && Objects.deepEquals(row.getIndexCode(), input.indexCode())
                 && Objects.deepEquals(row.getIndexName(), input.indexName())
                 && Objects.deepEquals(row.getIndexType(), input.indexType())
                 && Objects.deepEquals(row.getQcTool(), input.qcTool())
                 && Objects.deepEquals(row.getRemark(), input.remark())
-        ;
+                ;
     }
 }
 

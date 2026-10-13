@@ -8,10 +8,10 @@ import jakarta.validation.constraints.Size;
  * 计量单位写入参数，字段来自已审查的表结构。
  */
 public record UnitMeasureUpdateCommand(
-        @NotBlank @Size(max = 64) String code,
-        @NotBlank @Size(max = 255) String name,
-        @Size(max = 32) String symbol,
-        @NotBlank @Size(max = 16) String status
+        @NotBlank @Size(max=64) String code,
+        @NotBlank @Size(max=255) String name,
+        @Size(max=32) String symbol,
+        @NotBlank @Size(max=16) String status
 ) {
 }
 

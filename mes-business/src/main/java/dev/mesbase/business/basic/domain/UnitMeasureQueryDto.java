@@ -12,10 +12,10 @@ import jakarta.validation.constraints.Size;
 public record UnitMeasureQueryDto(
         @Min(0) Integer offset,
         @Min(1) @Max(100) Integer limit,
-        @Size(max = 64) String code,
-        @Size(max = 255) String name,
-        @Size(max = 32) String symbol,
-        @Size(max = 16) String status
+        @Size(max=64) String code,
+        @Size(max=255) String name,
+        @Size(max=32) String symbol,
+        @Size(max=16) String status
 ) implements BusinessCacheQuery {
     @Override
     public int cacheOffset() {

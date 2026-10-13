@@ -71,7 +71,7 @@ public class MdUnitMeasureController {
     @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED,
             permission = MdUnitMeasurePermissions.UPDATE)
     public MdUnitMeasureVo update(@PathVariable Long id,
-                                  @Valid @RequestBody MdUnitMeasureUpdateCommand input) {
+            @Valid @RequestBody MdUnitMeasureUpdateCommand input) {
         return toView(service.updateById(id, input));
     }
 
@@ -80,8 +80,8 @@ public class MdUnitMeasureController {
     @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED,
             permission = MdUnitMeasurePermissions.DELETE)
     public void delete(@RequestBody
-                       @NotEmpty @Size(max = 100)
-                       List<@NotNull Long> ids) {
+            @NotEmpty @Size(max = 100)
+            List<@NotNull Long> ids) {
         service.deleteByIds(ids);
     }
 

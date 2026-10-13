@@ -14,14 +14,14 @@ import java.math.BigDecimal;
 public record MdWorkshopQueryDto(
         @Min(0) Integer offset,
         @Min(1) @Max(100) Integer limit,
-        @Size(max = 64) String factoryId,
-        @Size(max = 64) String workshopCode,
-        @Size(max = 255) String workshopName,
-        @Digits(integer = 16, fraction = 2) BigDecimal area,
-        @Size(max = 64) String charge,
+        @Size(max=64) String factoryId,
+        @Size(max=64) String workshopCode,
+        @Size(max=255) String workshopName,
+        @Digits(integer=16,fraction=2) BigDecimal area,
+        @Size(max=64) String charge,
         Long deptId,
-        @Size(max = 1) String enableFlag,
-        @Size(max = 500) String remark
+        @Size(max=1) String enableFlag,
+        @Size(max=500) String remark
 ) implements BusinessCacheQuery {
     @Override
     public int cacheOffset() {

@@ -12,9 +12,9 @@ import java.math.BigDecimal;
  */
 public record SafetyStockCreateCommand(
         @NotNull Long materialId,
-        @NotNull @Digits(integer = 14, fraction = 4) BigDecimal minQty,
-        @Digits(integer = 14, fraction = 4) BigDecimal maxQty,
-        @NotBlank @Size(max = 16) String status
+        @NotNull @Digits(integer=14,fraction=4) BigDecimal minQty,
+        @Digits(integer=14,fraction=4) BigDecimal maxQty,
+        @NotBlank @Size(max=16) String status
 ) {
 }
 

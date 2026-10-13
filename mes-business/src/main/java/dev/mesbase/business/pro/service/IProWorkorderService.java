@@ -26,10 +26,9 @@ public interface IProWorkorderService {
     ProWorkorderEntity updateById(Long id, ProWorkorderUpdateCommand input);
 
     void deleteByIds(List<Long> ids);
-
     ProWorkorderSyncResult sync(FactoryScope scope);
 
     ProWorkorderSyncResult upsert(FactoryScope scope,
-                                  List<ExternalProWorkorder> inputs);
+            List<ExternalProWorkorder> inputs);
 }
 

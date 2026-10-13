@@ -12,12 +12,12 @@ import jakarta.validation.constraints.Size;
 public record QcDefectQueryDto(
         @Min(0) Integer offset,
         @Min(1) @Max(100) Integer limit,
-        @Size(max = 64) String factoryId,
-        @Size(max = 64) String defectCode,
-        @Size(max = 500) String defectName,
-        @Size(max = 64) String indexType,
-        @Size(max = 64) String defectLevel,
-        @Size(max = 500) String remark
+        @Size(max=64) String factoryId,
+        @Size(max=64) String defectCode,
+        @Size(max=500) String defectName,
+        @Size(max=64) String indexType,
+        @Size(max=64) String defectLevel,
+        @Size(max=500) String remark
 ) implements BusinessCacheQuery {
     @Override
     public int cacheOffset() {

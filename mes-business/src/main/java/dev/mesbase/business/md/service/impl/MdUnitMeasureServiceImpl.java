@@ -49,10 +49,10 @@ public class MdUnitMeasureServiceImpl implements IMdUnitMeasureService {
     private final BusinessCacheProcessor caches;
 
     public MdUnitMeasureServiceImpl(MdUnitMeasureMapper mapper,
-                                    ObjectProvider<MdUnitMeasureQueryPort> queries,
-                                    SyncCoordinator coordinator,
-                                    ObjectProvider<IMdUnitMeasureService> self,
-                                    Validator validator, BusinessCacheProcessor caches) {
+            ObjectProvider<MdUnitMeasureQueryPort> queries,
+            SyncCoordinator coordinator,
+            ObjectProvider<IMdUnitMeasureService> self,
+            Validator validator, BusinessCacheProcessor caches) {
         this.mapper = mapper;
         this.query = queries.getIfAvailable(UnconfiguredMdUnitMeasureQueryAdapter::new);
         this.coordinator = coordinator;
@@ -86,10 +86,10 @@ public class MdUnitMeasureServiceImpl implements IMdUnitMeasureService {
             criteria.andPrimaryFlagLike("%" + query.primaryFlag() + "%");
         }
         if (query.primaryId() != null) {
-            criteria.andPrimaryIdEqualTo(query.primaryId());
+            criteria.andPrimaryIdEqualTo( query.primaryId());
         }
         if (query.changeRate() != null) {
-            criteria.andChangeRateEqualTo(query.changeRate());
+            criteria.andChangeRateEqualTo( query.changeRate());
         }
         if (query.enableFlag() != null) {
             criteria.andEnableFlagLike("%" + query.enableFlag() + "%");
@@ -167,7 +167,7 @@ public class MdUnitMeasureServiceImpl implements IMdUnitMeasureService {
         MdUnitMeasureExample example = new MdUnitMeasureExample();
         for (var id : ids) requireRecord(id);
         example.createCriteria().andMeasureIdIn(ids)
-        ;
+                ;
         if (mapper.deleteByExample(example) != ids.size()) {
             throw new FoundationException(ErrorCode.RESOURCE_CONFLICT);
         }
@@ -180,7 +180,6 @@ public class MdUnitMeasureServiceImpl implements IMdUnitMeasureService {
         }
         return row;
     }
-
     public MdUnitMeasureSyncResult sync(FactoryScope scope) {
         if (!FactoryContext.required().equals(scope)) {
             throw new FoundationException(ErrorCode.CONFLICT);
@@ -205,7 +204,7 @@ public class MdUnitMeasureServiceImpl implements IMdUnitMeasureService {
 
     @Transactional(transactionManager = "businessTransactionManager", rollbackFor = Exception.class)
     public MdUnitMeasureSyncResult upsert(FactoryScope scope,
-                                          List<ExternalMdUnitMeasure> inputs) {
+                                       List<ExternalMdUnitMeasure> inputs) {
         if (!FactoryContext.required().equals(scope)) {
             throw new FoundationException(ErrorCode.CONFLICT);
         }
@@ -221,7 +220,7 @@ public class MdUnitMeasureServiceImpl implements IMdUnitMeasureService {
         if (inputs.isEmpty()) return new MdUnitMeasureSyncResult(0, 0, 0, 0);
         var example = new MdUnitMeasureExample();
         example.createCriteria().andMeasureCodeIn(List.copyOf(keys))
-        ;
+                ;
         var existing = new HashMap<String, MdUnitMeasureEntity>();
         for (var row : mapper.selectByExample(example)) {
             if (existing.put(row.getMeasureCode(), row) != null) {
@@ -265,17 +264,17 @@ public class MdUnitMeasureServiceImpl implements IMdUnitMeasureService {
     }
 
     private static boolean same(MdUnitMeasureEntity row, ExternalMdUnitMeasure input) {
-        return
-                &&Objects.deepEquals(row.getFactoryId(), input.factoryId())
+        return true
+                && Objects.deepEquals(row.getFactoryId(), input.factoryId())
                 && Objects.deepEquals(row.getMeasureCode(), input.measureCode())
                 && Objects.deepEquals(row.getMeasureName(), input.measureName())
                 && Objects.deepEquals(row.getPrimaryFlag(), input.primaryFlag())
                 && Objects.deepEquals(row.getPrimaryId(), input.primaryId())
                 && (row.getChangeRate() == null ? input.changeRate() == null
-                : input.changeRate() != null && row.getChangeRate().compareTo(input.changeRate()) == 0)
+                    : input.changeRate() != null && row.getChangeRate().compareTo(input.changeRate()) == 0)
                 && Objects.deepEquals(row.getEnableFlag(), input.enableFlag())
                 && Objects.deepEquals(row.getRemark(), input.remark())
-        ;
+                ;
     }
 }
 

@@ -142,7 +142,7 @@ execution:
   # 想先生成一份可查看的文件：复制本配置，将 backendRoot/frontendRoot 改到独立的 target 目录，
   # 再使用 write + fail；不要为了查看效果直接覆盖前后端项目中的现有代码。
   overwrite: "replace-generated"
-  formatJava: true
+  formatJava: false
   formatter: "scripts/format-java"
   # 批量预检全部完成后才发布，避免后面的表失败留下半套产物。
   # 报告 supported 表示表结构支持生成；rejected 中 <output> / OUTPUT_CONFLICT 表示输出冲突，

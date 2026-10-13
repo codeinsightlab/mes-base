@@ -26,10 +26,9 @@ public interface IMdWorkshopService {
     MdWorkshopEntity updateById(Long id, MdWorkshopUpdateCommand input);
 
     void deleteByIds(List<Long> ids);
-
     MdWorkshopSyncResult sync(FactoryScope scope);
 
     MdWorkshopSyncResult upsert(FactoryScope scope,
-                                List<ExternalMdWorkshop> inputs);
+            List<ExternalMdWorkshop> inputs);
 }
 

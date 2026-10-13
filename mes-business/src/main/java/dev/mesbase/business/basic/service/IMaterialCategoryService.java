@@ -26,10 +26,9 @@ public interface IMaterialCategoryService {
     MaterialCategoryEntity updateById(Long id, MaterialCategoryUpdateCommand input);
 
     void deleteByIds(List<Long> ids);
-
     MaterialCategorySyncResult sync(FactoryScope scope);
 
     MaterialCategorySyncResult upsert(FactoryScope scope,
-                                      List<ExternalMaterialCategory> inputs);
+            List<ExternalMaterialCategory> inputs);
 }
 

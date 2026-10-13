@@ -49,10 +49,10 @@ public class WorkstationServiceImpl implements IWorkstationService {
     private final BusinessCacheProcessor caches;
 
     public WorkstationServiceImpl(WorkstationMapper mapper,
-                                  ObjectProvider<WorkstationQueryPort> queries,
-                                  SyncCoordinator coordinator,
-                                  ObjectProvider<IWorkstationService> self,
-                                  Validator validator, BusinessCacheProcessor caches) {
+            ObjectProvider<WorkstationQueryPort> queries,
+            SyncCoordinator coordinator,
+            ObjectProvider<IWorkstationService> self,
+            Validator validator, BusinessCacheProcessor caches) {
         this.mapper = mapper;
         this.query = queries.getIfAvailable(UnconfiguredWorkstationQueryAdapter::new);
         this.coordinator = coordinator;
@@ -81,7 +81,7 @@ public class WorkstationServiceImpl implements IWorkstationService {
             criteria.andNameLike("%" + query.name() + "%");
         }
         if (query.workshopId() != null) {
-            criteria.andWorkshopIdEqualTo(query.workshopId());
+            criteria.andWorkshopIdEqualTo( query.workshopId());
         }
         if (query.status() != null) {
             criteria.andStatusLike("%" + query.status() + "%");
@@ -155,7 +155,7 @@ public class WorkstationServiceImpl implements IWorkstationService {
         for (var id : ids) requireRecord(id);
         example.createCriteria().andIdIn(ids)
                 .andFactoryIdEqualTo(FactoryContext.required().factoryId().value())
-        ;
+                ;
         if (mapper.deleteByExample(example) != ids.size()) {
             throw new FoundationException(ErrorCode.RESOURCE_CONFLICT);
         }
@@ -168,7 +168,6 @@ public class WorkstationServiceImpl implements IWorkstationService {
         }
         return row;
     }
-
     public WorkstationSyncResult sync(FactoryScope scope) {
         if (!FactoryContext.required().equals(scope)) {
             throw new FoundationException(ErrorCode.CONFLICT);
@@ -193,7 +192,7 @@ public class WorkstationServiceImpl implements IWorkstationService {
 
     @Transactional(transactionManager = "businessTransactionManager", rollbackFor = Exception.class)
     public WorkstationSyncResult upsert(FactoryScope scope,
-                                        List<ExternalWorkstation> inputs) {
+                                       List<ExternalWorkstation> inputs) {
         if (!FactoryContext.required().equals(scope)) {
             throw new FoundationException(ErrorCode.CONFLICT);
         }
@@ -210,7 +209,7 @@ public class WorkstationServiceImpl implements IWorkstationService {
         var example = new WorkstationExample();
         example.createCriteria().andCodeIn(List.copyOf(keys))
                 .andFactoryIdEqualTo(scope.factoryId().value())
-        ;
+                ;
         var existing = new HashMap<String, WorkstationEntity>();
         for (var row : mapper.selectByExample(example)) {
             if (existing.put(row.getCode(), row) != null) {
@@ -252,13 +251,13 @@ public class WorkstationServiceImpl implements IWorkstationService {
     }
 
     private static boolean same(WorkstationEntity row, ExternalWorkstation input) {
-        return
-                &&Objects.deepEquals(row.getCode(), input.code())
+        return true
+                && Objects.deepEquals(row.getCode(), input.code())
                 && Objects.deepEquals(row.getName(), input.name())
                 && Objects.deepEquals(row.getWorkshopId(), input.workshopId())
                 && Objects.deepEquals(row.getStatus(), input.status())
                 && Objects.deepEquals(row.getRemark(), input.remark())
-        ;
+                ;
     }
 }
 

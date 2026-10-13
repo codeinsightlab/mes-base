@@ -26,10 +26,9 @@ public interface IMdUnitMeasureService {
     MdUnitMeasureEntity updateById(Long id, MdUnitMeasureUpdateCommand input);
 
     void deleteByIds(List<Long> ids);
-
     MdUnitMeasureSyncResult sync(FactoryScope scope);
 
     MdUnitMeasureSyncResult upsert(FactoryScope scope,
-                                   List<ExternalMdUnitMeasure> inputs);
+            List<ExternalMdUnitMeasure> inputs);
 }
 

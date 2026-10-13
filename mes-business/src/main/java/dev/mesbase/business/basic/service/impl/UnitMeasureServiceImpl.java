@@ -49,10 +49,10 @@ public class UnitMeasureServiceImpl implements IUnitMeasureService {
     private final BusinessCacheProcessor caches;
 
     public UnitMeasureServiceImpl(UnitMeasureMapper mapper,
-                                  ObjectProvider<UnitMeasureQueryPort> queries,
-                                  SyncCoordinator coordinator,
-                                  ObjectProvider<IUnitMeasureService> self,
-                                  Validator validator, BusinessCacheProcessor caches) {
+            ObjectProvider<UnitMeasureQueryPort> queries,
+            SyncCoordinator coordinator,
+            ObjectProvider<IUnitMeasureService> self,
+            Validator validator, BusinessCacheProcessor caches) {
         this.mapper = mapper;
         this.query = queries.getIfAvailable(UnconfiguredUnitMeasureQueryAdapter::new);
         this.coordinator = coordinator;
@@ -150,7 +150,7 @@ public class UnitMeasureServiceImpl implements IUnitMeasureService {
         for (var id : ids) requireRecord(id);
         example.createCriteria().andIdIn(ids)
                 .andFactoryIdEqualTo(FactoryContext.required().factoryId().value())
-        ;
+                ;
         if (mapper.deleteByExample(example) != ids.size()) {
             throw new FoundationException(ErrorCode.RESOURCE_CONFLICT);
         }
@@ -163,7 +163,6 @@ public class UnitMeasureServiceImpl implements IUnitMeasureService {
         }
         return row;
     }
-
     public UnitMeasureSyncResult sync(FactoryScope scope) {
         if (!FactoryContext.required().equals(scope)) {
             throw new FoundationException(ErrorCode.CONFLICT);
@@ -188,7 +187,7 @@ public class UnitMeasureServiceImpl implements IUnitMeasureService {
 
     @Transactional(transactionManager = "businessTransactionManager", rollbackFor = Exception.class)
     public UnitMeasureSyncResult upsert(FactoryScope scope,
-                                        List<ExternalUnitMeasure> inputs) {
+                                       List<ExternalUnitMeasure> inputs) {
         if (!FactoryContext.required().equals(scope)) {
             throw new FoundationException(ErrorCode.CONFLICT);
         }
@@ -205,7 +204,7 @@ public class UnitMeasureServiceImpl implements IUnitMeasureService {
         var example = new UnitMeasureExample();
         example.createCriteria().andCodeIn(List.copyOf(keys))
                 .andFactoryIdEqualTo(scope.factoryId().value())
-        ;
+                ;
         var existing = new HashMap<String, UnitMeasureEntity>();
         for (var row : mapper.selectByExample(example)) {
             if (existing.put(row.getCode(), row) != null) {
@@ -246,12 +245,12 @@ public class UnitMeasureServiceImpl implements IUnitMeasureService {
     }
 
     private static boolean same(UnitMeasureEntity row, ExternalUnitMeasure input) {
-        return
-                &&Objects.deepEquals(row.getCode(), input.code())
+        return true
+                && Objects.deepEquals(row.getCode(), input.code())
                 && Objects.deepEquals(row.getName(), input.name())
                 && Objects.deepEquals(row.getSymbol(), input.symbol())
                 && Objects.deepEquals(row.getStatus(), input.status())
-        ;
+                ;
     }
 }
 

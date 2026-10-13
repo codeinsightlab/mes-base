@@ -26,10 +26,9 @@ public interface IDvSubjectService {
     DvSubjectEntity updateById(Long id, DvSubjectUpdateCommand input);
 
     void deleteByIds(List<Long> ids);
-
     DvSubjectSyncResult sync(FactoryScope scope);
 
     DvSubjectSyncResult upsert(FactoryScope scope,
-                               List<ExternalDvSubject> inputs);
+            List<ExternalDvSubject> inputs);
 }
 

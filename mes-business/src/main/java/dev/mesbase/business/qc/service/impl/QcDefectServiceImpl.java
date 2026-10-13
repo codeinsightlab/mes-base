@@ -49,10 +49,10 @@ public class QcDefectServiceImpl implements IQcDefectService {
     private final BusinessCacheProcessor caches;
 
     public QcDefectServiceImpl(QcDefectMapper mapper,
-                               ObjectProvider<QcDefectQueryPort> queries,
-                               SyncCoordinator coordinator,
-                               ObjectProvider<IQcDefectService> self,
-                               Validator validator, BusinessCacheProcessor caches) {
+            ObjectProvider<QcDefectQueryPort> queries,
+            SyncCoordinator coordinator,
+            ObjectProvider<IQcDefectService> self,
+            Validator validator, BusinessCacheProcessor caches) {
         this.mapper = mapper;
         this.query = queries.getIfAvailable(UnconfiguredQcDefectQueryAdapter::new);
         this.coordinator = coordinator;
@@ -157,7 +157,7 @@ public class QcDefectServiceImpl implements IQcDefectService {
         QcDefectExample example = new QcDefectExample();
         for (var id : ids) requireRecord(id);
         example.createCriteria().andDefectIdIn(ids)
-        ;
+                ;
         if (mapper.deleteByExample(example) != ids.size()) {
             throw new FoundationException(ErrorCode.RESOURCE_CONFLICT);
         }
@@ -170,7 +170,6 @@ public class QcDefectServiceImpl implements IQcDefectService {
         }
         return row;
     }
-
     public QcDefectSyncResult sync(FactoryScope scope) {
         if (!FactoryContext.required().equals(scope)) {
             throw new FoundationException(ErrorCode.CONFLICT);
@@ -195,7 +194,7 @@ public class QcDefectServiceImpl implements IQcDefectService {
 
     @Transactional(transactionManager = "businessTransactionManager", rollbackFor = Exception.class)
     public QcDefectSyncResult upsert(FactoryScope scope,
-                                     List<ExternalQcDefect> inputs) {
+                                       List<ExternalQcDefect> inputs) {
         if (!FactoryContext.required().equals(scope)) {
             throw new FoundationException(ErrorCode.CONFLICT);
         }
@@ -211,7 +210,7 @@ public class QcDefectServiceImpl implements IQcDefectService {
         if (inputs.isEmpty()) return new QcDefectSyncResult(0, 0, 0, 0);
         var example = new QcDefectExample();
         example.createCriteria().andDefectCodeIn(List.copyOf(keys))
-        ;
+                ;
         var existing = new HashMap<String, QcDefectEntity>();
         for (var row : mapper.selectByExample(example)) {
             if (existing.put(row.getDefectCode(), row) != null) {
@@ -253,14 +252,14 @@ public class QcDefectServiceImpl implements IQcDefectService {
     }
 
     private static boolean same(QcDefectEntity row, ExternalQcDefect input) {
-        return
-                &&Objects.deepEquals(row.getFactoryId(), input.factoryId())
+        return true
+                && Objects.deepEquals(row.getFactoryId(), input.factoryId())
                 && Objects.deepEquals(row.getDefectCode(), input.defectCode())
                 && Objects.deepEquals(row.getDefectName(), input.defectName())
                 && Objects.deepEquals(row.getIndexType(), input.indexType())
                 && Objects.deepEquals(row.getDefectLevel(), input.defectLevel())
                 && Objects.deepEquals(row.getRemark(), input.remark())
-        ;
+                ;
     }
 }
 

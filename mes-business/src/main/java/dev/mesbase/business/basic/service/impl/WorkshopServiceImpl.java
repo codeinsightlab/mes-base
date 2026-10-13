@@ -49,10 +49,10 @@ public class WorkshopServiceImpl implements IWorkshopService {
     private final BusinessCacheProcessor caches;
 
     public WorkshopServiceImpl(WorkshopMapper mapper,
-                               ObjectProvider<WorkshopQueryPort> queries,
-                               SyncCoordinator coordinator,
-                               ObjectProvider<IWorkshopService> self,
-                               Validator validator, BusinessCacheProcessor caches) {
+            ObjectProvider<WorkshopQueryPort> queries,
+            SyncCoordinator coordinator,
+            ObjectProvider<IWorkshopService> self,
+            Validator validator, BusinessCacheProcessor caches) {
         this.mapper = mapper;
         this.query = queries.getIfAvailable(UnconfiguredWorkshopQueryAdapter::new);
         this.coordinator = coordinator;
@@ -150,7 +150,7 @@ public class WorkshopServiceImpl implements IWorkshopService {
         for (var id : ids) requireRecord(id);
         example.createCriteria().andIdIn(ids)
                 .andFactoryIdEqualTo(FactoryContext.required().factoryId().value())
-        ;
+                ;
         if (mapper.deleteByExample(example) != ids.size()) {
             throw new FoundationException(ErrorCode.RESOURCE_CONFLICT);
         }
@@ -163,7 +163,6 @@ public class WorkshopServiceImpl implements IWorkshopService {
         }
         return row;
     }
-
     public WorkshopSyncResult sync(FactoryScope scope) {
         if (!FactoryContext.required().equals(scope)) {
             throw new FoundationException(ErrorCode.CONFLICT);
@@ -188,7 +187,7 @@ public class WorkshopServiceImpl implements IWorkshopService {
 
     @Transactional(transactionManager = "businessTransactionManager", rollbackFor = Exception.class)
     public WorkshopSyncResult upsert(FactoryScope scope,
-                                     List<ExternalWorkshop> inputs) {
+                                       List<ExternalWorkshop> inputs) {
         if (!FactoryContext.required().equals(scope)) {
             throw new FoundationException(ErrorCode.CONFLICT);
         }
@@ -205,7 +204,7 @@ public class WorkshopServiceImpl implements IWorkshopService {
         var example = new WorkshopExample();
         example.createCriteria().andCodeIn(List.copyOf(keys))
                 .andFactoryIdEqualTo(scope.factoryId().value())
-        ;
+                ;
         var existing = new HashMap<String, WorkshopEntity>();
         for (var row : mapper.selectByExample(example)) {
             if (existing.put(row.getCode(), row) != null) {
@@ -246,12 +245,12 @@ public class WorkshopServiceImpl implements IWorkshopService {
     }
 
     private static boolean same(WorkshopEntity row, ExternalWorkshop input) {
-        return
-                &&Objects.deepEquals(row.getCode(), input.code())
+        return true
+                && Objects.deepEquals(row.getCode(), input.code())
                 && Objects.deepEquals(row.getName(), input.name())
                 && Objects.deepEquals(row.getStatus(), input.status())
                 && Objects.deepEquals(row.getRemark(), input.remark())
-        ;
+                ;
     }
 }
 

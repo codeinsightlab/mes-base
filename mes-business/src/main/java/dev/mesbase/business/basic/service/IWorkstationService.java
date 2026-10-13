@@ -26,10 +26,9 @@ public interface IWorkstationService {
     WorkstationEntity updateById(Long id, WorkstationUpdateCommand input);
 
     void deleteByIds(List<Long> ids);
-
     WorkstationSyncResult sync(FactoryScope scope);
 
     WorkstationSyncResult upsert(FactoryScope scope,
-                                 List<ExternalWorkstation> inputs);
+            List<ExternalWorkstation> inputs);
 }
 

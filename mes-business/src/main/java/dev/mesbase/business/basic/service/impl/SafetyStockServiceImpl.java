@@ -49,10 +49,10 @@ public class SafetyStockServiceImpl implements ISafetyStockService {
     private final BusinessCacheProcessor caches;
 
     public SafetyStockServiceImpl(SafetyStockMapper mapper,
-                                  ObjectProvider<SafetyStockQueryPort> queries,
-                                  SyncCoordinator coordinator,
-                                  ObjectProvider<ISafetyStockService> self,
-                                  Validator validator, BusinessCacheProcessor caches) {
+            ObjectProvider<SafetyStockQueryPort> queries,
+            SyncCoordinator coordinator,
+            ObjectProvider<ISafetyStockService> self,
+            Validator validator, BusinessCacheProcessor caches) {
         this.mapper = mapper;
         this.query = queries.getIfAvailable(UnconfiguredSafetyStockQueryAdapter::new);
         this.coordinator = coordinator;
@@ -75,13 +75,13 @@ public class SafetyStockServiceImpl implements ISafetyStockService {
         SafetyStockExample.Criteria criteria = example.createCriteria();
         criteria.andFactoryIdEqualTo(FactoryContext.required().factoryId().value());
         if (query.materialId() != null) {
-            criteria.andMaterialIdEqualTo(query.materialId());
+            criteria.andMaterialIdEqualTo( query.materialId());
         }
         if (query.minQty() != null) {
-            criteria.andMinQtyEqualTo(query.minQty());
+            criteria.andMinQtyEqualTo( query.minQty());
         }
         if (query.maxQty() != null) {
-            criteria.andMaxQtyEqualTo(query.maxQty());
+            criteria.andMaxQtyEqualTo( query.maxQty());
         }
         if (query.status() != null) {
             criteria.andStatusLike("%" + query.status() + "%");
@@ -150,7 +150,7 @@ public class SafetyStockServiceImpl implements ISafetyStockService {
         for (var id : ids) requireRecord(id);
         example.createCriteria().andIdIn(ids)
                 .andFactoryIdEqualTo(FactoryContext.required().factoryId().value())
-        ;
+                ;
         if (mapper.deleteByExample(example) != ids.size()) {
             throw new FoundationException(ErrorCode.RESOURCE_CONFLICT);
         }
@@ -163,7 +163,6 @@ public class SafetyStockServiceImpl implements ISafetyStockService {
         }
         return row;
     }
-
     public SafetyStockSyncResult sync(FactoryScope scope) {
         if (!FactoryContext.required().equals(scope)) {
             throw new FoundationException(ErrorCode.CONFLICT);
@@ -188,7 +187,7 @@ public class SafetyStockServiceImpl implements ISafetyStockService {
 
     @Transactional(transactionManager = "businessTransactionManager", rollbackFor = Exception.class)
     public SafetyStockSyncResult upsert(FactoryScope scope,
-                                        List<ExternalSafetyStock> inputs) {
+                                       List<ExternalSafetyStock> inputs) {
         if (!FactoryContext.required().equals(scope)) {
             throw new FoundationException(ErrorCode.CONFLICT);
         }
@@ -205,7 +204,7 @@ public class SafetyStockServiceImpl implements ISafetyStockService {
         var example = new SafetyStockExample();
         example.createCriteria().andMaterialIdIn(List.copyOf(keys))
                 .andFactoryIdEqualTo(scope.factoryId().value())
-        ;
+                ;
         var existing = new HashMap<Long, SafetyStockEntity>();
         for (var row : mapper.selectByExample(example)) {
             if (existing.put(row.getMaterialId(), row) != null) {
@@ -246,14 +245,14 @@ public class SafetyStockServiceImpl implements ISafetyStockService {
     }
 
     private static boolean same(SafetyStockEntity row, ExternalSafetyStock input) {
-        return
-                &&Objects.deepEquals(row.getMaterialId(), input.materialId())
+        return true
+                && Objects.deepEquals(row.getMaterialId(), input.materialId())
                 && (row.getMinQty() == null ? input.minQty() == null
-                : input.minQty() != null && row.getMinQty().compareTo(input.minQty()) == 0)
+                    : input.minQty() != null && row.getMinQty().compareTo(input.minQty()) == 0)
                 && (row.getMaxQty() == null ? input.maxQty() == null
-                : input.maxQty() != null && row.getMaxQty().compareTo(input.maxQty()) == 0)
+                    : input.maxQty() != null && row.getMaxQty().compareTo(input.maxQty()) == 0)
                 && Objects.deepEquals(row.getStatus(), input.status())
-        ;
+                ;
     }
 }
 

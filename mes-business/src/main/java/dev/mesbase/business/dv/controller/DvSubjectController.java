@@ -71,7 +71,7 @@ public class DvSubjectController {
     @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED,
             permission = DvSubjectPermissions.UPDATE)
     public DvSubjectVo update(@PathVariable Long id,
-                              @Valid @RequestBody DvSubjectUpdateCommand input) {
+            @Valid @RequestBody DvSubjectUpdateCommand input) {
         return toView(service.updateById(id, input));
     }
 
@@ -80,8 +80,8 @@ public class DvSubjectController {
     @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED,
             permission = DvSubjectPermissions.DELETE)
     public void delete(@RequestBody
-                       @NotEmpty @Size(max = 100)
-                       List<@NotNull Long> ids) {
+            @NotEmpty @Size(max = 100)
+            List<@NotNull Long> ids) {
         service.deleteByIds(ids);
     }
 

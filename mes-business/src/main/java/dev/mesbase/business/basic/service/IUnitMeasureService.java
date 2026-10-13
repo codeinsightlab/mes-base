@@ -26,10 +26,9 @@ public interface IUnitMeasureService {
     UnitMeasureEntity updateById(Long id, UnitMeasureUpdateCommand input);
 
     void deleteByIds(List<Long> ids);
-
     UnitMeasureSyncResult sync(FactoryScope scope);
 
     UnitMeasureSyncResult upsert(FactoryScope scope,
-                                 List<ExternalUnitMeasure> inputs);
+            List<ExternalUnitMeasure> inputs);
 }
 

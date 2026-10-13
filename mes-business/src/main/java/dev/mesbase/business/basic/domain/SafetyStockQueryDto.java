@@ -15,9 +15,9 @@ public record SafetyStockQueryDto(
         @Min(0) Integer offset,
         @Min(1) @Max(100) Integer limit,
         Long materialId,
-        @Digits(integer = 14, fraction = 4) BigDecimal minQty,
-        @Digits(integer = 14, fraction = 4) BigDecimal maxQty,
-        @Size(max = 16) String status
+        @Digits(integer=14,fraction=4) BigDecimal minQty,
+        @Digits(integer=14,fraction=4) BigDecimal maxQty,
+        @Size(max=16) String status
 ) implements BusinessCacheQuery {
     @Override
     public int cacheOffset() {

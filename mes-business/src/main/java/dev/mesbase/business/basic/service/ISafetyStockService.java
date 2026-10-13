@@ -26,10 +26,9 @@ public interface ISafetyStockService {
     SafetyStockEntity updateById(Long id, SafetyStockUpdateCommand input);
 
     void deleteByIds(List<Long> ids);
-
     SafetyStockSyncResult sync(FactoryScope scope);
 
     SafetyStockSyncResult upsert(FactoryScope scope,
-                                 List<ExternalSafetyStock> inputs);
+            List<ExternalSafetyStock> inputs);
 }
 
