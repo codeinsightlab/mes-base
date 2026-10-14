@@ -36,7 +36,7 @@ public class WarehouseIntegration {
         if (current == null) throw new FoundationException(ErrorCode.INTEGRATION_NOT_CONFIGURED);
         if ("UNVERIFIED".equals(row.getExternalEffect()) || row.getSourceExecutionMode() == null)
             throw new FoundationException(ErrorCode.ISSUE_EXTERNAL_UNVERIFIED);
-        if (current == Mode.LOCAL_ONLY && "LOCAL_ONLY".equals(row.getSourceExecutionMode()) && "NONE".equals(row.getExternalEffect()))
+        if (current == Mode.LOCAL_ONLY && "LOCAL_ONLY".equals(row.getSourceExecutionMode()) && "NONE".equals(row.getExternalEffect()) && row.getExternalBindingKey() == null && row.getExternalReference() == null)
             return Mode.LOCAL_ONLY;
         if (!"CONNECTED".equals(row.getSourceExecutionMode()) || row.getExternalBindingKey() == null || row.getExternalReference() == null)
             throw new FoundationException(ErrorCode.ISSUE_EXTERNAL_UNVERIFIED);

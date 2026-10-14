@@ -343,3 +343,8 @@ Reporting 开发时：引用 execution_id，校验当前库关联、RELEASED 工
 | BUSINESS_VERIFIED | 是，限本轮生产身份及主链收敛范围；未涉及正式报工/入库/ERP |
 
 下一阶段仍按 E/H 的 execution_id、确切 Routing DAG、RELEASED 与事实锁定规则接入 Reporting/Receipt。本轮没有剩余必须修复的主链问题，后续业务及体验限制如上。
+
+
+### 2026-10-14：本轮完整生产主链只读审查
+
+新增[Report B](2026-10-14-production-chain-audit-review.md)，覆盖最终WorkOrder/Execution/MaterialIssue/Routing及ERP Extra。旧报告“后续Reporting”的安排需按本轮确认的完整路径语义调整：优先正式领料、选路/锁路及开工准入，再做路径内报工；不否定此前身份主链验收，也不把旧API/UI结果当作本轮V22验证。Phase B没有实施建议的生产业务改造。

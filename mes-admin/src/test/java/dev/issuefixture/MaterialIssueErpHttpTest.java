@@ -11,6 +11,8 @@ import dev.mesbase.business.integration.warehouse.ErpIssueQueryResult.Outcome;
 import dev.mesbase.business.integration.warehouse.ErpIssueQueryResult.DocumentStatus;
 import dev.mesbase.core.factory.FactoryScope;
 import java.util.Map;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -98,6 +100,21 @@ class MaterialIssueErpHttpTest {
     }
 
     @Test
+    void migratedOpaqueBindingDoesNotBecomeAVerifiedProvider() throws Exception {
+        try (var c = connected()) {
+            seed(c, "ERP_UNKNOWN");
+            var j = c.getBean(MaterialIssueHttpTest.Fixture.class).business.get("A");
+            String migration = Files.readString(Path.of("mes-admin/src/main/resources/db/business/V22__unverified_legacy_erp_provider.sql"));
+            j.execute(migration);
+            assertEquals("test", j.queryForObject("SELECT provider FROM mes_material_issue_erp_extra WHERE id=1", String.class));
+            j.update("UPDATE mes_material_issue_erp_extra SET provider=external_binding_key,last_operation=NULL WHERE id=1");
+            j.execute(migration);
+            MaterialIssueHttpTest.mvc(c).perform(full(get(Q))).andExpect(status().isConflict());
+            assertEquals("ERP-1", j.queryForObject("SELECT external_reference FROM mes_material_issue_erp_extra WHERE id=1", String.class));
+        }
+    }
+
+    @Test
     void workorderExtraFollowsTransactionalCreationAndDeletion() throws Exception {
         try (var c = MaterialIssueHttpTest.context()) {
             var m = MaterialIssueHttpTest.mvc(c);
@@ -105,7 +122,7 @@ class MaterialIssueErpHttpTest {
                     .andExpect(status().isOk()).andExpect(jsonPath("workorder.externalId").value("IMPORTED-1"));
             var j = c.getBean(MaterialIssueHttpTest.Fixture.class).business.get("A");
             assertEquals("IMPORTED-1", j.queryForObject("SELECT external_id FROM workorder_erp_extra WHERE id=2", String.class));
-            m.perform(full(delete("/api/production/workorder/2")).param("revision", "0"))
+            m.perform(full(delete("/api/production/workorder/2")).content("{\"revision\":0}"))
                     .andExpect(status().isNoContent());
             assertEquals(0, j.queryForObject("SELECT COUNT(*) FROM workorder_erp_extra WHERE id=2", Integer.class));
         }

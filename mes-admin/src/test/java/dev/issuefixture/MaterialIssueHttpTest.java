@@ -127,7 +127,7 @@ class MaterialIssueHttpTest {
             for (String id : List.of("A", "B")) {
                 var source = source();
                 var jdbc = new JdbcTemplate(source);
-                for (String name : List.of("V2__simple_business_capabilities.sql", "V3__operation_routing.sql", "V8__warehouse_inventory.sql", "V11__material_issue.sql", "V12__material_issue_quantity_precision.sql", "V13__workorder_batch_route.sql", "V16__production_execution.sql", "V18__material_issue_void.sql", "V19__local_void_external_effect.sql", "V20__material_issue_erp_extra.sql", "V21__workorder_external_extra.sql")) {
+                for (String name : List.of("V2__simple_business_capabilities.sql", "V3__operation_routing.sql", "V8__warehouse_inventory.sql", "V11__material_issue.sql", "V12__material_issue_quantity_precision.sql", "V13__workorder_batch_route.sql", "V16__production_execution.sql", "V18__material_issue_void.sql", "V19__local_void_external_effect.sql", "V20__material_issue_erp_extra.sql", "V21__workorder_external_extra.sql", "V22__unverified_legacy_erp_provider.sql")) {
                     String ddl = Files.readString(Path.of("mes-admin/src/main/resources/db/business/" + name))
                             .replace(") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT=", ") COMMENT ")
                             .replaceAll("(?m)^\\s*factory_id [^\\n]+\\n", "")

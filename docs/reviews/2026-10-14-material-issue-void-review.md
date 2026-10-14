@@ -97,3 +97,8 @@ AGENTS.md 新增领域 Adapter、厂商逻辑隔离、显式本地、CONNECTED �
 `MES_VOID_MYSQL_ACCEPTANCE=true MES_EXECUTION_MYSQL_ACCEPTANCE=true MES_ISSUE_MYSQL_ACCEPTANCE=true mvn -B -ntp verify -Dmes.test.workorder.mysql=true`：13:45:17 BUILD SUCCESS，411项、0失败、0错误、10跳过。`/usr/bin/python3 scripts/smoke-packaged.py`：10通过/0失败。git diff --check通过。末轮真库保留 TEST ONLY 工单38、领料40、产品75/工艺110（TEST_VOID_53dd7001）。
 
 JAR 包内确认含 V20、MaterialIssueErpFacts 与扩展表Mapper，主表Mapper不再引用迁出字段。SHA256：1741f4f6ddafbb3af73418259ffea2cfa8f934bf515ae8f8e86fad71f1633d56。尚未重启用户服务，API/UI待加载此构建后复核，真实ERP未验证。
+
+
+## 2026-10-14：后续ERP领域与核实任务
+
+V20将7个外部事实列迁入领料Extra；作废操作身份/原MES状态/时间继续属MES主表。V21迁出工单旧外部身份。当前作废/产品保护查询通过Extra协调，新增查询/核实及版本保护；详见[Report A](2026-10-14-erp-domain-integration-review.md)。本报告此前真实服务/UI验证只证明当时V19构建，不能直接当作V21当前证据。

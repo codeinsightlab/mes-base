@@ -12,6 +12,7 @@ import dev.mesbase.business.integration.warehouse.ErpIssueQueryResult.DocumentSt
 import dev.mesbase.core.factory.FactoryScope;
 import dev.mesbase.core.factory.FactoryId;
 import dev.mesbase.core.error.FoundationException;
+import dev.mesbase.business.issue.domain.MesMaterialIssueEntity;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.env.MockEnvironment;
@@ -49,6 +50,11 @@ class LocalWarehouseErpTest {
         env.setProperty("mes.integration.warehouse.factories.A.provider", "digiwin");
         assertThrows(FoundationException.class, () -> integration.query(scope, "CONNECTED", "digiwin", new QueryMaterialIssueCommand(1L, null, "digiwin", "ERP-1", null)));
         env.setProperty("mes.integration.warehouse.factories.A.mode", "LOCAL_ONLY");
+        var historical = new MesMaterialIssueEntity();
+        historical.setSourceExecutionMode("LOCAL_ONLY");
+        historical.setExternalEffect("NONE");
+        historical.setExternalReference("ERP-1");
+        assertThrows(FoundationException.class, () -> integration.cancellationMode(scope, historical));
         assertThrows(FoundationException.class, () -> integration.query(scope, "LOCAL_ONLY", "local", new QueryMaterialIssueCommand(1L, null, null, "ERP-1", null)));
     }
 }

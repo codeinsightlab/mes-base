@@ -17,3 +17,10 @@ WorkOrder 行锁串行化产品变更和领料关联、作废，存在非 VOIDED
 默认本地成功显式 LOCAL_ONLY，不冒充 ERP。Adapter 不访问 MES Mapper/事务，不判断厂商于业务 Service。无外部供应商配置、注册中心、任务平台、Reporting/Receipt/WIP 或跨系统原子性承诺。
 
 验证与未验证边界记录于对应实施报告。TEST ONLY Adapter 只在 src/test，不能代表真实 ERP 联调。CONNECTED 来源历史核实、被拒绝后的新操作授权重试、供应商真实连接与响应转换属于后续真实接入；当前重发同一作废请求始终幂等返回原结果。
+
+
+## 2026-10-14：ERP领域规范与Extra迁移修订
+
+前文V18外部事实保存在领料主表的结构由V20取代，V19保留历史纠正。V21同时迁出工单旧外部单据身份；原表Entity少量兼容投影从Extra填充，主表Mapper不映射外部事实。复用WarehouseErpAdapter作为仓储领域业务接口，LocalWarehouseErpService提供明确本地结果；厂商领域实现可编排其内部流程，Gateway仅通讯，不写MES库。新增只读领料查询和独立权限核实，通过Extra operation_version及MES操作身份拒绝迟到结果；已作废不自动恢复，冲突保留为待处理事实。工单/领料删除同步维护Extra生命周期。
+
+原取消操作继续按原绑定唯一匹配厂商实现，不将原CONNECTED单据自动本地作废；新的领料业务状态查询要求当前provider与原来源一致，跨provider历史迁移不在V1范围。无真实供应商、继续审核或完整出库提交入口，测试替身不能证明ERP联调。实施及最新验收边界见[Report A](../reviews/2026-10-14-erp-domain-integration-review.md)。原文旧测试/界面验收保留其时间点，不替代本轮真实HTTP/UI结果。
