@@ -1,5 +1,7 @@
 # Report B：Production Chain Audit
 
+> 本文下方新增的「Production Chain Audit Report：独立端到端复核」是用户重新发起只读审查后的最新结论。此前章节保留历史时间线；特别是此前“V14普通code索引/编号并发重复”的判断有误，已由本次源码及真实Schema证据撤回，不能作为修复依据。
+
 2026-10-14，Phase A最终最终全量Maven检查通过后进行只读审查。Phase A实施/运行边界见[Report A](2026-10-14-erp-domain-integration-review.md)。本阶段没有修改生产业务代码、执行数据写入或实现下述建议；没有以类名、旧报告或测试源码存在代替当前实现证据。
 
 ## 生产链路现状与业务对象职责
