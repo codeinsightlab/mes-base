@@ -12,7 +12,6 @@ import dev.mesbase.business.wm.domain.WmWarehouseExample;
 import dev.mesbase.business.wm.sync.ExternalWmInventory;
 import dev.mesbase.core.error.ErrorCode;
 import dev.mesbase.core.error.FoundationException;
-import dev.mesbase.platform.execution.FactoryContext;
 import java.util.List;
 import java.util.stream.Collectors;
 import dev.mesbase.business.wm.domain.WmInventoryItem;
@@ -34,10 +33,6 @@ public class StockReferenceRules {
         this.materials = materials;
         this.warehouses = warehouses;
         this.inventories = inventories;
-    }
-
-    private String factory() {
-        return FactoryContext.required().factoryId().value();
     }
 
     private void status(String status) {

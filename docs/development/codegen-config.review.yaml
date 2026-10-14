@@ -13,9 +13,10 @@ sync:
   batchMaximum: 1000
 
 source:
-  # 引用已有开发连接配置中的 profile，不等于运行时工厂或数据库名称。
-  connectionConfig: "mes-admin/src/main/resources/application-dev.yml"
-  datasource: "dev"
+  # 当前生成读取已核对并迁移的 SIMPLE_B 验收库；本地连接快照不入 Git、不包含隐藏项目默认值。
+  # 每次生成前仍须核对中心 Factory / Datasource 绑定；其他业务库先执行正式迁移。
+  connectionConfig: ".local/codegen-simple-b.yml"
+  datasource: "acceptance"
   # null 表示不指定 schema，使用连接所选数据库的 metadata 范围。
   schema: null
 
@@ -209,3 +210,38 @@ tableOverrides:
     module: basic
     displayName: 安全库存配置
     syncMatchKey: material_id
+
+  # 已有模块路径保持稳定；复杂业务的手工代码不得被基础 CRUD 覆盖。
+  equipment:
+    module: basic
+    displayName: 设备资源
+  operation:
+    module: production
+    displayName: 工序
+  routing:
+    module: production
+    displayName: 工艺路线版本
+  routing_node:
+    module: production
+  routing_edge:
+    module: production
+  routing_product:
+    module: production
+  mes_material_issue:
+    module: issue
+    displayName: 领料出库单
+  mes_material_issue_item:
+    module: issue
+    displayName: 领料出库明细
+  wm_warehouse:
+    module: wm
+    displayName: 仓库管理
+  wm_inventory:
+    module: wm
+    displayName: 库存管理
+  workorder:
+    module: production
+  production_batch:
+    module: production
+  batch_route_node:
+    module: production

@@ -154,7 +154,7 @@ public class SafetyStockServiceImpl implements ISafetyStockService {
         SafetyStockExample example = new SafetyStockExample();
         for (var id : ids) requireRecord(id);
         example.createCriteria().andIdIn(ids)
-                
+
         ;
         if (mapper.deleteByExample(example) != ids.size()) {
             throw new FoundationException(ErrorCode.RESOURCE_CONFLICT);
@@ -225,7 +225,7 @@ public class SafetyStockServiceImpl implements ISafetyStockService {
         if (inputs.isEmpty()) return new SafetyStockSyncResult(0, 0, 0, 0);
         var example = new SafetyStockExample();
         example.createCriteria().andMaterialIdIn(List.copyOf(keys))
-                
+
         ;
         var existing = new HashMap<Long, SafetyStockEntity>();
         for (var row : mapper.selectByExample(example)) {

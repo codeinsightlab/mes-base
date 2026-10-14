@@ -48,10 +48,10 @@ public class MdWorkshopServiceImpl implements IMdWorkshopService {
     private final BusinessCacheProcessor caches;
 
     public MdWorkshopServiceImpl(MdWorkshopMapper mapper,
-            ObjectProvider<MdWorkshopQueryPort> queries,
-            SyncCoordinator coordinator,
-            ObjectProvider<IMdWorkshopService> self,
-            Validator validator, BusinessCacheProcessor caches) {
+                                 ObjectProvider<MdWorkshopQueryPort> queries,
+                                 SyncCoordinator coordinator,
+                                 ObjectProvider<IMdWorkshopService> self,
+                                 Validator validator, BusinessCacheProcessor caches) {
         this.mapper = mapper;
         this.query = queries.getIfAvailable(UnconfiguredMdWorkshopQueryAdapter::new);
         this.coordinator = coordinator;
@@ -79,13 +79,13 @@ public class MdWorkshopServiceImpl implements IMdWorkshopService {
             criteria.andWorkshopNameLike("%" + query.workshopName() + "%");
         }
         if (query.area() != null) {
-            criteria.andAreaEqualTo( query.area());
+            criteria.andAreaEqualTo(query.area());
         }
         if (query.charge() != null) {
             criteria.andChargeLike("%" + query.charge() + "%");
         }
         if (query.deptId() != null) {
-            criteria.andDeptIdEqualTo( query.deptId());
+            criteria.andDeptIdEqualTo(query.deptId());
         }
         if (query.enableFlag() != null) {
             criteria.andEnableFlagLike("%" + query.enableFlag() + "%");
@@ -163,7 +163,7 @@ public class MdWorkshopServiceImpl implements IMdWorkshopService {
         MdWorkshopExample example = new MdWorkshopExample();
         for (var id : ids) requireRecord(id);
         example.createCriteria().andWorkshopIdIn(ids)
-                ;
+        ;
         if (mapper.deleteByExample(example) != ids.size()) {
             throw new FoundationException(ErrorCode.RESOURCE_CONFLICT);
         }
@@ -176,6 +176,7 @@ public class MdWorkshopServiceImpl implements IMdWorkshopService {
         }
         return row;
     }
+
     public MdWorkshopSyncResult sync(FactoryScope scope) {
         if (!FactoryContext.required().equals(scope)) {
             throw new FoundationException(ErrorCode.CONFLICT);
@@ -216,7 +217,7 @@ public class MdWorkshopServiceImpl implements IMdWorkshopService {
         if (inputs.isEmpty()) return new MdWorkshopSyncResult(0, 0, 0, 0);
         var example = new MdWorkshopExample();
         example.createCriteria().andWorkshopCodeIn(List.copyOf(keys))
-                ;
+        ;
         var existing = new HashMap<String, MdWorkshopEntity>();
         for (var row : mapper.selectByExample(example)) {
             if (existing.put(row.getWorkshopCode(), row) != null) {
@@ -263,7 +264,7 @@ public class MdWorkshopServiceImpl implements IMdWorkshopService {
         return Objects.deepEquals(row.getWorkshopCode(), input.workshopCode())
                 && Objects.deepEquals(row.getWorkshopName(), input.workshopName())
                 && (row.getArea() == null ? input.area() == null
-                    : input.area() != null && row.getArea().compareTo(input.area()) == 0)
+                : input.area() != null && row.getArea().compareTo(input.area()) == 0)
                 && Objects.deepEquals(row.getCharge(), input.charge())
                 && Objects.deepEquals(row.getDeptId(), input.deptId())
                 && Objects.deepEquals(row.getEnableFlag(), input.enableFlag())

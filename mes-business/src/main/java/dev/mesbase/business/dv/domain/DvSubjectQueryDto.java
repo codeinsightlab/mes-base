@@ -12,13 +12,13 @@ public record DvSubjectQueryDto(
         @Min(0) Integer offset,
         @Min(1) @Max(100) Integer limit,
 
-        @Size(max=64) String subjectCode,
-        @Size(max=255) String subjectName,
-        @Size(max=64) String subjectType,
-        @Size(max=500) String subjectContent,
-        @Size(max=255) String subjectStandard,
-        @Size(max=1) String enableFlag,
-        @Size(max=500) String remark
+        @Size(max = 64) String subjectCode,
+        @Size(max = 255) String subjectName,
+        @Size(max = 64) String subjectType,
+        @Size(max = 500) String subjectContent,
+        @Size(max = 255) String subjectStandard,
+        @Size(max = 1) String enableFlag,
+        @Size(max = 500) String remark
 ) implements BusinessCacheQuery {
     @Override
     public int cacheOffset() {

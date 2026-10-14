@@ -160,7 +160,7 @@ public class WorkstationServiceImpl implements IWorkstationService {
         WorkstationExample example = new WorkstationExample();
         for (var id : ids) requireRecord(id);
         example.createCriteria().andIdIn(ids)
-                
+
         ;
         if (mapper.deleteByExample(example) != ids.size()) {
             throw new FoundationException(ErrorCode.RESOURCE_CONFLICT);
@@ -231,7 +231,7 @@ public class WorkstationServiceImpl implements IWorkstationService {
         if (inputs.isEmpty()) return new WorkstationSyncResult(0, 0, 0, 0);
         var example = new WorkstationExample();
         example.createCriteria().andCodeIn(List.copyOf(keys))
-                
+
         ;
         var existing = new HashMap<String, WorkstationEntity>();
         for (var row : mapper.selectByExample(example)) {

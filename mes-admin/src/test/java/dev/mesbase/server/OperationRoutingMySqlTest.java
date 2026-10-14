@@ -66,7 +66,16 @@ import org.springframework.context.annotation.AnnotationConfigApplicationContext
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Import;
+import java.sql.Connection;
+import org.apache.ibatis.executor.statement.StatementHandler;
+import org.apache.ibatis.plugin.Interceptor;
+import org.apache.ibatis.plugin.Intercepts;
+import org.apache.ibatis.plugin.Invocation;
+import org.apache.ibatis.plugin.Signature;
+import org.apache.ibatis.reflection.SystemMetaObject;
 import org.springframework.jdbc.core.JdbcTemplate;
+import dev.mesbase.acceptance.AcceptanceBusinessDatabase;
+import java.util.UUID;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
 import org.springframework.mock.env.MockEnvironment;
 import org.springframework.transaction.annotation.EnableTransactionManagement;
@@ -76,26 +85,30 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.mock;
 
 /**
- * TEST ONLY: actual isolated MySQL + Spring transactions + real coordinator; synthetic ERP port, no server started.
+ * TEST ONLY: configured SIMPLE_B MySQL + Spring transactions; H2 coordinator and synthetic ERP port, no user server started.
  */
 class OperationRoutingMySqlTest {
-    static final String FACTORY = "TEST_OR_MYSQL";
+    static final String FACTORY = "SIMPLE_B";
     static final Set<Class<?>> MAPPERS = Set.of(OperationMapper.class, RoutingMapper.class,
             RoutingNodeMapper.class, RoutingEdgeMapper.class, RoutingProductMapper.class, MaterialMapper.class);
 
-    static DriverManagerDataSource source(Path file, String expected) throws Exception {
-        var settings = new Properties();
-        try (var reader = Files.newBufferedReader(file)) {
-            settings.load(reader);
+    /**
+     * TEST ONLY dialect translation; the real center MySQL mapper is unchanged.
+     */
+    @Intercepts(@Signature(type = StatementHandler.class, method = "prepare", args = {Connection.class, Integer.class}))
+    static class H2SyncDialect implements Interceptor {
+        @Override
+        public Object intercept(Invocation invocation) throws Throwable {
+            var statement = (StatementHandler) invocation.getTarget();
+            var bound = statement.getBoundSql();
+            String sql = bound.getSql();
+            if (sql.contains("DATE_SUB(CURRENT_TIMESTAMP(6), INTERVAL ? SECOND)")) {
+                SystemMetaObject.forObject(bound).setValue("sql", sql.replace(
+                        "DATE_SUB(CURRENT_TIMESTAMP(6), INTERVAL ? SECOND)",
+                        "DATEADD('SECOND', -?, CURRENT_TIMESTAMP(6))"));
+            }
+            return invocation.proceed();
         }
-        if (!expected.equals(settings.getProperty("database")))
-            throw new IllegalArgumentException("Explicit acceptance schema required");
-        String password = settings.getProperty("password");
-        if (password.startsWith("\"") && password.endsWith("\""))
-            password = password.substring(1, password.length() - 1);
-        return new DriverManagerDataSource("jdbc:mysql://" + settings.getProperty("host") + ":" + settings.getProperty("port")
-                + "/" + expected + "?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Shanghai",
-                settings.getProperty("user"), password);
     }
 
     @Configuration
@@ -155,9 +168,9 @@ class OperationRoutingMySqlTest {
 
     @Test
     void syntheticErpUsesRealMySqlUpsertAndCannotRewritePublishedInstructions() throws Exception {
-        Assumptions.assumeTrue(Boolean.getBoolean("mes.test.operation.mysql"), "Requires explicit owned MySQL acceptance schemas");
-        var business = source(Path.of(".local/operation-routing-20261013/mysql-conversion.cnf"), "mes_base_oproute_conversion_20261013");
-        var center = source(Path.of(".local/operation-routing-20261013/mysql-center.cnf"), "mes_base_dev");
+        Assumptions.assumeTrue(Boolean.getBoolean("mes.test.operation.mysql"), "Requires the configured SIMPLE_B MySQL acceptance binding");
+        var business = AcceptanceBusinessDatabase.source();
+        var center = new DriverManagerDataSource("jdbc:h2:mem:" + UUID.randomUUID() + ";MODE=MySQL;DATABASE_TO_LOWER=TRUE;DB_CLOSE_DELAY=-1", "sa", "");
         var jdbc = new JdbcTemplate(business);
         var centerJdbc = new JdbcTemplate(center);
         var id = new FactoryId(FACTORY);
@@ -166,10 +179,19 @@ class OperationRoutingMySqlTest {
         var catalog = new InMemoryFactoryCatalog(List.of(factory));
         var identity = new DatasourceIdentity("TEST_ONLY_OPERATION_ROUTING_MYSQL");
         var binding = new BusinessRuntimeBinding(id, identity, 1);
-        var platform = new PlatformPersistence(center, Set.of(MasterSyncMapper.class));
-        // The real coordinator table has a factory FK; seed an exact disposable center identity.
-        centerJdbc.update("INSERT INTO mf_factory(factory_id,enterprise_id,factory_code,factory_name,status,revision) VALUES(?,?,?,?,'ENABLED',1)",
-                FACTORY, "TEST_ONLY", FACTORY, "TEST ONLY 同步 MySQL 验收");
+        var platform = new PlatformPersistence(center, Set.of(MasterSyncMapper.class),
+                configuration -> configuration.addInterceptor(new H2SyncDialect()));
+        // Coordinator is an explicit H2 fixture; no real center factory or sync rows are modified.
+        centerJdbc.execute("CREATE TABLE mes_master_sync(id BIGINT AUTO_INCREMENT PRIMARY KEY,"
+                + "factory_id VARCHAR(64),sync_key VARCHAR(96),status VARCHAR(24) DEFAULT 'IDLE',"
+                + "run_token VARCHAR(40),started_at DATETIME(6),updated_at DATETIME(6),finished_at DATETIME(6),"
+                + "last_success_at DATETIME(6),cursor_time DATETIME(6),processed_count BIGINT DEFAULT 0,"
+                + "error_message VARCHAR(1000),UNIQUE(factory_id,sync_key))");
+        for (String table : List.of("operation", "routing", "material", "unit_measure")) {
+            if (jdbc.queryForObject("SELECT COUNT(*) FROM " + table + " WHERE code LIKE 'TEST-OR-MYSQL-%'", Long.class) != 0) {
+                throw new IllegalStateException("Acceptance sample code conflict; existing rows will not be overwritten");
+            }
+        }
         final String[] stage = {"first"};
         final int[] queries = {0, 0};
         try (var registry = new RuntimeRegistry(); var context = new AnnotationConfigApplicationContext()) {
@@ -208,9 +230,9 @@ class OperationRoutingMySqlTest {
             context.register(Config.class);
             context.refresh();
             FactoryContext.bind(scope);
-            jdbc.update("INSERT INTO unit_measure(factory_id,code,name,status) VALUES(?,?,?,'ENABLED')", FACTORY, "TEST-OR-MYSQL-UOM", "TEST ONLY");
-            Long unit = jdbc.queryForObject("SELECT id FROM unit_measure WHERE factory_id=? AND code=?", Long.class, FACTORY, "TEST-OR-MYSQL-UOM");
-            jdbc.update("INSERT INTO material(factory_id,code,name,unit_id,material_type,status) VALUES(?,?,?,?,'PRODUCT','ENABLED')", FACTORY, "TEST-OR-MYSQL-PRODUCT", "TEST ONLY", unit);
+            jdbc.update("INSERT INTO unit_measure(code,name,status) VALUES(?,?,'ENABLED')", "TEST-OR-MYSQL-UOM", "TEST ONLY");
+            Long unit = jdbc.queryForObject("SELECT id FROM unit_measure WHERE code=?", Long.class, "TEST-OR-MYSQL-UOM");
+            jdbc.update("INSERT INTO material(code,name,unit_id,material_type,status) VALUES(?,?,?,'PRODUCT','ENABLED')", "TEST-OR-MYSQL-PRODUCT", "TEST ONLY", unit);
             var operations = context.getBean(IOperationService.class);
             var routes = context.getBean(IRoutingService.class);
             var coordinator = context.getBean(SyncCoordinator.class);
@@ -221,8 +243,8 @@ class OperationRoutingMySqlTest {
             coordinator.fail(operationRun);
             assertEquals(2, operations.sync(scope).created());
             assertEquals(2, operations.sync(scope).skipped());
-            Long operationId = jdbc.queryForObject("SELECT id FROM operation WHERE factory_id=? AND code=?", Long.class, FACTORY, "TEST-OR-MYSQL-OP1");
-            Long materialId = jdbc.queryForObject("SELECT id FROM material WHERE factory_id=? AND code=?", Long.class, FACTORY, "TEST-OR-MYSQL-PRODUCT");
+            Long operationId = jdbc.queryForObject("SELECT id FROM operation WHERE code=?", Long.class, "TEST-OR-MYSQL-OP1");
+            Long materialId = jdbc.queryForObject("SELECT id FROM material WHERE code=?", Long.class, "TEST-OR-MYSQL-PRODUCT");
             verifyGraphs(routes, jdbc, operationId, materialId);
             var routingRun = coordinator.claim(scope, "routing.erp", Duration.ofMinutes(5));
             assertEquals(ErrorCode.SYNC_RUNNING, assertThrows(FoundationException.class,
@@ -231,7 +253,7 @@ class OperationRoutingMySqlTest {
             coordinator.fail(routingRun);
             assertEquals(1, routes.sync(scope).created());
             assertEquals(1, routes.sync(scope).skipped());
-            Long routeId = jdbc.queryForObject("SELECT id FROM routing WHERE factory_id=? AND code=? AND version=1", Long.class, FACTORY, "TEST-OR-MYSQL-ROUTE");
+            Long routeId = jdbc.queryForObject("SELECT id FROM routing WHERE code=? AND version=1", Long.class, "TEST-OR-MYSQL-ROUTE");
             var published = routes.publish(routeId, 0);
             assertEquals("PUBLISHED", published.getStatus());
             var frozen = routes.detail(routeId);
@@ -249,14 +271,14 @@ class OperationRoutingMySqlTest {
             assertEquals(1, routes.sync(scope).skipped());
             assertEquals("PUBLISHED", routes.detail(routeId).routing().getStatus());
             assertEquals("TEST ONLY first", routes.detail(routeId).routing().getName());
-            assertEquals(1, jdbc.queryForObject("SELECT COUNT(*) FROM routing WHERE factory_id=? AND code='TEST-OR-MYSQL-ROUTE' AND version=2 AND status='DRAFT'", Integer.class, FACTORY));
+            assertEquals(1, jdbc.queryForObject("SELECT COUNT(*) FROM routing WHERE code='TEST-OR-MYSQL-ROUTE' AND version=2 AND status='DRAFT'", Integer.class));
             assertEquals("SUCCEEDED", centerJdbc.queryForObject("SELECT status FROM mes_master_sync WHERE factory_id=? AND sync_key='routing.erp'", String.class, FACTORY));
-            Long versionTwo = jdbc.queryForObject("SELECT id FROM routing WHERE factory_id=? AND code='TEST-OR-MYSQL-ROUTE' AND version=2", Long.class, FACTORY);
+            Long versionTwo = jdbc.queryForObject("SELECT id FROM routing WHERE code='TEST-OR-MYSQL-ROUTE' AND version=2", Long.class);
             routes.publish(versionTwo, routes.detail(versionTwo).routing().getRevision());
             stage[0] = "graph";
             assertEquals(1, routes.sync(scope).created());
             assertEquals(1, routes.sync(scope).skipped());
-            Long versionThree = jdbc.queryForObject("SELECT id FROM routing WHERE factory_id=? AND code='TEST-OR-MYSQL-ROUTE' AND version=3", Long.class, FACTORY);
+            Long versionThree = jdbc.queryForObject("SELECT id FROM routing WHERE code='TEST-OR-MYSQL-ROUTE' AND version=3", Long.class);
             assertEquals(5, routes.detail(versionThree).nodes().size());
             assertEquals(5, routes.detail(versionThree).edges().size());
             assertEquals(2, routes.detail(versionTwo).nodes().size());
@@ -268,16 +290,14 @@ class OperationRoutingMySqlTest {
                     "SELECT run_token FROM mes_master_sync WHERE factory_id=? AND sync_key='operation.erp'", String.class, FACTORY));
         } finally {
             FactoryContext.clear();
-            // Only this fixture's exact factory rows are disposable; source-converted rows remain untouched.
-            jdbc.update("DELETE e FROM routing_edge e JOIN routing r ON r.id=e.routing_id WHERE r.factory_id=?", FACTORY);
-            jdbc.update("DELETE s FROM routing_node s JOIN routing r ON r.id=s.routing_id WHERE r.factory_id=?", FACTORY);
-            jdbc.update("DELETE p FROM routing_product p JOIN routing r ON r.id=p.routing_id WHERE r.factory_id=?", FACTORY);
-            jdbc.update("DELETE FROM routing WHERE factory_id=?", FACTORY);
-            jdbc.update("DELETE FROM operation WHERE factory_id=?", FACTORY);
-            jdbc.update("DELETE FROM material WHERE factory_id=?", FACTORY);
-            jdbc.update("DELETE FROM unit_measure WHERE factory_id=?", FACTORY);
-            centerJdbc.update("DELETE FROM mes_master_sync WHERE factory_id=?", FACTORY);
-            centerJdbc.update("DELETE FROM mf_factory WHERE factory_id=? AND factory_code=?", FACTORY, FACTORY);
+            // Preflight proved these exact test prefixes absent; cleanup never targets user rows.
+            jdbc.update("DELETE e FROM routing_edge e JOIN routing r ON r.id=e.routing_id WHERE r.code LIKE 'TEST-OR-MYSQL-%'");
+            jdbc.update("DELETE s FROM routing_node s JOIN routing r ON r.id=s.routing_id WHERE r.code LIKE 'TEST-OR-MYSQL-%'");
+            jdbc.update("DELETE p FROM routing_product p JOIN routing r ON r.id=p.routing_id WHERE r.code LIKE 'TEST-OR-MYSQL-%'");
+            jdbc.update("DELETE FROM routing WHERE code LIKE 'TEST-OR-MYSQL-%'");
+            jdbc.update("DELETE FROM operation WHERE code LIKE 'TEST-OR-MYSQL-%'");
+            jdbc.update("DELETE FROM material WHERE code LIKE 'TEST-OR-MYSQL-%'");
+            jdbc.update("DELETE FROM unit_measure WHERE code LIKE 'TEST-OR-MYSQL-%'");
         }
     }
 

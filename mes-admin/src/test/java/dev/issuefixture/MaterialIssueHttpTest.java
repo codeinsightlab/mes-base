@@ -103,9 +103,9 @@ class MaterialIssueHttpTest {
                 for (String name : List.of("V2__simple_business_capabilities.sql", "V3__operation_routing.sql", "V8__warehouse_inventory.sql", "V11__material_issue.sql", "V12__material_issue_quantity_precision.sql")) {
                     String ddl = Files.readString(Path.of("mes-admin/src/main/resources/db/business/" + name))
                             .replace(") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT=", ") COMMENT ")
-                    .replaceAll("(?m)^\\s*factory_id [^\\n]+\\n", "")
-                    .replace("factory_id,", "")
-                    .replace("factory_id, ", "");
+                            .replaceAll("(?m)^\\s*factory_id [^\\n]+\\n", "")
+                            .replace("factory_id,", "")
+                            .replace("factory_id, ", "");
                     for (String statement : ddl.split(";")) if (!statement.isBlank()) jdbc.execute(statement);
                 }
                 jdbc.update("INSERT INTO material(id,code,name,unit_id,material_type,status) VALUES(1,'M1','物料一',1,'ITEM','ENABLED')");
@@ -283,6 +283,15 @@ class MaterialIssueHttpTest {
                     .andExpect(jsonPath("items.length()").value(1));
             m.perform(get(H + "/1").header("Authorization", "Bearer FULL").header("X-Factory-Id", "B"))
                     .andExpect(status().isNotFound());
+            // Identical local IDs are valid in separate databases without row factory fields.
+            m.perform(post(H).header("Authorization", "Bearer FULL").header("X-Factory-Id", "B")
+                            .contentType("application/json").content(HEADER.replace("QA_ISSUE", "QA_ISSUE_B")))
+                    .andExpect(status().isOk()).andExpect(jsonPath("id").value("1"))
+                    .andExpect(jsonPath("factoryId").doesNotExist());
+            m.perform(get(H + "/1").header("Authorization", "Bearer FULL").header("X-Factory-Id", "A"))
+                    .andExpect(status().isOk()).andExpect(jsonPath("issueNo").value("QA_ISSUE"));
+            m.perform(get(H + "/1").header("Authorization", "Bearer FULL").header("X-Factory-Id", "B"))
+                    .andExpect(status().isOk()).andExpect(jsonPath("issueNo").value("QA_ISSUE_B"));
             m.perform(get(I).header("Authorization", "Bearer FULL").header("X-Factory-Id", "B"))
                     .andExpect(status().isOk()).andExpect(jsonPath("total").value(0));
             m.perform(delete(H).header("Authorization", "Bearer FULL").header("X-Factory-Id", "A")

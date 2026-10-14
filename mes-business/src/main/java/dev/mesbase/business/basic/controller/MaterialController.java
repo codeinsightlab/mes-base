@@ -70,7 +70,7 @@ public class MaterialController {
     @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED,
             permission = MaterialPermissions.UPDATE)
     public MaterialVo update(@PathVariable Long id,
-            @Valid @RequestBody MaterialUpdateCommand input) {
+                             @Valid @RequestBody MaterialUpdateCommand input) {
         return toView(service.updateById(id, input));
     }
 
@@ -79,8 +79,8 @@ public class MaterialController {
     @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED,
             permission = MaterialPermissions.DELETE)
     public void delete(@RequestBody
-            @NotEmpty @Size(max = 100)
-            List<@NotNull Long> ids) {
+                       @NotEmpty @Size(max = 100)
+                       List<@NotNull Long> ids) {
         service.deleteByIds(ids);
     }
 

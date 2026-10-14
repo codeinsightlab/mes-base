@@ -30,7 +30,6 @@ import dev.mesbase.business.production.domain.WorkorderEntity;
 import dev.mesbase.business.production.domain.WorkorderExample;
 import dev.mesbase.core.error.ErrorCode;
 import dev.mesbase.core.error.FoundationException;
-import dev.mesbase.platform.execution.FactoryContext;
 import java.time.LocalDateTime;
 import java.util.HashSet;
 import java.util.List;
@@ -39,6 +38,7 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -76,10 +76,6 @@ public class WorkOrderService {
         this.references = references;
         this.issues = issues;
         this.queries = queries;
-    }
-
-    private String factory() {
-        return FactoryContext.required().factoryId().value();
     }
 
     private void require(boolean ok) {
@@ -152,7 +148,7 @@ public class WorkOrderService {
                         .toList());
     }
 
-    @Transactional(transactionManager = "businessTransactionManager", isolation = Isolation.SERIALIZABLE, rollbackFor = Exception.class)
+    @Transactional(transactionManager = "businessTransactionManager", isolation = Isolation.READ_COMMITTED, rollbackFor = Exception.class)
     public WorkOrderModels.Detail create(WorkOrderModels.Save input) {
         validate(input);
         require(input.batches().stream().allMatch(b -> b.id() == null));
@@ -162,7 +158,7 @@ public class WorkOrderService {
         row.setRevision(0);
         row.setCreateTime(LocalDateTime.now());
         assign(row, input);
-        orders.insert(row);
+        saveOrder(row, true);
         saveBatches(row, input.batches());
         return detail(row.getId());
     }
@@ -175,7 +171,7 @@ public class WorkOrderService {
         uniqueCode(input.code(), id);
         assign(row, input);
         row.setRevision(row.getRevision() + 1);
-        orders.updateByPrimaryKey(row);
+        saveOrder(row, false);
         saveBatches(row, input.batches());
         return detail(id);
     }
@@ -210,7 +206,7 @@ public class WorkOrderService {
         row.setStatus("RELEASED");
         row.setRevision(revision + 1);
         row.setUpdateTime(LocalDateTime.now());
-        orders.updateByPrimaryKey(row);
+        saveOrder(row, false);
         return detail(id);
     }
 
@@ -392,6 +388,22 @@ public class WorkOrderService {
         row.setUpdateTime(LocalDateTime.now());
     }
 
+    private void saveOrder(WorkorderEntity row, boolean created) {
+        try {
+            if ((created ? orders.insert(row) : orders.updateByPrimaryKey(row)) != 1) conflict();
+        } catch (DuplicateKeyException failure) {
+            throw new FoundationException(ErrorCode.RESOURCE_CONFLICT, failure);
+        }
+    }
+
+    private void saveBatch(ProductionBatchEntity row) {
+        try {
+            if ((row.getId() == null ? batches.insert(row) : batches.updateByPrimaryKey(row)) != 1) conflict();
+        } catch (DuplicateKeyException failure) {
+            throw new FoundationException(ErrorCode.RESOURCE_CONFLICT, failure);
+        }
+    }
+
     private void saveBatches(WorkorderEntity w, List<WorkOrderModels.BatchInput> input) {
         var old = batchRows(w.getId());
         var seen = new HashSet<Long>();
@@ -426,8 +438,7 @@ public class WorkOrderService {
             row.setPlannedQty(b.plannedQty());
             row.setRemark(b.remark());
             row.setUpdateTime(LocalDateTime.now());
-            if (row.getId() == null) batches.insert(row);
-            else batches.updateByPrimaryKey(row);
+            saveBatch(row);
         }
 
     }

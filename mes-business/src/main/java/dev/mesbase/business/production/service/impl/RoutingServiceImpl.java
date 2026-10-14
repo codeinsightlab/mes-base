@@ -469,10 +469,6 @@ public class RoutingServiceImpl implements IRoutingService {
         return detail;
     }
 
-    private String factory() {
-        return FactoryContext.required().factoryId().value();
-    }
-
     private RoutingExample byId(Long id) {
         var filter = new RoutingExample();
         filter.createCriteria().andIdEqualTo(id);

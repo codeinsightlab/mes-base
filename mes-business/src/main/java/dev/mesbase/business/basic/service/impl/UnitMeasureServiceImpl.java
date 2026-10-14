@@ -154,7 +154,7 @@ public class UnitMeasureServiceImpl implements IUnitMeasureService {
         UnitMeasureExample example = new UnitMeasureExample();
         for (var id : ids) requireRecord(id);
         example.createCriteria().andIdIn(ids)
-                
+
         ;
         if (mapper.deleteByExample(example) != ids.size()) {
             throw new FoundationException(ErrorCode.RESOURCE_CONFLICT);
@@ -225,7 +225,7 @@ public class UnitMeasureServiceImpl implements IUnitMeasureService {
         if (inputs.isEmpty()) return new UnitMeasureSyncResult(0, 0, 0, 0);
         var example = new UnitMeasureExample();
         example.createCriteria().andCodeIn(List.copyOf(keys))
-                
+
         ;
         var existing = new HashMap<String, UnitMeasureEntity>();
         for (var row : mapper.selectByExample(example)) {

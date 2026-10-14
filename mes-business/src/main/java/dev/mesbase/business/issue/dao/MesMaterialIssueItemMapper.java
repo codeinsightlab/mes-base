@@ -21,9 +21,11 @@ public interface MesMaterialIssueItemMapper {
 
     MesMaterialIssueItemEntity selectByPrimaryKey(Long id);
 
-    int updateByExampleSelective(@Param("row") MesMaterialIssueItemEntity row, @Param("example") MesMaterialIssueItemExample example);
+    int updateByExampleSelective(@Param("row") MesMaterialIssueItemEntity row,
+                                 @Param("example") MesMaterialIssueItemExample example);
 
-    int updateByExample(@Param("row") MesMaterialIssueItemEntity row, @Param("example") MesMaterialIssueItemExample example);
+    int updateByExample(@Param("row") MesMaterialIssueItemEntity row,
+                        @Param("example") MesMaterialIssueItemExample example);
 
     int updateByPrimaryKeySelective(MesMaterialIssueItemEntity row);
 

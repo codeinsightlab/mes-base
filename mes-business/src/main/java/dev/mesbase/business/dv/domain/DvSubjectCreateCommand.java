@@ -8,13 +8,13 @@ import jakarta.validation.constraints.Size;
  */
 public record DvSubjectCreateCommand(
 
-        @NotBlank @Size(max=64) String subjectCode,
-        @Size(max=255) String subjectName,
-        @Size(max=64) String subjectType,
-        @NotBlank @Size(max=500) String subjectContent,
-        @Size(max=255) String subjectStandard,
-        @NotBlank @Size(max=1) String enableFlag,
-        @Size(max=500) String remark
+        @NotBlank @Size(max = 64) String subjectCode,
+        @Size(max = 255) String subjectName,
+        @Size(max = 64) String subjectType,
+        @NotBlank @Size(max = 500) String subjectContent,
+        @Size(max = 255) String subjectStandard,
+        @NotBlank @Size(max = 1) String enableFlag,
+        @Size(max = 500) String remark
 ) {
 }
 

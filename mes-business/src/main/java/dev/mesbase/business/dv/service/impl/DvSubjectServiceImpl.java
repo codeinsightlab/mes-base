@@ -48,10 +48,10 @@ public class DvSubjectServiceImpl implements IDvSubjectService {
     private final BusinessCacheProcessor caches;
 
     public DvSubjectServiceImpl(DvSubjectMapper mapper,
-            ObjectProvider<DvSubjectQueryPort> queries,
-            SyncCoordinator coordinator,
-            ObjectProvider<IDvSubjectService> self,
-            Validator validator, BusinessCacheProcessor caches) {
+                                ObjectProvider<DvSubjectQueryPort> queries,
+                                SyncCoordinator coordinator,
+                                ObjectProvider<IDvSubjectService> self,
+                                Validator validator, BusinessCacheProcessor caches) {
         this.mapper = mapper;
         this.query = queries.getIfAvailable(UnconfiguredDvSubjectQueryAdapter::new);
         this.coordinator = coordinator;
@@ -163,7 +163,7 @@ public class DvSubjectServiceImpl implements IDvSubjectService {
         DvSubjectExample example = new DvSubjectExample();
         for (var id : ids) requireRecord(id);
         example.createCriteria().andSubjectIdIn(ids)
-                ;
+        ;
         if (mapper.deleteByExample(example) != ids.size()) {
             throw new FoundationException(ErrorCode.RESOURCE_CONFLICT);
         }
@@ -176,6 +176,7 @@ public class DvSubjectServiceImpl implements IDvSubjectService {
         }
         return row;
     }
+
     public DvSubjectSyncResult sync(FactoryScope scope) {
         if (!FactoryContext.required().equals(scope)) {
             throw new FoundationException(ErrorCode.CONFLICT);
@@ -200,7 +201,7 @@ public class DvSubjectServiceImpl implements IDvSubjectService {
 
     @Transactional(transactionManager = "businessTransactionManager", rollbackFor = Exception.class)
     public DvSubjectSyncResult upsert(FactoryScope scope,
-                                       List<ExternalDvSubject> inputs) {
+                                      List<ExternalDvSubject> inputs) {
         if (!FactoryContext.required().equals(scope)) {
             throw new FoundationException(ErrorCode.CONFLICT);
         }
@@ -216,7 +217,7 @@ public class DvSubjectServiceImpl implements IDvSubjectService {
         if (inputs.isEmpty()) return new DvSubjectSyncResult(0, 0, 0, 0);
         var example = new DvSubjectExample();
         example.createCriteria().andSubjectCodeIn(List.copyOf(keys))
-                ;
+        ;
         var existing = new HashMap<String, DvSubjectEntity>();
         for (var row : mapper.selectByExample(example)) {
             if (existing.put(row.getSubjectCode(), row) != null) {

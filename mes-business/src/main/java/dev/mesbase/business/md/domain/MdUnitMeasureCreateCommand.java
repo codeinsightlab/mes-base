@@ -10,13 +10,13 @@ import java.math.BigDecimal;
  */
 public record MdUnitMeasureCreateCommand(
 
-        @NotBlank @Size(max=64) String measureCode,
-        @NotBlank @Size(max=255) String measureName,
-        @NotBlank @Size(max=1) String primaryFlag,
+        @NotBlank @Size(max = 64) String measureCode,
+        @NotBlank @Size(max = 255) String measureName,
+        @NotBlank @Size(max = 1) String primaryFlag,
         Long primaryId,
-        @Digits(integer=12,fraction=6) BigDecimal changeRate,
-        @NotBlank @Size(max=1) String enableFlag,
-        @Size(max=500) String remark
+        @Digits(integer = 12, fraction = 6) BigDecimal changeRate,
+        @NotBlank @Size(max = 1) String enableFlag,
+        @Size(max = 500) String remark
 ) {
 }
 

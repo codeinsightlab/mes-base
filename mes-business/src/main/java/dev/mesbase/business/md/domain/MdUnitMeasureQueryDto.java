@@ -14,13 +14,13 @@ public record MdUnitMeasureQueryDto(
         @Min(0) Integer offset,
         @Min(1) @Max(100) Integer limit,
 
-        @Size(max=64) String measureCode,
-        @Size(max=255) String measureName,
-        @Size(max=1) String primaryFlag,
+        @Size(max = 64) String measureCode,
+        @Size(max = 255) String measureName,
+        @Size(max = 1) String primaryFlag,
         Long primaryId,
-        @Digits(integer=12,fraction=6) BigDecimal changeRate,
-        @Size(max=1) String enableFlag,
-        @Size(max=500) String remark
+        @Digits(integer = 12, fraction = 6) BigDecimal changeRate,
+        @Size(max = 1) String enableFlag,
+        @Size(max = 500) String remark
 ) implements BusinessCacheQuery {
     @Override
     public int cacheOffset() {

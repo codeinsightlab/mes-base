@@ -10,13 +10,13 @@ import java.math.BigDecimal;
  */
 public record ExternalMdWorkshop(
 
-        @NotBlank @Size(max=64) String workshopCode,
-        @NotBlank @Size(max=255) String workshopName,
-        @Digits(integer=16,fraction=2) BigDecimal area,
-        @Size(max=64) String charge,
+        @NotBlank @Size(max = 64) String workshopCode,
+        @NotBlank @Size(max = 255) String workshopName,
+        @Digits(integer = 16, fraction = 2) BigDecimal area,
+        @Size(max = 64) String charge,
         Long deptId,
-        @NotBlank @Size(max=1) String enableFlag,
-        @Size(max=500) String remark
+        @NotBlank @Size(max = 1) String enableFlag,
+        @Size(max = 500) String remark
 ) {
 }
 

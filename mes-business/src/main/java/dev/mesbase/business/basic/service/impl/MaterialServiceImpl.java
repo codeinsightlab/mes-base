@@ -180,7 +180,7 @@ public class MaterialServiceImpl implements IMaterialService {
         MaterialExample example = new MaterialExample();
         for (var id : ids) requireRecord(id);
         example.createCriteria().andIdIn(ids)
-                
+
         ;
         if (mapper.deleteByExample(example) != ids.size()) {
             throw new FoundationException(ErrorCode.RESOURCE_CONFLICT);
@@ -251,7 +251,7 @@ public class MaterialServiceImpl implements IMaterialService {
         if (inputs.isEmpty()) return new MaterialSyncResult(0, 0, 0, 0);
         var example = new MaterialExample();
         example.createCriteria().andCodeIn(List.copyOf(keys))
-                
+
         ;
         var existing = new HashMap<String, MaterialEntity>();
         for (var row : mapper.selectByExample(example)) {

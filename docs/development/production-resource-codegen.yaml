@@ -6,8 +6,8 @@ sync:
   batchMaximum: 1000
 
 source:
-  connectionConfig: "mes-admin/src/main/resources/application-dev.yml"
-  datasource: "dev"
+  connectionConfig: ".local/codegen-simple-b.yml"
+  datasource: "acceptance"
   schema: null
 
 selection:

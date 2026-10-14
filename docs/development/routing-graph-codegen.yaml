@@ -14,8 +14,8 @@ sync:
 
 source:
   # 引用已有开发连接配置中的 profile，不等于运行时工厂或数据库名称。
-  connectionConfig: "mes-admin/src/main/resources/application-dev.yml"
-  datasource: "dev"
+  connectionConfig: ".local/codegen-simple-b.yml"
+  datasource: "acceptance"
   # null 表示不指定 schema，使用连接所选数据库的 metadata 范围。
   schema: null
 

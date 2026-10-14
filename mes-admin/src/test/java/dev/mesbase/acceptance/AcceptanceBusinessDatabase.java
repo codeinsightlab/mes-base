@@ -8,7 +8,9 @@ import java.util.Map;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
 import org.yaml.snakeyaml.Yaml;
 
-/** TEST ONLY: resolve and verify the user-designated existing SIMPLE_B binding. */
+/**
+ * TEST ONLY: resolve and verify the user-designated existing SIMPLE_B binding.
+ */
 public final class AcceptanceBusinessDatabase {
     private AcceptanceBusinessDatabase() {
     }

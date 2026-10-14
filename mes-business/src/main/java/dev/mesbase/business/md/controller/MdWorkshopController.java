@@ -70,7 +70,7 @@ public class MdWorkshopController {
     @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED,
             permission = MdWorkshopPermissions.UPDATE)
     public MdWorkshopVo update(@PathVariable Long id,
-            @Valid @RequestBody MdWorkshopUpdateCommand input) {
+                               @Valid @RequestBody MdWorkshopUpdateCommand input) {
         return toView(service.updateById(id, input));
     }
 
@@ -79,8 +79,8 @@ public class MdWorkshopController {
     @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED,
             permission = MdWorkshopPermissions.DELETE)
     public void delete(@RequestBody
-            @NotEmpty @Size(max = 100)
-            List<@NotNull Long> ids) {
+                       @NotEmpty @Size(max = 100)
+                       List<@NotNull Long> ids) {
         service.deleteByIds(ids);
     }
 

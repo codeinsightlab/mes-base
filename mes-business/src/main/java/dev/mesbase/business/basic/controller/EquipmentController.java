@@ -68,7 +68,7 @@ public class EquipmentController {
     @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED,
             permission = EquipmentPermissions.UPDATE)
     public EquipmentVo update(@PathVariable Long id,
-            @Valid @RequestBody EquipmentUpdateCommand input) {
+                              @Valid @RequestBody EquipmentUpdateCommand input) {
         return toView(service.updateById(id, input));
     }
 
@@ -77,8 +77,8 @@ public class EquipmentController {
     @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED,
             permission = EquipmentPermissions.DELETE)
     public void delete(@RequestBody
-            @NotEmpty @Size(max = 100)
-            List<@NotNull Long> ids) {
+                       @NotEmpty @Size(max = 100)
+                       List<@NotNull Long> ids) {
         service.deleteByIds(ids);
     }
 

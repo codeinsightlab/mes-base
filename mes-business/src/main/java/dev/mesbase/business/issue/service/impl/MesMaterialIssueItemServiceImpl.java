@@ -15,7 +15,6 @@ import dev.mesbase.core.error.ErrorCode;
 import dev.mesbase.core.error.FoundationException;
 import dev.mesbase.infrastructure.cache.annotation.BusinessCache;
 import dev.mesbase.infrastructure.cache.annotation.BusinessCacheEvict;
-import dev.mesbase.platform.execution.FactoryContext;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
@@ -158,7 +157,7 @@ public class MesMaterialIssueItemServiceImpl implements IMesMaterialIssueItemSer
         MesMaterialIssueItemExample example = new MesMaterialIssueItemExample();
         for (var id : ids) requireRecord(id);
         example.createCriteria().andIdIn(ids)
-                
+
         ;
         if (mapper.deleteByExample(example) != ids.size()) {
             throw new FoundationException(ErrorCode.RESOURCE_CONFLICT);

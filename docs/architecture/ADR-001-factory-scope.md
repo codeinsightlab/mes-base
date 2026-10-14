@@ -24,3 +24,17 @@
 
 上述 Enterprise record 是早期值对象设计记录。当前 Factory/平台目录使用 `enterpriseId` 字段，没有任何生产、测试、Bean、配置或外部契约引用 Enterprise Java 类型。
 本轮删除该未接入 record，企业归属字段、FactoryScope 和目录行为保持不变；不实现多企业业务。证据及验证见 [Architecture Slimming Audit](architecture-slimming-audit.md)。
+
+## 2026-10-13：业务数据只采用独立业务库隔离
+
+用户确认：本项目每厂独立业务库，业务表不再保存 factory_id、工厂编码或等价租户字段，
+不再叠加行级工厂谓词。既有物料、工序、路线、仓库和领料中的这些字段属于冗余设计，
+按新增迁移及重新生成／适配治理；原迁移保持历史证据与 checksum。
+
+FactoryScope、请求选厂、当前厂权限、固定事务租约与缓存命名空间仍是基础设施边界。
+当前库内引用存在性、工单／产品一致性、确切工艺版本和父子一致性继续验证；不同厂可有
+相同本地主键。中心库工厂资料、连接绑定、工厂角色／偏好和 mes_master_sync 的协调键
+继续保存必要工厂标识。没有启用同库多厂模式，不为配置错误建立第二层租户框架。
+
+执行与验证见 `docs/reviews/2026-10-13-business-factory-column-removal-review.md`。
+本次真实迁移目标为已核对的 SIMPLE_B；其他业务库部署前须单独备份、核对并升级。

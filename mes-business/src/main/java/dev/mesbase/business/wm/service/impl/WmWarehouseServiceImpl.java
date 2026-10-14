@@ -161,7 +161,7 @@ public class WmWarehouseServiceImpl implements IWmWarehouseService {
         WmWarehouseExample example = new WmWarehouseExample();
         for (var id : ids) requireRecord(id);
         example.createCriteria().andIdIn(ids)
-                
+
         ;
         if (mapper.deleteByExample(example) != ids.size()) {
             throw new FoundationException(ErrorCode.RESOURCE_CONFLICT);
@@ -226,7 +226,7 @@ public class WmWarehouseServiceImpl implements IWmWarehouseService {
         if (inputs.isEmpty()) return new WmWarehouseSyncResult(0, 0, 0, 0);
         var example = new WmWarehouseExample();
         example.createCriteria().andCodeIn(List.copyOf(keys))
-                
+
         ;
         var existing = new HashMap<String, WmWarehouseEntity>();
         for (var row : mapper.selectByExample(example)) {

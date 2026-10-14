@@ -841,3 +841,23 @@ Controller 接口、前端 API／按钮或同步权限。工具自身缺参默�
 -Dsurefire.failIfNoSpecifiedTests=false test` 通过（1项），以 TEST ONLY H2 验证关闭后生成产物
 无同步路径、前端按钮／接口、同步权限及主 Service 同步调用。`git diff --check` 通过。
 未执行正式生成或真实数据库验收。
+
+### 2026-10-13：移除业务表工厂列并按当前验收结构重新生成
+
+依据 AGENTS 第9.0节，业务表按独立业务库隔离，不再保存工厂字段。
+正式配置和业务开发配置移除 serverScopeColumn，继续 generateSync=false；当前生成源
+统一指向 `.local/codegen-simple-b.yml` 的 acceptance profile，来自已经核对的 SIMPLE_B
+中心绑定（数据源8、192.168.18.25:3306/mes_base_dev_business_simple_b）。连接快照不入Git，
+每次生成前仍须核对绑定；若用户改变目标，以新明确配置为准，不静默沿用旧库。
+
+主配置补齐当前已有模块的显式包映射，保持 basic、production、issue、wm 的实际目录，
+避免不含下划线的表落入另一个默认包。生成器通用 serverScopeColumn 能力保留，但本项目
+不使用，不按字段名限制其他项目的真实Schema。
+
+本轮V15移除16表工厂列后，从真实MySQL metadata生成16表审查副本，共306产物，
+无同步产物；采用64个标准Entity/Example/Mapper/XML产物，其余现有手工用例、控制器和
+页面只做字段及契约适配，保留规则和权限，未用基础CRUD覆盖工单／发布／图模型。
+手工变更文件解除生成归属。全量生成仍可能遇到手工文件OUTPUT_CONFLICT，不能恢复标记
+强行覆盖；复杂业务只复用持久化，基础CRUD并非其正式业务入口。菜单审查副本未执行。
+
+详细数据保全、验收、未重启用户服务及其他业务库部署边界见本轮review。

@@ -70,7 +70,7 @@ public class WorkstationController {
     @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED,
             permission = WorkstationPermissions.UPDATE)
     public WorkstationVo update(@PathVariable Long id,
-            @Valid @RequestBody WorkstationUpdateCommand input) {
+                                @Valid @RequestBody WorkstationUpdateCommand input) {
         return toView(service.updateById(id, input));
     }
 
@@ -79,8 +79,8 @@ public class WorkstationController {
     @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED,
             permission = WorkstationPermissions.DELETE)
     public void delete(@RequestBody
-            @NotEmpty @Size(max = 100)
-            List<@NotNull Long> ids) {
+                       @NotEmpty @Size(max = 100)
+                       List<@NotNull Long> ids) {
         service.deleteByIds(ids);
     }
 

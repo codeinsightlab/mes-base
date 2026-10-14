@@ -2,7 +2,6 @@ package dev.mesbase.business.basic.service;
 
 import dev.mesbase.core.error.ErrorCode;
 import dev.mesbase.core.error.FoundationException;
-import dev.mesbase.platform.execution.FactoryContext;
 import java.util.List;
 import dev.mesbase.business.wm.service.StockReferenceRules;
 import java.util.HashSet;
@@ -59,10 +58,6 @@ public class BasicDataRules {
         this.workstation = workstation;
         this.workshop = workshop;
         this.safetyStock = safetyStock;
-    }
-
-    private String factory() {
-        return FactoryContext.required().factoryId().value();
     }
 
     private void reject(boolean condition) {

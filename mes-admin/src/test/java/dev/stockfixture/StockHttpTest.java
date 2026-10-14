@@ -120,9 +120,9 @@ class StockHttpTest {
                 for (String name : List.of("V2__simple_business_capabilities.sql", "V8__warehouse_inventory.sql")) {
                     String ddl = Files.readString(Path.of("mes-admin/src/main/resources/db/business/" + name))
                             .replace(") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT=", ") COMMENT ")
-                    .replaceAll("(?m)^\\s*factory_id [^\\n]+\\n", "")
-                    .replace("factory_id,", "")
-                    .replace("factory_id, ", "");
+                            .replaceAll("(?m)^\\s*factory_id [^\\n]+\\n", "")
+                            .replace("factory_id,", "")
+                            .replace("factory_id, ", "");
                     for (String statement : ddl.split(";")) if (!statement.isBlank()) jdbc.execute(statement);
                 }
                 jdbc.update("INSERT INTO material(id,code,name,unit_id,material_type,status) VALUES(1,'M1','物料一',1,'ITEM','ENABLED')");

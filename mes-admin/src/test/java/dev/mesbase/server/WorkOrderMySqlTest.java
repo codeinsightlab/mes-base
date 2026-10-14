@@ -37,6 +37,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
+import dev.mesbase.acceptance.AcceptanceBusinessDatabase;
 import org.springframework.mock.env.MockEnvironment;
 import org.springframework.transaction.annotation.EnableTransactionManagement;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -134,7 +135,7 @@ class WorkOrderMySqlTest {
     @Test
     void realMySqlBusinessAndControlledIssueResults() throws Exception {
         Assumptions.assumeTrue(Boolean.getBoolean("mes.test.workorder.mysql"));
-        var business = OperationRoutingMySqlTest.source(Path.of(".local/operation-routing-20261013/mysql-b.cnf"), "mes_base_dev_business_simple_b");
+        var business = AcceptanceBusinessDatabase.source();
         var jdbc = new JdbcTemplate(business);
         var id = new FactoryId("SIMPLE_B");
         var identity = new DatasourceIdentity("TEST_ONLY_WORKORDER_MYSQL");
@@ -226,6 +227,34 @@ class WorkOrderMySqlTest {
             assertThrows(FoundationException.class, () -> service.confirmIssue(batchA, commandA, WorkOrderModels.IssueResult.REJECTED));
             assertEquals(pathA, service.batchDetail(batchA).path().stream().map(p -> p.getRoutingNodeId()).toList());
             assertEquals(pathA, service.batchDetail(batchB).path().stream().map(p -> p.getRoutingNodeId()).toList());
+            // A stale parent revision cannot overwrite another node's accepted edit.
+            var cas = service.create(input(tag + "-CAS", product, routing, 0));
+            try (var pool = Executors.newFixedThreadPool(2)) {
+                Callable<Boolean> edit = () -> {
+                    FactoryContext.bind(new FactoryScope(id));
+                    try {
+                        service.update(cas.workorder().getId(), input(tag + "-CAS", product, routing, 0));
+                        return true;
+                    } catch (FoundationException conflict) {
+                        return false;
+                    } finally {
+                        FactoryContext.clear();
+                    }
+                };
+                var results = pool.invokeAll(List.of(edit, edit));
+                assertEquals(1, results.stream().filter(f -> {
+                    try {
+                        return f.get();
+                    } catch (Exception failure) {
+                        throw new IllegalStateException(failure);
+                    }
+                }).count());
+            }
+            assertEquals(1, service.detail(cas.workorder().getId()).workorder().getRevision());
+            // Same business batch numbers are legal in a different workorder.
+            assertEquals("19001", cas.batches().getFirst().batch().getBatchNo());
+            assertThrows(FoundationException.class, () -> service.create(new WorkOrderModels.Save(tag + "-BAD", product, BigDecimal.ONE, routing, null, null, null, null, null, 0, List.of(new WorkOrderModels.BatchInput(null, "19001", new BigDecimal("2"), null)))));
+            assertEquals(0, jdbc.queryForObject("SELECT COUNT(*) FROM workorder WHERE code=?", Integer.class, tag + "-BAD"));
             Files.createDirectories(Path.of("target/validation"));
             Files.writeString(Path.of("target/validation/workorder-mysql-result.json"), "{\"passed\":true,\"schema\":\"mes_base_dev_business_simple_b\",\"fixtureTag\":\"" + tag + "\",\"workorderId\":" + order + ",\"routingId\":" + routing + ",\"issueEvidence\":\"TEST_ONLY_SIMULATED_RESULTS\",\"realERP\":false}");
         } finally {

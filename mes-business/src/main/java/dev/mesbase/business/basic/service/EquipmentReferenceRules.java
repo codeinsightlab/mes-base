@@ -7,7 +7,6 @@ import dev.mesbase.business.basic.domain.WorkstationEntity;
 import dev.mesbase.business.basic.domain.WorkstationExample;
 import dev.mesbase.core.error.ErrorCode;
 import dev.mesbase.core.error.FoundationException;
-import dev.mesbase.platform.execution.FactoryContext;
 import java.util.List;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
@@ -27,7 +26,6 @@ public class EquipmentReferenceRules {
     }
 
     public void lockWorkstations(List<Long> ids) {
-        String factory = FactoryContext.required().factoryId().value();
         var filter = new WorkstationExample();
         filter.createCriteria().andIdIn(ids);
         var lock = new WorkstationEntity();

@@ -164,7 +164,7 @@ public class MaterialCategoryServiceImpl implements IMaterialCategoryService {
         MaterialCategoryExample example = new MaterialCategoryExample();
         for (var id : ids) requireRecord(id);
         example.createCriteria().andIdIn(ids)
-                
+
         ;
         if (mapper.deleteByExample(example) != ids.size()) {
             throw new FoundationException(ErrorCode.RESOURCE_CONFLICT);
@@ -235,7 +235,7 @@ public class MaterialCategoryServiceImpl implements IMaterialCategoryService {
         if (inputs.isEmpty()) return new MaterialCategorySyncResult(0, 0, 0, 0);
         var example = new MaterialCategoryExample();
         example.createCriteria().andCodeIn(List.copyOf(keys))
-                
+
         ;
         var existing = new HashMap<String, MaterialCategoryEntity>();
         for (var row : mapper.selectByExample(example)) {

@@ -172,7 +172,7 @@ public class WmInventoryServiceImpl implements IWmInventoryService {
         WmInventoryExample example = new WmInventoryExample();
         for (var id : ids) requireRecord(id);
         example.createCriteria().andIdIn(ids)
-                
+
         ;
         if (mapper.deleteByExample(example) != ids.size()) {
             throw new FoundationException(ErrorCode.RESOURCE_CONFLICT);
@@ -239,7 +239,7 @@ public class WmInventoryServiceImpl implements IWmInventoryService {
         if (inputs.isEmpty()) return new WmInventorySyncResult(0, 0, 0, 0);
         var example = new WmInventoryExample();
         example.createCriteria().andMaterialIdIn(keys.stream().map(StockKey::materialId).distinct().toList())
-                
+
         ;
         var existing = new HashMap<StockKey, WmInventoryEntity>();
         for (var row : mapper.selectByExample(example)) {

@@ -41,6 +41,11 @@ class MaterialIssueMySqlTest {
             var connection = session.getConnection();
             assertEquals("mes_base_dev_business_simple_b", connection.getCatalog());
             try (var statement = connection.createStatement()) {
+                try (var columns = statement.executeQuery("SELECT COUNT(*) FROM information_schema.columns "
+                        + "WHERE TABLE_SCHEMA=DATABASE() AND COLUMN_NAME IN ('factory_id','factory_code','tenant_id')")) {
+                    columns.next();
+                    assertEquals(0, columns.getInt(1));
+                }
                 try (var rows = statement.executeQuery("SELECT COLUMN_COMMENT FROM information_schema.columns WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME IN ('mes_material_issue','mes_material_issue_item')")) {
                     int count = 0;
                     while (rows.next()) {

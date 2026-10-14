@@ -154,7 +154,7 @@ public class WorkshopServiceImpl implements IWorkshopService {
         WorkshopExample example = new WorkshopExample();
         for (var id : ids) requireRecord(id);
         example.createCriteria().andIdIn(ids)
-                
+
         ;
         if (mapper.deleteByExample(example) != ids.size()) {
             throw new FoundationException(ErrorCode.RESOURCE_CONFLICT);
@@ -225,7 +225,7 @@ public class WorkshopServiceImpl implements IWorkshopService {
         if (inputs.isEmpty()) return new WorkshopSyncResult(0, 0, 0, 0);
         var example = new WorkshopExample();
         example.createCriteria().andCodeIn(List.copyOf(keys))
-                
+
         ;
         var existing = new HashMap<String, WorkshopEntity>();
         for (var row : mapper.selectByExample(example)) {

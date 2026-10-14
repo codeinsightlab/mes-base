@@ -177,7 +177,7 @@ public class OperationServiceImpl implements IOperationService {
         for (var id : ids) requireRecord(id);
         references.deletingOperations(ids);
         example.createCriteria().andIdIn(ids)
-                
+
         ;
         if (mapper.deleteByExample(example) != ids.size()) {
             throw new FoundationException(ErrorCode.RESOURCE_CONFLICT);
