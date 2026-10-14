@@ -278,3 +278,17 @@ HTTP/H2覆盖单头／明细新增、查询、详情、明细订正、删除与�
 行级工厂隔离。引用存在性、稳定工艺版本、事务、权限和父子保护保留。领料两表现在共30列。
 详情及最新证据见 [业务工厂字段移除报告](2026-10-13-business-factory-column-removal-review.md)。
 本次未自行重启用户服务，旧API/UI通过记录不代表无工厂字段版本已完成真实服务验收。
+
+## 2026-10-14 主子单据统一页面与可复用组件
+
+按用户要求，将正式领料入口收敛为 /issue/mesMaterialIssue：列表查询后打开单据，上方主单表单、下方仅当前单据明细，先保存主单再新增明细。抽取 mes-base-ui/src/components/document/MasterDetailDocument.vue 与 DocumentFields.vue；后者同时复用于 CrudPage 弹窗。CrudPage 增加 embedded/fixedValues/managedEditing，固定父单查询和创建/更新命令、隐藏父单输入、保留列表单删/批删及分页列配置，并拒绝切换/卸载后的迟到结果。现有主单字段包括其他任务新增的 executionId 全部保留，未改后端用例或表结构。
+
+原 IssueRecordDetails 独立详情实现删除，旧明细页面替换为统一入口跳转；失效测试迁到主子组件，保留只读权限、bigint/decimal 精度、迟到详情/保存清理，并新增伪造父单草稿不能覆盖固定父单的验证。旧菜单 ID 2570 设置 visible=1 隐藏，主单菜单更名领料出库；角色权限与绑定未调整，旧地址仍能跳转。菜单及测试数据变更前备份在 .local/issue-menu-20261014/master-detail-*-before.tsv（0600）。菜单 JSON/SQL 手工维护时移除生成归属；领料生成配置 artifacts 改为 persistence/backend/test，不再生成两套前端和菜单。
+
+真实验收使用现有 5173 与用户后端，中心重新核对 SIMPLE_B→数据源8→192.168.18.25:3306/mes_base_dev_business_simple_b。统一页面读回已有合成主单5/明细9，主单备注更新为 TEST-FID-20261014 主子单据统一页面验收，明细数量更新为3.456789，MySQL精确查询一致。新建 TEST-MD-20261014-01 主单14，主单保存前显示“先保存主单，再新增明细”；随后新增明细18，无需填写父单ID，数据库issue_id=14、material_id=2、quantity=0.100001。切回主单5后仅显示其明细9，不混入14的明细。保留新增两条明确合成数据供用户复验，没有覆盖其他业务数据。
+
+真实UI还验证未保存主单返回提醒、取消保留草稿、删除主单确认取消、旧明细地址跳转。1440/1920/1280宽度检查documentElement.scrollWidth等于innerWidth，无整页横向溢出，表格内部滚动；针对首次检查后的密度调整为宽屏三列表单、1280两列。截图见 assets/2026-10-14-master-detail/document-final.jpg 及三档截图。
+
+AGENTS 两仓新增主子单据优先复用规则。组件接口、事务边界和旧入口处理详见 docs/development/master-detail-documents.md。当前主单/明细仍分别保存，不宣称整单原子事务；未保存提醒只覆盖页内返回列表，未实现跨路由/浏览器关闭草稿恢复。切厂/撤权及迟到响应由定向测试证明，本轮未另行换厂写入；未接ERP、扣库存或改服务生命周期。权限与删除保护后端保持既有测试与前轮真实证据。
+
+前端Node22全量测试最终35文件/188项通过；vue-tsc及生产构建通过（已有大chunk提示）。改动范围ESLint为0错误、CrudPage两个既有可选prop默认值警告；两仓git diff --check通过。日志 /tmp/mes-master-detail-{tests,build,lint}.log。未改Java，不重复执行Maven，不提交或推送；保留其他任务的未提交改动。

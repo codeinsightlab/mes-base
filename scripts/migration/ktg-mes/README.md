@@ -38,3 +38,9 @@
 Quality = DEFERRED。quality-index.sql 与 quality-defect.sql 已删除，不再提供检测项或缺陷转换。
 此前两份映射及合成验证属于 HISTORICAL，Source 证据保留在 docs/migration，不能继续作为正式转换断言。
 其他转换脚本保持原有范围和执行前提。
+
+## 2026-10-14 旧基础资料撤回
+
+workshop.sql 与 unit-measure.sql 已删除，不再向 md_workshop / md_unit_measure 导入。
+上文首轮映射为历史证据；当前保留的 workshop / unit_measure 属于基础数据正式模型，
+simple-base.sql 中源库 md_* 表名是 Source 读取来源，不代表恢复已退役的 Base 表。

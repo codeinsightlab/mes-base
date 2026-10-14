@@ -861,3 +861,14 @@ Controller 接口、前端 API／按钮或同步权限。工具自身缺参默�
 强行覆盖；复杂业务只复用持久化，基础CRUD并非其正式业务入口。菜单审查副本未执行。
 
 详细数据保全、验收、未重启用户服务及其他业务库部署边界见本轮review。
+
+### 2026-10-14 主子单据前端入口
+
+主子单据前端不沿用生成的单表页面，优先使用 mes-base-ui 的 MasterDetailDocument / DocumentFields；契约见 [主子单据组件](master-detail-documents.md)。后端仍必须针对主表、明细表从真实metadata生成完整基础代码（persistence + backend，通常同时test），不能因前端组件复用而跳过生成。领料已合并统一页面，原明细地址仅跳转；material-issue-codegen.yaml 不再生成 frontend/menu。业务聚合事务与规则由业务模块设计，生成器不替代主子用例。组件沿用既有CrudApi及后端接口，不另建数据访问体系。本轮手工维护的页面及菜单已解除生成归属，后续全量生成遇到 OUTPUT_CONFLICT 不得恢复标记覆盖。
+# 2026-10-14 旧车间与单位生成入口撤回
+
+`MdWorkshop` / `MdUnitMeasure` 的前后端、持久化、同步及专属脚手架测试已删除。
+当前配置将 `md_workshop` / `md_unit_measure` 加入 excludeTables，并移除对应 tableOverrides；
+合并菜单 SQL 与权限清单不再包含这两个模块。下文涉及旧 md 模型的生成、转换记录仅为历史证据，
+不作为当前开发入口。当前车间与计量单位使用 basic/workshop 和 basic/unitMeasure。
+正式清理迁移为业务 V17、中心 V28；已执行的旧迁移不改写。

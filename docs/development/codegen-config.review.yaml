@@ -27,7 +27,7 @@ selection:
   # 全量生成时明确跳过的表；默认草案为空，不猜测哪些属于业务表。
   # 排除 Flyway 迁移历史技术表，防止生成其 CRUD/同步接口。
   # pro_workorder 为已退役的 Source 结构，不能重新生成旧技术工单入口。
-  excludeTables: [flyway_business_schema_history, qc_index, qc_defect, pro_workorder]
+  excludeTables: [flyway_business_schema_history, qc_index, qc_defect, pro_workorder, md_workshop, md_unit_measure]
   # 与表选择独立：all 表示所有产物；也可指定 persistence/backend/frontend/menu/test。
   artifacts: [all]
 
@@ -173,14 +173,6 @@ tableOverrides:
     module: "dv"
     displayName: "设备点检保养项目"
     syncMatchKey: "subject_code"
-  md_unit_measure:
-    module: "md"
-    displayName: "计量单位"
-    syncMatchKey: "measure_code"
-  md_workshop:
-    module: "md"
-    displayName: "车间"
-    syncMatchKey: "workshop_code"
   pro_workorder:
     module: "pro"
     displayName: "生产工单"

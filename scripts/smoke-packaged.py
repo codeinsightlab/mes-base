@@ -30,7 +30,8 @@ with zipfile.ZipFile(JAR) as artifact:
         assert any(n.startswith("BOOT-INF/lib/" + dependency) for n in names), dependency
     assert not any(n.startswith("BOOT-INF/lib/mssql-jdbc-") for n in names)
     deferred_paths = ("dev/mesbase/mes/pro/productionmonitor/", "dev/mesbase/mes/pro/personnelanalysis/",
-                      "dev/mesbase/business/qc/", "dev/mesbase/modules/qc/")
+                      "dev/mesbase/business/qc/", "dev/mesbase/modules/qc/",
+                      "dev/mesbase/business/md/")
     deferred_types = ("SystemUserLookup.class", "UserLookupQuery.class", "SysUserDisplayExtraMapper.class",
                       "SysUserDisplayExtraMapper.xml")
     legacy_classes = ("PlatformConfiguration.class", "LegacyPlatformCondition.class", "PlatformTokenFilter.class",

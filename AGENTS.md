@@ -1,5 +1,15 @@
 # MES Base 工程规则
 
+## 2026-10-14 用户确认：主子单据统一交互与组件复用
+
+领料、采购、销售、入库、出库等主子单据优先使用统一单据页面：主单信息在上方，绑定当前主单的明细在下方；不将主表和子表各生成一个独立简单 CRUD 页面作为正式业务入口。复用 mes-base-ui 的 `src/components/document/MasterDetailDocument.vue` 和 `DocumentFields.vue`，明细表复用支持 embedded/fixedValues 的 CrudPage；领域字段、选择器和权限由业务页面显式传入。新建主单保存后才可新增明细，父单标识由当前单据固定注入，用户不手填或转移明细所属主单。
+
+**前端约束：** 未来遇到主表带明细的单据结构，不沿用生成的单表前端页面或拆成两个独立 CRUD 页面，优先复用本轮 MasterDetailDocument / DocumentFields；业务页面显式提供字段、API 适配、选择器和权限。主子结构不是停止后端生成的理由。
+
+**后端约束：** 新增主子单据仍必须按第13.0/14.1节，对主表、明细表分别通过 Codegen Skill 从真实 metadata 生成完整基础后端（persistence + backend，通常同时生成 test）：Entity、Example、Mapper/XML及基础Service/Controller等；不能因为前端使用主子组件就跳过生成或手写第二套基础CRUD/Mapper。生成配置应选后端产物，不生成或沿用独立单表前端页面。主子关系、引用规则、状态、删除保护及跨表事务由业务Service实施，需限制或替换会绕过这些规则的基础CRUD入口；既有迁移功能仍遵守第13节迁移例外，不为本规则重写已验证业务。
+
+**组件与后端复用边界：** MasterDetailDocument 通过现有 CrudApi 契约的 headerApi/itemApi，复用项目API适配层和request，调用已有主单/明细后端CRUD及生成Mapper/XML/Example；当前领料仍经原业务Service执行校验、事务及父单删除保护。本轮没有新增一套通用主子后端服务或替代数据访问实现。先设计主子用例、事务和状态规则，再复用前端组件；需要整单原子保存时由业务Service提供聚合命令和事务，前端不得把多次单表请求宣称为整单原子提交。当前领料明确主单/明细分别保存，不预建ERP或通用流程引擎。保持权限、字符串ID/decimal、分页及切厂/撤权/迟到响应清理；主子组件不定义特定业务字段或后端授权策略。
+
 ## 2026-10-13 用户确认：生产操作人员身份
 
 Production Operator = sys_user。当前 Base 不维护独立 Personnel 主数据，不建立 User → Personnel → Factory 链路。

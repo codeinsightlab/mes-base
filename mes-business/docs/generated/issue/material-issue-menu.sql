@@ -1,7 +1,5 @@
--- MES-CODEGEN: 本批次合并菜单 SQL。
 
 -- 来源：docs/generated/issue/mesMaterialIssue-menu.sql
--- MES-CODEGEN: reviewed add-or-update menu SQL; no role grants.
 -- 保留已有菜单 ID 和角色绑定，请在配置的菜单数据库串行执行。
 -- 目录按 parentId + directoryPath 定位，显示名称不作为目录唯一标识。
 
@@ -77,7 +75,6 @@ WHERE page.perms = 'business:mes:material:issue:list' AND page.menu_type = 'C'
   AND NOT EXISTS (SELECT 1 FROM sys_menu WHERE perms = 'business:mes:material:issue:delete' AND menu_type = 'F');
 
 -- 来源：docs/generated/issue/mesMaterialIssueItem-menu.sql
--- MES-CODEGEN: reviewed add-or-update menu SQL; no role grants.
 -- 保留已有菜单 ID 和角色绑定，请在配置的菜单数据库串行执行。
 -- 目录按 parentId + directoryPath 定位，显示名称不作为目录唯一标识。
 
@@ -151,3 +148,7 @@ SELECT '领料出库明细删除', page.menu_id, 4, '#', 'F', 'business:mes:mate
 FROM sys_menu page
 WHERE page.perms = 'business:mes:material:issue:item:list' AND page.menu_type = 'C'
   AND NOT EXISTS (SELECT 1 FROM sys_menu WHERE perms = 'business:mes:material:issue:item:delete' AND menu_type = 'F');
+
+-- 领料主子单据统一入口；保留旧明细菜单 ID、权限及角色绑定，旧地址仅跳转。
+UPDATE sys_menu SET menu_name='领料出库' WHERE component='issue/mesMaterialIssue/index' AND menu_type='C';
+UPDATE sys_menu SET visible='1' WHERE component='issue/mesMaterialIssueItem/index' AND menu_type='C';
