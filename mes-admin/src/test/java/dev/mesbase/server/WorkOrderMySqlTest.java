@@ -1,5 +1,8 @@
 package dev.mesbase.server;
 
+import dev.mesbase.business.production.service.WorkorderErpFacts;
+import dev.mesbase.business.production.dao.WorkorderErpExtraMapper;
+
 import dev.mesbase.business.basic.dao.MaterialMapper;
 import dev.mesbase.business.issue.dao.MesMaterialIssueMapper;
 import dev.mesbase.business.production.dao.MesProductionExecutionMapper;
@@ -67,11 +70,11 @@ import dev.mesbase.business.production.dao.WorkOrderExtraMapper;
  * TEST ONLY demand and execution convergence against configured acceptance MySQL; all writes roll back.
  */
 class WorkOrderMySqlTest {
-    static final Set<Class<?>> MAPPERS = Set.of(WorkorderMapper.class, ProductionBatchMapper.class, BatchRouteNodeMapper.class, RoutingMapper.class, RoutingNodeMapper.class, RoutingEdgeMapper.class, RoutingProductMapper.class, OperationMapper.class, WorkOrderExtraMapper.class, MaterialMapper.class, MesMaterialIssueMapper.class, MesProductionExecutionMapper.class);
+    static final Set<Class<?>> MAPPERS = Set.of(WorkorderErpExtraMapper.class, WorkorderMapper.class, ProductionBatchMapper.class, BatchRouteNodeMapper.class, RoutingMapper.class, RoutingNodeMapper.class, RoutingEdgeMapper.class, RoutingProductMapper.class, OperationMapper.class, WorkOrderExtraMapper.class, MaterialMapper.class, MesMaterialIssueMapper.class, MesProductionExecutionMapper.class);
 
     @Configuration
     @EnableTransactionManagement
-    @Import({WorkOrderService.class, RoutingReferenceRules.class, ProductionExecutionRules.class, MesProductionExecutionServiceImpl.class})
+    @Import({WorkorderErpFacts.class, WorkOrderService.class, RoutingReferenceRules.class, ProductionExecutionRules.class, MesProductionExecutionServiceImpl.class})
     static class Config {
         @Bean(name = "businessTransactionManager")
         OwnedTransactionManager manager(FactoryBusinessDataSource source) {
@@ -81,6 +84,11 @@ class WorkOrderMySqlTest {
         @Bean
         SqlSessionFactory sessions(FactoryBusinessDataSource source, OwnedTransactionManager manager) {
             return PersistenceFactories.create(source, MAPPERS, PersistenceFactories::pagination, manager::verifyAccess);
+        }
+
+        @Bean
+        WorkorderErpExtraMapper mapperWorkorderErp(SqlSessionFactory s) {
+            return new SqlSessionTemplate(s).getMapper(WorkorderErpExtraMapper.class);
         }
 
         @Bean

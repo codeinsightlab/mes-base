@@ -83,7 +83,7 @@ public class MesMaterialIssueController {
     }
 
 
-    private static MesMaterialIssueVo toView(MesMaterialIssueEntity row) {
+    static MesMaterialIssueVo toView(MesMaterialIssueEntity row) {
         return new MesMaterialIssueVo(
                 row.getId() == null ? null : row.getId().toString(),
 
@@ -101,7 +101,9 @@ public class MesMaterialIssueController {
                 row.getCreateTime(),
                 row.getUpdateBy(),
                 row.getUpdateTime(),
-                row.getExecutionId() == null ? null : row.getExecutionId().toString()
+                row.getExecutionId() == null ? null : row.getExecutionId().toString(),
+                row.getSourceExecutionMode(), row.getExternalEffect(), row.getExternalBindingKey(), row.getExternalReference(),
+                row.getVoidOperationId(), row.getVoidResultStatus(), row.getVoidExecutionMode(), row.getVoidMessage()
         );
     }
 }

@@ -1,10 +1,10 @@
-// MES-CODEGEN: MyBatis Generator standard single-table persistence.
 package dev.mesbase.business.production.domain;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 public class WorkorderEntity {
+    // External ID/code are read projections from workorder_erp_extra, never core-table columns.
     private Long id;
 
     private String code;

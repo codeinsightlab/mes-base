@@ -9,6 +9,8 @@ import org.apache.ibatis.annotations.Param;
  * Cross-table product applicability and WorkOrder/Execution allocation; no single-table CRUD.
  */
 public interface WorkOrderExtraMapper {
+    long countBlockingIssues(Long workorderId);
+
     List<WorkOrderModels.Allocation> allocationForOrders(@Param("ids") List<Long> ids);
 
     List<RoutingEntity> publishedForProduct(@Param("productId") Long productId,

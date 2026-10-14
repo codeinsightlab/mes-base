@@ -18,6 +18,10 @@
     <result column="create_time" jdbcType="TIMESTAMP" property="createTime" />
     <result column="update_by" jdbcType="VARCHAR" property="updateBy" />
     <result column="update_time" jdbcType="TIMESTAMP" property="updateTime" />
+    <result column="void_operation_id" jdbcType="VARCHAR" property="voidOperationId" />
+    <result column="void_from_status" jdbcType="VARCHAR" property="voidFromStatus" />
+    <result column="void_requested_at" jdbcType="TIMESTAMP" property="voidRequestedAt" />
+    <result column="void_finished_at" jdbcType="TIMESTAMP" property="voidFinishedAt" />
   </resultMap>
   <sql id="Example_Where_Clause">
     <where>
@@ -80,7 +84,7 @@
   <sql id="Base_Column_List">
     id, issue_no, workorder_id, execution_id, workorder_code, product_id, product_code,
     flow_card_no, routing_id, issue_time, status, remark, create_by, create_time, update_by,
-    update_time
+    update_time, void_operation_id, void_from_status, void_requested_at, void_finished_at
   </sql>
   <select id="selectByExample" parameterType="dev.mesbase.business.issue.domain.MesMaterialIssueExample" resultMap="BaseResultMap">
     select
@@ -114,14 +118,16 @@
       workorder_code, product_id, product_code,
       flow_card_no, routing_id, issue_time,
       status, remark, create_by,
-      create_time, update_by, update_time
-      )
+      create_time, update_by, update_time,
+      void_operation_id, void_from_status, void_requested_at,
+      void_finished_at)
     values (#{issueNo,jdbcType=VARCHAR}, #{workorderId,jdbcType=BIGINT}, #{executionId,jdbcType=BIGINT},
       #{workorderCode,jdbcType=VARCHAR}, #{productId,jdbcType=BIGINT}, #{productCode,jdbcType=VARCHAR},
       #{flowCardNo,jdbcType=VARCHAR}, #{routingId,jdbcType=BIGINT}, #{issueTime,jdbcType=TIMESTAMP},
       #{status,jdbcType=VARCHAR}, #{remark,jdbcType=VARCHAR}, #{createBy,jdbcType=VARCHAR},
-      #{createTime,jdbcType=TIMESTAMP}, #{updateBy,jdbcType=VARCHAR}, #{updateTime,jdbcType=TIMESTAMP}
-      )
+      #{createTime,jdbcType=TIMESTAMP}, #{updateBy,jdbcType=VARCHAR}, #{updateTime,jdbcType=TIMESTAMP},
+      #{voidOperationId,jdbcType=VARCHAR}, #{voidFromStatus,jdbcType=VARCHAR}, #{voidRequestedAt,jdbcType=TIMESTAMP},
+      #{voidFinishedAt,jdbcType=TIMESTAMP})
   </insert>
   <insert id="insertSelective" keyColumn="id" keyProperty="id" parameterType="dev.mesbase.business.issue.domain.MesMaterialIssueEntity" useGeneratedKeys="true">
     insert into mes_material_issue
@@ -171,6 +177,18 @@
       <if test="updateTime != null">
         update_time,
       </if>
+      <if test="voidOperationId != null">
+        void_operation_id,
+      </if>
+      <if test="voidFromStatus != null">
+        void_from_status,
+      </if>
+      <if test="voidRequestedAt != null">
+        void_requested_at,
+      </if>
+      <if test="voidFinishedAt != null">
+        void_finished_at,
+      </if>
     </trim>
     <trim prefix="values (" suffix=")" suffixOverrides=",">
       <if test="issueNo != null">
@@ -217,6 +235,18 @@
       </if>
       <if test="updateTime != null">
         #{updateTime,jdbcType=TIMESTAMP},
+      </if>
+      <if test="voidOperationId != null">
+        #{voidOperationId,jdbcType=VARCHAR},
+      </if>
+      <if test="voidFromStatus != null">
+        #{voidFromStatus,jdbcType=VARCHAR},
+      </if>
+      <if test="voidRequestedAt != null">
+        #{voidRequestedAt,jdbcType=TIMESTAMP},
+      </if>
+      <if test="voidFinishedAt != null">
+        #{voidFinishedAt,jdbcType=TIMESTAMP},
       </if>
     </trim>
   </insert>
@@ -277,6 +307,18 @@
       <if test="row.updateTime != null">
         update_time = #{row.updateTime,jdbcType=TIMESTAMP},
       </if>
+      <if test="row.voidOperationId != null">
+        void_operation_id = #{row.voidOperationId,jdbcType=VARCHAR},
+      </if>
+      <if test="row.voidFromStatus != null">
+        void_from_status = #{row.voidFromStatus,jdbcType=VARCHAR},
+      </if>
+      <if test="row.voidRequestedAt != null">
+        void_requested_at = #{row.voidRequestedAt,jdbcType=TIMESTAMP},
+      </if>
+      <if test="row.voidFinishedAt != null">
+        void_finished_at = #{row.voidFinishedAt,jdbcType=TIMESTAMP},
+      </if>
     </set>
     <if test="example != null">
       <include refid="Update_By_Example_Where_Clause" />
@@ -299,7 +341,11 @@
       create_by = #{row.createBy,jdbcType=VARCHAR},
       create_time = #{row.createTime,jdbcType=TIMESTAMP},
       update_by = #{row.updateBy,jdbcType=VARCHAR},
-      update_time = #{row.updateTime,jdbcType=TIMESTAMP}
+      update_time = #{row.updateTime,jdbcType=TIMESTAMP},
+      void_operation_id = #{row.voidOperationId,jdbcType=VARCHAR},
+      void_from_status = #{row.voidFromStatus,jdbcType=VARCHAR},
+      void_requested_at = #{row.voidRequestedAt,jdbcType=TIMESTAMP},
+      void_finished_at = #{row.voidFinishedAt,jdbcType=TIMESTAMP}
     <if test="example != null">
       <include refid="Update_By_Example_Where_Clause" />
     </if>
@@ -352,6 +398,18 @@
       <if test="updateTime != null">
         update_time = #{updateTime,jdbcType=TIMESTAMP},
       </if>
+      <if test="voidOperationId != null">
+        void_operation_id = #{voidOperationId,jdbcType=VARCHAR},
+      </if>
+      <if test="voidFromStatus != null">
+        void_from_status = #{voidFromStatus,jdbcType=VARCHAR},
+      </if>
+      <if test="voidRequestedAt != null">
+        void_requested_at = #{voidRequestedAt,jdbcType=TIMESTAMP},
+      </if>
+      <if test="voidFinishedAt != null">
+        void_finished_at = #{voidFinishedAt,jdbcType=TIMESTAMP},
+      </if>
     </set>
     where id = #{id,jdbcType=BIGINT}
   </update>
@@ -371,7 +429,11 @@
       create_by = #{createBy,jdbcType=VARCHAR},
       create_time = #{createTime,jdbcType=TIMESTAMP},
       update_by = #{updateBy,jdbcType=VARCHAR},
-      update_time = #{updateTime,jdbcType=TIMESTAMP}
+      update_time = #{updateTime,jdbcType=TIMESTAMP},
+      void_operation_id = #{voidOperationId,jdbcType=VARCHAR},
+      void_from_status = #{voidFromStatus,jdbcType=VARCHAR},
+      void_requested_at = #{voidRequestedAt,jdbcType=TIMESTAMP},
+      void_finished_at = #{voidFinishedAt,jdbcType=TIMESTAMP}
     where id = #{id,jdbcType=BIGINT}
   </update>
 </mapper>

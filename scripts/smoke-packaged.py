@@ -45,11 +45,11 @@ with zipfile.ZipFile(JAR) as artifact:
                       "HTMLFilter.class", "ISysAttachmentService.class", "SharedDatabasePersistence.class",
                       "SharedDatabasePersistence$ScopedIdentity.class", "Enterprise.class",
                       "OpenApiClientExtraMapper.class", "OpenApiClientExtraMapper.xml")
-    assert not any(n.endswith(legacy_classes) for n in names)
+    assert not any(n.rsplit("/", 1)[-1] in legacy_classes for n in names)
     for name in names:
         if name.startswith("BOOT-INF/lib/mes-") and name.endswith(".jar"):
             with zipfile.ZipFile(io.BytesIO(artifact.read(name))) as module:
-                assert not any(n.endswith(legacy_classes) for n in module.namelist())
+                assert not any(n.rsplit("/", 1)[-1] in legacy_classes for n in module.namelist())
                 assert not any(n.startswith(deferred_paths) or n.endswith(deferred_types)
                                for n in module.namelist())
     assert not any(any(path in n for path in deferred_paths) or n.endswith(deferred_types) for n in names)

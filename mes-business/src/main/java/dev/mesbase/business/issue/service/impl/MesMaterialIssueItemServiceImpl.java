@@ -155,7 +155,9 @@ public class MesMaterialIssueItemServiceImpl implements IMesMaterialIssueItemSer
             throw new FoundationException(ErrorCode.BAD_REQUEST);
         }
         MesMaterialIssueItemExample example = new MesMaterialIssueItemExample();
-        for (var id : ids) requireRecord(id);
+        rules.requireEditableIssues(ids.stream().map(id -> requireRecord(id).getIssueId()).distinct().sorted()
+                .toList());
+        rules.changedExtra(ids.stream().map(id -> requireRecord(id).getIssueId()).distinct().sorted().toList());
         example.createCriteria().andIdIn(ids)
 
         ;

@@ -12,6 +12,7 @@ import dev.mesbase.business.issue.domain.MesMaterialIssueResource;
 import dev.mesbase.business.issue.domain.MesMaterialIssueUpdateCommand;
 import dev.mesbase.business.issue.service.IMesMaterialIssueService;
 import dev.mesbase.core.error.ErrorCode;
+import dev.mesbase.business.integration.warehouse.MaterialIssueCreateCommand;
 import dev.mesbase.core.error.FoundationException;
 import dev.mesbase.infrastructure.cache.annotation.BusinessCache;
 import dev.mesbase.infrastructure.cache.annotation.BusinessCacheEvict;
@@ -22,6 +23,9 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Isolation;
 import dev.mesbase.business.issue.service.MaterialIssueRules;
+import dev.mesbase.business.integration.warehouse.WarehouseIntegration;
+import dev.mesbase.business.integration.warehouse.ErpActionResult.Mode;
+import dev.mesbase.platform.execution.FactoryContext;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
@@ -32,10 +36,13 @@ import org.springframework.transaction.annotation.Transactional;
 public class MesMaterialIssueServiceImpl implements IMesMaterialIssueService {
     private final MesMaterialIssueMapper mapper;
     private final MaterialIssueRules rules;
+    private final WarehouseIntegration warehouse;
 
-    public MesMaterialIssueServiceImpl(MesMaterialIssueMapper mapper, MaterialIssueRules rules) {
+    public MesMaterialIssueServiceImpl(MesMaterialIssueMapper mapper, MaterialIssueRules rules,
+                                       WarehouseIntegration warehouse) {
         this.mapper = mapper;
         this.rules = rules;
+        this.warehouse = warehouse;
     }
 
     @Override
@@ -84,6 +91,7 @@ public class MesMaterialIssueServiceImpl implements IMesMaterialIssueService {
         example.setOrderByClause("id");
         try (Page<MesMaterialIssueEntity> page = PageHelper.offsetPage(offset, limit)) {
             List<MesMaterialIssueEntity> rows = mapper.selectByExample(example);
+            rules.hydrate(rows);
             return new MesMaterialIssuePage(rows, page.getTotal(), offset, limit);
         } finally {
             PageHelper.clearPage();
@@ -117,10 +125,17 @@ public class MesMaterialIssueServiceImpl implements IMesMaterialIssueService {
         row.setStatus(input.status());
         row.setRemark(input.remark());
         rules.validate(row);
+        Mode mode = FactoryContext.current().map(warehouse::configuredMode).orElse(null);
+        row.setSourceExecutionMode(mode == null ? null : mode.name());
+        // This administrative CRUD never calls an external issue API.
+        row.setExternalEffect(mode == Mode.LOCAL_ONLY ? "NONE" : "UNVERIFIED");
         rules.audit(row, true);
         if (mapper.insert(row) != 1) {
             throw new FoundationException(ErrorCode.RESOURCE_CONFLICT);
         }
+        if (mode == Mode.LOCAL_ONLY)
+            warehouse.localCreate(FactoryContext.required(), new MaterialIssueCreateCommand(row.getId(), "LOCAL-" + row.getId(), row.getIssueNo(), row.getWorkorderId(), row.getExecutionId()));
+        rules.initializeExtra(row);
         return requireRecord(row.getId());
     }
 
@@ -134,6 +149,11 @@ public class MesMaterialIssueServiceImpl implements IMesMaterialIssueService {
         // Recorded execution facts cannot be detached or moved by administrative CRUD.
         if (row.getExecutionId() != null && !Objects.equals(row.getExecutionId(), input.executionId()))
             throw new FoundationException(ErrorCode.EXECUTION_FROZEN);
+        if (!"NONE".equals(row.getExternalEffect()) &&
+                (!Objects.equals(row.getWorkorderId(), input.workorderId())
+                        || input.productId() != null && !Objects.equals(row.getProductId(), input.productId())
+                        || input.routingId() != null && !Objects.equals(row.getRoutingId(), input.routingId())))
+            throw new FoundationException(ErrorCode.ISSUE_EXTERNAL_UNVERIFIED);
         row.setId(id);
         row.setExecutionId(input.executionId());
         row.setIssueNo(input.issueNo());
@@ -169,6 +189,7 @@ public class MesMaterialIssueServiceImpl implements IMesMaterialIssueService {
         example.createCriteria().andIdIn(ids)
 
         ;
+        rules.deleteExtra(ids);
         if (mapper.deleteByExample(example) != ids.size()) {
             throw new FoundationException(ErrorCode.RESOURCE_CONFLICT);
         }
@@ -179,7 +200,7 @@ public class MesMaterialIssueServiceImpl implements IMesMaterialIssueService {
         if (row == null) {
             throw new FoundationException(ErrorCode.NOT_FOUND);
         }
-        return row;
+        return rules.hydrate(row);
     }
 }
 

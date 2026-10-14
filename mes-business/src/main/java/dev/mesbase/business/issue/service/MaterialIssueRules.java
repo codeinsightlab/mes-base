@@ -41,11 +41,13 @@ public class MaterialIssueRules {
     private final RoutingMapper routings;
     private final RoutingProductMapper routingProducts;
     private final ProductionExecutionRules executions;
+    private final MaterialIssueErpFacts facts;
 
     public MaterialIssueRules(MesMaterialIssueMapper issues, MesMaterialIssueItemMapper items,
                               MaterialMapper materials, UnitMeasureMapper units, WmWarehouseMapper warehouses,
                               WorkorderMapper workorders, RoutingMapper routings,
-                              RoutingProductMapper routingProducts, ProductionExecutionRules executions) {
+                              RoutingProductMapper routingProducts, ProductionExecutionRules executions,
+                              MaterialIssueErpFacts facts) {
         this.issues = issues;
         this.items = items;
         this.materials = materials;
@@ -55,15 +57,42 @@ public class MaterialIssueRules {
         this.routings = routings;
         this.routingProducts = routingProducts;
         this.executions = executions;
+        this.facts = facts;
     }
 
     private void require(boolean valid) {
         if (!valid) throw new FoundationException(ErrorCode.BAD_REQUEST);
     }
 
+    public MesMaterialIssueEntity hydrate(MesMaterialIssueEntity row) {
+        return facts.hydrate(row);
+    }
+
+    public void hydrate(List<MesMaterialIssueEntity> rows) {
+        facts.hydrate(rows);
+    }
+
+    public void initializeExtra(MesMaterialIssueEntity row) {
+        facts.initialize(row);
+    }
+
+    public Long extraVersion(Long id) {
+        return facts.required(id).getOperationVersion();
+    }
+
+    public void changedExtra(List<Long> ids) {
+        for (Long id : ids) facts.changed(id);
+    }
+
+    public void deleteExtra(List<Long> ids) {
+        facts.delete(ids);
+    }
+
     public void validate(MesMaterialIssueEntity row) {
         require(row.getStatus() != null && Set.of("DRAFT", "RECORDED").contains(row.getStatus()));
         require(row.getIssueNo() != null && !row.getIssueNo().isBlank());
+        if (row.getVoidOperationId() != null || !Set.of("DRAFT", "RECORDED").contains(row.getStatus()))
+            throw new FoundationException(ErrorCode.ISSUE_VOID_CONFLICT);
         var execution = row.getExecutionId() == null ? null : executions.lock(row.getExecutionId());
         if (execution != null) {
             require(row.getWorkorderId() == null || Objects.equals(row.getWorkorderId(), execution.getWorkorderId()));
@@ -113,6 +142,9 @@ public class MaterialIssueRules {
     public void validate(MesMaterialIssueItemEntity row) {
         require(row.getIssueId() != null && row.getMaterialId() != null && row.getQuantity() != null);
         lockIssues(List.of(row.getIssueId()));
+        var header = issues.selectByPrimaryKey(row.getIssueId());
+        if (header.getVoidOperationId() != null || !Set.of("DRAFT", "RECORDED").contains(header.getStatus()))
+            throw new FoundationException(ErrorCode.ISSUE_VOID_CONFLICT);
         require(row.getQuantity().signum() > 0 && row.getQuantity().scale() <= 6
                 && row.getQuantity().precision() - row.getQuantity().scale() <= 14);
         var material = materials.selectByPrimaryKey(row.getMaterialId());
@@ -145,8 +177,26 @@ public class MaterialIssueRules {
         }
     }
 
+    public void requireEditableIssues(List<Long> ids) {
+        lockIssues(ids);
+        for (Long id : ids) {
+            var row = issues.selectByPrimaryKey(id);
+            if (row.getVoidOperationId() != null || !Set.of("DRAFT", "RECORDED").contains(row.getStatus()))
+                throw new FoundationException(ErrorCode.ISSUE_VOID_CONFLICT);
+        }
+    }
+
     public void deletingIssues(List<Long> ids) {
         lockIssues(ids);
+        var externalRows = new MesMaterialIssueExample();
+        externalRows.createCriteria().andIdIn(ids);
+        var loaded = issues.selectByExample(externalRows);
+        facts.hydrate(loaded);
+        if (loaded.stream().anyMatch(r -> !"NONE".equals(r.getExternalEffect())))
+            throw new FoundationException(ErrorCode.ISSUE_EXTERNAL_UNVERIFIED);
+        var protectedRows = new MesMaterialIssueExample();
+        protectedRows.createCriteria().andIdIn(ids).andVoidOperationIdIsNotNull();
+        if (issues.countByExample(protectedRows) > 0) throw new FoundationException(ErrorCode.ISSUE_VOID_CONFLICT);
         // Keep the execution fact relationship: physical deletion must not erase the freeze evidence.
         var headers = new MesMaterialIssueExample();
         headers.createCriteria().andIdIn(ids).andExecutionIdIsNotNull();
@@ -167,6 +217,7 @@ public class MaterialIssueRules {
         }
         row.setUpdateBy(user);
         row.setUpdateTime(now);
+        if (!created && row.getId() != null) facts.saveProjection(row);
     }
 
     public void audit(MesMaterialIssueItemEntity row, boolean created) {
@@ -178,5 +229,6 @@ public class MaterialIssueRules {
         }
         row.setUpdateBy(user);
         row.setUpdateTime(now);
+        facts.changed(row.getIssueId());
     }
 }

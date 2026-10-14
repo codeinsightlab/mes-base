@@ -21,4 +21,11 @@
   <foreach collection="ids" item="id" open="(" separator="," close=")">#{id}</foreach>
   GROUP BY w.id,w.planned_qty
  </select>
+  <select id="countBlockingIssues" resultType="long">
+    SELECT COUNT(*) FROM mes_material_issue i LEFT JOIN mes_material_issue_erp_extra e ON e.id=i.id
+    WHERE i.workorder_id=#{workorderId} AND NOT (i.status='VOIDED' AND
+      COALESCE(e.void_result_status,'')='SUCCEEDED' AND
+      ((COALESCE(e.source_execution_mode,'')='LOCAL_ONLY' AND COALESCE(e.void_execution_mode,'')='LOCAL_ONLY' AND COALESCE(e.external_effect,'')='NONE')
+       OR (COALESCE(e.source_execution_mode,'')='CONNECTED' AND COALESCE(e.void_execution_mode,'')='CONNECTED' AND COALESCE(e.external_effect,'')='REVERSED')))
+  </select>
 </mapper>

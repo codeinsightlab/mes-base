@@ -62,7 +62,7 @@ Token/跨厂缓存。
 
 Controller 收参、基础校验、HTTP View 转换和协议返回；不做业务。Service 编排、规则、状态转换、事务和外部协调；Mapper
 数据访问，不做授权决策。默认单
-Service，只有长期真实复杂协调才拆分。外部主动调用经 Port/Adapter，Adapter 不编排业务、不访问平台/业务 Mapper。
+Service，只有长期真实复杂协调才拆分。外部主动调用经领域 Port/Service；传输 Gateway/Adapter 不编排业务、不访问平台/业务 Mapper。ERP 领域实现可以编排供应商内部业务步骤，遵守下方 ERP Integration Architecture。
 
 ## 5. Domain / DTO / VO / Persistence
 
@@ -409,3 +409,16 @@ SysUser 敏感字段。
 生成的同步 Service 直接使用本表 QueryPort，默认未接入实现不是 Spring Bean，由 ObjectProvider 在没有真实实现时选择，避免默认与真实 Bean 竞争。外部只读查询先完成；未接入时不写业务库或同步状态。查询完成后复用已有 SyncCoordinator 抢占，成功抢占后才进入独立 Spring 代理的 SyncWriter 写事务。只读查询可并发，写入批次受已有协调协议约束。同步权限为当前生成权限前缀追加 `:sync`，菜单 SQL 同步 add-or-update、不自动执行或授予角色。现有手写 Material 同步保留 `material:sync`，Test Adapter 只在测试源目录。
 
 生成器目前只覆盖/发布文件，不跟踪和删除历史独立文件。true 改 false 后的新产物无同步引用，但旧的 SyncController、External DTO、QueryPort、未接入 Adapter、SyncResult、SyncService、SyncWriter 必须逐文件审查移除；禁止扫描删除手写业务目录或宣称自动清理。具体六表文件清单与验证见 `docs/development/codegen.md` 的同步章节。
+
+
+## ERP Integration Architecture（2026-10-14）
+
+- MES Business Service → ERP领域接口 → 配置选择的领域实现 → 厂商Gateway。复用现有 WarehouseErpAdapter 作为仓储领域业务接口；Production/MasterData 仅在真实消费者需要时建立，不按一个API建立一个类、不集中成巨大Service。
+- 领域方法表达完整业务行为；厂商实现负责其创建、提交、审核、查询等内部步骤、业务响应解析和人工恢复。Gateway仅负责认证、通讯、序列化及底层响应解析，不写MES库；MES Service不感知厂商字段、错误码或流程步骤。HTTP 200不等于业务成功。
+- 复用 mes.integration.warehouse.factories.<FactoryId> 配置，LOCAL_ONLY选择默认本地领域实现，CONNECTED须匹配该厂原绑定及provider，缺少或歧义明确失败；不得悄悄回退本地成功。无外部数据库装配。
+- 标准结果区分 SUCCEEDED（SUCCESS）、REJECTED（FAILED）、UNKNOWN，并标明 LOCAL_ONLY/CONNECTED。阶段失败保留已知外部身份；本地模式不伪造ERP单据、审核或冲销事实。
+- ERP单据身份、编号、业务状态、来源、操作结果及安全诊断存独立Extra；随当前业务库FactoryScope隔离，不在业务表新增工厂字段或ERP事实列。MES表仅保存MES状态与本地操作身份。Extra写入由MES协调逻辑管理，不开放普通编辑来伪造外部事实。
+- 查询确定性 FOUND/NOT_FOUND/UNKNOWN 与外部业务状态独立。查询只读、不改MES；NOT_FOUND不证明创建失败、不授权重建。核实经领域规则，在外部查询后短事务重锁MES对象并检查Extra操作版本及本地操作身份，原子更新MES与Extra；UNKNOWN不推进，VOIDED不因EFFECTIVE恢复，冲突保留诊断供人工处理。
+- ERP HTTP不在长事务或持有行锁时调用；创建/作废先持久化稳定意图，外部后果不能由本地回滚撤销。已知外部存在或结果未知不得重复创建；重复核实不产生外部写。所有编辑、明细变化与动作必须参与同一版本保护，不能让旧查询覆盖新作废。
+- 查询与核实使用独立权限，可信FactoryScope定位MES记录后从服务端Extra构造外部身份；禁止客户端指定外部身份或跨厂查询。诊断安全且限长，不向前端暴露Token、Secret或供应商原始报文。
+- 优先人工核实与有真实厂商实现的人工恢复，不允许人工标记成功；未接入继续审核时不制造审核业务。不建自动补偿/Saga/通用工作流、动态插件、无限重试或无需求空接口。V1不支持跨ERP历史迁移或单厂多ERP协同，历史provider不匹配明确拒绝并交项目处理。

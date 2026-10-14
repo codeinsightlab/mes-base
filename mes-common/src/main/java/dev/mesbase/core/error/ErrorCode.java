@@ -1,6 +1,10 @@
 package dev.mesbase.core.error;
 
 public enum ErrorCode {
+    INTEGRATION_NOT_CONFIGURED(422, "当前工厂仓储模式或对应领域连接未配置"),
+    ISSUE_EXTERNAL_UNVERIFIED(409, "单据外部出库来源未核实，不能自动本地作废"),
+    ISSUE_VOID_CONFLICT(409, "领料单已作废或正在核实，不允许普通编辑或继续使用"),
+    WORKORDER_ISSUE_REFERENCED(409, "工单存在有效或外部结果待核实的领料单，不能更换产品"),
     EXECUTION_INVALID(422, "生产执行必须关联有效工单、匹配产品和已发布工艺，并具有正计划数量及有效时间"),
     EXECUTION_FROZEN(409, "执行身份或已有生产事实关联不可更改"),
     EXECUTION_REFERENCED(409, "生产执行已启动或存在领料关联，不能删除"),

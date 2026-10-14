@@ -50,6 +50,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional(transactionManager = "businessTransactionManager", isolation = Isolation.READ_COMMITTED, rollbackFor = Exception.class)
 public class WorkOrderService {
     private final WorkorderMapper orders;
+    private final WorkorderErpFacts facts;
     private final ProductionBatchMapper batches;
     private final BatchRouteNodeMapper paths;
     private final RoutingMapper routings;
@@ -66,8 +67,9 @@ public class WorkOrderService {
                             RoutingMapper routings, RoutingProductMapper products, RoutingNodeMapper nodes,
                             RoutingEdgeMapper edges, MaterialMapper materials, RoutingReferenceRules references,
                             MesMaterialIssueMapper issues, WorkOrderExtraMapper queries,
-                            MesProductionExecutionMapper executions) {
+                            MesProductionExecutionMapper executions, WorkorderErpFacts facts) {
         this.orders = orders;
+        this.facts = facts;
         this.batches = batches;
         this.paths = paths;
         this.routings = routings;
@@ -105,6 +107,7 @@ public class WorkOrderService {
         } finally {
             PageHelper.clearPage();
         }
+        facts.hydrate(rows);
         var children = new ProductionBatchExample();
         List<ProductionBatchEntity> all = List.of();
         if (!rows.isEmpty()) {
@@ -175,6 +178,10 @@ public class WorkOrderService {
         if (hasLegacyBatches(id) && (!Objects.equals(row.getProductId(), input.productId())
                 || !Objects.equals(row.getRoutingId(), input.routingId())))
             throw new FoundationException(ErrorCode.WORKORDER_LEGACY_REFERENCED);
+        if (!Objects.equals(row.getProductId(), input.productId())) {
+            if (queries.countBlockingIssues(id) > 0)
+                throw new FoundationException(ErrorCode.WORKORDER_ISSUE_REFERENCED);
+        }
         validate(input);
         uniqueCode(input.code(), id);
         assign(row, input);
@@ -222,7 +229,8 @@ public class WorkOrderService {
         issueFilter.createCriteria().andWorkorderIdEqualTo(id);
         require(issues.countByExample(issueFilter) == 0);
         if (hasLegacyBatches(id)) throw new FoundationException(ErrorCode.WORKORDER_LEGACY_REFERENCED);
-        orders.deleteByPrimaryKey(id);
+        facts.delete(id);
+        if (orders.deleteByPrimaryKey(id) != 1) conflict();
     }
 
     @Transactional(transactionManager = "businessTransactionManager", readOnly = true)
@@ -267,6 +275,7 @@ public class WorkOrderService {
         }
         var row = orders.selectByPrimaryKey(id);
         if (row == null) throw new FoundationException(ErrorCode.NOT_FOUND);
+        facts.hydrate(List.of(row));
         return row;
     }
 
@@ -341,6 +350,7 @@ public class WorkOrderService {
     private void saveOrder(WorkorderEntity row, boolean created) {
         try {
             if ((created ? orders.insert(row) : orders.updateByPrimaryKey(row)) != 1) conflict();
+            facts.save(row, created);
         } catch (DuplicateKeyException failure) {
             throw new FoundationException(ErrorCode.RESOURCE_CONFLICT, failure);
         }

@@ -1,5 +1,4 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- MES-CODEGEN: MyBatis Generator standard single-table persistence. -->
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="dev.mesbase.business.production.dao.WorkorderMapper">
   <resultMap id="BaseResultMap" type="dev.mesbase.business.production.domain.WorkorderEntity">
@@ -11,8 +10,6 @@
     <result column="status" jdbcType="VARCHAR" property="status" />
     <result column="planned_start_at" jdbcType="TIMESTAMP" property="plannedStartAt" />
     <result column="planned_end_at" jdbcType="TIMESTAMP" property="plannedEndAt" />
-    <result column="external_id" jdbcType="VARCHAR" property="externalId" />
-    <result column="external_code" jdbcType="VARCHAR" property="externalCode" />
     <result column="remark" jdbcType="VARCHAR" property="remark" />
     <result column="revision" jdbcType="INTEGER" property="revision" />
     <result column="create_time" jdbcType="TIMESTAMP" property="createTime" />
@@ -77,8 +74,8 @@
     </where>
   </sql>
   <sql id="Base_Column_List">
-    id, code, product_id, planned_qty, routing_id, status, planned_start_at, planned_end_at, 
-    external_id, external_code, remark, revision, create_time, update_time
+    id, code, product_id, planned_qty, routing_id, status, planned_start_at, planned_end_at,
+    remark, revision, create_time, update_time
   </sql>
   <select id="selectByExample" parameterType="dev.mesbase.business.production.domain.WorkorderExample" resultMap="BaseResultMap">
     select
@@ -92,7 +89,7 @@
     </if>
   </select>
   <select id="selectByPrimaryKey" parameterType="Long" resultMap="BaseResultMap">
-    select 
+    select
     <include refid="Base_Column_List" />
     from workorder
     where id = #{id,jdbcType=BIGINT}
@@ -108,16 +105,14 @@
     </if>
   </delete>
   <insert id="insert" keyColumn="id" keyProperty="id" parameterType="dev.mesbase.business.production.domain.WorkorderEntity" useGeneratedKeys="true">
-    insert into workorder (code, product_id, planned_qty, 
-      routing_id, status, planned_start_at, 
-      planned_end_at, external_id, external_code, 
-      remark, revision, create_time, 
-      update_time)
-    values (#{code,jdbcType=VARCHAR}, #{productId,jdbcType=BIGINT}, #{plannedQty,jdbcType=DECIMAL}, 
-      #{routingId,jdbcType=BIGINT}, #{status,jdbcType=VARCHAR}, #{plannedStartAt,jdbcType=TIMESTAMP}, 
-      #{plannedEndAt,jdbcType=TIMESTAMP}, #{externalId,jdbcType=VARCHAR}, #{externalCode,jdbcType=VARCHAR}, 
-      #{remark,jdbcType=VARCHAR}, #{revision,jdbcType=INTEGER}, #{createTime,jdbcType=TIMESTAMP}, 
-      #{updateTime,jdbcType=TIMESTAMP})
+    insert into workorder (code, product_id, planned_qty,
+      routing_id, status, planned_start_at,
+      planned_end_at, remark, revision,
+      create_time, update_time)
+    values (#{code,jdbcType=VARCHAR}, #{productId,jdbcType=BIGINT}, #{plannedQty,jdbcType=DECIMAL},
+      #{routingId,jdbcType=BIGINT}, #{status,jdbcType=VARCHAR}, #{plannedStartAt,jdbcType=TIMESTAMP},
+      #{plannedEndAt,jdbcType=TIMESTAMP}, #{remark,jdbcType=VARCHAR}, #{revision,jdbcType=INTEGER},
+      #{createTime,jdbcType=TIMESTAMP}, #{updateTime,jdbcType=TIMESTAMP})
   </insert>
   <insert id="insertSelective" keyColumn="id" keyProperty="id" parameterType="dev.mesbase.business.production.domain.WorkorderEntity" useGeneratedKeys="true">
     insert into workorder
@@ -142,12 +137,6 @@
       </if>
       <if test="plannedEndAt != null">
         planned_end_at,
-      </if>
-      <if test="externalId != null">
-        external_id,
-      </if>
-      <if test="externalCode != null">
-        external_code,
       </if>
       <if test="remark != null">
         remark,
@@ -183,12 +172,6 @@
       </if>
       <if test="plannedEndAt != null">
         #{plannedEndAt,jdbcType=TIMESTAMP},
-      </if>
-      <if test="externalId != null">
-        #{externalId,jdbcType=VARCHAR},
-      </if>
-      <if test="externalCode != null">
-        #{externalCode,jdbcType=VARCHAR},
       </if>
       <if test="remark != null">
         #{remark,jdbcType=VARCHAR},
@@ -237,12 +220,6 @@
       <if test="row.plannedEndAt != null">
         planned_end_at = #{row.plannedEndAt,jdbcType=TIMESTAMP},
       </if>
-      <if test="row.externalId != null">
-        external_id = #{row.externalId,jdbcType=VARCHAR},
-      </if>
-      <if test="row.externalCode != null">
-        external_code = #{row.externalCode,jdbcType=VARCHAR},
-      </if>
       <if test="row.remark != null">
         remark = #{row.remark,jdbcType=VARCHAR},
       </if>
@@ -270,8 +247,6 @@
       status = #{row.status,jdbcType=VARCHAR},
       planned_start_at = #{row.plannedStartAt,jdbcType=TIMESTAMP},
       planned_end_at = #{row.plannedEndAt,jdbcType=TIMESTAMP},
-      external_id = #{row.externalId,jdbcType=VARCHAR},
-      external_code = #{row.externalCode,jdbcType=VARCHAR},
       remark = #{row.remark,jdbcType=VARCHAR},
       revision = #{row.revision,jdbcType=INTEGER},
       create_time = #{row.createTime,jdbcType=TIMESTAMP},
@@ -304,12 +279,6 @@
       <if test="plannedEndAt != null">
         planned_end_at = #{plannedEndAt,jdbcType=TIMESTAMP},
       </if>
-      <if test="externalId != null">
-        external_id = #{externalId,jdbcType=VARCHAR},
-      </if>
-      <if test="externalCode != null">
-        external_code = #{externalCode,jdbcType=VARCHAR},
-      </if>
       <if test="remark != null">
         remark = #{remark,jdbcType=VARCHAR},
       </if>
@@ -334,8 +303,6 @@
       status = #{status,jdbcType=VARCHAR},
       planned_start_at = #{plannedStartAt,jdbcType=TIMESTAMP},
       planned_end_at = #{plannedEndAt,jdbcType=TIMESTAMP},
-      external_id = #{externalId,jdbcType=VARCHAR},
-      external_code = #{externalCode,jdbcType=VARCHAR},
       remark = #{remark,jdbcType=VARCHAR},
       revision = #{revision,jdbcType=INTEGER},
       create_time = #{createTime,jdbcType=TIMESTAMP},

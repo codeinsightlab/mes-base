@@ -1134,6 +1134,266 @@ public class MesMaterialIssueExample {
             addCriterion("update_time not between", value1, value2, "updateTime");
             return (Criteria) this;
         }
+
+        public Criteria andVoidOperationIdIsNull() {
+            addCriterion("void_operation_id is null");
+            return (Criteria) this;
+        }
+
+        public Criteria andVoidOperationIdIsNotNull() {
+            addCriterion("void_operation_id is not null");
+            return (Criteria) this;
+        }
+
+        public Criteria andVoidOperationIdEqualTo(String value) {
+            addCriterion("void_operation_id =", value, "voidOperationId");
+            return (Criteria) this;
+        }
+
+        public Criteria andVoidOperationIdNotEqualTo(String value) {
+            addCriterion("void_operation_id <>", value, "voidOperationId");
+            return (Criteria) this;
+        }
+
+        public Criteria andVoidOperationIdGreaterThan(String value) {
+            addCriterion("void_operation_id >", value, "voidOperationId");
+            return (Criteria) this;
+        }
+
+        public Criteria andVoidOperationIdGreaterThanOrEqualTo(String value) {
+            addCriterion("void_operation_id >=", value, "voidOperationId");
+            return (Criteria) this;
+        }
+
+        public Criteria andVoidOperationIdLessThan(String value) {
+            addCriterion("void_operation_id <", value, "voidOperationId");
+            return (Criteria) this;
+        }
+
+        public Criteria andVoidOperationIdLessThanOrEqualTo(String value) {
+            addCriterion("void_operation_id <=", value, "voidOperationId");
+            return (Criteria) this;
+        }
+
+        public Criteria andVoidOperationIdLike(String value) {
+            addCriterion("void_operation_id like", value, "voidOperationId");
+            return (Criteria) this;
+        }
+
+        public Criteria andVoidOperationIdNotLike(String value) {
+            addCriterion("void_operation_id not like", value, "voidOperationId");
+            return (Criteria) this;
+        }
+
+        public Criteria andVoidOperationIdIn(List<String> values) {
+            addCriterion("void_operation_id in", values, "voidOperationId");
+            return (Criteria) this;
+        }
+
+        public Criteria andVoidOperationIdNotIn(List<String> values) {
+            addCriterion("void_operation_id not in", values, "voidOperationId");
+            return (Criteria) this;
+        }
+
+        public Criteria andVoidOperationIdBetween(String value1, String value2) {
+            addCriterion("void_operation_id between", value1, value2, "voidOperationId");
+            return (Criteria) this;
+        }
+
+        public Criteria andVoidOperationIdNotBetween(String value1, String value2) {
+            addCriterion("void_operation_id not between", value1, value2, "voidOperationId");
+            return (Criteria) this;
+        }
+
+        public Criteria andVoidFromStatusIsNull() {
+            addCriterion("void_from_status is null");
+            return (Criteria) this;
+        }
+
+        public Criteria andVoidFromStatusIsNotNull() {
+            addCriterion("void_from_status is not null");
+            return (Criteria) this;
+        }
+
+        public Criteria andVoidFromStatusEqualTo(String value) {
+            addCriterion("void_from_status =", value, "voidFromStatus");
+            return (Criteria) this;
+        }
+
+        public Criteria andVoidFromStatusNotEqualTo(String value) {
+            addCriterion("void_from_status <>", value, "voidFromStatus");
+            return (Criteria) this;
+        }
+
+        public Criteria andVoidFromStatusGreaterThan(String value) {
+            addCriterion("void_from_status >", value, "voidFromStatus");
+            return (Criteria) this;
+        }
+
+        public Criteria andVoidFromStatusGreaterThanOrEqualTo(String value) {
+            addCriterion("void_from_status >=", value, "voidFromStatus");
+            return (Criteria) this;
+        }
+
+        public Criteria andVoidFromStatusLessThan(String value) {
+            addCriterion("void_from_status <", value, "voidFromStatus");
+            return (Criteria) this;
+        }
+
+        public Criteria andVoidFromStatusLessThanOrEqualTo(String value) {
+            addCriterion("void_from_status <=", value, "voidFromStatus");
+            return (Criteria) this;
+        }
+
+        public Criteria andVoidFromStatusLike(String value) {
+            addCriterion("void_from_status like", value, "voidFromStatus");
+            return (Criteria) this;
+        }
+
+        public Criteria andVoidFromStatusNotLike(String value) {
+            addCriterion("void_from_status not like", value, "voidFromStatus");
+            return (Criteria) this;
+        }
+
+        public Criteria andVoidFromStatusIn(List<String> values) {
+            addCriterion("void_from_status in", values, "voidFromStatus");
+            return (Criteria) this;
+        }
+
+        public Criteria andVoidFromStatusNotIn(List<String> values) {
+            addCriterion("void_from_status not in", values, "voidFromStatus");
+            return (Criteria) this;
+        }
+
+        public Criteria andVoidFromStatusBetween(String value1, String value2) {
+            addCriterion("void_from_status between", value1, value2, "voidFromStatus");
+            return (Criteria) this;
+        }
+
+        public Criteria andVoidFromStatusNotBetween(String value1, String value2) {
+            addCriterion("void_from_status not between", value1, value2, "voidFromStatus");
+            return (Criteria) this;
+        }
+
+        public Criteria andVoidRequestedAtIsNull() {
+            addCriterion("void_requested_at is null");
+            return (Criteria) this;
+        }
+
+        public Criteria andVoidRequestedAtIsNotNull() {
+            addCriterion("void_requested_at is not null");
+            return (Criteria) this;
+        }
+
+        public Criteria andVoidRequestedAtEqualTo(LocalDateTime value) {
+            addCriterion("void_requested_at =", value, "voidRequestedAt");
+            return (Criteria) this;
+        }
+
+        public Criteria andVoidRequestedAtNotEqualTo(LocalDateTime value) {
+            addCriterion("void_requested_at <>", value, "voidRequestedAt");
+            return (Criteria) this;
+        }
+
+        public Criteria andVoidRequestedAtGreaterThan(LocalDateTime value) {
+            addCriterion("void_requested_at >", value, "voidRequestedAt");
+            return (Criteria) this;
+        }
+
+        public Criteria andVoidRequestedAtGreaterThanOrEqualTo(LocalDateTime value) {
+            addCriterion("void_requested_at >=", value, "voidRequestedAt");
+            return (Criteria) this;
+        }
+
+        public Criteria andVoidRequestedAtLessThan(LocalDateTime value) {
+            addCriterion("void_requested_at <", value, "voidRequestedAt");
+            return (Criteria) this;
+        }
+
+        public Criteria andVoidRequestedAtLessThanOrEqualTo(LocalDateTime value) {
+            addCriterion("void_requested_at <=", value, "voidRequestedAt");
+            return (Criteria) this;
+        }
+
+        public Criteria andVoidRequestedAtIn(List<LocalDateTime> values) {
+            addCriterion("void_requested_at in", values, "voidRequestedAt");
+            return (Criteria) this;
+        }
+
+        public Criteria andVoidRequestedAtNotIn(List<LocalDateTime> values) {
+            addCriterion("void_requested_at not in", values, "voidRequestedAt");
+            return (Criteria) this;
+        }
+
+        public Criteria andVoidRequestedAtBetween(LocalDateTime value1, LocalDateTime value2) {
+            addCriterion("void_requested_at between", value1, value2, "voidRequestedAt");
+            return (Criteria) this;
+        }
+
+        public Criteria andVoidRequestedAtNotBetween(LocalDateTime value1, LocalDateTime value2) {
+            addCriterion("void_requested_at not between", value1, value2, "voidRequestedAt");
+            return (Criteria) this;
+        }
+
+        public Criteria andVoidFinishedAtIsNull() {
+            addCriterion("void_finished_at is null");
+            return (Criteria) this;
+        }
+
+        public Criteria andVoidFinishedAtIsNotNull() {
+            addCriterion("void_finished_at is not null");
+            return (Criteria) this;
+        }
+
+        public Criteria andVoidFinishedAtEqualTo(LocalDateTime value) {
+            addCriterion("void_finished_at =", value, "voidFinishedAt");
+            return (Criteria) this;
+        }
+
+        public Criteria andVoidFinishedAtNotEqualTo(LocalDateTime value) {
+            addCriterion("void_finished_at <>", value, "voidFinishedAt");
+            return (Criteria) this;
+        }
+
+        public Criteria andVoidFinishedAtGreaterThan(LocalDateTime value) {
+            addCriterion("void_finished_at >", value, "voidFinishedAt");
+            return (Criteria) this;
+        }
+
+        public Criteria andVoidFinishedAtGreaterThanOrEqualTo(LocalDateTime value) {
+            addCriterion("void_finished_at >=", value, "voidFinishedAt");
+            return (Criteria) this;
+        }
+
+        public Criteria andVoidFinishedAtLessThan(LocalDateTime value) {
+            addCriterion("void_finished_at <", value, "voidFinishedAt");
+            return (Criteria) this;
+        }
+
+        public Criteria andVoidFinishedAtLessThanOrEqualTo(LocalDateTime value) {
+            addCriterion("void_finished_at <=", value, "voidFinishedAt");
+            return (Criteria) this;
+        }
+
+        public Criteria andVoidFinishedAtIn(List<LocalDateTime> values) {
+            addCriterion("void_finished_at in", values, "voidFinishedAt");
+            return (Criteria) this;
+        }
+
+        public Criteria andVoidFinishedAtNotIn(List<LocalDateTime> values) {
+            addCriterion("void_finished_at not in", values, "voidFinishedAt");
+            return (Criteria) this;
+        }
+
+        public Criteria andVoidFinishedAtBetween(LocalDateTime value1, LocalDateTime value2) {
+            addCriterion("void_finished_at between", value1, value2, "voidFinishedAt");
+            return (Criteria) this;
+        }
+
+        public Criteria andVoidFinishedAtNotBetween(LocalDateTime value1, LocalDateTime value2) {
+            addCriterion("void_finished_at not between", value1, value2, "voidFinishedAt");
+            return (Criteria) this;
+        }
     }
 
     public static class Criteria extends GeneratedCriteria {
