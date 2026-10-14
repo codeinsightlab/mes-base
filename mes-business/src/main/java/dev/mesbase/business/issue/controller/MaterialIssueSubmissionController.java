@@ -12,14 +12,23 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 
 @RestController
 @Validated
-@ConditionalOnProperty(name="mes.business.enabled",havingValue="true")
+@ConditionalOnProperty(name = "mes.business.enabled", havingValue = "true")
 public class MaterialIssueSubmissionController {
     private final MaterialIssueSubmissionService service;
-    public MaterialIssueSubmissionController(MaterialIssueSubmissionService service) {this.service=service;}
+
+    public MaterialIssueSubmissionController(MaterialIssueSubmissionService service) {
+        this.service = service;
+    }
+
     @PostMapping("/api/issue/mes-material-issue/{id}/actions/submit")
-    @EndpointAccess(value=EndpointAccess.Kind.AUTHORIZED,permission="business:mes:material:issue:submit")
-    public MesMaterialIssueVo submit(@PathVariable @NotNull Long id) {return MesMaterialIssueController.toView(service.submit(id));}
+    @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED, permission = "business:mes:material:issue:update")
+    public MesMaterialIssueVo submit(@PathVariable @NotNull Long id) {
+        return MesMaterialIssueController.toView(service.submit(id));
+    }
+
     @PostMapping("/api/issue/mes-material-issue/{id}/actions/reopen-rejected")
-    @EndpointAccess(value=EndpointAccess.Kind.AUTHORIZED,permission="business:mes:material:issue:submit")
-    public MesMaterialIssueVo reopen(@PathVariable @NotNull Long id) {return MesMaterialIssueController.toView(service.reopenRejected(id));}
+    @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED, permission = "business:mes:material:issue:update")
+    public MesMaterialIssueVo reopen(@PathVariable @NotNull Long id) {
+        return MesMaterialIssueController.toView(service.reopenRejected(id));
+    }
 }

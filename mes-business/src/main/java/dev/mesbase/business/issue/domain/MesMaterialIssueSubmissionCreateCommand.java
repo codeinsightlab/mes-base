@@ -12,8 +12,8 @@ import java.time.LocalDateTime;
 public record MesMaterialIssueSubmissionCreateCommand(
         @NotNull Long issueId,
         @NotNull Integer pathRevision,
-        @NotBlank @Size(max=10000) String commandJson,
-        @NotBlank @Size(max=16) String status,
+        @NotBlank @Size(max = 10000) String commandJson,
+        @NotBlank @Size(max = 16) String status,
         @NotNull LocalDateTime createdAt,
         LocalDateTime finishedAt
 ) {

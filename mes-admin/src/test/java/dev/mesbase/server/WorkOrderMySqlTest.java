@@ -1,5 +1,9 @@
 package dev.mesbase.server;
 
+import dev.mesbase.business.production.service.ProductionChainLocks;
+import dev.mesbase.business.production.dao.MesExecutionPathMapper;
+import dev.mesbase.business.production.dao.MesExecutionPathNodeMapper;
+
 import dev.mesbase.business.production.service.WorkorderErpFacts;
 import dev.mesbase.business.production.dao.WorkorderErpExtraMapper;
 
@@ -70,11 +74,11 @@ import dev.mesbase.business.production.dao.WorkOrderExtraMapper;
  * TEST ONLY demand and execution convergence against configured acceptance MySQL; all writes roll back.
  */
 class WorkOrderMySqlTest {
-    static final Set<Class<?>> MAPPERS = Set.of(WorkorderErpExtraMapper.class, WorkorderMapper.class, ProductionBatchMapper.class, BatchRouteNodeMapper.class, RoutingMapper.class, RoutingNodeMapper.class, RoutingEdgeMapper.class, RoutingProductMapper.class, OperationMapper.class, WorkOrderExtraMapper.class, MaterialMapper.class, MesMaterialIssueMapper.class, MesProductionExecutionMapper.class);
+    static final Set<Class<?>> MAPPERS = Set.of(MesExecutionPathMapper.class, MesExecutionPathNodeMapper.class, WorkorderErpExtraMapper.class, WorkorderMapper.class, ProductionBatchMapper.class, BatchRouteNodeMapper.class, RoutingMapper.class, RoutingNodeMapper.class, RoutingEdgeMapper.class, RoutingProductMapper.class, OperationMapper.class, WorkOrderExtraMapper.class, MaterialMapper.class, MesMaterialIssueMapper.class, MesProductionExecutionMapper.class);
 
     @Configuration
     @EnableTransactionManagement
-    @Import({WorkorderErpFacts.class, WorkOrderService.class, RoutingReferenceRules.class, ProductionExecutionRules.class, MesProductionExecutionServiceImpl.class})
+    @Import({ProductionChainLocks.class, WorkorderErpFacts.class, WorkOrderService.class, RoutingReferenceRules.class, ProductionExecutionRules.class, MesProductionExecutionServiceImpl.class})
     static class Config {
         @Bean(name = "businessTransactionManager")
         OwnedTransactionManager manager(FactoryBusinessDataSource source) {
@@ -84,6 +88,16 @@ class WorkOrderMySqlTest {
         @Bean
         SqlSessionFactory sessions(FactoryBusinessDataSource source, OwnedTransactionManager manager) {
             return PersistenceFactories.create(source, MAPPERS, PersistenceFactories::pagination, manager::verifyAccess);
+        }
+
+        @Bean
+        MesExecutionPathMapper pathMapper(SqlSessionFactory s) {
+            return new SqlSessionTemplate(s).getMapper(MesExecutionPathMapper.class);
+        }
+
+        @Bean
+        MesExecutionPathNodeMapper pathNodeMapper(SqlSessionFactory s) {
+            return new SqlSessionTemplate(s).getMapper(MesExecutionPathNodeMapper.class);
         }
 
         @Bean
@@ -200,7 +214,8 @@ class WorkOrderMySqlTest {
                 assertEquals(new BigDecimal("300.000000"), service.allocation(order).remainingTargetQty());
                 assertThrows(FoundationException.class, () -> executionService.updateById(e.getId(), new MesProductionExecutionUpdateCommand(order, routing, new BigDecimal("400"), "RUNNING", LocalDateTime.now(), null, tag)));
                 service.release(order, 0);
-                executionService.updateById(e.getId(), new MesProductionExecutionUpdateCommand(order, routing, new BigDecimal("1100"), "RUNNING", LocalDateTime.now(), null, tag));
+                assertThrows(FoundationException.class, () -> executionService.updateById(e.getId(), new MesProductionExecutionUpdateCommand(order, routing, new BigDecimal("1100"), "RUNNING", LocalDateTime.now(), null, tag)));
+                executionService.updateById(e.getId(), new MesProductionExecutionUpdateCommand(order, routing, new BigDecimal("1100"), "READY", null, null, tag));
                 assertEquals(new BigDecimal("1400.000000"), service.allocation(order).allocatedTargetQty());
                 assertEquals(new BigDecimal("-400.000000"), service.allocation(order).remainingTargetQty());
                 assertEquals(new BigDecimal("400.000000"), service.allocation(order).excessTargetQty());

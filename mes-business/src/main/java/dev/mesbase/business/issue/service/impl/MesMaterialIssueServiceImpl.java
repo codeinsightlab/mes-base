@@ -141,7 +141,7 @@ public class MesMaterialIssueServiceImpl implements IMesMaterialIssueService {
     @BusinessCacheEvict(business = MesMaterialIssueResource.PREFIX,
             scope = BusinessCacheEvict.Scope.LIST_AND_DETAIL)
     public MesMaterialIssueEntity updateById(Long id, MesMaterialIssueUpdateCommand input) {
-        rules.lockIssues(List.of(id));
+        rules.lockIssueUpdate(id, input.workorderId(), input.executionId());
         MesMaterialIssueEntity row = requireRecord(id);
         // Recorded execution facts cannot be detached or moved by administrative CRUD.
         if (row.getExecutionId() != null && !Objects.equals(row.getExecutionId(), input.executionId()))

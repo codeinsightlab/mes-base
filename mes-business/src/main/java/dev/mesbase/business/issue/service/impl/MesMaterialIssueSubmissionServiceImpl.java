@@ -47,19 +47,19 @@ public class MesMaterialIssueSubmissionServiceImpl implements IMesMaterialIssueS
         MesMaterialIssueSubmissionExample example = new MesMaterialIssueSubmissionExample();
         MesMaterialIssueSubmissionExample.Criteria criteria = example.createCriteria();
         if (query.issueId() != null) {
-            criteria.andIssueIdEqualTo( query.issueId());
+            criteria.andIssueIdEqualTo(query.issueId());
         }
         if (query.pathRevision() != null) {
-            criteria.andPathRevisionEqualTo( query.pathRevision());
+            criteria.andPathRevisionEqualTo(query.pathRevision());
         }
         if (query.status() != null) {
             criteria.andStatusLike("%" + query.status() + "%");
         }
         if (query.createdAt() != null) {
-            criteria.andCreatedAtEqualTo( query.createdAt());
+            criteria.andCreatedAtEqualTo(query.createdAt());
         }
         if (query.finishedAt() != null) {
-            criteria.andFinishedAtEqualTo( query.finishedAt());
+            criteria.andFinishedAtEqualTo(query.finishedAt());
         }
         example.setOrderByClause("id");
         try (Page<MesMaterialIssueSubmissionEntity> page = PageHelper.offsetPage(offset, limit)) {

@@ -11,7 +11,7 @@ import java.time.LocalDateTime;
  */
 public record MesExecutionPathUpdateCommand(
         @NotNull Long routingId,
-        @NotBlank @Size(max=16) String pathStatus,
+        @NotBlank @Size(max = 16) String pathStatus,
         @NotNull Integer revision,
         @NotNull LocalDateTime selectedAt,
         LocalDateTime lockedAt

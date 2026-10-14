@@ -21,9 +21,11 @@ public interface MesExecutionPathNodeMapper {
 
     MesExecutionPathNodeEntity selectByPrimaryKey(Long id);
 
-    int updateByExampleSelective(@Param("row") MesExecutionPathNodeEntity row, @Param("example") MesExecutionPathNodeExample example);
+    int updateByExampleSelective(@Param("row") MesExecutionPathNodeEntity row,
+                                 @Param("example") MesExecutionPathNodeExample example);
 
-    int updateByExample(@Param("row") MesExecutionPathNodeEntity row, @Param("example") MesExecutionPathNodeExample example);
+    int updateByExample(@Param("row") MesExecutionPathNodeEntity row,
+                        @Param("example") MesExecutionPathNodeExample example);
 
     int updateByPrimaryKeySelective(MesExecutionPathNodeEntity row);
 

@@ -15,7 +15,7 @@ public record MesExecutionPathQueryDto(
         @Min(0) Integer offset,
         @Min(1) @Max(100) Integer limit,
         Long routingId,
-        @Size(max=16) String pathStatus,
+        @Size(max = 16) String pathStatus,
         Integer revision,
         @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime selectedAt,
         @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime lockedAt

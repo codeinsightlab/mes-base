@@ -1,4 +1,5 @@
 package dev.issuefixture;
+
 import dev.mesbase.business.production.dao.MesExecutionPathMapper;
 import dev.mesbase.business.production.dao.MesExecutionPathNodeMapper;
 import dev.mesbase.business.issue.dao.MesMaterialIssueSubmissionMapper;
@@ -149,7 +150,8 @@ class MaterialIssueHttpTest {
                         ddl = ddl.replace(",\n DROP COLUMN", ";\nALTER TABLE mes_material_issue DROP COLUMN");
                     if (name.equals("V21__workorder_external_extra.sql"))
                         ddl = ddl.replace(", DROP COLUMN", "; ALTER TABLE workorder DROP COLUMN");
-                    if (name.equals("V23__production_core_v1.sql")) ddl = ddl.replace(",\n MODIFY COLUMN", ";\nALTER TABLE mes_material_issue ALTER COLUMN");
+                    if (name.equals("V23__production_core_v1.sql"))
+                        ddl = ddl.replace(",\n MODIFY COLUMN", ";\nALTER TABLE mes_material_issue ALTER COLUMN");
                     for (String statement : ddl.split(";")) if (!statement.isBlank()) jdbc.execute(statement);
                 }
                 jdbc.update("INSERT INTO material(id,code,name,unit_id,material_type,status) VALUES(1,'M1','物料一',1,'PRODUCT','ENABLED')");
@@ -213,9 +215,20 @@ class MaterialIssueHttpTest {
             return PersistenceFactories.create(source, MAPPERS, PersistenceFactories::pagination, manager::verifyAccess);
         }
 
-        @Bean MesExecutionPathMapper pathMapper(SqlSessionFactory f) { return new SqlSessionTemplate(f).getMapper(MesExecutionPathMapper.class); }
-        @Bean MesExecutionPathNodeMapper pathNodeMapper(SqlSessionFactory f) { return new SqlSessionTemplate(f).getMapper(MesExecutionPathNodeMapper.class); }
-        @Bean MesMaterialIssueSubmissionMapper submissionMapper(SqlSessionFactory f) { return new SqlSessionTemplate(f).getMapper(MesMaterialIssueSubmissionMapper.class); }
+        @Bean
+        MesExecutionPathMapper pathMapper(SqlSessionFactory f) {
+            return new SqlSessionTemplate(f).getMapper(MesExecutionPathMapper.class);
+        }
+
+        @Bean
+        MesExecutionPathNodeMapper pathNodeMapper(SqlSessionFactory f) {
+            return new SqlSessionTemplate(f).getMapper(MesExecutionPathNodeMapper.class);
+        }
+
+        @Bean
+        MesMaterialIssueSubmissionMapper submissionMapper(SqlSessionFactory f) {
+            return new SqlSessionTemplate(f).getMapper(MesMaterialIssueSubmissionMapper.class);
+        }
 
         @Bean
         WorkorderErpExtraMapper workorderErpMapper(SqlSessionFactory f) {

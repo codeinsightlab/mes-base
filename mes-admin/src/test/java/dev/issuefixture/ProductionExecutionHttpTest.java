@@ -135,7 +135,8 @@ class ProductionExecutionHttpTest {
                             .replace("\"status\"", "\"startTime\":\"2026-10-14T09:00:00\",\"status\"")))
                     .andExpect(status().isConflict());
             // Existing started records remain protected; formal start coverage is in ProductionCoreV1HttpTest.
-            c.getBean(MaterialIssueHttpTest.Fixture.class).business.get("A").update("UPDATE mes_production_execution SET status='RUNNING',start_time=CURRENT_TIMESTAMP WHERE id=1");
+            c.getBean(MaterialIssueHttpTest.Fixture.class).business.get("A")
+                    .update("UPDATE mes_production_execution SET status='RUNNING',start_time=CURRENT_TIMESTAMP WHERE id=1");
             m.perform(full(put(E + "/1"), "A").content(CREATE)).andExpect(status().isConflict());
             m.perform(full(delete(E), "A").content("[1]")).andExpect(status().isConflict());
             m.perform(delete(E).header("Authorization", "Bearer CRUD").header("X-Factory-Id", "A")

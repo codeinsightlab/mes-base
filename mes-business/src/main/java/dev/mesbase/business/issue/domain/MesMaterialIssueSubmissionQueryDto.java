@@ -16,7 +16,7 @@ public record MesMaterialIssueSubmissionQueryDto(
         @Min(1) @Max(100) Integer limit,
         Long issueId,
         Integer pathRevision,
-        @Size(max=16) String status,
+        @Size(max = 16) String status,
         @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime createdAt,
         @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime finishedAt
 ) implements BusinessCacheQuery {

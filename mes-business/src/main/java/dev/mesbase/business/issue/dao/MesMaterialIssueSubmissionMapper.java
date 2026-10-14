@@ -23,11 +23,14 @@ public interface MesMaterialIssueSubmissionMapper {
 
     MesMaterialIssueSubmissionEntity selectByPrimaryKey(Long id);
 
-    int updateByExampleSelective(@Param("row") MesMaterialIssueSubmissionEntity row, @Param("example") MesMaterialIssueSubmissionExample example);
+    int updateByExampleSelective(@Param("row") MesMaterialIssueSubmissionEntity row,
+                                 @Param("example") MesMaterialIssueSubmissionExample example);
 
-    int updateByExampleWithBLOBs(@Param("row") MesMaterialIssueSubmissionEntity row, @Param("example") MesMaterialIssueSubmissionExample example);
+    int updateByExampleWithBLOBs(@Param("row") MesMaterialIssueSubmissionEntity row,
+                                 @Param("example") MesMaterialIssueSubmissionExample example);
 
-    int updateByExample(@Param("row") MesMaterialIssueSubmissionEntity row, @Param("example") MesMaterialIssueSubmissionExample example);
+    int updateByExample(@Param("row") MesMaterialIssueSubmissionEntity row,
+                        @Param("example") MesMaterialIssueSubmissionExample example);
 
     int updateByPrimaryKeySelective(MesMaterialIssueSubmissionEntity row);
 

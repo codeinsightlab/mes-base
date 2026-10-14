@@ -25,7 +25,7 @@ naming:
     fallback: "table-name"
   author: "MES Base"
 output:
-  backendRoot: "target/production-core-v1/codegen"
+  backendRoot: ".local/production-core-v1-codegen-review"
   backendModule: "mes-business"
   frontendRoot: "../mes-base-ui"
   javaPackage: "dev.mesbase.business.{module}"

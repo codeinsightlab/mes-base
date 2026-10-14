@@ -47,19 +47,19 @@ public class MesExecutionPathServiceImpl implements IMesExecutionPathService {
         MesExecutionPathExample example = new MesExecutionPathExample();
         MesExecutionPathExample.Criteria criteria = example.createCriteria();
         if (query.routingId() != null) {
-            criteria.andRoutingIdEqualTo( query.routingId());
+            criteria.andRoutingIdEqualTo(query.routingId());
         }
         if (query.pathStatus() != null) {
             criteria.andPathStatusLike("%" + query.pathStatus() + "%");
         }
         if (query.revision() != null) {
-            criteria.andRevisionEqualTo( query.revision());
+            criteria.andRevisionEqualTo(query.revision());
         }
         if (query.selectedAt() != null) {
-            criteria.andSelectedAtEqualTo( query.selectedAt());
+            criteria.andSelectedAtEqualTo(query.selectedAt());
         }
         if (query.lockedAt() != null) {
-            criteria.andLockedAtEqualTo( query.lockedAt());
+            criteria.andLockedAtEqualTo(query.lockedAt());
         }
         example.setOrderByClause("id");
         try (Page<MesExecutionPathEntity> page = PageHelper.offsetPage(offset, limit)) {

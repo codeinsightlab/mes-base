@@ -26,8 +26,9 @@ public class HttpLoggingConfiguration {
     @Bean
     ServletListenerRegistrationBean<HttpRequestCompletionListener> httpCompletionRegistration(Environment environment) {
         String exclusions = environment.getProperty("mes.http.logging.exclude-paths", "/health,/actuator/health/**,/favicon.ico,/assets/**,/static/**,/openapi-docs/**");
+        long slowThresholdMs = environment.getProperty("mes.logging.http.slow-threshold-ms", Long.class, 1000L);
         var listener = new HttpRequestCompletionListener(Arrays.stream(exclusions.split(","))
-                .map(String::trim).filter(value -> !value.isEmpty()).toList());
+                .map(String::trim).filter(value -> !value.isEmpty()).toList(), slowThresholdMs);
         return new ServletListenerRegistrationBean<>(listener);
     }
 }

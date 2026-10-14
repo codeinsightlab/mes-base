@@ -20,24 +20,54 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 
 @RestController
 @Validated
-@ConditionalOnProperty(name="mes.business.enabled",havingValue="true")
+@ConditionalOnProperty(name = "mes.business.enabled", havingValue = "true")
 public class ExecutionActionController {
     private final ExecutionPathService service;
-    public ExecutionActionController(ExecutionPathService service){this.service=service;}
-    public record SelectRequest(@NotNull Integer revision,@NotEmpty @Size(max=100) List<@NotNull Long> routingNodeIds) {}
-    public record NodeView(String id,String nodeCode,String operationName,boolean required) {}
-    public record EdgeView(String fromNodeId,String toNodeId) {}
-    public record PathView(String executionId,String executionStatus,String routingId,String pathStatus,int revision,LocalDateTime selectedAt,LocalDateTime lockedAt,List<String> selectedNodeIds,List<NodeView> nodes,List<EdgeView> edges) {}
+
+    public ExecutionActionController(ExecutionPathService service) {
+        this.service = service;
+    }
+
+    public record SelectRequest(@NotNull Integer revision,
+                                @NotEmpty @Size(max = 100) List<@NotNull Long> routingNodeIds) {
+    }
+
+    public record NodeView(String id, String nodeCode, String operationName, boolean required) {
+    }
+
+    public record EdgeView(String fromNodeId, String toNodeId) {
+    }
+
+    public record PathView(String executionId, String executionStatus, String routingId, String pathStatus,
+                           int revision, LocalDateTime selectedAt, LocalDateTime lockedAt, List<String> selectedNodeIds,
+                           List<NodeView> nodes, List<EdgeView> edges) {
+    }
+
     @GetMapping("/api/production/executions/{id}/path")
-    @EndpointAccess(value=EndpointAccess.Kind.AUTHORIZED,permission="business:mes:production:execution:query")
-    public PathView view(@PathVariable @NotNull Long id){return toView(service.view(id));}
+    @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED, permission = "business:mes:production:execution:query")
+    public PathView view(@PathVariable @NotNull Long id) {
+        return toView(service.view(id));
+    }
+
     @PostMapping("/api/production/executions/{id}/actions/select-path")
-    @EndpointAccess(value=EndpointAccess.Kind.AUTHORIZED,permission="business:mes:production:execution:select-path")
-    public PathView select(@PathVariable @NotNull Long id,@RequestBody @Valid SelectRequest input){return toView(service.select(id,input.revision(),input.routingNodeIds()));}
+    @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED, permission = "business:mes:production:execution:update")
+    public PathView select(@PathVariable @NotNull Long id, @RequestBody @Valid SelectRequest input) {
+        return toView(service.select(id, input.revision(), input.routingNodeIds()));
+    }
+
     @PostMapping("/api/production/executions/{id}/actions/start")
-    @EndpointAccess(value=EndpointAccess.Kind.AUTHORIZED,permission="business:mes:production:execution:start")
-    public MesProductionExecutionVo start(@PathVariable @NotNull Long id){return MesProductionExecutionController.toView(service.start(id));}
+    @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED, permission = "business:mes:production:execution:update")
+    public MesProductionExecutionVo start(@PathVariable @NotNull Long id) {
+        return MesProductionExecutionController.toView(service.start(id));
+    }
+
     private static PathView toView(PathModel model) {
-        var p=model.path();return new PathView(model.executionId().toString(),model.executionStatus(),p==null?null:p.getRoutingId().toString(),p==null?"UNSELECTED":p.getPathStatus(),p==null?0:p.getRevision(),p==null?null:p.getSelectedAt(),p==null?null:p.getLockedAt(),model.selectedNodeIds().stream().map(Object::toString).toList(),model.nodes().stream().map(n->new NodeView(n.getId().toString(),n.getNodeCode(),n.getOperationName(),Boolean.TRUE.equals(n.getIsKey()))).toList(),model.edges().stream().map(e->new EdgeView(e.getFromNodeId().toString(),e.getToNodeId().toString())).toList());
+        var p = model.path();
+        return new PathView(model.executionId().toString(), model.executionStatus(), p == null ? null : p.getRoutingId()
+                .toString(), p == null ? "UNSELECTED" : p.getPathStatus(), p == null ? 0 : p.getRevision(), p == null ? null : p.getSelectedAt(), p == null ? null : p.getLockedAt(), model.selectedNodeIds()
+                .stream().map(Object::toString).toList(), model.nodes().stream().map(n -> new NodeView(n.getId()
+                        .toString(), n.getNodeCode(), n.getOperationName(), Boolean.TRUE.equals(n.getIsKey())))
+                .toList(), model.edges().stream()
+                .map(e -> new EdgeView(e.getFromNodeId().toString(), e.getToNodeId().toString())).toList());
     }
 }

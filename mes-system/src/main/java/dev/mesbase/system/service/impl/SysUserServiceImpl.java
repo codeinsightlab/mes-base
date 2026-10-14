@@ -31,7 +31,6 @@ import java.util.List;
 import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.slf4j.MDC;
 import dev.mesbase.system.service.SessionRevocationService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -574,8 +573,11 @@ public class SysUserServiceImpl implements ISysUserService {
                 failureNum++;
                 String msg = "<br/>" + failureNum + "、账号 " + user.getUserName() + " 导入失败：";
                 failureMsg.append(msg + "字段或关系校验失败");
-                log.warn("User import rejected requestId={} type={}", MDC.get("requestId"), e.getClass()
-                        .getSimpleName());
+                if (e instanceof ServiceException) {
+                    log.info("User import rejected type={}", e.getClass().getSimpleName());
+                } else {
+                    log.error("User import failed", e);
+                }
             }
         }
         if (failureNum > 0) {

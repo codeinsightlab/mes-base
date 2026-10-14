@@ -24,7 +24,8 @@ public record MesMaterialIssueVo(
         LocalDateTime updateTime,
         String executionId,
         String sourceExecutionMode, String externalEffect, String externalBindingKey, String externalReference,
-        String voidOperationId, String voidResultStatus, String voidExecutionMode, String voidMessage, String submissionId
+        String voidOperationId, String voidResultStatus, String voidExecutionMode, String voidMessage,
+        String submissionId
 ) {
 }
 

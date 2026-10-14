@@ -212,26 +212,75 @@ public class MesMaterialIssueEntity {
     public void setSubmissionId(Long submissionId) {
         this.submissionId = submissionId;
     }
+
     // Compatibility projections, owned by ERP Extra, not mapped into this table.
     private String sourceExecutionMode;
-    public String getSourceExecutionMode() { return sourceExecutionMode; }
-    public void setSourceExecutionMode(String value) { sourceExecutionMode = value; }
+
+    public String getSourceExecutionMode() {
+        return sourceExecutionMode;
+    }
+
+    public void setSourceExecutionMode(String value) {
+        sourceExecutionMode = value;
+    }
+
     private String externalEffect;
-    public String getExternalEffect() { return externalEffect; }
-    public void setExternalEffect(String value) { externalEffect = value; }
+
+    public String getExternalEffect() {
+        return externalEffect;
+    }
+
+    public void setExternalEffect(String value) {
+        externalEffect = value;
+    }
+
     private String externalBindingKey;
-    public String getExternalBindingKey() { return externalBindingKey; }
-    public void setExternalBindingKey(String value) { externalBindingKey = value; }
+
+    public String getExternalBindingKey() {
+        return externalBindingKey;
+    }
+
+    public void setExternalBindingKey(String value) {
+        externalBindingKey = value;
+    }
+
     private String externalReference;
-    public String getExternalReference() { return externalReference; }
-    public void setExternalReference(String value) { externalReference = value; }
+
+    public String getExternalReference() {
+        return externalReference;
+    }
+
+    public void setExternalReference(String value) {
+        externalReference = value;
+    }
+
     private String voidResultStatus;
-    public String getVoidResultStatus() { return voidResultStatus; }
-    public void setVoidResultStatus(String value) { voidResultStatus = value; }
+
+    public String getVoidResultStatus() {
+        return voidResultStatus;
+    }
+
+    public void setVoidResultStatus(String value) {
+        voidResultStatus = value;
+    }
+
     private String voidExecutionMode;
-    public String getVoidExecutionMode() { return voidExecutionMode; }
-    public void setVoidExecutionMode(String value) { voidExecutionMode = value; }
+
+    public String getVoidExecutionMode() {
+        return voidExecutionMode;
+    }
+
+    public void setVoidExecutionMode(String value) {
+        voidExecutionMode = value;
+    }
+
     private String voidMessage;
-    public String getVoidMessage() { return voidMessage; }
-    public void setVoidMessage(String value) { voidMessage = value; }
+
+    public String getVoidMessage() {
+        return voidMessage;
+    }
+
+    public void setVoidMessage(String value) {
+        voidMessage = value;
+    }
 }

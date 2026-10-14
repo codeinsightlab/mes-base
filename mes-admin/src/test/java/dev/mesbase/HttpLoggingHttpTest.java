@@ -45,6 +45,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -53,7 +54,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 @SpringBootTest(classes = {MesBaseApplication.class, FoundationHttpTest.Fixture.class, HttpLoggingHttpTest.Fixture.class},
         webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
         properties = {"mes.system.enabled=false", "mes.platform.enabled=false", "mes.runtime.enabled=false",
-                "mes.http.logging.exclude-paths=/health,/test-only/log/excluded", "server.tomcat.threads.max=1"})
+                "mes.http.logging.exclude-paths=/health,/test-only/log/excluded", "server.tomcat.threads.max=1",
+                "mes.logging.http.slow-threshold-ms=600"})
 class HttpLoggingHttpTest {
     @Autowired
     Environment environment;
@@ -86,7 +88,9 @@ class HttpLoggingHttpTest {
     static class TestController {
         @GetMapping("/test-only/log/{kind}")
         @EndpointAccess(EndpointAccess.Kind.PUBLIC)
-        String log(@PathVariable String kind) {
+        String log(@PathVariable String kind) throws InterruptedException {
+            if (kind.equals("slow")) Thread.sleep(700);
+            if (kind.equals("bad-request")) throw new FoundationException(ErrorCode.BAD_REQUEST);
             if (kind.equals("business")) throw new ServiceException("TEST ONLY expected validation");
             if (kind.equals("known")) throw new FoundationException(ErrorCode.UNPROCESSABLE);
             if (kind.equals("system"))
@@ -144,11 +148,13 @@ class HttpLoggingHttpTest {
 
     static class Events extends AppenderBase<ILoggingEvent> implements AutoCloseable {
         final List<ILoggingEvent> events = new CopyOnWriteArrayList<>();
+        final Logger access = (Logger) LoggerFactory.getLogger("MES_HTTP_ACCESS");
         final Logger root = (Logger) LoggerFactory.getLogger(Logger.ROOT_LOGGER_NAME);
 
         Events() {
             start();
             root.addAppender(this);
+            access.addAppender(this);
         }
 
         protected void append(ILoggingEvent event) {
@@ -158,6 +164,7 @@ class HttpLoggingHttpTest {
 
         public void close() {
             root.detachAppender(this);
+            access.detachAppender(this);
             stop();
         }
 
@@ -190,7 +197,12 @@ class HttpLoggingHttpTest {
         events.waitForCompletion(id);
         var logs = events.completed(id);
         assertEquals(1, logs.size(), path);
+        String message = logs.getFirst().getFormattedMessage();
+        long duration = Long.parseLong(message.split("durationMs=")[1].split(" ")[0]);
         assertEquals(Level.INFO, logs.getFirst().getLevel());
+        assertEquals("MES_HTTP_ACCESS", logs.getFirst().getLoggerName());
+        assertTrue(!message.contains("requestId="));
+        assertNull(logs.getFirst().getThrowableProxy());
         assertTrue(logs.getFirst().getFormattedMessage().contains("status=" + status), logs.getFirst()
                 .getFormattedMessage());
         assertTrue(logs.getFirst().getFormattedMessage().contains("path=" + path));
@@ -204,6 +216,14 @@ class HttpLoggingHttpTest {
             var response = get(client, "/test-only/log/normal?password=TEST_ONLY_QUERY_SECRET", null, null, "bad id=\"\\");
             String id = verify(events, response, 200, "/test-only/log/normal");
             assertEquals(id, response.body());
+            assertEquals(Level.INFO, events.completed(id).getFirst().getLevel());
+            String slow = verify(events, get(client, "/test-only/log/slow", null, null, null), 200, "/test-only/log/slow");
+            assertEquals(Level.INFO, events.completed(slow).getFirst().getLevel());
+            assertEquals(1, events.events.stream().filter(e -> slow.equals(e.getMDCPropertyMap().get("requestId"))
+                            && e.getFormattedMessage().startsWith("event=http.request.slow ") && e.getLevel() == Level.WARN)
+                    .count());
+            String bad = verify(events, get(client, "/test-only/log/bad-request", null, null, null), 400, "/test-only/log/bad-request");
+            assertEquals(Level.INFO, events.completed(bad).getFirst().getLevel());
             assertTrue(events.events.stream()
                     .anyMatch(e -> e.getFormattedMessage().equals("TEST ONLY application event")
                             && id.equals(e.getMDCPropertyMap().get("requestId"))));

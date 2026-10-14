@@ -102,3 +102,363 @@ failed/rejected和completed是不同语义事件；每个请求只有一条compl
 ## Document Created
 
 本文件新增Phase 1调用链/requestId/审计/安全证据，以及Phase 2修改清单、示例、验证/失败和剩余风险。业务代码与数据库审计实现未修改；基础设施代码有上述P0变更。证据覆盖源码、Mock/Fixture、真实嵌入式HTTP和隔离JAR；不覆盖当前用户服务/真实MySQL/部署生产。
+
+
+## 2026-10-14：普通 HTTP 完成摘要级别与 requestId 正文最小优化
+
+本节替代前文“所有完成摘要 INFO、正文含 requestId”的普通HTTP规则；历史验证记录保留。OpenAPI专用完成事件保持原字段、INFO级别、requestId正文及脱敏，不受普通摘要慢请求阈值影响。
+
+修改文件：
+
+- `mes-framework/src/main/java/dev/mesbase/platform/web/HttpRequestCompletionListener.java`：普通完成摘要移除正文requestId及参数，只通过现有MDC/Logback输出；新增构造参数slowThresholdMs。级别优先级：5xx或durationMs >= slowThresholdMs为WARN，其余4xx为INFO，其余DEBUG；不传Throwable、不新增ERROR堆栈。MDC.put/restore、排除路径、AtomicBoolean、State和最终response读取均保留。
+- `mes-admin/src/main/java/dev/mesbase/server/HttpLoggingConfiguration.java`：读取`mes.logging.http.slow-threshold-ms`，缺省1000L，注入监听器；原排除路径配置与Filter/Listener注册保持。
+- `mes-admin/src/main/resources/application.yml`：新增`mes.logging.http.slow-threshold-ms: 1000`及中文说明；未修改全局Logback pattern。普通200摘要在现有INFO日志配置下不输出，需要查看时仅为该监听器启用DEBUG。
+- `mes-admin/src/test/java/dev/mesbase/platform/web/HttpLoggingBoundaryTest.java`：更新构造调用，增加5组参数化验证（普通200/慢200/400/慢400/500），验证不附Throwable、格式化后UUID及requestId字段均只出现一次、MDC完整恢复和重复回调去重。
+- `mes-admin/src/test/java/dev/mesbase/HttpLoggingHttpTest.java`：仅测试环境启用该监听器DEBUG、配置600ms阈值；通过真实Tomcat确认普通200 DEBUG、700ms慢200 WARN、400 INFO、500 WARN且完成摘要无堆栈；保留异步完成/超时/ERROR派发、安全和排除测试。
+- `mes-admin/src/test/java/dev/mesbase/framework/openapi/OpenApiLoggingTest.java`：更新构造调用，阈值设为0仍要求OpenAPI完成事件INFO且正文保留requestId；原字段及脱敏回归保留，移除抛出拒绝异常之后不可达的重复断言（原返回后的有效断言继续保留）。
+
+验证：
+
+- 首次定向测试的5项参数化用例因JUnit无法自动转换Logback Level参数报错，已改为String参数后显式转换；不是生产代码失败，最终全量验证覆盖修正。
+- 当前共享工作区：`env PATH=/opt/homebrew/bin:/Users/user/apache-maven-3.6.1/bin:/usr/bin:/bin:/usr/sbin:/sbin mvn -B -ntp verify -Dmes.test.redis=true`，443项总计432通过、0失败/错误、11项真实MySQL opt-in跳过，BUILD SUCCESS。日志`/tmp/mes-http-level-verify.log`；本次不使用隔离副本。
+- 日志边界12项、真实HTTP组合2项全部通过；全部OpenAPI相关11项通过、0跳过。
+- IDEA本轮5个Java文件格式检查通过，日志`/tmp/mes-http-level-format-check.log`；本轮路径`git diff --check`通过。
+- 真实HTTP测试日志呈现完整UUID仅在Logback前缀出现一次。阈值600ms的测试观察到200/706ms为WARN；默认配置为1000ms。下方样例采用默认阈值、说明耗时值。
+
+```text
+DEBUG requestId=ba5e8447-3f9b-496c-8fd2-c9fe47a71352 event=http.request.completed method=GET path=/api/example status=200 durationMs=12 factoryId=A userId=42
+WARN  requestId=84811a11-5d8e-461e-bdd3-93502628410d event=http.request.completed method=GET path=/api/example status=200 durationMs=1200 factoryId=A userId=42
+INFO  requestId=1f4f39ee-f9de-4b20-a573-becb2e3a299a event=http.request.completed method=GET path=/api/example status=400 durationMs=4 factoryId=null userId=null
+WARN  requestId=0789f437-9f54-4c02-98c6-822c947fef67 event=http.request.completed method=GET path=/api/example status=500 durationMs=5 factoryId=null userId=null
+```
+
+没有修改异常处理、OpenAPI生产实现、请求响应、数据库审计及业务代码；没有重启用户服务、写数据库、提交或部署。本节追加证据覆盖Mock Servlet、真实嵌入式Tomcat及当前工作区全量构建；未证明用户正在运行的服务已加载本次改动。回滚范围为以上6个代码/配置/测试文件及本文新增章节，保护其他已有修改。
+
+
+## 2026-10-14：生产日志文件路由与滚动规范
+
+本节替代前文完成摘要的DEBUG/WARN分级和单一默认Boot输出方案。仅调整日志配置、技术日志调用点和对应测试，不改HTTP响应、异常传播、Factory/权限、数据库Schema或审计记录。
+
+### 修改前审查
+
+- Spring Boot 4.1.1，Maven依赖树实测 Logback classic/core 1.5.38，无新增依赖；证据`/tmp/mes-logback-version.log`。
+- 没有自定义logback-spring.xml、Appender或独立文件路由；公共application.yml只有MDC level pattern，dev/prod私有配置及公开example只定义level。默认profile dev；现有第三方及事务/后台查询level配置保持。
+- RequestBoundaryFilter仍负责UUID/MDC/Factory边界；完成监听器负责requestDestroyed、State、原路径、最终response状态、AtomicBoolean和排除；异常Advice/HttpFailureLogging已经分别处理预期拒绝与系统异常并去重。
+- 普通摘要此前在应用Logger，OpenAPI专用openapi.access为INFO并保留外部身份/API字段与脱敏。两个分支互斥，没有重复完成调用；原正文requestId在格式前缀中重复。
+- 仓库没有可核验的systemd unit、Dockerfile、compose或实际部署定义；config生产example明确不是已部署环境。当前只有本机启动脚本和隔离测试入口，不能声称生产容器/服务账户具有写权限。
+
+### 文件与职责变化（Change Summary）
+
+|文件|本轮职责|
+|---|---|
+|mes-admin/src/main/resources/logback-spring.xml|新增Boot/Spring Logback配置：dev彩色/其他profile纯文本console，统一无ANSI文件格式，APP/ACCESS/ERROR路由与gzip滚动|
+|mes-admin/src/main/resources/application.yml|移除重复logging.pattern.level；保留现有慢请求阈值与排除配置|
+|mes-framework/src/main/java/dev/mesbase/platform/web/HttpRequestCompletionListener.java|普通完成摘要统一MES_HTTP_ACCESS INFO；完成后达到阈值另在原应用Logger记录一次http.request.slow WARN，不附堆栈；其他生命周期完全保留|
+|mes-framework/src/main/java/dev/mesbase/framework/openapi/OpenApiRequestFilter.java|专用完成摘要改用同一MES_HTTP_ACCESS；仅移除重复requestId正文，其他clientId/appKey/apiCode/errorCode/peerIp和脱敏/系统失败处理不变|
+|mes-framework/src/main/java/dev/mesbase/platform/web/HttpFailureLogging.java|技术错误/拒绝正文移除重复requestId，MDC仍由原边界绑定，原错误链去重/级别/脱敏保留|
+|mes-framework/src/main/java/dev/mesbase/platform/web/FoundationErrorAdvice.java|技术日志正文移除重复requestId；响应、错误码及处理顺序不变|
+|mes-framework/src/main/java/dev/mesbase/framework/aspectj/LogAspect.java|仅审计失败技术日志移除重复requestId；按既有规则显式导入/格式化。审计表字段、调用时机、Service事务和best-effort行为均不变|
+|mes-system/src/main/java/dev/mesbase/system/service/impl/SysUserServiceImpl.java|仅导入catch内技术日志：ServiceException预期拒绝INFO，其他异常ERROR保留堆栈，移除重复requestId；既有导入统计/响应/持久化/事务均未修改|
+|mes-admin/src/test/java/dev/mesbase/HttpLoggingHttpTest.java|真实Tomcat验证INFO访问摘要及慢请求额外WARN，原安全/多厂/异步/ERROR/排除/异常回归保留|
+|mes-admin/src/test/java/dev/mesbase/platform/web/HttpLoggingBoundaryTest.java|访问日志捕获改为专用Logger；摘要与慢请求拆分断言、MDC/格式/去重验证|
+|mes-admin/src/test/java/dev/mesbase/framework/openapi/OpenApiLoggingTest.java|专用Logger捕获，验证新路由和正文单ID，外部字段和完整脱敏链回归保留|
+|mes-admin/src/test/java/dev/mesbase/server/ProductionLogbackTest.java|新增隔离JVM dev/prod加载真实XML；实写三类文件，验证级别/ANSI/完整堆栈/默认ID/路由；生产参数检查及缩小限额的日期/大小/gzip/启动清理/保留/总量测试|
+
+### 最终路由
+
+```text
+ROOT（默认INFO） → CONSOLE
+                 → APP：Threshold INFO → app.log（INFO/WARN/ERROR）
+                 → ERROR：Level ERROR only → error.log
+MES_HTTP_ACCESS（INFO，additivity=false） → ACCESS：Threshold INFO → access.log
+```
+
+每个未排除的逻辑HTTP请求只有一个访问摘要，所有HTTP status均为访问INFO，不能据此推断业务成功。OpenAPI也只走该访问Appender；其系统异常经原HttpFailureLogging进入ROOT，继续隐藏异常message、保留完整类型/源码/cause/suppressed。达到`mes.logging.http.slow-threshold-ms`（默认1000）后，保留access原摘要，ROOT另记WARN慢请求，无Throwable；非慢普通GET不进入app.log。
+
+文件pattern包含完整时间/级别/线程/requestId/Logger/正文及`%ex{full}`。无MDC时`%X{requestId:--}`显示`-`。本轮控制的日志正文不重复requestId；没有删MDC或丢弃异常链。
+
+|文件|单文件上限|保留|归档总量|格式|
+|---|---|---|---|---|
+|app.log|100MB|30天|5GB|每日+序号.log.gz|
+|access.log|100MB|14天|3GB|每日+序号.log.gz|
+|error.log|50MB|60天|2GB|每日+序号.log.gz|
+
+均为SizeAndTimeBasedRollingPolicy，cleanHistoryOnStart=true。归档总量限制不含活动文件；压缩/历史清理为异步，不宣称瞬时磁盘占用严格等于上限。
+
+### 路径、部署与权限
+
+日志根目录：`MES_LOG_DIR`，默认`.local/logs`；实际目录为根目录下的`MES_LOG_INSTANCE`。未配置实例名时默认主机名+PID，避免多个进程意外共用滚动文件。启动/文件写入在当前本机工作区及独立临时目录实际通过。
+
+生产必须配置稳定且唯一的实例名：例如单个systemd服务使用`MES_LOG_DIR=/var/log/mes-base`、`MES_LOG_INSTANCE=node-a`，服务账户对根目录及子目录有写权限；Docker使用可写卷根目录，每个副本使用唯一实例名。这里是部署要求示例，不代表已部署或已检查这些路径。相同实例名不能同时由两个JVM使用。稳定实例名允许重启后继续清理原归档；默认PID隔离模式产生的旧进程目录需按部署生命周期清理，不会由新目录的Appender跨实例删除。
+
+### 验证与实际样例
+
+- 当前工作区`env PATH=/opt/homebrew/bin:/Users/user/apache-maven-3.6.1/bin:/usr/bin:/bin:/usr/sbin:/sbin mvn -B -ntp verify -Dmes.test.redis=true`：446项总计435通过、0失败/错误、11项真实MySQL opt-in跳过，BUILD SUCCESS；`/tmp/mes-prod-log-verify.log`。
+- 打包启动：`/usr/bin/python3 scripts/smoke-packaged.py`，10通过、0失败；`/tmp/mes-prod-log-smoke.log`。JAR含BOOT-INF/classes/logback-spring.xml，使用自有隔离进程，不重启用户服务。
+- OpenAPI相关11项全部通过；日志边界12项、真实HTTP组合2项、原操作/登录审计回归2项、新文件/滚动3项全部通过。
+- 生产XML参数逐项核对。缩小测试限额256B/文件、2天、1024B用于验证同一Logback机制；模拟日期推进后等待每轮压缩和对应日期清理，再验证下一稳定清理周期结果。测试不会创建GB级文件，也不能冒充生产30/60天长期运行观测。
+- 开发ANSI与生产纯文本console均验证，文件无ANSI；requestId仅前缀一次，原始cause/suppressed完整，ERROR一次调用同时进入app/error，INFO/WARN不进入error，访问摘要不进入ROOT文件，无MDC显示`-`。
+- 初次定向测试存在参数名更新漏项，已修正。早期滚动测试因模拟命名时钟与异步清理时钟未对齐出现超量读数，已用TEST ONLY的策略Future等待及同日期清理统一模拟，不放宽生产配置或业务行为。
+- IDEA本轮10个Java文件格式检查和本轮路径git diff --check通过；`/tmp/mes-prod-log-format-check.log`。
+
+隔离Probe实际文件（合成TEST ONLY日志，不含用户业务数据）：
+
+- `/private/tmp/mes-base-production-log-evidence-fq0urfg1/TEST_ONLY_INSTANCE/app.log`
+- `/private/tmp/mes-base-production-log-evidence-fq0urfg1/TEST_ONLY_INSTANCE/access.log`
+- `/private/tmp/mes-base-production-log-evidence-fq0urfg1/TEST_ONLY_INSTANCE/error.log`
+- 同目录scaled归档及rolling-result.txt：retention=true cap=true。
+
+```text
+app.log:
+2026-10-14T16:43:48.705+08:00 INFO  [main] requestId=- TEST_ONLY_APP - TEST_ONLY_STARTUP_WITHOUT_ID
+2026-10-14T16:43:48.706+08:00 WARN  [main] requestId=11111111-2222-3333-4444-555555555555 TEST_ONLY_APP - TEST_ONLY_WARN
+
+access.log:
+2026-10-14T16:43:48.707+08:00 INFO  [main] requestId=11111111-2222-3333-4444-555555555555 MES_HTTP_ACCESS - event=http.request.completed method=GET path=/test-only status=200 durationMs=1 factoryId=null userId=null
+
+error.log:
+2026-10-14T16:43:48.706+08:00 ERROR [main] requestId=11111111-2222-3333-4444-555555555555 TEST_ONLY_APP - TEST_ONLY_ERROR
+java.lang.IllegalStateException: TEST_ONLY_SYSTEM_FAILURE
+    ... 完整源码堆栈、Suppressed及Caused by保存在实际文件中 ...
+```
+
+### 剩余风险与完成边界
+
+真实systemd/Docker账户、只读文件系统/卷权限、磁盘预算及实例名配置未验证；生产保留天数、GB级体量和长期负载未实测。Boot使用当前Spring profile及原第三方level配置，不改开发用户服务配置。Throwable原始内部消息可能含内部SQL/路径，运维应控制日志访问；OpenAPI消息脱敏保留。路径段不得由业务放敏感数据，访问日志本身不采集body/query/token/cookie。
+
+应用异常链去重保留；未处理Filter异常仍原样向容器抛出，Tomcat自身可能另记错误，不屏蔽容器诊断或改变异常传播。不自动传播HTTP MDC到不相关后台工作线程。
+
+本轮无数据库写入/迁移，不调整操作、登录、Quartz数据库日志，不启动/停止/重启用户服务，不提交/推送/部署。回滚只撤销本节列出的日志变更，保护其他并行工作。本文追加生产路由、配置、实际样例、测试及部署边界，历史结论保留。
+
+
+## 2026-10-15：生产日志最终验收（只读审查）
+
+### A. 总体验收结论：NO-GO
+
+**正常路径功能通过，但不批准最终上线验收。** 当前工作区构建和既有测试通过；文件分流、完成摘要去重和Servlet线程清理有效。但运行期访问文件不可写时会丢失原始访问事件，HTTP相关Callable工作线程没有requestId；另有普通拒绝应用INFO、Filter/容器重复堆栈及默认PID目录累积问题。不能把既有测试绿色等同于这些生产保障已满足。
+
+本判定的P0适用“重要访问记录在存储故障下降级丢失，且未证明有独立持久化副本”的严格验收口径。不是宣称正常磁盘时日志不可用，也不是宣称Logback初始化失败静默。若人工接受该故障降级，需先证明控制台持久化、告警和恢复契约，再重新验收；当前不默认部署已有这些保障。
+
+范围：只读审查、既有自动化测试、临时Java验证驱动及证据文件。没有修改生产代码、配置、仓库测试源码、数据库或部署。源码基线main/dirty，HEAD为3c2d2dfb65a7e5cfb2eec48d6910b955462d934f；下文路径/行号引用**本轮工作区**，不把未提交/未跟踪日志代码当作HEAD已提交内容。验收前后1,048个源码、配置、测试文件SHA-256一致；见`/private/tmp/mes-log-final-acceptance-20261015-lcruy796/source-before.json`、source-after.json、source-differences.json（空数组）。仅本文新增验收章节。
+
+证据根目录：`/private/tmp/mes-log-final-acceptance-20261015-lcruy796`。所有日志测试均写入该独立临时目录或JUnit自有临时目录；没有向用户运行目录灌测试日志。真实HTTP使用随机端口和合成身份/工厂；自建Quartz是独立RAMJobStore，不执行用户任务。未访问真实ERP或修改业务库。
+
+### Phase 1：实际日志执行链
+
+```mermaid
+flowchart TD
+    R[HTTP REQUEST] --> B[RequestBoundaryFilter: UUID/MDC 保存恢复]
+    B --> S[互斥 Spring Security 链]
+    S -->|普通401/403处理器| EW[ErrorWriter: 保持HTTP错误协议]
+    S -->|内部用户通过| MVC[Factory/权限拦截器与MVC]
+    S -->|OpenAPI| O[专用认证Filter及Resolver]
+    MVC -->|异常| A[FoundationErrorAdvice]
+    A -->|Foundation已知4xx| K[HttpFailureLogging.known: INFO]
+    A -->|ServiceException/参数错误| I[Advice: INFO拒绝]
+    A -->|未预期异常| F[HttpFailureLogging: ERROR及异常链去重]
+    B -->|未处理IO/Servlet异常| F
+    O -->|5xx系统失败| OF[HttpFailureLogging: 脱敏完整类型/源码链]
+    OF --> ROOT[ROOT]
+    K --> ROOT
+    I --> ROOT
+    F --> ROOT
+    F -->|Filter原样重抛| T[Tomcat再次记录: 可能requestId为空]
+    T --> ROOT
+    MVC --> END[Servlet requestDestroyed]
+    EW --> END
+    O --> END
+    END -->|排除路径直接结束| SKIP[无摘要/慢请求事件]
+    END -->|未排除: AtomicBoolean一次| ACC[MES_HTTP_ACCESS INFO]
+    END -->|耗时达到阈值| W[应用WARN慢请求]
+    W --> ROOT
+    ACC --> ACCESS[access.log: 不传播ROOT]
+    ROOT --> APP[app.log: INFO及以上]
+    ROOT --> CON[控制台]
+    ROOT -->|仅ERROR| ERR[error.log]
+```
+
+该图基于工作区源码与本轮运行记录；采用Mermaid而非伪造Archify提交级来源（关键文件未提交，不能提供HEAD级严格证据）。主要源码：
+
+- `mes-framework/src/main/java/dev/mesbase/platform/web/RequestBoundaryFilter.java:47-94`：请求ID属性复用、Header、MDC/Factory/PageHelper清理；ASYNC/ERROR派发重新绑定；不查询数据库补日志。
+- `mes-admin/src/main/java/dev/mesbase/server/HttpLoggingConfiguration.java:19-33`：现有Filter只注册一次，REQUEST/ASYNC/ERROR，注册最终监听器。
+- `mes-framework/src/main/java/dev/mesbase/platform/web/HttpRequestCompletionListener.java:71-98`：CAS去重、排除、最终status、INFO访问事件及慢WARN；完成监听器保存/恢复MDC。
+- `mes-framework/src/main/java/dev/mesbase/platform/web/HttpFailureLogging.java:22-76`：已知4xx INFO；系统ERROR；请求内异常身份/原因链去重。
+- `mes-framework/src/main/java/dev/mesbase/platform/web/FoundationErrorAdvice.java:28-98`：安全错误模型、Service401/403/422、参数400和未预期500；没有把异常统一改HTTP200。
+- `mes-framework/src/main/java/dev/mesbase/framework/openapi/OpenApiRequestFilter.java:57-77`：OpenAPI完成分支复用MES_HTTP_ACCESS，保留clientId/appKey/apiCode/errorCode/peerIp，系统错误用脱敏完整链。
+- `mes-admin/src/main/java/dev/mesbase/server/FoundationConfiguration.java:103-129`、`OpenApiDocumentationSecurityConfiguration.java:20-35`、`mes-framework/src/main/java/dev/mesbase/framework/openapi/OpenApiSecurityConfig.java:37-53`：普通、文档、OpenAPI互斥Security链；拒绝处理器本身主要写HTTP错误，不普遍打印堆栈。
+- `mes-admin/src/main/resources/logback-spring.xml:3-61`：ROOT与ACCESS严格分流；Spring Boot 4.1.1、Logback 1.5.38；application.yml默认dev，dev/prod现有level和第三方设置未改。
+
+### Phase 2：HttpFailureLogging全部入口及职责
+
+|入口|场景|当前应用日志|评价|
+|---|---|---|---|
+|RequestBoundaryFilter catch Foundation|Filter边界业务/认证/工厂拒绝|4xx INFO；5xx ERROR|普通拒绝INFO过多，P1-1|
+|RequestBoundaryFilter catch IO/Servlet/Runtime|未处理Filter异常|ERROR后原样重抛|与容器可能重复，P1-3|
+|FoundationErrorAdvice.known|MVC已知Foundation异常|4xx INFO；5xx ERROR|普通400/业务拒绝污染app|
+|FoundationErrorAdvice.unexpected|未预期MVC异常|ERROR完整Throwable|正常工作，单次应用ERROR|
+|SystemTokenFilter|认证基础设施DataAccessException或Foundation5xx|ERROR，保持原503|必要技术错误，不应删除|
+|FactoryMetadataCache.read|HTTP元数据读取失败包装503|ERROR，Advice遇同链不再重复|正常；非HTTP原错误日志保留|
+|OpenApiRequestFilter.logCompletion|OpenAPI保存的5xx异常|ERROR，去除message，保留类型/源码/cause/suppressed|脱敏保持；4xx不调用该ERROR分支|
+
+Advice的ServiceException/参数错误另有直接INFO，不经HttpFailureLogging的去重；它们不是重复堆栈，但也是P1-1的噪声来源。普通Security未认证401实测app无记录；登录/业务边界抛出Foundation401则会产生INFO，不能概括为“所有401都只有access”。
+
+安全审计职责：
+
+- 普通401/403有访问记录、status及requestId；生产内部身份可由已认证LoginUser补userId，合成Basic测试无系统userId时为null。
+- OpenAPI访问事件保留errorCode和peerIp、已核实的外部身份字段；令牌格式/失效/限流等不会因移除普通应用INFO而删除访问证据。Secret/Token不采集，测试canary未进入三类文件。
+- 当前OpenAPI使用随机`oa_` Bearer+Redis记录校验，不是JWT签名协议；“非法JWT签名”不适用，不能伪造一个不存在的签名入口来做验收。
+- 登录数据库日志：SysLoginService/SysRegisterService → SysLogininfor/Mapper/Service → 中心库sys_logininfor，具名master事务；记录成功/失败及requestId/actor。普通访问被401拒绝不等于执行过登录动作，不能假设每个401都有DB登录记录。
+- 操作审计：LogAspect → SysOperLog/Mapper/Service → 中心库sys_oper_log，@Log动作才触发，原事务/字段/失败处理不变；不覆盖所有拒绝。
+- Quartz：ControlledJobRunner/JobClaimMapper → 中心库sys_job_log，手工可带HTTP ID，调度独立UUID/run_token。真实用户任务未执行。
+- 本轮仅测试原审计入口与Mock接收端记录契约，不写/清理真实审计记录。后续若调整拒绝INFO，必须保留实际登录审计、访问errorCode/peerIp及有意义的异常认证/限流信号，不能“一删所有认证日志”。
+
+### B. 验证矩阵
+
+|场景|预期|实际|结论|证据|
+|---|---|---|---|---|
+|应用INFO|仅app|符合；不进入access/error|PASS|ProductionLogbackTest dev/prod子进程实写|
+|应用WARN|仅app|符合；慢WARN无Throwable|PASS|同上；http-matrix.json slow200|
+|应用ERROR|app+error，单次调用|符合；完整cause/suppressed|PASS|ProductionLogbackTest及system500实际文件|
+|正常HTTP200|app无自动摘要，access一次|app0/access1/error0|PASS|normal200，requestId=9487168a-7e34-48bf-8a5f-eb7f37383c41|
+|普通HTTP400|原则上仅access|app1 INFO拒绝/access1/error0|FAIL|bad400，71c5ea0f-4a58-475f-8789-8f18ea8acd76|
+|预期业务422|access；必要时DEBUG|应用INFO+access|FAIL|HttpLoggingHttpTest business/known；P1-1|
+|普通Security401|access|app0/access1/error0|PASS|unauth401，35d91eaa-b9d3-43b1-86c6-ca76785a367b|
+|边界/登录类401|避免泛化重复INFO，保留审计|临时Servlet驱动app INFO+access|FAIL|known-401，acc9dd86-3637-44e1-9dc3-00c5ca153a2d；不是实际登录服务调用|
+|权限403|access及必要安全记录|access一次、应用INFO FORBIDDEN，无ERROR|PASS|forbidden403，2610eecd-cf06-4f6e-b2d0-58ceaf399502；当前安全记录保留|
+|实际系统异常500|app ERROR+access+error|各一条逻辑记录；双文件ERROR允许|PASS|system500，708230e3-9c9d-4aa7-b70f-59438bfa4dcd|
+|主动返回500、无异常|仅访问，不凭status伪造堆栈|app0/access1/error0|PASS|returned-500.txt及对应三文件|
+|慢请求|access一次+app WARN，无额外堆栈|符合；测试控制器另主动INFO属测试业务事件|PASS|slow200，ae2117d1-318a-4a0f-8945-fdc9841600bf，707ms/阈值600|
+|DEBUG默认|不进入三个文件|符合，ROOT默认INFO，APP阈值INFO|PASS|ProductionLogbackTest|
+|OpenAPI正常/拒绝/系统错误|专用字段、单访问、脱敏|11项相关测试通过，secret canary未进入suite三文件|PASS|verify.log；OpenApiLoggingTest|
+|requestId单次格式化|完整ID一次|77条suite摘要、77个不同合法UUID，每条1个字段，无ANSI|PASS|test-summary.json及suite/access.log|
+|同一Servlet线程连续请求|不同ID，无污染|单worker连续请求及ASYNC回派发断言通过|PASS|AsyncRequestBoundaryHttpTest 2项；HttpLoggingBoundaryTest|
+|不同Servlet线程|各自ID/Scope隔离|多个worker的77条不同ID，原并发权限测试通过|PASS|FoundationHttpTest并发用例、线程统计|
+|ASYNC最终摘要|同ID一次|符合|PASS|async200、direct async.complete、timeout及现有测试|
+|HTTP Callable工作线程日志|相关应用处理日志可关联HTTP ID|task-1为requestId=-，最终摘要/响应头有UUID|FAIL|async-worker-result.txt及app/access；P1-2|
+|Servlet ERROR派发|完成一次；异常不重复|完成一次，但Filter与Tomcat各打印同一异常链，后者ID=-|FAIL（摘要部分PASS）|a001215d-c410-48c1-8d0d-7bb43f096d9b；P1-3|
+|Quartz后台|允许ID为空，不继承HTTP|独立RAMJobStore工作线程requestId=-；调用者原MDC保留|PASS（线程层）|quartz-quartz.txt及quartz/probe/app.log；真实用户任务NOT VERIFIED|
+|启动/无HTTP|ID=-|符合|PASS|实例Probe AUDIT_STARTUP_NO_HTTP与真实Spring启动日志|
+|目录覆盖|MES_LOG_DIR生效|所有suite/驱动都写独立指定目录|PASS|本证据目录|
+|默认实例重启|隔离且有清理责任|不同PID目录都保留，应用无跨目录清理|FAIL（生命周期）|instance-directories.json；P1-4|
+|真实systemd/Docker权限|账户可写且实例唯一|仓库无部署定义，未修改/访问这些环境|NOT VERIFIED|仅本机/隔离权限验证|
+|初始化目录不可写|明确失败，不静默启动|只读目录/路径为文件均初始化失败；实际JAR exit1，未启动应用|PASS|jar-readonly-result.json、init-readonly/blocked结果|
+|运行中ENOSPC类错误|重要访问事件仍可留存/检测恢复|原401访问事件丢失，控制台只有I/O故障诊断|FAIL|runtime-access-io-access.txt、io-access/probe三文件均空；P0-1|
+|应用ERROR通道运行期失败|明确诊断，保留可追踪副本|app/error文件未写入，原ERROR仍在console，另有Logback I/O诊断|部分PASS，文件FAIL|runtime-error-io-error.console.log；真实控制台持久化NOT VERIFIED|
+|滚动参数|100/100/50MB，30/14/60天，5/3/2GB|真实XML参数逐项符合|PASS（配置）|ProductionLogbackTest|
+|日期/大小/gzip/启动清理|正确工作|缩小256B、2天、1024B及合成日期的隔离机制测试通过|PASS（缩小验证）|ProductionLogbackTest 3项|
+|重启不覆盖旧归档|旧内容不变，继续索引|.0.gz sentinel保持，后续从.1至.9|PASS（缩小验证）|additional-results.json及restart-roll/probe/archive|
+|实际GB体量/长期保留|生产长期符合|未灌满磁盘或等待14/30/60天|NOT VERIFIED|不以缩小测试冒充长期观测|
+|原业务/DB审计|契约不变|既有回归通过，未改src/DB|PASS（回归），真实DB NOT VERIFIED|1048文件哈希一致；审计回归2项|
+
+矩阵中的PASS只覆盖已说明层级。完整实际数据见http-matrix.json；回放代码仅在本临时目录，没有新增仓库测试或修改被测实现。
+
+### C. 发现的问题与最小建议（不实施）
+
+#### P0-1：运行期访问输出失败会丢失唯一访问事件
+
+- **源码位置：** logback-spring.xml:28-38、54-56；HttpRequestCompletionListener.java:75、85-88。ACCESS只有文件Appender且不传播ROOT，CAS在写入前已标记完成。
+- **触发：** ACCESS文件输出过程中抛出ENOSPC类IOException（本轮注入到真实ResilientFileOutputStream的底层OutputStream；未真实填满磁盘）。
+- **实际影响：** 普通401保持401并返回合法requestId，但access/app/error均无该请求事件，原事件没有控制台副本或重放。Logback有控制台故障诊断和内存Status，并非完全静默；这些诊断不包含原访问事件，不能替代安全访问记录。非登录401本就不保证有DB登录审计。
+- **复现：** 临时LoggingAcceptanceProbe的runtime-access模式；结果httpStatus=401、callerContinued=true、Status.ERROR=2、StatusListener=1，`io-access/probe/access.log`为0字节。原事件ID为0a110d38-327a-4586-8890-7f1981ad0342，控制台仅I/O错误，未修改生产代码。
+- **最小建议：** 优先复用CONSOLE为MES_HTTP_ACCESS提供不经过ROOT的独立副本，并在实际部署证明stdout/stderr持久化及磁盘/I/O故障告警、恢复检测；或提供等效可靠降级通道。不能只写一句“RollingPolicy会重试”就认为已丢的事件可补回，不应让日志故障随意改变业务HTTP语义。人工确认后再修复/复验。
+
+#### P1-1：普通400/预期业务拒绝及部分401额外污染应用INFO
+
+- **源码位置：** HttpFailureLogging.java:22-30；FoundationErrorAdvice.java:35-55；RequestBoundaryFilter.java:61-64；SysLoginService.java:15-18（登录审计与拒绝入口）。
+- **触发：** Foundation4xx、ServiceException、参数校验异常；登录拒绝抛出Foundation401。Security EntryPoint直接写401的路径则没有该INFO。
+- **影响：** 同一普通拒绝同时有应用INFO和访问摘要，降低app诊断信噪比；不是重复ERROR堆栈。已实测400、422、边界401。
+- **复现：** HttpLoggingHttpTest的bad-request/business/known以及临时known-401模式；同一requestId对应app INFO+access INFO。
+- **最小建议：** 普通400/已预期业务拒绝以access为主，必要诊断降DEBUG；按入口区分普通401与异常认证/限流信号，保留登录DB审计、403必要记录和OpenAPI errorCode/peerIp，不能删除所有认证日志。
+
+#### P1-2：HTTP相关Callable工作线程缺少requestId
+
+- **源码位置：** RequestBoundaryFilter.java:49-56、78-83；HttpRequestCompletionListener.java:79-98；没有为MVC异步生产者设置对应MDC拦截/装饰器。
+- **触发：** MVC返回Callable，业务处理/日志发生在task-1，而不是Servlet回派发线程。
+- **影响：** 访问摘要、响应头有正确ID，但处理过程中的应用日志为`requestId=-`，难以串联排障；不是Quartz应否继承HTTP的问题。
+- **复现：** 临时AsyncMdcProbe，真实随机端口Tomcat，asyncHeader=4d455871-d595-4b55-8305-d3f5b497ca83，asyncBody中MDC=null；app.log的AUDIT_HTTP_ASYNC_WORK无ID，access有该UUID；后续同步请求ID正常。
+- **最小建议：** 在既有MVC异步执行扩展点仅捕获/绑定并finally恢复MDC/requestId（例如Callable拦截器或对应TaskDecorator），不要顺带传播FactoryContext、Security身份、数据库Session/事务租约，也不要强制Quartz继承HTTP ID。
+
+#### P1-3：Filter未处理异常与容器重复打印同一异常链
+
+- **源码位置：** RequestBoundaryFilter.java:65-78；HttpFailureLogging.java:34-39；ROOT配置logback-spring.xml:57-61。
+- **触发：** Filter抛出ServletException/RuntimeException，边界先ERROR再原样重抛；Tomcat随后记录相同根因。
+- **影响：** app/error中各有应用和容器两条ERROR（不是同一ERROR路由到双文件的正常复制），容器记录因MDC已恢复显示`requestId=-`。访问摘要仍只有一条。
+- **复现：** HttpLoggingHttpTest filter-error；应用ERROR时间07:40:04.044，Tomcat ERROR时间07:40:04.045，两者含TEST ONLY container error/同一根因，access在07:40:04.047只完成一次。
+- **最小建议：** 明确未处理Filter异常的唯一堆栈记录责任，并验证容器边界的关联方式；不要吞异常、改HTTP响应或屏蔽所有Tomcat ERROR来换取表面去重。审批修复时只对已由应用记录的同一异常链去重。
+
+#### P1-4：默认PID目录不能跨重启实施统一保留
+
+- **源码位置：** logback-spring.xml:5以及各rollingPolicy.fileNamePattern；scripts/run-local-backend:13（相对工作目录为仓库根）；.gitignore中的.local/。
+- **触发：** 未设置MES_LOG_INSTANCE，使用主机名+PID；进程重启或同宿主新进程。
+- **影响：** 新PID生成新目录，旧目录的活动文件和归档不在新RollingPolicy管理范围；本地常驻/持久卷反复重启可累积。不能断言部署永远不清理：容器销毁/外部运维可能清理，但本轮没有相应证据。
+- **复现：** 独立JVM PID29385和29387两个默认实例目录并存，见instance-directories.json；两者启动均成功。
+- **最小建议：** 单实例使用稳定服务实例名，多副本用唯一稳定标识，明确同目录只能一个JVM；明确旧PID目录退役/清理Owner和保留责任；先给部署方案，未经确认不改systemd/Docker或删除日志。
+
+#### P2：目录预算与Git边界需写清
+
+- **源码位置：** logback-spring.xml:5、18-50；.gitignore的.local/。
+- **触发/影响：** totalSizeCap只管当前实例当前policy的归档，不包含活动文件、其他实例、旧目录和异步压缩临时文件；不能把5+3+2GB当整个日志根目录绝对上限。默认.local/logs受Git忽略且本轮git ls-files无.log；自定义到相对logs/等未忽略目录可能进入工作树。
+- **复现：** 本轮两实例目录和各活动文件；静态配置/忽略规则。没有注入GB数据验证根目录空间极限。
+- **建议：** 部署使用绝对可写目录，按实例数/活动文件/压缩峰值制定磁盘预算及告警；验证Git忽略与外部清理责任，不在本轮擅自改配置。
+
+### D. 本轮真实日志样例
+
+原样摘录文件：`/private/tmp/mes-log-final-acceptance-20261015-lcruy796/actual-http-samples.md`，包含正常、401、403、500和慢请求各组app/access/error实际首行及无记录情况；完整堆栈在`/private/tmp/mes-log-final-acceptance-20261015-lcruy796/suite/acceptance-run/error.log`。以下时间均为本轮2026-10-15运行，不复用昨日样例。合成测试身份/工厂不等于生产业务验收。
+
+#### 正常200
+
+```text
+2026-10-15T07:40:35.062+08:00 INFO  [http-nio-auto-4-exec-3] requestId=9487168a-7e34-48bf-8a5f-eb7f37383c41 MES_HTTP_ACCESS - event=http.request.completed method=GET path=/api/foundation/context status=200 durationMs=0 factoryId=A userId=null
+```
+
+#### 普通Security401
+
+```text
+2026-10-15T07:40:04.900+08:00 INFO  [http-nio-auto-1-exec-1] requestId=35d91eaa-b9d3-43b1-86c6-ca76785a367b MES_HTTP_ACCESS - event=http.request.completed method=GET path=/api/foundation/context status=401 durationMs=1 factoryId=null userId=null
+```
+
+#### 权限403
+
+```text
+2026-10-15T07:40:04.998+08:00 INFO  [http-nio-auto-1-exec-1] requestId=2610eecd-cf06-4f6e-b2d0-58ceaf399502 dev.mesbase.platform.web.HttpFailureLogging - event=http.request.rejected errorCode=FORBIDDEN
+2026-10-15T07:40:04.998+08:00 INFO  [http-nio-auto-1-exec-1] requestId=2610eecd-cf06-4f6e-b2d0-58ceaf399502 MES_HTTP_ACCESS - event=http.request.completed method=GET path=/api/foundation/access status=403 durationMs=96 factoryId=A userId=null
+```
+
+#### 实际系统异常500
+
+```text
+2026-10-15T07:40:04.896+08:00 ERROR [http-nio-auto-1-exec-1] requestId=708230e3-9c9d-4aa7-b70f-59438bfa4dcd dev.mesbase.platform.web.HttpFailureLogging - event=http.request.failed errorCode=INTERNAL_ERROR
+2026-10-15T07:40:04.897+08:00 INFO  [http-nio-auto-1-exec-1] requestId=708230e3-9c9d-4aa7-b70f-59438bfa4dcd MES_HTTP_ACCESS - event=http.request.completed method=GET path=/test-only/log/system status=500 durationMs=1 factoryId=null userId=null
+```
+
+#### 慢请求
+
+```text
+2026-10-15T07:40:04.882+08:00 WARN  [http-nio-auto-1-exec-1] requestId=ae2117d1-318a-4a0f-8945-fdc9841600bf d.m.platform.web.HttpRequestCompletionListener - event=http.request.slow path=/test-only/log/slow durationMs=707
+2026-10-15T07:40:04.882+08:00 INFO  [http-nio-auto-1-exec-1] requestId=ae2117d1-318a-4a0f-8945-fdc9841600bf MES_HTTP_ACCESS - event=http.request.completed method=GET path=/test-only/log/slow status=200 durationMs=707 factoryId=null userId=null
+```
+
+额外关联缺口的实际输出：
+
+```text
+2026-10-15T07:49:18.316+08:00 INFO  [task-1] requestId=- AUDIT_HTTP_WORKER - AUDIT_HTTP_ASYNC_WORK
+2026-10-15T07:49:18.327+08:00 INFO  [http-nio-127.0.0.1-auto-1-exec-1] requestId=4d455871-d595-4b55-8305-d3f5b497ca83 MES_HTTP_ACCESS - event=http.request.completed method=GET path=/audit-only/async-worker status=200 durationMs=29 factoryId=null userId=null
+```
+
+### E. 构建、测试及证据边界
+
+- **命令：** `MES_LOG_DIR=/private/tmp/mes-log-final-acceptance-20261015-lcruy796/suite MES_LOG_INSTANCE=acceptance-run env PATH=/opt/homebrew/bin:/Users/user/apache-maven-3.6.1/bin:/usr/bin:/bin:/usr/sbin:/sbin mvn -B -ntp verify -Dmes.test.redis=true`。
+- **结果：** 446项总计435通过、0失败/错误、11跳过，BUILD SUCCESS。跳过均为真实MySQL opt-in未开启；没有并行模块构建阻断。现有测试通过不代表本轮更严格矩阵无FAIL。
+- **相关既有测试：** HttpLoggingHttpTest 2，HttpLoggingBoundaryTest 12，ProductionLogbackTest 3，AsyncRequestBoundaryHttpTest 2，FoundationHttpTest 14，RequestStateLifecycleTest 3，原审计回归2，OpenAPI相关共11均通过。
+- **隔离驱动：** LoggingAcceptanceProbe.java与AsyncMdcProbe.java只保存在临时证据目录，javac编译通过。记录运行事实而非把发现的缺口改成“通过断言”。完整命令见commands.txt，参数/结果见probe-results.json、additional-results.json、test-summary.json。模式包含I/O故障、Quartz、权限、实例重启、401、无异常500、归档续号；Async驱动两个真实HTTP响应均200，捕捉到关联失败。
+- **只读保障：** 1,048个src文件哈希无变化；未新增仓库测试，未改SQL/真实业务/审计记录。仅本文追加审查结果。测试生成target和独立临时证据是允许的验证产物。
+- **磁盘满边界：** 用真实Logback ResilientFileOutputStream下层IOException模拟ENOSPC；没有填满真实磁盘，不能声称做过真实磁盘满/配额/卷故障或真实生产恢复演练。只读目录是真实本地权限验证，JAR实际exit1、未启动。
+- **仍未验证：** 真实systemd/Docker可写路径/唯一实例策略/外部控制台持久化和告警、真实生产Quartz任务、长时间GB规模保留、已提交配置与实际用户服务加载情况；未重启用户服务/部署。
+
+### F. 后续建议与暂停
+
+必须先处理/落实：P0访问通道故障的原事件降级留存与告警恢复；P1 HTTP异步MDC、未处理异常唯一堆栈Owner、普通拒绝的应用INFO职责、生产实例目录及旧目录清理责任。403/异常认证的必要安全信号和数据库审计不能简单删除。
+
+可选优化仅为文档/运维层面：统一目录空间预算、补充外部部署权限与stdout持久化验收。无需Kafka/ELK/Loki/OpenTelemetry，也不需要新增业务AOP、数据库表或日志平台。
+
+**本轮审查到此停止，等待人工决定是否授权修复。** 不因发现问题自动改代码、配置、数据或部署。本章节是Document Updated：新增2026-10-15最终验收A-F、工作区链路图、逐项矩阵、五类问题、实际日志、命令及边界；没有修改生产代码。

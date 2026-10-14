@@ -52,8 +52,8 @@ class MaterialIssueMySqlTest {
                         assertTrue(rows.getString(1) != null && !rows.getString(1).isBlank());
                         count++;
                     }
-                    // V20 moves seven header fields to the 16-column ERP facts table.
-                    assertEquals(51, count);
+                    // V20 moves seven fields to Extra; V23 adds the current submission reference.
+                    assertEquals(52, count);
                 }
                 try (var indexes = statement.executeQuery("SELECT COUNT(*) FROM information_schema.statistics WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME IN ('mes_material_issue','mes_material_issue_item') AND NON_UNIQUE=0 AND INDEX_NAME<>'PRIMARY'")) {
                     indexes.next();

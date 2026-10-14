@@ -46,6 +46,10 @@ spring:
       max-request-size: 11MB
 
 mes:
+  logging:
+    http:
+      # 普通 HTTP 请求达到该耗时（毫秒）后以 WARN 记录完成摘要。
+      slow-threshold-ms: 1000
   http:
     logging:
       # 仅排除完成摘要，不跳过 requestId、安全检查或异常日志。空字符串表示不排除。
@@ -125,8 +129,3 @@ open-api:
   api-rate-limit: 120
   data-scope:
     enabled: false
-
-# 使用 Boot 现有 Logback；同时覆盖控制台和文件输出，后台无 HTTP 上下文时显示空值。
-logging:
-  pattern:
-    level: "%5p requestId=%X{requestId:-}"

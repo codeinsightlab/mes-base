@@ -18,7 +18,7 @@ import org.springframework.web.filter.OncePerRequestFilter;
  * 在专用Security链的最外层覆盖成功、认证拒绝、限流和异常。
  */
 public class OpenApiRequestFilter extends OncePerRequestFilter {
-    private static final Logger LOG = LoggerFactory.getLogger("openapi.access");
+    private static final Logger LOG = LoggerFactory.getLogger("MES_HTTP_ACCESS");
     private final OpenApiHttp http;
 
     public OpenApiRequestFilter(OpenApiHttp http) {
@@ -64,8 +64,8 @@ public class OpenApiRequestFilter extends OncePerRequestFilter {
             // Preserve full source/cause stacks without exposing credential-bearing messages.
             HttpFailureLogging.openApi(request, failure, OpenApiErrors.classify(failure).getCode());
         }
-        LOG.info("event=http.request.completed requestId={} method={} path={} status={} durationMs={} factoryId={} userId={} clientId={} appKey={} apiCode={} errorCode={} peerIp={}",
-                RequestBoundaryFilter.requestId(request), method, path, response.getStatus(), durationMs, null, null,
+        LOG.info("event=http.request.completed method={} path={} status={} durationMs={} factoryId={} userId={} clientId={} appKey={} apiCode={} errorCode={} peerIp={}",
+                method, path, response.getStatus(), durationMs, null, null,
                 identity == null ? null : identity.getClientId(), identity == null ? null : safe(identity.getAppKey()),
                 safe(String.valueOf(request.getAttribute(OpenApiHttp.API_CODE))),
                 request.getAttribute(OpenApiHttp.ERROR), safe(request.getRemoteAddr()));

@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+    <include resource="org/springframework/boot/logging/logback/defaults.xml"/>
+    <!-- 每个进程独立目录；容器共享卷时也必须保持实例标识唯一。 -->
+    <property name="LOG_DIR" value="${MES_LOG_DIR:-.local/logs}/${MES_LOG_INSTANCE:-${HOSTNAME:-local}-${PID:-standalone}}"/>
+    <property name="FILE_PATTERN" value="%d{yyyy-MM-dd'T'HH:mm:ss.SSSXXX} %-5level [%thread] requestId=%X{requestId:--} %logger{48} - %msg%n%ex{full}"/>
+    <springProfile name="dev">
+        <property name="MES_CONSOLE_PATTERN" value="%clr(%d{HH:mm:ss.SSS}){faint} %clr(%-5level) [%thread] requestId=%X{requestId:--} %clr(%logger{36}){cyan} - %msg%n%ex{full}"/>
+    </springProfile>
+    <springProfile name="!dev">
+        <property name="MES_CONSOLE_PATTERN" value="%d{HH:mm:ss.SSS} %-5level [%thread] requestId=%X{requestId:--} %logger{36} - %msg%n%ex{full}"/>
+    </springProfile>
+    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder><charset>UTF-8</charset><pattern>${MES_CONSOLE_PATTERN}</pattern></encoder>
+    </appender>
+    <appender name="APP" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>${LOG_DIR}/app.log</file>
+        <filter class="ch.qos.logback.classic.filter.ThresholdFilter"><level>INFO</level></filter>
+        <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
+            <fileNamePattern>${LOG_DIR}/archive/app.%d{yyyy-MM-dd}.%i.log.gz</fileNamePattern>
+            <maxFileSize>100MB</maxFileSize>
+            <maxHistory>30</maxHistory>
+            <totalSizeCap>5GB</totalSizeCap>
+            <cleanHistoryOnStart>true</cleanHistoryOnStart>
+        </rollingPolicy>
+        <encoder><charset>UTF-8</charset><pattern>${FILE_PATTERN}</pattern></encoder>
+    </appender>
+    <appender name="ACCESS" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>${LOG_DIR}/access.log</file>
+        <filter class="ch.qos.logback.classic.filter.ThresholdFilter"><level>INFO</level></filter>
+        <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
+            <fileNamePattern>${LOG_DIR}/archive/access.%d{yyyy-MM-dd}.%i.log.gz</fileNamePattern>
+            <maxFileSize>100MB</maxFileSize>
+            <maxHistory>14</maxHistory>
+            <totalSizeCap>3GB</totalSizeCap>
+            <cleanHistoryOnStart>true</cleanHistoryOnStart>
+        </rollingPolicy>
+        <encoder><charset>UTF-8</charset><pattern>${FILE_PATTERN}</pattern></encoder>
+    </appender>
+    <appender name="ERROR" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>${LOG_DIR}/error.log</file>
+        <filter class="ch.qos.logback.classic.filter.LevelFilter">
+            <level>ERROR</level><onMatch>ACCEPT</onMatch><onMismatch>DENY</onMismatch>
+        </filter>
+        <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
+            <fileNamePattern>${LOG_DIR}/archive/error.%d{yyyy-MM-dd}.%i.log.gz</fileNamePattern>
+            <maxFileSize>50MB</maxFileSize>
+            <maxHistory>60</maxHistory>
+            <totalSizeCap>2GB</totalSizeCap>
+            <cleanHistoryOnStart>true</cleanHistoryOnStart>
+        </rollingPolicy>
+        <encoder><charset>UTF-8</charset><pattern>${FILE_PATTERN}</pattern></encoder>
+    </appender>
+    <logger name="MES_HTTP_ACCESS" level="INFO" additivity="false">
+        <appender-ref ref="ACCESS"/>
+    </logger>
+    <root level="INFO">
+        <appender-ref ref="CONSOLE"/>
+        <appender-ref ref="APP"/>
+        <appender-ref ref="ERROR"/>
+    </root>
+</configuration>

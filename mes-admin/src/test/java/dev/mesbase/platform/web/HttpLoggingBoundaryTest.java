@@ -2,6 +2,7 @@ package dev.mesbase.platform.web;
 
 import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.PatternLayout;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
 import dev.mesbase.core.error.ErrorCode;
@@ -19,6 +20,8 @@ import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
 import org.springframework.mock.web.MockHttpServletRequest;
@@ -107,7 +110,7 @@ class HttpLoggingBoundaryTest {
 
     @Test
     void completionCapturesTrustedContextOnceRestoresMdcAndUsesTerminalStatus() throws Exception {
-        Logger logger = (Logger) LoggerFactory.getLogger(HttpRequestCompletionListener.class);
+        Logger logger = (Logger) LoggerFactory.getLogger("MES_HTTP_ACCESS");
         var events = new ListAppender<ILoggingEvent>();
         events.start();
         logger.addAppender(events);
@@ -120,7 +123,7 @@ class HttpLoggingBoundaryTest {
             });
             response.setStatus(503);
             MDC.setContextMap(Map.of("requestId", "listener-outer", "tag", "keep"));
-            var listener = new HttpRequestCompletionListener(List.of());
+            var listener = new HttpRequestCompletionListener(List.of(), 1000);
             var event = new ServletRequestEvent(new MockServletContext(), request);
             listener.requestDestroyed(event);
             listener.requestDestroyed(event);
@@ -131,6 +134,67 @@ class HttpLoggingBoundaryTest {
             assertEquals(Map.of("requestId", "listener-outer", "tag", "keep"), MDC.getCopyOfContextMap());
         } finally {
             logger.detachAppender(events);
+        }
+    }
+
+    @ParameterizedTest
+    @CsvSource({"200,1000000,false", "200,0,true", "400,1000000,false", "400,0,true", "500,1000000,false"})
+    void accessSummaryAndSeparateSlowWarningKeepMdcAndSingleId(int status, long threshold,
+                                                               boolean expectedSlow)
+            throws Exception {
+        Logger logger = (Logger) LoggerFactory.getLogger("MES_HTTP_ACCESS");
+        Level previousLevel = logger.getLevel();
+        logger.setLevel(Level.DEBUG);
+        Logger slowLogger = (Logger) LoggerFactory.getLogger(HttpRequestCompletionListener.class);
+        var slowEvents = new ListAppender<ILoggingEvent>();
+        slowEvents.start();
+        slowLogger.addAppender(slowEvents);
+        var events = new ListAppender<ILoggingEvent>() {
+            @Override
+            protected void append(ILoggingEvent event) {
+                event.prepareForDeferredProcessing();
+                super.append(event);
+            }
+        };
+        events.start();
+        logger.addAppender(events);
+        try {
+            var request = new MockHttpServletRequest("GET", "/api/test");
+            var response = new MockHttpServletResponse();
+            new RequestBoundaryFilter().doFilter(request, response, (req, res) -> {
+            });
+            response.setStatus(status);
+            String id = response.getHeader("X-Request-Id");
+            MDC.setContextMap(Map.of("requestId", "outer", "tag", "preserved"));
+            var listener = new HttpRequestCompletionListener(List.of(), threshold);
+            var event = new ServletRequestEvent(new MockServletContext(), request);
+            listener.requestDestroyed(event);
+            listener.requestDestroyed(event);
+            assertEquals(1, events.list.size());
+            var logged = events.list.getFirst();
+            assertEquals(Level.INFO, logged.getLevel());
+            assertEquals(expectedSlow ? 1 : 0, slowEvents.list.size());
+            if (expectedSlow) {
+                assertEquals(Level.WARN, slowEvents.list.getFirst().getLevel());
+                assertNull(slowEvents.list.getFirst().getThrowableProxy());
+                assertTrue(slowEvents.list.getFirst().getFormattedMessage().startsWith("event=http.request.slow "));
+            }
+            assertNull(logged.getThrowableProxy());
+            assertFalse(logged.getFormattedMessage().contains("requestId="));
+            assertEquals(id, logged.getMDCPropertyMap().get("requestId"));
+            var layout = new PatternLayout();
+            layout.setContext(logger.getLoggerContext());
+            layout.setPattern("%level requestId=%X{requestId:-} %msg%n");
+            layout.start();
+            String rendered = layout.doLayout(logged);
+            assertEquals(1, rendered.split(id, -1).length - 1, rendered);
+            assertEquals(1, rendered.split("requestId=", -1).length - 1, rendered);
+            layout.stop();
+            assertEquals(Map.of("requestId", "outer", "tag", "preserved"), MDC.getCopyOfContextMap());
+        } finally {
+            logger.detachAppender(events);
+            logger.setLevel(previousLevel);
+            slowLogger.detachAppender(slowEvents);
         }
     }
 

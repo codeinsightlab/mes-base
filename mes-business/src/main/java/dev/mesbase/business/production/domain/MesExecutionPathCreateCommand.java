@@ -12,7 +12,7 @@ import java.time.LocalDateTime;
 public record MesExecutionPathCreateCommand(
         @NotNull Long id,
         @NotNull Long routingId,
-        @NotBlank @Size(max=16) String pathStatus,
+        @NotBlank @Size(max = 16) String pathStatus,
         @NotNull Integer revision,
         @NotNull LocalDateTime selectedAt,
         LocalDateTime lockedAt

@@ -47,13 +47,13 @@ public class MesExecutionPathNodeServiceImpl implements IMesExecutionPathNodeSer
         MesExecutionPathNodeExample example = new MesExecutionPathNodeExample();
         MesExecutionPathNodeExample.Criteria criteria = example.createCriteria();
         if (query.executionId() != null) {
-            criteria.andExecutionIdEqualTo( query.executionId());
+            criteria.andExecutionIdEqualTo(query.executionId());
         }
         if (query.sequenceNo() != null) {
-            criteria.andSequenceNoEqualTo( query.sequenceNo());
+            criteria.andSequenceNoEqualTo(query.sequenceNo());
         }
         if (query.routingNodeId() != null) {
-            criteria.andRoutingNodeIdEqualTo( query.routingNodeId());
+            criteria.andRoutingNodeIdEqualTo(query.routingNodeId());
         }
         example.setOrderByClause("id");
         try (Page<MesExecutionPathNodeEntity> page = PageHelper.offsetPage(offset, limit)) {

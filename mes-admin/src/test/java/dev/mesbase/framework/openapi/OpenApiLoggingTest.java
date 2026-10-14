@@ -18,15 +18,18 @@ import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.mock.web.MockServletContext;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class OpenApiLoggingTest {
     @Test
     void successRejectionAndSystemFailureUseSharedTerminalEventAndSafeFullSourceTrace() throws Exception {
+        Logger access = (Logger) LoggerFactory.getLogger("MES_HTTP_ACCESS");
         Logger root = (Logger) LoggerFactory.getLogger(Logger.ROOT_LOGGER_NAME);
         var events = new ListAppender<ILoggingEvent>();
         events.start();
         root.addAppender(events);
+        access.addAppender(events);
         try {
             for (String kind : List.of("normal", "rejection", "system")) {
                 events.list.clear();
@@ -36,10 +39,6 @@ class OpenApiLoggingTest {
                 var openapi = new OpenApiRequestFilter(new OpenApiHttp(new ObjectMapper()));
                 new RequestBoundaryFilter().doFilter(request, response, (req, res) -> openapi.doFilter(req, res, (innerReq, innerRes) -> {
                     if (kind.equals("rejection")) throw new OpenApiException(OpenApiError.INVALID_REQUEST);
-                    if (kind.equals("rejection")) {
-                        assertEquals(400, response.getStatus());
-                        assertTrue(events.list.stream().noneMatch(e -> e.getLevel() == Level.ERROR));
-                    }
                     if (kind.equals("system")) {
                         var failure = new IllegalStateException("TEST_ONLY_SECRET_MESSAGE");
                         var frames = new StackTraceElement[40];
@@ -51,13 +50,16 @@ class OpenApiLoggingTest {
                     }
                 }));
                 String id = response.getHeader("X-Request-Id");
-                var listener = new HttpRequestCompletionListener(List.of());
+                var listener = new HttpRequestCompletionListener(List.of(), 0);
                 var event = new ServletRequestEvent(new MockServletContext(), request);
                 listener.requestDestroyed(event);
                 listener.requestDestroyed(event);
                 var summaries = events.list.stream()
                         .filter(e -> e.getFormattedMessage().startsWith("event=http.request.completed")).toList();
                 assertEquals(1, summaries.size());
+                assertEquals(Level.INFO, summaries.getFirst().getLevel());
+                assertFalse(summaries.getFirst().getFormattedMessage().contains("requestId="));
+                assertEquals("MES_HTTP_ACCESS", summaries.getFirst().getLoggerName());
                 assertEquals(id, summaries.getFirst().getMDCPropertyMap().get("requestId"));
                 assertTrue(summaries.getFirst().getFormattedMessage().contains("clientId="));
                 assertTrue(events.list.stream().noneMatch(e -> e.getFormattedMessage().contains("TEST_ONLY_SECRET")));
@@ -75,6 +77,7 @@ class OpenApiLoggingTest {
             }
         } finally {
             root.detachAppender(events);
+            access.detachAppender(events);
         }
     }
 }
