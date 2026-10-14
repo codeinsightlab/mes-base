@@ -17,6 +17,7 @@ import dev.mesbase.business.production.domain.RoutingProductExample;
 import dev.mesbase.business.wm.dao.WmWarehouseMapper;
 import dev.mesbase.common.utils.SecurityUtils;
 import dev.mesbase.business.production.service.ProductionExecutionRules;
+import dev.mesbase.business.production.service.ProductionChainLocks;
 import dev.mesbase.core.error.ErrorCode;
 import dev.mesbase.core.error.FoundationException;
 import java.time.LocalDateTime;
@@ -41,13 +42,15 @@ public class MaterialIssueRules {
     private final RoutingMapper routings;
     private final RoutingProductMapper routingProducts;
     private final ProductionExecutionRules executions;
+    private final ProductionChainLocks locks;
     private final MaterialIssueErpFacts facts;
 
     public MaterialIssueRules(MesMaterialIssueMapper issues, MesMaterialIssueItemMapper items,
                               MaterialMapper materials, UnitMeasureMapper units, WmWarehouseMapper warehouses,
                               WorkorderMapper workorders, RoutingMapper routings,
                               RoutingProductMapper routingProducts, ProductionExecutionRules executions,
-                              MaterialIssueErpFacts facts) {
+                              MaterialIssueErpFacts facts, ProductionChainLocks locks) {
+        this.locks = locks;
         this.issues = issues;
         this.items = items;
         this.materials = materials;
@@ -91,7 +94,7 @@ public class MaterialIssueRules {
     public void validate(MesMaterialIssueEntity row) {
         require(row.getStatus() != null && Set.of("DRAFT", "RECORDED").contains(row.getStatus()));
         require(row.getIssueNo() != null && !row.getIssueNo().isBlank());
-        if (row.getVoidOperationId() != null || !Set.of("DRAFT", "RECORDED").contains(row.getStatus()))
+        if (row.getSubmissionId() != null || row.getVoidOperationId() != null || !Set.of("DRAFT", "RECORDED").contains(row.getStatus()))
             throw new FoundationException(ErrorCode.ISSUE_VOID_CONFLICT);
         var execution = row.getExecutionId() == null ? null : executions.lock(row.getExecutionId());
         if (execution != null) {
@@ -143,7 +146,7 @@ public class MaterialIssueRules {
         require(row.getIssueId() != null && row.getMaterialId() != null && row.getQuantity() != null);
         lockIssues(List.of(row.getIssueId()));
         var header = issues.selectByPrimaryKey(row.getIssueId());
-        if (header.getVoidOperationId() != null || !Set.of("DRAFT", "RECORDED").contains(header.getStatus()))
+        if (header.getSubmissionId() != null || header.getVoidOperationId() != null || !Set.of("DRAFT", "RECORDED").contains(header.getStatus()))
             throw new FoundationException(ErrorCode.ISSUE_VOID_CONFLICT);
         require(row.getQuantity().signum() > 0 && row.getQuantity().scale() <= 6
                 && row.getQuantity().precision() - row.getQuantity().scale() <= 14);
@@ -165,23 +168,14 @@ public class MaterialIssueRules {
     }
 
     public void lockIssues(List<Long> ids) {
-        // Administrative batches are bounded to 100; each PK update preserves its own ID.
-        for (Long id : ids.stream().distinct().sorted().toList()) {
-            var filter = new MesMaterialIssueExample();
-            filter.createCriteria().andIdEqualTo(id);
-            var lock = new MesMaterialIssueEntity();
-            lock.setId(id);
-            if (issues.updateByExampleSelective(lock, filter) != 1) {
-                throw new FoundationException(ErrorCode.NOT_FOUND);
-            }
-        }
+        locks.issues(ids);
     }
 
     public void requireEditableIssues(List<Long> ids) {
         lockIssues(ids);
         for (Long id : ids) {
             var row = issues.selectByPrimaryKey(id);
-            if (row.getVoidOperationId() != null || !Set.of("DRAFT", "RECORDED").contains(row.getStatus()))
+            if (row.getSubmissionId() != null || row.getVoidOperationId() != null || !Set.of("DRAFT", "RECORDED").contains(row.getStatus()))
                 throw new FoundationException(ErrorCode.ISSUE_VOID_CONFLICT);
         }
     }
@@ -194,6 +188,7 @@ public class MaterialIssueRules {
         facts.hydrate(loaded);
         if (loaded.stream().anyMatch(r -> !"NONE".equals(r.getExternalEffect())))
             throw new FoundationException(ErrorCode.ISSUE_EXTERNAL_UNVERIFIED);
+        if (loaded.stream().anyMatch(r -> r.getSubmissionId() != null)) throw new FoundationException(ErrorCode.RESOURCE_CONFLICT);
         var protectedRows = new MesMaterialIssueExample();
         protectedRows.createCriteria().andIdIn(ids).andVoidOperationIdIsNotNull();
         if (issues.countByExample(protectedRows) > 0) throw new FoundationException(ErrorCode.ISSUE_VOID_CONFLICT);

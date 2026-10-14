@@ -12,7 +12,6 @@ import dev.mesbase.business.issue.domain.MesMaterialIssueResource;
 import dev.mesbase.business.issue.domain.MesMaterialIssueUpdateCommand;
 import dev.mesbase.business.issue.service.IMesMaterialIssueService;
 import dev.mesbase.core.error.ErrorCode;
-import dev.mesbase.business.integration.warehouse.MaterialIssueCreateCommand;
 import dev.mesbase.core.error.FoundationException;
 import dev.mesbase.infrastructure.cache.annotation.BusinessCache;
 import dev.mesbase.infrastructure.cache.annotation.BusinessCacheEvict;
@@ -133,8 +132,6 @@ public class MesMaterialIssueServiceImpl implements IMesMaterialIssueService {
         if (mapper.insert(row) != 1) {
             throw new FoundationException(ErrorCode.RESOURCE_CONFLICT);
         }
-        if (mode == Mode.LOCAL_ONLY)
-            warehouse.localCreate(FactoryContext.required(), new MaterialIssueCreateCommand(row.getId(), "LOCAL-" + row.getId(), row.getIssueNo(), row.getWorkorderId(), row.getExecutionId()));
         rules.initializeExtra(row);
         return requireRecord(row.getId());
     }

@@ -103,7 +103,7 @@ public class MesMaterialIssueController {
                 row.getUpdateTime(),
                 row.getExecutionId() == null ? null : row.getExecutionId().toString(),
                 row.getSourceExecutionMode(), row.getExternalEffect(), row.getExternalBindingKey(), row.getExternalReference(),
-                row.getVoidOperationId(), row.getVoidResultStatus(), row.getVoidExecutionMode(), row.getVoidMessage()
+                row.getVoidOperationId(), row.getVoidResultStatus(), row.getVoidExecutionMode(), row.getVoidMessage(), row.getSubmissionId() == null ? null : row.getSubmissionId().toString()
         );
     }
 }

@@ -10,8 +10,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.util.UUID;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import java.util.Map;
 import org.slf4j.MDC;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
@@ -22,7 +21,6 @@ import org.springframework.web.filter.OncePerRequestFilter;
 @Order(Ordered.HIGHEST_PRECEDENCE + 20)
 public final class RequestBoundaryFilter extends OncePerRequestFilter {
     public static final String REQUEST_ID = "mes.requestId";
-    private static final Logger LOG = LoggerFactory.getLogger(RequestBoundaryFilter.class);
 
     @Override
     protected boolean shouldNotFilterAsyncDispatch() {
@@ -30,11 +28,30 @@ public final class RequestBoundaryFilter extends OncePerRequestFilter {
     }
 
     @Override
+    protected boolean shouldNotFilterErrorDispatch() {
+        return false;
+    }
+
+    @Override
+    protected void doFilterNestedErrorDispatch(HttpServletRequest request, HttpServletResponse response,
+                                               FilterChain chain)
+            throws ServletException, IOException {
+        Map<String, String> previous = MDC.getCopyOfContextMap();
+        MDC.put("requestId", requestId(request));
+        try {
+            chain.doFilter(request, response);
+        } finally {
+            restoreMdc(previous);
+        }
+    }
+
+    @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain)
             throws ServletException, IOException {
         var previous = FactoryContext.current();
-        String previousId = MDC.get("requestId");
+        Map<String, String> previousMdc = MDC.getCopyOfContextMap();
         String requestId = requestId(request);
+        HttpRequestCompletionListener.begin(request, response);
         response.setHeader("X-Request-Id", requestId);
         MDC.put("requestId", requestId);
         try {
@@ -42,20 +59,28 @@ public final class RequestBoundaryFilter extends OncePerRequestFilter {
             PageHelper.clearPage();
             chain.doFilter(request, response);
         } catch (FoundationException failure) {
-            LOG.warn("Foundation request failed requestId={}", requestId, failure);
+            HttpFailureLogging.known(request, failure);
             if (response.isCommitted()) throw failure;
             ErrorWriter.write(failure.code(), request, response);
+        } catch (IOException | ServletException | RuntimeException failure) {
+            HttpFailureLogging.unexpected(request, failure);
+            throw failure;
         } finally {
+            HttpRequestCompletionListener.captureFactory(request);
             try {
                 BusinessRequestSnapshot.finish(request);
                 FactoryContext.clear();
                 previous.ifPresent(FactoryContext::bind);
             } finally {
                 PageHelper.clearPage();
-                if (previousId == null) MDC.remove("requestId");
-                else MDC.put("requestId", previousId);
+                restoreMdc(previousMdc);
             }
         }
+    }
+
+    static void restoreMdc(Map<String, String> previous) {
+        if (previous == null) MDC.clear();
+        else MDC.setContextMap(previous);
     }
 
     /**
@@ -63,7 +88,7 @@ public final class RequestBoundaryFilter extends OncePerRequestFilter {
      */
     public static String requestId(HttpServletRequest request) {
         Object existing = request.getAttribute(REQUEST_ID);
-        if (existing instanceof String id && !id.isBlank()) return id;
+        if (existing instanceof String id && id.matches("[A-Za-z0-9_-][A-Za-z0-9._-]{0,127}")) return id;
         String id = UUID.randomUUID().toString();
         request.setAttribute(REQUEST_ID, id);
         return id;

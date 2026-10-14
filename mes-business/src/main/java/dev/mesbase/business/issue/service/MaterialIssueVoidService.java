@@ -82,7 +82,7 @@ public class MaterialIssueVoidService {
             } else if (row.getVoidOperationId() != null || "VOIDED".equals(row.getStatus()))
                 return new Prepared(row, false, rules.extraVersion(id));
             if (!query) {
-                if (!Set.of("DRAFT", "RECORDED").contains(row.getStatus()))
+                if (!Set.of("DRAFT", "RECORDED", "CONFIRMED").contains(row.getStatus()))
                     throw new FoundationException(ErrorCode.ISSUE_VOID_CONFLICT);
                 if (row.getExecutionId() != null) {
                     var e = executions.lock(row.getExecutionId());

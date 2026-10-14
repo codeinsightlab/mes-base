@@ -1,4 +1,7 @@
 package dev.issuefixture;
+import dev.mesbase.business.production.service.ProductionChainLocks;
+import dev.mesbase.business.production.service.ExecutionPathService;
+import dev.mesbase.business.issue.service.MaterialIssueSubmissionService;
 
 import dev.mesbase.business.production.service.WorkorderErpFacts;
 
@@ -76,7 +79,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 class MaterialIssueVoidMySqlTest {
     @Configuration
     @EnableTransactionManagement
-    @Import({WorkorderErpFacts.class, MaterialIssueErpService.class, MaterialIssueErpFacts.class, WorkOrderService.class, RoutingReferenceRules.class, ProductionExecutionRules.class, MaterialIssueRules.class, MaterialIssueVoidService.class, MesMaterialIssueServiceImpl.class, WarehouseIntegration.class})
+    @Import({ProductionChainLocks.class, ExecutionPathService.class, MaterialIssueSubmissionService.class, WorkorderErpFacts.class, MaterialIssueErpService.class, MaterialIssueErpFacts.class, WorkOrderService.class, RoutingReferenceRules.class, ProductionExecutionRules.class, MaterialIssueRules.class, MaterialIssueVoidService.class, MesMaterialIssueServiceImpl.class, WarehouseIntegration.class})
     static class Config {
         @Bean(name = "businessTransactionManager")
         OwnedTransactionManager manager(FactoryBusinessDataSource s) {

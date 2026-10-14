@@ -44,10 +44,21 @@ public class WarehouseIntegration {
         return Mode.CONNECTED;
     }
 
-    public ErpActionResult localCreate(FactoryScope scope, MaterialIssueCreateCommand command) {
-        if (configuredMode(scope) != Mode.LOCAL_ONLY)
-            throw new FoundationException(ErrorCode.INTEGRATION_NOT_CONFIGURED);
-        return local.createMaterialIssue(scope, command);
+    public record Selection(Mode mode, String provider, String bindingKey) {}
+    public Selection submissionSelection(FactoryScope scope) {
+        var mode=configuredMode(scope);
+        if(mode==null) throw new FoundationException(ErrorCode.INTEGRATION_NOT_CONFIGURED);
+        if(mode==Mode.LOCAL_ONLY) return new Selection(mode,"local",null);
+        String key="mes.integration.warehouse.factories."+scope.factoryId().value();
+        String provider=environment.getProperty(key+".provider");
+        String binding=environment.getProperty(key+".binding-key");
+        if(provider==null || provider.isBlank() || binding==null || binding.isBlank()) throw new FoundationException(ErrorCode.INTEGRATION_NOT_CONFIGURED);
+        adapter(scope,binding);
+        return new Selection(mode,provider,binding);
+    }
+    public ErpActionResult createMaterialIssue(FactoryScope scope, Selection selection, MaterialIssueSubmitCommand command) {
+        if(!submissionSelection(scope).equals(selection)) throw new FoundationException(ErrorCode.INTEGRATION_NOT_CONFIGURED);
+        return selection.mode()==Mode.LOCAL_ONLY ? local.createMaterialIssue(scope,command) : adapter(scope,selection.bindingKey()).createMaterialIssue(scope,command);
     }
 
     public ErpIssueQueryResult query(FactoryScope scope, String sourceMode, String provider,

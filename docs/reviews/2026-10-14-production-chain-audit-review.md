@@ -126,3 +126,172 @@ Phase B到此停止，等待架构与业务语义审查；未开发上述路径�
 ### 用户授权后的验收状态（2026-10-14）
 
 admin角色100增量配置两个ERP权限后，14次真实HTTP与浏览器查询/核实操作通过，SIMPLE_B本地模式闭环已完成，原权限关联保留。前述500和403等待状态不再是当前状态。CONNECTED仍无真实供应商，生产完整路径/正式领料/开工准入建议尚未实施，Phase B停止点保持。详情及证据见Report A最新章节。
+
+## Production Chain Audit Report：独立端到端复核（2026-10-14）
+
+### 1. 范围、证据与重要更正
+
+本次从当前 Controller、Service、Mapper/XML、迁移、Vue 页面及测试源码重新追踪，没有沿用上次报告作为实现依据。后端分支 main；已有未提交后端、测试、文档及前端改动均保留。本次未修改业务代码、Flyway、测试、数据库数据或运行配置，未运行会写入数据的测试，未重启、提交或部署。仅追加本报告；用户审查期间另行明确要求新增 SQL 自动执行，按最新授权单独补入 AGENTS.md，未因此实施生产功能或生成 SQL。
+
+结束时当前HEAD为 `c649d2d`；审查期间工作区由外部操作提交了既有变更（`d54e241`）及规则/报告入口说明（`c649d2d`）。本Agent没有执行git add/commit，未覆盖这些操作；末次复核新增提交内容没有引入本次未审查的生产实现。
+
+本次真实数据库操作全部为 SELECT：核对中心绑定、information_schema、迁移记录、聚合及现有记录。目标为 `SIMPLE_B → datasource_id=8 → 192.168.18.25:3306/mes_base_dev_business_simple_b`，工厂/数据源均 ENABLED，business Flyway V1–V22 success=1。当前有 WorkOrder 37、Execution 2、Issue 19、Item 3、旧 Batch 20、旧路径节点 48、Inventory 1；主单缺失 Extra 数均为0。只读快照会随用户后续操作变化，不是生产交付验收。
+
+**更正旧结论：** V14 第3–5行明确新增 `UNIQUE KEY uk_workorder_code(code)`；真实库 information_schema.STATISTICS 也返回 NON_UNIQUE=0。`WorkOrderService#saveOrder:350–355`捕获 DuplicateKeyException。因此撤回旧章节“WorkOrder编号无数据库唯一保护”的P1；单独先查后插仍不是并发保障，但本项目已有数据库最终保障。本轮未发现工单编码重复，无需为此再建索引。
+
+历史证据仅作历史证据：读取 `target/erp-implementation/verify-final.log`，其中 ProductionChainHttpTest 4、ProductionExecutionHttpTest 3、MaterialIssueErpHttpTest 7、MaterialIssueVoidHttpTest 5、RoutingGraphValidatorTest 3均记录0失败/错误；这些主要是隔离 Fixture，不是供应商联调。本次没有重跑。`authorized-acceptance.json`记录上一轮14次真实HTTP，含会写核实元数据的POST；本轮只读取文件，没有重复执行。历史UI截图只证明当时查询/核实页面操作。不能由上述记录推出当前所有源文件、当前运行进程及整个生产链已重新通过验收。
+
+### 2. 架构与对象关系
+
+```text
+WorkOrder（需求、产品、计划量、默认确切Routing版本）
+  ├─ Workorder ERP Extra（外部标识；来源可能尚未核实）
+  └─ 0..N ProductionExecution（唯一新生产执行身份、EXE-{id}）
+       ├─ 固定WorkOrder/产品，绑定一个确切Routing版本
+       └─ 0..N MaterialIssue → 0..N Item（物料、仓库、可空batch_no）
+                         └─ ERP Extra（来源、外部单据、操作版本、核实事实）
+Routing → RoutingProduct + RoutingNode(Operation快照) + RoutingEdge（DAG定义）
+旧 ProductionBatch → BatchRouteNode（仅历史读取；有效写入口已拒绝）
+WmInventory（物料+仓库汇总）——尚未与领料、执行、产出协调
+```
+
+这些逻辑关联在当前 Factory 路由的业务库内成立，业务表不再带 factory_id。执行编号、生产执行主键、物料库存批次字符串、ERP工单/单据身份有不同语义，不互相替代。
+
+### 3. 实际调用路径与统一保护
+
+以下路径均为当前源码事实，未在本轮发起写请求：
+
+1. 工单页面 `views/production/workorder/index.vue:78–95` → `api/production/workorder.ts` → `WorkOrderController:105–120` → `WorkOrderService#create:160` / `release:211` → WorkorderMapper + WorkorderErpFacts。创建DRAFT；发布锁工单、检查revision及适用PUBLISHED版本，转RELEASED。没有ERP工单同步/发布调用。
+2. Execution独立页/工单嵌入 ProductionExecutionList → `/api/production/mes-production-execution` → Controller:61/68 → ServiceImpl:101/124 → ProductionExecutionRules:61/70 → generated ExecutionMapper。创建READY空起止时间，事务中生成EXE-{id}；普通PUT负责管理订正。
+3. 领料统一主子页 → `MasterDetailDocument#save:77–100`先保存单头 → IssueController → IssueServiceImpl#insert:113 → MaterialIssueRules#validate:91 → IssueMapper.insert → 仅LOCAL_ONLY调用 WarehouseIntegration.localCreate → LocalWarehouseErpService.createMaterialIssue → Extra.initialize。同一业务事务保存单头/Extra；此本地调用没有HTTP。明细之后通过 ItemController → ItemServiceImpl#insert:104 → Rules#validate(Item):142 → ItemMapper维护，另一个事务。
+4. 作废按钮 → `/{id}/actions/void` → MaterialIssueVoidController:20 → VoidService#perform:75。准备短事务持久化UUID、VOID_PENDING和Extra版本；事务外cancel；落地短事务检查operation/version，按结果VOIDED、VOID_UNKNOWN或恢复原态。`reconcile-void`只查询同一次作废，不重复冲销。
+5. 查询按钮 → GET `/{id}/erp-status` → MaterialIssueErpService#queryErpStatus:71：短只读快照→事务外领域查询→白名单QueryView，不写库。核实按钮 → POST `/{id}/actions/reconcile-erp` → #reconcileErpStatus:109：快照→外部查询→锁单头、校验Extra版本/作废操作/旧MES状态→领域规则→MES与Extra原子保存。
+6. WarehouseIntegration按Factory配置选实现；本地模式→LocalWarehouseErpService；CONNECTED查询按历史provider/current provider、binding及唯一supports匹配选Adapter。生产源码只有本地实现，Test Vendor在src/test；不存在真实厂商Gateway或真实提交/审核编排。
+
+统一Scope/权限：`FoundationAccessInterceptor:71–102`按URL、X-Factory-Id及请求快照解析当前厂并检查动作权限；`FactoryBusinessDataSource:31–53`取得并固定业务租约；`OwnedTransactionManager#doBegin/doCommit/doCleanupAfterCompletion`检查事务归属、固定租约并清理。BusinessCacheProcessor:48将Factory纳入缓存键，没有表内工厂过滤兜底。本次源码与同库关联检查未发现跨厂绕过；真实两厂隔离依赖历史Fixture/历史验收，不在本轮新增验证。
+
+主要权限：WorkOrder使用 `workorder:list/query/create/update/release/delete`；Execution使用 `business:mes:production:execution:*`；Issue使用 `business:mes:material:issue:*`，Item使用对应`:item:*`；作废使用`:void`，ERP查询/核实分别`:erp:query`、`:erp:reconcile`。每个HTTP方法显式AUTHORIZED。ERP Extra没有普通HTTP编辑Controller，生成的内部Service/Mapper存在不等于对外开放。
+
+### 4. 生产链路编排矩阵
+
+标记范围是目标业务动作是否完整，而非“有类/有表”。IMPLEMENTED可仅限本地明确能力；PARTIAL有模型/部分规则但闭环不完整；STUB只有契约/预留；NOT_IMPLEMENTED没有对应能力。验收列的历史证据均未在本轮重跑。
+
+| 业务动作 | 当前入口 | MES 编排 | ERP 调用 | 持久化 | 状态保护 | 实际验收 | 结论 |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| 工单创建 | POST /api/production/workorder；工单页 | 产品/工艺/计划量校验，DRAFT，Extra同事务 | 无；ERP同步未实现 | workorder + workorder_erp_extra | 引用锁、code数据库唯一 | 当前Schema SELECT；历史Fixture | IMPLEMENTED（手工本地创建）；ERP同步NOT_IMPLEMENTED |
+| 工单发布 | /workorder/{id}/actions/release；下达按钮 | DRAFT→RELEASED，适用发布版本 | 无 | workorder.revision/status | 父行锁+revision | 历史Fixture；本轮未下达 | IMPLEMENTED（MES发布） |
+| Execution创建 | POST /api/production/mes-production-execution；独立/嵌入页 | 固定工单产品、EXE编号、READY | 无 | mes_production_execution | 本库引用、事务、稳定身份 | 当前2条记录；历史Fixture | IMPLEMENTED（执行身份） |
+| 工艺版本绑定 | Execution POST/PUT，版本选择器 | 校验确切适用已发布版本；允许同工单不同版本 | 无 | execution.routing_id | 有领料单头/已开始后冻结；开始时要求启用发布版 | 当前两Execution绑定不同版本；历史Fixture | IMPLEMENTED（版本绑定） |
+| 实际路径选择 | 无Execution入口；旧batch path返回410 | 无完整路径枚举/校验/持久化 | 无 | 新路径表不存在 | 无；DAG冻结不能替代路径锁 | 当前Schema、源码检索 | NOT_IMPLEMENTED |
+| 领料创建 | Issue主子CRUD页 | 单头/明细分别保存、Execution引用校验 | 本地create；CONNECTED完整create仅契约 | Issue/Item/Extra；不扣库存 | 父单锁、状态/引用校验；无正式提交幂等意图 | 当前19单/3明细；历史HTTP | PARTIAL（资料维护已有；正式领料未闭环） |
+| 领料确认出库 | 无 | 无实际出库确认、锁路径编排 | 无真实出库；本地SUCCESS不代表实物移动 | 无独立出库确认事实 | 无 | 未实现，不可验收 | NOT_IMPLEMENTED |
+| 领料作废 | actions/void、reconcile-void；按钮 | 三段式、保留历史、重复不写外部 | 本地cancel；CONNECTED契约/选择器，真实冲销未接入 | MES作废意图+Extra结果 | 行锁、operation/version、开始后拒绝；存在并发窗口 | 当前14条VOIDED本地记录；历史Fixture/HTTP | IMPLEMENTED（本地）；CONNECTED实际冲销PARTIAL |
+| ERP状态查询 | GET erp-status；查询按钮 | 服务端身份、只读结果 | local NOT_FOUND；CONNECTED Query契约 | 不写 | 模式/provider/binding匹配、独立权限 | 历史真实GET；当前Extra SELECT | IMPLEMENTED（查询协调）；厂商STUB |
+| ERP核实同步 | POST reconcile-erp；核实按钮 | 白名单规则、状态冲突保留、MES/Extra同事务 | 只查不外部写 | Extra检查时间/版本；有限MES推进 | 重锁、version/operation/status防迟到 | 历史真实LOCAL_ONLY POST与Fixture；本轮不写 | IMPLEMENTED（协调）；厂商STUB |
+| 报工 | 无 | 无累计/工序/产量规则 | 无 | 无ProductionReporting表 | 无 | 源码+Schema检索 | NOT_IMPLEMENTED |
+| 完工 | 无正式动作；Execution PUT可填COMPLETED | 只有管理状态/时间校验，无产出判断 | 无 | status/end_time，无完工事实 | 无工序完成准入 | 当前代码、历史Fixture | PARTIAL（管理状态）；正式完工NOT_IMPLEMENTED |
+| 生产入库 | 无；WmInventory CRUD不是入库 | 无Receipt聚合/库存流转 | 无生产入库领域方法 | 无ProductionReceipt | 无 | 源码+Schema检索 | NOT_IMPLEMENTED |
+
+### 5. WorkOrder / Execution业务身份审查
+
+- WorkOrder是需求：允许没有Batch/Execution创建，不自动生成执行单元；无ERP同步入口。DRAFT才能编辑/删除，RELEASED无回撤/关闭能力。发布要求产品存在及适用PUBLISHED工艺，计划量>0；没有ERP下达成功门禁。
+- 产品更改由WorkOrderService:176–183保护：任意Execution（含CANCELLED）存在则拒绝；旧Batch也保护产品/默认工艺；有效或未知领料阻止产品变更。countBlockingIssues XML:25–29只有可信VOIDED且LOCAL_ONLY/NONE或CONNECTED/REVERSED才解除“领料本身”约束。全部作废也不解除仍存在Execution/旧Batch/RELEASED的约束。
+- WorkOrder外部ID/code在V21后物理上已迁Extra，真实Schema主表没有external/erp字段。Entity保留未映射投影，Controller请求仍允许人工录入外部ID/code，Facts#save:43–49写Extra；这不是已验证ERP映射，也没有provider/外部同步保证。不能宣称外部身份已不可人工维护。
+- allocation SQL:14–22 = SUM全部Execution.target_qty；remaining=planned−sum；excess=max(sum−planned,0)。CANCELLED计入，允许超额。工单页明确展示“含全部状态，不代表完成量”，这是当前统计语义，是否改为可分配余额须产品决策。真实工单18计划1000、合计1300，并非本轮制造的测试数据。
+- Execution有独立编号、本地ID、工单/产品/确切版本；一工单多Execution，一Execution多领料，一单多物料/批次结构成立。允许在DRAFT工单及未领料时预建READY。batch_no只是可空文本，未验证库存批次存在、可用数量、单位换算或BOM。
+- Execution创建不接受客户端产品身份；产品从工单固定，更新不允许换工单/产品/编号。有任意领料单头（含DRAFT/VOIDED）或开始事实后，不可换routing_id、不能回READY或清开始时间；删除有事实/领料关系的Execution被拒绝。
+- target_qty、已填start_time的具体值、end_time、remark及部分状态仍可订正。没有严格前后态矩阵：无事实的CANCELLED可回READY；满足工单/版本/时间条件时CANCELLED可转RUNNING/COMPLETED；已有开始事实不能回READY，但可在RUNNING/COMPLETED/CANCELLED之间订正。取消是否可恢复尚未形成正式用例。
+- **真实快照**：EXE-15 / WorkOrder18 / routing64是RUNNING，有start_time、0领料单；EXE-16 / routing65是READY，有2张RECORDED单但两单0明细。数据与源码一致，不能凭管理状态证明实际开工或领料完成。
+- ProductionBatchMapper/BatchRouteNodeMapper只在WorkOrderService历史查询使用；旧创建请求batches由WorkOrderSaveRequest:22拒绝，旧selectPath:249返回LEGACY_BATCH_READ_ONLY。有效写链路没有恢复第二套Batch；Mapper保留CRUD方法不等于公开写用例。
+
+### 6. Routing DAG与选定路径
+
+RoutingServiceImpl#saveContent:216 / publish:224 / touch:391只修改草稿，revision条件更新；发布保存产品及Operation快照，已发布只能启停/新版本/复制，不直接改拓扑。RoutingGraphValidator限制100节点/400边，校验节点唯一、端点属于图、无自环/重复边、无环；发布多节点时拒绝孤立节点。它没有枚举root→sink完整路径，也不强制单起点/单终点或整个图弱连通，不能把定义合法性当作具体Execution路径合法性。
+
+新Execution只有routing_id，无selectedPath、节点序列、path revision、lock time或出库锁定操作。旧batch_route_node保存的是旧身份历史，不能按相同ID或display_order借给Execution。当前没有“选路”与“锁路”的区别、首次出库锁路/补料复用或锁后修改规则；没有报工可核对路径节点。当前LOCAL_ONLY成功没有触发锁路，也没有错误地宣称锁路已完成；危险在于后续若直接拿create SUCCESS/EFFECTIVE当实物出库，会把不同事实混为一谈。
+
+最小建议：在Execution下持久化一条有序完整路径；验证同确切版本、首节点合法起点、尾节点合法终点、相邻edge存在、无重复且序号连续。多入口/出口、isKey是否必经须明确；不建设AND/OR并行引擎。保存选择与锁定分开；首次正式出库意图引用不可变的路径修订，PENDING/UNKNOWN期间禁止重选；首次可信出库确认幂等锁定，多张后续领料只沿用并校验同一路径。作废一单不自动解锁路径，全部冲销后能否重选需明确政策。
+
+### 7. MaterialIssue与ERP领域编排、人工恢复
+
+**创建**：当前是管理员资料CRUD，不是完整领料命令。单头可直接RECORDED且0明细，Controller/Rules并未要求先齐明细。仓储MaterialIssueCreateCommand仅含issueId/operationId/issueNo/workorderId/executionId，没有物料、批次、数量、单位、仓库、选定路径或可信ERP工单身份。仅LOCAL_ONLY调用本地create，结果返回值未参与业务状态推进；Extra记录LOCAL_RECORD/SUCCEEDED，外部影响NONE。CONNECTED只存UNVERIFIED，不调用真实create。缺少正式创建意图、整单快照、外部幂等契约及创建失败/未知恢复入口。不存在已知真实ERP重复创建事故的证据。
+
+**架构**：仓储领域接口组织合理，MES不依赖厂商create/submit/approve细节；未来Vendor Service可自主编排内部步骤，Gateway应只处理通讯。目前生产/MasterData领域消费者及入库方法未实现；不应为齐目录制造空层。缺失厂商不等于现有架构失败，但CONNECTED提交是STUB，不能交付实际领料。
+
+**配置**：WarehouseIntegration#configuredMode:23在无厂配置时返回null；查询/作废缺配置明确失败，不回退本地。Issue CRUD在null时仍允许资料保存、Extra标UNKNOWN/UNVERIFIED；这属于现有行政入口，并非可执行集成“默认成功”。LOCAL_ONLY必须当前厂显式配置才能调用localCreate。CONNECTED查询严格检查provider，作废选择主要基于历史binding及supports；未来真实实现必须证明supports同时核验该厂配置/原来源，不能只凭任意binding字符串接受旧单。
+
+**Extra/核实**：Issue Extra保存来源/外部身份/状态/operation_version/诊断，主表只保留MES作废意图。主单、明细增改删及核实/作废均推进Extra版本；核实检查快照版、操作ID与MES状态，旧结果不能覆盖新作废。UNKNOWN/NOT_FOUND不允许重建或直接标成功，LOCAL_ONLY始终NOT_FOUND/UNKNOWN且不造ERP身份。CONNECTED FOUND只有身份符合快照才采信；PENDING_APPROVAL不推进；EFFECTIVE仅推进ERP_PENDING/ERP_UNKNOWN到RECORDED；CANCELLED仅在既有作废意图下推进VOIDED。两个ERP创建等待态目前只被恢复规则识别，没有正式创建入口产出，不能把它们算作完整状态机。
+
+**作废**：保留单头/明细和voidOperationId；已有开始事实的Execution拒绝新作废；有效/UNKNOWN领料继续保护产品。重复作废读取原结果，不重复外部写；UNKNOWN人工query同操作。明确REJECTED恢复原MES态，却保留voidOperationId，普通编辑被拒绝，重复cancel不会创建新尝试，缺明确人工新尝试/继续审核入口。真实已出库是否“冲销”不能仅靠单据cancel概念，Vendor领域必须提供可信逆向业务事实；当前没有真实出库/冲销实现。
+
+**不允许伪造成功**：Issue普通CRUD仅DRAFT/RECORDED、不接受Extra/作废结果；不能PUT成VOIDED或修改外部效果。RECORDED本身可人工选，必须持续解释为本地资料状态。Execution普通编辑COMPLETED确实可人工维护，但不是ERP成功/生产产量证明，应在正式执行闭环中限制生命周期入口。
+
+### 8. 报工、完工、入库及库存现状
+
+生产主源码、前端/API、全部business迁移和真实Schema均未发现ProductionReporting、ProductionReceipt、ProductionCompletion、ExecutionRoute/SelectedPath或MaterialLot；结论为**未实现**。WmInventory已经实现CRUD、引用/数量校验和同步Port，表在V8创建、V15去Factory列，按material_id+warehouse_id唯一；同步缺真实QueryAdapter时失败。它没有批次粒度、流水、预占、领料扣减或生产入库行为；Issue/Production代码不调用InventoryMapper。
+
+后续最小关系建议（未设计完整QC/WIP系统）：报工绑定execution_id + 选定路径节点 + reporter_user_id(sys_user)，独立业务事实/幂等身份累计合格、不良数量，不从target_qty推断实际产量；是否逐工序、顺序/返工和累计限额须产品确认。Execution用例依据选定终点及可验证报工事实判断完工；WorkOrder需求完成是汇总政策。生产入库单引用Execution/实际合格产出，仓储领域负责ERP入库内部步骤，Extra保存外部事实；MES完工与ERP入库成功保持不同事实，失败或UNKNOWN人工查询/核实，不能自动回滚已发生生产事实。
+
+### 9. 事务、并发与异常时序 A–F
+
+| 场景 | 当前已具备 | 未具备/后果及证据等级 |
+| --- | --- | --- |
+| A ERP创建成功、MES更新失败 | 作废有先存意图/后调用；核实可用服务端已有身份查询 | 正式create从未接入，不能证明能找回创建结果、幂等重试。现有create command无完整载荷；未来稳定operation必须先持久化，按operation查回已有外部身份，禁止重建未知结果。当前是缺口而非已复现事故 |
+| B 创建成功、审核失败 | 结果模型可含已知externalReference；核实识别PENDING_APPROVAL且不推进 | 无Vendor步骤/阶段持久化/继续审核用例。仅模型支持不证明审核失败仍能恢复。后续应保留身份与阶段，人工继续同单，不从头create |
+| C ERP超时 | 作废捕获异常为VOID_UNKNOWN，保留意图；query异常UNKNOWN；NOT_FOUND不等于失败 | 创建超时链未实现；查询FoundationException直接错误返回，不伪造成功；真实供应商未验证。现有Fixture包含timeout规则，未在本轮运行 |
+| D 已出库、锁路径失败 | 无现成路径锁定动作，因此未发生当前代码可验证的锁路失败 | 缺少意图预先绑定路径、确认后原子落地，若未来接入外部会有不可回滚窗口。必须冻结预选版本/路径、pending拦截开工与重选，再可信确认落地，失败靠同操作核实 |
+| E 多人并发修改 | WorkOrder/Routing revision；Issue父锁/Extra版；Execution行锁；父子引用锁；code DB唯一 | Execution及Issue普通编辑没有客户端expected revision，合法字段同态更新可能后写覆盖前写。Void准备先Issue→WorkOrder→Execution，而Execution更新Execution→WorkOrder，存在锁反转；作废事务外时开工不检查pending/unknown。静态风险，未做真实并发写验证 |
+| F 旧结果覆盖完成/作废 | ERP核实重锁并比较Extra版/operation/status，VOIDED不因EFFECTIVE复活；request.ts上下文检查和ErpAction generation拒迟到回填 | 这些保护只覆盖当前核实/上下文，不代表未来报工/完工链；同一单据普通编辑没有客户端revision。历史Fixture lateEffectiveQueryCannotOverwriteNewVoidOperation支持核实保护，非本轮重验 |
+
+特别的可行窗口：Void准备事务检查Execution未开始后释放锁→另一请求将Execution更新RUNNING（只要求工单RELEASED、有效版本和start_time）→外部作废执行/结果落地。落地只检查Issue操作/Extra版，不重读Execution。单纯在落地拒绝不能撤销已发出的外部冲销；必须在开始入口和准备阶段共同阻止竞争。
+
+### 10. P0 / P1 / P2 问题清单
+
+本轮**没有确认的P0**：没有真实CONNECTED提交、库存扣减或Execution路径执行，未发现已发生跨厂污染/重复ERP单据。下面P1是明确闭环缺失或现有实现的可定位风险；未规划完整的模块不机械评为P0。File:Line以本次源码为准，后续改动需重核。
+
+| Issue ID / Severity / Module | File:Line | Current Behavior / Trigger Condition | Business Impact | Recommended Minimal Fix | Schema Change Required? | Affected Existing Data? |
+| --- | --- | --- | --- | --- | --- | --- |
+| PC-01 / P1 / MaterialIssue闭环 | MesMaterialIssueServiceImpl.java:113–138；MaterialIssueCreateCommand.java:6 | 保存单头即可RECORDED；明细另存；CONNECTED正式提交缺失；将保存当领料时触发 | 无法证明整单已齐、真实出库及外部单据；后续直接接create会缺幂等/恢复 | 保留资料CRUD，另设submit用例校验完整快照、固定Execution/路径、先存操作、事务外领域调用、短事务核实落地 | 是或扩充既有意图；Extra复用 | 有；历史RECORDED不能自动升级出库成功 |
+| PC-02 / P1 / Execution路径闭环 | V16__production_execution.sql:2；WorkOrderService.java:249；RoutingGraphValidator.java:24 | 只有版本/DAG，无完整路径选择/持久化/锁定；分支工艺开始生产 | 无法追踪实际路线、约束报工节点或证明出库锁路 | Execution单条完整路径、选择/锁定分离，首次确认幂等锁，后续领料沿用 | 是 | 有；2个Execution须明确补选，不能从旧Batch/展示序猜 |
+| PC-03 / P1 / Execution生命周期 | ProductionExecutionRules.java:70–79、109、124–133；前端fields.ts:59–84 | 普通PUT可进入RUNNING/COMPLETED，没领料/路径/报工准入；取消可复用 | 当前“已开始/已结束”不保证生产事实；库中EXE-15零领料RUNNING | 明确start/complete命令、准入规则；普通编辑限制 lifecycle；单独授权订正必要事实 | 开工限制本身可无；正式路径/报工需新增 | 有；不能把既有COMPLETED自动视为真实完工或批量回退 |
+| PC-04 / P1 / 作废与开工竞争（已有行为缺陷） | MaterialIssueVoidService.java:88、109、119–134；ProductionExecutionRules.java:109 | 准备释放锁后，开始入口不检查VOID_PENDING/UNKNOWN；外部期间开始 | 可形成已开始执行仍被作废供料；真实ERP接入后影响已用料安全 | 两动作共享准入/统一锁序；pending/unknown阻止start，准备作废锁Execution并检查状态 | 门禁无 | 需审查关联已开始/pending；当前无pending数据，不自动再冲销 |
+| PC-05 / P1 / 锁序反转（已有行为风险） | MaterialIssueVoidService.java:139–148、88；MesProductionExecutionServiceImpl.java:125；ProductionExecutionRules.java:100–104 | Void取得WorkOrder再等Execution；Execution更新反向等待WorkOrder | 数据库可能死锁中止合法动作，pending恢复体验不稳定；未复现真实写竞争 | 制定当前用例一致锁序，复读引用及状态，新增隔离并发测试 | 否 | 否，不重写历史 |
+| PC-06 / P1 / 人工恢复 | MaterialIssueVoidService.java:82–83、130–134；MaterialIssueRules.java:94 | REJECTED保留voidOperationId；重复返回旧结果，编辑被冻结；真实拒绝后再处理 | 操作可追踪但无授权新尝试/继续处理，项目级介入才能恢复 | 接真实Vendor时补明确人工新尝试/继续同外部单入口，保留旧操作历史；不无限重试 | 视操作历史最小模型决定 | 有；保留原拒绝及外部身份，不能清空冒充未发生 |
+| PC-07 / P2 / 管理编辑并发 | MesProductionExecutionServiceImpl.java:124–143；MesMaterialIssueServiceImpl.java:146–173；MesMaterialIssueItemServiceImpl.java:126–145 | 行锁序列化但无客户端expected revision；两客户端从旧值编辑同字段 | 后写覆盖合法订正，非跨厂/外部重复写事故 | 视订正并发需求补expected revision；沿用Extra版本也须提供正确前端契约 | Execution需字段；Issue可复用现有版本但需契约审查 | 可增量，不覆盖历史数据 |
+| PC-08 / P2 / 语义与metadata | V13__workorder_batch_route.sql:7；WorkOrderSaveRequest.java:22；WorkorderErpFacts.java:43 | planned_qty注释仍写批次合计；人工外部标识可写Extra但未验证 | 文档/生成字段可能误导，将外部ID或管理状态当已核实事实 | 后续正式迁移修正注释；响应明确外部来源未核实，人工标识不能充当ERP成功 | 注释治理需正式迁移；投影改造可无 | 不推断/删除历史外部标识 |
+
+外部FACT EFFECTIVE/CANCELLED当前没有独立“实物已出库/已冲销库存”结果语义；这列为PC-01未来接入的契约要求，不指控当前不存在的厂商错误。取消占用量、恢复取消、超额分配、多出口完整路径属于产品决策，不单独标缺陷。
+
+### 11. 最小分阶段路线（建议，未实施）
+
+| 阶段 | 为什么先做 / 最小交付范围 | 前置依赖 / 暂缓 | Codegen或业务编排 | 真实数据验收建议 |
+| --- | --- | --- | --- | --- |
+| 下一轮：领料确认与路径锁定闭环 | 一次完成“完整明细+Execution单路径选择→正式提交意图→可信实际出库确认→路径幂等锁定→start门禁”；同时修PC-04/05。保留单头/明细分开编辑，正式submit不等于整单编辑原子保存 | 明确本地实际出库事实来源/仓储接口成功含义、路径起止政策；暂缓报工、完工、入库、AND/OR引擎、Saga | 新路径/必要操作事实经正式建模/迁移/真实metadata Codegen persistence+backend；协调Service手写复用generated Mapper，收紧绕过入口 | 在SIMPLE_B复制为明确测试标签的最小工单/Execution/分支DAG/多批次明细，覆盖空明细拒绝、无路径拒绝、重复submit/确认、多单不重复锁路、UNKNOWN不重发、pending禁止start、并发作废；现有EXE-15/16只用于只读基线，不冒充已确认出库 |
+| 第二阶段：选定路径报工 | 先有稳定生产身份/路线/供料事实，才累计每节点合格不良产出和sys_user记录；不建立全面QC/WIP | 前阶段及累计/顺序/返工政策；暂缓ERP入库、完整库存批次系统 | 新报工表基础Codegen，Reporting业务规则/事务手写 | 同一测试Execution多次/重复/越路径节点/无权限/不同厂/超量报工，保留实际明细及累计核对 |
+| 第三阶段：完工事实 | 依据明确终点/产量规则形成Execution完工，明确WorkOrder汇总；不能PUT状态代替 | 已验证报工；需良品/不良/计划量与结束条件决定；暂缓复杂排产/QC | 新事实表如需要用Codegen，完成判断与聚合业务编排 | 节点未完成拒绝、分次完工、数量汇总、幂等/订正/多Execution工单状态 |
+| 第四阶段：生产入库与ERP恢复 | 根据真实合格产出构造Receipt，仓储领域编排厂商内部步骤，独立Extra与人工核实 | 完工/可入库数量政策、真实Vendor契约及验收环境；暂缓全库存平台重写 | 主子表后端Codegen，统一主子UI，Receipt提交/ERP协调手写 | SIMPLE_B内带来源标签的完工样例；真实Vendor测试厂验证创建后审核失败/超时/本地落地失败/人工核实，CONNECTED未接入时必须明确未验收 |
+
+首次闭环不必先迁工单ERP同步。优先使本地生产事实正确；真实Vendor接入可以并行于该闭环的契约准备，但不能在缺幂等意图/路径快照时先把HTTP塞进单头CRUD。LOCAL_ONLY只代表无外部写；若采用人工仓库确认，必须保存有权限操作者、时间、数量及确认来源，不能借本地create SUCCESS伪造实际出库。
+
+### 12. 需要用户决策的设计空白
+
+1. 实际出库确认以ERP可信库存业务结果为准，还是允许LOCAL_ONLY下仓库人工确认？采购/领料创建或审核何时真正改变库存，应由Vendor契约证明。
+2. DAG是否允许多个起点/终点、单Execution路径是否必须经过isKey，何为完整路径；保持单路径，不扩展并行引擎。
+3. 是否所有目标生产领料必须关联Execution；保留空Execution的历史/行政资料，但正式生产submit应有明确要求。是否允许工单DRAFT领料、补料及多张单到达的开工条件也需明确。
+4. CANCELLED是否释放计划分配、是否可恢复；是否允许超额目标；当前统计“全部状态目标量合计”可继续保留并另提供可分配量，不擅自改旧含义。
+5. 全部领料冲销且未开工时是否可重选路径；已开始后补料、退料应走何种独立恢复规则，不能直接解锁历史。
+6. 后续报工采用逐工序还是末工序、累计/返工政策及良品/不良完成条件；完工与入库是否可分批，何时关闭WorkOrder。
+
+上述是后续实施的必要决策清单，本次审查不等待回答、不提前开发。
+
+### 最终独立回答 A–D
+
+**A. 当前真实跑到哪一步？** 可维护/发布工艺DAG、手工创建/发布工单、创建独立Execution并绑定版本、保存领料单头与明细；本地作废、ERP只读查询及有限核实协调已存在。生产主链停在“领料资料保存”，没有实际出库确认、完整执行路径及锁路、报工、真实完工或入库闭环。可以把Execution管理状态改RUNNING/COMPLETED，不能据此声称生产链跑通。
+
+**B. 最危险的三个缺口？** ①正式领料没有完整载荷/稳定提交意图/实际出库事实；②Execution没有选定完整路径且普通编辑能越过领料/路径门禁；③作废与开工有事务外竞争窗口及相反锁序。均为P1级闭环缺失或风险，真实CONNECTED后果尚未验证。
+
+**C. 下一轮只实现哪个最小闭环？** “完整领料提交＋可信出库确认＋Execution单路径锁定＋开工门禁”，共同持久化意图、统一并发规则与人工核实；不同时建设报工/完工/入库。LOCAL_ONLY也必须有明确实际确认事实来源。
+
+**D. 是否须推翻设计？** 没有证据要求推翻。保留WorkOrder需求、Execution唯一执行身份、Routing版本DAG、MaterialIssue主子资料及ERP Extra职责，增量补执行路径和正式命令/事实即可；不恢复ProductionBatch写模型，不重写生产模块。
+
+本次已停止于审查与用户明确要求的规则补充，没有开始上述实现。

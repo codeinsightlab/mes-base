@@ -1,4 +1,3 @@
-// MES-CODEGEN: scaffold; review required.
 package dev.mesbase.business.production.controller;
 
 import dev.mesbase.business.production.controller.vo.MesProductionExecutionPageVo;
@@ -84,7 +83,7 @@ public class MesProductionExecutionController {
     }
 
 
-    private static MesProductionExecutionVo toView(MesProductionExecutionEntity row) {
+    static MesProductionExecutionVo toView(MesProductionExecutionEntity row) {
         return new MesProductionExecutionVo(
                 row.getId() == null ? null : row.getId().toString(),
                 row.getExecutionNo(),

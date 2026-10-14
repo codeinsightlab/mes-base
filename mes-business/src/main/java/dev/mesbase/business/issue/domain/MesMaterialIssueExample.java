@@ -1394,6 +1394,66 @@ public class MesMaterialIssueExample {
             addCriterion("void_finished_at not between", value1, value2, "voidFinishedAt");
             return (Criteria) this;
         }
+
+        public Criteria andSubmissionIdIsNull() {
+            addCriterion("submission_id is null");
+            return (Criteria) this;
+        }
+
+        public Criteria andSubmissionIdIsNotNull() {
+            addCriterion("submission_id is not null");
+            return (Criteria) this;
+        }
+
+        public Criteria andSubmissionIdEqualTo(Long value) {
+            addCriterion("submission_id =", value, "submissionId");
+            return (Criteria) this;
+        }
+
+        public Criteria andSubmissionIdNotEqualTo(Long value) {
+            addCriterion("submission_id <>", value, "submissionId");
+            return (Criteria) this;
+        }
+
+        public Criteria andSubmissionIdGreaterThan(Long value) {
+            addCriterion("submission_id >", value, "submissionId");
+            return (Criteria) this;
+        }
+
+        public Criteria andSubmissionIdGreaterThanOrEqualTo(Long value) {
+            addCriterion("submission_id >=", value, "submissionId");
+            return (Criteria) this;
+        }
+
+        public Criteria andSubmissionIdLessThan(Long value) {
+            addCriterion("submission_id <", value, "submissionId");
+            return (Criteria) this;
+        }
+
+        public Criteria andSubmissionIdLessThanOrEqualTo(Long value) {
+            addCriterion("submission_id <=", value, "submissionId");
+            return (Criteria) this;
+        }
+
+        public Criteria andSubmissionIdIn(List<Long> values) {
+            addCriterion("submission_id in", values, "submissionId");
+            return (Criteria) this;
+        }
+
+        public Criteria andSubmissionIdNotIn(List<Long> values) {
+            addCriterion("submission_id not in", values, "submissionId");
+            return (Criteria) this;
+        }
+
+        public Criteria andSubmissionIdBetween(Long value1, Long value2) {
+            addCriterion("submission_id between", value1, value2, "submissionId");
+            return (Criteria) this;
+        }
+
+        public Criteria andSubmissionIdNotBetween(Long value1, Long value2) {
+            addCriterion("submission_id not between", value1, value2, "submissionId");
+            return (Criteria) this;
+        }
     }
 
     public static class Criteria extends GeneratedCriteria {

@@ -33,23 +33,24 @@ public final class FoundationErrorAdvice {
 
     @ExceptionHandler(ServiceException.class)
     public ResponseEntity<ErrorResponse> sourceBusiness(ServiceException failure, HttpServletRequest request) {
-        LOG.warn("Source business rejection requestId={}", ErrorWriter.requestId(request));
         int status = failure.getCode() != null && failure.getCode() == 401 ? 401 : failure.getCode() != null && failure.getCode() == 403 ? 403 : 422;
+        String code = status == 422 ? "BUSINESS_REJECTED" : status == 401 ? "UNAUTHENTICATED" : "FORBIDDEN";
+        LOG.info("event=http.request.rejected requestId={} errorCode={}", ErrorWriter.requestId(request), code);
         String message = failure.getMessage() == null ? "当前操作不可执行" : failure.getMessage();
         if (message.length() > 500) message = message.substring(0, 500);
         return ResponseEntity.status(status)
-                .body(new ErrorResponse(status == 422 ? "BUSINESS_REJECTED" : status == 401 ? "UNAUTHENTICATED" : "FORBIDDEN", message, ErrorWriter.requestId(request)));
+                .body(new ErrorResponse(code, message, ErrorWriter.requestId(request)));
     }
 
     @ExceptionHandler(FoundationException.class)
     public ResponseEntity<ErrorResponse> known(FoundationException failure, HttpServletRequest request) {
-        LOG.warn("Foundation failure requestId={}", ErrorWriter.requestId(request), failure);
+        HttpFailureLogging.known(request, failure);
         return error(failure.code(), request);
     }
 
     @ExceptionHandler({HttpMessageNotReadableException.class, MethodArgumentNotValidException.class, MethodArgumentTypeMismatchException.class, HandlerMethodValidationException.class, ConstraintViolationException.class})
     public ResponseEntity<ErrorResponse> invalid(Exception failure, HttpServletRequest request) {
-        LOG.warn("Invalid request requestId={} type={}", ErrorWriter.requestId(request), failure.getClass()
+        LOG.info("event=http.request.rejected errorCode=BAD_REQUEST requestId={} type={}", ErrorWriter.requestId(request), failure.getClass()
                 .getSimpleName());
         return error(ErrorCode.BAD_REQUEST, request);
     }
@@ -79,7 +80,7 @@ public final class FoundationErrorAdvice {
 
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ErrorResponse> unexpected(Exception failure, HttpServletRequest request) {
-        LOG.error("Unhandled failure requestId={}", ErrorWriter.requestId(request), failure);
+        HttpFailureLogging.unexpected(request, failure);
         return error(ErrorCode.INTERNAL_ERROR, request);
     }
 

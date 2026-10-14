@@ -7,6 +7,8 @@ import org.springframework.dao.DataAccessException;
 import dev.mesbase.common.core.domain.model.LoginUser;
 import dev.mesbase.framework.web.service.TokenService;
 import dev.mesbase.platform.web.ErrorWriter;
+import dev.mesbase.platform.web.HttpRequestCompletionListener;
+import dev.mesbase.platform.web.HttpFailureLogging;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -47,12 +49,14 @@ public final class SystemTokenFilter extends OncePerRequestFilter {
             if (user != null) {
                 var auth = UsernamePasswordAuthenticationToken.authenticated(user, null, List.of());
                 SecurityContextHolder.getContext().setAuthentication(auth);
+                HttpRequestCompletionListener.captureUser(request, user.getUserId());
             }
         } catch (DataAccessException failure) {
-            logger.error("Session admission unavailable", failure);
+            HttpFailureLogging.known(request, new FoundationException(ErrorCode.AUTHENTICATION_UNAVAILABLE, failure));
             ErrorWriter.write(ErrorCode.AUTHENTICATION_UNAVAILABLE, request, response);
             return;
         } catch (FoundationException failure) {
+            if (failure.code().httpStatus() >= 500) HttpFailureLogging.known(request, failure);
             ErrorWriter.write(failure.code(), request, response);
             return;
         }

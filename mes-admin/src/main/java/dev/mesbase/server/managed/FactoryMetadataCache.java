@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.mesbase.common.core.redis.RoutingMetadataStore;
 import dev.mesbase.core.error.ErrorCode;
 import dev.mesbase.core.error.FoundationException;
+import dev.mesbase.platform.web.HttpFailureLogging;
 import dev.mesbase.infrastructure.persistence.PlatformPersistence;
 import dev.mesbase.system.factory.FactoryExecutionMetadata;
 import dev.mesbase.system.factory.RoutingMetadataMapper;
@@ -64,8 +65,13 @@ public class FactoryMetadataCache {
             return loaded;
         } catch (JsonProcessingException | RuntimeException failure) {
             if (failure instanceof FoundationException foundation) throw foundation;
-            LOG.error("Routing metadata read or publication failed", failure);
-            throw new FoundationException(ErrorCode.ROUTING_METADATA_UNAVAILABLE, failure);
+            var wrapped = new FoundationException(ErrorCode.ROUTING_METADATA_UNAVAILABLE, failure);
+            if (RequestContextHolder.getRequestAttributes() instanceof ServletRequestAttributes attrs) {
+                HttpFailureLogging.known(attrs.getRequest(), wrapped);
+            } else {
+                LOG.error("Routing metadata read or publication failed", failure);
+            }
+            throw wrapped;
         }
     }
 

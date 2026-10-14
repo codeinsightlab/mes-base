@@ -29,6 +29,7 @@ import org.springframework.stereotype.Component;
 @Component
 @ConditionalOnProperty(name = "mes.business.enabled", havingValue = "true")
 public class ProductionExecutionRules {
+    private final ProductionChainLocks locks;
     private final MesProductionExecutionMapper executions;
     private final WorkorderMapper workorders;
     private final MaterialMapper materials;
@@ -38,7 +39,8 @@ public class ProductionExecutionRules {
 
     public ProductionExecutionRules(MesProductionExecutionMapper executions, WorkorderMapper workorders,
                                     MaterialMapper materials, RoutingMapper routings,
-                                    RoutingProductMapper products, MesMaterialIssueMapper issues) {
+                                    RoutingProductMapper products, MesMaterialIssueMapper issues, ProductionChainLocks locks) {
+        this.locks = locks;
         this.executions = executions;
         this.workorders = workorders;
         this.materials = materials;
@@ -48,14 +50,7 @@ public class ProductionExecutionRules {
     }
 
     public MesProductionExecutionEntity lock(Long id) {
-        if (id == null) throw new FoundationException(ErrorCode.EXECUTION_INVALID);
-        var filter = new MesProductionExecutionExample();
-        filter.createCriteria().andIdEqualTo(id);
-        var patch = new MesProductionExecutionEntity();
-        patch.setId(id);
-        if (executions.updateByExampleSelective(patch, filter) != 1)
-            throw new FoundationException(ErrorCode.EXECUTION_NOT_FOUND);
-        return executions.selectByPrimaryKey(id);
+        return locks.execution(id);
     }
 
     public void initialize(MesProductionExecutionEntity row) {
@@ -68,6 +63,7 @@ public class ProductionExecutionRules {
     }
 
     public void updating(MesProductionExecutionEntity old, MesProductionExecutionEntity row) {
+        if (!Objects.equals(old.getStatus(), row.getStatus()) || !Objects.equals(old.getStartTime(), row.getStartTime()) || !Objects.equals(old.getEndTime(), row.getEndTime())) frozen();
         // WorkOrder/product define identity at creation; routing may be corrected only before facts.
         if (!Objects.equals(old.getWorkorderId(), row.getWorkorderId())
                 || !Objects.equals(old.getProductId(), row.getProductId())) frozen();
@@ -78,6 +74,11 @@ public class ProductionExecutionRules {
         validateReferences(row, !Objects.equals(old.getRoutingId(), row.getRoutingId()) || !started(old) && started(row));
         validateValues(row);
         audit(row, false);
+    }
+
+    public void checkReadyReferences(MesProductionExecutionEntity row) {
+        var order = validateReferences(row, true);
+        if (!"RELEASED".equals(order.getStatus())) throw new FoundationException(ErrorCode.WORKORDER_NOT_RELEASED);
     }
 
     public void deleting(Long id) {

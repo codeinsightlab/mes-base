@@ -12,7 +12,7 @@ public final class LocalWarehouseErpService implements WarehouseErpAdapter {
     }
 
     @Override
-    public ErpActionResult createMaterialIssue(FactoryScope scope, MaterialIssueCreateCommand command) {
+    public ErpActionResult createMaterialIssue(FactoryScope scope, MaterialIssueSubmitCommand command) {
         return ErpActionResult.localSuccess();
     }
 

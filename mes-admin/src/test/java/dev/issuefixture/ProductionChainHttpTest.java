@@ -97,11 +97,12 @@ class ProductionChainHttpTest {
             String running = one.replace("READY", "RUNNING").replace("}", ",\"startTime\":\"2026-10-14T09:00:00\"}");
             for (String body : List.of(running, running.replace("RUNNING", "COMPLETED")
                     .replace("}", ",\"endTime\":\"2026-10-14T10:00:00\"}")))
-                m.perform(full(put(E + "/1"), "A").content(body)).andExpect(status().isUnprocessableEntity())
-                        .andExpect(jsonPath("errorCode").value("WORKORDER_NOT_RELEASED"));
+                m.perform(full(put(E + "/1"), "A").content(body)).andExpect(status().isConflict())
+                        .andExpect(jsonPath("errorCode").value("EXECUTION_FROZEN"));
             m.perform(full(post(W + "/1/actions/release"), "A").content("{\"revision\":1}"))
                     .andExpect(status().isOk());
-            m.perform(full(put(E + "/1"), "A").content(running)).andExpect(status().isOk());
+            m.perform(full(put(E + "/1"), "A").content(running)).andExpect(status().isConflict());
+            m.perform(full(post("/api/production/executions/1/actions/start"), "A")).andExpect(status().isConflict());
             m.perform(full(put(E + "/2"), "A").content(two.replace("300", "900"))).andExpect(status().isOk());
             m.perform(full(get(W + "/1/allocation"), "A")).andExpect(status().isOk())
                     .andExpect(jsonPath("allocatedTargetQty").value("1300.000000"))

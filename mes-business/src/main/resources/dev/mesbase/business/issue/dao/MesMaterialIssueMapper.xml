@@ -1,4 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
+<!-- MES-CODEGEN: MyBatis Generator standard single-table persistence. -->
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="dev.mesbase.business.issue.dao.MesMaterialIssueMapper">
   <resultMap id="BaseResultMap" type="dev.mesbase.business.issue.domain.MesMaterialIssueEntity">
@@ -22,6 +23,7 @@
     <result column="void_from_status" jdbcType="VARCHAR" property="voidFromStatus" />
     <result column="void_requested_at" jdbcType="TIMESTAMP" property="voidRequestedAt" />
     <result column="void_finished_at" jdbcType="TIMESTAMP" property="voidFinishedAt" />
+    <result column="submission_id" jdbcType="BIGINT" property="submissionId" />
   </resultMap>
   <sql id="Example_Where_Clause">
     <where>
@@ -82,9 +84,10 @@
     </where>
   </sql>
   <sql id="Base_Column_List">
-    id, issue_no, workorder_id, execution_id, workorder_code, product_id, product_code,
-    flow_card_no, routing_id, issue_time, status, remark, create_by, create_time, update_by,
-    update_time, void_operation_id, void_from_status, void_requested_at, void_finished_at
+    id, issue_no, workorder_id, execution_id, workorder_code, product_id, product_code, 
+    flow_card_no, routing_id, issue_time, status, remark, create_by, create_time, update_by, 
+    update_time, void_operation_id, void_from_status, void_requested_at, void_finished_at, 
+    submission_id
   </sql>
   <select id="selectByExample" parameterType="dev.mesbase.business.issue.domain.MesMaterialIssueExample" resultMap="BaseResultMap">
     select
@@ -98,7 +101,7 @@
     </if>
   </select>
   <select id="selectByPrimaryKey" parameterType="Long" resultMap="BaseResultMap">
-    select
+    select 
     <include refid="Base_Column_List" />
     from mes_material_issue
     where id = #{id,jdbcType=BIGINT}
@@ -114,20 +117,20 @@
     </if>
   </delete>
   <insert id="insert" keyColumn="id" keyProperty="id" parameterType="dev.mesbase.business.issue.domain.MesMaterialIssueEntity" useGeneratedKeys="true">
-    insert into mes_material_issue (issue_no, workorder_id, execution_id,
-      workorder_code, product_id, product_code,
-      flow_card_no, routing_id, issue_time,
-      status, remark, create_by,
-      create_time, update_by, update_time,
-      void_operation_id, void_from_status, void_requested_at,
-      void_finished_at)
-    values (#{issueNo,jdbcType=VARCHAR}, #{workorderId,jdbcType=BIGINT}, #{executionId,jdbcType=BIGINT},
-      #{workorderCode,jdbcType=VARCHAR}, #{productId,jdbcType=BIGINT}, #{productCode,jdbcType=VARCHAR},
-      #{flowCardNo,jdbcType=VARCHAR}, #{routingId,jdbcType=BIGINT}, #{issueTime,jdbcType=TIMESTAMP},
-      #{status,jdbcType=VARCHAR}, #{remark,jdbcType=VARCHAR}, #{createBy,jdbcType=VARCHAR},
-      #{createTime,jdbcType=TIMESTAMP}, #{updateBy,jdbcType=VARCHAR}, #{updateTime,jdbcType=TIMESTAMP},
-      #{voidOperationId,jdbcType=VARCHAR}, #{voidFromStatus,jdbcType=VARCHAR}, #{voidRequestedAt,jdbcType=TIMESTAMP},
-      #{voidFinishedAt,jdbcType=TIMESTAMP})
+    insert into mes_material_issue (issue_no, workorder_id, execution_id, 
+      workorder_code, product_id, product_code, 
+      flow_card_no, routing_id, issue_time, 
+      status, remark, create_by, 
+      create_time, update_by, update_time, 
+      void_operation_id, void_from_status, void_requested_at, 
+      void_finished_at, submission_id)
+    values (#{issueNo,jdbcType=VARCHAR}, #{workorderId,jdbcType=BIGINT}, #{executionId,jdbcType=BIGINT}, 
+      #{workorderCode,jdbcType=VARCHAR}, #{productId,jdbcType=BIGINT}, #{productCode,jdbcType=VARCHAR}, 
+      #{flowCardNo,jdbcType=VARCHAR}, #{routingId,jdbcType=BIGINT}, #{issueTime,jdbcType=TIMESTAMP}, 
+      #{status,jdbcType=VARCHAR}, #{remark,jdbcType=VARCHAR}, #{createBy,jdbcType=VARCHAR}, 
+      #{createTime,jdbcType=TIMESTAMP}, #{updateBy,jdbcType=VARCHAR}, #{updateTime,jdbcType=TIMESTAMP}, 
+      #{voidOperationId,jdbcType=VARCHAR}, #{voidFromStatus,jdbcType=VARCHAR}, #{voidRequestedAt,jdbcType=TIMESTAMP}, 
+      #{voidFinishedAt,jdbcType=TIMESTAMP}, #{submissionId,jdbcType=BIGINT})
   </insert>
   <insert id="insertSelective" keyColumn="id" keyProperty="id" parameterType="dev.mesbase.business.issue.domain.MesMaterialIssueEntity" useGeneratedKeys="true">
     insert into mes_material_issue
@@ -189,6 +192,9 @@
       <if test="voidFinishedAt != null">
         void_finished_at,
       </if>
+      <if test="submissionId != null">
+        submission_id,
+      </if>
     </trim>
     <trim prefix="values (" suffix=")" suffixOverrides=",">
       <if test="issueNo != null">
@@ -247,6 +253,9 @@
       </if>
       <if test="voidFinishedAt != null">
         #{voidFinishedAt,jdbcType=TIMESTAMP},
+      </if>
+      <if test="submissionId != null">
+        #{submissionId,jdbcType=BIGINT},
       </if>
     </trim>
   </insert>
@@ -319,6 +328,9 @@
       <if test="row.voidFinishedAt != null">
         void_finished_at = #{row.voidFinishedAt,jdbcType=TIMESTAMP},
       </if>
+      <if test="row.submissionId != null">
+        submission_id = #{row.submissionId,jdbcType=BIGINT},
+      </if>
     </set>
     <if test="example != null">
       <include refid="Update_By_Example_Where_Clause" />
@@ -345,7 +357,8 @@
       void_operation_id = #{row.voidOperationId,jdbcType=VARCHAR},
       void_from_status = #{row.voidFromStatus,jdbcType=VARCHAR},
       void_requested_at = #{row.voidRequestedAt,jdbcType=TIMESTAMP},
-      void_finished_at = #{row.voidFinishedAt,jdbcType=TIMESTAMP}
+      void_finished_at = #{row.voidFinishedAt,jdbcType=TIMESTAMP},
+      submission_id = #{row.submissionId,jdbcType=BIGINT}
     <if test="example != null">
       <include refid="Update_By_Example_Where_Clause" />
     </if>
@@ -410,6 +423,9 @@
       <if test="voidFinishedAt != null">
         void_finished_at = #{voidFinishedAt,jdbcType=TIMESTAMP},
       </if>
+      <if test="submissionId != null">
+        submission_id = #{submissionId,jdbcType=BIGINT},
+      </if>
     </set>
     where id = #{id,jdbcType=BIGINT}
   </update>
@@ -433,7 +449,8 @@
       void_operation_id = #{voidOperationId,jdbcType=VARCHAR},
       void_from_status = #{voidFromStatus,jdbcType=VARCHAR},
       void_requested_at = #{voidRequestedAt,jdbcType=TIMESTAMP},
-      void_finished_at = #{voidFinishedAt,jdbcType=TIMESTAMP}
+      void_finished_at = #{voidFinishedAt,jdbcType=TIMESTAMP},
+      submission_id = #{submissionId,jdbcType=BIGINT}
     where id = #{id,jdbcType=BIGINT}
   </update>
 </mapper>

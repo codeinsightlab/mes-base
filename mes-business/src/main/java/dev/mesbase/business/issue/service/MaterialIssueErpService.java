@@ -33,6 +33,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 @ConditionalOnProperty(name = "mes.business.enabled", havingValue = "true")
 public class MaterialIssueErpService {
     private static final Logger LOG = LoggerFactory.getLogger(MaterialIssueErpService.class);
+    private final MaterialIssueSubmissionService submissions;
     private final MesMaterialIssueMapper issues;
     private final MaterialIssueErpFacts facts;
     private final MaterialIssueRules rules;
@@ -40,8 +41,9 @@ public class MaterialIssueErpService {
     private final TransactionTemplate read, write;
 
     public MaterialIssueErpService(MesMaterialIssueMapper issues, MaterialIssueErpFacts facts, MaterialIssueRules rules,
-                                   WarehouseIntegration warehouse,
+                                   WarehouseIntegration warehouse, MaterialIssueSubmissionService submissions,
                                    @Qualifier("businessTransactionManager") PlatformTransactionManager manager) {
+        this.submissions = submissions;
         this.issues = issues;
         this.facts = facts;
         this.rules = rules;
@@ -80,7 +82,7 @@ public class MaterialIssueErpService {
     private ErpIssueQueryResult query(FactoryScope scope, Snapshot snapshot) {
         var e = snapshot.extra();
         var row = snapshot.issue();
-        var command = new QueryMaterialIssueCommand(row.getId(), row.getVoidOperationId(), e.getExternalBindingKey(), e.getExternalReference(), e.getExternalCode());
+        var command = new QueryMaterialIssueCommand(row.getId(), row.getVoidOperationId() != null ? row.getVoidOperationId() : submissions.operationKey(row), e.getExternalBindingKey(), e.getExternalReference(), e.getExternalCode());
         ErpIssueQueryResult result;
         try {
             result = warehouse.query(scope, e.getSourceExecutionMode(), e.getProvider(), command);
@@ -116,9 +118,11 @@ public class MaterialIssueErpService {
             var extra = facts.required(id);
             if (!Objects.equals(extra.getOperationVersion(), snapshot.extra().getOperationVersion())
                     || !Objects.equals(row.getVoidOperationId(), snapshot.issue().getVoidOperationId())
+                    || !Objects.equals(row.getSubmissionId(), snapshot.issue().getSubmissionId())
                     || !Objects.equals(row.getStatus(), snapshot.issue().getStatus()))
                 throw new FoundationException(ErrorCode.RESOURCE_CONFLICT);
-            String message = MaterialIssueErpRules.reconcile(row, extra, result);
+            String message = submissions.reconcileSubmission(row, extra, result);
+            if (message == null) message = MaterialIssueErpRules.reconcile(row, extra, result);
             extra.setLastOperation("RECONCILE");
             extra.setLastOutcome(result.outcome().name());
             extra.setLastMessage(message);

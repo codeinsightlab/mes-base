@@ -1,7 +1,7 @@
 package dev.mesbase.business.issue;
 
 import dev.mesbase.business.integration.warehouse.LocalWarehouseErpService;
-import dev.mesbase.business.integration.warehouse.MaterialIssueCreateCommand;
+import dev.mesbase.business.integration.warehouse.MaterialIssueSubmitCommand;
 import dev.mesbase.business.integration.warehouse.WarehouseIntegration;
 import dev.mesbase.business.integration.warehouse.MaterialIssueCancelCommand;
 import dev.mesbase.business.integration.warehouse.QueryMaterialIssueCommand;
@@ -26,7 +26,7 @@ class LocalWarehouseErpTest {
     void localActionsAndQueryNeverInventExternalFacts() {
         var scope = new FactoryScope(new FactoryId("A"));
         var service = new LocalWarehouseErpService();
-        var create = service.createMaterialIssue(scope, new MaterialIssueCreateCommand(1L, "stable", "ISSUE-1", null, null));
+        var create = service.createMaterialIssue(scope, new MaterialIssueSubmitCommand(1L, "stable", "ISSUE-1", 1L, "WO", null, null, 1L, "EXE-1", 1L, "P", 1L, 1, List.of(1L), null, List.of()));
         var cancel = service.cancelMaterialIssue(scope, new MaterialIssueCancelCommand(1L, "stable", "local", null));
         assertEquals(Status.SUCCEEDED, create.status());
         assertEquals(Mode.LOCAL_ONLY, create.executionMode());

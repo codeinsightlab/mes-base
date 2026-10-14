@@ -1,4 +1,5 @@
 package dev.issuefixture;
+import dev.mesbase.business.production.service.ProductionChainLocks;
 
 import dev.mesbase.business.issue.service.MaterialIssueErpFacts;
 import dev.mesbase.business.issue.dao.MesMaterialIssueErpExtraMapper;
@@ -88,7 +89,8 @@ class ProductionExecutionMySqlTest {
             }
             var executions = s.getMapper(MesProductionExecutionMapper.class);
             var issues = s.getMapper(MesMaterialIssueMapper.class);
-            var rules = new ProductionExecutionRules(executions, s.getMapper(WorkorderMapper.class), s.getMapper(MaterialMapper.class), s.getMapper(RoutingMapper.class), s.getMapper(RoutingProductMapper.class), issues);
+            var chainLocks = new ProductionChainLocks(s.getMapper(WorkorderMapper.class), executions, issues);
+            var rules = new ProductionExecutionRules(executions, s.getMapper(WorkorderMapper.class), s.getMapper(MaterialMapper.class), s.getMapper(RoutingMapper.class), s.getMapper(RoutingProductMapper.class), issues, chainLocks);
             var service = new MesProductionExecutionServiceImpl(executions, rules);
             var input = new MesProductionExecutionCreateCommand(workorder, routing, new BigDecimal("99999999999999.123456"), "READY", null, null, tag);
             var first = service.insert(input);
@@ -102,7 +104,7 @@ class ProductionExecutionMySqlTest {
             var before = service.selectById(first.getId()).getUpdateTime();
             assertEquals(first.getId(), identity.resolve("EXE:" + first.getId()).executionId());
             assertEquals(before, service.selectById(first.getId()).getUpdateTime());
-            var issueRules = new MaterialIssueRules(issues, s.getMapper(MesMaterialIssueItemMapper.class), s.getMapper(MaterialMapper.class), s.getMapper(UnitMeasureMapper.class), s.getMapper(WmWarehouseMapper.class), s.getMapper(WorkorderMapper.class), s.getMapper(RoutingMapper.class), s.getMapper(RoutingProductMapper.class), rules, new MaterialIssueErpFacts(s.getMapper(MesMaterialIssueErpExtraMapper.class)));
+            var issueRules = new MaterialIssueRules(issues, s.getMapper(MesMaterialIssueItemMapper.class), s.getMapper(MaterialMapper.class), s.getMapper(UnitMeasureMapper.class), s.getMapper(WmWarehouseMapper.class), s.getMapper(WorkorderMapper.class), s.getMapper(RoutingMapper.class), s.getMapper(RoutingProductMapper.class), rules, new MaterialIssueErpFacts(s.getMapper(MesMaterialIssueErpExtraMapper.class)), chainLocks);
             var issueService = new MesMaterialIssueServiceImpl(issues, issueRules, new WarehouseIntegration(new MockEnvironment(), List.of()));
             var issue = issueService.insert(new MesMaterialIssueCreateCommand(tag, workorder, null, null, null, null, null, null, "RECORDED", tag, first.getId()));
             assertEquals(first.getId(), issue.getExecutionId());

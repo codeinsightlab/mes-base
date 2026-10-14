@@ -53,7 +53,7 @@ class ProductionExecutionHttpTest {
             m.perform(full(put(E + "/2"), "A").content(CREATE.replace("\"routingId\":\"1\"", "\"routingId\":\"3\"")
                             .replace("READY", "RUNNING")
                             .replace("\"status\"", "\"startTime\":\"2026-10-14T09:00:00\",\"status\"")))
-                    .andExpect(status().isUnprocessableEntity());
+                    .andExpect(status().isConflict());
             var before = a.queryForList("SELECT * FROM mes_production_execution ORDER BY id");
             m.perform(full(get(QR).param("code", "EXE:1"), "A"))
                     .andExpect(status().isOk()).andExpect(jsonPath("executionId").value("1"))
@@ -133,7 +133,9 @@ class ProductionExecutionHttpTest {
                     .andExpect(status().isOk());
             m.perform(full(put(E + "/1"), "A").content(CREATE.replace("READY", "RUNNING")
                             .replace("\"status\"", "\"startTime\":\"2026-10-14T09:00:00\",\"status\"")))
-                    .andExpect(status().isOk());
+                    .andExpect(status().isConflict());
+            // Existing started records remain protected; formal start coverage is in ProductionCoreV1HttpTest.
+            c.getBean(MaterialIssueHttpTest.Fixture.class).business.get("A").update("UPDATE mes_production_execution SET status='RUNNING',start_time=CURRENT_TIMESTAMP WHERE id=1");
             m.perform(full(put(E + "/1"), "A").content(CREATE)).andExpect(status().isConflict());
             m.perform(full(delete(E), "A").content("[1]")).andExpect(status().isConflict());
             m.perform(delete(E).header("Authorization", "Bearer CRUD").header("X-Factory-Id", "A")

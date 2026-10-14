@@ -3,7 +3,6 @@ package dev.mesbase.business.issue.domain;
 import java.time.LocalDateTime;
 
 public class MesMaterialIssueEntity {
-    // ERP compatibility projections loaded from Extra by the business service; not main-table columns.
     private Long id;
 
     private String issueNo;
@@ -36,27 +35,15 @@ public class MesMaterialIssueEntity {
 
     private LocalDateTime updateTime;
 
-    private String sourceExecutionMode;
-
-    private String externalEffect;
-
-    private String externalBindingKey;
-
-    private String externalReference;
-
     private String voidOperationId;
 
     private String voidFromStatus;
-
-    private String voidResultStatus;
-
-    private String voidExecutionMode;
 
     private LocalDateTime voidRequestedAt;
 
     private LocalDateTime voidFinishedAt;
 
-    private String voidMessage;
+    private Long submissionId;
 
     public Long getId() {
         return id;
@@ -186,38 +173,6 @@ public class MesMaterialIssueEntity {
         this.updateTime = updateTime;
     }
 
-    public String getSourceExecutionMode() {
-        return sourceExecutionMode;
-    }
-
-    public void setSourceExecutionMode(String sourceExecutionMode) {
-        this.sourceExecutionMode = sourceExecutionMode;
-    }
-
-    public String getExternalEffect() {
-        return externalEffect;
-    }
-
-    public void setExternalEffect(String externalEffect) {
-        this.externalEffect = externalEffect;
-    }
-
-    public String getExternalBindingKey() {
-        return externalBindingKey;
-    }
-
-    public void setExternalBindingKey(String externalBindingKey) {
-        this.externalBindingKey = externalBindingKey;
-    }
-
-    public String getExternalReference() {
-        return externalReference;
-    }
-
-    public void setExternalReference(String externalReference) {
-        this.externalReference = externalReference;
-    }
-
     public String getVoidOperationId() {
         return voidOperationId;
     }
@@ -232,22 +187,6 @@ public class MesMaterialIssueEntity {
 
     public void setVoidFromStatus(String voidFromStatus) {
         this.voidFromStatus = voidFromStatus;
-    }
-
-    public String getVoidResultStatus() {
-        return voidResultStatus;
-    }
-
-    public void setVoidResultStatus(String voidResultStatus) {
-        this.voidResultStatus = voidResultStatus;
-    }
-
-    public String getVoidExecutionMode() {
-        return voidExecutionMode;
-    }
-
-    public void setVoidExecutionMode(String voidExecutionMode) {
-        this.voidExecutionMode = voidExecutionMode;
     }
 
     public LocalDateTime getVoidRequestedAt() {
@@ -266,11 +205,33 @@ public class MesMaterialIssueEntity {
         this.voidFinishedAt = voidFinishedAt;
     }
 
-    public String getVoidMessage() {
-        return voidMessage;
+    public Long getSubmissionId() {
+        return submissionId;
     }
 
-    public void setVoidMessage(String voidMessage) {
-        this.voidMessage = voidMessage;
+    public void setSubmissionId(Long submissionId) {
+        this.submissionId = submissionId;
     }
+    // Compatibility projections, owned by ERP Extra, not mapped into this table.
+    private String sourceExecutionMode;
+    public String getSourceExecutionMode() { return sourceExecutionMode; }
+    public void setSourceExecutionMode(String value) { sourceExecutionMode = value; }
+    private String externalEffect;
+    public String getExternalEffect() { return externalEffect; }
+    public void setExternalEffect(String value) { externalEffect = value; }
+    private String externalBindingKey;
+    public String getExternalBindingKey() { return externalBindingKey; }
+    public void setExternalBindingKey(String value) { externalBindingKey = value; }
+    private String externalReference;
+    public String getExternalReference() { return externalReference; }
+    public void setExternalReference(String value) { externalReference = value; }
+    private String voidResultStatus;
+    public String getVoidResultStatus() { return voidResultStatus; }
+    public void setVoidResultStatus(String value) { voidResultStatus = value; }
+    private String voidExecutionMode;
+    public String getVoidExecutionMode() { return voidExecutionMode; }
+    public void setVoidExecutionMode(String value) { voidExecutionMode = value; }
+    private String voidMessage;
+    public String getVoidMessage() { return voidMessage; }
+    public void setVoidMessage(String value) { voidMessage = value; }
 }
