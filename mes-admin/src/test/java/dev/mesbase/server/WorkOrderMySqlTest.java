@@ -5,6 +5,15 @@ import dev.mesbase.business.issue.dao.MesMaterialIssueMapper;
 import dev.mesbase.business.production.dao.MesProductionExecutionMapper;
 import dev.mesbase.business.production.domain.WorkOrderModels;
 import dev.mesbase.business.production.service.WorkOrderService;
+import dev.mesbase.business.production.service.ProductionExecutionRules;
+import dev.mesbase.business.production.service.impl.MesProductionExecutionServiceImpl;
+import dev.mesbase.business.production.service.IMesProductionExecutionService;
+import dev.mesbase.business.production.domain.MesProductionExecutionCreateCommand;
+import dev.mesbase.business.production.domain.MesProductionExecutionUpdateCommand;
+import dev.mesbase.common.core.domain.entity.SysUser;
+import dev.mesbase.common.core.domain.model.LoginUser;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.context.SecurityContextHolder;
 import dev.mesbase.business.production.service.RoutingReferenceRules;
 import dev.mesbase.core.error.FoundationException;
 import dev.mesbase.core.factory.Factory;
@@ -21,14 +30,11 @@ import dev.mesbase.infrastructure.persistence.PersistenceFactories;
 import dev.mesbase.infrastructure.persistence.RuntimeRegistry;
 import dev.mesbase.platform.execution.FactoryContext;
 import java.math.BigDecimal;
-import java.nio.file.Files;
-import java.nio.file.Path;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
-import java.util.concurrent.Callable;
-import java.util.concurrent.Executors;
 import org.apache.ibatis.session.SqlSessionFactory;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Test;
@@ -58,14 +64,14 @@ import dev.mesbase.business.production.dao.OperationMapper;
 import dev.mesbase.business.production.dao.WorkOrderExtraMapper;
 
 /**
- * TEST ONLY controlled issue result simulator. Actual configured acceptance MySQL; no HTTP server or ERP.
+ * TEST ONLY demand and execution convergence against configured acceptance MySQL; all writes roll back.
  */
 class WorkOrderMySqlTest {
     static final Set<Class<?>> MAPPERS = Set.of(WorkorderMapper.class, ProductionBatchMapper.class, BatchRouteNodeMapper.class, RoutingMapper.class, RoutingNodeMapper.class, RoutingEdgeMapper.class, RoutingProductMapper.class, OperationMapper.class, WorkOrderExtraMapper.class, MaterialMapper.class, MesMaterialIssueMapper.class, MesProductionExecutionMapper.class);
 
     @Configuration
     @EnableTransactionManagement
-    @Import({WorkOrderService.class, RoutingReferenceRules.class})
+    @Import({WorkOrderService.class, RoutingReferenceRules.class, ProductionExecutionRules.class, MesProductionExecutionServiceImpl.class})
     static class Config {
         @Bean(name = "businessTransactionManager")
         OwnedTransactionManager manager(FactoryBusinessDataSource source) {
@@ -139,29 +145,23 @@ class WorkOrderMySqlTest {
     }
 
     @Test
-    void realMySqlBusinessAndControlledIssueResults() throws Exception {
+    void demandExecutionAllocationAndHistoricalPreservationInRollbackOnlyTransaction() throws Exception {
         Assumptions.assumeTrue(Boolean.getBoolean("mes.test.workorder.mysql"));
         var business = AcceptanceBusinessDatabase.source();
         var jdbc = new JdbcTemplate(business);
+        var selected = jdbc.queryForList("SELECT w.product_id,w.routing_id FROM workorder w JOIN routing r ON r.id=w.routing_id JOIN material m ON m.id=w.product_id WHERE r.status='PUBLISHED' AND r.published_at IS NOT NULL AND m.status='ENABLED' AND m.material_type='PRODUCT' ORDER BY w.id LIMIT 1")
+                .getFirst();
+        Long product = ((Number) selected.get("product_id")).longValue();
+        Long routing = ((Number) selected.get("routing_id")).longValue();
+        String tag = "TEST_CHAIN_" + UUID.randomUUID();
         var id = new FactoryId("SIMPLE_B");
-        var identity = new DatasourceIdentity("TEST_ONLY_WORKORDER_MYSQL");
-        var catalog = new InMemoryFactoryCatalog(List.of(new Factory(id, "TEST_ONLY", "SIMPLE_B", "验收 B", FactoryStatus.ENABLED)));
-        String tag = "TEST-WO-" + UUID.randomUUID().toString().substring(0, 8);
-        Long product = jdbc.queryForObject("SELECT id FROM material WHERE material_type='PRODUCT' AND status='ENABLED' ORDER BY id LIMIT 1", Long.class);
-        Long op = jdbc.queryForObject("SELECT id FROM operation ORDER BY id LIMIT 1", Long.class);
-        jdbc.update("INSERT INTO routing(code,name,version,status,revision,published_at) VALUES(?, 'TEST ONLY 工单分支汇合验收',1,'PUBLISHED',0,NOW())", tag);
-        Long routing = jdbc.queryForObject("SELECT id FROM routing WHERE code=?", Long.class, tag);
-        jdbc.update("INSERT INTO routing_product(routing_id,material_id,material_code,material_name) SELECT ?,id,code,name FROM material WHERE id=?", routing, product);
-        for (String code : List.of("A", "B", "C", "D", "E"))
-            jdbc.update("INSERT INTO routing_node(routing_id,node_code,operation_id,display_order) VALUES(?,?,?,0)", routing, code, op);
-        for (var pair : List.of(List.of("A", "B"), List.of("B", "C"), List.of("B", "D"), List.of("C", "E"), List.of("D", "E")))
-            jdbc.update("INSERT INTO routing_edge(routing_id,from_node_id,to_node_id) SELECT ?,f.id,t.id FROM routing_node f JOIN routing_node t ON t.routing_id=f.routing_id WHERE f.routing_id=? AND f.node_code=? AND t.node_code=?", routing, routing, pair.get(0), pair.get(1));
-        var pathA = List.of("A", "B", "C", "E").stream()
-                .map(code -> jdbc.queryForObject("SELECT id FROM routing_node WHERE routing_id=? AND node_code=?", Long.class, routing, code))
-                .toList();
-        var pathB = List.of("A", "B", "D", "E").stream()
-                .map(code -> jdbc.queryForObject("SELECT id FROM routing_node WHERE routing_id=? AND node_code=?", Long.class, routing, code))
-                .toList();
+        var identity = new DatasourceIdentity("TEST_ONLY_WORKORDER_ROLLBACK");
+        var catalog = new InMemoryFactoryCatalog(List.of(new Factory(id, "TEST_ONLY", "SIMPLE_B", "SIMPLE_B", FactoryStatus.ENABLED)));
+        var user = new SysUser();
+        user.setUserId(1L);
+        user.setUserName("TEST_ONLY");
+        SecurityContextHolder.getContext()
+                .setAuthentication(new UsernamePasswordAuthenticationToken(new LoginUser(1L, 1L, user, Set.of()), null, List.of()));
         try (var registry = new RuntimeRegistry(); var context = new AnnotationConfigApplicationContext()) {
             registry.registerDedicated(id, identity, 1, business, () -> {
             }, MAPPERS);
@@ -174,102 +174,37 @@ class WorkOrderMySqlTest {
             context.refresh();
             FactoryContext.bind(new FactoryScope(id));
             var service = context.getBean(WorkOrderService.class);
-            var input = input(tag, product, routing, 0);
-            var created = service.create(input);
-            Long order = created.workorder().getId();
-            assertEquals(2, created.batches().size());
-            assertEquals("19001", created.batches().getFirst().batch().getBatchNo());
-            assertThrows(FoundationException.class, () -> service.create(input));
-            assertThrows(FoundationException.class, () -> service.update(order, input(tag, product, routing, 99)));
-            var updated = service.update(order, input(tag, product, routing, 0));
-            assertEquals(1, updated.workorder().getRevision());
-            // A surrounding Spring transaction aborts both parent and children after a complete valid create.
+            var executionService = context.getBean(IMesProductionExecutionService.class);
             var manager = context.getBean("businessTransactionManager", OwnedTransactionManager.class);
-            assertThrows(IllegalStateException.class, () -> new TransactionTemplate(manager).execute(status -> {
-                service.create(input(tag + "-ROLLBACK", product, routing, 0));
-                throw new IllegalStateException("TEST ONLY rollback");
-            }));
-            assertEquals(0, jdbc.queryForObject("SELECT COUNT(*) FROM workorder WHERE code=?", Integer.class, tag + "-ROLLBACK"));
-            var released = service.release(order, 1);
-            assertEquals("RELEASED", released.workorder().getStatus());
-            assertThrows(FoundationException.class, () -> service.update(order, input(tag, product, routing, 2)));
-            Long batchA = released.batches().get(0).batch().getId(), batchB = released.batches().get(1).batch().getId();
-            for (var invalid : List.of(List.of(pathA.get(0), pathA.get(2), pathA.get(3)), List.of(pathA.get(0)), List.of(pathA.get(0), 999999999L, pathA.getLast()), List.of(pathA.get(0), pathA.get(1), pathA.get(1), pathA.getLast())))
-                assertThrows(FoundationException.class, () -> service.selectPath(batchA, new WorkOrderModels.PathSelection(1, invalid)));
-            service.selectPath(batchA, new WorkOrderModels.PathSelection(1, pathA));
-            service.selectPath(batchB, new WorkOrderModels.PathSelection(1, pathB));
-            var beginA = service.beginIssue(batchA, 2);
-            String commandA = beginA.batch().getIssueCommandId();
-            assertThrows(FoundationException.class, () -> service.selectPath(batchA, new WorkOrderModels.PathSelection(2, pathB)));
-            service.confirmIssue(batchA, commandA, WorkOrderModels.IssueResult.UNKNOWN);
-            assertEquals("UNKNOWN", service.batchDetail(batchA).batch().getRouteStatus());
-            assertThrows(FoundationException.class, () -> service.selectPath(batchA, new WorkOrderModels.PathSelection(3, pathB)));
-            var beginB = service.beginIssue(batchB, 2);
-            String commandB = beginB.batch().getIssueCommandId();
-            service.confirmIssue(batchB, commandB, WorkOrderModels.IssueResult.REJECTED);
-            service.confirmIssue(batchB, commandB, WorkOrderModels.IssueResult.REJECTED);
-            assertEquals("SELECTED", service.batchDetail(batchB).batch().getRouteStatus());
-            var reselected = service.selectPath(batchB, new WorkOrderModels.PathSelection(4, pathA));
-            var secondB = service.beginIssue(batchB, reselected.batch().getRevision());
-            assertThrows(FoundationException.class, () -> service.confirmIssue(batchB, commandB, WorkOrderModels.IssueResult.SUCCESS));
-            // Concurrent trusted SUCCESS callbacks are idempotent under the shared parent row lock.
-            try (var pool = Executors.newFixedThreadPool(2)) {
-                Callable<Integer> callback = () -> {
-                    FactoryContext.bind(new FactoryScope(id));
-                    try {
-                        return service.confirmIssue(batchA, commandA, WorkOrderModels.IssueResult.SUCCESS).batch()
-                                .getRevision();
-                    } finally {
-                        FactoryContext.clear();
-                    }
-                };
-                var results = pool.invokeAll(List.of(callback, callback));
-                assertEquals(results.get(0).get(), results.get(1).get());
-            }
-            assertEquals("LOCKED", service.batchDetail(batchA).batch().getRouteStatus());
-            assertEquals("PENDING", service.batchDetail(batchB).batch().getRouteStatus());
-            service.confirmIssue(batchB, secondB.batch().getIssueCommandId(), WorkOrderModels.IssueResult.SUCCESS);
-            assertThrows(FoundationException.class, () -> service.selectPath(batchA, new WorkOrderModels.PathSelection(4, pathB)));
-            assertThrows(FoundationException.class, () -> service.confirmIssue(batchA, commandA, WorkOrderModels.IssueResult.REJECTED));
-            assertEquals(pathA, service.batchDetail(batchA).path().stream().map(p -> p.getRoutingNodeId()).toList());
-            assertEquals(pathA, service.batchDetail(batchB).path().stream().map(p -> p.getRoutingNodeId()).toList());
-            // A stale parent revision cannot overwrite another node's accepted edit.
-            var cas = service.create(input(tag + "-CAS", product, routing, 0));
-            try (var pool = Executors.newFixedThreadPool(2)) {
-                Callable<Boolean> edit = () -> {
-                    FactoryContext.bind(new FactoryScope(id));
-                    try {
-                        service.update(cas.workorder().getId(), input(tag + "-CAS", product, routing, 0));
-                        return true;
-                    } catch (FoundationException conflict) {
-                        return false;
-                    } finally {
-                        FactoryContext.clear();
-                    }
-                };
-                var results = pool.invokeAll(List.of(edit, edit));
-                assertEquals(1, results.stream().filter(f -> {
-                    try {
-                        return f.get();
-                    } catch (Exception failure) {
-                        throw new IllegalStateException(failure);
-                    }
-                }).count());
-            }
-            assertEquals(1, service.detail(cas.workorder().getId()).workorder().getRevision());
-            // Same business batch numbers are legal in a different workorder.
-            assertEquals("19001", cas.batches().getFirst().batch().getBatchNo());
-            assertThrows(FoundationException.class, () -> service.create(new WorkOrderModels.Save(tag + "-BAD", product, BigDecimal.ONE, routing, null, null, null, null, null, 0, List.of(new WorkOrderModels.BatchInput(null, "19001", new BigDecimal("2"), null)))));
-            assertEquals(0, jdbc.queryForObject("SELECT COUNT(*) FROM workorder WHERE code=?", Integer.class, tag + "-BAD"));
-            Files.createDirectories(Path.of("target/validation"));
-            Files.writeString(Path.of("target/validation/workorder-mysql-result.json"), "{\"passed\":true,\"schema\":\"mes_base_dev_business_simple_b\",\"fixtureTag\":\"" + tag + "\",\"workorderId\":" + order + ",\"routingId\":" + routing + ",\"issueEvidence\":\"TEST_ONLY_SIMULATED_RESULTS\",\"realERP\":false}");
+            new TransactionTemplate(manager).execute(status -> {
+                var batchesBefore = jdbc.queryForList("SELECT * FROM production_batch ORDER BY id");
+                var pathsBefore = jdbc.queryForList("SELECT * FROM batch_route_node ORDER BY id");
+                var input = new WorkOrderModels.Save(tag, product, new BigDecimal("1000"), routing, null, null, null, null, "TEST ONLY ROLLBACK", 0);
+                var created = service.create(input);
+                Long order = created.workorder().getId();
+                assertEquals(0, created.batches().size());
+                assertEquals(0, created.allocation().executionCount());
+                assertThrows(FoundationException.class, () -> service.create(input));
+                assertThrows(FoundationException.class, () -> service.update(order, new WorkOrderModels.Save(tag, product, new BigDecimal("1000"), routing, null, null, null, null, null, 99)));
+                var e = executionService.insert(new MesProductionExecutionCreateCommand(order, routing, new BigDecimal("400"), "READY", null, null, tag));
+                executionService.insert(new MesProductionExecutionCreateCommand(order, routing, new BigDecimal("300"), "READY", null, null, tag));
+                assertEquals(new BigDecimal("700.000000"), service.allocation(order).allocatedTargetQty());
+                assertEquals(new BigDecimal("300.000000"), service.allocation(order).remainingTargetQty());
+                assertThrows(FoundationException.class, () -> executionService.updateById(e.getId(), new MesProductionExecutionUpdateCommand(order, routing, new BigDecimal("400"), "RUNNING", LocalDateTime.now(), null, tag)));
+                service.release(order, 0);
+                executionService.updateById(e.getId(), new MesProductionExecutionUpdateCommand(order, routing, new BigDecimal("1100"), "RUNNING", LocalDateTime.now(), null, tag));
+                assertEquals(new BigDecimal("1400.000000"), service.allocation(order).allocatedTargetQty());
+                assertEquals(new BigDecimal("-400.000000"), service.allocation(order).remainingTargetQty());
+                assertEquals(new BigDecimal("400.000000"), service.allocation(order).excessTargetQty());
+                assertEquals(batchesBefore, jdbc.queryForList("SELECT * FROM production_batch ORDER BY id"));
+                assertEquals(pathsBefore, jdbc.queryForList("SELECT * FROM batch_route_node ORDER BY id"));
+                status.setRollbackOnly();
+                return null;
+            });
         } finally {
             FactoryContext.clear();
+            SecurityContextHolder.clearContext();
         }
-    }
-
-    private static WorkOrderModels.Save input(String code, Long product, Long routing, int revision) {
-        return new WorkOrderModels.Save(code, product, new BigDecimal("10"), routing, null, null, null, null, "TEST ONLY", revision,
-                List.of(new WorkOrderModels.BatchInput(null, "19001", new BigDecimal("4"), null), new WorkOrderModels.BatchInput(null, "19002", new BigDecimal("6"), null)));
+        assertEquals(0, jdbc.queryForObject("SELECT COUNT(*) FROM workorder WHERE code=?", Integer.class, tag));
     }
 }

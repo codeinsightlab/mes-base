@@ -142,7 +142,7 @@ class WorkOrderRequestBudgetTest {
         while (columns.find()) definitions.add(columns.group(1) + " " + (columns.group(2)
                 .equals("VARCHAR") ? "VARCHAR(255)" : columns.group(2)));
         new JdbcTemplate(business).execute("CREATE TABLE workorder(" + String.join(",", definitions) + ")");
-        new JdbcTemplate(business).execute("INSERT INTO workorder(id,code,revision,product_id,routing_id) VALUES(1,'TEST ONLY',0,1,1)");
+        new JdbcTemplate(business).execute("INSERT INTO workorder(id,code,revision,product_id,routing_id,planned_qty) VALUES(1,'TEST ONLY',0,1,1,1000)");
         for (String type : List.of("ProductionBatch", "Routing")) {
             String xml = Files.readString(Path.of("mes-business/src/main/resources/dev/mesbase/business/production/dao/" + type + "Mapper.xml"));
             var matches = Pattern.compile("column=\"([^\"]+)\" jdbcType=\"([^\"]+)\"").matcher(xml);
@@ -174,23 +174,24 @@ class WorkOrderRequestBudgetTest {
             return true;
         });
         when(sessions.read(anyString())).thenAnswer(call -> payload.get());
+        new JdbcTemplate(business).execute("CREATE TABLE mes_production_execution (id BIGINT COMMENT '执行编号', workorder_id BIGINT COMMENT '所属工单', target_qty DECIMAL(20,6) COMMENT '目标数量') COMMENT '测试执行计划关联'");
         var tokens = new TokenService(sessions, accounts, new MockEnvironment());
         var user = accounts.account(42);
         String raw = tokens.createToken(new LoginUser(42L, 7L, user, Set.of()), new MockHttpServletRequest());
         try (var registry = new RuntimeRegistry()) {
             registry.registerDedicated(new FactoryId("A"), new DatasourceIdentity("managed-1"), 1, business, () -> {
-            }, Set.of(WorkorderMapper.class, ProductionBatchMapper.class, MaterialMapper.class, RoutingMapper.class));
+            }, Set.of(WorkOrderExtraMapper.class, WorkorderMapper.class, ProductionBatchMapper.class, MaterialMapper.class, RoutingMapper.class));
             var routingStore = RoutingCacheFixture.store();
             var metadata = new FactoryMetadataCache(platform, routingStore);
             var managed = new ManagedDatasourceService(platform, mock(DatasourcePasswordCipher.class), registry,
-                    center, null, Set.of(WorkorderMapper.class, ProductionBatchMapper.class, MaterialMapper.class, RoutingMapper.class), Path.of("target/TEST-ONLY-unused-ddl"), metadata);
+                    center, null, Set.of(WorkOrderExtraMapper.class, WorkorderMapper.class, ProductionBatchMapper.class, MaterialMapper.class, RoutingMapper.class), Path.of("target/TEST-ONLY-unused-ddl"), metadata);
             var source = new FactoryBusinessDataSource(managed::resolve, registry);
             var manager = new OwnedTransactionManager(source);
-            var factory = PersistenceFactories.create(source, Set.of(WorkorderMapper.class, ProductionBatchMapper.class, MaterialMapper.class, RoutingMapper.class), c -> {
+            var factory = PersistenceFactories.create(source, Set.of(WorkOrderExtraMapper.class, WorkorderMapper.class, ProductionBatchMapper.class, MaterialMapper.class, RoutingMapper.class), c -> {
                 PersistenceFactories.pagination(c);
                 c.addInterceptor(businessSql);
             }, manager::verifyAccess);
-            var controller = new WorkOrderController(new WorkOrderService(new SqlSessionTemplate(factory).getMapper(WorkorderMapper.class), new SqlSessionTemplate(factory).getMapper(ProductionBatchMapper.class), mock(BatchRouteNodeMapper.class), new SqlSessionTemplate(factory).getMapper(RoutingMapper.class), mock(RoutingProductMapper.class), mock(RoutingNodeMapper.class), mock(RoutingEdgeMapper.class), new SqlSessionTemplate(factory).getMapper(MaterialMapper.class), mock(RoutingReferenceRules.class), mock(MesMaterialIssueMapper.class), mock(WorkOrderExtraMapper.class), mock(MesProductionExecutionMapper.class)));
+            var controller = new WorkOrderController(new WorkOrderService(new SqlSessionTemplate(factory).getMapper(WorkorderMapper.class), new SqlSessionTemplate(factory).getMapper(ProductionBatchMapper.class), mock(BatchRouteNodeMapper.class), new SqlSessionTemplate(factory).getMapper(RoutingMapper.class), mock(RoutingProductMapper.class), mock(RoutingNodeMapper.class), mock(RoutingEdgeMapper.class), new SqlSessionTemplate(factory).getMapper(MaterialMapper.class), mock(RoutingReferenceRules.class), mock(MesMaterialIssueMapper.class), new SqlSessionTemplate(factory).getMapper(WorkOrderExtraMapper.class), mock(MesProductionExecutionMapper.class)));
             var permissions = new SystemPermissionService(platform.mapper(SysMenuMapper.class), platform.mapper(SysRoleMapper.class), platform.mapper(ManagedFactoryMapper.class));
             FactoryCatalog catalog = new FactoryCatalog() {
                 public Optional<Factory> find(FactoryId id) {
@@ -232,7 +233,7 @@ class WorkOrderRequestBudgetTest {
                             .noneMatch(sql -> sql.contains("m.parent_id") || sql.contains("selectMenuVo")));
                     if (i > 0) assertTrue(centerSql.queries.stream()
                             .noneMatch(sql -> sql.contains("mf_factory") || sql.contains("mf_datasource")));
-                    assertEquals(5, businessSql.queries.size(), businessSql.queries.toString());
+                    assertEquals(6, businessSql.queries.size(), businessSql.queries.toString());
                     assertTrue(centerSql.queries.stream().noneMatch(sql -> sql.toLowerCase().contains("u.password")));
                     if (i >= 5) times.add((System.nanoTime() - start) / 1_000_000.0);
                 } finally {

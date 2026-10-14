@@ -47,7 +47,7 @@ class WorkOrderExecutionProtectionTest {
         when(executions.countByExample(any(MesProductionExecutionExample.class))).thenReturn(1L);
         var service = new WorkOrderService(orders, mock(ProductionBatchMapper.class), mock(BatchRouteNodeMapper.class), mock(RoutingMapper.class), mock(RoutingProductMapper.class), mock(RoutingNodeMapper.class), mock(RoutingEdgeMapper.class), mock(MaterialMapper.class), mock(RoutingReferenceRules.class), mock(MesMaterialIssueMapper.class), mock(WorkOrderExtraMapper.class), executions);
         assertEquals(ErrorCode.EXECUTION_REFERENCED, assertThrows(FoundationException.class, () -> service.delete(1L, 0)).code());
-        var input = new WorkOrderModels.Save("WO", 2L, null, 1L, null, null, null, null, null, 0, null);
+        var input = new WorkOrderModels.Save("WO", 2L, null, 1L, null, null, null, null, null, 0);
         assertEquals(ErrorCode.EXECUTION_FROZEN, assertThrows(FoundationException.class, () -> service.update(1L, input)).code());
         verify(orders, never()).deleteByPrimaryKey(any());
         verify(orders, never()).updateByPrimaryKey(any());

@@ -106,6 +106,8 @@ public class ProductionExecutionRules {
         valid(order != null && (row.getProductId() == null || Objects.equals(row.getProductId(), order.getProductId())));
         var product = materials.selectByPrimaryKey(order.getProductId());
         valid(product != null && "PRODUCT".equals(product.getMaterialType()));
+        if (Set.of("RUNNING", "COMPLETED").contains(row.getStatus()) || row.getStartTime() != null)
+            if (!"RELEASED".equals(order.getStatus())) throw new FoundationException(ErrorCode.WORKORDER_NOT_RELEASED);
         var routingFilter = new RoutingExample();
         routingFilter.createCriteria().andIdEqualTo(row.getRoutingId());
         var routingPatch = new RoutingEntity();

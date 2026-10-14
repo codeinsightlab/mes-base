@@ -17,8 +17,8 @@ import dev.mesbase.business.production.dao.MesProductionExecutionMapper;
 import dev.mesbase.business.production.domain.MesProductionExecutionExample;
 import dev.mesbase.business.production.dao.WorkOrderExtraMapper;
 import dev.mesbase.business.production.domain.RoutingDetail;
-import dev.mesbase.business.production.domain.BatchPathPolicy;
 import dev.mesbase.business.production.domain.BatchRouteNodeEntity;
+import java.math.BigDecimal;
 import dev.mesbase.business.production.domain.BatchRouteNodeExample;
 import dev.mesbase.business.production.domain.ProductionBatchEntity;
 import dev.mesbase.business.production.domain.ProductionBatchExample;
@@ -33,10 +33,8 @@ import dev.mesbase.business.production.domain.WorkorderExample;
 import dev.mesbase.core.error.ErrorCode;
 import dev.mesbase.core.error.FoundationException;
 import java.time.LocalDateTime;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
-import java.util.UUID;
 import java.util.stream.Collectors;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
@@ -45,7 +43,7 @@ import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Parent serialization protects quantities, batch membership and path/issue transitions.
+ * WorkOrder owns demand. Legacy batches and selected paths are read-only historical references.
  */
 @Service
 @ConditionalOnProperty(name = "mes.business.enabled", havingValue = "true")
@@ -126,11 +124,13 @@ public class WorkOrderService {
                 .collect(Collectors.toMap(m -> m.getId(), m -> m));
         var routingIndex = routings.selectByExample(routingFilter).stream()
                 .collect(Collectors.toMap(r -> r.getId(), r -> r));
+        var allocations = queries.allocationForOrders(rows.stream().map(WorkorderEntity::getId).toList()).stream()
+                .collect(Collectors.toMap(WorkOrderModels.Allocation::workorderId, a -> a));
         return new WorkOrderModels.Page(rows.stream().map(w -> {
             var m = materialIndex.get(w.getProductId());
             var r = routingIndex.get(w.getRoutingId());
             return new WorkOrderModels.Summary(w, counts.getOrDefault(w.getId(), 0L)
-                    .intValue(), m == null ? null : m.getCode(), m == null ? null : m.getName(), r == null ? null : r.getCode(), r == null ? null : r.getVersion());
+                    .intValue(), m == null ? null : m.getCode(), m == null ? null : m.getName(), r == null ? null : r.getCode(), r == null ? null : r.getVersion(), allocations.get(w.getId()));
         }).toList(), total, offset, limit);
     }
 
@@ -150,13 +150,12 @@ public class WorkOrderService {
         return new WorkOrderModels.Detail(w, m == null ? null : m.getCode(), m == null ? null : m.getName(), routings.selectByPrimaryKey(w.getRoutingId()),
                 children.stream()
                         .map(b -> new WorkOrderModels.BatchDetail(b, grouped.getOrDefault(b.getId(), List.of())))
-                        .toList());
+                        .toList(), allocation(id));
     }
 
     @Transactional(transactionManager = "businessTransactionManager", isolation = Isolation.READ_COMMITTED, rollbackFor = Exception.class)
     public WorkOrderModels.Detail create(WorkOrderModels.Save input) {
         validate(input);
-        require(input.batches().stream().allMatch(b -> b.id() == null));
         uniqueCode(input.code(), null);
         var row = new WorkorderEntity();
         row.setStatus("DRAFT");
@@ -164,7 +163,6 @@ public class WorkOrderService {
         row.setCreateTime(LocalDateTime.now());
         assign(row, input);
         saveOrder(row, true);
-        saveBatches(row, input.batches());
         return detail(row.getId());
     }
 
@@ -174,12 +172,14 @@ public class WorkOrderService {
         if (!Objects.equals(row.getRevision(), input.revision())) conflict();
         if (!Objects.equals(row.getProductId(), input.productId()) && hasExecutions(id))
             throw new FoundationException(ErrorCode.EXECUTION_FROZEN);
+        if (hasLegacyBatches(id) && (!Objects.equals(row.getProductId(), input.productId())
+                || !Objects.equals(row.getRoutingId(), input.routingId())))
+            throw new FoundationException(ErrorCode.WORKORDER_LEGACY_REFERENCED);
         validate(input);
         uniqueCode(input.code(), id);
         assign(row, input);
         row.setRevision(row.getRevision() + 1);
         saveOrder(row, false);
-        saveBatches(row, input.batches());
         return detail(id);
     }
 
@@ -206,10 +206,6 @@ public class WorkOrderService {
         if (row.getRevision() != revision) conflict();
         require("DRAFT".equals(row.getStatus()));
         binding(row.getProductId(), row.getRoutingId());
-        var children = batchRows(id);
-        BatchPathPolicy.allocation(row.getPlannedQty(), children.stream()
-                .map(b -> new WorkOrderModels.BatchInput(b.getId(), b.getBatchNo(), b.getPlannedQty(), b.getRemark()))
-                .toList());
         row.setStatus("RELEASED");
         row.setRevision(revision + 1);
         row.setUpdateTime(LocalDateTime.now());
@@ -225,11 +221,7 @@ public class WorkOrderService {
         var issueFilter = new MesMaterialIssueExample();
         issueFilter.createCriteria().andWorkorderIdEqualTo(id);
         require(issues.countByExample(issueFilter) == 0);
-        var children = batchRows(id);
-        require(children.stream().allMatch(b -> "UNSELECTED".equals(b.getRouteStatus())));
-        var filter = new ProductionBatchExample();
-        filter.createCriteria().andWorkorderIdEqualTo(id);
-        batches.deleteByExample(filter);
+        if (hasLegacyBatches(id)) throw new FoundationException(ErrorCode.WORKORDER_LEGACY_REFERENCED);
         orders.deleteByPrimaryKey(id);
     }
 
@@ -242,84 +234,26 @@ public class WorkOrderService {
         return new WorkOrderModels.BatchDetail(b, paths.selectByExample(filter));
     }
 
+    /**
+     * Compatibility endpoint: historical selected paths can no longer be written.
+     */
+    @Transactional(transactionManager = "businessTransactionManager", readOnly = true)
     public WorkOrderModels.BatchDetail selectPath(Long id, WorkOrderModels.PathSelection input) {
-        var b = batch(id, true);
-        var w = order(b.getWorkorderId(), false);
-        require("RELEASED".equals(w.getStatus()));
-        if (!List.of("UNSELECTED", "SELECTED").contains(b.getRouteStatus()))
-            throw new FoundationException(ErrorCode.BATCH_ROUTE_FROZEN);
-        if (!Objects.equals(input.revision(), b.getRevision())) conflict();
-        var n = new RoutingNodeExample();
-        n.createCriteria().andRoutingIdEqualTo(w.getRoutingId());
-        var e = new RoutingEdgeExample();
-        e.createCriteria().andRoutingIdEqualTo(w.getRoutingId());
-        BatchPathPolicy.validate(input.nodeIds(), nodes.selectByExample(n), edges.selectByExample(e));
-        var old = new BatchRouteNodeExample();
-        old.createCriteria().andBatchIdEqualTo(id);
-        paths.deleteByExample(old);
-        int sequence = 0;
-        for (Long node : input.nodeIds()) {
-            var row = new BatchRouteNodeEntity();
-            row.setBatchId(id);
-            row.setRoutingNodeId(node);
-            row.setExecutionOrder(++sequence);
-            paths.insert(row);
-        }
-        b.setRouteStatus("SELECTED");
-        b.setIssueCommandId(null);
-        touch(b);
-        return batchDetail(id);
+        batch(id, false);
+        throw new FoundationException(ErrorCode.LEGACY_BATCH_READ_ONLY);
     }
 
-    /**
-     * Trusted server use only: persist BEFORE dispatching an external command. No HTTP endpoint.
-     */
-    public WorkOrderModels.BatchDetail beginIssue(Long batchId, int revision) {
-        String commandId = UUID.randomUUID().toString();
-        var b = batch(batchId, true);
-        if (b.getRevision() != revision) conflict();
-        require("SELECTED".equals(b.getRouteStatus()));
-        require(!commandId.equals(b.getIssueCommandId()));
-        b.setIssueCommandId(commandId);
-        b.setRouteStatus("PENDING");
-        touch(b);
-        return batchDetail(batchId);
+    @Transactional(transactionManager = "businessTransactionManager", readOnly = true)
+    public WorkOrderModels.Allocation allocation(Long id) {
+        var rows = queries.allocationForOrders(List.of(id));
+        if (rows.isEmpty()) throw new FoundationException(ErrorCode.NOT_FOUND);
+        return rows.getFirst();
     }
 
-    /**
-     * Caller must have authenticated the external result; this service never accepts a browser success claim.
-     */
-    public WorkOrderModels.BatchDetail confirmIssue(Long batchId, String commandId,
-                                                    WorkOrderModels.IssueResult result) {
-        require(result != null && commandId != null);
-        var b = batch(batchId, true);
-        require(commandId.equals(b.getIssueCommandId()));
-        if ("LOCKED".equals(b.getRouteStatus())) {
-            require(result == WorkOrderModels.IssueResult.SUCCESS);
-            return batchDetail(batchId);
-        }
-        if ("SELECTED".equals(b.getRouteStatus())) {
-            require(result == WorkOrderModels.IssueResult.REJECTED);
-            return batchDetail(batchId);
-        }
-        require(List.of("PENDING", "UNKNOWN").contains(b.getRouteStatus()));
-        if (result == WorkOrderModels.IssueResult.SUCCESS) {
-            b.setRouteStatus("LOCKED");
-            b.setStatus("ISSUED");
-            b.setLockedAt(LocalDateTime.now());
-        } else if (result == WorkOrderModels.IssueResult.REJECTED) b.setRouteStatus("SELECTED");
-        else {
-            if ("UNKNOWN".equals(b.getRouteStatus())) return batchDetail(batchId);
-            b.setRouteStatus("UNKNOWN");
-        }
-        touch(b);
-        return batchDetail(batchId);
-    }
-
-    private void touch(ProductionBatchEntity b) {
-        b.setRevision(b.getRevision() + 1);
-        b.setUpdateTime(LocalDateTime.now());
-        if (batches.updateByPrimaryKey(b) != 1) conflict();
+    private boolean hasLegacyBatches(Long id) {
+        var filter = new ProductionBatchExample();
+        filter.createCriteria().andWorkorderIdEqualTo(id);
+        return batches.countByExample(filter) > 0;
     }
 
     private WorkorderEntity order(Long id, boolean lock) {
@@ -370,7 +304,9 @@ public class WorkOrderService {
     private void validate(WorkOrderModels.Save input) {
         require(input != null && input.productId() != null && input.routingId() != null && input.code() != null && !input.code()
                 .isBlank() && input.code().length() <= 64);
-        BatchPathPolicy.allocation(input.plannedQty(), input.batches());
+        BigDecimal quantity = input.plannedQty();
+        require(quantity != null && quantity.signum() > 0 && quantity.scale() <= 6
+                && quantity.precision() - quantity.scale() <= 14);
         require(input.plannedStartAt() == null || input.plannedEndAt() == null || !input.plannedEndAt()
                 .isBefore(input.plannedStartAt()));
         binding(input.productId(), input.routingId());
@@ -410,50 +346,4 @@ public class WorkOrderService {
         }
     }
 
-    private void saveBatch(ProductionBatchEntity row) {
-        try {
-            if ((row.getId() == null ? batches.insert(row) : batches.updateByPrimaryKey(row)) != 1) conflict();
-        } catch (DuplicateKeyException failure) {
-            throw new FoundationException(ErrorCode.RESOURCE_CONFLICT, failure);
-        }
-    }
-
-    private void saveBatches(WorkorderEntity w, List<WorkOrderModels.BatchInput> input) {
-        var old = batchRows(w.getId());
-        var seen = new HashSet<Long>();
-        require(old.stream().allMatch(b -> "UNSELECTED".equals(b.getRouteStatus())));
-        // Remove unreferenced draft children before inserts; preserve stable IDs for unchanged business batch numbers.
-        for (var previous : old)
-            if (input.stream().noneMatch(b -> Objects.equals(b.id(), previous.getId())
-                    || b.id() == null && b.batchNo().trim().equalsIgnoreCase(previous.getBatchNo())))
-                batches.deleteByPrimaryKey(previous.getId());
-        for (var b : input) {
-            ProductionBatchEntity row;
-            Long existingId = b.id();
-            if (existingId == null)
-                existingId = old.stream().filter(x -> x.getBatchNo().equalsIgnoreCase(b.batchNo().trim()))
-                        .map(ProductionBatchEntity::getId).findFirst().orElse(null);
-            if (existingId != null) {
-                Long resolvedId = existingId;
-                require(seen.add(resolvedId));
-                row = old.stream().filter(x -> x.getId().equals(resolvedId)).findFirst()
-                        .orElseThrow(() -> new FoundationException(ErrorCode.WORKORDER_INVALID));
-                require("UNSELECTED".equals(row.getRouteStatus()));
-                row.setRevision(row.getRevision() + 1);
-            } else {
-                row = new ProductionBatchEntity();
-                row.setWorkorderId(w.getId());
-                row.setStatus("PLANNED");
-                row.setRouteStatus("UNSELECTED");
-                row.setRevision(0);
-                row.setCreateTime(LocalDateTime.now());
-            }
-            row.setBatchNo(b.batchNo().trim());
-            row.setPlannedQty(b.plannedQty());
-            row.setRemark(b.remark());
-            row.setUpdateTime(LocalDateTime.now());
-            saveBatch(row);
-        }
-
-    }
 }

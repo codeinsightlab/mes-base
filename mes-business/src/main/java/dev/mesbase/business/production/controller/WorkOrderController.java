@@ -52,11 +52,15 @@ public class WorkOrderController {
     }
 
     public record DetailView(OrderView workorder, String productCode, String productName, RoutingView routing,
-                             List<BatchView> batches) {
+                             List<BatchView> batches, AllocationView allocation) {
     }
 
     public record SummaryView(OrderView workorder, int batchCount, String productCode, String productName,
-                              String routingCode, Integer routingVersion) {
+                              String routingCode, Integer routingVersion, AllocationView allocation) {
+    }
+
+    public record AllocationView(String workorderId, String plannedQty, String allocatedTargetQty,
+                                 String remainingTargetQty, String excessTargetQty, Long executionCount) {
     }
 
     public record PageView(List<SummaryView> items, long total, int offset, int limit) {
@@ -68,7 +72,7 @@ public class WorkOrderController {
                          @RequestParam(defaultValue = "0") int offset, @RequestParam(defaultValue = "20") int limit) {
         var p = service.list(code, status, offset, limit);
         return new PageView(p.items().stream()
-                .map(s -> new SummaryView(order(s.workorder()), s.batchCount(), s.productCode(), s.productName(), s.routingCode(), s.routingVersion()))
+                .map(s -> new SummaryView(order(s.workorder()), s.batchCount(), s.productCode(), s.productName(), s.routingCode(), s.routingVersion(), allocation(s.allocation())))
                 .toList(), p.total(), p.offset(), p.limit());
     }
 
@@ -86,6 +90,12 @@ public class WorkOrderController {
         return view(service.detail(id));
     }
 
+    @GetMapping("/workorder/{id}/allocation")
+    @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED, permission = "workorder:query")
+    public AllocationView allocation(@PathVariable Long id) {
+        return allocation(service.allocation(id));
+    }
+
     @GetMapping("/workorder/{id}/graph")
     @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED, permission = "workorder:query")
     public RoutingDetailVo graph(@PathVariable Long id) {
@@ -94,14 +104,14 @@ public class WorkOrderController {
 
     @PostMapping("/workorder")
     @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED, permission = "workorder:create")
-    public DetailView create(@Valid @RequestBody WorkOrderModels.Save input) {
-        return view(service.create(input));
+    public DetailView create(@Valid @RequestBody WorkOrderSaveRequest input) {
+        return view(service.create(input.toCommand()));
     }
 
     @PutMapping("/workorder/{id}")
     @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED, permission = "workorder:update")
-    public DetailView update(@PathVariable Long id, @Valid @RequestBody WorkOrderModels.Save input) {
-        return view(service.update(id, input));
+    public DetailView update(@PathVariable Long id, @Valid @RequestBody WorkOrderSaveRequest input) {
+        return view(service.update(id, input.toCommand()));
     }
 
     @PostMapping("/workorder/{id}/actions/release")
@@ -129,6 +139,12 @@ public class WorkOrderController {
         return batch(service.selectPath(id, input));
     }
 
+    private static AllocationView allocation(WorkOrderModels.Allocation a) {
+        return new AllocationView(id(a.workorderId()), a.plannedQty().toPlainString(), a.allocatedTargetQty()
+                .toPlainString(),
+                a.remainingTargetQty().toPlainString(), a.excessTargetQty().toPlainString(), a.executionCount());
+    }
+
     private static String id(Long value) {
         return value == null ? null : value.toString();
     }
@@ -149,6 +165,6 @@ public class WorkOrderController {
         RoutingEntity r = detail.routing();
         var routing = new RoutingView(id(r.getId()), r.getCode(), r.getName(), r.getVersion(), r.getStatus());
         return new DetailView(order(detail.workorder()), detail.productCode(), detail.productName(), routing, detail.batches()
-                .stream().map(WorkOrderController::batch).toList());
+                .stream().map(WorkOrderController::batch).toList(), allocation(detail.allocation()));
     }
 }

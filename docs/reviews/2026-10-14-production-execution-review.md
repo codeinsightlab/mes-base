@@ -205,3 +205,141 @@ Factory/DataSource 都 ENABLED。V16前该库版本15、领料单头1条、工�
 无Execution的管理员领料样本、有关联事实的历史保护和扫码只读均有实际HTTP断言；结果写入同目录live-acceptance-result.json。
 用户权限配置完成前不把403转换为成功，也不绕过后端授权。
 本次后续复查前端出现`src/views/production/workorder/index.vue`新的并行未提交修改，本Agent未修改该文件。
+
+
+## 生产主链收敛（方案 A）实施报告 — 2026-10-14
+
+本节覆盖前述 V1 审查中 WorkOrder/ProductionBatch 仍为活跃写入模型的结论。当前实施以 Execution 为唯一活跃执行身份。
+本轮未提交、推送、部署或重启用户服务；并行任务提交导致仓库 HEAD 变化，不属于本 Agent 的 Git 操作。入场快照和修改前文件保存在 `.local/production-chain-20261014/`。
+
+### A. 修改前后模型
+
+| 对象 | 修改前 | 当前职责 |
+| --- | --- | --- |
+| WorkOrder | 必填 Batch，批次数量合计必须等于计划数量，共用工艺 | 独立生产需求：产品、计划量、日期、已发布默认工艺、DRAFT/RELEASED；允许零 Execution |
+| ProductionBatch | 分批、选线性路径、出库尝试和锁定 | 仅保存历史资料，不进入新执行主链 |
+| BatchRouteNode | 保存旧批次已选线性路径 | 只读历史，不转换为执行节点或完整 DAG |
+| ProductionExecution | 与旧批次并存 | 唯一活跃执行身份，自己的确切工艺版本权威 |
+| MaterialIssue | 已有可空 execution_id | 延续 V1 规则；关联执行时从 Execution 确定工单、产品和工艺，历史空关联仍可维护 |
+
+### B. 实际代码变更
+
+- `WorkOrderModels`：Save 移除批次命令；Summary/Detail 增加 Allocation 查询模型。删除退役的 BatchInput/IssueResult。
+- `WorkOrderSaveRequest`：Web 边界显式识别旧 batches 字段（包括空数组或显式 null），返回 410 LEGACY_BATCH_READ_ONLY，避免静默丢失旧请求数据。
+- `WorkOrderService`：create/update/release 不创建或推进旧批次；工单删除遇历史批次拒绝；历史批次存在时保护原产品与默认工艺。保留版本 revision 与行锁。删除未接入真实业务的 beginIssue/confirmIssue 和旧选路写入规则。
+- `WorkOrderExtraMapper`：真正的 WorkOrder LEFT JOIN Execution 汇总，一页工单只增加一次批量聚合查询，沿用已有 Mapper，无单表 Extra。
+- `WorkOrderController`：返回上述统计，并提供 `GET /api/production/workorder/{id}/allocation`，使用 workorder:query 权限；数量按十进制字符串返回，本地主键按字符串返回。
+- `ProductionExecutionRules`：普通更新到 RUNNING/COMPLETED 或设置开始时间前检查所属工单 RELEASED，READY 预建不受此限制。
+- `ErrorCode`：补充未下达、旧模型只读、历史引用保护错误。
+- Codegen 项目配置全量排除 production_batch/batch_route_node，防止生成重新开放旧写入。生成器本身未重构。
+- 删除不再表达当前业务的 BatchPathPolicy 与测试；新测试保留权限、两库隔离、并发 revision、真实 SQL、事务回滚和历史数据保护。
+
+### C. Schema
+
+本轮无需新增 Flyway：现有 workorder、mes_production_execution、mes_material_issue.execution_id、旧历史表及索引足够支持查询与关联。未修改 V13/V14/V15/V16，未调整工艺表，不做批次到 Execution 的自动迁移。
+
+重新核对验收目标：SIMPLE_B → datasource 8 → 192.168.18.25:3306/mes_base_dev_business_simple_b，工厂和数据源均 ENABLED。09:46 左右实查为 WorkOrder 10、旧 Batch 20、旧路径 48、Execution 0、MaterialIssue 2；当前没有留下本轮合成生产记录。
+
+### D. 旧 Batch 兼容
+
+- 工单详情中的 batches、`GET /api/production/batch/{id}` 保留，只读历史。
+- 旧路径 PUT 兼容入口保留权限与当前库存在性校验，然后明确拒绝 410，不能推进路径或身份。
+- create/update 输入 batches 明确拒绝；无隐式“双写”、getOrCreate、历史状态推断或身份映射。
+- 删除存在旧批次的工单返回 409，保护历史；ISSUED/LOCKED 不表示新的 Execution RUNNING/COMPLETED。
+- 真实 MySQL 回滚测试逐行比对旧 Batch 和路径，没有更新或删除。
+
+### E. Execution 业务规则与查询
+
+- 同工单多 Execution，允许不同已发布适用产品工艺；编号由已有 EXE-{id} 机制稳定生成。
+- 默认工艺变更不改写 Execution；实际 routing_id 不自动选最新版本。已开始或存在领料关联的冻结规则继续有效。
+- DRAFT 允许 READY，正式开始要求 RELEASED。无需先领料；本轮没有正式报工准入或生产状态机。
+- `allocatedTargetQty = SUM(target_qty)`，`remainingTargetQty = planned_qty - SUM(target_qty)`，`excessTargetQty = MAX(SUM(target_qty)-planned_qty,0)`。当前统计全部 Execution 状态（含 CANCELLED），明确为目标量统计；没有实际完成量语义。
+- 1000 计划、400+300 目标：700/300/0；400+900：1300/-300/300。统计同时出现在列表、详情及独立查询。
+- V1 二维码解析保持 `/api/production/identity?code=EXE:{id}`、query 权限和当前业务库查询；扫描无业务写入。
+
+### F. 前端收敛
+
+- WorkOrder 页面只保留需求字段；无需 Batch 可提交。默认工艺明确标注；列表和详情显示分配、带符号剩余和超额目标量。
+- 详情嵌入 `ProductionExecutionList`，父工单通过既有 CrudPage fixedValues 固定；独立执行页面复用同组件和同 API/fields，避免两套 CRUD。
+- WorkOrderSelect 支持有权限的工单搜索、缺 list 权限时的显式 ID 输入；切厂/权限变化清空，拒绝迟到响应。实际工艺列与默认工艺区分。
+- 历史批次折叠区清晰标为“历史只读”，无新选路和分批按钮；旧锁定记录只按历史解释。
+- MaterialIssue 的已完成主子单据改动和共享组件没有被本轮覆盖。
+
+### G. 验收证据
+
+实际命令：
+
+```sh
+MES_EXECUTION_MYSQL_ACCEPTANCE=true MES_ISSUE_MYSQL_ACCEPTANCE=true mvn -B -ntp verify -Dmes.test.workorder.mysql=true
+# mes-base-ui，使用 .nvmrc 已安装 Node 22.23.1 的 PATH
+npm test
+npm run build
+/usr/bin/python3 scripts/smoke-packaged.py
+```
+
+- Maven 最终 BUILD SUCCESS（09:45:02）：398 项，0 failure、0 error、10 skipped。包含 SIMPLE_B 真库 WorkOrder、Execution、MaterialIssue 三个回滚测试；含两库 HTTP Fixture、并发订正 revision、拒绝旧写入、版本权威、DRAFT 开工拒绝、数量汇总和历史保护。
+- 第一次完整检查发现测试取 JDK 事务代理实现类错误，改为接口取 Bean 后重跑通过；不属于业务失败。前期定向检查暴露的 Jackson 3 JSON 类型和 Fixture 统计精度问题已修复。
+- 前端 36 个测试文件、189 项通过；vue-tsc 与构建通过。只保留既有大 chunk 警告。
+- packaged smoke：10 passed、0 failed，启动的是脚本自有随机端口独立实例，未操作用户服务。
+- Java formatter 已用于本轮 13 文件；git diff --check 通过。
+- 实际重新登录 admin 成功，现有 Execution list 200；新增 WorkOrder allocation 404，用户服务仍为本轮修改前构建。已请用户按项目规则自行加载新构建后继续真实 API/UI，未用 Fixture 提高验收等级。
+- TEST ONLY 真实服务验收脚本已准备，先检测新接口，再写唯一标签的合成工单/执行/领料；备份并复核历史批次路径，保留复验数据。当前未执行写入。
+
+### H. 风险与后续工作
+
+本次必须完成的余项：用户服务加载最新构建后，真实登录环境复验创建工单、Execution、领料、扫码与 UI；当前不宣称完成。
+
+Reporting 开发时：引用 execution_id，校验当前库关联、RELEASED 工单和确切有效工艺；工序节点必须属于 Execution.routing_id 的 DAG，明确并行及可选分支语义。Report/Receipt 事实追加身份锁定与删除保护，不伪造不存在的关联校验；按 sys_user 保存报告人/操作者标识。
+
+低优先级：是否让 CANCELLED 不计入目标分配须另行明确产品规则；历史批次归档/删除表需要单独迁移及真实数据依据；可改善执行列表工单/产品/工艺名称展示，目前保留生成 CRUD 的稳定 ID 契约。当前没有扩展 ERP、生产完工汇总或运行引擎。
+
+### I. 最终状态（等待用户服务复验）
+
+| 状态 | 证据与结论 |
+| --- | --- |
+| SCHEMA_READY | 是，复用已应用 Schema，无新增迁移 |
+| CODE_GENERATED | 复用此前 V1 生成的 Mapper/CRUD；本轮无新表，未重复生成 |
+| API_VERIFIED | 本轮真实用户服务未验证；两库 HTTP Fixture 通过不等于此状态 |
+| UI_VERIFIED | 本轮真实浏览器业务未验证；189 个 jsdom 测试与构建通过 |
+| BUSINESS_VERIFIED | 部分：指定真库 Service/SQL 与回滚验证通过，真实服务/UI 端到端尚未完成 |
+
+
+### 用户重启后的真实验收补充 — 2026-10-14 11:09～11:18
+
+用户确认已重启后继续验收，未由 Agent 操作用户服务。本补充替代上节 I 的待验收状态，保留此前 404 的时间线。
+
+- 重新登录 admin，当前工厂 SIMPLE_B；再次核对 datasource 8 / 192.168.18.25:3306 / mes_base_dev_business_simple_b。
+- 执行 `python3 .local/production-chain-20261014/live-acceptance.py`：33 次真实 HTTP 请求按预期通过，包括 200 正例及 400/404/409/410/422 负例。启动后旧会话返回 401，重新登录后测试通过；没有跳过授权。
+- 真正创建无 Batch 的工单、同工单两个独立 Execution（routing_id 64/65），分配 400+300=700 后订正为 400+900=1300，剩余 -300、超额 300。DRAFT 开工拒绝、下达后无领料开工成功。
+- Execution 16 关联两张领料单，另建 execution_id=NULL 的兼容资料。工艺矛盾拒绝，关联执行删除与换工艺拒绝；未发布工艺和不存在的工单拒绝。
+- EXE:16 三次身份查询返回正确工单、产品、确切工艺、状态；执行与领料记录查询前后一致。错误格式 400/EXECUTION_QR_INVALID，不存在 404/EXECUTION_NOT_FOUND。
+- 历史 production_batch/batch_route_node 备份保存于 `.local/production-chain-20261014/legacy-before.tsv`，API 与浏览器操作结束再次逐行比较完全相同（20/48）。未改变任何工艺定义。
+- 真实浏览器使用用户现有 5173：登录、菜单、工单查询及关联 Execution 列表、1300/-300/300 统计、身份码查询成功；错误格式清除旧结果并显示错误。新增工单实际表单提交成功，计划 12.000001，0 Batch/0 Execution，数据库复核一致；删除确认取消后资料保留。
+- 历史工单 TEST-WO-UI-20261014 折叠区只读展示旧批次19001/19002和原路径；没有旧选路写入按钮。切 DEV 后返回工作台，无旧工单内容，随后恢复 SIMPLE_B。
+- 浏览器只验证 admin 的上述用例；低权限账号、完整响应式尺寸矩阵、浏览器创建/订正 Execution 或领料未逐项重跑。权限负例、两库隔离、迟到响应与写入保护分别由前述 HTTP Fixture/前端自动化/真实 API 覆盖，不扩大浏览器证据。
+- 当前扫码页面错误格式提示沿用统一错误消息“输入不符合要求，请检查字段”；后端 errorCode 明确，前端更具体的中文提示可作为后续体验改进，本轮无新增二维码映射。
+
+保留合成验收数据（仅指定 SIMPLE_B）：
+
+| 记录 | ID/编号 | 状态与目的 |
+| --- | --- | --- |
+| API 工单 | 18 / QA_CHAIN_20261014_b6251f91 | RELEASED，计划1000，0旧Batch/2Execution |
+| Execution | 15 / EXE-15 | RUNNING，实际routing64，目标400，无领料也可开工 |
+| Execution | 16 / EXE-16 | READY，实际routing65，目标900，两张领料关联 |
+| 领料单 | 19、20 | 测试标签_A/_B，关联Execution16 |
+| 兼容领料单 | 21 | 测试标签_LEGACY，execution_id NULL |
+| UI 工单 | 19 / QA_CHAIN_UI_20261014_b6251f91 | DRAFT，计划12.000001，0Batch/0Execution |
+
+没有自动清理或删除测试记录，保留给用户复验。测试脚本每次运行创建新身份，不可将重复运行当作对既有身份的更新。
+
+证据目录 `.local/production-chain-20261014/`：`live-acceptance-result.json`（全部请求、状态和保留ID）、`ui-acceptance-result.json`（浏览器验证范围）、`verification.json`，截图 `ui-workorder.png`、`ui-identity.png`、`ui-created-demand.png`、`ui-legacy.png`。这些本地证据不包含登录凭证；会话文件另存，仅本地使用。
+
+| 最终状态 | 本轮证据 |
+| --- | --- |
+| SCHEMA_READY | 是，既有 Schema 足够，本轮零迁移 |
+| CODE_GENERATED | 复用 V1 生成产物，本轮无需重新生成 |
+| API_VERIFIED | 是，指定环境真实登录33次请求通过 |
+| UI_VERIFIED | 是，限上述真实浏览器用例；其余范围明确未逐项重跑 |
+| BUSINESS_VERIFIED | 是，限本轮生产身份及主链收敛范围；未涉及正式报工/入库/ERP |
+
+下一阶段仍按 E/H 的 execution_id、确切 Routing DAG、RELEASED 与事实锁定规则接入 Reporting/Receipt。本轮没有剩余必须修复的主链问题，后续业务及体验限制如上。

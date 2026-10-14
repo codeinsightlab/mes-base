@@ -115,7 +115,7 @@ class ProductionExecutionHttpTest {
             var m = MaterialIssueHttpTest.mvc(c);
             var a = c.getBean(MaterialIssueHttpTest.Fixture.class).business.get("A");
             a.update("INSERT INTO routing(id,code,name,version,status,revision,published_at) VALUES(4,'R_OTHER','不适用产品',1,'PUBLISHED',0,CURRENT_TIMESTAMP)");
-            a.update("INSERT INTO workorder(id,code,product_id,routing_id) VALUES(9,'WO_A_ONLY',1,1)");
+            a.update("INSERT INTO workorder(id,code,product_id,planned_qty,routing_id,revision,create_time,update_time) VALUES(9,'WO_A_ONLY',1,1000,1,0,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)");
             m.perform(full(post(E), "B").content(CREATE.replace("\"workorderId\":\"1\"", "\"workorderId\":\"9\"")))
                     .andExpect(status().isUnprocessableEntity());
             m.perform(get(QR).header("Authorization", "Bearer NONE").header("X-Factory-Id", "A").param("code", "EXE:1"))
@@ -129,6 +129,8 @@ class ProductionExecutionHttpTest {
             m.perform(full(post(E), "A").content(CREATE)).andExpect(status().isOk());
             m.perform(put(E + "/1").header("Authorization", "Bearer CRUD").header("X-Factory-Id", "A")
                     .contentType("application/json").content(CREATE)).andExpect(status().isForbidden());
+            m.perform(full(post("/api/production/workorder/1/actions/release"), "A").content("{\"revision\":0}"))
+                    .andExpect(status().isOk());
             m.perform(full(put(E + "/1"), "A").content(CREATE.replace("READY", "RUNNING")
                             .replace("\"status\"", "\"startTime\":\"2026-10-14T09:00:00\",\"status\"")))
                     .andExpect(status().isOk());

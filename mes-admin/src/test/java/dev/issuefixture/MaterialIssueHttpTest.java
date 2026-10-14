@@ -7,6 +7,15 @@ import dev.mesbase.business.basic.dao.UnitMeasureMapper;
 import dev.mesbase.business.production.dao.RoutingMapper;
 import dev.mesbase.business.production.dao.RoutingProductMapper;
 import dev.mesbase.business.production.dao.WorkorderMapper;
+import dev.mesbase.business.production.dao.WorkOrderExtraMapper;
+import dev.mesbase.business.production.dao.ProductionBatchMapper;
+import dev.mesbase.business.production.dao.BatchRouteNodeMapper;
+import dev.mesbase.business.production.dao.RoutingNodeMapper;
+import dev.mesbase.business.production.dao.RoutingEdgeMapper;
+import dev.mesbase.business.production.dao.OperationMapper;
+import dev.mesbase.business.production.service.WorkOrderService;
+import dev.mesbase.business.production.service.RoutingReferenceRules;
+import dev.mesbase.business.production.controller.WorkOrderController;
 import dev.mesbase.business.production.dao.MesProductionExecutionMapper;
 import dev.mesbase.business.production.service.ProductionExecutionRules;
 import dev.mesbase.business.production.service.ProductionIdentityService;
@@ -92,7 +101,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * TEST ONLY: real generated SQL, HTTP authorization and transactions; two separate H2 databases.
  */
 class MaterialIssueHttpTest {
-    static final Set<Class<?>> MAPPERS = Set.of(MesProductionExecutionMapper.class, MaterialMapper.class, UnitMeasureMapper.class, WmWarehouseMapper.class, RoutingMapper.class, RoutingProductMapper.class, WorkorderMapper.class, MesMaterialIssueMapper.class, MesMaterialIssueItemMapper.class);
+    static final Set<Class<?>> MAPPERS = Set.of(WorkOrderExtraMapper.class, ProductionBatchMapper.class, BatchRouteNodeMapper.class, RoutingNodeMapper.class, RoutingEdgeMapper.class, OperationMapper.class, MesProductionExecutionMapper.class, MaterialMapper.class, UnitMeasureMapper.class, WmWarehouseMapper.class, RoutingMapper.class, RoutingProductMapper.class, WorkorderMapper.class, MesMaterialIssueMapper.class, MesMaterialIssueItemMapper.class);
 
     static class Fixture implements AutoCloseable {
         final RuntimeRegistry registry = new RuntimeRegistry();
@@ -106,7 +115,7 @@ class MaterialIssueHttpTest {
             for (String id : List.of("A", "B")) {
                 var source = source();
                 var jdbc = new JdbcTemplate(source);
-                for (String name : List.of("V2__simple_business_capabilities.sql", "V3__operation_routing.sql", "V8__warehouse_inventory.sql", "V11__material_issue.sql", "V12__material_issue_quantity_precision.sql", "V16__production_execution.sql")) {
+                for (String name : List.of("V2__simple_business_capabilities.sql", "V3__operation_routing.sql", "V8__warehouse_inventory.sql", "V11__material_issue.sql", "V12__material_issue_quantity_precision.sql", "V13__workorder_batch_route.sql", "V16__production_execution.sql")) {
                     String ddl = Files.readString(Path.of("mes-admin/src/main/resources/db/business/" + name))
                             .replace(") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT=", ") COMMENT ")
                             .replaceAll("(?m)^\\s*factory_id [^\\n]+\\n", "")
@@ -115,13 +124,7 @@ class MaterialIssueHttpTest {
                     for (String statement : ddl.split(";")) if (!statement.isBlank()) jdbc.execute(statement);
                 }
                 jdbc.update("INSERT INTO material(id,code,name,unit_id,material_type,status) VALUES(1,'M1','物料一',1,'PRODUCT','ENABLED')");
-                String xml = Files.readString(Path.of("mes-business/src/main/resources/dev/mesbase/business/production/dao/WorkorderMapper.xml"));
-                var matches = Pattern.compile("column=\"([^\"]+)\" jdbcType=\"([^\"]+)\"").matcher(xml);
-                var columns = new ArrayList<String>();
-                while (matches.find())
-                    columns.add(matches.group(1) + " " + ("VARCHAR".equals(matches.group(2)) ? "VARCHAR(255)" : matches.group(2)));
-                jdbc.execute("CREATE TABLE workorder(" + String.join(",", columns) + ")");
-                jdbc.update("INSERT INTO workorder(id,code,product_id,routing_id) VALUES(1,'WO1',1,1)");
+                jdbc.update("INSERT INTO workorder(id,code,product_id,planned_qty,routing_id,status,revision,create_time,update_time) VALUES(1,'WO1',1,1000,1,'DRAFT',0,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)");
                 jdbc.update("INSERT INTO unit_measure(id,code,name,status) VALUES(1,'KG','千克','ENABLED')");
                 jdbc.update("INSERT INTO wm_warehouse(id,code,name,status) VALUES(1,'W1','验收仓库','ENABLED')");
                 jdbc.update("INSERT INTO routing(id,code,name,version,status,revision,published_at) VALUES(1,'R1','已发布版本',1,'PUBLISHED',0,CURRENT_TIMESTAMP),(2,'R1','草稿版本',2,'DRAFT',0,NULL)");
@@ -153,7 +156,7 @@ class MaterialIssueHttpTest {
     @EnableWebMvc
     @EnableWebSecurity
     @EnableTransactionManagement
-    @Import({MesMaterialIssueController.class, MesMaterialIssueItemController.class, MesMaterialIssueServiceImpl.class, MesMaterialIssueItemServiceImpl.class, MaterialIssueRules.class, ProductionExecutionRules.class, ProductionIdentityService.class, MesProductionExecutionServiceImpl.class, MesProductionExecutionController.class, ProductionIdentityController.class, FoundationErrorAdvice.class})
+    @Import({MesMaterialIssueController.class, MesMaterialIssueItemController.class, MesMaterialIssueServiceImpl.class, MesMaterialIssueItemServiceImpl.class, MaterialIssueRules.class, ProductionExecutionRules.class, ProductionIdentityService.class, MesProductionExecutionServiceImpl.class, MesProductionExecutionController.class, ProductionIdentityController.class, WorkOrderController.class, WorkOrderService.class, RoutingReferenceRules.class, FoundationErrorAdvice.class})
     static class Web implements WebMvcConfigurer {
         @Bean(destroyMethod = "close")
         Fixture fixture() throws Exception {
@@ -183,6 +186,36 @@ class MaterialIssueHttpTest {
         @Bean
         MesProductionExecutionMapper executionMapper(SqlSessionFactory f) {
             return new SqlSessionTemplate(f).getMapper(MesProductionExecutionMapper.class);
+        }
+
+        @Bean
+        WorkOrderExtraMapper beanWorkOrderExtraMapper(SqlSessionFactory f) {
+            return new SqlSessionTemplate(f).getMapper(WorkOrderExtraMapper.class);
+        }
+
+        @Bean
+        ProductionBatchMapper beanProductionBatchMapper(SqlSessionFactory f) {
+            return new SqlSessionTemplate(f).getMapper(ProductionBatchMapper.class);
+        }
+
+        @Bean
+        BatchRouteNodeMapper beanBatchRouteNodeMapper(SqlSessionFactory f) {
+            return new SqlSessionTemplate(f).getMapper(BatchRouteNodeMapper.class);
+        }
+
+        @Bean
+        RoutingNodeMapper beanRoutingNodeMapper(SqlSessionFactory f) {
+            return new SqlSessionTemplate(f).getMapper(RoutingNodeMapper.class);
+        }
+
+        @Bean
+        RoutingEdgeMapper beanRoutingEdgeMapper(SqlSessionFactory f) {
+            return new SqlSessionTemplate(f).getMapper(RoutingEdgeMapper.class);
+        }
+
+        @Bean
+        OperationMapper beanOperationMapper(SqlSessionFactory f) {
+            return new SqlSessionTemplate(f).getMapper(OperationMapper.class);
         }
 
         @Bean
