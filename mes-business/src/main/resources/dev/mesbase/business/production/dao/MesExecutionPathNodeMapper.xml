@@ -1,0 +1,188 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- MES-CODEGEN: MyBatis Generator standard single-table persistence. -->
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="dev.mesbase.business.production.dao.MesExecutionPathNodeMapper">
+  <resultMap id="BaseResultMap" type="dev.mesbase.business.production.domain.MesExecutionPathNodeEntity">
+    <id column="id" jdbcType="BIGINT" property="id" />
+    <result column="execution_id" jdbcType="BIGINT" property="executionId" />
+    <result column="sequence_no" jdbcType="INTEGER" property="sequenceNo" />
+    <result column="routing_node_id" jdbcType="BIGINT" property="routingNodeId" />
+  </resultMap>
+  <sql id="Example_Where_Clause">
+    <where>
+      <foreach collection="oredCriteria" item="criteria" separator="or">
+        <if test="criteria.valid">
+          <trim prefix="(" prefixOverrides="and" suffix=")">
+            <foreach collection="criteria.criteria" item="criterion">
+              <choose>
+                <when test="criterion.noValue">
+                  and ${criterion.condition}
+                </when>
+                <when test="criterion.singleValue">
+                  and ${criterion.condition} #{criterion.value}
+                </when>
+                <when test="criterion.betweenValue">
+                  and ${criterion.condition} #{criterion.value} and #{criterion.secondValue}
+                </when>
+                <when test="criterion.listValue">
+                  and ${criterion.condition}
+                  <foreach close=")" collection="criterion.value" item="listItem" open="(" separator=",">
+                    #{listItem}
+                  </foreach>
+                </when>
+              </choose>
+            </foreach>
+          </trim>
+        </if>
+      </foreach>
+    </where>
+  </sql>
+  <sql id="Update_By_Example_Where_Clause">
+    <where>
+      <foreach collection="example.oredCriteria" item="criteria" separator="or">
+        <if test="criteria.valid">
+          <trim prefix="(" prefixOverrides="and" suffix=")">
+            <foreach collection="criteria.criteria" item="criterion">
+              <choose>
+                <when test="criterion.noValue">
+                  and ${criterion.condition}
+                </when>
+                <when test="criterion.singleValue">
+                  and ${criterion.condition} #{criterion.value}
+                </when>
+                <when test="criterion.betweenValue">
+                  and ${criterion.condition} #{criterion.value} and #{criterion.secondValue}
+                </when>
+                <when test="criterion.listValue">
+                  and ${criterion.condition}
+                  <foreach close=")" collection="criterion.value" item="listItem" open="(" separator=",">
+                    #{listItem}
+                  </foreach>
+                </when>
+              </choose>
+            </foreach>
+          </trim>
+        </if>
+      </foreach>
+    </where>
+  </sql>
+  <sql id="Base_Column_List">
+    id, execution_id, sequence_no, routing_node_id
+  </sql>
+  <select id="selectByExample" parameterType="dev.mesbase.business.production.domain.MesExecutionPathNodeExample" resultMap="BaseResultMap">
+    select
+    <include refid="Base_Column_List" />
+    from mes_execution_path_node
+    <if test="_parameter != null">
+      <include refid="Example_Where_Clause" />
+    </if>
+    <if test="orderByClause != null">
+      order by ${orderByClause}
+    </if>
+  </select>
+  <select id="selectByPrimaryKey" parameterType="Long" resultMap="BaseResultMap">
+    select 
+    <include refid="Base_Column_List" />
+    from mes_execution_path_node
+    where id = #{id,jdbcType=BIGINT}
+  </select>
+  <delete id="deleteByPrimaryKey" parameterType="Long">
+    delete from mes_execution_path_node
+    where id = #{id,jdbcType=BIGINT}
+  </delete>
+  <delete id="deleteByExample" parameterType="dev.mesbase.business.production.domain.MesExecutionPathNodeExample">
+    delete from mes_execution_path_node
+    <if test="_parameter != null">
+      <include refid="Example_Where_Clause" />
+    </if>
+  </delete>
+  <insert id="insert" keyColumn="id" keyProperty="id" parameterType="dev.mesbase.business.production.domain.MesExecutionPathNodeEntity" useGeneratedKeys="true">
+    insert into mes_execution_path_node (execution_id, sequence_no, routing_node_id
+      )
+    values (#{executionId,jdbcType=BIGINT}, #{sequenceNo,jdbcType=INTEGER}, #{routingNodeId,jdbcType=BIGINT}
+      )
+  </insert>
+  <insert id="insertSelective" keyColumn="id" keyProperty="id" parameterType="dev.mesbase.business.production.domain.MesExecutionPathNodeEntity" useGeneratedKeys="true">
+    insert into mes_execution_path_node
+    <trim prefix="(" suffix=")" suffixOverrides=",">
+      <if test="executionId != null">
+        execution_id,
+      </if>
+      <if test="sequenceNo != null">
+        sequence_no,
+      </if>
+      <if test="routingNodeId != null">
+        routing_node_id,
+      </if>
+    </trim>
+    <trim prefix="values (" suffix=")" suffixOverrides=",">
+      <if test="executionId != null">
+        #{executionId,jdbcType=BIGINT},
+      </if>
+      <if test="sequenceNo != null">
+        #{sequenceNo,jdbcType=INTEGER},
+      </if>
+      <if test="routingNodeId != null">
+        #{routingNodeId,jdbcType=BIGINT},
+      </if>
+    </trim>
+  </insert>
+  <select id="countByExample" parameterType="dev.mesbase.business.production.domain.MesExecutionPathNodeExample" resultType="java.lang.Long">
+    select count(*) from mes_execution_path_node
+    <if test="_parameter != null">
+      <include refid="Example_Where_Clause" />
+    </if>
+  </select>
+  <update id="updateByExampleSelective" parameterType="map">
+    update mes_execution_path_node
+    <set>
+      <if test="row.id != null">
+        id = #{row.id,jdbcType=BIGINT},
+      </if>
+      <if test="row.executionId != null">
+        execution_id = #{row.executionId,jdbcType=BIGINT},
+      </if>
+      <if test="row.sequenceNo != null">
+        sequence_no = #{row.sequenceNo,jdbcType=INTEGER},
+      </if>
+      <if test="row.routingNodeId != null">
+        routing_node_id = #{row.routingNodeId,jdbcType=BIGINT},
+      </if>
+    </set>
+    <if test="example != null">
+      <include refid="Update_By_Example_Where_Clause" />
+    </if>
+  </update>
+  <update id="updateByExample" parameterType="map">
+    update mes_execution_path_node
+    set id = #{row.id,jdbcType=BIGINT},
+      execution_id = #{row.executionId,jdbcType=BIGINT},
+      sequence_no = #{row.sequenceNo,jdbcType=INTEGER},
+      routing_node_id = #{row.routingNodeId,jdbcType=BIGINT}
+    <if test="example != null">
+      <include refid="Update_By_Example_Where_Clause" />
+    </if>
+  </update>
+  <update id="updateByPrimaryKeySelective" parameterType="dev.mesbase.business.production.domain.MesExecutionPathNodeEntity">
+    update mes_execution_path_node
+    <set>
+      <if test="executionId != null">
+        execution_id = #{executionId,jdbcType=BIGINT},
+      </if>
+      <if test="sequenceNo != null">
+        sequence_no = #{sequenceNo,jdbcType=INTEGER},
+      </if>
+      <if test="routingNodeId != null">
+        routing_node_id = #{routingNodeId,jdbcType=BIGINT},
+      </if>
+    </set>
+    where id = #{id,jdbcType=BIGINT}
+  </update>
+  <update id="updateByPrimaryKey" parameterType="dev.mesbase.business.production.domain.MesExecutionPathNodeEntity">
+    update mes_execution_path_node
+    set execution_id = #{executionId,jdbcType=BIGINT},
+      sequence_no = #{sequenceNo,jdbcType=INTEGER},
+      routing_node_id = #{routingNodeId,jdbcType=BIGINT}
+    where id = #{id,jdbcType=BIGINT}
+  </update>
+</mapper>
