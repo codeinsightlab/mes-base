@@ -13,6 +13,8 @@ import dev.mesbase.business.production.dao.RoutingMapper;
 import dev.mesbase.business.production.dao.RoutingNodeMapper;
 import dev.mesbase.business.production.dao.RoutingProductMapper;
 import dev.mesbase.business.production.dao.WorkorderMapper;
+import dev.mesbase.business.production.dao.MesProductionExecutionMapper;
+import dev.mesbase.business.production.domain.MesProductionExecutionExample;
 import dev.mesbase.business.production.dao.WorkOrderExtraMapper;
 import dev.mesbase.business.production.domain.RoutingDetail;
 import dev.mesbase.business.production.domain.BatchPathPolicy;
@@ -60,11 +62,13 @@ public class WorkOrderService {
     private final RoutingReferenceRules references;
     private final MesMaterialIssueMapper issues;
     private final WorkOrderExtraMapper queries;
+    private final MesProductionExecutionMapper executions;
 
     public WorkOrderService(WorkorderMapper orders, ProductionBatchMapper batches, BatchRouteNodeMapper paths,
                             RoutingMapper routings, RoutingProductMapper products, RoutingNodeMapper nodes,
                             RoutingEdgeMapper edges, MaterialMapper materials, RoutingReferenceRules references,
-                            MesMaterialIssueMapper issues, WorkOrderExtraMapper queries) {
+                            MesMaterialIssueMapper issues, WorkOrderExtraMapper queries,
+                            MesProductionExecutionMapper executions) {
         this.orders = orders;
         this.batches = batches;
         this.paths = paths;
@@ -76,6 +80,7 @@ public class WorkOrderService {
         this.references = references;
         this.issues = issues;
         this.queries = queries;
+        this.executions = executions;
     }
 
     private void require(boolean ok) {
@@ -167,6 +172,8 @@ public class WorkOrderService {
         var row = order(id, true);
         require("DRAFT".equals(row.getStatus()));
         if (!Objects.equals(row.getRevision(), input.revision())) conflict();
+        if (!Objects.equals(row.getProductId(), input.productId()) && hasExecutions(id))
+            throw new FoundationException(ErrorCode.EXECUTION_FROZEN);
         validate(input);
         uniqueCode(input.code(), id);
         assign(row, input);
@@ -214,6 +221,7 @@ public class WorkOrderService {
         var row = order(id, true);
         if (row.getRevision() != revision) conflict();
         require("DRAFT".equals(row.getStatus()));
+        if (hasExecutions(id)) throw new FoundationException(ErrorCode.EXECUTION_REFERENCED);
         var issueFilter = new MesMaterialIssueExample();
         issueFilter.createCriteria().andWorkorderIdEqualTo(id);
         require(issues.countByExample(issueFilter) == 0);
@@ -366,6 +374,12 @@ public class WorkOrderService {
         require(input.plannedStartAt() == null || input.plannedEndAt() == null || !input.plannedEndAt()
                 .isBefore(input.plannedStartAt()));
         binding(input.productId(), input.routingId());
+    }
+
+    private boolean hasExecutions(Long id) {
+        var filter = new MesProductionExecutionExample();
+        filter.createCriteria().andWorkorderIdEqualTo(id);
+        return executions.countByExample(filter) > 0;
     }
 
     private void uniqueCode(String code, Long id) {

@@ -7,6 +7,12 @@ import dev.mesbase.business.basic.dao.UnitMeasureMapper;
 import dev.mesbase.business.production.dao.RoutingMapper;
 import dev.mesbase.business.production.dao.RoutingProductMapper;
 import dev.mesbase.business.production.dao.WorkorderMapper;
+import dev.mesbase.business.production.dao.MesProductionExecutionMapper;
+import dev.mesbase.business.production.service.ProductionExecutionRules;
+import dev.mesbase.business.production.service.ProductionIdentityService;
+import dev.mesbase.business.production.service.impl.MesProductionExecutionServiceImpl;
+import dev.mesbase.business.production.controller.MesProductionExecutionController;
+import dev.mesbase.business.production.controller.ProductionIdentityController;
 import dev.mesbase.business.issue.controller.MesMaterialIssueController;
 import dev.mesbase.business.issue.controller.MesMaterialIssueItemController;
 import dev.mesbase.business.issue.service.impl.MesMaterialIssueServiceImpl;
@@ -86,7 +92,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * TEST ONLY: real generated SQL, HTTP authorization and transactions; two separate H2 databases.
  */
 class MaterialIssueHttpTest {
-    static final Set<Class<?>> MAPPERS = Set.of(MaterialMapper.class, UnitMeasureMapper.class, WmWarehouseMapper.class, RoutingMapper.class, RoutingProductMapper.class, WorkorderMapper.class, MesMaterialIssueMapper.class, MesMaterialIssueItemMapper.class);
+    static final Set<Class<?>> MAPPERS = Set.of(MesProductionExecutionMapper.class, MaterialMapper.class, UnitMeasureMapper.class, WmWarehouseMapper.class, RoutingMapper.class, RoutingProductMapper.class, WorkorderMapper.class, MesMaterialIssueMapper.class, MesMaterialIssueItemMapper.class);
 
     static class Fixture implements AutoCloseable {
         final RuntimeRegistry registry = new RuntimeRegistry();
@@ -100,7 +106,7 @@ class MaterialIssueHttpTest {
             for (String id : List.of("A", "B")) {
                 var source = source();
                 var jdbc = new JdbcTemplate(source);
-                for (String name : List.of("V2__simple_business_capabilities.sql", "V3__operation_routing.sql", "V8__warehouse_inventory.sql", "V11__material_issue.sql", "V12__material_issue_quantity_precision.sql")) {
+                for (String name : List.of("V2__simple_business_capabilities.sql", "V3__operation_routing.sql", "V8__warehouse_inventory.sql", "V11__material_issue.sql", "V12__material_issue_quantity_precision.sql", "V16__production_execution.sql")) {
                     String ddl = Files.readString(Path.of("mes-admin/src/main/resources/db/business/" + name))
                             .replace(") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT=", ") COMMENT ")
                             .replaceAll("(?m)^\\s*factory_id [^\\n]+\\n", "")
@@ -108,7 +114,7 @@ class MaterialIssueHttpTest {
                             .replace("factory_id, ", "");
                     for (String statement : ddl.split(";")) if (!statement.isBlank()) jdbc.execute(statement);
                 }
-                jdbc.update("INSERT INTO material(id,code,name,unit_id,material_type,status) VALUES(1,'M1','物料一',1,'ITEM','ENABLED')");
+                jdbc.update("INSERT INTO material(id,code,name,unit_id,material_type,status) VALUES(1,'M1','物料一',1,'PRODUCT','ENABLED')");
                 String xml = Files.readString(Path.of("mes-business/src/main/resources/dev/mesbase/business/production/dao/WorkorderMapper.xml"));
                 var matches = Pattern.compile("column=\"([^\"]+)\" jdbcType=\"([^\"]+)\"").matcher(xml);
                 var columns = new ArrayList<String>();
@@ -147,7 +153,7 @@ class MaterialIssueHttpTest {
     @EnableWebMvc
     @EnableWebSecurity
     @EnableTransactionManagement
-    @Import({MesMaterialIssueController.class, MesMaterialIssueItemController.class, MesMaterialIssueServiceImpl.class, MesMaterialIssueItemServiceImpl.class, MaterialIssueRules.class, FoundationErrorAdvice.class})
+    @Import({MesMaterialIssueController.class, MesMaterialIssueItemController.class, MesMaterialIssueServiceImpl.class, MesMaterialIssueItemServiceImpl.class, MaterialIssueRules.class, ProductionExecutionRules.class, ProductionIdentityService.class, MesProductionExecutionServiceImpl.class, MesProductionExecutionController.class, ProductionIdentityController.class, FoundationErrorAdvice.class})
     static class Web implements WebMvcConfigurer {
         @Bean(destroyMethod = "close")
         Fixture fixture() throws Exception {
@@ -172,6 +178,11 @@ class MaterialIssueHttpTest {
         @Bean
         SqlSessionFactory sessions(FactoryBusinessDataSource source, OwnedTransactionManager manager) {
             return PersistenceFactories.create(source, MAPPERS, PersistenceFactories::pagination, manager::verifyAccess);
+        }
+
+        @Bean
+        MesProductionExecutionMapper executionMapper(SqlSessionFactory f) {
+            return new SqlSessionTemplate(f).getMapper(MesProductionExecutionMapper.class);
         }
 
         @Bean
@@ -222,7 +233,7 @@ class MaterialIssueHttpTest {
                 if (value == null) return null;
                 var user = new SysUser();
                 user.setUserId(1L);
-                user.setUserName(value.endsWith("CRUD") ? "crud" : "full");
+                user.setUserName(value.endsWith("NONE") ? "none" : value.endsWith("CRUD") ? "crud" : "full");
                 return new LoginUser(1L, 1L, user, Set.of());
             });
             return http.csrf(c -> c.disable())
@@ -234,8 +245,8 @@ class MaterialIssueHttpTest {
             try {
                 var f = fixture();
                 r.addInterceptor(new FoundationAccessInterceptor(new FactorySelectionService(f.catalog, new InMemoryFactoryPreference()),
-                        (actor, scope, permission) -> "full".equals(actor.id()) || permission.code()
-                                .endsWith(":list") || permission.code().endsWith(":query")));
+                        (actor, scope, permission) -> "full".equals(actor.id()) || "crud".equals(actor.id()) && (permission.code()
+                                .endsWith(":list") || permission.code().endsWith(":query"))));
             } catch (Exception failure) {
                 throw new IllegalStateException(failure);
             }

@@ -285,6 +285,66 @@ public class MesMaterialIssueExample {
             return (Criteria) this;
         }
 
+        public Criteria andExecutionIdIsNull() {
+            addCriterion("execution_id is null");
+            return (Criteria) this;
+        }
+
+        public Criteria andExecutionIdIsNotNull() {
+            addCriterion("execution_id is not null");
+            return (Criteria) this;
+        }
+
+        public Criteria andExecutionIdEqualTo(Long value) {
+            addCriterion("execution_id =", value, "executionId");
+            return (Criteria) this;
+        }
+
+        public Criteria andExecutionIdNotEqualTo(Long value) {
+            addCriterion("execution_id <>", value, "executionId");
+            return (Criteria) this;
+        }
+
+        public Criteria andExecutionIdGreaterThan(Long value) {
+            addCriterion("execution_id >", value, "executionId");
+            return (Criteria) this;
+        }
+
+        public Criteria andExecutionIdGreaterThanOrEqualTo(Long value) {
+            addCriterion("execution_id >=", value, "executionId");
+            return (Criteria) this;
+        }
+
+        public Criteria andExecutionIdLessThan(Long value) {
+            addCriterion("execution_id <", value, "executionId");
+            return (Criteria) this;
+        }
+
+        public Criteria andExecutionIdLessThanOrEqualTo(Long value) {
+            addCriterion("execution_id <=", value, "executionId");
+            return (Criteria) this;
+        }
+
+        public Criteria andExecutionIdIn(List<Long> values) {
+            addCriterion("execution_id in", values, "executionId");
+            return (Criteria) this;
+        }
+
+        public Criteria andExecutionIdNotIn(List<Long> values) {
+            addCriterion("execution_id not in", values, "executionId");
+            return (Criteria) this;
+        }
+
+        public Criteria andExecutionIdBetween(Long value1, Long value2) {
+            addCriterion("execution_id between", value1, value2, "executionId");
+            return (Criteria) this;
+        }
+
+        public Criteria andExecutionIdNotBetween(Long value1, Long value2) {
+            addCriterion("execution_id not between", value1, value2, "executionId");
+            return (Criteria) this;
+        }
+
         public Criteria andWorkorderCodeIsNull() {
             addCriterion("workorder_code is null");
             return (Criteria) this;

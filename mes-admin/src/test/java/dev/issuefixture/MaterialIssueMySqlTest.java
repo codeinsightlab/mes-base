@@ -52,7 +52,7 @@ class MaterialIssueMySqlTest {
                         assertTrue(rows.getString(1) != null && !rows.getString(1).isBlank());
                         count++;
                     }
-                    assertEquals(30, count);
+                    assertEquals(31, count);
                 }
                 try (var indexes = statement.executeQuery("SELECT COUNT(*) FROM information_schema.statistics WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME IN ('mes_material_issue','mes_material_issue_item') AND NON_UNIQUE=0 AND INDEX_NAME<>'PRIMARY'")) {
                     indexes.next();

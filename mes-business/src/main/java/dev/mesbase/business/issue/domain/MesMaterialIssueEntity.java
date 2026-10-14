@@ -10,6 +10,8 @@ public class MesMaterialIssueEntity {
 
     private Long workorderId;
 
+    private Long executionId;
+
     private String workorderCode;
 
     private Long productId;
@@ -56,6 +58,14 @@ public class MesMaterialIssueEntity {
 
     public void setWorkorderId(Long workorderId) {
         this.workorderId = workorderId;
+    }
+
+    public Long getExecutionId() {
+        return executionId;
+    }
+
+    public void setExecutionId(Long executionId) {
+        this.executionId = executionId;
     }
 
     public String getWorkorderCode() {

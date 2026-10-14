@@ -2,6 +2,7 @@ package dev.mesbase.server;
 
 import dev.mesbase.business.basic.dao.MaterialMapper;
 import dev.mesbase.business.issue.dao.MesMaterialIssueMapper;
+import dev.mesbase.business.production.dao.MesProductionExecutionMapper;
 import dev.mesbase.business.production.domain.WorkOrderModels;
 import dev.mesbase.business.production.service.WorkOrderService;
 import dev.mesbase.business.production.service.RoutingReferenceRules;
@@ -60,7 +61,7 @@ import dev.mesbase.business.production.dao.WorkOrderExtraMapper;
  * TEST ONLY controlled issue result simulator. Actual configured acceptance MySQL; no HTTP server or ERP.
  */
 class WorkOrderMySqlTest {
-    static final Set<Class<?>> MAPPERS = Set.of(WorkorderMapper.class, ProductionBatchMapper.class, BatchRouteNodeMapper.class, RoutingMapper.class, RoutingNodeMapper.class, RoutingEdgeMapper.class, RoutingProductMapper.class, OperationMapper.class, WorkOrderExtraMapper.class, MaterialMapper.class, MesMaterialIssueMapper.class);
+    static final Set<Class<?>> MAPPERS = Set.of(WorkorderMapper.class, ProductionBatchMapper.class, BatchRouteNodeMapper.class, RoutingMapper.class, RoutingNodeMapper.class, RoutingEdgeMapper.class, RoutingProductMapper.class, OperationMapper.class, WorkOrderExtraMapper.class, MaterialMapper.class, MesMaterialIssueMapper.class, MesProductionExecutionMapper.class);
 
     @Configuration
     @EnableTransactionManagement
@@ -129,6 +130,11 @@ class WorkOrderMySqlTest {
         @Bean
         MesMaterialIssueMapper mapperMesMaterialIssue(SqlSessionFactory s) {
             return new SqlSessionTemplate(s).getMapper(MesMaterialIssueMapper.class);
+        }
+
+        @Bean
+        MesProductionExecutionMapper mapperMesProductionExecution(SqlSessionFactory s) {
+            return new SqlSessionTemplate(s).getMapper(MesProductionExecutionMapper.class);
         }
     }
 

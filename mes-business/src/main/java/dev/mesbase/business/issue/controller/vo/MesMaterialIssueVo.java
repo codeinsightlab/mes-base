@@ -21,7 +21,8 @@ public record MesMaterialIssueVo(
         String createBy,
         LocalDateTime createTime,
         String updateBy,
-        LocalDateTime updateTime
+        LocalDateTime updateTime,
+        String executionId
 ) {
 }
 

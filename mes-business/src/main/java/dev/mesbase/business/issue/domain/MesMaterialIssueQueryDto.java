@@ -1,4 +1,3 @@
-// MES-CODEGEN: scaffold; review required.
 package dev.mesbase.business.issue.domain;
 
 import dev.mesbase.infrastructure.cache.BusinessCacheQuery;
@@ -23,7 +22,8 @@ public record MesMaterialIssueQueryDto(
         Long routingId,
         @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime issueTime,
         @Size(max = 16) String status,
-        @Size(max = 500) String remark
+        @Size(max = 500) String remark,
+        Long executionId
 ) implements BusinessCacheQuery {
     @Override
     public int cacheOffset() {

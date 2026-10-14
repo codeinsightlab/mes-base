@@ -16,6 +16,7 @@ import dev.mesbase.business.production.dao.RoutingProductMapper;
 import dev.mesbase.business.production.domain.RoutingProductExample;
 import dev.mesbase.business.wm.dao.WmWarehouseMapper;
 import dev.mesbase.common.utils.SecurityUtils;
+import dev.mesbase.business.production.service.ProductionExecutionRules;
 import dev.mesbase.core.error.ErrorCode;
 import dev.mesbase.core.error.FoundationException;
 import java.time.LocalDateTime;
@@ -39,11 +40,12 @@ public class MaterialIssueRules {
     private final WorkorderMapper workorders;
     private final RoutingMapper routings;
     private final RoutingProductMapper routingProducts;
+    private final ProductionExecutionRules executions;
 
     public MaterialIssueRules(MesMaterialIssueMapper issues, MesMaterialIssueItemMapper items,
                               MaterialMapper materials, UnitMeasureMapper units, WmWarehouseMapper warehouses,
                               WorkorderMapper workorders, RoutingMapper routings,
-                              RoutingProductMapper routingProducts) {
+                              RoutingProductMapper routingProducts, ProductionExecutionRules executions) {
         this.issues = issues;
         this.items = items;
         this.materials = materials;
@@ -52,6 +54,7 @@ public class MaterialIssueRules {
         this.workorders = workorders;
         this.routings = routings;
         this.routingProducts = routingProducts;
+        this.executions = executions;
     }
 
     private void require(boolean valid) {
@@ -61,6 +64,15 @@ public class MaterialIssueRules {
     public void validate(MesMaterialIssueEntity row) {
         require(row.getStatus() != null && Set.of("DRAFT", "RECORDED").contains(row.getStatus()));
         require(row.getIssueNo() != null && !row.getIssueNo().isBlank());
+        var execution = row.getExecutionId() == null ? null : executions.lock(row.getExecutionId());
+        if (execution != null) {
+            require(row.getWorkorderId() == null || Objects.equals(row.getWorkorderId(), execution.getWorkorderId()));
+            require(row.getProductId() == null || Objects.equals(row.getProductId(), execution.getProductId()));
+            require(row.getRoutingId() == null || Objects.equals(row.getRoutingId(), execution.getRoutingId()));
+            row.setWorkorderId(execution.getWorkorderId());
+            row.setProductId(execution.getProductId());
+            row.setRoutingId(execution.getRoutingId());
+        }
         if (row.getProductId() != null) {
             var product = materials.selectByPrimaryKey(row.getProductId());
             require(product != null);
@@ -76,13 +88,13 @@ public class MaterialIssueRules {
             var workorder = workorders.selectByPrimaryKey(row.getWorkorderId());
             require(workorder != null);
             require(row.getProductId() == null || Objects.equals(row.getProductId(), workorder.getProductId()));
-            require(row.getRoutingId() == null || Objects.equals(row.getRoutingId(), workorder.getRoutingId()));
+            require(execution != null || row.getRoutingId() == null || Objects.equals(row.getRoutingId(), workorder.getRoutingId()));
             var product = materials.selectByPrimaryKey(workorder.getProductId());
             require(product != null);
             row.setProductId(product.getId());
             row.setProductCode(product.getCode());
             row.setWorkorderCode(workorder.getCode());
-            row.setRoutingId(workorder.getRoutingId());
+            if (execution == null) row.setRoutingId(workorder.getRoutingId());
         }
         if (row.getRoutingId() != null) {
             var routing = routings.selectByPrimaryKey(row.getRoutingId());
@@ -135,6 +147,10 @@ public class MaterialIssueRules {
 
     public void deletingIssues(List<Long> ids) {
         lockIssues(ids);
+        // Keep the execution fact relationship: physical deletion must not erase the freeze evidence.
+        var headers = new MesMaterialIssueExample();
+        headers.createCriteria().andIdIn(ids).andExecutionIdIsNotNull();
+        if (issues.countByExample(headers) > 0) throw new FoundationException(ErrorCode.EXECUTION_FROZEN);
         var filter = new MesMaterialIssueItemExample();
         filter.createCriteria().andIssueIdIn(ids);
         if (items.countByExample(filter) != 0) {

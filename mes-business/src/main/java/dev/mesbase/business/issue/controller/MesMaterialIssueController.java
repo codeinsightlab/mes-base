@@ -100,7 +100,8 @@ public class MesMaterialIssueController {
                 row.getCreateBy(),
                 row.getCreateTime(),
                 row.getUpdateBy(),
-                row.getUpdateTime()
+                row.getUpdateTime(),
+                row.getExecutionId() == null ? null : row.getExecutionId().toString()
         );
     }
 }

@@ -50,6 +50,7 @@ public class MesMaterialIssueServiceImpl implements IMesMaterialIssueService {
         }
         MesMaterialIssueExample example = new MesMaterialIssueExample();
         MesMaterialIssueExample.Criteria criteria = example.createCriteria();
+        if (query.executionId() != null) criteria.andExecutionIdEqualTo(query.executionId());
         if (query.issueNo() != null) {
             criteria.andIssueNoLike("%" + query.issueNo() + "%");
         }
@@ -104,6 +105,7 @@ public class MesMaterialIssueServiceImpl implements IMesMaterialIssueService {
     public MesMaterialIssueEntity insert(MesMaterialIssueCreateCommand input) {
         MesMaterialIssueEntity row = new MesMaterialIssueEntity();
 
+        row.setExecutionId(input.executionId());
         row.setIssueNo(input.issueNo());
         row.setWorkorderId(input.workorderId());
         row.setWorkorderCode(input.workorderCode());
@@ -127,8 +129,13 @@ public class MesMaterialIssueServiceImpl implements IMesMaterialIssueService {
     @BusinessCacheEvict(business = MesMaterialIssueResource.PREFIX,
             scope = BusinessCacheEvict.Scope.LIST_AND_DETAIL)
     public MesMaterialIssueEntity updateById(Long id, MesMaterialIssueUpdateCommand input) {
+        rules.lockIssues(List.of(id));
         MesMaterialIssueEntity row = requireRecord(id);
+        // Recorded execution facts cannot be detached or moved by administrative CRUD.
+        if (row.getExecutionId() != null && !Objects.equals(row.getExecutionId(), input.executionId()))
+            throw new FoundationException(ErrorCode.EXECUTION_FROZEN);
         row.setId(id);
+        row.setExecutionId(input.executionId());
         row.setIssueNo(input.issueNo());
         row.setWorkorderId(input.workorderId());
         row.setWorkorderCode(input.workorderCode());

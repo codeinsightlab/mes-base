@@ -1,6 +1,11 @@
 package dev.mesbase.core.error;
 
 public enum ErrorCode {
+    EXECUTION_INVALID(422, "生产执行必须关联有效工单、匹配产品和已发布工艺，并具有正计划数量及有效时间"),
+    EXECUTION_FROZEN(409, "执行身份或已有生产事实关联不可更改"),
+    EXECUTION_REFERENCED(409, "生产执行已启动或存在领料关联，不能删除"),
+    EXECUTION_QR_INVALID(400, "执行身份码格式应为EXE:正整数主键"),
+    EXECUTION_NOT_FOUND(404, "当前工厂未找到该生产执行身份"),
     WORKORDER_INVALID(422, "工单、批次数量、工艺引用或完整路径不符合规则"),
     BATCH_ROUTE_FROZEN(409, "路径已锁定、正在出库或结果待核实，禁止更改"),
     ROUTING_GRAPH_INVALID(422, "路线拓扑无效：请检查节点、连接、环路及孤立节点"),

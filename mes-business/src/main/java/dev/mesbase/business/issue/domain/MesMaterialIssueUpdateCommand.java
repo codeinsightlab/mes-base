@@ -1,4 +1,3 @@
-// MES-CODEGEN: scaffold; review required.
 package dev.mesbase.business.issue.domain;
 
 import jakarta.validation.constraints.NotBlank;
@@ -18,7 +17,8 @@ public record MesMaterialIssueUpdateCommand(
         Long routingId,
         LocalDateTime issueTime,
         @NotBlank @Size(max = 16) String status,
-        @Size(max = 500) String remark
+        @Size(max = 500) String remark,
+        Long executionId
 ) {
 }
 
