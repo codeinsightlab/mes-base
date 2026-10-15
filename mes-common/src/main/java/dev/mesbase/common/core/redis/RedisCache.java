@@ -5,11 +5,11 @@ import org.springframework.data.redis.core.BoundSetOperations;
 import org.springframework.data.redis.core.HashOperations;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
-import org.springframework.data.redis.core.SessionCallback;
-import org.springframework.data.redis.core.RedisOperations;
 import org.springframework.stereotype.Component;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.data.redis.connection.RedisClusterConnection;
+import org.springframework.data.redis.connection.ReturnType;
+import java.nio.charset.StandardCharsets;
 import org.springframework.data.redis.connection.RedisClusterNode;
 import org.springframework.data.redis.core.RedisCallback;
 import org.springframework.data.redis.core.Cursor;
@@ -47,19 +47,26 @@ public class RedisCache {
     }
 
     /**
-     * One pipeline, with an individual TTL for every cached reference.
+     * Atomically reject fills started before a committed detail invalidation.
      */
-    public void setCacheObjects(Map<String, byte[]> values, int ttlSeconds) {
+    public void setCacheObjectsIfVersion(String versionKey, String expectedVersion,
+                                         Map<String, byte[]> values, int ttlSeconds) {
         if (values.isEmpty()) return;
-        redisTemplate.executePipelined(new SessionCallback<Object>() {
-            @Override
-            public Object execute(RedisOperations operations) {
-                for (var item : values.entrySet())
-                    operations.opsForValue()
-                            .set(storageKey(item.getKey()), item.getValue(), ttlSeconds, TimeUnit.SECONDS);
-                return null;
-            }
-        });
+        byte[] script = ("local v=redis.call('GET',KEYS[1]); "
+                + "if ARGV[1]=='0' then if v then return 0 end "
+                + "else if v~=ARGV[2] then return 0 end end; "
+                + "for i=2,#KEYS do redis.call('SET',KEYS[i],ARGV[i+2],'EX',ARGV[3]) end; return 1")
+                .getBytes(StandardCharsets.UTF_8);
+        var arguments = new ArrayList<byte[]>();
+        arguments.add(redisTemplate.getKeySerializer().serialize(storageKey(versionKey)));
+        for (var key : values.keySet()) arguments.add(redisTemplate.getKeySerializer().serialize(storageKey(key)));
+        arguments.add((expectedVersion == null ? "0" : "1").getBytes(StandardCharsets.UTF_8));
+        arguments.add(expectedVersion == null ? new byte[0] : redisTemplate.getValueSerializer()
+                .serialize(expectedVersion));
+        arguments.add(Integer.toString(ttlSeconds).getBytes(StandardCharsets.UTF_8));
+        for (var value : values.values()) arguments.add(redisTemplate.getValueSerializer().serialize(value));
+        redisTemplate.execute((RedisCallback<Long>) connection -> connection.scriptingCommands()
+                .eval(script, ReturnType.INTEGER, values.size() + 1, arguments.toArray(byte[][]::new)));
     }
 
     public String storageKey(String logical) {

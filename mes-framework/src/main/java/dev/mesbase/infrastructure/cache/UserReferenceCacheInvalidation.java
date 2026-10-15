@@ -1,6 +1,8 @@
 package dev.mesbase.infrastructure.cache;
 
-import dev.mesbase.common.cache.ReferenceLabelCache;
+import dev.mesbase.system.domain.SysUserCacheResource;
+
+import dev.mesbase.common.cache.DetailEntityCache;
 import dev.mesbase.infrastructure.persistence.SpringCommitActions;
 import org.aspectj.lang.annotation.AfterReturning;
 import org.aspectj.lang.annotation.Aspect;
@@ -15,10 +17,10 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 @Component
 @ConditionalOnProperty(name = "mes.system.enabled", havingValue = "true")
 public class UserReferenceCacheInvalidation {
-    private final ReferenceLabelCache cache;
+    private final DetailEntityCache cache;
     private final SpringCommitActions commits;
 
-    public UserReferenceCacheInvalidation(ReferenceLabelCache cache, SpringCommitActions commits) {
+    public UserReferenceCacheInvalidation(DetailEntityCache cache, SpringCommitActions commits) {
         this.cache = cache;
         this.commits = commits;
     }
@@ -26,7 +28,7 @@ public class UserReferenceCacheInvalidation {
     @AfterReturning(pointcut = "execution(* dev.mesbase.system.mapper.SysUserMapper.insertUser(..)) || execution(* dev.mesbase.system.mapper.SysUserMapper.updateUser(..)) || execution(* dev.mesbase.system.mapper.SysUserMapper.deleteUserById(..)) || execution(* dev.mesbase.system.mapper.SysUserMapper.deleteUserByIds(..))", returning = "changed")
     public void changed(int changed) {
         if (changed <= 0) return;
-        Runnable action = () -> cache.invalidate(ReferenceLabelCache.USERS);
+        Runnable action = () -> cache.invalidate(SysUserCacheResource.PREFIX);
         if (TransactionSynchronizationManager.isActualTransactionActive()) commits.afterCommit(action);
         else action.run();
     }

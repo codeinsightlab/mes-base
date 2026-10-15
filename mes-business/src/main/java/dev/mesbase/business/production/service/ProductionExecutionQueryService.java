@@ -3,7 +3,7 @@ package dev.mesbase.business.production.service;
 import dev.mesbase.business.directory.service.BusinessDirectoryService;
 import dev.mesbase.business.production.domain.MesProductionExecutionEntity;
 import dev.mesbase.business.production.domain.MesProductionExecutionQueryDto;
-import dev.mesbase.common.cache.ReferenceLabelCache.Label;
+import dev.mesbase.business.directory.domain.DirectoryLabel;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Stream;
@@ -17,7 +17,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 @ConditionalOnProperty(name = "mes.business.enabled", havingValue = "true")
 public class ProductionExecutionQueryService {
-    public record Display(MesProductionExecutionEntity record, Label routing, String createByName,
+    public record Display(MesProductionExecutionEntity record, DirectoryLabel routing, String createByName,
                           String updateByName) {
     }
 
@@ -53,7 +53,7 @@ public class ProductionExecutionQueryService {
                 .toList();
     }
 
-    private static String name(Map<Long, Label> users, String value) {
+    private static String name(Map<Long, DirectoryLabel> users, String value) {
         var id = userId(value);
         if (id == null) return null;
         var label = users.get(id);

@@ -15,7 +15,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
-import dev.mesbase.common.cache.ReferenceLabelCache.Label;
+import dev.mesbase.business.directory.domain.DirectoryLabel;
 import dev.mesbase.business.production.controller.OperationPermissions;
 import dev.mesbase.business.production.controller.ProductionReportPermissions;
 import dev.mesbase.business.production.controller.RoutingPermissions;
@@ -129,12 +129,12 @@ public class BusinessDirectoryController {
                                   String description, String status, String departmentId) {
     }
 
-    private static ReferenceOption reference(Label row) {
+    private static ReferenceOption reference(DirectoryLabel row) {
         if (row == null) throw new FoundationException(ErrorCode.NOT_FOUND);
         return new ReferenceOption(id(row.id()), row.code(), row.name(), row.version(), row.description(), row.status(), id(row.departmentId()));
     }
 
-    private static DirectoryPage<ReferenceOption> references(DirectoryPage<Label> page) {
+    private static DirectoryPage<ReferenceOption> references(DirectoryPage<DirectoryLabel> page) {
         return new DirectoryPage<>(page.items().stream().map(BusinessDirectoryController::reference)
                 .toList(), page.total(), page.offset(), page.limit());
     }

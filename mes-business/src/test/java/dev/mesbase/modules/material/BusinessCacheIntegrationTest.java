@@ -1,8 +1,8 @@
 package dev.mesbase.modules.material;
 
 import dev.mesbase.common.core.redis.RedisCache;
-import dev.mesbase.common.cache.ReferenceLabelCache;
-import dev.mesbase.common.cache.ReferenceLabelCache.Label;
+import dev.mesbase.common.cache.DetailEntityCache;
+import dev.mesbase.common.cache.DetailCacheKeys;
 import dev.mesbase.common.core.redis.SystemCacheNamespace;
 import dev.mesbase.core.error.FoundationException;
 import dev.mesbase.core.factory.FactoryId;
@@ -37,6 +37,7 @@ import java.nio.file.Files;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
 import org.junit.jupiter.api.AfterAll;
@@ -278,30 +279,50 @@ class BusinessCacheIntegrationTest {
     }
 
     @Test
-    void directoryProjectionUsesRealRedisBatchAndCommitInvalidation() {
-        var references = new ReferenceLabelCache(redis, new MockEnvironment());
-        var namespace = caches.directoryNamespace("business:material");
-        var original = new Label(1L, "REF", "原名称", 2, "可复用说明", "ENABLED", 10L, null);
-        assertEquals(original, references.getAll(namespace, List.of(1L, 1L), ids -> Map.of(1L, original)).get(1L));
-        references.getAll(namespace, List.of(1L), ids -> {
-            throw new AssertionError("Warm cache queried database");
-        });
+    void directoryBatchAndCrudDetailShareTheSameEntityKeyAndCommitEviction() {
+        var details = new DetailEntityCache(redis, new MockEnvironment());
+        var namespace = caches.prefix("business:material");
+        var original = row(1L, "目录缓存的完整实体");
+        original.setSpecification("完整规格字段不因目录回显而丢失");
+        details.getAll(namespace, List.of(1L, 1L), MaterialEntity.class, MaterialEntity::getId, ids -> Map.of(1L, original));
+        assertEquals(List.of(DetailCacheKeys.detail(namespace, 1L)), List.copyOf(redis.keys(namespace + "detail:*")));
+        clearInvocations(mapper);
+        var fromDirectory = material.selectById(1L);
+        assertEquals(original.getName(), fromDirectory.getName());
+        assertEquals(original.getSpecification(), fromDirectory.getSpecification());
+        assertTrue(redis.keys("reference:*").isEmpty());
+        verify(mapper, never()).selectByPrimaryKey(anyLong());
+        var fromCrud = row(2L, "CRUD缓存的完整实体");
+        when(mapper.selectByPrimaryKey(2L)).thenReturn(fromCrud);
+        material.selectById(2L);
+        assertEquals(fromCrud.getName(), details.getAll(namespace, List.of(2L), MaterialEntity.class, MaterialEntity::getId,
+                ids -> {
+                    throw new AssertionError("CRUD warm entry was not reused");
+                }).get(2L).getName());
         boundary.run(() -> {
             caches.evict("business:material", Scope.LIST_AND_DETAIL);
-            assertEquals(original, references.getAll(namespace, List.of(1L), ids -> {
-                throw new AssertionError("Evicted before commit");
-            }).get(1L));
+            details.getAll(namespace, List.of(1L), MaterialEntity.class, MaterialEntity::getId,
+                    ids -> {
+                        throw new AssertionError("Evicted before commit");
+                    });
             return null;
         }, false);
-        var changed = new Label(1L, "REF", "新名称", 2, "可复用说明", "ENABLED", 10L, null);
-        assertEquals(changed, references.getAll(namespace, List.of(1L), ids -> Map.of(1L, changed)).get(1L));
+        assertTrue(redis.keys(namespace + "detail:*").isEmpty());
+        var changed = row(1L, "新名称");
+        details.getAll(namespace, List.of(1L), MaterialEntity.class, MaterialEntity::getId, ids -> Map.of(1L, changed));
         assertThrows(IllegalStateException.class, () -> boundary.run(() -> {
             caches.evict("business:material", Scope.LIST_AND_DETAIL);
             return null;
         }, true));
-        assertEquals(changed, references.getAll(namespace, List.of(1L), ids -> {
-            throw new AssertionError("Rollback evicted cache");
-        }).get(1L));
+        assertEquals(changed.getName(), details.getAll(namespace, List.of(1L), MaterialEntity.class, MaterialEntity::getId,
+                ids -> {
+                    throw new AssertionError("Rollback evicted detail");
+                }).get(1L).getName());
+        details.getAll(namespace, List.of(3L), MaterialEntity.class, MaterialEntity::getId, ids -> {
+            caches.evict("business:material", Scope.LIST_AND_DETAIL);
+            return Map.of(3L, row(3L, "失效前开始的旧读取"));
+        });
+        assertTrue(redis.keys(namespace + "detail:*").isEmpty());
     }
 
     @Test
@@ -367,7 +388,8 @@ class BusinessCacheIntegrationTest {
             redis.setCacheObject(caches.prefix("business:material") + "detail:" + i, "TEST ONLY", 300, TimeUnit.SECONDS);
         }
         caches.evict("business:material", Scope.LIST_AND_DETAIL);
-        assertTrue(redis.keys(caches.prefix("business:material") + "*").isEmpty());
+        assertEquals(Set.of(DetailCacheKeys.version(caches.prefix("business:material"))),
+                Set.copyOf(redis.keys(caches.prefix("business:material") + "*")));
         assertOthersRemain();
     }
 

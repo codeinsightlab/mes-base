@@ -22,7 +22,7 @@ import dev.mesbase.business.production.service.impl.OperationServiceImpl;
 import dev.mesbase.business.production.service.impl.RoutingServiceImpl;
 import dev.mesbase.business.directory.service.BusinessDirectoryService;
 import dev.mesbase.business.production.domain.OperationExample;
-import dev.mesbase.common.cache.ReferenceLabelCache.Label;
+import dev.mesbase.business.directory.domain.DirectoryLabel;
 import java.util.Collection;
 import java.util.LinkedHashMap;
 
@@ -129,12 +129,12 @@ class OperationRoutingMySqlTest {
             var directory = mock(BusinessDirectoryService.class);
             when(directory.operationLabels(any())).thenAnswer(call -> {
                 Collection<Long> ids = call.getArgument(0);
-                var labels = new LinkedHashMap<Long, Label>();
+                var labels = new LinkedHashMap<Long, DirectoryLabel>();
                 if (!ids.isEmpty()) {
                     var filter = new OperationExample();
                     filter.createCriteria().andIdIn(List.copyOf(ids));
                     for (var row : operations.selectByExample(filter))
-                        labels.put(row.getId(), new Label(row.getId(), row.getCode(), row.getName(), null, row.getDescription(), row.getStatus(), null, null));
+                        labels.put(row.getId(), new DirectoryLabel(row.getId(), row.getCode(), row.getName(), null, row.getDescription(), row.getStatus(), null, null));
                 }
                 return labels;
             });

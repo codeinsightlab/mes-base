@@ -50,7 +50,7 @@ import dev.mesbase.business.production.service.impl.MesProductionExecutionServic
 import dev.mesbase.business.production.controller.MesProductionExecutionController;
 import dev.mesbase.business.production.service.ProductionExecutionQueryService;
 import dev.mesbase.business.directory.service.BusinessDirectoryService;
-import dev.mesbase.common.cache.ReferenceLabelCache.Label;
+import dev.mesbase.business.directory.domain.DirectoryLabel;
 import dev.mesbase.business.production.domain.RoutingExample;
 import dev.mesbase.business.production.domain.OperationExample;
 import java.util.LinkedHashMap;
@@ -206,30 +206,30 @@ class MaterialIssueHttpTest {
         @Bean
         BusinessDirectoryService directoryLabels(RoutingMapper routes, OperationMapper operations) {
             var directory = mock(BusinessDirectoryService.class);
-            when(directory.userLabels(any())).thenReturn(Map.of(100L, new Label(100L, null, "历史操作人员", null), 1L, new Label(1L, null, "验收提交人", null)));
+            when(directory.userLabels(any())).thenReturn(Map.of(100L, new DirectoryLabel(100L, null, "历史操作人员", null), 1L, new DirectoryLabel(1L, null, "验收提交人", null)));
             when(directory.routingLabels(any())).thenAnswer(call -> {
                 Collection<Long> ids = call.getArgument(0);
-                var result = new LinkedHashMap<Long, Label>();
+                var result = new LinkedHashMap<Long, DirectoryLabel>();
                 if (!ids.isEmpty()) {
                     var filter = new RoutingExample();
                     filter.createCriteria().andIdIn(List.copyOf(ids));
                     for (var row : routes.selectByExample(filter))
-                        result.put(row.getId(), new Label(row.getId(), row.getCode(), row.getName(), row.getVersion()));
+                        result.put(row.getId(), new DirectoryLabel(row.getId(), row.getCode(), row.getName(), row.getVersion()));
                 }
                 return result;
             });
             when(directory.routingLabel(any())).thenAnswer(call -> {
                 var row = routes.selectByPrimaryKey(call.getArgument(0));
-                return row == null ? null : new Label(row.getId(), row.getCode(), row.getName(), row.getVersion());
+                return row == null ? null : new DirectoryLabel(row.getId(), row.getCode(), row.getName(), row.getVersion());
             });
             when(directory.operationLabels(any())).thenAnswer(call -> {
                 Collection<Long> ids = call.getArgument(0);
-                var result = new LinkedHashMap<Long, Label>();
+                var result = new LinkedHashMap<Long, DirectoryLabel>();
                 if (!ids.isEmpty()) {
                     var filter = new OperationExample();
                     filter.createCriteria().andIdIn(List.copyOf(ids));
                     for (var row : operations.selectByExample(filter))
-                        result.put(row.getId(), new Label(row.getId(), row.getCode(), row.getName(), null));
+                        result.put(row.getId(), new DirectoryLabel(row.getId(), row.getCode(), row.getName(), null));
                 }
                 return result;
             });

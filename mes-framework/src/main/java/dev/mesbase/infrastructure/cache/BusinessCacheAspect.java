@@ -5,8 +5,7 @@ import dev.mesbase.infrastructure.cache.annotation.BusinessCache;
 import dev.mesbase.infrastructure.cache.annotation.BusinessCacheEvict;
 import dev.mesbase.infrastructure.persistence.OwnedTransactionManager;
 import java.lang.reflect.Method;
-import java.util.Base64;
-import java.nio.charset.StandardCharsets;
+import dev.mesbase.common.cache.DetailCacheKeys;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.aspectj.lang.ProceedingJoinPoint;
 import org.aspectj.lang.annotation.Around;
@@ -61,13 +60,14 @@ public class BusinessCacheAspect {
         } else {
             if (!(argument instanceof Long || argument instanceof Integer || argument instanceof String))
                 throw new IllegalArgumentException("DETAIL argument must be a non-null String/Long/Integer ID");
-            key = prefix + "detail:" + Base64.getUrlEncoder().withoutPadding()
-                    .encodeToString(argument.toString().getBytes(StandardCharsets.UTF_8));
+            key = DetailCacheKeys.detail(prefix, argument);
         }
         transactions.verifyAccess();
         // Never reuse/populate shared query data from a write transaction (including an outer write unit).
         if (!TransactionSynchronizationManager.isCurrentTransactionReadOnly())
             return call.proceed();
+        var generation = intent.type() == BusinessCache.Type.DETAIL ? caches.detailGeneration(prefix) : null;
+        if (generation != null && !generation.available()) return call.proceed();
         Object hit = caches.read(key, type);
         if (hit != null) {
             transactions.verifyAccess();
@@ -75,7 +75,8 @@ public class BusinessCacheAspect {
         }
         Object result = call.proceed();
         transactions.verifyAccess();
-        caches.write(key, result);
+        if (intent.type() == BusinessCache.Type.DETAIL) caches.writeDetail(prefix, key, result, generation);
+        else caches.write(key, result);
         return result;
     }
 

@@ -4,7 +4,7 @@ import dev.mesbase.business.production.service.ReportUserReferenceService;
 import dev.mesbase.common.core.domain.entity.SysUser;
 import dev.mesbase.system.mapper.SysUserMapper;
 import dev.mesbase.business.directory.service.BusinessDirectoryService;
-import dev.mesbase.common.cache.ReferenceLabelCache;
+import dev.mesbase.common.cache.DetailEntityCache;
 import dev.mesbase.infrastructure.cache.BusinessCacheProcessor;
 import dev.mesbase.system.mapper.SysDeptMapper;
 import dev.mesbase.system.mapper.SysPostMapper;
@@ -31,7 +31,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 
 class ReportUserReferenceServiceTest {
     private BusinessDirectoryService directory(SysUserMapper users, PlatformPersistence center) {
-        return new BusinessDirectoryService(users, mock(SysDeptMapper.class), mock(SysPostMapper.class), mock(ReferenceLabelCache.class),
+        return new BusinessDirectoryService(users, mock(SysDeptMapper.class), mock(SysPostMapper.class), mock(DetailEntityCache.class),
                 mock(BusinessCacheProcessor.class), center, mock(ObjectProvider.class), mock(ObjectProvider.class), mock(ObjectProvider.class));
     }
 

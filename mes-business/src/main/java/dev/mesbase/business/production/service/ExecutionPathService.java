@@ -10,7 +10,7 @@ import dev.mesbase.business.production.dao.MesExecutionPathMapper;
 import dev.mesbase.business.production.dao.MesExecutionPathNodeMapper;
 import dev.mesbase.business.production.dao.MesProductionExecutionMapper;
 import dev.mesbase.business.production.dao.RoutingNodeMapper;
-import dev.mesbase.common.cache.ReferenceLabelCache.Label;
+import dev.mesbase.business.directory.domain.DirectoryLabel;
 import dev.mesbase.business.directory.service.BusinessDirectoryService;
 import dev.mesbase.business.production.dao.RoutingEdgeMapper;
 import dev.mesbase.business.production.domain.MesExecutionPathEntity;
@@ -76,7 +76,7 @@ public class ExecutionPathService {
 
     public record PathModel(Long executionId, String executionStatus, MesExecutionPathEntity path,
                             List<Long> selectedNodeIds, List<RoutingNodeEntity> nodes, List<RoutingEdgeEntity> edges,
-                            String executionNo, Label routing, Map<Long, Label> operationLabels) {
+                            String executionNo, DirectoryLabel routing, Map<Long, DirectoryLabel> operationLabels) {
     }
 
     @Transactional(transactionManager = "businessTransactionManager", readOnly = true)

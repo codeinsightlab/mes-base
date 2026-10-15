@@ -12,7 +12,12 @@ import dev.mesbase.infrastructure.persistence.PlatformPersistence;
 import dev.mesbase.business.directory.controller.BusinessDirectoryController;
 import dev.mesbase.business.directory.domain.DirectoryQuery;
 import dev.mesbase.business.directory.service.BusinessDirectoryService;
-import dev.mesbase.common.cache.ReferenceLabelCache;
+import dev.mesbase.common.cache.DetailEntityCache;
+import dev.mesbase.common.cache.DetailCacheKeys;
+import dev.mesbase.system.domain.SysUserCacheResource;
+
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
 import dev.mesbase.common.core.redis.RedisCache;
 import org.springframework.mock.env.MockEnvironment;
 import java.util.List;
@@ -86,6 +91,7 @@ class BusinessDirectoryTest {
     private MockMvc http;
     private Set<String> grants;
     private SysUserMapper userMapper;
+    private Map<String, Object> cacheValues;
 
     @BeforeEach
     void setup() throws Exception {
@@ -126,19 +132,20 @@ class BusinessDirectoryTest {
         context.registerBean("masterTransactionManager", OwnedTransactionManager.class, persistence::transactionManager);
         var redis = mock(RedisCache.class);
         var cached = new HashMap<String, Object>();
+        cacheValues = cached;
         when(redis.getCacheObject(any())).thenAnswer(call -> cached.get(call.getArgument(0)));
         when(redis.getCacheObjects(any())).thenAnswer(call -> {
             List<String> keys = call.getArgument(0);
             return keys.stream().map(cached::get).toList();
         });
         doAnswer(call -> {
-            cached.putAll(call.getArgument(0));
+            cached.putAll(call.getArgument(2));
             return null;
-        }).when(redis).setCacheObjects(any(), anyInt());
+        }).when(redis).setCacheObjectsIfVersion(any(), any(), any(), anyInt());
         userMapper = spy(persistence.mapper(SysUserMapper.class));
         context.registerBean(BusinessDirectoryService.class, () -> new BusinessDirectoryService(
                 userMapper, persistence.mapper(SysDeptMapper.class), persistence.mapper(SysPostMapper.class),
-                new ReferenceLabelCache(redis, new MockEnvironment()), mock(BusinessCacheProcessor.class), persistence,
+                new DetailEntityCache(redis, new MockEnvironment()), mock(BusinessCacheProcessor.class), persistence,
                 mock(ObjectProvider.class), mock(ObjectProvider.class), mock(ObjectProvider.class)));
         context.refresh();
         service = context.getBean(BusinessDirectoryService.class);
@@ -192,6 +199,10 @@ class BusinessDirectoryTest {
     void historicalReferencesBatchCacheAndWhitelistUseRealXml() throws Exception {
         var labels = service.userLabels(List.of(2L, 9007199254740993L, 2L, 3L));
         assertEquals(3, labels.size());
+        var serialized = new String((byte[]) cacheValues.get(DetailCacheKeys.detail(SysUserCacheResource.PREFIX, 9007199254740993L)), StandardCharsets.UTF_8);
+        assertTrue(serialized.contains("Reference"));
+        for (String privateField : Set.of("password", "email", "phonenumber", "roles", "authRevision"))
+            assertFalse(serialized.contains(privateField));
         assertEquals("reference", labels.get(9007199254740993L).code());
         assertEquals(10L, labels.get(9007199254740993L).departmentId());
         assertEquals("1", labels.get(2L).status());

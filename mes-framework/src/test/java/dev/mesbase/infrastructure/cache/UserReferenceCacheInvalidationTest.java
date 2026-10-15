@@ -1,6 +1,8 @@
 package dev.mesbase.infrastructure.cache;
 
-import dev.mesbase.common.cache.ReferenceLabelCache;
+import dev.mesbase.system.domain.SysUserCacheResource;
+
+import dev.mesbase.common.cache.DetailEntityCache;
 import dev.mesbase.infrastructure.persistence.SpringCommitActions;
 import dev.mesbase.system.mapper.SysUserMapper;
 import dev.mesbase.common.core.domain.entity.SysUser;
@@ -18,7 +20,7 @@ import static org.mockito.ArgumentMatchers.any;
 class UserReferenceCacheInvalidationTest {
     @Test
     void managedNameWriteInvalidatesOnlyAfterCommitAndRollbackDoesNotEvict() {
-        var cache = mock(ReferenceLabelCache.class);
+        var cache = mock(DetailEntityCache.class);
         var mapper = mock(SysUserMapper.class);
         when(mapper.updateUser(any())).thenReturn(1);
         var proxy = new AspectJProxyFactory(mapper);
@@ -31,11 +33,11 @@ class UserReferenceCacheInvalidationTest {
             users.updateUser(new SysUser());
             verifyNoInteractions(cache);
             for (var callback : TransactionSynchronizationManager.getSynchronizations()) callback.afterCommit();
-            verify(cache).invalidate(ReferenceLabelCache.USERS);
+            verify(cache).invalidate(SysUserCacheResource.PREFIX);
         } finally {
             TransactionSynchronizationManager.clear();
         }
-        var other = mock(ReferenceLabelCache.class);
+        var other = mock(DetailEntityCache.class);
         TransactionSynchronizationManager.initSynchronization();
         TransactionSynchronizationManager.setActualTransactionActive(true);
         try {

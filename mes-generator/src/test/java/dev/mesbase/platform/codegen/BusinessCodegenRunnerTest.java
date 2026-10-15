@@ -34,6 +34,8 @@ import jakarta.validation.Validator;
 import java.net.URL;
 import java.net.URLClassLoader;
 import java.util.Map;
+import java.util.Objects;
+import java.util.function.IntSupplier;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
@@ -145,6 +147,8 @@ class BusinessCodegenRunnerTest {
             definition.setInstanceSupplier(() -> mapper);
             context.registerBeanDefinition("mapper", definition);
             Map<String, Object> cached = new ConcurrentHashMap<>();
+            IntSupplier cachedObjects = () -> (int) cached.keySet().stream()
+                    .filter(key -> key.contains(":list:") || key.contains(":detail:")).count();
             var redis = mock(RedisCache.class);
             when(redis.getCacheObject(anyString())).thenAnswer(call -> cached.get(call.getArgument(0)));
             doAnswer(call -> {
@@ -157,6 +161,17 @@ class BusinessCodegenRunnerTest {
                 cached.keySet().removeIf(key -> key.startsWith(pattern.substring(0, pattern.length() - 1)));
                 return null;
             }).when(redis).deleteByPattern(anyString());
+            doAnswer(call -> {
+                cached.put(call.getArgument(0), call.getArgument(1));
+                return null;
+            }).when(redis).setCacheObject(anyString(), any());
+            doAnswer(call -> {
+                String versionKey = call.getArgument(0);
+                String expected = call.getArgument(1);
+                Map<String, byte[]> values = call.getArgument(2);
+                if (Objects.equals(expected, cached.get(versionKey))) cached.putAll(values);
+                return null;
+            }).when(redis).setCacheObjectsIfVersion(anyString(), any(), any(), any(Integer.class));
             var caches = new BusinessCacheProcessor(redis, new SpringCommitActions(), context.getEnvironment());
             context.register(CacheTransactions.class);
             context.registerBean("businessTransactionManager", OwnedTransactionManager.class, () -> manager);
@@ -186,31 +201,31 @@ class BusinessCodegenRunnerTest {
             Object hit = detail.invoke(service, 1L);
             assertEquals(original.getClass(), hit.getClass());
             assertEquals("分类一", hit.getClass().getMethod("getName").invoke(hit));
-            assertEquals(2, cached.size());
+            assertEquals(2, cachedObjects.getAsInt());
             Object pageHit = list.invoke(service, query);
             Object items = pageHit.getClass().getMethod("items").invoke(pageHit);
             assertEquals(original.getClass(), ((List<?>) items).getFirst().getClass());
             assertEquals("分类一", original.getClass().getMethod("getName").invoke(((List<?>) items).getFirst()));
             jdbc.update("UPDATE material_category SET name=? WHERE id=?", "分类一", 1L);
             upsert.invoke(writer, FactoryContext.required(), List.of(input.getConstructors()[0].newInstance("C2", "分类二")));
-            assertEquals(1, cached.size(), "Only-created sync evicts list and retains details");
+            assertEquals(1, cachedObjects.getAsInt(), "Only-created sync evicts list and retains details");
             list.invoke(service, query);
             upsert.invoke(writer, FactoryContext.required(), List.of(first));
-            assertEquals(2, cached.size(), "All-skipped sync retains both caches");
+            assertEquals(2, cachedObjects.getAsInt(), "All-skipped sync retains both caches");
             new TransactionTemplate(manager).execute(status -> {
                 try {
                     upsert.invoke(writer, FactoryContext.required(), List.of(input.getConstructors()[0].newInstance("C1", "回滚分类")));
-                    assertEquals(2, cached.size(), "Do not evict before commit");
+                    assertEquals(2, cachedObjects.getAsInt(), "Do not evict before commit");
                     status.setRollbackOnly();
                     return null;
                 } catch (ReflectiveOperationException failure) {
                     throw new IllegalStateException(failure);
                 }
             });
-            assertEquals(2, cached.size(), "Rollback must retain caches");
+            assertEquals(2, cachedObjects.getAsInt(), "Rollback must retain caches");
             assertEquals("分类一", jdbc.queryForObject("SELECT name FROM material_category WHERE id=1", String.class));
             upsert.invoke(writer, FactoryContext.required(), List.of(input.getConstructors()[0].newInstance("C1", "更新分类")));
-            assertTrue(cached.isEmpty(), "Updated sync evicts all lists and details after commit");
+            assertTrue(cachedObjects.getAsInt() == 0, "Updated sync evicts all lists and details after commit");
             assertEquals("更新分类", detail.invoke(service, 1L).getClass().getMethod("getName")
                     .invoke(detail.invoke(service, 1L)));
             list.invoke(service, query);
@@ -218,14 +233,14 @@ class BusinessCodegenRunnerTest {
             var update = loader.loadClass(root + "domain.MaterialCategoryUpdateCommand");
             serviceType.getMethod("insert", create)
                     .invoke(service, create.getConstructors()[0].newInstance("C3", "手工新增"));
-            assertEquals(1, cached.size(), "Generated create retains details");
+            assertEquals(1, cachedObjects.getAsInt(), "Generated create retains details");
             serviceType.getMethod("updateById", Long.class, update).invoke(service, 1L,
                     update.getConstructors()[0].newInstance("C1", "手工修改"));
-            assertTrue(cached.isEmpty(), "Generated update evicts both types");
+            assertTrue(cachedObjects.getAsInt() == 0, "Generated update evicts both types");
             list.invoke(service, query);
             detail.invoke(service, 1L);
             serviceType.getMethod("deleteByIds", List.class).invoke(service, List.of(1L));
-            assertTrue(cached.isEmpty(), "Generated delete evicts both types");
+            assertTrue(cachedObjects.getAsInt() == 0, "Generated delete evicts both types");
         } finally {
             FactoryContext.clear();
             Thread.currentThread().setContextClassLoader(previous);

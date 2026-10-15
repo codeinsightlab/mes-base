@@ -231,3 +231,25 @@ ReferenceLabelCacheTest：冷/部分未命中只加载一次去重 IDs、暖命�
 BusinessCacheIntegrationTest.directoryProjectionUsesRealRedisBatchAndCommitInvalidation：独立真实 Redis 测试进程及 Spring 事务下，验证宽投影真实序列化/MGET/pipeline、暖命中不查库、通用 CRUD 提交后重载、回滚保留。该类14项全部通过。此证据是本地独立 Redis 集成，不冒充对用户运行 Redis 手动改名后的验收。
 
 两仓 AGENTS 已明确补充：新增目录缓存必须与生成 CRUD 通用淘汰同源，禁止出现“读取走新 key、写入只淘汰旧 key”，并要求新对象同时覆盖导入/同步入口。
+
+## L. 2026-10-15 用户修正：单对象复用通用 detail Key 与 Entity
+
+本节替代 K 节中独立 `reference/.../directory:value:<generation>:<id>` 对象缓存方案。用户明确：保留批量查缓存及未命中 IN 的逻辑；同一对象必须使用通用详情 Key，不能仅把独立目录 Key 改名为 detail；缓存保存较宽 Entity，需要窄字段的业务在上层转换。
+
+### 实施
+
+- 新增通用 `DetailCacheKeys.detail(resourcePrefix,id)`，BusinessCacheAspect 与批量 DetailEntityCache 使用同一方法：`<资源前缀>detail:<Base64URL编码ID>`，对象 Key 不附加 directory/reference/label、IDs 集合或代际。
+- 移除 ReferenceLabelCache，改为通用 typed Entity 批量能力 DetailEntityCache；工序保存 OperationEntity，与 OperationServiceImpl.selectById 双向共享；工艺保存 RoutingEntity，节点/边聚合仍由工艺业务 Service 组装。DirectoryLabel 迁到 directory/domain，只作返回前的展示转换，不再作为对象缓存内容。
+- 用户使用中心 SysUserCacheResource.PREFIX；例如用户1、2、3分别为 `platform:resource:sys_user:detail:MQ`、`...:Mg`、`...:Mw`（均省略已有环境前缀）。缓存值反序列化为 SysUser Entity，但只保留既定安全字段，不存密码、联系方式、角色、权限、认证版本。用户不存在业务 Factory 前缀；工艺/工序沿用通用 Factory+资源前缀。
+- 目录窄响应由 BusinessDirectoryService/Controller 从 Entity 转换，通用缓存不再固定编码 Label 字段。仍然一次批量读取对象 Key、一次 IN 加载未命中部分；没有改成循环调用 findById。
+- 原有生成 CRUD detail:* 删除直接覆盖这份缓存，原目录专用命名空间方法已删除。用户统一写入后也删除同一 detail:*。
+- 对象 Key 去掉代际后，保留资源级 `detail-version` 作为通用写入屏障元数据；它不是第二份对象缓存。批量及普通详情写入共用版本检查与 Redis 原子条件写入，提交后的淘汰阻止旧查询迟到重新填回相同 Key；回滚不推进屏障或删除对象。缓存故障只影响缓存填充，不吞数据库异常。
+- 两仓 AGENTS 同步替换原投影缓存/独立 Key 约束，明确 Entity、共享通用 Key、上层转换、安全字段边界及双向复用验收。
+
+### 验证边界
+
+DetailEntityCacheTest 验证 `[1,2,3]` 只生成三个标准 detail 对象 Key、暖命中、部分未命中 IN、空批次、工厂隔离和迟到填充拒绝。BusinessDirectoryTest 使用真实用户 Mapper/XML 验证用户 Entity 的缓存复用和安全字段（包括不缓存 authRevision）。
+
+BusinessCacheIntegrationTest 在独立真实 Redis + Spring 事务下，验证批量先写→生成 CRUD 详情直接命中，CRUD先写→批量直接命中，并验证 Entity 的规格等非目录字段不丢失、提交后淘汰、回滚保留与迟到填充拒绝。生成器的实际编译/代理缓存测试同步适配通用屏障元数据，仍验证新增、修改、删除、同步、跳过和回滚行为，不修改生成模板或业务状态。
+
+本轮只改后端缓存及相关类型/fixture、两仓约束和本报告；不改 HTTP 响应契约、前端业务页面、SQL、生产数量算法或工艺核心模型。没有自行重启用户服务，运行中的旧版本和旧 Key 不作为新实现的真实验证；旧目录对象值按既有 TTL 到期，不双读旧 Key，不清空用户 Redis。

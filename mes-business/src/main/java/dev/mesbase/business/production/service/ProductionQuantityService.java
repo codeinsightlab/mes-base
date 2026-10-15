@@ -16,7 +16,7 @@ import com.github.pagehelper.PageHelper;
 import java.math.BigDecimal;
 import java.util.List;
 import dev.mesbase.business.directory.service.BusinessDirectoryService;
-import dev.mesbase.common.cache.ReferenceLabelCache.Label;
+import dev.mesbase.business.directory.domain.DirectoryLabel;
 import java.util.ArrayList;
 import java.util.Map;
 import java.util.Objects;
@@ -81,7 +81,7 @@ public class ProductionQuantityService {
                 .getPathStatus(), locked, locked ? null : "实际路径尚未锁定，禁止写入报工数量", List.copyOf(result), label(model.routing()));
     }
 
-    private static String label(Label label) {
+    private static String label(DirectoryLabel label) {
         return label == null ? null : label.code() + " / V" + label.version() + " · " + label.name();
     }
 
