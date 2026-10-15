@@ -20,11 +20,14 @@ import static org.mockito.Mockito.when;
 import static org.mockito.ArgumentMatchers.any;
 
 class DetailEntityCacheTest {
-    record TestEntity(Long id, String code, String name, Integer version) {}
-    private Map<Long,TestEntity> getAll(DetailEntityCache cache, String namespace, List<Long> ids,
-            Function<List<Long>, Map<Long,TestEntity>> loader) {
+    record TestEntity(Long id, String code, String name, Integer version) {
+    }
+
+    private Map<Long, TestEntity> getAll(DetailEntityCache cache, String namespace, List<Long> ids,
+                                         Function<List<Long>, Map<Long, TestEntity>> loader) {
         return cache.getAll(namespace, ids, TestEntity.class, TestEntity::id, loader);
     }
+
     static class Memory extends RedisCache {
         final Map<String, Object> values = new HashMap<>();
 
@@ -47,8 +50,10 @@ class DetailEntityCacheTest {
         public void setCacheObjectsIfVersion(String key, String expected, Map<String, byte[]> values, int ttl) {
             if (Objects.equals(expected, this.values.get(key))) this.values.putAll(values);
         }
-        @Override public void deleteByPattern(String pattern) {
-            String prefix = pattern.substring(0, pattern.length()-1);
+
+        @Override
+        public void deleteByPattern(String pattern) {
+            String prefix = pattern.substring(0, pattern.length() - 1);
             values.keySet().removeIf(key -> key.startsWith(prefix));
         }
     }

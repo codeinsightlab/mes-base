@@ -35,23 +35,27 @@ public class DetailEntityCache {
         if (ttl < 1) throw new IllegalArgumentException("Reference cache TTL must be positive");
     }
 
-    public record Generation(boolean available, String value) {}
+    public record Generation(boolean available, String value) {
+    }
 
     public Generation generation(String namespace) {
-        try { return new Generation(true, redis.getCacheObject(DetailCacheKeys.version(namespace))); }
-        catch (Exception failure) {
-            LOG.warn("Detail cache version unavailable namespace={} cause={}", namespace, failure.getClass().getSimpleName());
+        try {
+            return new Generation(true, redis.getCacheObject(DetailCacheKeys.version(namespace)));
+        } catch (Exception failure) {
+            LOG.warn("Detail cache version unavailable namespace={} cause={}", namespace, failure.getClass()
+                    .getSimpleName());
             return new Generation(false, null);
         }
     }
 
     public <T> Map<Long, T> getAll(String namespace, Collection<Long> requested, Class<T> type,
-                                  Function<T, Long> identity, Function<List<Long>, Map<Long, T>> loader) {
+                                   Function<T, Long> identity, Function<List<Long>, Map<Long, T>> loader) {
         return getAll(namespace, requested, type, identity, loader, null);
     }
 
     public <T> Map<Long, T> getAll(String namespace, Collection<Long> requested, Class<T> type,
-                                  Function<T, Long> identity, Function<List<Long>, Map<Long, T>> loader, Set<String> allowedFields) {
+                                   Function<T, Long> identity, Function<List<Long>, Map<Long, T>> loader,
+                                   Set<String> allowedFields) {
         var ids = requested.stream().filter(Objects::nonNull).distinct().sorted().toList();
         if (ids.size() > 200) throw new IllegalArgumentException("At most 200 reference IDs");
         if (ids.isEmpty()) return Map.of();
@@ -64,12 +68,14 @@ public class DetailEntityCache {
                 Object value = values.get(i);
                 if (value instanceof byte[] bytes) {
                     T row = json.readValue(bytes, type);
-                    if (!Objects.equals(ids.get(i), identity.apply(row))) throw new IllegalStateException("Detail identity mismatch");
+                    if (!Objects.equals(ids.get(i), identity.apply(row)))
+                        throw new IllegalStateException("Detail identity mismatch");
                     result.put(ids.get(i), row);
                 }
             }
         } catch (Exception failure) {
-            LOG.warn("Detail batch cache unavailable; querying database namespace={} cause={}", namespace, failure.getClass().getSimpleName());
+            LOG.warn("Detail batch cache unavailable; querying database namespace={} cause={}", namespace, failure.getClass()
+                    .getSimpleName());
             return Map.copyOf(loader.apply(ids));
         }
         var missing = ids.stream().filter(id -> !result.containsKey(id)).toList();
@@ -79,14 +85,16 @@ public class DetailEntityCache {
             for (var id : missing) {
                 var row = loaded.get(id);
                 if (row == null) continue;
-                if (!Objects.equals(id, identity.apply(row))) throw new IllegalStateException("Detail loader identity mismatch");
+                if (!Objects.equals(id, identity.apply(row)))
+                    throw new IllegalStateException("Detail loader identity mismatch");
                 result.put(id, row);
                 try {
                     ObjectNode value = json.valueToTree(row);
                     if (allowedFields != null) value.retain(allowedFields);
                     writes.put(DetailCacheKeys.detail(namespace, id), json.writeValueAsBytes(value));
+                } catch (Exception failure) {
+                    throw new IllegalArgumentException("Detail cannot be encoded", failure);
                 }
-                catch (Exception failure) { throw new IllegalArgumentException("Detail cannot be encoded", failure); }
             }
             write(namespace, generation, writes);
         }
@@ -95,8 +103,9 @@ public class DetailEntityCache {
 
     public void write(String namespace, Generation generation, Map<String, byte[]> values) {
         if (!generation.available()) return;
-        try { redis.setCacheObjectsIfVersion(DetailCacheKeys.version(namespace), generation.value(), values, ttl); }
-        catch (Exception failure) {
+        try {
+            redis.setCacheObjectsIfVersion(DetailCacheKeys.version(namespace), generation.value(), values, ttl);
+        } catch (Exception failure) {
             LOG.warn("Detail cache fill failed namespace={} cause={}", namespace, failure.getClass().getSimpleName());
         }
     }
