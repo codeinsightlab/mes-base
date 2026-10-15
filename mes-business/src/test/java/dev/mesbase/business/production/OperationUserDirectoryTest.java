@@ -7,13 +7,30 @@ import dev.mesbase.core.error.FoundationException;
 import dev.mesbase.core.factory.FactoryId;
 import dev.mesbase.core.factory.FactoryScope;
 import dev.mesbase.infrastructure.persistence.PlatformPersistence;
+import dev.mesbase.infrastructure.persistence.OwnedTransactionManager;
 import dev.mesbase.infrastructure.persistence.PersistenceFactories;
 import dev.mesbase.platform.execution.FactoryContext;
 import dev.mesbase.system.mapper.SysMenuMapper;
 import dev.mesbase.system.production.OperationUserDirectoryMapper;
 import java.util.List;
+import java.util.Map;
+import org.springframework.core.env.MapPropertySource;
 import java.util.Set;
 import java.util.UUID;
+import org.springframework.context.annotation.AnnotationConfigApplicationContext;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.transaction.annotation.EnableTransactionManagement;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
+import org.springframework.transaction.support.TransactionTemplate;
+
+import static org.junit.jupiter.api.Assertions.assertSame;
+
+import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.never;
+import static org.mockito.ArgumentMatchers.any;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
@@ -30,6 +47,14 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 class OperationUserDirectoryTest {
     OperationUserDirectory directory;
     JdbcTemplate jdbc;
+    PlatformPersistence center;
+    AnnotationConfigApplicationContext context;
+
+    @Configuration
+    @EnableTransactionManagement(proxyTargetClass = true)
+    static class Transactions {
+    }
+
 
     @BeforeEach
     void setup() {
@@ -45,16 +70,27 @@ class OperationUserDirectoryTest {
         jdbc.update("INSERT INTO sys_role_menu VALUES(1,2),(2,2),(3,2),(4,4),(5,2)");
         jdbc.update("INSERT INTO sys_user VALUES(1,'a','Factory A','0','0'),(2,'b','Factory B','0','0'),(3,'p','Platform business','0','0'),(4,'admin','Platform only','0','0'),(5,'off','Disabled user','1','0'),(6,'gone','Deleted user','0','2'),(7,'offrole','Disabled role','0','0'),(8,'empty','No grants','0','0')");
         jdbc.update("INSERT INTO sys_user_role VALUES(1,1),(2,2),(3,3),(4,4),(5,1),(6,1),(7,5)");
-        var center = new PlatformPersistence(source, Set.of(SysMenuMapper.class, OperationUserDirectoryMapper.class), c -> {
+        center = spy(new PlatformPersistence(source, Set.of(SysMenuMapper.class, OperationUserDirectoryMapper.class), c -> {
             c.getTypeAliasRegistry().registerAlias("SysMenu", SysMenu.class);
             PersistenceFactories.pagination(c);
-        });
-        directory = new OperationUserDirectory(center);
+        }));
+        context = new AnnotationConfigApplicationContext();
+        context.getEnvironment().getPropertySources()
+                .addFirst(new MapPropertySource("TEST ONLY", Map.of("mes.business.enabled", "true")));
+        context.register(Transactions.class);
+        context.registerBean("masterTransactionManager", OwnedTransactionManager.class, center::transactionManager);
+        context.registerBean(PlatformPersistence.class, () -> center);
+        context.registerBean(SysMenuMapper.class, () -> center.mapper(SysMenuMapper.class));
+        context.registerBean(OperationUserDirectoryMapper.class, () -> center.mapper(OperationUserDirectoryMapper.class));
+        context.registerBean(OperationUserDirectory.class);
+        context.refresh();
+        directory = context.getBean(OperationUserDirectory.class);
         FactoryContext.bind(new FactoryScope(new FactoryId("A")));
     }
 
     @AfterEach
     void clear() {
+        if (context != null) context.close();
         FactoryContext.clear();
         PageHelper.clearPage();
     }
@@ -66,6 +102,30 @@ class OperationUserDirectoryTest {
         FactoryContext.bind(new FactoryScope(new FactoryId("B")));
         assertEquals(List.of(2L, 3L), directory.page(null, 0, 20).items().stream()
                 .map(OperationUserDirectoryMapper.UserOption::id).toList());
+    }
+
+    @Test
+    void ordinaryPageUsesInjectedMappersWithoutIndependentWindow() {
+        assertEquals(2, directory.page(null, 0, 20).total());
+        verify(center, never()).readOnly(any());
+        assertFalse(TransactionSynchronizationManager.isActualTransactionActive());
+        assertEquals(2, directory.page(null, 0, 20).total());
+    }
+
+    @Test
+    void validationRetainsIndependentWindowInsideBusinessTransaction() {
+        var source = new DriverManagerDataSource("jdbc:h2:mem:" + UUID.randomUUID(), "sa", "");
+        var manager = new OwnedTransactionManager(source);
+        new TransactionTemplate(manager).execute(status -> {
+            Object connection = TransactionSynchronizationManager.getResource(source);
+            directory.requireValid(1L);
+            assertEquals(2, directory.validUsers(List.of(1L, 3L)).size());
+            assertSame(connection, TransactionSynchronizationManager.getResource(source));
+            assertThrows(FoundationException.class, () -> directory.page(null, 0, 20));
+            return null;
+        });
+        assertFalse(TransactionSynchronizationManager.isActualTransactionActive());
+        assertEquals(2, directory.page(null, 0, 20).total());
     }
 
     @Test

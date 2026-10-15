@@ -8,7 +8,6 @@ import dev.mesbase.business.production.domain.MesExecutionAssignmentEntity;
 import dev.mesbase.business.production.domain.MesExecutionAssignmentExample;
 import dev.mesbase.business.production.domain.MesExecutionAssignmentPage;
 import dev.mesbase.business.production.domain.MesExecutionAssignmentQueryDto;
-import dev.mesbase.business.production.domain.MesExecutionAssignmentResource;
 import dev.mesbase.business.production.domain.MesExecutionAssignmentUpdateCommand;
 import dev.mesbase.business.production.service.IMesExecutionAssignmentService;
 import dev.mesbase.core.error.ErrorCode;

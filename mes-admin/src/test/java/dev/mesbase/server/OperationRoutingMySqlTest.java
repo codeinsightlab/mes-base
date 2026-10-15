@@ -201,7 +201,7 @@ class OperationRoutingMySqlTest {
             context.getEnvironment().getPropertySources().addFirst(new MockEnvironment()
                     .withProperty("mes.business.enabled", "true").getPropertySources().get("mockProperties"));
             context.registerBean(FactoryBusinessDataSource.class, () -> source);
-            context.registerBean(SyncCoordinator.class, () -> new SyncCoordinator(platform, catalog));
+            context.registerBean(SyncCoordinator.class, () -> new SyncCoordinator(platform, platform.mapper(MasterSyncMapper.class), catalog));
             context.registerBean(OperationQueryPort.class, () -> (selected, maximum) -> {
                 queries[0]++;
                 if ("lost".equals(stage[0])) {

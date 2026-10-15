@@ -46,7 +46,7 @@ class SyncCoordinatorTest {
             return work.get();
         });
         when(factories.find(scope.factoryId())).thenReturn(Optional.of(factory(FactoryStatus.ENABLED)));
-        coordinator = new SyncCoordinator(persistence, factories);
+        coordinator = new SyncCoordinator(persistence, persistence.mapper(MasterSyncMapper.class), factories);
     }
 
     private Factory factory(FactoryStatus status) {

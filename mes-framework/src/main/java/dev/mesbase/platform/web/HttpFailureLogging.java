@@ -1,6 +1,7 @@
 package dev.mesbase.platform.web;
 
 import dev.mesbase.core.error.FoundationException;
+import dev.mesbase.common.exception.ServiceException;
 import dev.mesbase.framework.openapi.OpenApiHttp;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.Collections;
@@ -25,12 +26,48 @@ public final class HttpFailureLogging {
             if (OpenApiHttp.isOpenApi(request)) logSanitized(request, failure, failure.code().name());
             else LOG.error("event=http.request.failed errorCode={}",
                     failure.code(), failure);
-        } else if (failure.code().httpStatus() == 403) {
-            LOG.info("event=http.request.rejected errorCode={}",
-                    failure.code());
         } else {
-            LOG.debug("event=http.request.rejected errorCode={}", failure.code());
+            logBusiness(failure, failure.code().name());
         }
+    }
+
+    public static void known(HttpServletRequest request, ServiceException failure, String code) {
+        if (first(request, failure)) logBusiness(failure, code);
+    }
+
+    private static void logBusiness(Throwable failure, String code) {
+        if (failure.getCause() == null) {
+            LOG.warn("event=http.request.rejected errorCode={} exception={} origin={}",
+                    code, failure.getClass().getName(), origin(failure));
+        } else {
+            LOG.warn("event=http.request.rejected errorCode={} exception={} origin={} rootCauseOrigin={}",
+                    code, failure.getClass().getName(), origin(failure), rootCauseOrigin(failure));
+        }
+    }
+
+    private static String origin(Throwable failure) {
+        StackTraceElement[] frames = failure.getStackTrace();
+        if (frames.length == 0) return "unknown";
+        StackTraceElement frame = frames[0];
+        if (frame.getLineNumber() <= 0 || unavailable(frame.getFileName())
+                || unavailable(frame.getClassName()) || unavailable(frame.getMethodName())) return "unknown";
+        return "at " + frame.getClassName() + "." + frame.getMethodName()
+                + "(" + frame.getFileName() + ":" + frame.getLineNumber() + ")";
+    }
+
+    private static boolean unavailable(String value) {
+        return value == null || value.isBlank() || value.codePoints().anyMatch(Character::isISOControl);
+    }
+
+    private static String rootCauseOrigin(Throwable failure) {
+        Set<Throwable> seen = Collections.newSetFromMap(new IdentityHashMap<>());
+        Throwable root = failure;
+        seen.add(root);
+        while (root.getCause() != null) {
+            root = root.getCause();
+            if (!seen.add(root)) return "unknown";
+        }
+        return origin(root);
     }
 
     public static void unexpected(HttpServletRequest request, Throwable failure) {

@@ -75,7 +75,7 @@ class ManagedAdmissionTest {
             registry.registerDedicated(binding.factoryId(), binding.datasourceIdentity(), 1, source,
                     closed::incrementAndGet, Set.of());
             var cache = RoutingCacheFixture.cache(platform);
-            var service = new ManagedDatasourceService(platform, mock(DatasourcePasswordCipher.class), registry,
+            var service = new ManagedDatasourceService(platform, platform.mapper(ManagedDatasourceMapper.class), platform.mapper(ManagedFactoryMapper.class), mock(DatasourcePasswordCipher.class), registry,
                     source, null, Set.of(), Path.of("target/TEST-ONLY-unused-ddl"), cache);
             var loaded = new ConcurrentHashMap<Long, BusinessRuntimeBinding>();
             loaded.put(1L, binding);

@@ -11,29 +11,38 @@ import dev.mesbase.system.production.OperationUserDirectoryMapper;
 import dev.mesbase.system.production.OperationUserDirectoryMapper.UserOption;
 import dev.mesbase.system.service.MenuScopePolicy;
 import dev.mesbase.common.core.domain.entity.SysMenu;
+
 import java.util.List;
+
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Independent read-only center metadata window, including inside a business transaction.
+ * Ordinary directory queries use injected center mappers; business transaction validation uses an independent read window.
  */
 @Service
 @ConditionalOnProperty(name = "mes.business.enabled", havingValue = "true")
 public class OperationUserDirectory {
     private final PlatformPersistence center;
 
-    public OperationUserDirectory(PlatformPersistence center) {
+    private final SysMenuMapper menus;
+    private final OperationUserDirectoryMapper users;
+
+    public OperationUserDirectory(PlatformPersistence center, SysMenuMapper menus, OperationUserDirectoryMapper users) {
         this.center = center;
+        this.menus = menus;
+        this.users = users;
     }
 
     public record UserPage(List<UserOption> items, long total, int offset, int limit) {
     }
 
+    @Transactional(transactionManager = "masterTransactionManager", readOnly = true)
     public UserPage page(String keyword, int offset, int limit) {
         if (offset < 0 || limit < 1 || limit > 100 || keyword != null && keyword.length() > 100)
             throw new FoundationException(ErrorCode.BAD_REQUEST);
-        return read(null, keyword, offset, limit, null);
+        return query(FactoryContext.required().factoryId().value(), null, keyword, offset, limit, null, menus, users);
     }
 
     public void requireValid(Long userId) {
@@ -49,17 +58,22 @@ public class OperationUserDirectory {
 
     private UserPage read(Long id, String keyword, int offset, int limit, List<Long> userIds) {
         String factory = FactoryContext.required().factoryId().value();
-        return center.readOnly(session -> {
-            var menus = session.mapper(SysMenuMapper.class).selectMenuList(new SysMenu());
-            var policy = new MenuScopePolicy(menus);
-            var ids = menus.stream().filter(m -> "0".equals(m.getStatus()) && m.getPerms() != null
-                    && !m.getPerms().isBlank() && !policy.platform(m)).map(SysMenu::getMenuId).toList();
-            if (ids.isEmpty()) return new UserPage(List.of(), 0, offset, limit);
-            try (Page<UserOption> page = PageHelper.offsetPage(offset, limit)) {
-                var rows = session.mapper(OperationUserDirectoryMapper.class)
-                        .select(factory, id, keyword, ids, userIds);
-                return new UserPage(List.copyOf(rows), page.getTotal(), offset, limit);
-            }
-        });
+        if (!center.transactionManager().foreignTransactionActive())
+            return query(factory, id, keyword, offset, limit, userIds, menus, users);
+        return center.readOnly(session -> query(factory, id, keyword, offset, limit, userIds,
+                session.mapper(SysMenuMapper.class), session.mapper(OperationUserDirectoryMapper.class)));
+    }
+
+    private UserPage query(String factory, Long id, String keyword, int offset, int limit, List<Long> userIds,
+                           SysMenuMapper menuMapper, OperationUserDirectoryMapper userMapper) {
+        var menuRows = menuMapper.selectMenuList(new SysMenu());
+        var policy = new MenuScopePolicy(menuRows);
+        var ids = menuRows.stream().filter(m -> "0".equals(m.getStatus()) && m.getPerms() != null
+                && !m.getPerms().isBlank() && !policy.platform(m)).map(SysMenu::getMenuId).toList();
+        if (ids.isEmpty()) return new UserPage(List.of(), 0, offset, limit);
+        try (Page<UserOption> page = PageHelper.offsetPage(offset, limit)) {
+            var rows = userMapper.select(factory, id, keyword, ids, userIds);
+            return new UserPage(List.copyOf(rows), page.getTotal(), offset, limit);
+        }
     }
 }

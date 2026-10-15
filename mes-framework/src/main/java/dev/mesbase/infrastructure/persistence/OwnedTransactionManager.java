@@ -37,6 +37,12 @@ public final class OwnedTransactionManager extends JdbcTransactionManager {
             throw new FoundationException(ErrorCode.CONFLICT);
     }
 
+    /** True only when an active transaction belongs to a different database manager. */
+    public boolean foreignTransactionActive() {
+        return TransactionSynchronizationManager.isActualTransactionActive()
+                && TransactionSynchronizationManager.getResource(OWNER) != identity;
+    }
+
     public void verifyAccess() {
         if (routing == null && PersistenceReadContext.active(this)) return;
         checkOwner(identity);

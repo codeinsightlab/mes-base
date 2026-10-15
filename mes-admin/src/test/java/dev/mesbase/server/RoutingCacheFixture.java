@@ -1,5 +1,6 @@
 package dev.mesbase.server;
 
+import dev.mesbase.system.factory.RoutingMetadataMapper;
 import dev.mesbase.common.core.redis.RoutingMetadataStore;
 import dev.mesbase.infrastructure.persistence.PlatformPersistence;
 import dev.mesbase.server.managed.FactoryMetadataCache;
@@ -37,6 +38,6 @@ public final class RoutingCacheFixture {
     }
 
     public static FactoryMetadataCache cache(PlatformPersistence persistence) {
-        return new FactoryMetadataCache(persistence, store());
+        return new FactoryMetadataCache(persistence, store(), persistence.mapper(RoutingMetadataMapper.class));
     }
 }

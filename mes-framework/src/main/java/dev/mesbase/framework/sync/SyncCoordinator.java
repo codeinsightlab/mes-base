@@ -24,8 +24,8 @@ public final class SyncCoordinator {
     private final PlatformPersistence persistence;
     private final FactoryCatalog factories;
 
-    public SyncCoordinator(PlatformPersistence persistence, FactoryCatalog factories) {
-        this.mapper = persistence.mapper(MasterSyncMapper.class);
+    public SyncCoordinator(PlatformPersistence persistence, MasterSyncMapper mapper, FactoryCatalog factories) {
+        this.mapper = mapper;
         this.persistence = persistence;
         this.factories = factories;
     }
@@ -58,11 +58,13 @@ public final class SyncCoordinator {
     }
 
     public MasterSync state(FactoryScope scope, String key) {
-        return persistence.readOnly(s -> s.mapper(MasterSyncMapper.class).find(id(scope), key));
+        return mapper.find(id(scope), key);
     }
 
     public void assertOwner(Run run) {
-        var state = state(run.scope(), run.syncKey());
+        var state = persistence.transactionManager().foreignTransactionActive()
+                ? persistence.readOnly(s -> s.mapper(MasterSyncMapper.class).find(id(run.scope()), run.syncKey()))
+                : state(run.scope(), run.syncKey());
         if (state == null || !"RUNNING".equals(state.status()) || !run.runToken().equals(state.runToken()))
             throw new FoundationException(ErrorCode.SYNC_EXECUTION_LOST);
     }

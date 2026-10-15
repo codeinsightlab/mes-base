@@ -1,7 +1,5 @@
--- MES-CODEGEN: 本批次合并菜单 SQL。
 
 -- 来源：docs/generated/production/mesExecutionAssignment-menu.sql
--- MES-CODEGEN: reviewed add-or-update menu SQL; no role grants.
 -- 保留已有菜单 ID 和角色绑定，请在配置的菜单数据库串行执行。
 -- 目录按 parentId + directoryPath 定位，显示名称不作为目录唯一标识。
 
@@ -77,7 +75,6 @@ WHERE page.perms = 'business:mes:execution:assignment:list' AND page.menu_type =
   AND NOT EXISTS (SELECT 1 FROM sys_menu WHERE perms = 'business:mes:execution:assignment:delete' AND menu_type = 'F');
 
 -- 来源：docs/generated/production/mesOperationUser-menu.sql
--- MES-CODEGEN: reviewed add-or-update menu SQL; no role grants.
 -- 保留已有菜单 ID 和角色绑定，请在配置的菜单数据库串行执行。
 -- 目录按 parentId + directoryPath 定位，显示名称不作为目录唯一标识。
 
@@ -151,3 +148,9 @@ SELECT '工序能力人员删除', page.menu_id, 4, '#', 'F', 'business:mes:oper
 FROM sys_menu page
 WHERE page.perms = 'business:mes:operation:user:list' AND page.menu_type = 'C'
   AND NOT EXISTS (SELECT 1 FROM sys_menu WHERE perms = 'business:mes:operation:user:delete' AND menu_type = 'F');
+
+-- 生产执行与节点派工统一从工单进入；保留菜单编号、独立权限及角色绑定。
+-- 隐藏的旧路由仅用于兼容书签，前端跳转到生产工单。
+UPDATE sys_menu SET visible = '1'
+WHERE menu_type = 'C' AND component IN ('production/mesProductionExecution/index', 'production/mesExecutionAssignment/index')
+  AND perms IN ('business:mes:production:execution:list', 'business:mes:execution:assignment:list');

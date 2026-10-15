@@ -75,7 +75,7 @@ class OperatorAssignmentMySqlTest {
             c.getTypeAliasRegistry().registerAlias("SysMenu", SysMenu.class);
             c.addInterceptor(new PageInterceptor());
         });
-        var directory = new OperationUserDirectory(center);
+        var directory = new OperationUserDirectory(center, center.mapper(SysMenuMapper.class), center.mapper(OperationUserDirectoryMapper.class));
         String tag = "TEST_OPERATOR_" + UUID.randomUUID();
         FactoryContext.bind(new FactoryScope(new FactoryId("SIMPLE_B")));
         try (var session = sessions.openSession(false)) {

@@ -7,6 +7,9 @@ import dev.mesbase.infrastructure.persistence.BusinessPersistenceResolver;
 import dev.mesbase.infrastructure.persistence.OwnerMapperCatalog;
 import dev.mesbase.infrastructure.persistence.PersistenceOwner;
 import dev.mesbase.infrastructure.persistence.PlatformPersistence;
+import dev.mesbase.system.factory.ManagedDatasourceMapper;
+import dev.mesbase.system.factory.ManagedFactoryMapper;
+import dev.mesbase.system.factory.RoutingMetadataMapper;
 import dev.mesbase.infrastructure.persistence.RuntimeRegistry;
 import dev.mesbase.server.managed.DatasourcePasswordCipher;
 import dev.mesbase.server.managed.ManagedDatasourceService;
@@ -46,13 +49,13 @@ public class FactoryRuntimeConfiguration {
     }
 
     @Bean
-    FactoryMetadataCache factoryMetadataCache(PlatformPersistence persistence, RoutingMetadataStore store) {
-        return new FactoryMetadataCache(persistence, store);
+    FactoryMetadataCache factoryMetadataCache(PlatformPersistence persistence, RoutingMetadataStore store, RoutingMetadataMapper mapper) {
+        return new FactoryMetadataCache(persistence, store, mapper);
     }
 
     @Bean
     ManagedDatasourceService managedDatasources(Environment env,
-                                                PlatformPersistence persistence,
+                                                PlatformPersistence persistence, ManagedDatasourceMapper sources, ManagedFactoryMapper factories,
                                                 @Qualifier("masterDataSource") DataSource masterDataSource,
                                                 RuntimeRegistry registry,
                                                 OwnerMapperCatalog catalog, FactoryMetadataCache metadata) {
@@ -60,7 +63,7 @@ public class FactoryRuntimeConfiguration {
             throw new IllegalArgumentException("Factory Runtime requires explicit Platform persistence");
         var key = env.getRequiredProperty("mes.runtime.datasource-key");
         var mappers = catalog.types(PersistenceOwner.Kind.BUSINESS);
-        return new ManagedDatasourceService(persistence,
+        return new ManagedDatasourceService(persistence, sources, factories,
                 new DatasourcePasswordCipher(key), registry, masterDataSource, DruidPools.settings(env), mappers, Path.of(env.getRequiredProperty("mes.platform.file-root"))
                 .resolve("managed-ddl"), metadata);
     }

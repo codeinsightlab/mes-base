@@ -186,8 +186,8 @@ class WorkOrderRequestBudgetTest {
             registry.registerDedicated(new FactoryId("A"), new DatasourceIdentity("managed-1"), 1, business, () -> {
             }, Set.of(WorkorderErpExtraMapper.class, WorkOrderExtraMapper.class, WorkorderMapper.class, ProductionBatchMapper.class, MaterialMapper.class, RoutingMapper.class));
             var routingStore = RoutingCacheFixture.store();
-            var metadata = new FactoryMetadataCache(platform, routingStore);
-            var managed = new ManagedDatasourceService(platform, mock(DatasourcePasswordCipher.class), registry,
+            var metadata = new FactoryMetadataCache(platform, routingStore, platform.mapper(RoutingMetadataMapper.class));
+            var managed = new ManagedDatasourceService(platform, platform.mapper(ManagedDatasourceMapper.class), platform.mapper(ManagedFactoryMapper.class), mock(DatasourcePasswordCipher.class), registry,
                     center, null, Set.of(WorkorderErpExtraMapper.class, WorkOrderExtraMapper.class, WorkorderMapper.class, ProductionBatchMapper.class, MaterialMapper.class, RoutingMapper.class), Path.of("target/TEST-ONLY-unused-ddl"), metadata);
             var source = new FactoryBusinessDataSource(managed::resolve, registry);
             var manager = new OwnedTransactionManager(source);

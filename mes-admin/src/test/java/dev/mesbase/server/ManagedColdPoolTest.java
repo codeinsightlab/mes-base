@@ -71,7 +71,7 @@ class ManagedColdPoolTest {
         var platform = mock(DataSource.class);
         when(platform.getConnection()).thenAnswer(call -> probe("center"));
         var settings = new DruidPools.Settings(0, 0, 5, 1000, 1000, 1000, 1000, 0, 1000, "SELECT 1", false, false, false, "stat");
-        var service = new ManagedDatasourceService(persistence, mock(DatasourcePasswordCipher.class), registry, platform, settings,
+        var service = new ManagedDatasourceService(persistence, persistence.mapper(ManagedDatasourceMapper.class), persistence.mapper(ManagedFactoryMapper.class), mock(DatasourcePasswordCipher.class), registry, platform, settings,
                 Set.of(), Path.of("target/TEST-ONLY-unused-ddl"), RoutingCacheFixture.cache(persistence));
         return new Fixture(jdbc, service, registry);
     }

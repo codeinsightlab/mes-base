@@ -73,3 +73,9 @@ SELECT '生产执行单元删除', page.menu_id, 4, '#', 'F', 'business:mes:prod
 FROM sys_menu page
 WHERE page.perms = 'business:mes:production:execution:list' AND page.menu_type = 'C'
   AND NOT EXISTS (SELECT 1 FROM sys_menu WHERE perms = 'business:mes:production:execution:delete' AND menu_type = 'F');
+
+-- 生产执行与节点派工统一从工单进入；保留菜单编号、独立权限及角色绑定。
+-- 隐藏的旧路由仅用于兼容书签，前端跳转到生产工单。
+UPDATE sys_menu SET visible = '1'
+WHERE menu_type = 'C' AND component IN ('production/mesProductionExecution/index', 'production/mesExecutionAssignment/index')
+  AND perms IN ('business:mes:production:execution:list', 'business:mes:execution:assignment:list');

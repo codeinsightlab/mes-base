@@ -80,7 +80,7 @@ class ManagedRuntimeMySqlTest {
                 c.addInterceptor(interceptor);
             });
             var unit = persistence;
-            var service = new ManagedDatasourceService(persistence, new DatasourcePasswordCipher(key), registry, platform, settings, Set.of(), Path.of("target/validation/managed-ddl-" + factoryId), RoutingCacheFixture.cache(persistence));
+            var service = new ManagedDatasourceService(persistence, persistence.mapper(ManagedDatasourceMapper.class), persistence.mapper(ManagedFactoryMapper.class), new DatasourcePasswordCipher(key), registry, platform, settings, Set.of(), Path.of("target/validation/managed-ddl-" + factoryId), RoutingCacheFixture.cache(persistence));
             var catalog = new FactoryCatalog() {
                 public Optional<Factory> find(FactoryId id) {
                     return service.find(id);
@@ -127,8 +127,8 @@ class ManagedRuntimeMySqlTest {
             admission.lease().close();
             check(registry.contains(binding), "runtime loaded lazily");
             check(service.ddl(source.datasourceId(), false).sql().contains("Tables:"), "DDL snapshot without records");
-            var first = new SyncCoordinator(persistence, catalog);
-            var second = new SyncCoordinator(persistence, catalog);
+            var first = new SyncCoordinator(persistence, persistence.mapper(MasterSyncMapper.class), catalog);
+            var second = new SyncCoordinator(persistence, persistence.mapper(MasterSyncMapper.class), catalog);
             String syncKey = "test.only.migration." + UUID.randomUUID();
             try {
                 var pool = Executors.newFixedThreadPool(2);
@@ -243,7 +243,7 @@ class ManagedRuntimeMySqlTest {
                     throw new UnsupportedOperationException("Not used by probe");
                 }
             };
-            var coordinator = new SyncCoordinator(p, catalog);
+            var coordinator = new SyncCoordinator(p, p.mapper(MasterSyncMapper.class), catalog);
             Path gate = Path.of(args[3]);
             Files.createFile(gate.resolve("ready-" + args[4]));
             long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(20);

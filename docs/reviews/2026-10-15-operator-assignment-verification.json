@@ -1,0 +1,241 @@
+{
+  "date": "2026-10-15",
+  "scope": "OperationUser / ExecutionAssignment / ReportOperatorEligibility V1",
+  "schema": {
+    "status": "SCHEMA_READY",
+    "factory": "SIMPLE_B",
+    "datasourceId": 8,
+    "host": "192.168.18.25",
+    "port": 3306,
+    "database": "mes_base_dev_business_simple_b",
+    "migration": "V24__operation_user_execution_assignment.sql",
+    "flyway": "migrate + validate succeeded",
+    "tables": [
+      "mes_operation_user",
+      "mes_execution_assignment"
+    ],
+    "preexistingTables": false,
+    "finalSyntheticRows": 0
+  },
+  "codegen": {
+    "status": "CODE_GENERATED",
+    "source": "designated live MySQL metadata",
+    "tables": 2,
+    "artifacts": 40,
+    "rejected": 0,
+    "config": "docs/development/operator-assignment-codegen.yaml",
+    "reproductionReport": "docs/reviews/2026-10-15-operator-assignment-codegen.json"
+  },
+  "checks": [
+    {
+      "command": "MES_OPERATOR_MYSQL_ACCEPTANCE=true mvn -B -ntp verify",
+      "result": "PASS",
+      "tests": 493,
+      "passed": 477,
+      "skipped": 16,
+      "failures": 0,
+      "errors": 0,
+      "log": "/tmp/mes-operator-confirmed-verify.log",
+      "boundary": "Current shared source; includes one live designated-MySQL rollback test; 16 unrelated conditional skips"
+    },
+    {
+      "command": "npm test",
+      "runtime": "Node 22.23.1",
+      "result": "PASS",
+      "files": 41,
+      "tests": 218,
+      "log": "/tmp/mes-operator-ui-tests-final.log",
+      "boundary": "Vue/component mocks, not live browser"
+    },
+    {
+      "command": "npm run build",
+      "runtime": "Node 22.23.1",
+      "result": "PASS",
+      "log": "/tmp/mes-operator-ui-build-final.log",
+      "note": "Existing large chunk advisory; no build errors"
+    },
+    {
+      "command": "/usr/bin/python3 scripts/smoke-packaged.py",
+      "result": "PASS",
+      "passed": 10,
+      "failed": 0,
+      "log": "/tmp/mes-operator-smoke-confirmed.log",
+      "boundary": "Temporary isolated loopback Java test process; no developer business JDBC"
+    },
+    {
+      "command": "./scripts/format-java --check <39 task Java files>",
+      "result": "PASS",
+      "log": "/tmp/mes-operator-format-check.log"
+    },
+    {
+      "command": "git diff --check (both repositories)",
+      "result": "PASS"
+    }
+  ],
+  "newBackendTests": {
+    "ruleMatrixAndMutations": 21,
+    "centerDirectoryH2": 4,
+    "scopeTransactionContracts": 4,
+    "twoFactoryHttpH2": 2,
+    "designatedMySqlRollback": 1
+  },
+  "online": {
+    "health": 200,
+    "login": 200,
+    "factoryNavigation": 200,
+    "newPermissionCount": 0,
+    "capabilityGet": 403,
+    "assignmentGet": 403,
+    "roleGrantsAdded": 0,
+    "userServicesStartedStoppedOrRestarted": false
+  },
+  "evidence": {
+    "API_VERIFIED": "PARTIAL: real MockMvc/SQL/transactions; online permission denial only",
+    "UI_VERIFIED": "PARTIAL: 218 tests and build; new live-browser interactions NOT_RUN",
+    "BUSINESS_VERIFIED": "PARTIAL: rules and designated live MySQL rollback; authorized live API/UI end-to-end NOT_RUN"
+  },
+  "protectedParallelWork": {
+    "backendInitialHead": "5089000",
+    "backendObservedHead": "bc71f12",
+    "externalCommitIncludesTaskFiles": true,
+    "agentIssuedGitCommit": false,
+    "frontendHead": "732d669",
+    "sourceProductWritten": false,
+    "routingCoreWritten": false,
+    "workOrderModelWritten": false
+  },
+  "transientFailures": [
+    {
+      "result": "RECOVERED",
+      "details": "Supplementary Maven compilation saw missing target dependency classes; smoke log disappeared while running. Re-ran full verify serially successfully, then smoke successfully. No source workaround."
+    }
+  ],
+  "remaining": [
+    "Designate minimal read/create/delete permissions for a test role through normal role management",
+    "Authorized real API create/cancel and browser acceptance at desktop/narrow widths",
+    "Do not treat eligibility as future reporting API authorization or report submission implementation"
+  ],
+  "visualAcceptanceFollowup": {
+    "date": "2026-10-15",
+    "factory": "SIMPLE_B",
+    "frontend": "http://127.0.0.1:5173",
+    "backend": "http://127.0.0.1:8081",
+    "browser": "Codex in-app browser",
+    "result": "READ_ONLY_VISUAL_VERIFIED_WITH_FIXES",
+    "viewports": [
+      [
+        1920,
+        1080
+      ],
+      [
+        1440,
+        900
+      ],
+      [
+        1280,
+        720
+      ],
+      [
+        390,
+        844
+      ]
+    ],
+    "flows": [
+      "Normal login and actual factory context",
+      "Operation capability open/search/candidate selection",
+      "Unsaved close confirmation cancel/discard",
+      "Execution assignment open and exact node selection",
+      "Empty eligible-candidate explanation",
+      "Assignment query list hierarchy",
+      "Narrow dialog scrolling and pagination",
+      "Select input focus feedback"
+    ],
+    "checks": {
+      "frontendTestFiles": 41,
+      "frontendTests": 220,
+      "frontendTestResult": "PASS",
+      "build": "PASS",
+      "diffCheck": "PASS",
+      "finalBrowserErrorWarnLogs": 0
+    },
+    "screenshots": ".local/operator-assignment-20261015/visual-audit/",
+    "rejectedScreenshots": [
+      "16-assignment-final-1280.jpg",
+      "17-assignment-final-390.jpg"
+    ],
+    "scope": {
+      "backendCodeChanged": false,
+      "businessDataWritten": false,
+      "permissionsChanged": false,
+      "userServicesOperated": false,
+      "browserStateOrResponsesMocked": false
+    },
+    "limits": [
+      "No live create/delete business submission in this visual followup",
+      "No nonempty capability or assignment rows available in viewed contexts",
+      "Missing operation name remains an explicit unknown, no data fabricated",
+      "First login service-unavailable recovered on retry; root cause not determined"
+    ],
+    "evidenceChange": "Earlier zero-permission/403 snapshot is retained as historical evidence; current normal login can access configuration read flows without permission changes by this agent. BUSINESS_VERIFIED remains PARTIAL."
+  },
+  "workorderIntegrationFollowup": {
+    "status": "UI_WRITE_CHAIN_VERIFIED",
+    "target": {
+      "factoryId": "SIMPLE_B",
+      "datasourceId": "8",
+      "host": "192.168.18.25",
+      "port": 3306,
+      "database": "mes_base_dev_business_simple_b"
+    },
+    "menu": {
+      "executed": true,
+      "centralDatabase": "mes_base_dev",
+      "ids": [
+        "2579",
+        "2588"
+      ],
+      "visible": "1",
+      "roleGrantsChanged": false,
+      "legacyRoutes": "redirect to workorder"
+    },
+    "uiWrites": {
+      "capabilityIds": [
+        "10",
+        "11"
+      ],
+      "assignmentId": "7",
+      "workorderId": "18",
+      "executionId": "15",
+      "routingNodeId": "1024",
+      "operatorUserId": "100"
+    },
+    "failedBindingReproduced": false,
+    "observedGaps": [
+      "missing inline operation capability configuration from assignment",
+      "missing save feedback",
+      "asynchronous user label rendering",
+      "narrow workorder descriptions"
+    ],
+    "frontendTests": {
+      "files": 43,
+      "passed": 226,
+      "failed": 0
+    },
+    "frontendBuild": "PASSED",
+    "visualViewports": [
+      "1920x1080",
+      "1440x900",
+      "1280x720",
+      "390x844"
+    ],
+    "finalScreenshot": ".local/operator-assignment-20261015/visual-audit/30-workorder-assignment-final.jpg",
+    "limits": [
+      "single eligible live operator; multiple-user scenarios covered by existing automated fixtures",
+      "formal reporting not implemented by original scope",
+      "legacy workorderId parameter verified with unit tests, not live browser"
+    ],
+    "serviceRestarted": false,
+    "committed": false,
+    "deployed": false
+  }
+}

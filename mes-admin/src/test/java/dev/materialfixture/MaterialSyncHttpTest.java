@@ -174,7 +174,7 @@ class MaterialSyncHttpTest {
 
         @Bean
         SyncCoordinator coordinator(Fixture fixture) {
-            return new SyncCoordinator(fixture.platform, fixture.catalog);
+            return new SyncCoordinator(fixture.platform, fixture.platform.mapper(MasterSyncMapper.class), fixture.catalog);
         }
 
         @Bean

@@ -203,7 +203,7 @@ class StockHttpTest {
 
         @Bean
         SyncCoordinator coordinator(Fixture f) {
-            var coordinator = spy(new SyncCoordinator(f.platform, f.catalog));
+            var coordinator = spy(new SyncCoordinator(f.platform, f.platform.mapper(MasterSyncMapper.class), f.catalog));
             doAnswer(call -> {
                 if (++f.ownerChecks == f.loseAt) {
                     f.center.update("UPDATE mes_master_sync SET run_token='REPLACED' WHERE status='RUNNING'");

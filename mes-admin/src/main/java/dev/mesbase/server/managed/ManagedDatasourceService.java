@@ -49,11 +49,12 @@ import java.util.function.Supplier;
 import javax.sql.DataSource;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.scheduling.annotation.Scheduled;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * SOURCE_PRODUCT_PORT: ManagedDatasourceService. Platform records own configuration; pools are node-local.
  */
-public final class ManagedDatasourceService {
+public class ManagedDatasourceService {
     public record DatasourceForm(Long datasourceId, Long revision,
                                  @NotBlank @Size(max = 64) String datasourceName,
                                  @NotBlank @Size(max = 255) @Pattern(regexp = "[a-zA-Z0-9.-]+") String dbHost,
@@ -110,14 +111,14 @@ public final class ManagedDatasourceService {
 
     private final ConcurrentHashMap<Long, DdlCache> ddlCache = new ConcurrentHashMap<>();
 
-    public ManagedDatasourceService(PlatformPersistence persistence, DatasourcePasswordCipher cipher,
+    public ManagedDatasourceService(PlatformPersistence persistence, ManagedDatasourceMapper sources, ManagedFactoryMapper factories, DatasourcePasswordCipher cipher,
                                     RuntimeRegistry registry, DataSource platform, DruidPools.Settings settings,
                                     Set<Class<?>> mappers, Path ddlRoot, FactoryMetadataCache metadata) {
         this.metadata = Objects.requireNonNull(metadata);
         for (int i = 0; i < preparationLocks.length; i++) preparationLocks[i] = new Object();
         this.persistence = persistence;
-        this.sources = persistence.mapper(ManagedDatasourceMapper.class);
-        this.factories = persistence.mapper(ManagedFactoryMapper.class);
+        this.sources = sources;
+        this.factories = factories;
         this.cipher = cipher;
         this.registry = registry;
         this.platform = platform;
@@ -171,14 +172,9 @@ public final class ManagedDatasourceService {
 
     private <T> Page<T> page(int pageNum, int pageSize, Supplier<List<T>> query) {
         if (pageNum < 1 || pageSize < 1 || pageSize > 100) throw new FoundationException(ErrorCode.BAD_REQUEST);
-        var rows = persistence.run(() -> {
-            PageHelper.startPage(pageNum, pageSize);
-            try {
-                return query.get();
-            } finally {
-                PageHelper.clearPage();
-            }
-        });
+        List<T> rows;
+        PageHelper.startPage(pageNum, pageSize);
+        try { rows = query.get(); } finally { PageHelper.clearPage(); }
         if (!(rows instanceof Page<?>)) throw new IllegalStateException("Platform pagination interceptor required");
         return (Page<T>) rows;
     }
@@ -190,42 +186,44 @@ public final class ManagedDatasourceService {
         return result;
     }
 
+    @Transactional(transactionManager = "masterTransactionManager", readOnly = true)
     public synchronized List<DatasourceView> pageSources(int pageNum, int pageSize) {
         var rows = page(pageNum, pageSize, sources::all);
         var bindings = new HashMap<Long, ManagedFactory>();
-        if (!rows.isEmpty()) persistence.readOnly(s -> s.mapper(ManagedFactoryMapper.class)
-                        .byDatasources(rows.stream().map(ManagedDatasource::datasourceId).toList()))
+        if (!rows.isEmpty()) factories
+                        .byDatasources(rows.stream().map(ManagedDatasource::datasourceId).toList())
                 .forEach(f -> bindings.put(f.datasourceId(), f));
         return mapPage(rows, row -> view(row, bindings.get(row.datasourceId())));
     }
 
+    @Transactional(transactionManager = "masterTransactionManager", readOnly = true)
     public List<FactoryView> pageFactories(int pageNum, int pageSize) {
         var rows = page(pageNum, pageSize, factories::all);
         var ids = rows.stream().map(ManagedFactory::datasourceId).filter(Objects::nonNull).distinct().toList();
         var names = new HashMap<Long, String>();
-        if (!ids.isEmpty()) persistence.readOnly(s -> s.mapper(ManagedDatasourceMapper.class).byIds(ids))
+        if (!ids.isEmpty()) sources.byIds(ids)
                 .forEach(d -> names.put(d.datasourceId(), d.datasourceName()));
         return mapPage(rows, f -> view(f, names.get(f.datasourceId())));
     }
 
     public synchronized List<DatasourceView> list(int offset, int limit) {
         bounds(offset, limit);
-        var rows = persistence.readOnly(s -> s.mapper(ManagedDatasourceMapper.class).list(offset, limit));
+        var rows = sources.list(offset, limit);
         if (rows.isEmpty()) return List.of();
-        var bindings = persistence.readOnly(s -> s.mapper(ManagedFactoryMapper.class)
-                .byDatasources(rows.stream().map(ManagedDatasource::datasourceId).toList()));
+        var bindings = factories
+                .byDatasources(rows.stream().map(ManagedDatasource::datasourceId).toList());
         var bySource = new HashMap<Long, ManagedFactory>();
         bindings.forEach(f -> bySource.put(f.datasourceId(), f));
         return rows.stream().map(row -> view(row, bySource.get(row.datasourceId()))).toList();
     }
 
     public long countSources() {
-        return persistence.readOnly(s -> s.mapper(ManagedDatasourceMapper.class).count());
+        return sources.count();
     }
 
     public synchronized DatasourceView detail(long id) {
-        ManagedDatasource row = persistence.readOnly(s -> required(s.mapper(ManagedDatasourceMapper.class).find(id)));
-        return view(row, persistence.readOnly(s -> s.mapper(ManagedFactoryMapper.class).byDatasource(id)));
+        ManagedDatasource row = required(sources.find(id));
+        return view(row, factories.byDatasource(id));
     }
 
     public DatasourceView save(DatasourceForm form, boolean creating) {
@@ -286,23 +284,23 @@ public final class ManagedDatasourceService {
 
     public List<FactoryView> factoryList(int offset, int limit) {
         bounds(offset, limit);
-        var rows = persistence.readOnly(s -> s.mapper(ManagedFactoryMapper.class).list(offset, limit));
+        var rows = factories.list(offset, limit);
         var ids = rows.stream().map(ManagedFactory::datasourceId).filter(Objects::nonNull).distinct().toList();
         var names = new HashMap<Long, String>();
-        if (!ids.isEmpty()) persistence.readOnly(s -> s.mapper(ManagedDatasourceMapper.class).byIds(ids))
+        if (!ids.isEmpty()) sources.byIds(ids)
                 .forEach(d -> names.put(d.datasourceId(), d.datasourceName()));
         return rows.stream().map(f -> view(f, names.get(f.datasourceId()))).toList();
     }
 
     public FactoryView factory(String id) {
         var f = factoryRecord(id);
-        String name = f.datasourceId() == null ? null : persistence.readOnly(s -> required(s.mapper(ManagedDatasourceMapper.class)
-                .find(f.datasourceId()))).datasourceName();
+        String name = f.datasourceId() == null ? null : required(sources
+                .find(f.datasourceId())).datasourceName();
         return view(f, name);
     }
 
     private ManagedFactory factoryRecord(String id) {
-        return persistence.readOnly(s -> required(s.mapper(ManagedFactoryMapper.class).find(id)));
+        return required(factories.find(id));
     }
 
     public FactoryView saveFactory(FactoryForm form, boolean creating) {
@@ -351,7 +349,7 @@ public final class ManagedDatasourceService {
 
     public List<Factory> enabled(int offset, int limit) {
         bounds(offset, limit);
-        return persistence.readOnly(s -> s.mapper(ManagedFactoryMapper.class).enabled(offset, limit)).stream()
+        return factories.enabled(offset, limit).stream()
                 .map(ManagedDatasourceService::core).toList();
     }
 
@@ -363,7 +361,7 @@ public final class ManagedDatasourceService {
     }
 
     public DdlView ddl(long id, boolean refresh) {
-        var row = persistence.readOnly(s -> required(s.mapper(ManagedDatasourceMapper.class).find(id)));
+        var row = required(sources.find(id));
         if (!"ENABLED".equals(row.status())) throw new FoundationException(ErrorCode.RUNTIME_NOT_CONFIGURED);
         var cached = ddlCache.get(id);
         if (!refresh && cached != null && cached.revision() == row.revision()) return cached.view();
@@ -506,8 +504,8 @@ public final class ManagedDatasourceService {
         Map<Long, BusinessRuntimeBinding> observed = Map.copyOf(initialized);
         if (observed.isEmpty()) return;
         var ids = List.copyOf(observed.keySet());
-        var bindings = persistence.readOnly(s -> s.mapper(ManagedFactoryMapper.class).byDatasources(ids));
-        var configurations = persistence.readOnly(s -> s.mapper(ManagedDatasourceMapper.class).byIds(ids));
+        var bindings = factories.byDatasources(ids);
+        var configurations = sources.byIds(ids);
         for (var entry : observed.entrySet()) {
             long id = entry.getKey();
             BusinessRuntimeBinding old = entry.getValue();

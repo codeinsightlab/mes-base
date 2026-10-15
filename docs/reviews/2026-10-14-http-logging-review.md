@@ -677,3 +677,67 @@ MES_LOG_DIR=/private/tmp/mes-log-final-fix-20261015/suite MES_LOG_INSTANCE=accep
 回滚按本次五个生产文件、四个测试文件和本文变更逐项恢复即可；没有数据迁移或业务协议回滚。本轮没有提交、推送、部署或重启用户服务。Document Updated：本文新增最终授权修复与复验A–E、运维环境示例、真实日志/矩阵/测试及条件；保留历史NO-GO并标明被本轮取代；**未修改业务代码**。
 
 **本轮修复、测试与报告结束，到此停止，不自动进入新的日志优化。**
+
+
+## 2026-10-15：已知异常单行源码定位（用户后续授权）
+
+### Change Summary
+
+本轮按用户新要求，将 Foundation 业务异常（HTTP<500）与 ServiceException 从上一轮的 DEBUG/INFO 改为**单行 WARN**，以便生产 ROOT=INFO 时直接看到来源。该策略明确取代上一轮相应的业务拒绝降噪规则；普通 MVC 参数绑定/校验异常仍 DEBUG，Security EntryPoint 直接返回401的路径不额外制造异常/WARN。无全局Logback、业务代码、SQL或数据库审计改动；现有生产人员分配并行改动保持原样，未提交/推送/部署/重启用户服务。
+
+|文件|修改内容|
+|---|---|
+|`mes-framework/src/main/java/dev/mesbase/platform/web/HttpFailureLogging.java`|复用现有known边界和请求内Throwable/原因链去重；业务异常WARN含errorCode、完整exception类型、origin；为ServiceException增加共用known入口。Foundation的5xx继续ERROR及完整Throwable链；未预期异常和OpenAPI脱敏系统链不变|
+|`mes-framework/src/main/java/dev/mesbase/platform/web/FoundationErrorAdvice.java`|ServiceException只将原日志调用换成上述共用边界；保留原401/403/422映射、响应内容/消息处理和requestId。MVC参数校验调用不变|
+|`mes-admin/src/test/java/dev/mesbase/platform/web/HttpFailureOriginTest.java`（新增）|10项验证实际异常创建行、源码文件内容核对、空/Native/缺文件/缺行/控制字符回退、原因链、循环原因链、Service Advice重复调用及包装去重、prod INFO子JVM实际格式/完整系统ERROR链|
+|`mes-admin/src/test/java/dev/mesbase/platform/web/HttpLoggingBoundaryTest.java`|将已失效的业务DEBUG/403 INFO断言替换为INFO环境可见的WARN、无Throwable和原去重断言|
+|`mes-admin/src/test/java/dev/mesbase/HttpLoggingHttpTest.java`|实际HTTP异常验证一条WARN、类型和来源文件/方法、无Throwable、正文无requestId；原响应、500完整栈及异步完成测试保留；MVC绑定错误仍验证仅访问摘要|
+
+只读取Throwable.getStackTrace()的第一个StackTraceElement，通过getClassName/getMethodName/getFileName/getLineNumber构造`origin=at 完整类.方法(文件.java:行号)`，不解析打印堆栈、不通过Logger调用者位置猜异常来源、不跳过外层异常去覆盖origin。没有已知业务异常message或Throwable参数进入WARN，防止输出完整栈/凭证。requestId仍仅由现有MDC/pattern输出。
+
+有cause时附加`rootCauseOrigin`，指向最深原因的创建位置；外层origin保留。按对象身份集合防止循环原因链，无终点时rootCauseOrigin=unknown。空栈、文件名缺失、行号<=0（含native）、来源字段含控制字符时输出unknown；不拼接不安全多行文本。异常创建后被复用/重新抛出时，origin仍是Throwable保存的创建位置；不宣称它是每次重新throw语句的位置。
+
+### 真实日志与定位证据
+
+以下源于本轮独立JVM加载**实际logback-spring.xml，prod Profile、ROOT=INFO**；requestId是测试合成ID。两类异常各重复调用known两次，实际各一条WARN；没有异常message或完整业务异常堆栈。ERROR是另一个实际未预期异常，完整链保留。
+
+```text
+10:04:53.345 WARN  [main] requestId=11111111-2222-3333-4444-555555555555 d.m.platform.web.HttpFailureLogging - event=http.request.rejected errorCode=UNPROCESSABLE exception=dev.mesbase.core.error.FoundationException origin=at dev.mesbase.platform.web.HttpFailureOriginTest$Probe.main(HttpFailureOriginTest.java:175)
+10:04:53.346 WARN  [main] requestId=11111111-2222-3333-4444-555555555555 d.m.platform.web.HttpFailureLogging - event=http.request.rejected errorCode=BUSINESS_REJECTED exception=dev.mesbase.common.exception.ServiceException origin=at dev.mesbase.platform.web.HttpFailureOriginTest$Probe.main(HttpFailureOriginTest.java:176)
+10:04:53.347 ERROR [main] requestId=11111111-2222-3333-4444-555555555555 d.m.platform.web.HttpFailureLogging - event=http.request.failed errorCode=INTERNAL_ERROR
+java.lang.IllegalStateException: TEST ONLY unexpected
+	at dev.mesbase.platform.web.HttpFailureOriginTest$Probe.main(HttpFailureOriginTest.java:182)
+Caused by: java.lang.IllegalArgumentException: TEST ONLY root
+	... 1 common frames omitted
+```
+
+根因附加定位的实际运行行（JUnit测试创建的真实ServiceException/cause，未伪造StackTraceElement）：
+
+```text
+10:04:05.509 WARN  [main] requestId=TEST_ONLY_ORIGIN d.m.platform.web.HttpFailureLogging - event=http.request.rejected errorCode=BUSINESS_REJECTED exception=dev.mesbase.common.exception.ServiceException origin=at dev.mesbase.platform.web.HttpFailureOriginTest.serviceAdviceUsesSameDeduplicatedBoundaryAndPreservesResponse(HttpFailureOriginTest.java:113) rootCauseOrigin=at dev.mesbase.platform.web.HttpFailureOriginTest.serviceAdviceUsesSameDeduplicatedBoundaryAndPreservesResponse(HttpFailureOriginTest.java:114)
+```
+
+真实嵌入Tomcat HTTP测试的两个例子（测试Controller抛出；不是生产用户请求）：
+
+```text
+2026-10-15T10:04:04.833+08:00 WARN  [http-nio-auto-1-exec-1] requestId=e812a641-da97-4f0a-b4fb-773bbd9f68e7 dev.mesbase.platform.web.HttpFailureLogging - event=http.request.rejected errorCode=BAD_REQUEST exception=dev.mesbase.core.error.FoundationException origin=at dev.mesbase.HttpLoggingHttpTest$TestController.log(HttpLoggingHttpTest.java:94)
+2026-10-15T10:04:04.838+08:00 WARN  [http-nio-auto-1-exec-1] requestId=5c1d276f-80fc-490a-9f46-9d70fbbb51e5 dev.mesbase.platform.web.HttpFailureLogging - event=http.request.rejected errorCode=UNAUTHENTICATED exception=dev.mesbase.common.exception.ServiceException origin=at dev.mesbase.HttpLoggingHttpTest$TestController.log(HttpLoggingHttpTest.java:96)
+```
+
+IDEA跳转边界：本轮验证的是Maven/隔离JVM控制台、标准`at 类.方法(File.java:line)`片段以及编译后StackTraceElement行号对应真实源码创建语句；**没有在IDEA Run/Debug控制台实际点击链接跳转，IDEA识别与跳转标记为NOT VERIFIED**。没有以格式看似可识别或IDEA formatter成功代替实际UI验证，也没有启动/重启用户后端服务以生成IDEA日志。
+
+### 测试及边界
+
+```sh
+MES_LOG_DIR=/private/tmp/mes-log-origin-20261015/files MES_LOG_INSTANCE=verify \
+  env PATH=/opt/homebrew/bin:/Users/user/apache-maven-3.6.1/bin:/usr/bin:/bin:/usr/sbin:/sbin \
+  mvn -B -ntp verify -Dmes.test.redis=true
+```
+
+- **503项，490通过、0失败、0错误、13跳过，BUILD SUCCESS**。新增定位测试10项、Boundary13项、真实HTTP日志2项全部通过；既有Logback/OpenAPI/异步/审计回归仍通过。13项跳过均为未开启的真实MySQL opt-in（包括工作区已有人员分配/路线版本测试），未修改测试条件以制造通过；无并行模块构建阻断。
+- `./scripts/format-java --check <本轮5个Java文件>`和`git diff --check`通过。未格式化无关业务文件。
+- 独立prod Probe再次执行退出0，实际console保存在`/private/tmp/mes-log-origin-20261015/production-console.log`；原HTTP日志在`files/verify/{app,access,error}.log`。完整Maven输出`verify.log`、计数`test-summary.json`、跳过清单`skipped-tests.json`、实际样例`actual-origin-samples.txt`均在同一临时证据根。临时日志未写用户运行目录。
+- 未验证真实IDEA点击、真实数据库审计持久化或生产流量；未进行部署/重启。本任务无启动装配/全局日志配置改动，没有重复执行打包启动smoke；Maven verify已完成打包。
+- OpenAPI访问专用字段/消息脱敏不变。新增WARN只含错误码、类型、StackTraceElement来源，不输出原异常或cause消息。源代码/依赖库位置属于内部技术信息，继续使用现有日志访问控制。日志量会随本轮明确的业务WARN策略增加，没有新增采样/存储架构。
+
+回滚仅按本节2个生产Java、3个测试Java和本文追加内容逐项恢复；不涉及数据回滚，不覆盖并行工作。Document Updated：本文新增“已知异常单行源码定位”章节，记录策略变化、实现、实际日志、测试与IDEA未验证边界；未修改业务代码。任务到此完成。

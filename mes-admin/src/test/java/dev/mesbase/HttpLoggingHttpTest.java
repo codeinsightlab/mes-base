@@ -234,11 +234,11 @@ class HttpLoggingHttpTest {
                     .count());
             String bad = verify(events, get(client, "/test-only/log/bad-request", null, null, null), 400, "/test-only/log/bad-request");
             assertEquals(Level.INFO, events.completed(bad).getFirst().getLevel());
-            assertOnlyAccess(events, bad);
+            assertKnownWarning(events, bad, FoundationException.class);
             String unauthenticated = verify(events, get(client, "/test-only/log/unauthenticated", null, null, null), 401, "/test-only/log/unauthenticated");
-            assertOnlyAccess(events, unauthenticated);
+            assertKnownWarning(events, unauthenticated, FoundationException.class);
             String business401 = verify(events, get(client, "/test-only/log/business-401", null, null, null), 401, "/test-only/log/business-401");
-            assertOnlyAccess(events, business401);
+            assertKnownWarning(events, business401, ServiceException.class);
             String invalid = verify(events, get(client, "/test-only/log-parameter?count=invalid", null, null, null), 400, "/test-only/log-parameter");
             assertOnlyAccess(events, invalid);
             assertTrue(events.events.stream()
@@ -250,7 +250,7 @@ class HttpLoggingHttpTest {
                 String rejected = verify(events, get(client, "/test-only/log/" + kind, null, null, "x".repeat(1024)), 422, "/test-only/log/" + kind);
                 assertTrue(events.events.stream().filter(e -> rejected.equals(e.getMDCPropertyMap().get("requestId")))
                         .noneMatch(e -> e.getLevel() == Level.ERROR || e.getThrowableProxy() != null));
-                assertOnlyAccess(events, rejected);
+                assertKnownWarning(events, rejected, kind.equals("business") ? ServiceException.class : FoundationException.class);
             }
             String failed = verify(events, get(client, "/test-only/log/system", null, null, null), 500, "/test-only/log/system");
             var errors = events.events.stream()
@@ -267,6 +267,19 @@ class HttpLoggingHttpTest {
             String next = verify(events, get(client, "/test-only/log/normal", null, null, null), 200, "/test-only/log/normal");
             assertTrue(events.completed(next).getFirst().getFormattedMessage().contains("factoryId=null userId=null"));
         }
+    }
+
+    private void assertKnownWarning(Events events, String id, Class<? extends Throwable> type) {
+        var warnings = events.events.stream().filter(e -> id.equals(e.getMDCPropertyMap().get("requestId"))
+                && e.getFormattedMessage().startsWith("event=http.request.rejected ")).toList();
+        assertEquals(1, warnings.size());
+        var event = warnings.getFirst();
+        assertEquals(Level.WARN, event.getLevel());
+        assertNull(event.getThrowableProxy());
+        assertTrue(event.getFormattedMessage().contains("exception=" + type.getName()));
+        assertTrue(event.getFormattedMessage()
+                .contains("origin=at " + TestController.class.getName() + ".log(HttpLoggingHttpTest.java:"));
+        assertTrue(!event.getFormattedMessage().contains("requestId="));
     }
 
     private void assertOnlyAccess(Events events, String id) {

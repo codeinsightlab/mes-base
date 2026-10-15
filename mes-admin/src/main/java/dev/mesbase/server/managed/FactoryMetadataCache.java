@@ -25,11 +25,13 @@ public class FactoryMetadataCache {
     private static final Logger LOG = LoggerFactory.getLogger(FactoryMetadataCache.class);
     private final PlatformPersistence persistence;
     private final RoutingMetadataStore store;
+    private final RoutingMetadataMapper mapper;
     private final ObjectMapper json = new ObjectMapper();
 
-    public FactoryMetadataCache(PlatformPersistence persistence, RoutingMetadataStore store) {
+    public FactoryMetadataCache(PlatformPersistence persistence, RoutingMetadataStore store, RoutingMetadataMapper mapper) {
         this.persistence = persistence;
         this.store = store;
+        this.mapper = mapper;
     }
 
     public FactoryExecutionMetadata definition(String id) {
@@ -38,21 +40,29 @@ public class FactoryMetadataCache {
             String key = FactoryMetadataCache.class.getName() + field;
             Object cached = attrs.getRequest().getAttribute(key);
             if (cached instanceof FactoryExecutionMetadata value) return value;
-            var value = read(field, () -> persistence.readOnly(s -> s.mapper(RoutingMetadataMapper.class)
-                    .definition(id)));
+            var value = read(field, () -> definitionFromDatabase(id));
             if (value != null) attrs.getRequest().setAttribute(key, value);
             return value;
         }
-        return read(field, () -> persistence.readOnly(s -> s.mapper(RoutingMetadataMapper.class).definition(id)));
+        return read(field, () -> definitionFromDatabase(id));
     }
 
     public FactoryExecutionMetadata defaultDefinition() {
-        var value = read("default", () -> persistence.readOnly(s -> s.mapper(RoutingMetadataMapper.class)
-                .defaultDefinition()));
+        var value = read("default", () -> defaultFromDatabase());
         if (value != null && RequestContextHolder.getRequestAttributes() instanceof ServletRequestAttributes attrs)
             attrs.getRequest()
                     .setAttribute(FactoryMetadataCache.class.getName() + "binding:" + value.factoryId(), value);
         return value;
+    }
+
+    private FactoryExecutionMetadata definitionFromDatabase(String id) {
+        if (!persistence.transactionManager().foreignTransactionActive()) return mapper.definition(id);
+        return persistence.readOnly(s -> s.mapper(RoutingMetadataMapper.class).definition(id));
+    }
+
+    private FactoryExecutionMetadata defaultFromDatabase() {
+        if (!persistence.transactionManager().foreignTransactionActive()) return mapper.defaultDefinition();
+        return persistence.readOnly(s -> s.mapper(RoutingMetadataMapper.class).defaultDefinition());
     }
 
     private FactoryExecutionMetadata read(String field, Supplier<FactoryExecutionMetadata> loader) {

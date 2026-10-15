@@ -10,6 +10,9 @@ import dev.mesbase.framework.security.SystemTokenFilter;
 import dev.mesbase.framework.sync.SyncCoordinator;
 import dev.mesbase.framework.web.service.TokenService;
 import dev.mesbase.infrastructure.persistence.PlatformPersistence;
+import dev.mesbase.system.sync.MasterSyncMapper;
+import dev.mesbase.quartz.mapper.JobClaimMapper;
+import dev.mesbase.quartz.mapper.SysJobMapper;
 import dev.mesbase.infrastructure.platform.LocalPrivateFileStorage;
 import dev.mesbase.infrastructure.platform.MinioPrivateFileStorage;
 import dev.mesbase.platform.management.FileStorage;
@@ -89,8 +92,8 @@ public class SystemConfiguration {
     }
 
     @Bean
-    ControlledJobRunner controlledJobs(PlatformPersistence u, FactoryCatalog f) {
-        return new ControlledJobRunner(u, f);
+    ControlledJobRunner controlledJobs(PlatformPersistence u, FactoryCatalog f, JobClaimMapper claims, SysJobMapper jobs) {
+        return new ControlledJobRunner(u, f, claims, jobs);
     }
 
     @Bean(destroyMethod = "shutdown")
@@ -131,8 +134,8 @@ public class SystemConfiguration {
     }
 
     @Bean
-    SyncCoordinator syncCoordinator(PlatformPersistence p, FactoryCatalog f) {
-        return new SyncCoordinator(p, f);
+    SyncCoordinator syncCoordinator(PlatformPersistence p, FactoryCatalog f, MasterSyncMapper mapper) {
+        return new SyncCoordinator(p, mapper, f);
     }
 
     @Bean

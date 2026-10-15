@@ -199,25 +199,23 @@ class HttpLoggingBoundaryTest {
     }
 
     @Test
-    void ordinaryRejectionsAreDebugOnlyAndKeepDeduplication() {
+    void ordinaryRejectionsAreSingleWarningsAtInfoLevel() {
         Logger logger = (Logger) LoggerFactory.getLogger(HttpFailureLogging.class);
         Level previous = logger.getLevel();
         var events = new ListAppender<ILoggingEvent>();
         events.start();
         logger.addAppender(events);
         try {
+            logger.setLevel(Level.INFO);
             for (ErrorCode code : List.of(ErrorCode.BAD_REQUEST, ErrorCode.UNAUTHENTICATED, ErrorCode.UNPROCESSABLE)) {
-                logger.setLevel(Level.INFO);
-                HttpFailureLogging.known(new MockHttpServletRequest(), new FoundationException(code));
-                assertTrue(events.list.isEmpty());
-                logger.setLevel(Level.DEBUG);
                 var request = new MockHttpServletRequest();
                 var failure = new FoundationException(code);
                 HttpFailureLogging.known(request, failure);
                 HttpFailureLogging.known(request, failure);
                 assertEquals(1, events.list.size());
-                assertEquals(Level.DEBUG, events.list.getFirst().getLevel());
+                assertEquals(Level.WARN, events.list.getFirst().getLevel());
                 assertNull(events.list.getFirst().getThrowableProxy());
+                assertTrue(events.list.getFirst().getFormattedMessage().contains("origin=at " + getClass().getName()));
                 events.list.clear();
             }
         } finally {
@@ -238,7 +236,7 @@ class HttpLoggingBoundaryTest {
             HttpFailureLogging.known(request, rejection);
             HttpFailureLogging.known(request, rejection);
             assertEquals(1, events.list.size());
-            assertEquals(Level.INFO, events.list.getFirst().getLevel());
+            assertEquals(Level.WARN, events.list.getFirst().getLevel());
             assertNull(events.list.getFirst().getThrowableProxy());
             var cause = new IllegalStateException("TEST ONLY internal");
             HttpFailureLogging.known(request, new FoundationException(ErrorCode.ROUTING_METADATA_UNAVAILABLE, cause));

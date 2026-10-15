@@ -8,7 +8,6 @@ import dev.mesbase.business.production.domain.MesOperationUserEntity;
 import dev.mesbase.business.production.domain.MesOperationUserExample;
 import dev.mesbase.business.production.domain.MesOperationUserPage;
 import dev.mesbase.business.production.domain.MesOperationUserQueryDto;
-import dev.mesbase.business.production.domain.MesOperationUserResource;
 import dev.mesbase.business.production.domain.MesOperationUserUpdateCommand;
 import dev.mesbase.business.production.service.IMesOperationUserService;
 import dev.mesbase.core.error.ErrorCode;

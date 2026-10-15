@@ -176,6 +176,12 @@ fixture 校验；PLATFORM 是中心库平台语义，不是第三个库。
 生成器 GLOBAL 使用 dev.mesbase.platform.*，FACTORY_SCOPED 使用 dev.mesbase.business.*；不生成 Mapper 归属注解或注册清单。不存在
 external 扫描组或 ERP 连接选择入口。
 
+### 2026-10-15 用户确认：普通查询使用注入 Mapper
+
+普通平台/中心库查询与普通业务查询通过构造器注入对应归属的 Mapper，并按需要使用具名 Spring 只读事务；不得仅因“是读取”而调用 `PlatformPersistence`、`readOnly` 回调或手动获取 SqlSession/Mapper。中心 Mapper 仍由固定包扫描绑定 `masterSqlSessionFactory`，业务 Mapper 绑定 `businessSqlSessionFactory`。
+
+已有业务事务中确需读取中心身份/授权等 metadata 时，保留既有独立只读窗口及防护；它是明确的跨库读取边界例外，不能用于包装普通查询，也不能直接换成中心事务或删掉跨库保护。普通查询与事务内校验可复用查询规则，但需明确区分访问入口；不新增无业务语义的转发层。用户候选资格继续按启用账号、有效角色及当前工厂业务授权判定。
+
 ### 9.2 Spring 事务与验收
 
 Service 使用具名 Spring 事务；传播、提交、回滚和挂起恢复由 Spring 管理。业务事务固定 Factory 与连接身份，不能跨线程传
@@ -342,7 +348,7 @@ business:pro:workorder:read。Java 常量、Controller、Vue、菜单声明和 S
 复用 mes-base-ui 的统一 Shell/CrudPage/request/dict/permission，不为每页创造视觉体系。代码生成页只是 Functional
 Scaffold；必须检查查询、Toolbar、表格/列顺序、枚举/日期/精度、表单分组、loading/empty/error、确认删除、分页、窄屏、中文/tooltip/按钮权限并优化。API
 只读真实契约，不新增 AjaxResult/rows/data
-多结构兜底。按用户2026-10-06要求保存刷新登录态，浏览器只保存Token/有效期/选厂偏好，不保存密码或权限；恢复须重新校验服务端身份与授权，过期/401/注销清除。选厂清除旧授权、数据和对话框，过期响应不回填。
+多结构兜底。按用户2026-10-06要求保存刷新登录态，浏览器只保存Token/选厂偏好，不保存密码或权限；2026-10-15用户更新：前端不保存或按本地时间判断Token有效期，恢复须重新校验服务端身份与授权，由后端401或注销清除。选厂清除旧授权、数据和对话框，过期响应不回填。
 
 ## Java code style
 

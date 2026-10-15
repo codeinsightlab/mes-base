@@ -91,7 +91,7 @@ class RoutingMetadataRedisTest {
             jdbc.execute("INSERT INTO mf_factory VALUES('A','TEST ONLY','A','Before',1,'ENABLED',1)");
             jdbc.execute("INSERT INTO mf_datasource VALUES(1,'TEST ONLY','invalid.test',3306,'TEST_ONLY','TEST_ONLY','ENCRYPTED_ONLY','ENABLED',1)");
             var persistence = new PlatformPersistence(source, Set.of(RoutingMetadataMapper.class));
-            var healthy = new FactoryMetadataCache(persistence, second);
+            var healthy = new FactoryMetadataCache(persistence, second, persistence.mapper(RoutingMetadataMapper.class));
             assertEquals("Before", healthy.definition("A").factoryName());
             assertEquals("Before", healthy.defaultDefinition().factoryName());
             assertNull(healthy.definition("UNKNOWN"));
@@ -115,7 +115,7 @@ class RoutingMetadataRedisTest {
                     throw new IllegalStateException("TEST ONLY eviction failure");
                 }
             };
-            var management = new FactoryMetadataCache(persistence, failing);
+            var management = new FactoryMetadataCache(persistence, failing, persistence.mapper(RoutingMetadataMapper.class));
             persistence.run(() -> {
                 jdbc.update("UPDATE mf_factory SET factory_name='Saved despite Redis failure'");
                 management.changed(List.of("A"));
@@ -131,7 +131,7 @@ class RoutingMetadataRedisTest {
                 }
             };
             assertEquals(ErrorCode.ROUTING_METADATA_UNAVAILABLE, assertThrows(FoundationException.class,
-                    () -> new FactoryMetadataCache(persistence, unavailable).definition("A")).code());
+                    () -> new FactoryMetadataCache(persistence, unavailable, persistence.mapper(RoutingMetadataMapper.class)).definition("A")).code());
             second.invalidate(List.of("binding:A"));
             var noPublish = new RoutingMetadataStore(firstRedis, ns, ttl) {
                 public void publish(String field, String payload) {
@@ -139,7 +139,7 @@ class RoutingMetadataRedisTest {
                 }
             };
             assertEquals(ErrorCode.ROUTING_METADATA_UNAVAILABLE, assertThrows(FoundationException.class,
-                    () -> new FactoryMetadataCache(persistence, noPublish).definition("A")).code());
+                    () -> new FactoryMetadataCache(persistence, noPublish, persistence.mapper(RoutingMetadataMapper.class)).definition("A")).code());
             // After expiration, DB failure must fail, never serve an expired local copy.
             healthy.definition("A");
             Thread.sleep(2100);

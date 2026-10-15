@@ -79,3 +79,10 @@ epoch 无 TTL：它是用户认证版本的发行下界，不能因最后一个�
 
 不改变路由缓存固定 TTL/提交淘汰策略，不引入默认工厂或数据库兜底；被停用信息尚在允许的
 缓存窗口内时仍遵守既有一致性约定，这项改动负责服务端已拒绝后的恢复交互。
+
+
+## 2026-10-15 前端会话有效期由后端决定
+
+用户确认前端不再维护Token过期时间。后端继续使用现有随机Bearer与绝对有效期（项目application.yml的token.expire-time=240分钟），本轮不改变Redis TTL、账号撤销及请求准入语义。前端localStorage仅存token与factoryId，忽略旧缓存expiresAt；恢复登录向后端重新读取身份、菜单及当前工厂。不根据客户端时钟清理或发行Token；当前请求收到401才清理会话并进入/login，普通403、业务422和网络失败不等同会话到期。响应头及错误body之后继续核对token/factoryId/revision，旧请求的401不得退出新会话或新选厂。消息SSE复用公共请求认证/401处理并保留外部AbortSignal，不在页面单独判断或清除身份。
+
+实现与回归证据见相邻mes-base-ui的docs/acceptance/session-restore/README.md的2026-10-15追加记录。后端代码、数据库和服务进程未改变。
