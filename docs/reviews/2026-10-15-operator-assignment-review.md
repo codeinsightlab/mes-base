@@ -259,3 +259,82 @@ UI现在增加了**真实、已登录、指定工厂、只读交互的视觉证�
 - 运行中的HTTP/UI未宣称新实现已生效；未自行重启服务，未提交、推送或部署。回滚本节关联文件diff即可恢复原普通查询入口，数据库无变化。
 
 - 最终`mvn -B -ntp verify`全模块BUILD SUCCESS，日志`/tmp/mes-injected-directory-verify.log`；按本次日志逐测试类统计505项，其中488通过、17条件跳过，0失败/错误。未设置真实MySQL验收环境开关，不将条件跳过描述为真实库复验。3个修改Java文件执行项目IntelliJ formatter成功，git diff --check通过。
+
+
+## 2026-10-15 扩展审查：全项目普通查询 Mapper 注入治理
+
+### Change Summary
+
+用户指出上一轮仅改page不足，要求包含read函数并审查项目内全部违反约定的普通查询。本轮覆盖仓库所有模块`src/main`及对应调用测试，扫描PlatformPersistence、readOnly、mapper/getMapper、openSession、SqlSessionFactory；排除target生成隔离产物。未修改外部源产品、数据库或用户服务进程。
+
+| 调用位置 | 审查结论与修改 |
+|---|---|
+| OperationUserDirectory.read | 普通调用/同中心事务直接使用注入Mapper；只有foreignTransactionActive为真才走独立中心读取。新增已有测试断言requireValid/validUsers普通路径不触发readOnly。 |
+| ManagedDatasourceService | 构造器注入ManagedDatasourceMapper/ManagedFactoryMapper；数据源列表/计数/详情、工厂列表/详情/候选、DDL配置读取和节点池对账全部去除普通readOnly回调。分页去除PlatformPersistence.run查询包装，两个分页入口改为具名master只读事务（类去final以允许Spring代理）。写事务和afterCommit退休池仍沿用原机制。 |
+| FactoryMetadataCache | 构造器注入RoutingMetadataMapper；正常缓存回源直接查询，只有实际其他数据库事务中回源时保留独立窗口。请求内/Redis缓存和提交后失效语义保持。 |
+| SyncCoordinator | 构造器注入MasterSyncMapper；普通state直接查询。assertOwner按运行时事务归属选择普通查询或独立窗口，保留业务事务内处理/提交边界的run-token校验。写入抢占/恢复/续期/完成逻辑未改。 |
+| ControlledJobRunner | 构造器注入JobClaimMapper/SysJobMapper；移除运行时服务定位器获取Mapper，state单条查询不再包装PlatformPersistence.run。抢占/释放/日志原事务保留。 |
+| SystemConfiguration/FactoryRuntimeConfiguration | Bean参数注入对应中心Mapper，生产装配不手动调用persistence.mapper，不保留旧构造器兜底。 |
+| SysRegisterService/SysJobServiceImpl | 已通过注入Service/Mapper访问；PlatformPersistence仅用于注册整单写事务或afterCommit调度协调，不属于普通查询违规，保留。 |
+| PlatformAdminCli | 启动前初始化CLI、无Spring业务容器，已有受控事务/Mapper用法保留；不是HTTP普通查询。 |
+| PersistenceConfiguration/OwnerMapperRegistration及infrastructure.persistence | 原基础设施Bean装配、固定包扫描、SqlSession代理、独立读取窗口本体保留。没有增加数据源/SqlSessionFactory或放松跨库拒绝。 |
+| BusinessCodegenRunner的p.mapper() | 包配置属性getter，非Mapper查询，不改。 |
+
+### 事务边界与规则
+
+- OwnedTransactionManager新增foreignTransactionActive，仅检查当前活动事务与既有OWNER身份是否属于其他管理器，不执行SQL、不改事务绑定，不弱化checkOwner/verifyAccess。
+- 普通read不再因为“可能在业务事务内调用”而统一开窗口：无活动事务或当前中心事务使用注入Mapper，实际存在其他数据库活动事务时才开独立metadata窗口。
+- 剩余生产readOnly调用共4处，分布在OperationUserDirectory(1)、FactoryMetadataCache(2)、SyncCoordinator.assertOwner(1)，均有运行时foreign判断。独立窗口内仍使用专用session的Mapper，避免误加入外层会话；本轮不宣称跨中心/业务原子性。
+- AGENTS第9节补充共享read函数的分支约束，保留用户已认可的账号/角色/当前工厂业务授权判断。
+
+### 测试、保护与验收边界
+
+- 19个任务Java文件通过项目IntelliJ formatter，适配现有构造器测试；无生成文件归属标记被错误保留，未改生成器模板或独立基础CRUD。
+- OperationUserDirectoryTest保留真实Spring代理、分页/撤权/跨厂/缺Scope、事务内连接不变与普通查询拒绝跨库事务；普通入口断言扩展到requireValid/validUsers。SyncCoordinatorTest新增普通state不走窗口、外库事务旧run-token拒绝两项。ManagedAdmissionTest通过真实H2查询覆盖数据源/工厂各入口并断言无readOnly调用，继续覆盖配置变更/租约退休。
+- `mvn -B -ntp -DskipTests test`编译全部生产及测试源码通过（仅编译，不冒充测试）。最终`mvn -B -ntp verify`全模块成功，当前日志507项=490通过/17条件跳过，0失败/错误；日志`/tmp/mes-query-injection-verify.log`。未开启真实MySQL验收开关。
+- 二次扫描生产源码：普通服务及生产Bean装配无persistence.mapper服务定位器；除4处受条件保护的独立读取外，CLI和持久化基础设施为明确保留项。git diff --check通过。
+- 执行期间仓库HEAD由bc71f12变为5208ba6（外部提交，包含本轮部分进行中的变更）；本Agent未执行提交/推送，不回退或覆盖该提交。批量适配曾触及两个.local备份的构造调用，已反向恢复，后续修改限定正式src目录。
+- 本轮无SQL/配置环境/前端修改，不删除跨库保护。运行中的用户后端未重启，新Java实现需用户重启后生效；不能将本轮H2/构建证据宣称为运行服务已切换。
+
+- 隔离打包冒烟：`/usr/bin/python3 scripts/smoke-packaged.py`通过10项、失败0项，日志`/tmp/mes-query-injection-smoke.log`；使用随机本机端口和脚本自有进程，无开发数据库连接，不改变用户运行服务。
+
+
+## 2026-10-15 工序能力配置：单框昵称检索多选
+
+### Change Summary
+
+- 根据用户反馈，移除原“查询输入 + 查询按钮 + 多选输入”组合，改成一个 Element Plus 远程检索多选框；输入昵称300ms防抖自动调用既有人员候选接口，选中显示标签，仍由“批量增加能力”明确保存。
+- 修改 mes-base-ui 的 `OperatorConfiguration.vue`：换关键词保留已选用户；下拉区分已选择与匹配人员，保留分页加载、失败重试、加载及无匹配反馈；迟到响应及切厂清理继续有效。未改变后端授权或接口。
+- `CrudPage.vue` 增加可选 cell 字段插槽，既有默认单元格渲染保持；能力列表通过响应式姓名字典显示标签，不再因每次候选检索重建列表并重复请求。
+- 同步适配 `operatorConfiguration.test.ts`、`operatorConfigurationRendering.test.ts`，覆盖跨关键词选择、旧响应拒绝、分页、多选精确字符串ID以及姓名迟到时列表只查询一次。修正模拟响应跨测试残留，不删除原权限/切厂/派工节点测试。
+
+### 验证与边界
+
+- Node22.23.1，最终 `npm test -- --run`：44文件、236测试通过，0失败；`npm run build`（vue-tsc + vite）通过，保留既有大chunk告警；`git diff --check`通过。日志 `/tmp/mes-operator-search-final-test.log`、`/tmp/mes-operator-search-final-build.log`。
+- 使用现有5173页面和真实登录会话/SIMPLE_B，在喷砂工序弹窗验证昵称“管理”“陈”“zhang”匹配、切换关键词保留标签、真实两人多选与清除、无匹配反馈和保存按钮禁用；候选为当前有效用户，未模拟页面响应。浏览器控制台无warn/error。
+- 截图对比原两输入与新单输入；检查1440×900、1280×800、1920×1080及390×844：桌面单行排列，窄屏保存按钮自然换行，标签可显示。截图 `.local/operator-assignment-20261015/search-select/01-before.jpg` 至 `08-empty.jpg`。1440多选最终效果为 `04-multiselect-1440.jpg`。
+- 本轮只试选后清除，未提交能力变更、未新增SQL或修改后端、未启停服务。API保存语义由既有测试覆盖，不将本轮浏览器试选宣称为新增能力保存验收。恢复原视口并保留弹窗供用户复验。
+
+
+## 2026-10-15 工序编辑合并人员配置与菜单收敛
+
+### Change Summary
+
+- 用户要求移除独立工序能力人员菜单、将工序编辑与人员配置合并。本轮取代前文“编辑/可操作人员两入口”形式：工序列表只保留编辑入口（删除动作仍保留），编辑弹窗宽度按1040px/94vw，包含“工序信息”“可操作人员”两个页签，人员页签按需加载。
+- mes-base-ui `operation/index.vue` 组合现有 DocumentFields 与 OperatorConfigurationPanel；抽出人员面板供工序编辑与既有派工弹窗共用，OperatorConfiguration只负责弹窗入口。单框昵称检索、多选、分页、名单维护、权限、字符串ID和迟到响应保护沿用，不新增人员模型或后端API。
+- CrudPage增加可选编辑器slot、宽度、只读查看入口、外部未保存/忙状态及保存后保留编辑器配置。默认编辑器继续复用DocumentFields；关闭/遮罩/Esc有未保存内容时确认，取消保留；切厂及卸载清理。工序信息保存后保持弹窗和人员选择，并从更新结果刷新乐观修订号，支持再次保存。
+- 工序信息与能力名单分别保存，页面明确提示，不宣称整单原子提交。拥有能力权限但无operation:update的用户可在已有operation:list/query授权下进入同一编辑器，工序字段及保存受只读限制，人员仍按自身权限维护；不扩大后端授权。
+- mesOperationUser菜单JSON隐藏并移除手工文件的生成归属标记；旧页面替换为跳转operation，不保留独立CRUD。原派工/能力接口及权限保留。
+
+### 菜单SQL执行与数据核对
+
+- 中心目标核对为192.168.18.25:3306/mes_base_dev；SIMPLE_B绑定启用datasource8，指向同主机mes_base_dev_business_simple_b。本轮不写业务库。
+- 保存并执行 `mes-business/docs/generated/production/operation-editor-entry.sql`，仅将菜单2594（production/mesOperationUser/index且对应list权限）的visible从0改为1；菜单编号、parent2512、status0和权限不变，现有3条角色绑定保留。同步追加operator-assignment-menu.sql收尾隐藏规则，防止后续执行该脚本重新显示菜单。该项为已有菜单数据配置，不新增Schema/Flyway迁移。
+- 初次mysqldump因配置中的database参数不被支持而失败，连续命令曾先执行隐藏；发现后按刚核实的visible=0恢复原值，使用过滤该参数的临时私有配置成功备份，再以check=True方式执行正式脚本。完整菜单备份 `.local/operator-assignment-20261015/operation-editor/menu-before.sql`，不含用户凭证；没有删除菜单或角色授权。回滚只需按此菜单ID/组件/权限将visible恢复0，并回退本轮前端整合，不回滚其他工作。
+
+### 验证与边界
+
+- `npm test -- --run`：45文件242测试全部通过；新增operationEditor5项覆盖同入口、连续保存修订号与保留人员选择、关闭取消、权限独立、切厂迟到清理；旧入口跳转新增1项。原人员/派工15项继续通过。`npm run build`（vue-tsc与vite）通过，既有大chunk告警保留。两仓库git diff --check通过。最终日志 `/tmp/mes-operation-edit-final-test.log`、`/tmp/mes-operation-edit-final-build.log`。
+- 真实5173/现有后端/SIMPLE_B：刷新后独立菜单已消失；喷砂行只有编辑/删除，编辑包含两个页签；读取真实已配置管理员及候选人员，试选陈爱和后关闭出现确认，取消后保留选择。旧地址/production/mesOperationUser实际跳回/production/operation，控制台warn/error为空。
+- 首版上下排列截图发现人员列表需向下滚动，已微调为页签。截图 `.local/operator-assignment-20261015/operation-editor/01-editor-1440.jpg` 为改前证据，02-information-1440、03-people-1440、04-people-1280、05-people-1920、06-people-390为改后复核。桌面列表及保存按钮在弹窗内，390窄屏选择器与增加按钮自然换行，表内允许滚动。临时视口已恢复。
+- 浏览器试选后清理，未保存工序或新增/删除能力关系；保存行为由Mock组件测试覆盖，不冒充本轮真实写入验收。未修改Java/业务Schema，未重启用户服务，未提交/推送。

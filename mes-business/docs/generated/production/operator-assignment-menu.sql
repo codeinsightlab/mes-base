@@ -154,3 +154,8 @@ WHERE page.perms = 'business:mes:operation:user:list' AND page.menu_type = 'C'
 UPDATE sys_menu SET visible = '1'
 WHERE menu_type = 'C' AND component IN ('production/mesProductionExecution/index', 'production/mesExecutionAssignment/index')
   AND perms IN ('business:mes:production:execution:list', 'business:mes:execution:assignment:list');
+
+-- 工序能力人员从工序编辑进入，保留授权与旧地址兼容。
+UPDATE sys_menu SET visible = '1'
+WHERE menu_type = 'C' AND component = 'production/mesOperationUser/index'
+  AND perms = 'business:mes:operation:user:list';
