@@ -42,6 +42,7 @@ import org.springframework.core.env.Environment;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.RequestParam;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -91,6 +92,8 @@ class HttpLoggingHttpTest {
         String log(@PathVariable String kind) throws InterruptedException {
             if (kind.equals("slow")) Thread.sleep(700);
             if (kind.equals("bad-request")) throw new FoundationException(ErrorCode.BAD_REQUEST);
+            if (kind.equals("unauthenticated")) throw new FoundationException(ErrorCode.UNAUTHENTICATED);
+            if (kind.equals("business-401")) throw new ServiceException("TEST ONLY expected authentication", 401);
             if (kind.equals("business")) throw new ServiceException("TEST ONLY expected validation");
             if (kind.equals("known")) throw new FoundationException(ErrorCode.UNPROCESSABLE);
             if (kind.equals("system"))
@@ -99,12 +102,19 @@ class HttpLoggingHttpTest {
             return MDC.get("requestId");
         }
 
+        @GetMapping("/test-only/log-parameter")
+        @EndpointAccess(EndpointAccess.Kind.PUBLIC)
+        String parameter(@RequestParam int count) {
+            return Integer.toString(count);
+        }
+
         @GetMapping("/test-only/log-async/{kind}")
         @EndpointAccess(EndpointAccess.Kind.PUBLIC)
         Callable<String> async(@PathVariable String kind) {
             return () -> {
+                LoggerFactory.getLogger(TestController.class).info("TEST ONLY callable work");
                 if (kind.equals("system")) throw new IllegalStateException("TEST ONLY async unexpected");
-                return "TEST ONLY async";
+                return MDC.get("requestId");
             };
         }
 
@@ -224,6 +234,13 @@ class HttpLoggingHttpTest {
                     .count());
             String bad = verify(events, get(client, "/test-only/log/bad-request", null, null, null), 400, "/test-only/log/bad-request");
             assertEquals(Level.INFO, events.completed(bad).getFirst().getLevel());
+            assertOnlyAccess(events, bad);
+            String unauthenticated = verify(events, get(client, "/test-only/log/unauthenticated", null, null, null), 401, "/test-only/log/unauthenticated");
+            assertOnlyAccess(events, unauthenticated);
+            String business401 = verify(events, get(client, "/test-only/log/business-401", null, null, null), 401, "/test-only/log/business-401");
+            assertOnlyAccess(events, business401);
+            String invalid = verify(events, get(client, "/test-only/log-parameter?count=invalid", null, null, null), 400, "/test-only/log-parameter");
+            assertOnlyAccess(events, invalid);
             assertTrue(events.events.stream()
                     .anyMatch(e -> e.getFormattedMessage().equals("TEST ONLY application event")
                             && id.equals(e.getMDCPropertyMap().get("requestId"))));
@@ -233,6 +250,7 @@ class HttpLoggingHttpTest {
                 String rejected = verify(events, get(client, "/test-only/log/" + kind, null, null, "x".repeat(1024)), 422, "/test-only/log/" + kind);
                 assertTrue(events.events.stream().filter(e -> rejected.equals(e.getMDCPropertyMap().get("requestId")))
                         .noneMatch(e -> e.getLevel() == Level.ERROR || e.getThrowableProxy() != null));
+                assertOnlyAccess(events, rejected);
             }
             String failed = verify(events, get(client, "/test-only/log/system", null, null, null), 500, "/test-only/log/system");
             var errors = events.events.stream()
@@ -251,11 +269,24 @@ class HttpLoggingHttpTest {
         }
     }
 
+    private void assertOnlyAccess(Events events, String id) {
+        assertTrue(events.events.stream().filter(e -> id.equals(e.getMDCPropertyMap().get("requestId")))
+                .noneMatch(e -> !e.getLoggerName().equals("MES_HTTP_ACCESS") && e.getLevel()
+                        .isGreaterOrEqual(Level.INFO)));
+    }
+
     @Test
     void asyncCompletionDirectCompletionTimeoutAndContainerErrorHaveFinalStatus() throws Exception {
         try (var events = new Events(); var client = HttpClient.newHttpClient()) {
-            verify(events, get(client, "/test-only/log-async/normal", null, null, null), 200, "/test-only/log-async/normal");
-            verify(events, get(client, "/test-only/log-async/system", null, null, null), 500, "/test-only/log-async/system");
+            var response = get(client, "/test-only/log-async/normal", null, null, null);
+            String id = verify(events, response, 200, "/test-only/log-async/normal");
+            assertEquals(id, response.body());
+            String failed = verify(events, get(client, "/test-only/log-async/system", null, null, null), 500, "/test-only/log-async/system");
+            for (String requestId : List.of(id, failed)) {
+                assertEquals(1, events.events.stream()
+                        .filter(e -> e.getFormattedMessage().equals("TEST ONLY callable work")
+                                && requestId.equals(e.getMDCPropertyMap().get("requestId"))).count());
+            }
             verify(events, get(client, "/test-only/log-direct-async", null, null, null), 200, "/test-only/log-direct-async");
             verify(events, get(client, "/test-only/log-timeout", null, null, null), 504, "/test-only/log-timeout");
             verify(events, get(client, "/test-only/log/filter-error", null, null, null), 500, "/test-only/log/filter-error");

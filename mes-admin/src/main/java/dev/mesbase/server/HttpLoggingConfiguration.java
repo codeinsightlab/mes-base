@@ -1,6 +1,7 @@
 package dev.mesbase.server;
 
 import dev.mesbase.platform.web.HttpRequestCompletionListener;
+import dev.mesbase.platform.web.HttpCallableLoggingInterceptor;
 import dev.mesbase.platform.web.RequestBoundaryFilter;
 import jakarta.servlet.DispatcherType;
 import java.util.Arrays;
@@ -11,9 +12,21 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.Ordered;
 import org.springframework.core.env.Environment;
+import org.springframework.web.servlet.config.annotation.AsyncSupportConfigurer;
+import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
 @Configuration
 public class HttpLoggingConfiguration {
+    @Bean
+    WebMvcConfigurer httpCallableLogging() {
+        return new WebMvcConfigurer() {
+            @Override
+            public void configureAsyncSupport(AsyncSupportConfigurer configurer) {
+                configurer.registerCallableInterceptors(new HttpCallableLoggingInterceptor());
+            }
+        };
+    }
+
     @Bean
     FilterRegistrationBean<RequestBoundaryFilter> requestBoundaryRegistration(RequestBoundaryFilter filter) {
         var registration = new FilterRegistrationBean<>(filter);

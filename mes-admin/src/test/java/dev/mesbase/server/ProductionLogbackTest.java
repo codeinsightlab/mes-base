@@ -7,6 +7,16 @@ import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.rolling.RollingFileAppender;
 import ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy;
 import ch.qos.logback.core.rolling.TimeBasedRollingPolicy;
+import ch.qos.logback.core.recovery.ResilientOutputStreamBase;
+import ch.qos.logback.core.status.Status;
+import dev.mesbase.core.error.ErrorCode;
+import dev.mesbase.platform.web.ErrorWriter;
+import dev.mesbase.platform.web.HttpRequestCompletionListener;
+import dev.mesbase.platform.web.RequestBoundaryFilter;
+import jakarta.servlet.ServletRequestEvent;
+import java.io.IOException;
+import java.io.OutputStream;
+import java.util.List;
 import java.lang.reflect.Field;
 import java.util.concurrent.Future;
 import ch.qos.logback.core.util.FileSize;
@@ -29,6 +39,9 @@ import org.springframework.boot.ansi.AnsiOutput;
 import org.springframework.boot.logging.LoggingInitializationContext;
 import org.springframework.boot.logging.logback.LogbackLoggingSystem;
 import org.springframework.core.env.StandardEnvironment;
+import org.springframework.mock.web.MockHttpServletRequest;
+import org.springframework.mock.web.MockHttpServletResponse;
+import org.springframework.mock.web.MockServletContext;
 import javax.xml.parsers.DocumentBuilderFactory;
 import org.w3c.dom.Element;
 
@@ -80,6 +93,18 @@ class ProductionLogbackTest {
         }
         String console = Files.readString(root.resolveSibling(profile + "-console.log"));
         assertEquals(profile.equals("dev"), console.contains("\u001b["));
+        for (String event : List.of("TEST_ONLY_DEBUG", "TEST_ONLY_TRACE", "TEST_ONLY_INFO", "TEST_ONLY_WARN", "TEST_ONLY_ERROR",
+                "path=/test-only status=200", "path=/test-only/io-failed status=401", "TEST_ONLY_IO_FAILED_ERROR",
+                "TEST_ONLY_IO_RECOVERED_ERROR", "path=/test-only/io-recovered status=200")) {
+            assertEquals(1, console.lines().filter(line -> line.contains(event)).count(), event);
+        }
+        assertTrue(console.contains("TEST ONLY ENOSPC simulated"));
+        assertFalse(access.contains("path=/test-only/io-failed"));
+        assertFalse(app.contains("TEST_ONLY_IO_FAILED_ERROR"));
+        assertFalse(error.contains("TEST_ONLY_IO_FAILED_ERROR"));
+        assertTrue(access.contains("path=/test-only/io-recovered"));
+        assertTrue(app.contains("TEST_ONLY_IO_RECOVERED_ERROR"));
+        assertTrue(error.contains("TEST_ONLY_IO_RECOVERED_ERROR"));
         try (var archives = Files.list(logs.resolve("archive"))) {
             assertFalse(archives.anyMatch(path -> path.getFileName().toString().startsWith("old-")));
         }
@@ -121,6 +146,73 @@ class ProductionLogbackTest {
     }
 
     public static class Probe {
+        // TEST ONLY: inject into real Logback recovery streams, never fill a real filesystem.
+        private static void failOutput(RollingFileAppender<ILoggingEvent> appender) throws Exception {
+            Object stream = appender.getOutputStream();
+            if (!(stream instanceof ResilientOutputStreamBase)) throw new AssertionError(stream.getClass());
+            Field field = ResilientOutputStreamBase.class.getDeclaredField("os");
+            field.setAccessible(true);
+            ((OutputStream) field.get(stream)).close();
+            field.set(stream, new OutputStream() {
+                @Override
+                public void write(int value) throws IOException {
+                    throw new IOException("TEST ONLY ENOSPC simulated");
+                }
+
+                @Override
+                public void write(byte[] data, int offset, int length) throws IOException {
+                    throw new IOException("TEST ONLY ENOSPC simulated");
+                }
+
+                @Override
+                public void flush() throws IOException {
+                    throw new IOException("TEST ONLY ENOSPC simulated");
+                }
+            });
+        }
+
+        private static void verifyIoRecovery(LoggerContext context, Path logs) throws Exception {
+            Logger root = context.getLogger(Logger.ROOT_LOGGER_NAME);
+            Logger access = context.getLogger("MES_HTTP_ACCESS");
+            @SuppressWarnings("unchecked")
+            var appFile = (RollingFileAppender<ILoggingEvent>) root.getAppender("APP");
+            @SuppressWarnings("unchecked")
+            var errorFile = (RollingFileAppender<ILoggingEvent>) root.getAppender("ERROR");
+            @SuppressWarnings("unchecked")
+            var accessFile = (RollingFileAppender<ILoggingEvent>) access.getAppender("ACCESS");
+            failOutput(appFile);
+            failOutput(errorFile);
+            failOutput(accessFile);
+            var request = new MockHttpServletRequest("GET", "/test-only/io-failed");
+            var response = new MockHttpServletResponse();
+            new RequestBoundaryFilter().doFilter(request, response,
+                    (req, res) -> ErrorWriter.write(ErrorCode.UNAUTHENTICATED, request, response));
+            new HttpRequestCompletionListener(List.of(), 1000).requestDestroyed(
+                    new ServletRequestEvent(new MockServletContext(), request));
+            if (response.getStatus() != 401) throw new AssertionError("Logging changed HTTP response");
+            root.error("TEST_ONLY_IO_FAILED_ERROR", new IllegalStateException("TEST ONLY original system failure"));
+            if (context.getStatusManager().getCopyOfStatusList().stream()
+                    .noneMatch(status -> status.getLevel() == Status.ERROR))
+                throw new AssertionError("Missing I/O diagnostic");
+            // Let the real resilient streams reopen their original files after backoff.
+            boolean recovered = false;
+            for (int i = 0; i < 30; i++) {
+                Thread.sleep(100);
+                String marker = "TEST_ONLY_IO_ATTEMPT_" + i;
+                root.error(marker);
+                access.info(marker);
+                if (Files.readString(logs.resolve("app.log")).contains(marker)
+                        && Files.readString(logs.resolve("error.log")).contains(marker)
+                        && Files.readString(logs.resolve("access.log")).contains(marker)) {
+                    recovered = true;
+                    break;
+                }
+            }
+            if (!recovered) throw new AssertionError("I/O recovery failed");
+            root.error("TEST_ONLY_IO_RECOVERED_ERROR");
+            access.info("event=http.request.completed method=GET path=/test-only/io-recovered status=200 durationMs=1 factoryId=null userId=null");
+        }
+
         // TEST ONLY: await each policy's internal futures so synthetic clock jumps cannot race gzip writes.
         private static void awaitPolicyWork(SizeAndTimeBasedRollingPolicy<ILoggingEvent> policy) throws Exception {
             for (String name : new String[]{"compressionFuture", "cleanUpFuture"}) {
@@ -152,10 +244,11 @@ class ProductionLogbackTest {
             system.initialize(new LoggingInitializationContext(env), "classpath:logback-spring.xml", null);
             LoggerContext context = (LoggerContext) LoggerFactory.getILoggerFactory();
             Logger app = context.getLogger("TEST_ONLY_APP");
-            app.setLevel(Level.DEBUG);
+            app.setLevel(Level.TRACE);
             app.info("TEST_ONLY_STARTUP_WITHOUT_ID");
             MDC.put("requestId", "11111111-2222-3333-4444-555555555555");
             app.debug("TEST_ONLY_DEBUG");
+            app.trace("TEST_ONLY_TRACE");
             app.info("TEST_ONLY_INFO");
             app.warn("TEST_ONLY_WARN");
             var failure = new IllegalStateException("TEST_ONLY_SYSTEM_FAILURE", new IllegalArgumentException("TEST_ONLY_CAUSE"));
@@ -165,6 +258,7 @@ class ProductionLogbackTest {
             if (access.isAdditive()) throw new AssertionError("Access must not propagate to ROOT");
             access.info("event=http.request.completed method=GET path=/test-only status=200 durationMs=1 factoryId=null userId=null");
             MDC.clear();
+            verifyIoRecovery(context, logs);
             @SuppressWarnings("unchecked")
             var source = (RollingFileAppender<ILoggingEvent>) context.getLogger(Logger.ROOT_LOGGER_NAME)
                     .getAppender("APP");

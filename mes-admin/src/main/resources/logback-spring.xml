@@ -52,6 +52,7 @@
         <encoder><charset>UTF-8</charset><pattern>${FILE_PATTERN}</pattern></encoder>
     </appender>
     <logger name="MES_HTTP_ACCESS" level="INFO" additivity="false">
+        <appender-ref ref="CONSOLE"/>
         <appender-ref ref="ACCESS"/>
     </logger>
     <root level="INFO">

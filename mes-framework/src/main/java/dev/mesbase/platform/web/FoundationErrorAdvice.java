@@ -35,7 +35,8 @@ public final class FoundationErrorAdvice {
     public ResponseEntity<ErrorResponse> sourceBusiness(ServiceException failure, HttpServletRequest request) {
         int status = failure.getCode() != null && failure.getCode() == 401 ? 401 : failure.getCode() != null && failure.getCode() == 403 ? 403 : 422;
         String code = status == 422 ? "BUSINESS_REJECTED" : status == 401 ? "UNAUTHENTICATED" : "FORBIDDEN";
-        LOG.info("event=http.request.rejected errorCode={}", code);
+        if (status == 403) LOG.info("event=http.request.rejected errorCode={}", code);
+        else LOG.debug("event=http.request.rejected errorCode={}", code);
         String message = failure.getMessage() == null ? "当前操作不可执行" : failure.getMessage();
         if (message.length() > 500) message = message.substring(0, 500);
         return ResponseEntity.status(status)
@@ -50,7 +51,7 @@ public final class FoundationErrorAdvice {
 
     @ExceptionHandler({HttpMessageNotReadableException.class, MethodArgumentNotValidException.class, MethodArgumentTypeMismatchException.class, HandlerMethodValidationException.class, ConstraintViolationException.class})
     public ResponseEntity<ErrorResponse> invalid(Exception failure, HttpServletRequest request) {
-        LOG.info("event=http.request.rejected errorCode=BAD_REQUEST type={}", failure.getClass()
+        LOG.debug("event=http.request.rejected errorCode=BAD_REQUEST type={}", failure.getClass()
                 .getSimpleName());
         return error(ErrorCode.BAD_REQUEST, request);
     }

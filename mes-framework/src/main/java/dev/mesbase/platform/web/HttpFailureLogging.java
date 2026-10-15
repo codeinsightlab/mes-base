@@ -25,9 +25,11 @@ public final class HttpFailureLogging {
             if (OpenApiHttp.isOpenApi(request)) logSanitized(request, failure, failure.code().name());
             else LOG.error("event=http.request.failed errorCode={}",
                     failure.code(), failure);
-        } else {
+        } else if (failure.code().httpStatus() == 403) {
             LOG.info("event=http.request.rejected errorCode={}",
                     failure.code());
+        } else {
+            LOG.debug("event=http.request.rejected errorCode={}", failure.code());
         }
     }
 

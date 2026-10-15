@@ -199,6 +199,34 @@ class HttpLoggingBoundaryTest {
     }
 
     @Test
+    void ordinaryRejectionsAreDebugOnlyAndKeepDeduplication() {
+        Logger logger = (Logger) LoggerFactory.getLogger(HttpFailureLogging.class);
+        Level previous = logger.getLevel();
+        var events = new ListAppender<ILoggingEvent>();
+        events.start();
+        logger.addAppender(events);
+        try {
+            for (ErrorCode code : List.of(ErrorCode.BAD_REQUEST, ErrorCode.UNAUTHENTICATED, ErrorCode.UNPROCESSABLE)) {
+                logger.setLevel(Level.INFO);
+                HttpFailureLogging.known(new MockHttpServletRequest(), new FoundationException(code));
+                assertTrue(events.list.isEmpty());
+                logger.setLevel(Level.DEBUG);
+                var request = new MockHttpServletRequest();
+                var failure = new FoundationException(code);
+                HttpFailureLogging.known(request, failure);
+                HttpFailureLogging.known(request, failure);
+                assertEquals(1, events.list.size());
+                assertEquals(Level.DEBUG, events.list.getFirst().getLevel());
+                assertNull(events.list.getFirst().getThrowableProxy());
+                events.list.clear();
+            }
+        } finally {
+            logger.setLevel(previous);
+            logger.detachAppender(events);
+        }
+    }
+
+    @Test
     void knownRejectionsHaveNoStackAndSystemCauseIsLoggedOnlyOnceAcrossWrapping() {
         Logger logger = (Logger) LoggerFactory.getLogger(HttpFailureLogging.class);
         var events = new ListAppender<ILoggingEvent>();

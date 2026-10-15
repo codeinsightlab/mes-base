@@ -235,6 +235,8 @@ java.lang.IllegalStateException: TEST_ONLY_SYSTEM_FAILURE
 
 ### A. 总体验收结论：NO-GO
 
+> 历史结论：已由文末“2026-10-15：最终授权修复与复验”取代。原证据保留；本轮按用户新确认的运行期日志 best-effort 原则重新判定，不将日志落盘故障等同于业务数据可靠性故障。
+
 **正常路径功能通过，但不批准最终上线验收。** 当前工作区构建和既有测试通过；文件分流、完成摘要去重和Servlet线程清理有效。但运行期访问文件不可写时会丢失原始访问事件，HTTP相关Callable工作线程没有requestId；另有普通拒绝应用INFO、Filter/容器重复堆栈及默认PID目录累积问题。不能把既有测试绿色等同于这些生产保障已满足。
 
 本判定的P0适用“重要访问记录在存储故障下降级丢失，且未证明有独立持久化副本”的严格验收口径。不是宣称正常磁盘时日志不可用，也不是宣称Logback初始化失败静默。若人工接受该故障降级，需先证明控制台持久化、告警和恢复契约，再重新验收；当前不默认部署已有这些保障。
@@ -462,3 +464,216 @@ Advice的ServiceException/参数错误另有直接INFO，不经HttpFailureLoggin
 可选优化仅为文档/运维层面：统一目录空间预算、补充外部部署权限与stdout持久化验收。无需Kafka/ELK/Loki/OpenTelemetry，也不需要新增业务AOP、数据库表或日志平台。
 
 **本轮审查到此停止，等待人工决定是否授权修复。** 不因发现问题自动改代码、配置、数据或部署。本章节是Document Updated：新增2026-10-15最终验收A-F、工作区链路图、逐项矩阵、五类问题、实际日志、命令及边界；没有修改生产代码。
+
+
+## 2026-10-15：最终授权修复与复验
+
+### A. Change Summary / 修复清单
+
+**结论：CONDITIONAL PASS。** 日志基础设施最小修复和本地验收完成；生产部署的 stdout/stderr 采集、磁盘告警、稳定实例唯一性及退役目录清理由运维落实后投产。本轮没有部署、重启用户服务或改业务/数据库/审计。普通日志 I/O 故障采用 best-effort，不阻断已经运行的业务；不承诺丢失文件事件自动补写。该口径来自本轮用户明确授权，取代上一只读审查中将其列为 P0 的严格持久化要求。
+
+基线：main，HEAD `4390ea130892ac6f36248073c2ab0ff8208f3f50`，执行前工作区干净。所有变更仅限下表；没有 Controller、Service、DAO、SQL、部署文件或 Logback 依赖变更。Spring Boot 4.1.1 / Logback 1.5.38；各 Profile 仍只保留原日志 level，默认 ROOT INFO。
+
+|原问题 / 根因|修改文件|最小修复及结果|
+|---|---|---|
+|非 additive 访问 Logger 仅接 ACCESS 文件，无控制台出口|`mes-admin/src/main/resources/logback-spring.xml`|只加 CONSOLE 引用，保持 additivity=false、文件 pattern、阈值、滚动参数不变；普通/OpenAPI访问控制台各一次、不进ROOT|
+|MVC Callable 的 worker 没有经过 Servlet Filter|新增 `mes-framework/src/main/java/dev/mesbase/platform/web/HttpCallableLoggingInterceptor.java`；`mes-admin/src/main/java/dev/mesbase/server/HttpLoggingConfiguration.java`|通过原 MVC configureAsyncSupport 注册 CallableProcessingInterceptor。worker preProcess 读取原服务器 request attribute，不生成ID，仅覆盖MDC requestId；postProcess恢复整个worker原MDC并remove ThreadLocal，成功/异常均覆盖。Factory/事务/数据源/身份不由本组件传播|
+|普通Foundation 4xx均INFO；Service401/422及参数异常直接INFO|`mes-framework/src/main/java/dev/mesbase/platform/web/HttpFailureLogging.java`；`FoundationErrorAdvice.java`同目录|403仍INFO，其他预期4xx降DEBUG；普通Service401/422及绑定错误降DEBUG。5xx ERROR Throwable、异常链去重、HTTP状态/响应结构/错误码均不变|
+|相关缺口此前没有回归断言|`mes-admin/src/test/java/dev/mesbase/HttpLoggingHttpTest.java`|真实随机端口Tomcat验证Foundation400/401、Service401/422、绑定400无额外应用INFO；Callable成功/失败worker日志与header/完成摘要同ID；现有异步/ERROR完成去重保留|
+|拒绝级别与线程复用需可重复验证|`mes-admin/src/test/java/dev/mesbase/platform/web/HttpLoggingBoundaryTest.java`；新增同目录`HttpCallableLoggingInterceptorTest.java`|普通拒绝默认INFO不记录、显式DEBUG一次无堆栈；同一个真实单线程Executor连续两个ID、原MDC空/非空、成功/异常共4种组合，逐次恢复原MDC，不继承调用线程其他MDC字段|
+|控制台和I/O恢复缺少回归|`mes-admin/src/test/java/dev/mesbase/server/ProductionLogbackTest.java`|dev/prod真实XML子JVM：INFO/WARN/ERROR/显式DEBUG/TRACE/访问事件console各一次；故障注入真实Logback流，原HTTP401未改变、console原事件一次、故障诊断可见、三个文件后续自动恢复。继续执行已有缩小滚动/压缩/留存/启动清理测试|
+|稳定实例ID已有能力，但部署生命周期未说明|本文本章节|不改默认值，不删除旧目录；补稳定ID环境示例、单写者和运维清理/告警责任|
+
+没有修改 RequestBoundaryFilter、HttpRequestCompletionListener 的 State/CAS/requestDestroyed/MDC finally，亦未改 OpenApiRequestFilter、登录/操作审计、认证授权规则及原业务响应。
+
+### B. 最终 Logger / Appender 路由
+
+```text
+普通应用 Logger（继承；ROOT 默认 INFO）
+  └─ ROOT
+      ├─ CONSOLE：无 ThresholdFilter，所有已被 Logger 放行的事件一次
+      ├─ APP（APP_FILE）→ app.log：INFO/WARN/ERROR
+      └─ ERROR（ERROR_FILE）→ error.log：仅 ERROR
+
+HttpRequestCompletionListener ─┐
+OpenApiRequestFilter.logCompletion ─┴─ MES_HTTP_ACCESS（INFO, additivity=false）
+                                      ├─ CONSOLE：同一个访问事件一次
+                                      └─ ACCESS（ACCESS_FILE）→ access.log：INFO及以上
+
+系统失败 / 慢请求WARN → 各自应用 Logger → ROOT
+OpenAPI系统失败 → HttpFailureLogging脱敏链 → ROOT
+```
+
+APP_FILE/ACCESS_FILE/ERROR_FILE是用途名称；实际XML Appender名保持原有 APP/ACCESS/ERROR。没有其他additivity=false Logger。CONSOLE不设INFO门槛，因此显式开启的DEBUG/TRACE可以显示，仍不进三个文件（ACCESS文件仍有INFO门槛）。开发console颜色及毫秒保留；文件无ANSI；requestId仅pattern输出一次，无HTTP时为`-`。所有访问摘要仍INFO，慢请求另一个WARN是独立事件；没有把HTTP200自动判定为业务成功。
+
+### C. 运行证据及验收矩阵
+
+证据根：`/private/tmp/mes-log-final-fix-20261015`。完整命令、统计和样例见 `commands.txt`、`test-summary.json`、`http-matrix.json`、`actual-http-samples.md`；verify真实文件在 `suite/acceptance-run/{app,access,error}.log`。以下均本轮实际输出，不是模板；合成身份/工厂和临时Mock Servlet不是生产数据库验收。
+
+|场景|实际结果|结论 / 证据|
+|---|---|---|
+|应用INFO/WARN/ERROR|console各一次；app含三者、error只含ERROR，完整cause/suppressed|PASS，ProductionLogbackTest dev/prod|
+|明确启用DEBUG/TRACE|console各一次；不进入三个文件，ROOT仍INFO|PASS，同上|
+|普通200|app0/access1/error0/console1；测试控制器主动INFO另属独立事件|PASS，http-matrix normal200|
+|普通Foundation400、绑定400、Foundation401、Service401、Security401|app0/access1/error0/console1；响应状态保持|PASS，bad400/binding400/known401/business401/security401|
+|预期业务422|无额外应用INFO/堆栈，访问保留|PASS，HttpLoggingHttpTest business/known；Boundary DEBUG去重|
+|权限403|应用INFO FORBIDDEN + 访问各一条，各自在console一次，无ERROR|PASS，forbidden403；未删除安全记录|
+|实际异常500|应用ERROR一条含完整原因链，同事件进app+error；访问一次；console两独立事件|PASS，system500及error.log|
+|主动返回500无Throwable|仅访问一次，无伪造ERROR|PASS，returned-500探针|
+|慢请求|阈值600ms时705ms；访问一条、WARN一条且无Throwable（测试控制器另有主动INFO）|PASS，slow200；生产阈值仍默认1000ms|
+|Callable成功/失败|worker、访问、响应header相同ID；异常仍500|PASS，HttpLoggingHttpTest与async-worker-result.txt|
+|复用Callable worker，原MDC空/非空，成功/失败|4组合均恢复原MDC；两次不同请求不串ID，任务新增MDC也被清理|PASS，HttpCallableLoggingInterceptorTest 4项；单线程Executor扩展点单测，与真实HTTP接线测试区分|
+|Servlet ASYNC/ERROR/直接complete/timeout|最终HTTP状态正确且每请求摘要一次；Servlet线程Factory/Page清理保持|PASS，HttpLoggingHttpTest、AsyncRequestBoundaryHttpTest|
+|全量访问格式及console去重|80条摘要、80不同合法UUID；每条在console一次，正文无requestId，app无completed，文件无ANSI|PASS，http-matrix.json global|
+|OpenAPI|专用clientId/appKey/apiCode/errorCode/peerIp保留、3个摘要console各一次、脱敏canary无泄漏|PASS，原OpenAPI相关11项、全量文件检查；不把不存在的JWT签名协议当验收入口|
+|Quartz / 启动|独立RAMJobStore worker MDC=null，调用者原MDC保留；启动pattern requestId=-|PASS，quartz.txt与实际子进程启动日志；不代表真实用户Job执行|
+|运行期ENOSPC类IOException|真实Logback APP/ACCESS/ERROR底层流注入失败；原401继续返回，console原访问/ERROR各一次，故障诊断可见；文件不含失败原事件|PASS（best-effort语义），ProductionLogbackTest和production-prod.console.log|
+|故障恢复|Logback原恢复流在后续事件驱动下重新打开文件，约200ms后3文件可写；未重放丢失事件|PASS，同上；自动重试有退避，不是生产恢复时限SLA|
+|启动目录不可写|真实chmod0500临时目录，当前JAR exit1，Logback错误可见，未启动Tomcat|PASS，init-readonly-result.json；没有静默丢日志后继续启动|
+|实例目录|显式stable-prod-01两个JVM共用同目录（顺序运行）；默认两个不同PID目录各自存在|PASS，probe-results.json及instances；没有测试无保护并发共写，也不允许这种部署|
+|滚动与压缩|实际XML参数不变；缩小256B/2天/1024B验证日期+大小、gzip、启动清理、留存及cap|PASS，ProductionLogbackTest；production-prod/.../rolling-result.txt retention=true cap=true|
+|重启归档/其他实例|旧.0.gz sentinel完整，后续续号；其他retired-instance文件保留|PASS，restart-roll两次独立JVM及probe-results.json|
+|登录/操作数据库审计|原服务/AOP到Mock存储契约仍通过；生产实现未改|PASS（回归2项）；真实DB持久化未验证|
+|真实systemd/Docker stdout持久化/目录权限/磁盘告警|仓库未找到相应受管部署定义，未访问或修改真实部署|NOT VERIFIED，上线条件|
+|真实满盘/配额/卷故障、GB规模/14/30/60天观测|未填满磁盘，未等待长期留存，只有缩小与IOException注入|NOT VERIFIED；不能以fixture冒充生产观测|
+
+#### 实际HTTP日志摘录
+
+### normal200
+```text
+2026-10-15T08:08:10.948+08:00 INFO  [http-nio-auto-4-exec-4] requestId=4ad43a63-0362-45ec-a913-842e92cdbc61 MES_HTTP_ACCESS - event=http.request.completed method=GET path=/api/foundation/context status=200 durationMs=0 factoryId=A userId=null
+```
+
+### bad400
+```text
+2026-10-15T08:07:40.153+08:00 INFO  [http-nio-auto-1-exec-1] requestId=36526ad5-86e4-4434-8f0e-683f68ad6209 MES_HTTP_ACCESS - event=http.request.completed method=GET path=/test-only/log/bad-request status=400 durationMs=3 factoryId=null userId=null
+```
+
+### binding400
+```text
+2026-10-15T08:07:40.177+08:00 INFO  [http-nio-auto-1-exec-1] requestId=e1828def-611c-40c0-b04c-c60887dec01e MES_HTTP_ACCESS - event=http.request.completed method=GET path=/test-only/log-parameter status=400 durationMs=12 factoryId=null userId=null
+```
+
+### known401
+```text
+2026-10-15T08:07:40.159+08:00 INFO  [http-nio-auto-1-exec-1] requestId=76422061-f9ce-4d6f-bc1f-9bac96ddf144 MES_HTTP_ACCESS - event=http.request.completed method=GET path=/test-only/log/unauthenticated status=401 durationMs=2 factoryId=null userId=null
+```
+
+### business401
+```text
+2026-10-15T08:07:40.163+08:00 INFO  [http-nio-auto-1-exec-1] requestId=d8e45283-9a9b-4df8-aef9-5c8c06c6aa39 MES_HTTP_ACCESS - event=http.request.completed method=GET path=/test-only/log/business-401 status=401 durationMs=1 factoryId=null userId=null
+```
+
+### security401
+```text
+2026-10-15T08:07:40.193+08:00 INFO  [http-nio-auto-1-exec-1] requestId=7a8c654f-20b6-44b5-97ea-1363ebe11e35 MES_HTTP_ACCESS - event=http.request.completed method=GET path=/api/foundation/context status=401 durationMs=1 factoryId=null userId=null
+```
+
+### forbidden403
+```text
+2026-10-15T08:07:40.286+08:00 INFO  [http-nio-auto-1-exec-1] requestId=52c31023-74d2-4243-a424-997bbcf97fcb dev.mesbase.platform.web.HttpFailureLogging - event=http.request.rejected errorCode=FORBIDDEN
+2026-10-15T08:07:40.286+08:00 INFO  [http-nio-auto-1-exec-1] requestId=52c31023-74d2-4243-a424-997bbcf97fcb MES_HTTP_ACCESS - event=http.request.completed method=GET path=/api/foundation/access status=403 durationMs=91 factoryId=A userId=null
+```
+
+### system500
+```text
+2026-10-15T08:07:40.188+08:00 ERROR [http-nio-auto-1-exec-1] requestId=6a0aa29f-9931-47fc-be66-4a31a4835725 dev.mesbase.platform.web.HttpFailureLogging - event=http.request.failed errorCode=INTERNAL_ERROR
+2026-10-15T08:07:40.189+08:00 INFO  [http-nio-auto-1-exec-1] requestId=6a0aa29f-9931-47fc-be66-4a31a4835725 MES_HTTP_ACCESS - event=http.request.completed method=GET path=/test-only/log/system status=500 durationMs=1 factoryId=null userId=null
+```
+
+### slow200
+```text
+2026-10-15T08:07:40.142+08:00 INFO  [http-nio-auto-1-exec-1] requestId=69f3caa9-b434-42a9-b561-a44f2214538b dev.mesbase.HttpLoggingHttpTest$TestController - TEST ONLY application event
+2026-10-15T08:07:40.146+08:00 WARN  [http-nio-auto-1-exec-1] requestId=69f3caa9-b434-42a9-b561-a44f2214538b d.m.platform.web.HttpRequestCompletionListener - event=http.request.slow path=/test-only/log/slow durationMs=705
+2026-10-15T08:07:40.146+08:00 INFO  [http-nio-auto-1-exec-1] requestId=69f3caa9-b434-42a9-b561-a44f2214538b MES_HTTP_ACCESS - event=http.request.completed method=GET path=/test-only/log/slow status=200 durationMs=705 factoryId=null userId=null
+```
+
+### callable200
+```text
+2026-10-15T08:07:38.419+08:00 INFO  [task-1] requestId=aa6d2c8a-bfc2-4747-9b27-ab7cab0557ff dev.mesbase.HttpLoggingHttpTest$TestController - TEST ONLY callable work
+2026-10-15T08:07:38.428+08:00 INFO  [http-nio-auto-1-exec-1] requestId=aa6d2c8a-bfc2-4747-9b27-ab7cab0557ff MES_HTTP_ACCESS - event=http.request.completed method=GET path=/test-only/log-async/normal status=200 durationMs=15 factoryId=null userId=null
+```
+
+### callable500
+```text
+2026-10-15T08:07:38.436+08:00 INFO  [task-2] requestId=c8382299-4ed4-4323-80d7-d9f5ac0d512f dev.mesbase.HttpLoggingHttpTest$TestController - TEST ONLY callable work
+2026-10-15T08:07:38.436+08:00 ERROR [http-nio-auto-1-exec-1] requestId=c8382299-4ed4-4323-80d7-d9f5ac0d512f dev.mesbase.platform.web.HttpFailureLogging - event=http.request.failed errorCode=INTERNAL_ERROR
+2026-10-15T08:07:38.438+08:00 INFO  [http-nio-auto-1-exec-1] requestId=c8382299-4ed4-4323-80d7-d9f5ac0d512f MES_HTTP_ACCESS - event=http.request.completed method=GET path=/test-only/log-async/system status=500 durationMs=3 factoryId=null userId=null
+```
+
+### filter500
+```text
+2026-10-15T08:07:39.305+08:00 ERROR [http-nio-auto-1-exec-1] requestId=d5800c14-1117-4b6e-9ebf-4c7a98377c7e dev.mesbase.platform.web.HttpFailureLogging - event=http.request.failed errorCode=INTERNAL_ERROR
+2026-10-15T08:07:39.309+08:00 INFO  [http-nio-auto-1-exec-1] requestId=d5800c14-1117-4b6e-9ebf-4c7a98377c7e MES_HTTP_ACCESS - event=http.request.completed method=GET path=/test-only/log/filter-error status=500 durationMs=4 factoryId=null userId=null
+```
+
+系统500完整堆栈保存在error.log，未截断实现；以上仅展示事件首行。三文件ERROR复制是正确路由，console中一条ERROR加一条访问是两个独立事件。
+
+#### I/O故障、恢复与异步额外证据
+
+以下console行摘自production-prod.console.log；原访问事件确实被输出，而非仅凭CONSOLE配置推断。失败原事件没有写回文件，后续恢复标记在对应文件实际存在。
+
+```text
+08:08:07.795 INFO  [main] requestId=fc2788b0-98fb-4442-8461-fec678ed4d5e MES_HTTP_ACCESS - event=http.request.completed method=GET path=/test-only/io-failed status=401 durationMs=10 factoryId=null userId=null
+08:08:07,796 |-ERROR in c.q.l.c.recovery.ResilientFileOutputStream@1305935114 - IO failure while writing to file [/private/tmp/mes-log-final-fix-20261015/production-prod/TEST_ONLY_INSTANCE/access.log] java.io.IOException: TEST ONLY ENOSPC simulated
+08:08:07.797 ERROR [main] requestId=- ROOT - TEST_ONLY_IO_FAILED_ERROR
+08:08:08.005 ERROR [main] requestId=- ROOT - TEST_ONLY_IO_RECOVERED_ERROR
+08:08:08.005 INFO  [main] requestId=- MES_HTTP_ACCESS - event=http.request.completed method=GET path=/test-only/io-recovered status=200 durationMs=1 factoryId=null userId=null
+```
+
+实际独立HTTP Callable验证结果（header/body/worker）：
+
+```text
+asyncStatus=200 asyncHeader=c0325123-7dbd-4f3d-8735-0d04212275aa asyncBody=c0325123-7dbd-4f3d-8735-0d04212275aa|c0325123-7dbd-4f3d-8735-0d04212275aa|task-1
+syncStatus=200 syncHeader=d85a3848-423d-4ac8-a2f1-9f8ff9940426 syncBody=d85a3848-423d-4ac8-a2f1-9f8ff9940426|http-nio-127.0.0.1-auto-1-exec-1
+```
+
+#### Tomcat重复堆栈：明确保留的非阻断噪声
+
+准确链路：测试Filter(+30)抛ServletException → 外层RequestBoundaryFilter(+20)调用HttpFailureLogging.unexpected，记录带requestId的ERROR → finally恢复原MDC → 原异常原样抛回Tomcat StandardWrapperValve → 容器打印根因ERROR（此时requestId=-）→ ERROR派发 → requestDestroyed/CAS仅一条访问摘要。实际本轮应用ERROR在08:07:39.305、容器ERROR在08:07:39.306，完成摘要08:07:39.309；requestId为d5800c14-1117-4b6e-9ebf-4c7a98377c7e。
+
+没有新增应用重复调用；请求内异常身份/原因链去重仍生效，但不拦截Tomcat自己的Logger。删除应用Throwable会让完整堆栈只剩无requestId的容器输出；屏蔽容器需深入依赖容器实现、例外过滤并可能漏其他错误。按本轮授权约束，保留最小边界与容器传播，不吞异常、不改状态、不全局禁Tomcat ERROR。**这属于已知、非上线阻断的日志噪声，不是业务数据可靠性故障。**
+
+### D. 实例目录、故障告警与异步边界（部署说明；未修改部署）
+
+生产环境变量示例：
+
+```sh
+MES_LOG_DIR=/var/log/mes-base
+MES_LOG_INSTANCE=mes-base-prod-01
+```
+
+实际目录`/var/log/mes-base/mes-base-prod-01/{app.log,access.log,error.log,archive/}`。同一逻辑实例顺序重启保留该ID；并行实例必须不同稳定ID（例如StatefulSet ordinal或运维分配的实例名），同一组滚动文件严格单写者。不要让两个副本使用相同示例ID。
+
+缺省仍是`${MES_LOG_DIR:-.local/logs}/${MES_LOG_INSTANCE:-${HOSTNAME:-local}-${PID:-standalone}}`。保留主机名+PID降低本机并行碰撞风险；它不保证跨容器/共享卷全局唯一（相同hostname/PID仍可冲突），也不是永久实例身份。默认相对工作目录；现有本地启动器cd仓库，因此`.local/logs`在仓库下且已被Git忽略，未追踪任何.log。生产使用绝对路径，先由部署负责人核对运行用户可写和实例独占。覆盖到其他源码相对目录可能进入Git，不推荐这样配置。
+
+旧PID目录不由当前RollingPolicy清理。运维负责记录已退役实例，确认无运行写者、满足留存及备份要求后再按目录清理；本轮不删除任何日志或实例目录，不增加自动扫描/清理任务。当前policy不会管理其他实例。归档参数保持app=100MB/30天/5GB、access=100MB/14天/3GB、error=50MB/60天/2GB，gzip/cleanHistoryOnStart不变；totalSizeCap不是整个目录绝对上限，不含活动文件、其他实例、历史PID目录及压缩峰值。
+
+运行期日志I/O故障时，保留业务继续执行；Logback状态诊断在本轮实际console可见，且新增console路由保留了被注入文件故障的原事件。但stdout/stderr若未采集、采集端也失败或同盘已满，仍会丢失持久化记录。console不构成独立可靠备份，不补写已经丢失的事件。本轮不新增日志强一致、双写存储、逐事件磁盘探测或消息队列。
+
+部署负责人必须确认实际服务的stdout/stderr接收端、保留/轮转和权限（systemd journal或容器运行时现有机制均需实测，不能默认存在）；将磁盘容量、inode/配额和Logback `IO failure while writing to file` / 文件打开失败接入现有运维告警。可先设容量80%预警/90%升级并按现场调优；按多实例/活动文件/临时压缩预算预留空间。恢复后观察新的可关联事件能否落盘，不能将“文件存在”或“Appender仍started”当恢复成功。若console与文件在同盘，应明确共同故障域。真实部署采集/告警本轮未验证，是CONDITIONAL PASS的条件。
+
+Callable与WebAsyncTask走MVC Callable拦截链；已实测Callable成功/异常及单线程复用。取消/超时后正在运行的Callable在实际退出执行、Spring postProcess时恢复MDC；不在另一个timeout回调线程上清除仍在工作的线程MDC。Servlet ASYNC/ERROR及完成回调仍由原Filter/Listener绑定。DeferredResult、CompletableFuture、手工AsyncContext.start、@Async任意生产者线程不通过该Callable回调，本轮不承诺传播HTTP MDC；它们最终Servlet派发/完成摘要仍由原机制关联。源码未发现其他生产端全局TaskDecorator/异步传播机制，不改所有线程池。Quartz保持独立任务标识，可无HTTP requestId；不得传播Factory、Session、数据源路由或认证信息来补日志。
+
+### E. 构建、测试、剩余风险及停止
+
+实际命令：
+
+```sh
+MES_LOG_DIR=/private/tmp/mes-log-final-fix-20261015/suite MES_LOG_INSTANCE=acceptance-run \
+  env PATH=/opt/homebrew/bin:/Users/user/apache-maven-3.6.1/bin:/usr/bin:/bin:/usr/sbin:/sbin \
+  mvn -B -ntp verify -Dmes.test.redis=true
+```
+
+结果451项：**440通过、0失败、0错误、11跳过，BUILD SUCCESS**。跳过均为真实MySQL opt-in未开启，未为日志测试写真实业务库。无并行模块阻断。Maven/Java沿用现有环境；PATH选用本机可执行ARM Redis，测试只创建和关闭自身临时Redis。日志相关当前回归27项（HTTP2、Boundary13、Callable4、Logback3、Servlet async2、审计2、OpenAPI logging1）全部通过；其他OpenAPI相关11项总计亦通过（含该logging1）。首轮定向26项也全部通过，随后新增拒绝断言纳入全量，不能把两轮相加算唯一用例数。
+
+- `./scripts/format-java --check <本轮8个Java文件>`：通过；`git diff --check`通过。IDEA formatter诊断有插件/Gradle版本更新告警，格式检查退出0，不属于测试失败。
+- `/usr/bin/python3 /private/tmp/mes-log-final-fix-20261015/smoke-isolated.py`：实际调用项目`/usr/bin/python3 scripts/smoke-packaged.py`的runpy包装，仅向其自建子进程注入临时MES_LOG_DIR/INSTANCE；没有修改项目脚本，**打包smoke 10通过、0失败**。原脚本会剔除MES环境变量，因此不能仅在外层export就声称日志隔离；本包装真实传到子进程。
+- 额外11个隔离子JVM完成：实际XML/I/O恢复、独立Callable HTTP、Quartz、无异常500、Foundation401、默认/稳定实例、两次归档续号。运行程序退出均0。临时驱动初版错误地读取Logback local scope属性，得到null后断言失败；已改为核对实际Appender文件与PID目录，证据见probe-results.json。这是验证脚本断言问题，不是生产目录失效或Maven失败。
+- 当前打包JAR真实不可写启动检查exit1，诊断可见且未启动；独立临时目录权限已恢复，不操作用户服务。
+
+剩余风险只限：实际部署stdout留存/告警、实例唯一写者和旧目录运维责任尚未现场确认；任意异步生产者MDC不在本范围；Filter/Tomcat双堆栈按约定保留为非阻断噪声；真实满盘/长期留存未实测。既有系统错误堆栈可能包含内部信息，仍需原有日志访问控制；本轮不扩大采集范围或降低OpenAPI脱敏。INFO访问量与原方案一致，新增console副本会增加部署采集量，应由既有运行时轮转/留存管理，未做生产QPS容量压测。
+
+回滚按本次五个生产文件、四个测试文件和本文变更逐项恢复即可；没有数据迁移或业务协议回滚。本轮没有提交、推送、部署或重启用户服务。Document Updated：本文新增最终授权修复与复验A–E、运维环境示例、真实日志/矩阵/测试及条件；保留历史NO-GO并标明被本轮取代；**未修改业务代码**。
+
+**本轮修复、测试与报告结束，到此停止，不自动进入新的日志优化。**

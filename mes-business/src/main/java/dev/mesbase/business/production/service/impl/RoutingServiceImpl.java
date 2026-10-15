@@ -16,9 +16,11 @@ import dev.mesbase.core.error.FoundationException;
 import dev.mesbase.infrastructure.cache.annotation.BusinessCache;
 import dev.mesbase.infrastructure.cache.annotation.BusinessCacheEvict;
 import dev.mesbase.platform.execution.FactoryContext;
+
 import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
+
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 import dev.mesbase.business.production.dao.RoutingNodeMapper;
@@ -56,6 +58,7 @@ import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.transaction.annotation.Isolation;
 import jakarta.validation.Validator;
+
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -64,6 +67,7 @@ import java.util.Set;
 import java.util.Locale;
 import java.util.Comparator;
 import java.util.stream.Collectors;
+
 import org.springframework.transaction.annotation.Transactional;
 
 /**
@@ -148,8 +152,6 @@ public class RoutingServiceImpl implements IRoutingService {
         try (Page<RoutingEntity> page = PageHelper.offsetPage(offset, limit)) {
             List<RoutingEntity> rows = mapper.selectByExample(example);
             return new RoutingPage(rows, page.getTotal(), offset, limit);
-        } finally {
-            PageHelper.clearPage();
         }
     }
 
@@ -306,13 +308,16 @@ public class RoutingServiceImpl implements IRoutingService {
         }
         insertRow(row);
         var graph = graph(sourceDetail);
-        replaceContent(row, sourceDetail.products().stream().map(RoutingProductEntity::getMaterialId).toList(),
-                graph.nodes(), graph.edges());
+        var materialIds = sourceDetail.products().stream().map(RoutingProductEntity::getMaterialId).toList();
+        validateContentReferences(row, materialIds, graph.nodes(), graph.edges());
+        // This parent was just inserted in this transaction: there are no child rows to read or delete.
+        // insertRow already schedules cache eviction after commit, including these subsequent child writes.
+        writeContentRows(row, materialIds, graph.nodes(), graph.edges(), List.of());
         return row;
     }
 
-    private void replaceContent(RoutingEntity parent, List<Long> materialIds, List<RoutingNodeCommand> input,
-                                List<RoutingEdgeCommand> connections) {
+    private void validateContentReferences(RoutingEntity parent, List<Long> materialIds, List<RoutingNodeCommand> input,
+                                           List<RoutingEdgeCommand> connections) {
         if (!"DRAFT".equals(parent.getStatus())) throw new FoundationException(ErrorCode.ROUTING_FROZEN);
         if (materialIds == null || materialIds.size() > 100 || materialIds.stream().anyMatch(Objects::isNull)
                 || new HashSet<>(materialIds).size() != materialIds.size())
@@ -321,9 +326,12 @@ public class RoutingServiceImpl implements IRoutingService {
         references.lockMaterials(materialIds.stream().sorted().toList(), true);
         references.lockOperations(input.stream().map(RoutingNodeCommand::operationId).distinct().sorted()
                 .toList(), true);
+    }
+
+    private void replaceContent(RoutingEntity parent, List<Long> materialIds, List<RoutingNodeCommand> input,
+                                List<RoutingEdgeCommand> connections) {
+        validateContentReferences(parent, materialIds, input, connections);
         var existing = detailRows(parent).nodes();
-        var nodeIndex = new HashMap<String, RoutingNodeEntity>();
-        for (var node : existing) nodeIndex.put(node.getNodeCode(), node);
         var edgeFilter = new RoutingEdgeExample();
         edgeFilter.createCriteria().andRoutingIdEqualTo(parent.getId());
         edges.deleteByExample(edgeFilter);
@@ -339,6 +347,14 @@ public class RoutingServiceImpl implements IRoutingService {
         var productFilter = new RoutingProductExample();
         productFilter.createCriteria().andRoutingIdEqualTo(parent.getId());
         products.deleteByExample(productFilter);
+        writeContentRows(parent, materialIds, input, connections, existing);
+        dirty();
+    }
+
+    private void writeContentRows(RoutingEntity parent, List<Long> materialIds, List<RoutingNodeCommand> input,
+                                  List<RoutingEdgeCommand> connections, List<RoutingNodeEntity> existing) {
+        var nodeIndex = new HashMap<String, RoutingNodeEntity>();
+        for (var node : existing) nodeIndex.put(node.getNodeCode(), node);
         for (Long material : materialIds) {
             var product = new RoutingProductEntity();
             product.setRoutingId(parent.getId());
@@ -367,7 +383,6 @@ public class RoutingServiceImpl implements IRoutingService {
             edge.setToNodeId(nodeIndex.get(item.toNodeCode()).getId());
             changed(edges.insert(edge));
         }
-        dirty();
     }
 
     private RoutingGraph graph(RoutingDetail detail) {
@@ -411,16 +426,12 @@ public class RoutingServiceImpl implements IRoutingService {
         List<RoutingNodeEntity> stepRows;
         try (Page<RoutingNodeEntity> page = PageHelper.offsetPage(0, 101, false)) {
             stepRows = nodes.selectByExample(stepFilter);
-        } finally {
-            PageHelper.clearPage();
         }
         var productFilter = new RoutingProductExample();
         productFilter.createCriteria().andRoutingIdEqualTo(row.getId());
         List<RoutingProductEntity> productRows;
         try (Page<RoutingProductEntity> page = PageHelper.offsetPage(0, 101, false)) {
             productRows = products.selectByExample(productFilter);
-        } finally {
-            PageHelper.clearPage();
         }
         if (stepRows.size() > 100 || productRows.size() > 100)
             throw new FoundationException(ErrorCode.RESOURCE_CONFLICT);
@@ -460,8 +471,6 @@ public class RoutingServiceImpl implements IRoutingService {
         List<RoutingEdgeEntity> edgeRows;
         try (Page<RoutingEdgeEntity> page = PageHelper.offsetPage(0, 401, false)) {
             edgeRows = edges.selectByExample(edgeFilter);
-        } finally {
-            PageHelper.clearPage();
         }
         if (edgeRows.size() > 400) throw new FoundationException(ErrorCode.ROUTING_GRAPH_INVALID);
         var detail = new RoutingDetail(row, productRows, stepRows, edgeRows);
@@ -487,8 +496,6 @@ public class RoutingServiceImpl implements IRoutingService {
         filter.setOrderByClause("version desc");
         try (Page<RoutingEntity> page = PageHelper.offsetPage(0, 1, false)) {
             return mapper.selectByExample(filter).stream().findFirst().orElse(null);
-        } finally {
-            PageHelper.clearPage();
         }
     }
 
@@ -663,8 +670,6 @@ public class RoutingServiceImpl implements IRoutingService {
         try (Page<OperationEntity> page = PageHelper.offsetPage(0, limit, false)) {
             return operations.selectByExample(filter).stream()
                     .map(row -> new RoutingReference(row.getId(), row.getCode(), row.getName())).toList();
-        } finally {
-            PageHelper.clearPage();
         }
     }
 
@@ -682,8 +687,6 @@ public class RoutingServiceImpl implements IRoutingService {
         try (Page<MaterialEntity> page = PageHelper.offsetPage(0, limit, false)) {
             return materials.selectByExample(filter).stream()
                     .map(row -> new RoutingReference(row.getId(), row.getCode(), row.getName())).toList();
-        } finally {
-            PageHelper.clearPage();
         }
     }
 }
