@@ -1,5 +1,10 @@
 package dev.mesbase.business.issue.service;
 
+import dev.mesbase.business.production.domain.ProductionExecutionStatus;
+import dev.mesbase.business.issue.domain.MaterialIssueSubmissionStatus;
+import dev.mesbase.business.issue.domain.MaterialIssueStatus;
+import dev.mesbase.business.issue.domain.MaterialIssueOperation;
+import dev.mesbase.business.integration.warehouse.ExternalEffect;
 import dev.mesbase.business.issue.dao.MesMaterialIssueMapper;
 import dev.mesbase.business.issue.dao.MesMaterialIssueItemMapper;
 import dev.mesbase.business.issue.dao.MesMaterialIssueSubmissionMapper;
@@ -105,7 +110,8 @@ public class MaterialIssueSubmissionService {
             var row = rules.hydrate(issues.selectByPrimaryKey(id));
             var e = facts.required(id);
             if (!Objects.equals(row.getSubmissionId(), prepared.row()
-                    .getSubmissionId()) || !Objects.equals(e.getOperationVersion(), prepared.version()) || !"SUBMITTING".equals(row.getStatus()))
+                    .getSubmissionId()) || !Objects.equals(e.getOperationVersion(), prepared.version()) || !MaterialIssueStatus.SUBMITTING.getValue()
+                    .equals(row.getStatus()))
                 return row;
             apply(row, e, confirmed);
             changed(issues.updateByPrimaryKey(row));
@@ -118,10 +124,11 @@ public class MaterialIssueSubmissionService {
         rules.lockIssues(List.of(id));
         var row = rules.hydrate(issues.selectByPrimaryKey(id));
         if (row.getSubmissionId() != null) return new Prepared(row, null, null, null);
-        if (row.getVoidOperationId() != null || !Set.of("DRAFT", "RECORDED")
+        if (row.getVoidOperationId() != null || !Set.of(MaterialIssueStatus.DRAFT.getValue(), MaterialIssueStatus.RECORDED.getValue())
                 .contains(row.getStatus()) || row.getExecutionId() == null) fail();
         var e = locks.execution(row.getExecutionId());
-        if (!"READY".equals(e.getStatus()) || e.getStartTime() != null || !Objects.equals(row.getWorkorderId(), e.getWorkorderId()) || !Objects.equals(row.getProductId(), e.getProductId()) || !Objects.equals(row.getRoutingId(), e.getRoutingId()))
+        if (!ProductionExecutionStatus.READY.getValue()
+                .equals(e.getStatus()) || e.getStartTime() != null || !Objects.equals(row.getWorkorderId(), e.getWorkorderId()) || !Objects.equals(row.getProductId(), e.getProductId()) || !Objects.equals(row.getRoutingId(), e.getRoutingId()))
             fail();
         executions.checkReadyReferences(e);
         var path = paths.requireSelected(e);
@@ -134,16 +141,17 @@ public class MaterialIssueSubmissionService {
         // At most 100 lines, existing reference/quantity validation; no inventory or mandatory batch invention.
         lines.forEach(rules::validate);
         var extra = facts.required(id);
-        if (extra.getSourceExecutionMode() == null || extra.getExternalReference() != null || extra.getExternalCode() != null || "UNVERIFIED".equals(extra.getExternalEffect()) && !Set.of("LOCAL_RECORD", "REOPEN_REJECTED")
+        if (extra.getSourceExecutionMode() == null || extra.getExternalReference() != null || extra.getExternalCode() != null || ExternalEffect.UNVERIFIED.getValue()
+                .equals(extra.getExternalEffect()) && !Set.of(MaterialIssueOperation.LOCAL_RECORD.getValue(), MaterialIssueOperation.REOPEN_REJECTED.getValue())
                 .contains(extra.getLastOperation())) throw new FoundationException(ErrorCode.ISSUE_EXTERNAL_UNVERIFIED);
         var selection = warehouse.submissionSelection(scope);
-        if (!selection.mode().name().equals(extra.getSourceExecutionMode()))
+        if (!selection.mode().getValue().equals(extra.getSourceExecutionMode()))
             throw new FoundationException(ErrorCode.INTEGRATION_NOT_CONFIGURED);
         var attempt = new MesMaterialIssueSubmissionEntity();
         attempt.setIssueId(id);
         attempt.setPathRevision(path.getRevision());
         attempt.setCommandJson("{}");
-        attempt.setStatus("SUBMITTING");
+        attempt.setStatus(MaterialIssueSubmissionStatus.SUBMITTING.getValue());
         attempt.setCreatedAt(LocalDateTime.now());
         changed(attempts.insert(attempt));
         var external = orderFacts.selectByPrimaryKey(e.getWorkorderId());
@@ -154,13 +162,13 @@ public class MaterialIssueSubmissionService {
         attempt.setCommandJson(json.writeValueAsString(command));
         changed(attempts.updateByPrimaryKeyWithBLOBs(attempt));
         row.setSubmissionId(attempt.getId());
-        row.setStatus("SUBMITTING");
+        row.setStatus(MaterialIssueStatus.SUBMITTING.getValue());
         row.setUpdateTime(LocalDateTime.now());
         changed(issues.updateByPrimaryKey(row));
         extra.setProvider(selection.provider());
         extra.setExternalBindingKey(selection.bindingKey());
-        extra.setLastOperation("SUBMIT");
-        extra.setLastOutcome("UNKNOWN");
+        extra.setLastOperation(MaterialIssueOperation.SUBMIT.getValue());
+        extra.setLastOutcome(Status.UNKNOWN.getValue());
         extra.setLastMessage("领料提交已准备，等待可信结果");
         facts.save(extra);
         return new Prepared(row, command, selection, extra.getOperationVersion());
@@ -187,25 +195,25 @@ public class MaterialIssueSubmissionService {
             if (result.externalReference() != null) extra.setExternalReference(result.externalReference());
             if (result.externalCode() != null) extra.setExternalCode(result.externalCode());
         }
-        extra.setLastOperation("SUBMIT");
-        extra.setLastOutcome(result.status().name());
+        extra.setLastOperation(MaterialIssueOperation.SUBMIT.getValue());
+        extra.setLastOutcome(result.status().getValue());
         extra.setLastMessage(result.status() == Status.SUCCEEDED ? (result.executionMode() == Mode.LOCAL_ONLY ? "本地模式，领料已确认" : "ERP领料业务已确认") : result.status() == Status.REJECTED ? "领料业务明确拒绝，保留原提交记录" : "领料结果待核实，不得重复创建");
         if (result.status() == Status.SUCCEEDED) {
             var execution = locks.execution(row.getExecutionId());
             paths.confirm(execution, a.getPathRevision());
-            row.setStatus("CONFIRMED");
-            a.setStatus("SUCCEEDED");
+            row.setStatus(MaterialIssueStatus.CONFIRMED.getValue());
+            a.setStatus(MaterialIssueSubmissionStatus.SUCCEEDED.getValue());
             a.setFinishedAt(LocalDateTime.now());
-            extra.setExternalEffect(result.executionMode() == Mode.LOCAL_ONLY ? "NONE" : "CONFIRMED");
-            if (result.executionMode() == Mode.CONNECTED) extra.setDocumentStatus("EFFECTIVE");
+            extra.setExternalEffect(result.executionMode() == Mode.LOCAL_ONLY ? ExternalEffect.NONE.getValue() : ExternalEffect.CONFIRMED.getValue());
+            if (result.executionMode() == Mode.CONNECTED) extra.setDocumentStatus(DocumentStatus.EFFECTIVE.getValue());
         } else if (result.status() == Status.REJECTED) {
-            row.setStatus("SUBMIT_REJECTED");
-            a.setStatus("REJECTED");
+            row.setStatus(MaterialIssueStatus.SUBMIT_REJECTED.getValue());
+            a.setStatus(MaterialIssueSubmissionStatus.REJECTED.getValue());
             a.setFinishedAt(LocalDateTime.now());
         } else {
-            row.setStatus("SUBMIT_UNKNOWN");
-            a.setStatus("UNKNOWN");
-            extra.setExternalEffect(result.executionMode() == Mode.LOCAL_ONLY ? "NONE" : "UNKNOWN");
+            row.setStatus(MaterialIssueStatus.SUBMIT_UNKNOWN.getValue());
+            a.setStatus(MaterialIssueSubmissionStatus.UNKNOWN.getValue());
+            extra.setExternalEffect(result.executionMode() == Mode.LOCAL_ONLY ? ExternalEffect.NONE.getValue() : ExternalEffect.UNKNOWN.getValue());
         }
         changed(attempts.updateByPrimaryKeyWithBLOBs(a));
     }
@@ -217,14 +225,18 @@ public class MaterialIssueSubmissionService {
             rules.lockIssues(List.of(id));
             var row = rules.hydrate(issues.selectByPrimaryKey(id));
             var extra = facts.required(id);
-            if (!"SUBMIT_REJECTED".equals(row.getStatus()) || row.getVoidOperationId() != null || extra.getExternalReference() != null || extra.getExternalCode() != null || !"REJECTED".equals(extra.getLastOutcome()) || !"READY".equals(locks.execution(row.getExecutionId())
-                    .getStatus())) fail();
+            if (!MaterialIssueStatus.SUBMIT_REJECTED.getValue()
+                    .equals(row.getStatus()) || row.getVoidOperationId() != null || extra.getExternalReference() != null || extra.getExternalCode() != null || !Status.REJECTED.getValue()
+                    .equals(extra.getLastOutcome()) || !ProductionExecutionStatus.READY.getValue()
+                    .equals(locks.execution(row.getExecutionId())
+                            .getStatus())) fail();
             row.setSubmissionId(null);
-            row.setStatus("DRAFT");
+            row.setStatus(MaterialIssueStatus.DRAFT.getValue());
             changed(issues.updateByPrimaryKey(row));
-            extra.setExternalEffect("LOCAL_ONLY".equals(extra.getSourceExecutionMode()) ? "NONE" : "UNVERIFIED");
+            extra.setExternalEffect(Mode.LOCAL_ONLY.getValue()
+                    .equals(extra.getSourceExecutionMode()) ? ExternalEffect.NONE.getValue() : ExternalEffect.UNVERIFIED.getValue());
             // CONNECTED rejected with no external identity is a proven no-document case; new draft may submit explicitly again.
-            extra.setLastOperation("REOPEN_REJECTED");
+            extra.setLastOperation(MaterialIssueOperation.REOPEN_REJECTED.getValue());
             facts.save(extra);
             return rules.hydrate(row);
         });
@@ -232,7 +244,8 @@ public class MaterialIssueSubmissionService {
 
     public String reconcileSubmission(MesMaterialIssueEntity row, MesMaterialIssueErpExtraEntity extra,
                                       ErpIssueQueryResult result) {
-        if (row.getSubmissionId() == null || !Set.of("SUBMITTING", "SUBMIT_UNKNOWN").contains(row.getStatus()))
+        if (row.getSubmissionId() == null || !Set.of(MaterialIssueStatus.SUBMITTING.getValue(), MaterialIssueStatus.SUBMIT_UNKNOWN.getValue())
+                .contains(row.getStatus()))
             return null;
         if (result.executionMode() == Mode.LOCAL_ONLY) {
             // Deterministic local domain confirmation for the original persisted operation; no external document exists.
@@ -242,7 +255,7 @@ public class MaterialIssueSubmissionService {
         if (result.outcome() == Outcome.FOUND) {
             extra.setExternalReference(result.externalId());
             extra.setExternalCode(result.externalCode());
-            extra.setDocumentStatus(result.documentStatus().name());
+            extra.setDocumentStatus(result.documentStatus().getValue());
             if (result.documentStatus() == DocumentStatus.EFFECTIVE && result.externalId() != null) {
                 apply(row, extra, new ErpActionResult(Status.SUCCEEDED, Mode.CONNECTED, result.externalId(), result.externalCode(), "原领料操作已核实"));
                 return extra.getLastMessage();

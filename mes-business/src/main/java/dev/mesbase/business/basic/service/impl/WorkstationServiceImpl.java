@@ -96,8 +96,6 @@ public class WorkstationServiceImpl implements IWorkstationService {
         try (Page<WorkstationEntity> page = PageHelper.offsetPage(offset, limit)) {
             List<WorkstationEntity> rows = mapper.selectByExample(example);
             return new WorkstationPage(rows, page.getTotal(), offset, limit);
-        } finally {
-            PageHelper.clearPage();
         }
     }
 

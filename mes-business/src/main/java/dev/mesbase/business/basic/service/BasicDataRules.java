@@ -1,5 +1,7 @@
 package dev.mesbase.business.basic.service;
 
+import dev.mesbase.business.basic.domain.MaterialType;
+import dev.mesbase.business.shared.enums.EnableStatus;
 import dev.mesbase.core.error.ErrorCode;
 import dev.mesbase.core.error.FoundationException;
 import java.util.List;
@@ -65,7 +67,7 @@ public class BasicDataRules {
     }
 
     private void status(String value) {
-        if (!Set.of("ENABLED", "DISABLED").contains(value)) throw new FoundationException(ErrorCode.BAD_REQUEST);
+        if (EnableStatus.from(value) == null) throw new FoundationException(ErrorCode.BAD_REQUEST);
     }
 
     public void validate(MaterialEntity row) {
@@ -76,7 +78,7 @@ public class BasicDataRules {
         reject(material.countByExample(example) > 0);
         requireUnit(row.getUnitId());
         if (row.getCategoryId() != null) requireCategory(row.getCategoryId());
-        if (!Set.of("ITEM", "PRODUCT").contains(row.getMaterialType()))
+        if (MaterialType.from(row.getMaterialType()) == null)
             throw new FoundationException(ErrorCode.BAD_REQUEST);
     }
 

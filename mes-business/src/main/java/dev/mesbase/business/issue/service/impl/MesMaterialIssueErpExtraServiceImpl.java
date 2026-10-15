@@ -95,8 +95,6 @@ public class MesMaterialIssueErpExtraServiceImpl implements IMesMaterialIssueErp
         try (Page<MesMaterialIssueErpExtraEntity> page = PageHelper.offsetPage(offset, limit)) {
             List<MesMaterialIssueErpExtraEntity> rows = mapper.selectByExample(example);
             return new MesMaterialIssueErpExtraPage(rows, page.getTotal(), offset, limit);
-        } finally {
-            PageHelper.clearPage();
         }
     }
 

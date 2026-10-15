@@ -92,7 +92,7 @@ ruoyi:
     expiration-minutes: 2
 
 token:
-  expire-time: 60
+  expire-time: 240
 user:
   password:
     min-length: 12

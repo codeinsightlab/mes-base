@@ -56,8 +56,6 @@ public class ${ClassName}ServiceImpl implements ${servicePackage}.I${ClassName}S
         try (com.github.pagehelper.Page<${domainPackage}.${ClassName}Entity> page = com.github.pagehelper.PageHelper.offsetPage(offset, limit)) {
             java.util.List<${domainPackage}.${ClassName}Entity> rows = mapper.${selectByExampleMethod}(example);
             return new ${domainPackage}.${ClassName}Page(rows, page.getTotal(), offset, limit);
-        } finally {
-            com.github.pagehelper.PageHelper.clearPage();
         }
     }
 

@@ -1,5 +1,6 @@
 package dev.mesbase.business.production.controller;
 
+import dev.mesbase.business.production.domain.ExecutionPathStatus;
 import dev.mesbase.business.production.service.ExecutionPathService;
 import dev.mesbase.business.production.service.ExecutionPathService.PathModel;
 import dev.mesbase.business.production.controller.vo.MesProductionExecutionVo;
@@ -64,7 +65,7 @@ public class ExecutionActionController {
     private static PathView toView(PathModel model) {
         var p = model.path();
         return new PathView(model.executionId().toString(), model.executionStatus(), p == null ? null : p.getRoutingId()
-                .toString(), p == null ? "UNSELECTED" : p.getPathStatus(), p == null ? 0 : p.getRevision(), p == null ? null : p.getSelectedAt(), p == null ? null : p.getLockedAt(), model.selectedNodeIds()
+                .toString(), p == null ? ExecutionPathStatus.UNSELECTED.getValue() : p.getPathStatus(), p == null ? 0 : p.getRevision(), p == null ? null : p.getSelectedAt(), p == null ? null : p.getLockedAt(), model.selectedNodeIds()
                 .stream().map(Object::toString).toList(), model.nodes().stream().map(n -> new NodeView(n.getId()
                         .toString(), n.getNodeCode(), n.getOperationName(), Boolean.TRUE.equals(n.getIsKey())))
                 .toList(), model.edges().stream()

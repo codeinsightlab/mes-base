@@ -59,8 +59,6 @@ public class WorkorderErpExtraServiceImpl implements IWorkorderErpExtraService {
         try (Page<WorkorderErpExtraEntity> page = PageHelper.offsetPage(offset, limit)) {
             List<WorkorderErpExtraEntity> rows = mapper.selectByExample(example);
             return new WorkorderErpExtraPage(rows, page.getTotal(), offset, limit);
-        } finally {
-            PageHelper.clearPage();
         }
     }
 

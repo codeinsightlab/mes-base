@@ -1,5 +1,8 @@
 package dev.mesbase.business.issue.service;
 
+import dev.mesbase.business.integration.warehouse.ErpActionResult.Status;
+import dev.mesbase.business.integration.warehouse.ErpActionResult.Mode;
+import dev.mesbase.business.issue.domain.MaterialIssueOperation;
 import dev.mesbase.business.issue.dao.MesMaterialIssueErpExtraMapper;
 import dev.mesbase.business.issue.domain.MesMaterialIssueErpExtraEntity;
 import dev.mesbase.business.issue.domain.MesMaterialIssueErpExtraExample;
@@ -35,9 +38,10 @@ public class MaterialIssueErpFacts {
         extra.setId(row.getId());
         extra.setOperationVersion(0L);
         copy(row, extra);
-        extra.setLastOperation("LOCAL_RECORD");
-        extra.setLastOutcome("LOCAL_ONLY".equals(row.getSourceExecutionMode()) ? "SUCCEEDED" : "UNKNOWN");
-        extra.setProvider("LOCAL_ONLY".equals(row.getSourceExecutionMode()) ? "local" : null);
+        extra.setLastOperation(MaterialIssueOperation.LOCAL_RECORD.getValue());
+        extra.setLastOutcome(Mode.LOCAL_ONLY.getValue()
+                .equals(row.getSourceExecutionMode()) ? Status.SUCCEEDED.getValue() : Status.UNKNOWN.getValue());
+        extra.setProvider(Mode.LOCAL_ONLY.getValue().equals(row.getSourceExecutionMode()) ? "local" : null);
         if (mapper.insert(extra) != 1) throw new FoundationException(ErrorCode.RESOURCE_CONFLICT);
     }
 
@@ -63,7 +67,7 @@ public class MaterialIssueErpFacts {
         var e = required(row.getId());
         copy(row, e);
         if (row.getVoidOperationId() != null) {
-            e.setLastOperation("VOID");
+            e.setLastOperation(MaterialIssueOperation.VOID.getValue());
             e.setLastOutcome(row.getVoidResultStatus());
             e.setLastMessage(row.getVoidMessage());
         }

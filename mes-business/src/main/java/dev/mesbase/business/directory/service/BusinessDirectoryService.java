@@ -1,5 +1,7 @@
 package dev.mesbase.business.directory.service;
 
+import dev.mesbase.business.directory.domain.DirectoryStatus;
+import dev.mesbase.business.directory.domain.DirectoryDeletionFlag;
 import com.github.pagehelper.PageHelper;
 import dev.mesbase.business.directory.domain.DirectoryPage;
 import dev.mesbase.business.directory.domain.DirectoryQuery;
@@ -40,7 +42,7 @@ public class BusinessDirectoryService {
         var filter = new SysUser();
         filter.setNickName(query.keyword());
         filter.setDeptId(query.departmentId());
-        filter.setStatus("0");
+        filter.setStatus(DirectoryStatus.NORMAL.getValue());
         return page(query, "u.user_id asc", () -> users.selectUserList(filter));
     }
 
@@ -48,7 +50,7 @@ public class BusinessDirectoryService {
     public DirectoryPage<SysDept> departments(DirectoryQuery query) {
         var filter = new SysDept();
         filter.setDeptName(query.keyword());
-        filter.setStatus("0");
+        filter.setStatus(DirectoryStatus.NORMAL.getValue());
         return page(query, "d.dept_id asc", () -> departments.selectDeptList(filter));
     }
 
@@ -56,14 +58,15 @@ public class BusinessDirectoryService {
     public DirectoryPage<SysPost> posts(DirectoryQuery query) {
         var filter = new SysPost();
         filter.setPostName(query.keyword());
-        filter.setStatus("0");
+        filter.setStatus(DirectoryStatus.NORMAL.getValue());
         return page(query, "post_id asc", () -> posts.selectPostList(filter));
     }
 
     @Transactional(transactionManager = "masterTransactionManager", readOnly = true)
     public SysUser personnel(Long id) {
         var row = users.selectUserById(id);
-        if (row == null || !"0".equals(row.getDelFlag()) || !"0".equals(row.getStatus())) {
+        if (row == null || !DirectoryDeletionFlag.NORMAL.getValue()
+                .equals(row.getDelFlag()) || !DirectoryStatus.NORMAL.getValue().equals(row.getStatus())) {
             throw new FoundationException(ErrorCode.NOT_FOUND);
         }
         return row;
@@ -81,7 +84,8 @@ public class BusinessDirectoryService {
 
     private SysDept requireDepartment(Long id) {
         var row = departments.selectDeptById(id);
-        if (row == null || !"0".equals(row.getDelFlag()) || !"0".equals(row.getStatus())) {
+        if (row == null || !DirectoryDeletionFlag.NORMAL.getValue()
+                .equals(row.getDelFlag()) || !DirectoryStatus.NORMAL.getValue().equals(row.getStatus())) {
             throw new FoundationException(ErrorCode.NOT_FOUND);
         }
         return row;
@@ -89,7 +93,7 @@ public class BusinessDirectoryService {
 
     private SysPost requirePost(Long id) {
         var row = posts.selectPostById(id);
-        if (row == null || !"0".equals(row.getStatus())) {
+        if (row == null || !DirectoryStatus.NORMAL.getValue().equals(row.getStatus())) {
             throw new FoundationException(ErrorCode.NOT_FOUND);
         }
         return row;

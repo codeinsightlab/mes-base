@@ -97,8 +97,6 @@ public class DvSubjectServiceImpl implements IDvSubjectService {
         try (Page<DvSubjectEntity> page = PageHelper.offsetPage(offset, limit)) {
             List<DvSubjectEntity> rows = mapper.selectByExample(example);
             return new DvSubjectPage(rows, page.getTotal(), offset, limit);
-        } finally {
-            PageHelper.clearPage();
         }
     }
 

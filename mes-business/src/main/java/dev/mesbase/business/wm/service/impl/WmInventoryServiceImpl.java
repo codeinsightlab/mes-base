@@ -100,14 +100,13 @@ public class WmInventoryServiceImpl implements IWmInventoryService {
             criteria.andRemarkLike("%" + query.remark() + "%");
         }
         example.setOrderByClause("id");
+        List<WmInventoryEntity> rows;
+        long total;
         try (Page<WmInventoryEntity> page = PageHelper.offsetPage(offset, limit)) {
-            List<WmInventoryEntity> rows = mapper.selectByExample(example);
-            long total = page.getTotal();
-            PageHelper.clearPage();
-            return new WmInventoryPage(rules.describe(rows), total, offset, limit);
-        } finally {
-            PageHelper.clearPage();
+            rows = mapper.selectByExample(example);
+            total = page.getTotal();
         }
+        return new WmInventoryPage(rules.describe(rows), total, offset, limit);
     }
 
     @Override

@@ -97,8 +97,6 @@ public class WmWarehouseServiceImpl implements IWmWarehouseService {
         try (Page<WmWarehouseEntity> page = PageHelper.offsetPage(offset, limit)) {
             List<WmWarehouseEntity> rows = mapper.selectByExample(example);
             return new WmWarehousePage(rows, page.getTotal(), offset, limit);
-        } finally {
-            PageHelper.clearPage();
         }
     }
 

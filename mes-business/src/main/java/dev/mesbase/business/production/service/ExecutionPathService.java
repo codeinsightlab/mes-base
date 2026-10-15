@@ -1,5 +1,11 @@
 package dev.mesbase.business.production.service;
 
+import dev.mesbase.business.production.domain.ProductionExecutionStatus;
+import dev.mesbase.business.integration.warehouse.ErpActionResult.Mode;
+import dev.mesbase.business.issue.domain.MaterialIssueStatus;
+import dev.mesbase.business.integration.warehouse.ExternalEffect;
+import dev.mesbase.business.production.domain.ExecutionPathStatus;
+import dev.mesbase.business.integration.warehouse.ErpIssueQueryResult.DocumentStatus;
 import dev.mesbase.business.production.dao.MesExecutionPathMapper;
 import dev.mesbase.business.production.dao.MesExecutionPathNodeMapper;
 import dev.mesbase.business.production.dao.MesProductionExecutionMapper;
@@ -76,16 +82,17 @@ public class ExecutionPathService {
 
     public PathModel select(Long id, Integer revision, List<Long> nodeIds) {
         var e = locks.execution(id);
-        if (!"READY".equals(e.getStatus()) || e.getStartTime() != null) fail();
+        if (!ProductionExecutionStatus.READY.getValue().equals(e.getStatus()) || e.getStartTime() != null) fail();
         rules.checkReadyReferences(e);
         var old = paths.selectByPrimaryKey(id);
         if (revision == null || !Objects.equals(revision, old == null ? 0 : old.getRevision())) fail();
-        if (old != null && "LOCKED".equals(old.getPathStatus()) || hasBlockingIssue(id)) fail();
+        if (old != null && ExecutionPathStatus.LOCKED.getValue().equals(old.getPathStatus()) || hasBlockingIssue(id))
+            fail();
         ExecutionPathValidator.validate(nodeIds, nodes(e.getRoutingId()), edges(e.getRoutingId()));
         var path = new MesExecutionPathEntity();
         path.setId(id);
         path.setRoutingId(e.getRoutingId());
-        path.setPathStatus("SELECTED");
+        path.setPathStatus(ExecutionPathStatus.SELECTED.getValue());
         path.setRevision(revision + 1);
         path.setSelectedAt(LocalDateTime.now());
         changed(old == null ? paths.insert(path) : paths.updateByPrimaryKey(path));
@@ -105,7 +112,7 @@ public class ExecutionPathService {
 
     public MesExecutionPathEntity requireSelected(MesProductionExecutionEntity e) {
         var p = paths.selectByPrimaryKey(e.getId());
-        if (p == null || !Objects.equals(p.getRoutingId(), e.getRoutingId()) || !Set.of("SELECTED", "LOCKED")
+        if (p == null || !Objects.equals(p.getRoutingId(), e.getRoutingId()) || !Set.of(ExecutionPathStatus.SELECTED.getValue(), ExecutionPathStatus.LOCKED.getValue())
                 .contains(p.getPathStatus())) fail();
         ExecutionPathValidator.validate(nodeIds(e.getId()), nodes(e.getRoutingId()), edges(e.getRoutingId()));
         return p;
@@ -114,8 +121,8 @@ public class ExecutionPathService {
     public void confirm(MesProductionExecutionEntity e, Integer revision) {
         var p = requireSelected(e);
         if (!Objects.equals(p.getRevision(), revision)) fail();
-        if ("LOCKED".equals(p.getPathStatus())) return;
-        p.setPathStatus("LOCKED");
+        if (ExecutionPathStatus.LOCKED.getValue().equals(p.getPathStatus())) return;
+        p.setPathStatus(ExecutionPathStatus.LOCKED.getValue());
         p.setLockedAt(LocalDateTime.now());
         changed(paths.updateByPrimaryKey(p));
     }
@@ -123,24 +130,32 @@ public class ExecutionPathService {
     @BusinessCacheEvict(business = MesProductionExecutionResource.PREFIX, scope = BusinessCacheEvict.Scope.LIST_AND_DETAIL)
     public MesProductionExecutionEntity start(Long id) {
         var e = locks.execution(id);
-        if (!Set.of("READY", "RUNNING").contains(e.getStatus())) fail();
+        if (!Set.of(ProductionExecutionStatus.READY.getValue(), ProductionExecutionStatus.RUNNING.getValue())
+                .contains(e.getStatus())) fail();
         rules.checkReadyReferences(e);
-        if (!"LOCKED".equals(requireSelected(e).getPathStatus())) fail();
+        if (!ExecutionPathStatus.LOCKED.getValue().equals(requireSelected(e).getPathStatus())) fail();
         var rows = issueRows(id);
-        if (rows.stream().noneMatch(i -> "CONFIRMED".equals(i.getStatus())) || rows.stream()
-                .anyMatch(i -> Set.of("SUBMITTING", "SUBMIT_UNKNOWN", "VOID_PENDING", "VOID_UNKNOWN")
+        if (rows.stream()
+                .noneMatch(i -> MaterialIssueStatus.CONFIRMED.getValue().equals(i.getStatus())) || rows.stream()
+                .anyMatch(i -> Set.of(MaterialIssueStatus.SUBMITTING.getValue(), MaterialIssueStatus.SUBMIT_UNKNOWN.getValue(), MaterialIssueStatus.VOID_PENDING.getValue(), MaterialIssueStatus.VOID_UNKNOWN.getValue())
                         .contains(i.getStatus()))) fail();
-        var confirmed = rows.stream().filter(i -> "CONFIRMED".equals(i.getStatus())).toList();
+        var confirmed = rows.stream().filter(i -> MaterialIssueStatus.CONFIRMED.getValue().equals(i.getStatus()))
+                .toList();
         var filter = new MesMaterialIssueErpExtraExample();
         filter.createCriteria().andIdIn(confirmed.stream().map(MesMaterialIssueEntity::getId).toList());
         var facts = extras.selectByExample(filter).stream().collect(Collectors.toMap(x -> x.getId(), x -> x));
         for (var issue : confirmed) {
             var fact = facts.get(issue.getId());
-            if (issue.getSubmissionId() == null || fact == null || !("LOCAL_ONLY".equals(fact.getSourceExecutionMode()) && "NONE".equals(fact.getExternalEffect()) || "CONNECTED".equals(fact.getSourceExecutionMode()) && "CONFIRMED".equals(fact.getExternalEffect()) && "EFFECTIVE".equals(fact.getDocumentStatus())))
+            if (issue.getSubmissionId() == null || fact == null || !(Mode.LOCAL_ONLY.getValue()
+                    .equals(fact.getSourceExecutionMode()) && ExternalEffect.NONE.getValue()
+                    .equals(fact.getExternalEffect()) || Mode.CONNECTED.getValue()
+                    .equals(fact.getSourceExecutionMode()) && ExternalEffect.CONFIRMED.getValue()
+                    .equals(fact.getExternalEffect()) && DocumentStatus.EFFECTIVE.getValue()
+                    .equals(fact.getDocumentStatus())))
                 fail();
         }
-        if ("RUNNING".equals(e.getStatus())) return e;
-        e.setStatus("RUNNING");
+        if (ProductionExecutionStatus.RUNNING.getValue().equals(e.getStatus())) return e;
+        e.setStatus(ProductionExecutionStatus.RUNNING.getValue());
         e.setStartTime(LocalDateTime.now());
         e.setUpdateTime(LocalDateTime.now());
         e.setUpdateBy(String.valueOf(SecurityUtils.getUserId()));
@@ -151,7 +166,7 @@ public class ExecutionPathService {
 
     public boolean hasBlockingIssue(Long id) {
         return issueRows(id).stream()
-                .anyMatch(i -> i.getSubmissionId() != null || Set.of("VOID_PENDING", "VOID_UNKNOWN")
+                .anyMatch(i -> i.getSubmissionId() != null || Set.of(MaterialIssueStatus.VOID_PENDING.getValue(), MaterialIssueStatus.VOID_UNKNOWN.getValue())
                         .contains(i.getStatus()));
     }
 

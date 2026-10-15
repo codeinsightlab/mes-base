@@ -426,3 +426,50 @@ SysUser 敏感字段。
 - ERP HTTP不在长事务或持有行锁时调用；创建/作废先持久化稳定意图，外部后果不能由本地回滚撤销。已知外部存在或结果未知不得重复创建；重复核实不产生外部写。所有编辑、明细变化与动作必须参与同一版本保护，不能让旧查询覆盖新作废。
 - 查询与核实使用独立权限，可信FactoryScope定位MES记录后从服务端Extra构造外部身份；禁止客户端指定外部身份或跨厂查询。诊断安全且限长，不向前端暴露Token、Secret或供应商原始报文。
 - 优先人工核实与有真实厂商实现的人工恢复，不允许人工标记成功；未接入继续审核时不制造审核业务。不建自动补偿/Saga/通用工作流、动态插件、无限重试或无需求空接口。V1不支持跨ERP历史迁移或单厂多ERP协同，历史provider不匹配明确拒绝并交项目处理。
+
+## 2026-10-15 用户确认：业务枚举与统一模板（强制）
+
+- `dev.mesbase.business` 中具有封闭取值的业务状态、类型、执行模式、操作结果等必须定义为 Java `enum`。业务判断、赋值、查询条件、同步转换和 Mapper XML 不得散落字符串或数字魔法值，也不得用 `static final String` / 字符串集合代替业务枚举。不同业务含义即使编码相同也分别建模，例如领料状态、提交尝试状态与外部副作用不能混用。
+- 枚举以用户给定的 `Status` 形式为模板：枚举项显式声明中文 `description` 和稳定 `value`；字段使用 `private final`；构造器赋值；提供 `getDescription()`、`getValue()`、静态 `from(value)` 和静态 `toMap()`。`from` 未匹配（含可空入参）返回 `null`，调用边界必须明确拒绝非法值或处理未知，不能默认映射到成功/有效状态。`toMap()` 使用 `LinkedHashMap` 保持声明顺序，每次返回独立 Map。
+- `value` 类型依据已确认的数据库和接口契约选择，不机械套用 `byte`。已有 VARCHAR/CHAR 编码保留 `String`；实际为 byte 的业务使用 `byte` / `Map<Byte, String>`。禁止仅为统一枚举样式擅自改变存量编码、数据库类型、必填性或接口序列化。持久化与协议转换显式使用 `getValue()`，不依赖 `name()` / `ordinal()` / `valueOf()` 绑定枚举名称。
+- Java 业务逻辑优先解析后用枚举比较；兼容字符串 Entity/DTO 时可使用枚举 `getValue()` 比较、赋值和传入生成 Criteria。完整合法值校验复用 `from`；动作允许的状态子集由业务规则显式表达，不能因引入枚举扩大可编辑或可流转状态。
+- Mapper XML 涉及枚举时从枚举 `getValue()` 获取参数（例如 `<bind>` + `#{参数}`），禁止硬编码状态，也禁止 `${}` 字符串拼接。历史已执行迁移中的编码和默认值不因此改写。
+- 用户可维护字典、外部 provider 标识、单号/节点号前缀、权限码、配置键、错误文案等不凭名称臆造成封闭枚举。必须先确认真实取值语义；字典字段保留字典契约。
+- 新建业务及代码生成后必须按此规范审查并适配；生成器不推断业务枚举、不制造默认状态。手工修改生成文件仍须移除该文件的 `MES-CODEGEN` 归属标记。审查关联测试、同步入口和查询 SQL，并验证枚举值兼容、反向解析、未知值、选项顺序及业务状态保护。
+
+字符串编码模板见 `mes-business/src/main/java/dev/mesbase/business/shared/enums/EnableStatus.java`。数值编码采用相同结构，例如：
+
+```java
+public enum Status {
+    DELETED("已删除", (byte) -1),
+    INVALID("新建", (byte) 0),
+    DISABLE("禁用", (byte) 2),
+    VALID("有效", (byte) 1);
+
+    private final String description;
+    private final byte value;
+
+    Status(String description, byte value) {
+        this.description = description;
+        this.value = value;
+    }
+
+    public static Status from(byte value) {
+        for (Status item : values()) {
+            if (item.value == value) return item;
+        }
+        return null;
+    }
+
+    public static Map<Byte, String> toMap() {
+        Map<Byte, String> result = new LinkedHashMap<>();
+        for (Status item : values()) result.put(item.value, item.description);
+        return result;
+    }
+
+    public String getDescription() { return description; }
+    public byte getValue() { return value; }
+}
+```
+
+实际 Java 文件顶部必须显式导入 `java.util.Map`、`java.util.LinkedHashMap`。

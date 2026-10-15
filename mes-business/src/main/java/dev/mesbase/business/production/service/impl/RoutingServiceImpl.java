@@ -1,5 +1,7 @@
 package dev.mesbase.business.production.service.impl;
 
+import dev.mesbase.business.production.domain.RoutingStatus;
+import dev.mesbase.business.shared.enums.EnableStatus;
 import com.github.pagehelper.Page;
 import com.github.pagehelper.PageHelper;
 import dev.mesbase.business.production.dao.RoutingMapper;
@@ -165,7 +167,7 @@ public class RoutingServiceImpl implements IRoutingService {
         row.setName(input.name().strip());
         row.setDescription(input.description());
         row.setVersion(1);
-        row.setStatus("DRAFT");
+        row.setStatus(RoutingStatus.DRAFT.getValue());
         row.setRevision(0);
         insertRow(row);
         return row;
@@ -203,7 +205,7 @@ public class RoutingServiceImpl implements IRoutingService {
         productFilter.createCriteria().andRoutingIdIn(ids);
         products.deleteByExample(productFilter);
         var filter = new RoutingExample();
-        filter.createCriteria().andIdIn(ids).andStatusEqualTo("DRAFT");
+        filter.createCriteria().andIdIn(ids).andStatusEqualTo(RoutingStatus.DRAFT.getValue());
         if (mapper.deleteByExample(filter) != ids.size()) throw new FoundationException(ErrorCode.RESOURCE_CONFLICT);
         dirty();
     }
@@ -253,7 +255,7 @@ public class RoutingServiceImpl implements IRoutingService {
             step.setOperationDescription(operation.getDescription());
             changed(nodes.updateByPrimaryKey(step));
         }
-        row.setStatus("PUBLISHED");
+        row.setStatus(RoutingStatus.PUBLISHED.getValue());
         row.setPublishedAt(LocalDateTime.now());
         saveRow(row);
         return row;
@@ -263,10 +265,11 @@ public class RoutingServiceImpl implements IRoutingService {
             rollbackFor = Exception.class)
     public RoutingEntity availability(Long id, Integer revision, boolean enabled) {
         var row = touch(id, revision, false);
-        if (row.getPublishedAt() == null || !Set.of("PUBLISHED", "DISABLED").contains(row.getStatus())) {
+        if (row.getPublishedAt() == null || !Set.of(RoutingStatus.PUBLISHED.getValue(), RoutingStatus.DISABLED.getValue())
+                .contains(row.getStatus())) {
             throw new FoundationException(ErrorCode.ROUTING_FROZEN);
         }
-        row.setStatus(enabled ? "PUBLISHED" : "DISABLED");
+        row.setStatus(enabled ? RoutingStatus.PUBLISHED.getValue() : RoutingStatus.DISABLED.getValue());
         saveRow(row);
         return row;
     }
@@ -279,7 +282,8 @@ public class RoutingServiceImpl implements IRoutingService {
             throw new FoundationException(ErrorCode.ROUTING_REVISION_CONFLICT);
         if (source.getPublishedAt() == null) throw new FoundationException(ErrorCode.ROUTING_FROZEN);
         var latest = latest(source.getCode());
-        if ("DRAFT".equals(latest.getStatus())) throw new FoundationException(ErrorCode.RESOURCE_CONFLICT);
+        if (RoutingStatus.DRAFT.getValue().equals(latest.getStatus()))
+            throw new FoundationException(ErrorCode.RESOURCE_CONFLICT);
         return cloneVersion(source, source.getCode(), source.getName(), latest.getVersion() + 1, false);
     }
 
@@ -299,7 +303,7 @@ public class RoutingServiceImpl implements IRoutingService {
         row.setCode(code);
         row.setName(name);
         row.setVersion(version);
-        row.setStatus("DRAFT");
+        row.setStatus(RoutingStatus.DRAFT.getValue());
         row.setRevision(0);
         row.setDescription(source.getDescription());
         if (!copy) {
@@ -318,7 +322,8 @@ public class RoutingServiceImpl implements IRoutingService {
 
     private void validateContentReferences(RoutingEntity parent, List<Long> materialIds, List<RoutingNodeCommand> input,
                                            List<RoutingEdgeCommand> connections) {
-        if (!"DRAFT".equals(parent.getStatus())) throw new FoundationException(ErrorCode.ROUTING_FROZEN);
+        if (!RoutingStatus.DRAFT.getValue().equals(parent.getStatus()))
+            throw new FoundationException(ErrorCode.ROUTING_FROZEN);
         if (materialIds == null || materialIds.size() > 100 || materialIds.stream().anyMatch(Objects::isNull)
                 || new HashSet<>(materialIds).size() != materialIds.size())
             throw new FoundationException(ErrorCode.BAD_REQUEST);
@@ -405,12 +410,13 @@ public class RoutingServiceImpl implements IRoutingService {
 
     private RoutingEntity touch(Long id, Integer revision, boolean draftOnly) {
         var old = requireRecord(id);
-        if (draftOnly && !"DRAFT".equals(old.getStatus())) throw new FoundationException(ErrorCode.ROUTING_FROZEN);
+        if (draftOnly && !RoutingStatus.DRAFT.getValue().equals(old.getStatus()))
+            throw new FoundationException(ErrorCode.ROUTING_FROZEN);
         if (!Objects.equals(old.getRevision(), revision))
             throw new FoundationException(ErrorCode.ROUTING_REVISION_CONFLICT);
         var filter = byId(id);
         filter.getOredCriteria().getFirst().andRevisionEqualTo(revision);
-        if (draftOnly) filter.getOredCriteria().getFirst().andStatusEqualTo("DRAFT");
+        if (draftOnly) filter.getOredCriteria().getFirst().andStatusEqualTo(RoutingStatus.DRAFT.getValue());
         var update = new RoutingEntity();
         update.setRevision(revision + 1);
         if (mapper.updateByExampleSelective(update, filter) != 1)
@@ -435,7 +441,7 @@ public class RoutingServiceImpl implements IRoutingService {
         }
         if (stepRows.size() > 100 || productRows.size() > 100)
             throw new FoundationException(ErrorCode.RESOURCE_CONFLICT);
-        if ("DRAFT".equals(row.getStatus())) {
+        if (RoutingStatus.DRAFT.getValue().equals(row.getStatus())) {
             if (!stepRows.isEmpty()) {
                 var filter = new OperationExample();
                 filter.createCriteria()
@@ -611,14 +617,14 @@ public class RoutingServiceImpl implements IRoutingService {
                 skipped++;
                 continue;
             }
-            boolean insert = old == null || !"DRAFT".equals(old.getStatus());
+            boolean insert = old == null || !RoutingStatus.DRAFT.getValue().equals(old.getStatus());
             RoutingEntity row;
             if (insert) {
                 row = new RoutingEntity();
 
                 row.setCode(input.code().strip());
                 row.setVersion(old == null ? 1 : old.getVersion() + 1);
-                row.setStatus("DRAFT");
+                row.setStatus(RoutingStatus.DRAFT.getValue());
                 row.setRevision(0);
             } else row = touch(old.getId(), old.getRevision(), true);
             row.setName(input.name().strip());
@@ -661,10 +667,10 @@ public class RoutingServiceImpl implements IRoutingService {
         if (limit < 1 || limit > 100 || search != null && search.length() > 255)
             throw new FoundationException(ErrorCode.BAD_REQUEST);
         var filter = new OperationExample();
-        var criteria = filter.createCriteria().andStatusEqualTo("ENABLED");
+        var criteria = filter.createCriteria().andStatusEqualTo(EnableStatus.ENABLED.getValue());
         if (search != null && !search.isBlank()) {
             criteria.andCodeLike("%" + search + "%");
-            filter.or().andStatusEqualTo("ENABLED").andNameLike("%" + search + "%");
+            filter.or().andStatusEqualTo(EnableStatus.ENABLED.getValue()).andNameLike("%" + search + "%");
         }
         filter.setOrderByClause("code");
         try (Page<OperationEntity> page = PageHelper.offsetPage(0, limit, false)) {
@@ -678,10 +684,10 @@ public class RoutingServiceImpl implements IRoutingService {
         if (limit < 1 || limit > 100 || search != null && search.length() > 255)
             throw new FoundationException(ErrorCode.BAD_REQUEST);
         var filter = new MaterialExample();
-        var criteria = filter.createCriteria().andStatusEqualTo("ENABLED");
+        var criteria = filter.createCriteria().andStatusEqualTo(EnableStatus.ENABLED.getValue());
         if (search != null && !search.isBlank()) {
             criteria.andCodeLike("%" + search + "%");
-            filter.or().andStatusEqualTo("ENABLED").andNameLike("%" + search + "%");
+            filter.or().andStatusEqualTo(EnableStatus.ENABLED.getValue()).andNameLike("%" + search + "%");
         }
         filter.setOrderByClause("code");
         try (Page<MaterialEntity> page = PageHelper.offsetPage(0, limit, false)) {

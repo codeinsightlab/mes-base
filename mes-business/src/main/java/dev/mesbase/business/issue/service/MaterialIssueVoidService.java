@@ -1,5 +1,8 @@
 package dev.mesbase.business.issue.service;
 
+import dev.mesbase.business.production.domain.ProductionExecutionStatus;
+import dev.mesbase.business.issue.domain.MaterialIssueStatus;
+import dev.mesbase.business.integration.warehouse.ExternalEffect;
 import dev.mesbase.business.issue.dao.MesMaterialIssueMapper;
 import dev.mesbase.business.issue.domain.MesMaterialIssueEntity;
 import dev.mesbase.business.production.dao.WorkorderMapper;
@@ -77,24 +80,28 @@ public class MaterialIssueVoidService {
         var prepared = transaction.execute(s -> {
             var row = lock(id);
             if (query) {
-                if (!Set.of("VOID_PENDING", "VOID_UNKNOWN").contains(row.getStatus()))
+                if (!Set.of(MaterialIssueStatus.VOID_PENDING.getValue(), MaterialIssueStatus.VOID_UNKNOWN.getValue())
+                        .contains(row.getStatus()))
                     return new Prepared(row, false, rules.extraVersion(id));
-            } else if (row.getVoidOperationId() != null || "VOIDED".equals(row.getStatus()))
+            } else if (row.getVoidOperationId() != null || MaterialIssueStatus.VOIDED.getValue()
+                    .equals(row.getStatus()))
                 return new Prepared(row, false, rules.extraVersion(id));
             if (!query) {
-                if (!Set.of("DRAFT", "RECORDED", "CONFIRMED").contains(row.getStatus()))
+                if (!Set.of(MaterialIssueStatus.DRAFT.getValue(), MaterialIssueStatus.RECORDED.getValue(), MaterialIssueStatus.CONFIRMED.getValue())
+                        .contains(row.getStatus()))
                     throw new FoundationException(ErrorCode.ISSUE_VOID_CONFLICT);
                 if (row.getExecutionId() != null) {
                     var e = executions.lock(row.getExecutionId());
-                    if (e.getStartTime() != null || Set.of("RUNNING", "COMPLETED").contains(e.getStatus()))
+                    if (e.getStartTime() != null || Set.of(ProductionExecutionStatus.RUNNING.getValue(), ProductionExecutionStatus.COMPLETED.getValue())
+                            .contains(e.getStatus()))
                         throw new FoundationException(ErrorCode.EXECUTION_REFERENCED);
                 }
                 Mode mode = warehouse.cancellationMode(scope, row);
                 row.setVoidOperationId(UUID.randomUUID().toString());
                 row.setVoidFromStatus(row.getStatus());
-                row.setVoidExecutionMode(mode.name());
+                row.setVoidExecutionMode(mode.getValue());
                 row.setVoidRequestedAt(LocalDateTime.now());
-                row.setStatus("VOID_PENDING");
+                row.setStatus(MaterialIssueStatus.VOID_PENDING.getValue());
                 save(row);
             }
             return new Prepared(row, true, rules.extraVersion(id));
@@ -102,35 +109,38 @@ public class MaterialIssueVoidService {
         var claim = prepared;
         if (!claim.invoke()) return claim.row();
         var record = claim.row();
-        if (!Set.of("VOID_PENDING", "VOID_UNKNOWN").contains(record.getStatus())) return record;
+        if (!Set.of(MaterialIssueStatus.VOID_PENDING.getValue(), MaterialIssueStatus.VOID_UNKNOWN.getValue())
+                .contains(record.getStatus())) return record;
+        Mode recordedMode = Mode.from(record.getVoidExecutionMode());
+        if (recordedMode == null) throw new FoundationException(ErrorCode.INTEGRATION_NOT_CONFIGURED);
         // A repeated cancellation never repeats an external write; reconciliation only queries the same operation.
         ErpActionResult result;
         try {
             result = warehouse.execute(scope, record, query);
         } catch (Exception failure) {
             LOG.warn("Warehouse cancellation outcome unknown; operation {}", record.getVoidOperationId(), failure);
-            result = new ErpActionResult(Status.UNKNOWN, Mode.valueOf(record.getVoidExecutionMode()), record.getExternalReference(), "外部调用结果待核实");
+            result = new ErpActionResult(Status.UNKNOWN, recordedMode, record.getExternalReference(), "外部调用结果待核实");
         }
         if (result == null || result.status() == null || result.executionMode() == null || !result.executionMode()
-                .name()
+                .getValue()
                 .equals(record.getVoidExecutionMode()) || result.executionMode() == Mode.CONNECTED && !Objects.equals(result.externalReference(), record.getExternalReference()))
-            result = new ErpActionResult(Status.UNKNOWN, Mode.valueOf(record.getVoidExecutionMode()), record.getExternalReference(), "外部结果契约不完整或来源不符");
+            result = new ErpActionResult(Status.UNKNOWN, recordedMode, record.getExternalReference(), "外部结果契约不完整或来源不符");
         ErpActionResult confirmed = result;
         return transaction.execute(s -> {
             var row = lock(id);
             if (!claim.version().equals(rules.extraVersion(id)) || !record.getVoidOperationId()
-                    .equals(row.getVoidOperationId()) || !Set.of("VOID_PENDING", "VOID_UNKNOWN")
+                    .equals(row.getVoidOperationId()) || !Set.of(MaterialIssueStatus.VOID_PENDING.getValue(), MaterialIssueStatus.VOID_UNKNOWN.getValue())
                     .contains(row.getStatus())) return row;
-            row.setVoidResultStatus(confirmed.status().name());
+            row.setVoidResultStatus(confirmed.status().getValue());
             row.setVoidMessage(confirmed.status() == Status.SUCCEEDED ? "作废结果已确认" : confirmed.status() == Status.REJECTED ? "ERP明确拒绝作废，单据仍有效" : "外部结果待核实");
             if (confirmed.status() == Status.SUCCEEDED) {
-                row.setStatus("VOIDED");
-                row.setExternalEffect(confirmed.executionMode() == Mode.LOCAL_ONLY ? "NONE" : "REVERSED");
+                row.setStatus(MaterialIssueStatus.VOIDED.getValue());
+                row.setExternalEffect(confirmed.executionMode() == Mode.LOCAL_ONLY ? ExternalEffect.NONE.getValue() : ExternalEffect.REVERSED.getValue());
                 row.setVoidFinishedAt(LocalDateTime.now());
             } else if (confirmed.status() == Status.REJECTED) {
                 row.setStatus(row.getVoidFromStatus());
                 row.setVoidFinishedAt(LocalDateTime.now());
-            } else row.setStatus("VOID_UNKNOWN");
+            } else row.setStatus(MaterialIssueStatus.VOID_UNKNOWN.getValue());
             save(row);
             return row;
         });

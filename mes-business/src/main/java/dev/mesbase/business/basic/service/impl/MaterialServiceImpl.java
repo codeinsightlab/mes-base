@@ -108,8 +108,6 @@ public class MaterialServiceImpl implements IMaterialService {
         try (Page<MaterialEntity> page = PageHelper.offsetPage(offset, limit)) {
             List<MaterialEntity> rows = mapper.selectByExample(example);
             return new MaterialPage(rows, page.getTotal(), offset, limit);
-        } finally {
-            PageHelper.clearPage();
         }
     }
 

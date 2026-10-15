@@ -81,8 +81,6 @@ public class MesProductionExecutionServiceImpl implements IMesProductionExecutio
         try (Page<MesProductionExecutionEntity> page = PageHelper.offsetPage(offset, limit)) {
             List<MesProductionExecutionEntity> rows = mapper.selectByExample(example);
             return new MesProductionExecutionPage(rows, page.getTotal(), offset, limit);
-        } finally {
-            PageHelper.clearPage();
         }
     }
 

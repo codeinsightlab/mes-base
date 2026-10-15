@@ -1,5 +1,6 @@
 package dev.mesbase.business.production.service.impl;
 
+import dev.mesbase.business.shared.enums.EnableStatus;
 import com.github.pagehelper.Page;
 import com.github.pagehelper.PageHelper;
 import dev.mesbase.business.production.dao.OperationMapper;
@@ -33,7 +34,6 @@ import dev.mesbase.framework.sync.SyncCoordinator;
 import dev.mesbase.infrastructure.cache.BusinessCacheProcessor;
 import jakarta.validation.Validator;
 import java.time.Duration;
-import java.util.Set;
 import java.util.HashMap;
 import java.util.Locale;
 import org.springframework.transaction.annotation.Transactional;
@@ -103,8 +103,6 @@ public class OperationServiceImpl implements IOperationService {
         try (Page<OperationEntity> page = PageHelper.offsetPage(offset, limit)) {
             List<OperationEntity> rows = mapper.selectByExample(example);
             return new OperationPage(rows, page.getTotal(), offset, limit);
-        } finally {
-            PageHelper.clearPage();
         }
     }
 
@@ -185,7 +183,7 @@ public class OperationServiceImpl implements IOperationService {
     }
 
     private void validate(OperationEntity row) {
-        if (!Set.of("ENABLED", "DISABLED").contains(row.getStatus()) || row.getSort() == null
+        if (EnableStatus.from(row.getStatus()) == null || row.getSort() == null
                 || row.getSort() < 0) throw new FoundationException(ErrorCode.BAD_REQUEST);
         row.setCode(row.getCode().strip());
         row.setName(row.getName().strip());
@@ -236,7 +234,7 @@ public class OperationServiceImpl implements IOperationService {
         var normalized = new HashSet<String>();
         for (var input : inputs) {
             if (input == null || !validator.validate(input).isEmpty()
-                    || !Set.of("ENABLED", "DISABLED").contains(input.status())
+                    || EnableStatus.from(input.status()) == null
                     || !normalized.add(input.code().strip().toLowerCase(Locale.ROOT))) {
                 throw new FoundationException(ErrorCode.BAD_REQUEST);
             }

@@ -1,5 +1,6 @@
 package dev.mesbase.business.issue.service;
 
+import dev.mesbase.business.issue.domain.MaterialIssueOperation;
 import dev.mesbase.business.issue.dao.MesMaterialIssueMapper;
 import dev.mesbase.business.issue.domain.MesMaterialIssueEntity;
 import dev.mesbase.business.issue.domain.MesMaterialIssueErpExtraEntity;
@@ -93,7 +94,7 @@ public class MaterialIssueErpService {
             return ErpIssueQueryResult.unknown(Mode.CONNECTED);
         }
         if (result == null || result.outcome() == null || result.documentStatus() == null || result.executionMode() == null
-                || !result.executionMode().name().equals(e.getSourceExecutionMode()))
+                || !result.executionMode().getValue().equals(e.getSourceExecutionMode()))
             return ErpIssueQueryResult.unknown(Mode.valueOf(e.getSourceExecutionMode()));
         if (result.executionMode() == Mode.LOCAL_ONLY) return ErpIssueQueryResult.local();
         if (result.outcome() == Outcome.FOUND && (result.externalId() == null && result.externalCode() == null
@@ -123,8 +124,8 @@ public class MaterialIssueErpService {
                 throw new FoundationException(ErrorCode.RESOURCE_CONFLICT);
             String message = submissions.reconcileSubmission(row, extra, result);
             if (message == null) message = MaterialIssueErpRules.reconcile(row, extra, result);
-            extra.setLastOperation("RECONCILE");
-            extra.setLastOutcome(result.outcome().name());
+            extra.setLastOperation(MaterialIssueOperation.RECONCILE.getValue());
+            extra.setLastOutcome(result.outcome().getValue());
             extra.setLastMessage(message);
             extra.setCheckedAt(LocalDateTime.now());
             if (issues.updateByPrimaryKey(row) != 1) throw new FoundationException(ErrorCode.RESOURCE_CONFLICT);

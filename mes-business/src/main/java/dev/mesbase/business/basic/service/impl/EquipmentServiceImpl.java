@@ -1,5 +1,6 @@
 package dev.mesbase.business.basic.service.impl;
 
+import dev.mesbase.business.shared.enums.EnableStatus;
 import com.github.pagehelper.Page;
 import com.github.pagehelper.PageHelper;
 import dev.mesbase.business.basic.dao.EquipmentMapper;
@@ -21,7 +22,6 @@ import java.util.Objects;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import java.util.Set;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.transaction.annotation.Isolation;
 import dev.mesbase.business.basic.service.EquipmentReferenceRules;
@@ -75,8 +75,6 @@ public class EquipmentServiceImpl implements IEquipmentService {
         try (Page<EquipmentEntity> page = PageHelper.offsetPage(offset, limit)) {
             List<EquipmentEntity> rows = mapper.selectByExample(example);
             return new EquipmentPage(rows, page.getTotal(), offset, limit);
-        } finally {
-            PageHelper.clearPage();
         }
     }
 
@@ -160,7 +158,7 @@ public class EquipmentServiceImpl implements IEquipmentService {
     }
 
     private void validate(EquipmentEntity row) {
-        if (!Set.of("ENABLED", "DISABLED").contains(row.getStatus()))
+        if (EnableStatus.from(row.getStatus()) == null)
             throw new FoundationException(ErrorCode.BAD_REQUEST);
         var example = new EquipmentExample();
         var criteria = example.createCriteria().andCodeEqualTo(row.getCode());

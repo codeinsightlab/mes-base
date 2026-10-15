@@ -2,11 +2,14 @@
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="dev.mesbase.business.production.dao.WorkOrderExtraMapper">
  <select id="publishedForProduct" resultMap="dev.mesbase.business.production.dao.RoutingMapper.BaseResultMap">
+    <bind name="productType" value="@dev.mesbase.business.basic.domain.MaterialType@PRODUCT.getValue()"/>
+    <bind name="enabledStatus" value="@dev.mesbase.business.shared.enums.EnableStatus@ENABLED.getValue()"/>
+    <bind name="publishedStatus" value="@dev.mesbase.business.production.domain.RoutingStatus@PUBLISHED.getValue()"/>
   SELECT r.id,r.code,r.name,r.version,r.status,r.description,r.external_id,r.source_version,r.revision,r.published_at
   FROM routing r JOIN routing_product p ON p.routing_id=r.id
   JOIN material m ON m.id=p.material_id
   WHERE m.id=#{productId}
-   AND m.material_type='PRODUCT' AND m.status='ENABLED' AND r.status='PUBLISHED'
+   AND m.material_type=#{productType} AND m.status=#{enabledStatus} AND r.status=#{publishedStatus}
    <if test="search != null and search != ''">AND (r.code LIKE CONCAT('%',#{search},'%') OR r.name LIKE CONCAT('%',#{search},'%'))</if>
   ORDER BY r.code,r.version DESC,r.id LIMIT 100
  </select>
@@ -22,10 +25,16 @@
   GROUP BY w.id,w.planned_qty
  </select>
   <select id="countBlockingIssues" resultType="long">
+    <bind name="voidedStatus" value="@dev.mesbase.business.issue.domain.MaterialIssueStatus@VOIDED.getValue()"/>
+    <bind name="succeededStatus" value="@dev.mesbase.business.integration.warehouse.ErpActionResult$Status@SUCCEEDED.getValue()"/>
+    <bind name="localMode" value="@dev.mesbase.business.integration.warehouse.ErpActionResult$Mode@LOCAL_ONLY.getValue()"/>
+    <bind name="connectedMode" value="@dev.mesbase.business.integration.warehouse.ErpActionResult$Mode@CONNECTED.getValue()"/>
+    <bind name="noneEffect" value="@dev.mesbase.business.integration.warehouse.ExternalEffect@NONE.getValue()"/>
+    <bind name="reversedEffect" value="@dev.mesbase.business.integration.warehouse.ExternalEffect@REVERSED.getValue()"/>
     SELECT COUNT(*) FROM mes_material_issue i LEFT JOIN mes_material_issue_erp_extra e ON e.id=i.id
-    WHERE i.workorder_id=#{workorderId} AND NOT (i.status='VOIDED' AND
-      COALESCE(e.void_result_status,'')='SUCCEEDED' AND
-      ((COALESCE(e.source_execution_mode,'')='LOCAL_ONLY' AND COALESCE(e.void_execution_mode,'')='LOCAL_ONLY' AND COALESCE(e.external_effect,'')='NONE')
-       OR (COALESCE(e.source_execution_mode,'')='CONNECTED' AND COALESCE(e.void_execution_mode,'')='CONNECTED' AND COALESCE(e.external_effect,'')='REVERSED')))
+    WHERE i.workorder_id=#{workorderId} AND NOT (i.status=#{voidedStatus} AND
+      COALESCE(e.void_result_status,'')=#{succeededStatus} AND
+      ((COALESCE(e.source_execution_mode,'')=#{localMode} AND COALESCE(e.void_execution_mode,'')=#{localMode} AND COALESCE(e.external_effect,'')=#{noneEffect})
+       OR (COALESCE(e.source_execution_mode,'')=#{connectedMode} AND COALESCE(e.void_execution_mode,'')=#{connectedMode} AND COALESCE(e.external_effect,'')=#{reversedEffect})))
   </select>
 </mapper>

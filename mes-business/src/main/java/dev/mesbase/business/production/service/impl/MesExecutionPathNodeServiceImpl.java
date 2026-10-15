@@ -59,8 +59,6 @@ public class MesExecutionPathNodeServiceImpl implements IMesExecutionPathNodeSer
         try (Page<MesExecutionPathNodeEntity> page = PageHelper.offsetPage(offset, limit)) {
             List<MesExecutionPathNodeEntity> rows = mapper.selectByExample(example);
             return new MesExecutionPathNodePage(rows, page.getTotal(), offset, limit);
-        } finally {
-            PageHelper.clearPage();
         }
     }
 

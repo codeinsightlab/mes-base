@@ -1,5 +1,6 @@
 package dev.mesbase.business.production.service;
 
+import dev.mesbase.business.shared.enums.EnableStatus;
 import dev.mesbase.business.basic.dao.MaterialMapper;
 import dev.mesbase.business.basic.domain.MaterialEntity;
 import dev.mesbase.business.basic.domain.MaterialExample;
@@ -53,7 +54,7 @@ public class RoutingReferenceRules {
         }
         var rows = operations.selectByExample(filter);
         if (rows.size() != ids.size() || enabled && rows.stream()
-                .anyMatch(row -> !"ENABLED".equals(row.getStatus()))) {
+                .anyMatch(row -> !EnableStatus.ENABLED.getValue().equals(row.getStatus()))) {
             throw new FoundationException(ErrorCode.ROUTING_REFERENCE_INVALID);
         }
         return rows;
@@ -76,7 +77,7 @@ public class RoutingReferenceRules {
         }
         var rows = materials.selectByExample(filter);
         if (rows.size() != ids.size() || enabled && rows.stream()
-                .anyMatch(row -> !"ENABLED".equals(row.getStatus()))) {
+                .anyMatch(row -> !EnableStatus.ENABLED.getValue().equals(row.getStatus()))) {
             throw new FoundationException(ErrorCode.ROUTING_REFERENCE_INVALID);
         }
         return rows;

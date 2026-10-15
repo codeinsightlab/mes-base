@@ -1,5 +1,6 @@
 package dev.mesbase.business.wm.service;
 
+import dev.mesbase.business.shared.enums.EnableStatus;
 import dev.mesbase.business.basic.dao.MaterialMapper;
 import dev.mesbase.business.basic.domain.MaterialEntity;
 import dev.mesbase.business.basic.domain.MaterialExample;
@@ -15,7 +16,6 @@ import dev.mesbase.core.error.FoundationException;
 import java.util.List;
 import java.util.stream.Collectors;
 import dev.mesbase.business.wm.domain.WmInventoryItem;
-import java.util.Set;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
@@ -36,7 +36,7 @@ public class StockReferenceRules {
     }
 
     private void status(String status) {
-        if (status == null || !Set.of("ENABLED", "DISABLED").contains(status))
+        if (status == null || EnableStatus.from(status) == null)
             throw new FoundationException(ErrorCode.BAD_REQUEST);
     }
 

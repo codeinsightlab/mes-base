@@ -1,5 +1,7 @@
 package dev.mesbase.business.issue.service;
 
+import dev.mesbase.business.issue.domain.MaterialIssueStatus;
+import dev.mesbase.business.integration.warehouse.ExternalEffect;
 import dev.mesbase.business.basic.dao.MaterialMapper;
 import dev.mesbase.business.basic.dao.UnitMeasureMapper;
 import dev.mesbase.business.issue.dao.MesMaterialIssueMapper;
@@ -92,9 +94,10 @@ public class MaterialIssueRules {
     }
 
     public void validate(MesMaterialIssueEntity row) {
-        require(row.getStatus() != null && Set.of("DRAFT", "RECORDED").contains(row.getStatus()));
+        require(row.getStatus() != null && Set.of(MaterialIssueStatus.DRAFT.getValue(), MaterialIssueStatus.RECORDED.getValue())
+                .contains(row.getStatus()));
         require(row.getIssueNo() != null && !row.getIssueNo().isBlank());
-        if (row.getSubmissionId() != null || row.getVoidOperationId() != null || !Set.of("DRAFT", "RECORDED")
+        if (row.getSubmissionId() != null || row.getVoidOperationId() != null || !Set.of(MaterialIssueStatus.DRAFT.getValue(), MaterialIssueStatus.RECORDED.getValue())
                 .contains(row.getStatus()))
             throw new FoundationException(ErrorCode.ISSUE_VOID_CONFLICT);
         var execution = row.getExecutionId() == null ? null : executions.lock(row.getExecutionId());
@@ -147,7 +150,7 @@ public class MaterialIssueRules {
         require(row.getIssueId() != null && row.getMaterialId() != null && row.getQuantity() != null);
         lockIssues(List.of(row.getIssueId()));
         var header = issues.selectByPrimaryKey(row.getIssueId());
-        if (header.getSubmissionId() != null || header.getVoidOperationId() != null || !Set.of("DRAFT", "RECORDED")
+        if (header.getSubmissionId() != null || header.getVoidOperationId() != null || !Set.of(MaterialIssueStatus.DRAFT.getValue(), MaterialIssueStatus.RECORDED.getValue())
                 .contains(header.getStatus()))
             throw new FoundationException(ErrorCode.ISSUE_VOID_CONFLICT);
         require(row.getQuantity().signum() > 0 && row.getQuantity().scale() <= 6
@@ -181,7 +184,7 @@ public class MaterialIssueRules {
         lockIssues(ids);
         for (Long id : ids) {
             var row = issues.selectByPrimaryKey(id);
-            if (row.getSubmissionId() != null || row.getVoidOperationId() != null || !Set.of("DRAFT", "RECORDED")
+            if (row.getSubmissionId() != null || row.getVoidOperationId() != null || !Set.of(MaterialIssueStatus.DRAFT.getValue(), MaterialIssueStatus.RECORDED.getValue())
                     .contains(row.getStatus()))
                 throw new FoundationException(ErrorCode.ISSUE_VOID_CONFLICT);
         }
@@ -193,7 +196,7 @@ public class MaterialIssueRules {
         externalRows.createCriteria().andIdIn(ids);
         var loaded = issues.selectByExample(externalRows);
         facts.hydrate(loaded);
-        if (loaded.stream().anyMatch(r -> !"NONE".equals(r.getExternalEffect())))
+        if (loaded.stream().anyMatch(r -> !ExternalEffect.NONE.getValue().equals(r.getExternalEffect())))
             throw new FoundationException(ErrorCode.ISSUE_EXTERNAL_UNVERIFIED);
         if (loaded.stream().anyMatch(r -> r.getSubmissionId() != null))
             throw new FoundationException(ErrorCode.RESOURCE_CONFLICT);

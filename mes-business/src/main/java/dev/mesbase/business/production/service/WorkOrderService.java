@@ -1,5 +1,8 @@
 package dev.mesbase.business.production.service;
 
+import dev.mesbase.business.production.domain.WorkOrderStatus;
+import dev.mesbase.business.production.domain.RoutingStatus;
+import dev.mesbase.business.basic.domain.MaterialType;
 import com.github.pagehelper.Page;
 import com.github.pagehelper.PageHelper;
 import dev.mesbase.business.basic.dao.MaterialMapper;
@@ -104,8 +107,6 @@ public class WorkOrderService {
         try (Page<WorkorderEntity> page = PageHelper.offsetPage(offset, limit)) {
             rows = orders.selectByExample(filter);
             total = page.getTotal();
-        } finally {
-            PageHelper.clearPage();
         }
         facts.hydrate(rows);
         var children = new ProductionBatchExample();
@@ -161,7 +162,7 @@ public class WorkOrderService {
         validate(input);
         uniqueCode(input.code(), null);
         var row = new WorkorderEntity();
-        row.setStatus("DRAFT");
+        row.setStatus(WorkOrderStatus.DRAFT.getValue());
         row.setRevision(0);
         row.setCreateTime(LocalDateTime.now());
         assign(row, input);
@@ -171,7 +172,7 @@ public class WorkOrderService {
 
     public WorkOrderModels.Detail update(Long id, WorkOrderModels.Save input) {
         var row = order(id, true);
-        require("DRAFT".equals(row.getStatus()));
+        require(WorkOrderStatus.DRAFT.getValue().equals(row.getStatus()));
         if (!Objects.equals(row.getRevision(), input.revision())) conflict();
         if (!Objects.equals(row.getProductId(), input.productId()) && hasExecutions(id))
             throw new FoundationException(ErrorCode.EXECUTION_FROZEN);
@@ -211,9 +212,9 @@ public class WorkOrderService {
     public WorkOrderModels.Detail release(Long id, int revision) {
         var row = order(id, true);
         if (row.getRevision() != revision) conflict();
-        require("DRAFT".equals(row.getStatus()));
+        require(WorkOrderStatus.DRAFT.getValue().equals(row.getStatus()));
         binding(row.getProductId(), row.getRoutingId());
-        row.setStatus("RELEASED");
+        row.setStatus(WorkOrderStatus.RELEASED.getValue());
         row.setRevision(revision + 1);
         row.setUpdateTime(LocalDateTime.now());
         saveOrder(row, false);
@@ -223,7 +224,7 @@ public class WorkOrderService {
     public void delete(Long id, int revision) {
         var row = order(id, true);
         if (row.getRevision() != revision) conflict();
-        require("DRAFT".equals(row.getStatus()));
+        require(WorkOrderStatus.DRAFT.getValue().equals(row.getStatus()));
         if (hasExecutions(id)) throw new FoundationException(ErrorCode.EXECUTION_REFERENCED);
         var issueFilter = new MesMaterialIssueExample();
         issueFilter.createCriteria().andWorkorderIdEqualTo(id);
@@ -297,14 +298,14 @@ public class WorkOrderService {
     private void binding(Long product, Long routing) {
         references.lockMaterials(List.of(product), true);
         var m = materials.selectByPrimaryKey(product);
-        require("PRODUCT".equals(m.getMaterialType()));
+        require(MaterialType.PRODUCT.getValue().equals(m.getMaterialType()));
         var f = new RoutingExample();
         f.createCriteria().andIdEqualTo(routing);
         var patch = new RoutingEntity();
         patch.setId(routing);
         require(routings.updateByExampleSelective(patch, f) == 1);
         var r = routings.selectByPrimaryKey(routing);
-        require("PUBLISHED".equals(r.getStatus()));
+        require(RoutingStatus.PUBLISHED.getValue().equals(r.getStatus()));
         var p = new RoutingProductExample();
         p.createCriteria().andRoutingIdEqualTo(routing).andMaterialIdEqualTo(product);
         require(products.countByExample(p) > 0);

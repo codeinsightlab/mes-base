@@ -65,8 +65,6 @@ public class MesMaterialIssueSubmissionServiceImpl implements IMesMaterialIssueS
         try (Page<MesMaterialIssueSubmissionEntity> page = PageHelper.offsetPage(offset, limit)) {
             List<MesMaterialIssueSubmissionEntity> rows = mapper.selectByExampleWithBLOBs(example);
             return new MesMaterialIssueSubmissionPage(rows, page.getTotal(), offset, limit);
-        } finally {
-            PageHelper.clearPage();
         }
     }
 

@@ -1,5 +1,7 @@
 package dev.mesbase.platform.codegen;
 
+import com.github.pagehelper.Page;
+import com.github.pagehelper.PageHelper;
 import dev.mesbase.platform.codegen.CodegenRequest.OverwritePolicy;
 import dev.mesbase.platform.codegen.CodegenRequest.ScopeKind;
 import dev.mesbase.platform.codegen.ScaffoldWriter.Artifact;
@@ -10,6 +12,8 @@ import java.sql.Types;
 import java.math.BigDecimal;
 import java.net.URL;
 import java.net.URLClassLoader;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Proxy;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -21,6 +25,8 @@ import org.junit.jupiter.api.io.TempDir;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -99,7 +105,42 @@ class BusinessTemplatePackageTest {
                                     manager.getJavaFileObjectsFromPaths(files.filter(Files::isRegularFile).toList())).call(),
                             table + " sync=" + sync);
                 }
+                if (!sync) verifyPageLifecycle(classes, name);
             }
+        }
+    }
+
+    /** TEST ONLY: bypass MyBatis so only the generated resource boundary can clear the page. */
+    private void verifyPageLifecycle(Path classes, String name) throws Exception {
+        try (var loader = new URLClassLoader(new URL[] {classes.toUri().toURL()}, getClass().getClassLoader())) {
+            String root = "sample.business.material.";
+            Class<?> mapper = loader.loadClass(root + "mapper." + name + "Mapper");
+            Class<?> service = loader.loadClass(root + "usecase.impl." + name + "ServiceImpl");
+            Class<?> query = loader.loadClass(root + "model." + name + "QueryDto");
+            Object input = query.getConstructors()[0].newInstance(0, 20, null);
+            var selectPage = service.getMethod("selectPage", query);
+            var failure = new IllegalStateException("TEST ONLY failure before MyBatis interceptor");
+            for (boolean fail : List.of(false, true)) {
+                Object stub = Proxy.newProxyInstance(loader, new Class<?>[] {mapper}, (proxy, method, args) -> {
+                    assertEquals("selectByExample", method.getName());
+                    Page<?> page = PageHelper.getLocalPage();
+                    assertEquals(20, page.getPageSize());
+                    if (fail) throw failure;
+                    page.setTotal(0);
+                    return List.of();
+                });
+                Object instance = service.getConstructor(mapper).newInstance(stub);
+                if (fail) {
+                    assertSame(failure, assertThrows(InvocationTargetException.class,
+                            () -> selectPage.invoke(instance, input)).getCause());
+                } else {
+                    Object result = selectPage.invoke(instance, input);
+                    assertEquals(0L, result.getClass().getMethod("total").invoke(result));
+                }
+                assertNull(PageHelper.getLocalPage());
+            }
+        } finally {
+            PageHelper.clearPage();
         }
     }
 

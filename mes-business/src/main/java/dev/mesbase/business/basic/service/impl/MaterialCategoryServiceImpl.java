@@ -98,8 +98,6 @@ public class MaterialCategoryServiceImpl implements IMaterialCategoryService {
         try (Page<MaterialCategoryEntity> page = PageHelper.offsetPage(offset, limit)) {
             List<MaterialCategoryEntity> rows = mapper.selectByExample(example);
             return new MaterialCategoryPage(rows, page.getTotal(), offset, limit);
-        } finally {
-            PageHelper.clearPage();
         }
     }
 

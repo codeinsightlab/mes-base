@@ -84,8 +84,6 @@ public class MesMaterialIssueItemServiceImpl implements IMesMaterialIssueItemSer
         try (Page<MesMaterialIssueItemEntity> page = PageHelper.offsetPage(offset, limit)) {
             List<MesMaterialIssueItemEntity> rows = mapper.selectByExample(example);
             return new MesMaterialIssueItemPage(rows, page.getTotal(), offset, limit);
-        } finally {
-            PageHelper.clearPage();
         }
     }
 

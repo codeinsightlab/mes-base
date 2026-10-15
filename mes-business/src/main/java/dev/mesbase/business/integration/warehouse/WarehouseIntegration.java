@@ -1,5 +1,6 @@
 package dev.mesbase.business.integration.warehouse;
 
+import dev.mesbase.business.integration.warehouse.ExternalEffect;
 import dev.mesbase.business.issue.domain.MesMaterialIssueEntity;
 import dev.mesbase.core.factory.FactoryScope;
 import dev.mesbase.core.error.ErrorCode;
@@ -24,21 +25,23 @@ public class WarehouseIntegration {
         String value = environment.getProperty("mes.integration.warehouse.factories." + scope.factoryId()
                 .value() + ".mode");
         if (value == null) return null;
-        try {
-            return Mode.valueOf(value);
-        } catch (IllegalArgumentException failure) {
-            throw new FoundationException(ErrorCode.INTEGRATION_NOT_CONFIGURED, failure);
-        }
+        Mode mode = Mode.from(value);
+        if (mode == null) throw new FoundationException(ErrorCode.INTEGRATION_NOT_CONFIGURED);
+        return mode;
     }
 
     public Mode cancellationMode(FactoryScope scope, MesMaterialIssueEntity row) {
         Mode current = configuredMode(scope);
         if (current == null) throw new FoundationException(ErrorCode.INTEGRATION_NOT_CONFIGURED);
-        if ("UNVERIFIED".equals(row.getExternalEffect()) || row.getSourceExecutionMode() == null)
+        if (ExternalEffect.UNVERIFIED.getValue()
+                .equals(row.getExternalEffect()) || row.getSourceExecutionMode() == null)
             throw new FoundationException(ErrorCode.ISSUE_EXTERNAL_UNVERIFIED);
-        if (current == Mode.LOCAL_ONLY && "LOCAL_ONLY".equals(row.getSourceExecutionMode()) && "NONE".equals(row.getExternalEffect()) && row.getExternalBindingKey() == null && row.getExternalReference() == null)
+        if (current == Mode.LOCAL_ONLY && Mode.LOCAL_ONLY.getValue()
+                .equals(row.getSourceExecutionMode()) && ExternalEffect.NONE.getValue()
+                .equals(row.getExternalEffect()) && row.getExternalBindingKey() == null && row.getExternalReference() == null)
             return Mode.LOCAL_ONLY;
-        if (!"CONNECTED".equals(row.getSourceExecutionMode()) || row.getExternalBindingKey() == null || row.getExternalReference() == null)
+        if (!Mode.CONNECTED.getValue()
+                .equals(row.getSourceExecutionMode()) || row.getExternalBindingKey() == null || row.getExternalReference() == null)
             throw new FoundationException(ErrorCode.ISSUE_EXTERNAL_UNVERIFIED);
         adapter(scope, row.getExternalBindingKey());
         return Mode.CONNECTED;
@@ -71,13 +74,13 @@ public class WarehouseIntegration {
                                      QueryMaterialIssueCommand command) {
         Mode mode = configuredMode(scope);
         if (mode == null) throw new FoundationException(ErrorCode.INTEGRATION_NOT_CONFIGURED);
-        if ("LOCAL_ONLY".equals(sourceMode) && "local".equals(provider)) {
+        if (Mode.LOCAL_ONLY.getValue().equals(sourceMode) && "local".equals(provider)) {
             if (command.externalId() != null || command.externalCode() != null || command.bindingKey() != null)
                 throw new FoundationException(ErrorCode.ISSUE_EXTERNAL_UNVERIFIED);
             if (mode != Mode.LOCAL_ONLY) throw new FoundationException(ErrorCode.INTEGRATION_NOT_CONFIGURED);
             return local.queryMaterialIssue(scope, command);
         }
-        if (!"CONNECTED".equals(sourceMode) || provider == null || command.bindingKey() == null)
+        if (!Mode.CONNECTED.getValue().equals(sourceMode) || provider == null || command.bindingKey() == null)
             throw new FoundationException(ErrorCode.ISSUE_EXTERNAL_UNVERIFIED);
         if (mode != Mode.CONNECTED) throw new FoundationException(ErrorCode.INTEGRATION_NOT_CONFIGURED);
         // V1 requires the historical provider to match the current delivery configuration.
@@ -94,7 +97,7 @@ public class WarehouseIntegration {
     }
 
     public ErpActionResult execute(FactoryScope scope, MesMaterialIssueEntity row, boolean query) {
-        if ("LOCAL_ONLY".equals(row.getVoidExecutionMode())) {
+        if (Mode.LOCAL_ONLY.getValue().equals(row.getVoidExecutionMode())) {
             if (cancellationMode(scope, row) != Mode.LOCAL_ONLY)
                 throw new FoundationException(ErrorCode.INTEGRATION_NOT_CONFIGURED);
             return local.cancelMaterialIssue(scope, new MaterialIssueCancelCommand(row.getId(), row.getVoidOperationId(), "local", null));

@@ -1,5 +1,6 @@
 package dev.mesbase.business.issue.service.impl;
 
+import dev.mesbase.business.integration.warehouse.ExternalEffect;
 import com.github.pagehelper.Page;
 import com.github.pagehelper.PageHelper;
 import dev.mesbase.business.issue.dao.MesMaterialIssueMapper;
@@ -92,8 +93,6 @@ public class MesMaterialIssueServiceImpl implements IMesMaterialIssueService {
             List<MesMaterialIssueEntity> rows = mapper.selectByExample(example);
             rules.hydrate(rows);
             return new MesMaterialIssuePage(rows, page.getTotal(), offset, limit);
-        } finally {
-            PageHelper.clearPage();
         }
     }
 
@@ -125,9 +124,9 @@ public class MesMaterialIssueServiceImpl implements IMesMaterialIssueService {
         row.setRemark(input.remark());
         rules.validate(row);
         Mode mode = FactoryContext.current().map(warehouse::configuredMode).orElse(null);
-        row.setSourceExecutionMode(mode == null ? null : mode.name());
+        row.setSourceExecutionMode(mode == null ? null : mode.getValue());
         // This administrative CRUD never calls an external issue API.
-        row.setExternalEffect(mode == Mode.LOCAL_ONLY ? "NONE" : "UNVERIFIED");
+        row.setExternalEffect(mode == Mode.LOCAL_ONLY ? ExternalEffect.NONE.getValue() : ExternalEffect.UNVERIFIED.getValue());
         rules.audit(row, true);
         if (mapper.insert(row) != 1) {
             throw new FoundationException(ErrorCode.RESOURCE_CONFLICT);
@@ -146,7 +145,7 @@ public class MesMaterialIssueServiceImpl implements IMesMaterialIssueService {
         // Recorded execution facts cannot be detached or moved by administrative CRUD.
         if (row.getExecutionId() != null && !Objects.equals(row.getExecutionId(), input.executionId()))
             throw new FoundationException(ErrorCode.EXECUTION_FROZEN);
-        if (!"NONE".equals(row.getExternalEffect()) &&
+        if (!ExternalEffect.NONE.getValue().equals(row.getExternalEffect()) &&
                 (!Objects.equals(row.getWorkorderId(), input.workorderId())
                         || input.productId() != null && !Objects.equals(row.getProductId(), input.productId())
                         || input.routingId() != null && !Objects.equals(row.getRoutingId(), input.routingId())))

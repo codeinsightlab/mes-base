@@ -65,8 +65,6 @@ public class MesExecutionPathServiceImpl implements IMesExecutionPathService {
         try (Page<MesExecutionPathEntity> page = PageHelper.offsetPage(offset, limit)) {
             List<MesExecutionPathEntity> rows = mapper.selectByExample(example);
             return new MesExecutionPathPage(rows, page.getTotal(), offset, limit);
-        } finally {
-            PageHelper.clearPage();
         }
     }
 

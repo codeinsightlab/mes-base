@@ -1,5 +1,10 @@
 package dev.mesbase.business.production.service;
 
+import dev.mesbase.business.production.domain.WorkOrderStatus;
+import dev.mesbase.business.production.domain.RoutingStatus;
+import dev.mesbase.business.production.domain.ProductionExecutionStatus;
+import dev.mesbase.business.basic.domain.MaterialType;
+import dev.mesbase.business.production.domain.ExecutionPathStatus;
 import dev.mesbase.business.basic.dao.MaterialMapper;
 import dev.mesbase.business.issue.dao.MesMaterialIssueMapper;
 import dev.mesbase.business.issue.domain.MesMaterialIssueExample;
@@ -65,7 +70,8 @@ public class ProductionExecutionRules {
     public void initialize(MesProductionExecutionEntity row) {
         var order = validateReferences(row, true);
         row.setProductId(order.getProductId());
-        valid("READY".equals(row.getStatus()) && row.getStartTime() == null && row.getEndTime() == null);
+        valid(ProductionExecutionStatus.READY.getValue()
+                .equals(row.getStatus()) && row.getStartTime() == null && row.getEndTime() == null);
         validateValues(row);
         row.setExecutionNo("PENDING");
         audit(row, true);
@@ -81,7 +87,8 @@ public class ProductionExecutionRules {
             frozen();
         boolean facts = started(old) || hasIssues(old.getId());
         if (facts && (!Objects.equals(old.getRoutingId(), row.getRoutingId())
-                || "READY".equals(row.getStatus()) && !"READY".equals(old.getStatus())
+                || ProductionExecutionStatus.READY.getValue()
+                .equals(row.getStatus()) && !ProductionExecutionStatus.READY.getValue().equals(old.getStatus())
                 || old.getStartTime() != null && row.getStartTime() == null)) frozen();
         validateReferences(row, !Objects.equals(old.getRoutingId(), row.getRoutingId()) || !started(old) && started(row));
         validateValues(row);
@@ -90,7 +97,8 @@ public class ProductionExecutionRules {
 
     public void checkReadyReferences(MesProductionExecutionEntity row) {
         var order = validateReferences(row, true);
-        if (!"RELEASED".equals(order.getStatus())) throw new FoundationException(ErrorCode.WORKORDER_NOT_RELEASED);
+        if (!WorkOrderStatus.RELEASED.getValue().equals(order.getStatus()))
+            throw new FoundationException(ErrorCode.WORKORDER_NOT_RELEASED);
     }
 
     public void deleting(Long id) {
@@ -98,7 +106,7 @@ public class ProductionExecutionRules {
         if (started(row) || hasIssues(id)) throw new FoundationException(ErrorCode.EXECUTION_REFERENCED);
         var path = paths.selectByPrimaryKey(id);
         if (path != null) {
-            if ("LOCKED".equals(path.getPathStatus())) frozen();
+            if (ExecutionPathStatus.LOCKED.getValue().equals(path.getPathStatus())) frozen();
             var filter = new MesExecutionPathNodeExample();
             filter.createCriteria().andExecutionIdEqualTo(id);
             pathNodes.deleteByExample(filter);
@@ -113,7 +121,8 @@ public class ProductionExecutionRules {
     }
 
     private boolean started(MesProductionExecutionEntity row) {
-        return row.getStartTime() != null || Set.of("RUNNING", "COMPLETED").contains(row.getStatus());
+        return row.getStartTime() != null || Set.of(ProductionExecutionStatus.RUNNING.getValue(), ProductionExecutionStatus.COMPLETED.getValue())
+                .contains(row.getStatus());
     }
 
     private WorkorderEntity validateReferences(MesProductionExecutionEntity row, boolean newBinding) {
@@ -126,16 +135,19 @@ public class ProductionExecutionRules {
         var order = workorders.selectByPrimaryKey(row.getWorkorderId());
         valid(order != null && (row.getProductId() == null || Objects.equals(row.getProductId(), order.getProductId())));
         var product = materials.selectByPrimaryKey(order.getProductId());
-        valid(product != null && "PRODUCT".equals(product.getMaterialType()));
-        if (Set.of("RUNNING", "COMPLETED").contains(row.getStatus()) || row.getStartTime() != null)
-            if (!"RELEASED".equals(order.getStatus())) throw new FoundationException(ErrorCode.WORKORDER_NOT_RELEASED);
+        valid(product != null && MaterialType.PRODUCT.getValue().equals(product.getMaterialType()));
+        if (Set.of(ProductionExecutionStatus.RUNNING.getValue(), ProductionExecutionStatus.COMPLETED.getValue())
+                .contains(row.getStatus()) || row.getStartTime() != null)
+            if (!WorkOrderStatus.RELEASED.getValue().equals(order.getStatus()))
+                throw new FoundationException(ErrorCode.WORKORDER_NOT_RELEASED);
         var routingFilter = new RoutingExample();
         routingFilter.createCriteria().andIdEqualTo(row.getRoutingId());
         var routingPatch = new RoutingEntity();
         routingPatch.setId(row.getRoutingId());
         valid(routings.updateByExampleSelective(routingPatch, routingFilter) == 1);
         var routing = routings.selectByPrimaryKey(row.getRoutingId());
-        valid(routing != null && routing.getPublishedAt() != null && (!newBinding || "PUBLISHED".equals(routing.getStatus())));
+        valid(routing != null && routing.getPublishedAt() != null && (!newBinding || RoutingStatus.PUBLISHED.getValue()
+                .equals(routing.getStatus())));
         var applicable = new RoutingProductExample();
         applicable.createCriteria().andRoutingIdEqualTo(row.getRoutingId()).andMaterialIdEqualTo(order.getProductId());
         valid(products.countByExample(applicable) > 0);
@@ -146,11 +158,12 @@ public class ProductionExecutionRules {
         valid(row.getTargetQty() != null && row.getTargetQty().signum() > 0
                 && row.getTargetQty().scale() <= 6 && row.getTargetQty().precision() - row.getTargetQty()
                 .scale() <= 14);
-        valid(row.getStatus() != null && Set.of("READY", "RUNNING", "COMPLETED", "CANCELLED")
-                .contains(row.getStatus()));
-        valid(!Set.of("RUNNING", "COMPLETED").contains(row.getStatus()) || row.getStartTime() != null);
-        valid(!"COMPLETED".equals(row.getStatus()) || row.getEndTime() != null);
-        valid(!"READY".equals(row.getStatus()) || row.getStartTime() == null && row.getEndTime() == null);
+        valid(row.getStatus() != null && ProductionExecutionStatus.from(row.getStatus()) != null);
+        valid(!Set.of(ProductionExecutionStatus.RUNNING.getValue(), ProductionExecutionStatus.COMPLETED.getValue())
+                .contains(row.getStatus()) || row.getStartTime() != null);
+        valid(!ProductionExecutionStatus.COMPLETED.getValue().equals(row.getStatus()) || row.getEndTime() != null);
+        valid(!ProductionExecutionStatus.READY.getValue()
+                .equals(row.getStatus()) || row.getStartTime() == null && row.getEndTime() == null);
         valid(row.getEndTime() == null || row.getStartTime() != null && !row.getEndTime().isBefore(row.getStartTime()));
     }
 

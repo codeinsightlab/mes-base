@@ -92,8 +92,6 @@ public class UnitMeasureServiceImpl implements IUnitMeasureService {
         try (Page<UnitMeasureEntity> page = PageHelper.offsetPage(offset, limit)) {
             List<UnitMeasureEntity> rows = mapper.selectByExample(example);
             return new UnitMeasurePage(rows, page.getTotal(), offset, limit);
-        } finally {
-            PageHelper.clearPage();
         }
     }
 

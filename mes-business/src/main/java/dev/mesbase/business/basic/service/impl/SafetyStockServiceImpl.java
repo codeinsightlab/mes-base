@@ -92,8 +92,6 @@ public class SafetyStockServiceImpl implements ISafetyStockService {
         try (Page<SafetyStockEntity> page = PageHelper.offsetPage(offset, limit)) {
             List<SafetyStockEntity> rows = mapper.selectByExample(example);
             return new SafetyStockPage(rows, page.getTotal(), offset, limit);
-        } finally {
-            PageHelper.clearPage();
         }
     }
 

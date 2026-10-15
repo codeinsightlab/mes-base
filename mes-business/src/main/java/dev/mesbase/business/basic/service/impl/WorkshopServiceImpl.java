@@ -92,8 +92,6 @@ public class WorkshopServiceImpl implements IWorkshopService {
         try (Page<WorkshopEntity> page = PageHelper.offsetPage(offset, limit)) {
             List<WorkshopEntity> rows = mapper.selectByExample(example);
             return new WorkshopPage(rows, page.getTotal(), offset, limit);
-        } finally {
-            PageHelper.clearPage();
         }
     }
 

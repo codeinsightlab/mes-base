@@ -872,3 +872,35 @@ Controller 接口、前端 API／按钮或同步权限。工具自身缺参默�
 合并菜单 SQL 与权限清单不再包含这两个模块。下文涉及旧 md 模型的生成、转换记录仅为历史证据，
 不作为当前开发入口。当前车间与计量单位使用 basic/workshop 和 basic/unitMeasure。
 正式清理迁移为业务 V17、中心 V28；已执行的旧迁移不改写。
+
+### 2026-10-15：分页清理全链路审查与模板修正
+
+审查范围是后端 PageHelper 生命周期：全仓生产 Java 与 Velocity 模板的 startPage、offsetPage、doSelectPage、clearPage、getLocalPage/setLocalPage，以及对应 Controller、Service、缓存、两个 SessionFactory、Mapper、请求异常出口和测试。不是其他后端业务规则的全面审计。复核 pom.xml 锁定 PageHelper **6.1.1**，并用本机 Maven 实际依赖 jar 的 javap 字节码与该版本上游源码交叉核对。
+
+**源码事实与结论：**
+
+- [Page.close()](https://github.com/pagehelper/Mybatis-PageHelper/blob/v6.1.1/src/main/java/com/github/pagehelper/Page.java#L591-L594) 直接调用 clearPage。已有 `try (Page<...> page = PageHelper.offsetPage(...))` 时，无论成功、提前返回、Mapper 代理/参数绑定在拦截器前抛异常，或结果构造异常，资源关闭都负责清理；外层仅再次 clearPage 的 finally 可以移除。前提是 Page 已成功创建并进入资源作用域。
+- [PageInterceptor.intercept()](https://github.com/pagehelper/Mybatis-PageHelper/blob/v6.1.1/src/main/java/com/github/pagehelper/PageInterceptor.java#L165-L169) 的 finally 调用 dialect.afterAll；默认 [PageHelper.afterAll()](https://github.com/pagehelper/Mybatis-PageHelper/blob/v6.1.1/src/main/java/com/github/pagehelper/PageHelper.java#L134-L143) 清理分页。这覆盖进入拦截器的查询，不覆盖还没调用 Mapper、没有执行查询或在其前失败的分支，不能仅凭插件自动清理就删除所有显式边界。
+- [Page.doSelectPage()](https://github.com/pagehelper/Mybatis-PageHelper/blob/v6.1.1/src/main/java/com/github/pagehelper/Page.java#L532-L535) 仅执行回调再返回自身，没有 finally 或 close；不能将它视为独立的清理保障。
+
+**调用链与保留项：**
+
+| 入口/边界 | 当前链路与处理 |
+| --- | --- |
+| 业务分页，例如 GET /api/production/operation | RequestBoundaryFilter → 身份/选厂/权限 → Controller → 具名业务事务/BusinessCache → Service 创建 Page → Mapper/MyBatis-Spring → PageInterceptor → PersistenceStatementGuard/JDBC。拦截器清理 SQL 阶段，Page.close 保证 Service 作用域退出清理；缓存命中不执行方法体，不会创建新 Page。 |
+| 迁移系统分页，例如 SysRoleController.list | BaseController.startPage → PageUtils → Service → Mapper，Controller 未持有可关闭 Page。保留 RequestBoundaryFilter 的进入/退出 clearPage，以覆盖未查询、SQL 前异常及线程复用。BaseController/PageUtils 既有清理 API 保留。 |
+| BusinessDirectoryService.page | offsetPage + setOrderBy + doSelectPage，无资源关闭；保留 finally clearPage，覆盖回调未进入查询及异常。 |
+| ManagedDatasourceService.page | persistence.run 内 startPage + Supplier，无资源关闭；保留 finally，保证非 HTTP 调用也及时清理。 |
+| PlatformPersistence.readOnly | 暂存业务 Page → clearPage → 独立中心 metadata 查询 → finally clearPage 并恢复暂存 Page。保留两处清理，避免 metadata 消耗业务分页或污染调用者。 |
+| RoutingServiceImpl / OpenApiClientService | 已用 Page 资源关闭且没有额外 clearPage，无需修改；保留工艺文件已有并行改动。 |
+| 测试 teardown | 清理测试线程用于隔离，保留；先断言业务返回后状态为空，再执行 teardown，避免掩盖泄漏。 |
+
+**本次修改：** 19 个 ServiceImpl 和 WorkOrderService 共移除 20 个重复 finally；WmInventoryServiceImpl 额外移除关联补充前的手动 clearPage，将 rules.describe 移到 Page 资源关闭后，因此物料/仓库补充查询在分页状态清空后执行。service-impl.java.vm 同步移除 finally，只保留 try-with-resources。共删除生产 Service 中 21 次显式 clearPage，模板另 1 次。未改分页参数、总数、权限、Factory 路由、Mapper、SQL 或数据库；不宣称有可测的性能提升。修改前检查过生成归属标记，涉及的生产 Service 文件已无 MES-CODEGEN 标记，没有恢复标记或重新生成覆盖手工业务规则。
+
+**测试证据（本地，2026-10-15）：** `mvn -B -ntp verify` 全部 reactor 模块成功；455 项测试中 439 项通过、16 项条件跳过，0 failure/error。日志 `/tmp/mes-pagehelper-verify.log`。
+
+- BusinessTemplatePackageTest：6 项通过；既有循环从合成 metadata 渲染 6 类业务、同步启用/关闭共 12 组并编译。新增对 6 组无同步产物的真实生成 Service 动态调用，Mapper stub 绕过拦截器，验证空结果及拦截器前异常仍由资源关闭清理。
+- InventoryPaginationLifecycleTest：3 项通过；验证 offset/limit/total、关联补充前状态为空、Mapper 在拦截器前异常、异常后同线程再次调用，以及关联补充异常原样传播。这里是 Mock 证据，不是数据库验收。
+- 既有 CodegenAcceptanceTest（13 项通过）使用 H2 和真实生成 Mapper/XML、PageInterceptor/Spring Service 验证分页 SQL、总数与清理；请求边界、异步派发、目录及持久化隔离测试随 verify 执行。BusinessDirectoryTest 4 项、RequestStateLifecycleTest 3 项、AsyncRequestBoundaryHttpTest 2 项、PersistenceDeepAuditTest 13 项均通过。各项结果以 surefire 报告为准，真实 MySQL 条件测试跳过不算通过。
+
+**边界与回滚：** 未重启用户服务，未对现有 5173/后端进行在线 HTTP、真实 MySQL 或 UI 复验，未提交/推送。回滚只恢复本轮 Service、模板和关联测试差异，不恢复或覆盖其他并行工作。以后新增分页仍需资源关闭或显式 finally，不得仅以 doSelectPage 替代清理。

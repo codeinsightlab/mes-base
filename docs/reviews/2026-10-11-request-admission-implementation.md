@@ -344,3 +344,32 @@ V21 此前新增未跟踪，Git 全历史无该文件提交；此前执行记录
 - 最终 `mvn -B -ntp -Dmes.test.redis=true verify`：260 项，256 通过，4 项真实 MySQL 跳过，0 失败/错误；日志 `/tmp/mes-openapi-docs-verify-fixed.log`。IDEA 四文件格式检查通过。`scripts/smoke-packaged.py --openapi-docs`：14/14，自有隔离进程；日志 `/tmp/mes-openapi-docs-fixed-smoke.log`。
 - 本轮前端 test 134 项、build、页面及代理相关定向 ESLint 通过；两仓 diff 检查通过。现有 bundle 大小提示保留。
 - 最新后端泛型、错误字段及路径过滤修正尚未由用户重新加载到 8081；隔离 HTTP/打包检查不替代该运行服务验收。未操作真实数据库、重启用户服务、提交或推送。外部新增业务迁移与功能清单修改保留。回滚仅限本节文档页面、代理、专用文档后端及 UI 样式/测试，既有 OpenAPI 恢复不属于本节回滚范围。
+
+
+## 2026-10-15：后端重启后登录失效的只读审查
+
+用户反馈重启后登录全部失效；本轮只审查，不修改业务代码、配置或会话，不启动/停止/重启服务。
+
+### 当前保存与恢复链路（源码事实）
+
+- `SysLoginService.login → TokenService.createToken → UserSessionStore.issue`：登录生成 32 随机字节的 43 字符 opaque Bearer；浏览器持有原始 Token，Redis 键使用 SHA-256 摘要。Redis 只保存安全身份 JSON、userId/authRevision 和用户会话索引，不保存完整账号、密码、角色或权限。账号状态和认证版本仍来自中心库。
+- `TokenService` 读取 `token.expire-time`，application.yml 当前为 **60 分钟**。issue 用 PEXPIREAT 写登录时刻加 60 分钟的绝对到期时间；read 只有 HGET，resolve 不续期，没有 refresh token。因此持续操作、刷新页面或后端重启都不会延长到期时间。
+- 前端 `src/lib/sessionStorage.ts` 在 localStorage 的 `mes-base.session` 保存 `{token,expiresAt,factoryId}`。刷新后读取，校验本地 expiresAt，再经 auth.restoreSession 加载身份/导航/有效工厂。用户资料、权限、菜单不持久化；浏览器 origin 不同，其 localStorage 也不同。
+- 请求 `Authorization: Bearer … → SystemTokenFilter → TokenService.resolve`：查 Redis，再执行一次无密码账号/角色查询；账号不存在、停用、删除、用户名或 authRevision 不匹配返回 401。禁用、改密、删除触发认证版本及撤销 outbox，注销删除当前会话。
+- 前端 request 对属于当前上下文的非公共请求 401 调用 auth.clear，删除本地保存；网络失败/普通 5xx 保留已有 Token，供恢复重试；工厂专用 422 保留身份并要求重新选厂。旧上下文响应先被拒绝。
+- `SystemCacheNamespace` 由可选 cache-namespace 和完整 mes.platform.url 的 SHA-256 确定，不含进程启动随机值。改 JDBC URL（包括参数/顺序）、namespace、Redis DB 或环境可能让旧会话在新命名空间不可见。源码全仓未发现应用启动时 flush Redis 或批量撤销全部用户的钩子；撤销重试只处理持久化待交付项。
+
+### 当前运行的只读证据（2026-10-15，约 08:44，Asia/Shanghai）
+
+- 现有后端监听 127.0.0.1:8081，PID 65978，启动于 **08:42:32**；核查时运行约 1 分 53 秒。进程存在指向 127.0.0.1:6379 的连接。未读取或输出进程凭证。
+- 按当前 dev 配置只读检查 Redis 127.0.0.1:6379 / DB 1：运行约 769551 秒（8.9 天），不是本次后端重启时重启；evicted_keys=0，expired_keys=571 为实例累计统计，不能归因到此次登录。
+- SCAN 仅统计 v2 会话，读取 TTL 和身份内 loginTime 做聚合，不输出 Token、摘要键或身份 payload：共 2 条，创建距核查约 1.5 / 16.5 分钟，剩余约 58.5 / 43.5 分钟，均符合 60 分钟绝对 TTL。较早会话创建早于当前后端启动且仍在 Redis，证明本次重启没有清空该 Redis DB 的全部 v2 会话；不等于已证明该会话能通过当前账号状态校验。
+- Redis aof_enabled=0；INFO 显示存在 RDB 保存时间，但未核实 save 策略、磁盘卷和恢复结果，不能宣称 Redis 自身重启后会话必然全部保留。
+
+### 结论、限制与建议
+
+当前登录保存不是 JVM 内存会话，也不依赖每次重启重新生成的 JWT 签名密钥。**单独重启后端不应按当前实现使全部有效登录失效**；当前运行证据也没有证明全部会话被清空。明确的现行行为是“登录后 60 分钟硬到期，无操作续期”，到期后的第一次刷新/请求会表现为掉登录，即使时间上紧邻重启。
+
+本轮没有取得失效前的浏览器 expiresAt、对应旧 Token 的 Redis 状态、当时 401 响应及账号认证版本对照，所以不能把这一次反馈唯一归因于 60 分钟到期；命名空间/环境切换、账号撤销或浏览器 origin/存储变化也需对应证据。若实际是 Redis 故障，正常路径应是鉴权不可用的 503，而非主动清除所有登录。
+
+如果产品预期是持续操作保持登录，需要另行确认有效期/续期策略；本轮不调整既有绝对有效期约定。未运行新测试、未复现重启前后浏览器流程；只读运行观测与当前源码事实分别如上。仅追加本节审查记录，前一轮分页修改和其他并行工作均保留。
