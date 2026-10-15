@@ -28,7 +28,8 @@ public class FactoryMetadataCache {
     private final RoutingMetadataMapper mapper;
     private final ObjectMapper json = new ObjectMapper();
 
-    public FactoryMetadataCache(PlatformPersistence persistence, RoutingMetadataStore store, RoutingMetadataMapper mapper) {
+    public FactoryMetadataCache(PlatformPersistence persistence, RoutingMetadataStore store,
+                                RoutingMetadataMapper mapper) {
         this.persistence = persistence;
         this.store = store;
         this.mapper = mapper;

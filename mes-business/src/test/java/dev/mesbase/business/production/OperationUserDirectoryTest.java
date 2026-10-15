@@ -107,6 +107,8 @@ class OperationUserDirectoryTest {
     @Test
     void ordinaryPageUsesInjectedMappersWithoutIndependentWindow() {
         assertEquals(2, directory.page(null, 0, 20).total());
+        directory.requireValid(1L);
+        assertEquals(2, directory.validUsers(List.of(1L, 3L)).size());
         verify(center, never()).readOnly(any());
         assertFalse(TransactionSynchronizationManager.isActualTransactionActive());
         assertEquals(2, directory.page(null, 0, 20).total());

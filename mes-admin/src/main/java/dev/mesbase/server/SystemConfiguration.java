@@ -92,7 +92,8 @@ public class SystemConfiguration {
     }
 
     @Bean
-    ControlledJobRunner controlledJobs(PlatformPersistence u, FactoryCatalog f, JobClaimMapper claims, SysJobMapper jobs) {
+    ControlledJobRunner controlledJobs(PlatformPersistence u, FactoryCatalog f, JobClaimMapper claims,
+                                       SysJobMapper jobs) {
         return new ControlledJobRunner(u, f, claims, jobs);
     }
 

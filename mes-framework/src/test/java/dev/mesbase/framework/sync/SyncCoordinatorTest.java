@@ -8,6 +8,7 @@ import dev.mesbase.core.factory.FactoryId;
 import dev.mesbase.core.factory.FactoryScope;
 import dev.mesbase.core.factory.FactoryStatus;
 import dev.mesbase.infrastructure.persistence.PlatformPersistence;
+import dev.mesbase.infrastructure.persistence.OwnedTransactionManager;
 import dev.mesbase.system.sync.MasterSync;
 import dev.mesbase.system.sync.MasterSyncMapper;
 import java.time.Duration;
@@ -40,13 +41,13 @@ class SyncCoordinatorTest {
 
     @BeforeEach
     void setUp() {
-        when(persistence.mapper(MasterSyncMapper.class)).thenReturn(mapper);
+        when(persistence.transactionManager()).thenReturn(mock(OwnedTransactionManager.class));
         when(persistence.run(any())).thenAnswer(call -> {
             Supplier<?> work = call.getArgument(0);
             return work.get();
         });
         when(factories.find(scope.factoryId())).thenReturn(Optional.of(factory(FactoryStatus.ENABLED)));
-        coordinator = new SyncCoordinator(persistence, persistence.mapper(MasterSyncMapper.class), factories);
+        coordinator = new SyncCoordinator(persistence, mapper, factories);
     }
 
     private Factory factory(FactoryStatus status) {
@@ -116,9 +117,26 @@ class SyncCoordinatorTest {
 
     @Test
     void restoredOwnerRejectsTheOldExecutor() {
+        when(mapper.find("TEST_ONLY", "test")).thenReturn(state("RUNNING", "new"));
+        rejects(ErrorCode.SYNC_EXECUTION_LOST,
+                () -> coordinator.assertOwner(new SyncCoordinator.Run(scope, "test", "old")));
+    }
+
+    @Test
+    void ordinaryStateReadUsesInjectedMapper() {
+        when(mapper.find("TEST_ONLY", "test")).thenReturn(state("RUNNING", "current"));
+        assertEquals("current", coordinator.state(scope, "test").runToken());
+        verify(persistence, never()).readOnly(any());
+    }
+
+    @Test
+    void ownerValidationInForeignTransactionRetainsIndependentRead() {
+        when(persistence.transactionManager().foreignTransactionActive()).thenReturn(true);
         when(persistence.readOnly(any())).thenReturn(state("RUNNING", "new"));
         rejects(ErrorCode.SYNC_EXECUTION_LOST,
                 () -> coordinator.assertOwner(new SyncCoordinator.Run(scope, "test", "old")));
+        verify(persistence).readOnly(any());
+        verify(mapper, never()).find(anyString(), anyString());
     }
 
     @Test

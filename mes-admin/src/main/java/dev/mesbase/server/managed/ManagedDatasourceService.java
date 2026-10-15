@@ -111,7 +111,8 @@ public class ManagedDatasourceService {
 
     private final ConcurrentHashMap<Long, DdlCache> ddlCache = new ConcurrentHashMap<>();
 
-    public ManagedDatasourceService(PlatformPersistence persistence, ManagedDatasourceMapper sources, ManagedFactoryMapper factories, DatasourcePasswordCipher cipher,
+    public ManagedDatasourceService(PlatformPersistence persistence, ManagedDatasourceMapper sources,
+                                    ManagedFactoryMapper factories, DatasourcePasswordCipher cipher,
                                     RuntimeRegistry registry, DataSource platform, DruidPools.Settings settings,
                                     Set<Class<?>> mappers, Path ddlRoot, FactoryMetadataCache metadata) {
         this.metadata = Objects.requireNonNull(metadata);
@@ -174,7 +175,11 @@ public class ManagedDatasourceService {
         if (pageNum < 1 || pageSize < 1 || pageSize > 100) throw new FoundationException(ErrorCode.BAD_REQUEST);
         List<T> rows;
         PageHelper.startPage(pageNum, pageSize);
-        try { rows = query.get(); } finally { PageHelper.clearPage(); }
+        try {
+            rows = query.get();
+        } finally {
+            PageHelper.clearPage();
+        }
         if (!(rows instanceof Page<?>)) throw new IllegalStateException("Platform pagination interceptor required");
         return (Page<T>) rows;
     }
@@ -191,7 +196,7 @@ public class ManagedDatasourceService {
         var rows = page(pageNum, pageSize, sources::all);
         var bindings = new HashMap<Long, ManagedFactory>();
         if (!rows.isEmpty()) factories
-                        .byDatasources(rows.stream().map(ManagedDatasource::datasourceId).toList())
+                .byDatasources(rows.stream().map(ManagedDatasource::datasourceId).toList())
                 .forEach(f -> bindings.put(f.datasourceId(), f));
         return mapPage(rows, row -> view(row, bindings.get(row.datasourceId())));
     }

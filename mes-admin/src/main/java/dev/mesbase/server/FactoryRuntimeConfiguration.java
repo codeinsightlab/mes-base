@@ -49,13 +49,15 @@ public class FactoryRuntimeConfiguration {
     }
 
     @Bean
-    FactoryMetadataCache factoryMetadataCache(PlatformPersistence persistence, RoutingMetadataStore store, RoutingMetadataMapper mapper) {
+    FactoryMetadataCache factoryMetadataCache(PlatformPersistence persistence, RoutingMetadataStore store,
+                                              RoutingMetadataMapper mapper) {
         return new FactoryMetadataCache(persistence, store, mapper);
     }
 
     @Bean
     ManagedDatasourceService managedDatasources(Environment env,
-                                                PlatformPersistence persistence, ManagedDatasourceMapper sources, ManagedFactoryMapper factories,
+                                                PlatformPersistence persistence, ManagedDatasourceMapper sources,
+                                                ManagedFactoryMapper factories,
                                                 @Qualifier("masterDataSource") DataSource masterDataSource,
                                                 RuntimeRegistry registry,
                                                 OwnerMapperCatalog catalog, FactoryMetadataCache metadata) {

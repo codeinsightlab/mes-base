@@ -29,6 +29,10 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.never;
+import static org.mockito.ArgumentMatchers.any;
 
 /**
  * TEST ONLY: center configuration SQL and a preloaded synthetic pool; never creates a MySQL connection.
@@ -68,7 +72,7 @@ class ManagedAdmissionTest {
                 + "db_port INT,db_name VARCHAR(64),db_username VARCHAR(64),password_cipher VARCHAR(64),status VARCHAR(16),revision BIGINT)");
         jdbc.execute("INSERT INTO mf_factory VALUES('A','TEST ONLY','A','Before',1,'ENABLED',1)");
         jdbc.execute("INSERT INTO mf_datasource VALUES(1,'TEST ONLY','invalid.test',3306,'TEST_ONLY','TEST_ONLY','TEST_ONLY','ENABLED',1)");
-        var platform = new PlatformPersistence(source, Set.of(ManagedFactoryMapper.class, ManagedDatasourceMapper.class, RoutingMetadataMapper.class));
+        var platform = spy(new PlatformPersistence(source, Set.of(ManagedFactoryMapper.class, ManagedDatasourceMapper.class, RoutingMetadataMapper.class)));
         var closed = new AtomicInteger();
         try (var registry = new RuntimeRegistry()) {
             var binding = new BusinessRuntimeBinding(new FactoryId("A"), new DatasourceIdentity("managed-1"), 1);
@@ -77,6 +81,13 @@ class ManagedAdmissionTest {
             var cache = RoutingCacheFixture.cache(platform);
             var service = new ManagedDatasourceService(platform, platform.mapper(ManagedDatasourceMapper.class), platform.mapper(ManagedFactoryMapper.class), mock(DatasourcePasswordCipher.class), registry,
                     source, null, Set.of(), Path.of("target/TEST-ONLY-unused-ddl"), cache);
+            assertEquals(1, service.list(0, 20).size());
+            assertEquals(1, service.countSources());
+            assertEquals(1L, service.detail(1).datasourceId());
+            assertEquals(1, service.factoryList(0, 20).size());
+            assertEquals("A", service.factory("A").factoryId());
+            assertEquals(1, service.enabled(0, 20).size());
+            verify(platform, never()).readOnly(any());
             var loaded = new ConcurrentHashMap<Long, BusinessRuntimeBinding>();
             loaded.put(1L, binding);
             ReflectionTestUtils.setField(service, "initialized", loaded);
