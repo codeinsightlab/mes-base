@@ -11,8 +11,7 @@ import java.util.List;
  *
  * @author ruoyi
  */
-public interface SysUserMapper
-{
+public interface SysUserMapper {
     /**
      * 根据条件分页查询用户列表
      *
@@ -20,6 +19,11 @@ public interface SysUserMapper
      * @return 用户信息集合信息
      */
     public List<SysUser> selectUserList(SysUser sysUser);
+
+    /**
+     * Historical display only: one bounded IN query, without account eligibility filtering or sensitive columns.
+     */
+    List<SysUser> selectUserNamesByIds(@Param("userIds") List<Long> userIds);
 
     /**
      * 根据条件分页查询已配用户角色列表
@@ -47,6 +51,7 @@ public interface SysUserMapper
 
     /**
      * 根据手机号码查询
+     *
      * @param mobile
      * @return
      */
@@ -88,10 +93,11 @@ public interface SysUserMapper
      * 修改用户头像
      *
      * @param userName 用户名
-     * @param avatar 头像地址
+     * @param avatar   头像地址
      * @return 结果
      */
-    public int updateUserAvatar(@Param("userName") String userName, @Param("avatar") String avatar,@Param("minioUrl") String minioUrl);
+    public int updateUserAvatar(@Param("userName") String userName, @Param("avatar") String avatar,
+                                @Param("minioUrl") String minioUrl);
 
     /**
      * 重置用户密码
@@ -143,5 +149,5 @@ public interface SysUserMapper
     public SysUser checkEmailUnique(String email);
 
 
-   List<SysUser> selectUserListByType(String userType);
+    List<SysUser> selectUserListByType(String userType);
 }

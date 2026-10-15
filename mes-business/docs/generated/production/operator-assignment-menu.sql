@@ -149,11 +149,11 @@ FROM sys_menu page
 WHERE page.perms = 'business:mes:operation:user:list' AND page.menu_type = 'C'
   AND NOT EXISTS (SELECT 1 FROM sys_menu WHERE perms = 'business:mes:operation:user:delete' AND menu_type = 'F');
 
--- 生产执行与节点派工统一从工单进入；保留菜单编号、独立权限及角色绑定。
--- 隐藏的旧路由仅用于兼容书签，前端跳转到生产工单。
-UPDATE sys_menu SET visible = '1'
-WHERE menu_type = 'C' AND component IN ('production/mesProductionExecution/index', 'production/mesExecutionAssignment/index')
-  AND perms IN ('business:mes:production:execution:list', 'business:mes:execution:assignment:list');
+-- 生产执行恢复独立页面，保留原权限和角色绑定；派工通过生产执行进入。
+UPDATE sys_menu SET menu_name='生产执行',visible='0'
+WHERE menu_type='C' AND component='production/mesProductionExecution/index' AND perms='business:mes:production:execution:list';
+UPDATE sys_menu SET visible='1'
+WHERE menu_type='C' AND component='production/mesExecutionAssignment/index' AND perms='business:mes:execution:assignment:list';
 
 -- 工序能力人员从工序编辑进入，保留授权与旧地址兼容。
 UPDATE sys_menu SET visible = '1'

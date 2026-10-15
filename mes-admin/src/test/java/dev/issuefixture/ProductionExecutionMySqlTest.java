@@ -1,6 +1,8 @@
 package dev.issuefixture;
 
 import dev.mesbase.business.production.service.ProductionChainLocks;
+import dev.mesbase.business.production.dao.MesProductionReportMapper;
+import dev.mesbase.business.production.dao.ProductionQuantityMapper;
 import dev.mesbase.business.production.dao.MesExecutionPathMapper;
 import dev.mesbase.business.production.dao.MesExecutionPathNodeMapper;
 
@@ -93,7 +95,7 @@ class ProductionExecutionMySqlTest {
             var executions = s.getMapper(MesProductionExecutionMapper.class);
             var issues = s.getMapper(MesMaterialIssueMapper.class);
             var chainLocks = new ProductionChainLocks(s.getMapper(WorkorderMapper.class), executions, issues);
-            var rules = new ProductionExecutionRules(executions, s.getMapper(WorkorderMapper.class), s.getMapper(MaterialMapper.class), s.getMapper(RoutingMapper.class), s.getMapper(RoutingProductMapper.class), issues, chainLocks, s.getMapper(MesExecutionPathMapper.class), s.getMapper(MesExecutionPathNodeMapper.class));
+            var rules = new ProductionExecutionRules(executions, s.getMapper(WorkorderMapper.class), s.getMapper(MaterialMapper.class), s.getMapper(RoutingMapper.class), s.getMapper(RoutingProductMapper.class), issues, chainLocks, s.getMapper(MesExecutionPathMapper.class), s.getMapper(MesExecutionPathNodeMapper.class), s.getMapper(MesProductionReportMapper.class), s.getMapper(ProductionQuantityMapper.class));
             var service = new MesProductionExecutionServiceImpl(executions, rules);
             var input = new MesProductionExecutionCreateCommand(workorder, routing, new BigDecimal("99999999999999.123456"), "READY", null, null, tag);
             var first = service.insert(input);

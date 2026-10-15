@@ -1,7 +1,8 @@
 START TRANSACTION;
--- 生产执行与节点派工统一从工单进入；保留菜单编号、独立权限及角色绑定。
--- 隐藏的旧路由仅用于兼容书签，前端跳转到生产工单。
-UPDATE sys_menu SET visible = '1'
-WHERE menu_type = 'C' AND component IN ('production/mesProductionExecution/index', 'production/mesExecutionAssignment/index')
-  AND perms IN ('business:mes:production:execution:list', 'business:mes:execution:assignment:list');
+-- 工单仅保留执行摘要；生产执行恢复独立页面，复用菜单编号与既有角色绑定。
+UPDATE sys_menu SET menu_name='生产执行',visible='0'
+WHERE menu_type='C' AND component='production/mesProductionExecution/index' AND perms='business:mes:production:execution:list';
+-- 派工在生产执行页面操作，旧独立派工地址兼容跳转生产执行。
+UPDATE sys_menu SET visible='1'
+WHERE menu_type='C' AND component='production/mesExecutionAssignment/index' AND perms='business:mes:execution:assignment:list';
 COMMIT;

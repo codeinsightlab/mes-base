@@ -103,7 +103,7 @@ public class WorkOrderService {
             rows = orders.selectByExample(filter);
             total = page.getTotal();
         }
-        facts.hydrate(rows);
+        var missingExtras = facts.hydrateAvailable(rows);
         var children = new ProductionBatchExample();
         List<ProductionBatchEntity> all = List.of();
         if (!rows.isEmpty()) {
@@ -129,7 +129,7 @@ public class WorkOrderService {
             var m = materialIndex.get(w.getProductId());
             var r = routingIndex.get(w.getRoutingId());
             return new WorkOrderModels.Summary(w, counts.getOrDefault(w.getId(), 0L)
-                    .intValue(), m == null ? null : m.getCode(), m == null ? null : m.getName(), r == null ? null : r.getCode(), r == null ? null : r.getVersion(), allocations.get(w.getId()));
+                    .intValue(), m == null ? null : m.getCode(), m == null ? null : m.getName(), r == null ? null : r.getCode(), r == null ? null : r.getVersion(), allocations.get(w.getId()), missingExtras.contains(w.getId()));
         }).toList(), total, offset, limit);
     }
 

@@ -1,6 +1,10 @@
 package dev.mesbase.core.error;
 
 public enum ErrorCode {
+    REPORT_PATH_REQUIRED(409, "报工必须引用执行已锁定的完整实际路径"),
+    REPORT_QUANTITY_CONFLICT(409, "数量变更导致超量、负余额或上下游数量倒挂"),
+    REPORT_REFERENCE_INVALID(422, "报工人员、工作站或原始报工引用无效"),
+    REPORT_ORIGINAL_EMPTY(409, "原始报工有效余额已为零，不能重复冲销"),
     OPERATOR_NOT_AUTHORIZED(422, "用户不存在、已停用或无当前工厂业务授权"),
     OPERATOR_CAPABILITY_REQUIRED(422, "操作人员不具备当前工序能力"),
     OPERATOR_NOT_ASSIGNED(422, "当前节点已指定派工人员，该用户不在名单中"),

@@ -13,6 +13,9 @@ import dev.mesbase.business.production.dao.RoutingMapper;
 import dev.mesbase.business.production.dao.RoutingProductMapper;
 import dev.mesbase.business.production.dao.WorkorderMapper;
 import dev.mesbase.business.production.dao.MesExecutionPathMapper;
+import dev.mesbase.business.production.dao.MesProductionReportMapper;
+import dev.mesbase.business.production.dao.ProductionQuantityMapper;
+import dev.mesbase.business.production.domain.MesProductionReportExample;
 import dev.mesbase.business.production.dao.MesExecutionPathNodeMapper;
 import dev.mesbase.business.production.domain.MesExecutionPathNodeExample;
 import dev.mesbase.business.production.domain.MesProductionExecutionEntity;
@@ -38,6 +41,8 @@ import org.springframework.stereotype.Component;
 @ConditionalOnProperty(name = "mes.business.enabled", havingValue = "true")
 public class ProductionExecutionRules {
     private final ProductionChainLocks locks;
+    private final MesProductionReportMapper reports;
+    private final ProductionQuantityMapper quantities;
     private final MesExecutionPathMapper paths;
     private final MesExecutionPathNodeMapper pathNodes;
     private final MesProductionExecutionMapper executions;
@@ -51,7 +56,10 @@ public class ProductionExecutionRules {
                                     MaterialMapper materials, RoutingMapper routings,
                                     RoutingProductMapper products, MesMaterialIssueMapper issues,
                                     ProductionChainLocks locks, MesExecutionPathMapper paths,
-                                    MesExecutionPathNodeMapper pathNodes) {
+                                    MesExecutionPathNodeMapper pathNodes, MesProductionReportMapper reports,
+                                    ProductionQuantityMapper quantities) {
+        this.reports = reports;
+        this.quantities = quantities;
         this.locks = locks;
         this.paths = paths;
         this.pathNodes = pathNodes;
@@ -85,7 +93,11 @@ public class ProductionExecutionRules {
                 || !Objects.equals(old.getProductId(), row.getProductId())) frozen();
         if (!Objects.equals(old.getRoutingId(), row.getRoutingId()) && paths.selectByPrimaryKey(old.getId()) != null)
             frozen();
-        boolean facts = started(old) || hasIssues(old.getId());
+        boolean reportFacts = hasReports(old.getId());
+        boolean facts = started(old) || hasIssues(old.getId()) || reportFacts;
+        if (reportFacts && row.getTargetQty() != null && quantities.nodeTotals(old.getId()).stream()
+                .anyMatch(n -> n.reportedQty().compareTo(row.getTargetQty()) > 0))
+            throw new FoundationException(ErrorCode.REPORT_QUANTITY_CONFLICT);
         if (facts && (!Objects.equals(old.getRoutingId(), row.getRoutingId())
                 || ProductionExecutionStatus.READY.getValue()
                 .equals(row.getStatus()) && !ProductionExecutionStatus.READY.getValue().equals(old.getStatus())
@@ -103,7 +115,8 @@ public class ProductionExecutionRules {
 
     public void deleting(Long id) {
         var row = lock(id);
-        if (started(row) || hasIssues(id)) throw new FoundationException(ErrorCode.EXECUTION_REFERENCED);
+        if (started(row) || hasIssues(id) || hasReports(id))
+            throw new FoundationException(ErrorCode.EXECUTION_REFERENCED);
         var path = paths.selectByPrimaryKey(id);
         if (path != null) {
             if (ExecutionPathStatus.LOCKED.getValue().equals(path.getPathStatus())) frozen();
@@ -112,6 +125,12 @@ public class ProductionExecutionRules {
             pathNodes.deleteByExample(filter);
             if (paths.deleteByPrimaryKey(id) != 1) frozen();
         }
+    }
+
+    private boolean hasReports(Long id) {
+        var filter = new MesProductionReportExample();
+        filter.createCriteria().andExecutionIdEqualTo(id);
+        return reports.countByExample(filter) > 0;
     }
 
     private boolean hasIssues(Long id) {

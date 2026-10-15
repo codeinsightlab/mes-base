@@ -33,7 +33,8 @@ public class ExecutionActionController {
                                 @NotEmpty @Size(max = 100) List<@NotNull Long> routingNodeIds) {
     }
 
-    public record NodeView(String id, String nodeCode, String operationName, boolean required) {
+    public record NodeView(String id, String nodeCode, String operationName, boolean required, String operationId,
+                           String operationCode) {
     }
 
     public record EdgeView(String fromNodeId, String toNodeId) {
@@ -41,7 +42,8 @@ public class ExecutionActionController {
 
     public record PathView(String executionId, String executionStatus, String routingId, String pathStatus,
                            int revision, LocalDateTime selectedAt, LocalDateTime lockedAt, List<String> selectedNodeIds,
-                           List<NodeView> nodes, List<EdgeView> edges) {
+                           List<NodeView> nodes, List<EdgeView> edges, String executionNo, String routingCode,
+                           String routingName, Integer routingVersion) {
     }
 
     @GetMapping("/api/production/executions/{id}/path")
@@ -64,11 +66,14 @@ public class ExecutionActionController {
 
     private static PathView toView(PathModel model) {
         var p = model.path();
-        return new PathView(model.executionId().toString(), model.executionStatus(), p == null ? null : p.getRoutingId()
+        return new PathView(model.executionId().toString(), model.executionStatus(), model.routing().getId()
                 .toString(), p == null ? ExecutionPathStatus.UNSELECTED.getValue() : p.getPathStatus(), p == null ? 0 : p.getRevision(), p == null ? null : p.getSelectedAt(), p == null ? null : p.getLockedAt(), model.selectedNodeIds()
                 .stream().map(Object::toString).toList(), model.nodes().stream().map(n -> new NodeView(n.getId()
-                        .toString(), n.getNodeCode(), n.getOperationName(), Boolean.TRUE.equals(n.getIsKey())))
+                        .toString(), n.getNodeCode(), n.getOperationName(), Boolean.TRUE.equals(n.getIsKey()), n.getOperationId()
+                        .toString(), n.getOperationCode()))
                 .toList(), model.edges().stream()
-                .map(e -> new EdgeView(e.getFromNodeId().toString(), e.getToNodeId().toString())).toList());
+                .map(e -> new EdgeView(e.getFromNodeId().toString(), e.getToNodeId().toString()))
+                .toList(), model.executionNo(), model.routing().getCode(), model.routing().getName(), model.routing()
+                .getVersion());
     }
 }

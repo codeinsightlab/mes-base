@@ -1,0 +1,313 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- MES-CODEGEN: MyBatis Generator standard single-table persistence. -->
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="dev.mesbase.business.production.dao.MesProductionReportMapper">
+  <resultMap id="BaseResultMap" type="dev.mesbase.business.production.domain.MesProductionReportEntity">
+    <id column="id" jdbcType="BIGINT" property="id" />
+    <result column="execution_id" jdbcType="BIGINT" property="executionId" />
+    <result column="routing_node_id" jdbcType="BIGINT" property="routingNodeId" />
+    <result column="record_type" jdbcType="VARCHAR" property="recordType" />
+    <result column="quantity_delta" jdbcType="DECIMAL" property="quantityDelta" />
+    <result column="reference_report_id" jdbcType="BIGINT" property="referenceReportId" />
+    <result column="operator_user_id" jdbcType="BIGINT" property="operatorUserId" />
+    <result column="recorded_by" jdbcType="BIGINT" property="recordedBy" />
+    <result column="report_time" jdbcType="TIMESTAMP" property="reportTime" />
+    <result column="workstation_id" jdbcType="BIGINT" property="workstationId" />
+    <result column="reason" jdbcType="VARCHAR" property="reason" />
+    <result column="create_time" jdbcType="TIMESTAMP" property="createTime" />
+  </resultMap>
+  <sql id="Example_Where_Clause">
+    <where>
+      <foreach collection="oredCriteria" item="criteria" separator="or">
+        <if test="criteria.valid">
+          <trim prefix="(" prefixOverrides="and" suffix=")">
+            <foreach collection="criteria.criteria" item="criterion">
+              <choose>
+                <when test="criterion.noValue">
+                  and ${criterion.condition}
+                </when>
+                <when test="criterion.singleValue">
+                  and ${criterion.condition} #{criterion.value}
+                </when>
+                <when test="criterion.betweenValue">
+                  and ${criterion.condition} #{criterion.value} and #{criterion.secondValue}
+                </when>
+                <when test="criterion.listValue">
+                  and ${criterion.condition}
+                  <foreach close=")" collection="criterion.value" item="listItem" open="(" separator=",">
+                    #{listItem}
+                  </foreach>
+                </when>
+              </choose>
+            </foreach>
+          </trim>
+        </if>
+      </foreach>
+    </where>
+  </sql>
+  <sql id="Update_By_Example_Where_Clause">
+    <where>
+      <foreach collection="example.oredCriteria" item="criteria" separator="or">
+        <if test="criteria.valid">
+          <trim prefix="(" prefixOverrides="and" suffix=")">
+            <foreach collection="criteria.criteria" item="criterion">
+              <choose>
+                <when test="criterion.noValue">
+                  and ${criterion.condition}
+                </when>
+                <when test="criterion.singleValue">
+                  and ${criterion.condition} #{criterion.value}
+                </when>
+                <when test="criterion.betweenValue">
+                  and ${criterion.condition} #{criterion.value} and #{criterion.secondValue}
+                </when>
+                <when test="criterion.listValue">
+                  and ${criterion.condition}
+                  <foreach close=")" collection="criterion.value" item="listItem" open="(" separator=",">
+                    #{listItem}
+                  </foreach>
+                </when>
+              </choose>
+            </foreach>
+          </trim>
+        </if>
+      </foreach>
+    </where>
+  </sql>
+  <sql id="Base_Column_List">
+    id, execution_id, routing_node_id, record_type, quantity_delta, reference_report_id, 
+    operator_user_id, recorded_by, report_time, workstation_id, reason, create_time
+  </sql>
+  <select id="selectByExample" parameterType="dev.mesbase.business.production.domain.MesProductionReportExample" resultMap="BaseResultMap">
+    select
+    <include refid="Base_Column_List" />
+    from mes_production_report
+    <if test="_parameter != null">
+      <include refid="Example_Where_Clause" />
+    </if>
+    <if test="orderByClause != null">
+      order by ${orderByClause}
+    </if>
+  </select>
+  <select id="selectByPrimaryKey" parameterType="Long" resultMap="BaseResultMap">
+    select 
+    <include refid="Base_Column_List" />
+    from mes_production_report
+    where id = #{id,jdbcType=BIGINT}
+  </select>
+  <delete id="deleteByPrimaryKey" parameterType="Long">
+    delete from mes_production_report
+    where id = #{id,jdbcType=BIGINT}
+  </delete>
+  <delete id="deleteByExample" parameterType="dev.mesbase.business.production.domain.MesProductionReportExample">
+    delete from mes_production_report
+    <if test="_parameter != null">
+      <include refid="Example_Where_Clause" />
+    </if>
+  </delete>
+  <insert id="insert" keyColumn="id" keyProperty="id" parameterType="dev.mesbase.business.production.domain.MesProductionReportEntity" useGeneratedKeys="true">
+    insert into mes_production_report (execution_id, routing_node_id, record_type, 
+      quantity_delta, reference_report_id, operator_user_id, 
+      recorded_by, report_time, workstation_id, 
+      reason, create_time)
+    values (#{executionId,jdbcType=BIGINT}, #{routingNodeId,jdbcType=BIGINT}, #{recordType,jdbcType=VARCHAR}, 
+      #{quantityDelta,jdbcType=DECIMAL}, #{referenceReportId,jdbcType=BIGINT}, #{operatorUserId,jdbcType=BIGINT}, 
+      #{recordedBy,jdbcType=BIGINT}, #{reportTime,jdbcType=TIMESTAMP}, #{workstationId,jdbcType=BIGINT}, 
+      #{reason,jdbcType=VARCHAR}, #{createTime,jdbcType=TIMESTAMP})
+  </insert>
+  <insert id="insertSelective" keyColumn="id" keyProperty="id" parameterType="dev.mesbase.business.production.domain.MesProductionReportEntity" useGeneratedKeys="true">
+    insert into mes_production_report
+    <trim prefix="(" suffix=")" suffixOverrides=",">
+      <if test="executionId != null">
+        execution_id,
+      </if>
+      <if test="routingNodeId != null">
+        routing_node_id,
+      </if>
+      <if test="recordType != null">
+        record_type,
+      </if>
+      <if test="quantityDelta != null">
+        quantity_delta,
+      </if>
+      <if test="referenceReportId != null">
+        reference_report_id,
+      </if>
+      <if test="operatorUserId != null">
+        operator_user_id,
+      </if>
+      <if test="recordedBy != null">
+        recorded_by,
+      </if>
+      <if test="reportTime != null">
+        report_time,
+      </if>
+      <if test="workstationId != null">
+        workstation_id,
+      </if>
+      <if test="reason != null">
+        reason,
+      </if>
+      <if test="createTime != null">
+        create_time,
+      </if>
+    </trim>
+    <trim prefix="values (" suffix=")" suffixOverrides=",">
+      <if test="executionId != null">
+        #{executionId,jdbcType=BIGINT},
+      </if>
+      <if test="routingNodeId != null">
+        #{routingNodeId,jdbcType=BIGINT},
+      </if>
+      <if test="recordType != null">
+        #{recordType,jdbcType=VARCHAR},
+      </if>
+      <if test="quantityDelta != null">
+        #{quantityDelta,jdbcType=DECIMAL},
+      </if>
+      <if test="referenceReportId != null">
+        #{referenceReportId,jdbcType=BIGINT},
+      </if>
+      <if test="operatorUserId != null">
+        #{operatorUserId,jdbcType=BIGINT},
+      </if>
+      <if test="recordedBy != null">
+        #{recordedBy,jdbcType=BIGINT},
+      </if>
+      <if test="reportTime != null">
+        #{reportTime,jdbcType=TIMESTAMP},
+      </if>
+      <if test="workstationId != null">
+        #{workstationId,jdbcType=BIGINT},
+      </if>
+      <if test="reason != null">
+        #{reason,jdbcType=VARCHAR},
+      </if>
+      <if test="createTime != null">
+        #{createTime,jdbcType=TIMESTAMP},
+      </if>
+    </trim>
+  </insert>
+  <select id="countByExample" parameterType="dev.mesbase.business.production.domain.MesProductionReportExample" resultType="java.lang.Long">
+    select count(*) from mes_production_report
+    <if test="_parameter != null">
+      <include refid="Example_Where_Clause" />
+    </if>
+  </select>
+  <update id="updateByExampleSelective" parameterType="map">
+    update mes_production_report
+    <set>
+      <if test="row.id != null">
+        id = #{row.id,jdbcType=BIGINT},
+      </if>
+      <if test="row.executionId != null">
+        execution_id = #{row.executionId,jdbcType=BIGINT},
+      </if>
+      <if test="row.routingNodeId != null">
+        routing_node_id = #{row.routingNodeId,jdbcType=BIGINT},
+      </if>
+      <if test="row.recordType != null">
+        record_type = #{row.recordType,jdbcType=VARCHAR},
+      </if>
+      <if test="row.quantityDelta != null">
+        quantity_delta = #{row.quantityDelta,jdbcType=DECIMAL},
+      </if>
+      <if test="row.referenceReportId != null">
+        reference_report_id = #{row.referenceReportId,jdbcType=BIGINT},
+      </if>
+      <if test="row.operatorUserId != null">
+        operator_user_id = #{row.operatorUserId,jdbcType=BIGINT},
+      </if>
+      <if test="row.recordedBy != null">
+        recorded_by = #{row.recordedBy,jdbcType=BIGINT},
+      </if>
+      <if test="row.reportTime != null">
+        report_time = #{row.reportTime,jdbcType=TIMESTAMP},
+      </if>
+      <if test="row.workstationId != null">
+        workstation_id = #{row.workstationId,jdbcType=BIGINT},
+      </if>
+      <if test="row.reason != null">
+        reason = #{row.reason,jdbcType=VARCHAR},
+      </if>
+      <if test="row.createTime != null">
+        create_time = #{row.createTime,jdbcType=TIMESTAMP},
+      </if>
+    </set>
+    <if test="example != null">
+      <include refid="Update_By_Example_Where_Clause" />
+    </if>
+  </update>
+  <update id="updateByExample" parameterType="map">
+    update mes_production_report
+    set id = #{row.id,jdbcType=BIGINT},
+      execution_id = #{row.executionId,jdbcType=BIGINT},
+      routing_node_id = #{row.routingNodeId,jdbcType=BIGINT},
+      record_type = #{row.recordType,jdbcType=VARCHAR},
+      quantity_delta = #{row.quantityDelta,jdbcType=DECIMAL},
+      reference_report_id = #{row.referenceReportId,jdbcType=BIGINT},
+      operator_user_id = #{row.operatorUserId,jdbcType=BIGINT},
+      recorded_by = #{row.recordedBy,jdbcType=BIGINT},
+      report_time = #{row.reportTime,jdbcType=TIMESTAMP},
+      workstation_id = #{row.workstationId,jdbcType=BIGINT},
+      reason = #{row.reason,jdbcType=VARCHAR},
+      create_time = #{row.createTime,jdbcType=TIMESTAMP}
+    <if test="example != null">
+      <include refid="Update_By_Example_Where_Clause" />
+    </if>
+  </update>
+  <update id="updateByPrimaryKeySelective" parameterType="dev.mesbase.business.production.domain.MesProductionReportEntity">
+    update mes_production_report
+    <set>
+      <if test="executionId != null">
+        execution_id = #{executionId,jdbcType=BIGINT},
+      </if>
+      <if test="routingNodeId != null">
+        routing_node_id = #{routingNodeId,jdbcType=BIGINT},
+      </if>
+      <if test="recordType != null">
+        record_type = #{recordType,jdbcType=VARCHAR},
+      </if>
+      <if test="quantityDelta != null">
+        quantity_delta = #{quantityDelta,jdbcType=DECIMAL},
+      </if>
+      <if test="referenceReportId != null">
+        reference_report_id = #{referenceReportId,jdbcType=BIGINT},
+      </if>
+      <if test="operatorUserId != null">
+        operator_user_id = #{operatorUserId,jdbcType=BIGINT},
+      </if>
+      <if test="recordedBy != null">
+        recorded_by = #{recordedBy,jdbcType=BIGINT},
+      </if>
+      <if test="reportTime != null">
+        report_time = #{reportTime,jdbcType=TIMESTAMP},
+      </if>
+      <if test="workstationId != null">
+        workstation_id = #{workstationId,jdbcType=BIGINT},
+      </if>
+      <if test="reason != null">
+        reason = #{reason,jdbcType=VARCHAR},
+      </if>
+      <if test="createTime != null">
+        create_time = #{createTime,jdbcType=TIMESTAMP},
+      </if>
+    </set>
+    where id = #{id,jdbcType=BIGINT}
+  </update>
+  <update id="updateByPrimaryKey" parameterType="dev.mesbase.business.production.domain.MesProductionReportEntity">
+    update mes_production_report
+    set execution_id = #{executionId,jdbcType=BIGINT},
+      routing_node_id = #{routingNodeId,jdbcType=BIGINT},
+      record_type = #{recordType,jdbcType=VARCHAR},
+      quantity_delta = #{quantityDelta,jdbcType=DECIMAL},
+      reference_report_id = #{referenceReportId,jdbcType=BIGINT},
+      operator_user_id = #{operatorUserId,jdbcType=BIGINT},
+      recorded_by = #{recordedBy,jdbcType=BIGINT},
+      report_time = #{reportTime,jdbcType=TIMESTAMP},
+      workstation_id = #{workstationId,jdbcType=BIGINT},
+      reason = #{reason,jdbcType=VARCHAR},
+      create_time = #{createTime,jdbcType=TIMESTAMP}
+    where id = #{id,jdbcType=BIGINT}
+  </update>
+</mapper>

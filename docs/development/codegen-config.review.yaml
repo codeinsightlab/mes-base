@@ -28,7 +28,7 @@ selection:
   # 排除 Flyway 迁移历史技术表，防止生成其 CRUD/同步接口。
   # pro_workorder 为已退役的 Source 结构，不能重新生成旧技术工单入口。
   # 旧批次及路径仅保留历史读取，禁止全量生成重新开放其写入 CRUD。
-  excludeTables: [flyway_business_schema_history, qc_index, qc_defect, pro_workorder, md_workshop, md_unit_measure, production_batch, batch_route_node, mes_execution_path, mes_execution_path_node, mes_material_issue_submission]
+  excludeTables: [flyway_business_schema_history, qc_index, qc_defect, pro_workorder, md_workshop, md_unit_measure, production_batch, batch_route_node, mes_execution_path, mes_execution_path_node, mes_material_issue_submission, mes_production_report]
   # 与表选择独立：all 表示所有产物；也可指定 persistence/backend/frontend/menu/test。
   artifacts: [all]
 

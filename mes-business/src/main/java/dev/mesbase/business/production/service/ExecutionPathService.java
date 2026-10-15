@@ -10,6 +10,8 @@ import dev.mesbase.business.production.dao.MesExecutionPathMapper;
 import dev.mesbase.business.production.dao.MesExecutionPathNodeMapper;
 import dev.mesbase.business.production.dao.MesProductionExecutionMapper;
 import dev.mesbase.business.production.dao.RoutingNodeMapper;
+import dev.mesbase.business.production.dao.RoutingMapper;
+import dev.mesbase.business.production.domain.RoutingEntity;
 import dev.mesbase.business.production.dao.RoutingEdgeMapper;
 import dev.mesbase.business.production.domain.MesExecutionPathEntity;
 import dev.mesbase.business.production.domain.MesExecutionPathNodeEntity;
@@ -49,6 +51,7 @@ public class ExecutionPathService {
     private final MesExecutionPathNodeMapper selected;
     private final MesProductionExecutionMapper executions;
     private final RoutingNodeMapper nodes;
+    private final RoutingMapper routings;
     private final RoutingEdgeMapper edges;
     private final MesMaterialIssueMapper issues;
     private final MesMaterialIssueErpExtraMapper extras;
@@ -57,27 +60,31 @@ public class ExecutionPathService {
                                 MesExecutionPathMapper paths,
                                 MesExecutionPathNodeMapper selected, MesProductionExecutionMapper executions,
                                 RoutingNodeMapper nodes, RoutingEdgeMapper edges, MesMaterialIssueMapper issues,
-                                MesMaterialIssueErpExtraMapper extras) {
+                                MesMaterialIssueErpExtraMapper extras, RoutingMapper routings) {
         this.locks = locks;
         this.rules = rules;
         this.paths = paths;
         this.selected = selected;
         this.executions = executions;
         this.nodes = nodes;
+        this.routings = routings;
         this.edges = edges;
         this.issues = issues;
         this.extras = extras;
     }
 
     public record PathModel(Long executionId, String executionStatus, MesExecutionPathEntity path,
-                            List<Long> selectedNodeIds, List<RoutingNodeEntity> nodes, List<RoutingEdgeEntity> edges) {
+                            List<Long> selectedNodeIds, List<RoutingNodeEntity> nodes, List<RoutingEdgeEntity> edges,
+                            String executionNo, RoutingEntity routing) {
     }
 
     @Transactional(transactionManager = "businessTransactionManager", readOnly = true)
     public PathModel view(Long id) {
         var e = executions.selectByPrimaryKey(id);
         if (e == null) throw new FoundationException(ErrorCode.EXECUTION_NOT_FOUND);
-        return new PathModel(id, e.getStatus(), paths.selectByPrimaryKey(id), nodeIds(id), nodes(e.getRoutingId()), edges(e.getRoutingId()));
+        var routing = routings.selectByPrimaryKey(e.getRoutingId());
+        if (routing == null) throw new FoundationException(ErrorCode.RESOURCE_CONFLICT);
+        return new PathModel(id, e.getStatus(), paths.selectByPrimaryKey(id), nodeIds(id), nodes(e.getRoutingId()), edges(e.getRoutingId()), e.getExecutionNo(), routing);
     }
 
     public PathModel select(Long id, Integer revision, List<Long> nodeIds) {

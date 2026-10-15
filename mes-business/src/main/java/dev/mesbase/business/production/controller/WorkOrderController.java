@@ -44,7 +44,8 @@ public class WorkOrderController {
     }
 
     public record BatchSummaryView(String id, String workorderId, String batchNo, BigDecimal plannedQty,
-                                   String status, String routeStatus, LocalDateTime lockedAt, int revision, String remark) {
+                                   String status, String routeStatus, LocalDateTime lockedAt, int revision,
+                                   String remark) {
     }
 
     public record DetailView(OrderView workorder, String productCode, String productName, RoutingView routing,
@@ -52,7 +53,8 @@ public class WorkOrderController {
     }
 
     public record SummaryView(OrderView workorder, int batchCount, String productCode, String productName,
-                              String routingCode, Integer routingVersion, AllocationView allocation) {
+                              String routingCode, Integer routingVersion, AllocationView allocation,
+                              boolean erpExtraMissing) {
     }
 
     public record AllocationView(String workorderId, String plannedQty, String allocatedTargetQty,
@@ -68,7 +70,7 @@ public class WorkOrderController {
                          @RequestParam(defaultValue = "0") int offset, @RequestParam(defaultValue = "20") int limit) {
         var p = service.list(code, status, offset, limit);
         return new PageView(p.items().stream()
-                .map(s -> new SummaryView(order(s.workorder()), s.batchCount(), s.productCode(), s.productName(), s.routingCode(), s.routingVersion(), allocation(s.allocation())))
+                .map(s -> new SummaryView(order(s.workorder()), s.batchCount(), s.productCode(), s.productName(), s.routingCode(), s.routingVersion(), allocation(s.allocation()), s.erpExtraMissing()))
                 .toList(), p.total(), p.offset(), p.limit());
     }
 

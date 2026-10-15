@@ -26,7 +26,7 @@ public final class WorkOrderModels {
     }
 
     public record Summary(WorkorderEntity workorder, int batchCount, String productCode, String productName,
-                          String routingCode, Integer routingVersion, Allocation allocation) {
+                          String routingCode, Integer routingVersion, Allocation allocation, boolean erpExtraMissing) {
     }
 
     public record Page(List<Summary> items, long total, int offset, int limit) {
