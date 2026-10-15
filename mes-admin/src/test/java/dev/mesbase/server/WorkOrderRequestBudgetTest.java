@@ -5,7 +5,6 @@ import dev.mesbase.business.production.dao.WorkorderErpExtraMapper;
 
 import dev.mesbase.business.production.dao.ProductionBatchMapper;
 import dev.mesbase.business.production.dao.WorkOrderExtraMapper;
-import dev.mesbase.business.production.dao.BatchRouteNodeMapper;
 import dev.mesbase.business.production.dao.RoutingMapper;
 import dev.mesbase.business.production.dao.RoutingProductMapper;
 import dev.mesbase.business.production.dao.RoutingNodeMapper;
@@ -196,7 +195,7 @@ class WorkOrderRequestBudgetTest {
                 PersistenceFactories.pagination(c);
                 c.addInterceptor(businessSql);
             }, manager::verifyAccess);
-            var controller = new WorkOrderController(new WorkOrderService(new SqlSessionTemplate(factory).getMapper(WorkorderMapper.class), new SqlSessionTemplate(factory).getMapper(ProductionBatchMapper.class), mock(BatchRouteNodeMapper.class), new SqlSessionTemplate(factory).getMapper(RoutingMapper.class), mock(RoutingProductMapper.class), mock(RoutingNodeMapper.class), mock(RoutingEdgeMapper.class), new SqlSessionTemplate(factory).getMapper(MaterialMapper.class), mock(RoutingReferenceRules.class), mock(MesMaterialIssueMapper.class), new SqlSessionTemplate(factory).getMapper(WorkOrderExtraMapper.class), mock(MesProductionExecutionMapper.class), new WorkorderErpFacts(new SqlSessionTemplate(factory).getMapper(WorkorderErpExtraMapper.class))));
+            var controller = new WorkOrderController(new WorkOrderService(new SqlSessionTemplate(factory).getMapper(WorkorderMapper.class), new SqlSessionTemplate(factory).getMapper(ProductionBatchMapper.class), new SqlSessionTemplate(factory).getMapper(RoutingMapper.class), mock(RoutingProductMapper.class), mock(RoutingNodeMapper.class), mock(RoutingEdgeMapper.class), new SqlSessionTemplate(factory).getMapper(MaterialMapper.class), mock(RoutingReferenceRules.class), mock(MesMaterialIssueMapper.class), new SqlSessionTemplate(factory).getMapper(WorkOrderExtraMapper.class), mock(MesProductionExecutionMapper.class), new WorkorderErpFacts(new SqlSessionTemplate(factory).getMapper(WorkorderErpExtraMapper.class))));
             var permissions = new SystemPermissionService(platform.mapper(SysMenuMapper.class), platform.mapper(SysRoleMapper.class), platform.mapper(ManagedFactoryMapper.class));
             FactoryCatalog catalog = new FactoryCatalog() {
                 public Optional<Factory> find(FactoryId id) {

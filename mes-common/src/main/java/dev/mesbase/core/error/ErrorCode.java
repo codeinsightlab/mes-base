@@ -1,6 +1,11 @@
 package dev.mesbase.core.error;
 
 public enum ErrorCode {
+    OPERATOR_NOT_AUTHORIZED(422, "用户不存在、已停用或无当前工厂业务授权"),
+    OPERATOR_CAPABILITY_REQUIRED(422, "操作人员不具备当前工序能力"),
+    OPERATOR_NOT_ASSIGNED(422, "当前节点已指定派工人员，该用户不在名单中"),
+    ASSIGNMENT_NODE_INVALID(422, "节点不属于执行单元的确切工艺版本"),
+    ASSIGNMENT_EXECUTION_CLOSED(409, "当前执行状态不允许维护派工"),
     INTEGRATION_NOT_CONFIGURED(422, "当前工厂仓储模式或对应领域连接未配置"),
     ISSUE_EXTERNAL_UNVERIFIED(409, "单据外部出库来源未核实，不能自动本地作废"),
     ISSUE_VOID_CONFLICT(409, "领料单已作废或正在核实，不允许普通编辑或继续使用"),

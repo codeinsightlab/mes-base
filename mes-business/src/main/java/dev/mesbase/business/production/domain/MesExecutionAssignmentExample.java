@@ -1,15 +1,16 @@
 // MES-CODEGEN: MyBatis Generator standard single-table persistence.
 package dev.mesbase.business.production.domain;
 
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
-public class BatchRouteNodeExample {
+public class MesExecutionAssignmentExample {
     protected String orderByClause;
 
     protected List<Criteria> oredCriteria;
 
-    public BatchRouteNodeExample() {
+    public MesExecutionAssignmentExample() {
         oredCriteria = new ArrayList<>();
     }
 
@@ -154,63 +155,63 @@ public class BatchRouteNodeExample {
             return (Criteria) this;
         }
 
-        public Criteria andBatchIdIsNull() {
-            addCriterion("batch_id is null");
+        public Criteria andExecutionIdIsNull() {
+            addCriterion("execution_id is null");
             return (Criteria) this;
         }
 
-        public Criteria andBatchIdIsNotNull() {
-            addCriterion("batch_id is not null");
+        public Criteria andExecutionIdIsNotNull() {
+            addCriterion("execution_id is not null");
             return (Criteria) this;
         }
 
-        public Criteria andBatchIdEqualTo(Long value) {
-            addCriterion("batch_id =", value, "batchId");
+        public Criteria andExecutionIdEqualTo(Long value) {
+            addCriterion("execution_id =", value, "executionId");
             return (Criteria) this;
         }
 
-        public Criteria andBatchIdNotEqualTo(Long value) {
-            addCriterion("batch_id <>", value, "batchId");
+        public Criteria andExecutionIdNotEqualTo(Long value) {
+            addCriterion("execution_id <>", value, "executionId");
             return (Criteria) this;
         }
 
-        public Criteria andBatchIdGreaterThan(Long value) {
-            addCriterion("batch_id >", value, "batchId");
+        public Criteria andExecutionIdGreaterThan(Long value) {
+            addCriterion("execution_id >", value, "executionId");
             return (Criteria) this;
         }
 
-        public Criteria andBatchIdGreaterThanOrEqualTo(Long value) {
-            addCriterion("batch_id >=", value, "batchId");
+        public Criteria andExecutionIdGreaterThanOrEqualTo(Long value) {
+            addCriterion("execution_id >=", value, "executionId");
             return (Criteria) this;
         }
 
-        public Criteria andBatchIdLessThan(Long value) {
-            addCriterion("batch_id <", value, "batchId");
+        public Criteria andExecutionIdLessThan(Long value) {
+            addCriterion("execution_id <", value, "executionId");
             return (Criteria) this;
         }
 
-        public Criteria andBatchIdLessThanOrEqualTo(Long value) {
-            addCriterion("batch_id <=", value, "batchId");
+        public Criteria andExecutionIdLessThanOrEqualTo(Long value) {
+            addCriterion("execution_id <=", value, "executionId");
             return (Criteria) this;
         }
 
-        public Criteria andBatchIdIn(List<Long> values) {
-            addCriterion("batch_id in", values, "batchId");
+        public Criteria andExecutionIdIn(List<Long> values) {
+            addCriterion("execution_id in", values, "executionId");
             return (Criteria) this;
         }
 
-        public Criteria andBatchIdNotIn(List<Long> values) {
-            addCriterion("batch_id not in", values, "batchId");
+        public Criteria andExecutionIdNotIn(List<Long> values) {
+            addCriterion("execution_id not in", values, "executionId");
             return (Criteria) this;
         }
 
-        public Criteria andBatchIdBetween(Long value1, Long value2) {
-            addCriterion("batch_id between", value1, value2, "batchId");
+        public Criteria andExecutionIdBetween(Long value1, Long value2) {
+            addCriterion("execution_id between", value1, value2, "executionId");
             return (Criteria) this;
         }
 
-        public Criteria andBatchIdNotBetween(Long value1, Long value2) {
-            addCriterion("batch_id not between", value1, value2, "batchId");
+        public Criteria andExecutionIdNotBetween(Long value1, Long value2) {
+            addCriterion("execution_id not between", value1, value2, "executionId");
             return (Criteria) this;
         }
 
@@ -274,63 +275,253 @@ public class BatchRouteNodeExample {
             return (Criteria) this;
         }
 
-        public Criteria andExecutionOrderIsNull() {
-            addCriterion("execution_order is null");
+        public Criteria andUserIdIsNull() {
+            addCriterion("user_id is null");
             return (Criteria) this;
         }
 
-        public Criteria andExecutionOrderIsNotNull() {
-            addCriterion("execution_order is not null");
+        public Criteria andUserIdIsNotNull() {
+            addCriterion("user_id is not null");
             return (Criteria) this;
         }
 
-        public Criteria andExecutionOrderEqualTo(Integer value) {
-            addCriterion("execution_order =", value, "executionOrder");
+        public Criteria andUserIdEqualTo(Long value) {
+            addCriterion("user_id =", value, "userId");
             return (Criteria) this;
         }
 
-        public Criteria andExecutionOrderNotEqualTo(Integer value) {
-            addCriterion("execution_order <>", value, "executionOrder");
+        public Criteria andUserIdNotEqualTo(Long value) {
+            addCriterion("user_id <>", value, "userId");
             return (Criteria) this;
         }
 
-        public Criteria andExecutionOrderGreaterThan(Integer value) {
-            addCriterion("execution_order >", value, "executionOrder");
+        public Criteria andUserIdGreaterThan(Long value) {
+            addCriterion("user_id >", value, "userId");
             return (Criteria) this;
         }
 
-        public Criteria andExecutionOrderGreaterThanOrEqualTo(Integer value) {
-            addCriterion("execution_order >=", value, "executionOrder");
+        public Criteria andUserIdGreaterThanOrEqualTo(Long value) {
+            addCriterion("user_id >=", value, "userId");
             return (Criteria) this;
         }
 
-        public Criteria andExecutionOrderLessThan(Integer value) {
-            addCriterion("execution_order <", value, "executionOrder");
+        public Criteria andUserIdLessThan(Long value) {
+            addCriterion("user_id <", value, "userId");
             return (Criteria) this;
         }
 
-        public Criteria andExecutionOrderLessThanOrEqualTo(Integer value) {
-            addCriterion("execution_order <=", value, "executionOrder");
+        public Criteria andUserIdLessThanOrEqualTo(Long value) {
+            addCriterion("user_id <=", value, "userId");
             return (Criteria) this;
         }
 
-        public Criteria andExecutionOrderIn(List<Integer> values) {
-            addCriterion("execution_order in", values, "executionOrder");
+        public Criteria andUserIdIn(List<Long> values) {
+            addCriterion("user_id in", values, "userId");
             return (Criteria) this;
         }
 
-        public Criteria andExecutionOrderNotIn(List<Integer> values) {
-            addCriterion("execution_order not in", values, "executionOrder");
+        public Criteria andUserIdNotIn(List<Long> values) {
+            addCriterion("user_id not in", values, "userId");
             return (Criteria) this;
         }
 
-        public Criteria andExecutionOrderBetween(Integer value1, Integer value2) {
-            addCriterion("execution_order between", value1, value2, "executionOrder");
+        public Criteria andUserIdBetween(Long value1, Long value2) {
+            addCriterion("user_id between", value1, value2, "userId");
             return (Criteria) this;
         }
 
-        public Criteria andExecutionOrderNotBetween(Integer value1, Integer value2) {
-            addCriterion("execution_order not between", value1, value2, "executionOrder");
+        public Criteria andUserIdNotBetween(Long value1, Long value2) {
+            addCriterion("user_id not between", value1, value2, "userId");
+            return (Criteria) this;
+        }
+
+        public Criteria andAssignedByIsNull() {
+            addCriterion("assigned_by is null");
+            return (Criteria) this;
+        }
+
+        public Criteria andAssignedByIsNotNull() {
+            addCriterion("assigned_by is not null");
+            return (Criteria) this;
+        }
+
+        public Criteria andAssignedByEqualTo(Long value) {
+            addCriterion("assigned_by =", value, "assignedBy");
+            return (Criteria) this;
+        }
+
+        public Criteria andAssignedByNotEqualTo(Long value) {
+            addCriterion("assigned_by <>", value, "assignedBy");
+            return (Criteria) this;
+        }
+
+        public Criteria andAssignedByGreaterThan(Long value) {
+            addCriterion("assigned_by >", value, "assignedBy");
+            return (Criteria) this;
+        }
+
+        public Criteria andAssignedByGreaterThanOrEqualTo(Long value) {
+            addCriterion("assigned_by >=", value, "assignedBy");
+            return (Criteria) this;
+        }
+
+        public Criteria andAssignedByLessThan(Long value) {
+            addCriterion("assigned_by <", value, "assignedBy");
+            return (Criteria) this;
+        }
+
+        public Criteria andAssignedByLessThanOrEqualTo(Long value) {
+            addCriterion("assigned_by <=", value, "assignedBy");
+            return (Criteria) this;
+        }
+
+        public Criteria andAssignedByIn(List<Long> values) {
+            addCriterion("assigned_by in", values, "assignedBy");
+            return (Criteria) this;
+        }
+
+        public Criteria andAssignedByNotIn(List<Long> values) {
+            addCriterion("assigned_by not in", values, "assignedBy");
+            return (Criteria) this;
+        }
+
+        public Criteria andAssignedByBetween(Long value1, Long value2) {
+            addCriterion("assigned_by between", value1, value2, "assignedBy");
+            return (Criteria) this;
+        }
+
+        public Criteria andAssignedByNotBetween(Long value1, Long value2) {
+            addCriterion("assigned_by not between", value1, value2, "assignedBy");
+            return (Criteria) this;
+        }
+
+        public Criteria andAssignedAtIsNull() {
+            addCriterion("assigned_at is null");
+            return (Criteria) this;
+        }
+
+        public Criteria andAssignedAtIsNotNull() {
+            addCriterion("assigned_at is not null");
+            return (Criteria) this;
+        }
+
+        public Criteria andAssignedAtEqualTo(LocalDateTime value) {
+            addCriterion("assigned_at =", value, "assignedAt");
+            return (Criteria) this;
+        }
+
+        public Criteria andAssignedAtNotEqualTo(LocalDateTime value) {
+            addCriterion("assigned_at <>", value, "assignedAt");
+            return (Criteria) this;
+        }
+
+        public Criteria andAssignedAtGreaterThan(LocalDateTime value) {
+            addCriterion("assigned_at >", value, "assignedAt");
+            return (Criteria) this;
+        }
+
+        public Criteria andAssignedAtGreaterThanOrEqualTo(LocalDateTime value) {
+            addCriterion("assigned_at >=", value, "assignedAt");
+            return (Criteria) this;
+        }
+
+        public Criteria andAssignedAtLessThan(LocalDateTime value) {
+            addCriterion("assigned_at <", value, "assignedAt");
+            return (Criteria) this;
+        }
+
+        public Criteria andAssignedAtLessThanOrEqualTo(LocalDateTime value) {
+            addCriterion("assigned_at <=", value, "assignedAt");
+            return (Criteria) this;
+        }
+
+        public Criteria andAssignedAtIn(List<LocalDateTime> values) {
+            addCriterion("assigned_at in", values, "assignedAt");
+            return (Criteria) this;
+        }
+
+        public Criteria andAssignedAtNotIn(List<LocalDateTime> values) {
+            addCriterion("assigned_at not in", values, "assignedAt");
+            return (Criteria) this;
+        }
+
+        public Criteria andAssignedAtBetween(LocalDateTime value1, LocalDateTime value2) {
+            addCriterion("assigned_at between", value1, value2, "assignedAt");
+            return (Criteria) this;
+        }
+
+        public Criteria andAssignedAtNotBetween(LocalDateTime value1, LocalDateTime value2) {
+            addCriterion("assigned_at not between", value1, value2, "assignedAt");
+            return (Criteria) this;
+        }
+
+        public Criteria andRemarkIsNull() {
+            addCriterion("remark is null");
+            return (Criteria) this;
+        }
+
+        public Criteria andRemarkIsNotNull() {
+            addCriterion("remark is not null");
+            return (Criteria) this;
+        }
+
+        public Criteria andRemarkEqualTo(String value) {
+            addCriterion("remark =", value, "remark");
+            return (Criteria) this;
+        }
+
+        public Criteria andRemarkNotEqualTo(String value) {
+            addCriterion("remark <>", value, "remark");
+            return (Criteria) this;
+        }
+
+        public Criteria andRemarkGreaterThan(String value) {
+            addCriterion("remark >", value, "remark");
+            return (Criteria) this;
+        }
+
+        public Criteria andRemarkGreaterThanOrEqualTo(String value) {
+            addCriterion("remark >=", value, "remark");
+            return (Criteria) this;
+        }
+
+        public Criteria andRemarkLessThan(String value) {
+            addCriterion("remark <", value, "remark");
+            return (Criteria) this;
+        }
+
+        public Criteria andRemarkLessThanOrEqualTo(String value) {
+            addCriterion("remark <=", value, "remark");
+            return (Criteria) this;
+        }
+
+        public Criteria andRemarkLike(String value) {
+            addCriterion("remark like", value, "remark");
+            return (Criteria) this;
+        }
+
+        public Criteria andRemarkNotLike(String value) {
+            addCriterion("remark not like", value, "remark");
+            return (Criteria) this;
+        }
+
+        public Criteria andRemarkIn(List<String> values) {
+            addCriterion("remark in", values, "remark");
+            return (Criteria) this;
+        }
+
+        public Criteria andRemarkNotIn(List<String> values) {
+            addCriterion("remark not in", values, "remark");
+            return (Criteria) this;
+        }
+
+        public Criteria andRemarkBetween(String value1, String value2) {
+            addCriterion("remark between", value1, value2, "remark");
+            return (Criteria) this;
+        }
+
+        public Criteria andRemarkNotBetween(String value1, String value2) {
+            addCriterion("remark not between", value1, value2, "remark");
             return (Criteria) this;
         }
     }

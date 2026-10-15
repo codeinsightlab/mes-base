@@ -43,16 +43,12 @@ public class WorkOrderController {
     public record RoutingView(String id, String code, String name, int version, String status) {
     }
 
-    public record NodeView(String routingNodeId, int executionOrder) {
-    }
-
-    public record BatchView(String id, String workorderId, String batchNo, BigDecimal plannedQty,
-                            String status, String routeStatus, LocalDateTime lockedAt, int revision, String remark,
-                            List<NodeView> path) {
+    public record BatchSummaryView(String id, String workorderId, String batchNo, BigDecimal plannedQty,
+                                   String status, String routeStatus, LocalDateTime lockedAt, int revision, String remark) {
     }
 
     public record DetailView(OrderView workorder, String productCode, String productName, RoutingView routing,
-                             List<BatchView> batches, AllocationView allocation) {
+                             List<BatchSummaryView> batches, AllocationView allocation) {
     }
 
     public record SummaryView(OrderView workorder, int batchCount, String productCode, String productName,
@@ -127,18 +123,6 @@ public class WorkOrderController {
         service.delete(id, input.revision());
     }
 
-    @GetMapping("/batch/{id}")
-    @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED, permission = "batch:query")
-    public BatchView batch(@PathVariable Long id) {
-        return batch(service.batchDetail(id));
-    }
-
-    @PutMapping("/batch/{id}/path")
-    @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED, permission = "batch:selectRoute")
-    public BatchView path(@PathVariable Long id, @Valid @RequestBody WorkOrderModels.PathSelection input) {
-        return batch(service.selectPath(id, input));
-    }
-
     private static AllocationView allocation(WorkOrderModels.Allocation a) {
         return new AllocationView(id(a.workorderId()), a.plannedQty().toPlainString(), a.allocatedTargetQty()
                 .toPlainString(),
@@ -154,11 +138,9 @@ public class WorkOrderController {
                 w.getPlannedStartAt(), w.getPlannedEndAt(), w.getExternalId(), w.getExternalCode(), w.getRemark(), w.getRevision(), w.getCreateTime(), w.getUpdateTime());
     }
 
-    private static BatchView batch(WorkOrderModels.BatchDetail detail) {
-        ProductionBatchEntity b = detail.batch();
-        return new BatchView(id(b.getId()), id(b.getWorkorderId()), b.getBatchNo(), b.getPlannedQty(), b.getStatus(), b.getRouteStatus(), b.getLockedAt(), b.getRevision(), b.getRemark(),
-                detail.path().stream().map(n -> new NodeView(id(n.getRoutingNodeId()), n.getExecutionOrder()))
-                        .toList());
+    private static BatchSummaryView batch(ProductionBatchEntity b) {
+        return new BatchSummaryView(id(b.getId()), id(b.getWorkorderId()), b.getBatchNo(), b.getPlannedQty(),
+                b.getStatus(), b.getRouteStatus(), b.getLockedAt(), b.getRevision(), b.getRemark());
     }
 
     private static DetailView view(WorkOrderModels.Detail detail) {

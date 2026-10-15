@@ -9,7 +9,6 @@ import dev.mesbase.business.basic.dao.MaterialMapper;
 import dev.mesbase.business.basic.domain.MaterialExample;
 import dev.mesbase.business.issue.dao.MesMaterialIssueMapper;
 import dev.mesbase.business.issue.domain.MesMaterialIssueExample;
-import dev.mesbase.business.production.dao.BatchRouteNodeMapper;
 import dev.mesbase.business.production.dao.ProductionBatchMapper;
 import dev.mesbase.business.production.dao.RoutingEdgeMapper;
 import dev.mesbase.business.production.dao.RoutingMapper;
@@ -20,9 +19,7 @@ import dev.mesbase.business.production.dao.MesProductionExecutionMapper;
 import dev.mesbase.business.production.domain.MesProductionExecutionExample;
 import dev.mesbase.business.production.dao.WorkOrderExtraMapper;
 import dev.mesbase.business.production.domain.RoutingDetail;
-import dev.mesbase.business.production.domain.BatchRouteNodeEntity;
 import java.math.BigDecimal;
-import dev.mesbase.business.production.domain.BatchRouteNodeExample;
 import dev.mesbase.business.production.domain.ProductionBatchEntity;
 import dev.mesbase.business.production.domain.ProductionBatchExample;
 import dev.mesbase.business.production.domain.RoutingEdgeExample;
@@ -46,7 +43,7 @@ import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * WorkOrder owns demand. Legacy batches and selected paths are read-only historical references.
+ * WorkOrder owns demand. Legacy batch summaries are read-only references; historical paths have a separate query entry.
  */
 @Service
 @ConditionalOnProperty(name = "mes.business.enabled", havingValue = "true")
@@ -55,7 +52,6 @@ public class WorkOrderService {
     private final WorkorderMapper orders;
     private final WorkorderErpFacts facts;
     private final ProductionBatchMapper batches;
-    private final BatchRouteNodeMapper paths;
     private final RoutingMapper routings;
     private final RoutingProductMapper products;
     private final RoutingNodeMapper nodes;
@@ -66,7 +62,7 @@ public class WorkOrderService {
     private final WorkOrderExtraMapper queries;
     private final MesProductionExecutionMapper executions;
 
-    public WorkOrderService(WorkorderMapper orders, ProductionBatchMapper batches, BatchRouteNodeMapper paths,
+    public WorkOrderService(WorkorderMapper orders, ProductionBatchMapper batches,
                             RoutingMapper routings, RoutingProductMapper products, RoutingNodeMapper nodes,
                             RoutingEdgeMapper edges, MaterialMapper materials, RoutingReferenceRules references,
                             MesMaterialIssueMapper issues, WorkOrderExtraMapper queries,
@@ -74,7 +70,6 @@ public class WorkOrderService {
         this.orders = orders;
         this.facts = facts;
         this.batches = batches;
-        this.paths = paths;
         this.routings = routings;
         this.products = products;
         this.nodes = nodes;
@@ -143,18 +138,8 @@ public class WorkOrderService {
         var w = order(id, false);
         var m = materials.selectByPrimaryKey(w.getProductId());
         var children = batchRows(id);
-        var filter = new BatchRouteNodeExample();
-        List<BatchRouteNodeEntity> all = List.of();
-        if (!children.isEmpty()) {
-            filter.createCriteria().andBatchIdIn(children.stream().map(ProductionBatchEntity::getId).toList());
-            filter.setOrderByClause("execution_order,id");
-            all = paths.selectByExample(filter);
-        }
-        var grouped = all.stream().collect(Collectors.groupingBy(BatchRouteNodeEntity::getBatchId));
-        return new WorkOrderModels.Detail(w, m == null ? null : m.getCode(), m == null ? null : m.getName(), routings.selectByPrimaryKey(w.getRoutingId()),
-                children.stream()
-                        .map(b -> new WorkOrderModels.BatchDetail(b, grouped.getOrDefault(b.getId(), List.of())))
-                        .toList(), allocation(id));
+        return new WorkOrderModels.Detail(w, m == null ? null : m.getCode(), m == null ? null : m.getName(),
+                routings.selectByPrimaryKey(w.getRoutingId()), children, allocation(id));
     }
 
     @Transactional(transactionManager = "businessTransactionManager", isolation = Isolation.READ_COMMITTED, rollbackFor = Exception.class)
@@ -235,24 +220,6 @@ public class WorkOrderService {
     }
 
     @Transactional(transactionManager = "businessTransactionManager", readOnly = true)
-    public WorkOrderModels.BatchDetail batchDetail(Long id) {
-        var b = batch(id, false);
-        var filter = new BatchRouteNodeExample();
-        filter.createCriteria().andBatchIdEqualTo(id);
-        filter.setOrderByClause("execution_order,id");
-        return new WorkOrderModels.BatchDetail(b, paths.selectByExample(filter));
-    }
-
-    /**
-     * Compatibility endpoint: historical selected paths can no longer be written.
-     */
-    @Transactional(transactionManager = "businessTransactionManager", readOnly = true)
-    public WorkOrderModels.BatchDetail selectPath(Long id, WorkOrderModels.PathSelection input) {
-        batch(id, false);
-        throw new FoundationException(ErrorCode.LEGACY_BATCH_READ_ONLY);
-    }
-
-    @Transactional(transactionManager = "businessTransactionManager", readOnly = true)
     public WorkOrderModels.Allocation allocation(Long id) {
         var rows = queries.allocationForOrders(List.of(id));
         if (rows.isEmpty()) throw new FoundationException(ErrorCode.NOT_FOUND);
@@ -277,14 +244,6 @@ public class WorkOrderService {
         var row = orders.selectByPrimaryKey(id);
         if (row == null) throw new FoundationException(ErrorCode.NOT_FOUND);
         facts.hydrate(List.of(row));
-        return row;
-    }
-
-    private ProductionBatchEntity batch(Long id, boolean lock) {
-        var row = batches.selectByPrimaryKey(id);
-        if (row == null) throw new FoundationException(ErrorCode.NOT_FOUND);
-        order(row.getWorkorderId(), lock);
-        if (lock) row = batches.selectByPrimaryKey(id);
         return row;
     }
 

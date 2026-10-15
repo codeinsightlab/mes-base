@@ -12,6 +12,8 @@ import dev.mesbase.business.issue.dao.MesMaterialIssueMapper;
 import dev.mesbase.business.production.dao.MesProductionExecutionMapper;
 import dev.mesbase.business.production.domain.WorkOrderModels;
 import dev.mesbase.business.production.service.WorkOrderService;
+import dev.mesbase.business.production.service.LegacyBatchHistoryQuery;
+import dev.mesbase.business.production.controller.LegacyBatchHistoryController;
 import dev.mesbase.business.production.service.ProductionExecutionRules;
 import dev.mesbase.business.production.service.impl.MesProductionExecutionServiceImpl;
 import dev.mesbase.business.production.service.IMesProductionExecutionService;
@@ -57,6 +59,7 @@ import org.springframework.transaction.annotation.EnableTransactionManagement;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -78,7 +81,7 @@ class WorkOrderMySqlTest {
 
     @Configuration
     @EnableTransactionManagement
-    @Import({ProductionChainLocks.class, WorkorderErpFacts.class, WorkOrderService.class, RoutingReferenceRules.class, ProductionExecutionRules.class, MesProductionExecutionServiceImpl.class})
+    @Import({ProductionChainLocks.class, WorkorderErpFacts.class, WorkOrderService.class, LegacyBatchHistoryQuery.class, LegacyBatchHistoryController.class, RoutingReferenceRules.class, ProductionExecutionRules.class, MesProductionExecutionServiceImpl.class})
     static class Config {
         @Bean(name = "businessTransactionManager")
         OwnedTransactionManager manager(FactoryBusinessDataSource source) {
@@ -201,6 +204,19 @@ class WorkOrderMySqlTest {
             new TransactionTemplate(manager).execute(status -> {
                 var batchesBefore = jdbc.queryForList("SELECT * FROM production_batch ORDER BY id");
                 var pathsBefore = jdbc.queryForList("SELECT * FROM batch_route_node ORDER BY id");
+                var history = context.getBean(LegacyBatchHistoryQuery.class);
+                for (var batchRow : batchesBefore) {
+                    Long batchId = ((Number) batchRow.get("id")).longValue();
+                    var historical = history.detail(batchId);
+                    var expectedNodes = pathsBefore.stream().filter(n -> batchId.equals(((Number) n.get("batch_id")).longValue())).toList();
+                    assertEquals(expectedNodes.size(), historical.path().size());
+                    assertEquals(batchId, historical.batch().getId());
+                    for (var node : historical.path()) {
+                        assertEquals(batchId, node.getBatchId());
+                        assertNotNull(node.getRoutingNodeId());
+                        assertNotNull(node.getExecutionOrder());
+                    }
+                }
                 var input = new WorkOrderModels.Save(tag, product, new BigDecimal("1000"), routing, null, null, null, null, "TEST ONLY ROLLBACK", 0);
                 var created = service.create(input);
                 Long order = created.workorder().getId();

@@ -21,15 +21,8 @@ public final class WorkOrderModels {
     public record Revision(@NotNull Integer revision) {
     }
 
-    public record PathSelection(@NotNull Integer revision,
-                                @NotNull @Size(min = 1, max = 100) List<@NotNull Long> nodeIds) {
-    }
-
-    public record BatchDetail(ProductionBatchEntity batch, List<BatchRouteNodeEntity> path) {
-    }
-
     public record Detail(WorkorderEntity workorder, String productCode, String productName,
-                         RoutingEntity routing, List<BatchDetail> batches, Allocation allocation) {
+                         RoutingEntity routing, List<ProductionBatchEntity> batches, Allocation allocation) {
     }
 
     public record Summary(WorkorderEntity workorder, int batchCount, String productCode, String productName,

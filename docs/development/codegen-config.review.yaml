@@ -236,7 +236,5 @@ tableOverrides:
     module: production
   production_batch:
     module: production
-  batch_route_node:
-    module: production
 
 # 生产执行路径及提交历史只由明确业务命令维护；全量CRUD排除，专用配置生成受限基础后端。

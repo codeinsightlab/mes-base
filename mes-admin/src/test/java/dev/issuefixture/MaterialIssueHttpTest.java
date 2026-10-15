@@ -36,6 +36,8 @@ import dev.mesbase.business.production.dao.RoutingNodeMapper;
 import dev.mesbase.business.production.dao.RoutingEdgeMapper;
 import dev.mesbase.business.production.dao.OperationMapper;
 import dev.mesbase.business.production.service.WorkOrderService;
+import dev.mesbase.business.production.service.LegacyBatchHistoryQuery;
+import dev.mesbase.business.production.controller.LegacyBatchHistoryController;
 import dev.mesbase.business.production.service.RoutingReferenceRules;
 import dev.mesbase.business.production.controller.WorkOrderController;
 import dev.mesbase.business.production.dao.MesProductionExecutionMapper;
@@ -188,7 +190,7 @@ class MaterialIssueHttpTest {
     @EnableWebMvc
     @EnableWebSecurity
     @EnableTransactionManagement
-    @Import({ProductionChainLocks.class, ExecutionPathService.class, ExecutionActionController.class, MaterialIssueSubmissionService.class, MaterialIssueSubmissionController.class, WorkorderErpFacts.class, MaterialIssueErpFacts.class, MaterialIssueErpService.class, MaterialIssueErpController.class, WarehouseIntegration.class, MaterialIssueVoidService.class, MaterialIssueVoidController.class, MesMaterialIssueController.class, MesMaterialIssueItemController.class, MesMaterialIssueServiceImpl.class, MesMaterialIssueItemServiceImpl.class, MaterialIssueRules.class, ProductionExecutionRules.class, ProductionIdentityService.class, MesProductionExecutionServiceImpl.class, MesProductionExecutionController.class, ProductionIdentityController.class, WorkOrderController.class, WorkOrderService.class, RoutingReferenceRules.class, FoundationErrorAdvice.class})
+    @Import({ProductionChainLocks.class, ExecutionPathService.class, ExecutionActionController.class, MaterialIssueSubmissionService.class, MaterialIssueSubmissionController.class, WorkorderErpFacts.class, MaterialIssueErpFacts.class, MaterialIssueErpService.class, MaterialIssueErpController.class, WarehouseIntegration.class, MaterialIssueVoidService.class, MaterialIssueVoidController.class, MesMaterialIssueController.class, MesMaterialIssueItemController.class, MesMaterialIssueServiceImpl.class, MesMaterialIssueItemServiceImpl.class, MaterialIssueRules.class, ProductionExecutionRules.class, ProductionIdentityService.class, MesProductionExecutionServiceImpl.class, MesProductionExecutionController.class, ProductionIdentityController.class, WorkOrderController.class, WorkOrderService.class, LegacyBatchHistoryQuery.class, LegacyBatchHistoryController.class, RoutingReferenceRules.class, FoundationErrorAdvice.class})
     static class Web implements WebMvcConfigurer {
         @Bean(destroyMethod = "close")
         Fixture fixture() throws Exception {

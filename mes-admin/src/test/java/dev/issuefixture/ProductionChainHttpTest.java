@@ -116,6 +116,36 @@ class ProductionChainHttpTest {
     }
 
     @Test
+    void currentCommandsDoNotNeedLegacyPathTableEvenWhenHistoricalBatchesExist() throws Exception {
+        try (var c = MaterialIssueHttpTest.context()) {
+            var m = MaterialIssueHttpTest.mvc(c);
+            var a = c.getBean(MaterialIssueHttpTest.Fixture.class).business.get("A");
+            a.update("INSERT INTO production_batch(id,workorder_id,batch_no,planned_qty,status,route_status,revision,create_time,update_time) VALUES(1,1,'OLD_BATCH',1000,'ISSUED','LOCKED',2,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)");
+            // TEST ONLY: remove the retired table in this isolated H2 fixture to detect hidden coupling.
+            a.execute("DROP TABLE batch_route_node");
+            m.perform(full(get(W + "/1"), "A")).andExpect(status().isOk())
+                    .andExpect(jsonPath("batches[0].routeStatus").value("LOCKED"))
+                    .andExpect(jsonPath("batches[0].path").doesNotExist());
+            m.perform(full(put(W + "/1"), "A").content(DEMAND.replace("QA_DEMAND", "WO1")
+                            .replace("}", ",\"revision\":0}"))).andExpect(status().isOk());
+            m.perform(full(post(W), "A").content(DEMAND)).andExpect(status().isOk());
+            m.perform(full(delete(W + "/2"), "A").content("{\"revision\":0}"))
+                    .andExpect(status().isNoContent());
+            m.perform(full(get(W), "A")).andExpect(status().isOk());
+            m.perform(full(post(W + "/1/actions/release"), "A").content("{\"revision\":1}"))
+                    .andExpect(status().isOk());
+            m.perform(full(post(E), "A").content("{\"workorderId\":\"1\",\"routingId\":\"1\",\"targetQty\":\"3\",\"status\":\"READY\"}"))
+                    .andExpect(status().isOk()).andExpect(jsonPath("routingId").value("1"));
+            m.perform(full(get(E + "/1"), "A")).andExpect(status().isOk());
+            m.perform(full(post("/api/issue/mes-material-issue"), "A")
+                            .content("{\"issueNo\":\"NO_BATCH_PATH\",\"executionId\":\"1\",\"status\":\"DRAFT\"}"))
+                    .andExpect(status().isOk()).andExpect(jsonPath("executionId").value("1"))
+                    .andExpect(jsonPath("routingId").value("1"));
+            assertEquals(1, a.queryForObject("SELECT COUNT(*) FROM production_batch", Integer.class));
+        }
+    }
+
+    @Test
     void historicalBatchAndPathStayReadableButCannotBeMutatedOrOrphaned() throws Exception {
         try (var c = MaterialIssueHttpTest.context()) {
             var m = MaterialIssueHttpTest.mvc(c);
@@ -126,8 +156,13 @@ class ProductionChainHttpTest {
             var path = a.queryForList("SELECT * FROM batch_route_node");
             m.perform(full(get("/api/production/batch/1"), "A")).andExpect(status().isOk())
                     .andExpect(jsonPath("routeStatus").value("LOCKED")).andExpect(jsonPath("path.length()").value(1));
+            m.perform(full(get("/api/production/batch/1"), "B")).andExpect(status().isNotFound());
+            m.perform(get("/api/production/batch/1").header("Authorization", "Bearer NONE").header("X-Factory-Id", "A"))
+                    .andExpect(status().isForbidden());
+            // This fixture uses Spring Security default anonymous rejection (403).
+            m.perform(get("/api/production/batch/1")).andExpect(status().isForbidden());
             m.perform(full(put("/api/production/batch/1/path"), "A").content("{\"revision\":2,\"nodeIds\":[55]}"))
-                    .andExpect(status().isGone()).andExpect(jsonPath("errorCode").value("LEGACY_BATCH_READ_ONLY"));
+                    .andExpect(status().isNotFound());
             m.perform(full(delete(W + "/1"), "A").content("{\"revision\":0}"))
                     .andExpect(status().isConflict())
                     .andExpect(jsonPath("errorCode").value("WORKORDER_LEGACY_REFERENCED"));

@@ -348,3 +348,197 @@ Reporting 开发时：引用 execution_id，校验当前库关联、RELEASED 工
 ### 2026-10-14：本轮完整生产主链只读审查
 
 新增[Report B](2026-10-14-production-chain-audit-review.md)，覆盖最终WorkOrder/Execution/MaterialIssue/Routing及ERP Extra。旧报告“后续Reporting”的安排需按本轮确认的完整路径语义调整：优先正式领料、选路/锁路及开工准入，再做路径内报工；不否定此前身份主链验收，也不把旧API/UI结果当作本轮V22验证。Phase B没有实施建议的生产业务改造。
+
+
+## 2026-10-15：batch_route_node 旧路径职责退役实施回执
+
+### 结论与 Change Summary
+
+`CLEANUP_COMPLETE`（当前源码及本地验证范围）；`LEGACY_TABLE_RETAINED`。
+新生产命令与工单CRUD已经解除对旧路径模型的依赖；唯一保留的是明确隔离的历史查询。表仍有历史读取消费者，保留表与历史语义符合本次退役目标。真实用户服务超时，不能将源码完成、本地Fixture或指定库回滚测试当作运行服务已经更新。未提交、推送、部署或启动/停止/重启用户服务。
+
+本章取代上文关于 WorkOrderService 携带旧路径查询、旧 PUT 返回410及路径 Mapper 保留完整CRUD的当前描述；上文保留为2026-10-14历史证据。没有引入 ExecutionRouteNode，没有改动 Operation、Routing/DAG、Execution核心、MaterialIssue核心或派工代码。既有 V23 的执行选路实现不属于本次新增或替换内容。
+
+### A. 依赖审查与主链收敛
+
+两仓库入场：后端 `main / 5089000 init`，前端 `main / 732d669 init`。已读取个人工程入口、Principles、Workflow、Java、Frontend、知识治理及两仓库AGENTS。已检索 docs/ 的同主题内容（doc/、knowledge/不存在），本次追加本文件，不另建同主题平行报告。未访问/修改只读Source Product；事实来自Base当前真实调用链。
+
+对用户指定8项关键词进行了主代码、API、前端、测试、SQL及文档全局搜索。入场和最终完整匹配清单保存在 `.local/batch-route-retirement-20261015/{backend-entry-references,frontend-entry-references,final-runtime-references}.txt`。入场代码引用如下：
+
+| 位置 | 实际职责及处置 |
+| --- | --- |
+| WorkOrderService：构造依赖、detail、batchDetail | 详情曾附带查询旧路径，batchDetail历史只读；本次移出当前工单用例 |
+| WorkOrderService.selectPath / WorkOrderController PUT /batch/{id}/path | 兼容壳始终抛 LEGACY_BATCH_READ_ONLY；本次连同请求DTO移除 |
+| WorkOrderModels.PathSelection / BatchDetail；Controller.NodeView/BatchView | 前者无有效写消费者；后者为历史输出，本次移除旧模型嵌入并隔离历史输出 |
+| BatchRouteNodeMapper.java/XML | 原生成器全CRUD，真实消费者仅历史SELECT；本次裁成一个固定参数、固定排序的SELECT |
+| BatchRouteNodeEntity / Example | Entity保留历史投影；无消费者Example删除 |
+| ProductionBatchEntity/Example/Mapper/XML | 复用旧批次摘要、计数、引用保护；route_status仍解释历史，完整保留 |
+| MaterialIssueHttpTest / WorkOrderMySqlTest | 显式Fixture Mapper/Bean注册仍用于历史SELECT，保留并接入新Query/Controller |
+| WorkOrderExecutionProtectionTest / WorkOrderRequestBudgetTest | 构造函数曾注入旧Mapper，删除该无用参数，原保护/预算测试保留 |
+| ProductionChainHttpTest | 历史读取/不改写断言保留；旧410断言替换为接口不存在404；新增脱钩与权限负例 |
+| V13__workorder_batch_route.sql | 历史建表、execution_order及route_status定义；保持字节不变，不修改V13/V14/V15/V16或后续迁移 |
+| db/system/V27__workorder_business_menu.sql | 含batch:query及旧batch:selectRoute历史按钮权限；已执行历史不可改，现有权限记录保留为无效历史授权，无运行时写接口或UI按钮消费者 |
+| docs/development/codegen-config.review.yaml | 排除旧两表的生成保护保留；移除无效batch_route_node命名override |
+| 前端 src/api/production/workorder.ts 与 views/production/workorder/index.vue | 入场已经无路径写API/选路交互；曾随详情收到path，本次改为按权限点击读取历史GET |
+| 前端 tests/productionChain.test.ts | 更新工单详情Fixture契约，增加按需读取、切厂迟到响应、权限控制测试 |
+| 历史 reviews 与 workorder-permissions.md | 历史审查保留，本章说明变化；当前权限说明改为真实只读契约 |
+
+BatchPathPolicy、beginIssue、confirmIssue在本次入场代码中已经不存在；`src/lib/production/batchPath.ts`和旧线性路径选择组件/API也已经不存在，未虚构删除工作。计划数量的精度/正数校验仍由WorkOrderService.validate承担，未删除、复制或改变数量规则。全局 execution_order 仅剩历史SELECT/历史建表；route_status仅用于旧批次持久化和历史解释，不用于Execution准入或状态转换。
+
+主链六项检查：
+
+1. WorkOrderService.create 只保存工单与既有外部事实；不插入ProductionBatch或BatchRouteNode。
+2. MesProductionExecutionServiceImpl / ProductionExecutionRules不引用ProductionBatch或旧路径；创建只使用工单需求、产品及确切Routing版本。
+3. MaterialIssueRules execution分支通过execution_id读取Execution，明确校验并赋值Execution.routing_id；无旧路径依赖。
+4. 新生产运行代码中无BatchRouteNode引用；唯一运行时引用集是 LegacyBatchHistoryQuery → BatchRouteNodeMapper → Entity/XML。
+5. WorkOrder.routing_id继续仅作默认；Execution.routing_id决定实际工艺，不从历史Batch推导执行身份。
+6. 既有RoutingNode/RoutingEdge及发布/产品适用校验保留，本轮未更改工艺定义和验证器。
+
+### B. 清理文件与复用边界
+
+删除：`mes-business/src/main/java/dev/mesbase/business/production/domain/BatchRouteNodeExample.java`。
+
+修改生产文件（均在mes-business既有production包，未触及入场dirty业务文件）：
+
+- `service/WorkOrderService.java`：移除旧Mapper依赖、旧路径批量读取、batchDetail/selectPath及无消费者batch锁定helper；工单详情只返回旧批次摘要，保留产品/工艺/数量/状态/删除保护。
+- `domain/WorkOrderModels.java`：删除PathSelection/BatchDetail，工单Detail改为旧批次摘要集合，不再引用旧路径Entity。
+- `controller/WorkOrderController.java`：删除历史路径及旧PUT入口，只转换BatchSummaryView，不输出假空path。
+- `dao/BatchRouteNodeMapper.java` 与资源目录同名XML：只保留 selectHistoryByBatchId，参数化batchId，固定execution_order/id；删除所有写/删/计数/任意Example查询能力；手工修改的这两份生成文件同时移除MES-CODEGEN标记。
+
+新增两个明确历史读取文件（无第二套CRUD/数据访问实现）：
+
+- `service/LegacyBatchHistoryQuery.java`：具名businessTransactionManager只读事务，确认本库批次及其父工单存在，使用原ProductionBatchMapper与裁剪后的历史Mapper。
+- `controller/LegacyBatchHistoryController.java`：沿用原GET `/api/production/batch/{id}`、原batch:query授权、原历史响应字段与字符串ID。只提供GET，无历史写入口。
+
+其他修改：前端API/page及productionChain测试；后端MaterialIssueHttpTest、ProductionChainHttpTest、WorkOrderMySqlTest、WorkOrderRequestBudgetTest、WorkOrderExecutionProtectionTest；codegen项目配置；当前工单权限说明。本报告为现有文档追加。保留的BatchRouteNodeEntity未手改，因此不移除其生成标记；全量生成排除保护继续生效。
+
+### C. WorkOrder / Execution 影响
+
+工单详情的 `batches[]`保留批次摘要，移除嵌套path字段；前端同步适配，不能把“未读取历史路径”表示为“历史为空”。用户展开历史区后，具备batch:query权限才可点击“读取历史路径”，从稳定历史GET取得节点顺序。没有权限则提示权限要求，不调用接口。
+
+请求受现有身份/Factory/权限和当前业务库隔离保护；历史加载在切厂、撤权、关闭抽屉、重新打开不同工单及卸载时失效并清理，迟到响应不回填。历史展示不是新选路界面，也不能编辑/锁定路径。
+
+旧PUT `/api/production/batch/{id}/path`从路由表移除（Fixture全权限请求返回404）；不再保留410兼容壳。旧 `batch:selectRoute`持有者不能获得任何新权限。没有新增菜单SQL，也未放宽任何后端授权。
+
+### D. 数据库与备份
+
+真实目标已通过中心mf_factory/mf_datasource关联核实：Factory=SIMPLE_B，DataSource=8，`192.168.18.25:3306/mes_base_dev_business_simple_b`，Factory与DataSource均ENABLED；连接实际catalog/port匹配。业务Flyway History全部成功，当前最高V24（派工并行工作），本次新增迁移数=0。SCHEMA_READY仅表示既有结构满足历史读取，本次没有Schema改动或迁移执行。
+
+实际旧数据：ProductionBatch **20**，BatchRouteNode **48**；批次组合为PLANNED/UNSELECTED=8、PLANNED/SELECTED=4、ISSUED/LOCKED=8。information_schema中当前可见的引用外键、视图、存储过程、触发器、Event对该表的依赖查询均无结果；这不等于证明仓库以外的消费者不存在。已证明仍有历史读取消费者，因此不满足删除表条件，明确 `LEGACY_TABLE_RETAINED`。
+
+备份与数据核对：
+
+- `.local/batch-route-retirement-20261015/legacy-before.sql`：两张历史表的mysqldump一致性备份，7586字节，SHA256=`be3d2a1f7e625f5683ec21f8570f59be7c2392738a89a7cc9a072f7a625d1d51`，权限600，已确认dump成功；没有另建恢复库或演练恢复。
+- 初次mysqldump失败因复用mysql配置含不支持的database选项；已生成仅本地权限600的dump配置并成功重跑，未将空文件当作备份。
+- `database-before.tsv`与`database-after.tsv`包含绑定、历史Schema、两表按ID排序的全部行及Flyway历史，cmp返回0，逐行相同。
+- `current-chain-before.sql`额外备份工单/Execution表，随后指定库回滚测试未留下TEST_CHAIN工单（数量0）。测试的新记录回滚，MySQL自增序列可能留下间隙，未承诺回滚序列。
+- 未DROP/DELETE/改写历史业务行，不自动Batch→Execution转换，不用workorder_id+routing_id+planned_qty猜归属，不操作其他Factory。
+
+### E. ProductionBatch兼容
+
+旧status和route_status原值、locked_at、revision、历史节点及execution_order保留；ISSUED/LOCKED只描述旧批次已出库/路径锁定，不转换成Execution RUNNING或完工。UNSELECTED/SELECTED/PENDING/UNKNOWN/LOCKED仍属于历史路径状态；本次不改变它们的含义，不提供继续推进这些状态的用例。
+
+历史GET继续返回原批次和路径契约；工单保留旧批次计数/摘要及删除、产品/默认工艺变更保护，避免孤立历史。未删production_batch表、Mapper或合法共用代码。历史表日后只有在历史读取正式退役并具备可恢复方案后，才能另立新Flyway迁移任务评估删除。
+
+### F. 实际验收与失败记录
+
+- 首轮 `mvn -B -ntp verify`通过，但发生在新增脱钩测试编译前，不以该轮替代最终证据。
+- 最终 `mvn -B -ntp verify -Dmes.test.workorder.mysql=true`：BUILD SUCCESS；模块合计 **487 tests / 0 failures / 0 errors / 16 skipped**，含业务/平台/权限/隔离/事务/工艺等原测试。启用指定库WorkOrderMySqlTest（1/0/0/0），真实Mapper读取全部20个旧批次历史，校验历史节点映射；工单/Execution/分配/版本及保护规则在回滚事务内通过。
+- ProductionChainHttpTest **5/0/0/0**：两个隔离H2业务库、实际Mapper SQL及MockMvc鉴权/事务。新增测试只在TEST ONLY H2中DROP旧路径表，证明有旧批次时工单CRUD/下达、Execution创建查询、MaterialIssue.execution_id与routing_id关联均正常；另一用例覆盖历史GET、跨厂404、无权限拒绝、匿名拒绝、旧PUT404及历史两表逐行不变。
+- 测试中曾误用带query权限的CRUD账号断言403；已改为NONE账号。又发现Fixture默认匿名返回403，测试已按该Fixture契约断言拒绝，未修改生产授权策略或将该结果写成真实服务401证据。中间失败如实记录，最终重验通过。
+- Node使用本机 `.nvmrc`对应已安装Node22，不改变全局默认。`npm --prefix ../mes-base-ui run test`：**40文件、210测试通过**（含工单6项、Execution、Routing相关测试），证据为frontend-test.log。
+- `npm --prefix ../mes-base-ui run build`：首轮受并行新增OperatorConfiguration.vue类型错误阻断；本Agent未修改此文件。外部工作修正后重跑成功（vue-tsc+Vite），仅保留构建体积提示，证据frontend-build-final.log。
+- 两仓库 `git diff --check`通过。最终引用扫描无当前工单/新执行/领料业务对旧路径的引用，无旧路径写入Mapper或API。生成模板未依赖该旧模型；代码生成配置继续排除旧两表。
+- 真实现有服务：5173可呈现登录页，但5173的/health、/api/foundation/context及直接8081/health超时。未执行真实写入业务验收，未取得登录后业务UI证据；没有服务重启授权转移，因此未启动替代服务或自行重启。未运行packaged smoke启动测试。
+
+| 状态维度 | 本次结论 |
+| --- | --- |
+| SCHEMA_READY | 既有Schema满足；零结构变更/零新Flyway |
+| CODE_GENERATED | N/A，退役清理，不新增业务表/CRUD，不调用Codegen |
+| API_VERIFIED | 当前源码Fixture HTTP通过；真实用户服务TIMEOUT，未验证最新运行版本 |
+| UI_VERIFIED | 单元/组件及前端构建通过；真实业务UI未验证，浏览器仅登录页 |
+| BUSINESS_VERIFIED | 指定SIMPLE_B真实MySQL回滚测试+隔离Fixture通过；未宣称运行服务端到端验收 |
+
+### G. 并行开发保护
+
+最早入场dirty逐文件清单：`.local/batch-route-retirement-20261015/backend-entry-status.txt`与`frontend-entry-status.txt`；初次审查期间的逐文件SHA256快照及最终对照：`{backend,frontend}-entry.json`、`{backend,frontend}-preservation.json`。下方附全部入场状态供审查。没有本轮删除的入场dirty文件。
+
+入场前端AGENTS、RoutingGraphPreview、routing/index及人员派工API/menu/page均未由本Agent编辑；后端ErrorCode及V24/人员派工/OperationUser/mes-system生产目录均未由本Agent编辑。审查期间其他工作继续产生OperatorDirectory/OperatorCandidate/派工服务、ExecutionIdentityLookup/ProductionExecutionList/Operation页面等变化；本Agent未重置、覆盖或纳入本轮修改。哈希对照中少量这些文件变化不能声称全仓dirty字节不变，已在preservation.json如实记录。
+
+本轮只编辑B节列出的任务文件；没有提交/推送/清理工作区或root target目录。临时证据均在忽略的.local目录，没有把凭证写入报告或Git。
+
+### H. 未完成事项与回滚
+
+- 当前清理必须完成：旧写接口/算法/Mapper写能力、当前工单路径依赖清除及历史数据保全均已完成，没有活跃新业务依赖阻塞。
+- 依赖用户现有服务恢复/用户自行重启最新后端后，复验工单详情不带path、历史GET按权限按需读取、旧PUT无路由、Execution与领料主链；本次不能标记真实API/UI通过。并行模块构建错误已由外部工作修正，最新构建通过。
+- 后续Reporting：应基于Execution和其确切Routing/DAG及已确认的执行规则开发，不引用BatchRouteNode，不自动迁移历史批次。正式报工、入库、ERP领料、规则引擎均未实施。
+- 回滚仅按本章任务清单反向撤销代码/API/page及Fixture变化（保留其他dirty），历史数据库无需恢复；不得用全仓reset。若回滚到旧工单响应，前端应同步回滚嵌套历史path契约。备份只作恢复材料，本轮未恢复/覆盖现有库。
+
+### I. 最终状态
+
+`CLEANUP_COMPLETE / LEGACY_TABLE_RETAINED`。当前生产身份及工艺引用职责已脱离旧路径；保留历史表、Entity、仅SELECT的Mapper和独立历史GET是有意保留的兼容读边界。用户运行服务最新API/UI验收仍待恢复，不将其与源码完成合并。
+
+### 入场dirty完整清单
+
+后端：
+
+```text
+ M mes-common/src/main/java/dev/mesbase/core/error/ErrorCode.java
+?? docs/development/operator-assignment-codegen.yaml
+?? mes-admin/src/main/resources/db/business/V24__operation_user_execution_assignment.sql
+?? mes-business/docs/generated/production/operator-assignment-menu.sql
+?? mes-business/docs/generated/production/operator-assignment-permissions.md
+?? mes-business/src/main/java/dev/mesbase/business/production/controller/MesExecutionAssignmentController.java
+?? mes-business/src/main/java/dev/mesbase/business/production/controller/MesExecutionAssignmentPermissions.java
+?? mes-business/src/main/java/dev/mesbase/business/production/controller/MesOperationUserController.java
+?? mes-business/src/main/java/dev/mesbase/business/production/controller/MesOperationUserPermissions.java
+?? mes-business/src/main/java/dev/mesbase/business/production/controller/OperatorDirectoryController.java
+?? mes-business/src/main/java/dev/mesbase/business/production/controller/vo/MesExecutionAssignmentPageVo.java
+?? mes-business/src/main/java/dev/mesbase/business/production/controller/vo/MesExecutionAssignmentVo.java
+?? mes-business/src/main/java/dev/mesbase/business/production/controller/vo/MesOperationUserPageVo.java
+?? mes-business/src/main/java/dev/mesbase/business/production/controller/vo/MesOperationUserVo.java
+?? mes-business/src/main/java/dev/mesbase/business/production/dao/MesExecutionAssignmentMapper.java
+?? mes-business/src/main/java/dev/mesbase/business/production/dao/MesOperationUserMapper.java
+?? mes-business/src/main/java/dev/mesbase/business/production/domain/MesExecutionAssignmentCreateCommand.java
+?? mes-business/src/main/java/dev/mesbase/business/production/domain/MesExecutionAssignmentEntity.java
+?? mes-business/src/main/java/dev/mesbase/business/production/domain/MesExecutionAssignmentExample.java
+?? mes-business/src/main/java/dev/mesbase/business/production/domain/MesExecutionAssignmentPage.java
+?? mes-business/src/main/java/dev/mesbase/business/production/domain/MesExecutionAssignmentQueryDto.java
+?? mes-business/src/main/java/dev/mesbase/business/production/domain/MesExecutionAssignmentResource.java
+?? mes-business/src/main/java/dev/mesbase/business/production/domain/MesExecutionAssignmentUpdateCommand.java
+?? mes-business/src/main/java/dev/mesbase/business/production/domain/MesOperationUserCreateCommand.java
+?? mes-business/src/main/java/dev/mesbase/business/production/domain/MesOperationUserEntity.java
+?? mes-business/src/main/java/dev/mesbase/business/production/domain/MesOperationUserExample.java
+?? mes-business/src/main/java/dev/mesbase/business/production/domain/MesOperationUserPage.java
+?? mes-business/src/main/java/dev/mesbase/business/production/domain/MesOperationUserQueryDto.java
+?? mes-business/src/main/java/dev/mesbase/business/production/domain/MesOperationUserResource.java
+?? mes-business/src/main/java/dev/mesbase/business/production/domain/MesOperationUserUpdateCommand.java
+?? mes-business/src/main/java/dev/mesbase/business/production/service/IMesExecutionAssignmentService.java
+?? mes-business/src/main/java/dev/mesbase/business/production/service/IMesOperationUserService.java
+?? mes-business/src/main/java/dev/mesbase/business/production/service/OperationUserDirectory.java
+?? mes-business/src/main/java/dev/mesbase/business/production/service/OperatorCandidateService.java
+?? mes-business/src/main/java/dev/mesbase/business/production/service/OperatorQualificationRules.java
+?? mes-business/src/main/java/dev/mesbase/business/production/service/ReportOperatorEligibilityService.java
+?? mes-business/src/main/java/dev/mesbase/business/production/service/impl/MesExecutionAssignmentServiceImpl.java
+?? mes-business/src/main/java/dev/mesbase/business/production/service/impl/MesOperationUserServiceImpl.java
+?? mes-business/src/main/resources/dev/mesbase/business/production/dao/MesExecutionAssignmentMapper.xml
+?? mes-business/src/main/resources/dev/mesbase/business/production/dao/MesOperationUserMapper.xml
+?? mes-business/src/test/java/dev/mesbase/business/production/MesExecutionAssignmentScaffoldTest.java
+?? mes-business/src/test/java/dev/mesbase/business/production/MesOperationUserScaffoldTest.java
+?? mes-system/src/main/java/dev/mesbase/system/production/
+```
+
+前端：
+
+```text
+ M AGENTS.md
+ M src/components/business/RoutingGraphPreview.vue
+ M src/views/production/routing/index.vue
+?? src/api/production/mesExecutionAssignment.ts
+?? src/api/production/mesOperationUser.ts
+?? src/menus/production/mesExecutionAssignment.json
+?? src/menus/production/mesOperationUser.json
+?? src/views/production/mesExecutionAssignment/
+?? src/views/production/mesOperationUser/
+?? tests/routingPage.test.ts
+```
