@@ -20,6 +20,16 @@ import dev.mesbase.business.production.service.IRoutingService;
 import dev.mesbase.business.production.service.RoutingReferenceRules;
 import dev.mesbase.business.production.service.impl.OperationServiceImpl;
 import dev.mesbase.business.production.service.impl.RoutingServiceImpl;
+import dev.mesbase.business.directory.service.BusinessDirectoryService;
+import dev.mesbase.business.production.domain.OperationExample;
+import dev.mesbase.common.cache.ReferenceLabelCache.Label;
+import java.util.Collection;
+import java.util.LinkedHashMap;
+
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+
 import dev.mesbase.business.production.sync.ExternalOperation;
 import dev.mesbase.business.production.sync.ExternalRouting;
 import dev.mesbase.business.production.sync.ExternalRoutingStep;
@@ -82,7 +92,6 @@ import org.springframework.transaction.annotation.EnableTransactionManagement;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.mockito.Mockito.mock;
 
 /**
  * TEST ONLY: configured SIMPLE_B MySQL + Spring transactions; H2 coordinator and synthetic ERP port, no user server started.
@@ -115,6 +124,23 @@ class OperationRoutingMySqlTest {
     @EnableTransactionManagement
     @Import({OperationServiceImpl.class, RoutingServiceImpl.class, RoutingReferenceRules.class})
     static class Config {
+        @Bean
+        BusinessDirectoryService directory(OperationMapper operations) {
+            var directory = mock(BusinessDirectoryService.class);
+            when(directory.operationLabels(any())).thenAnswer(call -> {
+                Collection<Long> ids = call.getArgument(0);
+                var labels = new LinkedHashMap<Long, Label>();
+                if (!ids.isEmpty()) {
+                    var filter = new OperationExample();
+                    filter.createCriteria().andIdIn(List.copyOf(ids));
+                    for (var row : operations.selectByExample(filter))
+                        labels.put(row.getId(), new Label(row.getId(), row.getCode(), row.getName(), null, row.getDescription(), row.getStatus(), null, null));
+                }
+                return labels;
+            });
+            return directory;
+        }
+
         @Bean(name = "businessTransactionManager")
         OwnedTransactionManager manager(FactoryBusinessDataSource source) {
             return new OwnedTransactionManager(source);

@@ -1,6 +1,7 @@
 package dev.mesbase.business.production;
 
 import dev.mesbase.business.production.service.WorkorderErpFacts;
+import dev.mesbase.business.directory.service.BusinessDirectoryService;
 
 import dev.mesbase.business.basic.dao.MaterialMapper;
 import dev.mesbase.business.issue.dao.MesMaterialIssueMapper;
@@ -46,7 +47,7 @@ class WorkOrderExecutionProtectionTest {
         when(orders.selectByPrimaryKey(1L)).thenReturn(row);
         when(orders.updateByExampleSelective(any(WorkorderEntity.class), any(WorkorderExample.class))).thenReturn(1);
         when(executions.countByExample(any(MesProductionExecutionExample.class))).thenReturn(1L);
-        var service = new WorkOrderService(orders, mock(ProductionBatchMapper.class), mock(RoutingMapper.class), mock(RoutingProductMapper.class), mock(RoutingNodeMapper.class), mock(RoutingEdgeMapper.class), mock(MaterialMapper.class), mock(RoutingReferenceRules.class), mock(MesMaterialIssueMapper.class), mock(WorkOrderExtraMapper.class), executions, mock(WorkorderErpFacts.class));
+        var service = new WorkOrderService(orders, mock(ProductionBatchMapper.class), mock(RoutingMapper.class), mock(RoutingProductMapper.class), mock(RoutingNodeMapper.class), mock(RoutingEdgeMapper.class), mock(MaterialMapper.class), mock(RoutingReferenceRules.class), mock(MesMaterialIssueMapper.class), mock(WorkOrderExtraMapper.class), executions, mock(WorkorderErpFacts.class), mock(BusinessDirectoryService.class));
         assertEquals(ErrorCode.EXECUTION_REFERENCED, assertThrows(FoundationException.class, () -> service.delete(1L, 0)).code());
         var input = new WorkOrderModels.Save("WO", 2L, null, 1L, null, null, null, null, null, 0);
         assertEquals(ErrorCode.EXECUTION_FROZEN, assertThrows(FoundationException.class, () -> service.update(1L, input)).code());

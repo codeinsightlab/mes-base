@@ -8,6 +8,7 @@ import dev.mesbase.business.production.domain.MesProductionExecutionPage;
 import dev.mesbase.business.production.domain.MesProductionExecutionQueryDto;
 import dev.mesbase.business.production.domain.MesProductionExecutionUpdateCommand;
 import dev.mesbase.business.production.service.IMesProductionExecutionService;
+import dev.mesbase.business.production.service.ProductionExecutionQueryService;
 import dev.mesbase.platform.web.EndpointAccess;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotEmpty;
@@ -35,16 +36,19 @@ import org.springframework.web.bind.annotation.RestController;
 @ConditionalOnProperty(name = "mes.business.enabled", havingValue = "true")
 public class MesProductionExecutionController {
     private final IMesProductionExecutionService service;
+    private final ProductionExecutionQueryService queries;
 
-    public MesProductionExecutionController(IMesProductionExecutionService service) {
+    public MesProductionExecutionController(IMesProductionExecutionService service,
+                                            ProductionExecutionQueryService queries) {
         this.service = service;
+        this.queries = queries;
     }
 
     @GetMapping
     @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED,
             permission = MesProductionExecutionPermissions.LIST)
     public MesProductionExecutionPageVo list(@Valid @ModelAttribute MesProductionExecutionQueryDto query) {
-        MesProductionExecutionPage page = service.selectPage(query);
+        var page = queries.page(query);
         return new MesProductionExecutionPageVo(
                 page.items().stream().map(MesProductionExecutionController::toView).toList(),
                 page.total(), page.offset(), page.limit());
@@ -54,7 +58,7 @@ public class MesProductionExecutionController {
     @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED,
             permission = MesProductionExecutionPermissions.QUERY)
     public MesProductionExecutionVo detail(@PathVariable Long id) {
-        return toView(service.selectById(id));
+        return toView(queries.detail(id));
     }
 
     @PostMapping
@@ -83,7 +87,20 @@ public class MesProductionExecutionController {
     }
 
 
+    private static MesProductionExecutionVo toView(ProductionExecutionQueryService.Display display) {
+        return toView(display.record(), display.routing() == null ? null : display.routing()
+                .code(), display.routing() == null ? null : display.routing()
+                .name(), display.routing() == null ? null : display.routing()
+                .version(), display.createByName(), display.updateByName());
+    }
+
     static MesProductionExecutionVo toView(MesProductionExecutionEntity row) {
+        return toView(row, null, null, null, null, null);
+    }
+
+    private static MesProductionExecutionVo toView(MesProductionExecutionEntity row, String routingCode,
+                                                   String routingName, Integer routingVersion, String createByName,
+                                                   String updateByName) {
         return new MesProductionExecutionVo(
                 row.getId() == null ? null : row.getId().toString(),
                 row.getExecutionNo(),
@@ -98,7 +115,7 @@ public class MesProductionExecutionController {
                 row.getCreateBy(),
                 row.getCreateTime(),
                 row.getUpdateBy(),
-                row.getUpdateTime()
+                row.getUpdateTime(), routingCode, routingName, routingVersion, createByName, updateByName
         );
     }
 }

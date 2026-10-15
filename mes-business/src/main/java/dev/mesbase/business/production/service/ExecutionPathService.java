@@ -10,8 +10,8 @@ import dev.mesbase.business.production.dao.MesExecutionPathMapper;
 import dev.mesbase.business.production.dao.MesExecutionPathNodeMapper;
 import dev.mesbase.business.production.dao.MesProductionExecutionMapper;
 import dev.mesbase.business.production.dao.RoutingNodeMapper;
-import dev.mesbase.business.production.dao.RoutingMapper;
-import dev.mesbase.business.production.domain.RoutingEntity;
+import dev.mesbase.common.cache.ReferenceLabelCache.Label;
+import dev.mesbase.business.directory.service.BusinessDirectoryService;
 import dev.mesbase.business.production.dao.RoutingEdgeMapper;
 import dev.mesbase.business.production.domain.MesExecutionPathEntity;
 import dev.mesbase.business.production.domain.MesExecutionPathNodeEntity;
@@ -33,6 +33,7 @@ import dev.mesbase.core.error.FoundationException;
 import dev.mesbase.infrastructure.cache.annotation.BusinessCacheEvict;
 import dev.mesbase.business.production.domain.MesProductionExecutionResource;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.Objects;
 import java.time.LocalDateTime;
@@ -51,7 +52,7 @@ public class ExecutionPathService {
     private final MesExecutionPathNodeMapper selected;
     private final MesProductionExecutionMapper executions;
     private final RoutingNodeMapper nodes;
-    private final RoutingMapper routings;
+    private final BusinessDirectoryService references;
     private final RoutingEdgeMapper edges;
     private final MesMaterialIssueMapper issues;
     private final MesMaterialIssueErpExtraMapper extras;
@@ -60,14 +61,14 @@ public class ExecutionPathService {
                                 MesExecutionPathMapper paths,
                                 MesExecutionPathNodeMapper selected, MesProductionExecutionMapper executions,
                                 RoutingNodeMapper nodes, RoutingEdgeMapper edges, MesMaterialIssueMapper issues,
-                                MesMaterialIssueErpExtraMapper extras, RoutingMapper routings) {
+                                MesMaterialIssueErpExtraMapper extras, BusinessDirectoryService references) {
         this.locks = locks;
         this.rules = rules;
         this.paths = paths;
         this.selected = selected;
         this.executions = executions;
         this.nodes = nodes;
-        this.routings = routings;
+        this.references = references;
         this.edges = edges;
         this.issues = issues;
         this.extras = extras;
@@ -75,16 +76,19 @@ public class ExecutionPathService {
 
     public record PathModel(Long executionId, String executionStatus, MesExecutionPathEntity path,
                             List<Long> selectedNodeIds, List<RoutingNodeEntity> nodes, List<RoutingEdgeEntity> edges,
-                            String executionNo, RoutingEntity routing) {
+                            String executionNo, Label routing, Map<Long, Label> operationLabels) {
     }
 
     @Transactional(transactionManager = "businessTransactionManager", readOnly = true)
     public PathModel view(Long id) {
         var e = executions.selectByPrimaryKey(id);
         if (e == null) throw new FoundationException(ErrorCode.EXECUTION_NOT_FOUND);
-        var routing = routings.selectByPrimaryKey(e.getRoutingId());
+        var routing = references.routingLabel(e.getRoutingId());
+        var actualNodes = nodes(e.getRoutingId());
+        var operationLabels = references.operationLabels(actualNodes.stream().map(RoutingNodeEntity::getOperationId)
+                .toList());
         if (routing == null) throw new FoundationException(ErrorCode.RESOURCE_CONFLICT);
-        return new PathModel(id, e.getStatus(), paths.selectByPrimaryKey(id), nodeIds(id), nodes(e.getRoutingId()), edges(e.getRoutingId()), e.getExecutionNo(), routing);
+        return new PathModel(id, e.getStatus(), paths.selectByPrimaryKey(id), nodeIds(id), actualNodes, edges(e.getRoutingId()), e.getExecutionNo(), routing, operationLabels);
     }
 
     public PathModel select(Long id, Integer revision, List<Long> nodeIds) {

@@ -3,6 +3,12 @@ package dev.mesbase.business.production;
 import dev.mesbase.business.production.service.ReportUserReferenceService;
 import dev.mesbase.common.core.domain.entity.SysUser;
 import dev.mesbase.system.mapper.SysUserMapper;
+import dev.mesbase.business.directory.service.BusinessDirectoryService;
+import dev.mesbase.common.cache.ReferenceLabelCache;
+import dev.mesbase.infrastructure.cache.BusinessCacheProcessor;
+import dev.mesbase.system.mapper.SysDeptMapper;
+import dev.mesbase.system.mapper.SysPostMapper;
+import org.springframework.beans.factory.ObjectProvider;
 import dev.mesbase.infrastructure.persistence.PlatformPersistence;
 import dev.mesbase.infrastructure.persistence.OwnedTransactionManager;
 import dev.mesbase.infrastructure.persistence.OwnedSqlSession;
@@ -24,6 +30,11 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 class ReportUserReferenceServiceTest {
+    private BusinessDirectoryService directory(SysUserMapper users, PlatformPersistence center) {
+        return new BusinessDirectoryService(users, mock(SysDeptMapper.class), mock(SysPostMapper.class), mock(ReferenceLabelCache.class),
+                mock(BusinessCacheProcessor.class), center, mock(ObjectProvider.class), mock(ObjectProvider.class), mock(ObjectProvider.class));
+    }
+
     @Test
     void ordinaryHistoricalReferenceUsesInjectedMapperAndDoesNotRequireCurrentActiveAuthorization() {
         var users = mock(SysUserMapper.class);
@@ -35,27 +46,10 @@ class ReportUserReferenceServiceTest {
         historical.setStatus("1");
         historical.setDelFlag("2");
         when(users.selectUserById(7L)).thenReturn(historical);
-        new ReportUserReferenceService(users, center).requireExists(7L);
+        new ReportUserReferenceService(directory(users, center)).requireExists(7L);
         verify(users).selectUserById(7L);
         verify(center, never()).readOnly(any());
-        assertThrows(FoundationException.class, () -> new ReportUserReferenceService(users, center).requireExists(8L));
-    }
-
-    @Test
-    void batchNamesDeduplicateIdsAndUseOneInjectedQueryWithoutSensitiveProfileLookup() {
-        var mapper = mock(SysUserMapper.class);
-        var center = mock(PlatformPersistence.class);
-        when(center.transactionManager()).thenReturn(mock(OwnedTransactionManager.class));
-        var user = new SysUser();
-        user.setUserId(7L);
-        user.setNickName("历史昵称");
-        when(mapper.selectUserNamesByIds(List.of(7L, 8L))).thenReturn(List.of(user));
-        var service = new ReportUserReferenceService(mapper, center);
-        assertEquals(Map.of(7L, "历史昵称"), service.names(List.of(8L, 7L, 7L)));
-        verify(mapper, times(1)).selectUserNamesByIds(List.of(7L, 8L));
-        verify(mapper, never()).selectUserById(any());
-        verify(center, never()).readOnly(any());
-        assertEquals(Map.of(), service.names(List.of()));
+        assertThrows(FoundationException.class, () -> new ReportUserReferenceService(directory(users, center)).requireExists(8L));
     }
 
     @Test
@@ -73,7 +67,7 @@ class ReportUserReferenceServiceTest {
             Function<OwnedSqlSession, Object> read = call.getArgument(0);
             return read.apply(session);
         });
-        new ReportUserReferenceService(injected, center).requireExists(7L);
+        new ReportUserReferenceService(directory(injected, center)).requireExists(7L);
         verify(center).readOnly(any());
         verifyNoInteractions(injected);
     }

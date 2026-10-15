@@ -38,7 +38,7 @@ public final class ProductionReportModels {
 
     public record ExecutionQuantity(Long executionId, Long workorderId, String executionNo, Long routingId,
                                     BigDecimal targetQty, String pathStatus, boolean writable, String boundary,
-                                    List<NodeQuantity> nodes) {
+                                    List<NodeQuantity> nodes, String routingLabel) {
     }
 
     public record ExecutionSummary(Long executionId, Long workorderId, String executionNo, Long routingId,
@@ -56,6 +56,7 @@ public final class ProductionReportModels {
                              Map<Long, String> userNames) {
     }
 
-    public record ExecutionPage(List<ExecutionSummary> items, long total, int offset, int limit) {
+    public record ExecutionPage(List<ExecutionSummary> items, long total, int offset, int limit,
+                                Map<Long, String> routingLabels) {
     }
 }

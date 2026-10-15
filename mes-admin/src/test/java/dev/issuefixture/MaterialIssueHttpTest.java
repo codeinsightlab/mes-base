@@ -48,6 +48,13 @@ import dev.mesbase.business.production.dao.ProductionQuantityMapper;
 import dev.mesbase.business.production.service.ProductionIdentityService;
 import dev.mesbase.business.production.service.impl.MesProductionExecutionServiceImpl;
 import dev.mesbase.business.production.controller.MesProductionExecutionController;
+import dev.mesbase.business.production.service.ProductionExecutionQueryService;
+import dev.mesbase.business.directory.service.BusinessDirectoryService;
+import dev.mesbase.common.cache.ReferenceLabelCache.Label;
+import dev.mesbase.business.production.domain.RoutingExample;
+import dev.mesbase.business.production.domain.OperationExample;
+import java.util.LinkedHashMap;
+import java.util.Collection;
 import dev.mesbase.business.production.controller.ProductionIdentityController;
 import dev.mesbase.business.issue.controller.MesMaterialIssueController;
 import dev.mesbase.business.issue.controller.MesMaterialIssueItemController;
@@ -194,8 +201,41 @@ class MaterialIssueHttpTest {
     @EnableWebMvc
     @EnableWebSecurity
     @EnableTransactionManagement
-    @Import({ProductionChainLocks.class, ExecutionPathService.class, ExecutionActionController.class, MaterialIssueSubmissionService.class, MaterialIssueSubmissionController.class, WorkorderErpFacts.class, MaterialIssueErpFacts.class, MaterialIssueErpService.class, MaterialIssueErpController.class, WarehouseIntegration.class, MaterialIssueVoidService.class, MaterialIssueVoidController.class, MesMaterialIssueController.class, MesMaterialIssueItemController.class, MesMaterialIssueServiceImpl.class, MesMaterialIssueItemServiceImpl.class, MaterialIssueRules.class, ProductionExecutionRules.class, ProductionIdentityService.class, MesProductionExecutionServiceImpl.class, MesProductionExecutionController.class, ProductionIdentityController.class, WorkOrderController.class, WorkOrderService.class, LegacyBatchHistoryQuery.class, LegacyBatchHistoryController.class, RoutingReferenceRules.class, FoundationErrorAdvice.class})
+    @Import({ProductionExecutionQueryService.class, ProductionChainLocks.class, ExecutionPathService.class, ExecutionActionController.class, MaterialIssueSubmissionService.class, MaterialIssueSubmissionController.class, WorkorderErpFacts.class, MaterialIssueErpFacts.class, MaterialIssueErpService.class, MaterialIssueErpController.class, WarehouseIntegration.class, MaterialIssueVoidService.class, MaterialIssueVoidController.class, MesMaterialIssueController.class, MesMaterialIssueItemController.class, MesMaterialIssueServiceImpl.class, MesMaterialIssueItemServiceImpl.class, MaterialIssueRules.class, ProductionExecutionRules.class, ProductionIdentityService.class, MesProductionExecutionServiceImpl.class, MesProductionExecutionController.class, ProductionIdentityController.class, WorkOrderController.class, WorkOrderService.class, LegacyBatchHistoryQuery.class, LegacyBatchHistoryController.class, RoutingReferenceRules.class, FoundationErrorAdvice.class})
     static class Web implements WebMvcConfigurer {
+        @Bean
+        BusinessDirectoryService directoryLabels(RoutingMapper routes, OperationMapper operations) {
+            var directory = mock(BusinessDirectoryService.class);
+            when(directory.userLabels(any())).thenReturn(Map.of(100L, new Label(100L, null, "历史操作人员", null), 1L, new Label(1L, null, "验收提交人", null)));
+            when(directory.routingLabels(any())).thenAnswer(call -> {
+                Collection<Long> ids = call.getArgument(0);
+                var result = new LinkedHashMap<Long, Label>();
+                if (!ids.isEmpty()) {
+                    var filter = new RoutingExample();
+                    filter.createCriteria().andIdIn(List.copyOf(ids));
+                    for (var row : routes.selectByExample(filter))
+                        result.put(row.getId(), new Label(row.getId(), row.getCode(), row.getName(), row.getVersion()));
+                }
+                return result;
+            });
+            when(directory.routingLabel(any())).thenAnswer(call -> {
+                var row = routes.selectByPrimaryKey(call.getArgument(0));
+                return row == null ? null : new Label(row.getId(), row.getCode(), row.getName(), row.getVersion());
+            });
+            when(directory.operationLabels(any())).thenAnswer(call -> {
+                Collection<Long> ids = call.getArgument(0);
+                var result = new LinkedHashMap<Long, Label>();
+                if (!ids.isEmpty()) {
+                    var filter = new OperationExample();
+                    filter.createCriteria().andIdIn(List.copyOf(ids));
+                    for (var row : operations.selectByExample(filter))
+                        result.put(row.getId(), new Label(row.getId(), row.getCode(), row.getName(), null));
+                }
+                return result;
+            });
+            return directory;
+        }
+
         @Bean(destroyMethod = "close")
         Fixture fixture() throws Exception {
             return new Fixture();

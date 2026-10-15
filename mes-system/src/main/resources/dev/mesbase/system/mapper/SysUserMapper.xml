@@ -50,8 +50,8 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 		<result property="status"       column="role_status"    />
 	</resultMap>
 
-    <select id="selectUserNamesByIds" resultMap="SysUserResult">
-        SELECT user_id,nick_name FROM sys_user
+    <select id="selectUserReferencesByIds" resultMap="SysUserResult">
+        SELECT user_id,user_name,nick_name,dept_id,status,del_flag FROM sys_user
         <choose>
             <when test="userIds != null and userIds.size() > 0">
                 WHERE user_id IN <foreach collection="userIds" item="id" open="(" close=")" separator=",">#{id}</foreach>

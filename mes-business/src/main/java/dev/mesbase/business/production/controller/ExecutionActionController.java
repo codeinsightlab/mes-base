@@ -66,14 +66,16 @@ public class ExecutionActionController {
 
     private static PathView toView(PathModel model) {
         var p = model.path();
-        return new PathView(model.executionId().toString(), model.executionStatus(), model.routing().getId()
+        return new PathView(model.executionId().toString(), model.executionStatus(), model.routing().id()
                 .toString(), p == null ? ExecutionPathStatus.UNSELECTED.getValue() : p.getPathStatus(), p == null ? 0 : p.getRevision(), p == null ? null : p.getSelectedAt(), p == null ? null : p.getLockedAt(), model.selectedNodeIds()
                 .stream().map(Object::toString).toList(), model.nodes().stream().map(n -> new NodeView(n.getId()
-                        .toString(), n.getNodeCode(), n.getOperationName(), Boolean.TRUE.equals(n.getIsKey()), n.getOperationId()
+                        .toString(), n.getNodeCode(), n.getOperationName() != null ? n.getOperationName() : model.operationLabels()
+                        .containsKey(n.getOperationId()) ? model.operationLabels().get(n.getOperationId())
+                        .name() + "（当前名称）" : null, Boolean.TRUE.equals(n.getIsKey()), n.getOperationId()
                         .toString(), n.getOperationCode()))
                 .toList(), model.edges().stream()
                 .map(e -> new EdgeView(e.getFromNodeId().toString(), e.getToNodeId().toString()))
-                .toList(), model.executionNo(), model.routing().getCode(), model.routing().getName(), model.routing()
-                .getVersion());
+                .toList(), model.executionNo(), model.routing().code(), model.routing().name(), model.routing()
+                .version());
     }
 }

@@ -1,6 +1,8 @@
 package dev.mesbase.modules.material;
 
 import dev.mesbase.common.core.redis.RedisCache;
+import dev.mesbase.common.cache.ReferenceLabelCache;
+import dev.mesbase.common.cache.ReferenceLabelCache.Label;
 import dev.mesbase.common.core.redis.SystemCacheNamespace;
 import dev.mesbase.core.error.FoundationException;
 import dev.mesbase.core.factory.FactoryId;
@@ -273,6 +275,33 @@ class BusinessCacheIntegrationTest {
         assertTrue(has("business:material", "detail:fixture"));
         assertEquals(1, context.getBean(JdbcTemplate.class)
                 .queryForObject("select count(*) from marker", Integer.class));
+    }
+
+    @Test
+    void directoryProjectionUsesRealRedisBatchAndCommitInvalidation() {
+        var references = new ReferenceLabelCache(redis, new MockEnvironment());
+        var namespace = caches.directoryNamespace("business:material");
+        var original = new Label(1L, "REF", "原名称", 2, "可复用说明", "ENABLED", 10L, null);
+        assertEquals(original, references.getAll(namespace, List.of(1L, 1L), ids -> Map.of(1L, original)).get(1L));
+        references.getAll(namespace, List.of(1L), ids -> {
+            throw new AssertionError("Warm cache queried database");
+        });
+        boundary.run(() -> {
+            caches.evict("business:material", Scope.LIST_AND_DETAIL);
+            assertEquals(original, references.getAll(namespace, List.of(1L), ids -> {
+                throw new AssertionError("Evicted before commit");
+            }).get(1L));
+            return null;
+        }, false);
+        var changed = new Label(1L, "REF", "新名称", 2, "可复用说明", "ENABLED", 10L, null);
+        assertEquals(changed, references.getAll(namespace, List.of(1L), ids -> Map.of(1L, changed)).get(1L));
+        assertThrows(IllegalStateException.class, () -> boundary.run(() -> {
+            caches.evict("business:material", Scope.LIST_AND_DETAIL);
+            return null;
+        }, true));
+        assertEquals(changed, references.getAll(namespace, List.of(1L), ids -> {
+            throw new AssertionError("Rollback evicted cache");
+        }).get(1L));
     }
 
     @Test

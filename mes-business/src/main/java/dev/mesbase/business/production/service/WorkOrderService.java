@@ -1,6 +1,7 @@
 package dev.mesbase.business.production.service;
 
 import dev.mesbase.business.production.domain.WorkOrderStatus;
+import dev.mesbase.business.directory.service.BusinessDirectoryService;
 import dev.mesbase.business.production.domain.RoutingStatus;
 import dev.mesbase.business.basic.domain.MaterialType;
 import com.github.pagehelper.Page;
@@ -51,6 +52,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class WorkOrderService {
     private final WorkorderMapper orders;
     private final WorkorderErpFacts facts;
+    private final BusinessDirectoryService directory;
     private final ProductionBatchMapper batches;
     private final RoutingMapper routings;
     private final RoutingProductMapper products;
@@ -66,9 +68,11 @@ public class WorkOrderService {
                             RoutingMapper routings, RoutingProductMapper products, RoutingNodeMapper nodes,
                             RoutingEdgeMapper edges, MaterialMapper materials, RoutingReferenceRules references,
                             MesMaterialIssueMapper issues, WorkOrderExtraMapper queries,
-                            MesProductionExecutionMapper executions, WorkorderErpFacts facts) {
+                            MesProductionExecutionMapper executions, WorkorderErpFacts facts,
+                            BusinessDirectoryService directory) {
         this.orders = orders;
         this.facts = facts;
+        this.directory = directory;
         this.batches = batches;
         this.routings = routings;
         this.products = products;
@@ -191,7 +195,13 @@ public class WorkOrderService {
         e.createCriteria().andRoutingIdEqualTo(w.getRoutingId());
         var p = new RoutingProductExample();
         p.createCriteria().andRoutingIdEqualTo(w.getRoutingId());
-        return new RoutingDetail(routings.selectByPrimaryKey(w.getRoutingId()), products.selectByExample(p), nodes.selectByExample(n), edges.selectByExample(e));
+        var graphNodes = nodes.selectByExample(n);
+        var labels = directory.operationLabels(graphNodes.stream().map(node -> node.getOperationId()).toList());
+        for (var node : graphNodes) {
+            if (node.getOperationName() == null && labels.containsKey(node.getOperationId()))
+                node.setOperationName(labels.get(node.getOperationId()).name() + "（当前名称）");
+        }
+        return new RoutingDetail(routings.selectByPrimaryKey(w.getRoutingId()), products.selectByExample(p), graphNodes, edges.selectByExample(e));
     }
 
     public WorkOrderModels.Detail release(Long id, int revision) {

@@ -56,6 +56,7 @@ import dev.mesbase.business.production.sync.ProductionSyncResult;
 import dev.mesbase.framework.sync.SyncCoordinator;
 import dev.mesbase.core.factory.FactoryScope;
 import dev.mesbase.infrastructure.cache.BusinessCacheProcessor;
+import dev.mesbase.business.directory.service.BusinessDirectoryService;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.transaction.annotation.Isolation;
@@ -90,13 +91,14 @@ public class RoutingServiceImpl implements IRoutingService {
     private final ObjectProvider<IRoutingService> self;
     private final Validator validator;
     private final BusinessCacheProcessor caches;
+    private final BusinessDirectoryService directory;
 
     public RoutingServiceImpl(RoutingMapper mapper, RoutingNodeMapper nodes, RoutingEdgeMapper edges,
                               RoutingProductMapper products,
                               OperationMapper operations, MaterialMapper materials, RoutingReferenceRules references,
                               ObjectProvider<RoutingQueryPort> queries, SyncCoordinator coordinator,
                               ObjectProvider<IRoutingService> self, Validator validator,
-                              BusinessCacheProcessor caches) {
+                              BusinessCacheProcessor caches, BusinessDirectoryService directory) {
         this.nodes = nodes;
         this.edges = edges;
         this.products = products;
@@ -108,6 +110,7 @@ public class RoutingServiceImpl implements IRoutingService {
         this.self = self;
         this.validator = validator;
         this.caches = caches;
+        this.directory = directory;
         this.mapper = mapper;
     }
 
@@ -443,17 +446,14 @@ public class RoutingServiceImpl implements IRoutingService {
             throw new FoundationException(ErrorCode.RESOURCE_CONFLICT);
         if (RoutingStatus.DRAFT.getValue().equals(row.getStatus())) {
             if (!stepRows.isEmpty()) {
-                var filter = new OperationExample();
-                filter.createCriteria()
-                        .andIdIn(stepRows.stream().map(RoutingNodeEntity::getOperationId).toList());
-                var index = new HashMap<Long, OperationEntity>();
-                for (var op : operations.selectByExample(filter)) index.put(op.getId(), op);
+                var index = directory.operationLabels(stepRows.stream().map(RoutingNodeEntity::getOperationId)
+                        .toList());
                 for (var step : stepRows) {
                     var op = index.get(step.getOperationId());
                     if (op != null) {
-                        step.setOperationCode(op.getCode());
-                        step.setOperationName(op.getName());
-                        step.setOperationDescription(op.getDescription());
+                        step.setOperationCode(op.code());
+                        step.setOperationName(op.name());
+                        step.setOperationDescription(op.description());
                     }
                 }
             }

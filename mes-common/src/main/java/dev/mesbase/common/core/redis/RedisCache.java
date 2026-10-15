@@ -5,6 +5,8 @@ import org.springframework.data.redis.core.BoundSetOperations;
 import org.springframework.data.redis.core.HashOperations;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
+import org.springframework.data.redis.core.SessionCallback;
+import org.springframework.data.redis.core.RedisOperations;
 import org.springframework.stereotype.Component;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.data.redis.connection.RedisClusterConnection;
@@ -35,6 +37,30 @@ public class RedisCache {
     public RedisTemplate redisTemplate;
     @Autowired
     private SystemCacheNamespace namespace;
+
+    /**
+     * Namespaced batch reads; callers must still enforce their resource scope.
+     */
+    public List<Object> getCacheObjects(List<String> keys) {
+        if (keys.isEmpty()) return List.of();
+        return redisTemplate.opsForValue().multiGet(keys.stream().map(this::storageKey).toList());
+    }
+
+    /**
+     * One pipeline, with an individual TTL for every cached reference.
+     */
+    public void setCacheObjects(Map<String, byte[]> values, int ttlSeconds) {
+        if (values.isEmpty()) return;
+        redisTemplate.executePipelined(new SessionCallback<Object>() {
+            @Override
+            public Object execute(RedisOperations operations) {
+                for (var item : values.entrySet())
+                    operations.opsForValue()
+                            .set(storageKey(item.getKey()), item.getValue(), ttlSeconds, TimeUnit.SECONDS);
+                return null;
+            }
+        });
+    }
 
     public String storageKey(String logical) {
         return namespace.key(logical);

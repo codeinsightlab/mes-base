@@ -12,6 +12,18 @@ import dev.mesbase.business.production.service.ProductionExecutionRules;
 import dev.mesbase.business.production.service.ProductionChainLocks;
 import dev.mesbase.business.production.service.ExecutionPathService;
 import dev.mesbase.business.production.service.ReportUserReferenceService;
+import dev.mesbase.business.directory.service.BusinessDirectoryService;
+import dev.mesbase.common.cache.ReferenceLabelCache;
+import dev.mesbase.common.core.redis.RedisCache;
+import dev.mesbase.infrastructure.cache.BusinessCacheProcessor;
+import dev.mesbase.system.mapper.SysDeptMapper;
+import dev.mesbase.system.mapper.SysPostMapper;
+import dev.mesbase.business.production.dao.RoutingMapper;
+import dev.mesbase.business.production.dao.OperationMapper;
+import org.springframework.mock.env.MockEnvironment;
+
+import static org.mockito.Mockito.mock;
+
 import dev.mesbase.common.core.domain.entity.SysUser;
 import dev.mesbase.common.core.domain.model.LoginUser;
 import dev.mesbase.system.mapper.SysUserMapper;
@@ -86,6 +98,8 @@ class ProductionReportMySqlTest {
         });
         c.registerBean(PlatformPersistence.class, () -> center);
         c.registerBean(SysUserMapper.class, () -> center.mapper(SysUserMapper.class));
+        c.registerBean(BusinessDirectoryService.class, () -> new BusinessDirectoryService(
+                c.getBean(SysUserMapper.class), mock(SysDeptMapper.class), mock(SysPostMapper.class), new ReferenceLabelCache(mock(RedisCache.class), new MockEnvironment()), mock(BusinessCacheProcessor.class), center, c.getBeanProvider(OwnedTransactionManager.class), c.getBeanProvider(RoutingMapper.class), c.getBeanProvider(OperationMapper.class)));
         c.register(ProductionReportService.class, ProductionQuantityService.class, ReportUserReferenceService.class, ProductionChainLocks.class, ProductionExecutionRules.class, ExecutionPathService.class);
         c.refresh();
         return c;

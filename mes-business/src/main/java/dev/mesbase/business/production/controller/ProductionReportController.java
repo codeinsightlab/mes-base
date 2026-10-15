@@ -50,7 +50,8 @@ public class ProductionReportController {
     public Page<Summary> workorder(@PathVariable Long id, @RequestParam(defaultValue = "0") int offset,
                                    @RequestParam(defaultValue = "20") int limit) {
         var p = quantities.getWorkorderQuantities(id, offset, limit);
-        return new Page<>(p.items().stream().map(ProductionReportViews::summary)
+        return new Page<>(p.items().stream()
+                .map(row -> ProductionReportViews.summary(row, p.routingLabels().get(row.routingId())))
                 .toList(), p.total(), p.offset(), p.limit());
     }
 

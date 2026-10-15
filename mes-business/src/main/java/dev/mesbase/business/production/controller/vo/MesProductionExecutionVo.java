@@ -1,4 +1,3 @@
-// MES-CODEGEN: scaffold; review required.
 package dev.mesbase.business.production.controller.vo;
 
 import java.time.LocalDateTime;
@@ -20,7 +19,8 @@ public record MesProductionExecutionVo(
         String createBy,
         LocalDateTime createTime,
         String updateBy,
-        LocalDateTime updateTime
+        LocalDateTime updateTime,
+        String routingCode, String routingName, Integer routingVersion, String createByName, String updateByName
 ) {
 }
 

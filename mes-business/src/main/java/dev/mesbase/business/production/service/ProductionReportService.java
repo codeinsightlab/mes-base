@@ -19,6 +19,8 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
+import dev.mesbase.business.directory.service.BusinessDirectoryService;
 import java.util.stream.Stream;
 import org.springframework.stereotype.Service;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -33,17 +35,19 @@ public class ProductionReportService {
     private final ProductionQuantityService quantities;
     private final ProductionChainLocks locks;
     private final ReportUserReferenceService users;
+    private final BusinessDirectoryService references;
     private final WorkstationMapper workstations;
 
     public ProductionReportService(MesProductionReportMapper reports, ProductionQuantityMapper totals,
                                    ProductionQuantityService quantities,
                                    ProductionChainLocks locks, ReportUserReferenceService users,
-                                   WorkstationMapper workstations) {
+                                   WorkstationMapper workstations, BusinessDirectoryService references) {
         this.reports = reports;
         this.totals = totals;
         this.quantities = quantities;
         this.locks = locks;
         this.users = users;
+        this.references = references;
         this.workstations = workstations;
     }
 
@@ -163,8 +167,10 @@ public class ProductionReportService {
     }
 
     private Map<Long, String> names(List<MesProductionReportEntity> rows) {
-        return users.names(rows.stream().flatMap(row -> Stream.of(row.getOperatorUserId(), row.getRecordedBy()))
-                .toList());
+        return references.userLabels(rows.stream()
+                        .flatMap(row -> Stream.of(row.getOperatorUserId(), row.getRecordedBy())).toList()).values().stream()
+                .filter(label -> label.name() != null && !label.name().isBlank())
+                .collect(Collectors.toMap(label -> label.id(), label -> label.name()));
     }
 
     private MesProductionReportEntity require(Long id) {

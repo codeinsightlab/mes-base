@@ -1,6 +1,7 @@
 package dev.mesbase.infrastructure.cache;
 
 import com.fasterxml.jackson.databind.JavaType;
+import dev.mesbase.common.cache.ReferenceLabelCache;
 import com.fasterxml.jackson.databind.MapperFeature;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.databind.json.JsonMapper;
@@ -30,6 +31,7 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 public class BusinessCacheProcessor {
     private static final Logger LOG = LoggerFactory.getLogger(BusinessCacheProcessor.class);
     private final RedisCache redis;
+    private final ReferenceLabelCache references;
     private final SpringCommitActions commits;
     private final int ttl;
     private final JsonMapper json = JsonMapper.builder()
@@ -38,6 +40,7 @@ public class BusinessCacheProcessor {
 
     public BusinessCacheProcessor(RedisCache redis, SpringCommitActions commits, Environment environment) {
         this.redis = redis;
+        references = new ReferenceLabelCache(redis, environment);
         this.commits = commits;
         ttl = environment.getProperty("mes.business.cache.ttl-seconds", Integer.class, 300);
         if (ttl < 1) throw new IllegalArgumentException("Business cache TTL must be positive");
@@ -51,6 +54,17 @@ public class BusinessCacheProcessor {
                 .encodeToString(factory.getBytes(StandardCharsets.UTF_8));
         // Length-delimit the resource to isolate even a nested namespace such as business:material:list.
         return "business:factory:" + segment + ":resource:" + business.length() + ":" + business + ":";
+    }
+
+    /**
+     * Shared by directory reads and generated CRUD eviction; callers cannot invent a separate key prefix.
+     */
+    public String directoryNamespace(String business) {
+        return directoryNamespaceForPrefix(prefix(business));
+    }
+
+    private static String directoryNamespaceForPrefix(String captured) {
+        return "reference:" + captured + "directory";
     }
 
     public static void validateBusiness(String business) {
@@ -104,6 +118,7 @@ public class BusinessCacheProcessor {
 
     void evictCaptured(String captured, Scope scope) {
         Runnable action = () -> {
+            references.invalidate(directoryNamespaceForPrefix(captured));
             try {
                 redis.deleteByPattern(captured + "list:*");
                 if (scope == Scope.LIST_AND_DETAIL) redis.deleteByPattern(captured + "detail:*");

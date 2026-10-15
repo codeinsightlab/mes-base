@@ -12,6 +12,20 @@ import dev.mesbase.infrastructure.persistence.PlatformPersistence;
 import dev.mesbase.business.directory.controller.BusinessDirectoryController;
 import dev.mesbase.business.directory.domain.DirectoryQuery;
 import dev.mesbase.business.directory.service.BusinessDirectoryService;
+import dev.mesbase.common.cache.ReferenceLabelCache;
+import dev.mesbase.common.core.redis.RedisCache;
+import org.springframework.mock.env.MockEnvironment;
+import java.util.List;
+import java.util.HashMap;
+
+import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.times;
+
+import dev.mesbase.infrastructure.cache.BusinessCacheProcessor;
+import org.springframework.beans.factory.ObjectProvider;
 import dev.mesbase.platform.execution.FactoryContext;
 import dev.mesbase.platform.web.FoundationAccessInterceptor;
 import dev.mesbase.platform.web.FoundationErrorAdvice;
@@ -55,6 +69,8 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.hamcrest.Matchers.containsString;
 
 /**
  * TEST ONLY H2 database using the real center Mapper/XML and Spring transaction manager.
@@ -69,6 +85,7 @@ class BusinessDirectoryTest {
     private BusinessDirectoryService service;
     private MockMvc http;
     private Set<String> grants;
+    private SysUserMapper userMapper;
 
     @BeforeEach
     void setup() throws Exception {
@@ -107,8 +124,22 @@ class BusinessDirectoryTest {
                 new MapPropertySource("fixture", Map.of("mes.system.enabled", "true")));
         context.register(Transactions.class);
         context.registerBean("masterTransactionManager", OwnedTransactionManager.class, persistence::transactionManager);
+        var redis = mock(RedisCache.class);
+        var cached = new HashMap<String, Object>();
+        when(redis.getCacheObject(any())).thenAnswer(call -> cached.get(call.getArgument(0)));
+        when(redis.getCacheObjects(any())).thenAnswer(call -> {
+            List<String> keys = call.getArgument(0);
+            return keys.stream().map(cached::get).toList();
+        });
+        doAnswer(call -> {
+            cached.putAll(call.getArgument(0));
+            return null;
+        }).when(redis).setCacheObjects(any(), anyInt());
+        userMapper = spy(persistence.mapper(SysUserMapper.class));
         context.registerBean(BusinessDirectoryService.class, () -> new BusinessDirectoryService(
-                persistence.mapper(SysUserMapper.class), persistence.mapper(SysDeptMapper.class), persistence.mapper(SysPostMapper.class)));
+                userMapper, persistence.mapper(SysDeptMapper.class), persistence.mapper(SysPostMapper.class),
+                new ReferenceLabelCache(redis, new MockEnvironment()), mock(BusinessCacheProcessor.class), persistence,
+                mock(ObjectProvider.class), mock(ObjectProvider.class), mock(ObjectProvider.class)));
         context.refresh();
         service = context.getBean(BusinessDirectoryService.class);
         var selection = mock(FactorySelectionService.class);
@@ -155,6 +186,26 @@ class BusinessDirectoryTest {
                 .andExpect(jsonPath("$.password").doesNotExist());
         assertNull(PageHelper.getLocalPage());
         assertFalse(TransactionSynchronizationManager.isActualTransactionActive());
+    }
+
+    @Test
+    void historicalReferencesBatchCacheAndWhitelistUseRealXml() throws Exception {
+        var labels = service.userLabels(List.of(2L, 9007199254740993L, 2L, 3L));
+        assertEquals(3, labels.size());
+        assertEquals("reference", labels.get(9007199254740993L).code());
+        assertEquals(10L, labels.get(9007199254740993L).departmentId());
+        assertEquals("1", labels.get(2L).status());
+        service.userLabels(List.of(3L, 2L, 9007199254740993L));
+        verify(userMapper, times(1)).selectUserReferencesByIds(List.of(2L, 3L, 9007199254740993L));
+        http.perform(get("/api/business/directory/user-references").header("X-Factory-Id", "F1")
+                        .param("ids", "9007199254740993,2"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("\"name\":\"Reference\"")))
+                .andExpect(jsonPath("$[*].password").isEmpty()).andExpect(jsonPath("$[*].email").isEmpty())
+                .andExpect(jsonPath("$[*].roles").isEmpty());
+        grants = Set.of();
+        http.perform(get("/api/business/directory/user-references").header("X-Factory-Id", "F1").param("ids", "2"))
+                .andExpect(status().isForbidden());
     }
 
     @Test

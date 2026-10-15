@@ -23,7 +23,7 @@ public interface SysUserMapper {
     /**
      * Historical display only: one bounded IN query, without account eligibility filtering or sensitive columns.
      */
-    List<SysUser> selectUserNamesByIds(@Param("userIds") List<Long> userIds);
+    List<SysUser> selectUserReferencesByIds(@Param("userIds") List<Long> userIds);
 
     /**
      * 根据条件分页查询已配用户角色列表

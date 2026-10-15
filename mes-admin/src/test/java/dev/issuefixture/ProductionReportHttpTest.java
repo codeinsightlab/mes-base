@@ -63,7 +63,6 @@ class ProductionReportHttpTest {
                     throw new FoundationException(ErrorCode.REPORT_REFERENCE_INVALID);
                 return null;
             }).when(service).requireExists(any());
-            when(service.names(any())).thenReturn(Map.of(100L, "历史操作人员", 1L, "验收提交人"));
             return service;
         }
     }

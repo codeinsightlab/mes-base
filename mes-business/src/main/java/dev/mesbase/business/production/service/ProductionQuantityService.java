@@ -1,5 +1,7 @@
 package dev.mesbase.business.production.service;
 
+import dev.mesbase.business.production.domain.ProductionReportModels.ExecutionSummary;
+
 import dev.mesbase.business.production.dao.MesProductionExecutionMapper;
 import dev.mesbase.business.production.dao.MesExecutionPathNodeMapper;
 import dev.mesbase.business.production.dao.ProductionQuantityMapper;
@@ -13,6 +15,8 @@ import dev.mesbase.core.error.FoundationException;
 import com.github.pagehelper.PageHelper;
 import java.math.BigDecimal;
 import java.util.List;
+import dev.mesbase.business.directory.service.BusinessDirectoryService;
+import dev.mesbase.common.cache.ReferenceLabelCache.Label;
 import java.util.ArrayList;
 import java.util.Map;
 import java.util.Objects;
@@ -29,13 +33,16 @@ public class ProductionQuantityService {
     private final ExecutionPathService paths;
     private final MesExecutionPathNodeMapper pathNodes;
     private final ProductionQuantityMapper quantities;
+    private final BusinessDirectoryService directory;
 
     public ProductionQuantityService(MesProductionExecutionMapper executions, ExecutionPathService paths,
-                                     MesExecutionPathNodeMapper pathNodes, ProductionQuantityMapper quantities) {
+                                     MesExecutionPathNodeMapper pathNodes, ProductionQuantityMapper quantities,
+                                     BusinessDirectoryService directory) {
         this.executions = executions;
         this.paths = paths;
         this.pathNodes = pathNodes;
         this.quantities = quantities;
+        this.directory = directory;
     }
 
     public ExecutionQuantity getExecutionQuantities(Long executionId) {
@@ -44,7 +51,7 @@ public class ProductionQuantityService {
         var model = paths.view(executionId);
         if (model.path() == null)
             return new ExecutionQuantity(executionId, execution.getWorkorderId(), execution.getExecutionNo(),
-                    execution.getRoutingId(), execution.getTargetQty(), ExecutionPathStatus.UNSELECTED.getValue(), false, "执行尚未选择实际路径", List.of());
+                    execution.getRoutingId(), execution.getTargetQty(), ExecutionPathStatus.UNSELECTED.getValue(), false, "执行尚未选择实际路径", List.of(), label(model.routing()));
         if (!Objects.equals(model.path().getRoutingId(), execution.getRoutingId())) unavailable();
         ExecutionPathValidator.validate(model.selectedNodeIds(), model.nodes(), model.edges());
         var f = new MesExecutionPathNodeExample();
@@ -62,14 +69,20 @@ public class ProductionQuantityService {
             var node = nodeMap.get(ordered.get(i).getRoutingNodeId());
             var reported = totals.getOrDefault(node.getId(), BigDecimal.ZERO);
             requireWithin(input, reported);
-            result.add(new NodeQuantity(executionId, node.getId(), node.getOperationId(), node.getNodeCode(), node.getOperationName(), i + 1,
+            result.add(new NodeQuantity(executionId, node.getId(), node.getOperationId(), node.getNodeCode(), node.getOperationName() != null ? node.getOperationName() : model.operationLabels()
+                    .containsKey(node.getOperationId()) ? model.operationLabels().get(node.getOperationId())
+                    .name() + "（当前名称）" : null, i + 1,
                     input, reported, BigDecimal.ZERO, reported, input.subtract(reported), false));
             input = reported;
         }
         boolean locked = ExecutionPathStatus.LOCKED.getValue().equals(model.path().getPathStatus());
         return new ExecutionQuantity(executionId, execution.getWorkorderId(), execution.getExecutionNo(), execution.getRoutingId(),
                 execution.getTargetQty(), model.path()
-                .getPathStatus(), locked, locked ? null : "实际路径尚未锁定，禁止写入报工数量", List.copyOf(result));
+                .getPathStatus(), locked, locked ? null : "实际路径尚未锁定，禁止写入报工数量", List.copyOf(result), label(model.routing()));
+    }
+
+    private static String label(Label label) {
+        return label == null ? null : label.code() + " / V" + label.version() + " · " + label.name();
     }
 
     public List<NodeQuantity> getNodeQuantities(Long executionId) {
@@ -83,10 +96,15 @@ public class ProductionQuantityService {
 
     public ExecutionPage getWorkorderQuantities(Long workorderId, int offset, int limit) {
         paging(offset, limit);
+        List<ExecutionSummary> rows;
+        long total;
         try (var page = PageHelper.offsetPage(offset, limit)) {
-            var rows = quantities.workorderQuantities(workorderId);
-            return new ExecutionPage(List.copyOf(rows), page.getTotal(), offset, limit);
+            rows = List.copyOf(quantities.workorderQuantities(workorderId));
+            total = page.getTotal();
         }
+        var labels = directory.routingLabels(rows.stream().map(ExecutionSummary::routingId).toList()).entrySet()
+                .stream().collect(Collectors.toMap(entry -> entry.getKey(), entry -> label(entry.getValue())));
+        return new ExecutionPage(rows, total, offset, limit, labels);
     }
 
     public static void validateChange(ExecutionQuantity view, Long nodeId, BigDecimal delta) {

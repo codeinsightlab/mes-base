@@ -127,3 +127,107 @@ MySQL 测试通过真实中心绑定选择并固定指定数据源，验证真�
 | BUSINESS_VERIFIED | PASS：MySQL并发/回滚、路径与数量边界、不可变审计事实保留 |
 
 追加“单条工单扩展异常不阻断列表”修复：CODE/TEST/BUILD/LIVE_VERIFIED。异常与正常行同页、分页及恢复后的真实API/UI均已核实。
+
+## J. 2026-10-15 页面收敛、路线恢复与统一引用目录追加验收
+
+本节是后续任务的独立回执，不将上方原 V1 的 GO 自动沿用到新范围。范围为页面结构、只读路线展示、引用名称/缓存；数量算法、流水写入规则及 V25 Schema 未改变。
+
+### A. 修改文件与范围
+
+- 工单倒序：`WorkOrderService.list` 原有 `id desc` 保留，由 `WorkOrderListResilienceHttpTest.defaultDescendingIdsApplyBeforePaginationAndAfterFilters` 补充数据库分页回归。没有新增客户端排序。
+- 数量页面：前端 `views/production/productionReport/index.vue`、`components/business/production/ProductionReportManager.vue`、`ExecutionSelect.vue`、`api/production/productionReport.ts`、`menus/production/productionReport.json`；工单页改用 `WorkOrderExecutions.vue` 摘要和跳转，移除完整数量/派工/路径命令嵌套。
+- 路线展示：`WorkOrderRoutePreview.vue`、`ExecutionRoutePreview.vue` 复用 `RoutingGraphPreview.vue` / `routingGraph.ts`；后端 `ExecutionPathService`、`ExecutionActionController` 补充执行编号、确切版本和工序显示字段。`WorkOrderService.graph` 仅补充名称投影。
+- 引用目录：后端 `BusinessDirectoryService` / `BusinessDirectoryController`、`ReferenceLabelCache`、`RedisCache`、`BusinessCacheProcessor`、`UserReferenceCacheInvalidation`、`SysUserMapper` / XML；生产执行 `ProductionExecutionQueryService` / Controller / VO，报工读模型/VO、数量读模型、工艺草稿详情统一复用目录。`RoutingServiceImpl` 仅替换草稿工序展示信息补齐，不修改工艺模型、发布快照、图规则或引用校验。
+- 交互与导航：`ProductionExecutionList.vue`、`mesProductionExecution/fields.ts`、`CrudPage.vue` 的操作列宽配置；`api/business/directory.ts` / `BusinessDirectorySelect.vue`；`router.ts` 修复动态菜单首次匹配丢 query/hash。订正历史复用既有时间格式化。
+- 约束：后端及前端 `AGENTS.md` 均追加“统一业务目录与引用缓存”，明确统一入口、宽投影、批量未命中查询、提交后失效及与生成 CRUD 淘汰关联的要求。
+- 关联测试：BusinessDirectoryTest、ReferenceLabelCacheTest、UserReferenceCacheInvalidationTest、BusinessCacheIntegrationTest、ReportUserReferenceServiceTest、ExecutionRouteViewHttpTest、WorkOrderListResilienceHttpTest，前端 businessDirectory、dynamicRouteBootstrap、productionPages、productionExecution、productionReport 等；相应 Spring/MySQL fixture 装配同步适配。
+
+### B. 工单 SQL 与分页
+
+`WorkOrderService.list` 在 `PageHelper.offsetPage` 前设置 `WorkorderExample.orderByClause = "id desc"`。生成 Mapper/XML 的执行形态为 `SELECT ... FROM workorder WHERE ... ORDER BY id DESC LIMIT ...`，筛选参数仍绑定，不取一页后再排序。当前查询契约没有合法显式排序参数，因此不存在覆盖显式用户排序；未来引入时须采用允许列表并补唯一 ID 次序。
+
+H2 真实 Mapper/XML/分页测试按 10、12、11 的插入顺序造数，验证首两条为 12、11，下一页为 10，DRAFT / RELEASED / 编码查询后仍保持倒序。真实 SIMPLE_B API 已校验默认及筛选三页无重复 ID，证据见 `live-api-read-evidence.json`。该验证针对静态数据集，不承诺并发插入时 offset 分页的跨请求快照一致性。
+
+### C. 独立菜单、路由、权限与行为
+
+正式路由 `/production/productionReport`；复用原菜单 ID 2600，将既有 quantity 按钮提升为正式菜单，父目录 2512，按钮 2601–2604 跟随其下。仍复用 `business:production:report:{quantity,detail,supplement,adjust,void}`，没有增加第二套权限。中心 SQL 按现有正式菜单脚本执行；变更前菜单备份及 `role-menu-before.tsv` / `role-menu-after.tsv` 一致，未扩大角色授权。生产执行 2579 恢复独立入口，派工兼容菜单隐藏。
+
+可直接按工单查 Execution 摘要，也可按 Execution 查询实际节点、目标数量、上游输入、累计报工、剩余可报、质量未接入提示及流水。补录/正负订正/整笔冲销/历史沿用原组件/API。成功后刷新数量和摘要；切工单/Execution、切厂、撤权、关闭窗口、卸载均清理或隔离请求序号。浏览器发现并修复动态路由重匹配时把 fullPath 塞入 path 而丢 query/hash 的问题，现显式保留 path/query/hash；真实刷新直达参数及新增回归测试通过。
+
+### D. 路线图消失原因与恢复
+
+Git 历史确认前端 `ec3181bb76dbf30a151f2b73d6325a15efa3b8a2` 在清理旧批次/路径交互并嵌入 Execution 时，同时移除了工单默认路线图的组件及加载链路。更早的 `33ffe78`、`205f40b` 中已有图形展示。不是当前 Routing DAG 图形组件不可用。
+
+恢复既有只读 DAG 组件：工单默认图取该工单默认 routing；Execution 图取 `ExecutionPathService.view` 返回的确切 routing 版本、真实边与 selectedNodeIds，不能用显示排序串节点。UNSELECTED 提示“尚未选择实际执行路径”，完整定义图明确标识仅作参考；SELECTED/LOCKED 显示所选节点及边。历史快照优先，缺快照时使用目录当前名称且标注“当前名称”。没有重建 BatchRouteNode / BatchPathPolicy，也没有修改 Operation/Routing 核心表。
+
+真实 Execution 15=UNSELECTED/routing64，16=SELECTED/routing65，90=LOCKED/routing64；已验证不同 routing 的节点集合不混用。真实页面观察分叉/汇合与所选 A→B→C→E。V2 与线性路径、错版本响应拒绝由 HTTP/H2 和前端 fixture 覆盖；未声称创建了真实 V2 Execution。
+
+### E. 最终页面职责
+
+WorkOrder：列表、创建编辑、详情下达、默认工艺版本与图、Execution 摘要和跳转。ProductionExecution：执行单元维护、派工、路径选择和开工；列表操作收纳为编辑/删除/更多操作，更多中保留只读路线、数量跳转、派工、身份码、路径与开工。ProductionReport：独立的节点数量、流水和管理员订正操作。
+
+### F. 验证与证据
+
+- `mvn -B -ntp verify`：526 项，0 failure / 0 error，19 项环境条件测试跳过；其中 507 项实际执行。日志 `backend-verify.log`。
+- 前端 `npm run test -- --run`：49 文件、261 项通过；`npm run build` 通过，保留既有大 chunk 提示。日志 `frontend-tests.log` / `frontend-build.log`。
+- `/usr/bin/python3 scripts/smoke-packaged.py`：10 通过、0 失败，独立测试进程不等于重启用户服务。
+- 真实登录只读 API：11 个端点结果及 11 项字段/状态断言，`live-directory-read-evidence.json` / `live-directory-assertions.json`。包括去重用户/工序目录、白名单、工艺名称版本、三种路径状态、节点不跨 routing、原始流水与调整历史姓名、数量归零及质量占位。
+- 用户重启后的真实服务已返回 zhanglixin / 平台管理员、工艺名称和版本；执行列表按名称/编码检索工艺并过滤至指定 routing64（9 行），更多操作与未选/已选路径已实际打开。期间服务 PID 变化导致一次超时，后续真实重试成功；没有把失败截图算通过。
+- 独立页面真实操作：原始 17=1.000001；正订正18=+0.500000，负订正19=-0.250000，整笔冲销20=-1.250001。数据库只读复核原始记录保留、有效数量归零，API详情 originalEffectiveQty=0，历史3条，页面姓名正确。没有删除验收流水。
+- 数据源再次核对：SIMPLE_B / datasource8 / 192.168.18.25:3306/mes_base_dev_business_simple_b，工厂与数据源均启用。全部报工写验收在此库；切厂仅测试既有工厂选择和页面清理，未在其他工厂操作生产数据。
+- 真实 UI：1280、1440、1920，数量页/历史弹窗/执行操作列；视口 pageWidth 与 width 一致，宽表内部滚动。截图 `02`–`11`（`01` 为验收早期异常，非通过证据）。真实 SIMPLE_B→老厂→SIMPLE_B 验证旧执行行清空并返回工作台，再恢复指定工厂。
+- 迟到响应、切 Execution 和撤权 UI 清理/只读权限负例由自动化 fixture 覆盖；本次未修改真实账号角色来制造撤权，也未用真实只读账号重跑整套订正拒绝场景，此项不能宣称真实验收通过。
+
+证据均位于忽略目录 `.local/production-pages-20261015/`；不包含登录密码/Token。
+
+### G. 并行改动及未验证边界
+
+开始记录两仓 status/HEAD，后端 8f78b55d62144798706cce518db05eca3a343e42，前端 732d669e41c11e13c5bfcdb1a4ba3e67076e942e。期间外部将后端 HEAD 更新为 758145c7e8a10805bb09e49cdc392f65b8e8eb3f；Agent 没有提交/推送，未回退并行代码。已有前端认证、CRUD、工序编辑、工艺编辑等 dirty 内容保留，只追加本任务改动。
+
+数量/报工 Service 文件因名称投影和读模型追加字段发生变化，不能声称整文件 hash 不变；数量 SQL、计算及写命令规则未改。V25 hash 与入场一致。未改 Source Product、未部署、未自行启动/停止/重启用户服务。真实撤权/只读账号组合仍未完成；独立测试 Redis/H2 不冒充用户运行 Redis/数据库的写入更新验收。
+
+### H. GO / NO-GO
+
+代码、测试、构建、真实菜单/数量页面/名称接口/路径展示/三档宽度：GO。若按原任务 7.4 要求把真实撤权和真实只读账号操作负例全部作为整体验收门槛：仍为 NO-GO，保留上述明确未完成项；不把自动化 fixture 转写为真实账号验收。
+
+## K. 2026-10-15 统一 BusinessDirectory 缓存与通用淘汰审查
+
+### 缓存归属及散落点收敛
+
+| 审查位置 | 处理结果 |
+|---|---|
+| 原 personnel / departments / posts 通用组件 | 沿用 BusinessDirectoryController → BusinessDirectoryService；人员单项回显复用安全投影缓存，启用/删除状态仍先实时校验 |
+| 生产执行列表/详情的工艺和创建/订正人 | ProductionExecutionQueryService 收集整页 IDs，统一调用目录批量方法，无逐行数据库/Redis 请求 |
+| 报工流水/详情/订正历史的操作人、提交人 | 共用 userLabels，读模型批量回填；历史人员检索迁入目录 Controller；旧 report-operators 兼容 API 复用同一 Service 查询 |
+| 历史报工人员存在性校验 | BusinessDirectoryService.historicalUserExists 实时读取；ReportUserReferenceService 只保留报工错误语义与用例适配，不再持有中心 Mapper/缓存 |
+| 工单默认图、Execution 实际图、数量读模型 | 共用 operationLabels/routingLabels；快照不被当前名称覆盖 |
+| Routing 草稿详情补工序展示信息 | 改用 operationLabels；发布时生成快照、引用校验、同步编码映射仍实时执行，属于业务事实而非通用回显缓存 |
+| 工艺筛选前端 | 共用 BusinessDirectorySelect → 目录 routings API；不再以裸 ID 作为唯一显示 |
+| 操作人员资格、适用工艺、业务引用规则 | 保留各自领域查询与实时授权；不以通用缓存结果判断可派工/可开工/可报工 |
+| 其他生成 CRUD 的完整实体/分页缓存 | 继续使用通用 BusinessCacheAspect/Processor，并非散落名称缓存；本轮不机械替换。物料/仓库组件的 rows 查找是当前组件候选状态，未建立跨页面共享名称缓存 |
+
+没有保留第二个 ReferenceDataCache/业务模块用户名称共享缓存。ReferenceLabelCache 是目录内部的 Redis 批量存取设施，业务读取入口统一 BusinessDirectoryService；失效由通用基础设施处理。
+
+### 宽投影、查询和事务
+
+每个对象一份可复用投影：id、code、name、version、description、status、departmentId、deletionFlag。实际对象不适用字段为 null，不缓存用户密码、联系方式、角色、权限或资格。HTTP Controller 使用独立白名单响应及字符串 ID，不直接返回 SysUser Entity。
+
+userLabels / operationLabels / routingLabels 去空、去重，最多200个引用；一次 MGET，未命中部分一次参数化 IN，再批量 pipeline SET，每条固定 TTL（默认300秒，读取不续期），缺失对象不做负缓存。空批次不查库。Redis 读失败退回一次批量数据库查询；数据库异常继续传播，不伪装空名称。业务对象按 Factory+资源隔离，缓存前后保留事务租约校验，写事务不发布未提交投影；普通中心查询使用注入 Mapper，仅真实其他库活动事务进入既有受保护只读窗口。
+
+### Key 是否受生成 CRUD 淘汰规则管理
+
+**是，通过同一个通用淘汰处理器联动；不依赖原来的 list/detail 通配删除直接匹配目录键。**
+
+- 业务目录命名空间统一由 `BusinessCacheProcessor.directoryNamespace(resource)` 构造：`reference:business:factory:<base64Factory>:resource:<资源长度>:<资源>:directory`。目录读取和提交后淘汰复用同一命名方法，外部还会套现有 SystemCacheNamespace 环境前缀。
+- 目录键为 `<namespace>:version` 与 `<namespace>:value:<generation>:<id>`。`@BusinessCacheEvict`（生成新增 LIST、修改/删除 LIST_AND_DETAIL）和手工同步 `caches.evict` 都进入 `evictCaptured`；捕获原 Factory 前缀，提交后同时推进目录代际和删除原 list/detail。回滚不推进。旧未完成 loader 只能写旧代际，不能重新成为有效命中。
+- Operation 的新增/修改/删除注解及同步入口使用 OperationResource.PREFIX；Routing 所有 dirty/insertRow/update/delete/同步入口使用 RoutingResource.PREFIX。目录读取复用同一资源常量，无逐业务额外补淘汰调用，也不需要修改生成模板。
+- 中心用户使用共享 `reference:users`；SysUserMapper 的统一新增/更新/删除写入口由 UserReferenceCacheInvalidation 在提交后推进代际，回滚不推进，不缓存账号授权。
+- 失效 Redis 故障明确记录日志；旧值最多存活固定 TTL，未承诺跨节点即时强一致。版本键不是权限缓存。
+
+### 验证证据
+
+ReferenceLabelCacheTest：冷/部分未命中只加载一次去重 IDs、暖命中0次数据库、空集合、不同工厂隔离、旧 loader 失效后迟到回填、Redis故障与SQL故障边界。BusinessDirectoryTest：真实中心 Mapper/XML 的安全宽字段、历史禁用/删除人员、两次调用只执行一次 IN、白名单及权限拒绝。UserReferenceCacheInvalidationTest：实际 AOP 代理写入的提交后失效/回滚保留。
+
+BusinessCacheIntegrationTest.directoryProjectionUsesRealRedisBatchAndCommitInvalidation：独立真实 Redis 测试进程及 Spring 事务下，验证宽投影真实序列化/MGET/pipeline、暖命中不查库、通用 CRUD 提交后重载、回滚保留。该类14项全部通过。此证据是本地独立 Redis 集成，不冒充对用户运行 Redis 手动改名后的验收。
+
+两仓 AGENTS 已明确补充：新增目录缓存必须与生成 CRUD 通用淘汰同源，禁止出现“读取走新 key、写入只淘汰旧 key”，并要求新对象同时覆盖导入/同步入口。

@@ -1,0 +1,71 @@
+package dev.mesbase.business.production.service;
+
+import dev.mesbase.business.directory.service.BusinessDirectoryService;
+import dev.mesbase.business.production.domain.MesProductionExecutionEntity;
+import dev.mesbase.business.production.domain.MesProductionExecutionQueryDto;
+import dev.mesbase.common.cache.ReferenceLabelCache.Label;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Stream;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+/**
+ * Cached execution reads plus batch display references; does not change commands or execution state.
+ */
+@Service
+@ConditionalOnProperty(name = "mes.business.enabled", havingValue = "true")
+public class ProductionExecutionQueryService {
+    public record Display(MesProductionExecutionEntity record, Label routing, String createByName,
+                          String updateByName) {
+    }
+
+    public record Page(List<Display> items, long total, int offset, int limit) {
+    }
+
+    private final IMesProductionExecutionService executions;
+    private final BusinessDirectoryService references;
+
+    public ProductionExecutionQueryService(IMesProductionExecutionService executions,
+                                           BusinessDirectoryService references) {
+        this.executions = executions;
+        this.references = references;
+    }
+
+    @Transactional(transactionManager = "businessTransactionManager", readOnly = true)
+    public Page page(MesProductionExecutionQueryDto query) {
+        var page = executions.selectPage(query); // Retains the existing guarded page cache.
+        return new Page(describe(page.items()), page.total(), page.offset(), page.limit());
+    }
+
+    @Transactional(transactionManager = "businessTransactionManager", readOnly = true)
+    public Display detail(Long id) {
+        return describe(List.of(executions.selectById(id))).getFirst();
+    }
+
+    private List<Display> describe(List<MesProductionExecutionEntity> rows) {
+        var routings = references.routingLabels(rows.stream().map(MesProductionExecutionEntity::getRoutingId).toList());
+        var users = references.userLabels(rows.stream().flatMap(row -> Stream.of(row.getCreateBy(), row.getUpdateBy()))
+                .map(ProductionExecutionQueryService::userId).filter(id -> id != null).toList());
+        return rows.stream()
+                .map(row -> new Display(row, routings.get(row.getRoutingId()), name(users, row.getCreateBy()), name(users, row.getUpdateBy())))
+                .toList();
+    }
+
+    private static String name(Map<Long, Label> users, String value) {
+        var id = userId(value);
+        if (id == null) return null;
+        var label = users.get(id);
+        return label == null ? null : label.name();
+    }
+
+    private static Long userId(String value) {
+        if (value == null || !value.matches("[1-9][0-9]{0,18}")) return null;
+        try {
+            return Long.valueOf(value);
+        } catch (NumberFormatException ignored) {
+            return null;
+        }
+    }
+}

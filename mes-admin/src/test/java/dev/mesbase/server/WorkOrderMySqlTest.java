@@ -1,10 +1,13 @@
 package dev.mesbase.server;
 
+import static org.mockito.Mockito.mock;
+
 import dev.mesbase.business.production.service.ProductionChainLocks;
 import dev.mesbase.business.production.dao.MesExecutionPathMapper;
 import dev.mesbase.business.production.dao.MesExecutionPathNodeMapper;
 
 import dev.mesbase.business.production.service.WorkorderErpFacts;
+import dev.mesbase.business.directory.service.BusinessDirectoryService;
 import dev.mesbase.business.production.dao.WorkorderErpExtraMapper;
 
 import dev.mesbase.business.basic.dao.MaterialMapper;
@@ -83,6 +86,11 @@ class WorkOrderMySqlTest {
     @EnableTransactionManagement
     @Import({ProductionChainLocks.class, WorkorderErpFacts.class, WorkOrderService.class, LegacyBatchHistoryQuery.class, LegacyBatchHistoryController.class, RoutingReferenceRules.class, ProductionExecutionRules.class, MesProductionExecutionServiceImpl.class})
     static class Config {
+        @Bean
+        BusinessDirectoryService directory() {
+            return mock(BusinessDirectoryService.class);
+        }
+
         @Bean(name = "businessTransactionManager")
         OwnedTransactionManager manager(FactoryBusinessDataSource source) {
             return new OwnedTransactionManager(source);
@@ -208,7 +216,8 @@ class WorkOrderMySqlTest {
                 for (var batchRow : batchesBefore) {
                     Long batchId = ((Number) batchRow.get("id")).longValue();
                     var historical = history.detail(batchId);
-                    var expectedNodes = pathsBefore.stream().filter(n -> batchId.equals(((Number) n.get("batch_id")).longValue())).toList();
+                    var expectedNodes = pathsBefore.stream()
+                            .filter(n -> batchId.equals(((Number) n.get("batch_id")).longValue())).toList();
                     assertEquals(expectedNodes.size(), historical.path().size());
                     assertEquals(batchId, historical.batch().getId());
                     for (var node : historical.path()) {
