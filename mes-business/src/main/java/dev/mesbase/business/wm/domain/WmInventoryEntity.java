@@ -27,6 +27,10 @@ public class WmInventoryEntity {
 
     private LocalDateTime updateTime;
 
+    private String batchNo;
+
+    private String binCode;
+
     public Long getId() {
         return id;
     }
@@ -113,5 +117,21 @@ public class WmInventoryEntity {
 
     public void setUpdateTime(LocalDateTime updateTime) {
         this.updateTime = updateTime;
+    }
+
+    public String getBatchNo() {
+        return batchNo;
+    }
+
+    public void setBatchNo(String batchNo) {
+        this.batchNo = batchNo;
+    }
+
+    public String getBinCode() {
+        return binCode;
+    }
+
+    public void setBinCode(String binCode) {
+        this.binCode = binCode;
     }
 }

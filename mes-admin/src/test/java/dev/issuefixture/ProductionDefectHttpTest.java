@@ -1,7 +1,11 @@
 package dev.issuefixture;
 
+import java.math.BigDecimal;
+import org.springframework.jdbc.core.JdbcTemplate;
+
 import dev.mesbase.business.quality.controller.ProductionDefectController;
 import dev.mesbase.business.quality.service.ProductionDefectService;
+import dev.mesbase.business.production.service.ProductionQuantityService;
 import dev.mesbase.business.quality.integration.LocalProductionDefectErpGateway;
 import dev.mesbase.business.quality.dao.MesProductionDefectMapper;
 import dev.mesbase.business.directory.service.BusinessDirectoryService;
@@ -44,12 +48,9 @@ class ProductionDefectHttpTest {
     static final String ROOT = "/api/quality/defects";
 
     @Configuration
-    @Import({ProductionDefectController.class, ProductionDefectService.class, LocalProductionDefectErpGateway.class})
+    @Import({ProductionQuantityService.class, ProductionDefectController.class, ProductionDefectService.class, LocalProductionDefectErpGateway.class})
     static class Extra {
-        @Bean
-        MesProductionDefectMapper defects(SqlSessionFactory f) {
-            return new SqlSessionTemplate(f).getMapper(MesProductionDefectMapper.class);
-        }
+
     }
 
     static AnnotationConfigWebApplicationContext context() throws Exception {
@@ -63,12 +64,18 @@ class ProductionDefectHttpTest {
                 .equals(x.getArgument(0)));
         for (var jdbc : c.getBean(MaterialIssueHttpTest.Fixture.class).business.values()) {
             ProductionReportHttpTest.seed(jdbc);
-            var ddl = Files.readString(Path.of("mes-admin/src/main/resources/db/business/V26__production_defect.sql"))
-                    .split("CREATE TRIGGER")[0].replace(" COLLATE utf8mb4_bin", "")
-                    .replace(") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT=", ") COMMENT ");
-            jdbc.execute(ddl);
+            ProductionInputTestData.confirmed(jdbc, 1, new BigDecimal("10"));
+            ProductionInputTestData.confirmed(jdbc, 2, new BigDecimal("10"));
+            seedReports(jdbc, 1);
+            seedReports(jdbc, 2);
+
         }
         return c;
+    }
+
+    static void seedReports(JdbcTemplate jdbc, long execution) {
+        for (long node : List.of(11L, 12L, 13L))
+            jdbc.update("INSERT INTO mes_production_report(execution_id,routing_node_id,record_type,quantity_delta,operator_user_id,recorded_by,report_time,reason,create_time) VALUES(?,?,'REPORT',10,100,1,CURRENT_TIMESTAMP,'TEST ONLY gross processed fixture',CURRENT_TIMESTAMP)", execution, node);
     }
 
     static String command(String key, int revision, String quantity) {
@@ -106,7 +113,7 @@ class ProductionDefectHttpTest {
                     .andExpect(status().isConflict());
             m.perform(full(put(ROOT + "/" + id), "A").content("{}")).andExpect(status().isMethodNotAllowed());
             m.perform(full(delete(ROOT + "/" + id), "A")).andExpect(status().isMethodNotAllowed());
-            assertEquals(0, c.getBean(MaterialIssueHttpTest.Fixture.class).business.get("A")
+            assertEquals(6, c.getBean(MaterialIssueHttpTest.Fixture.class).business.get("A")
                     .queryForObject("SELECT COUNT(*) FROM mes_production_report", Integer.class));
         }
     }

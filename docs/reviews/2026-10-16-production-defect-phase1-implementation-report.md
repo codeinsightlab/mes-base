@@ -1,6 +1,6 @@
 # ProductionDefect Phase 1 实施与验收报告
 
-2026-10-16；范围：不良申报自身闭环。**最终验收 NO-GO**：代码及定向自动化、指定 MySQL 业务验收已完成；中心菜单迁移被已有失败迁移阻断，真实服务与 Web 流程未完成验收。没有进入 Phase 2。
+2026-10-16；范围：不良申报自身闭环。**首次交付验收 NO-GO**：代码及定向自动化、指定 MySQL 业务验收已完成；当时中心菜单迁移被已有失败迁移阻断，真实服务与 Web 流程未完成验收。**同日后续已修复中心迁移并执行 V29，见文末恢复记录；其他验收边界未据此改为通过。** 没有进入 Phase 2。
 
 `ProductionDefect Phase 1 = 自身闭环`
 
@@ -152,3 +152,42 @@ List<NodeTotal> nodeTotals(Long executionId);
 返回最新非 VOID 版本合计；空集合/无贡献为零；没有报工 JOIN。Phase 2 必须另行设计统一锁顺序、报工与不良数量一致性、下游约束、effectiveOutputQty/availableQty 推导及真实跨入口验收，不能直接接入就宣称数量闭环。
 
 回滚：保持当前未部署状态即可撤回应用代码；不可删除/更新已提交版本、不可改写已执行 V26/Flyway 历史。需要撤销数据库对象或审计数据时，另立经授权的正式迁移/数据保留任务。
+
+
+## 2026-10-16 中心迁移恢复与菜单落库（用户追加授权）
+
+用户要求“定位并且修复”菜单迁移失败。本次只修复中心库迁移状态、纳管已存在的结构并执行待办菜单迁移；没有修改业务代码、历史迁移 SQL 或现有角色授权，也没有重启用户服务。
+
+### 根因与当前实证
+
+历史事故记录见 [仓库与库存审查的中心库历史事故章节](2026-10-13-warehouse-inventory-review.md)。此前中心库 history 停在 V14，执行完整迁移成功到 V16，随后 V17 的 `CREATE TABLE mf_user_preference` 因表已存在而失败。实时复查确认：
+
+- 实际中心目标为 `192.168.18.25:3306/mes_base_dev`；同一配置的 SIMPLE_B 仍绑定启用数据源 8、`192.168.18.25:3306/mes_base_dev_business_simple_b`。
+- history V1–V16 成功，V17 `success=false`；V17 表已存在，有 4 条真实用户工厂偏好。
+- V19 撤销表、V20 续期字段/索引、V21 路由 metadata、V23 个人列偏好也已存在。实际 Schema 与 Flyway history 脱节，单独清理 V17 失败记录再全量执行仍会遇到重复建表/加列。
+- V18 已存在人员目录权限，但缺部门/岗位两项；V22 OpenAPI 菜单存在；V24/V25/V28 退役范围的菜单、个人偏好与同步键均为空。V26/V27 对应当前菜单已存在，可以按原 SQL 正常执行且保留 ID；不需要猜测旧角色授权。
+
+### 修复方法与数据保护
+
+1. 用正式配置解析连接，在变更前核对 Factory/数据源绑定、成功历史的 checksum/description/type、失败范围、所需字段类型/长度/null、主键/索引及路由单例有效性。发现结构、菜单路径或失败范围超出预期即停止。
+2. 保存诊断快照，以及受影响范围的 SQL 备份：`flyway_schema_history`、`mf_user_preference`、`sys_session_revocation`、`sys_routing_metadata`、`sys_user_table_preference`、`sys_menu`、`sys_role_menu`、`mes_master_sync`。备份为 `.local/center-migration-recovery-20261016/center-before.sql`（78,405 字节）；临时备份凭证文件已删除，不纳入版本库或报告。
+3. 先在隔离 H2 验证当前 Flyway 12.4 的 `skipExecutingMigrations` 会通过正式迁移机制登记历史且保留已有行。这是工具能力验证，不代替真实中心库验收。
+4. 调用正式 `Flyway.repair()`，只移除 V17 的失败记录；断言没有 align/delete 其他历史，V1–V16 成功历史及 checksum 完全保持原样。没有手工 UPDATE/INSERT Flyway history。
+5. 逐版本设置 `target`，对 **V17、V19、V20、V21、V23** 使用 `skipExecutingMigrations(true)` 纳管已核实的既有结构；对 **V18、V22、V24、V25、V26、V27、V28、V29** 正常执行原 SQL。已存在的偏好、撤销数据及路由代次不通过删表/重建或重置 seed 的方式处理。
+6. 恢复默认配置，执行正常 Flyway migrate/validate 复验。skip 参数仅用于这次有前置核对的恢复调用，没有写入应用配置、没有留下全局跳过迁移的开关。既有 collation/COMMENT 的非业务结构差异予以保留，不宣称历史 DDL 被重新执行或物理定义逐字符相同。
+
+官方依据：[Flyway Skip Executing Migrations Setting](https://documentation.red-gate.com/fd/flyway-skip-executing-migrations-setting-277579035.html)，用于将已在 Flyway 之外存在的变更纳入其迁移管理。本次没有购买/变更工具授权。
+
+### 修复结果与验证
+
+- **真实中心库 V1–V29 全部有效，29 项 validate 通过；failed=0，pending=0。**
+- V29 已通过正式迁移执行：质量目录 **2607**，不良品管理页面 **2608**，申报/订正/作废按钮 **2609/2610/2611**；页面组件为 `quality/productionDefect/index`，read/create/revise/void 四项权限全部存在。
+- 变更前 354 个菜单 ID 全部保留；885 条角色菜单关联逐项一致，没有新增角色授权或恢复无法证明的旧授权。4 条工厂偏好、个人列偏好和路由 metadata 代次逐项一致。
+- 通过原有正常入口再次运行：
+  `MES_DEFECT_MYSQL_ACCEPTANCE=true mvn -B -ntp -pl mes-admin -am test '-Dtest=ProductionDefectMigrationMySqlTest#migrateVerifiedCenterMenu' -Dsurefire.failIfNoSpecifiedTests=false`
+  **1 项通过，BUILD SUCCESS**；Flyway 返回数据库 V29 已是最新版本、无需迁移，29 项校验再次通过，四项质量权限数量断言通过。
+- 本次没有业务代码/配置修改，因此没有重复运行前端全量测试或宣称质量业务页面已完成真实交互验收。现有 `8081` 服务登录读取尝试超时，未取得菜单 HTTP 响应；证据为 `live-menu-read.json`。当前工作区新出现的 ProductionExecutionRules / WorkOrderService / WorkOrderExtraMapper / WorkOrderEnumSqlTest 改动属于其他工作，未编辑或覆盖。
+
+证据目录 `.local/center-migration-recovery-20261016/`：`diagnose.log`、`diagnostic-snapshot.yml`、`menu-audit.log`、`center-before.sql`、`backup.log`、`SkipProbe.java`/`skip-probe.log`、有严格前置检查的一次性 `Recover.java`/`recovery.log`、`after.yml`、`normal-migration-test.log`。该目录只保存本地诊断/备份，不包含提交或部署动作。
+
+**本次菜单问题已修复。** 首次报告中的“中心 V17 阻断/V29 未执行”已被本节真实证据取代，保留旧段落用于追溯。本次未重新评估 Phase 1 的其他引用保护、用户服务加载及完整 Web 流程，不能因菜单落库就宣称完整业务投用验收 GO。

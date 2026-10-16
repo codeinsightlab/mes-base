@@ -1,4 +1,3 @@
-// MES-CODEGEN: MyBatis Generator standard single-table persistence.
 package dev.mesbase.business.production.dao;
 
 import dev.mesbase.business.production.domain.MesProductionReportEntity;
@@ -7,6 +6,8 @@ import java.util.List;
 import org.apache.ibatis.annotations.Param;
 
 public interface MesProductionReportMapper {
+    MesProductionReportEntity selectByRequestId(@Param("requestId") String requestId);
+
     long countByExample(MesProductionReportExample example);
 
     int deleteByExample(MesProductionReportExample example);

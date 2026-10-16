@@ -1,5 +1,9 @@
 package dev.issuefixture;
 
+import dev.mesbase.business.production.service.ProductionQuantityService;
+import dev.mesbase.business.issue.service.MaterialIssueInputFacts;
+import dev.mesbase.business.quality.service.ExecutionQualityReferenceQueryImpl;
+
 import static org.mockito.Mockito.mock;
 
 import dev.mesbase.business.production.service.ProductionChainLocks;
@@ -85,7 +89,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 class MaterialIssueVoidMySqlTest {
     @Configuration
     @EnableTransactionManagement
-    @Import({MesProductionExecutionServiceImpl.class, MesMaterialIssueItemServiceImpl.class, ProductionChainLocks.class, ExecutionPathService.class, MaterialIssueSubmissionService.class, WorkorderErpFacts.class, MaterialIssueErpService.class, MaterialIssueErpFacts.class, WorkOrderService.class, RoutingReferenceRules.class, ProductionExecutionRules.class, MaterialIssueRules.class, MaterialIssueVoidService.class, MesMaterialIssueServiceImpl.class, WarehouseIntegration.class})
+    @Import({MaterialIssueInputFacts.class, ProductionQuantityService.class, ExecutionQualityReferenceQueryImpl.class, MesProductionExecutionServiceImpl.class, MesMaterialIssueItemServiceImpl.class, ProductionChainLocks.class, ExecutionPathService.class, MaterialIssueSubmissionService.class, WorkorderErpFacts.class, MaterialIssueErpService.class, MaterialIssueErpFacts.class, WorkOrderService.class, RoutingReferenceRules.class, ProductionExecutionRules.class, MaterialIssueRules.class, MaterialIssueVoidService.class, MesMaterialIssueServiceImpl.class, WarehouseIntegration.class})
     static class Config {
         @Bean
         BusinessDirectoryService directory() {

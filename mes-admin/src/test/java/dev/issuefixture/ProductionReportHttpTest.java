@@ -1,5 +1,6 @@
 package dev.issuefixture;
 
+import java.math.BigDecimal;
 import dev.mesbase.business.production.controller.ProductionReportController;
 import dev.mesbase.business.production.service.ProductionReportService;
 import dev.mesbase.business.production.service.ProductionQuantityService;
@@ -74,7 +75,11 @@ class ProductionReportHttpTest {
                 .addFirst(new MapPropertySource("TEST ONLY", Map.of("mes.business.enabled", "true")));
         c.register(MaterialIssueHttpTest.Web.class, Extra.class);
         c.refresh();
-        for (var jdbc : c.getBean(MaterialIssueHttpTest.Fixture.class).business.values()) seed(jdbc);
+        for (var jdbc : c.getBean(MaterialIssueHttpTest.Fixture.class).business.values()) {
+            seed(jdbc);
+            ProductionInputTestData.confirmed(jdbc, 1, new BigDecimal("10"));
+            ProductionInputTestData.confirmed(jdbc, 2, new BigDecimal("10"));
+        }
         return c;
     }
 
@@ -113,7 +118,7 @@ class ProductionReportHttpTest {
             m.perform(full(get("/api/production/report-quantities/executions/1"), "A")).andExpect(status().isOk())
                     .andExpect(jsonPath("nodes[0].routingNodeId").value("11"))
                     .andExpect(jsonPath("nodes[0].reportedQty").value("7.000001"))
-                    .andExpect(jsonPath("nodes[0].qualityIntegrated").value(false))
+                    .andExpect(jsonPath("nodes[0].qualityIntegrated").value(true))
                     .andExpect(jsonPath("nodes[1].availableQty").value("7.000001"));
             m.perform(full(post(ROOT + "/supplements"), "A").content(supplement(12, "8")))
                     .andExpect(status().isConflict());
@@ -129,7 +134,7 @@ class ProductionReportHttpTest {
             m.perform(full(get("/api/production/report-quantities/workorders/1"), "A")).andExpect(status().isOk())
                     .andExpect(jsonPath("total").value(2));
             m.perform(full(put("/api/production/mes-production-execution/1"), "A").content("{\"workorderId\":1,\"routingId\":1,\"targetQty\":6,\"status\":\"READY\"}"))
-                    .andExpect(status().isConflict());
+                    .andExpect(status().isOk());
         }
     }
 

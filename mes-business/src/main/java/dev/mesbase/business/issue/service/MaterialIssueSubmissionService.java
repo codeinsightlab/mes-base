@@ -1,5 +1,6 @@
 package dev.mesbase.business.issue.service;
 
+import dev.mesbase.business.production.domain.ExecutionPathStatus;
 import dev.mesbase.business.production.domain.ProductionExecutionStatus;
 import dev.mesbase.business.issue.domain.MaterialIssueSubmissionStatus;
 import dev.mesbase.business.issue.domain.MaterialIssueStatus;
@@ -62,6 +63,7 @@ public class MaterialIssueSubmissionService {
     private final ProductionExecutionRules executions;
     private final ExecutionPathService paths;
     private final WarehouseIntegration warehouse;
+    private final MaterialIssueInputFacts inputFacts;
     private final TransactionTemplate transaction;
     private final ObjectMapper json = new ObjectMapper();
 
@@ -70,7 +72,7 @@ public class MaterialIssueSubmissionService {
                                           WorkorderErpExtraMapper orderFacts, MaterialIssueErpFacts facts,
                                           MaterialIssueRules rules, ProductionChainLocks locks,
                                           ProductionExecutionRules executions, ExecutionPathService paths,
-                                          WarehouseIntegration warehouse,
+                                          WarehouseIntegration warehouse, MaterialIssueInputFacts inputFacts,
                                           @Qualifier("businessTransactionManager") PlatformTransactionManager manager) {
         this.issues = issues;
         this.items = items;
@@ -82,12 +84,13 @@ public class MaterialIssueSubmissionService {
         this.executions = executions;
         this.paths = paths;
         this.warehouse = warehouse;
+        this.inputFacts = inputFacts;
         transaction = new TransactionTemplate(manager);
         transaction.setIsolationLevel(TransactionDefinition.ISOLATION_READ_COMMITTED);
     }
 
-    private record Prepared(MesMaterialIssueEntity row, MaterialIssueSubmitCommand command, Selection selection,
-                            Long version) {
+    public record Prepared(MesMaterialIssueEntity row, MaterialIssueSubmitCommand command, Selection selection,
+                           Long version) {
     }
 
     @Transactional(transactionManager = "businessTransactionManager", propagation = Propagation.NOT_SUPPORTED)
@@ -95,6 +98,11 @@ public class MaterialIssueSubmissionService {
     public MesMaterialIssueEntity submit(Long id) {
         FactoryScope scope = FactoryContext.required();
         Prepared prepared = transaction.execute(s -> prepare(id, scope));
+        return executePrepared(scope, prepared);
+    }
+
+    public MesMaterialIssueEntity executePrepared(FactoryScope scope, Prepared prepared) {
+        Long id = prepared.row().getId();
         if (prepared.command() == null) return prepared.row();
         ErpActionResult result;
         try {
@@ -120,18 +128,20 @@ public class MaterialIssueSubmissionService {
         });
     }
 
-    private Prepared prepare(Long id, FactoryScope scope) {
+    public Prepared prepare(Long id, FactoryScope scope) {
         rules.lockIssues(List.of(id));
         var row = rules.hydrate(issues.selectByPrimaryKey(id));
         if (row.getSubmissionId() != null) return new Prepared(row, null, null, null);
         if (row.getVoidOperationId() != null || !Set.of(MaterialIssueStatus.DRAFT.getValue(), MaterialIssueStatus.RECORDED.getValue())
                 .contains(row.getStatus()) || row.getExecutionId() == null) fail();
         var e = locks.execution(row.getExecutionId());
-        if (!ProductionExecutionStatus.READY.getValue()
-                .equals(e.getStatus()) || e.getStartTime() != null || !Objects.equals(row.getWorkorderId(), e.getWorkorderId()) || !Objects.equals(row.getProductId(), e.getProductId()) || !Objects.equals(row.getRoutingId(), e.getRoutingId()))
+        if (!Set.of(ProductionExecutionStatus.READY.getValue(), ProductionExecutionStatus.RUNNING.getValue())
+                .contains(e.getStatus()) || !Objects.equals(row.getWorkorderId(), e.getWorkorderId()) || !Objects.equals(row.getProductId(), e.getProductId()) || !Objects.equals(row.getRoutingId(), e.getRoutingId()))
             fail();
-        executions.checkReadyReferences(e);
+        if (ProductionExecutionStatus.READY.getValue().equals(e.getStatus())) executions.checkReadyReferences(e);
         var path = paths.requireSelected(e);
+        if (ProductionExecutionStatus.RUNNING.getValue().equals(e.getStatus()) && !ExecutionPathStatus.LOCKED.getValue()
+                .equals(path.getPathStatus())) fail();
         var f = new MesMaterialIssueItemExample();
         f.createCriteria().andIssueIdEqualTo(id);
         f.setOrderByClause("id");
@@ -158,7 +168,7 @@ public class MaterialIssueSubmissionService {
         var command = new MaterialIssueSubmitCommand(id, "ISSUE-SUBMIT-" + attempt.getId(), row.getIssueNo(), row.getWorkorderId(), row.getWorkorderCode(), external == null ? null : external.getExternalId(), external == null ? null : external.getExternalCode(), e.getId(), e.getExecutionNo(), row.getProductId(), row.getProductCode(), e.getRoutingId(), path.getRevision(), paths.view(e.getId())
                 .selectedNodeIds(), row.getIssueTime() == null ? null : row.getIssueTime().toString(), lines.stream()
                 .map(i -> new Line(i.getId(), i.getMaterialId(), i.getMaterialCode(), i.getBatchNo(), i.getQuantity(), i.getUnitId(), i.getUnitCode(), i.getWarehouseId(), i.getWarehouseCode()))
-                .toList());
+                .toList(), inputFacts.snapshot(id));
         attempt.setCommandJson(json.writeValueAsString(command));
         changed(attempts.updateByPrimaryKeyWithBLOBs(attempt));
         row.setSubmissionId(attempt.getId());
@@ -200,6 +210,7 @@ public class MaterialIssueSubmissionService {
         extra.setLastMessage(result.status() == Status.SUCCEEDED ? (result.executionMode() == Mode.LOCAL_ONLY ? "本地模式，领料已确认" : "ERP领料业务已确认") : result.status() == Status.REJECTED ? "领料业务明确拒绝，保留原提交记录" : "领料结果待核实，不得重复创建");
         if (result.status() == Status.SUCCEEDED) {
             var execution = locks.execution(row.getExecutionId());
+            inputFacts.confirm(row, result.executionMode().getValue());
             paths.confirm(execution, a.getPathRevision());
             row.setStatus(MaterialIssueStatus.CONFIRMED.getValue());
             a.setStatus(MaterialIssueSubmissionStatus.SUCCEEDED.getValue());
@@ -225,6 +236,7 @@ public class MaterialIssueSubmissionService {
             rules.lockIssues(List.of(id));
             var row = rules.hydrate(issues.selectByPrimaryKey(id));
             var extra = facts.required(id);
+            if (inputFacts.find(id) != null) fail();
             if (!MaterialIssueStatus.SUBMIT_REJECTED.getValue()
                     .equals(row.getStatus()) || row.getVoidOperationId() != null || extra.getExternalReference() != null || extra.getExternalCode() != null || !Status.REJECTED.getValue()
                     .equals(extra.getLastOutcome()) || !ProductionExecutionStatus.READY.getValue()

@@ -1,5 +1,7 @@
 package dev.issuefixture;
 
+import dev.mesbase.business.quality.service.ExecutionQualityReferenceQueryImpl;
+
 import dev.mesbase.acceptance.AcceptanceBusinessDatabase;
 import dev.mesbase.business.production.dao.MesProductionReportMapper;
 import dev.mesbase.business.production.dao.MesProductionExecutionMapper;
@@ -68,6 +70,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 
 import dev.mesbase.business.quality.service.ProductionDefectService;
+import dev.mesbase.business.production.service.ProductionQuantityService;
 import dev.mesbase.business.quality.integration.LocalProductionDefectErpGateway;
 import dev.mesbase.business.quality.dao.MesProductionDefectMapper;
 import dev.mesbase.business.quality.domain.MesProductionDefectEntity;
@@ -110,7 +113,7 @@ class ProductionDefectMySqlTest {
         c.registerBean(SysUserMapper.class, () -> center.mapper(SysUserMapper.class));
         c.registerBean(BusinessDirectoryService.class, () -> new BusinessDirectoryService(
                 c.getBean(SysUserMapper.class), mock(SysDeptMapper.class), mock(SysPostMapper.class), new DetailEntityCache(mock(RedisCache.class), new MockEnvironment()), mock(BusinessCacheProcessor.class), center, c.getBeanProvider(OwnedTransactionManager.class), c.getBeanProvider(RoutingMapper.class), c.getBeanProvider(OperationMapper.class)));
-        c.register(ProductionChainLocks.class, ProductionExecutionRules.class, ExecutionPathService.class);
+        c.register(ProductionQuantityService.class, ExecutionQualityReferenceQueryImpl.class, ProductionChainLocks.class, ProductionExecutionRules.class, ExecutionPathService.class);
         c.refresh();
         return c;
     }
@@ -126,24 +129,23 @@ class ProductionDefectMySqlTest {
 
     @Test
     void committedLifecycleConcurrentIdempotencyAndImmutability() throws Exception {
-        try (var c = context(); var pool = Executors.newFixedThreadPool(2)) {
-            var jdbc = c.getBean(JdbcTemplate.class);
-            var mapper = c.getBean(MesProductionDefectMapper.class);
-            // Construct the isolated Quality use case on the same verified transaction infrastructure.
-            var service = new ProductionDefectService(mapper, c.getBean(ProductionChainLocks.class), c.getBean(ExecutionPathService.class), c.getBean(WmWarehouseMapper.class), c.getBean(BusinessDirectoryService.class), new LocalProductionDefectErpGateway(), c.getBean(RoutingNodeMapper.class));
-            var tx = new TransactionTemplate(c.getBean("businessTransactionManager", PlatformTransactionManager.class));
-            tx.setIsolationLevelName("ISOLATION_READ_COMMITTED");
-            var fixture = jdbc.queryForMap("SELECT e.id,n.routing_node_id FROM mes_production_execution e JOIN mes_execution_path p ON p.id=e.id JOIN mes_execution_path_node n ON n.execution_id=e.id WHERE p.path_status='LOCKED' ORDER BY e.id,n.sequence_no LIMIT 1");
-            Long execution = ((Number) fixture.get("id")).longValue(), node = ((Number) fixture.get("routing_node_id")).longValue();
-            Long warehouse = jdbc.queryForObject("SELECT id FROM wm_warehouse WHERE status='ENABLED' ORDER BY id LIMIT 1", Long.class);
+        try (var h = new ProductionQualityLifecycleMySqlTest.Harness(); var pool = Executors.newFixedThreadPool(2)) {
+            var c = h.context;
+            var jdbc = h.jdbc;
+            var service = h.quality;
+            var tx = h.tx;
+            var fixture = h.fixture();
+            ProductionQualityLifecycleMySqlTest.seedGrossReports(h, fixture);
+            Long execution = fixture.execution(), node = fixture.selected().get(1), warehouse = fixture.warehouse();
             String tag = "DEFECT_TEST_" + UUID.randomUUID();
-            var backup = Path.of(".local/production-defect-20261016/mysql-before.txt");
+            var backup = Path.of(".local/production-quality-phase2b-20261016/quality-regression-before.txt");
             Files.writeString(backup, "SIMPLE_B:192.168.18.25:3306/mes_base_dev_business_simple_b\nrequestPrefix=" + tag + "\nexistingConflict=" + jdbc.queryForObject("SELECT COUNT(*) FROM mes_production_defect WHERE request_key LIKE ?", Integer.class, tag + "%") + "\nproductionReports=" + jdbc.queryForList("SELECT id,execution_id,routing_node_id,quantity_delta FROM mes_production_report WHERE execution_id=?", execution));
             var before = jdbc.queryForList("SELECT * FROM mes_production_report WHERE execution_id=? ORDER BY id", execution);
             ProductionReportMySqlTest.actor();
             try {
                 var create = command(tag, 0, execution, node, warehouse, "2.123456");
                 var first = tx.execute(s -> service.create(create)).record();
+                h.declarations.add(first.getDeclarationId());
                 assertEquals(first.getId(), tx.execute(s -> service.create(create)).record().getId());
                 var barrier = new CyclicBarrier(2);
                 Callable<Integer> revise = () -> {
@@ -196,10 +198,11 @@ class ProductionDefectMySqlTest {
                 var x = pool.submit(same);
                 var y = pool.submit(same);
                 var one = x.get();
+                h.declarations.add(one.getDeclarationId());
                 assertEquals(one.getId(), y.get().getId());
                 tx.execute(s -> service.voidDeclaration(one.getDeclarationId(), new Command("VOID_" + UUID.randomUUID(), 1, "TEST ONLY验收作废", null)));
                 assertEquals(before, jdbc.queryForList("SELECT * FROM mes_production_report WHERE execution_id=? ORDER BY id", execution));
-                Files.writeString(Path.of(".local/production-defect-20261016/mysql-acceptance.txt"), "SIMPLE_B verified\nexecution=" + execution + "\naffectedNode=" + node + "\ndeclaration=" + first.getDeclarationId() + "\nretryDeclaration=" + one.getDeclarationId() + "\nversions=3 and 2; all VOID; report rows unchanged; no inventory or external ERP writes\n");
+                Files.writeString(Path.of(".local/production-quality-phase2b-20261016/quality-regression-acceptance.txt"), "SIMPLE_B verified\nexecution=" + execution + "\naffectedNode=" + node + "\ndeclaration=" + first.getDeclarationId() + "\nretryDeclaration=" + one.getDeclarationId() + "\nversions=3 and 2; all VOID; report rows unchanged; no inventory or external ERP writes\n");
             } finally {
                 SecurityContextHolder.clearContext();
             }

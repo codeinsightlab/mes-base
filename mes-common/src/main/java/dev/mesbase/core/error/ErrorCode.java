@@ -1,6 +1,13 @@
 package dev.mesbase.core.error;
 
 public enum ErrorCode {
+    RECEIPT_QUALITY_UNVERIFIED(409, "质量数量口径及阻止流转状态尚未完成核验，当前未提供稳定质量放行接口，禁止新增生产交接"),
+    RECEIPT_PATH_REQUIRED(409, "交接需要已锁定的确切实际路径及末道有效产出"),
+    RECEIPT_WAREHOUSE_INVALID(422, "目标仓库不存在或未启用"),
+    RECEIPT_REFERENCE_INVALID(422, "交接冲销只能引用原始正向交接"),
+    RECEIPT_QUANTITY_CONFLICT(409, "交接超出末道有效产出额度，或冲销超过原始剩余余额"),
+    RECEIPT_IDEMPOTENCY_CONFLICT(409, "请求UUID已用于其他交接动作、参数或操作人"),
+    EXECUTION_QUALITY_REFERENCED(409, "该生产执行已存在质量申报历史，为保证生产追溯，不允许删除或重新选择实际路径"),
     DEFECT_IDEMPOTENCY_CONFLICT(409, "不良申报请求标识已用于不同命令"),
     DEFECT_REVISION_CONFLICT(409, "不良申报已订正或作废，请刷新后重试"),
     REPORT_PATH_REQUIRED(409, "报工必须引用执行已锁定的完整实际路径"),
@@ -19,7 +26,12 @@ public enum ErrorCode {
     EXECUTION_INVALID(422, "生产执行必须关联有效工单、匹配产品和已发布工艺，并具有正计划数量及有效时间"),
     EXECUTION_FROZEN(409, "执行身份或已有生产事实关联不可更改"),
     EXECUTION_REFERENCED(409, "生产执行已启动或存在领料关联，不能删除"),
-    EXECUTION_QR_INVALID(400, "执行身份码格式应为EXE:正整数主键"),
+    PRODUCTION_IDENTITY_AMBIGUOUS(409, "材料批次关联多个产出产品，请扫描生产身份码或选择明确执行"),
+    PRODUCTION_INPUT_STALE(409, "用料计算依据已变化，请重新计算并确认"),
+    PRODUCTION_SINGLE_MATERIAL_REQUIRED(422, "工单包含多种必需材料，不支持当前单材料投产模式"),
+    PRODUCTION_IDENTITY_CONFLICT(409, "生产扫码身份已绑定其他工单"),
+    PRODUCTION_SUPPLEMENT_UNSUPPORTED(422, "当前版本尚不支持纯材料补料提交"),
+    EXECUTION_QR_INVALID(400, "扫码格式应为EXE:执行主键或版本化MES1生产身份"),
     EXECUTION_NOT_FOUND(404, "当前工厂未找到该生产执行身份"),
     WORKORDER_INVALID(422, "工单产品、计划数量、默认工艺或计划日期不符合规则"),
     WORKORDER_NOT_RELEASED(422, "工单尚未下达，只能预建待执行身份，不能开工或结束生产"),

@@ -1,5 +1,8 @@
 package dev.issuefixture;
 
+import dev.mesbase.business.quality.service.ExecutionQualityReferenceQueryImpl;
+import dev.mesbase.business.quality.dao.MesProductionDefectMapper;
+
 import dev.mesbase.business.production.service.ProductionChainLocks;
 import dev.mesbase.business.production.dao.MesProductionReportMapper;
 import dev.mesbase.business.production.dao.ProductionQuantityMapper;
@@ -30,6 +33,7 @@ import dev.mesbase.business.production.domain.MesProductionExecutionExample;
 import dev.mesbase.business.production.domain.MesProductionExecutionUpdateCommand;
 import dev.mesbase.business.production.service.ProductionExecutionRules;
 import dev.mesbase.business.production.service.ProductionIdentityService;
+import dev.mesbase.business.production.dao.MesProductionScanIdentityMapper;
 import dev.mesbase.business.production.service.impl.MesProductionExecutionServiceImpl;
 import dev.mesbase.common.core.domain.entity.SysUser;
 import dev.mesbase.common.core.domain.model.LoginUser;
@@ -95,7 +99,7 @@ class ProductionExecutionMySqlTest {
             var executions = s.getMapper(MesProductionExecutionMapper.class);
             var issues = s.getMapper(MesMaterialIssueMapper.class);
             var chainLocks = new ProductionChainLocks(s.getMapper(WorkorderMapper.class), executions, issues);
-            var rules = new ProductionExecutionRules(executions, s.getMapper(WorkorderMapper.class), s.getMapper(MaterialMapper.class), s.getMapper(RoutingMapper.class), s.getMapper(RoutingProductMapper.class), issues, chainLocks, s.getMapper(MesExecutionPathMapper.class), s.getMapper(MesExecutionPathNodeMapper.class), s.getMapper(MesProductionReportMapper.class), s.getMapper(ProductionQuantityMapper.class));
+            var rules = new ProductionExecutionRules(executions, s.getMapper(WorkorderMapper.class), s.getMapper(MaterialMapper.class), s.getMapper(RoutingMapper.class), s.getMapper(RoutingProductMapper.class), issues, chainLocks, s.getMapper(MesExecutionPathMapper.class), s.getMapper(MesExecutionPathNodeMapper.class), s.getMapper(MesProductionReportMapper.class), s.getMapper(ProductionQuantityMapper.class), new ExecutionQualityReferenceQueryImpl(s.getMapper(MesProductionDefectMapper.class)));
             var service = new MesProductionExecutionServiceImpl(executions, rules);
             var input = new MesProductionExecutionCreateCommand(workorder, routing, new BigDecimal("99999999999999.123456"), "READY", null, null, tag);
             var first = service.insert(input);
@@ -105,7 +109,7 @@ class ProductionExecutionMySqlTest {
             assertEquals("EXE-" + first.getId(), first.getExecutionNo());
             var updated = service.updateById(first.getId(), new MesProductionExecutionUpdateCommand(workorder, routing, new BigDecimal("1.123456"), "READY", null, null, tag));
             assertEquals(first.getExecutionNo(), updated.getExecutionNo());
-            var identity = new ProductionIdentityService(executions, s.getMapper(WorkorderMapper.class), s.getMapper(MaterialMapper.class), s.getMapper(RoutingMapper.class));
+            var identity = new ProductionIdentityService(executions, s.getMapper(WorkorderMapper.class), s.getMapper(MaterialMapper.class), s.getMapper(RoutingMapper.class), s.getMapper(MesProductionScanIdentityMapper.class));
             var before = service.selectById(first.getId()).getUpdateTime();
             assertEquals(first.getId(), identity.resolve("EXE:" + first.getId()).executionId());
             assertEquals(before, service.selectById(first.getId()).getUpdateTime());

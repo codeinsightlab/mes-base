@@ -1,0 +1,372 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- MES-CODEGEN: MyBatis Generator standard single-table persistence. -->
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="dev.mesbase.business.issue.dao.MesMaterialIssueInputMapper">
+  <resultMap id="BaseResultMap" type="dev.mesbase.business.issue.domain.MesMaterialIssueInputEntity">
+    <id column="id" jdbcType="VARCHAR" property="id" />
+    <result column="request_hash" jdbcType="CHAR" property="requestHash" />
+    <result column="issue_id" jdbcType="BIGINT" property="issueId" />
+    <result column="execution_id" jdbcType="BIGINT" property="executionId" />
+    <result column="input_kind" jdbcType="VARCHAR" property="inputKind" />
+    <result column="output_qty" jdbcType="DECIMAL" property="outputQty" />
+    <result column="source_mode" jdbcType="VARCHAR" property="sourceMode" />
+    <result column="stock_id" jdbcType="BIGINT" property="stockId" />
+    <result column="confirmed_at" jdbcType="TIMESTAMP" property="confirmedAt" />
+    <result column="stock_applied" jdbcType="BIT" property="stockApplied" />
+    <result column="created_at" jdbcType="TIMESTAMP" property="createdAt" />
+  </resultMap>
+  <resultMap extends="BaseResultMap" id="ResultMapWithBLOBs" type="dev.mesbase.business.issue.domain.MesMaterialIssueInputEntity">
+    <result column="calculation_json" jdbcType="LONGVARCHAR" property="calculationJson" />
+  </resultMap>
+  <sql id="Example_Where_Clause">
+    <where>
+      <foreach collection="oredCriteria" item="criteria" separator="or">
+        <if test="criteria.valid">
+          <trim prefix="(" prefixOverrides="and" suffix=")">
+            <foreach collection="criteria.criteria" item="criterion">
+              <choose>
+                <when test="criterion.noValue">
+                  and ${criterion.condition}
+                </when>
+                <when test="criterion.singleValue">
+                  and ${criterion.condition} #{criterion.value}
+                </when>
+                <when test="criterion.betweenValue">
+                  and ${criterion.condition} #{criterion.value} and #{criterion.secondValue}
+                </when>
+                <when test="criterion.listValue">
+                  and ${criterion.condition}
+                  <foreach close=")" collection="criterion.value" item="listItem" open="(" separator=",">
+                    #{listItem}
+                  </foreach>
+                </when>
+              </choose>
+            </foreach>
+          </trim>
+        </if>
+      </foreach>
+    </where>
+  </sql>
+  <sql id="Update_By_Example_Where_Clause">
+    <where>
+      <foreach collection="example.oredCriteria" item="criteria" separator="or">
+        <if test="criteria.valid">
+          <trim prefix="(" prefixOverrides="and" suffix=")">
+            <foreach collection="criteria.criteria" item="criterion">
+              <choose>
+                <when test="criterion.noValue">
+                  and ${criterion.condition}
+                </when>
+                <when test="criterion.singleValue">
+                  and ${criterion.condition} #{criterion.value}
+                </when>
+                <when test="criterion.betweenValue">
+                  and ${criterion.condition} #{criterion.value} and #{criterion.secondValue}
+                </when>
+                <when test="criterion.listValue">
+                  and ${criterion.condition}
+                  <foreach close=")" collection="criterion.value" item="listItem" open="(" separator=",">
+                    #{listItem}
+                  </foreach>
+                </when>
+              </choose>
+            </foreach>
+          </trim>
+        </if>
+      </foreach>
+    </where>
+  </sql>
+  <sql id="Base_Column_List">
+    id, request_hash, issue_id, execution_id, input_kind, output_qty, source_mode, stock_id, 
+    confirmed_at, stock_applied, created_at
+  </sql>
+  <sql id="Blob_Column_List">
+    calculation_json
+  </sql>
+  <select id="selectByExampleWithBLOBs" parameterType="dev.mesbase.business.issue.domain.MesMaterialIssueInputExample" resultMap="ResultMapWithBLOBs">
+    select
+    <include refid="Base_Column_List" />
+    ,
+    <include refid="Blob_Column_List" />
+    from mes_material_issue_input
+    <if test="_parameter != null">
+      <include refid="Example_Where_Clause" />
+    </if>
+    <if test="orderByClause != null">
+      order by ${orderByClause}
+    </if>
+  </select>
+  <select id="selectByExample" parameterType="dev.mesbase.business.issue.domain.MesMaterialIssueInputExample" resultMap="BaseResultMap">
+    select
+    <include refid="Base_Column_List" />
+    from mes_material_issue_input
+    <if test="_parameter != null">
+      <include refid="Example_Where_Clause" />
+    </if>
+    <if test="orderByClause != null">
+      order by ${orderByClause}
+    </if>
+  </select>
+  <select id="selectByPrimaryKey" parameterType="String" resultMap="ResultMapWithBLOBs">
+    select 
+    <include refid="Base_Column_List" />
+    ,
+    <include refid="Blob_Column_List" />
+    from mes_material_issue_input
+    where id = #{id,jdbcType=VARCHAR}
+  </select>
+  <delete id="deleteByPrimaryKey" parameterType="String">
+    delete from mes_material_issue_input
+    where id = #{id,jdbcType=VARCHAR}
+  </delete>
+  <delete id="deleteByExample" parameterType="dev.mesbase.business.issue.domain.MesMaterialIssueInputExample">
+    delete from mes_material_issue_input
+    <if test="_parameter != null">
+      <include refid="Example_Where_Clause" />
+    </if>
+  </delete>
+  <insert id="insert" parameterType="dev.mesbase.business.issue.domain.MesMaterialIssueInputEntity">
+    insert into mes_material_issue_input (id, request_hash, issue_id, 
+      execution_id, input_kind, output_qty, 
+      source_mode, stock_id, confirmed_at, 
+      stock_applied, created_at, calculation_json
+      )
+    values (#{id,jdbcType=VARCHAR}, #{requestHash,jdbcType=CHAR}, #{issueId,jdbcType=BIGINT}, 
+      #{executionId,jdbcType=BIGINT}, #{inputKind,jdbcType=VARCHAR}, #{outputQty,jdbcType=DECIMAL}, 
+      #{sourceMode,jdbcType=VARCHAR}, #{stockId,jdbcType=BIGINT}, #{confirmedAt,jdbcType=TIMESTAMP}, 
+      #{stockApplied,jdbcType=BIT}, #{createdAt,jdbcType=TIMESTAMP}, #{calculationJson,jdbcType=LONGVARCHAR}
+      )
+  </insert>
+  <insert id="insertSelective" parameterType="dev.mesbase.business.issue.domain.MesMaterialIssueInputEntity">
+    insert into mes_material_issue_input
+    <trim prefix="(" suffix=")" suffixOverrides=",">
+      <if test="id != null">
+        id,
+      </if>
+      <if test="requestHash != null">
+        request_hash,
+      </if>
+      <if test="issueId != null">
+        issue_id,
+      </if>
+      <if test="executionId != null">
+        execution_id,
+      </if>
+      <if test="inputKind != null">
+        input_kind,
+      </if>
+      <if test="outputQty != null">
+        output_qty,
+      </if>
+      <if test="sourceMode != null">
+        source_mode,
+      </if>
+      <if test="stockId != null">
+        stock_id,
+      </if>
+      <if test="confirmedAt != null">
+        confirmed_at,
+      </if>
+      <if test="stockApplied != null">
+        stock_applied,
+      </if>
+      <if test="createdAt != null">
+        created_at,
+      </if>
+      <if test="calculationJson != null">
+        calculation_json,
+      </if>
+    </trim>
+    <trim prefix="values (" suffix=")" suffixOverrides=",">
+      <if test="id != null">
+        #{id,jdbcType=VARCHAR},
+      </if>
+      <if test="requestHash != null">
+        #{requestHash,jdbcType=CHAR},
+      </if>
+      <if test="issueId != null">
+        #{issueId,jdbcType=BIGINT},
+      </if>
+      <if test="executionId != null">
+        #{executionId,jdbcType=BIGINT},
+      </if>
+      <if test="inputKind != null">
+        #{inputKind,jdbcType=VARCHAR},
+      </if>
+      <if test="outputQty != null">
+        #{outputQty,jdbcType=DECIMAL},
+      </if>
+      <if test="sourceMode != null">
+        #{sourceMode,jdbcType=VARCHAR},
+      </if>
+      <if test="stockId != null">
+        #{stockId,jdbcType=BIGINT},
+      </if>
+      <if test="confirmedAt != null">
+        #{confirmedAt,jdbcType=TIMESTAMP},
+      </if>
+      <if test="stockApplied != null">
+        #{stockApplied,jdbcType=BIT},
+      </if>
+      <if test="createdAt != null">
+        #{createdAt,jdbcType=TIMESTAMP},
+      </if>
+      <if test="calculationJson != null">
+        #{calculationJson,jdbcType=LONGVARCHAR},
+      </if>
+    </trim>
+  </insert>
+  <select id="countByExample" parameterType="dev.mesbase.business.issue.domain.MesMaterialIssueInputExample" resultType="java.lang.Long">
+    select count(*) from mes_material_issue_input
+    <if test="_parameter != null">
+      <include refid="Example_Where_Clause" />
+    </if>
+  </select>
+  <update id="updateByExampleSelective" parameterType="map">
+    update mes_material_issue_input
+    <set>
+      <if test="row.id != null">
+        id = #{row.id,jdbcType=VARCHAR},
+      </if>
+      <if test="row.requestHash != null">
+        request_hash = #{row.requestHash,jdbcType=CHAR},
+      </if>
+      <if test="row.issueId != null">
+        issue_id = #{row.issueId,jdbcType=BIGINT},
+      </if>
+      <if test="row.executionId != null">
+        execution_id = #{row.executionId,jdbcType=BIGINT},
+      </if>
+      <if test="row.inputKind != null">
+        input_kind = #{row.inputKind,jdbcType=VARCHAR},
+      </if>
+      <if test="row.outputQty != null">
+        output_qty = #{row.outputQty,jdbcType=DECIMAL},
+      </if>
+      <if test="row.sourceMode != null">
+        source_mode = #{row.sourceMode,jdbcType=VARCHAR},
+      </if>
+      <if test="row.stockId != null">
+        stock_id = #{row.stockId,jdbcType=BIGINT},
+      </if>
+      <if test="row.confirmedAt != null">
+        confirmed_at = #{row.confirmedAt,jdbcType=TIMESTAMP},
+      </if>
+      <if test="row.stockApplied != null">
+        stock_applied = #{row.stockApplied,jdbcType=BIT},
+      </if>
+      <if test="row.createdAt != null">
+        created_at = #{row.createdAt,jdbcType=TIMESTAMP},
+      </if>
+      <if test="row.calculationJson != null">
+        calculation_json = #{row.calculationJson,jdbcType=LONGVARCHAR},
+      </if>
+    </set>
+    <if test="example != null">
+      <include refid="Update_By_Example_Where_Clause" />
+    </if>
+  </update>
+  <update id="updateByExampleWithBLOBs" parameterType="map">
+    update mes_material_issue_input
+    set id = #{row.id,jdbcType=VARCHAR},
+      request_hash = #{row.requestHash,jdbcType=CHAR},
+      issue_id = #{row.issueId,jdbcType=BIGINT},
+      execution_id = #{row.executionId,jdbcType=BIGINT},
+      input_kind = #{row.inputKind,jdbcType=VARCHAR},
+      output_qty = #{row.outputQty,jdbcType=DECIMAL},
+      source_mode = #{row.sourceMode,jdbcType=VARCHAR},
+      stock_id = #{row.stockId,jdbcType=BIGINT},
+      confirmed_at = #{row.confirmedAt,jdbcType=TIMESTAMP},
+      stock_applied = #{row.stockApplied,jdbcType=BIT},
+      created_at = #{row.createdAt,jdbcType=TIMESTAMP},
+      calculation_json = #{row.calculationJson,jdbcType=LONGVARCHAR}
+    <if test="example != null">
+      <include refid="Update_By_Example_Where_Clause" />
+    </if>
+  </update>
+  <update id="updateByExample" parameterType="map">
+    update mes_material_issue_input
+    set id = #{row.id,jdbcType=VARCHAR},
+      request_hash = #{row.requestHash,jdbcType=CHAR},
+      issue_id = #{row.issueId,jdbcType=BIGINT},
+      execution_id = #{row.executionId,jdbcType=BIGINT},
+      input_kind = #{row.inputKind,jdbcType=VARCHAR},
+      output_qty = #{row.outputQty,jdbcType=DECIMAL},
+      source_mode = #{row.sourceMode,jdbcType=VARCHAR},
+      stock_id = #{row.stockId,jdbcType=BIGINT},
+      confirmed_at = #{row.confirmedAt,jdbcType=TIMESTAMP},
+      stock_applied = #{row.stockApplied,jdbcType=BIT},
+      created_at = #{row.createdAt,jdbcType=TIMESTAMP}
+    <if test="example != null">
+      <include refid="Update_By_Example_Where_Clause" />
+    </if>
+  </update>
+  <update id="updateByPrimaryKeySelective" parameterType="dev.mesbase.business.issue.domain.MesMaterialIssueInputEntity">
+    update mes_material_issue_input
+    <set>
+      <if test="requestHash != null">
+        request_hash = #{requestHash,jdbcType=CHAR},
+      </if>
+      <if test="issueId != null">
+        issue_id = #{issueId,jdbcType=BIGINT},
+      </if>
+      <if test="executionId != null">
+        execution_id = #{executionId,jdbcType=BIGINT},
+      </if>
+      <if test="inputKind != null">
+        input_kind = #{inputKind,jdbcType=VARCHAR},
+      </if>
+      <if test="outputQty != null">
+        output_qty = #{outputQty,jdbcType=DECIMAL},
+      </if>
+      <if test="sourceMode != null">
+        source_mode = #{sourceMode,jdbcType=VARCHAR},
+      </if>
+      <if test="stockId != null">
+        stock_id = #{stockId,jdbcType=BIGINT},
+      </if>
+      <if test="confirmedAt != null">
+        confirmed_at = #{confirmedAt,jdbcType=TIMESTAMP},
+      </if>
+      <if test="stockApplied != null">
+        stock_applied = #{stockApplied,jdbcType=BIT},
+      </if>
+      <if test="createdAt != null">
+        created_at = #{createdAt,jdbcType=TIMESTAMP},
+      </if>
+      <if test="calculationJson != null">
+        calculation_json = #{calculationJson,jdbcType=LONGVARCHAR},
+      </if>
+    </set>
+    where id = #{id,jdbcType=VARCHAR}
+  </update>
+  <update id="updateByPrimaryKeyWithBLOBs" parameterType="dev.mesbase.business.issue.domain.MesMaterialIssueInputEntity">
+    update mes_material_issue_input
+    set request_hash = #{requestHash,jdbcType=CHAR},
+      issue_id = #{issueId,jdbcType=BIGINT},
+      execution_id = #{executionId,jdbcType=BIGINT},
+      input_kind = #{inputKind,jdbcType=VARCHAR},
+      output_qty = #{outputQty,jdbcType=DECIMAL},
+      source_mode = #{sourceMode,jdbcType=VARCHAR},
+      stock_id = #{stockId,jdbcType=BIGINT},
+      confirmed_at = #{confirmedAt,jdbcType=TIMESTAMP},
+      stock_applied = #{stockApplied,jdbcType=BIT},
+      created_at = #{createdAt,jdbcType=TIMESTAMP},
+      calculation_json = #{calculationJson,jdbcType=LONGVARCHAR}
+    where id = #{id,jdbcType=VARCHAR}
+  </update>
+  <update id="updateByPrimaryKey" parameterType="dev.mesbase.business.issue.domain.MesMaterialIssueInputEntity">
+    update mes_material_issue_input
+    set request_hash = #{requestHash,jdbcType=CHAR},
+      issue_id = #{issueId,jdbcType=BIGINT},
+      execution_id = #{executionId,jdbcType=BIGINT},
+      input_kind = #{inputKind,jdbcType=VARCHAR},
+      output_qty = #{outputQty,jdbcType=DECIMAL},
+      source_mode = #{sourceMode,jdbcType=VARCHAR},
+      stock_id = #{stockId,jdbcType=BIGINT},
+      confirmed_at = #{confirmedAt,jdbcType=TIMESTAMP},
+      stock_applied = #{stockApplied,jdbcType=BIT},
+      created_at = #{createdAt,jdbcType=TIMESTAMP}
+    where id = #{id,jdbcType=VARCHAR}
+  </update>
+</mapper>

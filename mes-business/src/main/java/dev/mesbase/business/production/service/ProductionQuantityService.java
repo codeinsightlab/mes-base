@@ -1,6 +1,8 @@
 package dev.mesbase.business.production.service;
 
 import dev.mesbase.business.production.domain.ProductionReportModels.ExecutionSummary;
+import dev.mesbase.business.production.domain.ProductionQuantityConflictException;
+import dev.mesbase.business.quality.service.ProductionDefectQuantityQuery;
 
 import dev.mesbase.business.production.dao.MesProductionExecutionMapper;
 import dev.mesbase.business.production.dao.MesExecutionPathNodeMapper;
@@ -34,24 +36,32 @@ public class ProductionQuantityService {
     private final MesExecutionPathNodeMapper pathNodes;
     private final ProductionQuantityMapper quantities;
     private final BusinessDirectoryService directory;
+    private final ProductionDefectQuantityQuery defects;
 
     public ProductionQuantityService(MesProductionExecutionMapper executions, ExecutionPathService paths,
                                      MesExecutionPathNodeMapper pathNodes, ProductionQuantityMapper quantities,
-                                     BusinessDirectoryService directory) {
+                                     BusinessDirectoryService directory, ProductionDefectQuantityQuery defects) {
         this.executions = executions;
         this.paths = paths;
         this.pathNodes = pathNodes;
         this.quantities = quantities;
         this.directory = directory;
+        this.defects = defects;
     }
 
     public ExecutionQuantity getExecutionQuantities(Long executionId) {
+        return calculate(load(executionId), null, BigDecimal.ZERO, BigDecimal.ZERO);
+    }
+
+    private ExecutionQuantity load(Long executionId) {
         var execution = executions.selectByPrimaryKey(executionId);
         if (execution == null) throw new FoundationException(ErrorCode.EXECUTION_NOT_FOUND);
         var model = paths.view(executionId);
+        var balance = quantities.inputBalance(executionId);
+        var inputQty = balance.usableQty();
         if (model.path() == null)
             return new ExecutionQuantity(executionId, execution.getWorkorderId(), execution.getExecutionNo(),
-                    execution.getRoutingId(), execution.getTargetQty(), ExecutionPathStatus.UNSELECTED.getValue(), false, "执行尚未选择实际路径", List.of(), label(model.routing()));
+                    execution.getRoutingId(), execution.getTargetQty(), ExecutionPathStatus.UNSELECTED.getValue(), false, "执行尚未选择实际路径", List.of(), label(model.routing()), inputQty, balance.confirmedQty(), balance.reservedQty());
         if (!Objects.equals(model.path().getRoutingId(), execution.getRoutingId())) unavailable();
         ExecutionPathValidator.validate(model.selectedNodeIds(), model.nodes(), model.edges());
         var f = new MesExecutionPathNodeExample();
@@ -63,22 +73,22 @@ public class ProductionQuantityService {
         var nodeMap = model.nodes().stream().collect(Collectors.toMap(n -> n.getId(), n -> n));
         var totals = quantities.nodeTotals(executionId).stream()
                 .collect(Collectors.toMap(t -> t.routingNodeId(), t -> t.reportedQty()));
+        var defectTotals = defects.nodeTotals(executionId).stream()
+                .collect(Collectors.toMap(t -> t.affectedNodeId(), t -> t.effectiveDefectQty()));
         var result = new ArrayList<NodeQuantity>();
-        BigDecimal input = execution.getTargetQty();
         for (int i = 0; i < ordered.size(); i++) {
             var node = nodeMap.get(ordered.get(i).getRoutingNodeId());
             var reported = totals.getOrDefault(node.getId(), BigDecimal.ZERO);
-            requireWithin(input, reported);
+            var defect = defectTotals.getOrDefault(node.getId(), BigDecimal.ZERO);
             result.add(new NodeQuantity(executionId, node.getId(), node.getOperationId(), node.getNodeCode(), node.getOperationName() != null ? node.getOperationName() : model.operationLabels()
                     .containsKey(node.getOperationId()) ? model.operationLabels().get(node.getOperationId())
                     .name() + "（当前名称）" : null, i + 1,
-                    input, reported, BigDecimal.ZERO, reported, input.subtract(reported), false));
-            input = reported;
+                    BigDecimal.ZERO, reported, defect, BigDecimal.ZERO, BigDecimal.ZERO, true));
         }
         boolean locked = ExecutionPathStatus.LOCKED.getValue().equals(model.path().getPathStatus());
         return new ExecutionQuantity(executionId, execution.getWorkorderId(), execution.getExecutionNo(), execution.getRoutingId(),
                 execution.getTargetQty(), model.path()
-                .getPathStatus(), locked, locked ? null : "实际路径尚未锁定，禁止写入报工数量", List.copyOf(result), label(model.routing()));
+                .getPathStatus(), locked, locked ? null : "实际路径尚未锁定，禁止写入报工数量", List.copyOf(result), label(model.routing()), inputQty, balance.confirmedQty(), balance.reservedQty());
     }
 
     private static String label(DirectoryLabel label) {
@@ -109,27 +119,50 @@ public class ProductionQuantityService {
 
     public static void validateChange(ExecutionQuantity view, Long nodeId, BigDecimal delta) {
         if (!view.writable()) unavailable();
+        calculate(view, nodeId, delta, BigDecimal.ZERO);
+    }
+
+    /**
+     * Caller must hold the common WorkOrder -> Execution locks in its write transaction.
+     */
+    public void validateReportChange(Long executionId, Long nodeId, BigDecimal delta) {
+        validateChange(load(executionId), nodeId, delta);
+    }
+
+    /**
+     * Quality may exist before path locking; only report writes require LOCKED.
+     */
+    public void validateDefectChange(Long executionId, Long nodeId, BigDecimal contributionDelta) {
+        calculate(load(executionId), nodeId, BigDecimal.ZERO, contributionDelta);
+    }
+
+    private static ExecutionQuantity calculate(ExecutionQuantity view, Long nodeId, BigDecimal reportDelta,
+                                               BigDecimal defectDelta) {
         boolean found = false;
-        var input = view.targetQty();
+        var input = view.productionInputQty();
+        Long upstream = null;
+        var result = new ArrayList<NodeQuantity>();
         for (var node : view.nodes()) {
             var next = node.reportedQty();
+            var defect = node.defectQty();
             if (node.routingNodeId().equals(nodeId)) {
-                next = next.add(delta);
+                next = next.add(reportDelta);
+                defect = defect.add(defectDelta);
                 found = true;
             }
-            requireWithin(input, next);
-            input = next;
+            if (next.signum() < 0 || defect.signum() < 0 || next.compareTo(defect) < 0 || next.compareTo(input) > 0)
+                throw new ProductionQuantityConflictException(node.routingNodeId(), upstream, input, next, defect);
+            var output = next.subtract(defect);
+            result.add(new NodeQuantity(node.executionId(), node.routingNodeId(), node.operationId(), node.code(), node.name(), node.sequenceNo(), input, next, defect, output, input.subtract(next), node.qualityIntegrated()));
+            input = output;
+            upstream = node.routingNodeId();
         }
-        if (!found) unavailable();
+        if (nodeId != null && !found) unavailable();
+        return new ExecutionQuantity(view.executionId(), view.workorderId(), view.executionNo(), view.routingId(), view.targetQty(), view.pathStatus(), view.writable(), view.boundary(), List.copyOf(result), view.routingLabel(), view.productionInputQty(), view.confirmedInputQty(), view.reservedInputQty());
     }
 
     public static void paging(int offset, int limit) {
         if (offset < 0 || limit < 1 || limit > 100) throw new FoundationException(ErrorCode.BAD_REQUEST);
-    }
-
-    private static void requireWithin(BigDecimal input, BigDecimal reported) {
-        if (reported.signum() < 0 || reported.compareTo(input) > 0)
-            throw new FoundationException(ErrorCode.REPORT_QUANTITY_CONFLICT);
     }
 
     private static void unavailable() {

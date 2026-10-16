@@ -19,7 +19,8 @@ public record WmInventoryVo(
         String createBy,
         LocalDateTime createTime,
         String updateBy,
-        LocalDateTime updateTime
+        LocalDateTime updateTime,
+        String batchNo, String binCode
 ) {
 }
 

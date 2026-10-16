@@ -8,6 +8,8 @@ import dev.mesbase.business.quality.domain.ProductionDefectModels.NodeTotal;
 import org.apache.ibatis.annotations.Param;
 
 public interface MesProductionDefectMapper {
+    boolean existsExecutionHistory(@Param("executionId") Long executionId);
+
     long countByExample(MesProductionDefectExample example);
 
     int insert(MesProductionDefectEntity row);

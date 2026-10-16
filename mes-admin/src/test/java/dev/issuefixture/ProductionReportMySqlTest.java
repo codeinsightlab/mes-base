@@ -1,5 +1,7 @@
 package dev.issuefixture;
 
+import dev.mesbase.business.quality.service.ExecutionQualityReferenceQueryImpl;
+
 import dev.mesbase.acceptance.AcceptanceBusinessDatabase;
 import dev.mesbase.business.production.dao.MesProductionReportMapper;
 import dev.mesbase.business.production.dao.MesProductionExecutionMapper;
@@ -79,7 +81,7 @@ class ProductionReportMySqlTest {
     static AnnotationConfigApplicationContext context() throws Exception {
         var c = new AnnotationConfigApplicationContext();
         c.getEnvironment().getPropertySources()
-                .addFirst(new MapPropertySource("LIVE MYSQL TEST ONLY", Map.of("mes.business.enabled", "true")));
+                .addFirst(new MapPropertySource("LIVE MYSQL TEST ONLY", Map.of("mes.business.enabled", "true", "mes.system.enabled", "true")));
         DataSource source = AcceptanceBusinessDatabase.source();
         var tx = new OwnedTransactionManager(source);
         var factory = PersistenceFactories.create(source, MaterialIssueHttpTest.MAPPERS, PersistenceFactories::pagination, tx::verifyAccess);
@@ -100,7 +102,7 @@ class ProductionReportMySqlTest {
         c.registerBean(SysUserMapper.class, () -> center.mapper(SysUserMapper.class));
         c.registerBean(BusinessDirectoryService.class, () -> new BusinessDirectoryService(
                 c.getBean(SysUserMapper.class), mock(SysDeptMapper.class), mock(SysPostMapper.class), new DetailEntityCache(mock(RedisCache.class), new MockEnvironment()), mock(BusinessCacheProcessor.class), center, c.getBeanProvider(OwnedTransactionManager.class), c.getBeanProvider(RoutingMapper.class), c.getBeanProvider(OperationMapper.class)));
-        c.register(ProductionReportService.class, ProductionQuantityService.class, ReportUserReferenceService.class, ProductionChainLocks.class, ProductionExecutionRules.class, ExecutionPathService.class);
+        c.register(ExecutionQualityReferenceQueryImpl.class, ProductionReportService.class, ProductionQuantityService.class, ReportUserReferenceService.class, ProductionChainLocks.class, ProductionExecutionRules.class, ExecutionPathService.class);
         c.refresh();
         return c;
     }
@@ -130,6 +132,7 @@ class ProductionReportMySqlTest {
         jdbc.update("INSERT INTO mes_execution_path(id,routing_id,path_status,revision,selected_at,locked_at) VALUES(?,?,'LOCKED',1,NOW(),NOW())", execution, source.get("routing_id"));
         jdbc.update("INSERT INTO mes_execution_path_node(execution_id,sequence_no,routing_node_id) SELECT ?,sequence_no,routing_node_id FROM mes_execution_path_node WHERE execution_id=?", execution, source.get("id"));
         long node = jdbc.queryForObject("SELECT routing_node_id FROM mes_execution_path_node WHERE execution_id=? AND sequence_no=1", Long.class, execution);
+        ProductionInputTestData.confirmed(jdbc, execution, BigDecimal.TEN);
         return new Fixture(execution, node, tag);
     }
 
@@ -187,7 +190,7 @@ class ProductionReportMySqlTest {
     }
 
     @Test
-    void realMysqlConcurrentCommandsCannotExceedTargetAndPersistAuditableNetZeroFixture() throws Exception {
+    void realMysqlConcurrentCommandsCannotExceedConfirmedInputAndPersistAuditableNetZeroFixture() throws Exception {
         try (var c = context(); var executor = Executors.newFixedThreadPool(2)) {
             var jdbc = c.getBean(JdbcTemplate.class);
             var reports = c.getBean(ProductionReportService.class);

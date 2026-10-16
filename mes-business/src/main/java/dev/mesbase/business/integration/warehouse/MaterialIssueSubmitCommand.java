@@ -1,6 +1,7 @@
 package dev.mesbase.business.integration.warehouse;
 
 import java.math.BigDecimal;
+import dev.mesbase.business.integration.production.ProductionSupply.Calculation;
 import java.util.List;
 
 /**
@@ -12,10 +13,13 @@ public record MaterialIssueSubmitCommand(Long issueId, String operationKey, Stri
                                          Long executionId, String executionNo, Long productId, String productCode,
                                          Long routingId,
                                          Integer pathRevision, List<Long> routingNodeIds, String issueTime,
-                                         List<Line> lines) {
+                                         List<Line> lines, Input input) {
     public MaterialIssueSubmitCommand {
         routingNodeIds = List.copyOf(routingNodeIds);
         lines = List.copyOf(lines);
+    }
+
+    public record Input(String requestId, String inputKind, BigDecimal outputQty, Calculation calculation) {
     }
 
     public record Line(Long itemId, Long materialId, String materialCode, String batchNo,

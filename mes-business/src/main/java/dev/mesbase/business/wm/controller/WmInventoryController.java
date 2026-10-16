@@ -115,7 +115,7 @@ public class WmInventoryController {
                 row.getCreateBy(),
                 row.getCreateTime(),
                 row.getUpdateBy(),
-                row.getUpdateTime()
+                row.getUpdateTime(), row.getBatchNo(), row.getBinCode()
         );
     }
 }

@@ -121,3 +121,10 @@ Crud Field 增加可选 `columnMinWidth`，共享 CrudPage 默认行为保持；
 行级工厂隔离。引用存在性、稳定工艺版本、事务、权限和父子保护保留。领料两表现在共30列。
 详情及最新证据见 [业务工厂字段移除报告](2026-10-13-business-factory-column-removal-review.md)。
 本次未自行重启用户服务，旧API/UI通过记录不代表无工厂字段版本已完成真实服务验收。
+
+
+## 2026-10-16 中心 Flyway V17 恢复完成
+
+用户明确追加授权定位并修复后，已实时复核中心库 `192.168.18.25:3306/mes_base_dev` 与 SIMPLE_B 绑定、备份受影响范围，调用正式 Flyway repair 仅移除失败 V17，并通过 `skipExecutingMigrations` 逐项纳管已存在且核实过的 V17/V19/V20/V21/V23 结构，其余版本正常执行至 V29。没有改写历史 SQL、手工伪造 history、删除偏好表或自动恢复无法证明的旧角色授权。
+
+真实结果：29 项迁移校验通过，failed/pending 均为零；354 个原菜单 ID、885 条角色菜单关联、4 条工厂偏好、个人列偏好及路由代次保持原样。不良管理菜单 V29 已正式执行。原有正常迁移入口 MySQL 测试 1 项通过、BUILD SUCCESS；未修改业务代码或重启服务。详细方法、备份、证据及其他未验收边界见 [ProductionDefect 报告的中心迁移恢复记录](2026-10-16-production-defect-phase1-implementation-report.md#2026-10-16-中心迁移恢复与菜单落库用户追加授权)。本追加不改写事故发生时的记录，也不证明旧删除授权已经恢复。

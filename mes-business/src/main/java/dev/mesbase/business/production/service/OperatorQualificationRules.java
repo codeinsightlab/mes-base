@@ -13,6 +13,10 @@ import dev.mesbase.core.error.ErrorCode;
 import dev.mesbase.core.error.FoundationException;
 import dev.mesbase.platform.execution.FactoryContext;
 import java.util.Objects;
+import java.util.Map;
+import java.util.HashMap;
+import java.util.stream.Collectors;
+import dev.mesbase.business.production.domain.OperationExample;
 import java.util.List;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
@@ -82,6 +86,33 @@ public class OperatorQualificationRules {
         filter.createCriteria().andOperationIdEqualTo(operationId).andUserIdEqualTo(userId);
         if (capabilities.countByExample(filter) == 0)
             throw new FoundationException(ErrorCode.OPERATOR_CAPABILITY_REQUIRED);
+    }
+
+    /**
+     * Batched display/submit qualification; authorization is queried once, never cached across requests.
+     */
+    public Map<Long, ErrorCode> capabilityFailures(List<Long> operationIds, Long userId) {
+        FactoryContext.required();
+        var ids = operationIds.stream().distinct().toList();
+        if (ids.size() > 100) throw new FoundationException(ErrorCode.BAD_REQUEST);
+        var failures = new HashMap<Long, ErrorCode>();
+        if (ids.isEmpty()) return failures;
+        if (userId == null || users.validUsers(List.of(userId)).isEmpty()) {
+            ids.forEach(id -> failures.put(id, ErrorCode.OPERATOR_NOT_AUTHORIZED));
+            return failures;
+        }
+        var opFilter = new OperationExample();
+        opFilter.createCriteria().andIdIn(ids).andStatusEqualTo(EnableStatus.ENABLED.getValue());
+        var enabled = operations.selectByExample(opFilter).stream().map(row -> row.getId()).collect(Collectors.toSet());
+        var capFilter = new MesOperationUserExample();
+        capFilter.createCriteria().andOperationIdIn(ids).andUserIdEqualTo(userId);
+        var capable = capabilities.selectByExample(capFilter).stream().map(row -> row.getOperationId())
+                .collect(Collectors.toSet());
+        for (Long id : ids) {
+            if (!enabled.contains(id)) failures.put(id, ErrorCode.ROUTING_REFERENCE_INVALID);
+            else if (!capable.contains(id)) failures.put(id, ErrorCode.OPERATOR_CAPABILITY_REQUIRED);
+        }
+        return failures;
     }
 
     public static void requireMutable(MesProductionExecutionEntity execution) {

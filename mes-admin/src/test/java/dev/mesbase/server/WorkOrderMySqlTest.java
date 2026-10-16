@@ -1,5 +1,8 @@
 package dev.mesbase.server;
 
+import dev.mesbase.business.quality.service.ExecutionQualityReferenceQueryImpl;
+import dev.mesbase.business.quality.dao.MesProductionDefectMapper;
+
 import static org.mockito.Mockito.mock;
 
 import dev.mesbase.business.production.service.ProductionChainLocks;
@@ -80,11 +83,11 @@ import dev.mesbase.business.production.dao.WorkOrderExtraMapper;
  * TEST ONLY demand and execution convergence against configured acceptance MySQL; all writes roll back.
  */
 class WorkOrderMySqlTest {
-    static final Set<Class<?>> MAPPERS = Set.of(MesExecutionPathMapper.class, MesExecutionPathNodeMapper.class, WorkorderErpExtraMapper.class, WorkorderMapper.class, ProductionBatchMapper.class, BatchRouteNodeMapper.class, RoutingMapper.class, RoutingNodeMapper.class, RoutingEdgeMapper.class, RoutingProductMapper.class, OperationMapper.class, WorkOrderExtraMapper.class, MaterialMapper.class, MesMaterialIssueMapper.class, MesProductionExecutionMapper.class);
+    static final Set<Class<?>> MAPPERS = Set.of(MesProductionDefectMapper.class, MesExecutionPathMapper.class, MesExecutionPathNodeMapper.class, WorkorderErpExtraMapper.class, WorkorderMapper.class, ProductionBatchMapper.class, BatchRouteNodeMapper.class, RoutingMapper.class, RoutingNodeMapper.class, RoutingEdgeMapper.class, RoutingProductMapper.class, OperationMapper.class, WorkOrderExtraMapper.class, MaterialMapper.class, MesMaterialIssueMapper.class, MesProductionExecutionMapper.class);
 
     @Configuration
     @EnableTransactionManagement
-    @Import({ProductionChainLocks.class, WorkorderErpFacts.class, WorkOrderService.class, LegacyBatchHistoryQuery.class, LegacyBatchHistoryController.class, RoutingReferenceRules.class, ProductionExecutionRules.class, MesProductionExecutionServiceImpl.class})
+    @Import({ExecutionQualityReferenceQueryImpl.class, ProductionChainLocks.class, WorkorderErpFacts.class, WorkOrderService.class, LegacyBatchHistoryQuery.class, LegacyBatchHistoryController.class, RoutingReferenceRules.class, ProductionExecutionRules.class, MesProductionExecutionServiceImpl.class})
     static class Config {
         @Bean
         BusinessDirectoryService directory() {
@@ -99,6 +102,11 @@ class WorkOrderMySqlTest {
         @Bean
         SqlSessionFactory sessions(FactoryBusinessDataSource source, OwnedTransactionManager manager) {
             return PersistenceFactories.create(source, MAPPERS, PersistenceFactories::pagination, manager::verifyAccess);
+        }
+
+        @Bean
+        MesProductionDefectMapper qualityMapper(SqlSessionFactory s) {
+            return new SqlSessionTemplate(s).getMapper(MesProductionDefectMapper.class);
         }
 
         @Bean

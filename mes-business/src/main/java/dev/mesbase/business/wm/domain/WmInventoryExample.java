@@ -795,6 +795,146 @@ public class WmInventoryExample {
             addCriterion("update_time not between", value1, value2, "updateTime");
             return (Criteria) this;
         }
+
+        public Criteria andBatchNoIsNull() {
+            addCriterion("batch_no is null");
+            return (Criteria) this;
+        }
+
+        public Criteria andBatchNoIsNotNull() {
+            addCriterion("batch_no is not null");
+            return (Criteria) this;
+        }
+
+        public Criteria andBatchNoEqualTo(String value) {
+            addCriterion("batch_no =", value, "batchNo");
+            return (Criteria) this;
+        }
+
+        public Criteria andBatchNoNotEqualTo(String value) {
+            addCriterion("batch_no <>", value, "batchNo");
+            return (Criteria) this;
+        }
+
+        public Criteria andBatchNoGreaterThan(String value) {
+            addCriterion("batch_no >", value, "batchNo");
+            return (Criteria) this;
+        }
+
+        public Criteria andBatchNoGreaterThanOrEqualTo(String value) {
+            addCriterion("batch_no >=", value, "batchNo");
+            return (Criteria) this;
+        }
+
+        public Criteria andBatchNoLessThan(String value) {
+            addCriterion("batch_no <", value, "batchNo");
+            return (Criteria) this;
+        }
+
+        public Criteria andBatchNoLessThanOrEqualTo(String value) {
+            addCriterion("batch_no <=", value, "batchNo");
+            return (Criteria) this;
+        }
+
+        public Criteria andBatchNoLike(String value) {
+            addCriterion("batch_no like", value, "batchNo");
+            return (Criteria) this;
+        }
+
+        public Criteria andBatchNoNotLike(String value) {
+            addCriterion("batch_no not like", value, "batchNo");
+            return (Criteria) this;
+        }
+
+        public Criteria andBatchNoIn(List<String> values) {
+            addCriterion("batch_no in", values, "batchNo");
+            return (Criteria) this;
+        }
+
+        public Criteria andBatchNoNotIn(List<String> values) {
+            addCriterion("batch_no not in", values, "batchNo");
+            return (Criteria) this;
+        }
+
+        public Criteria andBatchNoBetween(String value1, String value2) {
+            addCriterion("batch_no between", value1, value2, "batchNo");
+            return (Criteria) this;
+        }
+
+        public Criteria andBatchNoNotBetween(String value1, String value2) {
+            addCriterion("batch_no not between", value1, value2, "batchNo");
+            return (Criteria) this;
+        }
+
+        public Criteria andBinCodeIsNull() {
+            addCriterion("bin_code is null");
+            return (Criteria) this;
+        }
+
+        public Criteria andBinCodeIsNotNull() {
+            addCriterion("bin_code is not null");
+            return (Criteria) this;
+        }
+
+        public Criteria andBinCodeEqualTo(String value) {
+            addCriterion("bin_code =", value, "binCode");
+            return (Criteria) this;
+        }
+
+        public Criteria andBinCodeNotEqualTo(String value) {
+            addCriterion("bin_code <>", value, "binCode");
+            return (Criteria) this;
+        }
+
+        public Criteria andBinCodeGreaterThan(String value) {
+            addCriterion("bin_code >", value, "binCode");
+            return (Criteria) this;
+        }
+
+        public Criteria andBinCodeGreaterThanOrEqualTo(String value) {
+            addCriterion("bin_code >=", value, "binCode");
+            return (Criteria) this;
+        }
+
+        public Criteria andBinCodeLessThan(String value) {
+            addCriterion("bin_code <", value, "binCode");
+            return (Criteria) this;
+        }
+
+        public Criteria andBinCodeLessThanOrEqualTo(String value) {
+            addCriterion("bin_code <=", value, "binCode");
+            return (Criteria) this;
+        }
+
+        public Criteria andBinCodeLike(String value) {
+            addCriterion("bin_code like", value, "binCode");
+            return (Criteria) this;
+        }
+
+        public Criteria andBinCodeNotLike(String value) {
+            addCriterion("bin_code not like", value, "binCode");
+            return (Criteria) this;
+        }
+
+        public Criteria andBinCodeIn(List<String> values) {
+            addCriterion("bin_code in", values, "binCode");
+            return (Criteria) this;
+        }
+
+        public Criteria andBinCodeNotIn(List<String> values) {
+            addCriterion("bin_code not in", values, "binCode");
+            return (Criteria) this;
+        }
+
+        public Criteria andBinCodeBetween(String value1, String value2) {
+            addCriterion("bin_code between", value1, value2, "binCode");
+            return (Criteria) this;
+        }
+
+        public Criteria andBinCodeNotBetween(String value1, String value2) {
+            addCriterion("bin_code not between", value1, value2, "binCode");
+            return (Criteria) this;
+        }
     }
 
     public static class Criteria extends GeneratedCriteria {

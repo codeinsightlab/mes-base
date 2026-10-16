@@ -64,7 +64,7 @@ public class ExecutionActionController {
         return MesProductionExecutionController.toView(service.start(id));
     }
 
-    private static PathView toView(PathModel model) {
+    public static PathView toView(PathModel model) {
         var p = model.path();
         return new PathView(model.executionId().toString(), model.executionStatus(), model.routing().id()
                 .toString(), p == null ? ExecutionPathStatus.UNSELECTED.getValue() : p.getPathStatus(), p == null ? 0 : p.getRevision(), p == null ? null : p.getSelectedAt(), p == null ? null : p.getLockedAt(), model.selectedNodeIds()

@@ -1,6 +1,7 @@
 package dev.mesbase.business.production.service;
 
 import dev.mesbase.business.production.domain.WorkOrderStatus;
+import dev.mesbase.business.quality.service.ExecutionQualityReferenceQuery;
 import dev.mesbase.business.production.domain.RoutingStatus;
 import dev.mesbase.business.production.domain.ProductionExecutionStatus;
 import dev.mesbase.business.production.domain.ExecutionPathStatus;
@@ -39,6 +40,7 @@ import org.springframework.stereotype.Component;
 @Component
 @ConditionalOnProperty(name = "mes.business.enabled", havingValue = "true")
 public class ProductionExecutionRules {
+    private final ExecutionQualityReferenceQuery quality;
     private final ProductionChainLocks locks;
     private final MesProductionReportMapper reports;
     private final ProductionQuantityMapper quantities;
@@ -56,7 +58,8 @@ public class ProductionExecutionRules {
                                     RoutingProductMapper products, MesMaterialIssueMapper issues,
                                     ProductionChainLocks locks, MesExecutionPathMapper paths,
                                     MesExecutionPathNodeMapper pathNodes, MesProductionReportMapper reports,
-                                    ProductionQuantityMapper quantities) {
+                                    ProductionQuantityMapper quantities, ExecutionQualityReferenceQuery quality) {
+        this.quality = quality;
         this.reports = reports;
         this.quantities = quantities;
         this.locks = locks;
@@ -94,9 +97,6 @@ public class ProductionExecutionRules {
             frozen();
         boolean reportFacts = hasReports(old.getId());
         boolean facts = started(old) || hasIssues(old.getId()) || reportFacts;
-        if (reportFacts && row.getTargetQty() != null && quantities.nodeTotals(old.getId()).stream()
-                .anyMatch(n -> n.reportedQty().compareTo(row.getTargetQty()) > 0))
-            throw new FoundationException(ErrorCode.REPORT_QUANTITY_CONFLICT);
         if (facts && (!Objects.equals(old.getRoutingId(), row.getRoutingId())
                 || ProductionExecutionStatus.READY.getValue()
                 .equals(row.getStatus()) && !ProductionExecutionStatus.READY.getValue().equals(old.getStatus())
@@ -116,6 +116,8 @@ public class ProductionExecutionRules {
         var row = lock(id);
         if (started(row) || hasIssues(id) || hasReports(id))
             throw new FoundationException(ErrorCode.EXECUTION_REFERENCED);
+        if (quality.hasAnyHistory(id))
+            throw new FoundationException(ErrorCode.EXECUTION_QUALITY_REFERENCED);
         var path = paths.selectByPrimaryKey(id);
         if (path != null) {
             if (ExecutionPathStatus.LOCKED.getValue().equals(path.getPathStatus())) frozen();

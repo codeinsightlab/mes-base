@@ -1,5 +1,10 @@
 package dev.issuefixture;
 
+import dev.mesbase.business.production.service.ProductionQuantityService;
+import dev.mesbase.business.issue.service.MaterialIssueInputFacts;
+import dev.mesbase.business.wm.dao.WmInventoryMapper;
+import dev.mesbase.business.production.dao.MesProductionScanIdentityMapper;
+import dev.mesbase.business.issue.dao.MesMaterialIssueInputMapper;
 import dev.mesbase.business.production.dao.MesExecutionPathMapper;
 import dev.mesbase.business.production.dao.MesExecutionPathNodeMapper;
 import dev.mesbase.business.issue.dao.MesMaterialIssueSubmissionMapper;
@@ -43,7 +48,11 @@ import dev.mesbase.business.production.controller.WorkOrderController;
 import dev.mesbase.business.production.dao.MesProductionExecutionMapper;
 import dev.mesbase.business.production.service.ProductionExecutionRules;
 import dev.mesbase.business.production.dao.MesProductionReportMapper;
+import dev.mesbase.business.production.dao.MesProductionReceiptMapper;
+import dev.mesbase.business.production.dao.ProductionReceiptQueryMapper;
 import dev.mesbase.business.quality.dao.MesProductionDefectMapper;
+import dev.mesbase.business.quality.service.ExecutionQualityReferenceQueryImpl;
+import dev.mesbase.business.production.controller.ProductionQuantityErrorAdvice;
 import dev.mesbase.business.basic.dao.WorkstationMapper;
 import dev.mesbase.business.production.dao.ProductionQuantityMapper;
 import dev.mesbase.business.production.service.ProductionIdentityService;
@@ -136,7 +145,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * TEST ONLY: real generated SQL, HTTP authorization and transactions; two separate H2 databases.
  */
 class MaterialIssueHttpTest {
-    static final Set<Class<?>> MAPPERS = Set.of(MesProductionDefectMapper.class, WorkstationMapper.class, MesProductionReportMapper.class, ProductionQuantityMapper.class, MesExecutionPathMapper.class, MesExecutionPathNodeMapper.class, MesMaterialIssueSubmissionMapper.class, WorkorderErpExtraMapper.class, MesMaterialIssueErpExtraMapper.class, WorkOrderExtraMapper.class, ProductionBatchMapper.class, BatchRouteNodeMapper.class, RoutingNodeMapper.class, RoutingEdgeMapper.class, OperationMapper.class, MesProductionExecutionMapper.class, MaterialMapper.class, UnitMeasureMapper.class, WmWarehouseMapper.class, RoutingMapper.class, RoutingProductMapper.class, WorkorderMapper.class, MesMaterialIssueMapper.class, MesMaterialIssueItemMapper.class);
+    static final Set<Class<?>> MAPPERS = Set.of(MesMaterialIssueInputMapper.class, MesProductionScanIdentityMapper.class, WmInventoryMapper.class, MesProductionReceiptMapper.class, ProductionReceiptQueryMapper.class, MesProductionDefectMapper.class, WorkstationMapper.class, MesProductionReportMapper.class, ProductionQuantityMapper.class, MesExecutionPathMapper.class, MesExecutionPathNodeMapper.class, MesMaterialIssueSubmissionMapper.class, WorkorderErpExtraMapper.class, MesMaterialIssueErpExtraMapper.class, WorkOrderExtraMapper.class, ProductionBatchMapper.class, BatchRouteNodeMapper.class, RoutingNodeMapper.class, RoutingEdgeMapper.class, OperationMapper.class, MesProductionExecutionMapper.class, MaterialMapper.class, UnitMeasureMapper.class, WmWarehouseMapper.class, RoutingMapper.class, RoutingProductMapper.class, WorkorderMapper.class, MesMaterialIssueMapper.class, MesMaterialIssueItemMapper.class);
 
     static class Fixture implements AutoCloseable {
         final RuntimeRegistry registry = new RuntimeRegistry();
@@ -150,7 +159,7 @@ class MaterialIssueHttpTest {
             for (String id : List.of("A", "B")) {
                 var source = source();
                 var jdbc = new JdbcTemplate(source);
-                for (String name : List.of("V2__simple_business_capabilities.sql", "V3__operation_routing.sql", "V4__routing_operation_instruction_snapshot.sql", "V9__routing_graph.sql", "V8__warehouse_inventory.sql", "V11__material_issue.sql", "V12__material_issue_quantity_precision.sql", "V13__workorder_batch_route.sql", "V16__production_execution.sql", "V18__material_issue_void.sql", "V19__local_void_external_effect.sql", "V20__material_issue_erp_extra.sql", "V21__workorder_external_extra.sql", "V22__unverified_legacy_erp_provider.sql", "V23__production_core_v1.sql", "V25__production_report_ledger.sql")) {
+                for (String name : List.of("V2__simple_business_capabilities.sql", "V3__operation_routing.sql", "V4__routing_operation_instruction_snapshot.sql", "V9__routing_graph.sql", "V8__warehouse_inventory.sql", "V11__material_issue.sql", "V12__material_issue_quantity_precision.sql", "V13__workorder_batch_route.sql", "V16__production_execution.sql", "V18__material_issue_void.sql", "V19__local_void_external_effect.sql", "V20__material_issue_erp_extra.sql", "V21__workorder_external_extra.sql", "V22__unverified_legacy_erp_provider.sql", "V23__production_core_v1.sql", "V25__production_report_ledger.sql", "V26__production_defect.sql", "V27__production_report_request.sql", "V29__single_material_production_input.sql")) {
                     String ddl = Files.readString(Path.of("mes-admin/src/main/resources/db/business/" + name))
                             .replace(") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT=", ") COMMENT ")
                             .replaceAll("(?m)^\\s*factory_id [^\\n]+\\n", "")
@@ -166,8 +175,22 @@ class MaterialIssueHttpTest {
                     if (name.equals("V23__production_core_v1.sql"))
                         ddl = ddl.replace(",\n MODIFY COLUMN", ";\nALTER TABLE mes_material_issue ALTER COLUMN");
                     if (name.equals("V25__production_report_ledger.sql")) ddl = ddl.split("-- 服务和数据库")[0];
+                    if (name.equals("V26__production_defect.sql"))
+                        ddl = ddl.split("CREATE TRIGGER")[0].replace(" COLLATE utf8mb4_bin", "");
+                    if (name.equals("V27__production_report_request.sql"))
+                        ddl = ddl.replace(" CHARACTER SET ascii COLLATE ascii_bin", "")
+                                .replace(",\n ADD UNIQUE KEY uk_report_request_id(request_id)", ";\nALTER TABLE mes_production_report ADD CONSTRAINT uk_report_request_id UNIQUE(request_id)");
+                    if (name.equals("V29__single_material_production_input.sql")) {
+                        ddl = ddl.split("-- 旧库存")[0].replace(" CHARACTER SET ascii COLLATE ascii_bin", "");
+                        jdbc.execute("ALTER TABLE wm_inventory ADD batch_no VARCHAR(128)");
+                        jdbc.execute("ALTER TABLE wm_inventory ADD bin_code VARCHAR(64)");
+                        jdbc.execute("ALTER TABLE wm_inventory DROP CONSTRAINT uk_inventory_factory_material_warehouse");
+                    }
                     for (String statement : ddl.split(";")) if (!statement.isBlank()) jdbc.execute(statement);
                 }
+                jdbc.execute("ALTER TABLE mes_production_scan_identity ADD product_code VARCHAR(64)");
+                jdbc.execute("ALTER TABLE mes_production_scan_identity ADD material_code VARCHAR(64)");
+                jdbc.execute("ALTER TABLE mes_production_scan_identity ADD material_lot_code VARCHAR(128)");
                 jdbc.update("INSERT INTO material(id,code,name,unit_id,material_type,status) VALUES(1,'M1','物料一',1,'PRODUCT','ENABLED')");
                 jdbc.update("INSERT INTO workorder(id,code,product_id,planned_qty,routing_id,status,revision,create_time,update_time) VALUES(1,'WO1',1,1000,1,'DRAFT',0,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)");
                 jdbc.update("INSERT INTO unit_measure(id,code,name,status) VALUES(1,'KG','千克','ENABLED')");
@@ -202,7 +225,7 @@ class MaterialIssueHttpTest {
     @EnableWebMvc
     @EnableWebSecurity
     @EnableTransactionManagement
-    @Import({ProductionExecutionQueryService.class, ProductionChainLocks.class, ExecutionPathService.class, ExecutionActionController.class, MaterialIssueSubmissionService.class, MaterialIssueSubmissionController.class, WorkorderErpFacts.class, MaterialIssueErpFacts.class, MaterialIssueErpService.class, MaterialIssueErpController.class, WarehouseIntegration.class, MaterialIssueVoidService.class, MaterialIssueVoidController.class, MesMaterialIssueController.class, MesMaterialIssueItemController.class, MesMaterialIssueServiceImpl.class, MesMaterialIssueItemServiceImpl.class, MaterialIssueRules.class, ProductionExecutionRules.class, ProductionIdentityService.class, MesProductionExecutionServiceImpl.class, MesProductionExecutionController.class, ProductionIdentityController.class, WorkOrderController.class, WorkOrderService.class, LegacyBatchHistoryQuery.class, LegacyBatchHistoryController.class, RoutingReferenceRules.class, FoundationErrorAdvice.class})
+    @Import({MaterialIssueInputFacts.class, ProductionQuantityService.class, ProductionQuantityErrorAdvice.class, ExecutionQualityReferenceQueryImpl.class, ProductionExecutionQueryService.class, ProductionChainLocks.class, ExecutionPathService.class, ExecutionActionController.class, MaterialIssueSubmissionService.class, MaterialIssueSubmissionController.class, WorkorderErpFacts.class, MaterialIssueErpFacts.class, MaterialIssueErpService.class, MaterialIssueErpController.class, WarehouseIntegration.class, MaterialIssueVoidService.class, MaterialIssueVoidController.class, MesMaterialIssueController.class, MesMaterialIssueItemController.class, MesMaterialIssueServiceImpl.class, MesMaterialIssueItemServiceImpl.class, MaterialIssueRules.class, ProductionExecutionRules.class, ProductionIdentityService.class, MesProductionExecutionServiceImpl.class, MesProductionExecutionController.class, ProductionIdentityController.class, WorkOrderController.class, WorkOrderService.class, LegacyBatchHistoryQuery.class, LegacyBatchHistoryController.class, RoutingReferenceRules.class, FoundationErrorAdvice.class})
     static class Web implements WebMvcConfigurer {
         @Bean
         BusinessDirectoryService directoryLabels(RoutingMapper routes, OperationMapper operations) {
@@ -273,6 +296,21 @@ class MaterialIssueHttpTest {
         }
 
         @Bean
+        MesMaterialIssueInputMapper inputMapper(SqlSessionFactory f) {
+            return new SqlSessionTemplate(f).getMapper(MesMaterialIssueInputMapper.class);
+        }
+
+        @Bean
+        MesProductionScanIdentityMapper scanMapper(SqlSessionFactory f) {
+            return new SqlSessionTemplate(f).getMapper(MesProductionScanIdentityMapper.class);
+        }
+
+        @Bean
+        WmInventoryMapper inventoryMapper(SqlSessionFactory f) {
+            return new SqlSessionTemplate(f).getMapper(WmInventoryMapper.class);
+        }
+
+        @Bean
         MesMaterialIssueSubmissionMapper submissionMapper(SqlSessionFactory f) {
             return new SqlSessionTemplate(f).getMapper(MesMaterialIssueSubmissionMapper.class);
         }
@@ -290,6 +328,11 @@ class MaterialIssueHttpTest {
         @Bean
         MesProductionExecutionMapper executionMapper(SqlSessionFactory f) {
             return new SqlSessionTemplate(f).getMapper(MesProductionExecutionMapper.class);
+        }
+
+        @Bean
+        MesProductionDefectMapper qualityReferenceMapper(SqlSessionFactory f) {
+            return new SqlSessionTemplate(f).getMapper(MesProductionDefectMapper.class);
         }
 
         @Bean
@@ -393,7 +436,9 @@ class MaterialIssueHttpTest {
                 var f = fixture();
                 r.addInterceptor(new FoundationAccessInterceptor(new FactorySelectionService(f.catalog, new InMemoryFactoryPreference()),
                         (actor, scope, permission) -> "full".equals(actor.id()) || "crud".equals(actor.id()) && (permission.code()
-                                .endsWith(":list") || permission.code().endsWith(":query") || permission.code().equals("business:quality:defect:read") || permission.code().equals("business:quality:defect:create"))));
+                                .endsWith(":list") || permission.code().endsWith(":query") || permission.code()
+                                .equals("business:quality:defect:read") || permission.code()
+                                .equals("business:quality:defect:create"))));
             } catch (Exception failure) {
                 throw new IllegalStateException(failure);
             }

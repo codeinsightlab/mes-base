@@ -125,6 +125,8 @@ public class WmInventoryServiceImpl implements IWmInventoryService {
         WmInventoryEntity row = new WmInventoryEntity();
 
         row.setMaterialId(input.materialId());
+        row.setBatchNo(input.batchNo());
+        row.setBinCode(input.binCode());
         row.setWarehouseId(input.warehouseId());
         row.setQuantity(input.quantity());
         row.setAvailableQuantity(input.availableQuantity());
@@ -146,6 +148,8 @@ public class WmInventoryServiceImpl implements IWmInventoryService {
         WmInventoryEntity row = requireRecord(id);
         row.setId(id);
         row.setMaterialId(input.materialId());
+        row.setBatchNo(input.batchNo());
+        row.setBinCode(input.binCode());
         row.setWarehouseId(input.warehouseId());
         row.setQuantity(input.quantity());
         row.setAvailableQuantity(input.availableQuantity());
@@ -227,11 +231,11 @@ public class WmInventoryServiceImpl implements IWmInventoryService {
         if (inputs == null || inputs.size() > 1000) {
             throw new FoundationException(ErrorCode.BAD_REQUEST);
         }
-        // EXTRA_CODE_REASON: inventory grain is Factory + Material + Warehouse.
+        // Inventory grain includes explicit material lot and optional bin within the current business database.
         var keys = new HashSet<StockKey>();
         for (var input : inputs) {
             if (input == null || !validator.validate(input)
-                    .isEmpty() || !keys.add(new StockKey(input.materialId(), input.warehouseId()))) {
+                    .isEmpty() || !keys.add(new StockKey(input.materialId(), input.warehouseId(), input.batchNo(), input.binCode()))) {
                 throw new FoundationException(ErrorCode.BAD_REQUEST);
             }
         }
@@ -242,7 +246,7 @@ public class WmInventoryServiceImpl implements IWmInventoryService {
         ;
         var existing = new HashMap<StockKey, WmInventoryEntity>();
         for (var row : mapper.selectByExample(example)) {
-            if (existing.put(new StockKey(row.getMaterialId(), row.getWarehouseId()), row) != null) {
+            if (existing.put(new StockKey(row.getMaterialId(), row.getWarehouseId(), row.getBatchNo(), row.getBinCode()), row) != null) {
                 throw new FoundationException(ErrorCode.RESOURCE_CONFLICT);
             }
         }
@@ -252,7 +256,7 @@ public class WmInventoryServiceImpl implements IWmInventoryService {
         int skipped = 0;
         for (var input : inputs) {
             coordinator.assertOwner(run);
-            var row = existing.get(new StockKey(input.materialId(), input.warehouseId()));
+            var row = existing.get(new StockKey(input.materialId(), input.warehouseId(), input.batchNo(), input.binCode()));
             if (row != null && same(row, input)) {
                 rules.validateInventoryFields(row);
                 skipped++;
@@ -264,6 +268,8 @@ public class WmInventoryServiceImpl implements IWmInventoryService {
 
             }
             row.setMaterialId(input.materialId());
+            row.setBatchNo(input.batchNo());
+            row.setBinCode(input.binCode());
             row.setWarehouseId(input.warehouseId());
             row.setQuantity(input.quantity());
             row.setAvailableQuantity(input.availableQuantity());
@@ -286,7 +292,7 @@ public class WmInventoryServiceImpl implements IWmInventoryService {
         return new WmInventorySyncResult(inputs.size(), created, updated, skipped);
     }
 
-    private record StockKey(Long materialId, Long warehouseId) {
+    private record StockKey(Long materialId, Long warehouseId, String batchNo, String binCode) {
     }
 
     // EXTRA_CODE_REASON: unique-key conflicts must be stable business errors for CRUD and sync.
@@ -310,7 +316,8 @@ public class WmInventoryServiceImpl implements IWmInventoryService {
     }
 
     private static boolean same(WmInventoryEntity row, ExternalWmInventory input) {
-        return Objects.deepEquals(row.getMaterialId(), input.materialId())
+        return Objects.equals(row.getBatchNo(), input.batchNo()) && Objects.equals(row.getBinCode(), input.binCode())
+                && Objects.deepEquals(row.getMaterialId(), input.materialId())
                 && Objects.deepEquals(row.getWarehouseId(), input.warehouseId())
                 && (row.getQuantity() == null ? input.quantity() == null
                 : input.quantity() != null && row.getQuantity().compareTo(input.quantity()) == 0)

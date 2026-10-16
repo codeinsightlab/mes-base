@@ -1,6 +1,7 @@
 package dev.mesbase.business.production.service;
 
 import dev.mesbase.business.production.domain.ProductionExecutionStatus;
+import dev.mesbase.business.quality.service.ExecutionQualityReferenceQuery;
 import dev.mesbase.business.integration.warehouse.ErpActionResult.Mode;
 import dev.mesbase.business.issue.domain.MaterialIssueStatus;
 import dev.mesbase.business.integration.warehouse.ExternalEffect;
@@ -46,6 +47,7 @@ import org.springframework.transaction.annotation.Isolation;
 @ConditionalOnProperty(name = "mes.business.enabled", havingValue = "true")
 @Transactional(transactionManager = "businessTransactionManager", isolation = Isolation.READ_COMMITTED, rollbackFor = Exception.class)
 public class ExecutionPathService {
+    private final ExecutionQualityReferenceQuery quality;
     private final ProductionChainLocks locks;
     private final ProductionExecutionRules rules;
     private final MesExecutionPathMapper paths;
@@ -61,7 +63,9 @@ public class ExecutionPathService {
                                 MesExecutionPathMapper paths,
                                 MesExecutionPathNodeMapper selected, MesProductionExecutionMapper executions,
                                 RoutingNodeMapper nodes, RoutingEdgeMapper edges, MesMaterialIssueMapper issues,
-                                MesMaterialIssueErpExtraMapper extras, BusinessDirectoryService references) {
+                                MesMaterialIssueErpExtraMapper extras, BusinessDirectoryService references,
+                                ExecutionQualityReferenceQuery quality) {
+        this.quality = quality;
         this.locks = locks;
         this.rules = rules;
         this.paths = paths;
@@ -97,8 +101,11 @@ public class ExecutionPathService {
         rules.checkReadyReferences(e);
         var old = paths.selectByPrimaryKey(id);
         if (revision == null || !Objects.equals(revision, old == null ? 0 : old.getRevision())) fail();
-        if (old != null && ExecutionPathStatus.LOCKED.getValue().equals(old.getPathStatus()) || hasBlockingIssue(id))
+        if (old != null && ExecutionPathStatus.LOCKED.getValue().equals(old.getPathStatus()))
             fail();
+        if (quality.hasAnyHistory(id))
+            throw new FoundationException(ErrorCode.EXECUTION_QUALITY_REFERENCED);
+        if (hasBlockingIssue(id)) fail();
         ExecutionPathValidator.validate(nodeIds, nodes(e.getRoutingId()), edges(e.getRoutingId()));
         var path = new MesExecutionPathEntity();
         path.setId(id);
@@ -143,12 +150,13 @@ public class ExecutionPathService {
         var e = locks.execution(id);
         if (!Set.of(ProductionExecutionStatus.READY.getValue(), ProductionExecutionStatus.RUNNING.getValue())
                 .contains(e.getStatus())) fail();
-        rules.checkReadyReferences(e);
+        if (ProductionExecutionStatus.READY.getValue().equals(e.getStatus())) rules.checkReadyReferences(e);
         if (!ExecutionPathStatus.LOCKED.getValue().equals(requireSelected(e).getPathStatus())) fail();
+        if (ProductionExecutionStatus.RUNNING.getValue().equals(e.getStatus())) return e;
         var rows = issueRows(id);
         if (rows.stream()
                 .noneMatch(i -> MaterialIssueStatus.CONFIRMED.getValue().equals(i.getStatus())) || rows.stream()
-                .anyMatch(i -> Set.of(MaterialIssueStatus.SUBMITTING.getValue(), MaterialIssueStatus.SUBMIT_UNKNOWN.getValue(), MaterialIssueStatus.VOID_PENDING.getValue(), MaterialIssueStatus.VOID_UNKNOWN.getValue())
+                .anyMatch(i -> Set.of(MaterialIssueStatus.VOID_PENDING.getValue(), MaterialIssueStatus.VOID_UNKNOWN.getValue())
                         .contains(i.getStatus()))) fail();
         var confirmed = rows.stream().filter(i -> MaterialIssueStatus.CONFIRMED.getValue().equals(i.getStatus()))
                 .toList();

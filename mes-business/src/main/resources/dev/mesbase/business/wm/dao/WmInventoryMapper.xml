@@ -14,6 +14,8 @@
     <result column="create_time" jdbcType="TIMESTAMP" property="createTime" />
     <result column="update_by" jdbcType="VARCHAR" property="updateBy" />
     <result column="update_time" jdbcType="TIMESTAMP" property="updateTime" />
+    <result column="batch_no" jdbcType="VARCHAR" property="batchNo" />
+    <result column="bin_code" jdbcType="VARCHAR" property="binCode" />
   </resultMap>
   <sql id="Example_Where_Clause">
     <where>
@@ -75,7 +77,7 @@
   </sql>
   <sql id="Base_Column_List">
     id, material_id, warehouse_id, quantity, available_quantity, status, remark, create_by, 
-    create_time, update_by, update_time
+    create_time, update_by, update_time, batch_no, bin_code
   </sql>
   <select id="selectByExample" parameterType="dev.mesbase.business.wm.domain.WmInventoryExample" resultMap="BaseResultMap">
     select
@@ -108,11 +110,13 @@
     insert into wm_inventory (material_id, warehouse_id, quantity, 
       available_quantity, status, remark, 
       create_by, create_time, update_by, 
-      update_time)
+      update_time, batch_no, bin_code
+      )
     values (#{materialId,jdbcType=BIGINT}, #{warehouseId,jdbcType=BIGINT}, #{quantity,jdbcType=DECIMAL}, 
       #{availableQuantity,jdbcType=DECIMAL}, #{status,jdbcType=VARCHAR}, #{remark,jdbcType=VARCHAR}, 
       #{createBy,jdbcType=VARCHAR}, #{createTime,jdbcType=TIMESTAMP}, #{updateBy,jdbcType=VARCHAR}, 
-      #{updateTime,jdbcType=TIMESTAMP})
+      #{updateTime,jdbcType=TIMESTAMP}, #{batchNo,jdbcType=VARCHAR}, #{binCode,jdbcType=VARCHAR}
+      )
   </insert>
   <insert id="insertSelective" keyColumn="id" keyProperty="id" parameterType="dev.mesbase.business.wm.domain.WmInventoryEntity" useGeneratedKeys="true">
     insert into wm_inventory
@@ -147,6 +151,12 @@
       <if test="updateTime != null">
         update_time,
       </if>
+      <if test="batchNo != null">
+        batch_no,
+      </if>
+      <if test="binCode != null">
+        bin_code,
+      </if>
     </trim>
     <trim prefix="values (" suffix=")" suffixOverrides=",">
       <if test="materialId != null">
@@ -178,6 +188,12 @@
       </if>
       <if test="updateTime != null">
         #{updateTime,jdbcType=TIMESTAMP},
+      </if>
+      <if test="batchNo != null">
+        #{batchNo,jdbcType=VARCHAR},
+      </if>
+      <if test="binCode != null">
+        #{binCode,jdbcType=VARCHAR},
       </if>
     </trim>
   </insert>
@@ -223,6 +239,12 @@
       <if test="row.updateTime != null">
         update_time = #{row.updateTime,jdbcType=TIMESTAMP},
       </if>
+      <if test="row.batchNo != null">
+        batch_no = #{row.batchNo,jdbcType=VARCHAR},
+      </if>
+      <if test="row.binCode != null">
+        bin_code = #{row.binCode,jdbcType=VARCHAR},
+      </if>
     </set>
     <if test="example != null">
       <include refid="Update_By_Example_Where_Clause" />
@@ -240,7 +262,9 @@
       create_by = #{row.createBy,jdbcType=VARCHAR},
       create_time = #{row.createTime,jdbcType=TIMESTAMP},
       update_by = #{row.updateBy,jdbcType=VARCHAR},
-      update_time = #{row.updateTime,jdbcType=TIMESTAMP}
+      update_time = #{row.updateTime,jdbcType=TIMESTAMP},
+      batch_no = #{row.batchNo,jdbcType=VARCHAR},
+      bin_code = #{row.binCode,jdbcType=VARCHAR}
     <if test="example != null">
       <include refid="Update_By_Example_Where_Clause" />
     </if>
@@ -278,6 +302,12 @@
       <if test="updateTime != null">
         update_time = #{updateTime,jdbcType=TIMESTAMP},
       </if>
+      <if test="batchNo != null">
+        batch_no = #{batchNo,jdbcType=VARCHAR},
+      </if>
+      <if test="binCode != null">
+        bin_code = #{binCode,jdbcType=VARCHAR},
+      </if>
     </set>
     where id = #{id,jdbcType=BIGINT}
   </update>
@@ -292,7 +322,9 @@
       create_by = #{createBy,jdbcType=VARCHAR},
       create_time = #{createTime,jdbcType=TIMESTAMP},
       update_by = #{updateBy,jdbcType=VARCHAR},
-      update_time = #{updateTime,jdbcType=TIMESTAMP}
+      update_time = #{updateTime,jdbcType=TIMESTAMP},
+      batch_no = #{batchNo,jdbcType=VARCHAR},
+      bin_code = #{binCode,jdbcType=VARCHAR}
     where id = #{id,jdbcType=BIGINT}
   </update>
 </mapper>

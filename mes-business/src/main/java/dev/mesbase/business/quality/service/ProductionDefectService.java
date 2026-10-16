@@ -47,6 +47,7 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.nio.charset.StandardCharsets;
 import java.util.HexFormat;
+import dev.mesbase.business.production.service.ProductionQuantityService;
 
 @Service
 @ConditionalOnProperty(name = "mes.business.enabled", havingValue = "true")
@@ -59,11 +60,13 @@ public class ProductionDefectService {
     private final BusinessDirectoryService directory;
     private final ProductionDefectErpGateway erp;
     private final RoutingNodeMapper routingNodes;
+    private final ProductionQuantityService quantities;
 
     public ProductionDefectService(MesProductionDefectMapper mapper, ProductionChainLocks locks,
                                    ExecutionPathService paths,
                                    WmWarehouseMapper warehouses, BusinessDirectoryService directory,
-                                   ProductionDefectErpGateway erp, RoutingNodeMapper routingNodes) {
+                                   ProductionDefectErpGateway erp, RoutingNodeMapper routingNodes,
+                                   ProductionQuantityService quantities) {
         this.mapper = mapper;
         this.locks = locks;
         this.paths = paths;
@@ -71,6 +74,7 @@ public class ProductionDefectService {
         this.directory = directory;
         this.erp = erp;
         this.routingNodes = routingNodes;
+        this.quantities = quantities;
     }
 
     public record Result(MesProductionDefectEntity record, ErpActionResult erp) {
@@ -121,6 +125,9 @@ public class ProductionDefectService {
         }
         Facts facts = action.equals(DefectRecordAction.VOID.getValue()) ? facts(before) : normalize(c.facts());
         if (!action.equals(DefectRecordAction.VOID.getValue())) facts = validate(facts);
+        var oldContribution = before == null ? BigDecimal.ZERO : before.getDefectQty();
+        var newContribution = action.equals(DefectRecordAction.VOID.getValue()) ? BigDecimal.ZERO : facts.defectQty();
+        quantities.validateDefectChange(execution, facts.affectedNodeId(), newContribution.subtract(oldContribution));
         apply(row, facts);
         row.setDeclarationId(id == null ? UUID.randomUUID().toString() : id);
         row.setRevisionNo(before == null ? 1 : before.getRevisionNo() + 1);

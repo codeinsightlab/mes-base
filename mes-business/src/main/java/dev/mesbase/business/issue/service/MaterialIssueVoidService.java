@@ -13,6 +13,7 @@ import dev.mesbase.business.integration.warehouse.ErpActionResult;
 import dev.mesbase.business.integration.warehouse.ErpActionResult.Status;
 import dev.mesbase.business.integration.warehouse.ErpActionResult.Mode;
 import dev.mesbase.business.production.service.ProductionExecutionRules;
+import dev.mesbase.business.production.service.ProductionQuantityService;
 import dev.mesbase.core.error.ErrorCode;
 import dev.mesbase.core.error.FoundationException;
 import dev.mesbase.core.factory.FactoryScope;
@@ -46,16 +47,21 @@ public class MaterialIssueVoidService {
     private final MaterialIssueRules rules;
     private final ProductionExecutionRules executions;
     private final WarehouseIntegration warehouse;
+    private final MaterialIssueInputFacts inputFacts;
+    private final ProductionQuantityService quantities;
     private final TransactionTemplate transaction;
 
     public MaterialIssueVoidService(MesMaterialIssueMapper issues, WorkorderMapper orders, MaterialIssueRules rules,
                                     ProductionExecutionRules executions, WarehouseIntegration warehouse,
+                                    MaterialIssueInputFacts inputFacts, ProductionQuantityService quantities,
                                     @Qualifier("businessTransactionManager") PlatformTransactionManager manager) {
         this.issues = issues;
         this.orders = orders;
         this.rules = rules;
         this.executions = executions;
         this.warehouse = warehouse;
+        this.inputFacts = inputFacts;
+        this.quantities = quantities;
         transaction = new TransactionTemplate(manager);
         transaction.setIsolationLevel(TransactionDefinition.ISOLATION_READ_COMMITTED);
     }
@@ -92,7 +98,8 @@ public class MaterialIssueVoidService {
                     throw new FoundationException(ErrorCode.ISSUE_VOID_CONFLICT);
                 if (row.getExecutionId() != null) {
                     var e = executions.lock(row.getExecutionId());
-                    if (e.getStartTime() != null || Set.of(ProductionExecutionStatus.RUNNING.getValue(), ProductionExecutionStatus.COMPLETED.getValue())
+                    if (inputFacts.find(id) == null && (e.getStartTime() != null || Set.of(ProductionExecutionStatus.RUNNING.getValue(), ProductionExecutionStatus.COMPLETED.getValue())
+                            .contains(e.getStatus())) || Set.of(ProductionExecutionStatus.COMPLETED.getValue(), ProductionExecutionStatus.CANCELLED.getValue())
                             .contains(e.getStatus()))
                         throw new FoundationException(ErrorCode.EXECUTION_REFERENCED);
                 }
@@ -103,6 +110,8 @@ public class MaterialIssueVoidService {
                 row.setVoidRequestedAt(LocalDateTime.now());
                 row.setStatus(MaterialIssueStatus.VOID_PENDING.getValue());
                 save(row);
+                if (row.getExecutionId() != null && inputFacts.find(id) != null)
+                    quantities.getExecutionQuantities(row.getExecutionId());
             }
             return new Prepared(row, true, rules.extraVersion(id));
         });
@@ -134,6 +143,7 @@ public class MaterialIssueVoidService {
             row.setVoidResultStatus(confirmed.status().getValue());
             row.setVoidMessage(confirmed.status() == Status.SUCCEEDED ? "作废结果已确认" : confirmed.status() == Status.REJECTED ? "ERP明确拒绝作废，单据仍有效" : "外部结果待核实");
             if (confirmed.status() == Status.SUCCEEDED) {
+                inputFacts.voidConfirmed(row);
                 row.setStatus(MaterialIssueStatus.VOIDED.getValue());
                 row.setExternalEffect(confirmed.executionMode() == Mode.LOCAL_ONLY ? ExternalEffect.NONE.getValue() : ExternalEffect.REVERSED.getValue());
                 row.setVoidFinishedAt(LocalDateTime.now());

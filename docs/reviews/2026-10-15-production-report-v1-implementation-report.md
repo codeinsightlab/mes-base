@@ -284,3 +284,11 @@ BusinessCacheIntegrationTest 在独立真实 Redis + Spring 事务下，验证�
 - 保护并行开发：不良管理/质量目录、V26/V29、公共 ErrorCode 及 MaterialIssueHttpTest 的并行改动未修改。无新迁移、不提交/推送/部署、不重启服务。回滚仅恢复本节列出的类型筛选/校验及对应测试，不回滚整个脏工作区。
 
 补充：`/usr/bin/python3 scripts/smoke-packaged.py` 10 项通过，日志 `/tmp/mes-workorder-material-smoke.log`；该脚本使用独立临时测试进程，不操作用户服务。
+
+### N.1 用户重启后的真实验收（2026-10-16）
+
+用户确认重启后复核中心绑定：SIMPLE_B / ENABLED → 数据源8 / ENABLED → 192.168.18.25:3306/mes_base_dev_business_simple_b。物料2（ITEM）只有草稿适用工艺，查询返回空是正常发布状态筛选；不为验收更改其工艺状态。改用现有物料46（ITEM，20100031501），查询返回已发布工艺8/V1和132/V2。
+
+通过现有生产接口创建 `TEST_ITEM_OUTPUT_20261016_5c33fefb`（ID83），产出物料46、工艺8、计划数量1；事先核对同编码查询为0并保存 before.json。创建、详情及列表回查成功，数据库复核 product_id=46/material_type=ITEM、routing_id=8、DRAFT、planned_qty=1.000000，必需 workorder_erp_extra 存在。浏览器通过工单书签显示产出物料名称、默认工艺V1及10节点9连接路线图。工单保留 TEST ONLY 草稿供用户复验，未下达、未创建执行/领料/报工，无旧数据覆盖、无工艺配置修改；不宣称本轮在真实库重新跑完开工报工链路。
+
+证据 `.local/workorder-material-20261016/{before.json,live-acceptance.json,db-verification.tsv,item-order-saved.png}`，不含凭证。真实 ITEM 工单保存与回显验收通过，此项不再等待重启。业务代码本轮未追加变更，仅补充本节验收记录。

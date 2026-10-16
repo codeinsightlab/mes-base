@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- MES-CODEGEN: MyBatis Generator standard single-table persistence. -->
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="dev.mesbase.business.production.dao.MesProductionReportMapper">
   <resultMap id="BaseResultMap" type="dev.mesbase.business.production.domain.MesProductionReportEntity">
     <id column="id" jdbcType="BIGINT" property="id" />
+    <result column="request_id" jdbcType="VARCHAR" property="requestId" />
     <result column="execution_id" jdbcType="BIGINT" property="executionId" />
     <result column="routing_node_id" jdbcType="BIGINT" property="routingNodeId" />
     <result column="record_type" jdbcType="VARCHAR" property="recordType" />
@@ -75,9 +75,12 @@
     </where>
   </sql>
   <sql id="Base_Column_List">
-    id, execution_id, routing_node_id, record_type, quantity_delta, reference_report_id, 
+    id, request_id, execution_id, routing_node_id, record_type, quantity_delta, reference_report_id,
     operator_user_id, recorded_by, report_time, workstation_id, reason, create_time
   </sql>
+  <select id="selectByRequestId" resultMap="BaseResultMap">
+    SELECT <include refid="Base_Column_List"/> FROM mes_production_report WHERE request_id=#{requestId}
+  </select>
   <select id="selectByExample" parameterType="dev.mesbase.business.production.domain.MesProductionReportExample" resultMap="BaseResultMap">
     select
     <include refid="Base_Column_List" />
@@ -106,11 +109,11 @@
     </if>
   </delete>
   <insert id="insert" keyColumn="id" keyProperty="id" parameterType="dev.mesbase.business.production.domain.MesProductionReportEntity" useGeneratedKeys="true">
-    insert into mes_production_report (execution_id, routing_node_id, record_type, 
+    insert into mes_production_report (request_id, execution_id, routing_node_id, record_type,
       quantity_delta, reference_report_id, operator_user_id, 
       recorded_by, report_time, workstation_id, 
       reason, create_time)
-    values (#{executionId,jdbcType=BIGINT}, #{routingNodeId,jdbcType=BIGINT}, #{recordType,jdbcType=VARCHAR}, 
+    values (#{requestId,jdbcType=VARCHAR}, #{executionId,jdbcType=BIGINT}, #{routingNodeId,jdbcType=BIGINT}, #{recordType,jdbcType=VARCHAR},
       #{quantityDelta,jdbcType=DECIMAL}, #{referenceReportId,jdbcType=BIGINT}, #{operatorUserId,jdbcType=BIGINT}, 
       #{recordedBy,jdbcType=BIGINT}, #{reportTime,jdbcType=TIMESTAMP}, #{workstationId,jdbcType=BIGINT}, 
       #{reason,jdbcType=VARCHAR}, #{createTime,jdbcType=TIMESTAMP})
@@ -118,6 +121,7 @@
   <insert id="insertSelective" keyColumn="id" keyProperty="id" parameterType="dev.mesbase.business.production.domain.MesProductionReportEntity" useGeneratedKeys="true">
     insert into mes_production_report
     <trim prefix="(" suffix=")" suffixOverrides=",">
+      <if test="requestId != null">request_id,</if>
       <if test="executionId != null">
         execution_id,
       </if>
@@ -153,6 +157,7 @@
       </if>
     </trim>
     <trim prefix="values (" suffix=")" suffixOverrides=",">
+      <if test="requestId != null">#{requestId,jdbcType=VARCHAR},</if>
       <if test="executionId != null">
         #{executionId,jdbcType=BIGINT},
       </if>

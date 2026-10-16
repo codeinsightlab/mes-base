@@ -1,0 +1,342 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="dev.mesbase.business.production.dao.MesProductionReceiptMapper">
+  <resultMap id="BaseResultMap" type="dev.mesbase.business.production.domain.MesProductionReceiptEntity">
+    <id column="id" jdbcType="VARCHAR" property="id" />
+    <result column="receipt_no" jdbcType="VARCHAR" property="receiptNo" />
+    <result column="execution_id" jdbcType="BIGINT" property="executionId" />
+    <result column="product_lot_code" jdbcType="VARCHAR" property="productLotCode" />
+    <result column="warehouse_id" jdbcType="BIGINT" property="warehouseId" />
+    <result column="record_type" jdbcType="VARCHAR" property="recordType" />
+    <result column="quantity_delta" jdbcType="DECIMAL" property="quantityDelta" />
+    <result column="reference_receipt_id" jdbcType="VARCHAR" property="referenceReceiptId" />
+    <result column="operator_user_id" jdbcType="BIGINT" property="operatorUserId" />
+    <result column="recorded_by" jdbcType="BIGINT" property="recordedBy" />
+    <result column="occurred_at" jdbcType="TIMESTAMP" property="occurredAt" />
+    <result column="create_time" jdbcType="TIMESTAMP" property="createTime" />
+    <result column="reason" jdbcType="VARCHAR" property="reason" />
+  </resultMap>
+  <sql id="Example_Where_Clause">
+    <where>
+      <foreach collection="oredCriteria" item="criteria" separator="or">
+        <if test="criteria.valid">
+          <trim prefix="(" prefixOverrides="and" suffix=")">
+            <foreach collection="criteria.criteria" item="criterion">
+              <choose>
+                <when test="criterion.noValue">
+                  and ${criterion.condition}
+                </when>
+                <when test="criterion.singleValue">
+                  and ${criterion.condition} #{criterion.value}
+                </when>
+                <when test="criterion.betweenValue">
+                  and ${criterion.condition} #{criterion.value} and #{criterion.secondValue}
+                </when>
+                <when test="criterion.listValue">
+                  and ${criterion.condition}
+                  <foreach close=")" collection="criterion.value" item="listItem" open="(" separator=",">
+                    #{listItem}
+                  </foreach>
+                </when>
+              </choose>
+            </foreach>
+          </trim>
+        </if>
+      </foreach>
+    </where>
+  </sql>
+  <sql id="Update_By_Example_Where_Clause">
+    <where>
+      <foreach collection="example.oredCriteria" item="criteria" separator="or">
+        <if test="criteria.valid">
+          <trim prefix="(" prefixOverrides="and" suffix=")">
+            <foreach collection="criteria.criteria" item="criterion">
+              <choose>
+                <when test="criterion.noValue">
+                  and ${criterion.condition}
+                </when>
+                <when test="criterion.singleValue">
+                  and ${criterion.condition} #{criterion.value}
+                </when>
+                <when test="criterion.betweenValue">
+                  and ${criterion.condition} #{criterion.value} and #{criterion.secondValue}
+                </when>
+                <when test="criterion.listValue">
+                  and ${criterion.condition}
+                  <foreach close=")" collection="criterion.value" item="listItem" open="(" separator=",">
+                    #{listItem}
+                  </foreach>
+                </when>
+              </choose>
+            </foreach>
+          </trim>
+        </if>
+      </foreach>
+    </where>
+  </sql>
+  <sql id="Base_Column_List">
+    id, receipt_no, execution_id, product_lot_code, warehouse_id, record_type, quantity_delta, 
+    reference_receipt_id, operator_user_id, recorded_by, occurred_at, create_time, reason
+  </sql>
+  <select id="selectByExample" parameterType="dev.mesbase.business.production.domain.MesProductionReceiptExample" resultMap="BaseResultMap">
+    select
+    <include refid="Base_Column_List" />
+    from mes_production_receipt
+    <if test="_parameter != null">
+      <include refid="Example_Where_Clause" />
+    </if>
+    <if test="orderByClause != null">
+      order by ${orderByClause}
+    </if>
+  </select>
+  <select id="selectByPrimaryKey" parameterType="String" resultMap="BaseResultMap">
+    select 
+    <include refid="Base_Column_List" />
+    from mes_production_receipt
+    where id = #{id,jdbcType=VARCHAR}
+  </select>
+  <delete id="deleteByPrimaryKey" parameterType="String">
+    delete from mes_production_receipt
+    where id = #{id,jdbcType=VARCHAR}
+  </delete>
+  <delete id="deleteByExample" parameterType="dev.mesbase.business.production.domain.MesProductionReceiptExample">
+    delete from mes_production_receipt
+    <if test="_parameter != null">
+      <include refid="Example_Where_Clause" />
+    </if>
+  </delete>
+  <insert id="insert" parameterType="dev.mesbase.business.production.domain.MesProductionReceiptEntity">
+    insert into mes_production_receipt (id, receipt_no, execution_id, 
+      product_lot_code, warehouse_id, record_type, 
+      quantity_delta, reference_receipt_id, operator_user_id, 
+      recorded_by, occurred_at, create_time, 
+      reason)
+    values (#{id,jdbcType=VARCHAR}, #{receiptNo,jdbcType=VARCHAR}, #{executionId,jdbcType=BIGINT}, 
+      #{productLotCode,jdbcType=VARCHAR}, #{warehouseId,jdbcType=BIGINT}, #{recordType,jdbcType=VARCHAR}, 
+      #{quantityDelta,jdbcType=DECIMAL}, #{referenceReceiptId,jdbcType=VARCHAR}, #{operatorUserId,jdbcType=BIGINT}, 
+      #{recordedBy,jdbcType=BIGINT}, #{occurredAt,jdbcType=TIMESTAMP}, #{createTime,jdbcType=TIMESTAMP}, 
+      #{reason,jdbcType=VARCHAR})
+  </insert>
+  <insert id="insertSelective" parameterType="dev.mesbase.business.production.domain.MesProductionReceiptEntity">
+    insert into mes_production_receipt
+    <trim prefix="(" suffix=")" suffixOverrides=",">
+      <if test="id != null">
+        id,
+      </if>
+      <if test="receiptNo != null">
+        receipt_no,
+      </if>
+      <if test="executionId != null">
+        execution_id,
+      </if>
+      <if test="productLotCode != null">
+        product_lot_code,
+      </if>
+      <if test="warehouseId != null">
+        warehouse_id,
+      </if>
+      <if test="recordType != null">
+        record_type,
+      </if>
+      <if test="quantityDelta != null">
+        quantity_delta,
+      </if>
+      <if test="referenceReceiptId != null">
+        reference_receipt_id,
+      </if>
+      <if test="operatorUserId != null">
+        operator_user_id,
+      </if>
+      <if test="recordedBy != null">
+        recorded_by,
+      </if>
+      <if test="occurredAt != null">
+        occurred_at,
+      </if>
+      <if test="createTime != null">
+        create_time,
+      </if>
+      <if test="reason != null">
+        reason,
+      </if>
+    </trim>
+    <trim prefix="values (" suffix=")" suffixOverrides=",">
+      <if test="id != null">
+        #{id,jdbcType=VARCHAR},
+      </if>
+      <if test="receiptNo != null">
+        #{receiptNo,jdbcType=VARCHAR},
+      </if>
+      <if test="executionId != null">
+        #{executionId,jdbcType=BIGINT},
+      </if>
+      <if test="productLotCode != null">
+        #{productLotCode,jdbcType=VARCHAR},
+      </if>
+      <if test="warehouseId != null">
+        #{warehouseId,jdbcType=BIGINT},
+      </if>
+      <if test="recordType != null">
+        #{recordType,jdbcType=VARCHAR},
+      </if>
+      <if test="quantityDelta != null">
+        #{quantityDelta,jdbcType=DECIMAL},
+      </if>
+      <if test="referenceReceiptId != null">
+        #{referenceReceiptId,jdbcType=VARCHAR},
+      </if>
+      <if test="operatorUserId != null">
+        #{operatorUserId,jdbcType=BIGINT},
+      </if>
+      <if test="recordedBy != null">
+        #{recordedBy,jdbcType=BIGINT},
+      </if>
+      <if test="occurredAt != null">
+        #{occurredAt,jdbcType=TIMESTAMP},
+      </if>
+      <if test="createTime != null">
+        #{createTime,jdbcType=TIMESTAMP},
+      </if>
+      <if test="reason != null">
+        #{reason,jdbcType=VARCHAR},
+      </if>
+    </trim>
+  </insert>
+  <select id="countByExample" parameterType="dev.mesbase.business.production.domain.MesProductionReceiptExample" resultType="java.lang.Long">
+    select count(*) from mes_production_receipt
+    <if test="_parameter != null">
+      <include refid="Example_Where_Clause" />
+    </if>
+  </select>
+  <update id="updateByExampleSelective" parameterType="map">
+    update mes_production_receipt
+    <set>
+      <if test="row.id != null">
+        id = #{row.id,jdbcType=VARCHAR},
+      </if>
+      <if test="row.receiptNo != null">
+        receipt_no = #{row.receiptNo,jdbcType=VARCHAR},
+      </if>
+      <if test="row.executionId != null">
+        execution_id = #{row.executionId,jdbcType=BIGINT},
+      </if>
+      <if test="row.productLotCode != null">
+        product_lot_code = #{row.productLotCode,jdbcType=VARCHAR},
+      </if>
+      <if test="row.warehouseId != null">
+        warehouse_id = #{row.warehouseId,jdbcType=BIGINT},
+      </if>
+      <if test="row.recordType != null">
+        record_type = #{row.recordType,jdbcType=VARCHAR},
+      </if>
+      <if test="row.quantityDelta != null">
+        quantity_delta = #{row.quantityDelta,jdbcType=DECIMAL},
+      </if>
+      <if test="row.referenceReceiptId != null">
+        reference_receipt_id = #{row.referenceReceiptId,jdbcType=VARCHAR},
+      </if>
+      <if test="row.operatorUserId != null">
+        operator_user_id = #{row.operatorUserId,jdbcType=BIGINT},
+      </if>
+      <if test="row.recordedBy != null">
+        recorded_by = #{row.recordedBy,jdbcType=BIGINT},
+      </if>
+      <if test="row.occurredAt != null">
+        occurred_at = #{row.occurredAt,jdbcType=TIMESTAMP},
+      </if>
+      <if test="row.createTime != null">
+        create_time = #{row.createTime,jdbcType=TIMESTAMP},
+      </if>
+      <if test="row.reason != null">
+        reason = #{row.reason,jdbcType=VARCHAR},
+      </if>
+    </set>
+    <if test="example != null">
+      <include refid="Update_By_Example_Where_Clause" />
+    </if>
+  </update>
+  <update id="updateByExample" parameterType="map">
+    update mes_production_receipt
+    set id = #{row.id,jdbcType=VARCHAR},
+      receipt_no = #{row.receiptNo,jdbcType=VARCHAR},
+      execution_id = #{row.executionId,jdbcType=BIGINT},
+      product_lot_code = #{row.productLotCode,jdbcType=VARCHAR},
+      warehouse_id = #{row.warehouseId,jdbcType=BIGINT},
+      record_type = #{row.recordType,jdbcType=VARCHAR},
+      quantity_delta = #{row.quantityDelta,jdbcType=DECIMAL},
+      reference_receipt_id = #{row.referenceReceiptId,jdbcType=VARCHAR},
+      operator_user_id = #{row.operatorUserId,jdbcType=BIGINT},
+      recorded_by = #{row.recordedBy,jdbcType=BIGINT},
+      occurred_at = #{row.occurredAt,jdbcType=TIMESTAMP},
+      create_time = #{row.createTime,jdbcType=TIMESTAMP},
+      reason = #{row.reason,jdbcType=VARCHAR}
+    <if test="example != null">
+      <include refid="Update_By_Example_Where_Clause" />
+    </if>
+  </update>
+  <update id="updateByPrimaryKeySelective" parameterType="dev.mesbase.business.production.domain.MesProductionReceiptEntity">
+    update mes_production_receipt
+    <set>
+      <if test="receiptNo != null">
+        receipt_no = #{receiptNo,jdbcType=VARCHAR},
+      </if>
+      <if test="executionId != null">
+        execution_id = #{executionId,jdbcType=BIGINT},
+      </if>
+      <if test="productLotCode != null">
+        product_lot_code = #{productLotCode,jdbcType=VARCHAR},
+      </if>
+      <if test="warehouseId != null">
+        warehouse_id = #{warehouseId,jdbcType=BIGINT},
+      </if>
+      <if test="recordType != null">
+        record_type = #{recordType,jdbcType=VARCHAR},
+      </if>
+      <if test="quantityDelta != null">
+        quantity_delta = #{quantityDelta,jdbcType=DECIMAL},
+      </if>
+      <if test="referenceReceiptId != null">
+        reference_receipt_id = #{referenceReceiptId,jdbcType=VARCHAR},
+      </if>
+      <if test="operatorUserId != null">
+        operator_user_id = #{operatorUserId,jdbcType=BIGINT},
+      </if>
+      <if test="recordedBy != null">
+        recorded_by = #{recordedBy,jdbcType=BIGINT},
+      </if>
+      <if test="occurredAt != null">
+        occurred_at = #{occurredAt,jdbcType=TIMESTAMP},
+      </if>
+      <if test="createTime != null">
+        create_time = #{createTime,jdbcType=TIMESTAMP},
+      </if>
+      <if test="reason != null">
+        reason = #{reason,jdbcType=VARCHAR},
+      </if>
+    </set>
+    where id = #{id,jdbcType=VARCHAR}
+  </update>
+  <update id="updateByPrimaryKey" parameterType="dev.mesbase.business.production.domain.MesProductionReceiptEntity">
+    update mes_production_receipt
+    set receipt_no = #{receiptNo,jdbcType=VARCHAR},
+      execution_id = #{executionId,jdbcType=BIGINT},
+      product_lot_code = #{productLotCode,jdbcType=VARCHAR},
+      warehouse_id = #{warehouseId,jdbcType=BIGINT},
+      record_type = #{recordType,jdbcType=VARCHAR},
+      quantity_delta = #{quantityDelta,jdbcType=DECIMAL},
+      reference_receipt_id = #{referenceReceiptId,jdbcType=VARCHAR},
+      operator_user_id = #{operatorUserId,jdbcType=BIGINT},
+      recorded_by = #{recordedBy,jdbcType=BIGINT},
+      occurred_at = #{occurredAt,jdbcType=TIMESTAMP},
+      create_time = #{createTime,jdbcType=TIMESTAMP},
+      reason = #{reason,jdbcType=VARCHAR}
+    where id = #{id,jdbcType=VARCHAR}
+  </update>
+  <select id="netQuantity" resultType="java.math.BigDecimal">
+    SELECT COALESCE(SUM(quantity_delta),0) FROM mes_production_receipt WHERE execution_id=#{executionId}
+  </select>
+  <select id="originalBalance" resultType="java.math.BigDecimal">
+    SELECT COALESCE(SUM(quantity_delta),0) FROM mes_production_receipt WHERE id=#{id} OR reference_receipt_id=#{id}
+  </select>
+</mapper>

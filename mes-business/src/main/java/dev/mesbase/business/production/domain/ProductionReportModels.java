@@ -38,11 +38,13 @@ public final class ProductionReportModels {
 
     public record ExecutionQuantity(Long executionId, Long workorderId, String executionNo, Long routingId,
                                     BigDecimal targetQty, String pathStatus, boolean writable, String boundary,
-                                    List<NodeQuantity> nodes, String routingLabel) {
+                                    List<NodeQuantity> nodes, String routingLabel, BigDecimal productionInputQty,
+                                    BigDecimal confirmedInputQty, BigDecimal reservedInputQty) {
     }
 
     public record ExecutionSummary(Long executionId, Long workorderId, String executionNo, Long routingId,
-                                   BigDecimal targetQty, String pathStatus, BigDecimal lastNodeReportedQty) {
+                                   BigDecimal targetQty, String pathStatus, BigDecimal lastNodeReportedQty,
+                                   BigDecimal productionInputQty) {
     }
 
     public record Balance(Long reportId, BigDecimal effectiveQty) {

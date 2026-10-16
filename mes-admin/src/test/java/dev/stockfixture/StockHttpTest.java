@@ -125,6 +125,8 @@ class StockHttpTest {
                             .replace("factory_id, ", "");
                     for (String statement : ddl.split(";")) if (!statement.isBlank()) jdbc.execute(statement);
                 }
+                jdbc.execute("ALTER TABLE wm_inventory ADD batch_no VARCHAR(128)");
+                jdbc.execute("ALTER TABLE wm_inventory ADD bin_code VARCHAR(64)");
                 jdbc.update("INSERT INTO material(id,code,name,unit_id,material_type,status) VALUES(1,'M1','物料一',1,'ITEM','ENABLED')");
                 business.put(id, jdbc);
                 var identity = new DatasourceIdentity("TEST_ONLY_" + id);
@@ -333,7 +335,7 @@ class StockHttpTest {
     }
 
     static ExternalWmInventory external(long warehouse, String quantity) {
-        return new ExternalWmInventory(1L, warehouse, new BigDecimal(quantity), null, "ENABLED", null);
+        return new ExternalWmInventory(1L, warehouse, new BigDecimal(quantity), null, "ENABLED", null, null, null);
     }
 
     @Test

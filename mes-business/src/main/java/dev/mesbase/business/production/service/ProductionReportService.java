@@ -54,14 +54,13 @@ public class ProductionReportService {
     @Transactional(transactionManager = "businessTransactionManager", isolation = Isolation.READ_COMMITTED, rollbackFor = Exception.class)
     public MesProductionReportEntity supplement(Supplement command) {
         locks.execution(command.executionId());
-        var view = quantities.getExecutionQuantities(command.executionId());
         positive(command.quantity());
         reason(command.reason());
         if (command.reportTime() == null || command.reportTime().isAfter(LocalDateTime.now())) invalid();
         users.requireExists(command.operatorUserId());
         if (command.workstationId() != null && workstations.selectByPrimaryKey(command.workstationId()) == null)
             throw new FoundationException(ErrorCode.REPORT_REFERENCE_INVALID);
-        ProductionQuantityService.validateChange(view, command.routingNodeId(), command.quantity());
+        quantities.validateReportChange(command.executionId(), command.routingNodeId(), command.quantity());
         var row = new MesProductionReportEntity();
         row.setExecutionId(command.executionId());
         row.setRoutingNodeId(command.routingNodeId());
@@ -95,8 +94,7 @@ public class ProductionReportService {
                                                    String reason) {
         var balance = totals.originalBalance(original.getExecutionId(), original.getId()).effectiveQty();
         if (balance.add(delta).signum() < 0) throw new FoundationException(ErrorCode.REPORT_QUANTITY_CONFLICT);
-        var view = quantities.getExecutionQuantities(original.getExecutionId());
-        ProductionQuantityService.validateChange(view, original.getRoutingNodeId(), delta);
+        quantities.validateReportChange(original.getExecutionId(), original.getRoutingNodeId(), delta);
         var row = new MesProductionReportEntity();
         row.setExecutionId(original.getExecutionId());
         row.setRoutingNodeId(original.getRoutingNodeId());

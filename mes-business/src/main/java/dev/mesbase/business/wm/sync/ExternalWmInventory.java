@@ -1,4 +1,3 @@
-// MES-CODEGEN: scaffold; review required.
 package dev.mesbase.business.wm.sync;
 
 import jakarta.validation.constraints.Digits;
@@ -13,10 +12,11 @@ import java.math.BigDecimal;
 public record ExternalWmInventory(
         @NotNull Long materialId,
         @NotNull Long warehouseId,
-        @NotNull @Digits(integer = 14, fraction = 4) BigDecimal quantity,
-        @Digits(integer = 14, fraction = 4) BigDecimal availableQuantity,
+        @NotNull @Digits(integer = 14, fraction = 6) BigDecimal quantity,
+        @Digits(integer = 14, fraction = 6) BigDecimal availableQuantity,
         @NotBlank @Size(max = 16) String status,
-        @Size(max = 500) String remark
+        @Size(max = 500) String remark,
+        @Size(max = 128) String batchNo, @Size(max = 64) String binCode
 ) {
 }
 

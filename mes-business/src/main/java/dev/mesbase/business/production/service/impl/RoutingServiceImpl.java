@@ -153,7 +153,7 @@ public class RoutingServiceImpl implements IRoutingService {
         if (query.publishedAt() != null) {
             criteria.andPublishedAtEqualTo(query.publishedAt());
         }
-        example.setOrderByClause("id");
+        example.setOrderByClause("published_at desc, id desc");
         try (Page<RoutingEntity> page = PageHelper.offsetPage(offset, limit)) {
             List<RoutingEntity> rows = mapper.selectByExample(example);
             return new RoutingPage(rows, page.getTotal(), offset, limit);

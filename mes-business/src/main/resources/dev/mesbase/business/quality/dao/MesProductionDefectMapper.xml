@@ -107,6 +107,9 @@
       <include refid="Example_Where_Clause" />
     </if>
   </select>
+  <select id="existsExecutionHistory" resultType="boolean" useCache="false" flushCache="true">
+    SELECT EXISTS (SELECT 1 FROM mes_production_defect WHERE execution_id = #{executionId,jdbcType=BIGINT})
+  </select>
   <sql id="Latest">NOT EXISTS (SELECT 1 FROM mes_production_defect newer WHERE newer.declaration_id=mes_production_defect.declaration_id AND newer.revision_no &gt; mes_production_defect.revision_no)</sql>
   <select id="selectLatest" resultMap="BaseResultMap">
     SELECT <include refid="Base_Column_List"/> FROM mes_production_defect WHERE <include refid="Latest"/>
