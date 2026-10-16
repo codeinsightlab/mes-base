@@ -1,6 +1,8 @@
 package dev.mesbase.core.error;
 
 public enum ErrorCode {
+    DEFECT_IDEMPOTENCY_CONFLICT(409, "不良申报请求标识已用于不同命令"),
+    DEFECT_REVISION_CONFLICT(409, "不良申报已订正或作废，请刷新后重试"),
     REPORT_PATH_REQUIRED(409, "报工必须引用执行已锁定的完整实际路径"),
     REPORT_QUANTITY_CONFLICT(409, "数量变更导致超量、负余额或上下游数量倒挂"),
     REPORT_REFERENCE_INVALID(422, "报工人员、工作站或原始报工引用无效"),

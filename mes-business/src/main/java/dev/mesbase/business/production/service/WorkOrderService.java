@@ -3,7 +3,6 @@ package dev.mesbase.business.production.service;
 import dev.mesbase.business.production.domain.WorkOrderStatus;
 import dev.mesbase.business.directory.service.BusinessDirectoryService;
 import dev.mesbase.business.production.domain.RoutingStatus;
-import dev.mesbase.business.basic.domain.MaterialType;
 import com.github.pagehelper.Page;
 import com.github.pagehelper.PageHelper;
 import dev.mesbase.business.basic.dao.MaterialMapper;
@@ -266,8 +265,6 @@ public class WorkOrderService {
 
     private void binding(Long product, Long routing) {
         references.lockMaterials(List.of(product), true);
-        var m = materials.selectByPrimaryKey(product);
-        require(MaterialType.PRODUCT.getValue().equals(m.getMaterialType()));
         var f = new RoutingExample();
         f.createCriteria().andIdEqualTo(routing);
         var patch = new RoutingEntity();

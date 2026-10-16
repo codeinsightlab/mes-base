@@ -1,0 +1,95 @@
+{
+  "status" : "GENERATED",
+  "mode" : "write",
+  "tables" : [ {
+    "table" : "mes_production_defect",
+    "module" : "quality",
+    "displayName" : "不良申报版本",
+    "javaPackage" : "dev.mesbase.business.quality",
+    "apiPath" : "/api/quality/mes-production-defect",
+    "permission" : "business:mes:production:defect",
+    "syncMatchKey" : null
+  } ],
+  "rejected" : [ ],
+  "files" : [ {
+    "target" : "BACKEND",
+    "path" : "/Users/user/work/lixin/mes-base/mes-business/src/main/java/dev/mesbase/business/quality/domain/MesProductionDefectExample.java",
+    "sha256" : "2a6c49c370d3c058e5c00788fc2dc00fb99a99791df91d8de65747b11a7398eb",
+    "removed" : false
+  }, {
+    "target" : "BACKEND",
+    "path" : "/Users/user/work/lixin/mes-base/mes-business/src/main/java/dev/mesbase/business/quality/domain/MesProductionDefectEntity.java",
+    "sha256" : "dd0ee06007f4bd38a181bbdb062bbb2123d01e02833f661490ca6c8e198b1eb6",
+    "removed" : false
+  }, {
+    "target" : "BACKEND",
+    "path" : "/Users/user/work/lixin/mes-base/mes-business/src/main/java/dev/mesbase/business/quality/dao/MesProductionDefectMapper.java",
+    "sha256" : "d76618a1e0cc036155ad412af617728da3e504add0ee44cf254fb7f43b3afa18",
+    "removed" : false
+  }, {
+    "target" : "BACKEND",
+    "path" : "/Users/user/work/lixin/mes-base/mes-business/src/main/resources/dev/mesbase/business/quality/dao/MesProductionDefectMapper.xml",
+    "sha256" : "6d99cc4857dea60734a62dd5778e8aaa1e02651500c26f5df421ae46649ab3ef",
+    "removed" : false
+  }, {
+    "target" : "BACKEND",
+    "path" : "/Users/user/work/lixin/mes-base/mes-business/src/main/java/dev/mesbase/business/quality/domain/MesProductionDefectCreateCommand.java",
+    "sha256" : "332504c472038d439feb07734c74d578752d7ca51b1b0f72da904121a1fb28db",
+    "removed" : false
+  }, {
+    "target" : "BACKEND",
+    "path" : "/Users/user/work/lixin/mes-base/mes-business/src/main/java/dev/mesbase/business/quality/domain/MesProductionDefectUpdateCommand.java",
+    "sha256" : "1bbea666f18cfcb08cd96dd66acc7ef84fb76a84a4a8c857b5ed6937a526d71b",
+    "removed" : false
+  }, {
+    "target" : "BACKEND",
+    "path" : "/Users/user/work/lixin/mes-base/mes-business/src/main/java/dev/mesbase/business/quality/domain/MesProductionDefectQueryDto.java",
+    "sha256" : "dc73d0303ba1f3704b1483f7844b4092a8fb230906353e035498ea24df6d5abb",
+    "removed" : false
+  }, {
+    "target" : "BACKEND",
+    "path" : "/Users/user/work/lixin/mes-base/mes-business/src/main/java/dev/mesbase/business/quality/domain/MesProductionDefectPage.java",
+    "sha256" : "b0cdf3ddb61389c086d5f209ec32fa0bf342ad124e178d2c929957dbf14506c2",
+    "removed" : false
+  }, {
+    "target" : "BACKEND",
+    "path" : "/Users/user/work/lixin/mes-base/mes-business/src/main/java/dev/mesbase/business/quality/controller/vo/MesProductionDefectVo.java",
+    "sha256" : "1a42ac35095b1f8e6c75ad2c663b886c441f1b994d405f0f4f611038e519c4cb",
+    "removed" : false
+  }, {
+    "target" : "BACKEND",
+    "path" : "/Users/user/work/lixin/mes-base/mes-business/src/main/java/dev/mesbase/business/quality/controller/vo/MesProductionDefectPageVo.java",
+    "sha256" : "3f3e8dc2a37fce5ab504244a3926114185415a37a648032ce593cf725480e78a",
+    "removed" : false
+  }, {
+    "target" : "BACKEND",
+    "path" : "/Users/user/work/lixin/mes-base/mes-business/src/main/java/dev/mesbase/business/quality/domain/MesProductionDefectResource.java",
+    "sha256" : "1651b921b48982b13d0073ef30471240e748fea19c68e4b771acc8e19307a92c",
+    "removed" : false
+  }, {
+    "target" : "BACKEND",
+    "path" : "/Users/user/work/lixin/mes-base/mes-business/src/main/java/dev/mesbase/business/quality/controller/MesProductionDefectPermissions.java",
+    "sha256" : "429654af6725952876e599afe985bff7f18e40f05afe1ddd45df5cee2226cf4c",
+    "removed" : false
+  }, {
+    "target" : "BACKEND",
+    "path" : "/Users/user/work/lixin/mes-base/mes-business/src/main/java/dev/mesbase/business/quality/service/IMesProductionDefectService.java",
+    "sha256" : "6e729fc582caa50b5c21c48b194f8e69164f48937458b541b1d24d2e4dda5cc1",
+    "removed" : false
+  }, {
+    "target" : "BACKEND",
+    "path" : "/Users/user/work/lixin/mes-base/mes-business/src/main/java/dev/mesbase/business/quality/service/impl/MesProductionDefectServiceImpl.java",
+    "sha256" : "936dfae09af0a50f9f25a9ec08711a652dd7f4a08342a7d125196c1cd116f154",
+    "removed" : false
+  }, {
+    "target" : "BACKEND",
+    "path" : "/Users/user/work/lixin/mes-base/mes-business/src/main/java/dev/mesbase/business/quality/controller/MesProductionDefectController.java",
+    "sha256" : "d6d5b6b7f57e35aace8e87230b324f2e3860207113b4e7ae34081f11741291f9",
+    "removed" : false
+  }, {
+    "target" : "BACKEND",
+    "path" : "/Users/user/work/lixin/mes-base/mes-business/src/test/java/dev/mesbase/business/quality/MesProductionDefectScaffoldTest.java",
+    "sha256" : "9dc327bbd2dfdc8e4e88c9bf32dca7ab4653039460756b6e077842a44a8aeb20",
+    "removed" : false
+  } ]
+}

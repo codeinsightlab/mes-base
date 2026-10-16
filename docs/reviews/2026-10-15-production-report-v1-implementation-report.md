@@ -253,3 +253,34 @@ DetailEntityCacheTest 验证 `[1,2,3]` 只生成三个标准 detail 对象 Key�
 BusinessCacheIntegrationTest 在独立真实 Redis + Spring 事务下，验证批量先写→生成 CRUD 详情直接命中，CRUD先写→批量直接命中，并验证 Entity 的规格等非目录字段不丢失、提交后淘汰、回滚保留与迟到填充拒绝。生成器的实际编译/代理缓存测试同步适配通用屏障元数据，仍验证新增、修改、删除、同步、跳过和回滚行为，不修改生成模板或业务状态。
 
 本轮只改后端缓存及相关类型/fixture、两仓约束和本报告；不改 HTTP 响应契约、前端业务页面、SQL、生产数量算法或工艺核心模型。没有自行重启用户服务，运行中的旧版本和旧 Key 不作为新实现的真实验证；旧目录对象值按既有 TTL 到期，不双读旧 Key，不清空用户 Redis。
+
+
+本轮最终验证：`mvn -B -ntp verify` 通过，526 项、0 failure / 0 error，其中19项环境条件测试跳过（507项实际执行）。共享 Key / Entity / 提交淘汰真实 Redis 集成14项通过，用户安全字段及真实 XML 测试5项通过；生成器实际生成、编译并经 Spring 代理执行 CRUD/同步的回归通过。格式化任务 Java 文件完成，`git diff --check` 通过。日志与汇总保存于 `.local/detail-keys-20261015/`。未修改前端业务代码，未将旧前端测试当成本轮新增测试；未重启用户服务，因此未声称用户运行服务已加载新缓存代码。
+
+入场后端 HEAD 为 9b54bfb1b3ca888cdfcf6fcbc535764e9e70423a，实施期间外部更新为 c6d15fc43931fe3ba50a54b23db3e1791d6b9087；Agent 没有执行提交/推送，不回退外部提交，当前仅追加必要格式化及验收记录。
+
+打包检查 `/usr/bin/python3 scripts/smoke-packaged.py`：10通过、0失败；未启动或重启用户服务。
+
+## M. 工单产品与适用工艺联动（2026-10-15）
+
+用户本轮将范围收窄为仅处理产品匹配工艺；放开非 PRODUCT 产出物料暂缓。后端生产代码、数量算法、工艺模型和权限均未修改，无新 SQL、无业务数据写入、无服务重启。
+
+- `mes-base-ui/src/views/production/workorder/index.vue`：未选产品时禁用默认工艺；切产品立即清空原工艺和候选，立即请求现有 `GET /api/production/workorder/references/routings?productId=...`。完整候选仅一条时自动选中，多条时保持空值交用户选择；搜索缩小为一条不自动选。切厂、撤权、关闭和重新新增失效旧请求。沿用 PRODUCT / ENABLED 过滤。
+- 后端原 `WorkOrderService.applicableRoutings → WorkOrderExtraMapper.publishedForProduct` 已通过 routing_product 精确匹配所选产品，并筛选启用产品及 PUBLISHED 工艺；保存及下达还会实时验证同一适用关系。无需重复实现查询或新增目录缓存。
+- 新增前端 `tests/workorderRoutingSelection.test.ts`：6 项，覆盖先选产品、保留类型限制、产品切换、迟到返回、关闭/切厂/撤权、唯一自动选择与搜索不误选。新增后端 `WorkOrderApplicableRoutingHttpTest`：真实生成 Mapper SQL + 隔离 H2 HTTP，覆盖两产品各自匹配、排除匹配草稿、搜索、跨厂及无权访问。
+- 当前命令：`mvn -B -ntp verify` 成功；前端 `npm run test -- --run` 50 文件 / 267 项通过；`npm run build` 成功（既有大 chunk 提示）。日志 `/tmp/mes-routing-{verify,ui-test,ui-build}.log`。
+- 真实用户服务/API及浏览器：SIMPLE_B，产品1返回9个已发布版本；产品68返回0个；产品69返回1个。浏览器验证69自动选中、切到1清空且由用户选择、切到68不保留旧工艺。本轮未点击保存、不新增工单。证据 `.local/workorder-routing-20261015/{api-evidence.json,matched-routings.png,only-routing-auto-selected.png}`；迟到响应、切厂和撤权为自动化模拟证据，不宣称本轮重新执行真实角色撤权。
+
+## N. 放开工单产出物料类型（2026-10-16）
+
+用户重新授权取消工单的物料类型限制。本节替代 M 节“非 PRODUCT 暂缓”的当前结论，M 节保留历史时间线。
+
+- 前端工单页去掉 `materialType=PRODUCT`，保留 `status=ENABLED`；列表/表单/详情统一展示“产出物料”，适用工艺匹配和唯一工艺自动选中继续复用原逻辑。内部 `productId` 字段与存量 API/数据库兼容，不改表。
+- `WorkOrderExtraMapper.publishedForProduct` 去掉 material_type 过滤；`WorkOrderService.binding` 去掉 PRODUCT 校验及多余单条读取，保留 `lockMaterials(..., true)` 的存在性/启用状态保护、已发布工艺及 routing_product 匹配关系。
+- `ProductionExecutionRules.validateReferences` 去掉 PRODUCT 限定，保留产出物料存在、所属工单一致、确切工艺及适用关系校验，避免普通 ITEM 工单保存后无法创建执行。工厂隔离及接口权限不变，本次“放开权限”仅按上下文落实为取消类型限制，没有修改角色授权。
+- 更新 `WorkOrderEnumSqlTest` 和前端 `workorderRoutingSelection.test.ts`，新增 ITEM 的 HTTP 回归：适用工艺查询、工单创建/编辑/下达、执行单元创建；不匹配/草稿工艺、不存在/停用物料仍拒绝。Fixture 使用隔离 H2 与真实生成 XML，不是现场数据库写入验收。
+- 验证：`mvn -B -ntp verify` 成功；前端51文件275项通过，构建成功（既有大 chunk 提示）。日志 `/tmp/mes-workorder-material-{verify,ui-tests,ui-build}.log`。
+- 真实浏览器已验证候选含 ITEM 并可选中：`20023032001 / 4003903排气摇臂--装配前（清洗）`，现有物料 API 返回 materialType=ITEM；截图 `.local/workorder-material-20261016/item-selected.png`。未点击保存，未写业务数据。后端需由用户重启后再验收真实 ITEM 适用工艺及保存，当前不宣称此项真实闭环通过。
+- 保护并行开发：不良管理/质量目录、V26/V29、公共 ErrorCode 及 MaterialIssueHttpTest 的并行改动未修改。无新迁移、不提交/推送/部署、不重启服务。回滚仅恢复本节列出的类型筛选/校验及对应测试，不回滚整个脏工作区。
+
+补充：`/usr/bin/python3 scripts/smoke-packaged.py` 10 项通过，日志 `/tmp/mes-workorder-material-smoke.log`；该脚本使用独立临时测试进程，不操作用户服务。

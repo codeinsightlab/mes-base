@@ -1,0 +1,128 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="dev.mesbase.business.quality.dao.MesProductionDefectMapper">
+  <resultMap id="BaseResultMap" type="dev.mesbase.business.quality.domain.MesProductionDefectEntity">
+    <id column="id" jdbcType="BIGINT" property="id" />
+    <result column="declaration_id" jdbcType="VARCHAR" property="declarationId" />
+    <result column="revision_no" jdbcType="INTEGER" property="revisionNo" />
+    <result column="record_action" jdbcType="VARCHAR" property="recordAction" />
+    <result column="revision_reason" jdbcType="VARCHAR" property="revisionReason" />
+    <result column="execution_id" jdbcType="BIGINT" property="executionId" />
+    <result column="affected_node_id" jdbcType="BIGINT" property="affectedNodeId" />
+    <result column="discovered_node_id" jdbcType="BIGINT" property="discoveredNodeId" />
+    <result column="responsible_node_id" jdbcType="BIGINT" property="responsibleNodeId" />
+    <result column="defect_qty" jdbcType="DECIMAL" property="defectQty" />
+    <result column="waste_category" jdbcType="VARCHAR" property="wasteCategory" />
+    <result column="defect_reason" jdbcType="VARCHAR" property="defectReason" />
+    <result column="responsible_user_id" jdbcType="BIGINT" property="responsibleUserId" />
+    <result column="responsibility_remark" jdbcType="VARCHAR" property="responsibilityRemark" />
+    <result column="destination_type" jdbcType="VARCHAR" property="destinationType" />
+    <result column="target_node_id" jdbcType="BIGINT" property="targetNodeId" />
+    <result column="target_warehouse_id" jdbcType="BIGINT" property="targetWarehouseId" />
+    <result column="destination_remark" jdbcType="VARCHAR" property="destinationRemark" />
+    <result column="request_key" jdbcType="VARCHAR" property="requestKey" />
+    <result column="request_fingerprint" jdbcType="VARCHAR" property="requestFingerprint" />
+    <result column="reported_by" jdbcType="BIGINT" property="reportedBy" />
+    <result column="occurred_at" jdbcType="TIMESTAMP" property="occurredAt" />
+    <result column="recorded_by" jdbcType="BIGINT" property="recordedBy" />
+    <result column="recorded_at" jdbcType="TIMESTAMP" property="recordedAt" />
+  </resultMap>
+  <sql id="Example_Where_Clause">
+    <where>
+      <foreach collection="oredCriteria" item="criteria" separator="or">
+        <if test="criteria.valid">
+          <trim prefix="(" prefixOverrides="and" suffix=")">
+            <foreach collection="criteria.criteria" item="criterion">
+              <choose>
+                <when test="criterion.noValue">
+                  and ${criterion.condition}
+                </when>
+                <when test="criterion.singleValue">
+                  and ${criterion.condition} #{criterion.value}
+                </when>
+                <when test="criterion.betweenValue">
+                  and ${criterion.condition} #{criterion.value} and #{criterion.secondValue}
+                </when>
+                <when test="criterion.listValue">
+                  and ${criterion.condition}
+                  <foreach close=")" collection="criterion.value" item="listItem" open="(" separator=",">
+                    #{listItem}
+                  </foreach>
+                </when>
+              </choose>
+            </foreach>
+          </trim>
+        </if>
+      </foreach>
+    </where>
+  </sql>
+  <sql id="Base_Column_List">
+    id, declaration_id, revision_no, record_action, revision_reason, execution_id, affected_node_id, 
+    discovered_node_id, responsible_node_id, defect_qty, waste_category, defect_reason, 
+    responsible_user_id, responsibility_remark, destination_type, target_node_id, target_warehouse_id, 
+    destination_remark, request_key, request_fingerprint, reported_by, occurred_at, recorded_by, 
+    recorded_at
+  </sql>
+  <select id="selectByExample" parameterType="dev.mesbase.business.quality.domain.MesProductionDefectExample" resultMap="BaseResultMap">
+    select
+    <include refid="Base_Column_List" />
+    from mes_production_defect
+    <if test="_parameter != null">
+      <include refid="Example_Where_Clause" />
+    </if>
+    <if test="orderByClause != null">
+      order by ${orderByClause}
+    </if>
+  </select>
+  <select id="selectByPrimaryKey" parameterType="Long" resultMap="BaseResultMap">
+    select 
+    <include refid="Base_Column_List" />
+    from mes_production_defect
+    where id = #{id,jdbcType=BIGINT}
+  </select>
+  <insert id="insert" keyColumn="id" keyProperty="id" parameterType="dev.mesbase.business.quality.domain.MesProductionDefectEntity" useGeneratedKeys="true">
+    insert into mes_production_defect (declaration_id, revision_no, record_action, 
+      revision_reason, execution_id, affected_node_id, 
+      discovered_node_id, responsible_node_id, defect_qty, 
+      waste_category, defect_reason, responsible_user_id, 
+      responsibility_remark, destination_type, 
+      target_node_id, target_warehouse_id, destination_remark, 
+      request_key, request_fingerprint, reported_by, 
+      occurred_at, recorded_by, recorded_at
+      )
+    values (#{declarationId,jdbcType=VARCHAR}, #{revisionNo,jdbcType=INTEGER}, #{recordAction,jdbcType=VARCHAR}, 
+      #{revisionReason,jdbcType=VARCHAR}, #{executionId,jdbcType=BIGINT}, #{affectedNodeId,jdbcType=BIGINT}, 
+      #{discoveredNodeId,jdbcType=BIGINT}, #{responsibleNodeId,jdbcType=BIGINT}, #{defectQty,jdbcType=DECIMAL}, 
+      #{wasteCategory,jdbcType=VARCHAR}, #{defectReason,jdbcType=VARCHAR}, #{responsibleUserId,jdbcType=BIGINT}, 
+      #{responsibilityRemark,jdbcType=VARCHAR}, #{destinationType,jdbcType=VARCHAR}, 
+      #{targetNodeId,jdbcType=BIGINT}, #{targetWarehouseId,jdbcType=BIGINT}, #{destinationRemark,jdbcType=VARCHAR}, 
+      #{requestKey,jdbcType=VARCHAR}, #{requestFingerprint,jdbcType=VARCHAR}, #{reportedBy,jdbcType=BIGINT}, 
+      #{occurredAt,jdbcType=TIMESTAMP}, #{recordedBy,jdbcType=BIGINT}, #{recordedAt,jdbcType=TIMESTAMP}
+      )
+  </insert>
+  <select id="countByExample" parameterType="dev.mesbase.business.quality.domain.MesProductionDefectExample" resultType="java.lang.Long">
+    select count(*) from mes_production_defect
+    <if test="_parameter != null">
+      <include refid="Example_Where_Clause" />
+    </if>
+  </select>
+  <sql id="Latest">NOT EXISTS (SELECT 1 FROM mes_production_defect newer WHERE newer.declaration_id=mes_production_defect.declaration_id AND newer.revision_no &gt; mes_production_defect.revision_no)</sql>
+  <select id="selectLatest" resultMap="BaseResultMap">
+    SELECT <include refid="Base_Column_List"/> FROM mes_production_defect WHERE <include refid="Latest"/>
+    <if test="executionId != null">AND execution_id=#{executionId}</if>
+    <if test="affectedNodeId != null">AND affected_node_id=#{affectedNodeId}</if>
+    <if test="workorderId != null">AND EXISTS (SELECT 1 FROM mes_production_execution e WHERE e.id=execution_id AND e.workorder_id=#{workorderId})</if>
+    ORDER BY recorded_at DESC,id DESC
+  </select>
+  <select id="sumEffective" resultType="java.math.BigDecimal">
+    <bind name="voidAction" value="@dev.mesbase.business.quality.domain.DefectRecordAction@VOID.getValue()"/>
+    SELECT COALESCE(SUM(defect_qty),0) FROM mes_production_defect WHERE <include refid="Latest"/>
+    AND record_action &lt;&gt; #{voidAction} AND execution_id=#{executionId} AND affected_node_id=#{affectedNodeId}
+  </select>
+  <select id="nodeTotals" resultType="dev.mesbase.business.quality.domain.ProductionDefectModels$NodeTotal">
+    <bind name="voidAction" value="@dev.mesbase.business.quality.domain.DefectRecordAction@VOID.getValue()"/>
+    SELECT affected_node_id, SUM(defect_qty) AS effective_defect_qty FROM mes_production_defect WHERE <include refid="Latest"/>
+    AND record_action &lt;&gt; #{voidAction} AND execution_id=#{executionId} GROUP BY affected_node_id
+  </select>
+</mapper>

@@ -3,7 +3,6 @@ package dev.mesbase.business.production.service;
 import dev.mesbase.business.production.domain.WorkOrderStatus;
 import dev.mesbase.business.production.domain.RoutingStatus;
 import dev.mesbase.business.production.domain.ProductionExecutionStatus;
-import dev.mesbase.business.basic.domain.MaterialType;
 import dev.mesbase.business.production.domain.ExecutionPathStatus;
 import dev.mesbase.business.basic.dao.MaterialMapper;
 import dev.mesbase.business.issue.dao.MesMaterialIssueMapper;
@@ -154,7 +153,7 @@ public class ProductionExecutionRules {
         var order = workorders.selectByPrimaryKey(row.getWorkorderId());
         valid(order != null && (row.getProductId() == null || Objects.equals(row.getProductId(), order.getProductId())));
         var product = materials.selectByPrimaryKey(order.getProductId());
-        valid(product != null && MaterialType.PRODUCT.getValue().equals(product.getMaterialType()));
+        valid(product != null);
         if (Set.of(ProductionExecutionStatus.RUNNING.getValue(), ProductionExecutionStatus.COMPLETED.getValue())
                 .contains(row.getStatus()) || row.getStartTime() != null)
             if (!WorkOrderStatus.RELEASED.getValue().equals(order.getStatus()))

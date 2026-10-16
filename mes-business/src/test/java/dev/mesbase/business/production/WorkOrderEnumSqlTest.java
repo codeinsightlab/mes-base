@@ -31,11 +31,10 @@ class WorkOrderEnumSqlTest {
         var sql = configuration().getMappedStatement(
                         "dev.mesbase.business.production.dao.WorkOrderExtraMapper.publishedForProduct")
                 .getBoundSql(Map.of("productId", 1L, "search", "test"));
-        assertEquals("PRODUCT", sql.getAdditionalParameter("productType"));
         assertEquals("ENABLED", sql.getAdditionalParameter("enabledStatus"));
         assertEquals("PUBLISHED", sql.getAdditionalParameter("publishedStatus"));
-        assertFalse(sql.getSql().contains("'PRODUCT'"));
-        assertEquals(6, sql.getParameterMappings().size());
+        assertFalse(sql.getSql().contains("material_type"));
+        assertEquals(5, sql.getParameterMappings().size());
     }
 
     @Test
