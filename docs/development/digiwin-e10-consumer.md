@@ -105,3 +105,29 @@ service 三字段均与指定源逐项一致，配置版本为 1；runtime_mode 
 临时视口已恢复。截图保存在 `.local/factory-oapi-20261017/oapi-saved.png`，包含连接身份参数，
 仅作本地验收资料，不提交 Git。仓库配置按用户后续要求暂停，本轮没有改动仓库配置或实施仓库迁移。
 未执行任何真实 ERP Query/Read 或写入，也未完成工单、仓库同步业务验收。
+
+
+## 2026-10-17 V2.0：MO/CMS 只读消费与同步准备
+
+复用现有工厂加密配置、Registry、Snapshot/Context 和 `E10OapiClient`，不复制 Header、认证、HTTP 或 JSON 错误解析。客户端惰性创建，启动/配置保存/能力检查均不请求 ERP。
+
+`DigiwinE10MoQueries` 提供 `queryMo(E10QueryRequest)`、`readMo(docNo)`、`queryWarehouse(E10QueryRequest)`、`readWarehouse(warehouseCode, ownerOrgRtk, plantCode)`。Query 必须显式分页、schema/count、conditions/orders；页码 1..10000、页大小 1..100。Read 使用 SDK 类型化 Key 和 Read_0001，保留 DOC_NO 或三个仓库定位字段，不自动从 Query 响应猜 ReadKey。Read 目前仅为受上下文约束的进程内接口，没有公开原始 DTO/报文 HTTP 入口。
+
+当前没有目标部署下的可信身份及映射证明，因此 **未开放正式同步**。没有 E10 `ExternalPlan`/`ExternalWmWarehouse` 转换或 `WmWarehouseQueryPort` 注册；既有可信写入入口及其来源/冻结门不变。此处是受证据约束的部分交付，不是 EXTERNAL 同步完成。
+
+现有工单、仓库页增加 ERP 同步准备：
+
+|接口|权限|行为|
+|---|---|---|
+|GET /api/production/workorder/erp-preview|workorder:sync|返回支持情况、writeEnabled=false、阻断原因；不请求 ERP|
+|POST /api/production/workorder/erp-preview?pageNo=1&pageSize=20|workorder:sync|只读取一页工单候选|
+|GET /api/wm/wm-warehouse/erp-preview|business:wm:warehouse:sync|返回仓库准备能力；不请求 ERP|
+|POST /api/wm/wm-warehouse/erp-preview?pageNo=1&pageSize=20|business:wm:warehouse:sync|只读取一页仓库候选|
+
+POST 使用 SyncCoordinator 的 e10.mo.preview / e10.warehouse.preview 独立键、五分钟租约和 run token。开始/完成前校验执行权，失败记录 FAILED 并保留异常链；不设同步水位，不自动重试或调度。协调器 SUCCEEDED 仅表示该页读取完成，HTTP status 始终为 PREVIEW_ONLY，created/updated/skipped=0。执行权丢失不发布成功预览。
+
+没有证据支持 orders 内部格式与全局稳定排序，故显式空条件/排序只用于候选浏览；满页仅提示可能有下一页，不宣称全量。保留同码候选及其原状态，禁止按显示编码去重或推导 externalId；缺字段显示为空，不将 approve_status 猜成启停状态。数量经 SDK BigDecimal 转十进制字符串，浏览器不先转 Number。
+
+V39 正式中心迁移只登记 workorder:sync，不授予现有角色。页面还要求 ERP 模式、独立同步权限和后端 supported；切厂/撤权/关闭/卸载均清除候选并拒绝迟到响应。仓库原来始终可点但默认未接入的写同步按钮由准备入口替代，避免无实现时提供写入承诺。后端 Service 是最终模式门。
+
+真实 ERP 读取需本轮明确授权目标、组织/账套/环境及调用范围；已有 OAPI 配置不等于读取授权。SIMPLE_B 保持 LOCAL，本轮未对 ERP 发请求、未切换模式、未修改绑定。真实写入和实时 ERP 联调未验收。当前结果与完整缺口见 [V2.0 实施报告](../reviews/2026-10-17-digiwin-e10-workorder-warehouse-sync-v20-report.md)。

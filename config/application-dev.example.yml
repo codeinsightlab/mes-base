@@ -34,8 +34,6 @@ spring:
 server:
   address: 127.0.0.1
   port: 18081
-user:
-  password: ""
 ruoyi:
   profile: .local/files
   captcha:

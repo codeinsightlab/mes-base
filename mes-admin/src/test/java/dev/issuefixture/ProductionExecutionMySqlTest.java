@@ -124,7 +124,7 @@ class ProductionExecutionMySqlTest {
             assertEquals(first.getId(), identity.resolve("EXE:" + first.getId()).executionId());
             assertEquals(before, service.selectById(first.getId()).getUpdateTime());
             var issueRules = new MaterialIssueRules(issues, s.getMapper(MesMaterialIssueItemMapper.class), s.getMapper(MaterialMapper.class), s.getMapper(UnitMeasureMapper.class), s.getMapper(WmWarehouseMapper.class), s.getMapper(WorkorderMapper.class), s.getMapper(RoutingMapper.class), s.getMapper(RoutingProductMapper.class), rules, new MaterialIssueErpFacts(s.getMapper(MesMaterialIssueErpExtraMapper.class)), chainLocks, Mockito.mock(BusinessSourceRules.class));
-            var issueService = new MesMaterialIssueServiceImpl(issues, issueRules, new WarehouseIntegration(new MockEnvironment(), List.of()));
+            var issueService = new MesMaterialIssueServiceImpl(issues, issueRules, new WarehouseIntegration(List.of()));
             var issue = issueService.insert(new MesMaterialIssueCreateCommand(tag, workorder, null, null, null, null, null, null, "RECORDED", tag, first.getId()));
             assertEquals(first.getId(), issue.getExecutionId());
             assertEquals(routing, issue.getRoutingId());

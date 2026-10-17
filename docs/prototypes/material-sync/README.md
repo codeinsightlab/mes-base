@@ -1,3 +1,5 @@
+> 2026-10-17 配置收敛修订：本文保留早期原型与当时验收时间线。当前物料模块条件为 `mes.business.enabled`，旧 `mes.material.enabled` 和 `mes.material.test-adapter.enabled` 均没有生产消费方；模拟 Adapter 仅在测试源码中注册。配套 TEST ONLY YAML 已改用当前业务开关。工厂模式只来自 FactoryIntegrationSnapshot，不能据本文历史开关启用 ERP。
+
 # Material ERP 同步架构试点
 
 > 当前实现已调整为正式未接入占位查询，TEST Adapter 移入测试目录；原单独生成配置/fixture launcher 已移除。以下保留首轮试点历史，最新调用链和验证见文末。正式生成只读 `docs/development/codegen-config.review.yaml`。

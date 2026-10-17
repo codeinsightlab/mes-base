@@ -77,3 +77,18 @@ E10 参数存于中心 mf_factory 的加密配置字段，复用已有加密与�
 配置准备与模式绑定分开保存；已有 ERP 绑定的参数只读，不通过修改配置绕过模式锁定或覆盖历史身份。
 SDK 只在明确业务调用时惰性创建客户端，应用启动、配置保存不探测 ERP。
 字段、API、验收与未验证边界见 [E10 消费方接入](../development/digiwin-e10-consumer.md)。
+
+## 2026-10-17 V2.0：按使用范围验收及 UNKNOWN 人工恢复
+
+本节替代历史建议中将远端 MES UUID 检索或全 SDK 契约闭合作为所有 E10 开发前提的解释。只验收 MES 实际操作及其 DTO、JSON、公共传输和业务状态；无关 P2-1 不扩大本轮范围，实际 MO/CMS 缺陷仍受阻。
+
+V1 接受 ERP 无 MES operationKey 原生幂等/唯一回溯：原请求身份、冻结请求、外部单号及摘要保留，UNKNOWN 不自动重建或改派，授权人员人工核实并记录原因、依据、操作者和结果。明确未发送可按原状态重发；可能已发送不得盲目重试。此决定不宣称人工核实 UI 已实现，不改变不可变事实或历史绑定规则。
+
+MO/CMS Query/Read 的官方定位字段定义不等于目标账套下的稳定身份验收。产品、单位、路线、状态和组织作用域尚未确认时只返回候选预览，不组装 ExternalPlan 或 ExternalWmWarehouse，不调用可信写入入口。单页预览不承诺全量、稳定分页或差异同步完成；读取成功与 MES 同步成功分别表达。
+
+## 2026-10-17 修订：移除正常运行中的仓储 YAML 模式兼容
+
+正常 Factory 业务仅使用受管快照；WarehouseIntegration 不再读取 Environment 或按工厂拼装 mode/provider/binding-key。
+缺快照时，无论 Runtime 开关如何取值均拒绝新业务；测试使用明确构造的快照。LOCAL_ONLY/CONNECTED 保留为历史事实与公共 API 语义，历史 query/execute/cancellationMode 继续按原持久化身份，而非当前 Factory 模式选择 Adapter。
+V34 是已发布的一次性旧配置导入，保留其源码、校验和与升级负例，不作为正常运行入口。旧工单用料兼容配置独立保留。
+清单、删除证据与验证见 [配置体系收敛报告](../reviews/2026-10-17-configuration-consolidation-review.md)。

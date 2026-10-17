@@ -1,5 +1,7 @@
 package dev.issuefixture;
 
+import dev.mesbase.acceptance.FactorySnapshotFixture;
+
 import tools.jackson.databind.node.ObjectNode;
 import org.springframework.core.env.Environment;
 import org.springframework.context.annotation.Primary;
@@ -55,8 +57,8 @@ class ProductionInputHttpTest {
     static class Extra {
         @Bean
         @Primary
-        WarehouseIntegration inputWarehouse(Environment environment, List<WarehouseErpAdapter> adapters) {
-            return spy(new WarehouseIntegration(environment, adapters));
+        WarehouseIntegration inputWarehouse(List<WarehouseErpAdapter> adapters) {
+            return spy(new WarehouseIntegration(adapters));
         }
 
         @Bean
@@ -69,8 +71,7 @@ class ProductionInputHttpTest {
         var c = new AnnotationConfigWebApplicationContext();
         c.setServletContext(new MockServletContext());
         c.getEnvironment().getPropertySources().addFirst(new MapPropertySource("TEST ONLY LOCAL MES", Map.of(
-                "mes.business.enabled", "true", "mes.integration.warehouse.factories.A.mode", "LOCAL_ONLY", "mes.integration.warehouse.factories.B.mode", "LOCAL_ONLY",
-                "mes.production.input.factories.A.workorders.1.material-id", "1",
+                "mes.business.enabled", "true", "mes.production.input.factories.A.workorders.1.material-id", "1",
                 "mes.production.input.factories.A.workorders.1.total-required-qty", "2000",
                 "mes.production.input.factories.A.workorders.1.work-center", "TEST-CENTER",
                 "mes.production.input.factories.A.workorders.1.warehouse-ids", "1")));
@@ -177,8 +178,7 @@ class ProductionInputHttpTest {
                     .andExpect(jsonPath("status").value("SUBMIT_UNKNOWN"));
             assertEquals(1, j.queryForObject("SELECT COUNT(*) FROM mes_production_scan_identity", Integer.class));
             assertEquals(0, j.queryForObject("SELECT COUNT(*) FROM mes_material_issue_input WHERE confirmed_at IS NOT NULL", Integer.class));
-            c.getEnvironment().getPropertySources()
-                    .addFirst(new MapPropertySource("TEST ONLY current mode changed after original LOCAL intent", Map.of("mes.integration.warehouse.factories.A.mode", "CONNECTED")));
+            FactorySnapshotFixture.set(c, FactorySnapshotFixture.erp("A", "TEST_PROVIDER", "TEST_A"));
             m.perform(ProductionCoreV1HttpTest.full(post(MaterialIssueHttpTest.H + "/" + r.get("issueId")
                     .asText() + "/actions/reconcile-erp"))).andExpect(status().isOk());
             assertEquals(1, j.queryForObject("SELECT COUNT(*) FROM mes_material_issue_input WHERE confirmed_at IS NOT NULL", Integer.class));

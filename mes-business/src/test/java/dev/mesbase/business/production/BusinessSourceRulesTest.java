@@ -42,7 +42,7 @@ class BusinessSourceRulesTest {
     private final WorkorderErpExtraMapper orderExtras = mock(WorkorderErpExtraMapper.class);
     private final WmWarehouseMapper warehouses = mock(WmWarehouseMapper.class);
     private final WmWarehouseErpExtraMapper warehouseExtras = mock(WmWarehouseErpExtraMapper.class);
-    private final WarehouseIntegration integration = new WarehouseIntegration(new MockEnvironment(), List.of());
+    private final WarehouseIntegration integration = new WarehouseIntegration(List.of());
     private final BusinessSourceRules rules = new BusinessSourceRules(integration, orders, orderExtras, warehouses, warehouseExtras,
             mock(MesMaterialIssueMapper.class), mock(MesMaterialIssueItemMapper.class), mock(MesProductionReceiptMapper.class));
 

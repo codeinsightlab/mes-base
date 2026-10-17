@@ -98,7 +98,7 @@ class ProductionDefectMySqlTest {
     static AnnotationConfigApplicationContext context() throws Exception {
         var c = new AnnotationConfigApplicationContext();
         c.getEnvironment().getPropertySources()
-                .addFirst(new MapPropertySource("LIVE MYSQL TEST ONLY", Map.of("mes.business.enabled", "true", "mes.system.enabled", "true", "mes.integration.warehouse.factories.SIMPLE_B.mode", "LOCAL_ONLY")));
+                .addFirst(new MapPropertySource("LIVE MYSQL TEST ONLY", Map.of("mes.business.enabled", "true", "mes.system.enabled", "true")));
         DataSource source = AcceptanceBusinessDatabase.source();
         var tx = new OwnedTransactionManager(source);
         var factory = PersistenceFactories.create(source, MaterialIssueHttpTest.MAPPERS, PersistenceFactories::pagination, tx::verifyAccess);

@@ -1,5 +1,7 @@
 package dev.issuefixture;
 
+import dev.mesbase.acceptance.FactorySnapshotFixture;
+
 import dev.mesbase.business.integration.warehouse.WarehouseErpAdapter;
 import dev.mesbase.business.integration.warehouse.MaterialIssueCancelCommand;
 import dev.mesbase.business.integration.warehouse.QueryMaterialIssueCommand;
@@ -89,9 +91,10 @@ class MaterialIssueErpHttpTest {
         var c = new AnnotationConfigWebApplicationContext();
         c.setServletContext(new MockServletContext());
         c.getEnvironment().getPropertySources()
-                .addFirst(new MapPropertySource("TEST ONLY", Map.of("mes.business.enabled", "true", "mes.integration.warehouse.factories.A.mode", "CONNECTED", "mes.integration.warehouse.factories.A.provider", "test", "mes.integration.warehouse.factories.B.mode", "LOCAL_ONLY")));
+                .addFirst(new MapPropertySource("TEST ONLY", Map.of("mes.business.enabled", "true")));
         c.register(MaterialIssueHttpTest.Web.class, VendorConfig.class);
         c.refresh();
+        FactorySnapshotFixture.set(c, FactorySnapshotFixture.erp("A", "test", "TEST_A"));
         MaterialIssueHttpTest.externalFixture(c);
         return c;
     }
@@ -231,8 +234,7 @@ class MaterialIssueErpHttpTest {
     void providerSwitchKeepsHistoricalConnectedProviderAndBinding() throws Exception {
         try (var c = connected()) {
             seed(c, "ERP_UNKNOWN");
-            c.getEnvironment().getPropertySources()
-                    .addFirst(new MapPropertySource("switch", Map.of("mes.integration.warehouse.factories.A.mode", "LOCAL_ONLY")));
+            FactorySnapshotFixture.set(c, FactorySnapshotFixture.local("A"));
             MaterialIssueHttpTest.mvc(c).perform(full(get(Q))).andExpect(status().isOk())
                     .andExpect(jsonPath("result.executionMode").value("CONNECTED"));
         }

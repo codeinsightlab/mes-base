@@ -80,8 +80,6 @@ mes:
 
 # Source Product infrastructure settings shared by the direct dev/prod YAML files.
 ruoyi:
-  name: MES Base
-  version: 0.1.0
   captcha:
     enabled: true
     type: char

@@ -112,6 +112,7 @@ import dev.mesbase.common.core.domain.entity.SysUser;
 import dev.mesbase.common.core.domain.model.LoginUser;
 import dev.mesbase.core.factory.Factory;
 import dev.mesbase.core.factory.FactoryId;
+import dev.mesbase.acceptance.FactorySnapshotFixture;
 import dev.mesbase.core.factory.FactoryStatus;
 import dev.mesbase.core.factory.FactorySelectionService;
 import dev.mesbase.framework.security.SystemTokenFilter;
@@ -266,6 +267,11 @@ class MaterialIssueHttpTest {
     @EnableTransactionManagement
     @Import({WorkOrderCancellationService.class, WorkOrderCancellationController.class, BusinessSourceRules.class, StockReferenceRules.class, ProductionCompletionService.class, ProductionCompletionController.class, WarehouseAcceptanceService.class, WarehouseAcceptanceController.class, QualityReleaseService.class, QualityReleaseController.class, WorkorderMaterialService.class, WorkorderMaterialController.class, LocalStockController.class, WmStockActionController.class, WmStockActionServiceImpl.class, LocalStockService.class, LocalProductionSupply.class, QualityTreatmentService.class, MaterialIssueInputFacts.class, ProductionQuantityService.class, ProductionQuantityErrorAdvice.class, ExecutionQualityReferenceQueryImpl.class, ProductionExecutionQueryService.class, ProductionChainLocks.class, ExecutionPathService.class, ExecutionActionController.class, MaterialIssueSubmissionService.class, MaterialIssueSubmissionController.class, WorkorderErpFacts.class, MaterialIssueErpFacts.class, MaterialIssueErpService.class, MaterialIssueErpController.class, WarehouseIntegration.class, MaterialIssueVoidService.class, MaterialIssueVoidController.class, MesMaterialIssueController.class, MesMaterialIssueItemController.class, MesMaterialIssueServiceImpl.class, MesMaterialIssueItemServiceImpl.class, MaterialIssueRules.class, ProductionExecutionRules.class, ProductionIdentityService.class, MesProductionExecutionServiceImpl.class, MesProductionExecutionController.class, ProductionIdentityController.class, WorkOrderController.class, WorkOrderService.class, LegacyBatchHistoryQuery.class, LegacyBatchHistoryController.class, RoutingReferenceRules.class, FoundationErrorAdvice.class})
     static class Web implements WebMvcConfigurer {
+        @Bean
+        FactorySnapshotFixture factorySnapshots() {
+            return new FactorySnapshotFixture();
+        }
+
         @Bean
         BusinessDirectoryService directoryLabels(RoutingMapper routes, OperationMapper operations) {
             var directory = mock(BusinessDirectoryService.class);
@@ -543,8 +549,7 @@ class MaterialIssueHttpTest {
      * Explicit synthetic external provenance; never a production migration or proof of real ERP sync.
      */
     static void externalFixture(AnnotationConfigWebApplicationContext c) {
-        String provider = c.getEnvironment()
-                .getProperty("mes.integration.warehouse.factories.A.provider", "TEST_PROVIDER");
+        String provider = FactorySnapshotFixture.current(c, "A").erpType();
         var j = c.getBean(Fixture.class).business.get("A");
         j.update("UPDATE workorder SET source='EXTERNAL' WHERE id=1");
         j.update("UPDATE workorder_erp_extra SET external_id='TEST-ERP-ORDER',provider=?,binding_key='TEST_A',configuration_revision=1 WHERE id=1", provider);
@@ -556,7 +561,7 @@ class MaterialIssueHttpTest {
         var c = new AnnotationConfigWebApplicationContext();
         c.setServletContext(new MockServletContext());
         c.getEnvironment().getPropertySources()
-                .addFirst(new MapPropertySource("TEST ONLY", Map.of("mes.business.enabled", "true", "mes.integration.warehouse.factories.A.mode", "LOCAL_ONLY", "mes.integration.warehouse.factories.B.mode", "LOCAL_ONLY")));
+                .addFirst(new MapPropertySource("TEST ONLY", Map.of("mes.business.enabled", "true")));
         c.register(Web.class);
         c.refresh();
         return c;
@@ -566,14 +571,11 @@ class MaterialIssueHttpTest {
         return MockMvcBuilders.webAppContextSetup(c)
                 .addFilters(new RequestBoundaryFilter(), (Filter) (req, res, chain) -> {
                     String factory = ((HttpServletRequest) req).getHeader("X-Factory-Id");
-                    String prefix = "mes.integration.warehouse.factories." + factory + ".";
-                    if (!"CONNECTED".equals(c.getEnvironment().getProperty(prefix + "mode"))) {
+                    if (factory == null) {
                         chain.doFilter(req, res);
                         return;
                     }
-                    var snapshot = new FactoryIntegrationSnapshot(new FactoryId(factory), FactoryRuntimeMode.ERP,
-                            c.getEnvironment().getProperty(prefix + "provider", "TEST_PROVIDER"), c.getEnvironment()
-                            .getProperty(prefix + "binding-key", "TEST_" + factory), 1, 1L);
+                    var snapshot = FactorySnapshotFixture.current(c, factory);
                     final IOException[] failure = new IOException[1];
                     final ServletException[] servlet = new ServletException[1];
                     FactoryIntegrationContext.run(snapshot, () -> {

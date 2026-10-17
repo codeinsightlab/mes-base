@@ -1,5 +1,7 @@
 package dev.issuefixture;
 
+import dev.mesbase.acceptance.FactorySnapshotFixture;
+
 import dev.mesbase.business.production.domain.WorkOrderStatus;
 import dev.mesbase.core.error.ErrorCode;
 import dev.mesbase.core.error.FoundationException;
@@ -41,8 +43,7 @@ class SourceIsolationHttpTest {
                             .content(body.replace("TEST_SOURCE_NEW", "TEST_FORGED")
                                     .replace("\"routingId\":1", "\"routingId\":1,\"source\":\"EXTERNAL\"")))
                     .andExpect(status().isOk()).andExpect(jsonPath("workorder.source").value("LOCAL"));
-            c.getEnvironment().getPropertySources()
-                    .addFirst(new MapPropertySource("TEST ERP mode", Map.of("mes.integration.warehouse.factories.A.mode", "CONNECTED")));
+            FactorySnapshotFixture.set(c, FactorySnapshotFixture.erp("A", "TEST_PROVIDER", "TEST_A"));
             m.perform(ProductionCoreV1HttpTest.full(post("/api/production/workorder"))
                             .content(body.replace("TEST_SOURCE_NEW", "TEST_MODE_BYPASS")))
                     .andExpect(status().isConflict())

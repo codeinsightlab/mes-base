@@ -141,7 +141,7 @@ class MaterialIssueVoidMySqlTest {
             }, MaterialIssueHttpTest.MAPPERS);
             c.registerBean(FactoryBusinessDataSource.class, () -> new FactoryBusinessDataSource(new ConfiguredBusinessPersistenceResolver(catalog, Map.of(id, new BusinessRuntimeBinding(id, identity, 1))), registry));
             c.getEnvironment().getPropertySources()
-                    .addFirst(new MapPropertySource("TEST ONLY", Map.of("mes.business.enabled", "true", "mes.integration.warehouse.factories.SIMPLE_B.mode", "LOCAL_ONLY")));
+                    .addFirst(new MapPropertySource("TEST ONLY", Map.of("mes.business.enabled", "true")));
             for (var m : MaterialIssueHttpTest.MAPPERS) mapper(c, m);
             c.register(Config.class);
             c.refresh();

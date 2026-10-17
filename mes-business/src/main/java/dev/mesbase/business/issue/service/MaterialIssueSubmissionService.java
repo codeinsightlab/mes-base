@@ -173,15 +173,15 @@ public class MaterialIssueSubmissionService {
         attempt.setCreatedAt(LocalDateTime.now());
         changed(attempts.insert(attempt));
         var external = orderFacts.selectByPrimaryKey(e.getWorkorderId());
-        var integrationSnapshot = FactoryIntegrationContext.current().orElse(null);
+        var integrationSnapshot = FactoryIntegrationContext.required();
         var externalWarehouses = selection.mode() == Mode.CONNECTED ? sources.externalWarehouseIds(lines.stream()
                 .map(line -> line.getWarehouseId()).toList()) : Map.<Long, String>of();
         var command = new MaterialIssueSubmitCommand(id, "ISSUE-SUBMIT-" + attempt.getId(), row.getIssueNo(), row.getWorkorderId(), row.getWorkorderCode(), external == null ? null : external.getExternalId(), external == null ? null : external.getExternalCode(), e.getId(), e.getExecutionNo(), row.getProductId(), row.getProductCode(), e.getRoutingId(), path.getRevision(), paths.view(e.getId())
                 .selectedNodeIds(), row.getIssueTime() == null ? null : row.getIssueTime().toString(), lines.stream()
                 .map(i -> new Line(i.getId(), i.getMaterialId(), i.getMaterialCode(), i.getBatchNo(), i.getQuantity(), i.getUnitId(), i.getUnitCode(), i.getWarehouseId(), i.getWarehouseCode(), externalWarehouses.get(i.getWarehouseId())))
                 .toList(), inputFacts.snapshot(id), new Source(selection.provider(), selection.bindingKey(),
-                integrationSnapshot == null ? null : integrationSnapshot.revision(),
-                integrationSnapshot == null ? null : integrationSnapshot.configurationRevision()));
+                integrationSnapshot.revision(),
+                integrationSnapshot.configurationRevision()));
         attempt.setCommandJson(json.writeValueAsString(command));
         changed(attempts.updateByPrimaryKeyWithBLOBs(attempt));
         row.setSubmissionId(attempt.getId());

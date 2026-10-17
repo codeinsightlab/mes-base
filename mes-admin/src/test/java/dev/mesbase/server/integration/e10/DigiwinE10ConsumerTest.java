@@ -11,6 +11,7 @@ import com.lixin.capability.digiwin.e10.gateway.OapiMoGateway;
 import com.lixin.capability.digiwin.e10.request.E10QueryRequest;
 import com.sun.net.httpserver.HttpServer;
 import dev.mesbase.core.error.FoundationException;
+import dev.mesbase.framework.sync.SyncCoordinator;
 import dev.mesbase.core.factory.FactoryId;
 import dev.mesbase.core.factory.FactoryRuntimeMode;
 import dev.mesbase.platform.execution.FactoryIntegrationContext;
@@ -221,11 +222,72 @@ class DigiwinE10ConsumerTest {
         }
     }
 
+    @Test
+    void cmsQueryAndBothReadsUseSdkRoutesAndExactLocators() {
+        runner().run(context -> FactoryIntegrationContext.run(validSnapshot(), () -> {
+            var queries = context.getBean(DigiwinE10MoQueries.class);
+            response = "{\"std_data\":{\"execution\":{\"code\":\"0\"},\"parameter\":{\"rows\":[{\"warehouse_no\":\"WH_A\",\"om_site_id\":\"SITE_A\"}]}}}";
+            assertEquals("WH_A", queries.queryWarehouse(request()).getRows().getFirst().getWarehouseNo().asText());
+            assertEquals("e10.oapi.warehouse.list.data.query.get", service.get().path("name").asText());
+            response = "{\"std_data\":{\"execution\":{\"code\":\"0\"},\"parameter\":{\"result\":{\"success\":[{\"doc_no\":\"MO_A\"}],\"error\":[]}}}}";
+            assertEquals("MO_A", queries.readMo("MO_A").getRecords().getFirst().getDocNo().asText());
+            assertEquals("MO_A", parameter.get().path("data_keys").get(0).path("DOC_NO").asText());
+            assertEquals("e10.oapi.wo.details.data.read.get", service.get().path("name").asText());
+            assertEquals("Read_0001", parameter.get().path("dataExchangeProjectID").asText());
+            response = "{\"std_data\":{\"execution\":{\"code\":\"0\"},\"parameter\":{\"result\":{\"success\":[{\"warehouse_no\":\"WH_A\",\"source_type_key\":\"PLANT\",\"om_site_id\":\"SITE_A\"}],\"error\":[]}}}}";
+            assertEquals("WH_A", queries.readWarehouse("WH_A", "PLANT", "SITE_A").getRecords().getFirst()
+                    .getWarehouseNo().asText());
+            assertEquals("e10.oapi.warehouse.details.data.read.get", service.get().path("name").asText());
+            var key = parameter.get().path("data_keys").get(0);
+            assertEquals(3, key.size());
+            assertEquals("WH_A", key.path("WAREHOUSE_CODE").asText());
+            assertEquals("PLANT", key.path("Owner_Org.RTK").asText());
+            assertEquals("SITE_A", key.path("Owner_Org_PLANT_PLANT_CODE").asText());
+            assertThrows(IllegalArgumentException.class, () -> queries.readWarehouse("WH_A", "", "SITE_A"));
+            assertThrows(IllegalArgumentException.class, () -> queries.readMo(""));
+            var oversized = request();
+            oversized.setPageSize(101);
+            assertThrows(IllegalArgumentException.class, () -> queries.queryWarehouse(oversized));
+        }));
+        assertEquals(3, calls.get());
+    }
+
+    @Test
+    void actualSdkDecoderPreservesLargeDecimalAndDoesNotInventAnExternalIdentity() {
+        response = "{\"std_data\":{\"execution\":{\"code\":\"0\"},\"parameter\":{\"rows\":[{\"doc_no\":\"TEST_ONLY\",\"plan_qty\":999999999999.123456}]}}}";
+        runner().run(context -> FactoryIntegrationContext.run(validSnapshot(), () -> {
+            var row = context.getBean(DigiwinE10MoQueries.class).queryMo(request()).getRows().getFirst();
+            assertEquals(new BigDecimal("999999999999.123456"), row.getPlanQty());
+            assertEquals("e10.oapi.wo.list.data.query.get", service.get().path("name").asText());
+        }));
+    }
+
+    @Test
+    void validFactoriesKeepIndependentSdkIdentityAndRejectRetiredConfiguration() {
+        var configurations = mock(FactoryOapiService.class);
+        var second = new FactoryOapiSettings(endpoint, settings().host(),
+                new FactoryOapiSettings.Service("TEST_ONLY", "TEST_ONLY", "TEST_B_SERVICE"));
+        when(configurations.connection("TEST_A")).thenReturn(new FactoryOapiService.Connection("TEST_A", "test-e10", 3, settings()));
+        when(configurations.connection("TEST_B")).thenReturn(new FactoryOapiService.Connection("TEST_B", "test-e10", 3, second));
+        try (var queries = new DigiwinE10MoQueries(configurations)) {
+            FactoryIntegrationContext.run(validSnapshot(), () -> queries.queryMo(request()));
+            assertEquals("TEST_ONLY_FINAL_SERVICE_ID", service.get().path("id").asText());
+            FactoryIntegrationContext.run(snapshot("TEST_B", DigiwinE10MoQueries.PROVIDER, "test-e10", 3),
+                    () -> queries.queryWarehouse(request()));
+            assertEquals("TEST_B_SERVICE", service.get().path("id").asText());
+            when(configurations.connection("TEST_A")).thenReturn(new FactoryOapiService.Connection("TEST_A", "test-e10", 4, settings()));
+            FactoryIntegrationContext.run(validSnapshot(), () -> assertThrows(FoundationException.class,
+                    () -> queries.queryMo(request())));
+        }
+        assertEquals(2, calls.get());
+    }
+
     private ApplicationContextRunner runner() {
         var configurations = mock(FactoryOapiService.class);
         when(configurations.connection("TEST_A")).thenReturn(new FactoryOapiService.Connection("TEST_A", "test-e10", 3, settings()));
         return new ApplicationContextRunner()
                 .withBean(FactoryOapiService.class, () -> configurations)
+                .withBean(SyncCoordinator.class, () -> mock(SyncCoordinator.class))
                 .withUserConfiguration(DigiwinE10Configuration.class)
                 .withPropertyValues("mes.runtime.enabled=true");
     }

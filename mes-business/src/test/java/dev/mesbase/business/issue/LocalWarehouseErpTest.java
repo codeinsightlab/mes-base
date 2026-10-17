@@ -52,14 +52,10 @@ class LocalWarehouseErpTest {
     @Test
     void configurationAndHistoricalIdentityFailClosed() {
         var scope = new FactoryScope(new FactoryId("A"));
-        var env = new MockEnvironment();
-        var integration = new WarehouseIntegration(env, List.of());
+        var integration = new WarehouseIntegration(List.of());
         var command = new QueryMaterialIssueCommand(1L, null, null, null, null);
         assertEquals(Outcome.NOT_FOUND, integration.query(scope, "LOCAL_ONLY", "local", command).outcome());
-        env.setProperty("mes.integration.warehouse.factories.A.mode", "CONNECTED");
-        env.setProperty("mes.integration.warehouse.factories.A.provider", "digiwin");
         assertThrows(FoundationException.class, () -> integration.query(scope, "CONNECTED", "digiwin", new QueryMaterialIssueCommand(1L, null, "digiwin", "ERP-1", null)));
-        env.setProperty("mes.integration.warehouse.factories.A.mode", "LOCAL_ONLY");
         var historical = new MesMaterialIssueEntity();
         historical.setSourceExecutionMode("LOCAL_ONLY");
         historical.setExternalEffect("NONE");
@@ -74,7 +70,7 @@ class LocalWarehouseErpTest {
         var adapter = mock(WarehouseErpAdapter.class);
         when(adapter.supports(scope, "old-binding")).thenReturn(true);
         when(adapter.supportsProvider("old-provider")).thenReturn(true);
-        var service = new WarehouseIntegration(new MockEnvironment(), List.of(adapter));
+        var service = new WarehouseIntegration(List.of(adapter));
         var row = new MesMaterialIssueEntity();
         row.setId(1L);
         row.setSourceExecutionMode("CONNECTED");

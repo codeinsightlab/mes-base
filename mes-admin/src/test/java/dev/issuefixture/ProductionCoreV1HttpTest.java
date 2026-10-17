@@ -1,5 +1,9 @@
 package dev.issuefixture;
 
+import dev.mesbase.core.factory.FactoryRuntimeMode;
+
+import dev.mesbase.acceptance.FactorySnapshotFixture;
+
 import dev.mesbase.business.integration.warehouse.WarehouseErpAdapter;
 import dev.mesbase.business.integration.warehouse.MaterialIssueSubmitCommand;
 import dev.mesbase.business.integration.warehouse.MaterialIssueCancelCommand;
@@ -67,7 +71,7 @@ class ProductionCoreV1HttpTest {
         j.update("INSERT INTO routing_node(id,routing_id,node_code,operation_id,operation_name,is_key,display_order) VALUES(1,1,'A',1,'相同工序',false,1),(2,1,'B',1,'相同工序',false,2),(3,1,'C',2,'分支C',false,3),(4,1,'D',3,'分支D',false,4),(5,1,'E',4,'终点',false,5)");
         j.update("INSERT INTO routing_edge(routing_id,from_node_id,to_node_id) VALUES(1,1,2),(1,2,3),(1,2,4),(1,3,5),(1,4,5)");
         var m = MaterialIssueHttpTest.mvc(c);
-        if ("CONNECTED".equals(c.getEnvironment().getProperty("mes.integration.warehouse.factories.A.mode"))) {
+        if (FactorySnapshotFixture.current(c, "A").mode() == FactoryRuntimeMode.ERP) {
             // TEST ONLY authoritative external release fixture, ordinary local release is forbidden.
             j.update("UPDATE workorder SET status='RELEASED' WHERE id=1");
         } else m.perform(full(post("/api/production/workorder/1/actions/release")).content("{\"revision\":0}"))
@@ -176,10 +180,11 @@ class ProductionCoreV1HttpTest {
         var c = new AnnotationConfigWebApplicationContext();
         c.setServletContext(new MockServletContext());
         c.getEnvironment().getPropertySources()
-                .addFirst(new MapPropertySource("TEST ONLY", Map.of("mes.business.enabled", "true", "mes.integration.warehouse.factories.A.mode", "CONNECTED", "mes.integration.warehouse.factories.A.provider", "test", "mes.integration.warehouse.factories.A.binding-key", "TEST_A", "mes.integration.warehouse.factories.B.mode", "LOCAL_ONLY")));
+                .addFirst(new MapPropertySource("TEST ONLY", Map.of("mes.business.enabled", "true")));
         c.register(MaterialIssueHttpTest.Web.class);
         if (vendor) c.register(VendorConfig.class, FaultConfig.class);
         c.refresh();
+        FactorySnapshotFixture.set(c, FactorySnapshotFixture.erp("A", "test", "TEST_A"));
         MaterialIssueHttpTest.externalFixture(c);
         return c;
     }

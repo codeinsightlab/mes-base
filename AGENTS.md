@@ -1,5 +1,22 @@
 # MES Base 工程规则
 
+## 2026-10-17 — 配置唯一权威与废弃配置管理
+
+- 当前 Factory 业务运行模式只能来自受管 FactoryIntegrationSnapshot / Context / Registry；禁止新增或恢复按 FactoryId/FactoryCode 在 YAML 中覆盖 LOCAL/ERP 的机制。正式业务缺少快照、模式非法或 ERP 连接不可解析时失败关闭，不回退 LOCAL；测试必须显式构造合法快照，不依赖生产兼容兜底。
+- WorkOrder/Warehouse.source 是可信持久化业务来源，不得由当前模式推断、回填或改写。新业务继续校验模式与来源一致性；历史 UUID 重放、UNKNOWN 核实及合法撤销按原持久化来源、provider/binding 和版本执行，不改派当前 ERP。
+- Factory 决定当前模式与绑定哪个 ERP；对应连接配置决定如何访问该 ERP。E10 参数由工厂中心配置维护，SDK 的 host/service 身份、生命周期及版本校验不能因清理而丢失；禁止另建竞争模式入口或静默兜底。
+- 删除配置必须同时检查声明、动态键拼装、绑定器/Bean 条件、脚本/Profile、历史兼容、测试与运行证据，连同失效分支和测试更新；未证明废弃的配置标记 REVIEW 并保留。业务概念只能有一个权威来源，不能长期保留相互竞争的配置。
+- 已发布迁移不重写。V34 对旧仓储 YAML 的一次性历史导入契约保留，仅供尚未执行该迁移的旧环境升级；它不再是正常运行模式入口。历史工单用料 YAML 及其停用开关在证明不再需要前保留，数据库用料行存在时不得回退 YAML。
+
+## 2026-10-17 — Digiwin E10 集成范围与人工补偿策略
+
+- Base MES 只验收实际调用的 OAPI 操作、Request/Response DTO、实际 JSON、公共 Header/认证/HTTP/序列化/错误处理与实际业务状态；不以 SDK 全量契约完整性作为本项目发布门槛。V1.9 P2-1 的 8 项操作、10 个属性不直接涉及当前 MO/CMS/IM 候选，不扩大范围修复；实际使用接口自身的缺陷仍须解决。
+- V1 不要求 ERP 原生支持 MES operationKey 幂等或按 MES UUID 唯一检索，不建设跨系统自动补偿。缺少远端 UUID 回溯是用户接受的人工恢复边界，不再单独列为阻断所有 E10 开发的 P1。
+- 结果不确定时保留原 requestId、operationKey、冻结请求、已取得的 ERP 单据号及响应摘要，标记 UNKNOWN；禁止自动重建、自动转 LOCAL 或改派。授权人员须人工查询 ERP，记录原因、依据、操作者和结果；未经可信核实不得宣称生效，不得修改不可变事实。明确未发送的请求可按原状态安全重新发起；可能已发送但无响应的创建不得自动重试。
+- 每厂最多一个 ERP，复用 FactoryIntegration、WarehouseIntegration 与现有 SDK；LOCAL/EXTERNAL 严格隔离，保持一套生产核心与两个数据源入口。工单、仓库 Query/Read 先确认部署下的稳定身份、产品/单位/路线及状态映射，再经既有可信同步服务落库；缺证据只允许候选预览，不猜 ID、状态或映射。
+- 本轮范围只含 MO/CMS Query/Read 和同步准备，不开发 ERP 领料、出库、成品入库、工单作废或自动补偿。真实读取需要目标、账套/组织/环境及调用范围的明确授权；已有配置及 Mock 成功不构成真实 ERP 读取授权，不自动切换 SIMPLE_B 模式或修改绑定。
+
+
 ## 2026-10-17 — LOCAL / ERP 来源隔离与迁移规则（用户确认）
 
 本节对 LOCAL/ERP 来源及迁移的约束优先于旧文档中的交叉混合单据、自由组合库存管理权和无缝迁移建议；不放宽 Factory 分库、权限、事务、引用保护及不可变事实规则。完整业务方案与实施缺口见 [LOCAL / ERP 业务边界设计方案 V1.0](docs/architecture/local-erp-business-boundary.md)。以下规则持续生效；V1.7 实施状态、真实 SIMPLE_B 验证及历史待核实边界见 [V1.7 实施报告](docs/reviews/2026-10-17-local-external-source-isolation-v17-report.md)。
@@ -438,7 +455,7 @@ SysUser 敏感字段。
 
 - MES Business Service → ERP领域接口 → 配置选择的领域实现 → 厂商Gateway。复用现有 WarehouseErpAdapter 作为仓储领域业务接口；Production/MasterData 仅在真实消费者需要时建立，不按一个API建立一个类、不集中成巨大Service。
 - 领域方法表达完整业务行为；厂商实现负责其创建、提交、审核、查询等内部步骤、业务响应解析和人工恢复。Gateway仅负责认证、通讯、序列化及底层响应解析，不写MES库；MES Service不感知厂商字段、错误码或流程步骤。HTTP 200不等于业务成功。
-- 托管运行时必须复用 FactoryIntegrationSnapshot / Context / Registry 的工厂配置，LOCAL 映射 LOCAL_ONLY，ERP 映射 CONNECTED；须匹配该厂绑定及 provider，缺少或歧义明确失败，不回退本地成功。旧 mes.integration.warehouse.factories.<FactoryId> 仅保留现有非托管兼容/测试入口，不作为托管业务缺配置的兜底。无外部数据库装配。
+- 托管运行时必须复用 FactoryIntegrationSnapshot / Context / Registry 的工厂配置，LOCAL 映射 LOCAL_ONLY，ERP 映射 CONNECTED；须匹配该厂绑定及 provider，缺少或歧义明确失败，不回退本地成功。旧仓储 YAML 运行分支已删除，测试显式使用 Factory 快照；仅 V34 历史迁移导入契约保留，详见“配置唯一权威与废弃配置管理”。无外部数据库装配。
 - 标准结果区分 SUCCEEDED（SUCCESS）、REJECTED（FAILED）、UNKNOWN，并标明 LOCAL_ONLY/CONNECTED。阶段失败保留已知外部身份；本地模式不伪造ERP单据、审核或冲销事实。
 - ERP单据身份、编号、业务状态、外部操作来源证据、操作结果及安全诊断存独立Extra；WorkOrder/Warehouse 的 LOCAL/EXTERNAL 业务来源属于 MES 业务身份，须按 2026-10-17 规则可信持久化，不以 Extra 或当前模式推断代替；随当前业务库FactoryScope隔离，不在业务表新增工厂字段或ERP事实列。MES表保存MES业务身份、状态与本地操作身份。Extra写入由MES协调逻辑管理，不开放普通编辑来伪造外部事实。
 - 查询确定性 FOUND/NOT_FOUND/UNKNOWN 与外部业务状态独立。查询只读、不改MES；NOT_FOUND不证明创建失败、不授权重建。核实经领域规则，在外部查询后短事务重锁MES对象并检查Extra操作版本及本地操作身份，原子更新MES与Extra；UNKNOWN不推进，VOIDED不因EFFECTIVE恢复，冲突保留诊断供人工处理。

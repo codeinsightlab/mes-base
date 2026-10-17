@@ -34,7 +34,7 @@ WorkOrder 和 Warehouse 均须具有可信持久化来源：LOCAL 由 MES 本地
 - LOCAL 仓库的权威余额与动作由 LocalStockService 管理；EXTERNAL 仓库的权威库存和仓储交易属于 ERP。本地 EXTERNAL 镜像只供检索、参考、展示和对账，不能作为正式库存操作的最终决策依据。
 - ERP 同步只管理 EXTERNAL 的 ERP 权威字段，不得 UPDATE/DELETE LOCAL 记录、LOCAL 权威库存或历史库存动作。当前业务查询依赖 ERP 权威接口或真实业务命令的权威校验。
 - ERP 可更新其主数据和未冻结计划字段；不能覆盖已锁定 Execution、RoutingPath、Report、Quality、Receipt 和库存事实。ERP 当前计划与 MES 历史冲突时保留历史并形成明确冲突。
-- ERP 出库单创建成功不等于实际出库或可信投产；须验证对应 ERP 的业务生效契约。UNKNOWN 保留原操作 UUID/幂等身份及 provider/binding，使用原身份查询与恢复；NOT_FOUND 不自动授权重新创建。
+- ERP 出库单创建成功不等于实际出库或可信投产；须验证对应 ERP 的业务生效契约。UNKNOWN 保留原 requestId、operationKey、冻结请求、已知 ERP 单号及响应摘要和 provider/binding；V1 不要求 ERP 支持 MES UUID 唯一检索，由授权人员人工查询 ERP 并记录原因、依据、操作者和结果。NOT_FOUND 不自动授权重新创建，可能已发送的创建不得自动重试。
 - Execution、Report、Quality、ProductionQuantityService 只有一套。来源差异影响准入和权威适配，不复制生产模型或数量计算链路。
 
 ## 2. V1严格来源隔离与停旧启新迁移策略
@@ -117,3 +117,7 @@ WorkOrder 的 CANCELLED 只终止后续正常生产，不代表历史业务已�
 LOCAL 取消仍符合当前工厂模式；NULL 历史来源仅在专用终止分支允许，不回填来源；EXTERNAL 没有可信远端取消契约时拒绝。本轮不开发ERP取消、无缝迁移或自动补偿。
 
 V1.7附录176张工单经用户明确确认全部为测试数据，V1.8 已通过正式API作废176/176，来源仍NULL，取消事实176条；其余业务事实及库存经前后快照证明不变。它们退出活跃候选并保留历史，不再以开发来源核实功能作为处理前提。详见 [V1.8实施报告](../reviews/2026-10-17-workorder-cancellation-v18-report.md)。第8节176张待处理描述保留实施当时的历史记录，本节为后续状态。
+
+## 2026-10-17 V2.0 补充：集成验收范围
+
+只验证 MES 实际使用的 SDK 操作和共用协议；无关 P2-1 不阻断当前 MO/CMS/IM 开发。当前操作自身的定位键、数量、业务状态与映射仍须证实。候选读取与正式 EXTERNAL 写入是独立门槛；缺身份或映射只预览，不修改 LOCAL/历史事实、不切换模式。人工 UNKNOWN 恢复边界替代远端 UUID 自动检索的强制要求，详见根 AGENTS 同日 E10 章节及 ADR-005 V2.0 修订。

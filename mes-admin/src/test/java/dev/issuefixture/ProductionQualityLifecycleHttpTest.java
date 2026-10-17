@@ -71,7 +71,7 @@ class ProductionQualityLifecycleHttpTest {
         var c = new AnnotationConfigWebApplicationContext();
         c.setServletContext(new MockServletContext());
         c.getEnvironment().getPropertySources()
-                .addFirst(new MapPropertySource("TEST ONLY", Map.of("mes.business.enabled", "true", "mes.integration.warehouse.factories.A.mode", "LOCAL_ONLY", "mes.integration.warehouse.factories.B.mode", "LOCAL_ONLY")));
+                .addFirst(new MapPropertySource("TEST ONLY", Map.of("mes.business.enabled", "true")));
         c.register(MaterialIssueHttpTest.Web.class, ProductionDefectHttpTest.Extra.class, ProductionReportHttpTest.Extra.class, RoutingTestConfig.class);
         c.refresh();
         when(c.getBean(BusinessDirectoryService.class).historicalUserExists(any())).thenReturn(true);

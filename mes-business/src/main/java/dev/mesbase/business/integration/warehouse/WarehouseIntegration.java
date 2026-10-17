@@ -11,40 +11,29 @@ import dev.mesbase.core.error.ErrorCode;
 import dev.mesbase.core.error.FoundationException;
 import java.util.List;
 import java.util.Objects;
-import org.springframework.core.env.Environment;
 import org.springframework.stereotype.Component;
 import dev.mesbase.business.integration.warehouse.ErpActionResult.Mode;
 
 @Component
 public class WarehouseIntegration {
     private final LocalWarehouseErpService local = new LocalWarehouseErpService();
-    private final Environment environment;
     private final List<WarehouseErpAdapter> adapters;
 
-    public WarehouseIntegration(Environment environment, List<WarehouseErpAdapter> adapters) {
-        this.environment = environment;
+    public WarehouseIntegration(List<WarehouseErpAdapter> adapters) {
         this.adapters = List.copyOf(adapters);
     }
 
     private FactoryIntegrationSnapshot snapshot(FactoryScope scope) {
         if (FactoryContext.current().isPresent() && !FactoryContext.required().equals(scope))
             throw new FoundationException(ErrorCode.CONFLICT);
-        var snapshot = FactoryIntegrationContext.current().orElse(null);
-        // Fixture/standalone legacy configuration remains explicit; managed runtime must admit a snapshot.
-        if (snapshot == null && environment.getProperty("mes.runtime.enabled", Boolean.class, false))
-            throw new FoundationException(ErrorCode.INTEGRATION_NOT_CONFIGURED);
+        var snapshot = FactoryIntegrationContext.required();
+        if (!snapshot.factoryId().equals(scope.factoryId()))
+            throw new FoundationException(ErrorCode.CONFLICT);
         return snapshot;
     }
 
     public Mode configuredMode(FactoryScope scope) {
-        var snapshot = snapshot(scope);
-        if (snapshot != null) return snapshot.mode() == FactoryRuntimeMode.LOCAL ? Mode.LOCAL_ONLY : Mode.CONNECTED;
-        String value = environment.getProperty("mes.integration.warehouse.factories." + scope.factoryId()
-                .value() + ".mode");
-        if (value == null) return null;
-        Mode mode = Mode.from(value);
-        if (mode == null) throw new FoundationException(ErrorCode.INTEGRATION_NOT_CONFIGURED);
-        return mode;
+        return snapshot(scope).mode() == FactoryRuntimeMode.LOCAL ? Mode.LOCAL_ONLY : Mode.CONNECTED;
     }
 
     public Mode cancellationMode(FactoryScope scope, MesMaterialIssueEntity row) {
@@ -73,12 +62,10 @@ public class WarehouseIntegration {
 
     public Selection submissionSelection(FactoryScope scope) {
         var mode = configuredMode(scope);
-        if (mode == null) throw new FoundationException(ErrorCode.INTEGRATION_NOT_CONFIGURED);
         if (mode == Mode.LOCAL_ONLY) return new Selection(mode, "local", null);
-        String key = "mes.integration.warehouse.factories." + scope.factoryId().value();
         var snapshot = snapshot(scope);
-        String provider = snapshot == null ? environment.getProperty(key + ".provider") : snapshot.erpType();
-        String binding = snapshot == null ? environment.getProperty(key + ".binding-key") : snapshot.configurationRef();
+        String provider = snapshot.erpType();
+        String binding = snapshot.configurationRef();
         if (provider == null || provider.isBlank() || binding == null || binding.isBlank())
             throw new FoundationException(ErrorCode.INTEGRATION_NOT_CONFIGURED);
         if (!adapter(scope, binding).supportsProvider(provider))

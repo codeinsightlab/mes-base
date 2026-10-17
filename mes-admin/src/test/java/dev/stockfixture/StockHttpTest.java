@@ -1,5 +1,7 @@
 package dev.stockfixture;
 
+import dev.mesbase.acceptance.FactorySnapshotFixture;
+
 import java.io.IOException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.ServletException;
@@ -313,7 +315,7 @@ class StockHttpTest {
         var c = new AnnotationConfigWebApplicationContext();
         c.setServletContext(new MockServletContext());
         c.getEnvironment().getPropertySources()
-                .addFirst(new MapPropertySource("TEST ONLY", Map.of("mes.business.enabled", "true", "mes.integration.warehouse.factories.A.mode", "LOCAL_ONLY", "mes.integration.warehouse.factories.B.mode", "LOCAL_ONLY")));
+                .addFirst(new MapPropertySource("TEST ONLY", Map.of("mes.business.enabled", "true")));
         c.register(Web.class);
         c.refresh();
         return c;
@@ -323,14 +325,15 @@ class StockHttpTest {
         return MockMvcBuilders.webAppContextSetup(c)
                 .addFilters(new RequestBoundaryFilter(), (Filter) (req, res, chain) -> {
                     var fixture = c.getBean(Fixture.class);
-                    if (!fixture.erp) {
+                    String requestedFactory = ((HttpServletRequest) req).getHeader("X-Factory-Id");
+                    if (requestedFactory == null) {
                         chain.doFilter(req, res);
                         return;
                     }
-                    var id = new FactoryId(((HttpServletRequest) req).getHeader("X-Factory-Id"));
+                    var id = new FactoryId(requestedFactory);
                     final IOException[] failure = new IOException[1];
                     final ServletException[] servlet = new ServletException[1];
-                    FactoryIntegrationContext.run(new FactoryIntegrationSnapshot(id, FactoryRuntimeMode.ERP, "test-erp", "test-binding", 1, 1L), () -> {
+                    FactoryIntegrationContext.run(fixture.erp ? new FactoryIntegrationSnapshot(id, FactoryRuntimeMode.ERP, "test-erp", "test-binding", 1, 1L) : FactorySnapshotFixture.local(id.value()), () -> {
                         try {
                             chain.doFilter(req, res);
                         } catch (IOException e) {

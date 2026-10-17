@@ -31,7 +31,6 @@ class ProductionStabilitySupplyMySqlTest {
     void existing101ReleasedOrdersDoNotBlockConfiguredMaterialQuery() throws Exception {
         try (var c = ProductionDefectMySqlTest.context()) {
             c.getEnvironment().getPropertySources().addFirst(new MapPropertySource("TEST ONLY read supply", Map.of(
-                    "mes.integration.warehouse.factories.SIMPLE_B.mode", "LOCAL_ONLY",
                     "mes.production.input.factories.SIMPLE_B.workorders.117.material-id", "1",
                     "mes.production.input.factories.SIMPLE_B.workorders.117.total-required-qty", "20",
                     "mes.production.input.factories.SIMPLE_B.workorders.117.warehouse-ids", "9",

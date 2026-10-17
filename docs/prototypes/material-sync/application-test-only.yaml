@@ -1,5 +1,5 @@
-# Historical TEST bindings removed. Material sync requires mes.material.enabled=true.
-# Default port explicitly rejects ERP queries; test adapters now exist only in test sources.
+# 当前业务模块使用 mes.business.enabled；此文件不是生产 ERP 连接或工厂模式配置。
+# 旧 mes.material.enabled / test-adapter 开关已失效；模拟 Adapter 仅存在于测试源码。
 mes:
-  material:
+  business:
     enabled: true

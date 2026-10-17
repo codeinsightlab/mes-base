@@ -1,5 +1,7 @@
 package dev.issuefixture;
 
+import dev.mesbase.acceptance.FactorySnapshotFixture;
+
 import java.util.UUID;
 import java.util.Map;
 import org.springframework.core.env.MapPropertySource;
@@ -122,8 +124,7 @@ class WarehouseAcceptanceHttpTest {
                             .content("{\"requestId\":\"" + UUID.randomUUID() + "\",\"quantity\":\"20\",\"reason\":\"TEST ONLY 不能负库\"}"))
                     .andExpect(status().isConflict());
             assertEquals(0, new BigDecimal("10").compareTo(j.queryForObject("SELECT quantity FROM wm_inventory WHERE id=1", BigDecimal.class)));
-            c.getEnvironment().getPropertySources()
-                    .addFirst(new MapPropertySource("TEST ONLY ERP isolation", Map.of("mes.integration.warehouse.factories.A.mode", "CONNECTED")));
+            FactorySnapshotFixture.set(c, FactorySnapshotFixture.erp("A", "TEST_PROVIDER", "TEST_A"));
             m.perform(ProductionCoreV1HttpTest.full(post(url)).content(command(UUID.randomUUID().toString(), "1")))
                     .andExpect(status().isConflict())
                     .andExpect(jsonPath("errorCode").value("BUSINESS_SOURCE_CONFLICT"));

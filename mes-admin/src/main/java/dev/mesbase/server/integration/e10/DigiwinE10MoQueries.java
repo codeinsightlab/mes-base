@@ -6,6 +6,13 @@ import com.lixin.capability.digiwin.e10.E10Service;
 import dev.mesbase.platform.execution.FactoryIntegrationSnapshot;
 import java.util.HashMap;
 import com.lixin.capability.digiwin.e10.gateway.OapiMoGateway;
+import com.lixin.capability.digiwin.e10.gateway.OapiCmsGateway;
+import com.lixin.capability.digiwin.e10.contract.mo.MoContract;
+import com.lixin.capability.digiwin.e10.contract.cms.WarehouseContract;
+import com.lixin.capability.digiwin.e10.response.E10OperationBusinessResponse;
+import com.lixin.capability.digiwin.e10.response.cms.WarehouseQueryRow;
+import com.fasterxml.jackson.databind.node.JsonNodeFactory;
+import java.util.List;
 import com.lixin.capability.digiwin.e10.request.E10QueryRequest;
 import com.lixin.capability.digiwin.e10.response.E10QueryBusinessResponse;
 import com.lixin.capability.digiwin.e10.response.mo.MoQueryRow;
@@ -16,7 +23,7 @@ import dev.mesbase.platform.execution.FactoryIntegrationContext;
 import java.util.Map;
 
 /**
- * 显式调用的 E10 工单查询示例；不注册 HTTP、调度、同步或健康探测入口，不修改 MES 业务事实。
+ * 按当前工厂显式调用 MO/CMS Query/Read；共用 SDK 传输，不修改 MES 业务事实。
  * SDK 异常原样传播，保留 Reason、Outcome 与完整响应，不记录报文、不重试。
  */
 public final class DigiwinE10MoQueries implements AutoCloseable {
@@ -53,13 +60,63 @@ public final class DigiwinE10MoQueries implements AutoCloseable {
 
     public E10QueryBusinessResponse<MoQueryRow> queryMo(E10QueryRequest request) {
         var snapshot = FactoryIntegrationContext.required();
+        validateQuery(request);
+        return new OapiMoGateway(client(snapshot)).mo().query(request);
+    }
+
+    public E10QueryBusinessResponse<WarehouseQueryRow> queryWarehouse(E10QueryRequest request) {
+        var snapshot = FactoryIntegrationContext.required();
+        validateQuery(request);
+        return new OapiCmsGateway(client(snapshot)).warehouse().query(request);
+    }
+
+    /**
+     * 定位值必须由调用者确认；DOC_NO 的定义不证明跨组织唯一。
+     */
+    public E10OperationBusinessResponse<MoContract.ReadResponseData> readMo(String docNo) {
+        var snapshot = FactoryIntegrationContext.required();
+        requiredKey(docNo);
+        var key = new MoContract.ReadKey();
+        key.setDocNo(JsonNodeFactory.instance.textNode(docNo));
+        var request = new MoContract.ReadRequest();
+        request.setKeys(List.of(key));
+        request.setDataExchangeProjectId(MoContract.READ_PROJECT_ID);
+        return new OapiMoGateway(client(snapshot)).mo().read(request);
+    }
+
+    /**
+     * 保留三个独立定位字段，不从 warehouse_no 猜测组织或据点。
+     */
+    public E10OperationBusinessResponse<WarehouseContract.ReadResponseData> readWarehouse(
+            String warehouseCode, String ownerOrgRtk, String plantCode) {
+        var snapshot = FactoryIntegrationContext.required();
+        requiredKey(warehouseCode);
+        requiredKey(ownerOrgRtk);
+        requiredKey(plantCode);
+        var key = new WarehouseContract.ReadKey();
+        key.setWarehouseCode(JsonNodeFactory.instance.textNode(warehouseCode));
+        key.setOwnerOrgRtk(JsonNodeFactory.instance.textNode(ownerOrgRtk));
+        key.setOwnerOrgPlantPlantCode(JsonNodeFactory.instance.textNode(plantCode));
+        var request = new WarehouseContract.ReadRequest();
+        request.setKeys(List.of(key));
+        request.setDataExchangeProjectId(WarehouseContract.READ_PROJECT_ID);
+        return new OapiCmsGateway(client(snapshot)).warehouse().read(request);
+    }
+
+    private static void requiredKey(String value) {
+        if (value == null || value.isBlank() || value.length() > 128)
+            throw new IllegalArgumentException("E10 Read requires explicit bounded locator values");
+    }
+
+    private static void validateQuery(E10QueryRequest request) {
         if (request == null || request.getPageNo() == null || request.getPageNo() < 1
+                || request.getPageNo() > 10000
                 || request.getPageSize() == null || request.getPageSize() < 1
+                || request.getPageSize() > 100
                 || request.getIsGetSchema() == null || request.getIsGetCount() == null
                 || request.getConditions() == null || request.getOrders() == null) {
             throw new IllegalArgumentException("E10 MO query requires explicit pagination, schema/count flags, conditions and orders");
         }
-        return new OapiMoGateway(client(snapshot)).mo().query(request);
     }
 
     @Override

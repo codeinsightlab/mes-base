@@ -1,9 +1,10 @@
 package dev.issuefixture;
 
 import java.util.UUID;
-import dev.mesbase.platform.execution.FactoryContext;
-import dev.mesbase.core.factory.FactoryId;
-import dev.mesbase.core.factory.FactoryScope;
+import dev.mesbase.platform.execution.FactoryIntegrationContext;
+import dev.mesbase.acceptance.FactorySnapshotFixture;
+import dev.mesbase.business.integration.production.ProductionSupply.Calculation;
+import java.util.concurrent.atomic.AtomicReference;
 import dev.mesbase.business.production.service.ProductionInputSupplyService;
 import tools.jackson.databind.node.ObjectNode;
 import java.util.stream.Stream;
@@ -211,9 +212,11 @@ class LocalWarehouseHttpTest {
             var j = ProductionInputHttpTest.db(c);
             var m = MaterialIssueHttpTest.mvc(c);
             ProductionInputTestData.confirmed(j, 1, new BigDecimal("100"));
-            var calculation = FactoryContext.withScope(new FactoryScope(new FactoryId("A")), () ->
-                    c.getBean(ProductionInputSupplyService.class).calculate("M1#L001", 1L, "1", new BigDecimal("100")));
-            j.update("UPDATE mes_material_issue_input SET stock_id=1,stock_applied=true,calculation_json=? WHERE issue_id=-1", new ObjectMapper().writeValueAsString(calculation));
+            var calculation = new AtomicReference<Calculation>();
+            FactoryIntegrationContext.run(FactorySnapshotFixture.current(c, "A"), () ->
+                    calculation.set(c.getBean(ProductionInputSupplyService.class)
+                            .calculate("M1#L001", 1L, "1", new BigDecimal("100"))));
+            j.update("UPDATE mes_material_issue_input SET stock_id=1,stock_applied=true,calculation_json=? WHERE issue_id=-1", new ObjectMapper().writeValueAsString(calculation.get()));
             j.update("UPDATE wm_inventory SET quantity=9800,available_quantity=9800 WHERE id=1");
             m.perform(ProductionCoreV1HttpTest.full(post(MaterialIssueHttpTest.H + "/-1/actions/void")))
                     .andExpect(status().isOk());

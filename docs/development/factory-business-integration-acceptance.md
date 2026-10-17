@@ -1,3 +1,5 @@
+> 2026-10-17 配置收敛：下文 V34 YAML 导入是已发布迁移的历史契约。当前正常业务（含非托管入口）缺 FactoryIntegrationSnapshot 即失败，旧仓储 YAML 已从 dev 移除；测试显式构造快照。E10 参数由工厂中心配置维护。现状与验证见 [配置收敛报告](../reviews/2026-10-17-configuration-consolidation-review.md)。
+
 # 工厂业务运行模式与 ERP 配置验收
 
 日期：2026-10-17。任务独立于 Production × Warehouse 架构审查。

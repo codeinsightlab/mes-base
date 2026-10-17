@@ -1,5 +1,7 @@
 package dev.issuefixture;
 
+import dev.mesbase.acceptance.FactorySnapshotFixture;
+
 
 import dev.mesbase.business.integration.warehouse.WarehouseErpAdapter;
 import dev.mesbase.business.integration.warehouse.MaterialIssueCancelCommand;
@@ -147,9 +149,10 @@ class MaterialIssueVoidHttpTest {
         var c = new AnnotationConfigWebApplicationContext();
         c.setServletContext(new MockServletContext());
         c.getEnvironment().getPropertySources()
-                .addFirst(new MapPropertySource("TEST ONLY", Map.of("mes.business.enabled", "true", "mes.integration.warehouse.factories.A.mode", "CONNECTED", "mes.integration.warehouse.factories.B.mode", "LOCAL_ONLY")));
+                .addFirst(new MapPropertySource("TEST ONLY", Map.of("mes.business.enabled", "true")));
         c.register(MaterialIssueHttpTest.Web.class, TestConfig.class);
         c.refresh();
+        FactorySnapshotFixture.set(c, FactorySnapshotFixture.erp("A", "TEST_PROVIDER", "TEST_A"));
         MaterialIssueHttpTest.externalFixture(c);
         return c;
     }
@@ -170,8 +173,7 @@ class MaterialIssueVoidHttpTest {
                 m.perform(full(post(H)).content(MaterialIssueHttpTest.HEADER)).andExpect(status().isOk());
                 source(c);
                 if (outcome == Status.SUCCEEDED)
-                    c.getEnvironment().getPropertySources()
-                            .addFirst(new MapPropertySource("CURRENT MODE SWITCH TEST", Map.of("mes.integration.warehouse.factories.A.mode", "LOCAL_ONLY")));
+                    FactorySnapshotFixture.set(c, FactorySnapshotFixture.local("A"));
                 m.perform(full(post(voidPath(1)))).andExpect(status().isOk())
                         .andExpect(jsonPath("voidResultStatus").value(outcome.name()));
                 m.perform(full(post(voidPath(1)))).andExpect(status().isOk());

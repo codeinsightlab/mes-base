@@ -77,7 +77,7 @@ class LocalWarehouseMySqlTest {
             String lot = "TEST_WAREHOUSE_" + UUID.randomUUID();
             String prefix = "mes.production.input.factories.SIMPLE_B.workorders." + f.order() + ".";
             c.getEnvironment().getPropertySources().addFirst(new MapPropertySource("TEST ONLY warehouse recipe", Map.of(
-                    "mes.integration.warehouse.factories.SIMPLE_B.mode", "LOCAL_ONLY", prefix + "material-id", Long.toString(material),
+                    prefix + "material-id", Long.toString(material),
                     prefix + "total-required-qty", "20", prefix + "warehouse-ids", Long.toString(f.warehouse()), prefix + "work-center", "TEST_WAREHOUSE_CENTER")));
             for (var type : new Class<?>[]{WarehouseIntegration.class, LocalStockService.class, LocalProductionSupply.class,
                     StockReferenceRules.class, MaterialIssueRules.class, MaterialIssueErpFacts.class, MaterialIssueInputFacts.class,

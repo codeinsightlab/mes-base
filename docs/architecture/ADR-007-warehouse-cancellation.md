@@ -6,7 +6,7 @@
 
 采用 WarehouseErpAdapter 的 cancelMaterialIssue 与 queryMaterialIssueCancellation。后者有真实 VOID_PENDING/UNKNOWN 消费者，仅查询稳定操作身份，不重复冲销；“未找到/仍处理中”必须 UNKNOWN，REJECTED 必须是已确认终态。未来 ProductionErpAdapter 在出现生产用例时新增内聚方法，当前不建空接口或厂商实现。
 
-按 `mes.integration.warehouse.factories.<FactoryId>.mode` 显式配置 LOCAL_ONLY/CONNECTED，缺配置拒绝。仅 SIMPLE_B 本地开发配置显式 LOCAL_ONLY，默认/生产不回退。CONNECTED 原连接由单据 external_binding_key 和 Adapter supports(scope,key) 验证，不能用当前 LOCAL_ONLY 覆盖原外部来源；无唯一匹配实现失败。
+2026-10-17 配置收敛：正常业务只接受 FactoryIntegrationSnapshot，LOCAL 映射 LOCAL_ONLY，ERP 映射 CONNECTED；缺快照明确拒绝，旧按厂 YAML 不再参与运行。历史单据中的 LOCAL_ONLY/CONNECTED 持久化语义保留。CONNECTED 原连接由单据 external_binding_key 和 Adapter supports(scope,key) 验证，不能用当前 LOCAL_ONLY 覆盖原外部来源；无唯一匹配实现失败。
 
 本地创建记录只在已明确 LOCAL_ONLY 时保存 source_execution_mode=LOCAL_ONLY/external_effect=NONE；其他行政 CRUD 不伪造真实出库影响。未来真实外部出库消费者必须在其事务中保存 CONNECTED、确切 binding/reference 与 CONFIRMED/UNKNOWN。现有普通命令不可写来源字段，无人工核实壳接口。
 
@@ -14,7 +14,7 @@
 
 WorkOrder 行锁串行化产品变更和领料关联、作废，存在非 VOIDED 或未确认 SUCCEEDED 及与来源一致的影响事实（LOCAL_ONLY/NONE 或 CONNECTED/REVERSED） 的领料时拒绝产品变化。作废历史单据保留原产品快照，工单后续订正不重写它。Execution 与旧 Batch 的历史身份约束独立保留。普通单头和明细写入、删除不允许绕过作废，权限为独立 business:mes:material:issue:void。
 
-默认本地成功显式 LOCAL_ONLY，不冒充 ERP。Adapter 不访问 MES Mapper/事务，不判断厂商于业务 Service。无外部供应商配置、注册中心、任务平台、Reporting/Receipt/WIP 或跨系统原子性承诺。
+明确 LOCAL 快照下的新业务或持久化 LOCAL 历史操作使用本地实现，不将缺配置解释为本地成功，不冒充 ERP。Adapter 不访问 MES Mapper/事务，不判断厂商于业务 Service。无外部供应商配置、注册中心、任务平台、Reporting/Receipt/WIP 或跨系统原子性承诺。
 
 验证与未验证边界记录于对应实施报告。TEST ONLY Adapter 只在 src/test，不能代表真实 ERP 联调。CONNECTED 来源历史核实、被拒绝后的新操作授权重试、供应商真实连接与响应转换属于后续真实接入；当前重发同一作废请求始终幂等返回原结果。
 
