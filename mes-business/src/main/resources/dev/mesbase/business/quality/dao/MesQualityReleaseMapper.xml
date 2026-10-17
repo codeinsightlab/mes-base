@@ -1,0 +1,304 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- MES-CODEGEN: MyBatis Generator standard single-table persistence. -->
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="dev.mesbase.business.quality.dao.MesQualityReleaseMapper">
+  <resultMap id="BaseResultMap" type="dev.mesbase.business.quality.domain.MesQualityReleaseEntity">
+    <id column="id" jdbcType="VARCHAR" property="id" />
+    <result column="execution_id" jdbcType="BIGINT" property="executionId" />
+    <result column="sequence_no" jdbcType="BIGINT" property="sequenceNo" />
+    <result column="action_type" jdbcType="VARCHAR" property="actionType" />
+    <result column="quantity" jdbcType="DECIMAL" property="quantity" />
+    <result column="basis_hash" jdbcType="CHAR" property="basisHash" />
+    <result column="reference_id" jdbcType="VARCHAR" property="referenceId" />
+    <result column="request_hash" jdbcType="CHAR" property="requestHash" />
+    <result column="operator_user_id" jdbcType="BIGINT" property="operatorUserId" />
+    <result column="recorded_at" jdbcType="TIMESTAMP" property="recordedAt" />
+    <result column="reason" jdbcType="VARCHAR" property="reason" />
+  </resultMap>
+  <sql id="Example_Where_Clause">
+    <where>
+      <foreach collection="oredCriteria" item="criteria" separator="or">
+        <if test="criteria.valid">
+          <trim prefix="(" prefixOverrides="and" suffix=")">
+            <foreach collection="criteria.criteria" item="criterion">
+              <choose>
+                <when test="criterion.noValue">
+                  and ${criterion.condition}
+                </when>
+                <when test="criterion.singleValue">
+                  and ${criterion.condition} #{criterion.value}
+                </when>
+                <when test="criterion.betweenValue">
+                  and ${criterion.condition} #{criterion.value} and #{criterion.secondValue}
+                </when>
+                <when test="criterion.listValue">
+                  and ${criterion.condition}
+                  <foreach close=")" collection="criterion.value" item="listItem" open="(" separator=",">
+                    #{listItem}
+                  </foreach>
+                </when>
+              </choose>
+            </foreach>
+          </trim>
+        </if>
+      </foreach>
+    </where>
+  </sql>
+  <sql id="Update_By_Example_Where_Clause">
+    <where>
+      <foreach collection="example.oredCriteria" item="criteria" separator="or">
+        <if test="criteria.valid">
+          <trim prefix="(" prefixOverrides="and" suffix=")">
+            <foreach collection="criteria.criteria" item="criterion">
+              <choose>
+                <when test="criterion.noValue">
+                  and ${criterion.condition}
+                </when>
+                <when test="criterion.singleValue">
+                  and ${criterion.condition} #{criterion.value}
+                </when>
+                <when test="criterion.betweenValue">
+                  and ${criterion.condition} #{criterion.value} and #{criterion.secondValue}
+                </when>
+                <when test="criterion.listValue">
+                  and ${criterion.condition}
+                  <foreach close=")" collection="criterion.value" item="listItem" open="(" separator=",">
+                    #{listItem}
+                  </foreach>
+                </when>
+              </choose>
+            </foreach>
+          </trim>
+        </if>
+      </foreach>
+    </where>
+  </sql>
+  <sql id="Base_Column_List">
+    id, execution_id, sequence_no, action_type, quantity, basis_hash, reference_id, request_hash, 
+    operator_user_id, recorded_at, reason
+  </sql>
+  <select id="selectByExample" parameterType="dev.mesbase.business.quality.domain.MesQualityReleaseExample" resultMap="BaseResultMap">
+    select
+    <include refid="Base_Column_List" />
+    from mes_quality_release
+    <if test="_parameter != null">
+      <include refid="Example_Where_Clause" />
+    </if>
+    <if test="orderByClause != null">
+      order by ${orderByClause}
+    </if>
+  </select>
+  <select id="selectByPrimaryKey" parameterType="String" resultMap="BaseResultMap">
+    select 
+    <include refid="Base_Column_List" />
+    from mes_quality_release
+    where id = #{id,jdbcType=VARCHAR}
+  </select>
+  <delete id="deleteByPrimaryKey" parameterType="String">
+    delete from mes_quality_release
+    where id = #{id,jdbcType=VARCHAR}
+  </delete>
+  <delete id="deleteByExample" parameterType="dev.mesbase.business.quality.domain.MesQualityReleaseExample">
+    delete from mes_quality_release
+    <if test="_parameter != null">
+      <include refid="Example_Where_Clause" />
+    </if>
+  </delete>
+  <insert id="insert" parameterType="dev.mesbase.business.quality.domain.MesQualityReleaseEntity">
+    insert into mes_quality_release (id, execution_id, sequence_no, 
+      action_type, quantity, basis_hash, 
+      reference_id, request_hash, operator_user_id, 
+      recorded_at, reason)
+    values (#{id,jdbcType=VARCHAR}, #{executionId,jdbcType=BIGINT}, #{sequenceNo,jdbcType=BIGINT}, 
+      #{actionType,jdbcType=VARCHAR}, #{quantity,jdbcType=DECIMAL}, #{basisHash,jdbcType=CHAR}, 
+      #{referenceId,jdbcType=VARCHAR}, #{requestHash,jdbcType=CHAR}, #{operatorUserId,jdbcType=BIGINT}, 
+      #{recordedAt,jdbcType=TIMESTAMP}, #{reason,jdbcType=VARCHAR})
+  </insert>
+  <insert id="insertSelective" parameterType="dev.mesbase.business.quality.domain.MesQualityReleaseEntity">
+    insert into mes_quality_release
+    <trim prefix="(" suffix=")" suffixOverrides=",">
+      <if test="id != null">
+        id,
+      </if>
+      <if test="executionId != null">
+        execution_id,
+      </if>
+      <if test="sequenceNo != null">
+        sequence_no,
+      </if>
+      <if test="actionType != null">
+        action_type,
+      </if>
+      <if test="quantity != null">
+        quantity,
+      </if>
+      <if test="basisHash != null">
+        basis_hash,
+      </if>
+      <if test="referenceId != null">
+        reference_id,
+      </if>
+      <if test="requestHash != null">
+        request_hash,
+      </if>
+      <if test="operatorUserId != null">
+        operator_user_id,
+      </if>
+      <if test="recordedAt != null">
+        recorded_at,
+      </if>
+      <if test="reason != null">
+        reason,
+      </if>
+    </trim>
+    <trim prefix="values (" suffix=")" suffixOverrides=",">
+      <if test="id != null">
+        #{id,jdbcType=VARCHAR},
+      </if>
+      <if test="executionId != null">
+        #{executionId,jdbcType=BIGINT},
+      </if>
+      <if test="sequenceNo != null">
+        #{sequenceNo,jdbcType=BIGINT},
+      </if>
+      <if test="actionType != null">
+        #{actionType,jdbcType=VARCHAR},
+      </if>
+      <if test="quantity != null">
+        #{quantity,jdbcType=DECIMAL},
+      </if>
+      <if test="basisHash != null">
+        #{basisHash,jdbcType=CHAR},
+      </if>
+      <if test="referenceId != null">
+        #{referenceId,jdbcType=VARCHAR},
+      </if>
+      <if test="requestHash != null">
+        #{requestHash,jdbcType=CHAR},
+      </if>
+      <if test="operatorUserId != null">
+        #{operatorUserId,jdbcType=BIGINT},
+      </if>
+      <if test="recordedAt != null">
+        #{recordedAt,jdbcType=TIMESTAMP},
+      </if>
+      <if test="reason != null">
+        #{reason,jdbcType=VARCHAR},
+      </if>
+    </trim>
+  </insert>
+  <select id="countByExample" parameterType="dev.mesbase.business.quality.domain.MesQualityReleaseExample" resultType="java.lang.Long">
+    select count(*) from mes_quality_release
+    <if test="_parameter != null">
+      <include refid="Example_Where_Clause" />
+    </if>
+  </select>
+  <update id="updateByExampleSelective" parameterType="map">
+    update mes_quality_release
+    <set>
+      <if test="row.id != null">
+        id = #{row.id,jdbcType=VARCHAR},
+      </if>
+      <if test="row.executionId != null">
+        execution_id = #{row.executionId,jdbcType=BIGINT},
+      </if>
+      <if test="row.sequenceNo != null">
+        sequence_no = #{row.sequenceNo,jdbcType=BIGINT},
+      </if>
+      <if test="row.actionType != null">
+        action_type = #{row.actionType,jdbcType=VARCHAR},
+      </if>
+      <if test="row.quantity != null">
+        quantity = #{row.quantity,jdbcType=DECIMAL},
+      </if>
+      <if test="row.basisHash != null">
+        basis_hash = #{row.basisHash,jdbcType=CHAR},
+      </if>
+      <if test="row.referenceId != null">
+        reference_id = #{row.referenceId,jdbcType=VARCHAR},
+      </if>
+      <if test="row.requestHash != null">
+        request_hash = #{row.requestHash,jdbcType=CHAR},
+      </if>
+      <if test="row.operatorUserId != null">
+        operator_user_id = #{row.operatorUserId,jdbcType=BIGINT},
+      </if>
+      <if test="row.recordedAt != null">
+        recorded_at = #{row.recordedAt,jdbcType=TIMESTAMP},
+      </if>
+      <if test="row.reason != null">
+        reason = #{row.reason,jdbcType=VARCHAR},
+      </if>
+    </set>
+    <if test="example != null">
+      <include refid="Update_By_Example_Where_Clause" />
+    </if>
+  </update>
+  <update id="updateByExample" parameterType="map">
+    update mes_quality_release
+    set id = #{row.id,jdbcType=VARCHAR},
+      execution_id = #{row.executionId,jdbcType=BIGINT},
+      sequence_no = #{row.sequenceNo,jdbcType=BIGINT},
+      action_type = #{row.actionType,jdbcType=VARCHAR},
+      quantity = #{row.quantity,jdbcType=DECIMAL},
+      basis_hash = #{row.basisHash,jdbcType=CHAR},
+      reference_id = #{row.referenceId,jdbcType=VARCHAR},
+      request_hash = #{row.requestHash,jdbcType=CHAR},
+      operator_user_id = #{row.operatorUserId,jdbcType=BIGINT},
+      recorded_at = #{row.recordedAt,jdbcType=TIMESTAMP},
+      reason = #{row.reason,jdbcType=VARCHAR}
+    <if test="example != null">
+      <include refid="Update_By_Example_Where_Clause" />
+    </if>
+  </update>
+  <update id="updateByPrimaryKeySelective" parameterType="dev.mesbase.business.quality.domain.MesQualityReleaseEntity">
+    update mes_quality_release
+    <set>
+      <if test="executionId != null">
+        execution_id = #{executionId,jdbcType=BIGINT},
+      </if>
+      <if test="sequenceNo != null">
+        sequence_no = #{sequenceNo,jdbcType=BIGINT},
+      </if>
+      <if test="actionType != null">
+        action_type = #{actionType,jdbcType=VARCHAR},
+      </if>
+      <if test="quantity != null">
+        quantity = #{quantity,jdbcType=DECIMAL},
+      </if>
+      <if test="basisHash != null">
+        basis_hash = #{basisHash,jdbcType=CHAR},
+      </if>
+      <if test="referenceId != null">
+        reference_id = #{referenceId,jdbcType=VARCHAR},
+      </if>
+      <if test="requestHash != null">
+        request_hash = #{requestHash,jdbcType=CHAR},
+      </if>
+      <if test="operatorUserId != null">
+        operator_user_id = #{operatorUserId,jdbcType=BIGINT},
+      </if>
+      <if test="recordedAt != null">
+        recorded_at = #{recordedAt,jdbcType=TIMESTAMP},
+      </if>
+      <if test="reason != null">
+        reason = #{reason,jdbcType=VARCHAR},
+      </if>
+    </set>
+    where id = #{id,jdbcType=VARCHAR}
+  </update>
+  <update id="updateByPrimaryKey" parameterType="dev.mesbase.business.quality.domain.MesQualityReleaseEntity">
+    update mes_quality_release
+    set execution_id = #{executionId,jdbcType=BIGINT},
+      sequence_no = #{sequenceNo,jdbcType=BIGINT},
+      action_type = #{actionType,jdbcType=VARCHAR},
+      quantity = #{quantity,jdbcType=DECIMAL},
+      basis_hash = #{basisHash,jdbcType=CHAR},
+      reference_id = #{referenceId,jdbcType=VARCHAR},
+      request_hash = #{requestHash,jdbcType=CHAR},
+      operator_user_id = #{operatorUserId,jdbcType=BIGINT},
+      recorded_at = #{recordedAt,jdbcType=TIMESTAMP},
+      reason = #{reason,jdbcType=VARCHAR}
+    where id = #{id,jdbcType=VARCHAR}
+  </update>
+</mapper>

@@ -58,3 +58,11 @@
 连接绑定键代表不可变集成身份；调整供应商、组织、账套等权威身份时使用新的绑定键并走迁移流程。已有旧配置无服务端连接定义时仍保留 ERP/provider/reference，但新请求明确失败，不能静默降级。没有供应商实现时允许维护有效连接定义，执行实际能力仍按现有 Adapter 门拒绝。
 
 本轮证据和未验证边界见 `docs/development/factory-business-integration-acceptance.md`；不以新增配置和 Fixture 证明厂商联调。
+
+## 2026-10-17 补充：来源隔离与停旧启新（用户最终确认）
+
+现行规则见 [Base MES — LOCAL / ERP 业务边界设计方案 V1.0](local-erp-business-boundary.md) 及根 AGENTS 的同日独立章节。本补充约束现有 HTTP 集成和工厂配置，不恢复上文已退出 Base 的外部数据库框架。
+
+每厂最多一个有效 ERP；LOCAL/EXTERNAL 工单、原料仓、成品仓必须同来源，并由当前模式允许新业务。ERP 同步仅管理 EXTERNAL 权威字段，不得改写 LOCAL 或 MES 不可变事实；本地镜像不授予正式库存权威。LOCAL→ERP 采用停旧启新，禁止自动无缝接续或清除可信历史，历史查询/撤销仍按原冻结身份。普通工厂编辑不得绕过现有模式锁定；配置锁定不代表迁移流程已实现。
+
+本补充是业务约束与文档固化。WorkOrder/Warehouse 尚无明确来源字段，三方来源准入、来源过滤同步及正式迁移准备流程仍待实施；已有模式快照与历史领料冻结不能替代这些能力。静态差异与未验证边界见 [本轮审查记录](../reviews/2026-10-17-local-erp-source-isolation-rules-review.md)。

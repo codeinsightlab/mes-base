@@ -21,7 +21,9 @@ public final class ProductionReceiptModels {
 
     public record Summary(ProductionIdentity identity, String routingLabel, String pathStatus, Long terminalNodeId,
                           String terminalNodeName, BigDecimal output, BigDecimal received, BigDecimal remaining,
-                          BigDecimal excess, boolean canReceive, String blockedCode, String blockedReason) {
+                          BigDecimal excess, boolean canReceive, String blockedCode, String blockedReason,
+                          BigDecimal released, BigDecimal releaseRemaining, BigDecimal accepted,
+                          BigDecimal pendingAcceptance, BigDecimal releaseExcess) {
     }
 
     public record Page(List<ProductionReceiptRow> items, long total, int offset, int limit,

@@ -1,3 +1,4 @@
+// MES-CODEGEN: MyBatis Generator standard single-table persistence.
 package dev.mesbase.business.production.dao;
 
 import dev.mesbase.business.production.domain.WorkorderErpExtraEntity;

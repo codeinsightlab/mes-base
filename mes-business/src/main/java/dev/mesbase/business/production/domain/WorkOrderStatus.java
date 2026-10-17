@@ -5,7 +5,8 @@ import java.util.Map;
 
 public enum WorkOrderStatus {
     DRAFT("草稿", "DRAFT"),
-    RELEASED("已下达", "RELEASED");
+    RELEASED("已下达", "RELEASED"),
+    CANCELLED("已作废", "CANCELLED");
 
     private final String description;
     private final String value;

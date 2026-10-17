@@ -1,5 +1,7 @@
 package dev.mesbase.business.issue.service;
 
+import dev.mesbase.business.production.service.BusinessSourceRules;
+import java.util.Map;
 import dev.mesbase.business.production.domain.ExecutionPathStatus;
 import dev.mesbase.business.production.domain.ProductionExecutionStatus;
 import dev.mesbase.business.issue.domain.MaterialIssueSubmissionStatus;
@@ -22,6 +24,8 @@ import dev.mesbase.business.integration.warehouse.MaterialIssueSubmitCommand;
 import dev.mesbase.business.integration.warehouse.MaterialIssueSubmitCommand.Line;
 import dev.mesbase.business.integration.warehouse.WarehouseIntegration;
 import dev.mesbase.business.integration.warehouse.WarehouseIntegration.Selection;
+import dev.mesbase.business.integration.warehouse.MaterialIssueSubmitCommand.Source;
+import dev.mesbase.platform.execution.FactoryIntegrationContext;
 import dev.mesbase.business.integration.warehouse.ErpActionResult;
 import dev.mesbase.business.integration.warehouse.ErpIssueQueryResult;
 import dev.mesbase.business.integration.warehouse.ErpIssueQueryResult.Outcome;
@@ -52,6 +56,7 @@ import org.slf4j.LoggerFactory;
 @Service
 @ConditionalOnProperty(name = "mes.business.enabled", havingValue = "true")
 public class MaterialIssueSubmissionService {
+    private final BusinessSourceRules sources;
     private static final Logger LOG = LoggerFactory.getLogger(MaterialIssueSubmissionService.class);
     private final MesMaterialIssueMapper issues;
     private final MesMaterialIssueItemMapper items;
@@ -73,7 +78,9 @@ public class MaterialIssueSubmissionService {
                                           MaterialIssueRules rules, ProductionChainLocks locks,
                                           ProductionExecutionRules executions, ExecutionPathService paths,
                                           WarehouseIntegration warehouse, MaterialIssueInputFacts inputFacts,
-                                          @Qualifier("businessTransactionManager") PlatformTransactionManager manager) {
+                                          @Qualifier("businessTransactionManager") PlatformTransactionManager manager,
+                                          BusinessSourceRules sources) {
+        this.sources = sources;
         this.issues = issues;
         this.items = items;
         this.attempts = attempts;
@@ -135,6 +142,7 @@ public class MaterialIssueSubmissionService {
         if (row.getVoidOperationId() != null || !Set.of(MaterialIssueStatus.DRAFT.getValue(), MaterialIssueStatus.RECORDED.getValue())
                 .contains(row.getStatus()) || row.getExecutionId() == null) fail();
         var e = locks.execution(row.getExecutionId());
+        rules.validateExecutionSource(e);
         if (!Set.of(ProductionExecutionStatus.READY.getValue(), ProductionExecutionStatus.RUNNING.getValue())
                 .contains(e.getStatus()) || !Objects.equals(row.getWorkorderId(), e.getWorkorderId()) || !Objects.equals(row.getProductId(), e.getProductId()) || !Objects.equals(row.getRoutingId(), e.getRoutingId()))
             fail();
@@ -165,10 +173,15 @@ public class MaterialIssueSubmissionService {
         attempt.setCreatedAt(LocalDateTime.now());
         changed(attempts.insert(attempt));
         var external = orderFacts.selectByPrimaryKey(e.getWorkorderId());
+        var integrationSnapshot = FactoryIntegrationContext.current().orElse(null);
+        var externalWarehouses = selection.mode() == Mode.CONNECTED ? sources.externalWarehouseIds(lines.stream()
+                .map(line -> line.getWarehouseId()).toList()) : Map.<Long, String>of();
         var command = new MaterialIssueSubmitCommand(id, "ISSUE-SUBMIT-" + attempt.getId(), row.getIssueNo(), row.getWorkorderId(), row.getWorkorderCode(), external == null ? null : external.getExternalId(), external == null ? null : external.getExternalCode(), e.getId(), e.getExecutionNo(), row.getProductId(), row.getProductCode(), e.getRoutingId(), path.getRevision(), paths.view(e.getId())
                 .selectedNodeIds(), row.getIssueTime() == null ? null : row.getIssueTime().toString(), lines.stream()
-                .map(i -> new Line(i.getId(), i.getMaterialId(), i.getMaterialCode(), i.getBatchNo(), i.getQuantity(), i.getUnitId(), i.getUnitCode(), i.getWarehouseId(), i.getWarehouseCode()))
-                .toList(), inputFacts.snapshot(id));
+                .map(i -> new Line(i.getId(), i.getMaterialId(), i.getMaterialCode(), i.getBatchNo(), i.getQuantity(), i.getUnitId(), i.getUnitCode(), i.getWarehouseId(), i.getWarehouseCode(), externalWarehouses.get(i.getWarehouseId())))
+                .toList(), inputFacts.snapshot(id), new Source(selection.provider(), selection.bindingKey(),
+                integrationSnapshot == null ? null : integrationSnapshot.revision(),
+                integrationSnapshot == null ? null : integrationSnapshot.configurationRevision()));
         attempt.setCommandJson(json.writeValueAsString(command));
         changed(attempts.updateByPrimaryKeyWithBLOBs(attempt));
         row.setSubmissionId(attempt.getId());
@@ -192,13 +205,17 @@ public class MaterialIssueSubmissionService {
         if (result.status() == Status.SUCCEEDED && (result.externalReference() == null || result.externalReference()
                 .isBlank()))
             return new ErpActionResult(Status.UNKNOWN, mode, result.externalReference(), result.externalCode(), "外部身份缺失，待核实");
-        return new ErpActionResult(result.status(), mode, result.externalReference(), result.externalCode(), "领料结果已记录");
+        if (result.status() == Status.SUCCEEDED && !result.stockEffective())
+            return new ErpActionResult(Status.UNKNOWN, mode, result.externalReference(), result.externalCode(), "ERP单据已创建，库存生效待核实");
+        return new ErpActionResult(result.status(), mode, result.externalReference(), result.externalCode(), "领料结果已记录", result.stockEffective());
     }
 
     /**
      * Caller holds chain locks. MES confirmation, attempt and Extra commit atomically with path lock.
      */
     public void apply(MesMaterialIssueEntity row, MesMaterialIssueErpExtraEntity extra, ErpActionResult result) {
+        if (result.executionMode() == Mode.CONNECTED && result.status() == Status.SUCCEEDED && !result.stockEffective())
+            result = new ErpActionResult(Status.UNKNOWN, Mode.CONNECTED, result.externalReference(), result.externalCode(), "ERP库存生效待核实");
         var a = attempts.selectByPrimaryKey(row.getSubmissionId());
         if (a == null || !Objects.equals(a.getIssueId(), row.getId())) fail();
         if (result.executionMode() == Mode.CONNECTED) {
@@ -269,7 +286,7 @@ public class MaterialIssueSubmissionService {
             extra.setExternalCode(result.externalCode());
             extra.setDocumentStatus(result.documentStatus().getValue());
             if (result.documentStatus() == DocumentStatus.EFFECTIVE && result.externalId() != null) {
-                apply(row, extra, new ErpActionResult(Status.SUCCEEDED, Mode.CONNECTED, result.externalId(), result.externalCode(), "原领料操作已核实"));
+                apply(row, extra, new ErpActionResult(Status.SUCCEEDED, Mode.CONNECTED, result.externalId(), result.externalCode(), "原领料操作已核实", true));
                 return extra.getLastMessage();
             }
             if (result.documentStatus() == DocumentStatus.REJECTED) {
@@ -278,6 +295,17 @@ public class MaterialIssueSubmissionService {
             }
         }
         return "原领料提交仍待核实，不得重复创建";
+    }
+
+    @Transactional(transactionManager = "businessTransactionManager", readOnly = true)
+    public Source source(MesMaterialIssueEntity row) {
+        if (row.getSubmissionId() == null) return null;
+        var attempt = attempts.selectByPrimaryKey(row.getSubmissionId());
+        if (attempt == null || !Objects.equals(row.getId(), attempt.getIssueId())) fail();
+        var node = json.readTree(attempt.getCommandJson());
+        var source = node.get("source");
+        // Historical attempts may contain only {} or predate the frozen source contract.
+        return source == null || source.isNull() ? null : json.treeToValue(source, Source.class);
     }
 
     public String operationKey(MesMaterialIssueEntity row) {

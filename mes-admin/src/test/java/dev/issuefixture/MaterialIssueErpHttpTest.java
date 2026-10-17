@@ -41,7 +41,9 @@ class MaterialIssueErpHttpTest {
     static final String H = MaterialIssueHttpTest.H, Q = H + "/1/erp-status", R = H + "/1/actions/reconcile-erp";
 
     static class Vendor implements WarehouseErpAdapter {
-        public boolean supportsProvider(String provider) { return "test".equals(provider); }
+        public boolean supportsProvider(String provider) {
+            return "test".equals(provider);
+        }
 
         Outcome outcome = Outcome.FOUND;
         DocumentStatus state = DocumentStatus.EFFECTIVE;
@@ -90,6 +92,7 @@ class MaterialIssueErpHttpTest {
                 .addFirst(new MapPropertySource("TEST ONLY", Map.of("mes.business.enabled", "true", "mes.integration.warehouse.factories.A.mode", "CONNECTED", "mes.integration.warehouse.factories.A.provider", "test", "mes.integration.warehouse.factories.B.mode", "LOCAL_ONLY")));
         c.register(MaterialIssueHttpTest.Web.class, VendorConfig.class);
         c.refresh();
+        MaterialIssueHttpTest.externalFixture(c);
         return c;
     }
 
@@ -120,10 +123,13 @@ class MaterialIssueErpHttpTest {
     void workorderExtraFollowsTransactionalCreationAndDeletion() throws Exception {
         try (var c = MaterialIssueHttpTest.context()) {
             var m = MaterialIssueHttpTest.mvc(c);
-            m.perform(full(post("/api/production/workorder")).content("{\"code\":\"WO_EXTRA_TEST\",\"productId\":1,\"routingId\":1,\"plannedQty\":10,\"externalId\":\"IMPORTED-1\",\"externalCode\":\"IMPORT-CODE-1\"}"))
-                    .andExpect(status().isOk()).andExpect(jsonPath("workorder.externalId").value("IMPORTED-1"));
+            String body = "{\"code\":\"WO_EXTRA_TEST\",\"productId\":1,\"routingId\":1,\"plannedQty\":10}";
+            m.perform(full(post("/api/production/workorder")).content(body.replace("10}", "10,\"externalId\":\"FORGED\"}")))
+                    .andExpect(status().isConflict());
+            m.perform(full(post("/api/production/workorder")).content(body))
+                    .andExpect(status().isOk()).andExpect(jsonPath("workorder.source").value("LOCAL"));
             var j = c.getBean(MaterialIssueHttpTest.Fixture.class).business.get("A");
-            assertEquals("IMPORTED-1", j.queryForObject("SELECT external_id FROM workorder_erp_extra WHERE id=2", String.class));
+            assertEquals(1, j.queryForObject("SELECT COUNT(*) FROM workorder_erp_extra WHERE id=2 AND external_id IS NULL AND provider IS NULL", Integer.class));
             m.perform(full(delete("/api/production/workorder/2")).content("{\"revision\":0}"))
                     .andExpect(status().isNoContent());
             assertEquals(0, j.queryForObject("SELECT COUNT(*) FROM workorder_erp_extra WHERE id=2", Integer.class));

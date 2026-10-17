@@ -56,7 +56,7 @@ class ProductionQualityV13MySqlTest {
                 nodes.add(ProductionReportMySqlTest.insert(j, "INSERT INTO routing_node(routing_id,node_code,operation_id,display_order,operation_code,operation_name) SELECT ?,?,id,?,code,name FROM operation WHERE id=?", routing, Character.toString((char) ('A' + i)), i, operation));
             for (int i = 1; i < 5; i++)
                 j.update("INSERT INTO routing_edge(routing_id,from_node_id,to_node_id) VALUES(?,?,?)", routing, nodes.get(i - 1), nodes.get(i));
-            long order = ProductionReportMySqlTest.insert(j, "INSERT INTO workorder(code,product_id,planned_qty,routing_id,status,revision,create_time,update_time) VALUES(?,?,100,?,'RELEASED',0,NOW(),NOW())", tag, material, routing);
+            long order = ProductionReportMySqlTest.insert(j, "INSERT INTO workorder(source,code,product_id,planned_qty,routing_id,status,revision,create_time,update_time) VALUES('LOCAL',?,?,100,?,'RELEASED',0,NOW(),NOW())", tag, material, routing);
             j.update("INSERT INTO workorder_erp_extra(id) VALUES(?)", order);
             long execution = ProductionReportMySqlTest.insert(j, "INSERT INTO mes_production_execution(execution_no,workorder_id,product_id,routing_id,target_qty,status,start_time,remark,create_by,create_time) VALUES(?,?,?,?,100,'RUNNING',NOW(),?,'TEST_ONLY_Q13',NOW())", tag, order, material, routing, tag);
             j.update("INSERT INTO mes_execution_path(id,routing_id,path_status,revision,selected_at,locked_at) VALUES(?,?,'LOCKED',1,NOW(),NOW())", execution, routing);

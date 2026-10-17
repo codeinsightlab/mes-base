@@ -4,7 +4,6 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 public class WorkorderEntity {
-    // External ID/code are read projections from workorder_erp_extra, never core-table columns.
     private Long id;
 
     private String code;
@@ -21,10 +20,6 @@ public class WorkorderEntity {
 
     private LocalDateTime plannedEndAt;
 
-    private String externalId;
-
-    private String externalCode;
-
     private String remark;
 
     private Integer revision;
@@ -32,6 +27,8 @@ public class WorkorderEntity {
     private LocalDateTime createTime;
 
     private LocalDateTime updateTime;
+
+    private String source;
 
     public Long getId() {
         return id;
@@ -97,22 +94,6 @@ public class WorkorderEntity {
         this.plannedEndAt = plannedEndAt;
     }
 
-    public String getExternalId() {
-        return externalId;
-    }
-
-    public void setExternalId(String externalId) {
-        this.externalId = externalId;
-    }
-
-    public String getExternalCode() {
-        return externalCode;
-    }
-
-    public void setExternalCode(String externalCode) {
-        this.externalCode = externalCode;
-    }
-
     public String getRemark() {
         return remark;
     }
@@ -144,4 +125,32 @@ public class WorkorderEntity {
     public void setUpdateTime(LocalDateTime updateTime) {
         this.updateTime = updateTime;
     }
+
+    public String getSource() {
+        return source;
+    }
+
+    public void setSource(String source) {
+        this.source = source;
+    }
+
+    private String externalId;
+    private String externalCode;
+
+    public String getExternalId() {
+        return externalId;
+    }
+
+    public void setExternalId(String externalId) {
+        this.externalId = externalId;
+    }
+
+    public String getExternalCode() {
+        return externalCode;
+    }
+
+    public void setExternalCode(String externalCode) {
+        this.externalCode = externalCode;
+    }
+
 }

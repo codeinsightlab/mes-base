@@ -1,12 +1,30 @@
 package dev.stockfixture;
 
+import java.io.IOException;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.ServletException;
+import jakarta.servlet.Filter;
+import dev.mesbase.core.factory.FactoryRuntimeMode;
+import dev.mesbase.platform.execution.FactoryIntegrationSnapshot;
+import dev.mesbase.platform.execution.FactoryIntegrationContext;
+import dev.mesbase.business.wm.dao.WmWarehouseErpExtraMapper;
+import dev.mesbase.business.issue.dao.MesMaterialIssueItemMapper;
+import dev.mesbase.business.issue.dao.MesMaterialIssueMapper;
+import dev.mesbase.business.production.dao.MesProductionReceiptMapper;
+import dev.mesbase.business.production.dao.WorkorderErpExtraMapper;
+import dev.mesbase.business.production.dao.WorkorderMapper;
+import dev.mesbase.business.production.service.BusinessSourceRules;
 import dev.mesbase.business.basic.dao.MaterialMapper;
 import dev.mesbase.business.wm.controller.WmInventoryController;
 import dev.mesbase.business.wm.controller.WmWarehouseController;
 import dev.mesbase.business.wm.dao.WmInventoryMapper;
 import dev.mesbase.business.wm.dao.WmWarehouseMapper;
 import dev.mesbase.business.wm.service.StockReferenceRules;
+import dev.mesbase.business.production.dao.MesWorkorderMaterialMapper;
 import dev.mesbase.business.wm.service.impl.WmInventoryServiceImpl;
+import dev.mesbase.business.wm.dao.WmStockActionMapper;
+import dev.mesbase.business.issue.dao.MesMaterialIssueInputMapper;
+import dev.mesbase.business.integration.warehouse.WarehouseIntegration;
 import dev.mesbase.business.wm.service.impl.WmWarehouseServiceImpl;
 import dev.mesbase.business.wm.sync.ExternalWmInventory;
 import dev.mesbase.business.wm.sync.ExternalWmWarehouse;
@@ -89,7 +107,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * TEST ONLY: real generated SQL, HTTP authorization and transactions; two separate H2 databases.
  */
 class StockHttpTest {
-    static final Set<Class<?>> MAPPERS = Set.of(MaterialMapper.class, WmWarehouseMapper.class, WmInventoryMapper.class);
+    static final Set<Class<?>> MAPPERS = Set.of(WmWarehouseErpExtraMapper.class, MesWorkorderMaterialMapper.class, WmStockActionMapper.class, MesMaterialIssueInputMapper.class, MaterialMapper.class, WmWarehouseMapper.class, WmInventoryMapper.class);
 
     static class Fixture implements AutoCloseable {
         final RuntimeRegistry registry = new RuntimeRegistry();
@@ -98,6 +116,7 @@ class StockHttpTest {
         final ConfiguredBusinessPersistenceResolver resolver;
         final PlatformPersistence platform;
         final JdbcTemplate center;
+        boolean erp;
         int ownerChecks;
         int loseAt;
         List<ExternalWmWarehouse> warehouseInputs = List.of();
@@ -125,6 +144,15 @@ class StockHttpTest {
                             .replace("factory_id, ", "");
                     for (String statement : ddl.split(";")) if (!statement.isBlank()) jdbc.execute(statement);
                 }
+                for (String fact : List.of("V35__local_production_closure.sql", "V29__single_material_production_input.sql", "V34__local_stock_action.sql")) {
+                    String ddl = Files.readString(Path.of("mes-admin/src/main/resources/db/business/" + fact))
+                            .split("CREATE TRIGGER")[0].split("-- 旧库存")[0]
+                            .replace(" CHARACTER SET ascii COLLATE ascii_bin", "")
+                            .replace(") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT=", ") COMMENT ");
+                    for (String statement : ddl.split(";")) if (!statement.isBlank()) jdbc.execute(statement);
+                }
+                jdbc.execute("ALTER TABLE wm_warehouse ADD source VARCHAR(16) DEFAULT 'LOCAL'");
+                jdbc.execute("CREATE TABLE wm_warehouse_erp_extra(id BIGINT PRIMARY KEY,external_id VARCHAR(128),provider VARCHAR(128),binding_key VARCHAR(128),configuration_revision BIGINT)");
                 jdbc.execute("ALTER TABLE wm_inventory ADD batch_no VARCHAR(128)");
                 jdbc.execute("ALTER TABLE wm_inventory ADD bin_code VARCHAR(64)");
                 jdbc.update("INSERT INTO material(id,code,name,unit_id,material_type,status) VALUES(1,'M1','物料一',1,'ITEM','ENABLED')");
@@ -155,7 +183,7 @@ class StockHttpTest {
     @EnableWebMvc
     @EnableWebSecurity
     @EnableTransactionManagement
-    @Import({WmWarehouseController.class, WmInventoryController.class, WmWarehouseServiceImpl.class, WmInventoryServiceImpl.class, StockReferenceRules.class, FoundationErrorAdvice.class})
+    @Import({WarehouseIntegration.class, WmWarehouseController.class, WmInventoryController.class, WmWarehouseServiceImpl.class, WmInventoryServiceImpl.class, StockReferenceRules.class, FoundationErrorAdvice.class})
     static class Web implements WebMvcConfigurer {
         @Bean(destroyMethod = "close")
         Fixture fixture() throws Exception {
@@ -184,8 +212,34 @@ class StockHttpTest {
         }
 
         @Bean
+        MesWorkorderMaterialMapper demandMapper(SqlSessionFactory f) {
+            return new SqlSessionTemplate(f).getMapper(MesWorkorderMaterialMapper.class);
+        }
+
+        @Bean
+        WmStockActionMapper stockActions(SqlSessionFactory f) {
+            return new SqlSessionTemplate(f).getMapper(WmStockActionMapper.class);
+        }
+
+        @Bean
+        MesMaterialIssueInputMapper inputs(SqlSessionFactory f) {
+            return new SqlSessionTemplate(f).getMapper(MesMaterialIssueInputMapper.class);
+        }
+
+        @Bean
         MaterialMapper materials(SqlSessionFactory f) {
             return new SqlSessionTemplate(f).getMapper(MaterialMapper.class);
+        }
+
+        @Bean
+        WmWarehouseErpExtraMapper warehouseExternal(SqlSessionFactory f) {
+            return new SqlSessionTemplate(f).getMapper(WmWarehouseErpExtraMapper.class);
+        }
+
+        @Bean
+        BusinessSourceRules sourceRules(WarehouseIntegration integration, WmWarehouseMapper warehouses,
+                                        WmWarehouseErpExtraMapper external) {
+            return new BusinessSourceRules(integration, mock(WorkorderMapper.class), mock(WorkorderErpExtraMapper.class), warehouses, external, mock(MesMaterialIssueMapper.class), mock(MesMaterialIssueItemMapper.class), mock(MesProductionReceiptMapper.class));
         }
 
         @Bean
@@ -259,7 +313,7 @@ class StockHttpTest {
         var c = new AnnotationConfigWebApplicationContext();
         c.setServletContext(new MockServletContext());
         c.getEnvironment().getPropertySources()
-                .addFirst(new MapPropertySource("TEST ONLY", Map.of("mes.business.enabled", "true")));
+                .addFirst(new MapPropertySource("TEST ONLY", Map.of("mes.business.enabled", "true", "mes.integration.warehouse.factories.A.mode", "LOCAL_ONLY", "mes.integration.warehouse.factories.B.mode", "LOCAL_ONLY")));
         c.register(Web.class);
         c.refresh();
         return c;
@@ -267,14 +321,34 @@ class StockHttpTest {
 
     static MockMvc mvc(AnnotationConfigWebApplicationContext c) {
         return MockMvcBuilders.webAppContextSetup(c)
-                .addFilters(new RequestBoundaryFilter(), c.getBean(FilterChainProxy.class)).build();
+                .addFilters(new RequestBoundaryFilter(), (Filter) (req, res, chain) -> {
+                    var fixture = c.getBean(Fixture.class);
+                    if (!fixture.erp) {
+                        chain.doFilter(req, res);
+                        return;
+                    }
+                    var id = new FactoryId(((HttpServletRequest) req).getHeader("X-Factory-Id"));
+                    final IOException[] failure = new IOException[1];
+                    final ServletException[] servlet = new ServletException[1];
+                    FactoryIntegrationContext.run(new FactoryIntegrationSnapshot(id, FactoryRuntimeMode.ERP, "test-erp", "test-binding", 1, 1L), () -> {
+                        try {
+                            chain.doFilter(req, res);
+                        } catch (IOException e) {
+                            failure[0] = e;
+                        } catch (ServletException e) {
+                            servlet[0] = e;
+                        }
+                    });
+                    if (failure[0] != null) throw failure[0];
+                    if (servlet[0] != null) throw servlet[0];
+                }, c.getBean(FilterChainProxy.class)).build();
     }
 
     static final String W = "/api/wm/wm-warehouse", I = "/api/wm/wm-inventory";
     static final String WH = "{\"code\":\"W1\",\"name\":\"一号仓\",\"status\":\"ENABLED\"}";
 
     static String inventory(String material, String warehouse) {
-        return "{\"materialId\":\"" + material + "\",\"warehouseId\":\"" + warehouse + "\",\"quantity\":\"1234567890.1234\",\"availableQuantity\":null,\"status\":\"ENABLED\"}";
+        return "{\"materialId\":\"" + material + "\",\"warehouseId\":\"" + warehouse + "\",\"quantity\":\"0\",\"availableQuantity\":null,\"status\":\"ENABLED\"}";
     }
 
     @Test
@@ -298,7 +372,7 @@ class StockHttpTest {
                     .andExpect(status().isUnprocessableEntity());
             m.perform(post(I).header("Authorization", "Bearer FULL").header("X-Factory-Id", "A")
                             .contentType("application/json").content(inventory("1", "1"))).andExpect(status().isOk())
-                    .andExpect(jsonPath("quantity").value("1234567890.1234"));
+                    .andExpect(jsonPath("quantity").value("0.0000"));
             m.perform(post(I).header("Authorization", "Bearer FULL").header("X-Factory-Id", "A")
                     .contentType("application/json").content(inventory("1", "1"))).andExpect(status().isConflict());
             m.perform(get(I).header("Authorization", "Bearer FULL").header("X-Factory-Id", "A"))
@@ -307,8 +381,8 @@ class StockHttpTest {
             m.perform(get(I).header("Authorization", "Bearer FULL").header("X-Factory-Id", "B"))
                     .andExpect(status().isOk()).andExpect(jsonPath("total").value(0));
             m.perform(put(I + "/1").header("Authorization", "Bearer FULL").header("X-Factory-Id", "A")
-                            .contentType("application/json").content(inventory("1", "1").replace("1234567890.1234", "9.0001")))
-                    .andExpect(status().isOk()).andExpect(jsonPath("quantity").value("9.0001"));
+                            .contentType("application/json").content(inventory("1", "1").replace("0", "9.0001")))
+                    .andExpect(status().isConflict());
             m.perform(delete(W).header("Authorization", "Bearer FULL").header("X-Factory-Id", "A")
                             .contentType("application/json").content("[1]")).andExpect(status().isConflict())
                     .andExpect(jsonPath("errorCode").value("WAREHOUSE_REFERENCED"));
@@ -324,6 +398,7 @@ class StockHttpTest {
     void syncUsesSeparatePermissionAndUnconfiguredSourceFails() throws Exception {
         try (var c = context()) {
             var m = mvc(c);
+            c.getBean(Fixture.class).erp = true;
             for (String path : List.of(W, I)) {
                 m.perform(post(path + "/actions/sync").header("Authorization", "Bearer CRUD")
                         .header("X-Factory-Id", "A")).andExpect(status().isForbidden());
@@ -343,8 +418,11 @@ class StockHttpTest {
         try (var c = context()) {
             var m = mvc(c);
             var f = c.getBean(Fixture.class);
+            f.erp = true;
             f.business.get("A")
-                    .update("INSERT INTO wm_warehouse(code,name,status) VALUES('W1','一仓','ENABLED'),('W2','二仓','ENABLED')");
+                    .update("INSERT INTO wm_warehouse(code,name,status,source) VALUES('W1','一仓','ENABLED','EXTERNAL'),('W2','二仓','ENABLED','EXTERNAL')");
+            f.business.get("A")
+                    .update("INSERT INTO wm_warehouse_erp_extra VALUES(1,'ERP-W1','test-erp','test-binding',1),(2,'ERP-W2','test-erp','test-binding',1)");
             f.inputs = List.of(external(1, "1.2"), external(2, "2.3"));
             m.perform(post(I + "/actions/sync").header("Authorization", "Bearer FULL").header("X-Factory-Id", "A"))
                     .andExpect(status().isOk()).andExpect(jsonPath("created").value(2));
@@ -373,12 +451,13 @@ class StockHttpTest {
         try (var c = context()) {
             var m = mvc(c);
             var f = c.getBean(Fixture.class);
-            f.warehouseInputs = List.of(new ExternalWmWarehouse("ERP1", "ERP仓库", "ENABLED", null));
+            f.erp = true;
+            f.warehouseInputs = List.of(new ExternalWmWarehouse("ERP1", "ERP仓库", "ENABLED", null, "ERP-W1"));
             m.perform(post(W + "/actions/sync").header("Authorization", "Bearer FULL").header("X-Factory-Id", "A"))
                     .andExpect(status().isOk()).andExpect(jsonPath("created").value(1));
             m.perform(post(W + "/actions/sync").header("Authorization", "Bearer FULL").header("X-Factory-Id", "A"))
                     .andExpect(status().isOk()).andExpect(jsonPath("skipped").value(1));
-            f.warehouseInputs = List.of(new ExternalWmWarehouse("ERP1", "ERP仓库更新", "DISABLED", null));
+            f.warehouseInputs = List.of(new ExternalWmWarehouse("ERP1", "ERP仓库更新", "DISABLED", null, "ERP-W1"));
             m.perform(post(W + "/actions/sync").header("Authorization", "Bearer FULL").header("X-Factory-Id", "A"))
                     .andExpect(status().isOk()).andExpect(jsonPath("updated").value(1));
         }
@@ -390,14 +469,51 @@ class StockHttpTest {
             try (var c = context()) {
                 var m = mvc(c);
                 var f = c.getBean(Fixture.class);
+                f.erp = true;
                 f.business.get("A")
-                        .update("INSERT INTO wm_warehouse(code,name,status) VALUES('W1','一仓','ENABLED'),('W2','二仓','ENABLED')");
+                        .update("INSERT INTO wm_warehouse(code,name,status,source) VALUES('W1','一仓','ENABLED','EXTERNAL'),('W2','二仓','ENABLED','EXTERNAL')");
+                f.business.get("A")
+                        .update("INSERT INTO wm_warehouse_erp_extra VALUES(1,'ERP-W1','test-erp','test-binding',1),(2,'ERP-W2','test-erp','test-binding',1)");
                 f.inputs = List.of(external(1, "1"), external(2, "2"));
                 f.loseAt = loseAt;
                 m.perform(post(I + "/actions/sync").header("Authorization", "Bearer FULL").header("X-Factory-Id", "A"))
                         .andExpect(status().isConflict()).andExpect(jsonPath("errorCode").value("SYNC_EXECUTION_LOST"));
                 assertEquals(0, f.business.get("A").queryForObject("SELECT COUNT(*) FROM wm_inventory", Integer.class));
             }
+        }
+    }
+
+    @Test
+    void trustedSourceIsReadOnlyAndSyncCannotTakeOverLocalIdentity() throws Exception {
+        try (var c = context()) {
+            var m = mvc(c);
+            var f = c.getBean(Fixture.class);
+            m.perform(post(W).header("Authorization", "Bearer FULL").header("X-Factory-Id", "A")
+                            .contentType("application/json").content(WH))
+                    .andExpect(status().isOk()).andExpect(jsonPath("source").value("LOCAL"));
+            m.perform(put(W + "/1").header("Authorization", "Bearer FULL").header("X-Factory-Id", "A")
+                            .contentType("application/json")
+                            .content(WH.replace("ENABLED\"}", "ENABLED\",\"source\":\"EXTERNAL\"}")))
+                    .andExpect(status().isOk()).andExpect(jsonPath("source").value("LOCAL"));
+            f.erp = true;
+            f.warehouseInputs = List.of(new ExternalWmWarehouse("W1", "ERP抢占", "ENABLED", null, "ERP-W1"));
+            m.perform(post(W + "/actions/sync").header("Authorization", "Bearer FULL").header("X-Factory-Id", "A"))
+                    .andExpect(status().isConflict())
+                    .andExpect(jsonPath("errorCode").value("BUSINESS_SOURCE_CONFLICT"));
+            assertEquals("LOCAL", f.business.get("A")
+                    .queryForObject("SELECT source FROM wm_warehouse WHERE id=1", String.class));
+            assertEquals(0, f.business.get("A")
+                    .queryForObject("SELECT COUNT(*) FROM wm_warehouse_erp_extra", Integer.class));
+            f.warehouseInputs = List.of(new ExternalWmWarehouse("ERP2", "ERP仓库", "ENABLED", null, "ERP-W2"));
+            m.perform(post(W + "/actions/sync").header("Authorization", "Bearer FULL").header("X-Factory-Id", "A"))
+                    .andExpect(status().isOk());
+            Long id = f.business.get("A")
+                    .queryForObject("SELECT id FROM wm_warehouse WHERE code='ERP2' AND source='EXTERNAL'", Long.class);
+            f.erp = false;
+            m.perform(put(W + "/" + id).header("Authorization", "Bearer FULL").header("X-Factory-Id", "A")
+                            .contentType("application/json").content(WH.replace("W1", "ERP2")))
+                    .andExpect(status().isConflict())
+                    .andExpect(jsonPath("errorCode").value("EXTERNAL_SOURCE_READ_ONLY"));
         }
     }
 

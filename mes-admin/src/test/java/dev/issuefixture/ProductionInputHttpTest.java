@@ -177,9 +177,13 @@ class ProductionInputHttpTest {
                     .andExpect(jsonPath("status").value("SUBMIT_UNKNOWN"));
             assertEquals(1, j.queryForObject("SELECT COUNT(*) FROM mes_production_scan_identity", Integer.class));
             assertEquals(0, j.queryForObject("SELECT COUNT(*) FROM mes_material_issue_input WHERE confirmed_at IS NOT NULL", Integer.class));
+            c.getEnvironment().getPropertySources()
+                    .addFirst(new MapPropertySource("TEST ONLY current mode changed after original LOCAL intent", Map.of("mes.integration.warehouse.factories.A.mode", "CONNECTED")));
             m.perform(ProductionCoreV1HttpTest.full(post(MaterialIssueHttpTest.H + "/" + r.get("issueId")
                     .asText() + "/actions/reconcile-erp"))).andExpect(status().isOk());
             assertEquals(1, j.queryForObject("SELECT COUNT(*) FROM mes_material_issue_input WHERE confirmed_at IS NOT NULL", Integer.class));
+            m.perform(ProductionCoreV1HttpTest.full(post(ROOT)).content(body)).andExpect(status().isOk())
+                    .andExpect(jsonPath("status").value("CONFIRMED"));
             verify(integration, times(1)).createMaterialIssue(any(), any(), any());
         }
     }

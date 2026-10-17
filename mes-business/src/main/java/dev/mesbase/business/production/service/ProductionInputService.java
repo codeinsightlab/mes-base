@@ -43,10 +43,13 @@ import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.dao.DuplicateKeyException;
+import dev.mesbase.business.issue.service.MaterialIssueInputFacts;
 
 @Service
 @ConditionalOnProperty(name = "mes.business.enabled", havingValue = "true")
 public class ProductionInputService {
+    private final BusinessSourceRules sources;
+
     public record Command(String requestId, String code, Long workorderId, String stockReference,
                           BigDecimal outputQty, Long routingId, List<Long> routingNodeIds, String inputKind,
                           String calculationKey) {
@@ -65,6 +68,7 @@ public class ProductionInputService {
     private final IMesMaterialIssueService issues;
     private final IMesMaterialIssueItemService items;
     private final MaterialIssueSubmissionService submissions;
+    private final MaterialIssueInputFacts inputFacts;
     private final ExecutionPathService paths;
     private final ProductionChainLocks locks;
     private final ProductionQuantityService quantities;
@@ -80,11 +84,14 @@ public class ProductionInputService {
                                   IMesProductionExecutionService executions,
                                   MesProductionExecutionMapper executionMapper, IMesMaterialIssueService issues,
                                   IMesMaterialIssueItemService items,
-                                  MaterialIssueSubmissionService submissions, ExecutionPathService paths,
+                                  MaterialIssueSubmissionService submissions, MaterialIssueInputFacts inputFacts,
+                                  ExecutionPathService paths,
                                   ProductionChainLocks locks, ProductionQuantityService quantities,
                                   WorkorderMapper orderMapper,
                                   MaterialMapper materials, RoutingMapper routings, IRoutingService routingService,
-                                  @Qualifier("businessTransactionManager") PlatformTransactionManager manager) {
+                                  @Qualifier("businessTransactionManager") PlatformTransactionManager manager,
+                                  BusinessSourceRules sources) {
+        this.sources = sources;
         this.supply = supply;
         this.bindings = bindings;
         this.inputs = inputs;
@@ -94,6 +101,7 @@ public class ProductionInputService {
         this.issues = issues;
         this.items = items;
         this.submissions = submissions;
+        this.inputFacts = inputFacts;
         this.paths = paths;
         this.locks = locks;
         this.quantities = quantities;
@@ -111,6 +119,7 @@ public class ProductionInputService {
     @Transactional(transactionManager = "businessTransactionManager", readOnly = true)
     public Preview preview(String code, Long workorderId) {
         var order = readOrder(workorderId);
+        sources.order(workorderId);
         var material = ProductionScanCode.material(code);
         var product = materials.selectByPrimaryKey(order.getProductId());
         if (product == null) fail();
@@ -156,6 +165,7 @@ public class ProductionInputService {
 
     private Prepared prepare(Command c, Calculation calculation, String hash) {
         var order = locks.order(c.workorderId());
+        supply.validateFrozenCalculation(calculation);
         var previous = inputs.selectByPrimaryKey(c.requestId());
         if (previous != null) {
             if (!previous.getRequestHash().equals(hash)) fail();
@@ -213,7 +223,7 @@ public class ProductionInputService {
                 .equals(calculation.sourceMode()) ? Long.valueOf(stock.reference()) : null);
         f.setStockApplied(false);
         f.setCreatedAt(LocalDateTime.now());
-        if (inputs.insert(f) != 1) fail();
+        inputFacts.freeze(f, calculation);
         return submissions.prepare(issue.getId(), FactoryContext.required());
     }
 

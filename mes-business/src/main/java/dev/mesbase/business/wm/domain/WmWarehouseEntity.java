@@ -22,6 +22,8 @@ public class WmWarehouseEntity {
 
     private LocalDateTime updateTime;
 
+    private String source;
+
     public Long getId() {
         return id;
     }
@@ -92,5 +94,13 @@ public class WmWarehouseEntity {
 
     public void setUpdateTime(LocalDateTime updateTime) {
         this.updateTime = updateTime;
+    }
+
+    public String getSource() {
+        return source;
+    }
+
+    public void setSource(String source) {
+        this.source = source;
     }
 }

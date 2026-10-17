@@ -9,6 +9,7 @@ import dev.mesbase.business.wm.sync.ExternalWmInventory;
 import dev.mesbase.business.wm.sync.WmInventorySyncResult;
 import dev.mesbase.core.factory.FactoryScope;
 import java.util.List;
+import dev.mesbase.business.wm.domain.WmInventoryItem;
 import dev.mesbase.framework.sync.SyncCoordinator;
 
 /**
@@ -21,9 +22,11 @@ public interface IWmInventoryService {
 
     WmInventoryEntity selectById(Long id);
 
-    WmInventoryEntity insert(WmInventoryCreateCommand input);
+    WmInventoryItem selectDetail(Long id);
 
-    WmInventoryEntity updateById(Long id, WmInventoryUpdateCommand input);
+    WmInventoryItem insert(WmInventoryCreateCommand input);
+
+    WmInventoryItem updateById(Long id, WmInventoryUpdateCommand input);
 
     void deleteByIds(List<Long> ids);
 

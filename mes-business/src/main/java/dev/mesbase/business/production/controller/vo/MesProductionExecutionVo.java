@@ -20,7 +20,8 @@ public record MesProductionExecutionVo(
         LocalDateTime createTime,
         String updateBy,
         LocalDateTime updateTime,
-        String routingCode, String routingName, Integer routingVersion, String createByName, String updateByName
+        String routingCode, String routingName, Integer routingVersion, String createByName, String updateByName,
+        String workorderStatus
 ) {
 }
 

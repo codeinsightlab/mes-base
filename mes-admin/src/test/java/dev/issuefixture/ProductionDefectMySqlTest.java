@@ -1,5 +1,6 @@
 package dev.issuefixture;
 
+import dev.mesbase.business.production.service.BusinessSourceRules;
 import dev.mesbase.business.quality.service.ExecutionQualityReferenceQueryImpl;
 
 import dev.mesbase.acceptance.AcceptanceBusinessDatabase;
@@ -71,6 +72,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import dev.mesbase.business.quality.service.ProductionDefectService;
 import dev.mesbase.business.quality.service.QualityTreatmentService;
+import dev.mesbase.business.quality.service.QualityReleaseService;
+import dev.mesbase.business.integration.warehouse.WarehouseIntegration;
 import dev.mesbase.business.quality.domain.QualityTreatmentModels.Assessment;
 import dev.mesbase.business.quality.domain.QualityTreatmentModels.Attribution;
 import dev.mesbase.business.production.service.ProductionQuantityService;
@@ -95,7 +98,7 @@ class ProductionDefectMySqlTest {
     static AnnotationConfigApplicationContext context() throws Exception {
         var c = new AnnotationConfigApplicationContext();
         c.getEnvironment().getPropertySources()
-                .addFirst(new MapPropertySource("LIVE MYSQL TEST ONLY", Map.of("mes.business.enabled", "true", "mes.system.enabled", "true")));
+                .addFirst(new MapPropertySource("LIVE MYSQL TEST ONLY", Map.of("mes.business.enabled", "true", "mes.system.enabled", "true", "mes.integration.warehouse.factories.SIMPLE_B.mode", "LOCAL_ONLY")));
         DataSource source = AcceptanceBusinessDatabase.source();
         var tx = new OwnedTransactionManager(source);
         var factory = PersistenceFactories.create(source, MaterialIssueHttpTest.MAPPERS, PersistenceFactories::pagination, tx::verifyAccess);
@@ -116,7 +119,7 @@ class ProductionDefectMySqlTest {
         c.registerBean(SysUserMapper.class, () -> center.mapper(SysUserMapper.class));
         c.registerBean(BusinessDirectoryService.class, () -> new BusinessDirectoryService(
                 c.getBean(SysUserMapper.class), mock(SysDeptMapper.class), mock(SysPostMapper.class), new DetailEntityCache(mock(RedisCache.class), new MockEnvironment()), mock(BusinessCacheProcessor.class), center, c.getBeanProvider(OwnedTransactionManager.class), c.getBeanProvider(RoutingMapper.class), c.getBeanProvider(OperationMapper.class)));
-        c.register(QualityTreatmentService.class, ProductionQuantityService.class, ExecutionQualityReferenceQueryImpl.class, ProductionChainLocks.class, ProductionExecutionRules.class, ExecutionPathService.class);
+        c.register(BusinessSourceRules.class, QualityReleaseService.class, WarehouseIntegration.class, QualityTreatmentService.class, ProductionQuantityService.class, ExecutionQualityReferenceQueryImpl.class, ProductionChainLocks.class, ProductionExecutionRules.class, ExecutionPathService.class);
         c.refresh();
         return c;
     }

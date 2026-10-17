@@ -95,6 +95,7 @@ public class WmWarehouseController {
         return new WmWarehouseVo(
                 row.getId() == null ? null : row.getId().toString(),
 
+                row.getSource(),
                 row.getCode(),
                 row.getName(),
                 row.getStatus(),

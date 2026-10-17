@@ -2,6 +2,7 @@ package dev.issuefixture;
 
 import dev.mesbase.business.production.service.ProductionQuantityService;
 import dev.mesbase.business.issue.service.MaterialIssueInputFacts;
+import dev.mesbase.business.wm.service.LocalStockService;
 import dev.mesbase.business.quality.service.ExecutionQualityReferenceQueryImpl;
 
 import static org.mockito.Mockito.mock;
@@ -22,10 +23,8 @@ import dev.mesbase.business.integration.warehouse.ErpIssueQueryResult.Outcome;
 
 import dev.mesbase.acceptance.AcceptanceBusinessDatabase;
 import dev.mesbase.business.basic.dao.MaterialMapper;
-import dev.mesbase.business.basic.domain.MaterialEntity;
 import dev.mesbase.business.production.dao.RoutingMapper;
 import dev.mesbase.business.production.dao.RoutingProductMapper;
-import dev.mesbase.business.production.domain.RoutingEntity;
 import dev.mesbase.business.production.domain.RoutingProductEntity;
 import dev.mesbase.business.production.domain.WorkOrderModels;
 import dev.mesbase.business.production.service.WorkOrderService;
@@ -59,7 +58,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.math.BigDecimal;
-import java.time.LocalDateTime;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
@@ -90,7 +88,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 class MaterialIssueVoidMySqlTest {
     @Configuration
     @EnableTransactionManagement
-    @Import({QualityTreatmentService.class, MaterialIssueInputFacts.class, ProductionQuantityService.class, ExecutionQualityReferenceQueryImpl.class, MesProductionExecutionServiceImpl.class, MesMaterialIssueItemServiceImpl.class, ProductionChainLocks.class, ExecutionPathService.class, MaterialIssueSubmissionService.class, WorkorderErpFacts.class, MaterialIssueErpService.class, MaterialIssueErpFacts.class, WorkOrderService.class, RoutingReferenceRules.class, ProductionExecutionRules.class, MaterialIssueRules.class, MaterialIssueVoidService.class, MesMaterialIssueServiceImpl.class, WarehouseIntegration.class})
+    @Import({LocalStockService.class, QualityTreatmentService.class, MaterialIssueInputFacts.class, ProductionQuantityService.class, ExecutionQualityReferenceQueryImpl.class, MesProductionExecutionServiceImpl.class, MesMaterialIssueItemServiceImpl.class, ProductionChainLocks.class, ExecutionPathService.class, MaterialIssueSubmissionService.class, WorkorderErpFacts.class, MaterialIssueErpService.class, MaterialIssueErpFacts.class, WorkOrderService.class, RoutingReferenceRules.class, ProductionExecutionRules.class, MaterialIssueRules.class, MaterialIssueVoidService.class, MesMaterialIssueServiceImpl.class, WarehouseIntegration.class})
     static class Config {
         @Bean
         BusinessDirectoryService directory() {

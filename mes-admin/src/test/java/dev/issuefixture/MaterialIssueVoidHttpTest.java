@@ -8,7 +8,6 @@ import dev.mesbase.business.integration.warehouse.ErpActionResult.Mode;
 import dev.mesbase.business.integration.warehouse.ErpActionResult.Status;
 import dev.mesbase.core.factory.FactoryScope;
 import java.util.Map;
-import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
@@ -17,7 +16,6 @@ import org.junit.jupiter.api.Test;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.env.MapPropertySource;
-import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.web.context.support.AnnotationConfigWebApplicationContext;
@@ -111,6 +109,11 @@ class MaterialIssueVoidHttpTest {
             return binding.equals("TEST_" + s.factoryId().value());
         }
 
+        public boolean supportsProvider(String provider) {
+            return "TEST_PROVIDER".equals(provider);
+        }
+
+        @Override
         public ErpActionResult cancelMaterialIssue(FactoryScope s, MaterialIssueCancelCommand c) {
             assertFalse(TransactionSynchronizationManager.isActualTransactionActive());
             writes.incrementAndGet();
@@ -147,12 +150,13 @@ class MaterialIssueVoidHttpTest {
                 .addFirst(new MapPropertySource("TEST ONLY", Map.of("mes.business.enabled", "true", "mes.integration.warehouse.factories.A.mode", "CONNECTED", "mes.integration.warehouse.factories.B.mode", "LOCAL_ONLY")));
         c.register(MaterialIssueHttpTest.Web.class, TestConfig.class);
         c.refresh();
+        MaterialIssueHttpTest.externalFixture(c);
         return c;
     }
 
     static void source(AnnotationConfigWebApplicationContext c) {
         c.getBean(MaterialIssueHttpTest.Fixture.class).business.get("A")
-                .update("UPDATE mes_material_issue_erp_extra SET source_execution_mode='CONNECTED',external_effect='CONFIRMED',external_binding_key='TEST_A',external_reference='ERP-1' WHERE id=1");
+                .update("UPDATE mes_material_issue_erp_extra SET provider='TEST_PROVIDER',source_execution_mode='CONNECTED',external_effect='CONFIRMED',external_binding_key='TEST_A',external_reference='ERP-1' WHERE id=1");
     }
 
     @Test

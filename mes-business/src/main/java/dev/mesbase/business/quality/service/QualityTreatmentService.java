@@ -38,10 +38,8 @@ import java.util.stream.Stream;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.UUID;
 import java.util.function.Function;
-import java.util.stream.Collectors;
 import org.springframework.stereotype.Service;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.dao.DuplicateKeyException;
@@ -150,6 +148,22 @@ public class QualityTreatmentService {
     private static BigDecimal sum(List<MesQualityTreatmentEntity> rows,
                                   Function<MesQualityTreatmentEntity, BigDecimal> f) {
         return rows.stream().map(f).reduce(ZERO, BigDecimal::add);
+    }
+
+    public record ReleaseBasis(List<Summary> declarations, List<String> factIdentities) {
+    }
+
+    /**
+     * Bounded batch reads, reused by release and completion; no per-declaration queries.
+     */
+    public ReleaseBasis releaseBasis(Long execution) {
+        var all = executionEvents(execution);
+        var versions = declarations(execution);
+        var facts = new ArrayList<String>();
+        versions.forEach(d -> facts.add("D:" + d.getDeclarationId() + ":" + d.getRevisionNo()));
+        all.forEach(e -> facts.add("T:" + e.getId()));
+        facts.sort(String::compareTo);
+        return new ReleaseBasis(versions.stream().map(d -> summarize(d, all)).toList(), List.copyOf(facts));
     }
 
     public List<NodeTotal> nodeTotals(Long execution) {

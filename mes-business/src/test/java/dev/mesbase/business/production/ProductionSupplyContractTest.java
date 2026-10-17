@@ -1,5 +1,11 @@
 package dev.mesbase.business.production;
 
+import dev.mesbase.business.production.domain.WorkorderEntity;
+import dev.mesbase.business.wm.dao.WmWarehouseErpExtraMapper;
+import dev.mesbase.framework.sync.SyncCoordinator;
+import dev.mesbase.business.production.dao.WorkorderErpExtraMapper;
+import dev.mesbase.business.production.service.BusinessSourceRules;
+import org.mockito.Mockito;
 import dev.mesbase.business.production.service.ProductionInputSupplyService;
 import dev.mesbase.business.integration.production.ProductionSupply.Stock;
 import dev.mesbase.business.integration.production.ProductionSupply.Order;
@@ -9,11 +15,7 @@ import dev.mesbase.business.integration.production.ProductionErpAdapter;
 import dev.mesbase.business.integration.warehouse.WarehouseIntegration;
 import dev.mesbase.business.integration.warehouse.WarehouseIntegration.Selection;
 import dev.mesbase.business.integration.warehouse.ErpActionResult.Mode;
-import dev.mesbase.business.basic.dao.MaterialMapper;
-import dev.mesbase.business.basic.dao.UnitMeasureMapper;
-import dev.mesbase.business.wm.dao.WmInventoryMapper;
-import dev.mesbase.business.wm.dao.WmWarehouseMapper;
-import dev.mesbase.business.production.dao.WorkorderMapper;
+import dev.mesbase.business.wm.service.LocalProductionSupply;
 import dev.mesbase.core.factory.FactoryScope;
 import dev.mesbase.core.factory.FactoryId;
 import dev.mesbase.platform.execution.FactoryContext;
@@ -22,7 +24,6 @@ import dev.mesbase.core.error.ErrorCode;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
-import org.springframework.mock.env.MockEnvironment;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.junit.jupiter.api.Test;
 
@@ -47,10 +48,15 @@ class ProductionSupplyContractTest {
         var order = new Order(1L, "WO", "P", "产品", "CENTER", new BigDecimal("100"), "PCS", "ERP_TEST_APPROVED", List.of(1L), List.of(
                 new Requirement("M", 1L, 1L, "KG", new BigDecimal("200")), new Requirement("M2", 2L, 1L, "KG", new BigDecimal("50"))), "MO_TEST", now);
         when(port.query(scope, "TEST_BINDING", "M", "L")).thenReturn(new Context(Mode.CONNECTED.getValue(), List.of(stock), List.of(order)));
-        var service = new ProductionInputSupplyService(integration, List.of(port), new MockEnvironment(), mock(MaterialMapper.class), mock(UnitMeasureMapper.class), mock(WmInventoryMapper.class), mock(WmWarehouseMapper.class), mock(WorkorderMapper.class), mock(PlatformTransactionManager.class));
+        var sourceRules = mock(BusinessSourceRules.class);
+        var sourceOrder = new WorkorderEntity();
+        sourceOrder.setId(1L);
+        sourceOrder.setSource("EXTERNAL");
+        when(sourceRules.order(1L)).thenReturn(sourceOrder);
+        var service = new ProductionInputSupplyService(integration, List.of(port), mock(LocalProductionSupply.class), mock(PlatformTransactionManager.class), sourceRules);
         var failure = assertThrows(FoundationException.class, () -> FactoryContext.withScope(scope, () -> service.calculate("M#L", 1L, "S1", BigDecimal.ONE)));
         assertEquals(ErrorCode.PRODUCTION_SINGLE_MATERIAL_REQUIRED, failure.code());
-        var absent = new ProductionInputSupplyService(integration, List.of(), new MockEnvironment(), mock(MaterialMapper.class), mock(UnitMeasureMapper.class), mock(WmInventoryMapper.class), mock(WmWarehouseMapper.class), mock(WorkorderMapper.class), mock(PlatformTransactionManager.class));
+        var absent = new ProductionInputSupplyService(integration, List.of(), mock(LocalProductionSupply.class), mock(PlatformTransactionManager.class), sourceRules);
         assertEquals(ErrorCode.INTEGRATION_NOT_CONFIGURED, assertThrows(FoundationException.class, () -> FactoryContext.withScope(scope, () -> absent.query("M#L"))).code());
     }
 }

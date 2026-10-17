@@ -1,12 +1,14 @@
-// MES-CODEGEN: MyBatis Generator standard single-table persistence.
 package dev.mesbase.business.wm.dao;
 
 import dev.mesbase.business.wm.domain.WmStockActionEntity;
 import dev.mesbase.business.wm.domain.WmStockActionExample;
 import java.util.List;
+import java.math.BigDecimal;
 import org.apache.ibatis.annotations.Param;
 
 public interface WmStockActionMapper {
+    BigDecimal sumReturns(@Param("reference") String reference, @Param("type") String type);
+
     long countByExample(WmStockActionExample example);
 
     int deleteByExample(WmStockActionExample example);

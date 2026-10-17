@@ -1,5 +1,9 @@
 package dev.mesbase.server;
 
+import dev.mesbase.business.wm.dao.WmWarehouseErpExtraMapper;
+import dev.mesbase.framework.sync.SyncCoordinator;
+import dev.mesbase.business.production.service.BusinessSourceRules;
+import org.mockito.Mockito;
 import dev.mesbase.business.production.service.WorkorderErpFacts;
 import dev.mesbase.business.directory.service.BusinessDirectoryService;
 import dev.mesbase.business.production.dao.WorkorderErpExtraMapper;
@@ -14,15 +18,6 @@ import dev.mesbase.business.basic.dao.MaterialMapper;
 import dev.mesbase.business.issue.dao.MesMaterialIssueMapper;
 import dev.mesbase.business.production.service.RoutingReferenceRules;
 
-import dev.mesbase.infrastructure.cache.BusinessCacheProcessor;
-
-import jakarta.validation.Validator;
-
-
-import dev.mesbase.framework.sync.SyncCoordinator;
-
-
-import org.springframework.beans.factory.support.DefaultListableBeanFactory;
 
 import dev.mesbase.common.core.domain.model.LoginUser;
 import dev.mesbase.common.core.redis.UserSessionStore;
@@ -33,7 +28,6 @@ import dev.mesbase.core.factory.FactorySelectionService;
 import dev.mesbase.framework.security.SystemTokenFilter;
 import dev.mesbase.framework.web.service.TokenService;
 import dev.mesbase.infrastructure.catalog.InMemoryFactoryPreference;
-import dev.mesbase.infrastructure.persistence.BusinessRuntimeBinding;
 import dev.mesbase.infrastructure.persistence.DatasourceIdentity;
 import dev.mesbase.infrastructure.persistence.FactoryBusinessDataSource;
 import dev.mesbase.infrastructure.persistence.OwnedTransactionManager;
@@ -45,13 +39,13 @@ import dev.mesbase.business.production.dao.WorkorderMapper;
 import dev.mesbase.business.production.dao.MesProductionExecutionMapper;
 
 import dev.mesbase.business.production.service.WorkOrderService;
+import dev.mesbase.business.production.dao.MesWorkorderMaterialMapper;
 import dev.mesbase.platform.web.FoundationAccessInterceptor;
 import dev.mesbase.platform.web.RequestBoundaryFilter;
 import dev.mesbase.server.managed.DatasourcePasswordCipher;
 import dev.mesbase.server.managed.ManagedDatasourceService;
 import dev.mesbase.server.managed.FactoryMetadataCache;
 import dev.mesbase.system.factory.RoutingMetadataMapper;
-import dev.mesbase.common.core.redis.RoutingMetadataStore;
 import dev.mesbase.system.factory.ManagedDatasourceMapper;
 import dev.mesbase.system.factory.ManagedFactoryMapper;
 import dev.mesbase.system.mapper.SessionAccountMapper;
@@ -145,8 +139,8 @@ class WorkOrderRequestBudgetTest {
         while (columns.find()) definitions.add(columns.group(1) + " " + (columns.group(2)
                 .equals("VARCHAR") ? "VARCHAR(255)" : columns.group(2)));
         new JdbcTemplate(business).execute("CREATE TABLE workorder(" + String.join(",", definitions) + ")");
-        new JdbcTemplate(business).execute("INSERT INTO workorder(id,code,revision,product_id,routing_id,planned_qty) VALUES(1,'TEST ONLY',0,1,1,1000)");
-        new JdbcTemplate(business).execute("CREATE TABLE workorder_erp_extra(id BIGINT PRIMARY KEY,external_id VARCHAR(128),external_code VARCHAR(128),provider VARCHAR(128))");
+        new JdbcTemplate(business).execute("INSERT INTO workorder(id,code,revision,product_id,routing_id,planned_qty,status,source) VALUES(1,'TEST ONLY',0,1,1,1000,'DRAFT','LOCAL')");
+        new JdbcTemplate(business).execute("CREATE TABLE workorder_erp_extra(id BIGINT PRIMARY KEY,external_id VARCHAR(128),external_code VARCHAR(128),provider VARCHAR(128),binding_key VARCHAR(128),configuration_revision BIGINT)");
         new JdbcTemplate(business).execute("INSERT INTO workorder_erp_extra(id) VALUES(1)");
         for (String type : List.of("ProductionBatch", "Routing")) {
             String xml = Files.readString(Path.of("mes-business/src/main/resources/dev/mesbase/business/production/dao/" + type + "Mapper.xml"));
@@ -196,7 +190,7 @@ class WorkOrderRequestBudgetTest {
                 PersistenceFactories.pagination(c);
                 c.addInterceptor(businessSql);
             }, manager::verifyAccess);
-            var controller = new WorkOrderController(new WorkOrderService(new SqlSessionTemplate(factory).getMapper(WorkorderMapper.class), new SqlSessionTemplate(factory).getMapper(ProductionBatchMapper.class), new SqlSessionTemplate(factory).getMapper(RoutingMapper.class), mock(RoutingProductMapper.class), mock(RoutingNodeMapper.class), mock(RoutingEdgeMapper.class), new SqlSessionTemplate(factory).getMapper(MaterialMapper.class), mock(RoutingReferenceRules.class), mock(MesMaterialIssueMapper.class), new SqlSessionTemplate(factory).getMapper(WorkOrderExtraMapper.class), mock(MesProductionExecutionMapper.class), new WorkorderErpFacts(new SqlSessionTemplate(factory).getMapper(WorkorderErpExtraMapper.class)), mock(BusinessDirectoryService.class)));
+            var controller = new WorkOrderController(new WorkOrderService(new SqlSessionTemplate(factory).getMapper(WorkorderMapper.class), new SqlSessionTemplate(factory).getMapper(ProductionBatchMapper.class), new SqlSessionTemplate(factory).getMapper(RoutingMapper.class), mock(RoutingProductMapper.class), mock(RoutingNodeMapper.class), mock(RoutingEdgeMapper.class), new SqlSessionTemplate(factory).getMapper(MaterialMapper.class), mock(RoutingReferenceRules.class), mock(MesMaterialIssueMapper.class), new SqlSessionTemplate(factory).getMapper(WorkOrderExtraMapper.class), mock(MesProductionExecutionMapper.class), new WorkorderErpFacts(new SqlSessionTemplate(factory).getMapper(WorkorderErpExtraMapper.class)), mock(BusinessDirectoryService.class), mock(MesWorkorderMaterialMapper.class), Mockito.mock(BusinessSourceRules.class), Mockito.mock(WorkorderErpExtraMapper.class), Mockito.mock(SyncCoordinator.class)));
             var permissions = new SystemPermissionService(platform.mapper(SysMenuMapper.class), platform.mapper(SysRoleMapper.class), platform.mapper(ManagedFactoryMapper.class));
             FactoryCatalog catalog = new FactoryCatalog() {
                 public Optional<Factory> find(FactoryId id) {
@@ -210,7 +204,7 @@ class WorkOrderRequestBudgetTest {
             var configuration = new SystemConfiguration();
             var access = new FoundationAccessInterceptor(new FactorySelectionService(catalog, new InMemoryFactoryPreference()),
                     configuration.factoryAuthorization(permissions), configuration.platformAuthorization(permissions), managed::admit);
-            var handler = new HandlerMethod(controller, WorkOrderController.class.getMethod("list", String.class, String.class, int.class, int.class));
+            var handler = new HandlerMethod(controller, WorkOrderController.class.getMethod("list", String.class, String.class, int.class, int.class, String.class));
             var times = new ArrayList<Double>();
             for (int i = 0; i < 25; i++) {
                 var request = new MockHttpServletRequest("GET", "/api/production/workorder");
@@ -226,7 +220,7 @@ class WorkOrderRequestBudgetTest {
                     new RequestBoundaryFilter().doFilter(request, response, (req, res) ->
                             new SystemTokenFilter(tokens).doFilter(request, response, (authenticated, result) -> {
                                 assertTrue(access.preHandle(request, response, handler));
-                                var page = new TransactionTemplate(manager).execute(status -> controller.list(null, null, 0, 20));
+                                var page = new TransactionTemplate(manager).execute(status -> controller.list(null, null, 0, 20, null));
                                 assertEquals(1, page.total());
                             }));
                     assertEquals(200, response.getStatus());

@@ -1,6 +1,7 @@
 package dev.issuefixture;
 
 import dev.mesbase.business.integration.warehouse.WarehouseIntegration;
+import dev.mesbase.business.wm.service.LocalProductionSupply;
 import dev.mesbase.business.production.controller.ProductionInputController;
 import dev.mesbase.business.production.service.ProductionInputService;
 import dev.mesbase.business.production.service.ProductionInputSupplyService;
@@ -36,6 +37,7 @@ class ProductionStabilitySupplyMySqlTest {
                     "mes.production.input.factories.SIMPLE_B.workorders.117.warehouse-ids", "9",
                     "mes.production.input.factories.SIMPLE_B.workorders.117.work-center", "TEST_LOCAL_CENTER")));
             c.registerBean(WarehouseIntegration.class);
+            c.registerBean(LocalProductionSupply.class);
             c.registerBean(ProductionInputSupplyService.class);
             var jdbc = c.getBean(JdbcTemplate.class);
             long count = jdbc.queryForObject("SELECT COUNT(*) FROM workorder WHERE status='RELEASED'", Long.class);

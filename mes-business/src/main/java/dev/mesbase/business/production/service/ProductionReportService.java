@@ -36,6 +36,8 @@ import org.springframework.transaction.annotation.Isolation;
 @Service
 @ConditionalOnProperty(name = "mes.business.enabled", havingValue = "true")
 public class ProductionReportService {
+    private final BusinessSourceRules sources;
+
     private enum AdminAction {SUPPLEMENT, ADJUST, VOID}
 
     private final MesProductionReportMapper reports;
@@ -49,7 +51,9 @@ public class ProductionReportService {
     public ProductionReportService(MesProductionReportMapper reports, ProductionQuantityMapper totals,
                                    ProductionQuantityService quantities,
                                    ProductionChainLocks locks, ReportUserReferenceService users,
-                                   WorkstationMapper workstations, BusinessDirectoryService references) {
+                                   WorkstationMapper workstations, BusinessDirectoryService references,
+                                   BusinessSourceRules sources) {
+        this.sources = sources;
         this.reports = reports;
         this.totals = totals;
         this.quantities = quantities;
@@ -68,6 +72,7 @@ public class ProductionReportService {
         locks.execution(command.executionId());
         existing = replay(command.requestId(), hash);
         if (existing != null) return existing;
+        sources.execution(locks.execution(command.executionId()), null);
         positive(command.quantity());
         reason(command.reason());
         if (command.reportTime() == null || command.reportTime().isAfter(LocalDateTime.now())) invalid();
@@ -95,6 +100,8 @@ public class ProductionReportService {
         var original = lockedOriginal(id);
         existing = replay(command.requestId(), hash);
         if (existing != null) return existing;
+        if (command.quantityDelta() != null && command.quantityDelta().signum() > 0)
+            locks.requireActiveExecution(original.getExecutionId());
         delta(command.quantityDelta());
         reason(command.reason());
         return adjustLocked(original, command.quantityDelta(), command.reason(), command.requestId(), hash);

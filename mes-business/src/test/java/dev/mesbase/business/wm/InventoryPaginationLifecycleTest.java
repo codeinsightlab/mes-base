@@ -1,5 +1,10 @@
 package dev.mesbase.business.wm;
 
+import dev.mesbase.business.wm.dao.WmWarehouseErpExtraMapper;
+import dev.mesbase.framework.sync.SyncCoordinator;
+import dev.mesbase.business.production.dao.WorkorderErpExtraMapper;
+import dev.mesbase.business.production.service.BusinessSourceRules;
+import org.mockito.Mockito;
 import com.github.pagehelper.Page;
 import com.github.pagehelper.PageHelper;
 import dev.mesbase.business.wm.dao.WmInventoryMapper;
@@ -25,13 +30,15 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
-/** TEST ONLY: mapper stubs deliberately bypass the interceptor's automatic cleanup. */
+/**
+ * TEST ONLY: mapper stubs deliberately bypass the interceptor's automatic cleanup.
+ */
 class InventoryPaginationLifecycleTest {
     private final WmInventoryMapper mapper = mock(WmInventoryMapper.class);
     private final StockReferenceRules rules = mock(StockReferenceRules.class);
     private final WmInventoryServiceImpl service = new WmInventoryServiceImpl(mapper,
             new DefaultListableBeanFactory().getBeanProvider(WmInventoryQueryPort.class),
-            null, null, null, null, rules);
+            null, null, null, null, rules, null, Mockito.mock(BusinessSourceRules.class));
     private final WmInventoryQueryDto query = new WmInventoryQueryDto(1, 1, null, null, null, null, null, null);
 
     @AfterEach

@@ -34,7 +34,8 @@ public class WorkOrderController {
         this.service = service;
     }
 
-    public record OrderView(String id, String code, String productId, BigDecimal plannedQty, String routingId,
+    public record OrderView(String id, String source, String code, String productId, BigDecimal plannedQty,
+                            String routingId,
                             String status, LocalDateTime plannedStartAt, LocalDateTime plannedEndAt,
                             String externalId, String externalCode, String remark, int revision,
                             LocalDateTime createTime, LocalDateTime updateTime) {
@@ -67,8 +68,9 @@ public class WorkOrderController {
     @GetMapping("/workorder")
     @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED, permission = "workorder:list")
     public PageView list(@RequestParam(required = false) String code, @RequestParam(required = false) String status,
-                         @RequestParam(defaultValue = "0") int offset, @RequestParam(defaultValue = "20") int limit) {
-        var p = service.list(code, status, offset, limit);
+                         @RequestParam(defaultValue = "0") int offset, @RequestParam(defaultValue = "20") int limit,
+                         @RequestParam(required = false) String source) {
+        var p = service.list(code, status, offset, limit, source);
         return new PageView(p.items().stream()
                 .map(s -> new SummaryView(order(s.workorder()), s.batchCount(), s.productCode(), s.productName(), s.routingCode(), s.routingVersion(), allocation(s.allocation()), s.erpExtraMissing()))
                 .toList(), p.total(), p.offset(), p.limit());
@@ -136,7 +138,7 @@ public class WorkOrderController {
     }
 
     private static OrderView order(WorkorderEntity w) {
-        return new OrderView(id(w.getId()), w.getCode(), id(w.getProductId()), w.getPlannedQty(), id(w.getRoutingId()), w.getStatus(),
+        return new OrderView(id(w.getId()), w.getSource(), w.getCode(), id(w.getProductId()), w.getPlannedQty(), id(w.getRoutingId()), w.getStatus(),
                 w.getPlannedStartAt(), w.getPlannedEndAt(), w.getExternalId(), w.getExternalCode(), w.getRemark(), w.getRevision(), w.getCreateTime(), w.getUpdateTime());
     }
 

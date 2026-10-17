@@ -3,7 +3,6 @@ package dev.issuefixture;
 import java.math.BigDecimal;
 import dev.mesbase.business.production.controller.ProductionReceiptController;
 import dev.mesbase.business.production.service.ProductionReceiptService;
-import dev.mesbase.business.production.dao.MesProductionReceiptMapper;
 import dev.mesbase.business.production.dao.ProductionReceiptQueryMapper;
 import org.apache.ibatis.session.SqlSessionFactory;
 import org.mybatis.spring.SqlSessionTemplate;
@@ -14,8 +13,6 @@ import org.springframework.core.env.MapPropertySource;
 import org.springframework.mock.web.MockServletContext;
 import org.springframework.web.context.support.AnnotationConfigWebApplicationContext;
 import org.springframework.jdbc.core.JdbcTemplate;
-import java.nio.file.Path;
-import java.nio.file.Files;
 import java.util.Map;
 import java.util.List;
 import java.util.ArrayList;
@@ -43,29 +40,20 @@ class ProductionReceiptHttpTest {
     @Import({ProductionReportHttpTest.Extra.class, ProductionReceiptService.class, ProductionReceiptController.class})
     static class Extra {
         @Bean
-        MesProductionReceiptMapper receiptMapper(SqlSessionFactory f) {
-            return new SqlSessionTemplate(f).getMapper(MesProductionReceiptMapper.class);
-        }
-
-        @Bean
         ProductionReceiptQueryMapper receiptQueries(SqlSessionFactory f) {
             return new SqlSessionTemplate(f).getMapper(ProductionReceiptQueryMapper.class);
         }
     }
 
-    static AnnotationConfigWebApplicationContext context() throws Exception {
+    static AnnotationConfigWebApplicationContext context(Class<?>... additional) throws Exception {
         var c = new AnnotationConfigWebApplicationContext();
         c.setServletContext(new MockServletContext());
         c.getEnvironment().getPropertySources()
-                .addFirst(new MapPropertySource("TEST ONLY", Map.of("mes.business.enabled", "true")));
+                .addFirst(new MapPropertySource("TEST ONLY", Map.of("mes.business.enabled", "true", "mes.integration.warehouse.factories.A.mode", "LOCAL_ONLY", "mes.integration.warehouse.factories.B.mode", "LOCAL_ONLY")));
         c.register(MaterialIssueHttpTest.Web.class, Extra.class, ProductionDefectHttpTest.Extra.class);
+        if (additional.length > 0) c.register(additional);
         c.refresh();
-        String ddl = Files.readString(Path.of("mes-admin/src/main/resources/db/business/V28__production_receipt.sql"))
-                .split("CREATE TRIGGER")[0]
-                .replace(" CHARACTER SET ascii COLLATE ascii_bin", "")
-                .replace(") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT=", ") COMMENT ");
         for (var j : c.getBean(MaterialIssueHttpTest.Fixture.class).business.values()) {
-            for (String sql : ddl.split(";")) if (!sql.isBlank()) j.execute(sql);
             ProductionReportHttpTest.seed(j);
             ProductionInputTestData.confirmed(j, 1, new BigDecimal("100"));
             j.update("UPDATE mes_production_execution SET target_qty=100,status='RUNNING',start_time=CURRENT_TIMESTAMP WHERE id=1");

@@ -1,5 +1,6 @@
 package dev.issuefixture;
 
+import dev.mesbase.platform.execution.FactoryContext;
 import dev.mesbase.business.quality.service.ProductionDefectService;
 import dev.mesbase.business.quality.service.QualityTreatmentService;
 import dev.mesbase.business.quality.integration.LocalProductionDefectErpGateway;
@@ -102,7 +103,7 @@ class ProductionQualityLifecycleMySqlTest {
                     nodes.add(ProductionReportMySqlTest.insert(jdbc, "INSERT INTO routing_node(routing_id,node_code,operation_id,operation_code,operation_name,display_order,is_key) SELECT ?,?,id,code,name,0,false FROM operation WHERE id=?", routing, code, operation));
                 for (var edge : List.of(List.of(0, 1), List.of(1, 3), List.of(0, 2), List.of(2, 3)))
                     jdbc.update("INSERT INTO routing_edge(routing_id,from_node_id,to_node_id) VALUES(?,?,?)", routing, nodes.get(edge.get(0)), nodes.get(edge.get(1)));
-                long order = ProductionReportMySqlTest.insert(jdbc, "INSERT INTO workorder(code,product_id,planned_qty,routing_id,status,revision,create_time,update_time) VALUES(?,?,10,?,'RELEASED',0,NOW(),NOW())", tag, material, routing);
+                long order = ProductionReportMySqlTest.insert(jdbc, "INSERT INTO workorder(source,code,product_id,planned_qty,routing_id,status,revision,create_time,update_time) VALUES('LOCAL',?,?,10,?,'RELEASED',0,NOW(),NOW())", tag, material, routing);
                 jdbc.update("INSERT INTO workorder_erp_extra(id) VALUES(?)", order);
                 long execution = ProductionReportMySqlTest.insert(jdbc, "INSERT INTO mes_production_execution(execution_no,workorder_id,product_id,routing_id,target_qty,status,remark,create_by,create_time) VALUES(?,?,?,?,10,'READY',?,'TEST_ONLY_QREF',NOW())", tag, order, material, routing, tag);
                 jdbc.update("INSERT INTO mes_execution_path(id,routing_id,path_status,revision,selected_at) VALUES(?,?,'SELECTED',1,NOW())", execution, routing);
@@ -153,6 +154,7 @@ class ProductionQualityLifecycleMySqlTest {
                 assertEquals(oldReports, jdbc.queryForList("SELECT * FROM mes_production_report WHERE id<=? ORDER BY id", maxOldReport));
             } finally {
                 SecurityContextHolder.clearContext();
+                FactoryContext.clear();
                 context.close();
             }
         }
@@ -184,6 +186,7 @@ class ProductionQualityLifecycleMySqlTest {
                     return e.code().httpStatus();
                 } finally {
                     SecurityContextHolder.clearContext();
+                    FactoryContext.clear();
                 }
             });
             var remove = pool.submit(() -> {
@@ -194,6 +197,7 @@ class ProductionQualityLifecycleMySqlTest {
                     return 204;
                 } finally {
                     SecurityContextHolder.clearContext();
+                    FactoryContext.clear();
                 }
             });
             gate.countDown();

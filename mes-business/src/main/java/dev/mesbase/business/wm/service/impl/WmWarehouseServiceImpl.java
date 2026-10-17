@@ -1,5 +1,8 @@
 package dev.mesbase.business.wm.service.impl;
 
+import dev.mesbase.business.production.service.BusinessSourceRules;
+import dev.mesbase.business.shared.enums.BusinessSource;
+
 import com.github.pagehelper.Page;
 import com.github.pagehelper.PageHelper;
 import dev.mesbase.business.wm.dao.WmWarehouseMapper;
@@ -36,6 +39,10 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
+import dev.mesbase.business.wm.dao.WmWarehouseErpExtraMapper;
+import dev.mesbase.business.wm.domain.WmWarehouseErpExtraEntity;
+import dev.mesbase.business.wm.domain.WmWarehouseErpExtraExample;
+import dev.mesbase.platform.execution.FactoryIntegrationContext;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
@@ -47,6 +54,8 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 @ConditionalOnProperty(name = "mes.business.enabled", havingValue = "true")
 public class WmWarehouseServiceImpl implements IWmWarehouseService {
+    private final BusinessSourceRules sources;
+    private final WmWarehouseErpExtraMapper external;
     private final StockReferenceRules rules;
     private final WmWarehouseMapper mapper;
     private final WmWarehouseQueryPort query;
@@ -59,7 +68,10 @@ public class WmWarehouseServiceImpl implements IWmWarehouseService {
                                   ObjectProvider<WmWarehouseQueryPort> queries,
                                   SyncCoordinator coordinator,
                                   ObjectProvider<IWmWarehouseService> self,
-                                  Validator validator, BusinessCacheProcessor caches, StockReferenceRules rules) {
+                                  Validator validator, BusinessCacheProcessor caches, StockReferenceRules rules,
+                                  BusinessSourceRules sources, WmWarehouseErpExtraMapper external) {
+        this.external = external;
+        this.sources = sources;
         this.rules = rules;
         this.mapper = mapper;
         this.query = queries.getIfAvailable(UnconfiguredWmWarehouseQueryAdapter::new);
@@ -93,6 +105,7 @@ public class WmWarehouseServiceImpl implements IWmWarehouseService {
         if (query.remark() != null) {
             criteria.andRemarkLike("%" + query.remark() + "%");
         }
+        if (query.source() != null) criteria.andSourceEqualTo(BusinessSourceRules.required(query.source()).getValue());
         example.setOrderByClause("id");
         try (Page<WmWarehouseEntity> page = PageHelper.offsetPage(offset, limit)) {
             List<WmWarehouseEntity> rows = mapper.selectByExample(example);
@@ -113,7 +126,9 @@ public class WmWarehouseServiceImpl implements IWmWarehouseService {
     @BusinessCacheEvict(business = WmWarehouseResource.PREFIX,
             scope = BusinessCacheEvict.Scope.LIST)
     public WmWarehouseEntity insert(WmWarehouseCreateCommand input) {
+        sources.localCreation();
         WmWarehouseEntity row = new WmWarehouseEntity();
+        row.setSource(BusinessSource.LOCAL.getValue());
 
         row.setCode(input.code());
         row.setName(input.name());
@@ -133,6 +148,8 @@ public class WmWarehouseServiceImpl implements IWmWarehouseService {
             scope = BusinessCacheEvict.Scope.LIST_AND_DETAIL)
     public WmWarehouseEntity updateById(Long id, WmWarehouseUpdateCommand input) {
         WmWarehouseEntity row = requireRecord(id);
+        BusinessSourceRules.localEditable(row.getSource());
+        sources.current(row.getSource());
         row.setId(id);
         row.setCode(input.code());
         row.setName(input.name());
@@ -157,7 +174,11 @@ public class WmWarehouseServiceImpl implements IWmWarehouseService {
         }
         rules.deletingWarehouses(ids);
         WmWarehouseExample example = new WmWarehouseExample();
-        for (var id : ids) requireRecord(id);
+        for (var id : ids) {
+            var row = requireRecord(id);
+            BusinessSourceRules.localEditable(row.getSource());
+            sources.current(row.getSource());
+        }
         example.createCriteria().andIdIn(ids)
 
         ;
@@ -178,6 +199,7 @@ public class WmWarehouseServiceImpl implements IWmWarehouseService {
         if (!FactoryContext.required().equals(scope)) {
             throw new FoundationException(ErrorCode.CONFLICT);
         }
+        sources.current(BusinessSource.EXTERNAL.getValue());
         var inputs = query.query(scope, 1000);
         var run = coordinator.claim(scope, "codegen.wm_warehouse", Duration.ofMinutes(5));
         try {
@@ -202,6 +224,7 @@ public class WmWarehouseServiceImpl implements IWmWarehouseService {
         if (!FactoryContext.required().equals(scope)) {
             throw new FoundationException(ErrorCode.CONFLICT);
         }
+        sources.current(BusinessSource.EXTERNAL.getValue());
         // EXTRA_CODE_REASON: sync writes stop at processing/commit boundaries after run-token loss.
         if (run == null || !scope.equals(run.scope()) || !"codegen.wm_warehouse".equals(run.syncKey()))
             throw new FoundationException(ErrorCode.SYNC_EXECUTION_LOST);
@@ -216,8 +239,10 @@ public class WmWarehouseServiceImpl implements IWmWarehouseService {
             throw new FoundationException(ErrorCode.BAD_REQUEST);
         }
         var keys = new HashSet<String>();
+        var externalKeys = new HashSet<String>();
         for (var input : inputs) {
-            if (input == null || !validator.validate(input).isEmpty() || !keys.add(input.code())) {
+            if (input == null || !validator.validate(input)
+                    .isEmpty() || !keys.add(input.code()) || !externalKeys.add(input.externalId())) {
                 throw new FoundationException(ErrorCode.BAD_REQUEST);
             }
         }
@@ -232,12 +257,36 @@ public class WmWarehouseServiceImpl implements IWmWarehouseService {
                 throw new FoundationException(ErrorCode.RESOURCE_CONFLICT);
             }
         }
+        var mappingFilter = new WmWarehouseErpExtraExample();
+        var currentSnapshot = FactoryIntegrationContext.required();
+        mappingFilter.createCriteria().andExternalIdIn(List.copyOf(externalKeys))
+                .andProviderEqualTo(currentSnapshot.erpType()).andBindingKeyEqualTo(currentSnapshot.configurationRef());
+        var knownMappings = external.selectByExample(mappingFilter);
+        var knownById = new HashMap<Long, WmWarehouseErpExtraEntity>();
+        for (var mapping : knownMappings) {
+            if (knownById.put(mapping.getId(), mapping) != null)
+                throw new FoundationException(ErrorCode.BUSINESS_SOURCE_CONFLICT);
+        }
+        for (var input : inputs)
+            for (var known : knownMappings) {
+                if (Objects.equals(input.externalId(), known.getExternalId()) && (existing.get(input.code()) == null
+                        || !Objects.equals(existing.get(input.code()).getId(), known.getId())))
+                    throw new FoundationException(ErrorCode.BUSINESS_SOURCE_CONFLICT);
+            }
         int created = 0;
         int updated = 0;
         int skipped = 0;
         for (var input : inputs) {
             coordinator.assertOwner(run);
             var row = existing.get(input.code());
+            if (row != null && BusinessSourceRules.required(row.getSource()) != BusinessSource.EXTERNAL)
+                throw new FoundationException(ErrorCode.BUSINESS_SOURCE_CONFLICT);
+            var snapshot = FactoryIntegrationContext.required();
+            var mapping = row == null ? null : knownById.get(row.getId());
+            if (row != null && (mapping == null || !Objects.equals(mapping.getExternalId(), input.externalId())))
+                throw new FoundationException(ErrorCode.BUSINESS_SOURCE_CONFLICT);
+            if (mapping != null)
+                BusinessSourceRules.binding(mapping.getProvider(), mapping.getBindingKey(), mapping.getConfigurationRevision());
             if (row != null && same(row, input)) {
                 rules.validate(row);
                 skipped++;
@@ -248,6 +297,7 @@ public class WmWarehouseServiceImpl implements IWmWarehouseService {
                 row = new WmWarehouseEntity();
 
             }
+            row.setSource(BusinessSource.EXTERNAL.getValue());
             row.setCode(input.code());
             row.setName(input.name());
             row.setStatus(input.status());
@@ -256,6 +306,15 @@ public class WmWarehouseServiceImpl implements IWmWarehouseService {
             audit(row, insert);
             int affected = write(row, insert);
             if (affected != 1) throw new FoundationException(ErrorCode.RESOURCE_CONFLICT);
+            if (insert) {
+                mapping = new WmWarehouseErpExtraEntity();
+                mapping.setId(row.getId());
+                mapping.setExternalId(input.externalId());
+                mapping.setProvider(snapshot.erpType());
+                mapping.setBindingKey(snapshot.configurationRef());
+                mapping.setConfigurationRevision(snapshot.configurationRevision());
+                if (external.insert(mapping) != 1) throw new FoundationException(ErrorCode.RESOURCE_CONFLICT);
+            }
             if (insert) created++;
             else updated++;
         }

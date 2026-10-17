@@ -1,24 +1,21 @@
 package dev.mesbase.business.issue.service;
 
 import dev.mesbase.business.integration.warehouse.ErpActionResult.Mode;
-import dev.mesbase.business.shared.enums.EnableStatus;
+import dev.mesbase.business.wm.service.LocalStockService;
 import dev.mesbase.business.issue.dao.MesMaterialIssueInputMapper;
 import dev.mesbase.business.issue.domain.MesMaterialIssueInputExample;
 import dev.mesbase.business.issue.domain.MesMaterialIssueInputEntity;
 import dev.mesbase.business.issue.domain.MesMaterialIssueEntity;
 import dev.mesbase.business.integration.production.ProductionSupply.Calculation;
 import dev.mesbase.business.integration.warehouse.MaterialIssueSubmitCommand.Input;
-import dev.mesbase.business.wm.dao.WmInventoryMapper;
-import dev.mesbase.business.wm.domain.WmInventoryExample;
-import dev.mesbase.business.wm.domain.WmInventoryEntity;
 import dev.mesbase.core.error.ErrorCode;
 import dev.mesbase.core.error.FoundationException;
 import java.time.LocalDateTime;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.annotation.Propagation;
 import java.util.Objects;
 import tools.jackson.databind.ObjectMapper;
 import org.springframework.stereotype.Service;
-import dev.mesbase.infrastructure.cache.annotation.BusinessCacheEvict;
-import dev.mesbase.business.wm.domain.WmInventoryResource;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 
 /**
@@ -28,12 +25,18 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 @ConditionalOnProperty(name = "mes.business.enabled", havingValue = "true")
 public class MaterialIssueInputFacts {
     private final MesMaterialIssueInputMapper inputs;
-    private final WmInventoryMapper inventory;
+    private final LocalStockService inventory;
     private final ObjectMapper json = new ObjectMapper();
 
-    public MaterialIssueInputFacts(MesMaterialIssueInputMapper inputs, WmInventoryMapper inventory) {
+    public MaterialIssueInputFacts(MesMaterialIssueInputMapper inputs, LocalStockService inventory) {
         this.inputs = inputs;
         this.inventory = inventory;
+    }
+
+    @Transactional(transactionManager = "businessTransactionManager", propagation = Propagation.MANDATORY)
+    public void freeze(MesMaterialIssueInputEntity fact, Calculation calculation) {
+        if (Mode.LOCAL_ONLY.getValue().equals(fact.getSourceMode())) inventory.validateInputSource(fact, calculation);
+        if (inputs.insert(fact) != 1) fail();
     }
 
     public MesMaterialIssueInputEntity find(Long issueId) {
@@ -49,7 +52,6 @@ public class MaterialIssueInputFacts {
         return f == null ? null : new Input(f.getId(), f.getInputKind(), f.getOutputQty(), json.readValue(f.getCalculationJson(), Calculation.class));
     }
 
-    @BusinessCacheEvict(business = WmInventoryResource.PREFIX, scope = BusinessCacheEvict.Scope.LIST_AND_DETAIL)
     public void confirm(MesMaterialIssueEntity issue, String mode) {
         var fact = find(issue.getId());
         if (fact == null) return; // Historical/administrative issue has no fabricated output contribution.
@@ -58,47 +60,18 @@ public class MaterialIssueInputFacts {
         if (fact.getConfirmedAt() != null) return;
         if (Mode.LOCAL_ONLY.getValue().equals(mode)) {
             var calculation = json.readValue(fact.getCalculationJson(), Calculation.class);
-            var sf = new WmInventoryExample();
-            sf.createCriteria().andIdEqualTo(fact.getStockId());
-            var lock = new WmInventoryEntity();
-            lock.setId(fact.getStockId());
-            if (inventory.updateByExampleSelective(lock, sf) != 1) fail();
-            var stock = inventory.selectByPrimaryKey(fact.getStockId());
-            var source = calculation.stock();
-            var qty = calculation.issueQty();
-            if (!EnableStatus.ENABLED.getValue()
-                    .equals(stock.getStatus()) || !Objects.equals(stock.getMaterialId(), source.materialId())
-                    || !Objects.equals(stock.getWarehouseId(), source.warehouseId()) || !Objects.equals(stock.getBatchNo(), source.lotCode())
-                    || !Objects.equals(stock.getBinCode(), source.binCode()) || stock.getQuantity().compareTo(qty) < 0
-                    || stock.getAvailableQuantity() != null && stock.getAvailableQuantity().compareTo(qty) < 0) fail();
-            stock.setQuantity(stock.getQuantity().subtract(qty));
-            if (stock.getAvailableQuantity() != null)
-                stock.setAvailableQuantity(stock.getAvailableQuantity().subtract(qty));
-            if (inventory.updateByPrimaryKey(stock) != 1) fail();
+            inventory.issue(fact, calculation);
             fact.setStockApplied(true);
         }
         fact.setConfirmedAt(LocalDateTime.now());
         if (inputs.updateByPrimaryKeyWithBLOBs(fact) != 1) fail();
     }
 
-    @BusinessCacheEvict(business = WmInventoryResource.PREFIX, scope = BusinessCacheEvict.Scope.LIST_AND_DETAIL)
     public void voidConfirmed(MesMaterialIssueEntity issue) {
         var fact = find(issue.getId());
         if (fact == null || !Boolean.TRUE.equals(fact.getStockApplied())) return;
-        var sf = new WmInventoryExample();
-        sf.createCriteria().andIdEqualTo(fact.getStockId());
-        var patch = new WmInventoryEntity();
-        patch.setId(fact.getStockId());
-        if (inventory.updateByExampleSelective(patch, sf) != 1) fail();
-        var stock = inventory.selectByPrimaryKey(fact.getStockId());
-        var c = json.readValue(fact.getCalculationJson(), Calculation.class);
-        if (!Objects.equals(stock.getMaterialId(), c.stock()
-                .materialId()) || !Objects.equals(stock.getWarehouseId(), c.stock()
-                .warehouseId()) || !Objects.equals(stock.getBatchNo(), c.stock().lotCode())) fail();
-        stock.setQuantity(stock.getQuantity().add(c.issueQty()));
-        if (stock.getAvailableQuantity() != null)
-            stock.setAvailableQuantity(stock.getAvailableQuantity().add(c.issueQty()));
-        if (inventory.updateByPrimaryKey(stock) != 1) fail();
+        if (!Mode.LOCAL_ONLY.getValue().equals(fact.getSourceMode()) || fact.getConfirmedAt() == null) fail();
+        inventory.reverse(fact, json.readValue(fact.getCalculationJson(), Calculation.class), issue.getVoidOperationId());
         fact.setStockApplied(false);
         if (inputs.updateByPrimaryKeyWithBLOBs(fact) != 1) fail();
     }

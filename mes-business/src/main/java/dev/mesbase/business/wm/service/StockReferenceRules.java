@@ -1,6 +1,12 @@
 package dev.mesbase.business.wm.service;
 
 import dev.mesbase.business.shared.enums.EnableStatus;
+import dev.mesbase.business.production.dao.MesWorkorderMaterialMapper;
+import dev.mesbase.business.production.domain.MesWorkorderMaterialExample;
+import dev.mesbase.business.wm.dao.WmStockActionMapper;
+import dev.mesbase.business.wm.domain.WmStockActionExample;
+import dev.mesbase.business.issue.dao.MesMaterialIssueInputMapper;
+import dev.mesbase.business.issue.domain.MesMaterialIssueInputExample;
 import dev.mesbase.business.basic.dao.MaterialMapper;
 import dev.mesbase.business.basic.domain.MaterialEntity;
 import dev.mesbase.business.basic.domain.MaterialExample;
@@ -25,14 +31,43 @@ import org.springframework.stereotype.Component;
 @Component
 @ConditionalOnProperty(name = "mes.business.enabled", havingValue = "true")
 public class StockReferenceRules {
+    private final MesWorkorderMaterialMapper demand;
     private final MaterialMapper materials;
     private final WmWarehouseMapper warehouses;
     private final WmInventoryMapper inventories;
+    private final WmStockActionMapper actions;
+    private final MesMaterialIssueInputMapper inputs;
 
-    public StockReferenceRules(MaterialMapper materials, WmWarehouseMapper warehouses, WmInventoryMapper inventories) {
+    public StockReferenceRules(MaterialMapper materials, WmWarehouseMapper warehouses, WmInventoryMapper inventories,
+                               WmStockActionMapper actions, MesMaterialIssueInputMapper inputs,
+                               MesWorkorderMaterialMapper demand) {
+        this.demand = demand;
+        this.actions = actions;
+        this.inputs = inputs;
         this.materials = materials;
         this.warehouses = warehouses;
         this.inventories = inventories;
+    }
+
+    /**
+     * Caller holds a named business write transaction.
+     */
+    public WmInventoryEntity lockInventory(Long id) {
+        var filter = new WmInventoryExample();
+        filter.createCriteria().andIdEqualTo(id);
+        var patch = new WmInventoryEntity();
+        patch.setId(id);
+        if (id == null || inventories.updateByExampleSelective(patch, filter) != 1)
+            throw new FoundationException(ErrorCode.NOT_FOUND);
+        return inventories.selectByPrimaryKey(id);
+    }
+
+    public boolean inventoryReferenced(Long id) {
+        var action = new WmStockActionExample();
+        action.createCriteria().andStockIdEqualTo(id);
+        var input = new MesMaterialIssueInputExample();
+        input.createCriteria().andStockIdEqualTo(id);
+        return actions.countByExample(action) > 0 || inputs.countByExample(input) > 0;
     }
 
     private void status(String status) {
@@ -54,6 +89,11 @@ public class StockReferenceRules {
         validateInventoryFields(row);
         lockMaterials(List.of(row.getMaterialId()));
         lockWarehouses(List.of(row.getWarehouseId()));
+    }
+
+    public void lockDemandReferences(Long material, List<Long> warehouseIds) {
+        lockMaterials(List.of(material));
+        lockWarehouses(warehouseIds);
     }
 
     public void validateBatch(List<ExternalWmInventory> rows) {
@@ -110,14 +150,26 @@ public class StockReferenceRules {
                 .andIdIn(rows.stream().map(WmInventoryEntity::getWarehouseId).distinct().toList());
         var materialNames = materials.selectByExample(materialFilter).stream()
                 .collect(Collectors.toMap(MaterialEntity::getId, row -> row.getCode() + " · " + row.getName()));
-        var warehouseNames = warehouses.selectByExample(warehouseFilter).stream()
-                .collect(Collectors.toMap(WmWarehouseEntity::getId, row -> row.getCode() + " · " + row.getName()));
+        var warehouseIndex = warehouses.selectByExample(warehouseFilter).stream()
+                .collect(Collectors.toMap(WmWarehouseEntity::getId, row -> row));
         return rows.stream().map(row -> new WmInventoryItem(row,
-                materialNames.get(row.getMaterialId()), warehouseNames.get(row.getWarehouseId()))).toList();
+                materialNames.get(row.getMaterialId()), warehouseIndex.containsKey(row.getWarehouseId()) ? warehouseIndex.get(row.getWarehouseId())
+                .getCode() + " · " + warehouseIndex.get(row.getWarehouseId()).getName() : null,
+                warehouseIndex.containsKey(row.getWarehouseId()) ? warehouseIndex.get(row.getWarehouseId())
+                        .getSource() : null)).toList();
     }
 
     public void deletingWarehouses(List<Long> ids) {
         lockWarehouses(ids);
+        var demandFilter = new MesWorkorderMaterialExample();
+        for (var id : ids) {
+            String v = id.toString();
+            demandFilter.or().andWarehouseIdsEqualTo("[" + v + "]");
+            demandFilter.or().andWarehouseIdsLike("[" + v + ",%");
+            demandFilter.or().andWarehouseIdsLike("%," + v + ",%");
+            demandFilter.or().andWarehouseIdsLike("%," + v + "]");
+        }
+        if (demand.countByExample(demandFilter) > 0) throw new FoundationException(ErrorCode.WAREHOUSE_REFERENCED);
         var filter = new WmInventoryExample();
         filter.createCriteria().andWarehouseIdIn(ids);
         if (inventories.countByExample(filter) > 0)
@@ -126,6 +178,10 @@ public class StockReferenceRules {
 
     public void deletingMaterials(List<Long> ids) {
         lockMaterials(ids);
+        var demandFilter = new MesWorkorderMaterialExample();
+        demandFilter.createCriteria().andMaterialIdIn(ids);
+        if (demand.countByExample(demandFilter) > 0)
+            throw new FoundationException(ErrorCode.MATERIAL_INVENTORY_REFERENCED);
         var filter = new WmInventoryExample();
         filter.createCriteria().andMaterialIdIn(ids);
         if (inventories.countByExample(filter) > 0)

@@ -5,6 +5,9 @@ import dev.mesbase.business.production.domain.MesProductionExecutionEntity;
 import dev.mesbase.business.production.domain.MesProductionExecutionQueryDto;
 import dev.mesbase.business.directory.domain.DirectoryLabel;
 import java.util.List;
+import dev.mesbase.business.production.dao.WorkorderMapper;
+import dev.mesbase.business.production.domain.WorkorderExample;
+import java.util.stream.Collectors;
 import java.util.Map;
 import java.util.stream.Stream;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -18,7 +21,7 @@ import org.springframework.transaction.annotation.Transactional;
 @ConditionalOnProperty(name = "mes.business.enabled", havingValue = "true")
 public class ProductionExecutionQueryService {
     public record Display(MesProductionExecutionEntity record, DirectoryLabel routing, String createByName,
-                          String updateByName) {
+                          String updateByName, String workorderStatus) {
     }
 
     public record Page(List<Display> items, long total, int offset, int limit) {
@@ -26,9 +29,11 @@ public class ProductionExecutionQueryService {
 
     private final IMesProductionExecutionService executions;
     private final BusinessDirectoryService references;
+    private final WorkorderMapper orders;
 
     public ProductionExecutionQueryService(IMesProductionExecutionService executions,
-                                           BusinessDirectoryService references) {
+                                           BusinessDirectoryService references, WorkorderMapper orders) {
+        this.orders = orders;
         this.executions = executions;
         this.references = references;
     }
@@ -45,11 +50,17 @@ public class ProductionExecutionQueryService {
     }
 
     private List<Display> describe(List<MesProductionExecutionEntity> rows) {
+        var filter = new WorkorderExample();
+        var ids = rows.stream().map(MesProductionExecutionEntity::getWorkorderId).distinct().toList();
+        if (ids.isEmpty()) return List.of();
+        filter.createCriteria().andIdIn(ids);
+        var statuses = orders.selectByExample(filter).stream()
+                .collect(Collectors.toMap(row -> row.getId(), row -> row.getStatus()));
         var routings = references.routingLabels(rows.stream().map(MesProductionExecutionEntity::getRoutingId).toList());
         var users = references.userLabels(rows.stream().flatMap(row -> Stream.of(row.getCreateBy(), row.getUpdateBy()))
                 .map(ProductionExecutionQueryService::userId).filter(id -> id != null).toList());
         return rows.stream()
-                .map(row -> new Display(row, routings.get(row.getRoutingId()), name(users, row.getCreateBy()), name(users, row.getUpdateBy())))
+                .map(row -> new Display(row, routings.get(row.getRoutingId()), name(users, row.getCreateBy()), name(users, row.getUpdateBy()), statuses.get(row.getWorkorderId())))
                 .toList();
     }
 

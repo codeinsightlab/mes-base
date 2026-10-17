@@ -12,6 +12,7 @@ public record WmInventoryVo(
         String warehouseId,
         String materialName,
         String warehouseName,
+        String warehouseSource,
         String quantity,
         String availableQuantity,
         String status,

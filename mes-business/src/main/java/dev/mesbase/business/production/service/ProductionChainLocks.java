@@ -12,6 +12,7 @@ import dev.mesbase.business.issue.domain.MesMaterialIssueExample;
 import dev.mesbase.core.error.ErrorCode;
 import dev.mesbase.core.error.FoundationException;
 import java.util.List;
+import dev.mesbase.business.production.domain.WorkOrderStatus;
 import java.util.ArrayList;
 import java.util.Objects;
 import org.springframework.stereotype.Component;
@@ -32,6 +33,16 @@ public class ProductionChainLocks {
         this.orders = orders;
         this.executions = executions;
         this.issues = issues;
+    }
+
+    public static void requireActive(WorkorderEntity row) {
+        if (row != null && WorkOrderStatus.CANCELLED.getValue().equals(row.getStatus()))
+            throw new FoundationException(ErrorCode.WORKORDER_CANCELLED);
+    }
+
+    public void requireActiveExecution(Long id) {
+        var row = execution(id);
+        requireActive(orders.selectByPrimaryKey(row.getWorkorderId()));
     }
 
     public WorkorderEntity order(Long id) {

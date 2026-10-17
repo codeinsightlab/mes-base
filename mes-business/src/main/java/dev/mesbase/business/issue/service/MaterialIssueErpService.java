@@ -83,7 +83,7 @@ public class MaterialIssueErpService {
     private ErpIssueQueryResult query(FactoryScope scope, Snapshot snapshot) {
         var e = snapshot.extra();
         var row = snapshot.issue();
-        var command = new QueryMaterialIssueCommand(row.getId(), row.getVoidOperationId() != null ? row.getVoidOperationId() : submissions.operationKey(row), e.getExternalBindingKey(), e.getExternalReference(), e.getExternalCode());
+        var command = new QueryMaterialIssueCommand(row.getId(), row.getVoidOperationId() != null ? row.getVoidOperationId() : submissions.operationKey(row), e.getExternalBindingKey(), e.getExternalReference(), e.getExternalCode(), submissions.source(row));
         ErpIssueQueryResult result;
         try {
             result = warehouse.query(scope, e.getSourceExecutionMode(), e.getProvider(), command);

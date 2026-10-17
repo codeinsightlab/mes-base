@@ -1,5 +1,8 @@
 package dev.mesbase.business.production.service;
 
+import dev.mesbase.business.production.service.BusinessSourceRules;
+import dev.mesbase.business.shared.enums.BusinessSource;
+
 import dev.mesbase.business.production.domain.WorkOrderStatus;
 import dev.mesbase.business.directory.service.BusinessDirectoryService;
 import dev.mesbase.business.production.domain.RoutingStatus;
@@ -15,6 +18,7 @@ import dev.mesbase.business.production.dao.RoutingMapper;
 import dev.mesbase.business.production.dao.RoutingNodeMapper;
 import dev.mesbase.business.production.dao.RoutingProductMapper;
 import dev.mesbase.business.production.dao.WorkorderMapper;
+import dev.mesbase.business.production.dao.MesWorkorderMaterialMapper;
 import dev.mesbase.business.production.dao.MesProductionExecutionMapper;
 import dev.mesbase.business.production.domain.MesProductionExecutionExample;
 import dev.mesbase.business.production.dao.WorkOrderExtraMapper;
@@ -34,6 +38,14 @@ import dev.mesbase.core.error.ErrorCode;
 import dev.mesbase.core.error.FoundationException;
 import java.time.LocalDateTime;
 import java.util.List;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
+import dev.mesbase.business.production.dao.WorkorderErpExtraMapper;
+import dev.mesbase.business.production.domain.WorkorderErpExtraEntity;
+import dev.mesbase.business.production.domain.WorkorderErpExtraExample;
+import dev.mesbase.platform.execution.FactoryContext;
+import dev.mesbase.platform.execution.FactoryIntegrationContext;
+import dev.mesbase.framework.sync.SyncCoordinator;
 import java.util.Objects;
 import java.util.stream.Collectors;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -49,6 +61,10 @@ import org.springframework.transaction.annotation.Transactional;
 @ConditionalOnProperty(name = "mes.business.enabled", havingValue = "true")
 @Transactional(transactionManager = "businessTransactionManager", isolation = Isolation.READ_COMMITTED, rollbackFor = Exception.class)
 public class WorkOrderService {
+    private final BusinessSourceRules sources;
+    private final WorkorderErpExtraMapper external;
+    private final SyncCoordinator sync;
+    private final MesWorkorderMaterialMapper requirements;
     private final WorkorderMapper orders;
     private final WorkorderErpFacts facts;
     private final BusinessDirectoryService directory;
@@ -68,7 +84,12 @@ public class WorkOrderService {
                             RoutingEdgeMapper edges, MaterialMapper materials, RoutingReferenceRules references,
                             MesMaterialIssueMapper issues, WorkOrderExtraMapper queries,
                             MesProductionExecutionMapper executions, WorkorderErpFacts facts,
-                            BusinessDirectoryService directory) {
+                            BusinessDirectoryService directory, MesWorkorderMaterialMapper requirements,
+                            BusinessSourceRules sources, WorkorderErpExtraMapper external, SyncCoordinator sync) {
+        this.external = external;
+        this.sync = sync;
+        this.sources = sources;
+        this.requirements = requirements;
         this.orders = orders;
         this.facts = facts;
         this.directory = directory;
@@ -93,12 +114,14 @@ public class WorkOrderService {
     }
 
     @Transactional(transactionManager = "businessTransactionManager", readOnly = true)
-    public WorkOrderModels.Page list(String code, String status, int offset, int limit) {
+    public WorkOrderModels.Page list(String code, String status, int offset, int limit, String source) {
         require(offset >= 0 && limit >= 1 && limit <= 100);
         var filter = new WorkorderExample();
         var c = filter.createCriteria();
         if (code != null && !code.isBlank()) c.andCodeLike("%" + code + "%");
         if (status != null && !status.isBlank()) c.andStatusEqualTo(status);
+        else c.andStatusNotEqualTo(WorkOrderStatus.CANCELLED.getValue());
+        if (source != null) c.andSourceEqualTo(BusinessSourceRules.required(source).getValue());
         filter.setOrderByClause("id desc");
         List<WorkorderEntity> rows;
         long total;
@@ -147,9 +170,13 @@ public class WorkOrderService {
 
     @Transactional(transactionManager = "businessTransactionManager", isolation = Isolation.READ_COMMITTED, rollbackFor = Exception.class)
     public WorkOrderModels.Detail create(WorkOrderModels.Save input) {
+        sources.localCreation();
+        if (input.externalId() != null || input.externalCode() != null)
+            throw new FoundationException(ErrorCode.EXTERNAL_SOURCE_READ_ONLY);
         validate(input);
         uniqueCode(input.code(), null);
         var row = new WorkorderEntity();
+        row.setSource(BusinessSource.LOCAL.getValue());
         row.setStatus(WorkOrderStatus.DRAFT.getValue());
         row.setRevision(0);
         row.setCreateTime(LocalDateTime.now());
@@ -158,8 +185,85 @@ public class WorkOrderService {
         return detail(row.getId());
     }
 
+    /**
+     * Trusted in-process ERP synchronization. No HTTP endpoint accepts this command.
+     */
+    public record ExternalPlan(WorkOrderModels.Save values, String externalId, String externalCode,
+                               WorkOrderStatus status) {
+    }
+
+    public WorkOrderModels.Detail syncExternal(ExternalPlan plan, SyncCoordinator.Run run) {
+        if (plan == null || plan.values() == null || (plan.status() != WorkOrderStatus.DRAFT && plan.status() != WorkOrderStatus.RELEASED))
+            conflict();
+        var input = plan.values();
+        var externalId = plan.externalId();
+        var externalCode = plan.externalCode();
+        sources.current(BusinessSource.EXTERNAL.getValue());
+        var snapshot = FactoryIntegrationContext.required();
+        if (run == null || !FactoryContext.required().equals(run.scope()) || !"workorder.erp".equals(run.syncKey())
+                || externalId == null || externalId.isBlank() || externalId.length() > 128
+                || input.externalId() != null || input.externalCode() != null) conflict();
+        sync.assertOwner(run);
+        validate(input);
+        var f = new WorkorderExample();
+        f.createCriteria().andCodeEqualTo(input.code());
+        var found = orders.selectByExample(f);
+        if (found.size() > 1) conflict();
+        var identity = new WorkorderErpExtraExample();
+        identity.createCriteria().andExternalIdEqualTo(externalId).andProviderEqualTo(snapshot.erpType())
+                .andBindingKeyEqualTo(snapshot.configurationRef());
+        if (external.selectByExample(identity).stream()
+                .anyMatch(x -> found.isEmpty() || !Objects.equals(x.getId(), found.getFirst().getId()))) conflict();
+        boolean created = found.isEmpty();
+        var row = created ? new WorkorderEntity() : order(found.getFirst().getId(), true);
+        if (!created) {
+            if (BusinessSourceRules.required(row.getSource()) != BusinessSource.EXTERNAL) conflict();
+            var old = external.selectByPrimaryKey(row.getId());
+            if (old == null || !Objects.equals(old.getExternalId(), externalId)) conflict();
+            BusinessSourceRules.binding(old.getProvider(), old.getBindingKey(), old.getConfigurationRevision());
+            if (hasExecutions(row.getId()) || hasLegacyBatches(row.getId()) || queries.countBlockingIssues(row.getId()) > 0)
+                throw new FoundationException(ErrorCode.EXECUTION_FROZEN);
+            if (!WorkOrderStatus.DRAFT.getValue().equals(row.getStatus())) conflict();
+        } else {
+            row.setSource(BusinessSource.EXTERNAL.getValue());
+            row.setStatus(WorkOrderStatus.DRAFT.getValue());
+            row.setRevision(0);
+            row.setCreateTime(LocalDateTime.now());
+        }
+        row.setStatus(plan.status().getValue());
+        row.setCode(input.code());
+        row.setProductId(input.productId());
+        row.setPlannedQty(input.plannedQty());
+        row.setRoutingId(input.routingId());
+        row.setPlannedStartAt(input.plannedStartAt());
+        row.setPlannedEndAt(input.plannedEndAt());
+        row.setRemark(input.remark());
+        row.setRevision(row.getRevision() + 1);
+        row.setUpdateTime(LocalDateTime.now());
+        if ((created ? orders.insert(row) : orders.updateByPrimaryKey(row)) != 1) conflict();
+        var mapping = created ? new WorkorderErpExtraEntity() : external.selectByPrimaryKey(row.getId());
+        mapping.setId(row.getId());
+        mapping.setExternalId(externalId);
+        mapping.setExternalCode(externalCode);
+        mapping.setProvider(snapshot.erpType());
+        mapping.setBindingKey(snapshot.configurationRef());
+        mapping.setConfigurationRevision(snapshot.configurationRevision());
+        if ((created ? external.insert(mapping) : external.updateByPrimaryKey(mapping)) != 1) conflict();
+        sync.assertOwner(run);
+        TransactionSynchronizationManager.registerSynchronization(
+                new TransactionSynchronization() {
+                    @Override
+                    public void beforeCommit(boolean readOnly) {
+                        sync.assertOwner(run);
+                    }
+                });
+        return detail(row.getId());
+    }
+
     public WorkOrderModels.Detail update(Long id, WorkOrderModels.Save input) {
         var row = order(id, true);
+        BusinessSourceRules.localEditable(row.getSource());
+        sources.current(row.getSource());
         require(WorkOrderStatus.DRAFT.getValue().equals(row.getStatus()));
         if (!Objects.equals(row.getRevision(), input.revision())) conflict();
         if (!Objects.equals(row.getProductId(), input.productId()) && hasExecutions(id))
@@ -205,6 +309,8 @@ public class WorkOrderService {
 
     public WorkOrderModels.Detail release(Long id, int revision) {
         var row = order(id, true);
+        BusinessSourceRules.localEditable(row.getSource());
+        sources.current(row.getSource());
         if (row.getRevision() != revision) conflict();
         require(WorkOrderStatus.DRAFT.getValue().equals(row.getStatus()));
         binding(row.getProductId(), row.getRoutingId());
@@ -217,6 +323,8 @@ public class WorkOrderService {
 
     public void delete(Long id, int revision) {
         var row = order(id, true);
+        BusinessSourceRules.localEditable(row.getSource());
+        sources.current(row.getSource());
         if (row.getRevision() != revision) conflict();
         require(WorkOrderStatus.DRAFT.getValue().equals(row.getStatus()));
         if (hasExecutions(id)) throw new FoundationException(ErrorCode.EXECUTION_REFERENCED);
@@ -224,6 +332,7 @@ public class WorkOrderService {
         issueFilter.createCriteria().andWorkorderIdEqualTo(id);
         require(issues.countByExample(issueFilter) == 0);
         if (hasLegacyBatches(id)) throw new FoundationException(ErrorCode.WORKORDER_LEGACY_REFERENCED);
+        requirements.deleteByPrimaryKey(id);
         facts.delete(id);
         if (orders.deleteByPrimaryKey(id) != 1) conflict();
     }
@@ -308,8 +417,8 @@ public class WorkOrderService {
         row.setPlannedQty(input.plannedQty());
         row.setPlannedStartAt(input.plannedStartAt());
         row.setPlannedEndAt(input.plannedEndAt());
-        row.setExternalId(input.externalId());
-        row.setExternalCode(input.externalCode());
+        if (!Objects.equals(row.getExternalId(), input.externalId()) || !Objects.equals(row.getExternalCode(), input.externalCode()))
+            throw new FoundationException(ErrorCode.EXTERNAL_SOURCE_READ_ONLY);
         row.setRemark(input.remark());
         row.setUpdateTime(LocalDateTime.now());
     }

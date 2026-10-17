@@ -1,5 +1,8 @@
 package dev.mesbase.business.production.service;
 
+import dev.mesbase.business.production.service.BusinessSourceRules;
+import dev.mesbase.business.shared.enums.BusinessSource;
+
 import dev.mesbase.business.production.domain.WorkOrderStatus;
 import dev.mesbase.business.quality.service.ExecutionQualityReferenceQuery;
 import dev.mesbase.business.production.domain.RoutingStatus;
@@ -42,6 +45,7 @@ import org.springframework.stereotype.Component;
 @Component
 @ConditionalOnProperty(name = "mes.business.enabled", havingValue = "true")
 public class ProductionExecutionRules {
+    private final BusinessSourceRules sources;
     private final ExecutionQualityReferenceQuery quality;
     private final ProductionChainLocks locks;
     private final MesProductionReportMapper reports;
@@ -62,7 +66,8 @@ public class ProductionExecutionRules {
                                     ProductionChainLocks locks, MesExecutionPathMapper paths,
                                     MesExecutionPathNodeMapper pathNodes, MesProductionReportMapper reports,
                                     ProductionQuantityMapper quantities, ExecutionQualityReferenceQuery quality,
-                                    MesExecutionAssignmentMapper assignments) {
+                                    MesExecutionAssignmentMapper assignments, BusinessSourceRules sources) {
+        this.sources = sources;
         this.assignments = assignments;
         this.quality = quality;
         this.reports = reports;
@@ -164,6 +169,7 @@ public class ProductionExecutionRules {
         patch.setId(row.getWorkorderId());
         valid(workorders.updateByExampleSelective(patch, filter) == 1);
         var order = workorders.selectByPrimaryKey(row.getWorkorderId());
+        sources.order(row.getWorkorderId());
         valid(order != null && (row.getProductId() == null || Objects.equals(row.getProductId(), order.getProductId())));
         var product = materials.selectByPrimaryKey(order.getProductId());
         valid(product != null);

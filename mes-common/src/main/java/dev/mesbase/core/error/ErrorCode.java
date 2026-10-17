@@ -1,7 +1,7 @@
 package dev.mesbase.core.error;
 
 public enum ErrorCode {
-    RECEIPT_QUALITY_UNVERIFIED(409, "质量数量口径及阻止流转状态尚未完成核验，当前未提供稳定质量放行接口，禁止新增生产交接"),
+    RECEIPT_QUALITY_UNVERIFIED(409, "缺少当前质量依据下的正式放行或质量核验未通过，禁止新增生产交接"),
     RECEIPT_PATH_REQUIRED(409, "交接需要已锁定的确切实际路径及末道有效产出"),
     RECEIPT_WAREHOUSE_INVALID(422, "目标仓库不存在或未启用"),
     RECEIPT_REFERENCE_INVALID(422, "交接冲销只能引用原始正向交接"),
@@ -22,6 +22,8 @@ public enum ErrorCode {
     ASSIGNMENT_NODE_INVALID(422, "节点不属于执行单元的确切工艺版本"),
     ASSIGNMENT_EXECUTION_CLOSED(409, "当前执行状态不允许维护派工"),
     FACTORY_MODE_CHANGE_REQUIRES_MIGRATION(409, "该工厂已锁定业务运行配置，切换模式或ERP绑定需要专门迁移流程"),
+    BUSINESS_SOURCE_CONFLICT(409, "业务来源缺失、不匹配或当前模式不允许"),
+    EXTERNAL_SOURCE_READ_ONLY(409, "外部权威数据只能由受控同步维护"),
     INTEGRATION_NOT_CONFIGURED(422, "当前工厂仓储模式或对应领域连接未配置"),
     ISSUE_EXTERNAL_UNVERIFIED(409, "单据外部出库来源未核实，不能自动本地作废"),
     ISSUE_VOID_CONFLICT(409, "领料单已作废或正在核实，不允许普通编辑或继续使用"),
@@ -58,6 +60,10 @@ public enum ErrorCode {
     SYNC_RUNNING(409, "同步正在进行"), SYNC_EXECUTION_LOST(409, "同步执行权已失效"),
     REPORT_REQUEST_ID_REQUIRED(400, "管理员报工命令必须携带稳定的requestId UUID，请升级客户端后重试"),
     REPORT_REQUEST_CONFLICT(409, "报工请求标识已被不同命令或操作者使用"),
+    PRODUCTION_CLOSURE_BLOCKED(409, "生产闭环条件尚未满足，请核对质量、交接和仓储接收差额"),
+    PRODUCTION_CLOSURE_CONFLICT(409, "闭环请求、版本或业务引用冲突，请使用原请求核实"),
+    WORKORDER_CANCELLED(409, "所属工单已作废，禁止新增正向生产业务；历史事实保留"),
+    WORKORDER_CANCELLATION_CONFLICT(409, "工单作废请求、版本或状态冲突，请核实原请求"),
     RESOURCE_CONFLICT(409, "Resource conflicts with current state"), BAD_REQUEST(400, "Invalid request"), UNAUTHENTICATED(401, "Authentication required"),
     FORBIDDEN(403, "Permission denied"), NOT_FOUND(404, "Resource not found"),
     CONFLICT(409, "Execution binding changed"), UNPROCESSABLE(422, "Request cannot be processed"),

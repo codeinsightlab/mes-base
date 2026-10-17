@@ -97,6 +97,7 @@ public class ExecutionPathService {
 
     public PathModel select(Long id, Integer revision, List<Long> nodeIds) {
         var e = locks.execution(id);
+        locks.requireActiveExecution(id);
         if (!ProductionExecutionStatus.READY.getValue().equals(e.getStatus()) || e.getStartTime() != null) fail();
         rules.checkReadyReferences(e);
         var old = paths.selectByPrimaryKey(id);
@@ -148,6 +149,7 @@ public class ExecutionPathService {
     @BusinessCacheEvict(business = MesProductionExecutionResource.PREFIX, scope = BusinessCacheEvict.Scope.LIST_AND_DETAIL)
     public MesProductionExecutionEntity start(Long id) {
         var e = locks.execution(id);
+        locks.requireActiveExecution(id);
         if (!Set.of(ProductionExecutionStatus.READY.getValue(), ProductionExecutionStatus.RUNNING.getValue())
                 .contains(e.getStatus())) fail();
         if (ProductionExecutionStatus.READY.getValue().equals(e.getStatus())) rules.checkReadyReferences(e);

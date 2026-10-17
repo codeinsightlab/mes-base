@@ -48,12 +48,14 @@ public class MaterialIssueVoidService {
     private final ProductionExecutionRules executions;
     private final WarehouseIntegration warehouse;
     private final MaterialIssueInputFacts inputFacts;
+    private final MaterialIssueSubmissionService submissions;
     private final ProductionQuantityService quantities;
     private final TransactionTemplate transaction;
 
     public MaterialIssueVoidService(MesMaterialIssueMapper issues, WorkorderMapper orders, MaterialIssueRules rules,
                                     ProductionExecutionRules executions, WarehouseIntegration warehouse,
                                     MaterialIssueInputFacts inputFacts, ProductionQuantityService quantities,
+                                    MaterialIssueSubmissionService submissions,
                                     @Qualifier("businessTransactionManager") PlatformTransactionManager manager) {
         this.issues = issues;
         this.orders = orders;
@@ -61,6 +63,7 @@ public class MaterialIssueVoidService {
         this.executions = executions;
         this.warehouse = warehouse;
         this.inputFacts = inputFacts;
+        this.submissions = submissions;
         this.quantities = quantities;
         transaction = new TransactionTemplate(manager);
         transaction.setIsolationLevel(TransactionDefinition.ISOLATION_READ_COMMITTED);
@@ -85,6 +88,7 @@ public class MaterialIssueVoidService {
         FactoryScope scope = FactoryContext.required();
         var prepared = transaction.execute(s -> {
             var row = lock(id);
+            row.setSourceContext(submissions.source(row));
             if (query) {
                 if (!Set.of(MaterialIssueStatus.VOID_PENDING.getValue(), MaterialIssueStatus.VOID_UNKNOWN.getValue())
                         .contains(row.getStatus()))

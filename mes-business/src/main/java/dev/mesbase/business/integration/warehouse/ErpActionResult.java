@@ -4,7 +4,14 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 
 public record ErpActionResult(Status status, Mode executionMode, String externalReference, String externalCode,
-                              String message) {
+                              String message, boolean stockEffective) {
+    /**
+     * Creation success alone is not evidence of an effective ERP stock issue.
+     */
+    public ErpActionResult(Status status, Mode mode, String reference, String code, String message) {
+        this(status, mode, reference, code, message, false);
+    }
+
     public ErpActionResult(Status status, Mode executionMode, String externalReference, String message) {
         this(status, executionMode, externalReference, null, message);
     }

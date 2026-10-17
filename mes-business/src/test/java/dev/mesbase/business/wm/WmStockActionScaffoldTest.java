@@ -1,27 +1,26 @@
-// MES-CODEGEN: scaffold; review required.
 package dev.mesbase.business.wm;
 
 import dev.mesbase.business.wm.controller.WmStockActionController;
 import dev.mesbase.business.wm.dao.WmStockActionMapper;
-import dev.mesbase.business.wm.domain.WmStockActionCreateCommand;
 import dev.mesbase.business.wm.domain.WmStockActionQueryDto;
 import dev.mesbase.business.wm.domain.WmStockActionResource;
-import dev.mesbase.business.wm.domain.WmStockActionUpdateCommand;
 import dev.mesbase.business.wm.service.impl.WmStockActionServiceImpl;
 import dev.mesbase.infrastructure.cache.BusinessCacheQuery;
 import dev.mesbase.infrastructure.cache.annotation.BusinessCache;
-import dev.mesbase.infrastructure.cache.annotation.BusinessCacheEvict;
 import dev.mesbase.infrastructure.persistence.MapperPackages;
 import dev.mesbase.infrastructure.persistence.PersistenceOwner;
 import dev.mesbase.platform.web.EndpointAccess;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.util.List;
+import java.util.Arrays;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.springframework.transaction.annotation.Transactional;
 
-/** TEST ONLY: scaffold contracts; add real business and database acceptance. */
+/**
+ * TEST ONLY: scaffold contracts; add real business and database acceptance.
+ */
 public class WmStockActionScaffoldTest {
     @Test
     void contractsStayScoped() {
@@ -51,9 +50,7 @@ public class WmStockActionScaffoldTest {
         var service = WmStockActionServiceImpl.class;
         var list = service.getMethod("selectPage", WmStockActionQueryDto.class)
                 .getAnnotation(BusinessCache.class);
-        Assertions.assertNotNull(list);
-        Assertions.assertEquals(WmStockActionResource.PREFIX, list.business());
-        Assertions.assertEquals(BusinessCache.Type.LIST, list.type());
+        Assertions.assertNull(list); // append-only facts must be immediately visible
         Assertions.assertTrue(BusinessCacheQuery.class
                 .isAssignableFrom(WmStockActionQueryDto.class));
         var detail = service.getMethod("selectById", String.class)
@@ -61,19 +58,12 @@ public class WmStockActionScaffoldTest {
         Assertions.assertNotNull(detail);
         Assertions.assertEquals(WmStockActionResource.PREFIX, detail.business());
         Assertions.assertEquals(BusinessCache.Type.DETAIL, detail.type());
-        var create = service.getMethod("insert", WmStockActionCreateCommand.class)
-                .getAnnotation(BusinessCacheEvict.class);
-        Assertions.assertNotNull(create);
-        Assertions.assertEquals(BusinessCacheEvict.Scope.LIST, create.scope());
-        var update = service.getMethod("updateById", String.class, WmStockActionUpdateCommand.class)
-                .getAnnotation(BusinessCacheEvict.class);
-        var delete = service.getMethod("deleteByIds", List.class)
-                .getAnnotation(BusinessCacheEvict.class);
-        Assertions.assertNotNull(update);
-        Assertions.assertNotNull(delete);
-        Assertions.assertEquals(BusinessCacheEvict.Scope.LIST_AND_DETAIL, update.scope());
-        Assertions.assertEquals(update.scope(), delete.scope());
     }
 
+    @Test
+    void immutableFactsHaveNoCrudWriteSurface() {
+        Assertions.assertEquals(2, WmStockActionController.class.getDeclaredMethods().length - 1);
+        Assertions.assertTrue(Arrays.stream(WmStockActionServiceImpl.class.getDeclaredMethods())
+                .noneMatch(m -> List.of("insert", "updateById", "deleteByIds").contains(m.getName())));
+    }
 }
-

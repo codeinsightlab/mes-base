@@ -10,6 +10,7 @@ import dev.mesbase.platform.execution.FactoryIntegrationSnapshot;
 import dev.mesbase.core.error.ErrorCode;
 import dev.mesbase.core.error.FoundationException;
 import java.util.List;
+import java.util.Objects;
 import org.springframework.core.env.Environment;
 import org.springframework.stereotype.Component;
 import dev.mesbase.business.integration.warehouse.ErpActionResult.Mode;
@@ -58,7 +59,12 @@ public class WarehouseIntegration {
         if (!Mode.CONNECTED.getValue()
                 .equals(row.getSourceExecutionMode()) || row.getExternalBindingKey() == null || row.getExternalReference() == null)
             throw new FoundationException(ErrorCode.ISSUE_EXTERNAL_UNVERIFIED);
-        adapter(scope, row.getExternalBindingKey());
+        var original = row.getSourceContext();
+        if (original != null && (!Objects.equals(original.provider(), row.getSourceProvider())
+                || !Objects.equals(original.bindingKey(), row.getExternalBindingKey())))
+            throw new FoundationException(ErrorCode.INTEGRATION_NOT_CONFIGURED);
+        if (row.getSourceProvider() == null || !adapter(scope, row.getExternalBindingKey()).supportsProvider(row.getSourceProvider()))
+            throw new FoundationException(ErrorCode.INTEGRATION_NOT_CONFIGURED);
         return Mode.CONNECTED;
     }
 
@@ -95,6 +101,9 @@ public class WarehouseIntegration {
         var adapter = adapter(scope, selection.bindingKey());
         if (!adapter.supportsProvider(selection.provider()))
             throw new FoundationException(ErrorCode.INTEGRATION_NOT_CONFIGURED);
+        if (command.lines().stream()
+                .anyMatch(line -> line.externalWarehouseId() == null || line.externalWarehouseId().isBlank()))
+            throw new FoundationException(ErrorCode.BUSINESS_SOURCE_CONFLICT);
         return adapter.createMaterialIssue(scope, command);
     }
 
@@ -124,7 +133,9 @@ public class WarehouseIntegration {
                 throw new FoundationException(ErrorCode.INTEGRATION_NOT_CONFIGURED);
             return local.cancelMaterialIssue(scope, new MaterialIssueCancelCommand(row.getId(), row.getVoidOperationId(), "local", null));
         }
-        var command = new MaterialIssueCancelCommand(row.getId(), row.getVoidOperationId(), row.getExternalBindingKey(), row.getExternalReference());
+        if (cancellationMode(scope, row) != Mode.CONNECTED)
+            throw new FoundationException(ErrorCode.INTEGRATION_NOT_CONFIGURED);
+        var command = new MaterialIssueCancelCommand(row.getId(), row.getVoidOperationId(), row.getExternalBindingKey(), row.getExternalReference(), row.getSourceContext());
         var adapter = adapter(scope, row.getExternalBindingKey());
         return query ? adapter.queryMaterialIssueCancellation(scope, command) : adapter.cancelMaterialIssue(scope, command);
     }

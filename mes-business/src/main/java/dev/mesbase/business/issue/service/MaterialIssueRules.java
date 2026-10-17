@@ -1,5 +1,8 @@
 package dev.mesbase.business.issue.service;
 
+import dev.mesbase.business.production.service.BusinessSourceRules;
+import dev.mesbase.business.shared.enums.BusinessSource;
+
 import dev.mesbase.business.issue.domain.MaterialIssueStatus;
 import dev.mesbase.business.integration.warehouse.ExternalEffect;
 import dev.mesbase.business.basic.dao.MaterialMapper;
@@ -19,11 +22,13 @@ import dev.mesbase.business.production.domain.RoutingProductExample;
 import dev.mesbase.business.wm.dao.WmWarehouseMapper;
 import dev.mesbase.common.utils.SecurityUtils;
 import dev.mesbase.business.production.service.ProductionExecutionRules;
+import dev.mesbase.business.production.domain.ProductionExecutionStatus;
 import dev.mesbase.business.production.service.ProductionChainLocks;
 import dev.mesbase.core.error.ErrorCode;
 import dev.mesbase.core.error.FoundationException;
 import java.time.LocalDateTime;
 import java.util.List;
+import dev.mesbase.business.production.domain.MesProductionExecutionEntity;
 import java.util.Objects;
 import java.util.Set;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -35,6 +40,7 @@ import org.springframework.stereotype.Component;
 @Component
 @ConditionalOnProperty(name = "mes.business.enabled", havingValue = "true")
 public class MaterialIssueRules {
+    private final BusinessSourceRules sources;
     private final MesMaterialIssueMapper issues;
     private final MesMaterialIssueItemMapper items;
     private final MaterialMapper materials;
@@ -51,7 +57,8 @@ public class MaterialIssueRules {
                               MaterialMapper materials, UnitMeasureMapper units, WmWarehouseMapper warehouses,
                               WorkorderMapper workorders, RoutingMapper routings,
                               RoutingProductMapper routingProducts, ProductionExecutionRules executions,
-                              MaterialIssueErpFacts facts, ProductionChainLocks locks) {
+                              MaterialIssueErpFacts facts, ProductionChainLocks locks, BusinessSourceRules sources) {
+        this.sources = sources;
         this.locks = locks;
         this.issues = issues;
         this.items = items;
@@ -75,6 +82,10 @@ public class MaterialIssueRules {
 
     public void hydrate(List<MesMaterialIssueEntity> rows) {
         facts.hydrate(rows);
+    }
+
+    public void validateExecutionSource(MesProductionExecutionEntity execution) {
+        sources.execution(execution, null);
     }
 
     public void initializeExtra(MesMaterialIssueEntity row) {
@@ -102,6 +113,9 @@ public class MaterialIssueRules {
             throw new FoundationException(ErrorCode.ISSUE_VOID_CONFLICT);
         var execution = row.getExecutionId() == null ? null : executions.lock(row.getExecutionId());
         if (execution != null) {
+            if (ProductionExecutionStatus.COMPLETED.getValue()
+                    .equals(execution.getStatus()) || ProductionExecutionStatus.CANCELLED.getValue()
+                    .equals(execution.getStatus())) throw new FoundationException(ErrorCode.EXECUTION_FROZEN);
             require(row.getWorkorderId() == null || Objects.equals(row.getWorkorderId(), execution.getWorkorderId()));
             require(row.getProductId() == null || Objects.equals(row.getProductId(), execution.getProductId()));
             require(row.getRoutingId() == null || Objects.equals(row.getRoutingId(), execution.getRoutingId()));
@@ -123,6 +137,7 @@ public class MaterialIssueRules {
             require(workorders.updateByExampleSelective(lock, filter) == 1);
             var workorder = workorders.selectByPrimaryKey(row.getWorkorderId());
             require(workorder != null);
+            sources.order(workorder.getId());
             require(row.getProductId() == null || Objects.equals(row.getProductId(), workorder.getProductId()));
             require(execution != null || row.getRoutingId() == null || Objects.equals(row.getRoutingId(), workorder.getRoutingId()));
             var product = materials.selectByPrimaryKey(workorder.getProductId());
@@ -168,6 +183,8 @@ public class MaterialIssueRules {
         if (row.getWarehouseId() != null) {
             var warehouse = warehouses.selectByPrimaryKey(row.getWarehouseId());
             require(warehouse != null);
+            if (header.getWorkorderId() == null) sources.warehouse(warehouse.getSource(), warehouse.getId());
+            else sources.warehouse(sources.order(header.getWorkorderId()).getSource(), warehouse.getId());
             row.setWarehouseCode(warehouse.getCode());
         }
     }

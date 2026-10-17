@@ -1,5 +1,6 @@
 package dev.mesbase.web.controller.system;
 
+import dev.mesbase.platform.execution.FactoryIntegrationContext;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -82,10 +83,11 @@ public class SystemSessionController {
         return new FactoryNavigation(permissions.permissions(SecurityUtils.getUsername(), FactoryContext.required()
                 .factoryId()
                 .value()), menus.buildMenus(menus.selectFactoryMenuTree(SecurityUtils.getUsername(), FactoryContext.required()
-                .factoryId().value())));
+                .factoryId().value())), FactoryIntegrationContext.current().map(snapshot -> snapshot.mode().name())
+                .orElse(null));
     }
 
-    public record FactoryNavigation(Set<String> permissions, List<RouterVo> menus) {
+    public record FactoryNavigation(Set<String> permissions, List<RouterVo> menus, String runtimeMode) {
     }
 
     @GetMapping("/api/session/menus")

@@ -67,7 +67,10 @@ class ProductionCoreV1HttpTest {
         j.update("INSERT INTO routing_node(id,routing_id,node_code,operation_id,operation_name,is_key,display_order) VALUES(1,1,'A',1,'相同工序',false,1),(2,1,'B',1,'相同工序',false,2),(3,1,'C',2,'分支C',false,3),(4,1,'D',3,'分支D',false,4),(5,1,'E',4,'终点',false,5)");
         j.update("INSERT INTO routing_edge(routing_id,from_node_id,to_node_id) VALUES(1,1,2),(1,2,3),(1,2,4),(1,3,5),(1,4,5)");
         var m = MaterialIssueHttpTest.mvc(c);
-        m.perform(full(post("/api/production/workorder/1/actions/release")).content("{\"revision\":0}"))
+        if ("CONNECTED".equals(c.getEnvironment().getProperty("mes.integration.warehouse.factories.A.mode"))) {
+            // TEST ONLY authoritative external release fixture, ordinary local release is forbidden.
+            j.update("UPDATE workorder SET status='RELEASED' WHERE id=1");
+        } else m.perform(full(post("/api/production/workorder/1/actions/release")).content("{\"revision\":0}"))
                 .andExpect(status().isOk());
         m.perform(full(post(E)).content(EXEC)).andExpect(status().isOk());
     }
@@ -84,9 +87,12 @@ class ProductionCoreV1HttpTest {
     }
 
     static class Vendor implements WarehouseErpAdapter {
-        public boolean supportsProvider(String provider) { return "test".equals(provider); }
+        public boolean supportsProvider(String provider) {
+            return "test".equals(provider);
+        }
 
         volatile Status result = Status.SUCCEEDED;
+        volatile boolean stockEffective = true;
         volatile Outcome outcome = Outcome.FOUND;
         volatile DocumentStatus document = DocumentStatus.EFFECTIVE;
         volatile CountDownLatch entered, release;
@@ -115,7 +121,7 @@ class ProductionCoreV1HttpTest {
             snapshot = command;
             pause();
             if (throwOnCreate) throw new IllegalStateException("TEST ONLY timeout");
-            return new ErpActionResult(result, Mode.CONNECTED, result == Status.SUCCEEDED ? "ERP-" + command.issueId() : null, result == Status.SUCCEEDED ? "DOC-" + command.issueId() : null, "PRIVATE secret raw response");
+            return new ErpActionResult(result, Mode.CONNECTED, result == Status.SUCCEEDED ? "ERP-" + command.issueId() : null, result == Status.SUCCEEDED ? "DOC-" + command.issueId() : null, "PRIVATE secret raw response", stockEffective);
         }
 
         public ErpActionResult cancelMaterialIssue(FactoryScope scope, MaterialIssueCancelCommand command) {
@@ -174,6 +180,7 @@ class ProductionCoreV1HttpTest {
         c.register(MaterialIssueHttpTest.Web.class);
         if (vendor) c.register(VendorConfig.class, FaultConfig.class);
         c.refresh();
+        MaterialIssueHttpTest.externalFixture(c);
         return c;
     }
 
@@ -341,6 +348,7 @@ class ProductionCoreV1HttpTest {
             assertEquals(200, pending.get(10, TimeUnit.SECONDS));
             assertEquals(1, v.creates.get());
             assertEquals(1, v.snapshot.lines().size());
+            assertEquals("TEST-ERP-WAREHOUSE", v.snapshot.lines().getFirst().externalWarehouseId());
         }
     }
 
@@ -460,4 +468,26 @@ class ProductionCoreV1HttpTest {
             assertEquals(1, v.creates.get());
         }
     }
+
+    @Test
+    void createdErpDocumentWithoutEffectiveStockEvidenceRetainsOriginalUnknownIntent() throws Exception {
+        try (var c = connected(true)) {
+            seed(c);
+            var m = MaterialIssueHttpTest.mvc(c);
+            select(m);
+            issue(m, 1);
+            var vendor = c.getBean(Vendor.class);
+            vendor.stockEffective = false;
+            m.perform(full(post(H + "/1/actions/submit"))).andExpect(status().isOk())
+                    .andExpect(jsonPath("status").value("SUBMIT_UNKNOWN"));
+            m.perform(full(post(H + "/1/actions/submit"))).andExpect(status().isOk());
+            assertEquals(1, vendor.creates.get());
+            assertEquals("SELECTED", db(c).queryForObject("SELECT path_status FROM mes_execution_path WHERE id=1", String.class));
+            assertEquals(0, db(c).queryForObject("SELECT COUNT(*) FROM mes_material_issue_input WHERE confirmed_at IS NOT NULL", Integer.class));
+            m.perform(full(post(H + "/1/actions/reconcile-erp"))).andExpect(status().isOk())
+                    .andExpect(jsonPath("mesStatus").value("CONFIRMED"));
+            assertEquals(1, vendor.creates.get());
+        }
+    }
+
 }

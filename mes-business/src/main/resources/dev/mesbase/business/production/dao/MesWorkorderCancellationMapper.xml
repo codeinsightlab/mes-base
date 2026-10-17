@@ -1,0 +1,274 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- MES-CODEGEN: MyBatis Generator standard single-table persistence. -->
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="dev.mesbase.business.production.dao.MesWorkorderCancellationMapper">
+  <resultMap id="BaseResultMap" type="dev.mesbase.business.production.domain.MesWorkorderCancellationEntity">
+    <id column="id" jdbcType="VARCHAR" property="id" />
+    <result column="workorder_id" jdbcType="BIGINT" property="workorderId" />
+    <result column="request_fingerprint" jdbcType="CHAR" property="requestFingerprint" />
+    <result column="reason" jdbcType="VARCHAR" property="reason" />
+    <result column="operator_user_id" jdbcType="BIGINT" property="operatorUserId" />
+    <result column="recorded_at" jdbcType="TIMESTAMP" property="recordedAt" />
+    <result column="previous_status" jdbcType="VARCHAR" property="previousStatus" />
+    <result column="source_snapshot" jdbcType="VARCHAR" property="sourceSnapshot" />
+    <result column="previous_revision" jdbcType="INTEGER" property="previousRevision" />
+  </resultMap>
+  <sql id="Example_Where_Clause">
+    <where>
+      <foreach collection="oredCriteria" item="criteria" separator="or">
+        <if test="criteria.valid">
+          <trim prefix="(" prefixOverrides="and" suffix=")">
+            <foreach collection="criteria.criteria" item="criterion">
+              <choose>
+                <when test="criterion.noValue">
+                  and ${criterion.condition}
+                </when>
+                <when test="criterion.singleValue">
+                  and ${criterion.condition} #{criterion.value}
+                </when>
+                <when test="criterion.betweenValue">
+                  and ${criterion.condition} #{criterion.value} and #{criterion.secondValue}
+                </when>
+                <when test="criterion.listValue">
+                  and ${criterion.condition}
+                  <foreach close=")" collection="criterion.value" item="listItem" open="(" separator=",">
+                    #{listItem}
+                  </foreach>
+                </when>
+              </choose>
+            </foreach>
+          </trim>
+        </if>
+      </foreach>
+    </where>
+  </sql>
+  <sql id="Update_By_Example_Where_Clause">
+    <where>
+      <foreach collection="example.oredCriteria" item="criteria" separator="or">
+        <if test="criteria.valid">
+          <trim prefix="(" prefixOverrides="and" suffix=")">
+            <foreach collection="criteria.criteria" item="criterion">
+              <choose>
+                <when test="criterion.noValue">
+                  and ${criterion.condition}
+                </when>
+                <when test="criterion.singleValue">
+                  and ${criterion.condition} #{criterion.value}
+                </when>
+                <when test="criterion.betweenValue">
+                  and ${criterion.condition} #{criterion.value} and #{criterion.secondValue}
+                </when>
+                <when test="criterion.listValue">
+                  and ${criterion.condition}
+                  <foreach close=")" collection="criterion.value" item="listItem" open="(" separator=",">
+                    #{listItem}
+                  </foreach>
+                </when>
+              </choose>
+            </foreach>
+          </trim>
+        </if>
+      </foreach>
+    </where>
+  </sql>
+  <sql id="Base_Column_List">
+    id, workorder_id, request_fingerprint, reason, operator_user_id, recorded_at, previous_status, 
+    source_snapshot, previous_revision
+  </sql>
+  <select id="selectByExample" parameterType="dev.mesbase.business.production.domain.MesWorkorderCancellationExample" resultMap="BaseResultMap">
+    select
+    <include refid="Base_Column_List" />
+    from mes_workorder_cancellation
+    <if test="_parameter != null">
+      <include refid="Example_Where_Clause" />
+    </if>
+    <if test="orderByClause != null">
+      order by ${orderByClause}
+    </if>
+  </select>
+  <select id="selectByPrimaryKey" parameterType="String" resultMap="BaseResultMap">
+    select 
+    <include refid="Base_Column_List" />
+    from mes_workorder_cancellation
+    where id = #{id,jdbcType=VARCHAR}
+  </select>
+  <delete id="deleteByPrimaryKey" parameterType="String">
+    delete from mes_workorder_cancellation
+    where id = #{id,jdbcType=VARCHAR}
+  </delete>
+  <delete id="deleteByExample" parameterType="dev.mesbase.business.production.domain.MesWorkorderCancellationExample">
+    delete from mes_workorder_cancellation
+    <if test="_parameter != null">
+      <include refid="Example_Where_Clause" />
+    </if>
+  </delete>
+  <insert id="insert" parameterType="dev.mesbase.business.production.domain.MesWorkorderCancellationEntity">
+    insert into mes_workorder_cancellation (id, workorder_id, request_fingerprint, 
+      reason, operator_user_id, recorded_at, 
+      previous_status, source_snapshot, previous_revision
+      )
+    values (#{id,jdbcType=VARCHAR}, #{workorderId,jdbcType=BIGINT}, #{requestFingerprint,jdbcType=CHAR}, 
+      #{reason,jdbcType=VARCHAR}, #{operatorUserId,jdbcType=BIGINT}, #{recordedAt,jdbcType=TIMESTAMP}, 
+      #{previousStatus,jdbcType=VARCHAR}, #{sourceSnapshot,jdbcType=VARCHAR}, #{previousRevision,jdbcType=INTEGER}
+      )
+  </insert>
+  <insert id="insertSelective" parameterType="dev.mesbase.business.production.domain.MesWorkorderCancellationEntity">
+    insert into mes_workorder_cancellation
+    <trim prefix="(" suffix=")" suffixOverrides=",">
+      <if test="id != null">
+        id,
+      </if>
+      <if test="workorderId != null">
+        workorder_id,
+      </if>
+      <if test="requestFingerprint != null">
+        request_fingerprint,
+      </if>
+      <if test="reason != null">
+        reason,
+      </if>
+      <if test="operatorUserId != null">
+        operator_user_id,
+      </if>
+      <if test="recordedAt != null">
+        recorded_at,
+      </if>
+      <if test="previousStatus != null">
+        previous_status,
+      </if>
+      <if test="sourceSnapshot != null">
+        source_snapshot,
+      </if>
+      <if test="previousRevision != null">
+        previous_revision,
+      </if>
+    </trim>
+    <trim prefix="values (" suffix=")" suffixOverrides=",">
+      <if test="id != null">
+        #{id,jdbcType=VARCHAR},
+      </if>
+      <if test="workorderId != null">
+        #{workorderId,jdbcType=BIGINT},
+      </if>
+      <if test="requestFingerprint != null">
+        #{requestFingerprint,jdbcType=CHAR},
+      </if>
+      <if test="reason != null">
+        #{reason,jdbcType=VARCHAR},
+      </if>
+      <if test="operatorUserId != null">
+        #{operatorUserId,jdbcType=BIGINT},
+      </if>
+      <if test="recordedAt != null">
+        #{recordedAt,jdbcType=TIMESTAMP},
+      </if>
+      <if test="previousStatus != null">
+        #{previousStatus,jdbcType=VARCHAR},
+      </if>
+      <if test="sourceSnapshot != null">
+        #{sourceSnapshot,jdbcType=VARCHAR},
+      </if>
+      <if test="previousRevision != null">
+        #{previousRevision,jdbcType=INTEGER},
+      </if>
+    </trim>
+  </insert>
+  <select id="countByExample" parameterType="dev.mesbase.business.production.domain.MesWorkorderCancellationExample" resultType="java.lang.Long">
+    select count(*) from mes_workorder_cancellation
+    <if test="_parameter != null">
+      <include refid="Example_Where_Clause" />
+    </if>
+  </select>
+  <update id="updateByExampleSelective" parameterType="map">
+    update mes_workorder_cancellation
+    <set>
+      <if test="row.id != null">
+        id = #{row.id,jdbcType=VARCHAR},
+      </if>
+      <if test="row.workorderId != null">
+        workorder_id = #{row.workorderId,jdbcType=BIGINT},
+      </if>
+      <if test="row.requestFingerprint != null">
+        request_fingerprint = #{row.requestFingerprint,jdbcType=CHAR},
+      </if>
+      <if test="row.reason != null">
+        reason = #{row.reason,jdbcType=VARCHAR},
+      </if>
+      <if test="row.operatorUserId != null">
+        operator_user_id = #{row.operatorUserId,jdbcType=BIGINT},
+      </if>
+      <if test="row.recordedAt != null">
+        recorded_at = #{row.recordedAt,jdbcType=TIMESTAMP},
+      </if>
+      <if test="row.previousStatus != null">
+        previous_status = #{row.previousStatus,jdbcType=VARCHAR},
+      </if>
+      <if test="row.sourceSnapshot != null">
+        source_snapshot = #{row.sourceSnapshot,jdbcType=VARCHAR},
+      </if>
+      <if test="row.previousRevision != null">
+        previous_revision = #{row.previousRevision,jdbcType=INTEGER},
+      </if>
+    </set>
+    <if test="example != null">
+      <include refid="Update_By_Example_Where_Clause" />
+    </if>
+  </update>
+  <update id="updateByExample" parameterType="map">
+    update mes_workorder_cancellation
+    set id = #{row.id,jdbcType=VARCHAR},
+      workorder_id = #{row.workorderId,jdbcType=BIGINT},
+      request_fingerprint = #{row.requestFingerprint,jdbcType=CHAR},
+      reason = #{row.reason,jdbcType=VARCHAR},
+      operator_user_id = #{row.operatorUserId,jdbcType=BIGINT},
+      recorded_at = #{row.recordedAt,jdbcType=TIMESTAMP},
+      previous_status = #{row.previousStatus,jdbcType=VARCHAR},
+      source_snapshot = #{row.sourceSnapshot,jdbcType=VARCHAR},
+      previous_revision = #{row.previousRevision,jdbcType=INTEGER}
+    <if test="example != null">
+      <include refid="Update_By_Example_Where_Clause" />
+    </if>
+  </update>
+  <update id="updateByPrimaryKeySelective" parameterType="dev.mesbase.business.production.domain.MesWorkorderCancellationEntity">
+    update mes_workorder_cancellation
+    <set>
+      <if test="workorderId != null">
+        workorder_id = #{workorderId,jdbcType=BIGINT},
+      </if>
+      <if test="requestFingerprint != null">
+        request_fingerprint = #{requestFingerprint,jdbcType=CHAR},
+      </if>
+      <if test="reason != null">
+        reason = #{reason,jdbcType=VARCHAR},
+      </if>
+      <if test="operatorUserId != null">
+        operator_user_id = #{operatorUserId,jdbcType=BIGINT},
+      </if>
+      <if test="recordedAt != null">
+        recorded_at = #{recordedAt,jdbcType=TIMESTAMP},
+      </if>
+      <if test="previousStatus != null">
+        previous_status = #{previousStatus,jdbcType=VARCHAR},
+      </if>
+      <if test="sourceSnapshot != null">
+        source_snapshot = #{sourceSnapshot,jdbcType=VARCHAR},
+      </if>
+      <if test="previousRevision != null">
+        previous_revision = #{previousRevision,jdbcType=INTEGER},
+      </if>
+    </set>
+    where id = #{id,jdbcType=VARCHAR}
+  </update>
+  <update id="updateByPrimaryKey" parameterType="dev.mesbase.business.production.domain.MesWorkorderCancellationEntity">
+    update mes_workorder_cancellation
+    set workorder_id = #{workorderId,jdbcType=BIGINT},
+      request_fingerprint = #{requestFingerprint,jdbcType=CHAR},
+      reason = #{reason,jdbcType=VARCHAR},
+      operator_user_id = #{operatorUserId,jdbcType=BIGINT},
+      recorded_at = #{recordedAt,jdbcType=TIMESTAMP},
+      previous_status = #{previousStatus,jdbcType=VARCHAR},
+      source_snapshot = #{sourceSnapshot,jdbcType=VARCHAR},
+      previous_revision = #{previousRevision,jdbcType=INTEGER}
+    where id = #{id,jdbcType=VARCHAR}
+  </update>
+</mapper>

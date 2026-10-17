@@ -72,7 +72,10 @@ public class OperatorQualificationRules {
         FactoryContext.required();
         var execution = executionId == null ? null : editing ? locks.execution(executionId) : executions.selectByPrimaryKey(executionId);
         if (execution == null) throw new FoundationException(ErrorCode.EXECUTION_NOT_FOUND);
-        if (editing) requireMutable(execution);
+        if (editing) {
+            locks.requireActiveExecution(executionId);
+            requireMutable(execution);
+        }
         var node = nodeId == null ? null : nodes.selectByPrimaryKey(nodeId);
         if (node == null || !Objects.equals(execution.getRoutingId(), node.getRoutingId()))
             throw new FoundationException(ErrorCode.ASSIGNMENT_NODE_INVALID);

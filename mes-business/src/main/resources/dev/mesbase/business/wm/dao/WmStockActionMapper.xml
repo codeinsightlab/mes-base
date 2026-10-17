@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- MES-CODEGEN: MyBatis Generator standard single-table persistence. -->
+
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="dev.mesbase.business.wm.dao.WmStockActionMapper">
   <resultMap id="BaseResultMap" type="dev.mesbase.business.wm.domain.WmStockActionEntity">
@@ -491,4 +491,8 @@
       reason = #{reason,jdbcType=VARCHAR}
     where id = #{id,jdbcType=VARCHAR}
   </update>
+  <select id="sumReturns" resultType="java.math.BigDecimal">
+    SELECT COALESCE(SUM(quantity_delta),0) FROM wm_stock_action
+    WHERE reference_action_id = #{reference} AND action_type = #{type}
+  </select>
 </mapper>

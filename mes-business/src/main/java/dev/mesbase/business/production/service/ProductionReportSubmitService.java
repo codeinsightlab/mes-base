@@ -33,6 +33,8 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 @ConditionalOnProperty(name = "mes.business.enabled", havingValue = "true")
 public class ProductionReportSubmitService {
+    private final BusinessSourceRules sources;
+
     public record Context(ProductionIdentity identity, ExecutionQuantity quantities, PathModel path,
                           List<Candidate> candidates) {
     }
@@ -52,7 +54,8 @@ public class ProductionReportSubmitService {
                                          ProductionChainLocks locks,
                                          MesProductionReportMapper reports, MesProductionExecutionMapper executions,
                                          WorkorderMapper orders,
-                                         WorkstationMapper workstations) {
+                                         WorkstationMapper workstations, BusinessSourceRules sources) {
+        this.sources = sources;
         this.identities = identities;
         this.quantities = quantities;
         this.paths = paths;
@@ -100,6 +103,7 @@ public class ProductionReportSubmitService {
         var execution = locks.execution(command.executionId());
         existing = reports.selectByRequestId(command.requestId());
         if (existing != null) return replay(existing, command, user);
+        sources.execution(execution, null);
         if (!open(execution.getStatus())) throw new FoundationException(ErrorCode.EXECUTION_INVALID);
         quantities.validateReportChange(command.executionId(), command.routingNodeId(), command.reportQty());
         eligibility.requireEligible(command.executionId(), command.routingNodeId(), user);

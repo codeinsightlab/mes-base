@@ -1,8 +1,29 @@
 package dev.mesbase.business.issue.domain;
 
 import java.time.LocalDateTime;
+import dev.mesbase.business.integration.warehouse.MaterialIssueSubmitCommand.Source;
 
 public class MesMaterialIssueEntity {
+    private Source sourceContext;
+
+    public Source getSourceContext() {
+        return sourceContext;
+    }
+
+    public void setSourceContext(Source sourceContext) {
+        this.sourceContext = sourceContext;
+    }
+
+    private String sourceProvider;
+
+    public String getSourceProvider() {
+        return sourceProvider;
+    }
+
+    public void setSourceProvider(String sourceProvider) {
+        this.sourceProvider = sourceProvider;
+    }
+
     private Long id;
 
     private String issueNo;

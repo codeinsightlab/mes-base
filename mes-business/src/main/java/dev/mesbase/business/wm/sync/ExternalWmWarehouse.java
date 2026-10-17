@@ -1,4 +1,3 @@
-// MES-CODEGEN: scaffold; review required.
 package dev.mesbase.business.wm.sync;
 
 import jakarta.validation.constraints.NotBlank;
@@ -11,7 +10,8 @@ public record ExternalWmWarehouse(
         @NotBlank @Size(max = 64) String code,
         @NotBlank @Size(max = 255) String name,
         @NotBlank @Size(max = 16) String status,
-        @Size(max = 500) String remark
+        @Size(max = 500) String remark,
+        @NotBlank @Size(max = 128) String externalId
 ) {
 }
 

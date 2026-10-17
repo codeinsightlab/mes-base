@@ -10,6 +10,10 @@ public class WorkorderErpExtraEntity {
 
     private String provider;
 
+    private String bindingKey;
+
+    private Long configurationRevision;
+
     public Long getId() {
         return id;
     }
@@ -40,5 +44,21 @@ public class WorkorderErpExtraEntity {
 
     public void setProvider(String provider) {
         this.provider = provider;
+    }
+
+    public String getBindingKey() {
+        return bindingKey;
+    }
+
+    public void setBindingKey(String bindingKey) {
+        this.bindingKey = bindingKey;
+    }
+
+    public Long getConfigurationRevision() {
+        return configurationRevision;
+    }
+
+    public void setConfigurationRevision(Long configurationRevision) {
+        this.configurationRevision = configurationRevision;
     }
 }

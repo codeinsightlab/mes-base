@@ -3,7 +3,6 @@ package dev.mesbase.business.wm.controller;
 import dev.mesbase.business.wm.controller.vo.WmInventoryPageVo;
 import dev.mesbase.business.wm.controller.vo.WmInventoryVo;
 import dev.mesbase.business.wm.domain.WmInventoryCreateCommand;
-import dev.mesbase.business.wm.domain.WmInventoryEntity;
 import dev.mesbase.business.wm.domain.WmInventoryItem;
 import dev.mesbase.business.wm.domain.WmInventoryPage;
 import dev.mesbase.business.wm.domain.WmInventoryQueryDto;
@@ -57,7 +56,7 @@ public class WmInventoryController {
     @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED,
             permission = WmInventoryPermissions.QUERY)
     public WmInventoryVo detail(@PathVariable Long id) {
-        return toView(service.selectById(id));
+        return toView(service.selectDetail(id));
     }
 
     @PostMapping
@@ -93,21 +92,15 @@ public class WmInventoryController {
     }
 
     private static WmInventoryVo toView(WmInventoryItem item) {
-        return toView(item.inventory(), item.materialName(), item.warehouseName());
-    }
-
-    private static WmInventoryVo toView(WmInventoryEntity row) {
-        return toView(row, null, null);
-    }
-
-    private static WmInventoryVo toView(WmInventoryEntity row, String materialName, String warehouseName) {
+        var row = item.inventory();
         return new WmInventoryVo(
                 row.getId() == null ? null : row.getId().toString(),
 
                 row.getMaterialId() == null ? null : row.getMaterialId().toString(),
                 row.getWarehouseId() == null ? null : row.getWarehouseId().toString(),
-                materialName,
-                warehouseName,
+                item.materialName(),
+                item.warehouseName(),
+                item.warehouseSource(),
                 row.getQuantity() == null ? null : row.getQuantity().toString(),
                 row.getAvailableQuantity() == null ? null : row.getAvailableQuantity().toString(),
                 row.getStatus(),

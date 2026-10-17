@@ -363,6 +363,136 @@ public class WorkorderErpExtraExample {
             addCriterion("provider not between", value1, value2, "provider");
             return (Criteria) this;
         }
+
+        public Criteria andBindingKeyIsNull() {
+            addCriterion("binding_key is null");
+            return (Criteria) this;
+        }
+
+        public Criteria andBindingKeyIsNotNull() {
+            addCriterion("binding_key is not null");
+            return (Criteria) this;
+        }
+
+        public Criteria andBindingKeyEqualTo(String value) {
+            addCriterion("binding_key =", value, "bindingKey");
+            return (Criteria) this;
+        }
+
+        public Criteria andBindingKeyNotEqualTo(String value) {
+            addCriterion("binding_key <>", value, "bindingKey");
+            return (Criteria) this;
+        }
+
+        public Criteria andBindingKeyGreaterThan(String value) {
+            addCriterion("binding_key >", value, "bindingKey");
+            return (Criteria) this;
+        }
+
+        public Criteria andBindingKeyGreaterThanOrEqualTo(String value) {
+            addCriterion("binding_key >=", value, "bindingKey");
+            return (Criteria) this;
+        }
+
+        public Criteria andBindingKeyLessThan(String value) {
+            addCriterion("binding_key <", value, "bindingKey");
+            return (Criteria) this;
+        }
+
+        public Criteria andBindingKeyLessThanOrEqualTo(String value) {
+            addCriterion("binding_key <=", value, "bindingKey");
+            return (Criteria) this;
+        }
+
+        public Criteria andBindingKeyLike(String value) {
+            addCriterion("binding_key like", value, "bindingKey");
+            return (Criteria) this;
+        }
+
+        public Criteria andBindingKeyNotLike(String value) {
+            addCriterion("binding_key not like", value, "bindingKey");
+            return (Criteria) this;
+        }
+
+        public Criteria andBindingKeyIn(List<String> values) {
+            addCriterion("binding_key in", values, "bindingKey");
+            return (Criteria) this;
+        }
+
+        public Criteria andBindingKeyNotIn(List<String> values) {
+            addCriterion("binding_key not in", values, "bindingKey");
+            return (Criteria) this;
+        }
+
+        public Criteria andBindingKeyBetween(String value1, String value2) {
+            addCriterion("binding_key between", value1, value2, "bindingKey");
+            return (Criteria) this;
+        }
+
+        public Criteria andBindingKeyNotBetween(String value1, String value2) {
+            addCriterion("binding_key not between", value1, value2, "bindingKey");
+            return (Criteria) this;
+        }
+
+        public Criteria andConfigurationRevisionIsNull() {
+            addCriterion("configuration_revision is null");
+            return (Criteria) this;
+        }
+
+        public Criteria andConfigurationRevisionIsNotNull() {
+            addCriterion("configuration_revision is not null");
+            return (Criteria) this;
+        }
+
+        public Criteria andConfigurationRevisionEqualTo(Long value) {
+            addCriterion("configuration_revision =", value, "configurationRevision");
+            return (Criteria) this;
+        }
+
+        public Criteria andConfigurationRevisionNotEqualTo(Long value) {
+            addCriterion("configuration_revision <>", value, "configurationRevision");
+            return (Criteria) this;
+        }
+
+        public Criteria andConfigurationRevisionGreaterThan(Long value) {
+            addCriterion("configuration_revision >", value, "configurationRevision");
+            return (Criteria) this;
+        }
+
+        public Criteria andConfigurationRevisionGreaterThanOrEqualTo(Long value) {
+            addCriterion("configuration_revision >=", value, "configurationRevision");
+            return (Criteria) this;
+        }
+
+        public Criteria andConfigurationRevisionLessThan(Long value) {
+            addCriterion("configuration_revision <", value, "configurationRevision");
+            return (Criteria) this;
+        }
+
+        public Criteria andConfigurationRevisionLessThanOrEqualTo(Long value) {
+            addCriterion("configuration_revision <=", value, "configurationRevision");
+            return (Criteria) this;
+        }
+
+        public Criteria andConfigurationRevisionIn(List<Long> values) {
+            addCriterion("configuration_revision in", values, "configurationRevision");
+            return (Criteria) this;
+        }
+
+        public Criteria andConfigurationRevisionNotIn(List<Long> values) {
+            addCriterion("configuration_revision not in", values, "configurationRevision");
+            return (Criteria) this;
+        }
+
+        public Criteria andConfigurationRevisionBetween(Long value1, Long value2) {
+            addCriterion("configuration_revision between", value1, value2, "configurationRevision");
+            return (Criteria) this;
+        }
+
+        public Criteria andConfigurationRevisionNotBetween(Long value1, Long value2) {
+            addCriterion("configuration_revision not between", value1, value2, "configurationRevision");
+            return (Criteria) this;
+        }
     }
 
     public static class Criteria extends GeneratedCriteria {

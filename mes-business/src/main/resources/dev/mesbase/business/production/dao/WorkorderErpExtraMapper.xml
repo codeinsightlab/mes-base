@@ -1,4 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
+<!-- MES-CODEGEN: MyBatis Generator standard single-table persistence. -->
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="dev.mesbase.business.production.dao.WorkorderErpExtraMapper">
   <resultMap id="BaseResultMap" type="dev.mesbase.business.production.domain.WorkorderErpExtraEntity">
@@ -6,6 +7,8 @@
     <result column="external_id" jdbcType="VARCHAR" property="externalId" />
     <result column="external_code" jdbcType="VARCHAR" property="externalCode" />
     <result column="provider" jdbcType="VARCHAR" property="provider" />
+    <result column="binding_key" jdbcType="VARCHAR" property="bindingKey" />
+    <result column="configuration_revision" jdbcType="BIGINT" property="configurationRevision" />
   </resultMap>
   <sql id="Example_Where_Clause">
     <where>
@@ -66,7 +69,7 @@
     </where>
   </sql>
   <sql id="Base_Column_List">
-    id, external_id, external_code, provider
+    id, external_id, external_code, provider, binding_key, configuration_revision
   </sql>
   <select id="selectByExample" parameterType="dev.mesbase.business.production.domain.WorkorderErpExtraExample" resultMap="BaseResultMap">
     select
@@ -97,9 +100,11 @@
   </delete>
   <insert id="insert" parameterType="dev.mesbase.business.production.domain.WorkorderErpExtraEntity">
     insert into workorder_erp_extra (id, external_id, external_code,
-      provider)
+      provider, binding_key, configuration_revision
+      )
     values (#{id,jdbcType=BIGINT}, #{externalId,jdbcType=VARCHAR}, #{externalCode,jdbcType=VARCHAR},
-      #{provider,jdbcType=VARCHAR})
+      #{provider,jdbcType=VARCHAR}, #{bindingKey,jdbcType=VARCHAR}, #{configurationRevision,jdbcType=BIGINT}
+      )
   </insert>
   <insert id="insertSelective" parameterType="dev.mesbase.business.production.domain.WorkorderErpExtraEntity">
     insert into workorder_erp_extra
@@ -116,6 +121,12 @@
       <if test="provider != null">
         provider,
       </if>
+      <if test="bindingKey != null">
+        binding_key,
+      </if>
+      <if test="configurationRevision != null">
+        configuration_revision,
+      </if>
     </trim>
     <trim prefix="values (" suffix=")" suffixOverrides=",">
       <if test="id != null">
@@ -129,6 +140,12 @@
       </if>
       <if test="provider != null">
         #{provider,jdbcType=VARCHAR},
+      </if>
+      <if test="bindingKey != null">
+        #{bindingKey,jdbcType=VARCHAR},
+      </if>
+      <if test="configurationRevision != null">
+        #{configurationRevision,jdbcType=BIGINT},
       </if>
     </trim>
   </insert>
@@ -153,6 +170,12 @@
       <if test="row.provider != null">
         provider = #{row.provider,jdbcType=VARCHAR},
       </if>
+      <if test="row.bindingKey != null">
+        binding_key = #{row.bindingKey,jdbcType=VARCHAR},
+      </if>
+      <if test="row.configurationRevision != null">
+        configuration_revision = #{row.configurationRevision,jdbcType=BIGINT},
+      </if>
     </set>
     <if test="example != null">
       <include refid="Update_By_Example_Where_Clause" />
@@ -163,7 +186,9 @@
     set id = #{row.id,jdbcType=BIGINT},
       external_id = #{row.externalId,jdbcType=VARCHAR},
       external_code = #{row.externalCode,jdbcType=VARCHAR},
-      provider = #{row.provider,jdbcType=VARCHAR}
+      provider = #{row.provider,jdbcType=VARCHAR},
+      binding_key = #{row.bindingKey,jdbcType=VARCHAR},
+      configuration_revision = #{row.configurationRevision,jdbcType=BIGINT}
     <if test="example != null">
       <include refid="Update_By_Example_Where_Clause" />
     </if>
@@ -180,6 +205,12 @@
       <if test="provider != null">
         provider = #{provider,jdbcType=VARCHAR},
       </if>
+      <if test="bindingKey != null">
+        binding_key = #{bindingKey,jdbcType=VARCHAR},
+      </if>
+      <if test="configurationRevision != null">
+        configuration_revision = #{configurationRevision,jdbcType=BIGINT},
+      </if>
     </set>
     where id = #{id,jdbcType=BIGINT}
   </update>
@@ -187,7 +218,9 @@
     update workorder_erp_extra
     set external_id = #{externalId,jdbcType=VARCHAR},
       external_code = #{externalCode,jdbcType=VARCHAR},
-      provider = #{provider,jdbcType=VARCHAR}
+      provider = #{provider,jdbcType=VARCHAR},
+      binding_key = #{bindingKey,jdbcType=VARCHAR},
+      configuration_revision = #{configurationRevision,jdbcType=BIGINT}
     where id = #{id,jdbcType=BIGINT}
   </update>
 </mapper>

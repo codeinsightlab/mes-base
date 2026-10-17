@@ -1,5 +1,7 @@
 package dev.mesbase.business.shared;
 
+import dev.mesbase.business.quality.domain.QualityReleaseAction;
+import dev.mesbase.business.production.domain.ProductionReceiptType;
 import dev.mesbase.business.basic.domain.MaterialType;
 import dev.mesbase.business.directory.domain.DirectoryDeletionFlag;
 import dev.mesbase.business.directory.domain.DirectoryStatus;
@@ -49,6 +51,8 @@ class BusinessEnumContractTest {
             ProductionExecutionStatus.class,
             RoutingStatus.class,
             WorkOrderStatus.class,
+            QualityReleaseAction.class,
+            ProductionReceiptType.class,
             EnableStatus.class);
 
     @Test

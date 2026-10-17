@@ -1,6 +1,16 @@
 package dev.mesbase.business.issue;
 
 import dev.mesbase.business.integration.warehouse.LocalWarehouseErpService;
+import dev.mesbase.business.integration.warehouse.WarehouseErpAdapter;
+import dev.mesbase.business.integration.warehouse.MaterialIssueSubmitCommand.Source;
+
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.verify;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+
 import dev.mesbase.business.integration.warehouse.MaterialIssueSubmitCommand;
 import dev.mesbase.business.integration.warehouse.WarehouseIntegration;
 import dev.mesbase.business.integration.warehouse.MaterialIssueCancelCommand;
@@ -56,5 +66,29 @@ class LocalWarehouseErpTest {
         historical.setExternalReference("ERP-1");
         assertThrows(FoundationException.class, () -> integration.cancellationMode(scope, historical));
         assertThrows(FoundationException.class, () -> integration.query(scope, "LOCAL_ONLY", "local", new QueryMaterialIssueCommand(1L, null, null, "ERP-1", null)));
+    }
+
+    @Test
+    void cancellationChecksFrozenProviderAndCarriesOriginalConfigurationRevision() {
+        var scope = new FactoryScope(new FactoryId("A"));
+        var adapter = mock(WarehouseErpAdapter.class);
+        when(adapter.supports(scope, "old-binding")).thenReturn(true);
+        when(adapter.supportsProvider("old-provider")).thenReturn(true);
+        var service = new WarehouseIntegration(new MockEnvironment(), List.of(adapter));
+        var row = new MesMaterialIssueEntity();
+        row.setId(1L);
+        row.setSourceExecutionMode("CONNECTED");
+        row.setVoidExecutionMode("CONNECTED");
+        row.setVoidOperationId("stable-cancel");
+        row.setExternalEffect("CONFIRMED");
+        row.setExternalReference("old-document");
+        row.setExternalBindingKey("old-binding");
+        row.setSourceProvider("wrong-provider");
+        assertThrows(FoundationException.class, () -> service.cancellationMode(scope, row));
+        row.setSourceProvider("old-provider");
+        var source = new Source("old-provider", "old-binding", 7L, 3L);
+        row.setSourceContext(source);
+        service.execute(scope, row, false);
+        verify(adapter).cancelMaterialIssue(scope, new MaterialIssueCancelCommand(1L, "stable-cancel", "old-binding", "old-document", source));
     }
 }

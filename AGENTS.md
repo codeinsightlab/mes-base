@@ -1,5 +1,18 @@
 # MES Base 工程规则
 
+## 2026-10-17 — LOCAL / ERP 来源隔离与迁移规则（用户确认）
+
+本节对 LOCAL/ERP 来源及迁移的约束优先于旧文档中的交叉混合单据、自由组合库存管理权和无缝迁移建议；不放宽 Factory 分库、权限、事务、引用保护及不可变事实规则。完整业务方案与实施缺口见 [LOCAL / ERP 业务边界设计方案 V1.0](docs/architecture/local-erp-business-boundary.md)。以下规则持续生效；V1.7 实施状态、真实 SIMPLE_B 验证及历史待核实边界见 [V1.7 实施报告](docs/reviews/2026-10-17-local-external-source-isolation-v17-report.md)。
+
+- 每个 Factory 最多一个有效 ERP，必须复用 FactoryIntegrationSnapshot / Context / Registry；新厂明确持久化 LOCAL。ERP 配置缺失、异常或不可解析必须失败，禁止降级 LOCAL、并开两套新业务或新增多 ERP 优先级/自动路由。FactoryScope 仅含 FactoryId，禁止另建全局模式 Resolver 或字典模式体系。
+- WorkOrder、Warehouse 必须持久化可信来源：LOCAL 由 MES 本地创建，EXTERNAL 由当前厂绑定 ERP 同步创建；来源创建后禁止普通编辑或同步改写。同编码不等于同一身份，禁止自动合并。业务来源属于 MES 业务身份；供应商单据标识、映射及配置版本沿用独立 Extra，不在业务表增加 factory_id。
+- 新正式生产领料、退料、交接对应仓储接收、成品入库及关联仓储交易，仅允许“工单来源＝原材料仓来源＝成品仓来源”，且当前运行模式允许该体系：LOCAL/LOCAL/LOCAL 或 EXTERNAL/EXTERNAL/EXTERNAL。缺来源、非法来源、模式不允许或必要映射缺失必须拒绝。WarehouseIntegration 与业务 Service 必须校验当前模式、相关对象来源、原操作来源及必要映射/连接；禁止以接口不可用或同步改来源绕过准入。
+- LOCAL 仓库由 LocalStockService 管理权威库存；EXTERNAL 仓库由 ERP 管理权威库存及交易，本地镜像仅供参考、检索、展示和对账。ERP 同步仅允许管理 EXTERNAL 权威字段，禁止 UPDATE/DELETE LOCAL、改写 LOCAL 余额/历史动作，禁止覆盖已锁定 Execution、RoutingPath、Report、Quality、Receipt 和库存事实。计划与事实冲突必须保留事实并明确报冲突。Execution / Report / Quality / ProductionQuantityService 只保留一套。
+- 正式 ERP 业务必须依据当前权威查询或真实命令的权威校验；出库单创建成功不等于已实际出库或可信投产，必须满足经验证的生效契约。UNKNOWN 必须保留原操作身份/幂等标识及 provider/binding 查询恢复，禁止重建或改派。复用 WarehouseIntegration、ProductionErpAdapter、WarehouseErpAdapter，禁止把 ERP HTTP 纳入 LOCAL 数据库原子事务承诺。
+- LOCAL→ERP 仅采用停旧启新：停止新 LOCAL，检查未完成生产/仓储及未知外部操作，按正式权限/状态入口受控作废或终止，保留不可变历史；人工盘点实物/在制品/余料/成品，完成 ERP 期初和工单准备，同步新 EXTERNAL，验证 ERP 接口与准入，经明确授权确认切换时间后启用 ERP 新业务。补录必须区分历史加工与新增加工，禁止重复加工事实或重复扣库存。禁止自动迁移执行、领料、报工、在制品、双账平衡或跨系统补偿。
+- 缺正式迁移流程时必须保留现有模式锁定，禁止普通工厂编辑切换有业务历史的模式，解绑不能解锁。将来受权迁移必须检查未决状态、盘点/期初确认、切换时间及历史配置版本；历史查询/撤销按原冻结来源与 provider/binding 执行，禁止 LOCAL↔ERP 改派。禁止为迁移删除事实及被事实引用的主数据；无事实、无依赖的普通主数据仅按既有删除/归档规则处理。
+- 新增或修改工单、仓库、同步、领料、入库、撤销、模式切换时必须逐项验证本节，覆盖来源矩阵、可信创建/不可编辑、同步不碰 LOCAL、模式异常拒绝、原身份 UNKNOWN 恢复与历史撤销；文档、静态检查及旧 LOCAL 闭环验收均不能冒充来源隔离或模式迁移已实现。
+
 ## 2026-10-14 用户确认：新增 SQL 的执行与验证
 
 任务中新增的 SQL，Agent 应负责在核实后的任务目标数据库执行并验证，不再将执行留给用户，也不为执行该任务 SQL 再次等待用户同意。执行前仍须核对真实数据源与 Factory 绑定、检查存量和冲突、备份受影响范围，保护用户已有数据；Flyway 变更通过项目正式迁移机制执行，不手工执行后绕过迁移记录。执行后核对 Schema、受影响数据及相关业务读取，明确 SQL 已保存、已执行和验证结果。目标无法确定或存在无法安全处理的冲突时说明具体阻碍，不擅自换库。明确只读的任务继续禁止新增或执行写入 SQL。需要重启用户服务时由用户重启，Agent 不自行启动、停止或重启服务。
@@ -425,9 +438,9 @@ SysUser 敏感字段。
 
 - MES Business Service → ERP领域接口 → 配置选择的领域实现 → 厂商Gateway。复用现有 WarehouseErpAdapter 作为仓储领域业务接口；Production/MasterData 仅在真实消费者需要时建立，不按一个API建立一个类、不集中成巨大Service。
 - 领域方法表达完整业务行为；厂商实现负责其创建、提交、审核、查询等内部步骤、业务响应解析和人工恢复。Gateway仅负责认证、通讯、序列化及底层响应解析，不写MES库；MES Service不感知厂商字段、错误码或流程步骤。HTTP 200不等于业务成功。
-- 复用 mes.integration.warehouse.factories.<FactoryId> 配置，LOCAL_ONLY选择默认本地领域实现，CONNECTED须匹配该厂原绑定及provider，缺少或歧义明确失败；不得悄悄回退本地成功。无外部数据库装配。
+- 托管运行时必须复用 FactoryIntegrationSnapshot / Context / Registry 的工厂配置，LOCAL 映射 LOCAL_ONLY，ERP 映射 CONNECTED；须匹配该厂绑定及 provider，缺少或歧义明确失败，不回退本地成功。旧 mes.integration.warehouse.factories.<FactoryId> 仅保留现有非托管兼容/测试入口，不作为托管业务缺配置的兜底。无外部数据库装配。
 - 标准结果区分 SUCCEEDED（SUCCESS）、REJECTED（FAILED）、UNKNOWN，并标明 LOCAL_ONLY/CONNECTED。阶段失败保留已知外部身份；本地模式不伪造ERP单据、审核或冲销事实。
-- ERP单据身份、编号、业务状态、来源、操作结果及安全诊断存独立Extra；随当前业务库FactoryScope隔离，不在业务表新增工厂字段或ERP事实列。MES表仅保存MES状态与本地操作身份。Extra写入由MES协调逻辑管理，不开放普通编辑来伪造外部事实。
+- ERP单据身份、编号、业务状态、外部操作来源证据、操作结果及安全诊断存独立Extra；WorkOrder/Warehouse 的 LOCAL/EXTERNAL 业务来源属于 MES 业务身份，须按 2026-10-17 规则可信持久化，不以 Extra 或当前模式推断代替；随当前业务库FactoryScope隔离，不在业务表新增工厂字段或ERP事实列。MES表保存MES业务身份、状态与本地操作身份。Extra写入由MES协调逻辑管理，不开放普通编辑来伪造外部事实。
 - 查询确定性 FOUND/NOT_FOUND/UNKNOWN 与外部业务状态独立。查询只读、不改MES；NOT_FOUND不证明创建失败、不授权重建。核实经领域规则，在外部查询后短事务重锁MES对象并检查Extra操作版本及本地操作身份，原子更新MES与Extra；UNKNOWN不推进，VOIDED不因EFFECTIVE恢复，冲突保留诊断供人工处理。
 - ERP HTTP不在长事务或持有行锁时调用；创建/作废先持久化稳定意图，外部后果不能由本地回滚撤销。已知外部存在或结果未知不得重复创建；重复核实不产生外部写。所有编辑、明细变化与动作必须参与同一版本保护，不能让旧查询覆盖新作废。
 - 查询与核实使用独立权限，可信FactoryScope定位MES记录后从服务端Extra构造外部身份；禁止客户端指定外部身份或跨厂查询。诊断安全且限长，不向前端暴露Token、Secret或供应商原始报文。

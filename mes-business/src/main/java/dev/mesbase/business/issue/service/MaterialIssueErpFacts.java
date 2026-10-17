@@ -100,6 +100,7 @@ public class MaterialIssueErpFacts {
     }
 
     private void project(MesMaterialIssueErpExtraEntity e, MesMaterialIssueEntity r) {
+        r.setSourceProvider(e.getProvider());
         r.setSourceExecutionMode(e.getSourceExecutionMode());
         r.setExternalEffect(e.getExternalEffect());
         r.setExternalBindingKey(e.getExternalBindingKey());

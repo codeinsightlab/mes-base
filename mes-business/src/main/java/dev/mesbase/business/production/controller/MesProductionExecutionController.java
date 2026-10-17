@@ -91,16 +91,16 @@ public class MesProductionExecutionController {
         return toView(display.record(), display.routing() == null ? null : display.routing()
                 .code(), display.routing() == null ? null : display.routing()
                 .name(), display.routing() == null ? null : display.routing()
-                .version(), display.createByName(), display.updateByName());
+                .version(), display.createByName(), display.updateByName(), display.workorderStatus());
     }
 
     static MesProductionExecutionVo toView(MesProductionExecutionEntity row) {
-        return toView(row, null, null, null, null, null);
+        return toView(row, null, null, null, null, null, null);
     }
 
     private static MesProductionExecutionVo toView(MesProductionExecutionEntity row, String routingCode,
                                                    String routingName, Integer routingVersion, String createByName,
-                                                   String updateByName) {
+                                                   String updateByName, String workorderStatus) {
         return new MesProductionExecutionVo(
                 row.getId() == null ? null : row.getId().toString(),
                 row.getExecutionNo(),
@@ -115,7 +115,7 @@ public class MesProductionExecutionController {
                 row.getCreateBy(),
                 row.getCreateTime(),
                 row.getUpdateBy(),
-                row.getUpdateTime(), routingCode, routingName, routingVersion, createByName, updateByName
+                row.getUpdateTime(), routingCode, routingName, routingVersion, createByName, updateByName, workorderStatus
         );
     }
 }

@@ -1,5 +1,8 @@
 package dev.mesbase.business.wm.service.impl;
 
+import dev.mesbase.business.production.service.BusinessSourceRules;
+import dev.mesbase.business.shared.enums.BusinessSource;
+
 import com.github.pagehelper.Page;
 import com.github.pagehelper.PageHelper;
 import dev.mesbase.business.wm.dao.WmInventoryMapper;
@@ -11,6 +14,9 @@ import dev.mesbase.business.wm.domain.WmInventoryQueryDto;
 import dev.mesbase.business.wm.domain.WmInventoryResource;
 import dev.mesbase.business.wm.domain.WmInventoryUpdateCommand;
 import dev.mesbase.business.wm.service.IWmInventoryService;
+import dev.mesbase.business.wm.service.LocalStockService;
+import dev.mesbase.business.integration.warehouse.WarehouseIntegration;
+import dev.mesbase.business.integration.warehouse.ErpActionResult.Mode;
 import dev.mesbase.business.wm.sync.ExternalWmInventory;
 import dev.mesbase.business.wm.sync.UnconfiguredWmInventoryQueryAdapter;
 import dev.mesbase.business.wm.sync.WmInventoryQueryPort;
@@ -35,6 +41,7 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import dev.mesbase.business.wm.domain.WmInventoryItem;
 import java.util.Objects;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -47,7 +54,9 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 @ConditionalOnProperty(name = "mes.business.enabled", havingValue = "true")
 public class WmInventoryServiceImpl implements IWmInventoryService {
+    private final BusinessSourceRules sources;
     private final StockReferenceRules rules;
+    private final WarehouseIntegration integration;
     private final WmInventoryMapper mapper;
     private final WmInventoryQueryPort query;
     private final SyncCoordinator coordinator;
@@ -59,7 +68,10 @@ public class WmInventoryServiceImpl implements IWmInventoryService {
                                   ObjectProvider<WmInventoryQueryPort> queries,
                                   SyncCoordinator coordinator,
                                   ObjectProvider<IWmInventoryService> self,
-                                  Validator validator, BusinessCacheProcessor caches, StockReferenceRules rules) {
+                                  Validator validator, BusinessCacheProcessor caches, StockReferenceRules rules,
+                                  WarehouseIntegration integration, BusinessSourceRules sources) {
+        this.sources = sources;
+        this.integration = integration;
         this.rules = rules;
         this.mapper = mapper;
         this.query = queries.getIfAvailable(UnconfiguredWmInventoryQueryAdapter::new);
@@ -118,10 +130,22 @@ public class WmInventoryServiceImpl implements IWmInventoryService {
     }
 
     @Override
+    @Transactional(transactionManager = "businessTransactionManager", readOnly = true)
+    public WmInventoryItem selectDetail(Long id) {
+        return rules.describe(List.of(self.getObject().selectById(id))).getFirst();
+    }
+
+    @Override
     @Transactional(transactionManager = "businessTransactionManager", isolation = Isolation.READ_COMMITTED, rollbackFor = Exception.class)
     @BusinessCacheEvict(business = WmInventoryResource.PREFIX,
             scope = BusinessCacheEvict.Scope.LIST)
-    public WmInventoryEntity insert(WmInventoryCreateCommand input) {
+    public WmInventoryItem insert(WmInventoryCreateCommand input) {
+        sources.localCreation();
+        sources.warehouse(BusinessSource.LOCAL.getValue(), input.warehouseId());
+        LocalStockService.validateBalances(input.quantity(), input.availableQuantity() == null ? input.quantity() : input.availableQuantity());
+        if (input.quantity().signum() != 0 || input.availableQuantity() != null && input.availableQuantity()
+                .signum() != 0)
+            throw new FoundationException(ErrorCode.RESOURCE_CONFLICT);
         WmInventoryEntity row = new WmInventoryEntity();
 
         row.setMaterialId(input.materialId());
@@ -133,34 +157,43 @@ public class WmInventoryServiceImpl implements IWmInventoryService {
         row.setStatus(input.status());
         row.setRemark(input.remark());
         rules.validate(row);
+        var identity = new WmInventoryExample();
+        var identityCriteria = identity.createCriteria().andMaterialIdEqualTo(row.getMaterialId())
+                .andWarehouseIdEqualTo(row.getWarehouseId());
+        if (row.getBatchNo() == null) identityCriteria.andBatchNoIsNull();
+        else identityCriteria.andBatchNoEqualTo(row.getBatchNo());
+        if (row.getBinCode() == null) identityCriteria.andBinCodeIsNull();
+        else identityCriteria.andBinCodeEqualTo(row.getBinCode());
+        // Reference row locks above serialize all source creation for the same material, across nodes.
+        if (mapper.countByExample(identity) != 0) throw new FoundationException(ErrorCode.RESOURCE_CONFLICT);
         audit(row, true);
         if (write(row, true) != 1) {
             throw new FoundationException(ErrorCode.RESOURCE_CONFLICT);
         }
-        return requireRecord(row.getId());
+        return rules.describe(List.of(requireRecord(row.getId()))).getFirst();
     }
 
     @Override
     @Transactional(transactionManager = "businessTransactionManager", isolation = Isolation.READ_COMMITTED, rollbackFor = Exception.class)
     @BusinessCacheEvict(business = WmInventoryResource.PREFIX,
             scope = BusinessCacheEvict.Scope.LIST_AND_DETAIL)
-    public WmInventoryEntity updateById(Long id, WmInventoryUpdateCommand input) {
-        WmInventoryEntity row = requireRecord(id);
-        row.setId(id);
-        row.setMaterialId(input.materialId());
-        row.setBatchNo(input.batchNo());
-        row.setBinCode(input.binCode());
-        row.setWarehouseId(input.warehouseId());
-        row.setQuantity(input.quantity());
-        row.setAvailableQuantity(input.availableQuantity());
+    public WmInventoryItem updateById(Long id, WmInventoryUpdateCommand input) {
+        sources.warehouse(BusinessSource.LOCAL.getValue(), input.warehouseId());
+        WmInventoryEntity row = rules.lockInventory(id);
+        if (!Objects.equals(row.getMaterialId(), input.materialId()) || !Objects.equals(row.getWarehouseId(), input.warehouseId())
+                || !Objects.equals(row.getBatchNo(), input.batchNo()) || !Objects.equals(row.getBinCode(), input.binCode())
+                || input.quantity() == null || row.getQuantity().compareTo(input.quantity()) != 0
+                || (row.getAvailableQuantity() == null ? row.getQuantity() : row.getAvailableQuantity())
+                .compareTo(input.availableQuantity() == null ? input.quantity() : input.availableQuantity()) != 0)
+            throw new FoundationException(ErrorCode.RESOURCE_CONFLICT);
         row.setStatus(input.status());
         row.setRemark(input.remark());
-        rules.validate(row);
+        rules.validateInventoryFields(row);
         audit(row, false);
         if (write(row, false) != 1) {
             throw new FoundationException(ErrorCode.RESOURCE_CONFLICT);
         }
-        return requireRecord(id);
+        return rules.describe(List.of(requireRecord(id))).getFirst();
     }
 
     @Override
@@ -173,13 +206,24 @@ public class WmInventoryServiceImpl implements IWmInventoryService {
             throw new FoundationException(ErrorCode.BAD_REQUEST);
         }
         WmInventoryExample example = new WmInventoryExample();
-        for (var id : ids) requireRecord(id);
+        for (var id : ids.stream().sorted().toList()) {
+            var row = rules.lockInventory(id);
+            sources.localCreation();
+            sources.warehouse(BusinessSource.LOCAL.getValue(), row.getWarehouseId());
+            if (rules.inventoryReferenced(id) || row.getQuantity().signum() != 0)
+                throw new FoundationException(ErrorCode.RESOURCE_CONFLICT);
+        }
         example.createCriteria().andIdIn(ids)
 
         ;
         if (mapper.deleteByExample(example) != ids.size()) {
             throw new FoundationException(ErrorCode.RESOURCE_CONFLICT);
         }
+    }
+
+    private void requireMirrorMode(FactoryScope scope) {
+        if (integration.configuredMode(scope) != Mode.CONNECTED)
+            throw new FoundationException(ErrorCode.INTEGRATION_NOT_CONFIGURED);
     }
 
     private WmInventoryEntity requireRecord(Long id) {
@@ -191,6 +235,7 @@ public class WmInventoryServiceImpl implements IWmInventoryService {
     }
 
     public WmInventorySyncResult sync(FactoryScope scope) {
+        requireMirrorMode(scope);
         if (!FactoryContext.required().equals(scope)) {
             throw new FoundationException(ErrorCode.CONFLICT);
         }
@@ -218,6 +263,7 @@ public class WmInventoryServiceImpl implements IWmInventoryService {
         if (!FactoryContext.required().equals(scope)) {
             throw new FoundationException(ErrorCode.CONFLICT);
         }
+        requireMirrorMode(scope);
         // EXTRA_CODE_REASON: sync writes stop at processing/commit boundaries after run-token loss.
         if (run == null || !scope.equals(run.scope()) || !"codegen.wm_inventory".equals(run.syncKey()))
             throw new FoundationException(ErrorCode.SYNC_EXECUTION_LOST);
@@ -240,6 +286,9 @@ public class WmInventoryServiceImpl implements IWmInventoryService {
             }
         }
         if (inputs.isEmpty()) return new WmInventorySyncResult(0, 0, 0, 0);
+        rules.validateBatch(inputs);
+        sources.warehouses(BusinessSource.EXTERNAL.getValue(), inputs.stream().map(ExternalWmInventory::warehouseId)
+                .toList());
         var example = new WmInventoryExample();
         example.createCriteria().andMaterialIdIn(keys.stream().map(StockKey::materialId).distinct().toList())
 
@@ -250,13 +299,17 @@ public class WmInventoryServiceImpl implements IWmInventoryService {
                 throw new FoundationException(ErrorCode.RESOURCE_CONFLICT);
             }
         }
-        rules.validateBatch(inputs);
         int created = 0;
         int updated = 0;
         int skipped = 0;
         for (var input : inputs) {
             coordinator.assertOwner(run);
             var row = existing.get(new StockKey(input.materialId(), input.warehouseId(), input.batchNo(), input.binCode()));
+            if (row != null) {
+                row = rules.lockInventory(row.getId());
+                if (rules.inventoryReferenced(row.getId())) throw new FoundationException(ErrorCode.RESOURCE_CONFLICT);
+            }
+            LocalStockService.validateBalances(input.quantity(), input.availableQuantity() == null ? input.quantity() : input.availableQuantity());
             if (row != null && same(row, input)) {
                 rules.validateInventoryFields(row);
                 skipped++;

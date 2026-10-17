@@ -73,7 +73,7 @@ class ProductionReportHttpTest {
         var c = new AnnotationConfigWebApplicationContext();
         c.setServletContext(new MockServletContext());
         c.getEnvironment().getPropertySources()
-                .addFirst(new MapPropertySource("TEST ONLY", Map.of("mes.business.enabled", "true")));
+                .addFirst(new MapPropertySource("TEST ONLY", Map.of("mes.business.enabled", "true", "mes.integration.warehouse.factories.A.mode", "LOCAL_ONLY", "mes.integration.warehouse.factories.B.mode", "LOCAL_ONLY")));
         c.register(MaterialIssueHttpTest.Web.class, Extra.class);
         c.refresh();
         for (var jdbc : c.getBean(MaterialIssueHttpTest.Fixture.class).business.values()) {

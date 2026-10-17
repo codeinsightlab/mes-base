@@ -1,4 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
+<!-- MES-CODEGEN: MyBatis Generator standard single-table persistence. -->
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="dev.mesbase.business.production.dao.WorkorderMapper">
   <resultMap id="BaseResultMap" type="dev.mesbase.business.production.domain.WorkorderEntity">
@@ -14,6 +15,7 @@
     <result column="revision" jdbcType="INTEGER" property="revision" />
     <result column="create_time" jdbcType="TIMESTAMP" property="createTime" />
     <result column="update_time" jdbcType="TIMESTAMP" property="updateTime" />
+    <result column="source" jdbcType="VARCHAR" property="source" />
   </resultMap>
   <sql id="Example_Where_Clause">
     <where>
@@ -75,7 +77,7 @@
   </sql>
   <sql id="Base_Column_List">
     id, code, product_id, planned_qty, routing_id, status, planned_start_at, planned_end_at,
-    remark, revision, create_time, update_time
+    remark, revision, create_time, update_time, source
   </sql>
   <select id="selectByExample" parameterType="dev.mesbase.business.production.domain.WorkorderExample" resultMap="BaseResultMap">
     select
@@ -108,11 +110,13 @@
     insert into workorder (code, product_id, planned_qty,
       routing_id, status, planned_start_at,
       planned_end_at, remark, revision,
-      create_time, update_time)
+      create_time, update_time, source
+      )
     values (#{code,jdbcType=VARCHAR}, #{productId,jdbcType=BIGINT}, #{plannedQty,jdbcType=DECIMAL},
       #{routingId,jdbcType=BIGINT}, #{status,jdbcType=VARCHAR}, #{plannedStartAt,jdbcType=TIMESTAMP},
       #{plannedEndAt,jdbcType=TIMESTAMP}, #{remark,jdbcType=VARCHAR}, #{revision,jdbcType=INTEGER},
-      #{createTime,jdbcType=TIMESTAMP}, #{updateTime,jdbcType=TIMESTAMP})
+      #{createTime,jdbcType=TIMESTAMP}, #{updateTime,jdbcType=TIMESTAMP}, #{source,jdbcType=VARCHAR}
+      )
   </insert>
   <insert id="insertSelective" keyColumn="id" keyProperty="id" parameterType="dev.mesbase.business.production.domain.WorkorderEntity" useGeneratedKeys="true">
     insert into workorder
@@ -150,6 +154,9 @@
       <if test="updateTime != null">
         update_time,
       </if>
+      <if test="source != null">
+        source,
+      </if>
     </trim>
     <trim prefix="values (" suffix=")" suffixOverrides=",">
       <if test="code != null">
@@ -184,6 +191,9 @@
       </if>
       <if test="updateTime != null">
         #{updateTime,jdbcType=TIMESTAMP},
+      </if>
+      <if test="source != null">
+        #{source,jdbcType=VARCHAR},
       </if>
     </trim>
   </insert>
@@ -232,6 +242,9 @@
       <if test="row.updateTime != null">
         update_time = #{row.updateTime,jdbcType=TIMESTAMP},
       </if>
+      <if test="row.source != null">
+        source = #{row.source,jdbcType=VARCHAR},
+      </if>
     </set>
     <if test="example != null">
       <include refid="Update_By_Example_Where_Clause" />
@@ -250,7 +263,8 @@
       remark = #{row.remark,jdbcType=VARCHAR},
       revision = #{row.revision,jdbcType=INTEGER},
       create_time = #{row.createTime,jdbcType=TIMESTAMP},
-      update_time = #{row.updateTime,jdbcType=TIMESTAMP}
+      update_time = #{row.updateTime,jdbcType=TIMESTAMP},
+      source = #{row.source,jdbcType=VARCHAR}
     <if test="example != null">
       <include refid="Update_By_Example_Where_Clause" />
     </if>
@@ -291,6 +305,9 @@
       <if test="updateTime != null">
         update_time = #{updateTime,jdbcType=TIMESTAMP},
       </if>
+      <if test="source != null">
+        source = #{source,jdbcType=VARCHAR},
+      </if>
     </set>
     where id = #{id,jdbcType=BIGINT}
   </update>
@@ -306,7 +323,8 @@
       remark = #{remark,jdbcType=VARCHAR},
       revision = #{revision,jdbcType=INTEGER},
       create_time = #{createTime,jdbcType=TIMESTAMP},
-      update_time = #{updateTime,jdbcType=TIMESTAMP}
+      update_time = #{updateTime,jdbcType=TIMESTAMP},
+      source = #{source,jdbcType=VARCHAR}
     where id = #{id,jdbcType=BIGINT}
   </update>
 </mapper>

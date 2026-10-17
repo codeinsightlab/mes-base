@@ -8,6 +8,7 @@ import java.time.LocalDateTime;
 public record WmWarehouseVo(
         String id,
 
+        String source,
         String code,
         String name,
         String status,

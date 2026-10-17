@@ -13,6 +13,8 @@ import dev.mesbase.business.issue.service.MaterialIssueInputFacts;
 import dev.mesbase.business.issue.service.MaterialIssueSubmissionService;
 import dev.mesbase.business.issue.service.MaterialIssueVoidService;
 import dev.mesbase.business.integration.warehouse.WarehouseIntegration;
+import dev.mesbase.business.wm.service.LocalProductionSupply;
+import dev.mesbase.business.wm.service.LocalStockService;
 import dev.mesbase.business.production.service.ProductionQuantityService;
 import dev.mesbase.core.factory.FactoryScope;
 import dev.mesbase.core.factory.FactoryId;
@@ -53,7 +55,7 @@ class ProductionInputMySqlTest {
                     .addFirst(new MapPropertySource("TEST ONLY local input recipe", Map.of(
                             "mes.integration.warehouse.factories.SIMPLE_B.mode", "LOCAL_ONLY", prefix + "material-id", Long.toString(material), prefix + "total-required-qty", "20", prefix + "warehouse-ids", Long.toString(f.warehouse()), prefix + "work-center", "TEST_LOCAL_CENTER")));
             c.registerBean(IRoutingService.class, () -> mock(IRoutingService.class));
-            for (var type : new Class<?>[]{WarehouseIntegration.class, MaterialIssueRules.class, MaterialIssueErpFacts.class, MaterialIssueInputFacts.class, MesProductionExecutionServiceImpl.class, MesMaterialIssueServiceImpl.class, MesMaterialIssueItemServiceImpl.class, MaterialIssueSubmissionService.class, MaterialIssueVoidService.class, ProductionInputSupplyService.class, ProductionInputService.class, ProductionIdentityService.class})
+            for (var type : new Class<?>[]{LocalStockService.class, LocalProductionSupply.class, WarehouseIntegration.class, MaterialIssueRules.class, MaterialIssueErpFacts.class, MaterialIssueInputFacts.class, MesProductionExecutionServiceImpl.class, MesMaterialIssueServiceImpl.class, MesMaterialIssueItemServiceImpl.class, MaterialIssueSubmissionService.class, MaterialIssueVoidService.class, ProductionInputSupplyService.class, ProductionInputService.class, ProductionIdentityService.class})
                 c.registerBean(type);
             var service = c.getBean(ProductionInputService.class);
             var supply = c.getBean(ProductionInputSupplyService.class);

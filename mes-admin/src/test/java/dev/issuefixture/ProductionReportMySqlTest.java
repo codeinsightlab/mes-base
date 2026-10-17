@@ -1,5 +1,8 @@
 package dev.issuefixture;
 
+import dev.mesbase.core.factory.FactoryId;
+import dev.mesbase.core.factory.FactoryScope;
+import dev.mesbase.platform.execution.FactoryContext;
 import dev.mesbase.business.quality.service.ExecutionQualityReferenceQueryImpl;
 import dev.mesbase.business.quality.service.QualityTreatmentService;
 
@@ -113,6 +116,7 @@ class ProductionReportMySqlTest {
     }
 
     static void actor() {
+        FactoryContext.bind(new FactoryScope(new FactoryId("SIMPLE_B")));
         var user = new SysUser();
         user.setUserId(100L);
         user.setUserName("TEST_ONLY_REPORT");
@@ -127,7 +131,7 @@ class ProductionReportMySqlTest {
         String tag = "TEST_REPORT_" + UUID.randomUUID().toString().substring(0, 12);
         assertEquals(0, jdbc.queryForObject("SELECT COUNT(*) FROM workorder WHERE code=?", Integer.class, tag));
         var source = jdbc.queryForMap("SELECT e.id,e.workorder_id,e.product_id,e.routing_id FROM mes_production_execution e JOIN mes_execution_path p ON p.id=e.id WHERE p.path_status='LOCKED' AND EXISTS(SELECT 1 FROM mes_execution_path_node n WHERE n.execution_id=e.id) ORDER BY e.id LIMIT 1");
-        long order = insert(jdbc, "INSERT INTO workorder(code,product_id,planned_qty,routing_id,status,revision,create_time,update_time) VALUES(?,?,10,?,'RELEASED',0,NOW(),NOW())", tag, source.get("product_id"), source.get("routing_id"));
+        long order = insert(jdbc, "INSERT INTO workorder(source,code,product_id,planned_qty,routing_id,status,revision,create_time,update_time) VALUES('LOCAL',?,?,10,?,'RELEASED',0,NOW(),NOW())", tag, source.get("product_id"), source.get("routing_id"));
         jdbc.update("INSERT INTO workorder_erp_extra(id) VALUES(?)", order);
         long execution = insert(jdbc, "INSERT INTO mes_production_execution(execution_no,workorder_id,product_id,routing_id,target_qty,status,remark,create_by,create_time) VALUES(?,?,?,?,10,'READY',?,'TEST_ONLY_REPORT',NOW())", tag, order, source.get("product_id"), source.get("routing_id"), tag);
         jdbc.update("INSERT INTO mes_execution_path(id,routing_id,path_status,revision,selected_at,locked_at) VALUES(?,?,'LOCKED',1,NOW(),NOW())", execution, source.get("routing_id"));
@@ -167,6 +171,7 @@ class ProductionReportMySqlTest {
                     return reports.supplement(cmd).getId();
                 } finally {
                     SecurityContextHolder.clearContext();
+                    FactoryContext.clear();
                 }
             };
             var a = executor.submit(submit);
@@ -197,6 +202,7 @@ class ProductionReportMySqlTest {
                 System.out.println("STABILITY_ADMIN_REPLAY_MYSQL execution=" + f.executionId() + " facts=3 net=0");
             } finally {
                 SecurityContextHolder.clearContext();
+                FactoryContext.clear();
             }
         }
     }
@@ -236,6 +242,7 @@ class ProductionReportMySqlTest {
                 assertEquals(0, jdbc.queryForObject("SELECT COUNT(*) FROM mes_production_execution WHERE id=?", Integer.class, execution[0]));
             } finally {
                 SecurityContextHolder.clearContext();
+                FactoryContext.clear();
             }
         }
     }
@@ -259,6 +266,7 @@ class ProductionReportMySqlTest {
                     return false;
                 } finally {
                     SecurityContextHolder.clearContext();
+                    FactoryContext.clear();
                 }
             };
             var a = executor.submit(submit);
@@ -271,6 +279,7 @@ class ProductionReportMySqlTest {
                 reports.voidOriginalReport(original, new VoidOriginal(f.tag() + " 并发验收后归零"));
             } finally {
                 SecurityContextHolder.clearContext();
+                FactoryContext.clear();
             }
             assertEquals(0, jdbc.queryForObject("SELECT SUM(quantity_delta) FROM mes_production_report WHERE execution_id=?", Integer.class, f.executionId()));
             assertEquals(2, jdbc.queryForObject("SELECT COUNT(*) FROM mes_production_report WHERE execution_id=?", Integer.class, f.executionId()));

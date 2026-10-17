@@ -72,7 +72,8 @@ public class ProductionReceiptController {
                           String routingLabel,
                           String pathStatus, String terminalNodeId, String terminalNodeName, String output,
                           String received, String remaining, String excess,
-                          boolean canReceive, String blockedCode, String blockedReason) {
+                          boolean canReceive, String blockedCode, String blockedReason, String released,
+                          String releaseRemaining, String accepted, String pendingAcceptance, String releaseExcess) {
     }
 
     @GetMapping
@@ -93,7 +94,7 @@ public class ProductionReceiptController {
         var i = s.identity();
         return new Summary(id(i.executionId()), i.executionNo(), id(i.workorderId()), i.workorderCode(), id(i.productId()), i.productCode(), i.productName(),
                 decimal(i.targetQty()), i.status(), s.routingLabel(), s.pathStatus(), id(s.terminalNodeId()), s.terminalNodeName(), decimal(s.output()), decimal(s.received()),
-                decimal(s.remaining()), decimal(s.excess()), s.canReceive(), s.blockedCode(), s.blockedReason());
+                decimal(s.remaining()), decimal(s.excess()), s.canReceive(), s.blockedCode(), s.blockedReason(), decimal(s.released()), decimal(s.releaseRemaining()), decimal(s.accepted()), decimal(s.pendingAcceptance()), decimal(s.releaseExcess()));
     }
 
     @GetMapping("/{id}")

@@ -1,0 +1,176 @@
+# 生成完整基础后端后，按不可变业务要求移除普通写入口，保留标准持久化及领域命令。
+# 项目配置：由 scripts/mes-business-codegen 读取，旧 scripts/mes-codegen 不读取此格式。
+# 本文件显式记录 MES Base 项目取值；生成器不得内置这些项目默认值。
+# 不包含数据库凭证，不执行菜单 SQL，不授予角色。
+version: 1
+
+# 2026-10-13 用户决定：后续暂只生成基础 CRUD，不生成同步代码、接口、按钮或权限。
+# 工具默认 false；保留 sync 参数供未来明确开启时使用，当前不会参与生成。
+generateSync: false
+sync:
+  # 物理列名，不猜业务字段；每表可用 tableOverrides.<table>.syncMatchKey 覆盖。
+  # primary-key 是显式选择 metadata 主键的技术策略，接 ERP 前须确认其来源标识映射；不会自动采用。
+  matchKey: "code"
+  batchMaximum: 1000
+
+source:
+  # 当前生成读取已核对并迁移的 SIMPLE_B 验收库；本地连接快照不入 Git、不包含隐藏项目默认值。
+  # 每次生成前仍须核对中心 Factory / Datasource 绑定；其他业务库先执行正式迁移。
+  connectionConfig: ".local/codegen-simple-b.yml"
+  datasource: "acceptance"
+  # null 表示不指定 schema，使用连接所选数据库的 metadata 范围。
+  schema: null
+
+selection:
+  # [] 表示全部表；[pro_workorder] 表示只生成这张表。
+  # [pro_workorder, person] 表示只生成列出的表。
+  tables: [workorder, wm_warehouse, workorder_erp_extra, wm_warehouse_erp_extra]
+  # 全量生成时明确跳过的表；默认草案为空，不猜测哪些属于业务表。
+  # 排除 Flyway 迁移历史技术表，防止生成其 CRUD/同步接口。
+  # pro_workorder 为已退役的 Source 结构，不能重新生成旧技术工单入口。
+  # 旧批次及路径仅保留历史读取，禁止全量生成重新开放其写入 CRUD。
+  excludeTables: [flyway_business_schema_history, qc_index, qc_defect, pro_workorder, md_workshop, md_unit_measure, production_batch, batch_route_node, mes_execution_path, mes_execution_path_node, mes_material_issue_submission]
+  # 与表选择独立：all 表示所有产物；也可指定 persistence/backend/frontend/menu/test。
+  artifacts: [persistence, backend, test]
+
+naming:
+  # 功能模块：决定 API 分组及前端目录，不是 Maven 模块或数据库名称。
+  # 例如 pro_workorder -> pro；person -> business。
+  module:
+    strategy: "table-prefix"
+    separator: "_"
+    # 无分隔符时使用的模块/包段，可修改；本项目约定值为 business。
+    # person -> dev.mesbase.modules.business；改为 common 后包段为 common。
+    # 此值应由配置提供，未来实现不能在生成器中暗藏 business 默认值。
+    fallback: "business"
+  # 表名按下划线转 PascalCase：pro_workorder -> ProWorkorder。
+  # 类名和字段名由技术命名规则转换，不逐个强制手工输入。
+  className:
+    strategy: "table-pascal-case"
+  # 页面显示名来自表注释；没有注释时明确采用完整表名。
+  displayName:
+    strategy: "table-comment"
+    fallback: "table-name"
+  author: "MES Base"
+
+output:
+  # 路径相对于后端仓库根解析，不相对于当前 shell 目录。
+  backendRoot: "target/source-v17-codegen"
+  backendModule: "mes-business"
+  frontendRoot: "target/source-v17-codegen-ui"
+  # {module} 等占位符是配置插值，不是生成器内置 MES 包规则。
+  javaPackage: "dev.mesbase.business.{module}"
+  packages:
+    domain: "domain"
+    mapper: "dao"
+    service: "service"
+    serviceImplementation: "service.impl"
+    controller: "controller"
+    response: "controller.vo"
+  frontendApi: "src/api/{module}/{classNameCamel}.ts"
+  frontendPage: "src/views/{module}/{classNameCamel}/index.vue"
+  frontendMenu: "src/menus/{module}/{classNameCamel}.json"
+  menuSql: "docs/generated/{module}/{classNameCamel}-menu.sql"
+  # SQL / Markdown 文档输出模式（前后端代码与菜单 JSON 不受影响）：
+  # per-table：按表分别输出 SQL / Markdown，保持原实现；SQL 使用上面的 menuSql 路径。
+  # merged：本次所选表的 SQL 合并为一个 .sql，权限说明合并为一个 .md，二者独立输出。
+  # 切回分开输出：把下面 mode 改为 "per-table"，sql / markdown 两个合并路径将不使用。
+  # 使用合并输出：mode 设为 "merged"，并分别指定 sql / markdown 路径（不能含表或模块占位符）。
+  # 路径相对于 backendRoot/backendModule；未配置 documents 时兼容原来的 per-table 模式。
+  # 仅改变本次生成产物，不自动删除此前按表输出的文档，不自动执行 SQL。
+  documents:
+    mode: "merged"
+    sql: "docs/generated/all-menu.sql"
+    markdown: "docs/generated/all-permissions.md"
+
+templates:
+  # 当前项目模板位置；未来换项目显式换模板包和其中的依赖引用。
+  root: "mes-generator/src/main/resources/codegen/base"
+  # MBG 持久化输出机制，仍是生成器自身的技术能力。
+  persistence: "mybatis3-xmlmapper"
+
+backend:
+  apiPath: "/api/{module}/{tableNameKebab}"
+  transactionManager: "businessTransactionManager"
+  conditional:
+    # false 表示不生成条件注解；此时 property/value 显式为 null。
+    enabled: true
+    property: "mes.production.closure.internal-crud.enabled"
+    value: "true"
+  permission:
+    # 不从 backendModule 自动推断，也不关联物理数据库名。
+    prefix: "business"
+    resource: "{tableNameColon}"
+    scope: "factory"
+    actions: [list, query, create, update, delete]
+    # 单删、批删均使用 delete 权限。
+    batchDeleteAction: "delete"
+
+fields:
+  # 先显式保留现行工程约定，是否需要这些审计字段规则可继续讨论。
+  audit: [create_by, create_time, update_by, update_time]
+  maxStringValidationLength: 10000
+  # 不设置字段名业务黑名单，不自动推断人员、资源或工厂业务。
+
+limits:
+  pageDefault: 20
+  pageMaximum: 100
+  batchDeleteMaximum: 100
+
+frontend:
+  crudComponent: "@/components/CrudPage.vue"
+  requestModule: "@/lib/request"
+  fieldTypesModule: "@/lib/crud"
+
+menu:
+  table: "sys_menu"
+  parentId: 0
+  directoryName: "基础数据"
+  # 目录路由标识，独立于 API/Java/页面所属模块；相同 parentId + directoryPath 共用一个目录。
+  # 固定 basic：所有生成业务页归入同一个“基础数据”；不会按 basic/dv/md/pro/qc 分建同名目录。
+  # 按模块分别建目录时可改为 "{module}"；旧配置不填写此项时保留按模块建目录的行为。
+  # 修改目录路径会调整生成页面的父目录，不自动删除旧目录，也不新增角色授权。
+  directoryPath: "basic"
+  directoryOrder: 0
+  pageOrder: 0
+  icon: "list"
+  frontendIcon: "List"
+  createdBy: "codegen"
+  # 是否需要生成旧权限名迁移 UPDATE，明确关闭而非默认猜测历史。
+  migrateLegacyPermissions: false
+
+execution:
+  # dry-run：读取表结构、生成内容并预检目标文件，不写入生成代码；仍会写调用时指定的 JSON 报告。
+  # write：全部预检通过后才写入生成文件；生成的菜单 SQL 仍需人工审查、另行执行。
+  # 注意：dry-run 同样检查覆盖策略，已有文件内容不同也会报 FAILED_PREFLIGHT / OUTPUT_CONFLICT。
+  mode: "write"
+  # fail：新文件允许生成；已有文件内容完全相同则保留；内容不同则拒绝本轮发布。
+  # replace-generated：仅当已有文件和新内容都带 MES-CODEGEN 标记时，允许覆盖不同内容。
+  # 该选项会覆盖生成文件中的手工修改，不做增量合并；没有生成标记的不同内容仍会拒绝。
+  # 正式重新生成已有代码：mode 改为 write，overwrite 改为 replace-generated，并先审查已有修改。
+  # 仅查看覆盖后的预期产物：保留 dry-run，改为 replace-generated；不会实际覆盖代码。
+  # 想先生成一份可查看的文件：复制本配置，将 backendRoot/frontendRoot 改到独立的 target 目录，
+  # 再使用 write + fail；不要为了查看效果直接覆盖前后端项目中的现有代码。
+  overwrite: "fail"
+  formatJava: false
+  formatter: "scripts/format-java"
+  # 批量预检全部完成后才发布，避免后面的表失败留下半套产物。
+  # 报告 supported 表示表结构支持生成；rejected 中 <output> / OUTPUT_CONFLICT 表示输出冲突，
+  # 不表示另外一张表不支持。FAILED_PREFLIGHT 时，本轮不会发布任何生成文件。
+  publication: "preflight-all"
+  unsupportedTable: "fail"
+
+# 每表覆盖不是额外的生成选择；只有 selection 选中的表才会生成。
+tableOverrides:
+  workorder:
+    module: production
+    displayName: 生产工单
+  wm_warehouse:
+    module: wm
+    displayName: 仓库管理
+  workorder_erp_extra:
+    module: production
+    displayName: 工单外部身份
+  wm_warehouse_erp_extra:
+    module: wm
+    displayName: 仓库外部身份
