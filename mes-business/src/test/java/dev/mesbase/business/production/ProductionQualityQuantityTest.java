@@ -19,6 +19,7 @@ import dev.mesbase.business.quality.service.ProductionDefectQuantityQuery;
 import dev.mesbase.business.quality.dao.MesProductionDefectMapper;
 import dev.mesbase.business.quality.domain.ProductionDefectModels.NodeTotal;
 import dev.mesbase.business.quality.service.ExecutionQualityReferenceQueryImpl;
+import dev.mesbase.business.quality.service.QualityTreatmentService;
 import java.math.BigDecimal;
 import dev.mesbase.business.production.domain.ProductionInputBalance;
 import java.util.List;
@@ -65,14 +66,15 @@ class ProductionQualityQuantityTest {
     }
 
     @Test
-    void typedQualityQueryReusesOneBatchMapperCallAndNeverHidesFailure() {
+    void typedQualityQueryUsesSharedTreatmentProjectionAndNeverHidesFailure() {
         var mapper = mock(MesProductionDefectMapper.class);
-        var query = new ExecutionQualityReferenceQueryImpl(mapper);
+        var treatments = mock(QualityTreatmentService.class);
+        var query = new ExecutionQualityReferenceQueryImpl(mapper, treatments);
         var values = List.of(new NodeTotal(11L, d("5")), new NodeTotal(12L, d("3")));
-        when(mapper.nodeTotals(1L)).thenReturn(values);
+        when(treatments.nodeTotals(1L)).thenReturn(values);
         assertEquals(values, query.nodeTotals(1L));
-        verify(mapper).nodeTotals(1L);
-        when(mapper.nodeTotals(2L)).thenThrow(new IllegalStateException("TEST ONLY query failure"));
+        verify(treatments).nodeTotals(1L);
+        when(treatments.nodeTotals(2L)).thenThrow(new IllegalStateException("TEST ONLY query failure"));
         assertThrows(IllegalStateException.class, () -> query.nodeTotals(2L));
     }
 

@@ -13,9 +13,11 @@ import org.springframework.transaction.annotation.Transactional;
 @ConditionalOnProperty(name = "mes.business.enabled", havingValue = "true")
 public class ExecutionQualityReferenceQueryImpl implements ExecutionQualityReferenceQuery, ProductionDefectQuantityQuery {
     private final MesProductionDefectMapper mapper;
+    private final QualityTreatmentService treatments;
 
-    public ExecutionQualityReferenceQueryImpl(MesProductionDefectMapper mapper) {
+    public ExecutionQualityReferenceQueryImpl(MesProductionDefectMapper mapper, QualityTreatmentService treatments) {
         this.mapper = mapper;
+        this.treatments = treatments;
     }
 
     @Override
@@ -29,6 +31,6 @@ public class ExecutionQualityReferenceQueryImpl implements ExecutionQualityRefer
     @Transactional(transactionManager = "businessTransactionManager", readOnly = true)
     public List<NodeTotal> nodeTotals(Long executionId) {
         if (executionId == null) throw new FoundationException(ErrorCode.BAD_REQUEST);
-        return mapper.nodeTotals(executionId);
+        return treatments.nodeTotals(executionId);
     }
 }

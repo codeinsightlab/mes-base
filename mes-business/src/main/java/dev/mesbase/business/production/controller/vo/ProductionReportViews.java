@@ -28,7 +28,10 @@ public final class ProductionReportViews {
     public record Node(String executionId, String routingNodeId, String operationId, String code, String name,
                        int sequenceNo,
                        String inputQty, String reportedQty, String defectQty, String effectiveOutputQty,
-                       String availableQty, boolean qualityIntegrated) {
+                       String availableQty, boolean qualityIntegrated, String directDefectQty, String recoveredQty,
+                       String netDefectQty, String propagatedLossQty, String historicalOverrunQty,
+                       String rawEffectiveOutputQty, String rawAvailableQty, String unverifiedDefectQty,
+                       boolean historicalConflict) {
     }
 
     public record Execution(String executionId, String workorderId, String executionNo, String routingId,
@@ -64,7 +67,7 @@ public final class ProductionReportViews {
 
     public static Node node(NodeQuantity n) {
         return new Node(id(n.executionId()), id(n.routingNodeId()), id(n.operationId()), n.code(), n.name(), n.sequenceNo(),
-                decimal(n.inputQty()), decimal(n.reportedQty()), decimal(n.defectQty()), decimal(n.effectiveOutputQty()), decimal(n.availableQty()), n.qualityIntegrated());
+                decimal(n.inputQty()), decimal(n.reportedQty()), decimal(n.defectQty()), decimal(n.effectiveOutputQty()), decimal(n.availableQty()), n.qualityIntegrated(), decimal(n.directDefectQty()), decimal(n.recoveredQty()), decimal(n.netDefectQty()), decimal(n.propagatedLossQty()), decimal(n.historicalOverrunQty()), decimal(n.rawEffectiveOutputQty()), decimal(n.rawAvailableQty()), decimal(n.unverifiedDefectQty()), n.historicalConflict());
     }
 
     public static Summary summary(ExecutionSummary e, String routingLabel) {

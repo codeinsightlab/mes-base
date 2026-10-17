@@ -118,14 +118,4 @@
     <if test="workorderId != null">AND EXISTS (SELECT 1 FROM mes_production_execution e WHERE e.id=execution_id AND e.workorder_id=#{workorderId})</if>
     ORDER BY recorded_at DESC,id DESC
   </select>
-  <select id="sumEffective" resultType="java.math.BigDecimal">
-    <bind name="voidAction" value="@dev.mesbase.business.quality.domain.DefectRecordAction@VOID.getValue()"/>
-    SELECT COALESCE(SUM(defect_qty),0) FROM mes_production_defect WHERE <include refid="Latest"/>
-    AND record_action &lt;&gt; #{voidAction} AND execution_id=#{executionId} AND affected_node_id=#{affectedNodeId}
-  </select>
-  <select id="nodeTotals" resultType="dev.mesbase.business.quality.domain.ProductionDefectModels$NodeTotal">
-    <bind name="voidAction" value="@dev.mesbase.business.quality.domain.DefectRecordAction@VOID.getValue()"/>
-    SELECT affected_node_id, SUM(defect_qty) AS effective_defect_qty FROM mes_production_defect WHERE <include refid="Latest"/>
-    AND record_action &lt;&gt; #{voidAction} AND execution_id=#{executionId} GROUP BY affected_node_id
-  </select>
 </mapper>

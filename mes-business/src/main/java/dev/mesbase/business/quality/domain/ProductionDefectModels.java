@@ -1,6 +1,7 @@
 package dev.mesbase.business.quality.domain;
 
 import jakarta.validation.Valid;
+import dev.mesbase.business.quality.domain.QualityTreatmentModels.Assessment;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
@@ -28,7 +29,10 @@ public final class ProductionDefectModels {
     }
 
     public record Command(@NotBlank @Size(max = 64) String requestKey, Integer expectedRevision,
-                          @Size(max = 500) String revisionReason, @Valid Facts facts) {
+                          @Size(max = 500) String revisionReason, @Valid Facts facts, Assessment assessment) {
+        public Command(String requestKey, Integer expectedRevision, String revisionReason, Facts facts) {
+            this(requestKey, expectedRevision, revisionReason, facts, null);
+        }
     }
 
     public record Names(Map<Long, String> nodes, Map<Long, String> users, Map<Long, String> warehouses) {
@@ -37,7 +41,11 @@ public final class ProductionDefectModels {
     public record Page(List<MesProductionDefectEntity> items, long total, int offset, int limit, Names names) {
     }
 
-    public record NodeTotal(Long affectedNodeId, BigDecimal effectiveDefectQty) {
+    public record NodeTotal(Long affectedNodeId, BigDecimal effectiveDefectQty, BigDecimal recoveredQty,
+                            BigDecimal unverifiedQty, BigDecimal directDefectQty) {
+        public NodeTotal(Long affectedNodeId, BigDecimal effectiveDefectQty) {
+            this(affectedNodeId, effectiveDefectQty, BigDecimal.ZERO, BigDecimal.ZERO, effectiveDefectQty);
+        }
     }
 
     public record Node(String id, String name, int sequenceNo) {

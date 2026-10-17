@@ -33,7 +33,36 @@ public final class ProductionReportModels {
 
     public record NodeQuantity(Long executionId, Long routingNodeId, Long operationId, String code, String name,
                                int sequenceNo, BigDecimal inputQty, BigDecimal reportedQty, BigDecimal defectQty,
-                               BigDecimal effectiveOutputQty, BigDecimal availableQty, boolean qualityIntegrated) {
+                               BigDecimal effectiveOutputQty, BigDecimal availableQty, boolean qualityIntegrated,
+                               BigDecimal recoveredQty, BigDecimal historicalOverrunQty,
+                               BigDecimal rawEffectiveOutputQty, BigDecimal rawAvailableQty,
+                               BigDecimal unverifiedDefectQty, BigDecimal directDefectQty) {
+        public NodeQuantity(Long executionId, Long routingNodeId, Long operationId, String code, String name,
+                            int sequenceNo, BigDecimal inputQty, BigDecimal reportedQty, BigDecimal defectQty,
+                            BigDecimal effectiveOutputQty, BigDecimal availableQty, boolean qualityIntegrated) {
+            this(executionId, routingNodeId, operationId, code, name, sequenceNo, inputQty, reportedQty, defectQty, effectiveOutputQty, availableQty, qualityIntegrated, BigDecimal.ZERO, BigDecimal.ZERO, effectiveOutputQty, availableQty, BigDecimal.ZERO, defectQty);
+        }
+
+        public NodeQuantity(Long executionId, Long routingNodeId, Long operationId, String code, String name,
+                            int sequenceNo, BigDecimal inputQty, BigDecimal reportedQty, BigDecimal defectQty,
+                            BigDecimal effectiveOutputQty, BigDecimal availableQty, boolean qualityIntegrated,
+                            BigDecimal recoveredQty, BigDecimal historicalOverrunQty, BigDecimal rawEffectiveOutputQty,
+                            BigDecimal rawAvailableQty, BigDecimal unverifiedDefectQty) {
+            this(executionId, routingNodeId, operationId, code, name, sequenceNo, inputQty, reportedQty, defectQty, effectiveOutputQty, availableQty, qualityIntegrated, recoveredQty, historicalOverrunQty, rawEffectiveOutputQty, rawAvailableQty, unverifiedDefectQty, defectQty);
+        }
+
+        public BigDecimal netDefectQty() {
+            return directDefectQty.subtract(recoveredQty);
+        }
+
+        public BigDecimal propagatedLossQty() {
+            return historicalOverrunQty;
+        }
+
+        public boolean historicalConflict() {
+            return historicalOverrunQty.signum() > 0 || rawEffectiveOutputQty.signum() < 0;
+        }
+
     }
 
     public record ExecutionQuantity(Long executionId, Long workorderId, String executionNo, Long routingId,

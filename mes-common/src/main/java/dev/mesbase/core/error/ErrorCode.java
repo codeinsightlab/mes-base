@@ -8,6 +8,8 @@ public enum ErrorCode {
     RECEIPT_QUANTITY_CONFLICT(409, "交接超出末道有效产出额度，或冲销超过原始剩余余额"),
     RECEIPT_IDEMPOTENCY_CONFLICT(409, "请求UUID已用于其他交接动作、参数或操作人"),
     EXECUTION_QUALITY_REFERENCED(409, "该生产执行已存在质量申报历史，为保证生产追溯，不允许删除或重新选择实际路径"),
+    QUALITY_TREATMENT_CONFLICT(409, "质量处置数量、版本或归属冲突，请刷新后核实"),
+    QUALITY_ATTRIBUTION_REQUIRED(409, "不良归属待核实，暂不能据此继续报工或交接"),
     DEFECT_IDEMPOTENCY_CONFLICT(409, "不良申报请求标识已用于不同命令"),
     DEFECT_REVISION_CONFLICT(409, "不良申报已订正或作废，请刷新后重试"),
     REPORT_PATH_REQUIRED(409, "报工必须引用执行已锁定的完整实际路径"),

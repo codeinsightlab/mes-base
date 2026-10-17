@@ -111,7 +111,7 @@ public class MaterialIssueVoidService {
                 row.setStatus(MaterialIssueStatus.VOID_PENDING.getValue());
                 save(row);
                 if (row.getExecutionId() != null && inputFacts.find(id) != null)
-                    quantities.getExecutionQuantities(row.getExecutionId());
+                    quantities.validateInputReduction(row.getExecutionId());
             }
             return new Prepared(row, true, rules.extraVersion(id));
         });

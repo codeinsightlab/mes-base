@@ -4,7 +4,7 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 
 public enum DefectDestination {
-    ROUTING_NODE("退指定工序", "ROUTING_NODE"), WAREHOUSE("退指定仓库", "WAREHOUSE");
+    SAME_NODE("所属工序处置", "SAME_NODE"), ROUTING_NODE("退指定工序", "ROUTING_NODE"), WAREHOUSE("退指定仓库", "WAREHOUSE");
     private final String description;
     private final String value;
 

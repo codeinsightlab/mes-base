@@ -1,0 +1,464 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- MES-CODEGEN: MyBatis Generator standard single-table persistence. -->
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="dev.mesbase.business.quality.dao.MesQualityTreatmentMapper">
+  <resultMap id="BaseResultMap" type="dev.mesbase.business.quality.domain.MesQualityTreatmentEntity">
+    <id column="id" jdbcType="VARCHAR" property="id" />
+    <result column="request_hash" jdbcType="CHAR" property="requestHash" />
+    <result column="declaration_id" jdbcType="VARCHAR" property="declarationId" />
+    <result column="declaration_revision" jdbcType="INTEGER" property="declarationRevision" />
+    <result column="execution_id" jdbcType="BIGINT" property="executionId" />
+    <result column="routing_node_id" jdbcType="BIGINT" property="routingNodeId" />
+    <result column="action_type" jdbcType="VARCHAR" property="actionType" />
+    <result column="parent_id" jdbcType="VARCHAR" property="parentId" />
+    <result column="attribution_type" jdbcType="VARCHAR" property="attributionType" />
+    <result column="related_declaration_id" jdbcType="VARCHAR" property="relatedDeclarationId" />
+    <result column="basis" jdbcType="VARCHAR" property="basis" />
+    <result column="scrap_qty" jdbcType="DECIMAL" property="scrapQty" />
+    <result column="rework_qty" jdbcType="DECIMAL" property="reworkQty" />
+    <result column="processed_qty" jdbcType="DECIMAL" property="processedQty" />
+    <result column="recovered_qty" jdbcType="DECIMAL" property="recoveredQty" />
+    <result column="failed_qty" jdbcType="DECIMAL" property="failedQty" />
+    <result column="operator_user_id" jdbcType="BIGINT" property="operatorUserId" />
+    <result column="confirmed_by" jdbcType="BIGINT" property="confirmedBy" />
+    <result column="occurred_at" jdbcType="TIMESTAMP" property="occurredAt" />
+    <result column="recorded_at" jdbcType="TIMESTAMP" property="recordedAt" />
+    <result column="reason" jdbcType="VARCHAR" property="reason" />
+  </resultMap>
+  <sql id="Example_Where_Clause">
+    <where>
+      <foreach collection="oredCriteria" item="criteria" separator="or">
+        <if test="criteria.valid">
+          <trim prefix="(" prefixOverrides="and" suffix=")">
+            <foreach collection="criteria.criteria" item="criterion">
+              <choose>
+                <when test="criterion.noValue">
+                  and ${criterion.condition}
+                </when>
+                <when test="criterion.singleValue">
+                  and ${criterion.condition} #{criterion.value}
+                </when>
+                <when test="criterion.betweenValue">
+                  and ${criterion.condition} #{criterion.value} and #{criterion.secondValue}
+                </when>
+                <when test="criterion.listValue">
+                  and ${criterion.condition}
+                  <foreach close=")" collection="criterion.value" item="listItem" open="(" separator=",">
+                    #{listItem}
+                  </foreach>
+                </when>
+              </choose>
+            </foreach>
+          </trim>
+        </if>
+      </foreach>
+    </where>
+  </sql>
+  <sql id="Update_By_Example_Where_Clause">
+    <where>
+      <foreach collection="example.oredCriteria" item="criteria" separator="or">
+        <if test="criteria.valid">
+          <trim prefix="(" prefixOverrides="and" suffix=")">
+            <foreach collection="criteria.criteria" item="criterion">
+              <choose>
+                <when test="criterion.noValue">
+                  and ${criterion.condition}
+                </when>
+                <when test="criterion.singleValue">
+                  and ${criterion.condition} #{criterion.value}
+                </when>
+                <when test="criterion.betweenValue">
+                  and ${criterion.condition} #{criterion.value} and #{criterion.secondValue}
+                </when>
+                <when test="criterion.listValue">
+                  and ${criterion.condition}
+                  <foreach close=")" collection="criterion.value" item="listItem" open="(" separator=",">
+                    #{listItem}
+                  </foreach>
+                </when>
+              </choose>
+            </foreach>
+          </trim>
+        </if>
+      </foreach>
+    </where>
+  </sql>
+  <sql id="Base_Column_List">
+    id, request_hash, declaration_id, declaration_revision, execution_id, routing_node_id, 
+    action_type, parent_id, attribution_type, related_declaration_id, basis, scrap_qty, 
+    rework_qty, processed_qty, recovered_qty, failed_qty, operator_user_id, confirmed_by, 
+    occurred_at, recorded_at, reason
+  </sql>
+  <select id="selectByExample" parameterType="dev.mesbase.business.quality.domain.MesQualityTreatmentExample" resultMap="BaseResultMap">
+    select
+    <include refid="Base_Column_List" />
+    from mes_quality_treatment
+    <if test="_parameter != null">
+      <include refid="Example_Where_Clause" />
+    </if>
+    <if test="orderByClause != null">
+      order by ${orderByClause}
+    </if>
+  </select>
+  <select id="selectByPrimaryKey" parameterType="String" resultMap="BaseResultMap">
+    select 
+    <include refid="Base_Column_List" />
+    from mes_quality_treatment
+    where id = #{id,jdbcType=VARCHAR}
+  </select>
+  <delete id="deleteByPrimaryKey" parameterType="String">
+    delete from mes_quality_treatment
+    where id = #{id,jdbcType=VARCHAR}
+  </delete>
+  <delete id="deleteByExample" parameterType="dev.mesbase.business.quality.domain.MesQualityTreatmentExample">
+    delete from mes_quality_treatment
+    <if test="_parameter != null">
+      <include refid="Example_Where_Clause" />
+    </if>
+  </delete>
+  <insert id="insert" parameterType="dev.mesbase.business.quality.domain.MesQualityTreatmentEntity">
+    insert into mes_quality_treatment (id, request_hash, declaration_id, 
+      declaration_revision, execution_id, routing_node_id, 
+      action_type, parent_id, attribution_type, 
+      related_declaration_id, basis, scrap_qty, 
+      rework_qty, processed_qty, recovered_qty, 
+      failed_qty, operator_user_id, confirmed_by, 
+      occurred_at, recorded_at, reason
+      )
+    values (#{id,jdbcType=VARCHAR}, #{requestHash,jdbcType=CHAR}, #{declarationId,jdbcType=VARCHAR}, 
+      #{declarationRevision,jdbcType=INTEGER}, #{executionId,jdbcType=BIGINT}, #{routingNodeId,jdbcType=BIGINT}, 
+      #{actionType,jdbcType=VARCHAR}, #{parentId,jdbcType=VARCHAR}, #{attributionType,jdbcType=VARCHAR}, 
+      #{relatedDeclarationId,jdbcType=VARCHAR}, #{basis,jdbcType=VARCHAR}, #{scrapQty,jdbcType=DECIMAL}, 
+      #{reworkQty,jdbcType=DECIMAL}, #{processedQty,jdbcType=DECIMAL}, #{recoveredQty,jdbcType=DECIMAL}, 
+      #{failedQty,jdbcType=DECIMAL}, #{operatorUserId,jdbcType=BIGINT}, #{confirmedBy,jdbcType=BIGINT}, 
+      #{occurredAt,jdbcType=TIMESTAMP}, #{recordedAt,jdbcType=TIMESTAMP}, #{reason,jdbcType=VARCHAR}
+      )
+  </insert>
+  <insert id="insertSelective" parameterType="dev.mesbase.business.quality.domain.MesQualityTreatmentEntity">
+    insert into mes_quality_treatment
+    <trim prefix="(" suffix=")" suffixOverrides=",">
+      <if test="id != null">
+        id,
+      </if>
+      <if test="requestHash != null">
+        request_hash,
+      </if>
+      <if test="declarationId != null">
+        declaration_id,
+      </if>
+      <if test="declarationRevision != null">
+        declaration_revision,
+      </if>
+      <if test="executionId != null">
+        execution_id,
+      </if>
+      <if test="routingNodeId != null">
+        routing_node_id,
+      </if>
+      <if test="actionType != null">
+        action_type,
+      </if>
+      <if test="parentId != null">
+        parent_id,
+      </if>
+      <if test="attributionType != null">
+        attribution_type,
+      </if>
+      <if test="relatedDeclarationId != null">
+        related_declaration_id,
+      </if>
+      <if test="basis != null">
+        basis,
+      </if>
+      <if test="scrapQty != null">
+        scrap_qty,
+      </if>
+      <if test="reworkQty != null">
+        rework_qty,
+      </if>
+      <if test="processedQty != null">
+        processed_qty,
+      </if>
+      <if test="recoveredQty != null">
+        recovered_qty,
+      </if>
+      <if test="failedQty != null">
+        failed_qty,
+      </if>
+      <if test="operatorUserId != null">
+        operator_user_id,
+      </if>
+      <if test="confirmedBy != null">
+        confirmed_by,
+      </if>
+      <if test="occurredAt != null">
+        occurred_at,
+      </if>
+      <if test="recordedAt != null">
+        recorded_at,
+      </if>
+      <if test="reason != null">
+        reason,
+      </if>
+    </trim>
+    <trim prefix="values (" suffix=")" suffixOverrides=",">
+      <if test="id != null">
+        #{id,jdbcType=VARCHAR},
+      </if>
+      <if test="requestHash != null">
+        #{requestHash,jdbcType=CHAR},
+      </if>
+      <if test="declarationId != null">
+        #{declarationId,jdbcType=VARCHAR},
+      </if>
+      <if test="declarationRevision != null">
+        #{declarationRevision,jdbcType=INTEGER},
+      </if>
+      <if test="executionId != null">
+        #{executionId,jdbcType=BIGINT},
+      </if>
+      <if test="routingNodeId != null">
+        #{routingNodeId,jdbcType=BIGINT},
+      </if>
+      <if test="actionType != null">
+        #{actionType,jdbcType=VARCHAR},
+      </if>
+      <if test="parentId != null">
+        #{parentId,jdbcType=VARCHAR},
+      </if>
+      <if test="attributionType != null">
+        #{attributionType,jdbcType=VARCHAR},
+      </if>
+      <if test="relatedDeclarationId != null">
+        #{relatedDeclarationId,jdbcType=VARCHAR},
+      </if>
+      <if test="basis != null">
+        #{basis,jdbcType=VARCHAR},
+      </if>
+      <if test="scrapQty != null">
+        #{scrapQty,jdbcType=DECIMAL},
+      </if>
+      <if test="reworkQty != null">
+        #{reworkQty,jdbcType=DECIMAL},
+      </if>
+      <if test="processedQty != null">
+        #{processedQty,jdbcType=DECIMAL},
+      </if>
+      <if test="recoveredQty != null">
+        #{recoveredQty,jdbcType=DECIMAL},
+      </if>
+      <if test="failedQty != null">
+        #{failedQty,jdbcType=DECIMAL},
+      </if>
+      <if test="operatorUserId != null">
+        #{operatorUserId,jdbcType=BIGINT},
+      </if>
+      <if test="confirmedBy != null">
+        #{confirmedBy,jdbcType=BIGINT},
+      </if>
+      <if test="occurredAt != null">
+        #{occurredAt,jdbcType=TIMESTAMP},
+      </if>
+      <if test="recordedAt != null">
+        #{recordedAt,jdbcType=TIMESTAMP},
+      </if>
+      <if test="reason != null">
+        #{reason,jdbcType=VARCHAR},
+      </if>
+    </trim>
+  </insert>
+  <select id="countByExample" parameterType="dev.mesbase.business.quality.domain.MesQualityTreatmentExample" resultType="java.lang.Long">
+    select count(*) from mes_quality_treatment
+    <if test="_parameter != null">
+      <include refid="Example_Where_Clause" />
+    </if>
+  </select>
+  <update id="updateByExampleSelective" parameterType="map">
+    update mes_quality_treatment
+    <set>
+      <if test="row.id != null">
+        id = #{row.id,jdbcType=VARCHAR},
+      </if>
+      <if test="row.requestHash != null">
+        request_hash = #{row.requestHash,jdbcType=CHAR},
+      </if>
+      <if test="row.declarationId != null">
+        declaration_id = #{row.declarationId,jdbcType=VARCHAR},
+      </if>
+      <if test="row.declarationRevision != null">
+        declaration_revision = #{row.declarationRevision,jdbcType=INTEGER},
+      </if>
+      <if test="row.executionId != null">
+        execution_id = #{row.executionId,jdbcType=BIGINT},
+      </if>
+      <if test="row.routingNodeId != null">
+        routing_node_id = #{row.routingNodeId,jdbcType=BIGINT},
+      </if>
+      <if test="row.actionType != null">
+        action_type = #{row.actionType,jdbcType=VARCHAR},
+      </if>
+      <if test="row.parentId != null">
+        parent_id = #{row.parentId,jdbcType=VARCHAR},
+      </if>
+      <if test="row.attributionType != null">
+        attribution_type = #{row.attributionType,jdbcType=VARCHAR},
+      </if>
+      <if test="row.relatedDeclarationId != null">
+        related_declaration_id = #{row.relatedDeclarationId,jdbcType=VARCHAR},
+      </if>
+      <if test="row.basis != null">
+        basis = #{row.basis,jdbcType=VARCHAR},
+      </if>
+      <if test="row.scrapQty != null">
+        scrap_qty = #{row.scrapQty,jdbcType=DECIMAL},
+      </if>
+      <if test="row.reworkQty != null">
+        rework_qty = #{row.reworkQty,jdbcType=DECIMAL},
+      </if>
+      <if test="row.processedQty != null">
+        processed_qty = #{row.processedQty,jdbcType=DECIMAL},
+      </if>
+      <if test="row.recoveredQty != null">
+        recovered_qty = #{row.recoveredQty,jdbcType=DECIMAL},
+      </if>
+      <if test="row.failedQty != null">
+        failed_qty = #{row.failedQty,jdbcType=DECIMAL},
+      </if>
+      <if test="row.operatorUserId != null">
+        operator_user_id = #{row.operatorUserId,jdbcType=BIGINT},
+      </if>
+      <if test="row.confirmedBy != null">
+        confirmed_by = #{row.confirmedBy,jdbcType=BIGINT},
+      </if>
+      <if test="row.occurredAt != null">
+        occurred_at = #{row.occurredAt,jdbcType=TIMESTAMP},
+      </if>
+      <if test="row.recordedAt != null">
+        recorded_at = #{row.recordedAt,jdbcType=TIMESTAMP},
+      </if>
+      <if test="row.reason != null">
+        reason = #{row.reason,jdbcType=VARCHAR},
+      </if>
+    </set>
+    <if test="example != null">
+      <include refid="Update_By_Example_Where_Clause" />
+    </if>
+  </update>
+  <update id="updateByExample" parameterType="map">
+    update mes_quality_treatment
+    set id = #{row.id,jdbcType=VARCHAR},
+      request_hash = #{row.requestHash,jdbcType=CHAR},
+      declaration_id = #{row.declarationId,jdbcType=VARCHAR},
+      declaration_revision = #{row.declarationRevision,jdbcType=INTEGER},
+      execution_id = #{row.executionId,jdbcType=BIGINT},
+      routing_node_id = #{row.routingNodeId,jdbcType=BIGINT},
+      action_type = #{row.actionType,jdbcType=VARCHAR},
+      parent_id = #{row.parentId,jdbcType=VARCHAR},
+      attribution_type = #{row.attributionType,jdbcType=VARCHAR},
+      related_declaration_id = #{row.relatedDeclarationId,jdbcType=VARCHAR},
+      basis = #{row.basis,jdbcType=VARCHAR},
+      scrap_qty = #{row.scrapQty,jdbcType=DECIMAL},
+      rework_qty = #{row.reworkQty,jdbcType=DECIMAL},
+      processed_qty = #{row.processedQty,jdbcType=DECIMAL},
+      recovered_qty = #{row.recoveredQty,jdbcType=DECIMAL},
+      failed_qty = #{row.failedQty,jdbcType=DECIMAL},
+      operator_user_id = #{row.operatorUserId,jdbcType=BIGINT},
+      confirmed_by = #{row.confirmedBy,jdbcType=BIGINT},
+      occurred_at = #{row.occurredAt,jdbcType=TIMESTAMP},
+      recorded_at = #{row.recordedAt,jdbcType=TIMESTAMP},
+      reason = #{row.reason,jdbcType=VARCHAR}
+    <if test="example != null">
+      <include refid="Update_By_Example_Where_Clause" />
+    </if>
+  </update>
+  <update id="updateByPrimaryKeySelective" parameterType="dev.mesbase.business.quality.domain.MesQualityTreatmentEntity">
+    update mes_quality_treatment
+    <set>
+      <if test="requestHash != null">
+        request_hash = #{requestHash,jdbcType=CHAR},
+      </if>
+      <if test="declarationId != null">
+        declaration_id = #{declarationId,jdbcType=VARCHAR},
+      </if>
+      <if test="declarationRevision != null">
+        declaration_revision = #{declarationRevision,jdbcType=INTEGER},
+      </if>
+      <if test="executionId != null">
+        execution_id = #{executionId,jdbcType=BIGINT},
+      </if>
+      <if test="routingNodeId != null">
+        routing_node_id = #{routingNodeId,jdbcType=BIGINT},
+      </if>
+      <if test="actionType != null">
+        action_type = #{actionType,jdbcType=VARCHAR},
+      </if>
+      <if test="parentId != null">
+        parent_id = #{parentId,jdbcType=VARCHAR},
+      </if>
+      <if test="attributionType != null">
+        attribution_type = #{attributionType,jdbcType=VARCHAR},
+      </if>
+      <if test="relatedDeclarationId != null">
+        related_declaration_id = #{relatedDeclarationId,jdbcType=VARCHAR},
+      </if>
+      <if test="basis != null">
+        basis = #{basis,jdbcType=VARCHAR},
+      </if>
+      <if test="scrapQty != null">
+        scrap_qty = #{scrapQty,jdbcType=DECIMAL},
+      </if>
+      <if test="reworkQty != null">
+        rework_qty = #{reworkQty,jdbcType=DECIMAL},
+      </if>
+      <if test="processedQty != null">
+        processed_qty = #{processedQty,jdbcType=DECIMAL},
+      </if>
+      <if test="recoveredQty != null">
+        recovered_qty = #{recoveredQty,jdbcType=DECIMAL},
+      </if>
+      <if test="failedQty != null">
+        failed_qty = #{failedQty,jdbcType=DECIMAL},
+      </if>
+      <if test="operatorUserId != null">
+        operator_user_id = #{operatorUserId,jdbcType=BIGINT},
+      </if>
+      <if test="confirmedBy != null">
+        confirmed_by = #{confirmedBy,jdbcType=BIGINT},
+      </if>
+      <if test="occurredAt != null">
+        occurred_at = #{occurredAt,jdbcType=TIMESTAMP},
+      </if>
+      <if test="recordedAt != null">
+        recorded_at = #{recordedAt,jdbcType=TIMESTAMP},
+      </if>
+      <if test="reason != null">
+        reason = #{reason,jdbcType=VARCHAR},
+      </if>
+    </set>
+    where id = #{id,jdbcType=VARCHAR}
+  </update>
+  <update id="updateByPrimaryKey" parameterType="dev.mesbase.business.quality.domain.MesQualityTreatmentEntity">
+    update mes_quality_treatment
+    set request_hash = #{requestHash,jdbcType=CHAR},
+      declaration_id = #{declarationId,jdbcType=VARCHAR},
+      declaration_revision = #{declarationRevision,jdbcType=INTEGER},
+      execution_id = #{executionId,jdbcType=BIGINT},
+      routing_node_id = #{routingNodeId,jdbcType=BIGINT},
+      action_type = #{actionType,jdbcType=VARCHAR},
+      parent_id = #{parentId,jdbcType=VARCHAR},
+      attribution_type = #{attributionType,jdbcType=VARCHAR},
+      related_declaration_id = #{relatedDeclarationId,jdbcType=VARCHAR},
+      basis = #{basis,jdbcType=VARCHAR},
+      scrap_qty = #{scrapQty,jdbcType=DECIMAL},
+      rework_qty = #{reworkQty,jdbcType=DECIMAL},
+      processed_qty = #{processedQty,jdbcType=DECIMAL},
+      recovered_qty = #{recoveredQty,jdbcType=DECIMAL},
+      failed_qty = #{failedQty,jdbcType=DECIMAL},
+      operator_user_id = #{operatorUserId,jdbcType=BIGINT},
+      confirmed_by = #{confirmedBy,jdbcType=BIGINT},
+      occurred_at = #{occurredAt,jdbcType=TIMESTAMP},
+      recorded_at = #{recordedAt,jdbcType=TIMESTAMP},
+      reason = #{reason,jdbcType=VARCHAR}
+    where id = #{id,jdbcType=VARCHAR}
+  </update>
+</mapper>

@@ -1,6 +1,7 @@
 package dev.issuefixture;
 
 import dev.mesbase.business.quality.service.ExecutionQualityReferenceQueryImpl;
+import dev.mesbase.business.quality.service.QualityTreatmentService;
 
 import dev.mesbase.acceptance.AcceptanceBusinessDatabase;
 import dev.mesbase.business.production.dao.MesProductionReportMapper;
@@ -102,7 +103,7 @@ class ProductionReportMySqlTest {
         c.registerBean(SysUserMapper.class, () -> center.mapper(SysUserMapper.class));
         c.registerBean(BusinessDirectoryService.class, () -> new BusinessDirectoryService(
                 c.getBean(SysUserMapper.class), mock(SysDeptMapper.class), mock(SysPostMapper.class), new DetailEntityCache(mock(RedisCache.class), new MockEnvironment()), mock(BusinessCacheProcessor.class), center, c.getBeanProvider(OwnedTransactionManager.class), c.getBeanProvider(RoutingMapper.class), c.getBeanProvider(OperationMapper.class)));
-        c.register(ExecutionQualityReferenceQueryImpl.class, ProductionReportService.class, ProductionQuantityService.class, ReportUserReferenceService.class, ProductionChainLocks.class, ProductionExecutionRules.class, ExecutionPathService.class);
+        c.register(QualityTreatmentService.class, ExecutionQualityReferenceQueryImpl.class, ProductionReportService.class, ProductionQuantityService.class, ReportUserReferenceService.class, ProductionChainLocks.class, ProductionExecutionRules.class, ExecutionPathService.class);
         c.refresh();
         return c;
     }

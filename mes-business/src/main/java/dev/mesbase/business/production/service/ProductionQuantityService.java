@@ -50,7 +50,7 @@ public class ProductionQuantityService {
     }
 
     public ExecutionQuantity getExecutionQuantities(Long executionId) {
-        return calculate(load(executionId), null, BigDecimal.ZERO, BigDecimal.ZERO);
+        return project(load(executionId));
     }
 
     private ExecutionQuantity load(Long executionId) {
@@ -74,16 +74,17 @@ public class ProductionQuantityService {
         var totals = quantities.nodeTotals(executionId).stream()
                 .collect(Collectors.toMap(t -> t.routingNodeId(), t -> t.reportedQty()));
         var defectTotals = defects.nodeTotals(executionId).stream()
-                .collect(Collectors.toMap(t -> t.affectedNodeId(), t -> t.effectiveDefectQty()));
+                .collect(Collectors.toMap(t -> t.affectedNodeId(), t -> t));
         var result = new ArrayList<NodeQuantity>();
         for (int i = 0; i < ordered.size(); i++) {
             var node = nodeMap.get(ordered.get(i).getRoutingNodeId());
             var reported = totals.getOrDefault(node.getId(), BigDecimal.ZERO);
-            var defect = defectTotals.getOrDefault(node.getId(), BigDecimal.ZERO);
+            var quality = defectTotals.get(node.getId());
+            var defect = quality == null ? BigDecimal.ZERO : quality.effectiveDefectQty();
             result.add(new NodeQuantity(executionId, node.getId(), node.getOperationId(), node.getNodeCode(), node.getOperationName() != null ? node.getOperationName() : model.operationLabels()
                     .containsKey(node.getOperationId()) ? model.operationLabels().get(node.getOperationId())
                     .name() + "（当前名称）" : null, i + 1,
-                    BigDecimal.ZERO, reported, defect, BigDecimal.ZERO, BigDecimal.ZERO, true));
+                    BigDecimal.ZERO, reported, defect, BigDecimal.ZERO, BigDecimal.ZERO, true, quality == null ? BigDecimal.ZERO : quality.recoveredQty(), BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, quality == null ? BigDecimal.ZERO : quality.unverifiedQty(), quality == null ? BigDecimal.ZERO : quality.directDefectQty()));
         }
         boolean locked = ExecutionPathStatus.LOCKED.getValue().equals(model.path().getPathStatus());
         return new ExecutionQuantity(executionId, execution.getWorkorderId(), execution.getExecutionNo(), execution.getRoutingId(),
@@ -117,9 +118,24 @@ public class ProductionQuantityService {
         return new ExecutionPage(rows, total, offset, limit, labels);
     }
 
+    public static ExecutionQuantity project(ExecutionQuantity view) {
+        return calculate(view, null, BigDecimal.ZERO, BigDecimal.ZERO);
+    }
+
     public static void validateChange(ExecutionQuantity view, Long nodeId, BigDecimal delta) {
         if (!view.writable()) unavailable();
-        calculate(view, nodeId, delta, BigDecimal.ZERO);
+        var before = calculate(view, null, BigDecimal.ZERO, BigDecimal.ZERO);
+        if (before.nodes().stream().anyMatch(n -> n.unverifiedDefectQty().signum() > 0))
+            throw new FoundationException(ErrorCode.QUALITY_ATTRIBUTION_REQUIRED);
+        var after = calculate(view, nodeId, delta, BigDecimal.ZERO);
+        for (int i = 0; i < after.nodes().size(); i++) {
+            var n = after.nodes().get(i);
+            var old = before.nodes().get(i);
+            if (n.historicalOverrunQty().compareTo(old.historicalOverrunQty()) > 0 || n.routingNodeId()
+                    .equals(nodeId) && delta.signum() > 0 && n.reportedQty().compareTo(n.inputQty()) > 0)
+                throw new ProductionQuantityConflictException(n.routingNodeId(), i == 0 ? null : after.nodes()
+                        .get(i - 1).routingNodeId(), n.inputQty(), n.reportedQty(), n.netDefectQty());
+        }
     }
 
     /**
@@ -145,20 +161,36 @@ public class ProductionQuantityService {
         for (var node : view.nodes()) {
             var next = node.reportedQty();
             var defect = node.defectQty();
+            var direct = node.directDefectQty();
             if (node.routingNodeId().equals(nodeId)) {
                 next = next.add(reportDelta);
                 defect = defect.add(defectDelta);
+                direct = direct.add(defectDelta);
                 found = true;
             }
-            if (next.signum() < 0 || defect.signum() < 0 || next.compareTo(defect) < 0 || next.compareTo(input) > 0)
-                throw new ProductionQuantityConflictException(node.routingNodeId(), upstream, input, next, defect);
-            var output = next.subtract(defect);
-            result.add(new NodeQuantity(node.executionId(), node.routingNodeId(), node.operationId(), node.code(), node.name(), node.sequenceNo(), input, next, defect, output, input.subtract(next), node.qualityIntegrated()));
+            var netDefect = direct.subtract(node.recoveredQty());
+            if (next.signum() < 0 || defect.signum() < 0 || direct.signum() < 0 || node.recoveredQty()
+                    .signum() < 0 || netDefect.signum() < 0 || next.compareTo(direct) < 0)
+                throw new ProductionQuantityConflictException(node.routingNodeId(), upstream, input, next, netDefect);
+            var rawAvailable = input.subtract(next);
+            var historical = rawAvailable.negate().max(BigDecimal.ZERO);
+            var rawOutput = next.subtract(netDefect).subtract(historical);
+            var output = rawOutput.max(BigDecimal.ZERO);
+            result.add(new NodeQuantity(node.executionId(), node.routingNodeId(), node.operationId(), node.code(), node.name(), node.sequenceNo(), input, next, defect, output, rawAvailable.max(BigDecimal.ZERO), node.qualityIntegrated(), node.recoveredQty(), historical, rawOutput, rawAvailable, node.unverifiedDefectQty(), direct));
             input = output;
             upstream = node.routingNodeId();
         }
         if (nodeId != null && !found) unavailable();
-        return new ExecutionQuantity(view.executionId(), view.workorderId(), view.executionNo(), view.routingId(), view.targetQty(), view.pathStatus(), view.writable(), view.boundary(), List.copyOf(result), view.routingLabel(), view.productionInputQty(), view.confirmedInputQty(), view.reservedInputQty());
+        return new ExecutionQuantity(view.executionId(), view.workorderId(), view.executionNo(), view.routingId(), view.targetQty(), view.pathStatus(), view.writable() && result.stream()
+                .noneMatch(n -> n.unverifiedDefectQty().signum() > 0), result.stream()
+                .anyMatch(n -> n.unverifiedDefectQty()
+                        .signum() > 0) ? "不良归属待核实，禁止新增报工及正向交接" : view.boundary(), List.copyOf(result), view.routingLabel(), view.productionInputQty(), view.confirmedInputQty(), view.reservedInputQty());
+    }
+
+    public void validateInputReduction(Long executionId) {
+        var view = getExecutionQuantities(executionId);
+        if (view.nodes().stream().anyMatch(n -> n.historicalConflict() || n.unverifiedDefectQty().signum() > 0))
+            throw new FoundationException(ErrorCode.REPORT_QUANTITY_CONFLICT);
     }
 
     public static void paging(int offset, int limit) {

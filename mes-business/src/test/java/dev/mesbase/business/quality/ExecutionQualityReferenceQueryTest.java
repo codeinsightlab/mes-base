@@ -2,6 +2,7 @@ package dev.mesbase.business.quality;
 
 import dev.mesbase.business.quality.dao.MesProductionDefectMapper;
 import dev.mesbase.business.quality.service.ExecutionQualityReferenceQueryImpl;
+import dev.mesbase.business.quality.service.QualityTreatmentService;
 import dev.mesbase.core.error.FoundationException;
 import org.springframework.dao.DataAccessResourceFailureException;
 import org.junit.jupiter.api.Test;
@@ -18,7 +19,7 @@ class ExecutionQualityReferenceQueryTest {
     @Test
     void usesOnlyHistoryExistenceAndPropagatesDatabaseFailure() {
         var mapper = mock(MesProductionDefectMapper.class);
-        var query = new ExecutionQualityReferenceQueryImpl(mapper);
+        var query = new ExecutionQualityReferenceQueryImpl(mapper, mock(QualityTreatmentService.class));
         when(mapper.existsExecutionHistory(1L)).thenReturn(true);
         when(mapper.existsExecutionHistory(2L)).thenReturn(false);
         when(mapper.existsExecutionHistory(3L)).thenThrow(new DataAccessResourceFailureException("TEST ONLY unavailable"));

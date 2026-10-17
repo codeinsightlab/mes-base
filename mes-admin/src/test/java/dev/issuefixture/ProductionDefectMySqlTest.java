@@ -70,6 +70,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 
 import dev.mesbase.business.quality.service.ProductionDefectService;
+import dev.mesbase.business.quality.service.QualityTreatmentService;
+import dev.mesbase.business.quality.domain.QualityTreatmentModels.Assessment;
+import dev.mesbase.business.quality.domain.QualityTreatmentModels.Attribution;
 import dev.mesbase.business.production.service.ProductionQuantityService;
 import dev.mesbase.business.quality.integration.LocalProductionDefectErpGateway;
 import dev.mesbase.business.quality.dao.MesProductionDefectMapper;
@@ -113,7 +116,7 @@ class ProductionDefectMySqlTest {
         c.registerBean(SysUserMapper.class, () -> center.mapper(SysUserMapper.class));
         c.registerBean(BusinessDirectoryService.class, () -> new BusinessDirectoryService(
                 c.getBean(SysUserMapper.class), mock(SysDeptMapper.class), mock(SysPostMapper.class), new DetailEntityCache(mock(RedisCache.class), new MockEnvironment()), mock(BusinessCacheProcessor.class), center, c.getBeanProvider(OwnedTransactionManager.class), c.getBeanProvider(RoutingMapper.class), c.getBeanProvider(OperationMapper.class)));
-        c.register(ProductionQuantityService.class, ExecutionQualityReferenceQueryImpl.class, ProductionChainLocks.class, ProductionExecutionRules.class, ExecutionPathService.class);
+        c.register(QualityTreatmentService.class, ProductionQuantityService.class, ExecutionQualityReferenceQueryImpl.class, ProductionChainLocks.class, ProductionExecutionRules.class, ExecutionPathService.class);
         c.refresh();
         return c;
     }
@@ -124,7 +127,7 @@ class ProductionDefectMySqlTest {
 
 
     static Command command(String key, int revision, Long execution, Long node, Long warehouse, String qty) {
-        return new Command(key, revision == 0 ? null : revision, revision == 0 ? null : "TEST ONLY订正", new Facts(execution, node, node, null, new BigDecimal(qty), "MATERIAL", "TEST_ONLY_DEFECT_PHASE1", null, null, "WAREHOUSE", null, warehouse, null, LocalDateTime.of(2026, 1, 1, 10, 0)));
+        return new Command(key, revision == 0 ? null : revision, revision == 0 ? null : "TEST ONLY订正", new Facts(execution, node, node, null, new BigDecimal(qty), "MATERIAL", "TEST_ONLY_DEFECT_PHASE1", null, null, "WAREHOUSE", null, warehouse, null, LocalDateTime.of(2026, 1, 1, 10, 0)), new Assessment(Attribution.INDEPENDENT, null, "TEST ONLY reviewed independent fixture"));
     }
 
     @Test

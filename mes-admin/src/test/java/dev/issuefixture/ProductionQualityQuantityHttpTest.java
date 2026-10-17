@@ -89,36 +89,23 @@ class ProductionQualityQuantityHttpTest {
     }
 
     @Test
-    void strictLateDefectAndReverseReportProtectionLeaveFactsUnchanged() throws Exception {
+    void lateDefectPreservesReportsAndNewWritesStillRespectEffectiveInput() throws Exception {
         try (var c = context()) {
             var m = MaterialIssueHttpTest.mvc(c);
             long a = report(m, 11, "100");
             long b = report(m, 12, "98");
             var j = ProductionReportingHttpTest.db(c);
             var before = j.queryForList("SELECT * FROM mes_production_report ORDER BY id");
-            m.perform(full(post("/api/quality/defects"), "A").content(command(11, "5")))
-                    .andExpect(status().isConflict()).andExpect(jsonPath("errorCode").value("REPORT_QUANTITY_CONFLICT"))
-                    .andExpect(jsonPath("message").value(containsString("95.000000")))
-                    .andExpect(jsonPath("message").value(containsString("12")));
-            assertEquals(0, j.queryForObject("SELECT COUNT(*) FROM mes_production_defect", Integer.class));
+            quality(m, 11, "5");
             assertEquals(before, j.queryForList("SELECT * FROM mes_production_report ORDER BY id"));
-            var small = quality(m, 11, "1");
-            m.perform(full(post("/api/quality/defects/" + small + "/revisions"), "A")
-                            .content(ProductionDefectHttpTest.command("too-large-revision", 1, "3")
-                                    .replace("affectedNodeId\":\"13", "affectedNodeId\":\"11")))
-                    .andExpect(status().isConflict());
-            m.perform(full(get("/api/quality/defects/" + small + "/history"), "A"))
-                    .andExpect(jsonPath("total").value(1));
-            adjust(m, b, "-98", 200);
-            var id = quality(m, 11, "8");
-            adjust(m, a, "-95", 409);
-            adjust(m, a, "-10", 200);
-            adjust(m, a, "5", 200);
-            m.perform(full(post("/api/production/reports/" + a + "/void"), "A").content("{\"reason\":\"TEST冲销\"}"))
-                    .andExpect(status().isConflict());
+            m.perform(full(get("/api/production/report-quantities/executions/1"), "A"))
+                    .andExpect(status().isOk()).andExpect(jsonPath("nodes[1].historicalOverrunQty").value("3.000000"))
+                    .andExpect(jsonPath("nodes[1].effectiveOutputQty").value("95.000000"));
+            adjust(m, b, "1", 409);
+            adjust(m, b, "-3", 200);
+            adjust(m, a, "-1", 409);
             m.perform(full(post("/api/quality/defects"), "A").content(command(11, "100")))
                     .andExpect(status().isConflict());
-            m.perform(full(get("/api/quality/defects/" + id + "/history"), "A")).andExpect(jsonPath("total").value(1));
         }
     }
 

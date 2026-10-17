@@ -4,6 +4,7 @@ import java.math.BigDecimal;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 import dev.mesbase.business.quality.controller.ProductionDefectController;
+import dev.mesbase.business.quality.controller.QualityTreatmentController;
 import dev.mesbase.business.quality.service.ProductionDefectService;
 import dev.mesbase.business.production.service.ProductionQuantityService;
 import dev.mesbase.business.quality.integration.LocalProductionDefectErpGateway;
@@ -48,7 +49,7 @@ class ProductionDefectHttpTest {
     static final String ROOT = "/api/quality/defects";
 
     @Configuration
-    @Import({ProductionQuantityService.class, ProductionDefectController.class, ProductionDefectService.class, LocalProductionDefectErpGateway.class})
+    @Import({QualityTreatmentController.class, ProductionQuantityService.class, ProductionDefectController.class, ProductionDefectService.class, LocalProductionDefectErpGateway.class})
     static class Extra {
 
     }
@@ -79,7 +80,7 @@ class ProductionDefectHttpTest {
     }
 
     static String command(String key, int revision, String quantity) {
-        return "{\"requestKey\":\"" + key + "\"," + (revision == 0 ? "" : "\"expectedRevision\":" + revision + ",\"revisionReason\":\"TEST订正\",") + "\"facts\":{\"executionId\":\"1\",\"affectedNodeId\":\"13\",\"discoveredNodeId\":\"12\",\"defectQty\":\"" + quantity + "\",\"wasteCategory\":\"PROCESS\",\"defectReason\":\"TEST ONLY缺陷\",\"destinationType\":\"ROUTING_NODE\",\"occurredAt\":\"2026-01-01T10:00:00\"}}";
+        return "{\"assessment\":{\"type\":\"INDEPENDENT\",\"basis\":\"TEST ONLY explicit independent fixture\"},\"requestKey\":\"" + key + "\"," + (revision == 0 ? "" : "\"expectedRevision\":" + revision + ",\"revisionReason\":\"TEST订正\",") + "\"facts\":{\"executionId\":\"1\",\"affectedNodeId\":\"13\",\"discoveredNodeId\":\"12\",\"defectQty\":\"" + quantity + "\",\"wasteCategory\":\"PROCESS\",\"defectReason\":\"TEST ONLY缺陷\",\"destinationType\":\"ROUTING_NODE\",\"occurredAt\":\"2026-01-01T10:00:00\"}}";
     }
 
     static String add(MockMvc m, String body, String factory) throws Exception {

@@ -1,6 +1,7 @@
 package dev.issuefixture;
 
 import dev.mesbase.business.quality.service.ProductionDefectService;
+import dev.mesbase.business.quality.service.QualityTreatmentService;
 import dev.mesbase.business.quality.integration.LocalProductionDefectErpGateway;
 import dev.mesbase.business.quality.service.ExecutionQualityReferenceQuery;
 import dev.mesbase.business.quality.domain.ProductionDefectModels.Command;

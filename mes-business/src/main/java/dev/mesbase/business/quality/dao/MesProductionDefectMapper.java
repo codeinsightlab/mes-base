@@ -22,7 +22,5 @@ public interface MesProductionDefectMapper {
                                                  @Param("workorderId") Long workorderId,
                                                  @Param("affectedNodeId") Long affectedNodeId);
 
-    BigDecimal sumEffective(@Param("executionId") Long executionId, @Param("affectedNodeId") Long affectedNodeId);
 
-    List<NodeTotal> nodeTotals(@Param("executionId") Long executionId);
 }

@@ -137,9 +137,11 @@ class ProductionQualityQuantityMySqlTest {
                 report(r, f, f.selected().getFirst(), "10");
                 Supplier<Object> q = () -> create(h, f, f.selected().getFirst(), "3");
                 Supplier<Object> b = () -> report(r, f, f.selected().get(1), "8");
-                ordered(h, qualityFirst ? q : b, qualityFirst ? b : q, 409);
+                ordered(h, qualityFirst ? q : b, qualityFirst ? b : q, qualityFirst ? 409 : 200);
                 h.invariant(f);
-                h.context.getBean(ProductionQuantityService.class).getExecutionQuantities(f.execution());
+                var view = h.context.getBean(ProductionQuantityService.class).getExecutionQuantities(f.execution());
+                assertEquals(0, BigDecimal.valueOf(qualityFirst ? 0 : 1)
+                        .compareTo(view.nodes().get(1).historicalOverrunQty()));
             }
         }
     }

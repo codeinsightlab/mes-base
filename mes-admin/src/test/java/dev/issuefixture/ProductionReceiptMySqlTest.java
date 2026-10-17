@@ -6,6 +6,8 @@ import dev.mesbase.business.production.service.ProductionReportService;
 import dev.mesbase.business.production.service.ReportUserReferenceService;
 import dev.mesbase.business.production.domain.ProductionReportModels.Adjustment;
 import dev.mesbase.business.quality.domain.ProductionDefectModels.Command;
+import dev.mesbase.business.quality.domain.QualityTreatmentModels.Assessment;
+import dev.mesbase.business.quality.domain.QualityTreatmentModels.Attribution;
 import dev.mesbase.business.quality.domain.ProductionDefectModels.Facts;
 import java.time.LocalDateTime;
 
@@ -138,11 +140,12 @@ class ProductionReceiptMySqlTest {
             assertEquals(0, service.summary(f.execution()).received().signum());
             // Real quality create/revise/void changes O once, without a second Receipt subtraction.
             var facts = new Facts(f.execution(), terminal, terminal, null, new BigDecimal("2"), "PROCESS", "TEST_RECEIPT_QUALITY", null, null, "WAREHOUSE", null, f.warehouse(), "TEST ONLY receipt quantity integration", LocalDateTime.of(2026, 1, 1, 10, 0));
-            var quality = h.quality.create(new Command("RECEIPT_Q_" + UUID.randomUUID(), null, null, facts)).record();
+            var quality = h.quality.create(new Command("RECEIPT_Q_" + UUID.randomUUID(), null, null, facts, new Assessment(Attribution.INDEPENDENT, null, "TEST ONLY reviewed independent receipt quality")))
+                    .record();
             h.declarations.add(quality.getDeclarationId());
             assertEquals(0, service.summary(f.execution()).output().compareTo(new BigDecimal("83")));
             var revised = new Facts(f.execution(), terminal, terminal, null, new BigDecimal("3"), "PROCESS", "TEST_RECEIPT_QUALITY", null, null, "WAREHOUSE", null, f.warehouse(), "TEST ONLY revised quantity", facts.occurredAt());
-            h.quality.revise(quality.getDeclarationId(), new Command("RECEIPT_Q_REV_" + UUID.randomUUID(), 1, "TEST ONLY revise", revised));
+            h.quality.revise(quality.getDeclarationId(), new Command("RECEIPT_Q_REV_" + UUID.randomUUID(), 1, "TEST ONLY revise", revised, new Assessment(Attribution.INDEPENDENT, null, "TEST ONLY reviewed independent receipt quality")));
             assertEquals(0, service.summary(f.execution()).output().compareTo(new BigDecimal("82")));
             h.quality.voidDeclaration(quality.getDeclarationId(), new Command("RECEIPT_Q_VOID_" + UUID.randomUUID(), 2, "TEST ONLY fixture ended", null));
             assertEquals(0, service.summary(f.execution()).output().compareTo(new BigDecimal("85")));

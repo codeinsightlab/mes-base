@@ -61,12 +61,13 @@ public class ProductionDefectService {
     private final ProductionDefectErpGateway erp;
     private final RoutingNodeMapper routingNodes;
     private final ProductionQuantityService quantities;
+    private final QualityTreatmentService treatments;
 
     public ProductionDefectService(MesProductionDefectMapper mapper, ProductionChainLocks locks,
                                    ExecutionPathService paths,
                                    WmWarehouseMapper warehouses, BusinessDirectoryService directory,
                                    ProductionDefectErpGateway erp, RoutingNodeMapper routingNodes,
-                                   ProductionQuantityService quantities) {
+                                   ProductionQuantityService quantities, QualityTreatmentService treatments) {
         this.mapper = mapper;
         this.locks = locks;
         this.paths = paths;
@@ -75,6 +76,7 @@ public class ProductionDefectService {
         this.erp = erp;
         this.routingNodes = routingNodes;
         this.quantities = quantities;
+        this.treatments = treatments;
     }
 
     public record Result(MesProductionDefectEntity record, ErpActionResult erp) {
@@ -123,11 +125,12 @@ public class ProductionDefectService {
                     .executionId(), before.getExecutionId()) || !Objects.equals(c.facts()
                     .affectedNodeId(), before.getAffectedNodeId()))) conflict();
         }
+        treatments.assertMutable(before);
         Facts facts = action.equals(DefectRecordAction.VOID.getValue()) ? facts(before) : normalize(c.facts());
         if (!action.equals(DefectRecordAction.VOID.getValue())) facts = validate(facts);
-        var oldContribution = before == null ? BigDecimal.ZERO : before.getDefectQty();
-        var newContribution = action.equals(DefectRecordAction.VOID.getValue()) ? BigDecimal.ZERO : facts.defectQty();
-        quantities.validateDefectChange(execution, facts.affectedNodeId(), newContribution.subtract(oldContribution));
+        if (!action.equals(DefectRecordAction.VOID.getValue()) && facts.defectQty()
+                .compareTo(quantities.getNodeQuantity(execution, facts.affectedNodeId()).reportedQty()) > 0)
+            throw new FoundationException(ErrorCode.REPORT_QUANTITY_CONFLICT);
         apply(row, facts);
         row.setDeclarationId(id == null ? UUID.randomUUID().toString() : id);
         row.setRevisionNo(before == null ? 1 : before.getRevisionNo() + 1);
@@ -145,6 +148,8 @@ public class ProductionDefectService {
             if (old != null) return replay(old, fingerprint);
             throw new FoundationException(ErrorCode.RESOURCE_CONFLICT, e);
         }
+        if (!action.equals(DefectRecordAction.VOID.getValue())) treatments.assessCreatedVersion(row, c.assessment());
+        quantities.validateDefectChange(execution, facts.affectedNodeId(), BigDecimal.ZERO);
         return new Result(row, erp.acknowledge(row));
     }
 
@@ -229,12 +234,13 @@ public class ProductionDefectService {
 
     public BigDecimal sumEffectiveDefectQty(Long executionId, Long affectedNodeId) {
         if (executionId == null || affectedNodeId == null) invalid();
-        return mapper.sumEffective(executionId, affectedNodeId);
+        return treatments.nodeTotals(executionId).stream().filter(t -> t.affectedNodeId().equals(affectedNodeId))
+                .map(NodeTotal::effectiveDefectQty).reduce(BigDecimal.ZERO, BigDecimal::add);
     }
 
     public List<NodeTotal> nodeTotals(Long executionId) {
         if (executionId == null) invalid();
-        return mapper.nodeTotals(executionId);
+        return treatments.nodeTotals(executionId);
     }
 
     public List<Node> nodes(Long executionId) {
@@ -273,6 +279,11 @@ public class ProductionDefectService {
         if (!ids.contains(f.affectedNodeId()) || !ids.contains(f.discoveredNodeId()) || f.responsibleNodeId() != null && !ids.contains(f.responsibleNodeId()))
             invalid();
         if (f.responsibleUserId() != null && !directory.historicalUserExists(f.responsibleUserId())) invalid();
+        if (DefectDestination.SAME_NODE.getValue().equals(f.destinationType())) {
+            if (f.targetWarehouseId() != null || f.targetNodeId() != null && !f.targetNodeId()
+                    .equals(f.affectedNodeId())) invalid();
+            return new Facts(f.executionId(), f.affectedNodeId(), f.discoveredNodeId(), f.responsibleNodeId(), f.defectQty(), f.wasteCategory(), f.defectReason(), f.responsibleUserId(), f.responsibilityRemark(), f.destinationType(), f.affectedNodeId(), null, f.destinationRemark(), f.occurredAt());
+        }
         if (DefectDestination.ROUTING_NODE.getValue().equals(f.destinationType())) {
             if (f.targetWarehouseId() != null) invalid();
             int index = ids.indexOf(f.discoveredNodeId());
@@ -300,7 +311,7 @@ public class ProductionDefectService {
         // Length-prefixed typed fields avoid JSON ordering, decimal scale and delimiter ambiguity.
         var f = normalize(c.facts());
         var b = new StringBuilder();
-        for (Object v : new Object[]{action, id, actor, c.expectedRevision(), trim(c.revisionReason()), f == null ? null : f.executionId(), f == null ? null : f.affectedNodeId(), f == null ? null : f.discoveredNodeId(), f == null ? null : f.responsibleNodeId(), f == null ? null : f.defectQty(), f == null ? null : f.wasteCategory(), f == null ? null : f.defectReason(), f == null ? null : f.responsibleUserId(), f == null ? null : f.responsibilityRemark(), f == null ? null : f.destinationType(), f == null ? null : f.targetNodeId(), f == null ? null : f.targetWarehouseId(), f == null ? null : f.destinationRemark(), f == null ? null : f.occurredAt()}) {
+        for (Object v : new Object[]{action, id, actor, c.expectedRevision(), trim(c.revisionReason()), f == null ? null : f.executionId(), f == null ? null : f.affectedNodeId(), f == null ? null : f.discoveredNodeId(), f == null ? null : f.responsibleNodeId(), f == null ? null : f.defectQty(), f == null ? null : f.wasteCategory(), f == null ? null : f.defectReason(), f == null ? null : f.responsibleUserId(), f == null ? null : f.responsibilityRemark(), f == null ? null : f.destinationType(), f == null ? null : f.targetNodeId(), f == null ? null : f.targetWarehouseId(), f == null ? null : f.destinationRemark(), f == null ? null : f.occurredAt(), c.assessment()}) {
             String s = v == null ? null : v.toString();
             b.append(s == null ? "-1:" : s.length() + ":" + s);
         }
