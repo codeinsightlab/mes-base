@@ -2,7 +2,7 @@ spring:
   application:
     name: mes-base
   profiles:
-    default: dev
+    default: prod
   web:
     error:
       include-message: never

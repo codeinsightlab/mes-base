@@ -55,6 +55,8 @@ class ConfigurationProfilesTest {
                     .run(context -> {
                         assertTrue(context.getStartupFailure() == null);
                         assertTrue(context.getEnvironment().getProperty("mes.runtime.enabled", Boolean.class, false));
+                        assertTrue(context.getEnvironment()
+                                .getProperty("mes.business.enabled", Boolean.class, false), "工作环境必须装配业务接口");
                         assertFalse(context.containsBean("masterDataSource"));
                         assertFalse(context.containsBean("digiwinE10MoQueries"));
                     });

@@ -5,7 +5,11 @@ import java.net.URI;
 /**
  * 工厂管理专用连接参数；不作为普通工厂响应或日志内容。
  */
-public record FactoryOapiSettings(String endpoint, Host host, Service service) {
+public record FactoryOapiSettings(String endpoint, Host host, Service service, E10SyncContract syncContract) {
+    public FactoryOapiSettings(String endpoint, Host host, Service service) {
+        this(endpoint, host, service, null);
+    }
+
     public record Host(String ver, String prod, String timezone, String ip, String id, String lang, String acct) {
         @Override
         public String toString() {
@@ -21,6 +25,7 @@ public record FactoryOapiSettings(String endpoint, Host host, Service service) {
     }
 
     public void validate() {
+        if (syncContract != null) syncContract.validate();
         required(endpoint);
         URI uri;
         try {

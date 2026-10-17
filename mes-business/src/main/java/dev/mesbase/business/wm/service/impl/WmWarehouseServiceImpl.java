@@ -2,6 +2,8 @@ package dev.mesbase.business.wm.service.impl;
 
 import dev.mesbase.business.production.service.BusinessSourceRules;
 import dev.mesbase.business.shared.enums.BusinessSource;
+import dev.mesbase.business.shared.ExternalSyncAction;
+import dev.mesbase.business.shared.ExternalSyncCheck;
 
 import com.github.pagehelper.Page;
 import com.github.pagehelper.PageHelper;
@@ -195,6 +197,42 @@ public class WmWarehouseServiceImpl implements IWmWarehouseService {
         return row;
     }
 
+    @Override
+    @Transactional(transactionManager = "businessTransactionManager", readOnly = true, noRollbackFor = FoundationException.class)
+    public ExternalSyncCheck inspectExternal(ExternalWmWarehouse input) {
+        return checkExternal(input);
+    }
+
+    private ExternalSyncCheck checkExternal(ExternalWmWarehouse input) {
+        sources.current(BusinessSource.EXTERNAL.getValue());
+        if (input == null || !validator.validate(input).isEmpty())
+            throw new FoundationException(ErrorCode.BAD_REQUEST);
+        var sample = new WmWarehouseEntity();
+        sample.setStatus(input.status());
+        rules.validate(sample);
+        var filter = new WmWarehouseExample();
+        filter.createCriteria().andCodeEqualTo(input.code());
+        var found = mapper.selectByExample(filter);
+        if (found.size() > 1) throw new FoundationException(ErrorCode.BUSINESS_SOURCE_CONFLICT);
+        var snapshot = FactoryIntegrationContext.required();
+        var ids = new WmWarehouseErpExtraExample();
+        ids.createCriteria().andExternalIdEqualTo(input.externalId()).andProviderEqualTo(snapshot.erpType())
+                .andBindingKeyEqualTo(snapshot.configurationRef());
+        var identities = external.selectByExample(ids);
+        if (identities.size() > 1 || identities.stream().anyMatch(x -> found.isEmpty()
+                || !Objects.equals(x.getId(), found.getFirst().getId())))
+            throw new FoundationException(ErrorCode.BUSINESS_SOURCE_CONFLICT);
+        if (found.isEmpty()) return new ExternalSyncCheck(ExternalSyncAction.CREATE, null);
+        var row = found.getFirst();
+        if (BusinessSourceRules.required(row.getSource()) != BusinessSource.EXTERNAL)
+            throw new FoundationException(ErrorCode.BUSINESS_SOURCE_CONFLICT);
+        var identity = external.selectByPrimaryKey(row.getId());
+        if (identity == null || !Objects.equals(identity.getExternalId(), input.externalId()))
+            throw new FoundationException(ErrorCode.BUSINESS_SOURCE_CONFLICT);
+        BusinessSourceRules.binding(identity.getProvider(), identity.getBindingKey(), identity.getConfigurationRevision());
+        return new ExternalSyncCheck(same(row, input) ? ExternalSyncAction.UNCHANGED : ExternalSyncAction.UPDATE, row.getId());
+    }
+
     public WmWarehouseSyncResult sync(FactoryScope scope) {
         if (!FactoryContext.required().equals(scope)) {
             throw new FoundationException(ErrorCode.CONFLICT);
@@ -246,6 +284,7 @@ public class WmWarehouseServiceImpl implements IWmWarehouseService {
                 throw new FoundationException(ErrorCode.BAD_REQUEST);
             }
         }
+        for (var input : inputs) checkExternal(input);
         if (inputs.isEmpty()) return new WmWarehouseSyncResult(0, 0, 0, 0);
         var example = new WmWarehouseExample();
         example.createCriteria().andCodeIn(List.copyOf(keys))

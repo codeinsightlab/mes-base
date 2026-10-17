@@ -2,6 +2,9 @@ package dev.mesbase.business.production.service;
 
 import dev.mesbase.business.production.service.BusinessSourceRules;
 import dev.mesbase.business.shared.enums.BusinessSource;
+import dev.mesbase.business.shared.enums.EnableStatus;
+import dev.mesbase.business.shared.ExternalSyncAction;
+import dev.mesbase.business.shared.ExternalSyncCheck;
 
 import dev.mesbase.business.production.domain.WorkOrderStatus;
 import dev.mesbase.business.directory.service.BusinessDirectoryService;
@@ -193,38 +196,24 @@ public class WorkOrderService {
     }
 
     public WorkOrderModels.Detail syncExternal(ExternalPlan plan, SyncCoordinator.Run run) {
-        if (plan == null || plan.values() == null || (plan.status() != WorkOrderStatus.DRAFT && plan.status() != WorkOrderStatus.RELEASED))
-            conflict();
+        if (run == null || !FactoryContext.required().equals(run.scope()) || !"workorder.erp".equals(run.syncKey()))
+            throw new FoundationException(ErrorCode.SYNC_EXECUTION_LOST);
+        sync.assertOwner(run);
+        var checked = checkExternal(plan, true);
         var input = plan.values();
         var externalId = plan.externalId();
         var externalCode = plan.externalCode();
-        sources.current(BusinessSource.EXTERNAL.getValue());
         var snapshot = FactoryIntegrationContext.required();
-        if (run == null || !FactoryContext.required().equals(run.scope()) || !"workorder.erp".equals(run.syncKey())
-                || externalId == null || externalId.isBlank() || externalId.length() > 128
-                || input.externalId() != null || input.externalCode() != null) conflict();
-        sync.assertOwner(run);
-        validate(input);
-        var f = new WorkorderExample();
-        f.createCriteria().andCodeEqualTo(input.code());
-        var found = orders.selectByExample(f);
-        if (found.size() > 1) conflict();
-        var identity = new WorkorderErpExtraExample();
-        identity.createCriteria().andExternalIdEqualTo(externalId).andProviderEqualTo(snapshot.erpType())
-                .andBindingKeyEqualTo(snapshot.configurationRef());
-        if (external.selectByExample(identity).stream()
-                .anyMatch(x -> found.isEmpty() || !Objects.equals(x.getId(), found.getFirst().getId()))) conflict();
-        boolean created = found.isEmpty();
-        var row = created ? new WorkorderEntity() : order(found.getFirst().getId(), true);
-        if (!created) {
-            if (BusinessSourceRules.required(row.getSource()) != BusinessSource.EXTERNAL) conflict();
-            var old = external.selectByPrimaryKey(row.getId());
-            if (old == null || !Objects.equals(old.getExternalId(), externalId)) conflict();
-            BusinessSourceRules.binding(old.getProvider(), old.getBindingKey(), old.getConfigurationRevision());
-            if (hasExecutions(row.getId()) || hasLegacyBatches(row.getId()) || queries.countBlockingIssues(row.getId()) > 0)
-                throw new FoundationException(ErrorCode.EXECUTION_FROZEN);
-            if (!WorkOrderStatus.DRAFT.getValue().equals(row.getStatus())) conflict();
-        } else {
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void beforeCommit(boolean readOnly) {
+                sync.assertOwner(run);
+            }
+        });
+        if (checked.action() == ExternalSyncAction.UNCHANGED) return detail(checked.localId());
+        boolean created = checked.action() == ExternalSyncAction.CREATE;
+        var row = created ? new WorkorderEntity() : orders.selectByPrimaryKey(checked.localId());
+        if (created) {
             row.setSource(BusinessSource.EXTERNAL.getValue());
             row.setStatus(WorkOrderStatus.DRAFT.getValue());
             row.setRevision(0);
@@ -250,14 +239,54 @@ public class WorkOrderService {
         mapping.setConfigurationRevision(snapshot.configurationRevision());
         if ((created ? external.insert(mapping) : external.updateByPrimaryKey(mapping)) != 1) conflict();
         sync.assertOwner(run);
-        TransactionSynchronizationManager.registerSynchronization(
-                new TransactionSynchronization() {
-                    @Override
-                    public void beforeCommit(boolean readOnly) {
-                        sync.assertOwner(run);
-                    }
-                });
         return detail(row.getId());
+    }
+
+    /**
+     * Exact same preconditions as syncExternal, with SELECT-only reference checks for Dry Run.
+     */
+    @Transactional(transactionManager = "businessTransactionManager", readOnly = true, noRollbackFor = FoundationException.class)
+    public ExternalSyncCheck inspectExternal(ExternalPlan plan) {
+        return checkExternal(plan, false);
+    }
+
+    private ExternalSyncCheck checkExternal(ExternalPlan plan, boolean lock) {
+        sources.current(BusinessSource.EXTERNAL.getValue());
+        if (plan == null || plan.values() == null || plan.status() == null
+                || plan.status() == WorkOrderStatus.CANCELLED || plan.externalId() == null
+                || plan.externalId().isBlank() || plan.externalId().length() > 128
+                || plan.externalCode() == null || plan.externalCode().length() > 128
+                || plan.values().externalId() != null || plan.values().externalCode() != null) conflict();
+        var input = plan.values();
+        validate(input, lock);
+        var snapshot = FactoryIntegrationContext.required();
+        var filter = new WorkorderExample();
+        filter.createCriteria().andCodeEqualTo(input.code());
+        var found = orders.selectByExample(filter);
+        if (found.size() > 1) conflict();
+        var identities = new WorkorderErpExtraExample();
+        identities.createCriteria().andExternalIdEqualTo(plan.externalId()).andProviderEqualTo(snapshot.erpType())
+                .andBindingKeyEqualTo(snapshot.configurationRef());
+        var known = external.selectByExample(identities);
+        if (known.size() > 1 || known.stream().anyMatch(x -> found.isEmpty()
+                || !Objects.equals(x.getId(), found.getFirst().getId()))) conflict();
+        if (found.isEmpty()) return new ExternalSyncCheck(ExternalSyncAction.CREATE, null);
+        var row = lock ? order(found.getFirst().getId(), true) : found.getFirst();
+        if (BusinessSourceRules.required(row.getSource()) != BusinessSource.EXTERNAL
+                || WorkOrderStatus.CANCELLED.getValue().equals(row.getStatus())) conflict();
+        var mapping = external.selectByPrimaryKey(row.getId());
+        if (mapping == null || !Objects.equals(mapping.getExternalId(), plan.externalId())) conflict();
+        BusinessSourceRules.binding(mapping.getProvider(), mapping.getBindingKey(), mapping.getConfigurationRevision());
+        if (Objects.equals(row.getProductId(), input.productId()) && Objects.equals(row.getRoutingId(), input.routingId())
+                && row.getPlannedQty()
+                .compareTo(input.plannedQty()) == 0 && Objects.equals(row.getStatus(), plan.status().getValue())
+                && Objects.equals(row.getPlannedStartAt(), input.plannedStartAt()) && Objects.equals(row.getPlannedEndAt(), input.plannedEndAt())
+                && Objects.equals(row.getRemark(), input.remark()) && Objects.equals(mapping.getExternalCode(), plan.externalCode()))
+            return new ExternalSyncCheck(ExternalSyncAction.UNCHANGED, row.getId());
+        if (hasExecutions(row.getId()) || hasLegacyBatches(row.getId()) || queries.countBlockingIssues(row.getId()) > 0)
+            throw new FoundationException(ErrorCode.EXECUTION_FROZEN);
+        if (!WorkOrderStatus.DRAFT.getValue().equals(row.getStatus())) conflict();
+        return new ExternalSyncCheck(ExternalSyncAction.UPDATE, row.getId());
     }
 
     public WorkOrderModels.Detail update(Long id, WorkOrderModels.Save input) {
@@ -373,20 +402,32 @@ public class WorkOrderService {
     }
 
     private void binding(Long product, Long routing) {
-        references.lockMaterials(List.of(product), true);
+        binding(product, routing, true);
+    }
+
+    private void binding(Long product, Long routing, boolean lock) {
+        if (lock) references.lockMaterials(List.of(product), true);
+        else {
+            var material = materials.selectByPrimaryKey(product);
+            require(material != null && EnableStatus.ENABLED.getValue().equals(material.getStatus()));
+        }
         var f = new RoutingExample();
         f.createCriteria().andIdEqualTo(routing);
         var patch = new RoutingEntity();
         patch.setId(routing);
-        require(routings.updateByExampleSelective(patch, f) == 1);
+        if (lock) require(routings.updateByExampleSelective(patch, f) == 1);
         var r = routings.selectByPrimaryKey(routing);
-        require(RoutingStatus.PUBLISHED.getValue().equals(r.getStatus()));
+        require(r != null && RoutingStatus.PUBLISHED.getValue().equals(r.getStatus()));
         var p = new RoutingProductExample();
         p.createCriteria().andRoutingIdEqualTo(routing).andMaterialIdEqualTo(product);
         require(products.countByExample(p) > 0);
     }
 
     private void validate(WorkOrderModels.Save input) {
+        validate(input, true);
+    }
+
+    private void validate(WorkOrderModels.Save input, boolean lock) {
         require(input != null && input.productId() != null && input.routingId() != null && input.code() != null && !input.code()
                 .isBlank() && input.code().length() <= 64);
         BigDecimal quantity = input.plannedQty();
@@ -394,7 +435,7 @@ public class WorkOrderService {
                 && quantity.precision() - quantity.scale() <= 14);
         require(input.plannedStartAt() == null || input.plannedEndAt() == null || !input.plannedEndAt()
                 .isBefore(input.plannedStartAt()));
-        binding(input.productId(), input.routingId());
+        binding(input.productId(), input.routingId(), lock);
     }
 
     private boolean hasExecutions(Long id) {

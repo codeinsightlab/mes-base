@@ -92,3 +92,14 @@ MO/CMS Query/Read 的官方定位字段定义不等于目标账套下的稳定�
 缺快照时，无论 Runtime 开关如何取值均拒绝新业务；测试使用明确构造的快照。LOCAL_ONLY/CONNECTED 保留为历史事实与公共 API 语义，历史 query/execute/cancellationMode 继续按原持久化身份，而非当前 Factory 模式选择 Adapter。
 V34 是已发布的一次性旧配置导入，保留其源码、校验和与升级负例，不作为正常运行入口。旧工单用料兼容配置独立保留。
 清单、删除证据与验证见 [配置体系收敛报告](../reviews/2026-10-17-configuration-consolidation-review.md)。
+
+
+## 2026-10-17 V2.1：可信转换、Dry Run 与正式执行器
+
+本节更新 V2.0 的候选消费实施边界，历史结论保留。缺证据的真实记录仍不组装可写计划，但允许实现并以隔离 Fixture 验证完整转换和写入执行器。ERP 提供生产计划，MES 选择唯一已发布且适用于该产品的确切 Routing；不要求 ERP 提供 MES 路线版本，也不按首条路线兜底。
+
+目标环境的身份字段、组织/据点、状态/审核映射、产品编码关系和稳定分页条件由现有工厂中心 OAPI 连接的可选 `syncContract` 保存，随连接版本冻结；缺少契约返回身份/映射未确认，不能提交。它不决定运行模式或 ERP 绑定，不新增 YAML 入口。单字段身份或 JSON 元组复合身份均须有证据，不把 MO_ID 与 sys_MainId 等同，不生成替代身份 Hash。
+
+Dry Run 与写入使用同一个转换及既有业务 Service 检查入口，Dry Run 只读业务库。正式提交重新 Query/Read、复核连接版本并取得既有正式 sync key 的 run token，逐候选事务调用 WorkOrderService.syncExternal / IWmWarehouseService.upsert；已有事实冻结、来源和映射保护继续生效。对完整内容相同的已有记录返回 UNCHANGED，不更新 revision 或生产事实。对读取超限、身份冲突及缺少真实 Read 复合键的记录拒绝写入。
+
+详情、验收层级与当前环境限制见 [V2.1 实施报告](../reviews/2026-10-17-digiwin-e10-sync-v21-report.md)。真实 E10 联调、模式迁移及 ERP 领退料/出入库不属于离线执行器通过所证明的能力。

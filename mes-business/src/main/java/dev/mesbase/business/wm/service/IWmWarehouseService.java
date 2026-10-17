@@ -8,6 +8,7 @@ import dev.mesbase.business.wm.domain.WmWarehouseUpdateCommand;
 import dev.mesbase.business.wm.sync.ExternalWmWarehouse;
 import dev.mesbase.business.wm.sync.WmWarehouseSyncResult;
 import dev.mesbase.core.factory.FactoryScope;
+import dev.mesbase.business.shared.ExternalSyncCheck;
 import java.util.List;
 import dev.mesbase.framework.sync.SyncCoordinator;
 
@@ -26,6 +27,8 @@ public interface IWmWarehouseService {
     WmWarehouseEntity updateById(Long id, WmWarehouseUpdateCommand input);
 
     void deleteByIds(List<Long> ids);
+
+    ExternalSyncCheck inspectExternal(ExternalWmWarehouse input);
 
     WmWarehouseSyncResult sync(FactoryScope scope);
 

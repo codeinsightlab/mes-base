@@ -11,6 +11,7 @@ import dev.mesbase.platform.web.FoundationAccessInterceptor;
 import dev.mesbase.platform.web.FoundationErrorAdvice;
 import dev.mesbase.server.integration.e10.DigiwinE10SyncPreview.Kind;
 import dev.mesbase.web.controller.DigiwinE10PreviewController;
+import org.springframework.beans.factory.ObjectProvider;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
@@ -83,6 +84,49 @@ class DigiwinE10PreviewHttpTest {
                 }
             }
         }
+    }
+
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void allDryRunAndCommitRoutesEnforceFactoryPermissionBeforeWorkflow() throws Exception {
+        for (var kind : Kind.values())
+            for (boolean commit : List.of(false, true)) {
+                var workflow = mock(DigiwinE10SyncService.class);
+                ObjectProvider<DigiwinE10SyncService> provider = mock(ObjectProvider.class);
+                when(provider.getIfAvailable()).thenReturn(workflow);
+                var selection = mock(FactorySelectionService.class);
+                var authorization = mock(AuthorizationService.class);
+                var actor = new AuthenticatedActor("TEST_ONLY");
+                var scope = new FactoryScope(new FactoryId("A"));
+                when(selection.resolve(any(), any())).thenAnswer(inv -> {
+                    Optional<FactoryId> selected = inv.getArgument(1);
+                    return selected.map(FactoryScope::new);
+                });
+                var mvc = MockMvcBuilders.standaloneSetup(new DigiwinE10PreviewController(mock(DigiwinE10SyncPreview.class), provider))
+                        .addInterceptors(new FoundationAccessInterceptor(selection, authorization))
+                        .setControllerAdvice(new FoundationErrorAdvice()).build();
+                String path = (kind == Kind.WORKORDER ? "/api/production/workorder/erp-preview" : "/api/wm/wm-warehouse/erp-preview")
+                        + (commit ? "/commit" : "/dry-run");
+                String permission = kind == Kind.WORKORDER ? "workorder:sync" : "business:wm:warehouse:sync";
+                try {
+                    mvc.perform(post(path)).andExpect(status().isUnauthorized());
+                    SecurityContextHolder.getContext()
+                            .setAuthentication(new UsernamePasswordAuthenticationToken("TEST_ONLY", "TEST_ONLY", List.of()));
+                    mvc.perform(post(path).header("X-Factory-Id", "A")).andExpect(status().isForbidden());
+                    when(authorization.hasPermission(actor, scope, new Permission(permission))).thenReturn(true);
+                    mvc.perform(post(path).header("X-Factory-Id", "B")).andExpect(status().isForbidden());
+                    verifyNoInteractions(workflow);
+                    when(workflow.execute(kind, commit, 20, 5)).thenReturn(new DigiwinE10SyncService.Result(commit ? "COMMITTED" : "DRY_RUN",
+                            "A", "DIGIWIN_E10", "TEST_BINDING", "1", "TEST_RUN", 0, 0, 0, 0, 0, 0, 0, 0, 0, List.of(), null));
+                    mvc.perform(post(path).header("X-Factory-Id", "A")).andExpect(status().isOk())
+                            .andExpect(jsonPath("$.status").value(commit ? "COMMITTED" : "DRY_RUN"));
+                    verify(workflow).execute(kind, commit, 20, 5);
+                } finally {
+                    SecurityContextHolder.clearContext();
+                    FactoryContext.clear();
+                }
+            }
     }
 
     private static MockHttpServletRequestBuilder request(String path, boolean command) {

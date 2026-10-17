@@ -2,11 +2,18 @@
 # User Java21 environment; standard packaged application-dev.yml profile.
 set -eu
 ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
-JAR="$ROOT/target/mes-base-0.1.0-SNAPSHOT.jar"
+JAR="${MES_LOCAL_JAR:-$ROOT/target/mes-base-0.1.0-SNAPSHOT.jar}"
 if [ ! -f "$JAR" ]; then
   printf '%s\n' 'Build the backend with the local dev/prod configuration first.' >&2
   exit 2
 fi
 if [ -n "${JAVA_HOME:-}" ]; then JAVA_BIN="$JAVA_HOME/bin/java"; else JAVA_BIN=java; fi
+# A running Boot loader must never reopen a Maven output being replaced by verify.
+# Keep one private, immutable artifact per launch; retain it until the user cleans stopped runs.
+umask 077
+mkdir -p "$ROOT/.local/runtime"
+RUN_DIR=$(mktemp -d "$ROOT/.local/runtime/backend.XXXXXX")
+cp "$JAR" "$RUN_DIR/app.jar"
+chmod 400 "$RUN_DIR/app.jar"
 cd "$ROOT"
-exec "$JAVA_BIN" -jar "$JAR" "--spring.profiles.active=dev" "--server.port=${MES_LOCAL_PORT:-18081}" "--server.address=127.0.0.1" "$@"
+exec "$JAVA_BIN" -jar "$RUN_DIR/app.jar" "--spring.profiles.active=${MES_LOCAL_PROFILE:-dev}" "--server.port=${MES_LOCAL_PORT:-18081}" "--server.address=127.0.0.1" "$@"

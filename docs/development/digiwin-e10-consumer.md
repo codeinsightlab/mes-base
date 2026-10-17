@@ -131,3 +131,36 @@ POST 使用 SyncCoordinator 的 e10.mo.preview / e10.warehouse.preview 独立键
 V39 正式中心迁移只登记 workorder:sync，不授予现有角色。页面还要求 ERP 模式、独立同步权限和后端 supported；切厂/撤权/关闭/卸载均清除候选并拒绝迟到响应。仓库原来始终可点但默认未接入的写同步按钮由准备入口替代，避免无实现时提供写入承诺。后端 Service 是最终模式门。
 
 真实 ERP 读取需本轮明确授权目标、组织/账套/环境及调用范围；已有 OAPI 配置不等于读取授权。SIMPLE_B 保持 LOCAL，本轮未对 ERP 发请求、未切换模式、未修改绑定。真实写入和实时 ERP 联调未验收。当前结果与完整缺口见 [V2.0 实施报告](../reviews/2026-10-17-digiwin-e10-workorder-warehouse-sync-v20-report.md)。
+
+
+## 2026-10-17 V2.1：Dry Run 与正式同步
+
+原 `/erp-preview` GET/POST 保留能力和单页 `PREVIEW_ONLY`。新增两个基础路径的 `/dry-run`、`/commit` POST：
+
+- `/api/production/workorder/erp-preview`，权限 `workorder:sync`。
+- `/api/wm/wm-warehouse/erp-preview`，权限 `business:wm:warehouse:sync`。
+
+请求只接受 `pageSize`（1–20）与 `maxPages`（1–5）。provider、binding、Factory 和连接版本从当前受管快照读取；客户端不能提交映射、身份契约或旧 Dry Run 计划。正式同步重新读取并校验，最大100条、90秒远端处理预算（单次在途请求仍受SDK超时控制）；不自动重试、不推进增量水位。最后一页满且超限时整批拒绝写入，需要缩小已核实的服务端过滤范围。逐条事务，不承诺跨页原子提交。
+
+可选 `FactoryOapiSettings.syncContract` 保存在现有加密 OAPI 配置，沿用平台工厂编辑权限、工厂 revision 和连接版本锁；没有另建配置表。已有 JSON 无此字段仍可解码，但提交关闭。契约字段如下：
+
+|字段|要求|
+|---|---|
+|commitEnabled|显式开放提交；本轮未给真实工厂设置|
+|workorder / warehouse|该类型已核实的 Rule，缺失则只读|
+|evidence|目标环境验收证据引用，非空；TEST ONLY 字样仅用于隔离夹具|
+|identityPointers|1–4个经证实的 JSON Pointer；一个保留原值，多个保存无歧义 JSON 数组字符串；总长≤128|
+|sitePointer / expectedSite|必须提供，逐条比对目标据点|
+|organizationPointer / expectedOrganization|组织维度存在时必须成对提供，不从编码推断|
+|statusPointer / statuses|明确的ERP原状态→MES映射；工单只接受DRAFT/RELEASED，仓库只接受ENABLED/DISABLED|
+|approvalPointer / approvedValues|工单审核字段及认可原值，不能将接口成功当审核通过|
+|productKey|CODE 或 EXTERNAL_CODE，经确认的 ERP 品号与 MES 产品编码关系|
+|conditionsJson / ordersJson|目标服务已核实的完整 JSON 数组字符串（避免应用Jackson3与SDK Jackson2类型跨HTTP绑定）；ordersJson数组非空且应以稳定唯一身份完成排序；不猜测字段拼写|
+|readRequired|是否必须 Read；Read 返回唯一记录并与 Query 身份一致才使用，不混拼两次返回|
+|readCodePointer / readOwnerPointer / readPlantPointer|仓库Read所需三个真实定位值的来源；缺失返回READ_KEY_INCOMPLETE|
+
+工单字段采用 SDK 的 `doc_no/item_no/unit_no/plan_qty/plan_start_date/plan_complete_date`，仓库采用 `warehouse_no/warehouse_name`。单位必须与启用的MES基础单位编码一致；无换算证据不换算数量。计划日期只接受ISO本地日期/日期时间，不猜时区。产品必须唯一、启用，发布且适用的MES路线必须唯一。
+
+Dry Run 输出逐条action/reasons、产品/路线ID和字符串数量、当前工厂与绑定版本，以及可创建/可更新/无变化/冲突/阻断统计；业务表及库存不写入，协调表仅保存本次运行状态。正式提交新增实际created/updated，返回COMMITTED/PARTIAL_SUCCESS/FAILED；异常通过runToken关联保留完整后台异常链。中断不把未处理记录算成功。协调表保留处理数量，细分统计由HTTP结果与带runToken的日志提供；当前不增加另一套同步审计表。
+
+配置维护不会发送ERP请求。是否允许真实读取必须另按目标账套/组织/环境授权核实，本轮没有真实 E10 调用。已绑定连接的参数仍只读，不能借syncContract绕过受控迁移。
