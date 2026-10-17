@@ -43,3 +43,18 @@
 ## 2026-10-09：外部数据库框架退出 Base
 
 按用户要求移除 ERP/HR/WMS 及其他外部数据库装配，不保留第三个 PersistenceOwner、SqlSessionFactory、TransactionManager、选源注解、连接配置或模板。历史规则和验证只描述当时快照；新集成需求须另行明确授权和设计，不恢复占位框架。中心库与 Factory 业务库规范见 ADR-004。
+
+## 2026-10-17 修订：中心工厂运行配置与只读快照
+
+本节只落实工厂业务模式与连接引用，不恢复第三数据源，不修改生产仓储边界审查。现有仓储/生产 Adapter 只有 `supports(scope, bindingKey)`，没有通用 ERP 类型枚举或连接管理表；供应商沿用服务端连接定义中的原注册标识，不另建 DINGJIE/SAP 枚举。
+
+- `mf_factory` 保存 `runtime_mode`（LOCAL/ERP）、`erp_provider`、`erp_config_ref`、`integration_revision`、`integration_locked`。新厂默认 LOCAL；本次正式 Flyway Java V34 从每厂旧 `mes.integration.warehouse.factories.<id>` 导入明确 CONNECTED/provider/binding-key。非法旧配置在 DDL 前拒绝，不把解析错误解释为 LOCAL。既有工厂全部锁定业务权威，避免未绑定但曾有业务历史的工厂被误判为空厂；新建未绑定工厂可配置，一旦绑定即永久锁定，解绑不解锁。实际 LOCAL ↔ ERP 和 ERP 供应商/绑定迁移留给专门流程。
+- 没有既有 ERP 连接管理模型可复用，因此连接定义继续采用现有服务端配置机制：`mes.integration.connections.<bindingKey>`。定义包含所属 factory-id、provider、service-url、credential-reference、organization、enabled、revision。认证引用指向服务端 Environment 可解析的凭证属性；不创建凭证存储，不在工厂表或响应中存入凭证。厂商 Adapter 将来负责使用其准确配置执行真实业务。
+- `FactoryIntegrationRegistry` 最终校验所属厂、provider、引用、启用状态、正版本、HTTP(S)地址、组织和可解析的认证引用；地址不允许 user-info/query/fragment。工厂管理只返回 reference/provider/revision 选择项；LOCAL 必须无 ERP 字段。配置缺失、停用、错误明确拒绝。
+- HTTP 准入沿用一次工厂 metadata 解析，`BusinessRequestSnapshot` 同时保存只读 `FactoryIntegrationSnapshot`，业务调用 `FactoryIntegrationContext.required()`。快照只含 factoryId、mode、erpType、configurationRef、revision、configurationRevision。FactoryScope 继续只含 FactoryId。路由共享缓存采用 v2 key，避免旧 JSON 缺字段。业务事务、权限和数据源租约行为保持原边界。
+- 非 HTTP 执行器注入 `FactoryIntegrationExecutor`，在执行线程调用 `run(scope, task)`；它显式解析配置、校验当前可用工厂/绑定并建立有界上下文。Quartz 工厂入口使用该执行器。上下文不继承到新线程，任务期间 pin FactoryScope，异常退出恢复/清理；同一 HTTP 请求不能被另一次配置解析覆盖。
+- `WarehouseIntegration` 的新操作选择使用准入快照；已冻结的提交、查询和作废使用原 provider/binding/source mode。查询同时要求 Adapter 明确支持冻结 provider，缺实现拒绝，不把历史 ERP 结果转换成本地成功。生产、领料和仓储 Service 及 ProductionQuantityService 算法未改。
+
+连接绑定键代表不可变集成身份；调整供应商、组织、账套等权威身份时使用新的绑定键并走迁移流程。已有旧配置无服务端连接定义时仍保留 ERP/provider/reference，但新请求明确失败，不能静默降级。没有供应商实现时允许维护有效连接定义，执行实际能力仍按现有 Adapter 门拒绝。
+
+本轮证据和未验证边界见 `docs/development/factory-business-integration-acceptance.md`；不以新增配置和 Fixture 证明厂商联调。

@@ -29,7 +29,7 @@ public class ManagedFactoryController extends BaseController {
     @GetMapping
     @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED, permission = "system:factory:list", permissionScope = EndpointAccess.PermissionScope.PLATFORM)
     public TableDataInfo list(@RequestParam(defaultValue = "1") int pageNum,
-                                                           @RequestParam(defaultValue = "20") int pageSize) {
+                              @RequestParam(defaultValue = "20") int pageSize) {
         return getDataTable(service.pageFactories(pageNum, pageSize));
     }
 

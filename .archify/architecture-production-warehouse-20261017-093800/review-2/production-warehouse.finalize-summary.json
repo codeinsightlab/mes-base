@@ -1,0 +1,64 @@
+{
+  "schemaVersion": 1,
+  "ok": false,
+  "command": "finalize",
+  "status": "fail",
+  "type": "architecture",
+  "quality": "showcase",
+  "specification": {
+    "path": "/Users/user/work/lixin/mes-base/.archify/architecture-production-warehouse-20261017-093800/candidate.json",
+    "sha256": "060065d76aae181398c385212771c01cf0053a6aba2477454c2d643449726aab",
+    "bytes": 6549
+  },
+  "artifact": {
+    "path": "/Users/user/work/lixin/mes-base/.archify/architecture-production-warehouse-20261017-093800/production-warehouse.html",
+    "sha256": "bc6a9f2c7f0eefe5583205eeb124cc482cc9ada8e5330aa8c3408eab5646424c",
+    "bytes": 761861
+  },
+  "gates": {
+    "validate": "pass",
+    "deliver": "pass",
+    "check": "pass",
+    "browser-check": "fail"
+  },
+  "failedStage": "browser-check",
+  "diagnostics": [
+    {
+      "code": "viewer/browser-check-runtime",
+      "severity": "error",
+      "message": "browser-check could not complete its Chrome inspection.",
+      "subject": {
+        "artifact": "/Users/user/work/lixin/mes-base/.archify/architecture-production-warehouse-20261017-093800/production-warehouse.html"
+      },
+      "evidence": {
+        "reason": "Chrome DevTools read pipe failed: stream ended\nChrome process: still running.\nChrome transport: Node v22.23.1, libuv 1.51.0, darwin; pid=88973, exitCode=null, signalCode=null.\nChrome read pipe: readable=false, ended=true, destroyed=false, receivedBytes=0, messages=0, bufferedBytes=0.\nChrome write pipe: writable=true, ended=false, destroyed=false, completedWrites=1, writtenBytes=50, bufferedBytes=0."
+      },
+      "supportedFixes": [
+        "resolve the reported Chrome inspection error, then rerun browser-check"
+      ]
+    }
+  ],
+  "diagnosticSummary": {
+    "total": 1,
+    "shown": 1,
+    "truncated": false
+  },
+  "evidence": {
+    "receipt": "/Users/user/work/lixin/mes-base/.archify/architecture-production-warehouse-20261017-093800/review-2/production-warehouse.finalize.json",
+    "summaryReceipt": "/Users/user/work/lixin/mes-base/.archify/architecture-production-warehouse-20261017-093800/review-2/production-warehouse.finalize-summary.json",
+    "browserCheckReceipt": "/Users/user/work/lixin/mes-base/.archify/architecture-production-warehouse-20261017-093800/review-2/production-warehouse.browser-check.json"
+  },
+  "update": {
+    "status": "unavailable",
+    "installedVersion": null,
+    "availableVersion": null,
+    "releaseNotes": null,
+    "checkedAt": null,
+    "source": null,
+    "noticeRequired": false,
+    "noticeText": null,
+    "reason": "cache-unavailable"
+  },
+  "visualReview": "not-requested",
+  "durationMs": 656
+}

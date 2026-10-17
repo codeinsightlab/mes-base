@@ -14,13 +14,21 @@ import org.springframework.boot.context.properties.bind.Bindable;
 import org.springframework.boot.context.properties.bind.Binder;
 import org.springframework.core.env.Environment;
 
-/** Uses server-owned opaque binding keys and provider identifiers, without a second provider enum or secret store. */
+/**
+ * Uses server-owned opaque binding keys and provider identifiers, without a second provider enum or secret store.
+ */
 public final class FactoryIntegrationRegistry {
     public record Connection(String factoryId, String provider, String serviceUrl, String credentialReference,
                              String organization, boolean enabled, long revision) {
-        @Override public String toString() { return "Connection[REDACTED]"; }
+        @Override
+        public String toString() {
+            return "Connection[REDACTED]";
+        }
     }
-    public record Choice(String reference, String provider, long revision) { }
+
+    public record Choice(String reference, String provider, long revision) {
+    }
+
     private final Map<String, Connection> connections;
     private final Environment environment;
 
@@ -39,7 +47,8 @@ public final class FactoryIntegrationRegistry {
 
     private boolean valid(Connection connection) {
         if (!connection.enabled() || connection.revision() < 1 || connection.provider() == null
-                || !connection.provider().matches("[A-Za-z0-9_-]{1,128}") || "local".equalsIgnoreCase(connection.provider())
+                || !connection.provider()
+                .matches("[A-Za-z0-9_-]{1,128}") || "local".equalsIgnoreCase(connection.provider())
                 || connection.organization() == null || connection.organization().isBlank()
                 || connection.credentialReference() == null || connection.credentialReference().isBlank()
                 || connection.serviceUrl() == null) return false;
@@ -47,7 +56,9 @@ public final class FactoryIntegrationRegistry {
             var uri = URI.create(connection.serviceUrl());
             if (!("https".equals(uri.getScheme()) || "http".equals(uri.getScheme())) || uri.getHost() == null
                     || uri.getUserInfo() != null || uri.getQuery() != null || uri.getFragment() != null) return false;
-        } catch (IllegalArgumentException invalid) { return false; }
+        } catch (IllegalArgumentException invalid) {
+            return false;
+        }
         // Reference resolves only on the server. Its value is never copied into any view or snapshot.
         String credential = environment.getProperty(connection.credentialReference());
         return credential != null && !credential.isBlank();
@@ -55,13 +66,17 @@ public final class FactoryIntegrationRegistry {
 
     public FactoryIntegrationSnapshot snapshot(ManagedFactory factory) {
         FactoryRuntimeMode mode;
-        try { mode = FactoryRuntimeMode.valueOf(factory.runtimeMode()); }
-        catch (IllegalArgumentException | NullPointerException invalid) {
+        try {
+            mode = FactoryRuntimeMode.valueOf(factory.runtimeMode());
+        } catch (IllegalArgumentException | NullPointerException invalid) {
             throw new FoundationException(ErrorCode.INTEGRATION_NOT_CONFIGURED, invalid);
         }
         if (mode == FactoryRuntimeMode.LOCAL)
             return new FactoryIntegrationSnapshot(new FactoryId(factory.factoryId()), mode, factory.erpProvider(),
                     factory.erpConfigRef(), factory.integrationRevision(), null);
+        if (factory.erpProvider() == null || factory.erpProvider().isBlank()
+                || factory.erpConfigRef() == null || factory.erpConfigRef().isBlank())
+            throw new FoundationException(ErrorCode.INTEGRATION_NOT_CONFIGURED);
         var connection = connections.get(factory.erpConfigRef());
         if (connection == null || !Objects.equals(factory.factoryId(), connection.factoryId())
                 || !Objects.equals(factory.erpProvider(), connection.provider()) || !valid(connection))
@@ -73,7 +88,8 @@ public final class FactoryIntegrationRegistry {
     public static ManagedFactory configure(ManagedFactory old, ManagedFactory proposed) {
         boolean changed = old != null && (!Objects.equals(old.runtimeMode(), proposed.runtimeMode())
                 || !Objects.equals(old.erpProvider(), proposed.erpProvider()) || !Objects.equals(old.erpConfigRef(), proposed.erpConfigRef()));
-        if (changed && old.integrationLocked()) throw new FoundationException(ErrorCode.FACTORY_MODE_CHANGE_REQUIRES_MIGRATION);
+        if (changed && old.integrationLocked())
+            throw new FoundationException(ErrorCode.FACTORY_MODE_CHANGE_REQUIRES_MIGRATION);
         return new ManagedFactory(proposed.factoryId(), proposed.enterpriseId(), proposed.factoryCode(), proposed.factoryName(),
                 proposed.datasourceId(), proposed.status(), proposed.revision(), proposed.runtimeMode(), proposed.erpProvider(),
                 proposed.erpConfigRef(), old == null ? 1 : old.integrationRevision() + (changed ? 1 : 0),

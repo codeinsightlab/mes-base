@@ -75,15 +75,27 @@ public class WarehouseIntegration {
         String binding = snapshot == null ? environment.getProperty(key + ".binding-key") : snapshot.configurationRef();
         if (provider == null || provider.isBlank() || binding == null || binding.isBlank())
             throw new FoundationException(ErrorCode.INTEGRATION_NOT_CONFIGURED);
-        adapter(scope, binding);
+        if (!adapter(scope, binding).supportsProvider(provider))
+            throw new FoundationException(ErrorCode.INTEGRATION_NOT_CONFIGURED);
         return new Selection(mode, provider, binding);
     }
 
     public ErpActionResult createMaterialIssue(FactoryScope scope, Selection selection,
                                                MaterialIssueSubmitCommand command) {
-        if (!submissionSelection(scope).equals(selection))
+        // The submission has already frozen this selection; configuration edits cannot reinterpret it.
+        if (selection == null || selection.mode() == null)
             throw new FoundationException(ErrorCode.INTEGRATION_NOT_CONFIGURED);
-        return selection.mode() == Mode.LOCAL_ONLY ? local.createMaterialIssue(scope, command) : adapter(scope, selection.bindingKey()).createMaterialIssue(scope, command);
+        if (selection.mode() == Mode.LOCAL_ONLY) {
+            if (!"local".equals(selection.provider()) || selection.bindingKey() != null)
+                throw new FoundationException(ErrorCode.INTEGRATION_NOT_CONFIGURED);
+            return local.createMaterialIssue(scope, command);
+        }
+        if (selection.bindingKey() == null || selection.provider() == null)
+            throw new FoundationException(ErrorCode.INTEGRATION_NOT_CONFIGURED);
+        var adapter = adapter(scope, selection.bindingKey());
+        if (!adapter.supportsProvider(selection.provider()))
+            throw new FoundationException(ErrorCode.INTEGRATION_NOT_CONFIGURED);
+        return adapter.createMaterialIssue(scope, command);
     }
 
     public ErpIssueQueryResult query(FactoryScope scope, String sourceMode, String provider,

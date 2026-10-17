@@ -67,22 +67,22 @@ class RoutingMetadataRedisTest {
             var ttl = Duration.ofSeconds(2);
             var first = new RoutingMetadataStore(firstRedis, ns, ttl);
             var second = new RoutingMetadataStore(secondRedis, ns, ttl);
-            first.publish("binding:A", "OLD");
+            first.publish("binding-v2:A", "OLD");
             Thread.sleep(500);
-            long remaining = firstRedis.getExpire(ns.key("factory-routing:entry:binding:A"), TimeUnit.MILLISECONDS);
-            assertEquals("OLD", second.read("binding:A"));
-            second.publish("binding:B", "OTHER");
-            long after = firstRedis.getExpire(ns.key("factory-routing:entry:binding:A"), TimeUnit.MILLISECONDS);
+            long remaining = firstRedis.getExpire(ns.key("factory-routing:entry:binding-v2:A"), TimeUnit.MILLISECONDS);
+            assertEquals("OLD", second.read("binding-v2:A"));
+            second.publish("binding-v2:B", "OTHER");
+            long after = firstRedis.getExpire(ns.key("factory-routing:entry:binding-v2:A"), TimeUnit.MILLISECONDS);
             assertTrue(after <= remaining);
             assertTrue(after > 0 && after < 1800);
-            second.invalidate(List.of("binding:A"));
-            assertNull(first.read("binding:A"));
+            second.invalidate(List.of("binding-v2:A"));
+            assertNull(first.read("binding-v2:A"));
             // A read begun before eviction may publish stale data; its own TTL bounds that value.
-            first.publish("binding:A", "LATE OLD");
-            assertEquals("LATE OLD", second.read("binding:A"));
+            first.publish("binding-v2:A", "LATE OLD");
+            assertEquals("LATE OLD", second.read("binding-v2:A"));
             Thread.sleep(2100);
-            assertNull(first.read("binding:A"));
-            assertNull(first.read("binding:B"));
+            assertNull(first.read("binding-v2:A"));
+            assertNull(first.read("binding-v2:B"));
 
             var source = new DriverManagerDataSource("jdbc:h2:mem:" + UUID.randomUUID() + ";MODE=MySQL;DB_CLOSE_DELAY=-1", "sa", "");
             var jdbc = new JdbcTemplate(source);
@@ -95,7 +95,7 @@ class RoutingMetadataRedisTest {
             assertEquals("Before", healthy.definition("A").factoryName());
             assertEquals("Before", healthy.defaultDefinition().factoryName());
             assertNull(healthy.definition("UNKNOWN"));
-            assertNull(second.read("binding:UNKNOWN"));
+            assertNull(second.read("binding-v2:UNKNOWN"));
             assertThrows(IllegalStateException.class, () -> persistence.run(() -> {
                 jdbc.update("UPDATE mf_factory SET factory_name='Rollback'");
                 healthy.changed(List.of("A"));
@@ -107,8 +107,8 @@ class RoutingMetadataRedisTest {
                 healthy.changed(List.of("A"));
                 return null;
             });
-            assertNull(first.read("binding:A"));
-            assertNull(first.read("default"));
+            assertNull(first.read("binding-v2:A"));
+            assertNull(first.read("default-v2"));
             assertEquals("Committed", healthy.definition("A").factoryName());
             var failing = new RoutingMetadataStore(firstRedis, ns, ttl) {
                 public void invalidate(Collection<String> fields) {
@@ -132,7 +132,7 @@ class RoutingMetadataRedisTest {
             };
             assertEquals(ErrorCode.ROUTING_METADATA_UNAVAILABLE, assertThrows(FoundationException.class,
                     () -> new FactoryMetadataCache(persistence, unavailable, persistence.mapper(RoutingMetadataMapper.class)).definition("A")).code());
-            second.invalidate(List.of("binding:A"));
+            second.invalidate(List.of("binding-v2:A"));
             var noPublish = new RoutingMetadataStore(firstRedis, ns, ttl) {
                 public void publish(String field, String payload) {
                     throw new IllegalStateException("TEST ONLY publication failure");

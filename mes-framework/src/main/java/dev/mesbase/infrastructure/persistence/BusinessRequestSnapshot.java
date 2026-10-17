@@ -33,7 +33,9 @@ public final class BusinessRequestSnapshot {
         this.lease = lease;
     }
 
-    public FactoryIntegrationSnapshot integration() { return integration; }
+    public FactoryIntegrationSnapshot integration() {
+        return integration;
+    }
 
     public BusinessRuntimeBinding binding() {
         return binding;

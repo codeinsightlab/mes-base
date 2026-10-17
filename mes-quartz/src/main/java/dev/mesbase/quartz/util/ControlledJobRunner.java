@@ -26,7 +26,9 @@ public final class ControlledJobRunner {
 
     public ControlledJobRunner(PlatformPersistence unit, FactoryCatalog factories, JobClaimMapper claims,
                                SysJobMapper jobs) {
-        this(unit, factories, claims, jobs, (scope, task) -> { throw new FoundationException(ErrorCode.INTEGRATION_NOT_CONFIGURED); });
+        this(unit, factories, claims, jobs, (scope, task) -> {
+            throw new FoundationException(ErrorCode.INTEGRATION_NOT_CONFIGURED);
+        });
     }
 
     public ControlledJobRunner(PlatformPersistence unit, FactoryCatalog factories, JobClaimMapper claims,
@@ -85,7 +87,8 @@ public final class ControlledJobRunner {
         try {
             var scope = "PLATFORM".equals(job.getExecutionScope()) ? ExecutionScope.platform() : ExecutionScope.factory(new FactoryScope(new FactoryId(job.getFactoryId())));
             scope.run(() -> {
-                if ("FACTORY".equals(job.getExecutionScope())) integration.run(FactoryContext.required(), () -> { });
+                if ("FACTORY".equals(job.getExecutionScope())) integration.run(FactoryContext.required(), () -> {
+                });
                 else if (FactoryContext.current().isPresent()) throw new FoundationException(ErrorCode.CONFLICT);
             });
         } catch (RuntimeException e) {

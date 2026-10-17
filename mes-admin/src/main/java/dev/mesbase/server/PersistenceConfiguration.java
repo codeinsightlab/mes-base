@@ -17,7 +17,7 @@ import dev.mesbase.infrastructure.persistence.SpringCommitActions;
 import javax.sql.DataSource;
 
 import org.apache.ibatis.session.SqlSessionFactory;
-import dev.mesbase.server.migration.FactoryFlyway;
+import dev.mesbase.server.schema.FactoryFlyway;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;

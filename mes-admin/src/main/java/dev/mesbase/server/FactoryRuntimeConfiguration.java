@@ -62,7 +62,8 @@ public class FactoryRuntimeConfiguration {
                                                 ManagedFactoryMapper factories,
                                                 @Qualifier("masterDataSource") DataSource masterDataSource,
                                                 RuntimeRegistry registry,
-                                                OwnerMapperCatalog catalog, FactoryMetadataCache metadata, FactoryIntegrationRegistry integrations) {
+                                                OwnerMapperCatalog catalog, FactoryMetadataCache metadata,
+                                                FactoryIntegrationRegistry integrations) {
         if (!env.getProperty("mes.platform.enabled", Boolean.class, false))
             throw new IllegalArgumentException("Factory Runtime requires explicit Platform persistence");
         var key = env.getRequiredProperty("mes.runtime.datasource-key");

@@ -7,7 +7,6 @@ import dev.mesbase.core.error.ErrorCode;
 import dev.mesbase.core.error.FoundationException;
 import dev.mesbase.core.factory.Factory;
 import dev.mesbase.platform.execution.FactoryIntegrationContext;
-import dev.mesbase.platform.execution.FactoryIntegrationSnapshot;
 import org.springframework.core.env.StandardEnvironment;
 import dev.mesbase.core.factory.FactoryId;
 import dev.mesbase.core.factory.FactoryScope;

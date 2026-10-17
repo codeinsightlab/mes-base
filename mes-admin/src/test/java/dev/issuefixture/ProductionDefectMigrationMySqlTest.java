@@ -2,6 +2,11 @@ package dev.issuefixture;
 
 import dev.mesbase.acceptance.AcceptanceBusinessDatabase;
 import org.flywaydb.core.Flyway;
+import dev.mesbase.server.schema.FactoryFlyway;
+import org.springframework.beans.factory.config.YamlPropertiesFactoryBean;
+import org.springframework.core.env.StandardEnvironment;
+import org.springframework.core.env.PropertiesPropertySource;
+import org.springframework.core.io.FileSystemResource;
 import org.yaml.snakeyaml.Yaml;
 import java.util.Map;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
@@ -30,8 +35,11 @@ class ProductionDefectMigrationMySqlTest {
         if (!Files.exists(backup))
             Files.writeString(backup, jdbc.queryForList("SELECT menu_id,parent_id,path,component,perms FROM sys_menu WHERE path='quality' OR perms LIKE 'business:quality:defect:%'")
                     .toString());
-        var flyway = Flyway.configure().dataSource(source).locations("classpath:db/platform", "classpath:db/system")
-                .load();
+        var yaml = new YamlPropertiesFactoryBean();
+        yaml.setResources(new FileSystemResource("mes-admin/src/main/resources/application-dev.yml"));
+        var environment = new StandardEnvironment();
+        environment.getPropertySources().addLast(new PropertiesPropertySource("developer configuration", yaml.getObject()));
+        var flyway = FactoryFlyway.configure(source, environment).load();
         flyway.migrate();
         flyway.validate();
         assertEquals(4, jdbc.queryForObject("SELECT COUNT(*) FROM sys_menu WHERE perms LIKE 'business:quality:defect:%'", Integer.class));

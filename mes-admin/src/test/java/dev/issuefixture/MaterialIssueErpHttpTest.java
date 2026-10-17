@@ -41,7 +41,7 @@ class MaterialIssueErpHttpTest {
     static final String H = MaterialIssueHttpTest.H, Q = H + "/1/erp-status", R = H + "/1/actions/reconcile-erp";
 
     static class Vendor implements WarehouseErpAdapter {
-        public boolean supportsProvider(String provider) { return "TEST_VENDOR".equals(provider); }
+        public boolean supportsProvider(String provider) { return "test".equals(provider); }
 
         Outcome outcome = Outcome.FOUND;
         DocumentStatus state = DocumentStatus.EFFECTIVE;
@@ -222,12 +222,13 @@ class MaterialIssueErpHttpTest {
     }
 
     @Test
-    void providerSwitchCannotTurnHistoricalConnectedIntoLocalSuccess() throws Exception {
+    void providerSwitchKeepsHistoricalConnectedProviderAndBinding() throws Exception {
         try (var c = connected()) {
             seed(c, "ERP_UNKNOWN");
             c.getEnvironment().getPropertySources()
                     .addFirst(new MapPropertySource("switch", Map.of("mes.integration.warehouse.factories.A.mode", "LOCAL_ONLY")));
-            MaterialIssueHttpTest.mvc(c).perform(full(get(Q))).andExpect(status().isUnprocessableEntity());
+            MaterialIssueHttpTest.mvc(c).perform(full(get(Q))).andExpect(status().isOk())
+                    .andExpect(jsonPath("result.executionMode").value("CONNECTED"));
         }
     }
 }

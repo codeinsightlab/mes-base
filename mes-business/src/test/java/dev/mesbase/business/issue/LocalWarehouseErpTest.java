@@ -45,7 +45,7 @@ class LocalWarehouseErpTest {
         var env = new MockEnvironment();
         var integration = new WarehouseIntegration(env, List.of());
         var command = new QueryMaterialIssueCommand(1L, null, null, null, null);
-        assertThrows(FoundationException.class, () -> integration.query(scope, "LOCAL_ONLY", "local", command));
+        assertEquals(Outcome.NOT_FOUND, integration.query(scope, "LOCAL_ONLY", "local", command).outcome());
         env.setProperty("mes.integration.warehouse.factories.A.mode", "CONNECTED");
         env.setProperty("mes.integration.warehouse.factories.A.provider", "digiwin");
         assertThrows(FoundationException.class, () -> integration.query(scope, "CONNECTED", "digiwin", new QueryMaterialIssueCommand(1L, null, "digiwin", "ERP-1", null)));

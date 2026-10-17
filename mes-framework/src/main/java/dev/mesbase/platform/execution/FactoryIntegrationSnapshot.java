@@ -5,7 +5,9 @@ import dev.mesbase.core.factory.FactoryRuntimeMode;
 import dev.mesbase.core.error.ErrorCode;
 import dev.mesbase.core.error.FoundationException;
 
-/** Immutable, credential-free configuration admitted for one request or explicit task. */
+/**
+ * Immutable, credential-free configuration admitted for one request or explicit task.
+ */
 public record FactoryIntegrationSnapshot(FactoryId factoryId, FactoryRuntimeMode mode, String erpType,
                                          String configurationRef, long revision, Long configurationRevision) {
     public FactoryIntegrationSnapshot {

@@ -8,7 +8,7 @@
     "quality_profile": "showcase",
     "repository": {
       "url": "https://github.com/codeinsightlab/mes-base.git",
-      "revision": "e908bbc6a75b725dacaf3af81b295a440e3114b1",
+      "revision": "b2d1229d6dbdacdf2f86e1d6ac68b523157df707",
       "link_mode": "local-only"
     }
   },
@@ -50,8 +50,8 @@
       "sources": [
         {
           "path": "mes-business/src/main/java/dev/mesbase/business/integration/warehouse/WarehouseIntegration.java",
-          "line": 53,
-          "end_line": 70
+          "line": 68,
+          "end_line": 86
         }
       ]
     },
@@ -72,7 +72,7 @@
         {
           "path": "mes-business/src/main/java/dev/mesbase/business/integration/warehouse/WarehouseErpAdapter.java",
           "line": 10,
-          "end_line": 24
+          "end_line": 27
         }
       ]
     },
