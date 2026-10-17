@@ -15,6 +15,7 @@ import dev.mesbase.server.managed.DatasourcePasswordCipher;
 import dev.mesbase.server.managed.ManagedDatasourceService;
 import dev.mesbase.server.managed.FactoryMetadataCache;
 import dev.mesbase.server.managed.FactoryIntegrationRegistry;
+import dev.mesbase.server.integration.e10.FactoryOapiService;
 import dev.mesbase.platform.execution.FactoryIntegrationExecutor;
 import dev.mesbase.common.core.redis.RoutingMetadataStore;
 import dev.mesbase.common.core.redis.SystemCacheNamespace;
@@ -74,8 +75,15 @@ public class FactoryRuntimeConfiguration {
     }
 
     @Bean
-    FactoryIntegrationRegistry factoryIntegrations(Environment environment) {
-        return new FactoryIntegrationRegistry(environment);
+    FactoryIntegrationRegistry factoryIntegrations(Environment environment, FactoryOapiService oapi) {
+        return new FactoryIntegrationRegistry(environment, oapi);
+    }
+
+    @Bean
+    FactoryOapiService factoryOapiService(ManagedFactoryMapper mapper, PlatformPersistence persistence,
+                                          FactoryMetadataCache metadata, Environment environment) {
+        return new FactoryOapiService(mapper, persistence,
+                new DatasourcePasswordCipher(environment.getRequiredProperty("mes.runtime.datasource-key")), metadata);
     }
 
     @Bean

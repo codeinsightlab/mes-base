@@ -1,6 +1,7 @@
 package dev.mesbase.web.controller.system;
 
 import dev.mesbase.server.managed.ManagedDatasourceService;
+import dev.mesbase.server.integration.e10.FactoryOapiService;
 import dev.mesbase.platform.web.EndpointAccess;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -21,9 +22,23 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 @RequestMapping("/api/system/factory")
 public class ManagedFactoryController extends BaseController {
     private final ManagedDatasourceService service;
+    private final FactoryOapiService oapi;
 
-    public ManagedFactoryController(ManagedDatasourceService service) {
+    public ManagedFactoryController(ManagedDatasourceService service, FactoryOapiService oapi) {
         this.service = service;
+        this.oapi = oapi;
+    }
+
+    @GetMapping("/{id}/oapi")
+    @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED, permission = "system:factory:edit", permissionScope = EndpointAccess.PermissionScope.PLATFORM)
+    public FactoryOapiService.View oapi(@PathVariable String id) {
+        return oapi.get(id);
+    }
+
+    @PutMapping("/{id}/oapi")
+    @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED, permission = "system:factory:edit", permissionScope = EndpointAccess.PermissionScope.PLATFORM)
+    public FactoryOapiService.View saveOapi(@PathVariable String id, @Valid @RequestBody FactoryOapiService.Form form) {
+        return oapi.save(id, form);
     }
 
     @GetMapping

@@ -6,6 +6,9 @@ import dev.mesbase.core.factory.FactoryId;
 import dev.mesbase.core.factory.FactoryRuntimeMode;
 import dev.mesbase.platform.execution.FactoryIntegrationSnapshot;
 import dev.mesbase.system.factory.ManagedFactory;
+import dev.mesbase.server.integration.e10.FactoryOapiService;
+import dev.mesbase.server.integration.e10.DigiwinE10MoQueries;
+import java.util.ArrayList;
 import java.net.URI;
 import java.util.List;
 import java.util.Map;
@@ -31,29 +34,32 @@ public final class FactoryIntegrationRegistry {
 
     private final Map<String, Connection> connections;
     private final Environment environment;
+    private final FactoryOapiService oapi;
 
     public FactoryIntegrationRegistry(Environment environment) {
+        this(environment, null);
+    }
+
+    public FactoryIntegrationRegistry(Environment environment, FactoryOapiService oapi) {
         this.environment = environment;
+        this.oapi = oapi;
         connections = Map.copyOf(Binder.get(environment).bind("mes.integration.connections",
                 Bindable.mapOf(String.class, Connection.class)).orElse(Map.of()));
     }
 
     public List<Choice> choices(String factoryId) {
-        return connections.entrySet().stream().filter(e -> Objects.equals(factoryId, e.getValue().factoryId()))
+        var choices = new ArrayList<Choice>();
+        if (oapi != null) {
+            var configured = oapi.connection(factoryId);
+            if (configured != null)
+                choices.add(new Choice(configured.reference(), DigiwinE10MoQueries.PROVIDER, configured.revision()));
+        }
+        connections.entrySet().stream().filter(e -> Objects.equals(factoryId, e.getValue().factoryId()))
+                .filter(e -> !DigiwinE10MoQueries.PROVIDER.equals(e.getValue().provider()))
                 .filter(e -> valid(e.getValue()))
                 .map(e -> new Choice(e.getKey(), e.getValue().provider(), e.getValue().revision()))
-                .sorted((a, b) -> a.reference().compareTo(b.reference())).toList();
-    }
-
-    /**
-     * 服务端消费方装配复用现有连接准入，不向 HTTP 响应暴露连接定义。
-     */
-    public Connection requireConnection(String reference) {
-        var connection = reference == null ? null : connections.get(reference);
-        if (connection == null || connection.factoryId() == null || connection.factoryId()
-                .isBlank() || !valid(connection))
-            throw new FoundationException(ErrorCode.INTEGRATION_NOT_CONFIGURED);
-        return connection;
+                .forEach(choices::add);
+        return choices.stream().sorted((a, b) -> a.reference().compareTo(b.reference())).toList();
     }
 
     private boolean valid(Connection connection) {
@@ -88,6 +94,13 @@ public final class FactoryIntegrationRegistry {
         if (factory.erpProvider() == null || factory.erpProvider().isBlank()
                 || factory.erpConfigRef() == null || factory.erpConfigRef().isBlank())
             throw new FoundationException(ErrorCode.INTEGRATION_NOT_CONFIGURED);
+        if (DigiwinE10MoQueries.PROVIDER.equals(factory.erpProvider())) {
+            var configured = oapi == null ? null : oapi.connection(factory.factoryId());
+            if (configured == null || !Objects.equals(factory.erpConfigRef(), configured.reference()))
+                throw new FoundationException(ErrorCode.INTEGRATION_NOT_CONFIGURED);
+            return new FactoryIntegrationSnapshot(new FactoryId(factory.factoryId()), mode, factory.erpProvider(),
+                    factory.erpConfigRef(), factory.integrationRevision(), configured.revision());
+        }
         var connection = connections.get(factory.erpConfigRef());
         if (connection == null || !Objects.equals(factory.factoryId(), connection.factoryId())
                 || !Objects.equals(factory.erpProvider(), connection.provider()) || !valid(connection))

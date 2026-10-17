@@ -9,6 +9,12 @@ import org.apache.ibatis.annotations.Param;
 import java.util.List;
 
 public interface ManagedFactoryMapper {
+    @Select("SELECT factory_id,oapi_config_ref AS reference,oapi_config_cipher AS settings_cipher,oapi_config_revision AS configuration_revision,revision AS factory_revision FROM mf_factory WHERE factory_id=#{id}")
+    FactoryOapiConfiguration oapi(String id);
+
+    @Update("UPDATE mf_factory SET oapi_config_ref=#{reference},oapi_config_cipher=#{settingsCipher},oapi_config_revision=#{configurationRevision},revision=revision+1 WHERE factory_id=#{factoryId} AND revision=#{factoryRevision} AND runtime_mode='LOCAL' AND erp_config_ref IS NULL")
+    int updateOapi(FactoryOapiConfiguration configuration);
+
     @Select("<script>SELECT factory_id FROM mf_factory WHERE status='ENABLED' AND factory_id IN <foreach collection='ids' item='id' open='(' separator=',' close=')'>#{id}</foreach></script>")
     List<String> enabledIds(@Param("ids") List<String> ids);
 

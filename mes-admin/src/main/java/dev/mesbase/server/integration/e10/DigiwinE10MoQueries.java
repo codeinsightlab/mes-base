@@ -1,6 +1,10 @@
 package dev.mesbase.server.integration.e10;
 
 import com.lixin.capability.digiwin.e10.E10OapiClient;
+import com.lixin.capability.digiwin.e10.E10Host;
+import com.lixin.capability.digiwin.e10.E10Service;
+import dev.mesbase.platform.execution.FactoryIntegrationSnapshot;
+import java.util.HashMap;
 import com.lixin.capability.digiwin.e10.gateway.OapiMoGateway;
 import com.lixin.capability.digiwin.e10.request.E10QueryRequest;
 import com.lixin.capability.digiwin.e10.response.E10QueryBusinessResponse;
@@ -18,38 +22,50 @@ import java.util.Map;
 public final class DigiwinE10MoQueries implements AutoCloseable {
     public static final String PROVIDER = "DIGIWIN_E10";
 
-    record Binding(String factoryId, long revision, E10OapiClient client) {
-        @Override
-        public String toString() {
-            return "E10Binding[REDACTED]";
-        }
+    private final FactoryOapiService configurations;
+    private final Map<String, E10OapiClient> clients = new HashMap<>();
+    private boolean closed;
+
+    DigiwinE10MoQueries(FactoryOapiService configurations) {
+        this.configurations = configurations;
     }
 
-    private final Map<String, Binding> bindings;
-
-    DigiwinE10MoQueries(Map<String, Binding> bindings) {
-        this.bindings = Map.copyOf(bindings);
+    private synchronized E10OapiClient client(FactoryIntegrationSnapshot snapshot) {
+        if (closed) throw new IllegalStateException("E10 client is closed");
+        if (snapshot.mode() != FactoryRuntimeMode.ERP || !PROVIDER.equals(snapshot.erpType()))
+            throw new FoundationException(ErrorCode.INTEGRATION_NOT_CONFIGURED);
+        var configuration = configurations.connection(snapshot.factoryId().value());
+        if (configuration == null || !snapshot.factoryId().value().equals(configuration.factoryId())
+                || !configuration.reference().equals(snapshot.configurationRef())
+                || !Long.valueOf(configuration.revision()).equals(snapshot.configurationRevision()))
+            throw new FoundationException(ErrorCode.INTEGRATION_NOT_CONFIGURED);
+        String key = configuration.factoryId() + ":" + configuration.reference() + ":" + configuration.revision();
+        return clients.computeIfAbsent(key, ignored -> {
+            var settings = configuration.settings();
+            settings.validate();
+            var host = settings.host();
+            var service = settings.service();
+            return E10OapiClient.builder().endpoint(settings.endpoint())
+                    .host(new E10Host(host.ver(), host.prod(), host.timezone(), host.ip(), host.id(), host.lang(), host.acct()))
+                    .service(new E10Service(service.prod(), service.ip(), service.id())).build();
+        });
     }
 
     public E10QueryBusinessResponse<MoQueryRow> queryMo(E10QueryRequest request) {
         var snapshot = FactoryIntegrationContext.required();
-        var binding = snapshot.configurationRef() == null ? null : bindings.get(snapshot.configurationRef());
-        if (snapshot.mode() != FactoryRuntimeMode.ERP || !PROVIDER.equals(snapshot.erpType())
-                || binding == null || !binding.factoryId().equals(snapshot.factoryId().value())
-                || !Long.valueOf(binding.revision()).equals(snapshot.configurationRevision())) {
-            throw new FoundationException(ErrorCode.INTEGRATION_NOT_CONFIGURED);
-        }
         if (request == null || request.getPageNo() == null || request.getPageNo() < 1
                 || request.getPageSize() == null || request.getPageSize() < 1
                 || request.getIsGetSchema() == null || request.getIsGetCount() == null
                 || request.getConditions() == null || request.getOrders() == null) {
             throw new IllegalArgumentException("E10 MO query requires explicit pagination, schema/count flags, conditions and orders");
         }
-        return new OapiMoGateway(binding.client()).mo().query(request);
+        return new OapiMoGateway(client(snapshot)).mo().query(request);
     }
 
     @Override
-    public void close() {
-        bindings.values().forEach(binding -> binding.client().close());
+    public synchronized void close() {
+        closed = true;
+        clients.values().forEach(E10OapiClient::close);
+        clients.clear();
     }
 }

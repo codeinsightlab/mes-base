@@ -1,182 +1,107 @@
 # 鼎捷 E10 SDK 消费方接入
 
-日期：2026-10-17。范围：MES 自有配置、按现有工厂连接绑定复用 Client、显式工单 Query 示例及离线测试。
-真实 ERP 请求为 0；没有修改 SDK、继续协议研究、生成 SDK、迁移数据或切换任何工厂模式。
+日期：2026-10-17。当前入口为工厂管理的“E10 OAPI 配置”；参数属于工厂中心配置，禁止在 dev/prod YAML 中维护第二份 E10 配置。
 
-## 依赖与装配位置
+## 工厂页面与持久化
 
-`mes-admin/pom.xml` 引入独立 Java 8 JAR：
+用户先保存工厂，再在工厂列表对应行打开“E10 OAPI 配置”。表单维护完整 endpoint、host 的
+ver/prod/timezone/ip/id/lang/acct，以及 service 的 prod/ip/id。host.id 必须显式提供，允许空字符串。
+时区及 service.id 原样使用，不补模块后缀、不猜测其他身份；旧系统 service.namespace 不属于本 SDK 契约。
 
-```xml
-<dependency>
-    <groupId>com.lixin</groupId>
-    <artifactId>lixin-common-capability-digiwin-e10</artifactId>
-    <version>0.1.0-SNAPSHOT</version>
-</dependency>
-```
+用户明确指定 `ktg-mes` dev 的 `oapi.YWMS` 为本次参数来源。真实值只通过管理页面填写，不写进文档、
+测试、样例或日志。原先短暂写入私有 dev 文件的参数已移除，默认 application.yml 的 E10 装配开关也已移除。
 
-MES 继续使用 Java 21 / Spring Boot 4。没有引入 all-starter、E10 Starter、systemPath 或复制 SDK 源码。
-SDK 本身不读取 application.yml，不具有 Spring 自动装配。
+复用现有中心表 `mf_factory`，正式 Flyway V38 增加：
 
-- `DigiwinE10Configuration`：本项目手工配置类，读取 MES 前缀并用 SDK Builder 创建 Client。
-- `DigiwinE10MoQueries`：显式调用的类型化工单查询，按已准入 FactoryIntegrationContext 检查绑定，原样传播 SDK 异常。
-- `FactoryIntegrationRegistry.requireConnection`：装配时复用现有注册连接校验。未新建模式 Resolver 或工厂授权来源。
+- `oapi_config_ref`：首次保存生成的不透明稳定连接引用。
+- `oapi_config_cipher`：整个连接参数 JSON，经现有 AES-GCM 机制加密。
+- `oapi_config_revision`：连接参数版本；保存同时校验并递增工厂 revision，拒绝并发覆盖。
 
-## 显式配置
+只扩展已有工厂基础设施，不新增业务表、独立 CRUD、凭证中心或第三数据源。运行环境仍需要既有
+`mes.runtime.datasource-key`，它是部署密钥，不能移到普通工厂响应或浏览器存储中。
 
-配置前缀 `mes.integration.digiwin-e10` 属于本业务项目。application.yml 中默认 `enabled: false`。
-启用但没有连接配置，或任一必需字段缺失/为空，装配明确失败；唯一允许显式空字符串的是 `host.id`。
-不读取旧项目、截图、历史联调配置或 SDK 示例身份来补值。
+`GET/PUT /api/system/factory/{id}/oapi` 均要求平台角色及 `system:factory:edit`，
+GET 是有权限管理员专用的连接维护响应，普通工厂列表、详情和连接候选不返回参数或密文。
+保存检查字段完整性、长度、控制字符和 HTTP(S) URL；不含 URL 账号、查询参数或片段。
+配置损坏或密钥不匹配明确拒绝，不降级、不发送请求。
 
-以下是待业务方提供值的配置模板，不是可直接用于 ERP 的身份：
+## 与运行模式分离
 
-```yaml
-mes:
-  integration:
-    # 既有连接注册入口；工厂持久化的 erp_config_ref 必须引用同一个 key。
-    connections:
-      binding-e10-v1:
-        factory-id: ${E10_FACTORY_ID}
-        provider: DIGIWIN_E10
-        service-url: ${E10_ENDPOINT}
-        organization: ${E10_ORGANIZATION}
-        credential-reference: ${E10_CREDENTIAL_REFERENCE}
-        enabled: true
-        revision: 1
-    digiwin-e10:
-      enabled: true
-      connections:
-        binding-e10-v1:
-          endpoint: ${E10_ENDPOINT}
-          host:
-            ver: ${E10_HOST_VER}
-            prod: ${E10_HOST_PROD}
-            timezone: ${E10_HOST_TIMEZONE}
-            ip: ${E10_HOST_IP}
-            id: ${E10_HOST_ID}
-            lang: ${E10_HOST_LANG}
-            acct: ${E10_HOST_ACCT}
-          service:
-            prod: ${E10_SERVICE_PROD}
-            ip: ${E10_SERVICE_IP}
-            id: ${E10_SERVICE_ID}
-```
+保存参数只做连接准备，不切换 LOCAL/ERP，不写 `erp_provider/erp_config_ref`，不解锁工厂，
+不创建 EXTERNAL 业务记录，不写库存，也不向 ERP 发送请求。页面显示“真实 ERP 读取尚未验证”。
+SIMPLE_B 继续保持既有 LOCAL 权威与模式锁定；配置准备完成不等于已授权切换。
 
-- `endpoint` 是完整 HTTP(S) 地址，必须与同引用下现有 `service-url` 完全一致，沿用注册入口的 URL 校验。
-- `host` 显式传入 `new E10Host(ver, prod, timezone, ip, id, lang, acct)`；timezone 为已确认 UTC offset。
-  `E10_HOST_ID` 必须存在，可以显式设为空；没有默认值。
-- `service` 显式传入 `new E10Service(prod, ip, id)`，`service.id` 原样传入，不追加后缀；OAPI_MO 不是身份。
-- `DIGIWIN_E10` 是本消费方采用的 provider 标识；不是新增的全局模式或供应商枚举。
-- `credential-reference` 是现有 FactoryIntegrationRegistry 的管理准入要求，必须解析到服务端非空配置值；
-  本次没有改变这一规则，也不将其作为 E10 Token、签名或 Header 发送。SDK 没有新增 Token 获取或认证流程。
-- 连接引用负责工厂归属与配置版本，新增 E10 子配置不会改变中心库工厂模式或解锁历史工厂。
-  当前 LOCAL 工厂不能因此发起 E10 Query。正式模式切换仍须遵守项目既有停旧启新规则。
+新工厂按既有工厂表单选择 ERP 类型和该厂连接，仍受 Registry 和原有模式锁定控制。
+一个工厂只保存一个 E10 配置；进入 ERP 或存在 ERP 绑定后，本入口只读，连接身份变更必须走受控迁移。
+不提供普通表单覆盖已冻结身份的路径，本次未实现模式迁移流程。
 
-目前未提供任何真实 endpoint、host/service 身份或授权的 ERP 连接绑定，保留关闭状态。
-示例配置中的 Factory、组织、凭证引用和模式绑定同样需要业务方确认，不自动创建或写入数据库。
+FactoryIntegrationRegistry 读取当前厂的数据库 E10 配置，按 factoryId、provider、reference、revision
+准入；旧 YAML 中的 DIGIWIN_E10 连接不再进入候选或运行快照。非 E10 的既有通用 Adapter 配置保留原行为。
+普通中心查询使用构造器注入 Mapper；只有业务事务活动时，才使用既有独立中心只读窗口。
 
-## Client 生命周期与调用边界
+## SDK 装配与业务调用
 
-启用时每个已注册连接引用创建一个 Client，并复用到应用退出；构造只做本地校验和资源初始化，不访问 ERP。
-装配依赖项目既有 Factory Runtime 提供的 FactoryIntegrationRegistry；未装配该入口时不创建替代 Registry。
-使用 SDK 默认连接/借连接/响应/整体超时 3000/3000/10000/30000ms、最大连接20、响应上限4MiB。
-不修改 SDK 网络策略，不自动重试或翻页。
+继续使用 `com.lixin:lixin-common-capability-digiwin-e10:0.1.0-SNAPSHOT`，
+不复制 SDK 的认证、Header、HTTP、序列化和错误解析。没有新增 Token 字段或虚构凭证来满足旧认证引用。
 
-手工 Bean 使用 `@Bean(destroyMethod = "close")` 管理 `DigiwinE10MoQueries`；其 `close()` 逐一关闭自有 SDK Client。
-多连接装配中途失败时，已创建的 Client 也会关闭。Gateway 共享这些 Client，不自行管理连接池。
+Factory Runtime 启用时装配查询消费方；启动不读取所有连接、不创建 SDK 客户端、不发送网络探测。
+显式 Query 要求已有合法 FactoryIntegrationContext，mode=ERP、provider=DIGIWIN_E10，
+工厂、连接引用及配置版本与数据库一致。首次业务调用惰性创建并缓存对应客户端，退出时统一关闭。
+LOCAL、缺上下文、跨厂、错误引用或过期配置均在请求发送前拒绝。
 
-调用时要求当前请求或显式任务已取得合法 FactoryIntegrationSnapshot，mode=ERP，provider=DIGIWIN_E10，
-当前 Factory、configurationRef、configurationRevision 与启动时登记的 Client 相符；不接受调用方参数选厂或改派连接。
-缺上下文、LOCAL、跨厂、错误 provider/引用或版本不符均在发送前拒绝。
-HTTP 使用已有请求准入；后台任务使用已有 FactoryIntegrationExecutor 在执行线程建立上下文。
+当前只提供既有 `DigiwinE10MoQueries.queryMo(E10QueryRequest)`，内部复用
+`OapiMoGateway.mo().query`。请求显式提供 pageNo/pageSize、isGetSchema/isGetCount、conditions/orders。
+SDK 异常继续原样传播，不转为空结果、不自动重试，不记录完整报文或身份。
+没有新增 ERP 查询按钮、自动同步、库存扣减或工单业务写入。
 
-没有注册 Controller、启动查询、健康检查、定时任务或自动同步，也没有把此示例实现成已验收的
-ProductionErpAdapter / WarehouseErpAdapter。工单 Query 本身不能证明库存、可投产或真实出库生效。
+## 验证与历史记录
 
-## 工单查询调用示例
+初次 SDK 接入曾完成 Maven 依赖解析、710 项全量测试统计、38 项旧装配定向测试及 10 项打包 smoke。
+这些只描述当时 YAML 装配入口的离线证据；该入口现已由工厂持久化配置替代，相应旧测试已删除或迁移，
+不能沿用旧统计证明本次实现。当前测试与数据库、UI 实际结果在本节后续记录。
 
-下面的消费方类可编译，只有业务代码显式调用方法时才会发送一次 Query。
-调用者必须已经处于上述工厂集成上下文，不能从应用启动或健康检查调用。
+本次保留回环 HTTP 的真实 SDK 请求/响应、Header、BigDecimal、空页、HTTP 错误、部分失败、
+超时 UNKNOWN 无重试及关闭行为检查，并增加加密持久化、工厂隔离、锁定、并发版本和回滚检查。
+真实 ERP Query/Read 尚未执行；保存或读回参数不代表真实 E10 联调完成。
 
-```java
-import com.fasterxml.jackson.databind.node.JsonNodeFactory;
-import com.lixin.capability.digiwin.e10.E10Exception;
-import com.lixin.capability.digiwin.e10.request.E10QueryRequest;
-import com.lixin.capability.digiwin.e10.response.mo.MoQueryRow;
-import dev.mesbase.server.integration.e10.DigiwinE10MoQueries;
-import java.util.List;
+## 回滚边界
 
-public final class MesE10MoUsage {
-    public static List<MoQueryRow> queryFirstPage(DigiwinE10MoQueries queries) {
-        E10QueryRequest request = new E10QueryRequest();
-        request.setPageNo(1);
-        request.setPageSize(20);
-        request.setIsGetSchema(false);
-        request.setIsGetCount(false);
-        request.setConditions(JsonNodeFactory.instance.arrayNode());
-        request.setOrders(JsonNodeFactory.instance.arrayNode());
-        try {
-            return queries.queryMo(request).getRows();
-        } catch (E10Exception failure) {
-            // 原样交给调用用例处理，Reason/Outcome/完整响应仍在原异常中。
-            // 不记录异常堆栈、响应或报文，不转换为空列表，不自动重试。
-            throw failure;
-        }
-    }
-}
-```
+回滚前停止新增连接配置，保留已保存的加密参数和 V38 迁移记录；不删除历史迁移或通过回填 YAML 绕过工厂配置。
+应用回退须评估旧版本对新配置的不可见性；任何已启用 ERP 工厂不得因配置缺失降级 LOCAL。
 
-内部调用为 `new OapiMoGateway(client).mo().query(request)`，不手工拼 Header、信封或服务名。
-需要数量时显式 `request.setIsGetCount(true)`，从同一个返回对象读取 `getRows()` 和 `getCnt()`；
-缺少 cnt 不补 0。非 Query SDK 使用 `getRecords()`，本轮没有增加非 Query 调用。
-conditions/orders 必须由调用方显式传入，内部结构不推测。Request 可变，禁止跨线程并发修改同一实例。
+### 本轮自动化及真实数据库执行结果
 
-SDK 正常返回已通过 HTTP、业务状态及已知结构校验；不再调用已删除的
-isHttpSuccess()/requireBusinessResponse()。E10Exception 原样向上抛出，保留 Reason、Outcome、
-完整响应和适用的原始正文；超时 UNKNOWN、部分成功与失败都不重放、不伪造成功。
-业务方如需诊断只能按授权范围读取原异常，不将完整异常、Header、digi-key、Token、身份或报文
-写日志/返回前端；不要开启 Apache wire/header 日志。
-业务落库、业务幂等与状态转换不在此传输示例中实现，也不承诺跨 ERP/MES 原子提交。
+- `mvn -B -ntp verify`：BUILD SUCCESS，690 项，647 通过、43 项环境门控跳过，0 失败/错误。
+  原 YAML 必填/启动装配测试已随入口退役替换，不将测试数减少解释为业务覆盖丢失。
+- 最终追加权限 HTTP 负例后定向测试：17 项通过，覆盖真实 Controller/权限拦截器、
+  平台角色与工厂编辑权限、匿名/越权拒绝、非法请求、加密持久化、隔离、锁定、并发版本、回滚及 SDK 回环。
+- `MES_FACTORY_OAPI_MIGRATION=true ... -Dtest=FactoryOapiLiveMigrationTest,... test`：
+  实际核实中心 `192.168.18.25:3306/mes_base_dev`，SIMPLE_B 仍绑定
+  `192.168.18.25:3306/mes_base_dev_business_simple_b`；正式 Flyway 从 V37 迁到 V38，记录成功。
+  三个新增列中文 COMMENT 非空，全部工厂原模式/provider/ref/revision/锁定字段保持不变。
+  备份位于 Git 忽略的 `.local/factory-oapi-20261017/`，数据备份权限为 0600。
+- 前端 `npm run test`：60 文件、358 项全部通过；`npm run build` 通过，保留既有大包体积提示。
+- `/usr/bin/python3 scripts/smoke-packaged.py`：10/10；隔离回环端口测试，不接管用户服务。
+- 新 JAR 已包含 OAPI 服务和 V38；源码与打包 dev 均无 E10 连接参数。后端及本轮前端文件
+  `git diff --check` 通过；前端其他并行修改中的 `issue/mesMaterialIssue/index.vue` 既有尾空格未处理。
 
-## 延期操作与验证范围
+日志：`/tmp/mes-factory-oapi-verify.log`、`/tmp/mes-factory-oapi-http-test.log`、
+`/tmp/mes-factory-oapi-combined.log`、`/tmp/mes-factory-oapi-ui-test-final.log`、
+`/tmp/mes-factory-oapi-ui-build-final.log`、`/tmp/mes-factory-oapi-smoke.log`。
 
-本轮不使用 EMP_CLAIM_DOC / EMP_LOAN_DOC / SUPPLIER_FI / SUPPLIER_PURCHASE / CUSTOMER_FI /
-CUSTOMER_SALES 的 ReqConfirm，以及 SUPPLIER / CUSTOMER 的 ReqApproval。
-8 项操作共 10 个属性仍为 DEFERRED / CONTRACT_UNVERIFIED，不研究绑定、不生成或修改 SDK。
+### 前端实际配置与读回
 
-已阅读 SDK 仓库 `/Users/user/work/lixin/lixin-common-capability` 的
-`skills/digiwin-e10-client-usage-skill.md`、README“鼎捷 E10”章节及
-`docs/reviews/digiwin-e10-stage-closeout.md`。
-本地测试 `DigiwinE10ConsumerTest` 只向随机端口 127.0.0.1 Mock HTTP Server 发送合成内容，
-不加载应用真实配置、数据库、Redis或真实 ERP。
+用户自行重启新 JAR 后，使用既有登录会话，在 `http://localhost:5173/system/factory`
+的 SIMPLE_B 行打开配置弹窗，逐项填写用户指定的 ktg-mes dev OAPI 参数并点击保存。
+页面返回“已保存 · 配置版本 1”，关闭后重新打开，全部字段从服务端正确恢复，空 host.id 保留。
 
-### 实际执行结果
+真实 MySQL 只读复核通过：SIMPLE_B 的配置密文可以由运行环境密钥解密，endpoint、host 七字段、
+service 三字段均与指定源逐项一致，配置版本为 1；runtime_mode 仍为 LOCAL，erp_provider/erp_config_ref
+仍为空，未修改业务运行权威。Flyway 38 条迁移全部验证通过，无新增迁移执行。
+命令环境 `MES_FACTORY_OAPI_MIGRATION=true MES_FACTORY_OAPI_READBACK=true`，定向
+`FactoryOapiLiveMigrationTest` 1/1 通过；日志 `/tmp/mes-factory-oapi-live-readback.log`。
 
-| 命令或检查 | 结果 |
-|---|---|
-| `mvn -B -ntp dependency:get -Dartifact=com.lixin:lixin-common-capability-digiwin-e10:0.1.0-SNAPSHOT -Dtransitive=true` | BUILD SUCCESS，SDK、父 POM 及传递依赖可解析；没有 install/deploy 或修改 SDK |
-| `mvn -B -ntp -pl mes-admin -am dependency:tree '-Dincludes=com.lixin:*,com.fasterxml.jackson.core:*,org.apache.httpcomponents:*,org.slf4j:*'` | BUILD SUCCESS，消费方实际使用 HttpClient 4.5.14、Jackson 2.21.5、SLF4J 2.0.18；无 Starter |
-| `./scripts/format-java`，仅本轮 4 个 Java 文件 | 通过，使用项目 IntelliJ formatter |
-| `E10_IT_ENABLED=false E10_MO_IT_ENABLED=false WXPUSHER_REAL_TEST=false mvn -B -ntp verify` | 全 reactor BUILD SUCCESS；710 项，668 通过、42 项环境门控跳过，0 失败/错误 |
-| `E10_IT_ENABLED=false E10_MO_IT_ENABLED=false WXPUSHER_REAL_TEST=false mvn -B -ntp -pl mes-admin -am -Dtest=DigiwinE10ConsumerTest,FactoryIntegrationConfigurationTest -Dsurefire.failIfNoSpecifiedTests=false verify` | 最后补充缺失 factory-id 的拒绝校验后重新编译打包；E10 消费方 34 项、既有集成配置 4 项，38/38 通过、0 跳过 |
-| 文档 Java 示例以最终消费方测试 classpath 执行 `javac -encoding UTF-8 --class-path ... -d /tmp/mes-e10-consumer-doc-20261017 /tmp/mes-e10-consumer-doc-20261017/MesE10MoUsage.java` | 编译通过，没有执行示例 |
-| `/usr/bin/python3 scripts/smoke-packaged.py` | 10/10，通过隔离随机回环端口验证打包应用；仅加载打包默认配置，E10 关闭，未访问开发连接或真实 ERP |
-| 打包内容及工作区检查 | SDK 独立 JAR 已进入 BOOT-INF/lib，无其他 lixin Starter；SDK 仓库保持干净；`git diff --check` 通过 |
-
-SDK 制品 class major=52，确认为 Java 8 字节码；本机使用的 SNAPSHOT JAR SHA-256：
-`2267e3574dfd6ac5c4d1121b52cb397acbef3b021f96b9245bf46083a09ff98e`。
-
-日志：`/tmp/mes-e10-dependency-resolution.log`、`/tmp/mes-e10-dependency-tree.log`、
-`/tmp/mes-e10-verify-final.log`、`/tmp/mes-e10-consumer-final.log`、`/tmp/mes-e10-packaged-smoke.log`。
-全量验证后最后一处增强仅涉及连接装配的 factory-id 缺失拒绝及对应离线负例，已由最后的定向 verify
-重新编译测试打包；打包 smoke 和文档编译使用最终产物。
-
-离线验证覆盖：启动零请求、默认关闭、配置缺失/空值、注册绑定失效/不匹配、工厂与模式准入、
-显式请求字段、原样 service.id、合法空查询、BigDecimal 数量、cnt 缺失语义、完整部分结果、
-HTTP 错误、超时 UNKNOWN 无重试，以及应用退出关闭 Client。
-未运行任何真实 ERP 查询或写入，没有自动探测，没有触及用户现有服务生命周期。
-没有 SDK 变更、数据库/菜单迁移、业务落库或正式业务状态流转；不能据此宣称真实 E10 接口或 ERP 业务闭环验收。
-本任务在消费方接入完成后停止，真实联调须另行明确授权与提供完整配置。
-
-回滚本轮接入时，移除该依赖、两个 E10 消费方类、手工装配开关和对应测试，并撤销 Registry 新增的
-`requireConnection` 方法；没有数据库状态需要回滚。
+浏览器检查包括初始空配置、保存状态、关闭后重新读回，以及 390×844 窄屏字段滚动和固定底部操作。
+临时视口已恢复。截图保存在 `.local/factory-oapi-20261017/oapi-saved.png`，包含连接身份参数，
+仅作本地验收资料，不提交 Git。仓库配置按用户后续要求暂停，本轮没有改动仓库配置或实施仓库迁移。
+未执行任何真实 ERP Query/Read 或写入，也未完成工单、仓库同步业务验收。
