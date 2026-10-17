@@ -1,6 +1,6 @@
 # Production Stability V1.4 整改报告
 
-状态：实施中，最终验证结论待补齐。未经真实验收的项目不计通过。
+状态（2026-10-17 09:25 更新）：用户再次重启后，原超时阻碍已解除；五个 Phase 主要业务已补真实 API/UI 证据。已验证整改链路局部 GO，完整验收仍有边界及一个错误请求返回500问题，不能宣称整个 MES 生产闭环 GO。历史失败保留，最新证据见第9节。
 
 ## UNVERIFIED 节点影响矩阵（改造前先行确定）
 
@@ -127,12 +127,12 @@ READY 已派工的执行，删除返回 EXECUTION_REFERENCED，改工艺返回 E
 
 证据：`phase5-test.log` 8 项通过；READY + 无正常报工 + 规划派工场景拒绝删除和改版本，引用保持不变。前端覆盖 UNKNOWN 可重查、重开复用 UUID、精确直达领料、切厂和迟到响应清理。
 
-## 7. 全量和真实验收（待最终追加结果）
+## 7. 全量和真实验收
 
-- 前端全量目前 326 项通过，构建通过；最终日志 `.local/stability-v14-20261017/` 及 `/private/tmp/stability-*.log`。
-- 后端最终 `mvn -B -ntp verify` 同时启用指定 SIMPLE_B 的扫码、报工、质量返工、投产、撤销、Receipt、人员/派工、Execution 和质量数量 MySQL 验收开关，运行中。
+- 前端全量 55 文件/326 项通过，最终 build 通过；日志 `/private/tmp/stability-ui-full.log`、`/private/tmp/stability-build-final.log`。构建只有既有大包提示，无编译错误。
+- 后端最终默认 `mvn -B -ntp verify` 通过（`verify-complete.log`）：620 项，0 失败、0 错误，37 项独立环境验收按开关跳过。指定 SIMPLE_B 的真实 MySQL 开关用例另行验证，共18项通过，见后文；不将默认跳过解释为真实验证通过。
 - 实际浏览器在用户现有 5173、SIMPLE_B、admin 登录下，已只读查看质量处置和新增纠错表单、原事件及可信姓名。1280/1440/1920 宽度截图保存在 `.local/stability-v14-20261017/ui/`，已恢复浏览器原尺寸。此时 8081 仍为旧代码，不能将表单展示当作新后端写入通过。
-- 真实用户服务 GET `/api/production/input?code=...` 当前仍为 400/BAD_REQUEST；已通过异步问题请求用户重启，未擅自启动/停止/重启服务。新后端真实登录 API 和浏览器写入验收待加载代码后执行。
+- 真实用户服务最初 GET `/api/production/input?code=...` 为旧版400/BAD_REQUEST。用户随后确认已重启，监听进程已变为68213，启动日志确认08:59:51正常启动；重启后的运行服务请求超时，详见下节。Agent没有自行启动/停止/重启服务。
 - 没有修改用户权限；只读角色和范围负例主要由 HTTP/H2 回归提供，真实用户撤权操作未进行。
 
 ## 8. 保留问题、风险及结论
@@ -142,7 +142,7 @@ READY 已派工的执行，删除返回 EXECUTION_REFERENCED，改工艺返回 E
 - Quality 的声明/事件总量保护、单节点返工范围、没有实物序列追踪的边界保持；UNKNOWN 未明确前不创建替代意图。待核实投产额度减少保留阻塞。
 - sessionStorage 仅保证同浏览器标签会话的恢复，不能替代跨设备操作台账；服务端 UUID 幂等和原领料查询仍为最终恢复依据。
 - 工作区有既有并行修改，均保留；未发现需覆盖其他 Agent 文件的冲突。
-- **当前 NO-GO：自动化与指定库证据正在收尾，用户现有服务尚未加载新后端，真实 API/UI 写入和101工单运行服务 GET 未完成。即使本轮全部整改通过，也不代表整个 MES 实物生产闭环 GO，正向 Receipt 原门禁继续保留。**
+- **此前结论（已由第9节补验更新）NO-GO：代码整改、默认全量和18项指定MySQL验收通过；重启后的运行服务扫码/数量请求超时，真实 API/UI 写入及运行服务101张以上工单的扫码GET验收未完成。不能仅凭自动化宣称整个 MES 实物生产闭环 GO，正向 Receipt 原门禁继续保留。**
 
 
 ### 最终回归发现与处理记录
@@ -159,3 +159,69 @@ READY 已派工的执行，删除返回 EXECUTION_REFERENCED，改工艺返回 E
 带真实库开关的前一轮中，另外 15 项 MySQL 验收已通过：质量/报工并发6、Receipt1、Execution1、投产1、管理员报工3、质量 V1.3及纠错2、扫码候选只读GET1。更改的 fixture 定向重跑后，实际 MySQL 验收共 18 项通过；它们与后续默认全量 verify 分开计证据，不把失败的整轮日志改称成功。缓存为这些 DB fixture 的 mock/容错入口，非真实 Redis 性能或淘汰验收。
 
 真实浏览器补验：在现有服务中通过链接直接打开领料89，显示 `TEST_VOID_b261e1db`、VOIDED/LOCAL_ONLY 与只读明细；返回列表成功。截图 `ui/recovery-linked-issue.png`。这验证了新前端链接与既有真实单据读取，未执行 ERP query/reconcile 写入或浏览器业务写入。
+
+
+### 用户重启后的真实服务阻碍
+
+用户已明确回复“已经重启”，不再把未验收原因归为用户未重启。只读核对：8081由新Java进程68213监听，启动日志正常，`/health`返回200，使用现有验收身份的菜单GET返回200。实际已下达工单数为123；Agent未删除、关闭或修改已有工单以降低数量。
+
+但带合法扫码内容的 `/api/production/input`、`/api/production/report-quantities/executions/204`、应快速返回格式错误的 `/api/production/input?code=INVALID` 均在6–15秒探测中超时。现有5173浏览器执行真实扫码GET，也最终显示“连接失败或超时”，没有候选结果。直连、前端代理和沙箱外只读探测均未完成该请求；没有因此改代理、权限、服务参数或重启进程。
+
+进程线程栈只读采集未检出Java死锁，app/error日志未记录扫码请求业务异常，access日志尚无该扫码请求完成记录。现有菜单和部分领料读取仍有200完成记录；当前不足以确定是连接传输、请求入口还是运行实例中的其他问题，不归因于数量公式，也不宣称本轮代码已通过运行服务验收。证据：`runtime-thread.txt`、`runtime-supply.json`、服务 `.local/logs/MacBook-Pro-3.local-68213/` 及 `ui/runtime-input-timeout.png`。
+
+因此没有在未知状态下继续发起报工或质量业务写入。待解决运行请求超时后，仍须补验：真实候选GET、管理员三命令重放、纠错和Receipt差额读回、节点候选/POST一致性、恢复查询及浏览器写入；真实撤权、切厂负例目前主要是自动化证据。打包启动smoke未执行，因为它会启动服务，而本轮禁止Agent自行启动用户服务。
+
+### 最终检查
+
+- 两仓库HEAD未变化，无提交/推送/部署；`git diff --check` 通过。
+- 所有本轮修改Java已用项目 `scripts/format-java` 格式化。
+- V33已正式迁移并validate；原四类不可变事实表共8个不可变触发器保持，相关真实负例验证通过。
+- 用户已有前端修改及未跟踪质量组件保留，未做危险清理。
+
+
+## 9. 2026-10-17 09:17–09:25 用户现有服务补验
+
+### 环境与权限
+
+用户明确“已经重启，按照我的服务来API/UI验收”。使用现有后端 `127.0.0.1:8081`（Java PID73992）及前端 `5173`，Agent未启动、停止或重启任何服务。再次核对中心绑定：`SIMPLE_B → datasource8 → 192.168.18.25:3306/mes_base_dev_business_simple_b`，工厂及数据源均ENABLED；已下达工单123张，业务Flyway最新V33成功。
+
+本次后端HEAD为 `e908bbc6a75b725dacaf3af81b295a440e3114b1`，已不同于最初实现基线；前端HEAD仍为 `94167e0c25fd9cb4dfcac5ecef369f6e8b715546`。后端开始时仅报告未提交，前端18项已有修改/未跟踪内容保持原状。本次只更新报告和忽略目录中的验收证据，未修改业务代码、Schema或角色权限，没有Git提交/推送/部署。
+
+admin原会话身份读取200；既有TEST Receipt写/读账号和正式报工账号均通过真实登录接口取得会话。admin缺少Receipt和正式报工权限时403，改用已授权的既有TEST账号，不扩大授权。写入全部限定SIMPLE_B的TEST单据。开始前保存质量摘要及事件至 `live-before.json`，新增命令只追加事实，不更新或删除历史。
+
+### 各Phase真实运行结果
+
+| 范围 | 真实证据 | 结果 |
+|---|---|---|
+| Phase1 | 123张RELEASED下合法品号/批次GET，库存13/仓库9/工单117；offset0返回total1、1条，offset20返回total1、空页 | 200；5173页面显示“已加载1/1张匹配工单”，唯一候选默认选中，原超时未复现 |
+| Phase2旧事实重放 | 补录214、订正215、冲销216原UUID/原内容，另4并发原UUID | 均200返回原事实；改内容409 REPORT_REQUEST_CONFLICT；缺UUID400 REPORT_REQUEST_ID_REQUIRED；原3条合计仍0 |
+| Phase2浏览器新写入 | 工单188/Execution204：补录237 +2、订正238 -1、冲销239 -1 | 三次提交后页面与真实数据刷新；原命令逐笔重放均200、ID不变，净量恢复0 |
+| Phase2首次并发 | 新UUID四请求同时补录1，随后模拟响应丢失原样重放 | 全部返回同一240，仅一条事实；冲销241后净量0；最终Execution204共8条流水、合计0 |
+| 正式报工V2回归 | 既有真实投产Execution127/节点1393，TEST报工用户提交1并重放 | 返回同一242；admin追加冲销243；前后节点数量对象完全一致 |
+| Phase3纠错及差额 | Execution206原RESULT纠错UUID重放；浏览器追加事件4b157905…，处理3/恢复2/失败1 | 200；恢复量1→2、净不良9→8、末道E91→92；Receipt已交98，超交7→6 |
+| Phase3恢复与依赖 | 新纠正事件ab4a3c9f…恢复处理3/恢复1/失败2；原CANCEL_START/CANCEL_ALLOC重放；尝试撤回已消耗部分 | 恢复E91/超交7；合法重放200，已消耗撤回409；原RESULT仍为处理4/恢复3/失败1，未被改写；原申报事件共9条 |
+| Phase4候选/POST一致 | TEST申报69a3a9e7…在D节点1651登记UNVERIFIED2；实际路径A1648/B1649/C1650/D1651/E1652 | 候选A/B/C为NO_QUANTITY（样本已报满，非质量冻结），D/E为QUALITY_PENDING；POST D409 QUALITY_ATTRIBUTION_REQUIRED，明确D名称及待核实2 |
+| Phase4核实后 | 将该TEST观察核实为原B不良的OVERLAP，保留申报和核实事实 | D/E不再QUALITY_PENDING；E91、已交98、超交7保持；正向Receipt原质量门禁仍在 |
+| Phase5原请求恢复 | 原投产UUID e2e8b811…连续重查两次；领料89外部只读状态查询 | 都200；两次返回相同issue81/execution127、投产额度320；领料89显示VOIDED/LOCAL_ONLY，不伪造ERP成功 |
+| Phase5派工保护 | 新TEST READY Execution212，未选路径、无领料/报工，现有合格TEST用户6241派工17 | 改工艺409 EXECUTION_FROZEN；删除409 EXECUTION_REFERENCED；再次GET确认执行212/工艺64/派工17均保留 |
+| 权限负例 | 既有只读TEST账号调用补录和质量处置 | 均403；不同操作者测试使用的Receipt账号也在权限入口403，未到指纹比较，不能计为真实“已授权不同操作者指纹拒绝” |
+
+### 浏览器视觉、导航及数据收尾
+
+真实5173执行扫码候选查询、质量结果纠错、管理员补录/负订正/整笔冲销；点击查询原领料ERP状态返回LOCAL_ONLY提示。刷新后数量及流水保持正确。质量弹窗1280/1440/1920截图均已检查，表单在弹窗内部滚动，未发现遮挡操作的布局异常；所有临时viewport已reset。
+
+切厂SIMPLE_B→DEV后旧领料89详情清空并返回概览，没有展示B的单据；随后恢复SIMPLE_B。没有对DEV写入业务数据。最终标签保留生产数量管理204供复验，工厂恢复原值。
+
+截图：`ui/live-supply.png`、`ui/live-quality-success-1440.png`、`ui/live-quality-1280.png`、`ui/live-quality-1920.png`、`ui/live-report-supplement.png`、`ui/live-final-1440.png`、`ui/live-recovery-query.png`、`ui/live-switch-dev.png`（均位于 `.local/stability-v14-20261017/`）。
+
+原始API证据：`live-api-0917.json`（含初轮错误探测，不改写失败）、`live-readback.json`、`live-api-more.json`、`live-gates.json`、`live-replays.json`、`live-formal.json`、`live-recovery.json`、`live-input-replay.json`、`live-protection.json`；最终数据库核对 `live-final-db.txt`。凭证仅在private文件中，不进入报告/API证据。
+
+质量纠错新增两笔相反差量后恢复原有效数量；TEST待核实观察已核实为OVERLAP，未遗留新质量阻塞。报工两个样本均追加冲销恢复原数量。READY执行212/派工17特意保留TEST备注，供复验引用保护；未删除规划引用，也未删除已有用户工单。期间未创建领料、未调用ERP外部写。
+
+### 新发现、证据边界与当前结论
+
+1. 初次验收脚本GET `/api/production/reports?executionId=204` 漏传必需的 `routingNodeId`，服务返回500。日志确认为 `MissingServletRequestParameterException` 未映射400；补齐节点1024后200，真实页面始终带节点，正常链路通过。此为错误请求的协议异常，仍需单独收敛，不能把500写成通过。本次未为验收扩展修改通用异常处理。
+2. 当前没有SUBMITTING/SUBMIT_UNKNOWN/VOID_PENDING/VOID_UNKNOWN真实领料样本；未伪造运行状态或发ERP命令制造UNKNOWN。上述状态下的原意图保留和查询按钮仍以既有自动化为证据，实际服务仅补确认态投产重放、VOIDED原单查询和页面入口。
+3. 未实际撤销/扩大用户权限；已有只读账号的403是真实负例，动态撤权与迟到响应仍主要由自动化证明。节点上游样本已报满，实际证明的是未被质量门禁冻结，未将其声称为上游正向报工成功。复杂门禁矩阵其他动作仍参考定向回归。
+4. 本次未改代码，未重复运行已经通过的620项默认verify、326项前端测试及build；它们属于上一轮日志证据。本轮后端 `git diff --check` 通过，前端现有 `src/views/issue/mesMaterialIssue/index.vue:3` 留有一处行末空格，本次未覆盖该文件。
+5. **已验证整改业务局部GO**：101张限制修复、管理员三命令和首次并发幂等、正式报工V2回归、质量纠错/守恒/Receipt差额、D/E候选与POST门禁一致、READY派工保护均有用户现有服务证据。原“请求超时导致无法验收”阻碍已解除。**完整验收仍NO-GO**：错误请求500尚存，真实UNKNOWN恢复/动态撤权等未验收；不宣称整个MES实物生产闭环或真实ERP集成GO，Receipt正向原门禁保持。

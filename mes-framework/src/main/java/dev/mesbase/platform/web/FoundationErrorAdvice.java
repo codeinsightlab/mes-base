@@ -5,6 +5,7 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.method.annotation.HandlerMethodValidationException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
@@ -48,7 +49,7 @@ public final class FoundationErrorAdvice {
         return error(failure.code(), request);
     }
 
-    @ExceptionHandler({HttpMessageNotReadableException.class, MethodArgumentNotValidException.class, MethodArgumentTypeMismatchException.class, HandlerMethodValidationException.class, ConstraintViolationException.class})
+    @ExceptionHandler({MissingServletRequestParameterException.class, HttpMessageNotReadableException.class, MethodArgumentNotValidException.class, MethodArgumentTypeMismatchException.class, HandlerMethodValidationException.class, ConstraintViolationException.class})
     public ResponseEntity<ErrorResponse> invalid(Exception failure, HttpServletRequest request) {
         LOG.debug("event=http.request.rejected errorCode=BAD_REQUEST type={}", failure.getClass()
                 .getSimpleName());

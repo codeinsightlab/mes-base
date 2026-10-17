@@ -1,0 +1,290 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "当前领料确认事务：库存与投产事实原子提交",
+    "locale": "zh-CN",
+    "output": ".archify/architecture-production-warehouse-20261017-093800/production-warehouse.html",
+    "quality_profile": "showcase",
+    "repository": {
+      "url": "https://github.com/codeinsightlab/mes-base.git",
+      "revision": "e908bbc6a75b725dacaf3af81b295a440e3114b1",
+      "link_mode": "local-only"
+    }
+  },
+  "components": [
+    {
+      "id": "local",
+      "type": "backend",
+      "label": "LOCAL 结果占位",
+      "sublabel": "没有库存写入",
+      "pos": [
+        30,
+        35
+      ],
+      "size": [
+        210,
+        70
+      ],
+      "sources": [
+        {
+          "path": "mes-business/src/main/java/dev/mesbase/business/integration/warehouse/LocalWarehouseErpService.java",
+          "line": 8,
+          "end_line": 17
+        }
+      ]
+    },
+    {
+      "id": "warehouse",
+      "type": "backend",
+      "label": "仓储能力分派",
+      "sublabel": "WarehouseIntegration",
+      "pos": [
+        370,
+        35
+      ],
+      "size": [
+        210,
+        70
+      ],
+      "sources": [
+        {
+          "path": "mes-business/src/main/java/dev/mesbase/business/integration/warehouse/WarehouseIntegration.java",
+          "line": 53,
+          "end_line": 70
+        }
+      ]
+    },
+    {
+      "id": "erp",
+      "type": "external",
+      "label": "ERP 领域契约",
+      "sublabel": "未接真实厂商 / Gateway",
+      "pos": [
+        710,
+        35
+      ],
+      "size": [
+        210,
+        70
+      ],
+      "sources": [
+        {
+          "path": "mes-business/src/main/java/dev/mesbase/business/integration/warehouse/WarehouseErpAdapter.java",
+          "line": 10,
+          "end_line": 24
+        }
+      ]
+    },
+    {
+      "id": "submit",
+      "type": "backend",
+      "label": "领料执行编排",
+      "sublabel": "先事务外取得结果",
+      "pos": [
+        370,
+        230
+      ],
+      "size": [
+        210,
+        70
+      ],
+      "sources": [
+        {
+          "path": "mes-business/src/main/java/dev/mesbase/business/issue/service/MaterialIssueSubmissionService.java",
+          "line": 104,
+          "end_line": 128
+        }
+      ]
+    },
+    {
+      "id": "apply",
+      "type": "backend",
+      "label": "成功结果确认",
+      "sublabel": "事务内重新锁定原操作",
+      "pos": [
+        370,
+        425
+      ],
+      "size": [
+        210,
+        70
+      ],
+      "sources": [
+        {
+          "path": "mes-business/src/main/java/dev/mesbase/business/issue/service/MaterialIssueSubmissionService.java",
+          "line": 104,
+          "end_line": 128
+        },
+        {
+          "path": "mes-business/src/main/java/dev/mesbase/business/issue/service/MaterialIssueSubmissionService.java",
+          "line": 201,
+          "end_line": 229
+        }
+      ]
+    },
+    {
+      "id": "input",
+      "type": "backend",
+      "label": "投产事实确认",
+      "sublabel": "仅 LOCAL 锁库存并扣减",
+      "pos": [
+        30,
+        615
+      ],
+      "size": [
+        210,
+        70
+      ],
+      "sources": [
+        {
+          "path": "mes-business/src/main/java/dev/mesbase/business/issue/service/MaterialIssueInputFacts.java",
+          "line": 53,
+          "end_line": 81
+        }
+      ]
+    },
+    {
+      "id": "mesfacts",
+      "type": "backend",
+      "label": "领料 / 路径确认",
+      "sublabel": "Issue、Attempt、Extra、Path",
+      "pos": [
+        710,
+        615
+      ],
+      "size": [
+        210,
+        70
+      ],
+      "sources": [
+        {
+          "path": "mes-business/src/main/java/dev/mesbase/business/issue/service/MaterialIssueSubmissionService.java",
+          "line": 211,
+          "end_line": 229
+        }
+      ]
+    },
+    {
+      "id": "stock",
+      "type": "database",
+      "label": "库存余额",
+      "sublabel": "wm_inventory",
+      "pos": [
+        30,
+        815
+      ],
+      "size": [
+        210,
+        70
+      ],
+      "sources": [
+        {
+          "path": "mes-business/src/main/java/dev/mesbase/business/issue/service/MaterialIssueInputFacts.java",
+          "line": 53,
+          "end_line": 81
+        }
+      ]
+    },
+    {
+      "id": "facts",
+      "type": "database",
+      "label": "MES 生产事实",
+      "sublabel": "同一业务库及同一事务",
+      "pos": [
+        710,
+        815
+      ],
+      "size": [
+        210,
+        70
+      ],
+      "sources": [
+        {
+          "path": "mes-business/src/main/java/dev/mesbase/business/issue/service/MaterialIssueSubmissionService.java",
+          "line": 104,
+          "end_line": 128
+        },
+        {
+          "path": "mes-business/src/main/java/dev/mesbase/business/issue/service/MaterialIssueInputFacts.java",
+          "line": 53,
+          "end_line": 81
+        }
+      ]
+    }
+  ],
+  "connections": [
+    {
+      "id": "pick-local",
+      "to": "local",
+      "label": "LOCAL_ONLY",
+      "from": "warehouse"
+    },
+    {
+      "id": "pick-erp",
+      "to": "erp",
+      "label": "CONNECTED",
+      "from": "warehouse"
+    },
+    {
+      "id": "invoke",
+      "to": "warehouse",
+      "label": "事务外调用",
+      "from": "submit"
+    },
+    {
+      "id": "commit-result",
+      "to": "apply",
+      "label": "重新开启写事务",
+      "from": "submit"
+    },
+    {
+      "id": "confirm-input",
+      "to": "input",
+      "label": "确认投入",
+      "from": "apply"
+    },
+    {
+      "id": "confirm-mes",
+      "to": "mesfacts",
+      "label": "确认生产状态",
+      "from": "apply"
+    },
+    {
+      "id": "deduct",
+      "to": "stock",
+      "label": "同事务扣料",
+      "from": "input"
+    },
+    {
+      "id": "save-input",
+      "to": "facts",
+      "label": "confirmed_at",
+      "from": "input"
+    },
+    {
+      "id": "save-mes",
+      "to": "facts",
+      "label": "同事务保存",
+      "from": "mesfacts"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "amber",
+      "title": "现状边界",
+      "items": [
+        "LOCAL 结果占位不代表扣库已完成；真正扣库在确认事务内。",
+        "ERP 只有领域契约，当前没有真实厂商 Gateway。"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "迁移约束",
+      "items": [
+        "库存扣减与投产确认必须同一事务，失败共同回滚。",
+        "不得将真实 LOCAL 扣库搬到事务外的 createMaterialIssue。"
+      ]
+    }
+  ]
+}

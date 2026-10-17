@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "receiptId": "3bec9581-1e0b-47fd-a627-479a5158a244",
+  "status": "current",
+  "command": "deliver",
+  "type": "architecture",
+  "input": "/Users/user/work/lixin/mes-base/.archify/architecture-production-warehouse-20261017-093800/candidate.json",
+  "output": "/Users/user/work/lixin/mes-base/.archify/architecture-production-warehouse-20261017-093800/production-warehouse.html",
+  "specification": {
+    "sha256": "1eb8501ee9fdf98131df13ccbbeb155c8657512e077c1a7e89526b4ad13c5c5f",
+    "bytes": 6549
+  },
+  "artifact": {
+    "sha256": "d7f8dfabbdd2d61f008f9a1fa7de317fef57765b0410c629e369f1f1b356a132",
+    "bytes": 761861
+  }
+}
