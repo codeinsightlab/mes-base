@@ -18,6 +18,9 @@ public interface WarehouseErpAdapter {
 
     boolean supports(FactoryScope scope, String bindingKey);
 
+    /** Historical dispatch uses frozen provider plus binding, never current Factory configuration. */
+    default boolean supportsProvider(String provider) { return false; }
+
     ErpActionResult cancelMaterialIssue(FactoryScope scope, MaterialIssueCancelCommand command);
 
     ErpActionResult queryMaterialIssueCancellation(FactoryScope scope, MaterialIssueCancelCommand command);

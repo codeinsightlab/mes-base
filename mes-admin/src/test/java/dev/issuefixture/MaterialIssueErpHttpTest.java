@@ -41,6 +41,8 @@ class MaterialIssueErpHttpTest {
     static final String H = MaterialIssueHttpTest.H, Q = H + "/1/erp-status", R = H + "/1/actions/reconcile-erp";
 
     static class Vendor implements WarehouseErpAdapter {
+        public boolean supportsProvider(String provider) { return "TEST_VENDOR".equals(provider); }
+
         Outcome outcome = Outcome.FOUND;
         DocumentStatus state = DocumentStatus.EFFECTIVE;
         CountDownLatch entered, release;

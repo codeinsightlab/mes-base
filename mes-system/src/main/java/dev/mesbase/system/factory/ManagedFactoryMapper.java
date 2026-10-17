@@ -15,7 +15,7 @@ public interface ManagedFactoryMapper {
     @Select("SELECT " + COLUMNS + " FROM mf_factory ORDER BY factory_id")
     List<ManagedFactory> all();
 
-    String COLUMNS = "factory_id,enterprise_id,factory_code,factory_name,datasource_id,status,revision";
+    String COLUMNS = "factory_id,enterprise_id,factory_code,factory_name,datasource_id,status,revision,runtime_mode,erp_provider,erp_config_ref,integration_revision,integration_locked";
 
     @Select("SELECT " + COLUMNS + " FROM mf_factory ORDER BY factory_id LIMIT #{limit} OFFSET #{offset}")
     List<ManagedFactory> list(@Param("offset") int offset, @Param("limit") int limit);
@@ -26,10 +26,10 @@ public interface ManagedFactoryMapper {
     @Select("SELECT " + COLUMNS + " FROM mf_factory WHERE factory_id=#{id}")
     ManagedFactory find(String id);
 
-    @Insert("INSERT INTO mf_factory(factory_id,enterprise_id,factory_code,factory_name,datasource_id,status,revision) VALUES(#{factoryId},#{enterpriseId},#{factoryCode},#{factoryName},#{datasourceId},#{status},1)")
+    @Insert("INSERT INTO mf_factory(factory_id,enterprise_id,factory_code,factory_name,datasource_id,status,revision,runtime_mode,erp_provider,erp_config_ref,integration_revision,integration_locked) VALUES(#{factoryId},#{enterpriseId},#{factoryCode},#{factoryName},#{datasourceId},#{status},1,#{runtimeMode},#{erpProvider},#{erpConfigRef},#{integrationRevision},#{integrationLocked})")
     int insert(ManagedFactory row);
 
-    @Update("UPDATE mf_factory SET enterprise_id=#{enterpriseId},factory_code=#{factoryCode},factory_name=#{factoryName},datasource_id=#{datasourceId},status=#{status},revision=revision+1 WHERE factory_id=#{factoryId} AND revision=#{revision}")
+    @Update("UPDATE mf_factory SET enterprise_id=#{enterpriseId},factory_code=#{factoryCode},factory_name=#{factoryName},datasource_id=#{datasourceId},status=#{status},runtime_mode=#{runtimeMode},erp_provider=#{erpProvider},erp_config_ref=#{erpConfigRef},integration_revision=#{integrationRevision},integration_locked=#{integrationLocked},revision=revision+1 WHERE factory_id=#{factoryId} AND revision=#{revision}")
     int update(ManagedFactory row);
 
     @Delete("DELETE FROM mf_factory WHERE factory_id=#{id} AND revision=#{revision}")

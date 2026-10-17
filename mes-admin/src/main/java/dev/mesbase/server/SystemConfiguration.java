@@ -2,6 +2,10 @@ package dev.mesbase.server;
 
 import dev.mesbase.common.core.domain.model.LoginUser;
 import dev.mesbase.core.factory.FactoryCatalog;
+import dev.mesbase.platform.execution.FactoryIntegrationExecutor;
+import org.springframework.beans.factory.ObjectProvider;
+import dev.mesbase.core.error.ErrorCode;
+import dev.mesbase.core.error.FoundationException;
 import dev.mesbase.core.factory.FactoryPreference;
 import dev.mesbase.infrastructure.catalog.DatabaseFactoryPreference;
 import dev.mesbase.system.factory.MfUserPreferenceMapper;
@@ -93,8 +97,12 @@ public class SystemConfiguration {
 
     @Bean
     ControlledJobRunner controlledJobs(PlatformPersistence u, FactoryCatalog f, JobClaimMapper claims,
-                                       SysJobMapper jobs) {
-        return new ControlledJobRunner(u, f, claims, jobs);
+                                       SysJobMapper jobs, ObjectProvider<FactoryIntegrationExecutor> integration) {
+        return new ControlledJobRunner(u, f, claims, jobs, (scope, task) -> {
+            var executor = integration.getIfAvailable();
+            if (executor == null) throw new FoundationException(ErrorCode.INTEGRATION_NOT_CONFIGURED);
+            executor.run(scope, task);
+        });
     }
 
     @Bean(destroyMethod = "shutdown")

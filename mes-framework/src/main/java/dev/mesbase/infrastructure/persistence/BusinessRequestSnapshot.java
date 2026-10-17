@@ -1,5 +1,6 @@
 package dev.mesbase.infrastructure.persistence;
 
+import dev.mesbase.platform.execution.FactoryIntegrationSnapshot;
 import dev.mesbase.core.error.ErrorCode;
 import dev.mesbase.core.error.FoundationException;
 import dev.mesbase.core.factory.FactoryScope;
@@ -15,13 +16,24 @@ import org.springframework.web.context.request.ServletRequestAttributes;
 public final class BusinessRequestSnapshot {
     private static final String KEY = BusinessRequestSnapshot.class.getName();
     private final BusinessRuntimeBinding binding;
+    private final FactoryIntegrationSnapshot integration;
     private final Supplier<RuntimeRegistry.Lease> lease;
 
     public BusinessRequestSnapshot(BusinessRuntimeBinding binding,
                                    Supplier<RuntimeRegistry.Lease> lease) {
+        this(binding, lease, null);
+    }
+
+    public BusinessRequestSnapshot(BusinessRuntimeBinding binding, Supplier<RuntimeRegistry.Lease> lease,
+                                   FactoryIntegrationSnapshot integration) {
+        if (integration != null && !integration.factoryId().equals(binding.factoryId()))
+            throw new FoundationException(ErrorCode.CONFLICT);
         this.binding = binding;
+        this.integration = integration;
         this.lease = lease;
     }
+
+    public FactoryIntegrationSnapshot integration() { return integration; }
 
     public BusinessRuntimeBinding binding() {
         return binding;

@@ -116,7 +116,7 @@ class FactoryPreferenceMigrationTest {
         var fixture = fixture();
         var jdbc = fixture.jdbc();
         jdbc.execute("CREATE TABLE mf_datasource (datasource_id BIGINT PRIMARY KEY, status VARCHAR(16), datasource_name VARCHAR(64), db_host VARCHAR(64), db_port INT, db_name VARCHAR(64), db_username VARCHAR(64), password_cipher VARCHAR(64), revision BIGINT)");
-        jdbc.execute("CREATE TABLE mf_factory (factory_id VARCHAR(64) PRIMARY KEY, enterprise_id VARCHAR(64), factory_code VARCHAR(64), factory_name VARCHAR(128), datasource_id BIGINT, status VARCHAR(16), revision BIGINT)");
+        jdbc.execute("CREATE TABLE mf_factory (factory_id VARCHAR(64) PRIMARY KEY, enterprise_id VARCHAR(64), factory_code VARCHAR(64), factory_name VARCHAR(128), datasource_id BIGINT, status VARCHAR(16), revision BIGINT,runtime_mode VARCHAR(16) DEFAULT 'LOCAL',erp_provider VARCHAR(128),erp_config_ref VARCHAR(128),integration_revision BIGINT DEFAULT 1,integration_locked BOOLEAN DEFAULT TRUE)");
         var mapper = fixture.sessions().getMapper(RoutingMetadataMapper.class);
         assertEquals(null, mapper.defaultDefinition());
         jdbc.update("INSERT INTO mf_datasource(datasource_id,status) VALUES (100, 'ENABLED'), (1, 'ENABLED'), (2, 'DISABLED')");
@@ -183,7 +183,7 @@ class FactoryPreferenceMigrationTest {
     }
 
     private void insert(JdbcTemplate jdbc, String id, Long datasource, String status) {
-        jdbc.update("INSERT INTO mf_factory VALUES (?, 'TEST_ONLY', ?, 'TEST ONLY', ?, ?, 1)",
+        jdbc.update("INSERT INTO mf_factory(factory_id,enterprise_id,factory_code,factory_name,datasource_id,status,revision) VALUES (?, 'TEST_ONLY', ?, 'TEST ONLY', ?, ?, 1)",
                 id, id, datasource, status);
     }
 

@@ -14,6 +14,8 @@ import dev.mesbase.infrastructure.persistence.RuntimeRegistry;
 import dev.mesbase.server.managed.DatasourcePasswordCipher;
 import dev.mesbase.server.managed.ManagedDatasourceService;
 import dev.mesbase.server.managed.FactoryMetadataCache;
+import dev.mesbase.server.managed.FactoryIntegrationRegistry;
+import dev.mesbase.platform.execution.FactoryIntegrationExecutor;
 import dev.mesbase.common.core.redis.RoutingMetadataStore;
 import dev.mesbase.common.core.redis.SystemCacheNamespace;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -60,14 +62,24 @@ public class FactoryRuntimeConfiguration {
                                                 ManagedFactoryMapper factories,
                                                 @Qualifier("masterDataSource") DataSource masterDataSource,
                                                 RuntimeRegistry registry,
-                                                OwnerMapperCatalog catalog, FactoryMetadataCache metadata) {
+                                                OwnerMapperCatalog catalog, FactoryMetadataCache metadata, FactoryIntegrationRegistry integrations) {
         if (!env.getProperty("mes.platform.enabled", Boolean.class, false))
             throw new IllegalArgumentException("Factory Runtime requires explicit Platform persistence");
         var key = env.getRequiredProperty("mes.runtime.datasource-key");
         var mappers = catalog.types(PersistenceOwner.Kind.BUSINESS);
         return new ManagedDatasourceService(persistence, sources, factories,
                 new DatasourcePasswordCipher(key), registry, masterDataSource, DruidPools.settings(env), mappers, Path.of(env.getRequiredProperty("mes.platform.file-root"))
-                .resolve("managed-ddl"), metadata);
+                .resolve("managed-ddl"), metadata, integrations);
+    }
+
+    @Bean
+    FactoryIntegrationRegistry factoryIntegrations(Environment environment) {
+        return new FactoryIntegrationRegistry(environment);
+    }
+
+    @Bean
+    FactoryIntegrationExecutor factoryIntegrationExecutor(ManagedDatasourceService service) {
+        return service::runIntegrated;
     }
 
     @Bean

@@ -86,9 +86,9 @@ class RoutingMetadataRedisTest {
 
             var source = new DriverManagerDataSource("jdbc:h2:mem:" + UUID.randomUUID() + ";MODE=MySQL;DB_CLOSE_DELAY=-1", "sa", "");
             var jdbc = new JdbcTemplate(source);
-            jdbc.execute("CREATE TABLE mf_factory(factory_id VARCHAR(64),enterprise_id VARCHAR(64),factory_code VARCHAR(32),factory_name VARCHAR(64),datasource_id BIGINT,status VARCHAR(16),revision BIGINT)");
+            jdbc.execute("CREATE TABLE mf_factory(factory_id VARCHAR(64),enterprise_id VARCHAR(64),factory_code VARCHAR(32),factory_name VARCHAR(64),datasource_id BIGINT,status VARCHAR(16),revision BIGINT,runtime_mode VARCHAR(16) DEFAULT 'LOCAL',erp_provider VARCHAR(128),erp_config_ref VARCHAR(128),integration_revision BIGINT DEFAULT 1,integration_locked BOOLEAN DEFAULT TRUE)");
             jdbc.execute("CREATE TABLE mf_datasource(datasource_id BIGINT,datasource_name VARCHAR(64),db_host VARCHAR(64),db_port INT,db_name VARCHAR(64),db_username VARCHAR(64),password_cipher VARCHAR(64),status VARCHAR(16),revision BIGINT)");
-            jdbc.execute("INSERT INTO mf_factory VALUES('A','TEST ONLY','A','Before',1,'ENABLED',1)");
+            jdbc.execute("INSERT INTO mf_factory(factory_id,enterprise_id,factory_code,factory_name,datasource_id,status,revision) VALUES('A','TEST ONLY','A','Before',1,'ENABLED',1)");
             jdbc.execute("INSERT INTO mf_datasource VALUES(1,'TEST ONLY','invalid.test',3306,'TEST_ONLY','TEST_ONLY','ENCRYPTED_ONLY','ENABLED',1)");
             var persistence = new PlatformPersistence(source, Set.of(RoutingMetadataMapper.class));
             var healthy = new FactoryMetadataCache(persistence, second, persistence.mapper(RoutingMetadataMapper.class));

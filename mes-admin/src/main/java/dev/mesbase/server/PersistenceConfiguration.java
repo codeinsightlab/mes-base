@@ -17,7 +17,7 @@ import dev.mesbase.infrastructure.persistence.SpringCommitActions;
 import javax.sql.DataSource;
 
 import org.apache.ibatis.session.SqlSessionFactory;
-import org.flywaydb.core.Flyway;
+import dev.mesbase.server.migration.FactoryFlyway;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
@@ -39,7 +39,7 @@ public class PersistenceConfiguration {
         DruidDataSource source = DruidPools.create(DruidPools.settings(env), "platform", env.getRequiredProperty("mes.platform.url"), env.getRequiredProperty("mes.platform.username"), env.getRequiredProperty("mes.platform.password"));
         try {
             if (env.getProperty("mes.platform.migrate", Boolean.class, false))
-                Flyway.configure().dataSource(source).locations("classpath:db/platform", "classpath:db/system").load()
+                FactoryFlyway.configure(source, env).load()
                         .migrate();
             return source;
         } catch (RuntimeException | Error failure) {

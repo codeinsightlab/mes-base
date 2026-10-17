@@ -1,4 +1,5 @@
 package dev.mesbase.platform.management;
+import dev.mesbase.server.migration.FactoryFlyway;
 import java.util.*;import dev.mesbase.infrastructure.persistence.*;import dev.mesbase.system.mapper.*;import dev.mesbase.common.core.domain.entity.*;import dev.mesbase.system.domain.*;
 /** First Source-system administrator only. Environment password; atomic empty-database guard; no userId magic. */
 public final class PlatformAdminCli {
@@ -12,7 +13,7 @@ public final class PlatformAdminCli {
   var settings=new ArrayList<String>();settings.add("--logging.level.root=ERROR");if(config!=null)settings.add("--spring.config.additional-location="+java.nio.file.Path.of(config).toAbsolutePath().toUri());
   try(var context=app.run(settings.toArray(String[]::new))){var env=context.getEnvironment();String password=env.getRequiredProperty("MES_BOOTSTRAP_PASSWORD");String encodedPassword=new dev.mesbase.common.utils.PasswordPolicy(env).encode(password);
    try(var pool=dev.mesbase.server.DruidPools.create(dev.mesbase.server.DruidPools.settings(env),"system-bootstrap",env.getRequiredProperty("mes.platform.url"),env.getRequiredProperty("mes.platform.username"),env.getRequiredProperty("mes.platform.password"))){
-    if(migrate)org.flywaydb.core.Flyway.configure().dataSource(new org.springframework.jdbc.datasource.DriverManagerDataSource(env.getRequiredProperty("mes.platform.url"),env.getRequiredProperty("mes.platform.username"),env.getRequiredProperty("mes.platform.password"))).locations("classpath:db/platform","classpath:db/system").load().migrate();
+    if(migrate)FactoryFlyway.configure(pool,env).load().migrate();
     var persistence=new PlatformPersistence(pool,Set.of(SystemBootstrapMapper.class,SysUserMapper.class,SysRoleMapper.class,SysMenuMapper.class,SysRoleMenuMapper.class,SysUserRoleMapper.class),c->{c.getTypeAliasRegistry().registerAliases("dev.mesbase.common.core.domain.entity");c.getTypeAliasRegistry().registerAliases("dev.mesbase.system.domain");});
     final String account=username;String id=persistence.transaction(session->{var guard=session.mapper(SystemBootstrapMapper.class);guard.lock();if(guard.users()!=0)throw new AlreadyInitialized();
      var role=new SysRole();role.setRoleName("平台管理员");role.setRoleKey("platform-admin");role.setRoleSort("0");role.setKind("PLATFORM");role.setFactoryId(null);role.setDataScope("1");role.setStatus("0");role.setCreateBy("BOOTSTRAP");session.mapper(SysRoleMapper.class).insertRole(role);

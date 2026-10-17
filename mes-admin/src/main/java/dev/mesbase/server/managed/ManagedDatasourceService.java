@@ -6,6 +6,9 @@ import com.github.pagehelper.PageHelper;
 import dev.mesbase.core.error.ErrorCode;
 import dev.mesbase.core.error.FoundationException;
 import dev.mesbase.core.factory.Factory;
+import dev.mesbase.platform.execution.FactoryIntegrationContext;
+import dev.mesbase.platform.execution.FactoryIntegrationSnapshot;
+import org.springframework.core.env.StandardEnvironment;
 import dev.mesbase.core.factory.FactoryId;
 import dev.mesbase.core.factory.FactoryScope;
 import dev.mesbase.core.factory.FactoryStatus;
@@ -72,7 +75,13 @@ public class ManagedDatasourceService {
                               @NotBlank @Size(max = 64) String enterpriseId,
                               @NotBlank @Size(max = 32) String factoryCode,
                               @NotBlank @Size(max = 64) String factoryName, Long datasourceId,
-                              @NotNull @Pattern(regexp = "ENABLED|DISABLED") String status, Long revision) {
+                              @NotNull @Pattern(regexp = "ENABLED|DISABLED") String status, Long revision,
+                              @Pattern(regexp = "LOCAL|ERP") String runtimeMode,
+                              @Size(max = 128) String erpProvider, @Size(max = 128) String erpConfigRef) {
+        public FactoryForm(String factoryId, String enterpriseId, String factoryCode, String factoryName,
+                           Long datasourceId, String status, Long revision) {
+            this(factoryId, enterpriseId, factoryCode, factoryName, datasourceId, status, revision, null, null, null);
+        }
     }
 
     public record DatasourceView(Long datasourceId, String datasourceName, String dbHost, int dbPort, String dbName,
@@ -83,9 +92,12 @@ public class ManagedDatasourceService {
     }
 
     public record FactoryView(String factoryId, String enterpriseId, String factoryCode, String factoryName,
-                              Long datasourceId, String status, long revision, String datasourceName) {
+                              Long datasourceId, String status, long revision, String datasourceName,
+                              String runtimeMode, String erpProvider, String erpConfigRef,
+                              long integrationRevision, boolean integrationLocked) {
     }
 
+    private final FactoryIntegrationRegistry integrations;
     private final FactoryMetadataCache metadata;
     private final Object[] preparationLocks = new Object[64];
     private final PlatformPersistence persistence;
@@ -115,6 +127,16 @@ public class ManagedDatasourceService {
                                     ManagedFactoryMapper factories, DatasourcePasswordCipher cipher,
                                     RuntimeRegistry registry, DataSource platform, DruidPools.Settings settings,
                                     Set<Class<?>> mappers, Path ddlRoot, FactoryMetadataCache metadata) {
+        this(persistence, sources, factories, cipher, registry, platform, settings, mappers, ddlRoot, metadata,
+                new FactoryIntegrationRegistry(new StandardEnvironment()));
+    }
+
+    public ManagedDatasourceService(PlatformPersistence persistence, ManagedDatasourceMapper sources,
+                                    ManagedFactoryMapper factories, DatasourcePasswordCipher cipher,
+                                    RuntimeRegistry registry, DataSource platform, DruidPools.Settings settings,
+                                    Set<Class<?>> mappers, Path ddlRoot, FactoryMetadataCache metadata,
+                                    FactoryIntegrationRegistry integrations) {
+        this.integrations = Objects.requireNonNull(integrations);
         this.metadata = Objects.requireNonNull(metadata);
         for (int i = 0; i < preparationLocks.length; i++) preparationLocks[i] = new Object();
         this.persistence = persistence;
@@ -168,7 +190,7 @@ public class ManagedDatasourceService {
     }
 
     private static FactoryView view(ManagedFactory f, String datasourceName) {
-        return new FactoryView(f.factoryId(), f.enterpriseId(), f.factoryCode(), f.factoryName(), f.datasourceId(), f.status(), f.revision(), datasourceName);
+        return new FactoryView(f.factoryId(), f.enterpriseId(), f.factoryCode(), f.factoryName(), f.datasourceId(), f.status(), f.revision(), datasourceName, f.runtimeMode(), f.erpProvider(), f.erpConfigRef(), f.integrationRevision(), f.integrationLocked());
     }
 
     private <T> Page<T> page(int pageNum, int pageSize, Supplier<List<T>> query) {
@@ -320,7 +342,14 @@ public class ManagedDatasourceService {
                 if (form.revision() == null || old.revision() != form.revision())
                     throw new FoundationException(ErrorCode.RESOURCE_CONFLICT);
             }
-            var row = new ManagedFactory(form.factoryId(), form.enterpriseId(), form.factoryCode(), form.factoryName(), form.datasourceId(), form.status(), creating ? 1 : old.revision());
+            // Omitted integration fields from older clients preserve existing authority.
+            String mode = form.runtimeMode() == null ? (old == null ? "LOCAL" : old.runtimeMode()) : form.runtimeMode();
+            String provider = form.runtimeMode() == null && old != null ? old.erpProvider() : form.erpProvider();
+            String reference = form.runtimeMode() == null && old != null ? old.erpConfigRef() : form.erpConfigRef();
+            var row = FactoryIntegrationRegistry.configure(old, new ManagedFactory(form.factoryId(), form.enterpriseId(),
+                    form.factoryCode(), form.factoryName(), form.datasourceId(), form.status(), creating ? 1 : old.revision(),
+                    mode, provider, reference, 1, false));
+            integrations.snapshot(row);
             if (creating) changed(factories.insert(row));
             else changed(factories.update(row));
             if (old != null && old.datasourceId() != null
@@ -431,11 +460,21 @@ public class ManagedDatasourceService {
                 .orElseGet(() -> binding(metadata.definition(scope.factoryId().value())));
     }
 
+    public List<FactoryIntegrationRegistry.Choice> integrationChoices(String factoryId) {
+        return integrations.choices(factoryId);
+    }
+
+    public void runIntegrated(FactoryScope scope, Runnable task) {
+        var definition = metadata.taskDefinition(scope.factoryId().value());
+        binding(definition); // Same enabled-factory and datasource admission as a business request.
+        FactoryIntegrationContext.run(integrations.snapshot(definition.factory()), task);
+    }
+
     public void admit(FactoryScope scope) {
         if (BusinessRequestSnapshot.current(scope).isPresent()) return;
         var definition = metadata.definition(scope.factoryId().value());
         var binding = binding(definition);
-        BusinessRequestSnapshot.install(new BusinessRequestSnapshot(binding, () -> acquire(binding, definition.datasource())));
+        BusinessRequestSnapshot.install(new BusinessRequestSnapshot(binding, () -> acquire(binding, definition.datasource()), integrations.snapshot(definition.factory())));
     }
 
     public BusinessPersistenceResolver.Acquisition begin(FactoryScope scope) {

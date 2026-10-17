@@ -9,6 +9,7 @@ import dev.mesbase.core.factory.FactoryStatus;
 import dev.mesbase.infrastructure.persistence.PlatformPersistence;
 import dev.mesbase.platform.execution.ExecutionScope;
 import dev.mesbase.platform.execution.FactoryContext;
+import dev.mesbase.platform.execution.FactoryIntegrationExecutor;
 import dev.mesbase.quartz.domain.SysJob;
 import dev.mesbase.quartz.mapper.JobClaimMapper;
 import dev.mesbase.quartz.mapper.SysJobMapper;
@@ -17,6 +18,7 @@ import java.util.Set;
 import java.util.UUID;
 
 public final class ControlledJobRunner {
+    private final FactoryIntegrationExecutor integration;
     private final PlatformPersistence unit;
     private final FactoryCatalog factories;
     private final JobClaimMapper claims;
@@ -24,6 +26,12 @@ public final class ControlledJobRunner {
 
     public ControlledJobRunner(PlatformPersistence unit, FactoryCatalog factories, JobClaimMapper claims,
                                SysJobMapper jobs) {
+        this(unit, factories, claims, jobs, (scope, task) -> { throw new FoundationException(ErrorCode.INTEGRATION_NOT_CONFIGURED); });
+    }
+
+    public ControlledJobRunner(PlatformPersistence unit, FactoryCatalog factories, JobClaimMapper claims,
+                               SysJobMapper jobs, FactoryIntegrationExecutor integration) {
+        this.integration = integration;
         this.unit = unit;
         this.factories = factories;
         this.claims = claims;
@@ -77,7 +85,7 @@ public final class ControlledJobRunner {
         try {
             var scope = "PLATFORM".equals(job.getExecutionScope()) ? ExecutionScope.platform() : ExecutionScope.factory(new FactoryScope(new FactoryId(job.getFactoryId())));
             scope.run(() -> {
-                if ("FACTORY".equals(job.getExecutionScope())) FactoryContext.required();
+                if ("FACTORY".equals(job.getExecutionScope())) integration.run(FactoryContext.required(), () -> { });
                 else if (FactoryContext.current().isPresent()) throw new FoundationException(ErrorCode.CONFLICT);
             });
         } catch (RuntimeException e) {

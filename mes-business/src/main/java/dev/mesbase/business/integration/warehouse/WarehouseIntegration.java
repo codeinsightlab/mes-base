@@ -3,6 +3,10 @@ package dev.mesbase.business.integration.warehouse;
 import dev.mesbase.business.integration.warehouse.ExternalEffect;
 import dev.mesbase.business.issue.domain.MesMaterialIssueEntity;
 import dev.mesbase.core.factory.FactoryScope;
+import dev.mesbase.core.factory.FactoryRuntimeMode;
+import dev.mesbase.platform.execution.FactoryContext;
+import dev.mesbase.platform.execution.FactoryIntegrationContext;
+import dev.mesbase.platform.execution.FactoryIntegrationSnapshot;
 import dev.mesbase.core.error.ErrorCode;
 import dev.mesbase.core.error.FoundationException;
 import java.util.List;
@@ -21,7 +25,19 @@ public class WarehouseIntegration {
         this.adapters = List.copyOf(adapters);
     }
 
+    private FactoryIntegrationSnapshot snapshot(FactoryScope scope) {
+        if (FactoryContext.current().isPresent() && !FactoryContext.required().equals(scope))
+            throw new FoundationException(ErrorCode.CONFLICT);
+        var snapshot = FactoryIntegrationContext.current().orElse(null);
+        // Fixture/standalone legacy configuration remains explicit; managed runtime must admit a snapshot.
+        if (snapshot == null && environment.getProperty("mes.runtime.enabled", Boolean.class, false))
+            throw new FoundationException(ErrorCode.INTEGRATION_NOT_CONFIGURED);
+        return snapshot;
+    }
+
     public Mode configuredMode(FactoryScope scope) {
+        var snapshot = snapshot(scope);
+        if (snapshot != null) return snapshot.mode() == FactoryRuntimeMode.LOCAL ? Mode.LOCAL_ONLY : Mode.CONNECTED;
         String value = environment.getProperty("mes.integration.warehouse.factories." + scope.factoryId()
                 .value() + ".mode");
         if (value == null) return null;
@@ -31,12 +47,11 @@ public class WarehouseIntegration {
     }
 
     public Mode cancellationMode(FactoryScope scope, MesMaterialIssueEntity row) {
-        Mode current = configuredMode(scope);
-        if (current == null) throw new FoundationException(ErrorCode.INTEGRATION_NOT_CONFIGURED);
+        // Cancellation follows frozen source evidence, independent of current factory authority.
         if (ExternalEffect.UNVERIFIED.getValue()
                 .equals(row.getExternalEffect()) || row.getSourceExecutionMode() == null)
             throw new FoundationException(ErrorCode.ISSUE_EXTERNAL_UNVERIFIED);
-        if (current == Mode.LOCAL_ONLY && Mode.LOCAL_ONLY.getValue()
+        if (Mode.LOCAL_ONLY.getValue()
                 .equals(row.getSourceExecutionMode()) && ExternalEffect.NONE.getValue()
                 .equals(row.getExternalEffect()) && row.getExternalBindingKey() == null && row.getExternalReference() == null)
             return Mode.LOCAL_ONLY;
@@ -55,8 +70,9 @@ public class WarehouseIntegration {
         if (mode == null) throw new FoundationException(ErrorCode.INTEGRATION_NOT_CONFIGURED);
         if (mode == Mode.LOCAL_ONLY) return new Selection(mode, "local", null);
         String key = "mes.integration.warehouse.factories." + scope.factoryId().value();
-        String provider = environment.getProperty(key + ".provider");
-        String binding = environment.getProperty(key + ".binding-key");
+        var snapshot = snapshot(scope);
+        String provider = snapshot == null ? environment.getProperty(key + ".provider") : snapshot.erpType();
+        String binding = snapshot == null ? environment.getProperty(key + ".binding-key") : snapshot.configurationRef();
         if (provider == null || provider.isBlank() || binding == null || binding.isBlank())
             throw new FoundationException(ErrorCode.INTEGRATION_NOT_CONFIGURED);
         adapter(scope, binding);
@@ -72,22 +88,16 @@ public class WarehouseIntegration {
 
     public ErpIssueQueryResult query(FactoryScope scope, String sourceMode, String provider,
                                      QueryMaterialIssueCommand command) {
-        Mode mode = configuredMode(scope);
-        if (mode == null) throw new FoundationException(ErrorCode.INTEGRATION_NOT_CONFIGURED);
         if (Mode.LOCAL_ONLY.getValue().equals(sourceMode) && "local".equals(provider)) {
             if (command.externalId() != null || command.externalCode() != null || command.bindingKey() != null)
                 throw new FoundationException(ErrorCode.ISSUE_EXTERNAL_UNVERIFIED);
-            if (mode != Mode.LOCAL_ONLY) throw new FoundationException(ErrorCode.INTEGRATION_NOT_CONFIGURED);
             return local.queryMaterialIssue(scope, command);
         }
         if (!Mode.CONNECTED.getValue().equals(sourceMode) || provider == null || command.bindingKey() == null)
             throw new FoundationException(ErrorCode.ISSUE_EXTERNAL_UNVERIFIED);
-        if (mode != Mode.CONNECTED) throw new FoundationException(ErrorCode.INTEGRATION_NOT_CONFIGURED);
-        // V1 requires the historical provider to match the current delivery configuration.
-        String configured = environment.getProperty("mes.integration.warehouse.factories." + scope.factoryId()
-                .value() + ".provider");
-        if (!provider.equals(configured)) throw new FoundationException(ErrorCode.INTEGRATION_NOT_CONFIGURED);
-        return adapter(scope, command.bindingKey()).queryMaterialIssue(scope, command);
+        var adapter = adapter(scope, command.bindingKey());
+        if (!adapter.supportsProvider(provider)) throw new FoundationException(ErrorCode.INTEGRATION_NOT_CONFIGURED);
+        return adapter.queryMaterialIssue(scope, command);
     }
 
     private WarehouseErpAdapter adapter(FactoryScope scope, String bindingKey) {

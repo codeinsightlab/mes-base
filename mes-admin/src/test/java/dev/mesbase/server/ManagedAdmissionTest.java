@@ -44,10 +44,10 @@ class ManagedAdmissionTest {
                 + ";MODE=MySQL;DB_CLOSE_DELAY=-1", "sa", "");
         var jdbc = new JdbcTemplate(source);
         jdbc.execute("CREATE TABLE mf_factory(factory_id VARCHAR(64),enterprise_id VARCHAR(64),factory_code VARCHAR(32),"
-                + "factory_name VARCHAR(64),datasource_id BIGINT,status VARCHAR(16),revision BIGINT)");
+                + "factory_name VARCHAR(64),datasource_id BIGINT,status VARCHAR(16),revision BIGINT,runtime_mode VARCHAR(16) DEFAULT 'LOCAL',erp_provider VARCHAR(128),erp_config_ref VARCHAR(128),integration_revision BIGINT DEFAULT 1,integration_locked BOOLEAN DEFAULT TRUE)");
         jdbc.execute("CREATE TABLE mf_datasource(datasource_id BIGINT,status VARCHAR(16))");
         jdbc.execute("INSERT INTO mf_datasource VALUES(1,'ENABLED'),(2,'DISABLED')");
-        jdbc.execute("INSERT INTO mf_factory VALUES"
+        jdbc.execute("INSERT INTO mf_factory(factory_id,enterprise_id,factory_code,factory_name,datasource_id,status,revision) VALUES"
                 + "('A',NULL,NULL,'Unbound',NULL,'ENABLED',1),"
                 + "('B',NULL,NULL,'Disabled source',2,'ENABLED',1),"
                 + "('C',NULL,NULL,'Missing source',3,'ENABLED',1),"
@@ -67,10 +67,10 @@ class ManagedAdmissionTest {
                 + ";MODE=MySQL;DB_CLOSE_DELAY=-1", "sa", "");
         var jdbc = new JdbcTemplate(source);
         jdbc.execute("CREATE TABLE mf_factory(factory_id VARCHAR(64),enterprise_id VARCHAR(64),factory_code VARCHAR(32),"
-                + "factory_name VARCHAR(64),datasource_id BIGINT,status VARCHAR(16),revision BIGINT)");
+                + "factory_name VARCHAR(64),datasource_id BIGINT,status VARCHAR(16),revision BIGINT,runtime_mode VARCHAR(16) DEFAULT 'LOCAL',erp_provider VARCHAR(128),erp_config_ref VARCHAR(128),integration_revision BIGINT DEFAULT 1,integration_locked BOOLEAN DEFAULT TRUE)");
         jdbc.execute("CREATE TABLE mf_datasource(datasource_id BIGINT,datasource_name VARCHAR(64),db_host VARCHAR(64),"
                 + "db_port INT,db_name VARCHAR(64),db_username VARCHAR(64),password_cipher VARCHAR(64),status VARCHAR(16),revision BIGINT)");
-        jdbc.execute("INSERT INTO mf_factory VALUES('A','TEST ONLY','A','Before',1,'ENABLED',1)");
+        jdbc.execute("INSERT INTO mf_factory(factory_id,enterprise_id,factory_code,factory_name,datasource_id,status,revision) VALUES('A','TEST ONLY','A','Before',1,'ENABLED',1)");
         jdbc.execute("INSERT INTO mf_datasource VALUES(1,'TEST ONLY','invalid.test',3306,'TEST_ONLY','TEST_ONLY','TEST_ONLY','ENABLED',1)");
         var platform = spy(new PlatformPersistence(source, Set.of(ManagedFactoryMapper.class, ManagedDatasourceMapper.class, RoutingMetadataMapper.class)));
         var closed = new AtomicInteger();

@@ -135,9 +135,9 @@ class WorkOrderRequestBudgetTest {
         jdbc.execute("INSERT INTO sys_user_role VALUES(42,8)");
         jdbc.execute("INSERT INTO sys_menu(menu_id,menu_name,parent_id,path,menu_type,perms,status) VALUES(1,'Fixture',0,'pro','C','workorder:list','0')");
         jdbc.execute("INSERT INTO sys_role_menu VALUES(8,1)");
-        jdbc.execute("CREATE TABLE mf_factory(factory_id VARCHAR(64),enterprise_id VARCHAR(64),factory_code VARCHAR(32),factory_name VARCHAR(64),datasource_id BIGINT,status VARCHAR(16),revision BIGINT)");
+        jdbc.execute("CREATE TABLE mf_factory(factory_id VARCHAR(64),enterprise_id VARCHAR(64),factory_code VARCHAR(32),factory_name VARCHAR(64),datasource_id BIGINT,status VARCHAR(16),revision BIGINT,runtime_mode VARCHAR(16) DEFAULT 'LOCAL',erp_provider VARCHAR(128),erp_config_ref VARCHAR(128),integration_revision BIGINT DEFAULT 1,integration_locked BOOLEAN DEFAULT TRUE)");
         jdbc.execute("CREATE TABLE mf_datasource(datasource_id BIGINT,datasource_name VARCHAR(64),db_host VARCHAR(64),db_port INT,db_name VARCHAR(64),db_username VARCHAR(64),password_cipher VARCHAR(64),status VARCHAR(16),revision BIGINT)");
-        jdbc.execute("INSERT INTO mf_factory VALUES('A','TEST ONLY','A','TEST ONLY',1,'ENABLED',1)");
+        jdbc.execute("INSERT INTO mf_factory(factory_id,enterprise_id,factory_code,factory_name,datasource_id,status,revision) VALUES('A','TEST ONLY','A','TEST ONLY',1,'ENABLED',1)");
         jdbc.execute("INSERT INTO mf_datasource VALUES(1,'TEST ONLY','invalid.test',3306,'TEST_ONLY','TEST_ONLY','TEST_ONLY','ENABLED',1)");
         String mapperXml = Files.readString(Path.of("mes-business/src/main/resources/dev/mesbase/business/production/dao/WorkorderMapper.xml"));
         var columns = Pattern.compile("column=\"([^\"]+)\" jdbcType=\"([^\"]+)\"").matcher(mapperXml);

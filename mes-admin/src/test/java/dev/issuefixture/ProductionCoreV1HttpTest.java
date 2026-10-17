@@ -84,6 +84,8 @@ class ProductionCoreV1HttpTest {
     }
 
     static class Vendor implements WarehouseErpAdapter {
+        public boolean supportsProvider(String provider) { return "TEST_VENDOR".equals(provider); }
+
         volatile Status result = Status.SUCCEEDED;
         volatile Outcome outcome = Outcome.FOUND;
         volatile DocumentStatus document = DocumentStatus.EFFECTIVE;

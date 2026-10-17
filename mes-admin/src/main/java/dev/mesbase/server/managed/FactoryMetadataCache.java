@@ -36,7 +36,7 @@ public class FactoryMetadataCache {
     }
 
     public FactoryExecutionMetadata definition(String id) {
-        String field = "binding:" + id;
+        String field = "binding-v2:" + id;
         if (RequestContextHolder.getRequestAttributes() instanceof ServletRequestAttributes attrs) {
             String key = FactoryMetadataCache.class.getName() + field;
             Object cached = attrs.getRequest().getAttribute(key);
@@ -48,11 +48,15 @@ public class FactoryMetadataCache {
         return read(field, () -> definitionFromDatabase(id));
     }
 
+    public FactoryExecutionMetadata taskDefinition(String id) {
+        return read("binding-v2:" + id, () -> definitionFromDatabase(id));
+    }
+
     public FactoryExecutionMetadata defaultDefinition() {
-        var value = read("default", () -> defaultFromDatabase());
+        var value = read("default-v2", () -> defaultFromDatabase());
         if (value != null && RequestContextHolder.getRequestAttributes() instanceof ServletRequestAttributes attrs)
             attrs.getRequest()
-                    .setAttribute(FactoryMetadataCache.class.getName() + "binding:" + value.factoryId(), value);
+                    .setAttribute(FactoryMetadataCache.class.getName() + "binding-v2:" + value.factoryId(), value);
         return value;
     }
 
@@ -93,8 +97,8 @@ public class FactoryMetadataCache {
         if (!TransactionSynchronizationManager.isActualTransactionActive())
             throw new IllegalStateException("Configuration transaction required");
         var fields = new ArrayList<String>();
-        fields.add("default");
-        factoryIds.stream().distinct().map(id -> "binding:" + id).forEach(fields::add);
+        fields.add("default-v2");
+        factoryIds.stream().distinct().map(id -> "binding-v2:" + id).forEach(fields::add);
         persistence.afterCommit(() -> {
             try {
                 store.invalidate(fields);
