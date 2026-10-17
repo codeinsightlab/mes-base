@@ -48,7 +48,7 @@ class ProductionQualityQuantityHttpTest {
     }
 
     static void adjust(MockMvc m, long original, String delta, int expected) throws Exception {
-        m.perform(full(post("/api/production/reports/" + original + "/adjustments"), "A").content("{\"quantityDelta\":\"" + delta + "\",\"reason\":\"TEST ONLY订正\"}"))
+        m.perform(full(post("/api/production/reports/" + original + "/adjustments"), "A").content("{\"requestId\":\"" + UUID.randomUUID() + "\",\"quantityDelta\":\"" + delta + "\",\"reason\":\"TEST ONLY订正\"}"))
                 .andExpect(status().is(expected));
     }
 

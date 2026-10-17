@@ -94,6 +94,42 @@ class ProductionQualityV13MySqlTest {
     }
 
     @Test
+    void realMysqlCorrectionsReprojectPropagationAndReceiptWithoutChangingHistory() throws Exception {
+        try (var h = new ProductionQualityLifecycleMySqlTest.Harness()) {
+            h.context.registerBean(ProductionIdentityService.class);
+            h.context.registerBean(ProductionReceiptService.class);
+            var t = h.context.getBean(QualityTreatmentService.class);
+            var q = h.context.getBean(ProductionQuantityService.class);
+            var receipt = h.context.getBean(ProductionReceiptService.class);
+            var f = fixture(h, 100, 100, 100, 100, 100);
+            String id = defect(h, f, 1, 10);
+            h.jdbc.update("INSERT INTO mes_production_receipt(id,receipt_no,execution_id,warehouse_id,record_type,quantity_delta,operator_user_id,recorded_by,occurred_at,create_time,reason) VALUES(?,?,?,?,'RECEIPT',98,100,100,NOW(),NOW(),'TEST ONLY stability historical handover')", UUID.randomUUID()
+                    .toString(), f.tag(), f.execution(), f.warehouse());
+            var allocated = action(Action.ALLOCATE, null, 2, 8, 0, 0, 0);
+            t.execute(id, allocated);
+            var start = action(Action.START, allocated.requestId(), 0, 6, 0, 0, 0);
+            t.execute(id, start);
+            var result = action(Action.RESULT, start.requestId(), 0, 0, 4, 3, 1);
+            t.execute(id, result);
+            var original = h.jdbc.queryForMap("SELECT * FROM mes_quality_treatment WHERE id=?", result.requestId());
+            t.execute(id, action(Action.CANCEL_START, start.requestId(), 0, 2, 0, 0, 0));
+            t.execute(id, action(Action.CANCEL_ALLOC, allocated.requestId(), 2, 4, 0, 0, 0));
+            var correction = action(Action.CORRECT_RESULT, result.requestId(), 0, 0, 3, 1, 2);
+            t.execute(id, correction);
+            t.execute(id, correction);
+            eq(91, q.getExecutionQuantities(f.execution()).nodes().getLast().effectiveOutputQty());
+            eq(7, receipt.summary(f.execution()).excess());
+            assertEquals(original, h.jdbc.queryForMap("SELECT * FROM mes_quality_treatment WHERE id=?", result.requestId()));
+            assertEquals(1, h.jdbc.queryForObject("SELECT COUNT(*) FROM mes_quality_treatment WHERE id=?", Integer.class, correction.requestId()));
+            assertThrows(DataAccessException.class, () -> h.jdbc.update("DELETE FROM mes_quality_treatment WHERE id=?", correction.requestId()));
+            eq(4, t.summary(id).startedQty());
+            eq(3, t.summary(id).processedQty());
+            eq(1, t.summary(id).recoveredQty());
+            System.out.println("STABILITY_QUALITY_CORRECTION_MYSQL execution=" + f.execution() + " output=91 historicalReceipt=98 excess=7");
+        }
+    }
+
+    @Test
     void fiveNodeLateQualityImmutableReportsReceiptExcessAndConcurrentRecovery() throws Exception {
         try (var h = new ProductionQualityLifecycleMySqlTest.Harness(); var pool = Executors.newFixedThreadPool(2)) {
             var c = h.context;

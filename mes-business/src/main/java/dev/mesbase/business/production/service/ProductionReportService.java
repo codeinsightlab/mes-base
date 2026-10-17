@@ -16,6 +16,12 @@ import dev.mesbase.core.error.ErrorCode;
 import dev.mesbase.core.error.FoundationException;
 import com.github.pagehelper.PageHelper;
 import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.HexFormat;
+import java.util.Objects;
+import org.springframework.dao.DuplicateKeyException;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
@@ -30,6 +36,8 @@ import org.springframework.transaction.annotation.Isolation;
 @Service
 @ConditionalOnProperty(name = "mes.business.enabled", havingValue = "true")
 public class ProductionReportService {
+    private enum AdminAction {SUPPLEMENT, ADJUST, VOID}
+
     private final MesProductionReportMapper reports;
     private final ProductionQuantityMapper totals;
     private final ProductionQuantityService quantities;
@@ -53,7 +61,13 @@ public class ProductionReportService {
 
     @Transactional(transactionManager = "businessTransactionManager", isolation = Isolation.READ_COMMITTED, rollbackFor = Exception.class)
     public MesProductionReportEntity supplement(Supplement command) {
+        String hash = fingerprint(AdminAction.SUPPLEMENT, command.executionId(), command.routingNodeId(), command.quantity(),
+                command.operatorUserId(), command.reportTime(), command.workstationId(), command.reason());
+        var existing = replay(command.requestId(), hash);
+        if (existing != null) return existing;
         locks.execution(command.executionId());
+        existing = replay(command.requestId(), hash);
+        if (existing != null) return existing;
         positive(command.quantity());
         reason(command.reason());
         if (command.reportTime() == null || command.reportTime().isAfter(LocalDateTime.now())) invalid();
@@ -70,28 +84,38 @@ public class ProductionReportService {
         row.setReportTime(command.reportTime());
         row.setWorkstationId(command.workstationId());
         row.setReason(command.reason().trim());
-        return append(row);
+        return append(row, command.requestId(), hash);
     }
 
     @Transactional(transactionManager = "businessTransactionManager", isolation = Isolation.READ_COMMITTED, rollbackFor = Exception.class)
     public MesProductionReportEntity adjust(Long id, Adjustment command) {
+        String hash = fingerprint(AdminAction.ADJUST, id, command.quantityDelta(), command.reason());
+        var existing = replay(command.requestId(), hash);
+        if (existing != null) return existing;
         var original = lockedOriginal(id);
+        existing = replay(command.requestId(), hash);
+        if (existing != null) return existing;
         delta(command.quantityDelta());
         reason(command.reason());
-        return adjustLocked(original, command.quantityDelta(), command.reason());
+        return adjustLocked(original, command.quantityDelta(), command.reason(), command.requestId(), hash);
     }
 
     @Transactional(transactionManager = "businessTransactionManager", isolation = Isolation.READ_COMMITTED, rollbackFor = Exception.class)
     public MesProductionReportEntity voidOriginalReport(Long id, VoidOriginal command) {
+        String hash = fingerprint(AdminAction.VOID, id, command.reason());
+        var existing = replay(command.requestId(), hash);
+        if (existing != null) return existing;
         var original = lockedOriginal(id);
+        existing = replay(command.requestId(), hash);
+        if (existing != null) return existing;
         reason(command.reason());
         var balance = totals.originalBalance(original.getExecutionId(), id).effectiveQty();
         if (balance.signum() <= 0) throw new FoundationException(ErrorCode.REPORT_ORIGINAL_EMPTY);
-        return adjustLocked(original, balance.negate(), command.reason());
+        return adjustLocked(original, balance.negate(), command.reason(), command.requestId(), hash);
     }
 
     private MesProductionReportEntity adjustLocked(MesProductionReportEntity original, BigDecimal delta,
-                                                   String reason) {
+                                                   String reason, String requestId, String hash) {
         var balance = totals.originalBalance(original.getExecutionId(), original.getId()).effectiveQty();
         if (balance.add(delta).signum() < 0) throw new FoundationException(ErrorCode.REPORT_QUANTITY_CONFLICT);
         quantities.validateReportChange(original.getExecutionId(), original.getRoutingNodeId(), delta);
@@ -105,7 +129,7 @@ public class ProductionReportService {
         row.setReportTime(original.getReportTime());
         row.setWorkstationId(original.getWorkstationId());
         row.setReason(reason.trim());
-        return append(row);
+        return append(row, requestId, hash);
     }
 
     private MesProductionReportEntity lockedOriginal(Long id) {
@@ -117,11 +141,45 @@ public class ProductionReportService {
         return original;
     }
 
-    private MesProductionReportEntity append(MesProductionReportEntity row) {
+    private MesProductionReportEntity append(MesProductionReportEntity row, String requestId, String hash) {
+        row.setRequestId(requestId);
+        row.setCommandFingerprint(hash);
         row.setRecordedBy(SecurityUtils.getUserId());
         row.setCreateTime(LocalDateTime.now());
-        if (reports.insert(row) != 1) throw new FoundationException(ErrorCode.RESOURCE_CONFLICT);
+        try {
+            if (reports.insert(row) != 1) throw new FoundationException(ErrorCode.RESOURCE_CONFLICT);
+        } catch (DuplicateKeyException collision) {
+            throw new FoundationException(ErrorCode.REPORT_REQUEST_CONFLICT, collision);
+        }
         return reports.selectByPrimaryKey(row.getId());
+    }
+
+    private MesProductionReportEntity replay(String requestId, String hash) {
+        if (requestId == null || !requestId.matches("[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"))
+            throw new FoundationException(ErrorCode.REPORT_REQUEST_ID_REQUIRED);
+        var row = reports.selectByRequestId(requestId);
+        if (row != null && (!Objects.equals(row.getCommandFingerprint(), hash)
+                || !Objects.equals(row.getRecordedBy(), SecurityUtils.getUserId())))
+            throw new FoundationException(ErrorCode.REPORT_REQUEST_CONFLICT);
+        return row;
+    }
+
+    private static String fingerprint(Object... fields) {
+        // Length-prefixed canonical values prevent delimiter ambiguity; decimals compare by numeric value.
+        StringBuilder input = new StringBuilder();
+        for (Object field : fields) {
+            String value = field == null ? null : field instanceof BigDecimal number
+                    ? number.stripTrailingZeros().toPlainString() : field.toString().trim();
+            input.append(value == null ? -1 : value.length()).append(':');
+            if (value != null) input.append(value);
+        }
+        input.append('|').append(SecurityUtils.getUserId());
+        try {
+            return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256")
+                    .digest(input.toString().getBytes(StandardCharsets.UTF_8)));
+        } catch (NoSuchAlgorithmException impossible) {
+            throw new IllegalStateException(impossible);
+        }
     }
 
     @Transactional(transactionManager = "businessTransactionManager", readOnly = true)

@@ -4,16 +4,6 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 public class MesProductionReportEntity {
-    private String requestId;
-
-    public String getRequestId() {
-        return requestId;
-    }
-
-    public void setRequestId(String requestId) {
-        this.requestId = requestId;
-    }
-
     private Long id;
 
     private Long executionId;
@@ -37,6 +27,10 @@ public class MesProductionReportEntity {
     private String reason;
 
     private LocalDateTime createTime;
+
+    private String requestId;
+
+    private String commandFingerprint;
 
     public Long getId() {
         return id;
@@ -132,5 +126,21 @@ public class MesProductionReportEntity {
 
     public void setCreateTime(LocalDateTime createTime) {
         this.createTime = createTime;
+    }
+
+    public String getRequestId() {
+        return requestId;
+    }
+
+    public void setRequestId(String requestId) {
+        this.requestId = requestId;
+    }
+
+    public String getCommandFingerprint() {
+        return commandFingerprint;
+    }
+
+    public void setCommandFingerprint(String commandFingerprint) {
+        this.commandFingerprint = commandFingerprint;
     }
 }

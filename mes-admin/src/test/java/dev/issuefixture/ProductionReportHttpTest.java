@@ -25,6 +25,7 @@ import static org.mockito.ArgumentMatchers.any;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.junit.jupiter.api.Test;
 import java.util.List;
+import java.util.UUID;
 import java.util.Map;
 import java.util.concurrent.Callable;
 import java.util.concurrent.Executors;
@@ -99,7 +100,7 @@ class ProductionReportHttpTest {
     }
 
     static String supplement(long node, String quantity) {
-        return "{\"executionId\":\"1\",\"routingNodeId\":\"" + node + "\",\"quantity\":\"" + quantity + "\",\"operatorUserId\":\"100\",\"reportTime\":\"2026-01-01T10:00:00\",\"reason\":\"TEST ONLY历史补录\",\"recordedBy\":999}";
+        return "{\"requestId\":\"" + UUID.randomUUID() + "\",\"executionId\":\"1\",\"routingNodeId\":\"" + node + "\",\"quantity\":\"" + quantity + "\",\"operatorUserId\":\"100\",\"reportTime\":\"2026-01-01T10:00:00\",\"reason\":\"TEST ONLY历史补录\",\"recordedBy\":999}";
     }
 
     static long add(MockMvc m, long node, String quantity) throws Exception {
@@ -125,7 +126,7 @@ class ProductionReportHttpTest {
             m.perform(full(post(ROOT + "/supplements"), "A").content(supplement(13, "1")))
                     .andExpect(status().isConflict());
             add(m, 12, "6");
-            m.perform(full(post(ROOT + "/" + id + "/adjustments"), "A").content("{\"quantityDelta\":\"-2\",\"reason\":\"倒挂拒绝\"}"))
+            m.perform(full(post(ROOT + "/" + id + "/adjustments"), "A").content("{\"requestId\":\"" + UUID.randomUUID() + "\",\"quantityDelta\":\"-2\",\"reason\":\"倒挂拒绝\"}"))
                     .andExpect(status().isConflict());
             m.perform(full(get("/api/production/report-quantities/executions/1"), "B"))
                     .andExpect(jsonPath("nodes[0].reportedQty").value("0"));
@@ -144,16 +145,16 @@ class ProductionReportHttpTest {
             var m = MaterialIssueHttpTest.mvc(c);
             var jdbc = c.getBean(MaterialIssueHttpTest.Fixture.class).business.get("A");
             long id = add(m, 11, "4");
-            m.perform(full(post(ROOT + "/" + id + "/adjustments"), "A").content("{\"quantityDelta\":\"2\",\"reason\":\"增加\"}"))
+            m.perform(full(post(ROOT + "/" + id + "/adjustments"), "A").content("{\"requestId\":\"" + UUID.randomUUID() + "\",\"quantityDelta\":\"2\",\"reason\":\"增加\"}"))
                     .andExpect(status().isOk()).andExpect(jsonPath("operatorUserId").value("100"));
-            m.perform(full(post(ROOT + "/" + id + "/adjustments"), "A").content("{\"quantityDelta\":\"-1\",\"reason\":\"减少\"}"))
+            m.perform(full(post(ROOT + "/" + id + "/adjustments"), "A").content("{\"requestId\":\"" + UUID.randomUUID() + "\",\"quantityDelta\":\"-1\",\"reason\":\"减少\"}"))
                     .andExpect(status().isOk());
             long adjustment = jdbc.queryForObject("SELECT MAX(id) FROM mes_production_report", Long.class);
-            m.perform(full(post(ROOT + "/" + adjustment + "/adjustments"), "A").content("{\"quantityDelta\":\"1\",\"reason\":\"错误引用\"}"))
+            m.perform(full(post(ROOT + "/" + adjustment + "/adjustments"), "A").content("{\"requestId\":\"" + UUID.randomUUID() + "\",\"quantityDelta\":\"1\",\"reason\":\"错误引用\"}"))
                     .andExpect(status().isUnprocessableEntity());
-            m.perform(full(post(ROOT + "/" + id + "/void"), "A").content("{\"reason\":\"整笔冲销\"}"))
+            m.perform(full(post(ROOT + "/" + id + "/void"), "A").content("{\"requestId\":\"" + UUID.randomUUID() + "\",\"reason\":\"整笔冲销\"}"))
                     .andExpect(status().isOk()).andExpect(jsonPath("quantityDelta").value("-5.000000"));
-            m.perform(full(post(ROOT + "/" + id + "/void"), "A").content("{\"reason\":\"重复冲销\"}"))
+            m.perform(full(post(ROOT + "/" + id + "/void"), "A").content("{\"requestId\":\"" + UUID.randomUUID() + "\",\"reason\":\"重复冲销\"}"))
                     .andExpect(status().isConflict());
             m.perform(full(get(ROOT + "/" + id), "A")).andExpect(jsonPath("originalEffectiveQty").value("0.000000"));
             m.perform(full(get(ROOT + "/" + id + "/adjustments"), "A")).andExpect(jsonPath("total").value(3));
@@ -207,6 +208,48 @@ class ProductionReportHttpTest {
                     .andExpect(jsonPath("record.quantityDelta").value("2.000000"));
             m.perform(full(get("/api/production/report-quantities/executions/1"), "A"))
                     .andExpect(jsonPath("nodes.length()").value(3)).andExpect(jsonPath("nodes[0].code").value("A"));
+        }
+    }
+
+    @Test
+    void administratorCommandsReplayLostResponsesAndRejectChangedContent() throws Exception {
+        try (var c = context(); var executor = Executors.newFixedThreadPool(2)) {
+            var m = MaterialIssueHttpTest.mvc(c);
+            String body = supplement(11, "4");
+            var barrier = new CyclicBarrier(2);
+            Callable<String> submit = () -> {
+                barrier.await();
+                return m.perform(full(post(ROOT + "/supplements"), "A").content(body))
+                        .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+            };
+            var a = executor.submit(submit);
+            var b = executor.submit(submit);
+            String first = a.get();
+            assertEquals(first, b.get());
+            String id = new ObjectMapper().readTree(first).get("id").asText();
+            m.perform(full(post(ROOT + "/supplements"), "A").content(body))
+                    .andExpect(status().isOk()).andExpect(jsonPath("id").value(id));
+            m.perform(full(post(ROOT + "/supplements"), "A").content(body.replace("历史补录", "不同命令")))
+                    .andExpect(status().isConflict()).andExpect(jsonPath("errorCode").value("REPORT_REQUEST_CONFLICT"));
+            String adjustment = "{\"requestId\":\"" + UUID.randomUUID() + "\",\"quantityDelta\":\"-1\",\"reason\":\"TEST ONLY correction\"}";
+            String endpoint = ROOT + "/" + id + "/adjustments";
+            String adjusted = m.perform(full(post(endpoint), "A").content(adjustment)).andExpect(status().isOk())
+                    .andReturn().getResponse().getContentAsString();
+            assertEquals(adjusted, m.perform(full(post(endpoint), "A").content(adjustment)).andExpect(status().isOk())
+                    .andReturn().getResponse().getContentAsString());
+            String cancel = "{\"requestId\":\"" + UUID.randomUUID() + "\",\"reason\":\"TEST ONLY void\"}";
+            String voided = m.perform(full(post(ROOT + "/" + id + "/void"), "A").content(cancel))
+                    .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+            assertEquals(voided, m.perform(full(post(ROOT + "/" + id + "/void"), "A").content(cancel))
+                    .andExpect(status().isOk()).andReturn().getResponse().getContentAsString());
+            m.perform(full(post(ROOT + "/" + id + "/adjustments"), "A").content(cancel.replace("}", ",\"quantityDelta\":\"-3\"}")))
+                    .andExpect(status().isConflict());
+            m.perform(full(post(ROOT + "/" + id + "/void"), "A").content("{\"reason\":\"legacy\"}"))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("errorCode").value("REPORT_REQUEST_ID_REQUIRED"));
+            var j = c.getBean(MaterialIssueHttpTest.Fixture.class).business.get("A");
+            assertEquals(3, j.queryForObject("SELECT COUNT(*) FROM mes_production_report", Integer.class));
+            assertEquals(0, j.queryForObject("SELECT SUM(quantity_delta) FROM mes_production_report", Integer.class));
         }
     }
 

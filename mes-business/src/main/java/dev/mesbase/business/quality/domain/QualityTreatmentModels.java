@@ -8,7 +8,7 @@ public final class QualityTreatmentModels {
     private QualityTreatmentModels() {
     }
 
-    public enum Action {ASSESS, ALLOCATE, START, RESULT}
+    public enum Action {ASSESS, ALLOCATE, START, RESULT, CANCEL_ALLOC, CANCEL_START, CORRECT_RESULT}
 
     public enum State {UNVERIFIED, OVERLAP, PENDING, IN_PROGRESS, WAITING_REWORK, FAILED_SCRAPPED, RECOVERED, SCRAPPED, VOIDED}
 

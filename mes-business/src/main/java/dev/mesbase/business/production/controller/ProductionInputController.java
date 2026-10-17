@@ -44,7 +44,8 @@ public class ProductionInputController {
                             String plannedQty, String outputUnitCode, String status, List<String> allowedWarehouses) {
     }
 
-    public record SupplyView(String sourceMode, List<StockView> stocks, List<OrderView> orders) {
+    public record SupplyView(String sourceMode, List<StockView> stocks, List<OrderView> orders, long total, int offset,
+                             int limit) {
     }
 
     public record CalculationView(String sourceMode, OrderView order, StockView stock, String outputQty,
@@ -53,10 +54,12 @@ public class ProductionInputController {
 
     @GetMapping
     @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED, permission = PERMISSION)
-    public SupplyView query(@RequestParam String code) {
-        var c = supply.query(code);
+    public SupplyView query(@RequestParam String code, @RequestParam(defaultValue = "0") int offset,
+                            @RequestParam(defaultValue = "20") int limit) {
+        var c = supply.query(code, null, offset, limit);
         return new SupplyView(c.sourceMode(), c.stocks().stream().map(ProductionInputController::stock)
-                .toList(), c.orders().stream().map(ProductionInputController::order).toList());
+                .toList(), c.orders().stream().map(ProductionInputController::order)
+                .toList(), c.total(), c.offset(), c.limit());
     }
 
     @GetMapping("/calculate")

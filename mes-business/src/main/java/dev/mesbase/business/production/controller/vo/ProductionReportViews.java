@@ -5,6 +5,7 @@ import dev.mesbase.business.production.domain.ProductionReportModels.ExecutionQu
 import dev.mesbase.business.production.domain.ProductionReportModels.NodeQuantity;
 import dev.mesbase.business.production.domain.ProductionReportModels.ExecutionSummary;
 import java.math.BigDecimal;
+import dev.mesbase.business.production.service.ProductionQuantityService;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
@@ -31,7 +32,7 @@ public final class ProductionReportViews {
                        String availableQty, boolean qualityIntegrated, String directDefectQty, String recoveredQty,
                        String netDefectQty, String propagatedLossQty, String historicalOverrunQty,
                        String rawEffectiveOutputQty, String rawAvailableQty, String unverifiedDefectQty,
-                       boolean historicalConflict) {
+                       boolean historicalConflict, String positiveReportBlockReason) {
     }
 
     public record Execution(String executionId, String workorderId, String executionNo, String routingId,
@@ -61,13 +62,18 @@ public final class ProductionReportViews {
 
     public static Execution execution(ExecutionQuantity v) {
         return new Execution(id(v.executionId()), id(v.workorderId()), v.executionNo(), id(v.routingId()), decimal(v.targetQty()),
-                v.pathStatus(), v.writable(), v.boundary(), v.nodes().stream().map(ProductionReportViews::node)
+                v.pathStatus(), v.writable(), v.boundary(), v.nodes().stream()
+                .map(n -> node(n, ProductionQuantityService.positiveReportBlockReason(v, n.routingNodeId())))
                 .toList(), v.routingLabel(), decimal(v.productionInputQty()), decimal(v.confirmedInputQty()), decimal(v.reservedInputQty()));
     }
 
     public static Node node(NodeQuantity n) {
+        return node(n, null);
+    }
+
+    private static Node node(NodeQuantity n, String blocked) {
         return new Node(id(n.executionId()), id(n.routingNodeId()), id(n.operationId()), n.code(), n.name(), n.sequenceNo(),
-                decimal(n.inputQty()), decimal(n.reportedQty()), decimal(n.defectQty()), decimal(n.effectiveOutputQty()), decimal(n.availableQty()), n.qualityIntegrated(), decimal(n.directDefectQty()), decimal(n.recoveredQty()), decimal(n.netDefectQty()), decimal(n.propagatedLossQty()), decimal(n.historicalOverrunQty()), decimal(n.rawEffectiveOutputQty()), decimal(n.rawAvailableQty()), decimal(n.unverifiedDefectQty()), n.historicalConflict());
+                decimal(n.inputQty()), decimal(n.reportedQty()), decimal(n.defectQty()), decimal(n.effectiveOutputQty()), decimal(n.availableQty()), n.qualityIntegrated(), decimal(n.directDefectQty()), decimal(n.recoveredQty()), decimal(n.netDefectQty()), decimal(n.propagatedLossQty()), decimal(n.historicalOverrunQty()), decimal(n.rawEffectiveOutputQty()), decimal(n.rawAvailableQty()), decimal(n.unverifiedDefectQty()), n.historicalConflict(), blocked);
     }
 
     public static Summary summary(ExecutionSummary e, String routingLabel) {

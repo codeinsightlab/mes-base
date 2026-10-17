@@ -22,6 +22,7 @@ import dev.mesbase.business.wm.domain.WmWarehouseExample;
 import java.util.stream.Collectors;
 import dev.mesbase.business.production.dao.WorkorderMapper;
 import dev.mesbase.business.production.domain.WorkorderExample;
+import dev.mesbase.business.production.domain.WorkorderEntity;
 import dev.mesbase.business.production.domain.ProductionScanCode;
 import dev.mesbase.core.error.ErrorCode;
 import dev.mesbase.core.error.FoundationException;
@@ -36,6 +37,9 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Objects;
 import org.springframework.core.env.Environment;
+import org.springframework.core.env.ConfigurableEnvironment;
+import org.springframework.core.env.EnumerablePropertySource;
+import java.util.TreeSet;
 import org.springframework.stereotype.Service;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.transaction.annotation.Transactional;
@@ -78,6 +82,12 @@ public class ProductionInputSupplyService {
 
     @Transactional(transactionManager = "businessTransactionManager", propagation = Propagation.NOT_SUPPORTED)
     public Context query(String code) {
+        return query(code, null, 0, 20);
+    }
+
+    @Transactional(transactionManager = "businessTransactionManager", propagation = Propagation.NOT_SUPPORTED)
+    public Context query(String code, Long workorderId, int offset, int limit) {
+        ProductionQuantityService.paging(offset, limit);
         var identity = ProductionScanCode.material(code);
         var scope = FactoryContext.required();
         var selection = integration.submissionSelection(scope);
@@ -87,13 +97,16 @@ public class ProductionInputSupplyService {
             var result = matching.getFirst()
                     .query(scope, selection.bindingKey(), identity.materialCode(), identity.lotCode());
             if (result == null || !Mode.CONNECTED.getValue().equals(result.sourceMode())) fail();
-            return result;
+            var eligible = result.orders().stream()
+                    .filter(o -> workorderId == null || workorderId.equals(o.workorderId())).toList();
+            return new Context(result.sourceMode(), result.stocks(), eligible.stream().skip(offset).limit(limit)
+                    .toList(), eligible.size(), offset, limit);
         }
-        return readTransaction.execute(status -> local(code, identity, scope, selection));
+        return readTransaction.execute(status -> local(code, identity, scope, selection, workorderId, offset, limit));
     }
 
     private Context local(String code, ProductionScanCode.MaterialLot identity, FactoryScope scope,
-                          Selection selection) {
+                          Selection selection, Long workorderId, int offset, int limit) {
         var mf = new MaterialExample();
         mf.createCriteria().andCodeEqualTo(identity.materialCode());
         var matches = materials.selectByExample(mf).stream()
@@ -111,7 +124,8 @@ public class ProductionInputSupplyService {
         var stockRows = inventory.selectByExample(sf);
         var warehouseFilter = new WmWarehouseExample();
         var warehouseIds = stockRows.stream().map(r -> r.getWarehouseId()).distinct().toList();
-        if (warehouseIds.isEmpty()) return new Context(selection.mode().getValue(), List.of(), List.of());
+        if (warehouseIds.isEmpty())
+            return new Context(selection.mode().getValue(), List.of(), List.of(), 0, offset, limit);
         warehouseFilter.createCriteria().andIdIn(warehouseIds);
         var warehouseMap = warehouses.selectByExample(warehouseFilter).stream()
                 .collect(Collectors.toMap(r -> r.getId(), r -> r));
@@ -125,14 +139,40 @@ public class ProductionInputSupplyService {
                 stocks.add(new Stock(s.getId()
                         .toString(), material.getId(), material.getCode(), s.getBatchNo(), w.getId(), w.getCode(), s.getBinCode(), unit.getId(), unit.getCode(), available, now));
         }
+        String prefix = "mes.production.input.factories." + scope.factoryId().value() + ".workorders.";
+        var configuredIds = configuredOrders(prefix).stream()
+                .filter(id -> workorderId == null || id.equals(workorderId)).filter(id -> {
+                    String key = prefix + id + ".";
+                    if (!material.getId().toString().equals(environment.getProperty(key + "material-id"))) return false;
+                    String allowed = environment.getProperty(key + "warehouse-ids");
+                    if (allowed == null) fail();
+                    var ids = Arrays.stream(allowed.split(",")).map(String::trim).map(Long::valueOf).toList();
+                    return stocks.stream().anyMatch(stock -> ids.contains(stock.warehouseId()));
+                }).toList();
+        if (configuredIds.isEmpty())
+            return new Context(selection.mode().getValue(), List.copyOf(stocks), List.of(), 0, offset, limit);
         var of = new WorkorderExample();
-        of.createCriteria().andStatusEqualTo(WorkOrderStatus.RELEASED.getValue());
+        var criteria = of.createCriteria().andStatusEqualTo(WorkOrderStatus.RELEASED.getValue()).andIdIn(configuredIds);
+        if (code.startsWith("MES1.")) {
+            var pf = new MaterialExample();
+            pf.createCriteria().andCodeEqualTo(ProductionScanCode.parse(code).productCode());
+            var productIds = materials.selectByExample(pf).stream()
+                    .filter(p -> p.getCode().equals(ProductionScanCode.parse(code).productCode())).map(p -> p.getId())
+                    .toList();
+            if (productIds.isEmpty())
+                return new Context(selection.mode().getValue(), List.copyOf(stocks), List.of(), 0, offset, limit);
+            criteria.andProductIdIn(productIds);
+        }
         of.setOrderByClause("id DESC");
         var candidates = new ArrayList<Order>();
-        // Explicit 100-order query budget; never silently hide orders beyond this bound.
-        if (orders.countByExample(of) > 100) fail();
-        var orderRows = orders.selectByExample(of);
-        if (orderRows.isEmpty()) return new Context(selection.mode().getValue(), List.copyOf(stocks), List.of());
+        List<WorkorderEntity> orderRows;
+        long candidateTotal;
+        try (var page = PageHelper.offsetPage(offset, limit)) {
+            orderRows = List.copyOf(orders.selectByExample(of));
+            candidateTotal = page.getTotal();
+        }
+        if (orderRows.isEmpty()) return new Context(selection.mode()
+                .getValue(), List.copyOf(stocks), List.of(), candidateTotal, offset, limit);
         var productFilter = new MaterialExample();
         productFilter.createCriteria().andIdIn(orderRows.stream().map(o -> o.getProductId()).distinct().toList());
         var productMap = materials.selectByExample(productFilter).stream()
@@ -144,14 +184,13 @@ public class ProductionInputSupplyService {
         uf.createCriteria().andIdIn(outputUnitIds);
         var outputUnits = units.selectByExample(uf).stream().collect(Collectors.toMap(u -> u.getId(), u -> u));
         for (var o : orderRows) {
-            String prefix = "mes.production.input.factories." + scope.factoryId()
-                    .value() + ".workorders." + o.getId() + ".";
-            String configured = environment.getProperty(prefix + "material-id");
+            String orderPrefix = prefix + o.getId() + ".";
+            String configured = environment.getProperty(orderPrefix + "material-id");
             if (!Objects.equals(configured, material.getId().toString())) continue;
             var product = productMap.get(o.getProductId());
-            var total = environment.getProperty(prefix + "total-required-qty", BigDecimal.class);
-            var center = environment.getProperty(prefix + "work-center");
-            var allowed = environment.getProperty(prefix + "warehouse-ids");
+            var total = environment.getProperty(orderPrefix + "total-required-qty", BigDecimal.class);
+            var center = environment.getProperty(orderPrefix + "work-center");
+            var allowed = environment.getProperty(orderPrefix + "warehouse-ids");
             if (product == null || total == null || total.signum() <= 0 || center == null || center.isBlank() || allowed == null)
                 fail();
             var ids = Arrays.stream(allowed.split(",")).map(String::trim).map(Long::valueOf).toList();
@@ -163,12 +202,13 @@ public class ProductionInputSupplyService {
             candidates.add(new Order(o.getId(), o.getCode(), product.getCode(), product.getName(), center, o.getPlannedQty(), outputUnit.getCode(), o.getStatus(), ids,
                     List.of(new Requirement(material.getCode(), material.getId(), unit.getId(), unit.getCode(), total)), "LOCAL-WORKORDER:" + o.getId(), now));
         }
-        return new Context(selection.mode().getValue(), List.copyOf(stocks), List.copyOf(candidates));
+        return new Context(selection.mode()
+                .getValue(), List.copyOf(stocks), List.copyOf(candidates), candidateTotal, offset, limit);
     }
 
     @Transactional(transactionManager = "businessTransactionManager", propagation = Propagation.NOT_SUPPORTED)
     public Calculation calculate(String code, Long orderId, String stockReference, BigDecimal outputQty) {
-        var context = query(code);
+        var context = query(code, orderId, 0, 1);
         var order = context.orders().stream().filter(o -> o.workorderId().equals(orderId)).findFirst()
                 .orElseThrow(() -> new FoundationException(ErrorCode.BAD_REQUEST));
         var stock = context.stocks().stream().filter(s -> s.reference().equals(stockReference)).findFirst()
@@ -185,6 +225,28 @@ public class ProductionInputSupplyService {
         var quantity = issueQuantity(order.plannedQty(), total, outputQty);
         if (quantity.compareTo(stock.availableQty()) > 0) fail();
         return new Calculation(context.sourceMode(), order, stock, outputQty, quantity);
+    }
+
+    // Transition boundary: only configured workorders are indexed, never all released business rows.
+    private List<Long> configuredOrders(String prefix) {
+        if (!(environment instanceof ConfigurableEnvironment configurable))
+            throw new FoundationException(ErrorCode.INTEGRATION_NOT_CONFIGURED);
+        var ids = new TreeSet<Long>();
+        for (var source : configurable.getPropertySources()) {
+            if (!(source instanceof EnumerablePropertySource<?> enumerable)) continue;
+            for (String name : enumerable.getPropertyNames()) {
+                if (!name.startsWith(prefix) || !name.endsWith(".material-id")) continue;
+                String id = name.substring(prefix.length(), name.length() - ".material-id".length());
+                if (!id.matches("[1-9][0-9]{0,18}")) fail();
+                try {
+                    ids.add(Long.valueOf(id));
+                } catch (NumberFormatException invalid) {
+                    fail();
+                }
+                if (ids.size() > 10000) throw new FoundationException(ErrorCode.INTEGRATION_NOT_CONFIGURED);
+            }
+        }
+        return List.copyOf(ids);
     }
 
     public static String calculationKey(Calculation c) {

@@ -14,6 +14,9 @@ import dev.mesbase.business.production.service.ProductionInputSupplyService;
 import dev.mesbase.business.production.service.IRoutingService;
 import dev.mesbase.business.production.domain.ProductionScanCode;
 import java.util.Map;
+import java.util.HashMap;
+import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.Executors;
@@ -277,6 +280,49 @@ class ProductionInputHttpTest {
                     .andExpect(jsonPath("productCode").value("P2"));
             m.perform(ProductionReportHttpTest.full(get("/api/production/identity"), "B").param("code", "M1#L001"))
                     .andExpect(status().isOk());
+        }
+    }
+
+    @Test
+    void configuredCandidatesArePagedIndependentlyOfAllReleasedOrders() throws Exception {
+        try (var c = context()) {
+            var j = db(c);
+            var m = MaterialIssueHttpTest.mvc(c);
+            for (int id = 2; id <= 1000; id++)
+                j.update("INSERT INTO workorder(id,code,product_id,planned_qty,routing_id,status,revision,create_time,update_time) VALUES(?,?,1,1000,1,'RELEASED',0,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)", id, "TEST_SCALE_" + id);
+            for (int size : new int[]{99, 100, 101, 1000}) {
+                j.update("UPDATE workorder SET status=CASE WHEN id<=? THEN 'RELEASED' ELSE 'DRAFT' END", size);
+                m.perform(ProductionCoreV1HttpTest.full(get(ROOT)).param("code", "M1#L001")).andExpect(status().isOk())
+                        .andExpect(jsonPath("$.total").value(1));
+            }
+            for (int size : new int[]{0, 1, 20, 200}) {
+                var properties = new HashMap<String, Object>();
+                properties.put("mes.production.input.factories.A.workorders.1.material-id", "99");
+                for (int id = 1; id <= size; id++) {
+                    String prefix = "mes.production.input.factories.A.workorders." + id + ".";
+                    properties.put(prefix + "material-id", "1");
+                    properties.put(prefix + "total-required-qty", "20");
+                    properties.put(prefix + "warehouse-ids", "1");
+                    properties.put(prefix + "work-center", "TEST-CENTER");
+                }
+                c.getEnvironment().getPropertySources()
+                        .addFirst(new MapPropertySource("TEST candidate scale", properties));
+                var ids = new ArrayList<Long>();
+                for (int offset = 0; offset < Math.max(1, size); offset += 20) {
+                    var response = m.perform(ProductionCoreV1HttpTest.full(get(ROOT)).param("code", "M1#L001")
+                                    .param("offset", Integer.toString(offset)))
+                            .andExpect(status().isOk()).andExpect(jsonPath("$.total").value(size)).andReturn()
+                            .getResponse().getContentAsString();
+                    for (var order : new ObjectMapper().readTree(response).get("orders"))
+                        ids.add(order.get("workorderId").asLong());
+                }
+                assertEquals(size, new HashSet<>(ids).size());
+                for (int i = 0; i < size; i++) assertEquals(size - i, ids.get(i));
+                if (size == 200)
+                    m.perform(ProductionCoreV1HttpTest.full(get(ROOT + "/calculate")).param("code", "M1#L001")
+                                    .param("workorderId", "1").param("stockReference", "1").param("outputQty", "100"))
+                            .andExpect(status().isOk());
+            }
         }
     }
 

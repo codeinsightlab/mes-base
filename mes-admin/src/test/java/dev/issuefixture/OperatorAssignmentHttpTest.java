@@ -32,6 +32,7 @@ import org.springframework.mock.web.MockServletContext;
 import org.springframework.web.context.support.AnnotationConfigWebApplicationContext;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static dev.issuefixture.ProductionReportHttpTest.full;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
@@ -39,6 +40,7 @@ import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -56,12 +58,6 @@ class OperatorAssignmentHttpTest {
         MesOperationUserMapper capabilities(SqlSessionFactory sessions) {
             sessions.getConfiguration().addMapper(MesOperationUserMapper.class);
             return new SqlSessionTemplate(sessions).getMapper(MesOperationUserMapper.class);
-        }
-
-        @Bean
-        MesExecutionAssignmentMapper assignments(SqlSessionFactory sessions) {
-            sessions.getConfiguration().addMapper(MesExecutionAssignmentMapper.class);
-            return new SqlSessionTemplate(sessions).getMapper(MesExecutionAssignmentMapper.class);
         }
 
         @Bean
@@ -89,9 +85,6 @@ class OperatorAssignmentHttpTest {
         c.register(MaterialIssueHttpTest.Web.class, Extra.class);
         c.refresh();
         for (var jdbc : c.getBean(MaterialIssueHttpTest.Fixture.class).business.values()) {
-            var ddl = Files.readString(Path.of("mes-admin/src/main/resources/db/business/V24__operation_user_execution_assignment.sql"))
-                    .replace(") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT=", ") COMMENT ");
-            for (var sql : ddl.split(";")) if (!sql.isBlank()) jdbc.execute(sql);
             jdbc.update("INSERT INTO operation(id,code,name,status,sort,revision) VALUES(1,'DRILL','钻孔','ENABLED',0,0),(2,'TURN','车削','ENABLED',0,0)");
             jdbc.update("INSERT INTO routing_node(id,routing_id,node_code,operation_id,operation_code,operation_name,is_key,display_order) VALUES(1,1,'A',1,'DRILL','钻孔',TRUE,0),(2,1,'B',1,'DRILL','钻孔',TRUE,1),(3,2,'WRONG',1,'DRILL','钻孔',TRUE,0)");
             jdbc.update("INSERT INTO mes_production_execution(id,execution_no,workorder_id,product_id,routing_id,target_qty,status) VALUES(1,'EXE-1',1,1,1,100,'READY'),(2,'EXE-2',1,1,1,100,'COMPLETED')");
@@ -100,6 +93,21 @@ class OperatorAssignmentHttpTest {
     }
 
     static final String C = "/api/production/mes-operation-user", A = "/api/production/mes-execution-assignment";
+
+    @Test
+    void readyExecutionWithPlanningAssignmentsCannotBeDeletedOrChangeRouting() throws Exception {
+        try (var c = context()) {
+            var m = MaterialIssueHttpTest.mvc(c);
+            var j = c.getBean(MaterialIssueHttpTest.Fixture.class).business.get("A");
+            j.update("INSERT INTO mes_execution_assignment(execution_id,routing_node_id,user_id,assigned_by,assigned_at) VALUES(1,1,1,1,CURRENT_TIMESTAMP)");
+            m.perform(full(delete("/api/production/mes-production-execution"), "A").content("[1]"))
+                    .andExpect(status().isConflict()).andExpect(jsonPath("errorCode").value("EXECUTION_REFERENCED"));
+            m.perform(full(put("/api/production/mes-production-execution/1"), "A").content("{\"workorderId\":\"1\",\"routingId\":\"2\",\"targetQty\":\"100\",\"status\":\"READY\"}"))
+                    .andExpect(status().isConflict()).andExpect(jsonPath("errorCode").value("EXECUTION_FROZEN"));
+            assertEquals(1, j.queryForObject("SELECT COUNT(*) FROM mes_execution_assignment WHERE execution_id=1", Integer.class));
+            assertEquals(1, j.queryForObject("SELECT routing_id FROM mes_production_execution WHERE id=1", Integer.class));
+        }
+    }
 
     @Test
     void scopePermissionsDuplicateAndTransactionalBatch() throws Exception {

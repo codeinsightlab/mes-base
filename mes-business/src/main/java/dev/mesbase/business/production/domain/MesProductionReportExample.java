@@ -1,4 +1,3 @@
-// MES-CODEGEN: MyBatis Generator standard single-table persistence.
 package dev.mesbase.business.production.domain;
 
 import java.math.BigDecimal;
@@ -833,6 +832,146 @@ public class MesProductionReportExample {
 
         public Criteria andCreateTimeNotBetween(LocalDateTime value1, LocalDateTime value2) {
             addCriterion("create_time not between", value1, value2, "createTime");
+            return (Criteria) this;
+        }
+
+        public Criteria andRequestIdIsNull() {
+            addCriterion("request_id is null");
+            return (Criteria) this;
+        }
+
+        public Criteria andRequestIdIsNotNull() {
+            addCriterion("request_id is not null");
+            return (Criteria) this;
+        }
+
+        public Criteria andRequestIdEqualTo(String value) {
+            addCriterion("request_id =", value, "requestId");
+            return (Criteria) this;
+        }
+
+        public Criteria andRequestIdNotEqualTo(String value) {
+            addCriterion("request_id <>", value, "requestId");
+            return (Criteria) this;
+        }
+
+        public Criteria andRequestIdGreaterThan(String value) {
+            addCriterion("request_id >", value, "requestId");
+            return (Criteria) this;
+        }
+
+        public Criteria andRequestIdGreaterThanOrEqualTo(String value) {
+            addCriterion("request_id >=", value, "requestId");
+            return (Criteria) this;
+        }
+
+        public Criteria andRequestIdLessThan(String value) {
+            addCriterion("request_id <", value, "requestId");
+            return (Criteria) this;
+        }
+
+        public Criteria andRequestIdLessThanOrEqualTo(String value) {
+            addCriterion("request_id <=", value, "requestId");
+            return (Criteria) this;
+        }
+
+        public Criteria andRequestIdLike(String value) {
+            addCriterion("request_id like", value, "requestId");
+            return (Criteria) this;
+        }
+
+        public Criteria andRequestIdNotLike(String value) {
+            addCriterion("request_id not like", value, "requestId");
+            return (Criteria) this;
+        }
+
+        public Criteria andRequestIdIn(List<String> values) {
+            addCriterion("request_id in", values, "requestId");
+            return (Criteria) this;
+        }
+
+        public Criteria andRequestIdNotIn(List<String> values) {
+            addCriterion("request_id not in", values, "requestId");
+            return (Criteria) this;
+        }
+
+        public Criteria andRequestIdBetween(String value1, String value2) {
+            addCriterion("request_id between", value1, value2, "requestId");
+            return (Criteria) this;
+        }
+
+        public Criteria andRequestIdNotBetween(String value1, String value2) {
+            addCriterion("request_id not between", value1, value2, "requestId");
+            return (Criteria) this;
+        }
+
+        public Criteria andCommandFingerprintIsNull() {
+            addCriterion("command_fingerprint is null");
+            return (Criteria) this;
+        }
+
+        public Criteria andCommandFingerprintIsNotNull() {
+            addCriterion("command_fingerprint is not null");
+            return (Criteria) this;
+        }
+
+        public Criteria andCommandFingerprintEqualTo(String value) {
+            addCriterion("command_fingerprint =", value, "commandFingerprint");
+            return (Criteria) this;
+        }
+
+        public Criteria andCommandFingerprintNotEqualTo(String value) {
+            addCriterion("command_fingerprint <>", value, "commandFingerprint");
+            return (Criteria) this;
+        }
+
+        public Criteria andCommandFingerprintGreaterThan(String value) {
+            addCriterion("command_fingerprint >", value, "commandFingerprint");
+            return (Criteria) this;
+        }
+
+        public Criteria andCommandFingerprintGreaterThanOrEqualTo(String value) {
+            addCriterion("command_fingerprint >=", value, "commandFingerprint");
+            return (Criteria) this;
+        }
+
+        public Criteria andCommandFingerprintLessThan(String value) {
+            addCriterion("command_fingerprint <", value, "commandFingerprint");
+            return (Criteria) this;
+        }
+
+        public Criteria andCommandFingerprintLessThanOrEqualTo(String value) {
+            addCriterion("command_fingerprint <=", value, "commandFingerprint");
+            return (Criteria) this;
+        }
+
+        public Criteria andCommandFingerprintLike(String value) {
+            addCriterion("command_fingerprint like", value, "commandFingerprint");
+            return (Criteria) this;
+        }
+
+        public Criteria andCommandFingerprintNotLike(String value) {
+            addCriterion("command_fingerprint not like", value, "commandFingerprint");
+            return (Criteria) this;
+        }
+
+        public Criteria andCommandFingerprintIn(List<String> values) {
+            addCriterion("command_fingerprint in", values, "commandFingerprint");
+            return (Criteria) this;
+        }
+
+        public Criteria andCommandFingerprintNotIn(List<String> values) {
+            addCriterion("command_fingerprint not in", values, "commandFingerprint");
+            return (Criteria) this;
+        }
+
+        public Criteria andCommandFingerprintBetween(String value1, String value2) {
+            addCriterion("command_fingerprint between", value1, value2, "commandFingerprint");
+            return (Criteria) this;
+        }
+
+        public Criteria andCommandFingerprintNotBetween(String value1, String value2) {
+            addCriterion("command_fingerprint not between", value1, value2, "commandFingerprint");
             return (Criteria) this;
         }
     }

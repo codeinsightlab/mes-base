@@ -100,6 +100,85 @@ class ProductionQualityV13HttpTest {
     }
 
     @Test
+    void pendingAtDAllowsUpstreamReportsAndSafeNegativeCorrectionButProtectsItsBasis() throws Exception {
+        try (var c = context(99, 98, 97, 96, 95)) {
+            var m = MaterialIssueHttpTest.mvc(c);
+            defect(m, 14, "2", null, null);
+            for (int n = 11; n <= 13; n++)
+                m.perform(full(post("/api/production/reports/supplements"), "A").content(ProductionReportHttpTest.supplement(n, "1")))
+                        .andExpect(status().isOk());
+            var blocked = m.perform(full(post("/api/production/reports/supplements"), "A").content(ProductionReportHttpTest.supplement(14, "1")))
+                    .andExpect(status().isConflict())
+                    .andExpect(jsonPath("errorCode").value("QUALITY_ATTRIBUTION_REQUIRED")).andReturn().getResponse()
+                    .getContentAsString();
+            assertTrue(blocked.contains("D") && blocked.contains("先核实"));
+            var j = ProductionReceiptHttpTest.db(c);
+            Long original = j.queryForObject("SELECT id FROM mes_production_report WHERE routing_node_id=14 AND record_type='REPORT'", Long.class);
+            String endpoint = "/api/production/reports/" + original + "/adjustments";
+            m.perform(full(post(endpoint), "A").content("{\"requestId\":\"" + UUID.randomUUID() + "\",\"quantityDelta\":\"-1\",\"reason\":\"TEST ONLY safe negative\"}"))
+                    .andExpect(status().isOk());
+            m.perform(full(post(endpoint), "A").content("{\"requestId\":\"" + UUID.randomUUID() + "\",\"quantityDelta\":\"-94\",\"reason\":\"TEST ONLY breaks basis\"}"))
+                    .andExpect(status().isConflict());
+            var q = quantities(m);
+            assertTrue(q.get("nodes").get(2).get("positiveReportBlockReason").isNull());
+            assertTrue(q.get("nodes").get(3).get("positiveReportBlockReason").asText().contains("D"));
+            assertTrue(q.get("nodes").get(4).get("positiveReportBlockReason").asText().contains("D"));
+            Long a = j.queryForObject("SELECT MIN(id) FROM mes_production_report WHERE routing_node_id=11", Long.class);
+            m.perform(full(post("/api/production/reports/" + a + "/adjustments"), "A").content("{\"requestId\":\"" + UUID.randomUUID() + "\",\"quantityDelta\":\"-2\",\"reason\":\"TEST ONLY upstream breaks downstream\"}"))
+                    .andExpect(status().isConflict());
+        }
+    }
+
+    @Test
+    void controlledCorrectionsRespectParentBudgetsAndPreserveOriginalEvents() throws Exception {
+        try (var c = context(100, 100, 100, 100, 100); var pool = Executors.newFixedThreadPool(2)) {
+            var m = MaterialIssueHttpTest.mvc(c);
+            var j = ProductionReceiptHttpTest.db(c);
+            var id = defect(m, 12, "10", "INDEPENDENT", null);
+            var allocation = execute(m, id, command("ALLOCATE", null, "2", "8", "0", "0", "0"));
+            String a = event(allocation, "ALLOCATE");
+            var started = execute(m, id, command("START", a, "0", "6", "0", "0", "0"));
+            String st = event(started, "START");
+            var result = execute(m, id, command("RESULT", st, "0", "0", "4", "3", "1"));
+            String r = event(result, "RESULT");
+            var originals = j.queryForList("SELECT * FROM mes_quality_treatment WHERE declaration_id=? ORDER BY id", id);
+            String cancel = command("CANCEL_START", st, "0", "2", "0", "0", "0");
+            var v = execute(m, id, cancel);
+            execute(m, id, cancel);
+            amount(v, "startedQty", "4");
+            amount(v, "inProgressQty", "0");
+            m.perform(full(post(Q + "/" + id + "/treatment"), "A").content(command("CANCEL_START", st, "0", "1", "0", "0", "0")))
+                    .andExpect(status().isConflict());
+            v = execute(m, id, command("CANCEL_ALLOC", a, "2", "4", "0", "0", "0"));
+            amount(v, "allocatedReworkQty", "4");
+            amount(v, "pendingDispositionQty", "6");
+            amount(v, "netDefectQty", "7");
+            m.perform(full(post(Q + "/" + id + "/treatment"), "A").content(command("CANCEL_ALLOC", a, "0", "1", "0", "0", "0")))
+                    .andExpect(status().isConflict());
+            String correction = command("CORRECT_RESULT", r, "0", "0", "3", "1", "2");
+            var correctionA = pool.submit(() -> execute(m, id, correction));
+            var correctionB = pool.submit(() -> execute(m, id, correction));
+            v = correctionA.get();
+            assertEquals(v, correctionB.get());
+            amount(v, "processedQty", "3");
+            amount(v, "recoveredQty", "1");
+            amount(v, "failedQty", "2");
+            amount(v, "inProgressQty", "1");
+            amount(quantities(m).get("nodes").get(4), "effectiveOutputQty", "91");
+            execute(m, id, command("CANCEL_START", st, "0", "1", "0", "0", "0"));
+            execute(m, id, command("CANCEL_ALLOC", a, "0", "1", "0", "0", "0"));
+            m.perform(full(post(Q + "/" + id + "/treatment"), "A").content(command("CORRECT_RESULT", r, "0", "0", "4", "2", "2")))
+                    .andExpect(status().isConflict());
+            v = execute(m, id, command("CORRECT_RESULT", r, "0", "0", "3", "2", "1"));
+            amount(v, "netDefectQty", "8");
+            amount(v, "startedQty", "3");
+            amount(v, "processedQty", "3");
+            for (var row : originals)
+                assertEquals(row, j.queryForMap("SELECT * FROM mes_quality_treatment WHERE id=?", row.get("ID")));
+        }
+    }
+
+    @Test
     void casesABFullHistoryAndRecoveryDoNotRewriteNormalReports() throws Exception {
         try (var c = context(100, 100, 100, 100, 100)) {
             var m = MaterialIssueHttpTest.mvc(c);
@@ -154,7 +233,7 @@ class ProductionQualityV13HttpTest {
             amount(quantities(m).get("nodes").get(4), "effectiveOutputQty", "87");
             defect(m, 14, "2", null, null);
             var q = quantities(m);
-            assertEquals(false, q.get("writable").asBoolean());
+            assertEquals(true, q.get("writable").asBoolean());
             amount(q.get("nodes").get(3), "unverifiedDefectQty", "2");
         }
     }

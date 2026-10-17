@@ -30,7 +30,11 @@ public final class ProductionSupply {
         }
     }
 
-    public record Context(String sourceMode, List<Stock> stocks, List<Order> orders) {
+    public record Context(String sourceMode, List<Stock> stocks, List<Order> orders, long total, int offset,
+                          int limit) {
+        public Context(String sourceMode, List<Stock> stocks, List<Order> orders) {
+            this(sourceMode, stocks, orders, orders.size(), 0, orders.size());
+        }
     }
 
     public record Calculation(String sourceMode, Order order, Stock stock, BigDecimal outputQty, BigDecimal issueQty) {

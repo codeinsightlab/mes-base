@@ -3,6 +3,7 @@ package dev.issuefixture;
 import dev.mesbase.business.production.controller.ProductionReportingController;
 import dev.mesbase.business.production.service.ProductionReportSubmitService;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Map;
@@ -47,9 +48,6 @@ class ProductionReportingHttpTest {
         c.register(MaterialIssueHttpTest.Web.class, Extra.class, ProductionDefectHttpTest.Extra.class);
         c.refresh();
         for (var j : c.getBean(MaterialIssueHttpTest.Fixture.class).business.values()) {
-            var ddl = Files.readString(Path.of("mes-admin/src/main/resources/db/business/V24__operation_user_execution_assignment.sql"))
-                    .replace(") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT=", ") COMMENT ");
-            for (String sql : ddl.split(";")) if (!sql.isBlank()) j.execute(sql);
             ProductionReportHttpTest.seed(j);
             ProductionInputTestData.confirmed(j, 1, new BigDecimal("10"));
             ProductionInputTestData.confirmed(j, 2, new BigDecimal("10"));
@@ -83,6 +81,33 @@ class ProductionReportingHttpTest {
         var result = m.perform(ProductionCoreV1HttpTest.full(post(ROOT)).content(body(node, qty)))
                 .andExpect(status().isOk()).andReturn();
         return new ObjectMapper().readTree(result.getResponse().getContentAsString()).get("id").asLong();
+    }
+
+    @Test
+    void pendingQualityCandidateAndPostShareTheSameNodeBoundary() throws Exception {
+        try (var c = context()) {
+            var m = MaterialIssueHttpTest.mvc(c);
+            confirmIssue(m);
+            var j = db(c);
+            j.update("INSERT INTO mes_production_report(execution_id,routing_node_id,record_type,quantity_delta,operator_user_id,recorded_by,report_time,reason,create_time) VALUES(1,11,'REPORT',8,1,1,CURRENT_TIMESTAMP,'TEST ONLY stability',CURRENT_TIMESTAMP),(1,12,'REPORT',5,1,1,CURRENT_TIMESTAMP,'TEST ONLY stability',CURRENT_TIMESTAMP),(1,13,'REPORT',3,1,1,CURRENT_TIMESTAMP,'TEST ONLY stability',CURRENT_TIMESTAMP)");
+            var json = new ObjectMapper();
+            var declaration = json.readTree(ProductionDefectHttpTest.command(UUID.randomUUID().toString(), 0, "2"));
+            ((ObjectNode) declaration).remove("assessment");
+            var facts = (ObjectNode) declaration.get("facts");
+            facts.put("affectedNodeId", "12");
+            facts.put("discoveredNodeId", "13");
+            facts.put("destinationNodeId", "12");
+            facts.put("destinationType", "SAME_NODE");
+            ProductionDefectHttpTest.add(m, declaration.toString(), "A");
+            m.perform(ProductionCoreV1HttpTest.full(get(ROOT + "/context").param("code", "EXE:1")))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("candidates[0].status").value("AVAILABLE"))
+                    .andExpect(jsonPath("candidates[1].status").value("QUALITY_PENDING"))
+                    .andExpect(jsonPath("candidates[2].status").value("QUALITY_PENDING"));
+            m.perform(ProductionCoreV1HttpTest.full(post(ROOT)).content(body(11, "1"))).andExpect(status().isOk());
+            m.perform(ProductionCoreV1HttpTest.full(post(ROOT)).content(body(12, "1"))).andExpect(status().isConflict())
+                    .andExpect(jsonPath("errorCode").value("QUALITY_ATTRIBUTION_REQUIRED"));
+        }
     }
 
     @Test
@@ -227,7 +252,8 @@ class ProductionReportingHttpTest {
             assertEquals(9, j.queryForObject("SELECT SUM(quantity_delta) FROM mes_production_report WHERE routing_node_id=11", Integer.class));
             var id = j.queryForObject("SELECT MIN(id) FROM mes_production_report", Long.class);
             m.perform(ProductionCoreV1HttpTest.full(post("/api/production/reports/" + id + "/adjustments"))
-                    .content("{\"quantityDelta\":\"-2\",\"reason\":\"TEST ONLY订正\"}")).andExpect(status().isOk());
+                            .content("{\"requestId\":\"" + UUID.randomUUID() + "\",\"quantityDelta\":\"-2\",\"reason\":\"TEST ONLY订正\"}"))
+                    .andExpect(status().isOk());
             submit(m, 11, "3");
             submit(m, 12, "10");
             assertEquals("RUNNING", j.queryForObject("SELECT status FROM mes_production_execution WHERE id=1", String.class));
@@ -268,7 +294,8 @@ class ProductionReportingHttpTest {
             var b = pool.submit(() -> {
                 gate.await();
                 return m.perform(ProductionCoreV1HttpTest.full(post("/api/production/reports/" + id + "/adjustments"))
-                                .content("{\"quantityDelta\":\"3\",\"reason\":\"TEST ONLY并发订正\"}")).andReturn()
+                                .content("{\"requestId\":\"" + UUID.randomUUID() + "\",\"quantityDelta\":\"3\",\"reason\":\"TEST ONLY并发订正\"}"))
+                        .andReturn()
                         .getResponse().getStatus();
             });
             assertTrue(List.of(a.get(), b.get()).contains(200));

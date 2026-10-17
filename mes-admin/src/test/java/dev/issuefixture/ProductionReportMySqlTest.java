@@ -152,6 +152,56 @@ class ProductionReportMySqlTest {
     }
 
     @Test
+    void realMysqlLostResponseAndConcurrentReplayAppendEachIntentOnlyOnce() throws Exception {
+        try (var c = context(); var executor = Executors.newFixedThreadPool(2)) {
+            var jdbc = c.getBean(JdbcTemplate.class);
+            var reports = c.getBean(ProductionReportService.class);
+            var tx = new TransactionTemplate(c.getBean("businessTransactionManager", OwnedTransactionManager.class));
+            var f = tx.execute(status -> createFixture(jdbc));
+            var cmd = command(f, "4");
+            var barrier = new CyclicBarrier(2);
+            Callable<Long> submit = () -> {
+                actor();
+                try {
+                    barrier.await();
+                    return reports.supplement(cmd).getId();
+                } finally {
+                    SecurityContextHolder.clearContext();
+                }
+            };
+            var a = executor.submit(submit);
+            var b = executor.submit(submit);
+            Long original = a.get();
+            assertEquals(original, b.get());
+            actor();
+            try {
+                assertEquals(original, reports.supplement(cmd).getId());
+                var changed = new Supplement(cmd.executionId(), cmd.routingNodeId(), BigDecimal.ONE, cmd.operatorUserId(), cmd.reportTime(), null, cmd.reason(), cmd.requestId());
+                assertEquals(ErrorCode.REPORT_REQUEST_CONFLICT, assertThrows(FoundationException.class, () -> reports.supplement(changed)).code());
+                var login = new SysUser();
+                login.setUserId(101L);
+                SecurityContextHolder.getContext()
+                        .setAuthentication(new UsernamePasswordAuthenticationToken(new LoginUser(101L, 1L, login, Set.of()), null, List.of()));
+                assertEquals(ErrorCode.REPORT_REQUEST_CONFLICT, assertThrows(FoundationException.class, () -> reports.supplement(cmd)).code());
+                actor();
+                var correction = new Adjustment(BigDecimal.ONE.negate(), f.tag());
+                var adjusted = reports.adjust(original, correction);
+                assertEquals(adjusted.getId(), reports.adjust(original, correction).getId());
+                var cancel = new VoidOriginal(f.tag());
+                var voided = reports.voidOriginalReport(original, cancel);
+                assertEquals(voided.getId(), reports.voidOriginalReport(original, cancel).getId());
+                assertEquals(3, jdbc.queryForObject("SELECT COUNT(*) FROM mes_production_report WHERE execution_id=?", Integer.class, f.executionId()));
+                assertEquals(0, jdbc.queryForObject("SELECT SUM(quantity_delta) FROM mes_production_report WHERE execution_id=?", BigDecimal.class, f.executionId())
+                        .signum());
+                assertThrows(RuntimeException.class, () -> jdbc.update("UPDATE mes_production_report SET reason='forbidden' WHERE id=?", original));
+                System.out.println("STABILITY_ADMIN_REPLAY_MYSQL execution=" + f.executionId() + " facts=3 net=0");
+            } finally {
+                SecurityContextHolder.clearContext();
+            }
+        }
+    }
+
+    @Test
     void realMysqlRollbackConstraintsAndImmutableLedger() throws Exception {
         try (var c = context()) {
             var jdbc = c.getBean(JdbcTemplate.class);

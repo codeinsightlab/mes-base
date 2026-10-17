@@ -10,6 +10,7 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 public final class ProductionReportModels {
     private ProductionReportModels() {
@@ -18,14 +19,25 @@ public final class ProductionReportModels {
     public record Supplement(@NotNull Long executionId, @NotNull Long routingNodeId,
                              @NotNull @DecimalMin(value = "0", inclusive = false) @Digits(integer = 14, fraction = 6) BigDecimal quantity,
                              @NotNull Long operatorUserId, @NotNull @PastOrPresent LocalDateTime reportTime,
-                             Long workstationId, @NotBlank @Size(max = 500) String reason) {
+                             Long workstationId, @NotBlank @Size(max = 500) String reason, String requestId) {
+        public Supplement(Long executionId, Long routingNodeId, BigDecimal quantity, Long operatorUserId,
+                          LocalDateTime reportTime, Long workstationId, String reason) {
+            this(executionId, routingNodeId, quantity, operatorUserId, reportTime, workstationId, reason, UUID.randomUUID()
+                    .toString());
+        }
     }
 
     public record Adjustment(@NotNull @Digits(integer = 14, fraction = 6) BigDecimal quantityDelta,
-                             @NotBlank @Size(max = 500) String reason) {
+                             @NotBlank @Size(max = 500) String reason, String requestId) {
+        public Adjustment(BigDecimal quantityDelta, String reason) {
+            this(quantityDelta, reason, UUID.randomUUID().toString());
+        }
     }
 
-    public record VoidOriginal(@NotBlank @Size(max = 500) String reason) {
+    public record VoidOriginal(@NotBlank @Size(max = 500) String reason, String requestId) {
+        public VoidOriginal(String reason) {
+            this(reason, UUID.randomUUID().toString());
+        }
     }
 
     public record NodeTotal(Long routingNodeId, BigDecimal reportedQty) {

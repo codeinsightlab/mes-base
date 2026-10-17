@@ -2,6 +2,7 @@ package dev.mesbase.business.production.service;
 
 import dev.mesbase.business.production.domain.ProductionReportModels.ExecutionSummary;
 import dev.mesbase.business.production.domain.ProductionQuantityConflictException;
+import dev.mesbase.business.production.domain.ProductionQualityPendingException;
 import dev.mesbase.business.quality.service.ProductionDefectQuantityQuery;
 
 import dev.mesbase.business.production.dao.MesProductionExecutionMapper;
@@ -125,12 +126,16 @@ public class ProductionQuantityService {
     public static void validateChange(ExecutionQuantity view, Long nodeId, BigDecimal delta) {
         if (!view.writable()) unavailable();
         var before = calculate(view, null, BigDecimal.ZERO, BigDecimal.ZERO);
-        if (before.nodes().stream().anyMatch(n -> n.unverifiedDefectQty().signum() > 0))
-            throw new FoundationException(ErrorCode.QUALITY_ATTRIBUTION_REQUIRED);
+        String blocked = positiveReportBlockReason(before, nodeId);
+        if (delta.signum() > 0 && blocked != null) throw new ProductionQualityPendingException(blocked);
         var after = calculate(view, nodeId, delta, BigDecimal.ZERO);
         for (int i = 0; i < after.nodes().size(); i++) {
             var n = after.nodes().get(i);
             var old = before.nodes().get(i);
+            if (delta.signum() < 0 && n.routingNodeId().equals(nodeId)
+                    && n.reportedQty().compareTo(n.unverifiedDefectQty()) < 0)
+                throw new ProductionQualityPendingException("工序 " + n.code() + " · " + n.name()
+                        + " 订正后报工不足以解释待核实不良申报，请先核实质量记录。");
             if (n.historicalOverrunQty().compareTo(old.historicalOverrunQty()) > 0 || n.routingNodeId()
                     .equals(nodeId) && delta.signum() > 0 && n.reportedQty().compareTo(n.inputQty()) > 0)
                 throw new ProductionQuantityConflictException(n.routingNodeId(), i == 0 ? null : after.nodes()
@@ -181,10 +186,25 @@ public class ProductionQuantityService {
             upstream = node.routingNodeId();
         }
         if (nodeId != null && !found) unavailable();
-        return new ExecutionQuantity(view.executionId(), view.workorderId(), view.executionNo(), view.routingId(), view.targetQty(), view.pathStatus(), view.writable() && result.stream()
-                .noneMatch(n -> n.unverifiedDefectQty().signum() > 0), result.stream()
+        return new ExecutionQuantity(view.executionId(), view.workorderId(), view.executionNo(), view.routingId(), view.targetQty(), view.pathStatus(), view.writable(), result.stream()
                 .anyMatch(n -> n.unverifiedDefectQty()
-                        .signum() > 0) ? "不良归属待核实，禁止新增报工及正向交接" : view.boundary(), List.copyOf(result), view.routingLabel(), view.productionInputQty(), view.confirmedInputQty(), view.reservedInputQty());
+                        .signum() > 0) ? "存在待核实不良；从受影响工序起禁止新增正向报工，请核实质量记录，正向交接保持质量门禁" : view.boundary(), List.copyOf(result), view.routingLabel(), view.productionInputQty(), view.confirmedInputQty(), view.reservedInputQty());
+    }
+
+    /**
+     * Shared by positive submit validation, candidate queries and administrator UI projection.
+     */
+    public static String positiveReportBlockReason(ExecutionQuantity view, Long nodeId) {
+        if (!view.writable()) return view.boundary() == null ? "实际路径尚未锁定" : view.boundary();
+        NodeQuantity affected = null;
+        for (var n : view.nodes()) {
+            if (affected == null && n.unverifiedDefectQty().signum() > 0) affected = n;
+            if (n.routingNodeId().equals(nodeId)) return affected == null ? null :
+                    "工序 " + affected.code() + " · " + affected.name() + " 存在待核实不良 "
+                            + affected.unverifiedDefectQty()
+                            .toPlainString() + "；当前工序受其影响，须先核实质量记录再新增报工。";
+        }
+        throw new FoundationException(ErrorCode.REPORT_PATH_REQUIRED);
     }
 
     public void validateInputReduction(Long executionId) {

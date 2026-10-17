@@ -34,7 +34,8 @@ import org.springframework.transaction.annotation.Transactional;
 @ConditionalOnProperty(name = "mes.business.enabled", havingValue = "true")
 public class ProductionReportSubmitService {
     public record Context(ProductionIdentity identity, ExecutionQuantity quantities, PathModel path,
-                          List<Candidate> candidates) { }
+                          List<Candidate> candidates) {
+    }
 
     private final ProductionIdentityService identities;
     private final ProductionQuantityService quantities;
@@ -78,10 +79,11 @@ public class ProductionReportSubmitService {
                 .collect(Collectors.toMap(n -> n.routingNodeId(), n -> n.operationId())), user) : Map.<Long, ErrorCode>of();
         for (var node : quantity.nodes()) {
             var failure = failures.get(node.routingNodeId());
-            String status = !ready ? "EXECUTION_NOT_READY" : failure == ErrorCode.OPERATOR_NOT_ASSIGNED ? "NOT_ASSIGNED"
+            String qualityBlocked = ProductionQuantityService.positiveReportBlockReason(quantity, node.routingNodeId());
+            String status = !ready ? "EXECUTION_NOT_READY" : qualityBlocked != null ? "QUALITY_PENDING" : failure == ErrorCode.OPERATOR_NOT_ASSIGNED ? "NOT_ASSIGNED"
                     : failure != null ? "NO_CAPABILITY" : node.availableQty()
                     .signum() <= 0 ? "NO_QUANTITY" : "AVAILABLE";
-            String reason = !ready ? "工单须已下达，执行须未关闭且实际路径已锁定" : failure != null ? failure.safeMessage()
+            String reason = !ready ? "工单须已下达，执行须未关闭且实际路径已锁定" : qualityBlocked != null ? qualityBlocked : failure != null ? failure.safeMessage()
                     : node.availableQty().signum() <= 0 ? "当前节点没有剩余可报数量" : null;
             candidates.add(new Candidate(node.routingNodeId(), status, reason));
         }
@@ -128,7 +130,7 @@ public class ProductionReportSubmitService {
     }
 
     private static MesProductionReportEntity replay(MesProductionReportEntity row, Command command, Long user) {
-        if (!Objects.equals(row.getExecutionId(), command.executionId()) || !Objects.equals(row.getRoutingNodeId(), command.routingNodeId())
+        if (row.getCommandFingerprint() != null || !Objects.equals(row.getExecutionId(), command.executionId()) || !Objects.equals(row.getRoutingNodeId(), command.routingNodeId())
                 || !Objects.equals(row.getOperatorUserId(), user) || !Objects.equals(row.getRecordedBy(), user)
                 || !Objects.equals(row.getWorkstationId(), command.workstationId()) || row.getQuantityDelta()
                 .compareTo(command.reportQty()) != 0)

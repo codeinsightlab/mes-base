@@ -1,6 +1,7 @@
 package dev.mesbase.business.production.controller;
 
 import dev.mesbase.business.production.domain.ProductionQuantityConflictException;
+import dev.mesbase.business.production.domain.ProductionQualityPendingException;
 import dev.mesbase.platform.web.ErrorResponse;
 import dev.mesbase.platform.web.ErrorWriter;
 import dev.mesbase.platform.web.HttpFailureLogging;
@@ -20,5 +21,13 @@ public class ProductionQuantityErrorAdvice {
         HttpFailureLogging.known(request, failure);
         return ResponseEntity.status(failure.code().httpStatus()).body(new ErrorResponse(failure.code()
                 .name(), failure.safeExplanation(), ErrorWriter.requestId(request)));
+    }
+
+    @ExceptionHandler(ProductionQualityPendingException.class)
+    public ResponseEntity<ErrorResponse> qualityPending(ProductionQualityPendingException failure,
+                                                        HttpServletRequest request) {
+        HttpFailureLogging.known(request, failure);
+        return ResponseEntity.status(failure.code().httpStatus()).body(new ErrorResponse(failure.code().name(),
+                failure.safeExplanation(), ErrorWriter.requestId(request)));
     }
 }

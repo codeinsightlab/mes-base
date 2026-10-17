@@ -55,6 +55,8 @@ public enum ErrorCode {
     SYNC_QUERY_NOT_IMPLEMENTED(422, "暂未接入外部同步查询接口"),
     ERP_SYNC_NOT_CONFIGURED(422, "暂未接入 ERP 物料查询接口"),
     SYNC_RUNNING(409, "同步正在进行"), SYNC_EXECUTION_LOST(409, "同步执行权已失效"),
+    REPORT_REQUEST_ID_REQUIRED(400, "管理员报工命令必须携带稳定的requestId UUID，请升级客户端后重试"),
+    REPORT_REQUEST_CONFLICT(409, "报工请求标识已被不同命令或操作者使用"),
     RESOURCE_CONFLICT(409, "Resource conflicts with current state"), BAD_REQUEST(400, "Invalid request"), UNAUTHENTICATED(401, "Authentication required"),
     FORBIDDEN(403, "Permission denied"), NOT_FOUND(404, "Resource not found"),
     CONFLICT(409, "Execution binding changed"), UNPROCESSABLE(422, "Request cannot be processed"),

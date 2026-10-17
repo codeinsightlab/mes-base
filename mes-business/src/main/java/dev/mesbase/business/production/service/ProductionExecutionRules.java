@@ -14,6 +14,8 @@ import dev.mesbase.business.production.dao.RoutingProductMapper;
 import dev.mesbase.business.production.dao.WorkorderMapper;
 import dev.mesbase.business.production.dao.MesExecutionPathMapper;
 import dev.mesbase.business.production.dao.MesProductionReportMapper;
+import dev.mesbase.business.production.dao.MesExecutionAssignmentMapper;
+import dev.mesbase.business.production.domain.MesExecutionAssignmentExample;
 import dev.mesbase.business.production.dao.ProductionQuantityMapper;
 import dev.mesbase.business.production.domain.MesProductionReportExample;
 import dev.mesbase.business.production.dao.MesExecutionPathNodeMapper;
@@ -43,6 +45,7 @@ public class ProductionExecutionRules {
     private final ExecutionQualityReferenceQuery quality;
     private final ProductionChainLocks locks;
     private final MesProductionReportMapper reports;
+    private final MesExecutionAssignmentMapper assignments;
     private final ProductionQuantityMapper quantities;
     private final MesExecutionPathMapper paths;
     private final MesExecutionPathNodeMapper pathNodes;
@@ -58,7 +61,9 @@ public class ProductionExecutionRules {
                                     RoutingProductMapper products, MesMaterialIssueMapper issues,
                                     ProductionChainLocks locks, MesExecutionPathMapper paths,
                                     MesExecutionPathNodeMapper pathNodes, MesProductionReportMapper reports,
-                                    ProductionQuantityMapper quantities, ExecutionQualityReferenceQuery quality) {
+                                    ProductionQuantityMapper quantities, ExecutionQualityReferenceQuery quality,
+                                    MesExecutionAssignmentMapper assignments) {
+        this.assignments = assignments;
         this.quality = quality;
         this.reports = reports;
         this.quantities = quantities;
@@ -93,7 +98,7 @@ public class ProductionExecutionRules {
         // WorkOrder/product define identity at creation; routing may be corrected only before facts.
         if (!Objects.equals(old.getWorkorderId(), row.getWorkorderId())
                 || !Objects.equals(old.getProductId(), row.getProductId())) frozen();
-        if (!Objects.equals(old.getRoutingId(), row.getRoutingId()) && paths.selectByPrimaryKey(old.getId()) != null)
+        if (!Objects.equals(old.getRoutingId(), row.getRoutingId()) && (paths.selectByPrimaryKey(old.getId()) != null || hasAssignments(old.getId())))
             frozen();
         boolean reportFacts = hasReports(old.getId());
         boolean facts = started(old) || hasIssues(old.getId()) || reportFacts;
@@ -114,7 +119,7 @@ public class ProductionExecutionRules {
 
     public void deleting(Long id) {
         var row = lock(id);
-        if (started(row) || hasIssues(id) || hasReports(id))
+        if (started(row) || hasIssues(id) || hasReports(id) || hasAssignments(id))
             throw new FoundationException(ErrorCode.EXECUTION_REFERENCED);
         if (quality.hasAnyHistory(id))
             throw new FoundationException(ErrorCode.EXECUTION_QUALITY_REFERENCED);
@@ -126,6 +131,12 @@ public class ProductionExecutionRules {
             pathNodes.deleteByExample(filter);
             if (paths.deleteByPrimaryKey(id) != 1) frozen();
         }
+    }
+
+    private boolean hasAssignments(Long id) {
+        var filter = new MesExecutionAssignmentExample();
+        filter.createCriteria().andExecutionIdEqualTo(id);
+        return assignments.countByExample(filter) > 0;
     }
 
     private boolean hasReports(Long id) {

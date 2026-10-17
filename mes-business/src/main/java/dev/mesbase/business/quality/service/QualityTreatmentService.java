@@ -129,9 +129,13 @@ public class QualityTreatmentService {
                 .orElse(null);
         var type = assessment == null ? Attribution.UNVERIFIED : Attribution.valueOf(assessment.getAttributionType());
         var scrap = sum(rows, MesQualityTreatmentEntity::getScrapQty);
-        var rework = rows.stream().filter(e -> Action.ALLOCATE.name().equals(e.getActionType()))
+        var rework = rows.stream()
+                .filter(e -> Action.ALLOCATE.name().equals(e.getActionType()) || Action.CANCEL_ALLOC.name()
+                        .equals(e.getActionType()))
                 .map(MesQualityTreatmentEntity::getReworkQty).reduce(ZERO, BigDecimal::add);
-        var started = rows.stream().filter(e -> Action.START.name().equals(e.getActionType()))
+        var started = rows.stream()
+                .filter(e -> Action.START.name().equals(e.getActionType()) || Action.CANCEL_START.name()
+                        .equals(e.getActionType()))
                 .map(MesQualityTreatmentEntity::getReworkQty).reduce(ZERO, BigDecimal::add);
         var processed = sum(rows, MesQualityTreatmentEntity::getProcessedQty);
         var recovered = sum(rows, MesQualityTreatmentEntity::getRecoveredQty);
@@ -254,18 +258,60 @@ public class QualityTreatmentService {
                         .signum() <= 0 || c.scrapQty().signum() != 0 || c.processedQty()
                         .signum() != 0 || c.recoveredQty().signum() != 0 || c.failedQty().signum() != 0) fail();
                 var used = s.events().stream().filter(e -> parent.getId().equals(e.getParentId()) && Action.START.name()
-                                .equals(e.getActionType())).map(MesQualityTreatmentEntity::getReworkQty)
+                                .equals(e.getActionType()))
+                        .map(e -> effective(s.events(), e, MesQualityTreatmentEntity::getReworkQty))
                         .reduce(ZERO, BigDecimal::add);
-                if (used.add(c.reworkQty()).compareTo(parent.getReworkQty()) > 0) fail();
+                if (used.add(c.reworkQty())
+                        .compareTo(effective(s.events(), parent, MesQualityTreatmentEntity::getReworkQty)) > 0) fail();
             } else if (c.action() == Action.RESULT) {
                 if (parent == null || !Action.START.name().equals(parent.getActionType()) || c.processedQty()
                         .signum() <= 0 || c.scrapQty().signum() != 0 || c.reworkQty().signum() != 0 || c.recoveredQty()
                         .add(c.failedQty()).compareTo(c.processedQty()) != 0) fail();
                 var used = s.events().stream()
                         .filter(e -> parent.getId().equals(e.getParentId()) && Action.RESULT.name()
-                                .equals(e.getActionType())).map(MesQualityTreatmentEntity::getProcessedQty)
+                                .equals(e.getActionType()))
+                        .map(e -> effective(s.events(), e, MesQualityTreatmentEntity::getProcessedQty))
                         .reduce(ZERO, BigDecimal::add);
-                if (used.add(c.processedQty()).compareTo(parent.getReworkQty()) > 0) fail();
+                if (used.add(c.processedQty())
+                        .compareTo(effective(s.events(), parent, MesQualityTreatmentEntity::getReworkQty)) > 0) fail();
+            } else if (c.action() == Action.CANCEL_ALLOC) {
+                if (parent == null || !Action.ALLOCATE.name().equals(parent.getActionType()) ||
+                        c.processedQty().signum() != 0 || c.recoveredQty().signum() != 0 || c.failedQty()
+                        .signum() != 0 ||
+                        c.scrapQty().add(c.reworkQty()).signum() <= 0) fail();
+                var spent = s.events().stream()
+                        .filter(e -> parent.getId().equals(e.getParentId()) && Action.START.name()
+                                .equals(e.getActionType()))
+                        .map(e -> effective(s.events(), e, MesQualityTreatmentEntity::getReworkQty))
+                        .reduce(ZERO, BigDecimal::add);
+                if (c.scrapQty().compareTo(effective(s.events(), parent, MesQualityTreatmentEntity::getScrapQty)) > 0 ||
+                        c.reworkQty().add(spent)
+                                .compareTo(effective(s.events(), parent, MesQualityTreatmentEntity::getReworkQty)) > 0)
+                    fail();
+            } else if (c.action() == Action.CANCEL_START) {
+                if (parent == null || !Action.START.name().equals(parent.getActionType()) || c.reworkQty()
+                        .signum() <= 0 ||
+                        c.scrapQty().signum() != 0 || c.processedQty().signum() != 0 || c.recoveredQty()
+                        .signum() != 0 || c.failedQty().signum() != 0) fail();
+                var spent = s.events().stream()
+                        .filter(e -> parent.getId().equals(e.getParentId()) && Action.RESULT.name()
+                                .equals(e.getActionType()))
+                        .map(e -> effective(s.events(), e, MesQualityTreatmentEntity::getProcessedQty))
+                        .reduce(ZERO, BigDecimal::add);
+                if (c.reworkQty().add(spent)
+                        .compareTo(effective(s.events(), parent, MesQualityTreatmentEntity::getReworkQty)) > 0) fail();
+            } else if (c.action() == Action.CORRECT_RESULT) {
+                if (parent == null || !Action.RESULT.name().equals(parent.getActionType()) ||
+                        c.scrapQty().signum() != 0 || c.reworkQty().signum() != 0 ||
+                        c.recoveredQty().add(c.failedQty()).compareTo(c.processedQty()) != 0 ||
+                        c.processedQty()
+                                .compareTo(effective(s.events(), parent, MesQualityTreatmentEntity::getProcessedQty)) > 0)
+                    fail();
+                if (c.processedQty()
+                        .compareTo(effective(s.events(), parent, MesQualityTreatmentEntity::getProcessedQty)) == 0 &&
+                        c.recoveredQty()
+                                .compareTo(effective(s.events(), parent, MesQualityTreatmentEntity::getRecoveredQty)) == 0)
+                    fail();
             } else fail();
         }
         var row = new MesQualityTreatmentEntity();
@@ -288,7 +334,20 @@ public class QualityTreatmentService {
         row.setRecoveredQty(c.recoveredQty());
         row.setFailedQty(c.failedQty());
         var parent = c.parentId() == null ? null : events.selectByPrimaryKey(c.parentId());
-        row.setOperatorUserId(c.action() == Action.RESULT ? parent.getOperatorUserId() : SecurityUtils.getUserId());
+        if (c.action() == Action.CANCEL_ALLOC) {
+            row.setScrapQty(c.scrapQty().negate());
+            row.setReworkQty(c.reworkQty().negate());
+        } else if (c.action() == Action.CANCEL_START) row.setReworkQty(c.reworkQty().negate());
+        else if (c.action() == Action.CORRECT_RESULT) {
+            // The command specifies replacement effective quantities; history stores only its signed correction.
+            row.setProcessedQty(c.processedQty()
+                    .subtract(effective(s.events(), parent, MesQualityTreatmentEntity::getProcessedQty)));
+            row.setRecoveredQty(c.recoveredQty()
+                    .subtract(effective(s.events(), parent, MesQualityTreatmentEntity::getRecoveredQty)));
+            row.setFailedQty(c.failedQty()
+                    .subtract(effective(s.events(), parent, MesQualityTreatmentEntity::getFailedQty)));
+        }
+        row.setOperatorUserId((c.action() == Action.RESULT || c.action() == Action.CORRECT_RESULT) ? parent.getOperatorUserId() : SecurityUtils.getUserId());
         row.setConfirmedBy(SecurityUtils.getUserId());
         row.setOccurredAt(c.occurredAt());
         row.setRecordedAt(LocalDateTime.now());
@@ -298,6 +357,19 @@ public class QualityTreatmentService {
         } catch (DuplicateKeyException e) {
             throw new FoundationException(ErrorCode.QUALITY_TREATMENT_CONFLICT, e);
         }
+    }
+
+    private static BigDecimal effective(List<MesQualityTreatmentEntity> rows, MesQualityTreatmentEntity parent,
+                                        Function<MesQualityTreatmentEntity, BigDecimal> field) {
+        String correction = switch (Action.valueOf(parent.getActionType())) {
+            case ALLOCATE -> Action.CANCEL_ALLOC.name();
+            case START -> Action.CANCEL_START.name();
+            case RESULT -> Action.CORRECT_RESULT.name();
+            default -> throw new FoundationException(ErrorCode.QUALITY_TREATMENT_CONFLICT);
+        };
+        return field.apply(parent).add(rows.stream()
+                .filter(e -> parent.getId().equals(e.getParentId()) && correction.equals(e.getActionType()))
+                .map(field).reduce(ZERO, BigDecimal::add));
     }
 
     private String hash(Command c) {

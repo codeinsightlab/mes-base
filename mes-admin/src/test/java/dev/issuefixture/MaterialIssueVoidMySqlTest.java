@@ -14,6 +14,7 @@ import dev.mesbase.business.issue.service.MaterialIssueSubmissionService;
 
 import dev.mesbase.business.production.service.WorkorderErpFacts;
 import dev.mesbase.business.directory.service.BusinessDirectoryService;
+import dev.mesbase.business.quality.service.QualityTreatmentService;
 
 import dev.mesbase.business.issue.service.MaterialIssueErpFacts;
 import dev.mesbase.business.issue.service.MaterialIssueErpService;
@@ -89,7 +90,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 class MaterialIssueVoidMySqlTest {
     @Configuration
     @EnableTransactionManagement
-    @Import({MaterialIssueInputFacts.class, ProductionQuantityService.class, ExecutionQualityReferenceQueryImpl.class, MesProductionExecutionServiceImpl.class, MesMaterialIssueItemServiceImpl.class, ProductionChainLocks.class, ExecutionPathService.class, MaterialIssueSubmissionService.class, WorkorderErpFacts.class, MaterialIssueErpService.class, MaterialIssueErpFacts.class, WorkOrderService.class, RoutingReferenceRules.class, ProductionExecutionRules.class, MaterialIssueRules.class, MaterialIssueVoidService.class, MesMaterialIssueServiceImpl.class, WarehouseIntegration.class})
+    @Import({QualityTreatmentService.class, MaterialIssueInputFacts.class, ProductionQuantityService.class, ExecutionQualityReferenceQueryImpl.class, MesProductionExecutionServiceImpl.class, MesMaterialIssueItemServiceImpl.class, ProductionChainLocks.class, ExecutionPathService.class, MaterialIssueSubmissionService.class, WorkorderErpFacts.class, MaterialIssueErpService.class, MaterialIssueErpFacts.class, WorkOrderService.class, RoutingReferenceRules.class, ProductionExecutionRules.class, MaterialIssueRules.class, MaterialIssueVoidService.class, MesMaterialIssueServiceImpl.class, WarehouseIntegration.class})
     static class Config {
         @Bean
         BusinessDirectoryService directory() {
