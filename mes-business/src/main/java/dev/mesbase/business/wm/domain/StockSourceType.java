@@ -6,7 +6,9 @@ import java.util.LinkedHashMap;
 public enum StockSourceType {
     INVENTORY("库存业务", "INVENTORY"),
     PRODUCTION_RECEIPT("生产交接", "PRODUCTION_RECEIPT"),
-    MATERIAL_ISSUE("生产领料", "MATERIAL_ISSUE");
+    MATERIAL_ISSUE("生产领料", "MATERIAL_ISSUE"),
+    OTHER_RECEIPT("其他入库", "OTHER_RECEIPT"),
+    OTHER_ISSUE("其他出库", "OTHER_ISSUE");
     private final String description;
     private final String value;
 

@@ -1,4 +1,3 @@
-// MES-CODEGEN: scaffold; review required.
 package dev.mesbase.business.wm.controller.vo;
 
 import java.time.LocalDateTime;
@@ -29,7 +28,9 @@ public record WmStockActionVo(
         String operatorUserId,
         LocalDateTime occurredAt,
         LocalDateTime recordedAt,
-        String reason
+        String reason,
+        String documentLineId,
+        String operationId
 ) {
 }
 

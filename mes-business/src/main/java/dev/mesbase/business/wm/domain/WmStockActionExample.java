@@ -1565,6 +1565,136 @@ public class WmStockActionExample {
             addCriterion("reason not between", value1, value2, "reason");
             return (Criteria) this;
         }
+
+        public Criteria andDocumentLineIdIsNull() {
+            addCriterion("document_line_id is null");
+            return (Criteria) this;
+        }
+
+        public Criteria andDocumentLineIdIsNotNull() {
+            addCriterion("document_line_id is not null");
+            return (Criteria) this;
+        }
+
+        public Criteria andDocumentLineIdEqualTo(Long value) {
+            addCriterion("document_line_id =", value, "documentLineId");
+            return (Criteria) this;
+        }
+
+        public Criteria andDocumentLineIdNotEqualTo(Long value) {
+            addCriterion("document_line_id <>", value, "documentLineId");
+            return (Criteria) this;
+        }
+
+        public Criteria andDocumentLineIdGreaterThan(Long value) {
+            addCriterion("document_line_id >", value, "documentLineId");
+            return (Criteria) this;
+        }
+
+        public Criteria andDocumentLineIdGreaterThanOrEqualTo(Long value) {
+            addCriterion("document_line_id >=", value, "documentLineId");
+            return (Criteria) this;
+        }
+
+        public Criteria andDocumentLineIdLessThan(Long value) {
+            addCriterion("document_line_id <", value, "documentLineId");
+            return (Criteria) this;
+        }
+
+        public Criteria andDocumentLineIdLessThanOrEqualTo(Long value) {
+            addCriterion("document_line_id <=", value, "documentLineId");
+            return (Criteria) this;
+        }
+
+        public Criteria andDocumentLineIdIn(List<Long> values) {
+            addCriterion("document_line_id in", values, "documentLineId");
+            return (Criteria) this;
+        }
+
+        public Criteria andDocumentLineIdNotIn(List<Long> values) {
+            addCriterion("document_line_id not in", values, "documentLineId");
+            return (Criteria) this;
+        }
+
+        public Criteria andDocumentLineIdBetween(Long value1, Long value2) {
+            addCriterion("document_line_id between", value1, value2, "documentLineId");
+            return (Criteria) this;
+        }
+
+        public Criteria andDocumentLineIdNotBetween(Long value1, Long value2) {
+            addCriterion("document_line_id not between", value1, value2, "documentLineId");
+            return (Criteria) this;
+        }
+
+        public Criteria andOperationIdIsNull() {
+            addCriterion("operation_id is null");
+            return (Criteria) this;
+        }
+
+        public Criteria andOperationIdIsNotNull() {
+            addCriterion("operation_id is not null");
+            return (Criteria) this;
+        }
+
+        public Criteria andOperationIdEqualTo(String value) {
+            addCriterion("operation_id =", value, "operationId");
+            return (Criteria) this;
+        }
+
+        public Criteria andOperationIdNotEqualTo(String value) {
+            addCriterion("operation_id <>", value, "operationId");
+            return (Criteria) this;
+        }
+
+        public Criteria andOperationIdGreaterThan(String value) {
+            addCriterion("operation_id >", value, "operationId");
+            return (Criteria) this;
+        }
+
+        public Criteria andOperationIdGreaterThanOrEqualTo(String value) {
+            addCriterion("operation_id >=", value, "operationId");
+            return (Criteria) this;
+        }
+
+        public Criteria andOperationIdLessThan(String value) {
+            addCriterion("operation_id <", value, "operationId");
+            return (Criteria) this;
+        }
+
+        public Criteria andOperationIdLessThanOrEqualTo(String value) {
+            addCriterion("operation_id <=", value, "operationId");
+            return (Criteria) this;
+        }
+
+        public Criteria andOperationIdLike(String value) {
+            addCriterion("operation_id like", value, "operationId");
+            return (Criteria) this;
+        }
+
+        public Criteria andOperationIdNotLike(String value) {
+            addCriterion("operation_id not like", value, "operationId");
+            return (Criteria) this;
+        }
+
+        public Criteria andOperationIdIn(List<String> values) {
+            addCriterion("operation_id in", values, "operationId");
+            return (Criteria) this;
+        }
+
+        public Criteria andOperationIdNotIn(List<String> values) {
+            addCriterion("operation_id not in", values, "operationId");
+            return (Criteria) this;
+        }
+
+        public Criteria andOperationIdBetween(String value1, String value2) {
+            addCriterion("operation_id between", value1, value2, "operationId");
+            return (Criteria) this;
+        }
+
+        public Criteria andOperationIdNotBetween(String value1, String value2) {
+            addCriterion("operation_id not between", value1, value2, "operationId");
+            return (Criteria) this;
+        }
     }
 
     public static class Criteria extends GeneratedCriteria {

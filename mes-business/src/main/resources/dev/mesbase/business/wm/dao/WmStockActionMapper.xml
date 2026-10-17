@@ -1,5 +1,4 @@
 <?xml version="1.0" encoding="UTF-8"?>
-
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="dev.mesbase.business.wm.dao.WmStockActionMapper">
   <resultMap id="BaseResultMap" type="dev.mesbase.business.wm.domain.WmStockActionEntity">
@@ -26,6 +25,8 @@
     <result column="occurred_at" jdbcType="TIMESTAMP" property="occurredAt" />
     <result column="recorded_at" jdbcType="TIMESTAMP" property="recordedAt" />
     <result column="reason" jdbcType="VARCHAR" property="reason" />
+    <result column="document_line_id" jdbcType="BIGINT" property="documentLineId" />
+    <result column="operation_id" jdbcType="VARCHAR" property="operationId" />
   </resultMap>
   <sql id="Example_Where_Clause">
     <where>
@@ -86,10 +87,10 @@
     </where>
   </sql>
   <sql id="Base_Column_List">
-    id, request_hash, stock_id, material_id, unit_id, warehouse_id, batch_no, bin_code, 
-    action_type, quantity_delta, available_delta, quantity_before, quantity_after, available_before, 
-    available_after, source_type, source_id, reference_action_id, execution_id, operator_user_id, 
-    occurred_at, recorded_at, reason
+    id, request_hash, stock_id, material_id, unit_id, warehouse_id, batch_no, bin_code,
+    action_type, quantity_delta, available_delta, quantity_before, quantity_after, available_before,
+    available_after, source_type, source_id, reference_action_id, execution_id, operator_user_id,
+    occurred_at, recorded_at, reason, document_line_id, operation_id
   </sql>
   <select id="selectByExample" parameterType="dev.mesbase.business.wm.domain.WmStockActionExample" resultMap="BaseResultMap">
     select
@@ -103,7 +104,7 @@
     </if>
   </select>
   <select id="selectByPrimaryKey" parameterType="String" resultMap="BaseResultMap">
-    select 
+    select
     <include refid="Base_Column_List" />
     from wm_stock_action
     where id = #{id,jdbcType=VARCHAR}
@@ -119,22 +120,24 @@
     </if>
   </delete>
   <insert id="insert" parameterType="dev.mesbase.business.wm.domain.WmStockActionEntity">
-    insert into wm_stock_action (id, request_hash, stock_id, 
-      material_id, unit_id, warehouse_id, 
-      batch_no, bin_code, action_type, 
-      quantity_delta, available_delta, quantity_before, 
-      quantity_after, available_before, available_after, 
-      source_type, source_id, reference_action_id, 
-      execution_id, operator_user_id, occurred_at, 
-      recorded_at, reason)
-    values (#{id,jdbcType=VARCHAR}, #{requestHash,jdbcType=CHAR}, #{stockId,jdbcType=BIGINT}, 
-      #{materialId,jdbcType=BIGINT}, #{unitId,jdbcType=BIGINT}, #{warehouseId,jdbcType=BIGINT}, 
-      #{batchNo,jdbcType=VARCHAR}, #{binCode,jdbcType=VARCHAR}, #{actionType,jdbcType=VARCHAR}, 
-      #{quantityDelta,jdbcType=DECIMAL}, #{availableDelta,jdbcType=DECIMAL}, #{quantityBefore,jdbcType=DECIMAL}, 
-      #{quantityAfter,jdbcType=DECIMAL}, #{availableBefore,jdbcType=DECIMAL}, #{availableAfter,jdbcType=DECIMAL}, 
-      #{sourceType,jdbcType=VARCHAR}, #{sourceId,jdbcType=VARCHAR}, #{referenceActionId,jdbcType=VARCHAR}, 
-      #{executionId,jdbcType=BIGINT}, #{operatorUserId,jdbcType=BIGINT}, #{occurredAt,jdbcType=TIMESTAMP}, 
-      #{recordedAt,jdbcType=TIMESTAMP}, #{reason,jdbcType=VARCHAR})
+    insert into wm_stock_action (id, request_hash, stock_id,
+      material_id, unit_id, warehouse_id,
+      batch_no, bin_code, action_type,
+      quantity_delta, available_delta, quantity_before,
+      quantity_after, available_before, available_after,
+      source_type, source_id, reference_action_id,
+      execution_id, operator_user_id, occurred_at,
+      recorded_at, reason, document_line_id,
+      operation_id)
+    values (#{id,jdbcType=VARCHAR}, #{requestHash,jdbcType=CHAR}, #{stockId,jdbcType=BIGINT},
+      #{materialId,jdbcType=BIGINT}, #{unitId,jdbcType=BIGINT}, #{warehouseId,jdbcType=BIGINT},
+      #{batchNo,jdbcType=VARCHAR}, #{binCode,jdbcType=VARCHAR}, #{actionType,jdbcType=VARCHAR},
+      #{quantityDelta,jdbcType=DECIMAL}, #{availableDelta,jdbcType=DECIMAL}, #{quantityBefore,jdbcType=DECIMAL},
+      #{quantityAfter,jdbcType=DECIMAL}, #{availableBefore,jdbcType=DECIMAL}, #{availableAfter,jdbcType=DECIMAL},
+      #{sourceType,jdbcType=VARCHAR}, #{sourceId,jdbcType=VARCHAR}, #{referenceActionId,jdbcType=VARCHAR},
+      #{executionId,jdbcType=BIGINT}, #{operatorUserId,jdbcType=BIGINT}, #{occurredAt,jdbcType=TIMESTAMP},
+      #{recordedAt,jdbcType=TIMESTAMP}, #{reason,jdbcType=VARCHAR}, #{documentLineId,jdbcType=BIGINT},
+      #{operationId,jdbcType=VARCHAR})
   </insert>
   <insert id="insertSelective" parameterType="dev.mesbase.business.wm.domain.WmStockActionEntity">
     insert into wm_stock_action
@@ -208,6 +211,12 @@
       <if test="reason != null">
         reason,
       </if>
+      <if test="documentLineId != null">
+        document_line_id,
+      </if>
+      <if test="operationId != null">
+        operation_id,
+      </if>
     </trim>
     <trim prefix="values (" suffix=")" suffixOverrides=",">
       <if test="id != null">
@@ -278,6 +287,12 @@
       </if>
       <if test="reason != null">
         #{reason,jdbcType=VARCHAR},
+      </if>
+      <if test="documentLineId != null">
+        #{documentLineId,jdbcType=BIGINT},
+      </if>
+      <if test="operationId != null">
+        #{operationId,jdbcType=VARCHAR},
       </if>
     </trim>
   </insert>
@@ -359,6 +374,12 @@
       <if test="row.reason != null">
         reason = #{row.reason,jdbcType=VARCHAR},
       </if>
+      <if test="row.documentLineId != null">
+        document_line_id = #{row.documentLineId,jdbcType=BIGINT},
+      </if>
+      <if test="row.operationId != null">
+        operation_id = #{row.operationId,jdbcType=VARCHAR},
+      </if>
     </set>
     <if test="example != null">
       <include refid="Update_By_Example_Where_Clause" />
@@ -388,7 +409,9 @@
       operator_user_id = #{row.operatorUserId,jdbcType=BIGINT},
       occurred_at = #{row.occurredAt,jdbcType=TIMESTAMP},
       recorded_at = #{row.recordedAt,jdbcType=TIMESTAMP},
-      reason = #{row.reason,jdbcType=VARCHAR}
+      reason = #{row.reason,jdbcType=VARCHAR},
+      document_line_id = #{row.documentLineId,jdbcType=BIGINT},
+      operation_id = #{row.operationId,jdbcType=VARCHAR}
     <if test="example != null">
       <include refid="Update_By_Example_Where_Clause" />
     </if>
@@ -462,6 +485,12 @@
       <if test="reason != null">
         reason = #{reason,jdbcType=VARCHAR},
       </if>
+      <if test="documentLineId != null">
+        document_line_id = #{documentLineId,jdbcType=BIGINT},
+      </if>
+      <if test="operationId != null">
+        operation_id = #{operationId,jdbcType=VARCHAR},
+      </if>
     </set>
     where id = #{id,jdbcType=VARCHAR}
   </update>
@@ -488,7 +517,9 @@
       operator_user_id = #{operatorUserId,jdbcType=BIGINT},
       occurred_at = #{occurredAt,jdbcType=TIMESTAMP},
       recorded_at = #{recordedAt,jdbcType=TIMESTAMP},
-      reason = #{reason,jdbcType=VARCHAR}
+      reason = #{reason,jdbcType=VARCHAR},
+      document_line_id = #{documentLineId,jdbcType=BIGINT},
+      operation_id = #{operationId,jdbcType=VARCHAR}
     where id = #{id,jdbcType=VARCHAR}
   </update>
   <select id="sumReturns" resultType="java.math.BigDecimal">

@@ -1,0 +1,408 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- MES-CODEGEN: MyBatis Generator standard single-table persistence. -->
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="dev.mesbase.business.wm.dao.WmStockDocumentMapper">
+  <resultMap id="BaseResultMap" type="dev.mesbase.business.wm.domain.WmStockDocumentEntity">
+    <id column="id" jdbcType="BIGINT" property="id" />
+    <result column="document_no" jdbcType="VARCHAR" property="documentNo" />
+    <result column="document_type" jdbcType="VARCHAR" property="documentType" />
+    <result column="status" jdbcType="VARCHAR" property="status" />
+    <result column="reason" jdbcType="VARCHAR" property="reason" />
+    <result column="remark" jdbcType="VARCHAR" property="remark" />
+    <result column="source_workorder_id" jdbcType="BIGINT" property="sourceWorkorderId" />
+    <result column="create_by" jdbcType="VARCHAR" property="createBy" />
+    <result column="create_time" jdbcType="TIMESTAMP" property="createTime" />
+    <result column="update_by" jdbcType="VARCHAR" property="updateBy" />
+    <result column="update_time" jdbcType="TIMESTAMP" property="updateTime" />
+    <result column="posted_by" jdbcType="BIGINT" property="postedBy" />
+    <result column="posted_at" jdbcType="TIMESTAMP" property="postedAt" />
+    <result column="cancelled_by" jdbcType="BIGINT" property="cancelledBy" />
+    <result column="cancelled_at" jdbcType="TIMESTAMP" property="cancelledAt" />
+    <result column="revision" jdbcType="BIGINT" property="revision" />
+    <result column="post_request_id" jdbcType="VARCHAR" property="postRequestId" />
+    <result column="post_request_hash" jdbcType="CHAR" property="postRequestHash" />
+  </resultMap>
+  <sql id="Example_Where_Clause">
+    <where>
+      <foreach collection="oredCriteria" item="criteria" separator="or">
+        <if test="criteria.valid">
+          <trim prefix="(" prefixOverrides="and" suffix=")">
+            <foreach collection="criteria.criteria" item="criterion">
+              <choose>
+                <when test="criterion.noValue">
+                  and ${criterion.condition}
+                </when>
+                <when test="criterion.singleValue">
+                  and ${criterion.condition} #{criterion.value}
+                </when>
+                <when test="criterion.betweenValue">
+                  and ${criterion.condition} #{criterion.value} and #{criterion.secondValue}
+                </when>
+                <when test="criterion.listValue">
+                  and ${criterion.condition}
+                  <foreach close=")" collection="criterion.value" item="listItem" open="(" separator=",">
+                    #{listItem}
+                  </foreach>
+                </when>
+              </choose>
+            </foreach>
+          </trim>
+        </if>
+      </foreach>
+    </where>
+  </sql>
+  <sql id="Update_By_Example_Where_Clause">
+    <where>
+      <foreach collection="example.oredCriteria" item="criteria" separator="or">
+        <if test="criteria.valid">
+          <trim prefix="(" prefixOverrides="and" suffix=")">
+            <foreach collection="criteria.criteria" item="criterion">
+              <choose>
+                <when test="criterion.noValue">
+                  and ${criterion.condition}
+                </when>
+                <when test="criterion.singleValue">
+                  and ${criterion.condition} #{criterion.value}
+                </when>
+                <when test="criterion.betweenValue">
+                  and ${criterion.condition} #{criterion.value} and #{criterion.secondValue}
+                </when>
+                <when test="criterion.listValue">
+                  and ${criterion.condition}
+                  <foreach close=")" collection="criterion.value" item="listItem" open="(" separator=",">
+                    #{listItem}
+                  </foreach>
+                </when>
+              </choose>
+            </foreach>
+          </trim>
+        </if>
+      </foreach>
+    </where>
+  </sql>
+  <sql id="Base_Column_List">
+    id, document_no, document_type, status, reason, remark, source_workorder_id, create_by,
+    create_time, update_by, update_time, posted_by, posted_at, cancelled_by, cancelled_at,
+    revision, post_request_id, post_request_hash
+  </sql>
+  <select id="selectByExample" parameterType="dev.mesbase.business.wm.domain.WmStockDocumentExample" resultMap="BaseResultMap">
+    select
+    <include refid="Base_Column_List" />
+    from wm_stock_document
+    <if test="_parameter != null">
+      <include refid="Example_Where_Clause" />
+    </if>
+    <if test="orderByClause != null">
+      order by ${orderByClause}
+    </if>
+  </select>
+  <select id="selectByPrimaryKey" parameterType="Long" resultMap="BaseResultMap">
+    select
+    <include refid="Base_Column_List" />
+    from wm_stock_document
+    where id = #{id,jdbcType=BIGINT}
+  </select>
+  <delete id="deleteByPrimaryKey" parameterType="Long">
+    delete from wm_stock_document
+    where id = #{id,jdbcType=BIGINT}
+  </delete>
+  <delete id="deleteByExample" parameterType="dev.mesbase.business.wm.domain.WmStockDocumentExample">
+    delete from wm_stock_document
+    <if test="_parameter != null">
+      <include refid="Example_Where_Clause" />
+    </if>
+  </delete>
+  <insert id="insert" keyColumn="id" keyProperty="id" parameterType="dev.mesbase.business.wm.domain.WmStockDocumentEntity" useGeneratedKeys="true">
+    insert into wm_stock_document (document_no, document_type, status,
+      reason, remark, source_workorder_id,
+      create_by, create_time, update_by,
+      update_time, posted_by, posted_at,
+      cancelled_by, cancelled_at, revision,
+      post_request_id, post_request_hash)
+    values (#{documentNo,jdbcType=VARCHAR}, #{documentType,jdbcType=VARCHAR}, #{status,jdbcType=VARCHAR},
+      #{reason,jdbcType=VARCHAR}, #{remark,jdbcType=VARCHAR}, #{sourceWorkorderId,jdbcType=BIGINT},
+      #{createBy,jdbcType=VARCHAR}, #{createTime,jdbcType=TIMESTAMP}, #{updateBy,jdbcType=VARCHAR},
+      #{updateTime,jdbcType=TIMESTAMP}, #{postedBy,jdbcType=BIGINT}, #{postedAt,jdbcType=TIMESTAMP},
+      #{cancelledBy,jdbcType=BIGINT}, #{cancelledAt,jdbcType=TIMESTAMP}, #{revision,jdbcType=BIGINT},
+      #{postRequestId,jdbcType=VARCHAR}, #{postRequestHash,jdbcType=CHAR})
+  </insert>
+  <insert id="insertSelective" keyColumn="id" keyProperty="id" parameterType="dev.mesbase.business.wm.domain.WmStockDocumentEntity" useGeneratedKeys="true">
+    insert into wm_stock_document
+    <trim prefix="(" suffix=")" suffixOverrides=",">
+      <if test="documentNo != null">
+        document_no,
+      </if>
+      <if test="documentType != null">
+        document_type,
+      </if>
+      <if test="status != null">
+        status,
+      </if>
+      <if test="reason != null">
+        reason,
+      </if>
+      <if test="remark != null">
+        remark,
+      </if>
+      <if test="sourceWorkorderId != null">
+        source_workorder_id,
+      </if>
+      <if test="createBy != null">
+        create_by,
+      </if>
+      <if test="createTime != null">
+        create_time,
+      </if>
+      <if test="updateBy != null">
+        update_by,
+      </if>
+      <if test="updateTime != null">
+        update_time,
+      </if>
+      <if test="postedBy != null">
+        posted_by,
+      </if>
+      <if test="postedAt != null">
+        posted_at,
+      </if>
+      <if test="cancelledBy != null">
+        cancelled_by,
+      </if>
+      <if test="cancelledAt != null">
+        cancelled_at,
+      </if>
+      <if test="revision != null">
+        revision,
+      </if>
+      <if test="postRequestId != null">
+        post_request_id,
+      </if>
+      <if test="postRequestHash != null">
+        post_request_hash,
+      </if>
+    </trim>
+    <trim prefix="values (" suffix=")" suffixOverrides=",">
+      <if test="documentNo != null">
+        #{documentNo,jdbcType=VARCHAR},
+      </if>
+      <if test="documentType != null">
+        #{documentType,jdbcType=VARCHAR},
+      </if>
+      <if test="status != null">
+        #{status,jdbcType=VARCHAR},
+      </if>
+      <if test="reason != null">
+        #{reason,jdbcType=VARCHAR},
+      </if>
+      <if test="remark != null">
+        #{remark,jdbcType=VARCHAR},
+      </if>
+      <if test="sourceWorkorderId != null">
+        #{sourceWorkorderId,jdbcType=BIGINT},
+      </if>
+      <if test="createBy != null">
+        #{createBy,jdbcType=VARCHAR},
+      </if>
+      <if test="createTime != null">
+        #{createTime,jdbcType=TIMESTAMP},
+      </if>
+      <if test="updateBy != null">
+        #{updateBy,jdbcType=VARCHAR},
+      </if>
+      <if test="updateTime != null">
+        #{updateTime,jdbcType=TIMESTAMP},
+      </if>
+      <if test="postedBy != null">
+        #{postedBy,jdbcType=BIGINT},
+      </if>
+      <if test="postedAt != null">
+        #{postedAt,jdbcType=TIMESTAMP},
+      </if>
+      <if test="cancelledBy != null">
+        #{cancelledBy,jdbcType=BIGINT},
+      </if>
+      <if test="cancelledAt != null">
+        #{cancelledAt,jdbcType=TIMESTAMP},
+      </if>
+      <if test="revision != null">
+        #{revision,jdbcType=BIGINT},
+      </if>
+      <if test="postRequestId != null">
+        #{postRequestId,jdbcType=VARCHAR},
+      </if>
+      <if test="postRequestHash != null">
+        #{postRequestHash,jdbcType=CHAR},
+      </if>
+    </trim>
+  </insert>
+  <select id="countByExample" parameterType="dev.mesbase.business.wm.domain.WmStockDocumentExample" resultType="java.lang.Long">
+    select count(*) from wm_stock_document
+    <if test="_parameter != null">
+      <include refid="Example_Where_Clause" />
+    </if>
+  </select>
+  <update id="updateByExampleSelective" parameterType="map">
+    update wm_stock_document
+    <set>
+      <if test="row.id != null">
+        id = #{row.id,jdbcType=BIGINT},
+      </if>
+      <if test="row.documentNo != null">
+        document_no = #{row.documentNo,jdbcType=VARCHAR},
+      </if>
+      <if test="row.documentType != null">
+        document_type = #{row.documentType,jdbcType=VARCHAR},
+      </if>
+      <if test="row.status != null">
+        status = #{row.status,jdbcType=VARCHAR},
+      </if>
+      <if test="row.reason != null">
+        reason = #{row.reason,jdbcType=VARCHAR},
+      </if>
+      <if test="row.remark != null">
+        remark = #{row.remark,jdbcType=VARCHAR},
+      </if>
+      <if test="row.sourceWorkorderId != null">
+        source_workorder_id = #{row.sourceWorkorderId,jdbcType=BIGINT},
+      </if>
+      <if test="row.createBy != null">
+        create_by = #{row.createBy,jdbcType=VARCHAR},
+      </if>
+      <if test="row.createTime != null">
+        create_time = #{row.createTime,jdbcType=TIMESTAMP},
+      </if>
+      <if test="row.updateBy != null">
+        update_by = #{row.updateBy,jdbcType=VARCHAR},
+      </if>
+      <if test="row.updateTime != null">
+        update_time = #{row.updateTime,jdbcType=TIMESTAMP},
+      </if>
+      <if test="row.postedBy != null">
+        posted_by = #{row.postedBy,jdbcType=BIGINT},
+      </if>
+      <if test="row.postedAt != null">
+        posted_at = #{row.postedAt,jdbcType=TIMESTAMP},
+      </if>
+      <if test="row.cancelledBy != null">
+        cancelled_by = #{row.cancelledBy,jdbcType=BIGINT},
+      </if>
+      <if test="row.cancelledAt != null">
+        cancelled_at = #{row.cancelledAt,jdbcType=TIMESTAMP},
+      </if>
+      <if test="row.revision != null">
+        revision = #{row.revision,jdbcType=BIGINT},
+      </if>
+      <if test="row.postRequestId != null">
+        post_request_id = #{row.postRequestId,jdbcType=VARCHAR},
+      </if>
+      <if test="row.postRequestHash != null">
+        post_request_hash = #{row.postRequestHash,jdbcType=CHAR},
+      </if>
+    </set>
+    <if test="example != null">
+      <include refid="Update_By_Example_Where_Clause" />
+    </if>
+  </update>
+  <update id="updateByExample" parameterType="map">
+    update wm_stock_document
+    set id = #{row.id,jdbcType=BIGINT},
+      document_no = #{row.documentNo,jdbcType=VARCHAR},
+      document_type = #{row.documentType,jdbcType=VARCHAR},
+      status = #{row.status,jdbcType=VARCHAR},
+      reason = #{row.reason,jdbcType=VARCHAR},
+      remark = #{row.remark,jdbcType=VARCHAR},
+      source_workorder_id = #{row.sourceWorkorderId,jdbcType=BIGINT},
+      create_by = #{row.createBy,jdbcType=VARCHAR},
+      create_time = #{row.createTime,jdbcType=TIMESTAMP},
+      update_by = #{row.updateBy,jdbcType=VARCHAR},
+      update_time = #{row.updateTime,jdbcType=TIMESTAMP},
+      posted_by = #{row.postedBy,jdbcType=BIGINT},
+      posted_at = #{row.postedAt,jdbcType=TIMESTAMP},
+      cancelled_by = #{row.cancelledBy,jdbcType=BIGINT},
+      cancelled_at = #{row.cancelledAt,jdbcType=TIMESTAMP},
+      revision = #{row.revision,jdbcType=BIGINT},
+      post_request_id = #{row.postRequestId,jdbcType=VARCHAR},
+      post_request_hash = #{row.postRequestHash,jdbcType=CHAR}
+    <if test="example != null">
+      <include refid="Update_By_Example_Where_Clause" />
+    </if>
+  </update>
+  <update id="updateByPrimaryKeySelective" parameterType="dev.mesbase.business.wm.domain.WmStockDocumentEntity">
+    update wm_stock_document
+    <set>
+      <if test="documentNo != null">
+        document_no = #{documentNo,jdbcType=VARCHAR},
+      </if>
+      <if test="documentType != null">
+        document_type = #{documentType,jdbcType=VARCHAR},
+      </if>
+      <if test="status != null">
+        status = #{status,jdbcType=VARCHAR},
+      </if>
+      <if test="reason != null">
+        reason = #{reason,jdbcType=VARCHAR},
+      </if>
+      <if test="remark != null">
+        remark = #{remark,jdbcType=VARCHAR},
+      </if>
+      <if test="sourceWorkorderId != null">
+        source_workorder_id = #{sourceWorkorderId,jdbcType=BIGINT},
+      </if>
+      <if test="createBy != null">
+        create_by = #{createBy,jdbcType=VARCHAR},
+      </if>
+      <if test="createTime != null">
+        create_time = #{createTime,jdbcType=TIMESTAMP},
+      </if>
+      <if test="updateBy != null">
+        update_by = #{updateBy,jdbcType=VARCHAR},
+      </if>
+      <if test="updateTime != null">
+        update_time = #{updateTime,jdbcType=TIMESTAMP},
+      </if>
+      <if test="postedBy != null">
+        posted_by = #{postedBy,jdbcType=BIGINT},
+      </if>
+      <if test="postedAt != null">
+        posted_at = #{postedAt,jdbcType=TIMESTAMP},
+      </if>
+      <if test="cancelledBy != null">
+        cancelled_by = #{cancelledBy,jdbcType=BIGINT},
+      </if>
+      <if test="cancelledAt != null">
+        cancelled_at = #{cancelledAt,jdbcType=TIMESTAMP},
+      </if>
+      <if test="revision != null">
+        revision = #{revision,jdbcType=BIGINT},
+      </if>
+      <if test="postRequestId != null">
+        post_request_id = #{postRequestId,jdbcType=VARCHAR},
+      </if>
+      <if test="postRequestHash != null">
+        post_request_hash = #{postRequestHash,jdbcType=CHAR},
+      </if>
+    </set>
+    where id = #{id,jdbcType=BIGINT}
+  </update>
+  <update id="updateByPrimaryKey" parameterType="dev.mesbase.business.wm.domain.WmStockDocumentEntity">
+    update wm_stock_document
+    set document_no = #{documentNo,jdbcType=VARCHAR},
+      document_type = #{documentType,jdbcType=VARCHAR},
+      status = #{status,jdbcType=VARCHAR},
+      reason = #{reason,jdbcType=VARCHAR},
+      remark = #{remark,jdbcType=VARCHAR},
+      source_workorder_id = #{sourceWorkorderId,jdbcType=BIGINT},
+      create_by = #{createBy,jdbcType=VARCHAR},
+      create_time = #{createTime,jdbcType=TIMESTAMP},
+      update_by = #{updateBy,jdbcType=VARCHAR},
+      update_time = #{updateTime,jdbcType=TIMESTAMP},
+      posted_by = #{postedBy,jdbcType=BIGINT},
+      posted_at = #{postedAt,jdbcType=TIMESTAMP},
+      cancelled_by = #{cancelledBy,jdbcType=BIGINT},
+      cancelled_at = #{cancelledAt,jdbcType=TIMESTAMP},
+      revision = #{revision,jdbcType=BIGINT},
+      post_request_id = #{postRequestId,jdbcType=VARCHAR},
+      post_request_hash = #{postRequestHash,jdbcType=CHAR}
+    where id = #{id,jdbcType=BIGINT}
+  </update>
+</mapper>

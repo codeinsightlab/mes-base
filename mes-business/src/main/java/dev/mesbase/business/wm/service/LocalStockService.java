@@ -7,6 +7,7 @@ import dev.mesbase.business.wm.dao.WmInventoryMapper;
 import dev.mesbase.business.wm.dao.WmStockActionMapper;
 import dev.mesbase.business.wm.dao.WmWarehouseMapper;
 import dev.mesbase.business.wm.domain.WmInventoryEntity;
+import dev.mesbase.business.wm.domain.WmStockDocumentLineEntity;
 import dev.mesbase.business.wm.domain.WmInventoryExample;
 import dev.mesbase.business.wm.domain.WmStockActionEntity;
 import dev.mesbase.business.wm.domain.WmStockActionExample;
@@ -264,6 +265,36 @@ public class LocalStockService {
         return change(stock, fact.getId(), hash, type, fact.getQuantityDelta(), StockSourceType.PRODUCTION_RECEIPT, receipt.getId(), fact.getReferenceId(), fact.getExecutionId(), SecurityUtils.getUserId(), fact.getReason());
     }
 
+    /**
+     * The document transaction owns all lines; this owner alone mutates balances and appends facts.
+     */
+    @Transactional(transactionManager = "businessTransactionManager", propagation = Propagation.MANDATORY, rollbackFor = Exception.class)
+    @BusinessCacheEvict(business = WmInventoryResource.PREFIX, scope = BusinessCacheEvict.Scope.LIST_AND_DETAIL)
+    public WmStockActionEntity postDocument(String type, Long documentId, WmStockDocumentLineEntity line,
+                                            String operationId, String actionId, String requestHash, String reason) {
+        var actionType = StockActionType.from(type);
+        var sourceType = StockSourceType.from(type);
+        if (actionType != StockActionType.OTHER_RECEIPT && actionType != StockActionType.OTHER_ISSUE) bad();
+        uuid(operationId);
+        uuid(actionId);
+        decimal(line.getQuantity());
+        if (line.getQuantity().signum() <= 0 || !Objects.equals(documentId, line.getDocumentId())) bad();
+        var stock = lock(line.getStockId());
+        sources.warehouse(BusinessSource.LOCAL.getValue(), stock.getWarehouseId());
+        var material = materials.selectByPrimaryKey(stock.getMaterialId());
+        if (!Objects.equals(stock.getMaterialId(), line.getMaterialId())
+                || !Objects.equals(stock.getWarehouseId(), line.getWarehouseId())
+                || !Objects.equals(stock.getBatchNo(), line.getBatchNo())
+                || !Objects.equals(stock.getBinCode(), line.getBinCode())
+                || material == null || !Objects.equals(material.getUnitId(), line.getUnitId())) conflict();
+        if (actionType == StockActionType.OTHER_ISSUE && (stock.getQuantity().compareTo(line.getQuantity()) < 0
+                || available(stock).compareTo(line.getQuantity()) < 0))
+            throw new FoundationException(ErrorCode.STOCK_INSUFFICIENT);
+        BigDecimal delta = actionType == StockActionType.OTHER_ISSUE ? line.getQuantity().negate() : line.getQuantity();
+        return change(stock, actionId, requestHash, actionType, delta, sourceType, documentId.toString(),
+                null, null, SecurityUtils.getUserId(), reason, line.getId(), operationId);
+    }
+
     @Transactional(transactionManager = "businessTransactionManager", propagation = Propagation.MANDATORY)
     public WmInventoryEntity lock(Long id) {
         var f = new WmInventoryExample();
@@ -288,6 +319,14 @@ public class LocalStockService {
                                        BigDecimal delta, StockSourceType sourceType, String sourceId, String reference,
                                        Long execution,
                                        Long actor, String reason) {
+        return change(stock, id, hash, type, delta, sourceType, sourceId, reference, execution, actor, reason,
+                null, null);
+    }
+
+    private WmStockActionEntity change(WmInventoryEntity stock, String id, String hash, StockActionType type,
+                                       BigDecimal delta, StockSourceType sourceType, String sourceId, String reference,
+                                       Long execution, Long actor, String reason, Long documentLineId,
+                                       String operationId) {
         if (actor == null) conflict();
         var material = materials.selectByPrimaryKey(stock.getMaterialId());
         var warehouse = warehouses.selectByPrimaryKey(stock.getWarehouseId());
@@ -303,6 +342,8 @@ public class LocalStockService {
         var a = new WmStockActionEntity();
         a.setId(id);
         a.setRequestHash(hash);
+        a.setDocumentLineId(documentLineId);
+        a.setOperationId(operationId);
         a.setStockId(stock.getId());
         a.setMaterialId(stock.getMaterialId());
         a.setUnitId(unit.getId());

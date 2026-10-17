@@ -4,6 +4,8 @@ import dev.mesbase.business.shared.enums.EnableStatus;
 import dev.mesbase.business.production.dao.MesWorkorderMaterialMapper;
 import dev.mesbase.business.production.domain.MesWorkorderMaterialExample;
 import dev.mesbase.business.wm.dao.WmStockActionMapper;
+import dev.mesbase.business.wm.dao.WmStockDocumentLineMapper;
+import dev.mesbase.business.wm.domain.WmStockDocumentLineExample;
 import dev.mesbase.business.wm.domain.WmStockActionExample;
 import dev.mesbase.business.issue.dao.MesMaterialIssueInputMapper;
 import dev.mesbase.business.issue.domain.MesMaterialIssueInputExample;
@@ -32,6 +34,7 @@ import org.springframework.stereotype.Component;
 @ConditionalOnProperty(name = "mes.business.enabled", havingValue = "true")
 public class StockReferenceRules {
     private final MesWorkorderMaterialMapper demand;
+    private final WmStockDocumentLineMapper documentLines;
     private final MaterialMapper materials;
     private final WmWarehouseMapper warehouses;
     private final WmInventoryMapper inventories;
@@ -40,7 +43,8 @@ public class StockReferenceRules {
 
     public StockReferenceRules(MaterialMapper materials, WmWarehouseMapper warehouses, WmInventoryMapper inventories,
                                WmStockActionMapper actions, MesMaterialIssueInputMapper inputs,
-                               MesWorkorderMaterialMapper demand) {
+                               MesWorkorderMaterialMapper demand, WmStockDocumentLineMapper documentLines) {
+        this.documentLines = documentLines;
         this.demand = demand;
         this.actions = actions;
         this.inputs = inputs;
@@ -67,7 +71,10 @@ public class StockReferenceRules {
         action.createCriteria().andStockIdEqualTo(id);
         var input = new MesMaterialIssueInputExample();
         input.createCriteria().andStockIdEqualTo(id);
-        return actions.countByExample(action) > 0 || inputs.countByExample(input) > 0;
+        var document = new WmStockDocumentLineExample();
+        document.createCriteria().andStockIdEqualTo(id);
+        return actions.countByExample(action) > 0 || inputs.countByExample(input) > 0
+                || documentLines.countByExample(document) > 0;
     }
 
     private void status(String status) {

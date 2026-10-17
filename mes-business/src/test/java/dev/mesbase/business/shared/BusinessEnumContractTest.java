@@ -22,6 +22,8 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.HashSet;
+import dev.mesbase.business.wm.domain.StockDocumentType;
+import dev.mesbase.business.wm.domain.StockDocumentStatus;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -53,7 +55,9 @@ class BusinessEnumContractTest {
             WorkOrderStatus.class,
             QualityReleaseAction.class,
             ProductionReceiptType.class,
-            EnableStatus.class);
+            EnableStatus.class,
+            StockDocumentType.class,
+            StockDocumentStatus.class);
 
     @Test
     void valuesRoundTripAndOptionsFollowDeclarationOrder() throws Exception {

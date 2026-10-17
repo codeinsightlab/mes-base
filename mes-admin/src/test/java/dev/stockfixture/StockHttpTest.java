@@ -1,5 +1,7 @@
 package dev.stockfixture;
 
+import dev.mesbase.business.wm.dao.WmStockDocumentLineMapper;
+
 import dev.mesbase.acceptance.FactorySnapshotFixture;
 
 import java.io.IOException;
@@ -109,7 +111,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * TEST ONLY: real generated SQL, HTTP authorization and transactions; two separate H2 databases.
  */
 class StockHttpTest {
-    static final Set<Class<?>> MAPPERS = Set.of(WmWarehouseErpExtraMapper.class, MesWorkorderMaterialMapper.class, WmStockActionMapper.class, MesMaterialIssueInputMapper.class, MaterialMapper.class, WmWarehouseMapper.class, WmInventoryMapper.class);
+    static final Set<Class<?>> MAPPERS = Set.of(WmStockDocumentLineMapper.class, WmWarehouseErpExtraMapper.class, MesWorkorderMaterialMapper.class, WmStockActionMapper.class, MesMaterialIssueInputMapper.class, MaterialMapper.class, WmWarehouseMapper.class, WmInventoryMapper.class);
 
     static class Fixture implements AutoCloseable {
         final RuntimeRegistry registry = new RuntimeRegistry();
@@ -158,6 +160,10 @@ class StockHttpTest {
                 jdbc.execute("ALTER TABLE wm_inventory ADD batch_no VARCHAR(128)");
                 jdbc.execute("ALTER TABLE wm_inventory ADD bin_code VARCHAR(64)");
                 jdbc.update("INSERT INTO material(id,code,name,unit_id,material_type,status) VALUES(1,'M1','物料一',1,'ITEM','ENABLED')");
+                String documentDdl = Files.readString(Path.of("mes-admin/src/main/resources/db/business/V38__local_stock_documents.sql"));
+                documentDdl = documentDdl.substring(documentDdl.indexOf("CREATE TABLE wm_stock_document_line"))
+                        .replace(") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT=", ") COMMENT ");
+                jdbc.execute(documentDdl);
                 business.put(id, jdbc);
                 var identity = new DatasourceIdentity("TEST_ONLY_" + id);
                 var factoryId = new FactoryId(id);
@@ -216,6 +222,11 @@ class StockHttpTest {
         @Bean
         MesWorkorderMaterialMapper demandMapper(SqlSessionFactory f) {
             return new SqlSessionTemplate(f).getMapper(MesWorkorderMaterialMapper.class);
+        }
+
+        @Bean
+        WmStockDocumentLineMapper stockDocumentLines(SqlSessionFactory f) {
+            return new SqlSessionTemplate(f).getMapper(WmStockDocumentLineMapper.class);
         }
 
         @Bean

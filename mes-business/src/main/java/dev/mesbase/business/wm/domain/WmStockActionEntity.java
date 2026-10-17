@@ -51,6 +51,10 @@ public class WmStockActionEntity {
 
     private String reason;
 
+    private Long documentLineId;
+
+    private String operationId;
+
     public String getId() {
         return id;
     }
@@ -233,5 +237,21 @@ public class WmStockActionEntity {
 
     public void setReason(String reason) {
         this.reason = reason;
+    }
+
+    public Long getDocumentLineId() {
+        return documentLineId;
+    }
+
+    public void setDocumentLineId(Long documentLineId) {
+        this.documentLineId = documentLineId;
+    }
+
+    public String getOperationId() {
+        return operationId;
+    }
+
+    public void setOperationId(String operationId) {
+        this.operationId = operationId;
     }
 }

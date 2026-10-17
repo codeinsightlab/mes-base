@@ -1,0 +1,137 @@
+package dev.issuefixture;
+
+import java.math.BigDecimal;
+import java.util.List;
+import java.util.UUID;
+import java.util.concurrent.CyclicBarrier;
+import java.util.concurrent.Executors;
+import org.junit.jupiter.api.Test;
+import tools.jackson.databind.ObjectMapper;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+/**
+ * TEST ONLY V2.3: independent H2 scenarios, real services, generated SQL and transactions.
+ */
+class LocalFullChainV23HttpTest {
+    @Test
+    void splitAcceptanceMustRespectEachOriginalHandoverBeforeStrictCompletion() throws Exception {
+        try (var c = ProductionQualityV13HttpTest.context(100, 100, 100, 100, 100)) {
+            var m = MaterialIssueHttpTest.mvc(c);
+            var j = ProductionReceiptHttpTest.db(c);
+            j.update("INSERT INTO wm_inventory(id,material_id,warehouse_id,batch_no,quantity,available_quantity,status) VALUES(1,1,1,'TEST-FINISHED',0,0,'ENABLED')");
+            m.perform(ProductionCoreV1HttpTest.full(post("/api/quality/releases/executions/1"))
+                    .content(ProductionCompletionHttpTest.release("100"))).andExpect(status().isOk());
+            String a = ProductionCompletionHttpTest.handover(m, "40");
+            String b = ProductionCompletionHttpTest.handover(m, "35");
+            String d = ProductionCompletionHttpTest.handover(m, "25");
+            assertEquals(0, j.queryForObject("SELECT quantity FROM wm_inventory WHERE id=1", BigDecimal.class)
+                    .signum());
+            ProductionCompletionHttpTest.accept(m, a, "30");
+            // A physical batch of 45 needs two original handover references (10 + 35).
+            m.perform(ProductionCoreV1HttpTest.full(post("/api/wm/production-acceptances/receipts/" + b))
+                            .content(WarehouseAcceptanceHttpTest.command(UUID.randomUUID().toString(), "45")))
+                    .andExpect(status().isConflict());
+            ProductionCompletionHttpTest.accept(m, a, "10");
+            ProductionCompletionHttpTest.accept(m, b, "35");
+            var state = new ObjectMapper().readTree(m.perform(ProductionCoreV1HttpTest.full(get("/api/production/executions/1/closure")))
+                    .andExpect(jsonPath("accepted").value("75.000000")).andReturn().getResponse().getContentAsString());
+            String body = "{\"requestId\":\"" + UUID.randomUUID() + "\",\"expectedBasisHash\":\"" + state.get("basisHash")
+                    .asString() + "\",\"reason\":\"TEST ONLY V23 split\"}";
+            m.perform(ProductionCoreV1HttpTest.full(post("/api/production/executions/1/actions/complete"))
+                            .content(body))
+                    .andExpect(status().isConflict());
+            ProductionCompletionHttpTest.accept(m, d, "25");
+            m.perform(ProductionCoreV1HttpTest.full(post("/api/production/executions/1/actions/complete"))
+                            .content(body))
+                    .andExpect(status().isOk());
+            assertEquals(0, new BigDecimal("100").compareTo(j.queryForObject("SELECT quantity FROM wm_inventory WHERE id=1", BigDecimal.class)));
+            assertEquals(0, j.queryForObject("SELECT COUNT(*) FROM wm_stock_action WHERE quantity_after<>quantity_before+quantity_delta", Integer.class));
+            assertEquals(1, j.queryForObject("SELECT COUNT(*) FROM mes_execution_completion", Integer.class));
+        }
+    }
+
+    @Test
+    void cancellationAndPositiveReportShareTheWorkorderLockAndKeepCommittedHistory() throws Exception {
+        for (int round = 0; round < 4; round++) {
+            try (var c = ProductionQualityV13HttpTest.context(99, 98, 97, 96, 95);
+                 var pool = Executors.newFixedThreadPool(2)) {
+                var m = MaterialIssueHttpTest.mvc(c);
+                var j = ProductionReceiptHttpTest.db(c);
+                var original = j.queryForList("SELECT * FROM mes_production_report ORDER BY id");
+                String cancel = WorkOrderCancellationHttpTest.body(UUID.randomUUID().toString());
+                String report = ProductionReportHttpTest.supplement(11, "1");
+                var barrier = new CyclicBarrier(2);
+                var a = pool.submit(() -> {
+                    barrier.await();
+                    return m.perform(ProductionCoreV1HttpTest.full(post(WorkOrderCancellationHttpTest.CANCEL))
+                                    .content(cancel))
+                            .andReturn().getResponse().getStatus();
+                });
+                var b = pool.submit(() -> {
+                    barrier.await();
+                    return m.perform(ProductionCoreV1HttpTest.full(post("/api/production/reports/supplements"))
+                                    .content(report))
+                            .andReturn().getResponse().getStatus();
+                });
+                assertEquals(200, a.get());
+                int reportStatus = b.get();
+                assertTrue(List.of(200, 409).contains(reportStatus));
+                if (reportStatus == 200) {
+                    assertEquals(0, j.queryForObject("SELECT COUNT(*) FROM mes_production_report r CROSS JOIN mes_workorder_cancellation c WHERE r.id=(SELECT MAX(id) FROM mes_production_report) AND r.create_time>c.recorded_at", Integer.class));
+                }
+                System.out.println("TEST_V23 CASE09 round=" + round + " cancel=200 report=" + reportStatus);
+                assertEquals(reportStatus == 200 ? 6 : 5, j.queryForObject("SELECT COUNT(*) FROM mes_production_report", Integer.class));
+                for (var row : original)
+                    assertEquals(row, j.queryForMap("SELECT * FROM mes_production_report WHERE id=?", row.get("ID")));
+                assertEquals("CANCELLED", j.queryForObject("SELECT status FROM workorder WHERE id=1", String.class));
+                m.perform(ProductionCoreV1HttpTest.full(post("/api/production/reports/supplements"))
+                                .content(ProductionReportHttpTest.supplement(11, "1"))).andExpect(status().isConflict())
+                        .andExpect(jsonPath("errorCode").value("WORKORDER_CANCELLED"));
+                m.perform(ProductionCoreV1HttpTest.full(post(WorkOrderCancellationHttpTest.CANCEL)).content(cancel))
+                        .andExpect(status().isOk());
+                assertEquals(1, j.queryForObject("SELECT COUNT(*) FROM mes_workorder_cancellation", Integer.class));
+            }
+        }
+    }
+
+    @Test
+    void partialReturnPreservesFrozenInputAndCannotCreateAdditionalProductionCredit() throws Exception {
+        try (var c = ProductionInputHttpTest.context()) {
+            var m = MaterialIssueHttpTest.mvc(c);
+            var j = ProductionInputHttpTest.db(c);
+            j.update("UPDATE wm_inventory SET quantity=0,available_quantity=0 WHERE id=1");
+            LocalWarehouseHttpTest.apply(m, "receipt", "200", "0");
+            String inputBody = ProductionInputHttpTest.command(m, UUID.randomUUID().toString(), "L001", "50");
+            var input = new ObjectMapper().readTree(ProductionInputHttpTest.submit(m, inputBody));
+            var frozen = j.queryForList("SELECT * FROM mes_material_issue_input WHERE issue_id=?", input.get("issueId")
+                    .asString());
+            LocalWarehouseHttpTest.balance(j, "100");
+            String body = LocalWarehouseHttpTest.body(UUID.randomUUID().toString(), "20", "100", input.get("issueId")
+                    .asString());
+            m.perform(ProductionCoreV1HttpTest.full(post(LocalWarehouseHttpTest.ROOT + "return")).content(body))
+                    .andExpect(status().isOk());
+            m.perform(ProductionCoreV1HttpTest.full(post(LocalWarehouseHttpTest.ROOT + "return")).content(body))
+                    .andExpect(status().isOk());
+            ProductionInputHttpTest.submit(m, inputBody);
+            LocalWarehouseHttpTest.balance(j, "120");
+            assertEquals(frozen, j.queryForList("SELECT * FROM mes_material_issue_input WHERE issue_id=?", input.get("issueId")
+                    .asString()));
+            var q = new ObjectMapper().readTree(m.perform(ProductionCoreV1HttpTest.full(get("/api/production/report-quantities/executions/" + input.get("executionId")
+                            .asString())))
+                    .andExpect(status().isOk()).andReturn().getResponse().getContentAsString());
+            assertTrue(new BigDecimal(q.get("productionInputQty").asString()).compareTo(new BigDecimal("50")) <= 0);
+            m.perform(ProductionCoreV1HttpTest.full(post(LocalWarehouseHttpTest.ROOT + "return"))
+                            .content(LocalWarehouseHttpTest.body(UUID.randomUUID().toString(), "81", "120", input.get("issueId")
+                                    .asString())))
+                    .andExpect(status().isConflict());
+            LocalWarehouseHttpTest.balance(j, "120");
+            assertEquals(3, j.queryForObject("SELECT COUNT(*) FROM wm_stock_action WHERE stock_id=1", Integer.class));
+        }
+    }
+}

@@ -13,7 +13,9 @@ public enum StockActionType {
     CORRECTION("业务纠错", "CORRECTION"),
     PRODUCT_RECEIPT("成品仓储接收", "PRODUCT_RECEIPT"),
     PRODUCT_REVERSAL("成品接收逆向", "PRODUCT_REVERSAL"),
-    REVERSAL("原操作撤销", "REVERSAL");
+    REVERSAL("原操作撤销", "REVERSAL"),
+    OTHER_RECEIPT("其他入库", "OTHER_RECEIPT"),
+    OTHER_ISSUE("其他出库", "OTHER_ISSUE");
     private final String description;
     private final String value;
 

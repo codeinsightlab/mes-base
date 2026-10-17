@@ -69,7 +69,9 @@ public class WmStockActionController {
                 row.getOperatorUserId() == null ? null : row.getOperatorUserId().toString(),
                 row.getOccurredAt(),
                 row.getRecordedAt(),
-                row.getReason()
+                row.getReason(),
+                row.getDocumentLineId() == null ? null : row.getDocumentLineId().toString(),
+                row.getOperationId()
         );
     }
 }
