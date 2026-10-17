@@ -45,6 +45,17 @@ public final class FactoryIntegrationRegistry {
                 .sorted((a, b) -> a.reference().compareTo(b.reference())).toList();
     }
 
+    /**
+     * 服务端消费方装配复用现有连接准入，不向 HTTP 响应暴露连接定义。
+     */
+    public Connection requireConnection(String reference) {
+        var connection = reference == null ? null : connections.get(reference);
+        if (connection == null || connection.factoryId() == null || connection.factoryId()
+                .isBlank() || !valid(connection))
+            throw new FoundationException(ErrorCode.INTEGRATION_NOT_CONFIGURED);
+        return connection;
+    }
+
     private boolean valid(Connection connection) {
         if (!connection.enabled() || connection.revision() < 1 || connection.provider() == null
                 || !connection.provider()

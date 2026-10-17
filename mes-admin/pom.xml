@@ -9,6 +9,11 @@
     <artifactId>mes-admin</artifactId>
     <dependencies>
         <dependency>
+            <groupId>com.lixin</groupId>
+            <artifactId>lixin-common-capability-digiwin-e10</artifactId>
+            <version>0.1.0-SNAPSHOT</version>
+        </dependency>
+        <dependency>
             <groupId>dev.mesbase</groupId>
             <artifactId>mes-business</artifactId>
             <version>${project.version}</version>

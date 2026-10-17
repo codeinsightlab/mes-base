@@ -46,6 +46,10 @@ spring:
       max-request-size: 11MB
 
 mes:
+  integration:
+    digiwin-e10:
+      # 消费方手工装配；启用前须显式提供连接引用及完整 endpoint/host/service。
+      enabled: false
   logging:
     http:
       # 普通 HTTP 请求达到该耗时（毫秒）后以 WARN 记录完成摘要。
