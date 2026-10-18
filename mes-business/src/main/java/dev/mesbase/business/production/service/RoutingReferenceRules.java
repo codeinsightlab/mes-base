@@ -5,6 +5,8 @@ import dev.mesbase.business.basic.dao.MaterialMapper;
 import dev.mesbase.business.basic.domain.MaterialEntity;
 import dev.mesbase.business.basic.domain.MaterialExample;
 import dev.mesbase.business.production.dao.OperationMapper;
+import dev.mesbase.business.quality.dao.OperationDefectTypeMapper;
+import dev.mesbase.business.quality.domain.OperationDefectTypeExample;
 import dev.mesbase.business.production.dao.RoutingProductMapper;
 import dev.mesbase.business.production.dao.RoutingNodeMapper;
 import dev.mesbase.business.production.domain.OperationEntity;
@@ -23,13 +25,16 @@ import org.springframework.stereotype.Component;
 @Component
 @ConditionalOnProperty(name = "mes.business.enabled", havingValue = "true")
 public class RoutingReferenceRules {
+    private final OperationDefectTypeMapper defectTypes;
     private final OperationMapper operations;
     private final MaterialMapper materials;
     private final RoutingNodeMapper nodes;
     private final RoutingProductMapper products;
 
     public RoutingReferenceRules(OperationMapper operations, MaterialMapper materials,
-                                 RoutingNodeMapper nodes, RoutingProductMapper products) {
+                                 RoutingNodeMapper nodes, RoutingProductMapper products,
+                                 OperationDefectTypeMapper defectTypes) {
+        this.defectTypes = defectTypes;
         this.operations = operations;
         this.materials = materials;
         this.nodes = nodes;
@@ -85,6 +90,9 @@ public class RoutingReferenceRules {
 
     public void deletingOperations(List<Long> ids) {
         lockOperations(ids, false);
+        var types = new OperationDefectTypeExample();
+        types.createCriteria().andOperationIdIn(ids);
+        if (defectTypes.countByExample(types) > 0) throw new FoundationException(ErrorCode.OPERATION_REFERENCED);
         var filter = new RoutingNodeExample();
         filter.createCriteria().andOperationIdIn(ids);
         if (nodes.countByExample(filter) > 0) {

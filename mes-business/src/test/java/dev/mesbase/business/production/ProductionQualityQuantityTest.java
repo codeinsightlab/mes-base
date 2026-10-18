@@ -5,6 +5,7 @@ import dev.mesbase.business.production.domain.ProductionReportModels;
 import dev.mesbase.business.production.domain.ProductionReportModels.NodeQuantity;
 import dev.mesbase.business.production.domain.ProductionQuantityConflictException;
 import dev.mesbase.business.production.service.ProductionQuantityService;
+import dev.mesbase.business.production.dao.WorkorderMapper;
 import dev.mesbase.business.production.service.ExecutionPathService;
 import dev.mesbase.business.production.service.ExecutionPathService.PathModel;
 import dev.mesbase.business.production.dao.MesProductionExecutionMapper;
@@ -105,7 +106,7 @@ class ProductionQualityQuantityTest {
         when(reports.nodeTotals(1L)).thenReturn(List.of(new ProductionReportModels.NodeTotal(11L, d("10")), new ProductionReportModels.NodeTotal(99L, d("999"))));
         when(quality.nodeTotals(1L)).thenReturn(List.of(new NodeTotal(11L, d("2")), new NodeTotal(99L, d("900"))));
         when(reports.inputBalance(1L)).thenReturn(new ProductionInputBalance(d("100"), d("0")));
-        var service = new ProductionQuantityService(executions, paths, selected, reports, mock(BusinessDirectoryService.class), quality);
+        var service = new ProductionQuantityService(executions, paths, selected, reports, mock(BusinessDirectoryService.class), quality, mock(WorkorderMapper.class));
         var result = service.getExecutionQuantities(1L);
         assertEquals(1, result.nodes().size());
         assertEquals(d("8"), result.nodes().getFirst().effectiveOutputQty());

@@ -20,6 +20,7 @@ import java.time.LocalDateTime;
 import dev.mesbase.business.integration.warehouse.ErpActionResult.Status;
 import dev.mesbase.business.integration.warehouse.ErpActionResult.Mode;
 import java.util.List;
+import dev.mesbase.business.quality.domain.DefectCostCategory;
 import java.util.Map;
 import dev.mesbase.business.quality.domain.ProductionDefectModels.Names;
 
@@ -41,7 +42,9 @@ public class ProductionDefectController {
                           String destinationRemark, String defectQty, LocalDateTime occurredAt,
                           LocalDateTime recordedAt, String discoveredNodeName, String affectedNodeName,
                           String responsibleNodeName, String targetNodeName, String targetWarehouseName,
-                          String responsibleUserName, String reportedByName, String recordedByName) {
+                          String responsibleUserName, String reportedByName, String recordedByName,
+                          String defectTypeId, String defectTypeCodeSnapshot, String defectTypeNameSnapshot,
+                          Integer defectTypeRevision, String costCategory) {
     }
 
     public record Page(List<Version> items, long total, int offset, int limit) {
@@ -60,7 +63,7 @@ public class ProductionDefectController {
 
     public static Version view(MesProductionDefectEntity r, Names names) {
         return new Version(id(r.getId()), r.getDeclarationId(), r.getRevisionNo(), r.getRecordAction(), r.getRevisionReason(), id(r.getExecutionId()), id(r.getAffectedNodeId()), id(r.getDiscoveredNodeId()), id(r.getResponsibleNodeId()), id(r.getResponsibleUserId()), id(r.getTargetNodeId()), id(r.getTargetWarehouseId()), id(r.getReportedBy()), id(r.getRecordedBy()), r.getWasteCategory(), r.getDefectReason(), r.getResponsibilityRemark(), r.getDestinationType(), r.getDestinationRemark(), r.getDefectQty()
-                .toPlainString(), r.getOccurredAt(), r.getRecordedAt(), label(names.nodes(), r.getDiscoveredNodeId()), label(names.nodes(), r.getAffectedNodeId()), label(names.nodes(), r.getResponsibleNodeId()), label(names.nodes(), r.getTargetNodeId()), label(names.warehouses(), r.getTargetWarehouseId()), label(names.users(), r.getResponsibleUserId()), label(names.users(), r.getReportedBy()), label(names.users(), r.getRecordedBy()));
+                .toPlainString(), r.getOccurredAt(), r.getRecordedAt(), label(names.nodes(), r.getDiscoveredNodeId()), label(names.nodes(), r.getAffectedNodeId()), label(names.nodes(), r.getResponsibleNodeId()), label(names.nodes(), r.getTargetNodeId()), label(names.warehouses(), r.getTargetWarehouseId()), label(names.users(), r.getResponsibleUserId()), label(names.users(), r.getReportedBy()), label(names.users(), r.getRecordedBy()), id(r.getDefectTypeId()), r.getDefectTypeCodeSnapshot(), r.getDefectTypeNameSnapshot(), r.getDefectTypeRevision(), r.getCostCategory() == null ? DefectCostCategory.UNKNOWN.name() : r.getCostCategory());
     }
 
     private static String label(Map<Long, String> names, Long id) {
@@ -71,7 +74,7 @@ public class ProductionDefectController {
         return id == null ? null : id.toString();
     }
 
-    private static Acknowledgement result(Result r) {
+    public static Acknowledgement result(Result r) {
         return new Acknowledgement(view(r.record()), r.erp().status() == Status.SUCCEEDED, r.erp()
                 .executionMode() == Mode.CONNECTED, r.erp().executionMode().getValue(), r.erp()
                 .externalReference());

@@ -21,7 +21,6 @@ import dev.mesbase.core.error.FoundationException;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Objects;
-import java.util.Set;
 import java.util.Map;
 import java.util.stream.Collectors;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -73,7 +72,8 @@ public class ProductionReportSubmitService {
         var execution = executions.selectByPrimaryKey(identity.executionId());
         var order = orders.selectByPrimaryKey(identity.workorderId());
         var quantity = quantities.getExecutionQuantities(identity.executionId());
-        boolean ready = WorkOrderStatus.RELEASED.getValue().equals(order.getStatus()) && open(execution.getStatus())
+        boolean ready = WorkOrderStatus.RELEASED.getValue()
+                .equals(order.getStatus()) && ProductionExecutionStatus.allowsNormalReporting(execution.getStatus())
                 && ExecutionPathStatus.LOCKED.getValue().equals(quantity.pathStatus());
         var candidates = new ArrayList<Candidate>();
         Long user = SecurityUtils.getUserId();
@@ -104,7 +104,8 @@ public class ProductionReportSubmitService {
         existing = reports.selectByRequestId(command.requestId());
         if (existing != null) return replay(existing, command, user);
         sources.execution(execution, null);
-        if (!open(execution.getStatus())) throw new FoundationException(ErrorCode.EXECUTION_INVALID);
+        if (!ProductionExecutionStatus.allowsNormalReporting(execution.getStatus()))
+            throw new FoundationException(ErrorCode.EXECUTION_INVALID);
         quantities.validateReportChange(command.executionId(), command.routingNodeId(), command.reportQty());
         eligibility.requireEligible(command.executionId(), command.routingNodeId(), user);
         if (command.workstationId() != null && workstations.selectByPrimaryKey(command.workstationId()) == null)
@@ -140,11 +141,6 @@ public class ProductionReportSubmitService {
                 .compareTo(command.reportQty()) != 0)
             throw new FoundationException(ErrorCode.RESOURCE_CONFLICT);
         return row;
-    }
-
-    private static boolean open(String status) {
-        return Set.of(ProductionExecutionStatus.READY.getValue(), ProductionExecutionStatus.RUNNING.getValue())
-                .contains(status);
     }
 
     private static void validate(Command c) {

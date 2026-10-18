@@ -6,6 +6,9 @@ import dev.mesbase.business.production.domain.ProductionQualityPendingException;
 import dev.mesbase.business.quality.service.ProductionDefectQuantityQuery;
 
 import dev.mesbase.business.production.dao.MesProductionExecutionMapper;
+import dev.mesbase.business.production.dao.WorkorderMapper;
+import dev.mesbase.business.production.domain.WorkOrderStatus;
+import dev.mesbase.business.production.domain.ProductionExecutionStatus;
 import dev.mesbase.business.production.dao.MesExecutionPathNodeMapper;
 import dev.mesbase.business.production.dao.ProductionQuantityMapper;
 import dev.mesbase.business.production.domain.MesExecutionPathNodeExample;
@@ -33,6 +36,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional(transactionManager = "businessTransactionManager", readOnly = true)
 public class ProductionQuantityService {
     private final MesProductionExecutionMapper executions;
+    private final WorkorderMapper orders;
     private final ExecutionPathService paths;
     private final MesExecutionPathNodeMapper pathNodes;
     private final ProductionQuantityMapper quantities;
@@ -41,7 +45,9 @@ public class ProductionQuantityService {
 
     public ProductionQuantityService(MesProductionExecutionMapper executions, ExecutionPathService paths,
                                      MesExecutionPathNodeMapper pathNodes, ProductionQuantityMapper quantities,
-                                     BusinessDirectoryService directory, ProductionDefectQuantityQuery defects) {
+                                     BusinessDirectoryService directory, ProductionDefectQuantityQuery defects,
+                                     WorkorderMapper orders) {
+        this.orders = orders;
         this.executions = executions;
         this.paths = paths;
         this.pathNodes = pathNodes;
@@ -88,9 +94,16 @@ public class ProductionQuantityService {
                     BigDecimal.ZERO, reported, defect, BigDecimal.ZERO, BigDecimal.ZERO, true, quality == null ? BigDecimal.ZERO : quality.recoveredQty(), BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, quality == null ? BigDecimal.ZERO : quality.unverifiedQty(), quality == null ? BigDecimal.ZERO : quality.directDefectQty()));
         }
         boolean locked = ExecutionPathStatus.LOCKED.getValue().equals(model.path().getPathStatus());
+        var order = orders.selectByPrimaryKey(execution.getWorkorderId());
+        String boundary = !locked ? "实际路径尚未锁定，禁止写入报工数量"
+                : order == null || !WorkOrderStatus.RELEASED.getValue().equals(order.getStatus())
+                ? "工单未下达或已作废，禁止继续正常报工"
+                : !ProductionExecutionStatus.allowsNormalReporting(execution.getStatus())
+                ? "执行已关闭或状态非法，禁止继续正常报工" : null;
+        // writable describes normal forward reporting only, not historical correction authorization.
         return new ExecutionQuantity(executionId, execution.getWorkorderId(), execution.getExecutionNo(), execution.getRoutingId(),
                 execution.getTargetQty(), model.path()
-                .getPathStatus(), locked, locked ? null : "实际路径尚未锁定，禁止写入报工数量", List.copyOf(result), label(model.routing()), inputQty, balance.confirmedQty(), balance.reservedQty());
+                .getPathStatus(), boundary == null, boundary, List.copyOf(result), label(model.routing()), inputQty, balance.confirmedQty(), balance.reservedQty());
     }
 
     private static String label(DirectoryLabel label) {
@@ -124,7 +137,8 @@ public class ProductionQuantityService {
     }
 
     public static void validateChange(ExecutionQuantity view, Long nodeId, BigDecimal delta) {
-        if (!view.writable()) unavailable();
+        // Historical corrections retain their formal gates even after normal reporting closes.
+        if (!ExecutionPathStatus.LOCKED.getValue().equals(view.pathStatus())) unavailable();
         var before = calculate(view, null, BigDecimal.ZERO, BigDecimal.ZERO);
         String blocked = positiveReportBlockReason(before, nodeId);
         if (delta.signum() > 0 && blocked != null) throw new ProductionQualityPendingException(blocked);
@@ -195,7 +209,7 @@ public class ProductionQuantityService {
      * Shared by positive submit validation, candidate queries and administrator UI projection.
      */
     public static String positiveReportBlockReason(ExecutionQuantity view, Long nodeId) {
-        if (!view.writable()) return view.boundary() == null ? "实际路径尚未锁定" : view.boundary();
+        if (!ExecutionPathStatus.LOCKED.getValue().equals(view.pathStatus())) return "实际路径尚未锁定";
         NodeQuantity affected = null;
         for (var n : view.nodes()) {
             if (affected == null && n.unverifiedDefectQty().signum() > 0) affected = n;

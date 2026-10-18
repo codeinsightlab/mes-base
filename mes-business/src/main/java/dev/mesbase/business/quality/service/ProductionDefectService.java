@@ -26,6 +26,16 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.annotation.Isolation;
 import org.springframework.dao.DuplicateKeyException;
+import dev.mesbase.business.quality.domain.ProductionDefectV2Models;
+import dev.mesbase.business.quality.domain.QualityTreatmentModels.Attribution;
+import dev.mesbase.business.production.domain.ExecutionPathStatus;
+import dev.mesbase.business.production.dao.MesProductionExecutionMapper;
+import dev.mesbase.business.basic.dao.MaterialMapper;
+import dev.mesbase.core.security.AuthorizationService;
+import dev.mesbase.core.security.AuthenticatedActor;
+import dev.mesbase.core.security.Permission;
+import dev.mesbase.platform.execution.FactoryContext;
+import org.springframework.beans.factory.ObjectProvider;
 import java.math.BigDecimal;
 import dev.mesbase.business.shared.enums.EnableStatus;
 import dev.mesbase.business.quality.domain.DefectRecordAction;
@@ -39,6 +49,7 @@ import java.util.stream.Stream;
 import java.util.stream.Collectors;
 import dev.mesbase.business.quality.domain.ProductionDefectModels.Names;
 import dev.mesbase.business.production.dao.RoutingNodeMapper;
+import dev.mesbase.business.production.domain.RoutingNodeEntity;
 import dev.mesbase.business.production.domain.RoutingNodeExample;
 import dev.mesbase.business.wm.domain.WmWarehouseEntity;
 import java.util.Objects;
@@ -48,11 +59,16 @@ import java.security.NoSuchAlgorithmException;
 import java.nio.charset.StandardCharsets;
 import java.util.HexFormat;
 import dev.mesbase.business.production.service.ProductionQuantityService;
+import dev.mesbase.business.production.service.ExecutionPathValidator;
 
 @Service
 @ConditionalOnProperty(name = "mes.business.enabled", havingValue = "true")
 @Transactional(transactionManager = "businessTransactionManager", readOnly = true)
 public class ProductionDefectService {
+    private final ObjectProvider<AuthorizationService> authorization;
+    private final ObjectProvider<OperationDefectTypeService> defectTypes;
+    private final MesProductionExecutionMapper executions;
+    private final MaterialMapper materials;
     private final MesProductionDefectMapper mapper;
     private final ProductionChainLocks locks;
     private final ExecutionPathService paths;
@@ -67,7 +83,14 @@ public class ProductionDefectService {
                                    ExecutionPathService paths,
                                    WmWarehouseMapper warehouses, BusinessDirectoryService directory,
                                    ProductionDefectErpGateway erp, RoutingNodeMapper routingNodes,
-                                   ProductionQuantityService quantities, QualityTreatmentService treatments) {
+                                   ProductionQuantityService quantities, QualityTreatmentService treatments,
+                                   ObjectProvider<AuthorizationService> authorization,
+                                   ObjectProvider<OperationDefectTypeService> defectTypes,
+                                   MesProductionExecutionMapper executions, MaterialMapper materials) {
+        this.authorization = authorization;
+        this.defectTypes = defectTypes;
+        this.executions = executions;
+        this.materials = materials;
         this.mapper = mapper;
         this.locks = locks;
         this.paths = paths;
@@ -84,11 +107,13 @@ public class ProductionDefectService {
 
     @Transactional(transactionManager = "businessTransactionManager", isolation = Isolation.READ_COMMITTED, rollbackFor = Exception.class)
     public Result create(Command c) {
+        authorizeAssessment(c);
         return execute(DefectRecordAction.CREATE.getValue(), null, c);
     }
 
     @Transactional(transactionManager = "businessTransactionManager", isolation = Isolation.READ_COMMITTED, rollbackFor = Exception.class)
     public Result revise(String id, Command c) {
+        authorizeAssessment(c);
         return execute(DefectRecordAction.REVISE.getValue(), id, c);
     }
 
@@ -98,6 +123,11 @@ public class ProductionDefectService {
     }
 
     private Result execute(String action, String id, Command c) {
+        return execute(action, id, c, null, null);
+    }
+
+    private Result execute(String action, String id, Command c, MesProductionDefectEntity typed,
+                           String typedFingerprint) {
         if (c == null || c.requestKey() == null || c.requestKey().isBlank() || c.requestKey().length() > 64) invalid();
         if (action.equals(DefectRecordAction.CREATE.getValue())) {
             if (c.expectedRevision() != null || c.revisionReason() != null || c.facts() == null) invalid();
@@ -107,7 +137,7 @@ public class ProductionDefectService {
             if (action.equals(DefectRecordAction.VOID.getValue()) && c.facts() != null || action.equals(DefectRecordAction.REVISE.getValue()) && c.facts() == null)
                 invalid();
         }
-        var fingerprint = fingerprint(action, id, c, SecurityUtils.getUserId());
+        var fingerprint = typedFingerprint == null ? fingerprint(action, id, c, SecurityUtils.getUserId()) : typedFingerprint;
         var retry = byKey(c.requestKey());
         if (retry != null) return replay(retry, fingerprint);
         var before = id == null ? null : latest(id);
@@ -127,11 +157,18 @@ public class ProductionDefectService {
         }
         treatments.assertMutable(before);
         Facts facts = action.equals(DefectRecordAction.VOID.getValue()) ? facts(before) : normalize(c.facts());
-        if (!action.equals(DefectRecordAction.VOID.getValue())) facts = validate(facts);
+        if (!action.equals(DefectRecordAction.VOID.getValue())) {
+            if (typed == null && (before == null || before.getDefectTypeId() == null)
+                    && WasteCategory.from(facts.wasteCategory()) == null) invalid();
+            facts = validate(facts);
+        }
         if (!action.equals(DefectRecordAction.VOID.getValue()) && facts.defectQty()
                 .compareTo(quantities.getNodeQuantity(execution, facts.affectedNodeId()).reportedQty()) > 0)
             throw new FoundationException(ErrorCode.REPORT_QUANTITY_CONFLICT);
         apply(row, facts);
+        if (typed != null) copyType(typed, row);
+        else if (before != null) copyType(before, row);
+        row.setCommandVersion(typed == null ? null : "V2");
         row.setDeclarationId(id == null ? UUID.randomUUID().toString() : id);
         row.setRevisionNo(before == null ? 1 : before.getRevisionNo() + 1);
         row.setRecordAction(action);
@@ -153,11 +190,117 @@ public class ProductionDefectService {
         return new Result(row, erp.acknowledge(row));
     }
 
+
+    private boolean permitted(String permission) {
+        var service = authorization.getIfAvailable();
+        return service != null && service.hasPermission(new AuthenticatedActor(SecurityUtils.getAuthentication()
+                        .getName()),
+                FactoryContext.required(), new Permission(permission));
+    }
+
+    private void authorizeAssessment(Command c) {
+        if (c != null && c.assessment() != null && !permitted("business:quality:defect:revise"))
+            throw new FoundationException(ErrorCode.FORBIDDEN);
+    }
+
+    public ProductionDefectV2Models.Context declarationContext(Long executionId, Long nodeId, int offset, int limit) {
+        var node = actualNode(executionId, nodeId);
+        var execution = executions.selectByPrimaryKey(executionId);
+        var product = materials.selectByPrimaryKey(execution.getProductId());
+        if (product == null) invalid();
+        var page = defectTypes.getObject().page(node.getOperationId(), true, offset, limit);
+        return new ProductionDefectV2Models.Context(executionId, nodeId, node.getOperationId(), node.getOperationName(),
+                product.getId(), product.getCode(), product.getName(), page.items(), page.total(), offset, limit,
+                permitted("business:quality:defect:cost:override"));
+    }
+
+    @Transactional(transactionManager = "businessTransactionManager", isolation = Isolation.READ_COMMITTED, rollbackFor = Exception.class)
+    public Result declare(ProductionDefectV2Models.Command c) {
+        if (c == null || c.requestId() == null) invalid();
+        try {
+            if (!UUID.fromString(c.requestId()).toString().equals(c.requestId())) invalid();
+        } catch (IllegalArgumentException e) {
+            invalid();
+        }
+        // Authorization is shared by old/new entry points; no caller can self-assess using create alone.
+        authorizeAssessment(new Command(c.requestId(), null, null, null, c.assessment()));
+        String fp = v2Fingerprint(c);
+        var old = byKey(c.requestId());
+        if (old != null) return replay(old, fp);
+        locks.execution(c.executionId());
+        old = byKey(c.requestId());
+        if (old != null) return replay(old, fp);
+        if (c.defectTypeId() == null || c.expectedTypeRevision() == null || c.costCategory() == null) invalid();
+        var node = actualNode(c.executionId(), c.nodeId());
+        var type = defectTypes.getObject()
+                .lockForDeclaration(node.getOperationId(), c.defectTypeId(), c.expectedTypeRevision(), c.costCategory());
+        if (!Objects.equals(type.getDefaultCostCategory(), c.costCategory()) && !permitted("business:quality:defect:cost:override"))
+            throw new FoundationException(ErrorCode.FORBIDDEN);
+        var typed = new MesProductionDefectEntity();
+        typed.setDefectTypeId(type.getId());
+        typed.setDefectTypeCodeSnapshot(type.getCode());
+        typed.setDefectTypeNameSnapshot(type.getName());
+        typed.setDefectTypeRevision(type.getRevision());
+        typed.setCostCategory(c.costCategory());
+        String reason = trim(c.remark());
+        if (reason == null) reason = type.getName();
+        var facts = new Facts(c.executionId(), c.nodeId(), c.nodeId(), null, c.quantity(), null, reason,
+                null, null, DefectDestination.SAME_NODE.getValue(), c.nodeId(), null, null, c.occurredAt());
+        return execute(DefectRecordAction.CREATE.getValue(), null,
+                new Command(c.requestId(), null, null, facts, c.assessment()), typed, fp);
+    }
+
+    private RoutingNodeEntity actualNode(Long executionId, Long nodeId) {
+        if (executionId == null || nodeId == null) invalid();
+        var p = paths.view(executionId);
+        if (p.path() == null || !ExecutionPathStatus.LOCKED.getValue().equals(p.path().getPathStatus())
+                || !p.selectedNodeIds().contains(nodeId)) throw new FoundationException(ErrorCode.REPORT_PATH_REQUIRED);
+        if (p.routing() == null || !Objects.equals(p.path().getRoutingId(), p.routing().id()))
+            throw new FoundationException(ErrorCode.REPORT_PATH_REQUIRED);
+        ExecutionPathValidator.validate(p.selectedNodeIds(), p.nodes(), p.edges());
+        return p.nodes().stream().filter(n -> n.getId().equals(nodeId)).findFirst()
+                .orElseThrow(() -> new FoundationException(ErrorCode.DEFECT_TYPE_INVALID));
+    }
+
+    private String v2Fingerprint(ProductionDefectV2Models.Command c) {
+        var b = new StringBuilder("V2:");
+        for (Object value : new Object[]{SecurityUtils.getUserId(), c.requestId(), c.executionId(), c.nodeId(), c.defectTypeId(),
+                c.expectedTypeRevision(), c.quantity() == null ? null : c.quantity()
+                .stripTrailingZeros(), c.costCategory(),
+                trim(c.remark()), c.occurredAt() == null ? null : c.occurredAt()
+                .withNano(c.occurredAt().getNano() / 1000 * 1000), c.assessment()}) {
+            String v = value == null ? null : value.toString();
+            b.append(v == null ? "-1:" : v.length() + ":" + v);
+        }
+        try {
+            return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256")
+                    .digest(b.toString().getBytes(StandardCharsets.UTF_8)));
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException(e);
+        }
+    }
+
+    private static void copyType(MesProductionDefectEntity from, MesProductionDefectEntity to) {
+        to.setDefectTypeId(from.getDefectTypeId());
+        to.setDefectTypeCodeSnapshot(from.getDefectTypeCodeSnapshot());
+        to.setDefectTypeNameSnapshot(from.getDefectTypeNameSnapshot());
+        to.setDefectTypeRevision(from.getDefectTypeRevision());
+        to.setCostCategory(from.getCostCategory());
+    }
+
     private Result replay(MesProductionDefectEntity row, String fp) {
         if (!fp.equals(row.getRequestFingerprint()))
             throw new FoundationException(ErrorCode.DEFECT_IDEMPOTENCY_CONFLICT);
         // Acknowledgement is local and has no external side effects, including retries.
         return new Result(row, erp.acknowledge(row));
+    }
+
+    public MesProductionDefectEntity ownRequest(String key) {
+        var row = byKey(key);
+        if (row == null) throw new FoundationException(ErrorCode.NOT_FOUND);
+        if (!Objects.equals(row.getRecordedBy(), SecurityUtils.getUserId()))
+            throw new FoundationException(ErrorCode.FORBIDDEN);
+        return row;
     }
 
     private MesProductionDefectEntity byKey(String key) {
@@ -269,8 +412,7 @@ public class ProductionDefectService {
         if (f.executionId() == null || f.affectedNodeId() == null || f.discoveredNodeId() == null || f.defectQty() == null || f.defectQty()
                 .signum() <= 0 || f.defectQty().scale() > 6 || f.defectQty().precision() - f.defectQty().scale() > 14)
             invalid();
-        if (!WasteCategory.PROCESS.getValue().equals(f.wasteCategory()) && !WasteCategory.MATERIAL.getValue()
-                .equals(f.wasteCategory())) invalid();
+        if (f.wasteCategory() != null && WasteCategory.from(f.wasteCategory()) == null) invalid();
         text(f.defectReason(), true);
         text(f.responsibilityRemark(), false);
         text(f.destinationRemark(), false);

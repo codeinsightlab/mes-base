@@ -20,7 +20,7 @@ public final class ProductionDefectModels {
     public record Facts(@NotNull Long executionId, @NotNull Long affectedNodeId, @NotNull Long discoveredNodeId,
                         Long responsibleNodeId,
                         @NotNull @DecimalMin(value = "0", inclusive = false) @Digits(integer = 14, fraction = 6) BigDecimal defectQty,
-                        @NotBlank String wasteCategory, @NotBlank @Size(max = 500) String defectReason,
+                        String wasteCategory, @NotBlank @Size(max = 500) String defectReason,
                         Long responsibleUserId,
                         @Size(max = 500) String responsibilityRemark, @NotBlank String destinationType,
                         Long targetNodeId,

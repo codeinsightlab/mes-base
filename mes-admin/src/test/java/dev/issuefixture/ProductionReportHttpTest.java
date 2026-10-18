@@ -111,6 +111,39 @@ class ProductionReportHttpTest {
     }
 
     @Test
+    void lifecycleProjectionClosesNormalReportingWithoutDisablingHistoricalCorrection() throws Exception {
+        try (var c = context()) {
+            var m = MaterialIssueHttpTest.mvc(c);
+            var jdbc = c.getBean(MaterialIssueHttpTest.Fixture.class).business.get("A");
+            String q = "/api/production/report-quantities/executions/1";
+            for (String state : List.of("READY", "RUNNING")) {
+                jdbc.update("UPDATE mes_production_execution SET status=? WHERE id=1", state);
+                m.perform(full(get(q), "A")).andExpect(status().isOk()).andExpect(jsonPath("writable").value(true));
+            }
+            long original = add(m, 11, "4");
+            jdbc.update("UPDATE mes_production_execution SET status='COMPLETED' WHERE id=1");
+            m.perform(full(get(q), "A")).andExpect(jsonPath("writable").value(false))
+                    .andExpect(jsonPath("nodes[0].reportedQty").value("4.000000"));
+            // Historical negative correction has its own permissions and quantity constraints.
+            jdbc.update("UPDATE workorder SET status='CANCELLED' WHERE id=1");
+            m.perform(full(get(q), "A")).andExpect(jsonPath("writable").value(false));
+            m.perform(full(post(ROOT + "/" + original + "/adjustments"), "A")
+                            .content("{\"requestId\":\"" + UUID.randomUUID() + "\",\"quantityDelta\":\"-1\",\"reason\":\"TEST ONLY历史订正\"}"))
+                    .andExpect(status().isOk());
+            jdbc.update("UPDATE workorder SET status='DRAFT' WHERE id=1");
+            jdbc.update("UPDATE mes_production_execution SET status='READY' WHERE id=1");
+            m.perform(full(get(q), "A")).andExpect(jsonPath("writable").value(false));
+            jdbc.update("UPDATE workorder SET status='RELEASED' WHERE id=1");
+            jdbc.update("UPDATE mes_execution_path SET path_status='SELECTED' WHERE id=1");
+            m.perform(full(get(q), "A")).andExpect(jsonPath("writable").value(false));
+            jdbc.update("DELETE FROM mes_execution_path_node WHERE execution_id=1");
+            jdbc.update("DELETE FROM mes_execution_path WHERE id=1");
+            m.perform(full(get(q), "A")).andExpect(jsonPath("writable").value(false))
+                    .andExpect(jsonPath("nodes").isEmpty());
+        }
+    }
+
+    @Test
     void sumsExactQuantitiesValidatesUpstreamAndPreservesQualityMeaning() throws Exception {
         try (var c = context()) {
             var m = MaterialIssueHttpTest.mvc(c);

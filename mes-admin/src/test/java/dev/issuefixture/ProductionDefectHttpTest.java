@@ -21,6 +21,7 @@ import org.springframework.web.context.support.AnnotationConfigWebApplicationCon
 import org.springframework.test.web.servlet.MockMvc;
 import org.junit.jupiter.api.Test;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Map;
@@ -54,12 +55,13 @@ class ProductionDefectHttpTest {
 
     }
 
-    static AnnotationConfigWebApplicationContext context() throws Exception {
+    static AnnotationConfigWebApplicationContext context(Class<?>... extras) throws Exception {
         var c = new AnnotationConfigWebApplicationContext();
         c.setServletContext(new MockServletContext());
         c.getEnvironment().getPropertySources()
                 .addFirst(new MapPropertySource("TEST ONLY", Map.of("mes.business.enabled", "true")));
         c.register(MaterialIssueHttpTest.Web.class, Extra.class);
+        if (extras.length > 0) c.register(extras);
         c.refresh();
         when(c.getBean(BusinessDirectoryService.class).historicalUserExists(any())).thenAnswer(x -> Long.valueOf(100)
                 .equals(x.getArgument(0)));
@@ -198,7 +200,12 @@ class ProductionDefectHttpTest {
                                 .contentType("application/json").content(command("forbid", 1, "2")))
                         .andExpect(status().isForbidden());
             m.perform(post(ROOT).header("Authorization", "Bearer CRUD").header("X-Factory-Id", "A")
-                    .contentType("application/json").content(command("ordinary", 0, "1"))).andExpect(status().isOk());
+                            .contentType("application/json").content(command("ordinary", 0, "1")))
+                    .andExpect(status().isForbidden());
+            var ordinary = new ObjectMapper().readTree(command("ordinary", 0, "1"));
+            ((ObjectNode) ordinary).remove("assessment");
+            m.perform(post(ROOT).header("Authorization", "Bearer CRUD").header("X-Factory-Id", "A")
+                    .contentType("application/json").content(ordinary.toString())).andExpect(status().isOk());
             m.perform(post(ROOT).header("Authorization", "Bearer NONE").header("X-Factory-Id", "A")
                             .contentType("application/json").content(command("forbidden", 0, "1")))
                     .andExpect(status().isForbidden());

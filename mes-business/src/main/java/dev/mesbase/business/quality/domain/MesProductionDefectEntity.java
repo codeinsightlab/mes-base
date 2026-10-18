@@ -53,6 +53,18 @@ public class MesProductionDefectEntity {
 
     private LocalDateTime recordedAt;
 
+    private Long defectTypeId;
+
+    private String defectTypeCodeSnapshot;
+
+    private String defectTypeNameSnapshot;
+
+    private Integer defectTypeRevision;
+
+    private String costCategory;
+
+    private String commandVersion;
+
     public Long getId() {
         return id;
     }
@@ -243,5 +255,53 @@ public class MesProductionDefectEntity {
 
     public void setRecordedAt(LocalDateTime recordedAt) {
         this.recordedAt = recordedAt;
+    }
+
+    public Long getDefectTypeId() {
+        return defectTypeId;
+    }
+
+    public void setDefectTypeId(Long defectTypeId) {
+        this.defectTypeId = defectTypeId;
+    }
+
+    public String getDefectTypeCodeSnapshot() {
+        return defectTypeCodeSnapshot;
+    }
+
+    public void setDefectTypeCodeSnapshot(String defectTypeCodeSnapshot) {
+        this.defectTypeCodeSnapshot = defectTypeCodeSnapshot;
+    }
+
+    public String getDefectTypeNameSnapshot() {
+        return defectTypeNameSnapshot;
+    }
+
+    public void setDefectTypeNameSnapshot(String defectTypeNameSnapshot) {
+        this.defectTypeNameSnapshot = defectTypeNameSnapshot;
+    }
+
+    public Integer getDefectTypeRevision() {
+        return defectTypeRevision;
+    }
+
+    public void setDefectTypeRevision(Integer defectTypeRevision) {
+        this.defectTypeRevision = defectTypeRevision;
+    }
+
+    public String getCostCategory() {
+        return costCategory;
+    }
+
+    public void setCostCategory(String costCategory) {
+        this.costCategory = costCategory;
+    }
+
+    public String getCommandVersion() {
+        return commandVersion;
+    }
+
+    public void setCommandVersion(String commandVersion) {
+        this.commandVersion = commandVersion;
     }
 }

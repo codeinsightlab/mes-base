@@ -90,6 +90,9 @@ import dev.mesbase.business.production.dao.MesProductionReportMapper;
 import dev.mesbase.business.production.dao.MesProductionReceiptMapper;
 import dev.mesbase.business.production.dao.ProductionReceiptQueryMapper;
 import dev.mesbase.business.quality.dao.MesProductionDefectMapper;
+import dev.mesbase.business.quality.dao.OperationDefectTypeMapper;
+import dev.mesbase.business.quality.dao.DefectStatisticsExtraMapper;
+import dev.mesbase.core.security.AuthorizationService;
 import dev.mesbase.business.quality.service.ExecutionQualityReferenceQueryImpl;
 import dev.mesbase.business.quality.service.QualityTreatmentService;
 import dev.mesbase.business.quality.dao.MesQualityTreatmentMapper;
@@ -182,7 +185,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * TEST ONLY: real generated SQL, HTTP authorization and transactions; two separate H2 databases.
  */
 class MaterialIssueHttpTest {
-    static final Set<Class<?>> MAPPERS = Set.of(WmStockDocumentMapper.class, WmStockDocumentLineMapper.class, MesWorkorderCancellationMapper.class, WmWarehouseErpExtraMapper.class, MesQualityReleaseMapper.class, MesWarehouseAcceptanceMapper.class, MesExecutionCompletionMapper.class, MesWorkorderMaterialMapper.class, WmStockActionMapper.class, MesExecutionAssignmentMapper.class, MesMaterialIssueInputMapper.class, MesProductionScanIdentityMapper.class, WmInventoryMapper.class, MesProductionReceiptMapper.class, ProductionReceiptQueryMapper.class, MesProductionDefectMapper.class, MesQualityTreatmentMapper.class, WorkstationMapper.class, MesProductionReportMapper.class, ProductionQuantityMapper.class, MesExecutionPathMapper.class, MesExecutionPathNodeMapper.class, MesMaterialIssueSubmissionMapper.class, WorkorderErpExtraMapper.class, MesMaterialIssueErpExtraMapper.class, WorkOrderExtraMapper.class, ProductionBatchMapper.class, BatchRouteNodeMapper.class, RoutingNodeMapper.class, RoutingEdgeMapper.class, OperationMapper.class, MesProductionExecutionMapper.class, MaterialMapper.class, UnitMeasureMapper.class, WmWarehouseMapper.class, RoutingMapper.class, RoutingProductMapper.class, WorkorderMapper.class, MesMaterialIssueMapper.class, MesMaterialIssueItemMapper.class);
+    static final Set<Class<?>> MAPPERS = Set.of(OperationDefectTypeMapper.class, DefectStatisticsExtraMapper.class, WmStockDocumentMapper.class, WmStockDocumentLineMapper.class, MesWorkorderCancellationMapper.class, WmWarehouseErpExtraMapper.class, MesQualityReleaseMapper.class, MesWarehouseAcceptanceMapper.class, MesExecutionCompletionMapper.class, MesWorkorderMaterialMapper.class, WmStockActionMapper.class, MesExecutionAssignmentMapper.class, MesMaterialIssueInputMapper.class, MesProductionScanIdentityMapper.class, WmInventoryMapper.class, MesProductionReceiptMapper.class, ProductionReceiptQueryMapper.class, MesProductionDefectMapper.class, MesQualityTreatmentMapper.class, WorkstationMapper.class, MesProductionReportMapper.class, ProductionQuantityMapper.class, MesExecutionPathMapper.class, MesExecutionPathNodeMapper.class, MesMaterialIssueSubmissionMapper.class, WorkorderErpExtraMapper.class, MesMaterialIssueErpExtraMapper.class, WorkOrderExtraMapper.class, ProductionBatchMapper.class, BatchRouteNodeMapper.class, RoutingNodeMapper.class, RoutingEdgeMapper.class, OperationMapper.class, MesProductionExecutionMapper.class, MaterialMapper.class, UnitMeasureMapper.class, WmWarehouseMapper.class, RoutingMapper.class, RoutingProductMapper.class, WorkorderMapper.class, MesMaterialIssueMapper.class, MesMaterialIssueItemMapper.class);
 
     static class Fixture implements AutoCloseable {
         final RuntimeRegistry registry = new RuntimeRegistry();
@@ -196,13 +199,15 @@ class MaterialIssueHttpTest {
             for (String id : List.of("A", "B")) {
                 var source = source();
                 var jdbc = new JdbcTemplate(source);
-                for (String name : List.of("V2__simple_business_capabilities.sql", "V3__operation_routing.sql", "V4__routing_operation_instruction_snapshot.sql", "V9__routing_graph.sql", "V8__warehouse_inventory.sql", "V11__material_issue.sql", "V12__material_issue_quantity_precision.sql", "V13__workorder_batch_route.sql", "V16__production_execution.sql", "V18__material_issue_void.sql", "V19__local_void_external_effect.sql", "V20__material_issue_erp_extra.sql", "V21__workorder_external_extra.sql", "V22__unverified_legacy_erp_provider.sql", "V23__production_core_v1.sql", "V24__operation_user_execution_assignment.sql", "V25__production_report_ledger.sql", "V26__production_defect.sql", "V27__production_report_request.sql", "V28__production_receipt.sql", "V29__single_material_production_input.sql", "V32__quality_treatment_facts.sql", "V33__admin_report_command_fingerprint.sql", "V34__local_stock_action.sql", "V35__local_production_closure.sql", "V36__business_source_isolation.sql", "V37__workorder_cancellation.sql", "V38__local_stock_documents.sql")) {
+                for (String name : List.of("V2__simple_business_capabilities.sql", "V3__operation_routing.sql", "V4__routing_operation_instruction_snapshot.sql", "V9__routing_graph.sql", "V8__warehouse_inventory.sql", "V11__material_issue.sql", "V12__material_issue_quantity_precision.sql", "V13__workorder_batch_route.sql", "V16__production_execution.sql", "V18__material_issue_void.sql", "V19__local_void_external_effect.sql", "V20__material_issue_erp_extra.sql", "V21__workorder_external_extra.sql", "V22__unverified_legacy_erp_provider.sql", "V23__production_core_v1.sql", "V24__operation_user_execution_assignment.sql", "V25__production_report_ledger.sql", "V26__production_defect.sql", "V27__production_report_request.sql", "V28__production_receipt.sql", "V29__single_material_production_input.sql", "V32__quality_treatment_facts.sql", "V33__admin_report_command_fingerprint.sql", "V34__local_stock_action.sql", "V35__local_production_closure.sql", "V36__business_source_isolation.sql", "V37__workorder_cancellation.sql", "V38__local_stock_documents.sql", "V39__operation_defect_types_and_cost.sql")) {
                     String ddl = Files.readString(Path.of("mes-admin/src/main/resources/db/business/" + name))
                             .replace(") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT=", ") COMMENT ")
                             .replaceAll("(?m)^\\s*factory_id [^\\n]+\\n", "")
                             .replace("factory_id,", "")
                             .replace("factory_id, ", "")
                             .replace(" CHARACTER SET utf8mb4 COLLATE utf8mb4_bin", "");
+                    if (name.equals("V39__operation_defect_types_and_cost.sql"))
+                        ddl = ddl.replace("MODIFY COLUMN", "ALTER COLUMN");
                     if (name.equals("V18__material_issue_void.sql"))
                         ddl = ddl.replace(",\n ADD COLUMN", ";\nALTER TABLE mes_material_issue ADD COLUMN");
                     if (name.equals("V20__material_issue_erp_extra.sql"))
@@ -379,6 +384,22 @@ class MaterialIssueHttpTest {
         }
 
         @Bean
+        OperationDefectTypeMapper operationDefectTypeMapper(SqlSessionFactory f) {
+            return new SqlSessionTemplate(f).getMapper(OperationDefectTypeMapper.class);
+        }
+
+        @Bean
+        DefectStatisticsExtraMapper defectStatisticsExtraMapper(SqlSessionFactory f) {
+            return new SqlSessionTemplate(f).getMapper(DefectStatisticsExtraMapper.class);
+        }
+
+        @Bean
+        AuthorizationService qualityAuthorization() {
+            return (actor, scope, permission) -> "full".equals(actor.id()) || "revise".equals(actor.id()) && permission.code()
+                    .equals("business:quality:defect:revise");
+        }
+
+        @Bean
         MesQualityReleaseMapper mesQualityReleaseMapper(SqlSessionFactory f) {
             return new SqlSessionTemplate(f).getMapper(MesQualityReleaseMapper.class);
         }
@@ -541,7 +562,7 @@ class MaterialIssueHttpTest {
                 if (value == null) return null;
                 var user = new SysUser();
                 user.setUserId(1L);
-                user.setUserName(value.endsWith("NONE") ? "none" : value.endsWith("CRUD") ? "crud" : "full");
+                user.setUserName(value.endsWith("NONE") ? "none" : value.endsWith("CRUD") ? "crud" : value.endsWith("CREATE") ? "create" : value.endsWith("REVISE") ? "revise" : "full");
                 return new LoginUser(1L, 1L, user, Set.of());
             });
             return http.csrf(c -> c.disable())
@@ -553,7 +574,12 @@ class MaterialIssueHttpTest {
             try {
                 var f = fixture();
                 r.addInterceptor(new FoundationAccessInterceptor(new FactorySelectionService(f.catalog, new InMemoryFactoryPreference()),
-                        (actor, scope, permission) -> "full".equals(actor.id()) || "crud".equals(actor.id()) && (permission.code()
+                        (actor, scope, permission) -> "full".equals(actor.id())
+                                || "create".equals(actor.id()) && permission.code()
+                                .equals("business:quality:defect:create")
+                                || "revise".equals(actor.id()) && permission.code()
+                                .equals("business:quality:defect:revise")
+                                || "crud".equals(actor.id()) && (permission.code()
                                 .endsWith(":list") || permission.code().endsWith(":query") || permission.code()
                                 .equals("business:quality:defect:read") || permission.code()
                                 .equals("business:quality:defect:create"))));

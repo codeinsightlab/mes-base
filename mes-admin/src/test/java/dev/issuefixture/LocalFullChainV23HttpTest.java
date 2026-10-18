@@ -20,6 +20,65 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  */
 class LocalFullChainV23HttpTest {
     @Test
+    void receiptReversalAndPhysicalAcceptanceCannotSpendTheSameRemainingHandover() throws Exception {
+        try (var c = ProductionReceiptHttpTest.context(); var pool = Executors.newFixedThreadPool(2)) {
+            var m = MaterialIssueHttpTest.mvc(c);
+            var j = ProductionReceiptHttpTest.db(c);
+            String receipt = WarehouseAcceptanceHttpTest.fixture(m, j);
+            var original = j.queryForMap("SELECT * FROM mes_production_receipt WHERE id=?", receipt);
+            var barrier = new CyclicBarrier(2);
+            var reverse = pool.submit(() -> {
+                barrier.await();
+                return m.perform(ProductionCoreV1HttpTest.full(post("/api/production/receipts/" + receipt + "/reverse"))
+                                .content(ProductionReceiptHttpTest.reverse("60", UUID.randomUUID().toString())))
+                        .andReturn().getResponse().getStatus();
+            });
+            var accept = pool.submit(() -> {
+                barrier.await();
+                return m.perform(ProductionCoreV1HttpTest.full(post("/api/wm/production-acceptances/receipts/" + receipt))
+                                .content(WarehouseAcceptanceHttpTest.command(UUID.randomUUID().toString(), "60")))
+                        .andReturn().getResponse().getStatus();
+            });
+            var result = List.of(reverse.get(), accept.get());
+            assertTrue(result.contains(200) && result.contains(409));
+            assertEquals(original, j.queryForMap("SELECT * FROM mes_production_receipt WHERE id=?", receipt));
+            BigDecimal handover = j.queryForObject("SELECT SUM(quantity_delta) FROM mes_production_receipt", BigDecimal.class);
+            BigDecimal accepted = j.queryForObject("SELECT COALESCE(SUM(quantity_delta),0) FROM mes_warehouse_acceptance", BigDecimal.class);
+            assertTrue(handover.compareTo(accepted) >= 0);
+            assertEquals(0, accepted.compareTo(j.queryForObject("SELECT quantity FROM wm_inventory WHERE id=1", BigDecimal.class)));
+            System.out.println("TEST_V23 exploratory receipt-reversal/acceptance statuses=" + result);
+        }
+    }
+
+    @Test
+    void simultaneousQualityBasisChangeNeverLeavesAnEffectiveStaleRelease() throws Exception {
+        try (var c = ProductionQualityV13HttpTest.context(100, 100, 100, 100, 100);
+             var pool = Executors.newFixedThreadPool(2)) {
+            var m = MaterialIssueHttpTest.mvc(c);
+            var j = ProductionReceiptHttpTest.db(c);
+            var reports = j.queryForList("SELECT * FROM mes_production_report ORDER BY id");
+            var barrier = new CyclicBarrier(2);
+            var release = pool.submit(() -> {
+                barrier.await();
+                return m.perform(ProductionCoreV1HttpTest.full(post("/api/quality/releases/executions/1"))
+                        .content(ProductionCompletionHttpTest.release("100"))).andReturn().getResponse().getStatus();
+            });
+            var defect = pool.submit(() -> {
+                barrier.await();
+                return ProductionQualityV13HttpTest.defect(m, 12, "10", "INDEPENDENT", null);
+            });
+            int releaseStatus = release.get();
+            assertTrue(List.of(200, 409).contains(releaseStatus));
+            assertTrue(defect.get() != null);
+            m.perform(ProductionCoreV1HttpTest.full(get("/api/quality/releases/executions/1")))
+                    .andExpect(status().isOk()).andExpect(jsonPath("released").value("0"));
+            assertEquals(releaseStatus == 200 ? 1 : 0, j.queryForObject("SELECT COUNT(*) FROM mes_quality_release", Integer.class));
+            assertEquals(reports, j.queryForList("SELECT * FROM mes_production_report ORDER BY id"));
+            System.out.println("TEST_V23 exploratory quality-basis/release releaseStatus=" + releaseStatus);
+        }
+    }
+
+    @Test
     void splitAcceptanceMustRespectEachOriginalHandoverBeforeStrictCompletion() throws Exception {
         try (var c = ProductionQualityV13HttpTest.context(100, 100, 100, 100, 100)) {
             var m = MaterialIssueHttpTest.mvc(c);

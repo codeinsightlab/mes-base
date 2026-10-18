@@ -1635,6 +1635,406 @@ public class MesProductionDefectExample {
             addCriterion("recorded_at not between", value1, value2, "recordedAt");
             return (Criteria) this;
         }
+
+        public Criteria andDefectTypeIdIsNull() {
+            addCriterion("defect_type_id is null");
+            return (Criteria) this;
+        }
+
+        public Criteria andDefectTypeIdIsNotNull() {
+            addCriterion("defect_type_id is not null");
+            return (Criteria) this;
+        }
+
+        public Criteria andDefectTypeIdEqualTo(Long value) {
+            addCriterion("defect_type_id =", value, "defectTypeId");
+            return (Criteria) this;
+        }
+
+        public Criteria andDefectTypeIdNotEqualTo(Long value) {
+            addCriterion("defect_type_id <>", value, "defectTypeId");
+            return (Criteria) this;
+        }
+
+        public Criteria andDefectTypeIdGreaterThan(Long value) {
+            addCriterion("defect_type_id >", value, "defectTypeId");
+            return (Criteria) this;
+        }
+
+        public Criteria andDefectTypeIdGreaterThanOrEqualTo(Long value) {
+            addCriterion("defect_type_id >=", value, "defectTypeId");
+            return (Criteria) this;
+        }
+
+        public Criteria andDefectTypeIdLessThan(Long value) {
+            addCriterion("defect_type_id <", value, "defectTypeId");
+            return (Criteria) this;
+        }
+
+        public Criteria andDefectTypeIdLessThanOrEqualTo(Long value) {
+            addCriterion("defect_type_id <=", value, "defectTypeId");
+            return (Criteria) this;
+        }
+
+        public Criteria andDefectTypeIdIn(List<Long> values) {
+            addCriterion("defect_type_id in", values, "defectTypeId");
+            return (Criteria) this;
+        }
+
+        public Criteria andDefectTypeIdNotIn(List<Long> values) {
+            addCriterion("defect_type_id not in", values, "defectTypeId");
+            return (Criteria) this;
+        }
+
+        public Criteria andDefectTypeIdBetween(Long value1, Long value2) {
+            addCriterion("defect_type_id between", value1, value2, "defectTypeId");
+            return (Criteria) this;
+        }
+
+        public Criteria andDefectTypeIdNotBetween(Long value1, Long value2) {
+            addCriterion("defect_type_id not between", value1, value2, "defectTypeId");
+            return (Criteria) this;
+        }
+
+        public Criteria andDefectTypeCodeSnapshotIsNull() {
+            addCriterion("defect_type_code_snapshot is null");
+            return (Criteria) this;
+        }
+
+        public Criteria andDefectTypeCodeSnapshotIsNotNull() {
+            addCriterion("defect_type_code_snapshot is not null");
+            return (Criteria) this;
+        }
+
+        public Criteria andDefectTypeCodeSnapshotEqualTo(String value) {
+            addCriterion("defect_type_code_snapshot =", value, "defectTypeCodeSnapshot");
+            return (Criteria) this;
+        }
+
+        public Criteria andDefectTypeCodeSnapshotNotEqualTo(String value) {
+            addCriterion("defect_type_code_snapshot <>", value, "defectTypeCodeSnapshot");
+            return (Criteria) this;
+        }
+
+        public Criteria andDefectTypeCodeSnapshotGreaterThan(String value) {
+            addCriterion("defect_type_code_snapshot >", value, "defectTypeCodeSnapshot");
+            return (Criteria) this;
+        }
+
+        public Criteria andDefectTypeCodeSnapshotGreaterThanOrEqualTo(String value) {
+            addCriterion("defect_type_code_snapshot >=", value, "defectTypeCodeSnapshot");
+            return (Criteria) this;
+        }
+
+        public Criteria andDefectTypeCodeSnapshotLessThan(String value) {
+            addCriterion("defect_type_code_snapshot <", value, "defectTypeCodeSnapshot");
+            return (Criteria) this;
+        }
+
+        public Criteria andDefectTypeCodeSnapshotLessThanOrEqualTo(String value) {
+            addCriterion("defect_type_code_snapshot <=", value, "defectTypeCodeSnapshot");
+            return (Criteria) this;
+        }
+
+        public Criteria andDefectTypeCodeSnapshotLike(String value) {
+            addCriterion("defect_type_code_snapshot like", value, "defectTypeCodeSnapshot");
+            return (Criteria) this;
+        }
+
+        public Criteria andDefectTypeCodeSnapshotNotLike(String value) {
+            addCriterion("defect_type_code_snapshot not like", value, "defectTypeCodeSnapshot");
+            return (Criteria) this;
+        }
+
+        public Criteria andDefectTypeCodeSnapshotIn(List<String> values) {
+            addCriterion("defect_type_code_snapshot in", values, "defectTypeCodeSnapshot");
+            return (Criteria) this;
+        }
+
+        public Criteria andDefectTypeCodeSnapshotNotIn(List<String> values) {
+            addCriterion("defect_type_code_snapshot not in", values, "defectTypeCodeSnapshot");
+            return (Criteria) this;
+        }
+
+        public Criteria andDefectTypeCodeSnapshotBetween(String value1, String value2) {
+            addCriterion("defect_type_code_snapshot between", value1, value2, "defectTypeCodeSnapshot");
+            return (Criteria) this;
+        }
+
+        public Criteria andDefectTypeCodeSnapshotNotBetween(String value1, String value2) {
+            addCriterion("defect_type_code_snapshot not between", value1, value2, "defectTypeCodeSnapshot");
+            return (Criteria) this;
+        }
+
+        public Criteria andDefectTypeNameSnapshotIsNull() {
+            addCriterion("defect_type_name_snapshot is null");
+            return (Criteria) this;
+        }
+
+        public Criteria andDefectTypeNameSnapshotIsNotNull() {
+            addCriterion("defect_type_name_snapshot is not null");
+            return (Criteria) this;
+        }
+
+        public Criteria andDefectTypeNameSnapshotEqualTo(String value) {
+            addCriterion("defect_type_name_snapshot =", value, "defectTypeNameSnapshot");
+            return (Criteria) this;
+        }
+
+        public Criteria andDefectTypeNameSnapshotNotEqualTo(String value) {
+            addCriterion("defect_type_name_snapshot <>", value, "defectTypeNameSnapshot");
+            return (Criteria) this;
+        }
+
+        public Criteria andDefectTypeNameSnapshotGreaterThan(String value) {
+            addCriterion("defect_type_name_snapshot >", value, "defectTypeNameSnapshot");
+            return (Criteria) this;
+        }
+
+        public Criteria andDefectTypeNameSnapshotGreaterThanOrEqualTo(String value) {
+            addCriterion("defect_type_name_snapshot >=", value, "defectTypeNameSnapshot");
+            return (Criteria) this;
+        }
+
+        public Criteria andDefectTypeNameSnapshotLessThan(String value) {
+            addCriterion("defect_type_name_snapshot <", value, "defectTypeNameSnapshot");
+            return (Criteria) this;
+        }
+
+        public Criteria andDefectTypeNameSnapshotLessThanOrEqualTo(String value) {
+            addCriterion("defect_type_name_snapshot <=", value, "defectTypeNameSnapshot");
+            return (Criteria) this;
+        }
+
+        public Criteria andDefectTypeNameSnapshotLike(String value) {
+            addCriterion("defect_type_name_snapshot like", value, "defectTypeNameSnapshot");
+            return (Criteria) this;
+        }
+
+        public Criteria andDefectTypeNameSnapshotNotLike(String value) {
+            addCriterion("defect_type_name_snapshot not like", value, "defectTypeNameSnapshot");
+            return (Criteria) this;
+        }
+
+        public Criteria andDefectTypeNameSnapshotIn(List<String> values) {
+            addCriterion("defect_type_name_snapshot in", values, "defectTypeNameSnapshot");
+            return (Criteria) this;
+        }
+
+        public Criteria andDefectTypeNameSnapshotNotIn(List<String> values) {
+            addCriterion("defect_type_name_snapshot not in", values, "defectTypeNameSnapshot");
+            return (Criteria) this;
+        }
+
+        public Criteria andDefectTypeNameSnapshotBetween(String value1, String value2) {
+            addCriterion("defect_type_name_snapshot between", value1, value2, "defectTypeNameSnapshot");
+            return (Criteria) this;
+        }
+
+        public Criteria andDefectTypeNameSnapshotNotBetween(String value1, String value2) {
+            addCriterion("defect_type_name_snapshot not between", value1, value2, "defectTypeNameSnapshot");
+            return (Criteria) this;
+        }
+
+        public Criteria andDefectTypeRevisionIsNull() {
+            addCriterion("defect_type_revision is null");
+            return (Criteria) this;
+        }
+
+        public Criteria andDefectTypeRevisionIsNotNull() {
+            addCriterion("defect_type_revision is not null");
+            return (Criteria) this;
+        }
+
+        public Criteria andDefectTypeRevisionEqualTo(Integer value) {
+            addCriterion("defect_type_revision =", value, "defectTypeRevision");
+            return (Criteria) this;
+        }
+
+        public Criteria andDefectTypeRevisionNotEqualTo(Integer value) {
+            addCriterion("defect_type_revision <>", value, "defectTypeRevision");
+            return (Criteria) this;
+        }
+
+        public Criteria andDefectTypeRevisionGreaterThan(Integer value) {
+            addCriterion("defect_type_revision >", value, "defectTypeRevision");
+            return (Criteria) this;
+        }
+
+        public Criteria andDefectTypeRevisionGreaterThanOrEqualTo(Integer value) {
+            addCriterion("defect_type_revision >=", value, "defectTypeRevision");
+            return (Criteria) this;
+        }
+
+        public Criteria andDefectTypeRevisionLessThan(Integer value) {
+            addCriterion("defect_type_revision <", value, "defectTypeRevision");
+            return (Criteria) this;
+        }
+
+        public Criteria andDefectTypeRevisionLessThanOrEqualTo(Integer value) {
+            addCriterion("defect_type_revision <=", value, "defectTypeRevision");
+            return (Criteria) this;
+        }
+
+        public Criteria andDefectTypeRevisionIn(List<Integer> values) {
+            addCriterion("defect_type_revision in", values, "defectTypeRevision");
+            return (Criteria) this;
+        }
+
+        public Criteria andDefectTypeRevisionNotIn(List<Integer> values) {
+            addCriterion("defect_type_revision not in", values, "defectTypeRevision");
+            return (Criteria) this;
+        }
+
+        public Criteria andDefectTypeRevisionBetween(Integer value1, Integer value2) {
+            addCriterion("defect_type_revision between", value1, value2, "defectTypeRevision");
+            return (Criteria) this;
+        }
+
+        public Criteria andDefectTypeRevisionNotBetween(Integer value1, Integer value2) {
+            addCriterion("defect_type_revision not between", value1, value2, "defectTypeRevision");
+            return (Criteria) this;
+        }
+
+        public Criteria andCostCategoryIsNull() {
+            addCriterion("cost_category is null");
+            return (Criteria) this;
+        }
+
+        public Criteria andCostCategoryIsNotNull() {
+            addCriterion("cost_category is not null");
+            return (Criteria) this;
+        }
+
+        public Criteria andCostCategoryEqualTo(String value) {
+            addCriterion("cost_category =", value, "costCategory");
+            return (Criteria) this;
+        }
+
+        public Criteria andCostCategoryNotEqualTo(String value) {
+            addCriterion("cost_category <>", value, "costCategory");
+            return (Criteria) this;
+        }
+
+        public Criteria andCostCategoryGreaterThan(String value) {
+            addCriterion("cost_category >", value, "costCategory");
+            return (Criteria) this;
+        }
+
+        public Criteria andCostCategoryGreaterThanOrEqualTo(String value) {
+            addCriterion("cost_category >=", value, "costCategory");
+            return (Criteria) this;
+        }
+
+        public Criteria andCostCategoryLessThan(String value) {
+            addCriterion("cost_category <", value, "costCategory");
+            return (Criteria) this;
+        }
+
+        public Criteria andCostCategoryLessThanOrEqualTo(String value) {
+            addCriterion("cost_category <=", value, "costCategory");
+            return (Criteria) this;
+        }
+
+        public Criteria andCostCategoryLike(String value) {
+            addCriterion("cost_category like", value, "costCategory");
+            return (Criteria) this;
+        }
+
+        public Criteria andCostCategoryNotLike(String value) {
+            addCriterion("cost_category not like", value, "costCategory");
+            return (Criteria) this;
+        }
+
+        public Criteria andCostCategoryIn(List<String> values) {
+            addCriterion("cost_category in", values, "costCategory");
+            return (Criteria) this;
+        }
+
+        public Criteria andCostCategoryNotIn(List<String> values) {
+            addCriterion("cost_category not in", values, "costCategory");
+            return (Criteria) this;
+        }
+
+        public Criteria andCostCategoryBetween(String value1, String value2) {
+            addCriterion("cost_category between", value1, value2, "costCategory");
+            return (Criteria) this;
+        }
+
+        public Criteria andCostCategoryNotBetween(String value1, String value2) {
+            addCriterion("cost_category not between", value1, value2, "costCategory");
+            return (Criteria) this;
+        }
+
+        public Criteria andCommandVersionIsNull() {
+            addCriterion("command_version is null");
+            return (Criteria) this;
+        }
+
+        public Criteria andCommandVersionIsNotNull() {
+            addCriterion("command_version is not null");
+            return (Criteria) this;
+        }
+
+        public Criteria andCommandVersionEqualTo(String value) {
+            addCriterion("command_version =", value, "commandVersion");
+            return (Criteria) this;
+        }
+
+        public Criteria andCommandVersionNotEqualTo(String value) {
+            addCriterion("command_version <>", value, "commandVersion");
+            return (Criteria) this;
+        }
+
+        public Criteria andCommandVersionGreaterThan(String value) {
+            addCriterion("command_version >", value, "commandVersion");
+            return (Criteria) this;
+        }
+
+        public Criteria andCommandVersionGreaterThanOrEqualTo(String value) {
+            addCriterion("command_version >=", value, "commandVersion");
+            return (Criteria) this;
+        }
+
+        public Criteria andCommandVersionLessThan(String value) {
+            addCriterion("command_version <", value, "commandVersion");
+            return (Criteria) this;
+        }
+
+        public Criteria andCommandVersionLessThanOrEqualTo(String value) {
+            addCriterion("command_version <=", value, "commandVersion");
+            return (Criteria) this;
+        }
+
+        public Criteria andCommandVersionLike(String value) {
+            addCriterion("command_version like", value, "commandVersion");
+            return (Criteria) this;
+        }
+
+        public Criteria andCommandVersionNotLike(String value) {
+            addCriterion("command_version not like", value, "commandVersion");
+            return (Criteria) this;
+        }
+
+        public Criteria andCommandVersionIn(List<String> values) {
+            addCriterion("command_version in", values, "commandVersion");
+            return (Criteria) this;
+        }
+
+        public Criteria andCommandVersionNotIn(List<String> values) {
+            addCriterion("command_version not in", values, "commandVersion");
+            return (Criteria) this;
+        }
+
+        public Criteria andCommandVersionBetween(String value1, String value2) {
+            addCriterion("command_version between", value1, value2, "commandVersion");
+            return (Criteria) this;
+        }
+
+        public Criteria andCommandVersionNotBetween(String value1, String value2) {
+            addCriterion("command_version not between", value1, value2, "commandVersion");
+            return (Criteria) this;
+        }
     }
 
     public static class Criteria extends GeneratedCriteria {

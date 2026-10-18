@@ -35,6 +35,13 @@ public enum ProductionExecutionStatus {
         return result;
     }
 
+    /**
+     * Normal forward reporting accepts READY and RUNNING; historical corrections have separate gates.
+     */
+    public static boolean allowsNormalReporting(String value) {
+        return from(value) == READY || from(value) == RUNNING;
+    }
+
     public String getDescription() {
         return description;
     }
