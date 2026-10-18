@@ -35,6 +35,7 @@ import org.springframework.stereotype.Service;
 import dev.mesbase.business.basic.service.BasicDataRules;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.annotation.Isolation;
 
 /**
  * 计量单位 CRUD：规则与事务由 Service 负责，Mapper 通过 MyBatis-Spring 注入。
@@ -140,7 +141,7 @@ public class UnitMeasureServiceImpl implements IUnitMeasureService {
     }
 
     @Override
-    @Transactional(transactionManager = "businessTransactionManager", rollbackFor = Exception.class)
+    @Transactional(transactionManager = "businessTransactionManager", isolation = Isolation.READ_COMMITTED, rollbackFor = Exception.class)
     @BusinessCacheEvict(business = UnitMeasureResource.PREFIX,
             scope = BusinessCacheEvict.Scope.LIST_AND_DETAIL)
     public void deleteByIds(List<Long> ids) {

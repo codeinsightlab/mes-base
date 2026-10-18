@@ -28,7 +28,7 @@ public class OperationDefectTypeController {
         this.service = service;
     }
 
-    public record View(String id, String operationId, String code, String name, String defaultCostCategory,
+    public record View(String id, String operationId, String code, String name, String defaultWasteCategory,
                        String status, Integer sort, String remark, Integer revision) {
     }
 
@@ -37,7 +37,7 @@ public class OperationDefectTypeController {
 
     public static View view(OperationDefectTypeEntity r) {
         return new View(r.getId().toString(), r.getOperationId().toString(), r.getCode(), r.getName(),
-                r.getDefaultCostCategory(), r.getStatus(), r.getSort(), r.getRemark(), r.getRevision());
+                r.getDefaultWasteCategory(), r.getStatus(), r.getSort(), r.getRemark(), r.getRevision());
     }
 
     @GetMapping

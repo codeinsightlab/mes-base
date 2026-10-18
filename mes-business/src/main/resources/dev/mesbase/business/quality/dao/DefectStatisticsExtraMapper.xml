@@ -2,13 +2,12 @@
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="dev.mesbase.business.quality.dao.DefectStatisticsExtraMapper">
   <select id="summarize" resultType="dev.mesbase.business.quality.domain.DefectStatistics$Row">
-    <bind name="unknownCost" value="@dev.mesbase.business.quality.domain.DefectCostCategory@UNKNOWN.name()"/>
     <bind name="voidAction" value="@dev.mesbase.business.quality.domain.DefectRecordAction@VOID.getValue()"/>
     <bind name="independent" value="@dev.mesbase.business.quality.domain.QualityTreatmentModels$Attribution@INDEPENDENT.name()"/>
     <bind name="overlap" value="@dev.mesbase.business.quality.domain.QualityTreatmentModels$Attribution@OVERLAP.name()"/>
     <bind name="unverified" value="@dev.mesbase.business.quality.domain.QualityTreatmentModels$Attribution@UNVERIFIED.name()"/>
     SELECT n.operation_id, d.defect_type_id, MIN(d.defect_type_name_snapshot) type_name, COUNT(DISTINCT d.defect_type_name_snapshot) type_name_variants,
-      COALESCE(d.cost_category,#{unknownCost}) cost_category,
+      d.waste_category waste_category,
       SUM(d.defect_qty) declared_qty,
       SUM(CASE WHEN t.attribution=#{independent} THEN d.defect_qty ELSE 0 END) independent_qty,
       SUM(CASE WHEN t.attribution=#{overlap} THEN d.defect_qty ELSE 0 END) overlap_qty,
@@ -26,11 +25,11 @@
     <if test="executionId != null">AND d.execution_id=#{executionId}</if>
     <if test="operationId != null">AND n.operation_id=#{operationId}</if>
     <if test="defectTypeId != null">AND d.defect_type_id=#{defectTypeId}</if>
-    <if test="costCategory != null">AND COALESCE(d.cost_category,#{unknownCost})=#{costCategory}</if>
+    <if test="wasteCategory != null">AND d.waste_category=#{wasteCategory}</if>
     <if test="attribution != null">AND COALESCE(t.attribution,#{unverified})=#{attribution}</if>
     <if test="from != null">AND d.occurred_at&gt;=#{from}</if>
     <if test="to != null">AND d.occurred_at&lt;=#{to}</if>
-    GROUP BY n.operation_id,d.defect_type_id,d.cost_category
-    ORDER BY n.operation_id,d.defect_type_id,d.cost_category
+    GROUP BY n.operation_id,d.defect_type_id,d.waste_category
+    ORDER BY n.operation_id,d.defect_type_id,d.waste_category
   </select>
 </mapper>

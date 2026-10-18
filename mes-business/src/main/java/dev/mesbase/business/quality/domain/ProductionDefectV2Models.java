@@ -11,13 +11,13 @@ public final class ProductionDefectV2Models {
     }
 
     public record Command(String requestId, Long executionId, Long nodeId, Long defectTypeId,
-                          Integer expectedTypeRevision, BigDecimal quantity, String costCategory,
+                          Integer expectedTypeRevision, BigDecimal quantity, String wasteCategory,
                           String remark, LocalDateTime occurredAt, Assessment assessment) {
     }
 
     public record Context(Long executionId, Long nodeId, Long operationId, String operationName,
                           Long productId, String productCode, String productName,
                           List<OperationDefectTypeEntity> types, long typeTotal, int offset, int limit,
-                          boolean canOverrideCost) {
+                          boolean canOverrideWasteCategory) {
     }
 }

@@ -8,7 +8,7 @@ import dev.mesbase.business.quality.dao.MesProductionDefectMapper;
 import dev.mesbase.business.quality.domain.OperationDefectTypeEntity;
 import dev.mesbase.business.quality.domain.OperationDefectTypeExample;
 import dev.mesbase.business.quality.domain.MesProductionDefectExample;
-import dev.mesbase.business.quality.domain.DefectCostCategory;
+import dev.mesbase.business.quality.domain.WasteCategory;
 import dev.mesbase.business.shared.enums.EnableStatus;
 import dev.mesbase.common.utils.SecurityUtils;
 import dev.mesbase.core.error.ErrorCode;
@@ -39,7 +39,7 @@ public class OperationDefectTypeService {
         this.references = references;
     }
 
-    public record Input(String code, String name, String defaultCostCategory, String status, Integer sort,
+    public record Input(String code, String name, String defaultWasteCategory, String status, Integer sort,
                         String remark, Integer expectedRevision) {
     }
 
@@ -69,13 +69,13 @@ public class OperationDefectTypeService {
      * Shared parent lock serializes create/update/delete against declarations and operation deletion.
      */
     @Transactional(transactionManager = "businessTransactionManager", propagation = Propagation.MANDATORY)
-    public OperationDefectTypeEntity lockForDeclaration(Long operation, Long id, int revision, String cost) {
+    public OperationDefectTypeEntity lockForDeclaration(Long operation, Long id, int revision, String category) {
         references.lockOperations(List.of(operation), true);
         var row = require(operation, id);
         if (row.getRevision() != revision) throw new FoundationException(ErrorCode.DEFECT_TYPE_STALE);
         if (!EnableStatus.ENABLED.getValue().equals(row.getStatus()))
             throw new FoundationException(ErrorCode.DEFECT_TYPE_INVALID);
-        if (!DefectCostCategory.valid(cost)) bad();
+        if (WasteCategory.from(category) == null) bad();
         return row;
     }
 
@@ -84,7 +84,7 @@ public class OperationDefectTypeService {
         references.lockOperations(List.of(operation), id == null);
         if (input == null || input.code() == null || input.code().isBlank() || input.code().length() > 64
                 || input.name() == null || input.name().isBlank() || input.name().length() > 255
-                || !DefectCostCategory.valid(input.defaultCostCategory()) || EnableStatus.from(input.status()) == null
+                || WasteCategory.from(input.defaultWasteCategory()) == null || EnableStatus.from(input.status()) == null
                 || input.sort() == null || input.sort() < 0 || input.remark() != null && input.remark().length() > 500)
             bad();
         String code = input.code().strip().toUpperCase(Locale.ROOT);
@@ -99,7 +99,7 @@ public class OperationDefectTypeService {
         row.setOperationId(operation);
         row.setCode(code);
         row.setName(input.name().strip());
-        row.setDefaultCostCategory(input.defaultCostCategory());
+        row.setDefaultWasteCategory(input.defaultWasteCategory());
         row.setStatus(input.status());
         row.setSort(input.sort());
         row.setRemark(input.remark());

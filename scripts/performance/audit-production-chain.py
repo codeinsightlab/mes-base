@@ -26,6 +26,9 @@ def main():
     if not a.partial:
         assert len(records)==w['cycles'],'Full planned workload has not completed'
         assert c.execute("SELECT COUNT(*) FROM steps WHERE state<>'SUCCEEDED'").fetchone()[0]==0,'Unresolved steps exist'
+    for column in [1,2,3,4]:
+        assert len({r[column] for r in records})==len(records),'Duplicate production identity in cycle mapping'
+    assert len({v for r in records for v in [r[3],r[4]]})==len(records)*2,'Reused stock identity across cycles'
     selections=[]
     for job,eid,wid,raw,fg,q in records:
         assert all(str(v).isdigit() for v in [job,eid,wid,raw,fg])

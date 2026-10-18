@@ -2,7 +2,7 @@ package dev.mesbase.system.service.impl;
 
 import dev.mesbase.common.constant.Constants;
 import dev.mesbase.common.constant.UserConstants;
-import dev.mesbase.common.core.redis.RedisCache;
+import dev.mesbase.common.core.redis.CenterSettingsCache;
 import dev.mesbase.common.core.text.Convert;
 import dev.mesbase.common.exception.ServiceException;
 import dev.mesbase.common.utils.SecurityUtils;
@@ -15,7 +15,6 @@ import dev.mesbase.system.mapper.SysConfigMapper;
 import dev.mesbase.system.service.ISysConfigService;
 import dev.mesbase.system.service.SystemPermissionService;
 import jakarta.validation.Validator;
-import java.util.Collection;
 import java.util.List;
 import java.util.Set;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -37,7 +36,7 @@ public class SysConfigServiceImpl implements ISysConfigService {
     private SysConfigMapper configMapper;
 
     @Autowired
-    private RedisCache redisCache;
+    private CenterSettingsCache settingsCache;
     @Autowired
     private SystemPermissionService permissions;
 
@@ -79,7 +78,9 @@ public class SysConfigServiceImpl implements ISysConfigService {
      */
     @Override
     public String selectConfigByKey(String configKey) {
-        String configValue = Convert.toStr(redisCache.getCacheObject(getCacheKey(configKey)));
+        // Account switches are security decisions: always use the database authority.
+        boolean security = configKey.startsWith("sys.account.");
+        String configValue = security ? "" : Convert.toStr(settingsCache.get(getCacheKey(configKey)));
         if (StringUtils.isNotEmpty(configValue)) {
             return configValue;
         }
@@ -87,7 +88,7 @@ public class SysConfigServiceImpl implements ISysConfigService {
         config.setConfigKey(configKey);
         SysConfig retConfig = configMapper.selectConfig(config);
         if (StringUtils.isNotNull(retConfig)) {
-            redisCache.setCacheObject(getCacheKey(configKey), retConfig.getConfigValue());
+            if (!security) settingsCache.put(getCacheKey(configKey), retConfig.getConfigValue());
             return retConfig.getConfigValue();
         }
         return StringUtils.EMPTY;
@@ -130,7 +131,7 @@ public class SysConfigServiceImpl implements ISysConfigService {
         BeanValidators.validateWithException(contractValidator, config);
         int row = configMapper.insertConfig(config);
         if (row > 0) {
-            redisCache.setCacheObject(getCacheKey(config.getConfigKey()), config.getConfigValue());
+            settingsCache.invalidate(getCacheKey(config.getConfigKey()));
         }
         return row;
     }
@@ -147,10 +148,10 @@ public class SysConfigServiceImpl implements ISysConfigService {
         BeanValidators.validateWithException(contractValidator, config);
         var previous = selectConfigById(config.getConfigId());
         if (previous == null) throw new FoundationException(ErrorCode.NOT_FOUND);
-        redisCache.deleteObject(getCacheKey(previous.getConfigKey()));
+        settingsCache.invalidate(getCacheKey(previous.getConfigKey()));
         int row = configMapper.updateConfig(config);
         if (row > 0) {
-            redisCache.setCacheObject(getCacheKey(config.getConfigKey()), config.getConfigValue());
+            settingsCache.invalidate(getCacheKey(config.getConfigKey()));
         }
         return row;
     }
@@ -169,7 +170,7 @@ public class SysConfigServiceImpl implements ISysConfigService {
                 throw new ServiceException(String.format("内置参数【%1$s】不能删除 ", config.getConfigKey()));
             }
             configMapper.deleteConfigById(configId);
-            redisCache.deleteObject(getCacheKey(config.getConfigKey()));
+            settingsCache.invalidate(getCacheKey(config.getConfigKey()));
         }
     }
 
@@ -178,10 +179,8 @@ public class SysConfigServiceImpl implements ISysConfigService {
      */
     @Override
     public void loadingConfigCache() {
-        List<SysConfig> configsList = configMapper.selectConfigList(new SysConfig());
-        for (SysConfig config : configsList) {
-            redisCache.setCacheObject(getCacheKey(config.getConfigKey()), config.getConfigValue());
-        }
+        // Lazy loading avoids publishing a transaction snapshot during reset/startup.
+        clearConfigCache();
     }
 
     /**
@@ -189,8 +188,7 @@ public class SysConfigServiceImpl implements ISysConfigService {
      */
     @Override
     public void clearConfigCache() {
-        Collection<String> keys = redisCache.keys(Constants.SYS_CONFIG_KEY + "*");
-        redisCache.deleteObject(keys);
+        settingsCache.clear(Constants.SYS_CONFIG_KEY);
     }
 
     /**

@@ -20,7 +20,7 @@ public class DefectStatisticsController {
     }
 
     public record Row(String operationId, String defectTypeId, String typeName, Long typeNameVariants,
-                      String costCategory,
+                      String wasteCategory,
                       String declaredQty, String independentQty, String overlapQty, String unverifiedQty,
                       String recoveredQty, String netDefectQty) {
     }
@@ -36,7 +36,7 @@ public class DefectStatisticsController {
         return new Page(p.items().stream()
                 .map(r -> new Row(r.operationId().toString(), r.defectTypeId() == null ? null : r.defectTypeId()
                         .toString(),
-                        r.typeName(), r.typeNameVariants(), r.costCategory(), r.declaredQty()
+                        r.typeName(), r.typeNameVariants(), r.wasteCategory(), r.declaredQty()
                         .toPlainString(), r.independentQty()
                         .toPlainString(), r.overlapQty().toPlainString(),
                         r.unverifiedQty().toPlainString(), r.recoveredQty().toPlainString(), r.netDefectQty()

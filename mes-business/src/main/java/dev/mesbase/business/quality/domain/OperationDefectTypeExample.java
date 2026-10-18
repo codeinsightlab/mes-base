@@ -355,73 +355,73 @@ public class OperationDefectTypeExample {
             return (Criteria) this;
         }
 
-        public Criteria andDefaultCostCategoryIsNull() {
-            addCriterion("default_cost_category is null");
+        public Criteria andDefaultWasteCategoryIsNull() {
+            addCriterion("default_waste_category is null");
             return (Criteria) this;
         }
 
-        public Criteria andDefaultCostCategoryIsNotNull() {
-            addCriterion("default_cost_category is not null");
+        public Criteria andDefaultWasteCategoryIsNotNull() {
+            addCriterion("default_waste_category is not null");
             return (Criteria) this;
         }
 
-        public Criteria andDefaultCostCategoryEqualTo(String value) {
-            addCriterion("default_cost_category =", value, "defaultCostCategory");
+        public Criteria andDefaultWasteCategoryEqualTo(String value) {
+            addCriterion("default_waste_category =", value, "defaultWasteCategory");
             return (Criteria) this;
         }
 
-        public Criteria andDefaultCostCategoryNotEqualTo(String value) {
-            addCriterion("default_cost_category <>", value, "defaultCostCategory");
+        public Criteria andDefaultWasteCategoryNotEqualTo(String value) {
+            addCriterion("default_waste_category <>", value, "defaultWasteCategory");
             return (Criteria) this;
         }
 
-        public Criteria andDefaultCostCategoryGreaterThan(String value) {
-            addCriterion("default_cost_category >", value, "defaultCostCategory");
+        public Criteria andDefaultWasteCategoryGreaterThan(String value) {
+            addCriterion("default_waste_category >", value, "defaultWasteCategory");
             return (Criteria) this;
         }
 
-        public Criteria andDefaultCostCategoryGreaterThanOrEqualTo(String value) {
-            addCriterion("default_cost_category >=", value, "defaultCostCategory");
+        public Criteria andDefaultWasteCategoryGreaterThanOrEqualTo(String value) {
+            addCriterion("default_waste_category >=", value, "defaultWasteCategory");
             return (Criteria) this;
         }
 
-        public Criteria andDefaultCostCategoryLessThan(String value) {
-            addCriterion("default_cost_category <", value, "defaultCostCategory");
+        public Criteria andDefaultWasteCategoryLessThan(String value) {
+            addCriterion("default_waste_category <", value, "defaultWasteCategory");
             return (Criteria) this;
         }
 
-        public Criteria andDefaultCostCategoryLessThanOrEqualTo(String value) {
-            addCriterion("default_cost_category <=", value, "defaultCostCategory");
+        public Criteria andDefaultWasteCategoryLessThanOrEqualTo(String value) {
+            addCriterion("default_waste_category <=", value, "defaultWasteCategory");
             return (Criteria) this;
         }
 
-        public Criteria andDefaultCostCategoryLike(String value) {
-            addCriterion("default_cost_category like", value, "defaultCostCategory");
+        public Criteria andDefaultWasteCategoryLike(String value) {
+            addCriterion("default_waste_category like", value, "defaultWasteCategory");
             return (Criteria) this;
         }
 
-        public Criteria andDefaultCostCategoryNotLike(String value) {
-            addCriterion("default_cost_category not like", value, "defaultCostCategory");
+        public Criteria andDefaultWasteCategoryNotLike(String value) {
+            addCriterion("default_waste_category not like", value, "defaultWasteCategory");
             return (Criteria) this;
         }
 
-        public Criteria andDefaultCostCategoryIn(List<String> values) {
-            addCriterion("default_cost_category in", values, "defaultCostCategory");
+        public Criteria andDefaultWasteCategoryIn(List<String> values) {
+            addCriterion("default_waste_category in", values, "defaultWasteCategory");
             return (Criteria) this;
         }
 
-        public Criteria andDefaultCostCategoryNotIn(List<String> values) {
-            addCriterion("default_cost_category not in", values, "defaultCostCategory");
+        public Criteria andDefaultWasteCategoryNotIn(List<String> values) {
+            addCriterion("default_waste_category not in", values, "defaultWasteCategory");
             return (Criteria) this;
         }
 
-        public Criteria andDefaultCostCategoryBetween(String value1, String value2) {
-            addCriterion("default_cost_category between", value1, value2, "defaultCostCategory");
+        public Criteria andDefaultWasteCategoryBetween(String value1, String value2) {
+            addCriterion("default_waste_category between", value1, value2, "defaultWasteCategory");
             return (Criteria) this;
         }
 
-        public Criteria andDefaultCostCategoryNotBetween(String value1, String value2) {
-            addCriterion("default_cost_category not between", value1, value2, "defaultCostCategory");
+        public Criteria andDefaultWasteCategoryNotBetween(String value1, String value2) {
+            addCriterion("default_waste_category not between", value1, value2, "defaultWasteCategory");
             return (Criteria) this;
         }
 

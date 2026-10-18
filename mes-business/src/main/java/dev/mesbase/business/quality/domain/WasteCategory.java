@@ -4,7 +4,7 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 
 public enum WasteCategory {
-    PROCESS("工废", "PROCESS"), MATERIAL("料废", "MATERIAL");
+    PROCESS("工废", "PROCESS"), MATERIAL("料废", "MATERIAL"), BOTH("工废＋料废", "BOTH");
     private final String description;
     private final String value;
 

@@ -7,7 +7,7 @@
     <result column="operation_id" jdbcType="BIGINT" property="operationId" />
     <result column="code" jdbcType="VARCHAR" property="code" />
     <result column="name" jdbcType="VARCHAR" property="name" />
-    <result column="default_cost_category" jdbcType="VARCHAR" property="defaultCostCategory" />
+    <result column="default_waste_category" jdbcType="VARCHAR" property="defaultWasteCategory" />
     <result column="status" jdbcType="VARCHAR" property="status" />
     <result column="sort" jdbcType="INTEGER" property="sort" />
     <result column="remark" jdbcType="VARCHAR" property="remark" />
@@ -76,7 +76,7 @@
     </where>
   </sql>
   <sql id="Base_Column_List">
-    id, operation_id, code, name, default_cost_category, status, sort, remark, revision,
+    id, operation_id, code, name, default_waste_category, status, sort, remark, revision,
     create_by, create_time, update_by, update_time
   </sql>
   <select id="selectByExample" parameterType="dev.mesbase.business.quality.domain.OperationDefectTypeExample" resultMap="BaseResultMap">
@@ -108,12 +108,12 @@
   </delete>
   <insert id="insert" keyColumn="id" keyProperty="id" parameterType="dev.mesbase.business.quality.domain.OperationDefectTypeEntity" useGeneratedKeys="true">
     insert into operation_defect_type (operation_id, code, name,
-      default_cost_category, status, sort,
+      default_waste_category, status, sort,
       remark, revision, create_by,
       create_time, update_by, update_time
       )
     values (#{operationId,jdbcType=BIGINT}, #{code,jdbcType=VARCHAR}, #{name,jdbcType=VARCHAR},
-      #{defaultCostCategory,jdbcType=VARCHAR}, #{status,jdbcType=VARCHAR}, #{sort,jdbcType=INTEGER},
+      #{defaultWasteCategory,jdbcType=VARCHAR}, #{status,jdbcType=VARCHAR}, #{sort,jdbcType=INTEGER},
       #{remark,jdbcType=VARCHAR}, #{revision,jdbcType=INTEGER}, #{createBy,jdbcType=BIGINT},
       #{createTime,jdbcType=TIMESTAMP}, #{updateBy,jdbcType=BIGINT}, #{updateTime,jdbcType=TIMESTAMP}
       )
@@ -130,8 +130,8 @@
       <if test="name != null">
         name,
       </if>
-      <if test="defaultCostCategory != null">
-        default_cost_category,
+      <if test="defaultWasteCategory != null">
+        default_waste_category,
       </if>
       <if test="status != null">
         status,
@@ -168,8 +168,8 @@
       <if test="name != null">
         #{name,jdbcType=VARCHAR},
       </if>
-      <if test="defaultCostCategory != null">
-        #{defaultCostCategory,jdbcType=VARCHAR},
+      <if test="defaultWasteCategory != null">
+        #{defaultWasteCategory,jdbcType=VARCHAR},
       </if>
       <if test="status != null">
         #{status,jdbcType=VARCHAR},
@@ -218,8 +218,8 @@
       <if test="row.name != null">
         name = #{row.name,jdbcType=VARCHAR},
       </if>
-      <if test="row.defaultCostCategory != null">
-        default_cost_category = #{row.defaultCostCategory,jdbcType=VARCHAR},
+      <if test="row.defaultWasteCategory != null">
+        default_waste_category = #{row.defaultWasteCategory,jdbcType=VARCHAR},
       </if>
       <if test="row.status != null">
         status = #{row.status,jdbcType=VARCHAR},
@@ -256,7 +256,7 @@
       operation_id = #{row.operationId,jdbcType=BIGINT},
       code = #{row.code,jdbcType=VARCHAR},
       name = #{row.name,jdbcType=VARCHAR},
-      default_cost_category = #{row.defaultCostCategory,jdbcType=VARCHAR},
+      default_waste_category = #{row.defaultWasteCategory,jdbcType=VARCHAR},
       status = #{row.status,jdbcType=VARCHAR},
       sort = #{row.sort,jdbcType=INTEGER},
       remark = #{row.remark,jdbcType=VARCHAR},
@@ -281,8 +281,8 @@
       <if test="name != null">
         name = #{name,jdbcType=VARCHAR},
       </if>
-      <if test="defaultCostCategory != null">
-        default_cost_category = #{defaultCostCategory,jdbcType=VARCHAR},
+      <if test="defaultWasteCategory != null">
+        default_waste_category = #{defaultWasteCategory,jdbcType=VARCHAR},
       </if>
       <if test="status != null">
         status = #{status,jdbcType=VARCHAR},
@@ -316,7 +316,7 @@
     set operation_id = #{operationId,jdbcType=BIGINT},
       code = #{code,jdbcType=VARCHAR},
       name = #{name,jdbcType=VARCHAR},
-      default_cost_category = #{defaultCostCategory,jdbcType=VARCHAR},
+      default_waste_category = #{defaultWasteCategory,jdbcType=VARCHAR},
       status = #{status,jdbcType=VARCHAR},
       sort = #{sort,jdbcType=INTEGER},
       remark = #{remark,jdbcType=VARCHAR},

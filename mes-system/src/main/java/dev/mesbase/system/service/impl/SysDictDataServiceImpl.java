@@ -6,6 +6,7 @@ import dev.mesbase.common.utils.bean.BeanValidators;
 import dev.mesbase.system.mapper.SysDictDataMapper;
 import dev.mesbase.system.service.ISysDictDataService;
 import jakarta.validation.Validator;
+import dev.mesbase.common.exception.ServiceException;
 import java.util.List;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -70,8 +71,7 @@ public class SysDictDataServiceImpl implements ISysDictDataService {
         for (Long dictCode : dictCodes) {
             SysDictData data = selectDictDataById(dictCode);
             dictDataMapper.deleteDictDataById(dictCode);
-            List<SysDictData> dictDatas = dictDataMapper.selectDictDataByType(data.getDictType());
-            DictUtils.setDictCache(data.getDictType(), dictDatas);
+            DictUtils.removeDictCache(data.getDictType());
         }
     }
 
@@ -87,8 +87,7 @@ public class SysDictDataServiceImpl implements ISysDictDataService {
         BeanValidators.validateWithException(contractValidator, data);
         int row = dictDataMapper.insertDictData(data);
         if (row > 0) {
-            List<SysDictData> dictDatas = dictDataMapper.selectDictDataByType(data.getDictType());
-            DictUtils.setDictCache(data.getDictType(), dictDatas);
+            DictUtils.removeDictCache(data.getDictType());
         }
         return row;
     }
@@ -103,10 +102,12 @@ public class SysDictDataServiceImpl implements ISysDictDataService {
     @Transactional(transactionManager = "masterTransactionManager", rollbackFor = Exception.class)
     public int updateDictData(SysDictData data) {
         BeanValidators.validateWithException(contractValidator, data);
+        var previous = dictDataMapper.selectDictDataById(data.getDictCode());
+        if (previous == null) throw new ServiceException("字典数据不存在");
         int row = dictDataMapper.updateDictData(data);
+        if (row > 0) DictUtils.removeDictCache(previous.getDictType());
         if (row > 0) {
-            List<SysDictData> dictDatas = dictDataMapper.selectDictDataByType(data.getDictType());
-            DictUtils.setDictCache(data.getDictType(), dictDatas);
+            DictUtils.removeDictCache(data.getDictType());
         }
         return row;
     }

@@ -199,15 +199,13 @@ class MaterialIssueHttpTest {
             for (String id : List.of("A", "B")) {
                 var source = source();
                 var jdbc = new JdbcTemplate(source);
-                for (String name : List.of("V2__simple_business_capabilities.sql", "V3__operation_routing.sql", "V4__routing_operation_instruction_snapshot.sql", "V9__routing_graph.sql", "V8__warehouse_inventory.sql", "V11__material_issue.sql", "V12__material_issue_quantity_precision.sql", "V13__workorder_batch_route.sql", "V16__production_execution.sql", "V18__material_issue_void.sql", "V19__local_void_external_effect.sql", "V20__material_issue_erp_extra.sql", "V21__workorder_external_extra.sql", "V22__unverified_legacy_erp_provider.sql", "V23__production_core_v1.sql", "V24__operation_user_execution_assignment.sql", "V25__production_report_ledger.sql", "V26__production_defect.sql", "V27__production_report_request.sql", "V28__production_receipt.sql", "V29__single_material_production_input.sql", "V32__quality_treatment_facts.sql", "V33__admin_report_command_fingerprint.sql", "V34__local_stock_action.sql", "V35__local_production_closure.sql", "V36__business_source_isolation.sql", "V37__workorder_cancellation.sql", "V38__local_stock_documents.sql", "V39__operation_defect_types_and_cost.sql")) {
+                for (String name : List.of("V2__simple_business_capabilities.sql", "V3__operation_routing.sql", "V4__routing_operation_instruction_snapshot.sql", "V9__routing_graph.sql", "V8__warehouse_inventory.sql", "V11__material_issue.sql", "V12__material_issue_quantity_precision.sql", "V13__workorder_batch_route.sql", "V16__production_execution.sql", "V18__material_issue_void.sql", "V19__local_void_external_effect.sql", "V20__material_issue_erp_extra.sql", "V21__workorder_external_extra.sql", "V22__unverified_legacy_erp_provider.sql", "V23__production_core_v1.sql", "V24__operation_user_execution_assignment.sql", "V25__production_report_ledger.sql", "V26__production_defect.sql", "V27__production_report_request.sql", "V28__production_receipt.sql", "V29__single_material_production_input.sql", "V32__quality_treatment_facts.sql", "V33__admin_report_command_fingerprint.sql", "V34__local_stock_action.sql", "V35__local_production_closure.sql", "V36__business_source_isolation.sql", "V37__workorder_cancellation.sql", "V38__local_stock_documents.sql", "V39__operation_defect_types.sql")) {
                     String ddl = Files.readString(Path.of("mes-admin/src/main/resources/db/business/" + name))
                             .replace(") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT=", ") COMMENT ")
                             .replaceAll("(?m)^\\s*factory_id [^\\n]+\\n", "")
                             .replace("factory_id,", "")
                             .replace("factory_id, ", "")
                             .replace(" CHARACTER SET utf8mb4 COLLATE utf8mb4_bin", "");
-                    if (name.equals("V39__operation_defect_types_and_cost.sql"))
-                        ddl = ddl.replace("MODIFY COLUMN", "ALTER COLUMN");
                     if (name.equals("V18__material_issue_void.sql"))
                         ddl = ddl.replace(",\n ADD COLUMN", ";\nALTER TABLE mes_material_issue ADD COLUMN");
                     if (name.equals("V20__material_issue_erp_extra.sql"))

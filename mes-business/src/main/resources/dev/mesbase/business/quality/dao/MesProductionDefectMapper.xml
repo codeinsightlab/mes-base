@@ -31,7 +31,6 @@
     <result column="defect_type_code_snapshot" jdbcType="VARCHAR" property="defectTypeCodeSnapshot" />
     <result column="defect_type_name_snapshot" jdbcType="VARCHAR" property="defectTypeNameSnapshot" />
     <result column="defect_type_revision" jdbcType="INTEGER" property="defectTypeRevision" />
-    <result column="cost_category" jdbcType="VARCHAR" property="costCategory" />
     <result column="command_version" jdbcType="VARCHAR" property="commandVersion" />
   </resultMap>
   <sql id="Example_Where_Clause">
@@ -69,7 +68,7 @@
     responsible_user_id, responsibility_remark, destination_type, target_node_id, target_warehouse_id,
     destination_remark, request_key, request_fingerprint, reported_by, occurred_at, recorded_by,
     recorded_at, defect_type_id, defect_type_code_snapshot, defect_type_name_snapshot,
-    defect_type_revision, cost_category, command_version
+    defect_type_revision, command_version
   </sql>
   <select id="selectByExample" parameterType="dev.mesbase.business.quality.domain.MesProductionDefectExample" resultMap="BaseResultMap">
     select
@@ -98,8 +97,7 @@
       request_key, request_fingerprint, reported_by,
       occurred_at, recorded_by, recorded_at,
       defect_type_id, defect_type_code_snapshot, defect_type_name_snapshot,
-      defect_type_revision, cost_category, command_version
-      )
+      defect_type_revision, command_version)
     values (#{declarationId,jdbcType=VARCHAR}, #{revisionNo,jdbcType=INTEGER}, #{recordAction,jdbcType=VARCHAR},
       #{revisionReason,jdbcType=VARCHAR}, #{executionId,jdbcType=BIGINT}, #{affectedNodeId,jdbcType=BIGINT},
       #{discoveredNodeId,jdbcType=BIGINT}, #{responsibleNodeId,jdbcType=BIGINT}, #{defectQty,jdbcType=DECIMAL},
@@ -109,8 +107,7 @@
       #{requestKey,jdbcType=VARCHAR}, #{requestFingerprint,jdbcType=VARCHAR}, #{reportedBy,jdbcType=BIGINT},
       #{occurredAt,jdbcType=TIMESTAMP}, #{recordedBy,jdbcType=BIGINT}, #{recordedAt,jdbcType=TIMESTAMP},
       #{defectTypeId,jdbcType=BIGINT}, #{defectTypeCodeSnapshot,jdbcType=VARCHAR}, #{defectTypeNameSnapshot,jdbcType=VARCHAR},
-      #{defectTypeRevision,jdbcType=INTEGER}, #{costCategory,jdbcType=VARCHAR}, #{commandVersion,jdbcType=VARCHAR}
-      )
+      #{defectTypeRevision,jdbcType=INTEGER}, #{commandVersion,jdbcType=VARCHAR})
   </insert>
   <select id="countByExample" parameterType="dev.mesbase.business.quality.domain.MesProductionDefectExample" resultType="java.lang.Long">
     select count(*) from mes_production_defect

@@ -13,8 +13,8 @@ sync:
   batchMaximum: 1000
 
 source:
-  # 当前生成读取已核对并迁移的 SIMPLE_B 验收库；本地连接快照不入 Git、不包含隐藏项目默认值。
-  # 每次生成前仍须核对中心 Factory / Datasource 绑定；其他业务库先执行正式迁移。
+  # 本轮明确使用隔离 H2 的真实 JDBC metadata；不连接或迁移 PROD。
+  # 真实目标为已只读核对的 PROD，正式迁移及 MySQL 验收仍待本轮写入授权。
   connectionConfig: ".local/quality-v2-phase12-20261018/codegen-fixture.yml"
   datasource: "fixture"
   # null 表示不指定 schema，使用连接所选数据库的 metadata 范围。
@@ -54,7 +54,7 @@ naming:
 
 output:
   # 路径相对于后端仓库根解析，不相对于当前 shell 目录。
-  backendRoot: "target/quality-v2-generated"
+  backendRoot: "target/quality-v2-waste-generated"
   backendModule: "mes-business"
   frontendRoot: "../mes-base-ui"
   # {module} 等占位符是配置插值，不是生成器内置 MES 包规则。

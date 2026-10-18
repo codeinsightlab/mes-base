@@ -33,6 +33,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import dev.mesbase.system.service.SessionRevocationService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -48,6 +49,9 @@ import org.springframework.util.CollectionUtils;
 public class SysUserServiceImpl implements ISysUserService {
     @Autowired
     private SessionRevocationService revocations;
+    @Autowired
+    private ObjectProvider<ISysUserService> self;
+    private static final int IMPORT_MAXIMUM = 200;
     @Autowired
     private Validator contractValidator;
     private static final Logger log = LoggerFactory.getLogger(SysUserServiceImpl.class);
@@ -269,6 +273,7 @@ public class SysUserServiceImpl implements ISysUserService {
         user.setUserId(null);
         // 新增用户信息
         int rows = userMapper.insertUser(user);
+        if (rows != 1) throw new FoundationException(ErrorCode.RESOURCE_CONFLICT);
         // 新增用户岗位关联
         insertUserPost(user);
         // 新增用户与角色管理
@@ -310,6 +315,7 @@ public class SysUserServiceImpl implements ISysUserService {
         // 新增用户与岗位管理
         insertUserPost(user);
         int changed = userMapper.updateUser(user);
+        if (changed != 1) throw new FoundationException(ErrorCode.RESOURCE_CONFLICT);
         if (changed > 0 && (StringUtils.isNotEmpty(user.getPassword()) || StringUtils.isNotEmpty(user.getStatus())))
             revocations.enqueue(List.of(user.getUserId()));
         return changed;
@@ -341,6 +347,7 @@ public class SysUserServiceImpl implements ISysUserService {
     @Transactional(transactionManager = "masterTransactionManager", rollbackFor = Exception.class)
     public int updateUserStatus(SysUser user) {
         int changed = userMapper.updateUser(user);
+        if (changed != 1) throw new FoundationException(ErrorCode.RESOURCE_CONFLICT);
         if (changed > 0 && (StringUtils.isNotEmpty(user.getPassword()) || StringUtils.isNotEmpty(user.getStatus())))
             revocations.enqueue(List.of(user.getUserId()));
         return changed;
@@ -541,6 +548,9 @@ public class SysUserServiceImpl implements ISysUserService {
         if (StringUtils.isNull(userList) || userList.size() == 0) {
             throw new ServiceException("导入用户数据不能为空！");
         }
+        if (userList.size() > IMPORT_MAXIMUM) {
+            throw new ServiceException("单次最多导入 " + IMPORT_MAXIMUM + " 个用户，请分批导入");
+        }
         int successNum = 0;
         int failureNum = 0;
         StringBuilder successMsg = new StringBuilder();
@@ -554,7 +564,7 @@ public class SysUserServiceImpl implements ISysUserService {
                     BeanValidators.validateWithException(validator, user);
                     user.setPassword(SecurityUtils.encryptPassword(password));
                     user.setCreateBy(operName);
-                    this.insertUser(user);
+                    self.getObject().insertUser(user);
                     successNum++;
                     successMsg.append("<br/>" + successNum + "、账号 " + user.getUserName() + " 导入成功");
                 } else if (isUpdateSupport) {
@@ -562,7 +572,7 @@ public class SysUserServiceImpl implements ISysUserService {
                     user.setUserId(u.getUserId());
                     checkUserDataScope(u.getUserId());
                     user.setUpdateBy(operName);
-                    this.updateUser(user);
+                    self.getObject().updateUser(user);
                     successNum++;
                     successMsg.append("<br/>" + successNum + "、账号 " + user.getUserName() + " 更新成功");
                 } else {
@@ -572,7 +582,13 @@ public class SysUserServiceImpl implements ISysUserService {
             } catch (Exception e) {
                 failureNum++;
                 String msg = "<br/>" + failureNum + "、账号 " + user.getUserName() + " 导入失败：";
-                failureMsg.append(msg + "字段或关系校验失败");
+                if (e instanceof FoundationException failure
+                        && failure.code() == ErrorCode.SESSION_REVOCATION_PENDING) {
+                    failureMsg.append("<br/>账号 " + user.getUserName()
+                            + " 已提交，会话撤销待自动重试，请勿重复导入该行");
+                } else {
+                    failureMsg.append(msg + "该行未提交，字段或关系校验失败");
+                }
                 if (e instanceof ServiceException) {
                     log.info("User import rejected type={}", e.getClass().getSimpleName());
                 } else {
@@ -581,7 +597,7 @@ public class SysUserServiceImpl implements ISysUserService {
             }
         }
         if (failureNum > 0) {
-            failureMsg.insert(0, "很抱歉，导入失败！共 " + failureNum + " 条数据格式不正确，错误如下：");
+            failureMsg.insert(0, "很抱歉，导入失败！共 " + failureNum + " 条未完成；其他成功行已提交，结果如下：");
             throw new ServiceException(failureMsg.toString());
         } else {
             successMsg.insert(0, "恭喜您，数据已全部导入成功！共 " + successNum + " 条，数据如下：");

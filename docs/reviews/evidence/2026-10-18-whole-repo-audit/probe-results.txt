@@ -1,0 +1,4 @@
+Evidence: current compiled production classes + Spring transaction proxy + Mockito Mapper/Redis/transaction-manager substitutes. No live database or Redis writes.
+ROLE_PROBE exception=ServiceException scopeWritten=true oldDepartmentsDeleted=true transactionStarts=0
+IMPORT_PROBE exception=ServiceException accountWritten=true transactionActive=false transactionStarts=0
+CONFIG_PROBE exception=IllegalStateException cachePublishedBeforeFailedCommit=true

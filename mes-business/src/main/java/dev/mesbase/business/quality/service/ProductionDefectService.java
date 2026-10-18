@@ -158,8 +158,6 @@ public class ProductionDefectService {
         treatments.assertMutable(before);
         Facts facts = action.equals(DefectRecordAction.VOID.getValue()) ? facts(before) : normalize(c.facts());
         if (!action.equals(DefectRecordAction.VOID.getValue())) {
-            if (typed == null && (before == null || before.getDefectTypeId() == null)
-                    && WasteCategory.from(facts.wasteCategory()) == null) invalid();
             facts = validate(facts);
         }
         if (!action.equals(DefectRecordAction.VOID.getValue()) && facts.defectQty()
@@ -211,7 +209,7 @@ public class ProductionDefectService {
         var page = defectTypes.getObject().page(node.getOperationId(), true, offset, limit);
         return new ProductionDefectV2Models.Context(executionId, nodeId, node.getOperationId(), node.getOperationName(),
                 product.getId(), product.getCode(), product.getName(), page.items(), page.total(), offset, limit,
-                permitted("business:quality:defect:cost:override"));
+                permitted("business:quality:defect:waste:override"));
     }
 
     @Transactional(transactionManager = "businessTransactionManager", isolation = Isolation.READ_COMMITTED, rollbackFor = Exception.class)
@@ -230,21 +228,20 @@ public class ProductionDefectService {
         locks.execution(c.executionId());
         old = byKey(c.requestId());
         if (old != null) return replay(old, fp);
-        if (c.defectTypeId() == null || c.expectedTypeRevision() == null || c.costCategory() == null) invalid();
+        if (c.defectTypeId() == null || c.expectedTypeRevision() == null || c.wasteCategory() == null) invalid();
         var node = actualNode(c.executionId(), c.nodeId());
         var type = defectTypes.getObject()
-                .lockForDeclaration(node.getOperationId(), c.defectTypeId(), c.expectedTypeRevision(), c.costCategory());
-        if (!Objects.equals(type.getDefaultCostCategory(), c.costCategory()) && !permitted("business:quality:defect:cost:override"))
+                .lockForDeclaration(node.getOperationId(), c.defectTypeId(), c.expectedTypeRevision(), c.wasteCategory());
+        if (!Objects.equals(type.getDefaultWasteCategory(), c.wasteCategory()) && !permitted("business:quality:defect:waste:override"))
             throw new FoundationException(ErrorCode.FORBIDDEN);
         var typed = new MesProductionDefectEntity();
         typed.setDefectTypeId(type.getId());
         typed.setDefectTypeCodeSnapshot(type.getCode());
         typed.setDefectTypeNameSnapshot(type.getName());
         typed.setDefectTypeRevision(type.getRevision());
-        typed.setCostCategory(c.costCategory());
         String reason = trim(c.remark());
         if (reason == null) reason = type.getName();
-        var facts = new Facts(c.executionId(), c.nodeId(), c.nodeId(), null, c.quantity(), null, reason,
+        var facts = new Facts(c.executionId(), c.nodeId(), c.nodeId(), null, c.quantity(), c.wasteCategory(), reason,
                 null, null, DefectDestination.SAME_NODE.getValue(), c.nodeId(), null, null, c.occurredAt());
         return execute(DefectRecordAction.CREATE.getValue(), null,
                 new Command(c.requestId(), null, null, facts, c.assessment()), typed, fp);
@@ -266,7 +263,7 @@ public class ProductionDefectService {
         var b = new StringBuilder("V2:");
         for (Object value : new Object[]{SecurityUtils.getUserId(), c.requestId(), c.executionId(), c.nodeId(), c.defectTypeId(),
                 c.expectedTypeRevision(), c.quantity() == null ? null : c.quantity()
-                .stripTrailingZeros(), c.costCategory(),
+                .stripTrailingZeros(), c.wasteCategory(),
                 trim(c.remark()), c.occurredAt() == null ? null : c.occurredAt()
                 .withNano(c.occurredAt().getNano() / 1000 * 1000), c.assessment()}) {
             String v = value == null ? null : value.toString();
@@ -285,7 +282,6 @@ public class ProductionDefectService {
         to.setDefectTypeCodeSnapshot(from.getDefectTypeCodeSnapshot());
         to.setDefectTypeNameSnapshot(from.getDefectTypeNameSnapshot());
         to.setDefectTypeRevision(from.getDefectTypeRevision());
-        to.setCostCategory(from.getCostCategory());
     }
 
     private Result replay(MesProductionDefectEntity row, String fp) {
@@ -412,7 +408,7 @@ public class ProductionDefectService {
         if (f.executionId() == null || f.affectedNodeId() == null || f.discoveredNodeId() == null || f.defectQty() == null || f.defectQty()
                 .signum() <= 0 || f.defectQty().scale() > 6 || f.defectQty().precision() - f.defectQty().scale() > 14)
             invalid();
-        if (f.wasteCategory() != null && WasteCategory.from(f.wasteCategory()) == null) invalid();
+        if (WasteCategory.from(f.wasteCategory()) == null) invalid();
         text(f.defectReason(), true);
         text(f.responsibilityRemark(), false);
         text(f.destinationRemark(), false);

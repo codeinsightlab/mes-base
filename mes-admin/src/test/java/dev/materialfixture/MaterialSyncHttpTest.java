@@ -25,6 +25,7 @@ import dev.mesbase.infrastructure.persistence.RuntimeRegistry;
 import dev.mesbase.business.basic.controller.MaterialController;
 import dev.mesbase.business.basic.controller.MaterialPermissions;
 import dev.mesbase.business.basic.service.BasicDataRules;
+import dev.mesbase.business.basic.service.MaterialUnitRules;
 import dev.mesbase.business.basic.service.EquipmentReferenceRules;
 import jakarta.validation.Validation;
 import jakarta.validation.Validator;
@@ -156,6 +157,14 @@ class MaterialSyncHttpTest {
     @Import({MaterialController.class, MaterialServiceImpl.class, BasicDataRules.class,
             FoundationErrorAdvice.class})
     static class Web implements WebMvcConfigurer {
+        @Bean
+        MaterialUnitRules metering(MaterialMapper materials) {
+            // This fixture covers synchronization shape; metering has separate persistence tests.
+            var guard = mock(MaterialUnitRules.class);
+            when(guard.lockMaterial(any())).thenAnswer(call -> materials.selectByPrimaryKey(call.getArgument(0)));
+            return guard;
+        }
+
         @Bean
         EquipmentReferenceRules equipmentReferences() {
             // This fixture exposes material synchronization, never resource assignment/deletion.

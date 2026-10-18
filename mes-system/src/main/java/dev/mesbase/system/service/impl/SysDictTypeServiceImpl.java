@@ -11,10 +11,7 @@ import dev.mesbase.system.mapper.SysDictDataMapper;
 import dev.mesbase.system.mapper.SysDictTypeMapper;
 import dev.mesbase.system.service.ISysDictTypeService;
 import jakarta.validation.Validator;
-import java.util.Comparator;
 import java.util.List;
-import java.util.Map;
-import java.util.stream.Collectors;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
@@ -130,14 +127,7 @@ public class SysDictTypeServiceImpl implements ISysDictTypeService {
      */
     @Override
     public void loadingDictCache() {
-        SysDictData dictData = new SysDictData();
-        dictData.setStatus("0");
-        Map<String, List<SysDictData>> dictDataMap = dictDataMapper.selectDictDataList(dictData).stream()
-                .collect(Collectors.groupingBy(SysDictData::getDictType));
-        for (Map.Entry<String, List<SysDictData>> entry : dictDataMap.entrySet()) {
-            DictUtils.setDictCache(entry.getKey(), entry.getValue().stream()
-                    .sorted(Comparator.comparing(SysDictData::getDictSort)).collect(Collectors.toList()));
-        }
+        clearDictCache();
     }
 
     /**
@@ -170,7 +160,7 @@ public class SysDictTypeServiceImpl implements ISysDictTypeService {
         BeanValidators.validateWithException(contractValidator, dict);
         int row = dictTypeMapper.insertDictType(dict);
         if (row > 0) {
-            DictUtils.setDictCache(dict.getDictType(), null);
+            DictUtils.removeDictCache(dict.getDictType());
         }
         return row;
     }
@@ -188,11 +178,12 @@ public class SysDictTypeServiceImpl implements ISysDictTypeService {
     public int updateDictType(SysDictType dict) {
         BeanValidators.validateWithException(contractValidator, dict);
         SysDictType oldDict = dictTypeMapper.selectDictTypeById(dict.getDictId());
+        if (oldDict == null) throw new ServiceException("字典类型不存在");
         dictDataMapper.updateDictDataType(oldDict.getDictType(), dict.getDictType());
         int row = dictTypeMapper.updateDictType(dict);
         if (row > 0) {
-            List<SysDictData> dictDatas = dictDataMapper.selectDictDataByType(dict.getDictType());
-            DictUtils.setDictCache(dict.getDictType(), dictDatas);
+            DictUtils.removeDictCache(oldDict.getDictType());
+            DictUtils.removeDictCache(dict.getDictType());
         }
         return row;
     }

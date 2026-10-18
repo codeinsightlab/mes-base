@@ -147,7 +147,8 @@ public class MaterialServiceImpl implements IMaterialService {
     @BusinessCacheEvict(business = MaterialResource.PREFIX,
             scope = BusinessCacheEvict.Scope.LIST_AND_DETAIL)
     public MaterialEntity updateById(Long id, MaterialUpdateCommand input) {
-        MaterialEntity row = requireRecord(id);
+        MaterialEntity row = rules.lockMaterial(id);
+        rules.changingUnit(row, input.unitId());
         row.setId(id);
         row.setCode(input.code());
         row.setName(input.name());
@@ -260,6 +261,10 @@ public class MaterialServiceImpl implements IMaterialService {
         int created = 0;
         int updated = 0;
         int skipped = 0;
+        // Stabilize the full existing batch before reading identity, in primary-key order.
+        for (var row : existing.values().stream().sorted((a, b) -> a.getId().compareTo(b.getId())).toList()) {
+            existing.put(row.getCode(), rules.lockMaterial(row.getId()));
+        }
         for (var input : inputs) {
             var row = existing.get(input.code());
             if (row != null && same(row, input)) {
@@ -267,6 +272,7 @@ public class MaterialServiceImpl implements IMaterialService {
                 continue;
             }
             boolean insert = row == null;
+            if (!insert) rules.changingUnit(row, input.unitId());
             if (insert) {
                 row = new MaterialEntity();
 

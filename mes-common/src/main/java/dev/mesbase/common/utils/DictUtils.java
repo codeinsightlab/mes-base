@@ -2,10 +2,9 @@ package dev.mesbase.common.utils;
 
 import dev.mesbase.common.constant.Constants;
 import dev.mesbase.common.core.domain.entity.SysDictData;
-import dev.mesbase.common.core.redis.RedisCache;
+import dev.mesbase.common.core.redis.CenterSettingsCache;
 import dev.mesbase.common.utils.spring.SpringUtils;
 
-import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -30,7 +29,7 @@ public class DictUtils
      */
     public static void setDictCache(String key, List<SysDictData> dictDatas)
     {
-        SpringUtils.getBean(RedisCache.class).setCacheObject(getCacheKey(key), dictDatas);
+        SpringUtils.getBean(CenterSettingsCache.class).put(getCacheKey(key), dictDatas);
     }
 
     /**
@@ -41,7 +40,7 @@ public class DictUtils
      */
     public static List<SysDictData> getDictCache(String key)
     {
-        Object cacheObj = SpringUtils.getBean(RedisCache.class).getCacheObject(getCacheKey(key));
+        Object cacheObj = SpringUtils.getBean(CenterSettingsCache.class).get(getCacheKey(key));
         if (StringUtils.isNotNull(cacheObj))
         {
             return StringUtils.cast(cacheObj);
@@ -160,7 +159,7 @@ public class DictUtils
      */
     public static void removeDictCache(String key)
     {
-        SpringUtils.getBean(RedisCache.class).deleteObject(getCacheKey(key));
+        SpringUtils.getBean(CenterSettingsCache.class).invalidate(getCacheKey(key));
     }
 
     /**
@@ -168,8 +167,7 @@ public class DictUtils
      */
     public static void clearDictCache()
     {
-        Collection<String> keys = SpringUtils.getBean(RedisCache.class).keys(Constants.SYS_DICT_KEY + "*");
-        SpringUtils.getBean(RedisCache.class).deleteObject(keys);
+        SpringUtils.getBean(CenterSettingsCache.class).clear(Constants.SYS_DICT_KEY);
     }
 
     /**

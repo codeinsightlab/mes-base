@@ -61,8 +61,6 @@ public class MesProductionDefectEntity {
 
     private Integer defectTypeRevision;
 
-    private String costCategory;
-
     private String commandVersion;
 
     public Long getId() {
@@ -287,14 +285,6 @@ public class MesProductionDefectEntity {
 
     public void setDefectTypeRevision(Integer defectTypeRevision) {
         this.defectTypeRevision = defectTypeRevision;
-    }
-
-    public String getCostCategory() {
-        return costCategory;
-    }
-
-    public void setCostCategory(String costCategory) {
-        this.costCategory = costCategory;
     }
 
     public String getCommandVersion() {

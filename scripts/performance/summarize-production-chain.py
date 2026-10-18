@@ -25,11 +25,11 @@ def category(step):
     return step
 
 
-def summarize(directory, start=1, end=1000000000):
+def summarize(directory, start=1, end=1000000000, since=0, until=1e20):
     c = sqlite3.connect(directory / 'journal.sqlite')
     c.row_factory = sqlite3.Row
     groups = defaultdict(list)
-    rows = list(c.execute('SELECT * FROM timings WHERE job>=? AND job<=? ORDER BY id', (start, end)))
+    rows = list(c.execute('SELECT * FROM timings WHERE job>=? AND job<=? AND started>=? AND started<? ORDER BY id', (start, end, since, until)))
     for row in rows:
         groups[category(row['step'])].append(row)
     output = {}
@@ -41,10 +41,10 @@ def summarize(directory, start=1, end=1000000000):
                         'p99Ms': percentile(values, 99), 'maxMs': max(values) if values else None}
     elapsed = max((r['started'] + r['ms'] / 1000 for r in rows), default=0) - min((r['started'] for r in rows), default=0)
     # Overall span may include deliberate gaps between phases; retain that boundary explicitly.
-    output['_overall'] = {'httpRequests': len(rows), 'successfulMutations': sum(r['status'] == 200 and r['method'] in ('POST', 'PUT', 'DELETE') for r in rows),
+    output['_overall'] = {'sampleSince': since, 'sampleUntil': until, 'httpRequests': len(rows), 'successfulMutations': sum(r['status'] == 200 and r['method'] in ('POST', 'PUT', 'DELETE') for r in rows),
                           'observedWallSpanSecondsIncludingPhaseGaps': round(elapsed, 3),
-                          'completedCycles': c.execute("SELECT COUNT(*) FROM cycles WHERE state='COMPLETED' AND job>=? AND job<=?", (start, end)).fetchone()[0],
-                          'pendingSteps': c.execute("SELECT COUNT(*) FROM steps WHERE state<>'SUCCEEDED' AND job>=? AND job<=?", (start, end)).fetchone()[0]}
+                          'completedCycles': len({r['job'] for r in rows if r['step']=='complete' and r['status']==200}),
+                          'currentJournalPendingStepsInJobRange': c.execute("SELECT COUNT(*) FROM steps WHERE state<>'SUCCEEDED' AND job>=? AND job<=?", (start, end)).fetchone()[0]}
     (directory / 'http-summary.json').write_text(json.dumps(output, indent=2))
     return output
 
@@ -54,5 +54,7 @@ if __name__ == '__main__':
     p.add_argument('directory', type=Path)
     p.add_argument('--start',type=int,default=1)
     p.add_argument('--end',type=int,default=1000000000)
+    p.add_argument('--since',type=float,default=0)
+    p.add_argument('--until',type=float,default=1e20)
     a = p.parse_args()
-    print(json.dumps(summarize(a.directory, a.start, a.end), indent=2))
+    print(json.dumps(summarize(a.directory, a.start, a.end, a.since, a.until), indent=2))

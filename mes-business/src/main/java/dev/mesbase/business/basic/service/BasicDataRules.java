@@ -41,6 +41,7 @@ public class BasicDataRules {
     private final ObjectProvider<RoutingReferenceRules> routing;
     private final EquipmentReferenceRules equipment;
     private final MaterialMapper material;
+    private final MaterialUnitRules metering;
     private final MaterialCategoryMapper materialCategory;
     private final UnitMeasureMapper unitMeasure;
     private final WorkstationMapper workstation;
@@ -50,7 +51,8 @@ public class BasicDataRules {
     public BasicDataRules(MaterialMapper material, MaterialCategoryMapper materialCategory,
                           UnitMeasureMapper unitMeasure, WorkstationMapper workstation, WorkshopMapper workshop,
                           SafetyStockMapper safetyStock, ObjectProvider<RoutingReferenceRules> routing,
-                          EquipmentReferenceRules equipment, ObjectProvider<StockReferenceRules> stock) {
+                          EquipmentReferenceRules equipment, ObjectProvider<StockReferenceRules> stock, MaterialUnitRules metering) {
+        this.metering = metering;
         this.stock = stock;
         this.equipment = equipment;
         this.routing = routing;
@@ -76,6 +78,7 @@ public class BasicDataRules {
         var criteria = example.createCriteria().andCodeEqualTo(row.getCode());
         if (row.getId() != null) criteria.andIdNotEqualTo(row.getId());
         reject(material.countByExample(example) > 0);
+        metering.lockUnit(row.getUnitId());
         requireUnit(row.getUnitId());
         if (row.getCategoryId() != null) requireCategory(row.getCategoryId());
         if (MaterialType.from(row.getMaterialType()) == null)
@@ -136,6 +139,14 @@ public class BasicDataRules {
                 .compareTo(row.getMinQty()) < 0) throw new FoundationException(ErrorCode.BAD_REQUEST);
     }
 
+    public MaterialEntity lockMaterial(Long id) {
+        return metering.lockMaterial(id);
+    }
+
+    public void changingUnit(MaterialEntity before, Long next) {
+        metering.changingUnit(before, next);
+    }
+
     public MaterialEntity requireMaterial(Long id) {
         var row = id == null ? null : material.selectByPrimaryKey(id);
         if (row == null) throw new FoundationException(ErrorCode.NOT_FOUND);
@@ -181,9 +192,7 @@ public class BasicDataRules {
     }
 
     public void deletingUnitMeasure(List<Long> ids) {
-        var materialRefs = new MaterialExample();
-        materialRefs.createCriteria().andUnitIdIn(ids);
-        reject(material.countByExample(materialRefs) > 0);
+        metering.deletingUnits(ids);
     }
 
     public void deletingWorkstation(List<Long> ids) {

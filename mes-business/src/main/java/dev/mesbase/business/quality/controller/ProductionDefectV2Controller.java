@@ -29,7 +29,7 @@ public class ProductionDefectV2Controller {
 
     public record Context(String executionId, String nodeId, String operationId, String operationName,
                           String productId, String productCode, String productName, List<View> types,
-                          long typeTotal, int offset, int limit, boolean canOverrideCost) {
+                          long typeTotal, int offset, int limit, boolean canOverrideWasteCategory) {
     }
 
     @GetMapping("/executions/{executionId}/nodes/{nodeId}/declaration-context")
@@ -42,7 +42,7 @@ public class ProductionDefectV2Controller {
                 .toString(), c.operationName(),
                 c.productId().toString(), c.productCode(), c.productName(), c.types().stream()
                 .map(OperationDefectTypeController::view).toList(),
-                c.typeTotal(), offset, limit, c.canOverrideCost());
+                c.typeTotal(), offset, limit, c.canOverrideWasteCategory());
     }
 
     @GetMapping("/executions/{executionId}/declaration-nodes")

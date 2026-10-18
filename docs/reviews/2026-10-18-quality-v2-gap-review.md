@@ -2,7 +2,7 @@
 
 日期：2026-10-18。结论：**CONDITIONAL GO，允许按本文最小方案进入实施；当前实现尚未达到目标 V2，不构成 V2 上线验收。**
 
-复用现有 ProductionDefect、QualityTreatment、ProductionQuantityService、QualityRelease 和生产交接链。新增工序所属不良类型及独立费用分类，扩展处置事实与交互；不重建不良主子单，不新增检验前置门禁，不修改生产数量算法，不自动操作库存或 ERP。
+复用现有 ProductionDefect、QualityTreatment、ProductionQuantityService、QualityRelease 和生产交接链。新增工序所属不良类型及工废/料废分类扩展，扩展处置事实与交互；不重建不良主子单，不新增检验前置门禁，不修改生产数量算法，不自动操作库存或 ERP。
 
 ## A. 真实代码与数据库基线
 
@@ -135,24 +135,19 @@ E07通过 ProductionDefectQuantityQuery → ExecutionQualityReferenceQueryImpl �
 | 来源 | 未见不良表source/provider或ERP外部单据号；Gateway只返回localSuccess、externalExecuted=false，不执行ERP。不得据此宣称ERP质量已处理（E16） |
 | 后续核实 | 追加mes_quality_treatment ASSESS，不改原不良行；新申报版本默认重新待核实（E05） |
 | 编辑/删除 | 无普通PUT/DELETE；未处理时可受控追加REVISE/VOID，已处理或被重叠引用后assertMutable拒绝（E01/E02/E05） |
-| 快照 | 现有node已冻结工序名称；缺类型ID/类型code-name快照、独立费用事实。无需重建ProductionDefect，只增必要列及新DTO转换（E03/E10/E14） |
+| 快照 | 现有node已冻结工序名称；缺类型ID/类型code-name快照、类别事实。无需重建ProductionDefect，只增必要列及新DTO转换（E03/E10/E14） |
 
-**必须保留的细节：** 旧记录在操作回放前不能重新套用今天的类型启停、默认费用或工厂模式。旧VOID继承原Facts而不重新检查旧目标仓库启停；新增字段后也要继续允许历史合法作废，不要求未知旧类型突然必填。已处理记录的费用/类型纠错不能借普通REVISE绕过assertMutable；V2首版可继续禁止，若确需纠错再设计独立追加事实。（E02/E05）
+**必须保留的细节：** 旧记录在操作回放前不能重新套用今天的类型启停、默认类别或工厂模式。旧VOID继承原Facts而不重新检查旧目标仓库启停；新增字段后也要继续允许历史合法作废，不要求未知旧类型突然必填。已处理记录的类别/类型纠错不能借普通REVISE绕过assertMutable；V2首版可继续禁止，若确需纠错再设计独立追加事实。（E02/E05）
 
-## E. 费用归类差异
+## E. 工废 / 料废类别差异（按最终确认修正）
 
-E16 WasteCategory为PROCESS“工废”、MATERIAL“料废”；E11默认PROCESS，E02要求二选一。它表示旧不良类别，源码没有证明等于费用承担范围，也没有BOTH。当前质量模块、API及目标表未找到费用金额、计价规则或质量成本结算实现；本结论限定在所查Base范围，不泛化为所有历史分析模块都不存在成本字段。
+2026-10-18 用户最终确认：“工费 / 料费”为笔误。此前独立费用模型建议作废，本节及下文以最终工废/料废语义为准，不作为原费用设计的实施依据。
 
-最小方案：独立 `default_cost_category` 与 `cost_category`，值LABOR/MATERIAL/BOTH；不要重命名或复用waste_category。费用、报废/返工、仓库目标是独立轴。
+保留现有WasteCategory和waste_category，PROCESS=工废、MATERIAL=料废，仅增加BOTH=工废＋料废。类型默认列采用default_waste_category；不新增独立类别列或模型，既有waste_category保持NOT NULL。
 
-1. 类型配置的默认费用必须显式选三者之一，不自动指定LABOR。
-2. 现场加载默认值；建议允许具有单独 `business:quality:defect:cost:override` 权限者覆盖。没有该权时按服务端默认确认，拒绝不同值；权限不由前端字段readonly代替。
-3. 服务端在申报事务中读取类型及revision，冻结实际cost_category、配置revision和必要默认依据；客户端返回选中值及expectedTypeRevision，配置变化则提示刷新，避免用户看到工费却保存新默认料费。
-4. 无论未来类型改名/默认值变化，既有申报费用不变。新增字段进入规范摘要与版本留痕。
-5. 历史费用字段保持NULL，响应显式投影 `UNKNOWN/历史未记录`。UNKNOWN只用于读取统计，不作为新申报可选第四类；禁止按旧PROCESS/MATERIAL批量回填。
-6. 统计同时展示LABOR、MATERIAL、BOTH、UNKNOWN四桶。总量按桶互斥求和；若另出“涉及工费/涉及料费”，BOTH分别参与，两者不可相加冒充总不良。
+默认类别必须显式选择；普通申报采用服务端核对的默认类别，授权覆盖使用business:quality:defect:waste:override。提交所选wasteCategory和expectedTypeRevision，配置变化应冲突，历史类别与类型快照不因默认改变而重解释。
 
-旧waste_category当前NOT NULL，V2请求若不再填写它，必须通过**新增迁移**允许新记录该历史字段为空，并同步修正E11“非PROCESS一律料废”的显示分支及旧读契约；不能后台自动填PROCESS满足约束。旧版本原值保留，旧API仍可显式接收原枚举。是否将旧类别继续作为V2可选附加项列于L节；不将该问题混入新费用字段。
+统计按PROCESS/MATERIAL/BOTH互斥分桶，BOTH只计一次。历史原值直接读取、不转换、不回填，不新增历史UNKNOWN类别桶。类型快照历史为空仍显示“历史未记录”。类别与处置方式、仓库去向独立。
 
 ## F. QualityTreatment 差异及即时/延后处置
 
@@ -186,21 +181,21 @@ E16 WasteCategory为PROCESS“工废”、MATERIAL“料废”；E11默认PROCES
 
 | 路径 | 推荐提交及结果 | 不得省略 |
 |---|---|---|
-| 立即处置 | 同一业务事务受控追加不良事实、费用快照、ASSESS、ALLOCATE；全部成功或全部回滚；START/RESULT仍是后续实际执行事实 | create、核实/处置授权，独立/重叠依据、版本/锁/额度/幂等检查 |
-| 延后处置 | create只写一条申报及费用，默认UNVERIFIED；授权人员再ASSESS和ALLOCATE；现场初始意图若需保存明确标为未生效意图 | 不自动标INDEPENDENT，不把“想报废”当已确认报废，不把意图计入处置额度 |
+| 立即处置 | 同一业务事务受控追加不良事实、类别快照、ASSESS、ALLOCATE；全部成功或全部回滚；START/RESULT仍是后续实际执行事实 | create、核实/处置授权，独立/重叠依据、版本/锁/额度/幂等检查 |
+| 延后处置 | create只写一条申报及类别，默认UNVERIFIED；授权人员再ASSESS和ALLOCATE；现场初始意图若需保存明确标为未生效意图 | 不自动标INDEPENDENT，不把“想报废”当已确认报废，不把意图计入处置额度 |
 
 只有已核实INDEPENDENT才可正式分配；OVERLAP不再次分配/扣减，UNVERIFIED只能保存意图。不能为“一键”默认独立。初始意图建议复用新增可空字段记录在申报完整版本中，真正处置另外追加事件；未选意图不必人为默认SAME_NODE。
 
-聚合请求建议沿用一个客户端UUID并保存命令摘要；子事件ID可由外层UUID+动作稳定派生或显式传入并纳入摘要。重放必须在读取当前配置默认、启停和重新授权业务动作前识别原结果；同UUID改类型/费用/意图拒绝。旧requestKey摘要算法必须保持可验证，新旧命令版本明确区分，不能因新增字段导致旧成功请求失去重放能力。新Controller只调用一个用例Service；不得在Controller或前端串行两次HTTP后宣称事务原子。
+聚合请求建议沿用一个客户端UUID并保存命令摘要；子事件ID可由外层UUID+动作稳定派生或显式传入并纳入摘要。重放必须在读取当前配置默认、启停和重新授权业务动作前识别原结果；同UUID改类型/类别/意图拒绝。旧requestKey摘要算法必须保持可验证，新旧命令版本明确区分，不能因新增字段导致旧成功请求失去重放能力。新Controller只调用一个用例Service；不得在Controller或前端串行两次HTTP后宣称事务原子。
 
 ## G. 当前前端交互与建议
 
 本节为源码交互审查，无本轮截图、尺寸或可访问性实测结论。
 
 - **工序配置（E13）**：现有工序详情有信息/人员tabs，可直接增加绑定operationId的不良类型嵌入面板，先保存工序再配置；独立配置权限，撤权/切厂清空候选。
-- **逐次申报（E11）**：当前本来就是一条数量、一条原因，没有总量主单。问题是影响/发现/责任节点、工废料废、去向等字段均面向管理录入，缺产品上下文、工序类型和费用。现场从Execution详情或报工上下文打开单条弹窗，产品/工序自动只读展示，填写类型、数量、费用、备注和可选意图。管理页保留历史复杂字段只读，不以新简化表单重解释旧事实。
+- **逐次申报（E11）**：当前本来就是一条数量、一条原因，没有总量主单。问题是影响/发现/责任节点、工废料废、去向等字段均面向管理录入，缺产品上下文、工序类型和类别。现场从Execution详情或报工上下文打开单条弹窗，产品/工序自动只读展示，填写类型、数量、类别、备注和可选意图。管理页保留历史复杂字段只读，不以新简化表单重解释旧事实。
 - **核实/处置（E12）**：当前需打开历史面板后选ASSESS、ALLOCATE、START、RESULT，技术动作暴露较多。针对整条报废/整条返工提供一键填量提交，部分处理仍允许输入数量；系统计算pending，不新增“先填写总不良量”的步骤。后端事实继续分开。
-- **待核实/待处置等列表（E11/E12）**：当前列表主要展示申报，summary在详情读取，无按处置状态/类型/费用筛选的正式列表契约。建议服务端分页汇总，不能逐行请求details或只按当前页统计。混合部分处置同时显示余额、返工中/报废量，保留既有State，退工序/退仓另以决策类型过滤。
+- **待核实/待处置等列表（E11/E12）**：当前列表主要展示申报，summary在详情读取，无按处置状态/类型/类别筛选的正式列表契约。建议服务端分页汇总，不能逐行请求details或只按当前页统计。混合部分处置同时显示余额、返工中/报废量，保留既有State，退工序/退仓另以决策类型过滤。
 - **重叠候选（E12）**：relatedOptions来自外层当前页rows，可能漏掉同Execution其他页的合法原申报；服务端仍校验INDEPENDENT。应提供有界分页候选查询，不能扩大当前页数组当完整候选。
 - **结果不确定（E11/E12）**：处置面板有sessionStorage原命令恢复、只允许原请求重查；申报有稳定requestKey但没有同等跨刷新恢复，且摘要内容修改后继续同key会冲突。V2提交应冻结完整命令，明确拒绝后才允许改内容换key；网络未知先查原结果。
 - **数量显示（E13）**：管理面板已区分原申报、独立、待核实、恢复及未恢复；现场报工页有“有效不良”列绑定defectQty，容易把含重复/待核实的原始量当净扣减。改标签/响应展示到明确指标，不改数量算法。
@@ -211,8 +206,8 @@ E16 WasteCategory为PROCESS“工废”、MATERIAL“料废”；E11默认PROCES
 
 | 对象 | 最小建议字段/约束 | 历史策略 |
 |---|---|---|
-| operation_defect_type | id BIGINT；operation_id；code/name；ENABLED/DISABLED；default_cost_category；revision；必要sort/remark。operation_id创建后固定，跨工序同名不同ID；同工序code去重约束实施前确认 | 无旧行迁入；已引用禁止删除，允许停用。工序删除保护须同时检查该配置，不能只检查routing_node |
-| mes_production_defect增量 | defect_type_id、defect_type_code_snapshot、defect_type_name_snapshot、defect_type_revision、cost_category；必要初始意图字段。工序身份从原affected_node→operation解析，优先复用节点工序快照，不重复建可编辑operation_id | 全部旧类型/费用NULL，读为历史未记录；旧revision及指纹保持。新字段通过受控申报入口必需校验，不用数据库默认伪造旧事实 |
+| operation_defect_type | id BIGINT；operation_id；code/name；ENABLED/DISABLED；default_waste_category；revision；必要sort/remark。operation_id创建后固定，跨工序同名不同ID；同工序code去重约束实施前确认 | 无旧行迁入；已引用禁止删除，允许停用。工序删除保护须同时检查该配置，不能只检查routing_node |
+| mes_production_defect增量 | defect_type_id、defect_type_code_snapshot、defect_type_name_snapshot、defect_type_revision；复用既有waste_category，必要初始意图字段。工序身份从原affected_node→operation解析，优先复用节点工序快照，不重复建可编辑operation_id | 旧类型快照NULL，类别保持原值；旧revision及指纹保持。新字段通过受控申报入口必需校验，不用数据库默认伪造旧事实 |
 | mes_quality_treatment增量 | decision_type、target_node_id、target_warehouse_id、return_qty及必要目标展示快照；原routing_node_id、parent_id、五类数量、审计事实保留 | 旧事件依原动作和数量解释；不批量改写旧目标/状态；处理和恢复原损失的关系不变 |
 
 不新增不良主单/明细、责任工序新实体、实际金额字段或第二套质量账本。工序被停用时：禁止新增该工序的配置和新现场申报（建议），历史查询/原UUID重放/已有申报核实处置/合法撤销继续可用；晚申报旧事实通过现有授权管理通道保留，不因普通现场开关抹除事实。类型停用同理，已有版本续读旧快照；若追加订正而类型不变，不能强制替换为今天启用的新类型。
@@ -222,10 +217,10 @@ E16 WasteCategory为PROCESS“工废”、MATERIAL“料废”；E11默认PROCES
 | 接口 | 用途 / 服务端约束 |
 |---|---|
 | `/api/production/operation/{operationId}/defect-types` GET/POST，`/{typeId}` PUT/DELETE | 配置管理；URL父ID绑定、对象归属、revision、引用删除保护；独立read/create/update/delete权限 |
-| `/api/quality/defects/executions/{id}/nodes/{nodeId}/declaration-context` GET | 返回Execution产品、确切节点/operation、允许类型、默认费用/配置revision和当前用户可覆盖能力；不能以目录缓存代替提交校验 |
-| `/api/quality/defects/declarations` POST（或现接口明确V2 DTO） | 单条申报；requestId、executionId、nodeId、typeId、expectedTypeRevision、costCategory、qty、备注/时间、可选assessment/initialDisposition。无客户端productId、operationId、操作者字段；复用原Service/Mapper与事务 |
+| `/api/quality/defects/executions/{id}/nodes/{nodeId}/declaration-context` GET | 返回Execution产品、确切节点/operation、允许类型、默认类别/配置revision和当前用户可覆盖能力；不能以目录缓存代替提交校验 |
+| `/api/quality/defects/declarations` POST（或现接口明确V2 DTO） | 单条申报；requestId、executionId、nodeId、typeId、expectedTypeRevision、wasteCategory、qty、备注/时间、可选assessment/initialDisposition。无客户端productId、operationId、操作者字段；复用原Service/Mapper与事务 |
 | 原 `/{id}/treatment` POST | 扩展decision/target和必要额度字段，保留原动作、原命令回放及父事件预算；旧非SAME_NODE登记不自动升级为正式处置 |
-| 原不良列表及新增有界summary/statistics GET | 服务端按工序/类型/费用/派生状态筛选统计，明确观察量与净扣减口径；统计以最新非VOID版本及核实语义为准，不累计历史revision |
+| 原不良列表及新增有界summary/statistics GET | 服务端按工序/类型/类别/派生状态筛选统计，明确观察量与净扣减口径；统计以最新非VOID版本及核实语义为准，不累计历史revision |
 
 类型→operation归属必须在提交事务核实：Execution→确切routing/path node→operation→type.operation_id；客户端即使传同名其他工序typeId也拒绝。引用配置的修改/删除与申报并发需共享锁或条件revision策略，定义锁序并测试；不能先读启用、随后无约束删除配置。快照与事实写入同业务事务，不在响应阶段临时JOIN今天的类型名替代历史。
 
@@ -235,8 +230,8 @@ E16 WasteCategory为PROCESS“工废”、MATERIAL“料废”；E11默认PROCES
 
 | 风险 | 具体证据 / 最小控制 |
 |---|---|
-| 历史丢失或被误分类 | E04 latest/版本查询、E14触发器；新增列可空，历史不INNER JOIN启用类型，不用PROCESS推LABOR，不UPDATE旧账本 |
-| 配置改名/停用破坏历史 | E02 names/E10发布快照已保护工序；新类型必须冻结名称/代码和费用。新配置变更只作用于后续申报 |
+| 历史丢失或被误分类 | E04 latest/版本查询、E14触发器；新增列可空，历史不INNER JOIN启用类型，保留PROCESS/MATERIAL原值，不UPDATE旧账本 |
+| 配置改名/停用破坏历史 | E02 names/E10发布快照已保护工序；新类型必须冻结名称/代码和类别。新配置变更只作用于后续申报 |
 | 跨工序同名类型误选 | 当前E03无类型约束；新增服务端type.operation_id严格等于实际节点operation_id，比较ID而非名称 |
 | 重复扣减 | E05 nodeTotals/E07 calculate；报废/退回决定不再次增加D，OVERLAP不扣，BOTH不能被金额统计反向计入数量 |
 | 重复处置 | E05原UUID/parent/预算/版本锁；退回数量必须占同一预算，撤回亦追加事件，不能重复分配已花额度 |
@@ -258,16 +253,16 @@ E16 WasteCategory为PROCESS“工废”、MATERIAL“料废”；E11默认PROCES
 | 不良类型配置 | 工序信息/人员tabs（E13） | 工序详情维护 | 缺类型API/UI | 复用CRUD及嵌入面板 | 父ID转移/删除引用 |
 | 单条申报 | 一次CREATE一事实，无主单总数（E02/E03/E11） | 每次一事件 | 已具基础 | 增DTO字段，复用原账本 | 重建主子单破坏追溯 |
 | 工序身份校验 | 校验实际节点，无类型归属（E02） | 实际node→operation→type | 缺类型约束/可信上下文展示 | 服务端解析产品/工序 | 同名/跨工序选型 |
-| 费用类别 | PROCESS/MATERIAL工废料废（E16） | LABOR/MATERIAL/BOTH | 语义不同，缺BOTH | 独立费用字段/默认/覆盖权限 | 历史误推、BOTH双计 |
-| 缺陷历史快照 | 原因文本、node工序快照（E02/E10） | 类型/费用历史稳定 | 缺类型快照 | 类型code/name/revision及费用冻结 | 配置改名重写历史展示 |
-| 不良数量统计 | 最新版本、D/R/U统一传播（E04/E05/E07） | 自动分组且不重复扣 | 缺类型/费用维度 | 新查询统计复用原量口径 | 原始量冒充净扣减 |
+| 工废/料废类别 | PROCESS/MATERIAL工废料废（E16） | PROCESS/MATERIAL/BOTH | 既有类别缺BOTH | 复用WasteCategory/默认/覆盖权限 | 历史误推、BOTH双计 |
+| 缺陷历史快照 | 原因文本、node工序快照（E02/E10） | 类型/类别历史稳定 | 缺类型快照 | 类型code/name/revision及类别冻结 | 配置改名重写历史展示 |
+| 不良数量统计 | 最新版本、D/R/U统一传播（E04/E05/E07） | 自动分组且不重复扣 | 缺类型/类别维度 | 新查询统计复用原量口径 | 原始量冒充净扣减 |
 | 独立/重叠核实 | ASSESS及依据，默认UNVERIFIED（E05） | 保留 | 主要是入口权限/交互差异 | 保留事实，统一核实授权 | 为一键默认独立 |
 | 报废 | ALLOCATE.scrap、RESULT.failed（E05） | SCRAP | 已实现核心 | UI语义映射/一键填量 | 再扣D或恢复报废 |
 | 返工 | SAME_NODE分配/开始/结果（E05） | 合法已过实际工序可选 | 缺事件级目标 | 目标与归属分离，原额度链复用 | 自动重走DAG/增产 |
 | 退工序 | 申报去向登记，上游按discovered（E02） | 正式退回决定/目标追溯 | 非正式处置闭环 | 扩展事件目标和预算，确认纯退回语义 | 双份返工额度 |
 | 退仓库 | 启用仓登记，无库存（E02/E16） | 正式决定，无库存 | 缺处置事件支持 | 新decision+returnQty/目标 | 被当实际接收/放行 |
-| 页面交互 | 单条申报+历史内技术动作（E11/E12） | 上下文自动填、即时或延后 | 缺类型/费用，步骤可简化 | 一个弹窗多个后端事实 | 前端多HTTP伪原子 |
-| 权限 | read/create/revise/void；CREATE可ASSESS（E01/E06） | 配置、申报、核实/处置、费用覆盖可区分 | 缺细分及统一核实检查 | 复用EndpointAccess+Service共同准入 | 旧入口绕过新权限 |
+| 页面交互 | 单条申报+历史内技术动作（E11/E12） | 上下文自动填、即时或延后 | 缺类型/类别，步骤可简化 | 一个弹窗多个后端事实 | 前端多HTTP伪原子 |
+| 权限 | read/create/revise/void；CREATE可ASSESS（E01/E06） | 配置、申报、核实/处置、类别覆盖可区分 | 缺细分及统一核实检查 | 复用EndpointAccess+Service共同准入 | 旧入口绕过新权限 |
 | 历史兼容 | 不可变版本、处置、放行、节点保护（E02/E05/E08/E14） | 继续读/重放/合法撤销 | 新字段与旧必填契约冲突 | nullable旧数据、版本化DTO/指纹 | 批量补值/旧UUID失效 |
 | LOCAL生产回归 | V1.6、V2.2、V2.3.1历史验收，当前PROD事实可读（A.4） | 原闭环及新类型/处置均通过 | V2尚无实施或验收 | 定向+全量+真实API/UI | 把历史GO冒充V2 GO |
 | 正式放行与接收 | basis校验、来源、额度及独立接收（E08） | 保留 | 新事件纳入依据需验证 | 保留原入口与事实 | 自动放行/自动入库 |
@@ -278,9 +273,9 @@ E16 WasteCategory为PROCESS“工废”、MATERIAL“料废”；E11默认PROCES
 
 新增正式迁移、真实metadata生成后端，完成配置API/权限/工序详情面板及引用删除保护。表结构不得写factory_id；同名跨工序不同身份。配置改名/停用、跨工序typeId、并发revision及切厂/撤权是交付必测。真实目标按用户最终授权再次核实，不能沿用本轮只读授权执行写迁移。
 
-### Phase 2 — 单条申报及费用
+### Phase 2 — 单条申报及类别
 
-扩展原不良版本、类型快照、costCategory、上下文GET及新申报DTO；冻结默认/覆盖，保护旧key指纹，修正legacy wasteCategory读取。普通操作者只申报，核实/处置授权在服务端共同执行。不得增加检验完成门禁或修改Quantity公式。
+扩展原不良版本、类型快照、wasteCategory、上下文GET及新申报DTO；冻结默认/覆盖，保护旧key指纹，修正legacy wasteCategory读取。普通操作者只申报，核实/处置授权在服务端共同执行。不得增加检验完成门禁或修改Quantity公式。
 
 Phase1/2可同一版本发布：无新类型配置的申报入口无法闭环，但代码/迁移仍分步可审查；配置先建、旧数据可读，再启用V2写入口。新字段缺失拒绝只针对新命令，历史读取和旧成功回放不受影响。
 
@@ -292,13 +287,13 @@ Phase1/2可同一版本发布：无新类型配置的申报入口无法闭环，
 
 | 层级 | 必须覆盖 |
 |---|---|
-| 单元/契约 | LABOR/MATERIAL/BOTH及UNKNOWN桶；类型归属；费用覆盖；默认改变后原UUID重放；新旧指纹兼容；完整快照/BigDecimal精度 |
+| 单元/契约 | PROCESS/MATERIAL/BOTH桶；类型归属；类别覆盖；默认改变后原UUID重放；新旧指纹兼容；完整快照/BigDecimal精度 |
 | 真实Service/XML事务Fixture | 单条多次申报、同工序独立/重叠/待核实、部分多次分配、开始/结果/修正、并发超预算拒绝、聚合失败整笔回滚；旧CREATE assessment授权旁路 |
 | 数量不变量 | 原REPORT不变、D只扣一次、失败不再扣、R不超过原损失；上游返工仅恢复原归属损失、不新增正常报工；晚申报的历史超额投影保持 |
-| 历史/数据库 | 新迁移不改旧校验和；旧类型/费用未知；触发器仍在；旧name/status变更后历史稳定；已处理申报不得普通改删 |
+| 历史/数据库 | 新迁移不改旧校验和；旧类型未知、类别原值保留；触发器仍在；旧name/status变更后历史稳定；已处理申报不得普通改删 |
 | 放行/仓储 | 返工后不自动放行；原basis失效需重新放行；退仓决定前后库存/动作不变；既有Receipt/Acceptance/严格完工/取消后受控处理保持 |
 | 权限/分库/来源 | 同ID不同厂类型/不良隔离、无权403、切厂迟到响应；LOCAL/EXTERNAL模式与来源矩阵、配置异常失败关闭；不使用真实ERP调用替代本轮范围 |
-| 前端 | 类型候选随工序清理、默认费用展示/覆盖、即时/延后、部分处理、待核实/已报废/返工/退回筛选、原UUID未知恢复、分页重叠候选；实际浏览器与窄屏另列 |
+| 前端 | 类型候选随工序清理、默认类别展示/覆盖、即时/延后、部分处理、待核实/已报废/返工/退回筛选、原UUID未知恢复、分页重叠候选；实际浏览器与窄屏另列 |
 | 真实验收 | 用明确授权的现有PROD及绑定，在备份/冲突检查后经正式API准备标记样本；Schema/数据/API/UI分层记录。复演V1.6核心数量及V2.3 C03/C04/C11、来源/并发场景，不改已有事实 |
 
 可复用测试源码：[ProductionDefectContractTest](/Users/user/work/lixin/mes-base/mes-business/src/test/java/dev/mesbase/business/quality/ProductionDefectContractTest.java)、[ProductionQualityV13HttpTest](/Users/user/work/lixin/mes-base/mes-admin/src/test/java/dev/issuefixture/ProductionQualityV13HttpTest.java)、[ProductionQualityLifecycleHttpTest](/Users/user/work/lixin/mes-base/mes-admin/src/test/java/dev/issuefixture/ProductionQualityLifecycleHttpTest.java)、[QualityReleaseHttpTest](/Users/user/work/lixin/mes-base/mes-admin/src/test/java/dev/issuefixture/QualityReleaseHttpTest.java)、[LocalFullChainV23HttpTest](/Users/user/work/lixin/mes-base/mes-admin/src/test/java/dev/issuefixture/LocalFullChainV23HttpTest.java)。前端复用productionDefect/qualityTreatment/productionReport相关tests。均已核对存在及行为断言，本轮未运行；实施时更新受影响旧入口测试，不保留失真兼容断言。
@@ -307,13 +302,13 @@ Phase1/2可同一版本发布：无新类型配置的申报入口无法闭环，
 
 ## L. 需用户决策的问题
 
-不再询问已确认的Operation 1:N、单条申报、检验可选、三类费用、不改Quantity算法和退仓不动库存。以下是现实现与新目标之间尚需明确的细节，本文给出推荐默认方案供下一轮采用：
+不再询问已确认的Operation 1:N、单条申报、检验可选、三类类别、不改Quantity算法和退仓不动库存。以下是现实现与新目标之间尚需明确的细节，本文给出推荐默认方案供下一轮采用：
 
-1. **谁可确认及覆盖费用？** 推荐普通create只申报，现有revise作为首版质量核实/处置准入；费用覆盖另设cost:override，配置管理单独授权。若拆出assess/treat专用权限，需同时治理旧CREATE assessment入口，且不自动给角色增权。
+1. **谁可确认及覆盖类别？** 推荐普通create只申报，现有revise作为首版质量核实/处置准入；类别覆盖另设waste:override，配置管理单独授权。若拆出assess/treat专用权限，需同时治理旧CREATE assessment入口，且不自动给角色增权。
 2. **退回决定是否完成处置？** 推荐退仓决定只完成“决定”，不代表实物已处理或允许正向交接；纯退工序同理。需要确认哪些退回量可退出待处置、哪些仍阻止放行/完工，以及以后如何受控撤回/转返工；不能凭字段名直接放行。
 3. **上游返工的恢复确认点。** 推荐实际目标可为已过上游节点，可信RESULT只恢复原不良损失，授权确认人需对恢复依据负责；不自动证明中间/末道加工已重做。若业务要求逐道返工路线，则另立任务，不能修改原锁定DAG或原Quantity公式。
 4. **新“当前工序”与旧发现/影响节点。** 推荐V2现场同一实际node映射为affected/discovered，旧两者不同记录原样保留。旧退工序规则明确按discovered上游；新同一node上下文无歧义，管理历史入口不可静默改成affected基准。
-5. **旧工废/料废是否仍需新采集？** 推荐历史只读，新V2不再强制填写，与费用独立；需将legacy列改为可空并更新旧显示。若业务仍需它，作为独立可选分类，不能拿来填费用或处置结果。
+5. **工废/料废类别（已确认）** 新旧申报复用既有必填类别，扩展BOTH；不新增平行模型，不修改历史。类别与处置方式及仓库去向独立。
 
 这些问题不阻止Phase1配置准备；影响权限和处置生效的部分应在对应Phase开放前明确，不以暂定值伪造历史或启用有歧义的正式动作。
 
@@ -321,6 +316,6 @@ Phase1/2可同一版本发布：无新类型配置的申报入口无法闭环，
 
 **CONDITIONAL GO。** 现有单条不良账本、独立/重叠核实、不可变报废/返工事实与统一数量服务具有可复用基础；PROD真实Schema和存量事实支持该判断。最小路线是“一个工序子配置 + 原不良版本增量 + 原处置事件增量 + 现有页面上下文简化”，不需要另建质量平台。
 
-条件为：费用语义独立且历史未知、服务端类型归属与共同授权、事件级处理目标及单一预算、退回不冒充实物流转、原UUID和不可变历史兼容，以及分层回归通过。当前四种目标处置尚未一一形成正式能力，不能把登记去向写成已实施RETURN_OPERATION/RETURN_WAREHOUSE，也不能把当前LOCAL证据外推ERP。
+条件为：类别复用既有语义且历史原值保留、服务端类型归属与共同授权、事件级处理目标及单一预算、退回不冒充实物流转、原UUID和不可变历史兼容，以及分层回归通过。当前四种目标处置尚未一一形成正式能力，不能把登记去向写成已实施RETURN_OPERATION/RETURN_WAREHOUSE，也不能把当前LOCAL证据外推ERP。
 
 本轮交付A～M与差异矩阵、数据/API草案、实施分期和决策项；只新增本报告及忽略目录中的脱敏读取证据。未修改业务代码、Schema、配置、测试数据；未运行写API/SQL、测试构建、部署或服务启停。现有dirty文件逐文件哈希复核另存同证据目录，报告创建前基线不变。

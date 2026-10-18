@@ -12,7 +12,7 @@ public class OperationDefectTypeEntity {
 
     private String name;
 
-    private String defaultCostCategory;
+    private String defaultWasteCategory;
 
     private String status;
 
@@ -62,12 +62,12 @@ public class OperationDefectTypeEntity {
         this.name = name;
     }
 
-    public String getDefaultCostCategory() {
-        return defaultCostCategory;
+    public String getDefaultWasteCategory() {
+        return defaultWasteCategory;
     }
 
-    public void setDefaultCostCategory(String defaultCostCategory) {
-        this.defaultCostCategory = defaultCostCategory;
+    public void setDefaultWasteCategory(String defaultWasteCategory) {
+        this.defaultWasteCategory = defaultWasteCategory;
     }
 
     public String getStatus() {
