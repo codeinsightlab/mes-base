@@ -1,5 +1,4 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- MES-CODEGEN: MyBatis Generator standard single-table persistence. -->
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="dev.mesbase.business.production.dao.RoutingMapper">
   <resultMap id="BaseResultMap" type="dev.mesbase.business.production.domain.RoutingEntity">
@@ -92,6 +91,13 @@
     <include refid="Base_Column_List" />
     from routing
     where id = #{id,jdbcType=BIGINT}
+  </select>
+  <select id="selectByPrimaryKeyForUpdate" flushCache="true" useCache="false" parameterType="Long" resultMap="BaseResultMap">
+    select
+    <include refid="Base_Column_List" />
+    from routing
+    where id = #{id,jdbcType=BIGINT}
+    for update
   </select>
   <delete id="deleteByPrimaryKey" parameterType="Long">
     delete from routing

@@ -568,35 +568,27 @@ public class RoutingServiceImpl implements IRoutingService {
         var materialFilter = new MaterialExample();
         materialFilter.createCriteria()
                 .andCodeIn(List.copyOf(materialCodes));
-        var materialLock = new MaterialEntity();
-
+        var materialFilterLockedRows = new ArrayList<MaterialEntity>();
         for (var reference : materials.selectByExample(materialFilter).stream()
                 .sorted((left, right) -> left.getId().compareTo(right.getId())).toList()) {
-            materialLock.setId(reference.getId());
-            var rowFilter = new MaterialExample();
-            rowFilter.createCriteria().andIdEqualTo(reference.getId());
-            if (materials.updateByExampleSelective(materialLock, rowFilter) != 1) {
-                throw new FoundationException(ErrorCode.NOT_FOUND);
-            }
+            var locked = materials.selectByPrimaryKeyForUpdate(reference.getId());
+            if (locked == null) throw new FoundationException(ErrorCode.NOT_FOUND);
+            materialFilterLockedRows.add(locked);
         }
         var materialIndex = new HashMap<String, Long>();
-        for (var row : materials.selectByExample(materialFilter)) materialIndex.put(key(row.getCode()), row.getId());
+        for (var row : materialFilterLockedRows) materialIndex.put(key(row.getCode()), row.getId());
         var operationFilter = new OperationExample();
         operationFilter.createCriteria()
                 .andCodeIn(List.copyOf(operationCodes));
-        var operationLock = new OperationEntity();
-
+        var operationFilterLockedRows = new ArrayList<OperationEntity>();
         for (var reference : operations.selectByExample(operationFilter).stream()
                 .sorted((left, right) -> left.getId().compareTo(right.getId())).toList()) {
-            operationLock.setId(reference.getId());
-            var rowFilter = new OperationExample();
-            rowFilter.createCriteria().andIdEqualTo(reference.getId());
-            if (operations.updateByExampleSelective(operationLock, rowFilter) != 1) {
-                throw new FoundationException(ErrorCode.NOT_FOUND);
-            }
+            var locked = operations.selectByPrimaryKeyForUpdate(reference.getId());
+            if (locked == null) throw new FoundationException(ErrorCode.NOT_FOUND);
+            operationFilterLockedRows.add(locked);
         }
         var operationIndex = new HashMap<String, Long>();
-        for (var row : operations.selectByExample(operationFilter)) operationIndex.put(key(row.getCode()), row.getId());
+        for (var row : operationFilterLockedRows) operationIndex.put(key(row.getCode()), row.getId());
         int created = 0, updated = 0, skipped = 0;
         // Each route has at most 100 products/steps; maximum batch is 100 routes, one local transaction.
         for (var input : inputs) {

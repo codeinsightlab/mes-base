@@ -21,6 +21,7 @@ import dev.mesbase.business.wm.domain.WmWarehouseExample;
 import dev.mesbase.business.wm.sync.ExternalWmInventory;
 import dev.mesbase.core.error.ErrorCode;
 import dev.mesbase.core.error.FoundationException;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 import dev.mesbase.business.wm.domain.WmInventoryItem;
@@ -57,13 +58,10 @@ public class StockReferenceRules {
      * Caller holds a named business write transaction.
      */
     public WmInventoryEntity lockInventory(Long id) {
-        var filter = new WmInventoryExample();
-        filter.createCriteria().andIdEqualTo(id);
-        var patch = new WmInventoryEntity();
-        patch.setId(id);
-        if (id == null || inventories.updateByExampleSelective(patch, filter) != 1)
-            throw new FoundationException(ErrorCode.NOT_FOUND);
-        return inventories.selectByPrimaryKey(id);
+        if (id == null) throw new FoundationException(ErrorCode.NOT_FOUND);
+        var row = inventories.selectByPrimaryKeyForUpdate(id);
+        if (row == null) throw new FoundationException(ErrorCode.NOT_FOUND);
+        return row;
     }
 
     public boolean inventoryReferenced(Long id) {
@@ -112,19 +110,15 @@ public class StockReferenceRules {
         if (ids.isEmpty()) return;
         var filter = new MaterialExample();
         filter.createCriteria().andIdIn(ids);
-        // Existing generated same-value UPDATE acquires row locks shared with reference deletion.
-        var lock = new MaterialEntity();
-
+        // Lock in the same primary-key order as reference deletion.
+        var filterLockedRows = new ArrayList<MaterialEntity>();
         for (var reference : materials.selectByExample(filter).stream()
                 .sorted((left, right) -> left.getId().compareTo(right.getId())).toList()) {
-            lock.setId(reference.getId());
-            var rowFilter = new MaterialExample();
-            rowFilter.createCriteria().andIdEqualTo(reference.getId());
-            if (materials.updateByExampleSelective(lock, rowFilter) != 1) {
-                throw new FoundationException(ErrorCode.NOT_FOUND);
-            }
+            var locked = materials.selectByPrimaryKeyForUpdate(reference.getId());
+            if (locked == null) throw new FoundationException(ErrorCode.NOT_FOUND);
+            filterLockedRows.add(locked);
         }
-        if (materials.countByExample(filter) != ids.size())
+        if (filterLockedRows.size() != ids.size())
             throw new FoundationException(ErrorCode.STOCK_REFERENCE_INVALID);
     }
 
@@ -132,18 +126,14 @@ public class StockReferenceRules {
         if (ids.isEmpty()) return;
         var filter = new WmWarehouseExample();
         filter.createCriteria().andIdIn(ids);
-        var lock = new WmWarehouseEntity();
-
+        var filterLockedRows = new ArrayList<WmWarehouseEntity>();
         for (var reference : warehouses.selectByExample(filter).stream()
                 .sorted((left, right) -> left.getId().compareTo(right.getId())).toList()) {
-            lock.setId(reference.getId());
-            var rowFilter = new WmWarehouseExample();
-            rowFilter.createCriteria().andIdEqualTo(reference.getId());
-            if (warehouses.updateByExampleSelective(lock, rowFilter) != 1) {
-                throw new FoundationException(ErrorCode.NOT_FOUND);
-            }
+            var locked = warehouses.selectByPrimaryKeyForUpdate(reference.getId());
+            if (locked == null) throw new FoundationException(ErrorCode.NOT_FOUND);
+            filterLockedRows.add(locked);
         }
-        if (warehouses.countByExample(filter) != ids.size())
+        if (filterLockedRows.size() != ids.size())
             throw new FoundationException(ErrorCode.STOCK_REFERENCE_INVALID);
     }
 

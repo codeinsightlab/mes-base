@@ -1,4 +1,3 @@
-// MES-CODEGEN: MyBatis Generator standard single-table persistence.
 package dev.mesbase.business.basic.dao;
 
 import dev.mesbase.business.basic.domain.UnitMeasureEntity;
@@ -20,6 +19,8 @@ public interface UnitMeasureMapper {
     List<UnitMeasureEntity> selectByExample(UnitMeasureExample example);
 
     UnitMeasureEntity selectByPrimaryKey(Long id);
+
+    UnitMeasureEntity selectByPrimaryKeyForUpdate(Long id);
 
     int updateByExampleSelective(@Param("row") UnitMeasureEntity row, @Param("example") UnitMeasureExample example);
 

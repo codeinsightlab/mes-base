@@ -1,4 +1,3 @@
-// MES-CODEGEN: MyBatis Generator standard single-table persistence.
 package dev.mesbase.business.issue.dao;
 
 import dev.mesbase.business.issue.domain.MesMaterialIssueEntity;
@@ -20,6 +19,8 @@ public interface MesMaterialIssueMapper {
     List<MesMaterialIssueEntity> selectByExample(MesMaterialIssueExample example);
 
     MesMaterialIssueEntity selectByPrimaryKey(Long id);
+
+    MesMaterialIssueEntity selectByPrimaryKeyForUpdate(Long id);
 
     int updateByExampleSelective(@Param("row") MesMaterialIssueEntity row,
                                  @Param("example") MesMaterialIssueExample example);

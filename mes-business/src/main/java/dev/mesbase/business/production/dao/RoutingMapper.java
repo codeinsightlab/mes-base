@@ -1,4 +1,3 @@
-// MES-CODEGEN: MyBatis Generator standard single-table persistence.
 package dev.mesbase.business.production.dao;
 
 import dev.mesbase.business.production.domain.RoutingEntity;
@@ -20,6 +19,8 @@ public interface RoutingMapper {
     List<RoutingEntity> selectByExample(RoutingExample example);
 
     RoutingEntity selectByPrimaryKey(Long id);
+
+    RoutingEntity selectByPrimaryKeyForUpdate(Long id);
 
     int updateByExampleSelective(@Param("row") RoutingEntity row, @Param("example") RoutingExample example);
 

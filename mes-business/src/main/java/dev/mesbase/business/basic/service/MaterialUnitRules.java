@@ -4,8 +4,6 @@ import dev.mesbase.business.basic.dao.MaterialMapper;
 import dev.mesbase.business.basic.dao.UnitMeasureMapper;
 import dev.mesbase.business.basic.domain.MaterialEntity;
 import dev.mesbase.business.basic.domain.MaterialExample;
-import dev.mesbase.business.basic.domain.UnitMeasureEntity;
-import dev.mesbase.business.basic.domain.UnitMeasureExample;
 import dev.mesbase.business.issue.dao.MesMaterialIssueItemMapper;
 import dev.mesbase.business.issue.domain.MesMaterialIssueItemExample;
 import dev.mesbase.business.production.dao.MesWorkorderMaterialMapper;
@@ -64,16 +62,13 @@ public class MaterialUnitRules {
     }
 
     public MaterialEntity lockMaterial(Long id) {
-        var filter = new MaterialExample();
-        filter.createCriteria().andIdEqualTo(id);
-        var patch = new MaterialEntity();
-        patch.setId(id);
-        if (materials.updateByExampleSelective(patch, filter) != 1) missing();
-        return materials.selectByPrimaryKey(id);
+        var row = materials.selectByPrimaryKeyForUpdate(id);
+        if (row == null) missing();
+        return row;
     }
 
     /**
-     * Same-value generated UPDATE shares the existing reference-creation row-lock protocol.
+     * Locking reads share the existing reference-creation row-lock protocol.
      */
     public void changingUnit(MaterialEntity before, Long next) {
         if (Objects.equals(before.getUnitId(), next)) return;
@@ -105,11 +100,7 @@ public class MaterialUnitRules {
      */
     public void lockUnit(Long id) {
         if (id == null) missing();
-        var filter = new UnitMeasureExample();
-        filter.createCriteria().andIdEqualTo(id);
-        var patch = new UnitMeasureEntity();
-        patch.setId(id);
-        if (units.updateByExampleSelective(patch, filter) != 1) missing();
+        if (units.selectByPrimaryKeyForUpdate(id) == null) missing();
     }
 
     public void deletingUnits(List<Long> ids) {

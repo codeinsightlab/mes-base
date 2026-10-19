@@ -1,6 +1,5 @@
 package dev.mesbase.business.production;
 
-import dev.mesbase.business.wm.dao.WmWarehouseErpExtraMapper;
 import dev.mesbase.framework.sync.SyncCoordinator;
 import dev.mesbase.business.production.dao.WorkorderErpExtraMapper;
 import dev.mesbase.business.production.service.BusinessSourceRules;
@@ -20,7 +19,6 @@ import dev.mesbase.business.production.dao.WorkOrderExtraMapper;
 import dev.mesbase.business.production.dao.WorkorderMapper;
 import dev.mesbase.business.production.domain.MesProductionExecutionExample;
 import dev.mesbase.business.production.domain.WorkorderEntity;
-import dev.mesbase.business.production.domain.WorkorderExample;
 import dev.mesbase.business.production.domain.WorkOrderModels;
 import dev.mesbase.business.production.service.RoutingReferenceRules;
 import dev.mesbase.business.production.service.WorkOrderService;
@@ -52,7 +50,7 @@ class WorkOrderExecutionProtectionTest {
         row.setSource("LOCAL");
         row.setProductId(1L);
         when(orders.selectByPrimaryKey(1L)).thenReturn(row);
-        when(orders.updateByExampleSelective(any(WorkorderEntity.class), any(WorkorderExample.class))).thenReturn(1);
+        when(orders.selectByPrimaryKeyForUpdate(1L)).thenReturn(row);
         when(executions.countByExample(any(MesProductionExecutionExample.class))).thenReturn(1L);
         var service = new WorkOrderService(orders, mock(ProductionBatchMapper.class), mock(RoutingMapper.class), mock(RoutingProductMapper.class), mock(RoutingNodeMapper.class), mock(RoutingEdgeMapper.class), mock(MaterialMapper.class), mock(RoutingReferenceRules.class), mock(MesMaterialIssueMapper.class), mock(WorkOrderExtraMapper.class), executions, mock(WorkorderErpFacts.class), mock(BusinessDirectoryService.class), mock(MesWorkorderMaterialMapper.class), Mockito.mock(BusinessSourceRules.class), Mockito.mock(WorkorderErpExtraMapper.class), Mockito.mock(SyncCoordinator.class));
         assertEquals(ErrorCode.EXECUTION_REFERENCED, assertThrows(FoundationException.class, () -> service.delete(1L, 0)).code());

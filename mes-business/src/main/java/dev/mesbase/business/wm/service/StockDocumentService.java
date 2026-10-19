@@ -322,13 +322,10 @@ public class StockDocumentService {
     }
 
     private WmStockDocumentEntity lock(Long id) {
-        require(id);
-        var f = new WmStockDocumentExample();
-        f.createCriteria().andIdEqualTo(id);
-        var patch = new WmStockDocumentEntity();
-        patch.setId(id);
-        if (documents.updateByExampleSelective(patch, f) != 1) conflict();
-        return require(id);
+        if (id == null) bad();
+        var row = documents.selectByPrimaryKeyForUpdate(id);
+        if (row == null) throw new FoundationException(ErrorCode.NOT_FOUND);
+        return row;
     }
 
     private WmStockDocumentEntity require(Long id) {

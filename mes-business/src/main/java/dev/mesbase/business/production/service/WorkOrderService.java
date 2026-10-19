@@ -381,14 +381,7 @@ public class WorkOrderService {
 
     private WorkorderEntity order(Long id, boolean lock) {
         require(id != null);
-        if (lock) {
-            var f = new WorkorderExample();
-            f.createCriteria().andIdEqualTo(id);
-            var patch = new WorkorderEntity();
-            patch.setId(id);
-            if (orders.updateByExampleSelective(patch, f) != 1) throw new FoundationException(ErrorCode.NOT_FOUND);
-        }
-        var row = orders.selectByPrimaryKey(id);
+        var row = lock ? orders.selectByPrimaryKeyForUpdate(id) : orders.selectByPrimaryKey(id);
         if (row == null) throw new FoundationException(ErrorCode.NOT_FOUND);
         facts.hydrate(List.of(row));
         return row;
@@ -411,12 +404,7 @@ public class WorkOrderService {
             var material = materials.selectByPrimaryKey(product);
             require(material != null && EnableStatus.ENABLED.getValue().equals(material.getStatus()));
         }
-        var f = new RoutingExample();
-        f.createCriteria().andIdEqualTo(routing);
-        var patch = new RoutingEntity();
-        patch.setId(routing);
-        if (lock) require(routings.updateByExampleSelective(patch, f) == 1);
-        var r = routings.selectByPrimaryKey(routing);
+        var r = lock ? routings.selectByPrimaryKeyForUpdate(routing) : routings.selectByPrimaryKey(routing);
         require(r != null && RoutingStatus.PUBLISHED.getValue().equals(r.getStatus()));
         var p = new RoutingProductExample();
         p.createCriteria().andRoutingIdEqualTo(routing).andMaterialIdEqualTo(product);

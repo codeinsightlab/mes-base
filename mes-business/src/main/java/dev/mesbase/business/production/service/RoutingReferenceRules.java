@@ -15,6 +15,7 @@ import dev.mesbase.business.production.domain.RoutingProductExample;
 import dev.mesbase.business.production.domain.RoutingNodeExample;
 import dev.mesbase.core.error.ErrorCode;
 import dev.mesbase.core.error.FoundationException;
+import java.util.ArrayList;
 import java.util.List;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
@@ -45,19 +46,15 @@ public class RoutingReferenceRules {
         if (ids.isEmpty()) return List.of();
         var filter = new OperationExample();
         filter.createCriteria().andIdIn(ids);
-        // Same-value UPDATE takes a database row lock without a second persistence implementation.
-        var lock = new OperationEntity();
-
+        // Lock in primary-key order and validate the rows returned by the locking read.
+        var filterLockedRows = new ArrayList<OperationEntity>();
         for (var reference : operations.selectByExample(filter).stream()
                 .sorted((left, right) -> left.getId().compareTo(right.getId())).toList()) {
-            lock.setId(reference.getId());
-            var rowFilter = new OperationExample();
-            rowFilter.createCriteria().andIdEqualTo(reference.getId());
-            if (operations.updateByExampleSelective(lock, rowFilter) != 1) {
-                throw new FoundationException(ErrorCode.NOT_FOUND);
-            }
+            var locked = operations.selectByPrimaryKeyForUpdate(reference.getId());
+            if (locked == null) throw new FoundationException(ErrorCode.NOT_FOUND);
+            filterLockedRows.add(locked);
         }
-        var rows = operations.selectByExample(filter);
+        var rows = filterLockedRows;
         if (rows.size() != ids.size() || enabled && rows.stream()
                 .anyMatch(row -> !EnableStatus.ENABLED.getValue().equals(row.getStatus()))) {
             throw new FoundationException(ErrorCode.ROUTING_REFERENCE_INVALID);
@@ -69,18 +66,14 @@ public class RoutingReferenceRules {
         if (ids.isEmpty()) return List.of();
         var filter = new MaterialExample();
         filter.createCriteria().andIdIn(ids);
-        var lock = new MaterialEntity();
-
+        var filterLockedRows = new ArrayList<MaterialEntity>();
         for (var reference : materials.selectByExample(filter).stream()
                 .sorted((left, right) -> left.getId().compareTo(right.getId())).toList()) {
-            lock.setId(reference.getId());
-            var rowFilter = new MaterialExample();
-            rowFilter.createCriteria().andIdEqualTo(reference.getId());
-            if (materials.updateByExampleSelective(lock, rowFilter) != 1) {
-                throw new FoundationException(ErrorCode.NOT_FOUND);
-            }
+            var locked = materials.selectByPrimaryKeyForUpdate(reference.getId());
+            if (locked == null) throw new FoundationException(ErrorCode.NOT_FOUND);
+            filterLockedRows.add(locked);
         }
-        var rows = materials.selectByExample(filter);
+        var rows = filterLockedRows;
         if (rows.size() != ids.size() || enabled && rows.stream()
                 .anyMatch(row -> !EnableStatus.ENABLED.getValue().equals(row.getStatus()))) {
             throw new FoundationException(ErrorCode.ROUTING_REFERENCE_INVALID);

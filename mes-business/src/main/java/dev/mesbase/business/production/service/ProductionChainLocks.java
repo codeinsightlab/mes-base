@@ -3,11 +3,8 @@ package dev.mesbase.business.production.service;
 import dev.mesbase.business.production.dao.WorkorderMapper;
 import dev.mesbase.business.production.dao.MesProductionExecutionMapper;
 import dev.mesbase.business.production.domain.WorkorderEntity;
-import dev.mesbase.business.production.domain.WorkorderExample;
 import dev.mesbase.business.production.domain.MesProductionExecutionEntity;
-import dev.mesbase.business.production.domain.MesProductionExecutionExample;
 import dev.mesbase.business.issue.dao.MesMaterialIssueMapper;
-import dev.mesbase.business.issue.domain.MesMaterialIssueEntity;
 import dev.mesbase.business.issue.domain.MesMaterialIssueExample;
 import dev.mesbase.core.error.ErrorCode;
 import dev.mesbase.core.error.FoundationException;
@@ -47,25 +44,17 @@ public class ProductionChainLocks {
 
     public WorkorderEntity order(Long id) {
         if (id == null) throw new FoundationException(ErrorCode.NOT_FOUND);
-        var f = new WorkorderExample();
-        f.createCriteria().andIdEqualTo(id);
-        var patch = new WorkorderEntity();
-        patch.setId(id);
-        if (orders.updateByExampleSelective(patch, f) != 1) throw new FoundationException(ErrorCode.NOT_FOUND);
-        return orders.selectByPrimaryKey(id);
+        var row = orders.selectByPrimaryKeyForUpdate(id);
+        if (row == null) throw new FoundationException(ErrorCode.NOT_FOUND);
+        return row;
     }
 
     public MesProductionExecutionEntity execution(Long id) {
         var before = executions.selectByPrimaryKey(id);
         if (before == null) throw new FoundationException(ErrorCode.EXECUTION_NOT_FOUND);
         order(before.getWorkorderId());
-        var f = new MesProductionExecutionExample();
-        f.createCriteria().andIdEqualTo(id);
-        var patch = new MesProductionExecutionEntity();
-        patch.setId(id);
-        if (executions.updateByExampleSelective(patch, f) != 1)
-            throw new FoundationException(ErrorCode.EXECUTION_NOT_FOUND);
-        var current = executions.selectByPrimaryKey(id);
+        var current = executions.selectByPrimaryKeyForUpdate(id);
+        if (current == null) throw new FoundationException(ErrorCode.EXECUTION_NOT_FOUND);
         if (!Objects.equals(before.getWorkorderId(), current.getWorkorderId()))
             throw new FoundationException(ErrorCode.RESOURCE_CONFLICT);
         return current;
@@ -102,12 +91,8 @@ public class ProductionChainLocks {
         for (Long id : orderIds.stream().distinct().sorted().toList()) order(id);
         for (Long id : executionIds.stream().distinct().sorted().toList()) execution(id);
         for (var row : before.stream().sorted((a, b) -> a.getId().compareTo(b.getId())).toList()) {
-            var byId = new MesMaterialIssueExample();
-            byId.createCriteria().andIdEqualTo(row.getId());
-            var patch = new MesMaterialIssueEntity();
-            patch.setId(row.getId());
-            if (issues.updateByExampleSelective(patch, byId) != 1) throw new FoundationException(ErrorCode.NOT_FOUND);
-            var current = issues.selectByPrimaryKey(row.getId());
+            var current = issues.selectByPrimaryKeyForUpdate(row.getId());
+            if (current == null) throw new FoundationException(ErrorCode.NOT_FOUND);
             if (!Objects.equals(row.getWorkorderId(), current.getWorkorderId()) || !Objects.equals(row.getExecutionId(), current.getExecutionId()))
                 throw new FoundationException(ErrorCode.RESOURCE_CONFLICT);
         }

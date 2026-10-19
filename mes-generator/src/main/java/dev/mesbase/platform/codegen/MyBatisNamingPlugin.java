@@ -3,7 +3,12 @@ package dev.mesbase.platform.codegen;
 import java.util.List;
 import org.mybatis.generator.api.IntrospectedTable;
 import org.mybatis.generator.api.PluginAdapter;
+import org.mybatis.generator.api.dom.java.Interface;
+import org.mybatis.generator.api.dom.java.Method;
 import org.mybatis.generator.api.dom.java.TopLevelClass;
+import org.mybatis.generator.api.dom.xml.Attribute;
+import org.mybatis.generator.api.dom.xml.Document;
+import org.mybatis.generator.api.dom.xml.TextElement;
 import org.mybatis.generator.api.dom.xml.XmlElement;
 
 /**
@@ -42,6 +47,38 @@ public final class MyBatisNamingPlugin extends PluginAdapter {
     public boolean sqlMapSelectByExampleWithBLOBsElementGenerated(XmlElement element,
                                                                   IntrospectedTable table) {
         removeDistinct(element);
+        return true;
+    }
+
+    @Override
+    public boolean clientSelectByPrimaryKeyMethodGenerated(Method method, Interface mapper,
+                                                           IntrospectedTable table) {
+        var lockingRead = new Method(method);
+        lockingRead.setName("selectByPrimaryKeyForUpdate");
+        mapper.addMethod(lockingRead);
+        return true;
+    }
+
+    @Override
+    public boolean sqlMapDocumentGenerated(Document document, IntrospectedTable table) {
+        var root = document.getRootElement();
+        var primaryRead = root.getElements().stream()
+                .filter(XmlElement.class::isInstance)
+                .map(XmlElement.class::cast)
+                .filter(element -> element.getAttributes().stream().anyMatch(attribute ->
+                        "id".equals(attribute.getName())
+                                && "selectByPrimaryKey".equals(attribute.getValue())))
+                .findFirst();
+        primaryRead.ifPresent(element -> {
+            var lockingRead = new XmlElement(element);
+            lockingRead.getAttributes().removeIf(attribute -> "id".equals(attribute.getName()));
+            lockingRead.addAttribute(new Attribute("id", "selectByPrimaryKeyForUpdate"));
+            // Every invocation must reach the current connection, including reentrant locks.
+            lockingRead.addAttribute(new Attribute("flushCache", "true"));
+            lockingRead.addAttribute(new Attribute("useCache", "false"));
+            lockingRead.addElement(new TextElement("for update"));
+            root.addElement(lockingRead);
+        });
         return true;
     }
 

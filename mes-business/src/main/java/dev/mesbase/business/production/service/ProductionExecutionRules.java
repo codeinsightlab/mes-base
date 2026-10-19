@@ -1,7 +1,6 @@
 package dev.mesbase.business.production.service;
 
 import dev.mesbase.business.production.service.BusinessSourceRules;
-import dev.mesbase.business.shared.enums.BusinessSource;
 
 import dev.mesbase.business.production.domain.WorkOrderStatus;
 import dev.mesbase.business.quality.service.ExecutionQualityReferenceQuery;
@@ -24,12 +23,8 @@ import dev.mesbase.business.production.domain.MesProductionReportExample;
 import dev.mesbase.business.production.dao.MesExecutionPathNodeMapper;
 import dev.mesbase.business.production.domain.MesExecutionPathNodeExample;
 import dev.mesbase.business.production.domain.MesProductionExecutionEntity;
-import dev.mesbase.business.production.domain.MesProductionExecutionExample;
-import dev.mesbase.business.production.domain.RoutingEntity;
-import dev.mesbase.business.production.domain.RoutingExample;
 import dev.mesbase.business.production.domain.RoutingProductExample;
 import dev.mesbase.business.production.domain.WorkorderEntity;
-import dev.mesbase.business.production.domain.WorkorderExample;
 import dev.mesbase.common.utils.SecurityUtils;
 import dev.mesbase.core.error.ErrorCode;
 import dev.mesbase.core.error.FoundationException;
@@ -163,12 +158,8 @@ public class ProductionExecutionRules {
 
     private WorkorderEntity validateReferences(MesProductionExecutionEntity row, boolean newBinding) {
         valid(row.getWorkorderId() != null && row.getRoutingId() != null);
-        var filter = new WorkorderExample();
-        filter.createCriteria().andIdEqualTo(row.getWorkorderId());
-        var patch = new WorkorderEntity();
-        patch.setId(row.getWorkorderId());
-        valid(workorders.updateByExampleSelective(patch, filter) == 1);
-        var order = workorders.selectByPrimaryKey(row.getWorkorderId());
+        var order = workorders.selectByPrimaryKeyForUpdate(row.getWorkorderId());
+        valid(order != null);
         sources.order(row.getWorkorderId());
         valid(order != null && (row.getProductId() == null || Objects.equals(row.getProductId(), order.getProductId())));
         var product = materials.selectByPrimaryKey(order.getProductId());
@@ -177,12 +168,7 @@ public class ProductionExecutionRules {
                 .contains(row.getStatus()) || row.getStartTime() != null)
             if (!WorkOrderStatus.RELEASED.getValue().equals(order.getStatus()))
                 throw new FoundationException(ErrorCode.WORKORDER_NOT_RELEASED);
-        var routingFilter = new RoutingExample();
-        routingFilter.createCriteria().andIdEqualTo(row.getRoutingId());
-        var routingPatch = new RoutingEntity();
-        routingPatch.setId(row.getRoutingId());
-        valid(routings.updateByExampleSelective(routingPatch, routingFilter) == 1);
-        var routing = routings.selectByPrimaryKey(row.getRoutingId());
+        var routing = routings.selectByPrimaryKeyForUpdate(row.getRoutingId());
         valid(routing != null && routing.getPublishedAt() != null && (!newBinding || RoutingStatus.PUBLISHED.getValue()
                 .equals(routing.getStatus())));
         var applicable = new RoutingProductExample();

@@ -8,7 +8,6 @@ import dev.mesbase.business.wm.dao.WmStockActionMapper;
 import dev.mesbase.business.wm.dao.WmWarehouseMapper;
 import dev.mesbase.business.wm.domain.WmInventoryEntity;
 import dev.mesbase.business.wm.domain.WmStockDocumentLineEntity;
-import dev.mesbase.business.wm.domain.WmInventoryExample;
 import dev.mesbase.business.wm.domain.WmStockActionEntity;
 import dev.mesbase.business.wm.domain.WmStockActionExample;
 import dev.mesbase.business.wm.domain.WmInventoryResource;
@@ -39,7 +38,6 @@ import dev.mesbase.business.shared.enums.EnableStatus;
 import dev.mesbase.common.utils.SecurityUtils;
 import dev.mesbase.core.error.ErrorCode;
 import dev.mesbase.core.error.FoundationException;
-import dev.mesbase.platform.execution.FactoryContext;
 import dev.mesbase.infrastructure.cache.annotation.BusinessCacheEvict;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -297,12 +295,9 @@ public class LocalStockService {
 
     @Transactional(transactionManager = "businessTransactionManager", propagation = Propagation.MANDATORY)
     public WmInventoryEntity lock(Long id) {
-        var f = new WmInventoryExample();
-        f.createCriteria().andIdEqualTo(id);
-        var patch = new WmInventoryEntity();
-        patch.setId(id);
-        if (id == null || inventory.updateByExampleSelective(patch, f) != 1) conflict();
-        var stock = inventory.selectByPrimaryKey(id);
+        if (id == null) conflict();
+        var stock = inventory.selectByPrimaryKeyForUpdate(id);
+        if (stock == null) conflict();
         validateBalances(stock.getQuantity(), available(stock));
         return stock;
     }

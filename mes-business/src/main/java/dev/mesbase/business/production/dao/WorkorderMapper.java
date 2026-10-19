@@ -1,4 +1,3 @@
-// MES-CODEGEN: MyBatis Generator standard single-table persistence.
 package dev.mesbase.business.production.dao;
 
 import dev.mesbase.business.production.domain.WorkorderEntity;
@@ -20,6 +19,8 @@ public interface WorkorderMapper {
     List<WorkorderEntity> selectByExample(WorkorderExample example);
 
     WorkorderEntity selectByPrimaryKey(Long id);
+
+    WorkorderEntity selectByPrimaryKeyForUpdate(Long id);
 
     int updateByExampleSelective(@Param("row") WorkorderEntity row, @Param("example") WorkorderExample example);
 

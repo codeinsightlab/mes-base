@@ -6,8 +6,6 @@ import dev.mesbase.business.integration.warehouse.ExternalEffect;
 import dev.mesbase.business.issue.dao.MesMaterialIssueMapper;
 import dev.mesbase.business.issue.domain.MesMaterialIssueEntity;
 import dev.mesbase.business.production.dao.WorkorderMapper;
-import dev.mesbase.business.production.domain.WorkorderEntity;
-import dev.mesbase.business.production.domain.WorkorderExample;
 import dev.mesbase.business.integration.warehouse.WarehouseIntegration;
 import dev.mesbase.business.integration.warehouse.ErpActionResult;
 import dev.mesbase.business.integration.warehouse.ErpActionResult.Status;
@@ -164,11 +162,8 @@ public class MaterialIssueVoidService {
         rules.lockIssues(List.of(id));
         var row = rules.hydrate(issues.selectByPrimaryKey(id));
         if (row.getWorkorderId() != null) {
-            var filter = new WorkorderExample();
-            filter.createCriteria().andIdEqualTo(row.getWorkorderId());
-            var patch = new WorkorderEntity();
-            patch.setId(row.getWorkorderId());
-            if (orders.updateByExampleSelective(patch, filter) != 1) throw new FoundationException(ErrorCode.NOT_FOUND);
+            if (orders.selectByPrimaryKeyForUpdate(row.getWorkorderId()) == null)
+                throw new FoundationException(ErrorCode.NOT_FOUND);
         }
         return row;
     }

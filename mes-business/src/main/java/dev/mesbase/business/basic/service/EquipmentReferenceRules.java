@@ -7,6 +7,7 @@ import dev.mesbase.business.basic.domain.WorkstationEntity;
 import dev.mesbase.business.basic.domain.WorkstationExample;
 import dev.mesbase.core.error.ErrorCode;
 import dev.mesbase.core.error.FoundationException;
+import java.util.ArrayList;
 import java.util.List;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
@@ -28,18 +29,14 @@ public class EquipmentReferenceRules {
     public void lockWorkstations(List<Long> ids) {
         var filter = new WorkstationExample();
         filter.createCriteria().andIdIn(ids);
-        var lock = new WorkstationEntity();
-
+        var filterLockedRows = new ArrayList<WorkstationEntity>();
         for (var reference : workstations.selectByExample(filter).stream()
                 .sorted((left, right) -> left.getId().compareTo(right.getId())).toList()) {
-            lock.setId(reference.getId());
-            var rowFilter = new WorkstationExample();
-            rowFilter.createCriteria().andIdEqualTo(reference.getId());
-            if (workstations.updateByExampleSelective(lock, rowFilter) != 1) {
-                throw new FoundationException(ErrorCode.NOT_FOUND);
-            }
+            var locked = workstations.selectByPrimaryKeyForUpdate(reference.getId());
+            if (locked == null) throw new FoundationException(ErrorCode.NOT_FOUND);
+            filterLockedRows.add(locked);
         }
-        if (workstations.countByExample(filter) != ids.size()) {
+        if (filterLockedRows.size() != ids.size()) {
             throw new FoundationException(ErrorCode.NOT_FOUND);
         }
     }

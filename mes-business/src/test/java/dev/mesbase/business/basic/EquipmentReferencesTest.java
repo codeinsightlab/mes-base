@@ -2,6 +2,7 @@ package dev.mesbase.business.basic;
 
 import dev.mesbase.business.basic.dao.EquipmentMapper;
 import dev.mesbase.business.basic.dao.WorkstationMapper;
+import dev.mesbase.business.basic.domain.WorkstationEntity;
 import dev.mesbase.business.basic.service.EquipmentReferenceRules;
 import dev.mesbase.core.error.ErrorCode;
 import dev.mesbase.core.error.FoundationException;
@@ -30,7 +31,10 @@ class EquipmentReferencesTest {
             assertEquals(ErrorCode.NOT_FOUND, assertThrows(FoundationException.class,
                     () -> rules.deletingWorkstations(List.of(1L))).code());
             verify(equipment, never()).countByExample(any());
-            when(stations.countByExample(any())).thenReturn(1L);
+            var station = new WorkstationEntity();
+            station.setId(1L);
+            when(stations.selectByExample(any())).thenReturn(List.of(station));
+            when(stations.selectByPrimaryKeyForUpdate(1L)).thenReturn(station);
             when(equipment.countByExample(any())).thenReturn(1L);
             assertEquals(ErrorCode.RESOURCE_CONFLICT, assertThrows(FoundationException.class,
                     () -> rules.deletingWorkstations(List.of(1L))).code());

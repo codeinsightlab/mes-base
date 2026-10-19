@@ -96,6 +96,13 @@
     from mes_production_execution
     where id = #{id,jdbcType=BIGINT}
   </select>
+  <select id="selectByPrimaryKeyForUpdate" flushCache="true" useCache="false" parameterType="Long" resultMap="BaseResultMap">
+    select
+    <include refid="Base_Column_List" />
+    from mes_production_execution
+    where id = #{id,jdbcType=BIGINT}
+    for update
+  </select>
   <delete id="deleteByPrimaryKey" parameterType="Long">
     delete from mes_production_execution
     where id = #{id,jdbcType=BIGINT}

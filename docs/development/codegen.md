@@ -904,3 +904,9 @@ Controller 接口、前端 API／按钮或同步权限。工具自身缺参默�
 - 既有 CodegenAcceptanceTest（13 项通过）使用 H2 和真实生成 Mapper/XML、PageInterceptor/Spring Service 验证分页 SQL、总数与清理；请求边界、异步派发、目录及持久化隔离测试随 verify 执行。BusinessDirectoryTest 4 项、RequestStateLifecycleTest 3 项、AsyncRequestBoundaryHttpTest 2 项、PersistenceDeepAuditTest 13 项均通过。各项结果以 surefire 报告为准，真实 MySQL 条件测试跳过不算通过。
 
 **边界与回滚：** 未重启用户服务，未对现有 5173/后端进行在线 HTTP、真实 MySQL 或 UI 复验，未提交/推送。回滚只恢复本轮 Service、模板和关联测试差异，不恢复或覆盖其他并行工作。以后新增分页仍需资源关闭或显式 finally，不得仅以 doSelectPage 替代清理。
+
+### 2026-10-19：显式主键锁定读
+
+本轮按用户授权，将生产/库存引用保护的同值UPDATE锁替换为主键锁定读。MBG扩展在原Mapper/XML生成 `selectByPrimaryKeyForUpdate`，复用原主键类型、列清单和resultMap；不新增ExtraMapper，不自动加锁普通CRUD，也不生成锁顺序或业务状态规则。该方法仅供已有显式写事务内调用，XML配置 `flushCache=true`、`useCache=false`，确保不复用MyBatis一级/二级缓存结果。MySQL的当前读不负责绕过MyBatis缓存，二者需要分别保证。
+
+本轮已有11张表的Mapper/XML手工适配并移除该文件的MES-CODEGEN归属标记，保护定制文件；未来新生成产物由通用插件提供同名能力。锁顺序由业务Service维持；`FOR UPDATE`不替代乐观版本更新、数据库条件状态抢占或run_token隔离。只依赖Redis租约不能替代与数据库提交一致的行锁。生成契约测试使用非id字段的String主键，业务缓存测试覆盖“普通查询缓存旧值、锁定读必须返回当前值”。真实DEV并发及性能证据追加到现有SQL/性能报告。

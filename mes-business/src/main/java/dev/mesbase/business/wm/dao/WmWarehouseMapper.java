@@ -1,4 +1,3 @@
-// MES-CODEGEN: MyBatis Generator standard single-table persistence.
 package dev.mesbase.business.wm.dao;
 
 import dev.mesbase.business.wm.domain.WmWarehouseEntity;
@@ -20,6 +19,8 @@ public interface WmWarehouseMapper {
     List<WmWarehouseEntity> selectByExample(WmWarehouseExample example);
 
     WmWarehouseEntity selectByPrimaryKey(Long id);
+
+    WmWarehouseEntity selectByPrimaryKeyForUpdate(Long id);
 
     int updateByExampleSelective(@Param("row") WmWarehouseEntity row, @Param("example") WmWarehouseExample example);
 

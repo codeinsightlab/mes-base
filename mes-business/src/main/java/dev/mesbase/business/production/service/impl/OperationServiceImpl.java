@@ -18,6 +18,7 @@ import dev.mesbase.infrastructure.cache.annotation.BusinessCache;
 import dev.mesbase.infrastructure.cache.annotation.BusinessCacheEvict;
 import dev.mesbase.platform.execution.FactoryContext;
 import java.util.HashSet;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -244,19 +245,15 @@ public class OperationServiceImpl implements IOperationService {
         var filter = new OperationExample();
         filter.createCriteria().andCodeIn(List.copyOf(keys));
         // Lock existing definitions before reading the revision used by this write.
-        var lock = new OperationEntity();
-
+        var filterLockedRows = new ArrayList<OperationEntity>();
         for (var reference : mapper.selectByExample(filter).stream()
                 .sorted((left, right) -> left.getId().compareTo(right.getId())).toList()) {
-            lock.setId(reference.getId());
-            var rowFilter = new OperationExample();
-            rowFilter.createCriteria().andIdEqualTo(reference.getId());
-            if (mapper.updateByExampleSelective(lock, rowFilter) != 1) {
-                throw new FoundationException(ErrorCode.NOT_FOUND);
-            }
+            var locked = mapper.selectByPrimaryKeyForUpdate(reference.getId());
+            if (locked == null) throw new FoundationException(ErrorCode.NOT_FOUND);
+            filterLockedRows.add(locked);
         }
         var existing = new HashMap<String, OperationEntity>();
-        for (var row : mapper.selectByExample(filter)) existing.put(row.getCode().toLowerCase(Locale.ROOT), row);
+        for (var row : filterLockedRows) existing.put(row.getCode().toLowerCase(Locale.ROOT), row);
         int created = 0, updated = 0, skipped = 0;
         for (var input : inputs) {
             var row = existing.get(input.code().strip().toLowerCase(Locale.ROOT));

@@ -1,15 +1,10 @@
 package dev.mesbase.business.issue.service;
 
 import dev.mesbase.business.production.service.BusinessSourceRules;
-import dev.mesbase.business.shared.enums.BusinessSource;
 
 import dev.mesbase.business.issue.domain.MaterialIssueStatus;
 import dev.mesbase.business.integration.warehouse.ExternalEffect;
 import dev.mesbase.business.basic.dao.MaterialMapper;
-import dev.mesbase.business.basic.domain.MaterialExample;
-import dev.mesbase.business.basic.domain.MaterialEntity;
-import dev.mesbase.business.basic.domain.UnitMeasureExample;
-import dev.mesbase.business.basic.domain.UnitMeasureEntity;
 import dev.mesbase.business.basic.dao.UnitMeasureMapper;
 import dev.mesbase.business.issue.dao.MesMaterialIssueMapper;
 import dev.mesbase.business.issue.dao.MesMaterialIssueItemMapper;
@@ -18,8 +13,6 @@ import dev.mesbase.business.issue.domain.MesMaterialIssueExample;
 import dev.mesbase.business.issue.domain.MesMaterialIssueItemEntity;
 import dev.mesbase.business.issue.domain.MesMaterialIssueItemExample;
 import dev.mesbase.business.production.dao.WorkorderMapper;
-import dev.mesbase.business.production.domain.WorkorderEntity;
-import dev.mesbase.business.production.domain.WorkorderExample;
 import dev.mesbase.business.production.dao.RoutingMapper;
 import dev.mesbase.business.production.dao.RoutingProductMapper;
 import dev.mesbase.business.production.domain.RoutingProductExample;
@@ -134,12 +127,7 @@ public class MaterialIssueRules {
         }
         if (row.getWorkorderId() != null) {
             // WorkOrder belongs to the request-pinned business database.
-            var filter = new WorkorderExample();
-            filter.createCriteria().andIdEqualTo(row.getWorkorderId());
-            var lock = new WorkorderEntity();
-            lock.setId(row.getWorkorderId());
-            require(workorders.updateByExampleSelective(lock, filter) == 1);
-            var workorder = workorders.selectByPrimaryKey(row.getWorkorderId());
+            var workorder = workorders.selectByPrimaryKeyForUpdate(row.getWorkorderId());
             require(workorder != null);
             sources.order(workorder.getId());
             require(row.getProductId() == null || Objects.equals(row.getProductId(), workorder.getProductId()));
@@ -174,22 +162,12 @@ public class MaterialIssueRules {
             throw new FoundationException(ErrorCode.ISSUE_VOID_CONFLICT);
         require(row.getQuantity().signum() > 0 && row.getQuantity().scale() <= 6
                 && row.getQuantity().precision() - row.getQuantity().scale() <= 14);
-        var materialLock = new MaterialEntity();
-        materialLock.setId(row.getMaterialId());
-        var materialFilter = new MaterialExample();
-        materialFilter.createCriteria().andIdEqualTo(row.getMaterialId());
-        require(materials.updateByExampleSelective(materialLock, materialFilter) == 1);
-        var material = materials.selectByPrimaryKey(row.getMaterialId());
+        var material = materials.selectByPrimaryKeyForUpdate(row.getMaterialId());
         require(material != null);
         row.setMaterialCode(material.getCode());
         row.setUnitCode(null);
         if (row.getUnitId() != null) {
-            var unitLock = new UnitMeasureEntity();
-            unitLock.setId(row.getUnitId());
-            var unitFilter = new UnitMeasureExample();
-            unitFilter.createCriteria().andIdEqualTo(row.getUnitId());
-            require(units.updateByExampleSelective(unitLock, unitFilter) == 1);
-            var unit = units.selectByPrimaryKey(row.getUnitId());
+            var unit = units.selectByPrimaryKeyForUpdate(row.getUnitId());
             require(unit != null);
             row.setUnitCode(unit.getCode());
         }
