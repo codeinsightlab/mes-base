@@ -441,3 +441,14 @@ MySQL支持按主键 `SELECT ... FOR UPDATE` 同时取得当前行与排他锁�
 多Service重复调用同一锁函数是另一个问题：即便5→3，重入仍可能重复发SQL。必须单独建立当前事务持锁与视图有效性证明，不能因为“已经锁过”就复用过期数量/质量事实。当前所有锁保留；本次只提出同锁顺序下的表达替换建议。
 
 官方依据（2026-10-19核对）：[MySQL8.0 Locking Reads](https://dev.mysql.com/doc/refman/8.0/en/innodb-locking-reads.html)、[InnoDB语句锁范围](https://dev.mysql.com/doc/refman/8.0/en/innodb-locks-set.html)、[Connector/J useAffectedRows](https://dev.mysql.com/doc/connector-j/en/connector-j-connp-props-connection.html)。未进行本轮FOR UPDATE替换或并发等价实验，不能宣称替换已验收。
+
+
+## 2026-10-19 实施完成：主键 FOR UPDATE 与 DEV 复测
+
+按用户后续明确授权，已将全仓确认的24处纯同值UPDATE锁（13个Service/Rules，11个原业务Mapper/XML）替换为返回当前行的主键FOR UPDATE，保留WorkOrder→Execution→Issue排序、锁后父身份检查、数量权威、质量/来源/路径/权限/UUID规则。没有直接删除互斥，也没有用Redis租约替代数据库事务行锁。工单作废/工艺revision CAS、库存实际变更、同步及Quartz令牌抢占仍保留真实条件UPDATE。
+
+`execution` 单次方法5→3条Mapper SQL；完整暖请求READY 84→68（Mapper67→59、driver10→2、控制7），RUNNING69→57（Mapper55→49、driver7→1、控制7），重放8→8。Execution的SELECT合计仍10/9，WorkOrder仍8/6，部分普通读取转为锁定读，不把它说成已经解决跨Service重复读取。所有新锁查询flushCache=true/useCache=false；MySQL当前读与MyBatis缓存绕过是两层机制。通用MBG生成能力和缓存/锁序测试同步补齐。
+
+DEV两JVM验证同UUID16请求只一事实；不同UUID数量竞争10成功6拒绝、总量10；READY、payload冲突、工单作废、失败完工/回滚、库存重复过账及同库存竞争均按预期。捕获workorder PRIMARY的RECORD/X,REC_NOT_GAP等待及ROLLBACK后放行。新JAR f7025c0e99013aa0ccbc8167258299f5beb764c7df483d150c6f61639b3a62b8。
+
+两版各1280计时请求，1/4/8/16并发吞吐A 2.403/8.311/14.296/24.988，B 2.716/9.191/16.579/26.762 req/s，全部成功。16并发P95 751.91→772.84ms略升，不宣称尾延迟全面改善。旧Source Factory B45表摘要和绑定不变，DEV既有123886行逐字段未改。完整报告、逐条SQL、资源和限制见[性能报告第14节](2026-10-19-dev-production-chain-performance.md#14-2026-10-19-同值-update-锁改为-for-update实施与-dev-对照)及[独立证据](evidence/2026-10-19-production-lock-for-update/README.md)。上文“尚未实施”的结论仅对应前一阶段，现由本节实施证据补充；原失败/成功Trace不覆盖。

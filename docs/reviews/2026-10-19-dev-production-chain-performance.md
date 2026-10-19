@@ -1,6 +1,6 @@
 # Factory B 十万级数据复制到DEV与性能对照验收
 
-日期：2026-10-19。当前状态：**GO，本轮隔离复制及性能测量完成**，见第13节。第1—12节保留解阻前 NO-GO 历史记录，不能作为当前状态。源45表完整复制至独立DEV Schema，原901闭环及121,830条历史记录保持；正式Trace、1/4/8/16并发测试及收尾已完成，不代表生产SLA认证。
+日期：2026-10-19。当前状态：**GO，本轮隔离复制及性能测量完成**，第13节为复制基线，第14节为后续FOR UPDATE实施与复测。第1—12节保留解阻前 NO-GO 历史记录，不能作为当前状态。源45表完整复制至独立DEV Schema，原901闭环及121,830条历史记录保持；正式Trace、1/4/8/16并发测试及收尾已完成，不代表生产SLA认证。
 
 ## 1. 源库、目标库和隔离预检
 
@@ -288,3 +288,105 @@ DEV复现Execution主键READY10/RUNNING9次、WorkOrder8/6次、路径节点3次
 当前答案：正常RUNNING完整协议69条（55 Mapper+7驱动SELECT+7控制），READY84条，重放8条；重复主键及锁相关往返仍在。单请求服务器最突出COMMIT约77ms，累计往返最高的是Execution/WorkOrder读取；16并发稳态报工22.377 req/s、P95 1312.57ms，READY预热另有明显等待。下一轮优先评估资格COUNT、锁后身份视图复用、锁定节点快照复用，先补并发证明再实施。
 
 最终交付复核：`scripts/check-private-config.py`通过（仅选定工作树，不含Git历史）；全部公开证据JSON/JSONL解析、文档相对链接及SHA256清单核验通过。初始已有路径仅application.yml的用户并行修改不同；前轮报告保持原哈希。证据目录与私有诊断目录均命中现有Git忽略规则，未提交/推送。
+
+
+## 14. 2026-10-19 同值 UPDATE 锁改为 FOR UPDATE：实施与 DEV 对照
+
+### 14.1 实施范围、版本与保护边界
+
+本节是后续用户明确授权的代码实施；第1—13节保留原复制与旧版性能历史。本轮全仓审查生产Java/XML中的同值UPDATE、主键补丁、锁方法和条件抢占，确认并替换 **24个纯加锁调用点，分布13个Service/Rules、11张业务表的原Mapper/XML**。范围包括生产链WorkOrder/Execution/Issue、工艺与工序/物料引用、计量单位/工位、库存及库存单据。逐文件清单见[锁审查清单](evidence/2026-10-19-production-lock-for-update/lock-audit.json)。
+
+保留的真实UPDATE：工单作废的status+revision条件变更、工艺revision+1 CAS、库存余额和单据状态写入、同步run_token/lease与Quartz running_token条件抢占。这些是持久化状态转换，不能用SELECT或Redis锁替代。中心角色、启动版本、OpenAPI客户端、编码规则等已使用FOR UPDATE的入口未发现本轮这种“纯同值UPDATE+重读”模式，未重写；部分既有Mapper归属/Extra历史不属于本轮治理。数据库事务行锁本身可跨JVM互斥，并随commit/rollback结束；本轮不新增Redis分布式锁，不引入TTL与数据库提交脱节的第二套互斥协议。
+
+HEAD仍为 `9b709348fc4fbae58743f16e9fb9bf4536732e75`，工作树含本轮源码和既有未跟踪报告。用户原有application.yml改动在本轮开始/结束字节一致，未覆盖。固定A旧JAR SHA256=`0a54a3080bc1f0e8ba2efbb0d0477ee56b42f78b86d327af0bce6fbab3b3f5d9`；固定B新JAR SHA256=`f7025c0e99013aa0ccbc8167258299f5beb764c7df483d150c6f61639b3a62b8`。[构建/源码摘要](evidence/2026-10-19-production-lock-for-update/artifact.json)。两版运行均显式使用同一份冻结的外部配置，排除用户并行application.yml变化对比较的影响；Java21、Connector/J、Druid、事务隔离、权限角色与数据源绑定保持相同。源码新改动没有部署到源Factory B。
+
+DEV只用既有隔离Factory `TEST_DEV_PERF_20261019` → DataSource9/r2 → `192.168.18.25:3306/mes_base_dev_perf_test`，LOCAL；Business V39、Master V40，本轮没有执行迁移或权限授予。报工账号6246/工厂角色152未扩权；作废及完工负例使用已有DEV管理员100的既有正式权限，仍只针对本轮新工单，不使用PROD身份/会话。[前置核验](evidence/2026-10-19-production-lock-for-update/target-preflight.xml)。
+
+### 14.2 锁语义与 Mapper 缓存
+
+`ProductionChainLocks.order` 从 UPDATE(id=id)+SELECT 改为一次返回完整行的主键FOR UPDATE。`execution` 仍先普通读取父工单ID，再锁WorkOrder，最后锁Execution并复核父身份，**单次完整方法5条Mapper SQL变为3条**；发现父身份的一次读取不能在未知父ID时盲目删除。Issue仍按既有WorkOrder→Execution→Issue顺序及ID排序加锁，并保留锁后关联比较；WorkOrder/Execution重复重入的Service契约继续保留。本轮没有引入“已经锁过”的请求缓存或复用过期数量视图。
+
+11个原Mapper/XML增加 `selectByPrimaryKeyForUpdate`，复用完整列清单/resultMap、主键参数和固定SessionFactory归属，无新ExtraMapper。批量引用保护仍按已发现ID排序逐主键锁定，用锁定读返回的当前行校验数量/状态，不再UPDATE后另做重读/COUNT；编码同步仍先发现候选ID、再按主键顺序逐条锁，保留有界N+1，尚未实现单条批量锁查询。旧后置查询可能看见未锁定的并发新插入，当前实现只使用本轮实际锁住的行，缺项失败关闭/由既有唯一约束拒绝，不转而更新未锁定对象。
+
+MySQL的当前读只在SQL到达数据库后发生，不会自动绕过MyBatis缓存。新XML明确 `flushCache=true`（清理一级缓存并触发所属二级缓存失效）、`useCache=false`（不使用二级缓存），确保每次锁定读真正执行。没有全局关闭普通查询缓存。手工修改带MES-CODEGEN标记的文件已按规则移除该文件标记；通用MBG插件同时补齐同名主键锁定读生成能力，未来生成不会再因缺能力而借用UPDATE。调用方仍须处于原有业务写事务内。
+
+### 14.3 同环境、同口径完整 SQL Trace
+
+A/B串行启动独立诊断实例，使用相同调用级采样方法，参数及结果仅公开哈希。每个主样本的实际JDBC execute=Mapper次数，COM_QUERY协议数与实际物理连接的Performance Schema statement/sql前后计数一致；每条SQL顺序、MapperID、调用栈、事务/数据源、耗时及FOR UPDATE标识见链接。
+
+|版本/请求|Mapper|Driver SELECT|事务控制|完整SQL|Master/Business完整SQL|HTTP Root ms|JDBC互斥并集 ms|服务器elapsed ms|
+|---|---:|---:|---:|---:|---|---:|---:|---:|
+|[A READY](evidence/2026-10-19-production-lock-for-update/a-ready-sql.md)|67|10|7|84|7/77|635.620|471.834|123.697|
+|[A RUNNING](evidence/2026-10-19-production-lock-for-update/a-running-sql.md)|55|7|7|69|7/62|625.764|457.026|144.984|
+|[A REPLAY](evidence/2026-10-19-production-lock-for-update/a-replay-sql.md)|3|0|5|8|2/6|40.947|29.164|2.422|
+|[B READY](evidence/2026-10-19-production-lock-for-update/b-ready-sql.md)|59|2|7|68|7/61|474.618|361.762|85.458|
+|[B RUNNING](evidence/2026-10-19-production-lock-for-update/b-running-sql.md)|49|1|7|57|7/50|403.382|301.421|93.680|
+|[B REPLAY](evidence/2026-10-19-production-lock-for-update/b-replay-sql.md)|3|0|5|8|2/6|43.526|31.567|2.523|
+
+结论：READY **84→68（少16条）**，RUNNING **69→57（少12条）**，UUID重放8→8。READY少8个纯UPDATE及其8个驱动只读探测；RUNNING少6个纯UPDATE及其6个探测。剩余真实INSERT/状态UPDATE仍有驱动transaction_read_only读取，未改驱动或Druid配置。Master SQL没有因本轮改动减少，授权/资格查询保持原链路。
+
+**不能误读为Execution读取次数已下降。** READY Execution从10次普通SELECT+3次纯UPDATE，变为7次普通SELECT+3次FOR UPDATE；RUNNING从9次普通SELECT+3次纯UPDATE，变为6次普通SELECT+3次FOR UPDATE，SELECT合计仍10/9。WorkOrder普通SELECT从8/6变为4/3，另有4/3次FOR UPDATE，SELECT合计仍8/6。减少的是锁定与返回行合并后的独立DML及其驱动往返；跨Service重复加载问题仍待下一轮显式持锁视图证明，未借机删锁或缓存数量事实。
+
+READY/RUNNING中的正式INSERT、COMMIT、提交后SpringCommitActions及缓存失效均到达；READY只进行一次生命周期启动，路径保持LOCKED。所有嵌套Mapper/Service/事务span、JDBC和服务器elapsed不能相加：JDBC含网络/服务器等待，服务器elapsed也不是DB CPU。线程级服务器计数只用于单请求串行且无后台重用连接干扰的窗口。
+
+采样偏差单独保留：B第一条成功READY触发冷池初始化，100个协议命令中95个COM_QUERY、5个COM_PING，不能把100当SQL数；第二条成功READY为68条SQL，但服务器计数核对受同连接其他活动干扰。前两条不作服务器完整匹配主样本；各1条事实均保留，未重放为“首次报工”。增加登录审计静默期、预热连接，另建独立READY资源后取得上表匹配样本。干扰与异步登录审计存在时间相关性，未把未归因计数强行塞入报工调用链。[原始偏差摘要及私有Trace摘要](evidence/2026-10-19-production-lock-for-update/excluded-startup-samples.json)。HTTP单样本不推导P50或提升率。
+
+### 14.4 DEV 两个独立 JVM 的并发正确性
+
+正式HTTP请求交错发往18082/18083，使用同一个隔离Factory及独立测试账号；两个进程没有共享JVM锁。除显式持锁诊断只执行SELECT/ROLLBACK外，业务事实均由正式API创建，未直接SQL修改状态/库存或伪造报工。
+
+|场景|实际结果与数据库事实|
+|---|---|
+|同Execution、同UUID、同payload，16请求|全部HTTP200，返回同一个ID，仅1条报工事实|
+|同Execution、16个不同UUID各报1，投产上限10|10个200、6个409/REPORT_QUANTITY_CONFLICT；事实10条，总量10，可报量0|
+|READY首次报工竞争16请求各0.01|全部200，16条事实/总量0.16；Execution RUNNING，有start_time，路径仍LOCKED|
+|同UUID不同payload（数量1/2）竞争|1个200、1个409，仅1条事实|
+|超额失败与持锁回滚|非法报11返回409、0事实；独立SQL会话按WO→Execution持锁，另一JVM请求实际等待；ROLLBACK后3358.682ms完成合法报工，仅1事实|
+|作废与报工竞争|本样本报工先成功1条、随后作废成功；后续新UUID报工409/WORKORDER_CANCELLED；原成功UUID在另一JVM仍可重放且不新增事实|
+|不具备完工条件|正式完工409/PRODUCTION_CLOSURE_BLOCKED，0完工事实；随后另一JVM正常报工200，证明失败路径释放锁|
+|同一库存单据16次同UUID过账|全部200，仅1条+5库存动作|
+|两个不同出库单争用余额5，各扣4|仅1份过账成功、另一份明确拒绝；余额/可用量均1，库存动作合计2条（+5、-4）；单据状态2 POSTED、1 DRAFT|
+
+[生产并发结果](evidence/2026-10-19-production-lock-for-update/concurrency-results.json)、[库存并发结果](evidence/2026-10-19-production-lock-for-update/concurrency-stock-results.json)、同目录测试脚本。实际捕获锁等待为 `workorder / PRIMARY / RECORD / X,REC_NOT_GAP / WAITING / LOCK_DATA=1003`，明确是本轮新工单的记录锁；不是根据UPDATE耗时猜测行锁。完整列主键锁定读的只读EXPLAIN在WorkOrder、Execution、Inventory均为PRIMARY/const/估1行，无新增索引。[执行计划](evidence/2026-10-19-production-lock-for-update/locking-read-plans.json)。这不是缺失行/范围查询锁行为的全面证明。
+
+单元/生成契约补验覆盖：父锁先于子锁、锁后父身份变化拒绝、等待期间Execution消失拒绝、被引用工单/工位删除保护、非id的String主键生成，以及普通读取缓存旧值而FOR UPDATE必须读到当前值。缓存用H2证明MyBatis机制，真实并发与锁证据来自上述DEV MySQL，二者不混用。
+
+### 14.5 无 agent 的 A/B 性能对照
+
+两版各29个独立工单/Execution，每worker一份；每档2次正式预热/worker，不计入时延统计。1/4/8并发各256次，16并发512次，两版共2,560个计时报工全部200，无错误、无超时。确定性UUID，发送前落SQLite，不自动重试。每次节点A报0.010000，投产10，保持相同业务规则；不是对原901个已完工工单重报。诊断、建数据、EXPLAIN、构建和管理操作均不与计时阶段混跑。
+
+|并发|每版N|A吞吐 req/s|B吞吐 req/s|A P50 ms|B P50 ms|A P95 ms|B P95 ms|A P99 ms|B P99 ms|
+|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+|1|256|2.403|2.716|408.98|359.06|462.63|438.11|485.31|475.57|
+|4|256|8.311|9.191|468.99|417.26|549.12|529.91|599.72|590.78|
+|8|256|14.296|16.579|525.36|471.27|643.83|583.19|759.90|657.67|
+|16|512|24.988|26.762|616.91|554.70|751.91|772.84|857.14|847.64|
+
+本次各档吞吐均提高、P50均降低；**16并发P95从751.91升到772.84ms，不能声称尾延迟全面改善。** 分位数按(n-1)线性插值，只有一组A后B的顺序实验，未随机交替/长时运行，不给统计显著性或生产SLA承诺。数据规模、每worker报工量与客户端一致，数据库持续增长少量新事实、缓存/JIT/存储背景活动仍可能影响结果。[完整逐请求与阶段结果](evidence/2026-10-19-production-lock-for-update/benchmark-comparison.json)，同目录a/b-write-c*-samples.json为逐请求时延。
+
+各档计时窗口全局InnoDB row_lock_waits/time增量均0；这是独立Execution的RUNNING稳态，不代表同Execution/READY不等待。READY预热最大HTTP另列，A/B：C1 533.3/490.3ms、C4 1214.3/1017.6ms、C8 2468.5/2193.2ms、C16 4928.1/6021.4ms。共享Routing等必要锁、池扩容及提交等待仍可能形成排队，FOR UPDATE不消除热点；预热不混入稳态分位数，也不隐去C16预热变慢。
+
+### 14.6 资源、数据与收尾
+
+资源为1Hz白名单采样，等待计数只是在阶段内样本首尾差分，可能漏短暂峰值；CPU为JVM进程0—1归一化比例。没有MySQL宿主OS CPU/IOPS或逐语句行锁历史，不把服务器elapsed说成CPU。
+
+|版本/并发|采样数|heap峰值 MiB|CPU load峰值|GC差分 ms|Business active峰值/等待 ms|Master active峰值/等待 ms|
+|---|---:|---:|---:|---:|---|---|
+|A/1|106|224.4|0.0349|106|1/0|1/0|
+|A/4|30|219.2|0.0500|45|4/0|3/0|
+|A/8|18|219.8|0.0538|30|8/0|3/0|
+|A/16|21|219.7|0.1017|74|16/3|8/409|
+|B/1|94|199.8|0.0338|73|1/0|1/0|
+|B/4|28|195.1|0.0593|46|4/0|1/0|
+|B/8|15|192.3|0.0566|37|8/0|1/0|
+|B/16|19|193.8|0.0734|60|16/0|7/386|
+
+池maxActive仍20，采样ErrorCount均0；未取得的Connect/Create计数不按0处理。[资源摘要](evidence/2026-10-19-production-lock-for-update/resource-summary.json)及a/b-resources.jsonl。压力阶段schema线程累计SQL/服务器时间含池维护等非请求活动，不能除以样本数作为精确单次SQL，更不能把多线程累计时间当墙钟；精确SQL结论只用上节逐协议Trace。
+
+最终源Factory B绑定仍DataSource2/110.42.227.83/mes_base_v23_factory_b_test/LOCAL；源45表完整摘要前后完全一致，原901闭环/90,100条报工/100,011核心事实不变。DEV中本轮开始前 **123,886条既有记录逐主键/全部规范化字段均无缺失或改变**，包括前一轮验收新增事实；全部新事实只关联本轮69个独立工单/Execution。新增2,713条报工（2,560计时+116预热+6基线/诊断+31并发事实），逐UUID、数量、ID和操作者6246匹配正式响应/发送日志；18次成功报工重放未新增事实。69次投产合计690，生产原料消耗1380，140条新库存动作另含其他入库5/其他出库4，最终净库存1留在TEST库存2002，其余新库存余额0；这些其他出入库不是正式生产完工。未伪造质量放行/完工或把新部分生产算成完整闭环。[最终事实/绑定/全量保护核验](evidence/2026-10-19-production-lock-for-update/final-verification.json)、[正式数量及两实例状态读取](evidence/2026-10-19-production-lock-for-update/final-http.json)。
+
+`mvn -B -ntp verify`最终SUCCESS，757项中46项按环境条件跳过，711执行，0失败/错误；46个未执行的旧Live验收不冒充通过。本轮DEV验收是单独真实HTTP/MySQL证据。`scripts/smoke-packaged.py`通过；30个改动Java文件native formatter检查通过，git diff --check通过。初期新生成契约测试切片忽略了XML属性排序、旧Mock仍按UPDATE/COUNT设置返回值，已修正为完整锁SELECT片段与锁定返回行，最终完整测试通过，未保留失真的旧桩。[测试摘要](evidence/2026-10-19-production-lock-for-update/test-summary.json)。
+
+自建18082/18083 JVM及17479 Redis已停止；用户8081/PID40599、5173/PID12465保留，原application.yml保持本轮开始时哈希。测试库、新69组资源、1条工单作废事实、库存净余额1及全部不可变事实保留供复验，不做破坏性清理。私有配置/凭据/备份/逐行原始hash/冷启动完整诊断不提交Git。[收尾](evidence/2026-10-19-production-lock-for-update/cleanup.json)、[工作树保护](evidence/2026-10-19-production-lock-for-update/workspace-preservation.json)。
+
+**本轮 GO：24处纯锁UPDATE已替换，锁顺序/校验保留，DEV跨JVM数量/幂等/状态/回滚/库存竞争通过，SQL与性能对照完成。** 不宣称全部未来死锁场景、质量大事实并发、缺行/范围锁、长时间SLA或所有24个入口的逐一真实竞争均已覆盖；本轮真实竞争集中于生产链和仓储，其他引用入口有静态链路与定向/完整测试证据。回滚可切回冻结A产物并审查还原本轮Mapper/Service/生成器改动，不清理不可变TEST事实、不覆盖用户application.yml或其他工作。未提交/推送，未修改源Factory B数据、绑定、Druid、隔离配置或Flyway。
