@@ -32,6 +32,11 @@ class PrivateConfigTest(unittest.TestCase):
         self.assertNotEqual(0, result.returncode)
         self.assertNotIn(literal, result.stdout + result.stderr)
 
+    def test_multiline_constructor_is_rejected(self):
+        result = self.run_check('new DatasourcePasswordCipher(\n"SYNTHETIC_ONLY_12345678");')
+        self.assertNotEqual(0, result.returncode)
+        self.assertNotIn("SYNTHETIC_ONLY_12345678", result.stdout + result.stderr)
+
     def test_runtime_constructor_is_allowed(self):
         self.assertEqual(0, self.run_check('new DatasourcePasswordCipher(properties.key());').returncode)
 

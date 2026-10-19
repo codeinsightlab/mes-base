@@ -13,6 +13,8 @@ import dev.mesbase.business.production.domain.MesWorkorderMaterialExample;
 import dev.mesbase.business.production.dao.RoutingProductMapper;
 import dev.mesbase.business.production.domain.RoutingProductExample;
 import dev.mesbase.business.production.dao.WorkorderMapper;
+import dev.mesbase.business.production.dao.MesProductionExecutionMapper;
+import dev.mesbase.business.production.domain.MesProductionExecutionExample;
 import dev.mesbase.business.production.domain.WorkorderExample;
 import dev.mesbase.business.wm.dao.WmInventoryMapper;
 import dev.mesbase.business.wm.dao.WmStockActionMapper;
@@ -27,7 +29,9 @@ import java.util.Objects;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
-/** Metering identity guard; all checks use the current Factory's business database. */
+/**
+ * Metering identity guard; all checks use the current Factory's business database.
+ */
 @Component
 @ConditionalOnProperty(name = "mes.business.enabled", havingValue = "true")
 public class MaterialUnitRules {
@@ -40,11 +44,13 @@ public class MaterialUnitRules {
     private final MesMaterialIssueItemMapper issues;
     private final RoutingProductMapper products;
     private final WorkorderMapper orders;
+    private final MesProductionExecutionMapper executions;
 
     public MaterialUnitRules(MaterialMapper materials, UnitMeasureMapper units, WmInventoryMapper stocks,
                              WmStockActionMapper actions, WmStockDocumentLineMapper documents,
                              MesWorkorderMaterialMapper demands, MesMaterialIssueItemMapper issues,
-                             RoutingProductMapper products, WorkorderMapper orders) {
+                             RoutingProductMapper products, WorkorderMapper orders,
+                             MesProductionExecutionMapper executions) {
         this.materials = materials;
         this.units = units;
         this.stocks = stocks;
@@ -54,6 +60,7 @@ public class MaterialUnitRules {
         this.issues = issues;
         this.products = products;
         this.orders = orders;
+        this.executions = executions;
     }
 
     public MaterialEntity lockMaterial(Long id) {
@@ -65,7 +72,9 @@ public class MaterialUnitRules {
         return materials.selectByPrimaryKey(id);
     }
 
-    /** Same-value generated UPDATE shares the existing reference-creation row-lock protocol. */
+    /**
+     * Same-value generated UPDATE shares the existing reference-creation row-lock protocol.
+     */
     public void changingUnit(MaterialEntity before, Long next) {
         if (Objects.equals(before.getUnitId(), next)) return;
         Long id = before.getId();
@@ -83,13 +92,17 @@ public class MaterialUnitRules {
         product.createCriteria().andMaterialIdEqualTo(id);
         var order = new WorkorderExample();
         order.createCriteria().andProductIdEqualTo(id);
+        var execution = new MesProductionExecutionExample();
+        execution.createCriteria().andProductIdEqualTo(id);
         if (stocks.countByExample(stock) > 0 || actions.countByExample(action) > 0
                 || documents.countByExample(document) > 0 || demands.countByExample(demand) > 0
                 || issues.countByExample(issue) > 0 || products.countByExample(product) > 0
-                || orders.countByExample(order) > 0) conflict();
+                || orders.countByExample(order) > 0 || executions.countByExample(execution) > 0) conflict();
     }
 
-    /** Lock order is material -> unit. Unit deletion locks only units and never waits for material locks. */
+    /**
+     * Lock order is material -> unit. Unit deletion locks only units and never waits for material locks.
+     */
     public void lockUnit(Long id) {
         if (id == null) missing();
         var filter = new UnitMeasureExample();

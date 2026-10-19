@@ -557,3 +557,355 @@ mvn -B -ntp -pl mes-admin -am test \
 - 同目录`probe-results.txt`：三项隔离探针的必要脱敏输出与证据等级。
 
 未修改业务代码、生产配置、生成模板、迁移或已有用户改动。上述报告与清单是审查证据，不是整改完成或发布批准。
+
+
+## 八、2026-10-18 P1 阶段 A 整改
+
+### 8.1 授权、基线与只读复核矩阵
+
+本次用户单独授权五项 P1 的源码/测试整改，覆盖先前“只规划”边界；明确不实施七项 P2、不改 SyncCoordinator、不轮换实际密钥、不修改真实托管密文、不重写 Git 历史、不提交/推送/部署。开始时后端 HEAD 为 `01415b78ccdbb5e6457362e09f479e35d491d504`，分支 `main`；已有质量 V2、性能脚本及审查/规划文档改动。修改前保存工作树和暂存区差异，逐文件限定本任务范围。工作期间检测到外部提交使 HEAD 变为 `a793e0b7de5bc6f938b8aacbb7b9624ef0ac62c6`，其中包含原质量改动及部分阶段 A 中间内容；Agent 未执行项目暂存/提交操作，也没有回退该提交。按原 HEAD、禁用 rename 检测后的差异核对，28 项原有非本任务差异保持一致。
+
+| 问题 | 当前源码复核 | 需要修正或补充的判断 | 最小实施范围 |
+| --- | --- | --- | --- |
+| QA-06 | 调试 main 包含真实 dev 主密钥及解密输出，事实成立 | 未证明 prod 同密钥；同密钥还保护 OAPI 配置；删常量不能关闭暴露事件 | 删除调试入口，保留 AES-GCM API/格式；扩展源码扫描与合成负例；轮换仅给操作方案 |
+| QA-07 | HTTP 调四参数 importUser，无外层事务，this 写入绕过代理，事实成立 | 循环继续处理错误行、成功行保留、最后汇总失败；前端无逐行结构化结果。先前规划的整批原子建议不适用本次保契约整改 | 逐行经过现有 Spring Service 代理；账号、关系和撤销 outbox 同事务；保留字符串/AjaxResult 格式，明确已提交范围 |
+| QA-08 | authDataScope 无事务，先更新/删除后验证部门，事实成立 | 部门为中心共享身份，没有部门 Factory 字段，不能新造工厂过滤；事务之外还需同角色互斥 | 中心事务、角色行锁、写前部门集合校验和专用字段更新；关联重叠编辑/删除入口共用锁 |
+| QA-09 | 三类 Service 在提交前写永久缓存，改名漏旧键，事实成立 | afterCommit 单独不能解决 Redis 失败/旧值回填；现有路由缓存决定不适用于本缓存 | 提交后失效、有限 TTL、新键版本、事务内不回填；账号安全开关直接 DB |
+| QA-01 | 编辑和 upsert 均可换单位，事实成立 | Material 是 Factory 独立业务库身份，不是跨厂共享中心物料；计划引用和安全库存也有数量语义 | 复用生成 Mapper 行锁；冻结已有数量/历史/引用的单位；单位删除保护；保留普通字段编辑及合法撤销 |
+
+证据等级：STATIC 为调用链；UNIT 为无外部服务规则测试；MOCK 包括 H2、Spring 代理、故障替身及 Fixture；MYSQL/REDIS 必须分别有真实引擎/状态；HTTP 只计真实运行服务请求。MockMvc 不记作真实 HTTP。
+
+### 8.2 实施结果与关键设计
+
+| 问题 | 修改文件与职责 | 本轮实施结果 | 证据入口 | 关闭状态 |
+| --- | --- | --- | --- | --- |
+| QA-06 | `mes-admin/.../server/managed/DatasourcePasswordCipher.java`；`scripts/check-private-config.py`；`scripts/tests/test_private_config.py`；`P1CipherTest` | 移除 main、密钥常量与输出。正常加解密格式不变；生产 Java 的构造字面量、明显 Secret 变量和跨行构造纳入扫描。仅报告路径/行号，不回显值 | Python 合成负例、运行随机密钥 API 回归、工作树扫描 | 源码部分已实施；运维轮换待授权，事件未关闭 |
+| QA-07 | `mes-system/.../service/impl/SysUserServiceImpl.java`；`P1CorrectnessTest` | ObjectProvider 获取真实 ISysUserService 代理后调用 insertUser/updateUser，沿用 masterTransactionManager。单行失败回滚，其他成功行保留；账户写入影响行数异常拒绝；提交后撤销失败标为“已提交、待自动重试”，不伪称回滚。单次最多 200 行，BCrypt 在行写事务外执行 | 关联/用户/Outbox 写后故障与最终状态、正常新增/更新、中间行失败及重复导入、已提交待撤销测试 | 实施完成，MYSQL/真实 HTTP 尚未验收 |
+| QA-08 | `SysRoleServiceImpl.java`、既有 `SysRoleMapper.java`；`P1CorrectnessTest` | authDataScope 使用具名中心事务；SELECT 主角色 FOR UPDATE 后校验类型/不可变范围和部门集合，拒绝不存在/已删除/重复部门。专用 updateDataScope 只写数据范围字段，避免 SysRole 默认布尔值覆盖其他元数据；普通角色更新、状态更新和删除先取同一角色锁，批删按 ID 排序 | 写后故障回滚、原 scope/集合保留、并发整体替换；既有平台/工厂权限回归 | 实施完成，MYSQL 锁及真实 HTTP 尚未验收 |
+| QA-09 | `CenterSettingsCache.java`、`DictUtils.java`、`DictDataLookup.java`、既有字典查询接口、三个配置/字典 Service；`P1CorrectnessTest`、`P1SettingsRedisTest` | 复用 CommitActions；新值只由事务外读取回填。写入提交后失效旧/新键，回滚/提交失败不动缓存。加载/重置改为失效后懒加载；Excel 正反向字典转换通过 common 的最小查询端口复用既有字典 Service，未命中/过期后仍可加载，不依赖永久预热。无额外 JVM 本地副本；不改路由/会话缓存 | 回滚、注入 commit 失败、批量故障、改键/改类型、真实 Redis 过期和失效故障 | 实施完成，MYSQL 组合验收尚缺 |
+| QA-01 | `MaterialUnitRules.java`、`BasicDataRules.java`、`MaterialServiceImpl.java`、`UnitMeasureServiceImpl.java`、`MaterialIssueRules.java`；`P1MaterialUnitTest`；两项既有 Fixture 适配 | 编辑/同步先锁物料再读当前身份；同步按主键排序锁已有行。余额含零余额、动作、仓储明细、用料、领料、工艺产品、工单、独立 Execution 历史及安全库存引用阻止换单位。单位锁与引用创建共享；删除覆盖直接历史单位引用。单位删除使用 READ_COMMITTED；不改历史数值/单位、来源、冻结 Execution 或撤销规则 | 实际生成 SQL、逐类引用负例、同步旁路、非计量编辑、库存创建并发；既有生产/仓储/质量测试 | 实施完成，MYSQL 并发与真实服务闭环尚缺 |
+
+**导入协议：** 成功返回原字符串成功消息；包含失败行仍抛 ServiceException，保留现有响应形状，消息明确其他成功行已提交。新用户才设置本次初始密码，更新不擅自重置密码；状态/密码更新继续复用既有账号版本与撤销 outbox。行数上限是请求工作量保护，不代表已完成 200 行响应时间 SLA 验收；Excel 解析仍受现有上传限制，不宣称改造成流式导入。
+
+**缓存一致性：** 新逻辑键为 `committed-v1:` + 原 key，再沿用 SystemCacheNamespace 的中心库命名空间。旧永久键不再读，提交后同时清理旧键。普通配置/字典采用最多 30 秒的单条缓存寿命，命中不续期；Redis 失效失败和并发旧读迟到回填允许短暂陈旧，不能宣称线性一致。该窗口从发布旧值计时，不承诺从 DB 提交瞬间起严格 30 秒内收敛。日志记录失败类型；缓存读/填失败回到数据库，DB 失败继续传播。所有 `sys.account.*` 账号开关直接读取 DB，不因 Redis 旧值开放注册或关闭验证码；事务内读不使用/发布共享缓存。旧节点必须完成升级才适用该协议。
+
+**计量锁协议：** 物料更新与既有库存、工单/工艺、用料引用创建共享物料主键行锁；领料明细和安全库存新增补齐同一物料锁。单位采用生成 Mapper 同值 UPDATE 锁定；顺序为已有业务链锁 → 物料 → 单位，单位删除只锁单位并检查引用，不反向锁物料。库存已存在就禁止单位变更，因此动作/投产依赖已有库存/用料时不另加第二套计量锁。业务库隔离继续由 Factory 数据源负责，不增加表内 Factory 条件。生产数量权威及 SyncCoordinator 未修改。
+
+### 8.3 安全轮换操作方案（仅方案，未执行）
+
+1. **冻结范围：** 由运维核实实际使用暴露主密钥的环境及中心库配置；目前仅已确认 dev 匹配，prod 不推定受影响。盘点 `mf_datasource.password_cipher`、`mf_factory.oapi_config_cipher` 全部消费者、版本和连接池/缓存；不按 SIMPLE_B 业务库名选择轮换目标。
+2. **备份与窗口：** 单独获得轮换授权，记录责任人、中心库身份、记录数、版本及恢复条件。对受影响密文和身份/版本做加密且限权的备份，不落明文。冻结配置写入，由用户安排依赖服务的维护/停启窗口，避免旧进程读取新密文。
+3. **重加密：** 在受控进程中用旧密钥解密、随机生成新 32 字节密钥后重加密；保持既有 AES-GCM 格式，不输出密码/配置明文/密钥。中心库条件更新同时匹配原身份、版本及旧密文，核对影响行数；两类密文统一盘点和切换。工厂 OAPI 的普通编辑有模式锁，不能通过临时解绑、改模式来重加密，维护写入须单独审查。
+4. **切换与验证：** 私有运行密钥与密文协调切换，清理元数据缓存，按用户操作单重启/冷建池。验证全部有效密文可由新密钥读出、原文内存比较一致、旧密钥不能解密新密文、冷池/DDL 使用正常以及 OAPI 配置本地解码；真实 ERP 调用仍另需授权。检查日志与构建产物不含明文。
+5. **数据库账号密码：** 主密钥轮换不会改变 DB 账号密码。只有证据表明账号密码也暴露或实际策略要求时，另行安排账号轮换、连接可用性和撤销旧凭据；本轮没有证明调试解密字面量是当前有效账号密码。
+6. **失败与历史：** 任一记录/版本冲突停止切换，不混用新旧密钥长期兜底；受控备份用于离线恢复和向前重加密，不把恢复暴露密钥作为长期上线方案。盘点历史提交和分发副本；删 main 不会撤销泄漏，未经授权不重写 Git 历史或强推。实际轮换完成前 QA-06 保持未关闭。
+
+### 8.4 测试收据与真实环境边界
+
+最终测试收据见下表及 [阶段 A 机器收据](evidence/2026-10-18-p1-stage-a/results.json)。测试源码位于 `mes-admin/src/test/java/dev/mesbase/server/P1*Test.java`，共用 `P1TestDatabase`。
+
+- MYSQL 目标：来自当前私有 dev 的中心连接，主机 `192.168.18.25:3306`。测试仅计划 `test_only_p1_<随机UUID>` 新 Schema，`Factory=TEST_ONLY_UNBOUND`，不绑定运行 Factory，不复用 `mes_base_dev`/SIMPLE_B 业务表。拟建表为当前 Entity 派生的合成最小结构，拟 INSERT/UPDATE/DELETE 仅为测试生成记录，测试后 DROP 自有 Schema；不代表正式 Flyway 或生产完整 Schema 验收。
+- 连接在 MySQL 握手阶段 EOF/CommunicationsException，沙箱外重试相同；没有进入建库/建表或业务 DML，MYSQL **未通过**。不能把日志中的拟定 Schema 名当成已创建。机器没有可用 mysqld、容器运行时，未擅自安装或改共享服务。
+- REDIS 使用测试自行启动、结束的回环随机端口进程，独立命名空间；不连接或停止用户 Redis。完整 30 秒过期窗口有实测，不靠 Mock 的 TTL 参数断言替代。
+- 没有修改前端、生产配置、Flyway 或生成模板；不执行 QA-02/03/04/05/10/11/12。没有针对五项 P1 的真实业务 HTTP、浏览器 UI、SIMPLE_B 业务数据复验、ERP 请求、密钥轮换、用户服务重启、提交/推送/部署。
+
+| 级别 | 测试/命令 | 最终结果 |
+| --- | --- | --- |
+| UNIT | `python3 -m unittest discover -s scripts/tests -p test_private_config.py` | 4 通过；包括跨行构造、字面量拒绝及不回显 |
+| STATIC | `python3 scripts/check-private-config.py --working-tree`；`./scripts/format-java --check` + manifest 中 23 个 Java 路径；`git diff --check` | 均通过；原密钥不在当前 Cipher 源码、class、打包 class 中；不代表历史已消除 |
+| UNIT/MOCK/REDIS | `mvn -B -ntp -Dtest=P1CorrectnessTest,P1MaterialUnitTest,P1CipherTest,P1SettingsRedisTest -Dmes.test.redis=true -Dsurefire.failIfNoSpecifiedTests=false test` | 11 通过：6 + 3 + 1 + 1；其中 Redis 为真实独立进程，DB 为 H2 |
+| 默认全集 | `mvn -B -ntp verify` | **752 总数，706 通过、46 跳过、0 失败、0 错误；BUILD SUCCESS**。跳过项不是已验收 |
+| MYSQL | `MES_P1_MYSQL=true mvn -B -ntp -Dtest=P1CorrectnessTest,P1MaterialUnitTest,P1SettingsRedisTest -Dmes.test.redis=true -Dsurefire.failIfNoSpecifiedTests=false test` | JDBC 握手失败；未到 Schema 创建及断言。该连接尝试发生在最后新增回归前，仅作环境阻断证据，不宣称最终 MySQL 用例已验证 |
+| 打包/回环 HTTP | `/usr/bin/python3 scripts/smoke-packaged.py` | **10 通过、0 失败**；真实自有 Java 进程 /health 与未认证拒绝边界；不加载业务 JDBC/账号，不替代五项 P1 的业务 HTTP 验收 |
+
+`P1CorrectnessTest` 的 6 项覆盖新增/更新、角色/岗位/账号/outbox 写后故障、整行回滚、中间行失败与重复导入、提交后撤销失败、角色并发及缓存回滚/commit 故障。`P1MaterialUnitTest` 的 3 项包含逐类历史引用、非计量编辑、同步负例、历史单位删除，以及库存/生产用料引用持锁期间另一事务换单位被阻塞后拒绝；使用真实生成 SQL，但引擎为 H2。`P1SettingsRedisTest` 实测旧键失效、回滚不发布、Redis 删除故障、迟到回填 TTL、30 秒实际过期与 Excel 正反向转换重新读取。未执行真实投产 HTTP/真实 MySQL 并发，不把上述协议级 Fixture 扩写成这些证明。
+
+### 8.5 交付与 GO / NO-GO
+
+| 判定项 | 结论 |
+| --- | --- |
+| 代码整改是否完成 | **是，GO 仅限代码评审及继续验收**；本轮源码实现、定向回归、默认 verify、格式与打包 smoke 通过 |
+| 隔离真实数据库验证是否完成 | **否，NO-GO**；MySQL 握手阻断，Redis 独立实测通过不能替代 MySQL |
+| 五项 P1 是否关闭 | **否**；QA-06 仅源码处置，实际密钥轮换未授权；其余四项仍缺真实 MySQL/业务验收 |
+| 生产部署是否可 GO | **NO-GO**；补真实事务/锁/回滚及业务 HTTP 验收，并按受影响环境完成单独授权的密钥处置后重新评估 |
+
+剩余风险：既有历史数据是否已受旧单位变更影响尚未核实，本轮不自动修数；200 行导入上限未做满负载时延承诺；普通展示字典/配置保留明确的 30 秒单条缓存陈旧窗口；混合运行旧节点不能声称已应用新缓存协议。七项 P2 保持原台账，未扩展实施。回滚必须按本任务文件差异逐段处理，保留外部提交和质量改动，不能整仓 reset；不得以回滚代码代替泄漏密钥处置。
+
+### 8.6 本轮变更回执
+
+- 本文件：追加 §八，记录复核矩阵、实现文件、导入粒度、角色锁、缓存/Excel 消费者、计量保护、轮换方案、分级证据与 GO/NO-GO；保留 §六/七历史事实。
+- `docs/development/next-stage-plan.md`：增加后续执行记录，明确阶段 A 已获单独授权及逐行导入契约对原建议的覆盖，不改后续 P2 范围。
+- `evidence/2026-10-18-p1-stage-a/results.json`：完整命令、默认测试逐类计数、环境失败与未验证边界；`source-manifest.csv`：25 个本任务源码/工具文件 SHA-256；`verification.txt`：必要脱敏收据。临时完整日志可能被系统清理，持久结论不依赖它们独立存在。
+
+**本轮修改业务代码及测试。** 未改运行配置、Flyway、前端或 SyncCoordinator，未执行真实密文写入、密钥轮换、用户服务启停、Git 提交/推送或部署。源码冻结 hash 与最终验证一致；工作期间外部提交及原有修改保护结果见 §8.1。
+
+
+## 九、2026-10-18 使用 PROD 连接继续阶段 A 验收
+
+### 9.1 授权边界与环境预检
+
+用户明确授权读取私有 `application-prod.yml`，只在 PROD 实例上创建自有随机测试 Schema，并在隔离得到证明后执行 MySQL/Redis/真实 HTTP 验收；禁止写现有 PROD 业务表、修改真实工厂/数据源/OAPI、运行现有库 Flyway、启停现有服务、轮换密钥及 Git 提交/推送。本轮没有修改项目源码、测试源码、前端、配置、迁移或 SyncCoordinator。
+
+开始 HEAD 为 `a793e0b7de5bc6f938b8aacbb7b9624ef0ac62c6`，保留阶段 A 及用户性能报告等已有改动。已保存本轮开始的工作树/暂存区差异。上一轮阶段 A 的 25 个源码/工具 hash 全部匹配，本轮没有重复执行其静态规则审查。
+
+| 预检项 | 实际结果 |
+| --- | --- |
+| 配置入口 | 本机私有 `mes-admin/src/main/resources/application-prod.yml`，不复制到证据目录 |
+| 实际端点及默认 catalog | **110.42.227.83:3306 / mes_base_prod**；JDBC `getCatalog()` 与配置一致 |
+| JDBC 握手 | **通过**；预检连接使用有限 connect/socket timeout |
+| 数据库 | **MySQL 8.0.40** |
+| 默认存储引擎 | **InnoDB**；没有创建测试表，因此不声称测试表引擎已验收 |
+| 当前会话隔离级别 | JDBC `4` = **REPEATABLE READ**；未修改全局隔离配置 |
+| 直接授权（账号身份脱敏） | `USAGE ON *.*`；`ALL PRIVILEGES ON mes_base_prod.*`；`ALL PRIVILEGES ON mes_base_prod_business.*`；未显示任意独立库的创建权限 |
+| 原配置迁移开关 | `mes.platform.migrate=false`，未修改/启用 |
+| 独立 Schema 权限核验 | 见 §9.2，**1044 / 42000，拒绝** |
+
+权限和连接元数据通过独立 JDBC 诊断进程读取，未启动 PROD Profile 应用。异常只记录类型、SQLSTATE、vendor code，不记录密码、Secret、主密钥、原始认证异常消息。脱敏结果见 [预检 JSON](evidence/2026-10-18-p1-prod-acceptance/preflight.json)。
+
+### 9.2 隔离 Schema 创建与清理记录
+
+- 本轮唯一拟建 Schema：`test_only_p1_55937b54e0444e158ba99214719b4706`。
+- 运行标记：`55937b54e0444e158ba99214719b4706`。命令仅为 `CREATE DATABASE` 随机新库，指定 utf8mb4；没有 `IF NOT EXISTS` 或回退到现有库。
+- 实际结果：**SQLSyntaxErrorException / vendor code 1044 / SQLSTATE 42000**。与 SHOW GRANTS 的权限范围一致：当前账号不能创建这一本轮测试库。
+- 成功创建记录不存在；没有创建测试表、写入标记表或测试业务数据。自有数据库资源数为 **0**，无需 DROP；没有对现有 PROD Schema 执行 DDL/DML、migrate/repair/clean，也没有更改工厂或连接配置。
+- 创建结果见 [权限核验 JSON](evidence/2026-10-18-p1-prod-acceptance/schema-permission.json)。不能把这个拟定库名写成“已创建、已清理”。
+
+**隔离准入未通过，真实 MYSQL 与业务 HTTP 验收均为 BLOCKED。** 未尝试 GRANT、切换其他账号、利用现有库权限建测试表或调用真实业务账号执行破坏性用例。
+
+最小解阻条件：由有权运维提供专用测试库的创建/管理及其中所需 DDL/DML、索引和触发器权限；更小的授权范围是由 DBA 预建明确命名的隔离测试库，仅对这些库授权，不需要向 Agent 开放现有 PROD 表写入。完整应用必须有独立测试中心库和业务库；需要证明两个 Factory 的分库路由时，应另有两个独立测试业务库。当前两个已有 PROD 库的 ALL PRIVILEGES 不能当成此类隔离授权。本轮不提供或执行扩大生产账号权限的操作。
+
+### 9.3 测试启动副作用及路由检查
+
+没有直接以 `spring.profiles.active=prod` 启动测试应用。已确认以下真实装配风险：
+
+- `SystemConfiguration` 自定义 `startSystemJobs` 会执行 Job init 并调用 `scheduler.start()`，不能仅假定 Spring Quartz 的 auto-startup 开关可阻止它；该配置也开启 Spring scheduling。
+- `SessionRevocationService.retryPending` 有定时 outbox 交付/更新；`ManagedDatasourceService` 有定时连接资源协调。系统缓存初始化也会清理当前连接配置所决定的 Redis 命名空间。
+- `PersistenceConfiguration` 直接由 `mes.platform.url` 创建 Master DataSource；Master Mapper 与 TransactionManager 会使用其 catalog。业务 DataSource 再由受管工厂绑定解析，不能只改一个 JDBC 默认库就宣称隔离完成。
+- ERP 连接由受管 Factory 集成快照解析；没有隔离中心库、测试 Factory/业务绑定和显式禁止外部执行的测试装配前，不能证明运行实例不会取得真实 ERP 目标。本轮没有读取真实 ERP 配置或发起 ERP 请求。
+
+因此没有装配测试 Master/Business SqlSessionFactory、TransactionManager 或 FactoryContext，也没有创建测试绑定、修改真实绑定或启动新的业务 HTTP 服务；这些运行时隔离检查是未执行，不是通过。已有 `P1TestDatabase` 硬编码 dev 配置且使用 Entity 派生简化 DDL，不符合本轮 PROD 正式 Schema 要求，**未将它的 MYSQL 分支用于本轮验收，也未修改它来绕过权限阻断**。
+
+打包 smoke 仅启动其自有随机回环端口进程，强制加载 classpath application.yml、明确 default profile，无业务 JDBC/账号；其健康与未认证接口测试不记为本轮 P1 业务 HTTP 验收。
+
+### 9.4 实际测试矩阵及状态证据
+
+| 编号 | 实际测试环境 | 测试数量 | 真实 DB 结果 | HTTP 结果 | GO/NO-GO |
+| --- | --- | --- | --- | --- | --- |
+| QA-06 | 当前冻结源码、随机测试密钥 | Cipher 1 项 | 不要求本轮轮换；未写真实密文 | 本项无业务写 HTTP 验收 | **部分完成**，实际轮换前不关闭 |
+| QA-07 | 本地 H2 + Spring 事务代理/MyBatis；PROD 仅预检 | 导入相关 3 项本地；MYSQL 0 | **BLOCKED**，没有真实回滚前后状态 | **BLOCKED，0 请求** | **NO-GO** |
+| QA-08 | 本地 H2/真实行锁 SQL；PROD 仅预检 | 授权及并发 1 项本地；MYSQL 0 | **BLOCKED**，未执行真实连接竞争 | **BLOCKED，0 请求** | **NO-GO** |
+| QA-09 | 独立回环 Redis + H2；PROD 仅预检 | 中心提交/回滚 2 项本地 + Redis 1 项；MYSQL 0 | **BLOCKED**；Redis 单独实测不能代替 MySQL | **BLOCKED，0 请求** | **NO-GO** |
+| QA-01 | H2 + 实际生成 Mapper/物料锁协议；PROD 仅预检 | 单位保护 3 项本地；MYSQL 0 | **BLOCKED**，MySQL 锁/死锁/超时及撤销均未验收 | **BLOCKED，0 请求** | **NO-GO** |
+
+没有 MySQL 测试事务、测试 COMMIT/ROLLBACK、两连接并发时间线或锁等待/死锁指标可供报告。连接预检成功不等于这些用例通过，指标记为 N/A，不能写“0 次死锁/全部回滚正确”。正常导入/更新、关联与 outbox 失败、角色删除/状态竞争、安全权限负例、缓存 commit/Redis 故障、单位引用及撤销等所需真实业务用例仍全部待完成。
+
+独立 Redis 定向测试实际验证提交后失效、回滚不发布、改名清旧键、删除失败后的有限 TTL、旧值回填、实际 30 秒过期及 Excel 字典转换重载；其 DB 是 H2，不记录为真实 MySQL + Redis 组合验收。普通展示配置/字典的 30 秒单条发布寿命及允许迟到回填窗口保持原设计，不宣称从 DB 提交瞬间起强一致；`sys.account.*` 直接 DB 的本地回归不扩写为本轮 PROD 数据核验。
+
+### 9.5 本轮回归收据与变更回执
+
+最终回归结果和命令见下表及 [机器结果](evidence/2026-10-18-p1-prod-acceptance/results.json)。默认回归清除外部验收 opt-in，禁止它们转向共享数据库；P1 定向日志确认 DB product 为 H2。Redis 测试独立创建/销毁本轮进程，不连接生产 Redis，不执行 FLUSHDB/FLUSHALL。
+
+| 验证 | 实际命令/入口 | 本轮结果与边界 |
+| --- | --- | --- |
+| PROD 连接预检 | 临时 `ProdPreflight.java`，复用现有 JDBC runtime | 连接、版本、引擎、会话隔离及 SHOW GRANTS 读取成功；凭据不进入命令行/报告 |
+| 独立库创建权限 | 临时 `SchemaPermissionProbe.java`，单次随机 CREATE DATABASE | 1044 / 42000；未创建资源，无清理动作 |
+| P1 定向 | `mvn -B -ntp -Dtest=P1CorrectnessTest,P1MaterialUnitTest,P1CipherTest,P1SettingsRedisTest -Dmes.test.redis=true -Dsurefire.failIfNoSpecifiedTests=false test` | **11 通过、0 失败**；Cipher 1、Correctness 6、Material 3、真实 Redis 1；数据库为 H2 |
+| 默认回归 | `mvn -B -ntp verify`，清除外部验收 opt-in 和继承的 JVM 属性覆盖，显式 `MES_P1_MYSQL=false` | **752 总数、706 通过、46 跳过、0 失败/错误，BUILD SUCCESS**；含 Factory/权限/库存/生产/质量既有回归，跳过不等于验收 |
+| 打包 smoke | `/usr/bin/python3 scripts/smoke-packaged.py` | **10 通过、0 失败**；自有进程回环 HTTP 与产物结构，不是 P1 业务 HTTP |
+
+本轮持久 JSON 证据为 `preflight.json`、`schema-permission.json`、`results.json`，另有 `verification.txt` 脱敏摘要；命令与默认测试逐类数量可从 results.json 复核。临时完整日志位于 `/private/tmp/mes-p1-prod-acceptance/`，不作为唯一长期证据。
+
+本轮仅追加本文件 §九及对应脱敏证据；没有修改项目源码。私有 PROD 配置 hash 不变，上一轮 25 个源码/工具 hash 全部匹配；除本文件外，本轮开始时的所有已有工作树差异保持一致，暂存区不变。没有执行密钥轮换、现有服务启停/部署、Git 提交或推送。
+
+**最终状态：MYSQL BLOCKED；P1 业务 HTTP BLOCKED；五项 P1 未整体关闭；生产 NO-GO。** 下一步只缺可合法使用的隔离数据库权限/资源，不扩大到阶段 B，也不以连接成功或已有本地测试通过替代验收。
+
+## 十、2026-10-18 阶段 A：复用 Factory B 的真实 MySQL / HTTP 验收
+
+本节接续 §九的 CREATE DATABASE 权限阻塞，保留此前结果。用户本轮明确授权现有独立 Factory B 的专用测试数据写入，不重新执行十万级压测，不写真实 PROD 业务数据或中心权限。本轮结论：**QA-01 在本次九类正确性验收范围内 GO；QA-07/08/09 真实 Master 验收 BLOCKED；QA-06 部分完成；阶段 A 整体仍 NO-GO。** 不外推为生产迁移、所有 Factory、ERP 或完整业务流程已验收。
+
+### 10.1 实际环境与隔离门槛
+
+- 正式中心查询确认 `V23_FACTORY_B_TEST → datasource 2 → 110.42.227.83:3306/mes_base_v23_factory_b_test`，Factory revision=9、DataSource revision=14、均 ENABLED；LOCAL、integration revision=1，ERP provider/config/oapi reference 均空。原 `PROD → datasource 1 → mes_base_prod_business` 保持原绑定，没有重绑。
+- 从受管数据源密文解出既有业务凭证并实际连接，不以库名或 TEST 名称代替验证。MySQL **8.0.40 / InnoDB**；连接默认 **REPEATABLE READ**，物料写入 Service 及并发探针显式 **READ COMMITTED**。业务账号具备所需 DML 权限，且实际权限比本轮需求更广；本轮未利用这些额外权限修改其他库、账户或全局设置。本机备份管理员连接只用于最初只读元数据查询，后续测试使用受管业务数据源凭证。
+- Master 仍是共享 `mes_base_prod`。可见库中没有已授权的专用中心测试 Schema。既有 CASE12 专用账号/角色位于共享 Master，名称带 TEST 不能证明可开展故障注入、删除或授权竞争；没有对其做这些写入。DEV Schema 不自动视为隔离 Master。
+- B 库存在其他连接，不能宣称独占。开始保存 **121,752 条既有记录**的主键/全字段 SHA256，以及 Factory/数据源绑定；本轮使用标签 `TEST_P1_20261018_0c44f4cc`，所有写入对象均本轮创建。CASE12 原有七张表记录逐字段与原性能验收前快照一致。
+- TEST ONLY 独立 Spring Boot 实例使用真实两个 SqlSessionFactory 和两个 TransactionManager，运行时确认 Bean 不同；生产包扫描、动态路由、事务租约及业务 Mapper 保留。测试拦截器禁止 Master Mapper 写入，并在业务 SQL 前核对 Factory B 和连接 catalog。没有将 Master 路由到 B，也没有运行旧 P1TestDatabase 的建库/简化表分支。
+- 禁用 `startSystemJobs`、缓存预热和 Scheduled 注解处理器；Quartz 仅创建且未启动。Redis 为本轮独立回环实例、独立命名空间；登录/操作审计写入本地 TEST ONLY sink，真实 BCrypt、TokenService、账号状态、当前角色及 HTTP 权限校验保留。此适配是保护共享 Master 的审计落点调整，不是认证/权限 Mock；不构成生产中心审计持久化验收。没有实际 ERP、消息通知或外部同步调用。
+
+### 10.2 B 库 V38 / 当前源码 V39 的差异及恢复
+
+初始 B 库正式迁移停在 V38，当前源码已包含质量 V39 Mapper。正式投产请求 UUID `f44e012d-8f0e-4498-9921-99b3504218e1` 首次 HTTP500/INTERNAL_ERROR（requestId `bbe13888-d7de-43d9-b903-532006d93c22`），实际 SQL 读取 `mes_production_defect.defect_type_id` 报 MySQL 1054。
+
+**HTTP500 不等于整体回滚：** 真实查询证明 Input 已 CONFIRMED、Issue904 已 CONFIRMED、Execution903 已创建，库存1808从2扣至0；异常发生在已提交后的 `ProductionQuantityService` 结果读取。没有生成新 UUID 重发。第一次正式撤销同样因缺列返回500（requestId `09e757b6-d6b7-4251-9e03-d614a7e48579`），撤销前后 Issue/Input/Stock/Action 全字段完全相同，Issue仍 CONFIRMED，证明该次撤销事务的 VOID_PENDING 更新回滚。
+
+按项目“缺表走正式迁移”规则补齐验收前提：只对已经核实的 B 独立验收库执行**既有、未修改的 `V39__operation_defect_types.sql`**，target固定39，使用正式 Flyway 记录。执行前备份受影响表结构和38条迁移记录，确认 `mes_production_defect` 历史行数为0、待建配置表不存在；V39新增空表、可空字段及索引，无历史回填。Flyway迁移自身校验和迁移后validate均通过，executed=1，B库当前39。预先单独调用validate曾因pending39拒绝，未写库；改为正式migrate自身的迁移前校验后成功，没有repair/clean、没有忽略checksum，也没有改写迁移文件。原PROD中心和业务库均未迁移。
+
+迁移后以**原UUID/原冻结请求**重放返回200，Issue/Execution仍904/903，流水集合不增加；正式撤销返回200/VOIDED，库存恢复2，再次撤销200但流水不增加。保留迁移前500及数据库已提交状态，不能把本次恢复改写为从未失败。该证据还说明：当前源码部署到其他仍为V38的库前，需匹配正式迁移；本轮没有升级这些库。
+
+### 10.3 QA-01 九类验收与真实事务
+
+| 场景 | 真实入口与对象 | 结果 |
+|---|---|---|
+| 1 无引用修改 | HTTP Material6，Unit3→4→3 | 200，数据库回读一致；首轮失败探针释放锁后允许的修改最终使Material6为Unit4，属于本轮对象，不影响历史记录 |
+| 2 库存余额保护 | Material7 / Stock1806，正式 OTHER_RECEIPT入10 | 改单位409 / RESOURCE_CONFLICT，Unit3不变 |
+| 3 零余额历史保护 | 正式 OTHER_ISSUE出10，Stock1806=0，保留两条历史动作及单据行 | 改单位409，Unit3及历史动作单位不变 |
+| 4 领料引用 | Material8 / Issue903 / Item903，正式DRAFT主单和明细 | 改单位409，原单位不变 |
+| 5 工艺/工单数量引用 | Product9 / Routing4 / Node16 / WorkOrder903、904 | 工艺保存、工单创建后分别改单位409；WorkOrder903通过正式作废入口为CANCELLED后仍拒绝改单位 |
+| 6 同步写入保护 | 实际Spring代理 `IMaterialService.upsert` 输入合成 ExternalMaterial，目标Material7 | RESOURCE_CONFLICT；数据库Unit3不变。只验实际同步落库Service保护，不声称真实ERP同步已验收 |
+| 7 单位删除/新增引用竞争 | Unit5；实际IUnitMeasureService删除与实际IMaterialService创建Material11 | 两个独立MySQL连接；引用方提交后，删除方RESOURCE_CONFLICT；Unit5和Material11均存在，无悬空引用 |
+| 8 库存新增/改单位竞争 | Material10 / Stock1807 | 持锁方复用正式StockReferenceRules与生成MyBatis Mapper创建本轮零余额引用；正式物料Service改单位等待后RESOURCE_CONFLICT，Unit3不变。此竞争的引用写入是规则+Mapper层，HTTP库存创建已在场景2独立通过 |
+| 9 合法生产撤销 | WorkOrder904 / Execution903 / Input原UUID / Issue904 / Stock1808 | V39后正式HTTP撤销成功；库存2→0→2，原负向动作不改写，追加引用原动作的正向2；重复撤销不增事实，撤销后物料改单位仍409 |
+
+额外真实回滚证明：Material13在具名业务事务中先查询Unit3，调用实际事务代理更新后同连接查询Unit4，再主动抛出TEST ONLY异常；事务结束后新事务直接SQL查询仍Unit3。`service-results.json`完整记录 **3→4（未提交）→3（回滚后）**，不以HTTP失败或缓存回读代替数据库证明。首次撤销500前后的全字段比较另见 `production-boundary-result.json`。
+
+并发时序：事务A先取实际行锁，事务B另一个连接执行竞争操作，750ms检查B仍未完成，放行A创建引用并提交，B结束并被业务冲突拒绝。库存竞争连接 **97663/97662**，耗时1306ms；单位竞争 **97662/97663**，耗时1020ms。本轮两组未发生死锁/锁等待超时异常，不推断全实例没有死锁。尝试直接经路由数据源读取performance_schema锁表时，因为没有业务事务被基础设施拒绝，所以**没有取得InnoDB锁表指标**；不把750ms屏障或总耗时写成数据库精确锁等待统计。连接ID、阻塞屏障和最终状态分别留证。
+
+独立应用实际HTTP共 **72次：200×61、401×1、403×1、409×7、500×2**；两个500均为V39补齐前，补齐后的恢复请求没有500。401=UNAUTHENTICATED，已存在B限定测试账号尝试物料编辑得到403=FORBIDDEN，没有修改账号或角色；409=RESOURCE_CONFLICT。68次在脱敏HTTP日志，另4次为探针续接登录/新增物料、确认已提交后的登录/首次撤销，分别有私有运行日志、状态和数据库比较证据。HTTP请求成功与真实DB最终状态分开核对。
+
+### 10.4 历史数据保护、资源清单与清理
+
+- 最终全部 **121,752 条开始时既有记录逐主键/全字段hash不变，无缺失**；原工单/Execution状态、历史UUID、库存余额及动作均包含在比较中；绑定及版本不变。CASE12原Stock1仍11，原七张表的既有记录一致。
+- 原17项关联审计开始/结束均PASS：901个闭环、90,100条报工、100,011条核心事实；17项bad全部0。审计按原journal的确切工单/执行/库存ID关联，不能拿库内总数减法代替历史完整性。
+- 本轮新增48条业务/关联记录及1条Flyway记录，详见 `created-resource-ids.json`；标签不覆盖原 `TEST_PERF_20261018`。主要ID：Unit3/4/5、Material6～13、Warehouse4、Stock1806/1807/1808、WorkOrder903/904、Execution903、Issue903/904、Routing4。原流水保留，新增5条库存动作，其中生产撤销正向动作明确引用原扣减动作。原性能闭环之外新增1个执行，不计作新的十万级验收。
+- 测试记录全部保留供复验；没有删除不可变事实，也没有DROP任何Schema或表。原型并发探针因缺受管后台集成上下文而失败，未作为通过证据；重装配后用独立Material10完成规则+Mapper竞争，避免把探针错误当作产品修复。另有测试工具编译、重复消费文件及只读核验字段拼写问题均已更正，保留私有原日志；未因此修改业务实现。
+- 本轮所有自启应用和Redis监听均已关闭，8081/5173仍监听；未启停、重启或重新部署用户服务。没有Git提交、推送或历史改写。
+
+### 10.5 关闭矩阵、回归与最小剩余条件
+
+| 问题 | 使用数据库 | MySQL真实测试 | HTTP验收 | 是否关闭 |
+|---|---|---|---|---|
+| QA-01 | Factory B正式Schema，V38→正式V39 | 九类场景通过；额外真实代理回滚通过 | 实际认证/权限及正反例通过；迁移前500与原UUID恢复均留证 | **GO，本轮约定范围关闭** |
+| QA-07 | 仅共享Master可用 | BLOCKED | 写入验收BLOCKED | NO-GO |
+| QA-08 | 仅共享Master可用 | BLOCKED | 写入验收BLOCKED | NO-GO |
+| QA-09 | 仅共享Master；独立Redis可用 | 真实Master事务/缓存组合BLOCKED | 写入验收BLOCKED | NO-GO |
+| QA-06 | 独立密钥运维 | 本轮不轮换 | 不适用 | 保持部分完成 |
+
+QA-07/08/09最小解阻条件：明确授权的专用中心测试Schema（正式中心结构）、可隔离Master绑定的测试服务与专用测试身份/角色/部门/配置/字典；Redis沿用独立实例。B业务库、共享中心库中的TEST名称或备份管理员权限都不能替代这一条件。QA-06仍需另行授权真实密钥轮换。
+
+本轮重新运行：P1定向 **11通过/0失败**（H2与真实独立Redis，含30秒TTL实际过期）；`mvn -B -ntp verify` **752总数、706通过、46跳过、0失败/错误，189类，BUILD SUCCESS**；打包smoke **10通过/0失败**。这些回归与上述真实MySQL业务验收分别记账，跳过项不计通过，smoke不代替P1业务HTTP。
+
+证据目录：[`evidence/2026-10-18-p1-factory-b-acceptance/`](evidence/2026-10-18-p1-factory-b-acceptance/)，包括 `results.json`、真实最终查询SQL/JSON、绑定、并发与回滚、17项审计前后结果、资源ID、历史保护、回归及清理回执。私有原始日志、全行hash与迁移结构备份位于 `.local/p1-factory-b-20261018/`；TEST ONLY源码在自有 `target/p1-factory-b-acceptance/`，不是生产模块。
+
+**修改回执：** 未修改业务源码、生产配置、连接池配置、SyncCoordinator、前端或已发布Flyway文件。新增TEST ONLY验收工具、脱敏证据及本节；实际修改数据仅为授权B库的专用测试记录及正式V39 Schema/迁移记录。上一轮25个源码/工具fingerprint全部匹配，开始时已有工作区补丁和暂存区在报告更新前完全一致。阶段B及其他P2不开展。QA-01关闭不改变五项P1整体仍未完成的状态，最终整体 **NO-GO**。
+
+## 十一、2026-10-18 PROD key 复核与工厂创建意图澄清（暂停待目标业务库）
+
+用户先说明已修复PROD datasource-key并允许不可用时重新创建数据库环境；Agent误解为另建完整隔离Master+Business环境。后续用户明确纠正：意图是**通过MES创建新的Factory和DataSource，使用当前环境密钥，并使用PROD数据库连接信息**。本节以这一纠正为准，不把此前独立Master建库路线视为用户最终需求，也不把已有QA-07/08/09 BLOCKED写成已完成。
+
+实际只读复核：当前application-prod.yml JDBC连接110.42.227.83:3306/mes_base_prod成功，MySQL8.0.40/InnoDB/REPEATABLE READ；配置账号仍仅在mes_base_prod及mes_base_prod_business拥有Schema内权限，*.*仅USAGE。当前配置key解密既有DataSource2密码仍报AEADBadTagException；没有输出key/密码、改写旧密文或修改PROD配置。新数据源应由MES用当前key正式加密，不能通过改旧密文解决本次新建需求。
+
+误解路径的实际副作用已如实保留：使用上一轮已核实的受管业务连接凭证，在同实例创建 `test_only_p1_master_f58fdf52f29d4db89f6aab633dfecf9b` 和 `test_only_p1_business_f58fdf52f29d4db89f6aab633dfecf9b`；执行了部分正式Flyway初始化。用户纠正后定位并SIGTERM停止本轮专用Provision进程，子进程退出143，官方bootstrap没有执行；没有启动该环境应用、测试账号或Redis，没有创建MES的Factory/DataSource记录。停止后只读核对：Master51表且本轮owner标记存在，Business24表且owner标记暂未恢复（初始化尚未完成）；因此两个库不能宣称就绪，不应直接拿来验收。本轮没有擅自DROP，资源及创建/停止证据保存在 `.local/p1-master-20261018/environment.json`、`stopped-misinterpreted-provisioning.json` 与私有迁移日志，TEST ONLY工具在 `target/p1-master-acceptance/`。
+
+原PROD中心/业务记录、Factory B绑定/性能事实及用户服务未被上述初始化操作修改。未提交/推送代码，未执行密钥轮换。后续仅沿用MES正式管理入口，当前待明确新DataSource的目标业务库：PROD profile中的mes_base_prod是中心库，不得作为Factory业务库；已绑定的业务库也不能未经核实被新Factory共享。新Schema还需目标连接账号具备对应范围权限，不能把key修复视为建库授权或数据库GRANT自动修复。
+
+### 11.1 用户提供 key 的只读实测
+
+用户随后提供一个候选key并要求实际解密。TEST ONLY探针通过标准输入接收该值，不把key写入文件或输出日志；读取当前PROD中心库DataSource2 revision14的现存password_cipher，解密仍失败，根因类型AEADBadTagException。该候选key与磁盘application-prod.yml中的datasource-key不相同。中心库握手PASS；目标仍110.42.227.83:3306/mes_base_v23_factory_b_test；因解密失败，未尝试业务握手。没有修改配置、密文、数据或运行服务。不能由此确定原加密key是哪一把，也不代表已检查运行进程的实际环境覆盖。脱敏结果在 `.local/p1-master-20261018/provided-key-check-redacted.json`；探针源码不含key，位于 `target/p1-key-check/CheckProvidedKey.java`。
+
+### 11.2 第二个候选 key 验证成功（取代此前当前 key 不匹配的判断）
+
+用户提供第二个候选key后，重新只读查询DataSource2 revision14的现存密文：候选值与本次读取的磁盘PROD配置datasource-key相同，AES-GCM解密PASS；以解密后的既有凭证实际连接110.42.227.83:3306/mes_base_v23_factory_b_test，JDBC握手PASS、catalog匹配、MySQL8.0.40。中心握手同样PASS。未回显或落盘候选key/解密密码，未由Agent修改PROD配置、密文或数据；此前失败保留为当时对应候选值的实测，不能继续宣称当前配置key无法解密DataSource2。此结果不解决新Schema权限或隔离Master缺失，也不代表新Factory/DataSource已创建。脱敏结果：`.local/p1-master-20261018/second-candidate-key-redacted.json`。
+
+## 十二、2026-10-18 PROD 版本：隔离 Master 的 QA-07 / QA-08 / QA-09 真实验收
+
+用户本轮明确授权提供隔离Master测试库及测试身份，完成剩余三项；QA-06真实密钥轮换继续独立处理。本节取代 §十中三项环境BLOCKED状态，保留此前失败、误解和权限证据。**QA-07/08/09本轮真实MySQL、Redis及必要HTTP全部通过，可在约定范围关闭；QA-01沿用§十的真实通过结果。QA-06仍部分完成，五项整体尚不能宣称全部完成。**
+
+### 12.1 环境、正式结构、身份与隔离证明
+
+使用当前代码、`prod` profile、当前PROD datasource-key；为独立实例提供受限私有覆盖配置，将Master指向专用库，使用独立回环Redis。未修改application-prod.yml、数据库账号权限、生产凭证、主密钥或既有密文。
+
+| 对象 | 实际值 / 证据 |
+|---|---|
+| MySQL实例 | `110.42.227.83:3306`，MySQL8.0.40、InnoDB，连接默认REPEATABLE READ |
+| 独立Master | `test_only_p1_master_f58fdf52f29d4db89f6aab633dfecf9b` |
+| 独立业务库 | `test_only_p1_business_f58fdf52f29d4db89f6aab633dfecf9b` |
+| 归属 | 本轮既有创建记录、runId `f58fdf52f29d4db89f6aab633dfecf9b`、数据库owner表相符；不是只按TEST名称判断 |
+| 正式迁移 | Master完整V41，FactoryFlyway校验通过；业务库从已成功V22续跑17个正式迁移至V39，迁移后校验通过，恢复owner标记；不执行repair/clean，不重写迁移 |
+| 专用身份 | 官方空库PlatformAdminCli初始化 `test_p1_admin`，userId100；另经正式HTTP创建 `p1_factory_only`，只分配本轮Factory角色 |
+| MES管理对象 | 在**隔离Master**经正式HTTP创建Factory=`P1_FACTORY`、DataSource=1、LOCAL、Factory revision1 / DataSource revision2；不是共享PROD中心的数据源1，也未修改原PROD或Factory B绑定 |
+| 新数据源密文 | 用当前PROD key重新只读解密PASS，真实业务库JDBC握手PASS，catalog确认为本轮独立业务库；候选key与私有测试覆盖及当前PROD key相同，均不回显 |
+
+独立应用真实装配 `masterSqlSessionFactory` / `businessSqlSessionFactory` 及两个具名OwnedTransactionManager，并在启动核对两组Bean不同。中心Mapper仍通过正式扫描归属Master，Service为实际Spring事务代理；没有把中心Mapper挂到业务库，没有使用H2、简化表或MockMvc替代本节真实验收。正常HTTP使用真实BCrypt、TokenService、Redis会话及当前角色/权限；服务层故障探针的操作者从本轮真实管理员记录构造，仅用于直接Service测试，HTTP认证另行真实执行。
+
+TEST ONLY装配在SQL prepare前检查实际连接catalog，仅允许上述两个独立库，拒绝原PROD及B库引用；所有记录到的应用MyBatis SQL实际catalog均为独立Master（本轮三项均属中心业务）。管理接口携带本轮Factory头也没有错误切到业务库。SQL记录为参数化prepare文本，不记录密码、key或参数值，不作为事务数量统计。
+
+独立实例不占8081/5173；移除Quartz初始化/启动、缓存预热入口，并在测试装配中禁止Scheduled任务实际执行、清理调度处理器。没有调用ERP、外部同步或消息通知。审计日志正常写入独立Master，本节不使用§十的本地审计sink。为测试登录关闭的captcha开关仅存在于独立Master；原PROD安全开关未改。提交故障通过TEST ONLY连接包装器注入；两个Druid监控构造入口在测试装配中取得原池，池参数不改。
+
+### 12.2 QA-07：用户导入 / 账号版本 / outbox
+
+真实Service层 **12个断言覆盖原10类要求**；实际HTTP另验证成功、部分失败、重复导入。真实MySQL状态见 `service-cases.json`：
+
+1. 正常导入新增与更新，查询确认账号、角色和岗位完整；实际对象为 `SysUserServiceImpl$$SpringCGLIB`，逐行self代理事务生效。
+2. 分别在真实 `SysUserRoleMapper.batchUserRole`、`SysUserPostMapper.batchUserPost` **SQL执行后**注入异常，新账号消失，关系总数恢复，不能只靠异常返回判断回滚。
+3. 分别在真实用户UPDATE、`SessionAccountMapper.enqueue` SQL之后注入异常，完整比较同一用户的nickName、status、auth_revision、角色、岗位与outbox前后；结果完全相同。
+4. 中间行引用不存在的角色被拒绝；首尾成功行保留，失败行及其关系不存在。正式Excel HTTP中间行Bean校验失败同样保留首尾行，返回422/BUSINESS_REJECTED并明确其他成功行已提交。
+5. 在独立真实Redis创建本轮用户旧版本会话，状态变更及改密分别使MySQL auth_revision增加、outbox持久化、旧会话索引撤销；不是只检查方法被调用。
+6. 重复导入不生成第二个账号或重复角色/岗位关系；遵循既有逐行提交契约，不宣称整批原子导入。
+
+本轮案例前缀及确切userId、roleId、postId、版本/outbox快照均在脱敏案例和最终数据库清单中。异常注入是SQL之后的测试故障，不假称真实发生过磁盘故障或新增FK约束失败。
+
+### 12.3 QA-08：角色数据范围 / 回滚 / 三组并发
+
+真实Service层 **12个断言覆盖原8类要求**；正常修改、无效部门、PLATFORM/FACTORY边界还通过实际HTTP验证。
+
+- 正常替换后data_scope和部门关系一致；无效部门被拒绝，原范围和部门集合保持不变。
+- 在范围UPDATE、删除旧部门关系、批量插入新部门关系SQL后分别注入异常；比较角色范围/状态/kind/factoryId及部门集合，全部回滚至原状态。具体before/after对象保留，不以请求失败替代证明。
+- 角色kind/所属Factory创建后不可变；Factory账号访问平台dataScope接口403/FORBIDDEN；Factory角色携带平台权限、PLATFORM角色携带Factory绑定均422/BUSINESS_REJECTED且未生成无效角色。
+
+| 并发场景 | 真实MySQL连接（持锁 / 等待） | 750ms屏障 / MySQL锁表 | 最终结果 |
+|---|---|---|---|
+| 两次数据范围替换，Role107 | 98118 / 98116 | B仍等待；performance_schema确认98116等待98118；总1084ms | 最终为后一完整部门集合，无混合关系 |
+| 数据范围修改与删除，Role108 | 98116 / 98118 | B仍等待；锁表确认反向等待；总1021ms | 沿现有系统角色软删除契约del_flag=2，旧部门关系清除；不是要求角色物理行消失 |
+| 数据范围修改与状态更新，Role109 | 98118 / 98116 | B仍等待；锁表确认等待；总969ms | status=1，已提交data_scope及部门集合保留 |
+
+每组A先调用真实Service取得角色锁，B以另一连接进入竞争操作；记录锁等待后才放行A提交，再检查B完成及数据库终态。没有用JVM锁代替数据库锁，没有用H2推断MySQL。三组完成时未出现死锁或锁等待超时，不外推为全实例从无死锁。
+
+### 12.4 QA-09：真实 MySQL + Redis 的缓存提交边界
+
+**12个断言及1个事务内观测点覆盖原10类要求**，配置/字典管理另有真实HTTP正例：
+
+- 正常提交、共享缓存写入及有限TTL；外层事务内读到自己的未提交值，同时Redis仍保持原已提交值；主动异常后MySQL及Redis均恢复/保持原状态，事务内没有发布共享值。
+- **真实提交连接故障：** 在COMMIT即将发出前，从本轮连接读取CONNECTION_ID，以控制连接核实该ID确属本轮独立Master后，仅KILL这个自有未提交连接。真实JDBC提交失败，MySQL回滚，新配置行数0、共享缓存不存在，afterCommit未发布。没有KILL其他连接、MySQL服务或用户应用；确切连接ID见 `fault-injections.json`。
+- **真实Redis删除失败：** 仅在本轮独立Redis临时用ACL拒绝DEL/UNLINK，取得真实NOPERM错误；配置UPDATE仍提交，数据库为COMMITTED，共享缓存暂为BEFORE；finally恢复ACL。没有关闭整个Redis来抹掉陈旧缓存，也没有触及生产Redis。
+- 配置键重命名后旧/新键正确失效；字典类型重命名后类型、数据行及旧/新缓存一致；另验证字典重命名事务回滚。
+- **并发迟到回填：** 独立MySQL读线程读出OLD后暂停，写线程提交NEW并清缓存，再释放旧读线程，真实观察到数据库NEW/缓存OLD；等待真实30.5秒后，Service重新从MySQL读取NEW并以有限TTL发布。
+- 向 `sys.account.*` 本轮测试键写入与数据库相反的缓存值，Service仍返回数据库值，证明安全开关不依赖缓存。DictUtils在到期后仍通过真实服务读取字典标签。
+
+**设计仍允许短暂陈旧：** TTL为每次缓存发布后的30秒，迟到旧读也可能从其发布时重新起算；长读本身的时间不能被忽略。不承诺强一致，也不承诺数据库提交起严格30秒内全部读者可见新值。实际Redis证据不等于已部署环境Redis故障演练。
+
+### 12.5 HTTP、原环境保护、回归与探针边界
+
+完成实际HTTP **11类验收检查**。连同环境准备、错误断言校准和续跑，共56次HTTP：200×43、422×9、403×2、401×1、404×1，没有500。404来自探针误用了已不存在的旧configKey路径，后改用源码实际 `config/{id}` 和 `common/dict/{type}`；最初将业务拒绝预期为400，已按真实422契约校准。保留这些原始结果，不能把它们描述成产品接口缺陷或删除失败日志。所有写入结果均通过真实MySQL最终状态复核。
+
+测试工具还曾有AtomicReference故障标记比较、角色软删除断言及Mapper未回填ID等适配错误，均只修测试工具，保留原始私有日志；最后分别使用已通过的用户、角色、缓存组结果汇总，**36个通过断言+1个已验证事务观测点**。没有为让探针通过修改或弱化生产实现；故障注入点对应真实SQL，回滚状态可独立复核。
+
+共享PROD中心14张管理表开始479条记录。结束观察到另一个标记 `test_sqltrace_v39_b` 的Role103在21:01:54新增，另增1条用户角色、2条角色菜单关联；该标记不是本轮对象。11张表全量hash一致；对另3张表排除新增Role103及关联后，hash与本轮开始完全一致，证明原479条管理记录未变。共享库并非完全静止，本轮没有回滚这些并行新增，也不归因它们的业务来源。本轮Factory、DataSource、用户标记在共享中心查询数量均0；应用SQL catalog记录及写入前门禁进一步证明测试写入仅进入独立Master。此保护结论覆盖上述管理表，不冒充所有生产库的全量快照。
+
+本轮没有对Factory B业务库写入；QA-01源码/工具25项fingerprint全部一致，沿用§十真实验收及历史保护证据，没有重复十万级造数、压测或宣称本轮重跑其业务闭环。
+
+重新运行：
+
+| 检查 | 本轮实际结果 | 证据边界 |
+|---|---|---|
+| P1定向（显式真实Redis） | 11通过、0失败 | H2/Spring+独立Redis回归；本节实际MySQL案例另记 |
+| `mvn -B -ntp verify` | 752总数，706通过、46跳过，0失败/错误，189类，BUILD SUCCESS | 跳过不计通过 |
+| packaged smoke | 10通过、0失败 | 独立产物/基础HTTP冒烟，不代替本节业务HTTP |
+| 真实MySQL/Redis/HTTP | 三项要求覆盖通过 | 正式Schema、实际Service/Mapper、认证权限和独立应用 |
+
+自启应用及Redis均已停止，最后实例55759/55681无监听，原8081/5173仍监听；未重启、停止或部署用户服务。测试库、唯一owner标记、Factory、DataSource、专用身份及测试数据**保留供复核**，没有DROP或删除原环境数据。管理员凭证仅保存在本机0600私有文件 `.local/p1-master-20261018/credentials-private.json`，不在报告回显。
+
+### 12.6 最终关闭状态与修改回执
+
+| 问题 | 使用数据库 | MySQL真实测试 | HTTP验收 | 是否关闭 |
+|---|---|---|---|---|
+| QA-01 | 原Factory B | 沿用§十真实PASS，源码fingerprint不变 | 沿用§十真实PASS | GO，已关闭 |
+| QA-07 | 本轮隔离Master V41 | PASS，10类要求/12断言 | 成功、部分失败、重复导入PASS | **GO，可关闭** |
+| QA-08 | 本轮隔离Master V41 | PASS，8类要求/12断言、3组真实锁竞争 | 正例及部门/权限负例PASS | **GO，可关闭** |
+| QA-09 | 本轮隔离Master V41+独立Redis | PASS，10类要求/12断言+1观测 | 配置/字典管理PASS | **GO，可关闭** |
+| QA-06 | 独立密钥运维 | 本轮没有真实轮换 | 不适用 | 仍部分完成 |
+
+**剩余条件只有QA-06真实密钥轮换及其独立运维验收；未执行、未假称通过。四项正确性P1可关闭，五项阶段A整体全完成仍NO-GO。** 本轮不构成生产部署授权、真实ERP验收或所有Factory/业务迁移均通过。
+
+本轮未改业务源码、前端、生产配置、连接池参数、SyncCoordinator、已发布迁移或生产密钥/密文；未提交/推送。新增/修订仅TEST ONLY工具、隔离环境私有配置/数据与本节及脱敏证据，更新规划入口的执行状态。生产配置hash、原25项源码/工具hash、暂存区与开始时工作区补丁在报告更新前全部保持一致。
+
+证据：[`evidence/2026-10-18-p1-master-acceptance/`](evidence/2026-10-18-p1-master-acceptance/)，含 `results.json`、37个案例条目、故障注入、参数化SQL prepare轨迹、HTTP结果、真实最终SQL/数据库清单、原环境比较、回归和服务清理。TEST ONLY源码：`target/p1-master-acceptance/`；私有原始日志与失败探针：`.local/p1-master-acceptance-20261018/`。没有把缺失/失败的原型探针记录从时间线中抹去。

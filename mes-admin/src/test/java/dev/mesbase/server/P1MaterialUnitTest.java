@@ -1,5 +1,15 @@
 package dev.mesbase.server;
 
+import java.util.concurrent.ExecutionException;
+
+import dev.mesbase.business.basic.sync.MaterialQueryPort;
+
+import dev.mesbase.business.production.service.RoutingReferenceRules;
+
+import org.springframework.beans.factory.support.StaticListableBeanFactory;
+
+import org.apache.ibatis.session.Configuration;
+
 import dev.mesbase.business.basic.dao.MaterialMapper;
 import dev.mesbase.business.basic.dao.MaterialCategoryMapper;
 import dev.mesbase.business.basic.dao.UnitMeasureMapper;
@@ -23,6 +33,8 @@ import dev.mesbase.business.issue.domain.MesMaterialIssueItemEntity;
 import dev.mesbase.business.production.dao.MesWorkorderMaterialMapper;
 import dev.mesbase.business.production.dao.RoutingProductMapper;
 import dev.mesbase.business.production.dao.WorkorderMapper;
+import dev.mesbase.business.production.dao.MesProductionExecutionMapper;
+import dev.mesbase.business.production.domain.MesProductionExecutionEntity;
 import dev.mesbase.business.production.domain.MesWorkorderMaterialEntity;
 import dev.mesbase.business.production.domain.RoutingProductEntity;
 import dev.mesbase.business.production.domain.WorkorderEntity;
@@ -45,18 +57,23 @@ import java.util.Set;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import org.junit.jupiter.api.Test;
 import org.mybatis.spring.SqlSessionFactoryBean;
 import org.mybatis.spring.SqlSessionTemplate;
-import org.springframework.beans.factory.support.StaticListableBeanFactory;
 import org.springframework.jdbc.datasource.DataSourceTransactionManager;
 import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.support.TransactionTemplate;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.mockito.Mockito.mock;
 
-/** MOCK/H2 or opt-in MYSQL, actual production identity guard, reference locks and generated SQL. */
+/**
+ * MOCK/H2 or opt-in MYSQL, actual production identity guard, reference locks and generated SQL.
+ */
 class P1MaterialUnitTest {
     static final class Harness implements AutoCloseable {
         final P1TestDatabase db = new P1TestDatabase();
@@ -65,6 +82,7 @@ class P1MaterialUnitTest {
         final MaterialUnitRules units;
         final MaterialServiceImpl service;
         final StockReferenceRules references;
+
         Harness() throws Exception {
             db.table("material", MaterialEntity.class, "id");
             db.table("material_category", MaterialCategoryEntity.class, "id");
@@ -77,39 +95,54 @@ class P1MaterialUnitTest {
             db.table("mes_material_issue_item", MesMaterialIssueItemEntity.class, "id");
             db.table("routing_product", RoutingProductEntity.class, "id");
             db.table("workorder", WorkorderEntity.class, "id");
-            var config = new org.apache.ibatis.session.Configuration();
+            db.table("mes_production_execution", MesProductionExecutionEntity.class, "id");
+            var config = new Configuration();
             for (var mapper : Set.of(MaterialMapper.class, UnitMeasureMapper.class, MaterialCategoryMapper.class,
                     WorkshopMapper.class, WorkstationMapper.class, SafetyStockMapper.class, WmInventoryMapper.class,
                     WmStockActionMapper.class, WmStockDocumentLineMapper.class, MesWorkorderMaterialMapper.class,
-                    MesMaterialIssueItemMapper.class, RoutingProductMapper.class, WorkorderMapper.class)) config.addMapper(mapper);
+                    MesMaterialIssueItemMapper.class, RoutingProductMapper.class, WorkorderMapper.class, MesProductionExecutionMapper.class))
+                config.addMapper(mapper);
             var factory = new SqlSessionFactoryBean();
-            factory.setDataSource(db.source); factory.setConfiguration(config);
+            factory.setDataSource(db.source);
+            factory.setConfiguration(config);
             sessions = new SqlSessionTemplate(factory.getObject());
             units = new MaterialUnitRules(mapper(MaterialMapper.class), mapper(UnitMeasureMapper.class), mapper(WmInventoryMapper.class),
                     mapper(WmStockActionMapper.class), mapper(WmStockDocumentLineMapper.class), mapper(MesWorkorderMaterialMapper.class),
-                    mapper(MesMaterialIssueItemMapper.class), mapper(RoutingProductMapper.class), mapper(WorkorderMapper.class));
+                    mapper(MesMaterialIssueItemMapper.class), mapper(RoutingProductMapper.class), mapper(WorkorderMapper.class), mapper(MesProductionExecutionMapper.class));
             var empty = new StaticListableBeanFactory();
             var rules = new BasicDataRules(mapper(MaterialMapper.class), mapper(MaterialCategoryMapper.class), mapper(UnitMeasureMapper.class),
-                    mapper(WorkstationMapper.class), mapper(WorkshopMapper.class), mapper(SafetyStockMapper.class), empty.getBeanProvider(dev.mesbase.business.production.service.RoutingReferenceRules.class),
+                    mapper(WorkstationMapper.class), mapper(WorkshopMapper.class), mapper(SafetyStockMapper.class), empty.getBeanProvider(RoutingReferenceRules.class),
                     mock(EquipmentReferenceRules.class), empty.getBeanProvider(StockReferenceRules.class), units);
             service = P1CorrectnessTest.proxy(new MaterialServiceImpl(mapper(MaterialMapper.class), rules,
-                    empty.getBeanProvider(dev.mesbase.business.basic.sync.MaterialQueryPort.class), mock(SyncCoordinator.class),
-                    empty.getBeanProvider(IMaterialService.class), Validation.buildDefaultValidatorFactory().getValidator(),
+                    empty.getBeanProvider(MaterialQueryPort.class), mock(SyncCoordinator.class),
+                    empty.getBeanProvider(IMaterialService.class), Validation.buildDefaultValidatorFactory()
+                    .getValidator(),
                     mock(BusinessCacheProcessor.class)), manager);
             references = new StockReferenceRules(mapper(MaterialMapper.class), mock(WmWarehouseMapper.class), mapper(WmInventoryMapper.class),
                     mapper(WmStockActionMapper.class), mock(MesMaterialIssueInputMapper.class), mapper(MesWorkorderMaterialMapper.class), mapper(WmStockDocumentLineMapper.class));
             db.jdbc.update("INSERT INTO unit_measure(id,code,name,status) VALUES(1,'TEST_KG','kg','ENABLED'),(2,'TEST_PCS','pcs','ENABLED')");
             db.jdbc.update("INSERT INTO material(id,code,name,unit_id,material_type,status) VALUES(1,'TEST_M','TEST material',1,'ITEM','ENABLED')");
         }
-        <T> T mapper(Class<T> type) { return sessions.getMapper(type); }
-        TransactionTemplate transaction() {
-            var tx = new TransactionTemplate(manager); tx.setIsolationLevel(TransactionDefinition.ISOLATION_READ_COMMITTED); return tx;
+
+        <T> T mapper(Class<T> type) {
+            return sessions.getMapper(type);
         }
-        public void close() { db.close(); }
+
+        TransactionTemplate transaction() {
+            var tx = new TransactionTemplate(manager);
+            tx.setIsolationLevel(TransactionDefinition.ISOLATION_READ_COMMITTED);
+            return tx;
+        }
+
+        public void close() {
+            db.close();
+        }
     }
+
     static MaterialUpdateCommand change(Long unit) {
         return new MaterialUpdateCommand("TEST_M", "TEST renamed", null, null, unit, "ITEM", "ENABLED", null, null);
     }
+
     @Test
     void unusedCanChangeButEveryHistoricalReferenceFreezesUnitAndNonMeteringEditsRemainAllowed() throws Exception {
         try (var h = new Harness()) {
@@ -117,12 +150,14 @@ class P1MaterialUnitTest {
             h.service.updateById(1L, change(1L));
             var inserts = List.of(
                     "INSERT INTO wm_inventory(id,material_id,quantity) VALUES(1,1,0)",
+                    "INSERT INTO safety_stock(id,material_id,min_qty) VALUES(1,1,0)",
                     "INSERT INTO wm_stock_action(id,material_id,unit_id) VALUES(1,1,1)",
                     "INSERT INTO wm_stock_document_line(id,material_id,unit_id) VALUES(1,1,1)",
                     "INSERT INTO mes_workorder_material(id,material_id,unit_id) VALUES(1,1,1)",
                     "INSERT INTO mes_material_issue_item(id,material_id,unit_id) VALUES(1,1,1)",
                     "INSERT INTO routing_product(id,material_id) VALUES(1,1)",
-                    "INSERT INTO workorder(id,product_id) VALUES(1,1)");
+                    "INSERT INTO workorder(id,product_id) VALUES(1,1)",
+                    "INSERT INTO mes_production_execution(id,product_id) VALUES(1,1)");
             for (String insert : inserts) {
                 h.transaction().executeWithoutResult(status -> {
                     h.db.jdbc.update(insert);
@@ -140,31 +175,58 @@ class P1MaterialUnitTest {
             assertEquals(0, h.db.jdbc.queryForObject("SELECT quantity FROM wm_inventory WHERE id=1", Integer.class));
         }
     }
+
     @Test
     void directHistoricalUnitReferencePreventsDeletionEvenWithoutCurrentMaterial() throws Exception {
         try (var h = new Harness()) {
             h.db.jdbc.update("INSERT INTO wm_stock_action(id,material_id,unit_id) VALUES(1,999,2)");
-            assertThrows(RuntimeException.class, () -> h.transaction().executeWithoutResult(status -> h.units.deletingUnits(List.of(2L))));
+            assertThrows(RuntimeException.class, () -> h.transaction()
+                    .executeWithoutResult(status -> h.units.deletingUnits(List.of(2L))));
             assertEquals(2, h.db.jdbc.queryForObject("SELECT COUNT(*) FROM unit_measure", Integer.class));
         }
     }
+
     @Test
-    void stockCreationHoldingMaterialLockMakesConcurrentUnitChangeWaitThenReject() throws Exception {
-        try (var h = new Harness(); var threads = Executors.newFixedThreadPool(2)) {
-            var locked = new CountDownLatch(1); var release = new CountDownLatch(1); var entered = new CountDownLatch(1);
-            var create = threads.submit(() -> h.transaction().executeWithoutResult(status -> {
-                h.references.lockDemandReferences(1L, List.of());
-                locked.countDown();
-                try { assertTrue(release.await(5, TimeUnit.SECONDS)); } catch (InterruptedException e) { throw new RuntimeException(e); }
-                h.db.jdbc.update("INSERT INTO wm_inventory(id,material_id,quantity) VALUES(1,1,100)");
-            }));
-            assertTrue(locked.await(5, TimeUnit.SECONDS));
-            var edit = threads.submit(() -> { entered.countDown(); return h.service.updateById(1L, change(2L)); });
-            assertTrue(entered.await(5, TimeUnit.SECONDS));
-            release.countDown(); create.get(10, TimeUnit.SECONDS);
-            assertThrows(java.util.concurrent.ExecutionException.class, () -> edit.get(10, TimeUnit.SECONDS));
-            assertEquals(1L, h.db.jdbc.queryForObject("SELECT unit_id FROM material WHERE id=1", Long.class));
-            assertEquals(100, h.db.jdbc.queryForObject("SELECT quantity FROM wm_inventory WHERE id=1", Integer.class));
+    void quantityReferenceCreationHoldingMaterialLockMakesConcurrentUnitChangeWaitThenReject() throws Exception {
+        // The real helper is shared by inventory creation and production workorder-material creation.
+        for (boolean production : List.of(false, true)) {
+            try (var h = new Harness(); var threads = Executors.newFixedThreadPool(2)) {
+                var locked = new CountDownLatch(1);
+                var release = new CountDownLatch(1);
+                var entered = new CountDownLatch(1);
+                var create = threads.submit(() -> h.transaction().executeWithoutResult(status -> {
+                    h.references.lockDemandReferences(1L, List.of());
+                    Long unit = h.mapper(MaterialMapper.class).selectByPrimaryKey(1L).getUnitId();
+                    locked.countDown();
+                    try {
+                        assertTrue(release.await(5, TimeUnit.SECONDS));
+                    } catch (InterruptedException e) {
+                        throw new RuntimeException(e);
+                    }
+                    if (production) {
+                        h.db.jdbc.update("INSERT INTO mes_workorder_material(id,material_id,unit_id,total_required_qty) VALUES(1,1,?,100)", unit);
+                    } else {
+                        h.db.jdbc.update("INSERT INTO wm_inventory(id,material_id,quantity) VALUES(1,1,100)");
+                    }
+                }));
+                assertTrue(locked.await(5, TimeUnit.SECONDS));
+                var edit = threads.submit(() -> {
+                    entered.countDown();
+                    return h.service.updateById(1L, change(2L));
+                });
+                assertTrue(entered.await(5, TimeUnit.SECONDS));
+                assertThrows(TimeoutException.class, () -> edit.get(100, TimeUnit.MILLISECONDS));
+                release.countDown();
+                create.get(10, TimeUnit.SECONDS);
+                assertThrows(ExecutionException.class, () -> edit.get(10, TimeUnit.SECONDS));
+                assertEquals(1L, h.db.jdbc.queryForObject("SELECT unit_id FROM material WHERE id=1", Long.class));
+                if (production) {
+                    assertEquals(1L, h.db.jdbc.queryForObject("SELECT unit_id FROM mes_workorder_material WHERE id=1", Long.class));
+                    assertEquals(100, h.db.jdbc.queryForObject("SELECT total_required_qty FROM mes_workorder_material WHERE id=1", Integer.class));
+                } else {
+                    assertEquals(100, h.db.jdbc.queryForObject("SELECT quantity FROM wm_inventory WHERE id=1", Integer.class));
+                }
+            }
         }
     }
 }

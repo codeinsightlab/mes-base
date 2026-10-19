@@ -2,6 +2,7 @@ package dev.mesbase.system.service;
 
 import dev.mesbase.common.core.domain.entity.SysDictData;
 import dev.mesbase.common.core.domain.entity.SysDictType;
+import dev.mesbase.common.utils.DictDataLookup;
 
 import java.util.List;
 
@@ -10,8 +11,7 @@ import java.util.List;
  *
  * @author ruoyi
  */
-public interface ISysDictTypeService
-{
+public interface ISysDictTypeService extends DictDataLookup {
     /**
      * 根据条件分页查询字典类型
      *

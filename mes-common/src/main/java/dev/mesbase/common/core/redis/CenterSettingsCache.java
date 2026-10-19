@@ -8,7 +8,9 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
-/** Committed center settings only. Display values may be stale for at most one finite cache lifetime. */
+/**
+ * Committed center settings only. Display values may be stale for at most one finite cache lifetime.
+ */
 @Component
 @ConditionalOnProperty(name = "mes.system.enabled", havingValue = "true")
 public class CenterSettingsCache {

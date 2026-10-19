@@ -1,14 +1,15 @@
 #!/usr/bin/env python3
-"""Check index/HEAD configuration without printing credential values."""
+"""Check selected configuration and obvious source secrets without printing values."""
 import argparse
 import re
 import subprocess
 from pathlib import Path
 
 parser = argparse.ArgumentParser(description=__doc__)
-parser.add_argument('--working-tree', action='store_true', help='Inspect tracked working files')
-parser.add_argument('--staged', action='store_true')
-parser.add_argument('--revision', help='Inspect a committed tree instead of the index')
+scope = parser.add_mutually_exclusive_group()
+scope.add_argument('--working-tree', action='store_true', help='Inspect tracked and untracked working files')
+scope.add_argument('--staged', action='store_true')
+scope.add_argument('--revision', help='Inspect a committed tree instead of the index')
 args = parser.parse_args()
 
 def git(*arguments):
@@ -18,6 +19,8 @@ if args.revision:
     paths = git('ls-tree', '-r', '--name-only', '-z', args.revision)
 elif args.staged:
     paths = git('diff', '--cached', '--name-only', '--diff-filter=ACMR', '-z')
+elif args.working_tree:
+    paths = git('ls-files', '-co', '--exclude-standard', '-z')
 else:
     paths = git('ls-files', '-z')
 
@@ -39,9 +42,10 @@ for raw in paths.split(b'\0'):
             r'new\s+DatasourcePasswordCipher\s*\(\s*"[^"\n]+"',
             r'(?i)(?:String|var)\s+\w*(?:password|secret|datasourceKey|privateKey)\w*\s*=\s*"[^"\n]{8,}"',
         ]
-        for number, line in enumerate(source.splitlines(), 1):
-            if any(re.search(pattern, line) for pattern in patterns):
-                errors.append(path + ':' + str(number) + ': possible hardcoded secret (value redacted)')
+        lines = {source.count('\n', 0, match.start()) + 1
+                 for pattern in patterns for match in re.finditer(pattern, source)}
+        for number in sorted(lines):
+            errors.append(path + ':' + str(number) + ': possible hardcoded secret (value redacted)')
         continue
     if not (path.startswith('config/') or '/src/main/resources/' in path):
         continue

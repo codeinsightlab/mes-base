@@ -8,6 +8,7 @@ import java.util.List;
 import dev.mesbase.business.wm.service.StockReferenceRules;
 import java.util.HashSet;
 import java.util.Set;
+import java.util.Objects;
 import org.springframework.stereotype.Component;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import dev.mesbase.business.production.service.RoutingReferenceRules;
@@ -51,7 +52,8 @@ public class BasicDataRules {
     public BasicDataRules(MaterialMapper material, MaterialCategoryMapper materialCategory,
                           UnitMeasureMapper unitMeasure, WorkstationMapper workstation, WorkshopMapper workshop,
                           SafetyStockMapper safetyStock, ObjectProvider<RoutingReferenceRules> routing,
-                          EquipmentReferenceRules equipment, ObjectProvider<StockReferenceRules> stock, MaterialUnitRules metering) {
+                          EquipmentReferenceRules equipment, ObjectProvider<StockReferenceRules> stock,
+                          MaterialUnitRules metering) {
         this.metering = metering;
         this.stock = stock;
         this.equipment = equipment;
@@ -134,7 +136,7 @@ public class BasicDataRules {
                 .andMaterialIdEqualTo(row.getMaterialId());
         if (row.getId() != null) criteria.andIdNotEqualTo(row.getId());
         reject(safetyStock.countByExample(example) > 0);
-        requireMaterial(row.getMaterialId());
+        lockMaterial(row.getMaterialId());
         if (row.getMinQty() == null || row.getMinQty().signum() < 0 || row.getMaxQty() != null && row.getMaxQty()
                 .compareTo(row.getMinQty()) < 0) throw new FoundationException(ErrorCode.BAD_REQUEST);
     }
@@ -144,6 +146,11 @@ public class BasicDataRules {
     }
 
     public void changingUnit(MaterialEntity before, Long next) {
+        if (!Objects.equals(before.getUnitId(), next)) {
+            var references = new SafetyStockExample();
+            references.createCriteria().andMaterialIdEqualTo(before.getId());
+            reject(safetyStock.countByExample(references) > 0);
+        }
         metering.changingUnit(before, next);
     }
 

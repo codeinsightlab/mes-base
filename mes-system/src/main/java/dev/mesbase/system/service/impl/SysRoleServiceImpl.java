@@ -330,7 +330,7 @@ public class SysRoleServiceImpl implements ISysRoleService {
         patch.setDataScope(role.getDataScope());
         patch.setDeptCheckStrictly(role.isDeptCheckStrictly());
         patch.setUpdateBy(role.getUpdateBy());
-        if (roleMapper.updateRole(patch) != 1) throw new FoundationException(ErrorCode.RESOURCE_CONFLICT);
+        if (roleMapper.updateDataScope(patch) != 1) throw new FoundationException(ErrorCode.RESOURCE_CONFLICT);
         roleDeptMapper.deleteRoleDeptByRoleId(role.getRoleId());
         if (!relations.isEmpty() && roleDeptMapper.batchRoleDept(relations) != relations.size()) {
             throw new FoundationException(ErrorCode.RESOURCE_CONFLICT);
@@ -368,24 +368,17 @@ public class SysRoleServiceImpl implements ISysRoleService {
         return rows;
     }
 
-    /**
-     * 新增角色部门信息(数据权限)
-     *
-     * @param role 角色对象
-     */
-    @Transactional(transactionManager = "masterTransactionManager", rollbackFor = Exception.class)
-    public int insertRoleDept(SysRole role) {
-        var relations = roleDepartments(role);
-        return relations.isEmpty() ? 1 : roleDeptMapper.batchRoleDept(relations);
-    }
-
     private List<SysRoleDept> roleDepartments(SysRole role) {
         List<SysRoleDept> relations = new ArrayList<>();
         Set<Long> unique = new HashSet<>();
         for (Long deptId : role.getDeptIds() == null ? new Long[0] : role.getDeptIds()) {
             // Departments are shared center identities, not Factory-owned rows.
-            if (deptId == null || !unique.add(deptId) || departments.selectDeptById(deptId) == null) {
+            if (deptId == null || !unique.add(deptId)) {
                 throw new ServiceException("部门不存在或重复");
+            }
+            var department = departments.selectDeptById(deptId);
+            if (department == null || !"0".equals(department.getDelFlag())) {
+                throw new ServiceException("部门不存在或已删除");
             }
             SysRoleDept relation = new SysRoleDept();
             relation.setRoleId(role.getRoleId());

@@ -1,5 +1,15 @@
 package dev.mesbase.server;
 
+import java.util.Collections;
+
+import org.springframework.transaction.TransactionSystemException;
+
+import org.springframework.transaction.support.DefaultTransactionStatus;
+
+import org.springframework.beans.factory.support.StaticListableBeanFactory;
+
+import org.apache.ibatis.session.Configuration;
+
 import dev.mesbase.common.core.domain.entity.SysUser;
 import dev.mesbase.common.core.domain.entity.SysRole;
 import dev.mesbase.common.core.domain.entity.SysDept;
@@ -11,6 +21,7 @@ import dev.mesbase.common.core.redis.RedisCache;
 import dev.mesbase.common.core.redis.UserSessionStore;
 import dev.mesbase.common.exception.ServiceException;
 import dev.mesbase.common.utils.PasswordPolicy;
+import dev.mesbase.common.utils.DictDataLookup;
 import dev.mesbase.common.utils.spring.SpringUtils;
 import dev.mesbase.core.factory.FactoryCatalog;
 import dev.mesbase.infrastructure.persistence.SpringCommitActions;
@@ -68,16 +79,29 @@ import org.springframework.transaction.annotation.AnnotationTransactionAttribute
 import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.*;
-import static org.mockito.Mockito.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.reset;
+import static org.mockito.Mockito.doThrow;
 
-/** Production services and MyBatis SQL; H2 MOCK by default, isolated real MYSQL on explicit opt-in. */
+/**
+ * Production services and MyBatis SQL; H2 MOCK by default, isolated real MYSQL on explicit opt-in.
+ */
 class P1CorrectnessTest {
     @Intercepts({@Signature(type = Executor.class, method = "update", args = {MappedStatement.class, Object.class}),
             @Signature(type = StatementHandler.class, method = "prepare", args = {Connection.class, Integer.class})})
     static class Failures implements Interceptor {
         final AtomicReference<String> statement = new AtomicReference<>();
+
         public Object intercept(Invocation call) throws Throwable {
             if (call.getTarget() instanceof StatementHandler handler) {
                 // Only H2 clock syntax differs. MySQL is executed without this rewrite.
@@ -140,14 +164,15 @@ class P1CorrectnessTest {
             db.jdbc.update("INSERT INTO sys_role(role_id,role_name,role_key,role_sort,kind,data_scope,status,del_flag) VALUES(1,'TEST role','test',1,'PLATFORM','2','0','0')");
             db.jdbc.update("INSERT INTO sys_post(post_id,post_name,status) VALUES(1,'TEST post','0')");
             db.jdbc.update("INSERT INTO sys_role_dept VALUES(1,1)");
-            var config = new org.apache.ibatis.session.Configuration();
+            var config = new Configuration();
             config.getTypeAliasRegistry().registerAliases("dev.mesbase.common.core.domain.entity");
             config.getTypeAliasRegistry().registerAliases("dev.mesbase.system.domain");
             config.setMapUnderscoreToCamelCase(true);
             config.addInterceptor(failures);
             for (var mapper : Set.of(SysUserMapper.class, SysRoleMapper.class, SysDeptMapper.class, SysPostMapper.class,
                     SysUserRoleMapper.class, SysUserPostMapper.class, SysRoleDeptMapper.class, SessionAccountMapper.class,
-                    SysConfigMapper.class, SysDictDataMapper.class, SysDictTypeMapper.class)) config.addMapper(mapper);
+                    SysConfigMapper.class, SysDictDataMapper.class, SysDictTypeMapper.class))
+                config.addMapper(mapper);
             var factory = new SqlSessionFactoryBean();
             factory.setDataSource(db.source);
             factory.setConfiguration(config);
@@ -167,7 +192,7 @@ class P1CorrectnessTest {
             ReflectionTestUtils.setField(user, "passwords", new PasswordPolicy(new MockEnvironment()));
             ReflectionTestUtils.setField(user, "revocations", new SessionRevocationService(mapper(SessionAccountMapper.class), sessionStore, manager));
             users = proxy(user, manager);
-            var provider = new org.springframework.beans.factory.support.StaticListableBeanFactory();
+            var provider = new StaticListableBeanFactory();
             provider.addBean("users", users);
             ReflectionTestUtils.setField(user, "self", provider.getBeanProvider(ISysUserService.class));
             var role = new SysRoleServiceImpl();
@@ -190,14 +215,23 @@ class P1CorrectnessTest {
             ReflectionTestUtils.setField(type, "dictDataMapper", mapper(SysDictDataMapper.class));
             ReflectionTestUtils.setField(type, "dictTypeMapper", mapper(SysDictTypeMapper.class));
             dictTypes = proxy(type, manager);
+            beans.registerBean(DictDataLookup.class, () -> dictTypes);
             var identity = new SysUser();
             identity.setUserId(999L);
             identity.setUserName("TEST operator");
             SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken(
                     new LoginUser(999L, 1L, identity, Set.of()), null, List.of()));
         }
-        <T> T mapper(Class<T> type) { return sessions.getMapper(type); }
-        public void close() { SecurityContextHolder.clearContext(); beans.close(); db.close(); }
+
+        <T> T mapper(Class<T> type) {
+            return sessions.getMapper(type);
+        }
+
+        public void close() {
+            SecurityContextHolder.clearContext();
+            beans.close();
+            db.close();
+        }
     }
 
     @SuppressWarnings("unchecked")
@@ -218,6 +252,7 @@ class P1CorrectnessTest {
         user.setPostIds(new Long[]{1L});
         return user;
     }
+
     static SysRole role(Long... depts) {
         var role = new SysRole();
         role.setRoleId(1L);
@@ -237,7 +272,8 @@ class P1CorrectnessTest {
                 assertEquals(0, h.db.jdbc.queryForObject("SELECT COUNT(*) FROM sys_user_role", Integer.class));
                 assertEquals(0, h.db.jdbc.queryForObject("SELECT COUNT(*) FROM sys_user_post", Integer.class));
             }
-            assertTrue(h.users.importUser(List.of(user("retry")), true, "TEST", "Test-only-password-42").contains("全部导入成功"));
+            assertTrue(h.users.importUser(List.of(user("retry")), true, "TEST", "Test-only-password-42")
+                    .contains("全部导入成功"));
             long id = h.db.jdbc.queryForObject("SELECT user_id FROM sys_user WHERE user_name='retry'", Long.class);
             for (String point : List.of("SysUserMapper.updateUser", "SessionAccountMapper.enqueue")) {
                 h.failures.statement.set("dev.mesbase.system.mapper." + point);
@@ -250,7 +286,11 @@ class P1CorrectnessTest {
                 assertEquals(1, h.db.jdbc.queryForObject("SELECT COUNT(*) FROM sys_user_post WHERE user_id=?", Integer.class, id));
                 assertEquals(0, h.db.jdbc.queryForObject("SELECT COUNT(*) FROM sys_session_revocation", Integer.class));
             }
-            h.users.updateUser(h.mapper(SysUserMapper.class).selectUserById(id));
+            var updated = user("retry");
+            updated.setNickName("updated");
+            assertTrue(h.users.importUser(List.of(updated), true, "TEST", "Test-only-password-42")
+                    .contains("更新成功"));
+            assertEquals("updated", h.db.jdbc.queryForObject("SELECT nick_name FROM sys_user WHERE user_id=?", String.class, id));
             verify(h.sessionStore).revoke(eq(id), anyLong());
             assertEquals(1, h.db.jdbc.queryForObject("SELECT COUNT(*) FROM sys_session_revocation", Integer.class));
         }
@@ -259,32 +299,47 @@ class P1CorrectnessTest {
     @Test
     void middleImportFailureKeepsOnlyCompleteSuccessfulRowsAndRejectsOversizeBeforeWriting() throws Exception {
         try (var h = new Harness()) {
-            h.failures.statement.set("dev.mesbase.system.mapper.SysUserRoleMapper.batchUserRole");
-            assertThrows(ServiceException.class, () -> h.users.importUser(List.of(user("first_failure"), user("success")), true, "TEST", "Test-only-password-42"));
-            assertEquals(List.of("success"), h.db.jdbc.queryForList("SELECT user_name FROM sys_user", String.class));
-            assertEquals(1, h.db.jdbc.queryForObject("SELECT COUNT(*) FROM sys_user_role", Integer.class));
-            assertThrows(ServiceException.class, () -> h.users.importUser(java.util.Collections.nCopies(201, user("oversize")), true, "TEST", "Test-only-password-42"));
-            assertEquals(1, h.db.jdbc.queryForObject("SELECT COUNT(*) FROM sys_user", Integer.class));
+            var invalid = user("middle_failure");
+            invalid.setRoleIds(new Long[]{999L});
+            assertThrows(ServiceException.class, () -> h.users.importUser(List.of(user("first"), invalid, user("last")), true, "TEST", "Test-only-password-42"));
+            assertEquals(List.of("first", "last"), h.db.jdbc.queryForList("SELECT user_name FROM sys_user ORDER BY user_name", String.class));
+            assertEquals(2, h.db.jdbc.queryForObject("SELECT COUNT(*) FROM sys_user_role", Integer.class));
+            assertThrows(ServiceException.class, () -> h.users.importUser(Collections.nCopies(201, user("oversize")), true, "TEST", "Test-only-password-42"));
+            assertEquals(2, h.db.jdbc.queryForObject("SELECT COUNT(*) FROM sys_user", Integer.class));
         }
     }
 
     @Test
     void roleFailurePreservesScopeAndDepartmentsAndConcurrentReplacementNeverMixes() throws Exception {
         try (var h = new Harness(); var threads = Executors.newFixedThreadPool(2)) {
+            h.db.jdbc.update("UPDATE sys_role SET update_by='TEST original' WHERE role_id=1");
             assertThrows(ServiceException.class, () -> h.roles.authDataScope(role(999L)));
             assertThrows(ServiceException.class, () -> h.roles.authDataScope(role(1L, 1L)));
-            for (String point : List.of("SysRoleDeptMapper.deleteRoleDeptByRoleId", "SysRoleDeptMapper.batchRoleDept")) {
+            for (String point : List.of("SysRoleMapper.updateDataScope", "SysRoleDeptMapper.deleteRoleDeptByRoleId", "SysRoleDeptMapper.batchRoleDept")) {
                 h.failures.statement.set("dev.mesbase.system.mapper." + point);
-                assertThrows(RuntimeException.class, () -> h.roles.authDataScope(role(2L)));
+                var change = role(2L);
+                change.setDataScope("3");
+                assertThrows(RuntimeException.class, () -> h.roles.authDataScope(change));
+                assertEquals("2", h.db.jdbc.queryForObject("SELECT data_scope FROM sys_role WHERE role_id=1", String.class));
                 assertEquals(List.of(1L), h.db.jdbc.queryForList("SELECT dept_id FROM sys_role_dept WHERE role_id=1", Long.class));
             }
             var start = new CountDownLatch(1);
-            var a = threads.submit(() -> { start.await(); h.roles.authDataScope(role(1L)); return null; });
-            var b = threads.submit(() -> { start.await(); h.roles.authDataScope(role(2L)); return null; });
+            var a = threads.submit(() -> {
+                start.await();
+                h.roles.authDataScope(role(1L));
+                return null;
+            });
+            var b = threads.submit(() -> {
+                start.await();
+                h.roles.authDataScope(role(2L));
+                return null;
+            });
             start.countDown();
-            a.get(10, TimeUnit.SECONDS); b.get(10, TimeUnit.SECONDS);
+            a.get(10, TimeUnit.SECONDS);
+            b.get(10, TimeUnit.SECONDS);
             var result = h.db.jdbc.queryForList("SELECT dept_id FROM sys_role_dept WHERE role_id=1", Long.class);
             assertTrue(result.equals(List.of(1L)) || result.equals(List.of(2L)));
+            assertEquals("TEST original", h.db.jdbc.queryForObject("SELECT update_by FROM sys_role WHERE role_id=1", String.class));
             assertEquals("2", h.db.jdbc.queryForObject("SELECT data_scope FROM sys_role WHERE role_id=1", String.class));
         }
     }
@@ -293,14 +348,18 @@ class P1CorrectnessTest {
     void configRollbackRenameAndWriteTransactionMissNeverPublishUncommittedValues() throws Exception {
         try (var h = new Harness()) {
             var config = new SysConfig();
-            config.setConfigName("TEST config"); config.setConfigKey("test.old"); config.setConfigValue("before"); config.setConfigType("N");
+            config.setConfigName("TEST config");
+            config.setConfigKey("test.old");
+            config.setConfigValue("before");
+            config.setConfigType("N");
             h.configs.insertConfig(config);
             config.setConfigId(h.db.jdbc.queryForObject("SELECT config_id FROM sys_config", Long.class));
             verify(h.redis).deleteObject("committed-v1:sys_config:test.old");
             reset(h.redis);
             var tx = new TransactionTemplate(h.manager);
             assertThrows(IllegalStateException.class, () -> tx.executeWithoutResult(status -> {
-                config.setConfigKey("test.new"); config.setConfigValue("uncommitted");
+                config.setConfigKey("test.new");
+                config.setConfigValue("uncommitted");
                 h.configs.updateConfig(config);
                 assertEquals("uncommitted", h.configs.selectConfigByKey("test.new"));
                 verifyNoInteractions(h.redis);
@@ -320,23 +379,27 @@ class P1CorrectnessTest {
             verifyNoInteractions(h.redis);
         }
     }
+
     @Test
     void commitFailureAndBatchDictionaryFailureLeaveDatabaseAndCacheUnpublished() throws Exception {
         try (var h = new Harness()) {
             var failing = new DataSourceTransactionManager(h.db.source) {
                 @Override
-                protected void doCommit(org.springframework.transaction.support.DefaultTransactionStatus status) {
-                    throw new org.springframework.transaction.TransactionSystemException("TEST commit unavailable");
+                protected void doCommit(DefaultTransactionStatus status) {
+                    throw new TransactionSystemException("TEST commit unavailable");
                 }
             };
             failing.setRollbackOnCommitFailure(true);
             var target = new SysConfigServiceImpl();
-            ReflectionTestUtils.setField(target, "contractValidator", Validation.buildDefaultValidatorFactory().getValidator());
+            ReflectionTestUtils.setField(target, "contractValidator", Validation.buildDefaultValidatorFactory()
+                    .getValidator());
             ReflectionTestUtils.setField(target, "configMapper", h.mapper(SysConfigMapper.class));
             ReflectionTestUtils.setField(target, "settingsCache", h.cache);
             var service = P1CorrectnessTest.proxy(target, failing);
             var config = new SysConfig();
-            config.setConfigName("TEST commit"); config.setConfigKey("test.commit"); config.setConfigValue("MUST_NOT_PUBLISH");
+            config.setConfigName("TEST commit");
+            config.setConfigKey("test.commit");
+            config.setConfigValue("MUST_NOT_PUBLISH");
             assertThrows(RuntimeException.class, () -> service.insertConfig(config));
             assertEquals(0, h.db.jdbc.queryForObject("SELECT COUNT(*) FROM sys_config", Integer.class));
             verifyNoInteractions(h.redis);
@@ -345,6 +408,22 @@ class P1CorrectnessTest {
             assertThrows(RuntimeException.class, () -> h.dictData.deleteDictDataByIds(new Long[]{1L, 2L}));
             assertEquals(2, h.db.jdbc.queryForObject("SELECT COUNT(*) FROM sys_dict_data", Integer.class));
             verifyNoInteractions(h.redis);
+        }
+    }
+
+    @Test
+    void importedStatusCommitWithRedisRevocationFailureIsReportedAsCommittedPending() throws Exception {
+        try (var h = new Harness()) {
+            h.users.importUser(List.of(user("pending")), true, "TEST", "Test-only-password-42");
+            doThrow(new IllegalStateException("TEST Redis unavailable")).when(h.sessionStore)
+                    .revoke(anyLong(), anyLong());
+            var change = user("pending");
+            change.setStatus("1");
+            var failure = assertThrows(ServiceException.class,
+                    () -> h.users.importUser(List.of(change), true, "TEST", "Test-only-password-42"));
+            assertTrue(failure.getMessage().contains("已提交，会话撤销待自动重试"));
+            assertEquals("1", h.db.jdbc.queryForObject("SELECT status FROM sys_user WHERE user_name='pending'", String.class));
+            assertEquals(1, h.db.jdbc.queryForObject("SELECT COUNT(*) FROM sys_session_revocation", Integer.class));
         }
     }
 

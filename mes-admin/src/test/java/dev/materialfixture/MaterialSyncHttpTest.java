@@ -1,5 +1,20 @@
 package dev.materialfixture;
 
+import dev.mesbase.business.production.dao.WorkorderMapper;
+import dev.mesbase.business.production.dao.MesProductionExecutionMapper;
+
+import dev.mesbase.business.production.dao.RoutingProductMapper;
+
+import dev.mesbase.business.issue.dao.MesMaterialIssueItemMapper;
+
+import dev.mesbase.business.production.dao.MesWorkorderMaterialMapper;
+
+import dev.mesbase.business.wm.dao.WmStockDocumentLineMapper;
+
+import dev.mesbase.business.wm.dao.WmStockActionMapper;
+
+import dev.mesbase.business.wm.dao.WmInventoryMapper;
+
 import dev.mesbase.common.core.domain.entity.SysUser;
 import dev.mesbase.common.core.domain.model.LoginUser;
 import dev.mesbase.core.error.ErrorCode;
@@ -158,11 +173,12 @@ class MaterialSyncHttpTest {
             FoundationErrorAdvice.class})
     static class Web implements WebMvcConfigurer {
         @Bean
-        MaterialUnitRules metering(MaterialMapper materials) {
-            // This fixture covers synchronization shape; metering has separate persistence tests.
-            var guard = mock(MaterialUnitRules.class);
-            when(guard.lockMaterial(any())).thenAnswer(call -> materials.selectByPrimaryKey(call.getArgument(0)));
-            return guard;
+        MaterialUnitRules metering(MaterialMapper materials, UnitMeasureMapper units) {
+            // Real metering locks; this fixture has no historical-fact tables.
+            return new MaterialUnitRules(materials, units, mock(WmInventoryMapper.class),
+                    mock(WmStockActionMapper.class), mock(WmStockDocumentLineMapper.class),
+                    mock(MesWorkorderMaterialMapper.class), mock(MesMaterialIssueItemMapper.class),
+                    mock(RoutingProductMapper.class), mock(WorkorderMapper.class), mock(MesProductionExecutionMapper.class));
         }
 
         @Bean

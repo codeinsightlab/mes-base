@@ -152,6 +152,8 @@ class BusinessCacheIntegrationTest {
         FactoryContext.bind(scope("A"));
         redis.deleteByPattern("business:*");
         when(mapper.selectByPrimaryKey(anyLong())).thenAnswer(call -> row(call.getArgument(0), "LIST"));
+        when(context.getBean(BasicDataRules.class).lockMaterial(anyLong()))
+                .thenAnswer(call -> mapper.selectByPrimaryKey(call.getArgument(0)));
         when(mapper.selectByExample(any(MaterialExample.class))).thenAnswer(call -> {
             var page = PageHelper.getLocalPage();
             if (page != null) page.setTotal(123);
@@ -347,6 +349,7 @@ class BusinessCacheIntegrationTest {
         assertTrue(has("business:material", "detail:fixture"));
         seed();
         var existing = row(1L, "old");
+        when(context.getBean(BasicDataRules.class).lockMaterial(1L)).thenReturn(existing);
         when(mapper.selectByExample(any())).thenReturn(List.of(existing));
         assertEquals(1, writer.upsert(scope("A"), List.of(input)).updated());
         assertFalse(has("business:material", "detail:fixture"));
