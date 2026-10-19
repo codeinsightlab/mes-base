@@ -383,10 +383,12 @@ READY/RUNNING中的正式INSERT、COMMIT、提交后SpringCommitActions及缓存
 
 池maxActive仍20，采样ErrorCount均0；未取得的Connect/Create计数不按0处理。[资源摘要](evidence/2026-10-19-production-lock-for-update/resource-summary.json)及a/b-resources.jsonl。压力阶段schema线程累计SQL/服务器时间含池维护等非请求活动，不能除以样本数作为精确单次SQL，更不能把多线程累计时间当墙钟；精确SQL结论只用上节逐协议Trace。
 
-最终源Factory B绑定仍DataSource2/110.42.227.83/mes_base_v23_factory_b_test/LOCAL；源45表完整摘要前后完全一致，原901闭环/90,100条报工/100,011核心事实不变。DEV中本轮开始前 **123,886条既有记录逐主键/全部规范化字段均无缺失或改变**，包括前一轮验收新增事实；全部新事实只关联本轮69个独立工单/Execution。新增2,713条报工（2,560计时+116预热+6基线/诊断+31并发事实），逐UUID、数量、ID和操作者6246匹配正式响应/发送日志；18次成功报工重放未新增事实。69次投产合计690，生产原料消耗1380，140条新库存动作另含其他入库5/其他出库4，最终净库存1留在TEST库存2002，其余新库存余额0；这些其他出入库不是正式生产完工。未伪造质量放行/完工或把新部分生产算成完整闭环。[最终事实/绑定/全量保护核验](evidence/2026-10-19-production-lock-for-update/final-verification.json)、[正式数量及两实例状态读取](evidence/2026-10-19-production-lock-for-update/final-http.json)。
+最终源Factory B绑定仍DataSource2/110.42.227.83/mes_base_v23_factory_b_test/LOCAL；源45表完整摘要前后完全一致，原901闭环/90,100条报工/100,011核心事实不变。DEV中本轮开始前 **123,886条既有记录逐主键/全部规范化字段均无缺失或改变**，包括前一轮验收新增事实；新增生产事实限定于本轮69个独立工单/Execution，其他出入库仅涉及本轮新库存。新增2,713条报工（2,560计时+116预热+6基线/诊断+31并发事实），逐UUID、数量、ID和操作者6246匹配正式响应/发送日志；18次成功报工重放未新增事实。69次投产合计690，生产原料消耗1380，140条新库存动作另含其他入库5/其他出库4，最终净库存1留在TEST库存2002，其余新库存余额0；这些其他出入库不是正式生产完工。未伪造质量放行/完工或把新部分生产算成完整闭环。[最终事实/绑定/全量保护核验](evidence/2026-10-19-production-lock-for-update/final-verification.json)、[正式数量及两实例状态读取](evidence/2026-10-19-production-lock-for-update/final-http.json)。
 
 `mvn -B -ntp verify`最终SUCCESS，757项中46项按环境条件跳过，711执行，0失败/错误；46个未执行的旧Live验收不冒充通过。本轮DEV验收是单独真实HTTP/MySQL证据。`scripts/smoke-packaged.py`通过；30个改动Java文件native formatter检查通过，git diff --check通过。初期新生成契约测试切片忽略了XML属性排序、旧Mock仍按UPDATE/COUNT设置返回值，已修正为完整锁SELECT片段与锁定返回行，最终完整测试通过，未保留失真的旧桩。[测试摘要](evidence/2026-10-19-production-lock-for-update/test-summary.json)。
 
 自建18082/18083 JVM及17479 Redis已停止；用户8081/PID40599、5173/PID12465保留，原application.yml保持本轮开始时哈希。测试库、新69组资源、1条工单作废事实、库存净余额1及全部不可变事实保留供复验，不做破坏性清理。私有配置/凭据/备份/逐行原始hash/冷启动完整诊断不提交Git。[收尾](evidence/2026-10-19-production-lock-for-update/cleanup.json)、[工作树保护](evidence/2026-10-19-production-lock-for-update/workspace-preservation.json)。
 
 **本轮 GO：24处纯锁UPDATE已替换，锁顺序/校验保留，DEV跨JVM数量/幂等/状态/回滚/库存竞争通过，SQL与性能对照完成。** 不宣称全部未来死锁场景、质量大事实并发、缺行/范围锁、长时间SLA或所有24个入口的逐一真实竞争均已覆盖；本轮真实竞争集中于生产链和仓储，其他引用入口有静态链路与定向/完整测试证据。回滚可切回冻结A产物并审查还原本轮Mapper/Service/生成器改动，不清理不可变TEST事实、不覆盖用户application.yml或其他工作。未提交/推送，未修改源Factory B数据、绑定、Druid、隔离配置或Flyway。
+
+本轮最终交付检查：私有配置检查通过（选定工作树，不含Git历史）；当前生产源码摘要及B产物SHA与实际采样版本一致；11个锁XML缓存策略、全部证据JSON/JSONL、文档链接、当前SHA256清单核验通过。

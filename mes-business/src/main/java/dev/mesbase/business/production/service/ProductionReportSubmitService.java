@@ -28,6 +28,8 @@ import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
+import dev.mesbase.infrastructure.persistence.OwnedTransactionManager;
+import org.springframework.beans.factory.annotation.Qualifier;
 
 @Service
 @ConditionalOnProperty(name = "mes.business.enabled", havingValue = "true")
@@ -47,13 +49,16 @@ public class ProductionReportSubmitService {
     private final MesProductionExecutionMapper executions;
     private final WorkorderMapper orders;
     private final WorkstationMapper workstations;
+    private final OwnedTransactionManager transactionManager;
 
     public ProductionReportSubmitService(ProductionIdentityService identities, ProductionQuantityService quantities,
                                          ExecutionPathService paths, ReportOperatorEligibilityService eligibility,
                                          ProductionChainLocks locks,
                                          MesProductionReportMapper reports, MesProductionExecutionMapper executions,
                                          WorkorderMapper orders,
-                                         WorkstationMapper workstations, BusinessSourceRules sources) {
+                                         WorkstationMapper workstations, BusinessSourceRules sources,
+                                         @Qualifier("businessTransactionManager") OwnedTransactionManager transactionManager) {
+        this.transactionManager = transactionManager;
         this.sources = sources;
         this.identities = identities;
         this.quantities = quantities;
@@ -100,18 +105,19 @@ public class ProductionReportSubmitService {
         // A successful replay remains readable even if execution/qualification later changes; it creates no new fact.
         var existing = reports.selectByRequestId(command.requestId());
         if (existing != null) return replay(existing, command, user);
-        var execution = locks.execution(command.executionId());
+        var locked = locks.lockedExecution(command.executionId(), transactionManager);
+        var execution = locked.execution();
         existing = reports.selectByRequestId(command.requestId());
         if (existing != null) return replay(existing, command, user);
         sources.execution(execution, null);
         if (!ProductionExecutionStatus.allowsNormalReporting(execution.getStatus()))
             throw new FoundationException(ErrorCode.EXECUTION_INVALID);
-        quantities.validateReportChange(command.executionId(), command.routingNodeId(), command.reportQty());
-        eligibility.requireEligible(command.executionId(), command.routingNodeId(), user);
+        quantities.validateReportChange(locked, command.routingNodeId(), command.reportQty());
+        eligibility.requireEligible(locked, command.routingNodeId(), user);
         if (command.workstationId() != null && workstations.selectByPrimaryKey(command.workstationId()) == null)
             throw new FoundationException(ErrorCode.REPORT_REFERENCE_INVALID);
         // Reuse the formal start contract, including released order, exact routing, locked path and confirmed issue.
-        paths.start(command.executionId());
+        paths.start(locked);
         var now = LocalDateTime.now();
         var row = new MesProductionReportEntity();
         row.setExecutionId(command.executionId());

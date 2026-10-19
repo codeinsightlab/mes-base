@@ -12,6 +12,10 @@ import dev.mesbase.business.production.domain.ProductionExecutionStatus;
 import dev.mesbase.business.production.dao.MesExecutionPathNodeMapper;
 import dev.mesbase.business.production.dao.ProductionQuantityMapper;
 import dev.mesbase.business.production.domain.MesExecutionPathNodeExample;
+import dev.mesbase.business.production.domain.MesExecutionPathNodeEntity;
+import dev.mesbase.business.production.service.ExecutionPathService.PathModel;
+import dev.mesbase.business.production.service.ProductionChainLocks.LockedExecution;
+import dev.mesbase.business.production.domain.MesProductionExecutionEntity;
 import dev.mesbase.business.production.domain.ExecutionPathStatus;
 import dev.mesbase.business.production.domain.ProductionReportModels.ExecutionQuantity;
 import dev.mesbase.business.production.domain.ProductionReportModels.ExecutionPage;
@@ -60,10 +64,43 @@ public class ProductionQuantityService {
         return project(load(executionId));
     }
 
+    /**
+     * Historical ledger access validates the actual path without calculating mutable production quantities.
+     */
+    public void requireReadableExecutionNode(Long executionId, Long nodeId) {
+        var model = paths.view(executionId);
+        if (model.path() == null || !Objects.equals(model.path().getRoutingId(), model.routing().id())) unavailable();
+        ExecutionPathValidator.validate(model.selectedNodeIds(), model.nodes(), model.edges());
+        if (orderedPathNodes(executionId, model).stream()
+                .noneMatch(row -> Objects.equals(row.getRoutingNodeId(), nodeId)))
+            unavailable();
+    }
+
+    private List<MesExecutionPathNodeEntity> orderedPathNodes(Long executionId, PathModel model) {
+        var f = new MesExecutionPathNodeExample();
+        f.createCriteria().andExecutionIdEqualTo(executionId);
+        f.setOrderByClause("sequence_no,id");
+        var ordered = pathNodes.selectByExample(f);
+        if (ordered.size() != model.selectedNodeIds().size()) unavailable();
+        for (int i = 0; i < ordered.size(); i++)
+            if (ordered.get(i).getSequenceNo() != i + 1
+                    || !Objects.equals(ordered.get(i).getRoutingNodeId(), model.selectedNodeIds().get(i)))
+                unavailable();
+        return ordered;
+    }
+
     private ExecutionQuantity load(Long executionId) {
         var execution = executions.selectByPrimaryKey(executionId);
         if (execution == null) throw new FoundationException(ErrorCode.EXECUTION_NOT_FOUND);
-        var model = paths.view(executionId);
+        return load(executionId, execution, paths.view(executionId));
+    }
+
+    private ExecutionQuantity load(LockedExecution locked) {
+        var execution = locked.execution();
+        return load(execution.getId(), execution, paths.view(locked));
+    }
+
+    private ExecutionQuantity load(Long executionId, MesProductionExecutionEntity execution, PathModel model) {
         var balance = quantities.inputBalance(executionId);
         var inputQty = balance.usableQty();
         if (model.path() == null)
@@ -71,12 +108,7 @@ public class ProductionQuantityService {
                     execution.getRoutingId(), execution.getTargetQty(), ExecutionPathStatus.UNSELECTED.getValue(), false, "执行尚未选择实际路径", List.of(), label(model.routing()), inputQty, balance.confirmedQty(), balance.reservedQty());
         if (!Objects.equals(model.path().getRoutingId(), execution.getRoutingId())) unavailable();
         ExecutionPathValidator.validate(model.selectedNodeIds(), model.nodes(), model.edges());
-        var f = new MesExecutionPathNodeExample();
-        f.createCriteria().andExecutionIdEqualTo(executionId);
-        f.setOrderByClause("sequence_no,id");
-        var ordered = pathNodes.selectByExample(f);
-        if (ordered.size() != model.selectedNodeIds().size()) unavailable();
-        for (int i = 0; i < ordered.size(); i++) if (ordered.get(i).getSequenceNo() != i + 1) unavailable();
+        var ordered = orderedPathNodes(executionId, model);
         var nodeMap = model.nodes().stream().collect(Collectors.toMap(n -> n.getId(), n -> n));
         var totals = quantities.nodeTotals(executionId).stream()
                 .collect(Collectors.toMap(t -> t.routingNodeId(), t -> t.reportedQty()));
@@ -162,6 +194,10 @@ public class ProductionQuantityService {
      */
     public void validateReportChange(Long executionId, Long nodeId, BigDecimal delta) {
         validateChange(load(executionId), nodeId, delta);
+    }
+
+    public void validateReportChange(LockedExecution locked, Long nodeId, BigDecimal delta) {
+        validateChange(load(locked), nodeId, delta);
     }
 
     /**

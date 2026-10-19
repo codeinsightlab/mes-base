@@ -201,7 +201,7 @@ public class ProductionReportService {
 
     @Transactional(transactionManager = "businessTransactionManager", readOnly = true)
     public ReportPage page(Long executionId, Long nodeId, int offset, int limit) {
-        quantities.getNodeQuantity(executionId, nodeId);
+        quantities.requireReadableExecutionNode(executionId, nodeId);
         var f = new MesProductionReportExample();
         f.createCriteria().andExecutionIdEqualTo(executionId).andRoutingNodeIdEqualTo(nodeId);
         return page(f, offset, limit);

@@ -17,6 +17,13 @@ import java.util.Map;
 import org.springframework.core.env.MapPropertySource;
 import java.util.Set;
 import java.util.UUID;
+import java.sql.Connection;
+import java.util.ArrayList;
+import org.apache.ibatis.executor.statement.StatementHandler;
+import org.apache.ibatis.plugin.Interceptor;
+import org.apache.ibatis.plugin.Intercepts;
+import org.apache.ibatis.plugin.Invocation;
+import org.apache.ibatis.plugin.Signature;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.transaction.annotation.EnableTransactionManagement;
@@ -49,6 +56,22 @@ class OperationUserDirectoryTest {
     JdbcTemplate jdbc;
     PlatformPersistence center;
     AnnotationConfigApplicationContext context;
+    SqlBudget sqlBudget;
+
+    @Intercepts(@Signature(type = StatementHandler.class, method = "prepare", args = {Connection.class, Integer.class}))
+    static class SqlBudget implements Interceptor {
+        final List<String> statements = new ArrayList<>();
+
+        @Override
+        public Object intercept(Invocation invocation) throws Throwable {
+            statements.add(((StatementHandler) invocation.getTarget()).getBoundSql().getSql().toLowerCase());
+            return invocation.proceed();
+        }
+
+        long counts() {
+            return statements.stream().filter(sql -> sql.matches("(?s).*select\\s+count\\s*\\(.*")).count();
+        }
+    }
 
     @Configuration
     @EnableTransactionManagement(proxyTargetClass = true)
@@ -70,9 +93,11 @@ class OperationUserDirectoryTest {
         jdbc.update("INSERT INTO sys_role_menu VALUES(1,2),(2,2),(3,2),(4,4),(5,2)");
         jdbc.update("INSERT INTO sys_user VALUES(1,'a','Factory A','0','0'),(2,'b','Factory B','0','0'),(3,'p','Platform business','0','0'),(4,'admin','Platform only','0','0'),(5,'off','Disabled user','1','0'),(6,'gone','Deleted user','0','2'),(7,'offrole','Disabled role','0','0'),(8,'empty','No grants','0','0')");
         jdbc.update("INSERT INTO sys_user_role VALUES(1,1),(2,2),(3,3),(4,4),(5,1),(6,1),(7,5)");
+        sqlBudget = new SqlBudget();
         center = spy(new PlatformPersistence(source, Set.of(SysMenuMapper.class, OperationUserDirectoryMapper.class), c -> {
             c.getTypeAliasRegistry().registerAlias("SysMenu", SysMenu.class);
             PersistenceFactories.pagination(c);
+            c.addInterceptor(sqlBudget);
         }));
         context = new AnnotationConfigApplicationContext();
         context.getEnvironment().getPropertySources()
@@ -156,5 +181,35 @@ class OperationUserDirectoryTest {
         assertThrows(FoundationException.class, () -> directory.page(null, 0, 101));
         FactoryContext.clear();
         assertThrows(FoundationException.class, () -> directory.page(null, 0, 20));
+    }
+
+    @Test
+    void internalEligibilitySkipsCountButPublicPageKeepsAccurateTotal() {
+        directory.requireValid(1L);
+        assertEquals(0, sqlBudget.counts());
+        assertNull(PageHelper.getLocalPage());
+        sqlBudget.statements.clear();
+        assertEquals(2, directory.validUsers(List.of(1L, 2L, 3L)).size());
+        assertEquals(0, sqlBudget.counts());
+        assertNull(PageHelper.getLocalPage());
+        sqlBudget.statements.clear();
+        var page = directory.page(null, 0, 1);
+        assertEquals(2, page.total());
+        assertEquals(1, page.items().size());
+        assertEquals(1, sqlBudget.counts());
+        assertNull(PageHelper.getLocalPage());
+    }
+
+    @Test
+    void noMenuEmptyResultAndDatabaseFailureLeaveNoPaginationState() {
+        assertEquals(List.of(), directory.validUsers(List.of(999L)));
+        assertNull(PageHelper.getLocalPage());
+        jdbc.update("UPDATE sys_menu SET status='1'");
+        assertThrows(FoundationException.class, () -> directory.requireValid(1L));
+        assertEquals(0, directory.page(null, 0, 20).total());
+        assertNull(PageHelper.getLocalPage());
+        jdbc.execute("DROP TABLE sys_menu");
+        assertThrows(RuntimeException.class, () -> directory.requireValid(1L));
+        assertNull(PageHelper.getLocalPage());
     }
 }

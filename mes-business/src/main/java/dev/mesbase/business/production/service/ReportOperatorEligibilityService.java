@@ -12,6 +12,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.annotation.Isolation;
+import dev.mesbase.business.production.service.ProductionChainLocks.LockedExecution;
 
 /**
  * Shared qualification for trusted operator identities in reporting transactions and read-only candidate hints.
@@ -31,9 +32,20 @@ public class ReportOperatorEligibilityService {
     @Transactional(transactionManager = "businessTransactionManager", isolation = Isolation.READ_COMMITTED, readOnly = true)
     public void requireEligible(Long executionId, Long routingNodeId, Long userId) {
         var node = rules.node(executionId, routingNodeId, false);
-        rules.requireCapability(node.getOperationId(), userId);
+        requireEligible(executionId, routingNodeId, node.getOperationId(), userId);
+    }
+
+    @Transactional(transactionManager = "businessTransactionManager", isolation = Isolation.READ_COMMITTED, readOnly = true)
+    public void requireEligible(LockedExecution locked, Long routingNodeId, Long userId) {
+        var node = rules.node(locked, routingNodeId);
+        requireEligible(locked.execution().getId(), routingNodeId, node.getOperationId(), userId);
+    }
+
+    private void requireEligible(Long executionId, Long routingNodeId, Long operationId, Long userId) {
+        rules.requireCapability(operationId, userId);
         var filter = new MesExecutionAssignmentExample();
-        var criteria = filter.createCriteria().andExecutionIdEqualTo(executionId).andRoutingNodeIdEqualTo(routingNodeId);
+        var criteria = filter.createCriteria().andExecutionIdEqualTo(executionId)
+                .andRoutingNodeIdEqualTo(routingNodeId);
         if (assignments.countByExample(filter) == 0) return;
         criteria.andUserIdEqualTo(userId);
         if (assignments.countByExample(filter) == 0) throw new FoundationException(ErrorCode.OPERATOR_NOT_ASSIGNED);

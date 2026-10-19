@@ -42,6 +42,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.annotation.Isolation;
+import dev.mesbase.business.production.service.ProductionChainLocks.LockedExecution;
 
 @Service
 @ConditionalOnProperty(name = "mes.business.enabled", havingValue = "true")
@@ -87,6 +88,16 @@ public class ExecutionPathService {
     public PathModel view(Long id) {
         var e = executions.selectByPrimaryKey(id);
         if (e == null) throw new FoundationException(ErrorCode.EXECUTION_NOT_FOUND);
+        return view(e);
+    }
+
+    @Transactional(transactionManager = "businessTransactionManager", readOnly = true)
+    public PathModel view(LockedExecution locked) {
+        return view(locked.execution());
+    }
+
+    private PathModel view(MesProductionExecutionEntity e) {
+        Long id = e.getId();
         var routing = references.routingLabel(e.getRoutingId());
         var actualNodes = nodes(e.getRoutingId());
         var operationLabels = references.operationLabels(actualNodes.stream().map(RoutingNodeEntity::getOperationId)
@@ -148,8 +159,22 @@ public class ExecutionPathService {
 
     @BusinessCacheEvict(business = MesProductionExecutionResource.PREFIX, scope = BusinessCacheEvict.Scope.LIST_AND_DETAIL)
     public MesProductionExecutionEntity start(Long id) {
-        var e = locks.execution(id);
-        locks.requireActiveExecution(id);
+        return start(id, null);
+    }
+
+    @BusinessCacheEvict(business = MesProductionExecutionResource.PREFIX, scope = BusinessCacheEvict.Scope.LIST_AND_DETAIL)
+    public MesProductionExecutionEntity start(LockedExecution locked) {
+        try {
+            return start(locked.execution().getId(), locked);
+        } finally {
+            locked.invalidate();
+        }
+    }
+
+    private MesProductionExecutionEntity start(Long id, LockedExecution locked) {
+        var e = locked == null ? locks.execution(id) : locked.execution();
+        if (locked == null) locks.requireActiveExecution(id);
+        else locks.requireActiveExecution(id, locked);
         if (!Set.of(ProductionExecutionStatus.READY.getValue(), ProductionExecutionStatus.RUNNING.getValue())
                 .contains(e.getStatus())) fail();
         if (ProductionExecutionStatus.READY.getValue().equals(e.getStatus())) rules.checkReadyReferences(e);

@@ -49,6 +49,77 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class ProductionReportHttpTest {
     static final String ROOT = "/api/production/reports";
 
+    @Test
+    void ledgerKeepsFactoryExecutionPagingAndHistoricalReadBoundaries() throws Exception {
+        try (var c = context()) {
+            var m = MaterialIssueHttpTest.mvc(c);
+            var jdbc = c.getBean(MaterialIssueHttpTest.Fixture.class).business.get("A");
+            long original = add(m, 11, "4");
+            m.perform(full(post(ROOT + "/supplements"), "B").content(supplement(11, "2")))
+                    .andExpect(status().isOk());
+            String page = ROOT + "?executionId=1&routingNodeId=11&offset=0&limit=1";
+            m.perform(full(get(page), "A")).andExpect(status().isOk())
+                    .andExpect(jsonPath("total").value(1))
+                    .andExpect(jsonPath("items[0].id").value(String.valueOf(original)))
+                    .andExpect(jsonPath("items[0].quantityDelta").value("4.000000"));
+            m.perform(full(get(page), "B")).andExpect(status().isOk())
+                    .andExpect(jsonPath("items[0].quantityDelta").value("2.000000"));
+            m.perform(full(get(ROOT + "?executionId=2&routingNodeId=11"), "A"))
+                    .andExpect(status().isOk()).andExpect(jsonPath("total").value(0));
+            m.perform(full(get(ROOT + "?executionId=999&routingNodeId=11"), "A"))
+                    .andExpect(status().isNotFound());
+            m.perform(full(get(ROOT + "?executionId=1&routingNodeId=999"), "A"))
+                    .andExpect(status().isConflict());
+            for (String executionStatus : List.of("READY", "RUNNING", "COMPLETED")) {
+                jdbc.update("UPDATE mes_production_execution SET status=? WHERE id=1", executionStatus);
+                m.perform(full(get(page), "A")).andExpect(status().isOk())
+                        .andExpect(jsonPath("total").value(1));
+            }
+            jdbc.update("UPDATE workorder SET status='CANCELLED' WHERE id=1");
+            jdbc.update("UPDATE mes_execution_path SET path_status='SELECTED' WHERE id=1");
+            m.perform(full(get(page), "A")).andExpect(status().isOk())
+                    .andExpect(jsonPath("items[0].quantityDelta").value("4.000000"));
+            m.perform(full(get(ROOT + "?executionId=1&routingNodeId=11&offset=1&limit=1"), "A"))
+                    .andExpect(status().isOk()).andExpect(jsonPath("total").value(1))
+                    .andExpect(jsonPath("items").isEmpty());
+        }
+    }
+
+    @Test
+    void ledgerRejectsUnselectedNodesRoutingMismatchAndSequenceGaps() throws Exception {
+        try (var c = context()) {
+            var m = MaterialIssueHttpTest.mvc(c);
+            var jdbc = c.getBean(MaterialIssueHttpTest.Fixture.class).business.get("A");
+            jdbc.update("INSERT INTO routing_node(id,routing_id,node_code,operation_id,operation_code,operation_name,display_order,is_key) VALUES(14,1,'ALT',1,'O1','Unselected',4,false)");
+            jdbc.update("INSERT INTO routing_edge(routing_id,from_node_id,to_node_id) VALUES(1,11,14),(1,14,13)");
+            m.perform(full(get(ROOT + "?executionId=1&routingNodeId=14"), "A"))
+                    .andExpect(status().isConflict());
+            jdbc.update("UPDATE mes_execution_path SET routing_id=999 WHERE id=1");
+            m.perform(full(get(ROOT + "?executionId=1&routingNodeId=11"), "A"))
+                    .andExpect(status().isConflict());
+            jdbc.update("UPDATE mes_execution_path SET routing_id=1 WHERE id=1");
+            jdbc.update("UPDATE mes_execution_path_node SET sequence_no=4 WHERE execution_id=1 AND routing_node_id=13");
+            m.perform(full(get(ROOT + "?executionId=1&routingNodeId=11"), "A"))
+                    .andExpect(status().isConflict());
+        }
+    }
+
+    @Test
+    void ledgerDoesNotLoadQualityOrInputBalancesToReadImmutableReports() throws Exception {
+        try (var c = context()) {
+            var m = MaterialIssueHttpTest.mvc(c);
+            var jdbc = c.getBean(MaterialIssueHttpTest.Fixture.class).business.get("A");
+            long original = add(m, 11, "4");
+            // A quantity outage remains a failure for quantity reads, but is unrelated to historical ledger access.
+            jdbc.execute("ALTER TABLE mes_quality_treatment RENAME TO unavailable_quality_ledger_fixture");
+            m.perform(full(get("/api/production/report-quantities/executions/1"), "A"))
+                    .andExpect(status().is5xxServerError());
+            m.perform(full(get(ROOT + "?executionId=1&routingNodeId=11"), "A"))
+                    .andExpect(status().isOk()).andExpect(jsonPath("total").value(1))
+                    .andExpect(jsonPath("items[0].id").value(String.valueOf(original)));
+        }
+    }
+
     @Configuration
     @Import({ProductionReportController.class, ProductionReportService.class, ProductionQuantityService.class})
     static class Extra {

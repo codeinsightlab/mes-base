@@ -42,7 +42,8 @@ public class OperationUserDirectory {
     public UserPage page(String keyword, int offset, int limit) {
         if (offset < 0 || limit < 1 || limit > 100 || keyword != null && keyword.length() > 100)
             throw new FoundationException(ErrorCode.BAD_REQUEST);
-        return query(FactoryContext.required().factoryId().value(), null, keyword, offset, limit, null, menus, users);
+        return query(FactoryContext.required().factoryId()
+                .value(), null, keyword, offset, limit, null, true, menus, users);
     }
 
     public void requireValid(Long userId) {
@@ -59,21 +60,26 @@ public class OperationUserDirectory {
     private UserPage read(Long id, String keyword, int offset, int limit, List<Long> userIds) {
         String factory = FactoryContext.required().factoryId().value();
         if (!center.transactionManager().foreignTransactionActive())
-            return query(factory, id, keyword, offset, limit, userIds, menus, users);
-        return center.readOnly(session -> query(factory, id, keyword, offset, limit, userIds,
+            return query(factory, id, keyword, offset, limit, userIds, false, menus, users);
+        return center.readOnly(session -> query(factory, id, keyword, offset, limit, userIds, false,
                 session.mapper(SysMenuMapper.class), session.mapper(OperationUserDirectoryMapper.class)));
     }
 
     private UserPage query(String factory, Long id, String keyword, int offset, int limit, List<Long> userIds,
+                           boolean count,
                            SysMenuMapper menuMapper, OperationUserDirectoryMapper userMapper) {
-        var menuRows = menuMapper.selectMenuList(new SysMenu());
-        var policy = new MenuScopePolicy(menuRows);
-        var ids = menuRows.stream().filter(m -> "0".equals(m.getStatus()) && m.getPerms() != null
-                && !m.getPerms().isBlank() && !policy.platform(m)).map(SysMenu::getMenuId).toList();
-        if (ids.isEmpty()) return new UserPage(List.of(), 0, offset, limit);
-        try (Page<UserOption> page = PageHelper.offsetPage(offset, limit)) {
-            var rows = userMapper.select(factory, id, keyword, ids, userIds);
-            return new UserPage(List.copyOf(rows), page.getTotal(), offset, limit);
+        try {
+            var menuRows = menuMapper.selectMenuList(new SysMenu());
+            var policy = new MenuScopePolicy(menuRows);
+            var ids = menuRows.stream().filter(m -> "0".equals(m.getStatus()) && m.getPerms() != null
+                    && !m.getPerms().isBlank() && !policy.platform(m)).map(SysMenu::getMenuId).toList();
+            if (ids.isEmpty()) return new UserPage(List.of(), 0, offset, limit);
+            try (Page<UserOption> page = PageHelper.offsetPage(offset, limit, count)) {
+                var rows = userMapper.select(factory, id, keyword, ids, userIds);
+                return new UserPage(List.copyOf(rows), page.getTotal(), offset, limit);
+            }
+        } finally {
+            PageHelper.clearPage();
         }
     }
 }

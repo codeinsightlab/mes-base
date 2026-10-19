@@ -20,6 +20,7 @@ import dev.mesbase.business.production.domain.OperationExample;
 import java.util.List;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
+import dev.mesbase.business.production.service.ProductionChainLocks.LockedExecution;
 
 /**
  * Shared production qualification rules; authorization remains at the HTTP boundary.
@@ -76,6 +77,14 @@ public class OperatorQualificationRules {
             locks.requireActiveExecution(executionId);
             requireMutable(execution);
         }
+        return node(execution, nodeId);
+    }
+
+    public RoutingNodeEntity node(LockedExecution locked, Long nodeId) {
+        return node(locked.execution(), nodeId);
+    }
+
+    private RoutingNodeEntity node(MesProductionExecutionEntity execution, Long nodeId) {
         var node = nodeId == null ? null : nodes.selectByPrimaryKey(nodeId);
         if (node == null || !Objects.equals(execution.getRoutingId(), node.getRoutingId()))
             throw new FoundationException(ErrorCode.ASSIGNMENT_NODE_INVALID);
