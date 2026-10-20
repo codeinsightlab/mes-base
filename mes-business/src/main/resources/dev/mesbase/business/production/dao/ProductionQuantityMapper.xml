@@ -1,63 +1,193 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="dev.mesbase.business.production.dao.ProductionQuantityMapper">
- <select id="nodeTotals" resultType="dev.mesbase.business.production.domain.ProductionReportModels$NodeTotal">
-  SELECT p.routing_node_id AS routingNodeId, COALESCE(SUM(r.quantity_delta),0) AS reportedQty
-  FROM mes_execution_path_node p LEFT JOIN mes_production_report r
-    ON r.execution_id=p.execution_id AND r.routing_node_id=p.routing_node_id
-  WHERE p.execution_id=#{executionId} GROUP BY p.routing_node_id
- </select>
- <select id="originalBalance" resultType="dev.mesbase.business.production.domain.ProductionReportModels$Balance">
-  SELECT r.id AS reportId,r.quantity_delta+COALESCE(SUM(a.quantity_delta),0) AS effectiveQty
-  FROM mes_production_execution e JOIN mes_production_report r ON r.execution_id=e.id
-  LEFT JOIN mes_production_report a ON a.reference_report_id=r.id AND a.execution_id=e.id AND a.routing_node_id=r.routing_node_id
-  WHERE e.id=#{executionId} AND r.id=#{reportId}
-  GROUP BY r.id,r.quantity_delta
- </select>
- <select id="workorderQuantities" resultType="dev.mesbase.business.production.domain.ProductionReportModels$ExecutionSummary">
-  <bind name="inputCONFIRMED" value="@dev.mesbase.business.issue.domain.MaterialIssueStatus@CONFIRMED.getValue()"/>
-  <bind name="inputVOID_PENDING" value="@dev.mesbase.business.issue.domain.MaterialIssueStatus@VOID_PENDING.getValue()"/>
-  <bind name="inputVOID_UNKNOWN" value="@dev.mesbase.business.issue.domain.MaterialIssueStatus@VOID_UNKNOWN.getValue()"/>
-  <bind name="inputSUCCEEDED" value="@dev.mesbase.business.issue.domain.MaterialIssueSubmissionStatus@SUCCEEDED.getValue()"/>
-  <bind name="inputLOCAL_ONLY" value="@dev.mesbase.business.integration.warehouse.ErpActionResult$Mode@LOCAL_ONLY.getValue()"/>
-  <bind name="inputCONNECTED" value="@dev.mesbase.business.integration.warehouse.ErpActionResult$Mode@CONNECTED.getValue()"/>
-  <bind name="inputNONE" value="@dev.mesbase.business.integration.warehouse.ExternalEffect@NONE.getValue()"/>
-  <bind name="inputEFFECTIVE" value="@dev.mesbase.business.integration.warehouse.ErpIssueQueryResult$DocumentStatus@EFFECTIVE.getValue()"/>
-  SELECT e.id AS executionId,e.workorder_id AS workorderId,e.execution_no AS executionNo,e.routing_id AS routingId,
-    e.target_qty AS targetQty,p.path_status AS pathStatus,COALESCE(SUM(r.quantity_delta),0) AS lastNodeReportedQty,
-    COALESCE((SELECT SUM(f.output_qty) FROM mes_material_issue_input f
-       JOIN mes_material_issue i ON i.id=f.issue_id AND i.execution_id=f.execution_id
-       JOIN mes_material_issue_submission a ON a.id=i.submission_id AND a.issue_id=i.id AND a.status=#{inputSUCCEEDED}
-       JOIN mes_material_issue_erp_extra x ON x.id=i.id
-       WHERE f.execution_id=e.id AND f.input_kind='PRODUCTION_INPUT' AND f.confirmed_at IS NOT NULL AND i.status=#{inputCONFIRMED}
-       AND ((f.source_mode=#{inputLOCAL_ONLY} AND x.source_execution_mode=#{inputLOCAL_ONLY} AND x.external_effect=#{inputNONE})
-         OR (f.source_mode=#{inputCONNECTED} AND x.source_execution_mode=#{inputCONNECTED} AND x.external_effect=#{inputCONFIRMED} AND x.document_status=#{inputEFFECTIVE}))),0) AS productionInputQty
-  FROM mes_production_execution e LEFT JOIN mes_execution_path p ON p.id=e.id
-  LEFT JOIN mes_execution_path_node n ON n.execution_id=e.id
-    AND n.sequence_no=(SELECT MAX(last.sequence_no) FROM mes_execution_path_node last WHERE last.execution_id=e.id)
-  LEFT JOIN mes_production_report r ON r.execution_id=e.id AND r.routing_node_id=n.routing_node_id
-  WHERE e.workorder_id=#{workorderId}
-  GROUP BY e.id,e.workorder_id,e.execution_no,e.routing_id,e.target_qty,p.path_status
-  ORDER BY e.id DESC
- </select>
- <select id="inputBalance" resultType="dev.mesbase.business.production.domain.ProductionInputBalance">
-  <bind name="inputCONFIRMED" value="@dev.mesbase.business.issue.domain.MaterialIssueStatus@CONFIRMED.getValue()"/>
-  <bind name="inputVOID_PENDING" value="@dev.mesbase.business.issue.domain.MaterialIssueStatus@VOID_PENDING.getValue()"/>
-  <bind name="inputVOID_UNKNOWN" value="@dev.mesbase.business.issue.domain.MaterialIssueStatus@VOID_UNKNOWN.getValue()"/>
-  <bind name="inputSUCCEEDED" value="@dev.mesbase.business.issue.domain.MaterialIssueSubmissionStatus@SUCCEEDED.getValue()"/>
-  <bind name="inputLOCAL_ONLY" value="@dev.mesbase.business.integration.warehouse.ErpActionResult$Mode@LOCAL_ONLY.getValue()"/>
-  <bind name="inputCONNECTED" value="@dev.mesbase.business.integration.warehouse.ErpActionResult$Mode@CONNECTED.getValue()"/>
-  <bind name="inputNONE" value="@dev.mesbase.business.integration.warehouse.ExternalEffect@NONE.getValue()"/>
-  <bind name="inputEFFECTIVE" value="@dev.mesbase.business.integration.warehouse.ErpIssueQueryResult$DocumentStatus@EFFECTIVE.getValue()"/>
-  SELECT COALESCE(SUM(f.output_qty),0) AS confirmedQty,
-    COALESCE(SUM(CASE WHEN i.status IN (#{inputVOID_PENDING},#{inputVOID_UNKNOWN}) THEN f.output_qty ELSE 0 END),0) AS reservedQty
-  FROM mes_material_issue_input f
+    <select id="nodeTotals" resultType="dev.mesbase.business.production.domain.ProductionReportModels$NodeTotal">
+        SELECT p.routing_node_id AS routingNodeId, COALESCE(SUM(r.quantity_delta), 0) AS reportedQty
+        FROM mes_execution_path_node p
+                 LEFT JOIN mes_production_report r
+                           ON r.execution_id = p.execution_id AND r.routing_node_id = p.routing_node_id
+        WHERE p.execution_id = #{executionId}
+        GROUP BY p.routing_node_id
+    </select>
+    <select id="originalBalance" resultType="dev.mesbase.business.production.domain.ProductionReportModels$Balance">
+        SELECT r.id AS reportId, r.quantity_delta + COALESCE(SUM(a.quantity_delta), 0) AS effectiveQty
+        FROM mes_production_execution e
+                 JOIN mes_production_report r ON r.execution_id = e.id
+                 LEFT JOIN mes_production_report a ON a.reference_report_id = r.id AND a.execution_id = e.id AND
+                                                      a.routing_node_id = r.routing_node_id
+        WHERE e.id = #{executionId}
+          AND r.id = #{reportId}
+        GROUP BY r.id, r.quantity_delta
+    </select>
+    <select id="workorderQuantities"
+            resultType="dev.mesbase.business.production.domain.ProductionReportModels$ExecutionSummary">
+        <bind name="inputCONFIRMED"
+              value="@dev.mesbase.business.issue.domain.MaterialIssueStatus@CONFIRMED.getValue()"/>
+        <bind name="inputVOID_PENDING"
+              value="@dev.mesbase.business.issue.domain.MaterialIssueStatus@VOID_PENDING.getValue()"/>
+        <bind name="inputVOID_UNKNOWN"
+              value="@dev.mesbase.business.issue.domain.MaterialIssueStatus@VOID_UNKNOWN.getValue()"/>
+        <bind name="inputSUCCEEDED"
+              value="@dev.mesbase.business.issue.domain.MaterialIssueSubmissionStatus@SUCCEEDED.getValue()"/>
+        <bind name="inputLOCAL_ONLY"
+              value="@dev.mesbase.business.integration.warehouse.ErpActionResult$Mode@LOCAL_ONLY.getValue()"/>
+        <bind name="inputCONNECTED"
+              value="@dev.mesbase.business.integration.warehouse.ErpActionResult$Mode@CONNECTED.getValue()"/>
+        <bind name="inputNONE" value="@dev.mesbase.business.integration.warehouse.ExternalEffect@NONE.getValue()"/>
+        <bind name="inputEFFECTIVE"
+              value="@dev.mesbase.business.integration.warehouse.ErpIssueQueryResult$DocumentStatus@EFFECTIVE.getValue()"/>
+        SELECT e.id AS executionId,e.workorder_id AS workorderId,e.execution_no AS executionNo,e.routing_id AS
+        routingId,
+        e.target_qty AS targetQty,p.path_status AS pathStatus,COALESCE(SUM(r.quantity_delta),0) AS lastNodeReportedQty,
+        COALESCE((SELECT SUM(f.output_qty) FROM mes_material_issue_input f
+        JOIN mes_material_issue i ON i.id=f.issue_id AND i.execution_id=f.execution_id
+        JOIN mes_material_issue_submission a ON a.id=i.submission_id AND a.issue_id=i.id AND a.status=#{inputSUCCEEDED}
+        JOIN mes_material_issue_erp_extra x ON x.id=i.id
+        WHERE f.execution_id=e.id AND f.input_kind='PRODUCTION_INPUT' AND f.confirmed_at IS NOT NULL AND
+        i.status=#{inputCONFIRMED}
+        AND ((f.source_mode=#{inputLOCAL_ONLY} AND x.source_execution_mode=#{inputLOCAL_ONLY} AND
+        x.external_effect=#{inputNONE})
+        OR (f.source_mode=#{inputCONNECTED} AND x.source_execution_mode=#{inputCONNECTED} AND
+        x.external_effect=#{inputCONFIRMED} AND x.document_status=#{inputEFFECTIVE}))),0) AS productionInputQty
+        FROM mes_production_execution e LEFT JOIN mes_execution_path p ON p.id=e.id
+        LEFT JOIN mes_execution_path_node n ON n.execution_id=e.id
+        AND n.sequence_no=(SELECT MAX(last.sequence_no) FROM mes_execution_path_node last WHERE last.execution_id=e.id)
+        LEFT JOIN mes_production_report r ON r.execution_id=e.id AND r.routing_node_id=n.routing_node_id
+        WHERE e.workorder_id=#{workorderId}
+        GROUP BY e.id,e.workorder_id,e.execution_no,e.routing_id,e.target_qty,p.path_status
+        ORDER BY e.id DESC
+    </select>
+    <sql id="InputBalanceBindings">
+        <bind name="inputCONFIRMED"
+              value="@dev.mesbase.business.issue.domain.MaterialIssueStatus@CONFIRMED.getValue()"/>
+        <bind name="inputVOID_PENDING"
+              value="@dev.mesbase.business.issue.domain.MaterialIssueStatus@VOID_PENDING.getValue()"/>
+        <bind name="inputVOID_UNKNOWN"
+              value="@dev.mesbase.business.issue.domain.MaterialIssueStatus@VOID_UNKNOWN.getValue()"/>
+        <bind name="inputSUCCEEDED"
+              value="@dev.mesbase.business.issue.domain.MaterialIssueSubmissionStatus@SUCCEEDED.getValue()"/>
+        <bind name="inputLOCAL_ONLY"
+              value="@dev.mesbase.business.integration.warehouse.ErpActionResult$Mode@LOCAL_ONLY.getValue()"/>
+        <bind name="inputCONNECTED"
+              value="@dev.mesbase.business.integration.warehouse.ErpActionResult$Mode@CONNECTED.getValue()"/>
+        <bind name="inputNONE" value="@dev.mesbase.business.integration.warehouse.ExternalEffect@NONE.getValue()"/>
+        <bind name="inputEFFECTIVE"
+              value="@dev.mesbase.business.integration.warehouse.ErpIssueQueryResult$DocumentStatus@EFFECTIVE.getValue()"/>
+    </sql>
+    <sql id="InputBalanceFrom">
+        FROM mes_material_issue_input f
   JOIN mes_material_issue i ON i.id=f.issue_id AND i.execution_id=f.execution_id
-  JOIN mes_material_issue_submission a ON a.id=i.submission_id AND a.issue_id=i.id AND a.status=#{inputSUCCEEDED}
-  JOIN mes_material_issue_erp_extra x ON x.id=i.id
-  WHERE f.execution_id=#{executionId} AND f.input_kind='PRODUCTION_INPUT' AND f.confirmed_at IS NOT NULL
-    AND i.status IN (#{inputCONFIRMED},#{inputVOID_PENDING},#{inputVOID_UNKNOWN})
-    AND ((f.source_mode=#{inputLOCAL_ONLY} AND x.source_execution_mode=#{inputLOCAL_ONLY} AND x.external_effect=#{inputNONE})
-      OR (f.source_mode=#{inputCONNECTED} AND x.source_execution_mode=#{inputCONNECTED} AND x.external_effect=#{inputCONFIRMED} AND x.document_status=#{inputEFFECTIVE}))
- </select>
+  JOIN mes_material_issue_submission a ON a.id=i.submission_id AND a.issue_id=i.id AND a.status=
+        #{inputSUCCEEDED}
+        JOIN
+        mes_material_issue_erp_extra
+        x
+        ON
+        x
+        .
+        id
+        =
+        i
+        .
+        id
+        WHERE
+        f
+        .
+        input_kind
+        =
+        'PRODUCTION_INPUT'
+        AND
+        f
+        .
+        confirmed_at
+        IS
+        NOT
+        NULL
+        AND
+        i
+        .
+        status
+        IN
+        (
+        #{inputCONFIRMED},
+        #{inputVOID_PENDING},
+        #{inputVOID_UNKNOWN}
+        )
+        AND
+        (
+        (
+        f
+        .
+        source_mode
+        =
+        #{inputLOCAL_ONLY}
+        AND
+        x
+        .
+        source_execution_mode
+        =
+        #{inputLOCAL_ONLY}
+        AND
+        x
+        .
+        external_effect
+        =
+        #{inputNONE}
+        )
+        OR
+        (
+        f
+        .
+        source_mode
+        =
+        #{inputCONNECTED}
+        AND
+        x
+        .
+        source_execution_mode
+        =
+        #{inputCONNECTED}
+        AND
+        x
+        .
+        external_effect
+        =
+        #{inputCONFIRMED}
+        AND
+        x
+        .
+        document_status
+        =
+        #{inputEFFECTIVE}
+        )
+        )
+    </sql>
+    <select id="inputBalance" resultType="dev.mesbase.business.production.domain.ProductionInputBalance">
+        <include refid="InputBalanceBindings"/>
+        SELECT COALESCE(SUM(f.output_qty),0) AS confirmedQty,
+        COALESCE(SUM(CASE WHEN i.status IN (#{inputVOID_PENDING},#{inputVOID_UNKNOWN}) THEN f.output_qty ELSE 0 END),0)
+        AS reservedQty
+        <include refid="InputBalanceFrom"/>
+        AND f.execution_id=#{executionId}
+    </select>
+    <select id="inputBalances"
+            resultType="dev.mesbase.business.production.domain.ProductionReportModels$ExecutionInputBalance">
+        <include refid="InputBalanceBindings"/>
+        SELECT f.execution_id executionId,COALESCE(SUM(f.output_qty),0) AS confirmedQty,
+        COALESCE(SUM(CASE WHEN i.status IN (#{inputVOID_PENDING},#{inputVOID_UNKNOWN}) THEN f.output_qty ELSE 0 END),0)
+        AS reservedQty
+        <include refid="InputBalanceFrom"/>
+        AND f.execution_id IN
+        <foreach collection="executionIds" item="id" open="(" close=")" separator=",">#{id}</foreach>
+        GROUP BY f.execution_id
+    </select>
+    <select id="nodeTotalsBatch"
+            resultType="dev.mesbase.business.production.domain.ProductionReportModels$ExecutionNodeTotal">
+        SELECT p.execution_id executionId,p.routing_node_id routingNodeId,COALESCE(SUM(r.quantity_delta),0) reportedQty
+        FROM mes_execution_path_node p LEFT JOIN mes_production_report r
+        ON r.execution_id=p.execution_id AND r.routing_node_id=p.routing_node_id
+        WHERE p.execution_id IN
+        <foreach collection="executionIds" item="id" open="(" close=")" separator=",">#{id}</foreach>
+        GROUP BY p.execution_id,p.routing_node_id
+    </select>
 </mapper>

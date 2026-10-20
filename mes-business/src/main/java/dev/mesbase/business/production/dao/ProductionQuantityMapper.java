@@ -6,6 +6,8 @@ import dev.mesbase.business.production.domain.ProductionReportModels.ExecutionSu
 import org.apache.ibatis.annotations.Param;
 import java.util.List;
 import dev.mesbase.business.production.domain.ProductionInputBalance;
+import dev.mesbase.business.production.domain.ProductionReportModels.ExecutionNodeTotal;
+import dev.mesbase.business.production.domain.ProductionReportModels.ExecutionInputBalance;
 
 /**
  * Only cross-table quantity projections; single-table persistence uses the generated mapper.
@@ -14,6 +16,10 @@ public interface ProductionQuantityMapper {
     ProductionInputBalance inputBalance(@Param("executionId") Long executionId);
 
     List<NodeTotal> nodeTotals(@Param("executionId") Long executionId);
+
+    List<ExecutionNodeTotal> nodeTotalsBatch(@Param("executionIds") List<Long> executionIds);
+
+    List<ExecutionInputBalance> inputBalances(@Param("executionIds") List<Long> executionIds);
 
     Balance originalBalance(@Param("executionId") Long executionId, @Param("reportId") Long reportId);
 

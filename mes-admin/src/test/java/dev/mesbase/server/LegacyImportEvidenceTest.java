@@ -21,6 +21,13 @@ import java.time.LocalDateTime;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.Map;
+import java.util.Collections;
+import javax.sql.DataSource;
+import dev.mesbase.infrastructure.persistence.FactoryBusinessDataSource;
+import dev.mesbase.infrastructure.persistence.BusinessRuntimeBinding;
+import dev.mesbase.infrastructure.persistence.DatasourceIdentity;
+import dev.mesbase.business.production.service.ReportUserReferenceService;
+import org.springframework.beans.factory.ObjectProvider;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -36,6 +43,10 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.never;
+import static org.mockito.ArgumentMatchers.any;
 
 /**
  * TEST ONLY: public prepare validates frozen evidence without any database writes.
@@ -46,6 +57,12 @@ class LegacyImportEvidenceTest {
     private LegacyMigrationMapper metadata;
     @Mock
     private BusinessSourceRules sources;
+    @Mock
+    private ObjectProvider<DataSource> dataSource;
+    @Mock
+    private FactoryBusinessDataSource routingSource;
+    @Mock
+    private ReportUserReferenceService users;
     @InjectMocks
     private LegacyHistoryImportService service;
     private final ObjectMapper json = new ObjectMapper().findAndRegisterModules();
@@ -54,6 +71,9 @@ class LegacyImportEvidenceTest {
     @BeforeEach
     void scope() {
         FactoryContext.bind(new FactoryScope(new FactoryId("F")));
+        lenient().when(dataSource.getObject()).thenReturn(routingSource);
+        lenient().when(routingSource.currentBinding())
+                .thenReturn(new BusinessRuntimeBinding(new FactoryId("F"), new DatasourceIdentity("TEST"), 1));
         var user = new LoginUser();
         user.setUserId(100L);
         SecurityContextHolder.getContext().setAuthentication(
@@ -95,6 +115,19 @@ class LegacyImportEvidenceTest {
                 List.of(report(raw("R1", "7")), report(raw("R2", substitutedReport ? "8" : "7"))), List.of());
         return new LegacyImportCommand("B", "a".repeat(64), "F", "WO", hash(payload), payload, new BigDecimal("2"),
                 time, time, "U", "Unit", "M", "Material", null, List.of(execution));
+    }
+
+    @Test
+    void boundedCacheRejectsClosedOrChangedBindingBeforeLockingOrWriting() throws Exception {
+        var c = command(false, false);
+        var refs = service.preloadBatch(List.of(c));
+        verify(users).requireAllExist(List.of(7L, 7L));
+        when(routingSource.currentBinding()).thenReturn(new BusinessRuntimeBinding(new FactoryId("F"), new DatasourceIdentity("TEST"), 2));
+        assertThrows(FoundationException.class, () -> service.execute(c, refs));
+        refs.close();
+        assertThrows(FoundationException.class, () -> service.execute(c, refs));
+        verify(metadata, never()).ensureLock(any());
+        assertThrows(FoundationException.class, () -> service.preloadBatch(Collections.nCopies(11, c)));
     }
 
     @Test

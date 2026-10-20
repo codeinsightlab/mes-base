@@ -13,6 +13,10 @@ public final class LegacyHistory {
     public record Input(Long executionId, BigDecimal quantity) {
     }
 
+    public record ExecutionNode(Long executionId, Long routingNodeId, BigDecimal legacyNet,
+                                BigDecimal grossCorrection, BigDecimal effectiveDefect) {
+    }
+
     public record Node(Long routingNodeId, BigDecimal legacyNet, BigDecimal grossCorrection,
                        BigDecimal effectiveDefect, String evidence) {
     }

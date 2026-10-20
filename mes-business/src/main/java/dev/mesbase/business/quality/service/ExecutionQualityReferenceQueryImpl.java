@@ -3,6 +3,7 @@ package dev.mesbase.business.quality.service;
 import dev.mesbase.business.quality.dao.MesProductionDefectMapper;
 import dev.mesbase.business.quality.domain.ProductionDefectModels.NodeTotal;
 import java.util.List;
+import java.util.Map;
 import dev.mesbase.core.error.ErrorCode;
 import dev.mesbase.core.error.FoundationException;
 import org.springframework.stereotype.Service;
@@ -32,5 +33,11 @@ public class ExecutionQualityReferenceQueryImpl implements ExecutionQualityRefer
     public List<NodeTotal> nodeTotals(Long executionId) {
         if (executionId == null) throw new FoundationException(ErrorCode.BAD_REQUEST);
         return treatments.nodeTotals(executionId);
+    }
+
+    @Override
+    @Transactional(transactionManager = "businessTransactionManager", readOnly = true)
+    public Map<Long, List<NodeTotal>> nodeTotalsBatch(List<Long> executionIds) {
+        return treatments.nodeTotalsBatch(executionIds);
     }
 }

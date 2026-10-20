@@ -22,5 +22,7 @@ public interface MesProductionDefectMapper {
                                                  @Param("workorderId") Long workorderId,
                                                  @Param("affectedNodeId") Long affectedNodeId);
 
+    List<MesProductionDefectEntity> selectLatestBatch(@Param("executionIds") List<Long> executionIds);
+
 
 }

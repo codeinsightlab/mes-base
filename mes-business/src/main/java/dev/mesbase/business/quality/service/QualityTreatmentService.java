@@ -38,6 +38,9 @@ import java.util.stream.Stream;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.LinkedHashMap;
+import java.util.stream.Collectors;
 import java.util.UUID;
 import java.util.function.Function;
 import org.springframework.stereotype.Service;
@@ -189,8 +192,42 @@ public class QualityTreatmentService {
 
     public List<NodeTotal> nodeTotals(Long execution) {
         var all = executionEvents(execution);
+        return nodeTotalsRows(declarations(execution), all);
+    }
+
+    /**
+     * Bounded batch read; grouping and the single-node calculation share the existing authority.
+     */
+    public Map<Long, List<NodeTotal>> nodeTotalsBatch(List<Long> executions) {
+        if (executions == null || executions.size() > 1000 || executions.stream().anyMatch(Objects::isNull)) fail();
+        var ids = executions.stream().distinct().toList();
+        if (ids.isEmpty()) return Map.of();
+        var f = new MesQualityTreatmentExample();
+        f.createCriteria().andExecutionIdIn(ids);
+        f.setOrderByClause("recorded_at,id");
+        List<MesQualityTreatmentEntity> all;
+        try (var page = PageHelper.offsetPage(0, 5001, false)) {
+            all = events.selectByExample(f);
+            if (all.size() > 5000) fail();
+        }
+        List<MesProductionDefectEntity> versions;
+        try (var page = PageHelper.offsetPage(0, 1001, false)) {
+            versions = defects.selectLatestBatch(ids);
+            if (versions.size() > 1000) fail();
+        }
+        var byExecution = all.stream().collect(Collectors.groupingBy(MesQualityTreatmentEntity::getExecutionId));
+        var declarations = versions.stream()
+                .filter(r -> !DefectRecordAction.VOID.getValue().equals(r.getRecordAction()))
+                .collect(Collectors.groupingBy(MesProductionDefectEntity::getExecutionId));
+        var result = new LinkedHashMap<Long, List<NodeTotal>>();
+        for (Long id : ids)
+            result.put(id, nodeTotalsRows(declarations.getOrDefault(id, List.of()), byExecution.getOrDefault(id, List.of())));
+        return Map.copyOf(result);
+    }
+
+    private List<NodeTotal> nodeTotalsRows(List<MesProductionDefectEntity> versions,
+                                           List<MesQualityTreatmentEntity> all) {
         var totals = new HashMap<Long, BigDecimal[]>();
-        var versions = declarations(execution);
         var grouped = groupedEvents(all);
         for (var d : versions) {
             var s = summarizeRows(d, grouped.getOrDefault(new DeclarationVersion(d.getDeclarationId(), d.getRevisionNo()), List.of()));

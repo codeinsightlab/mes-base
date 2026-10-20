@@ -6,6 +6,7 @@ import dev.mesbase.business.legacy.domain.LegacyImportCommand;
 import dev.mesbase.business.legacy.dao.LegacyMigrationMapper;
 import dev.mesbase.business.production.dao.MesProductionReportMapper;
 import java.util.UUID;
+import java.util.ArrayList;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -179,93 +180,134 @@ public final class LegacyAuthorizedBatchLauncher {
                 var gate = json.readTree(Files.readString(permit));
                 if (!manifestHash.equals(gate.path("manifestHash").asText()) || !gate.path("go").asBoolean())
                     throw new IllegalArgumentException("Phase gate rejected");
-                for (Entry entry : manifest.entries()) {
-                    boolean replayOnly = List.of("replay", "validation").contains(phase);
-                    boolean rollbackOnly = "rollback".equals(phase);
-                    String originalId = completed.get(entry.phase() + ":" + entry.sha256());
-                    if ("validation".equals(phase) && originalId == null) continue;
-                    if (rollbackOnly && (!rollbackScope.commands().contains(entry.sha256()) || originalId != null))
-                        continue;
-                    if (!replayOnly && !rollbackOnly && !phase.equals(entry.phase())) continue;
-                    if (!replayOnly && originalId != null) continue;
-                    if (Files.exists(root.resolve("STOP"))) return;
-                    // A per-component permit allows the coordinator to audit bounded checkpoints.
-                    Path step = root.resolve("permits").resolve(phase + "-" + entry.sha256());
-                    while (!Files.exists(step)) {
+                var eligible = manifest.entries().stream().filter(e -> {
+                    String previous = completed.get(e.phase() + ":" + e.sha256());
+                    if ("validation".equals(phase)) return previous != null;
+                    if ("rollback".equals(phase))
+                        return previous == null && rollbackScope.commands().contains(e.sha256());
+                    if ("replay".equals(phase)) return true;
+                    return phase.equals(e.phase()) && previous == null;
+                }).toList();
+                LegacyHistoryImportService.BatchReferences[] references = {null};
+                try {
+                    for (int index = 0; index < eligible.size(); index++) {
+                        Entry entry = eligible.get(index);
+                        boolean replayOnly = List.of("replay", "validation").contains(phase);
+                        boolean rollbackOnly = "rollback".equals(phase);
+                        String originalId = completed.get(entry.phase() + ":" + entry.sha256());
+                        if ("validation".equals(phase) && originalId == null) continue;
+                        if (rollbackOnly && (!rollbackScope.commands().contains(entry.sha256()) || originalId != null))
+                            continue;
+                        if (!replayOnly && !rollbackOnly && !phase.equals(entry.phase())) continue;
+                        if (!replayOnly && originalId != null) continue;
                         if (Files.exists(root.resolve("STOP"))) return;
-                        Thread.sleep(100);
-                    }
-                    var principal = tokens.resolve(Files.readString(root.resolve("session-token")).trim());
-                    if (roles.selectRolePermissionByUserId(principal.getUserId()).stream()
-                            .noneMatch(r -> "PLATFORM".equals(r.getKind()) && "0".equals(r.getStatus())))
-                        throw new IllegalStateException("Authenticated enabled platform role required");
-                    SecurityContextHolder.getContext().setAuthentication(
-                            UsernamePasswordAuthenticationToken.authenticated(principal, null, List.of()));
-                    long started = System.nanoTime();
-                    try {
-                        String text = Files.readString(root.resolve(entry.file()));
-                        if (!sha(text).equals(entry.sha256()))
-                            throw new IllegalStateException("Frozen command changed");
-                        var command = json.readValue(text, LegacyImportCommand.class);
-                        managed.runIntegrated(new FactoryScope(new FactoryId(command.factoryId())), () -> {
-                            Runnable work = () -> {
-                                if (!replayOnly) {
-                                    importer.prepare(command);
-                                    importer.approve(command);
+                        // A per-component permit allows the coordinator to audit bounded checkpoints.
+                        Path step = root.resolve("permits").resolve(phase + "-" + entry.sha256());
+                        while (!Files.exists(step)) {
+                            if (Files.exists(root.resolve("STOP"))) return;
+                            Thread.sleep(100);
+                        }
+                        var principal = tokens.resolve(Files.readString(root.resolve("session-token")).trim());
+                        if (roles.selectRolePermissionByUserId(principal.getUserId()).stream()
+                                .noneMatch(r -> "PLATFORM".equals(r.getKind()) && "0".equals(r.getStatus())))
+                            throw new IllegalStateException("Authenticated enabled platform role required");
+                        SecurityContextHolder.getContext().setAuthentication(
+                                UsernamePasswordAuthenticationToken.authenticated(principal, null, List.of()));
+                        long started = System.nanoTime();
+                        try {
+                            String text = Files.readString(root.resolve(entry.file()));
+                            if (!sha(text).equals(entry.sha256()))
+                                throw new IllegalStateException("Frozen command changed");
+                            var command = json.readValue(text, LegacyImportCommand.class);
+                            if (index % 10 == 0) {
+                                if (references[0] != null) references[0].close();
+                                var commands = new ArrayList<LegacyImportCommand>();
+                                for (var pending : eligible.subList(index, Math.min(index + 10, eligible.size()))) {
+                                    String pendingText = Files.readString(root.resolve(pending.file()));
+                                    if (!sha(pendingText).equals(pending.sha256()))
+                                        throw new IllegalStateException("Frozen batch changed");
+                                    commands.add(json.readValue(pendingText, LegacyImportCommand.class));
                                 }
                                 counter.reset();
-                                long transactionStarted = System.nanoTime();
-                                Long id = entry.append() ? importer.append(command) : importer.execute(command);
-                                long transactionMs = (System.nanoTime() - transactionStarted) / 1_000_000;
-                                var firstSql = counter.snapshot();
-                                counter.reset();
-                                long replayStarted = System.nanoTime();
-                                Long replay = replayOnly ? Long.valueOf(originalId)
-                                        : entry.append() ? importer.append(command) : importer.execute(command);
-                                long replayMs = (System.nanoTime() - replayStarted) / 1_000_000;
-                                var replaySql = counter.snapshot();
-                                if (!id.equals(replay)) throw new IllegalStateException("Replay identity changed");
-                                try {
-                                    if (rollbackOnly) verifyReportIdentities(context, json, command);
-                                    var resultData = new LinkedHashMap<String, Object>();
-                                    resultData.put("phase", phase);
-                                    resultData.put("rolledBack", rollbackOnly);
-                                    resultData.put("commandHash", entry.sha256());
-                                    resultData.put("batchId", command.batchId());
-                                    resultData.put("workorderId", id.toString());
-                                    resultData.put("operatorId", principal.getUserId().toString());
-                                    resultData.put("elapsedMs", (System.nanoTime() - started) / 1_000_000);
-                                    resultData.put("transactionMs", transactionMs);
-                                    resultData.put("replaySameIdentity", true);
-                                    resultData.put("replayMs", replayMs);
-                                    resultData.put("sqlFirstTransaction", firstSql);
-                                    resultData.put("sqlReplay", replaySql);
-                                    resultData.put("runtimeArtifactHash", env.getRequiredProperty("legacy.artifact-sha256"));
-                                    String result = json.writeValueAsString(resultData);
-                                    Files.writeString(root.resolve("results.jsonl"), result + "\n",
-                                            StandardOpenOption.CREATE, StandardOpenOption.APPEND);
-                                    if (!replayOnly && !rollbackOnly)
-                                        completed.put(entry.phase() + ":" + entry.sha256(), id.toString());
-                                } catch (Exception e) {
-                                    throw new IllegalStateException(e);
-                                }
-                            };
-                            if (rollbackOnly) {
-                                var tx = new TransactionTemplate(context.getBean("businessTransactionManager", PlatformTransactionManager.class));
-                                tx.setIsolationLevel(TransactionDefinition.ISOLATION_READ_COMMITTED);
-                                tx.executeWithoutResult(status -> {
-                                    work.run();
-                                    status.setRollbackOnly();
-                                });
-                            } else work.run();
-                        });
-                    } catch (RuntimeException failure) {
-                        Files.writeString(root.resolve("failure.json"), json.writeValueAsString(Map.of(
-                                "phase", phase, "commandHash", entry.sha256(), "exception", failure.toString())));
-                        throw failure;
-                    } finally {
-                        SecurityContextHolder.clearContext();
+                                long prefetchStarted = System.nanoTime();
+                                managed.runIntegrated(new FactoryScope(new FactoryId(command.factoryId())), () ->
+                                        references[0] = importer.preloadBatch(commands));
+                                Files.writeString(root.resolve("batch-prefetch.jsonl"), json.writeValueAsString(Map.of(
+                                                "phase", phase, "firstCommandHash", entry.sha256(), "count", commands.size(),
+                                                "elapsedMs", (System.nanoTime() - prefetchStarted) / 1_000_000,
+                                                "sql", counter.snapshot(), "runtimeArtifactHash", env.getRequiredProperty("legacy.artifact-sha256"))) + "\n",
+                                        StandardOpenOption.CREATE, StandardOpenOption.APPEND);
+                            }
+                            managed.runIntegrated(new FactoryScope(new FactoryId(command.factoryId())), () -> {
+                                int[] rollbackAttempt = {1};
+                                Runnable work = () -> {
+                                    if (!replayOnly) {
+                                        importer.prepare(command);
+                                        importer.approve(command);
+                                    }
+                                    counter.reset();
+                                    long transactionStarted = System.nanoTime();
+                                    Long id = entry.append() ? importer.append(command, references[0]) : importer.execute(command, references[0]);
+                                    long transactionMs = (System.nanoTime() - transactionStarted) / 1_000_000;
+                                    var firstSql = counter.snapshot();
+                                    counter.reset();
+                                    long replayStarted = System.nanoTime();
+                                    Long replay = replayOnly ? Long.valueOf(originalId)
+                                            : entry.append() ? importer.append(command, references[0]) : importer.execute(command, references[0]);
+                                    long replayMs = (System.nanoTime() - replayStarted) / 1_000_000;
+                                    var replaySql = counter.snapshot();
+                                    if (!id.equals(replay)) throw new IllegalStateException("Replay identity changed");
+                                    try {
+                                        if (rollbackOnly) verifyReportIdentities(context, json, command);
+                                        var resultData = new LinkedHashMap<String, Object>();
+                                        resultData.put("phase", phase);
+                                        resultData.put("rolledBack", rollbackOnly);
+                                        resultData.put("rollbackAttempt", rollbackAttempt[0]);
+                                        resultData.put("commandHash", entry.sha256());
+                                        resultData.put("batchId", command.batchId());
+                                        resultData.put("workorderId", id.toString());
+                                        resultData.put("operatorId", principal.getUserId().toString());
+                                        resultData.put("elapsedMs", (System.nanoTime() - started) / 1_000_000);
+                                        resultData.put("transactionMs", transactionMs);
+                                        resultData.put("replaySameIdentity", true);
+                                        resultData.put("replayMs", replayMs);
+                                        resultData.put("sqlFirstTransaction", firstSql);
+                                        resultData.put("sqlReplay", replaySql);
+                                        resultData.put("runtimeArtifactHash", env.getRequiredProperty("legacy.artifact-sha256"));
+                                        String result = json.writeValueAsString(resultData);
+                                        Files.writeString(root.resolve("results.jsonl"), result + "\n",
+                                                StandardOpenOption.CREATE, StandardOpenOption.APPEND);
+                                        if (!replayOnly && !rollbackOnly)
+                                            completed.put(entry.phase() + ":" + entry.sha256(), id.toString());
+                                    } catch (Exception e) {
+                                        throw new IllegalStateException(e);
+                                    }
+                                };
+                                if (rollbackOnly) {
+                                    var tx = new TransactionTemplate(context.getBean("businessTransactionManager", PlatformTransactionManager.class));
+                                    tx.setIsolationLevel(TransactionDefinition.ISOLATION_READ_COMMITTED);
+                                    tx.executeWithoutResult(status -> {
+                                        work.run();
+                                        status.setRollbackOnly();
+                                    });
+                                    // Reuse the same batch cache after a real rollback; uncommitted identities must not survive.
+                                    rollbackAttempt[0] = 2;
+                                    tx.executeWithoutResult(status -> {
+                                        work.run();
+                                        status.setRollbackOnly();
+                                    });
+                                } else work.run();
+                            });
+                        } catch (RuntimeException failure) {
+                            Files.writeString(root.resolve("failure.json"), json.writeValueAsString(Map.of(
+                                    "phase", phase, "commandHash", entry.sha256(), "exception", failure.toString())));
+                            throw failure;
+                        } finally {
+                            SecurityContextHolder.clearContext();
+                        }
                     }
+                } finally {
+                    if (references[0] != null) references[0].close();
                 }
                 Files.writeString(root.resolve(phase + "-complete.json"), "{\"complete\":true}");
             }

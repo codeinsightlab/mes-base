@@ -43,6 +43,12 @@ public final class ProductionReportModels {
     public record NodeTotal(Long routingNodeId, BigDecimal reportedQty) {
     }
 
+    public record ExecutionNodeTotal(Long executionId, Long routingNodeId, BigDecimal reportedQty) {
+    }
+
+    public record ExecutionInputBalance(Long executionId, BigDecimal confirmedQty, BigDecimal reservedQty) {
+    }
+
     public record NodeQuantity(Long executionId, Long routingNodeId, Long operationId, String code, String name,
                                int sequenceNo, BigDecimal inputQty, BigDecimal reportedQty, BigDecimal defectQty,
                                BigDecimal effectiveOutputQty, BigDecimal availableQty, boolean qualityIntegrated,

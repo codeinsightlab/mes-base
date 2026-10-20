@@ -15,6 +15,15 @@ import com.fasterxml.jackson.databind.JsonNode;
 import dev.mesbase.business.legacy.domain.LegacyHistory.MappingIdentity;
 import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.Set;
+import java.util.Collection;
+import java.util.function.Function;
+import javax.sql.DataSource;
+import dev.mesbase.infrastructure.persistence.BusinessRuntimeBinding;
+import dev.mesbase.infrastructure.persistence.FactoryBusinessDataSource;
+import dev.mesbase.infrastructure.persistence.SpringCommitActions;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.annotation.Qualifier;
 import dev.mesbase.business.basic.dao.MaterialMapper;
 import dev.mesbase.business.basic.dao.UnitMeasureMapper;
 import dev.mesbase.business.basic.domain.MaterialEntity;
@@ -44,6 +53,7 @@ import dev.mesbase.business.production.domain.MesProductionReportEntity;
 import dev.mesbase.business.production.domain.OperationEntity;
 import dev.mesbase.business.production.domain.OperationExample;
 import dev.mesbase.business.production.domain.RoutingEntity;
+import dev.mesbase.business.production.domain.RoutingExample;
 import dev.mesbase.business.production.domain.RoutingNodeEntity;
 import dev.mesbase.business.production.domain.RoutingEdgeEntity;
 import dev.mesbase.business.production.domain.RoutingProductEntity;
@@ -73,6 +83,7 @@ import java.util.UUID;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Isolation;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
@@ -84,6 +95,8 @@ public class LegacyHistoryImportService {
     private static final String RULE = "report-driven-local-v2";
     private static final int BATCH_SIZE = 128;
     private static final int MAPPING_PAYLOAD_BYTES = 512 * 1024;
+    private final ObjectProvider<DataSource> dataSource;
+    private final SpringCommitActions commits;
     private final LegacyMigrationMapper metadata;
     private final WorkorderMapper orders;
     private final UnitMeasureMapper units;
@@ -110,7 +123,11 @@ public class LegacyHistoryImportService {
                                       MesExecutionPathMapper paths, MesExecutionPathNodeMapper selected,
                                       MesProductionReportMapper reports, ReportUserReferenceService users,
                                       ProductionQuantityService quantities, BusinessSourceRules sources,
-                                      WorkorderErpFacts facts) {
+                                      WorkorderErpFacts facts,
+                                      @Qualifier("businessDataSource") ObjectProvider<DataSource> dataSource,
+                                      SpringCommitActions commits) {
+        this.dataSource = dataSource;
+        this.commits = commits;
         this.metadata = metadata;
         this.orders = orders;
         this.units = units;
@@ -128,6 +145,207 @@ public class LegacyHistoryImportService {
         this.quantities = quantities;
         this.sources = sources;
         this.facts = facts;
+    }
+
+    /**
+     * Explicit, bounded work-unit cache; never a global cache or a second routing authority.
+     */
+    public static final class BatchReferences implements AutoCloseable {
+        private final Thread owner = Thread.currentThread();
+        private final BusinessRuntimeBinding binding;
+        private final Set<String> commands;
+        private final Map<String, MappingIdentity> identities = new LinkedHashMap<>();
+        private final Map<Long, MaterialEntity> materials = new LinkedHashMap<>();
+        private final Map<Long, UnitMeasureEntity> units = new LinkedHashMap<>();
+        private final Map<Long, OperationEntity> operations = new LinkedHashMap<>();
+        private final Map<Long, RoutingEntity> routings = new LinkedHashMap<>();
+        private final Map<Long, MesProductionExecutionEntity> executions = new LinkedHashMap<>();
+        private boolean closed;
+
+        private BatchReferences(BusinessRuntimeBinding binding, Set<String> commands) {
+            this.binding = binding;
+            this.commands = Set.copyOf(commands);
+        }
+
+        private void verify(BusinessRuntimeBinding actual, String command) {
+            if (closed || Thread.currentThread() != owner || !binding.equals(actual) || !commands.contains(command))
+                conflictStatic();
+        }
+
+        @Override
+        public void close() {
+            if (Thread.currentThread() != owner) conflictStatic();
+            closed = true;
+            identities.clear();
+            materials.clear();
+            units.clear();
+            operations.clear();
+            routings.clear();
+            executions.clear();
+        }
+    }
+
+    private static void conflictStatic() {
+        throw new FoundationException(ErrorCode.RESOURCE_CONFLICT);
+    }
+
+    private static final class ReferenceLookup {
+        private final BatchReferences references;
+        private final Map<String, MappingIdentity> identities = new LinkedHashMap<>();
+        private final Map<Long, MaterialEntity> materials = new LinkedHashMap<>();
+        private final Map<Long, RoutingEntity> routings = new LinkedHashMap<>();
+        private final Set<String> operationCodes = new HashSet<>();
+
+        private ReferenceLookup(BatchReferences references) {
+            this.references = references;
+            if (references != null) {
+                identities.putAll(references.identities);
+                materials.putAll(references.materials);
+                routings.putAll(references.routings);
+            }
+        }
+    }
+
+    private BusinessRuntimeBinding currentBinding() {
+        DataSource actual = dataSource == null ? null : dataSource.getObject();
+        if (!(actual instanceof FactoryBusinessDataSource)) conflictStatic();
+        return ((FactoryBusinessDataSource) actual).currentBinding();
+    }
+
+    private List<String> headerKeys(LegacyImportCommand c) {
+        var keys = new TreeSet<String>();
+        keys.add(key("WORKORDER", c.code()));
+        keys.add(key("ROUTING", c.code()));
+        keys.add(key("UNIT", c.unitCode()));
+        keys.add(key("MATERIAL", c.productCode()));
+        for (var e : c.executions()) for (var n : e.nodes()) keys.add(key("PROCESS", n.processId()));
+        return List.copyOf(keys);
+    }
+
+    private List<String> factKeys(LegacyImportCommand c) {
+        var keys = new ArrayList<String>();
+        for (var e : c.executions()) {
+            keys.add(key("EXECUTION", e.sourceKey()));
+            for (var r : e.reports()) keys.add(key("pro_reporting_work", r.sourceId()));
+        }
+        return keys;
+    }
+
+    private void readIdentities(List<String> ids, Map<String, MappingIdentity> result) {
+        for (int from = 0; from < ids.size(); from += BATCH_SIZE)
+            for (var row : metadata.findIdentities(ids.subList(from, Math.min(from + BATCH_SIZE, ids.size()))))
+                result.put(row.id(), row);
+    }
+
+    private List<Long> entityIds(Collection<LegacyImportCommand> commands, String kind,
+                                 Function<LegacyImportCommand, String> value,
+                                 Map<String, MappingIdentity> identities) {
+        return commands.stream().map(c -> identities.get(key(kind, value.apply(c)))).filter(Objects::nonNull)
+                .map(MappingIdentity::entityId).filter(Objects::nonNull).distinct().toList();
+    }
+
+    private <T> void loadRows(List<Long> ids, Map<Long, T> into, Function<List<Long>, List<T>> reader,
+                              Function<T, Long> id) {
+        var missing = ids.stream().filter(v -> !into.containsKey(v)).distinct().toList();
+        for (int from = 0; from < missing.size(); from += BATCH_SIZE)
+            for (var row : reader.apply(missing.subList(from, Math.min(from + BATCH_SIZE, missing.size()))))
+                into.put(id.apply(row), row);
+    }
+
+    @Transactional(transactionManager = "businessTransactionManager", readOnly = true, propagation = Propagation.REQUIRES_NEW,
+            isolation = Isolation.READ_COMMITTED)
+    public BatchReferences preloadBatch(List<LegacyImportCommand> commands) {
+        if (commands == null || commands.isEmpty() || commands.size() > 10) conflict();
+        var hashes = new HashSet<String>();
+        var keys = new TreeSet<String>();
+        for (var c : commands) {
+            check(c);
+            hashes.add(hash(encode(c)));
+            keys.addAll(headerKeys(c));
+        }
+        if (commands.stream().map(LegacyImportCommand::snapshotHash).distinct().count() != 1) conflict();
+        var refs = new BatchReferences(currentBinding(), hashes);
+        readIdentities(List.copyOf(keys), refs.identities);
+        var existing = commands.stream().filter(c -> refs.identities.containsKey(key("WORKORDER", c.code()))).toList();
+        readIdentities(existing.stream().flatMap(c -> factKeys(c).stream()).distinct().toList(), refs.identities);
+        loadRows(entityIds(commands, "UNIT", LegacyImportCommand::unitCode, refs.identities), refs.units, ids -> {
+            var f = new UnitMeasureExample();
+            f.createCriteria().andIdIn(ids);
+            return units.selectByExample(f);
+        }, UnitMeasureEntity::getId);
+        loadRows(entityIds(commands, "MATERIAL", LegacyImportCommand::productCode, refs.identities), refs.materials, ids -> {
+            var f = new MaterialExample();
+            f.createCriteria().andIdIn(ids);
+            return materials.selectByExample(f);
+        }, MaterialEntity::getId);
+        var operationIds = commands.stream().flatMap(c -> c.executions().stream()).flatMap(e -> e.nodes().stream())
+                .map(n -> refs.identities.get(key("PROCESS", n.processId()))).filter(Objects::nonNull)
+                .map(MappingIdentity::entityId).distinct().toList();
+        loadRows(operationIds, refs.operations, ids -> {
+            var f = new OperationExample();
+            f.createCriteria().andIdIn(ids);
+            return operations.selectByExample(f);
+        }, OperationEntity::getId);
+        loadRows(entityIds(commands, "ROUTING", LegacyImportCommand::code, refs.identities), refs.routings, ids -> {
+            var f = new RoutingExample();
+            f.createCriteria().andIdIn(ids);
+            return routings.selectByExample(f);
+        }, RoutingEntity::getId);
+        var executionIds = existing.stream().flatMap(c -> c.executions().stream())
+                .map(e -> refs.identities.get(key("EXECUTION", e.sourceKey()))).filter(Objects::nonNull)
+                .map(MappingIdentity::entityId).distinct().toList();
+        loadRows(executionIds, refs.executions, ids -> {
+            var f = new MesProductionExecutionExample();
+            f.createCriteria().andIdIn(ids);
+            return executions.selectByExample(f);
+        }, MesProductionExecutionEntity::getId);
+        users.requireAllExist(commands.stream().flatMap(c -> c.executions().stream()).flatMap(e -> e.reports().stream())
+                .map(LegacyImportCommand.Report::operatorUserId).toList());
+        return refs;
+    }
+
+    private ReferenceLookup lookup(LegacyImportCommand command, BatchReferences references) {
+        if (references != null) references.verify(currentBinding(), hash(encode(command)));
+        var lookup = new ReferenceLookup(references);
+        // Only unresolved identities are refreshed under the original source locks. Never trust an absence cached in an earlier transaction.
+        readIdentities(headerKeys(command).stream().filter(k -> !lookup.identities.containsKey(k))
+                .toList(), lookup.identities);
+        if (references != null) {
+            loadRows(entityIds(List.of(command), "MATERIAL", LegacyImportCommand::productCode, lookup.identities), lookup.materials, ids -> {
+                var f = new MaterialExample();
+                f.createCriteria().andIdIn(ids);
+                return materials.selectByExample(f);
+            }, MaterialEntity::getId);
+            loadRows(entityIds(List.of(command), "ROUTING", LegacyImportCommand::code, lookup.identities), lookup.routings, ids -> {
+                var f = new RoutingExample();
+                f.createCriteria().andIdIn(ids);
+                return routings.selectByExample(f);
+            }, RoutingEntity::getId);
+        }
+        var codes = command.executions().stream().flatMap(e -> e.nodes().stream())
+                .filter(n -> !lookup.identities.containsKey(key("PROCESS", n.processId())))
+                .map(LegacyImportCommand.Node::code).distinct().toList();
+        for (int from = 0; from < codes.size(); from += BATCH_SIZE) {
+            var f = new OperationExample();
+            f.createCriteria().andCodeIn(codes.subList(from, Math.min(from + BATCH_SIZE, codes.size())));
+            for (var row : operations.selectByExample(f)) lookup.operationCodes.add(row.getCode());
+        }
+        return lookup;
+    }
+
+    private void remember(ReferenceLookup lookup, Mapping row) {
+        var identity = new MappingIdentity(row.id(), row.parentId(), row.sourceHash(), row.ruleVersion(), row.entityId());
+        lookup.identities.put(identity.id(), identity);
+        if (lookup.references != null) commits.afterCommit(() -> {
+            if (!lookup.references.closed) lookup.references.identities.put(identity.id(), identity);
+        });
+    }
+
+    private void rememberRow(ReferenceLookup lookup, RoutingEntity routing) {
+        lookup.routings.put(routing.getId(), routing);
+        if (lookup.references != null) commits.afterCommit(() -> {
+            if (!lookup.references.closed) lookup.references.routings.put(routing.getId(), routing);
+        });
     }
 
     @Transactional(transactionManager = "businessTransactionManager", isolation = Isolation.READ_COMMITTED, rollbackFor = Exception.class)
@@ -157,7 +375,7 @@ public class LegacyHistoryImportService {
 
     @Transactional(transactionManager = "businessTransactionManager", isolation = Isolation.READ_COMMITTED, rollbackFor = Exception.class)
     public Long execute(LegacyImportCommand command) {
-        return executeReviewed(command, false);
+        return executeReviewed(command, false, null);
     }
 
     /**
@@ -165,11 +383,22 @@ public class LegacyHistoryImportService {
      */
     @Transactional(transactionManager = "businessTransactionManager", isolation = Isolation.READ_COMMITTED, rollbackFor = Exception.class)
     public Long append(LegacyImportCommand command) {
-        return executeReviewed(command, true);
+        return executeReviewed(command, true, null);
     }
 
-    private Long executeReviewed(LegacyImportCommand c, boolean append) {
+    @Transactional(transactionManager = "businessTransactionManager", isolation = Isolation.READ_COMMITTED, rollbackFor = Exception.class)
+    public Long execute(LegacyImportCommand command, BatchReferences references) {
+        return executeReviewed(command, false, references);
+    }
+
+    @Transactional(transactionManager = "businessTransactionManager", isolation = Isolation.READ_COMMITTED, rollbackFor = Exception.class)
+    public Long append(LegacyImportCommand command, BatchReferences references) {
+        return executeReviewed(command, true, references);
+    }
+
+    private Long executeReviewed(LegacyImportCommand c, boolean append, BatchReferences references) {
         check(c);
+        if (references != null) references.verify(currentBinding(), hash(encode(c)));
         var locks = new TreeSet<String>();
         locks.add(key("WORKORDER", c.code()));
         locks.add(key("UNIT", c.unitCode()));
@@ -180,13 +409,14 @@ public class LegacyHistoryImportService {
             metadata.ensureLock(identity);
             if (!identity.equals(metadata.lock(identity))) conflict();
         }
+        var lookup = lookup(c, references);
         // Triggers read batch authorization rows: never hold a competing batch row while waiting for source ownership.
         var batch = metadata.batch(c.batchId());
         sameBatch(batch, c);
-        var existing = metadata.find(key("WORKORDER", c.code()));
+        var existing = lookup.identities.get(key("WORKORDER", c.code()));
         if (existing != null) {
-            var order = requireExistingOrder(c, existing);
-            var replay = replayMappings(c);
+            var order = requireExistingOrder(c, existing, lookup);
+            var replay = replayMappings(c, lookup);
             boolean allMapped = c.executions().stream()
                     .allMatch(e -> mappedExecution(c, e, existing.id(), order.getId(), replay));
             if (LegacyBatchStatus.COMPLETED.getValue().equals(batch.status())) {
@@ -209,16 +439,17 @@ public class LegacyHistoryImportService {
                 }
                 // The formal locked path must still be a complete route. Do not invent unreported nodes for a partial legacy card.
                 for (var e : c.executions())
-                    if (metadata.find(key("EXECUTION", e.sourceKey())) == null && e.nodes()
+                    if (!replay.mappings().containsKey(key("EXECUTION", e.sourceKey())) && e.nodes()
                             .size() != targetNodes.size()) conflict();
                 var existingInputs = metadata.orderInputs(existing.id());
-                var added = c.executions().stream().filter(e -> metadata.find(key("EXECUTION", e.sourceKey())) == null)
+                var added = c.executions().stream()
+                        .filter(e -> !replay.mappings().containsKey(key("EXECUTION", e.sourceKey())))
                         .map(e -> e.inputQty()).reduce(BigDecimal.ZERO, BigDecimal::add);
                 if (existingInputs.add(added).compareTo(order.getPlannedQty()) > 0) conflict();
-                map(c.batchId(), key("APPEND_AUTHORIZATION", c.batchId() + "/" + existing.id()), existing.id(),
+                map(lookup, c.batchId(), key("APPEND_AUTHORIZATION", c.batchId() + "/" + existing.id()), existing.id(),
                         "APPEND_AUTHORIZATION", c.batchId() + "/" + existing.id(), c.sourceHash(), "APPEND_AUTHORIZATION", order.getId(),
                         c.sourcePayload(), encode(new AppendAuthorization(hash(encode(c)))));
-                appendExecutions(c, order, targetNodes, existing.id(), replay);
+                appendExecutions(c, order, targetNodes, existing.id(), replay, lookup);
             }
             changed(metadata.transition(batch.id(), LegacyBatchStatus.RUNNING.getValue(), LegacyBatchStatus.COMPLETED.getValue(), LegacyBatchStatus.COMPLETED.getValue()));
             return order.getId();
@@ -228,8 +459,8 @@ public class LegacyHistoryImportService {
         var collision = new WorkorderExample();
         collision.createCriteria().andCodeEqualTo(c.code());
         if (orders.countByExample(collision) != 0) conflict();
-        Long unit = unit(c);
-        Long product = product(c, unit);
+        Long unit = unit(c, lookup);
+        Long product = product(c, unit, lookup);
         var routing = new RoutingEntity();
         routing.setCode("LEGACY_" + key("WORKORDER", c.code()).substring(0, 24));
         routing.setName("历史转换工艺 " + c.code());
@@ -244,7 +475,7 @@ public class LegacyHistoryImportService {
         Long previous = null;
         int sequence = 0;
         for (var n : c.executions().getFirst().nodes()) {
-            Long operation = operation(c.batchId(), n);
+            Long operation = operation(c.batchId(), n, lookup);
             var node = new RoutingNodeEntity();
             node.setRoutingId(routing.getId());
             node.setNodeCode("LEGACY_" + n.processId());
@@ -284,9 +515,10 @@ public class LegacyHistoryImportService {
         changed(orders.insert(order));
         facts.save(order, true);
         String orderKey = key("WORKORDER", c.code());
-        map(c.batchId(), orderKey, null, "WORKORDER", c.code(), c.sourceHash(), "WORKORDER", order.getId(), c.sourcePayload(), "{}");
-        map(c.batchId(), key("ROUTING", c.code()), orderKey, "ROUTING", c.code(), c.sourceHash(), "ROUTING", routing.getId(), c.sourcePayload(), "{}");
-        appendExecutions(c, order, targetNodes, orderKey, new ReplayState(Map.of(), Map.of()));
+        map(lookup, c.batchId(), orderKey, null, "WORKORDER", c.code(), c.sourceHash(), "WORKORDER", order.getId(), c.sourcePayload(), "{}");
+        map(lookup, c.batchId(), key("ROUTING", c.code()), orderKey, "ROUTING", c.code(), c.sourceHash(), "ROUTING", routing.getId(), c.sourcePayload(), "{}");
+        rememberRow(lookup, routing);
+        appendExecutions(c, order, targetNodes, orderKey, new ReplayState(Map.of(), Map.of()), lookup);
         changed(metadata.transition(batch.id(), LegacyBatchStatus.RUNNING.getValue(), LegacyBatchStatus.COMPLETED.getValue(), LegacyBatchStatus.COMPLETED.getValue()));
         return order.getId();
     }
@@ -294,11 +526,12 @@ public class LegacyHistoryImportService {
     private record AppendAuthorization(String commandHash) {
     }
 
-    private WorkorderEntity requireExistingOrder(LegacyImportCommand c, Mapping existing) {
+    private WorkorderEntity requireExistingOrder(LegacyImportCommand c, MappingIdentity existing,
+                                                 ReferenceLookup lookup) {
         if (!existing.sourceHash().equals(c.sourceHash()) || !existing.ruleVersion().equals(RULE)) conflict();
         var order = orders.selectByPrimaryKeyForUpdate(existing.entityId());
-        var route = metadata.find(key("ROUTING", c.code()));
-        var product = metadata.find(key("MATERIAL", c.productCode()));
+        var route = lookup.identities.get(key("ROUTING", c.code()));
+        var product = lookup.identities.get(key("MATERIAL", c.productCode()));
         if (order == null || !WorkOrderStatus.HISTORICAL.getValue().equals(order.getStatus())
                 || !BusinessSource.LOCAL.getValue().equals(order.getSource()) || !order.getCode().equals(c.code())
                 || order.getPlannedQty().compareTo(c.plannedQty()) != 0
@@ -309,9 +542,9 @@ public class LegacyHistoryImportService {
                 || product == null || !product.entityId().equals(order.getProductId())
                 || !product.sourceHash().equals(hash(encode(List.of(c.productCode(), c.productName(), c.unitCode())))))
             conflict();
-        var material = materials.selectByPrimaryKey(order.getProductId());
-        var unit = metadata.find(key("UNIT", c.unitCode()));
-        var routeRow = routings.selectByPrimaryKey(order.getRoutingId());
+        var material = lookup.references == null ? materials.selectByPrimaryKey(order.getProductId()) : lookup.materials.get(order.getProductId());
+        var unit = lookup.identities.get(key("UNIT", c.unitCode()));
+        var routeRow = lookup.references == null ? routings.selectByPrimaryKey(order.getRoutingId()) : lookup.routings.get(order.getRoutingId());
         if (material == null || unit == null || !unit.entityId().equals(material.getUnitId())
                 || !material.getCode().equals(c.productCode()) || !material.getName().equals(c.productName())
                 || !Objects.equals(material.getSpecification(), c.specification())
@@ -340,11 +573,13 @@ public class LegacyHistoryImportService {
     }
 
     private void appendExecutions(LegacyImportCommand c, WorkorderEntity order, Map<String, Long> targetNodes,
-                                  String orderKey, ReplayState replay) {
+                                  String orderKey, ReplayState replay, ReferenceLookup lookup) {
         var pending = c.executions().stream().filter(e -> !mappedExecution(c, e, orderKey, order.getId(), replay))
                 .toList();
-        users.requireAllExist(pending.stream().flatMap(e -> e.reports().stream())
-                .map(LegacyImportCommand.Report::operatorUserId).toList());
+        if (lookup.references == null)
+            users.requireAllExist(pending.stream().flatMap(e -> e.reports().stream())
+                    .map(LegacyImportCommand.Report::operatorUserId).toList());
+        var imported = new LinkedHashMap<Long, LegacyImportCommand.Execution>();
         for (var e : pending) {
             if (!e.nodes().stream().allMatch(n -> targetNodes.containsKey(n.processId()))) conflict();
             var execution = new MesProductionExecutionEntity();
@@ -368,7 +603,7 @@ public class LegacyHistoryImportService {
             path.setLockedAt(LocalDateTime.now());
             changed(paths.insert(path));
             String executionKey = key("EXECUTION", e.sourceKey());
-            map(c.batchId(), executionKey, orderKey, "EXECUTION", e.sourceKey(), e.sourceHash(), "EXECUTION",
+            map(lookup, c.batchId(), executionKey, orderKey, "EXECUTION", e.sourceKey(), e.sourceHash(), "EXECUTION",
                     execution.getId(), e.sourcePayload(), encode(new ExecutionEvidence(e.inputQty(), "LEGACY_MATERIAL_EVIDENCE")));
             int sequence = 0;
             var nodeMappings = new ArrayList<Mapping>();
@@ -385,7 +620,7 @@ public class LegacyHistoryImportService {
                         "NODE", nodeId, n.evidence(), encode(n)));
             }
             if (selected.insertBatch(choices) != choices.size()) conflict();
-            insertMappings(nodeMappings);
+            insertMappings(nodeMappings, lookup);
             for (int from = 0; from < e.reports().size(); from += BATCH_SIZE) {
                 var sourceReports = e.reports().subList(from, Math.min(from + BATCH_SIZE, e.reports().size()));
                 var reportRows = new ArrayList<MesProductionReportEntity>();
@@ -416,14 +651,22 @@ public class LegacyHistoryImportService {
                             "pro_reporting_work", r.sourceId(), r.sourceHash(), "REPORT", reportRows.get(i)
                                     .getId(), r.sourcePayload(), "{}"));
                 }
-                insertMappings(reportMappings);
+                insertMappings(reportMappings, lookup);
             }
             var qualityMappings = new ArrayList<Mapping>();
             for (var q : e.defects())
                 qualityMappings.add(mapping(c.batchId(), key("qc_defective", q.sourceId()), executionKey,
                         "qc_defective", q.sourceId(), q.sourceHash(), "QUALITY_EVIDENCE", null, q.sourcePayload(), "{}"));
-            insertMappings(qualityMappings);
-            var projected = quantities.getExecutionQuantities(execution.getId());
+            insertMappings(qualityMappings, lookup);
+            imported.put(execution.getId(), e);
+            if (lookup.references != null) commits.afterCommit(() -> {
+                if (!lookup.references.closed) lookup.references.executions.put(execution.getId(), execution);
+            });
+        }
+        var projectedBatch = quantities.getHistoricalExecutionQuantities(List.copyOf(imported.keySet()));
+        for (var item : imported.entrySet()) {
+            var e = item.getValue();
+            var projected = projectedBatch.get(item.getKey());
             if (!projected.historical() || projected.writable() || projected.nodes().size() != e.nodes().size())
                 conflict();
             for (int i = 0; i < e.nodes().size(); i++) {
@@ -434,8 +677,8 @@ public class LegacyHistoryImportService {
         }
     }
 
-    private Long unit(LegacyImportCommand c) {
-        var old = metadata.find(key("UNIT", c.unitCode()));
+    private Long unit(LegacyImportCommand c, ReferenceLookup lookup) {
+        var old = lookup.identities.get(key("UNIT", c.unitCode()));
         if (old != null) {
             if (!old.sourceHash()
                     .equals(hash(encode(List.of(c.unitCode(), c.unitName())))) || !RULE.equals(old.ruleVersion()))
@@ -451,13 +694,16 @@ public class LegacyHistoryImportService {
         row.setSymbol(c.unitName());
         row.setStatus(EnableStatus.ENABLED.getValue());
         changed(units.insert(row));
+        if (lookup.references != null) commits.afterCommit(() -> {
+            if (!lookup.references.closed) lookup.references.units.put(row.getId(), row);
+        });
         String payload = encode(List.of(c.unitCode(), c.unitName()));
-        map(c.batchId(), key("UNIT", c.unitCode()), null, "UNIT", c.unitCode(), hash(payload), "UNIT", row.getId(), payload, "{}");
+        map(lookup, c.batchId(), key("UNIT", c.unitCode()), null, "UNIT", c.unitCode(), hash(payload), "UNIT", row.getId(), payload, "{}");
         return row.getId();
     }
 
-    private Long product(LegacyImportCommand c, Long unit) {
-        var old = metadata.find(key("MATERIAL", c.productCode()));
+    private Long product(LegacyImportCommand c, Long unit, ReferenceLookup lookup) {
+        var old = lookup.identities.get(key("MATERIAL", c.productCode()));
         if (old != null) {
             if (!old.sourceHash()
                     .equals(hash(encode(List.of(c.productCode(), c.productName(), c.unitCode())))) || !RULE.equals(old.ruleVersion()))
@@ -475,22 +721,23 @@ public class LegacyHistoryImportService {
         row.setMaterialType(MaterialType.PRODUCT.getValue());
         row.setStatus(EnableStatus.ENABLED.getValue());
         changed(materials.insert(row));
+        if (lookup.references != null) commits.afterCommit(() -> {
+            if (!lookup.references.closed) lookup.references.materials.put(row.getId(), row);
+        });
         String payload = encode(List.of(c.productCode(), c.productName(), c.unitCode()));
-        map(c.batchId(), key("MATERIAL", c.productCode()), null, "MATERIAL", c.productCode(), hash(payload), "MATERIAL", row.getId(), payload, "{}");
+        map(lookup, c.batchId(), key("MATERIAL", c.productCode()), null, "MATERIAL", c.productCode(), hash(payload), "MATERIAL", row.getId(), payload, "{}");
         return row.getId();
     }
 
-    private Long operation(String batch, LegacyImportCommand.Node n) {
-        var old = metadata.find(key("PROCESS", n.processId()));
+    private Long operation(String batch, LegacyImportCommand.Node n, ReferenceLookup lookup) {
+        var old = lookup.identities.get(key("PROCESS", n.processId()));
         if (old != null) {
             if (!old.sourceHash()
                     .equals(hash(encode(List.of(n.processId(), n.code(), n.name())))) || !RULE.equals(old.ruleVersion()))
                 conflict();
             return old.entityId();
         }
-        var f = new OperationExample();
-        f.createCriteria().andCodeEqualTo(n.code());
-        if (operations.countByExample(f) != 0) conflict();
+        if (!lookup.operationCodes.add(n.code())) conflict();
         var row = new OperationEntity();
         row.setCode(n.code());
         row.setName(n.name());
@@ -498,8 +745,11 @@ public class LegacyHistoryImportService {
         row.setSort(0);
         row.setRevision(0);
         changed(operations.insert(row));
+        if (lookup.references != null) commits.afterCommit(() -> {
+            if (!lookup.references.closed) lookup.references.operations.put(row.getId(), row);
+        });
         String payload = encode(List.of(n.processId(), n.code(), n.name()));
-        map(batch, key("PROCESS", n.processId()), null, "PROCESS", n.processId(), hash(payload), "OPERATION", row.getId(), payload, "{}");
+        map(lookup, batch, key("PROCESS", n.processId()), null, "PROCESS", n.processId(), hash(payload), "OPERATION", row.getId(), payload, "{}");
         return row.getId();
     }
 
@@ -580,9 +830,12 @@ public class LegacyHistoryImportService {
                 || !batch.operatorUserId().equals(SecurityUtils.getUserId())) conflict();
     }
 
-    private void map(String batch, String id, String parent, String table, String pk, String sourceHash,
+    private void map(ReferenceLookup lookup, String batch, String id, String parent, String table, String pk,
+                     String sourceHash,
                      String kind, Long target, String raw, String conversion) {
-        changed(metadata.insert(mapping(batch, id, parent, table, pk, sourceHash, kind, target, raw, conversion)));
+        var row = mapping(batch, id, parent, table, pk, sourceHash, kind, target, raw, conversion);
+        changed(metadata.insert(row));
+        remember(lookup, row);
     }
 
     private Mapping mapping(String batch, String id, String parent, String table, String pk, String sourceHash,
@@ -590,7 +843,7 @@ public class LegacyHistoryImportService {
         return new Mapping(id, batch, parent, table, pk, sourceHash, RULE, kind, target, raw, conversion, LocalDateTime.now());
     }
 
-    private void insertMappings(List<Mapping> rows) {
+    private void insertMappings(List<Mapping> rows, ReferenceLookup lookup) {
         for (int from = 0; from < rows.size(); ) {
             int to = from;
             int bytes = 0;
@@ -603,11 +856,12 @@ public class LegacyHistoryImportService {
                 to++;
             }
             if (metadata.insertBatch(rows.subList(from, to)) != to - from) conflict();
+            for (var row : rows.subList(from, to)) remember(lookup, row);
             from = to;
         }
     }
 
-    private ReplayState replayMappings(LegacyImportCommand c) {
+    private ReplayState replayMappings(LegacyImportCommand c, ReferenceLookup lookup) {
         var keys = new TreeSet<String>();
         for (var e : c.executions()) {
             keys.add(key("EXECUTION", e.sourceKey()));
@@ -615,12 +869,16 @@ public class LegacyHistoryImportService {
         }
         var ids = new ArrayList<>(keys);
         var result = new LinkedHashMap<String, MappingIdentity>();
-        for (int from = 0; from < ids.size(); from += BATCH_SIZE)
-            for (var row : metadata.findIdentities(ids.subList(from, Math.min(from + BATCH_SIZE, ids.size()))))
-                result.put(row.id(), row);
+        for (String id : ids) if (lookup.identities.containsKey(id)) result.put(id, lookup.identities.get(id));
+        var missing = ids.stream().filter(id -> !result.containsKey(id)).toList();
+        readIdentities(missing, result);
         var executionIds = c.executions().stream().map(e -> result.get(key("EXECUTION", e.sourceKey())))
                 .filter(Objects::nonNull).map(MappingIdentity::entityId).filter(Objects::nonNull).distinct().toList();
         var rows = new LinkedHashMap<Long, MesProductionExecutionEntity>();
+        if (lookup.references != null)
+            for (Long id : executionIds)
+                if (lookup.references.executions.containsKey(id)) rows.put(id, lookup.references.executions.get(id));
+        executionIds = executionIds.stream().filter(id -> !rows.containsKey(id)).toList();
         for (int from = 0; from < executionIds.size(); from += BATCH_SIZE) {
             var f = new MesProductionExecutionExample();
             f.createCriteria().andIdIn(executionIds.subList(from, Math.min(from + BATCH_SIZE, executionIds.size())));

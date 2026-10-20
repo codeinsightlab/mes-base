@@ -18,6 +18,10 @@ import dev.mesbase.business.production.domain.MesExecutionPathEntity;
 import dev.mesbase.business.production.domain.MesExecutionPathNodeEntity;
 import dev.mesbase.business.production.domain.MesExecutionPathNodeExample;
 import dev.mesbase.business.production.domain.MesProductionExecutionEntity;
+import dev.mesbase.business.production.domain.MesProductionExecutionExample;
+import dev.mesbase.business.production.domain.MesExecutionPathExample;
+import java.util.LinkedHashMap;
+import java.util.ArrayList;
 import dev.mesbase.business.production.domain.RoutingNodeEntity;
 import dev.mesbase.business.production.domain.RoutingNodeExample;
 import dev.mesbase.business.production.domain.RoutingEdgeEntity;
@@ -89,6 +93,61 @@ public class ExecutionPathService {
         var e = executions.selectByPrimaryKey(id);
         if (e == null) throw new FoundationException(ErrorCode.EXECUTION_NOT_FOUND);
         return view(e);
+    }
+
+    public record PathBatch(Map<Long, MesProductionExecutionEntity> executions, Map<Long, PathModel> models,
+                            Map<Long, List<MesExecutionPathNodeEntity>> ordered) {
+    }
+
+    @Transactional(transactionManager = "businessTransactionManager", readOnly = true)
+    public PathBatch viewBatch(List<Long> executionIds) {
+        if (executionIds == null || executionIds.size() > 1000 || executionIds.stream().anyMatch(Objects::isNull))
+            throw new FoundationException(ErrorCode.BAD_REQUEST);
+        var ids = executionIds.stream().distinct().toList();
+        if (ids.isEmpty()) return new PathBatch(Map.of(), Map.of(), Map.of());
+        var e = new MesProductionExecutionExample();
+        e.createCriteria().andIdIn(ids);
+        var rows = executions.selectByExample(e);
+        if (rows.size() != ids.size()) throw new FoundationException(ErrorCode.EXECUTION_NOT_FOUND);
+        var routeIds = rows.stream().map(MesProductionExecutionEntity::getRoutingId).distinct().toList();
+        var p = new MesExecutionPathExample();
+        p.createCriteria().andIdIn(ids);
+        var pathRows = paths.selectByExample(p).stream()
+                .collect(Collectors.toMap(MesExecutionPathEntity::getId, v -> v));
+        var n = new MesExecutionPathNodeExample();
+        n.createCriteria().andExecutionIdIn(ids);
+        n.setOrderByClause("execution_id,sequence_no,id");
+        var ordered = selected.selectByExample(n).stream()
+                .collect(Collectors.groupingBy(MesExecutionPathNodeEntity::getExecutionId));
+        var nodeQuery = new RoutingNodeExample();
+        nodeQuery.createCriteria().andRoutingIdIn(routeIds);
+        nodeQuery.setOrderByClause("routing_id,display_order,id");
+        var routeNodes = nodes.selectByExample(nodeQuery);
+        var nodesByRoute = routeNodes.stream().collect(Collectors.groupingBy(RoutingNodeEntity::getRoutingId));
+        var edgeQuery = new RoutingEdgeExample();
+        edgeQuery.createCriteria().andRoutingIdIn(routeIds);
+        var edgesByRoute = edges.selectByExample(edgeQuery).stream()
+                .collect(Collectors.groupingBy(RoutingEdgeEntity::getRoutingId));
+        var routeLabels = new LinkedHashMap<Long, DirectoryLabel>();
+        for (int from = 0; from < routeIds.size(); from += 200)
+            routeLabels.putAll(references.routingLabels(routeIds.subList(from, Math.min(from + 200, routeIds.size()))));
+        var operationIds = routeNodes.stream().map(RoutingNodeEntity::getOperationId).distinct().toList();
+        var operationLabels = new LinkedHashMap<Long, DirectoryLabel>();
+        for (int from = 0; from < operationIds.size(); from += 200)
+            operationLabels.putAll(references.operationLabels(operationIds.subList(from, Math.min(from + 200, operationIds.size()))));
+        var models = new LinkedHashMap<Long, PathModel>();
+        var byId = new LinkedHashMap<Long, MesProductionExecutionEntity>();
+        for (var row : rows) {
+            var label = routeLabels.get(row.getRoutingId());
+            if (label == null) throw new FoundationException(ErrorCode.RESOURCE_CONFLICT);
+            var choices = ordered.getOrDefault(row.getId(), List.of());
+            models.put(row.getId(), new PathModel(row.getId(), row.getStatus(), pathRows.get(row.getId()),
+                    choices.stream().map(MesExecutionPathNodeEntity::getRoutingNodeId).toList(),
+                    nodesByRoute.getOrDefault(row.getRoutingId(), List.of()), edgesByRoute.getOrDefault(row.getRoutingId(), List.of()),
+                    row.getExecutionNo(), label, operationLabels));
+            byId.put(row.getId(), row);
+        }
+        return new PathBatch(Map.copyOf(byId), Map.copyOf(models), Map.copyOf(ordered));
     }
 
     private PathModel view(MesProductionExecutionEntity e) {

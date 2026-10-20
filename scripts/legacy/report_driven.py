@@ -340,10 +340,12 @@ def capture(config, directory, include_source=True, expected_flyway="39"):
     if identity != {'uuid': SERVER, 'port': 3306}:
         raise ValueError('Unexpected server: no business tables read')
     metadata_sql = """SET SESSION TRANSACTION READ ONLY;
-SELECT JSON_OBJECT('schema',TABLE_SCHEMA,'table',TABLE_NAME,'column',COLUMN_NAME,
-'ordinal',ORDINAL_POSITION,'key',COLUMN_KEY,'type',COLUMN_TYPE,'engine',
-(SELECT ENGINE FROM information_schema.tables t WHERE t.TABLE_SCHEMA=c.TABLE_SCHEMA AND t.TABLE_NAME=c.TABLE_NAME))
-FROM information_schema.columns c WHERE TABLE_SCHEMA IN ('prod_j2eedb','mes_base_dev_perf_test') ORDER BY TABLE_SCHEMA,TABLE_NAME,ORDINAL_POSITION;"""
+SELECT JSON_OBJECT('schema',c.TABLE_SCHEMA,'table',c.TABLE_NAME,'column',c.COLUMN_NAME,
+'ordinal',c.ORDINAL_POSITION,'key',c.COLUMN_KEY,'type',c.COLUMN_TYPE,'engine',t.ENGINE)
+FROM information_schema.columns c LEFT JOIN information_schema.tables t
+ ON t.TABLE_SCHEMA=c.TABLE_SCHEMA AND t.TABLE_NAME=c.TABLE_NAME
+WHERE c.TABLE_SCHEMA IN ('prod_j2eedb','mes_base_dev_perf_test')
+ORDER BY c.TABLE_SCHEMA,c.TABLE_NAME,c.ORDINAL_POSITION;"""
     metadata = [json.loads(line) for line in mysql(config, metadata_sql).splitlines()]
     write_json(directory / 'metadata.json', metadata)
     tables = defaultdict(list)

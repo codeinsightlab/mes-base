@@ -3,6 +3,7 @@ package dev.mesbase.business.legacy.dao;
 import dev.mesbase.business.legacy.domain.LegacyHistory.Batch;
 import dev.mesbase.business.legacy.domain.LegacyHistory.Mapping;
 import dev.mesbase.business.legacy.domain.LegacyHistory.MappingIdentity;
+import dev.mesbase.business.legacy.domain.LegacyHistory.ExecutionNode;
 import dev.mesbase.business.legacy.domain.LegacyHistory.Node;
 import java.math.BigDecimal;
 import dev.mesbase.business.legacy.domain.LegacyHistory.Input;
@@ -85,6 +86,15 @@ public interface LegacyMigrationMapper {
             + "n.conversion_payload evidence FROM mes_legacy_source_mapping n JOIN mes_legacy_source_mapping e "
             + "ON e.id=n.parent_id WHERE e.entity_kind='EXECUTION' AND e.entity_id=#{id} AND n.entity_kind='NODE'")
     List<Node> nodes(@Param("id") Long executionId);
+
+    @Select({"<script>SELECT e.entity_id execution_id,n.entity_id routing_node_id,",
+            "CAST(JSON_UNQUOTE(JSON_EXTRACT(n.conversion_payload,'$.legacyNet')) AS DECIMAL(20,6)) legacy_net,",
+            "CAST(JSON_UNQUOTE(JSON_EXTRACT(n.conversion_payload,'$.grossCorrection')) AS DECIMAL(20,6)) gross_correction,",
+            "CAST(JSON_UNQUOTE(JSON_EXTRACT(n.conversion_payload,'$.effectiveDefect')) AS DECIMAL(20,6)) effective_defect ",
+            "FROM mes_legacy_source_mapping n JOIN mes_legacy_source_mapping e ON e.id=n.parent_id ",
+            "WHERE e.entity_kind='EXECUTION' AND n.entity_kind='NODE' AND e.entity_id IN ",
+            "<foreach collection='ids' item='id' open='(' separator=',' close=')'>#{id}</foreach></script>"})
+    List<ExecutionNode> nodesBatch(@Param("ids") List<Long> executionIds);
 
     @Select("SELECT m.id,m.batch_id,m.parent_id,m.source_table,m.source_pk,m.source_hash,m.rule_version,"
             + "m.entity_kind,m.entity_id,m.source_payload,m.conversion_payload,m.created_at "

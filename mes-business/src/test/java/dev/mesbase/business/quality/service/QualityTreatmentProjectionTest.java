@@ -76,6 +76,35 @@ class QualityTreatmentProjectionTest {
     }
 
     @Test
+    void executionBatchKeepsSharedNodesSeparateAndMatchesSingleProjection() {
+        var first = declaration("first", 1, "5", 11);
+        var second = declaration("second", 1, "9", 11);
+        second.setExecutionId(2L);
+        var gone = declaration("gone", 1, "99", 11);
+        gone.setExecutionId(2L);
+        gone.setRecordAction(DefectRecordAction.VOID.getValue());
+        when(events.selectByExample(any())).thenReturn(List.of());
+        when(defects.selectLatestBatch(List.of(1L, 2L))).thenReturn(List.of(first, second, gone));
+        var result = service.nodeTotalsBatch(List.of(1L, 2L));
+        when(defects.selectLatest(1L, null, null)).thenReturn(List.of(first));
+        assertEquals(service.nodeTotals(1L), result.get(1L));
+        when(defects.selectLatest(2L, null, null)).thenReturn(List.of(second, gone));
+        assertEquals(service.nodeTotals(2L), result.get(2L));
+    }
+
+    @Test
+    void executionBatchCapAppliesBeforeVoidFiltering() {
+        var rows = IntStream.range(0, 1001).mapToObj(i -> {
+            var d = declaration("void-" + i, 1, "1", 11);
+            d.setRecordAction(DefectRecordAction.VOID.getValue());
+            return d;
+        }).toList();
+        when(events.selectByExample(any())).thenReturn(List.of());
+        when(defects.selectLatestBatch(any())).thenReturn(rows);
+        assertThrows(FoundationException.class, () -> service.nodeTotalsBatch(List.of(1L, 2L)));
+    }
+
+    @Test
     void batchMatchesTheExistingSingleDeclarationProjectionIncludingRevisionAndEncounterOrder() {
         var a = declaration("a", 2, "5", 11);
         var b = declaration("b", 1, "2", 11);

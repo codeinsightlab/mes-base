@@ -1,11 +1,57 @@
 package dev.mesbase.infrastructure.platform;
-import dev.mesbase.platform.management.FileStorage;import io.minio.*;import java.io.*;
-/** SOURCE_PRODUCT_PORT of MinioService: SDK upload/read/remove, private UUID keys; no public links. */
+
+import dev.mesbase.platform.management.FileStorage;
+import io.minio.*;
+
+import java.io.*;
+
+/**
+ * SOURCE_PRODUCT_PORT of MinioService: SDK upload/read/remove, private UUID keys; no public links.
+ */
 public final class MinioPrivateFileStorage implements FileStorage {
- private final MinioClient client;private final String bucket;
- public MinioPrivateFileStorage(String endpoint,String accessKey,String secretKey,String bucket){if(endpoint==null||endpoint.isBlank()||accessKey==null||accessKey.isBlank()||secretKey==null||secretKey.isBlank()||bucket==null||!bucket.matches("[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]"))throw new IllegalArgumentException("Explicit Minio configuration required");this.client=MinioClient.builder().endpoint(endpoint).credentials(accessKey,secretKey).build();this.bucket=bucket;}
- private String key(String id){if(id==null||!id.matches("[a-f0-9-]{36}"))throw new IllegalArgumentException("File ID invalid");return id;}
- public long write(String id,InputStream input,long maxBytes)throws IOException{if(maxBytes<1||maxBytes>100000000)throw new IllegalArgumentException("File size limit invalid");byte[] bytes=input.readNBytes((int)maxBytes+1);if(bytes.length>maxBytes)throw new IOException("Upload exceeds size limit");try{client.putObject(PutObjectArgs.builder().bucket(bucket).object(key(id)).stream(new ByteArrayInputStream(bytes),(long)bytes.length,-1L).contentType("application/octet-stream").build());return bytes.length;}catch(Exception failure){throw new IOException("Private object upload failed",failure);}}
- public byte[] read(String id,long expectedSize)throws IOException{if(expectedSize<0||expectedSize>100000000)throw new IOException("Stored size invalid");try(var stream=client.getObject(GetObjectArgs.builder().bucket(bucket).object(key(id)).build())){byte[] bytes=stream.readNBytes((int)expectedSize+1);if(bytes.length!=expectedSize)throw new IOException("Private object size changed");return bytes;}catch(Exception failure){throw new IOException("Private object read failed",failure);}}
- public void delete(String id)throws IOException{try{client.removeObject(RemoveObjectArgs.builder().bucket(bucket).object(key(id)).build());}catch(Exception failure){throw new IOException("Private object removal failed",failure);}}
+    private final MinioClient client;
+    private final String bucket;
+
+    public MinioPrivateFileStorage(String endpoint, String accessKey, String secretKey, String bucket) {
+        if (endpoint == null || endpoint.isBlank() || accessKey == null || accessKey.isBlank() || secretKey == null || secretKey.isBlank() || bucket == null || !bucket.matches("[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]"))
+            throw new IllegalArgumentException("Explicit Minio configuration required");
+        this.client = MinioClient.builder().endpoint(endpoint).credentials(accessKey, secretKey).build();
+        this.bucket = bucket;
+    }
+
+    private String key(String id) {
+        if (id == null || !id.matches("[a-f0-9-]{36}")) throw new IllegalArgumentException("File ID invalid");
+        return id;
+    }
+
+    public long write(String id, InputStream input, long maxBytes) throws IOException {
+        if (maxBytes < 1 || maxBytes > 100000000) throw new IllegalArgumentException("File size limit invalid");
+        byte[] bytes = input.readNBytes((int) maxBytes + 1);
+        if (bytes.length > maxBytes) throw new IOException("Upload exceeds size limit");
+        try {
+            client.putObject(PutObjectArgs.builder().bucket(bucket).object(key(id)).stream(new ByteArrayInputStream(bytes), (long) bytes.length, -1L).contentType("application/octet-stream").build());
+            return bytes.length;
+        } catch (Exception failure) {
+            throw new IOException("Private object upload failed", failure);
+        }
+    }
+
+    public byte[] read(String id, long expectedSize) throws IOException {
+        if (expectedSize < 0 || expectedSize > 100000000) throw new IOException("Stored size invalid");
+        try (var stream = client.getObject(GetObjectArgs.builder().bucket(bucket).object(key(id)).build())) {
+            byte[] bytes = stream.readNBytes((int) expectedSize + 1);
+            if (bytes.length != expectedSize) throw new IOException("Private object size changed");
+            return bytes;
+        } catch (Exception failure) {
+            throw new IOException("Private object read failed", failure);
+        }
+    }
+
+    public void delete(String id) throws IOException {
+        try {
+            client.removeObject(RemoveObjectArgs.builder().bucket(bucket).object(key(id)).build());
+        } catch (Exception failure) {
+            throw new IOException("Private object removal failed", failure);
+        }
+    }
 }

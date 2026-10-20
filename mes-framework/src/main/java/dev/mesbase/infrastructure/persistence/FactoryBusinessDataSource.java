@@ -53,6 +53,14 @@ public final class FactoryBusinessDataSource extends AbstractDataSource implemen
         selected.lease().verify(selected.binding());
     }
 
+    /**
+     * Credential-free identity of the already pinned transaction, without re-reading management state.
+     */
+    public BusinessRuntimeBinding currentBinding() {
+        verify();
+        return ((Selection) TransactionSynchronizationManager.getResource(key)).binding();
+    }
+
     public Object suspend() {
         Selection selected = (Selection) TransactionSynchronizationManager.unbindResource(key);
         selected.pin().close();

@@ -126,4 +126,9 @@
     <if test="workorderId != null">AND EXISTS (SELECT 1 FROM mes_production_execution e WHERE e.id=execution_id AND e.workorder_id=#{workorderId})</if>
     ORDER BY recorded_at DESC,id DESC
   </select>
+  <select id="selectLatestBatch" resultMap="BaseResultMap">
+    SELECT <include refid="Base_Column_List"/> FROM mes_production_defect WHERE <include refid="Latest"/>
+    AND execution_id IN <foreach collection="executionIds" item="id" open="(" close=")" separator=",">#{id}</foreach>
+    ORDER BY recorded_at DESC,id DESC
+  </select>
 </mapper>
