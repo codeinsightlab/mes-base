@@ -123,6 +123,24 @@ public class QualityTreatmentService {
         var rows = all.stream()
                 .filter(e -> e.getDeclarationId().equals(d.getDeclarationId()) && e.getDeclarationRevision()
                         .equals(d.getRevisionNo())).toList();
+        return summarizeRows(d, rows);
+    }
+
+    private record DeclarationVersion(String declarationId, Integer revision) {
+    }
+
+    private static Map<DeclarationVersion, List<MesQualityTreatmentEntity>> groupedEvents(
+            List<MesQualityTreatmentEntity> all) {
+        var grouped = new HashMap<DeclarationVersion, List<MesQualityTreatmentEntity>>();
+        for (var event : all)
+            grouped.computeIfAbsent(new DeclarationVersion(event.getDeclarationId(), event.getDeclarationRevision()),
+                    key -> new ArrayList<>()).add(event);
+        // Preserve the original recorded_at,id encounter order and immutable Summary.events contract.
+        grouped.replaceAll((key, rows) -> List.copyOf(rows));
+        return grouped;
+    }
+
+    private Summary summarizeRows(MesProductionDefectEntity d, List<MesQualityTreatmentEntity> rows) {
         var assessment = rows.stream().filter(e -> Action.ASSESS.name().equals(e.getActionType())).findFirst()
                 .orElse(null);
         var type = assessment == null ? Attribution.UNVERIFIED : Attribution.valueOf(assessment.getAttributionType());
@@ -159,18 +177,23 @@ public class QualityTreatmentService {
     public ReleaseBasis releaseBasis(Long execution) {
         var all = executionEvents(execution);
         var versions = declarations(execution);
+        var grouped = groupedEvents(all);
         var facts = new ArrayList<String>();
         versions.forEach(d -> facts.add("D:" + d.getDeclarationId() + ":" + d.getRevisionNo()));
         all.forEach(e -> facts.add("T:" + e.getId()));
         facts.sort(String::compareTo);
-        return new ReleaseBasis(versions.stream().map(d -> summarize(d, all)).toList(), List.copyOf(facts));
+        return new ReleaseBasis(versions.stream().map(d -> summarizeRows(d,
+                        grouped.getOrDefault(new DeclarationVersion(d.getDeclarationId(), d.getRevisionNo()), List.of())))
+                .toList(), List.copyOf(facts));
     }
 
     public List<NodeTotal> nodeTotals(Long execution) {
         var all = executionEvents(execution);
         var totals = new HashMap<Long, BigDecimal[]>();
-        for (var d : declarations(execution)) {
-            var s = summarize(d, all);
+        var versions = declarations(execution);
+        var grouped = groupedEvents(all);
+        for (var d : versions) {
+            var s = summarizeRows(d, grouped.getOrDefault(new DeclarationVersion(d.getDeclarationId(), d.getRevisionNo()), List.of()));
             var v = totals.computeIfAbsent(d.getAffectedNodeId(), n -> new BigDecimal[]{ZERO, ZERO, ZERO, ZERO});
             v[0] = v[0].add(d.getDefectQty());
             if (s.attribution() == Attribution.INDEPENDENT) {
@@ -188,8 +211,10 @@ public class QualityTreatmentService {
         var all = executionEvents(before.getExecutionId());
         if (all.stream().anyMatch(e -> e.getDeclarationId().equals(before.getDeclarationId()) && !Action.ASSESS.name()
                 .equals(e.getActionType()))) fail();
-        for (var d : declarations(before.getExecutionId())) {
-            var s = summarize(d, all);
+        var versions = declarations(before.getExecutionId());
+        var grouped = groupedEvents(all);
+        for (var d : versions) {
+            var s = summarizeRows(d, grouped.getOrDefault(new DeclarationVersion(d.getDeclarationId(), d.getRevisionNo()), List.of()));
             if (s.attribution() == Attribution.OVERLAP && before.getDeclarationId().equals(s.relatedDeclarationId()))
                 fail();
         }

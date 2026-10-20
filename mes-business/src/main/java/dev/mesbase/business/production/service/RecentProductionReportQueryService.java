@@ -18,7 +18,7 @@ public class RecentProductionReportQueryService {
     private final BusinessDirectoryService directory;
 
     public RecentProductionReportQueryService(RecentProductionReportExtraMapper reports,
-                                               BusinessDirectoryService directory) {
+                                              BusinessDirectoryService directory) {
         this.reports = reports;
         this.directory = directory;
     }

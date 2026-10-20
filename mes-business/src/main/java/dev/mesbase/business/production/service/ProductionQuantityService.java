@@ -1,6 +1,7 @@
 package dev.mesbase.business.production.service;
 
 import dev.mesbase.business.production.domain.ProductionReportModels.ExecutionSummary;
+import dev.mesbase.business.legacy.dao.LegacyMigrationMapper;
 import dev.mesbase.business.production.domain.ProductionQuantityConflictException;
 import dev.mesbase.business.production.domain.ProductionQualityPendingException;
 import dev.mesbase.business.quality.service.ProductionDefectQuantityQuery;
@@ -34,6 +35,8 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.stream.Collectors;
 import org.springframework.stereotype.Service;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -43,6 +46,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class ProductionQuantityService {
     private final MesProductionExecutionMapper executions;
     private final WorkorderMapper orders;
+    private LegacyMigrationMapper history;
     private final ExecutionPathService paths;
     private final MesExecutionPathNodeMapper pathNodes;
     private final ProductionQuantityMapper quantities;
@@ -60,6 +64,15 @@ public class ProductionQuantityService {
         this.quantities = quantities;
         this.directory = directory;
         this.defects = defects;
+    }
+
+    @Autowired
+    public ProductionQuantityService(MesProductionExecutionMapper executions, ExecutionPathService paths,
+                                     MesExecutionPathNodeMapper pathNodes, ProductionQuantityMapper quantities,
+                                     BusinessDirectoryService directory, ProductionDefectQuantityQuery defects,
+                                     WorkorderMapper orders, ObjectProvider<LegacyMigrationMapper> history) {
+        this(executions, paths, pathNodes, quantities, directory, defects, orders);
+        this.history = history.getIfAvailable();
     }
 
     public ExecutionQuantity getExecutionQuantities(Long executionId) {
@@ -104,7 +117,12 @@ public class ProductionQuantityService {
     private ExecutionQuantity load(Long executionId, MesProductionExecutionEntity execution, PathModel model,
                                    Supplier<List<MesExecutionPathNodeEntity>> selectedRows) {
         var balance = quantities.inputBalance(executionId);
-        var inputQty = balance.usableQty();
+        boolean historical = ProductionExecutionStatus.HISTORICAL.getValue().equals(execution.getStatus());
+        if (historical && history == null) unavailable();
+        var inputQty = historical ? history.input(executionId) : balance.usableQty();
+        if (inputQty == null || inputQty.signum() < 0) unavailable();
+        var historyNodes = historical ? history.nodes(executionId).stream()
+                .collect(Collectors.toMap(n -> n.routingNodeId(), n -> n)) : null;
         if (model.path() == null)
             return new ExecutionQuantity(executionId, execution.getWorkorderId(), execution.getExecutionNo(),
                     execution.getRoutingId(), execution.getTargetQty(), ExecutionPathStatus.UNSELECTED.getValue(), false, "执行尚未选择实际路径", List.of(), label(model.routing()), inputQty, balance.confirmedQty(), balance.reservedQty());
@@ -122,14 +140,21 @@ public class ProductionQuantityService {
             var reported = totals.getOrDefault(node.getId(), BigDecimal.ZERO);
             var quality = defectTotals.get(node.getId());
             var defect = quality == null ? BigDecimal.ZERO : quality.effectiveDefectQty();
+            if (historical) {
+                var evidence = historyNodes.get(node.getId());
+                if (evidence == null || evidence.legacyNet().compareTo(reported) != 0 || quality != null)
+                    unavailable();
+                reported = reported.add(evidence.grossCorrection());
+                defect = evidence.effectiveDefect();
+            }
             result.add(new NodeQuantity(executionId, node.getId(), node.getOperationId(), node.getNodeCode(), node.getOperationName() != null ? node.getOperationName() : model.operationLabels()
                     .containsKey(node.getOperationId()) ? model.operationLabels().get(node.getOperationId())
                     .name() + "（当前名称）" : null, i + 1,
-                    BigDecimal.ZERO, reported, defect, BigDecimal.ZERO, BigDecimal.ZERO, true, quality == null ? BigDecimal.ZERO : quality.recoveredQty(), BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, quality == null ? BigDecimal.ZERO : quality.unverifiedQty(), quality == null ? BigDecimal.ZERO : quality.directDefectQty()));
+                    BigDecimal.ZERO, reported, defect, BigDecimal.ZERO, BigDecimal.ZERO, true, quality == null ? BigDecimal.ZERO : quality.recoveredQty(), BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, quality == null ? BigDecimal.ZERO : quality.unverifiedQty(), historical ? defect : quality == null ? BigDecimal.ZERO : quality.directDefectQty()));
         }
         boolean locked = ExecutionPathStatus.LOCKED.getValue().equals(model.path().getPathStatus());
         var order = orders.selectByPrimaryKey(execution.getWorkorderId());
-        String boundary = !locked ? "实际路径尚未锁定，禁止写入报工数量"
+        String boundary = historical ? "历史只读；投入为冻结材料证据推导，禁止正常生产操作" : !locked ? "实际路径尚未锁定，禁止写入报工数量"
                 : order == null || !WorkOrderStatus.RELEASED.getValue().equals(order.getStatus())
                 ? "工单未下达或已作废，禁止继续正常报工"
                 : !ProductionExecutionStatus.allowsNormalReporting(execution.getStatus())
@@ -137,7 +162,7 @@ public class ProductionQuantityService {
         // writable describes normal forward reporting only, not historical correction authorization.
         return new ExecutionQuantity(executionId, execution.getWorkorderId(), execution.getExecutionNo(), execution.getRoutingId(),
                 execution.getTargetQty(), model.path()
-                .getPathStatus(), boundary == null, boundary, List.copyOf(result), label(model.routing()), inputQty, balance.confirmedQty(), balance.reservedQty());
+                .getPathStatus(), boundary == null, boundary, List.copyOf(result), label(model.routing()), inputQty, balance.confirmedQty(), balance.reservedQty(), historical);
     }
 
     private static String label(DirectoryLabel label) {
@@ -163,6 +188,16 @@ public class ProductionQuantityService {
         }
         var labels = directory.routingLabels(rows.stream().map(ExecutionSummary::routingId).toList()).entrySet()
                 .stream().collect(Collectors.toMap(entry -> entry.getKey(), entry -> label(entry.getValue())));
+        var order = orders.selectByPrimaryKey(workorderId);
+        if (order != null && WorkOrderStatus.HISTORICAL.getValue().equals(order.getStatus()) && !rows.isEmpty()) {
+            if (history == null) unavailable();
+            var historicalInputs = history.inputs(rows.stream().map(ExecutionSummary::executionId).toList()).stream()
+                    .collect(Collectors.toMap(v -> v.executionId(), v -> v.quantity()));
+            if (historicalInputs.size() != rows.size()) unavailable();
+            rows = rows.stream().map(v -> new ExecutionSummary(v.executionId(), v.workorderId(), v.executionNo(),
+                    v.routingId(), v.targetQty(), v.pathStatus(), v.lastNodeReportedQty(),
+                    historicalInputs.get(v.executionId()))).toList();
+        }
         return new ExecutionPage(rows, total, offset, limit, labels);
     }
 
@@ -172,6 +207,7 @@ public class ProductionQuantityService {
 
     public static void validateChange(ExecutionQuantity view, Long nodeId, BigDecimal delta) {
         // Historical corrections retain their formal gates even after normal reporting closes.
+        if (view.historical()) unavailable();
         if (!ExecutionPathStatus.LOCKED.getValue().equals(view.pathStatus())) unavailable();
         var before = calculate(view, null, BigDecimal.ZERO, BigDecimal.ZERO);
         String blocked = positiveReportBlockReason(before, nodeId);
@@ -236,20 +272,21 @@ public class ProductionQuantityService {
             var historical = rawAvailable.negate().max(BigDecimal.ZERO);
             var rawOutput = next.subtract(netDefect).subtract(historical);
             var output = rawOutput.max(BigDecimal.ZERO);
-            result.add(new NodeQuantity(node.executionId(), node.routingNodeId(), node.operationId(), node.code(), node.name(), node.sequenceNo(), input, next, defect, output, rawAvailable.max(BigDecimal.ZERO), node.qualityIntegrated(), node.recoveredQty(), historical, rawOutput, rawAvailable, node.unverifiedDefectQty(), direct));
+            result.add(new NodeQuantity(node.executionId(), node.routingNodeId(), node.operationId(), node.code(), node.name(), node.sequenceNo(), input, next, defect, output, view.historical() ? BigDecimal.ZERO : rawAvailable.max(BigDecimal.ZERO), node.qualityIntegrated(), node.recoveredQty(), historical, rawOutput, rawAvailable, node.unverifiedDefectQty(), direct));
             input = output;
             upstream = node.routingNodeId();
         }
         if (nodeId != null && !found) unavailable();
         return new ExecutionQuantity(view.executionId(), view.workorderId(), view.executionNo(), view.routingId(), view.targetQty(), view.pathStatus(), view.writable(), result.stream()
                 .anyMatch(n -> n.unverifiedDefectQty()
-                        .signum() > 0) ? "存在待核实不良；从受影响工序起禁止新增正向报工，请核实质量记录，正向交接保持质量门禁" : view.boundary(), List.copyOf(result), view.routingLabel(), view.productionInputQty(), view.confirmedInputQty(), view.reservedInputQty());
+                        .signum() > 0) ? "存在待核实不良；从受影响工序起禁止新增正向报工，请核实质量记录，正向交接保持质量门禁" : view.boundary(), List.copyOf(result), view.routingLabel(), view.productionInputQty(), view.confirmedInputQty(), view.reservedInputQty(), view.historical());
     }
 
     /**
      * Shared by positive submit validation, candidate queries and administrator UI projection.
      */
     public static String positiveReportBlockReason(ExecutionQuantity view, Long nodeId) {
+        if (view.historical()) return "历史只读，不能继续报工";
         if (!ExecutionPathStatus.LOCKED.getValue().equals(view.pathStatus())) return "实际路径尚未锁定";
         NodeQuantity affected = null;
         for (var n : view.nodes()) {

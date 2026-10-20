@@ -80,7 +80,14 @@ public final class ProductionReportModels {
     public record ExecutionQuantity(Long executionId, Long workorderId, String executionNo, Long routingId,
                                     BigDecimal targetQty, String pathStatus, boolean writable, String boundary,
                                     List<NodeQuantity> nodes, String routingLabel, BigDecimal productionInputQty,
-                                    BigDecimal confirmedInputQty, BigDecimal reservedInputQty) {
+                                    BigDecimal confirmedInputQty, BigDecimal reservedInputQty, boolean historical) {
+        public ExecutionQuantity(Long executionId, Long workorderId, String executionNo, Long routingId,
+                                 BigDecimal targetQty, String pathStatus, boolean writable, String boundary,
+                                 List<NodeQuantity> nodes, String routingLabel, BigDecimal productionInputQty,
+                                 BigDecimal confirmedInputQty, BigDecimal reservedInputQty) {
+            this(executionId, workorderId, executionNo, routingId, targetQty, pathStatus, writable, boundary,
+                    nodes, routingLabel, productionInputQty, confirmedInputQty, reservedInputQty, false);
+        }
     }
 
     public record ExecutionSummary(Long executionId, Long workorderId, String executionNo, Long routingId,
