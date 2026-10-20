@@ -13,6 +13,8 @@ import java.util.UUID;
 import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.Executors;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Import;
 import org.springframework.core.env.MapPropertySource;
@@ -81,6 +83,30 @@ class ProductionReportingHttpTest {
         var result = m.perform(ProductionCoreV1HttpTest.full(post(ROOT)).content(body(node, qty)))
                 .andExpect(status().isOk()).andReturn();
         return new ObjectMapper().readTree(result.getResponse().getContentAsString()).get("id").asLong();
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"sequence", "routing", "status", "graph"})
+    void heldPathReuseStillRejectsMalformedOrUnlockedPathsBeforeWriting(String damage) throws Exception {
+        try (var c = context()) {
+            var m = MaterialIssueHttpTest.mvc(c);
+            var j = db(c);
+            confirmIssue(m);
+            String before = j.queryForObject("SELECT status FROM mes_production_execution WHERE id=1", String.class);
+            switch (damage) {
+                case "sequence" ->
+                        j.update("UPDATE mes_execution_path_node SET sequence_no=sequence_no+10 WHERE execution_id=1");
+                case "routing" -> j.update("UPDATE mes_execution_path SET routing_id=2 WHERE id=1");
+                case "status" -> j.update("UPDATE mes_execution_path SET path_status='SELECTED' WHERE id=1");
+                case "graph" -> j.update("UPDATE routing_node SET routing_id=2 WHERE id=12");
+                default -> throw new AssertionError(damage);
+            }
+            m.perform(ProductionCoreV1HttpTest.full(post(ROOT)).content(body(11, "1")))
+                    .andExpect(status().is4xxClientError())
+                    .andExpect(jsonPath("errorCode").value(damage.equals("graph") ? "ROUTING_GRAPH_INVALID" : "REPORT_PATH_REQUIRED"));
+            assertEquals(0, j.queryForObject("SELECT COUNT(*) FROM mes_production_report", Integer.class));
+            assertEquals(before, j.queryForObject("SELECT status FROM mes_production_execution WHERE id=1", String.class));
+        }
     }
 
     @Test

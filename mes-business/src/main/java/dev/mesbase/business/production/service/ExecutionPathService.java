@@ -91,19 +91,67 @@ public class ExecutionPathService {
         return view(e);
     }
 
-    @Transactional(transactionManager = "businessTransactionManager", readOnly = true)
-    public PathModel view(LockedExecution locked) {
-        return view(locked.execution());
+    private PathModel view(MesProductionExecutionEntity e) {
+        return view(e, null);
     }
 
-    private PathModel view(MesProductionExecutionEntity e) {
+    private PathModel view(MesProductionExecutionEntity e, List<MesExecutionPathNodeEntity> ordered) {
         Long id = e.getId();
         var routing = references.routingLabel(e.getRoutingId());
         var actualNodes = nodes(e.getRoutingId());
         var operationLabels = references.operationLabels(actualNodes.stream().map(RoutingNodeEntity::getOperationId)
                 .toList());
         if (routing == null) throw new FoundationException(ErrorCode.RESOURCE_CONFLICT);
-        return new PathModel(id, e.getStatus(), paths.selectByPrimaryKey(id), nodeIds(id), actualNodes, edges(e.getRoutingId()), e.getExecutionNo(), routing, operationLabels);
+        return new PathModel(id, e.getStatus(), paths.selectByPrimaryKey(id),
+                ordered == null ? nodeIds(id) : ordered.stream().map(MesExecutionPathNodeEntity::getRoutingNodeId)
+                        .toList(),
+                actualNodes, edges(e.getRoutingId()), e.getExecutionNo(), routing, operationLabels);
+    }
+
+    /**
+     * Only for the report validation chain while its WorkOrder/Execution locks remain held.
+     * Published graph versions are immutable; a new version has a different routing primary key.
+     */
+    public static final class LockedPath {
+        private final LockedExecution owner;
+        private final PathModel model;
+        private final List<MesExecutionPathNodeEntity> ordered;
+
+        private LockedPath(LockedExecution owner, PathModel model, List<MesExecutionPathNodeEntity> ordered) {
+            this.owner = owner;
+            this.model = model;
+            this.ordered = List.copyOf(ordered);
+        }
+
+        private void requireOwner(LockedExecution expected) {
+            owner.verify();
+            if (owner != expected) throw new FoundationException(ErrorCode.RESOURCE_CONFLICT);
+        }
+
+        public PathModel model() {
+            owner.verify();
+            return model;
+        }
+
+        public List<MesExecutionPathNodeEntity> orderedRows() {
+            owner.verify();
+            return ordered;
+        }
+    }
+
+    public LockedPath lockedPath(LockedExecution locked) {
+        var e = locked.execution();
+        var ordered = selectedRows(e.getId());
+        var model = view(e, ordered);
+        if (model.path() == null || !Objects.equals(model.path().getRoutingId(), e.getRoutingId()))
+            throw new FoundationException(ErrorCode.REPORT_PATH_REQUIRED);
+        ExecutionPathValidator.validate(model.selectedNodeIds(), model.nodes(), model.edges());
+        for (int i = 0; i < ordered.size(); i++)
+            if (ordered.get(i).getSequenceNo() != i + 1)
+                throw new FoundationException(ErrorCode.REPORT_PATH_REQUIRED);
+        if (!ExecutionPathStatus.LOCKED.getValue().equals(model.path().getPathStatus()))
+            throw new FoundationException(ErrorCode.REPORT_PATH_REQUIRED);
+        return new LockedPath(locked, model, ordered);
     }
 
     public PathModel select(Long id, Integer revision, List<Long> nodeIds) {
@@ -159,26 +207,29 @@ public class ExecutionPathService {
 
     @BusinessCacheEvict(business = MesProductionExecutionResource.PREFIX, scope = BusinessCacheEvict.Scope.LIST_AND_DETAIL)
     public MesProductionExecutionEntity start(Long id) {
-        return start(id, null);
+        return start(id, null, null);
     }
 
     @BusinessCacheEvict(business = MesProductionExecutionResource.PREFIX, scope = BusinessCacheEvict.Scope.LIST_AND_DETAIL)
-    public MesProductionExecutionEntity start(LockedExecution locked) {
+    public MesProductionExecutionEntity start(LockedExecution locked, LockedPath path) {
         try {
-            return start(locked.execution().getId(), locked);
+            path.requireOwner(locked);
+            return start(locked.execution().getId(), locked, path);
         } finally {
             locked.invalidate();
         }
     }
 
-    private MesProductionExecutionEntity start(Long id, LockedExecution locked) {
+    private MesProductionExecutionEntity start(Long id, LockedExecution locked, LockedPath path) {
         var e = locked == null ? locks.execution(id) : locked.execution();
         if (locked == null) locks.requireActiveExecution(id);
         else locks.requireActiveExecution(id, locked);
         if (!Set.of(ProductionExecutionStatus.READY.getValue(), ProductionExecutionStatus.RUNNING.getValue())
                 .contains(e.getStatus())) fail();
         if (ProductionExecutionStatus.READY.getValue().equals(e.getStatus())) rules.checkReadyReferences(e);
-        if (!ExecutionPathStatus.LOCKED.getValue().equals(requireSelected(e).getPathStatus())) fail();
+        if (path != null) path.requireOwner(locked);
+        var selectedPath = path == null ? requireSelected(e) : path.model().path();
+        if (!ExecutionPathStatus.LOCKED.getValue().equals(selectedPath.getPathStatus())) fail();
         if (ProductionExecutionStatus.RUNNING.getValue().equals(e.getStatus())) return e;
         var rows = issueRows(id);
         if (rows.stream()
@@ -224,10 +275,14 @@ public class ExecutionPathService {
     }
 
     private List<Long> nodeIds(Long id) {
+        return selectedRows(id).stream().map(MesExecutionPathNodeEntity::getRoutingNodeId).toList();
+    }
+
+    private List<MesExecutionPathNodeEntity> selectedRows(Long id) {
         var f = new MesExecutionPathNodeExample();
         f.createCriteria().andExecutionIdEqualTo(id);
         f.setOrderByClause("sequence_no,id");
-        return selected.selectByExample(f).stream().map(MesExecutionPathNodeEntity::getRoutingNodeId).toList();
+        return selected.selectByExample(f);
     }
 
     private List<RoutingNodeEntity> nodes(Long id) {

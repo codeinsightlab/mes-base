@@ -23,7 +23,8 @@
 |Phase1|OperationUserDirectory及定向测试|READY68→67；RUNNING57→56；REPLAY8→8|16并发P50 547.76→512.95ms；P95 671.17→634.75ms|定向测试、完整verify、真实资格、原901/17审计通过|GO（SQL及正确性；耗时仅本窗口观察）|
 |Phase2|LEDGER专用路径校验及HTTP测试|LEDGER23→17，其余不变|16并发补测吞吐116.97→162.71 req/s；P95 149.39→113.41ms|真实API、历史JSON、原901审计及verify通过|GO；保留初次高并发回退样本|
 |Phase3a|受控锁定上下文及四处普通读|READY67→63；RUNNING56→52；REPLAY8不变|恢复后16并发P50 538.72→514.41ms，P95 693.96→650.35ms|物理事务、双JVM矩阵、verify、原901审计通过|GO；4并发P99有回退，不承诺所有尾延迟改善|
-|Phase3b|start内部重复锁链|待新固定产物实测|待测|定向测试通过，完整verify及新资源准备中|未GO|
+|Phase3b|start内部重复锁链，公共首次锁链保留|READY63→57；RUNNING52→46；REPLAY8不变|16并发P50 514.41→496.19ms，P95 650.35→638.32ms|新双JVM矩阵、事务探针、原901审计及verify重跑通过|GO（SQL/正确性/中位耗时）；部分尾延迟回退|
+|Phase3c|持锁实际路径快照复用|待固定产物实测|待测|四种坏路径HTTP负例及定向测试通过，完整verify进行中|未GO|
 |Phase4|不改变锁模式|不适用|READY独立观察|待独立Routing真实等待链|仅诊断及设计|
 |Phase5|未实施|未测|未测|需质量/basisHash等价与容量边界|待分析/门禁|
 
@@ -102,3 +103,7 @@ LEDGER继续校验Execution、routingId、完整工艺图、有序selected rows�
 |16|27.529→28.626|538.72→514.41|693.96→650.35|709.41→695.63|
 
 每个产物1280次正式请求全部200、零超时。四档吞吐/P95改善，4并发P99回退；SQL净减4是本轮确定收益，耗时为此窗口观察。使用同31个worker执行资源及同一合法数量，追加报工使历史行数增长，不宣称数据量完全冻结或全部延迟变化可由代码单独解释。
+
+Phase3b首次完整verify出现既有H2竞争测试 `StockDocumentHttpTest.documentAndFormalProductionIssueCompeteOnTheSameOwner` 失败：预期一成功一409，实际一成功、另一投产在事务前重新计算时库存已不足，按现有 `ProductionInputSupplyService.calculate` 返回400/BAD_REQUEST。该链路不经过本批锁定上下文入口；未修改生产行为、未放宽测试断言。原样单独复核通过，保留首次失败日志，重新执行完整verify；不能将单独复核通过称为首次完整验证通过。
+
+2026-10-20 07:58完整verify重跑通过（81秒），原失败记录仍保留。工作期间HEAD外部更新为 `f43f266b62ccdd8fa7dcc49b1280b34bf580634f`，提交包含本轮截至Phase3b的现有改动；逐文件检查未引入其他业务源码，开始已有报告的哈希仍完全相同。Agent未执行提交或推送；后续在此版本上继续，阶段回退使用独立差异，不重置该提交。

@@ -112,12 +112,12 @@ public class ProductionReportSubmitService {
         sources.execution(execution, null);
         if (!ProductionExecutionStatus.allowsNormalReporting(execution.getStatus()))
             throw new FoundationException(ErrorCode.EXECUTION_INVALID);
-        quantities.validateReportChange(locked, command.routingNodeId(), command.reportQty());
+        var path = quantities.validateReportChange(locked, command.routingNodeId(), command.reportQty());
         eligibility.requireEligible(locked, command.routingNodeId(), user);
         if (command.workstationId() != null && workstations.selectByPrimaryKey(command.workstationId()) == null)
             throw new FoundationException(ErrorCode.REPORT_REFERENCE_INVALID);
         // Reuse the formal start contract, including released order, exact routing, locked path and confirmed issue.
-        paths.start(locked);
+        paths.start(locked, path);
         var now = LocalDateTime.now();
         var row = new MesProductionReportEntity();
         row.setExecutionId(command.executionId());

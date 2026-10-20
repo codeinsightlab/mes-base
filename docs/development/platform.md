@@ -462,3 +462,58 @@ Spring 上下文启动、权限不扩大、真实 Controller → Service 删除�
  target/menu-deletion-check，原始日志 /private/tmp/menu-delete-focused-test.log。
 Java IDEA 格式化与 diff 检查通过。未执行真实数据库清理、重启服务或部署；不声明实际应用
 已启动或完整 Maven 测试已通过，用户需加载新编译产物后重启验证原故障。
+
+### 2026-10-20：首页工作台真实接口接入可行性审查
+
+本轮为当前工作区源码审查，不修改业务代码、配置或数据库，不启动/停止/重启服务。
+未执行 HTTP、浏览器或真实数据库验收；下列“已有接口”表示源码中存在正式调用链，
+不表示当前运行进程已加载、账号已授权或目标库已有可展示数据。
+本节补充 2026-10-10 首页记录：业务模块已增加正式能力，但首页仍使用原示例组件。
+
+#### 当前入口与数据来源
+
+- `mes-base-ui/src/views/Home.vue` 根据服务端 workspaceAccess 决定工作台；
+  业务模式和平台显式预览都挂载 `BusinessWorkspace.vue`。
+- `BusinessWorkspace.vue` 只导入 `src/lib/businessWorkspaceSample.ts`，
+  生产概览、近期报工、质量检验、待办及四项 KPI 全部为静态示例；factoryName 只影响展示。
+  页面持续标注“示例数据”，没有将示例伪装为真实结果，但已经不能用其判断业务是否接入。
+- `PlatformWorkspace.vue` 经 `useWorkspaceStatus.ts` 使用五个真实只读接口：
+  `/api/monitor/online/list`、`/api/monitor/job/list`、`/api/monitor/server`、
+  `/api/monitor/cache`、`/api/monitor/operlog/list`。分别检查平台权限、展示失败/未授权、
+  按 revision 和卸载丢弃旧结果。在线数是会话数，任务数是配置数，不代表设备在线或任务执行成功。
+
+#### 接入对应关系与缺口
+
+| 首页区域 | 当前正式能力 | 结论 |
+| --- | --- | --- |
+| 工单列表 | GET `/api/production/workorder` → WorkOrderService → WorkorderMapper，分页并返回产品、计划量、来源、状态与分配摘要 | 可直接复用现有 API 适配层；工序、产线、完成量不在此列表中，不能沿用示例字段硬映射 |
+| 执行与数量 | `/api/production/mes-production-execution`；GET `/api/production/report-quantities/executions/{id}`、`/workorders/{id}`；GET `/api/production/executions/{id}/closure` | 存在真实执行、工序净报工、有效产出、放行/交接/接收口径；首页批量汇总需专用查询，避免逐工单逐执行请求 |
+| 近期报工 | GET `/api/production/reports` → ProductionReportService.page → MesProductionReportMapper | executionId、routingNodeId 必填，目前只支持指定执行/工序台账；要显示全厂近期记录需补分页查询，复用原事实表和业务规则 |
+| 质量区域 | GET `/api/quality/defects`、`/api/quality/defects/statistics`；单声明处置与单执行放行查询 | 可展示不良记录、工废/料废及净损失等真实统计；不能解释为首检、巡检、抽样任务或“已合格” |
+| 待办 | 已有执行、路径、报工候选和质量处置/放行规则，但所审查入口中没有首页统一待办查询 | 需定义任务来源、可操作状态、当前人/全厂范围及权限；不得仅凭存在执行或不良记录就生成“我的待办” |
+| 班次、工时、合格率 | 当前报工 Ledger 包含数量增量、操作者、时间等，不含示例的 hours、qualified、待确认状态 | 当前接口不足以一一替换；首版移除这些列/指标或明确未接入，不能根据时间或无不良记录猜测 |
+
+#### 实施建议与必须保留的边界
+
+1. 保留平台工作台真实监控；将正式业务工作台接入真实工单、执行、不良记录及质量统计，
+   详情跳转现有业务页。显式示例预览可继续独立存在，但禁止作为真实接口失败兜底。
+2. 首页概览和全厂近期报工缺少直接适配的接口，应补有界、只读的查询用例。
+   Controller → Service → 注入 Mapper，使用业务事务和既有分页机制，复用业务事实与权威规则；
+   不新增生产事实体系，不为首页调用真实 ERP，不用前端遍历全部分页汇总。
+3. 完成量必须先明确是末工序净报工、扣除净不良后的有效产出、已放行量、已交接量还是仓库接收量。
+   `ProductionQuantityMapper.workorderQuantities` 的 lastNodeReportedQty 为末节点数量增量之和，
+   不是自动扣净不良后的合格量；应结合 ProductionQuantityService 和 closure 语义。
+   报工须考虑调整/冲销，质量须考虑版本、重叠、不确定数量及返工回收；不能直接加原始记录。
+4. KPI 要明确时间范围、时区、状态与来源范围；没有班次契约时取消“本班次”承诺。
+   不同产品/单位不能未经换算统一累加为“件”；比率分母为零或证据不足时展示不可计算。
+   单页数量不能冒充全厂总计，不同分组的 quality statistics.total 不能当不良单数。
+5. 有效选厂与逐模块业务权限共同决定读取。workspaceAccess 仅决定工作台入口，不能代替数据授权。
+   未选厂时不请求业务 API；无权限、真实空数据、失败分别展示。切厂/撤权/卸载清理列表、指标、
+   弹窗并拒绝迟到结果。历史 LOCAL/EXTERNAL 可查询不等于允许跨来源新操作。
+6. 替换时同步调整 `tests/homeWorkspaces.test.ts` 中的示例断言，保留平台预览不改范围、
+   撤权清理等有效行为测试，新增真实读取的权限与异步边界验证。
+   最终使用核实绑定后的 SIMPLE_B 配置验收库与现有服务进行 API/UI 回读，
+   识别已有合成测试标签，不把测试业务数据宣称为现场生产数据。
+
+结论：可以接入真实接口和真实业务库数据，首版具备基础；完整保留示例全部内容则存在语义和查询缺口。
+本轮未实施接入，未运行测试/构建；生产数量相关文件有用户未提交修改，审查未覆盖或改写这些工作。

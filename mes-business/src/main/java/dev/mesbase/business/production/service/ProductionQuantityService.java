@@ -14,6 +14,8 @@ import dev.mesbase.business.production.dao.ProductionQuantityMapper;
 import dev.mesbase.business.production.domain.MesExecutionPathNodeExample;
 import dev.mesbase.business.production.domain.MesExecutionPathNodeEntity;
 import dev.mesbase.business.production.service.ExecutionPathService.PathModel;
+import dev.mesbase.business.production.service.ExecutionPathService.LockedPath;
+import java.util.function.Supplier;
 import dev.mesbase.business.production.service.ProductionChainLocks.LockedExecution;
 import dev.mesbase.business.production.domain.MesProductionExecutionEntity;
 import dev.mesbase.business.production.domain.ExecutionPathStatus;
@@ -95,12 +97,12 @@ public class ProductionQuantityService {
         return load(executionId, execution, paths.view(executionId));
     }
 
-    private ExecutionQuantity load(LockedExecution locked) {
-        var execution = locked.execution();
-        return load(execution.getId(), execution, paths.view(locked));
+    private ExecutionQuantity load(Long executionId, MesProductionExecutionEntity execution, PathModel model) {
+        return load(executionId, execution, model, () -> orderedPathNodes(executionId, model));
     }
 
-    private ExecutionQuantity load(Long executionId, MesProductionExecutionEntity execution, PathModel model) {
+    private ExecutionQuantity load(Long executionId, MesProductionExecutionEntity execution, PathModel model,
+                                   Supplier<List<MesExecutionPathNodeEntity>> selectedRows) {
         var balance = quantities.inputBalance(executionId);
         var inputQty = balance.usableQty();
         if (model.path() == null)
@@ -108,7 +110,7 @@ public class ProductionQuantityService {
                     execution.getRoutingId(), execution.getTargetQty(), ExecutionPathStatus.UNSELECTED.getValue(), false, "执行尚未选择实际路径", List.of(), label(model.routing()), inputQty, balance.confirmedQty(), balance.reservedQty());
         if (!Objects.equals(model.path().getRoutingId(), execution.getRoutingId())) unavailable();
         ExecutionPathValidator.validate(model.selectedNodeIds(), model.nodes(), model.edges());
-        var ordered = orderedPathNodes(executionId, model);
+        var ordered = selectedRows.get();
         var nodeMap = model.nodes().stream().collect(Collectors.toMap(n -> n.getId(), n -> n));
         var totals = quantities.nodeTotals(executionId).stream()
                 .collect(Collectors.toMap(t -> t.routingNodeId(), t -> t.reportedQty()));
@@ -196,8 +198,11 @@ public class ProductionQuantityService {
         validateChange(load(executionId), nodeId, delta);
     }
 
-    public void validateReportChange(LockedExecution locked, Long nodeId, BigDecimal delta) {
-        validateChange(load(locked), nodeId, delta);
+    public LockedPath validateReportChange(LockedExecution locked, Long nodeId, BigDecimal delta) {
+        var path = paths.lockedPath(locked);
+        var execution = locked.execution();
+        validateChange(load(execution.getId(), execution, path.model(), path::orderedRows), nodeId, delta);
+        return path;
     }
 
     /**
