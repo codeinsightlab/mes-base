@@ -2,6 +2,7 @@ package dev.mesbase.business.legacy.dao;
 
 import dev.mesbase.business.legacy.domain.LegacyHistory.Batch;
 import dev.mesbase.business.legacy.domain.LegacyHistory.Mapping;
+import dev.mesbase.business.legacy.domain.LegacyHistory.MappingIdentity;
 import dev.mesbase.business.legacy.domain.LegacyHistory.Node;
 import java.math.BigDecimal;
 import dev.mesbase.business.legacy.domain.LegacyHistory.Input;
@@ -36,6 +37,17 @@ public interface LegacyMigrationMapper {
     @Select("SELECT id,batch_id,parent_id,source_table,source_pk,source_hash,rule_version,entity_kind,entity_id,"
             + "source_payload,conversion_payload,created_at FROM mes_legacy_source_mapping WHERE id=#{id}")
     Mapping find(@Param("id") String id);
+
+    @Select({"<script>SELECT id,parent_id,source_hash,rule_version,entity_id FROM mes_legacy_source_mapping WHERE id IN ",
+            "<foreach collection='ids' item='id' open='(' separator=',' close=')'>#{id}</foreach></script>"})
+    List<MappingIdentity> findIdentities(@Param("ids") List<String> ids);
+
+    @Insert({"<script>INSERT INTO mes_legacy_source_mapping(id,batch_id,parent_id,source_table,source_pk,source_hash,",
+            "rule_version,entity_kind,entity_id,source_payload,conversion_payload,created_at) VALUES ",
+            "<foreach collection='rows' item='r' separator=','>",
+            "(#{r.id},#{r.batchId},#{r.parentId},#{r.sourceTable},#{r.sourcePk},#{r.sourceHash},#{r.ruleVersion},",
+            "#{r.entityKind},#{r.entityId},#{r.sourcePayload},#{r.conversionPayload},#{r.createdAt})</foreach></script>"})
+    int insertBatch(@Param("rows") List<Mapping> rows);
 
     @Insert("INSERT INTO mes_legacy_source_mapping(id,batch_id,parent_id,source_table,source_pk,source_hash,"
             + "rule_version,entity_kind,entity_id,source_payload,conversion_payload,created_at) "

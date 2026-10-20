@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Verify a migrated sample with formal HTTP reads and denied production commands."""
 import argparse
+from collections import Counter
 from decimal import Decimal
 import json
 import os
@@ -18,7 +19,7 @@ def main():
     p.add_argument('--command',type=Path,required=True);p.add_argument('--workorder-id',required=True)
     p.add_argument('--output',type=Path,required=True)
     p.add_argument('--allow-existing-cards',action='store_true')
-    a=p.parse_args();a.output.mkdir(mode=0o700)
+    a=p.parse_args();a.output.mkdir(mode=0o700,parents=True)
     command=json.loads(a.command.read_text());token=None;checks=[];counter=0
     def request(name,path,method='GET',body=None,expected=200,factory=command['factoryId'],auth=True):
         nonlocal counter
@@ -44,6 +45,8 @@ def main():
     assert listing['total']==1 and not listing['items'][0]['erpExtraMissing']
     summary=request('execution-summary','/api/production/report-quantities/workorders/'+wid+'?limit=100')
     assert summary['total']>=len(command['executions']) if a.allow_existing_cards else summary['total']==len(command['executions'])
+    if len(json.loads(command['sourcePayload'])['executions'])==len(command['executions']):
+        assert summary['total']==len(command['executions'])
     eids=[];report_ids=[]
     for ix,entry in enumerate(summary['items']):
         if a.allow_existing_cards:
@@ -66,12 +69,22 @@ def main():
         for n,original in zip(quantity['nodes'],approved['nodes']):
             assert Decimal(n['reportedQty'])==Decimal(original['legacyNet'])+Decimal(original['grossCorrection'])
             assert Decimal(n['effectiveOutputQty'])==Decimal(original['legacyNet']) and Decimal(n['availableQty'])==0
-            ledger=request('ledger-'+str(ix)+'-'+str(n['sequenceNo']),'/api/production/reports?executionId='+eid+'&routingNodeId='+n['routingNodeId']+'&limit=100')
+            assert Decimal(n['defectQty'])==Decimal(original['effectiveDefect']) and not n['historicalConflict']
+            ledger_path='/api/production/reports?executionId='+eid+'&routingNodeId='+n['routingNodeId']+'&limit=100'
+            ledger=request('ledger-'+str(ix)+'-'+str(n['sequenceNo']),ledger_path)
             raw_reports=[r for r in approved['reports'] if r['processId']==original['processId']]
             assert ledger['total']==len(raw_reports)
-            for row in ledger['items']:
-                matches=[r for r in raw_reports if str(r['operatorUserId'])==row['operatorUserId'] and Decimal(r['quantity'])==Decimal(row['quantityDelta']) and r['reportTime']==row['reportTime']]
-                assert matches,'Original operator/time/net quantity did not survive'
+            rows=list(ledger['items'])
+            while len(rows)<ledger['total']:
+                page=request('ledger-page-'+str(ix)+'-'+str(n['sequenceNo'])+'-'+str(len(rows)),ledger_path+'&offset='+str(len(rows)))
+                assert page['items'] and page['total']==ledger['total']
+                rows.extend(page['items'])
+            assert len(rows)==len(raw_reports)
+            expected=Counter((str(r['operatorUserId']),Decimal(r['quantity']),r['reportTime']) for r in raw_reports)
+            actual=Counter((str(row['operatorUserId']),Decimal(row['quantityDelta']),row['reportTime']) for row in rows)
+            assert expected==actual,'Original operator/time/net quantity multiplicity did not survive'
+            assert len({row['id'] for row in rows})==len(rows)
+            for row in rows:
                 assert row['recordedBy']=='100';report_ids.append(row['id'])
         if len(eids)==1:
             request('deny-start','/api/production/executions/'+eid+'/actions/start','POST',expected=409)

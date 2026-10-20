@@ -17,6 +17,8 @@ import org.junit.jupiter.api.Test;
 import java.util.function.Function;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.LongStream;
+import java.util.ArrayList;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.Mockito.times;
@@ -30,6 +32,48 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 class ReportUserReferenceServiceTest {
+    @Test
+    void bulkHistoricalReferencesDeduplicateAndRemainBoundedWithoutCrossCallCaching() {
+        var directory = mock(BusinessDirectoryService.class);
+        when(directory.historicalUsersExist(any())).thenReturn(true);
+        var service = new ReportUserReferenceService(directory);
+        var ids = new ArrayList<>(LongStream.rangeClosed(1, 201).boxed().toList());
+        ids.addAll(ids.subList(0, 100));
+        service.requireAllExist(ids);
+        service.requireAllExist(List.of(1L));
+        verify(directory).historicalUsersExist(LongStream.rangeClosed(1, 200).boxed().toList());
+        verify(directory).historicalUsersExist(List.of(201L));
+        verify(directory).historicalUsersExist(List.of(1L));
+        when(directory.historicalUsersExist(List.of(9L))).thenReturn(false);
+        assertThrows(FoundationException.class, () -> service.requireAllExist(List.of(9L)));
+    }
+
+    @Test
+    void bulkHistoricalReferencesKeepForeignTransactionWindowAndIgnoreCurrentStatus() {
+        var injected = mock(SysUserMapper.class);
+        var independent = mock(SysUserMapper.class);
+        var center = mock(PlatformPersistence.class);
+        var tx = mock(OwnedTransactionManager.class);
+        var session = mock(OwnedSqlSession.class);
+        when(center.transactionManager()).thenReturn(tx);
+        when(tx.foreignTransactionActive()).thenReturn(true);
+        when(session.mapper(SysUserMapper.class)).thenReturn(independent);
+        var deleted = new SysUser();
+        deleted.setUserId(7L);
+        deleted.setStatus("1");
+        deleted.setDelFlag("2");
+        when(independent.selectUserReferencesByIds(List.of(7L))).thenReturn(List.of(deleted));
+        when(center.readOnly(any())).thenAnswer(call -> {
+            Function<OwnedSqlSession, Object> read = call.getArgument(0);
+            return read.apply(session);
+        });
+        var service = new ReportUserReferenceService(directory(injected, center));
+        service.requireAllExist(List.of(7L, 7L));
+        assertThrows(FoundationException.class, () -> service.requireAllExist(List.of(8L)));
+        verify(center, times(2)).readOnly(any());
+        verifyNoInteractions(injected);
+    }
+
     private BusinessDirectoryService directory(SysUserMapper users, PlatformPersistence center) {
         return new BusinessDirectoryService(users, mock(SysDeptMapper.class), mock(SysPostMapper.class), mock(DetailEntityCache.class),
                 mock(BusinessCacheProcessor.class), center, mock(ObjectProvider.class), mock(ObjectProvider.class), mock(ObjectProvider.class));

@@ -131,3 +131,36 @@ HTTP Fixture覆盖：扫码格式/无身份/无权限/缺Factory、同ID两库�
 正式入口现已接通“身份→实际路径→人员资格→数量→REPORT→必要开工状态”，不是V1管理员界面的复制。Quality/ProductionDefect由并行任务维护，本轮不申报不良、不扣减质量、不改qualityIntegrated=false预留规则。MaterialIssue只复用既有成功确认与正式开工契约，不实现ERP出库；Receipt、自动完工/入库、绩效工时、APS、第二套人员或数量模型均未开发。
 
 当前交付为授权隔离开发环境的最小正式报工V2 GO。生产启用前由使用方为实际工人配置独立submit权限、对应工序能力和派工；本轮不扩大既有生产角色授权，不宣称已部署到真实生产环境。
+
+## 2026-10-20：报工入口填充与输入框审查
+
+本节是当前源码与现有5173页面只读审查；保留前文历史验收结论。本轮不修改业务代码、配置或数据，不执行报工POST，不将当前已选TEST_DEV_PERF_20261019观察冒充SIMPLE_B验收。
+
+### 填充契约
+
+1. 顶部定位框应输入`EXE:{执行数据库主键ID}`或已绑定完整MES1码；后端ProductionIdentityService还兼容唯一绑定的“材料品号#批次”。多绑定明确拒绝。工单号、裸ID、列表业务executionNo（如LEGACY_*、EXE-1135）不能直接填入。当前placeholder“EXE:执行编号”混淆了executionId和executionNo，属于P2入口契约文案缺陷。
+2. GET /api/production/reporting/context → ProductionReportSubmitService.context → ProductionIdentityService + ProductionQuantityService + ExecutionPathService + ReportOperatorEligibilityService，填充执行号/状态、所属工单、产品、执行targetQty、实际工艺版本/路径、节点输入/累计报工/质量/剩余可报与当前用户资格；targetQty不是工单总计划量或已确认投产量。节点只有AVAILABLE才可选择；默认只显示AVAILABLE，其他节点可通过开关查看原因。
+3. 工序和本次完成数量均由人选填，没有自动选首工序或自动填剩余量。reportQty为本工序本次加工完成总量，包含不良；质量另记，不是累计量、合格量、材料量或成品入库量。当前前后端接受正数、14位整数和最多6位小数。
+4. POST提交executionId/routingNodeId/reportQty/workstationId:null/requestId。操作者和录入者取服务端当前sys_user，时间取服务端；页面不让用户代填人员。本入口追加正式REPORT，必要时复用正式开工校验，不自动完工或入库。
+
+### 本次捕获的步骤与问题
+
+- 步骤1（投产初始）：可进入，宽度有问题。见[投产契约复核](../development/production-input.md)。
+- 步骤2（报工初始）：可进入，输入框约208px而查询按钮在整行最右侧，placeholder被截断；44px输入框相对32px标签高度有视觉错位。截图`target/production-entry-audit-20261020/02-production-reporting-audit.png`。
+- 步骤3（只读定位）：输入本次浏览器已有读取记录中出现的EXE:4464，真实请求200，显示业务执行号LEGACY_ea4f18c8003e68611fb5bdb6、工单5100-250601476、产出物料20108024001、目标534.000000和LOCKED实际工艺。执行HISTORICAL，因此无AVAILABLE节点，确认报工禁用。身份和关联填充正常，界面仍裸露HISTORICAL/LOCKED且缺少直接解释“历史执行不能正式报工”。截图`target/production-entry-audit-20261020/03-production-reporting-context-audit.png`。
+
+P2样式原因：全局styles.css:450固定查询控件宽度!important（默认184px、>=1800时208px、1281–1799时160px），覆盖报工index.vue:121的width:100%；form-item flex:1只扩大父项，把按钮推远。全局label高度/行高为32px，本页:118–119仅将控件/按钮提高到44px，导致标签和控件不一致。下方report-form最大640px与顶部约208px也形成明显宽度差。
+
+建议保持单一扫码行，让身份码输入和定位按钮相邻，扫描区使用页面作用域宽度、统一标签/输入/按钮高度；提示明确“执行ID，例如EXE:4464”并提供从执行列表复制身份码的入口，允许扫码与现有执行选择组件并存需另行确认业务设计。支持完整MES1码查看；不要通过改协议或自动猜测同名编号解决文案问题。历史执行直接展示只读原因，减少双空态和仍可编辑的无效数量框。没有进行完整键盘或读屏验收，截图不证明可访问性合规。
+
+### 附带源码风险（未做故障注入）
+
+index.vue:27–39中locate先clear，clear会清空pending；顶部定位框和按钮在pending或busy时未禁用。本页的未知结果仅保存在内存，重新定位/离页可能丢失原UUID和冻结数量，用户后续重新填相同报工可能生成新请求。现有安全重试按钮复用UUID是正确行为，但其上下文退出保护不完整。此结论为静态调用链风险，未在真实服务制造超时或重复报工；修复时应覆盖原请求保存/恢复、重定位和离页边界，不因UI调整绕过。
+
+验证：现有productionInput.test.ts、productionReporting.test.ts共20项通过；未运行全量构建（无代码改动）、未提交报工、未改数据库或服务。捕获保留用户现有DevTools与缩放，未完成1440/1920/1280精确视口及实体扫码枪验证。
+
+### 2026-10-20 后续实施：报工扫码输入框修复
+
+用户指出审查后页面尚未调整，本轮已实际修改`mes-base-ui/src/views/production/productionReporting/index.vue`模板和局部样式：标签“执行身份码”置顶，扫码框640px，按钮紧邻12px且统一44px高度；修正placeholder为EXE:4464示例，说明EXE:后填写执行ID，补充maxlength2048及aria说明关联。页面作用域覆盖公共查询框!important宽度，无全局样式变更。按后续授权，扫码投产也统一此布局。没有修改报工提交、数量精度、权限、原请求或其他业务规则。
+
+浏览器现有5173两页面1280/1440/1920初始扫码区均验证通过：输入640px、间距12px、无页面横向溢出，临时视口恢复。全量67文件404测试通过，生产构建通过。截图位于`/private/tmp/production-reporting-fixed-{1280,1440,1920}.png`及对应投产截图。没有正式报工或新投产；前文未知结果退出恢复风险仍未处理，历史状态文案未扩展。源码/Fixture与初始UI验证不代表正式生产业务重验。回滚范围仅两个页面本轮模板和样式差异。

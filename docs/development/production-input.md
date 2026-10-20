@@ -96,3 +96,33 @@ RUNNING追加不改targetQty、路径、routing_id、开始时间；未确认增
 - 本轮验收配置仅针对 TEST 工单117及TEST批次库存，不是客户生产配置；服务由用户重启加载。
 - 已有普通领料资料没有outputQty时不自动产生投产贡献；需要历史迁移须另立可审查任务与可信来源。
 - Quality/Receipt原有准入继续生效；生产交接不代表库存入库，不实现ERP5901/5A00或多材料装配。
+
+## 2026-10-20：投产与报工入口填充契约复核（只审查）
+
+本节基于当前源码及5173真实浏览器只读观察。旧章节的YAML模式入口、候选100条等历史描述不作为当前规则：当前模式复用FactoryIntegration权威配置；候选已经分页；本地用料优先mes_workorder_material，只有缺数据库用料行时才有仍保留的历史配置兼容。没有修改代码、配置、数据库或服务。
+
+### 1. 扫码投产应填写什么
+
+- 扫码框接受精确的“材料品号#材料批次”，例如`RM001#LOT001`（仅格式示意，不是本次真实库存），或系统产生的完整MES1生产身份码；不接受工单号、单独材料品号、EXE执行码。材料品号及批次按原值匹配，不自动去空格或规范化。
+- MES1由产出品号、材料品号、批次的UTF-8 base64url无padding组成；应使用系统生成码，不由操作员手工拼编码。
+- GET /api/production/input → ProductionInputSupplyService → 当前模式对应供料源。LOCAL由LocalProductionSupply读取启用物料/单位、批次库存、启用LOCAL仓库及已下达LOCAL工单；用料、单位和允许仓库须匹配。EXTERNAL候选由当前绑定适配器提供并校验来源；本轮未调用ERP。
+- 工单候选只有总数1时自动选中；多张必须手选。库存来源不自动取首条，必须明确选仓库/批次/库位；outputQty由人填“本次预计成品产出量”，不是材料领用量。
+- GET calculate按`材料总需求 × 本次预计产出 / 工单计划量`计算材料领用量，四舍五入至6位小数。服务端返回calculationKey；页面不能手填或覆盖issueQty。
+- 首次身份无绑定时人工选择相邻工序组成完整路径；已有绑定时显示原执行的确切版本和锁定路径。
+- POST携带requestId/code/workorderId/stockReference/outputQty/routingId/routingNodeIds/inputKind/calculationKey；正式确认可能创建执行、永久生产身份绑定、领料主子单、冻结投产事实并扣库存，不是只保存表单。未知结果保存原请求，不能新建替代请求。
+
+### 2. 现场界面证据
+
+步骤1：进入扫码投产，入口可访问，但输入框窄且placeholder截断，按钮远离输入框。截图：`target/production-entry-audit-20261020/01-production-input-audit.png`。
+
+原因是UI全局styles.css `.filter-panel .el-input`的184px!important，>=1800时208px!important及1281–1799时160px!important，覆盖本页width:100%。父form-item flex:1只扩大空白，不扩大输入框。建议将扫码入口按独立扫描任务排版，在页面作用域解决固定宽度覆盖；保留真实协议和权限，不直接全局放宽全部查询框。
+
+### 3. 证据边界
+
+当前浏览器选中TEST_DEV_PERF_20261019，保留其已有DevTools和缩放状态；没有改厂、没有连接数据库、没有构造库存/工单数据或正式提交。本轮投产只观察初始入口，候选和计算填充来自源码审查与现有Fixture测试；不能称为SIMPLE_B真实投产验收。Node22运行productionInput.test.ts与productionReporting.test.ts共20项通过。报工填充、占位错误及UI原因详见[报工报告2026-10-20追加章节](../reviews/2026-10-16-production-report-v2-implementation-report.md)。截图为本次原生Chrome窗口捕获，已打开保存文件复核；未进行完整键盘、读屏及响应式三档验收。
+
+### 2026-10-20 后续实施：统一扫码输入布局
+
+用户确认后已修改`mes-base-ui/src/views/production/productionInput/index.vue`：标签置顶，扫码输入最大640px、44px高，查询按钮相邻12px，空间不足自然换行；页面作用域覆盖公共!important固定宽度，未修改全局查询栏。增加材料品号#批次的格式示例和MES1完整码说明、aria标签/说明关联。候选、数量、路径、幂等恢复、权限和请求协议不变。报工页同步采用相同布局。
+
+现有5173浏览器两页面在1280/1440/1920下扫码框均640px、按钮间距12px，documentWidth与视口相等；临时视口已恢复。截图保存`/private/tmp/production-input-fixed-{1280,1440,1920}.png`及对应`production-reporting-fixed-*`，覆盖初始扫码区域。Node22全量67文件404测试通过，生产构建通过（保留已有deep选择器和包体积提示）。未发送投产/报工POST、未重启服务；未验证实际扫码枪、真实新投产及本轮未处理的报工未知结果退出恢复风险。回滚只需撤销两个页面本次template/style差异，不回滚同工作区其他修改。

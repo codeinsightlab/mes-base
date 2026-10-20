@@ -11,6 +11,10 @@ import dev.mesbase.business.shared.enums.BusinessSource;
 import dev.mesbase.business.basic.domain.MaterialType;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.JsonNode;
+import dev.mesbase.business.legacy.domain.LegacyHistory.MappingIdentity;
+import java.util.ArrayList;
+import java.util.HashSet;
 import dev.mesbase.business.basic.dao.MaterialMapper;
 import dev.mesbase.business.basic.dao.UnitMeasureMapper;
 import dev.mesbase.business.basic.domain.MaterialEntity;
@@ -35,6 +39,7 @@ import dev.mesbase.business.production.dao.WorkorderMapper;
 import dev.mesbase.business.production.domain.MesExecutionPathEntity;
 import dev.mesbase.business.production.domain.MesExecutionPathNodeEntity;
 import dev.mesbase.business.production.domain.MesProductionExecutionEntity;
+import dev.mesbase.business.production.domain.MesProductionExecutionExample;
 import dev.mesbase.business.production.domain.MesProductionReportEntity;
 import dev.mesbase.business.production.domain.OperationEntity;
 import dev.mesbase.business.production.domain.OperationExample;
@@ -77,6 +82,8 @@ import org.springframework.transaction.annotation.Transactional;
 @ConditionalOnProperty(name = "mes.business.enabled", havingValue = "true")
 public class LegacyHistoryImportService {
     private static final String RULE = "report-driven-local-v2";
+    private static final int BATCH_SIZE = 128;
+    private static final int MAPPING_PAYLOAD_BYTES = 512 * 1024;
     private final LegacyMigrationMapper metadata;
     private final WorkorderMapper orders;
     private final UnitMeasureMapper units;
@@ -179,7 +186,9 @@ public class LegacyHistoryImportService {
         var existing = metadata.find(key("WORKORDER", c.code()));
         if (existing != null) {
             var order = requireExistingOrder(c, existing);
-            boolean allMapped = c.executions().stream().allMatch(e -> mappedExecution(c, e, existing.id()));
+            var replay = replayMappings(c);
+            boolean allMapped = c.executions().stream()
+                    .allMatch(e -> mappedExecution(c, e, existing.id(), order.getId(), replay));
             if (LegacyBatchStatus.COMPLETED.getValue().equals(batch.status())) {
                 if (!allMapped) conflict();
                 return order.getId();
@@ -209,7 +218,7 @@ public class LegacyHistoryImportService {
                 map(c.batchId(), key("APPEND_AUTHORIZATION", c.batchId() + "/" + existing.id()), existing.id(),
                         "APPEND_AUTHORIZATION", c.batchId() + "/" + existing.id(), c.sourceHash(), "APPEND_AUTHORIZATION", order.getId(),
                         c.sourcePayload(), encode(new AppendAuthorization(hash(encode(c)))));
-                appendExecutions(c, order, targetNodes, existing.id());
+                appendExecutions(c, order, targetNodes, existing.id(), replay);
             }
             changed(metadata.transition(batch.id(), LegacyBatchStatus.RUNNING.getValue(), LegacyBatchStatus.COMPLETED.getValue(), LegacyBatchStatus.COMPLETED.getValue()));
             return order.getId();
@@ -277,7 +286,7 @@ public class LegacyHistoryImportService {
         String orderKey = key("WORKORDER", c.code());
         map(c.batchId(), orderKey, null, "WORKORDER", c.code(), c.sourceHash(), "WORKORDER", order.getId(), c.sourcePayload(), "{}");
         map(c.batchId(), key("ROUTING", c.code()), orderKey, "ROUTING", c.code(), c.sourceHash(), "ROUTING", routing.getId(), c.sourcePayload(), "{}");
-        appendExecutions(c, order, targetNodes, orderKey);
+        appendExecutions(c, order, targetNodes, orderKey, new ReplayState(Map.of(), Map.of()));
         changed(metadata.transition(batch.id(), LegacyBatchStatus.RUNNING.getValue(), LegacyBatchStatus.COMPLETED.getValue(), LegacyBatchStatus.COMPLETED.getValue()));
         return order.getId();
     }
@@ -312,17 +321,18 @@ public class LegacyHistoryImportService {
         return order;
     }
 
-    private boolean mappedExecution(LegacyImportCommand c, LegacyImportCommand.Execution e, String orderKey) {
-        var mapped = metadata.find(key("EXECUTION", e.sourceKey()));
+    private boolean mappedExecution(LegacyImportCommand c, LegacyImportCommand.Execution e, String orderKey,
+                                    Long orderId,
+                                    ReplayState replay) {
+        var mapped = replay.mappings().get(key("EXECUTION", e.sourceKey()));
         if (mapped == null) return false;
         if (!mapped.sourceHash().equals(e.sourceHash()) || !mapped.ruleVersion().equals(RULE)
                 || !orderKey.equals(mapped.parentId())) conflict();
-        var row = executions.selectByPrimaryKey(mapped.entityId());
-        var order = metadata.find(orderKey);
-        if (row == null || order == null || !row.getWorkorderId().equals(order.entityId())
+        var row = replay.executions().get(mapped.entityId());
+        if (row == null || !row.getWorkorderId().equals(orderId)
                 || !ProductionExecutionStatus.HISTORICAL.getValue().equals(row.getStatus())) conflict();
         for (var r : e.reports()) {
-            var report = metadata.find(key("pro_reporting_work", r.sourceId()));
+            var report = replay.mappings().get(key("pro_reporting_work", r.sourceId()));
             if (report == null || !report.sourceHash().equals(r.sourceHash()) || !RULE.equals(report.ruleVersion())
                     || !key("NODE", e.sourceKey() + "/" + r.processId()).equals(report.parentId())) conflict();
         }
@@ -330,9 +340,12 @@ public class LegacyHistoryImportService {
     }
 
     private void appendExecutions(LegacyImportCommand c, WorkorderEntity order, Map<String, Long> targetNodes,
-                                  String orderKey) {
-        for (var e : c.executions()) {
-            if (mappedExecution(c, e, orderKey)) continue;
+                                  String orderKey, ReplayState replay) {
+        var pending = c.executions().stream().filter(e -> !mappedExecution(c, e, orderKey, order.getId(), replay))
+                .toList();
+        users.requireAllExist(pending.stream().flatMap(e -> e.reports().stream())
+                .map(LegacyImportCommand.Report::operatorUserId).toList());
+        for (var e : pending) {
             if (!e.nodes().stream().allMatch(n -> targetNodes.containsKey(n.processId()))) conflict();
             var execution = new MesProductionExecutionEntity();
             execution.setWorkorderId(order.getId());
@@ -358,39 +371,58 @@ public class LegacyHistoryImportService {
             map(c.batchId(), executionKey, orderKey, "EXECUTION", e.sourceKey(), e.sourceHash(), "EXECUTION",
                     execution.getId(), e.sourcePayload(), encode(new ExecutionEvidence(e.inputQty(), "LEGACY_MATERIAL_EVIDENCE")));
             int sequence = 0;
+            var nodeMappings = new ArrayList<Mapping>();
+            var choices = new ArrayList<MesExecutionPathNodeEntity>();
             for (var n : e.nodes()) {
                 Long nodeId = targetNodes.get(n.processId());
                 var choice = new MesExecutionPathNodeEntity();
                 choice.setExecutionId(execution.getId());
                 choice.setRoutingNodeId(nodeId);
                 choice.setSequenceNo(++sequence);
-                changed(selected.insert(choice));
+                choices.add(choice);
                 String nodeKey = key("NODE", e.sourceKey() + "/" + n.processId());
-                map(c.batchId(), nodeKey, executionKey, "NODE", e.sourceKey() + "/" + n.processId(), hash(n.evidence()),
-                        "NODE", nodeId, n.evidence(), encode(n));
+                nodeMappings.add(mapping(c.batchId(), nodeKey, executionKey, "NODE", e.sourceKey() + "/" + n.processId(), hash(n.evidence()),
+                        "NODE", nodeId, n.evidence(), encode(n)));
             }
-            for (var r : e.reports()) {
-                users.requireExists(r.operatorUserId());
-                var report = new MesProductionReportEntity();
-                report.setExecutionId(execution.getId());
-                report.setRoutingNodeId(targetNodes.get(r.processId()));
-                report.setRecordType(ReportRecordType.REPORT.getValue());
-                report.setQuantityDelta(r.quantity());
-                report.setOperatorUserId(r.operatorUserId());
-                report.setRecordedBy(SecurityUtils.getUserId());
-                report.setReportTime(r.reportTime());
-                report.setCreateTime(LocalDateTime.now());
-                report.setReason("历史净报工；工序总加工量另有可追溯聚合证据");
-                report.setRequestId(UUID.nameUUIDFromBytes(key("pro_reporting_work", r.sourceId()).getBytes(StandardCharsets.UTF_8))
-                        .toString());
-                report.setCommandFingerprint(r.sourceHash());
-                changed(reports.insert(report));
-                map(c.batchId(), key("pro_reporting_work", r.sourceId()), key("NODE", e.sourceKey() + "/" + r.processId()),
-                        "pro_reporting_work", r.sourceId(), r.sourceHash(), "REPORT", report.getId(), r.sourcePayload(), "{}");
+            if (selected.insertBatch(choices) != choices.size()) conflict();
+            insertMappings(nodeMappings);
+            for (int from = 0; from < e.reports().size(); from += BATCH_SIZE) {
+                var sourceReports = e.reports().subList(from, Math.min(from + BATCH_SIZE, e.reports().size()));
+                var reportRows = new ArrayList<MesProductionReportEntity>();
+                for (var r : sourceReports) {
+                    var report = new MesProductionReportEntity();
+                    report.setExecutionId(execution.getId());
+                    report.setRoutingNodeId(targetNodes.get(r.processId()));
+                    report.setRecordType(ReportRecordType.REPORT.getValue());
+                    report.setQuantityDelta(r.quantity());
+                    report.setOperatorUserId(r.operatorUserId());
+                    report.setRecordedBy(SecurityUtils.getUserId());
+                    report.setReportTime(r.reportTime());
+                    report.setCreateTime(LocalDateTime.now());
+                    report.setReason("历史净报工；工序总加工量另有可追溯聚合证据");
+                    report.setRequestId(UUID.nameUUIDFromBytes(key("pro_reporting_work", r.sourceId()).getBytes(StandardCharsets.UTF_8))
+                            .toString());
+                    report.setCommandFingerprint(r.sourceHash());
+                    reportRows.add(report);
+                }
+                if (reports.insertBatch(reportRows) != reportRows.size()
+                        || reportRows.stream().anyMatch(r -> r.getId() == null)
+                        || reportRows.stream().map(MesProductionReportEntity::getId).distinct()
+                        .count() != reportRows.size()) conflict();
+                var reportMappings = new ArrayList<Mapping>();
+                for (int i = 0; i < sourceReports.size(); i++) {
+                    var r = sourceReports.get(i);
+                    reportMappings.add(mapping(c.batchId(), key("pro_reporting_work", r.sourceId()), key("NODE", e.sourceKey() + "/" + r.processId()),
+                            "pro_reporting_work", r.sourceId(), r.sourceHash(), "REPORT", reportRows.get(i)
+                                    .getId(), r.sourcePayload(), "{}"));
+                }
+                insertMappings(reportMappings);
             }
+            var qualityMappings = new ArrayList<Mapping>();
             for (var q : e.defects())
-                map(c.batchId(), key("qc_defective", q.sourceId()), executionKey,
-                        "qc_defective", q.sourceId(), q.sourceHash(), "QUALITY_EVIDENCE", null, q.sourcePayload(), "{}");
+                qualityMappings.add(mapping(c.batchId(), key("qc_defective", q.sourceId()), executionKey,
+                        "qc_defective", q.sourceId(), q.sourceHash(), "QUALITY_EVIDENCE", null, q.sourcePayload(), "{}"));
+            insertMappings(qualityMappings);
             var projected = quantities.getExecutionQuantities(execution.getId());
             if (!projected.historical() || projected.writable() || projected.nodes().size() != e.nodes().size())
                 conflict();
@@ -487,15 +519,17 @@ public class LegacyHistoryImportService {
             var source = json.readTree(c.sourcePayload());
             if (!hash(c.sourcePayload()).equals(c.sourceHash()) || !source.path("code").asText().equals(c.code()))
                 conflict();
+            var sourceExecutions = new HashSet<JsonNode>();
+            for (var original : source.path("executions")) sourceExecutions.add(original);
             for (var e : c.executions()) {
                 var frozen = json.readTree(e.sourcePayload());
                 if (!hash(e.sourcePayload()).equals(e.sourceHash()) || !encode(frozen.path("key")).equals(e.sourceKey())
                         || !frozen.path("key").get(0).asText().equals(c.code())
                         || new BigDecimal(frozen.path("input_qty_candidate").asText()).compareTo(e.inputQty()) != 0)
                     conflict();
-                boolean belongs = false;
-                for (var original : source.path("executions")) if (original.equals(frozen)) belongs = true;
-                if (!belongs) conflict();
+                if (!sourceExecutions.contains(frozen)) conflict();
+                var sourceReports = new HashSet<JsonNode>();
+                for (var original : frozen.path("reports")) sourceReports.add(original.path("raw"));
                 for (var r : e.reports()) {
                     var raw = json.readTree(r.sourcePayload()).path("report");
                     if (!hash(encode(raw)).equals(r.sourceHash()) || !raw.path("record_id").asText()
@@ -505,9 +539,7 @@ public class LegacyHistoryImportService {
                             || new BigDecimal(raw.path("reporting_work_quantity").asText()).compareTo(r.quantity()) != 0
                             || !LocalDateTime.parse(raw.path("create_time").asText().replace(' ', 'T'))
                             .equals(r.reportTime())) conflict();
-                    boolean present = false;
-                    for (var original : frozen.path("reports")) if (original.path("raw").equals(raw)) present = true;
-                    if (!present) conflict();
+                    if (!sourceReports.contains(raw)) conflict();
                 }
                 if (frozen.path("reports").size() != e.reports().size()) conflict();
             }
@@ -550,7 +582,55 @@ public class LegacyHistoryImportService {
 
     private void map(String batch, String id, String parent, String table, String pk, String sourceHash,
                      String kind, Long target, String raw, String conversion) {
-        changed(metadata.insert(new Mapping(id, batch, parent, table, pk, sourceHash, RULE, kind, target, raw, conversion, LocalDateTime.now())));
+        changed(metadata.insert(mapping(batch, id, parent, table, pk, sourceHash, kind, target, raw, conversion)));
+    }
+
+    private Mapping mapping(String batch, String id, String parent, String table, String pk, String sourceHash,
+                            String kind, Long target, String raw, String conversion) {
+        return new Mapping(id, batch, parent, table, pk, sourceHash, RULE, kind, target, raw, conversion, LocalDateTime.now());
+    }
+
+    private void insertMappings(List<Mapping> rows) {
+        for (int from = 0; from < rows.size(); ) {
+            int to = from;
+            int bytes = 0;
+            while (to < rows.size() && to - from < BATCH_SIZE) {
+                var row = rows.get(to);
+                int size = row.sourcePayload().getBytes(StandardCharsets.UTF_8).length
+                        + row.conversionPayload().getBytes(StandardCharsets.UTF_8).length;
+                if (to > from && bytes + size > MAPPING_PAYLOAD_BYTES) break;
+                bytes += size;
+                to++;
+            }
+            if (metadata.insertBatch(rows.subList(from, to)) != to - from) conflict();
+            from = to;
+        }
+    }
+
+    private ReplayState replayMappings(LegacyImportCommand c) {
+        var keys = new TreeSet<String>();
+        for (var e : c.executions()) {
+            keys.add(key("EXECUTION", e.sourceKey()));
+            for (var r : e.reports()) keys.add(key("pro_reporting_work", r.sourceId()));
+        }
+        var ids = new ArrayList<>(keys);
+        var result = new LinkedHashMap<String, MappingIdentity>();
+        for (int from = 0; from < ids.size(); from += BATCH_SIZE)
+            for (var row : metadata.findIdentities(ids.subList(from, Math.min(from + BATCH_SIZE, ids.size()))))
+                result.put(row.id(), row);
+        var executionIds = c.executions().stream().map(e -> result.get(key("EXECUTION", e.sourceKey())))
+                .filter(Objects::nonNull).map(MappingIdentity::entityId).filter(Objects::nonNull).distinct().toList();
+        var rows = new LinkedHashMap<Long, MesProductionExecutionEntity>();
+        for (int from = 0; from < executionIds.size(); from += BATCH_SIZE) {
+            var f = new MesProductionExecutionExample();
+            f.createCriteria().andIdIn(executionIds.subList(from, Math.min(from + BATCH_SIZE, executionIds.size())));
+            for (var row : executions.selectByExample(f)) rows.put(row.getId(), row);
+        }
+        return new ReplayState(result, rows);
+    }
+
+    private record ReplayState(Map<String, MappingIdentity> mappings,
+                               Map<Long, MesProductionExecutionEntity> executions) {
     }
 
     private String key(String table, String pk) {

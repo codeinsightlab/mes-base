@@ -26,6 +26,7 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.LinkedHashMap;
 import java.util.function.Function;
+import java.util.stream.Collectors;
 
 import dev.mesbase.common.cache.DetailEntityCache;
 import dev.mesbase.business.directory.domain.DirectoryLabel;
@@ -170,6 +171,21 @@ public class BusinessDirectoryService {
         if (center.transactionManager().foreignTransactionActive())
             return center.readOnly(session -> session.mapper(SysUserMapper.class).selectUserById(id) != null);
         return users.selectUserById(id) != null;
+    }
+
+    /**
+     * Uncached bounded historical identity check, including disabled/deleted accounts.
+     */
+    public boolean historicalUsersExist(Collection<Long> ids) {
+        validateIds(ids);
+        if (ids.stream().anyMatch(Objects::isNull)) return false;
+        var distinct = ids.stream().distinct().toList();
+        if (distinct.isEmpty()) return true;
+        Function<SysUserMapper, Boolean> query = mapper -> mapper.selectUserReferencesByIds(distinct).stream()
+                .map(SysUser::getUserId).collect(Collectors.toSet()).containsAll(distinct);
+        if (center.transactionManager().foreignTransactionActive())
+            return center.readOnly(session -> query.apply(session.mapper(SysUserMapper.class)));
+        return query.apply(users);
     }
 
     public DirectoryLabel userLabel(Long id) {

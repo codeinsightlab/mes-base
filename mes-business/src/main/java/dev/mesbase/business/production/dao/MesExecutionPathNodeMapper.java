@@ -1,10 +1,10 @@
-// MES-CODEGEN: MyBatis Generator standard single-table persistence.
 package dev.mesbase.business.production.dao;
 
 import dev.mesbase.business.production.domain.MesExecutionPathNodeEntity;
 import dev.mesbase.business.production.domain.MesExecutionPathNodeExample;
 import java.util.List;
 import org.apache.ibatis.annotations.Param;
+import org.apache.ibatis.annotations.Insert;
 
 public interface MesExecutionPathNodeMapper {
     long countByExample(MesExecutionPathNodeExample example);
@@ -14,6 +14,11 @@ public interface MesExecutionPathNodeMapper {
     int deleteByPrimaryKey(Long id);
 
     int insert(MesExecutionPathNodeEntity row);
+
+    @Insert({"<script>INSERT INTO mes_execution_path_node(execution_id,routing_node_id,sequence_no) VALUES ",
+            "<foreach collection='rows' item='r' separator=','>",
+            "(#{r.executionId},#{r.routingNodeId},#{r.sequenceNo})</foreach></script>"})
+    int insertBatch(@Param("rows") List<MesExecutionPathNodeEntity> rows);
 
     int insertSelective(MesExecutionPathNodeEntity row);
 
