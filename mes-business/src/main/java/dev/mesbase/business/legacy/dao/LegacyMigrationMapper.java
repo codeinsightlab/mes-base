@@ -90,19 +90,26 @@ public interface LegacyMigrationMapper {
             "<foreach collection='ids' item='id' open='(' separator=',' close=')'>#{id}</foreach></script>"})
     List<Input> inputs(@Param("ids") List<Long> ids);
 
-    @Select("SELECT n.entity_id routing_node_id,"
+    @Select("<script><bind name=\"completed\" value=\"@dev.mesbase.business.legacy.domain.LegacyBatchStatus@COMPLETED.getValue()\"/>SELECT n.entity_id routing_node_id,"
             + "CAST(JSON_UNQUOTE(JSON_EXTRACT(n.conversion_payload,'$.legacyNet')) AS DECIMAL(20,6)) legacy_net,"
-            + "CAST(JSON_UNQUOTE(JSON_EXTRACT(n.conversion_payload,'$.grossCorrection')) AS DECIMAL(20,6)) gross_correction,"
-            + "CAST(JSON_UNQUOTE(JSON_EXTRACT(n.conversion_payload,'$.effectiveDefect')) AS DECIMAL(20,6)) effective_defect,"
+            + "CASE WHEN b.status=#{completed} THEN CAST(JSON_UNQUOTE(JSON_EXTRACT(c.conversion_payload,'$.grossDelta')) AS DECIMAL(20,6)) ELSE CAST(JSON_UNQUOTE(JSON_EXTRACT(n.conversion_payload,'$.grossCorrection')) AS DECIMAL(20,6)) END gross_correction,"
+            + "CASE WHEN b.status=#{completed} THEN 0 ELSE CAST(JSON_UNQUOTE(JSON_EXTRACT(n.conversion_payload,'$.effectiveDefect')) AS DECIMAL(20,6)) END effective_defect,"
             + "n.conversion_payload evidence FROM mes_legacy_source_mapping n JOIN mes_legacy_source_mapping e "
-            + "ON e.id=n.parent_id WHERE e.entity_kind='EXECUTION' AND e.entity_id=#{id} AND n.entity_kind='NODE'")
+            + "ON e.id=n.parent_id "
+            + "LEFT JOIN mes_legacy_source_mapping c ON c.id=SHA2(CONCAT('legacy-quality-formal-v1:',n.id),256) AND c.parent_id=n.id AND c.entity_kind='NODE_QUALITY_CONVERSION' "
+            + "AND c.rule_version='legacy-quality-formal-v1' AND c.source_hash=n.source_hash "
+            + "LEFT JOIN mes_legacy_migration_batch b ON b.id=c.batch_id AND b.rule_version=c.rule_version AND JSON_CONTAINS(b.approved_scope,JSON_QUOTE(c.id)) "
+            + "WHERE e.entity_kind='EXECUTION' AND e.entity_id=#{id} AND n.entity_kind='NODE'</script>")
     List<Node> nodes(@Param("id") Long executionId);
 
-    @Select({"<script>SELECT e.entity_id execution_id,n.entity_id routing_node_id,",
+    @Select({"<script><bind name=\"completed\" value=\"@dev.mesbase.business.legacy.domain.LegacyBatchStatus@COMPLETED.getValue()\"/>SELECT e.entity_id execution_id,n.entity_id routing_node_id,",
             "CAST(JSON_UNQUOTE(JSON_EXTRACT(n.conversion_payload,'$.legacyNet')) AS DECIMAL(20,6)) legacy_net,",
-            "CAST(JSON_UNQUOTE(JSON_EXTRACT(n.conversion_payload,'$.grossCorrection')) AS DECIMAL(20,6)) gross_correction,",
-            "CAST(JSON_UNQUOTE(JSON_EXTRACT(n.conversion_payload,'$.effectiveDefect')) AS DECIMAL(20,6)) effective_defect ",
+            "CASE WHEN b.status=#{completed} THEN CAST(JSON_UNQUOTE(JSON_EXTRACT(c.conversion_payload,'$.grossDelta')) AS DECIMAL(20,6)) ELSE CAST(JSON_UNQUOTE(JSON_EXTRACT(n.conversion_payload,'$.grossCorrection')) AS DECIMAL(20,6)) END gross_correction,",
+            "CASE WHEN b.status=#{completed} THEN 0 ELSE CAST(JSON_UNQUOTE(JSON_EXTRACT(n.conversion_payload,'$.effectiveDefect')) AS DECIMAL(20,6)) END effective_defect ",
             "FROM mes_legacy_source_mapping n JOIN mes_legacy_source_mapping e ON e.id=n.parent_id ",
+            "LEFT JOIN mes_legacy_source_mapping c ON c.id=SHA2(CONCAT('legacy-quality-formal-v1:',n.id),256) AND c.parent_id=n.id AND c.entity_kind='NODE_QUALITY_CONVERSION' ",
+            "AND c.rule_version='legacy-quality-formal-v1' AND c.source_hash=n.source_hash ",
+            "LEFT JOIN mes_legacy_migration_batch b ON b.id=c.batch_id AND b.rule_version=c.rule_version AND JSON_CONTAINS(b.approved_scope,JSON_QUOTE(c.id)) ",
             "WHERE e.entity_kind='EXECUTION' AND n.entity_kind='NODE' AND e.entity_id IN ",
             "<foreach collection='ids' item='id' open='(' separator=',' close=')'>#{id}</foreach></script>"})
     List<ExecutionNode> nodesBatch(@Param("ids") List<Long> executionIds);

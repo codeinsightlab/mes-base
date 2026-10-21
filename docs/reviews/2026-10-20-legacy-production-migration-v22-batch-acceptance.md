@@ -348,3 +348,50 @@ ProductionQuantityService将“历史只读状态”和“导入期初数量依�
 最终验证补充：`verify-delivery.log`标准全量verify通过（合计810项、47项按既有环境门禁跳过，零失败/错误）；`verify-final-flow.log`补充12项verify通过，其中新场景在期初投入100、期初损耗10、末道已有80时，确认不能提前完工，再经正式报工HTTP追加10，真实提交后事件自动完成执行及父工单，最终产出90且库存动作仍0。打包smoke10项通过。原有有投入/报工执行目标从10降到6的旧测试已更新为拒绝，不为维持旧断言放松额度保护。新的有效分配及未决投入SQL已在实际目标只读执行，未决投入使用idx_input_execution及领料主键关联。
 
 回滚后另将当前全部566张历史工单与8380个历史执行重新导出，与原备份的INSERT行按完整字段进行SHA-256比较，结果完全相同（`rollback-full-row-verification.json`），没有额外保存第二份全量导出。正式批次的566个工单ID及来源哈希已冻结到`scope.json`及`scope.sha256`；TEST ONLY运维启动器校验冻结摘要和来源身份，禁止静默扩大范围。激活用例复用现有Factory范围执行缓存失效协议，提交后清理执行列表及详情，回滚不发布失效，不清理其他工厂或权限缓存。尚未批量转态的部署边界保持不变。
+
+
+### 同日正式执行完成：批量接入执行中，完工交回系统
+
+本节更新前述“尚未批量转态”的时间点结论。用户已确认重新加载最终后端。首次重启与最后打包时间交叠，Agent过早提示重启，随后明确说明并由用户再次重启；第二次确认后8081真实登录及数量读取成功。最终JAR固定于2026-10-21 11:00:50，SHA-256为`103031f52c5cee39d20b39c1a4ac356d07d38187345dce5235a51bb08a2fcd11`，执行结束再次校验相同；Agent没有启动、停止或重启用户服务。
+
+最初运维启动器在激活后串行逐执行检查完工，已激活60张工单、919个执行，其中917个完工、2个因数量未闭合保留RUNNING。用户随后明确要求只把历史对象接入执行中，让系统自行处理。原做法把批量接入和逐执行完工核算串在同一长任务中，是本轮等待过长的直接路径；本次没有完成SQL级耗时剖析，不能据此宣称已定位所有慢查询。按用户最新要求，仅对本轮拥有的workorder-completion运行令牌条件终止，旧执行器失去执行权后退出；未停止用户服务。随后正常调度已取得新令牌并成功检查181个候选，未被原任务永久占锁。
+
+剩余506张工单、7461个执行采用集合式读取及按父单事务批量接入：预检冻结身份、路径、期初投入和工单额度，保存与正式服务同契约的不可变激活关联，经V45门禁将父单HISTORICAL→RELEASED、执行HISTORICAL→RUNNING，完成审核批次。先对13个执行实际回滚探针，再提交全部剩余对象。该运维批次不逐执行强制核算完工、不伪造完成事实；已COMPLETED的对象未降回RUNNING。后续正常报工事件及10分钟补偿调度继续使用系统正式完工链路，不再由Agent追加全量串行扫描。
+
+最终真实DEV审计快照：566张工单全部接入，其中RELEASED 509、COMPLETED 57；8380个执行全部接入，其中RUNNING 7463、COMPLETED 917，范围内HISTORICAL为0。ORDER_ACTIVATION关联566、PRODUCTION_ACTIVATION关联8380。917个已完成执行各有正式完成事实，已完成缺事实及未完成有事实均为0。这是接入后的审计时点状态，后续系统调度可以继续改变完成数量；RUNNING不表示本轮已判定其数量不闭合。
+
+原报工总数227783、原来源映射247915不变；本范围新增当前领料投入、库存动作及质量放行均为0。wm_inventory、wm_stock_action、mes_material_issue_input、mes_production_report的CHECKSUM分别仍为1808800821、2866375946、3328657690、2455882409，与写入前一致。受影响对象原始全字段备份保留在status-before.sql；新增状态、审计关联及917条完成事实是本轮明确授权的变化，不能把这些变化误称为“全库完全不变”。
+
+批量后仅清理当前Factory的执行列表/详情缓存，generation更新已验证。通过用户现有8081读取末批执行9945：status=RUNNING、historical=false、writable=true，期初投入仍为2400，各节点reportedQty/effectiveOutputQty/defectQty与转态前逐值相同，历史只读阻断原因已清除。两个真实未闭合样本1138和1170仍为RUNNING，之前核算余量分别8和3，未强制标记完成。原样板1107已COMPLETED，父单1109因7200/9600覆盖继续RELEASED。
+
+证据位于`.local/production-activation-20261021/`：bulk-state-probe.json、bulk-state-result.json、final-audit.sql/log、cache-after-bulk.json、http-last-sample-before/after.json及final-http-verification.json。最终接入、真实数据库审计和现有HTTP数量读取已完成；不把本次批量接入描述为全部8380个执行已经完成业务完工，也不宣称已逐一验收所有剩余对象的后续质量处置。临时会话令牌在读取验证结束后删除。
+
+
+### 2026-10-21 补充：实际批号重复清单与不良业务迁移规划
+
+用户要求核对executionNo是否适合展示实际批次，并把LEGACY摘要换为真实批号；随后补充“不合并，输出执行单元重复清单”。本次先交付只读核对清单，尚未修改execution_no、业务代码、状态或质量事实。旧实际批号为pro_reporting_work.xtransfer_no，冻结EXECUTION来源映射的source_pk为[工单编码, xtransfer_no, 来源route_id]。execution_no可用于展示该执行的批号，但不能当作全厂唯一身份或据其合并执行；内部主键及所有事实引用仍为execution_id。
+
+在重新核实的TEST_DEV_PERF_20261019 / 数据源9 revision2 / 192.168.18.25:3306/mes_base_dev_perf_test只读提取全部8380个迁入执行：实际批号3164个，跨执行重复批号2302组，涉及7518个执行；同工单＋批号重复为0，同工单＋批号＋来源工艺重复为0。最大一批号对应14个执行且分属14张工单。因此本清单证明的是跨工单复用批号，不是重复导入。完整汇总及逐执行明细在`.local/execution-batch-review-20261021/执行单元重复批号清单.md`，附执行ID、当前编号、工单、实际批号、工艺版本、状态及目标量；extract.sql、rows.json和summary.json保留只读证据。
+
+真实目标库的mes_legacy_source_mapping已有12078条entity_kind=QUALITY_EVIDENCE记录，source_table=qc_defective，source_pk为原record_id，source_payload保留原始数量、类型、原因、时间、批号、发现/责任工序及退废引用，parent_id指向对应EXECUTION映射，entity_id为空，conversion_payload目前为空对象。这些属于不可变来源证据，不是mes_production_defect正式申报。导入写入位置为LegacyHistoryImportService.appendExecutions；正常不良页面查询正式账本，不会自动展示这些来源JSON。不能把本批12078与更早来源全库17297直接比较为丢失，范围尚须按来源主键集合核对。
+
+下一步不良迁移计划（尚未实施）：
+
+1. 以这12078条来源主键和hash冻结范围，批量关联执行/发现节点/责任节点/人员/材料单位，输出可迁、缺字段、冲突及来源范围外清单；保留旧单号、发生时间及原始状态，不凭旧status=1认定Base质量处置或ERP现状。
+2. 逐执行节点核对旧物料不良到产品数量的换算。现有ProductionQuantityService已把冻结grossCorrection加到旧净报工，并把effectiveDefect计入损耗；若正式申报再次纳入聚合，会重复扣不良。因此必须采用带原证据关联的替代投影，确保同一原不良始终只计一次，不能删除或改写原NODE/QUALITY_EVIDENCE。
+3. 对缺去向、原申报账号或确切处置事件的数据明确列出缺口；现有正式申报要求这些字段，禁止填默认仓库、当前操作者冒充原申报人或虚构返工/放行。只能在有证据支持的迁移契约下接入同一质量业务，并保留未知边界。
+4. 样板覆盖工废、料废、发现/责任工序不同、缺字段、已完工执行和后续修订。验证迁前迁后每节点投入/有效产出/最终损耗不变、页面可查询、幂等无重复、错误整单回滚、无库存及ERP副作用；任何影响现有已完工事实的矛盾先形成冲突清单，不自动重开或删除完工事实。
+5. 样板通过后按有界工单批次集合预取、内存分组及短事务导入，保存新质量事实与来源关联，完成后核对源主键覆盖和数量守恒。所需Schema/门禁通过新增正式Flyway演进，不能重写已发布迁移。
+
+本次已验证真实目标绑定、批号分布和来源证据落点，并审查正式不良模型及数量叠加入口；尚未实施批号修改或正式不良导入，没有为本次只读清单运行构建或重启服务。
+
+
+### 2026-10-21 补充：旧净报工到当前加工总量的转换公式
+
+用户追问“不良是否直接扣减、旧报工＋不良＝上道与Base是否一致”。源码复核：conversion_v2.convert_v2以旧报工聚合为legacyNet，以经物料/单位/有效状态核实的不良为effectiveDefect，计算gross=legacyNet+effectiveDefect，校验gross+legacyRemaining=upstream；prepare_component将effectiveDefect同时保存为NODE.conversion_payload的grossCorrection和effectiveDefect。原mes_production_report保留员工旧报工原数量，未把补足量记到某个员工工资/报工事实中。
+
+ProductionQuantityService.compose读取正式报工合计后，先加冻结grossCorrection得到当前加工总量，再把冻结effectiveDefect加入不良，使用同一project计算有效产出。因此不是直接在旧净报工上再减一次不良。例：旧上道400、净报工396、不良4、未报0，转换为当前加工总量400、不良4、有效产出396；当前剩余按投入减加工总量计算为0。对原数据存在未报量的节点保留未报量，不强补到投入数。
+
+真实DEV只读核对执行8354：来源工单/批号/工艺的冻结映射关联原不良13691数量7和13692数量2（同来源工序103）。节点5637冻结legacyNet=1271、grossCorrection=9、effectiveDefect=9，当前投影口径为加工1280、不良9、净产出1271。该执行其他有不良节点也保存同样的两项补正。此证据为数据库冻结转换依据和当前源码核对，本轮未重新登录HTTP、未声称新增正式不良记录或已完成新迁移。
+
+当前缺口是转换仅落实为“原净报工＋导入节点补正”的数量投影以及QUALITY_EVIDENCE来源，而非完整正式不良账本。后续应按Base口径把“转换后加工总量＋正式不良事实”作为一次性迁移目标，并为每条来源建立唯一转换关联；同一事务/可验证切换中以正式质量贡献替代对应冻结effectiveDefect，gross补足也必须具有可追溯且只计一次的转换依据。禁止把冻结损耗保留参与聚合又新增同额正式不良；禁止直接原位修改不可变旧员工报工、给某员工虚增产量或删除原证据。全节点迁前迁后有效产出、未报量、损耗总量及完工判定须等价。具体正式落账契约仍属于前节规划，尚未实施；用户本次质询未被冒认为已有一次性转换任务完成。
