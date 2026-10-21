@@ -14,6 +14,9 @@ import org.apache.ibatis.annotations.Select;
 import org.apache.ibatis.annotations.Update;
 
 public interface LegacyMigrationMapper {
+    // Original status 0/1 is an external scrap-conversion code, not a Base business enum.
+    String PENDING_LOSS = "CASE WHEN b.status=#{completed} THEN 0 ELSE COALESCE((SELECT SUM(CAST(JSON_UNQUOTE(JSON_EXTRACT(q.source_payload,'$.quantity')) AS DECIMAL(20,6))) FROM mes_legacy_source_mapping q WHERE q.parent_id=e.id AND q.entity_kind='QUALITY_EVIDENCE' AND JSON_UNQUOTE(JSON_EXTRACT(q.source_payload,'$.process_id'))=SUBSTRING_INDEX(n.source_pk,'/',-1) AND (COALESCE(JSON_UNQUOTE(JSON_EXTRACT(q.source_payload,'$.status')),'') &lt;&gt; '1' OR COALESCE(JSON_UNQUOTE(JSON_EXTRACT(q.source_payload,'$.scrap_code')),'')='')),0) END unverified_loss_qty ";
+
     @Insert("INSERT INTO mes_legacy_source_lock(id) VALUES(#{id}) ON DUPLICATE KEY UPDATE id=id")
     int ensureLock(@Param("id") String id);
 
@@ -94,7 +97,7 @@ public interface LegacyMigrationMapper {
             + "CAST(JSON_UNQUOTE(JSON_EXTRACT(n.conversion_payload,'$.legacyNet')) AS DECIMAL(20,6)) legacy_net,"
             + "CASE WHEN b.status=#{completed} THEN CAST(JSON_UNQUOTE(JSON_EXTRACT(c.conversion_payload,'$.grossDelta')) AS DECIMAL(20,6)) ELSE CAST(JSON_UNQUOTE(JSON_EXTRACT(n.conversion_payload,'$.grossCorrection')) AS DECIMAL(20,6)) END gross_correction,"
             + "CASE WHEN b.status=#{completed} THEN 0 ELSE CAST(JSON_UNQUOTE(JSON_EXTRACT(n.conversion_payload,'$.effectiveDefect')) AS DECIMAL(20,6)) END effective_defect,"
-            + "n.conversion_payload evidence FROM mes_legacy_source_mapping n JOIN mes_legacy_source_mapping e "
+            + "n.conversion_payload evidence," + PENDING_LOSS + " FROM mes_legacy_source_mapping n JOIN mes_legacy_source_mapping e "
             + "ON e.id=n.parent_id "
             + "LEFT JOIN mes_legacy_source_mapping c ON c.id=SHA2(CONCAT('legacy-quality-formal-v1:',n.id),256) AND c.parent_id=n.id AND c.entity_kind='NODE_QUALITY_CONVERSION' "
             + "AND c.rule_version='legacy-quality-formal-v1' AND c.source_hash=n.source_hash "
@@ -105,7 +108,7 @@ public interface LegacyMigrationMapper {
     @Select({"<script><bind name=\"completed\" value=\"@dev.mesbase.business.legacy.domain.LegacyBatchStatus@COMPLETED.getValue()\"/>SELECT e.entity_id execution_id,n.entity_id routing_node_id,",
             "CAST(JSON_UNQUOTE(JSON_EXTRACT(n.conversion_payload,'$.legacyNet')) AS DECIMAL(20,6)) legacy_net,",
             "CASE WHEN b.status=#{completed} THEN CAST(JSON_UNQUOTE(JSON_EXTRACT(c.conversion_payload,'$.grossDelta')) AS DECIMAL(20,6)) ELSE CAST(JSON_UNQUOTE(JSON_EXTRACT(n.conversion_payload,'$.grossCorrection')) AS DECIMAL(20,6)) END gross_correction,",
-            "CASE WHEN b.status=#{completed} THEN 0 ELSE CAST(JSON_UNQUOTE(JSON_EXTRACT(n.conversion_payload,'$.effectiveDefect')) AS DECIMAL(20,6)) END effective_defect ",
+            "CASE WHEN b.status=#{completed} THEN 0 ELSE CAST(JSON_UNQUOTE(JSON_EXTRACT(n.conversion_payload,'$.effectiveDefect')) AS DECIMAL(20,6)) END effective_defect,", PENDING_LOSS,
             "FROM mes_legacy_source_mapping n JOIN mes_legacy_source_mapping e ON e.id=n.parent_id ",
             "LEFT JOIN mes_legacy_source_mapping c ON c.id=SHA2(CONCAT('legacy-quality-formal-v1:',n.id),256) AND c.parent_id=n.id AND c.entity_kind='NODE_QUALITY_CONVERSION' ",
             "AND c.rule_version='legacy-quality-formal-v1' AND c.source_hash=n.source_hash ",

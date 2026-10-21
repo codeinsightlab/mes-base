@@ -1,34 +1,62 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="dev.mesbase.business.production.dao.WorkOrderProgressExtraMapper">
-  <select id="orders" resultType="dev.mesbase.business.production.domain.WorkOrderProgress$Order">
-    <bind name="cancelledStatus" value="@dev.mesbase.business.production.domain.WorkOrderStatus@CANCELLED.getValue()"/>
-    SELECT w.id, w.code, w.source, w.status, m.code AS productCode, m.name AS productName,
-           u.name AS unitName, w.planned_qty AS plannedQty
-    FROM workorder w
-    LEFT JOIN material m ON m.id = w.product_id
-    LEFT JOIN unit_measure u ON u.id = m.unit_id
-    <where>
-      <if test="pattern != null">
-        (w.code LIKE #{pattern} ESCAPE '!' OR m.code LIKE #{pattern} ESCAPE '!'
-         OR m.name LIKE #{pattern} ESCAPE '!')
-      </if>
-      <choose>
-        <when test="status == null">AND w.status != #{cancelledStatus}</when>
-        <when test="status != 'ALL'">AND w.status = #{status}</when>
-      </choose>
-    </where>
-    ORDER BY w.id DESC
-  </select>
-  <select id="completions" resultType="dev.mesbase.business.production.domain.WorkOrderProgress$Completion">
-    SELECT e.workorder_id AS workorderId, SUM(c.effective_qty) AS quantity,
-           COUNT(c.id) AS factCount, COUNT(DISTINCT c.execution_id) AS executionCount,
-           SUM(CASE WHEN c.effective_qty IS NULL OR c.effective_qty &lt; 0 THEN 1 ELSE 0 END) AS invalidCount,
-           MAX(c.recorded_at) AS lastCompletedAt
-    FROM mes_production_execution e
-    JOIN mes_execution_completion c ON c.execution_id = e.id
-    WHERE e.workorder_id IN
-    <foreach collection="ids" item="id" open="(" separator="," close=")">#{id}</foreach>
-    GROUP BY e.workorder_id
-  </select>
+    <select id="orders" resultType="dev.mesbase.business.production.domain.WorkOrderProgress$Order">
+        <bind name="cancelledStatus"
+              value="@dev.mesbase.business.production.domain.WorkOrderStatus@CANCELLED.getValue()"/>
+        SELECT w.id, w.code, w.source, w.status, m.code AS productCode, m.name AS productName,
+        u.name AS unitName, w.planned_qty AS plannedQty
+        FROM workorder w
+        LEFT JOIN material m ON m.id = w.product_id
+        LEFT JOIN unit_measure u ON u.id = m.unit_id
+        <where>
+            <if test="filter.workorderCodePattern != null">
+                AND w.code LIKE #{filter.workorderCodePattern} ESCAPE '!'
+            </if>
+            <if test="filter.productCodePattern != null">
+                AND m.code LIKE #{filter.productCodePattern} ESCAPE '!'
+            </if>
+            <choose>
+                <when test="filter.status == null">AND w.status != #{cancelledStatus}</when>
+                <when test="filter.status != 'ALL'">AND w.status = #{filter.status}</when>
+            </choose>
+        </where>
+        ORDER BY w.id DESC
+    </select>
+    <select id="completions" resultType="dev.mesbase.business.production.domain.WorkOrderProgress$Completion">
+        SELECT e.workorder_id AS workorderId, SUM(c.effective_qty) AS quantity,
+        COUNT(c.id) AS factCount, COUNT(DISTINCT c.execution_id) AS executionCount,
+        SUM(CASE WHEN c.effective_qty IS NULL OR c.effective_qty &lt; 0 THEN 1 ELSE 0 END) AS invalidCount,
+        MAX(c.recorded_at) AS lastCompletedAt
+        FROM mes_production_execution e
+        JOIN mes_execution_completion c ON c.execution_id = e.id
+        WHERE e.workorder_id IN
+        <foreach collection="ids" item="id" open="(" separator="," close=")">#{id}</foreach>
+        GROUP BY e.workorder_id
+    </select>
+    <select id="quality" resultType="dev.mesbase.business.production.domain.WorkOrderProgress$Quality">
+        <bind name="allocateAction" value="@dev.mesbase.business.quality.domain.QualityTreatmentModels$Action@ALLOCATE.name()"/>
+        <bind name="cancelAllocateAction" value="@dev.mesbase.business.quality.domain.QualityTreatmentModels$Action@CANCEL_ALLOC.name()"/>
+        <bind name="startAction" value="@dev.mesbase.business.quality.domain.QualityTreatmentModels$Action@START.name()"/>
+        <bind name="cancelStartAction" value="@dev.mesbase.business.quality.domain.QualityTreatmentModels$Action@CANCEL_START.name()"/>
+        <bind name="voidAction" value="@dev.mesbase.business.quality.domain.DefectRecordAction@VOID.getValue()"/>
+        SELECT e.workorder_id AS workorderId, d.defect_qty AS declaredQty,
+        MAX(t.attribution_type) AS attribution, d.destination_type AS destinationType,
+        COALESCE(SUM(t.scrap_qty), 0) AS scrapQty,
+        COALESCE(SUM(t.failed_qty), 0) AS failedQty,
+        COALESCE(SUM(t.recovered_qty), 0) AS recoveredQty,
+        COALESCE(SUM(CASE WHEN t.action_type IN (#{allocateAction}, #{cancelAllocateAction}) THEN t.rework_qty ELSE 0 END), 0) AS allocatedReworkQty,
+        COALESCE(SUM(CASE WHEN t.action_type IN (#{startAction}, #{cancelStartAction}) THEN t.rework_qty ELSE 0 END), 0) AS startedQty,
+        COALESCE(SUM(t.processed_qty), 0) AS processedQty
+        FROM mes_production_execution e
+        JOIN mes_production_defect d ON d.execution_id = e.id
+        LEFT JOIN mes_quality_treatment t ON t.declaration_id = d.declaration_id
+        AND t.declaration_revision = d.revision_no AND t.execution_id = d.execution_id
+        WHERE e.workorder_id IN
+        <foreach collection="ids" item="id" open="(" separator="," close=")">#{id}</foreach>
+        AND d.record_action != #{voidAction}
+        AND NOT EXISTS (SELECT 1 FROM mes_production_defect newer
+        WHERE newer.declaration_id = d.declaration_id AND newer.revision_no &gt; d.revision_no)
+        GROUP BY e.workorder_id, d.declaration_id, d.revision_no, d.defect_qty, d.destination_type
+    </select>
 </mapper>

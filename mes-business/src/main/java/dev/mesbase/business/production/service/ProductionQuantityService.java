@@ -103,7 +103,7 @@ public class ProductionQuantityService {
         var ids = List.copyOf(batch.executions().keySet());
         var inputs = history.inputs(ids).stream().collect(Collectors.toMap(n -> n.executionId(), n -> n.quantity()));
         var nodes = history.nodesBatch(ids).stream().collect(Collectors.groupingBy(n -> n.executionId(),
-                Collectors.toMap(n -> n.routingNodeId(), n -> new HistoricalNode(n.legacyNet(), n.grossCorrection(), n.effectiveDefect()))));
+                Collectors.toMap(n -> n.routingNodeId(), n -> new HistoricalNode(n.legacyNet(), n.grossCorrection(), n.effectiveDefect(), n.unverifiedLossQty()))));
         var balances = quantities.inputBalances(ids).stream().collect(Collectors.toMap(n -> n.executionId(),
                 n -> new ProductionInputBalance(n.confirmedQty(), n.reservedQty())));
         var totals = quantities.nodeTotalsBatch(ids).stream().collect(Collectors.groupingBy(n -> n.executionId(),
@@ -191,7 +191,7 @@ public class ProductionQuantityService {
         var inputQty = historical ? history.input(executionId) : balance.usableQty();
         if (inputQty == null || inputQty.signum() < 0) unavailable();
         var historyNodes = imported ? history.nodes(executionId).stream()
-                .collect(Collectors.toMap(n -> n.routingNodeId(), n -> new HistoricalNode(n.legacyNet(), n.grossCorrection(), n.effectiveDefect()))) : null;
+                .collect(Collectors.toMap(n -> n.routingNodeId(), n -> new HistoricalNode(n.legacyNet(), n.grossCorrection(), n.effectiveDefect(), n.unverifiedLossQty()))) : null;
         if (model.path() == null)
             return new ExecutionQuantity(executionId, execution.getWorkorderId(), execution.getExecutionNo(),
                     execution.getRoutingId(), execution.getTargetQty(), ExecutionPathStatus.UNSELECTED.getValue(), false, "执行尚未选择实际路径", List.of(), label(model.routing()), inputQty, balance.confirmedQty(), balance.reservedQty());
@@ -206,7 +206,8 @@ public class ProductionQuantityService {
                 totals, defectTotals, orders.selectByPrimaryKey(execution.getWorkorderId())));
     }
 
-    private record HistoricalNode(BigDecimal legacyNet, BigDecimal grossCorrection, BigDecimal effectiveDefect) {
+    private record HistoricalNode(BigDecimal legacyNet, BigDecimal grossCorrection, BigDecimal effectiveDefect,
+                                  BigDecimal unverifiedLossQty) {
     }
 
     private record QuantityFacts(ProductionInputBalance balance, BigDecimal inputQty, boolean historical,
@@ -240,10 +241,12 @@ public class ProductionQuantityService {
                 reported = reported.add(evidence.grossCorrection());
                 defect = defect.add(evidence.effectiveDefect());
             }
+            BigDecimal unverified = quality == null ? BigDecimal.ZERO : quality.unverifiedQty();
+            if (historyNodes != null) unverified = unverified.add(historyNodes.get(node.getId()).unverifiedLossQty());
             result.add(new NodeQuantity(executionId, node.getId(), node.getOperationId(), node.getNodeCode(), node.getOperationName() != null ? node.getOperationName() : model.operationLabels()
                     .containsKey(node.getOperationId()) ? model.operationLabels().get(node.getOperationId())
                     .name() + "（当前名称）" : null, i + 1,
-                    BigDecimal.ZERO, reported, defect, BigDecimal.ZERO, BigDecimal.ZERO, true, quality == null ? BigDecimal.ZERO : quality.recoveredQty(), BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, quality == null ? BigDecimal.ZERO : quality.unverifiedQty(), historyNodes != null ? historyNodes.get(node.getId())
+                    BigDecimal.ZERO, reported, defect, BigDecimal.ZERO, BigDecimal.ZERO, true, quality == null ? BigDecimal.ZERO : quality.recoveredQty(), BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, unverified, historyNodes != null ? historyNodes.get(node.getId())
                     .effectiveDefect()
                     .add(quality == null ? BigDecimal.ZERO : quality.directDefectQty()) : quality == null ? BigDecimal.ZERO : quality.directDefectQty()));
         }

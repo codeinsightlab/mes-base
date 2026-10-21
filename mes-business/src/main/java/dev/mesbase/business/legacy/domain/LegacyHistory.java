@@ -14,11 +14,19 @@ public final class LegacyHistory {
     }
 
     public record ExecutionNode(Long executionId, Long routingNodeId, BigDecimal legacyNet,
-                                BigDecimal grossCorrection, BigDecimal effectiveDefect) {
+                                BigDecimal grossCorrection, BigDecimal effectiveDefect, BigDecimal unverifiedLossQty) {
+        public ExecutionNode(Long executionId, Long routingNodeId, BigDecimal legacyNet,
+                             BigDecimal grossCorrection, BigDecimal effectiveDefect) {
+            this(executionId, routingNodeId, legacyNet, grossCorrection, effectiveDefect, BigDecimal.ZERO);
+        }
     }
 
     public record Node(Long routingNodeId, BigDecimal legacyNet, BigDecimal grossCorrection,
-                       BigDecimal effectiveDefect, String evidence) {
+                       BigDecimal effectiveDefect, String evidence, BigDecimal unverifiedLossQty) {
+        public Node(Long routingNodeId, BigDecimal legacyNet, BigDecimal grossCorrection,
+                    BigDecimal effectiveDefect, String evidence) {
+            this(routingNodeId, legacyNet, grossCorrection, effectiveDefect, evidence, BigDecimal.ZERO);
+        }
     }
 
     public record Mapping(String id, String batchId, String parentId, String sourceTable, String sourcePk,

@@ -1,6 +1,6 @@
 """Fixed-scope, append-only quality conversion. Probe rolls back; apply requires deployed code proof.
 
-At most ten executions are committed together. Each portion locks workorders then executions,
+At most fifty executions are committed together. Each portion locks workorders then executions,
 checks the shared database run token, and atomically appends declarations, treatment facts and
 source-linked node conversions. No reports, states, inventory or external ERP are written.
 """
@@ -65,17 +65,34 @@ def insert(table, columns, rows):
         '(' + ','.join(row) + ')' for row in rows)
 
 
-def vector(client, ids, converted):
-    # This probe mirrors production: opening gross is retained, opening loss is replaced
-    # by independent formal defect quantity. Existing formal facts are rejected first.
-    contribution = "COALESCE(d.qty,0)" if converted else "CAST(JSON_EXTRACT(n.conversion_payload,'$.effectiveDefect') AS DECIMAL(20,6))"
-    sql = "SELECT JSON_OBJECT('execution',e.entity_id,'node',n.entity_id,'gross',CAST(COALESCE(r.qty,0)+CAST(JSON_EXTRACT(n.conversion_payload,'$.grossCorrection') AS DECIMAL(20,6)) AS CHAR),'loss',CAST(" + contribution + " AS CHAR)) FROM mes_legacy_source_mapping n JOIN mes_legacy_source_mapping e ON e.id=n.parent_id LEFT JOIN (SELECT execution_id,routing_node_id,SUM(quantity_delta) qty FROM mes_production_report WHERE execution_id IN (" + ids + ") GROUP BY execution_id,routing_node_id) r ON r.execution_id=e.entity_id AND r.routing_node_id=n.entity_id LEFT JOIN (SELECT execution_id,affected_node_id,SUM(defect_qty) qty FROM mes_production_defect WHERE execution_id IN (" + ids + ") GROUP BY execution_id,affected_node_id) d ON d.execution_id=e.entity_id AND d.affected_node_id=n.entity_id WHERE e.entity_kind='EXECUTION' AND e.entity_id IN (" + ids + ") AND n.entity_kind='NODE' ORDER BY e.entity_id,n.entity_id"
+def remaining(client, accepted):
+    """Load committed conversion leaves once; group against the frozen plan in memory."""
     from decimal import Decimal
-    return [(r['execution'], r['node'], Decimal(r['gross']), Decimal(r['loss']))
-            for line in client.run(sql) if (r := json.loads(line))]
+    records = client.run("SELECT JSON_OBJECT('source',a.parent_id,'id',a.id,'sourceHash',a.source_hash,'execution',d.execution_id,'quantity',CAST(d.defect_qty AS CHAR)) FROM mes_legacy_source_mapping a FORCE INDEX(idx_legacy_target) JOIN mes_legacy_migration_batch b ON b.id=a.batch_id AND b.rule_version=a.rule_version AND b.status='COMPLETED' JOIN mes_production_defect d ON d.id=a.entity_id AND d.request_key=a.id WHERE a.entity_kind='QUALITY_DECLARATION' AND a.rule_version='legacy-quality-formal-v1'")
+    converted = {r['source']:r for line in records if (r := json.loads(line))}
+    records = client.run("SELECT JSON_OBJECT('source',c.parent_id,'id',c.id,'node',c.entity_id,'gross',JSON_EXTRACT(c.conversion_payload,'$.grossDelta'),'loss',JSON_EXTRACT(c.conversion_payload,'$.convertedDefectQty')) FROM mes_legacy_source_mapping c FORCE INDEX(idx_legacy_target) JOIN mes_legacy_source_mapping n ON n.id=c.parent_id AND n.entity_kind='NODE' AND c.source_hash=n.source_hash AND c.entity_id=n.entity_id JOIN mes_legacy_migration_batch b ON b.id=c.batch_id AND b.rule_version=c.rule_version AND b.status='COMPLETED' WHERE c.entity_kind='NODE_QUALITY_CONVERSION' AND c.rule_version='legacy-quality-formal-v1'")
+    node_records = {r['source']:r for line in records if (r := json.loads(line))}
+    pending, already = [], 0
+    for e in accepted:
+        count = 0
+        for d in e['declarations']:
+            q = d['source']
+            r = converted.get(q['mappingId'])
+            if r is not None:
+                assert r['id'] == key(q['mappingId']) and r['sourceHash'] == q['sourceHash'] and r['execution'] == int(e['executionId']) and Decimal(r['quantity']) == Decimal(q['raw']['quantity']), 'Committed declaration mismatch'
+                count += 1
+        assert count in (0,len(e['declarations'])), 'Partial source conversion requires inspection'
+        if count:
+            for n in e['nodes']:
+                r = node_records[n['mappingId']]
+                assert r['id'] == key(n['mappingId']) and r['node'] == n['nodeId'] and Decimal(str(r['gross'])) == Decimal(str(n['gross'])) and Decimal(str(r['loss'])) == Decimal(str(n['loss'])), 'Committed node conversion mismatch'
+            already += count
+        else:
+            pending.append(e)
+    return pending, already
 
 
-def convert(client, portion, snapshot, probe=False):
+def convert(client, portion, snapshot, probe=False, reader=None):
     ids = ','.join(str(int(e['executionId'])) for e in portion)
     markers = [key(d['source']['mappingId']) for e in portion for d in e['declarations']]
     markers += [key(n['mappingId']) for e in portion for n in e['nodes']]
@@ -92,7 +109,10 @@ def convert(client, portion, snapshot, probe=False):
         locked = client.run("SELECT e.id FROM mes_production_execution e JOIN workorder w ON w.id=e.workorder_id JOIN mes_execution_path p ON p.id=e.id AND p.routing_id=e.routing_id AND p.path_status='LOCKED' WHERE e.id IN (" + ids + ") AND e.status IN ('RUNNING','COMPLETED') AND w.source='LOCAL' AND w.status IN ('RELEASED','COMPLETED') ORDER BY e.id FOR UPDATE")
         assert len(locked) == len(portion), 'State/source/path changed'
         assert client.number('SELECT COUNT(*) FROM mes_production_defect WHERE execution_id IN (' + ids + ')') == 0, 'Existing formal quality requires separate reconciliation'
-        before = vector(client, ids, False)
+        from decimal import Decimal
+        # Original node and report facts are immutable. Validate the frozen gross/loss
+        # at the INSERT SELECT below; unchanged zero-loss nodes need no repeated read.
+        before = sorted((int(e['executionId']),int(n['nodeId']),Decimal(str(n['gross'])),Decimal(str(n['loss']))) for e in portion for n in e['nodes'])
         client.run("INSERT INTO mes_legacy_migration_batch(id,rule_version,snapshot_hash,status,approved_scope,operator_user_id,created_at) VALUES(" + ','.join([quote(batch), quote(RULE), quote(snapshot), "'RUNNING'", quote(canonical(markers)), str(ACTOR), 'NOW(6)']) + ')')
         declarations, treatments, mappings = [], [], []
         mapping_columns = ['id','batch_id','parent_id','source_table','source_pk','source_hash','rule_version','entity_kind','entity_id','source_payload','conversion_payload','created_at']
@@ -115,16 +135,31 @@ def convert(client, portion, snapshot, probe=False):
                 quality_values.append('SELECT ' + quote(q['mappingId']) + ' original_id,' + quote(key(q['mappingId'])) + ' marker_id,' + quote(canonical({'sourceMappingId':q['mappingId']})) + ' payload,' + quote(canonical({'declarationId':d['declarationId'],'quantity':q['raw']['quantity']})) + ' conversion')
             for n in e['nodes']:
                 payload = canonical({'grossDelta':str(n['gross']),'convertedDefectQty':str(n['loss']), 'basis':'FORMAL_DECLARATIONS_REPLACE_OPENING_LOSS'})
-                node_values.append('SELECT ' + quote(n['mappingId']) + ' original_id,' + quote(key(n['mappingId'])) + ' marker_id,' + quote(canonical({'sourceNodeMappingId':n['mappingId']})) + ' payload,' + quote(payload) + ' conversion,' + quote(n['loss']) + ' loss,' + quote(n['gross']) + ' gross')
+                node_values.append('SELECT ' + quote(n['mappingId']) + ' original_id,' + quote(key(n['mappingId'])) + ' marker_id,' + quote(canonical({'sourceNodeMappingId':n['mappingId'],'executionId':int(e['executionId'])})) + ' payload,' + quote(payload) + ' conversion,' + quote(n['loss']) + ' loss,' + quote(n['gross']) + ' gross')
         client.run('INSERT INTO mes_legacy_source_mapping(' + ','.join(mapping_columns) + ') SELECT a.marker_id,' + quote(batch) + ",q.id,'qc_defective',q.source_pk,q.source_hash," + quote(RULE) + ",'QUALITY_DECLARATION',d.id,a.payload,a.conversion,NOW(6) FROM (" + ' UNION ALL '.join(quality_values) + ') a JOIN mes_legacy_source_mapping q ON q.id=a.original_id JOIN mes_production_defect d ON d.request_key=a.marker_id')
         client.run('INSERT INTO mes_legacy_source_mapping(' + ','.join(mapping_columns) + ') SELECT a.marker_id,' + quote(batch) + ",n.id,'LEGACY_NODE_CONVERSION',n.source_pk,n.source_hash," + quote(RULE) + ",'NODE_QUALITY_CONVERSION',n.entity_id,a.payload,a.conversion,NOW(6) FROM (" + ' UNION ALL '.join(node_values) + ") a JOIN mes_legacy_source_mapping n ON n.id=a.original_id WHERE CAST(JSON_EXTRACT(n.conversion_payload,'$.effectiveDefect') AS DECIMAL(20,6))=a.loss AND CAST(JSON_EXTRACT(n.conversion_payload,'$.grossCorrection') AS DECIMAL(20,6))=a.gross")
         actual = client.number('SELECT COUNT(*) FROM mes_legacy_source_mapping WHERE batch_id=' + quote(batch))
         assert actual == len(markers), 'Not all source/node conversions were appended'
         client.run("UPDATE mes_legacy_migration_batch SET status='COMPLETED',finished_at=NOW(6) WHERE id=" + quote(batch) + " AND status='RUNNING'")
-        assert before == vector(client, ids, True), 'Gross/loss invariance failed; rolling back'
+        after_sql = "SELECT JSON_OBJECT('execution',JSON_EXTRACT(c.source_payload,'$.executionId'),'node',c.entity_id,'gross',JSON_EXTRACT(c.conversion_payload,'$.grossDelta'),'loss',CAST(d.qty AS CHAR)) FROM mes_legacy_source_mapping c LEFT JOIN (SELECT execution_id,affected_node_id,SUM(defect_qty) qty FROM mes_production_defect WHERE execution_id IN (" + ids + ") GROUP BY execution_id,affected_node_id) d ON d.execution_id=CAST(JSON_EXTRACT(c.source_payload,'$.executionId') AS UNSIGNED) AND d.affected_node_id=c.entity_id WHERE c.batch_id=" + quote(batch) + " AND c.entity_kind='NODE_QUALITY_CONVERSION'"
+        after = sorted((int(r['execution']),int(r['node']),Decimal(str(r['gross'])),Decimal(str(r['loss']))) for line in client.run(after_sql) if (r := json.loads(line)))
+        assert before == after, 'Converted gross/formal loss invariance failed; rolling back'
+        if reader is not None:
+            from decimal import Decimal
+            mapped = []
+            for query in reader.values():
+                parts = iter(query['values'])
+                sql = query['sql']
+                sql = sql.replace('?', '{}').format(*(quote(value) for value in parts))
+                projected = [json.loads(line) for line in client.run("SELECT JSON_OBJECT('node',routing_node_id,'gross',CAST(gross_correction AS CHAR),'loss',CAST(effective_defect AS CHAR)) FROM (" + sql + ') real_mapper')]
+                mapped.append({x['node']:(Decimal(x['gross']),Decimal(x['loss'])) for x in projected})
+            assert mapped[0] == mapped[1], 'Single and batch Mapper disagree'
+            for n in portion[0]['nodes']:
+                assert mapped[0][n['nodeId']] == (Decimal(str(n['gross'])),Decimal(0)), 'Real Mapper failed to replace opening loss'
+
         if probe:
             client.run('ROLLBACK')
-        return dict(batchId=batch, executions=len(portion), declarations=len(declarations), nodeConversions=sum(len(e['nodes']) for e in portion), allNodeGrossAndLossUnchanged=True, rolledBack=probe)
+        return dict(batchId=batch, executions=len(portion), declarations=len(declarations), nodeConversions=sum(len(e['nodes']) for e in portion), allNodeGrossAndLossUnchanged=True, rolledBack=probe, realSingleAndBatchMapperVerified=reader is not None)
     except BaseException:
         if client.process.poll() is None:
             client.run('ROLLBACK')
@@ -137,13 +172,17 @@ def main():
     parser.add_argument('--evidence', type=Path, required=True)
     parser.add_argument('--apply', action='store_true')
     parser.add_argument('--deployed-proof', type=Path)
+    parser.add_argument('--reader-sql', type=Path)
+    parser.add_argument('--batch-size', type=int, default=50)
     args = parser.parse_args()
     with gzip.open(args.evidence / 'plan.json.gz', 'rt') as f:
         content = f.read()
     snapshot = hashlib.sha256(content.encode()).hexdigest()
     assert snapshot == (args.evidence / 'plan.sha256').read_text().strip(), 'Frozen plan changed'
     plan = json.loads(content)
+    reader = json.loads(args.reader_sql.read_text()) if args.reader_sql else None
     assert plan['rule'] == RULE and plan['sourceCount'] == 12078
+    assert 1 <= args.batch_size <= 50
     if args.apply:
         assert args.deployed_proof, 'Apply requires current backend code proof'
         proof = json.loads(args.deployed_proof.read_text())
@@ -166,13 +205,19 @@ def main():
             changed = center.run("UPDATE mes_master_sync SET status='RUNNING',run_token=" + quote(token) + ",started_at=NOW(6),updated_at=NOW(6),finished_at=NULL,processed_count=0,error_message=NULL WHERE " + scope + " AND status<>'RUNNING'; SELECT ROW_COUNT()")
             assert changed == ['1'], 'Migration is already running'
             owned = True
-        portions = [plan['accepted'][i:i+10] for i in range(0, len(plan['accepted']), 10)] if args.apply else [plan['accepted'][:1]]
+        pending, already = remaining(c, plan['accepted'])
+        print(json.dumps({'remainingExecutions':len(pending),'alreadyConvertedDeclarations':already}),flush=True)
+        if owned:
+            assert center.run('UPDATE mes_master_sync SET processed_count=' + str(already) + ',updated_at=NOW(6) WHERE ' + owner + '; SELECT ROW_COUNT()') == ['1']
+        portions = [pending[i:i+args.batch_size] for i in range(0, len(pending), args.batch_size)] if args.apply else [pending[:args.batch_size]]
+        portions = [portion for portion in portions if portion]
+        assert all(sum(len(e['declarations']) for e in portion) <= 1000 for portion in portions), 'Portion exceeds quality read budget'
         output = args.evidence / ('apply-progress.jsonl' if args.apply else 'probe.jsonl')
         with output.open('a' if args.apply else 'w') as f:
             for portion in portions:
                 if owned:
                     assert center.run('UPDATE mes_master_sync SET updated_at=NOW(6) WHERE ' + owner + '; SELECT ROW_COUNT()') == ['1'], 'Lost migration ownership'
-                result = convert(c, portion, snapshot, probe=not args.apply)
+                result = convert(c, portion, snapshot, probe=not args.apply, reader=reader if not args.apply else None)
                 if args.apply:
                     assert center.number('SELECT COUNT(*) FROM mes_master_sync WHERE ' + owner) == 1, 'Lost migration ownership before commit'
                     c.run('COMMIT')
@@ -180,7 +225,7 @@ def main():
                 result['totalDeclarationsWrittenThisRun'] = done
                 f.write(json.dumps(result) + '\n'); f.flush()
                 if owned:
-                    assert center.run('UPDATE mes_master_sync SET processed_count=' + str(done) + ',updated_at=NOW(6) WHERE ' + owner + '; SELECT ROW_COUNT()') == ['1']
+                    assert center.run('UPDATE mes_master_sync SET processed_count=' + str(already + done) + ',updated_at=NOW(6) WHERE ' + owner + '; SELECT ROW_COUNT()') == ['1']
                 print(json.dumps(result), flush=True)
         if owned:
             assert center.run("UPDATE mes_master_sync SET status='SUCCEEDED',updated_at=NOW(6),finished_at=NOW(6),last_success_at=NOW(6) WHERE " + owner + '; SELECT ROW_COUNT()') == ['1']

@@ -4,6 +4,10 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'legacy'))
 from plan_quality import build
+from plan_quality import key
+from migrate_quality import remaining
+import json
+import copy
 
 
 class QualityPlanTest(unittest.TestCase):
@@ -45,6 +49,39 @@ class QualityPlanTest(unittest.TestCase):
         rows = self.rows()
         rows[-1]['raw']['xtransfer_no'] = 'OTHER'
         self.assertIn('SOURCE_IDENTITY_CONFLICT', build(rows)['rejected'][0]['reasons'])
+
+    def test_resume_skips_complete_execution_instead_of_reinserting(self):
+        class Client:
+            def __init__(self):
+                self.rows = iter([[json.dumps(dict(source='q', id=key('q'), sourceHash='f'*64,
+                                                  execution=1, quantity='4'))],
+                                  [json.dumps(dict(source='n', id=key('n'), node=11, gross='4', loss='4'))]])
+
+            def run(self, sql):
+                return next(self.rows)
+
+        pending, done = remaining(Client(), build(self.rows())['accepted'])
+        self.assertEqual([], pending)
+        self.assertEqual(1, done)
+
+    def test_resume_rejects_partial_execution(self):
+        rows = self.rows()
+        rows[-1]['raw']['quantity'] = '2'
+        other = copy.deepcopy(rows[-1])
+        other['mappingId'] = 'q2'
+        other['sourceId'] = '2'
+        rows.append(other)
+
+        class Client:
+            def __init__(self):
+                self.rows = iter([[json.dumps(dict(source='q', id=key('q'), sourceHash='f'*64,
+                                                  execution=1, quantity='2'))], []])
+
+            def run(self, sql):
+                return next(self.rows)
+
+        with self.assertRaises(AssertionError):
+            remaining(Client(), build(rows)['accepted'])
 
 
 if __name__ == '__main__':

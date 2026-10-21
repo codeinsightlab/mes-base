@@ -138,4 +138,32 @@ class ActivatedProductionHttpTest {
         }
     }
 
+    @Test
+    void historicalUnspecifiedDestinationCannotBeSubmittedAsANewNormalDeclaration() throws Exception {
+        try (var c = ProductionDefectHttpTest.context()) {
+            var http = MaterialIssueHttpTest.mvc(c);
+            String body = ProductionDefectHttpTest.command("unknown-destination", 0, "1")
+                    .replace("ROUTING_NODE", "UNSPECIFIED");
+            http.perform(ProductionReportHttpTest.full(post("/api/quality/defects"), "A").content(body))
+                    .andExpect(status().isBadRequest());
+        }
+    }
+
+    @Test
+    void balancedOpeningWithUnprovenHistoricalDispositionCannotComplete() throws Exception {
+        try (var c = ProductionQualityV13HttpTest.context(new Class<?>[]{Opening.class}, 100, 90, 90, 90, 90)) {
+            var mapper = c.getBean(LegacyMigrationMapper.class);
+            var pending = mapper.nodes(1L).stream().map(n -> new Node(n.routingNodeId(), n.legacyNet(),
+                    n.grossCorrection(), n.effectiveDefect(), n.evidence(),
+                    n.routingNodeId() == 12 ? new BigDecimal("10") : BigDecimal.ZERO)).toList();
+            when(mapper.nodes(1L)).thenReturn(pending);
+            var http = MaterialIssueHttpTest.mvc(c);
+            http.perform(ProductionCoreV1HttpTest.full(get("/api/production/executions/1/closure")))
+                    .andExpect(status().isOk()).andExpect(jsonPath("canComplete").value(false));
+            var q = ProductionQualityV13HttpTest.quantities(http);
+            ProductionQualityV13HttpTest.amount(q.path("nodes").get(1), "unverifiedDefectQty", "10");
+            ProductionQualityV13HttpTest.amount(q.path("nodes").get(4), "effectiveOutputQty", "90");
+        }
+    }
+
 }
