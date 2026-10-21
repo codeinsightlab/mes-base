@@ -122,7 +122,7 @@ class ProductionExecutionHttpTest {
                     .andExpect(status().isForbidden());
             for (String body : List.of(CREATE.replace("\"routingId\":\"1\"", "\"routingId\":\"4\""), CREATE.replace("\"routingId\":\"1\"", "\"routingId\":\"2\""),
                     CREATE.replace("\"workorderId\":\"1\"", "\"workorderId\":\"999\""),
-                    CREATE.replace("12.12", "0"), CREATE.replace("12.12", "1.1234567")))
+                    CREATE.replace("12.12", "0"), CREATE.replace("12.12", "1.123"), CREATE.replace("12.12", "1.1234567")))
                 m.perform(full(post(E), "A").content(body)).andExpect(status().is4xxClientError());
             m.perform(post(E).header("Authorization", "Bearer CRUD").header("X-Factory-Id", "A")
                     .contentType("application/json").content(CREATE)).andExpect(status().isForbidden());

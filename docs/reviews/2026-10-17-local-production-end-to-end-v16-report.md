@@ -147,3 +147,51 @@ ERP仅增加 `ProductionReceiptAcceptanceCommand` 与 WarehouseErpAdapter 默认
 **GO：LOCAL单材料完整闭环。** 主样本233已由正式业务命令与页面贯通，数量、库存、历史与严格完工互相解释；不是Schema、历史TEST或Mock冒充业务验收。指定数据库保留主样本233（完工94）和边界样本234（晚不良历史超额8），用户可在SIMPLE_B复验。
 
 真实ERP厂商、多材料、多节点返工、真实发货/后续消耗流程均不在GO范围。ERP模式拒绝/无Adapter不回退由HTTP/H2及契约测试覆盖，未修改真实工厂模式来制造证明；库存不足逆向的真实负例使用明确标注的受控调整模拟消耗。当前没有逐件实物身份，不承诺SN级放行或跨设备UNKNOWN恢复。
+
+## 2026-10-21 — 数量输入/展示、工单创建时间与定时完工收口
+
+本节记录用户确认后的新增行为，不改写上文 2026-10-17 的验收时间线。
+
+### 本轮业务契约
+
+- 生产相关数量展示最多两位小数，新人工输入最多两位；数据库 decimal、内部换算和历史事实精度保持不变。字符串/BigInt 展示避免大数经过 JS Number；非零极小差额显示 `< 0.01` / `> -0.01`，避免显示为零而被误认为已平账。表格和数量文本保留原值 title。
+- `ProductionQuantityInput` 在新业务命令通过原 UUID 重放检查后校验人工数量；在原状态、权限允许编辑的前提下，工单、执行目标、需求和不良旧数量未变时允许维护其他字段。合法的原请求重放、整笔冲销的系统计算数量、扫码投产内部材料换算、历史导入及 ERP 同步计划不被统一截断到两位。
+- 工单列表直接展示后端已有 `createTime`，没有增加 schema 或以本轮时间回填历史创建时间。状态显式映射 HISTORICAL / DRAFT / RELEASED / COMPLETED / CANCELLED；历史工单不会再被默认显示成“已下达”。
+- 工单完工收口由后台系统定时任务负责，执行单元正式完工命令只写自己的事实与状态，不同步改父工单。默认应用启动 60 秒后执行首轮，上一轮结束后等待 60 秒再巡检。
+
+### 判定入口及事务
+
+`mes-admin/.../WorkOrderCompletionJob.scheduled` → 受管 `FactoryIntegrationExecutor` → `SyncCoordinator` → `mes-business/.../WorkOrderCompletionService.reconcile`。
+
+任务仅处理合法 LOCAL 模式下、持久化来源 LOCAL 且状态 RELEASED 的工单，跳过 ERP 生命周期以及 HISTORICAL/DRAFT/CANCELLED/COMPLETED。候选 SQL 按主键分页，每页100；至少存在一个未作废执行单元，全部未作废执行单元为 COMPLETED 且有正式完工事实才进入复核。全部作废、空工单、手改执行状态但缺事实都不能完成工单。
+
+复核按既有 WorkOrder→Execution 锁序，锁住父工单后检查：无未决领料；已确认领料必须关联可核实的 PRODUCTION_INPUT 与本工单已结束执行；各执行的可信投产数量（已折算为产出单位）严格等于“末道有效报工＋各节点独立不良净损失”。不跨工序重复累加报工、不重复计入重叠观察、不把返工恢复当新增报工；质量处置未完成、待核实、投产撤销预留或精确差额均拒绝。继续使用 ProductionQuantityService 的权威投影与质量放行门禁；同一次复核的质量检查复用已取得的投影，不再次读取一整套数量。
+
+满足条件后单工单独立业务事务更新 COMPLETED、revision 和 updateTime；计划数量和事实不变，也不要求产出达到计划量。运行期间失去 token，包含 UPDATE 之后失去 token，都必须回滚。父工单完成后的普通新生产入口拒绝；历史查询、成功 UUID 重放与原有独立权限的受控历史纠正继续保留。历史纠正可能与原完工快照产生差额，不自动重开或改写旧完工事实。
+
+### 调度、失败和查询边界
+
+复用 `mes_master_sync` 的 `factory_id + workorder-completion` 条件抢占、run_token、五分钟失活租约恢复、进度与完成/失败记录，不增加 JVM 互斥锁、模式 YAML 或第三个数据库入口。任务在处理边界续期，业务事务在写入前后复核执行权；多节点争抢的失败节点不继续业务。ERP 厂不执行 LOCAL 收口，缺快照或非法绑定按原入口失败关闭。
+
+候选和执行清单按100条分页。每个工单事务中逐执行复用现有数量/质量完整性校验；不是“每个执行只一条SQL”，本轮没有另写一套聚合算式绕过质量链。已知路径/数量/质量冲突候选保持原状并继续后续候选；执行权失效和基础设施异常停止该工厂本轮，记录失败，不推进成功水位。日志按轮记录 checked/completed/blocked/invalid 和首个非法候选ID，避免对每张旧工单重复输出堆栈。其他工厂继续独立执行。
+
+### 已取得的证据与上线边界
+
+- H2 / MockMvc 闭环覆盖：100投入、10不良、恢复4、最终损失6、有效产出94；未交接/接收完拒绝；执行完工后父工单暂留RELEASED；存在READY兄弟执行拒绝；定时收口后COMPLETED，重复巡检不再增加revision，原完工UUID仍可重放；80产出但投入100即使全部交接/接收也不满足平衡。
+- 原数量精度测试保留六位存量事实，通过 TEST ONLY 直接植入存量而非用新人工命令创建。新增两位人工输入、三位拒绝和旧值未变校验；大数原值不被截断。
+- 前端全量67文件411项通过，生产构建通过。通过现有5173页面读取 `TEST_DEV_PERF_20261019` 的真实列表，确认历史状态、创建时间与两位展示。
+- 真实配置只读核对：中心库 `mes_base_dev`，Factory `TEST_DEV_PERF_20261019` → 数据源9/revision2/ENABLED/LOCAL → `192.168.18.25:3306/mes_base_dev_perf_test`。三个新增跨表查询已在该库只读事务执行并 EXPLAIN；执行关联走 idx_execution_workorder / idx_completion_execution，领料关联走 idx_issue_workorder / idx_input_issue。没有执行 UPDATE、迁移历史状态或改变历史数量。
+- 本轮未自行重启用户后端；上述真实页面证明展示已加载，不代表新的后台定时任务已经部署执行。新 Java 需用户重启现有后端后加载。没有新增 DDL / Flyway，回退代码不会自动撤销已合法完成的工单或删除不可变事实。
+- 验证日志：`.local/production-quantity-status-20261021/`（仅本轮小型日志与界面源文件备份；不保存新的验收JAR或全库备份）。
+
+
+最终补验：`maven-verify-final.log` 的全量 verify 通过；补充异常候选继续处理后，`maven-verify-delivery.log` 出现一项既有库存并发测试波动（StockDocumentHttpTest.documentAndFormalProductionIssueCompeteOnTheSameOwner，竞争失败方返回400而测试期望409）。该生产库存链路未在本轮修改；`backend-final-focused.log` 对库存7项、完工/调度/精度6项复验全部通过，未放宽该测试断言。最新完结态只读提示及“全部执行结束但投入100/产出80”的定时负例在 `backend-delivery-closed-state.log` / `completion-unbalanced-final.log` 通过。不能将上述复验描述为全量稳定无波动。
+
+前端全量411项后，交接/接收剩余数量展示补验23项通过（含新增原值仍保留的断言），最终构建通过；打包隔离 smoke 10项通过（`packaged-smoke-final.log`，使用隔离随机端口进程，未重启用户现有服务）。前后端 diff whitespace 检查通过。新的工单收口调度入口在 WorkOrderCompletionJob.java:41，业务锁内判定入口在 WorkOrderCompletionService.java:63。
+
+
+### 2026-10-21 用户调整：十分钟巡检及线程/锁边界
+
+用户将工单完工巡检频率调整为10分钟。WorkOrderCompletionJob 的 initialDelay/fixedDelay 均改为600000ms，即启动10分钟后首轮，此后每轮结束10分钟后再执行；上文60秒为之前的实现记录。频率不等于租约时长，五分钟失活租约与处理期间续期保持原样。
+
+当前 scheduled 方法仍按工厂串行调用 integration.run，因此慢厂会延后后续厂；尚未实现工厂并发线程池。若后续并行，应采用有界共享工作池，在工作线程内重新进入受管Factory上下文和独立事务，不跨线程传Session/事务；每厂长期线程不是必要条件。reconcileFactory 复用 mes_master_sync 的 factory_id + workorder-completion 条件抢占和run_token，属于跨节点的数据库租约；单工单 reconcile 另持有父工单行锁并按原锁序复核，不是依赖synchronized保护。

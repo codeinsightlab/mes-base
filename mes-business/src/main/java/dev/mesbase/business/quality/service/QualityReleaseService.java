@@ -71,7 +71,9 @@ public class QualityReleaseService {
         return stateFor(quantities.getExecutionQuantities(execution));
     }
 
-    /** Reuses an authoritative projection already read under the caller's business transaction. */
+    /**
+     * Reuses an authoritative projection already read under the caller's business transaction.
+     */
     @Transactional(transactionManager = "businessTransactionManager", readOnly = true, isolation = Isolation.READ_COMMITTED)
     public State stateFor(ExecutionQuantity q) {
         Long execution = q.executionId();

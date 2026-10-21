@@ -12,10 +12,19 @@ import dev.mesbase.framework.sync.SyncCoordinator;
 import dev.mesbase.platform.execution.FactoryIntegrationContext;
 import dev.mesbase.server.WorkOrderCompletionJob;
 import org.springframework.context.ApplicationContext;
+
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.doNothing;
+
+import java.util.concurrent.atomic.AtomicInteger;
+import dev.mesbase.core.error.FoundationException;
+import dev.mesbase.core.error.ErrorCode;
+
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+
 import java.math.BigDecimal;
 import org.springframework.test.web.servlet.MockMvc;
 import tools.jackson.databind.ObjectMapper;
@@ -75,8 +84,21 @@ class ProductionCompletionHttpTest {
             job.scheduled();
             assertEquals("RELEASED", j.queryForObject("SELECT status FROM workorder WHERE id=1", String.class));
             j.update("DELETE FROM mes_production_execution WHERE id=9000");
+            // Ownership lost after the UPDATE must roll back the entire business transaction.
+            var coordinator = c.getBean(SyncCoordinator.class);
+            var checks = new AtomicInteger();
+            doAnswer(invocation -> {
+                if (checks.incrementAndGet() == 4) throw new FoundationException(ErrorCode.SYNC_EXECUTION_LOST);
+                return null;
+            }).when(coordinator).assertOwner(any());
+            job.scheduled();
+            assertEquals("RELEASED", j.queryForObject("SELECT status FROM workorder WHERE id=1", String.class));
+            doNothing().when(coordinator).assertOwner(any());
             job.scheduled();
             assertEquals("COMPLETED", j.queryForObject("SELECT status FROM workorder WHERE id=1", String.class));
+            m.perform(ProductionCoreV1HttpTest.full(get("/api/production/report-quantities/executions/1")))
+                    .andExpect(status().isOk()).andExpect(jsonPath("writable").value(false))
+                    .andExpect(jsonPath("boundary").value("工单已完工，禁止继续正常报工"));
             var revision = j.queryForObject("SELECT revision FROM workorder WHERE id=1", Integer.class);
             job.scheduled();
             assertEquals(revision, j.queryForObject("SELECT revision FROM workorder WHERE id=1", Integer.class));
@@ -103,9 +125,14 @@ class ProductionCompletionHttpTest {
             m.perform(ProductionCoreV1HttpTest.full(get("/api/production/executions/1/closure")))
                     .andExpect(status().isOk()).andExpect(jsonPath("canComplete").value(false))
                     .andExpect(jsonPath("blockedReason").value("投入数量不等于末道有效报工与最终不良损失之和，不能完工"));
+            j.update("DELETE FROM mes_production_execution WHERE id=2"); // TEST ONLY unused sibling
+            // TEST ONLY legacy formal stamp with an unbalanced physical input must not close its parent.
+            j.update("UPDATE mes_production_execution SET status='COMPLETED' WHERE id=1");
+            j.update("INSERT INTO mes_execution_completion(id,execution_id,effective_qty,released_qty,receipt_qty,accepted_qty,basis_hash,request_hash,operator_user_id,recorded_at,reason) VALUES(?,1,80,80,80,80,?,?,1,CURRENT_TIMESTAMP,'TEST ONLY unbalanced legacy stamp')",
+                    UUID.randomUUID().toString(), "0".repeat(64), "0".repeat(64));
             job(c).scheduled();
             assertEquals("RELEASED", j.queryForObject("SELECT status FROM workorder WHERE id=1", String.class));
-            assertEquals(0, j.queryForObject("SELECT COUNT(*) FROM mes_execution_completion", Integer.class));
+            assertEquals(1, j.queryForObject("SELECT COUNT(*) FROM mes_execution_completion", Integer.class));
         }
     }
 
@@ -117,7 +144,8 @@ class ProductionCompletionHttpTest {
         when(catalog.enabled(100, 100)).thenReturn(List.of());
         var coordinator = context.getBean(SyncCoordinator.class);
         when(coordinator.claim(any(), eq("workorder-completion"), any())).thenAnswer(invocation ->
-                new SyncCoordinator.Run(invocation.getArgument(0), "workorder-completion", UUID.randomUUID().toString()));
+                new SyncCoordinator.Run(invocation.getArgument(0), "workorder-completion", UUID.randomUUID()
+                        .toString()));
         return new WorkOrderCompletionJob(catalog, (scope, task) -> FactoryIntegrationContext.run(
                 FactorySnapshotFixture.current(context, scope.factoryId().value()), task), coordinator,
                 context.getBean(WorkOrderCompletionService.class));

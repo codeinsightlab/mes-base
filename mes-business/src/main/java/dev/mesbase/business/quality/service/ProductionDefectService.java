@@ -147,7 +147,8 @@ public class ProductionDefectService {
         locks.execution(execution); // existing WorkOrder -> Execution lock order, then version read
         retry = byKey(c.requestKey());
         if (retry != null) return replay(retry, fingerprint);
-        if (c.facts() != null) ProductionQuantityInput.changed(c.facts().defectQty(), before == null ? null : before.getDefectQty());
+        if (c.facts() != null)
+            ProductionQuantityInput.changed(c.facts().defectQty(), before == null ? null : before.getDefectQty());
         var row = new MesProductionDefectEntity();
         if (before != null) {
             before = latest(id);

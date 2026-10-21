@@ -738,7 +738,7 @@ class MaterialIssueHttpTest {
                     .contentType("application/json").content(HEADER)).andExpect(status().isOk());
             for (String invalid : List.of(ITEM.replace("\"materialId\":\"1\"", "\"materialId\":\"2\""),
                     ITEM.replace("\"issueId\":\"1\"", "\"issueId\":\"999\""),
-                    ITEM.replace("99999999999999.12", "-1"), ITEM.replace("99999999999999.12", "1.1234567"))) {
+                    ITEM.replace("99999999999999.12", "-1"), ITEM.replace("99999999999999.12", "1.123"), ITEM.replace("99999999999999.12", "1.1234567"))) {
                 m.perform(post(I).header("Authorization", "Bearer FULL").header("X-Factory-Id", "A")
                                 .contentType("application/json").content(invalid))
                         .andExpect(status().is4xxClientError());

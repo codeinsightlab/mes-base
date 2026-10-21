@@ -11,6 +11,7 @@ import dev.mesbase.platform.execution.FactoryContext;
 import dev.mesbase.platform.execution.FactoryIntegrationContext;
 import dev.mesbase.platform.execution.FactoryIntegrationExecutor;
 import java.time.Duration;
+import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -37,7 +38,7 @@ public class WorkOrderCompletionJob {
         this.completion = completion;
     }
 
-    @Scheduled(initialDelay = 60000, fixedDelay = 60000)
+    @Scheduled(initialDelay = 600000, fixedDelay = 600000)
     public void scheduled() {
         for (int offset = 0; ; offset += 100) {
             var page = factories.enabled(offset, 100);
@@ -62,6 +63,9 @@ public class WorkOrderCompletionJob {
         var run = coordinator.claim(FactoryContext.required(),
                 "workorder-completion", Duration.ofMinutes(5));
         long processed = 0;
+        long completed = 0;
+        long invalid = 0;
+        Long firstInvalid = null;
         long after = 0;
         try {
             while (true) {
@@ -70,11 +74,23 @@ public class WorkOrderCompletionJob {
                 if (ids.isEmpty()) break;
                 for (Long id : ids) {
                     coordinator.progress(run, processed);
-                    if (completion.reconcile(id, run)) processed++;
+                    try {
+                        if (completion.reconcile(id, run)) completed++;
+                    } catch (FoundationException blocked) {
+                        if (!Set.of(ErrorCode.REPORT_PATH_REQUIRED, ErrorCode.REPORT_QUANTITY_CONFLICT,
+                                ErrorCode.QUALITY_ATTRIBUTION_REQUIRED).contains(blocked.code())) throw blocked;
+                        // A malformed old candidate must not starve later valid workorders. No writes committed.
+                        if (firstInvalid == null) firstInvalid = id;
+                        invalid++;
+                    }
+                    processed++;
                     after = id;
                 }
             }
             coordinator.succeed(run, null);
+            LOG.info("Work-order completion run={} factory={} checked={} completed={} blocked={} invalid={} firstInvalid={}",
+                    run.runToken(), run.scope().factoryId().value(), processed, completed,
+                    processed - completed - invalid, invalid, firstInvalid);
         } catch (RuntimeException failure) {
             try {
                 coordinator.fail(run);

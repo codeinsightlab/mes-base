@@ -16,14 +16,18 @@ import dev.mesbase.business.production.domain.MesExecutionPathNodeExample;
 import dev.mesbase.business.production.domain.MesExecutionPathNodeEntity;
 import dev.mesbase.business.production.service.ExecutionPathService.PathModel;
 import dev.mesbase.business.production.service.ExecutionPathService.LockedPath;
+
 import java.util.function.Supplier;
+
 import dev.mesbase.business.production.service.ProductionChainLocks.LockedExecution;
 import dev.mesbase.business.production.domain.MesProductionExecutionEntity;
 import dev.mesbase.business.production.domain.WorkorderEntity;
 import dev.mesbase.business.production.domain.WorkorderExample;
 import dev.mesbase.business.production.domain.ProductionInputBalance;
 import dev.mesbase.business.quality.domain.ProductionDefectModels;
+
 import java.util.LinkedHashMap;
+
 import dev.mesbase.business.production.domain.ExecutionPathStatus;
 import dev.mesbase.business.production.domain.ProductionReportModels.ExecutionQuantity;
 import dev.mesbase.business.production.domain.ProductionReportModels.ExecutionPage;
@@ -31,14 +35,18 @@ import dev.mesbase.business.production.domain.ProductionReportModels.NodeQuantit
 import dev.mesbase.core.error.ErrorCode;
 import dev.mesbase.core.error.FoundationException;
 import com.github.pagehelper.PageHelper;
+
 import java.math.BigDecimal;
 import java.util.List;
+
 import dev.mesbase.business.directory.service.BusinessDirectoryService;
 import dev.mesbase.business.directory.domain.DirectoryLabel;
+
 import java.util.ArrayList;
 import java.util.Map;
 import java.util.Objects;
 import java.util.stream.Collectors;
+
 import org.springframework.stereotype.Service;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -234,6 +242,8 @@ public class ProductionQuantityService {
         }
         boolean locked = ExecutionPathStatus.LOCKED.getValue().equals(model.path().getPathStatus());
         String boundary = historical ? "历史只读；投入为冻结材料证据推导，禁止正常生产操作" : !locked ? "实际路径尚未锁定，禁止写入报工数量"
+                : order != null && WorkOrderStatus.COMPLETED.getValue().equals(order.getStatus())
+                ? "工单已完工，禁止继续正常报工"
                 : order == null || !WorkOrderStatus.RELEASED.getValue().equals(order.getStatus())
                 ? "工单未下达或已作废，禁止继续正常报工"
                 : !ProductionExecutionStatus.allowsNormalReporting(execution.getStatus())
