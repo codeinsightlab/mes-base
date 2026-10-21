@@ -94,6 +94,36 @@ class ProductionDefectHttpTest {
     }
 
     @Test
+    void recentTreatmentKeepsEveryEventAndOrdersByRegistrationTimeRatherThanUuidWithoutCount() throws Exception {
+        try (var c = context()) {
+            var jdbc = c.getBean(MaterialIssueHttpTest.Fixture.class).business.get("A");
+            for (int i = 0; i < 12; i++)
+                jdbc.update("INSERT INTO mes_quality_treatment(id,request_hash,declaration_id,declaration_revision,execution_id,routing_node_id,action_type,operator_user_id,confirmed_by,occurred_at,recorded_at,reason,recovered_qty,failed_qty) VALUES(?,?,'same-declaration',?,1,11,?,100,1,'2026-01-01 09:00:00',?,'TEST ONLY immutable event',?,?)",
+                        String.format("00000000-0000-0000-0000-%012d", 12 - i), "test-" + i, i < 6 ? 1 : 2,
+                        i == 11 ? "CORRECT_RESULT" : "RESULT", "2026-01-01 10:00:" + String.format("%02d", i),
+                        i == 11 ? "-0.123456" : "0.123456", "0");
+            var capture = new RecentProductionReportHttpTest.SqlCapture();
+            c.getBean(SqlSessionFactory.class).getConfiguration().addInterceptor(capture);
+            var mvc = MaterialIssueHttpTest.mvc(c);
+            mvc.perform(full(get("/api/quality/treatments/recent"), "A"))
+                    .andExpect(status().isOk()).andExpect(jsonPath("$.length()").value(10))
+                    .andExpect(jsonPath("[0].id").value("00000000-0000-0000-0000-000000000001"))
+                    .andExpect(jsonPath("[0].actionType").value("CORRECT_RESULT"))
+                    .andExpect(jsonPath("[0].recoveredQty").value("-0.123456"))
+                    .andExpect(jsonPath("[9].id").value("00000000-0000-0000-0000-000000000010"))
+                    .andExpect(jsonPath("[9].declarationRevision").value(1));
+            capture.assertNoCount();
+            mvc.perform(full(get("/api/quality/treatments/recent"), "B"))
+                    .andExpect(status().isOk()).andExpect(jsonPath("$").isEmpty());
+            mvc.perform(get("/api/quality/treatments/recent").header("Authorization", "Bearer NONE")
+                            .header("X-Factory-Id", "A"))
+                    .andExpect(status().isForbidden());
+            mvc.perform(get("/api/quality/treatments/recent").header("Authorization", "Bearer FULL"))
+                    .andExpect(status().isUnprocessableEntity());
+        }
+    }
+
+    @Test
     void completeVersionLifecycleAndAggregation() throws Exception {
         try (var c = context()) {
             var m = MaterialIssueHttpTest.mvc(c);

@@ -92,7 +92,7 @@ def remaining(client, accepted):
     return pending, already
 
 
-def convert(client, portion, snapshot, probe=False, reader=None):
+def convert(client, portion, snapshot, probe=False, reader=None, start_transaction=True):
     ids = ','.join(str(int(e['executionId'])) for e in portion)
     markers = [key(d['source']['mappingId']) for e in portion for d in e['declarations']]
     markers += [key(n['mappingId']) for e in portion for n in e['nodes']]
@@ -103,7 +103,8 @@ def convert(client, portion, snapshot, probe=False, reader=None):
         actual = client.number('SELECT COUNT(*) FROM mes_legacy_source_mapping WHERE batch_id=' + quote(batch))
         assert actual == len(markers), 'Completed marker count mismatch'
         return dict(batchId=batch, executions=len(portion), declarations=0, replay=True)
-    client.run('START TRANSACTION')
+    if start_transaction:
+        client.run('START TRANSACTION')
     try:
         client.run('SELECT id FROM workorder WHERE id IN (SELECT workorder_id FROM mes_production_execution WHERE id IN (' + ids + ')) ORDER BY id FOR UPDATE')
         locked = client.run("SELECT e.id FROM mes_production_execution e JOIN workorder w ON w.id=e.workorder_id JOIN mes_execution_path p ON p.id=e.id AND p.routing_id=e.routing_id AND p.path_status='LOCKED' WHERE e.id IN (" + ids + ") AND e.status IN ('RUNNING','COMPLETED') AND w.source='LOCAL' AND w.status IN ('RELEASED','COMPLETED') ORDER BY e.id FOR UPDATE")
@@ -177,6 +178,7 @@ def main():
     parser.add_argument('--deployed-proof', type=Path)
     parser.add_argument('--reader-sql', type=Path)
     parser.add_argument('--batch-size', type=int, default=50)
+    parser.add_argument('--expected-source-count', type=int, default=12078)
     args = parser.parse_args()
     with gzip.open(args.evidence / 'plan.json.gz', 'rt') as f:
         content = f.read()
@@ -184,7 +186,8 @@ def main():
     assert snapshot == (args.evidence / 'plan.sha256').read_text().strip(), 'Frozen plan changed'
     plan = json.loads(content)
     reader = json.loads(args.reader_sql.read_text()) if args.reader_sql else None
-    assert plan['rule'] == RULE and plan['sourceCount'] == 12078
+    assert args.expected_source_count > 0
+    assert plan['rule'] == RULE and plan['sourceCount'] == args.expected_source_count
     assert 1 <= args.batch_size <= 50
     if args.apply:
         assert args.deployed_proof, 'Apply requires current backend code proof'

@@ -43,6 +43,8 @@ class QualityPlanTest(unittest.TestCase):
         self.assertEqual([], plan['rejected'])
         self.assertEqual('PENDING', plan['accepted'][0]['declarations'][0]['disposition'])
         self.assertIsNone(plan['accepted'][0]['declarations'][0]['source']['raw']['scrap_code'])
+        rows[-1]['raw']['status'] = '1'
+        self.assertEqual('PENDING', build(rows, allow_pending_disposition=True)['accepted'][0]['declarations'][0]['disposition'])
         rows[-1]['raw']['status'] = 'UNKNOWN'
         self.assertEqual([], build(rows, allow_pending_disposition=True)['accepted'])
 

@@ -30,7 +30,8 @@ class RecentProductionReportMySqlTest {
         try (var session = new SqlSessionFactoryBuilder().build(configuration).openSession()) {
             session.getConnection().setReadOnly(true);
             assertEquals("mes_base_dev_business_simple_b", session.getConnection().getCatalog());
-            try (var statement = session.getConnection().prepareStatement("SELECT version FROM flyway_business_schema_history WHERE success=1 ORDER BY installed_rank DESC LIMIT 1"); var history = statement.executeQuery()) {
+            try (var statement = session.getConnection()
+                    .prepareStatement("SELECT version FROM flyway_business_schema_history WHERE success=1 ORDER BY installed_rank DESC LIMIT 1"); var history = statement.executeQuery()) {
                 if (history.next()) System.out.println("SIMPLE_B current migration=" + history.getString(1));
             }
             for (String statementId : new String[]{RecentProductionReportExtraMapper.class.getName() + ".recent",

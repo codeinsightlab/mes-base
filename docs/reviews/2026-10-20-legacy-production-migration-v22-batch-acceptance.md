@@ -475,3 +475,20 @@ ProductionQuantityService.compose读取正式报工合计后，先加冻结gross
 先进行真实事务回滚样板，566张更新及逐字段比较通过；正式执行再次锁定目标工单并核对全表与备份一致，通过单条集合UPDATE仅改create_time/remark并验证受影响566行，再提交并独立读回。新时间范围2024-05-06 07:52:20至2026-10-16 20:46:04。其余1108张工单完整字段不变；所有工单的状态、数量、路线、来源、revision和update_time均未变。mes_production_report、mes_production_execution、mes_production_defect、mes_quality_treatment、mes_material_issue_input、wm_inventory、wm_stock_action七表CHECKSUM与执行前完全一致。
 
 实际8081详情复核1149/1407/1695三个工单及列表编码查询，创建时间和推导备注均已回显：5100-240701408=2024-07-01T15:03:30，5100-251001479=2025-10-05T15:11:40，5100-261001769=2026-10-05T15:24:37。现有前端创建时间字段消费该列表响应；本轮未额外执行浏览器视觉验收，未修改Java/Vue业务代码或Schema，未构建、重启服务。证据目录.local/legacy-report-identity-time-20261021/workorder-create-time包含all-workorders-before/after.json.gz、plan.json/sha256、apply.sql、rollback.sql、probe/apply-verification.json、http-verification.json。SQL已保存、正式执行并验证；rollback.sql仅保存未执行，回退仍须以当前值条件核对后使用。此前不良迁移阶段“工单头字段未变”的快照结论仍是当时事实，本次创建时间与备注变化由此条独立用户授权产生。
+
+
+### 2026-10-21 - User-selected requestDate mapping
+
+The user explicitly selects source workorder requestDate as Base workorder create_time, superseding both original create_time lookup and earliest-report inference for this synchronization. The actual source column is prod_j2eedb.pro_workorder.request_date; all1822 retrieved source workorders have a value. Reporting time continues to use the original reporting timestamp.
+
+Execution reuses the earlier metadata repair SQL with exact old-value conditions and affected-row backups. It is running; full completion is not claimed. Receipts are stored under .local/legacy-broader-migration-20261021/request-date-mapping/. A following operations queue calls the existing production activation function after the original imports and then repeats this date mapping for newly eligible headers. Existing function failures and missing source orders remain explicit exceptions. No trigger bypass, new route synchronization, additional probe, user-service restart or production migration function changes are introduced.
+
+
+### 2026-10-21 15:38 - In-flight import performance
+
+Committed168/202 workorders,1842 executions,23242 original reports; duplicate replay receipt excluded. Sum of per-order transaction measurements3074.79s; average18.30s/order, median11.44s, P90=40.43s, P95=58.40s, maximum138.24s (33 executions/603 reports). Measured transaction throughput7.56 source report rows/s. Latest20 orders consumed187.09s for1265 reports/233 executions. These measurements exclude reference preloading, startup, later activation, formal quality conversion and date metadata repair. This is a live progress snapshot rather than final migration acceptance. Machine-readable snapshot: .local/legacy-broader-migration-20261021/performance-current.json.
+
+
+### 2026-10-21 15:59 - Completion error during user service shutdown
+
+User reported stopping the backend. Actual user-service PID64314 app.log shows graceful shutdown beginning15:58:22.148, HTTP shutdown complete15:58:31.679, workOrderCompletionExecutor still running after its30000ms wait at15:59:01.695, and WorkOrderCompletionJob logging failure15:59:02.149. Root cause is SQLException: interrupt while PageHelper obtains a Druid connection during QualityTreatmentService.nodeTotals / ProductionQuantityService loading. This is the interrupted automatic completion worker, not a source import transaction failure. The importer had already committed205 orders; the separate activation runner ended15:57:55 with192 successful orders/2326 executions and13 original-function rejections. Formal quality conversion continues in a separate owned Python process and does not depend on the user8081 server. No user-service restart or new code fix was performed for this diagnosis. Evidence: .local/logs/MacBook-Pro-3.local-64314/app.log:1516-1526 and error.log:1441 onward.

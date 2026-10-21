@@ -22,9 +22,11 @@ public interface MesQualityTreatmentMapper {
 
     MesQualityTreatmentEntity selectByPrimaryKey(String id);
 
-    int updateByExampleSelective(@Param("row") MesQualityTreatmentEntity row, @Param("example") MesQualityTreatmentExample example);
+    int updateByExampleSelective(@Param("row") MesQualityTreatmentEntity row,
+                                 @Param("example") MesQualityTreatmentExample example);
 
-    int updateByExample(@Param("row") MesQualityTreatmentEntity row, @Param("example") MesQualityTreatmentExample example);
+    int updateByExample(@Param("row") MesQualityTreatmentEntity row,
+                        @Param("example") MesQualityTreatmentExample example);
 
     int updateByPrimaryKeySelective(MesQualityTreatmentEntity row);
 

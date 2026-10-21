@@ -53,7 +53,8 @@ def build(rows, reporter_overrides=None, allow_pending_disposition=False):
             if raw['type'] not in ('5704', '5705') or qty <= 0:
                 reasons.add('INVALID_LOSS')
             scrap_proven = raw['status'] == '1' and bool(raw.get('scrap_code'))
-            pending = raw['status'] == '0' and not raw.get('scrap_code')
+            # Missing or contradictory disposition evidence remains pending; never invent scrap.
+            pending = raw['status'] in ('0', '1') and not scrap_proven
             if not scrap_proven and not (allow_pending_disposition and pending):
                 reasons.add('DISPOSITION_NOT_PROVEN')
             creator = raw.get('create_by')
