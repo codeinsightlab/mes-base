@@ -103,11 +103,12 @@ class ProductionChainHttpTest {
                     .andExpect(status().isOk());
             m.perform(full(put(E + "/1"), "A").content(running)).andExpect(status().isConflict());
             m.perform(full(post("/api/production/executions/1/actions/start"), "A")).andExpect(status().isConflict());
-            m.perform(full(put(E + "/2"), "A").content(two.replace("300", "900"))).andExpect(status().isOk());
+            m.perform(full(put(E + "/2"), "A").content(two.replace("300", "900")))
+                    .andExpect(status().isUnprocessableEntity());
             m.perform(full(get(W + "/1/allocation"), "A")).andExpect(status().isOk())
-                    .andExpect(jsonPath("allocatedTargetQty").value("1300.000000"))
-                    .andExpect(jsonPath("remainingTargetQty").value("-300.000000"))
-                    .andExpect(jsonPath("excessTargetQty").value("300.000000"));
+                    .andExpect(jsonPath("allocatedTargetQty").value("700.000000"))
+                    .andExpect(jsonPath("remainingTargetQty").value("300.000000"))
+                    .andExpect(jsonPath("excessTargetQty").value("0.000000"));
             m.perform(full(get(W + "/1/allocation"), "B")).andExpect(status().isOk())
                     .andExpect(jsonPath("executionCount").value(0));
             assertEquals(0, a.queryForObject("SELECT COUNT(*) FROM production_batch", Integer.class));
@@ -127,7 +128,7 @@ class ProductionChainHttpTest {
                     .andExpect(jsonPath("batches[0].routeStatus").value("LOCKED"))
                     .andExpect(jsonPath("batches[0].path").doesNotExist());
             m.perform(full(put(W + "/1"), "A").content(DEMAND.replace("QA_DEMAND", "WO1")
-                            .replace("}", ",\"revision\":0}"))).andExpect(status().isOk());
+                    .replace("}", ",\"revision\":0}"))).andExpect(status().isOk());
             m.perform(full(post(W), "A").content(DEMAND)).andExpect(status().isOk());
             m.perform(full(delete(W + "/2"), "A").content("{\"revision\":0}"))
                     .andExpect(status().isNoContent());

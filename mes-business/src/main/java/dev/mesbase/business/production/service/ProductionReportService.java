@@ -1,6 +1,9 @@
 package dev.mesbase.business.production.service;
 
 import dev.mesbase.business.production.domain.ProductionQuantityInput;
+import dev.mesbase.business.production.domain.ProductionCompletionRequested;
+import dev.mesbase.platform.execution.FactoryContext;
+import org.springframework.context.ApplicationEventPublisher;
 
 import dev.mesbase.business.production.dao.MesProductionReportMapper;
 import dev.mesbase.business.production.dao.ProductionQuantityMapper;
@@ -39,6 +42,7 @@ import org.springframework.transaction.annotation.Isolation;
 @ConditionalOnProperty(name = "mes.business.enabled", havingValue = "true")
 public class ProductionReportService {
     private final BusinessSourceRules sources;
+    private final ApplicationEventPublisher publisher;
 
     private enum AdminAction {SUPPLEMENT, ADJUST, VOID}
 
@@ -54,7 +58,8 @@ public class ProductionReportService {
                                    ProductionQuantityService quantities,
                                    ProductionChainLocks locks, ReportUserReferenceService users,
                                    WorkstationMapper workstations, BusinessDirectoryService references,
-                                   BusinessSourceRules sources) {
+                                   BusinessSourceRules sources, ApplicationEventPublisher publisher) {
+        this.publisher = publisher;
         this.sources = sources;
         this.reports = reports;
         this.totals = totals;
@@ -162,6 +167,7 @@ public class ProductionReportService {
         } catch (DuplicateKeyException collision) {
             throw new FoundationException(ErrorCode.REPORT_REQUEST_CONFLICT, collision);
         }
+        publisher.publishEvent(new ProductionCompletionRequested(FactoryContext.required(), row.getExecutionId()));
         return reports.selectByPrimaryKey(row.getId());
     }
 

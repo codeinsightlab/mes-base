@@ -184,9 +184,13 @@ public class ProductionQuantityService {
         var balance = quantities.inputBalance(executionId);
         boolean historical = ProductionExecutionStatus.HISTORICAL.getValue().equals(execution.getStatus());
         if (historical && history == null) unavailable();
+        var opening = !historical && history != null ? history.activatedInput(executionId) : null;
+        boolean imported = historical || opening != null;
+        if (opening != null)
+            balance = new ProductionInputBalance(balance.confirmedQty().add(opening), balance.reservedQty());
         var inputQty = historical ? history.input(executionId) : balance.usableQty();
         if (inputQty == null || inputQty.signum() < 0) unavailable();
-        var historyNodes = historical ? history.nodes(executionId).stream()
+        var historyNodes = imported ? history.nodes(executionId).stream()
                 .collect(Collectors.toMap(n -> n.routingNodeId(), n -> new HistoricalNode(n.legacyNet(), n.grossCorrection(), n.effectiveDefect()))) : null;
         if (model.path() == null)
             return new ExecutionQuantity(executionId, execution.getWorkorderId(), execution.getExecutionNo(),
@@ -228,17 +232,20 @@ public class ProductionQuantityService {
             var reported = totals.getOrDefault(node.getId(), BigDecimal.ZERO);
             var quality = defectTotals.get(node.getId());
             var defect = quality == null ? BigDecimal.ZERO : quality.effectiveDefectQty();
-            if (historical) {
+            if (historyNodes != null) {
                 var evidence = historyNodes.get(node.getId());
-                if (evidence == null || evidence.legacyNet().compareTo(reported) != 0 || quality != null)
+                if (evidence == null || historical && (evidence.legacyNet()
+                        .compareTo(reported) != 0 || quality != null))
                     unavailable();
                 reported = reported.add(evidence.grossCorrection());
-                defect = evidence.effectiveDefect();
+                defect = defect.add(evidence.effectiveDefect());
             }
             result.add(new NodeQuantity(executionId, node.getId(), node.getOperationId(), node.getNodeCode(), node.getOperationName() != null ? node.getOperationName() : model.operationLabels()
                     .containsKey(node.getOperationId()) ? model.operationLabels().get(node.getOperationId())
                     .name() + "（当前名称）" : null, i + 1,
-                    BigDecimal.ZERO, reported, defect, BigDecimal.ZERO, BigDecimal.ZERO, true, quality == null ? BigDecimal.ZERO : quality.recoveredQty(), BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, quality == null ? BigDecimal.ZERO : quality.unverifiedQty(), historical ? defect : quality == null ? BigDecimal.ZERO : quality.directDefectQty()));
+                    BigDecimal.ZERO, reported, defect, BigDecimal.ZERO, BigDecimal.ZERO, true, quality == null ? BigDecimal.ZERO : quality.recoveredQty(), BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, quality == null ? BigDecimal.ZERO : quality.unverifiedQty(), historyNodes != null ? historyNodes.get(node.getId())
+                    .effectiveDefect()
+                    .add(quality == null ? BigDecimal.ZERO : quality.directDefectQty()) : quality == null ? BigDecimal.ZERO : quality.directDefectQty()));
         }
         boolean locked = ExecutionPathStatus.LOCKED.getValue().equals(model.path().getPathStatus());
         String boundary = historical ? "历史只读；投入为冻结材料证据推导，禁止正常生产操作" : !locked ? "实际路径尚未锁定，禁止写入报工数量"
@@ -277,15 +284,13 @@ public class ProductionQuantityService {
         }
         var labels = directory.routingLabels(rows.stream().map(ExecutionSummary::routingId).toList()).entrySet()
                 .stream().collect(Collectors.toMap(entry -> entry.getKey(), entry -> label(entry.getValue())));
-        var order = orders.selectByPrimaryKey(workorderId);
-        if (order != null && WorkOrderStatus.HISTORICAL.getValue().equals(order.getStatus()) && !rows.isEmpty()) {
-            if (history == null) unavailable();
-            var historicalInputs = history.inputs(rows.stream().map(ExecutionSummary::executionId).toList()).stream()
+        if (history != null && !rows.isEmpty()) {
+            var importedInputs = history.inputs(rows.stream().map(ExecutionSummary::executionId).toList()).stream()
                     .collect(Collectors.toMap(v -> v.executionId(), v -> v.quantity()));
-            if (historicalInputs.size() != rows.size()) unavailable();
             rows = rows.stream().map(v -> new ExecutionSummary(v.executionId(), v.workorderId(), v.executionNo(),
-                    v.routingId(), v.targetQty(), v.pathStatus(), v.lastNodeReportedQty(),
-                    historicalInputs.get(v.executionId()))).toList();
+                            v.routingId(), v.targetQty(), v.pathStatus(), v.lastNodeReportedQty(),
+                            v.productionInputQty().add(importedInputs.getOrDefault(v.executionId(), BigDecimal.ZERO))))
+                    .toList();
         }
         return new ExecutionPage(rows, total, offset, limit, labels);
     }
@@ -368,7 +373,7 @@ public class ProductionQuantityService {
         if (nodeId != null && !found) unavailable();
         return new ExecutionQuantity(view.executionId(), view.workorderId(), view.executionNo(), view.routingId(), view.targetQty(), view.pathStatus(), view.writable(), result.stream()
                 .anyMatch(n -> n.unverifiedDefectQty()
-                        .signum() > 0) ? "存在待核实不良；从受影响工序起禁止新增正向报工，请核实质量记录，正向交接保持质量门禁" : view.boundary(), List.copyOf(result), view.routingLabel(), view.productionInputQty(), view.confirmedInputQty(), view.reservedInputQty(), view.historical());
+                        .signum() > 0) ? "存在待核实不良；从受影响工序起禁止新增正向报工，请核实质量记录，后续流转保持质量门禁" : view.boundary(), List.copyOf(result), view.routingLabel(), view.productionInputQty(), view.confirmedInputQty(), view.reservedInputQty(), view.historical());
     }
 
     /**

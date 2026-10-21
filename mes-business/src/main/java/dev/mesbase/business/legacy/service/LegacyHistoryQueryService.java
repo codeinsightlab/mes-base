@@ -7,7 +7,6 @@ import dev.mesbase.business.production.dao.MesProductionExecutionMapper;
 import dev.mesbase.core.error.ErrorCode;
 import dev.mesbase.core.error.FoundationException;
 import java.math.BigDecimal;
-import dev.mesbase.business.production.domain.ProductionExecutionStatus;
 import java.util.List;
 import java.util.ArrayList;
 import java.util.stream.Collectors;
@@ -72,8 +71,6 @@ public class LegacyHistoryQueryService {
     public Detail execution(Long id) {
         var row = executions.selectByPrimaryKey(id);
         if (row == null) throw new FoundationException(ErrorCode.EXECUTION_NOT_FOUND);
-        if (!ProductionExecutionStatus.HISTORICAL.getValue().equals(row.getStatus()))
-            throw new FoundationException(ErrorCode.BAD_REQUEST);
         var mapping = metadata.execution(id);
         if (mapping == null) throw new FoundationException(ErrorCode.RESOURCE_CONFLICT);
         return new Detail(mapping, metadata.input(id), List.copyOf(metadata.nodes(id)));

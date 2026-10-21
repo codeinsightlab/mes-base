@@ -4,8 +4,8 @@ import java.util.Map;
 import java.util.LinkedHashMap;
 
 public enum StockDocumentType {
-    OTHER_RECEIPT("其他入库", "OTHER_RECEIPT"),
-    OTHER_ISSUE("其他出库", "OTHER_ISSUE");
+    OTHER_RECEIPT("入库单", "OTHER_RECEIPT"),
+    OTHER_ISSUE("出库单", "OTHER_ISSUE");
     private final String description;
     private final String value;
 

@@ -5,6 +5,7 @@ import dev.mesbase.business.production.dao.WorkorderMapper;
 import dev.mesbase.business.production.dao.WorkorderErpExtraMapper;
 import dev.mesbase.business.production.dao.MesProductionReceiptMapper;
 import dev.mesbase.business.production.domain.WorkorderEntity;
+import dev.mesbase.business.production.domain.MesProductionExecutionEntity;
 import dev.mesbase.business.production.domain.WorkorderErpExtraEntity;
 import dev.mesbase.business.wm.dao.WmWarehouseMapper;
 import dev.mesbase.business.wm.dao.WmWarehouseErpExtraMapper;
@@ -26,7 +27,6 @@ import dev.mesbase.business.integration.production.ProductionSupply.Context;
 import dev.mesbase.business.integration.production.ProductionSupply.Order;
 import dev.mesbase.business.integration.production.ProductionSupply.Stock;
 import org.junit.jupiter.api.Test;
-import org.springframework.mock.env.MockEnvironment;
 
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -69,6 +69,29 @@ class BusinessSourceRulesTest {
             return x;
         }).toList();
         when(warehouseExtras.selectByExample(any())).thenReturn(mappings);
+    }
+
+    @Test
+    void completedParentAllowsOnlyFinishedOutputAndStillChecksPersistedSources() {
+        var order = new WorkorderEntity();
+        order.setId(1L);
+        order.setSource("LOCAL");
+        order.setStatus("COMPLETED");
+        when(orders.selectByPrimaryKey(1L)).thenReturn(order);
+        var execution = new MesProductionExecutionEntity();
+        execution.setId(1L);
+        execution.setWorkorderId(1L);
+        mode(true, () -> {
+            assertDoesNotThrow(() -> rules.finishedOutput(execution, null));
+            assertThrows(FoundationException.class, () -> rules.execution(execution, null));
+            for (String status : List.of("CANCELLED", "HISTORICAL")) {
+                order.setStatus(status);
+                assertThrows(FoundationException.class, () -> rules.finishedOutput(execution, null));
+            }
+            order.setStatus("COMPLETED");
+            order.setSource("EXTERNAL");
+            assertThrows(FoundationException.class, () -> rules.finishedOutput(execution, null));
+        });
     }
 
     @Test

@@ -16,6 +16,7 @@ import dev.mesbase.business.production.dao.MesProductionExecutionMapper;
 import dev.mesbase.business.production.dao.RoutingMapper;
 import dev.mesbase.business.production.dao.RoutingProductMapper;
 import dev.mesbase.business.production.dao.WorkorderMapper;
+import dev.mesbase.business.production.dao.WorkOrderExtraMapper;
 import dev.mesbase.business.production.dao.MesExecutionPathMapper;
 import dev.mesbase.business.production.dao.MesProductionReportMapper;
 import dev.mesbase.business.production.dao.MesExecutionAssignmentMapper;
@@ -42,6 +43,7 @@ import org.springframework.stereotype.Component;
 @Component
 @ConditionalOnProperty(name = "mes.business.enabled", havingValue = "true")
 public class ProductionExecutionRules {
+    private final WorkOrderExtraMapper allocation;
     private final BusinessSourceRules sources;
     private final ExecutionQualityReferenceQuery quality;
     private final ProductionChainLocks locks;
@@ -63,7 +65,9 @@ public class ProductionExecutionRules {
                                     ProductionChainLocks locks, MesExecutionPathMapper paths,
                                     MesExecutionPathNodeMapper pathNodes, MesProductionReportMapper reports,
                                     ProductionQuantityMapper quantities, ExecutionQualityReferenceQuery quality,
-                                    MesExecutionAssignmentMapper assignments, BusinessSourceRules sources) {
+                                    MesExecutionAssignmentMapper assignments, BusinessSourceRules sources,
+                                    WorkOrderExtraMapper allocation) {
+        this.allocation = allocation;
         this.sources = sources;
         this.assignments = assignments;
         this.quality = quality;
@@ -91,6 +95,7 @@ public class ProductionExecutionRules {
                 .equals(row.getStatus()) && row.getStartTime() == null && row.getEndTime() == null);
         ProductionQuantityInput.check(row.getTargetQty());
         validateValues(row);
+        capacity(row);
         row.setExecutionNo("PENDING");
         audit(row, true);
     }
@@ -106,6 +111,8 @@ public class ProductionExecutionRules {
             frozen();
         boolean reportFacts = hasReports(old.getId());
         boolean facts = started(old) || hasIssues(old.getId()) || reportFacts;
+        valid(row.getTargetQty() != null);
+        if (facts && row.getTargetQty().compareTo(old.getTargetQty()) < 0) frozen();
         if (facts && (!Objects.equals(old.getRoutingId(), row.getRoutingId())
                 || ProductionExecutionStatus.READY.getValue()
                 .equals(row.getStatus()) && !ProductionExecutionStatus.READY.getValue().equals(old.getStatus())
@@ -113,6 +120,7 @@ public class ProductionExecutionRules {
         validateReferences(row, !Objects.equals(old.getRoutingId(), row.getRoutingId()) || !started(old) && started(row));
         validateValues(row);
         ProductionQuantityInput.changed(row.getTargetQty(), old.getTargetQty());
+        capacity(row);
         audit(row, false);
     }
 
@@ -180,6 +188,12 @@ public class ProductionExecutionRules {
         applicable.createCriteria().andRoutingIdEqualTo(row.getRoutingId()).andMaterialIdEqualTo(order.getProductId());
         valid(products.countByExample(applicable) > 0);
         return order;
+    }
+
+    private void capacity(MesProductionExecutionEntity row) {
+        var capacity = allocation.activeAllocation(row.getWorkorderId(), row.getId());
+        valid(capacity != null && capacity.allocatedTargetQty().add(row.getTargetQty())
+                .compareTo(capacity.plannedQty()) <= 0);
     }
 
     private void validateValues(MesProductionExecutionEntity row) {

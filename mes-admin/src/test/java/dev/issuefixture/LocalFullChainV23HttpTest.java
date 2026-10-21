@@ -20,42 +20,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  */
 class LocalFullChainV23HttpTest {
     @Test
-    void receiptReversalAndPhysicalAcceptanceCannotSpendTheSameRemainingHandover() throws Exception {
-        try (var c = ProductionReceiptHttpTest.context(); var pool = Executors.newFixedThreadPool(2)) {
-            var m = MaterialIssueHttpTest.mvc(c);
-            var j = ProductionReceiptHttpTest.db(c);
-            String receipt = WarehouseAcceptanceHttpTest.fixture(m, j);
-            var original = j.queryForMap("SELECT * FROM mes_production_receipt WHERE id=?", receipt);
-            var barrier = new CyclicBarrier(2);
-            var reverse = pool.submit(() -> {
-                barrier.await();
-                return m.perform(ProductionCoreV1HttpTest.full(post("/api/production/receipts/" + receipt + "/reverse"))
-                                .content(ProductionReceiptHttpTest.reverse("60", UUID.randomUUID().toString())))
-                        .andReturn().getResponse().getStatus();
-            });
-            var accept = pool.submit(() -> {
-                barrier.await();
-                return m.perform(ProductionCoreV1HttpTest.full(post("/api/wm/production-acceptances/receipts/" + receipt))
-                                .content(WarehouseAcceptanceHttpTest.command(UUID.randomUUID().toString(), "60")))
-                        .andReturn().getResponse().getStatus();
-            });
-            var result = List.of(reverse.get(), accept.get());
-            assertTrue(result.contains(200) && result.contains(409));
-            assertEquals(original, j.queryForMap("SELECT * FROM mes_production_receipt WHERE id=?", receipt));
-            BigDecimal handover = j.queryForObject("SELECT SUM(quantity_delta) FROM mes_production_receipt", BigDecimal.class);
-            BigDecimal accepted = j.queryForObject("SELECT COALESCE(SUM(quantity_delta),0) FROM mes_warehouse_acceptance", BigDecimal.class);
-            assertTrue(handover.compareTo(accepted) >= 0);
-            assertEquals(0, accepted.compareTo(j.queryForObject("SELECT quantity FROM wm_inventory WHERE id=1", BigDecimal.class)));
-            System.out.println("TEST_V23 exploratory receipt-reversal/acceptance statuses=" + result);
-        }
-    }
-
-    @Test
     void simultaneousQualityBasisChangeNeverLeavesAnEffectiveStaleRelease() throws Exception {
         try (var c = ProductionQualityV13HttpTest.context(100, 100, 100, 100, 100);
              var pool = Executors.newFixedThreadPool(2)) {
             var m = MaterialIssueHttpTest.mvc(c);
-            var j = ProductionReceiptHttpTest.db(c);
+            var j = ProductionWarehouseFixture.db(c);
             var reports = j.queryForList("SELECT * FROM mes_production_report ORDER BY id");
             var barrier = new CyclicBarrier(2);
             var release = pool.submit(() -> {
@@ -79,49 +48,12 @@ class LocalFullChainV23HttpTest {
     }
 
     @Test
-    void splitAcceptanceMustRespectEachOriginalHandoverBeforeStrictCompletion() throws Exception {
-        try (var c = ProductionQualityV13HttpTest.context(100, 100, 100, 100, 100)) {
-            var m = MaterialIssueHttpTest.mvc(c);
-            var j = ProductionReceiptHttpTest.db(c);
-            j.update("INSERT INTO wm_inventory(id,material_id,warehouse_id,batch_no,quantity,available_quantity,status) VALUES(1,1,1,'TEST-FINISHED',0,0,'ENABLED')");
-            m.perform(ProductionCoreV1HttpTest.full(post("/api/quality/releases/executions/1"))
-                    .content(ProductionCompletionHttpTest.release("100"))).andExpect(status().isOk());
-            String a = ProductionCompletionHttpTest.handover(m, "40");
-            String b = ProductionCompletionHttpTest.handover(m, "35");
-            String d = ProductionCompletionHttpTest.handover(m, "25");
-            assertEquals(0, j.queryForObject("SELECT quantity FROM wm_inventory WHERE id=1", BigDecimal.class)
-                    .signum());
-            ProductionCompletionHttpTest.accept(m, a, "30");
-            // A physical batch of 45 needs two original handover references (10 + 35).
-            m.perform(ProductionCoreV1HttpTest.full(post("/api/wm/production-acceptances/receipts/" + b))
-                            .content(WarehouseAcceptanceHttpTest.command(UUID.randomUUID().toString(), "45")))
-                    .andExpect(status().isConflict());
-            ProductionCompletionHttpTest.accept(m, a, "10");
-            ProductionCompletionHttpTest.accept(m, b, "35");
-            var state = new ObjectMapper().readTree(m.perform(ProductionCoreV1HttpTest.full(get("/api/production/executions/1/closure")))
-                    .andExpect(jsonPath("accepted").value("75.000000")).andReturn().getResponse().getContentAsString());
-            String body = "{\"requestId\":\"" + UUID.randomUUID() + "\",\"expectedBasisHash\":\"" + state.get("basisHash")
-                    .asString() + "\",\"reason\":\"TEST ONLY V23 split\"}";
-            m.perform(ProductionCoreV1HttpTest.full(post("/api/production/executions/1/actions/complete"))
-                            .content(body))
-                    .andExpect(status().isConflict());
-            ProductionCompletionHttpTest.accept(m, d, "25");
-            m.perform(ProductionCoreV1HttpTest.full(post("/api/production/executions/1/actions/complete"))
-                            .content(body))
-                    .andExpect(status().isOk());
-            assertEquals(0, new BigDecimal("100").compareTo(j.queryForObject("SELECT quantity FROM wm_inventory WHERE id=1", BigDecimal.class)));
-            assertEquals(0, j.queryForObject("SELECT COUNT(*) FROM wm_stock_action WHERE quantity_after<>quantity_before+quantity_delta", Integer.class));
-            assertEquals(1, j.queryForObject("SELECT COUNT(*) FROM mes_execution_completion", Integer.class));
-        }
-    }
-
-    @Test
     void cancellationAndPositiveReportShareTheWorkorderLockAndKeepCommittedHistory() throws Exception {
         for (int round = 0; round < 4; round++) {
             try (var c = ProductionQualityV13HttpTest.context(99, 98, 97, 96, 95);
                  var pool = Executors.newFixedThreadPool(2)) {
                 var m = MaterialIssueHttpTest.mvc(c);
-                var j = ProductionReceiptHttpTest.db(c);
+                var j = ProductionWarehouseFixture.db(c);
                 var original = j.queryForList("SELECT * FROM mes_production_report ORDER BY id");
                 String cancel = WorkOrderCancellationHttpTest.body(UUID.randomUUID().toString());
                 String report = ProductionReportHttpTest.supplement(11, "1");
@@ -165,7 +97,7 @@ class LocalFullChainV23HttpTest {
             var m = MaterialIssueHttpTest.mvc(c);
             var j = ProductionInputHttpTest.db(c);
             j.update("UPDATE wm_inventory SET quantity=0,available_quantity=0 WHERE id=1");
-            LocalWarehouseHttpTest.apply(m, "receipt", "200", "0");
+            LocalWarehouseHttpTest.apply(m, "gain", "200", "0");
             String inputBody = ProductionInputHttpTest.command(m, UUID.randomUUID().toString(), "L001", "50");
             var input = new ObjectMapper().readTree(ProductionInputHttpTest.submit(m, inputBody));
             var frozen = j.queryForList("SELECT * FROM mes_material_issue_input WHERE issue_id=?", input.get("issueId")

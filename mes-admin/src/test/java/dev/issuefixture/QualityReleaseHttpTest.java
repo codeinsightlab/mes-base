@@ -50,26 +50,25 @@ class QualityReleaseHttpTest {
     }
 
     @Test
-    void lateRealDefectPreservesReleasedHandoverAndShowsExcessWithoutAutoStockChanges() throws Exception {
+    void lateRealDefectPreservesPostedInboundAndBlocksFurtherStockChanges() throws Exception {
         try (var c = ProductionQualityV13HttpTest.context(100, 100, 100, 100, 100)) {
             var m = MaterialIssueHttpTest.mvc(c);
-            var j = ProductionReceiptHttpTest.db(c);
+            var j = ProductionWarehouseFixture.db(c);
             m.perform(ProductionCoreV1HttpTest.full(post("/api/quality/releases/executions/1"))
                     .content(ProductionCompletionHttpTest.release("98"))).andExpect(status().isOk());
-            String receipt = ProductionCompletionHttpTest.handover(m, "98");
             j.update("INSERT INTO wm_inventory(id,material_id,warehouse_id,batch_no,quantity,available_quantity,status) VALUES(1,1,1,'TEST-FINISHED',0,0,'ENABLED')");
-            ProductionCompletionHttpTest.accept(m, receipt, "98");
+            UnifiedInboundHttpTest.receive(m, "98");
             String defect = ProductionQualityV13HttpTest.defect(m, 12, "10", null, null);
             m.perform(ProductionCoreV1HttpTest.full(post("/api/quality/releases/executions/1"))
                     .content(ProductionCompletionHttpTest.release("90"))).andExpect(status().isConflict());
             var assess = (ObjectNode) new ObjectMapper().readTree(ProductionQualityV13HttpTest.command("ASSESS", null, "0", "0", "0", "0", "0"));
             assess.putObject("assessment").put("type", "INDEPENDENT").put("basis", "TEST ONLY 晚申报独立依据");
             ProductionQualityV13HttpTest.execute(m, defect, assess.toString());
-            m.perform(ProductionCoreV1HttpTest.full(get("/api/production/receipts/summary")).param("executionId", "1"))
-                    .andExpect(status().isOk()).andExpect(jsonPath("output").value("90.000000"))
-                    .andExpect(jsonPath("received").value("98.000000")).andExpect(jsonPath("excess").value("8.000000"));
+            m.perform(ProductionCoreV1HttpTest.full(get("/api/wm/stock-documents/executions/1/basis")))
+                    .andExpect(status().isOk()).andExpect(jsonPath("effective").value("90.000000"))
+                    .andExpect(jsonPath("received").value("98.000000")).andExpect(jsonPath("canReceive").value(false));
             assertEquals(1, j.queryForObject("SELECT COUNT(*) FROM mes_quality_release", Integer.class));
-            assertEquals(1, j.queryForObject("SELECT COUNT(*) FROM mes_production_receipt", Integer.class));
+            assertEquals(0, j.queryForObject("SELECT COUNT(*) FROM mes_production_receipt", Integer.class));
             assertEquals(0, new BigDecimal("98").compareTo(j.queryForObject("SELECT quantity FROM wm_inventory WHERE id=1", BigDecimal.class)));
         }
     }

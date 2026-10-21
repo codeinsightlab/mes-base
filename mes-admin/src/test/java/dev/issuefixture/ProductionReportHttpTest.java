@@ -242,7 +242,7 @@ class ProductionReportHttpTest {
             m.perform(full(get("/api/production/report-quantities/workorders/1"), "A")).andExpect(status().isOk())
                     .andExpect(jsonPath("total").value(2));
             m.perform(full(put("/api/production/mes-production-execution/1"), "A").content("{\"workorderId\":1,\"routingId\":1,\"targetQty\":6,\"status\":\"READY\"}"))
-                    .andExpect(status().isOk());
+                    .andExpect(status().isConflict()).andExpect(jsonPath("errorCode").value("EXECUTION_FROZEN"));
         }
     }
 

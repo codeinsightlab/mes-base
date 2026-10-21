@@ -40,6 +40,8 @@ public class WmStockDocumentEntity {
 
     private String postRequestHash;
 
+    private Long sourceExecutionId;
+
     public Long getId() {
         return id;
     }
@@ -182,5 +184,13 @@ public class WmStockDocumentEntity {
 
     public void setPostRequestHash(String postRequestHash) {
         this.postRequestHash = postRequestHash;
+    }
+
+    public Long getSourceExecutionId() {
+        return sourceExecutionId;
+    }
+
+    public void setSourceExecutionId(Long sourceExecutionId) {
+        this.sourceExecutionId = sourceExecutionId;
     }
 }

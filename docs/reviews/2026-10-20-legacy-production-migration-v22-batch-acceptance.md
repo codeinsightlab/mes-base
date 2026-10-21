@@ -300,3 +300,51 @@ Map 在私有 Python 工具中构建；在一个目标事务中锁定 566 条旧
 **构建边界：** 私有 Flyway 验收 helper 使用现有源码并仅将扫描位置明确为当前仓库 filesystem 迁移目录，已执行 IDEA 原生格式化、javac 编译和真实 Flyway migrate/validate。`mvn -B -ntp verify` 首次在既有 StockDocumentHttpTest 并发用例失败，该用例单独重验通过；第二次完整 verify 在 CodegenAcceptanceTest.globalCrudUsesPlatformOwnerAndPermissionWithoutFactoryIdentity 和 CodegenPersonAcceptanceTest.generatesPersonFromJdbcMetadataWithACompiledMenu 两项失败。验收期间工作区新增了多个其他任务的未提交改动，包括代码生成器及上述测试文件，已保护且未修改；本轮未声称完整构建通过，也不为取得通过而改写这些其他链路。数据库修正、真实门禁、回滚、重放、字段和 API 验证均已单独通过。git diff --check 通过。
 
 私有证据根为 `.local/route-identity-restore-20261021/`：`plan.json`、`source-routes-before/after.jsonl`、`routes-before.jsonl`、`routing-before.sql.gz`、`backup-manifest.json`、`flyway-43-before/after.txt`、`flyway.log`、`result.json`、`routes-after-all-fields.json`、`field-and-final-guard-verification.json`、`replay-idempotence.json`、`verification.json`、`concurrent-draft-additions.json`、`http-route-593.json`、`cache-eviction.json`、各负例及构建日志。前后全字段快照压缩并校验内容 SHA 后保存为 before/after/snapshot.jsonl.gz；verify.py 支持直接读取压缩快照，不再保留重复的大型未压缩文件。旧 .local 清理报告的空间统计仍代表当时状态。
+
+## 2026-10-21 — 导入业务状态与正式流转缺口复审
+
+用户进一步明确目标：外部导入应进入同一正式业务模型，可信的已完成生产应在Base呈现完成，而非永久停留在历史只读。本节是诊断及设计建议，未实施状态升级，未修改业务代码、触发器或库存。前述V2.2验收仍只证明当时约定的历史只读迁移完成，不证明业务接续已实现。
+
+### 当前真实数据与源码证据
+
+- 重新核对中心绑定：TEST_DEV_PERF_20261019，ENABLED/LOCAL，数据源9/revision2/ENABLED，192.168.18.25:3306/mes_base_dev_perf_test。只读统计当前HISTORICAL工单566、执行8380、关联报工122171；这些执行关联的mes_material_issue_input及mes_execution_completion均为0。此为当前总存量，不能替代前述冻结564单的批次统计。
+- LegacyHistoryImportService创建工单及执行时硬编码HISTORICAL；报工写入同一mes_production_report，类型REPORT，数量、人员、时间及原始来源证据落地，但没有将旧报工状态转换成Base生产完成状态。导入命令本身也没有可信完成状态/完成时间字段。
+- 当前报工表没有草稿/审核/完成的生命周期状态字段，只有REPORT/ADJUSTMENT事实类型；作废通过追加负调整表达。productionReporting页面的AVAILABLE、NO_QUANTITY、NOT_ASSIGNED、NO_CAPABILITY、QUALITY_PENDING、EXECUTION_NOT_READY是当前节点可操作性，不是原报工流水是否有效。
+- context()只接受工单RELEASED、执行READY/RUNNING及路径LOCKED；HISTORICAL首先返回EXECUTION_NOT_READY，通用原因没有清楚指出历史隔离。数量投影对历史对象固定writable=false、availableQty=0，以冻结映射读取推导历史投入；正式confirmedInput不是该历史投入。
+- 自动完工候选只取RELEASED/LOCAL父单下的RUNNING执行；ProductionCompletionBalance还拒绝historical投影。已实际查询到mes_history_execution_update、mes_history_order_update及history_mes_execution_completion_insert三个BEFORE触发器，V41定义明确禁止历史对象更新及追加正式完工事实。该阻断不是巡检延迟，不能通过直接UPDATE状态修复。
+- 当前来源REPORT映射保留的report.status分布：0共104，1共53，4共23，5共121991。只读审查ktg-mes的DicEnums确认0=未完结、1=已完结、4=部分入库、5=全部入库。旧状态混合生产完结与仓储进度，不能直接作为Base工单或执行状态。单条报工完成也不证明所有工序、所有流程卡或整张工单完成。
+- 旧质量在本迁移中作为QUALITY_EVIDENCE映射保存，不能自动等同已建立正式质量处置。旧投入也是有来源的推导证据，不能宣称已创建当前LOCAL领料或库存动作。
+
+### 设计判断与接续建议（未实施）
+
+当前HISTORICAL同时表达来源、写保护和生产生命周期，适合第一阶段隔离归档，却不满足用户现在要求的正式接续。来源/迁移证据、生产状态、质量处置和仓储进度应分别表达；导入与手工创建复用同一状态规则及数量投影，不另建一套生产核心。历史导入标签不应永久代替正常业务状态，也不能把历史导入误归为当前ERP管理的EXTERNAL对象。
+
+建议先逐执行核实完整路径、来源完成依据、归一单位的投入/净产出/最终损失及质量处置；再按父单核实全部流程卡范围，包括尚未迁入、拒绝及排除的范围。可信完成的执行受控登记带来源/原完成时间/本次登记时间的完成依据；可信整单完成再进入COMPLETED。未完成对象只有具备切换时点、在制数量、后续库存权属及剩余可加工额度时才接续RUNNING；证据缺失项列出具体原因，不能伪造领料、放行、入库或当前操作人点击事实。
+
+生产完成不依赖成品先入库或人工数量放行；仍须质量处置结束。入库单确认过账负责库存生效，旧系统已入库记录仅凭状态值不得再次新增当前库存。数量闭合应使用相同计量口径、末道有效产出及最终损失，不能累计所有工序报工或把公斤原料直接等同件数产品；阶段性闭合还需明确执行范围及无未决投入/返工，防止提前终结。跨保管责任、工序或外协转移可按真实需求保留独立追溯事实，不应因为移除原成品交接审批链而删除所有流转记录。
+
+实施需要新增正式迁移演进V41门禁及历史数量依据入口，保留已发布迁移和来源Mapping，不直接禁用全部触发器。验收应先列逐执行状态对照和阻断清单，再验证代表性已完成、未完成、有不良、已入库及不完整工单：状态正确、后续操作正确、重复导入无新增、当前库存不重复变化。当前尚未取得这些接续验收证据，也未验证用户运行服务已加载此前自动完工代码。
+
+参考边界：OPC Foundation ISA-95 Part4 JobResponse同时表达JobState、实际资源/材料及StartTime/EndTime；这里借鉴事实与状态的区分，不宣称标准强制本项目使用上述具体完成公式。参考：https://reference.opcfoundation.org/specs/OPC-10031-4/6.3.5 。
+
+### 同日用户纠正与正式接入实现
+
+用户明确选择不使用外部完成状态：现有HISTORICAL执行先受控进入RUNNING，由内部数量及质量门禁自行判定完成。用户同时纠正上节“阶段性闭合还需等待执行范围固定”的建议：单执行数量闭合且质量处置结束即可自动完工；工单未覆盖的需求通过追加执行单元处理，累计不能突破工单量。本条取代上节有关未来可能追加生产而暂缓当前执行完工的建议，不把未来追加需求作为当前执行完工的额外门禁。
+
+新增LegacyProductionActivationService作为受控运维用例，按工单持锁并在同一业务事务内验证历史投影、保存不可变ORDER_ACTIVATION/PRODUCTION_ACTIVATION来源关联、将父单设为RELEASED及执行设为RUNNING。启动时间记录本次正式接入时间，原始报工时间及来源不改。提交后发送现有ProductionCompletionRequested事件，沿用同一完工服务；不复制来源status，不直接把对象批量设为COMPLETED，不创建领料、库存或质量放行单据。原来源Mapping保持不变，激活后原已完成导入命令可按原身份重放，但旧历史追加入口不得继续给已激活工单补入只读执行。
+
+ProductionQuantityService将“历史只读状态”和“导入期初数量依据”解耦：激活后读取有授权关联的冻结投入，作为已审核期初投入与当前正常投入相加；保留节点grossCorrection及期初最终损耗，再叠加正式报工调整及后续质量事实。切换RUNNING/COMPLETED不会让原投入归零或损耗消失，availableQty按同一投影重新计算，不再因来源是导入而固定为0。confirmedInputQty在此表达已认可投入总额，包含明确来源的期初量，不表示补造了当前领料事实。尚未激活的对象仍按旧只读契约保护。历史证据查询改为依据来源Mapping而非状态判断可读性。
+
+补齐此前实际缺失的总量约束：执行创建/编辑在工单锁内限制有效执行目标合计不超过计划量；有已开始生产、领料或报工事实时不得减少执行目标以腾挪已占用额度。重复投产将当前确认投入、未决投入意图与本次投入一起占用执行目标，必要时在工单总量内扩展目标，未知/未决意图不能重复占用同一份额度。工单不能编辑到低于有效执行分配量。单执行仍按自身投入=末道有效产出+最终损耗完工；父单还须所有执行正式结束、有效执行目标合计及确认投入合计均等于工单计划量，避免首批执行结束就提前封单。
+
+正式新增V45仅演进V41的工单/执行更新门禁，精确允许具有冻结来源关联及RUNNING审核批次的HISTORICAL→RELEASED/RUNNING转换，原报工、Mapping及其他事实的不可变门禁保留。已在重新核实的同一DEV实例及绑定上通过正式Flyway执行，45项校验通过；V40—V44校验和未改。已有566张历史工单与8380个历史执行的范围备份及执行日志在`.local/production-activation-20261021/`，没有保存额外验收JAR副本。
+
+真实MySQL回滚试验使用当前登录的平台用户100、正式Factory路由/快照及业务事务：两张工单共11个执行先激活，再调用真实ProductionCompletionService.reconcile，11个均按内部规则完工；第一张父单因范围/数量未覆盖保持RELEASED，第二张满足条件转COMPLETED。全部事务显式回滚，随后历史工单仍566、历史执行仍8380、激活关联仍0；原报工、正式投入、库存余额及动作CHECKSUM与试验前完全一致。另实际验证未带激活关联的两种直接UPDATE均被V45拒绝。CHECKSUM是本次范围的附加变化检测，不替代前述迁移阶段的逐主键全字段审计。
+
+定向24项测试已通过，其中新增HTTP/H2场景验证期初投入100、末道产出90及损耗10的执行自动完工，计划1000的父单保留追加900的空间、拒绝追加901；重复投产不能突破总量且失败不新增领料单。H2中的期初依据读取器是显式Mock，正式SQL、V45门禁及事务证据由上述真实MySQL探针补充。首次全量验证发现两条旧用例仍允许超量分配，已改为断言拒绝；另一个Fixture的12.12执行改为匹配10的工单计划。先前实现全量verify已通过，补齐重复投产上限后的最终构建记录另见后续回执。
+
+部署边界：批量激活尚未执行。必须先由用户重新加载新后端，再执行566单的受控激活并给出实际完成/未完成及具体阻断原因；旧后端只按状态读取历史投入，不能在其仍运行时把8380个执行直接改为RUNNING。Agent没有重启用户服务，也没有将回滚结果记为已持久化完成。进入正式流程后不得回退到忽略期初依据的旧JAR；不能删除新增完工事实或把COMPLETED强改回HISTORICAL作为回滚。
+
+最终验证补充：`verify-delivery.log`标准全量verify通过（合计810项、47项按既有环境门禁跳过，零失败/错误）；`verify-final-flow.log`补充12项verify通过，其中新场景在期初投入100、期初损耗10、末道已有80时，确认不能提前完工，再经正式报工HTTP追加10，真实提交后事件自动完成执行及父工单，最终产出90且库存动作仍0。打包smoke10项通过。原有有投入/报工执行目标从10降到6的旧测试已更新为拒绝，不为维持旧断言放松额度保护。新的有效分配及未决投入SQL已在实际目标只读执行，未决投入使用idx_input_execution及领料主键关联。
+
+回滚后另将当前全部566张历史工单与8380个历史执行重新导出，与原备份的INSERT行按完整字段进行SHA-256比较，结果完全相同（`rollback-full-row-verification.json`），没有额外保存第二份全量导出。正式批次的566个工单ID及来源哈希已冻结到`scope.json`及`scope.sha256`；TEST ONLY运维启动器校验冻结摘要和来源身份，禁止静默扩大范围。激活用例复用现有Factory范围执行缓存失效协议，提交后清理执行列表及详情，回滚不发布失效，不清理其他工厂或权限缓存。尚未批量转态的部署边界保持不变。

@@ -25,8 +25,6 @@ import dev.mesbase.business.integration.production.ProductionSupply.Calculation;
 import dev.mesbase.business.integration.warehouse.WarehouseIntegration;
 import dev.mesbase.business.integration.warehouse.ErpActionResult.Mode;
 import dev.mesbase.business.production.service.ProductionChainLocks;
-import dev.mesbase.business.production.domain.MesProductionReceiptEntity;
-import dev.mesbase.business.wm.domain.MesWarehouseAcceptanceEntity;
 import dev.mesbase.business.production.dao.MesProductionReportMapper;
 import dev.mesbase.business.production.domain.MesProductionReportExample;
 import dev.mesbase.business.quality.dao.MesProductionDefectMapper;
@@ -126,6 +124,7 @@ public class LocalStockService {
         var stock = lock(c.stockId());
         var old = replay(id, hash);
         if (old != null) return old;
+        if (type == StockActionType.RECEIPT) throw new FoundationException(ErrorCode.STOCK_DOCUMENT_REQUIRED);
         if (input == null) sources.warehouse(BusinessSource.LOCAL.getValue(), stock.getWarehouseId());
         else {
             var originalExecution = locks.execution(input.getExecutionId());
@@ -227,49 +226,14 @@ public class LocalStockService {
     /**
      * Caller holds WorkOrder -> Execution before entering this owner; only the owner locks/writes stock.
      */
-    @Transactional(transactionManager = "businessTransactionManager", propagation = Propagation.MANDATORY, rollbackFor = Exception.class)
-    @BusinessCacheEvict(business = WmInventoryResource.PREFIX, scope = BusinessCacheEvict.Scope.LIST_AND_DETAIL)
-    public WmStockActionEntity receiveProduct(MesWarehouseAcceptanceEntity fact, MesProductionReceiptEntity receipt,
-                                              Long productId) {
-        var ownerExecution = locks.execution(fact.getExecutionId());
-        var stock = lock(fact.getStockId());
-        if (fact.getQuantityDelta().signum() > 0)
-            sources.warehouse(BusinessSource.LOCAL.getValue(), stock.getWarehouseId());
-        if (!Objects.equals(stock.getMaterialId(), productId) || !Objects.equals(stock.getWarehouseId(), receipt.getWarehouseId())
-                || stock.getBatchNo() == null || stock.getBatchNo().isBlank()
-                || receipt.getProductLotCode() != null && !Objects.equals(stock.getBatchNo(), receipt.getProductLotCode())
-                || !Objects.equals(fact.getExecutionId(), receipt.getExecutionId()) || !Objects.equals(fact.getReceiptId(), receipt.getId())
-                || !Objects.equals(fact.getProductId(), productId)) conflict();
-        decimal(fact.getQuantityDelta());
-        if (fact.getQuantityDelta().signum() == 0) bad();
-        var type = fact.getQuantityDelta()
-                .signum() > 0 ? StockActionType.PRODUCT_RECEIPT : StockActionType.PRODUCT_REVERSAL;
-        String hash = digest(type, fact.getRequestHash());
-        var old = replay(fact.getId(), hash);
-        if (old != null) return old;
-        if (fact.getQuantityDelta().signum() > 0) sources.execution(ownerExecution, receipt.getWarehouseId());
-        if (type == StockActionType.PRODUCT_REVERSAL) {
-            var original = actions.selectByPrimaryKey(fact.getReferenceId());
-            if (original == null || !StockActionType.PRODUCT_RECEIPT.getValue().equals(original.getActionType())
-                    || !Objects.equals(original.getStockId(), fact.getStockId()) || !Objects.equals(original.getExecutionId(), fact.getExecutionId())
-                    || !Objects.equals(original.getSourceId(), receipt.getId())
-                    || !Objects.equals(original.getMaterialId(), stock.getMaterialId())
-                    || !Objects.equals(original.getWarehouseId(), stock.getWarehouseId())
-                    || !Objects.equals(original.getBatchNo(), stock.getBatchNo())
-                    || !Objects.equals(original.getBinCode(), stock.getBinCode())
-                    || !Objects.equals(original.getUnitId(), materials.selectByPrimaryKey(stock.getMaterialId())
-                    .getUnitId())) conflict();
-        } else if (fact.getReferenceId() != null) bad();
-        return change(stock, fact.getId(), hash, type, fact.getQuantityDelta(), StockSourceType.PRODUCTION_RECEIPT, receipt.getId(), fact.getReferenceId(), fact.getExecutionId(), SecurityUtils.getUserId(), fact.getReason());
-    }
-
     /**
      * The document transaction owns all lines; this owner alone mutates balances and appends facts.
      */
     @Transactional(transactionManager = "businessTransactionManager", propagation = Propagation.MANDATORY, rollbackFor = Exception.class)
     @BusinessCacheEvict(business = WmInventoryResource.PREFIX, scope = BusinessCacheEvict.Scope.LIST_AND_DETAIL)
     public WmStockActionEntity postDocument(String type, Long documentId, WmStockDocumentLineEntity line,
-                                            String operationId, String actionId, String requestHash, String reason) {
+                                            String operationId, String actionId, String requestHash, String reason,
+                                            Long executionId) {
         var actionType = StockActionType.from(type);
         var sourceType = StockSourceType.from(type);
         if (actionType != StockActionType.OTHER_RECEIPT && actionType != StockActionType.OTHER_ISSUE) bad();
@@ -290,7 +254,7 @@ public class LocalStockService {
             throw new FoundationException(ErrorCode.STOCK_INSUFFICIENT);
         BigDecimal delta = actionType == StockActionType.OTHER_ISSUE ? line.getQuantity().negate() : line.getQuantity();
         return change(stock, actionId, requestHash, actionType, delta, sourceType, documentId.toString(),
-                null, null, SecurityUtils.getUserId(), reason, line.getId(), operationId);
+                null, executionId, SecurityUtils.getUserId(), reason, line.getId(), operationId);
     }
 
     @Transactional(transactionManager = "businessTransactionManager", propagation = Propagation.MANDATORY)

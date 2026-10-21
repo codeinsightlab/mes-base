@@ -10,7 +10,6 @@ import dev.mesbase.business.quality.domain.QualityTreatmentModels.Assessment;
 import dev.mesbase.business.quality.domain.QualityTreatmentModels.Command;
 import dev.mesbase.business.quality.domain.ProductionDefectModels;
 import dev.mesbase.business.quality.domain.ProductionDefectModels.Facts;
-import dev.mesbase.business.production.domain.ProductionReportModels.ExecutionQuantity;
 import dev.mesbase.core.error.FoundationException;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -118,7 +117,8 @@ class ProductionQualityV13MySqlTest {
             t.execute(id, correction);
             t.execute(id, correction);
             eq(91, q.getExecutionQuantities(f.execution()).nodes().getLast().effectiveOutputQty());
-            eq(7, receipt.summary(f.execution()).excess());
+            eq(7, h.jdbc.queryForObject("SELECT SUM(quantity_delta) FROM mes_production_receipt WHERE execution_id=?", BigDecimal.class, f.execution())
+                    .subtract(q.getExecutionQuantities(f.execution()).nodes().getLast().effectiveOutputQty()));
             assertEquals(original, h.jdbc.queryForMap("SELECT * FROM mes_quality_treatment WHERE id=?", result.requestId()));
             assertEquals(1, h.jdbc.queryForObject("SELECT COUNT(*) FROM mes_quality_treatment WHERE id=?", Integer.class, correction.requestId()));
             assertThrows(DataAccessException.class, () -> h.jdbc.update("DELETE FROM mes_quality_treatment WHERE id=?", correction.requestId()));
@@ -145,7 +145,8 @@ class ProductionQualityV13MySqlTest {
             var id = defect(h, f, 1, 10);
             var a = q.getExecutionQuantities(f.execution());
             eq(90, a.nodes().getLast().effectiveOutputQty());
-            eq(8, receipts.summary(f.execution()).excess());
+            eq(8, h.jdbc.queryForObject("SELECT SUM(quantity_delta) FROM mes_production_receipt WHERE execution_id=?", BigDecimal.class, f.execution())
+                    .subtract(a.nodes().getLast().effectiveOutputQty()));
             for (int i = 2; i < 5; i++) eq(10, a.nodes().get(i).historicalOverrunQty());
             var parent = start(t, id);
             var result = action(Action.RESULT, parent, 0, 0, 4, 4, 0);

@@ -145,13 +145,11 @@ class StockDocumentHttpTest {
 
     @Test
     void cancelledOrderUsesOnlyUnreceivedHandoverAndPreservesProductionFacts() throws Exception {
-        try (var c = ProductionReceiptHttpTest.context()) {
+        try (var c = ProductionWarehouseFixture.context()) {
             var m = MaterialIssueHttpTest.mvc(c);
-            var j = ProductionReceiptHttpTest.db(c);
-            String receipt = WarehouseAcceptanceHttpTest.fixture(m, j);
-            m.perform(full(post("/api/wm/production-acceptances/receipts/" + receipt))
-                            .content(WarehouseAcceptanceHttpTest.command(UUID.randomUUID().toString(), "60")))
-                    .andExpect(status().isOk());
+            var j = ProductionWarehouseFixture.db(c);
+            String receipt = ProductionWarehouseFixture.legacy(m, j);
+            ProductionWarehouseFixture.legacyAccepted(j, receipt, "60");
             String version = j.queryForObject("SELECT revision FROM workorder WHERE id=1", String.class);
             m.perform(full(post("/api/production/workorder/1/actions/cancel"))
                             .content("{\"requestId\":\"" + UUID.randomUUID() + "\",\"expectedRevision\":" + version + ",\"reason\":\"TEST ONLY warehouse handover remainder\"}"))

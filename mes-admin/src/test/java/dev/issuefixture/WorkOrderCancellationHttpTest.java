@@ -18,7 +18,6 @@ import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.Executors;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.jdbc.core.JdbcTemplate;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -96,13 +95,11 @@ class WorkOrderCancellationHttpTest {
 
     @Test
     void runningWithWarehouseFactsCancelsWithoutChangingAnyFactAndRejectsForwardCommands() throws Exception {
-        try (var c = ProductionReceiptHttpTest.context(ProductionInputHttpTest.Extra.class)) {
+        try (var c = ProductionWarehouseFixture.context(ProductionInputHttpTest.Extra.class)) {
             var m = MaterialIssueHttpTest.mvc(c);
-            var j = ProductionReceiptHttpTest.db(c);
-            String receipt = WarehouseAcceptanceHttpTest.fixture(m, j), acceptance = UUID.randomUUID().toString();
-            String acceptBody = WarehouseAcceptanceHttpTest.command(acceptance, "60");
-            m.perform(ProductionCoreV1HttpTest.full(post("/api/wm/production-acceptances/receipts/" + receipt))
-                    .content(acceptBody)).andExpect(status().isOk());
+            var j = ProductionWarehouseFixture.db(c);
+            String receipt = ProductionWarehouseFixture.legacy(m, j);
+            String acceptance = ProductionWarehouseFixture.legacyAccepted(j, receipt, "60");
             var tables = List.of("mes_production_execution", "mes_material_issue", "mes_material_issue_input", "mes_production_report", "mes_production_defect", "mes_quality_treatment", "mes_quality_release", "mes_production_receipt", "mes_warehouse_acceptance", "wm_inventory", "wm_stock_action");
             var baseline = tables.stream().map(t -> j.queryForList("SELECT * FROM " + t + " ORDER BY id")).toList();
             cancel(m);
@@ -123,21 +120,15 @@ class WorkOrderCancellationHttpTest {
             m.perform(ProductionCoreV1HttpTest.full(post("/api/quality/releases/executions/1"))
                             .content("{\"requestId\":\"" + UUID.randomUUID() + "\",\"quantity\":\"1\",\"reason\":\"TEST ONLY\"}"))
                     .andExpect(status().isConflict()).andExpect(jsonPath("errorCode").value("WORKORDER_CANCELLED"));
-            m.perform(ProductionCoreV1HttpTest.full(post(ProductionReceiptHttpTest.ROOT))
-                            .content("{\"requestId\":\"" + UUID.randomUUID() + "\",\"executionId\":1,\"warehouseId\":1,\"quantity\":\"1\"}"))
-                    .andExpect(status().isConflict()).andExpect(jsonPath("errorCode").value("WORKORDER_CANCELLED"));
-            m.perform(ProductionCoreV1HttpTest.full(post("/api/wm/production-acceptances/receipts/" + receipt))
-                            .content(WarehouseAcceptanceHttpTest.command(UUID.randomUUID().toString(), "1")))
+            m.perform(ProductionCoreV1HttpTest.full(post(StockDocumentHttpTest.ROOT))
+                            .content("{\"documentType\":\"OTHER_RECEIPT\",\"sourceExecutionId\":1,\"reason\":\"TEST ONLY\"}"))
                     .andExpect(status().isConflict()).andExpect(jsonPath("errorCode").value("WORKORDER_CANCELLED"));
             m.perform(ProductionCoreV1HttpTest.full(post("/api/production/executions/1/actions/complete"))
                             .content("{\"requestId\":\"" + UUID.randomUUID() + "\",\"expectedBasisHash\":\"test\",\"reason\":\"TEST ONLY\"}"))
                     .andExpect(status().isConflict());
-            m.perform(ProductionCoreV1HttpTest.full(post("/api/wm/production-acceptances/receipts/" + receipt))
-                    .content(acceptBody)).andExpect(status().isOk()).andExpect(jsonPath("id").value(acceptance));
-            m.perform(ProductionCoreV1HttpTest.full(post("/api/wm/production-acceptances/" + acceptance + "/reverse"))
-                            .content("{\"requestId\":\"" + UUID.randomUUID() + "\",\"quantity\":\"1\",\"reason\":\"TEST ONLY historical recovery\"}"))
+            m.perform(ProductionCoreV1HttpTest.full(get("/api/wm/production-acceptances/receipts/" + receipt + "/history")))
                     .andExpect(status().isOk());
-            assertEquals(0, new BigDecimal("59").compareTo(j.queryForObject("SELECT quantity FROM wm_inventory WHERE id=1", BigDecimal.class)));
+            assertEquals(0, new BigDecimal("60").compareTo(j.queryForObject("SELECT quantity FROM wm_inventory WHERE id=1", BigDecimal.class)));
         }
     }
 

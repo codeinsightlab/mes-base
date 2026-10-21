@@ -1264,6 +1264,66 @@ public class WmStockDocumentExample {
             addCriterion("post_request_hash not between", value1, value2, "postRequestHash");
             return (Criteria) this;
         }
+
+        public Criteria andSourceExecutionIdIsNull() {
+            addCriterion("source_execution_id is null");
+            return (Criteria) this;
+        }
+
+        public Criteria andSourceExecutionIdIsNotNull() {
+            addCriterion("source_execution_id is not null");
+            return (Criteria) this;
+        }
+
+        public Criteria andSourceExecutionIdEqualTo(Long value) {
+            addCriterion("source_execution_id =", value, "sourceExecutionId");
+            return (Criteria) this;
+        }
+
+        public Criteria andSourceExecutionIdNotEqualTo(Long value) {
+            addCriterion("source_execution_id <>", value, "sourceExecutionId");
+            return (Criteria) this;
+        }
+
+        public Criteria andSourceExecutionIdGreaterThan(Long value) {
+            addCriterion("source_execution_id >", value, "sourceExecutionId");
+            return (Criteria) this;
+        }
+
+        public Criteria andSourceExecutionIdGreaterThanOrEqualTo(Long value) {
+            addCriterion("source_execution_id >=", value, "sourceExecutionId");
+            return (Criteria) this;
+        }
+
+        public Criteria andSourceExecutionIdLessThan(Long value) {
+            addCriterion("source_execution_id <", value, "sourceExecutionId");
+            return (Criteria) this;
+        }
+
+        public Criteria andSourceExecutionIdLessThanOrEqualTo(Long value) {
+            addCriterion("source_execution_id <=", value, "sourceExecutionId");
+            return (Criteria) this;
+        }
+
+        public Criteria andSourceExecutionIdIn(List<Long> values) {
+            addCriterion("source_execution_id in", values, "sourceExecutionId");
+            return (Criteria) this;
+        }
+
+        public Criteria andSourceExecutionIdNotIn(List<Long> values) {
+            addCriterion("source_execution_id not in", values, "sourceExecutionId");
+            return (Criteria) this;
+        }
+
+        public Criteria andSourceExecutionIdBetween(Long value1, Long value2) {
+            addCriterion("source_execution_id between", value1, value2, "sourceExecutionId");
+            return (Criteria) this;
+        }
+
+        public Criteria andSourceExecutionIdNotBetween(Long value1, Long value2) {
+            addCriterion("source_execution_id not between", value1, value2, "sourceExecutionId");
+            return (Criteria) this;
+        }
     }
 
     public static class Criteria extends GeneratedCriteria {

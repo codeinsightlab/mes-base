@@ -4,20 +4,26 @@ import com.github.pagehelper.PageHelper;
 import dev.mesbase.business.basic.dao.MaterialMapper;
 import dev.mesbase.business.basic.dao.UnitMeasureMapper;
 import dev.mesbase.business.production.dao.MesProductionExecutionMapper;
+import dev.mesbase.business.production.dao.WorkorderMapper;
+import dev.mesbase.platform.execution.FactoryIntegrationContext;
+import dev.mesbase.core.factory.FactoryRuntimeMode;
 import dev.mesbase.business.production.dao.MesProductionReceiptMapper;
 import dev.mesbase.business.production.domain.MesProductionExecutionExample;
+import dev.mesbase.business.production.domain.MesProductionExecutionEntity;
 import dev.mesbase.business.production.domain.MesProductionReceiptExample;
 import dev.mesbase.business.production.domain.WorkorderEntity;
+import dev.mesbase.business.production.domain.ProductionExecutionStatus;
+import dev.mesbase.business.production.domain.ProductionQuantityInput;
+import dev.mesbase.business.quality.service.QualityReleaseService;
+import dev.mesbase.business.wm.dao.StockDocumentExtraMapper;
 import dev.mesbase.business.production.service.BusinessSourceRules;
 import dev.mesbase.business.production.service.ProductionChainLocks;
 import dev.mesbase.business.production.domain.ProductionScanCode;
 import dev.mesbase.business.shared.enums.BusinessSource;
 import dev.mesbase.business.shared.enums.EnableStatus;
-import dev.mesbase.business.wm.dao.MesWarehouseAcceptanceMapper;
 import dev.mesbase.business.wm.dao.WmInventoryMapper;
 import dev.mesbase.business.wm.dao.WmStockDocumentMapper;
 import dev.mesbase.business.wm.dao.WmStockDocumentLineMapper;
-import dev.mesbase.business.wm.domain.MesWarehouseAcceptanceExample;
 import dev.mesbase.business.wm.domain.StockDocumentModels;
 import dev.mesbase.business.wm.domain.StockDocumentStatus;
 import dev.mesbase.business.wm.domain.StockDocumentType;
@@ -65,14 +71,20 @@ public class StockDocumentService {
     private final ProductionChainLocks locks;
     private final MesProductionExecutionMapper executions;
     private final MesProductionReceiptMapper receipts;
-    private final MesWarehouseAcceptanceMapper acceptances;
     private final Validator validator;
+    private final StockDocumentExtraMapper inbound;
+    private final QualityReleaseService releases;
+    private final WorkorderMapper orders;
 
     public StockDocumentService(WmStockDocumentMapper documents, WmStockDocumentLineMapper lines,
                                 WmInventoryMapper inventories, MaterialMapper materials, UnitMeasureMapper units,
                                 LocalStockService stock, BusinessSourceRules sources, ProductionChainLocks locks,
                                 MesProductionExecutionMapper executions, MesProductionReceiptMapper receipts,
-                                MesWarehouseAcceptanceMapper acceptances, Validator validator) {
+                                Validator validator, StockDocumentExtraMapper inbound, QualityReleaseService releases,
+                                WorkorderMapper orders) {
+        this.orders = orders;
+        this.inbound = inbound;
+        this.releases = releases;
         this.documents = documents;
         this.lines = lines;
         this.inventories = inventories;
@@ -83,7 +95,6 @@ public class StockDocumentService {
         this.locks = locks;
         this.executions = executions;
         this.receipts = receipts;
-        this.acceptances = acceptances;
         this.validator = validator;
     }
 
@@ -122,6 +133,11 @@ public class StockDocumentService {
         validate(command);
         type(command.documentType());
         sources.localCreation();
+        if (command.sourceExecutionId() != null) {
+            if (command.sourceWorkorderId() != null || !StockDocumentType.OTHER_RECEIPT.getValue()
+                    .equals(command.documentType())) bad();
+            productionExecution(command.sourceExecutionId());
+        }
         if (command.sourceWorkorderId() != null) {
             if (!StockDocumentType.OTHER_RECEIPT.getValue().equals(command.documentType())) bad();
             cancelled(command.sourceWorkorderId());
@@ -134,6 +150,7 @@ public class StockDocumentService {
         row.setReason(command.reason());
         row.setRemark(command.remark());
         row.setSourceWorkorderId(command.sourceWorkorderId());
+        row.setSourceExecutionId(command.sourceExecutionId());
         row.setRevision(0L);
         audit(row, true);
         if (documents.insert(row) != 1) conflict();
@@ -184,6 +201,7 @@ public class StockDocumentService {
         line.setBinCode(command.binCode());
         line.setQuantity(command.quantity());
         line.setRemark(command.remark());
+        if (header.getSourceExecutionId() != null) ProductionQuantityInput.check(command.quantity());
         validateIdentity(line);
         if ((lineId == null ? lines.insert(line) : lines.updateByPrimaryKey(line)) != 1) conflict();
         save(header);
@@ -209,6 +227,7 @@ public class StockDocumentService {
         // Original frozen replay is a read: a later factory mode cannot rewrite already committed LOCAL facts.
         if (replay(before, command, hash)) return detail(id);
         if (before.getSourceWorkorderId() != null) cancelled(before.getSourceWorkorderId());
+        if (before.getSourceExecutionId() != null) productionExecution(before.getSourceExecutionId());
         var row = lock(id);
         if (replay(row, command, hash)) return detail(id);
         draft(row, command.expectedRevision());
@@ -226,6 +245,20 @@ public class StockDocumentService {
             if (amount.compareTo(basis.remaining()) > 0)
                 throw new FoundationException(ErrorCode.STOCK_DOCUMENT_BASIS_INVALID);
         }
+        if (row.getSourceExecutionId() != null) {
+            var basis = productionBasis(row.getSourceExecutionId());
+            var execution = productionExecution(row.getSourceExecutionId());
+            sources.finishedOutput(execution, null);
+            sources.warehouses(BusinessSource.LOCAL.getValue(), detail.stream()
+                    .map(WmStockDocumentLineEntity::getWarehouseId).toList());
+            BigDecimal amount = BigDecimal.ZERO;
+            for (var line : detail) {
+                if (!Objects.equals(basis.productId(), line.getMaterialId())) conflict();
+                amount = amount.add(line.getQuantity());
+            }
+            if (!basis.canReceive() || amount.compareTo(basis.remaining()) > 0)
+                throw new FoundationException(ErrorCode.STOCK_DOCUMENT_BASIS_INVALID);
+        }
         // One deterministic inventory order for the complete document, including repeated-stock lines.
         var ordered = detail.stream().sorted(Comparator.comparing(WmStockDocumentLineEntity::getStockId)
                 .thenComparing(WmStockDocumentLineEntity::getId)).toList();
@@ -238,7 +271,7 @@ public class StockDocumentService {
                         : UUID.nameUUIDFromBytes((command.requestId() + ":" + line.getId()).getBytes(StandardCharsets.UTF_8))
                         .toString();
                 var action = stock.postDocument(row.getDocumentType(), id, line, command.requestId(), actionId,
-                        hash, row.getReason());
+                        hash, row.getReason(), row.getSourceExecutionId());
                 line.setStockActionId(action.getId());
                 if (lines.updateByPrimaryKey(line) != 1) conflict();
             }
@@ -254,6 +287,33 @@ public class StockDocumentService {
         return detail(id);
     }
 
+    @Transactional(transactionManager = "businessTransactionManager", readOnly = true)
+    public StockDocumentModels.ProductionBasis productionBasis(Long executionId) {
+        var execution = executions.selectByPrimaryKey(executionId);
+        if (execution == null) throw new FoundationException(ErrorCode.NOT_FOUND);
+        var order = orders.selectByPrimaryKey(execution.getWorkorderId());
+        boolean admitted = order != null && List.of(WorkOrderStatus.RELEASED.getValue(), WorkOrderStatus.COMPLETED.getValue())
+                .contains(order.getStatus())
+                && BusinessSource.LOCAL.getValue().equals(order.getSource()) && FactoryIntegrationContext.required()
+                .mode() == FactoryRuntimeMode.LOCAL;
+        var release = releases.state(executionId);
+        var received = inbound.netProductionInbound(executionId);
+        var remaining = release.released().min(release.effective()).subtract(received);
+        String blocked = !admitted ? "当前工单状态、来源或模式不允许入库" : !List.of(ProductionExecutionStatus.RUNNING.getValue(), ProductionExecutionStatus.COMPLETED.getValue())
+                .contains(execution.getStatus())
+                ? "执行状态不允许入库" : !release.safe() ? release.blockedReason() : !release.basisValid() ? "缺少当前质量依据下的正式放行"
+                : remaining.signum() <= 0 ? "可入库数量不足或存在历史超额" : null;
+        return new StockDocumentModels.ProductionBasis(executionId, execution.getProductId(), release.effective(), release.released(), received, remaining.max(BigDecimal.ZERO), blocked == null, blocked);
+    }
+
+    private MesProductionExecutionEntity productionExecution(Long id) {
+        var execution = locks.execution(id);
+        if (!List.of(ProductionExecutionStatus.RUNNING.getValue(), ProductionExecutionStatus.COMPLETED.getValue())
+                .contains(execution.getStatus())) conflict();
+        sources.finishedOutput(execution, null);
+        return execution;
+    }
+
     /**
      * Locks the original order and all its executions before reading net handover/acceptance facts.
      */
@@ -265,17 +325,14 @@ public class StockDocumentService {
         var executionRows = bounded(() -> executions.selectByExample(e));
         for (var execution : executionRows) locks.execution(execution.getId());
         BigDecimal handed = BigDecimal.ZERO;
-        BigDecimal accepted = BigDecimal.ZERO;
+        BigDecimal accepted = inbound.netProductionInboundForOrder(workorderId);
         if (!executionRows.isEmpty()) {
             var ids = executionRows.stream().map(row -> row.getId()).toList();
             var r = new MesProductionReceiptExample();
             r.createCriteria().andExecutionIdIn(ids);
             for (var receipt : bounded(() -> receipts.selectByExample(r)))
                 handed = handed.add(receipt.getQuantityDelta());
-            var a = new MesWarehouseAcceptanceExample();
-            a.createCriteria().andExecutionIdIn(ids);
-            for (var fact : bounded(() -> acceptances.selectByExample(a)))
-                accepted = accepted.add(fact.getQuantityDelta());
+
         }
         var d = new WmStockDocumentExample();
         d.createCriteria().andSourceWorkorderIdEqualTo(workorderId)

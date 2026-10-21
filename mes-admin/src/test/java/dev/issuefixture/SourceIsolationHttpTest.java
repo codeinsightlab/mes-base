@@ -17,8 +17,6 @@ import java.util.UUID;
 import dev.mesbase.business.integration.warehouse.WarehouseIntegration;
 import java.math.BigDecimal;
 import org.junit.jupiter.api.Test;
-import org.springframework.core.env.MapPropertySource;
-import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -73,19 +71,15 @@ class SourceIsolationHttpTest {
     }
 
     @Test
-    void finishedWarehouseMismatchAndAcceptanceBypassAreRejectedWithoutStockChanges() throws Exception {
-        try (var c = ProductionReceiptHttpTest.context()) {
+    void finishedWarehouseMismatchAndInboundBypassAreRejectedWithoutStockChanges() throws Exception {
+        try (var c = ProductionWarehouseFixture.context()) {
             var m = MaterialIssueHttpTest.mvc(c);
-            var j = ProductionReceiptHttpTest.db(c);
-            String receipt = WarehouseAcceptanceHttpTest.fixture(m, j);
-            j.update("INSERT INTO wm_warehouse(id,code,name,status,source) VALUES(2,'TEST_EXTERNAL','ERP仓','ENABLED','EXTERNAL')");
-            m.perform(ProductionCoreV1HttpTest.full(post(ProductionReceiptHttpTest.ROOT))
-                            .content("{\"requestId\":\"" + UUID.randomUUID() + "\",\"executionId\":1,\"warehouseId\":2,\"quantity\":\"1\"}"))
-                    .andExpect(status().isConflict())
-                    .andExpect(jsonPath("errorCode").value("BUSINESS_SOURCE_CONFLICT"));
+            var j = ProductionWarehouseFixture.db(c);
+            j.update("INSERT INTO wm_inventory(id,material_id,warehouse_id,batch_no,quantity,available_quantity,status) VALUES(1,1,1,'TEST-FINISHED',0,0,'ENABLED')");
+            String document = UnifiedInboundHttpTest.draft(m, "1", "10");
             j.update("UPDATE wm_warehouse SET source='EXTERNAL' WHERE id=1");
-            m.perform(ProductionCoreV1HttpTest.full(post("/api/wm/production-acceptances/receipts/" + receipt))
-                            .content(WarehouseAcceptanceHttpTest.command(UUID.randomUUID().toString(), "1")))
+            m.perform(ProductionCoreV1HttpTest.full(post(StockDocumentHttpTest.ROOT + "/" + document + "/actions/post"))
+                            .content(StockDocumentHttpTest.intent(UUID.randomUUID().toString(), 1)))
                     .andExpect(status().isConflict())
                     .andExpect(jsonPath("errorCode").value("BUSINESS_SOURCE_CONFLICT"));
             assertEquals(0, j.queryForObject("SELECT COUNT(*) FROM wm_stock_action", Integer.class));

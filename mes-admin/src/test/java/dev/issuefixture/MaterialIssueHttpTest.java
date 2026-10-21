@@ -13,8 +13,6 @@ import dev.mesbase.business.production.controller.WorkOrderCancellationControlle
 import jakarta.servlet.ServletException;
 import java.io.IOException;
 import jakarta.servlet.Filter;
-import dev.mesbase.core.factory.FactoryRuntimeMode;
-import dev.mesbase.platform.execution.FactoryIntegrationSnapshot;
 import dev.mesbase.platform.execution.FactoryIntegrationContext;
 import dev.mesbase.framework.sync.SyncCoordinator;
 import dev.mesbase.business.production.service.WorkOrderCompletionService;
@@ -29,6 +27,7 @@ import dev.mesbase.business.wm.service.impl.WmStockActionServiceImpl;
 import dev.mesbase.business.production.dao.MesWorkorderMaterialMapper;
 import dev.mesbase.business.quality.dao.MesQualityReleaseMapper;
 import dev.mesbase.business.wm.dao.MesWarehouseAcceptanceMapper;
+import dev.mesbase.business.wm.dao.StockDocumentExtraMapper;
 import dev.mesbase.business.production.dao.MesExecutionCompletionMapper;
 import dev.mesbase.business.production.service.WorkorderMaterialService;
 import dev.mesbase.business.production.service.ProductionCompletionService;
@@ -186,7 +185,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * TEST ONLY: real generated SQL, HTTP authorization and transactions; two separate H2 databases.
  */
 class MaterialIssueHttpTest {
-    static final Set<Class<?>> MAPPERS = Set.of(OperationDefectTypeMapper.class, DefectStatisticsExtraMapper.class, WmStockDocumentMapper.class, WmStockDocumentLineMapper.class, MesWorkorderCancellationMapper.class, WmWarehouseErpExtraMapper.class, MesQualityReleaseMapper.class, MesWarehouseAcceptanceMapper.class, MesExecutionCompletionMapper.class, MesWorkorderMaterialMapper.class, WmStockActionMapper.class, MesExecutionAssignmentMapper.class, MesMaterialIssueInputMapper.class, MesProductionScanIdentityMapper.class, WmInventoryMapper.class, MesProductionReceiptMapper.class, ProductionReceiptQueryMapper.class, MesProductionDefectMapper.class, MesQualityTreatmentMapper.class, WorkstationMapper.class, MesProductionReportMapper.class, ProductionQuantityMapper.class, MesExecutionPathMapper.class, MesExecutionPathNodeMapper.class, MesMaterialIssueSubmissionMapper.class, WorkorderErpExtraMapper.class, MesMaterialIssueErpExtraMapper.class, WorkOrderExtraMapper.class, ProductionBatchMapper.class, BatchRouteNodeMapper.class, RoutingNodeMapper.class, RoutingEdgeMapper.class, OperationMapper.class, MesProductionExecutionMapper.class, MaterialMapper.class, UnitMeasureMapper.class, WmWarehouseMapper.class, RoutingMapper.class, RoutingProductMapper.class, WorkorderMapper.class, MesMaterialIssueMapper.class, MesMaterialIssueItemMapper.class);
+    static final Set<Class<?>> MAPPERS = Set.of(StockDocumentExtraMapper.class, OperationDefectTypeMapper.class, DefectStatisticsExtraMapper.class, WmStockDocumentMapper.class, WmStockDocumentLineMapper.class, MesWorkorderCancellationMapper.class, WmWarehouseErpExtraMapper.class, MesQualityReleaseMapper.class, MesWarehouseAcceptanceMapper.class, MesExecutionCompletionMapper.class, MesWorkorderMaterialMapper.class, WmStockActionMapper.class, MesExecutionAssignmentMapper.class, MesMaterialIssueInputMapper.class, MesProductionScanIdentityMapper.class, WmInventoryMapper.class, MesProductionReceiptMapper.class, ProductionReceiptQueryMapper.class, MesProductionDefectMapper.class, MesQualityTreatmentMapper.class, WorkstationMapper.class, MesProductionReportMapper.class, ProductionQuantityMapper.class, MesExecutionPathMapper.class, MesExecutionPathNodeMapper.class, MesMaterialIssueSubmissionMapper.class, WorkorderErpExtraMapper.class, MesMaterialIssueErpExtraMapper.class, WorkOrderExtraMapper.class, ProductionBatchMapper.class, BatchRouteNodeMapper.class, RoutingNodeMapper.class, RoutingEdgeMapper.class, OperationMapper.class, MesProductionExecutionMapper.class, MaterialMapper.class, UnitMeasureMapper.class, WmWarehouseMapper.class, RoutingMapper.class, RoutingProductMapper.class, WorkorderMapper.class, MesMaterialIssueMapper.class, MesMaterialIssueItemMapper.class);
 
     static class Fixture implements AutoCloseable {
         final RuntimeRegistry registry = new RuntimeRegistry();
@@ -200,7 +199,7 @@ class MaterialIssueHttpTest {
             for (String id : List.of("A", "B")) {
                 var source = source();
                 var jdbc = new JdbcTemplate(source);
-                for (String name : List.of("V2__simple_business_capabilities.sql", "V3__operation_routing.sql", "V4__routing_operation_instruction_snapshot.sql", "V9__routing_graph.sql", "V8__warehouse_inventory.sql", "V11__material_issue.sql", "V12__material_issue_quantity_precision.sql", "V13__workorder_batch_route.sql", "V16__production_execution.sql", "V18__material_issue_void.sql", "V19__local_void_external_effect.sql", "V20__material_issue_erp_extra.sql", "V21__workorder_external_extra.sql", "V22__unverified_legacy_erp_provider.sql", "V23__production_core_v1.sql", "V24__operation_user_execution_assignment.sql", "V25__production_report_ledger.sql", "V26__production_defect.sql", "V27__production_report_request.sql", "V28__production_receipt.sql", "V29__single_material_production_input.sql", "V32__quality_treatment_facts.sql", "V33__admin_report_command_fingerprint.sql", "V34__local_stock_action.sql", "V35__local_production_closure.sql", "V36__business_source_isolation.sql", "V37__workorder_cancellation.sql", "V38__local_stock_documents.sql", "V39__operation_defect_types.sql")) {
+                for (String name : List.of("V2__simple_business_capabilities.sql", "V3__operation_routing.sql", "V4__routing_operation_instruction_snapshot.sql", "V9__routing_graph.sql", "V8__warehouse_inventory.sql", "V11__material_issue.sql", "V12__material_issue_quantity_precision.sql", "V13__workorder_batch_route.sql", "V16__production_execution.sql", "V18__material_issue_void.sql", "V19__local_void_external_effect.sql", "V20__material_issue_erp_extra.sql", "V21__workorder_external_extra.sql", "V22__unverified_legacy_erp_provider.sql", "V23__production_core_v1.sql", "V24__operation_user_execution_assignment.sql", "V25__production_report_ledger.sql", "V26__production_defect.sql", "V27__production_report_request.sql", "V28__production_receipt.sql", "V29__single_material_production_input.sql", "V32__quality_treatment_facts.sql", "V33__admin_report_command_fingerprint.sql", "V34__local_stock_action.sql", "V35__local_production_closure.sql", "V36__business_source_isolation.sql", "V37__workorder_cancellation.sql", "V38__local_stock_documents.sql", "V39__operation_defect_types.sql", "V44__unified_inbound_documents.sql")) {
                     String ddl = Files.readString(Path.of("mes-admin/src/main/resources/db/business/" + name))
                             .replace(") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT=", ") COMMENT ")
                             .replaceAll("(?m)^\\s*factory_id [^\\n]+\\n", "")
@@ -234,6 +233,8 @@ class MaterialIssueHttpTest {
                         ddl = ddl.split("DELIMITER")[0].replace(",\n ADD COLUMN", ";\nALTER TABLE workorder_erp_extra ADD COLUMN");
                     if (name.equals("V38__local_stock_documents.sql"))
                         ddl = ddl.replace(",\n ADD COLUMN", ";\nALTER TABLE wm_stock_action ADD COLUMN");
+                    if (name.equals("V44__unified_inbound_documents.sql"))
+                        ddl = ddl.replace(",\n ADD KEY idx_stock_document_execution(", ";\nCREATE INDEX idx_stock_document_execution ON wm_stock_document(");
                     if (name.equals("V37__workorder_cancellation.sql")) ddl = ddl.split("CREATE TRIGGER")[0];
                     for (String statement : ddl.split(";")) if (!statement.isBlank()) jdbc.execute(statement);
                 }
@@ -401,6 +402,11 @@ class MaterialIssueHttpTest {
         @Bean
         MesQualityReleaseMapper mesQualityReleaseMapper(SqlSessionFactory f) {
             return new SqlSessionTemplate(f).getMapper(MesQualityReleaseMapper.class);
+        }
+
+        @Bean
+        StockDocumentExtraMapper stockDocumentExtraMapper(SqlSessionFactory f) {
+            return new SqlSessionTemplate(f).getMapper(StockDocumentExtraMapper.class);
         }
 
         @Bean

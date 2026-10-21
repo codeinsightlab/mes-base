@@ -426,6 +426,7 @@ public class LegacyHistoryImportService {
             if (!LegacyBatchStatus.REVIEWED.getValue().equals(batch.status()) || (!append && !allMapped)) conflict();
             changed(metadata.transition(batch.id(), LegacyBatchStatus.REVIEWED.getValue(), LegacyBatchStatus.RUNNING.getValue(), LegacyBatchStatus.COMPLETED.getValue()));
             if (!allMapped) {
+                if (!WorkOrderStatus.HISTORICAL.getValue().equals(order.getStatus())) conflict();
                 var criteria = new RoutingNodeExample();
                 criteria.createCriteria().andRoutingIdEqualTo(order.getRoutingId());
                 var targetNodes = new LinkedHashMap<String, Long>();
@@ -532,7 +533,8 @@ public class LegacyHistoryImportService {
         var order = orders.selectByPrimaryKeyForUpdate(existing.entityId());
         var route = lookup.identities.get(key("ROUTING", c.code()));
         var product = lookup.identities.get(key("MATERIAL", c.productCode()));
-        if (order == null || !WorkOrderStatus.HISTORICAL.getValue().equals(order.getStatus())
+        if (order == null || (!WorkOrderStatus.HISTORICAL.getValue()
+                .equals(order.getStatus()) && metadata.activatedOrder(order.getId()) != 1)
                 || !BusinessSource.LOCAL.getValue().equals(order.getSource()) || !order.getCode().equals(c.code())
                 || order.getPlannedQty().compareTo(c.plannedQty()) != 0
                 || !order.getPlannedStartAt().equals(c.plannedStart()) || !order.getPlannedEndAt()
@@ -563,7 +565,8 @@ public class LegacyHistoryImportService {
                 || !orderKey.equals(mapped.parentId())) conflict();
         var row = replay.executions().get(mapped.entityId());
         if (row == null || !row.getWorkorderId().equals(orderId)
-                || !ProductionExecutionStatus.HISTORICAL.getValue().equals(row.getStatus())) conflict();
+                || (!ProductionExecutionStatus.HISTORICAL.getValue()
+                .equals(row.getStatus()) && metadata.activatedInput(row.getId()) == null)) conflict();
         for (var r : e.reports()) {
             var report = replay.mappings().get(key("pro_reporting_work", r.sourceId()));
             if (report == null || !report.sourceHash().equals(r.sourceHash()) || !RULE.equals(report.ruleVersion())

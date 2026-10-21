@@ -1,7 +1,5 @@
 package dev.issuefixture;
 
-import dev.mesbase.business.wm.dao.WmWarehouseErpExtraMapper;
-import dev.mesbase.business.production.dao.WorkorderErpExtraMapper;
 import dev.mesbase.business.production.service.BusinessSourceRules;
 import org.mockito.Mockito;
 import dev.mesbase.business.wm.service.LocalStockService;
@@ -99,9 +97,9 @@ class LocalWarehouseMySqlTest {
                 assertThrows(FoundationException.class, () -> crud.insert(new WmInventoryCreateCommand(material, f.warehouse(), BigDecimal.ZERO, BigDecimal.ZERO, "ENABLED", "TEST duplicate source", lot, "TEST_BIN")));
                 service.execute(StockActionType.OPENING, command(id, "500", "0", null));
                 var receipt = command(id, "300", "500", null);
-                service.execute(StockActionType.RECEIPT, receipt);
-                service.execute(StockActionType.RECEIPT, receipt);
-                assertThrows(FoundationException.class, () -> service.execute(StockActionType.RECEIPT, new StockCommand(receipt.requestId(), id, new BigDecimal("301"), receipt.expectedQuantity(), receipt.expectedAvailable(), receipt.reason(), null)));
+                service.execute(StockActionType.GAIN, receipt);
+                service.execute(StockActionType.GAIN, receipt);
+                assertThrows(FoundationException.class, () -> service.execute(StockActionType.GAIN, new StockCommand(receipt.requestId(), id, new BigDecimal("301"), receipt.expectedQuantity(), receipt.expectedAvailable(), receipt.reason(), null)));
                 var supply = c.getBean(ProductionInputSupplyService.class);
                 var production = c.getBean(ProductionInputService.class);
                 var calculation = supply.calculate(code + "#" + lot, f.order(), Long.toString(id), new BigDecimal("100"));
@@ -133,12 +131,12 @@ class LocalWarehouseMySqlTest {
                 var x = pool.submit(() -> {
                     ProductionReportMySqlTest.actor();
                     barrier.await();
-                    return FactoryContext.withScope(scope, () -> service.execute(StockActionType.RECEIPT, concurrent));
+                    return FactoryContext.withScope(scope, () -> service.execute(StockActionType.GAIN, concurrent));
                 });
                 var y = pool.submit(() -> {
                     ProductionReportMySqlTest.actor();
                     barrier.await();
-                    return FactoryContext.withScope(scope, () -> service.execute(StockActionType.RECEIPT, concurrent));
+                    return FactoryContext.withScope(scope, () -> service.execute(StockActionType.GAIN, concurrent));
                 });
                 try {
                     assertEquals(x.get().getId(), y.get().getId());

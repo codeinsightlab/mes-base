@@ -18,6 +18,7 @@ import dev.mesbase.core.error.ErrorCode;
 import dev.mesbase.core.error.FoundationException;
 import dev.mesbase.framework.sync.SyncCoordinator;
 import dev.mesbase.platform.execution.FactoryContext;
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -26,7 +27,7 @@ import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Scheduled reconciliation only; execution commands never change the parent work-order status.
+ * Shared reconciliation for committed execution-completion hints and periodic recovery.
  */
 @Service
 @ConditionalOnProperty(name = "mes.business.enabled", havingValue = "true")
@@ -55,6 +56,11 @@ public class WorkOrderCompletionService {
     }
 
     @Transactional(transactionManager = "businessTransactionManager", readOnly = true)
+    public List<Long> executionCandidates(Long after) {
+        return queries.executionCompletionCandidates(after, 100);
+    }
+
+    @Transactional(transactionManager = "businessTransactionManager", readOnly = true)
     public List<Long> candidates(Long after) {
         return queries.completionCandidates(after, 100);
     }
@@ -71,12 +77,15 @@ public class WorkOrderCompletionService {
         sources.current(order.getSource());
         var state = queries.completionState(id);
         if (state == null || !state.allCompleted()) return false;
+        var allocation = queries.activeAllocation(id, null);
+        if (allocation == null || allocation.allocatedTargetQty().compareTo(allocation.plannedQty()) != 0) return false;
         var pending = new MesMaterialIssueExample();
         pending.createCriteria().andWorkorderIdEqualTo(id).andStatusNotIn(List.of(
                 MaterialIssueStatus.CONFIRMED.getValue(), MaterialIssueStatus.VOIDED.getValue(),
                 MaterialIssueStatus.SUBMIT_REJECTED.getValue()));
         if (issues.countByExample(pending) > 0 || queries.countUnaccountedInputs(id) > 0) return false;
         // Bounded pages; reuse the authoritative quantity and quality gates for each formal execution.
+        BigDecimal totalInput = BigDecimal.ZERO;
         long after = 0;
         while (true) {
             var filter = new MesProductionExecutionExample();
@@ -91,12 +100,14 @@ public class WorkOrderCompletionService {
                     var projection = quantities.getExecutionQuantities(execution.getId());
                     if (ProductionCompletionBalance.blockedReason(projection) != null)
                         return false;
+                    totalInput = totalInput.add(projection.confirmedInputQty());
                     var release = releases.stateFor(projection);
-                    if (!release.safe() || !release.basisValid()) return false;
+                    if (!release.safe()) return false;
                     after = execution.getId();
                 }
             }
         }
+        if (totalInput.compareTo(allocation.plannedQty()) != 0) return false;
         coordinator.assertOwner(run);
         var patch = new WorkorderEntity();
         patch.setId(id);

@@ -22,6 +22,7 @@ import dev.mesbase.business.issue.service.MaterialIssueSubmissionService.Prepare
 import dev.mesbase.business.integration.production.ProductionSupply.Calculation;
 import dev.mesbase.business.production.dao.MesProductionExecutionMapper;
 import dev.mesbase.business.production.dao.WorkorderMapper;
+import dev.mesbase.business.production.dao.WorkOrderExtraMapper;
 import dev.mesbase.business.production.domain.WorkorderEntity;
 import dev.mesbase.business.issue.dao.MesMaterialIssueMapper;
 import dev.mesbase.business.production.dao.RoutingMapper;
@@ -50,6 +51,7 @@ import dev.mesbase.business.issue.service.MaterialIssueInputFacts;
 @Service
 @ConditionalOnProperty(name = "mes.business.enabled", havingValue = "true")
 public class ProductionInputService {
+    private final WorkOrderExtraMapper allocation;
     private final BusinessSourceRules sources;
 
     public record Command(String requestId, String code, Long workorderId, String stockReference,
@@ -92,7 +94,8 @@ public class ProductionInputService {
                                   WorkorderMapper orderMapper,
                                   MaterialMapper materials, RoutingMapper routings, IRoutingService routingService,
                                   @Qualifier("businessTransactionManager") PlatformTransactionManager manager,
-                                  BusinessSourceRules sources) {
+                                  BusinessSourceRules sources, WorkOrderExtraMapper allocation) {
+        this.allocation = allocation;
         this.sources = sources;
         this.supply = supply;
         this.bindings = bindings;
@@ -208,6 +211,18 @@ public class ProductionInputService {
                     .contains(e.getStatus())) fail();
             var path = paths.view(executionId);
             if (!path.selectedNodeIds().equals(c.routingNodeIds())) fail();
+        }
+        // Reserve output capacity before any external submission. Parent lock serializes concurrent intents.
+        var execution = locks.execution(executionId);
+        var required = quantities.getExecutionQuantities(executionId).confirmedInputQty()
+                .add(allocation.pendingExecutionInput(executionId)).add(c.outputQty());
+        if (required.compareTo(execution.getTargetQty()) > 0) {
+            var capacity = allocation.activeAllocation(order.getId(), executionId);
+            if (capacity == null || capacity.allocatedTargetQty().add(required).compareTo(capacity.plannedQty()) > 0)
+                fail();
+            execution.setTargetQty(required);
+            execution.setUpdateTime(LocalDateTime.now());
+            if (executionMapper.updateByPrimaryKey(execution) != 1) fail();
         }
         var issue = issues.insert(new MesMaterialIssueCreateCommand("INPUT-" + c.requestId(), order.getId(), null, order.getProductId(), null,
                 null, c.routingId(), LocalDateTime.now(), MaterialIssueStatus.DRAFT.getValue(), null, executionId));

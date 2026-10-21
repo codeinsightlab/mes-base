@@ -1,6 +1,23 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="dev.mesbase.business.production.dao.WorkOrderExtraMapper">
+ <select id="pendingExecutionInput" resultType="java.math.BigDecimal">
+  <bind name="voided" value="@dev.mesbase.business.issue.domain.MaterialIssueStatus@VOIDED.getValue()"/>
+  <bind name="rejected" value="@dev.mesbase.business.issue.domain.MaterialIssueStatus@SUBMIT_REJECTED.getValue()"/>
+  SELECT COALESCE(SUM(f.output_qty),0) FROM mes_material_issue_input f
+  JOIN mes_material_issue i ON i.id=f.issue_id AND i.execution_id=f.execution_id
+  WHERE f.execution_id=#{id} AND f.input_kind='PRODUCTION_INPUT' AND f.confirmed_at IS NULL
+    AND i.status NOT IN (#{voided},#{rejected})
+ </select>
+ <select id="activeAllocation" resultType="dev.mesbase.business.production.domain.WorkOrderModels$Allocation">
+  <bind name="cancelled" value="@dev.mesbase.business.production.domain.ProductionExecutionStatus@CANCELLED.getValue()"/>
+  SELECT w.id AS workorder_id,w.planned_qty,COALESCE(SUM(e.target_qty),0) AS allocated_target_qty,
+         w.planned_qty-COALESCE(SUM(e.target_qty),0) AS remaining_target_qty,
+         GREATEST(COALESCE(SUM(e.target_qty),0)-w.planned_qty,0) AS excess_target_qty,COUNT(e.id) AS execution_count
+  FROM workorder w LEFT JOIN mes_production_execution e ON e.workorder_id=w.id AND e.status!=#{cancelled}
+  <if test="excluding != null">AND e.id!=#{excluding}</if>
+  WHERE w.id=#{id} GROUP BY w.id,w.planned_qty
+ </select>
  <select id="completionState" resultType="dev.mesbase.business.production.domain.WorkOrderModels$CompletionState">
   <bind name="cancelled" value="@dev.mesbase.business.production.domain.ProductionExecutionStatus@CANCELLED.getValue()"/>
   <bind name="completed" value="@dev.mesbase.business.production.domain.ProductionExecutionStatus@COMPLETED.getValue()"/>
@@ -21,6 +38,14 @@
   WHERE i.workorder_id=#{id} AND i.status=#{confirmed}
     AND (f.id IS NULL OR f.input_kind!='PRODUCTION_INPUT' OR f.confirmed_at IS NULL
          OR f.execution_id!=i.execution_id OR e.id IS NULL OR e.status!=#{completed})
+ </select>
+ <select id="executionCompletionCandidates" resultType="long">
+  <bind name="released" value="@dev.mesbase.business.production.domain.WorkOrderStatus@RELEASED.getValue()"/>
+  <bind name="running" value="@dev.mesbase.business.production.domain.ProductionExecutionStatus@RUNNING.getValue()"/>
+  <bind name="local" value="@dev.mesbase.business.shared.enums.BusinessSource@LOCAL.getValue()"/>
+  SELECT e.id FROM mes_production_execution e JOIN workorder w ON w.id=e.workorder_id
+  WHERE e.id &gt; #{after} AND e.status=#{running} AND w.status=#{released} AND w.source=#{local}
+  ORDER BY e.id LIMIT #{limit}
  </select>
  <select id="completionCandidates" resultType="long">
   <bind name="released" value="@dev.mesbase.business.production.domain.WorkOrderStatus@RELEASED.getValue()"/>

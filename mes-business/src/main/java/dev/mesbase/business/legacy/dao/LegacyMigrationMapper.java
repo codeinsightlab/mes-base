@@ -70,6 +70,17 @@ public interface LegacyMigrationMapper {
     int transition(@Param("id") String id, @Param("expected") String expected, @Param("next") String next,
                    @Param("completed") String completed);
 
+    @Select("SELECT COUNT(*) FROM mes_legacy_source_mapping a JOIN mes_legacy_source_mapping w ON w.id=a.parent_id "
+            + "WHERE a.entity_kind='ORDER_ACTIVATION' AND a.entity_id=#{id} AND w.entity_kind='WORKORDER' "
+            + "AND w.entity_id=a.entity_id AND a.source_hash=w.source_hash AND a.rule_version='internal-production-activation-v1'")
+    int activatedOrder(@Param("id") Long workorderId);
+
+    @Select("SELECT CAST(JSON_UNQUOTE(JSON_EXTRACT(e.conversion_payload,'$.inputQty')) AS DECIMAL(20,6)) "
+            + "FROM mes_legacy_source_mapping e JOIN mes_legacy_source_mapping a ON a.parent_id=e.id "
+            + "AND a.entity_kind='PRODUCTION_ACTIVATION' AND a.entity_id=e.entity_id AND a.source_hash=e.source_hash "
+            + "AND a.rule_version='internal-production-activation-v1' WHERE e.entity_kind='EXECUTION' AND e.entity_id=#{id}")
+    BigDecimal activatedInput(@Param("id") Long executionId);
+
     @Select("SELECT CAST(JSON_UNQUOTE(JSON_EXTRACT(conversion_payload,'$.inputQty')) AS DECIMAL(20,6)) "
             + "FROM mes_legacy_source_mapping WHERE entity_kind='EXECUTION' AND entity_id=#{id}")
     BigDecimal input(@Param("id") Long executionId);

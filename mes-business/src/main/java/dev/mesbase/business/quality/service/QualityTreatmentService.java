@@ -1,6 +1,9 @@
 package dev.mesbase.business.quality.service;
 
 import dev.mesbase.business.production.domain.ProductionQuantityInput;
+import dev.mesbase.business.production.domain.ProductionCompletionRequested;
+import dev.mesbase.platform.execution.FactoryContext;
+import org.springframework.context.ApplicationEventPublisher;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -56,6 +59,8 @@ import org.springframework.transaction.annotation.Isolation;
 @ConditionalOnProperty(name = "mes.business.enabled", havingValue = "true")
 @Transactional(transactionManager = "businessTransactionManager", readOnly = true)
 public class QualityTreatmentService {
+    private final ApplicationEventPublisher completionPublisher;
+
     private static final BigDecimal ZERO = BigDecimal.ZERO;
     private final MesProductionDefectMapper defects;
     private final MesQualityTreatmentMapper events;
@@ -67,7 +72,9 @@ public class QualityTreatmentService {
 
     public QualityTreatmentService(MesProductionDefectMapper defects, MesQualityTreatmentMapper events,
                                    ProductionChainLocks locks, @Lazy ExecutionPathService paths,
-                                   @Lazy ProductionQuantityService quantities, BusinessDirectoryService directory) {
+                                   @Lazy ProductionQuantityService quantities, BusinessDirectoryService directory,
+                                   ApplicationEventPublisher completionPublisher) {
+        this.completionPublisher = completionPublisher;
         this.defects = defects;
         this.events = events;
         this.locks = locks;
@@ -297,6 +304,7 @@ public class QualityTreatmentService {
         for (var value : List.of(c.scrapQty(), c.reworkQty(), c.processedQty(), c.recoveredQty(), c.failedQty()))
             ProductionQuantityInput.check(value);
         quantities.validateDefectChange(d.getExecutionId(), d.getAffectedNodeId(), ZERO);
+        completionPublisher.publishEvent(new ProductionCompletionRequested(FactoryContext.required(), d.getExecutionId()));
         return details(declaration);
     }
 

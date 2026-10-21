@@ -5,8 +5,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.util.UUID;
 import java.math.BigDecimal;
-import java.util.List;
-import java.util.Map;
 import java.util.concurrent.Executors;
 import org.junit.jupiter.api.Test;
 import org.springframework.web.context.support.AnnotationConfigWebApplicationContext;
@@ -28,7 +26,11 @@ class ProductionQualityV13HttpTest {
     static final String Q = "/api/quality/defects", N = "/api/production/report-quantities/executions/1";
 
     static AnnotationConfigWebApplicationContext context(int... reports) throws Exception {
-        var c = ProductionReceiptHttpTest.context();
+        return context(new Class<?>[0], reports);
+    }
+
+    static AnnotationConfigWebApplicationContext context(Class<?>[] extra, int... reports) throws Exception {
+        var c = ProductionWarehouseFixture.context(extra);
         for (var j : c.getBean(MaterialIssueHttpTest.Fixture.class).business.values()) {
             j.update("DELETE FROM mes_production_report");
             j.update("INSERT INTO routing_node(id,routing_id,node_code,operation_id,display_order,operation_name) SELECT 14,routing_id,'D',operation_id,4,operation_name FROM routing_node WHERE id=13");
@@ -112,7 +114,7 @@ class ProductionQualityV13HttpTest {
                     .andExpect(jsonPath("errorCode").value("QUALITY_ATTRIBUTION_REQUIRED")).andReturn().getResponse()
                     .getContentAsString();
             assertTrue(blocked.contains("D") && blocked.contains("先核实"));
-            var j = ProductionReceiptHttpTest.db(c);
+            var j = ProductionWarehouseFixture.db(c);
             Long original = j.queryForObject("SELECT id FROM mes_production_report WHERE routing_node_id=14 AND record_type='REPORT'", Long.class);
             String endpoint = "/api/production/reports/" + original + "/adjustments";
             m.perform(full(post(endpoint), "A").content("{\"requestId\":\"" + UUID.randomUUID() + "\",\"quantityDelta\":\"-1\",\"reason\":\"TEST ONLY safe negative\"}"))
@@ -133,7 +135,7 @@ class ProductionQualityV13HttpTest {
     void controlledCorrectionsRespectParentBudgetsAndPreserveOriginalEvents() throws Exception {
         try (var c = context(100, 100, 100, 100, 100); var pool = Executors.newFixedThreadPool(2)) {
             var m = MaterialIssueHttpTest.mvc(c);
-            var j = ProductionReceiptHttpTest.db(c);
+            var j = ProductionWarehouseFixture.db(c);
             var id = defect(m, 12, "10", "INDEPENDENT", null);
             var allocation = execute(m, id, command("ALLOCATE", null, "2", "8", "0", "0", "0"));
             String a = event(allocation, "ALLOCATE");
@@ -182,7 +184,7 @@ class ProductionQualityV13HttpTest {
     void casesABFullHistoryAndRecoveryDoNotRewriteNormalReports() throws Exception {
         try (var c = context(100, 100, 100, 100, 100)) {
             var m = MaterialIssueHttpTest.mvc(c);
-            var j = ProductionReceiptHttpTest.db(c);
+            var j = ProductionWarehouseFixture.db(c);
             var before = j.queryForList("SELECT * FROM mes_production_report ORDER BY id");
             var id = defect(m, 12, "10", "INDEPENDENT", null);
             var q = quantities(m);
@@ -259,12 +261,13 @@ class ProductionQualityV13HttpTest {
     void caseFHistoricalReceiptRemainsWhileLateQualityCreatesExcess() throws Exception {
         try (var c = context(100, 100, 100, 100, 100)) {
             var m = MaterialIssueHttpTest.mvc(c);
-            var j = ProductionReceiptHttpTest.db(c);
-            ProductionReceiptHttpTest.seed(j, "98");
+            var j = ProductionWarehouseFixture.db(c);
+            String legacy = ProductionWarehouseFixture.seed(j, "98");
             defect(m, 12, "10", "INDEPENDENT", null);
-            m.perform(full(get("/api/production/receipts/summary").param("executionId", "1"), "A"))
-                    .andExpect(status().isOk()).andExpect(jsonPath("excess").value("8.000000"))
-                    .andExpect(jsonPath("canReceive").value(false));
+            amount(quantities(m).get("nodes").get(4), "effectiveOutputQty", "90");
+            m.perform(full(get("/api/production/receipts/" + legacy), "A"))
+                    .andExpect(status().isOk()).andExpect(jsonPath("originalBalance").value("98.000000"));
+            assertEquals(0, j.queryForObject("SELECT COUNT(*) FROM wm_stock_action", Integer.class));
             assertEquals(1, j.queryForObject("SELECT COUNT(*) FROM mes_production_receipt", Integer.class));
         }
     }
@@ -281,7 +284,7 @@ class ProductionQualityV13HttpTest {
             one.get();
             two.get();
             amount(quantities(m).get("nodes").get(4), "effectiveOutputQty", "94");
-            var j = ProductionReceiptHttpTest.db(c);
+            var j = ProductionWarehouseFixture.db(c);
             assertEquals(1, j.queryForObject("SELECT COUNT(*) FROM mes_quality_treatment WHERE action_type='RESULT'", Integer.class));
             m.perform(full(post(Q + "/" + id + "/treatment"), "A").content(command("RESULT", parent, "0", "0", "4", "4", "0")))
                     .andExpect(status().isConflict());

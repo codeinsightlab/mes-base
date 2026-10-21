@@ -16,7 +16,7 @@ public final class StockDocumentModels {
     }
 
     public record Create(@NotBlank String documentType, @NotBlank @Size(max = 500) String reason,
-                         @Size(max = 500) String remark, Long sourceWorkorderId) {
+                         @Size(max = 500) String remark, Long sourceWorkorderId, Long sourceExecutionId) {
     }
 
     public record Edit(@NotNull Long expectedRevision, @NotBlank @Size(max = 500) String reason,
@@ -48,6 +48,10 @@ public final class StockDocumentModels {
     /**
      * Only net formal handover not already received is eligible; never infer stock from plans/reports.
      */
+    public record ProductionBasis(Long executionId, Long productId, BigDecimal effective, BigDecimal released,
+                                  BigDecimal received, BigDecimal remaining, boolean canReceive, String blockedReason) {
+    }
+
     public record CancellationBasis(Long workorderId, Long productId, String status,
                                     BigDecimal handedOver, BigDecimal accepted, BigDecimal manuallyReceived,
                                     BigDecimal remaining) {

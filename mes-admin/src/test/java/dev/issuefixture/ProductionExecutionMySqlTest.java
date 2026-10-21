@@ -36,6 +36,7 @@ import dev.mesbase.business.production.dao.MesExecutionAssignmentMapper;
 import dev.mesbase.business.production.dao.RoutingMapper;
 import dev.mesbase.business.production.dao.RoutingProductMapper;
 import dev.mesbase.business.production.dao.WorkorderMapper;
+import dev.mesbase.business.production.dao.WorkOrderExtraMapper;
 import dev.mesbase.business.basic.dao.UnitMeasureMapper;
 import dev.mesbase.business.wm.dao.WmWarehouseMapper;
 import dev.mesbase.business.production.domain.MesProductionExecutionCreateCommand;
@@ -109,7 +110,7 @@ class ProductionExecutionMySqlTest {
             var executions = s.getMapper(MesProductionExecutionMapper.class);
             var issues = s.getMapper(MesMaterialIssueMapper.class);
             var chainLocks = new ProductionChainLocks(s.getMapper(WorkorderMapper.class), executions, issues);
-            var rules = new ProductionExecutionRules(executions, s.getMapper(WorkorderMapper.class), s.getMapper(MaterialMapper.class), s.getMapper(RoutingMapper.class), s.getMapper(RoutingProductMapper.class), issues, chainLocks, s.getMapper(MesExecutionPathMapper.class), s.getMapper(MesExecutionPathNodeMapper.class), s.getMapper(MesProductionReportMapper.class), s.getMapper(ProductionQuantityMapper.class), new ExecutionQualityReferenceQueryImpl(s.getMapper(MesProductionDefectMapper.class), mock(QualityTreatmentService.class)), s.getMapper(MesExecutionAssignmentMapper.class), Mockito.mock(BusinessSourceRules.class));
+            var rules = new ProductionExecutionRules(executions, s.getMapper(WorkorderMapper.class), s.getMapper(MaterialMapper.class), s.getMapper(RoutingMapper.class), s.getMapper(RoutingProductMapper.class), issues, chainLocks, s.getMapper(MesExecutionPathMapper.class), s.getMapper(MesExecutionPathNodeMapper.class), s.getMapper(MesProductionReportMapper.class), s.getMapper(ProductionQuantityMapper.class), new ExecutionQualityReferenceQueryImpl(s.getMapper(MesProductionDefectMapper.class), mock(QualityTreatmentService.class)), s.getMapper(MesExecutionAssignmentMapper.class), Mockito.mock(BusinessSourceRules.class), s.getMapper(WorkOrderExtraMapper.class));
             var service = new MesProductionExecutionServiceImpl(executions, rules);
             var input = new MesProductionExecutionCreateCommand(workorder, routing, new BigDecimal("99999999999999.12"), "READY", null, null, tag);
             var first = service.insert(input);

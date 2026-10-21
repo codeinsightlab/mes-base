@@ -309,6 +309,8 @@ public class WorkOrderService {
         }
         validate(input);
         ProductionQuantityInput.changed(input.plannedQty(), row.getPlannedQty());
+        var allocation = queries.activeAllocation(id, null);
+        require(allocation != null && allocation.allocatedTargetQty().compareTo(input.plannedQty()) <= 0);
         uniqueCode(input.code(), id);
         assign(row, input);
         row.setRevision(row.getRevision() + 1);

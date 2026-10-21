@@ -15,6 +15,7 @@ import dev.mesbase.business.production.service.ProductionInputService;
 import dev.mesbase.business.production.service.ProductionInputSupplyService;
 import dev.mesbase.business.production.service.IRoutingService;
 import dev.mesbase.business.production.domain.ProductionScanCode;
+import java.math.BigDecimal;
 import java.util.Map;
 import java.util.HashMap;
 import java.util.ArrayList;
@@ -104,6 +105,23 @@ class ProductionInputHttpTest {
     }
 
     @Test
+    void repeatedInputReservesOrderCapacityAndRejectsOverflowWithoutAnotherIssue() throws Exception {
+        try (var c = context()) {
+            var j = db(c);
+            var m = MaterialIssueHttpTest.mvc(c);
+            j.update("DELETE FROM mes_production_execution"); // TEST ONLY unused seeded executions
+            submit(m, command(m, UUID.randomUUID().toString(), "L001", "100"));
+            submit(m, command(m, UUID.randomUUID().toString(), "L001", "900"));
+            int issues = j.queryForObject("SELECT COUNT(*) FROM mes_material_issue", Integer.class);
+            m.perform(ProductionCoreV1HttpTest.full(post(ROOT))
+                            .content(command(m, UUID.randomUUID().toString(), "L001", "1")))
+                    .andExpect(status().isConflict());
+            assertEquals(issues, j.queryForObject("SELECT COUNT(*) FROM mes_material_issue", Integer.class));
+            assertEquals(0, new BigDecimal("1000").compareTo(j.queryForObject("SELECT target_qty FROM mes_production_execution", BigDecimal.class)));
+        }
+    }
+
+    @Test
     void firstRepeatRunningDifferentLotsIdempotenceAndPermanentOwnership() throws Exception {
         try (var c = context()) {
             var m = MaterialIssueHttpTest.mvc(c);
@@ -126,7 +144,7 @@ class ProductionInputHttpTest {
                     .andExpect(jsonPath("nodes[0].availableQty").value("220.000000"));
             var other = new ObjectMapper().readTree(submit(m, command(m, UUID.randomUUID().toString(), "L002", "150")));
             assertEquals(2, j.queryForObject("SELECT COUNT(*) FROM mes_production_scan_identity", Integer.class));
-            assertEquals(0, j.queryForObject("SELECT COUNT(*) FROM mes_production_execution WHERE id=? AND target_qty<>100", Integer.class, e));
+            assertEquals(0, j.queryForObject("SELECT COUNT(*) FROM mes_production_execution WHERE id=? AND target_qty<>300", Integer.class, e));
             m.perform(ProductionCoreV1HttpTest.full(get("/api/production/identity"))
                             .param("code", first.get("code").asText())).andExpect(status().isOk())
                     .andExpect(jsonPath("executionId").value(Long.toString(e)));

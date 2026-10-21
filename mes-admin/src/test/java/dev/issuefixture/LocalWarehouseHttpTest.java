@@ -64,7 +64,7 @@ class LocalWarehouseHttpTest {
             var m = MaterialIssueHttpTest.mvc(c);
             j.update("UPDATE wm_inventory SET quantity=0,available_quantity=0 WHERE id=1");
             apply(m, "opening", "500", "0");
-            apply(m, "receipt", "300", "500");
+            apply(m, "gain", "300", "500");
             String result = ProductionInputHttpTest.submit(m, ProductionInputHttpTest.command(m, UUID.randomUUID()
                     .toString(), "L001", "100"));
             String issue = new ObjectMapper().readTree(result).get("issueId").asText();
@@ -106,17 +106,17 @@ class LocalWarehouseHttpTest {
             m.perform(ProductionCoreV1HttpTest.full(post(ROOT + "opening"))
                     .content(body(UUID.randomUUID().toString(), "10", "0", null))).andExpect(status().isConflict());
             String request = body(UUID.randomUUID().toString(), "300", "0", null);
-            m.perform(ProductionCoreV1HttpTest.full(post(ROOT + "receipt")).content(request))
+            m.perform(ProductionCoreV1HttpTest.full(post(ROOT + "gain")).content(request))
                     .andExpect(status().isOk());
-            m.perform(ProductionCoreV1HttpTest.full(post(ROOT + "receipt")).content(request))
+            m.perform(ProductionCoreV1HttpTest.full(post(ROOT + "gain")).content(request))
                     .andExpect(status().isOk());
-            m.perform(ProductionCoreV1HttpTest.full(post(ROOT + "receipt")).content(request.replace("300", "301")))
+            m.perform(ProductionCoreV1HttpTest.full(post(ROOT + "gain")).content(request.replace("300", "301")))
                     .andExpect(status().isConflict());
-            m.perform(ProductionCoreV1HttpTest.full(post(ROOT + "receipt"))
+            m.perform(ProductionCoreV1HttpTest.full(post(ROOT + "gain"))
                     .content(body(UUID.randomUUID().toString(), "1", "0", null))).andExpect(status().isConflict());
             m.perform(ProductionCoreV1HttpTest.full(post(ROOT + "loss"))
                     .content(body(UUID.randomUUID().toString(), "301", "300", null))).andExpect(status().isConflict());
-            m.perform(post(ROOT + "receipt").header("Authorization", "Bearer CRUD").header("X-Factory-Id", "A")
+            m.perform(post(ROOT + "gain").header("Authorization", "Bearer CRUD").header("X-Factory-Id", "A")
                     .contentType("application/json").content(request)).andExpect(status().isForbidden());
             balance(j, "300");
         }
@@ -131,12 +131,12 @@ class LocalWarehouseHttpTest {
             var barrier = new CyclicBarrier(2);
             var tasks = List.of(pool.submit(() -> {
                         barrier.await();
-                        return m.perform(ProductionCoreV1HttpTest.full(post(ROOT + "receipt")).content(request)).andReturn()
+                        return m.perform(ProductionCoreV1HttpTest.full(post(ROOT + "gain")).content(request)).andReturn()
                                 .getResponse().getStatus();
                     }),
                     pool.submit(() -> {
                         barrier.await();
-                        return m.perform(ProductionCoreV1HttpTest.full(post(ROOT + "receipt")).content(request))
+                        return m.perform(ProductionCoreV1HttpTest.full(post(ROOT + "gain")).content(request))
                                 .andReturn().getResponse().getStatus();
                     }));
             for (var task : tasks) assertEquals(200, task.get());

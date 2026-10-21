@@ -38,7 +38,8 @@ class QualityTreatmentProjectionTest {
     private final MesQualityTreatmentMapper events = mock(MesQualityTreatmentMapper.class);
     private final QualityTreatmentService service = new QualityTreatmentService(defects, events,
             mock(ProductionChainLocks.class), mock(ExecutionPathService.class),
-            mock(ProductionQuantityService.class), mock(BusinessDirectoryService.class));
+            mock(ProductionQuantityService.class), mock(BusinessDirectoryService.class), event -> {
+    });
 
     @AfterEach
     void paginationDoesNotEscapeTheProjection() {

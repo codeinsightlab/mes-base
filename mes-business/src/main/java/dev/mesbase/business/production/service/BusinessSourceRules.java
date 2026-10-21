@@ -1,6 +1,7 @@
 package dev.mesbase.business.production.service;
 
 import dev.mesbase.business.shared.enums.BusinessSource;
+import dev.mesbase.business.production.domain.WorkOrderStatus;
 import dev.mesbase.business.integration.warehouse.WarehouseIntegration;
 import dev.mesbase.business.integration.warehouse.ErpActionResult.Mode;
 import dev.mesbase.business.production.dao.WorkorderMapper;
@@ -17,7 +18,6 @@ import dev.mesbase.business.wm.dao.WmWarehouseMapper;
 import dev.mesbase.business.wm.dao.WmWarehouseErpExtraMapper;
 import dev.mesbase.business.wm.domain.WmWarehouseExample;
 import dev.mesbase.business.wm.domain.WmWarehouseErpExtraExample;
-import dev.mesbase.business.wm.domain.WmWarehouseEntity;
 import dev.mesbase.business.issue.dao.MesMaterialIssueMapper;
 import dev.mesbase.business.issue.dao.MesMaterialIssueItemMapper;
 import dev.mesbase.business.issue.domain.MesMaterialIssueExample;
@@ -86,9 +86,14 @@ public class BusinessSourceRules {
     }
 
     public WorkorderEntity order(Long id) {
+        return order(id, false);
+    }
+
+    private WorkorderEntity order(Long id, boolean output) {
         var row = orders.selectByPrimaryKey(id);
         if (row == null) conflict();
-        ProductionChainLocks.requireActive(row);
+        if (!output || !WorkOrderStatus.COMPLETED.getValue().equals(row.getStatus()))
+            ProductionChainLocks.requireActive(row);
         current(row.getSource());
         if (required(row.getSource()) == BusinessSource.EXTERNAL) {
             var extra = orderExtras.selectByPrimaryKey(id);
@@ -171,7 +176,18 @@ public class BusinessSourceRules {
     }
 
     public void execution(MesProductionExecutionEntity execution, Long finishedWarehouse) {
-        var order = order(execution.getWorkorderId());
+        execution(execution, finishedWarehouse, false);
+    }
+
+    /**
+     * Production completion does not close the separately authorized output/warehouse flow.
+     */
+    public void finishedOutput(MesProductionExecutionEntity execution, Long finishedWarehouse) {
+        execution(execution, finishedWarehouse, true);
+    }
+
+    private void execution(MesProductionExecutionEntity execution, Long finishedWarehouse, boolean output) {
+        var order = order(execution.getWorkorderId(), output);
         var ids = new ArrayList<Long>();
         if (finishedWarehouse != null) ids.add(finishedWarehouse);
         var f = new MesMaterialIssueExample();

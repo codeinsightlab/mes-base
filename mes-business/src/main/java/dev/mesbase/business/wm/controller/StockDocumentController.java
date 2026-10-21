@@ -88,6 +88,19 @@ public class StockDocumentController {
         service.removeLine(id, lineId, command);
     }
 
+    @GetMapping("/executions/{id}/basis")
+    @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED, permission = PERMISSION + "query")
+    public ProductionBasis productionBasis(@PathVariable Long id) {
+        var b = service.productionBasis(id);
+        return new ProductionBasis(b.executionId().toString(), b.productId().toString(), b.effective()
+                .toPlainString(), b.released().toPlainString(), b.received().toPlainString(), b.remaining()
+                .toPlainString(), b.canReceive(), b.blockedReason());
+    }
+
+    public record ProductionBasis(String executionId, String productId, String effective, String released,
+                                  String received, String remaining, boolean canReceive, String blockedReason) {
+    }
+
     @GetMapping("/cancelled-workorders/{id}/basis")
     @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED, permission = PERMISSION + "query")
     public Basis basis(@PathVariable Long id) {
@@ -103,7 +116,7 @@ public class StockDocumentController {
 
     private static Header view(WmStockDocumentEntity row) {
         return new Header(row.getId().toString(), row.getDocumentNo(), row.getDocumentType(), row.getStatus(),
-                row.getReason(), row.getRemark(), string(row.getSourceWorkorderId()), row.getCreateBy(), row.getCreateTime(),
+                row.getReason(), row.getRemark(), string(row.getSourceWorkorderId()), string(row.getSourceExecutionId()), row.getCreateBy(), row.getCreateTime(),
                 row.getUpdateBy(), row.getUpdateTime(), string(row.getPostedBy()), row.getPostedAt(),
                 string(row.getCancelledBy()), row.getCancelledAt(), row.getRevision()
                 .toString(), row.getPostRequestId());
@@ -121,7 +134,8 @@ public class StockDocumentController {
     }
 
     public record Header(String id, String documentNo, String documentType, String status, String reason,
-                         String remark, String sourceWorkorderId, String createBy, LocalDateTime createTime,
+                         String remark, String sourceWorkorderId, String sourceExecutionId, String createBy,
+                         LocalDateTime createTime,
                          String updateBy, LocalDateTime updateTime, String postedBy, LocalDateTime postedAt,
                          String cancelledBy, LocalDateTime cancelledAt, String revision, String postRequestId) {
     }

@@ -22,14 +22,13 @@ public class ProductionCompletionController {
         this.service = service;
     }
 
-    public record Fact(String id, String executionId, String effectiveQty, String releasedQty, String receiptQty,
-                       String acceptedQty, String operatorUserId, LocalDateTime recordedAt, String reason) {
+    public record Fact(String id, String executionId, String effectiveQty, String releasedQty,
+                       String inboundQty, String operatorUserId, LocalDateTime recordedAt, String reason) {
     }
 
     public record Summary(String executionId, String executionNo, String status, String targetQty, String effective,
-                          String released, String historicalReleased, String received, String accepted,
-                          String remainingHandover, String pendingAcceptance, String outputExcess, String releaseExcess,
-                          String basisHash, boolean canComplete, String blockedReason, Fact completion) {
+                          String released, String historicalReleased, String basisHash, boolean canComplete,
+                          String blockedReason, Fact completion) {
     }
 
     @GetMapping("/closure")
@@ -37,11 +36,9 @@ public class ProductionCompletionController {
     public Summary summary(@PathVariable Long id) {
         var s = service.summary(id);
         return new Summary(id.toString(), s.execution().getExecutionNo(), s.execution().getStatus(), s.execution()
-                .getTargetQty().toPlainString(), s.release().effective().toPlainString(), s.release().released()
-                .toPlainString(), s.release().historicalReleased().toPlainString(), s.received()
-                .toPlainString(), s.accepted().toPlainString(), s.remainingHandover()
-                .toPlainString(), s.pendingAcceptance().toPlainString(), s.outputExcess()
-                .toPlainString(), s.releaseExcess().toPlainString(), s.release()
+                .getTargetQty().toPlainString(),
+                s.release().effective().toPlainString(), s.release().released().toPlainString(), s.release()
+                .historicalReleased().toPlainString(), s.release()
                 .basisHash(), s.canComplete(), s.blockedReason(), s.completion() == null ? null : view(s.completion()));
     }
 
@@ -53,8 +50,8 @@ public class ProductionCompletionController {
 
     private static Fact view(MesExecutionCompletionEntity r) {
         return new Fact(r.getId(), r.getExecutionId().toString(), r.getEffectiveQty()
-                .toPlainString(), r.getReleasedQty().toPlainString(), r.getReceiptQty()
-                .toPlainString(), r.getAcceptedQty().toPlainString(), r.getOperatorUserId()
+                .toPlainString(), r.getReleasedQty().toPlainString(), r.getAcceptedQty()
+                .toPlainString(), r.getOperatorUserId()
                 .toString(), r.getRecordedAt(), r.getReason());
     }
 }

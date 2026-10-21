@@ -12,6 +12,7 @@ import dev.mesbase.business.production.domain.ProductionReportModels.ExecutionQu
 import dev.mesbase.business.production.domain.ExecutionPathStatus;
 import dev.mesbase.business.production.domain.ProductionExecutionStatus;
 import dev.mesbase.business.production.service.ProductionChainLocks;
+import dev.mesbase.business.production.service.BusinessSourceRules;
 import dev.mesbase.business.production.service.ProductionQuantityService;
 import dev.mesbase.business.integration.warehouse.WarehouseIntegration;
 import dev.mesbase.business.integration.warehouse.ErpActionResult.Mode;
@@ -55,10 +56,12 @@ public class QualityReleaseService {
     private final QualityTreatmentService treatments;
     private final ProductionChainLocks locks;
     private final WarehouseIntegration integration;
+    private final BusinessSourceRules sources;
 
     public QualityReleaseService(MesQualityReleaseMapper releases, ProductionQuantityService quantities,
                                  QualityTreatmentService treatments, ProductionChainLocks locks,
-                                 WarehouseIntegration integration) {
+                                 WarehouseIntegration integration, BusinessSourceRules sources) {
+        this.sources = sources;
         this.releases = releases;
         this.quantities = quantities;
         this.treatments = treatments;
@@ -139,13 +142,14 @@ public class QualityReleaseService {
             return old;
         }
         ProductionQuantityInput.check(c.quantity());
-        if (!c.revoke()) locks.requireActiveExecution(execution);
+        if (!c.revoke()) sources.finishedOutput(row, null);
         if (integration.configuredMode(FactoryContext.required()) != Mode.LOCAL_ONLY)
             blocked("ERP模式须由真实质量集成实现，不允许回退LOCAL放行");
         var state = state(execution);
         if (!Objects.equals(c.expectedReleaseId(), state.currentReleaseId())) conflict();
-        if (!ProductionExecutionStatus.RUNNING.getValue().equals(row.getStatus()))
-            blocked("仅运行中的执行可以新增正式放行或撤回；终态历史保留");
+        if (!List.of(ProductionExecutionStatus.RUNNING.getValue(), ProductionExecutionStatus.COMPLETED.getValue())
+                .contains(row.getStatus()))
+            blocked("仅运行或生产已完工的执行可以新增正式放行或撤回");
         if (!c.revoke() && (!state.safe() || c.quantity().compareTo(state.effective()) > 0))
             blocked(state.blockedReason() == null ? "放行数量不能超过末道有效产出" : state.blockedReason());
         if (c.revoke() && state.currentReleaseId() == null) conflict();

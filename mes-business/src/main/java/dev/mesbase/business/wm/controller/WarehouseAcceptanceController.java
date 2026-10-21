@@ -8,9 +8,7 @@ import java.util.List;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 
@@ -29,20 +27,7 @@ public class WarehouseAcceptanceController {
                        LocalDateTime recordedAt, String reason) {
     }
 
-    public record State(String receiptId, String executionId, String productId, String warehouseId,
-                        String productLotCode, String netHandover, String accepted, String pending) {
-    }
-
     public record Page(List<Fact> items, long total, int offset, int limit) {
-    }
-
-    @GetMapping("/receipts/{id}")
-    @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED, permission = "business:wm:acceptance:read")
-    public State state(@PathVariable String id) {
-        var s = service.state(id);
-        return new State(id, s.receipt().getExecutionId().toString(), s.productId().toString(), s.receipt()
-                .getWarehouseId().toString(), s.receipt().getProductLotCode(), s.netHandover()
-                .toPlainString(), s.accepted().toPlainString(), s.pending().toPlainString());
     }
 
     @GetMapping("/receipts/{id}/history")
@@ -51,18 +36,6 @@ public class WarehouseAcceptanceController {
                         @RequestParam(defaultValue = "20") int limit) {
         var p = service.history(id, offset, limit);
         return new Page(p.items().stream().map(WarehouseAcceptanceController::view).toList(), p.total(), offset, limit);
-    }
-
-    @PostMapping("/receipts/{id}")
-    @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED, permission = "business:wm:acceptance:create")
-    public Fact accept(@PathVariable String id, @RequestBody WarehouseAcceptanceService.Accept c) {
-        return view(service.accept(id, c));
-    }
-
-    @PostMapping("/{id}/reverse")
-    @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED, permission = "business:wm:acceptance:reverse")
-    public Fact reverse(@PathVariable String id, @RequestBody WarehouseAcceptanceService.Reverse c) {
-        return view(service.reverse(id, c));
     }
 
     private static Fact view(MesWarehouseAcceptanceEntity r) {

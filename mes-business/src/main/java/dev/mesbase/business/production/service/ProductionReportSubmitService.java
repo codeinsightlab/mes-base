@@ -1,6 +1,9 @@
 package dev.mesbase.business.production.service;
 
 import dev.mesbase.business.production.domain.ProductionQuantityInput;
+import dev.mesbase.business.production.domain.ProductionCompletionRequested;
+import dev.mesbase.platform.execution.FactoryContext;
+import org.springframework.context.ApplicationEventPublisher;
 
 import dev.mesbase.business.basic.dao.WorkstationMapper;
 import dev.mesbase.business.production.dao.MesProductionExecutionMapper;
@@ -37,6 +40,7 @@ import org.springframework.beans.factory.annotation.Qualifier;
 @ConditionalOnProperty(name = "mes.business.enabled", havingValue = "true")
 public class ProductionReportSubmitService {
     private final BusinessSourceRules sources;
+    private final ApplicationEventPublisher publisher;
 
     public record Context(ProductionIdentity identity, ExecutionQuantity quantities, PathModel path,
                           List<Candidate> candidates) {
@@ -59,7 +63,9 @@ public class ProductionReportSubmitService {
                                          MesProductionReportMapper reports, MesProductionExecutionMapper executions,
                                          WorkorderMapper orders,
                                          WorkstationMapper workstations, BusinessSourceRules sources,
-                                         @Qualifier("businessTransactionManager") OwnedTransactionManager transactionManager) {
+                                         @Qualifier("businessTransactionManager") OwnedTransactionManager transactionManager,
+                                         ApplicationEventPublisher publisher) {
+        this.publisher = publisher;
         this.transactionManager = transactionManager;
         this.sources = sources;
         this.identities = identities;
@@ -120,6 +126,7 @@ public class ProductionReportSubmitService {
         if (command.workstationId() != null && workstations.selectByPrimaryKey(command.workstationId()) == null)
             throw new FoundationException(ErrorCode.REPORT_REFERENCE_INVALID);
         // Reuse the formal start contract, including released order, exact routing, locked path and confirmed issue.
+        boolean terminal = Objects.equals(path.orderedRows().getLast().getRoutingNodeId(), command.routingNodeId());
         paths.start(locked, path);
         var now = LocalDateTime.now();
         var row = new MesProductionReportEntity();
@@ -140,6 +147,8 @@ public class ProductionReportSubmitService {
             // Same-execution retries are serialized above. A cross-execution UUID collision has different payload.
             throw new FoundationException(ErrorCode.RESOURCE_CONFLICT, collision);
         }
+        if (terminal)
+            publisher.publishEvent(new ProductionCompletionRequested(FactoryContext.required(), execution.getId()));
         return reports.selectByPrimaryKey(row.getId());
     }
 

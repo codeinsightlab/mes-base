@@ -8,10 +8,6 @@ import dev.mesbase.core.error.ErrorCode;
  * Warehouse ERP domain contract, not an HTTP adapter per API. Vendor implementations own internal workflows.
  */
 public interface WarehouseErpAdapter {
-    default ErpActionResult acceptProductionReceipt(FactoryScope scope, ProductionReceiptAcceptanceCommand command) {
-        throw new FoundationException(ErrorCode.INTEGRATION_NOT_CONFIGURED);
-    }
-
     default ErpActionResult createMaterialIssue(FactoryScope scope, MaterialIssueSubmitCommand command) {
         throw new FoundationException(ErrorCode.INTEGRATION_NOT_CONFIGURED);
     }
