@@ -5,7 +5,7 @@
         <bind name="cancelledStatus"
               value="@dev.mesbase.business.production.domain.WorkOrderStatus@CANCELLED.getValue()"/>
         SELECT w.id, w.code, w.source, w.status, m.code AS productCode, m.name AS productName,
-        u.name AS unitName, w.planned_qty AS plannedQty
+        u.name AS unitName, w.planned_qty AS plannedQty, w.create_time AS createTime
         FROM workorder w
         LEFT JOIN material m ON m.id = w.product_id
         LEFT JOIN unit_measure u ON u.id = m.unit_id

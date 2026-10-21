@@ -62,6 +62,23 @@ class BusinessTemplatePackageTest {
     }
 
     @Test
+    void generatedFrontendDelegatesNativeQuerySubmitToTheSharedCrudPage() throws Exception {
+        for (boolean sync : List.of(false, true)) {
+            var artifacts = new BusinessTemplateRenderer(options(templates(), Map.of()))
+                    .render(request("material", sync), metadata("material"));
+            String page = artifacts.stream().filter(a -> a.relativePath().endsWith(".vue"))
+                    .findFirst().orElseThrow().content();
+            assertTrue(page.contains("<CrudPage"));
+            assertTrue(page.contains(":fields=\"fields\""));
+            assertTrue(page.contains("CrudPage / QueryForm"));
+            assertFalse(page.contains("@keyup.enter"));
+            assertFalse(page.contains("@keydown.enter"));
+            assertFalse(page.contains("queryEnter"));
+            assertFalse(page.contains("<el-form"));
+        }
+    }
+
+    @Test
     void genericTemplatesFollowPackageConfigurationAndProduceCompilableSources() throws Exception {
         for (String table : List.of("material_category", "unit_measure", "workshop", "workstation", "material", "safety_stock")) {
             for (boolean sync : List.of(false, true)) {

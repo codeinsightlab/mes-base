@@ -1,5 +1,4 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- MES-CODEGEN: MyBatis Generator standard single-table persistence. -->
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="dev.mesbase.business.quality.dao.MesQualityTreatmentMapper">
   <resultMap id="BaseResultMap" type="dev.mesbase.business.quality.domain.MesQualityTreatmentEntity">
@@ -89,6 +88,11 @@
     rework_qty, processed_qty, recovered_qty, failed_qty, operator_user_id, confirmed_by, 
     occurred_at, recorded_at, reason
   </sql>
+  <select id="selectRecent" resultMap="BaseResultMap">
+    SELECT <include refid="Base_Column_List"/> FROM mes_quality_treatment
+    ORDER BY recorded_at DESC, id DESC
+    LIMIT #{limit}
+  </select>
   <select id="selectByExample" parameterType="dev.mesbase.business.quality.domain.MesQualityTreatmentExample" resultMap="BaseResultMap">
     select
     <include refid="Base_Column_List" />

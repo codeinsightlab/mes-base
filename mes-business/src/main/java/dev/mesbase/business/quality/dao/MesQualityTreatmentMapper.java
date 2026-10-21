@@ -1,4 +1,3 @@
-// MES-CODEGEN: MyBatis Generator standard single-table persistence.
 package dev.mesbase.business.quality.dao;
 
 import dev.mesbase.business.quality.domain.MesQualityTreatmentEntity;
@@ -7,6 +6,8 @@ import java.util.List;
 import org.apache.ibatis.annotations.Param;
 
 public interface MesQualityTreatmentMapper {
+    List<MesQualityTreatmentEntity> selectRecent(@Param("limit") int limit);
+
     long countByExample(MesQualityTreatmentExample example);
 
     int deleteByExample(MesQualityTreatmentExample example);

@@ -7,7 +7,6 @@ import java.time.LocalDateTime;
 import java.util.List;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
@@ -25,16 +24,12 @@ public class RecentProductionReportController {
                       String operatorName, LocalDateTime reportTime, LocalDateTime createTime) {
     }
 
-    public record Page(List<Row> items, long total, int offset, int limit) {
-    }
-
     @GetMapping("/api/production/reports/recent")
     @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED, permission = ProductionReportPermissions.DETAIL)
-    public Page recent(@RequestParam(defaultValue = "0") int offset,
-                       @RequestParam(defaultValue = "6") int limit) {
-        var page = service.recent(offset, limit);
-        var rows = page.items().stream().map(r -> {
-            var user = page.users().get(r.operatorUserId());
+    public List<Row> recent() {
+        var result = service.recent();
+        return result.items().stream().map(r -> {
+            var user = result.users().get(r.operatorUserId());
             return new Row(ProductionReportViews.id(r.id()), ProductionReportViews.id(r.executionId()),
                     r.executionNo(), ProductionReportViews.id(r.workorderId()), r.workorderCode(), r.source(),
                     r.productCode(), r.productName(), r.unitName(), ProductionReportViews.id(r.routingNodeId()),
@@ -42,6 +37,5 @@ public class RecentProductionReportController {
                     ProductionReportViews.id(r.operatorUserId()), user == null ? null : user.name(),
                     r.reportTime(), r.createTime());
         }).toList();
-        return new Page(rows, page.total(), page.offset(), page.limit());
     }
 }

@@ -4,6 +4,17 @@ import dev.mesbase.business.production.controller.RecentProductionReportControll
 import dev.mesbase.business.production.dao.RecentProductionReportExtraMapper;
 import dev.mesbase.business.production.service.RecentProductionReportQueryService;
 import java.util.Map;
+import java.util.ArrayList;
+import java.util.List;
+import java.sql.Connection;
+import org.apache.ibatis.executor.statement.StatementHandler;
+import org.apache.ibatis.plugin.Interceptor;
+import org.apache.ibatis.plugin.Intercepts;
+import org.apache.ibatis.plugin.Signature;
+import org.apache.ibatis.plugin.Invocation;
+
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
 import org.apache.ibatis.session.SqlSessionFactory;
 import org.junit.jupiter.api.Test;
 import org.mybatis.spring.SqlSessionTemplate;
@@ -25,6 +36,20 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  */
 class RecentProductionReportHttpTest {
     private static final String URL = "/api/production/reports/recent";
+
+    @Intercepts(@Signature(type = StatementHandler.class, method = "prepare", args = {Connection.class, Integer.class}))
+    static class SqlCapture implements Interceptor {
+        final List<String> statements = new ArrayList<>();
+
+        public Object intercept(Invocation invocation) throws Throwable {
+            statements.add(((StatementHandler) invocation.getTarget()).getBoundSql().getSql().toLowerCase());
+            return invocation.proceed();
+        }
+
+        void assertNoCount() {
+            assertTrue(statements.stream().noneMatch(sql -> sql.contains("count(")), statements.toString());
+        }
+    }
 
     @Configuration
     @Import({RecentProductionReportController.class, RecentProductionReportQueryService.class})
@@ -60,41 +85,38 @@ class RecentProductionReportHttpTest {
             seed(jdbc.get("A"), "TEST-A", "4.123456");
             seed(jdbc.get("B"), "TEST-B", "2.654321");
             var mvc = MaterialIssueHttpTest.mvc(context);
-            mvc.perform(ProductionReportHttpTest.full(get(URL).param("limit", "1"), "A"))
-                    .andExpect(status().isOk()).andExpect(jsonPath("total").value(2))
-                    .andExpect(jsonPath("items[0].id").value("9007199254740994"))
-                    .andExpect(jsonPath("items[0].recordType").value("ADJUSTMENT"))
-                    .andExpect(jsonPath("items[0].quantityDelta").value("-1.000000"))
-                    .andExpect(jsonPath("items[0].workorderCode").value("TEST-A"))
-                    .andExpect(jsonPath("items[0].operationName").value("首工序"));
+            var capture = new SqlCapture();
+            context.getBean(SqlSessionFactory.class).getConfiguration().addInterceptor(capture);
             for (String factory : new String[]{"A", "B"}) {
-                mvc.perform(ProductionReportHttpTest.full(get(URL).param("offset", "1").param("limit", "1"), factory))
-                        .andExpect(status().isOk()).andExpect(jsonPath("items[0].id").value("9007199254740993"))
-                        .andExpect(jsonPath("items[0].workorderCode").value("TEST-" + factory))
-                        .andExpect(jsonPath("items[0].quantityDelta").value(factory.equals("A") ? "4.123456" : "2.654321"));
+                mvc.perform(ProductionReportHttpTest.full(get(URL), factory))
+                        .andExpect(status().isOk()).andExpect(jsonPath("$.length()").value(2))
+                        .andExpect(jsonPath("[0].id").value("9007199254740994"))
+                        .andExpect(jsonPath("[0].recordType").value("ADJUSTMENT"))
+                        .andExpect(jsonPath("[0].quantityDelta").value("-1.000000"))
+                        .andExpect(jsonPath("[0].workorderCode").value("TEST-" + factory))
+                        .andExpect(jsonPath("[0].operationName").value("首工序"))
+                        .andExpect(jsonPath("[1].quantityDelta").value(factory.equals("A") ? "4.123456" : "2.654321"));
             }
-            mvc.perform(ProductionReportHttpTest.full(get(URL).param("offset", "2"), "A"))
-                    .andExpect(status().isOk()).andExpect(jsonPath("total").value(2))
-                    .andExpect(jsonPath("items").isEmpty());
-            assertEquals(2, jdbc.get("A").queryForObject("SELECT COUNT(*) FROM mes_production_report", Integer.class));
+            capture.assertNoCount();
+            for (int i = 0; i < 12; i++)
+                jdbc.get("A")
+                        .update("INSERT INTO mes_production_report(execution_id,routing_node_id,record_type,quantity_delta,operator_user_id,recorded_by,report_time,create_time,reason,request_id,command_fingerprint) VALUES(1,11,'REPORT',1,100,1,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,'TEST ONLY',?, 'test')", "bounded-" + i);
+            mvc.perform(ProductionReportHttpTest.full(get(URL).param("offset", "100").param("limit", "1000"), "A"))
+                    .andExpect(status().isOk()).andExpect(jsonPath("$.length()").value(10));
+            capture.assertNoCount();
+            assertEquals(14, jdbc.get("A").queryForObject("SELECT COUNT(*) FROM mes_production_report", Integer.class));
         }
     }
 
     @Test
-    void rejectsMissingScopeWrongPermissionAndUnboundedPages() throws Exception {
+    void rejectsMissingScopeWrongPermissionAndReturnsEmptyArray() throws Exception {
         try (var context = context()) {
             var mvc = MaterialIssueHttpTest.mvc(context);
             mvc.perform(get(URL).header("Authorization", "Bearer NONE").header("X-Factory-Id", "A"))
                     .andExpect(status().isForbidden());
             mvc.perform(get(URL).header("Authorization", "Bearer FULL")).andExpect(status().isUnprocessableEntity());
             mvc.perform(ProductionReportHttpTest.full(get(URL), "B"))
-                    .andExpect(status().isOk()).andExpect(jsonPath("total").value(0));
-            for (String limit : new String[]{"0", "101", "-1"}) {
-                mvc.perform(ProductionReportHttpTest.full(get(URL).param("limit", limit), "A"))
-                        .andExpect(status().isBadRequest());
-            }
-            mvc.perform(ProductionReportHttpTest.full(get(URL).param("offset", "-1"), "A"))
-                    .andExpect(status().isBadRequest());
+                    .andExpect(status().isOk()).andExpect(jsonPath("$").isEmpty());
         }
     }
 }

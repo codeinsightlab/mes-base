@@ -1,4 +1,4 @@
-<!-- MES-CODEGEN: Base Design System; shared CRUD interactions and explicit field contract. -->
+<!-- MES-CODEGEN: Base Design System; native query submit via shared CrudPage/QueryForm and explicit field contract. -->
 <script setup lang="ts">
 import CrudPage from '${crudComponent}'
 import { api } from '${frontendApiImport}'
@@ -26,6 +26,7 @@ const fields: Field[] = [
 </script>
 
 <template>
+  <!-- 查询按钮和回车由公共 CrudPage / QueryForm 的原生 submit 统一处理，不生成逐字段键盘监听。 -->
   <CrudPage
 #if($generateSync)
     ref="page"

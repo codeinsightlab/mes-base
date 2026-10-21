@@ -440,3 +440,38 @@ ProductionQuantityService.compose读取正式报工合计后，先加冻结gross
 全操作再次执行通过：remainingExecutions=0、alreadyConvertedDeclarations=12052，无新增业务记录；再次核对不良/处置总数仍为12071/24146，mes_master_sync最终SUCCEEDED、processed_count=12052。Python计划/断点测试7项及前后端git diff --check再次通过。正式完成后仍保留冲突供用户人工审核，不自动改状态或补造处置结果。
 
 用户质询迁移为何“跑全流程”后明确：本次以冻结来源集合映射并批量INSERT正式不良、已有历史处置事实和唯一转换关联，不逐条调用申报/审核/报废业务接口，不重跑领料、报工和库存。额外关联用于防止原期初损耗与正式不良重复扣减。早期重复扫描全节点属于本次工具实现过重，已移出逐批热路径；必要的收尾全量核对仅执行一次。
+
+
+#### 2026-10-21 用户确认申报人映射与未处理不良补迁
+
+用户随后明确授权旧admin相关不良映射到user_id=100，并允许选择当前系统一个同名“周静”账号。实际中心库账号6148/L20260614/周静启用且未删除，另一个5862已停用，因此选择6148。迁移计划通过显式reporter_overrides覆盖这两项身份，保留原create_by/source_hash；不是全体申报人回填当前操作者。旧admin共5条、周静共3条，解除8个执行的身份冲突，整组补迁20条，其他12条保留原已确认申报人。真实回滚样板通过后提交；逐条来源、数量、原申报人/授权映射、40项处置事实及15个节点转换核验通过，原12执行/10工单全部字段及报工/输入/库存校验值不变。证据在私有identity-supplement目录。
+
+用户进一步明确旧status=0应映射本系统新增未处理状态。此前DISPOSITION_NOT_PROVEN是本轮工具的保守排除原因，并非系统没有待处置状态；原限制过严，现由用户授权调整。planner仅在本次显式allow_pending_disposition=True时接受status=0且没有退废引用的记录，未知或矛盾状态仍拒绝。其独立不良及节点损耗已经通过冻结来源、身份、全部节点数量守恒核实，因此登记ASSESS/INDEPENDENT，保留未处理事实，不生成ALLOCATE、报废、返工或库存动作。系统已有Summary自然投影为PENDING（待处置），不是伪造SCRAPPED，也不增加第二套状态机。
+
+剩余4执行/6条来源、数量合计29已正式迁入：9452的3条，9635/9944/1126各1条。真实回滚后提交6条正式申报、6项归属核实、5个节点转换。真实8081逐条处置查询确认六条全部PENDING、pendingDispositionQty=defectQty、allocatedScrapQty=0、仅有ASSESS事实。全部4执行投入、报工、不良、有效产出、剩余量及净损耗与迁前Decimal逐项等值；原来源待核实提示转换为正式待处置表示（unverifiedDefectQty由合计29变0），质量放行权威接口safe=false，blockedReason为质量处置或返工尚未完成。待处置门禁保持，原4执行/4工单头字段完全不变；未重开或改写原完工事实，既有完工状态仍按用户先前要求留待人工审查。原员工报工、投入、库存四表CHECKSUM不变。
+
+截至此次补迁，12078条来源全部映射为正式不良：12072条有历史退废依据，6条待处置；覆盖4028执行、6821节点转换。全库不良账本12097条（含迁前19），质量事件24192条（含迁前42）。最终重放remainingExecutions=0/alreadyConvertedDeclarations=12078，没有重复业务记录。两次补迁均核对原DEV目标绑定并使用原数据库令牌、确定性来源身份和事务批量插入；原计划/备份/前次验收不覆盖，新证据分别在identity-supplement和pending-supplement。仅修改Python迁移工具及其9项通过的测试，未修改Java/Vue业务代码、Schema或JAR，未重启服务。git diff --check通过。最新冲突清单已追加补迁结果，原隔离表保留为历史快照。
+
+
+#### 2026-10-21 报工人／实际生产时间及工单创建时间复审
+
+用户要求报工人及生产时间恢复旧数据，账号采用刚确认的admin→100、周静→6148规则，并要求工单创建时间恢复原始数据。本次先对真实DEV完整历史范围只读复核，未直接覆盖账本。真实绑定仍为TEST_DEV_PERF_20261019、数据源9/revision2、192.168.18.25:3306/mes_base_dev_perf_test、LOCAL，server_uuid与前述一致。
+
+已关联REPORT来源的122171条报工，operator_user_id与冻结source_payload.report.user_id不符数0，report_time与冻结report.create_time不符数0；206个操作人分组的ID、来源账号及昵称与当前中心用户一致。该历史范围不存在admin或周静报工，不需应用本次两个特殊身份映射。真实8081详情接口复核105603/105604：105603操作人5008/贺仁翠、生产时间2026-10-04T13:22:46，与旧报工一致；recorded_by=100和2026-10-20的create_time分别是迁移提交人及本地登记时间。前端ProductionReportManager已分别展示实际操作人/提交人、生产时间(reportTime)/记录时间(createTime)。这些是不同字段，不应把当前登记审计字段改写为旧操作人和旧生产时间。
+
+全表227783条报工还包含未关联本次历史REPORT来源的105612条记录；例如流水1所属工单TEST_PERF_20261018_000001_WO，备注明确规则驱动仿真、非现场真实记录，操作人100和2026-10-18时间不能被当成本次历史报工映射失败的证据。本次不据此将无来源的测试报工改派给历史员工。
+
+566个已迁历史工单的create_time确为本次导入时间。通过冻结raw_source_identities中的原mo_id唯一关联prod_j2eedb.pro_workorder，仅12个仍存在，create_time全部NULL；其余554个原记录当前不在原表。该12个有transaction_date，但旧界面称其交易日期，并非已证明的原创建时间，未静默替代。既有迁移冻结未捕获原pro_workorder.create_time，只有报工驱动的计划边界及原身份，因此无法宣称已有566张真实创建时间可直接恢复。
+
+已向用户发出缺失时间处理选择：使用每工单最早旧报工时间并明确标记推导，或等待取得原工单真实时间；此决定待回复，未回填创建时间，也未改报工事实、数量、状态或库存。只读证据在.local/legacy-report-identity-time-20261021/audit-summary.json、report-operator-groups.json、workorder-date-evidence.json、http-report-details.json。未修改业务代码、未构建或重启服务。
+
+
+#### 2026-10-21 用户授权按最早旧报工时间回填工单创建时间（推导值）
+
+用户明确选择“用各工单最早的旧报工时间回填，并明确记录为推导时间”，本节取代上一节的待回复状态。按122171条冻结REPORT来源report.create_time，经原报工→执行→工单关联，在入口集合聚合MIN时间，566张历史工单全部覆盖；同时逐组验证来源工单编码一致、实际report_time等于冻结时间且无缺失。不是按工单编码推算日期，不使用当前导入时间，也不把12张原表的交易日期冒充创建时间。
+
+执行前再次核验目标Factory TEST_DEV_PERF_20261019、数据源9/revision2、LOCAL、192.168.18.25:3306/mes_base_dev_perf_test及server_uuid。冻结全1674张工单完整字段备份、566张变更计划、计划SHA256以及带旧值条件的执行/回退SQL。全部566张原备注可原样保留，追加“【创建时间推导】取本工单最早旧报工时间；非原系统创建时间。”，追加后最长54字符，不截断已有备注。
+
+先进行真实事务回滚样板，566张更新及逐字段比较通过；正式执行再次锁定目标工单并核对全表与备份一致，通过单条集合UPDATE仅改create_time/remark并验证受影响566行，再提交并独立读回。新时间范围2024-05-06 07:52:20至2026-10-16 20:46:04。其余1108张工单完整字段不变；所有工单的状态、数量、路线、来源、revision和update_time均未变。mes_production_report、mes_production_execution、mes_production_defect、mes_quality_treatment、mes_material_issue_input、wm_inventory、wm_stock_action七表CHECKSUM与执行前完全一致。
+
+实际8081详情复核1149/1407/1695三个工单及列表编码查询，创建时间和推导备注均已回显：5100-240701408=2024-07-01T15:03:30，5100-251001479=2025-10-05T15:11:40，5100-261001769=2026-10-05T15:24:37。现有前端创建时间字段消费该列表响应；本轮未额外执行浏览器视觉验收，未修改Java/Vue业务代码或Schema，未构建、重启服务。证据目录.local/legacy-report-identity-time-20261021/workorder-create-time包含all-workorders-before/after.json.gz、plan.json/sha256、apply.sql、rollback.sql、probe/apply-verification.json、http-verification.json。SQL已保存、正式执行并验证；rollback.sql仅保存未执行，回退仍须以当前值条件核对后使用。此前不良迁移阶段“工单头字段未变”的快照结论仍是当时事实，本次创建时间与备注变化由此条独立用户授权产生。

@@ -106,7 +106,7 @@ public class WorkOrderProgressQueryService {
                 invalidQuality ? null : decimal(scrap), decimal(unfinished), invalidQuality ? null : decimal(untreated),
                 invalidQuality ? null : decimal(waiting), invalidQuality ? null : decimal(reworking),
                 decimal(unverified), decimal(percent), completion == null ? 0 : completion.executionCount(),
-                completion == null ? null : completion.lastCompletedAt(), issue);
+                completion == null ? null : completion.lastCompletedAt(), issue, order.createTime());
     }
 
     private static String decimal(BigDecimal value) {

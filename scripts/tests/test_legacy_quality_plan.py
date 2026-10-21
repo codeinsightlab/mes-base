@@ -36,6 +36,16 @@ class QualityPlanTest(unittest.TestCase):
         self.assertEqual([], build(rows)['accepted'])
         self.assertIn('DISPOSITION_NOT_PROVEN', build(rows)['rejected'][0]['reasons'])
 
+    def test_authorized_pending_import_retains_unhandled_source(self):
+        rows = self.rows()
+        rows[-1]['raw'].update(status='0', scrap_code=None)
+        plan = build(rows, allow_pending_disposition=True)
+        self.assertEqual([], plan['rejected'])
+        self.assertEqual('PENDING', plan['accepted'][0]['declarations'][0]['disposition'])
+        self.assertIsNone(plan['accepted'][0]['declarations'][0]['source']['raw']['scrap_code'])
+        rows[-1]['raw']['status'] = 'UNKNOWN'
+        self.assertEqual([], build(rows, allow_pending_disposition=True)['accepted'])
+
     def test_ambiguous_reporter_is_not_replaced_with_operator(self):
         rows = self.rows() + [dict(kind='user', id='8', name='原申报人')]
         self.assertIn('REPORTER_NOT_UNIQUE', build(rows)['rejected'][0]['reasons'])
@@ -44,6 +54,16 @@ class QualityPlanTest(unittest.TestCase):
         rows = self.rows()
         rows[-1]['raw']['quantity'] = '3'
         self.assertIn('OPENING_LOSS_NOT_CONSERVED', build(rows)['rejected'][0]['reasons'])
+
+    def test_authorized_admin_mapping_does_not_override_other_reporters(self):
+        rows = self.rows()
+        rows[-1]['raw']['create_by'] = '管理员'
+        self.assertEqual([], build(rows)['accepted'])
+        plan = build(rows, {'管理员': '100'})
+        self.assertEqual('100', plan['accepted'][0]['declarations'][0]['reporterId'])
+        self.assertEqual('管理员', plan['accepted'][0]['declarations'][0]['source']['raw']['create_by'])
+        rows[-1]['raw']['create_by'] = '其他未知人员'
+        self.assertEqual([], build(rows, {'管理员': '100'})['accepted'])
 
     def test_wrong_batch_is_not_assigned_to_execution(self):
         rows = self.rows()

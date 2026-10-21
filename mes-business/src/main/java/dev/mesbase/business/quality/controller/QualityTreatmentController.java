@@ -19,7 +19,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 
 @RestController
-@RequestMapping("/api/quality/defects/{id}/treatment")
+@RequestMapping("/api/quality")
 @ConditionalOnProperty(name = "mes.business.enabled", havingValue = "true")
 public class QualityTreatmentController {
     private final QualityTreatmentService service;
@@ -45,13 +45,20 @@ public class QualityTreatmentController {
                        String state, String recordAction, String destinationType, List<Event> events) {
     }
 
-    @GetMapping
+    @GetMapping("/treatments/recent")
+    @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED, permission = "business:quality:defect:read")
+    public List<Event> recent() {
+        var result = service.recent();
+        return result.events().stream().map(e -> event(e, result.users())).toList();
+    }
+
+    @GetMapping("/defects/{id}/treatment")
     @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED, permission = "business:quality:defect:read")
     public View details(@PathVariable String id) {
         return view(service.details(id));
     }
 
-    @PostMapping
+    @PostMapping("/defects/{id}/treatment")
     @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED, permission = "business:quality:defect:revise")
     public View execute(@PathVariable String id, @RequestBody Command c) {
         return view(service.execute(id, c));

@@ -1,6 +1,5 @@
 package dev.mesbase.business.production.service;
 
-import com.github.pagehelper.PageHelper;
 import dev.mesbase.business.directory.domain.DirectoryLabel;
 import dev.mesbase.business.directory.service.BusinessDirectoryService;
 import dev.mesbase.business.production.dao.RecentProductionReportExtraMapper;
@@ -23,21 +22,15 @@ public class RecentProductionReportQueryService {
         this.directory = directory;
     }
 
-    public record Page(List<RecentProductionReport> items, long total, int offset, int limit,
-                       Map<Long, DirectoryLabel> users) {
+    public record Recent(List<RecentProductionReport> items,
+                         Map<Long, DirectoryLabel> users) {
     }
 
     @Transactional(transactionManager = "businessTransactionManager", readOnly = true)
-    public Page recent(int offset, int limit) {
-        ProductionQuantityService.paging(offset, limit);
-        List<RecentProductionReport> rows;
-        long total;
-        try (var page = PageHelper.offsetPage(offset, limit)) {
-            rows = List.copyOf(reports.recent());
-            total = page.getTotal();
-        }
+    public Recent recent() {
+        var rows = List.copyOf(reports.recent(10));
         var users = rows.isEmpty() ? Map.<Long, DirectoryLabel>of()
                 : directory.userLabels(rows.stream().map(RecentProductionReport::operatorUserId).distinct().toList());
-        return new Page(rows, total, offset, limit, users);
+        return new Recent(rows, users);
     }
 }

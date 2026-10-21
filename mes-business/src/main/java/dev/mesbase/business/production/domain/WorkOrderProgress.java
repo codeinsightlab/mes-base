@@ -15,7 +15,7 @@ public final class WorkOrderProgress {
     }
 
     public record Order(Long id, String code, String source, String status, String productCode,
-                        String productName, String unitName, BigDecimal plannedQty) {
+                        String productName, String unitName, BigDecimal plannedQty, LocalDateTime createTime) {
     }
 
     public record Completion(Long workorderId, BigDecimal quantity, long factCount, long executionCount,
@@ -35,7 +35,8 @@ public final class WorkOrderProgress {
                            String goodOutputGapQty, String scrappedQty, String pendingCompletionQty,
                            String qualityUntreatedQty, String qualityWaitingReworkQty, String qualityReworkingQty,
                            String qualityUnverifiedQty, String completionPercent,
-                           long completedExecutions, LocalDateTime lastCompletedAt, String issue) {
+                           long completedExecutions, LocalDateTime lastCompletedAt, String issue,
+                           LocalDateTime createTime) {
     }
 
     public record Page(List<Progress> items, long total, int offset, int limit) {

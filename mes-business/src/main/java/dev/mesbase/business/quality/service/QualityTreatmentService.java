@@ -98,6 +98,16 @@ public class QualityTreatmentService {
     public record Details(Summary summary, Map<Long, DirectoryLabel> users, List<MesQualityTreatmentEntity> history) {
     }
 
+    public record Recent(List<MesQualityTreatmentEntity> events, Map<Long, DirectoryLabel> users) {
+    }
+
+    public Recent recent() {
+        var rows = List.copyOf(events.selectRecent(10));
+        var users = rows.isEmpty() ? Map.<Long, DirectoryLabel>of() : directory.userLabels(rows.stream()
+                .flatMap(e -> Stream.of(e.getOperatorUserId(), e.getConfirmedBy())).distinct().toList());
+        return new Recent(rows, users);
+    }
+
     public Details details(String declaration) {
         var d = latest(declaration);
         var all = executionEvents(d.getExecutionId());

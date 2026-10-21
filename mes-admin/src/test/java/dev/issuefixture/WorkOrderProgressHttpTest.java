@@ -149,7 +149,7 @@ class WorkOrderProgressHttpTest {
             var db = c.getBean(MaterialIssueHttpTest.Fixture.class).business;
             for (var jdbc : db.values()) {
                 ProductionReportHttpTest.seed(jdbc);
-                jdbc.update("UPDATE workorder SET planned_qty=10 WHERE id=1");
+                jdbc.update("UPDATE workorder SET planned_qty=10,create_time='2026-10-01 09:30:45' WHERE id=1");
             }
             complete(db.get("A"), "test-a-1", 1, "4");
             complete(db.get("A"), "test-a-2", 2, "1");
@@ -157,6 +157,7 @@ class WorkOrderProgressHttpTest {
             var mvc = MaterialIssueHttpTest.mvc(c);
             mvc.perform(ProductionReportHttpTest.full(get(URL), "A"))
                     .andExpect(status().isOk()).andExpect(jsonPath("total").value(1))
+                    .andExpect(jsonPath("items[0].createTime").value("2026-10-01T09:30:45"))
                     .andExpect(jsonPath("items[0].plannedQty").value("10.000000"))
                     .andExpect(jsonPath("items[0].completedQty").value("5.000000"))
                     .andExpect(jsonPath("items[0].goodOutputGapQty").value("5.000000"))

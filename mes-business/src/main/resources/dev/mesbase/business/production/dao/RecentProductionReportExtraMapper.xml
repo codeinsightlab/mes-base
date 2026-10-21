@@ -1,19 +1,25 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="dev.mesbase.business.production.dao.RecentProductionReportExtraMapper">
-  <select id="recent" resultType="dev.mesbase.business.production.domain.RecentProductionReport">
-    SELECT r.id, r.execution_id AS executionId, e.execution_no AS executionNo,
-           e.workorder_id AS workorderId, w.code AS workorderCode, w.source,
-           m.code AS productCode, m.name AS productName, u.name AS unitName,
-           r.routing_node_id AS routingNodeId, n.operation_name AS operationName,
-           r.record_type AS recordType, r.quantity_delta AS quantityDelta,
-           r.operator_user_id AS operatorUserId, r.report_time AS reportTime, r.create_time AS createTime
-    FROM mes_production_report r
-    LEFT JOIN mes_production_execution e ON e.id = r.execution_id
-    LEFT JOIN workorder w ON w.id = e.workorder_id
-    LEFT JOIN material m ON m.id = e.product_id
-    LEFT JOIN unit_measure u ON u.id = m.unit_id
-    LEFT JOIN routing_node n ON n.id = r.routing_node_id AND n.routing_id = e.routing_id
-    ORDER BY r.id DESC
-  </select>
+    <select id="recent" resultType="dev.mesbase.business.production.domain.RecentProductionReport">
+        SELECT r.id, r.execution_id AS executionId, e.execution_no AS executionNo,
+        e.workorder_id AS workorderId, w.code AS workorderCode, w.source,
+        m.code AS productCode, m.name AS productName, u.name AS unitName,
+        r.routing_node_id AS routingNodeId, n.operation_name AS operationName,
+        r.record_type AS recordType, r.quantity_delta AS quantityDelta,
+        r.operator_user_id AS operatorUserId, r.report_time AS reportTime, r.create_time AS createTime
+        FROM (
+            SELECT id, execution_id, routing_node_id, record_type, quantity_delta,
+                   operator_user_id, report_time, create_time
+            FROM mes_production_report
+            ORDER BY id DESC
+            LIMIT #{limit}
+        ) r
+        LEFT JOIN mes_production_execution e ON e.id = r.execution_id
+        LEFT JOIN workorder w ON w.id = e.workorder_id
+        LEFT JOIN material m ON m.id = e.product_id
+        LEFT JOIN unit_measure u ON u.id = m.unit_id
+        LEFT JOIN routing_node n ON n.id = r.routing_node_id AND n.routing_id = e.routing_id
+        ORDER BY r.id DESC
+    </select>
 </mapper>

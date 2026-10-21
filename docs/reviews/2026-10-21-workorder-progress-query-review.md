@@ -109,3 +109,13 @@ ID 与数量仍使用精确字符串。权限仍为当前工厂的 `workorder:li
 完整状态数据已在实际 Mapper / HTTP Fixture 验证，不能冒充当前运行中服务的端到端验收；需由用户重启后端后复验。
 页面截图：`.local/workorder-progress-search-20261021/home-quality-states.png`。
 未调用真实 ERP。
+
+## 2026-10-21：工单创建时间列
+
+工单进度新增“工单创建时间”，字段来自既有 `workorder.create_time`，经 WorkOrderProgress.Order / Progress 与查询 Service 返回 `createTime`；页面使用现有 parseTime 按 `YYYY-MM-DD HH:mm:ss` 显示，缺失显示“—”，不从完工、更新或导入时间推断。列宽至少 180，沿用表格横向滚动，不改变检索、排序、分页、权限或数量计算。无 Schema / 数据写入、配置或生成模板变更。
+
+修改：后端 WorkOrderProgress.java、WorkOrderProgressQueryService.java、WorkOrderProgressExtraMapper.xml；前端 workOrderProgress.ts、WorkOrderProgress.vue。既有 HTTP Fixture 测试增加固定 create_time 的 JSON 断言，既有组件测试增加时间格式展示断言，没有另建重复测试。
+
+已验证：Java 格式化；定向 WorkOrderProgressSqlTest / HttpTest / MySqlTest 共 8 项通过，其中真实 SIMPLE_B 验收库仅只读执行 SELECT / EXPLAIN；前端 72 文件、419 项测试与 build 通过；修改范围 diff --check 通过。全量 `mvn -B -ntp verify` 重跑通过；首次运行因多个模块编译输出中的类文件缺失发生 ClassNotFoundException，未通过修改业务代码或削弱断言掩盖。`/usr/bin/python3 scripts/smoke-packaged.py` 10 项通过、0 失败，使用脚本自有隔离进程，未访问真实 ERP。日志 `/tmp/mes-progress-created-targeted.log`、`/tmp/mes-progress-created-ui-tests.log`、`/tmp/mes-progress-created-ui-build.log`、`/tmp/mes-progress-created-verify-retry.log`、`/tmp/mes-progress-created-smoke.log`。
+
+浏览器当前 5173、原 TEST_DEV_PERF_20261019 工厂核对新列布局，未切厂或操作业务数据。14:28 使用既有查询按钮刷新后，运行中的后端已返回真实 createTime；工单 5100-261001769 显示 `2026-10-05 15:24:37`，页面显示与接口一致。Agent 未启动、停止或重启用户服务。截图在 UI `.local/workorder-created-time-20261021/created-time-column.png`。本轮新增字段可独立按差异回退，不覆盖既有表单、扫码和其他工作区修改。

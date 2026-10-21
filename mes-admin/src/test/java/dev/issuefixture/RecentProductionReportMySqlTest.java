@@ -2,7 +2,8 @@ package dev.issuefixture;
 
 import dev.mesbase.acceptance.AcceptanceBusinessDatabase;
 import dev.mesbase.business.production.dao.RecentProductionReportExtraMapper;
-import com.github.pagehelper.PageHelper;
+import dev.mesbase.business.quality.dao.MesQualityTreatmentMapper;
+import java.util.Map;
 import dev.mesbase.infrastructure.persistence.PersistenceFactories;
 import org.apache.ibatis.mapping.Environment;
 import org.apache.ibatis.session.Configuration;
@@ -24,35 +25,38 @@ class RecentProductionReportMySqlTest {
         var source = AcceptanceBusinessDatabase.source();
         var configuration = new Configuration(new Environment("SIMPLE_B READ ONLY", new JdbcTransactionFactory(), source));
         configuration.addMapper(RecentProductionReportExtraMapper.class);
+        configuration.addMapper(MesQualityTreatmentMapper.class);
         PersistenceFactories.pagination(configuration);
         try (var session = new SqlSessionFactoryBuilder().build(configuration).openSession()) {
             session.getConnection().setReadOnly(true);
             assertEquals("mes_base_dev_business_simple_b", session.getConnection().getCatalog());
-            var sql = configuration.getMappedStatement(RecentProductionReportExtraMapper.class.getName() + ".recent")
-                    .getBoundSql(null).getSql();
-            try (var statement = session.getConnection().prepareStatement("EXPLAIN " + sql + " LIMIT 6");
-                 var plan = statement.executeQuery()) {
-                while (plan.next()) {
-                    System.out.println("SIMPLE_B recent plan: table=" + plan.getString("table")
-                            + ", key=" + plan.getString("key") + ", rows=" + plan.getString("rows")
-                            + ", extra=" + plan.getString("Extra"));
+            try (var statement = session.getConnection().prepareStatement("SELECT version FROM flyway_business_schema_history WHERE success=1 ORDER BY installed_rank DESC LIMIT 1"); var history = statement.executeQuery()) {
+                if (history.next()) System.out.println("SIMPLE_B current migration=" + history.getString(1));
+            }
+            for (String statementId : new String[]{RecentProductionReportExtraMapper.class.getName() + ".recent",
+                    MesQualityTreatmentMapper.class.getName() + ".selectRecent"}) {
+                var sql = configuration.getMappedStatement(statementId).getBoundSql(Map.of("limit", 10)).getSql();
+                try (var statement = session.getConnection().prepareStatement("EXPLAIN " + sql)) {
+                    statement.setInt(1, 10);
+                    try (var plan = statement.executeQuery()) {
+                        while (plan.next()) {
+                            System.out.println("SIMPLE_B " + statementId.substring(statementId.lastIndexOf('.') + 1)
+                                    + " plan: table=" + plan.getString("table") + ", type=" + plan.getString("type")
+                                    + ", key=" + plan.getString("key") + ", rows=" + plan.getString("rows")
+                                    + ", extra=" + plan.getString("Extra"));
+                        }
+                    }
                 }
             }
-            try (var statement = session.getConnection().prepareStatement(
-                    "SELECT COUNT(*) FROM information_schema.columns WHERE table_schema=DATABASE() AND table_name='mes_production_defect' AND column_name='defect_type_id'");
-                 var columns = statement.executeQuery()) {
-                columns.next();
-                System.out.println("SIMPLE_B quality defect_type_id column exists=" + (columns.getInt(1) == 1));
-            }
-            try (var page = PageHelper.offsetPage(0, 6)) {
-                var rows = session.getMapper(RecentProductionReportExtraMapper.class).recent();
-                assertTrue(rows.size() <= 6);
-                assertTrue(page.getTotal() >= rows.size());
-                for (var row : rows) {
-                    assertTrue(row.id() != null && row.quantityDelta() != null);
-                }
-                System.out.println("SIMPLE_B recent report SELECT: total=" + page.getTotal() + ", returned=" + rows.size());
-            }
+            var capture = new RecentProductionReportHttpTest.SqlCapture();
+            configuration.addInterceptor(capture);
+            var rows = session.getMapper(RecentProductionReportExtraMapper.class).recent(10);
+            assertTrue(rows.size() <= 10);
+            for (var row : rows) assertTrue(row.id() != null && row.quantityDelta() != null);
+            var defects = session.getMapper(MesQualityTreatmentMapper.class).selectRecent(10);
+            assertTrue(defects.size() <= 10);
+            capture.assertNoCount();
+            System.out.println("SIMPLE_B recent SELECT: reports=" + rows.size() + ", defects=" + defects.size() + ", no count");
             session.rollback();
         }
     }

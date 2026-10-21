@@ -26,7 +26,9 @@ def identity(original):
     return str(uuid.uuid5(uuid.NAMESPACE_URL, RULE + ':' + original))
 
 
-def build(rows):
+def build(rows, reporter_overrides=None, allow_pending_disposition=False):
+    # Explicitly reviewed historical identity mappings; never default to the operator.
+    reporter_overrides = reporter_overrides or {}
     users = defaultdict(set)
     nodes = defaultdict(dict)
     quality = defaultdict(list)
@@ -50,9 +52,13 @@ def build(rows):
             qty = Decimal(raw['quantity'])
             if raw['type'] not in ('5704', '5705') or qty <= 0:
                 reasons.add('INVALID_LOSS')
-            if raw['status'] != '1' or not raw.get('scrap_code'):
+            scrap_proven = raw['status'] == '1' and bool(raw.get('scrap_code'))
+            pending = raw['status'] == '0' and not raw.get('scrap_code')
+            if not scrap_proven and not (allow_pending_disposition and pending):
                 reasons.add('DISPOSITION_NOT_PROVEN')
-            creators = users.get(raw.get('create_by'), set())
+            creator = raw.get('create_by')
+            creators = ({str(reporter_overrides[creator])} if creator in reporter_overrides
+                        else users.get(creator, set()))
             if len(creators) != 1:
                 reasons.add('REPORTER_NOT_UNIQUE')
             node = nodes[parent].get(process)
@@ -69,6 +75,7 @@ def build(rows):
                 responsible = None
             declarations.append(dict(source=q, declarationId=identity(q['mappingId']),
                                      reporterId=next(iter(creators)) if len(creators) == 1 else None,
+                                     disposition='SCRAPPED' if scrap_proven else 'PENDING',
                                      affectedNodeId=node['nodeId'] if node else None,
                                      responsibleNodeId=responsible['nodeId'] if responsible else None,
                                      wasteCategory='PROCESS' if raw['type'] == '5705' else 'MATERIAL'))
