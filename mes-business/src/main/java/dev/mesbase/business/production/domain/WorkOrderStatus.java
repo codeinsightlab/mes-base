@@ -7,6 +7,7 @@ public enum WorkOrderStatus {
     HISTORICAL("历史只读", "HISTORICAL"),
     DRAFT("草稿", "DRAFT"),
     RELEASED("已下达", "RELEASED"),
+    COMPLETED("已完工", "COMPLETED"),
     CANCELLED("已作废", "CANCELLED");
 
     private final String description;

@@ -250,7 +250,7 @@ class ProductionCoreV1HttpTest {
             m.perform(full(post(H)).content(HEADER)).andExpect(status().isOk());
             m.perform(full(post(H + "/1/actions/submit"))).andExpect(status().isBadRequest());
             assertEquals(0, db(c).queryForObject("SELECT COUNT(*) FROM mes_material_issue_submission", Integer.class));
-            m.perform(full(post(MaterialIssueHttpTest.I)).content(MaterialIssueHttpTest.ITEM.replace("99999999999999.123456", "0")))
+            m.perform(full(post(MaterialIssueHttpTest.I)).content(MaterialIssueHttpTest.ITEM.replace("99999999999999.12", "0")))
                     .andExpect(status().isBadRequest());
             m.perform(full(post(MaterialIssueHttpTest.I)).content(MaterialIssueHttpTest.ITEM))
                     .andExpect(status().isOk());
@@ -296,7 +296,7 @@ class ProductionCoreV1HttpTest {
             assertNotEquals(key, v.snapshot.operationKey());
             assertEquals(2, db(c).queryForObject("SELECT COUNT(*) FROM mes_material_issue_submission", Integer.class));
             assertTrue(db(c).queryForObject("SELECT command_json FROM mes_material_issue_submission ORDER BY id DESC LIMIT 1", String.class)
-                    .contains("99999999999999.123456"));
+                    .contains("99999999999999.12"));
             assertEquals("ERP-1", db(c).queryForObject("SELECT external_reference FROM mes_material_issue_erp_extra WHERE id=1", String.class));
         }
     }

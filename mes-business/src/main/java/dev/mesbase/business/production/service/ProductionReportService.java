@@ -1,5 +1,7 @@
 package dev.mesbase.business.production.service;
 
+import dev.mesbase.business.production.domain.ProductionQuantityInput;
+
 import dev.mesbase.business.production.dao.MesProductionReportMapper;
 import dev.mesbase.business.production.dao.ProductionQuantityMapper;
 import dev.mesbase.business.basic.dao.WorkstationMapper;
@@ -73,6 +75,7 @@ public class ProductionReportService {
         existing = replay(command.requestId(), hash);
         if (existing != null) return existing;
         sources.execution(locks.execution(command.executionId()), null);
+        ProductionQuantityInput.check(command.quantity());
         positive(command.quantity());
         reason(command.reason());
         if (command.reportTime() == null || command.reportTime().isAfter(LocalDateTime.now())) invalid();
@@ -102,6 +105,7 @@ public class ProductionReportService {
         if (existing != null) return existing;
         if (command.quantityDelta() != null && command.quantityDelta().signum() > 0)
             locks.requireActiveExecution(original.getExecutionId());
+        ProductionQuantityInput.check(command.quantityDelta());
         delta(command.quantityDelta());
         reason(command.reason());
         return adjustLocked(original, command.quantityDelta(), command.reason(), command.requestId(), hash);

@@ -277,3 +277,26 @@ python3 .local/storage-review-20261021/cleanup.py --restore legacy-v2-20261020/b
 该来源路线在当前批准命令集中被多个工单引用。修正不能直接将所有派生路线改为相同 code 和 version=1，也不能按旧编码合并已被生产事实引用的路线；应先核对编码/版本唯一约束、原路线身份与实际路径差异，再制定保留现有 ID/事实引用和不可变来源映射的修正方案。原路线来自当前来源表，不能伪称已有真实历史发布版本号。
 
 本次仅定位，没有修改业务代码、数据库、冻结命令或既有审批哈希；快照事实尚未重新对当前在线库进行验证。具体来源/目标字段与引用范围保存在私有 `routing-code-name-review-20261021.json`，不把原始业务编号写入公开报告。此前已完成的迁移验收结论需增加“路线业务编码/名称还原未覆盖”这一明确限制，不能继续表述为工艺全部字段完全还原。
+
+
+### 2026-10-21 工艺编码/名称恢复：原工艺 Map → 目标库 UPDATE
+
+用户明确要求与 ktg-mes 保持一致，并指定简单方式：重新批量读取原工艺、建立 Map、更新数据库。本轮按该范围修复已迁入主数据，没有重建迁移架构、合并历史路线、重跑生产数据或改变既有冻结命令。原导入器生成 LEGACY 路线的逻辑本轮未改造；后续新增转换仍须另行处理来源字段传递，不能宣称新转换入口已自动修复。
+
+**实际执行目标：** 核对中心库 mf_factory/mf_datasource 后，确认 Factory `TEST_DEV_PERF_20261019`、LOCAL、DS 9/revision 2、目标 `192.168.18.25:3306/mes_base_dev_perf_test`，MySQL server UUID 仍为既有授权实例。来源只读 `prod_j2eedb.pro_route`，一次读取 route_id/route_code/route_name 建 Map。566 条已有 ROUTING 映射均能由原冻结 source_payload 中的路线 ID 唯一对应到 47 条原工艺；缺失、多来源、空值、长度越界及编码/版本冲突均先拒绝，不猜名称或截断编码。
+
+**备份与更新：** 写入前保存 routing 全表一致性 SQL gzip 备份和 649,414 条原有目标行全字段哈希基线，保存每条原路线完整字段、来源 Map 和更新计划。已将 566 条路线 code/name 恢复为原工艺 route_code/route_name；同编码的多个历史快照依照 Base(code,version)唯一约束分配独立本地版本，本轮最大版本 27。该版本是 Base 本地快照序号，不冒充 ktg-mes 原始历史发布版本。保留路线 ID、工单/执行/报工引用、节点/边、状态、description、external_id、source_version、revision、published_at。逐条字段比对通过。
+
+**历史 UPDATE 门禁：** V41 会拒绝任何已映射历史路线 UPDATE，未直接停用触发器或使用会话跳过开关。新增正式 `V43__legacy_routing_identity_restore.sql`，经既有 Factory/实例校验的 Flyway 入口执行并 validate。迁移通过临时严格保护触发器完成原 guard 替换，不存在无保护的 DDL 间隙。仍只允许在 RUNNING 的 `legacy-route-identity-restore-v1` 修正批次中，凭不可变 `ROUTING_IDENTITY_RESTORE` 审计记录，绑定原 ROUTING 映射、原路线 ID、旧 code/name/version 和精确新值，更新 code/name/本地 version；其他字段依旧拒绝。普通编辑、无审批修正、错误值、已完成修正再次改写、报工和路径等历史事实均不放开。SQL 不含客户数据，没有新增表、生产 HTTP 修正入口或外部数据源装配。
+
+Map 在私有 Python 工具中构建；在一个目标事务中锁定 566 条旧路线并核对原值，新增 1 个修正批次及 566 条不可变审计映射，以一次集合 UPDATE 写入，逐条比较结果后完成批次并提交。未修改原有来源映射或审批证据。再次运行只校验既有完成批次和全部结果，SQL 写入为零。当前真实启用且具平台角色的迁移操作员已核对并记录，凭据未写入报告。
+
+**真实验证：** 无授权 UPDATE 拒绝、授权值不匹配拒绝、试图同时改 status 拒绝；正确授权可更新并完整回滚，回滚后授权记录和目标值均恢复。正式提交后再验证已完成批次不能复用、历史 Report UPDATE 仍拒绝。最终前后全字段比对确认原有 649,414 条行中，除 566 条路线允许的三个元数据字段外，其余原有行哈希不变；原 Mapping、生产数量与报工事实不变，没有原有行删除。新增本轮审计 Mapping 566、修正批次 1、Flyway V43 1，来源工艺 Map 读取前后逐字节一致。
+
+验收窗口同时出现一条并发新增的 DRAFT 路线 607 及其 4 个节点、3 条边、1 个产品关联，均无原迁移 ROUTING 映射，不属于本轮冻结 566 条修正范围。该草稿仍带来源复制出的 LEGACY 标签，不能仅凭同编码推断它等于已迁历史对象。本轮未创建、合并、更新或删除该草稿及关联；全表新增统计明确单独记录，不把它冒认为“全库只新增本轮审计”或“全部 LEGACY 编码已清零”。未追问或覆盖其他任务的新数据。
+
+使用用户现有后端 `127.0.0.1:8081`，真实登录并在指定 Factory 下读取 `/api/production/routing/593`，返回的 code/name 为来源中文业务值，ID 593 保持不变；另以 6 次分页请求核对全部 566 条列表值。仅按该厂 routing 资源的既有缓存协议轮换详情缓存 generation 和清理列表/详情，不清理其他工厂、权限或认证缓存；Redis 目标与当前 dev 配置一致，任务临时 Redis 凭据副本已删除。没有启动、停止或重启用户服务。
+
+**构建边界：** 私有 Flyway 验收 helper 使用现有源码并仅将扫描位置明确为当前仓库 filesystem 迁移目录，已执行 IDEA 原生格式化、javac 编译和真实 Flyway migrate/validate。`mvn -B -ntp verify` 首次在既有 StockDocumentHttpTest 并发用例失败，该用例单独重验通过；第二次完整 verify 在 CodegenAcceptanceTest.globalCrudUsesPlatformOwnerAndPermissionWithoutFactoryIdentity 和 CodegenPersonAcceptanceTest.generatesPersonFromJdbcMetadataWithACompiledMenu 两项失败。验收期间工作区新增了多个其他任务的未提交改动，包括代码生成器及上述测试文件，已保护且未修改；本轮未声称完整构建通过，也不为取得通过而改写这些其他链路。数据库修正、真实门禁、回滚、重放、字段和 API 验证均已单独通过。git diff --check 通过。
+
+私有证据根为 `.local/route-identity-restore-20261021/`：`plan.json`、`source-routes-before/after.jsonl`、`routes-before.jsonl`、`routing-before.sql.gz`、`backup-manifest.json`、`flyway-43-before/after.txt`、`flyway.log`、`result.json`、`routes-after-all-fields.json`、`field-and-final-guard-verification.json`、`replay-idempotence.json`、`verification.json`、`concurrent-draft-additions.json`、`http-route-593.json`、`cache-eviction.json`、各负例及构建日志。前后全字段快照压缩并校验内容 SHA 后保存为 before/after/snapshot.jsonl.gz；verify.py 支持直接读取压缩快照，不再保留重复的大型未压缩文件。旧 .local 清理报告的空间统计仍代表当时状态。

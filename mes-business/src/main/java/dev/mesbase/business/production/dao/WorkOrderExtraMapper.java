@@ -11,6 +11,12 @@ import org.apache.ibatis.annotations.Param;
 public interface WorkOrderExtraMapper {
     long countBlockingIssues(Long workorderId);
 
+    long countUnaccountedInputs(@Param("id") Long workorderId);
+
+    WorkOrderModels.CompletionState completionState(@Param("id") Long workorderId);
+
+    List<Long> completionCandidates(@Param("after") Long after, @Param("limit") int limit);
+
     List<WorkOrderModels.Allocation> allocationForOrders(@Param("ids") List<Long> ids);
 
     List<RoutingEntity> publishedForProduct(@Param("productId") Long productId,

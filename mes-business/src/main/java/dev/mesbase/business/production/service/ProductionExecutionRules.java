@@ -1,5 +1,7 @@
 package dev.mesbase.business.production.service;
 
+import dev.mesbase.business.production.domain.ProductionQuantityInput;
+
 import dev.mesbase.business.production.service.BusinessSourceRules;
 
 import dev.mesbase.business.production.domain.WorkOrderStatus;
@@ -87,12 +89,14 @@ public class ProductionExecutionRules {
         row.setProductId(order.getProductId());
         valid(ProductionExecutionStatus.READY.getValue()
                 .equals(row.getStatus()) && row.getStartTime() == null && row.getEndTime() == null);
+        ProductionQuantityInput.check(row.getTargetQty());
         validateValues(row);
         row.setExecutionNo("PENDING");
         audit(row, true);
     }
 
     public void updating(MesProductionExecutionEntity old, MesProductionExecutionEntity row) {
+        if (ProductionExecutionStatus.COMPLETED.getValue().equals(old.getStatus())) frozen();
         if (!Objects.equals(old.getStatus(), row.getStatus()) || !Objects.equals(old.getStartTime(), row.getStartTime()) || !Objects.equals(old.getEndTime(), row.getEndTime()))
             frozen();
         // WorkOrder/product define identity at creation; routing may be corrected only before facts.
@@ -108,6 +112,7 @@ public class ProductionExecutionRules {
                 || old.getStartTime() != null && row.getStartTime() == null)) frozen();
         validateReferences(row, !Objects.equals(old.getRoutingId(), row.getRoutingId()) || !started(old) && started(row));
         validateValues(row);
+        ProductionQuantityInput.changed(row.getTargetQty(), old.getTargetQty());
         audit(row, false);
     }
 

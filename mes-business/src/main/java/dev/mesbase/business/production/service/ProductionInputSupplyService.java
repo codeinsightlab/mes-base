@@ -1,5 +1,7 @@
 package dev.mesbase.business.production.service;
 
+import dev.mesbase.business.production.domain.ProductionQuantityInput;
+
 import dev.mesbase.business.production.service.BusinessSourceRules;
 import dev.mesbase.business.shared.enums.BusinessSource;
 
@@ -77,6 +79,7 @@ public class ProductionInputSupplyService {
 
     @Transactional(transactionManager = "businessTransactionManager", propagation = Propagation.NOT_SUPPORTED)
     public Calculation calculate(String code, Long orderId, String stockReference, BigDecimal outputQty) {
+        ProductionQuantityInput.check(outputQty);
         var sourceOrder = readTransaction.execute(status -> sources.order(orderId));
         if (BusinessSource.LOCAL.getValue().equals(sourceOrder.getSource()))
             readTransaction.executeWithoutResult(status -> local.validateRequestedSource(orderId, stockReference));

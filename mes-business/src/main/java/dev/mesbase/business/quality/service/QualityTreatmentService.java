@@ -1,5 +1,7 @@
 package dev.mesbase.business.quality.service;
 
+import dev.mesbase.business.production.domain.ProductionQuantityInput;
+
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import dev.mesbase.business.directory.service.BusinessDirectoryService;
@@ -292,6 +294,8 @@ public class QualityTreatmentService {
         if (path.path() == null || !ExecutionPathStatus.LOCKED.getValue()
                 .equals(path.path().getPathStatus()) || !path.selectedNodeIds().contains(d.getAffectedNodeId())) fail();
         append(d, c, fingerprint);
+        for (var value : List.of(c.scrapQty(), c.reworkQty(), c.processedQty(), c.recoveredQty(), c.failedQty()))
+            ProductionQuantityInput.check(value);
         quantities.validateDefectChange(d.getExecutionId(), d.getAffectedNodeId(), ZERO);
         return details(declaration);
     }

@@ -1,5 +1,7 @@
 package dev.mesbase.business.production.service;
 
+import dev.mesbase.business.production.domain.ProductionQuantityInput;
+
 import dev.mesbase.business.basic.dao.WorkstationMapper;
 import dev.mesbase.business.production.dao.MesProductionExecutionMapper;
 import dev.mesbase.business.production.dao.MesProductionReportMapper;
@@ -109,6 +111,7 @@ public class ProductionReportSubmitService {
         var execution = locked.execution();
         existing = reports.selectByRequestId(command.requestId());
         if (existing != null) return replay(existing, command, user);
+        ProductionQuantityInput.check(command.reportQty());
         sources.execution(execution, null);
         if (!ProductionExecutionStatus.allowsNormalReporting(execution.getStatus()))
             throw new FoundationException(ErrorCode.EXECUTION_INVALID);

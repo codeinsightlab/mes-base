@@ -21,6 +21,15 @@ public final class WorkOrderModels {
     public record Revision(@NotNull Integer revision) {
     }
 
+    /**
+     * Only formal terminal execution facts qualify for the scheduled work-order transition.
+     */
+    public record CompletionState(long activeCount, long unfinishedCount, long missingCompletionCount) {
+        public boolean allCompleted() {
+            return activeCount > 0 && unfinishedCount == 0 && missingCompletionCount == 0;
+        }
+    }
+
     public record Detail(WorkorderEntity workorder, String productCode, String productName,
                          RoutingEntity routing, List<ProductionBatchEntity> batches, Allocation allocation) {
     }

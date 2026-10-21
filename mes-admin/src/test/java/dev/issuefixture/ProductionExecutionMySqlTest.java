@@ -111,7 +111,7 @@ class ProductionExecutionMySqlTest {
             var chainLocks = new ProductionChainLocks(s.getMapper(WorkorderMapper.class), executions, issues);
             var rules = new ProductionExecutionRules(executions, s.getMapper(WorkorderMapper.class), s.getMapper(MaterialMapper.class), s.getMapper(RoutingMapper.class), s.getMapper(RoutingProductMapper.class), issues, chainLocks, s.getMapper(MesExecutionPathMapper.class), s.getMapper(MesExecutionPathNodeMapper.class), s.getMapper(MesProductionReportMapper.class), s.getMapper(ProductionQuantityMapper.class), new ExecutionQualityReferenceQueryImpl(s.getMapper(MesProductionDefectMapper.class), mock(QualityTreatmentService.class)), s.getMapper(MesExecutionAssignmentMapper.class), Mockito.mock(BusinessSourceRules.class));
             var service = new MesProductionExecutionServiceImpl(executions, rules);
-            var input = new MesProductionExecutionCreateCommand(workorder, routing, new BigDecimal("99999999999999.123456"), "READY", null, null, tag);
+            var input = new MesProductionExecutionCreateCommand(workorder, routing, new BigDecimal("99999999999999.12"), "READY", null, null, tag);
             var first = service.insert(input);
             var second = service.insert(input);
             assertNotEquals(first.getId(), second.getId());

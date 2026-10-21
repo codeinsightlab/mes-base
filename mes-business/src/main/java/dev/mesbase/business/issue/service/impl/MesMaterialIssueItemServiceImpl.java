@@ -1,5 +1,7 @@
 package dev.mesbase.business.issue.service.impl;
 
+import dev.mesbase.business.production.domain.ProductionQuantityInput;
+
 import com.github.pagehelper.Page;
 import com.github.pagehelper.PageHelper;
 import dev.mesbase.business.issue.dao.MesMaterialIssueItemMapper;
@@ -100,6 +102,7 @@ public class MesMaterialIssueItemServiceImpl implements IMesMaterialIssueItemSer
     @BusinessCacheEvict(business = MesMaterialIssueItemResource.PREFIX,
             scope = BusinessCacheEvict.Scope.LIST)
     public MesMaterialIssueItemEntity insert(MesMaterialIssueItemCreateCommand input) {
+        ProductionQuantityInput.check(input.quantity());
         MesMaterialIssueItemEntity row = new MesMaterialIssueItemEntity();
 
         row.setIssueId(input.issueId());
@@ -127,6 +130,7 @@ public class MesMaterialIssueItemServiceImpl implements IMesMaterialIssueItemSer
         if (!Objects.equals(row.getIssueId(), input.issueId())) {
             throw new FoundationException(ErrorCode.BAD_REQUEST);
         }
+        ProductionQuantityInput.changed(input.quantity(), row.getQuantity());
         row.setId(id);
         row.setIssueId(input.issueId());
         row.setMaterialId(input.materialId());

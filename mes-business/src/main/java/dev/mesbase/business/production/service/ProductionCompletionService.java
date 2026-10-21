@@ -11,6 +11,7 @@ import dev.mesbase.business.production.domain.MesExecutionCompletionExample;
 import dev.mesbase.business.production.domain.MesProductionExecutionEntity;
 import dev.mesbase.business.production.domain.MesProductionExecutionResource;
 import dev.mesbase.business.production.domain.ProductionClosureRules;
+import dev.mesbase.business.production.domain.ProductionCompletionBalance;
 import dev.mesbase.business.production.domain.ProductionExecutionStatus;
 import dev.mesbase.business.issue.dao.MesMaterialIssueMapper;
 import dev.mesbase.business.issue.domain.MesMaterialIssueExample;
@@ -58,6 +59,7 @@ public class ProductionCompletionService {
     private final MesMaterialIssueMapper issues;
     private final ProductionChainLocks locks;
     private final QualityReleaseService releases;
+    private final ProductionQuantityService quantities;
     private final ProductionExecutionRules rules;
     private final WarehouseIntegration integration;
 
@@ -67,7 +69,8 @@ public class ProductionCompletionService {
                                        MesMaterialIssueMapper issues,
                                        ProductionChainLocks locks, QualityReleaseService releases,
                                        ProductionExecutionRules rules, WarehouseIntegration integration,
-                                       BusinessSourceRules sources) {
+                                       BusinessSourceRules sources, ProductionQuantityService quantities) {
+        this.quantities = quantities;
         this.sources = sources;
         this.completions = completions;
         this.executions = executions;
@@ -84,7 +87,8 @@ public class ProductionCompletionService {
     public Summary summary(Long id) {
         var execution = executions.selectByPrimaryKey(id);
         if (execution == null) ProductionClosureRules.bad();
-        var q = releases.state(id);
+        var projection = quantities.getExecutionQuantities(id);
+        var q = releases.stateFor(projection);
         var r = receipts.netQuantity(id);
         var a = acceptances.netExecution(id);
         var f = new MesExecutionCompletionExample();
@@ -98,8 +102,9 @@ public class ProductionCompletionService {
         var unresolved = new MesMaterialIssueExample();
         unresolved.createCriteria().andExecutionIdEqualTo(id)
                 .andStatusNotIn(List.of(MaterialIssueStatus.CONFIRMED.getValue(), MaterialIssueStatus.VOIDED.getValue(), MaterialIssueStatus.SUBMIT_REJECTED.getValue()));
+        String balanceReason = ProductionCompletionBalance.blockedReason(projection);
         String reason = !ProductionExecutionStatus.RUNNING.getValue()
-                .equals(execution.getStatus()) ? "执行必须处于RUNNING状态" : !q.safe() ? q.blockedReason() : !q.basisValid() ? "缺少当前生产质量依据下的明确放行" : issues.countByExample(unresolved) > 0 ? "相关领料仍有未决状态，请核实原请求" : r.compareTo(q.effective()) != 0 ? "末道有效产出尚未全部合法交接；未交接数量 " + q.effective()
+                .equals(execution.getStatus()) ? "执行必须处于RUNNING状态" : !q.safe() ? q.blockedReason() : !q.basisValid() ? "缺少当前生产质量依据下的明确放行" : balanceReason != null ? balanceReason : issues.countByExample(unresolved) > 0 ? "相关领料仍有未决状态，请核实原请求" : r.compareTo(q.effective()) != 0 ? "末道有效产出尚未全部合法交接；未交接数量 " + q.effective()
                 .subtract(r)
                 .toPlainString() : r.compareTo(q.released()) > 0 ? "生产交接超过当前可信放行额度" : a.compareTo(r) != 0 ? "生产交接尚未全部实际接收；待接收数量 " + r.subtract(a)
                 .toPlainString() : null;

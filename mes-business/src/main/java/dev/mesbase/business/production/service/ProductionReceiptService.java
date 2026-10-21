@@ -1,5 +1,7 @@
 package dev.mesbase.business.production.service;
 
+import dev.mesbase.business.production.domain.ProductionQuantityInput;
+
 import dev.mesbase.business.production.service.BusinessSourceRules;
 import dev.mesbase.business.shared.enums.BusinessSource;
 
@@ -116,6 +118,7 @@ public class ProductionReceiptService {
         if (warehouse == null || !EnableStatus.ENABLED.getValue().equals(warehouse.getStatus()))
             throw new FoundationException(ErrorCode.RECEIPT_WAREHOUSE_INVALID);
         sources.execution(execution, c.warehouseId());
+        ProductionQuantityInput.check(c.quantity());
         validateReceive(q.nodes().getLast().effectiveOutputQty(), receipts.netQuantity(c.executionId()), c.quantity());
         var release = releases.state(c.executionId());
         if (!release.basisValid() || !release.safe()) requireQualityRelease();
@@ -162,6 +165,7 @@ public class ProductionReceiptService {
             throw new FoundationException(ErrorCode.RECEIPT_REFERENCE_INVALID);
         if (ProductionExecutionStatus.COMPLETED.getValue().equals(execution.getStatus()))
             ProductionClosureRules.blocked("已正式完工；不支持终态交接冲销，请保留历史差额并走专项纠正");
+        ProductionQuantityInput.check(c.quantity());
         validateReverse(receipts.originalBalance(id).subtract(acceptances.netReceipt(id)), c.quantity());
         // 冲销只验证原始余额，不因当前质量未知、上游差额或仓库停用而阻止纠正事实。
         var row = new MesProductionReceiptEntity();

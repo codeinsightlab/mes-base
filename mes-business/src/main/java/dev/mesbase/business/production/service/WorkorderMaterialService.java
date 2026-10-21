@@ -1,5 +1,7 @@
 package dev.mesbase.business.production.service;
 
+import dev.mesbase.business.production.domain.ProductionQuantityInput;
+
 import dev.mesbase.business.production.service.BusinessSourceRules;
 import dev.mesbase.business.shared.enums.BusinessSource;
 
@@ -92,6 +94,7 @@ public class WorkorderMaterialService {
                 || c.workCenter().isBlank() || c.workCenter().length() > 100 || c.warehouseIds() == null
                 || c.warehouseIds().isEmpty() || c.warehouseIds().size() > 100 || c.warehouseIds().stream()
                 .anyMatch(Objects::isNull)) fail();
+        ProductionQuantityInput.changed(c.totalRequiredQty(), previous == null ? null : previous.getTotalRequiredQty());
         var ids = c.warehouseIds().stream().distinct().sorted().toList();
         references.lockDemandReferences(c.materialId(), ids);
         sources.warehouses(order.getSource(), ids);

@@ -19,7 +19,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class ProductionExecutionHttpTest {
     static final String E = "/api/production/mes-production-execution";
     static final String QR = "/api/production/identity";
-    static final String CREATE = "{\"workorderId\":\"1\",\"routingId\":\"1\",\"targetQty\":\"12.123456\",\"status\":\"READY\"}";
+    static final String CREATE = "{\"workorderId\":\"1\",\"routingId\":\"1\",\"targetQty\":\"12.12\",\"status\":\"READY\"}";
 
     private MockHttpServletRequestBuilder full(MockHttpServletRequestBuilder request, String factory) {
         return request.header("Authorization", "Bearer FULL").header("X-Factory-Id", factory)
@@ -42,7 +42,7 @@ class ProductionExecutionHttpTest {
             assertEquals(3, a.queryForObject("SELECT COUNT(DISTINCT execution_no) FROM mes_production_execution", Integer.class));
             m.perform(full(get(E + "/1"), "A")).andExpect(status().isOk())
                     .andExpect(jsonPath("executionNo").value("EXE-1"));
-            m.perform(full(put(E + "/1"), "A").content(CREATE.replace("12.123456", "8.000001")))
+            m.perform(full(put(E + "/1"), "A").content(CREATE.replace("12.12", "8.01")))
                     .andExpect(status().isOk()).andExpect(jsonPath("executionNo").value("EXE-1"));
             // Route correction is permitted before any execution fact; each execution remains independent.
             m.perform(full(put(E + "/2"), "A").content(CREATE)).andExpect(status().isOk())
@@ -98,7 +98,7 @@ class ProductionExecutionHttpTest {
                     .andExpect(status().isBadRequest());
             m.perform(full(post(MaterialIssueHttpTest.H), "B").content(issue)).andExpect(status().isNotFound());
             m.perform(full(put(E + "/1"), "A").content(CREATE)).andExpect(status().isConflict());
-            m.perform(full(put(E + "/1"), "A").content(alternate.replace("12.123456", "15.000001")))
+            m.perform(full(put(E + "/1"), "A").content(alternate.replace("12.12", "15.01")))
                     .andExpect(status().isOk());
             m.perform(full(delete(E), "A").content("[1]")).andExpect(status().isConflict())
                     .andExpect(jsonPath("errorCode").value("EXECUTION_REFERENCED"));
@@ -122,7 +122,7 @@ class ProductionExecutionHttpTest {
                     .andExpect(status().isForbidden());
             for (String body : List.of(CREATE.replace("\"routingId\":\"1\"", "\"routingId\":\"4\""), CREATE.replace("\"routingId\":\"1\"", "\"routingId\":\"2\""),
                     CREATE.replace("\"workorderId\":\"1\"", "\"workorderId\":\"999\""),
-                    CREATE.replace("12.123456", "0"), CREATE.replace("12.123456", "1.1234567")))
+                    CREATE.replace("12.12", "0"), CREATE.replace("12.12", "1.1234567")))
                 m.perform(full(post(E), "A").content(body)).andExpect(status().is4xxClientError());
             m.perform(post(E).header("Authorization", "Bearer CRUD").header("X-Factory-Id", "A")
                     .contentType("application/json").content(CREATE)).andExpect(status().isForbidden());

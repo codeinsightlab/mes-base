@@ -1,5 +1,7 @@
 package dev.mesbase.business.production.service;
 
+import dev.mesbase.business.production.domain.ProductionQuantityInput;
+
 import dev.mesbase.business.integration.warehouse.ErpActionResult.Mode;
 import dev.mesbase.business.issue.domain.MaterialIssueStatus;
 import dev.mesbase.business.production.domain.ProductionExecutionStatus;
@@ -146,6 +148,7 @@ public class ProductionInputService {
         String hash = ProductionScanCode.digest(json.writeValueAsString(command));
         var previous = transaction.execute(s -> inputs.selectByPrimaryKey(command.requestId()));
         if (previous != null) return replay(previous, hash); // Never repeat an external create on replay.
+        ProductionQuantityInput.check(command.outputQty());
         var calculation = supply.calculate(command.code(), command.workorderId(), command.stockReference(), command.outputQty());
         if (!Objects.equals(command.calculationKey(), ProductionInputSupplyService.calculationKey(calculation)))
             throw new FoundationException(ErrorCode.PRODUCTION_INPUT_STALE);

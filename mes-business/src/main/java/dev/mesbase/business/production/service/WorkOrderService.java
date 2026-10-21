@@ -1,5 +1,7 @@
 package dev.mesbase.business.production.service;
 
+import dev.mesbase.business.production.domain.ProductionQuantityInput;
+
 import dev.mesbase.business.production.service.BusinessSourceRules;
 import dev.mesbase.business.shared.enums.BusinessSource;
 import dev.mesbase.business.shared.enums.EnableStatus;
@@ -177,6 +179,7 @@ public class WorkOrderService {
         if (input.externalId() != null || input.externalCode() != null)
             throw new FoundationException(ErrorCode.EXTERNAL_SOURCE_READ_ONLY);
         validate(input);
+        ProductionQuantityInput.check(input.plannedQty());
         uniqueCode(input.code(), null);
         var row = new WorkorderEntity();
         row.setSource(BusinessSource.LOCAL.getValue());
@@ -305,6 +308,7 @@ public class WorkOrderService {
                 throw new FoundationException(ErrorCode.WORKORDER_ISSUE_REFERENCED);
         }
         validate(input);
+        ProductionQuantityInput.changed(input.plannedQty(), row.getPlannedQty());
         uniqueCode(input.code(), id);
         assign(row, input);
         row.setRevision(row.getRevision() + 1);

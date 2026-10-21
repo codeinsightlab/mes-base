@@ -1,11 +1,14 @@
 package dev.mesbase.business.quality.service;
 
+import dev.mesbase.business.production.domain.ProductionQuantityInput;
+
 import dev.mesbase.business.quality.dao.MesQualityReleaseMapper;
 import dev.mesbase.business.quality.domain.MesQualityReleaseEntity;
 import dev.mesbase.business.quality.domain.QualityReleaseAction;
 import dev.mesbase.business.quality.domain.MesQualityReleaseExample;
 import dev.mesbase.business.quality.domain.QualityTreatmentModels.Attribution;
 import dev.mesbase.business.production.domain.ProductionClosureRules;
+import dev.mesbase.business.production.domain.ProductionReportModels.ExecutionQuantity;
 import dev.mesbase.business.production.domain.ExecutionPathStatus;
 import dev.mesbase.business.production.domain.ProductionExecutionStatus;
 import dev.mesbase.business.production.service.ProductionChainLocks;
@@ -65,7 +68,13 @@ public class QualityReleaseService {
 
     @Transactional(transactionManager = "businessTransactionManager", readOnly = true, isolation = Isolation.READ_COMMITTED)
     public State state(Long execution) {
-        var q = quantities.getExecutionQuantities(execution);
+        return stateFor(quantities.getExecutionQuantities(execution));
+    }
+
+    /** Reuses an authoritative projection already read under the caller's business transaction. */
+    @Transactional(transactionManager = "businessTransactionManager", readOnly = true, isolation = Isolation.READ_COMMITTED)
+    public State stateFor(ExecutionQuantity q) {
+        Long execution = q.executionId();
         var basis = treatments.releaseBasis(execution);
         String issue = null;
         if (!ExecutionPathStatus.LOCKED.getValue().equals(q.pathStatus()) || q.nodes().isEmpty())
@@ -127,6 +136,7 @@ public class QualityReleaseService {
             if (!hash.equals(old.getRequestHash())) conflict();
             return old;
         }
+        ProductionQuantityInput.check(c.quantity());
         if (!c.revoke()) locks.requireActiveExecution(execution);
         if (integration.configuredMode(FactoryContext.required()) != Mode.LOCAL_ONLY)
             blocked("ERP模式须由真实质量集成实现，不允许回退LOCAL放行");

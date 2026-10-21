@@ -218,7 +218,9 @@ class ProductionReportHttpTest {
     void sumsExactQuantitiesValidatesUpstreamAndPreservesQualityMeaning() throws Exception {
         try (var c = context()) {
             var m = MaterialIssueHttpTest.mvc(c);
-            long id = add(m, 11, "5.000001");
+            long id = add(m, 11, "5.01");
+            // TEST ONLY existing six-decimal fact: new human commands are limited to two decimals.
+            c.getBean(MaterialIssueHttpTest.Fixture.class).business.get("A").update("UPDATE mes_production_report SET quantity_delta=5.000001 WHERE id=?", id);
             add(m, 11, "2");
             m.perform(full(get("/api/production/report-quantities/executions/1"), "A")).andExpect(status().isOk())
                     .andExpect(jsonPath("nodes[0].routingNodeId").value("11"))

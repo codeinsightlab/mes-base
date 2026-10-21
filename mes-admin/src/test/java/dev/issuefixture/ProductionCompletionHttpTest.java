@@ -1,6 +1,21 @@
 package dev.issuefixture;
 
 import java.util.UUID;
+import java.util.List;
+import dev.mesbase.acceptance.FactorySnapshotFixture;
+import dev.mesbase.business.production.service.WorkOrderCompletionService;
+import dev.mesbase.core.factory.FactoryCatalog;
+import dev.mesbase.core.factory.Factory;
+import dev.mesbase.core.factory.FactoryId;
+import dev.mesbase.core.factory.FactoryStatus;
+import dev.mesbase.framework.sync.SyncCoordinator;
+import dev.mesbase.platform.execution.FactoryIntegrationContext;
+import dev.mesbase.server.WorkOrderCompletionJob;
+import org.springframework.context.ApplicationContext;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import java.math.BigDecimal;
 import org.springframework.test.web.servlet.MockMvc;
 import tools.jackson.databind.ObjectMapper;
@@ -21,6 +36,7 @@ class ProductionCompletionHttpTest {
         try (var c = ProductionQualityV13HttpTest.context(100, 100, 100, 100, 100)) {
             var m = MaterialIssueHttpTest.mvc(c);
             var j = ProductionReceiptHttpTest.db(c);
+            j.update("DELETE FROM mes_production_execution WHERE id=2"); // TEST ONLY unused sibling
             String defect = ProductionQualityV13HttpTest.defect(m, 12, "10", "INDEPENDENT", null);
             String started = ProductionQualityV13HttpTest.start(m, defect);
             m.perform(ProductionCoreV1HttpTest.full(post("/api/quality/releases/executions/1")).content(release("90")))
@@ -52,6 +68,20 @@ class ProductionCompletionHttpTest {
                     .andExpect(status().isOk()).andExpect(jsonPath("effectiveQty").value("94.000000"));
             m.perform(ProductionCoreV1HttpTest.full(post(root + "/actions/complete")).content(body))
                     .andExpect(status().isOk()).andExpect(jsonPath("id").value(id));
+            // Execution completion leaves the parent RELEASED until the periodic job observes it.
+            assertEquals("RELEASED", j.queryForObject("SELECT status FROM workorder WHERE id=1", String.class));
+            var job = job(c);
+            j.update("INSERT INTO mes_production_execution(id,workorder_id,execution_no,product_id,routing_id,target_qty,status) VALUES(9000,1,'TEST-NOT-FINISHED',1,1,1,'READY')");
+            job.scheduled();
+            assertEquals("RELEASED", j.queryForObject("SELECT status FROM workorder WHERE id=1", String.class));
+            j.update("DELETE FROM mes_production_execution WHERE id=9000");
+            job.scheduled();
+            assertEquals("COMPLETED", j.queryForObject("SELECT status FROM workorder WHERE id=1", String.class));
+            var revision = j.queryForObject("SELECT revision FROM workorder WHERE id=1", Integer.class);
+            job.scheduled();
+            assertEquals(revision, j.queryForObject("SELECT revision FROM workorder WHERE id=1", Integer.class));
+            m.perform(ProductionCoreV1HttpTest.full(post(root + "/actions/complete")).content(body))
+                    .andExpect(status().isOk()).andExpect(jsonPath("id").value(id));
             assertEquals(1, j.queryForObject("SELECT COUNT(*) FROM mes_execution_completion", Integer.class));
             assertEquals("COMPLETED", j.queryForObject("SELECT status FROM mes_production_execution WHERE id=1", String.class));
             assertEquals("100.000000", j.queryForObject("SELECT target_qty FROM mes_production_execution WHERE id=1", BigDecimal.class)
@@ -59,6 +89,38 @@ class ProductionCompletionHttpTest {
             m.perform(ProductionCoreV1HttpTest.full(post(root + "/actions/select-path"))
                     .content("{\"revision\":1,\"routingNodeIds\":[11,12,13,14,15]}")).andExpect(status().isConflict());
         }
+    }
+
+    @Test
+    void unprocessedInputCannotCompleteEvenWhenAllOutputWasReleasedAndAccepted() throws Exception {
+        try (var c = ProductionQualityV13HttpTest.context(80, 80, 80, 80, 80)) {
+            var m = MaterialIssueHttpTest.mvc(c);
+            var j = ProductionReceiptHttpTest.db(c);
+            m.perform(ProductionCoreV1HttpTest.full(post("/api/quality/releases/executions/1")).content(release("80")))
+                    .andExpect(status().isOk());
+            j.update("INSERT INTO wm_inventory(id,material_id,warehouse_id,batch_no,quantity,available_quantity,status) VALUES(1,1,1,'TEST-FINISHED',0,0,'ENABLED')");
+            accept(m, handover(m, "80"), "80");
+            m.perform(ProductionCoreV1HttpTest.full(get("/api/production/executions/1/closure")))
+                    .andExpect(status().isOk()).andExpect(jsonPath("canComplete").value(false))
+                    .andExpect(jsonPath("blockedReason").value("投入数量不等于末道有效报工与最终不良损失之和，不能完工"));
+            job(c).scheduled();
+            assertEquals("RELEASED", j.queryForObject("SELECT status FROM workorder WHERE id=1", String.class));
+            assertEquals(0, j.queryForObject("SELECT COUNT(*) FROM mes_execution_completion", Integer.class));
+        }
+    }
+
+    static WorkOrderCompletionJob job(ApplicationContext context) {
+        var catalog = mock(FactoryCatalog.class);
+        when(catalog.enabled(0, 100)).thenReturn(List.of(
+                new Factory(new FactoryId("A"), "TEST", "TEST-A", "TEST ONLY A", FactoryStatus.ENABLED),
+                new Factory(new FactoryId("B"), "TEST", "TEST-B", "TEST ONLY B", FactoryStatus.ENABLED)));
+        when(catalog.enabled(100, 100)).thenReturn(List.of());
+        var coordinator = context.getBean(SyncCoordinator.class);
+        when(coordinator.claim(any(), eq("workorder-completion"), any())).thenAnswer(invocation ->
+                new SyncCoordinator.Run(invocation.getArgument(0), "workorder-completion", UUID.randomUUID().toString()));
+        return new WorkOrderCompletionJob(catalog, (scope, task) -> FactoryIntegrationContext.run(
+                FactorySnapshotFixture.current(context, scope.factoryId().value()), task), coordinator,
+                context.getBean(WorkOrderCompletionService.class));
     }
 
     static String release(String qty) {

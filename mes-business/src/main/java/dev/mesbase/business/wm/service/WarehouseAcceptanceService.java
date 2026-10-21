@@ -1,5 +1,7 @@
 package dev.mesbase.business.wm.service;
 
+import dev.mesbase.business.production.domain.ProductionQuantityInput;
+
 import dev.mesbase.business.production.service.BusinessSourceRules;
 
 import dev.mesbase.business.wm.dao.MesWarehouseAcceptanceMapper;
@@ -107,6 +109,7 @@ public class WarehouseAcceptanceService {
         String hash = ProductionClosureRules.hash(receiptId, c.stockId(), ProductionClosureRules.number(c.quantity()), c.reason(), ProductionClosureRules.actor());
         var old = replay(c.requestId(), hash);
         if (old != null) return old;
+        ProductionQuantityInput.check(c.quantity());
         sources.execution(execution, r.getWarehouseId());
         local();
         if (!ProductionExecutionStatus.RUNNING.getValue().equals(execution.getStatus()))
@@ -135,6 +138,7 @@ public class WarehouseAcceptanceService {
         String hash = ProductionClosureRules.hash(originalId, ProductionClosureRules.number(c.quantity()), c.reason(), ProductionClosureRules.actor());
         var old = replay(c.requestId(), hash);
         if (old != null) return old;
+        ProductionQuantityInput.check(c.quantity());
         if (ProductionExecutionStatus.COMPLETED.getValue().equals(execution.getStatus()))
             blocked("已正式完工；不支持终态接收逆向，请保留历史差额并走专项纠正");
         if (original.getQuantityDelta().signum() <= 0 || c.quantity()

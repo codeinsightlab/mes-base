@@ -101,6 +101,8 @@ public class ProductionChainLocks {
     }
 
     public static void requireActive(WorkorderEntity row) {
+        if (row != null && WorkOrderStatus.COMPLETED.getValue().equals(row.getStatus()))
+            throw new FoundationException(ErrorCode.RESOURCE_CONFLICT);
         if (row != null && WorkOrderStatus.HISTORICAL.getValue().equals(row.getStatus()))
             throw new FoundationException(ErrorCode.RESOURCE_CONFLICT);
         if (row != null && WorkOrderStatus.CANCELLED.getValue().equals(row.getStatus()))

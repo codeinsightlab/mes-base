@@ -1,5 +1,7 @@
 package dev.mesbase.business.quality.service;
 
+import dev.mesbase.business.production.domain.ProductionQuantityInput;
+
 import dev.mesbase.business.quality.dao.MesProductionDefectMapper;
 import dev.mesbase.business.quality.domain.MesProductionDefectEntity;
 import dev.mesbase.business.quality.domain.MesProductionDefectExample;
@@ -145,6 +147,7 @@ public class ProductionDefectService {
         locks.execution(execution); // existing WorkOrder -> Execution lock order, then version read
         retry = byKey(c.requestKey());
         if (retry != null) return replay(retry, fingerprint);
+        if (c.facts() != null) ProductionQuantityInput.changed(c.facts().defectQty(), before == null ? null : before.getDefectQty());
         var row = new MesProductionDefectEntity();
         if (before != null) {
             before = latest(id);
@@ -228,6 +231,7 @@ public class ProductionDefectService {
         locks.execution(c.executionId());
         old = byKey(c.requestId());
         if (old != null) return replay(old, fp);
+        ProductionQuantityInput.check(c.quantity());
         if (c.defectTypeId() == null || c.expectedTypeRevision() == null || c.wasteCategory() == null) invalid();
         var node = actualNode(c.executionId(), c.nodeId());
         var type = defectTypes.getObject()

@@ -17,6 +17,7 @@ import dev.mesbase.core.factory.FactoryRuntimeMode;
 import dev.mesbase.platform.execution.FactoryIntegrationSnapshot;
 import dev.mesbase.platform.execution.FactoryIntegrationContext;
 import dev.mesbase.framework.sync.SyncCoordinator;
+import dev.mesbase.business.production.service.WorkOrderCompletionService;
 import dev.mesbase.business.wm.dao.WmWarehouseErpExtraMapper;
 import dev.mesbase.business.production.service.BusinessSourceRules;
 import dev.mesbase.business.production.service.ProductionQuantityService;
@@ -276,7 +277,7 @@ class MaterialIssueHttpTest {
     @EnableWebMvc
     @EnableWebSecurity
     @EnableTransactionManagement
-    @Import({StockDocumentService.class, StockDocumentController.class, WorkOrderCancellationService.class, WorkOrderCancellationController.class, BusinessSourceRules.class, StockReferenceRules.class, ProductionCompletionService.class, ProductionCompletionController.class, WarehouseAcceptanceService.class, WarehouseAcceptanceController.class, QualityReleaseService.class, QualityReleaseController.class, WorkorderMaterialService.class, WorkorderMaterialController.class, LocalStockController.class, WmStockActionController.class, WmStockActionServiceImpl.class, LocalStockService.class, LocalProductionSupply.class, QualityTreatmentService.class, MaterialIssueInputFacts.class, ProductionQuantityService.class, ProductionQuantityErrorAdvice.class, ExecutionQualityReferenceQueryImpl.class, ProductionExecutionQueryService.class, ProductionChainLocks.class, ExecutionPathService.class, ExecutionActionController.class, MaterialIssueSubmissionService.class, MaterialIssueSubmissionController.class, WorkorderErpFacts.class, MaterialIssueErpFacts.class, MaterialIssueErpService.class, MaterialIssueErpController.class, WarehouseIntegration.class, MaterialIssueVoidService.class, MaterialIssueVoidController.class, MesMaterialIssueController.class, MesMaterialIssueItemController.class, MesMaterialIssueServiceImpl.class, MesMaterialIssueItemServiceImpl.class, MaterialIssueRules.class, ProductionExecutionRules.class, ProductionIdentityService.class, MesProductionExecutionServiceImpl.class, MesProductionExecutionController.class, ProductionIdentityController.class, WorkOrderController.class, WorkOrderService.class, LegacyBatchHistoryQuery.class, LegacyBatchHistoryController.class, RoutingReferenceRules.class, FoundationErrorAdvice.class})
+    @Import({WorkOrderCompletionService.class, StockDocumentService.class, StockDocumentController.class, WorkOrderCancellationService.class, WorkOrderCancellationController.class, BusinessSourceRules.class, StockReferenceRules.class, ProductionCompletionService.class, ProductionCompletionController.class, WarehouseAcceptanceService.class, WarehouseAcceptanceController.class, QualityReleaseService.class, QualityReleaseController.class, WorkorderMaterialService.class, WorkorderMaterialController.class, LocalStockController.class, WmStockActionController.class, WmStockActionServiceImpl.class, LocalStockService.class, LocalProductionSupply.class, QualityTreatmentService.class, MaterialIssueInputFacts.class, ProductionQuantityService.class, ProductionQuantityErrorAdvice.class, ExecutionQualityReferenceQueryImpl.class, ProductionExecutionQueryService.class, ProductionChainLocks.class, ExecutionPathService.class, ExecutionActionController.class, MaterialIssueSubmissionService.class, MaterialIssueSubmissionController.class, WorkorderErpFacts.class, MaterialIssueErpFacts.class, MaterialIssueErpService.class, MaterialIssueErpController.class, WarehouseIntegration.class, MaterialIssueVoidService.class, MaterialIssueVoidController.class, MesMaterialIssueController.class, MesMaterialIssueItemController.class, MesMaterialIssueServiceImpl.class, MesMaterialIssueItemServiceImpl.class, MaterialIssueRules.class, ProductionExecutionRules.class, ProductionIdentityService.class, MesProductionExecutionServiceImpl.class, MesProductionExecutionController.class, ProductionIdentityController.class, WorkOrderController.class, WorkOrderService.class, LegacyBatchHistoryQuery.class, LegacyBatchHistoryController.class, RoutingReferenceRules.class, FoundationErrorAdvice.class})
     static class Web implements WebMvcConfigurer {
         @Bean
         FactorySnapshotFixture factorySnapshots() {
@@ -636,7 +637,7 @@ class MaterialIssueHttpTest {
 
     static final String H = "/api/issue/mes-material-issue", I = H + "-item";
     static final String HEADER = "{\"issueNo\":\"QA_ISSUE\",\"workorderId\":\"1\",\"routingId\":\"1\",\"status\":\"RECORDED\"}";
-    static final String ITEM = "{\"issueId\":\"1\",\"materialId\":\"1\",\"batchNo\":\"ERP/ arbitrary-batch\",\"quantity\":\"99999999999999.123456\",\"unitId\":\"1\",\"warehouseId\":\"1\"}";
+    static final String ITEM = "{\"issueId\":\"1\",\"materialId\":\"1\",\"batchNo\":\"ERP/ arbitrary-batch\",\"quantity\":\"99999999999999.12\",\"unitId\":\"1\",\"warehouseId\":\"1\"}";
 
     @Test
     void listSortsBeforePagingAndKeepsFiltersAndFactoryIsolation() throws Exception {
@@ -672,7 +673,7 @@ class MaterialIssueHttpTest {
                     .andExpect(jsonPath("workorderCode").value("WO1")).andExpect(jsonPath("productCode").value("M1"));
             m.perform(post(I).header("Authorization", "Bearer FULL").header("X-Factory-Id", "A")
                             .contentType("application/json").content(ITEM))
-                    .andExpect(status().isOk()).andExpect(jsonPath("quantity").value("99999999999999.123456"))
+                    .andExpect(status().isOk()).andExpect(jsonPath("quantity").value("99999999999999.120000"))
                     .andExpect(jsonPath("materialCode").value("M1")).andExpect(jsonPath("warehouseCode").value("W1"));
             // Same material and batch can occur repeatedly; no guessed uniqueness.
             m.perform(post(I).header("Authorization", "Bearer FULL").header("X-Factory-Id", "A")
@@ -699,8 +700,8 @@ class MaterialIssueHttpTest {
                             .contentType("application/json").content("[1]"))
                     .andExpect(status().isConflict());
             m.perform(put(I + "/1").header("Authorization", "Bearer FULL").header("X-Factory-Id", "A")
-                            .contentType("application/json").content(ITEM.replace("99999999999999.123456", "9.123456")))
-                    .andExpect(status().isOk()).andExpect(jsonPath("quantity").value("9.123456"));
+                            .contentType("application/json").content(ITEM.replace("99999999999999.12", "9.12")))
+                    .andExpect(status().isOk()).andExpect(jsonPath("quantity").value("9.120000"));
             m.perform(delete(I).header("Authorization", "Bearer FULL").header("X-Factory-Id", "A")
                             .contentType("application/json").content("[1,999]"))
                     .andExpect(status().isNotFound());
@@ -737,7 +738,7 @@ class MaterialIssueHttpTest {
                     .contentType("application/json").content(HEADER)).andExpect(status().isOk());
             for (String invalid : List.of(ITEM.replace("\"materialId\":\"1\"", "\"materialId\":\"2\""),
                     ITEM.replace("\"issueId\":\"1\"", "\"issueId\":\"999\""),
-                    ITEM.replace("99999999999999.123456", "-1"), ITEM.replace("99999999999999.123456", "1.1234567"))) {
+                    ITEM.replace("99999999999999.12", "-1"), ITEM.replace("99999999999999.12", "1.1234567"))) {
                 m.perform(post(I).header("Authorization", "Bearer FULL").header("X-Factory-Id", "A")
                                 .contentType("application/json").content(invalid))
                         .andExpect(status().is4xxClientError());
