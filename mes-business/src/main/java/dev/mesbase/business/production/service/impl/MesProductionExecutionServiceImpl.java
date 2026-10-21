@@ -77,7 +77,7 @@ public class MesProductionExecutionServiceImpl implements IMesProductionExecutio
         if (query.remark() != null) {
             criteria.andRemarkLike("%" + query.remark() + "%");
         }
-        example.setOrderByClause("id DESC");
+        example.setOrderByClause("id desc");
         try (Page<MesProductionExecutionEntity> page = PageHelper.offsetPage(offset, limit)) {
             List<MesProductionExecutionEntity> rows = mapper.selectByExample(example);
             return new MesProductionExecutionPage(rows, page.getTotal(), offset, limit);

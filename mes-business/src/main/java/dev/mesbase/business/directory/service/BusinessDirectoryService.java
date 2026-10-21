@@ -87,7 +87,7 @@ public class BusinessDirectoryService {
         filter.setNickName(query.keyword());
         filter.setDeptId(query.departmentId());
         filter.setStatus(DirectoryStatus.NORMAL.getValue());
-        return page(query, "u.user_id asc", () -> users.selectUserList(filter));
+        return page(query, "u.user_id desc", () -> users.selectUserList(filter));
     }
 
     @Transactional(transactionManager = "masterTransactionManager", readOnly = true)
@@ -95,7 +95,7 @@ public class BusinessDirectoryService {
         var filter = new SysDept();
         filter.setDeptName(query.keyword());
         filter.setStatus(DirectoryStatus.NORMAL.getValue());
-        return page(query, "d.dept_id asc", () -> departments.selectDeptList(filter));
+        return page(query, "d.dept_id desc", () -> departments.selectDeptList(filter));
     }
 
     @Transactional(transactionManager = "masterTransactionManager", readOnly = true)
@@ -103,7 +103,7 @@ public class BusinessDirectoryService {
         var filter = new SysPost();
         filter.setPostName(query.keyword());
         filter.setStatus(DirectoryStatus.NORMAL.getValue());
-        return page(query, "post_id asc", () -> posts.selectPostList(filter));
+        return page(query, "post_id desc", () -> posts.selectPostList(filter));
     }
 
     @Transactional(transactionManager = "masterTransactionManager", readOnly = true)
@@ -156,7 +156,7 @@ public class BusinessDirectoryService {
         if (keyword != null && keyword.length() > 100) throw new FoundationException(ErrorCode.BAD_REQUEST);
         var filter = new SysUser();
         filter.setNickName(keyword);
-        var rows = page(new DirectoryQuery(null, null, offset, limit), "u.user_id asc", () -> users.selectUserList(filter));
+        var rows = page(new DirectoryQuery(null, null, offset, limit), "u.user_id desc", () -> users.selectUserList(filter));
         return new DirectoryPage<>(rows.items().stream()
                 .map(user -> new DirectoryLabel(user.getUserId(), user.getUserName(), user.getNickName(), null,
                         null, user.getStatus(), user.getDeptId(), user.getDelFlag()))

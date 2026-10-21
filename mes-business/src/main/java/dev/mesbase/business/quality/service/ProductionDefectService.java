@@ -320,7 +320,7 @@ public class ProductionDefectService {
 
     public Page page(Long executionId, Long workorderId, Long affectedNodeId, int offset, int limit) {
         paging(offset, limit);
-        try (var page = PageHelper.offsetPage(offset, limit)) {
+        try (var page = PageHelper.offsetPage(offset, limit).setOrderBy("id desc")) {
             var rows = mapper.selectLatest(executionId, workorderId, affectedNodeId);
             return new Page(List.copyOf(rows), page.getTotal(), offset, limit, names(rows));
         }
@@ -331,7 +331,7 @@ public class ProductionDefectService {
         latest(id);
         var e = new MesProductionDefectExample();
         e.createCriteria().andDeclarationIdEqualTo(id);
-        e.setOrderByClause("revision_no desc");
+        e.setOrderByClause("id desc");
         try (var page = PageHelper.offsetPage(offset, limit)) {
             var rows = mapper.selectByExample(e);
             return new Page(List.copyOf(rows), page.getTotal(), offset, limit, names(rows));
@@ -397,7 +397,7 @@ public class ProductionDefectService {
         var e = new WmWarehouseExample();
         var c = e.createCriteria().andStatusEqualTo(EnableStatus.ENABLED.getValue());
         if (keyword != null && !keyword.isBlank()) c.andNameLike("%" + keyword + "%");
-        e.setOrderByClause("id");
+        e.setOrderByClause("id desc");
         try (var page = PageHelper.offsetPage(0, 50)) {
             return warehouses.selectByExample(e).stream()
                     .map(w -> new Warehouse(w.getId().toString(), w.getCode(), w.getName())).toList();

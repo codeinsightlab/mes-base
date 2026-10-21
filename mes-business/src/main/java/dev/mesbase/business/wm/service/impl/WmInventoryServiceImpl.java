@@ -111,7 +111,7 @@ public class WmInventoryServiceImpl implements IWmInventoryService {
         if (query.remark() != null) {
             criteria.andRemarkLike("%" + query.remark() + "%");
         }
-        example.setOrderByClause("id");
+        example.setOrderByClause("id desc");
         List<WmInventoryEntity> rows;
         long total;
         try (Page<WmInventoryEntity> page = PageHelper.offsetPage(offset, limit)) {

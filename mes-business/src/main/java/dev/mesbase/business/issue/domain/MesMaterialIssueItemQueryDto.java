@@ -36,7 +36,7 @@ public record MesMaterialIssueItemQueryDto(
 
     @Override
     public String cacheSort() {
-        return "id";
+        return "id desc";
     }
 }
 

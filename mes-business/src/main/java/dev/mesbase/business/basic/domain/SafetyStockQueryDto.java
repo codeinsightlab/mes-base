@@ -1,4 +1,3 @@
-// MES-CODEGEN: scaffold; review required.
 package dev.mesbase.business.basic.domain;
 
 import dev.mesbase.infrastructure.cache.BusinessCacheQuery;
@@ -15,9 +14,9 @@ public record SafetyStockQueryDto(
         @Min(0) Integer offset,
         @Min(1) @Max(100) Integer limit,
         Long materialId,
-        @Digits(integer=14,fraction=4) BigDecimal minQty,
-        @Digits(integer=14,fraction=4) BigDecimal maxQty,
-        @Size(max=16) String status
+        @Digits(integer = 14, fraction = 4) BigDecimal minQty,
+        @Digits(integer = 14, fraction = 4) BigDecimal maxQty,
+        @Size(max = 16) String status
 ) implements BusinessCacheQuery {
     @Override
     public int cacheOffset() {
@@ -31,7 +30,7 @@ public record SafetyStockQueryDto(
 
     @Override
     public String cacheSort() {
-        return "id";
+        return "id desc";
     }
 }
 

@@ -68,7 +68,7 @@ class CodegenPersonAcceptanceTest {
         assertFalse(xml.contains("&quot;"));
         assertFalse(xml.contains("\"public\"."));
         assertFalse(xml.contains("public.person"));
-        assertTrue(service.contains("example.setOrderByClause(\"id\")"));
+        assertTrue(service.contains("example.setOrderByClause(\"id desc\")"));
         String permissions = Files.readString(javaRoot.resolve("controller/PersonPermissions.java"));
         assertTrue(Files.readString(javaRoot.resolve("domain/PersonResource.java")).contains("business:person"));
         assertTrue(permissions.contains("PersonResource.PREFIX"));

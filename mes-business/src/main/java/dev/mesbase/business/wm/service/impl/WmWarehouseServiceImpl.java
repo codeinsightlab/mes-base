@@ -108,7 +108,7 @@ public class WmWarehouseServiceImpl implements IWmWarehouseService {
             criteria.andRemarkLike("%" + query.remark() + "%");
         }
         if (query.source() != null) criteria.andSourceEqualTo(BusinessSourceRules.required(query.source()).getValue());
-        example.setOrderByClause("id");
+        example.setOrderByClause("id desc");
         try (Page<WmWarehouseEntity> page = PageHelper.offsetPage(offset, limit)) {
             List<WmWarehouseEntity> rows = mapper.selectByExample(example);
             return new WmWarehousePage(rows, page.getTotal(), offset, limit);

@@ -88,7 +88,7 @@ public class SafetyStockServiceImpl implements ISafetyStockService {
         if (query.status() != null) {
             criteria.andStatusLike("%" + query.status() + "%");
         }
-        example.setOrderByClause("id");
+        example.setOrderByClause("id desc");
         try (Page<SafetyStockEntity> page = PageHelper.offsetPage(offset, limit)) {
             List<SafetyStockEntity> rows = mapper.selectByExample(example);
             return new SafetyStockPage(rows, page.getTotal(), offset, limit);

@@ -153,7 +153,7 @@ public class RoutingServiceImpl implements IRoutingService {
         if (query.publishedAt() != null) {
             criteria.andPublishedAtEqualTo(query.publishedAt());
         }
-        example.setOrderByClause("published_at desc, id desc");
+        example.setOrderByClause("id desc");
         try (Page<RoutingEntity> page = PageHelper.offsetPage(offset, limit)) {
             List<RoutingEntity> rows = mapper.selectByExample(example);
             return new RoutingPage(rows, page.getTotal(), offset, limit);
@@ -664,7 +664,7 @@ public class RoutingServiceImpl implements IRoutingService {
             criteria.andCodeLike("%" + search + "%");
             filter.or().andStatusEqualTo(EnableStatus.ENABLED.getValue()).andNameLike("%" + search + "%");
         }
-        filter.setOrderByClause("code");
+        filter.setOrderByClause("id desc");
         try (Page<OperationEntity> page = PageHelper.offsetPage(0, limit, false)) {
             return operations.selectByExample(filter).stream()
                     .map(row -> new RoutingReference(row.getId(), row.getCode(), row.getName())).toList();
@@ -681,7 +681,7 @@ public class RoutingServiceImpl implements IRoutingService {
             criteria.andCodeLike("%" + search + "%");
             filter.or().andStatusEqualTo(EnableStatus.ENABLED.getValue()).andNameLike("%" + search + "%");
         }
-        filter.setOrderByClause("code");
+        filter.setOrderByClause("id desc");
         try (Page<MaterialEntity> page = PageHelper.offsetPage(0, limit, false)) {
             return materials.selectByExample(filter).stream()
                     .map(row -> new RoutingReference(row.getId(), row.getCode(), row.getName())).toList();

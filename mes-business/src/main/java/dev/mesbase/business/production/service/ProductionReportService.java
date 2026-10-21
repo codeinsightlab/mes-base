@@ -219,7 +219,7 @@ public class ProductionReportService {
 
     private ReportPage page(MesProductionReportExample f, int offset, int limit) {
         ProductionQuantityService.paging(offset, limit);
-        f.setOrderByClause("create_time desc,id desc");
+        f.setOrderByClause("id desc");
         List<MesProductionReportEntity> rows;
         long total;
         try (var page = PageHelper.offsetPage(offset, limit)) {

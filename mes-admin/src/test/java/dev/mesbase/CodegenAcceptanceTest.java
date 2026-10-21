@@ -478,7 +478,7 @@ class CodegenAcceptanceTest {
                         query.getConstructors()[0].newInstance(1, 1, null, null));
                 assertEquals(2L, paged.getClass().getMethod("total").invoke(paged));
                 assertEquals(1, ((List<?>) paged.getClass().getMethod("items").invoke(paged)).size());
-                assertEquals(entityType.getMethod("getId").invoke(second),
+                assertEquals(Long.valueOf(id),
                         entityType.getMethod("getId")
                                 .invoke(((List<?>) paged.getClass().getMethod("items").invoke(paged)).getFirst()));
                 assertEquals(null, com.github.pagehelper.PageHelper.getLocalPage());

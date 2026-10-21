@@ -69,7 +69,7 @@ public class MesExecutionAssignmentServiceImpl implements IMesExecutionAssignmen
         if (query.remark() != null) {
             criteria.andRemarkLike("%" + query.remark() + "%");
         }
-        example.setOrderByClause("id");
+        example.setOrderByClause("id desc");
         try (Page<MesExecutionAssignmentEntity> page = PageHelper.offsetPage(offset, limit)) {
             List<MesExecutionAssignmentEntity> rows = mapper.selectByExample(example);
             return new MesExecutionAssignmentPage(rows, page.getTotal(), offset, limit);

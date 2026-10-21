@@ -35,7 +35,7 @@ public record RoutingQueryDto(
 
     @Override
     public String cacheSort() {
-        return "id";
+        return "id desc";
     }
 }
 

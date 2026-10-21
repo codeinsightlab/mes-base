@@ -98,6 +98,7 @@ public class LocalProductionSupply {
         sf.createCriteria().andMaterialIdEqualTo(material.getId()).andBatchNoEqualTo(identity.lotCode())
                 .andStatusEqualTo(EnableStatus.ENABLED.getValue());
         if (inventory.countByExample(sf) > 100) fail();
+        sf.setOrderByClause("id desc");
         var stockRows = inventory.selectByExample(sf);
         var warehouseFilter = new WmWarehouseExample();
         var warehouseIds = stockRows.stream().map(r -> r.getWarehouseId()).distinct().toList();

@@ -122,10 +122,10 @@ class OperationUserDirectoryTest {
 
     @Test
     void currentFactoryAndPlatformBusinessGrantsOnly() {
-        assertEquals(List.of(1L, 3L), directory.page(null, 0, 20).items().stream()
+        assertEquals(List.of(3L, 1L), directory.page(null, 0, 20).items().stream()
                 .map(OperationUserDirectoryMapper.UserOption::id).toList());
         FactoryContext.bind(new FactoryScope(new FactoryId("B")));
-        assertEquals(List.of(2L, 3L), directory.page(null, 0, 20).items().stream()
+        assertEquals(List.of(3L, 2L), directory.page(null, 0, 20).items().stream()
                 .map(OperationUserDirectoryMapper.UserOption::id).toList());
     }
 

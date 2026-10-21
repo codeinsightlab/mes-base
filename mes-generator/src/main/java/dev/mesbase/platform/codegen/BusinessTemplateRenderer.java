@@ -216,6 +216,7 @@ public final class BusinessTemplateRenderer {
         ctx.put("idType", pk.javaType());
         ctx.put("pkField", pk.javaField());
         ctx.put("sqlPk", string(t.sqlIdentifier(pk.name())));
+        ctx.put("defaultOrderBy", string(t.sqlIdentifier(pk.name()) + (pk.autoIncrement() ? " desc" : "")));
         ctx.put("domainPackage", p + ".domain");
         ctx.put("daoPackage", p + ".dao");
         ctx.put("servicePackage", p + ".service");

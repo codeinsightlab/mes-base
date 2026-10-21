@@ -59,7 +59,7 @@ public class MesOperationUserServiceImpl implements IMesOperationUserService {
         if (query.remark() != null) {
             criteria.andRemarkLike("%" + query.remark() + "%");
         }
-        example.setOrderByClause("id");
+        example.setOrderByClause("id desc");
         try (Page<MesOperationUserEntity> page = PageHelper.offsetPage(offset, limit)) {
             List<MesOperationUserEntity> rows = mapper.selectByExample(example);
             return new MesOperationUserPage(rows, page.getTotal(), offset, limit);

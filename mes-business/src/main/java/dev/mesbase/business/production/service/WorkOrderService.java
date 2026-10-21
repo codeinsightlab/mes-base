@@ -392,7 +392,7 @@ public class WorkOrderService {
     private List<ProductionBatchEntity> batchRows(Long id) {
         var f = new ProductionBatchExample();
         f.createCriteria().andWorkorderIdEqualTo(id);
-        f.setOrderByClause("id");
+        f.setOrderByClause("id desc");
         return batches.selectByExample(f);
     }
 

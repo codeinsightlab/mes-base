@@ -92,7 +92,7 @@ public class WorkstationServiceImpl implements IWorkstationService {
         if (query.remark() != null) {
             criteria.andRemarkLike("%" + query.remark() + "%");
         }
-        example.setOrderByClause("id");
+        example.setOrderByClause("id desc");
         try (Page<WorkstationEntity> page = PageHelper.offsetPage(offset, limit)) {
             List<WorkstationEntity> rows = mapper.selectByExample(example);
             return new WorkstationPage(rows, page.getTotal(), offset, limit);

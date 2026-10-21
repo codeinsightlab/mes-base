@@ -88,7 +88,7 @@ public class WorkshopServiceImpl implements IWorkshopService {
         if (query.remark() != null) {
             criteria.andRemarkLike("%" + query.remark() + "%");
         }
-        example.setOrderByClause("id");
+        example.setOrderByClause("id desc");
         try (Page<WorkshopEntity> page = PageHelper.offsetPage(offset, limit)) {
             List<WorkshopEntity> rows = mapper.selectByExample(example);
             return new WorkshopPage(rows, page.getTotal(), offset, limit);

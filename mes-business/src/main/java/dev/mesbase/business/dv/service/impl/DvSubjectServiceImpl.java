@@ -93,7 +93,7 @@ public class DvSubjectServiceImpl implements IDvSubjectService {
         if (query.remark() != null) {
             criteria.andRemarkLike("%" + query.remark() + "%");
         }
-        example.setOrderByClause("subject_id");
+        example.setOrderByClause("subject_id desc");
         try (Page<DvSubjectEntity> page = PageHelper.offsetPage(offset, limit)) {
             List<DvSubjectEntity> rows = mapper.selectByExample(example);
             return new DvSubjectPage(rows, page.getTotal(), offset, limit);

@@ -21,7 +21,7 @@ public record ${ClassName}QueryDto(
 
     @Override
     public String cacheSort() {
-        return "${sqlPk}";
+        return "${defaultOrderBy}";
     }
 #end
 }

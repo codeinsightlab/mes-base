@@ -110,19 +110,23 @@ class BusinessTemplatePackageTest {
         }
     }
 
-    /** TEST ONLY: bypass MyBatis so only the generated resource boundary can clear the page. */
+    /**
+     * TEST ONLY: bypass MyBatis so only the generated resource boundary can clear the page.
+     */
     private void verifyPageLifecycle(Path classes, String name) throws Exception {
-        try (var loader = new URLClassLoader(new URL[] {classes.toUri().toURL()}, getClass().getClassLoader())) {
+        try (var loader = new URLClassLoader(new URL[]{classes.toUri().toURL()}, getClass().getClassLoader())) {
             String root = "sample.business.material.";
             Class<?> mapper = loader.loadClass(root + "mapper." + name + "Mapper");
             Class<?> service = loader.loadClass(root + "usecase.impl." + name + "ServiceImpl");
             Class<?> query = loader.loadClass(root + "model." + name + "QueryDto");
             Object input = query.getConstructors()[0].newInstance(0, 20, null);
+            assertEquals("id desc", query.getMethod("cacheSort").invoke(input));
             var selectPage = service.getMethod("selectPage", query);
             var failure = new IllegalStateException("TEST ONLY failure before MyBatis interceptor");
             for (boolean fail : List.of(false, true)) {
-                Object stub = Proxy.newProxyInstance(loader, new Class<?>[] {mapper}, (proxy, method, args) -> {
+                Object stub = Proxy.newProxyInstance(loader, new Class<?>[]{mapper}, (proxy, method, args) -> {
                     assertEquals("selectByExample", method.getName());
+                    assertEquals("id desc", args[0].getClass().getMethod("getOrderByClause").invoke(args[0]));
                     Page<?> page = PageHelper.getLocalPage();
                     assertEquals(20, page.getPageSize());
                     if (fail) throw failure;

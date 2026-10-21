@@ -31,7 +31,7 @@ public record OperationQueryDto(
 
     @Override
     public String cacheSort() {
-        return "sort,id";
+        return "id desc";
     }
 }
 

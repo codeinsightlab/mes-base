@@ -10,7 +10,7 @@
   WHERE m.id=#{productId}
    AND m.status=#{enabledStatus} AND r.status=#{publishedStatus}
    <if test="search != null and search != ''">AND (r.code LIKE CONCAT('%',#{search},'%') OR r.name LIKE CONCAT('%',#{search},'%'))</if>
-  ORDER BY r.code,r.version DESC,r.id LIMIT 100
+  ORDER BY r.id DESC LIMIT 100
  </select>
  <select id="allocationForOrders" resultType="dev.mesbase.business.production.domain.WorkOrderModels$Allocation">
   SELECT w.id AS workorder_id,w.planned_qty,

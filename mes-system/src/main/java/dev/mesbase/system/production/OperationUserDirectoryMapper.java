@@ -25,7 +25,7 @@ public interface OperationUserDirectoryMapper {
               AND ((r.kind='PLATFORM' AND r.factory_id IS NULL) OR (r.kind='FACTORY' AND r.factory_id=#{factory}))
               AND rm.menu_id IN
               <foreach collection="menuIds" item="menu" open="(" separator="," close=")">#{menu}</foreach>)
-            ORDER BY u.user_id
+            ORDER BY u.user_id DESC
             </script>
             """)
     List<UserOption> select(@Param("factory") String factory, @Param("id") Long id,

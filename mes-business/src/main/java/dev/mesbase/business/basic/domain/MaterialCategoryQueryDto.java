@@ -1,4 +1,3 @@
-// MES-CODEGEN: scaffold; review required.
 package dev.mesbase.business.basic.domain;
 
 import dev.mesbase.infrastructure.cache.BusinessCacheQuery;
@@ -12,12 +11,12 @@ import jakarta.validation.constraints.Size;
 public record MaterialCategoryQueryDto(
         @Min(0) Integer offset,
         @Min(1) @Max(100) Integer limit,
-        @Size(max=64) String code,
-        @Size(max=255) String name,
+        @Size(max = 64) String code,
+        @Size(max = 255) String name,
         Long parentId,
         Integer sort,
-        @Size(max=16) String status,
-        @Size(max=500) String remark
+        @Size(max = 16) String status,
+        @Size(max = 500) String remark
 ) implements BusinessCacheQuery {
     @Override
     public int cacheOffset() {
@@ -31,7 +30,7 @@ public record MaterialCategoryQueryDto(
 
     @Override
     public String cacheSort() {
-        return "id";
+        return "id desc";
     }
 }
 

@@ -88,7 +88,7 @@ public class MesMaterialIssueServiceImpl implements IMesMaterialIssueService {
         if (query.remark() != null) {
             criteria.andRemarkLike("%" + query.remark() + "%");
         }
-        example.setOrderByClause("id");
+        example.setOrderByClause("id desc");
         try (Page<MesMaterialIssueEntity> page = PageHelper.offsetPage(offset, limit)) {
             List<MesMaterialIssueEntity> rows = mapper.selectByExample(example);
             rules.hydrate(rows);

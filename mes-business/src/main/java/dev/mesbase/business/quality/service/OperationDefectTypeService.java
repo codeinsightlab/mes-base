@@ -52,7 +52,7 @@ public class OperationDefectTypeService {
         var e = new OperationDefectTypeExample();
         var c = e.createCriteria().andOperationIdEqualTo(operation);
         if (enabledOnly) c.andStatusEqualTo(EnableStatus.ENABLED.getValue());
-        e.setOrderByClause("sort,id");
+        e.setOrderByClause("id desc");
         try (var page = PageHelper.offsetPage(offset, limit)) {
             var rows = mapper.selectByExample(e);
             return new Page(List.copyOf(rows), page.getTotal(), offset, limit);

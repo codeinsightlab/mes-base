@@ -55,7 +55,7 @@ public class MesExecutionPathNodeServiceImpl implements IMesExecutionPathNodeSer
         if (query.routingNodeId() != null) {
             criteria.andRoutingNodeIdEqualTo(query.routingNodeId());
         }
-        example.setOrderByClause("id");
+        example.setOrderByClause("id desc");
         try (Page<MesExecutionPathNodeEntity> page = PageHelper.offsetPage(offset, limit)) {
             List<MesExecutionPathNodeEntity> rows = mapper.selectByExample(example);
             return new MesExecutionPathNodePage(rows, page.getTotal(), offset, limit);

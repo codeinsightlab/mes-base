@@ -52,7 +52,7 @@ public class ${ClassName}ServiceImpl implements ${servicePackage}.I${ClassName}S
             criteria.${field.criteriaMethod}(#if($field.string)"%" + query.${field.name}() + "%"#else query.${field.name}()#end);
         }
 #end
-        example.setOrderByClause("${sqlPk}");
+        example.setOrderByClause("${defaultOrderBy}");
         try (com.github.pagehelper.Page<${domainPackage}.${ClassName}Entity> page = com.github.pagehelper.PageHelper.offsetPage(offset, limit)) {
             java.util.List<${domainPackage}.${ClassName}Entity> rows = mapper.${selectByExampleMethod}(example);
             return new ${domainPackage}.${ClassName}Page(rows, page.getTotal(), offset, limit);

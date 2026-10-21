@@ -32,7 +32,7 @@ public record DvSubjectQueryDto(
 
     @Override
     public String cacheSort() {
-        return "subject_id";
+        return "subject_id desc";
     }
 }
 

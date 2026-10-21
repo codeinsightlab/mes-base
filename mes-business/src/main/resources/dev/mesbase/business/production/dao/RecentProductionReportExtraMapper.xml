@@ -14,6 +14,6 @@
     LEFT JOIN material m ON m.id = e.product_id
     LEFT JOIN unit_measure u ON u.id = m.unit_id
     LEFT JOIN routing_node n ON n.id = r.routing_node_id AND n.routing_id = e.routing_id
-    ORDER BY r.create_time DESC, r.id DESC
+    ORDER BY r.id DESC
   </select>
 </mapper>

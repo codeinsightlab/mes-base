@@ -33,7 +33,7 @@ public record WmWarehouseQueryDto(
 
     @Override
     public String cacheSort() {
-        return "id";
+        return "id desc";
     }
 }
 

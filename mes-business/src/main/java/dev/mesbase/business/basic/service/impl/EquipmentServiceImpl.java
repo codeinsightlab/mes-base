@@ -71,7 +71,7 @@ public class EquipmentServiceImpl implements IEquipmentService {
         if (query.remark() != null) {
             criteria.andRemarkLike("%" + query.remark() + "%");
         }
-        example.setOrderByClause("id");
+        example.setOrderByClause("id desc");
         try (Page<EquipmentEntity> page = PageHelper.offsetPage(offset, limit)) {
             List<EquipmentEntity> rows = mapper.selectByExample(example);
             return new EquipmentPage(rows, page.getTotal(), offset, limit);

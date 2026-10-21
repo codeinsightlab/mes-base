@@ -100,7 +100,7 @@ public class OperationServiceImpl implements IOperationService {
         if (query.revision() != null) {
             criteria.andRevisionEqualTo(query.revision());
         }
-        example.setOrderByClause("sort, id");
+        example.setOrderByClause("id desc");
         try (Page<OperationEntity> page = PageHelper.offsetPage(offset, limit)) {
             List<OperationEntity> rows = mapper.selectByExample(example);
             return new OperationPage(rows, page.getTotal(), offset, limit);

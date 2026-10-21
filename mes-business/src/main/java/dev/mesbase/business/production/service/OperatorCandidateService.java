@@ -71,7 +71,7 @@ public class OperatorCandidateService {
         rules.operation(operationId);
         var filter = new MesOperationUserExample();
         filter.createCriteria().andOperationIdEqualTo(operationId);
-        filter.setOrderByClause("id");
+        filter.setOrderByClause("id desc");
         List<MesOperationUserEntity> rows;
         long total;
         try (Page<MesOperationUserEntity> page = PageHelper.offsetPage(offset, 100)) {

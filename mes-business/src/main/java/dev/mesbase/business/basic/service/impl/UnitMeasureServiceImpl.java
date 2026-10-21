@@ -89,7 +89,7 @@ public class UnitMeasureServiceImpl implements IUnitMeasureService {
         if (query.status() != null) {
             criteria.andStatusLike("%" + query.status() + "%");
         }
-        example.setOrderByClause("id");
+        example.setOrderByClause("id desc");
         try (Page<UnitMeasureEntity> page = PageHelper.offsetPage(offset, limit)) {
             List<UnitMeasureEntity> rows = mapper.selectByExample(example);
             return new UnitMeasurePage(rows, page.getTotal(), offset, limit);

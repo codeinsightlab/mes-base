@@ -61,7 +61,7 @@ public class MesMaterialIssueSubmissionServiceImpl implements IMesMaterialIssueS
         if (query.finishedAt() != null) {
             criteria.andFinishedAtEqualTo(query.finishedAt());
         }
-        example.setOrderByClause("id");
+        example.setOrderByClause("id desc");
         try (Page<MesMaterialIssueSubmissionEntity> page = PageHelper.offsetPage(offset, limit)) {
             List<MesMaterialIssueSubmissionEntity> rows = mapper.selectByExampleWithBLOBs(example);
             return new MesMaterialIssueSubmissionPage(rows, page.getTotal(), offset, limit);

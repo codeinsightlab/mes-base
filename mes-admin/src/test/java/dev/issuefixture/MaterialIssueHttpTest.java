@@ -639,6 +639,30 @@ class MaterialIssueHttpTest {
     static final String ITEM = "{\"issueId\":\"1\",\"materialId\":\"1\",\"batchNo\":\"ERP/ arbitrary-batch\",\"quantity\":\"99999999999999.123456\",\"unitId\":\"1\",\"warehouseId\":\"1\"}";
 
     @Test
+    void listSortsBeforePagingAndKeepsFiltersAndFactoryIsolation() throws Exception {
+        try (var c = context()) {
+            var m = mvc(c);
+            for (int number = 1; number <= 3; number++) {
+                m.perform(post(H).header("Authorization", "Bearer FULL").header("X-Factory-Id", "A")
+                                .contentType("application/json").content(HEADER.replace("QA_ISSUE", "TEST_SORT_" + number)))
+                        .andExpect(status().isOk());
+            }
+            m.perform(get(H).header("Authorization", "Bearer FULL").header("X-Factory-Id", "A")
+                            .param("issueNo", "TEST_SORT").param("limit", "2"))
+                    .andExpect(status().isOk()).andExpect(jsonPath("total").value(3))
+                    .andExpect(jsonPath("items[0].id").value("3"))
+                    .andExpect(jsonPath("items[1].id").value("2"));
+            m.perform(get(H).header("Authorization", "Bearer FULL").header("X-Factory-Id", "A")
+                            .param("issueNo", "TEST_SORT").param("offset", "2").param("limit", "2"))
+                    .andExpect(status().isOk()).andExpect(jsonPath("total").value(3))
+                    .andExpect(jsonPath("items.length()").value(1))
+                    .andExpect(jsonPath("items[0].id").value("1"));
+            m.perform(get(H).header("Authorization", "Bearer FULL").header("X-Factory-Id", "B"))
+                    .andExpect(status().isOk()).andExpect(jsonPath("total").value(0));
+        }
+    }
+
+    @Test
     void scopedCrudPrecisionSnapshotsAndParentProtection() throws Exception {
         try (var c = context()) {
             var m = mvc(c);

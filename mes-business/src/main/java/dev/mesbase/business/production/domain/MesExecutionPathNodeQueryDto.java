@@ -1,4 +1,3 @@
-// MES-CODEGEN: scaffold; review required.
 package dev.mesbase.business.production.domain;
 
 import dev.mesbase.infrastructure.cache.BusinessCacheQuery;
@@ -27,7 +26,7 @@ public record MesExecutionPathNodeQueryDto(
 
     @Override
     public String cacheSort() {
-        return "id";
+        return "id desc";
     }
 }
 
