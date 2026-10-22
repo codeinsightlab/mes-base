@@ -1,5 +1,8 @@
 package dev.mesbase.business.production.service;
 
+import com.github.pagehelper.PageHelper;
+import java.util.Objects;
+
 import dev.mesbase.business.basic.dao.MaterialMapper;
 import dev.mesbase.business.production.dao.MesProductionExecutionMapper;
 import dev.mesbase.business.production.dao.RoutingMapper;
@@ -71,6 +74,29 @@ public class ProductionIdentityService {
         return new ProductionIdentity(execution.getId(), execution.getExecutionNo(), code.startsWith("MES1.") ? code : "EXE:" + execution.getId(),
                 workorder.getId(), workorder.getCode(), product.getId(), product.getCode(), product.getName(),
                 routing.getId(), routing.getCode(), routing.getVersion(), execution.getStatus(), execution.getTargetQty());
+    }
+
+    /**
+     * The material lot is retained as the finished-product lot; an execution number is not a lot.
+     */
+    @Transactional(transactionManager = "businessTransactionManager", readOnly = true)
+    public String requiredBatch(Long executionId) {
+        if (executionId == null) throw new FoundationException(ErrorCode.BAD_REQUEST);
+        var filter = new MesProductionScanIdentityExample();
+        filter.createCriteria().andExecutionIdEqualTo(executionId);
+        try (var page = PageHelper.offsetPage(0, 2, false)) {
+            var rows = bindings.selectByExample(filter);
+            if (rows.isEmpty()) throw new FoundationException(ErrorCode.PRODUCTION_BATCH_REQUIRED);
+            if (rows.size() != 1) throw new FoundationException(ErrorCode.PRODUCTION_BATCH_CONFLICT);
+            var binding = rows.getFirst();
+            var identity = ProductionScanCode.parse(binding.getEncodedCode());
+            if (!identity.key().equals(binding.getId())
+                    || !Objects.equals(identity.productCode(), binding.getProductCode())
+                    || !Objects.equals(identity.materialCode(), binding.getMaterialCode())
+                    || !Objects.equals(identity.lotCode(), binding.getMaterialLotCode()))
+                throw new FoundationException(ErrorCode.PRODUCTION_BATCH_CONFLICT);
+            return identity.lotCode();
+        }
     }
 
     public static Long parse(String code) {

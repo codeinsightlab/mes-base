@@ -195,29 +195,6 @@ public class QualityTreatmentService {
         return row;
     }
 
-    /**
-     * Read one page's processing states without per-row database queries.
-     */
-    public Map<String, Summary> summaries(List<MesProductionDefectEntity> declarations) {
-        if (declarations.isEmpty()) return Map.of();
-        if (declarations.size() > 100) ParameterChecks.reject(ErrorCode.QUALITY_TREATMENT_CONFLICT);
-        var filter = new MesQualityTreatmentExample();
-        filter.createCriteria()
-                .andDeclarationIdIn(declarations.stream().map(MesProductionDefectEntity::getDeclarationId).toList());
-        filter.setOrderByClause("recorded_at,id");
-        List<MesQualityTreatmentEntity> rows;
-        try (var page = PageHelper.offsetPage(0, 5001, false)) {
-            rows = events.selectByExample(filter);
-            if (rows.size() > 5000) ParameterChecks.reject(ErrorCode.QUALITY_TREATMENT_CONFLICT);
-        }
-        var grouped = groupedEvents(rows);
-        var result = new LinkedHashMap<String, Summary>();
-        for (var declaration : declarations)
-            result.put(declaration.getDeclarationId(), summarizeRows(declaration, grouped.getOrDefault(
-                    new DeclarationVersion(declaration.getDeclarationId(), declaration.getRevisionNo()), List.of())));
-        return Map.copyOf(result);
-    }
-
     public Summary summary(String declaration) {
         var d = latest(declaration);
         return summarize(d, executionEvents(d.getExecutionId()));
@@ -265,10 +242,27 @@ public class QualityTreatmentService {
         var transferred = rows.stream().filter(e -> Action.TRANSFER_WAREHOUSE.name().equals(e.getActionType()))
                 .map(MesQualityTreatmentEntity::getTransferQty).reduce(ZERO, BigDecimal::add);
         var pending = d.getDefectQty().subtract(scrap).subtract(rework).subtract(returned).subtract(transferred);
+        var state = processingState(d.getRecordAction(), type, pending, started, processed, rework,
+                returned, transferred, failed, recovered);
+        return new Summary(d.getDeclarationId(), d.getRevisionNo(), d.getExecutionId(), d.getAffectedNodeId(), d.getDefectQty(), type, Optional.ofNullable(assessment)
+                .map(MesQualityTreatmentEntity::getRelatedDeclarationId)
+                .orElse(null), Optional.ofNullable(assessment).map(nullableValue -> nullableValue.getBasis())
+                .orElse(null), scrap, rework, started, processed, recovered, failed, pending, rework.subtract(started), started.subtract(processed), type == Attribution.INDEPENDENT ? d.getDefectQty()
+                .subtract(recovered)
+                .subtract(returned) : ZERO, state, d.getRecordAction(), d.getDestinationType(), rows, returned, transferred);
+    }
+
+    /**
+     * Shared state rules for detail facts and the compact list projection.
+     */
+    static String processingState(String recordAction, Attribution attribution, BigDecimal pending,
+                                  BigDecimal started, BigDecimal processed, BigDecimal rework,
+                                  BigDecimal returned, BigDecimal transferred, BigDecimal failed,
+                                  BigDecimal recovered) {
         String state;
-        if (DefectRecordAction.VOID.getValue().equals(d.getRecordAction())) state = State.VOIDED.name();
-        else if (type == Attribution.UNVERIFIED) state = State.UNVERIFIED.name();
-        else if (type == Attribution.OVERLAP) state = State.OVERLAP.name();
+        if (DefectRecordAction.VOID.getValue().equals(recordAction)) state = State.VOIDED.name();
+        else if (attribution == Attribution.UNVERIFIED) state = State.UNVERIFIED.name();
+        else if (attribution == Attribution.OVERLAP) state = State.OVERLAP.name();
         else if (pending.signum() > 0) state = State.PENDING.name();
             // Existing unfinished rework must remain visible when only the unallocated balance is redirected.
         else if (started.compareTo(processed) > 0) state = State.IN_PROGRESS.name();
@@ -279,12 +273,7 @@ public class QualityTreatmentService {
         else if (failed.signum() > 0) state = State.FAILED_SCRAPPED.name();
         else if (recovered.signum() > 0) state = State.RECOVERED.name();
         else state = State.SCRAPPED.name();
-        return new Summary(d.getDeclarationId(), d.getRevisionNo(), d.getExecutionId(), d.getAffectedNodeId(), d.getDefectQty(), type, Optional.ofNullable(assessment)
-                .map(nullableValue -> nullableValue.getRelatedDeclarationId())
-                .orElse(null), Optional.ofNullable(assessment).map(nullableValue -> nullableValue.getBasis())
-                .orElse(null), scrap, rework, started, processed, recovered, failed, pending, rework.subtract(started), started.subtract(processed), type == Attribution.INDEPENDENT ? d.getDefectQty()
-                .subtract(recovered)
-                .subtract(returned) : ZERO, state, d.getRecordAction(), d.getDestinationType(), rows, returned, transferred);
+        return state;
     }
 
     private static BigDecimal sum(List<MesQualityTreatmentEntity> rows,

@@ -16,6 +16,9 @@ import dev.mesbase.business.production.service.ExecutionPathValidator;
 import dev.mesbase.business.production.service.ProductionChainLocks;
 import dev.mesbase.business.production.service.ProductionQuantityService;
 import dev.mesbase.business.quality.dao.MesProductionDefectMapper;
+import dev.mesbase.business.quality.dao.ProductionDefectListExtraMapper;
+import dev.mesbase.business.quality.domain.ProductionDefectModels.Processing;
+import dev.mesbase.business.quality.domain.QualityTreatmentModels.Attribution;
 import dev.mesbase.business.quality.domain.DefectDestination;
 import dev.mesbase.business.quality.domain.DefectRecordAction;
 import dev.mesbase.business.quality.domain.MesProductionDefectEntity;
@@ -79,6 +82,7 @@ public class ProductionDefectService {
     private final MesProductionExecutionMapper executions;
     private final MaterialMapper materials;
     private final MesProductionDefectMapper mapper;
+    private final ProductionDefectListExtraMapper listQueries;
     private final ProductionChainLocks locks;
     private final ExecutionPathService paths;
     private final WmWarehouseMapper warehouses;
@@ -96,7 +100,9 @@ public class ProductionDefectService {
                                    ObjectProvider<AuthorizationService> authorization,
                                    ObjectProvider<OperationDefectTypeService> defectTypes,
                                    MesProductionExecutionMapper executions, MaterialMapper materials,
-                                   ApplicationEventPublisher completionPublisher) {
+                                   ApplicationEventPublisher completionPublisher,
+                                   ProductionDefectListExtraMapper listQueries) {
+        this.listQueries = listQueries;
         this.completionPublisher = completionPublisher;
         this.authorization = authorization;
         this.defectTypes = defectTypes;
@@ -344,14 +350,31 @@ public class ProductionDefectService {
         ParameterChecks.paging(offset, limit);
         List<MesProductionDefectEntity> rows;
         long total;
-        try (var page = PageHelper.offsetPage(offset, limit).setOrderBy("id desc")) {
+        try (var page = PageHelper.offsetPage(offset, limit)) {
             rows = List.copyOf(mapper.selectLatest(executionId, workorderId, affectedNodeId));
             total = page.getTotal();
         }
-        var contexts = rows.isEmpty() ? Map.<String, ListContext>of() : mapper.selectListContexts(rows.stream()
+        var contexts = rows.isEmpty() ? Map.<String, ListContext>of() : listQueries.selectContexts(rows.stream()
                         .map(MesProductionDefectEntity::getId).toList()).stream()
                 .collect(Collectors.toMap(ListContext::declarationId, value -> value));
-        return new Page(rows, total, offset, limit, names(rows), treatments.summaries(rows), contexts);
+        var states = new HashMap<String, Processing>();
+        if (!rows.isEmpty()) {
+            var totals = listQueries.selectTreatmentTotals(rows.stream().map(MesProductionDefectEntity::getId).toList())
+                    .stream().collect(Collectors.toMap(t -> t.declarationId(), t -> t));
+            for (var row : rows) {
+                var t = totals.get(row.getDeclarationId());
+                if (t == null) throw new FoundationException(ErrorCode.QUALITY_TREATMENT_CONFLICT);
+                var pending = row.getDefectQty().subtract(t.scrapQty()).subtract(t.reworkQty())
+                        .subtract(t.returnedQty()).subtract(t.transferredQty());
+                var attribution = Attribution.UNVERIFIED;
+                if (t.attribution() != null) attribution = Attribution.valueOf(t.attribution());
+                var state = QualityTreatmentService.processingState(row.getRecordAction(), attribution, pending,
+                        t.startedQty(), t.processedQty(), t.reworkQty(), t.returnedQty(), t.transferredQty(),
+                        t.failedQty(), t.recoveredQty());
+                states.put(row.getDeclarationId(), new Processing(state, pending, t.returnedQty(), t.transferredQty()));
+            }
+        }
+        return new Page(rows, total, offset, limit, names(rows), Map.copyOf(states), contexts);
     }
 
     public Page history(String id, int offset, int limit) {

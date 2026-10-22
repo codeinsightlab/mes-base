@@ -1,5 +1,7 @@
 package dev.mesbase.business.quality.controller;
 
+import com.fasterxml.jackson.annotation.JsonUnwrapped;
+
 import dev.mesbase.business.integration.warehouse.ErpActionResult.Mode;
 import dev.mesbase.business.integration.warehouse.ErpActionResult.Status;
 import dev.mesbase.business.quality.domain.MesProductionDefectEntity;
@@ -8,7 +10,7 @@ import dev.mesbase.business.quality.domain.ProductionDefectModels.ListContext;
 import dev.mesbase.business.quality.domain.ProductionDefectModels.Names;
 import dev.mesbase.business.quality.domain.ProductionDefectModels.Node;
 import dev.mesbase.business.quality.domain.ProductionDefectModels.Warehouse;
-import dev.mesbase.business.quality.domain.QualityTreatmentModels.Summary;
+import dev.mesbase.business.quality.domain.ProductionDefectModels.Processing;
 import dev.mesbase.business.quality.service.ProductionDefectService.Result;
 import dev.mesbase.business.quality.service.ProductionDefectService;
 import dev.mesbase.common.utils.bean.BeanConversions;
@@ -50,7 +52,8 @@ public class ProductionDefectController {
                           Integer defectTypeRevision, String processingState, String pendingQuantity,
                           String returnedQuantity, String transferredQuantity, String executionNo,
                           String workorderCode, String productCode, String productName,
-                          String workorderStatus, String executionStatus, String source) {
+                          String workorderStatus, String executionStatus, String source, String batchNo,
+                          String specification) {
     }
 
     public record Page(List<Version> items, long total, int offset, int limit) {
@@ -74,12 +77,10 @@ public class ProductionDefectController {
     private record Labels(String discoveredNodeName, String affectedNodeName, String responsibleNodeName,
                           String targetNodeName, String targetWarehouseName, String responsibleUserName,
                           String reportedByName, String recordedByName, String processingState, String pendingQuantity,
-                          String returnedQuantity, String transferredQuantity, String executionNo, String workorderCode,
-                          String productCode, String productName, String workorderStatus, String executionStatus,
-                          String source) {
+                          String returnedQuantity, String transferredQuantity, @JsonUnwrapped ListContext context) {
     }
 
-    private static Version view(MesProductionDefectEntity r, Names names, Summary treatment, ListContext context) {
+    private static Version view(MesProductionDefectEntity r, Names names, Processing treatment, ListContext context) {
         String state = null, pending = null, returned = null, transferred = null;
         if (treatment != null) {
             state = treatment.state();
@@ -87,24 +88,12 @@ public class ProductionDefectController {
             returned = treatment.returnedQty().toPlainString();
             transferred = treatment.transferredQty().toPlainString();
         }
-        String executionNo = null, workorderCode = null, productCode = null, productName = null;
-        String workorderStatus = null, executionStatus = null, source = null;
-        if (context != null) {
-            executionNo = context.executionNo();
-            workorderCode = context.workorderCode();
-            productCode = context.productCode();
-            productName = context.productName();
-            workorderStatus = context.workorderStatus();
-            executionStatus = context.executionStatus();
-            source = context.source();
-        }
         return BeanConversions.convertWith(r, new Labels(
                 label(names.nodes(), r.getDiscoveredNodeId()), label(names.nodes(), r.getAffectedNodeId()),
                 label(names.nodes(), r.getResponsibleNodeId()), label(names.nodes(), r.getTargetNodeId()),
                 label(names.warehouses(), r.getTargetWarehouseId()), label(names.users(), r.getResponsibleUserId()),
                 label(names.users(), r.getReportedBy()), label(names.users(), r.getRecordedBy()),
-                state, pending, returned, transferred, executionNo, workorderCode, productCode, productName,
-                workorderStatus, executionStatus, source), Version.class);
+                state, pending, returned, transferred, context), Version.class);
     }
 
     private static String label(Map<Long, String> names, Long id) {

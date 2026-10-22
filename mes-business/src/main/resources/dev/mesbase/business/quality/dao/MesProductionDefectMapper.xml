@@ -124,21 +124,11 @@
     <if test="executionId != null">AND execution_id=#{executionId}</if>
     <if test="affectedNodeId != null">AND affected_node_id=#{affectedNodeId}</if>
     <if test="workorderId != null">AND EXISTS (SELECT 1 FROM mes_production_execution e WHERE e.id=execution_id AND e.workorder_id=#{workorderId})</if>
-    ORDER BY recorded_at DESC,id DESC
+    ORDER BY id DESC
   </select>
   <select id="selectLatestBatch" resultMap="BaseResultMap">
     SELECT <include refid="Base_Column_List"/> FROM mes_production_defect WHERE <include refid="Latest"/>
     AND execution_id IN <foreach collection="executionIds" item="id" open="(" close=")" separator=",">#{id}</foreach>
     ORDER BY recorded_at DESC,id DESC
-  </select>
-  <select id="selectListContexts" resultType="dev.mesbase.business.quality.domain.ProductionDefectModels$ListContext">
-    SELECT d.declaration_id AS declarationId, e.execution_no AS executionNo,
-      w.code AS workorderCode, m.code AS productCode, m.name AS productName,
-      w.status AS workorderStatus, e.status AS executionStatus, w.source AS source
-    FROM mes_production_defect d
-    LEFT JOIN mes_production_execution e ON e.id=d.execution_id
-    LEFT JOIN workorder w ON w.id=e.workorder_id
-    LEFT JOIN material m ON m.id=e.product_id
-    WHERE d.id IN <foreach collection="ids" item="id" open="(" separator="," close=")">#{id}</foreach>
   </select>
 </mapper>

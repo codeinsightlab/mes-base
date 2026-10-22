@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="dev.mesbase.business.quality.dao.ProductionDefectListExtraMapper">
+  <select id="selectContexts" resultType="dev.mesbase.business.quality.domain.ProductionDefectModels$ListContext">
+    SELECT d.declaration_id AS declarationId, e.execution_no AS executionNo,
+      w.code AS workorderCode, m.code AS productCode, m.name AS productName,
+      w.status AS workorderStatus, e.status AS executionStatus, w.source AS source,
+      (SELECT s.material_lot_code FROM mes_production_scan_identity s WHERE s.execution_id=e.id) AS batchNo,
+      m.specification AS specification
+    FROM mes_production_defect d
+    LEFT JOIN mes_production_execution e ON e.id=d.execution_id
+    LEFT JOIN workorder w ON w.id=e.workorder_id
+    LEFT JOIN material m ON m.id=e.product_id
+    WHERE d.id IN <foreach collection="ids" item="id" open="(" separator="," close=")">#{id}</foreach>
+  </select>
+  <select id="selectTreatmentTotals" resultType="dev.mesbase.business.quality.domain.ProductionDefectModels$TreatmentTotals">
+    SELECT d.declaration_id AS declarationId,
+      <!-- The locked command path permits at most one ASSESS per declaration revision. -->
+      MAX(CASE WHEN t.action_type='ASSESS' THEN t.attribution_type END) AS attribution,
+      COALESCE(SUM(t.scrap_qty),0) AS scrapQty,
+      COALESCE(SUM(CASE WHEN t.action_type IN ('ALLOCATE','CANCEL_ALLOC') THEN t.rework_qty ELSE 0 END),0) AS reworkQty,
+      COALESCE(SUM(CASE WHEN t.action_type IN ('START','CANCEL_START') THEN t.rework_qty ELSE 0 END),0) AS startedQty,
+      COALESCE(SUM(t.processed_qty),0) AS processedQty,
+      COALESCE(SUM(t.recovered_qty),0) AS recoveredQty,
+      COALESCE(SUM(t.failed_qty),0) AS failedQty,
+      COALESCE(SUM(CASE WHEN t.action_type='RETURN_NODE' THEN t.rework_qty ELSE 0 END),0) AS returnedQty,
+      COALESCE(SUM(CASE WHEN t.action_type='TRANSFER_WAREHOUSE' THEN t.transfer_qty ELSE 0 END),0) AS transferredQty
+    FROM mes_production_defect d
+    LEFT JOIN mes_quality_treatment t ON t.declaration_id=d.declaration_id AND t.declaration_revision=d.revision_no
+    WHERE d.id IN <foreach collection="ids" item="id" open="(" separator="," close=")">#{id}</foreach>
+    GROUP BY d.id,d.declaration_id,d.revision_no
+  </select>
+</mapper>

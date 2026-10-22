@@ -172,3 +172,5 @@ WarehouseQueryService 复用原仓库详情/分页及其缓存，收集当前页
 验证：WarehouseAuditNamesTest 的批量去重、姓名/账号回退、用户缺失及审计 ID 保持测试通过；WarehouseTypeHttpTest 增加真实 H2 API 列表和详情的姓名断言。相关后端定向 17 项通过；前端 warehouseType.test.ts 共6项通过，新增审计姓名列绑定及姓名显示断言；前端构建及改动文件 ESLint 通过。日志位于 `.local/warehouse-type-20261022/audit-name-tests.log`、`audit-name-ui-tests.log`、`audit-name-ui-build.log`、`audit-name-lint.log`。
 
 本轮未调整数据库或已有仓库记录。已请求用户重启后端，姓名的真实页面显示待重启续验；此前仓库类型的真实页面验收结果不受影响。回退本轮姓名投影和页面字段即可恢复旧展示，无数据回滚需求。
+
+姓名展示重启续验：用户再次确认后端已重启后，刷新真实 Chrome 仓库页面并恢复原登录/工厂上下文。当前 TEST_DEV_PERF_20261019 的9条仓库行中，创建人与修改人均正确显示“平台管理员”，不再显示用户 ID 100；横向滚动到审计列完成截图核对。证据：`.local/warehouse-type-20261022/audit-name-runtime.png`。此前“姓名真实页面显示待重启续验”已关闭。本次仅进行页面只读核验和追加报告，没有修改仓库或用户数据；详情姓名的自动化 API 断言仍以此前 H2 测试证据为准。

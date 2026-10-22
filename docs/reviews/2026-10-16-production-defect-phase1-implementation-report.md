@@ -191,3 +191,32 @@ List<NodeTotal> nodeTotals(Long executionId);
 证据目录 `.local/center-migration-recovery-20261016/`：`diagnose.log`、`diagnostic-snapshot.yml`、`menu-audit.log`、`center-before.sql`、`backup.log`、`SkipProbe.java`/`skip-probe.log`、有严格前置检查的一次性 `Recover.java`/`recovery.log`、`after.yml`、`normal-migration-test.log`。该目录只保存本地诊断/备份，不包含提交或部署动作。
 
 **本次菜单问题已修复。** 首次报告中的“中心 V17 阻断/V29 未执行”已被本节真实证据取代，保留旧段落用于追溯。本次未重新评估 Phase 1 的其他引用保护、用户服务加载及完整 Web 流程，不能因菜单落库就宣称完整业务投用验收 GO。
+
+## 2026-10-22 — 不良列表查询收窄与生产批次展示
+
+本节记录当前代码的新证据，不将前述 Phase 1 界面或数据模型描述当作当前交互。用户确认批次号从投入材料一直延续到成品；本次列表中的 `batchNo` 读取永久生产扫码身份的 `material_lot_code`，不使用执行编号、旧生产批次表或某一张入库单推导。没有可信绑定时明确显示“批次未记录”，没有为导入验证数据新增兼容分支。
+
+### 源码审查与修改
+
+- 原列表在完成分页后，通过 `QualityTreatmentService.summaries` 加载本页申报所有版本的完整流水，最多取5001行，再分组构造含事件、依据、净不良、待开始、在制等详情字段的 Summary。列表实际只消费状态、待处理、退回及转仓数量；旧版本流水不应参与本页状态计算。
+- 现在先分页取最新申报版本，再由 `ProductionDefectListExtraMapper` 按当前页版本主键批量查询：关联信息走主键；处置按 `declaration_id + declaration_revision` 聚合，一页至多返回100个紧凑结果，不加载完整流水、人员、原因和依据，不再受跨版本5000条流水上限影响。仍保留决定现有业务状态的必要数量，并与详情共用同一个状态函数，避免列表和详情各定义一套状态。ASSESS的MAX只用于投影核实结论，依据是现有持锁命令路径每个版本至多允许一次核实，不代表按大小选择业务结论。
+- 分页总数继续保留，一次COUNT只统计最新版本；不把统计分析页的分组汇总接到列表。列表有效排序仍为 `id DESC`，移除Service对Mapper排序的重复覆盖；HTTP转换继续只在Controller通过公共函数完成。关联Context使用类型化record和通用属性映射，不逐字段搬运新增字段。
+- 列表新增批次号、产出品号、规格；批次与工单合列、产品名称省略并可查看完整值，减少长名称造成的行高。详情同步显示批次及规格。品号、名称和规格来自执行产出产品对应的Material；规格是当前主数据值，本次没有将其声明为申报时冻结快照。
+- 修改范围：质量Controller/查询模型、列表ExtraMapper及XML、申报Service、共享状态函数、相关Fixture及HTTP测试；前端不良列表、详情组件、API类型及页面测试。原完整处置详情与生产数量业务继续读取其需要的事实。
+
+### 表结构与冗余决定
+
+已重新核对中心绑定：Factory `TEST_DEV_PERF_20261019` / datasource `9`，目标 `192.168.18.25:3306/mes_base_dev_perf_test`，服务端UUID `03dbc952-7403-11ef-802c-0242ac130002`；业务Flyway为V48。真实库有15598条不良版本、31194条处置流水、1106个扫码身份；同一执行多扫码身份数量为0，重复版本核实数量为0。
+
+本次不向不可变不良版本账本增加批次、品号、规格冗余列。分页后只关联本页对象，Execution/Workorder/Material均使用主键，扫码身份使用 `idx_scan_execution`，处置使用 `idx_quality_treatment_declaration(declaration_id,declaration_revision)`；没有全表产品关联或一对多连接导致分页行膨胀。即使冗余产品字段，判定当前工单/执行状态及来源仍需读取这些关联，不能消除主要关联。若将来需要“申报时规格”这一历史业务事实，应明确建模快照，不能以本次性能猜测代替语义决定。
+
+真实只读 `EXPLAIN ANALYZE` 对20条版本采样：最新页为PRIMARY反向扫描加 `uk_defect_revision` 反连接；关联信息5次热读中位服务端0.290ms，紧凑处置聚合0.844ms。两条查询各返回20行，处置索引实际读取40条本页事件。小规模样本不证明整体接口已加速，也不包含COUNT、目录、网络与序列化耗时；收益首先是查询版本范围和返回数据量收窄。证据位于 `.local/defect-query-20261022/query-plans.json`。
+
+### 验证与边界
+
+- `PATH=/opt/homebrew/bin:$PATH /Users/user/apache-maven-3.6.1/bin/mvn -B -ntp verify`：BUILD SUCCESS，848项、零失败/错误，49项按环境跳过。新HTTP测试覆盖批次前导零、规格、状态与详情一致、旧版本核实不污染当前版本、数量精度、空页仍保留total、另一工厂读取隔离，以及只对当前页版本读取紧凑汇总。日志 `/tmp/mes-defect-batch-final-verify.log`。
+- 前端使用已有Node22，`npm test`：74个文件、430项通过；`npm run build`通过。日志 `/tmp/mes-defect-ui-full-tests.log`、`/tmp/mes-defect-ui-build.log`。既有5173页面实际观察到新增列和1280/1440/1920宽度布局；其后端仍为旧进程，不能据此宣称新字段及查询链路已通过运行服务验收。
+- 本次没有DDL/DML、迁移、真实ERP调用、提交或用户服务启停。查询变更已在核实的真实目标执行只读计划检查；业务读写及权限的自动化证据来自隔离H2 Fixture，不冒充真实库写入验收。撤销本轮相关源码变更即可回滚，没有数据库回滚需求；用户重启后端后才能验证其运行接口。
+- 同轮用户确认修正不良转仓批次。`ProductionIdentityService.requiredBatch` 使用执行索引最多读取2条绑定、不做COUNT；核对唯一绑定、规范扫码编码摘要及冻结品号/材料/批次的一致性，保留批次原文，缺失或冲突明确拒绝。`QualityDispositionService` 对库存定位、新建库存及正式入库明细统一使用此批次，沿用原来源、权限、物料引用保护及本地事务，不改写旧库存或旧单据，不增加ERP写入能力。
+- 质量处置10项HTTP回归通过，包含入库单/库存/列表批次一致、原请求重放不重复入库（即使新准入所需身份随后不可用，仍先读取原不可变结果）、缺失/歧义/冻结内容不一致拒绝且不产生仓储或处置事实，以及过账失败回滚。相关SQL写入仅发生在隔离H2 Fixture，未执行真实验收库入库。
+- 后端最终构建结束后已请用户重启现有服务，再进行真实只读接口复核；不在验证中自动创建真实申报或库存动作。

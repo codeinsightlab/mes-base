@@ -2,7 +2,7 @@ package dev.mesbase.business.quality.domain;
 
 import jakarta.validation.Valid;
 import dev.mesbase.business.quality.domain.QualityTreatmentModels.Assessment;
-import dev.mesbase.business.quality.domain.QualityTreatmentModels.Summary;
+
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
@@ -42,11 +42,28 @@ public final class ProductionDefectModels {
 
     public record ListContext(String declarationId, String executionNo, String workorderCode,
                               String productCode, String productName, String workorderStatus,
-                              String executionStatus, String source) {
+                              String executionStatus, String source, String batchNo, String specification) {
+    }
+
+    /**
+     * Compact list state; no event history, attribution basis or detail-only quantities.
+     */
+    public record Processing(String state, BigDecimal pendingDispositionQty, BigDecimal returnedQty,
+                             BigDecimal transferredQty) {
+    }
+
+    /**
+     * Indexed aggregation of the exact versions in the current page.
+     */
+    public record TreatmentTotals(String declarationId, String attribution, BigDecimal scrapQty,
+                                  BigDecimal reworkQty, BigDecimal startedQty, BigDecimal processedQty,
+                                  BigDecimal recoveredQty, BigDecimal failedQty, BigDecimal returnedQty,
+                                  BigDecimal transferredQty) {
     }
 
     public record Page(List<MesProductionDefectEntity> items, long total, int offset, int limit, Names names,
-                       Map<String, Summary> treatments, Map<String, ListContext> contexts) implements PageData<MesProductionDefectEntity> {
+                       Map<String, Processing> treatments,
+                       Map<String, ListContext> contexts) implements PageData<MesProductionDefectEntity> {
     }
 
     public record NodeTotal(Long affectedNodeId, BigDecimal effectiveDefectQty, BigDecimal recoveredQty,

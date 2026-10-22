@@ -35,6 +35,8 @@ public enum ErrorCode {
     EXECUTION_INVALID(422, "生产执行必须关联有效工单、匹配产品和已发布工艺，并具有正计划数量及有效时间"),
     EXECUTION_FROZEN(409, "执行身份或已有生产事实关联不可更改"),
     EXECUTION_REFERENCED(409, "生产执行已启动或存在领料关联，不能删除"),
+    PRODUCTION_BATCH_REQUIRED(409, "缺少可信生产批次，无法入库，请核对投产身份"),
+    PRODUCTION_BATCH_CONFLICT(409, "生产批次绑定不一致，无法入库，请核对投产身份"),
     PRODUCTION_IDENTITY_AMBIGUOUS(409, "材料批次关联多个产出产品，请扫描生产身份码或选择明确执行"),
     PRODUCTION_INPUT_STALE(409, "用料计算依据已变化，请重新计算并确认"),
     PRODUCTION_SINGLE_MATERIAL_REQUIRED(422, "工单包含多种必需材料，不支持当前单材料投产模式"),
