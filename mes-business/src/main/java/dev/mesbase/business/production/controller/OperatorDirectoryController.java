@@ -1,5 +1,6 @@
 package dev.mesbase.business.production.controller;
 
+import dev.mesbase.common.utils.bean.BeanConversions;
 import dev.mesbase.common.core.page.PageData;
 import dev.mesbase.business.production.service.OperationUserDirectory;
 import dev.mesbase.business.production.service.OperatorCandidateService;
@@ -50,15 +51,13 @@ public class OperatorDirectoryController {
     public UserPage users(@RequestParam(required = false) String keyword, @RequestParam(defaultValue = "0") int offset,
                           @RequestParam(defaultValue = "20") int limit) {
         var page = users.page(keyword, offset, limit);
-        return new UserPage(page.items().stream().map(u -> new Option(u.id().toString(), u.name()))
-                .toList(), page.total(), offset, limit);
+        return BeanConversions.convertPage(page, UserPage.class);
     }
 
     @GetMapping("/api/production/operator-candidates")
     @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED, permission = MesExecutionAssignmentPermissions.LIST)
     public CandidatePage candidates(@RequestParam Long operationId, @RequestParam(defaultValue = "0") int offset) {
         var page = candidates.candidates(operationId, offset);
-        return new CandidatePage(page.items().stream().map(u -> new Option(u.id().toString(), u.name()))
-                .toList(), page.nextOffset(), page.hasMore());
+        return BeanConversions.convert(page, CandidatePage.class);
     }
 }

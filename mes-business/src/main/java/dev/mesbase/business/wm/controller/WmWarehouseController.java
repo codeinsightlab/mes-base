@@ -7,6 +7,9 @@ import dev.mesbase.business.wm.domain.WmWarehouseEntity;
 import dev.mesbase.business.wm.domain.WmWarehouseQueryDto;
 import dev.mesbase.business.wm.domain.WmWarehouseUpdateCommand;
 import dev.mesbase.business.wm.service.IWmWarehouseService;
+import dev.mesbase.business.wm.service.WarehouseQueryService;
+import dev.mesbase.business.directory.domain.DirectoryLabel;
+import java.util.Map;
 import dev.mesbase.business.wm.sync.WmWarehouseSyncResult;
 import dev.mesbase.common.utils.bean.BeanConversions;
 import dev.mesbase.platform.execution.FactoryContext;
@@ -38,22 +41,27 @@ import org.springframework.web.bind.annotation.RestController;
 public class WmWarehouseController {
     private final IWmWarehouseService service;
 
-    public WmWarehouseController(IWmWarehouseService service) {
+    private final WarehouseQueryService queries;
+
+    public WmWarehouseController(IWmWarehouseService service, WarehouseQueryService queries) {
         this.service = service;
+        this.queries = queries;
     }
 
     @GetMapping
     @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED,
             permission = WmWarehousePermissions.LIST)
     public WmWarehousePageVo list(@Valid @ModelAttribute WmWarehouseQueryDto query) {
-        return BeanConversions.convertPage(service.selectPage(query), WmWarehousePageVo.class);
+        var result = queries.page(query);
+        return BeanConversions.convertPage(result.records(), row -> toView(row, result.users()), WmWarehousePageVo::new);
     }
 
     @GetMapping("/{id}")
     @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED,
             permission = WmWarehousePermissions.QUERY)
     public WmWarehouseVo detail(@PathVariable Long id) {
-        return toView(service.selectById(id));
+        var result = queries.detail(id);
+        return toView(result.record(), result.users());
     }
 
     @PostMapping
@@ -88,8 +96,16 @@ public class WmWarehouseController {
         return service.sync(FactoryContext.required());
     }
 
+    private record AuditNames(String createByName, String updateByName) {
+    }
+
     private static WmWarehouseVo toView(WmWarehouseEntity row) {
         return BeanConversions.convert(row, WmWarehouseVo.class);
+    }
+
+    private static WmWarehouseVo toView(WmWarehouseEntity row, Map<Long, DirectoryLabel> users) {
+        return BeanConversions.convertWith(row, new AuditNames(WarehouseQueryService.name(users, row.getCreateBy()),
+                WarehouseQueryService.name(users, row.getUpdateBy())), WmWarehouseVo.class);
     }
 }
 

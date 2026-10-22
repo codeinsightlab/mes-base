@@ -15,10 +15,16 @@ public record WmWarehouseQueryDto(
         @Size(max = 255) String name,
         @Size(max = 16) String status,
         @Size(max = 500) String remark,
-        @Size(max = 16) String source
+        @Size(max = 16) String source,
+        @Size(max = 32) String warehouseType
 ) implements BusinessCacheQuery {
     public WmWarehouseQueryDto(Integer offset, Integer limit, String code, String name, String status, String remark) {
-        this(offset, limit, code, name, status, remark, null);
+        this(offset, limit, code, name, status, remark, null, null);
+    }
+
+    public WmWarehouseQueryDto(Integer offset, Integer limit, String code, String name, String status, String remark,
+                               String source) {
+        this(offset, limit, code, name, status, remark, source, null);
     }
 
     @Override

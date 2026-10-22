@@ -138,6 +138,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import org.springframework.jdbc.datasource.init.ScriptUtils;
+import org.springframework.core.io.FileSystemResource;
 import org.apache.ibatis.session.SqlSessionFactory;
 import org.junit.jupiter.api.Test;
 import org.mybatis.spring.SqlSessionTemplate;
@@ -233,6 +235,9 @@ class MaterialIssueHttpTest {
                     }
                     if (name.equals("V37__workorder_cancellation.sql")) ddl = ddl.split("CREATE TRIGGER")[0];
                     for (String statement : ddl.split(";")) if (!statement.isBlank()) jdbc.execute(statement);
+                }
+                try (var connection = source.getConnection()) {
+                    ScriptUtils.executeSqlScript(connection, new FileSystemResource("mes-admin/src/main/resources/db/business/V48__warehouse_type.sql"));
                 }
                 // TEST ONLY: these fresh fixture objects are explicitly local; no production migration default.
                 jdbc.execute("ALTER TABLE workorder ALTER COLUMN source SET DEFAULT 'LOCAL'");

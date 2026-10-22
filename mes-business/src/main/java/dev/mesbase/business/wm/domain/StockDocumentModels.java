@@ -1,5 +1,6 @@
 package dev.mesbase.business.wm.domain;
 
+import dev.mesbase.common.core.page.PageData;
 import jakarta.validation.constraints.Digits;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -39,7 +40,8 @@ public final class StockDocumentModels {
     public record Query(String documentType, String status, String documentNo, Integer offset, Integer limit) {
     }
 
-    public record Page(List<WmStockDocumentEntity> items, long total, int offset, int limit) {
+    public record Page(List<WmStockDocumentEntity> items, long total, int offset,
+                       int limit) implements PageData<WmStockDocumentEntity> {
     }
 
     public record Detail(WmStockDocumentEntity document, List<WmStockDocumentLineEntity> lines) {

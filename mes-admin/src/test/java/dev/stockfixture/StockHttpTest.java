@@ -1,4 +1,7 @@
 package dev.stockfixture;
+import com.github.pagehelper.PageInterceptor;
+import dev.mesbase.business.wm.service.WarehouseQueryService;
+import dev.mesbase.business.directory.service.BusinessDirectoryService;
 
 import dev.mesbase.business.wm.dao.WmStockDocumentLineMapper;
 
@@ -71,6 +74,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import org.springframework.jdbc.datasource.init.ScriptUtils;
+import org.springframework.core.io.FileSystemResource;
 import org.apache.ibatis.session.SqlSessionFactory;
 import org.junit.jupiter.api.Test;
 import org.mybatis.spring.SqlSessionTemplate;
@@ -155,6 +160,9 @@ class StockHttpTest {
                             .replace(") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT=", ") COMMENT ");
                     for (String statement : ddl.split(";")) if (!statement.isBlank()) jdbc.execute(statement);
                 }
+                try (var connection = source.getConnection()) {
+                    ScriptUtils.executeSqlScript(connection, new FileSystemResource("mes-admin/src/main/resources/db/business/V48__warehouse_type.sql"));
+                }
                 jdbc.execute("ALTER TABLE wm_warehouse ADD source VARCHAR(16) DEFAULT 'LOCAL'");
                 jdbc.execute("CREATE TABLE wm_warehouse_erp_extra(id BIGINT PRIMARY KEY,external_id VARCHAR(128),provider VARCHAR(128),binding_key VARCHAR(128),configuration_revision BIGINT)");
                 jdbc.execute("ALTER TABLE wm_inventory ADD batch_no VARCHAR(128)");
@@ -191,11 +199,16 @@ class StockHttpTest {
     @EnableWebMvc
     @EnableWebSecurity
     @EnableTransactionManagement
-    @Import({WarehouseIntegration.class, WmWarehouseController.class, WmInventoryController.class, WmWarehouseServiceImpl.class, WmInventoryServiceImpl.class, StockReferenceRules.class, FoundationErrorAdvice.class})
+    @Import({WarehouseIntegration.class, WarehouseQueryService.class, WmWarehouseController.class, WmInventoryController.class, WmWarehouseServiceImpl.class, WmInventoryServiceImpl.class, StockReferenceRules.class, FoundationErrorAdvice.class})
     static class Web implements WebMvcConfigurer {
         @Bean(destroyMethod = "close")
         Fixture fixture() throws Exception {
             return new Fixture();
+        }
+
+        @Bean
+        BusinessDirectoryService directory() {
+            return mock(BusinessDirectoryService.class);
         }
 
         @Bean
@@ -216,6 +229,7 @@ class StockHttpTest {
         @Bean
         SqlSessionFactory sessions(FactoryBusinessDataSource source, OwnedTransactionManager manager) {
             return PersistenceFactories.create(source, MAPPERS, c -> {
+                c.addInterceptor(new PageInterceptor());
             }, manager::verifyAccess);
         }
 
@@ -359,7 +373,7 @@ class StockHttpTest {
     }
 
     static final String W = "/api/wm/wm-warehouse", I = "/api/wm/wm-inventory";
-    static final String WH = "{\"code\":\"W1\",\"name\":\"一号仓\",\"status\":\"ENABLED\"}";
+    static final String WH = "{\"code\":\"W1\",\"name\":\"一号仓\",\"warehouseType\":\"RAW_MATERIAL\",\"status\":\"ENABLED\"}";
 
     static String inventory(String material, String warehouse) {
         return "{\"materialId\":\"" + material + "\",\"warehouseId\":\"" + warehouse + "\",\"quantity\":\"0\",\"availableQuantity\":null,\"status\":\"ENABLED\"}";

@@ -916,3 +916,21 @@ Controller 接口、前端 API／按钮或同步权限。工具自身缺参默�
 Base 的 `index.vue.vm` 继续生成复用 `CrudPage` 的页面；其查询区已统一使用公共 `QueryForm`。查询按钮 `native-type="submit"`，点击和输入框回车由同一个表单 submit 处理；重置为普通 button。不再生成/依赖全局 document 按键捕获、按钮文案匹配、逐字段 keyup.enter 或重复 click 查询。自定义 crudComponent 的消费者须保留这一原生表单契约。
 
 启用/停用同步的模板渲染已有契约测试，前端公共组件与真实页面的提交验证见 [查询表单与扫码记录](../reviews/2026-10-21-query-enter-code-scanner-review.md)。本次不重新生成覆盖现有业务页面，不执行 SQL。
+
+## 2026-10-22 — 保留分页契约与统一属性转换
+
+保留每表的 `XxxPage` 查询结果与 `XxxPageVo` 响应模型；二者分别持有Entity和VO，查询结果封装不是Entity→VO转换。二者实现公共 `PageData<T>`，不把PageHelper暴露成Service接口，也不需要为此改变缓存格式。
+
+普通Controller统一调用：
+
+```java
+return BeanConversions.convertPage(service.selectPage(query), MaterialPageVo.class);
+// 单条详情/新增/更新响应
+return BeanConversions.convert(service.selectById(id), MaterialVo.class);
+```
+
+公共实现位于 `mes-common/.../utils/bean/BeanConversions.java`，复用项目已有Jackson 3依赖，支持Java record与目标模型声明的嵌套泛型列表。Spring BeanUtils.copyProperties依赖可写属性，不能直接填充当前不可变record；本项目不为此引入另一套映射库。目标VO仍是审查后的字段白名单，不能用于请求绑定或持久化写入；不向VO新增密码、凭证或内部字段以迁就转换。
+
+Long→String保持精确值，BigDecimal以普通十进制字符串转换；null保持null，禁止写成字符串"null"。Date通过毫秒值复制，LocalDateTime保留精度；属性映射不预先套用HTTP日期格式。无法匹配的必填原始类型明确失败，不猜默认值。
+
+确有业务派生字段或名称关联时，先由Service批量读取事实，再在Controller使用有明确字段的record补充属性（convertWith），或通过convertPage的行函数/响应工厂重载适配。禁止在转换回调中查询数据库/ERP；禁止手写重复分页元数据组装。生成器同步保留page/page-view模板，并在Controller模板中使用公共转换；手工修改生成产物仍须移除其生成归属标记。

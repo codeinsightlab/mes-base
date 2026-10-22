@@ -12,6 +12,7 @@
     <result column="update_by" jdbcType="VARCHAR" property="updateBy" />
     <result column="update_time" jdbcType="TIMESTAMP" property="updateTime" />
     <result column="source" jdbcType="VARCHAR" property="source" />
+    <result column="warehouse_type" jdbcType="VARCHAR" property="warehouseType" />
   </resultMap>
   <sql id="Example_Where_Clause">
     <where>
@@ -72,7 +73,8 @@
     </where>
   </sql>
   <sql id="Base_Column_List">
-    id, code, name, status, remark, create_by, create_time, update_by, update_time, source
+    id, code, name, status, remark, create_by, create_time, update_by, update_time, source,
+    warehouse_type
   </sql>
   <select id="selectByExample" parameterType="dev.mesbase.business.wm.domain.WmWarehouseExample" resultMap="BaseResultMap">
     select
@@ -111,12 +113,12 @@
   <insert id="insert" keyColumn="id" keyProperty="id" parameterType="dev.mesbase.business.wm.domain.WmWarehouseEntity" useGeneratedKeys="true">
     insert into wm_warehouse (code, name, status,
       remark, create_by, create_time,
-      update_by, update_time, source
-      )
+      update_by, update_time, source,
+      warehouse_type)
     values (#{code,jdbcType=VARCHAR}, #{name,jdbcType=VARCHAR}, #{status,jdbcType=VARCHAR},
       #{remark,jdbcType=VARCHAR}, #{createBy,jdbcType=VARCHAR}, #{createTime,jdbcType=TIMESTAMP},
-      #{updateBy,jdbcType=VARCHAR}, #{updateTime,jdbcType=TIMESTAMP}, #{source,jdbcType=VARCHAR}
-      )
+      #{updateBy,jdbcType=VARCHAR}, #{updateTime,jdbcType=TIMESTAMP}, #{source,jdbcType=VARCHAR},
+      #{warehouseType,jdbcType=VARCHAR})
   </insert>
   <insert id="insertSelective" keyColumn="id" keyProperty="id" parameterType="dev.mesbase.business.wm.domain.WmWarehouseEntity" useGeneratedKeys="true">
     insert into wm_warehouse
@@ -148,6 +150,9 @@
       <if test="source != null">
         source,
       </if>
+      <if test="warehouseType != null">
+        warehouse_type,
+      </if>
     </trim>
     <trim prefix="values (" suffix=")" suffixOverrides=",">
       <if test="code != null">
@@ -176,6 +181,9 @@
       </if>
       <if test="source != null">
         #{source,jdbcType=VARCHAR},
+      </if>
+      <if test="warehouseType != null">
+        #{warehouseType,jdbcType=VARCHAR},
       </if>
     </trim>
   </insert>
@@ -218,6 +226,9 @@
       <if test="row.source != null">
         source = #{row.source,jdbcType=VARCHAR},
       </if>
+      <if test="row.warehouseType != null">
+        warehouse_type = #{row.warehouseType,jdbcType=VARCHAR},
+      </if>
     </set>
     <if test="example != null">
       <include refid="Update_By_Example_Where_Clause" />
@@ -234,7 +245,8 @@
       create_time = #{row.createTime,jdbcType=TIMESTAMP},
       update_by = #{row.updateBy,jdbcType=VARCHAR},
       update_time = #{row.updateTime,jdbcType=TIMESTAMP},
-      source = #{row.source,jdbcType=VARCHAR}
+      source = #{row.source,jdbcType=VARCHAR},
+      warehouse_type = #{row.warehouseType,jdbcType=VARCHAR}
     <if test="example != null">
       <include refid="Update_By_Example_Where_Clause" />
     </if>
@@ -269,6 +281,9 @@
       <if test="source != null">
         source = #{source,jdbcType=VARCHAR},
       </if>
+      <if test="warehouseType != null">
+        warehouse_type = #{warehouseType,jdbcType=VARCHAR},
+      </if>
     </set>
     where id = #{id,jdbcType=BIGINT}
   </update>
@@ -282,7 +297,8 @@
       create_time = #{createTime,jdbcType=TIMESTAMP},
       update_by = #{updateBy,jdbcType=VARCHAR},
       update_time = #{updateTime,jdbcType=TIMESTAMP},
-      source = #{source,jdbcType=VARCHAR}
+      source = #{source,jdbcType=VARCHAR},
+      warehouse_type = #{warehouseType,jdbcType=VARCHAR}
     where id = #{id,jdbcType=BIGINT}
   </update>
 </mapper>

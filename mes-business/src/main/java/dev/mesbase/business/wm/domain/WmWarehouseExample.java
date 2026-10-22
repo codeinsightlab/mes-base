@@ -1,4 +1,3 @@
-// MES-CODEGEN: MyBatis Generator standard single-table persistence.
 package dev.mesbase.business.wm.domain;
 
 import java.time.LocalDateTime;
@@ -762,6 +761,76 @@ public class WmWarehouseExample {
 
         public Criteria andSourceNotBetween(String value1, String value2) {
             addCriterion("source not between", value1, value2, "source");
+            return (Criteria) this;
+        }
+
+        public Criteria andWarehouseTypeIsNull() {
+            addCriterion("warehouse_type is null");
+            return (Criteria) this;
+        }
+
+        public Criteria andWarehouseTypeIsNotNull() {
+            addCriterion("warehouse_type is not null");
+            return (Criteria) this;
+        }
+
+        public Criteria andWarehouseTypeEqualTo(String value) {
+            addCriterion("warehouse_type =", value, "warehouseType");
+            return (Criteria) this;
+        }
+
+        public Criteria andWarehouseTypeNotEqualTo(String value) {
+            addCriterion("warehouse_type <>", value, "warehouseType");
+            return (Criteria) this;
+        }
+
+        public Criteria andWarehouseTypeGreaterThan(String value) {
+            addCriterion("warehouse_type >", value, "warehouseType");
+            return (Criteria) this;
+        }
+
+        public Criteria andWarehouseTypeGreaterThanOrEqualTo(String value) {
+            addCriterion("warehouse_type >=", value, "warehouseType");
+            return (Criteria) this;
+        }
+
+        public Criteria andWarehouseTypeLessThan(String value) {
+            addCriterion("warehouse_type <", value, "warehouseType");
+            return (Criteria) this;
+        }
+
+        public Criteria andWarehouseTypeLessThanOrEqualTo(String value) {
+            addCriterion("warehouse_type <=", value, "warehouseType");
+            return (Criteria) this;
+        }
+
+        public Criteria andWarehouseTypeLike(String value) {
+            addCriterion("warehouse_type like", value, "warehouseType");
+            return (Criteria) this;
+        }
+
+        public Criteria andWarehouseTypeNotLike(String value) {
+            addCriterion("warehouse_type not like", value, "warehouseType");
+            return (Criteria) this;
+        }
+
+        public Criteria andWarehouseTypeIn(List<String> values) {
+            addCriterion("warehouse_type in", values, "warehouseType");
+            return (Criteria) this;
+        }
+
+        public Criteria andWarehouseTypeNotIn(List<String> values) {
+            addCriterion("warehouse_type not in", values, "warehouseType");
+            return (Criteria) this;
+        }
+
+        public Criteria andWarehouseTypeBetween(String value1, String value2) {
+            addCriterion("warehouse_type between", value1, value2, "warehouseType");
+            return (Criteria) this;
+        }
+
+        public Criteria andWarehouseTypeNotBetween(String value1, String value2) {
+            addCriterion("warehouse_type not between", value1, value2, "warehouseType");
             return (Criteria) this;
         }
     }
