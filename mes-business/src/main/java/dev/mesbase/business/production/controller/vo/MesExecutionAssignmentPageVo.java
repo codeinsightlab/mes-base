@@ -1,6 +1,6 @@
-// MES-CODEGEN: scaffold; review required.
 package dev.mesbase.business.production.controller.vo;
 
+import dev.mesbase.common.core.page.PageData;
 import java.util.List;
 
 /**
@@ -11,6 +11,6 @@ public record MesExecutionAssignmentPageVo(
         long total,
         int offset,
         int limit
-) {
+) implements PageData<MesExecutionAssignmentVo> {
 }
 

@@ -1,5 +1,6 @@
 package dev.mesbase.business.production.service;
 
+import dev.mesbase.common.utils.StringUtils;
 import dev.mesbase.common.validation.ParameterChecks;
 import java.util.Optional;
 
@@ -93,8 +94,7 @@ public class WorkorderMaterialService {
         if (c == null || c.expectedRevision() == null || c.expectedRevision() != revision || c.materialId() == null
                 || c.totalRequiredQty() == null || c.totalRequiredQty().signum() <= 0 || c.totalRequiredQty()
                 .scale() > 6
-                || c.totalRequiredQty().precision() - c.totalRequiredQty().scale() > 14 || c.workCenter() == null
-                || c.workCenter().isBlank() || c.workCenter().length() > 100 || c.warehouseIds() == null
+                || c.totalRequiredQty().precision() - c.totalRequiredQty().scale() > 14 || StringUtils.isBlank(c.workCenter()) || c.workCenter().length() > 100 || c.warehouseIds() == null
                 || c.warehouseIds().isEmpty() || c.warehouseIds().size() > 100 || c.warehouseIds().stream()
                 .anyMatch(Objects::isNull)) ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
         ProductionQuantityInput.changed(c.totalRequiredQty(), Optional.ofNullable(previous).map(nullableValue -> nullableValue.getTotalRequiredQty()).orElse(null));

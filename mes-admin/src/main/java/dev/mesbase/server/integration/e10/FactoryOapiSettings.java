@@ -1,5 +1,6 @@
 package dev.mesbase.server.integration.e10;
 
+import dev.mesbase.common.utils.StringUtils;
 import java.net.URI;
 
 /**
@@ -49,7 +50,7 @@ public record FactoryOapiSettings(String endpoint, Host host, Service service, E
     }
 
     private static void required(String value) {
-        if (value == null || value.isBlank() || value.length() > 2048 || value.chars()
+        if (StringUtils.isBlank(value) || value.length() > 2048 || value.chars()
                 .anyMatch(Character::isISOControl))
             throw new IllegalArgumentException("请填写完整的 OAPI 参数，且不能包含控制字符");
     }

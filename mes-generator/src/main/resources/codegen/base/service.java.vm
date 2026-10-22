@@ -4,7 +4,7 @@
  * @author ${authorJavaDoc}
  */
 public interface I${ClassName}Service {
-    com.github.pagehelper.Page<${domainPackage}.${ClassName}Entity> selectPage(${domainPackage}.${ClassName}QueryDto query);
+    ${domainPackage}.${ClassName}Page selectPage(${domainPackage}.${ClassName}QueryDto query);
 
     ${domainPackage}.${ClassName}Entity selectById(${idType} id);
 

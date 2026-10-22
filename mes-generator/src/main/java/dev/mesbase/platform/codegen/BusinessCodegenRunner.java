@@ -1,5 +1,6 @@
 package dev.mesbase.platform.codegen;
 
+import dev.mesbase.common.utils.StringUtils;
 import java.util.Optional;
 
 import dev.mesbase.platform.codegen.ScaffoldWriter.Artifact;
@@ -80,7 +81,7 @@ public final class BusinessCodegenRunner {
                 var table = metadata.read(source, config.source().schema(), tableName);
                 ConfiguredCodegenService.validate(table);
                 String module = module(config, tableName);
-                String displayName = table.comment() == null || table.comment().isBlank() ? tableName : table.comment();
+                String displayName = StringUtils.isBlank(table.comment()) ? tableName : table.comment();
                 if (config.tableOverrides() != null && config.tableOverrides().containsKey(tableName)) {
                     var override = config.tableOverrides().get(tableName);
                     if (override.module() != null) module = override.module();

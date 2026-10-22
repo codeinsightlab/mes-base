@@ -1,5 +1,6 @@
 package dev.mesbase.server.integration.e10;
 
+import dev.mesbase.common.utils.StringUtils;
 import com.fasterxml.jackson.core.JsonPointer;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -45,9 +46,9 @@ public record E10SyncContract(boolean commitEnabled, Rule workorder, Rule wareho
         }
 
         public void validate(boolean mo) {
-            if (evidence == null || evidence.isBlank() || evidence.length() > 500
+            if (StringUtils.isBlank(evidence) || evidence.length() > 500
                     || identityPointers.isEmpty() || identityPointers.size() > 4
-                    || expectedSite == null || expectedSite.isBlank() || statuses.isEmpty()
+                    || StringUtils.isBlank(expectedSite) || statuses.isEmpty()
                     || conditions().size() > 100 || orders().isEmpty() || orders().size() > 10)
                 throw new IllegalArgumentException("同步契约需要身份、据点、状态、排序及证据");
             identityPointers.forEach(Rule::pointer);
@@ -55,7 +56,7 @@ public record E10SyncContract(boolean commitEnabled, Rule workorder, Rule wareho
             pointer(statusPointer);
             if (organizationPointer != null) {
                 pointer(organizationPointer);
-                if (expectedOrganization == null || expectedOrganization.isBlank())
+                if (StringUtils.isBlank(expectedOrganization))
                     throw new IllegalArgumentException("组织映射缺失");
             }
             if (mo) {

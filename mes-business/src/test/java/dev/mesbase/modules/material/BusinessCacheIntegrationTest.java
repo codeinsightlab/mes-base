@@ -18,8 +18,8 @@ import dev.mesbase.infrastructure.persistence.SpringCommitActions;
 import dev.mesbase.business.basic.dao.MaterialMapper;
 import dev.mesbase.business.basic.domain.MaterialCreateCommand;
 import dev.mesbase.business.basic.domain.MaterialEntity;
-import dev.mesbase.business.basic.domain.MaterialExample;
 import dev.mesbase.business.basic.domain.MaterialPage;
+import dev.mesbase.business.basic.domain.MaterialExample;
 import dev.mesbase.business.basic.domain.MaterialQueryDto;
 import dev.mesbase.business.basic.domain.MaterialUpdateCommand;
 import dev.mesbase.business.basic.service.BasicDataRules;
@@ -30,6 +30,7 @@ import dev.mesbase.business.basic.sync.MaterialQueryPort;
 import dev.mesbase.framework.sync.SyncCoordinator;
 import org.springframework.beans.factory.ObjectProvider;
 import dev.mesbase.platform.execution.FactoryContext;
+import com.github.pagehelper.Page;
 import com.github.pagehelper.PageHelper;
 import jakarta.validation.Validation;
 import java.net.ServerSocket;
@@ -156,7 +157,7 @@ class BusinessCacheIntegrationTest {
                 .thenAnswer(call -> mapper.selectByPrimaryKey(call.getArgument(0)));
         when(mapper.selectByExample(any(MaterialExample.class))).thenAnswer(call -> {
             var page = PageHelper.getLocalPage();
-            if (page != null) page.setTotal(123);
+            if (page != null) { page.setTotal(123); page.add(row(1L, "LIST")); return page; }
             return List.of(row(1L, "LIST"));
         });
         doAnswer(call -> {
@@ -182,7 +183,9 @@ class BusinessCacheIntegrationTest {
             var second = material.selectPage(query(offset, 20, "M"));
             verify(mapper, times(offset < 100 ? 1 : 2)).selectByExample(any());
             assertInstanceOf(MaterialEntity.class, second.items().getFirst());
-            assertEquals(first, new MaterialPage(first.items(), second.total(), second.offset(), second.limit()));
+            assertEquals(first.items().getFirst().getId(), second.items().getFirst().getId());
+            assertEquals(offset, second.offset());
+            assertEquals(20, second.limit());
             assertEquals(123, second.total());
         }
         material.selectById(1L);

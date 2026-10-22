@@ -1,5 +1,6 @@
 package dev.mesbase.server.integration.e10;
 
+import dev.mesbase.common.utils.StringUtils;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 
@@ -11,11 +12,11 @@ public final class E10ExternalIdentity {
     }
 
     public static String resolve(JsonNode row, E10SyncContract.Rule rule) {
-        if (rule == null || rule.evidence() == null || rule.evidence().isBlank()) return null;
+        if (rule == null || StringUtils.isBlank(rule.evidence())) return null;
         var values = JsonNodeFactory.instance.arrayNode();
         for (String pointer : rule.identityPointers()) {
             String value = text(row, pointer);
-            if (value == null || value.isBlank()) return null;
+            if (StringUtils.isBlank(value)) return null;
             values.add(value);
         }
         if (values.isEmpty()) return null;

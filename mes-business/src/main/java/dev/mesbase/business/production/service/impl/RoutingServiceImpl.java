@@ -1,5 +1,7 @@
 package dev.mesbase.business.production.service.impl;
 
+import dev.mesbase.business.production.domain.RoutingPage;
+import dev.mesbase.common.utils.StringUtils;
 import dev.mesbase.common.validation.ParameterChecks;
 import dev.mesbase.business.production.domain.RoutingStatus;
 import dev.mesbase.business.shared.enums.EnableStatus;
@@ -118,7 +120,7 @@ public class RoutingServiceImpl implements IRoutingService {
     @Transactional(transactionManager = "businessTransactionManager", readOnly = true)
     @BusinessCache(business = RoutingResource.PREFIX,
             type = BusinessCache.Type.LIST)
-    public Page<RoutingEntity> selectPage(RoutingQueryDto query) {
+    public RoutingPage selectPage(RoutingQueryDto query) {
         int offset = query.offset() == null ? 0 : query.offset();
         int limit = query.limit() == null ? 20 : query.limit();
         ParameterChecks.paging(offset, limit, 100);
@@ -153,8 +155,8 @@ public class RoutingServiceImpl implements IRoutingService {
         }
         example.setOrderByClause("id desc");
         try (Page<RoutingEntity> page = PageHelper.offsetPage(offset, limit)) {
-            mapper.selectByExample(example);
-            return page;
+            List<RoutingEntity> rows = mapper.selectByExample(example);
+            return new RoutingPage(rows, page.getTotal(), offset, limit);
         }
     }
 
@@ -658,7 +660,7 @@ public class RoutingServiceImpl implements IRoutingService {
             throw new FoundationException(ErrorCode.BAD_REQUEST);
         var filter = new OperationExample();
         var criteria = filter.createCriteria().andStatusEqualTo(EnableStatus.ENABLED.getValue());
-        if (search != null && !search.isBlank()) {
+        if (StringUtils.isNotBlank(search)) {
             criteria.andCodeLike("%" + search + "%");
             filter.or().andStatusEqualTo(EnableStatus.ENABLED.getValue()).andNameLike("%" + search + "%");
         }
@@ -675,7 +677,7 @@ public class RoutingServiceImpl implements IRoutingService {
             throw new FoundationException(ErrorCode.BAD_REQUEST);
         var filter = new MaterialExample();
         var criteria = filter.createCriteria().andStatusEqualTo(EnableStatus.ENABLED.getValue());
-        if (search != null && !search.isBlank()) {
+        if (StringUtils.isNotBlank(search)) {
             criteria.andCodeLike("%" + search + "%");
             filter.or().andStatusEqualTo(EnableStatus.ENABLED.getValue()).andNameLike("%" + search + "%");
         }

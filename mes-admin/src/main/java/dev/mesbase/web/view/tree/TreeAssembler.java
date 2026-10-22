@@ -1,5 +1,6 @@
 package dev.mesbase.web.view.tree;
 
+import dev.mesbase.common.utils.bean.BeanConversions;
 import java.util.Objects;
 
 import dev.mesbase.common.core.domain.TreeSelect;
@@ -11,10 +12,7 @@ public final class TreeAssembler {
     }
 
     public static TreeResult toResult(TreeSelect tree) {
-        if (tree == null) return null;
-        return new TreeResult(Objects.toString(tree.getId(), null),
-                tree.getLabel(),
-                TreeAssembler.toResults(tree.getChildren()));
+        return BeanConversions.convert(tree, TreeResult.class);
     }
 
     public static List<TreeResult> toResults(List<TreeSelect> rows) {

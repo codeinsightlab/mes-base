@@ -1,5 +1,6 @@
 package dev.mesbase.business.production.controller;
 
+import dev.mesbase.common.utils.bean.BeanConversions;
 import com.github.pagehelper.Page;
 import java.util.Objects;
 
@@ -46,10 +47,7 @@ public class MesOperationUserController {
     @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED,
             permission = MesOperationUserPermissions.LIST)
     public MesOperationUserPageVo list(@Valid @ModelAttribute MesOperationUserQueryDto query) {
-        Page<MesOperationUserEntity> page = service.selectPage(query);
-        return new MesOperationUserPageVo(
-                page.stream().map(MesOperationUserController::toView).toList(),
-                page.getTotal(), (int) page.getStartRow(), page.getPageSize());
+        return BeanConversions.convertPage(service.selectPage(query), MesOperationUserPageVo.class);
     }
 
     @GetMapping("/{id}")
@@ -96,14 +94,7 @@ public class MesOperationUserController {
     }
 
     private static MesOperationUserVo toView(MesOperationUserEntity row) {
-        return new MesOperationUserVo(
-                Objects.toString(row.getId(), null),
-                Objects.toString(row.getOperationId(), null),
-                Objects.toString(row.getUserId(), null),
-                row.getRemark(),
-                row.getCreateBy(),
-                row.getCreateTime()
-        );
+        return BeanConversions.convert(row, MesOperationUserVo.class);
     }
 }
 

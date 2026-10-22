@@ -1,5 +1,6 @@
 package dev.mesbase.business.production.service;
 
+import dev.mesbase.common.core.page.PageData;
 import dev.mesbase.core.error.ErrorCode;
 import dev.mesbase.core.error.FoundationException;
 import dev.mesbase.business.directory.service.BusinessDirectoryService;
@@ -25,7 +26,7 @@ public class ReportUserReferenceService {
     public record HistoricalUser(Long id, String name) {
     }
 
-    public record UserPage(List<HistoricalUser> items, long total, int offset, int limit) {
+    public record UserPage(List<HistoricalUser> items, long total, int offset, int limit) implements PageData<HistoricalUser> {
     }
 
     public void requireExists(Long id) {

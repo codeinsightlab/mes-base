@@ -1,5 +1,6 @@
 package dev.mesbase.business.production.domain;
 
+import dev.mesbase.common.utils.StringUtils;
 import dev.mesbase.core.error.ErrorCode;
 import dev.mesbase.core.error.FoundationException;
 import java.nio.ByteBuffer;
@@ -64,7 +65,7 @@ public record ProductionScanCode(String productCode, String materialCode, String
     }
 
     private static void field(String value, int max) {
-        if (value == null || value.isBlank() || value.codePointCount(0, value.length()) > max || value.codePoints()
+        if (StringUtils.isBlank(value) || value.codePointCount(0, value.length()) > max || value.codePoints()
                 .anyMatch(c -> Character.isISOControl(c))
                 || !StandardCharsets.UTF_8.newEncoder().canEncode(value)) invalid();
     }

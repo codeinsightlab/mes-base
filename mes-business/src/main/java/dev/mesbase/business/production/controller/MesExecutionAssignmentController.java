@@ -1,5 +1,6 @@
 package dev.mesbase.business.production.controller;
 
+import dev.mesbase.common.utils.bean.BeanConversions;
 import com.github.pagehelper.Page;
 import java.util.Objects;
 
@@ -46,10 +47,7 @@ public class MesExecutionAssignmentController {
     @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED,
             permission = MesExecutionAssignmentPermissions.LIST)
     public MesExecutionAssignmentPageVo list(@Valid @ModelAttribute MesExecutionAssignmentQueryDto query) {
-        Page<MesExecutionAssignmentEntity> page = service.selectPage(query);
-        return new MesExecutionAssignmentPageVo(
-                page.stream().map(MesExecutionAssignmentController::toView).toList(),
-                page.getTotal(), (int) page.getStartRow(), page.getPageSize());
+        return BeanConversions.convertPage(service.selectPage(query), MesExecutionAssignmentPageVo.class);
     }
 
     @GetMapping("/{id}")
@@ -86,15 +84,7 @@ public class MesExecutionAssignmentController {
 
 
     private static MesExecutionAssignmentVo toView(MesExecutionAssignmentEntity row) {
-        return new MesExecutionAssignmentVo(
-                Objects.toString(row.getId(), null),
-                Objects.toString(row.getExecutionId(), null),
-                Objects.toString(row.getRoutingNodeId(), null),
-                Objects.toString(row.getUserId(), null),
-                Objects.toString(row.getAssignedBy(), null),
-                row.getAssignedAt(),
-                row.getRemark()
-        );
+        return BeanConversions.convert(row, MesExecutionAssignmentVo.class);
     }
 }
 

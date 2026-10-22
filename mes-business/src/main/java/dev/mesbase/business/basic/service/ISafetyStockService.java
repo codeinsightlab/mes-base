@@ -1,5 +1,6 @@
 package dev.mesbase.business.basic.service;
 
+import dev.mesbase.business.basic.domain.SafetyStockPage;
 import com.github.pagehelper.Page;
 import dev.mesbase.business.basic.domain.SafetyStockCreateCommand;
 import dev.mesbase.business.basic.domain.SafetyStockEntity;
@@ -16,7 +17,7 @@ import java.util.List;
  * @author MES Base
  */
 public interface ISafetyStockService {
-    Page<SafetyStockEntity> selectPage(SafetyStockQueryDto query);
+    SafetyStockPage selectPage(SafetyStockQueryDto query);
 
     SafetyStockEntity selectById(Long id);
 

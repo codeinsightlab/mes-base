@@ -1,5 +1,6 @@
 package dev.mesbase.business.production.service;
 
+import dev.mesbase.common.utils.StringUtils;
 import dev.mesbase.common.validation.ParameterChecks;
 import dev.mesbase.business.shared.enums.BusinessSource;
 import dev.mesbase.business.production.domain.WorkOrderStatus;
@@ -98,7 +99,7 @@ public class BusinessSourceRules {
         current(row.getSource());
         if (required(row.getSource()) == BusinessSource.EXTERNAL) {
             var extra = orderExtras.selectByPrimaryKey(id);
-            if (extra == null || extra.getExternalId() == null || extra.getExternalId().isBlank()) ParameterChecks.reject(ErrorCode.BUSINESS_SOURCE_CONFLICT);
+            if (extra == null || StringUtils.isBlank(extra.getExternalId())) ParameterChecks.reject(ErrorCode.BUSINESS_SOURCE_CONFLICT);
             binding(extra.getProvider(), extra.getBindingKey(), extra.getConfigurationRevision());
         }
         return row;
@@ -126,7 +127,7 @@ public class BusinessSourceRules {
             var extras = warehouseExtras.selectByExample(e);
             if (extras.size() != unique.size()) ParameterChecks.reject(ErrorCode.BUSINESS_SOURCE_CONFLICT);
             for (var x : extras) {
-                if (x.getExternalId() == null || x.getExternalId().isBlank()) ParameterChecks.reject(ErrorCode.BUSINESS_SOURCE_CONFLICT);
+                if (StringUtils.isBlank(x.getExternalId())) ParameterChecks.reject(ErrorCode.BUSINESS_SOURCE_CONFLICT);
                 binding(x.getProvider(), x.getBindingKey(), x.getConfigurationRevision());
             }
         }
@@ -144,7 +145,7 @@ public class BusinessSourceRules {
         var rows = warehouseExtras.selectByExample(filter);
         if (rows.size() != unique.size()) ParameterChecks.reject(ErrorCode.BUSINESS_SOURCE_CONFLICT);
         for (var row : rows) {
-            if (row.getExternalId() == null || row.getExternalId().isBlank()) ParameterChecks.reject(ErrorCode.BUSINESS_SOURCE_CONFLICT);
+            if (StringUtils.isBlank(row.getExternalId())) ParameterChecks.reject(ErrorCode.BUSINESS_SOURCE_CONFLICT);
             binding(row.getProvider(), row.getBindingKey(), row.getConfigurationRevision());
         }
         return rows.stream().collect(Collectors.toMap(row -> row.getId(), row -> row.getExternalId()));
@@ -168,7 +169,7 @@ public class BusinessSourceRules {
             for (var row : rows) {
                 if (required(row.getSource()) != BusinessSource.EXTERNAL) ParameterChecks.reject(ErrorCode.BUSINESS_SOURCE_CONFLICT);
                 var extra = extras.get(row.getId());
-                if (extra == null || extra.getExternalId() == null || extra.getExternalId().isBlank()) ParameterChecks.reject(ErrorCode.BUSINESS_SOURCE_CONFLICT);
+                if (extra == null || StringUtils.isBlank(extra.getExternalId())) ParameterChecks.reject(ErrorCode.BUSINESS_SOURCE_CONFLICT);
                 binding(extra.getProvider(), extra.getBindingKey(), extra.getConfigurationRevision());
             }
         }

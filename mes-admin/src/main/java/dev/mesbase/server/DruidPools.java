@@ -1,5 +1,6 @@
 package dev.mesbase.server;
 
+import dev.mesbase.common.utils.StringUtils;
 import com.alibaba.druid.pool.DruidDataSource;
 import java.sql.SQLException;
 import org.springframework.boot.context.properties.bind.Bindable;
@@ -23,7 +24,7 @@ public final class DruidPools {
                     || minIdle > maxActive || maxWait < 250 || connectTimeout < 1 || socketTimeout < 1
                     || timeBetweenEvictionRunsMillis < 1000 || minEvictableIdleTimeMillis < 0
                     || maxEvictableIdleTimeMillis < minEvictableIdleTimeMillis
-                    || validationQuery == null || validationQuery.isBlank())
+                    || StringUtils.isBlank(validationQuery))
                 throw new IllegalArgumentException("Invalid Druid pool settings");
         }
     }

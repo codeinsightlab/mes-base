@@ -1,5 +1,6 @@
 package dev.mesbase.business.wm.service;
 
+import dev.mesbase.common.utils.StringUtils;
 import dev.mesbase.common.validation.ParameterChecks;
 import java.util.Optional;
 
@@ -104,7 +105,7 @@ public class LocalStockService {
         decimal(c.quantity());
         decimal(c.expectedQuantity());
         decimal(c.expectedAvailable());
-        if (c.reason() == null || c.reason().isBlank() || c.reason().length() > 500 || c.stockId() == null) ParameterChecks.reject(ErrorCode.BAD_REQUEST);
+        if (StringUtils.isBlank(c.reason()) || c.reason().length() > 500 || c.stockId() == null) ParameterChecks.reject(ErrorCode.BAD_REQUEST);
         if (type != StockActionType.RETURN && c.issueId() != null) ParameterChecks.reject(ErrorCode.BAD_REQUEST);
         Long actor = SecurityUtils.getUserId();
         String hash = digest(type, c.stockId(), normalized(c.quantity()), normalized(c.expectedQuantity()),

@@ -1,5 +1,6 @@
 package dev.mesbase.web.view.log;
 
+import dev.mesbase.common.utils.bean.BeanConversions;
 import java.util.Objects;
 
 import dev.mesbase.system.domain.SysOperLog;
@@ -11,34 +12,7 @@ public final class SysOperLogAssembler {
     }
 
     public static SysOperLogResult toResult(SysOperLog row) {
-        if (row == null) return null;
-        return new SysOperLogResult(row.getRequestId(),
-                row.getActorId(),
-                row.getFactoryId(),
-                row.getExecutionScope(),
-                row.getCostTime(),
-                Objects.toString(row.getOperId(), null),
-                row.getTitle(),
-                row.getBusinessType(),
-                row.getBusinessTypes(),
-                row.getMethod(),
-                row.getRequestMethod(),
-                row.getOperatorType(),
-                row.getOperName(),
-                row.getDeptName(),
-                row.getOperUrl(),
-                row.getOperIp(),
-                row.getOperLocation(),
-                row.getOperParam(),
-                row.getJsonResult(),
-                row.getStatus(),
-                row.getErrorMsg(),
-                row.getOperTime(),
-                row.getCreateBy(),
-                row.getCreateTime(),
-                row.getUpdateBy(),
-                row.getUpdateTime(),
-                row.getRemark());
+        return BeanConversions.convert(row, SysOperLogResult.class);
     }
 
     public static List<SysOperLogResult> toResults(List<SysOperLog> rows) {

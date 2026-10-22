@@ -1,5 +1,6 @@
 package dev.mesbase.business.wm.service;
 
+import dev.mesbase.common.utils.StringUtils;
 import dev.mesbase.common.validation.ParameterChecks;
 import com.github.pagehelper.PageHelper;
 import dev.mesbase.business.basic.dao.MaterialMapper;
@@ -106,16 +107,16 @@ public class StockDocumentService {
         if (offset < 0 || limit < 1 || limit > 100) ParameterChecks.reject(ErrorCode.BAD_REQUEST);
         var f = new WmStockDocumentExample();
         var c = f.createCriteria();
-        if (q.documentType() != null && !q.documentType().isBlank()) {
+        if (StringUtils.isNotBlank(q.documentType())) {
             type(q.documentType());
             c.andDocumentTypeEqualTo(q.documentType());
         }
-        if (q.status() != null && !q.status().isBlank()) {
+        if (StringUtils.isNotBlank(q.status())) {
             if (!List.of(StockDocumentStatus.DRAFT.getValue(), StockDocumentStatus.POSTED.getValue(), StockDocumentStatus.CANCELLED.getValue())
                     .contains(q.status())) ParameterChecks.reject(ErrorCode.BAD_REQUEST);
             c.andStatusEqualTo(q.status());
         }
-        if (q.documentNo() != null && !q.documentNo().isBlank()) {
+        if (StringUtils.isNotBlank(q.documentNo())) {
             if (q.documentNo().length() > 64) ParameterChecks.reject(ErrorCode.BAD_REQUEST);
             c.andDocumentNoLike("%" + q.documentNo() + "%");
         }
@@ -240,7 +241,7 @@ public class StockDocumentService {
             BigDecimal amount = BigDecimal.ZERO;
             for (var line : detail) {
                 if (!Objects.equals(basis.productId(), line.getMaterialId())
-                        || line.getRemark() == null || line.getRemark().isBlank()) ParameterChecks.reject(ErrorCode.STOCK_DOCUMENT_CONFLICT);
+                        || StringUtils.isBlank(line.getRemark())) ParameterChecks.reject(ErrorCode.STOCK_DOCUMENT_CONFLICT);
                 amount = amount.add(line.getQuantity());
             }
             if (amount.compareTo(basis.remaining()) > 0)

@@ -1,5 +1,6 @@
 package dev.mesbase.server.schema;
 
+import dev.mesbase.common.utils.StringUtils;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
@@ -51,7 +52,7 @@ public final class V34__FactoryBusinessIntegration extends BaseJavaMigration {
             } else if ("CONNECTED".equals(mode)) {
                 String provider = environment.getProperty(key + ".provider");
                 String reference = environment.getProperty(key + ".binding-key");
-                if (provider == null || provider.isBlank() || reference == null || reference.isBlank())
+                if (StringUtils.isBlank(provider) || StringUtils.isBlank(reference))
                     throw new IllegalStateException("Legacy ERP configuration incomplete; migration refused for " + id);
                 rows.add(new Legacy(id, "ERP", provider, reference));
             } else throw new IllegalStateException("Legacy factory mode invalid; migration refused for " + id);

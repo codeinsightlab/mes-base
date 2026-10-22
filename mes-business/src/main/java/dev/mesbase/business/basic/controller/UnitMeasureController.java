@@ -1,5 +1,6 @@
 package dev.mesbase.business.basic.controller;
 
+import dev.mesbase.common.utils.bean.BeanConversions;
 import com.github.pagehelper.Page;
 import java.util.Objects;
 
@@ -48,10 +49,7 @@ public class UnitMeasureController {
     @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED,
             permission = UnitMeasurePermissions.LIST)
     public UnitMeasurePageVo list(@Valid @ModelAttribute UnitMeasureQueryDto query) {
-        Page<UnitMeasureEntity> page = service.selectPage(query);
-        return new UnitMeasurePageVo(
-                page.stream().map(UnitMeasureController::toView).toList(),
-                page.getTotal(), (int) page.getStartRow(), page.getPageSize());
+        return BeanConversions.convertPage(service.selectPage(query), UnitMeasurePageVo.class);
     }
 
     @GetMapping("/{id}")
@@ -94,14 +92,7 @@ public class UnitMeasureController {
     }
 
     private static UnitMeasureVo toView(UnitMeasureEntity row) {
-        return new UnitMeasureVo(
-                Objects.toString(row.getId(), null),
-
-                row.getCode(),
-                row.getName(),
-                row.getSymbol(),
-                row.getStatus()
-        );
+        return BeanConversions.convert(row, UnitMeasureVo.class);
     }
 }
 

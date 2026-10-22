@@ -1,5 +1,6 @@
 package dev.mesbase.business.dv.service.impl;
 
+import dev.mesbase.business.dv.domain.DvSubjectPage;
 import dev.mesbase.common.validation.ParameterChecks;
 import com.github.pagehelper.Page;
 import com.github.pagehelper.PageHelper;
@@ -64,7 +65,7 @@ public class DvSubjectServiceImpl implements IDvSubjectService {
     @Transactional(transactionManager = "businessTransactionManager", readOnly = true)
     @BusinessCache(business = DvSubjectResource.PREFIX,
             type = BusinessCache.Type.LIST)
-    public Page<DvSubjectEntity> selectPage(DvSubjectQueryDto query) {
+    public DvSubjectPage selectPage(DvSubjectQueryDto query) {
         int offset = query.offset() == null ? 0 : query.offset();
         int limit = query.limit() == null ? 20 : query.limit();
         ParameterChecks.paging(offset, limit, 100);
@@ -93,8 +94,8 @@ public class DvSubjectServiceImpl implements IDvSubjectService {
         }
         example.setOrderByClause("subject_id desc");
         try (Page<DvSubjectEntity> page = PageHelper.offsetPage(offset, limit)) {
-            mapper.selectByExample(example);
-            return page;
+            List<DvSubjectEntity> rows = mapper.selectByExample(example);
+            return new DvSubjectPage(rows, page.getTotal(), offset, limit);
         }
     }
 

@@ -1,5 +1,6 @@
 package dev.mesbase.business.basic.service.impl;
 
+import dev.mesbase.business.basic.domain.MaterialPage;
 import dev.mesbase.common.validation.ParameterChecks;
 import com.github.pagehelper.Page;
 import com.github.pagehelper.PageHelper;
@@ -69,7 +70,7 @@ public class MaterialServiceImpl implements IMaterialService {
     @Transactional(transactionManager = "businessTransactionManager", readOnly = true)
     @BusinessCache(business = MaterialResource.PREFIX,
             type = BusinessCache.Type.LIST)
-    public Page<MaterialEntity> selectPage(MaterialQueryDto query) {
+    public MaterialPage selectPage(MaterialQueryDto query) {
         int offset = query.offset() == null ? 0 : query.offset();
         int limit = query.limit() == null ? 20 : query.limit();
         ParameterChecks.paging(offset, limit, 100);
@@ -104,8 +105,8 @@ public class MaterialServiceImpl implements IMaterialService {
         }
         example.setOrderByClause("id desc");
         try (Page<MaterialEntity> page = PageHelper.offsetPage(offset, limit)) {
-            mapper.selectByExample(example);
-            return page;
+            List<MaterialEntity> rows = mapper.selectByExample(example);
+            return new MaterialPage(rows, page.getTotal(), offset, limit);
         }
     }
 

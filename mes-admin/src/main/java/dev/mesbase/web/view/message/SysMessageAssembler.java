@@ -1,5 +1,6 @@
 package dev.mesbase.web.view.message;
 
+import dev.mesbase.common.utils.bean.BeanConversions;
 import dev.mesbase.system.domain.SysMessage;
 import java.util.List;
 
@@ -9,23 +10,7 @@ public final class SysMessageAssembler {
     }
 
     public static SysMessageResult toResult(SysMessage r) {
-        if (r == null) return null;
-        return new SysMessageResult(String.valueOf(r.getMessageId()),
-                r.getMessageType(),
-                r.getMessageLevel(),
-                r.getMessageTitle(),
-                r.getMessageContent(),
-                String.valueOf(r.getSenderId()),
-                r.getSenderName(),
-                r.getSenderNick(),
-                String.valueOf(r.getRecipientId()),
-                r.getRecipientName(),
-                r.getRecipientNick(),
-                r.getProcessTime(),
-                r.getCallBack(),
-                r.getStatus(),
-                r.getRemark(),
-                r.getCreateTime());
+        return BeanConversions.convert(r, SysMessageResult.class);
     }
 
     public static List<SysMessageResult> toResults(List<SysMessage> rows) {

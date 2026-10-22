@@ -1,5 +1,6 @@
 package dev.mesbase.business.production.controller;
 
+import dev.mesbase.common.utils.bean.BeanConversions;
 import com.github.pagehelper.Page;
 import java.util.Objects;
 
@@ -34,10 +35,7 @@ public class MesExecutionCompletionController {
     @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED,
             permission = MesExecutionCompletionPermissions.LIST)
     public MesExecutionCompletionPageVo list(@Valid @ModelAttribute MesExecutionCompletionQueryDto query) {
-        Page<MesExecutionCompletionEntity> page = service.selectPage(query);
-        return new MesExecutionCompletionPageVo(
-                page.stream().map(MesExecutionCompletionController::toView).toList(),
-                page.getTotal(), (int) page.getStartRow(), page.getPageSize());
+        return BeanConversions.convertPage(service.selectPage(query), MesExecutionCompletionPageVo.class);
     }
 
     @GetMapping("/{id}")
@@ -49,19 +47,7 @@ public class MesExecutionCompletionController {
 
 
     private static MesExecutionCompletionVo toView(MesExecutionCompletionEntity row) {
-        return new MesExecutionCompletionVo(
-                row.getId(),
-                Objects.toString(row.getExecutionId(), null),
-                Objects.toString(row.getEffectiveQty(), null),
-                Objects.toString(row.getReleasedQty(), null),
-                Objects.toString(row.getReceiptQty(), null),
-                Objects.toString(row.getAcceptedQty(), null),
-                row.getBasisHash(),
-                row.getRequestHash(),
-                Objects.toString(row.getOperatorUserId(), null),
-                row.getRecordedAt(),
-                row.getReason()
-        );
+        return BeanConversions.convert(row, MesExecutionCompletionVo.class);
     }
 }
 

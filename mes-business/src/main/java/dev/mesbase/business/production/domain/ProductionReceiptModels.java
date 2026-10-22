@@ -2,6 +2,7 @@ package dev.mesbase.business.production.domain;
 
 import java.math.BigDecimal;
 import java.util.List;
+import dev.mesbase.common.core.page.PageData;
 import java.util.Map;
 
 public final class ProductionReceiptModels {
@@ -13,7 +14,7 @@ public final class ProductionReceiptModels {
     }
 
     public record Page(List<ProductionReceiptRow> items, long total, int offset, int limit,
-                       Map<Long, String> userNames) {
+                       Map<Long, String> userNames) implements PageData<ProductionReceiptRow> {
     }
 
     public record Detail(ProductionReceiptRow record, BigDecimal originalBalance, Map<Long, String> userNames) {

@@ -1,5 +1,6 @@
 package dev.mesbase.business.production.service;
 
+import dev.mesbase.business.production.domain.MesOperationUserPage;
 import com.github.pagehelper.Page;
 import dev.mesbase.business.production.domain.MesOperationUserCreateCommand;
 import dev.mesbase.business.production.domain.MesOperationUserEntity;
@@ -13,7 +14,7 @@ import java.util.List;
  * @author MES Base
  */
 public interface IMesOperationUserService {
-    Page<MesOperationUserEntity> selectPage(MesOperationUserQueryDto query);
+    MesOperationUserPage selectPage(MesOperationUserQueryDto query);
 
     MesOperationUserEntity selectById(Long id);
 

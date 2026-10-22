@@ -1,6 +1,7 @@
 package dev.mesbase.business.quality.service;
 
 import dev.mesbase.common.validation.ParameterChecks;
+import dev.mesbase.common.core.page.PageData;
 import com.github.pagehelper.PageHelper;
 import dev.mesbase.business.quality.dao.DefectStatisticsExtraMapper;
 import dev.mesbase.business.quality.domain.DefectStatistics.Query;
@@ -24,8 +25,8 @@ public class DefectStatisticsService {
         this.mapper = mapper;
     }
 
-    public record Page(List<Row> items, long total, int offset, int limit) {
-    }
+
+    public record Page(List<Row> items, long total, int offset, int limit) implements PageData<Row> { }
 
     public Page summarize(Query q) {
         int offset = q.offset() == null ? 0 : q.offset(), limit = q.limit() == null ? 20 : q.limit();
@@ -39,7 +40,8 @@ public class DefectStatisticsService {
             }
         }
         try (var page = PageHelper.offsetPage(offset, limit)) {
-            return new Page(List.copyOf(mapper.summarize(q)), page.getTotal(), offset, limit);
+            var rows = List.copyOf(mapper.summarize(q));
+            return new Page(rows, page.getTotal(), offset, limit);
         }
     }
 

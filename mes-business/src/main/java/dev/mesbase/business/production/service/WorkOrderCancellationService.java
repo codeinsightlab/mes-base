@@ -56,10 +56,10 @@ public class WorkOrderCancellationService {
 
     @Transactional(transactionManager = "businessTransactionManager", isolation = Isolation.READ_COMMITTED, rollbackFor = Exception.class)
     public MesWorkorderCancellationEntity cancel(Long id, Command command) {
-        if (command == null) ProductionClosureRules.bad();
+        if (command == null) ParameterChecks.reject(ErrorCode.BAD_REQUEST);
         ProductionClosureRules.uuid(command.requestId());
         ProductionClosureRules.reason(command.reason());
-        if (command.expectedRevision() != null && command.expectedRevision() < 0) ProductionClosureRules.bad();
+        if (command.expectedRevision() != null && command.expectedRevision() < 0) ParameterChecks.reject(ErrorCode.BAD_REQUEST);
         var actor = ProductionClosureRules.actor();
         var row = locks.order(id);
         String hash = ProductionClosureRules.hash(id, command.requestId(), command.reason(), command.expectedRevision(), actor);

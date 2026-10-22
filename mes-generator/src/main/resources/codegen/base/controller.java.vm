@@ -17,10 +17,7 @@ public class ${ClassName}Controller {
     @dev.mesbase.platform.web.EndpointAccess(value = dev.mesbase.platform.web.EndpointAccess.Kind.AUTHORIZED,
             permission = ${ClassName}Permissions.${listPermissionConstant}#if(!$scoped), permissionScope = dev.mesbase.platform.web.EndpointAccess.PermissionScope.PLATFORM#end)
     public ${responsePackage}.${ClassName}PageVo list(@jakarta.validation.Valid @org.springframework.web.bind.annotation.ModelAttribute ${domainPackage}.${ClassName}QueryDto query) {
-        com.github.pagehelper.Page<${domainPackage}.${ClassName}Entity> page = service.selectPage(query);
-        return new ${responsePackage}.${ClassName}PageVo(
-                page.stream().map(${ClassName}Controller::toView).toList(),
-                page.getTotal(), (int) page.getStartRow(), page.getPageSize());
+        return dev.mesbase.common.utils.bean.BeanConversions.convertPage(service.selectPage(query), ${responsePackage}.${ClassName}PageVo.class);
     }
 
     @org.springframework.web.bind.annotation.GetMapping("/{id}")
@@ -65,10 +62,6 @@ public class ${ClassName}Controller {
 #end
 
     private static ${responsePackage}.${ClassName}Vo toView(${domainPackage}.${ClassName}Entity row) {
-        return new ${responsePackage}.${ClassName}Vo(
-#foreach($field in $viewFields)
-                #if($field.stringValue)java.util.Objects.toString(row.${field.getter}(), null)#else row.${field.getter}()#end#if($foreach.hasNext),#end
-#end
-        );
+        return dev.mesbase.common.utils.bean.BeanConversions.convert(row, ${responsePackage}.${ClassName}Vo.class);
     }
 }

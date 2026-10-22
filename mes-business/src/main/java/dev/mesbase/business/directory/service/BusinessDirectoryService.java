@@ -1,5 +1,6 @@
 package dev.mesbase.business.directory.service;
 
+import dev.mesbase.common.utils.StringUtils;
 import dev.mesbase.system.domain.SysUserCacheResource;
 
 import dev.mesbase.business.directory.domain.DirectoryStatus;
@@ -269,7 +270,7 @@ public class BusinessDirectoryService {
     @Transactional(transactionManager = "businessTransactionManager", readOnly = true)
     public DirectoryPage<DirectoryLabel> routings(DirectoryQuery query) {
         var filter = new RoutingExample();
-        if (query.keyword() != null && !query.keyword().isBlank()) {
+        if (StringUtils.isNotBlank(query.keyword())) {
             filter.createCriteria().andNameLike("%" + query.keyword() + "%");
             filter.or().andCodeLike("%" + query.keyword() + "%");
         }
@@ -282,7 +283,7 @@ public class BusinessDirectoryService {
     @Transactional(transactionManager = "businessTransactionManager", readOnly = true)
     public DirectoryPage<DirectoryLabel> operations(DirectoryQuery query) {
         var filter = new OperationExample();
-        if (query.keyword() != null && !query.keyword().isBlank()) {
+        if (StringUtils.isNotBlank(query.keyword())) {
             filter.createCriteria().andNameLike("%" + query.keyword() + "%");
             filter.or().andCodeLike("%" + query.keyword() + "%");
         }

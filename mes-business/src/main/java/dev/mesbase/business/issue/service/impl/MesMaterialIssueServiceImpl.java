@@ -1,5 +1,6 @@
 package dev.mesbase.business.issue.service.impl;
 
+import dev.mesbase.business.issue.domain.MesMaterialIssuePage;
 import dev.mesbase.common.validation.ParameterChecks;
 import java.util.Optional;
 
@@ -51,7 +52,7 @@ public class MesMaterialIssueServiceImpl implements IMesMaterialIssueService {
     @Transactional(transactionManager = "businessTransactionManager", readOnly = true)
     @BusinessCache(business = MesMaterialIssueResource.PREFIX,
             type = BusinessCache.Type.LIST)
-    public Page<MesMaterialIssueEntity> selectPage(MesMaterialIssueQueryDto query) {
+    public MesMaterialIssuePage selectPage(MesMaterialIssueQueryDto query) {
         int offset = query.offset() == null ? 0 : query.offset();
         int limit = query.limit() == null ? 20 : query.limit();
         ParameterChecks.paging(offset, limit, 100);
@@ -92,7 +93,7 @@ public class MesMaterialIssueServiceImpl implements IMesMaterialIssueService {
         try (Page<MesMaterialIssueEntity> page = PageHelper.offsetPage(offset, limit)) {
             List<MesMaterialIssueEntity> rows = mapper.selectByExample(example);
             rules.hydrate(rows);
-            return page;
+            return new MesMaterialIssuePage(rows, page.getTotal(), offset, limit);
         }
     }
 

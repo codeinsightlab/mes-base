@@ -1,5 +1,6 @@
 package dev.mesbase.system.service.impl;
 
+import dev.mesbase.common.utils.StringUtils;
 import dev.mesbase.common.core.domain.MessageEvents;
 import dev.mesbase.common.exception.ServiceException;
 import dev.mesbase.common.utils.DateUtils;
@@ -43,11 +44,11 @@ public class SysMessageServiceImpl implements ISysMessageService {
     }
 
     private void validate(SysMessage row) {
-        if (row.getMessageTitle() == null || row.getMessageTitle().isBlank() || row.getMessageTitle()
+        if (StringUtils.isBlank(row.getMessageTitle()) || row.getMessageTitle()
                 .length() > 100 || row.getMessageContent() == null || row.getMessageContent()
                 .isBlank() || row.getMessageContent().length() > 20000 || row.getRecipientId() == null)
             throw new ServiceException("标题、内容和接收人不能为空");
-        if (row.getCallBack() != null && !row.getCallBack().isBlank() && !row.getCallBack()
+        if (StringUtils.isNotBlank(row.getCallBack()) && !row.getCallBack()
                 .matches("/(?!/)[A-Za-z0-9/_?=&.-]{0,250}")) throw new ServiceException("消息回调只能使用系统内路由");
         var recipient = users.selectUserById(row.getRecipientId());
         if (recipient == null || !"0".equals(recipient.getStatus()) || !"0".equals(recipient.getDelFlag()))

@@ -3,6 +3,7 @@ package dev.mesbase.business.production.domain;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
+import dev.mesbase.common.core.page.PageData;
 
 public final class WorkOrderProgress {
     private WorkOrderProgress() {
@@ -29,17 +30,17 @@ public final class WorkOrderProgress {
     }
 
     /**
-     * 明确字段白名单的进度查询结果，ID和数量保持精确字符串表示。
+     * 业务进度计算结果；ID和数量保持原始类型，展示格式由Controller转换。
      */
-    public record Progress(String id, String code, String source, String status, String productCode,
-                           String productName, String unitName, String plannedQty, String completedQty,
-                           String goodOutputGapQty, String scrappedQty, String pendingCompletionQty,
-                           String qualityUntreatedQty, String qualityWaitingReworkQty, String qualityReworkingQty,
-                           String qualityUnverifiedQty, String completionPercent,
+    public record Progress(Long id, String code, String source, String status, String productCode,
+                           String productName, String unitName, BigDecimal plannedQty, BigDecimal completedQty,
+                           BigDecimal goodOutputGapQty, BigDecimal scrappedQty, BigDecimal pendingCompletionQty,
+                           BigDecimal qualityUntreatedQty, BigDecimal qualityWaitingReworkQty, BigDecimal qualityReworkingQty,
+                           BigDecimal qualityUnverifiedQty, BigDecimal completionPercent,
                            long completedExecutions, LocalDateTime lastCompletedAt, String issue,
-                           LocalDateTime createTime, String qualityTransferredQty) {
+                           LocalDateTime createTime, BigDecimal qualityTransferredQty) {
     }
 
-    public record Page(List<Progress> items, long total, int offset, int limit) {
+    public record Page(List<Progress> items, long total, int offset, int limit) implements PageData<Progress> {
     }
 }

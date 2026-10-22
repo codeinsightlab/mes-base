@@ -1,5 +1,6 @@
 package dev.mesbase.business.dv.service;
 
+import dev.mesbase.business.dv.domain.DvSubjectPage;
 import com.github.pagehelper.Page;
 import dev.mesbase.business.dv.domain.DvSubjectCreateCommand;
 import dev.mesbase.business.dv.domain.DvSubjectEntity;
@@ -16,7 +17,7 @@ import java.util.List;
  * @author MES Base
  */
 public interface IDvSubjectService {
-    Page<DvSubjectEntity> selectPage(DvSubjectQueryDto query);
+    DvSubjectPage selectPage(DvSubjectQueryDto query);
 
     DvSubjectEntity selectById(Long id);
 

@@ -1,5 +1,8 @@
 package dev.mesbase.business.wm.service;
 
+import dev.mesbase.core.error.ErrorCode;
+import dev.mesbase.common.validation.ParameterChecks;
+import dev.mesbase.common.core.page.PageData;
 import com.github.pagehelper.PageHelper;
 import dev.mesbase.business.wm.dao.MesWarehouseAcceptanceMapper;
 import dev.mesbase.business.production.domain.ProductionClosureRules;
@@ -23,13 +26,13 @@ public class WarehouseAcceptanceService {
     }
 
 
-    public record Page(List<MesWarehouseAcceptanceEntity> items, long total, int offset, int limit) {
-    }
+
+    public record Page(List<MesWarehouseAcceptanceEntity> items, long total, int offset, int limit) implements PageData<MesWarehouseAcceptanceEntity> { }
 
     @Transactional(transactionManager = "businessTransactionManager", readOnly = true)
     public Page history(String receiptId, int offset, int limit) {
         ProductionClosureRules.uuid(receiptId);
-        devPaging(offset, limit);
+        ParameterChecks.paging(offset, limit);
         var f = new MesWarehouseAcceptanceExample();
         f.createCriteria().andReceiptIdEqualTo(receiptId);
         f.setOrderByClause("recorded_at DESC,id DESC");
@@ -39,7 +42,4 @@ public class WarehouseAcceptanceService {
         }
     }
 
-    private static void devPaging(int offset, int limit) {
-        if (offset < 0 || limit < 1 || limit > 100) ProductionClosureRules.bad();
-    }
 }

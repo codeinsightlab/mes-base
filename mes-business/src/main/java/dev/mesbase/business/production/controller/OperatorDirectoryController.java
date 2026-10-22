@@ -1,5 +1,6 @@
 package dev.mesbase.business.production.controller;
 
+import dev.mesbase.common.core.page.PageData;
 import dev.mesbase.business.production.service.OperationUserDirectory;
 import dev.mesbase.business.production.service.OperatorCandidateService;
 import dev.mesbase.platform.web.EndpointAccess;
@@ -24,7 +25,7 @@ public class OperatorDirectoryController {
     public record Option(String id, String name) {
     }
 
-    public record UserPage(List<Option> items, long total, int offset, int limit) {
+    public record UserPage(List<Option> items, long total, int offset, int limit) implements PageData<Option> {
     }
 
     public record CandidatePage(List<Option> items, int nextOffset, boolean hasMore) {

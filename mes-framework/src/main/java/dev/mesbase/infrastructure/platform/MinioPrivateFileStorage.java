@@ -1,5 +1,6 @@
 package dev.mesbase.infrastructure.platform;
 
+import dev.mesbase.common.utils.StringUtils;
 import dev.mesbase.platform.management.FileStorage;
 import io.minio.*;
 
@@ -13,7 +14,7 @@ public final class MinioPrivateFileStorage implements FileStorage {
     private final String bucket;
 
     public MinioPrivateFileStorage(String endpoint, String accessKey, String secretKey, String bucket) {
-        if (endpoint == null || endpoint.isBlank() || accessKey == null || accessKey.isBlank() || secretKey == null || secretKey.isBlank() || bucket == null || !bucket.matches("[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]"))
+        if (StringUtils.isBlank(endpoint) || StringUtils.isBlank(accessKey) || StringUtils.isBlank(secretKey) || bucket == null || !bucket.matches("[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]"))
             throw new IllegalArgumentException("Explicit Minio configuration required");
         this.client = MinioClient.builder().endpoint(endpoint).credentials(accessKey, secretKey).build();
         this.bucket = bucket;

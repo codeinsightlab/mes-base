@@ -1,5 +1,8 @@
 package dev.mesbase.business.quality.service;
 
+import java.util.Collections;
+import java.util.Arrays;
+import java.util.ArrayList;
 import dev.mesbase.common.validation.ParameterChecks;
 import dev.mesbase.common.utils.StringUtils;
 import java.util.Optional;
@@ -140,7 +143,7 @@ public class ProductionDefectService {
 
     private Result execute(String action, String id, Command c, MesProductionDefectEntity typed,
                            String typedFingerprint) {
-        if (c == null || c.requestKey() == null || c.requestKey().isBlank() || c.requestKey().length() > 64) ParameterChecks.reject(ErrorCode.BAD_REQUEST);
+        if (c == null || StringUtils.isBlank(c.requestKey()) || c.requestKey().length() > 64) ParameterChecks.reject(ErrorCode.BAD_REQUEST);
         if (action.equals(DefectRecordAction.CREATE.getValue())) {
             if (c.expectedRevision() != null || c.revisionReason() != null || c.facts() == null) ParameterChecks.reject(ErrorCode.BAD_REQUEST);
         } else {
@@ -323,7 +326,7 @@ public class ProductionDefectService {
     }
 
     public MesProductionDefectEntity latest(String id) {
-        if (id == null || id.isBlank()) ParameterChecks.reject(ErrorCode.BAD_REQUEST);
+        if (StringUtils.isBlank(id)) ParameterChecks.reject(ErrorCode.BAD_REQUEST);
         var e = new MesProductionDefectExample();
         e.createCriteria().andDeclarationIdEqualTo(id);
         e.setOrderByClause("revision_no desc");
@@ -354,10 +357,13 @@ public class ProductionDefectService {
         var e = new MesProductionDefectExample();
         e.createCriteria().andDeclarationIdEqualTo(id);
         e.setOrderByClause("id desc");
+        List<MesProductionDefectEntity> rows;
+        long total;
         try (var page = PageHelper.offsetPage(offset, limit)) {
-            var rows = mapper.selectByExample(e);
-            return new Page(List.copyOf(rows), page.getTotal(), offset, limit, names(rows), Map.of(), Map.of());
+            rows = List.copyOf(mapper.selectByExample(e));
+            total = page.getTotal();
         }
+        return new Page(rows, total, offset, limit, names(rows), Map.of(), Map.of());
     }
 
     private Names names(List<MesProductionDefectEntity> rows) {
@@ -418,7 +424,7 @@ public class ProductionDefectService {
     public List<Warehouse> warehouses(String keyword) {
         var e = new WmWarehouseExample();
         var c = e.createCriteria().andStatusEqualTo(EnableStatus.ENABLED.getValue());
-        if (keyword != null && !keyword.isBlank()) c.andNameLike("%" + keyword + "%");
+        if (StringUtils.isNotBlank(keyword)) c.andNameLike("%" + keyword + "%");
         e.setOrderByClause("id desc");
         try (var page = PageHelper.offsetPage(0, 50)) {
             return warehouses.selectByExample(e).stream()
@@ -471,7 +477,16 @@ public class ProductionDefectService {
         // Length-prefixed typed fields avoid JSON ordering, decimal scale and delimiter ambiguity.
         var f = normalize(c.facts());
         var b = new StringBuilder();
-        for (Object v : new Object[]{action, id, actor, c.expectedRevision(), StringUtils.trimToNull(c.revisionReason()), Optional.ofNullable(f).map(nullableValue -> nullableValue.executionId()).orElse(null), Optional.ofNullable(f).map(nullableValue -> nullableValue.affectedNodeId()).orElse(null), Optional.ofNullable(f).map(nullableValue -> nullableValue.discoveredNodeId()).orElse(null), Optional.ofNullable(f).map(nullableValue -> nullableValue.responsibleNodeId()).orElse(null), Optional.ofNullable(f).map(nullableValue -> nullableValue.defectQty()).orElse(null), Optional.ofNullable(f).map(nullableValue -> nullableValue.wasteCategory()).orElse(null), Optional.ofNullable(f).map(nullableValue -> nullableValue.defectReason()).orElse(null), Optional.ofNullable(f).map(nullableValue -> nullableValue.responsibleUserId()).orElse(null), Optional.ofNullable(f).map(nullableValue -> nullableValue.responsibilityRemark()).orElse(null), Optional.ofNullable(f).map(nullableValue -> nullableValue.destinationType()).orElse(null), Optional.ofNullable(f).map(nullableValue -> nullableValue.targetNodeId()).orElse(null), Optional.ofNullable(f).map(nullableValue -> nullableValue.targetWarehouseId()).orElse(null), Optional.ofNullable(f).map(nullableValue -> nullableValue.destinationRemark()).orElse(null), Optional.ofNullable(f).map(nullableValue -> nullableValue.occurredAt()).orElse(null), c.assessment()}) {
+        Object[] factFields = new Object[14];
+        if (f != null) {
+            factFields = new Object[]{f.executionId(), f.affectedNodeId(), f.discoveredNodeId(), f.responsibleNodeId(),
+                    f.defectQty(), f.wasteCategory(), f.defectReason(), f.responsibleUserId(), f.responsibilityRemark(),
+                    f.destinationType(), f.targetNodeId(), f.targetWarehouseId(), f.destinationRemark(), f.occurredAt()};
+        }
+        var values = new ArrayList<Object>(Arrays.asList(action, id, actor, c.expectedRevision(), StringUtils.trimToNull(c.revisionReason())));
+        Collections.addAll(values, factFields);
+        values.add(c.assessment());
+        for (Object v : values) {
             String s = Objects.toString(v, null);
             b.append(s == null ? "-1:" : s.length() + ":" + s);
         }

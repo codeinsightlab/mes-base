@@ -1,6 +1,6 @@
-// MES-CODEGEN: scaffold; review required.
 package dev.mesbase.business.wm.domain;
 
+import dev.mesbase.common.core.page.PageData;
 import java.util.List;
 
 /**
@@ -11,6 +11,6 @@ public record WmWarehousePage(
         long total,
         int offset,
         int limit
-) {
+) implements PageData<WmWarehouseEntity> {
 }
 

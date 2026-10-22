@@ -1,7 +1,7 @@
 package dev.mesbase.business.quality.service;
 
 import dev.mesbase.common.validation.ParameterChecks;
-import dev.mesbase.common.utils.StringUtils;
+import org.apache.commons.lang3.StringUtils;
 import java.util.Optional;
 
 import dev.mesbase.business.production.domain.ProductionQuantityInput;
@@ -90,7 +90,7 @@ public class QualityTreatmentService {
     }
 
     public MesProductionDefectEntity latest(String id) {
-        if (id == null || id.isBlank()) ParameterChecks.reject(ErrorCode.QUALITY_TREATMENT_CONFLICT);
+        if (StringUtils.isBlank(id)) ParameterChecks.reject(ErrorCode.QUALITY_TREATMENT_CONFLICT);
         var filter = new MesProductionDefectExample();
         filter.createCriteria().andDeclarationIdEqualTo(id);
         filter.setOrderByClause("revision_no DESC");
@@ -424,7 +424,7 @@ public class QualityTreatmentService {
     }
 
     private void append(MesProductionDefectEntity d, Command c, String fingerprint) {
-        if (c.reason() == null || c.reason().isBlank() || c.reason()
+        if (StringUtils.isBlank(c.reason()) || c.reason()
                 .length() > 500 || c.occurredAt() == null || c.occurredAt().isAfter(LocalDateTime.now())) ParameterChecks.reject(ErrorCode.QUALITY_TREATMENT_CONFLICT);
         var s = summary(d.getDeclarationId());
         if (c.action() == Action.ASSESS) {

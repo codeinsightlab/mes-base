@@ -112,7 +112,7 @@ public class SysMenuServiceImpl implements ISysMenuService {
      * @return 菜单列表
      */
     public List<SysMenu> selectFactoryMenuTree(String username, String factoryId) {
-        if (factoryId == null || factoryId.isBlank()) throw new ServiceException("请选择工厂");
+        if (StringUtils.isBlank(factoryId)) throw new ServiceException("请选择工厂");
         var policy = permissionService.menuPolicy();
         return getChildPerms(menuMapper.selectFactoryMenus(username, factoryId).stream()
                 .filter(menu -> !policy.platform(menu)).toList(), 0);
@@ -327,9 +327,9 @@ public class SysMenuServiceImpl implements ISysMenuService {
             parent = row.getParentId();
         }
         String component = menu.getComponent();
-        if (component != null && !component.isBlank() && !component.matches("[A-Za-z][A-Za-z0-9_/-]{0,199}"))
+        if (StringUtils.isNotBlank(component) && !component.matches("[A-Za-z][A-Za-z0-9_/-]{0,199}"))
             throw new ServiceException("组件必须为已编译页面的路径");
-        if (menu.getQuery() != null && !menu.getQuery().isBlank()) {
+        if (StringUtils.isNotBlank(menu.getQuery())) {
             if (menu.getQuery().length() > 255) throw new ServiceException("路由参数过长");
             try {
                 if (!new ObjectMapper().readTree(menu.getQuery()).isObject()) throw new IllegalArgumentException();

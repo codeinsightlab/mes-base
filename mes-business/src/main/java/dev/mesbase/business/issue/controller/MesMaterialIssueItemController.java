@@ -1,5 +1,6 @@
 package dev.mesbase.business.issue.controller;
 
+import dev.mesbase.common.utils.bean.BeanConversions;
 import com.github.pagehelper.Page;
 import java.util.Objects;
 
@@ -46,10 +47,7 @@ public class MesMaterialIssueItemController {
     @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED,
             permission = MesMaterialIssueItemPermissions.LIST)
     public MesMaterialIssueItemPageVo list(@Valid @ModelAttribute MesMaterialIssueItemQueryDto query) {
-        Page<MesMaterialIssueItemEntity> page = service.selectPage(query);
-        return new MesMaterialIssueItemPageVo(
-                page.stream().map(MesMaterialIssueItemController::toView).toList(),
-                page.getTotal(), (int) page.getStartRow(), page.getPageSize());
+        return BeanConversions.convertPage(service.selectPage(query), MesMaterialIssueItemPageVo.class);
     }
 
     @GetMapping("/{id}")
@@ -86,24 +84,7 @@ public class MesMaterialIssueItemController {
 
 
     private static MesMaterialIssueItemVo toView(MesMaterialIssueItemEntity row) {
-        return new MesMaterialIssueItemVo(
-                Objects.toString(row.getId(), null),
-
-                Objects.toString(row.getIssueId(), null),
-                Objects.toString(row.getMaterialId(), null),
-                row.getMaterialCode(),
-                row.getBatchNo(),
-                Objects.toString(row.getQuantity(), null),
-                Objects.toString(row.getUnitId(), null),
-                row.getUnitCode(),
-                Objects.toString(row.getWarehouseId(), null),
-                row.getWarehouseCode(),
-                row.getRemark(),
-                row.getCreateBy(),
-                row.getCreateTime(),
-                row.getUpdateBy(),
-                row.getUpdateTime()
-        );
+        return BeanConversions.convert(row, MesMaterialIssueItemVo.class);
     }
 }
 

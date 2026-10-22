@@ -1,5 +1,6 @@
 package dev.mesbase.web.view.autocode;
 
+import dev.mesbase.common.utils.bean.BeanConversions;
 import java.util.Objects;
 
 import dev.mesbase.common.core.domain.entity.SysAutoCodeRule;
@@ -11,21 +12,7 @@ public final class SysAutoCodeRuleAssembler {
     }
 
     public static SysAutoCodeRuleResult toResult(SysAutoCodeRule row) {
-        if (row == null) return null;
-        return new SysAutoCodeRuleResult(Objects.toString(row.getRuleId(), null),
-                row.getRuleCode(),
-                row.getRuleName(),
-                row.getRuleDesc(),
-                row.getMaxLength(),
-                row.getIsPadded(),
-                row.getPaddedChar(),
-                row.getPaddedMethod(),
-                row.getEnableFlag(),
-                row.getRemark(),
-                row.getCreateBy(),
-                row.getCreateTime(),
-                row.getUpdateBy(),
-                row.getUpdateTime());
+        return BeanConversions.convert(row, SysAutoCodeRuleResult.class);
     }
 
     public static List<SysAutoCodeRuleResult> toResults(List<SysAutoCodeRule> rows) {

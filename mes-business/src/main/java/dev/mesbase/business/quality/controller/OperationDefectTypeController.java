@@ -1,5 +1,6 @@
 package dev.mesbase.business.quality.controller;
 
+import dev.mesbase.common.utils.bean.BeanConversions;
 import dev.mesbase.business.quality.service.OperationDefectTypeService;
 import dev.mesbase.business.quality.service.OperationDefectTypeService.Input;
 import dev.mesbase.business.quality.domain.OperationDefectTypeEntity;
@@ -36,16 +37,14 @@ public class OperationDefectTypeController {
     }
 
     public static View view(OperationDefectTypeEntity r) {
-        return new View(r.getId().toString(), r.getOperationId().toString(), r.getCode(), r.getName(),
-                r.getDefaultWasteCategory(), r.getStatus(), r.getSort(), r.getRemark(), r.getRevision());
+        return BeanConversions.convert(r, View.class);
     }
 
     @GetMapping
     @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED, permission = "business:operation:defect:type:read")
     public Page page(@PathVariable Long operationId, @RequestParam(defaultValue = "0") int offset,
                      @RequestParam(defaultValue = "20") int limit) {
-        var p = service.page(operationId, false, offset, limit);
-        return new Page(p.items().stream().map(OperationDefectTypeController::view).toList(), p.total(), offset, limit);
+        return BeanConversions.convertPage(service.page(operationId, false, offset, limit), Page.class);
     }
 
     @PostMapping

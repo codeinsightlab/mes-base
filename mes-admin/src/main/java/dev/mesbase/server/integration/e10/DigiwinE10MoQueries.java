@@ -1,5 +1,6 @@
 package dev.mesbase.server.integration.e10;
 
+import dev.mesbase.common.utils.StringUtils;
 import com.lixin.capability.digiwin.e10.E10OapiClient;
 import com.lixin.capability.digiwin.e10.E10Host;
 import com.lixin.capability.digiwin.e10.E10Service;
@@ -104,7 +105,7 @@ public final class DigiwinE10MoQueries implements AutoCloseable {
     }
 
     private static void requiredKey(String value) {
-        if (value == null || value.isBlank() || value.length() > 128)
+        if (StringUtils.isBlank(value) || value.length() > 128)
             throw new IllegalArgumentException("E10 Read requires explicit bounded locator values");
     }
 

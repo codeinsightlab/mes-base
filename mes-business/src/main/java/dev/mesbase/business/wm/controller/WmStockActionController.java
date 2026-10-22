@@ -1,5 +1,6 @@
 package dev.mesbase.business.wm.controller;
 
+import dev.mesbase.common.utils.bean.BeanConversions;
 import com.github.pagehelper.Page;
 import java.util.Objects;
 
@@ -34,10 +35,7 @@ public class WmStockActionController {
     @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED,
             permission = WmStockActionPermissions.LIST)
     public WmStockActionPageVo list(@Valid @ModelAttribute WmStockActionQueryDto query) {
-        Page<WmStockActionEntity> page = service.selectPage(query);
-        return new WmStockActionPageVo(
-                page.stream().map(WmStockActionController::toView).toList(),
-                page.getTotal(), (int) page.getStartRow(), page.getPageSize());
+        return BeanConversions.convertPage(service.selectPage(query), WmStockActionPageVo.class);
     }
 
     @GetMapping("/{id}")
@@ -48,33 +46,7 @@ public class WmStockActionController {
     }
 
     static WmStockActionVo toView(WmStockActionEntity row) {
-        return new WmStockActionVo(
-                row.getId(),
-                row.getRequestHash(),
-                Objects.toString(row.getStockId(), null),
-                Objects.toString(row.getMaterialId(), null),
-                Objects.toString(row.getUnitId(), null),
-                Objects.toString(row.getWarehouseId(), null),
-                row.getBatchNo(),
-                row.getBinCode(),
-                row.getActionType(),
-                Objects.toString(row.getQuantityDelta(), null),
-                Objects.toString(row.getAvailableDelta(), null),
-                Objects.toString(row.getQuantityBefore(), null),
-                Objects.toString(row.getQuantityAfter(), null),
-                Objects.toString(row.getAvailableBefore(), null),
-                Objects.toString(row.getAvailableAfter(), null),
-                row.getSourceType(),
-                row.getSourceId(),
-                row.getReferenceActionId(),
-                Objects.toString(row.getExecutionId(), null),
-                Objects.toString(row.getOperatorUserId(), null),
-                row.getOccurredAt(),
-                row.getRecordedAt(),
-                row.getReason(),
-                Objects.toString(row.getDocumentLineId(), null),
-                row.getOperationId()
-        );
+        return BeanConversions.convert(row, WmStockActionVo.class);
     }
 }
 

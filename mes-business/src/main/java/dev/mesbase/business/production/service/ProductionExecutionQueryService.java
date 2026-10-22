@@ -5,7 +5,7 @@ import dev.mesbase.business.production.domain.MesProductionExecutionEntity;
 import dev.mesbase.business.production.domain.MesProductionExecutionQueryDto;
 import dev.mesbase.business.directory.domain.DirectoryLabel;
 import java.util.List;
-import com.github.pagehelper.Page;
+import dev.mesbase.business.production.domain.MesProductionExecutionPage;
 import dev.mesbase.business.production.dao.WorkorderMapper;
 import dev.mesbase.business.production.domain.WorkorderExample;
 import java.util.stream.Collectors;
@@ -27,7 +27,7 @@ public class ProductionExecutionQueryService {
 
     public record References(Map<Long, DirectoryLabel> routings, Map<Long, DirectoryLabel> users, Map<Long, String> workorderStatuses) { }
 
-    public record Search(Page<MesProductionExecutionEntity> records, References references) { }
+    public record Search(MesProductionExecutionPage records, References references) { }
 
 
     private final IMesProductionExecutionService executions;
@@ -44,7 +44,7 @@ public class ProductionExecutionQueryService {
     @Transactional(transactionManager = "businessTransactionManager", readOnly = true)
     public Search page(MesProductionExecutionQueryDto query) {
         var page = executions.selectPage(query); // Retains the existing guarded page cache.
-        return new Search(page, references(page));
+        return new Search(page, references(page.items()));
     }
 
     @Transactional(transactionManager = "businessTransactionManager", readOnly = true)

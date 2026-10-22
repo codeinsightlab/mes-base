@@ -1,5 +1,7 @@
 package dev.mesbase.business.production.service;
 
+import dev.mesbase.common.core.page.PageData;
+import dev.mesbase.common.utils.StringUtils;
 import com.github.pagehelper.Page;
 import com.github.pagehelper.PageHelper;
 import dev.mesbase.core.error.ErrorCode;
@@ -35,7 +37,7 @@ public class OperationUserDirectory {
         this.users = users;
     }
 
-    public record UserPage(List<UserOption> items, long total, int offset, int limit) {
+    public record UserPage(List<UserOption> items, long total, int offset, int limit) implements PageData<UserOption> {
     }
 
     @Transactional(transactionManager = "masterTransactionManager", readOnly = true)
@@ -71,8 +73,7 @@ public class OperationUserDirectory {
         try {
             var menuRows = menuMapper.selectMenuList(new SysMenu());
             var policy = new MenuScopePolicy(menuRows);
-            var ids = menuRows.stream().filter(m -> "0".equals(m.getStatus()) && m.getPerms() != null
-                    && !m.getPerms().isBlank() && !policy.platform(m)).map(SysMenu::getMenuId).toList();
+            var ids = menuRows.stream().filter(m -> "0".equals(m.getStatus()) && StringUtils.isNotBlank(m.getPerms()) && !policy.platform(m)).map(SysMenu::getMenuId).toList();
             if (ids.isEmpty()) return new UserPage(List.of(), 0, offset, limit);
             try (Page<UserOption> page = PageHelper.offsetPage(offset, limit, count)) {
                 var rows = userMapper.select(factory, id, keyword, ids, userIds);

@@ -1,5 +1,6 @@
 package dev.mesbase.business.basic.service.impl;
 
+import dev.mesbase.business.basic.domain.WorkstationPage;
 import dev.mesbase.common.validation.ParameterChecks;
 import com.github.pagehelper.Page;
 import com.github.pagehelper.PageHelper;
@@ -69,7 +70,7 @@ public class WorkstationServiceImpl implements IWorkstationService {
     @Transactional(transactionManager = "businessTransactionManager", readOnly = true)
     @BusinessCache(business = WorkstationResource.PREFIX,
             type = BusinessCache.Type.LIST)
-    public Page<WorkstationEntity> selectPage(WorkstationQueryDto query) {
+    public WorkstationPage selectPage(WorkstationQueryDto query) {
         int offset = query.offset() == null ? 0 : query.offset();
         int limit = query.limit() == null ? 20 : query.limit();
         ParameterChecks.paging(offset, limit, 100);
@@ -92,8 +93,8 @@ public class WorkstationServiceImpl implements IWorkstationService {
         }
         example.setOrderByClause("id desc");
         try (Page<WorkstationEntity> page = PageHelper.offsetPage(offset, limit)) {
-            mapper.selectByExample(example);
-            return page;
+            List<WorkstationEntity> rows = mapper.selectByExample(example);
+            return new WorkstationPage(rows, page.getTotal(), offset, limit);
         }
     }
 

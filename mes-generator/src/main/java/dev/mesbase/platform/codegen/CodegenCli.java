@@ -1,5 +1,6 @@
 package dev.mesbase.platform.codegen;
 
+import dev.mesbase.common.utils.StringUtils;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -68,7 +69,7 @@ public final class CodegenCli {
                         .orElseThrow(() -> new CodegenException(CodegenException.Code.UNKNOWN_DATASOURCE));
                 Map<String, DataSource> sources = new HashMap<>();
                 if (settings.profiles() != null) settings.profiles().forEach((name, p) -> {
-                    if (p.url() == null || p.url().isBlank()) {
+                    if (StringUtils.isBlank(p.url())) {
                         sources.put(name, new AbstractDataSource() {
                             public Connection getConnection() throws SQLException {
                                 throw new SQLException("Developer profile unavailable");
@@ -84,7 +85,7 @@ public final class CodegenCli {
                             .matches(".*(password|pwd|secret)=.*"))
                         throw new CodegenException(CodegenException.Code.INVALID_REQUEST);
                     var ds = new DriverManagerDataSource();
-                    if (p.driverClassName() != null && !p.driverClassName().isBlank())
+                    if (StringUtils.isNotBlank(p.driverClassName()))
                         ds.setDriverClassName(p.driverClassName());
                     ds.setUrl(p.url());
                     ds.setUsername(p.username());
@@ -123,7 +124,7 @@ public final class CodegenCli {
 
     private static String required(Map<String, String> flags, String key) {
         String value = flags.get(key);
-        if (value == null || value.isBlank()) throw new CodegenException(CodegenException.Code.INVALID_REQUEST);
+        if (StringUtils.isBlank(value)) throw new CodegenException(CodegenException.Code.INVALID_REQUEST);
         return value;
     }
 

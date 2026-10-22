@@ -1,5 +1,6 @@
 package dev.mesbase.business.production.service;
 
+import dev.mesbase.business.production.domain.RoutingPage;
 import com.github.pagehelper.Page;
 import dev.mesbase.business.production.domain.RoutingCreateCommand;
 import dev.mesbase.business.production.domain.RoutingEntity;
@@ -21,7 +22,7 @@ import dev.mesbase.business.production.domain.RoutingCopyCommand;
  * @author MES Base
  */
 public interface IRoutingService {
-    Page<RoutingEntity> selectPage(RoutingQueryDto query);
+    RoutingPage selectPage(RoutingQueryDto query);
 
     RoutingEntity insert(RoutingCreateCommand input);
 

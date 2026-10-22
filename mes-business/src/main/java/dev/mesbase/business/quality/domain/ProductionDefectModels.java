@@ -12,6 +12,7 @@ import jakarta.validation.constraints.PastOrPresent;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
+import dev.mesbase.common.core.page.PageData;
 import java.util.Map;
 
 public final class ProductionDefectModels {
@@ -45,7 +46,7 @@ public final class ProductionDefectModels {
     }
 
     public record Page(List<MesProductionDefectEntity> items, long total, int offset, int limit, Names names,
-                       Map<String, Summary> treatments, Map<String, ListContext> contexts) {
+                       Map<String, Summary> treatments, Map<String, ListContext> contexts) implements PageData<MesProductionDefectEntity> {
     }
 
     public record NodeTotal(Long affectedNodeId, BigDecimal effectiveDefectQty, BigDecimal recoveredQty,

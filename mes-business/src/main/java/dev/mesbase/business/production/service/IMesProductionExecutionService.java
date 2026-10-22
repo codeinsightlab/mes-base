@@ -1,5 +1,6 @@
 package dev.mesbase.business.production.service;
 
+import dev.mesbase.business.production.domain.MesProductionExecutionPage;
 import com.github.pagehelper.Page;
 import dev.mesbase.business.production.domain.MesProductionExecutionCreateCommand;
 import dev.mesbase.business.production.domain.MesProductionExecutionEntity;
@@ -13,7 +14,7 @@ import java.util.List;
  * @author MES Base
  */
 public interface IMesProductionExecutionService {
-    Page<MesProductionExecutionEntity> selectPage(MesProductionExecutionQueryDto query);
+    MesProductionExecutionPage selectPage(MesProductionExecutionQueryDto query);
 
     MesProductionExecutionEntity selectById(Long id);
 

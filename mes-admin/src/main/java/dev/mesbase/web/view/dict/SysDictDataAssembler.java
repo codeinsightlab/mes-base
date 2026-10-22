@@ -1,5 +1,6 @@
 package dev.mesbase.web.view.dict;
 
+import dev.mesbase.common.utils.bean.BeanConversions;
 import java.util.Objects;
 
 import dev.mesbase.common.core.domain.entity.SysDictData;
@@ -11,21 +12,7 @@ public final class SysDictDataAssembler {
     }
 
     public static SysDictDataResult toResult(SysDictData row) {
-        if (row == null) return null;
-        return new SysDictDataResult(Objects.toString(row.getDictCode(), null),
-                row.getDictSort(),
-                row.getDictLabel(),
-                row.getDictValue(),
-                row.getDictType(),
-                row.getCssClass(),
-                row.getListClass(),
-                row.getIsDefault(),
-                row.getStatus(),
-                row.getCreateBy(),
-                row.getCreateTime(),
-                row.getUpdateBy(),
-                row.getUpdateTime(),
-                row.getRemark());
+        return BeanConversions.convert(row, SysDictDataResult.class);
     }
 
     public static List<SysDictDataResult> toResults(List<SysDictData> rows) {

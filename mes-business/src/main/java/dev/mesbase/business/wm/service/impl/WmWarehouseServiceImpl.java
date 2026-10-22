@@ -1,5 +1,6 @@
 package dev.mesbase.business.wm.service.impl;
 
+import dev.mesbase.business.wm.domain.WmWarehousePage;
 import dev.mesbase.common.validation.ParameterChecks;
 import java.util.Optional;
 
@@ -89,7 +90,7 @@ public class WmWarehouseServiceImpl implements IWmWarehouseService {
     @Transactional(transactionManager = "businessTransactionManager", readOnly = true)
     @BusinessCache(business = WmWarehouseResource.PREFIX,
             type = BusinessCache.Type.LIST)
-    public Page<WmWarehouseEntity> selectPage(WmWarehouseQueryDto query) {
+    public WmWarehousePage selectPage(WmWarehouseQueryDto query) {
         int offset = query.offset() == null ? 0 : query.offset();
         int limit = query.limit() == null ? 20 : query.limit();
         ParameterChecks.paging(offset, limit, 100);
@@ -110,8 +111,8 @@ public class WmWarehouseServiceImpl implements IWmWarehouseService {
         if (query.source() != null) criteria.andSourceEqualTo(BusinessSourceRules.required(query.source()).getValue());
         example.setOrderByClause("id desc");
         try (Page<WmWarehouseEntity> page = PageHelper.offsetPage(offset, limit)) {
-            mapper.selectByExample(example);
-            return page;
+            List<WmWarehouseEntity> rows = mapper.selectByExample(example);
+            return new WmWarehousePage(rows, page.getTotal(), offset, limit);
         }
     }
 

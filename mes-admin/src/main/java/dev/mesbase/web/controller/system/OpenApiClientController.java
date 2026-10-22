@@ -1,5 +1,11 @@
 package dev.mesbase.web.controller.system;
 
+import dev.mesbase.common.utils.bean.BeanConversions;
+import dev.mesbase.system.openapi.domain.OpenApiClientStatus;
+import dev.mesbase.system.openapi.domain.OpenApiClient;
+import dev.mesbase.system.openapi.vo.OpenApiSecretVo;
+import dev.mesbase.system.openapi.vo.OpenApiClientVo;
+import dev.mesbase.system.openapi.vo.OpenApiClientPageVo;
 import dev.mesbase.common.core.domain.AjaxResult;
 import dev.mesbase.framework.openapi.OpenApiCatalogService;
 import dev.mesbase.framework.openapi.OpenApiDataScopeVerification;
@@ -49,19 +55,19 @@ public class OpenApiClientController {
     @PostMapping
     public AjaxResult create(@Valid @RequestBody OpenApiClientCreateRequest request, HttpServletResponse response) {
         response.setHeader("Cache-Control", "no-store");
-        return AjaxResult.success(service.create(request));
+        return AjaxResult.success(secretVo(service.create(request)));
     }
 
     @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED, permissionScope = EndpointAccess.PermissionScope.PLATFORM, permission = "system:openApiClient:list")
     @GetMapping
     public AjaxResult list(@Valid OpenApiClientListRequest request) {
-        return AjaxResult.success(service.list(request));
+        return AjaxResult.success(BeanConversions.convertPage(service.list(request), OpenApiClientPageVo.class));
     }
 
     @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED, permissionScope = EndpointAccess.PermissionScope.PLATFORM, permission = "system:openApiClient:query")
     @GetMapping("/{clientId}")
     public AjaxResult detail(@PathVariable Long clientId) {
-        return AjaxResult.success(service.detail(clientId));
+        return AjaxResult.success(toVo(service.detail(clientId)));
     }
 
     @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED, permissionScope = EndpointAccess.PermissionScope.PLATFORM, permission = "system:openApiClient:edit")
@@ -75,7 +81,7 @@ public class OpenApiClientController {
     @PostMapping("/reset-secret")
     public AjaxResult reset(@Valid @RequestBody OpenApiClientIdRequest request, HttpServletResponse response) {
         response.setHeader("Cache-Control", "no-store");
-        return AjaxResult.success(service.resetSecret(request));
+        return AjaxResult.success(secretVo(service.resetSecret(request)));
     }
 
     @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED, permissionScope = EndpointAccess.PermissionScope.PLATFORM, permission = "system:openApiClient:query")
@@ -98,5 +104,14 @@ public class OpenApiClientController {
     }
 
     public record DataScopeStatus(boolean enabled) {
+    }
+    private static OpenApiSecretVo secretVo(OpenApiClientService.IssuedSecret issued) {
+        return BeanConversions.convert(issued, OpenApiSecretVo.class);
+    }
+
+    private record StatusLabel(String statusName) { }
+
+    private static OpenApiClientVo toVo(OpenApiClient client) {
+        return BeanConversions.convertWith(client, new StatusLabel(OpenApiClientStatus.fromCode(client.getStatus()).getName()), OpenApiClientVo.class);
     }
 }

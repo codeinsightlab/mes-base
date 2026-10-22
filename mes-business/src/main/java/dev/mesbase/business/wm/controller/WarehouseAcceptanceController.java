@@ -1,5 +1,6 @@
 package dev.mesbase.business.wm.controller;
 
+import dev.mesbase.common.utils.bean.BeanConversions;
 import dev.mesbase.business.wm.service.WarehouseAcceptanceService;
 import dev.mesbase.business.wm.domain.MesWarehouseAcceptanceEntity;
 import dev.mesbase.platform.web.EndpointAccess;
@@ -34,14 +35,10 @@ public class WarehouseAcceptanceController {
     @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED, permission = "business:wm:acceptance:read")
     public Page history(@PathVariable String id, @RequestParam(defaultValue = "0") int offset,
                         @RequestParam(defaultValue = "20") int limit) {
-        var p = service.history(id, offset, limit);
-        return new Page(p.items().stream().map(WarehouseAcceptanceController::view).toList(), p.total(), offset, limit);
+        return BeanConversions.convertPage(service.history(id, offset, limit), Page.class);
     }
 
     private static Fact view(MesWarehouseAcceptanceEntity r) {
-        return new Fact(r.getId(), r.getReceiptId(), r.getExecutionId().toString(), r.getProductId()
-                .toString(), r.getStockId().toString(), r.getQuantityDelta()
-                .toPlainString(), r.getReferenceId(), r.getStockActionId(), r.getOperatorUserId()
-                .toString(), r.getRecordedAt(), r.getReason());
+        return BeanConversions.convert(r, Fact.class);
     }
 }

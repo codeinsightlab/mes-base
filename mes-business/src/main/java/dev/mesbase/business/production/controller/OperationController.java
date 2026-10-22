@@ -1,5 +1,6 @@
 package dev.mesbase.business.production.controller;
 
+import dev.mesbase.common.utils.bean.BeanConversions;
 import com.github.pagehelper.Page;
 import java.util.Objects;
 
@@ -48,10 +49,7 @@ public class OperationController {
     @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED,
             permission = OperationPermissions.LIST)
     public OperationPageVo list(@Valid @ModelAttribute OperationQueryDto query) {
-        Page<OperationEntity> page = service.selectPage(query);
-        return new OperationPageVo(
-                page.stream().map(OperationController::toView).toList(),
-                page.getTotal(), (int) page.getStartRow(), page.getPageSize());
+        return BeanConversions.convertPage(service.selectPage(query), OperationPageVo.class);
     }
 
     @GetMapping("/{id}")
@@ -94,17 +92,7 @@ public class OperationController {
     }
 
     private static OperationVo toView(OperationEntity row) {
-        return new OperationVo(
-                Objects.toString(row.getId(), null),
-
-                row.getCode(),
-                row.getName(),
-                row.getDescription(),
-                row.getStatus(),
-                row.getSort(),
-                row.getExternalId(),
-                row.getRevision()
-        );
+        return BeanConversions.convert(row, OperationVo.class);
     }
 }
 

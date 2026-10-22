@@ -1,5 +1,6 @@
 package dev.mesbase.business.basic.service.impl;
 
+import dev.mesbase.business.basic.domain.WorkshopPage;
 import dev.mesbase.common.validation.ParameterChecks;
 import com.github.pagehelper.Page;
 import com.github.pagehelper.PageHelper;
@@ -68,7 +69,7 @@ public class WorkshopServiceImpl implements IWorkshopService {
     @Transactional(transactionManager = "businessTransactionManager", readOnly = true)
     @BusinessCache(business = WorkshopResource.PREFIX,
             type = BusinessCache.Type.LIST)
-    public Page<WorkshopEntity> selectPage(WorkshopQueryDto query) {
+    public WorkshopPage selectPage(WorkshopQueryDto query) {
         int offset = query.offset() == null ? 0 : query.offset();
         int limit = query.limit() == null ? 20 : query.limit();
         ParameterChecks.paging(offset, limit, 100);
@@ -88,8 +89,8 @@ public class WorkshopServiceImpl implements IWorkshopService {
         }
         example.setOrderByClause("id desc");
         try (Page<WorkshopEntity> page = PageHelper.offsetPage(offset, limit)) {
-            mapper.selectByExample(example);
-            return page;
+            List<WorkshopEntity> rows = mapper.selectByExample(example);
+            return new WorkshopPage(rows, page.getTotal(), offset, limit);
         }
     }
 

@@ -1,8 +1,10 @@
 package dev.mesbase.system.openapi.vo;
 
 import java.util.List;
+import com.fasterxml.jackson.annotation.JsonAlias;
 
 public class OpenApiClientPageVo {
+    @JsonAlias("items")
     private List<OpenApiClientVo> list;
     private long total;
 

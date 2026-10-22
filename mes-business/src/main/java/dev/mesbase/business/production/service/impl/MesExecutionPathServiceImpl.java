@@ -1,5 +1,6 @@
 package dev.mesbase.business.production.service.impl;
 
+import dev.mesbase.business.production.domain.MesExecutionPathPage;
 import dev.mesbase.common.validation.ParameterChecks;
 import com.github.pagehelper.Page;
 import com.github.pagehelper.PageHelper;
@@ -38,7 +39,7 @@ public class MesExecutionPathServiceImpl implements IMesExecutionPathService {
     @Transactional(transactionManager = "businessTransactionManager", readOnly = true)
     @BusinessCache(business = MesExecutionPathResource.PREFIX,
             type = BusinessCache.Type.LIST)
-    public Page<MesExecutionPathEntity> selectPage(MesExecutionPathQueryDto query) {
+    public MesExecutionPathPage selectPage(MesExecutionPathQueryDto query) {
         int offset = query.offset() == null ? 0 : query.offset();
         int limit = query.limit() == null ? 20 : query.limit();
         ParameterChecks.paging(offset, limit, 100);
@@ -61,8 +62,8 @@ public class MesExecutionPathServiceImpl implements IMesExecutionPathService {
         }
         example.setOrderByClause("id");
         try (Page<MesExecutionPathEntity> page = PageHelper.offsetPage(offset, limit)) {
-            mapper.selectByExample(example);
-            return page;
+            List<MesExecutionPathEntity> rows = mapper.selectByExample(example);
+            return new MesExecutionPathPage(rows, page.getTotal(), offset, limit);
         }
     }
 

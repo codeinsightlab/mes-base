@@ -1,5 +1,6 @@
 package dev.mesbase.platform.web;
 
+import dev.mesbase.common.utils.StringUtils;
 import dev.mesbase.core.error.FoundationException;
 import dev.mesbase.common.exception.ServiceException;
 import dev.mesbase.framework.openapi.OpenApiHttp;
@@ -56,7 +57,7 @@ public final class HttpFailureLogging {
     }
 
     private static boolean unavailable(String value) {
-        return value == null || value.isBlank() || value.codePoints().anyMatch(Character::isISOControl);
+        return StringUtils.isBlank(value) || value.codePoints().anyMatch(Character::isISOControl);
     }
 
     private static String rootCauseOrigin(Throwable failure) {

@@ -1,5 +1,6 @@
 package dev.mesbase.business.production.service.impl;
 
+import dev.mesbase.business.production.domain.WorkorderErpExtraPage;
 import dev.mesbase.common.validation.ParameterChecks;
 import com.github.pagehelper.Page;
 import com.github.pagehelper.PageHelper;
@@ -38,7 +39,7 @@ public class WorkorderErpExtraServiceImpl implements IWorkorderErpExtraService {
     @Transactional(transactionManager = "businessTransactionManager", readOnly = true)
     @BusinessCache(business = WorkorderErpExtraResource.PREFIX,
             type = BusinessCache.Type.LIST)
-    public Page<WorkorderErpExtraEntity> selectPage(WorkorderErpExtraQueryDto query) {
+    public WorkorderErpExtraPage selectPage(WorkorderErpExtraQueryDto query) {
         int offset = query.offset() == null ? 0 : query.offset();
         int limit = query.limit() == null ? 20 : query.limit();
         ParameterChecks.paging(offset, limit, 100);
@@ -55,8 +56,8 @@ public class WorkorderErpExtraServiceImpl implements IWorkorderErpExtraService {
         }
         example.setOrderByClause("id");
         try (Page<WorkorderErpExtraEntity> page = PageHelper.offsetPage(offset, limit)) {
-            mapper.selectByExample(example);
-            return page;
+            List<WorkorderErpExtraEntity> rows = mapper.selectByExample(example);
+            return new WorkorderErpExtraPage(rows, page.getTotal(), offset, limit);
         }
     }
 

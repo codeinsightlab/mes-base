@@ -1,5 +1,6 @@
 package dev.mesbase.web.view.file;
 
+import dev.mesbase.common.utils.bean.BeanConversions;
 import java.util.Objects;
 
 import dev.mesbase.system.domain.SysAttachment;
@@ -11,20 +12,7 @@ public final class SysAttachmentAssembler {
     }
 
     public static SysAttachmentResult toResult(SysAttachment r) {
-        if (r == null) return null;
-        return new SysAttachmentResult(String.valueOf(r.getAttachmentId()),
-                Objects.toString(r.getSourceDocId(), null),
-                r.getSourceDocType(),
-                r.getFileId(),
-                r.getFileUrl(),
-                r.getFileName(),
-                r.getOrignalName(),
-                r.getFileType(),
-                r.getFileSize(),
-                String.valueOf(r.getOwnerId()),
-                r.getFactoryId(),
-                r.getResource(),
-                r.getCreateTime());
+        return BeanConversions.convert(r, SysAttachmentResult.class);
     }
 
     public static List<SysAttachmentResult> toResults(List<SysAttachment> rows) {

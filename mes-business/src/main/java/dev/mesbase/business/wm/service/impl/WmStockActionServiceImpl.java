@@ -1,5 +1,6 @@
 package dev.mesbase.business.wm.service.impl;
 
+import dev.mesbase.business.wm.domain.WmStockActionPage;
 import dev.mesbase.common.validation.ParameterChecks;
 import com.github.pagehelper.Page;
 import com.github.pagehelper.PageHelper;
@@ -31,7 +32,7 @@ public class WmStockActionServiceImpl implements IWmStockActionService {
 
     @Override
     @Transactional(transactionManager = "businessTransactionManager", readOnly = true)
-    public Page<WmStockActionEntity> selectPage(WmStockActionQueryDto query) {
+    public WmStockActionPage selectPage(WmStockActionQueryDto query) {
         int offset = query.offset() == null ? 0 : query.offset();
         int limit = query.limit() == null ? 20 : query.limit();
         ParameterChecks.paging(offset, limit, 100);
@@ -105,8 +106,8 @@ public class WmStockActionServiceImpl implements IWmStockActionService {
         }
         example.setOrderByClause("recorded_at DESC,id DESC");
         try (Page<WmStockActionEntity> page = PageHelper.offsetPage(offset, limit)) {
-            mapper.selectByExample(example);
-            return page;
+            List<WmStockActionEntity> rows = mapper.selectByExample(example);
+            return new WmStockActionPage(rows, page.getTotal(), offset, limit);
         }
     }
 

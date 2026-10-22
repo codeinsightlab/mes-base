@@ -1,5 +1,6 @@
 package dev.mesbase.business.basic.service;
 
+import dev.mesbase.business.basic.domain.WorkstationPage;
 import com.github.pagehelper.Page;
 import dev.mesbase.business.basic.domain.WorkstationCreateCommand;
 import dev.mesbase.business.basic.domain.WorkstationEntity;
@@ -16,7 +17,7 @@ import java.util.List;
  * @author MES Base
  */
 public interface IWorkstationService {
-    Page<WorkstationEntity> selectPage(WorkstationQueryDto query);
+    WorkstationPage selectPage(WorkstationQueryDto query);
 
     WorkstationEntity selectById(Long id);
 

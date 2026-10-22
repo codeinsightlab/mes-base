@@ -1,5 +1,6 @@
 package dev.mesbase.web.view.post;
 
+import dev.mesbase.common.utils.bean.BeanConversions;
 import java.util.Optional;
 
 import java.util.Objects;
@@ -13,18 +14,7 @@ public final class SysPostAssembler {
     }
 
     public static SysPostResult toResult(SysPost row) {
-        if (row == null) return null;
-        return new SysPostResult(Objects.toString(row.getPostId(), null),
-                row.getPostCode(),
-                row.getPostName(),
-                Optional.ofNullable(row.getPostSort()).map(nullableValue -> Integer.valueOf(nullableValue)).orElse(null),
-                row.getStatus(),
-                row.isFlag(),
-                row.getCreateBy(),
-                row.getCreateTime(),
-                row.getUpdateBy(),
-                row.getUpdateTime(),
-                row.getRemark());
+        return BeanConversions.convert(row, SysPostResult.class);
     }
 
     public static List<SysPostResult> toResults(List<SysPost> rows) {

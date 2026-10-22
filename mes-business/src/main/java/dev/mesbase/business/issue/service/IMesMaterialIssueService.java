@@ -1,5 +1,6 @@
 package dev.mesbase.business.issue.service;
 
+import dev.mesbase.business.issue.domain.MesMaterialIssuePage;
 import com.github.pagehelper.Page;
 import dev.mesbase.business.issue.domain.MesMaterialIssueCreateCommand;
 import dev.mesbase.business.issue.domain.MesMaterialIssueEntity;
@@ -13,7 +14,7 @@ import java.util.List;
  * @author MES Base
  */
 public interface IMesMaterialIssueService {
-    Page<MesMaterialIssueEntity> selectPage(MesMaterialIssueQueryDto query);
+    MesMaterialIssuePage selectPage(MesMaterialIssueQueryDto query);
 
     MesMaterialIssueEntity selectById(Long id);
 

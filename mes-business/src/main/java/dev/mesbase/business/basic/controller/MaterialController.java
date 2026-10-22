@@ -1,5 +1,6 @@
 package dev.mesbase.business.basic.controller;
 
+import dev.mesbase.common.utils.bean.BeanConversions;
 import com.github.pagehelper.Page;
 import java.util.Objects;
 
@@ -48,10 +49,7 @@ public class MaterialController {
     @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED,
             permission = MaterialPermissions.LIST)
     public MaterialPageVo list(@Valid @ModelAttribute MaterialQueryDto query) {
-        Page<MaterialEntity> page = service.selectPage(query);
-        return new MaterialPageVo(
-                page.stream().map(MaterialController::toView).toList(),
-                page.getTotal(), (int) page.getStartRow(), page.getPageSize());
+        return BeanConversions.convertPage(service.selectPage(query), MaterialPageVo.class);
     }
 
     @GetMapping("/{id}")
@@ -94,19 +92,7 @@ public class MaterialController {
     }
 
     private static MaterialVo toView(MaterialEntity row) {
-        return new MaterialVo(
-                Objects.toString(row.getId(), null),
-
-                row.getCode(),
-                row.getName(),
-                row.getSpecification(),
-                Objects.toString(row.getCategoryId(), null),
-                Objects.toString(row.getUnitId(), null),
-                row.getMaterialType(),
-                row.getStatus(),
-                row.getExternalId(),
-                row.getExternalCode()
-        );
+        return BeanConversions.convert(row, MaterialVo.class);
     }
 }
 

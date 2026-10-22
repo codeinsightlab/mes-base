@@ -9,6 +9,7 @@ import jakarta.validation.constraints.PastOrPresent;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
+import dev.mesbase.common.core.page.PageData;
 import java.util.Map;
 import java.util.UUID;
 
@@ -109,7 +110,7 @@ public final class ProductionReportModels {
     }
 
     public record ReportPage(List<MesProductionReportEntity> items, long total, int offset, int limit,
-                             Map<Long, String> userNames) {
+                             Map<Long, String> userNames) implements PageData<MesProductionReportEntity> {
     }
 
     public record ExecutionPage(List<ExecutionSummary> items, long total, int offset, int limit,

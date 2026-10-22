@@ -1,5 +1,6 @@
 package dev.mesbase.server.managed;
 
+import dev.mesbase.common.utils.StringUtils;
 import java.util.Optional;
 
 import dev.mesbase.core.error.ErrorCode;
@@ -68,8 +69,8 @@ public final class FactoryIntegrationRegistry {
         if (!connection.enabled() || connection.revision() < 1 || connection.provider() == null
                 || !connection.provider()
                 .matches("[A-Za-z0-9_-]{1,128}") || "local".equalsIgnoreCase(connection.provider())
-                || connection.organization() == null || connection.organization().isBlank()
-                || connection.credentialReference() == null || connection.credentialReference().isBlank()
+                || StringUtils.isBlank(connection.organization())
+                || StringUtils.isBlank(connection.credentialReference())
                 || connection.serviceUrl() == null) return false;
         try {
             var uri = URI.create(connection.serviceUrl());
@@ -80,7 +81,7 @@ public final class FactoryIntegrationRegistry {
         }
         // Reference resolves only on the server. Its value is never copied into any view or snapshot.
         String credential = environment.getProperty(connection.credentialReference());
-        return credential != null && !credential.isBlank();
+        return StringUtils.isNotBlank(credential);
     }
 
     public FactoryIntegrationSnapshot snapshot(ManagedFactory factory) {
@@ -93,8 +94,8 @@ public final class FactoryIntegrationRegistry {
         if (mode == FactoryRuntimeMode.LOCAL)
             return new FactoryIntegrationSnapshot(new FactoryId(factory.factoryId()), mode, factory.erpProvider(),
                     factory.erpConfigRef(), factory.integrationRevision(), null);
-        if (factory.erpProvider() == null || factory.erpProvider().isBlank()
-                || factory.erpConfigRef() == null || factory.erpConfigRef().isBlank())
+        if (StringUtils.isBlank(factory.erpProvider())
+                || StringUtils.isBlank(factory.erpConfigRef()))
             throw new FoundationException(ErrorCode.INTEGRATION_NOT_CONFIGURED);
         if (DigiwinE10MoQueries.PROVIDER.equals(factory.erpProvider())) {
             var configured = Optional.ofNullable(oapi).map(nullableValue -> nullableValue.connection(factory.factoryId())).orElse(null);

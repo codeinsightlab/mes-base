@@ -1,5 +1,6 @@
 package dev.mesbase.business.production.service.impl;
 
+import dev.mesbase.business.production.domain.MesExecutionCompletionPage;
 import dev.mesbase.common.validation.ParameterChecks;
 import com.github.pagehelper.Page;
 import com.github.pagehelper.PageHelper;
@@ -33,7 +34,7 @@ public class MesExecutionCompletionServiceImpl implements IMesExecutionCompletio
     @Transactional(transactionManager = "businessTransactionManager", readOnly = true)
     @BusinessCache(business = MesExecutionCompletionResource.PREFIX,
             type = BusinessCache.Type.LIST)
-    public Page<MesExecutionCompletionEntity> selectPage(MesExecutionCompletionQueryDto query) {
+    public MesExecutionCompletionPage selectPage(MesExecutionCompletionQueryDto query) {
         int offset = query.offset() == null ? 0 : query.offset();
         int limit = query.limit() == null ? 20 : query.limit();
         ParameterChecks.paging(offset, limit, 100);
@@ -71,8 +72,8 @@ public class MesExecutionCompletionServiceImpl implements IMesExecutionCompletio
         }
         example.setOrderByClause("id");
         try (Page<MesExecutionCompletionEntity> page = PageHelper.offsetPage(offset, limit)) {
-            mapper.selectByExample(example);
-            return page;
+            List<MesExecutionCompletionEntity> rows = mapper.selectByExample(example);
+            return new MesExecutionCompletionPage(rows, page.getTotal(), offset, limit);
         }
     }
 

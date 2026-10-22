@@ -1,5 +1,6 @@
 package dev.mesbase.business.basic.service.impl;
 
+import dev.mesbase.business.basic.domain.SafetyStockPage;
 import dev.mesbase.common.validation.ParameterChecks;
 import com.github.pagehelper.Page;
 import com.github.pagehelper.PageHelper;
@@ -68,7 +69,7 @@ public class SafetyStockServiceImpl implements ISafetyStockService {
     @Transactional(transactionManager = "businessTransactionManager", readOnly = true)
     @BusinessCache(business = SafetyStockResource.PREFIX,
             type = BusinessCache.Type.LIST)
-    public Page<SafetyStockEntity> selectPage(SafetyStockQueryDto query) {
+    public SafetyStockPage selectPage(SafetyStockQueryDto query) {
         int offset = query.offset() == null ? 0 : query.offset();
         int limit = query.limit() == null ? 20 : query.limit();
         ParameterChecks.paging(offset, limit, 100);
@@ -88,8 +89,8 @@ public class SafetyStockServiceImpl implements ISafetyStockService {
         }
         example.setOrderByClause("id desc");
         try (Page<SafetyStockEntity> page = PageHelper.offsetPage(offset, limit)) {
-            mapper.selectByExample(example);
-            return page;
+            List<SafetyStockEntity> rows = mapper.selectByExample(example);
+            return new SafetyStockPage(rows, page.getTotal(), offset, limit);
         }
     }
 

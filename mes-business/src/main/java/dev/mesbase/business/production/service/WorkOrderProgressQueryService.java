@@ -114,18 +114,14 @@ public class WorkOrderProgressQueryService {
         if (invalidQuality) issue = "质量处置数量异常，请核实";
         BigDecimal unfinished = null;
         if (gap != null && !invalidQuality) unfinished = order.plannedQty().subtract(completed).subtract(scrap).subtract(transferred).max(BigDecimal.ZERO);
-        return new Progress(order.id().toString(), order.code(), order.source(), order.status(), order.productCode(),
-                order.productName(), order.unitName(), decimal(order.plannedQty()), decimal(completed), decimal(gap),
-                invalidQuality ? null : decimal(scrap), decimal(unfinished), invalidQuality ? null : decimal(untreated),
-                invalidQuality ? null : decimal(waiting), invalidQuality ? null : decimal(reworking),
-                decimal(unverified), decimal(percent), completion == null ? 0 : completion.executionCount(),
-                Optional.ofNullable(completion).map(nullableValue -> nullableValue.lastCompletedAt()).orElse(null), issue, order.createTime(), invalidQuality ? null : decimal(transferred));
+        return new Progress(order.id(), order.code(), order.source(), order.status(), order.productCode(),
+                order.productName(), order.unitName(), order.plannedQty(), completed, gap,
+                invalidQuality ? null : scrap, unfinished, invalidQuality ? null : untreated,
+                invalidQuality ? null : waiting, invalidQuality ? null : reworking,
+                unverified, percent, completion == null ? 0 : completion.executionCount(),
+                Optional.ofNullable(completion).map(nullableValue -> nullableValue.lastCompletedAt()).orElse(null), issue, order.createTime(), invalidQuality ? null : transferred);
     }
 
-    private static String decimal(BigDecimal value) {
-        if (value == null) return null;
-        return value.toPlainString();
-    }
 
     private static String normalize(String text) {
         if (StringUtils.isBlank(text)) return null;

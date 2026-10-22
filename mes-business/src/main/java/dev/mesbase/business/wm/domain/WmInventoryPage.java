@@ -1,5 +1,6 @@
 package dev.mesbase.business.wm.domain;
 
+import dev.mesbase.common.core.page.PageData;
 import java.util.List;
 
 /**
@@ -10,6 +11,6 @@ public record WmInventoryPage(
         long total,
         int offset,
         int limit
-) {
+) implements PageData<WmInventoryItem> {
 }
 

@@ -1,5 +1,6 @@
 package dev.mesbase.web.view.log;
 
+import dev.mesbase.common.utils.bean.BeanConversions;
 import java.util.Objects;
 
 import dev.mesbase.system.domain.SysLogininfor;
@@ -11,23 +12,7 @@ public final class SysLogininforAssembler {
     }
 
     public static SysLogininforResult toResult(SysLogininfor row) {
-        if (row == null) return null;
-        return new SysLogininforResult(row.getRequestId(),
-                row.getActorId(),
-                Objects.toString(row.getInfoId(), null),
-                row.getUserName(),
-                row.getStatus(),
-                row.getIpaddr(),
-                row.getLoginLocation(),
-                row.getBrowser(),
-                row.getOs(),
-                row.getMsg(),
-                row.getLoginTime(),
-                row.getCreateBy(),
-                row.getCreateTime(),
-                row.getUpdateBy(),
-                row.getUpdateTime(),
-                row.getRemark());
+        return BeanConversions.convert(row, SysLogininforResult.class);
     }
 
     public static List<SysLogininforResult> toResults(List<SysLogininfor> rows) {

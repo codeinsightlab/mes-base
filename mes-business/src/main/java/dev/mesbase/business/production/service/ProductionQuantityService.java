@@ -391,10 +391,12 @@ public class ProductionQuantityService {
         NodeQuantity affected = null;
         for (var n : view.nodes()) {
             if (affected == null && n.unverifiedDefectQty().signum() > 0) affected = n;
-            if (n.routingNodeId().equals(nodeId)) if (affected == null) return null;
+            if (n.routingNodeId().equals(nodeId)) {
+                if (affected == null) return null;
         return "工序 " + affected.code() + " · " + affected.name() + " 存在待核实不良 "
                             + affected.unverifiedDefectQty()
                             .toPlainString() + "；当前工序受其影响，须先核实质量记录再新增报工。";
+            }
         }
         throw new FoundationException(ErrorCode.REPORT_PATH_REQUIRED);
     }

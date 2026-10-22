@@ -1,5 +1,6 @@
 package dev.mesbase.business.basic.service;
 
+import dev.mesbase.business.basic.domain.WorkshopPage;
 import com.github.pagehelper.Page;
 import dev.mesbase.business.basic.domain.WorkshopCreateCommand;
 import dev.mesbase.business.basic.domain.WorkshopEntity;
@@ -16,7 +17,7 @@ import java.util.List;
  * @author MES Base
  */
 public interface IWorkshopService {
-    Page<WorkshopEntity> selectPage(WorkshopQueryDto query);
+    WorkshopPage selectPage(WorkshopQueryDto query);
 
     WorkshopEntity selectById(Long id);
 

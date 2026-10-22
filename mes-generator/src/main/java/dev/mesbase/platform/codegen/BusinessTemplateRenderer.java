@@ -318,6 +318,7 @@ public final class BusinessTemplateRenderer {
             ctx.put("commandFields", ctx.get("editFields"));
             emitJava(out, ctx, "domain", n + "UpdateCommand", "command.java.vm");
             emitJava(out, ctx, "domain", n + "QueryDto", "query.java.vm");
+            emitJava(out, ctx, "domain", n + "Page", "page.java.vm");
             emitJava(out, ctx, "controller/vo", n + "Vo", "view.java.vm");
             emitJava(out, ctx, "controller/vo", n + "PageVo", "page-view.java.vm");
             if (Boolean.TRUE.equals(ctx.get("scoped"))) {

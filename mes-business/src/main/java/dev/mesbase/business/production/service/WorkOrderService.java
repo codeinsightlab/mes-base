@@ -1,5 +1,6 @@
 package dev.mesbase.business.production.service;
 
+import dev.mesbase.common.utils.StringUtils;
 import java.util.Optional;
 
 import dev.mesbase.business.production.domain.ProductionQuantityInput;
@@ -125,8 +126,8 @@ public class WorkOrderService {
         require(offset >= 0 && limit >= 1 && limit <= 100);
         var filter = new WorkorderExample();
         var c = filter.createCriteria();
-        if (code != null && !code.isBlank()) c.andCodeLike("%" + code + "%");
-        if (status != null && !status.isBlank()) c.andStatusEqualTo(status);
+        if (StringUtils.isNotBlank(code)) c.andCodeLike("%" + code + "%");
+        if (StringUtils.isNotBlank(status)) c.andStatusEqualTo(status);
         else c.andStatusNotEqualTo(WorkOrderStatus.CANCELLED.getValue());
         if (source != null) c.andSourceEqualTo(BusinessSourceRules.required(source).getValue());
         filter.setOrderByClause("id desc");
@@ -258,8 +259,7 @@ public class WorkOrderService {
     private ExternalSyncCheck checkExternal(ExternalPlan plan, boolean lock) {
         sources.current(BusinessSource.EXTERNAL.getValue());
         if (plan == null || plan.values() == null || plan.status() == null
-                || plan.status() == WorkOrderStatus.CANCELLED || plan.externalId() == null
-                || plan.externalId().isBlank() || plan.externalId().length() > 128
+                || plan.status() == WorkOrderStatus.CANCELLED || StringUtils.isBlank(plan.externalId()) || plan.externalId().length() > 128
                 || plan.externalCode() == null || plan.externalCode().length() > 128
                 || plan.values().externalId() != null || plan.values().externalCode() != null) conflict();
         var input = plan.values();

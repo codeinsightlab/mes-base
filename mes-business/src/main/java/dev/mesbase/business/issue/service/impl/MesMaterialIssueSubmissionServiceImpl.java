@@ -1,5 +1,6 @@
 package dev.mesbase.business.issue.service.impl;
 
+import dev.mesbase.business.issue.domain.MesMaterialIssueSubmissionPage;
 import dev.mesbase.common.validation.ParameterChecks;
 import com.github.pagehelper.Page;
 import com.github.pagehelper.PageHelper;
@@ -38,7 +39,7 @@ public class MesMaterialIssueSubmissionServiceImpl implements IMesMaterialIssueS
     @Transactional(transactionManager = "businessTransactionManager", readOnly = true)
     @BusinessCache(business = MesMaterialIssueSubmissionResource.PREFIX,
             type = BusinessCache.Type.LIST)
-    public Page<MesMaterialIssueSubmissionEntity> selectPage(MesMaterialIssueSubmissionQueryDto query) {
+    public MesMaterialIssueSubmissionPage selectPage(MesMaterialIssueSubmissionQueryDto query) {
         int offset = query.offset() == null ? 0 : query.offset();
         int limit = query.limit() == null ? 20 : query.limit();
         ParameterChecks.paging(offset, limit, 100);
@@ -62,7 +63,7 @@ public class MesMaterialIssueSubmissionServiceImpl implements IMesMaterialIssueS
         example.setOrderByClause("id desc");
         try (Page<MesMaterialIssueSubmissionEntity> page = PageHelper.offsetPage(offset, limit)) {
             List<MesMaterialIssueSubmissionEntity> rows = mapper.selectByExampleWithBLOBs(example);
-            return page;
+            return new MesMaterialIssueSubmissionPage(rows, page.getTotal(), offset, limit);
         }
     }
 

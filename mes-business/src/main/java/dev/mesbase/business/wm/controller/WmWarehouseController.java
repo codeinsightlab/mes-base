@@ -1,5 +1,6 @@
 package dev.mesbase.business.wm.controller;
 
+import dev.mesbase.common.utils.bean.BeanConversions;
 import com.github.pagehelper.Page;
 import java.util.Objects;
 
@@ -48,10 +49,7 @@ public class WmWarehouseController {
     @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED,
             permission = WmWarehousePermissions.LIST)
     public WmWarehousePageVo list(@Valid @ModelAttribute WmWarehouseQueryDto query) {
-        Page<WmWarehouseEntity> page = service.selectPage(query);
-        return new WmWarehousePageVo(
-                page.stream().map(WmWarehouseController::toView).toList(),
-                page.getTotal(), (int) page.getStartRow(), page.getPageSize());
+        return BeanConversions.convertPage(service.selectPage(query), WmWarehousePageVo.class);
     }
 
     @GetMapping("/{id}")
@@ -94,19 +92,7 @@ public class WmWarehouseController {
     }
 
     private static WmWarehouseVo toView(WmWarehouseEntity row) {
-        return new WmWarehouseVo(
-                Objects.toString(row.getId(), null),
-
-                row.getSource(),
-                row.getCode(),
-                row.getName(),
-                row.getStatus(),
-                row.getRemark(),
-                row.getCreateBy(),
-                row.getCreateTime(),
-                row.getUpdateBy(),
-                row.getUpdateTime()
-        );
+        return BeanConversions.convert(row, WmWarehouseVo.class);
     }
 }
 

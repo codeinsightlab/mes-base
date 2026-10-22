@@ -1,5 +1,6 @@
 package dev.mesbase.business.basic.service;
 
+import dev.mesbase.business.basic.domain.EquipmentPage;
 import com.github.pagehelper.Page;
 import dev.mesbase.business.basic.domain.EquipmentCreateCommand;
 import dev.mesbase.business.basic.domain.EquipmentEntity;
@@ -13,7 +14,7 @@ import java.util.List;
  * @author MES Base
  */
 public interface IEquipmentService {
-    Page<EquipmentEntity> selectPage(EquipmentQueryDto query);
+    EquipmentPage selectPage(EquipmentQueryDto query);
 
     EquipmentEntity selectById(Long id);
 

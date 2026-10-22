@@ -1,5 +1,6 @@
 package dev.mesbase.system.openapi.service;
 
+import dev.mesbase.common.core.page.PageData;
 import com.github.pagehelper.Page;
 import com.github.pagehelper.PageHelper;
 import dev.mesbase.common.exception.ServiceException;
@@ -21,9 +22,6 @@ import dev.mesbase.system.openapi.dto.OpenApiCredentialRequest;
 import dev.mesbase.system.openapi.dto.OpenApiTokenCheck;
 import dev.mesbase.system.openapi.mapper.OpenApiClientApiMapper;
 import dev.mesbase.system.openapi.mapper.OpenApiClientMapper;
-import dev.mesbase.system.openapi.vo.OpenApiClientPageVo;
-import dev.mesbase.system.openapi.vo.OpenApiClientVo;
-import dev.mesbase.system.openapi.vo.OpenApiSecretVo;
 import java.security.SecureRandom;
 import java.util.Base64;
 import java.util.Date;
@@ -38,6 +36,10 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 @ConditionalOnProperty(name = {"mes.system.enabled", "open-api.enabled"}, havingValue = "true")
 public class OpenApiClientService {
+    public record IssuedSecret(Long clientId, String appKey, String appSecret) { }
+
+    public record ClientPage(List<OpenApiClient> items, long total, int offset, int limit) implements PageData<OpenApiClient> { }
+
     private final OpenApiClientMapper clients;
     private final OpenApiClientApiMapper grants;
     private final PasswordEncoder encoder;
@@ -52,7 +54,7 @@ public class OpenApiClientService {
 
     @Transactional(transactionManager = "masterTransactionManager", rollbackFor = Exception.class)
 
-    public OpenApiSecretVo create(OpenApiClientCreateRequest request) {
+    public IssuedSecret create(OpenApiClientCreateRequest request) {
         OpenApiClient entity = new OpenApiClient();
         String secret = randomValue(32);
         entity.setAppKey("mes_" + randomValue(24));
@@ -64,24 +66,21 @@ public class OpenApiClientService {
         entity.setCreateBy(SecurityUtils.getUsername());
         entity.setCreateTime(new Date());
         requireUpdated(clients.insert(entity));
-        return secretVo(entity, secret);
+        return new IssuedSecret(entity.getClientId(), entity.getAppKey(), secret);
     }
 
-    public OpenApiClientPageVo list(OpenApiClientListRequest request) {
+    public ClientPage list(OpenApiClientListRequest request) {
         OpenApiClient filter = new OpenApiClient();
         filter.setAppKey(request.getAppKey());
         if (request.getStatus() != null) filter.setStatus(OpenApiClientStatus.fromCode(request.getStatus()).getCode());
         try (Page<OpenApiClient> page = PageHelper.startPage(request.getPageNum(), request.getPageSize())) {
-            List<OpenApiClient> rows = clients.selectList(filter);
-            OpenApiClientPageVo result = new OpenApiClientPageVo();
-            result.setList(rows.stream().map(this::toVo).collect(Collectors.toList()));
-            result.setTotal(page.getTotal());
-            return result;
+            var rows = clients.selectList(filter);
+            return new ClientPage(rows, page.getTotal(), Math.toIntExact(page.getStartRow()), page.getPageSize());
         }
     }
 
-    public OpenApiClientVo detail(Long clientId) {
-        return toVo(required(clientId));
+    public OpenApiClient detail(Long clientId) {
+        return required(clientId);
     }
 
     @Transactional(transactionManager = "masterTransactionManager", rollbackFor = Exception.class)
@@ -96,13 +95,13 @@ public class OpenApiClientService {
 
     @Transactional(transactionManager = "masterTransactionManager", rollbackFor = Exception.class)
 
-    public OpenApiSecretVo resetSecret(OpenApiClientIdRequest request) {
+    public IssuedSecret resetSecret(OpenApiClientIdRequest request) {
         OpenApiClient client = lock(request.getClientId());
         String secret = randomValue(32);
         OpenApiCredentialChange change = change(client.getClientId());
         change.setSecretHash(encoder.encode(secret));
         requireUpdated(clients.changeCredentials(change));
-        return secretVo(client, secret);
+        return new IssuedSecret(client.getClientId(), client.getAppKey(), secret);
     }
 
     public List<String> apiCodes(Long clientId) {
@@ -194,24 +193,4 @@ public class OpenApiClientService {
         return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
     }
 
-    private OpenApiSecretVo secretVo(OpenApiClient client, String secret) {
-        OpenApiSecretVo vo = new OpenApiSecretVo();
-        vo.setClientId(client.getClientId());
-        vo.setAppKey(client.getAppKey());
-        vo.setAppSecret(secret);
-        return vo;
-    }
-
-    private OpenApiClientVo toVo(OpenApiClient client) {
-        OpenApiClientVo vo = new OpenApiClientVo();
-        vo.setClientId(client.getClientId());
-        vo.setAppKey(client.getAppKey());
-        vo.setClientName(client.getClientName());
-        vo.setStatus(client.getStatus());
-        vo.setStatusName(OpenApiClientStatus.fromCode(client.getStatus()).getName());
-        vo.setRemark(client.getRemark());
-        vo.setCreateTime(client.getCreateTime());
-        vo.setUpdateTime(client.getUpdateTime());
-        return vo;
-    }
 }

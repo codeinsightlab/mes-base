@@ -1,5 +1,6 @@
 package dev.mesbase.quartz.util;
 
+import dev.mesbase.common.utils.StringUtils;
 import dev.mesbase.core.error.ErrorCode;
 import dev.mesbase.core.error.FoundationException;
 import dev.mesbase.core.factory.FactoryCatalog;
@@ -43,7 +44,7 @@ public final class ControlledJobRunner {
     public void validate(SysJob job) {
         boolean platform = "platform-heartbeat".equals(job.getInvokeTarget()), factory = "factory-heartbeat".equals(job.getInvokeTarget());
         if (!platform && !factory) throw new FoundationException(ErrorCode.UNPROCESSABLE);
-        if (job.getJobName() == null || job.getJobName().isBlank() || job.getJobName()
+        if (StringUtils.isBlank(job.getJobName()) || job.getJobName()
                 .length() > 64 || job.getJobGroup() == null || !job.getJobGroup()
                 .matches("[A-Za-z0-9_-]{1,64}") || !CronUtils.isValid(job.getCronExpression()) || !Set.of("0", "1", "2", "3")
                 .contains(job.getMisfirePolicy()) || !Set.of("0", "1").contains(job.getConcurrent()))

@@ -1,5 +1,6 @@
 package dev.mesbase.server.integration.e10;
 
+import dev.mesbase.common.utils.StringUtils;
 import java.util.Optional;
 
 import com.fasterxml.jackson.databind.JsonNode;
@@ -75,7 +76,7 @@ public class DigiwinE10SyncMapping {
         String code = value(raw, kind == Kind.WORKORDER ? "/doc_no" : "/warehouse_no");
         String identity = E10ExternalIdentity.resolve(raw, rule);
         var action = ExternalSyncAction.CREATE;
-        if (code == null || code.isBlank() || code.length() > 64) {
+        if (StringUtils.isBlank(code) || code.length() > 64) {
             reasons.add("INVALID_CODE: 编码缺失或超长");
             action = ExternalSyncAction.MAPPING_REQUIRED;
         }
@@ -150,7 +151,7 @@ public class DigiwinE10SyncMapping {
             }
         } else {
             String name = value(raw, "/warehouse_name");
-            if (name == null || name.isBlank() || name.length() > 255)
+            if (StringUtils.isBlank(name) || name.length() > 255)
                 reasons.add("MAPPING_REQUIRED: 仓库名称缺失或超长");
         }
         if (reasons.isEmpty()) {
@@ -206,7 +207,7 @@ public class DigiwinE10SyncMapping {
     }
 
     private static LocalDateTime date(String text) {
-        if (text == null || text.isBlank()) return null;
+        if (StringUtils.isBlank(text)) return null;
         return text.length() == 10 ? LocalDate.parse(text).atStartOfDay() : LocalDateTime.parse(text);
     }
 }

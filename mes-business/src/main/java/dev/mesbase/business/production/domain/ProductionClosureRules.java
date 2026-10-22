@@ -1,5 +1,6 @@
 package dev.mesbase.business.production.domain;
 
+import dev.mesbase.common.validation.ParameterChecks;
 import dev.mesbase.common.utils.SecurityUtils;
 import dev.mesbase.core.error.ErrorCode;
 import dev.mesbase.core.error.FoundationException;
@@ -17,18 +18,18 @@ public final class ProductionClosureRules {
 
     public static void uuid(String id) {
         try {
-            if (id == null || !UUID.fromString(id).toString().equals(id)) bad();
+            if (id == null || !UUID.fromString(id).toString().equals(id)) ParameterChecks.reject(ErrorCode.BAD_REQUEST);
         } catch (IllegalArgumentException e) {
-            bad();
+            ParameterChecks.reject(ErrorCode.BAD_REQUEST);
         }
     }
 
     public static void quantity(BigDecimal q, boolean zero) {
-        if (q == null || q.signum() < (zero ? 0 : 1) || q.scale() > 6 || q.precision() - q.scale() > 14) bad();
+        if (q == null || q.signum() < (zero ? 0 : 1) || q.scale() > 6 || q.precision() - q.scale() > 14) ParameterChecks.reject(ErrorCode.BAD_REQUEST);
     }
 
     public static void reason(String reason) {
-        if (reason == null || reason.isBlank() || reason.length() > 500) bad();
+        ParameterChecks.text(reason, true, 500, ErrorCode.BAD_REQUEST);
     }
 
     public static String hash(Object... values) {
@@ -45,13 +46,7 @@ public final class ProductionClosureRules {
         return id;
     }
 
-    public static void bad() {
-        throw new FoundationException(ErrorCode.BAD_REQUEST);
-    }
 
-    public static void conflict() {
-        throw new FoundationException(ErrorCode.PRODUCTION_CLOSURE_CONFLICT);
-    }
 
     public static void blocked(String explanation) {
         throw new ProductionClosureBlockedException(explanation);

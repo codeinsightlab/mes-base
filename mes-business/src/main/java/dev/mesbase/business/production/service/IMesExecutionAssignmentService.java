@@ -1,5 +1,6 @@
 package dev.mesbase.business.production.service;
 
+import dev.mesbase.business.production.domain.MesExecutionAssignmentPage;
 import com.github.pagehelper.Page;
 import dev.mesbase.business.production.domain.MesExecutionAssignmentCreateCommand;
 import dev.mesbase.business.production.domain.MesExecutionAssignmentEntity;
@@ -13,7 +14,7 @@ import java.util.List;
  * @author MES Base
  */
 public interface IMesExecutionAssignmentService {
-    Page<MesExecutionAssignmentEntity> selectPage(MesExecutionAssignmentQueryDto query);
+    MesExecutionAssignmentPage selectPage(MesExecutionAssignmentQueryDto query);
 
     MesExecutionAssignmentEntity selectById(Long id);
 

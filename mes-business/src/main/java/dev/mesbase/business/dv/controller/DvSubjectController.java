@@ -1,5 +1,6 @@
 package dev.mesbase.business.dv.controller;
 
+import dev.mesbase.common.utils.bean.BeanConversions;
 import com.github.pagehelper.Page;
 import java.util.Objects;
 
@@ -48,10 +49,7 @@ public class DvSubjectController {
     @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED,
             permission = DvSubjectPermissions.LIST)
     public DvSubjectPageVo list(@Valid @ModelAttribute DvSubjectQueryDto query) {
-        Page<DvSubjectEntity> page = service.selectPage(query);
-        return new DvSubjectPageVo(
-                page.stream().map(DvSubjectController::toView).toList(),
-                page.getTotal(), (int) page.getStartRow(), page.getPageSize());
+        return BeanConversions.convertPage(service.selectPage(query), DvSubjectPageVo.class);
     }
 
     @GetMapping("/{id}")
@@ -94,21 +92,7 @@ public class DvSubjectController {
     }
 
     private static DvSubjectVo toView(DvSubjectEntity row) {
-        return new DvSubjectVo(
-                Objects.toString(row.getSubjectId(), null),
-
-                row.getSubjectCode(),
-                row.getSubjectName(),
-                row.getSubjectType(),
-                row.getSubjectContent(),
-                row.getSubjectStandard(),
-                row.getEnableFlag(),
-                row.getRemark(),
-                row.getCreateBy(),
-                row.getCreateTime(),
-                row.getUpdateBy(),
-                row.getUpdateTime()
-        );
+        return BeanConversions.convert(row, DvSubjectVo.class);
     }
 }
 

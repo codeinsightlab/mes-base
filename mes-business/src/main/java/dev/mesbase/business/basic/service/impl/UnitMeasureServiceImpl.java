@@ -1,5 +1,6 @@
 package dev.mesbase.business.basic.service.impl;
 
+import dev.mesbase.business.basic.domain.UnitMeasurePage;
 import dev.mesbase.common.validation.ParameterChecks;
 import com.github.pagehelper.Page;
 import com.github.pagehelper.PageHelper;
@@ -69,7 +70,7 @@ public class UnitMeasureServiceImpl implements IUnitMeasureService {
     @Transactional(transactionManager = "businessTransactionManager", readOnly = true)
     @BusinessCache(business = UnitMeasureResource.PREFIX,
             type = BusinessCache.Type.LIST)
-    public Page<UnitMeasureEntity> selectPage(UnitMeasureQueryDto query) {
+    public UnitMeasurePage selectPage(UnitMeasureQueryDto query) {
         int offset = query.offset() == null ? 0 : query.offset();
         int limit = query.limit() == null ? 20 : query.limit();
         ParameterChecks.paging(offset, limit, 100);
@@ -89,8 +90,8 @@ public class UnitMeasureServiceImpl implements IUnitMeasureService {
         }
         example.setOrderByClause("id desc");
         try (Page<UnitMeasureEntity> page = PageHelper.offsetPage(offset, limit)) {
-            mapper.selectByExample(example);
-            return page;
+            List<UnitMeasureEntity> rows = mapper.selectByExample(example);
+            return new UnitMeasurePage(rows, page.getTotal(), offset, limit);
         }
     }
 

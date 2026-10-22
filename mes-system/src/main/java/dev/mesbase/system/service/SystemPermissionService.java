@@ -1,5 +1,6 @@
 package dev.mesbase.system.service;
 
+import dev.mesbase.common.utils.StringUtils;
 import dev.mesbase.system.mapper.SysMenuMapper;
 import dev.mesbase.common.exception.ServiceException;
 import dev.mesbase.common.core.domain.entity.SysMenu;
@@ -133,7 +134,7 @@ public class SystemPermissionService {
     }
 
     public boolean grantedFactory(String user, String factory, String permission) {
-        if (factory == null || factory.isBlank()) return false;
+        if (StringUtils.isBlank(factory)) return false;
         var permissions = permissions(user, factory);
         return permissions.contains(permission);
     }

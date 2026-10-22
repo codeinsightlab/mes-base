@@ -1,5 +1,6 @@
 package dev.mesbase.business.integration.warehouse;
 
+import dev.mesbase.common.utils.StringUtils;
 import dev.mesbase.business.integration.warehouse.ExternalEffect;
 import dev.mesbase.business.issue.domain.MesMaterialIssueEntity;
 import dev.mesbase.core.factory.FactoryScope;
@@ -66,7 +67,7 @@ public class WarehouseIntegration {
         var snapshot = snapshot(scope);
         String provider = snapshot.erpType();
         String binding = snapshot.configurationRef();
-        if (provider == null || provider.isBlank() || binding == null || binding.isBlank())
+        if (StringUtils.isBlank(provider) || StringUtils.isBlank(binding))
             throw new FoundationException(ErrorCode.INTEGRATION_NOT_CONFIGURED);
         if (!adapter(scope, binding).supportsProvider(provider))
             throw new FoundationException(ErrorCode.INTEGRATION_NOT_CONFIGURED);
@@ -89,7 +90,7 @@ public class WarehouseIntegration {
         if (!adapter.supportsProvider(selection.provider()))
             throw new FoundationException(ErrorCode.INTEGRATION_NOT_CONFIGURED);
         if (command.lines().stream()
-                .anyMatch(line -> line.externalWarehouseId() == null || line.externalWarehouseId().isBlank()))
+                .anyMatch(line -> StringUtils.isBlank(line.externalWarehouseId())))
             throw new FoundationException(ErrorCode.BUSINESS_SOURCE_CONFLICT);
         return adapter.createMaterialIssue(scope, command);
     }

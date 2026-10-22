@@ -1,5 +1,6 @@
 package dev.mesbase.business.production.service.impl;
 
+import dev.mesbase.business.production.domain.OperationPage;
 import dev.mesbase.common.validation.ParameterChecks;
 import dev.mesbase.business.shared.enums.EnableStatus;
 import com.github.pagehelper.Page;
@@ -71,7 +72,7 @@ public class OperationServiceImpl implements IOperationService {
     @Transactional(transactionManager = "businessTransactionManager", readOnly = true)
     @BusinessCache(business = OperationResource.PREFIX,
             type = BusinessCache.Type.LIST)
-    public Page<OperationEntity> selectPage(OperationQueryDto query) {
+    public OperationPage selectPage(OperationQueryDto query) {
         int offset = query.offset() == null ? 0 : query.offset();
         int limit = query.limit() == null ? 20 : query.limit();
         ParameterChecks.paging(offset, limit, 100);
@@ -100,8 +101,8 @@ public class OperationServiceImpl implements IOperationService {
         }
         example.setOrderByClause("id desc");
         try (Page<OperationEntity> page = PageHelper.offsetPage(offset, limit)) {
-            mapper.selectByExample(example);
-            return page;
+            List<OperationEntity> rows = mapper.selectByExample(example);
+            return new OperationPage(rows, page.getTotal(), offset, limit);
         }
     }
 

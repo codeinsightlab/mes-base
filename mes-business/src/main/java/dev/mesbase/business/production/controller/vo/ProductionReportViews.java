@@ -87,6 +87,7 @@ public final class ProductionReportViews {
     }
 
     public static String decimal(BigDecimal value) {
+        if (value == null) return null;
         return value.toPlainString();
     }
 }

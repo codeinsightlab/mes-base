@@ -1,5 +1,6 @@
 package dev.mesbase.business.issue.service;
 
+import dev.mesbase.common.utils.StringUtils;
 import java.util.Optional;
 
 import dev.mesbase.business.production.service.BusinessSourceRules;
@@ -106,7 +107,7 @@ public class MaterialIssueRules {
     public void validate(MesMaterialIssueEntity row) {
         require(row.getStatus() != null && Set.of(MaterialIssueStatus.DRAFT.getValue(), MaterialIssueStatus.RECORDED.getValue())
                 .contains(row.getStatus()));
-        require(row.getIssueNo() != null && !row.getIssueNo().isBlank());
+        require(StringUtils.isNotBlank(row.getIssueNo()));
         if (row.getSubmissionId() != null || row.getVoidOperationId() != null || !Set.of(MaterialIssueStatus.DRAFT.getValue(), MaterialIssueStatus.RECORDED.getValue())
                 .contains(row.getStatus()))
             throw new FoundationException(ErrorCode.ISSUE_VOID_CONFLICT);
@@ -146,7 +147,7 @@ public class MaterialIssueRules {
             require(routing != null
                     && routing.getPublishedAt() != null);
             // A previously published disabled version is still a stable historical reference.
-            if (row.getProductCode() != null && !row.getProductCode().isBlank()) {
+            if (StringUtils.isNotBlank(row.getProductCode())) {
                 var applicable = new RoutingProductExample();
                 applicable.createCriteria().andRoutingIdEqualTo(row.getRoutingId())
                         .andMaterialCodeEqualTo(row.getProductCode());

@@ -1,5 +1,6 @@
 package dev.mesbase.business.production.controller;
 
+import dev.mesbase.common.utils.bean.BeanConversions;
 import com.github.pagehelper.Page;
 import java.util.Objects;
 
@@ -60,10 +61,7 @@ public class RoutingController {
     @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED,
             permission = RoutingPermissions.LIST)
     public RoutingPageVo list(@Valid @ModelAttribute RoutingQueryDto query) {
-        Page<RoutingEntity> page = service.selectPage(query);
-        return new RoutingPageVo(
-                page.stream().map(RoutingController::toView).toList(),
-                page.getTotal(), (int) page.getStartRow(), page.getPageSize());
+        return BeanConversions.convertPage(service.selectPage(query), RoutingPageVo.class);
     }
 
     @GetMapping("/{id}")
@@ -174,19 +172,7 @@ public class RoutingController {
     }
 
     private static RoutingVo toView(RoutingEntity row) {
-        return new RoutingVo(
-                Objects.toString(row.getId(), null),
-
-                row.getCode(),
-                row.getName(),
-                row.getVersion(),
-                row.getStatus(),
-                row.getDescription(),
-                row.getExternalId(),
-                row.getSourceVersion(),
-                row.getRevision(),
-                row.getPublishedAt()
-        );
+        return BeanConversions.convert(row, RoutingVo.class);
     }
 }
 

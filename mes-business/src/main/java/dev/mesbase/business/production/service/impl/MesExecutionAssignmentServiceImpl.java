@@ -1,5 +1,6 @@
 package dev.mesbase.business.production.service.impl;
 
+import dev.mesbase.business.production.domain.MesExecutionAssignmentPage;
 import dev.mesbase.common.validation.ParameterChecks;
 import com.github.pagehelper.Page;
 import com.github.pagehelper.PageHelper;
@@ -42,7 +43,7 @@ public class MesExecutionAssignmentServiceImpl implements IMesExecutionAssignmen
 
     @Override
     @Transactional(transactionManager = "businessTransactionManager", readOnly = true)
-    public Page<MesExecutionAssignmentEntity> selectPage(MesExecutionAssignmentQueryDto query) {
+    public MesExecutionAssignmentPage selectPage(MesExecutionAssignmentQueryDto query) {
         FactoryContext.required();
         int offset = query.offset() == null ? 0 : query.offset();
         int limit = query.limit() == null ? 20 : query.limit();
@@ -69,8 +70,8 @@ public class MesExecutionAssignmentServiceImpl implements IMesExecutionAssignmen
         }
         example.setOrderByClause("id desc");
         try (Page<MesExecutionAssignmentEntity> page = PageHelper.offsetPage(offset, limit)) {
-            mapper.selectByExample(example);
-            return page;
+            List<MesExecutionAssignmentEntity> rows = mapper.selectByExample(example);
+            return new MesExecutionAssignmentPage(rows, page.getTotal(), offset, limit);
         }
     }
 

@@ -1,5 +1,6 @@
 package dev.mesbase.business.quality.controller;
 
+import dev.mesbase.common.utils.bean.BeanConversions;
 import java.util.Optional;
 
 import dev.mesbase.business.quality.domain.DefectStatistics.Query;
@@ -34,14 +35,6 @@ public class DefectStatisticsController {
     @ResponseBody
     @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED, permission = "business:quality:defect:read")
     public Page statistics(@ModelAttribute Query query) {
-        var p = service.summarize(query);
-        return new Page(p.items().stream()
-                .map(r -> new Row(r.operationId().toString(), Optional.ofNullable(r.defectTypeId()).map(nullableValue -> nullableValue
-                        .toString()).orElse(null),
-                        r.typeName(), r.typeNameVariants(), r.wasteCategory(), r.declaredQty()
-                        .toPlainString(), r.independentQty()
-                        .toPlainString(), r.overlapQty().toPlainString(),
-                        r.unverifiedQty().toPlainString(), r.recoveredQty().toPlainString(), r.netDefectQty()
-                        .toPlainString())).toList(), p.total(), p.offset(), p.limit());
+        return BeanConversions.convertPage(service.summarize(query), Page.class);
     }
 }

@@ -1,5 +1,6 @@
 package dev.mesbase.business.wm.service;
 
+import dev.mesbase.common.utils.StringUtils;
 import dev.mesbase.common.validation.ParameterChecks;
 import java.util.Optional;
 
@@ -195,7 +196,7 @@ public class LocalProductionSupply {
             if (db != null && db.getPlannedQty().compareTo(o.getPlannedQty()) != 0) continue;
             var center = db == null ? environment.getProperty(orderPrefix + "work-center") : db.getWorkCenter();
             var allowed = db == null ? environment.getProperty(orderPrefix + "warehouse-ids") : "database";
-            if (product == null || total == null || total.signum() <= 0 || center == null || center.isBlank() || allowed == null)
+            if (product == null || total == null || total.signum() <= 0 || StringUtils.isBlank(center) || allowed == null)
                 ParameterChecks.reject(ErrorCode.BAD_REQUEST);
             var ids = db == null ? Arrays.stream(allowed.split(",")).map(String::trim).map(Long::valueOf)
                     .toList() : warehouseIds(db);

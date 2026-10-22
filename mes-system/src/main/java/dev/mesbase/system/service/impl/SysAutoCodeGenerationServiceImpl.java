@@ -1,5 +1,6 @@
 package dev.mesbase.system.service.impl;
 
+import dev.mesbase.common.utils.StringUtils;
 import dev.mesbase.common.core.domain.entity.SysAutoCodePart;
 import dev.mesbase.common.core.domain.entity.SysAutoCodeResult;
 import dev.mesbase.common.core.domain.entity.SysAutoCodeRule;
@@ -125,7 +126,7 @@ public class SysAutoCodeGenerationServiceImpl {
             default -> throw new ServiceException("不支持的循环方式");
         };
         if (pattern != null) return part.getCycleMethod() + ":" + DateTimeFormatter.ofPattern(pattern).format(now);
-        if (input == null || input.isBlank()) throw new ServiceException("按输入字符循环时必须传入字符");
+        if (StringUtils.isBlank(input)) throw new ServiceException("按输入字符循环时必须传入字符");
         return "INPUT:" + input;
     }
 }

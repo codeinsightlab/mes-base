@@ -1,5 +1,6 @@
 package dev.mesbase.business.wm.service;
 
+import dev.mesbase.business.wm.domain.WmStockActionPage;
 import com.github.pagehelper.Page;
 import dev.mesbase.business.wm.domain.WmStockActionEntity;
 import dev.mesbase.business.wm.domain.WmStockActionQueryDto;
@@ -10,7 +11,7 @@ import dev.mesbase.business.wm.domain.WmStockActionQueryDto;
  * @author MES Base
  */
 public interface IWmStockActionService {
-    Page<WmStockActionEntity> selectPage(WmStockActionQueryDto query);
+    WmStockActionPage selectPage(WmStockActionQueryDto query);
 
     WmStockActionEntity selectById(String id);
 

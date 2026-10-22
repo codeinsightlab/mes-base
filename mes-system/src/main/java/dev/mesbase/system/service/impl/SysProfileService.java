@@ -1,5 +1,6 @@
 package dev.mesbase.system.service.impl;
 
+import dev.mesbase.common.utils.StringUtils;
 import dev.mesbase.common.core.domain.entity.SysUser;
 import dev.mesbase.common.exception.ServiceException;
 import dev.mesbase.common.utils.PasswordPolicy;
@@ -43,9 +44,9 @@ public class SysProfileService {
         user.setSex(sex);
         user.setUpdateBy(current.getUserName());
         BeanValidators.validateWithException(validator, user);
-        if (phone != null && !phone.isBlank() && "1".equals(users.checkPhoneUnique(user)))
+        if (StringUtils.isNotBlank(phone) && "1".equals(users.checkPhoneUnique(user)))
             throw new ServiceException("手机号码已存在");
-        if (email != null && !email.isBlank() && "1".equals(users.checkEmailUnique(user)))
+        if (StringUtils.isNotBlank(email) && "1".equals(users.checkEmailUnique(user)))
             throw new ServiceException("邮箱已存在");
         return users.updateUserProfile(user);
     }

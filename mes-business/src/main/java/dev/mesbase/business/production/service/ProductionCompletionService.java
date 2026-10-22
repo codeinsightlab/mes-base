@@ -1,6 +1,7 @@
 package dev.mesbase.business.production.service;
 
 
+import dev.mesbase.common.validation.ParameterChecks;
 import dev.mesbase.business.production.dao.MesExecutionCompletionMapper;
 import dev.mesbase.business.production.dao.MesProductionReportMapper;
 import dev.mesbase.business.production.domain.MesProductionReportExample;
@@ -39,7 +40,6 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.annotation.Isolation;
 
 import static dev.mesbase.business.production.domain.ProductionClosureRules.blocked;
-import static dev.mesbase.business.production.domain.ProductionClosureRules.conflict;
 
 @Service
 @ConditionalOnProperty(name = "mes.business.enabled", havingValue = "true")
@@ -93,7 +93,7 @@ public class ProductionCompletionService {
     @Transactional(transactionManager = "businessTransactionManager", readOnly = true, isolation = Isolation.READ_COMMITTED)
     public Summary summary(Long id) {
         var execution = executions.selectByPrimaryKey(id);
-        if (execution == null) ProductionClosureRules.bad();
+        if (execution == null) ParameterChecks.reject(ErrorCode.BAD_REQUEST);
         var projection = quantities.getExecutionQuantities(id);
         var q = releases.stateFor(projection);
         var f = new MesExecutionCompletionExample();
@@ -101,7 +101,7 @@ public class ProductionCompletionService {
         MesExecutionCompletionEntity completed;
         try (var page = PageHelper.offsetPage(0, 2, false)) {
             var rows = completions.selectByExample(f);
-            if (rows.size() > 1) conflict();
+            if (rows.size() > 1) ParameterChecks.reject(ErrorCode.PRODUCTION_CLOSURE_CONFLICT);
             completed = rows.isEmpty() ? null : rows.getFirst();
         }
         var unresolved = new MesMaterialIssueExample();
@@ -116,14 +116,14 @@ public class ProductionCompletionService {
     @Transactional(transactionManager = "businessTransactionManager", isolation = Isolation.READ_COMMITTED, rollbackFor = Exception.class)
     @BusinessCacheEvict(business = MesProductionExecutionResource.PREFIX, scope = BusinessCacheEvict.Scope.LIST_AND_DETAIL)
     public MesExecutionCompletionEntity complete(Long id, Command c) {
-        if (c == null) ProductionClosureRules.bad();
+        if (c == null) ParameterChecks.reject(ErrorCode.BAD_REQUEST);
         ProductionClosureRules.uuid(c.requestId());
         ProductionClosureRules.reason(c.reason());
         String hash = ProductionClosureRules.hash(id, c.expectedBasisHash(), c.reason(), ProductionClosureRules.actor());
         var execution = locks.execution(id);
         var existing = completions.selectByPrimaryKey(c.requestId());
         if (existing != null) {
-            if (!hash.equals(existing.getRequestHash())) conflict();
+            if (!hash.equals(existing.getRequestHash())) ParameterChecks.reject(ErrorCode.PRODUCTION_CLOSURE_CONFLICT);
             return existing;
         }
         sources.execution(execution, null);
@@ -132,7 +132,7 @@ public class ProductionCompletionService {
         var s = summary(id);
         if (s.completion() != null) blocked("执行已经正式完工，请查询或重放原完工请求");
         if (!s.canComplete()) blocked(s.blockedReason());
-        if (c.expectedBasisHash() == null || !c.expectedBasisHash().equals(s.release().basisHash())) conflict();
+        if (c.expectedBasisHash() == null || !c.expectedBasisHash().equals(s.release().basisHash())) ParameterChecks.reject(ErrorCode.PRODUCTION_CLOSURE_CONFLICT);
         rules.checkReadyReferences(execution);
         return append(execution, s, c.requestId(), hash, ProductionClosureRules.actor(), c.reason());
     }
@@ -186,7 +186,7 @@ public class ProductionCompletionService {
         row.setRecordedAt(LocalDateTime.now());
         row.setReason(reason);
         try {
-            if (completions.insert(row) != 1) conflict();
+            if (completions.insert(row) != 1) ParameterChecks.reject(ErrorCode.PRODUCTION_CLOSURE_CONFLICT);
         } catch (DuplicateKeyException collision) {
             throw new FoundationException(ErrorCode.PRODUCTION_CLOSURE_CONFLICT, collision);
         }
@@ -194,7 +194,7 @@ public class ProductionCompletionService {
         execution.setEndTime(row.getRecordedAt());
         execution.setUpdateBy(row.getOperatorUserId().toString());
         execution.setUpdateTime(row.getRecordedAt());
-        if (executions.updateByPrimaryKey(execution) != 1) conflict();
+        if (executions.updateByPrimaryKey(execution) != 1) ParameterChecks.reject(ErrorCode.PRODUCTION_CLOSURE_CONFLICT);
         events.publishEvent(new WorkOrderCompletionRequested(FactoryContext.required(), execution.getWorkorderId()));
         return row;
     }

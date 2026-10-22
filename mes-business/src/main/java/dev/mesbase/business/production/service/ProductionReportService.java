@@ -1,5 +1,6 @@
 package dev.mesbase.business.production.service;
 
+import dev.mesbase.common.utils.StringUtils;
 import dev.mesbase.common.validation.ParameterChecks;
 import java.util.Optional;
 
@@ -303,7 +304,7 @@ public class ProductionReportService {
     private Map<Long, String> names(List<MesProductionReportEntity> rows) {
         return references.userLabels(rows.stream()
                         .flatMap(row -> Stream.of(row.getOperatorUserId(), row.getRecordedBy())).toList()).values().stream()
-                .filter(label -> label.name() != null && !label.name().isBlank())
+                .filter(label -> StringUtils.isNotBlank(label.name()))
                 .collect(Collectors.toMap(label -> label.id(), label -> label.name()));
     }
 
@@ -314,7 +315,7 @@ public class ProductionReportService {
     }
 
     private static void reason(String reason) {
-        if (reason == null || reason.isBlank() || reason.length() > 500) ParameterChecks.reject(ErrorCode.BAD_REQUEST);
+        if (StringUtils.isBlank(reason) || reason.length() > 500) ParameterChecks.reject(ErrorCode.BAD_REQUEST);
     }
 
     private static void positive(BigDecimal value) {

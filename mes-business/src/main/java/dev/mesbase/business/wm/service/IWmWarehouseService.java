@@ -1,5 +1,6 @@
 package dev.mesbase.business.wm.service;
 
+import dev.mesbase.business.wm.domain.WmWarehousePage;
 import com.github.pagehelper.Page;
 import dev.mesbase.business.wm.domain.WmWarehouseCreateCommand;
 import dev.mesbase.business.wm.domain.WmWarehouseEntity;
@@ -18,7 +19,7 @@ import dev.mesbase.framework.sync.SyncCoordinator;
  * @author MES Base
  */
 public interface IWmWarehouseService {
-    Page<WmWarehouseEntity> selectPage(WmWarehouseQueryDto query);
+    WmWarehousePage selectPage(WmWarehouseQueryDto query);
 
     WmWarehouseEntity selectById(Long id);
 

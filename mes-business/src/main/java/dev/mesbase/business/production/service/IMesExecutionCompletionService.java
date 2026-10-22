@@ -1,5 +1,6 @@
 package dev.mesbase.business.production.service;
 
+import dev.mesbase.business.production.domain.MesExecutionCompletionPage;
 import com.github.pagehelper.Page;
 import dev.mesbase.business.production.domain.MesExecutionCompletionEntity;
 import dev.mesbase.business.production.domain.MesExecutionCompletionQueryDto;
@@ -10,7 +11,7 @@ import dev.mesbase.business.production.domain.MesExecutionCompletionQueryDto;
  * @author MES Base
  */
 public interface IMesExecutionCompletionService {
-    Page<MesExecutionCompletionEntity> selectPage(MesExecutionCompletionQueryDto query);
+    MesExecutionCompletionPage selectPage(MesExecutionCompletionQueryDto query);
 
     MesExecutionCompletionEntity selectById(String id);
 

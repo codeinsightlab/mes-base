@@ -1,6 +1,8 @@
 package dev.mesbase.business.quality.service;
 
+import dev.mesbase.common.utils.StringUtils;
 import dev.mesbase.common.validation.ParameterChecks;
+import dev.mesbase.common.core.page.PageData;
 import com.github.pagehelper.PageHelper;
 import dev.mesbase.business.production.service.RoutingReferenceRules;
 import dev.mesbase.business.production.dao.OperationMapper;
@@ -44,8 +46,8 @@ public class OperationDefectTypeService {
                         String remark, Integer expectedRevision) {
     }
 
-    public record Page(List<OperationDefectTypeEntity> items, long total, int offset, int limit) {
-    }
+
+    public record Page(List<OperationDefectTypeEntity> items, long total, int offset, int limit) implements PageData<OperationDefectTypeEntity> { }
 
     public Page page(Long operation, boolean enabledOnly, int offset, int limit) {
         if (operation == null || offset < 0 || limit < 1 || limit > 100) ParameterChecks.reject(ErrorCode.BAD_REQUEST);
@@ -55,8 +57,8 @@ public class OperationDefectTypeService {
         if (enabledOnly) c.andStatusEqualTo(EnableStatus.ENABLED.getValue());
         e.setOrderByClause("id desc");
         try (var page = PageHelper.offsetPage(offset, limit)) {
-            var rows = mapper.selectByExample(e);
-            return new Page(List.copyOf(rows), page.getTotal(), offset, limit);
+            var rows = List.copyOf(mapper.selectByExample(e));
+            return new Page(rows, page.getTotal(), offset, limit);
         }
     }
 
@@ -83,8 +85,8 @@ public class OperationDefectTypeService {
     @Transactional(transactionManager = "businessTransactionManager", isolation = Isolation.READ_COMMITTED, rollbackFor = Exception.class)
     public OperationDefectTypeEntity save(Long operation, Long id, Input input) {
         references.lockOperations(List.of(operation), id == null);
-        if (input == null || input.code() == null || input.code().isBlank() || input.code().length() > 64
-                || input.name() == null || input.name().isBlank() || input.name().length() > 255
+        if (input == null || StringUtils.isBlank(input.code()) || input.code().length() > 64
+                || StringUtils.isBlank(input.name()) || input.name().length() > 255
                 || WasteCategory.from(input.defaultWasteCategory()) == null || EnableStatus.from(input.status()) == null
                 || input.sort() == null || input.sort() < 0 || input.remark() != null && input.remark().length() > 500)
             ParameterChecks.reject(ErrorCode.BAD_REQUEST);

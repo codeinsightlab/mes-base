@@ -1,5 +1,6 @@
 package dev.mesbase.business.issue.controller;
 
+import dev.mesbase.common.utils.bean.BeanConversions;
 import com.github.pagehelper.Page;
 import java.util.Optional;
 
@@ -48,10 +49,7 @@ public class MesMaterialIssueController {
     @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED,
             permission = MesMaterialIssuePermissions.LIST)
     public MesMaterialIssuePageVo list(@Valid @ModelAttribute MesMaterialIssueQueryDto query) {
-        Page<MesMaterialIssueEntity> page = service.selectPage(query);
-        return new MesMaterialIssuePageVo(
-                page.stream().map(MesMaterialIssueController::toView).toList(),
-                page.getTotal(), (int) page.getStartRow(), page.getPageSize());
+        return BeanConversions.convertPage(service.selectPage(query), MesMaterialIssuePageVo.class);
     }
 
     @GetMapping("/{id}")
@@ -88,28 +86,7 @@ public class MesMaterialIssueController {
 
 
     static MesMaterialIssueVo toView(MesMaterialIssueEntity row) {
-        return new MesMaterialIssueVo(
-                Objects.toString(row.getId(), null),
-
-                row.getIssueNo(),
-                Objects.toString(row.getWorkorderId(), null),
-                row.getWorkorderCode(),
-                Objects.toString(row.getProductId(), null),
-                row.getProductCode(),
-                row.getFlowCardNo(),
-                Objects.toString(row.getRoutingId(), null),
-                row.getIssueTime(),
-                row.getStatus(),
-                row.getRemark(),
-                row.getCreateBy(),
-                row.getCreateTime(),
-                row.getUpdateBy(),
-                row.getUpdateTime(),
-                Objects.toString(row.getExecutionId(), null),
-                row.getSourceExecutionMode(), row.getExternalEffect(), row.getExternalBindingKey(), row.getExternalReference(),
-                row.getVoidOperationId(), row.getVoidResultStatus(), row.getVoidExecutionMode(), row.getVoidMessage(), Optional.ofNullable(row.getSubmissionId()).map(nullableValue -> nullableValue
-                .toString()).orElse(null)
-        );
+        return BeanConversions.convert(row, MesMaterialIssueVo.class);
     }
 }
 

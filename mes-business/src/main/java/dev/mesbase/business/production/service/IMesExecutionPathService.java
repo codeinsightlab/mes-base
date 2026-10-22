@@ -1,5 +1,6 @@
 package dev.mesbase.business.production.service;
 
+import dev.mesbase.business.production.domain.MesExecutionPathPage;
 import com.github.pagehelper.Page;
 import dev.mesbase.business.production.domain.MesExecutionPathCreateCommand;
 import dev.mesbase.business.production.domain.MesExecutionPathEntity;
@@ -13,7 +14,7 @@ import java.util.List;
  * @author MES Base
  */
 public interface IMesExecutionPathService {
-    Page<MesExecutionPathEntity> selectPage(MesExecutionPathQueryDto query);
+    MesExecutionPathPage selectPage(MesExecutionPathQueryDto query);
 
     MesExecutionPathEntity selectById(Long id);
 

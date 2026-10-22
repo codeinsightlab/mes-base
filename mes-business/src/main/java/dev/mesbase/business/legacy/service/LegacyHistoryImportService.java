@@ -1,5 +1,6 @@
 package dev.mesbase.business.legacy.service;
 
+import dev.mesbase.common.utils.StringUtils;
 import dev.mesbase.common.validation.ParameterChecks;
 import java.util.Optional;
 
@@ -761,7 +762,7 @@ public class LegacyHistoryImportService {
                 || c.executions() == null || c.executions().isEmpty() || c.executions().size() > 100
                 || c.plannedQty() == null || c.plannedQty().signum() <= 0 || c.plannedEnd().isBefore(c.plannedStart()))
             ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
-        if (c.code() == null || c.code().isBlank() || c.code().length() > 64
+        if (StringUtils.isBlank(c.code()) || c.code().length() > 64
                 || c.snapshotHash() == null || !c.snapshotHash().matches("[0-9a-f]{64}")
                 || c.sourceHash() == null || !c.sourceHash().matches("[0-9a-f]{64}")
                 || c.executions().stream().mapToInt(e -> e.reports().size()).sum() > 10000

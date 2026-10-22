@@ -1,5 +1,6 @@
 package dev.mesbase.server.integration.e10;
 
+import dev.mesbase.common.utils.StringUtils;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.lixin.capability.digiwin.e10.request.E10QueryRequest;
@@ -168,13 +169,13 @@ public class DigiwinE10SyncService {
         List<? extends E10ObservedRecord> records;
         if (kind == Kind.WORKORDER) {
             String code = E10ExternalIdentity.text(query, "/doc_no");
-            if (code == null || code.isBlank()) return new Candidate(query, "READ_KEY_INCOMPLETE: 缺少工单定位值");
+            if (StringUtils.isBlank(code)) return new Candidate(query, "READ_KEY_INCOMPLETE: 缺少工单定位值");
             records = queries.readMo(code).getRecords();
         } else {
             String code = E10ExternalIdentity.text(query, rule.readCodePointer());
             String owner = E10ExternalIdentity.text(query, rule.readOwnerPointer());
             String plant = E10ExternalIdentity.text(query, rule.readPlantPointer());
-            if (code == null || code.isBlank() || owner == null || owner.isBlank() || plant == null || plant.isBlank())
+            if (StringUtils.isBlank(code) || StringUtils.isBlank(owner) || StringUtils.isBlank(plant))
                 return new Candidate(query, "READ_KEY_INCOMPLETE: 缺少仓库真实复合定位值");
             records = queries.readWarehouse(code, owner, plant).getRecords();
         }

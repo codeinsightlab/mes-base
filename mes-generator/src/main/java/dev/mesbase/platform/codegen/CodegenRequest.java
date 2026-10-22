@@ -1,5 +1,6 @@
 package dev.mesbase.platform.codegen;
 
+import dev.mesbase.common.utils.StringUtils;
 import java.nio.file.Path;
 import java.util.Locale;
 
@@ -12,10 +13,10 @@ public record CodegenRequest(
         OverwritePolicy overwritePolicy, boolean dryRun, Path backendRoot, Path frontendRoot,
         String backendModule, boolean generateSync, String syncMatchKey) {
     public CodegenRequest {
-        if (moduleName == null || moduleName.isBlank()) {
+        if (StringUtils.isBlank(moduleName)) {
             moduleName = defaultModule(tableName);
         }
-        if (packageName == null || packageName.isBlank()) {
+        if (StringUtils.isBlank(packageName)) {
             packageName = "dev.mesbase." + (scope == ScopeKind.GLOBAL ? "platform." : "modules.")
                     + moduleName;
         }

@@ -1,5 +1,6 @@
 package dev.mesbase.web.view.dept;
 
+import dev.mesbase.common.utils.bean.BeanConversions;
 import java.util.Optional;
 
 import java.util.Objects;
@@ -13,24 +14,7 @@ public final class SysDeptAssembler {
     }
 
     public static SysDeptResult toResult(SysDept row) {
-        if (row == null) return null;
-        return new SysDeptResult(Objects.toString(row.getDeptId(), null),
-                Objects.toString(row.getParentId(), null),
-                row.getAncestors(),
-                row.getDeptName(),
-                Optional.ofNullable(row.getOrderNum()).map(nullableValue -> Integer.valueOf(nullableValue)).orElse(null),
-                row.getLeader(),
-                row.getPhone(),
-                row.getEmail(),
-                row.getStatus(),
-                row.getDelFlag(),
-                row.getParentName(),
-                SysDeptAssembler.toResults(row.getChildren()),
-                row.getCreateBy(),
-                row.getCreateTime(),
-                row.getUpdateBy(),
-                row.getUpdateTime(),
-                row.getRemark());
+        return BeanConversions.convert(row, SysDeptResult.class);
     }
 
     public static List<SysDeptResult> toResults(List<SysDept> rows) {

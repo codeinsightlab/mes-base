@@ -1,5 +1,6 @@
 package dev.mesbase.business.basic.controller;
 
+import dev.mesbase.common.utils.bean.BeanConversions;
 import com.github.pagehelper.Page;
 import java.util.Objects;
 
@@ -46,10 +47,7 @@ public class EquipmentController {
     @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED,
             permission = EquipmentPermissions.READ)
     public EquipmentPageVo list(@Valid @ModelAttribute EquipmentQueryDto query) {
-        Page<EquipmentEntity> page = service.selectPage(query);
-        return new EquipmentPageVo(
-                page.stream().map(EquipmentController::toView).toList(),
-                page.getTotal(), (int) page.getStartRow(), page.getPageSize());
+        return BeanConversions.convertPage(service.selectPage(query), EquipmentPageVo.class);
     }
 
     @GetMapping("/{id}")
@@ -86,16 +84,7 @@ public class EquipmentController {
 
 
     private static EquipmentVo toView(EquipmentEntity row) {
-        return new EquipmentVo(
-                Objects.toString(row.getId(), null),
-
-                row.getCode(),
-                row.getName(),
-                row.getModel(),
-                Objects.toString(row.getWorkstationId(), null),
-                row.getStatus(),
-                row.getRemark()
-        );
+        return BeanConversions.convert(row, EquipmentVo.class);
     }
 }
 

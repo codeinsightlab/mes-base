@@ -1,5 +1,6 @@
 package dev.mesbase.business.production.controller;
 
+import dev.mesbase.common.utils.bean.BeanConversions;
 import com.github.pagehelper.Page;
 import java.util.Optional;
 
@@ -54,8 +55,7 @@ public class MesProductionExecutionController {
     public MesProductionExecutionPageVo list(@Valid @ModelAttribute MesProductionExecutionQueryDto query) {
         var data = queries.page(query);
         var page = data.records();
-        return new MesProductionExecutionPageVo(
-                page.stream().map(row -> {
+        return BeanConversions.convertPage(page, row -> {
                     var routing = data.references().routings().get(row.getRoutingId());
                     return toView(row, Optional.ofNullable(routing).map(value -> value.code()).orElse(null),
                             Optional.ofNullable(routing).map(value -> value.name()).orElse(null),
@@ -63,8 +63,7 @@ public class MesProductionExecutionController {
                             ProductionExecutionQueryService.name(data.references().users(), row.getCreateBy()),
                             ProductionExecutionQueryService.name(data.references().users(), row.getUpdateBy()),
                             data.references().workorderStatuses().get(row.getWorkorderId()));
-                }).toList(),
-                page.getTotal(), (int) page.getStartRow(), page.getPageSize());
+                }, MesProductionExecutionPageVo::new);
     }
 
     @GetMapping("/{id}")
@@ -100,6 +99,9 @@ public class MesProductionExecutionController {
     }
 
 
+    private record Labels(String routingCode, String routingName, Integer routingVersion,
+                          String createByName, String updateByName, String workorderStatus) { }
+
     private static MesProductionExecutionVo toView(ProductionExecutionQueryService.Display display) {
         return toView(display.record(), Optional.ofNullable(display.routing()).map(nullableValue -> nullableValue
                 .code()).orElse(null), Optional.ofNullable(display.routing()).map(nullableValue -> nullableValue
@@ -114,22 +116,8 @@ public class MesProductionExecutionController {
     private static MesProductionExecutionVo toView(MesProductionExecutionEntity row, String routingCode,
                                                    String routingName, Integer routingVersion, String createByName,
                                                    String updateByName, String workorderStatus) {
-        return new MesProductionExecutionVo(
-                Objects.toString(row.getId(), null),
-                row.getExecutionNo(),
-                Objects.toString(row.getWorkorderId(), null),
-                Objects.toString(row.getProductId(), null),
-                Objects.toString(row.getRoutingId(), null),
-                Objects.toString(row.getTargetQty(), null),
-                row.getStatus(),
-                row.getStartTime(),
-                row.getEndTime(),
-                row.getRemark(),
-                row.getCreateBy(),
-                row.getCreateTime(),
-                row.getUpdateBy(),
-                row.getUpdateTime(), routingCode, routingName, routingVersion, createByName, updateByName, workorderStatus
-        );
+        return BeanConversions.convertWith(row, new Labels(routingCode, routingName, routingVersion,
+                createByName, updateByName, workorderStatus), MesProductionExecutionVo.class);
     }
 }
 

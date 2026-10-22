@@ -1,5 +1,6 @@
 package dev.mesbase.business.quality.service.impl;
 
+import dev.mesbase.business.quality.domain.MesQualityReleasePage;
 import dev.mesbase.common.validation.ParameterChecks;
 import com.github.pagehelper.Page;
 import com.github.pagehelper.PageHelper;
@@ -33,7 +34,7 @@ public class MesQualityReleaseServiceImpl implements IMesQualityReleaseService {
     @Transactional(transactionManager = "businessTransactionManager", readOnly = true)
     @BusinessCache(business = MesQualityReleaseResource.PREFIX,
             type = BusinessCache.Type.LIST)
-    public Page<MesQualityReleaseEntity> selectPage(MesQualityReleaseQueryDto query) {
+    public MesQualityReleasePage selectPage(MesQualityReleaseQueryDto query) {
         int offset = query.offset() == null ? 0 : query.offset();
         int limit = query.limit() == null ? 20 : query.limit();
         ParameterChecks.paging(offset, limit, 100);
@@ -71,8 +72,8 @@ public class MesQualityReleaseServiceImpl implements IMesQualityReleaseService {
         }
         example.setOrderByClause("id");
         try (Page<MesQualityReleaseEntity> page = PageHelper.offsetPage(offset, limit)) {
-            mapper.selectByExample(example);
-            return page;
+            List<MesQualityReleaseEntity> rows = mapper.selectByExample(example);
+            return new MesQualityReleasePage(rows, page.getTotal(), offset, limit);
         }
     }
 

@@ -1,5 +1,6 @@
 package dev.mesbase.business.production.service;
 
+import dev.mesbase.business.production.domain.WorkorderErpExtraPage;
 import com.github.pagehelper.Page;
 import dev.mesbase.business.production.domain.WorkorderErpExtraCreateCommand;
 import dev.mesbase.business.production.domain.WorkorderErpExtraEntity;
@@ -13,7 +14,7 @@ import java.util.List;
  * @author MES Base
  */
 public interface IWorkorderErpExtraService {
-    Page<WorkorderErpExtraEntity> selectPage(WorkorderErpExtraQueryDto query);
+    WorkorderErpExtraPage selectPage(WorkorderErpExtraQueryDto query);
 
     WorkorderErpExtraEntity selectById(Long id);
 

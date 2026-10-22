@@ -1,5 +1,6 @@
 package dev.mesbase.business.quality.controller;
 
+import dev.mesbase.common.utils.bean.BeanConversions;
 import com.github.pagehelper.Page;
 import java.util.Objects;
 
@@ -34,10 +35,7 @@ public class MesQualityReleaseController {
     @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED,
             permission = MesQualityReleasePermissions.LIST)
     public MesQualityReleasePageVo list(@Valid @ModelAttribute MesQualityReleaseQueryDto query) {
-        Page<MesQualityReleaseEntity> page = service.selectPage(query);
-        return new MesQualityReleasePageVo(
-                page.stream().map(MesQualityReleaseController::toView).toList(),
-                page.getTotal(), (int) page.getStartRow(), page.getPageSize());
+        return BeanConversions.convertPage(service.selectPage(query), MesQualityReleasePageVo.class);
     }
 
     @GetMapping("/{id}")
@@ -49,19 +47,7 @@ public class MesQualityReleaseController {
 
 
     private static MesQualityReleaseVo toView(MesQualityReleaseEntity row) {
-        return new MesQualityReleaseVo(
-                row.getId(),
-                Objects.toString(row.getExecutionId(), null),
-                Objects.toString(row.getSequenceNo(), null),
-                row.getActionType(),
-                Objects.toString(row.getQuantity(), null),
-                row.getBasisHash(),
-                row.getReferenceId(),
-                row.getRequestHash(),
-                Objects.toString(row.getOperatorUserId(), null),
-                row.getRecordedAt(),
-                row.getReason()
-        );
+        return BeanConversions.convert(row, MesQualityReleaseVo.class);
     }
 }
 

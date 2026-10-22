@@ -1,5 +1,6 @@
 package dev.mesbase.business.wm.controller;
 
+import dev.mesbase.common.utils.bean.BeanConversions;
 import java.util.Objects;
 
 import dev.mesbase.business.wm.controller.vo.WmInventoryPageVo;
@@ -93,25 +94,11 @@ public class WmInventoryController {
         return service.sync(FactoryContext.required());
     }
 
-    private static WmInventoryVo toView(WmInventoryItem item) {
-        var row = item.inventory();
-        return new WmInventoryVo(
-                Objects.toString(row.getId(), null),
+    private record Labels(String materialName, String warehouseName, String warehouseSource) { }
 
-                Objects.toString(row.getMaterialId(), null),
-                Objects.toString(row.getWarehouseId(), null),
-                item.materialName(),
-                item.warehouseName(),
-                item.warehouseSource(),
-                Objects.toString(row.getQuantity(), null),
-                Objects.toString(row.getAvailableQuantity(), null),
-                row.getStatus(),
-                row.getRemark(),
-                row.getCreateBy(),
-                row.getCreateTime(),
-                row.getUpdateBy(),
-                row.getUpdateTime(), row.getBatchNo(), row.getBinCode()
-        );
+    private static WmInventoryVo toView(WmInventoryItem item) {
+        return BeanConversions.convertWith(item.inventory(), new Labels(item.materialName(), item.warehouseName(),
+                item.warehouseSource()), WmInventoryVo.class);
     }
 }
 

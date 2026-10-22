@@ -1,5 +1,6 @@
 package dev.mesbase.business.basic.service;
 
+import dev.mesbase.business.basic.domain.MaterialCategoryPage;
 import com.github.pagehelper.Page;
 import dev.mesbase.business.basic.domain.MaterialCategoryCreateCommand;
 import dev.mesbase.business.basic.domain.MaterialCategoryEntity;
@@ -16,7 +17,7 @@ import java.util.List;
  * @author MES Base
  */
 public interface IMaterialCategoryService {
-    Page<MaterialCategoryEntity> selectPage(MaterialCategoryQueryDto query);
+    MaterialCategoryPage selectPage(MaterialCategoryQueryDto query);
 
     MaterialCategoryEntity selectById(Long id);
 

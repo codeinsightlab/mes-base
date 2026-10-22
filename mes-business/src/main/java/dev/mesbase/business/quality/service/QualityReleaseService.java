@@ -34,7 +34,6 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.annotation.Isolation;
 
 import static dev.mesbase.business.production.domain.ProductionClosureRules.blocked;
-import static dev.mesbase.business.production.domain.ProductionClosureRules.conflict;
 
 /**
  * Absolute execution-level authorization snapshots; a changed basis invalidates authorization, never history.
@@ -131,17 +130,17 @@ public class QualityReleaseService {
 
     @Transactional(transactionManager = "businessTransactionManager", isolation = Isolation.READ_COMMITTED, rollbackFor = Exception.class)
     public MesQualityReleaseEntity execute(Long execution, Command c) {
-        if (c == null) ProductionClosureRules.bad();
+        if (c == null) ParameterChecks.reject(ErrorCode.BAD_REQUEST);
         ProductionClosureRules.uuid(c.requestId());
         ProductionClosureRules.quantity(c.quantity(), true);
         ProductionClosureRules.reason(c.reason());
-        if (c.revoke() && c.quantity().signum() != 0) ProductionClosureRules.bad();
+        if (c.revoke() && c.quantity().signum() != 0) ParameterChecks.reject(ErrorCode.BAD_REQUEST);
         Long actor = ProductionClosureRules.actor();
         String hash = ProductionClosureRules.hash(execution, c.requestId(), c.expectedReleaseId(), ProductionClosureRules.number(c.quantity()), c.revoke(), c.reason(), actor);
         var row = locks.execution(execution);
         var old = releases.selectByPrimaryKey(c.requestId());
         if (old != null) {
-            if (!hash.equals(old.getRequestHash())) conflict();
+            if (!hash.equals(old.getRequestHash())) ParameterChecks.reject(ErrorCode.PRODUCTION_CLOSURE_CONFLICT);
             return old;
         }
         ProductionQuantityInput.check(c.quantity());
@@ -149,13 +148,13 @@ public class QualityReleaseService {
         if (integration.configuredMode(FactoryContext.required()) != Mode.LOCAL_ONLY)
             blocked("ERP模式须由真实质量集成实现，不允许回退LOCAL放行");
         var state = state(execution);
-        if (!Objects.equals(c.expectedReleaseId(), state.currentReleaseId())) conflict();
+        if (!Objects.equals(c.expectedReleaseId(), state.currentReleaseId())) ParameterChecks.reject(ErrorCode.PRODUCTION_CLOSURE_CONFLICT);
         if (!List.of(ProductionExecutionStatus.RUNNING.getValue(), ProductionExecutionStatus.COMPLETED.getValue())
                 .contains(row.getStatus()))
             blocked("仅运行或生产已完工的执行可以新增正式放行或撤回");
         if (!c.revoke() && (!state.safe() || c.quantity().compareTo(state.effective()) > 0))
             blocked(state.blockedReason() == null ? "放行数量不能超过末道有效产出" : state.blockedReason());
-        if (c.revoke() && state.currentReleaseId() == null) conflict();
+        if (c.revoke() && state.currentReleaseId() == null) ParameterChecks.reject(ErrorCode.PRODUCTION_CLOSURE_CONFLICT);
         var previous = latest(execution);
         var fact = new MesQualityReleaseEntity();
         fact.setId(c.requestId());
@@ -170,7 +169,7 @@ public class QualityReleaseService {
         fact.setRecordedAt(LocalDateTime.now());
         fact.setReason(c.reason());
         try {
-            if (releases.insert(fact) != 1) conflict();
+            if (releases.insert(fact) != 1) ParameterChecks.reject(ErrorCode.PRODUCTION_CLOSURE_CONFLICT);
         } catch (DuplicateKeyException collision) {
             throw new FoundationException(ErrorCode.PRODUCTION_CLOSURE_CONFLICT, collision);
         }

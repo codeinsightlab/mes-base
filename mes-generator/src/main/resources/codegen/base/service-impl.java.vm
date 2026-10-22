@@ -36,12 +36,10 @@ public class ${ClassName}ServiceImpl implements ${servicePackage}.I${ClassName}S
     @dev.mesbase.infrastructure.cache.annotation.BusinessCache(business = ${domainPackage}.${ClassName}Resource.PREFIX,
             type = dev.mesbase.infrastructure.cache.annotation.BusinessCache.Type.LIST)
 #end
-    public com.github.pagehelper.Page<${domainPackage}.${ClassName}Entity> selectPage(${domainPackage}.${ClassName}QueryDto query) {
+    public ${domainPackage}.${ClassName}Page selectPage(${domainPackage}.${ClassName}QueryDto query) {
         int offset = query.offset() == null ? 0 : query.offset();
         int limit = query.limit() == null ? ${pageDefault} : query.limit();
-        if (offset < 0 || limit < 1 || limit > ${pageMaximum}) {
-            throw new dev.mesbase.core.error.FoundationException(dev.mesbase.core.error.ErrorCode.BAD_REQUEST);
-        }
+        dev.mesbase.common.validation.ParameterChecks.paging(offset, limit, ${pageMaximum});
         ${domainPackage}.${ClassName}Example example = new ${domainPackage}.${ClassName}Example();
         ${domainPackage}.${ClassName}Example.Criteria criteria = example.createCriteria();
 #if($serverScope)

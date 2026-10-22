@@ -1,5 +1,6 @@
 package dev.mesbase.business.production.controller;
 
+import dev.mesbase.common.utils.bean.BeanConversions;
 import com.github.pagehelper.Page;
 import java.util.Objects;
 
@@ -34,10 +35,7 @@ public class MesWorkorderMaterialController {
     @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED,
             permission = MesWorkorderMaterialPermissions.LIST)
     public MesWorkorderMaterialPageVo list(@Valid @ModelAttribute MesWorkorderMaterialQueryDto query) {
-        Page<MesWorkorderMaterialEntity> page = service.selectPage(query);
-        return new MesWorkorderMaterialPageVo(
-                page.stream().map(MesWorkorderMaterialController::toView).toList(),
-                page.getTotal(), (int) page.getStartRow(), page.getPageSize());
+        return BeanConversions.convertPage(service.selectPage(query), MesWorkorderMaterialPageVo.class);
     }
 
     @GetMapping("/{id}")
@@ -49,19 +47,7 @@ public class MesWorkorderMaterialController {
 
 
     private static MesWorkorderMaterialVo toView(MesWorkorderMaterialEntity row) {
-        return new MesWorkorderMaterialVo(
-                Objects.toString(row.getId(), null),
-                Objects.toString(row.getMaterialId(), null),
-                Objects.toString(row.getUnitId(), null),
-                Objects.toString(row.getTotalRequiredQty(), null),
-                Objects.toString(row.getPlannedQty(), null),
-                row.getWarehouseIds(),
-                row.getWorkCenter(),
-                Objects.toString(row.getRevision(), null),
-                row.getStatus(),
-                Objects.toString(row.getUpdatedBy(), null),
-                row.getUpdatedAt()
-        );
+        return BeanConversions.convert(row, MesWorkorderMaterialVo.class);
     }
 }
 

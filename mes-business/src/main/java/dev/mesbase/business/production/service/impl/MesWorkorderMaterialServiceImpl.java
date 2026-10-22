@@ -1,5 +1,6 @@
 package dev.mesbase.business.production.service.impl;
 
+import dev.mesbase.business.production.domain.MesWorkorderMaterialPage;
 import dev.mesbase.common.validation.ParameterChecks;
 import com.github.pagehelper.Page;
 import com.github.pagehelper.PageHelper;
@@ -33,7 +34,7 @@ public class MesWorkorderMaterialServiceImpl implements IMesWorkorderMaterialSer
     @Transactional(transactionManager = "businessTransactionManager", readOnly = true)
     @BusinessCache(business = MesWorkorderMaterialResource.PREFIX,
             type = BusinessCache.Type.LIST)
-    public Page<MesWorkorderMaterialEntity> selectPage(MesWorkorderMaterialQueryDto query) {
+    public MesWorkorderMaterialPage selectPage(MesWorkorderMaterialQueryDto query) {
         int offset = query.offset() == null ? 0 : query.offset();
         int limit = query.limit() == null ? 20 : query.limit();
         ParameterChecks.paging(offset, limit, 100);
@@ -71,8 +72,8 @@ public class MesWorkorderMaterialServiceImpl implements IMesWorkorderMaterialSer
         }
         example.setOrderByClause("id");
         try (Page<MesWorkorderMaterialEntity> page = PageHelper.offsetPage(offset, limit)) {
-            mapper.selectByExample(example);
-            return page;
+            List<MesWorkorderMaterialEntity> rows = mapper.selectByExample(example);
+            return new MesWorkorderMaterialPage(rows, page.getTotal(), offset, limit);
         }
     }
 
