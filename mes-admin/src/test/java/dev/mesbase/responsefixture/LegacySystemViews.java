@@ -1,9 +1,5 @@
 package dev.mesbase.responsefixture;
 
-import java.util.Optional;
-
-import java.util.Objects;
-
 import com.fasterxml.jackson.annotation.JsonFormat;
 import dev.mesbase.common.core.domain.TreeSelect;
 import dev.mesbase.common.core.domain.entity.SysAutoCodePart;
@@ -32,8 +28,12 @@ import java.util.Date;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
 
-/** TEST ONLY: frozen pre-migration response oracle, never registered in production. */
+/**
+ * TEST ONLY: frozen pre-migration response oracle, never registered in production.
+ */
 final class LegacySystemViews {
     public static Object project(Object value) {
         if (value == null) return null;
@@ -51,17 +51,29 @@ final class LegacySystemViews {
         if (value instanceof SysAutoCodePart row)
             return new SysAutoCodePartView(Objects.toString(row.getPartId(), null), Objects.toString(row.getRuleId(), null), row.getPartIndex(), row.getPartType(), row.getPartCode(), row.getPartName(), row.getPartLength(), row.getDateFormat(), row.getInputCharacter(), row.getFixCharacter(), row.getSeriaStartNo(), row.getSeriaStep(), row.getCycleFlag(), row.getCycleMethod(), row.getRemark(), row.getCreateBy(), row.getCreateTime(), row.getUpdateBy(), row.getUpdateTime());
         if (value instanceof SysRole row)
-            return new SysRoleView(row.getKind(), row.getFactoryId(), Objects.toString(row.getRoleId(), null), row.getRoleName(), row.getRoleKey(), Optional.ofNullable(row.getRoleSort()).map(nullableValue -> Integer.valueOf(nullableValue)).orElse(null), row.getDataScope(), row.isMenuCheckStrictly(), row.isDeptCheckStrictly(), row.getStatus(), row.getDelFlag(), row.isFlag(), Optional.ofNullable(row.getMenuIds()).map(nullableValue -> Arrays.stream(nullableValue).map(String::valueOf).toArray(String[]::new)).orElse(null), Optional.ofNullable(row.getDeptIds()).map(nullableValue -> Arrays.stream(nullableValue).map(String::valueOf).toArray(String[]::new)).orElse(null), row.getCreateBy(), row.getCreateTime(), row.getUpdateBy(), row.getUpdateTime(), row.getRemark());
+            return new SysRoleView(row.getKind(), row.getFactoryId(), Objects.toString(row.getRoleId(), null), row.getRoleName(), row.getRoleKey(), Optional.ofNullable(row.getRoleSort())
+                    .map(nullableValue -> Integer.valueOf(nullableValue))
+                    .orElse(null), row.getDataScope(), row.isMenuCheckStrictly(), row.isDeptCheckStrictly(), row.getStatus(), row.getDelFlag(), row.isFlag(), Optional.ofNullable(row.getMenuIds())
+                    .map(nullableValue -> Arrays.stream(nullableValue).map(String::valueOf).toArray(String[]::new))
+                    .orElse(null), Optional.ofNullable(row.getDeptIds())
+                    .map(nullableValue -> Arrays.stream(nullableValue).map(String::valueOf).toArray(String[]::new))
+                    .orElse(null), row.getCreateBy(), row.getCreateTime(), row.getUpdateBy(), row.getUpdateTime(), row.getRemark());
         if (value instanceof SysDictData row)
             return new SysDictDataView(Objects.toString(row.getDictCode(), null), row.getDictSort(), row.getDictLabel(), row.getDictValue(), row.getDictType(), row.getCssClass(), row.getListClass(), row.getIsDefault(), row.getStatus(), row.getCreateBy(), row.getCreateTime(), row.getUpdateBy(), row.getUpdateTime(), row.getRemark());
         if (value instanceof SysUser row)
-            return new SysUserView(Objects.toString(row.getUserId(), null), Objects.toString(row.getDeptId(), null), row.getUserName(), row.getNickName(), row.getUserType(), row.getEmail(), row.getPhonenumber(), row.getSex(), row.getAvatar(), row.getStatus(), row.getDelFlag(), row.getLoginIp(), row.getLoginDate(), project(row.getDept()), project(row.getRoles()), Optional.ofNullable(row.getRoleIds()).map(nullableValue -> Arrays.stream(nullableValue).map(String::valueOf).toArray(String[]::new)).orElse(null), Optional.ofNullable(row.getPostIds()).map(nullableValue -> Arrays.stream(nullableValue).map(String::valueOf).toArray(String[]::new)).orElse(null), Objects.toString(row.getRoleId(), null), row.getCreateBy(), row.getCreateTime(), row.getUpdateBy(), row.getUpdateTime(), row.getRemark());
+            return new SysUserView(Objects.toString(row.getUserId(), null), Objects.toString(row.getDeptId(), null), row.getUserName(), row.getNickName(), row.getUserType(), row.getEmail(), row.getPhonenumber(), row.getSex(), row.getAvatar(), row.getStatus(), row.getDelFlag(), row.getLoginIp(), row.getLoginDate(), project(row.getDept()), project(row.getRoles()), Optional.ofNullable(row.getRoleIds())
+                    .map(nullableValue -> Arrays.stream(nullableValue).map(String::valueOf).toArray(String[]::new))
+                    .orElse(null), Optional.ofNullable(row.getPostIds())
+                    .map(nullableValue -> Arrays.stream(nullableValue).map(String::valueOf).toArray(String[]::new))
+                    .orElse(null), Objects.toString(row.getRoleId(), null), row.getCreateBy(), row.getCreateTime(), row.getUpdateBy(), row.getUpdateTime(), row.getRemark());
         if (value instanceof SysMenu row)
             return new SysMenuView(Objects.toString(row.getMenuId(), null), row.getMenuName(), row.getParentName(), Objects.toString(row.getParentId(), null), row.getOrderNum(), row.getPath(), row.getComponent(), row.getQuery(), row.getIsFrame(), row.getIsCache(), row.getMenuType(), row.getVisible(), row.getStatus(), row.getPerms(), row.getIcon(), project(row.getChildren()), row.getCreateBy(), row.getCreateTime(), row.getUpdateBy(), row.getUpdateTime(), row.getRemark());
         if (value instanceof SysDictType row)
             return new SysDictTypeView(Objects.toString(row.getDictId(), null), row.getDictName(), row.getDictType(), row.getStatus(), row.getCreateBy(), row.getCreateTime(), row.getUpdateBy(), row.getUpdateTime(), row.getRemark());
         if (value instanceof SysDept row)
-            return new SysDeptView(Objects.toString(row.getDeptId(), null), Objects.toString(row.getParentId(), null), row.getAncestors(), row.getDeptName(), Optional.ofNullable(row.getOrderNum()).map(nullableValue -> Integer.valueOf(nullableValue)).orElse(null), row.getLeader(), row.getPhone(), row.getEmail(), row.getStatus(), row.getDelFlag(), row.getParentName(), project(row.getChildren()), row.getCreateBy(), row.getCreateTime(), row.getUpdateBy(), row.getUpdateTime(), row.getRemark());
+            return new SysDeptView(Objects.toString(row.getDeptId(), null), Objects.toString(row.getParentId(), null), row.getAncestors(), row.getDeptName(), Optional.ofNullable(row.getOrderNum())
+                    .map(nullableValue -> Integer.valueOf(nullableValue))
+                    .orElse(null), row.getLeader(), row.getPhone(), row.getEmail(), row.getStatus(), row.getDelFlag(), row.getParentName(), project(row.getChildren()), row.getCreateBy(), row.getCreateTime(), row.getUpdateBy(), row.getUpdateTime(), row.getRemark());
         if (value instanceof SysOperLog row)
             return new SysOperLogView(row.getRequestId(), row.getActorId(), row.getFactoryId(), row.getExecutionScope(), row.getCostTime(), Objects.toString(row.getOperId(), null), row.getTitle(), row.getBusinessType(), row.getBusinessTypes(), row.getMethod(), row.getRequestMethod(), row.getOperatorType(), row.getOperName(), row.getDeptName(), row.getOperUrl(), row.getOperIp(), row.getOperLocation(), row.getOperParam(), row.getJsonResult(), row.getStatus(), row.getErrorMsg(), row.getOperTime(), row.getCreateBy(), row.getCreateTime(), row.getUpdateBy(), row.getUpdateTime(), row.getRemark());
         if (value instanceof SysUserRole row)
@@ -81,7 +93,9 @@ final class LegacySystemViews {
         if (value instanceof SysUserPost row)
             return new SysUserPostView(Objects.toString(row.getUserId(), null), Objects.toString(row.getPostId(), null));
         if (value instanceof SysPost row)
-            return new SysPostView(Objects.toString(row.getPostId(), null), row.getPostCode(), row.getPostName(), Optional.ofNullable(row.getPostSort()).map(nullableValue -> Integer.valueOf(nullableValue)).orElse(null), row.getStatus(), row.isFlag(), row.getCreateBy(), row.getCreateTime(), row.getUpdateBy(), row.getUpdateTime(), row.getRemark());
+            return new SysPostView(Objects.toString(row.getPostId(), null), row.getPostCode(), row.getPostName(), Optional.ofNullable(row.getPostSort())
+                    .map(nullableValue -> Integer.valueOf(nullableValue))
+                    .orElse(null), row.getStatus(), row.isFlag(), row.getCreateBy(), row.getCreateTime(), row.getUpdateBy(), row.getUpdateTime(), row.getRemark());
         if (value instanceof SysMessage r)
             return new MessageView(String.valueOf(r.getMessageId()), r.getMessageType(), r.getMessageLevel(), r.getMessageTitle(), r.getMessageContent(), String.valueOf(r.getSenderId()), r.getSenderName(), r.getSenderNick(), String.valueOf(r.getRecipientId()), r.getRecipientName(), r.getRecipientNick(), r.getProcessTime(), r.getCallBack(), r.getStatus(), r.getRemark(), r.getCreateTime());
         if (value instanceof SysAttachment r)

@@ -1,15 +1,12 @@
 package dev.mesbase.web.view.role;
 
-import dev.mesbase.common.utils.bean.BeanConversions;
-import java.util.Optional;
-
-import java.util.Objects;
-
 import dev.mesbase.common.core.domain.entity.SysRole;
-import java.util.Arrays;
+import dev.mesbase.common.utils.bean.BeanConversions;
 import java.util.List;
 
-/** Explicit conversion at the Controller HTTP boundary. */
+/**
+ * Explicit conversion at the Controller HTTP boundary.
+ */
 public final class SysRoleAssembler {
     private SysRoleAssembler() {
     }

@@ -1,9 +1,8 @@
 package dev.mesbase.business.basic.service;
 
-import dev.mesbase.business.basic.domain.SafetyStockPage;
-import com.github.pagehelper.Page;
 import dev.mesbase.business.basic.domain.SafetyStockCreateCommand;
 import dev.mesbase.business.basic.domain.SafetyStockEntity;
+import dev.mesbase.business.basic.domain.SafetyStockPage;
 import dev.mesbase.business.basic.domain.SafetyStockQueryDto;
 import dev.mesbase.business.basic.domain.SafetyStockUpdateCommand;
 import dev.mesbase.business.basic.sync.ExternalSafetyStock;
@@ -26,9 +25,10 @@ public interface ISafetyStockService {
     SafetyStockEntity updateById(Long id, SafetyStockUpdateCommand input);
 
     void deleteByIds(List<Long> ids);
+
     SafetyStockSyncResult sync(FactoryScope scope);
 
     SafetyStockSyncResult upsert(FactoryScope scope,
-            List<ExternalSafetyStock> inputs);
+                                 List<ExternalSafetyStock> inputs);
 }
 

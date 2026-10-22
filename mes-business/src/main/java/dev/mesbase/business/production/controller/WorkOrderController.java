@@ -1,18 +1,17 @@
 package dev.mesbase.business.production.controller;
 
-import java.util.Objects;
-
-import dev.mesbase.business.production.domain.ProductionBatchEntity;
 import dev.mesbase.business.production.controller.vo.RoutingDetailVo;
-import dev.mesbase.business.production.domain.RoutingEntity;
+import dev.mesbase.business.production.domain.ProductionBatchEntity;
 import dev.mesbase.business.production.domain.WorkOrderModels;
 import dev.mesbase.business.production.domain.WorkorderEntity;
 import dev.mesbase.business.production.service.WorkOrderService;
+import dev.mesbase.common.utils.bean.BeanConversions;
 import dev.mesbase.platform.web.EndpointAccess;
 import jakarta.validation.Valid;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Objects;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -72,10 +71,7 @@ public class WorkOrderController {
     public PageView list(@RequestParam(required = false) String code, @RequestParam(required = false) String status,
                          @RequestParam(defaultValue = "0") int offset, @RequestParam(defaultValue = "20") int limit,
                          @RequestParam(required = false) String source) {
-        var p = service.list(code, status, offset, limit, source);
-        return new PageView(p.items().stream()
-                .map(s -> new SummaryView(order(s.workorder()), s.batchCount(), s.productCode(), s.productName(), s.routingCode(), s.routingVersion(), allocation(s.allocation()), s.erpExtraMissing()))
-                .toList(), p.total(), p.offset(), p.limit());
+        return BeanConversions.convertPage(service.list(code, status, offset, limit, source), PageView.class);
     }
 
     @GetMapping("/workorder/references/routings")
@@ -130,9 +126,7 @@ public class WorkOrderController {
     }
 
     private static AllocationView allocation(WorkOrderModels.Allocation a) {
-        return new AllocationView(id(a.workorderId()), a.plannedQty().toPlainString(), a.allocatedTargetQty()
-                .toPlainString(),
-                a.remainingTargetQty().toPlainString(), a.excessTargetQty().toPlainString(), a.executionCount());
+        return BeanConversions.convert(a, AllocationView.class);
     }
 
     private static String id(Long value) {
@@ -140,19 +134,14 @@ public class WorkOrderController {
     }
 
     private static OrderView order(WorkorderEntity w) {
-        return new OrderView(id(w.getId()), w.getSource(), w.getCode(), id(w.getProductId()), w.getPlannedQty(), id(w.getRoutingId()), w.getStatus(),
-                w.getPlannedStartAt(), w.getPlannedEndAt(), w.getExternalId(), w.getExternalCode(), w.getRemark(), w.getRevision(), w.getCreateTime(), w.getUpdateTime());
+        return BeanConversions.convert(w, OrderView.class);
     }
 
     private static BatchSummaryView batch(ProductionBatchEntity b) {
-        return new BatchSummaryView(id(b.getId()), id(b.getWorkorderId()), b.getBatchNo(), b.getPlannedQty(),
-                b.getStatus(), b.getRouteStatus(), b.getLockedAt(), b.getRevision(), b.getRemark());
+        return BeanConversions.convert(b, BatchSummaryView.class);
     }
 
     private static DetailView view(WorkOrderModels.Detail detail) {
-        RoutingEntity r = detail.routing();
-        var routing = new RoutingView(id(r.getId()), r.getCode(), r.getName(), r.getVersion(), r.getStatus());
-        return new DetailView(order(detail.workorder()), detail.productCode(), detail.productName(), routing, detail.batches()
-                .stream().map(WorkOrderController::batch).toList(), allocation(detail.allocation()));
+        return BeanConversions.convert(detail, DetailView.class);
     }
 }

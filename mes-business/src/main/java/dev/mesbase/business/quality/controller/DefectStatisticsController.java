@@ -1,14 +1,12 @@
 package dev.mesbase.business.quality.controller;
 
-import dev.mesbase.common.utils.bean.BeanConversions;
-import java.util.Optional;
-
 import dev.mesbase.business.quality.domain.DefectStatistics.Query;
 import dev.mesbase.business.quality.service.DefectStatisticsService;
+import dev.mesbase.common.utils.bean.BeanConversions;
 import dev.mesbase.platform.web.EndpointAccess;
 import java.util.List;
-import org.springframework.stereotype.Controller;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.ResponseBody;

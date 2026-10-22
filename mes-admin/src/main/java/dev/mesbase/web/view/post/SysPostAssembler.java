@@ -1,14 +1,12 @@
 package dev.mesbase.web.view.post;
 
 import dev.mesbase.common.utils.bean.BeanConversions;
-import java.util.Optional;
-
-import java.util.Objects;
-
 import dev.mesbase.system.domain.SysPost;
 import java.util.List;
 
-/** Explicit conversion at the Controller HTTP boundary. */
+/**
+ * Explicit conversion at the Controller HTTP boundary.
+ */
 public final class SysPostAssembler {
     private SysPostAssembler() {
     }

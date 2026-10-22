@@ -1,34 +1,33 @@
 package dev.mesbase.business.issue.service.impl;
 
-import dev.mesbase.business.issue.domain.MesMaterialIssuePage;
-import dev.mesbase.common.validation.ParameterChecks;
-import java.util.Optional;
-
-import dev.mesbase.business.integration.warehouse.ExternalEffect;
 import com.github.pagehelper.Page;
 import com.github.pagehelper.PageHelper;
+import dev.mesbase.business.integration.warehouse.ErpActionResult.Mode;
+import dev.mesbase.business.integration.warehouse.ExternalEffect;
+import dev.mesbase.business.integration.warehouse.WarehouseIntegration;
 import dev.mesbase.business.issue.dao.MesMaterialIssueMapper;
 import dev.mesbase.business.issue.domain.MesMaterialIssueCreateCommand;
 import dev.mesbase.business.issue.domain.MesMaterialIssueEntity;
 import dev.mesbase.business.issue.domain.MesMaterialIssueExample;
+import dev.mesbase.business.issue.domain.MesMaterialIssuePage;
 import dev.mesbase.business.issue.domain.MesMaterialIssueQueryDto;
 import dev.mesbase.business.issue.domain.MesMaterialIssueResource;
 import dev.mesbase.business.issue.domain.MesMaterialIssueUpdateCommand;
 import dev.mesbase.business.issue.service.IMesMaterialIssueService;
+import dev.mesbase.business.issue.service.MaterialIssueRules;
+import dev.mesbase.common.validation.ParameterChecks;
 import dev.mesbase.core.error.ErrorCode;
 import dev.mesbase.core.error.FoundationException;
 import dev.mesbase.infrastructure.cache.annotation.BusinessCache;
 import dev.mesbase.infrastructure.cache.annotation.BusinessCacheEvict;
+import dev.mesbase.platform.execution.FactoryContext;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Isolation;
-import dev.mesbase.business.issue.service.MaterialIssueRules;
-import dev.mesbase.business.integration.warehouse.WarehouseIntegration;
-import dev.mesbase.business.integration.warehouse.ErpActionResult.Mode;
-import dev.mesbase.platform.execution.FactoryContext;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
@@ -125,7 +124,8 @@ public class MesMaterialIssueServiceImpl implements IMesMaterialIssueService {
         row.setRemark(input.remark());
         rules.validate(row);
         Mode mode = FactoryContext.current().map(warehouse::configuredMode).orElse(null);
-        row.setSourceExecutionMode(Optional.ofNullable(mode).map(nullableValue -> nullableValue.getValue()).orElse(null));
+        row.setSourceExecutionMode(Optional.ofNullable(mode).map(nullableValue -> nullableValue.getValue())
+                .orElse(null));
         // This administrative CRUD never calls an external issue API.
         row.setExternalEffect(mode == Mode.LOCAL_ONLY ? ExternalEffect.NONE.getValue() : ExternalEffect.UNVERIFIED.getValue());
         rules.audit(row, true);

@@ -1,12 +1,9 @@
 package dev.mesbase.infrastructure.persistence;
 
-import java.util.Optional;
-
 import dev.mesbase.core.error.ErrorCode;
 import dev.mesbase.core.error.FoundationException;
-
+import java.util.Optional;
 import javax.sql.DataSource;
-
 import org.springframework.jdbc.support.JdbcTransactionManager;
 import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.support.DefaultTransactionStatus;
@@ -79,7 +76,8 @@ public final class OwnedTransactionManager extends JdbcTransactionManager {
     protected Object doSuspend(Object transaction) {
         Object connection = super.doSuspend(transaction);
         Object owner = TransactionSynchronizationManager.unbindResource(OWNER);
-        return new Suspended(connection, owner, Optional.ofNullable(routing).map(nullableValue -> nullableValue.suspend()).orElse(null));
+        return new Suspended(connection, owner, Optional.ofNullable(routing)
+                .map(nullableValue -> nullableValue.suspend()).orElse(null));
     }
 
     @Override

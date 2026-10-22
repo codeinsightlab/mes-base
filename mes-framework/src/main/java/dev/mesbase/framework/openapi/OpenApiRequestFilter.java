@@ -1,18 +1,17 @@
 package dev.mesbase.framework.openapi;
 
-import java.util.Optional;
-
 import dev.mesbase.common.openapi.OpenApiPrincipal;
+import dev.mesbase.platform.web.HttpFailureLogging;
+import dev.mesbase.platform.web.HttpRequestCompletionListener;
 import dev.mesbase.platform.web.RequestBoundaryFilter;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
+import java.util.Optional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import dev.mesbase.platform.web.HttpRequestCompletionListener;
-import dev.mesbase.platform.web.HttpFailureLogging;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.filter.OncePerRequestFilter;
 
@@ -68,7 +67,9 @@ public class OpenApiRequestFilter extends OncePerRequestFilter {
         }
         LOG.info("event=http.request.completed method={} path={} status={} durationMs={} factoryId={} userId={} clientId={} appKey={} apiCode={} errorCode={} peerIp={}",
                 method, path, response.getStatus(), durationMs, null, null,
-                Optional.ofNullable(identity).map(nullableValue -> nullableValue.getClientId()).orElse(null), Optional.ofNullable(identity).map(nullableValue -> safe(nullableValue.getAppKey())).orElse(null),
+                Optional.ofNullable(identity).map(nullableValue -> nullableValue.getClientId())
+                        .orElse(null), Optional.ofNullable(identity)
+                        .map(nullableValue -> safe(nullableValue.getAppKey())).orElse(null),
                 safe(String.valueOf(request.getAttribute(OpenApiHttp.API_CODE))),
                 request.getAttribute(OpenApiHttp.ERROR), safe(request.getRemoteAddr()));
     }

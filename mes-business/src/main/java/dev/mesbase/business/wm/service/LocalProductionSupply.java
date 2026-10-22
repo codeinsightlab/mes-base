@@ -1,52 +1,51 @@
 package dev.mesbase.business.wm.service;
 
-import dev.mesbase.common.utils.StringUtils;
-import dev.mesbase.common.validation.ParameterChecks;
-import java.util.Optional;
-
-import dev.mesbase.business.production.domain.WorkOrderStatus;
-import dev.mesbase.business.shared.enums.EnableStatus;
-import dev.mesbase.business.integration.production.ProductionSupply.Stock;
-import dev.mesbase.business.integration.production.ProductionSupply.Calculation;
-import dev.mesbase.business.integration.production.ProductionSupply.Order;
-import dev.mesbase.business.integration.production.ProductionSupply.Requirement;
-import dev.mesbase.business.integration.production.ProductionSupply.Context;
+import com.github.pagehelper.PageHelper;
 import dev.mesbase.business.basic.dao.MaterialMapper;
 import dev.mesbase.business.basic.dao.UnitMeasureMapper;
 import dev.mesbase.business.basic.domain.MaterialExample;
 import dev.mesbase.business.basic.domain.UnitMeasureExample;
+import dev.mesbase.business.integration.production.ProductionSupply.Calculation;
+import dev.mesbase.business.integration.production.ProductionSupply.Context;
+import dev.mesbase.business.integration.production.ProductionSupply.Order;
+import dev.mesbase.business.integration.production.ProductionSupply.Requirement;
+import dev.mesbase.business.integration.production.ProductionSupply.Stock;
+import dev.mesbase.business.integration.warehouse.WarehouseIntegration.Selection;
+import dev.mesbase.business.production.dao.MesWorkorderMaterialMapper;
+import dev.mesbase.business.production.dao.WorkorderMapper;
+import dev.mesbase.business.production.domain.MesWorkorderMaterialEntity;
+import dev.mesbase.business.production.domain.MesWorkorderMaterialExample;
+import dev.mesbase.business.production.domain.ProductionScanCode;
+import dev.mesbase.business.production.domain.WorkOrderStatus;
+import dev.mesbase.business.production.domain.WorkorderEntity;
+import dev.mesbase.business.production.domain.WorkorderExample;
+import dev.mesbase.business.shared.enums.BusinessSource;
+import dev.mesbase.business.shared.enums.EnableStatus;
 import dev.mesbase.business.wm.dao.WmInventoryMapper;
 import dev.mesbase.business.wm.dao.WmWarehouseMapper;
 import dev.mesbase.business.wm.domain.WmInventoryExample;
 import dev.mesbase.business.wm.domain.WmWarehouseExample;
-import java.util.stream.Collectors;
-import dev.mesbase.business.production.dao.WorkorderMapper;
-import dev.mesbase.business.production.domain.WorkorderExample;
-import dev.mesbase.business.production.domain.WorkorderEntity;
-import dev.mesbase.business.production.domain.ProductionScanCode;
+import dev.mesbase.common.utils.StringUtils;
+import dev.mesbase.common.validation.ParameterChecks;
 import dev.mesbase.core.error.ErrorCode;
 import dev.mesbase.core.error.FoundationException;
-import com.github.pagehelper.PageHelper;
+import dev.mesbase.core.factory.FactoryScope;
 import java.math.BigDecimal;
-import dev.mesbase.business.shared.enums.BusinessSource;
 import java.time.LocalDateTime;
-import java.util.List;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
+import java.util.List;
 import java.util.Objects;
-import org.springframework.core.env.Environment;
+import java.util.Optional;
+import java.util.TreeSet;
+import java.util.stream.Collectors;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.core.env.ConfigurableEnvironment;
 import org.springframework.core.env.EnumerablePropertySource;
-import java.util.TreeSet;
-import java.util.HashMap;
-import dev.mesbase.business.production.dao.MesWorkorderMaterialMapper;
-import dev.mesbase.business.production.domain.MesWorkorderMaterialExample;
-import dev.mesbase.business.production.domain.MesWorkorderMaterialEntity;
-import tools.jackson.databind.ObjectMapper;
+import org.springframework.core.env.Environment;
 import org.springframework.stereotype.Service;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
-import dev.mesbase.core.factory.FactoryScope;
-import dev.mesbase.business.integration.warehouse.WarehouseIntegration.Selection;
+import tools.jackson.databind.ObjectMapper;
 
 @Service
 @ConditionalOnProperty(name = "mes.business.enabled", havingValue = "true")
@@ -80,7 +79,8 @@ public class LocalProductionSupply {
         }
         var stock = inventory.selectByPrimaryKey(id);
         var order = orders.selectByPrimaryKey(orderId);
-        var warehouse = Optional.ofNullable(stock).map(nullableValue -> warehouses.selectByPrimaryKey(nullableValue.getWarehouseId())).orElse(null);
+        var warehouse = Optional.ofNullable(stock)
+                .map(nullableValue -> warehouses.selectByPrimaryKey(nullableValue.getWarehouseId())).orElse(null);
         if (order == null || warehouse == null || !BusinessSource.LOCAL.getValue().equals(order.getSource())
                 || !BusinessSource.LOCAL.getValue().equals(warehouse.getSource()))
             throw new FoundationException(ErrorCode.BUSINESS_SOURCE_CONFLICT);
@@ -95,8 +95,10 @@ public class LocalProductionSupply {
                         .equals(m.getStatus())).toList();
         if (matches.size() != 1) ParameterChecks.reject(ErrorCode.BAD_REQUEST);
         var material = matches.getFirst();
-        var unit = Optional.ofNullable(material.getUnitId()).map(nullableValue -> units.selectByPrimaryKey(nullableValue)).orElse(null);
-        if (unit == null || !EnableStatus.ENABLED.getValue().equals(unit.getStatus())) ParameterChecks.reject(ErrorCode.BAD_REQUEST);
+        var unit = Optional.ofNullable(material.getUnitId())
+                .map(nullableValue -> units.selectByPrimaryKey(nullableValue)).orElse(null);
+        if (unit == null || !EnableStatus.ENABLED.getValue().equals(unit.getStatus()))
+            ParameterChecks.reject(ErrorCode.BAD_REQUEST);
         var now = LocalDateTime.now();
         var sf = new WmInventoryExample();
         sf.createCriteria().andMaterialIdEqualTo(material.getId()).andBatchNoEqualTo(identity.lotCode())
@@ -204,7 +206,8 @@ public class LocalProductionSupply {
             if (code.startsWith("MES1.") && !ProductionScanCode.parse(code).productCode().equals(product.getCode()))
                 continue;
             var outputUnit = outputUnits.get(product.getUnitId());
-            if (outputUnit == null || !EnableStatus.ENABLED.getValue().equals(outputUnit.getStatus())) ParameterChecks.reject(ErrorCode.BAD_REQUEST);
+            if (outputUnit == null || !EnableStatus.ENABLED.getValue().equals(outputUnit.getStatus()))
+                ParameterChecks.reject(ErrorCode.BAD_REQUEST);
             candidates.add(new Order(o.getId(), o.getCode(), product.getCode(), product.getName(), center, o.getPlannedQty(), outputUnit.getCode(), o.getStatus(), ids,
                     List.of(new Requirement(material.getCode(), material.getId(), unit.getId(), unit.getCode(), total)), "LOCAL-WORKORDER:" + o.getId() + (db == null ? ":LEGACY" : ":R" + db.getRevision()), now));
         }

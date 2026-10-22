@@ -1,57 +1,48 @@
 package dev.mesbase.business.production.service;
 
-import dev.mesbase.common.validation.ParameterChecks;
-import dev.mesbase.business.production.domain.ProductionReportModels.ExecutionSummary;
+import com.github.pagehelper.PageHelper;
+import dev.mesbase.business.directory.domain.DirectoryLabel;
+import dev.mesbase.business.directory.service.BusinessDirectoryService;
 import dev.mesbase.business.legacy.dao.LegacyMigrationMapper;
-import dev.mesbase.business.production.domain.ProductionQuantityConflictException;
-import dev.mesbase.business.production.domain.ProductionQualityPendingException;
-import dev.mesbase.business.quality.service.ProductionDefectQuantityQuery;
-
-import dev.mesbase.business.production.dao.MesProductionExecutionMapper;
-import dev.mesbase.business.production.dao.WorkorderMapper;
-import dev.mesbase.business.production.domain.WorkOrderStatus;
-import dev.mesbase.business.production.domain.ProductionExecutionStatus;
 import dev.mesbase.business.production.dao.MesExecutionPathNodeMapper;
+import dev.mesbase.business.production.dao.MesProductionExecutionMapper;
 import dev.mesbase.business.production.dao.ProductionQuantityMapper;
-import dev.mesbase.business.production.domain.MesExecutionPathNodeExample;
+import dev.mesbase.business.production.dao.WorkorderMapper;
+import dev.mesbase.business.production.domain.ExecutionPathStatus;
 import dev.mesbase.business.production.domain.MesExecutionPathNodeEntity;
-import dev.mesbase.business.production.service.ExecutionPathService.PathModel;
-import dev.mesbase.business.production.service.ExecutionPathService.LockedPath;
-
-import java.util.function.Supplier;
-
-import dev.mesbase.business.production.service.ProductionChainLocks.LockedExecution;
+import dev.mesbase.business.production.domain.MesExecutionPathNodeExample;
 import dev.mesbase.business.production.domain.MesProductionExecutionEntity;
+import dev.mesbase.business.production.domain.ProductionExecutionStatus;
+import dev.mesbase.business.production.domain.ProductionInputBalance;
+import dev.mesbase.business.production.domain.ProductionQualityPendingException;
+import dev.mesbase.business.production.domain.ProductionQuantityConflictException;
+import dev.mesbase.business.production.domain.ProductionReportModels.ExecutionPage;
+import dev.mesbase.business.production.domain.ProductionReportModels.ExecutionQuantity;
+import dev.mesbase.business.production.domain.ProductionReportModels.ExecutionSummary;
+import dev.mesbase.business.production.domain.ProductionReportModels.NodeQuantity;
+import dev.mesbase.business.production.domain.WorkOrderStatus;
 import dev.mesbase.business.production.domain.WorkorderEntity;
 import dev.mesbase.business.production.domain.WorkorderExample;
-import dev.mesbase.business.production.domain.ProductionInputBalance;
+import dev.mesbase.business.production.service.ExecutionPathService.LockedPath;
+import dev.mesbase.business.production.service.ExecutionPathService.PathModel;
+import dev.mesbase.business.production.service.ProductionChainLocks.LockedExecution;
 import dev.mesbase.business.quality.domain.ProductionDefectModels;
-
-import java.util.LinkedHashMap;
-
-import dev.mesbase.business.production.domain.ExecutionPathStatus;
-import dev.mesbase.business.production.domain.ProductionReportModels.ExecutionQuantity;
-import dev.mesbase.business.production.domain.ProductionReportModels.ExecutionPage;
-import dev.mesbase.business.production.domain.ProductionReportModels.NodeQuantity;
+import dev.mesbase.business.quality.service.ProductionDefectQuantityQuery;
+import dev.mesbase.common.validation.ParameterChecks;
 import dev.mesbase.core.error.ErrorCode;
 import dev.mesbase.core.error.FoundationException;
-import com.github.pagehelper.PageHelper;
-
 import java.math.BigDecimal;
-import java.util.List;
-
-import dev.mesbase.business.directory.service.BusinessDirectoryService;
-import dev.mesbase.business.directory.domain.DirectoryLabel;
-
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
-
-import org.springframework.stereotype.Service;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
@@ -100,7 +91,8 @@ public class ProductionQuantityService {
         var batch = paths.viewBatch(executionIds);
         if (batch.executions().isEmpty()) return Map.of();
         if (history == null || batch.executions().values().stream()
-                .anyMatch(e -> !ProductionExecutionStatus.HISTORICAL.getValue().equals(e.getStatus()))) ParameterChecks.reject(ErrorCode.REPORT_PATH_REQUIRED);
+                .anyMatch(e -> !ProductionExecutionStatus.HISTORICAL.getValue().equals(e.getStatus())))
+            ParameterChecks.reject(ErrorCode.REPORT_PATH_REQUIRED);
         var ids = List.copyOf(batch.executions().keySet());
         var inputs = history.inputs(ids).stream().collect(Collectors.toMap(n -> n.executionId(), n -> n.quantity()));
         var nodes = history.nodesBatch(ids).stream().collect(Collectors.groupingBy(n -> n.executionId(),
@@ -129,7 +121,8 @@ public class ProductionQuantityService {
                         List.of(), label(model.routing()), input, balance.confirmedQty(), balance.reservedQty()));
                 continue;
             }
-            if (!Objects.equals(model.path().getRoutingId(), e.getRoutingId())) ParameterChecks.reject(ErrorCode.REPORT_PATH_REQUIRED);
+            if (!Objects.equals(model.path().getRoutingId(), e.getRoutingId()))
+                ParameterChecks.reject(ErrorCode.REPORT_PATH_REQUIRED);
             ExecutionPathValidator.validate(model.selectedNodeIds(), model.nodes(), model.edges());
             var ordered = validateOrdered(batch.ordered().getOrDefault(id, List.of()), model);
             result.put(id, project(compose(e, model, new QuantityFacts(balance, input, true,
@@ -146,7 +139,8 @@ public class ProductionQuantityService {
      */
     public void requireReadableExecutionNode(Long executionId, Long nodeId) {
         var model = paths.view(executionId);
-        if (model.path() == null || !Objects.equals(model.path().getRoutingId(), model.routing().id())) ParameterChecks.reject(ErrorCode.REPORT_PATH_REQUIRED);
+        if (model.path() == null || !Objects.equals(model.path().getRoutingId(), model.routing().id()))
+            ParameterChecks.reject(ErrorCode.REPORT_PATH_REQUIRED);
         ExecutionPathValidator.validate(model.selectedNodeIds(), model.nodes(), model.edges());
         if (orderedPathNodes(executionId, model).stream()
                 .noneMatch(row -> Objects.equals(row.getRoutingNodeId(), nodeId)))
@@ -197,7 +191,8 @@ public class ProductionQuantityService {
         if (model.path() == null)
             return new ExecutionQuantity(executionId, execution.getWorkorderId(), execution.getExecutionNo(),
                     execution.getRoutingId(), execution.getTargetQty(), ExecutionPathStatus.UNSELECTED.getValue(), false, "执行尚未选择实际路径", List.of(), label(model.routing()), inputQty, balance.confirmedQty(), balance.reservedQty());
-        if (!Objects.equals(model.path().getRoutingId(), execution.getRoutingId())) ParameterChecks.reject(ErrorCode.REPORT_PATH_REQUIRED);
+        if (!Objects.equals(model.path().getRoutingId(), execution.getRoutingId()))
+            ParameterChecks.reject(ErrorCode.REPORT_PATH_REQUIRED);
         ExecutionPathValidator.validate(model.selectedNodeIds(), model.nodes(), model.edges());
         var ordered = selectedRows.get();
         var totals = quantities.nodeTotals(executionId).stream()
@@ -308,7 +303,8 @@ public class ProductionQuantityService {
     public static void validateChange(ExecutionQuantity view, Long nodeId, BigDecimal delta) {
         // Historical corrections retain their formal gates even after normal reporting closes.
         if (view.historical()) ParameterChecks.reject(ErrorCode.REPORT_PATH_REQUIRED);
-        if (!ExecutionPathStatus.LOCKED.getValue().equals(view.pathStatus())) ParameterChecks.reject(ErrorCode.REPORT_PATH_REQUIRED);
+        if (!ExecutionPathStatus.LOCKED.getValue().equals(view.pathStatus()))
+            ParameterChecks.reject(ErrorCode.REPORT_PATH_REQUIRED);
         var before = calculate(view, null, BigDecimal.ZERO, BigDecimal.ZERO);
         String blocked = positiveReportBlockReason(before, nodeId);
         if (delta.signum() > 0 && blocked != null) throw new ProductionQualityPendingException(blocked);
@@ -393,9 +389,9 @@ public class ProductionQuantityService {
             if (affected == null && n.unverifiedDefectQty().signum() > 0) affected = n;
             if (n.routingNodeId().equals(nodeId)) {
                 if (affected == null) return null;
-        return "工序 " + affected.code() + " · " + affected.name() + " 存在待核实不良 "
-                            + affected.unverifiedDefectQty()
-                            .toPlainString() + "；当前工序受其影响，须先核实质量记录再新增报工。";
+                return "工序 " + affected.code() + " · " + affected.name() + " 存在待核实不良 "
+                        + affected.unverifiedDefectQty()
+                        .toPlainString() + "；当前工序受其影响，须先核实质量记录再新增报工。";
             }
         }
         throw new FoundationException(ErrorCode.REPORT_PATH_REQUIRED);

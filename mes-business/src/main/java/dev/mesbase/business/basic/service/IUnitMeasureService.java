@@ -1,9 +1,8 @@
 package dev.mesbase.business.basic.service;
 
-import dev.mesbase.business.basic.domain.UnitMeasurePage;
-import com.github.pagehelper.Page;
 import dev.mesbase.business.basic.domain.UnitMeasureCreateCommand;
 import dev.mesbase.business.basic.domain.UnitMeasureEntity;
+import dev.mesbase.business.basic.domain.UnitMeasurePage;
 import dev.mesbase.business.basic.domain.UnitMeasureQueryDto;
 import dev.mesbase.business.basic.domain.UnitMeasureUpdateCommand;
 import dev.mesbase.business.basic.sync.ExternalUnitMeasure;
@@ -26,9 +25,10 @@ public interface IUnitMeasureService {
     UnitMeasureEntity updateById(Long id, UnitMeasureUpdateCommand input);
 
     void deleteByIds(List<Long> ids);
+
     UnitMeasureSyncResult sync(FactoryScope scope);
 
     UnitMeasureSyncResult upsert(FactoryScope scope,
-            List<ExternalUnitMeasure> inputs);
+                                 List<ExternalUnitMeasure> inputs);
 }
 

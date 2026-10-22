@@ -1,43 +1,40 @@
 package dev.mesbase.business.wm.service;
 
-import dev.mesbase.common.utils.StringUtils;
-import dev.mesbase.common.validation.ParameterChecks;
-import java.util.Optional;
-
+import dev.mesbase.business.basic.dao.MaterialMapper;
+import dev.mesbase.business.basic.dao.UnitMeasureMapper;
+import dev.mesbase.business.integration.production.ProductionSupply.Calculation;
+import dev.mesbase.business.integration.warehouse.ErpActionResult.Mode;
+import dev.mesbase.business.integration.warehouse.WarehouseIntegration;
+import dev.mesbase.business.issue.dao.MesMaterialIssueInputMapper;
+import dev.mesbase.business.issue.dao.MesMaterialIssueMapper;
+import dev.mesbase.business.issue.domain.MaterialIssueStatus;
+import dev.mesbase.business.issue.domain.MesMaterialIssueInputEntity;
+import dev.mesbase.business.issue.domain.MesMaterialIssueInputExample;
+import dev.mesbase.business.production.dao.MesProductionReceiptMapper;
+import dev.mesbase.business.production.dao.MesProductionReportMapper;
+import dev.mesbase.business.production.domain.MesProductionReceiptExample;
+import dev.mesbase.business.production.domain.MesProductionReportExample;
+import dev.mesbase.business.production.domain.ProductionScanCode;
 import dev.mesbase.business.production.service.BusinessSourceRules;
+import dev.mesbase.business.production.service.ProductionChainLocks;
+import dev.mesbase.business.quality.dao.MesProductionDefectMapper;
+import dev.mesbase.business.quality.domain.MesProductionDefectExample;
 import dev.mesbase.business.shared.enums.BusinessSource;
-
+import dev.mesbase.business.shared.enums.EnableStatus;
 import dev.mesbase.business.wm.dao.WmInventoryMapper;
 import dev.mesbase.business.wm.dao.WmStockActionMapper;
 import dev.mesbase.business.wm.dao.WmWarehouseMapper;
+import dev.mesbase.business.wm.domain.StockActionType;
+import dev.mesbase.business.wm.domain.StockCommand;
+import dev.mesbase.business.wm.domain.StockSourceType;
 import dev.mesbase.business.wm.domain.WmInventoryEntity;
-import dev.mesbase.business.wm.domain.WmStockDocumentLineEntity;
+import dev.mesbase.business.wm.domain.WmInventoryResource;
 import dev.mesbase.business.wm.domain.WmStockActionEntity;
 import dev.mesbase.business.wm.domain.WmStockActionExample;
-import dev.mesbase.business.wm.domain.WmInventoryResource;
-import dev.mesbase.business.wm.domain.StockActionType;
-import dev.mesbase.business.wm.domain.StockSourceType;
-import dev.mesbase.business.wm.domain.StockCommand;
-import dev.mesbase.business.basic.dao.MaterialMapper;
-import dev.mesbase.business.basic.dao.UnitMeasureMapper;
-import dev.mesbase.business.issue.dao.MesMaterialIssueMapper;
-import dev.mesbase.business.issue.dao.MesMaterialIssueInputMapper;
-import dev.mesbase.business.issue.domain.MesMaterialIssueInputEntity;
-import dev.mesbase.business.issue.domain.MesMaterialIssueInputExample;
-import dev.mesbase.business.issue.domain.MaterialIssueStatus;
-import dev.mesbase.business.integration.production.ProductionSupply.Calculation;
-import dev.mesbase.business.integration.warehouse.WarehouseIntegration;
-import dev.mesbase.business.integration.warehouse.ErpActionResult.Mode;
-import dev.mesbase.business.production.service.ProductionChainLocks;
-import dev.mesbase.business.production.dao.MesProductionReportMapper;
-import dev.mesbase.business.production.domain.MesProductionReportExample;
-import dev.mesbase.business.quality.dao.MesProductionDefectMapper;
-import dev.mesbase.business.quality.domain.MesProductionDefectExample;
-import dev.mesbase.business.production.dao.MesProductionReceiptMapper;
-import dev.mesbase.business.production.domain.MesProductionReceiptExample;
-import dev.mesbase.business.production.domain.ProductionScanCode;
-import dev.mesbase.business.shared.enums.EnableStatus;
+import dev.mesbase.business.wm.domain.WmStockDocumentLineEntity;
 import dev.mesbase.common.utils.SecurityUtils;
+import dev.mesbase.common.utils.StringUtils;
+import dev.mesbase.common.validation.ParameterChecks;
 import dev.mesbase.core.error.ErrorCode;
 import dev.mesbase.core.error.FoundationException;
 import dev.mesbase.infrastructure.cache.annotation.BusinessCacheEvict;
@@ -46,13 +43,14 @@ import java.time.LocalDateTime;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.UUID;
-import tools.jackson.databind.ObjectMapper;
-import org.springframework.stereotype.Service;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
-import org.springframework.transaction.annotation.Transactional;
-import org.springframework.transaction.annotation.Propagation;
+import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Isolation;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
+import tools.jackson.databind.ObjectMapper;
 
 /**
  * LOCAL余额唯一业务写入者。锁序：工单→执行→领料→库存；动作和调用方事实同事务。
@@ -105,7 +103,8 @@ public class LocalStockService {
         decimal(c.quantity());
         decimal(c.expectedQuantity());
         decimal(c.expectedAvailable());
-        if (StringUtils.isBlank(c.reason()) || c.reason().length() > 500 || c.stockId() == null) ParameterChecks.reject(ErrorCode.BAD_REQUEST);
+        if (StringUtils.isBlank(c.reason()) || c.reason().length() > 500 || c.stockId() == null)
+            ParameterChecks.reject(ErrorCode.BAD_REQUEST);
         if (type != StockActionType.RETURN && c.issueId() != null) ParameterChecks.reject(ErrorCode.BAD_REQUEST);
         Long actor = SecurityUtils.getUserId();
         String hash = digest(type, c.stockId(), normalized(c.quantity()), normalized(c.expectedQuantity()),
@@ -115,7 +114,8 @@ public class LocalStockService {
             if (c.issueId() == null) ParameterChecks.reject(ErrorCode.BAD_REQUEST);
             locks.issues(List.of(c.issueId()));
             var issue = issues.selectByPrimaryKey(c.issueId());
-            if (!MaterialIssueStatus.CONFIRMED.getValue().equals(issue.getStatus())) ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
+            if (!MaterialIssueStatus.CONFIRMED.getValue().equals(issue.getStatus()))
+                ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
             var f = new MesMaterialIssueInputExample();
             f.createCriteria().andIssueIdEqualTo(c.issueId());
             var found = inputs.selectByExampleWithBLOBs(f);
@@ -140,7 +140,8 @@ public class LocalStockService {
         BigDecimal delta = c.quantity();
         if (type == StockActionType.OPENING) {
             if (delta.signum() < 0 || stock.getQuantity()
-                    .signum() != 0 || available(stock).signum() != 0 || referenced(stock.getId())) ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
+                    .signum() != 0 || available(stock).signum() != 0 || referenced(stock.getId()))
+                ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
         } else if (type == StockActionType.CORRECTION) {
             if (delta.signum() == 0) ParameterChecks.reject(ErrorCode.BAD_REQUEST);
         } else {
@@ -159,17 +160,21 @@ public class LocalStockService {
             var pf = new MesProductionReceiptExample();
             pf.createCriteria().andExecutionIdEqualTo(input.getExecutionId());
             if (execution.getStartTime() != null || reports.countByExample(rf) != 0
-                    || defects.countByExample(df) != 0 || receipts.countByExample(pf) != 0) ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
+                    || defects.countByExample(df) != 0 || receipts.countByExample(pf) != 0)
+                ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
             var original = actions.selectByPrimaryKey(input.getId());
-            if (original == null || !StockActionType.ISSUE.getValue().equals(original.getActionType())) ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
+            if (original == null || !StockActionType.ISSUE.getValue().equals(original.getActionType()))
+                ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
             var calculation = json.readValue(input.getCalculationJson(), Calculation.class);
             identity(stock, calculation);
-            if (returned(original.getId()).add(delta).compareTo(calculation.issueQty()) > 0) ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
+            if (returned(original.getId()).add(delta).compareTo(calculation.issueQty()) > 0)
+                ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
             reference = original.getId();
         }
         return change(stock, id, hash, type, delta, input == null ? StockSourceType.INVENTORY : StockSourceType.MATERIAL_ISSUE,
                 input == null ? stock.getId().toString() : input.getIssueId().toString(), reference,
-                Optional.ofNullable(input).map(nullableValue -> nullableValue.getExecutionId()).orElse(null), actor, c.reason());
+                Optional.ofNullable(input).map(nullableValue -> nullableValue.getExecutionId())
+                        .orElse(null), actor, c.reason());
     }
 
     /**
@@ -185,7 +190,8 @@ public class LocalStockService {
         identity(stock, calculation);
         if (!EnableStatus.ENABLED.getValue().equals(stock.getStatus())
                 || stock.getQuantity().compareTo(calculation.issueQty()) < 0
-                || available(stock).compareTo(calculation.issueQty()) < 0) ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
+                || available(stock).compareTo(calculation.issueQty()) < 0)
+            ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
     }
 
     /**
@@ -223,7 +229,8 @@ public class LocalStockService {
         BigDecimal delta = calculation.issueQty().subtract(returned(input.getId()));
         if (delta.signum() < 0) ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
         change(stock, id, hash, StockActionType.REVERSAL, delta, StockSourceType.MATERIAL_ISSUE,
-                input.getIssueId().toString(), Optional.ofNullable(original).map(nullableValue -> nullableValue.getId()).orElse(null), input.getExecutionId(),
+                input.getIssueId().toString(), Optional.ofNullable(original).map(nullableValue -> nullableValue.getId())
+                        .orElse(null), input.getExecutionId(),
                 SecurityUtils.getUserId(), original == null ? "历史领料撤销，按原冻结投入恢复余额" : "原领料整单撤销，扣除已退材料后恢复");
     }
 
@@ -240,11 +247,13 @@ public class LocalStockService {
                                             Long executionId) {
         var actionType = StockActionType.from(type);
         var sourceType = StockSourceType.from(type);
-        if (actionType != StockActionType.OTHER_RECEIPT && actionType != StockActionType.OTHER_ISSUE) ParameterChecks.reject(ErrorCode.BAD_REQUEST);
+        if (actionType != StockActionType.OTHER_RECEIPT && actionType != StockActionType.OTHER_ISSUE)
+            ParameterChecks.reject(ErrorCode.BAD_REQUEST);
         uuid(operationId);
         uuid(actionId);
         decimal(line.getQuantity());
-        if (line.getQuantity().signum() <= 0 || !Objects.equals(documentId, line.getDocumentId())) ParameterChecks.reject(ErrorCode.BAD_REQUEST);
+        if (line.getQuantity().signum() <= 0 || !Objects.equals(documentId, line.getDocumentId()))
+            ParameterChecks.reject(ErrorCode.BAD_REQUEST);
         var stock = lock(line.getStockId());
         sources.warehouse(BusinessSource.LOCAL.getValue(), stock.getWarehouseId());
         var material = materials.selectByPrimaryKey(stock.getMaterialId());
@@ -252,7 +261,8 @@ public class LocalStockService {
                 || !Objects.equals(stock.getWarehouseId(), line.getWarehouseId())
                 || !Objects.equals(stock.getBatchNo(), line.getBatchNo())
                 || !Objects.equals(stock.getBinCode(), line.getBinCode())
-                || material == null || !Objects.equals(material.getUnitId(), line.getUnitId())) ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
+                || material == null || !Objects.equals(material.getUnitId(), line.getUnitId()))
+            ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
         if (actionType == StockActionType.OTHER_ISSUE && (stock.getQuantity().compareTo(line.getQuantity()) < 0
                 || available(stock).compareTo(line.getQuantity()) < 0))
             throw new FoundationException(ErrorCode.STOCK_INSUFFICIENT);
@@ -299,7 +309,8 @@ public class LocalStockService {
                 .equals(stock.getStatus())
                 || !EnableStatus.ENABLED.getValue().equals(material.getStatus()) || !EnableStatus.ENABLED.getValue()
                 .equals(warehouse.getStatus())
-                || !EnableStatus.ENABLED.getValue().equals(unit.getStatus())) ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
+                || !EnableStatus.ENABLED.getValue().equals(unit.getStatus()))
+            ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
         BigDecimal before = stock.getQuantity(), avail = available(stock);
         BigDecimal after = before.add(delta), availableAfter = avail.add(delta);
         validateBalances(after, availableAfter);
@@ -333,7 +344,8 @@ public class LocalStockService {
         stock.setAvailableQuantity(availableAfter);
         stock.setUpdateBy(actor.toString());
         stock.setUpdateTime(a.getRecordedAt());
-        if (inventory.updateByPrimaryKey(stock) != 1 || actions.insert(a) != 1) ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
+        if (inventory.updateByPrimaryKey(stock) != 1 || actions.insert(a) != 1)
+            ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
         return a;
     }
 
@@ -350,7 +362,8 @@ public class LocalStockService {
 
     private static void requireLocal(MesMaterialIssueInputEntity input, Calculation calculation) {
         if (!Mode.LOCAL_ONLY.getValue().equals(input.getSourceMode())
-                || !Mode.LOCAL_ONLY.getValue().equals(calculation.sourceMode())) ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
+                || !Mode.LOCAL_ONLY.getValue().equals(calculation.sourceMode()))
+            ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
     }
 
     private void identity(WmInventoryEntity s, Calculation c) {
@@ -359,7 +372,8 @@ public class LocalStockService {
         if (!Objects.equals(s.getId()
                 .toString(), source.reference()) || !Objects.equals(s.getMaterialId(), source.materialId()) || !Objects.equals(s.getWarehouseId(), source.warehouseId())
                 || !Objects.equals(s.getBatchNo(), source.lotCode()) || !Objects.equals(s.getBinCode(), source.binCode())
-                || material == null || !Objects.equals(material.getUnitId(), source.unitId())) ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
+                || material == null || !Objects.equals(material.getUnitId(), source.unitId()))
+            ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
     }
 
     private static BigDecimal available(WmInventoryEntity s) {
@@ -369,11 +383,13 @@ public class LocalStockService {
     public static void validateBalances(BigDecimal quantity, BigDecimal available) {
         decimal(quantity);
         decimal(available);
-        if (quantity.signum() < 0 || available.signum() < 0 || available.compareTo(quantity) > 0) ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
+        if (quantity.signum() < 0 || available.signum() < 0 || available.compareTo(quantity) > 0)
+            ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
     }
 
     private static void decimal(BigDecimal value) {
-        if (value == null || value.scale() > 6 || value.precision() - value.scale() > 14) ParameterChecks.reject(ErrorCode.BAD_REQUEST);
+        if (value == null || value.scale() > 6 || value.precision() - value.scale() > 14)
+            ParameterChecks.reject(ErrorCode.BAD_REQUEST);
     }
 
     private static String normalized(BigDecimal value) {

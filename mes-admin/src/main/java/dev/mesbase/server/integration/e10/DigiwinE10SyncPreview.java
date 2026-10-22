@@ -1,7 +1,5 @@
 package dev.mesbase.server.integration.e10;
 
-import java.util.Optional;
-
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.lixin.capability.digiwin.e10.request.E10QueryRequest;
@@ -14,6 +12,7 @@ import dev.mesbase.platform.execution.FactoryIntegrationContext;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 /**
  * 身份及业务映射尚未验收，只允许有界单页候选读取。不持有业务事务，不写业务表。
@@ -66,7 +65,8 @@ public final class DigiwinE10SyncPreview {
                 for (var row : queries.queryMo(request).getRows()) {
                     rows.add(new Candidate(row.getDocNo(), row.getItemName(), text(row.getSource(), "om_site_id"),
                             null, row.getItemNo(), row.getUnitNo(), row.getProcessNo(), row.getStatus(),
-                            Optional.ofNullable(row.getPlanQty()).map(nullableValue -> nullableValue.toPlainString()).orElse(null)));
+                            Optional.ofNullable(row.getPlanQty()).map(nullableValue -> nullableValue.toPlainString())
+                                    .orElse(null)));
                 }
             } else {
                 for (var row : queries.queryWarehouse(request).getRows()) {

@@ -1,14 +1,9 @@
 package dev.mesbase.server;
 
-import dev.mesbase.core.factory.FactoryScope;
-import java.util.function.Consumer;
-import java.util.Optional;
-
 import dev.mesbase.core.error.ErrorCode;
 import dev.mesbase.core.factory.FactoryCatalog;
-import dev.mesbase.server.managed.ManagedDatasourceService;
-import org.springframework.beans.factory.ObjectProvider;
 import dev.mesbase.core.factory.FactoryPreference;
+import dev.mesbase.core.factory.FactoryScope;
 import dev.mesbase.core.factory.FactorySelectionService;
 import dev.mesbase.core.security.AuthorizationService;
 import dev.mesbase.framework.security.SystemTokenFilter;
@@ -22,15 +17,18 @@ import dev.mesbase.infrastructure.persistence.RuntimeRegistry;
 import dev.mesbase.platform.security.PlatformAuthorization;
 import dev.mesbase.platform.web.ErrorWriter;
 import dev.mesbase.platform.web.FoundationAccessInterceptor;
+import dev.mesbase.platform.web.PublicEndpointMatcher;
+import dev.mesbase.server.managed.ManagedDatasourceService;
+import jakarta.servlet.DispatcherType;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Consumer;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.env.Environment;
-import jakarta.servlet.DispatcherType;
-import dev.mesbase.platform.web.PublicEndpointMatcher;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;

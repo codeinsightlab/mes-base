@@ -1,9 +1,8 @@
 package dev.mesbase.business.dv.service;
 
-import dev.mesbase.business.dv.domain.DvSubjectPage;
-import com.github.pagehelper.Page;
 import dev.mesbase.business.dv.domain.DvSubjectCreateCommand;
 import dev.mesbase.business.dv.domain.DvSubjectEntity;
+import dev.mesbase.business.dv.domain.DvSubjectPage;
 import dev.mesbase.business.dv.domain.DvSubjectQueryDto;
 import dev.mesbase.business.dv.domain.DvSubjectUpdateCommand;
 import dev.mesbase.business.dv.sync.DvSubjectSyncResult;
@@ -26,9 +25,10 @@ public interface IDvSubjectService {
     DvSubjectEntity updateById(Long id, DvSubjectUpdateCommand input);
 
     void deleteByIds(List<Long> ids);
+
     DvSubjectSyncResult sync(FactoryScope scope);
 
     DvSubjectSyncResult upsert(FactoryScope scope,
-            List<ExternalDvSubject> inputs);
+                               List<ExternalDvSubject> inputs);
 }
 

@@ -1,11 +1,10 @@
 package dev.mesbase.acceptance;
 
-import java.util.Optional;
-
 import dev.mesbase.core.factory.FactoryId;
 import dev.mesbase.core.factory.FactoryRuntimeMode;
 import dev.mesbase.platform.execution.FactoryIntegrationSnapshot;
 import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import org.springframework.context.ApplicationContext;
 

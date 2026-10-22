@@ -1,37 +1,35 @@
 package dev.mesbase.business.quality.service;
 
-import dev.mesbase.common.validation.ParameterChecks;
-import java.util.Optional;
-
+import com.github.pagehelper.PageHelper;
+import dev.mesbase.business.integration.warehouse.ErpActionResult.Mode;
+import dev.mesbase.business.integration.warehouse.WarehouseIntegration;
+import dev.mesbase.business.production.domain.ExecutionPathStatus;
+import dev.mesbase.business.production.domain.ProductionClosureRules;
+import dev.mesbase.business.production.domain.ProductionExecutionStatus;
 import dev.mesbase.business.production.domain.ProductionQuantityInput;
-
+import dev.mesbase.business.production.domain.ProductionReportModels.ExecutionQuantity;
+import dev.mesbase.business.production.service.BusinessSourceRules;
+import dev.mesbase.business.production.service.ProductionChainLocks;
+import dev.mesbase.business.production.service.ProductionQuantityService;
 import dev.mesbase.business.quality.dao.MesQualityReleaseMapper;
 import dev.mesbase.business.quality.domain.MesQualityReleaseEntity;
-import dev.mesbase.business.quality.domain.QualityReleaseAction;
 import dev.mesbase.business.quality.domain.MesQualityReleaseExample;
+import dev.mesbase.business.quality.domain.QualityReleaseAction;
 import dev.mesbase.business.quality.domain.QualityTreatmentModels.Attribution;
-import dev.mesbase.business.production.domain.ProductionClosureRules;
-import dev.mesbase.business.production.domain.ProductionReportModels.ExecutionQuantity;
-import dev.mesbase.business.production.domain.ExecutionPathStatus;
-import dev.mesbase.business.production.domain.ProductionExecutionStatus;
-import dev.mesbase.business.production.service.ProductionChainLocks;
-import dev.mesbase.business.production.service.BusinessSourceRules;
-import dev.mesbase.business.production.service.ProductionQuantityService;
-import dev.mesbase.business.integration.warehouse.WarehouseIntegration;
-import dev.mesbase.business.integration.warehouse.ErpActionResult.Mode;
+import dev.mesbase.common.validation.ParameterChecks;
+import dev.mesbase.core.error.ErrorCode;
+import dev.mesbase.core.error.FoundationException;
 import dev.mesbase.platform.execution.FactoryContext;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Objects;
-import com.github.pagehelper.PageHelper;
-import org.springframework.stereotype.Service;
-import org.springframework.dao.DuplicateKeyException;
-import dev.mesbase.core.error.FoundationException;
-import dev.mesbase.core.error.ErrorCode;
+import java.util.Optional;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.dao.DuplicateKeyException;
+import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Isolation;
+import org.springframework.transaction.annotation.Transactional;
 
 import static dev.mesbase.business.production.domain.ProductionClosureRules.blocked;
 
@@ -103,7 +101,8 @@ public class QualityReleaseService {
         boolean valid = latest != null && issue == null && latest.getBasisHash()
                 .equals(hash) && QualityReleaseAction.RELEASE.getValue()
                 .equals(latest.getActionType()) && latest.getQuantity().compareTo(output) <= 0;
-        return new State(execution, output, valid ? latest.getQuantity() : BigDecimal.ZERO, latest == null ? BigDecimal.ZERO : latest.getQuantity(), Optional.ofNullable(latest).map(nullableValue -> nullableValue.getId()).orElse(null), hash, valid, issue == null, issue);
+        return new State(execution, output, valid ? latest.getQuantity() : BigDecimal.ZERO, latest == null ? BigDecimal.ZERO : latest.getQuantity(), Optional.ofNullable(latest)
+                .map(nullableValue -> nullableValue.getId()).orElse(null), hash, valid, issue == null, issue);
     }
 
     private MesQualityReleaseEntity latest(Long execution) {
@@ -148,13 +147,15 @@ public class QualityReleaseService {
         if (integration.configuredMode(FactoryContext.required()) != Mode.LOCAL_ONLY)
             blocked("ERP模式须由真实质量集成实现，不允许回退LOCAL放行");
         var state = state(execution);
-        if (!Objects.equals(c.expectedReleaseId(), state.currentReleaseId())) ParameterChecks.reject(ErrorCode.PRODUCTION_CLOSURE_CONFLICT);
+        if (!Objects.equals(c.expectedReleaseId(), state.currentReleaseId()))
+            ParameterChecks.reject(ErrorCode.PRODUCTION_CLOSURE_CONFLICT);
         if (!List.of(ProductionExecutionStatus.RUNNING.getValue(), ProductionExecutionStatus.COMPLETED.getValue())
                 .contains(row.getStatus()))
             blocked("仅运行或生产已完工的执行可以新增正式放行或撤回");
         if (!c.revoke() && (!state.safe() || c.quantity().compareTo(state.effective()) > 0))
             blocked(state.blockedReason() == null ? "放行数量不能超过末道有效产出" : state.blockedReason());
-        if (c.revoke() && state.currentReleaseId() == null) ParameterChecks.reject(ErrorCode.PRODUCTION_CLOSURE_CONFLICT);
+        if (c.revoke() && state.currentReleaseId() == null)
+            ParameterChecks.reject(ErrorCode.PRODUCTION_CLOSURE_CONFLICT);
         var previous = latest(execution);
         var fact = new MesQualityReleaseEntity();
         fact.setId(c.requestId());

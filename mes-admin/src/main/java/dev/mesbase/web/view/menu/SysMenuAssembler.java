@@ -1,12 +1,12 @@
 package dev.mesbase.web.view.menu;
 
-import dev.mesbase.common.utils.bean.BeanConversions;
-import java.util.Objects;
-
 import dev.mesbase.common.core.domain.entity.SysMenu;
+import dev.mesbase.common.utils.bean.BeanConversions;
 import java.util.List;
 
-/** Explicit conversion at the Controller HTTP boundary. */
+/**
+ * Explicit conversion at the Controller HTTP boundary.
+ */
 public final class SysMenuAssembler {
     private SysMenuAssembler() {
     }

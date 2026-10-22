@@ -1,66 +1,63 @@
 package dev.mesbase.business.production.service;
 
-import dev.mesbase.common.utils.StringUtils;
-import java.util.Optional;
-
-import dev.mesbase.business.production.domain.ProductionQuantityInput;
-
-import dev.mesbase.business.production.service.BusinessSourceRules;
-import dev.mesbase.business.shared.enums.BusinessSource;
-import dev.mesbase.business.shared.enums.EnableStatus;
-import dev.mesbase.business.shared.ExternalSyncAction;
-import dev.mesbase.business.shared.ExternalSyncCheck;
-
-import dev.mesbase.business.production.domain.WorkOrderStatus;
-import dev.mesbase.business.directory.service.BusinessDirectoryService;
-import dev.mesbase.business.production.domain.RoutingStatus;
 import com.github.pagehelper.Page;
 import com.github.pagehelper.PageHelper;
 import dev.mesbase.business.basic.dao.MaterialMapper;
 import dev.mesbase.business.basic.domain.MaterialExample;
+import dev.mesbase.business.directory.service.BusinessDirectoryService;
 import dev.mesbase.business.issue.dao.MesMaterialIssueMapper;
 import dev.mesbase.business.issue.domain.MesMaterialIssueExample;
+import dev.mesbase.business.production.dao.MesProductionExecutionMapper;
+import dev.mesbase.business.production.dao.MesWorkorderMaterialMapper;
 import dev.mesbase.business.production.dao.ProductionBatchMapper;
 import dev.mesbase.business.production.dao.RoutingEdgeMapper;
 import dev.mesbase.business.production.dao.RoutingMapper;
 import dev.mesbase.business.production.dao.RoutingNodeMapper;
 import dev.mesbase.business.production.dao.RoutingProductMapper;
-import dev.mesbase.business.production.dao.WorkorderMapper;
-import dev.mesbase.business.production.dao.MesWorkorderMaterialMapper;
-import dev.mesbase.business.production.dao.MesProductionExecutionMapper;
-import dev.mesbase.business.production.domain.MesProductionExecutionExample;
 import dev.mesbase.business.production.dao.WorkOrderExtraMapper;
-import dev.mesbase.business.production.domain.RoutingDetail;
-import java.math.BigDecimal;
+import dev.mesbase.business.production.dao.WorkorderErpExtraMapper;
+import dev.mesbase.business.production.dao.WorkorderMapper;
+import dev.mesbase.business.production.domain.MesProductionExecutionExample;
 import dev.mesbase.business.production.domain.ProductionBatchEntity;
 import dev.mesbase.business.production.domain.ProductionBatchExample;
+import dev.mesbase.business.production.domain.ProductionQuantityInput;
+import dev.mesbase.business.production.domain.RoutingDetail;
 import dev.mesbase.business.production.domain.RoutingEdgeExample;
 import dev.mesbase.business.production.domain.RoutingEntity;
 import dev.mesbase.business.production.domain.RoutingExample;
 import dev.mesbase.business.production.domain.RoutingNodeExample;
 import dev.mesbase.business.production.domain.RoutingProductExample;
+import dev.mesbase.business.production.domain.RoutingStatus;
 import dev.mesbase.business.production.domain.WorkOrderModels;
+import dev.mesbase.business.production.domain.WorkOrderStatus;
 import dev.mesbase.business.production.domain.WorkorderEntity;
-import dev.mesbase.business.production.domain.WorkorderExample;
-import dev.mesbase.core.error.ErrorCode;
-import dev.mesbase.core.error.FoundationException;
-import java.time.LocalDateTime;
-import java.util.List;
-import org.springframework.transaction.support.TransactionSynchronization;
-import org.springframework.transaction.support.TransactionSynchronizationManager;
-import dev.mesbase.business.production.dao.WorkorderErpExtraMapper;
 import dev.mesbase.business.production.domain.WorkorderErpExtraEntity;
 import dev.mesbase.business.production.domain.WorkorderErpExtraExample;
+import dev.mesbase.business.production.domain.WorkorderExample;
+import dev.mesbase.business.production.service.BusinessSourceRules;
+import dev.mesbase.business.shared.ExternalSyncAction;
+import dev.mesbase.business.shared.ExternalSyncCheck;
+import dev.mesbase.business.shared.enums.BusinessSource;
+import dev.mesbase.business.shared.enums.EnableStatus;
+import dev.mesbase.common.utils.StringUtils;
+import dev.mesbase.core.error.ErrorCode;
+import dev.mesbase.core.error.FoundationException;
+import dev.mesbase.framework.sync.SyncCoordinator;
 import dev.mesbase.platform.execution.FactoryContext;
 import dev.mesbase.platform.execution.FactoryIntegrationContext;
-import dev.mesbase.framework.sync.SyncCoordinator;
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.stream.Collectors;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
-import org.springframework.stereotype.Service;
 import org.springframework.dao.DuplicateKeyException;
+import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 /**
  * WorkOrder owns demand. Legacy batch summaries are read-only references; historical paths have a separate query entry.
@@ -163,7 +160,11 @@ public class WorkOrderService {
             var m = materialIndex.get(w.getProductId());
             var r = routingIndex.get(w.getRoutingId());
             return new WorkOrderModels.Summary(w, counts.getOrDefault(w.getId(), 0L)
-                    .intValue(), Optional.ofNullable(m).map(nullableValue -> nullableValue.getCode()).orElse(null), Optional.ofNullable(m).map(nullableValue -> nullableValue.getName()).orElse(null), Optional.ofNullable(r).map(nullableValue -> nullableValue.getCode()).orElse(null), Optional.ofNullable(r).map(nullableValue -> nullableValue.getVersion()).orElse(null), allocations.get(w.getId()), missingExtras.contains(w.getId()));
+                    .intValue(), Optional.ofNullable(m).map(nullableValue -> nullableValue.getCode())
+                    .orElse(null), Optional.ofNullable(m).map(nullableValue -> nullableValue.getName())
+                    .orElse(null), Optional.ofNullable(r).map(nullableValue -> nullableValue.getCode())
+                    .orElse(null), Optional.ofNullable(r).map(nullableValue -> nullableValue.getVersion())
+                    .orElse(null), allocations.get(w.getId()), missingExtras.contains(w.getId()));
         }).toList(), total, offset, limit);
     }
 
@@ -172,7 +173,8 @@ public class WorkOrderService {
         var w = order(id, false);
         var m = materials.selectByPrimaryKey(w.getProductId());
         var children = batchRows(id);
-        return new WorkOrderModels.Detail(w, Optional.ofNullable(m).map(nullableValue -> nullableValue.getCode()).orElse(null), Optional.ofNullable(m).map(nullableValue -> nullableValue.getName()).orElse(null),
+        return new WorkOrderModels.Detail(w, Optional.ofNullable(m).map(nullableValue -> nullableValue.getCode())
+                .orElse(null), Optional.ofNullable(m).map(nullableValue -> nullableValue.getName()).orElse(null),
                 routings.selectByPrimaryKey(w.getRoutingId()), children, allocation(id));
     }
 
@@ -259,7 +261,8 @@ public class WorkOrderService {
     private ExternalSyncCheck checkExternal(ExternalPlan plan, boolean lock) {
         sources.current(BusinessSource.EXTERNAL.getValue());
         if (plan == null || plan.values() == null || plan.status() == null
-                || plan.status() == WorkOrderStatus.CANCELLED || StringUtils.isBlank(plan.externalId()) || plan.externalId().length() > 128
+                || plan.status() == WorkOrderStatus.CANCELLED || StringUtils.isBlank(plan.externalId()) || plan.externalId()
+                .length() > 128
                 || plan.externalCode() == null || plan.externalCode().length() > 128
                 || plan.values().externalId() != null || plan.values().externalCode() != null) conflict();
         var input = plan.values();

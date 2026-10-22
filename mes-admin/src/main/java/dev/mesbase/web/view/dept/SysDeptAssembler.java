@@ -1,14 +1,12 @@
 package dev.mesbase.web.view.dept;
 
-import dev.mesbase.common.utils.bean.BeanConversions;
-import java.util.Optional;
-
-import java.util.Objects;
-
 import dev.mesbase.common.core.domain.entity.SysDept;
+import dev.mesbase.common.utils.bean.BeanConversions;
 import java.util.List;
 
-/** Explicit conversion at the Controller HTTP boundary. */
+/**
+ * Explicit conversion at the Controller HTTP boundary.
+ */
 public final class SysDeptAssembler {
     private SysDeptAssembler() {
     }

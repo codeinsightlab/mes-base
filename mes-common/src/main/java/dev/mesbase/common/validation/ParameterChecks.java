@@ -4,9 +4,12 @@ import dev.mesbase.common.utils.StringUtils;
 import dev.mesbase.core.error.ErrorCode;
 import dev.mesbase.core.error.FoundationException;
 
-/** Shared parameter bounds. Domain callers retain their explicit error codes. */
+/**
+ * Shared parameter bounds. Domain callers retain their explicit error codes.
+ */
 public final class ParameterChecks {
-    private ParameterChecks() { }
+    private ParameterChecks() {
+    }
 
     public static void paging(int offset, int limit) {
         paging(offset, limit, 100);

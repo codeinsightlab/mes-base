@@ -53,7 +53,7 @@ public class ${ClassName}ServiceImpl implements ${servicePackage}.I${ClassName}S
         example.setOrderByClause("${defaultOrderBy}");
         try (com.github.pagehelper.Page<${domainPackage}.${ClassName}Entity> page = com.github.pagehelper.PageHelper.offsetPage(offset, limit)) {
             java.util.List<${domainPackage}.${ClassName}Entity> rows = mapper.${selectByExampleMethod}(example);
-            return page;
+            return new ${domainPackage}.${ClassName}Page(rows, page.getTotal(), offset, limit);
         }
     }
 

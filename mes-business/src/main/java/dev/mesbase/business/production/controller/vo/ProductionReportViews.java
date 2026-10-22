@@ -1,16 +1,15 @@
 package dev.mesbase.business.production.controller.vo;
 
-import java.util.Objects;
-
 import dev.mesbase.business.production.domain.MesProductionReportEntity;
 import dev.mesbase.business.production.domain.ProductionReportModels.ExecutionQuantity;
-import dev.mesbase.business.production.domain.ProductionReportModels.NodeQuantity;
 import dev.mesbase.business.production.domain.ProductionReportModels.ExecutionSummary;
-import java.math.BigDecimal;
+import dev.mesbase.business.production.domain.ProductionReportModels.NodeQuantity;
 import dev.mesbase.business.production.service.ProductionQuantityService;
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
 public final class ProductionReportViews {
     private ProductionReportViews() {

@@ -1,12 +1,11 @@
 package dev.mesbase.business.production.controller;
 
-import java.util.Optional;
-
 import dev.mesbase.business.production.controller.vo.ProductionReportViews;
 import dev.mesbase.business.production.service.RecentProductionReportQueryService;
 import dev.mesbase.platform.web.EndpointAccess;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -36,7 +35,8 @@ public class RecentProductionReportController {
                     r.executionNo(), ProductionReportViews.id(r.workorderId()), r.workorderCode(), r.source(),
                     r.productCode(), r.productName(), r.unitName(), ProductionReportViews.id(r.routingNodeId()),
                     r.operationName(), r.recordType(), ProductionReportViews.decimal(r.quantityDelta()),
-                    ProductionReportViews.id(r.operatorUserId()), Optional.ofNullable(user).map(nullableValue -> nullableValue.name()).orElse(null),
+                    ProductionReportViews.id(r.operatorUserId()), Optional.ofNullable(user)
+                    .map(nullableValue -> nullableValue.name()).orElse(null),
                     r.reportTime(), r.createTime());
         }).toList();
     }

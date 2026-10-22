@@ -10,9 +10,12 @@ import java.util.ArrayList;
 import java.util.List;
 import javax.tools.ToolProvider;
 import org.junit.jupiter.api.Test;
+
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-/** Enforces the user's source rule using Java syntax, including multiline and reversed conditions. */
+/**
+ * Enforces the user's source rule using Java syntax, including multiline and reversed conditions.
+ */
 class NullPropagationConventionTest {
     @Test
     void nullPropagationIsNotHiddenInConditionalExpressions() throws Exception {
@@ -32,7 +35,8 @@ class NullPropagationConventionTest {
         var compiler = ToolProvider.getSystemJavaCompiler();
         List<String> violations = new ArrayList<>();
         try (var files = compiler.getStandardFileManager(null, null, null)) {
-            var task = (JavacTask) compiler.getTask(null, files, diagnostic -> {}, List.of("-proc:none"), null,
+            var task = (JavacTask) compiler.getTask(null, files, diagnostic -> {
+                    }, List.of("-proc:none"), null,
                     files.getJavaFileObjectsFromPaths(sources));
             for (var unit : task.parse()) {
                 new TreeScanner<Void, Void>() {

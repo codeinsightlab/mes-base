@@ -1,5 +1,6 @@
 package dev.mesbase.business.production.domain;
 
+import dev.mesbase.common.core.page.PageData;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
@@ -38,7 +39,7 @@ public final class WorkOrderModels {
                           String routingCode, Integer routingVersion, Allocation allocation, boolean erpExtraMissing) {
     }
 
-    public record Page(List<Summary> items, long total, int offset, int limit) {
+    public record Page(List<Summary> items, long total, int offset, int limit) implements PageData<Summary> {
     }
 
     /**

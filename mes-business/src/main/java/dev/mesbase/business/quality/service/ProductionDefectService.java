@@ -1,77 +1,73 @@
 package dev.mesbase.business.quality.service;
 
-import java.util.Collections;
-import java.util.Arrays;
-import java.util.ArrayList;
-import dev.mesbase.common.validation.ParameterChecks;
-import dev.mesbase.common.utils.StringUtils;
-import java.util.Optional;
-
+import com.github.pagehelper.PageHelper;
+import dev.mesbase.business.basic.dao.MaterialMapper;
+import dev.mesbase.business.directory.service.BusinessDirectoryService;
+import dev.mesbase.business.integration.warehouse.ErpActionResult;
+import dev.mesbase.business.production.dao.MesProductionExecutionMapper;
+import dev.mesbase.business.production.dao.RoutingNodeMapper;
+import dev.mesbase.business.production.domain.ExecutionPathStatus;
+import dev.mesbase.business.production.domain.ProductionCompletionRequested;
 import dev.mesbase.business.production.domain.ProductionQuantityInput;
-
+import dev.mesbase.business.production.domain.RoutingNodeEntity;
+import dev.mesbase.business.production.domain.RoutingNodeExample;
+import dev.mesbase.business.production.service.ExecutionPathService;
+import dev.mesbase.business.production.service.ExecutionPathValidator;
+import dev.mesbase.business.production.service.ProductionChainLocks;
+import dev.mesbase.business.production.service.ProductionQuantityService;
 import dev.mesbase.business.quality.dao.MesProductionDefectMapper;
+import dev.mesbase.business.quality.domain.DefectDestination;
+import dev.mesbase.business.quality.domain.DefectRecordAction;
 import dev.mesbase.business.quality.domain.MesProductionDefectEntity;
 import dev.mesbase.business.quality.domain.MesProductionDefectExample;
 import dev.mesbase.business.quality.domain.ProductionDefectModels.Command;
-import dev.mesbase.business.quality.domain.ProductionDefectModels.ListContext;
 import dev.mesbase.business.quality.domain.ProductionDefectModels.Facts;
-import dev.mesbase.business.quality.domain.ProductionDefectModels.Page;
+import dev.mesbase.business.quality.domain.ProductionDefectModels.ListContext;
+import dev.mesbase.business.quality.domain.ProductionDefectModels.Names;
 import dev.mesbase.business.quality.domain.ProductionDefectModels.Node;
 import dev.mesbase.business.quality.domain.ProductionDefectModels.NodeTotal;
+import dev.mesbase.business.quality.domain.ProductionDefectModels.Page;
 import dev.mesbase.business.quality.domain.ProductionDefectModels.Warehouse;
-import dev.mesbase.business.production.service.ProductionChainLocks;
-import dev.mesbase.business.production.service.ExecutionPathService;
-import dev.mesbase.business.production.service.ExecutionPathValidator;
-import dev.mesbase.business.directory.service.BusinessDirectoryService;
-import dev.mesbase.business.wm.dao.WmWarehouseMapper;
-import dev.mesbase.business.wm.domain.WmWarehouseExample;
+import dev.mesbase.business.quality.domain.ProductionDefectV2Models;
+import dev.mesbase.business.quality.domain.WasteCategory;
 import dev.mesbase.business.quality.integration.ProductionDefectErpGateway;
-import dev.mesbase.business.integration.warehouse.ErpActionResult;
+import dev.mesbase.business.shared.enums.EnableStatus;
+import dev.mesbase.business.wm.dao.WmWarehouseMapper;
+import dev.mesbase.business.wm.domain.WmWarehouseEntity;
+import dev.mesbase.business.wm.domain.WmWarehouseExample;
 import dev.mesbase.common.utils.SecurityUtils;
+import dev.mesbase.common.utils.StringUtils;
+import dev.mesbase.common.validation.ParameterChecks;
 import dev.mesbase.core.error.ErrorCode;
 import dev.mesbase.core.error.FoundationException;
-import com.github.pagehelper.PageHelper;
-import org.springframework.stereotype.Service;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
-import org.springframework.transaction.annotation.Transactional;
-import org.springframework.transaction.annotation.Isolation;
-import org.springframework.dao.DuplicateKeyException;
-import dev.mesbase.business.quality.domain.ProductionDefectV2Models;
-import dev.mesbase.business.production.domain.ExecutionPathStatus;
-import dev.mesbase.business.production.dao.MesProductionExecutionMapper;
-import dev.mesbase.business.basic.dao.MaterialMapper;
-import dev.mesbase.core.security.AuthorizationService;
 import dev.mesbase.core.security.AuthenticatedActor;
+import dev.mesbase.core.security.AuthorizationService;
 import dev.mesbase.core.security.Permission;
 import dev.mesbase.platform.execution.FactoryContext;
-import org.springframework.beans.factory.ObjectProvider;
 import java.math.BigDecimal;
-import dev.mesbase.business.shared.enums.EnableStatus;
-import dev.mesbase.business.quality.domain.DefectRecordAction;
-import dev.mesbase.business.quality.domain.WasteCategory;
-import dev.mesbase.business.quality.domain.DefectDestination;
-import java.time.LocalDateTime;
-import java.util.List;
-import java.util.Map;
-import java.util.HashMap;
-import java.util.stream.Stream;
-import java.util.stream.Collectors;
-import dev.mesbase.business.quality.domain.ProductionDefectModels.Names;
-import dev.mesbase.business.production.dao.RoutingNodeMapper;
-import dev.mesbase.business.production.domain.RoutingNodeEntity;
-import dev.mesbase.business.production.domain.RoutingNodeExample;
-import dev.mesbase.business.wm.domain.WmWarehouseEntity;
-import java.util.Objects;
-import org.springframework.context.ApplicationEventPublisher;
-import dev.mesbase.business.production.domain.ProductionCompletionRequested;
-import dev.mesbase.platform.execution.FactoryContext;
-import java.util.UUID;
+import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
-import java.nio.charset.StandardCharsets;
+import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.HexFormat;
-import dev.mesbase.business.production.service.ProductionQuantityService;
-import dev.mesbase.business.production.service.ExecutionPathValidator;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.UUID;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.dao.DuplicateKeyException;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Isolation;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @ConditionalOnProperty(name = "mes.business.enabled", havingValue = "true")
@@ -143,9 +139,11 @@ public class ProductionDefectService {
 
     private Result execute(String action, String id, Command c, MesProductionDefectEntity typed,
                            String typedFingerprint) {
-        if (c == null || StringUtils.isBlank(c.requestKey()) || c.requestKey().length() > 64) ParameterChecks.reject(ErrorCode.BAD_REQUEST);
+        if (c == null || StringUtils.isBlank(c.requestKey()) || c.requestKey().length() > 64)
+            ParameterChecks.reject(ErrorCode.BAD_REQUEST);
         if (action.equals(DefectRecordAction.CREATE.getValue())) {
-            if (c.expectedRevision() != null || c.revisionReason() != null || c.facts() == null) ParameterChecks.reject(ErrorCode.BAD_REQUEST);
+            if (c.expectedRevision() != null || c.revisionReason() != null || c.facts() == null)
+                ParameterChecks.reject(ErrorCode.BAD_REQUEST);
         } else {
             ParameterChecks.text(c.revisionReason(), true, 500, ErrorCode.BAD_REQUEST);
             if (c.expectedRevision() == null || c.expectedRevision() < 1) ParameterChecks.reject(ErrorCode.BAD_REQUEST);
@@ -161,7 +159,8 @@ public class ProductionDefectService {
         retry = byKey(c.requestKey());
         if (retry != null) return replay(retry, fingerprint);
         if (c.facts() != null)
-            ProductionQuantityInput.changed(c.facts().defectQty(), Optional.ofNullable(before).map(nullableValue -> nullableValue.getDefectQty()).orElse(null));
+            ProductionQuantityInput.changed(c.facts().defectQty(), Optional.ofNullable(before)
+                    .map(nullableValue -> nullableValue.getDefectQty()).orElse(null));
         var row = new MesProductionDefectEntity();
         if (before != null) {
             before = latest(id);
@@ -170,7 +169,8 @@ public class ProductionDefectService {
                 ParameterChecks.reject(ErrorCode.DEFECT_REVISION_CONFLICT);
             if (!action.equals(DefectRecordAction.VOID.getValue()) && (!Objects.equals(c.facts()
                     .executionId(), before.getExecutionId()) || !Objects.equals(c.facts()
-                    .affectedNodeId(), before.getAffectedNodeId()))) ParameterChecks.reject(ErrorCode.DEFECT_REVISION_CONFLICT);
+                    .affectedNodeId(), before.getAffectedNodeId())))
+                ParameterChecks.reject(ErrorCode.DEFECT_REVISION_CONFLICT);
         }
         treatments.assertMutable(before);
         Facts facts = action.equals(DefectRecordAction.VOID.getValue()) ? facts(before) : normalize(c.facts());
@@ -234,7 +234,8 @@ public class ProductionDefectService {
     public Result declare(ProductionDefectV2Models.Command c) {
         if (c == null || c.requestId() == null) ParameterChecks.reject(ErrorCode.BAD_REQUEST);
         try {
-            if (!UUID.fromString(c.requestId()).toString().equals(c.requestId())) ParameterChecks.reject(ErrorCode.BAD_REQUEST);
+            if (!UUID.fromString(c.requestId()).toString().equals(c.requestId()))
+                ParameterChecks.reject(ErrorCode.BAD_REQUEST);
         } catch (IllegalArgumentException e) {
             ParameterChecks.reject(ErrorCode.BAD_REQUEST);
         }
@@ -247,7 +248,8 @@ public class ProductionDefectService {
         old = byKey(c.requestId());
         if (old != null) return replay(old, fp);
         ProductionQuantityInput.check(c.quantity());
-        if (c.defectTypeId() == null || c.expectedTypeRevision() == null || c.wasteCategory() == null) ParameterChecks.reject(ErrorCode.BAD_REQUEST);
+        if (c.defectTypeId() == null || c.expectedTypeRevision() == null || c.wasteCategory() == null)
+            ParameterChecks.reject(ErrorCode.BAD_REQUEST);
         var node = actualNode(c.executionId(), c.nodeId());
         var type = defectTypes.getObject()
                 .lockForDeclaration(node.getOperationId(), c.defectTypeId(), c.expectedTypeRevision(), c.wasteCategory());
@@ -281,10 +283,11 @@ public class ProductionDefectService {
     private String v2Fingerprint(ProductionDefectV2Models.Command c) {
         var b = new StringBuilder("V2:");
         for (Object value : new Object[]{SecurityUtils.getUserId(), c.requestId(), c.executionId(), c.nodeId(), c.defectTypeId(),
-                c.expectedTypeRevision(), Optional.ofNullable(c.quantity()).map(nullableValue -> nullableValue
-                .stripTrailingZeros()).orElse(null), c.wasteCategory(),
-                StringUtils.trimToNull(c.remark()), Optional.ofNullable(c.occurredAt()).map(nullableValue -> nullableValue
-                .withNano(nullableValue.getNano() / 1000 * 1000)).orElse(null), c.assessment()}) {
+                c.expectedTypeRevision(), Optional.ofNullable(c.quantity())
+                .map(BigDecimal::stripTrailingZeros).orElse(null), c.wasteCategory(),
+                StringUtils.trimToNull(c.remark()), Optional.ofNullable(c.occurredAt())
+                .map(nullableValue -> nullableValue
+                        .withNano(nullableValue.getNano() / 1000 * 1000)).orElse(null), c.assessment()}) {
             String v = Objects.toString(value, null);
             b.append(v == null ? "-1:" : v.length() + ":" + v);
         }
@@ -412,7 +415,8 @@ public class ProductionDefectService {
 
     public List<Node> nodes(Long executionId) {
         var p = paths.view(executionId);
-        if (p.path() == null || !Objects.equals(p.path().getRoutingId(), p.routing().id())) ParameterChecks.reject(ErrorCode.BAD_REQUEST);
+        if (p.path() == null || !Objects.equals(p.path().getRoutingId(), p.routing().id()))
+            ParameterChecks.reject(ErrorCode.BAD_REQUEST);
         ExecutionPathValidator.validate(p.selectedNodeIds(), p.nodes(), p.edges());
         return p.selectedNodeIds().stream().map(id -> {
             var n = p.nodes().stream().filter(x -> x.getId().equals(id)).findFirst().orElseThrow();
@@ -440,11 +444,13 @@ public class ProductionDefectService {
         ParameterChecks.text(f.defectReason(), true, 500, ErrorCode.BAD_REQUEST);
         ParameterChecks.text(f.responsibilityRemark(), false, 500, ErrorCode.BAD_REQUEST);
         ParameterChecks.text(f.destinationRemark(), false, 500, ErrorCode.BAD_REQUEST);
-        if (f.occurredAt() == null || f.occurredAt().isAfter(LocalDateTime.now())) ParameterChecks.reject(ErrorCode.BAD_REQUEST);
+        if (f.occurredAt() == null || f.occurredAt().isAfter(LocalDateTime.now()))
+            ParameterChecks.reject(ErrorCode.BAD_REQUEST);
         var ids = nodes(f.executionId()).stream().map(n -> Long.valueOf(n.id())).toList();
         if (!ids.contains(f.affectedNodeId()) || !ids.contains(f.discoveredNodeId()) || f.responsibleNodeId() != null && !ids.contains(f.responsibleNodeId()))
             ParameterChecks.reject(ErrorCode.BAD_REQUEST);
-        if (f.responsibleUserId() != null && !directory.historicalUserExists(f.responsibleUserId())) ParameterChecks.reject(ErrorCode.BAD_REQUEST);
+        if (f.responsibleUserId() != null && !directory.historicalUserExists(f.responsibleUserId()))
+            ParameterChecks.reject(ErrorCode.BAD_REQUEST);
         if (DefectDestination.SAME_NODE.getValue().equals(f.destinationType())) {
             if (f.targetWarehouseId() != null || f.targetNodeId() != null && !f.targetNodeId()
                     .equals(f.affectedNodeId())) ParameterChecks.reject(ErrorCode.BAD_REQUEST);
@@ -455,22 +461,27 @@ public class ProductionDefectService {
             int index = ids.indexOf(f.discoveredNodeId());
             Long target = f.targetNodeId();
             if (target == null && index > 0) target = ids.get(index - 1);
-            if (target == null || ids.indexOf(target) < 0 || ids.indexOf(target) >= index) ParameterChecks.reject(ErrorCode.BAD_REQUEST);
+            if (target == null || ids.indexOf(target) < 0 || ids.indexOf(target) >= index)
+                ParameterChecks.reject(ErrorCode.BAD_REQUEST);
             return new Facts(f.executionId(), f.affectedNodeId(), f.discoveredNodeId(), f.responsibleNodeId(), f.defectQty(), f.wasteCategory(), f.defectReason(), f.responsibleUserId(), f.responsibilityRemark(), f.destinationType(), target, null, f.destinationRemark(), f.occurredAt());
         }
         if (!DefectDestination.WAREHOUSE.getValue()
                 .equals(f.destinationType()) || f.targetNodeId() != null || f.targetWarehouseId() == null)
             ParameterChecks.reject(ErrorCode.BAD_REQUEST);
         var w = warehouses.selectByPrimaryKey(f.targetWarehouseId());
-        if (w == null || !EnableStatus.ENABLED.getValue().equals(w.getStatus())) ParameterChecks.reject(ErrorCode.BAD_REQUEST);
+        if (w == null || !EnableStatus.ENABLED.getValue().equals(w.getStatus()))
+            ParameterChecks.reject(ErrorCode.BAD_REQUEST);
         return f;
     }
 
     public static Facts normalize(Facts f) {
         if (f == null) return null;
-        return new Facts(f.executionId(), f.affectedNodeId(), f.discoveredNodeId(), f.responsibleNodeId(), Optional.ofNullable(f.defectQty()).map(nullableValue -> nullableValue
-                .stripTrailingZeros()).orElse(null), f.wasteCategory(), StringUtils.trimToNull(f.defectReason()), f.responsibleUserId(), StringUtils.trimToNull(f.responsibilityRemark()), f.destinationType(), f.targetNodeId(), f.targetWarehouseId(), StringUtils.trimToNull(f.destinationRemark()), Optional.ofNullable(f.occurredAt()).map(nullableValue -> nullableValue
-                .withNano(nullableValue.getNano() / 1000 * 1000)).orElse(null));
+        return new Facts(f.executionId(), f.affectedNodeId(), f.discoveredNodeId(), f.responsibleNodeId(), Optional.ofNullable(f.defectQty())
+                .map(nullableValue -> nullableValue
+                        .stripTrailingZeros())
+                .orElse(null), f.wasteCategory(), StringUtils.trimToNull(f.defectReason()), f.responsibleUserId(), StringUtils.trimToNull(f.responsibilityRemark()), f.destinationType(), f.targetNodeId(), f.targetWarehouseId(), StringUtils.trimToNull(f.destinationRemark()), Optional.ofNullable(f.occurredAt())
+                .map(nullableValue -> nullableValue
+                        .withNano(nullableValue.getNano() / 1000 * 1000)).orElse(null));
     }
 
     public static String fingerprint(String action, String id, Command c, Long actor) {
@@ -518,9 +529,6 @@ public class ProductionDefectService {
         r.setDestinationRemark(f.destinationRemark());
         r.setOccurredAt(f.occurredAt());
     }
-
-
-
 
 
 }

@@ -1,12 +1,12 @@
 package dev.mesbase.web.view.autocode;
 
-import dev.mesbase.common.utils.bean.BeanConversions;
-import java.util.Objects;
-
 import dev.mesbase.common.core.domain.entity.SysAutoCodeRule;
+import dev.mesbase.common.utils.bean.BeanConversions;
 import java.util.List;
 
-/** Explicit conversion at the Controller HTTP boundary. */
+/**
+ * Explicit conversion at the Controller HTTP boundary.
+ */
 public final class SysAutoCodeRuleAssembler {
     private SysAutoCodeRuleAssembler() {
     }

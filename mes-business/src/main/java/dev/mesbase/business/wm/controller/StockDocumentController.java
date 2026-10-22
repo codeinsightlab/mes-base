@@ -1,7 +1,6 @@
 package dev.mesbase.business.wm.controller;
 
-import java.util.Objects;
-
+import dev.mesbase.common.utils.bean.BeanConversions;
 import dev.mesbase.business.wm.domain.StockDocumentModels;
 import dev.mesbase.business.wm.domain.WmStockDocumentEntity;
 import dev.mesbase.business.wm.domain.WmStockDocumentLineEntity;
@@ -10,13 +9,14 @@ import dev.mesbase.platform.web.EndpointAccess;
 import jakarta.validation.Valid;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Objects;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -36,8 +36,7 @@ public class StockDocumentController {
     @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED, permission = PERMISSION + "list")
     public Page page(@ModelAttribute StockDocumentModels.Query query) {
         var page = service.page(query);
-        return new Page(page.items().stream().map(StockDocumentController::view)
-                .toList(), page.total(), page.offset(), page.limit());
+        return BeanConversions.convertPage(page, Page.class);
     }
 
     @GetMapping("/{id}")
@@ -113,22 +112,15 @@ public class StockDocumentController {
     }
 
     private static Detail view(StockDocumentModels.Detail detail) {
-        return new Detail(view(detail.document()), detail.lines().stream().map(StockDocumentController::view).toList());
+        return BeanConversions.convert(detail, Detail.class);
     }
 
     private static Header view(WmStockDocumentEntity row) {
-        return new Header(row.getId().toString(), row.getDocumentNo(), row.getDocumentType(), row.getStatus(),
-                row.getReason(), row.getRemark(), string(row.getSourceWorkorderId()), string(row.getSourceExecutionId()), row.getCreateBy(), row.getCreateTime(),
-                row.getUpdateBy(), row.getUpdateTime(), string(row.getPostedBy()), row.getPostedAt(),
-                string(row.getCancelledBy()), row.getCancelledAt(), row.getRevision()
-                .toString(), row.getPostRequestId());
+        return BeanConversions.convert(row, Header.class);
     }
 
     private static Line view(WmStockDocumentLineEntity row) {
-        return new Line(row.getId().toString(), row.getDocumentId().toString(), row.getLineNo(),
-                row.getMaterialId().toString(), row.getWarehouseId().toString(), row.getStockId().toString(),
-                row.getBatchNo(), row.getBinCode(), row.getUnitId().toString(), row.getQuantity().toPlainString(),
-                row.getRemark(), row.getStockActionId(), row.getRevision().toString());
+        return BeanConversions.convert(row, Line.class);
     }
 
     private static String string(Long id) {

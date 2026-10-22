@@ -1,11 +1,5 @@
 package dev.mesbase.business.production.controller;
 
-import dev.mesbase.common.utils.bean.BeanConversions;
-import com.github.pagehelper.Page;
-import java.util.Optional;
-
-import java.util.Objects;
-
 import dev.mesbase.business.production.controller.vo.MesProductionExecutionPageVo;
 import dev.mesbase.business.production.controller.vo.MesProductionExecutionVo;
 import dev.mesbase.business.production.domain.MesProductionExecutionCreateCommand;
@@ -14,12 +8,14 @@ import dev.mesbase.business.production.domain.MesProductionExecutionQueryDto;
 import dev.mesbase.business.production.domain.MesProductionExecutionUpdateCommand;
 import dev.mesbase.business.production.service.IMesProductionExecutionService;
 import dev.mesbase.business.production.service.ProductionExecutionQueryService;
+import dev.mesbase.common.utils.bean.BeanConversions;
 import dev.mesbase.platform.web.EndpointAccess;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import java.util.List;
+import java.util.Optional;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -56,14 +52,14 @@ public class MesProductionExecutionController {
         var data = queries.page(query);
         var page = data.records();
         return BeanConversions.convertPage(page, row -> {
-                    var routing = data.references().routings().get(row.getRoutingId());
-                    return toView(row, Optional.ofNullable(routing).map(value -> value.code()).orElse(null),
-                            Optional.ofNullable(routing).map(value -> value.name()).orElse(null),
-                            Optional.ofNullable(routing).map(value -> value.version()).orElse(null),
-                            ProductionExecutionQueryService.name(data.references().users(), row.getCreateBy()),
-                            ProductionExecutionQueryService.name(data.references().users(), row.getUpdateBy()),
-                            data.references().workorderStatuses().get(row.getWorkorderId()));
-                }, MesProductionExecutionPageVo::new);
+            var routing = data.references().routings().get(row.getRoutingId());
+            return toView(row, Optional.ofNullable(routing).map(value -> value.code()).orElse(null),
+                    Optional.ofNullable(routing).map(value -> value.name()).orElse(null),
+                    Optional.ofNullable(routing).map(value -> value.version()).orElse(null),
+                    ProductionExecutionQueryService.name(data.references().users(), row.getCreateBy()),
+                    ProductionExecutionQueryService.name(data.references().users(), row.getUpdateBy()),
+                    data.references().workorderStatuses().get(row.getWorkorderId()));
+        }, MesProductionExecutionPageVo::new);
     }
 
     @GetMapping("/{id}")
@@ -100,7 +96,8 @@ public class MesProductionExecutionController {
 
 
     private record Labels(String routingCode, String routingName, Integer routingVersion,
-                          String createByName, String updateByName, String workorderStatus) { }
+                          String createByName, String updateByName, String workorderStatus) {
+    }
 
     private static MesProductionExecutionVo toView(ProductionExecutionQueryService.Display display) {
         return toView(display.record(), Optional.ofNullable(display.routing()).map(nullableValue -> nullableValue

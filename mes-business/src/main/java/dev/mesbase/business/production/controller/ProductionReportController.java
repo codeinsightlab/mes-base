@@ -1,28 +1,29 @@
 package dev.mesbase.business.production.controller;
 
-import dev.mesbase.business.production.service.ProductionReportService;
-import dev.mesbase.business.production.service.ProductionQuantityService;
-import dev.mesbase.business.production.service.ReportUserReferenceService;
-import dev.mesbase.business.production.domain.ProductionReportModels.Supplement;
-import dev.mesbase.business.production.domain.ProductionReportModels.Adjustment;
-import dev.mesbase.business.production.domain.ProductionReportModels.VoidOriginal;
-import dev.mesbase.business.production.controller.vo.ProductionReportViews;
-import dev.mesbase.business.production.controller.vo.ProductionReportViews.Ledger;
 import dev.mesbase.business.production.controller.vo.ProductionReportViews.Detail;
-import dev.mesbase.business.production.controller.vo.ProductionReportViews.Page;
 import dev.mesbase.business.production.controller.vo.ProductionReportViews.Execution;
-import dev.mesbase.business.production.controller.vo.ProductionReportViews.Summary;
 import dev.mesbase.business.production.controller.vo.ProductionReportViews.HistoricalUser;
+import dev.mesbase.business.production.controller.vo.ProductionReportViews.Ledger;
+import dev.mesbase.business.production.controller.vo.ProductionReportViews.Page;
+import dev.mesbase.business.production.controller.vo.ProductionReportViews.Summary;
+import dev.mesbase.business.production.controller.vo.ProductionReportViews;
+import dev.mesbase.business.production.domain.ProductionReportModels.Adjustment;
+import dev.mesbase.business.production.domain.ProductionReportModels.Supplement;
+import dev.mesbase.business.production.domain.ProductionReportModels.VoidOriginal;
+import dev.mesbase.business.production.service.ProductionQuantityService;
+import dev.mesbase.business.production.service.ProductionReportService;
+import dev.mesbase.business.production.service.ReportUserReferenceService;
+import dev.mesbase.common.utils.bean.BeanConversions;
 import dev.mesbase.platform.web.EndpointAccess;
 import jakarta.validation.Valid;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
-import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/api/production")
@@ -50,9 +51,8 @@ public class ProductionReportController {
     public Page<Summary> workorder(@PathVariable Long id, @RequestParam(defaultValue = "0") int offset,
                                    @RequestParam(defaultValue = "20") int limit) {
         var p = quantities.getWorkorderQuantities(id, offset, limit);
-        return new Page<>(p.items().stream()
-                .map(row -> ProductionReportViews.summary(row, p.routingLabels().get(row.routingId())))
-                .toList(), p.total(), p.offset(), p.limit());
+        return BeanConversions.convertPage(p, row -> ProductionReportViews.summary(row, p.routingLabels()
+                .get(row.routingId())), Page::new);
     }
 
     @GetMapping("/reports")
@@ -61,8 +61,7 @@ public class ProductionReportController {
                              @RequestParam(defaultValue = "0") int offset,
                              @RequestParam(defaultValue = "20") int limit) {
         var p = reports.page(executionId, routingNodeId, offset, limit);
-        return new Page<>(p.items().stream().map(row -> ProductionReportViews.ledger(row, p.userNames()))
-                .toList(), p.total(), p.offset(), p.limit());
+        return BeanConversions.convertPage(p, row -> ProductionReportViews.ledger(row, p.userNames()), Page::new);
     }
 
     @GetMapping("/reports/{id}")
@@ -77,8 +76,7 @@ public class ProductionReportController {
     public Page<Ledger> history(@PathVariable Long id, @RequestParam(defaultValue = "0") int offset,
                                 @RequestParam(defaultValue = "20") int limit) {
         var p = reports.adjustments(id, offset, limit);
-        return new Page<>(p.items().stream().map(row -> ProductionReportViews.ledger(row, p.userNames()))
-                .toList(), p.total(), p.offset(), p.limit());
+        return BeanConversions.convertPage(p, row -> ProductionReportViews.ledger(row, p.userNames()), Page::new);
     }
 
     @PostMapping("/reports/supplements")
@@ -105,7 +103,6 @@ public class ProductionReportController {
                                       @RequestParam(defaultValue = "0") int offset,
                                       @RequestParam(defaultValue = "20") int limit) {
         var p = users.page(keyword, offset, limit);
-        return new Page<>(p.items().stream().map(u -> new HistoricalUser(ProductionReportViews.id(u.id()), u.name()))
-                .toList(), p.total(), p.offset(), p.limit());
+        return BeanConversions.convertPage(p, u -> BeanConversions.convert(u, HistoricalUser.class), Page::new);
     }
 }

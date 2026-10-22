@@ -1,9 +1,5 @@
 package dev.mesbase.business.production.controller;
 
-import dev.mesbase.common.utils.bean.BeanConversions;
-import com.github.pagehelper.Page;
-import java.util.Objects;
-
 import dev.mesbase.business.production.controller.vo.MesExecutionAssignmentPageVo;
 import dev.mesbase.business.production.controller.vo.MesExecutionAssignmentVo;
 import dev.mesbase.business.production.domain.MesExecutionAssignmentCreateCommand;
@@ -11,6 +7,7 @@ import dev.mesbase.business.production.domain.MesExecutionAssignmentEntity;
 import dev.mesbase.business.production.domain.MesExecutionAssignmentQueryDto;
 import dev.mesbase.business.production.domain.MesExecutionAssignmentUpdateCommand;
 import dev.mesbase.business.production.service.IMesExecutionAssignmentService;
+import dev.mesbase.common.utils.bean.BeanConversions;
 import dev.mesbase.platform.web.EndpointAccess;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotEmpty;

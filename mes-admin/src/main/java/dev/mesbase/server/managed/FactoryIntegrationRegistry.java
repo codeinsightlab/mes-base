@@ -1,21 +1,20 @@
 package dev.mesbase.server.managed;
 
 import dev.mesbase.common.utils.StringUtils;
-import java.util.Optional;
-
 import dev.mesbase.core.error.ErrorCode;
 import dev.mesbase.core.error.FoundationException;
 import dev.mesbase.core.factory.FactoryId;
 import dev.mesbase.core.factory.FactoryRuntimeMode;
 import dev.mesbase.platform.execution.FactoryIntegrationSnapshot;
-import dev.mesbase.system.factory.ManagedFactory;
-import dev.mesbase.server.integration.e10.FactoryOapiService;
 import dev.mesbase.server.integration.e10.DigiwinE10MoQueries;
-import java.util.ArrayList;
+import dev.mesbase.server.integration.e10.FactoryOapiService;
+import dev.mesbase.system.factory.ManagedFactory;
 import java.net.URI;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import org.springframework.boot.context.properties.bind.Bindable;
 import org.springframework.boot.context.properties.bind.Binder;
 import org.springframework.core.env.Environment;
@@ -98,7 +97,8 @@ public final class FactoryIntegrationRegistry {
                 || StringUtils.isBlank(factory.erpConfigRef()))
             throw new FoundationException(ErrorCode.INTEGRATION_NOT_CONFIGURED);
         if (DigiwinE10MoQueries.PROVIDER.equals(factory.erpProvider())) {
-            var configured = Optional.ofNullable(oapi).map(nullableValue -> nullableValue.connection(factory.factoryId())).orElse(null);
+            var configured = Optional.ofNullable(oapi)
+                    .map(nullableValue -> nullableValue.connection(factory.factoryId())).orElse(null);
             if (configured == null || !Objects.equals(factory.erpConfigRef(), configured.reference()))
                 throw new FoundationException(ErrorCode.INTEGRATION_NOT_CONFIGURED);
             return new FactoryIntegrationSnapshot(new FactoryId(factory.factoryId()), mode, factory.erpProvider(),

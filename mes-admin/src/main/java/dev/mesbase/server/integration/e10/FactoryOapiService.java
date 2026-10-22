@@ -1,7 +1,5 @@
 package dev.mesbase.server.integration.e10;
 
-import java.util.Optional;
-
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.mesbase.core.error.ErrorCode;
@@ -16,6 +14,7 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -65,7 +64,8 @@ public class FactoryOapiService {
         var row = mapper.oapi(factoryId);
         var connection = decode(row);
         return new View(factoryId, factory.revision(), row.reference(), row.configurationRevision(),
-                locked(factory), Optional.ofNullable(connection).map(nullableValue -> nullableValue.settings()).orElse(null));
+                locked(factory), Optional.ofNullable(connection).map(nullableValue -> nullableValue.settings())
+                .orElse(null));
     }
 
     @Transactional(transactionManager = "masterTransactionManager")

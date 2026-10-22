@@ -1,7 +1,7 @@
 package dev.mesbase.business.legacy.service;
 
-import java.util.Optional;
-
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.mesbase.business.legacy.dao.LegacyMigrationMapper;
 import dev.mesbase.business.legacy.domain.LegacyHistory.Mapping;
 import dev.mesbase.business.legacy.domain.LegacyHistory.Node;
@@ -9,11 +9,10 @@ import dev.mesbase.business.production.dao.MesProductionExecutionMapper;
 import dev.mesbase.core.error.ErrorCode;
 import dev.mesbase.core.error.FoundationException;
 import java.math.BigDecimal;
-import java.util.List;
 import java.util.ArrayList;
+import java.util.List;
+import java.util.Optional;
 import java.util.stream.Collectors;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.core.JsonProcessingException;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -58,7 +57,8 @@ public class LegacyHistoryQueryService {
                 int fullNodes = source.path("routing").path("current_node_ids").size();
                 int reportedNodes = source.path("reported_by_node").size();
                 cards.add(new Card(key, Optional.ofNullable(child).map(nullableValue -> nullableValue.entityId()
-                        .toString()).orElse(null), Optional.ofNullable(child).map(nullableValue -> nullableValue.batchId()).orElse(null),
+                        .toString()).orElse(null), Optional.ofNullable(child)
+                        .map(nullableValue -> nullableValue.batchId()).orElse(null),
                         child != null, source.path("reports")
                         .size(), count == null ? 0 : count.reportCount(), fullNodes,
                         count == null ? 0 : count.nodeCount(), reportedNodes < fullNodes));

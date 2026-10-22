@@ -1,21 +1,22 @@
 package dev.mesbase.business.basic.service.impl;
 
-import dev.mesbase.business.basic.domain.MaterialCategoryPage;
-import dev.mesbase.common.validation.ParameterChecks;
 import com.github.pagehelper.Page;
 import com.github.pagehelper.PageHelper;
 import dev.mesbase.business.basic.dao.MaterialCategoryMapper;
 import dev.mesbase.business.basic.domain.MaterialCategoryCreateCommand;
 import dev.mesbase.business.basic.domain.MaterialCategoryEntity;
 import dev.mesbase.business.basic.domain.MaterialCategoryExample;
+import dev.mesbase.business.basic.domain.MaterialCategoryPage;
 import dev.mesbase.business.basic.domain.MaterialCategoryQueryDto;
 import dev.mesbase.business.basic.domain.MaterialCategoryResource;
 import dev.mesbase.business.basic.domain.MaterialCategoryUpdateCommand;
+import dev.mesbase.business.basic.service.BasicDataRules;
 import dev.mesbase.business.basic.service.IMaterialCategoryService;
 import dev.mesbase.business.basic.sync.ExternalMaterialCategory;
 import dev.mesbase.business.basic.sync.MaterialCategoryQueryPort;
 import dev.mesbase.business.basic.sync.MaterialCategorySyncResult;
 import dev.mesbase.business.basic.sync.UnconfiguredMaterialCategoryQueryAdapter;
+import dev.mesbase.common.validation.ParameterChecks;
 import dev.mesbase.core.error.ErrorCode;
 import dev.mesbase.core.error.FoundationException;
 import dev.mesbase.core.factory.FactoryScope;
@@ -32,9 +33,8 @@ import java.util.List;
 import java.util.Objects;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
-import org.springframework.stereotype.Service;
-import dev.mesbase.business.basic.service.BasicDataRules;
 import org.springframework.dao.DuplicateKeyException;
+import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**

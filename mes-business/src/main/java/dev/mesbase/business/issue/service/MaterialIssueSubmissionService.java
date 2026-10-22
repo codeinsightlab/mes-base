@@ -1,60 +1,59 @@
 package dev.mesbase.business.issue.service;
 
-import dev.mesbase.common.validation.ParameterChecks;
-import java.util.Optional;
-
-import dev.mesbase.business.production.service.BusinessSourceRules;
-import java.util.Map;
-import dev.mesbase.business.production.domain.ExecutionPathStatus;
-import dev.mesbase.business.production.domain.ProductionExecutionStatus;
-import dev.mesbase.business.issue.domain.MaterialIssueSubmissionStatus;
-import dev.mesbase.business.issue.domain.MaterialIssueStatus;
-import dev.mesbase.business.issue.domain.MaterialIssueOperation;
-import dev.mesbase.business.integration.warehouse.ExternalEffect;
-import dev.mesbase.business.issue.dao.MesMaterialIssueMapper;
-import dev.mesbase.business.issue.dao.MesMaterialIssueItemMapper;
-import dev.mesbase.business.issue.dao.MesMaterialIssueSubmissionMapper;
-import dev.mesbase.business.issue.domain.MesMaterialIssueEntity;
-import dev.mesbase.business.issue.domain.MesMaterialIssueItemExample;
-import dev.mesbase.business.issue.domain.MesMaterialIssueSubmissionEntity;
-import dev.mesbase.business.issue.domain.MesMaterialIssueErpExtraEntity;
-import dev.mesbase.business.issue.domain.MesMaterialIssueResource;
-import dev.mesbase.business.production.dao.WorkorderErpExtraMapper;
-import dev.mesbase.business.production.service.ProductionChainLocks;
-import dev.mesbase.business.production.service.ExecutionPathService;
-import dev.mesbase.business.production.service.ProductionExecutionRules;
-import dev.mesbase.business.integration.warehouse.MaterialIssueSubmitCommand;
-import dev.mesbase.business.integration.warehouse.MaterialIssueSubmitCommand.Line;
-import dev.mesbase.business.integration.warehouse.WarehouseIntegration;
-import dev.mesbase.business.integration.warehouse.WarehouseIntegration.Selection;
-import dev.mesbase.business.integration.warehouse.MaterialIssueSubmitCommand.Source;
-import dev.mesbase.platform.execution.FactoryIntegrationContext;
-import dev.mesbase.business.integration.warehouse.ErpActionResult;
-import dev.mesbase.business.integration.warehouse.ErpIssueQueryResult;
-import dev.mesbase.business.integration.warehouse.ErpIssueQueryResult.Outcome;
-import dev.mesbase.business.integration.warehouse.ErpIssueQueryResult.DocumentStatus;
 import dev.mesbase.business.integration.warehouse.ErpActionResult.Mode;
 import dev.mesbase.business.integration.warehouse.ErpActionResult.Status;
+import dev.mesbase.business.integration.warehouse.ErpActionResult;
+import dev.mesbase.business.integration.warehouse.ErpIssueQueryResult.DocumentStatus;
+import dev.mesbase.business.integration.warehouse.ErpIssueQueryResult.Outcome;
+import dev.mesbase.business.integration.warehouse.ErpIssueQueryResult;
+import dev.mesbase.business.integration.warehouse.ExternalEffect;
+import dev.mesbase.business.integration.warehouse.MaterialIssueSubmitCommand.Line;
+import dev.mesbase.business.integration.warehouse.MaterialIssueSubmitCommand.Source;
+import dev.mesbase.business.integration.warehouse.MaterialIssueSubmitCommand;
+import dev.mesbase.business.integration.warehouse.WarehouseIntegration.Selection;
+import dev.mesbase.business.integration.warehouse.WarehouseIntegration;
+import dev.mesbase.business.issue.dao.MesMaterialIssueItemMapper;
+import dev.mesbase.business.issue.dao.MesMaterialIssueMapper;
+import dev.mesbase.business.issue.dao.MesMaterialIssueSubmissionMapper;
+import dev.mesbase.business.issue.domain.MaterialIssueOperation;
+import dev.mesbase.business.issue.domain.MaterialIssueStatus;
+import dev.mesbase.business.issue.domain.MaterialIssueSubmissionStatus;
+import dev.mesbase.business.issue.domain.MesMaterialIssueEntity;
+import dev.mesbase.business.issue.domain.MesMaterialIssueErpExtraEntity;
+import dev.mesbase.business.issue.domain.MesMaterialIssueItemExample;
+import dev.mesbase.business.issue.domain.MesMaterialIssueResource;
+import dev.mesbase.business.issue.domain.MesMaterialIssueSubmissionEntity;
+import dev.mesbase.business.production.dao.WorkorderErpExtraMapper;
+import dev.mesbase.business.production.domain.ExecutionPathStatus;
+import dev.mesbase.business.production.domain.ProductionExecutionStatus;
+import dev.mesbase.business.production.service.BusinessSourceRules;
+import dev.mesbase.business.production.service.ExecutionPathService;
+import dev.mesbase.business.production.service.ProductionChainLocks;
+import dev.mesbase.business.production.service.ProductionExecutionRules;
+import dev.mesbase.common.validation.ParameterChecks;
 import dev.mesbase.core.error.ErrorCode;
 import dev.mesbase.core.error.FoundationException;
 import dev.mesbase.core.factory.FactoryScope;
-import dev.mesbase.platform.execution.FactoryContext;
 import dev.mesbase.infrastructure.cache.annotation.BusinessCacheEvict;
-import tools.jackson.databind.ObjectMapper;
+import dev.mesbase.platform.execution.FactoryContext;
+import dev.mesbase.platform.execution.FactoryIntegrationContext;
 import java.time.LocalDateTime;
 import java.util.List;
-import java.util.Set;
+import java.util.Map;
 import java.util.Objects;
-import org.springframework.beans.factory.annotation.Qualifier;
-import org.springframework.stereotype.Service;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
-import org.springframework.transaction.PlatformTransactionManager;
-import org.springframework.transaction.TransactionDefinition;
-import org.springframework.transaction.support.TransactionTemplate;
-import org.springframework.transaction.annotation.Transactional;
-import org.springframework.transaction.annotation.Propagation;
+import java.util.Optional;
+import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
+import tools.jackson.databind.ObjectMapper;
 
 @Service
 @ConditionalOnProperty(name = "mes.business.enabled", havingValue = "true")
@@ -143,7 +142,8 @@ public class MaterialIssueSubmissionService {
         var row = rules.hydrate(issues.selectByPrimaryKey(id));
         if (row.getSubmissionId() != null) return new Prepared(row, null, null, null);
         if (row.getVoidOperationId() != null || !Set.of(MaterialIssueStatus.DRAFT.getValue(), MaterialIssueStatus.RECORDED.getValue())
-                .contains(row.getStatus()) || row.getExecutionId() == null) ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
+                .contains(row.getStatus()) || row.getExecutionId() == null)
+            ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
         var e = locks.execution(row.getExecutionId());
         rules.validateExecutionSource(e);
         if (!Set.of(ProductionExecutionStatus.READY.getValue(), ProductionExecutionStatus.RUNNING.getValue())
@@ -179,7 +179,10 @@ public class MaterialIssueSubmissionService {
         var integrationSnapshot = FactoryIntegrationContext.required();
         var externalWarehouses = selection.mode() == Mode.CONNECTED ? sources.externalWarehouseIds(lines.stream()
                 .map(line -> line.getWarehouseId()).toList()) : Map.<Long, String>of();
-        var command = new MaterialIssueSubmitCommand(id, "ISSUE-SUBMIT-" + attempt.getId(), row.getIssueNo(), row.getWorkorderId(), row.getWorkorderCode(), Optional.ofNullable(external).map(nullableValue -> nullableValue.getExternalId()).orElse(null), Optional.ofNullable(external).map(nullableValue -> nullableValue.getExternalCode()).orElse(null), e.getId(), e.getExecutionNo(), row.getProductId(), row.getProductCode(), e.getRoutingId(), path.getRevision(), paths.view(e.getId())
+        var command = new MaterialIssueSubmitCommand(id, "ISSUE-SUBMIT-" + attempt.getId(), row.getIssueNo(), row.getWorkorderId(), row.getWorkorderCode(), Optional.ofNullable(external)
+                .map(nullableValue -> nullableValue.getExternalId()).orElse(null), Optional.ofNullable(external)
+                .map(nullableValue -> nullableValue.getExternalCode())
+                .orElse(null), e.getId(), e.getExecutionNo(), row.getProductId(), row.getProductCode(), e.getRoutingId(), path.getRevision(), paths.view(e.getId())
                 .selectedNodeIds(), Objects.toString(row.getIssueTime(), null), lines.stream()
                 .map(i -> new Line(i.getId(), i.getMaterialId(), i.getMaterialCode(), i.getBatchNo(), i.getQuantity(), i.getUnitId(), i.getUnitCode(), i.getWarehouseId(), i.getWarehouseCode(), externalWarehouses.get(i.getWarehouseId())))
                 .toList(), inputFacts.snapshot(id), new Source(selection.provider(), selection.bindingKey(),
@@ -220,7 +223,8 @@ public class MaterialIssueSubmissionService {
         if (result.executionMode() == Mode.CONNECTED && result.status() == Status.SUCCEEDED && !result.stockEffective())
             result = new ErpActionResult(Status.UNKNOWN, Mode.CONNECTED, result.externalReference(), result.externalCode(), "ERP库存生效待核实");
         var a = attempts.selectByPrimaryKey(row.getSubmissionId());
-        if (a == null || !Objects.equals(a.getIssueId(), row.getId())) ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
+        if (a == null || !Objects.equals(a.getIssueId(), row.getId()))
+            ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
         if (result.executionMode() == Mode.CONNECTED) {
             if (result.externalReference() != null) extra.setExternalReference(result.externalReference());
             if (result.externalCode() != null) extra.setExternalCode(result.externalCode());
@@ -304,7 +308,8 @@ public class MaterialIssueSubmissionService {
     public Source source(MesMaterialIssueEntity row) {
         if (row.getSubmissionId() == null) return null;
         var attempt = attempts.selectByPrimaryKey(row.getSubmissionId());
-        if (attempt == null || !Objects.equals(row.getId(), attempt.getIssueId())) ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
+        if (attempt == null || !Objects.equals(row.getId(), attempt.getIssueId()))
+            ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
         var node = json.readTree(attempt.getCommandJson());
         var source = node.get("source");
         // Historical attempts may contain only {} or predate the frozen source contract.

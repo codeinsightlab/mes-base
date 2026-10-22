@@ -1,39 +1,35 @@
 package dev.mesbase.business.production.service;
 
-import dev.mesbase.common.utils.StringUtils;
-import dev.mesbase.common.validation.ParameterChecks;
-import java.util.Optional;
-
-import dev.mesbase.business.production.domain.ProductionQuantityInput;
-
-import dev.mesbase.business.production.service.BusinessSourceRules;
-import dev.mesbase.business.shared.enums.BusinessSource;
-
-import dev.mesbase.business.production.dao.MesWorkorderMaterialMapper;
-import dev.mesbase.business.production.domain.MesWorkorderMaterialEntity;
-import dev.mesbase.business.production.domain.WorkOrderStatus;
-import dev.mesbase.business.issue.dao.MesMaterialIssueMapper;
-import dev.mesbase.business.issue.domain.MesMaterialIssueExample;
 import dev.mesbase.business.basic.dao.MaterialMapper;
 import dev.mesbase.business.basic.dao.UnitMeasureMapper;
-import dev.mesbase.business.wm.dao.WmWarehouseMapper;
-import dev.mesbase.business.wm.service.StockReferenceRules;
-import dev.mesbase.business.wm.domain.WmWarehouseExample;
-import dev.mesbase.business.integration.warehouse.WarehouseIntegration;
 import dev.mesbase.business.integration.warehouse.ErpActionResult.Mode;
+import dev.mesbase.business.integration.warehouse.WarehouseIntegration;
+import dev.mesbase.business.issue.dao.MesMaterialIssueMapper;
+import dev.mesbase.business.issue.domain.MesMaterialIssueExample;
+import dev.mesbase.business.production.dao.MesWorkorderMaterialMapper;
+import dev.mesbase.business.production.domain.MesWorkorderMaterialEntity;
+import dev.mesbase.business.production.domain.ProductionQuantityInput;
+import dev.mesbase.business.production.domain.WorkOrderStatus;
+import dev.mesbase.business.production.service.BusinessSourceRules;
 import dev.mesbase.business.shared.enums.EnableStatus;
+import dev.mesbase.business.wm.dao.WmWarehouseMapper;
+import dev.mesbase.business.wm.domain.WmWarehouseExample;
+import dev.mesbase.business.wm.service.StockReferenceRules;
 import dev.mesbase.common.utils.SecurityUtils;
-import dev.mesbase.core.error.FoundationException;
+import dev.mesbase.common.utils.StringUtils;
+import dev.mesbase.common.validation.ParameterChecks;
 import dev.mesbase.core.error.ErrorCode;
+import dev.mesbase.core.error.FoundationException;
 import dev.mesbase.platform.execution.FactoryContext;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Objects;
-import org.springframework.stereotype.Service;
+import java.util.Optional;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Isolation;
+import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.databind.ObjectMapper;
 
 /**
@@ -94,10 +90,13 @@ public class WorkorderMaterialService {
         if (c == null || c.expectedRevision() == null || c.expectedRevision() != revision || c.materialId() == null
                 || c.totalRequiredQty() == null || c.totalRequiredQty().signum() <= 0 || c.totalRequiredQty()
                 .scale() > 6
-                || c.totalRequiredQty().precision() - c.totalRequiredQty().scale() > 14 || StringUtils.isBlank(c.workCenter()) || c.workCenter().length() > 100 || c.warehouseIds() == null
+                || c.totalRequiredQty().precision() - c.totalRequiredQty()
+                .scale() > 14 || StringUtils.isBlank(c.workCenter()) || c.workCenter()
+                .length() > 100 || c.warehouseIds() == null
                 || c.warehouseIds().isEmpty() || c.warehouseIds().size() > 100 || c.warehouseIds().stream()
                 .anyMatch(Objects::isNull)) ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
-        ProductionQuantityInput.changed(c.totalRequiredQty(), Optional.ofNullable(previous).map(nullableValue -> nullableValue.getTotalRequiredQty()).orElse(null));
+        ProductionQuantityInput.changed(c.totalRequiredQty(), Optional.ofNullable(previous)
+                .map(nullableValue -> nullableValue.getTotalRequiredQty()).orElse(null));
         var ids = c.warehouseIds().stream().distinct().sorted().toList();
         references.lockDemandReferences(c.materialId(), ids);
         sources.warehouses(order.getSource(), ids);
@@ -105,7 +104,8 @@ public class WorkorderMaterialService {
         if (material == null || material.getUnitId() == null) ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
         var unit = units.selectByPrimaryKey(material.getUnitId());
         if (material == null || unit == null || !EnableStatus.ENABLED.getValue().equals(material.getStatus())
-                || !EnableStatus.ENABLED.getValue().equals(unit.getStatus())) ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
+                || !EnableStatus.ENABLED.getValue().equals(unit.getStatus()))
+            ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
         var wf = new WmWarehouseExample();
         wf.createCriteria().andIdIn(ids).andStatusEqualTo(EnableStatus.ENABLED.getValue());
         if (warehouses.countByExample(wf) != ids.size()) ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
@@ -123,7 +123,8 @@ public class WorkorderMaterialService {
         row.setStatus(c.enabled() ? EnableStatus.ENABLED.getValue() : EnableStatus.DISABLED.getValue());
         row.setUpdatedBy(SecurityUtils.getUserId());
         row.setUpdatedAt(LocalDateTime.now());
-        if ((previous == null ? requirements.insert(row) : requirements.updateByPrimaryKey(row)) != 1) ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
+        if ((previous == null ? requirements.insert(row) : requirements.updateByPrimaryKey(row)) != 1)
+            ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
         return row;
     }
 

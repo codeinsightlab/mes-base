@@ -1,38 +1,37 @@
 package dev.mesbase.business.basic.service;
 
-import java.util.Optional;
-
-import dev.mesbase.business.basic.domain.MaterialType;
-import dev.mesbase.business.shared.enums.EnableStatus;
-import dev.mesbase.core.error.ErrorCode;
-import dev.mesbase.core.error.FoundationException;
-import java.util.List;
-import dev.mesbase.business.wm.service.StockReferenceRules;
-import java.util.HashSet;
-import java.util.Set;
-import java.util.Objects;
-import org.springframework.stereotype.Component;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
-import dev.mesbase.business.production.service.RoutingReferenceRules;
-import org.springframework.beans.factory.ObjectProvider;
-import dev.mesbase.business.basic.dao.MaterialMapper;
-import dev.mesbase.business.basic.domain.MaterialEntity;
-import dev.mesbase.business.basic.domain.MaterialExample;
 import dev.mesbase.business.basic.dao.MaterialCategoryMapper;
+import dev.mesbase.business.basic.dao.MaterialMapper;
+import dev.mesbase.business.basic.dao.SafetyStockMapper;
+import dev.mesbase.business.basic.dao.UnitMeasureMapper;
+import dev.mesbase.business.basic.dao.WorkshopMapper;
+import dev.mesbase.business.basic.dao.WorkstationMapper;
 import dev.mesbase.business.basic.domain.MaterialCategoryEntity;
 import dev.mesbase.business.basic.domain.MaterialCategoryExample;
-import dev.mesbase.business.basic.dao.UnitMeasureMapper;
-import dev.mesbase.business.basic.domain.UnitMeasureEntity;
-import dev.mesbase.business.basic.domain.UnitMeasureExample;
-import dev.mesbase.business.basic.dao.WorkstationMapper;
-import dev.mesbase.business.basic.domain.WorkstationEntity;
-import dev.mesbase.business.basic.domain.WorkstationExample;
-import dev.mesbase.business.basic.dao.WorkshopMapper;
-import dev.mesbase.business.basic.domain.WorkshopEntity;
-import dev.mesbase.business.basic.domain.WorkshopExample;
-import dev.mesbase.business.basic.dao.SafetyStockMapper;
+import dev.mesbase.business.basic.domain.MaterialEntity;
+import dev.mesbase.business.basic.domain.MaterialExample;
+import dev.mesbase.business.basic.domain.MaterialType;
 import dev.mesbase.business.basic.domain.SafetyStockEntity;
 import dev.mesbase.business.basic.domain.SafetyStockExample;
+import dev.mesbase.business.basic.domain.UnitMeasureEntity;
+import dev.mesbase.business.basic.domain.UnitMeasureExample;
+import dev.mesbase.business.basic.domain.WorkshopEntity;
+import dev.mesbase.business.basic.domain.WorkshopExample;
+import dev.mesbase.business.basic.domain.WorkstationEntity;
+import dev.mesbase.business.basic.domain.WorkstationExample;
+import dev.mesbase.business.production.service.RoutingReferenceRules;
+import dev.mesbase.business.shared.enums.EnableStatus;
+import dev.mesbase.business.wm.service.StockReferenceRules;
+import dev.mesbase.core.error.ErrorCode;
+import dev.mesbase.core.error.FoundationException;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.Set;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.stereotype.Component;
 
 /**
  * Shared minimal business checks for manual CRUD and synchronization.
@@ -163,13 +162,15 @@ public class BasicDataRules {
     }
 
     public MaterialCategoryEntity requireCategory(Long id) {
-        var row = Optional.ofNullable(id).map(nullableValue -> materialCategory.selectByPrimaryKey(nullableValue)).orElse(null);
+        var row = Optional.ofNullable(id).map(nullableValue -> materialCategory.selectByPrimaryKey(nullableValue))
+                .orElse(null);
         if (row == null) throw new FoundationException(ErrorCode.NOT_FOUND);
         return row;
     }
 
     public UnitMeasureEntity requireUnit(Long id) {
-        var row = Optional.ofNullable(id).map(nullableValue -> unitMeasure.selectByPrimaryKey(nullableValue)).orElse(null);
+        var row = Optional.ofNullable(id).map(nullableValue -> unitMeasure.selectByPrimaryKey(nullableValue))
+                .orElse(null);
         if (row == null) throw new FoundationException(ErrorCode.NOT_FOUND);
         return row;
     }

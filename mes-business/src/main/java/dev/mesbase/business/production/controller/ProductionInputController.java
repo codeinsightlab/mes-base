@@ -1,26 +1,25 @@
 package dev.mesbase.business.production.controller;
 
-import java.util.Optional;
-
-import dev.mesbase.business.production.service.ProductionInputSupplyService;
-import dev.mesbase.business.production.service.ProductionInputService;
+import dev.mesbase.business.integration.production.ProductionSupply.Order;
+import dev.mesbase.business.integration.production.ProductionSupply.Stock;
+import dev.mesbase.business.production.controller.ExecutionActionController.PathView;
+import dev.mesbase.business.production.controller.vo.RoutingDetailVo;
 import dev.mesbase.business.production.service.ProductionInputService.Command;
 import dev.mesbase.business.production.service.ProductionInputService.Result;
-import dev.mesbase.business.integration.production.ProductionSupply.Stock;
-import dev.mesbase.business.integration.production.ProductionSupply.Order;
+import dev.mesbase.business.production.service.ProductionInputService;
+import dev.mesbase.business.production.service.ProductionInputSupplyService;
 import dev.mesbase.platform.web.EndpointAccess;
-import dev.mesbase.business.production.controller.vo.RoutingDetailVo;
-import dev.mesbase.business.production.controller.ExecutionActionController.PathView;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
-import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.bind.annotation.RequestMapping;
+import java.util.Optional;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/api/production/input")
@@ -80,7 +79,8 @@ public class ProductionInputController {
     @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED, permission = PERMISSION)
     public PreviewView preview(@RequestParam String code, @RequestParam Long workorderId) {
         var p = service.preview(code, workorderId);
-        return new PreviewView(RoutingController.detailView(p.definition()), Optional.ofNullable(p.actual()).map(nullableValue -> ExecutionActionController.toView(nullableValue)).orElse(null));
+        return new PreviewView(RoutingController.detailView(p.definition()), Optional.ofNullable(p.actual())
+                .map(nullableValue -> ExecutionActionController.toView(nullableValue)).orElse(null));
     }
 
     @PostMapping

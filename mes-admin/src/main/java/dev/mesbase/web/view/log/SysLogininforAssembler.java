@@ -1,12 +1,12 @@
 package dev.mesbase.web.view.log;
 
 import dev.mesbase.common.utils.bean.BeanConversions;
-import java.util.Objects;
-
 import dev.mesbase.system.domain.SysLogininfor;
 import java.util.List;
 
-/** Explicit conversion at the Controller HTTP boundary. */
+/**
+ * Explicit conversion at the Controller HTTP boundary.
+ */
 public final class SysLogininforAssembler {
     private SysLogininforAssembler() {
     }

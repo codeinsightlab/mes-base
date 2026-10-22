@@ -6,19 +6,18 @@ import com.github.pagehelper.PageHelper;
 import dev.mesbase.core.error.ErrorCode;
 import dev.mesbase.core.error.FoundationException;
 import dev.mesbase.core.factory.Factory;
-import dev.mesbase.platform.execution.FactoryIntegrationContext;
-import org.springframework.core.env.StandardEnvironment;
 import dev.mesbase.core.factory.FactoryId;
 import dev.mesbase.core.factory.FactoryScope;
 import dev.mesbase.core.factory.FactoryStatus;
-import dev.mesbase.infrastructure.persistence.BusinessRuntimeBinding;
 import dev.mesbase.infrastructure.persistence.BusinessPersistenceResolver;
 import dev.mesbase.infrastructure.persistence.BusinessRequestSnapshot;
-import dev.mesbase.system.factory.FactoryExecutionMetadata;
+import dev.mesbase.infrastructure.persistence.BusinessRuntimeBinding;
 import dev.mesbase.infrastructure.persistence.DatasourceIdentity;
 import dev.mesbase.infrastructure.persistence.PlatformPersistence;
 import dev.mesbase.infrastructure.persistence.RuntimeRegistry;
+import dev.mesbase.platform.execution.FactoryIntegrationContext;
 import dev.mesbase.server.DruidPools;
+import dev.mesbase.system.factory.FactoryExecutionMetadata;
 import dev.mesbase.system.factory.ManagedDatasource;
 import dev.mesbase.system.factory.ManagedDatasourceMapper;
 import dev.mesbase.system.factory.ManagedFactory;
@@ -49,7 +48,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Function;
 import java.util.function.Supplier;
 import javax.sql.DataSource;
-import org.springframework.transaction.support.TransactionSynchronizationManager;
+import org.springframework.core.env.StandardEnvironment;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -173,7 +172,9 @@ public class ManagedDatasourceService {
 
     private DatasourceView view(ManagedDatasource s, ManagedFactory f) {
         var loaded = f != null && registry.contains(new BusinessRuntimeBinding(new FactoryId(f.factoryId()), identity(s.datasourceId()), s.revision()));
-        return new DatasourceView(s.datasourceId(), s.datasourceName(), s.dbHost(), s.dbPort(), s.dbName(), s.dbUsername(), s.status(), s.revision(), loaded ? "MANAGED" : "UNMANAGED", Optional.ofNullable(f).map(nullableValue -> nullableValue.factoryId()).orElse(null), Optional.ofNullable(f).map(nullableValue -> nullableValue.factoryName()).orElse(null),
+        return new DatasourceView(s.datasourceId(), s.datasourceName(), s.dbHost(), s.dbPort(), s.dbName(), s.dbUsername(), s.status(), s.revision(), loaded ? "MANAGED" : "UNMANAGED", Optional.ofNullable(f)
+                .map(nullableValue -> nullableValue.factoryId()).orElse(null), Optional.ofNullable(f)
+                .map(nullableValue -> nullableValue.factoryName()).orElse(null),
                 "ENABLED".equals(s.status()) ? "已加入管理" : "未加入管理", loaded ? "已加载" : "未加载", loaded, null, null, generatedAt(s), nodeId);
     }
 
@@ -266,7 +267,9 @@ public class ManagedDatasourceService {
                 editable(old);
                 if (old.revision() != form.revision()) throw new FoundationException(ErrorCode.RESOURCE_CONFLICT);
             }
-            String password = form.password() == null ? (Optional.ofNullable(old).map(nullableValue -> nullableValue.passwordCipher()).orElse(null)) : cipher.encrypt(form.password());
+            String password = form.password() == null ? (Optional.ofNullable(old)
+                    .map(nullableValue -> nullableValue.passwordCipher())
+                    .orElse(null)) : cipher.encrypt(form.password());
             if (password == null) throw new FoundationException(ErrorCode.BAD_REQUEST);
             var row = new ManagedDatasource(form.datasourceId(), form.datasourceName(), form.dbHost(), form.dbPort(), form.dbName(), form.dbUsername(), password, "DISABLED", old == null ? 1 : old.revision());
             if (creating) {

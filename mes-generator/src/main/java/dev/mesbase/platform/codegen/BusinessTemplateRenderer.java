@@ -1,7 +1,5 @@
 package dev.mesbase.platform.codegen;
 
-import java.util.Optional;
-
 import dev.mesbase.platform.codegen.ScaffoldWriter.Artifact;
 import dev.mesbase.platform.codegen.TableMetadata.Column;
 import java.io.StringWriter;
@@ -11,6 +9,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -36,7 +35,8 @@ public final class BusinessTemplateRenderer {
     }
 
     public BusinessTemplateRenderer(CodegenTemplateOptions options) {
-        this(options, VelocityTemplateInitializer.initialize(Optional.ofNullable(options).map(nullableValue -> nullableValue.templateRoot()).orElse(null)));
+        this(options, VelocityTemplateInitializer.initialize(Optional.ofNullable(options)
+                .map(nullableValue -> nullableValue.templateRoot()).orElse(null)));
     }
 
     BusinessTemplateRenderer(CodegenTemplateOptions options, VelocityEngine engine) {
@@ -156,7 +156,8 @@ public final class BusinessTemplateRenderer {
         String n = cap(JdbcMetadataReader.camel(r.tableName())), p = r.packageName(), name = JdbcMetadataReader.camel(r.tableName()), route = "/api/" + r.moduleName() + "/" + r.tableName()
                 .replace('_', '-').toLowerCase(Locale.ROOT), perm = permissionNamespace(r) + ":" + r.tableName()
                 .replace('_', ':');
-        String scopeColumnName = Optional.ofNullable(options).map(nullableValue -> (String) nullableValue.variables().get("serverScopeColumn")).orElse(null);
+        String scopeColumnName = Optional.ofNullable(options)
+                .map(nullableValue -> (String) nullableValue.variables().get("serverScopeColumn")).orElse(null);
         Column scopeColumn = Optional.ofNullable(scopeColumnName).map(nullableValue -> t.columns().stream()
                 .filter(column -> column.name().equalsIgnoreCase(nullableValue)).findFirst()
                 .orElseThrow(() -> new CodegenException(CodegenException.Code.INVALID_REQUEST))).orElse(null);

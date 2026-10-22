@@ -1,26 +1,39 @@
 package dev.mesbase.common.bean;
 
-import dev.mesbase.common.core.page.PageData;
-import dev.mesbase.common.utils.bean.BeanConversions;
+import com.fasterxml.jackson.annotation.JsonFormat;
+import dev.mesbase.business.basic.controller.vo.MaterialPageVo;
 import dev.mesbase.business.basic.domain.MaterialEntity;
 import dev.mesbase.business.basic.domain.MaterialPage;
-import dev.mesbase.business.basic.controller.vo.MaterialPageVo;
+import dev.mesbase.common.core.page.PageData;
+import dev.mesbase.common.utils.bean.BeanConversions;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.Date;
 import java.util.List;
 import org.junit.jupiter.api.Test;
-import tools.jackson.core.JacksonException;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import tools.jackson.core.JacksonException;
 
 class BeanConversionsTest {
-    record Source(Long id, BigDecimal quantity, String password, List<Source> children, LocalDateTime time) { }
-    record View(String id, String quantity, List<View> children, LocalDateTime time) { }
-    record QueryPage(List<Source> items, long total, int offset, int limit) implements PageData<Source> { }
-    record ViewPage(List<View> items, long total, int offset, int limit) implements PageData<View> { }
-    record Required(int count) { }
+    record Source(Long id, BigDecimal quantity, String password, List<Source> children, LocalDateTime time) {
+    }
+
+    record View(String id, String quantity, List<View> children, LocalDateTime time) {
+    }
+
+    record QueryPage(List<Source> items, long total, int offset, int limit) implements PageData<Source> {
+    }
+
+    record ViewPage(List<View> items, long total, int offset, int limit) implements PageData<View> {
+    }
+
+    record Required(int count) {
+    }
 
     @Test
     void mapsImmutableRecordsAndNestedGenericRowsWithoutLosingPrecision() {
@@ -62,5 +75,18 @@ class BeanConversionsTest {
         assertThrows(JacksonException.class, () -> BeanConversions.convert(new RequiredSource(null), Required.class));
     }
 
-    record RequiredSource(Integer count) { }
+    record DateSource(@JsonFormat(pattern = "yyyy-MM-dd") Date value) {
+    }
+
+    record DateView(@JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss") Date value) {
+    }
+
+    @Test
+    void propertyConversionDoesNotApplyHttpDateFormatting() {
+        var time = new Date(1700000000123L);
+        assertEquals(time, BeanConversions.convert(new DateSource(time), DateView.class).value());
+    }
+
+    record RequiredSource(Integer count) {
+    }
 }

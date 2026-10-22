@@ -1,18 +1,19 @@
 package dev.mesbase.business.basic.service.impl;
 
-import dev.mesbase.business.basic.domain.EquipmentPage;
-import dev.mesbase.common.validation.ParameterChecks;
-import dev.mesbase.business.shared.enums.EnableStatus;
 import com.github.pagehelper.Page;
 import com.github.pagehelper.PageHelper;
 import dev.mesbase.business.basic.dao.EquipmentMapper;
 import dev.mesbase.business.basic.domain.EquipmentCreateCommand;
 import dev.mesbase.business.basic.domain.EquipmentEntity;
 import dev.mesbase.business.basic.domain.EquipmentExample;
+import dev.mesbase.business.basic.domain.EquipmentPage;
 import dev.mesbase.business.basic.domain.EquipmentQueryDto;
 import dev.mesbase.business.basic.domain.EquipmentResource;
 import dev.mesbase.business.basic.domain.EquipmentUpdateCommand;
+import dev.mesbase.business.basic.service.EquipmentReferenceRules;
 import dev.mesbase.business.basic.service.IEquipmentService;
+import dev.mesbase.business.shared.enums.EnableStatus;
+import dev.mesbase.common.validation.ParameterChecks;
 import dev.mesbase.core.error.ErrorCode;
 import dev.mesbase.core.error.FoundationException;
 import dev.mesbase.infrastructure.cache.annotation.BusinessCache;
@@ -21,12 +22,10 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 import org.springframework.dao.DuplicateKeyException;
+import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Isolation;
-import dev.mesbase.business.basic.service.EquipmentReferenceRules;
-
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * 设备 CRUD：规则与事务由 Service 负责，Mapper 通过 MyBatis-Spring 注入。

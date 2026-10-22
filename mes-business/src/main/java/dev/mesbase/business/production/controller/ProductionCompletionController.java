@@ -1,18 +1,17 @@
 package dev.mesbase.business.production.controller;
 
-import java.util.Optional;
-
-import dev.mesbase.business.production.service.ProductionCompletionService;
 import dev.mesbase.business.production.domain.MesExecutionCompletionEntity;
+import dev.mesbase.business.production.service.ProductionCompletionService;
 import dev.mesbase.platform.web.EndpointAccess;
 import java.time.LocalDateTime;
-import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.RequestBody;
+import java.util.Optional;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/api/production/executions/{id}")
@@ -41,7 +40,8 @@ public class ProductionCompletionController {
                 .getTargetQty().toPlainString(),
                 s.release().effective().toPlainString(), s.release().released().toPlainString(), s.release()
                 .historicalReleased().toPlainString(), s.release()
-                .basisHash(), s.canComplete(), s.blockedReason(), Optional.ofNullable(s.completion()).map(nullableValue -> view(nullableValue)).orElse(null));
+                .basisHash(), s.canComplete(), s.blockedReason(), Optional.ofNullable(s.completion())
+                .map(nullableValue -> view(nullableValue)).orElse(null));
     }
 
     @PostMapping("/actions/complete")

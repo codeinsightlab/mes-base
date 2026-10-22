@@ -1,8 +1,5 @@
 package dev.mesbase.business.wm.controller;
 
-import dev.mesbase.common.utils.bean.BeanConversions;
-import java.util.Objects;
-
 import dev.mesbase.business.wm.controller.vo.WmInventoryPageVo;
 import dev.mesbase.business.wm.controller.vo.WmInventoryVo;
 import dev.mesbase.business.wm.domain.WmInventoryCreateCommand;
@@ -12,6 +9,7 @@ import dev.mesbase.business.wm.domain.WmInventoryQueryDto;
 import dev.mesbase.business.wm.domain.WmInventoryUpdateCommand;
 import dev.mesbase.business.wm.service.IWmInventoryService;
 import dev.mesbase.business.wm.sync.WmInventorySyncResult;
+import dev.mesbase.common.utils.bean.BeanConversions;
 import dev.mesbase.platform.execution.FactoryContext;
 import dev.mesbase.platform.web.EndpointAccess;
 import jakarta.validation.Valid;
@@ -50,9 +48,7 @@ public class WmInventoryController {
             permission = WmInventoryPermissions.LIST)
     public WmInventoryPageVo list(@Valid @ModelAttribute WmInventoryQueryDto query) {
         WmInventoryPage page = service.selectPage(query);
-        return new WmInventoryPageVo(
-                page.items().stream().map(WmInventoryController::toView).toList(),
-                page.total(), page.offset(), page.limit());
+        return BeanConversions.convertPage(page, WmInventoryController::toView, WmInventoryPageVo::new);
     }
 
     @GetMapping("/{id}")
@@ -94,7 +90,8 @@ public class WmInventoryController {
         return service.sync(FactoryContext.required());
     }
 
-    private record Labels(String materialName, String warehouseName, String warehouseSource) { }
+    private record Labels(String materialName, String warehouseName, String warehouseSource) {
+    }
 
     private static WmInventoryVo toView(WmInventoryItem item) {
         return BeanConversions.convertWith(item.inventory(), new Labels(item.materialName(), item.warehouseName(),

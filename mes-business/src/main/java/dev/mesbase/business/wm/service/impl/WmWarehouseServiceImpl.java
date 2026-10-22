@@ -1,28 +1,31 @@
 package dev.mesbase.business.wm.service.impl;
 
-import dev.mesbase.business.wm.domain.WmWarehousePage;
-import dev.mesbase.common.validation.ParameterChecks;
-import java.util.Optional;
-
-import dev.mesbase.business.production.service.BusinessSourceRules;
-import dev.mesbase.business.shared.enums.BusinessSource;
-import dev.mesbase.business.shared.ExternalSyncAction;
-import dev.mesbase.business.shared.ExternalSyncCheck;
-
 import com.github.pagehelper.Page;
 import com.github.pagehelper.PageHelper;
+import dev.mesbase.business.production.service.BusinessSourceRules;
+import dev.mesbase.business.shared.ExternalSyncAction;
+import dev.mesbase.business.shared.ExternalSyncCheck;
+import dev.mesbase.business.shared.enums.BusinessSource;
+import dev.mesbase.business.wm.dao.WmWarehouseErpExtraMapper;
 import dev.mesbase.business.wm.dao.WmWarehouseMapper;
 import dev.mesbase.business.wm.domain.WmWarehouseCreateCommand;
 import dev.mesbase.business.wm.domain.WmWarehouseEntity;
+import dev.mesbase.business.wm.domain.WmWarehouseErpExtraEntity;
+import dev.mesbase.business.wm.domain.WmWarehouseErpExtraExample;
 import dev.mesbase.business.wm.domain.WmWarehouseExample;
+import dev.mesbase.business.wm.domain.WmWarehousePage;
+import dev.mesbase.business.wm.domain.WarehouseType;
 import dev.mesbase.business.wm.domain.WmWarehouseQueryDto;
 import dev.mesbase.business.wm.domain.WmWarehouseResource;
 import dev.mesbase.business.wm.domain.WmWarehouseUpdateCommand;
 import dev.mesbase.business.wm.service.IWmWarehouseService;
+import dev.mesbase.business.wm.service.StockReferenceRules;
 import dev.mesbase.business.wm.sync.ExternalWmWarehouse;
 import dev.mesbase.business.wm.sync.UnconfiguredWmWarehouseQueryAdapter;
 import dev.mesbase.business.wm.sync.WmWarehouseQueryPort;
 import dev.mesbase.business.wm.sync.WmWarehouseSyncResult;
+import dev.mesbase.common.utils.SecurityUtils;
+import dev.mesbase.common.validation.ParameterChecks;
 import dev.mesbase.core.error.ErrorCode;
 import dev.mesbase.core.error.FoundationException;
 import dev.mesbase.core.factory.FactoryScope;
@@ -31,27 +34,23 @@ import dev.mesbase.infrastructure.cache.BusinessCacheProcessor;
 import dev.mesbase.infrastructure.cache.annotation.BusinessCache;
 import dev.mesbase.infrastructure.cache.annotation.BusinessCacheEvict;
 import dev.mesbase.platform.execution.FactoryContext;
+import dev.mesbase.platform.execution.FactoryIntegrationContext;
 import jakarta.validation.Validator;
 import java.time.Duration;
 import java.time.LocalDateTime;
-import dev.mesbase.business.wm.service.StockReferenceRules;
-import dev.mesbase.common.utils.SecurityUtils;
-import org.springframework.dao.DuplicateKeyException;
-import org.springframework.transaction.annotation.Isolation;
-import org.springframework.transaction.support.TransactionSynchronization;
-import org.springframework.transaction.support.TransactionSynchronizationManager;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
-import dev.mesbase.business.wm.dao.WmWarehouseErpExtraMapper;
-import dev.mesbase.business.wm.domain.WmWarehouseErpExtraEntity;
-import dev.mesbase.business.wm.domain.WmWarehouseErpExtraExample;
-import dev.mesbase.platform.execution.FactoryIntegrationContext;
+import java.util.Optional;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 /**
  * 仓库管理 CRUD：规则与事务由 Service 负责，Mapper 通过 MyBatis-Spring 注入。
@@ -109,6 +108,9 @@ public class WmWarehouseServiceImpl implements IWmWarehouseService {
             criteria.andRemarkLike("%" + query.remark() + "%");
         }
         if (query.source() != null) criteria.andSourceEqualTo(BusinessSourceRules.required(query.source()).getValue());
+        if (query.warehouseType() != null) {
+            criteria.andWarehouseTypeEqualTo(requiredType(query.warehouseType()).getValue());
+        }
         example.setOrderByClause("id desc");
         try (Page<WmWarehouseEntity> page = PageHelper.offsetPage(offset, limit)) {
             List<WmWarehouseEntity> rows = mapper.selectByExample(example);
@@ -135,6 +137,7 @@ public class WmWarehouseServiceImpl implements IWmWarehouseService {
 
         row.setCode(input.code());
         row.setName(input.name());
+        row.setWarehouseType(requiredType(input.warehouseType()).getValue());
         row.setStatus(input.status());
         row.setRemark(input.remark());
         rules.validate(row);
@@ -156,6 +159,7 @@ public class WmWarehouseServiceImpl implements IWmWarehouseService {
         row.setId(id);
         row.setCode(input.code());
         row.setName(input.name());
+        row.setWarehouseType(requiredType(input.warehouseType()).getValue());
         row.setStatus(input.status());
         row.setRemark(input.remark());
         rules.validate(row);
@@ -188,6 +192,12 @@ public class WmWarehouseServiceImpl implements IWmWarehouseService {
         if (mapper.deleteByExample(example) != ids.size()) {
             throw new FoundationException(ErrorCode.RESOURCE_CONFLICT);
         }
+    }
+
+    private static WarehouseType requiredType(String value) {
+        WarehouseType type = WarehouseType.from(value);
+        if (type == null) throw new FoundationException(ErrorCode.BAD_REQUEST);
+        return type;
     }
 
     private WmWarehouseEntity requireRecord(Long id) {
@@ -322,7 +332,8 @@ public class WmWarehouseServiceImpl implements IWmWarehouseService {
             if (row != null && BusinessSourceRules.required(row.getSource()) != BusinessSource.EXTERNAL)
                 throw new FoundationException(ErrorCode.BUSINESS_SOURCE_CONFLICT);
             var snapshot = FactoryIntegrationContext.required();
-            var mapping = Optional.ofNullable(row).map(nullableValue -> knownById.get(nullableValue.getId())).orElse(null);
+            var mapping = Optional.ofNullable(row).map(nullableValue -> knownById.get(nullableValue.getId()))
+                    .orElse(null);
             if (row != null && (mapping == null || !Objects.equals(mapping.getExternalId(), input.externalId())))
                 throw new FoundationException(ErrorCode.BUSINESS_SOURCE_CONFLICT);
             if (mapping != null)

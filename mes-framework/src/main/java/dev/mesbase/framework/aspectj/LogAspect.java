@@ -1,20 +1,19 @@
 package dev.mesbase.framework.aspectj;
 
-import java.util.Optional;
-
 import dev.mesbase.common.annotation.Log;
 import dev.mesbase.common.utils.SecurityUtils;
 import dev.mesbase.common.utils.ServletUtils;
+import dev.mesbase.platform.execution.FactoryContext;
 import dev.mesbase.system.domain.SysOperLog;
 import dev.mesbase.system.service.ISysOperLogService;
-import org.aspectj.lang.annotation.Aspect;
+import java.util.Optional;
+import org.aspectj.lang.ProceedingJoinPoint;
 import org.aspectj.lang.annotation.Around;
+import org.aspectj.lang.annotation.Aspect;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.stereotype.Component;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
-import dev.mesbase.platform.execution.FactoryContext;
-import org.aspectj.lang.ProceedingJoinPoint;
+import org.springframework.stereotype.Component;
 
 /**
  * SOURCE_PRODUCT_PORT of RuoYi audit; metadata only, never bodies, credentials or query strings.
@@ -56,7 +55,8 @@ public class LogAspect {
                 row.setFactoryId(FactoryContext.current().map(s -> s.factoryId().value()).orElse(null));
                 row.setExecutionScope(row.getFactoryId() == null ? "PLATFORM" : "FACTORY");
                 row.setStatus(failure == null ? 0 : 1);
-                row.setErrorMsg(Optional.ofNullable(failure).map(nullableValue -> nullableValue.getClass().getSimpleName()).orElse(null));
+                row.setErrorMsg(Optional.ofNullable(failure)
+                        .map(nullableValue -> nullableValue.getClass().getSimpleName()).orElse(null));
                 row.setCostTime((System.nanoTime() - started) / 1000000L);
                 service.insertOperlog(row);
             } catch (Exception error) {

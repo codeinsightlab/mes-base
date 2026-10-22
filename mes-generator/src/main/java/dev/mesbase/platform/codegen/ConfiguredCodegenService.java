@@ -1,20 +1,19 @@
 package dev.mesbase.platform.codegen;
 
-import java.util.Optional;
-
+import dev.mesbase.platform.codegen.BusinessCodegenConfiguration.Documents;
+import dev.mesbase.platform.codegen.ScaffoldWriter.Artifact;
+import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.nio.file.Path;
-import org.apache.velocity.app.VelocityEngine;
-import java.util.HashMap;
+import java.util.Optional;
 import java.util.Set;
 import java.util.function.UnaryOperator;
 import javax.lang.model.SourceVersion;
-import dev.mesbase.platform.codegen.ScaffoldWriter.Artifact;
-import dev.mesbase.platform.codegen.BusinessCodegenConfiguration.Documents;
-import java.util.Comparator;
+import org.apache.velocity.app.VelocityEngine;
 
 /**
  * Explicit batch plans; validates all artifacts before one publication operation.
@@ -47,7 +46,8 @@ public final class ConfiguredCodegenService {
                 throw new CodegenException(CodegenException.Code.INVALID_REQUEST);
             }
             validate(plan.metadata());
-            Path templateRoot = Optional.ofNullable(plan.templates()).map(nullableValue -> nullableValue.templateRoot()).orElse(null);
+            Path templateRoot = Optional.ofNullable(plan.templates()).map(nullableValue -> nullableValue.templateRoot())
+                    .orElse(null);
             VelocityEngine engine = engines.computeIfAbsent(templateRoot, VelocityTemplateInitializer::initialize);
             BusinessTemplateRenderer renderer = new BusinessTemplateRenderer(plan.templates(), engine);
             artifacts.addAll(renderer.render(request, plan.metadata(), targets));

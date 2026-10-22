@@ -1,49 +1,47 @@
 package dev.mesbase.business.production.service;
 
-import dev.mesbase.common.utils.StringUtils;
-import dev.mesbase.common.validation.ParameterChecks;
-import java.util.Optional;
-
-import dev.mesbase.business.production.domain.ProductionQuantityInput;
-import dev.mesbase.business.production.domain.ProductionCompletionRequested;
-import dev.mesbase.platform.execution.FactoryContext;
-import org.springframework.context.ApplicationEventPublisher;
-
+import com.github.pagehelper.PageHelper;
+import dev.mesbase.business.basic.dao.WorkstationMapper;
+import dev.mesbase.business.directory.service.BusinessDirectoryService;
 import dev.mesbase.business.production.dao.MesProductionReportMapper;
 import dev.mesbase.business.production.dao.ProductionQuantityMapper;
-import dev.mesbase.business.basic.dao.WorkstationMapper;
 import dev.mesbase.business.production.domain.MesProductionReportEntity;
 import dev.mesbase.business.production.domain.MesProductionReportExample;
-import dev.mesbase.business.production.domain.ReportRecordType;
-import dev.mesbase.business.production.domain.ProductionReportModels.Supplement;
+import dev.mesbase.business.production.domain.ProductionCompletionRequested;
+import dev.mesbase.business.production.domain.ProductionQuantityInput;
 import dev.mesbase.business.production.domain.ProductionReportModels.Adjustment;
-import dev.mesbase.business.production.domain.ProductionReportModels.VoidOriginal;
-import dev.mesbase.business.production.domain.ProductionReportModels.ReportPage;
 import dev.mesbase.business.production.domain.ProductionReportModels.Detail;
+import dev.mesbase.business.production.domain.ProductionReportModels.ReportPage;
+import dev.mesbase.business.production.domain.ProductionReportModels.Supplement;
+import dev.mesbase.business.production.domain.ProductionReportModels.VoidOriginal;
+import dev.mesbase.business.production.domain.ReportRecordType;
 import dev.mesbase.common.utils.SecurityUtils;
+import dev.mesbase.common.utils.StringUtils;
+import dev.mesbase.common.validation.ParameterChecks;
 import dev.mesbase.core.error.ErrorCode;
 import dev.mesbase.core.error.FoundationException;
-import com.github.pagehelper.PageHelper;
+import dev.mesbase.platform.execution.FactoryContext;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
-import java.util.HexFormat;
-import java.util.Objects;
-import org.springframework.dao.DuplicateKeyException;
 import java.time.LocalDateTime;
-import java.util.List;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.UUID;
+import java.util.HexFormat;
+import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.UUID;
 import java.util.stream.Collectors;
-import dev.mesbase.business.directory.service.BusinessDirectoryService;
 import java.util.stream.Stream;
-import org.springframework.stereotype.Service;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.dao.DuplicateKeyException;
+import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Isolation;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @ConditionalOnProperty(name = "mes.business.enabled", havingValue = "true")
@@ -90,7 +88,8 @@ public class ProductionReportService {
         ProductionQuantityInput.check(command.quantity());
         positive(command.quantity());
         reason(command.reason());
-        if (command.reportTime() == null || command.reportTime().isAfter(LocalDateTime.now())) ParameterChecks.reject(ErrorCode.BAD_REQUEST);
+        if (command.reportTime() == null || command.reportTime().isAfter(LocalDateTime.now()))
+            ParameterChecks.reject(ErrorCode.BAD_REQUEST);
         users.requireExists(command.operatorUserId());
         if (command.workstationId() != null && workstations.selectByPrimaryKey(command.workstationId()) == null)
             throw new FoundationException(ErrorCode.REPORT_REFERENCE_INVALID);

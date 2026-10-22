@@ -1,54 +1,33 @@
 package dev.mesbase.business.legacy.service;
 
-import dev.mesbase.common.utils.StringUtils;
-import dev.mesbase.common.validation.ParameterChecks;
-import java.util.Optional;
-
-import dev.mesbase.business.legacy.domain.LegacyBatchStatus;
-import dev.mesbase.business.production.domain.WorkOrderStatus;
-import dev.mesbase.business.production.domain.ProductionExecutionStatus;
-import dev.mesbase.business.production.domain.ExecutionPathStatus;
-import dev.mesbase.business.production.domain.RoutingStatus;
-import dev.mesbase.business.production.domain.ReportRecordType;
-import dev.mesbase.business.shared.enums.EnableStatus;
-import dev.mesbase.business.shared.enums.BusinessSource;
-import dev.mesbase.business.basic.domain.MaterialType;
 import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.JsonNode;
-import dev.mesbase.business.legacy.domain.LegacyHistory.MappingIdentity;
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.Set;
-import java.util.Collection;
-import java.util.function.Function;
-import javax.sql.DataSource;
-import dev.mesbase.infrastructure.persistence.BusinessRuntimeBinding;
-import dev.mesbase.infrastructure.persistence.FactoryBusinessDataSource;
-import dev.mesbase.infrastructure.persistence.SpringCommitActions;
-import org.springframework.beans.factory.ObjectProvider;
-import org.springframework.beans.factory.annotation.Qualifier;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.mesbase.business.basic.dao.MaterialMapper;
 import dev.mesbase.business.basic.dao.UnitMeasureMapper;
 import dev.mesbase.business.basic.domain.MaterialEntity;
 import dev.mesbase.business.basic.domain.MaterialExample;
+import dev.mesbase.business.basic.domain.MaterialType;
 import dev.mesbase.business.basic.domain.UnitMeasureEntity;
 import dev.mesbase.business.basic.domain.UnitMeasureExample;
 import dev.mesbase.business.legacy.dao.LegacyMigrationMapper;
+import dev.mesbase.business.legacy.domain.LegacyBatchStatus;
 import dev.mesbase.business.legacy.domain.LegacyHistory.Batch;
-import dev.mesbase.business.legacy.domain.LegacyHistory.Mapping;
 import dev.mesbase.business.legacy.domain.LegacyHistory.ExecutionEvidence;
+import dev.mesbase.business.legacy.domain.LegacyHistory.Mapping;
+import dev.mesbase.business.legacy.domain.LegacyHistory.MappingIdentity;
 import dev.mesbase.business.legacy.domain.LegacyImportCommand;
 import dev.mesbase.business.production.dao.MesExecutionPathMapper;
 import dev.mesbase.business.production.dao.MesExecutionPathNodeMapper;
 import dev.mesbase.business.production.dao.MesProductionExecutionMapper;
 import dev.mesbase.business.production.dao.MesProductionReportMapper;
 import dev.mesbase.business.production.dao.OperationMapper;
+import dev.mesbase.business.production.dao.RoutingEdgeMapper;
 import dev.mesbase.business.production.dao.RoutingMapper;
 import dev.mesbase.business.production.dao.RoutingNodeMapper;
-import dev.mesbase.business.production.dao.RoutingEdgeMapper;
 import dev.mesbase.business.production.dao.RoutingProductMapper;
 import dev.mesbase.business.production.dao.WorkorderMapper;
+import dev.mesbase.business.production.domain.ExecutionPathStatus;
 import dev.mesbase.business.production.domain.MesExecutionPathEntity;
 import dev.mesbase.business.production.domain.MesExecutionPathNodeEntity;
 import dev.mesbase.business.production.domain.MesProductionExecutionEntity;
@@ -56,34 +35,54 @@ import dev.mesbase.business.production.domain.MesProductionExecutionExample;
 import dev.mesbase.business.production.domain.MesProductionReportEntity;
 import dev.mesbase.business.production.domain.OperationEntity;
 import dev.mesbase.business.production.domain.OperationExample;
+import dev.mesbase.business.production.domain.ProductionExecutionStatus;
+import dev.mesbase.business.production.domain.ReportRecordType;
+import dev.mesbase.business.production.domain.RoutingEdgeEntity;
 import dev.mesbase.business.production.domain.RoutingEntity;
 import dev.mesbase.business.production.domain.RoutingExample;
 import dev.mesbase.business.production.domain.RoutingNodeEntity;
-import dev.mesbase.business.production.domain.RoutingEdgeEntity;
+import dev.mesbase.business.production.domain.RoutingNodeExample;
 import dev.mesbase.business.production.domain.RoutingProductEntity;
+import dev.mesbase.business.production.domain.RoutingStatus;
+import dev.mesbase.business.production.domain.WorkOrderStatus;
 import dev.mesbase.business.production.domain.WorkorderEntity;
 import dev.mesbase.business.production.domain.WorkorderExample;
-import dev.mesbase.business.production.domain.RoutingNodeExample;
-import java.util.TreeSet;
-import java.util.Objects;
 import dev.mesbase.business.production.service.BusinessSourceRules;
 import dev.mesbase.business.production.service.ProductionQuantityService;
 import dev.mesbase.business.production.service.ReportUserReferenceService;
 import dev.mesbase.business.production.service.WorkorderErpFacts;
+import dev.mesbase.business.shared.enums.BusinessSource;
+import dev.mesbase.business.shared.enums.EnableStatus;
 import dev.mesbase.common.utils.SecurityUtils;
+import dev.mesbase.common.utils.StringUtils;
+import dev.mesbase.common.validation.ParameterChecks;
 import dev.mesbase.core.error.ErrorCode;
 import dev.mesbase.core.error.FoundationException;
+import dev.mesbase.infrastructure.persistence.BusinessRuntimeBinding;
+import dev.mesbase.infrastructure.persistence.FactoryBusinessDataSource;
+import dev.mesbase.infrastructure.persistence.SpringCommitActions;
 import dev.mesbase.platform.execution.FactoryContext;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashSet;
 import java.util.HexFormat;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.Set;
+import java.util.TreeSet;
 import java.util.UUID;
+import java.util.function.Function;
+import javax.sql.DataSource;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Isolation;
@@ -208,7 +207,8 @@ public class LegacyHistoryImportService {
     }
 
     private BusinessRuntimeBinding currentBinding() {
-        DataSource actual = Optional.ofNullable(dataSource).map(nullableValue -> nullableValue.getObject()).orElse(null);
+        DataSource actual = Optional.ofNullable(dataSource).map(nullableValue -> nullableValue.getObject())
+                .orElse(null);
         if (!(actual instanceof FactoryBusinessDataSource)) ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
         return ((FactoryBusinessDataSource) actual).currentBinding();
     }
@@ -256,7 +256,8 @@ public class LegacyHistoryImportService {
     @Transactional(transactionManager = "businessTransactionManager", readOnly = true, propagation = Propagation.REQUIRES_NEW,
             isolation = Isolation.READ_COMMITTED)
     public BatchReferences preloadBatch(List<LegacyImportCommand> commands) {
-        if (commands == null || commands.isEmpty() || commands.size() > 10) ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
+        if (commands == null || commands.isEmpty() || commands.size() > 10)
+            ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
         var hashes = new HashSet<String>();
         var keys = new TreeSet<String>();
         for (var c : commands) {
@@ -264,7 +265,8 @@ public class LegacyHistoryImportService {
             hashes.add(hash(encode(c)));
             keys.addAll(headerKeys(c));
         }
-        if (commands.stream().map(LegacyImportCommand::snapshotHash).distinct().count() != 1) ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
+        if (commands.stream().map(LegacyImportCommand::snapshotHash).distinct().count() != 1)
+            ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
         var refs = new BatchReferences(currentBinding(), hashes);
         readIdentities(List.copyOf(keys), refs.identities);
         var existing = commands.stream().filter(c -> refs.identities.containsKey(key("WORKORDER", c.code()))).toList();
@@ -424,10 +426,12 @@ public class LegacyHistoryImportService {
                 if (!allMapped) ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
                 return order.getId();
             }
-            if (!LegacyBatchStatus.REVIEWED.getValue().equals(batch.status()) || (!append && !allMapped)) ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
+            if (!LegacyBatchStatus.REVIEWED.getValue().equals(batch.status()) || (!append && !allMapped))
+                ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
             changed(metadata.transition(batch.id(), LegacyBatchStatus.REVIEWED.getValue(), LegacyBatchStatus.RUNNING.getValue(), LegacyBatchStatus.COMPLETED.getValue()));
             if (!allMapped) {
-                if (!WorkOrderStatus.HISTORICAL.getValue().equals(order.getStatus())) ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
+                if (!WorkOrderStatus.HISTORICAL.getValue().equals(order.getStatus()))
+                    ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
                 var criteria = new RoutingNodeExample();
                 criteria.createCriteria().andRoutingIdEqualTo(order.getRoutingId());
                 var targetNodes = new LinkedHashMap<String, Long>();
@@ -437,7 +441,8 @@ public class LegacyHistoryImportService {
                     for (var e : c.executions())
                         for (var n : e.nodes())
                             if (process.equals(n.processId()) && (!node.getOperationCode()
-                                    .equals(n.code()) || !node.getOperationName().equals(n.name()))) ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
+                                    .equals(n.code()) || !node.getOperationName().equals(n.name())))
+                                ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
                 }
                 // The formal locked path must still be a complete route. Do not invent unreported nodes for a partial legacy card.
                 for (var e : c.executions())
@@ -447,7 +452,8 @@ public class LegacyHistoryImportService {
                 var added = c.executions().stream()
                         .filter(e -> !replay.mappings().containsKey(key("EXECUTION", e.sourceKey())))
                         .map(e -> e.inputQty()).reduce(BigDecimal.ZERO, BigDecimal::add);
-                if (existingInputs.add(added).compareTo(order.getPlannedQty()) > 0) ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
+                if (existingInputs.add(added).compareTo(order.getPlannedQty()) > 0)
+                    ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
                 map(lookup, c.batchId(), key("APPEND_AUTHORIZATION", c.batchId() + "/" + existing.id()), existing.id(),
                         "APPEND_AUTHORIZATION", c.batchId() + "/" + existing.id(), c.sourceHash(), "APPEND_AUTHORIZATION", order.getId(),
                         c.sourcePayload(), encode(new AppendAuthorization(hash(encode(c)))));
@@ -456,7 +462,8 @@ public class LegacyHistoryImportService {
             changed(metadata.transition(batch.id(), LegacyBatchStatus.RUNNING.getValue(), LegacyBatchStatus.COMPLETED.getValue(), LegacyBatchStatus.COMPLETED.getValue()));
             return order.getId();
         }
-        if (append || !LegacyBatchStatus.REVIEWED.getValue().equals(batch.status())) ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
+        if (append || !LegacyBatchStatus.REVIEWED.getValue().equals(batch.status()))
+            ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
         changed(metadata.transition(batch.id(), LegacyBatchStatus.REVIEWED.getValue(), LegacyBatchStatus.RUNNING.getValue(), LegacyBatchStatus.COMPLETED.getValue()));
         var collision = new WorkorderExample();
         collision.createCriteria().andCodeEqualTo(c.code());
@@ -530,7 +537,8 @@ public class LegacyHistoryImportService {
 
     private WorkorderEntity requireExistingOrder(LegacyImportCommand c, MappingIdentity existing,
                                                  ReferenceLookup lookup) {
-        if (!existing.sourceHash().equals(c.sourceHash()) || !existing.ruleVersion().equals(RULE)) ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
+        if (!existing.sourceHash().equals(c.sourceHash()) || !existing.ruleVersion().equals(RULE))
+            ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
         var order = orders.selectByPrimaryKeyForUpdate(existing.entityId());
         var route = lookup.identities.get(key("ROUTING", c.code()));
         var product = lookup.identities.get(key("MATERIAL", c.productCode()));
@@ -567,11 +575,13 @@ public class LegacyHistoryImportService {
         var row = replay.executions().get(mapped.entityId());
         if (row == null || !row.getWorkorderId().equals(orderId)
                 || (!ProductionExecutionStatus.HISTORICAL.getValue()
-                .equals(row.getStatus()) && metadata.activatedInput(row.getId()) == null)) ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
+                .equals(row.getStatus()) && metadata.activatedInput(row.getId()) == null))
+            ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
         for (var r : e.reports()) {
             var report = replay.mappings().get(key("pro_reporting_work", r.sourceId()));
             if (report == null || !report.sourceHash().equals(r.sourceHash()) || !RULE.equals(report.ruleVersion())
-                    || !key("NODE", e.sourceKey() + "/" + r.processId()).equals(report.parentId())) ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
+                    || !key("NODE", e.sourceKey() + "/" + r.processId()).equals(report.parentId()))
+                ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
         }
         return true;
     }
@@ -585,7 +595,8 @@ public class LegacyHistoryImportService {
                     .map(LegacyImportCommand.Report::operatorUserId).toList());
         var imported = new LinkedHashMap<Long, LegacyImportCommand.Execution>();
         for (var e : pending) {
-            if (!e.nodes().stream().allMatch(n -> targetNodes.containsKey(n.processId()))) ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
+            if (!e.nodes().stream().allMatch(n -> targetNodes.containsKey(n.processId())))
+                ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
             var execution = new MesProductionExecutionEntity();
             execution.setWorkorderId(order.getId());
             execution.setProductId(order.getProductId());
@@ -795,7 +806,8 @@ public class LegacyHistoryImportService {
                             .equals(r.reportTime())) ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
                     if (!sourceReports.contains(raw)) ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
                 }
-                if (frozen.path("reports").size() != e.reports().size()) ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
+                if (frozen.path("reports").size() != e.reports().size())
+                    ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
             }
         } catch (JsonProcessingException failure) {
             throw new FoundationException(ErrorCode.RESOURCE_CONFLICT);
@@ -809,7 +821,8 @@ public class LegacyHistoryImportService {
             for (var n : e.nodes()) {
                 if (n.legacyNet().signum() < 0 || n.grossCorrection().signum() < 0 || n.effectiveDefect().signum() < 0
                         || n.grossCorrection().compareTo(n.effectiveDefect()) != 0
-                        || n.legacyNet().add(n.grossCorrection()).compareTo(upstream) > 0) ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
+                        || n.legacyNet().add(n.grossCorrection()).compareTo(upstream) > 0)
+                    ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
                 var total = e.reports().stream().filter(r -> r.processId().equals(n.processId()))
                         .map(r -> r.quantity()).reduce(BigDecimal.ZERO, BigDecimal::add);
                 if (total.compareTo(n.legacyNet()) != 0) ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
@@ -831,7 +844,8 @@ public class LegacyHistoryImportService {
     private void sameBatch(Batch batch, LegacyImportCommand c) {
         if (batch == null || !batch.ruleVersion().equals(RULE) || !batch.snapshotHash().equals(c.snapshotHash())
                 || !batch.approvedScope().replace(" ", "").equals(encode(List.of(hash(encode(c)))))
-                || !batch.operatorUserId().equals(SecurityUtils.getUserId())) ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
+                || !batch.operatorUserId().equals(SecurityUtils.getUserId()))
+            ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
     }
 
     private void map(ReferenceLookup lookup, String batch, String id, String parent, String table, String pk,
@@ -859,7 +873,8 @@ public class LegacyHistoryImportService {
                 bytes += size;
                 to++;
             }
-            if (metadata.insertBatch(rows.subList(from, to)) != to - from) ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
+            if (metadata.insertBatch(rows.subList(from, to)) != to - from)
+                ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
             for (var row : rows.subList(from, to)) remember(lookup, row);
             from = to;
         }

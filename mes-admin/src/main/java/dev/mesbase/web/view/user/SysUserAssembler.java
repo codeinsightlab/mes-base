@@ -1,17 +1,12 @@
 package dev.mesbase.web.view.user;
 
-import dev.mesbase.common.utils.bean.BeanConversions;
-import java.util.Optional;
-
-import java.util.Objects;
-
 import dev.mesbase.common.core.domain.entity.SysUser;
-import dev.mesbase.web.view.dept.SysDeptAssembler;
-import dev.mesbase.web.view.role.SysRoleAssembler;
-import java.util.Arrays;
+import dev.mesbase.common.utils.bean.BeanConversions;
 import java.util.List;
 
-/** Explicit conversion at the Controller HTTP boundary. */
+/**
+ * Explicit conversion at the Controller HTTP boundary.
+ */
 public final class SysUserAssembler {
     private SysUserAssembler() {
     }

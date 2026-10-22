@@ -1,8 +1,5 @@
 package dev.mesbase.server.integration.e10;
 
-import dev.mesbase.common.utils.StringUtils;
-import java.util.Optional;
-
 import com.fasterxml.jackson.databind.JsonNode;
 import dev.mesbase.business.basic.dao.MaterialMapper;
 import dev.mesbase.business.basic.dao.UnitMeasureMapper;
@@ -26,6 +23,7 @@ import dev.mesbase.business.wm.dao.WmWarehouseMapper;
 import dev.mesbase.business.wm.domain.WmWarehouseExample;
 import dev.mesbase.business.wm.service.IWmWarehouseService;
 import dev.mesbase.business.wm.sync.ExternalWmWarehouse;
+import dev.mesbase.common.utils.StringUtils;
 import dev.mesbase.core.error.FoundationException;
 import dev.mesbase.server.integration.e10.DigiwinE10SyncPreview.Kind;
 import java.math.BigDecimal;
@@ -35,6 +33,7 @@ import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
@@ -89,8 +88,10 @@ public class DigiwinE10SyncMapping {
             reasons.add("ORGANIZATION_CONFLICT: 组织或据点与契约不一致");
             action = ExternalSyncAction.CONFLICT;
         }
-        String externalStatus = Optional.ofNullable(rule).map(nullableValue -> value(raw, nullableValue.statusPointer())).orElse(null);
-        String targetStatus = Optional.ofNullable(externalStatus).map(nullableValue -> rule.statuses().get(nullableValue)).orElse(null);
+        String externalStatus = Optional.ofNullable(rule)
+                .map(nullableValue -> value(raw, nullableValue.statusPointer())).orElse(null);
+        String targetStatus = Optional.ofNullable(externalStatus)
+                .map(nullableValue -> rule.statuses().get(nullableValue)).orElse(null);
         if (targetStatus == null) {
             reasons.add("STATUS_UNVERIFIED: 未确认 ERP 业务状态转换");
             if (action == ExternalSyncAction.CREATE) action = ExternalSyncAction.STATUS_UNVERIFIED;
@@ -118,7 +119,8 @@ public class DigiwinE10SyncMapping {
                 else product = found.getFirst();
             }
             if (product != null) {
-                var localUnit = Optional.ofNullable(product.getUnitId()).map(nullableValue -> units.selectByPrimaryKey(nullableValue)).orElse(null);
+                var localUnit = Optional.ofNullable(product.getUnitId())
+                        .map(nullableValue -> units.selectByPrimaryKey(nullableValue)).orElse(null);
                 if (localUnit == null || !EnableStatus.ENABLED.getValue().equals(localUnit.getStatus())
                         || unit == null || !unit.equals(localUnit.getCode()))
                     reasons.add("MAPPING_REQUIRED: 单位不一致或缺少可信换算；不改变数量");
@@ -181,9 +183,11 @@ public class DigiwinE10SyncMapping {
 
     private static Item item(String code, String identity, ExternalSyncAction action, List<String> reasons,
                              MaterialEntity product, Long routing, BigDecimal quantity, String unit) {
-        return new Item(code, identity, action.getValue(), List.copyOf(reasons), Optional.ofNullable(product).map(nullableValue -> nullableValue.getId()
-                .toString()).orElse(null),
-                Objects.toString(routing, null), Optional.ofNullable(quantity).map(nullableValue -> nullableValue.toPlainString()).orElse(null), unit);
+        return new Item(code, identity, action.getValue(), List.copyOf(reasons), Optional.ofNullable(product)
+                .map(nullableValue -> nullableValue.getId()
+                        .toString()).orElse(null),
+                Objects.toString(routing, null), Optional.ofNullable(quantity)
+                .map(nullableValue -> nullableValue.toPlainString()).orElse(null), unit);
     }
 
     private boolean protectedCode(Kind kind, String code) {

@@ -1,20 +1,18 @@
 package dev.mesbase.business.production.service;
 
-import dev.mesbase.business.production.domain.RoutingPage;
-import com.github.pagehelper.Page;
-import dev.mesbase.business.production.domain.RoutingCreateCommand;
-import dev.mesbase.business.production.domain.RoutingEntity;
-import dev.mesbase.business.production.domain.RoutingQueryDto;
-import dev.mesbase.business.production.domain.RoutingUpdateCommand;
-import java.util.List;
-import dev.mesbase.core.factory.FactoryScope;
-import dev.mesbase.business.production.sync.ExternalRouting;
-import dev.mesbase.business.production.sync.ProductionSyncResult;
-import dev.mesbase.business.production.domain.RoutingReference;
-import dev.mesbase.business.production.domain.RoutingDetail;
 import dev.mesbase.business.production.domain.RoutingContentCommand;
 import dev.mesbase.business.production.domain.RoutingCopyCommand;
-
+import dev.mesbase.business.production.domain.RoutingCreateCommand;
+import dev.mesbase.business.production.domain.RoutingDetail;
+import dev.mesbase.business.production.domain.RoutingEntity;
+import dev.mesbase.business.production.domain.RoutingPage;
+import dev.mesbase.business.production.domain.RoutingQueryDto;
+import dev.mesbase.business.production.domain.RoutingReference;
+import dev.mesbase.business.production.domain.RoutingUpdateCommand;
+import dev.mesbase.business.production.sync.ExternalRouting;
+import dev.mesbase.business.production.sync.ProductionSyncResult;
+import dev.mesbase.core.factory.FactoryScope;
+import java.util.List;
 
 /**
  * 工艺路线 CRUD 用例。

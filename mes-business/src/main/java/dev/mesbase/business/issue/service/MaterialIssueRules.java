@@ -1,35 +1,33 @@
 package dev.mesbase.business.issue.service;
 
-import dev.mesbase.common.utils.StringUtils;
-import java.util.Optional;
-
-import dev.mesbase.business.production.service.BusinessSourceRules;
-
-import dev.mesbase.business.issue.domain.MaterialIssueStatus;
-import dev.mesbase.business.integration.warehouse.ExternalEffect;
 import dev.mesbase.business.basic.dao.MaterialMapper;
 import dev.mesbase.business.basic.dao.UnitMeasureMapper;
-import dev.mesbase.business.issue.dao.MesMaterialIssueMapper;
+import dev.mesbase.business.integration.warehouse.ExternalEffect;
 import dev.mesbase.business.issue.dao.MesMaterialIssueItemMapper;
+import dev.mesbase.business.issue.dao.MesMaterialIssueMapper;
+import dev.mesbase.business.issue.domain.MaterialIssueStatus;
 import dev.mesbase.business.issue.domain.MesMaterialIssueEntity;
 import dev.mesbase.business.issue.domain.MesMaterialIssueExample;
 import dev.mesbase.business.issue.domain.MesMaterialIssueItemEntity;
 import dev.mesbase.business.issue.domain.MesMaterialIssueItemExample;
-import dev.mesbase.business.production.dao.WorkorderMapper;
 import dev.mesbase.business.production.dao.RoutingMapper;
 import dev.mesbase.business.production.dao.RoutingProductMapper;
+import dev.mesbase.business.production.dao.WorkorderMapper;
+import dev.mesbase.business.production.domain.MesProductionExecutionEntity;
+import dev.mesbase.business.production.domain.ProductionExecutionStatus;
 import dev.mesbase.business.production.domain.RoutingProductExample;
+import dev.mesbase.business.production.service.BusinessSourceRules;
+import dev.mesbase.business.production.service.ProductionChainLocks;
+import dev.mesbase.business.production.service.ProductionExecutionRules;
 import dev.mesbase.business.wm.dao.WmWarehouseMapper;
 import dev.mesbase.common.utils.SecurityUtils;
-import dev.mesbase.business.production.service.ProductionExecutionRules;
-import dev.mesbase.business.production.domain.ProductionExecutionStatus;
-import dev.mesbase.business.production.service.ProductionChainLocks;
+import dev.mesbase.common.utils.StringUtils;
 import dev.mesbase.core.error.ErrorCode;
 import dev.mesbase.core.error.FoundationException;
 import java.time.LocalDateTime;
 import java.util.List;
-import dev.mesbase.business.production.domain.MesProductionExecutionEntity;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
@@ -111,7 +109,8 @@ public class MaterialIssueRules {
         if (row.getSubmissionId() != null || row.getVoidOperationId() != null || !Set.of(MaterialIssueStatus.DRAFT.getValue(), MaterialIssueStatus.RECORDED.getValue())
                 .contains(row.getStatus()))
             throw new FoundationException(ErrorCode.ISSUE_VOID_CONFLICT);
-        var execution = Optional.ofNullable(row.getExecutionId()).map(nullableValue -> executions.lock(nullableValue)).orElse(null);
+        var execution = Optional.ofNullable(row.getExecutionId()).map(nullableValue -> executions.lock(nullableValue))
+                .orElse(null);
         if (execution != null) {
             if (ProductionExecutionStatus.COMPLETED.getValue()
                     .equals(execution.getStatus()) || ProductionExecutionStatus.CANCELLED.getValue()

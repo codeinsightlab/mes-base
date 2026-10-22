@@ -1,15 +1,23 @@
 package dev.mesbase.business.directory.controller;
 
-import java.util.Objects;
-
+import dev.mesbase.common.utils.bean.BeanConversions;
+import dev.mesbase.business.directory.domain.DirectoryLabel;
 import dev.mesbase.business.directory.domain.DirectoryPage;
 import dev.mesbase.business.directory.domain.DirectoryQuery;
 import dev.mesbase.business.directory.service.BusinessDirectoryService;
+import dev.mesbase.business.production.controller.OperationPermissions;
+import dev.mesbase.business.production.controller.ProductionReportPermissions;
+import dev.mesbase.business.production.controller.RoutingPermissions;
 import dev.mesbase.common.core.domain.entity.SysDept;
 import dev.mesbase.common.core.domain.entity.SysUser;
+import dev.mesbase.core.error.ErrorCode;
+import dev.mesbase.core.error.FoundationException;
 import dev.mesbase.platform.web.EndpointAccess;
 import dev.mesbase.system.domain.SysPost;
 import jakarta.validation.Valid;
+import java.util.List;
+import java.util.Objects;
+import java.util.function.Function;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
@@ -17,15 +25,6 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
-import dev.mesbase.business.directory.domain.DirectoryLabel;
-import dev.mesbase.business.production.controller.OperationPermissions;
-import dev.mesbase.business.production.controller.ProductionReportPermissions;
-import dev.mesbase.business.production.controller.RoutingPermissions;
-import java.util.List;
-import dev.mesbase.core.error.FoundationException;
-import dev.mesbase.core.error.ErrorCode;
-
-import java.util.function.Function;
 
 @RestController
 @RequestMapping("/api/business/directory")
@@ -133,12 +132,11 @@ public class BusinessDirectoryController {
 
     private static ReferenceOption reference(DirectoryLabel row) {
         if (row == null) throw new FoundationException(ErrorCode.NOT_FOUND);
-        return new ReferenceOption(id(row.id()), row.code(), row.name(), row.version(), row.description(), row.status(), id(row.departmentId()));
+        return BeanConversions.convert(row, ReferenceOption.class);
     }
 
     private static DirectoryPage<ReferenceOption> references(DirectoryPage<DirectoryLabel> page) {
-        return new DirectoryPage<>(page.items().stream().map(BusinessDirectoryController::reference)
-                .toList(), page.total(), page.offset(), page.limit());
+        return BeanConversions.convertPage(page, BusinessDirectoryController::reference, DirectoryPage::new);
     }
 
     private static DirectoryOption personnelView(SysUser row) {
@@ -161,7 +159,6 @@ public class BusinessDirectoryController {
 
     private static <T> DirectoryPage<DirectoryOption> view(DirectoryPage<T> page,
                                                            Function<T, DirectoryOption> convert) {
-        return new DirectoryPage<>(page.items().stream().map(convert).toList(),
-                page.total(), page.offset(), page.limit());
+        return BeanConversions.convertPage(page, convert, DirectoryPage::new);
     }
 }

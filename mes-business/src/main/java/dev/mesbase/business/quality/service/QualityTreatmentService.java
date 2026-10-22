@@ -1,65 +1,63 @@
 package dev.mesbase.business.quality.service;
 
-import dev.mesbase.common.validation.ParameterChecks;
-import org.apache.commons.lang3.StringUtils;
-import java.util.Optional;
-
-import dev.mesbase.business.production.domain.ProductionQuantityInput;
-import dev.mesbase.business.production.domain.ProductionCompletionRequested;
-import dev.mesbase.platform.execution.FactoryContext;
-import org.springframework.context.ApplicationEventPublisher;
-
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.core.JsonProcessingException;
-import dev.mesbase.business.directory.service.BusinessDirectoryService;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.github.pagehelper.PageHelper;
 import dev.mesbase.business.directory.domain.DirectoryLabel;
-import dev.mesbase.business.quality.dao.MesProductionDefectMapper;
-import dev.mesbase.business.quality.dao.MesQualityTreatmentMapper;
-import dev.mesbase.business.quality.domain.MesProductionDefectEntity;
-import dev.mesbase.business.quality.domain.MesQualityTreatmentEntity;
-import dev.mesbase.business.quality.domain.MesQualityTreatmentExample;
-import dev.mesbase.business.quality.domain.DefectRecordAction;
-import dev.mesbase.business.quality.domain.DefectDestination;
-import dev.mesbase.business.quality.domain.ProductionDefectModels.NodeTotal;
-import dev.mesbase.business.quality.domain.QualityTreatmentModels.Action;
-import dev.mesbase.business.quality.domain.QualityTreatmentModels.State;
-import dev.mesbase.business.quality.domain.QualityTreatmentModels.Attribution;
-import dev.mesbase.business.quality.domain.QualityTreatmentModels.Assessment;
-import dev.mesbase.business.quality.domain.QualityTreatmentModels.Command;
-import dev.mesbase.business.quality.domain.QualityTreatmentModels.Disposition;
-import dev.mesbase.business.quality.domain.QualityTreatmentModels.Destination;
-import dev.mesbase.business.quality.domain.QualityTreatmentModels.Summary;
+import dev.mesbase.business.directory.service.BusinessDirectoryService;
+import dev.mesbase.business.production.domain.ExecutionPathStatus;
+import dev.mesbase.business.production.domain.ProductionCompletionRequested;
+import dev.mesbase.business.production.domain.ProductionQuantityInput;
+import dev.mesbase.business.production.service.ExecutionPathService;
 import dev.mesbase.business.production.service.ProductionChainLocks;
 import dev.mesbase.business.production.service.ProductionQuantityService;
-import dev.mesbase.business.production.service.ExecutionPathService;
-import dev.mesbase.business.production.domain.ExecutionPathStatus;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
-import java.util.HexFormat;
-import java.nio.charset.StandardCharsets;
+import dev.mesbase.business.quality.dao.MesProductionDefectMapper;
+import dev.mesbase.business.quality.dao.MesQualityTreatmentMapper;
+import dev.mesbase.business.quality.domain.DefectDestination;
+import dev.mesbase.business.quality.domain.DefectRecordAction;
+import dev.mesbase.business.quality.domain.MesProductionDefectEntity;
+import dev.mesbase.business.quality.domain.MesProductionDefectExample;
+import dev.mesbase.business.quality.domain.MesQualityTreatmentEntity;
+import dev.mesbase.business.quality.domain.MesQualityTreatmentExample;
+import dev.mesbase.business.quality.domain.ProductionDefectModels.NodeTotal;
+import dev.mesbase.business.quality.domain.QualityTreatmentModels.Action;
+import dev.mesbase.business.quality.domain.QualityTreatmentModels.Assessment;
+import dev.mesbase.business.quality.domain.QualityTreatmentModels.Attribution;
+import dev.mesbase.business.quality.domain.QualityTreatmentModels.Command;
+import dev.mesbase.business.quality.domain.QualityTreatmentModels.Destination;
+import dev.mesbase.business.quality.domain.QualityTreatmentModels.Disposition;
+import dev.mesbase.business.quality.domain.QualityTreatmentModels.State;
+import dev.mesbase.business.quality.domain.QualityTreatmentModels.Summary;
 import dev.mesbase.common.utils.SecurityUtils;
+import dev.mesbase.common.validation.ParameterChecks;
 import dev.mesbase.core.error.ErrorCode;
 import dev.mesbase.core.error.FoundationException;
+import dev.mesbase.platform.execution.FactoryContext;
 import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.time.LocalDateTime;
-import dev.mesbase.business.quality.domain.MesProductionDefectExample;
-import com.github.pagehelper.PageHelper;
 import java.util.ArrayList;
-import java.util.stream.Stream;
 import java.util.HashMap;
+import java.util.HexFormat;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.LinkedHashMap;
-import java.util.stream.Collectors;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.function.Function;
-import org.springframework.stereotype.Service;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
+import org.apache.commons.lang3.StringUtils;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.dao.DuplicateKeyException;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Isolation;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @ConditionalOnProperty(name = "mes.business.enabled", havingValue = "true")
@@ -162,7 +160,8 @@ public class QualityTreatmentService {
             ParameterChecks.reject(ErrorCode.QUALITY_TREATMENT_CONFLICT);
         var path = paths.view(d.getExecutionId());
         if (path.path() == null || !ExecutionPathStatus.LOCKED.getValue().equals(path.path().getPathStatus())
-                || !path.selectedNodeIds().contains(d.getAffectedNodeId())) ParameterChecks.reject(ErrorCode.QUALITY_TREATMENT_CONFLICT);
+                || !path.selectedNodeIds().contains(d.getAffectedNodeId()))
+            ParameterChecks.reject(ErrorCode.QUALITY_TREATMENT_CONFLICT);
         ProductionQuantityInput.check(command.quantity());
         ParameterChecks.text(command.reason(), true, 500, ErrorCode.QUALITY_TREATMENT_CONFLICT);
         var row = new MesQualityTreatmentEntity();
@@ -280,7 +279,10 @@ public class QualityTreatmentService {
         else if (failed.signum() > 0) state = State.FAILED_SCRAPPED.name();
         else if (recovered.signum() > 0) state = State.RECOVERED.name();
         else state = State.SCRAPPED.name();
-        return new Summary(d.getDeclarationId(), d.getRevisionNo(), d.getExecutionId(), d.getAffectedNodeId(), d.getDefectQty(), type, Optional.ofNullable(assessment).map(nullableValue -> nullableValue.getRelatedDeclarationId()).orElse(null), Optional.ofNullable(assessment).map(nullableValue -> nullableValue.getBasis()).orElse(null), scrap, rework, started, processed, recovered, failed, pending, rework.subtract(started), started.subtract(processed), type == Attribution.INDEPENDENT ? d.getDefectQty()
+        return new Summary(d.getDeclarationId(), d.getRevisionNo(), d.getExecutionId(), d.getAffectedNodeId(), d.getDefectQty(), type, Optional.ofNullable(assessment)
+                .map(nullableValue -> nullableValue.getRelatedDeclarationId())
+                .orElse(null), Optional.ofNullable(assessment).map(nullableValue -> nullableValue.getBasis())
+                .orElse(null), scrap, rework, started, processed, recovered, failed, pending, rework.subtract(started), started.subtract(processed), type == Attribution.INDEPENDENT ? d.getDefectQty()
                 .subtract(recovered)
                 .subtract(returned) : ZERO, state, d.getRecordAction(), d.getDestinationType(), rows, returned, transferred);
     }
@@ -318,7 +320,8 @@ public class QualityTreatmentService {
      * Bounded batch read; grouping and the single-node calculation share the existing authority.
      */
     public Map<Long, List<NodeTotal>> nodeTotalsBatch(List<Long> executions) {
-        if (executions == null || executions.size() > 1000 || executions.stream().anyMatch(Objects::isNull)) ParameterChecks.reject(ErrorCode.QUALITY_TREATMENT_CONFLICT);
+        if (executions == null || executions.size() > 1000 || executions.stream().anyMatch(Objects::isNull))
+            ParameterChecks.reject(ErrorCode.QUALITY_TREATMENT_CONFLICT);
         var ids = executions.stream().distinct().toList();
         if (ids.isEmpty()) return Map.of();
         var f = new MesQualityTreatmentExample();
@@ -388,9 +391,11 @@ public class QualityTreatmentService {
 
     @Transactional(transactionManager = "businessTransactionManager", isolation = Isolation.READ_COMMITTED, rollbackFor = Exception.class)
     public Details execute(String declaration, Command input) {
-        if (input == null || input.action() == null || input.requestId() == null) ParameterChecks.reject(ErrorCode.QUALITY_TREATMENT_CONFLICT);
+        if (input == null || input.action() == null || input.requestId() == null)
+            ParameterChecks.reject(ErrorCode.QUALITY_TREATMENT_CONFLICT);
         try {
-            if (!UUID.fromString(input.requestId()).toString().equals(input.requestId())) ParameterChecks.reject(ErrorCode.QUALITY_TREATMENT_CONFLICT);
+            if (!UUID.fromString(input.requestId()).toString().equals(input.requestId()))
+                ParameterChecks.reject(ErrorCode.QUALITY_TREATMENT_CONFLICT);
         } catch (IllegalArgumentException e) {
             ParameterChecks.reject(ErrorCode.QUALITY_TREATMENT_CONFLICT);
         }
@@ -402,14 +407,16 @@ public class QualityTreatmentService {
         fingerprint = digest(fingerprint);
         var retry = events.selectByPrimaryKey(c.requestId());
         if (retry != null) {
-            if (!fingerprint.equals(retry.getRequestHash()) || !declaration.equals(retry.getDeclarationId())) ParameterChecks.reject(ErrorCode.QUALITY_TREATMENT_CONFLICT);
+            if (!fingerprint.equals(retry.getRequestHash()) || !declaration.equals(retry.getDeclarationId()))
+                ParameterChecks.reject(ErrorCode.QUALITY_TREATMENT_CONFLICT);
             return details(declaration);
         }
         if (c.expectedRevision() != d.getRevisionNo() || DefectRecordAction.VOID.getValue().equals(d.getRecordAction()))
             ParameterChecks.reject(ErrorCode.QUALITY_TREATMENT_CONFLICT);
         var path = paths.view(d.getExecutionId());
         if (path.path() == null || !ExecutionPathStatus.LOCKED.getValue()
-                .equals(path.path().getPathStatus()) || !path.selectedNodeIds().contains(d.getAffectedNodeId())) ParameterChecks.reject(ErrorCode.QUALITY_TREATMENT_CONFLICT);
+                .equals(path.path().getPathStatus()) || !path.selectedNodeIds().contains(d.getAffectedNodeId()))
+            ParameterChecks.reject(ErrorCode.QUALITY_TREATMENT_CONFLICT);
         // Keep the frozen command fingerprint stable for retries, including older pending commands.
         // New facts use the server clock; client-supplied operation times are never persisted.
         c = new Command(c.requestId(), c.expectedRevision(), c.action(), c.parentId(), c.scrapQty(),
@@ -425,29 +432,36 @@ public class QualityTreatmentService {
 
     private void append(MesProductionDefectEntity d, Command c, String fingerprint) {
         if (StringUtils.isBlank(c.reason()) || c.reason()
-                .length() > 500 || c.occurredAt() == null || c.occurredAt().isAfter(LocalDateTime.now())) ParameterChecks.reject(ErrorCode.QUALITY_TREATMENT_CONFLICT);
+                .length() > 500 || c.occurredAt() == null || c.occurredAt().isAfter(LocalDateTime.now()))
+            ParameterChecks.reject(ErrorCode.QUALITY_TREATMENT_CONFLICT);
         var s = summary(d.getDeclarationId());
         if (c.action() == Action.ASSESS) {
             var a = c.assessment();
             if (a == null || a.type() == null || a.type() == Attribution.UNVERIFIED || s.attribution() != Attribution.UNVERIFIED || s.events()
-                    .stream().anyMatch(e -> Action.ASSESS.name().equals(e.getActionType()))) ParameterChecks.reject(ErrorCode.QUALITY_TREATMENT_CONFLICT);
+                    .stream().anyMatch(e -> Action.ASSESS.name().equals(e.getActionType())))
+                ParameterChecks.reject(ErrorCode.QUALITY_TREATMENT_CONFLICT);
             ParameterChecks.text(a.basis(), true, 500, ErrorCode.QUALITY_TREATMENT_CONFLICT);
             if (a.type() == Attribution.OVERLAP) {
-                if (a.relatedDeclarationId() == null || a.relatedDeclarationId().equals(d.getDeclarationId())) ParameterChecks.reject(ErrorCode.QUALITY_TREATMENT_CONFLICT);
+                if (a.relatedDeclarationId() == null || a.relatedDeclarationId().equals(d.getDeclarationId()))
+                    ParameterChecks.reject(ErrorCode.QUALITY_TREATMENT_CONFLICT);
                 var related = latest(a.relatedDeclarationId());
                 var rs = summary(related.getDeclarationId());
                 if (!related.getExecutionId().equals(d.getExecutionId()) || DefectRecordAction.VOID.getValue()
                         .equals(related.getRecordAction()) || rs.attribution() != Attribution.INDEPENDENT || d.getDefectQty()
-                        .compareTo(related.getDefectQty()) > 0) ParameterChecks.reject(ErrorCode.QUALITY_TREATMENT_CONFLICT);
+                        .compareTo(related.getDefectQty()) > 0)
+                    ParameterChecks.reject(ErrorCode.QUALITY_TREATMENT_CONFLICT);
             } else if (a.relatedDeclarationId() != null) ParameterChecks.reject(ErrorCode.QUALITY_TREATMENT_CONFLICT);
             if (c.scrapQty().signum() != 0 || c.reworkQty().signum() != 0 || c.processedQty()
                     .signum() != 0 || c.recoveredQty().signum() != 0 || c.failedQty()
-                    .signum() != 0 || c.parentId() != null) ParameterChecks.reject(ErrorCode.QUALITY_TREATMENT_CONFLICT);
+                    .signum() != 0 || c.parentId() != null)
+                ParameterChecks.reject(ErrorCode.QUALITY_TREATMENT_CONFLICT);
         } else {
             if (c.assessment() != null || s.attribution() != Attribution.INDEPENDENT || !DefectDestination.SAME_NODE.getValue()
                     .equals(d.getDestinationType())) ParameterChecks.reject(ErrorCode.QUALITY_TREATMENT_CONFLICT);
-            var parent = Optional.ofNullable(c.parentId()).map(nullableValue -> events.selectByPrimaryKey(nullableValue)).orElse(null);
-            if (parent != null && c.occurredAt().isBefore(parent.getOccurredAt())) ParameterChecks.reject(ErrorCode.QUALITY_TREATMENT_CONFLICT);
+            var parent = Optional.ofNullable(c.parentId())
+                    .map(nullableValue -> events.selectByPrimaryKey(nullableValue)).orElse(null);
+            if (parent != null && c.occurredAt().isBefore(parent.getOccurredAt()))
+                ParameterChecks.reject(ErrorCode.QUALITY_TREATMENT_CONFLICT);
             if (parent != null && (!parent.getDeclarationId()
                     .equals(d.getDeclarationId()) || !parent.getDeclarationRevision().equals(d.getRevisionNo())))
                 ParameterChecks.reject(ErrorCode.QUALITY_TREATMENT_CONFLICT);
@@ -459,29 +473,34 @@ public class QualityTreatmentService {
             } else if (c.action() == Action.START) {
                 if (parent == null || !Action.ALLOCATE.name().equals(parent.getActionType()) || c.reworkQty()
                         .signum() <= 0 || c.scrapQty().signum() != 0 || c.processedQty()
-                        .signum() != 0 || c.recoveredQty().signum() != 0 || c.failedQty().signum() != 0) ParameterChecks.reject(ErrorCode.QUALITY_TREATMENT_CONFLICT);
+                        .signum() != 0 || c.recoveredQty().signum() != 0 || c.failedQty().signum() != 0)
+                    ParameterChecks.reject(ErrorCode.QUALITY_TREATMENT_CONFLICT);
                 var used = s.events().stream().filter(e -> parent.getId().equals(e.getParentId()) && Action.START.name()
                                 .equals(e.getActionType()))
                         .map(e -> effective(s.events(), e, MesQualityTreatmentEntity::getReworkQty))
                         .reduce(ZERO, BigDecimal::add);
                 if (used.add(c.reworkQty())
-                        .compareTo(effective(s.events(), parent, MesQualityTreatmentEntity::getReworkQty)) > 0) ParameterChecks.reject(ErrorCode.QUALITY_TREATMENT_CONFLICT);
+                        .compareTo(effective(s.events(), parent, MesQualityTreatmentEntity::getReworkQty)) > 0)
+                    ParameterChecks.reject(ErrorCode.QUALITY_TREATMENT_CONFLICT);
             } else if (c.action() == Action.RESULT) {
                 if (parent == null || !Action.START.name().equals(parent.getActionType()) || c.processedQty()
                         .signum() <= 0 || c.scrapQty().signum() != 0 || c.reworkQty().signum() != 0 || c.recoveredQty()
-                        .add(c.failedQty()).compareTo(c.processedQty()) != 0) ParameterChecks.reject(ErrorCode.QUALITY_TREATMENT_CONFLICT);
+                        .add(c.failedQty()).compareTo(c.processedQty()) != 0)
+                    ParameterChecks.reject(ErrorCode.QUALITY_TREATMENT_CONFLICT);
                 var used = s.events().stream()
                         .filter(e -> parent.getId().equals(e.getParentId()) && Action.RESULT.name()
                                 .equals(e.getActionType()))
                         .map(e -> effective(s.events(), e, MesQualityTreatmentEntity::getProcessedQty))
                         .reduce(ZERO, BigDecimal::add);
                 if (used.add(c.processedQty())
-                        .compareTo(effective(s.events(), parent, MesQualityTreatmentEntity::getReworkQty)) > 0) ParameterChecks.reject(ErrorCode.QUALITY_TREATMENT_CONFLICT);
+                        .compareTo(effective(s.events(), parent, MesQualityTreatmentEntity::getReworkQty)) > 0)
+                    ParameterChecks.reject(ErrorCode.QUALITY_TREATMENT_CONFLICT);
             } else if (c.action() == Action.CANCEL_ALLOC) {
                 if (parent == null || !Action.ALLOCATE.name().equals(parent.getActionType()) ||
                         c.processedQty().signum() != 0 || c.recoveredQty().signum() != 0 || c.failedQty()
                         .signum() != 0 ||
-                        c.scrapQty().add(c.reworkQty()).signum() <= 0) ParameterChecks.reject(ErrorCode.QUALITY_TREATMENT_CONFLICT);
+                        c.scrapQty().add(c.reworkQty()).signum() <= 0)
+                    ParameterChecks.reject(ErrorCode.QUALITY_TREATMENT_CONFLICT);
                 var spent = s.events().stream()
                         .filter(e -> parent.getId().equals(e.getParentId()) && Action.START.name()
                                 .equals(e.getActionType()))
@@ -495,14 +514,16 @@ public class QualityTreatmentService {
                 if (parent == null || !Action.START.name().equals(parent.getActionType()) || c.reworkQty()
                         .signum() <= 0 ||
                         c.scrapQty().signum() != 0 || c.processedQty().signum() != 0 || c.recoveredQty()
-                        .signum() != 0 || c.failedQty().signum() != 0) ParameterChecks.reject(ErrorCode.QUALITY_TREATMENT_CONFLICT);
+                        .signum() != 0 || c.failedQty().signum() != 0)
+                    ParameterChecks.reject(ErrorCode.QUALITY_TREATMENT_CONFLICT);
                 var spent = s.events().stream()
                         .filter(e -> parent.getId().equals(e.getParentId()) && Action.RESULT.name()
                                 .equals(e.getActionType()))
                         .map(e -> effective(s.events(), e, MesQualityTreatmentEntity::getProcessedQty))
                         .reduce(ZERO, BigDecimal::add);
                 if (c.reworkQty().add(spent)
-                        .compareTo(effective(s.events(), parent, MesQualityTreatmentEntity::getReworkQty)) > 0) ParameterChecks.reject(ErrorCode.QUALITY_TREATMENT_CONFLICT);
+                        .compareTo(effective(s.events(), parent, MesQualityTreatmentEntity::getReworkQty)) > 0)
+                    ParameterChecks.reject(ErrorCode.QUALITY_TREATMENT_CONFLICT);
             } else if (c.action() == Action.CORRECT_RESULT) {
                 if (parent == null || !Action.RESULT.name().equals(parent.getActionType()) ||
                         c.scrapQty().signum() != 0 || c.reworkQty().signum() != 0 ||
@@ -537,7 +558,8 @@ public class QualityTreatmentService {
         row.setProcessedQty(c.processedQty());
         row.setRecoveredQty(c.recoveredQty());
         row.setFailedQty(c.failedQty());
-        var parent = Optional.ofNullable(c.parentId()).map(nullableValue -> events.selectByPrimaryKey(nullableValue)).orElse(null);
+        var parent = Optional.ofNullable(c.parentId()).map(nullableValue -> events.selectByPrimaryKey(nullableValue))
+                .orElse(null);
         if (c.action() == Action.CANCEL_ALLOC) {
             row.setScrapQty(c.scrapQty().negate());
             row.setReworkQty(c.reworkQty().negate());
@@ -596,10 +618,10 @@ public class QualityTreatmentService {
     private static BigDecimal number(BigDecimal v) {
         if (v == null) return ZERO;
         v = v.stripTrailingZeros();
-        if (v.signum() < 0 || v.scale() > 6 || v.precision() - v.scale() > 14) ParameterChecks.reject(ErrorCode.QUALITY_TREATMENT_CONFLICT);
+        if (v.signum() < 0 || v.scale() > 6 || v.precision() - v.scale() > 14)
+            ParameterChecks.reject(ErrorCode.QUALITY_TREATMENT_CONFLICT);
         return v;
     }
-
 
 
 }

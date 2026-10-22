@@ -1,23 +1,22 @@
 package dev.mesbase.platform.codegen;
 
-import java.util.Optional;
-
 import dev.mesbase.platform.codegen.ScaffoldWriter.Artifact;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.nio.file.attribute.BasicFileAttributes;
-import java.nio.charset.StandardCharsets;
-import java.util.HashMap;
-import java.util.Map;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 import java.util.function.UnaryOperator;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Formats staged Java with the repository's native IDEA formatter before publishing or hashing.
@@ -36,7 +35,8 @@ public final class IdeaGeneratedJavaFormatter implements UnaryOperator<List<Arti
 
     public IdeaGeneratedJavaFormatter(Path launcher, Path cacheDirectory) {
         this.launcher = launcher.toAbsolutePath().normalize();
-        this.cacheDirectory = Optional.ofNullable(cacheDirectory).map(nullableValue -> nullableValue.toAbsolutePath().normalize()).orElse(null);
+        this.cacheDirectory = Optional.ofNullable(cacheDirectory)
+                .map(nullableValue -> nullableValue.toAbsolutePath().normalize()).orElse(null);
     }
 
     @Override

@@ -1,7 +1,5 @@
 package dev.mesbase.platform.codegen;
 
-import java.util.Optional;
-
 import java.sql.DatabaseMetaData;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -48,7 +46,8 @@ public final class JdbcMetadataReader {
             if (found == null) {
                 String normalized = meta.storesUpperCaseIdentifiers() ? table.toUpperCase(Locale.ROOT) : table.toLowerCase(Locale.ROOT);
                 String ns = null;
-                if (schema != null) ns = meta.storesUpperCaseIdentifiers() ? schema.toUpperCase(Locale.ROOT) : schema.toLowerCase(Locale.ROOT);
+                if (schema != null)
+                    ns = meta.storesUpperCaseIdentifiers() ? schema.toUpperCase(Locale.ROOT) : schema.toLowerCase(Locale.ROOT);
                 try (var tables = meta.getTables(catalog, ns, normalized, new String[]{"TABLE"})) {
                     while (tables.next()) {
                         if (table.equalsIgnoreCase(tables.getString("TABLE_NAME"))) {

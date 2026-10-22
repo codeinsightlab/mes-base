@@ -1,9 +1,8 @@
 package dev.mesbase.business.basic.service;
 
-import dev.mesbase.business.basic.domain.MaterialPage;
-import com.github.pagehelper.Page;
 import dev.mesbase.business.basic.domain.MaterialCreateCommand;
 import dev.mesbase.business.basic.domain.MaterialEntity;
+import dev.mesbase.business.basic.domain.MaterialPage;
 import dev.mesbase.business.basic.domain.MaterialQueryDto;
 import dev.mesbase.business.basic.domain.MaterialUpdateCommand;
 import dev.mesbase.business.basic.sync.ExternalMaterial;
@@ -26,9 +25,10 @@ public interface IMaterialService {
     MaterialEntity updateById(Long id, MaterialUpdateCommand input);
 
     void deleteByIds(List<Long> ids);
+
     MaterialSyncResult sync(FactoryScope scope);
 
     MaterialSyncResult upsert(FactoryScope scope,
-            List<ExternalMaterial> inputs);
+                              List<ExternalMaterial> inputs);
 }
 

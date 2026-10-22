@@ -1,26 +1,25 @@
 package dev.mesbase.business.production.service;
 
-import dev.mesbase.common.utils.StringUtils;
-import dev.mesbase.common.validation.ParameterChecks;
-import java.util.Optional;
-
 import com.github.pagehelper.PageHelper;
 import dev.mesbase.business.production.dao.WorkOrderProgressExtraMapper;
 import dev.mesbase.business.production.domain.WorkOrderProgress.Completion;
 import dev.mesbase.business.production.domain.WorkOrderProgress.Filter;
-import dev.mesbase.business.production.domain.WorkOrderProgress.Query;
 import dev.mesbase.business.production.domain.WorkOrderProgress.Order;
 import dev.mesbase.business.production.domain.WorkOrderProgress.Page;
 import dev.mesbase.business.production.domain.WorkOrderProgress.Progress;
 import dev.mesbase.business.production.domain.WorkOrderProgress.Quality;
-import dev.mesbase.business.quality.domain.QualityTreatmentModels.Attribution;
-import dev.mesbase.business.quality.domain.DefectDestination;
+import dev.mesbase.business.production.domain.WorkOrderProgress.Query;
 import dev.mesbase.business.production.domain.WorkOrderStatus;
+import dev.mesbase.business.quality.domain.DefectDestination;
+import dev.mesbase.business.quality.domain.QualityTreatmentModels.Attribution;
+import dev.mesbase.common.utils.StringUtils;
+import dev.mesbase.common.validation.ParameterChecks;
 import dev.mesbase.core.error.ErrorCode;
 import dev.mesbase.core.error.FoundationException;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.List;
+import java.util.Optional;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -113,13 +112,16 @@ public class WorkOrderProgressQueryService {
         }
         if (invalidQuality) issue = "质量处置数量异常，请核实";
         BigDecimal unfinished = null;
-        if (gap != null && !invalidQuality) unfinished = order.plannedQty().subtract(completed).subtract(scrap).subtract(transferred).max(BigDecimal.ZERO);
+        if (gap != null && !invalidQuality)
+            unfinished = order.plannedQty().subtract(completed).subtract(scrap).subtract(transferred)
+                    .max(BigDecimal.ZERO);
         return new Progress(order.id(), order.code(), order.source(), order.status(), order.productCode(),
                 order.productName(), order.unitName(), order.plannedQty(), completed, gap,
                 invalidQuality ? null : scrap, unfinished, invalidQuality ? null : untreated,
                 invalidQuality ? null : waiting, invalidQuality ? null : reworking,
                 unverified, percent, completion == null ? 0 : completion.executionCount(),
-                Optional.ofNullable(completion).map(nullableValue -> nullableValue.lastCompletedAt()).orElse(null), issue, order.createTime(), invalidQuality ? null : transferred);
+                Optional.ofNullable(completion).map(nullableValue -> nullableValue.lastCompletedAt())
+                        .orElse(null), issue, order.createTime(), invalidQuality ? null : transferred);
     }
 
 

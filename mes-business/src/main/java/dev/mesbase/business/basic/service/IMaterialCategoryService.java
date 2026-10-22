@@ -1,9 +1,8 @@
 package dev.mesbase.business.basic.service;
 
-import dev.mesbase.business.basic.domain.MaterialCategoryPage;
-import com.github.pagehelper.Page;
 import dev.mesbase.business.basic.domain.MaterialCategoryCreateCommand;
 import dev.mesbase.business.basic.domain.MaterialCategoryEntity;
+import dev.mesbase.business.basic.domain.MaterialCategoryPage;
 import dev.mesbase.business.basic.domain.MaterialCategoryQueryDto;
 import dev.mesbase.business.basic.domain.MaterialCategoryUpdateCommand;
 import dev.mesbase.business.basic.sync.ExternalMaterialCategory;
@@ -26,9 +25,10 @@ public interface IMaterialCategoryService {
     MaterialCategoryEntity updateById(Long id, MaterialCategoryUpdateCommand input);
 
     void deleteByIds(List<Long> ids);
+
     MaterialCategorySyncResult sync(FactoryScope scope);
 
     MaterialCategorySyncResult upsert(FactoryScope scope,
-            List<ExternalMaterialCategory> inputs);
+                                      List<ExternalMaterialCategory> inputs);
 }
 

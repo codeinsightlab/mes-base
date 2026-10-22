@@ -4,7 +4,9 @@ import dev.mesbase.common.utils.bean.BeanConversions;
 import dev.mesbase.system.domain.SysMessage;
 import java.util.List;
 
-/** Explicit conversion at the Controller HTTP boundary. */
+/**
+ * Explicit conversion at the Controller HTTP boundary.
+ */
 public final class SysMessageAssembler {
     private SysMessageAssembler() {
     }

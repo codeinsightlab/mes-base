@@ -1,15 +1,16 @@
 package dev.mesbase.common.utils.bean;
 
-import tools.jackson.core.JsonGenerator;
-import tools.jackson.databind.DeserializationFeature;
-import tools.jackson.databind.ValueSerializer;
-import tools.jackson.databind.SerializationContext;
-import tools.jackson.databind.json.JsonMapper;
-import tools.jackson.databind.module.SimpleModule;
 import dev.mesbase.common.core.page.PageData;
 import java.math.BigDecimal;
+import java.util.Date;
 import java.util.List;
 import java.util.function.Function;
+import tools.jackson.core.JsonGenerator;
+import tools.jackson.databind.DeserializationFeature;
+import tools.jackson.databind.SerializationContext;
+import tools.jackson.databind.ValueSerializer;
+import tools.jackson.databind.json.JsonMapper;
+import tools.jackson.databind.module.SimpleModule;
 import tools.jackson.databind.node.ObjectNode;
 
 /**
@@ -19,7 +20,8 @@ import tools.jackson.databind.node.ObjectNode;
 public final class BeanConversions {
     private static final JsonMapper MAPPER = mapper();
 
-    private BeanConversions() { }
+    private BeanConversions() {
+    }
 
     private static JsonMapper mapper() {
         var numbers = new SimpleModule();
@@ -27,6 +29,12 @@ public final class BeanConversions {
             @Override
             public void serialize(BigDecimal value, JsonGenerator output, SerializationContext serializers) {
                 output.writeString(value.toPlainString());
+            }
+        });
+        numbers.addSerializer(Date.class, new ValueSerializer<>() {
+            @Override
+            public void serialize(Date value, JsonGenerator output, SerializationContext serializers) {
+                output.writeNumber(value.getTime());
             }
         });
         return JsonMapper.builder().findAndAddModules().addModule(numbers)
@@ -39,7 +47,9 @@ public final class BeanConversions {
         return MAPPER.convertValue(source, target);
     }
 
-    /** Only typed, trusted Controller-derived attributes may supplement an existing response projection. */
+    /**
+     * Only typed, trusted Controller-derived attributes may supplement an existing response projection.
+     */
     public static <T> T convertWith(Object source, Object attributes, Class<T> target) {
         if (source == null) return null;
         if (!(MAPPER.valueToTree(source) instanceof ObjectNode properties)
@@ -54,13 +64,18 @@ public final class BeanConversions {
         R create(List<T> items, long total, int offset, int limit);
     }
 
-    /** Custom business-derived rows use this path; pagination metadata is still assembled only here. */
+    /**
+     * Custom business-derived rows use this path; pagination metadata is still assembled only here.
+     */
     public static <S, T, R> R convertPage(PageData<S> source, Function<? super S, ? extends T> rows,
-                                         PageFactory<T, R> result) {
-        return result.create(source.items().stream().<T>map(rows).toList(), source.total(), source.offset(), source.limit());
+                                          PageFactory<T, R> result) {
+        return result.create(source.items().stream().<T>map(rows)
+                .toList(), source.total(), source.offset(), source.limit());
     }
 
-    /** Maps rows using the concrete target's generic item type and preserves all pagination metadata. */
+    /**
+     * Maps rows using the concrete target's generic item type and preserves all pagination metadata.
+     */
     public static <S, T> T convertPage(PageData<S> source, Class<T> target) {
         return convert(source, target);
     }

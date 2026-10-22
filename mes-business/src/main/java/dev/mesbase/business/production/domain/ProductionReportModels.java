@@ -1,15 +1,15 @@
 package dev.mesbase.business.production.domain;
 
-import jakarta.validation.constraints.NotNull;
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.Size;
-import jakarta.validation.constraints.Digits;
+import dev.mesbase.common.core.page.PageData;
 import jakarta.validation.constraints.DecimalMin;
+import jakarta.validation.constraints.Digits;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.PastOrPresent;
+import jakarta.validation.constraints.Size;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
-import dev.mesbase.common.core.page.PageData;
 import java.util.Map;
 import java.util.UUID;
 
@@ -114,6 +114,6 @@ public final class ProductionReportModels {
     }
 
     public record ExecutionPage(List<ExecutionSummary> items, long total, int offset, int limit,
-                                Map<Long, String> routingLabels) {
+                                Map<Long, String> routingLabels) implements PageData<ExecutionSummary> {
     }
 }

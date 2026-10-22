@@ -1,24 +1,23 @@
 package dev.mesbase.business.production.controller;
 
-import java.util.Optional;
-
-import java.util.Objects;
-
-import dev.mesbase.business.production.domain.ProductionReceiptModels.Query;
 import dev.mesbase.business.production.domain.MesProductionReceiptEntity;
+import dev.mesbase.business.production.domain.ProductionReceiptModels.Query;
 import dev.mesbase.business.production.domain.ProductionReceiptRow;
 import dev.mesbase.business.production.service.ProductionReceiptService;
+import dev.mesbase.common.utils.bean.BeanConversions;
 import dev.mesbase.platform.web.EndpointAccess;
-import java.time.LocalDateTime;
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
-import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
 
 /**
  * Read-only legacy logistics history.
@@ -57,7 +56,7 @@ public class ProductionReceiptController {
                      @RequestParam(required = false) String referenceReceiptId,
                      @RequestParam(defaultValue = "0") int offset, @RequestParam(defaultValue = "20") int limit) {
         var p = service.page(new Query(workorderId, executionId, warehouseId, productLotCode, referenceReceiptId, offset, limit));
-        return new Page(p.items().stream().map(r -> view(r, p.userNames())).toList(), p.total(), p.offset(), p.limit());
+        return BeanConversions.convertPage(p, r -> view(r, p.userNames()), Page::new);
     }
 
     @GetMapping("/{id}")
@@ -69,8 +68,14 @@ public class ProductionReceiptController {
 
     private static Ledger view(MesProductionReceiptEntity r, Map<Long, String> names) {
         ProductionReceiptRow ref = r instanceof ProductionReceiptRow row ? row : null;
-        return new Ledger(r.getId(), r.getReceiptNo(), id(r.getExecutionId()), Optional.ofNullable(ref).map(nullableValue -> nullableValue.getExecutionNo()).orElse(null), Optional.ofNullable(ref).map(nullableValue -> nullableValue.getWorkorderCode()).orElse(null),
-                Optional.ofNullable(ref).map(nullableValue -> nullableValue.getProductCode()).orElse(null), Optional.ofNullable(ref).map(nullableValue -> nullableValue.getProductName()).orElse(null), id(r.getWarehouseId()), Optional.ofNullable(ref).map(nullableValue -> nullableValue.getWarehouseName()).orElse(null), r.getProductLotCode(), r.getRecordType(),
+        return new Ledger(r.getId(), r.getReceiptNo(), id(r.getExecutionId()), Optional.ofNullable(ref)
+                .map(nullableValue -> nullableValue.getExecutionNo()).orElse(null), Optional.ofNullable(ref)
+                .map(nullableValue -> nullableValue.getWorkorderCode()).orElse(null),
+                Optional.ofNullable(ref).map(nullableValue -> nullableValue.getProductCode())
+                        .orElse(null), Optional.ofNullable(ref).map(nullableValue -> nullableValue.getProductName())
+                .orElse(null), id(r.getWarehouseId()), Optional.ofNullable(ref)
+                .map(nullableValue -> nullableValue.getWarehouseName())
+                .orElse(null), r.getProductLotCode(), r.getRecordType(),
                 decimal(r.getQuantityDelta()), r.getReferenceReceiptId(), id(r.getOperatorUserId()), names.get(r.getOperatorUserId()), id(r.getRecordedBy()), names.get(r.getRecordedBy()), r.getOccurredAt(), r.getCreateTime(), r.getReason());
     }
 

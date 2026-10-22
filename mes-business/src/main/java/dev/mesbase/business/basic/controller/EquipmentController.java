@@ -1,9 +1,5 @@
 package dev.mesbase.business.basic.controller;
 
-import dev.mesbase.common.utils.bean.BeanConversions;
-import com.github.pagehelper.Page;
-import java.util.Objects;
-
 import dev.mesbase.business.basic.controller.vo.EquipmentPageVo;
 import dev.mesbase.business.basic.controller.vo.EquipmentVo;
 import dev.mesbase.business.basic.domain.EquipmentCreateCommand;
@@ -11,6 +7,7 @@ import dev.mesbase.business.basic.domain.EquipmentEntity;
 import dev.mesbase.business.basic.domain.EquipmentQueryDto;
 import dev.mesbase.business.basic.domain.EquipmentUpdateCommand;
 import dev.mesbase.business.basic.service.IEquipmentService;
+import dev.mesbase.common.utils.bean.BeanConversions;
 import dev.mesbase.platform.web.EndpointAccess;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotEmpty;

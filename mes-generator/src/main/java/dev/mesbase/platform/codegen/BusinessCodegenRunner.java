@@ -1,8 +1,6 @@
 package dev.mesbase.platform.codegen;
 
 import dev.mesbase.common.utils.StringUtils;
-import java.util.Optional;
-
 import dev.mesbase.platform.codegen.ScaffoldWriter.Artifact;
 import java.io.IOException;
 import java.nio.file.Path;
@@ -11,13 +9,14 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.function.UnaryOperator;
 import javax.sql.DataSource;
 import org.springframework.boot.context.properties.bind.Binder;
-import org.springframework.boot.env.YamlPropertySourceLoader;
 import org.springframework.boot.context.properties.source.ConfigurationPropertySources;
+import org.springframework.boot.env.YamlPropertySourceLoader;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
 
@@ -164,7 +163,8 @@ public final class BusinessCodegenRunner {
         Map<String, String> packages = Map.of("domain", p.domain(), "dao", p.mapper(), "service", p.service(),
                 "service/impl", p.serviceImplementation(), "controller", p.controller(), "controller/vo", p.response());
         Map<String, Object> variables = new HashMap<>();
-        var tableOverride = Optional.ofNullable(c.tableOverrides()).map(nullableValue -> nullableValue.get(table)).orElse(null);
+        var tableOverride = Optional.ofNullable(c.tableOverrides()).map(nullableValue -> nullableValue.get(table))
+                .orElse(null);
         if (tableOverride != null && tableOverride.serverScopeColumn() != null) {
             variables.put("serverScopeColumn", tableOverride.serverScopeColumn());
         }

@@ -1,9 +1,8 @@
 package dev.mesbase.business.basic.service;
 
-import dev.mesbase.business.basic.domain.WorkshopPage;
-import com.github.pagehelper.Page;
 import dev.mesbase.business.basic.domain.WorkshopCreateCommand;
 import dev.mesbase.business.basic.domain.WorkshopEntity;
+import dev.mesbase.business.basic.domain.WorkshopPage;
 import dev.mesbase.business.basic.domain.WorkshopQueryDto;
 import dev.mesbase.business.basic.domain.WorkshopUpdateCommand;
 import dev.mesbase.business.basic.sync.ExternalWorkshop;
@@ -26,9 +25,10 @@ public interface IWorkshopService {
     WorkshopEntity updateById(Long id, WorkshopUpdateCommand input);
 
     void deleteByIds(List<Long> ids);
+
     WorkshopSyncResult sync(FactoryScope scope);
 
     WorkshopSyncResult upsert(FactoryScope scope,
-            List<ExternalWorkshop> inputs);
+                              List<ExternalWorkshop> inputs);
 }
 
