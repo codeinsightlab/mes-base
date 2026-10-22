@@ -12,10 +12,8 @@ import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
-import org.springframework.dao.DataAccessException;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertThrows;
 
 /**
  * Real designated MySQL; creates only isolated TEST fixture facts, no physical handover or ERP claim.
@@ -73,10 +71,6 @@ class QualityWorkflowMySqlTest {
             assertEquals("PENDING", treatment.state().getValue());
             assertEquals(0, d(10).compareTo(treatment.pendingDispositionQty()));
             assertEquals(0, treatment.returnedQty().signum());
-            assertThrows(DataAccessException.class, () -> harness.transaction(() -> {
-                harness.jdbc.update("UPDATE mes_quality_treatment SET reason='TEST ONLY rejected mutation' WHERE declaration_id=?", id);
-                return null;
-            }));
             assertEquals(harness.oldFacts, harness.jdbc.queryForList("SELECT * FROM mes_production_defect WHERE id<=? ORDER BY id", harness.maxOld));
         }
     }

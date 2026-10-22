@@ -8,7 +8,6 @@ import dev.mesbase.business.production.domain.WorkOrderStatus;
 import dev.mesbase.business.quality.service.ExecutionQualityReferenceQuery;
 import dev.mesbase.business.production.domain.RoutingStatus;
 import dev.mesbase.business.production.domain.ProductionExecutionStatus;
-import dev.mesbase.business.production.domain.ExecutionPathStatus;
 import dev.mesbase.business.basic.dao.MaterialMapper;
 import dev.mesbase.business.issue.dao.MesMaterialIssueMapper;
 import dev.mesbase.business.issue.domain.MesMaterialIssueExample;
@@ -101,12 +100,24 @@ public class ProductionExecutionRules {
     }
 
     public void updating(MesProductionExecutionEntity old, MesProductionExecutionEntity row) {
-        if (ProductionExecutionStatus.COMPLETED.getValue().equals(old.getStatus())) frozen();
+        var order = workorders.selectByPrimaryKey(old.getWorkorderId());
+        valid(order != null);
+        BusinessSourceRules.localEditable(order.getSource());
+        sources.current(order.getSource());
+        valid(row.getTargetQty() != null);
+        if (ProductionExecutionStatus.COMPLETED.getValue().equals(old.getStatus())
+                && (!Objects.equals(old.getRoutingId(), row.getRoutingId())
+                || old.getTargetQty().compareTo(row.getTargetQty()) != 0)) frozen();
         if (!Objects.equals(old.getStatus(), row.getStatus()) || !Objects.equals(old.getStartTime(), row.getStartTime()) || !Objects.equals(old.getEndTime(), row.getEndTime()))
             frozen();
         // WorkOrder/product define identity at creation; routing may be corrected only before facts.
         if (!Objects.equals(old.getWorkorderId(), row.getWorkorderId())
                 || !Objects.equals(old.getProductId(), row.getProductId())) frozen();
+        if (Objects.equals(old.getRoutingId(), row.getRoutingId())
+                && old.getTargetQty().compareTo(row.getTargetQty()) == 0) {
+            audit(row, false);
+            return;
+        }
         if (!Objects.equals(old.getRoutingId(), row.getRoutingId()) && (paths.selectByPrimaryKey(old.getId()) != null || hasAssignments(old.getId())))
             frozen();
         boolean reportFacts = hasReports(old.getId());
@@ -132,13 +143,16 @@ public class ProductionExecutionRules {
 
     public void deleting(Long id) {
         var row = lock(id);
-        if (started(row) || hasIssues(id) || hasReports(id) || hasAssignments(id))
+        var order = workorders.selectByPrimaryKey(row.getWorkorderId());
+        valid(order != null);
+        BusinessSourceRules.localEditable(order.getSource());
+        sources.current(order.getSource());
+        if (hasIssues(id) || hasReports(id) || hasAssignments(id) || allocation.hasExecutionDependents(id))
             throw new FoundationException(ErrorCode.EXECUTION_REFERENCED);
         if (quality.hasAnyHistory(id))
             throw new FoundationException(ErrorCode.EXECUTION_QUALITY_REFERENCED);
         var path = paths.selectByPrimaryKey(id);
         if (path != null) {
-            if (ExecutionPathStatus.LOCKED.getValue().equals(path.getPathStatus())) frozen();
             var filter = new MesExecutionPathNodeExample();
             filter.createCriteria().andExecutionIdEqualTo(id);
             pathNodes.deleteByExample(filter);

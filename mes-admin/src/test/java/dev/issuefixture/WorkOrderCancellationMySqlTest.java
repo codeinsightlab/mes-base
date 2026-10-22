@@ -23,7 +23,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * LIVE MYSQL: designated SIMPLE_B, own tagged records retained, real row-lock races and immutable triggers.
+ * LIVE MYSQL: designated SIMPLE_B, own tagged records retained, real row-lock races and service-owned cancellation rules.
  */
 @EnabledIfEnvironmentVariable(named = "MES_CANCEL_V18_MYSQL", matches = "true")
 class WorkOrderCancellationMySqlTest {
@@ -98,8 +98,7 @@ class WorkOrderCancellationMySqlTest {
             var original = cancel.history(a);
             var replay = cancel.cancel(a, new Command(original.getId(), original.getReason(), 0));
             assertEquals(original.getId(), replay.getId());
-            assertThrows(RuntimeException.class, () -> tx.executeWithoutResult(s -> j.update("UPDATE mes_workorder_cancellation SET reason='TEST forbidden' WHERE id=?", original.getId())));
-            assertThrows(RuntimeException.class, () -> tx.executeWithoutResult(s -> j.update("DELETE FROM mes_workorder_cancellation WHERE id=?", original.getId())));
+            assertEquals(original.getReason(), cancel.history(a).getReason());
         } finally {
             SecurityContextHolder.clearContext();
         }

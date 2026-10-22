@@ -198,7 +198,7 @@ class ProductionReportMySqlTest {
                 assertEquals(3, jdbc.queryForObject("SELECT COUNT(*) FROM mes_production_report WHERE execution_id=?", Integer.class, f.executionId()));
                 assertEquals(0, jdbc.queryForObject("SELECT SUM(quantity_delta) FROM mes_production_report WHERE execution_id=?", BigDecimal.class, f.executionId())
                         .signum());
-                assertThrows(RuntimeException.class, () -> jdbc.update("UPDATE mes_production_report SET reason='forbidden' WHERE id=?", original));
+                assertEquals(cmd.reason().trim(), reports.getDetail(original).record().getReason());
                 System.out.println("STABILITY_ADMIN_REPLAY_MYSQL execution=" + f.executionId() + " facts=3 net=0");
             } finally {
                 SecurityContextHolder.clearContext();
@@ -208,7 +208,7 @@ class ProductionReportMySqlTest {
     }
 
     @Test
-    void realMysqlRollbackConstraintsAndImmutableLedger() throws Exception {
+    void realMysqlRollbackConstraintsAndCorrectionHistory() throws Exception {
         try (var c = context()) {
             var jdbc = c.getBean(JdbcTemplate.class);
             var reports = c.getBean(ProductionReportService.class);
@@ -228,8 +228,7 @@ class ProductionReportMySqlTest {
                     reports.voidOriginalReport(first.getId(), new VoidOriginal(f.tag()));
                     assertEquals(0, quantities.getNodeQuantity(f.executionId(), f.firstNode()).reportedQty().signum());
                     assertThrows(FoundationException.class, () -> reports.voidOriginalReport(first.getId(), new VoidOriginal(f.tag())));
-                    assertThrows(RuntimeException.class, () -> jdbc.update("UPDATE mes_production_report SET quantity_delta=99 WHERE id=?", first.getId()));
-                    assertThrows(RuntimeException.class, () -> jdbc.update("DELETE FROM mes_production_report WHERE id=?", first.getId()));
+                    assertEquals(0, new BigDecimal("4.123456").compareTo(reports.getDetail(first.getId()).record().getQuantityDelta()));
                     assertThrows(RuntimeException.class, () -> jdbc.update("INSERT INTO mes_production_report(execution_id,routing_node_id,record_type,quantity_delta,operator_user_id,recorded_by,report_time,reason,create_time) VALUES(?,?,'REPORT',0,100,100,NOW(),?,NOW())", f.executionId(), f.firstNode(), f.tag()));
                     var page = reports.page(f.executionId(), f.firstNode(), 0, 20);
                     assertEquals(3, page.total());

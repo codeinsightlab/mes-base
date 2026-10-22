@@ -10,6 +10,10 @@ import org.apache.ibatis.annotations.Param;
  * Cross-table product applicability and WorkOrder/Execution allocation; no single-table CRUD.
  */
 public interface WorkOrderExtraMapper {
+    boolean hasOrderDependents(@Param("id") Long workorderId);
+
+    boolean hasExecutionDependents(@Param("id") Long executionId);
+
     WorkOrderModels.Allocation activeAllocation(@Param("id") Long workorderId, @Param("excluding") Long excluding);
 
     BigDecimal pendingExecutionInput(@Param("id") Long executionId);

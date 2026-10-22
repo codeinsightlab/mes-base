@@ -302,8 +302,13 @@ public class WorkOrderService {
         BusinessSourceRules.localEditable(row.getSource());
         sources.current(row.getSource());
         require(WorkOrderStatus.DRAFT.getValue().equals(row.getStatus()));
+        require(input != null);
         if (!Objects.equals(row.getRevision(), input.revision())) conflict();
-        if (!Objects.equals(row.getProductId(), input.productId()) && hasExecutions(id))
+        boolean identityChanged = !Objects.equals(row.getProductId(), input.productId())
+                || !Objects.equals(row.getRoutingId(), input.routingId());
+        boolean quantityChanged = input.plannedQty() == null || row.getPlannedQty() == null
+                || input.plannedQty().compareTo(row.getPlannedQty()) != 0;
+        if (identityChanged && hasExecutions(id))
             throw new FoundationException(ErrorCode.EXECUTION_FROZEN);
         if (hasLegacyBatches(id) && (!Objects.equals(row.getProductId(), input.productId())
                 || !Objects.equals(row.getRoutingId(), input.routingId())))
@@ -312,10 +317,14 @@ public class WorkOrderService {
             if (queries.countBlockingIssues(id) > 0)
                 throw new FoundationException(ErrorCode.WORKORDER_ISSUE_REFERENCED);
         }
-        validate(input);
+        validateValues(input);
+        if (identityChanged) binding(input.productId(), input.routingId());
         ProductionQuantityInput.changed(input.plannedQty(), row.getPlannedQty());
-        var allocation = queries.activeAllocation(id, null);
-        require(allocation != null && allocation.allocatedTargetQty().compareTo(input.plannedQty()) <= 0);
+        if (quantityChanged) {
+            var allocation = queries.activeAllocation(id, null);
+            if (allocation == null || allocation.allocatedTargetQty().compareTo(input.plannedQty()) > 0)
+                throw new FoundationException(ErrorCode.WORKORDER_QUANTITY_CONFLICT);
+        }
         uniqueCode(input.code(), id);
         assign(row, input);
         row.setRevision(row.getRevision() + 1);
@@ -366,15 +375,35 @@ public class WorkOrderService {
         BusinessSourceRules.localEditable(row.getSource());
         sources.current(row.getSource());
         if (row.getRevision() != revision) conflict();
-        require(WorkOrderStatus.DRAFT.getValue().equals(row.getStatus()));
-        if (hasExecutions(id)) throw new FoundationException(ErrorCode.EXECUTION_REFERENCED);
-        var issueFilter = new MesMaterialIssueExample();
-        issueFilter.createCriteria().andWorkorderIdEqualTo(id);
-        require(issues.countByExample(issueFilter) == 0);
-        if (hasLegacyBatches(id)) throw new FoundationException(ErrorCode.WORKORDER_LEGACY_REFERENCED);
+        ensureNoDownstream(id);
         requirements.deleteByPrimaryKey(id);
         facts.delete(id);
         if (orders.deleteByPrimaryKey(id) != 1) conflict();
+    }
+
+    public WorkOrderModels.Detail recall(Long id, int revision) {
+        var row = order(id, true);
+        BusinessSourceRules.localEditable(row.getSource());
+        sources.current(row.getSource());
+        if (row.getRevision() != revision) conflict();
+        require(WorkOrderStatus.RELEASED.getValue().equals(row.getStatus()));
+        ensureNoDownstream(id);
+        row.setStatus(WorkOrderStatus.DRAFT.getValue());
+        row.setRevision(revision + 1);
+        row.setUpdateTime(LocalDateTime.now());
+        saveOrder(row, false);
+        return detail(id);
+    }
+
+    private void ensureNoDownstream(Long id) {
+        if (hasExecutions(id)) throw new FoundationException(ErrorCode.EXECUTION_REFERENCED);
+        var issueFilter = new MesMaterialIssueExample();
+        issueFilter.createCriteria().andWorkorderIdEqualTo(id);
+        if (issues.countByExample(issueFilter) > 0)
+            throw new FoundationException(ErrorCode.WORKORDER_ISSUE_REFERENCED);
+        if (queries.hasOrderDependents(id))
+            throw new FoundationException(ErrorCode.WORKORDER_REFERENCED);
+        if (hasLegacyBatches(id)) throw new FoundationException(ErrorCode.WORKORDER_LEGACY_REFERENCED);
     }
 
     @Transactional(transactionManager = "businessTransactionManager", readOnly = true)
@@ -427,6 +456,11 @@ public class WorkOrderService {
     }
 
     private void validate(WorkOrderModels.Save input, boolean lock) {
+        validateValues(input);
+        binding(input.productId(), input.routingId(), lock);
+    }
+
+    private void validateValues(WorkOrderModels.Save input) {
         require(input != null && input.productId() != null && input.routingId() != null && input.code() != null && !input.code()
                 .isBlank() && input.code().length() <= 64);
         BigDecimal quantity = input.plannedQty();
@@ -434,7 +468,6 @@ public class WorkOrderService {
                 && quantity.precision() - quantity.scale() <= 14);
         require(input.plannedStartAt() == null || input.plannedEndAt() == null || !input.plannedEndAt()
                 .isBefore(input.plannedStartAt()));
-        binding(input.productId(), input.routingId(), lock);
     }
 
     private boolean hasExecutions(Long id) {

@@ -110,7 +110,7 @@ class ProductionExecutionHttpTest {
     }
 
     @Test
-    void permissionsReferenceNegativesAndStartedProtection() throws Exception {
+    void permissionsReferenceNegativesAndDownstreamProtection() throws Exception {
         try (var c = MaterialIssueHttpTest.context()) {
             var m = MaterialIssueHttpTest.mvc(c);
             var a = c.getBean(MaterialIssueHttpTest.Fixture.class).business.get("A");
@@ -134,11 +134,11 @@ class ProductionExecutionHttpTest {
             m.perform(full(put(E + "/1"), "A").content(CREATE.replace("READY", "RUNNING")
                             .replace("\"status\"", "\"startTime\":\"2026-10-14T09:00:00\",\"status\"")))
                     .andExpect(status().isConflict());
-            // Existing started records remain protected; formal start coverage is in ProductionCoreV1HttpTest.
+            // A state transition cannot be forged by editing; deletion depends on actual downstream rows.
             c.getBean(MaterialIssueHttpTest.Fixture.class).business.get("A")
                     .update("UPDATE mes_production_execution SET status='RUNNING',start_time=CURRENT_TIMESTAMP WHERE id=1");
             m.perform(full(put(E + "/1"), "A").content(CREATE)).andExpect(status().isConflict());
-            m.perform(full(delete(E), "A").content("[1]")).andExpect(status().isConflict());
+            m.perform(full(delete(E), "A").content("[1]")).andExpect(status().isNoContent());
             m.perform(delete(E).header("Authorization", "Bearer CRUD").header("X-Factory-Id", "A")
                     .contentType("application/json").content("[1]")).andExpect(status().isForbidden());
             m.perform(get(QR).param("code", "EXE:1")).andExpect(status().isForbidden());

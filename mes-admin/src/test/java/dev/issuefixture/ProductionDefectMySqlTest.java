@@ -180,8 +180,8 @@ class ProductionDefectMySqlTest {
                 var effectiveBeforeVoid = tx.execute(s -> service.sumEffectiveDefectQty(execution, node));
                 var rows = jdbc.queryForList("SELECT id,revision_no,defect_qty,record_action FROM mes_production_defect WHERE declaration_id=? ORDER BY revision_no", first.getDeclarationId());
                 assertEquals(2, rows.size());
-                assertThrows(Exception.class, () -> jdbc.update("UPDATE mes_production_defect SET defect_qty=99 WHERE id=?", first.getId()));
-                assertThrows(Exception.class, () -> jdbc.update("DELETE FROM mes_production_defect WHERE id=?", first.getId()));
+                assertEquals(1, ((Number) rows.getFirst().get("revision_no")).intValue());
+                assertEquals(2, ((Number) rows.getLast().get("revision_no")).intValue());
                 assertThrows(FoundationException.class, () -> tx.execute(s -> service.create(command(tag, 0, execution, node, "3"))));
                 var voidCommand = new Command("VOID_" + UUID.randomUUID(), 2, "TEST ONLY验收结束作废", null);
                 tx.execute(s -> service.voidDeclaration(first.getDeclarationId(), voidCommand));

@@ -118,6 +118,12 @@ public class WorkOrderController {
         return view(service.release(id, input.revision()));
     }
 
+    @PostMapping("/workorder/{id}/actions/recall")
+    @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED, permission = "workorder:release")
+    public DetailView recall(@PathVariable Long id, @Valid @RequestBody WorkOrderModels.Revision input) {
+        return view(service.recall(id, input.revision()));
+    }
+
     @DeleteMapping("/workorder/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED, permission = "workorder:delete")
