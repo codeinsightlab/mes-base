@@ -10,6 +10,7 @@ import dev.mesbase.server.WorkOrderCompletionJob;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 import java.util.concurrent.Executors;
 import org.junit.jupiter.api.Test;
 import org.springframework.context.annotation.Bean;
@@ -27,6 +28,28 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * Real H2 production commands; only the immutable opening-evidence reader is mocked.
  */
 class ActivatedProductionHttpTest {
+    @Test
+    void importedFactsUseNormalAuditedAdjustmentWithoutMigrationActivationGate() throws Exception {
+        try (var c = QualityWorkflowHttpTest.context(new Class<?>[]{Opening.class}, 40, 30, 30, 30, 30)) {
+            var j = ProductionWarehouseFixture.db(c);
+            when(c.getBean(LegacyHistoryMapper.class).input(1L)).thenReturn(new BigDecimal("100.000000"));
+            j.update("UPDATE workorder SET status='HISTORICAL' WHERE id=1");
+            j.update("UPDATE mes_production_execution SET status='HISTORICAL' WHERE id=1");
+            Long original = j.queryForObject("SELECT MIN(id) FROM mes_production_report WHERE execution_id=1 AND routing_node_id=15", Long.class);
+            var http = MaterialIssueHttpTest.mvc(c);
+            http.perform(ProductionCoreV1HttpTest.full(get("/api/production/report-quantities/executions/1")))
+                    .andExpect(status().isOk()).andExpect(jsonPath("writable").value(false))
+                    .andExpect(jsonPath("nodes[0].availableQty").value("60.000000"));
+            http.perform(ProductionCoreV1HttpTest.full(post("/api/production/reports/" + original + "/adjustments"))
+                            .content("{\"requestId\":\"" + UUID.randomUUID() + "\",\"quantityDelta\":\"-1\",\"reason\":\"TEST ONLY audited correction\"}"))
+                    .andExpect(status().isOk());
+            assertEquals(1, j.queryForObject("SELECT COUNT(*) FROM mes_production_report WHERE record_type='ADJUSTMENT' AND reference_report_id=?", Integer.class, original));
+            assertEquals("HISTORICAL", j.queryForObject("SELECT status FROM workorder WHERE id=1", String.class));
+            http.perform(ProductionCoreV1HttpTest.full(get("/api/production/report-quantities/executions/1")))
+                    .andExpect(status().isOk()).andExpect(jsonPath("nodes[4].reportedQty").value("29.000000"));
+        }
+    }
+
     @Configuration(proxyBeanMethods = false)
     static class Opening {
         @Bean
@@ -104,17 +127,6 @@ class ActivatedProductionHttpTest {
             assertEquals(0, j.queryForObject("SELECT COUNT(*) FROM wm_stock_action", Integer.class));
             http.perform(ProductionCoreV1HttpTest.full(get("/api/production/report-quantities/executions/1")))
                     .andExpect(status().isOk()).andExpect(jsonPath("nodes[4].effectiveOutputQty").value("90.000000"));
-        }
-    }
-
-    @Test
-    void historicalUnspecifiedDestinationCannotBeSubmittedAsANewNormalDeclaration() throws Exception {
-        try (var c = ProductionDefectHttpTest.context()) {
-            var http = MaterialIssueHttpTest.mvc(c);
-            String body = ProductionDefectHttpTest.command("unknown-destination", 0, "1")
-                    .replace("SAME_NODE", "UNSPECIFIED");
-            http.perform(ProductionReportHttpTest.full(post("/api/quality/defects"), "A").content(body))
-                    .andExpect(status().isBadRequest());
         }
     }
 

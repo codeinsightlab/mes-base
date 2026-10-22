@@ -103,6 +103,7 @@ class BusinessSourceRulesTest {
                     for (boolean local : List.of(true, false)) {
                         var o = new WorkorderEntity();
                         o.setId(1L);
+                        o.setStatus("RELEASED");
                         o.setSource(orderSource);
                         when(orders.selectByPrimaryKey(1L)).thenReturn(o);
                         var w = new WmWarehouseEntity();
@@ -133,6 +134,7 @@ class BusinessSourceRulesTest {
         });
         var o = new WorkorderEntity();
         o.setId(1L);
+        o.setStatus("RELEASED");
         o.setSource("EXTERNAL");
         when(orders.selectByPrimaryKey(1L)).thenReturn(o);
         mode(false, () -> assertThrows(FoundationException.class, () -> rules.order(1L)));
@@ -147,6 +149,7 @@ class BusinessSourceRulesTest {
         mappings();
         var o = new WorkorderEntity();
         o.setId(1L);
+        o.setStatus("RELEASED");
         o.setSource("EXTERNAL");
         when(orders.selectByPrimaryKey(1L)).thenReturn(o);
         mode(false, () -> {

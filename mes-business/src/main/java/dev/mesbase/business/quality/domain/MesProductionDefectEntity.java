@@ -1,4 +1,3 @@
-// MES-CODEGEN: MyBatis Generator standard single-table persistence.
 package dev.mesbase.business.quality.domain;
 
 import java.math.BigDecimal;
@@ -19,9 +18,6 @@ public class MesProductionDefectEntity {
 
     private Long affectedNodeId;
 
-    private Long discoveredNodeId;
-
-    private Long responsibleNodeId;
 
     private BigDecimal defectQty;
 
@@ -33,13 +29,6 @@ public class MesProductionDefectEntity {
 
     private String responsibilityRemark;
 
-    private String destinationType;
-
-    private Long targetNodeId;
-
-    private Long targetWarehouseId;
-
-    private String destinationRemark;
 
     private String requestKey;
 
@@ -61,7 +50,6 @@ public class MesProductionDefectEntity {
 
     private Integer defectTypeRevision;
 
-    private String commandVersion;
 
     public Long getId() {
         return id;
@@ -119,21 +107,6 @@ public class MesProductionDefectEntity {
         this.affectedNodeId = affectedNodeId;
     }
 
-    public Long getDiscoveredNodeId() {
-        return discoveredNodeId;
-    }
-
-    public void setDiscoveredNodeId(Long discoveredNodeId) {
-        this.discoveredNodeId = discoveredNodeId;
-    }
-
-    public Long getResponsibleNodeId() {
-        return responsibleNodeId;
-    }
-
-    public void setResponsibleNodeId(Long responsibleNodeId) {
-        this.responsibleNodeId = responsibleNodeId;
-    }
 
     public BigDecimal getDefectQty() {
         return defectQty;
@@ -175,37 +148,6 @@ public class MesProductionDefectEntity {
         this.responsibilityRemark = responsibilityRemark;
     }
 
-    public String getDestinationType() {
-        return destinationType;
-    }
-
-    public void setDestinationType(String destinationType) {
-        this.destinationType = destinationType;
-    }
-
-    public Long getTargetNodeId() {
-        return targetNodeId;
-    }
-
-    public void setTargetNodeId(Long targetNodeId) {
-        this.targetNodeId = targetNodeId;
-    }
-
-    public Long getTargetWarehouseId() {
-        return targetWarehouseId;
-    }
-
-    public void setTargetWarehouseId(Long targetWarehouseId) {
-        this.targetWarehouseId = targetWarehouseId;
-    }
-
-    public String getDestinationRemark() {
-        return destinationRemark;
-    }
-
-    public void setDestinationRemark(String destinationRemark) {
-        this.destinationRemark = destinationRemark;
-    }
 
     public String getRequestKey() {
         return requestKey;
@@ -287,11 +229,5 @@ public class MesProductionDefectEntity {
         this.defectTypeRevision = defectTypeRevision;
     }
 
-    public String getCommandVersion() {
-        return commandVersion;
-    }
 
-    public void setCommandVersion(String commandVersion) {
-        this.commandVersion = commandVersion;
-    }
 }

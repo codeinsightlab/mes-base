@@ -30,13 +30,13 @@ public class QualityTreatmentController {
     public record Event(String id, String declarationId, int declarationRevision, String executionId,
                         String routingNodeId, String actionType, String attributionType, String relatedDeclarationId,
                         String basis, String returnedQty, String operatorUserId, String operatorName,
-                        String confirmedBy, String confirmedByName, LocalDateTime occurredAt, LocalDateTime recordedAt,
+                        LocalDateTime recordedAt,
                         String reason, String targetWarehouseId, String stockDocumentId, String transferQty) {
     }
 
     public record View(String declarationId, int revision, String executionId, String routingNodeId, String defectQty,
                        String attribution, String relatedDeclarationId, String basis, String pendingDispositionQty,
-                       String netDefectQty, String state, String recordAction, String destinationType,
+                       String netDefectQty, String state, String recordAction,
                        List<Event> events,
                        String returnedQty, String transferredQty) {
     }
@@ -63,7 +63,7 @@ public class QualityTreatmentController {
     private record History(List<Event> events) {
     }
 
-    private record Labels(String operatorName, String confirmedByName) {
+    private record Labels(String operatorName) {
     }
 
     static View view(QualityTreatmentService.Details data) {
@@ -72,8 +72,7 @@ public class QualityTreatmentController {
     }
 
     private static Event event(MesQualityTreatmentEntity event, Map<Long, DirectoryLabel> users) {
-        return BeanConversions.convertWith(event, new Labels(name(users, event.getOperatorUserId()),
-                name(users, event.getConfirmedBy())), Event.class);
+        return BeanConversions.convertWith(event, new Labels(name(users, event.getOperatorUserId())), Event.class);
     }
 
     private static String name(Map<Long, DirectoryLabel> names, Long id) {

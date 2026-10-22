@@ -19,6 +19,7 @@ UI `http://127.0.0.1:15174` → 本轮后端 `127.0.0.1:18081`。用户请求的
 - [实际验收记录](docs/reviews/2026-10-06-phase1-verification.json)
 - [配置和操作边界](docs/development/platform.md)
 - [SQL 导出入口](sql/README.md)
+- [数据库版本升级与 Flyway 执行](docs/development/database-upgrades.md)
 
 ## 模块与页面
 

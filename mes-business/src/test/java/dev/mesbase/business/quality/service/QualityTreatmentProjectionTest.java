@@ -54,7 +54,6 @@ class QualityTreatmentProjectionTest {
         d.setAffectedNodeId(node);
         d.setDefectQty(new BigDecimal(quantity));
         d.setRecordAction(DefectRecordAction.CREATE.getValue());
-        d.setDestinationType("SAME_NODE");
         return d;
     }
 

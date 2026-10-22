@@ -76,7 +76,7 @@ class ProductionDefectHttpTest {
     }
 
     static String command(String key, int revision, String quantity) {
-        return "{\"assessment\":{\"type\":\"INDEPENDENT\",\"basis\":\"TEST ONLY explicit independent fixture\"},\"requestKey\":\"" + key + "\"," + (revision == 0 ? "" : "\"expectedRevision\":" + revision + ",\"revisionReason\":\"TEST订正\",") + "\"facts\":{\"executionId\":\"1\",\"affectedNodeId\":\"13\",\"discoveredNodeId\":\"13\",\"defectQty\":\"" + quantity + "\",\"wasteCategory\":\"PROCESS\",\"defectReason\":\"TEST ONLY缺陷\",\"destinationType\":\"SAME_NODE\",\"occurredAt\":\"2026-01-01T10:00:00\"}}";
+        return "{\"assessment\":{\"type\":\"INDEPENDENT\",\"basis\":\"TEST ONLY explicit independent fixture\"},\"requestKey\":\"" + key + "\"," + (revision == 0 ? "" : "\"expectedRevision\":" + revision + ",\"revisionReason\":\"TEST订正\",") + "\"facts\":{\"executionId\":\"1\",\"affectedNodeId\":\"13\",\"defectQty\":\"" + quantity + "\",\"wasteCategory\":\"PROCESS\",\"defectReason\":\"TEST ONLY缺陷\",\"occurredAt\":\"2026-01-01T10:00:00\"}}";
     }
 
     static String add(MockMvc m, String body, String factory) throws Exception {
@@ -92,7 +92,7 @@ class ProductionDefectHttpTest {
         try (var c = context()) {
             var jdbc = c.getBean(MaterialIssueHttpTest.Fixture.class).business.get("A");
             for (int i = 0; i < 12; i++)
-                jdbc.update("INSERT INTO mes_quality_treatment(id,request_hash,declaration_id,declaration_revision,execution_id,routing_node_id,action_type,operator_user_id,confirmed_by,occurred_at,recorded_at,reason,rework_qty,transfer_qty) VALUES(?,?,'same-declaration',?,1,11,?,100,1,'2026-01-01 09:00:00',?,'TEST ONLY immutable event',?,?)",
+                jdbc.update("INSERT INTO mes_quality_treatment(id,request_hash,declaration_id,declaration_revision,execution_id,routing_node_id,action_type,operator_user_id,recorded_at,reason,returned_qty,transfer_qty) VALUES(?,?,'same-declaration',?,1,11,?,100,?,'TEST ONLY immutable event',?,?)",
                         String.format("00000000-0000-0000-0000-%012d", 12 - i), "test-" + i, i < 6 ? 1 : 2,
                         i == 11 ? "TRANSFER_WAREHOUSE" : "RETURN_NODE", "2026-01-01 10:00:" + String.format("%02d", i),
                         i == 11 ? "0" : "0.123456", i == 11 ? "0.123456" : "0");
@@ -122,7 +122,7 @@ class ProductionDefectHttpTest {
         try (var c = context()) {
             var m = MaterialIssueHttpTest.mvc(c);
             var id = add(m, command("one", 0, "2"), "A");
-            m.perform(full(get(ROOT + "/" + id), "A")).andExpect(jsonPath("targetNodeId").value("13"))
+            m.perform(full(get(ROOT + "/" + id), "A")).andExpect(jsonPath("affectedNodeId").value("13"))
                     .andExpect(jsonPath("reportedBy").value("1"));
             for (int rev = 1; rev <= 2; rev++)
                 m.perform(full(post(ROOT + "/" + id + "/revisions"), "A").content(command("rev" + rev, rev, "4")))
@@ -164,19 +164,19 @@ class ProductionDefectHttpTest {
     }
 
     @Test
-    void declarationsOnlyAcceptTheReportingNodeAndValidateReferences() throws Exception {
+    void declarationsValidateActualPathAndResponsibleUserReferences() throws Exception {
         try (var c = context()) {
             var mvc = MaterialIssueHttpTest.mvc(c);
             var base = new ObjectMapper().readTree(command(UUID.randomUUID().toString(), 0, "1"));
             var facts = (ObjectNode) base.get("facts");
-            facts.put("targetNodeId", "12");
+            facts.put("affectedNodeId", "9999");
             mvc.perform(full(post(ROOT), "A").content(base.toString())).andExpect(status().isBadRequest());
-            facts.put("targetNodeId", "13");
+            facts.put("affectedNodeId", "13");
             facts.put("responsibleUserId", "999");
             mvc.perform(full(post(ROOT), "A").content(base.toString())).andExpect(status().isBadRequest());
             facts.put("responsibleUserId", "100");
             var id = add(mvc, base.toString(), "A");
-            mvc.perform(full(get(ROOT + "/" + id), "A")).andExpect(jsonPath("targetNodeId").value("13"));
+            mvc.perform(full(get(ROOT + "/" + id), "A")).andExpect(jsonPath("affectedNodeId").value("13"));
             mvc.perform(full(post(ROOT + "/" + id + "/revisions"), "A").content(command(UUID.randomUUID()
                             .toString(), 1, "3").replace("affectedNodeId\":\"13", "affectedNodeId\":\"12")))
                     .andExpect(status().isConflict());
@@ -184,15 +184,19 @@ class ProductionDefectHttpTest {
     }
 
     @Test
-    void declarationRejectsRetiredDestinationChoices() throws Exception {
+    void declarationDoesNotPretendToHaveAnExecutedDisposition() throws Exception {
         try (var c = context()) {
             var mvc = MaterialIssueHttpTest.mvc(c);
-            for (var destination : new String[]{"WAREHOUSE", "ROUTING_NODE", "UNSPECIFIED"})
-                mvc.perform(full(post(ROOT), "A").content(command(UUID.randomUUID()
-                                .toString(), 0, "2").replace("SAME_NODE", destination)))
-                        .andExpect(status().isBadRequest());
-            assertEquals(0, c.getBean(MaterialIssueHttpTest.Fixture.class).business.get("A")
-                    .queryForObject("SELECT COUNT(*) FROM mes_production_defect", Integer.class));
+            var id = add(mvc, command("current-declaration", 0, "2"), "A");
+            mvc.perform(full(get(ROOT + "/" + id), "A"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("discoveredNodeId").doesNotExist())
+                    .andExpect(jsonPath("responsibleNodeId").doesNotExist())
+                    .andExpect(jsonPath("destinationType").doesNotExist())
+                    .andExpect(jsonPath("targetNodeId").doesNotExist())
+                    .andExpect(jsonPath("targetWarehouseId").doesNotExist())
+                    .andExpect(jsonPath("destinationRemark").doesNotExist())
+                    .andExpect(jsonPath("commandVersion").doesNotExist());
         }
     }
 
@@ -258,7 +262,7 @@ class ProductionDefectHttpTest {
     void responsibilityHistorySpoofProtectionAndLatestBeforeFiltering() throws Exception {
         try (var c = context()) {
             var m = MaterialIssueHttpTest.mvc(c);
-            String initial = command("responsibility", 0, "2").replace("\"destinationType\"", "\"responsibleUserId\":\"100\",\"responsibleNodeId\":\"11\",\"destinationType\"");
+            String initial = command("responsibility", 0, "2").replace("\"wasteCategory\"", "\"responsibleUserId\":\"100\",\"wasteCategory\"");
             initial = initial.substring(0, initial.length() - 1) + ",\"reportedBy\":999,\"recordedBy\":999}";
             var id = add(m, initial, "A");
             m.perform(full(get(ROOT + "/" + id), "A")).andExpect(jsonPath("reportedBy").value("1"))

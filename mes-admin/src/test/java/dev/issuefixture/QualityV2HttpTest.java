@@ -73,6 +73,24 @@ class QualityV2HttpTest {
     }
 
     @Test
+    void configuredSortControlsBothManagementAndDeclarationChoices() throws Exception {
+        try (var c = context()) {
+            var mvc = MaterialIssueHttpTest.mvc(c);
+            String late = addType(mvc, "A", "LATE", "PROCESS");
+            String early = addType(mvc, "A", "EARLY", "PROCESS");
+            mvc.perform(full(put(TYPES + "/" + late), "A")
+                            .content(config("LATE", "PROCESS", 0, "ENABLED").replace("\"sort\":0", "\"sort\":20")))
+                    .andExpect(status().isOk());
+            mvc.perform(full(get(TYPES), "A"))
+                    .andExpect(jsonPath("items[0].id").value(early))
+                    .andExpect(jsonPath("items[1].id").value(late));
+            mvc.perform(full(get("/api/quality/defects/executions/1/nodes/12/declaration-context"), "A"))
+                    .andExpect(jsonPath("types[0].id").value(early))
+                    .andExpect(jsonPath("types[1].id").value(late));
+        }
+    }
+
+    @Test
     void configScopesUniquenessRevisionAndHistoricalReferences() throws Exception {
         try (var c = context()) {
             var m = MaterialIssueHttpTest.mvc(c);

@@ -9,6 +9,7 @@ import dev.mesbase.business.quality.domain.ProductionDefectModels.ListContext;
 import dev.mesbase.business.quality.domain.ProductionDefectModels.Names;
 import dev.mesbase.business.quality.domain.ProductionDefectModels.Node;
 import dev.mesbase.business.quality.domain.ProductionDefectModels.Processing;
+import dev.mesbase.business.quality.domain.QualityTreatmentModels.State;
 import dev.mesbase.business.quality.domain.ProductionDefectModels.Warehouse;
 import dev.mesbase.business.quality.service.ProductionDefectService.Result;
 import dev.mesbase.business.quality.service.ProductionDefectService;
@@ -39,13 +40,11 @@ public class ProductionDefectController {
     }
 
     public record Version(String id, String declarationId, Integer revisionNo, String recordAction,
-                          String revisionReason, String executionId, String affectedNodeId, String discoveredNodeId,
-                          String responsibleNodeId, String responsibleUserId, String targetNodeId,
-                          String targetWarehouseId, String reportedBy, String recordedBy, String wasteCategory,
-                          String defectReason, String responsibilityRemark, String destinationType,
-                          String destinationRemark, String defectQty, LocalDateTime occurredAt,
-                          LocalDateTime recordedAt, String discoveredNodeName, String affectedNodeName,
-                          String responsibleNodeName, String targetNodeName, String targetWarehouseName,
+                          String revisionReason, String executionId, String affectedNodeId,
+                          String responsibleUserId, String reportedBy, String recordedBy,
+                          String wasteCategory,
+                          String defectReason, String responsibilityRemark, String defectQty, LocalDateTime occurredAt,
+                          LocalDateTime recordedAt, String affectedNodeName,
                           String responsibleUserName, String reportedByName, String recordedByName,
                           String defectTypeId, String defectTypeCodeSnapshot, String defectTypeNameSnapshot,
                           Integer defectTypeRevision, String processingState, String pendingQuantity,
@@ -66,15 +65,15 @@ public class ProductionDefectController {
     }
 
     public static Version view(MesProductionDefectEntity r) {
-        return view(r, new Names(Map.of(), Map.of(), Map.of()));
+        return view(r, new Names(Map.of(), Map.of()));
     }
 
     public static Version view(MesProductionDefectEntity r, Names names) {
         return view(r, names, null, null);
     }
 
-    private record Labels(String discoveredNodeName, String affectedNodeName, String responsibleNodeName,
-                          String targetNodeName, String targetWarehouseName, String responsibleUserName,
+    private record Labels(String affectedNodeName,
+                          String responsibleUserName,
                           String reportedByName, String recordedByName, String processingState, String pendingQuantity,
                           String returnedQuantity, String transferredQuantity, @JsonUnwrapped ListContext context) {
     }
@@ -83,14 +82,15 @@ public class ProductionDefectController {
         String state = null, pending = null, returned = null, transferred = null;
         if (treatment != null) {
             state = treatment.state().getValue();
-            pending = treatment.pendingDispositionQty().toPlainString();
-            returned = treatment.returnedQty().toPlainString();
-            transferred = treatment.transferredQty().toPlainString();
+            if (treatment.state() != State.UNRESOLVED) {
+                pending = treatment.pendingDispositionQty().toPlainString();
+                returned = treatment.returnedQty().toPlainString();
+                transferred = treatment.transferredQty().toPlainString();
+            }
         }
         return BeanConversions.convertWith(r, new Labels(
-                label(names.nodes(), r.getDiscoveredNodeId()), label(names.nodes(), r.getAffectedNodeId()),
-                label(names.nodes(), r.getResponsibleNodeId()), label(names.nodes(), r.getTargetNodeId()),
-                label(names.warehouses(), r.getTargetWarehouseId()), label(names.users(), r.getResponsibleUserId()),
+                label(names.nodes(), r.getAffectedNodeId()),
+                label(names.users(), r.getResponsibleUserId()),
                 label(names.users(), r.getReportedBy()), label(names.users(), r.getRecordedBy()),
                 state, pending, returned, transferred, context), Version.class);
     }

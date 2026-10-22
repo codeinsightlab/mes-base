@@ -121,9 +121,7 @@ class ProductionReportingHttpTest {
             ((ObjectNode) declaration).remove("assessment");
             var facts = (ObjectNode) declaration.get("facts");
             facts.put("affectedNodeId", "12");
-            facts.put("discoveredNodeId", "13");
             facts.put("destinationNodeId", "12");
-            facts.put("destinationType", "SAME_NODE");
             ProductionDefectHttpTest.add(m, declaration.toString(), "A");
             m.perform(ProductionCoreV1HttpTest.full(get(ROOT + "/context").param("code", "EXE:1")))
                     .andExpect(status().isOk())

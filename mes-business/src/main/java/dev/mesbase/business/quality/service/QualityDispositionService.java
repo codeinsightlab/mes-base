@@ -7,7 +7,6 @@ import dev.mesbase.business.production.service.BusinessSourceRules;
 import dev.mesbase.business.production.service.ProductionChainLocks;
 import dev.mesbase.business.production.service.ProductionIdentityService;
 import dev.mesbase.business.production.service.ProductionReportService;
-import dev.mesbase.business.quality.domain.DefectDestination;
 import dev.mesbase.business.quality.domain.DefectRecordAction;
 import dev.mesbase.business.quality.domain.MesQualityTreatmentEntity;
 import dev.mesbase.business.quality.domain.QualityTreatmentModels.Attribution;
@@ -16,6 +15,8 @@ import dev.mesbase.business.quality.domain.QualityTreatmentModels.Disposition;
 import dev.mesbase.business.shared.enums.BusinessSource;
 import dev.mesbase.business.shared.enums.EnableStatus;
 import dev.mesbase.business.wm.dao.WmInventoryMapper;
+import dev.mesbase.business.wm.dao.WmWarehouseMapper;
+import dev.mesbase.business.wm.domain.WarehouseType;
 import dev.mesbase.business.wm.domain.StockDocumentModels;
 import dev.mesbase.business.wm.domain.StockDocumentType;
 import dev.mesbase.business.wm.domain.WmInventoryCreateCommand;
@@ -63,6 +64,7 @@ public class QualityDispositionService {
     private final MaterialMapper materials;
     private final AuthorizationService authorization;
     private final ProductionIdentityService identities;
+    private final WmWarehouseMapper warehouses;
 
     public QualityDispositionService(QualityTreatmentService treatments, ProductionChainLocks locks,
                                      BusinessSourceRules sources, ProductionReportService reports,
@@ -70,7 +72,8 @@ public class QualityDispositionService {
                                      ObjectProvider<IWmInventoryService> inventory, WmInventoryMapper stocks,
                                      StockReferenceRules references,
                                      MaterialMapper materials, AuthorizationService authorization,
-                                     ProductionIdentityService identities) {
+                                     ProductionIdentityService identities, WmWarehouseMapper warehouses) {
+        this.warehouses = warehouses;
         this.identities = identities;
         this.treatments = treatments;
         this.locks = locks;
@@ -108,7 +111,7 @@ public class QualityDispositionService {
             ParameterChecks.reject(ErrorCode.QUALITY_TREATMENT_CONFLICT);
         sources.execution(execution, c.warehouseId());
         var s = treatments.summary(declaration);
-        if (!DefectDestination.SAME_NODE.getValue().equals(d.getDestinationType()) || DefectRecordAction.VOID.getValue()
+        if (DefectRecordAction.VOID.getValue()
                 .equals(d.getRecordAction())) ParameterChecks.reject(ErrorCode.QUALITY_TREATMENT_CONFLICT);
         if (c.expectedRevision() != s.revision() || s.attribution() != Attribution.INDEPENDENT
                 || c.quantity().compareTo(s.pendingDispositionQty()) > 0)
@@ -122,6 +125,11 @@ public class QualityDispositionService {
                 throw new FoundationException(ErrorCode.INTEGRATION_NOT_CONFIGURED);
             var batchNo = identities.requiredBatch(execution.getId());
             references.lockDemandReferences(execution.getProductId(), List.of(c.warehouseId()));
+            var warehouse = warehouses.selectByPrimaryKey(c.warehouseId());
+            var warehouseType = WarehouseType.from(warehouse.getWarehouseType());
+            if (warehouseType != WarehouseType.DEFECTIVE && warehouseType != WarehouseType.SCRAP)
+                ParameterChecks.reject(ErrorCode.RECEIPT_WAREHOUSE_INVALID);
+            var receiptType = warehouseType == WarehouseType.DEFECTIVE ? StockDocumentType.DEFECT_RECEIPT : StockDocumentType.SCRAP_RECEIPT;
             var material = materials.selectByPrimaryKey(execution.getProductId());
             if (material == null || material.getUnitId() == null)
                 ParameterChecks.reject(ErrorCode.QUALITY_TREATMENT_CONFLICT);
@@ -135,19 +143,21 @@ public class QualityDispositionService {
                             c.warehouseId(), BigDecimal.ZERO, BigDecimal.ZERO, EnableStatus.ENABLED.getValue(), "质量转仓库存来源", batchNo, null))
                     .inventory().getId() : rows.getFirst().getId();
             var owner = documents.getObject();
-            var doc = owner.create(new StockDocumentModels.Create(StockDocumentType.OTHER_RECEIPT.getValue(), c.reason()
+            var doc = owner.createQualityReceipt(new StockDocumentModels.Create(receiptType.getValue(), c.reason()
                     .trim(), "质量申报 " + declaration, null, null));
             documentId = doc.document().getId();
             owner.putLine(documentId, null, new StockDocumentModels.Line(doc.document().getRevision(), stockId,
                     execution.getProductId(), c.warehouseId(), material.getUnitId(), batchNo, null,
                     c.quantity(), "质量处置 " + c.requestId()));
-            owner.post(documentId, new StockDocumentModels.Post(c.requestId(), owner.detail(documentId).document()
+            treatments.recordDisposition(declaration, c, hash, documentId);
+            owner.approve(documentId, new StockDocumentModels.Post(c.requestId(), owner.detail(documentId).document()
                     .getRevision()));
         }
-        if (c.destination() == Destination.RETURN_NODE)
+        if (c.destination() == Destination.RETURN_NODE) {
             reports.returnToNode(execution.getId(), d.getAffectedNodeId(), c.quantity(), c.requestId(), c.reason()
                     .trim());
-        treatments.recordDisposition(declaration, c, hash, documentId);
+            treatments.recordDisposition(declaration, c, hash, null);
+        }
         return treatments.details(declaration);
     }
 

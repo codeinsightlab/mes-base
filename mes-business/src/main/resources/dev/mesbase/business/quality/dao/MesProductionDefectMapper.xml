@@ -10,17 +10,11 @@
     <result column="revision_reason" jdbcType="VARCHAR" property="revisionReason" />
     <result column="execution_id" jdbcType="BIGINT" property="executionId" />
     <result column="affected_node_id" jdbcType="BIGINT" property="affectedNodeId" />
-    <result column="discovered_node_id" jdbcType="BIGINT" property="discoveredNodeId" />
-    <result column="responsible_node_id" jdbcType="BIGINT" property="responsibleNodeId" />
     <result column="defect_qty" jdbcType="DECIMAL" property="defectQty" />
     <result column="waste_category" jdbcType="VARCHAR" property="wasteCategory" />
     <result column="defect_reason" jdbcType="VARCHAR" property="defectReason" />
     <result column="responsible_user_id" jdbcType="BIGINT" property="responsibleUserId" />
     <result column="responsibility_remark" jdbcType="VARCHAR" property="responsibilityRemark" />
-    <result column="destination_type" jdbcType="VARCHAR" property="destinationType" />
-    <result column="target_node_id" jdbcType="BIGINT" property="targetNodeId" />
-    <result column="target_warehouse_id" jdbcType="BIGINT" property="targetWarehouseId" />
-    <result column="destination_remark" jdbcType="VARCHAR" property="destinationRemark" />
     <result column="request_key" jdbcType="VARCHAR" property="requestKey" />
     <result column="request_fingerprint" jdbcType="VARCHAR" property="requestFingerprint" />
     <result column="reported_by" jdbcType="BIGINT" property="reportedBy" />
@@ -31,7 +25,6 @@
     <result column="defect_type_code_snapshot" jdbcType="VARCHAR" property="defectTypeCodeSnapshot" />
     <result column="defect_type_name_snapshot" jdbcType="VARCHAR" property="defectTypeNameSnapshot" />
     <result column="defect_type_revision" jdbcType="INTEGER" property="defectTypeRevision" />
-    <result column="command_version" jdbcType="VARCHAR" property="commandVersion" />
   </resultMap>
   <sql id="Example_Where_Clause">
     <where>
@@ -64,11 +57,10 @@
   </sql>
   <sql id="Base_Column_List">
     id, declaration_id, revision_no, record_action, revision_reason, execution_id, affected_node_id,
-    discovered_node_id, responsible_node_id, defect_qty, waste_category, defect_reason,
-    responsible_user_id, responsibility_remark, destination_type, target_node_id, target_warehouse_id,
-    destination_remark, request_key, request_fingerprint, reported_by, occurred_at, recorded_by,
+    defect_qty, waste_category, defect_reason,
+    responsible_user_id, responsibility_remark, request_key, request_fingerprint, reported_by, occurred_at, recorded_by,
     recorded_at, defect_type_id, defect_type_code_snapshot, defect_type_name_snapshot,
-    defect_type_revision, command_version
+    defect_type_revision
   </sql>
   <select id="selectByExample" parameterType="dev.mesbase.business.quality.domain.MesProductionDefectExample" resultMap="BaseResultMap">
     select
@@ -90,24 +82,20 @@
   <insert id="insert" keyColumn="id" keyProperty="id" parameterType="dev.mesbase.business.quality.domain.MesProductionDefectEntity" useGeneratedKeys="true">
     insert into mes_production_defect (declaration_id, revision_no, record_action,
       revision_reason, execution_id, affected_node_id,
-      discovered_node_id, responsible_node_id, defect_qty,
+      defect_qty,
       waste_category, defect_reason, responsible_user_id,
-      responsibility_remark, destination_type,
-      target_node_id, target_warehouse_id, destination_remark,
-      request_key, request_fingerprint, reported_by,
+      responsibility_remark, request_key, request_fingerprint, reported_by,
       occurred_at, recorded_by, recorded_at,
       defect_type_id, defect_type_code_snapshot, defect_type_name_snapshot,
-      defect_type_revision, command_version)
+      defect_type_revision)
     values (#{declarationId,jdbcType=VARCHAR}, #{revisionNo,jdbcType=INTEGER}, #{recordAction,jdbcType=VARCHAR},
       #{revisionReason,jdbcType=VARCHAR}, #{executionId,jdbcType=BIGINT}, #{affectedNodeId,jdbcType=BIGINT},
-      #{discoveredNodeId,jdbcType=BIGINT}, #{responsibleNodeId,jdbcType=BIGINT}, #{defectQty,jdbcType=DECIMAL},
+      #{defectQty,jdbcType=DECIMAL},
       #{wasteCategory,jdbcType=VARCHAR}, #{defectReason,jdbcType=VARCHAR}, #{responsibleUserId,jdbcType=BIGINT},
-      #{responsibilityRemark,jdbcType=VARCHAR}, #{destinationType,jdbcType=VARCHAR},
-      #{targetNodeId,jdbcType=BIGINT}, #{targetWarehouseId,jdbcType=BIGINT}, #{destinationRemark,jdbcType=VARCHAR},
-      #{requestKey,jdbcType=VARCHAR}, #{requestFingerprint,jdbcType=VARCHAR}, #{reportedBy,jdbcType=BIGINT},
+      #{responsibilityRemark,jdbcType=VARCHAR}, #{requestKey,jdbcType=VARCHAR}, #{requestFingerprint,jdbcType=VARCHAR}, #{reportedBy,jdbcType=BIGINT},
       #{occurredAt,jdbcType=TIMESTAMP}, #{recordedBy,jdbcType=BIGINT}, #{recordedAt,jdbcType=TIMESTAMP},
       #{defectTypeId,jdbcType=BIGINT}, #{defectTypeCodeSnapshot,jdbcType=VARCHAR}, #{defectTypeNameSnapshot,jdbcType=VARCHAR},
-      #{defectTypeRevision,jdbcType=INTEGER}, #{commandVersion,jdbcType=VARCHAR})
+      #{defectTypeRevision,jdbcType=INTEGER})
   </insert>
   <select id="countByExample" parameterType="dev.mesbase.business.quality.domain.MesProductionDefectExample" resultType="java.lang.Long">
     select count(*) from mes_production_defect

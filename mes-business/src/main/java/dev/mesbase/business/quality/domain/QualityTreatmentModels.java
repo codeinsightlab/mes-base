@@ -24,6 +24,10 @@ public final class QualityTreatmentModels {
             return name();
         }
 
+        public static boolean recognizes(String value) {
+            return value != null && BY_VALUE.containsKey(value);
+        }
+
         public static Action from(String value) {
             var action = BY_VALUE.get(value);
             if (action == null) throw new FoundationException(ErrorCode.QUALITY_DATA_INVALID);
@@ -32,7 +36,7 @@ public final class QualityTreatmentModels {
     }
 
     public enum State {
-        UNVERIFIED, OVERLAP, PENDING, VOIDED, RETURNED, TRANSFERRED, DISPOSED;
+        UNVERIFIED, OVERLAP, PENDING, VOIDED, RETURNED, TRANSFERRED, DISPOSED, UNRESOLVED;
 
         private static final Map<String, State> BY_VALUE = Arrays.stream(values())
                 .collect(Collectors.toUnmodifiableMap(State::getValue, Function.identity()));
@@ -51,6 +55,12 @@ public final class QualityTreatmentModels {
 
     public enum Attribution {
         INDEPENDENT, OVERLAP, UNVERIFIED;
+
+        public static Attribution find(String value) {
+            for (var attribution : values())
+                if (attribution.getValue().equals(value)) return attribution;
+            return null;
+        }
 
         @JsonValue
         public String getValue() {
@@ -73,7 +83,7 @@ public final class QualityTreatmentModels {
     public record Summary(String declarationId, int revision, Long executionId, Long routingNodeId,
                           BigDecimal defectQty, Attribution attribution, String relatedDeclarationId, String basis,
                           BigDecimal pendingDispositionQty, BigDecimal netDefectQty, State state,
-                          String recordAction, String destinationType, List<MesQualityTreatmentEntity> events,
+                          String recordAction, List<MesQualityTreatmentEntity> events,
                           BigDecimal returnedQty, BigDecimal transferredQty) {
     }
 }

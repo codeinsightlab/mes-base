@@ -42,8 +42,6 @@ public class DefectStatisticsService {
         }
         try (var page = PageHelper.offsetPage(offset, limit)) {
             var rows = List.copyOf(mapper.summarize(q));
-            if (rows.stream().anyMatch(row -> row.invalidActions() > 0))
-                ParameterChecks.reject(ErrorCode.QUALITY_DATA_INVALID);
             return new Page(rows, page.getTotal(), offset, limit);
         }
     }

@@ -121,7 +121,7 @@ class WorkOrderCancellationHttpTest {
                             .content("{\"requestId\":\"" + UUID.randomUUID() + "\",\"quantity\":\"1\",\"reason\":\"TEST ONLY\"}"))
                     .andExpect(status().isConflict()).andExpect(jsonPath("errorCode").value("WORKORDER_CANCELLED"));
             m.perform(ProductionCoreV1HttpTest.full(post(StockDocumentHttpTest.ROOT))
-                            .content("{\"documentType\":\"OTHER_RECEIPT\",\"sourceExecutionId\":1,\"reason\":\"TEST ONLY\"}"))
+                            .content("{\"documentType\":\"PRODUCTION_RECEIPT\",\"sourceExecutionId\":1,\"reason\":\"TEST ONLY\"}"))
                     .andExpect(status().isConflict()).andExpect(jsonPath("errorCode").value("WORKORDER_CANCELLED"));
             m.perform(ProductionCoreV1HttpTest.full(post("/api/production/executions/1/actions/complete"))
                             .content("{\"requestId\":\"" + UUID.randomUUID() + "\",\"expectedBasisHash\":\"test\",\"reason\":\"TEST ONLY\"}"))

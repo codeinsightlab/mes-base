@@ -254,3 +254,196 @@ List<NodeTotal> nodeTotals(Long executionId);
 - 前端 `npm test`：74个文件、430项通过，日志 `/tmp/mes-current-quality-ui-full-tests.log`；`npm run build`通过，日志 `/tmp/mes-current-quality-ui-build.log`。构建保留既有分块体积提示，没有为本任务调整打包配置。
 - 以本次clean verify得到的JAR快照运行现有 `scripts/smoke-packaged.py`（仅将脚本内JAR路径指向 `/tmp/mes-current-quality-validated.jar`）：10项通过、0失败。独立随机端口进程使用classpath默认配置，不连接用户开发库、不探测ERP、不启停用户服务；原脚本其余逻辑未变。安装包内再次核对：旧导入/激活服务、命令及可写Mapper（含内部类）均不存在，只读 `LegacyHistoryMapper` 保留。
 - `git diff --check`（后端/UI）通过。未提交、推送或部署；代码回滚可恢复本次源码变更，无数据库回滚。已在最终构建结束后请用户重启开发后端，运行服务复核另记，不能用上述Fixture/打包验证代替。
+
+### 2026-10-22 用户重启后的真实只读复核
+
+用户确认后端已重启后，重新核对中心绑定仍为 `TEST_DEV_PERF_20261019` / datasource9 / `192.168.18.25:3306/mes_base_dev_perf_test`。通过现有8081服务读取，不调用ERP，不创建申报、处置或库存事实。此前私有验证会话已失效，使用用户已提供的本地开发账号重新认证；令牌只在验证进程内使用，未写入报告。
+
+- 默认不良列表、最新处理流水、默认工单进度均真实返回HTTP409 / `QUALITY_DATA_INVALID`，与当前库仍含旧动作的事实一致，不能宣称全库列表已正常可用。
+- 执行1126、9944、9635的限定不良列表、单条申报详情与处理详情全部HTTP200。三个样本品号、规格存在；列表与详情的状态、待处理、退回和转仓数量逐项一致，流水均只有ASSESS。样本待处理分别10、10、1；没有虚构扫码批次，三个样本的batchNo均为null。
+- 按工单号5100-261001754、5100-261001769筛选的进度HTTP200，返回创建时间、待处理10、退回0、转仓0，已不含旧报废/待开始/在制字段；工单5100-260901515的其他关联记录仍有旧动作，返回同一明确数据错误，不能凭该工单的一条有效申报推断整张工单有效。
+- 5173浏览器实际加载新版列；筛选执行1126展示一条记录，品号24155262001、规格3142U061、批次未记录、待处理10。查看详情展示申报/待处理/退回/转仓的数量去向与核实记录；本轮没有提交处理。
+- 发现并修复前端请求层提示遗漏：原专用错误码被HTTP409通用文案覆盖，错误提示误导用户“刷新重试”。在 `src/lib/request.ts` 的既有受控业务错误表补充 `QUALITY_DATA_INVALID`：“质量记录不符合当前流程，请核对验证数据；刷新无法解决此问题”。不透传任意后端错误文本，不改变身份/选厂或重试策略。浏览器热更新已实际显示新提示。
+- 对应 `tests/request.test.ts` 增加该专用码的身份/选厂保持断言，`npm test -- tests/request.test.ts` 共30项通过；`npm run build`通过。日志 `/tmp/mes-quality-live-ui-request-tests.log`、`/tmp/mes-quality-live-ui-build.log`。后端本轮未再修改，不重复编译或要求重启。
+
+真实HTTP响应和限定SQL候选记录保存在 `.local/defect-query-20261022/live-after-restart.json`；不包含认证令牌。此次完成的是新版本运行读取与错误边界验证，不是旧验证数据转换或真实处置写入验收。现有旧流水的数据问题仍需另行按事实保护规则处理；没有为了让页面可读而静默忽略旧数量，也没有恢复已退役的迁移工具。
+
+## 2026-10-22 — 查询不因单条处置数据异常而阻断（用户纠正）
+
+用户明确要求：数据状况不应阻断查询。本节取代前述“默认列表因旧动作整页返回409”的处理决定；不通过简单删除前端提示、隐藏异常记录或返回空列表来修复。
+
+- 不良列表继续返回本页所有申报、原排序和total。未知动作、未知归属、非法余额或缺少汇总时，受影响记录的查询状态为 `UNRESOLVED`（处置待确认）；无法确认的待处理/退回/转仓数量返回null，前端显示“—”。正常记录仍按原规则计算，不能因同页其他记录异常而失败。
+- 详情和最近10条处理流水保留原始动作码、登记时间、原因和操作者。未知动作展示“未识别的操作（原动作码）”，不恢复旧流程命令或替它编造新动作。详情数量不可确认时展示轻量说明，基本信息与处理记录仍可查看。
+- 工单进度保留计划、正式完工、良品缺口及创建时间等可信字段；质量处置无法计算时，该工单的质量合计与依赖转仓数量的待完工差额返回null，并给出行内说明。统计保留申报和核实分类等已记录信息，有未知处置动作的组不返回未经确认的退回/净不良数量，标记处置数量待确认。
+- 查询投影与命令校验使用同一当前余额规则，但查询允许结果待确认；写入、处置、放行和库存事实仍执行严格校验。未知动作不会被忽略后当作零处置放行；前端也不提供基于未知余额的核实/处理按钮。Factory隔离、权限、基础设施故障仍保留真实错误，不捕获或吞掉数据库/网络异常。
+- 既有前端请求层 `QUALITY_DATA_INVALID` 仅供严格处理失败提示，改为“当前记录暂不能处理，请先核对处置记录”，不再使用阻塞查询的文案。`AGENTS.md` 追加查询可读性与处理校验规则。
+- 回归场景使用同页一条有效申报和一条含未知流水的申报：列表/详情/最近流水/工单进度/统计均应200；分页和有效记录不受影响，未知余额为null，尝试写处置仍失败且无新增事实。前端回归验证原始流水可见、“—”区别于0、无整页错误且无误开放处理入口。本轮没有SQL/Schema变更、真实业务写入、迁移工具恢复或ERP调用。
+
+本轮验证：`PATH=/opt/homebrew/bin:$PATH /Users/user/apache-maven-3.6.1/bin/mvn -B -ntp verify` BUILD SUCCESS，844项、0失败/错误、48项环境跳过（`/tmp/mes-query-tolerance-verify.log`）；Node22下`npm test`为74个文件432项通过（`/tmp/mes-query-tolerance-ui-full-tests.log`），`npm run build`通过（`/tmp/mes-query-tolerance-ui-build.log`）。两端`git diff --check`通过。自动化业务证据来自隔离H2，未执行真实处置；后端最终构建结束后已请用户重启，再验证默认查询的真实服务结果。
+
+用户确认本轮重启后，在重新核实的TEST_DEV_PERF_20261019/datasource9/perf_test目标通过真实8081复核：默认不良列表HTTP200，20条/总计15597；第二页20条、total相同且与第一页ID不重叠。最近流水HTTP200返回10条；默认工单进度HTTP200返回5条/总计1879；统计HTTP200返回20组/总计426。默认页含旧动作的20条记录均返回UNRESOLVED及null余额，记录本身可读；三个有效样本的列表和详情仍一致。原先会阻断整个查询的申报现可通过详情读取，基本信息、申报数量26、原始ALLOCATE动作/原因/时间均保留，处置余额显示“—”。浏览器5173已实际验证默认列表、详情和待确认展示，无原阻塞提示；未提交任何真实处置或修改事实。
+
+最终打包烟测 `python3 scripts/smoke-packaged.py`：10项通过、0失败（`/tmp/mes-query-tolerance-smoke.log`）；隔离进程未使用开发库配置，未启停用户服务。真实只读HTTP证据为 `.local/defect-query-20261022/live-query-tolerance-after-restart.json`，不含认证令牌。本节将上一节的默认查询409实证标记为已修复，保留旧描述仅用于审查追溯；当前仍不支持以未知流水推导可写余额，也未恢复旧处置或迁移能力。
+
+
+## 2026-10-22 不良品闭环与关联表使用审查
+
+### 范围、结论与证据等级
+
+按用户要求审查当前工作树：不良申报/订正/作废 → 归属核实 → 返回申报节点正常报工，或创建指定仓库入库单并审核 → 库存动作 → 质量放行与生产完工。只读审查，不修改业务代码、配置、迁移或业务数据；仅追加本章节及保存本地只读证据。工作树有用户及前轮修改，包括未提交V49，不执行或改写这些内容。
+
+结论：**当前LOCAL两种处置的实现链路已接通，有隔离HTTP集成测试证明；当前指定验收库尚未完成新流程真实闭环，不能宣布不良品整体已验收。四张现行质量相关表均有实际代码入口，没有发现可以按“整表无人使用”直接删除的现行质量表；旧流程遗留主要是处置表的字段及存量动作。** 导入样本不满足当前规则属于验证数据准备问题，不要求产品兼容旧流程。
+
+### 本轮发现
+
+1. **验收阻碍：新申报入口缺少不良类型配置。** 当前perf库operation_defect_type共0条，而ProductionDefectService.declare要求defectTypeId、expectedTypeRevision并调用lockForDeclaration核实所属工序、启用状态和版本。正式GET declaration-context返回200、types=[]。因此不能仅凭旧申报列表有数据认定“新建申报→处理”已经真实验证。建议经现有工序不良类型维护接口准备正确配置，再使用当前正常生产链测试；不通过旧创建接口绕过V2来冒充验收。
+2. **验收阻碍：没有当前退回/转仓的真实样本。** 本轮只读查处置表：ASSESS15596、ALLOCATE15582、START8、RESULT8，RETURN_NODE/TRANSFER_WAREHOUSE为0；DEFECT_RECEIPT/SCRAP_RECEIPT单据为0。申报15598条，19条SAME_NODE、15579条UNSPECIFIED，command_version均为空。前轮固定10条HTTP命令全部409，不能以日志/老ALLOCATE当作实际入库。批次未落正式身份链、样本已完工及旧动作问题沿用warehouse-inventory.md的INBOUND-001/002，不在本轮修复、重新迁移或恢复旧命令。
+3. **中优先级产品风险：不良/报废仓库存可再次被普通业务使用。** LocalStockService.postDocument按入库方向增加quantity和available_quantity；QualityDispositionService没有单独冻结不良库存。WorkorderMaterialService.save只检查所选仓库启用、来源等，不排除DEFECTIVE/SCRAP；ProductionInputSupplyService.calculate只要求仓库在allowedWarehouses、物料/单位匹配且可用量足够。因此在不良/报废仓被纳入某工单允许领料清单且物料匹配时，没有类型门禁阻止其作为正常领料来源。这是源码确认的条件路径，本轮未向真实仓库写入来复现。用户选择“MES按指定仓入库、ERP决定最终处理”不要求新增复杂质量库存维度，但若LOCAL仍可领料，应明确禁止普通领料使用这些仓或制定受控回用入口；不能把仓库标签当作已完成隔离。与导入数据兼容无关。
+4. **低优先级结构遗留：旧处置字段已退出当前模型，但物理列仍存在。** parent_id、scrap_qty、processed_qty、recovered_qty、failed_qty在当前处置Entity及正式Mapper读写字段中已移除，业务服务和聚合不再使用；真实库15590条记录在这些列仍保存旧事实。rework_qty则仍在使用，Mapper明确映射成returnedQty，表示当前RETURN_NODE退回数量，不能误删。表/列注释仍含旧“分配、开始、结果”等语义，容易误导后续维护。若治理列名/废弃列，应另做向前迁移及事实保留决策；本次审查不删除表列、不重写既有迁移，也不建议为了旧数据恢复旧代码。
+
+### 表使用清单
+
+| 表 | 当前代码读写与用途 | 本轮perf库数量 | 结论 |
+| --- | --- | --- | --- |
+| mes_production_defect | ProductionDefectService追加CREATE/REVISE/VOID完整版本；详情、列表、统计、数量投影及引用保护读取 | 15598 | 核心申报账本，在用；申报身份和版本行共用此表，没有另建版本历史表 |
+| mes_quality_treatment | QualityTreatmentService追加ASSESS/RETURN_NODE/TRANSFER_WAREHOUSE；QualityDispositionService关联入库；列表、状态、放行、完工和统计读取 | 31194 | 核心处理流水，在用；当前真实库存量主要为旧动作，不等于表废弃 |
+| operation_defect_type | OperationDefectTypeService提供工序内配置维护、启停/版本/引用保护；V2申报读取并冻结类型快照 | 0 | 已接入新建申报，当前库未配置，不是无人引用的空表 |
+| mes_quality_release | QualityReleaseService追加RELEASE/REVOKE；StockDocumentService.productionBasis及ProductionCompletionService据此校验放行/完工 | 910 | 在用，属于良品后续放行门禁，并非重复的处置流水 |
+| mes_production_report（复用） | RETURN_NODE同事务追加负向ADJUSTMENT和source_quality_event_id；后续走正常REPORT恢复产出 | 非本轮新增表 | 在用，不建立第二套开始返工/确认结果表 |
+| wm_stock_document、wm_stock_document_line（复用） | 质量转仓创建DEFECT_RECEIPT/SCRAP_RECEIPT及明细，审核后POSTED；处置事件stock_document_id与审核UUID关联 | 两类质量单据0 | 代码已使用，当前库无成功新流程样本 |
+| wm_stock_action、wm_inventory（复用） | 审核同事务追加动作并改变余额；失败回滚全部质量、单据和库存写入 | 前轮已确认库存动作4030 | 统一库存执行入口，不另设不良库存流水表 |
+
+早期qc_index、qc_defect已由V7正式迁移删除，本轮真实schema中也不存在。没有发现独立的当前rework任务/结果表。mes_legacy_*属于冻结来源审计与期初数量证据，不是新不良处理表；现有只读引用不在本次整表删除范围。mes_quality_release的可选生成只读Controller默认关闭，不代表正式QualityReleaseService未使用该表。
+
+### 已接通的当前流程
+
+- 申报：V2选择工序不良类型并冻结名称/编码/版本，归属INDEPENDENT/OVERLAP/UNVERIFIED；未核实不能直接消耗处置数量。订正/作废追加新版本，已产生处置事实后禁止随意改写原申报。
+- 返回节点：在同一业务事务中追加负向报工修正及RETURN_NODE事件，减少该节点已报量和净不良，恢复正常报工额度；不删除原记录，不再使用旧START/RESULT流程。后续正常报工是当前用户确认的返工记录方式，不要求单独“返工完成”状态。
+- 指定仓入库：QualityDispositionService确认可信执行、数量、批次及仓库类型，创建不良/报废入库单及明细，追加关联处置事实，再调用StockDocumentService.approve；LocalStockService唯一执行余额变化。审核失败全事务回滚，原UUID重放不重复入库。审核不是第二人审批，当前质量业务按用户要求自动调用创建+审核。
+- 后续放行/完工：pendingDispositionQty及未核实质量参与放行门禁，当前质量/报工依据变化会使旧放行快照失效；不能仅因已写处置流水就认定合格成品已获放行。
+- MES边界：已转不良仓后由ERP决定最终处置是用户已确认边界；当前MES没有再花一次原申报额度把同批不良仓库存“转报废”的正式关联命令，不把它列为本轮必须新增的流程。实际ERP5705/5704/1601/1F05/1602创建、主材料/配件退料分单、ERP审核与库存对账均未实现/未实测，不能宣称已覆盖用户参考的整套ERP单据链。
+
+### 本轮验证与未验证
+
+- 重新核对中心绑定TEST_DEV_PERF_20261019 → datasource9 → 192.168.18.25:3306/mes_base_dev_perf_test，模式LOCAL；真实库只执行SELECT/metadata读取，证据保存 `.local/quality-closure-audit-20261022/readonly-evidence.json`。
+- 使用现有8081服务只读GET：样本declaration-context为200、types空；treatment为200、UNRESOLVED、保留2条原流水。未新增申报、处理、审核或库存命令，未请求真实ERP，也未重启服务。
+- 本轮实际执行 `mvn -B -ntp -pl mes-admin -am test -Dtest=QualityDispositionHttpTest,QualityWorkflowHttpTest,QualityReleaseHttpTest -Dsurefire.failIfNoSpecifiedTests=false`，16项通过，0失败/错误/跳过。日志 `/tmp/mes-quality-closure-audit-tests.log`。覆盖返工后正常报工、转仓/报废入库审核、幂等、并发数量竞争、回滚、权限/来源/批次负例及放行依据失效，环境为隔离H2 HTTP集成，不等同真实perf全链验收。
+- 没有为审查新增测试或业务代码，没有运行全量构建、UI交互或真实ERP验证；前轮真实10条全拒绝证据继续有效。本轮没有证明库存隔离风险已被修复，也没有因为旧样本不可处理而要求兼容旧产品。
+
+
+## 2026-10-22 质量表逐字段清理与结构审查
+
+用户要求清理无效字段，尤其不能因“字段被赋值/搬运到接口”误判仍在使用。本轮从当前页面、V2申报、正式业务命令、Mapper、数量/放行/库存消费者、审计含义及数据库结构逐项核对。四张表职责不同，均保留，不因某表数据为空删除功能；不修复上游批次，不适配旧产品或重开旧返工流程。
+
+### 删除14列、正名1列
+
+| 表 | 字段 | 判定与清理 |
+| --- | --- | --- |
+| mes_production_defect | discovered_node_id | 当前单节点V2申报恒等affected_node_id，无独立录入/页面展示。旧Facts校验和响应搬运不是当前产品消费者；移除重复节点 |
+| mes_production_defect | responsible_node_id | 无当前页面的责任工序维护/展示入口，只剩旧契约搬运；删除。责任人及责任说明仍有实际编辑入口，保留 |
+| mes_production_defect | destination_type | 当前恒写SAME_NODE，不代表实际处理；移除字段、固定赋值及依赖此值的准入分支。真实去向由处置命令和流水确定 |
+| mes_production_defect | target_node_id | 恒等affected_node_id，无独立目标选择；删除重复节点及名称查询 |
+| mes_production_defect | target_warehouse_id | 当前申报强制为空；真正接收仓位于处理流水，删除申报空壳字段 |
+| mes_production_defect | destination_remark | 旧计划去向说明，只复制而不影响当前处置；实际处理说明保存在流水reason，删除 |
+| mes_production_defect | command_version | 仅被写入V2/空，没有实际读取、分派或业务消费者，删除 |
+| mes_quality_treatment | parent_id | 旧ALLOCATE→START→RESULT链关系已退役；删除列及idx_quality_treatment_parent索引 |
+| mes_quality_treatment | scrap_qty、processed_qty、recovered_qty、failed_qty | 旧分配报废和独立返工结果确认数量不再读写；删除。报废品实际入库保留transfer_qty、单据类型及库存动作 |
+| mes_quality_treatment | confirmed_by | 当前所有正式动作与operator_user_id取同一登录用户，没有独立确认步骤；删除重复身份、姓名查询和响应 |
+| mes_quality_treatment | occurred_at | 当前正式动作后台即时处理，与recorded_at取同一服务端时间；删除重复时间，详情/首页统一使用recordedAt |
+| mes_quality_treatment | rework_qty → returned_qty | 仍被当前节点退回/数量/进度/统计消费，不能删除；正名为实际语义并保留全部原值，同步Mapper、Example和跨表查询 |
+
+删除申报7列、处理7列；保留处理表target_warehouse_id、stock_document_id，它们是真实转仓来源，与申报表被删除的空壳字段不同。同步删除请求/响应、前端类型、赋值、无效名称查询、旧单值DefectDestination枚举及失效测试/条件；不保留假值、空壳字段或兼容适配。V2申报指纹字段不变；普通申报/订正按精简后的Facts计算指纹，已落库摘要不改写，旧契约的未决请求不得改UUID自动重放。
+
+前轮审查曾按旧Facts接受/校验及响应搬运，将发现/责任节点视为可保留的信息能力；本轮追到实际页面和V2写入后纠正该判断。不能把仅在旧接口和测试中有字段视为当前产品仍需要它。
+
+### 四张表及清理后全部63列
+
+| 表 | 职责与基数 | 结构结论 |
+| --- | --- | --- |
+| mes_production_defect（22列） | 每项申报的完整版本：CREATE/REVISE/VOID | 申报身份不等于版本行ID；保留不可变账本，不另设版本历史表 |
+| mes_quality_treatment（17列） | 每次归属核实、返工返回节点或正式质量入库 | 一项申报可有多次/部分处置，不能合并进申报行覆盖历史 |
+| mes_quality_release（11列） | 每个执行的累计良品放行授权与撤回 | 控制良品入库和完工，不是另一份不良处理记录；全部字段有实际业务/追溯用途 |
+| operation_defect_type（13列） | 工序直接拥有的可维护不良类型 | 第四张质量相关表；虽然当前验收库0条，申报依赖它，不能当闲置表删除 |
+
+**mes_production_defect逐字段组：**
+
+| 字段 | 实际消费者/保留理由 |
+| --- | --- |
+| id | 版本行身份、分页和当前页关联汇总 |
+| declaration_id、revision_no | 稳定申报身份、最新完整版本、处置版本绑定和并发冲突 |
+| record_action、revision_reason | 申报/订正/作废有效性、版本留痕；作废不再贡献当前不良 |
+| execution_id、affected_node_id | 所属执行及唯一申报节点；路径/产品/数量校验、返工返回、统计 |
+| defect_qty、waste_category、defect_reason | 不良数量、工废/料废类别和真实原因；数量/上限校验、统计及页面展示。原因可与类型名称不同 |
+| responsible_user_id、responsibility_remark | 责任认定信息；当前订正表单可编辑，服务核对用户存在并保留历史 |
+| request_key、request_fingerprint | 请求幂等和内容冲突检测；摘要不因页面不展示而删除 |
+| reported_by、recorded_by | 原申报人和本版本录入人，订正时可能不同；不能因CREATE时相同判为重复 |
+| occurred_at、recorded_at | 申报实际发生时间与后台录入时间，允许补报此前发生的不良，时间筛选/审计各有用途。不同于即时处置的同值时间 |
+| defect_type_id、defect_type_code_snapshot、defect_type_name_snapshot、defect_type_revision | 类型引用、历史名称/编码/修订快照；删除保护、统计和历史说明，不以当前可改名类型还原旧事实 |
+
+**mes_quality_treatment逐字段组：**
+
+| 字段 | 实际消费者/保留理由 |
+| --- | --- |
+| id、request_hash | 处置/核实UUID和内容指纹；幂等、库存动作关联及重放校验 |
+| declaration_id、declaration_revision | 作用于哪项申报的哪个版本；防止旧处理汇入新版本 |
+| execution_id、routing_node_id | 实际执行/处理节点快照；执行批量投影、节点汇总、操作追溯 |
+| action_type | ASSESS/RETURN_NODE/TRANSFER_WAREHOUSE；解释数量和行为，未知存量动作只读不恢复执行 |
+| attribution_type、related_declaration_id、basis | 独立/重复归属、指向原申报和核实依据，决定扣量/处置准入；仅ASSESS使用，其他动作为空属合法可选 |
+| returned_qty、transfer_qty | 两个正式分支实际消耗的处置数量；待处理、净不良、正常报工恢复和进度统计 |
+| operator_user_id、recorded_at、reason | 唯一可信操作者、后台执行时间、实际处理原因；详情/首页流水和审计 |
+| target_warehouse_id、stock_document_id | 实际接收仓及正式入库单；审核核对仓库/数量/请求身份，单据反查质量来源。返回节点动作为空不是无效字段 |
+
+**mes_quality_release逐字段组：**
+
+| 字段 | 实际消费者/保留理由 |
+| --- | --- |
+| id、request_hash | 放行/撤回请求幂等，避免重复或改换参数 |
+| execution_id、sequence_no | 执行级事实、串行顺序；最新授权读取及expectedReleaseId并发保护 |
+| action_type、quantity | RELEASE累计放行额度/REVOKE撤回；成品入库和正式完工门禁，不是单项不良数量 |
+| basis_hash | 冻结路径、投入、报工、不良及处理依据；依据变化使旧放行失效，不能只查“有放行记录” |
+| reference_id | 被替代/撤回的上一授权身份；不可变授权历史的因果链接，不是重复的状态字段 |
+| operator_user_id、recorded_at、reason | 放行/撤回真实操作者、时间、依据；与申报/处置可能不同，独立保留 |
+
+**operation_defect_type逐字段组：**
+
+| 字段 | 实际消费者/保留理由 |
+| --- | --- |
+| id、operation_id、code、name | 工序所属类型、可维护编码/名称；工序归属和同工序编码唯一性、申报选择 |
+| default_waste_category、status | 默认类别/启停，申报覆盖权限、候选过滤及禁用校验 |
+| sort | 发现原实现允许编辑但查询只按id DESC，属于“写值却不生效”。本轮改为sort ASC,id ASC，管理列表与申报选择共用，并补HTTP顺序断言，不删除已有排序功能 |
+| remark | 类型维护表单可写、编辑可回显的业务说明，有实际用户信息用途 |
+| revision | 类型编辑/启停/删除及申报选择的并发修订保护 |
+| create_by、create_time、update_by、update_time | 可维护主数据的创建/修改审计，编辑保留创建事实。未在简版列表展示不代表审计无效 |
+
+### 约束、迁移和证据边界
+
+- 保留申报身份/版本唯一约束、请求唯一约束、执行/节点/责任用户/类型索引；处置保留命令主键、声明版本、执行节点、最新流水、入库单索引；放行继续按执行/sequence_no读取并在公共生产锁内序列化。未新增业务factory_id、并行状态表、假默认值或未经审查的物理外键。
+- 三张事实表原UPDATE/DELETE拒绝触发器、身份及已保存摘要保留；DDL不删除/更新事实行。旧处理42条发生时间与记录时间不同，原列完整保留在私有备份，当前产品不为旧流程恢复独立时间录入。
+- 原计划以target=48.1限定本任务。运行核对发现另一迁移入口已于13:30:29执行V49、13:33:40执行本轮中间版V48.1；本Agent首次正式migrate在13:41:39因V48.1校验和不符被拒绝，未继续写DDL。以Flyway逐行CRC32核对后，恢复已执行V48.1原文（校验和-1377960441），保留其12列清理及数量列正名；最后两列另增V50向前迁移。不执行repair、不改历史记录，不重写V26/V32/V35/V39/V47等已发布迁移。
+- V50首次尝试在获取当前schema前遇到连接中断。只读核对迁移记录尚无V50、两列仍存在后才重新发起；13:43:49正式Flyway确认只新应用1个V50，最终validate成功校验51项。V49为先前其他入口执行，本轮不冒充由本任务执行或验收其业务效果。
+- 执行目标核实为TEST_DEV_PERF_20261019、datasource9、192.168.18.25:3306/mes_base_dev_perf_test。其他业务库不自动升级。四张表完整mysqldump含结构/数据/触发器，保存在忽略目录 `.local/quality-schema-cleanup-20261022/quality-ledgers-before.sql`，26396291字节、0600权限。保留字段、放行、类型及库存的规范行摘要在before.json，迁移后以相同序列化对比，不仅比较行数。
+- schema变化需配套新后端。旧进程仍含被删列的SQL，迁移后应由用户重启；不以恢复旧字段/兼容查询掩盖版本不一致。需要回退时先停止相关业务，通过新向前迁移恢复所需结构并按备份精准恢复原列，不能直接用备份覆盖后来新增事实或伪造Flyway记录。
+- 此次结构清理不代表真实新流程已验收：缺不良类型、上游正式批次缺失、旧动作/已完成样本等仍属于先前记录的独立问题；不自动改写数据或制造入库成功。
+
+### 实际验证结果
+
+- 实际执行 `mvn -B -ntp clean verify` 全量成功，845项、0失败/错误、48项环境门控跳过；过程中的旧字段断言已替换/删除，并保留版本、幂等、数量、权限和路径负例。一次无关慢请求日志时序失败在最终全量复跑通过，未修改日志业务代码。最终迁移拆分后执行 `mvn -B -ntp -pl mes-admin -am verify -Dtest=QualityDispositionHttpTest,QualityWorkflowHttpTest,QualityReleaseHttpTest,ProductionDefectHttpTest,WorkOrderProgressHttpTest,QualityV2HttpTest,ProductionQualityQuantityHttpTest,ActivatedProductionHttpTest,ProductionDefectContractTest,QualityTreatmentProjectionTest -Dsurefire.failIfNoSpecifiedTests=false`，58项全部通过并重新打包；安装包中的V48.1/V50原文与正式源码逐字一致；最终安装包执行 `python3 scripts/smoke-packaged.py`，10项隔离烟测全部通过，不连接用户业务库或ERP。
+- 前端最终全量74文件/433项通过，`npm run build`成功；保留原有大chunk提示。单独31项定向验证包含处理流水使用recordedAt显示时间、原UUID恢复及申报页面行为。前后端diff空白检查通过，修改的Java经项目IDEA格式化。
+- 真实数据库验证已通过：22/17/11/13列均与现行Entity属性完全一致，每列保留COMMENT；6个事实UPDATE/DELETE拒绝触发器存在，旧parent索引已移除。按规范行序列化的SHA256对比，申报15598行、处理31194行、放行910行、类型0行及库存2216行/库存动作4030行的全部保留字段与备份前基线一致，非仅数量汇总一致。
+- 使用mes-crud-codegen读取同一真实目标metadata，在隔离忽略目录生成四表完整基础后端审查副本（64个文件，0拒绝），逐项比对生产Entity属性集合为22/17/11/13。没有把生成的普通写CRUD覆盖到不可变账本，也没有修改用户正式生成配置；手改生成归属文件已移除对应MES-CODEGEN标记。
+- 证据位于 `.local/quality-schema-cleanup-20261022/`：before-original-retained.json、before.json、after.json、schema-verification.log、codegen-report.json、codegen-properties.json、migrate.log、validate.log及完整SQL备份。完整构建/定向/前端/打包日志在 `/tmp/mes-quality-cleanup-*`。备份和凭证不纳入Git。
+- 尚待用户重启后通过运行服务核对精简后的只读接口；没有自行启停8081/5173，没有新增真实申报/处置/入库、没有真实ERP调用。打包隔离烟测不代表真实库业务闭环。本次修改业务代码、前端契约、测试及正式向前迁移；未提交或推送。
+
+
+### 2026-10-22 用户重启后质量字段清理续验
+
+用户确认“已经重启”后，复用现有8081服务与正式身份，重新核对中心绑定仍为TEST_DEV_PERF_20261019 / datasource9 / 192.168.18.25:3306/mes_base_dev_perf_test / LOCAL；V48.1与V50迁移记录均成功。没有自行启停服务、修改业务数据或调用ERP。
+
+本轮12个只读HTTP请求全部200：工厂上下文、不良列表两页、申报详情、版本历史、处理详情、最新处理流水、放行历史、放行状态、库存单据类型目录、不良统计及工单进度。
+
+- 不良列表offset=0/10、limit=10均返回10行、total=15597，两页版本行ID没有重叠；分页元数据正常。详情/版本历史及列表不再返回discoveredNodeId、responsibleNodeId、destinationType、targetNodeId、targetWarehouseId、destinationRemark、commandVersion及对应废弃名称字段。
+- 样本处理详情保留2条旧原始流水，状态UNRESOLVED，不阻塞读取、不伪装已处置；响应已无申报destinationType，事件已无confirmedBy/confirmedByName/occurredAt，保留operatorUserId与非空recordedAt。首页最新处理流水返回固定10条，均使用recordedAt。
+- 执行1135的正式放行历史返回1条；放行状态safe=true、basisValid=true，证明运行服务中的放行依据链仍可读取，并非只检查类型定义。没有执行放行/撤回命令。
+- 不良统计返回10行、total=426；工单进度返回10行、total=1879，验证引用returned_qty的关联查询在真实服务中正常，未发生旧列不存在等SQL错误。
+
+证据在忽略目录 `.local/quality-schema-cleanup-20261022/runtime/`：binding.json、context.json、requests.json、summary.json及各只读响应。此处关闭上节“待用户重启后的只读接口复核”事项。本次仅追加本文结果，未修改业务代码或业务数据；仍不代表旧样本已成功处置/入库，既有批次准备与不良仓领料隔离问题不因本轮查询通过而关闭。

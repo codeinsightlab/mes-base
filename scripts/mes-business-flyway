@@ -1,0 +1,38 @@
+#!/bin/sh
+# Explicit business-schema maintenance; no application/service is started.
+set -eu
+ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
+usage() {
+    printf '%s\n' 'Usage: scripts/mes-business-flyway info|validate [VERSION]' \
+        '       scripts/mes-business-flyway migrate VERSION' \
+        'Requires FLYWAY_URL, FLYWAY_USER, FLYWAY_PASSWORD. Verify Factory binding and back up before migrate.'
+}
+ACTION=${1:---help}
+case "$ACTION" in
+    --help) usage; exit 0 ;;
+    info|validate|migrate) ;;
+    *) usage >&2; exit 2 ;;
+esac
+[ "$#" -le 2 ] || { usage >&2; exit 2; }
+VERSION=${2:-}
+if [ "$ACTION" = migrate ] && [ -z "$VERSION" ]; then
+    printf '%s\n' 'migrate requires an explicit target version.' >&2
+    exit 2
+fi
+if [ -n "$VERSION" ]; then
+    case "$VERSION" in *[!0-9.]*|.*|*..*|*.) usage >&2; exit 2 ;; esac
+fi
+: "${FLYWAY_URL:?Set FLYWAY_URL to the verified business JDBC URL}"
+: "${FLYWAY_USER:?Set FLYWAY_USER}"
+: "${FLYWAY_PASSWORD:?Set FLYWAY_PASSWORD}"
+cd "$ROOT"
+# Explicit arguments prevent stale shell settings from selecting another history or migration directory.
+set -- mvn -B -ntp -N -Pbusiness-flyway "flyway:$ACTION" \
+    "-Dflyway.locations=filesystem:$ROOT/mes-admin/src/main/resources/db/business" \
+    -Dflyway.table=flyway_business_schema_history -Dflyway.cleanDisabled=true \
+    -Dflyway.baselineOnMigrate=false -Dflyway.outOfOrder=false \
+    -Dflyway.validateOnMigrate=true -Dflyway.validateMigrationNaming=true
+if [ -n "$VERSION" ]; then
+    set -- "$@" "-Dflyway.target=$VERSION"
+fi
+exec "$@"

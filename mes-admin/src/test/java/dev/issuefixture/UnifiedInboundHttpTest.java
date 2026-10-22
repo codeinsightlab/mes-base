@@ -25,7 +25,7 @@ class UnifiedInboundHttpTest {
     }
 
     static String draft(MockMvc m, String execution, String qty, String batchNo) throws Exception {
-        String body = "{\"documentType\":\"OTHER_RECEIPT\",\"reason\":\"TEST ONLY inbound\"" + (execution == null ? "" : ",\"sourceExecutionId\":\"" + execution + "\"") + "}";
+        String body = "{\"documentType\":\"" + (execution == null ? "OTHER_RECEIPT" : "PRODUCTION_RECEIPT") + "\",\"reason\":\"TEST ONLY inbound\"" + (execution == null ? "" : ",\"sourceExecutionId\":\"" + execution + "\"") + "}";
         var d = StockDocumentHttpTest.JSON.readTree(m.perform(full(post(StockDocumentHttpTest.ROOT)).content(body))
                 .andExpect(status().isOk()).andReturn().getResponse().getContentAsString());
         String id = d.get("document").get("id").asText();
@@ -35,7 +35,7 @@ class UnifiedInboundHttpTest {
     }
 
     static void confirm(MockMvc m, String id, int revision) throws Exception {
-        m.perform(full(post(StockDocumentHttpTest.ROOT + "/" + id + "/actions/post")).content(StockDocumentHttpTest.intent(UUID.randomUUID()
+        m.perform(full(post(StockDocumentHttpTest.ROOT + "/" + id + "/actions/approve")).content(StockDocumentHttpTest.intent(UUID.randomUUID()
                 .toString(), revision))).andExpect(status().isOk());
     }
 
@@ -69,7 +69,7 @@ class UnifiedInboundHttpTest {
             StockDocumentHttpTest.balance(j, "0");
             String intent = StockDocumentHttpTest.intent(UUID.randomUUID().toString(), 1);
             for (int i = 0; i < 2; i++)
-                m.perform(full(post(StockDocumentHttpTest.ROOT + "/" + id + "/actions/post")).content(intent))
+                m.perform(full(post(StockDocumentHttpTest.ROOT + "/" + id + "/actions/approve")).content(intent))
                         .andExpect(status().isOk()).andExpect(jsonPath("document.sourceExecutionId").value("1"));
             StockDocumentHttpTest.balance(j, "60");
             assertEquals("RUNNING", j.queryForObject("SELECT status FROM mes_production_execution WHERE id=1", String.class));
@@ -102,12 +102,12 @@ class UnifiedInboundHttpTest {
             var j = ProductionWarehouseFixture.db(c);
             stock(j);
             String id = draft(m, "1", "60");
-            m.perform(full(post(StockDocumentHttpTest.ROOT + "/" + id + "/actions/post")).content(StockDocumentHttpTest.intent(UUID.randomUUID()
+            m.perform(full(post(StockDocumentHttpTest.ROOT + "/" + id + "/actions/approve")).content(StockDocumentHttpTest.intent(UUID.randomUUID()
                     .toString(), 1))).andExpect(status().isConflict());
             release(m, "80");
             m.perform(full(post(StockDocumentHttpTest.ROOT + "/" + id + "/lines")).content(StockDocumentHttpTest.line("1", "1", "TEST-FINISHED", "30")
                     .replace("\"binCode\":\"BIN1\"", "\"binCode\":null"))).andExpect(status().isOk());
-            m.perform(full(post(StockDocumentHttpTest.ROOT + "/" + id + "/actions/post")).content(StockDocumentHttpTest.intent(UUID.randomUUID()
+            m.perform(full(post(StockDocumentHttpTest.ROOT + "/" + id + "/actions/approve")).content(StockDocumentHttpTest.intent(UUID.randomUUID()
                     .toString(), 2))).andExpect(status().isConflict());
             StockDocumentHttpTest.balance(j, "0");
             assertEquals(0, j.queryForObject("SELECT COUNT(*) FROM wm_stock_action", Integer.class));
@@ -125,7 +125,7 @@ class UnifiedInboundHttpTest {
             var barrier = new CyclicBarrier(2);
             var tasks = ids.stream().map(id -> pool.submit(() -> {
                 barrier.await();
-                return m.perform(full(post(StockDocumentHttpTest.ROOT + "/" + id + "/actions/post")).content(StockDocumentHttpTest.intent(UUID.randomUUID()
+                return m.perform(full(post(StockDocumentHttpTest.ROOT + "/" + id + "/actions/approve")).content(StockDocumentHttpTest.intent(UUID.randomUUID()
                         .toString(), 1))).andReturn().getResponse().getStatus();
             })).toList();
             var statuses = List.of(tasks.get(0).get(), tasks.get(1).get());
@@ -145,7 +145,7 @@ class UnifiedInboundHttpTest {
             release(m, "100");
             var before = j.queryForList("SELECT * FROM mes_warehouse_acceptance");
             String excessive = draft(m, "1", "50");
-            m.perform(full(post(StockDocumentHttpTest.ROOT + "/" + excessive + "/actions/post")).content(StockDocumentHttpTest.intent(UUID.randomUUID()
+            m.perform(full(post(StockDocumentHttpTest.ROOT + "/" + excessive + "/actions/approve")).content(StockDocumentHttpTest.intent(UUID.randomUUID()
                     .toString(), 1))).andExpect(status().isConflict());
             receive(m, "40");
             StockDocumentHttpTest.balance(j, "100");
@@ -183,13 +183,13 @@ class UnifiedInboundHttpTest {
                     .replace("\"binCode\":\"BIN1\"", "\"binCode\":null"))).andExpect(status().isOk());
             String intent = StockDocumentHttpTest.intent(UUID.randomUUID().toString(), 2);
             j.execute("ALTER TABLE wm_stock_action ADD CONSTRAINT test_only_post_failure CHECK(quantity_delta != 30)");
-            m.perform(full(post(StockDocumentHttpTest.ROOT + "/" + id + "/actions/post")).content(intent))
+            m.perform(full(post(StockDocumentHttpTest.ROOT + "/" + id + "/actions/approve")).content(intent))
                     .andExpect(status().is5xxServerError());
             StockDocumentHttpTest.balance(j, "0");
             assertEquals(0, j.queryForObject("SELECT COUNT(*) FROM wm_stock_action", Integer.class));
             assertEquals("DRAFT", j.queryForObject("SELECT status FROM wm_stock_document WHERE id=?", String.class, id));
             j.execute("ALTER TABLE wm_stock_action DROP CONSTRAINT test_only_post_failure");
-            m.perform(full(post(StockDocumentHttpTest.ROOT + "/" + id + "/actions/post")).content(intent))
+            m.perform(full(post(StockDocumentHttpTest.ROOT + "/" + id + "/actions/approve")).content(intent))
                     .andExpect(status().isOk());
             StockDocumentHttpTest.balance(j, "80");
         }

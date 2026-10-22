@@ -2,6 +2,7 @@ package dev.mesbase.core.error;
 
 
 public enum ErrorCode {
+    STOCK_DOCUMENT_SOURCE_PENDING(422, "来源业务尚未接通或关联依据不完整，禁止审核"),
     RECEIPT_QUALITY_UNVERIFIED(409, "缺少当前质量依据下的正式放行或质量核验未通过，禁止新增生产交接"),
     RECEIPT_PATH_REQUIRED(409, "交接需要已锁定的确切实际路径及末道有效产出"),
     RECEIPT_WAREHOUSE_INVALID(422, "目标仓库不存在或未启用"),

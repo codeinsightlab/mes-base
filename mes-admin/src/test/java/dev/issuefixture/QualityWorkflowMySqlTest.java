@@ -58,9 +58,8 @@ class QualityWorkflowMySqlTest {
 
     static String defect(ProductionQualityLifecycleMySqlTest.Harness h, Fixture f, int node, int qty) {
         return h.quality.create(new ProductionDefectModels.Command(UUID.randomUUID()
-                        .toString(), null, null, new Facts(f.execution(), f.nodes().get(node), f.nodes()
-                        .get(node), null, d(qty), "PROCESS", f.tag(), null, null, "SAME_NODE", f.nodes()
-                        .get(node), null, null, LocalDateTime.of(2026, 1, 1, 10, 0)), new Assessment(Attribution.INDEPENDENT, null, "TEST ONLY reviewed independent five-node facts")))
+                        .toString(), null, null, new Facts(f.execution(), f.nodes()
+                        .get(node), d(qty), "PROCESS", f.tag(), null, null, LocalDateTime.of(2026, 1, 1, 10, 0)), new Assessment(Attribution.INDEPENDENT, null, "TEST ONLY reviewed independent five-node facts")))
                 .record().getDeclarationId();
     }
 

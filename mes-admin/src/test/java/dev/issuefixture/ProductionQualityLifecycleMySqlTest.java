@@ -122,8 +122,7 @@ class ProductionQualityLifecycleMySqlTest {
 
         Command command(Fixture f) {
             return new Command("QREF_" + UUID.randomUUID(), null, null, new Facts(f.execution(), f.selected()
-                    .get(1), f.selected()
-                    .get(1), null, new BigDecimal("2"), "PROCESS", f.tag(), null, null, "SAME_NODE", null, null, "TEST ONLY lifecycle concurrency", LocalDateTime.of(2026, 1, 1, 10, 0)));
+                    .get(1), new BigDecimal("2"), "PROCESS", f.tag(), null, null, LocalDateTime.of(2026, 1, 1, 10, 0)));
         }
 
         String create(Fixture f) {

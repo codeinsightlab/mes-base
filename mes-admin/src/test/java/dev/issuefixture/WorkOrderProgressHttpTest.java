@@ -53,25 +53,20 @@ class WorkOrderProgressHttpTest {
     }
 
     private static void declaration(JdbcTemplate jdbc, String id, int revision, String action, String quantity) {
-        declaration(jdbc, id, revision, action, quantity, "SAME_NODE");
-    }
-
-    private static void declaration(JdbcTemplate jdbc, String id, int revision, String action, String quantity,
-                                    String destination) {
-        jdbc.update("INSERT INTO mes_production_defect(declaration_id,revision_no,record_action,execution_id,affected_node_id,discovered_node_id,defect_qty,waste_category,defect_reason,destination_type,request_key,request_fingerprint,reported_by,occurred_at,recorded_by,recorded_at) VALUES(?,?,?,1,11,11,?,'PROCESS','TEST ONLY',?,?,?,1,CURRENT_TIMESTAMP,1,CURRENT_TIMESTAMP)",
-                id, revision, action, quantity, destination, UUID.randomUUID().toString(), "d".repeat(64));
+        jdbc.update("INSERT INTO mes_production_defect(declaration_id,revision_no,record_action,execution_id,affected_node_id,defect_qty,waste_category,defect_reason,request_key,request_fingerprint,reported_by,occurred_at,recorded_by,recorded_at) VALUES(?,?,?,1,11,?,'PROCESS','TEST ONLY',?,?,1,CURRENT_TIMESTAMP,1,CURRENT_TIMESTAMP)",
+                id, revision, action, quantity, UUID.randomUUID().toString(), "d".repeat(64));
     }
 
     private static void treatment(JdbcTemplate jdbc, String declaration, int revision, String action,
-                                  String attribution, String scrap, String failed, String recovered) {
-        treatment(jdbc, declaration, revision, action, attribution, scrap, failed, recovered, "0");
+                                  String attribution) {
+        treatment(jdbc, declaration, revision, action, attribution, "0");
     }
 
     private static void treatment(JdbcTemplate jdbc, String declaration, int revision, String action,
-                                  String attribution, String scrap, String failed, String recovered, String rework) {
-        jdbc.update("INSERT INTO mes_quality_treatment(id,request_hash,declaration_id,declaration_revision,execution_id,routing_node_id,action_type,attribution_type,scrap_qty,failed_qty,recovered_qty,rework_qty,processed_qty,operator_user_id,confirmed_by,occurred_at,recorded_at,reason) VALUES(?,?,?, ?,1,11,?,?,?,?,?,?,?,1,1,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,'TEST ONLY')",
+                                  String attribution, String returned) {
+        jdbc.update("INSERT INTO mes_quality_treatment(id,request_hash,declaration_id,declaration_revision,execution_id,routing_node_id,action_type,attribution_type,returned_qty,operator_user_id,recorded_at,reason) VALUES(?,?,?,?,1,11,?,?,?,1,CURRENT_TIMESTAMP,'TEST ONLY')",
                 UUID.randomUUID()
-                        .toString(), "t".repeat(64), declaration, revision, action, attribution, scrap, failed, recovered, rework, new BigDecimal(failed).add(new BigDecimal(recovered)));
+                        .toString(), "t".repeat(64), declaration, revision, action, attribution, returned);
     }
 
     @Test
@@ -82,15 +77,15 @@ class WorkOrderProgressHttpTest {
             jdbc.update("UPDATE workorder SET planned_qty=100 WHERE id=1");
             complete(jdbc, "completed", 1, "90");
             declaration(jdbc, "independent", 1, "CREATE", "10");
-            treatment(jdbc, "independent", 1, "ASSESS", "INDEPENDENT", "0", "0", "0");
+            treatment(jdbc, "independent", 1, "ASSESS", "INDEPENDENT");
             var mvc = MaterialIssueHttpTest.mvc(c);
             mvc.perform(ProductionReportHttpTest.full(get(URL), "A")).andExpect(status().isOk())
                     .andExpect(jsonPath("items[0].qualityUntreatedQty").value("10.000000"));
-            treatment(jdbc, "independent", 1, "RETURN_NODE", null, "0", "0", "0", "4");
-            jdbc.update("INSERT INTO mes_quality_treatment(id,request_hash,declaration_id,declaration_revision,execution_id,routing_node_id,action_type,transfer_qty,operator_user_id,confirmed_by,occurred_at,recorded_at,reason) VALUES(?,?,?,1,1,11,'TRANSFER_WAREHOUSE',6,1,1,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,'TEST ONLY')", UUID.randomUUID()
+            treatment(jdbc, "independent", 1, "RETURN_NODE", null, "4");
+            jdbc.update("INSERT INTO mes_quality_treatment(id,request_hash,declaration_id,declaration_revision,execution_id,routing_node_id,action_type,transfer_qty,operator_user_id,recorded_at,reason) VALUES(?,?,?,1,1,11,'TRANSFER_WAREHOUSE',6,1,CURRENT_TIMESTAMP,'TEST ONLY')", UUID.randomUUID()
                     .toString(), "t".repeat(64), "independent");
             declaration(jdbc, "overlap", 1, "CREATE", "2");
-            treatment(jdbc, "overlap", 1, "ASSESS", "OVERLAP", "0", "0", "0");
+            treatment(jdbc, "overlap", 1, "ASSESS", "OVERLAP");
             declaration(jdbc, "unverified", 1, "CREATE", "3");
             mvc.perform(ProductionReportHttpTest.full(get(URL), "A")).andExpect(status().isOk())
                     .andExpect(jsonPath("items[0].qualityUntreatedQty").value("0.000000"))
@@ -204,9 +199,9 @@ class WorkOrderProgressHttpTest {
             j.update("UPDATE workorder SET planned_qty=100 WHERE id=1");
             complete(j, "TEST ONLY completed90", 1, "90");
             declaration(j, "TEST ONLY split disposition", 1, "CREATE", "10");
-            treatment(j, "TEST ONLY split disposition", 1, "ASSESS", "INDEPENDENT", "0", "0", "0");
-            treatment(j, "TEST ONLY split disposition", 1, "RETURN_NODE", null, "0", "0", "0", "4");
-            j.update("INSERT INTO mes_quality_treatment(id,request_hash,declaration_id,declaration_revision,execution_id,routing_node_id,action_type,transfer_qty,operator_user_id,confirmed_by,occurred_at,recorded_at,reason) VALUES(?,?,?,1,1,11,'TRANSFER_WAREHOUSE',6,1,1,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,'TEST ONLY')", UUID.randomUUID()
+            treatment(j, "TEST ONLY split disposition", 1, "ASSESS", "INDEPENDENT");
+            treatment(j, "TEST ONLY split disposition", 1, "RETURN_NODE", null, "4");
+            j.update("INSERT INTO mes_quality_treatment(id,request_hash,declaration_id,declaration_revision,execution_id,routing_node_id,action_type,transfer_qty,operator_user_id,recorded_at,reason) VALUES(?,?,?,1,1,11,'TRANSFER_WAREHOUSE',6,1,CURRENT_TIMESTAMP,'TEST ONLY')", UUID.randomUUID()
                     .toString(), "t".repeat(64), "TEST ONLY split disposition");
             MaterialIssueHttpTest.mvc(c).perform(ProductionReportHttpTest.full(get(URL), "A"))
                     .andExpect(status().isOk())

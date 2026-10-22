@@ -4,7 +4,7 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 
 public enum ProductionExecutionStatus {
-    HISTORICAL("历史只读", "HISTORICAL"),
+    HISTORICAL("待确认（HISTORICAL）", "HISTORICAL"),
     READY("待执行", "READY"),
     RUNNING("执行中", "RUNNING"),
     COMPLETED("已结束", "COMPLETED"),

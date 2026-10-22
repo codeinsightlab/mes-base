@@ -22,14 +22,11 @@ public final class ProductionDefectModels {
     private ProductionDefectModels() {
     }
 
-    public record Facts(@NotNull Long executionId, @NotNull Long affectedNodeId, @NotNull Long discoveredNodeId,
-                        Long responsibleNodeId,
+    public record Facts(@NotNull Long executionId, @NotNull Long affectedNodeId,
                         @NotNull @DecimalMin(value = "0", inclusive = false) @Digits(integer = 14, fraction = 6) BigDecimal defectQty,
                         @NotBlank String wasteCategory, @NotBlank @Size(max = 500) String defectReason,
                         Long responsibleUserId,
-                        @Size(max = 500) String responsibilityRemark, @NotBlank String destinationType,
-                        Long targetNodeId,
-                        Long targetWarehouseId, @Size(max = 500) String destinationRemark,
+                        @Size(max = 500) String responsibilityRemark,
                         @NotNull @PastOrPresent LocalDateTime occurredAt) {
     }
 
@@ -40,7 +37,7 @@ public final class ProductionDefectModels {
         }
     }
 
-    public record Names(Map<Long, String> nodes, Map<Long, String> users, Map<Long, String> warehouses) {
+    public record Names(Map<Long, String> nodes, Map<Long, String> users) {
     }
 
     public record ListContext(String declarationId, String executionNo, String workorderCode,
@@ -53,10 +50,28 @@ public final class ProductionDefectModels {
      */
     public record Processing(State state, BigDecimal pendingDispositionQty, BigDecimal returnedQty,
                              BigDecimal transferredQty) {
+        public static Processing unresolved() {
+            return new Processing(State.UNRESOLVED, null, null, null);
+        }
+
+        /**
+         * Query-only projection: an unavailable balance does not prevent reading the record.
+         */
+        public static Processing read(String recordAction, Attribution attribution, BigDecimal declared,
+                                      BigDecimal returned, BigDecimal transferred, long invalidActions) {
+            if (invalidActions > 0 || attribution == null || declared == null || returned == null || transferred == null)
+                return unresolved();
+            try {
+                return of(recordAction, attribution, declared, returned, transferred);
+            } catch (FoundationException invalidBalance) {
+                return unresolved();
+            }
+        }
+
         public static Processing of(String recordAction, Attribution attribution, BigDecimal declared,
                                     BigDecimal returned, BigDecimal transferred) {
             var pending = declared.subtract(returned).subtract(transferred);
-            if (DefectRecordAction.from(recordAction) == null || declared.signum() <= 0 || returned.signum() < 0 || transferred.signum() < 0 || pending.signum() < 0
+            if (attribution == null || DefectRecordAction.from(recordAction) == null || declared.signum() <= 0 || returned.signum() < 0 || transferred.signum() < 0 || pending.signum() < 0
                     || attribution != Attribution.INDEPENDENT && (returned.signum() > 0 || transferred.signum() > 0))
                 throw new FoundationException(ErrorCode.QUALITY_TREATMENT_CONFLICT);
             State state;

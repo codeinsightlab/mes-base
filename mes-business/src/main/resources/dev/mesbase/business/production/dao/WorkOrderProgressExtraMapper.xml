@@ -41,7 +41,7 @@
         <bind name="voidAction" value="@dev.mesbase.business.quality.domain.DefectRecordAction@VOID.getValue()"/>
         SELECT e.workorder_id AS workorderId, d.defect_qty AS declaredQty,
         MAX(CASE WHEN t.action_type=#{assessAction} THEN t.attribution_type END) AS attribution,
-        COALESCE(SUM(CASE WHEN t.action_type = #{return_nodeAction} THEN t.rework_qty ELSE 0 END), 0) AS returnedQty,
+        COALESCE(SUM(CASE WHEN t.action_type = #{return_nodeAction} THEN t.returned_qty ELSE 0 END), 0) AS returnedQty,
         COALESCE(SUM(CASE WHEN t.action_type = #{transfer_warehouseAction} THEN t.transfer_qty ELSE 0 END), 0) AS transferredQty,
         SUM(CASE WHEN t.action_type IS NOT NULL AND t.action_type NOT IN (#{assessAction},#{return_nodeAction},#{transfer_warehouseAction}) THEN 1 ELSE 0 END) AS invalidActions
         FROM mes_production_execution e

@@ -22,7 +22,6 @@ import dev.mesbase.business.production.domain.ProductionReportModels.ExecutionSu
 import dev.mesbase.business.production.domain.ProductionReportModels.NodeQuantity;
 import dev.mesbase.business.production.domain.WorkOrderStatus;
 import dev.mesbase.business.production.domain.WorkorderEntity;
-import dev.mesbase.business.production.domain.WorkorderExample;
 import dev.mesbase.business.production.service.ExecutionPathService.LockedPath;
 import dev.mesbase.business.production.service.ExecutionPathService.PathModel;
 import dev.mesbase.business.production.service.ProductionChainLocks.LockedExecution;
@@ -33,7 +32,6 @@ import dev.mesbase.core.error.ErrorCode;
 import dev.mesbase.core.error.FoundationException;
 import java.math.BigDecimal;
 import java.util.ArrayList;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -82,56 +80,6 @@ public class ProductionQuantityService {
 
     public ExecutionQuantity getExecutionQuantities(Long executionId) {
         return project(load(executionId));
-    }
-
-    /**
-     * Bounded set reads followed by in-memory grouping; arithmetic is shared with the single-execution path.
-     */
-    public Map<Long, ExecutionQuantity> getHistoricalExecutionQuantities(List<Long> executionIds) {
-        var batch = paths.viewBatch(executionIds);
-        if (batch.executions().isEmpty()) return Map.of();
-        if (history == null || batch.executions().values().stream()
-                .anyMatch(e -> !ProductionExecutionStatus.HISTORICAL.getValue().equals(e.getStatus())))
-            ParameterChecks.reject(ErrorCode.REPORT_PATH_REQUIRED);
-        var ids = List.copyOf(batch.executions().keySet());
-        var inputs = history.inputs(ids).stream().collect(Collectors.toMap(n -> n.executionId(), n -> n.quantity()));
-        var nodes = history.nodesBatch(ids).stream().collect(Collectors.groupingBy(n -> n.executionId(),
-                Collectors.toMap(n -> n.routingNodeId(), n -> new HistoricalNode(n.legacyNet(), n.grossCorrection(), n.effectiveDefect(), n.unverifiedLossQty()))));
-        var balances = quantities.inputBalances(ids).stream().collect(Collectors.toMap(n -> n.executionId(),
-                n -> new ProductionInputBalance(n.confirmedQty(), n.reservedQty())));
-        var totals = quantities.nodeTotalsBatch(ids).stream().collect(Collectors.groupingBy(n -> n.executionId(),
-                Collectors.toMap(n -> n.routingNodeId(), n -> n.reportedQty())));
-        var quality = defects.nodeTotalsBatch(ids);
-        var workorderIds = batch.executions().values().stream().map(MesProductionExecutionEntity::getWorkorderId)
-                .distinct().toList();
-        var filter = new WorkorderExample();
-        filter.createCriteria().andIdIn(workorderIds);
-        var workorders = orders.selectByExample(filter).stream()
-                .collect(Collectors.toMap(WorkorderEntity::getId, v -> v));
-        var result = new LinkedHashMap<Long, ExecutionQuantity>();
-        for (Long id : ids) {
-            var e = batch.executions().get(id);
-            var model = batch.models().get(id);
-            var balance = balances.getOrDefault(id, new ProductionInputBalance(BigDecimal.ZERO, BigDecimal.ZERO));
-            var input = inputs.get(id);
-            if (input == null || input.signum() < 0) ParameterChecks.reject(ErrorCode.REPORT_PATH_REQUIRED);
-            if (model.path() == null) {
-                result.put(id, new ExecutionQuantity(id, e.getWorkorderId(), e.getExecutionNo(), e.getRoutingId(),
-                        e.getTargetQty(), ExecutionPathStatus.UNSELECTED.getValue(), false, "执行尚未选择实际路径",
-                        List.of(), label(model.routing()), input, balance.confirmedQty(), balance.reservedQty()));
-                continue;
-            }
-            if (!Objects.equals(model.path().getRoutingId(), e.getRoutingId()))
-                ParameterChecks.reject(ErrorCode.REPORT_PATH_REQUIRED);
-            ExecutionPathValidator.validate(model.selectedNodeIds(), model.nodes(), model.edges());
-            var ordered = validateOrdered(batch.ordered().getOrDefault(id, List.of()), model);
-            result.put(id, project(compose(e, model, new QuantityFacts(balance, input, true,
-                    nodes.getOrDefault(id, Map.of()), ordered, totals.getOrDefault(id, Map.of()),
-                    quality.getOrDefault(id, List.of()).stream()
-                            .collect(Collectors.toMap(n -> n.affectedNodeId(), n -> n)),
-                    workorders.get(e.getWorkorderId())))));
-        }
-        return Map.copyOf(result);
     }
 
     /**
@@ -187,7 +135,7 @@ public class ProductionQuantityService {
         var inputQty = historical ? history.input(executionId) : balance.usableQty();
         if (inputQty == null || inputQty.signum() < 0) ParameterChecks.reject(ErrorCode.REPORT_PATH_REQUIRED);
         var historyNodes = imported ? history.nodes(executionId).stream()
-                .collect(Collectors.toMap(n -> n.routingNodeId(), n -> new HistoricalNode(n.legacyNet(), n.grossCorrection(), n.effectiveDefect(), n.unverifiedLossQty()))) : null;
+                .collect(Collectors.toMap(n -> n.routingNodeId(), n -> new HistoricalNode(n.grossCorrection(), n.effectiveDefect(), n.unverifiedLossQty()))) : null;
         if (model.path() == null)
             return new ExecutionQuantity(executionId, execution.getWorkorderId(), execution.getExecutionNo(),
                     execution.getRoutingId(), execution.getTargetQty(), ExecutionPathStatus.UNSELECTED.getValue(), false, "执行尚未选择实际路径", List.of(), label(model.routing()), inputQty, balance.confirmedQty(), balance.reservedQty());
@@ -203,7 +151,7 @@ public class ProductionQuantityService {
                 totals, defectTotals, orders.selectByPrimaryKey(execution.getWorkorderId())));
     }
 
-    private record HistoricalNode(BigDecimal legacyNet, BigDecimal grossCorrection, BigDecimal effectiveDefect,
+    private record HistoricalNode(BigDecimal grossCorrection, BigDecimal effectiveDefect,
                                   BigDecimal unverifiedLossQty) {
     }
 
@@ -232,8 +180,7 @@ public class ProductionQuantityService {
             var defect = quality == null ? BigDecimal.ZERO : quality.effectiveDefectQty();
             if (historyNodes != null) {
                 var evidence = historyNodes.get(node.getId());
-                if (evidence == null || historical && (evidence.legacyNet()
-                        .compareTo(reported) != 0 || quality != null))
+                if (evidence == null)
                     ParameterChecks.reject(ErrorCode.REPORT_PATH_REQUIRED);
                 reported = reported.add(evidence.grossCorrection());
                 defect = defect.add(evidence.effectiveDefect());
@@ -248,7 +195,7 @@ public class ProductionQuantityService {
                     .add(quality == null ? BigDecimal.ZERO : quality.directDefectQty()) : quality == null ? BigDecimal.ZERO : quality.directDefectQty()));
         }
         boolean locked = ExecutionPathStatus.LOCKED.getValue().equals(model.path().getPathStatus());
-        String boundary = historical ? "历史只读；投入为冻结材料证据推导，禁止正常生产操作" : !locked ? "实际路径尚未锁定，禁止写入报工数量"
+        String boundary = !locked ? "实际路径尚未锁定，禁止写入报工数量"
                 : order != null && WorkOrderStatus.COMPLETED.getValue().equals(order.getStatus())
                 ? "工单已完工，禁止继续正常报工"
                 : order == null || !WorkOrderStatus.RELEASED.getValue().equals(order.getStatus())
@@ -312,8 +259,6 @@ public class ProductionQuantityService {
     }
 
     private static void validateChange(ExecutionQuantity view, Long nodeId, BigDecimal delta, BigDecimal defectDelta) {
-        // Historical corrections retain their formal gates even after normal reporting closes.
-        if (view.historical()) ParameterChecks.reject(ErrorCode.REPORT_PATH_REQUIRED);
         if (!ExecutionPathStatus.LOCKED.getValue().equals(view.pathStatus()))
             ParameterChecks.reject(ErrorCode.REPORT_PATH_REQUIRED);
         var before = calculate(view, null, BigDecimal.ZERO, BigDecimal.ZERO);
@@ -379,7 +324,7 @@ public class ProductionQuantityService {
             var historical = rawAvailable.negate().max(BigDecimal.ZERO);
             var rawOutput = next.subtract(netDefect).subtract(historical);
             var output = rawOutput.max(BigDecimal.ZERO);
-            result.add(new NodeQuantity(node.executionId(), node.routingNodeId(), node.operationId(), node.code(), node.name(), node.sequenceNo(), input, next, defect, output, view.historical() ? BigDecimal.ZERO : rawAvailable.max(BigDecimal.ZERO), node.qualityIntegrated(), node.returnedQty(), historical, rawOutput, rawAvailable, node.unverifiedDefectQty(), direct));
+            result.add(new NodeQuantity(node.executionId(), node.routingNodeId(), node.operationId(), node.code(), node.name(), node.sequenceNo(), input, next, defect, output, rawAvailable.max(BigDecimal.ZERO), node.qualityIntegrated(), node.returnedQty(), historical, rawOutput, rawAvailable, node.unverifiedDefectQty(), direct));
             input = output;
             upstream = node.routingNodeId();
         }
@@ -393,7 +338,6 @@ public class ProductionQuantityService {
      * Shared by positive submit validation, candidate queries and administrator UI projection.
      */
     public static String positiveReportBlockReason(ExecutionQuantity view, Long nodeId) {
-        if (view.historical()) return "历史只读，不能继续报工";
         if (!ExecutionPathStatus.LOCKED.getValue().equals(view.pathStatus())) return "实际路径尚未锁定";
         NodeQuantity affected = null;
         for (var n : view.nodes()) {

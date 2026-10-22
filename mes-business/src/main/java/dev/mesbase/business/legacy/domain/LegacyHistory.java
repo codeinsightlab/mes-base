@@ -10,14 +10,6 @@ public final class LegacyHistory {
     public record Input(Long executionId, BigDecimal quantity) {
     }
 
-    public record ExecutionNode(Long executionId, Long routingNodeId, BigDecimal legacyNet,
-                                BigDecimal grossCorrection, BigDecimal effectiveDefect, BigDecimal unverifiedLossQty) {
-        public ExecutionNode(Long executionId, Long routingNodeId, BigDecimal legacyNet,
-                             BigDecimal grossCorrection, BigDecimal effectiveDefect) {
-            this(executionId, routingNodeId, legacyNet, grossCorrection, effectiveDefect, BigDecimal.ZERO);
-        }
-    }
-
     public record Node(Long routingNodeId, BigDecimal legacyNet, BigDecimal grossCorrection,
                        BigDecimal effectiveDefect, String evidence, BigDecimal unverifiedLossQty) {
         public Node(Long routingNodeId, BigDecimal legacyNet, BigDecimal grossCorrection,

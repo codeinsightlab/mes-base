@@ -132,7 +132,7 @@ class ProductionDefectMySqlTest {
 
 
     static Command command(String key, int revision, Long execution, Long node, String qty) {
-        return new Command(key, revision == 0 ? null : revision, revision == 0 ? null : "TEST ONLY订正", new Facts(execution, node, node, null, new BigDecimal(qty), "MATERIAL", "TEST_ONLY_DEFECT_PHASE1", null, null, "SAME_NODE", null, null, null, LocalDateTime.of(2026, 1, 1, 10, 0)), new Assessment(Attribution.INDEPENDENT, null, "TEST ONLY reviewed independent fixture"));
+        return new Command(key, revision == 0 ? null : revision, revision == 0 ? null : "TEST ONLY订正", new Facts(execution, node, new BigDecimal(qty), "MATERIAL", "TEST_ONLY_DEFECT_PHASE1", null, null, LocalDateTime.of(2026, 1, 1, 10, 0)), new Assessment(Attribution.INDEPENDENT, null, "TEST ONLY reviewed independent fixture"));
     }
 
     @Test

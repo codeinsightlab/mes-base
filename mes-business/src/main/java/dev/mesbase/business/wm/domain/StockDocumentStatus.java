@@ -5,7 +5,7 @@ import java.util.LinkedHashMap;
 
 public enum StockDocumentStatus {
     DRAFT("草稿", "DRAFT"),
-    POSTED("已过账", "POSTED"),
+    POSTED("已审核", "POSTED"),
     CANCELLED("已作废", "CANCELLED");
     private final String description;
     private final String value;

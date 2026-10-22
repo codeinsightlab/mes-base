@@ -394,8 +394,6 @@ public class WorkOrderService {
         require(id != null);
         var row = lock ? orders.selectByPrimaryKeyForUpdate(id) : orders.selectByPrimaryKey(id);
         if (row == null) throw new FoundationException(ErrorCode.NOT_FOUND);
-        if (lock && WorkOrderStatus.HISTORICAL.getValue().equals(row.getStatus()))
-            throw new FoundationException(ErrorCode.RESOURCE_CONFLICT);
         facts.hydrate(List.of(row));
         return row;
     }

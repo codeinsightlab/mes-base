@@ -766,62 +766,62 @@ public class MesQualityTreatmentExample {
         }
 
         public Criteria andReturnedQtyIsNull() {
-            addCriterion("rework_qty is null");
+            addCriterion("returned_qty is null");
             return (Criteria) this;
         }
 
         public Criteria andReturnedQtyIsNotNull() {
-            addCriterion("rework_qty is not null");
+            addCriterion("returned_qty is not null");
             return (Criteria) this;
         }
 
         public Criteria andReturnedQtyEqualTo(BigDecimal value) {
-            addCriterion("rework_qty =", value, "returnedQty");
+            addCriterion("returned_qty =", value, "returnedQty");
             return (Criteria) this;
         }
 
         public Criteria andReturnedQtyNotEqualTo(BigDecimal value) {
-            addCriterion("rework_qty <>", value, "returnedQty");
+            addCriterion("returned_qty <>", value, "returnedQty");
             return (Criteria) this;
         }
 
         public Criteria andReturnedQtyGreaterThan(BigDecimal value) {
-            addCriterion("rework_qty >", value, "returnedQty");
+            addCriterion("returned_qty >", value, "returnedQty");
             return (Criteria) this;
         }
 
         public Criteria andReturnedQtyGreaterThanOrEqualTo(BigDecimal value) {
-            addCriterion("rework_qty >=", value, "returnedQty");
+            addCriterion("returned_qty >=", value, "returnedQty");
             return (Criteria) this;
         }
 
         public Criteria andReturnedQtyLessThan(BigDecimal value) {
-            addCriterion("rework_qty <", value, "returnedQty");
+            addCriterion("returned_qty <", value, "returnedQty");
             return (Criteria) this;
         }
 
         public Criteria andReturnedQtyLessThanOrEqualTo(BigDecimal value) {
-            addCriterion("rework_qty <=", value, "returnedQty");
+            addCriterion("returned_qty <=", value, "returnedQty");
             return (Criteria) this;
         }
 
         public Criteria andReturnedQtyIn(List<BigDecimal> values) {
-            addCriterion("rework_qty in", values, "returnedQty");
+            addCriterion("returned_qty in", values, "returnedQty");
             return (Criteria) this;
         }
 
         public Criteria andReturnedQtyNotIn(List<BigDecimal> values) {
-            addCriterion("rework_qty not in", values, "returnedQty");
+            addCriterion("returned_qty not in", values, "returnedQty");
             return (Criteria) this;
         }
 
         public Criteria andReturnedQtyBetween(BigDecimal value1, BigDecimal value2) {
-            addCriterion("rework_qty between", value1, value2, "returnedQty");
+            addCriterion("returned_qty between", value1, value2, "returnedQty");
             return (Criteria) this;
         }
 
         public Criteria andReturnedQtyNotBetween(BigDecimal value1, BigDecimal value2) {
-            addCriterion("rework_qty not between", value1, value2, "returnedQty");
+            addCriterion("returned_qty not between", value1, value2, "returnedQty");
             return (Criteria) this;
         }
 
@@ -885,125 +885,6 @@ public class MesQualityTreatmentExample {
             return (Criteria) this;
         }
 
-        public Criteria andConfirmedByIsNull() {
-            addCriterion("confirmed_by is null");
-            return (Criteria) this;
-        }
-
-        public Criteria andConfirmedByIsNotNull() {
-            addCriterion("confirmed_by is not null");
-            return (Criteria) this;
-        }
-
-        public Criteria andConfirmedByEqualTo(Long value) {
-            addCriterion("confirmed_by =", value, "confirmedBy");
-            return (Criteria) this;
-        }
-
-        public Criteria andConfirmedByNotEqualTo(Long value) {
-            addCriterion("confirmed_by <>", value, "confirmedBy");
-            return (Criteria) this;
-        }
-
-        public Criteria andConfirmedByGreaterThan(Long value) {
-            addCriterion("confirmed_by >", value, "confirmedBy");
-            return (Criteria) this;
-        }
-
-        public Criteria andConfirmedByGreaterThanOrEqualTo(Long value) {
-            addCriterion("confirmed_by >=", value, "confirmedBy");
-            return (Criteria) this;
-        }
-
-        public Criteria andConfirmedByLessThan(Long value) {
-            addCriterion("confirmed_by <", value, "confirmedBy");
-            return (Criteria) this;
-        }
-
-        public Criteria andConfirmedByLessThanOrEqualTo(Long value) {
-            addCriterion("confirmed_by <=", value, "confirmedBy");
-            return (Criteria) this;
-        }
-
-        public Criteria andConfirmedByIn(List<Long> values) {
-            addCriterion("confirmed_by in", values, "confirmedBy");
-            return (Criteria) this;
-        }
-
-        public Criteria andConfirmedByNotIn(List<Long> values) {
-            addCriterion("confirmed_by not in", values, "confirmedBy");
-            return (Criteria) this;
-        }
-
-        public Criteria andConfirmedByBetween(Long value1, Long value2) {
-            addCriterion("confirmed_by between", value1, value2, "confirmedBy");
-            return (Criteria) this;
-        }
-
-        public Criteria andConfirmedByNotBetween(Long value1, Long value2) {
-            addCriterion("confirmed_by not between", value1, value2, "confirmedBy");
-            return (Criteria) this;
-        }
-
-        public Criteria andOccurredAtIsNull() {
-            addCriterion("occurred_at is null");
-            return (Criteria) this;
-        }
-
-        public Criteria andOccurredAtIsNotNull() {
-            addCriterion("occurred_at is not null");
-            return (Criteria) this;
-        }
-
-        public Criteria andOccurredAtEqualTo(LocalDateTime value) {
-            addCriterion("occurred_at =", value, "occurredAt");
-            return (Criteria) this;
-        }
-
-        public Criteria andOccurredAtNotEqualTo(LocalDateTime value) {
-            addCriterion("occurred_at <>", value, "occurredAt");
-            return (Criteria) this;
-        }
-
-        public Criteria andOccurredAtGreaterThan(LocalDateTime value) {
-            addCriterion("occurred_at >", value, "occurredAt");
-            return (Criteria) this;
-        }
-
-        public Criteria andOccurredAtGreaterThanOrEqualTo(LocalDateTime value) {
-            addCriterion("occurred_at >=", value, "occurredAt");
-            return (Criteria) this;
-        }
-
-        public Criteria andOccurredAtLessThan(LocalDateTime value) {
-            addCriterion("occurred_at <", value, "occurredAt");
-            return (Criteria) this;
-        }
-
-        public Criteria andOccurredAtLessThanOrEqualTo(LocalDateTime value) {
-            addCriterion("occurred_at <=", value, "occurredAt");
-            return (Criteria) this;
-        }
-
-        public Criteria andOccurredAtIn(List<LocalDateTime> values) {
-            addCriterion("occurred_at in", values, "occurredAt");
-            return (Criteria) this;
-        }
-
-        public Criteria andOccurredAtNotIn(List<LocalDateTime> values) {
-            addCriterion("occurred_at not in", values, "occurredAt");
-            return (Criteria) this;
-        }
-
-        public Criteria andOccurredAtBetween(LocalDateTime value1, LocalDateTime value2) {
-            addCriterion("occurred_at between", value1, value2, "occurredAt");
-            return (Criteria) this;
-        }
-
-        public Criteria andOccurredAtNotBetween(LocalDateTime value1, LocalDateTime value2) {
-            addCriterion("occurred_at not between", value1, value2, "occurredAt");
-            return (Criteria) this;
-        }
 
         public Criteria andRecordedAtIsNull() {
             addCriterion("recorded_at is null");

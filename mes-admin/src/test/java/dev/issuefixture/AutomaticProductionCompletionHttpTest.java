@@ -98,7 +98,7 @@ class AutomaticProductionCompletionHttpTest {
             // Production completion cannot manufacture stock or waive explicit output release.
             j.update("INSERT INTO wm_inventory(id,material_id,warehouse_id,batch_no,quantity,available_quantity,status) VALUES(1,1,1,'TEST-FINISHED',0,0,'ENABLED')");
             String document = UnifiedInboundHttpTest.draft(m, "1", "100");
-            m.perform(ProductionCoreV1HttpTest.full(post(StockDocumentHttpTest.ROOT + "/" + document + "/actions/post"))
+            m.perform(ProductionCoreV1HttpTest.full(post(StockDocumentHttpTest.ROOT + "/" + document + "/actions/approve"))
                             .content(StockDocumentHttpTest.intent(UUID.randomUUID().toString(), 1)))
                     .andExpect(status().isConflict())
                     .andExpect(jsonPath("errorCode").value("STOCK_DOCUMENT_BASIS_INVALID"));

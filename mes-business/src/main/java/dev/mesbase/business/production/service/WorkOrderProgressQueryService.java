@@ -13,6 +13,7 @@ import dev.mesbase.business.production.domain.WorkOrderStatus;
 import dev.mesbase.business.quality.domain.DefectRecordAction;
 import dev.mesbase.business.quality.domain.ProductionDefectModels.Processing;
 import dev.mesbase.business.quality.domain.QualityTreatmentModels.Attribution;
+import dev.mesbase.business.quality.domain.QualityTreatmentModels.State;
 import dev.mesbase.common.utils.StringUtils;
 import dev.mesbase.common.validation.ParameterChecks;
 import dev.mesbase.core.error.ErrorCode;
@@ -85,12 +86,16 @@ public class WorkOrderProgressQueryService {
         }
         BigDecimal untreated = BigDecimal.ZERO, returned = BigDecimal.ZERO,
                 unverified = BigDecimal.ZERO, transferred = BigDecimal.ZERO;
+        boolean qualityResolved = true;
         for (var fact : quality) {
             var attribution = Attribution.UNVERIFIED;
-            if (fact.attribution() != null) attribution = Attribution.valueOf(fact.attribution());
-            if (fact.invalidActions() > 0) throw new FoundationException(ErrorCode.QUALITY_DATA_INVALID);
-            var processing = Processing.of(DefectRecordAction.CREATE.getValue(), attribution,
-                    fact.declaredQty(), fact.returnedQty(), fact.transferredQty());
+            if (fact.attribution() != null) attribution = Attribution.find(fact.attribution());
+            var processing = Processing.read(DefectRecordAction.CREATE.getValue(), attribution,
+                    fact.declaredQty(), fact.returnedQty(), fact.transferredQty(), fact.invalidActions());
+            if (processing.state() == State.UNRESOLVED) {
+                qualityResolved = false;
+                continue;
+            }
             if (attribution == Attribution.UNVERIFIED) unverified = unverified.add(fact.declaredQty());
             else if (attribution == Attribution.INDEPENDENT) {
                 untreated = untreated.add(processing.pendingDispositionQty());
@@ -98,8 +103,13 @@ public class WorkOrderProgressQueryService {
                 transferred = transferred.add(processing.transferredQty());
             }
         }
+        if (!qualityResolved) {
+            untreated = returned = unverified = transferred = null;
+            issue = issue == null ? "质量处置数量待确认" : issue + "；质量处置数量待确认";
+        }
         BigDecimal unfinished = null;
-        if (gap != null) unfinished = order.plannedQty().subtract(completed).subtract(transferred).max(BigDecimal.ZERO);
+        if (gap != null && qualityResolved)
+            unfinished = order.plannedQty().subtract(completed).subtract(transferred).max(BigDecimal.ZERO);
         return new Progress(order.id(), order.code(), order.source(), order.status(), order.productCode(),
                 order.productName(), order.unitName(), order.plannedQty(), completed, gap,
                 unfinished, untreated, returned,

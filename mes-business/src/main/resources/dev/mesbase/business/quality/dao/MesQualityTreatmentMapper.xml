@@ -12,10 +12,8 @@
     <result column="attribution_type" jdbcType="VARCHAR" property="attributionType" />
     <result column="related_declaration_id" jdbcType="VARCHAR" property="relatedDeclarationId" />
     <result column="basis" jdbcType="VARCHAR" property="basis" />
-    <result column="rework_qty" jdbcType="DECIMAL" property="returnedQty" />
+    <result column="returned_qty" jdbcType="DECIMAL" property="returnedQty" />
     <result column="operator_user_id" jdbcType="BIGINT" property="operatorUserId" />
-    <result column="confirmed_by" jdbcType="BIGINT" property="confirmedBy" />
-    <result column="occurred_at" jdbcType="TIMESTAMP" property="occurredAt" />
     <result column="recorded_at" jdbcType="TIMESTAMP" property="recordedAt" />
     <result column="reason" jdbcType="VARCHAR" property="reason" />
     <result column="target_warehouse_id" jdbcType="BIGINT" property="targetWarehouseId" />
@@ -53,8 +51,8 @@
   </sql>
   <sql id="Base_Column_List">
     id, request_hash, declaration_id, declaration_revision, execution_id, routing_node_id,
-    action_type, attribution_type, related_declaration_id, basis, rework_qty, operator_user_id, confirmed_by,
-    occurred_at, recorded_at, reason, target_warehouse_id, stock_document_id, transfer_qty
+    action_type, attribution_type, related_declaration_id, basis, returned_qty, operator_user_id,
+    recorded_at, reason, target_warehouse_id, stock_document_id, transfer_qty
   </sql>
   <select id="selectByExample" parameterType="dev.mesbase.business.quality.domain.MesQualityTreatmentExample" resultMap="BaseResultMap">
     select
@@ -77,15 +75,15 @@
     insert into mes_quality_treatment (id, request_hash, declaration_id,
       declaration_revision, execution_id, routing_node_id,
       action_type, attribution_type,
-      related_declaration_id, basis, rework_qty, operator_user_id, confirmed_by,
-      occurred_at, recorded_at, reason,
+      related_declaration_id, basis, returned_qty, operator_user_id,
+      recorded_at, reason,
       target_warehouse_id, stock_document_id, transfer_qty
       )
     values (#{id,jdbcType=VARCHAR}, #{requestHash,jdbcType=CHAR}, #{declarationId,jdbcType=VARCHAR},
       #{declarationRevision,jdbcType=INTEGER}, #{executionId,jdbcType=BIGINT}, #{routingNodeId,jdbcType=BIGINT},
       #{actionType,jdbcType=VARCHAR}, #{attributionType,jdbcType=VARCHAR},
-      #{relatedDeclarationId,jdbcType=VARCHAR}, #{basis,jdbcType=VARCHAR}, #{returnedQty,jdbcType=DECIMAL}, #{operatorUserId,jdbcType=BIGINT}, #{confirmedBy,jdbcType=BIGINT},
-      #{occurredAt,jdbcType=TIMESTAMP}, #{recordedAt,jdbcType=TIMESTAMP}, #{reason,jdbcType=VARCHAR},
+      #{relatedDeclarationId,jdbcType=VARCHAR}, #{basis,jdbcType=VARCHAR}, #{returnedQty,jdbcType=DECIMAL}, #{operatorUserId,jdbcType=BIGINT},
+      #{recordedAt,jdbcType=TIMESTAMP}, #{reason,jdbcType=VARCHAR},
       #{targetWarehouseId,jdbcType=BIGINT}, #{stockDocumentId,jdbcType=BIGINT}, #{transferQty,jdbcType=DECIMAL}
       )
   </insert>

@@ -101,12 +101,12 @@ public class ProductionChainLocks {
     }
 
     public static void requireActive(WorkorderEntity row) {
-        if (row != null && WorkOrderStatus.COMPLETED.getValue().equals(row.getStatus()))
-            throw new FoundationException(ErrorCode.RESOURCE_CONFLICT);
-        if (row != null && WorkOrderStatus.HISTORICAL.getValue().equals(row.getStatus()))
-            throw new FoundationException(ErrorCode.RESOURCE_CONFLICT);
-        if (row != null && WorkOrderStatus.CANCELLED.getValue().equals(row.getStatus()))
+        if (row == null) throw new FoundationException(ErrorCode.NOT_FOUND);
+        if (WorkOrderStatus.CANCELLED.getValue().equals(row.getStatus()))
             throw new FoundationException(ErrorCode.WORKORDER_CANCELLED);
+        if (!WorkOrderStatus.DRAFT.getValue().equals(row.getStatus())
+                && !WorkOrderStatus.RELEASED.getValue().equals(row.getStatus()))
+            throw new FoundationException(ErrorCode.RESOURCE_CONFLICT);
     }
 
     public void requireActiveExecution(Long id) {
@@ -125,8 +125,6 @@ public class ProductionChainLocks {
         if (id == null) throw new FoundationException(ErrorCode.NOT_FOUND);
         var row = orders.selectByPrimaryKeyForUpdate(id);
         if (row == null) throw new FoundationException(ErrorCode.NOT_FOUND);
-        if (WorkOrderStatus.HISTORICAL.getValue().equals(row.getStatus()))
-            throw new FoundationException(ErrorCode.RESOURCE_CONFLICT);
         return row;
     }
 

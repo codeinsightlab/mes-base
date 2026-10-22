@@ -41,6 +41,7 @@ class QualityWorkflowHttpTest {
         var c = ProductionWarehouseFixture.context(modules.toArray(Class<?>[]::new));
         for (var j : c.getBean(MaterialIssueHttpTest.Fixture.class).business.values()) {
             j.update("DELETE FROM mes_production_report");
+            j.update("UPDATE wm_warehouse SET warehouse_type='DEFECTIVE' WHERE id=1");
             j.update("INSERT INTO routing_node(id,routing_id,node_code,operation_id,display_order,operation_name) SELECT 14,routing_id,'D',operation_id,4,operation_name FROM routing_node WHERE id=13");
             j.update("INSERT INTO routing_node(id,routing_id,node_code,operation_id,display_order,operation_name) SELECT 15,routing_id,'E',operation_id,5,operation_name FROM routing_node WHERE id=13");
             j.update("INSERT INTO routing_edge(routing_id,from_node_id,to_node_id) VALUES(1,13,14),(1,14,15)");
@@ -55,8 +56,6 @@ class QualityWorkflowHttpTest {
         var body = (ObjectNode) JSON.readTree(ProductionDefectHttpTest.command(UUID.randomUUID().toString(), 0, qty));
         var facts = (ObjectNode) body.get("facts");
         facts.put("affectedNodeId", Long.toString(node));
-        facts.put("discoveredNodeId", Long.toString(node));
-        facts.put("destinationType", "SAME_NODE");
         if (type == null) body.remove("assessment");
         else {
             var assessment = body.putObject("assessment");
@@ -101,6 +100,12 @@ class QualityWorkflowHttpTest {
             var repeated = assess(mvc, id, body);
             assertEquals(first.get("events"), repeated.get("events"));
             assertEquals(1, first.get("events").size());
+            var event = first.get("events").get(0);
+            assertEquals(false, event.has("confirmedBy"));
+            assertEquals(false, event.has("confirmedByName"));
+            assertEquals(false, event.has("occurredAt"));
+            assertEquals(true, event.hasNonNull("recordedAt"));
+            assertEquals("1", event.get("operatorUserId").asText());
             assertEquals("PENDING", first.get("state").asText());
             mvc.perform(full(post(Q + "/" + id + "/assessments"), "B").content(body))
                     .andExpect(status().is4xxClientError());
@@ -111,8 +116,8 @@ class QualityWorkflowHttpTest {
     }
 
     @Test
-    void retiredOperationsHaveNoCommandEndpointAndDoNotWriteFacts() throws Exception {
-        try (var c = context(100, 100, 90, 90, 90)) {
+    void unreadableDispositionDoesNotBlockQueriesOrAllowCommands() throws Exception {
+        try (var c = context(new Class<?>[]{WorkOrderProgressHttpTest.Extra.class, QualityV2HttpTest.Extra.class}, 100, 100, 90, 90, 90)) {
             var mvc = MaterialIssueHttpTest.mvc(c);
             var id = defect(mvc, 12, "10", "INDEPENDENT", null);
             for (var action : new String[]{"ALLOCATE", "START", "RESULT", "CANCEL_ALLOC", "CANCEL_START", "CORRECT_RESULT"})
@@ -120,12 +125,34 @@ class QualityWorkflowHttpTest {
                         .andExpect(status().is4xxClientError());
             assertEquals(1, ProductionWarehouseFixture.db(c).queryForObject(
                     "SELECT COUNT(*) FROM mes_quality_treatment WHERE declaration_id=?", Integer.class, id));
+            var healthy = defect(mvc, 12, "1", "INDEPENDENT", null);
             ProductionWarehouseFixture.db(c)
-                    .update("INSERT INTO mes_quality_treatment(id,request_hash,declaration_id,declaration_revision,execution_id,routing_node_id,action_type,operator_user_id,confirmed_by,occurred_at,recorded_at,reason) VALUES(?,?,?,1,1,12,'ALLOCATE',1,1,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,'TEST ONLY rejected imported workflow')",
+                    .update("INSERT INTO mes_quality_treatment(id,request_hash,declaration_id,declaration_revision,execution_id,routing_node_id,action_type,operator_user_id,recorded_at,reason) VALUES(?,?,?,1,1,12,'ALLOCATE',1,CURRENT_TIMESTAMP,'TEST ONLY rejected imported workflow')",
                             UUID.randomUUID().toString(), "x".repeat(64), id);
-            for (var url : new String[]{Q, Q + "/" + id + "/treatment", "/api/quality/treatments/recent"})
-                mvc.perform(full(get(url), "A")).andExpect(status().isConflict())
-                        .andExpect(jsonPath("errorCode").value("QUALITY_DATA_INVALID"));
+            var list = JSON.readTree(mvc.perform(full(get(Q), "A")).andExpect(status().isOk())
+                    .andReturn().getResponse().getContentAsString());
+            assertEquals(2, list.path("total").asInt());
+            assertEquals(healthy, list.path("items").get(0).path("declarationId").asText());
+            assertEquals("PENDING", list.path("items").get(0).path("processingState").asText());
+            assertEquals("UNRESOLVED", list.path("items").get(1).path("processingState").asText());
+            assertEquals(true, list.path("items").get(1).path("pendingQuantity").isNull());
+            var detail = JSON.readTree(mvc.perform(full(get(Q + "/" + id + "/treatment"), "A"))
+                    .andExpect(status().isOk()).andReturn().getResponse().getContentAsString());
+            assertEquals("UNRESOLVED", detail.path("state").asText());
+            assertEquals(true, detail.path("pendingDispositionQty").isNull());
+            assertEquals(2, detail.path("events").size());
+            mvc.perform(full(get("/api/quality/treatments/recent"), "A")).andExpect(status().isOk());
+            mvc.perform(full(get("/api/production/workorder-progress"), "A"))
+                    .andExpect(status().isOk()).andExpect(jsonPath("items[0].qualityUntreatedQty").doesNotExist());
+            mvc.perform(full(get(Q + "/statistics"), "A"))
+                    .andExpect(status().isOk()).andExpect(jsonPath("items[0].returnedQty").doesNotExist())
+                    .andExpect(jsonPath("items[0].invalidActions").value(1));
+            mvc.perform(full(post(Q + "/" + id + "/dispositions"), "A")
+                            .content(QualityDispositionHttpTest.command(UUID.randomUUID()
+                                    .toString(), "RETURN_NODE", "1", null)))
+                    .andExpect(status().isConflict()).andExpect(jsonPath("errorCode").value("QUALITY_DATA_INVALID"));
+            assertEquals(3, ProductionWarehouseFixture.db(c)
+                    .queryForObject("SELECT COUNT(*) FROM mes_quality_treatment", Integer.class));
         }
     }
 }

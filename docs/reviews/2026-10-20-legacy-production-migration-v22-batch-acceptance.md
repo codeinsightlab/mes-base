@@ -525,3 +525,304 @@ User reported stopping the backend. Actual user-service PID64314 app.log shows g
 }
 
 These are committed operation receipts, not additional UI or business-flow acceptance. All exception data is preserved. No source facts, original input/stock facts or completed business facts were overwritten to force admission. Detailed frozen inputs and receipts are under .local/legacy-broader-migration-20261021/.
+
+### 2026-10-22 用户确认：迁移工艺继续用于正式生产
+
+一次性历史生产导入与激活已退役，迁入工艺属于正式生产工艺。V41 中阻止新工单引用已映射路线的 `mes_history_order_new_reference`，以及同组按 `HISTORICAL` 状态拦截工单、执行、报工、质量、入库、领料和库存动作的触发器，不再符合当前业务边界。新增正式 Flyway V49 删除 V41/V42/V43/V45 当前遗留的历史生产写保护触发器；不改写已执行迁移。V40 对 `mes_legacy_source_mapping` 的更新/删除保护继续保留，以保护已迁入来源证据。该迁移尚未对真实数据库执行；应用效果需在目标库通过 Flyway 正式升级并核对触发器清单后确认。
+
+### 2026-10-22 迁移门禁复查与自主 Flyway 升级说明
+
+本节为静态源码审查，未连接或升级数据库，未修改业务代码。V49 是本轮开始前已有的未跟踪文件，保留原内容。不能据此宣称迁移门禁已全部移除。
+
+- 新工单链路为 `WorkOrderController.create → WorkOrderService.create → validate/binding → saveOrder`。Java 的工艺绑定校验要求产品启用、工艺已发布及产品关联成立，没有按迁移来源拒绝新工单。V41 的 `mes_history_order_new_reference` 则明确禁止普通新工单引用 `mes_legacy_source_mapping` 中的 ROUTING；这是当前描述的直接候选原因，仍需实际异常和目标库触发器确认。
+- V49 删除 V41 创建、经 V42/V43/V45 替换后仍存续的全部 21 个生产写保护触发器。后续迁移的临时 transition 触发器均在各自脚本末尾删除，不属于成功迁移后的存续门禁。V40 来源映射不可变保护、V36 来源不可变保护及其他正常业务事实保护不在 V49 删除范围。
+- 应用仍有迁移专用限制：`WorkOrderService.order` 在锁定 HISTORICAL 工单时拒绝；`ProductionChainLocks.requireActive/order` 拒绝 HISTORICAL；`ProductionQuantityService.validateChange` 拒绝 historical 数量视图。前端执行单元及质量处理也以 HISTORICAL 隐藏或禁止操作。因此 V49 仅完成数据库层解除，不能代替状态、数量、前端和测试契约治理；直接删判断也不能将未知数量或缺失的正式业务状态伪装为可处理。
+- `hasLegacyBatches` 对改产品/路线和删除工单的限制涉及已有批次引用保护；`WorkOrderSaveRequest` 的 batches 只读限制防止恢复废弃批次写入口。它们不能仅因名称含 Legacy 就与迁移来源门禁一起删除。
+
+项目没有配置 Flyway Maven 插件或业务库自动迁移入口。`PersistenceConfiguration.masterDataSource` 的 `mes.platform.migrate` 只调用 `FactoryFlyway`，扫描 `db/platform` 和 `db/system`，不扫描 `db/business`。中心迁移还有 V34 Java Migration，不应仅拼 SQL 目录冒充完整中心升级。
+
+自主升级业务库可使用独立 Flyway CLI（按官方 macOS 安装说明安装、加入 PATH，优先对齐项目实际解析的 Flyway 版本）。先核实中心库 `mf_factory → mf_datasource` 的实际启用绑定、目标 host/port/db_name，备份业务库（含触发器和 `flyway_business_schema_history`），在维护窗口操作。以下占位符由操作者替换，不代表已确认目标：
+
+```zsh
+export FLYWAY_URL='jdbc:mysql://目标主机:3306/目标业务库?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai'
+export FLYWAY_USER='升级账号'
+read -s 'FLYWAY_PASSWORD?数据库密码: '
+echo
+export FLYWAY_PASSWORD
+export FLYWAY_LOCATIONS='filesystem:/Users/user/work/lixin/mes-base/mes-admin/src/main/resources/db/business'
+export FLYWAY_TABLE='flyway_business_schema_history'
+export FLYWAY_TARGET='49'
+export FLYWAY_CLEAN_DISABLED='true'
+export FLYWAY_BASELINE_ON_MIGRATE='false'
+flyway info
+flyway validate
+# 核实 info 的数据库身份、已应用版本及全部 Pending 项后执行：
+flyway migrate
+flyway validate
+flyway info
+unset FLYWAY_PASSWORD
+```
+
+`target=49` 表示升级至 V49，会按序执行此前所有尚未执行的版本；不是只执行 V49。预期库已到 V48 时，应只有 V49 Pending。历史缺失、checksum 不一致或 failed 项应先定位，不能用 baseline、repair 或手工改历史掩盖，也不应在数据库工具直接运行 V49 后补写历史。不同工厂的不同物理业务库分别核实、分别升级，共用物理库不要重复当作不同目标处理。
+
+升级后核对 V49 的 success 记录、与 V49 DROP 清单逐项比较真实 `information_schema.TRIGGERS`，并确认来源映射不可变等正常保护仍在；最后用正式新工单入口引用相同工艺复验。MySQL DDL 中断可能部分生效，应按真实触发器及 Flyway 记录定位后恢复，不盲目 repair/重跑。数据库升级与应用重启分开；需要重启时由用户执行。
+
+参考：[Flyway CLI 官方说明](https://documentation.red-gate.com/flyway/reference/usage/command-line)、[Target 配置](https://documentation.red-gate.com/flyway/reference/configuration/flyway-namespace/flyway-target-setting)。本机当前 PATH 未发现 flyway，命令为操作说明，未实际运行。
+
+### 2026-10-22 项目升级入口、V49/V48.1 实际执行与残留清理
+
+本节追加真实执行结果，取代上一节“尚未执行”的状态。新增维护入口 `scripts/mes-business-flyway` 和根 POM 的 `business-flyway` Profile，复用项目 Flyway 12.4.0 与受管 MySQL 驱动；文档位于 `docs/development/database-upgrades.md`，README 已链接。入口仅开放 info / validate / migrate，固定业务目录与历史表，要求 migrate 显式目标版本，禁用 clean、自动 baseline 和乱序；不编译业务模块、不启停服务。中心升级仍经包含 Java V34 的 `FactoryFlyway`，不使用此业务入口。
+
+**目标与升级事实：** 重新核实中心 `mes_base_dev` 的 `TEST_DEV_PERF_20261019 → datasource 9 / revision 2 → 192.168.18.25:3306/mes_base_dev_perf_test`，工厂与数据源均 ENABLED、模式 LOCAL，server_uuid 为 `03dbc952-7403-11ef-802c-0242ac130002`。升级前 V48 成功，唯一待执行为 V49。通过项目新入口正式执行 V49，Flyway success 已记录；21 个迁移写保护触发器全部不存在，来源及来源证据不可变触发器保留。
+
+V49 执行期间另一工作新增 V48.1 质量删列迁移，用户明确授权合并升级，随后要求“不需要备份，直接按顺序执行”。V49 已先写入历史，故仅本次维护显式设置 outOfOrder=true 补执行 V48.1，不倒改版本、不忽略校验；恢复常规禁止乱序设置后，严格 validate 通过全部 50 份迁移。V48.1 的 15,598 条不良记录及 31,194 条处理记录均未删除，逐行核对所有保留字段不变，returned_qty 与原 rework_qty 一致；删除字段是该质量清理 SQL 的显式 Schema 变更，不能把旧 ALLOCATE/START/RESULT 原始动作误报为当前处理已成功。
+
+**备份边界：** V49 前保存全部触发器定义、Flyway 历史、绑定及九表 checksum；其 SQL 不改业务行。V48.1 的两张完整质量表（含旧列值、结构、索引和触发器）及 Flyway 历史备份 26,135,567 字节已在用户后续取消追加备份前完成，保留于私有证据目录，不再追加备份或执行恢复。工单、工艺、执行、报工、来源映射、库存及库存动作七表升级前后 checksum 一致；两张质量表因 Schema 变化不比较整表 checksum，而比较保留事实字段及数量。没有重建迁移、激活或数据转换入口。
+
+**真实工单验证：** 升级前，在必定回滚的事务中用迁移已发布工艺 15 / 产品 17 插入普通 DRAFT，被 `mes_history_order_new_reference` 以 SQLSTATE 45000 / Historical production is read only 拒绝；V49 后相同探针成功并回滚。随后使用用户现有 8081 正式 HTTP 接口、同一工厂与工艺，POST `/api/production/workorder` 创建数量 1 的明确 TEST ONLY 草稿 1915（200），GET 详情（200），DELETE revision=0（204），再次 GET 为 404。没有下达、领料、报工或库存动作，测试草稿无残留。HTTP 验证使用现有运行代码，证明数据库层引用阻塞已解除，不代替新代码部署验收。
+
+**代码残留处理：** 移除 WorkOrderService / ProductionChainLocks 锁定读取中的 HISTORICAL 专用拒绝；活动写入统一要求当前 DRAFT / RELEASED 状态。移除数量校验、正向报工阻断原因、可用量强置零及完工计算对 historical 标记的额外拒绝；冻结期初与节点证据仍只读参与计算。已无正式调用方的批量迁移数量校验、PathBatch / viewBatch、nodesBatch DTO/Mapper 和其专用测试一并删除，保留并扩展正式数量/订正测试。前端执行与质量操作改按当前工单/执行状态准入，不按迁移身份黑名单判断；未知原状态按原值可读，不标成“历史只读”。
+
+仍保留的 HISTORICAL 枚举/查询筛选和只读冻结证据用于解释原记录，不构成迁移写入口。原 13 张工单、58 个执行的 HISTORICAL 状态未被自动改成 RELEASED/RUNNING；它们仍须满足当前业务状态和完整性规则，不能因取消来源门禁而伪造已下达、已投产或数量闭合。旧批次的引用/删除保护、废弃 batches 请求禁止写入、LOCAL/EXTERNAL、权限、路径、质量及事实保护继续生效。
+
+**验证进度与证据：** 实际数据库升级、50 份迁移严格校验、触发器清单、七表 checksum、质量逐字段核对与真实工单创建/删除均通过；前端 74 文件 / 433 测试及生产构建通过（只有既有体积提示）。后端全量构建遇到并行代码/输出变更，后续在隔离源码快照完成验证后追加结果。现有用户服务未重启；V48.1 删列后旧质量接口不能作为新代码验收，须由用户重启新版后端后复验。
+
+私有证据目录 `.local/legacy-guards-20261022/`：before.yml、triggers-before.sql、route-probe-before/after.txt、flyway-migrate.log、flyway-quality-migrate.log、flyway-after-validate-final.log、verified.yml、quality-audit.yml、quality-before.sql、quality-backup.yml、quality-verified.txt、http-route-probe.json、ui-tests.log、ui-build.log。凭证不写文档或命令参数；未提交、推送或启停用户服务。
+
+#### 后端验证补充
+
+使用 `/private/tmp/mes-base-legacy-guards-20261022` 隔离源码快照，避免并行构建改写同一输出目录。本轮九个相关测试类共 52 项全部通过，覆盖冻结证据数量、统一状态准入、正式订正、新旧事实读取、工单引用与来源隔离；执行带定向测试的 verify，编译及打包通过，随后 packaged smoke 10/10 通过。升级入口另做九项无数据库参数检查，通过显式目标、缺凭证拒绝、危险/无效命令拒绝及继承乱序设置不能覆盖固定保护。V48.1 的 13 个旧字段名均不存在，returned_qty DECIMAL(20,6) NOT NULL 已经真实核对。最终 info 返回 Schema version 49，V49 Success、V48.1 Out of Order，严格 validate 通过。
+
+未宣称全量后端绿灯：较早快照的全量 verify 在 mes-admin 跑 582 项，其中 48 跳过、3 项失败。两项是并行质量清理后仍断言旧去向字段的过时测试，已由该工作修正并在上述定向测试通过。余下一项 `StockDocumentHttpTest.documentAndFormalProductionIssueCompeteOnTheSameOwner` 存在间歇返回 BAD_REQUEST 而非预期 409 的并发断言失败。只在私有快照将本轮 WorkOrderService / ProductionChainLocks 恢复 HEAD 基线后，单次通过，但十次重复有一次同样失败；证明在移除此轮锁定代码变更后仍可复现，未修改用户正式库存测试或扩展修复库存业务。证据为 maven-verify-snapshot-final.log、maven-targeted-snapshot.log、packaged-smoke.log、launcher-checks.json、stock-concurrency-baseline.log、stock-concurrency-baseline-repeat.log。
+
+代码层清理回滚可还原本轮差异，需保护同时进行的质量/仓储改动；不能以回退代码倒改 Flyway 历史。数据库层已发生 V48.1 显式删列，必要恢复需使用已有私有备份制定保留后续事实的恢复方案。用户仍需自行重启新版后端；真实 HTTP 证明的是原先新工单引用阻塞解除，不是全部新质量界面或生产闭环已在部署版本验收。
+
+### 2026-10-22 工艺版本关系与后续追加工艺标识恢复
+
+**版本模型源码事实：** `RoutingServiceImpl.newVersion` 保留当前 code/name，查询同 code 最大 version 并加一，复制所选版本的节点、连接和产品到新的 DRAFT / routing ID。`copy` 使用用户指定的新 code/name，从 version=1 开始。普通更新不开放 code；name 可以在草稿中编辑，不作为版本关联键。真实目标库唯一键 `uk_routing_version(code,version)`，code 使用 utf8mb4_0900_ai_ci；没有独立 family_id、previous_version_id 或 cloned_from_id。故同 code 的记录属于同版本系列，不靠 name 肉眼推断，但仅靠当前表不能证明某版本究竟从哪一个旧版本复制。工单与执行保存确切 routing_id，创建新版本不会自动把已有工单切到新版本。version 是本地版本序号，revision 是并发修订号，source_version 是来源标签，三者不可混用。
+
+**本次真实核对：** 仍为工厂 TEST_DEV_PERF_20261019、DS9/revision2、LOCAL、192.168.18.25:3306/mes_base_dev_perf_test，server_uuid 与前节一致。771 条不可变 ROUTING 映射全部能以冻结 executions.key 中的原路线 ID 对应只读来源 prod_j2eedb.pro_route；566 条已恢复，后续追加的 205 条仍为 LEGACY_哈希编码和“历史转换工艺 + 工单号”。来源编码/名称均存在、非空且满足目标长度，未截断、翻译或猜测。
+
+另有 DRAFT 607 没有迁移 ROUTING 映射，但仍保留旧 hash code / name、version=2、revision=0。之前恢复计划明确记载该旧编码属于原路线 602（原 version=1，已修正为源工艺53 / 3737A291 / 通用工艺 / 本地 version=8）；结合未变的 description、external_id、source_version、草稿节点工序/节点属性、连接及产品关联，证明 607 是同一旧编码系列的派生草稿。发布工序快照字段不作为草稿结构等价条件。前次只修正已映射对象，遗漏此派生草稿，使系列被旧、新 code 拆开。
+
+**实际修复：** 对 205 个来源明确的迁移工艺及派生草稿607，共206条，按当前明确任务恢复源 route_code / route_name。先使用目标 MySQL 相同 collation 与唯一键的临时表校验全部 code/version 分配，优先保留无冲突原序号；200 条为避免现有 (code,version) 冲突重新分配本地序号，本轮分配最大30。草稿607最后分配为 3737A291 v11，使它回到原系列并保持为该系列最后草稿；其他记录不合并、不重建、不迁移工单引用。迁移时按工单实际路径隔离出来的各快照不是已证明的原系统历史发布版本，修复后也不能将 v1/v2/v30 宣称为旧系统实际版本演进。
+
+使用带旧 code/name/version/revision/status 条件的参数化 UPDATE，在单一目标事务中锁定并核对工艺集合后批量执行。SQL 模板和完整旧值/新值计划已保存，正式提交206行，逐字段核对 routing 全表仅计划内 code/name/version 改变；id、状态、revision、description、external_id、source_version、published_at 和其他工艺均不变。源数据只读，来源映射、迁移批次不写入；没有恢复已经退役的导入/激活服务、修改已发布 Flyway 或新增业务接口。用户此前要求不追加备份，本次保存核对及修复计划，不另做整库备份。
+
+**真实验证：** 修复后本业务库 LEGACY_ 工艺编码为0；workorder、mes_production_execution、routing_node、routing_edge、routing_product、mes_production_report、wm_inventory、wm_stock_action 八表 checksum 前后一致。复用既有 BusinessCacheProcessor，仅失效当前工厂 business:routing 的列表/详情及通用详情 generation。使用现有8081服务读取607/610/612详情，并用9个分页请求核对全部206条 code/name/version 全部回显。例如610为 ISX15L-5484094（4059294） / 通用工艺 / 本地v25；607仍为DRAFT，602及其原有工单/执行引用未改变。没有新增工单、下达、报工或库存动作，未启停服务；未执行浏览器视觉验收。刷新工艺页面可重新读取已验证接口。
+
+本轮未修改业务源码或Schema，不新增无关测试或重跑构建；真实数据及缓存/HTTP核对是本轮证据。私有目录 `.local/routing-labels-20261022/` 保存 audit.json、draft-lineage.json、plan.json、applied-statement.sql、references-before.json、expected-after.json、applied.json、verified.json、cache-invalidated.json、http-verification.json。未来若需回退，只能按该计划和当前精确值设计受控元数据修正，不能合并路线或覆盖后续用户编辑。
+
+
+### 2026-10-22 同 code 工艺多版本只读审查
+
+**结论：本次迁移把工单路径快照建成了工艺主数据，再在恢复原 code 时排列为本地版本。这是迁移建模错误，不是已证明的原工艺发布版本演进。** 上节 code/name 修正只解决了标识和唯一键冲突，没有解决快照被当成版本的问题。本次严格按用户要求审查，没有合并工艺、调整工单或执行引用，也没有修正节点和连接。
+
+#### 核实范围与比较方法
+
+目标仍为 Factory TEST_DEV_PERF_20261019、数据源9/revision2、ENABLED/LOCAL，物理库 `192.168.18.25:3306/mes_base_dev_perf_test`；server_uuid=`03dbc952-7403-11ef-802c-0242ac130002`。原系统来源为同实例 `prod_j2eedb`。提取使用 JDBC 只读、REPEATABLE_READ 事务，真实会话 `@@transaction_read_only=1`，仅执行 SELECT，最后 rollback。此次没有写数据库、失效缓存或启停服务。
+
+全量读取当前801条工艺、9055个节点、8254条连接、801条产品关联，以及1889张工单、11870条执行引用；以771条不可变 ROUTING 来源映射识别本次迁移对象，对应53个原工艺ID/code。当前正常新建、派生草稿等未映射记录单独区分，不作为迁移重复记录计数。
+
+比较忽略新生成的 routing/node/edge ID，按实际边连接恢复节点顺序；保留重复出现的同一工序，不将其折叠。801条现有图均为单一连通线性路径，因此没有无法匹配的分叉图。分层比较：①工序ID序列及连接拓扑；②is_key、description等节点业务属性；③node_code、发布工序编码/名称/说明、display_order等完整节点字段；④产品关联。另对每条映射冻结的完整来源工序记录ID、reported_by_node及当前源 pro_route_process 顺序交叉核实。不能用节点ID不同、显示顺序相同或产品相同代替结构比较。
+
+#### 审查结果
+
+- 771条迁移记录来自53个原工艺；52个 code 有多条迁移记录。其中24组全部版本的工序、节点属性、连接和产品关联完全一致；另外28组确有结构差异，但全部能由迁移时按已报工工序筛选解释。
+- 687条迁移路径包含完整来源工序；84条仅包含来源工序子集。其中28条是前缀截短，56条还产生了跳过缺失中间工序的直接连接。84条裁剪工艺当前被84张工单、500条执行引用；这些引用本轮全部保留。
+- 按同 code 统计，仅有86种工序/连接形态；再计完整节点属性和产品关联，共91种内容。相对771条记录分别有685条结构重复副本、680条完整内容重复副本。这是比较统计，不是可直接删除的清单。
+- 所有53个 code 的迁移冻结来源均只有一套完整工序记录ID模板，且均与此次只读取得的原工艺工序一致。原 pro_route 表也没有 version/revision 或发布历史字段。本次冻结迁移范围没有支持几十次真实升版的证据；这不等于证明原系统在所有历史时间从未修改过工艺。
+
+| 工艺 code | 现有表现 | 核实差异 |
+| --- | --- | --- |
+| 三角下摇臂热前 | 30个版本 | 全部为6节点、5连接，节点属性及产品关联也完全一致 |
+| 三角下摇臂热后 | 30个版本 | 全部为9节点、8连接，完整内容一致 |
+| ISX15L-5484094（4059294） | 29个版本 | 28条为完整18节点；610/v25只有17节点，缺末尾“清洗” |
+| 3737A291 | 含派生草稿共11个版本 | 完整模板13节点；602/v8及未映射草稿607/v11只有前4节点，草稿发布快照属性另行区分 |
+| ISX11.9L-4330228（4975244）-新工艺 | 完整来源18节点，部分目标17节点 | 缺“车端面2”，目标直接连接“车端面1→粗铣螺纹面”，属于迁移筛选后重连 |
+| 钛15L排气摇臂轴（氮化前） | 4条迁移记录，14/14/11/8节点 | 来源完整18节点，当前没有完整迁入版本；最大版本v4反而只有8节点 |
+
+因此不能直接选最大 version，也不能单凭节点最多选择所谓原版。后续若另行授权治理，应先按完整来源恢复准确主数据方案，并区分现有工单冻结路径与今后新建工单使用的正式工艺；本次不执行该治理。
+
+#### 迁移原因的静态证据
+
+仅查阅已经退役的私有归档，不恢复或执行旧迁移入口：
+
+1. `.local/legacy-v22-20261020/batch-prefetch-source/scripts/legacy/conversion_v2.py` 按完整来源 current_node_ids 遍历，但遇到工序不在 reported_by_node 中就跳过；未报工不等于该工序不属于工艺，这一步把完整模板裁成了工单已发生事实的子集。
+2. 同归档 `mes-business/src/main/java/dev/mesbase/business/legacy/service/LegacyHistoryImportService.java` 464–499行，为每张工单创建一个新的 routing，编码取 WORKORDER 哈希，初始 version=1，节点来自第一条 execution.nodes，并按相邻节点直接创建连接。description 自身就注明“不代表原始历史发布版本”。因此同一原工艺被重复创建，子集还会被串成新路径。
+3. 后续把哈希恢复为相同原 code 时，为满足 `uk_routing_version(code,version)` 而分配不同本地序号，使上述工单快照显示成 v1/v2/v30。序号由恢复过程分配，不能据此推导真实变更顺序。
+
+#### 全部原工艺分组结果
+
+下表仅统计771条有来源映射的迁移记录；“一致”指完整来源工序序列与连接，不代表跨 code 适合合并。产品和严格节点属性另见逐对比较文件。
+
+| 工艺 code | 原工艺ID | 迁移记录数 | 工序/连接形态数 | 节点数 | 与完整来源一致 | 裁剪记录数 |
+| --- | ---: | ---: | ---: | --- | ---: | ---: |
+| 1.9L摇臂总成1006021FB热前 | 32 | 20 | 1 | 7 | 20 | 0 |
+| 1.9L摇臂总成1006021FB热后 | 37 | 22 | 2 | 3,5 | 21 | 1 |
+| 1.9L摇臂总成1006031FB热前 | 33 | 20 | 1 | 7 | 20 | 0 |
+| 1.9L摇臂总成1006031FB热后 | 36 | 22 | 2 | 3,5 | 21 | 1 |
+| 15L5484091新厂加工 | 69 | 6 | 1 | 16 | 6 | 0 |
+| 15L5484094新厂加工 | 70 | 6 | 1 | 16 | 6 | 0 |
+| 2.7L摇臂总成1006021FE010-磷化后. | 38 | 23 | 2 | 2,6 | 22 | 1 |
+| 2.7L摇臂总成1006031FE010-磷化后 | 39 | 23 | 1 | 6 | 23 | 0 |
+| 2.7L支座1006015FE010 | 35 | 21 | 1 | 11 | 21 | 0 |
+| 3142U051挺柱热前 | 61 | 6 | 1 | 3 | 6 | 0 |
+| 3142U051挺柱热后 | 64 | 6 | 1 | 10 | 6 | 0 |
+| 3142U061挺柱热前 | 62 | 6 | 1 | 3 | 6 | 0 |
+| 3142U061挺柱热后 | 65 | 6 | 1 | 10 | 6 | 0 |
+| 3737A281 | 52 | 10 | 2 | 4,13 | 9 | 1 |
+| 3737A291 | 53 | 10 | 2 | 4,13 | 9 | 1 |
+| 3737A341 | 66 | 9 | 1 | 13 | 9 | 0 |
+| 3737A351 | 67 | 9 | 1 | 13 | 9 | 0 |
+| 4646253挺柱热前 | 60 | 6 | 1 | 2 | 6 | 0 |
+| 4646253挺柱热后 | 63 | 6 | 1 | 10 | 6 | 0 |
+| DCE6.7L排气摇臂 | 59 | 6 | 3 | 12,13,17 | 4 | 2 |
+| DCE6.7L进气摇臂 | 58 | 6 | 3 | 12,13,17 | 4 | 2 |
+| ISX11.9L-4330228（4975244）-新工艺 | 46 | 11 | 2 | 17,18 | 1 | 10 |
+| ISX11.9L-4330232（4975240）-新工艺 | 47 | 11 | 2 | 15,16 | 1 | 10 |
+| ISX11.9L-4330237（4975235）-新工艺 | 48 | 9 | 2 | 17,18 | 2 | 7 |
+| ISX11.9L-4330241（4975231）-新工艺 | 49 | 9 | 2 | 15,16 | 2 | 7 |
+| ISX15L-5484091（4059353） | 1 | 29 | 2 | 17,18 | 28 | 1 |
+| ISX15L-5484092（4059351） | 6 | 26 | 2 | 17,18 | 25 | 1 |
+| ISX15L-5484093（4059297） | 7 | 27 | 3 | 1,17,18 | 25 | 2 |
+| ISX15L-5484094（4059294） | 9 | 29 | 2 | 17,18 | 28 | 1 |
+| M11-4003903 -新工艺 | 42 | 8 | 2 | 13,14 | 4 | 4 |
+| M11-4003904-新工艺 | 43 | 8 | 2 | 13,14 | 1 | 7 |
+| M11-4003905-新工艺 | 44 | 8 | 2 | 13,14 | 4 | 4 |
+| M11-4003906-新工艺 | 45 | 8 | 2 | 13,14 | 1 | 7 |
+| 三角下摇臂热前 | 14 | 30 | 1 | 6 | 30 | 0 |
+| 三角下摇臂热后 | 17 | 30 | 1 | 9 | 30 | 0 |
+| 云内27摇臂总成-490PLUS-070035 | 31 | 19 | 2 | 4,18 | 18 | 1 |
+| 云内27摇臂总成-490PLUS-070036 | 30 | 19 | 2 | 4,17 | 18 | 1 |
+| 喷油器摇臂-3896642 | 15 | 30 | 2 | 13,14 | 28 | 2 |
+| 火狐狸总成-5267686 | 10 | 26 | 2 | 12,20 | 25 | 1 |
+| 火狐狸总成-5267687 | 11 | 27 | 3 | 9,17,20 | 25 | 2 |
+| 火狐狸支座5295581 | 34 | 22 | 1 | 10 | 22 | 0 |
+| 迪尔摇臂-R133629 | 16 | 26 | 2 | 4,14 | 25 | 1 |
+| 钛15L6536547摇臂 | 77 | 2 | 2 | 2,13 | 1 | 1 |
+| 钛15L排气摇臂轴（氮化前） | 75 | 4 | 3 | 8,11,14 | 0 | 4 |
+| 钛15L排气摇臂轴（氮化后） | 76 | 1 | 1 | 2 | 1 | 0 |
+| 钛15L排气摇臂轴（调质前） | 74 | 2 | 1 | 5 | 2 | 0 |
+| 钛15L进气摇臂轴（氮化前） | 72 | 3 | 2 | 10,17 | 2 | 1 |
+| 钛15L进气摇臂轴（氮化后） | 73 | 2 | 1 | 2 | 2 | 0 |
+| 钛15L进气摇臂轴（调质前） | 71 | 2 | 1 | 4 | 2 | 0 |
+| 阿瓦隆总成-5259945 | 25 | 25 | 1 | 5 | 25 | 0 |
+| 阿瓦隆总成-5259946 | 23 | 25 | 1 | 4 | 25 | 0 |
+| 阿瓦隆总成磷化-5259945 | 24 | 22 | 1 | 5 | 22 | 0 |
+| 阿瓦隆总成磷化-5259946 | 22 | 22 | 1 | 5 | 22 | 0 |
+
+
+#### 证据与验证边界
+
+私有审查目录 `.local/routing-version-audit-20261022/`：`snapshot.json` 为只读提取；`analysis.json` 为分层归一化结果；`frozen-verification.json` 为来源模板及报工筛选核对；`migrated-families.csv` 为53组迁移工艺清单；`version-pairs.csv` 对全部同 code 多版本组逐对比较7717对（含目标中同系列的正常/派生记录）；`summary.json` 为迁移对象统计。snapshot.json SHA-256 为 `786bde61a9fd950723f001bb3a998b57ba76dc88980f9b57a18eaeae2c5a8e0c`。
+
+验证采用真实数据库只读提取、全量图结构比较与来源冻结证据交叉核对。未新增/修改业务源码、Schema、Flyway 或业务记录，不运行无关构建测试，不将本次审查宣称为工艺治理完成。项目只追加本审查记录，私有分析产物不作为产品运行入口。
+
+
+### 2026-10-22 合并停止、阻塞原因与触发器职责/必要性审查
+
+用户先要求停止合并脚本，随后明确将合并滞后，审查触发器数量、职责和存在必要性。本节为审查结论，不是执行删除触发器的授权记录。本轮未提交工艺合并，未继续执行 Flyway 升级；新建但未应用的 V51 合并SQL已移出正式迁移目录，保存为 `.local/routing-consolidation-20261022/V51__consolidate_identical_routing_versions.sql.pending`，避免服务启动或后续升级误执行。Flyway最大成功版本仍为50，版本51记录为0。
+
+#### 停止操作与阻塞原因（真实数据库证据）
+
+仍核实 Factory TEST_DEV_PERF_20261019、数据源9/revision2、ENABLED/LOCAL、192.168.18.25:3306/mes_base_dev_perf_test，server_uuid=03dbc952-7403-11ef-802c-0242ac130002；只读审查会话真实 transaction_read_only=1。
+
+此次执行方案过重：回滚演练不仅处理685张工单，还一次更新执行、路径、报工、质量与来源映射中的大量节点引用，并对 workorder、execution、routing及其图/产品表全表加锁。前七类引用更新即涉及320703行；维护期四个触发器又逐行比较不变属性，其中来源JSON造成重复载荷检查。第一次演练连接中断；第二次为优化此成本主动停止。二者均未形成正式合并提交，不能把未完成的演练宣称为全量通过。
+
+停止写入后数据库仍需撤销已产生的undo；观察到事务4117749/线程42983处于 ROLLING BACK，一度有约86万行锁、32万余条undo。恢复触发器的 `DROP TRIGGER IF EXISTS mes_defect_no_update`（线程43001）等待该事务释放元数据锁。**当时的直接阻塞链是大事务回滚持锁→维护DDL排队，不是每次业务请求都执行23个触发器。** 该执行方案和演练方式是本次维护的问题，不归咎于触发器总数。
+
+用户要求停止后，已终止仅属于本任务的写入/排队维护连接，不再留下自动恢复DDL队列。14:52:34只读快照确认回滚结束，无活动维护写入、无待决元数据锁，工艺801条、节点9055条、连接8254条，保持合并前规模。随后仅完成停止操作必要收尾：恢复本轮临时替换的4个UPDATE触发器，清理本轮6个维护过程。实际比对全部23个触发器定义与演练前一致，`routing_merge_%`过程为0；没有删除正式触发器。全部17类引用列计数、按实体类型的来源映射计数及证据样本与演练前核对一致。此为事务回滚/计数/定义证据，未声称停止后另跑了全表逐行数据摘要或业务生产闭环。
+
+#### 数量、职责与业务影响
+
+实际业务库23个触发器，中心库 mes_base_dev 为0；未将此数量外推为每个工厂物理库均已核对。V49列出的21个旧迁移写门禁与实际触发器名称交集为0，已删除，没有恢复。现有23个全部为BEFORE触发器（12个UPDATE、11个DELETE），没有INSERT或AFTER触发器。
+
+它们仅承担“检查并拒绝”职责，不写其他表、不计算库存或生产数量、不自动创建单据、不执行ERP、不推进状态。20个原定义是无条件SIGNAL，禁止指定表UPDATE/DELETE；另外2个比较OLD/NEW来源；最后1个只读查询交接引用。正常INSERT不会运行这些UPDATE/DELETE保护，SELECT也不会执行它们。来源/幂等/数量/权限/状态和事务仍由正式Service实施。
+
+- 18个：9类业务/历史事实表各一对“禁止UPDATE、禁止DELETE”，保护报工、不良版本、质量处置、交接、质量放行、仓储接收、完工、工单作废、库存动作。
+- 2个：禁止原位修改/删除冻结来源映射及数量证据。它们来自V40，但职责是证据保护，不是已移除的迁移准入/激活门禁。
+- 2个：工单与仓库已有非空source不得改值或清空；并不替代来源合法值、运行模式、provider/binding和权限校验。
+- 1个：存在生产交接记录时拒绝删除对应执行，保护跨表引用。
+
+#### 逐项职责与处置判定
+
+以下“候选”表示正式业务运行未发现必须依赖该触发器完成的用例，不表示删除后数据库直写防护已经等价实现；需要同步明确写账号权限并迁移相关测试。普通生成Mapper仍包含UPDATE/DELETE方法，不将“没有HTTP入口”误写成“底层无法写入”。
+
+| 触发器 | 操作 | 实际职责 | 必要性审查 |
+| --- | --- | --- | --- |
+| `mes_defect_no_delete` | DELETE | 禁止原位物理删除事实记录；不执行业务计算 | 可移除候选，规则由服务/写权限承接 |
+| `mes_defect_no_update` | UPDATE | 禁止原位修改事实记录；不执行业务计算 | 可移除候选，规则由服务/写权限承接 |
+| `mes_execution_completion_no_delete` | DELETE | 禁止原位物理删除事实记录；不执行业务计算 | 可移除候选，规则由服务/写权限承接 |
+| `mes_execution_completion_no_update` | UPDATE | 禁止原位修改事实记录；不执行业务计算 | 可移除候选，规则由服务/写权限承接 |
+| `mes_legacy_mapping_no_delete` | DELETE | 禁止原位修改/删除冻结来源映射和数量依据 | 可移除候选，规则由服务/写权限承接 |
+| `mes_legacy_mapping_no_update` | UPDATE | 禁止原位修改/删除冻结来源映射和数量依据 | 可移除候选，规则由服务/写权限承接 |
+| `mes_quality_release_no_delete` | DELETE | 禁止原位物理删除事实记录；不执行业务计算 | 可移除候选，规则由服务/写权限承接 |
+| `mes_quality_release_no_update` | UPDATE | 禁止原位修改事实记录；不执行业务计算 | 可移除候选，规则由服务/写权限承接 |
+| `mes_quality_treatment_no_delete` | DELETE | 禁止原位物理删除事实记录；不执行业务计算 | 可移除候选，规则由服务/写权限承接 |
+| `mes_quality_treatment_no_update` | UPDATE | 禁止原位修改事实记录；不执行业务计算 | 可移除候选，规则由服务/写权限承接 |
+| `mes_receipt_execution_guard` | DELETE | 存在交接事实时拒绝删除对应生产执行 | 先补Service显式交接引用检查，再移除 |
+| `mes_receipt_no_delete` | DELETE | 禁止原位物理删除事实记录；不执行业务计算 | 可移除候选，规则由服务/写权限承接 |
+| `mes_receipt_no_update` | UPDATE | 禁止原位修改事实记录；不执行业务计算 | 可移除候选，规则由服务/写权限承接 |
+| `mes_report_no_delete` | DELETE | 禁止原位物理删除事实记录；不执行业务计算 | 可移除候选，规则由服务/写权限承接 |
+| `mes_report_no_update` | UPDATE | 禁止原位修改事实记录；不执行业务计算 | 可移除候选，规则由服务/写权限承接 |
+| `mes_warehouse_acceptance_no_delete` | DELETE | 禁止原位物理删除事实记录；不执行业务计算 | 可移除候选，规则由服务/写权限承接 |
+| `mes_warehouse_acceptance_no_update` | UPDATE | 禁止原位修改事实记录；不执行业务计算 | 可移除候选，规则由服务/写权限承接 |
+| `mes_workorder_cancellation_no_delete` | DELETE | 禁止原位物理删除事实记录；不执行业务计算 | 可移除候选，规则由服务/写权限承接 |
+| `mes_workorder_cancellation_no_update` | UPDATE | 禁止原位修改事实记录；不执行业务计算 | 可移除候选，规则由服务/写权限承接 |
+| `wm_stock_action_no_delete` | DELETE | 禁止原位物理删除事实记录；不执行业务计算 | 可移除候选，规则由服务/写权限承接 |
+| `wm_stock_action_no_update` | UPDATE | 禁止原位修改事实记录；不执行业务计算 | 可移除候选，规则由服务/写权限承接 |
+| `wm_warehouse_source_immutable` | UPDATE | 禁止将已有非空业务来源改为其他值或清空 | 可移除候选，规则由服务/写权限承接 |
+| `workorder_source_immutable` | UPDATE | 禁止将已有非空业务来源改为其他值或清空 | 可移除候选，规则由服务/写权限承接 |
+
+
+#### 现有代码承接证据及缺口
+
+1. **事实追加20个保护的承接：** ProductionReportSubmitService / ProductionReportService 通过 insert、insertBatch 追加报工及订正；ProductionDefectService 通过新revision行订正/作废；QualityTreatmentService、QualityReleaseService、ProductionCompletionService、WorkOrderCancellationService追加事件/事实；LocalStockService在同一事务更新当前余额并insert库存动作，未发现正式入口原位改写/删除动作账本。StockAction、质量放行/完工内部CRUD展示只提供查询；ProductionReceiptService和WarehouseAcceptanceService当前为历史只读入口；LegacyHistoryMapper / QueryService仅查询冻结证据。故这些保护是数据库的额外防改手段，业务规则本身不要求以触发器实现。生成Mapper的完整CRUD仍存在，未来移除时应限制调用方和运行账号权限，不能靠保留触发器掩盖错误写入口，也不能宣称Service可拦住数据库管理员SQL。
+2. **来源2个保护的承接：** WorkOrderModels.Save、WmWarehouseUpdateCommand不含source。LOCAL创建由服务赋值，EXTERNAL同步检查旧对象必须为EXTERNAL及可信绑定，普通编辑保留旧source；WorkOrderService.update、WmWarehouseServiceImpl.updateById执行来源/模式校验。未发现正常API需要将已持久化source改派为另一体系，故触发器不是当前正式链路的唯一权威实现。移除它们仍保留来源隔离规则。
+3. **交接引用1个保护需先补：** ProductionExecutionRules.deleting（133行起）锁定执行，检查开工、领料、报工、派工、不良历史及LOCKED路径，但未显式检查 mes_production_receipt。原触发器V28第31行恰好补这一条查询。现有正常事实往往会被其他状态检查间接拦住，但不能把间接条件当成显式覆盖。建议在既有删除规则与相同执行锁下补交接引用检查后移除此触发器；本轮不新增外键，也未证明存在可通过正式入口删除真实交接执行的线上复现。
+4. **数据库层替代保护：** 如需继续阻止运行账号直接改账本，可采用账本SELECT/INSERT、冻结证据SELECT的最小表权限，维护账号与运行账号分离；来源字段也可采用列写权限配合服务白名单。此为可选实施方式，本轮未修改账号/授权。没有发现必须保留触发器才能满足的独有业务职责，建议整体向无业务触发器方向收敛，先补齐第3项，配套写入口与权限策略，再以新的正式迁移移除，不倒改V25–V49历史SQL。
+5. **测试不能原样保留：** SourceIsolationMySqlTest直接断言改source返回45000；ProductionReportMySqlTest、ProductionDefectMySqlTest、QualityWorkflowMySqlTest和WorkOrderCancellationMySqlTest含直接SQL修改/删除被拒绝断言。将来去触发器时，应改为真实业务入口的不可编辑/追加订正/引用保护测试；如选用数据库账号权限，还应使用受限运行账号验证权限拒绝。不能继续用root写SQL失败来冒充无触发器后的产品保证。本轮仅审查测试源码，未运行会写库的测试。
+
+关键源码：`ProductionExecutionRules.java:133`、`WorkOrderService.java:300`、`WmWarehouseServiceImpl.java:155,332`、`ProductionReportService.java:221`、`ProductionDefectService.java:193–202`、`QualityTreatmentService.java:192,423`、`QualityReleaseService.java:172`、`ProductionCompletionService.java:174–197`、`WorkOrderCancellationService.java:90`、`LocalStockService.java:349`、`LegacyHistoryMapper.java`。原始触发器来自业务迁移V25、V26、V28、V32、V34、V35、V36、V37、V40；完整23项名称、表、职责、维护状态、处置建议见私有 `trigger-responsibilities.csv`。
+
+#### 本轮维护临时状态的单独结论
+
+本轮只替换过 `mes_report_no_update`、`mes_defect_no_update`、`mes_quality_treatment_no_update`、`mes_legacy_mapping_no_update` 四个既有名称，没有增加触发器总数。临时定义通过会话变量允许维护连接改变关联列；这种变量可由SQL会话设置，不适合作为长期授权或不可变事实边界。它们现已全部恢复原定义，6个本轮维护过程已清理，停止收尾完成。尚未执行上表提出的正式触发器移除，没有修改业务源码、接口、账号权限、正式已执行迁移或应用服务。
+
+证据目录 `.local/routing-consolidation-20261022/`：`inspection.json`（维护前定义）、`stopped-audit.json`（停止初始快照）、`trigger-audit-state.json`（回滚结束快照）、`center-triggers.json`、`trigger-responsibilities.csv`、`trigger-summary.json`、`stop-cleanup.json`、`references-after-stop.json`。根因与职责判断基于真实MySQL只读状态和当前源码；“可以移除”的部分是替代实现审查结论，不是已实施的发布结果。合并继续搁置。
+
+#### 2026-10-22 用户确定代码层方向：逐项业务合理性评审清单
+
+用户要求逐项列出并共同评审合理性，最终全部迁往代码层。方向已明确，但不表示用户已经认可现有整表禁止修改/删除规则。本节列出待评审建议，不实施触发器移除、不改变已有记录，不恢复工艺合并。上节数据库表/列写权限仅为当时备选，不作为本轮迁移业务规则的承接方案；不新增另一套数据库业务门禁。代码约束作用于正式服务入口，不承诺拦截管理员直接SQL。
+
+下表前10项每项对应既有 `_no_update`、`_no_delete` 两个触发器，后3项各对应1个，共23个。修改和删除应分别评审，不能以“事实表”名义直接认定整表永久只读。
+
+| 项 | 对象/触发器前缀 | 当前限制 | 待评审建议及理由 | 代码承接点/待补项 |
+| --- | --- | --- | --- | --- |
+| 1 | 报工 `mes_report` | 所有字段不能修改，不能删除 | 保留数量订正可追踪；评审备注等非数量字段能否编辑，以及未产生下游业务的错误报工如何撤销；不直接认定所有字段不可改 | ProductionReportService/SubmitService已有追加订正；字段编辑与撤销范围待定 |
+| 2 | 不良申报 `mes_defect` | 所有字段不能修改，不能删除 | 已有新增版本订正/作废；评审是否保留版本方式，及未处置记录能否直接编辑；已处置后的修改必须核对处置数量 | ProductionDefectService已有revision订正/作废；须验证当前质量链路联动 |
+| 3 | 质量处置 `mes_quality_treatment` | 所有字段不能修改，不能删除 | 已导致返工、报废或库存影响时不能只改一行；评审未执行处置能否修改/撤销，以及执行后纠错用例；不预设新增通用流程 | QualityTreatmentService/QualityDispositionService校验数量、状态、关联与事务；撤销能力不能视为已具备 |
+| 4 | 生产交接 `mes_receipt` | 所有字段不能修改，不能删除 | 当前历史只读入口；保留读取，不恢复旧写流程；必要引用修复与业务数量更改分开评审 | ProductionReceiptService当前只读；受控维护不得改变数量与原始依据 |
+| 5 | 质量放行 `mes_quality_release` | 所有字段不能修改，不能删除 | 放行可能已被后续业务消费；评审未消费时是否可撤销，消费后是否须先处理依赖；不默认整表禁改 | QualityReleaseService已有正式放行；撤销及依赖检查范围待定 |
+| 6 | 仓储接收 `mes_warehouse_acceptance` | 所有字段不能修改，不能删除 | 当前历史只读；新入库遵循当前单据草稿/审核链路，不恢复旧接收写流程 | WarehouseAcceptanceService历史读取；StockDocumentService承担新业务 |
+| 7 | 执行完工 `mes_execution_completion` | 所有字段不能修改，不能删除 | 完工撤回涉及执行、工单及入库依赖，应评审具体撤回条件；不能仅删除完工记录制造未完工状态 | ProductionCompletionService承接完工；撤回用例尚未在本轮证明 |
+| 8 | 工单作废 `mes_workorder_cancellation` | 所有字段不能修改，不能删除 | 作废原因等字段与恢复工单是不同操作；评审原因订正权限及是否需要恢复能力，不能用删记录代替状态转换 | WorkOrderCancellationService已有作废事实与工单状态同事务写入 |
+| 9 | 库存动作 `wm_stock_action` | 所有字段不能修改，不能删除 | 数量/方向/仓库直接改动会与余额脱节；库存纠错须同步处理余额和动作；评审备注等字段可编辑范围 | LocalStockService已有余额更新+动作新增同事务；不推断完整冲销入口已经存在 |
+| 10 | 冻结来源映射 `mes_legacy_mapping` | 原始载荷、数量依据、目标引用等全部不能修改/删除 | 原始载荷与数量依据保留；目标工艺/节点引用不应仅因同表而永久冻结，可按明确维护范围核实调整；不恢复一次性导入入口 | LegacyHistoryMapper当前只读；未来引用维护方式另定，当前不执行合并 |
+| 11 | `workorder_source_immutable` | 已有非空来源不能修改/清空 | 保留普通业务不能把LOCAL工单改派EXTERNAL的规则，与可信同步身份一致 | WorkOrderService创建/编辑/同步已有校验；检查所有正式入口与来源测试 |
+| 12 | `wm_warehouse_source_immutable` | 已有非空来源不能修改/清空 | 保留普通业务不能改派仓库来源的规则，防止库存权威归属改变 | WmWarehouseServiceImpl创建/编辑/同步已有校验；检查所有正式入口与来源测试 |
+| 13 | `mes_receipt_execution_guard` | 有交接记录时禁止删除执行 | 保留被引用执行不能删除的规则，避免交接成为孤立记录 | ProductionExecutionRules.deleting须在既有执行父锁/事务内补显式交接引用检查 |
+
+实施依据：先确定每项允许修改的字段、允许撤销/删除的状态及关联影响，再复用现有Service实施，覆盖正式写入口、同事务引用校验与并发；不新增全局拦截器照搬整表禁改。随后将测试由SQL触发器拒绝改为真实业务入口行为测试，新增正式Flyway迁移删除23个触发器，不修改已发布迁移。此步骤顺序为实施建议，当前仅完成清单与评审材料；未修改业务代码、测试、账号权限或数据库，未执行新增测试。
+
+#### 2026-10-22 用户修正评审标准：修改留痕与下游删除保护
+
+此标准更新上一节的评审方向，不将既有整表禁改/禁删作为默认保留规则。用户明确：已有订正流水或变更记录承担修改留痕时，不应再由触发器禁止修改；删除按下游依赖决定，例如工单有执行则不能删，执行有报工则不能删，报工有不良则不能删。最终均由业务代码承接。
+
+- 修改审查：逐项核实实际记录结构。独立变更日志、追加订正行与业务本身的数量流水不是同一种结构；应证明原值/新值或订正关系、操作者、时间和原因确实可追踪，再判断是否已有足够留痕。不因表名含“流水/记录”就宣称修改历史已覆盖，也不强制把现有追加订正改造成原位UPDATE。
+- 删除审查：列出真实下游引用及已经产生的关联影响，核对Service是否有明确检查和准确拒绝原因；不能只凭“已开工/已完成”状态代替实际依赖检查。有下游则拒绝当前对象删除，无下游进入正常删除处理，不继续沿用无条件禁删。
+- 已生效库存动作、完工等若涉及余额或父对象状态，删除用例仍须在同一业务事务内保持这些关联结果一致；无下游不等于仅DELETE一行即可完成。具体回退方式作为对象级评审项，不另设整表禁删触发器。
+- 并发审查：删除检查与删除操作必须处于同一事务，复用现有父对象锁，并核对下游创建也遵守相同锁协议，防止检查后新建下游。权限、可信来源和幂等继续由现有正式业务入口执行。
+
+后续清单统一采用“对象→现有订正/变更留痕→真实下游依赖→当前代码覆盖→缺口”的列结构；上述示例为用户确认的评审标准，不宣称其已全部实现。本轮仅更新评审文档，未修改业务代码、测试或数据库；工艺合并仍搁置。

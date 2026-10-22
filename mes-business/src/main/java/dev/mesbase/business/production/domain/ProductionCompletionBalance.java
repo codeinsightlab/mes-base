@@ -11,7 +11,7 @@ public final class ProductionCompletionBalance {
     }
 
     public static String blockedReason(ExecutionQuantity quantities) {
-        if (quantities.historical() || quantities.nodes().isEmpty()) return "缺少可核实的正式生产路径";
+        if (quantities.nodes().isEmpty()) return "缺少可核实的正式生产路径";
         if (quantities.confirmedInputQty().signum() <= 0 || quantities.reservedInputQty().signum() != 0)
             return "缺少正式投入或仍有未决投产意图";
         if (quantities.nodes().stream().anyMatch(n -> n.rawEffectiveOutputQty().signum() < 0

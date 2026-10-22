@@ -17,10 +17,11 @@ import dev.mesbase.business.production.service.ProductionChainLocks;
 import dev.mesbase.business.production.service.ProductionQuantityService;
 import dev.mesbase.business.quality.dao.MesProductionDefectMapper;
 import dev.mesbase.business.quality.dao.ProductionDefectListExtraMapper;
-import dev.mesbase.business.quality.domain.DefectDestination;
 import dev.mesbase.business.quality.domain.DefectRecordAction;
 import dev.mesbase.business.quality.domain.MesProductionDefectEntity;
 import dev.mesbase.business.quality.domain.MesProductionDefectExample;
+import dev.mesbase.business.quality.domain.ProductionDefectV2Models;
+import dev.mesbase.business.quality.domain.WasteCategory;
 import dev.mesbase.business.quality.domain.ProductionDefectModels.Command;
 import dev.mesbase.business.quality.domain.ProductionDefectModels.Facts;
 import dev.mesbase.business.quality.domain.ProductionDefectModels.ListContext;
@@ -30,9 +31,8 @@ import dev.mesbase.business.quality.domain.ProductionDefectModels.NodeTotal;
 import dev.mesbase.business.quality.domain.ProductionDefectModels.Page;
 import dev.mesbase.business.quality.domain.ProductionDefectModels.Processing;
 import dev.mesbase.business.quality.domain.ProductionDefectModels.Warehouse;
-import dev.mesbase.business.quality.domain.ProductionDefectV2Models;
+import dev.mesbase.business.quality.domain.ProductionDefectModels.TreatmentTotals;
 import dev.mesbase.business.quality.domain.QualityTreatmentModels.Attribution;
-import dev.mesbase.business.quality.domain.WasteCategory;
 import dev.mesbase.business.quality.integration.ProductionDefectErpGateway;
 import dev.mesbase.business.shared.enums.EnableStatus;
 import dev.mesbase.business.wm.dao.WmWarehouseMapper;
@@ -166,7 +166,7 @@ public class ProductionDefectService {
         if (retry != null) return replay(retry, fingerprint);
         if (c.facts() != null)
             ProductionQuantityInput.changed(c.facts().defectQty(), Optional.ofNullable(before)
-                    .map(nullableValue -> nullableValue.getDefectQty()).orElse(null));
+                    .map(MesProductionDefectEntity::getDefectQty).orElse(null));
         var row = new MesProductionDefectEntity();
         if (before != null) {
             before = latest(id);
@@ -189,7 +189,6 @@ public class ProductionDefectService {
         apply(row, facts);
         if (typed != null) copyType(typed, row);
         else if (before != null) copyType(before, row);
-        row.setCommandVersion(Optional.ofNullable(typed).map(nullableValue -> "V2").orElse(null));
         row.setDeclarationId(id == null ? UUID.randomUUID().toString() : id);
         row.setRevisionNo(before == null ? 1 : before.getRevisionNo() + 1);
         row.setRecordAction(action);
@@ -268,8 +267,8 @@ public class ProductionDefectService {
         typed.setDefectTypeRevision(type.getRevision());
         String reason = StringUtils.trimToNull(c.remark());
         if (reason == null) reason = type.getName();
-        var facts = new Facts(c.executionId(), c.nodeId(), c.nodeId(), null, c.quantity(), c.wasteCategory(), reason,
-                null, null, DefectDestination.SAME_NODE.getValue(), c.nodeId(), null, null, c.occurredAt());
+        var facts = new Facts(c.executionId(), c.nodeId(), c.quantity(), c.wasteCategory(), reason,
+                null, null, c.occurredAt());
         return execute(DefectRecordAction.CREATE.getValue(), null,
                 new Command(c.requestId(), null, null, facts, c.assessment()), typed, fp);
     }
@@ -360,15 +359,17 @@ public class ProductionDefectService {
         var states = new HashMap<String, Processing>();
         if (!rows.isEmpty()) {
             var totals = listQueries.selectTreatmentTotals(rows.stream().map(MesProductionDefectEntity::getId).toList())
-                    .stream().collect(Collectors.toMap(t -> t.declarationId(), t -> t));
+                    .stream().collect(Collectors.toMap(TreatmentTotals::declarationId, t -> t));
             for (var row : rows) {
                 var t = totals.get(row.getDeclarationId());
-                if (t == null) throw new FoundationException(ErrorCode.QUALITY_TREATMENT_CONFLICT);
-                if (t.invalidActions() > 0) throw new FoundationException(ErrorCode.QUALITY_DATA_INVALID);
+                if (t == null) {
+                    states.put(row.getDeclarationId(), Processing.unresolved());
+                    continue;
+                }
                 var attribution = Attribution.UNVERIFIED;
-                if (t.attribution() != null) attribution = Attribution.valueOf(t.attribution());
-                states.put(row.getDeclarationId(), Processing.of(row.getRecordAction(), attribution,
-                        row.getDefectQty(), t.returnedQty(), t.transferredQty()));
+                if (t.attribution() != null) attribution = Attribution.find(t.attribution());
+                states.put(row.getDeclarationId(), Processing.read(row.getRecordAction(), attribution,
+                        row.getDefectQty(), t.returnedQty(), t.transferredQty(), t.invalidActions()));
             }
         }
         return new Page(rows, total, offset, limit, names(rows), Map.copyOf(states), contexts);
@@ -391,7 +392,7 @@ public class ProductionDefectService {
 
     private Names names(List<MesProductionDefectEntity> rows) {
         var ids = rows.stream()
-                .flatMap(r -> Stream.of(r.getAffectedNodeId(), r.getDiscoveredNodeId(), r.getResponsibleNodeId(), r.getTargetNodeId()))
+                .map(MesProductionDefectEntity::getAffectedNodeId)
                 .filter(Objects::nonNull).distinct().toList();
         Map<Long, String> nodeNames = new HashMap<>();
         if (!ids.isEmpty()) {
@@ -410,16 +411,7 @@ public class ProductionDefectService {
             directory.userLabels(userIds.subList(i, Math.min(i + 200, userIds.size()))).forEach((id, label) -> {
                 if (label.name() != null) userNames.put(id, label.name());
             });
-        var warehouseIds = rows.stream().map(MesProductionDefectEntity::getTargetWarehouseId).filter(Objects::nonNull)
-                .distinct().toList();
-        Map<Long, String> warehouseNames = Map.of();
-        if (!warehouseIds.isEmpty()) {
-            var e = new WmWarehouseExample();
-            e.createCriteria().andIdIn(warehouseIds);
-            warehouseNames = warehouses.selectByExample(e).stream()
-                    .collect(Collectors.toMap(WmWarehouseEntity::getId, WmWarehouseEntity::getName));
-        }
-        return new Names(nodeNames, userNames, warehouseNames);
+        return new Names(nodeNames, userNames);
     }
 
     public BigDecimal sumEffectiveDefectQty(Long executionId, Long affectedNodeId) {
@@ -457,34 +449,27 @@ public class ProductionDefectService {
     }
 
     private Facts validate(Facts f) {
-        if (f.executionId() == null || f.affectedNodeId() == null || f.discoveredNodeId() == null || f.defectQty() == null || f.defectQty()
+        if (f.executionId() == null || f.affectedNodeId() == null || f.defectQty() == null || f.defectQty()
                 .signum() <= 0 || f.defectQty().scale() > 6 || f.defectQty().precision() - f.defectQty().scale() > 14)
             ParameterChecks.reject(ErrorCode.BAD_REQUEST);
         if (WasteCategory.from(f.wasteCategory()) == null) ParameterChecks.reject(ErrorCode.BAD_REQUEST);
         ParameterChecks.text(f.defectReason(), true, 500, ErrorCode.BAD_REQUEST);
         ParameterChecks.text(f.responsibilityRemark(), false, 500, ErrorCode.BAD_REQUEST);
-        ParameterChecks.text(f.destinationRemark(), false, 500, ErrorCode.BAD_REQUEST);
         if (f.occurredAt() == null || f.occurredAt().isAfter(LocalDateTime.now()))
             ParameterChecks.reject(ErrorCode.BAD_REQUEST);
         var ids = nodes(f.executionId()).stream().map(n -> Long.valueOf(n.id())).toList();
-        if (!ids.contains(f.affectedNodeId()) || !ids.contains(f.discoveredNodeId()) || f.responsibleNodeId() != null && !ids.contains(f.responsibleNodeId()))
+        if (!ids.contains(f.affectedNodeId()))
             ParameterChecks.reject(ErrorCode.BAD_REQUEST);
         if (f.responsibleUserId() != null && !directory.historicalUserExists(f.responsibleUserId()))
             ParameterChecks.reject(ErrorCode.BAD_REQUEST);
-        if (DefectDestination.SAME_NODE.getValue().equals(f.destinationType())) {
-            if (f.targetWarehouseId() != null || f.targetNodeId() != null && !f.targetNodeId()
-                    .equals(f.affectedNodeId())) ParameterChecks.reject(ErrorCode.BAD_REQUEST);
-            return new Facts(f.executionId(), f.affectedNodeId(), f.discoveredNodeId(), f.responsibleNodeId(), f.defectQty(), f.wasteCategory(), f.defectReason(), f.responsibleUserId(), f.responsibilityRemark(), f.destinationType(), f.affectedNodeId(), null, f.destinationRemark(), f.occurredAt());
-        }
-        throw new FoundationException(ErrorCode.BAD_REQUEST);
+        return f;
     }
 
     public static Facts normalize(Facts f) {
         if (f == null) return null;
-        return new Facts(f.executionId(), f.affectedNodeId(), f.discoveredNodeId(), f.responsibleNodeId(), Optional.ofNullable(f.defectQty())
-                .map(nullableValue -> nullableValue
-                        .stripTrailingZeros())
-                .orElse(null), f.wasteCategory(), StringUtils.trimToNull(f.defectReason()), f.responsibleUserId(), StringUtils.trimToNull(f.responsibilityRemark()), f.destinationType(), f.targetNodeId(), f.targetWarehouseId(), StringUtils.trimToNull(f.destinationRemark()), Optional.ofNullable(f.occurredAt())
+        return new Facts(f.executionId(), f.affectedNodeId(), Optional.ofNullable(f.defectQty())
+                .map(BigDecimal::stripTrailingZeros)
+                .orElse(null), f.wasteCategory(), StringUtils.trimToNull(f.defectReason()), f.responsibleUserId(), StringUtils.trimToNull(f.responsibilityRemark()), Optional.ofNullable(f.occurredAt())
                 .map(nullableValue -> nullableValue
                         .withNano(nullableValue.getNano() / 1000 * 1000)).orElse(null));
     }
@@ -493,11 +478,11 @@ public class ProductionDefectService {
         // Length-prefixed typed fields avoid JSON ordering, decimal scale and delimiter ambiguity.
         var f = normalize(c.facts());
         var b = new StringBuilder();
-        Object[] factFields = new Object[14];
+        Object[] factFields = new Object[8];
         if (f != null) {
-            factFields = new Object[]{f.executionId(), f.affectedNodeId(), f.discoveredNodeId(), f.responsibleNodeId(),
+            factFields = new Object[]{f.executionId(), f.affectedNodeId(),
                     f.defectQty(), f.wasteCategory(), f.defectReason(), f.responsibleUserId(), f.responsibilityRemark(),
-                    f.destinationType(), f.targetNodeId(), f.targetWarehouseId(), f.destinationRemark(), f.occurredAt()};
+                    f.occurredAt()};
         }
         var values = new ArrayList<Object>(Arrays.asList(action, id, actor, c.expectedRevision(), StringUtils.trimToNull(c.revisionReason())));
         Collections.addAll(values, factFields);
@@ -515,23 +500,17 @@ public class ProductionDefectService {
     }
 
     public static Facts facts(MesProductionDefectEntity r) {
-        return new Facts(r.getExecutionId(), r.getAffectedNodeId(), r.getDiscoveredNodeId(), r.getResponsibleNodeId(), r.getDefectQty(), r.getWasteCategory(), r.getDefectReason(), r.getResponsibleUserId(), r.getResponsibilityRemark(), r.getDestinationType(), r.getTargetNodeId(), r.getTargetWarehouseId(), r.getDestinationRemark(), r.getOccurredAt());
+        return new Facts(r.getExecutionId(), r.getAffectedNodeId(), r.getDefectQty(), r.getWasteCategory(), r.getDefectReason(), r.getResponsibleUserId(), r.getResponsibilityRemark(), r.getOccurredAt());
     }
 
     private static void apply(MesProductionDefectEntity r, Facts f) {
         r.setExecutionId(f.executionId());
         r.setAffectedNodeId(f.affectedNodeId());
-        r.setDiscoveredNodeId(f.discoveredNodeId());
-        r.setResponsibleNodeId(f.responsibleNodeId());
         r.setDefectQty(f.defectQty());
         r.setWasteCategory(f.wasteCategory());
         r.setDefectReason(f.defectReason());
         r.setResponsibleUserId(f.responsibleUserId());
         r.setResponsibilityRemark(f.responsibilityRemark());
-        r.setDestinationType(f.destinationType());
-        r.setTargetNodeId(f.targetNodeId());
-        r.setTargetWarehouseId(f.targetWarehouseId());
-        r.setDestinationRemark(f.destinationRemark());
         r.setOccurredAt(f.occurredAt());
     }
 

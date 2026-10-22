@@ -78,4 +78,44 @@
             </dependency>
         </dependencies>
     </dependencyManagement>
+    <profiles>
+        <profile>
+            <id>business-flyway</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.flywaydb</groupId>
+                        <artifactId>flyway-maven-plugin</artifactId>
+                        <version>${flyway.version}</version>
+                        <configuration>
+                            <url>${env.FLYWAY_URL}</url>
+                            <user>${env.FLYWAY_USER}</user>
+                            <password>${env.FLYWAY_PASSWORD}</password>
+                            <locations>
+                                <location>filesystem:${maven.multiModuleProjectDirectory}/mes-admin/src/main/resources/db/business</location>
+                            </locations>
+                            <table>flyway_business_schema_history</table>
+                            <cleanDisabled>true</cleanDisabled>
+                            <baselineOnMigrate>false</baselineOnMigrate>
+                            <outOfOrder>false</outOfOrder>
+                            <validateOnMigrate>true</validateOnMigrate>
+                            <validateMigrationNaming>true</validateMigrationNaming>
+                        </configuration>
+                        <dependencies>
+                            <dependency>
+                                <groupId>org.flywaydb</groupId>
+                                <artifactId>flyway-mysql</artifactId>
+                                <version>${flyway.version}</version>
+                            </dependency>
+                            <dependency>
+                                <groupId>com.mysql</groupId>
+                                <artifactId>mysql-connector-j</artifactId>
+                                <version>${mysql.version}</version>
+                            </dependency>
+                        </dependencies>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
 </project>

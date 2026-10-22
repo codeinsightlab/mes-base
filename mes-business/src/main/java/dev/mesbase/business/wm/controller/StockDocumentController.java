@@ -2,6 +2,8 @@ package dev.mesbase.business.wm.controller;
 
 import dev.mesbase.common.utils.bean.BeanConversions;
 import dev.mesbase.business.wm.domain.StockDocumentModels;
+import dev.mesbase.business.wm.domain.StockDocumentType;
+import java.util.Arrays;
 import dev.mesbase.business.wm.domain.WmStockDocumentEntity;
 import dev.mesbase.business.wm.domain.WmStockDocumentLineEntity;
 import dev.mesbase.business.wm.service.StockDocumentService;
@@ -39,6 +41,18 @@ public class StockDocumentController {
         return BeanConversions.convertPage(page, Page.class);
     }
 
+    public record Type(String value, String label, String origin, String requiredDocuments, boolean approvalAvailable,
+                       boolean qualityReceipt) {
+    }
+
+    @GetMapping("/types")
+    @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED, permission = PERMISSION + "query")
+    public List<Type> types() {
+        return Arrays.stream(StockDocumentType.values()).map(type -> new Type(type.getValue(), type.getDescription(),
+                        type.getOrigin(), type.getRequiredDocuments(), type.isApprovalAvailable(), type.isQualityReceipt()))
+                .toList();
+    }
+
     @GetMapping("/{id}")
     @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED, permission = PERMISSION + "query")
     public Detail detail(@PathVariable Long id) {
@@ -63,10 +77,10 @@ public class StockDocumentController {
         return view(service.cancel(id, command));
     }
 
-    @PostMapping("/{id}/actions/post")
+    @PostMapping("/{id}/actions/approve")
     @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED, permission = PERMISSION + "post")
-    public Detail post(@PathVariable Long id, @Valid @RequestBody StockDocumentModels.Post command) {
-        return view(service.post(id, command));
+    public Detail approve(@PathVariable Long id, @Valid @RequestBody StockDocumentModels.Post command) {
+        return view(service.approve(id, command));
     }
 
     @PostMapping("/{id}/lines")
@@ -139,7 +153,10 @@ public class StockDocumentController {
                        String remark, String stockActionId, String revision) {
     }
 
-    public record Detail(Header document, List<Line> lines) {
+    public record QualitySource(String sourceDeclarationId, String sourceTreatmentId, String sourceQualityExecutionId) {
+    }
+
+    public record Detail(Header document, List<Line> lines, QualitySource qualitySource) {
     }
 
     public record Page(List<Header> items, long total, int offset, int limit) {

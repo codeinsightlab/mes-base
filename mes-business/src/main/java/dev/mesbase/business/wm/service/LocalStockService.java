@@ -25,6 +25,7 @@ import dev.mesbase.business.wm.dao.WmInventoryMapper;
 import dev.mesbase.business.wm.dao.WmStockActionMapper;
 import dev.mesbase.business.wm.dao.WmWarehouseMapper;
 import dev.mesbase.business.wm.domain.StockActionType;
+import dev.mesbase.business.wm.domain.StockDocumentType;
 import dev.mesbase.business.wm.domain.StockCommand;
 import dev.mesbase.business.wm.domain.StockSourceType;
 import dev.mesbase.business.wm.domain.WmInventoryEntity;
@@ -245,10 +246,11 @@ public class LocalStockService {
     public WmStockActionEntity postDocument(String type, Long documentId, WmStockDocumentLineEntity line,
                                             String operationId, String actionId, String requestHash, String reason,
                                             Long executionId) {
-        var actionType = StockActionType.from(type);
-        var sourceType = StockSourceType.from(type);
-        if (actionType != StockActionType.OTHER_RECEIPT && actionType != StockActionType.OTHER_ISSUE)
-            ParameterChecks.reject(ErrorCode.BAD_REQUEST);
+        var purpose = StockDocumentType.from(type);
+        if (purpose == null || !purpose.isApprovalAvailable())
+            ParameterChecks.reject(ErrorCode.STOCK_DOCUMENT_SOURCE_PENDING);
+        var actionType = purpose.isReceipt() ? StockActionType.OTHER_RECEIPT : StockActionType.OTHER_ISSUE;
+        var sourceType = purpose.isReceipt() ? StockSourceType.OTHER_RECEIPT : StockSourceType.OTHER_ISSUE;
         uuid(operationId);
         uuid(actionId);
         decimal(line.getQuantity());

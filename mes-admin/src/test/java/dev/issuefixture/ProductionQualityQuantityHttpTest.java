@@ -31,8 +31,7 @@ class ProductionQualityQuantityHttpTest {
 
     static String command(long node, String qty) {
         return ProductionDefectHttpTest.command(UUID.randomUUID().toString(), 0, qty)
-                .replace("affectedNodeId\":\"13", "affectedNodeId\":\"" + node)
-                .replace("discoveredNodeId\":\"13", "discoveredNodeId\":\"" + node);
+                .replace("affectedNodeId\":\"13", "affectedNodeId\":\"" + node);
     }
 
     static long report(MockMvc m, long node, String qty) throws Exception {
@@ -66,11 +65,10 @@ class ProductionQualityQuantityHttpTest {
                     .andExpect(jsonPath("nodes[2].availableQty").value("2.000000"))
                     .andExpect(jsonPath("nodes[0].qualityIntegrated").value(true));
             String revision = ProductionDefectHttpTest.command("revision", 1, "4")
-                    .replace("affectedNodeId\":\"13", "affectedNodeId\":\"11")
-                    .replace("discoveredNodeId\":\"13", "discoveredNodeId\":\"11");
+                    .replace("affectedNodeId\":\"13", "affectedNodeId\":\"11");
             for (int i = 0; i < 2; i++)
                 m.perform(full(post("/api/quality/defects/" + a + "/revisions"), "A").content(revision))
-                        .andExpect(status().isOk()).andExpect(jsonPath("record.targetNodeId").value("11"));
+                        .andExpect(status().isOk()).andExpect(jsonPath("record.affectedNodeId").value("11"));
             m.perform(full(get("/api/quality/defects/executions/1/totals"), "A"))
                     .andExpect(jsonPath("[?(@.affectedNodeId == '11') ].effectiveDefectQty").value(hasItem("4.000000")));
             var voidBody = "{\"requestKey\":\"void\",\"expectedRevision\":2,\"revisionReason\":\"TEST释放容量\"}";
@@ -114,7 +112,7 @@ class ProductionQualityQuantityHttpTest {
             var m = MaterialIssueHttpTest.mvc(c);
             report(m, 11, "100");
             var facts = command(11, "5").replace("TEST ONLY缺陷", "裂纹、划伤、色差")
-                    .replace("\"wasteCategory\"", "\"responsibleNodeId\":\"13\",\"wasteCategory\"");
+                    .replace("\"wasteCategory\"", "\"wasteCategory\"");
             ProductionDefectHttpTest.add(m, facts, "A");
             quality(m, 11, "3");
             m.perform(full(get("/api/production/report-quantities/executions/1"), "A"))

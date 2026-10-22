@@ -64,12 +64,14 @@ class StockDocumentHttpTest {
             add(m, receipt, "0", "1", "L001", "100");
             balance(j, "0");
             String receive = intent(UUID.randomUUID().toString(), 1);
-            m.perform(full(post(ROOT + "/" + receipt + "/actions/post")).content(receive)).andExpect(status().isOk());
+            m.perform(full(post(ROOT + "/" + receipt + "/actions/approve")).content(receive))
+                    .andExpect(status().isOk());
             balance(j, "100");
-            m.perform(full(post(ROOT + "/" + receipt + "/actions/post")).content(receive)).andExpect(status().isOk());
-            m.perform(full(post(ROOT + "/" + receipt + "/actions/post")).content(receive.replace("\"1\"", "\"2\"")))
+            m.perform(full(post(ROOT + "/" + receipt + "/actions/approve")).content(receive))
+                    .andExpect(status().isOk());
+            m.perform(full(post(ROOT + "/" + receipt + "/actions/approve")).content(receive.replace("\"1\"", "\"2\"")))
                     .andExpect(status().isConflict());
-            m.perform(full(post(ROOT + "/" + receipt + "/actions/post")).content(intent(UUID.randomUUID()
+            m.perform(full(post(ROOT + "/" + receipt + "/actions/approve")).content(intent(UUID.randomUUID()
                     .toString(), 1))).andExpect(status().isConflict());
             m.perform(full(put(ROOT + "/" + receipt)).content("{\"reason\":\"changed\",\"expectedRevision\":2}"))
                     .andExpect(status().isConflict());
@@ -77,20 +79,21 @@ class StockDocumentHttpTest {
             String issue = create(m, "OTHER_ISSUE", null).get("document").get("id").asText();
             add(m, issue, "0", "1", "L001", "30");
             String out = intent(UUID.randomUUID().toString(), 1);
-            m.perform(full(post(ROOT + "/" + issue + "/actions/post")).content(out)).andExpect(status().isOk());
-            m.perform(full(post(ROOT + "/" + issue + "/actions/post")).content(out)).andExpect(status().isOk());
+            m.perform(full(post(ROOT + "/" + issue + "/actions/approve")).content(out)).andExpect(status().isOk());
+            m.perform(full(post(ROOT + "/" + issue + "/actions/approve")).content(out)).andExpect(status().isOk());
             balance(j, "70");
             assertEquals(2, j.queryForObject("SELECT COUNT(*) FROM wm_stock_action WHERE operation_id IS NOT NULL AND document_line_id IS NOT NULL", Integer.class));
             String atomic = create(m, "OTHER_ISSUE", null).get("document").get("id").asText();
             add(m, atomic, "0", "1", "L001", "10");
             add(m, atomic, "1", "2", "L002", "1");
-            m.perform(full(post(ROOT + "/" + atomic + "/actions/post")).content(intent(UUID.randomUUID()
+            m.perform(full(post(ROOT + "/" + atomic + "/actions/approve")).content(intent(UUID.randomUUID()
                     .toString(), 2))).andExpect(status().isConflict());
             balance(j, "70");
             assertEquals("DRAFT", j.queryForObject("SELECT status FROM wm_stock_document WHERE id=?", String.class, atomic));
             assertEquals(2, j.queryForObject("SELECT COUNT(*) FROM wm_stock_action", Integer.class));
             FactorySnapshotFixture.set(c, FactorySnapshotFixture.erp("A", "TEST", "TEST"));
-            m.perform(full(post(ROOT + "/" + receipt + "/actions/post")).content(receive)).andExpect(status().isOk());
+            m.perform(full(post(ROOT + "/" + receipt + "/actions/approve")).content(receive))
+                    .andExpect(status().isOk());
             m.perform(full(post(ROOT)).content("{\"documentType\":\"OTHER_RECEIPT\",\"reason\":\"blocked ERP\"}"))
                     .andExpect(status().isConflict());
         }
@@ -101,10 +104,10 @@ class StockDocumentHttpTest {
         try (var c = ProductionInputHttpTest.context()) {
             var m = MaterialIssueHttpTest.mvc(c);
             String id = create(m, "OTHER_RECEIPT", null).get("document").get("id").asText();
-            m.perform(post(ROOT + "/" + id + "/actions/post").header("Authorization", "Bearer CRUD")
+            m.perform(post(ROOT + "/" + id + "/actions/approve").header("Authorization", "Bearer CRUD")
                     .header("X-Factory-Id", "A").contentType("application/json")
                     .content(intent(UUID.randomUUID().toString(), 0))).andExpect(status().isForbidden());
-            m.perform(full(post(ROOT + "/" + id + "/actions/post")).content(intent(UUID.randomUUID().toString(), 0)))
+            m.perform(full(post(ROOT + "/" + id + "/actions/approve")).content(intent(UUID.randomUUID().toString(), 0)))
                     .andExpect(status().isConflict());
             m.perform(full(post(ROOT + "/" + id + "/lines")).content(line("0", "999", "L001", "1")))
                     .andExpect(status().isConflict());
@@ -115,7 +118,7 @@ class StockDocumentHttpTest {
                     .andExpect(status().isConflict());
             m.perform(full(post(ROOT + "/" + id + "/actions/cancel")).content("{\"expectedRevision\":1}"))
                     .andExpect(status().isOk());
-            m.perform(full(post(ROOT + "/" + id + "/actions/post")).content(intent(UUID.randomUUID().toString(), 2)))
+            m.perform(full(post(ROOT + "/" + id + "/actions/approve")).content(intent(UUID.randomUUID().toString(), 2)))
                     .andExpect(status().isConflict());
             m.perform(get(ROOT + "/" + id).header("Authorization", "Bearer FULL").header("X-Factory-Id", "B"))
                     .andExpect(status().isNotFound());
@@ -131,9 +134,9 @@ class StockDocumentHttpTest {
             String id = create(m, "OTHER_ISSUE", null).get("document").get("id").asText();
             add(m, id, "0", "1", "L001", "30");
             add(m, id, "1", "1", "L001", "30");
-            var a = pool.submit(() -> m.perform(full(post(ROOT + "/" + id + "/actions/post")).content(intent(UUID.randomUUID()
+            var a = pool.submit(() -> m.perform(full(post(ROOT + "/" + id + "/actions/approve")).content(intent(UUID.randomUUID()
                     .toString(), 2))).andReturn().getResponse().getStatus());
-            var b = pool.submit(() -> m.perform(full(post(ROOT + "/" + id + "/actions/post")).content(intent(UUID.randomUUID()
+            var b = pool.submit(() -> m.perform(full(post(ROOT + "/" + id + "/actions/approve")).content(intent(UUID.randomUUID()
                     .toString(), 2))).andReturn().getResponse().getStatus());
             var results = List.of(a.get(), b.get());
             assertEquals(1, results.stream().filter(code -> code == 200).count());
@@ -163,14 +166,14 @@ class StockDocumentHttpTest {
             m.perform(full(post(ROOT + "/" + id + "/lines"))
                             .content(line("0", "1", "TEST-FINISHED", "20").replace("\"binCode\":\"BIN1\"", "\"binCode\":null")))
                     .andExpect(status().isOk());
-            m.perform(full(post(ROOT + "/" + id + "/actions/post"))
+            m.perform(full(post(ROOT + "/" + id + "/actions/approve"))
                     .content(intent(UUID.randomUUID().toString(), 1))).andExpect(status().isOk());
             balance(j, "80");
             String second = create(m, "OTHER_RECEIPT", "1").get("document").get("id").asText();
             m.perform(full(post(ROOT + "/" + second + "/lines"))
                             .content(line("0", "1", "TEST-FINISHED", "1").replace("\"binCode\":\"BIN1\"", "\"binCode\":null")))
                     .andExpect(status().isOk());
-            m.perform(full(post(ROOT + "/" + second + "/actions/post"))
+            m.perform(full(post(ROOT + "/" + second + "/actions/approve"))
                     .content(intent(UUID.randomUUID().toString(), 1))).andExpect(status().isConflict());
             assertEquals(reports, j.queryForList("SELECT * FROM mes_production_report ORDER BY id"));
             assertEquals(quality, j.queryForList("SELECT * FROM mes_quality_release ORDER BY id"));
@@ -189,18 +192,18 @@ class StockDocumentHttpTest {
             String first = create(m, "OTHER_RECEIPT", null).get("document").get("id").asText();
             add(m, first, "0", "1", "L001", "10");
             String uuid = UUID.randomUUID().toString();
-            m.perform(full(post(ROOT + "/" + first + "/actions/post")).content(intent(uuid, 1)))
+            m.perform(full(post(ROOT + "/" + first + "/actions/approve")).content(intent(uuid, 1)))
                     .andExpect(status().isOk());
             String duplicate = create(m, "OTHER_RECEIPT", null).get("document").get("id").asText();
             add(m, duplicate, "0", "1", "L001", "10");
-            m.perform(full(post(ROOT + "/" + duplicate + "/actions/post")).content(intent(uuid, 1)))
+            m.perform(full(post(ROOT + "/" + duplicate + "/actions/approve")).content(intent(uuid, 1)))
                     .andExpect(status().isConflict());
             balance(j, "10");
             String failing = create(m, "OTHER_RECEIPT", null).get("document").get("id").asText();
             add(m, failing, "0", "1", "L001", "10");
             add(m, failing, "1", "2", "L002", "10");
             j.execute("ALTER TABLE wm_stock_document_line ADD CONSTRAINT test_document_failure CHECK(stock_id<>2 OR stock_action_id IS NULL)");
-            m.perform(full(post(ROOT + "/" + failing + "/actions/post")).content(intent(UUID.randomUUID()
+            m.perform(full(post(ROOT + "/" + failing + "/actions/approve")).content(intent(UUID.randomUUID()
                     .toString(), 2))).andExpect(status().is5xxServerError());
             balance(j, "10");
             assertEquals(1, j.queryForObject("SELECT COUNT(*) FROM wm_stock_action", Integer.class));
@@ -217,7 +220,7 @@ class StockDocumentHttpTest {
             String id = create(m, "OTHER_ISSUE", null).get("document").get("id").asText();
             add(m, id, "0", "1", "L001", "50");
             String production = ProductionInputHttpTest.command(m, UUID.randomUUID().toString(), "L001", "20");
-            var a = pool.submit(() -> m.perform(full(post(ROOT + "/" + id + "/actions/post"))
+            var a = pool.submit(() -> m.perform(full(post(ROOT + "/" + id + "/actions/approve"))
                     .content(intent(UUID.randomUUID().toString(), 1))).andReturn().getResponse().getStatus());
             var b = pool.submit(() -> m.perform(full(post("/api/production/input"))
                     .content(production)).andReturn().getResponse().getStatus());
@@ -239,19 +242,46 @@ class StockDocumentHttpTest {
             j.update("UPDATE workorder SET status='CANCELLED' WHERE id=1");
             String cancelled = create(m, "OTHER_RECEIPT", "1").get("document").get("id").asText();
             add(m, cancelled, "0", "1", "L001", "1");
-            m.perform(full(post(ROOT + "/" + cancelled + "/actions/post"))
+            m.perform(full(post(ROOT + "/" + cancelled + "/actions/approve"))
                     .content(intent(UUID.randomUUID().toString(), 1))).andExpect(status().isConflict());
             String regular = create(m, "OTHER_RECEIPT", null).get("document").get("id").asText();
             add(m, regular, "0", "1", "L001", "10");
             j.update("UPDATE wm_warehouse SET source='EXTERNAL' WHERE id=1");
-            m.perform(full(post(ROOT + "/" + regular + "/actions/post"))
+            m.perform(full(post(ROOT + "/" + regular + "/actions/approve"))
                     .content(intent(UUID.randomUUID().toString(), 1))).andExpect(status().isConflict());
             j.update("UPDATE wm_warehouse SET source='LOCAL' WHERE id=1");
             j.update("INSERT INTO wm_inventory(id,material_id,warehouse_id,quantity,available_quantity,status,batch_no,bin_code) VALUES(3,1,1,7,7,'ENABLED','L001','BIN2')");
-            m.perform(full(post(ROOT + "/" + regular + "/actions/post"))
+            m.perform(full(post(ROOT + "/" + regular + "/actions/approve"))
                     .content(intent(UUID.randomUUID().toString(), 1))).andExpect(status().isOk());
             assertEquals(0, new BigDecimal("7").compareTo(j.queryForObject("SELECT quantity FROM wm_inventory WHERE id=3", BigDecimal.class)));
             assertEquals(0, new BigDecimal("10000").compareTo(j.queryForObject("SELECT quantity FROM wm_inventory WHERE id=2", BigDecimal.class)));
+        }
+    }
+
+    @Test
+    void unavailableSourcesStayDraftAndCannotApproveOrChangeStock() throws Exception {
+        try (var c = ProductionInputHttpTest.context()) {
+            var m = MaterialIssueHttpTest.mvc(c);
+            var j = ProductionInputHttpTest.db(c);
+            j.update("UPDATE wm_inventory SET quantity=0,available_quantity=0");
+            var catalog = JSON.readTree(m.perform(full(get(ROOT + "/types"))).andExpect(status().isOk())
+                    .andReturn().getResponse().getContentAsString());
+            assertEquals(10, catalog.size());
+            for (String type : List.of("PURCHASE_RECEIPT", "OUTSOURCE_RECEIPT", "MATERIAL_RETURN_RECEIPT", "REWORK_RECEIPT", "SALES_RETURN_RECEIPT")) {
+                var draft = create(m, type, null).get("document");
+                String id = draft.get("id").asText();
+                assertEquals("DRAFT", draft.get("status").asText());
+                add(m, id, "0", "1", "L001", "5");
+                m.perform(full(post(ROOT + "/" + id + "/actions/approve"))
+                                .content(intent(UUID.randomUUID().toString(), 1)))
+                        .andExpect(status().isUnprocessableEntity());
+                assertEquals("DRAFT", j.queryForObject("SELECT status FROM wm_stock_document WHERE id=?", String.class, id));
+                balance(j, "0");
+            }
+            for (String type : List.of("DEFECT_RECEIPT", "SCRAP_RECEIPT"))
+                m.perform(full(post(ROOT)).content("{\"documentType\":\"" + type + "\",\"reason\":\"no quality source\"}"))
+                        .andExpect(status().isUnprocessableEntity());
+            assertEquals(0, j.queryForObject("SELECT COUNT(*) FROM wm_stock_action", Integer.class));
         }
     }
 

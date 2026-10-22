@@ -47,7 +47,9 @@ public class OperationDefectTypeService {
     }
 
 
-    public record Page(List<OperationDefectTypeEntity> items, long total, int offset, int limit) implements PageData<OperationDefectTypeEntity> { }
+    public record Page(List<OperationDefectTypeEntity> items, long total, int offset,
+                       int limit) implements PageData<OperationDefectTypeEntity> {
+    }
 
     public Page page(Long operation, boolean enabledOnly, int offset, int limit) {
         if (operation == null || offset < 0 || limit < 1 || limit > 100) ParameterChecks.reject(ErrorCode.BAD_REQUEST);
@@ -55,7 +57,7 @@ public class OperationDefectTypeService {
         var e = new OperationDefectTypeExample();
         var c = e.createCriteria().andOperationIdEqualTo(operation);
         if (enabledOnly) c.andStatusEqualTo(EnableStatus.ENABLED.getValue());
-        e.setOrderByClause("id desc");
+        e.setOrderByClause("sort ASC, id ASC");
         try (var page = PageHelper.offsetPage(offset, limit)) {
             var rows = List.copyOf(mapper.selectByExample(e));
             return new Page(rows, page.getTotal(), offset, limit);

@@ -28,9 +28,6 @@ public class MesQualityTreatmentEntity {
 
     private Long operatorUserId;
 
-    private Long confirmedBy;
-
-    private LocalDateTime occurredAt;
 
     private LocalDateTime recordedAt;
 
@@ -141,21 +138,6 @@ public class MesQualityTreatmentEntity {
         this.operatorUserId = operatorUserId;
     }
 
-    public Long getConfirmedBy() {
-        return confirmedBy;
-    }
-
-    public void setConfirmedBy(Long confirmedBy) {
-        this.confirmedBy = confirmedBy;
-    }
-
-    public LocalDateTime getOccurredAt() {
-        return occurredAt;
-    }
-
-    public void setOccurredAt(LocalDateTime occurredAt) {
-        this.occurredAt = occurredAt;
-    }
 
     public LocalDateTime getRecordedAt() {
         return recordedAt;

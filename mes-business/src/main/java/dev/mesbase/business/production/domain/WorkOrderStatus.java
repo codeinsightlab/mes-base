@@ -4,7 +4,7 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 
 public enum WorkOrderStatus {
-    HISTORICAL("历史只读", "HISTORICAL"),
+    HISTORICAL("待确认（HISTORICAL）", "HISTORICAL"),
     DRAFT("草稿", "DRAFT"),
     RELEASED("已下达", "RELEASED"),
     COMPLETED("已完工", "COMPLETED"),

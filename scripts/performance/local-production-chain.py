@@ -195,7 +195,7 @@ class Run:
             doc = self.post(job,'opening','/api/wm/stock-documents', {'documentType':'OTHER_RECEIPT','reason':tag+' 验收原料入库'}, 'stock')
             did = doc['document']['id']
             self.post(job,'opening-line','/api/wm/stock-documents/'+did+'/lines', {'expectedRevision':'0','stockId':raw['id'],'materialId':self.raw['id'],'warehouseId':self.warehouses[0]['id'],'unitId':self.unit,'batchNo':raw['batchNo'],'binCode':'RAW','quantity':str(plan*2),'remark':tag}, 'stock')
-            self.post(job,'opening-post','/api/wm/stock-documents/'+did+'/actions/post', {'expectedRevision':'1'}, 'stock', True)
+            self.post(job,'opening-post','/api/wm/stock-documents/'+did+'/actions/approve', {'expectedRevision':'1'}, 'stock', True)
             order = self.post(job,'workorder','/api/production/workorder', {'code':tag+'_WO','productId':p['id'],'plannedQty':str(plan),'routingId':r['id'],'remark':tag+' 规则驱动仿真，非现场真实记录'})
             wid = order['workorder']['id']
             self.step(job,'material','PUT','/api/production/workorder/'+wid+'/material', {'expectedRevision':0,'materialId':self.raw['id'],'totalRequiredQty':str(plan*2),'warehouseIds':[self.warehouses[0]['id']],'workCenter':'PERF_TEST','enabled':True})

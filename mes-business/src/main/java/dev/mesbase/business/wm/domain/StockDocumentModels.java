@@ -44,7 +44,11 @@ public final class StockDocumentModels {
                        int limit) implements PageData<WmStockDocumentEntity> {
     }
 
-    public record Detail(WmStockDocumentEntity document, List<WmStockDocumentLineEntity> lines) {
+    public record QualitySource(String sourceDeclarationId, String sourceTreatmentId, Long sourceQualityExecutionId) {
+    }
+
+    public record Detail(WmStockDocumentEntity document, List<WmStockDocumentLineEntity> lines,
+                         QualitySource qualitySource) {
     }
 
     /**

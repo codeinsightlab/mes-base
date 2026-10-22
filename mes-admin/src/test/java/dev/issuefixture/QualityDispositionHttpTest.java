@@ -103,6 +103,7 @@ class QualityDispositionHttpTest {
             var e = result.get("events").get(result.get("events").size() - 1);
             String doc = e.get("stockDocumentId").asText();
             assertEquals("POSTED", j.queryForObject("SELECT status FROM wm_stock_document WHERE id=?", String.class, doc));
+            assertEquals("DEFECT_RECEIPT", j.queryForObject("SELECT document_type FROM wm_stock_document WHERE id=?", String.class, doc));
             assertEquals(0, new BigDecimal("10").compareTo(j.queryForObject("SELECT SUM(quantity) FROM wm_inventory WHERE batch_no='000LOT-001' ", BigDecimal.class)));
             assertEquals("000LOT-001", j.queryForObject("SELECT batch_no FROM wm_stock_document_line WHERE document_id=?", String.class, doc));
             assertEquals("000LOT-001", JSON.readTree(m.perform(full(get(Q), "A"))
@@ -308,6 +309,32 @@ class QualityDispositionHttpTest {
             amount(produced.get("nodes").get(1), "reportedQty", "100");
             amount(produced.get("nodes").get(1), "effectiveOutputQty", "94");
             amount(produced.get("nodes").get(4), "effectiveOutputQty", "94");
+        }
+    }
+
+    @Test
+    void scrapReceiptCreatesAndApprovesLinkedDocumentAndReplayDoesNotReceiveTwice() throws Exception {
+        try (var c = context(EXTRA, 100, 100, 90, 90, 90)) {
+            var m = MaterialIssueHttpTest.mvc(c);
+            var j = ProductionWarehouseFixture.db(c);
+            j.update("UPDATE wm_warehouse SET warehouse_type='SCRAP' WHERE id=1");
+            String declaration = defect(m, 12, "10", "INDEPENDENT", null);
+            bindBatch(j, "000SCRAP-001");
+            String key = UUID.randomUUID().toString();
+            String body = command(key, "WAREHOUSE", "10", "1");
+            var result = dispose(m, declaration, body);
+            var event = result.path("events").get(result.path("events").size() - 1);
+            String documentId = event.path("stockDocumentId").asText();
+            assertEquals("SCRAP_RECEIPT", j.queryForObject("SELECT document_type FROM wm_stock_document WHERE id=?", String.class, documentId));
+            assertEquals(key, j.queryForObject("SELECT post_request_id FROM wm_stock_document WHERE id=? AND status='POSTED' AND posted_by=1 AND posted_at IS NOT NULL", String.class, documentId));
+            var document = JSON.readTree(m.perform(full(get(StockDocumentHttpTest.ROOT + "/" + documentId), "A"))
+                    .andExpect(status().isOk()).andReturn().getResponse().getContentAsString());
+            assertEquals(declaration, document.path("qualitySource").path("sourceDeclarationId").asText());
+            assertEquals(key, document.path("qualitySource").path("sourceTreatmentId").asText());
+            assertEquals(1, j.queryForObject("SELECT COUNT(*) FROM wm_stock_document_line l JOIN wm_stock_action a ON a.id=l.stock_action_id AND a.document_line_id=l.id WHERE l.document_id=?", Integer.class, documentId));
+            dispose(m, declaration, body);
+            assertEquals(1, j.queryForObject("SELECT COUNT(*) FROM wm_stock_document", Integer.class));
+            assertEquals(0, new BigDecimal("10").compareTo(j.queryForObject("SELECT SUM(quantity) FROM wm_inventory WHERE batch_no='000SCRAP-001'", BigDecimal.class)));
         }
     }
 

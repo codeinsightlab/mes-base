@@ -27,6 +27,7 @@ import dev.mesbase.business.quality.domain.QualityTreatmentModels.Attribution;
 import dev.mesbase.business.quality.domain.QualityTreatmentModels.Destination;
 import dev.mesbase.business.quality.domain.QualityTreatmentModels.Disposition;
 import dev.mesbase.business.quality.domain.QualityTreatmentModels.Summary;
+import dev.mesbase.business.quality.domain.QualityTreatmentModels.State;
 import dev.mesbase.common.utils.SecurityUtils;
 import dev.mesbase.common.validation.ParameterChecks;
 import dev.mesbase.core.error.ErrorCode;
@@ -47,7 +48,6 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.ApplicationEventPublisher;
@@ -105,20 +105,19 @@ public class QualityTreatmentService {
 
     public Recent recent() {
         var rows = List.copyOf(events.selectRecent(10));
-        rows.forEach(event -> Action.from(event.getActionType()));
         var users = rows.isEmpty() ? Map.<Long, DirectoryLabel>of() : directory.userLabels(rows.stream()
-                .flatMap(e -> Stream.of(e.getOperatorUserId(), e.getConfirmedBy())).distinct().toList());
+                .map(MesQualityTreatmentEntity::getOperatorUserId).distinct().toList());
         return new Recent(rows, users);
     }
 
     public Details details(String declaration) {
         var d = latest(declaration);
         var all = declarationEvents(declaration);
-        var s = summarize(d, all);
+        var current = all.stream().filter(e -> e.getDeclarationRevision().equals(d.getRevisionNo())).toList();
+        var s = summarizeRows(d, current, false);
         var history = all.stream().filter(e -> e.getDeclarationId().equals(declaration)).toList();
-        history.forEach(event -> Action.from(event.getActionType()));
         return new Details(s, directory.userLabels(history.stream()
-                .flatMap(e -> Stream.of(e.getOperatorUserId(), e.getConfirmedBy())).distinct().toList()), history);
+                .map(MesQualityTreatmentEntity::getOperatorUserId).distinct().toList()), history);
     }
 
     private List<MesQualityTreatmentEntity> executionEvents(Long execution) {
@@ -187,9 +186,7 @@ public class QualityTreatmentService {
         row.setTargetWarehouseId(command.warehouseId());
         row.setStockDocumentId(stockDocumentId);
         row.setOperatorUserId(SecurityUtils.getUserId());
-        row.setConfirmedBy(SecurityUtils.getUserId());
-        row.setOccurredAt(LocalDateTime.now());
-        row.setRecordedAt(row.getOccurredAt());
+        row.setRecordedAt(LocalDateTime.now());
         row.setReason(command.reason().trim());
         try {
             if (events.insert(row) != 1) ParameterChecks.reject(ErrorCode.QUALITY_TREATMENT_CONFLICT);
@@ -228,22 +225,30 @@ public class QualityTreatmentService {
     }
 
     private Summary summarizeRows(MesProductionDefectEntity d, List<MesQualityTreatmentEntity> rows) {
+        return summarizeRows(d, rows, true);
+    }
+
+    private Summary summarizeRows(MesProductionDefectEntity d, List<MesQualityTreatmentEntity> rows, boolean strict) {
         var assessment = rows.stream().filter(e -> Action.ASSESS.name().equals(e.getActionType())).findFirst()
                 .orElse(null);
-        var type = assessment == null ? Attribution.UNVERIFIED : Attribution.valueOf(assessment.getAttributionType());
-        rows.forEach(event -> Action.from(event.getActionType()));
+        var type = assessment == null ? Attribution.UNVERIFIED : Attribution.find(assessment.getAttributionType());
+        long invalidActions = rows.stream().filter(event -> !Action.recognizes(event.getActionType())).count();
+        if (strict) rows.forEach(event -> Action.from(event.getActionType()));
         var returned = rows.stream().filter(e -> Action.RETURN_NODE.name().equals(e.getActionType()))
                 .map(MesQualityTreatmentEntity::getReturnedQty).reduce(ZERO, BigDecimal::add);
         var transferred = rows.stream().filter(e -> Action.TRANSFER_WAREHOUSE.name().equals(e.getActionType()))
                 .map(MesQualityTreatmentEntity::getTransferQty).reduce(ZERO, BigDecimal::add);
-        var processing = Processing.of(d.getRecordAction(), type, d.getDefectQty(), returned, transferred);
+        var processing = strict ? Processing.of(d.getRecordAction(), type, d.getDefectQty(), returned, transferred)
+                : Processing.read(d.getRecordAction(), type, d.getDefectQty(), returned, transferred, invalidActions);
+        BigDecimal net = null;
+        if (processing.state() != State.UNRESOLVED)
+            net = type == Attribution.INDEPENDENT ? d.getDefectQty().subtract(returned) : ZERO;
         return new Summary(d.getDeclarationId(), d.getRevisionNo(), d.getExecutionId(), d.getAffectedNodeId(),
                 d.getDefectQty(), type, Optional.ofNullable(assessment)
                 .map(MesQualityTreatmentEntity::getRelatedDeclarationId)
                 .orElse(null), Optional.ofNullable(assessment).map(MesQualityTreatmentEntity::getBasis).orElse(null),
-                processing.pendingDispositionQty(), type == Attribution.INDEPENDENT ? d.getDefectQty()
-                .subtract(returned) : ZERO,
-                processing.state(), d.getRecordAction(), d.getDestinationType(), rows, returned, transferred);
+                processing.pendingDispositionQty(), net,
+                processing.state(), d.getRecordAction(), rows, processing.returnedQty(), processing.transferredQty());
     }
 
     public record ReleaseBasis(List<Summary> declarations, List<String> factIdentities) {
@@ -412,9 +417,7 @@ public class QualityTreatmentService {
         row.setReturnedQty(ZERO);
         row.setTransferQty(ZERO);
         row.setOperatorUserId(SecurityUtils.getUserId());
-        row.setConfirmedBy(SecurityUtils.getUserId());
-        row.setOccurredAt(LocalDateTime.now());
-        row.setRecordedAt(row.getOccurredAt());
+        row.setRecordedAt(LocalDateTime.now());
         row.setReason(command.reason().trim());
         try {
             if (events.insert(row) != 1) ParameterChecks.reject(ErrorCode.QUALITY_TREATMENT_CONFLICT);

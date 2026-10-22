@@ -37,4 +37,17 @@ class CurrentQualityProcessingTest {
         assertThrows(FoundationException.class, () -> Action.from("ALLOCATE"));
         assertThrows(FoundationException.class, () -> State.from("WAITING_REWORK"));
     }
+
+    @Test
+    void queryProjectionKeepsUnknownBalancesDistinctFromZero() {
+        var valid = Processing.read("CREATE", Attribution.INDEPENDENT, BigDecimal.TEN, BigDecimal.ZERO, BigDecimal.ZERO, 0);
+        assertEquals(State.PENDING, valid.state());
+        var unresolved = Processing.read("CREATE", Attribution.INDEPENDENT, BigDecimal.TEN, BigDecimal.ZERO, BigDecimal.ZERO, 1);
+        assertEquals(State.UNRESOLVED, unresolved.state());
+        assertEquals(null, unresolved.pendingDispositionQty());
+        assertEquals(null, unresolved.returnedQty());
+        assertEquals(State.UNRESOLVED, Processing.read("CREATE", Attribution.INDEPENDENT, BigDecimal.ONE, BigDecimal.TEN, BigDecimal.ZERO, 0)
+                .state());
+    }
+
 }
