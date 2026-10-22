@@ -1,5 +1,7 @@
 package dev.mesbase.web.view.log;
 
+import java.util.Objects;
+
 import dev.mesbase.system.domain.SysLogininfor;
 import java.util.List;
 
@@ -12,7 +14,7 @@ public final class SysLogininforAssembler {
         if (row == null) return null;
         return new SysLogininforResult(row.getRequestId(),
                 row.getActorId(),
-                row.getInfoId() == null ? null : row.getInfoId().toString(),
+                Objects.toString(row.getInfoId(), null),
                 row.getUserName(),
                 row.getStatus(),
                 row.getIpaddr(),
@@ -29,6 +31,7 @@ public final class SysLogininforAssembler {
     }
 
     public static List<SysLogininforResult> toResults(List<SysLogininfor> rows) {
-        return rows == null ? null : rows.stream().map(SysLogininforAssembler::toResult).toList();
+        if (rows == null) return null;
+        return rows.stream().map(SysLogininforAssembler::toResult).toList();
     }
 }

@@ -5,6 +5,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.util.UUID;
 import java.math.BigDecimal;
+import java.sql.Timestamp;
+import java.time.LocalDateTime;
 import java.util.concurrent.Executors;
 import org.junit.jupiter.api.Test;
 import org.springframework.web.context.support.AnnotationConfigWebApplicationContext;
@@ -99,6 +101,25 @@ class ProductionQualityV13HttpTest {
     static String start(MockMvc m, String id) throws Exception {
         var allocated = execute(m, id, command("ALLOCATE", null, "6", "4", "0", "0", "0"));
         return event(execute(m, id, command("START", event(allocated, "ALLOCATE"), "0", "4", "0", "0", "0")), "START");
+    }
+
+    @Test
+    void serverWritesOperationTimeAndIdenticalRetryKeepsTheOriginalFact() throws Exception {
+        try (var c = context(100, 100, 100, 100, 100)) {
+            var m = MaterialIssueHttpTest.mvc(c);
+            var id = defect(m, 12, "10", "INDEPENDENT", null);
+            var body = JSON.readTree(command("ALLOCATE", null, "2", "0", "0", "0", "0"));
+            ((ObjectNode) body).remove("occurredAt");
+            var first = execute(m, id, body.toString());
+            var eventId = event(first, "ALLOCATE");
+            var retry = execute(m, id, body.toString());
+            assertEquals(eventId, event(retry, "ALLOCATE"));
+            var j = ProductionWarehouseFixture.db(c);
+            var occurredAt = j.queryForObject("SELECT occurred_at FROM mes_quality_treatment WHERE id=?", Timestamp.class, eventId);
+            assertTrue(occurredAt.toLocalDateTime().isAfter(LocalDateTime.now().minusMinutes(1)));
+            assertEquals(1, j.queryForObject("SELECT COUNT(*) FROM mes_quality_treatment WHERE id=?", Integer.class, eventId));
+            assertEquals(first.get("events"), retry.get("events"));
+        }
     }
 
     @Test

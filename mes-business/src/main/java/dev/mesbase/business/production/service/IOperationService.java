@@ -1,8 +1,8 @@
 package dev.mesbase.business.production.service;
 
+import com.github.pagehelper.Page;
 import dev.mesbase.business.production.domain.OperationCreateCommand;
 import dev.mesbase.business.production.domain.OperationEntity;
-import dev.mesbase.business.production.domain.OperationPage;
 import dev.mesbase.business.production.domain.OperationQueryDto;
 import dev.mesbase.business.production.domain.OperationUpdateCommand;
 import java.util.List;
@@ -16,7 +16,7 @@ import dev.mesbase.business.production.sync.ProductionSyncResult;
  * @author MES Base
  */
 public interface IOperationService {
-    OperationPage selectPage(OperationQueryDto query);
+    Page<OperationEntity> selectPage(OperationQueryDto query);
 
     OperationEntity selectById(Long id);
 

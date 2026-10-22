@@ -1,5 +1,7 @@
 package dev.mesbase.business.directory.controller;
 
+import java.util.Objects;
+
 import dev.mesbase.business.directory.domain.DirectoryPage;
 import dev.mesbase.business.directory.domain.DirectoryQuery;
 import dev.mesbase.business.directory.service.BusinessDirectoryService;
@@ -154,7 +156,7 @@ public class BusinessDirectoryController {
     }
 
     private static String id(Long value) {
-        return value == null ? null : value.toString();
+        return Objects.toString(value, null);
     }
 
     private static <T> DirectoryPage<DirectoryOption> view(DirectoryPage<T> page,

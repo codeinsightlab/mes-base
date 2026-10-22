@@ -1,5 +1,8 @@
 package dev.mesbase.business.wm.service.impl;
 
+import dev.mesbase.common.validation.ParameterChecks;
+import java.util.Optional;
+
 import dev.mesbase.business.production.service.BusinessSourceRules;
 import dev.mesbase.business.shared.enums.BusinessSource;
 import dev.mesbase.business.shared.ExternalSyncAction;
@@ -11,7 +14,6 @@ import dev.mesbase.business.wm.dao.WmWarehouseMapper;
 import dev.mesbase.business.wm.domain.WmWarehouseCreateCommand;
 import dev.mesbase.business.wm.domain.WmWarehouseEntity;
 import dev.mesbase.business.wm.domain.WmWarehouseExample;
-import dev.mesbase.business.wm.domain.WmWarehousePage;
 import dev.mesbase.business.wm.domain.WmWarehouseQueryDto;
 import dev.mesbase.business.wm.domain.WmWarehouseResource;
 import dev.mesbase.business.wm.domain.WmWarehouseUpdateCommand;
@@ -87,12 +89,10 @@ public class WmWarehouseServiceImpl implements IWmWarehouseService {
     @Transactional(transactionManager = "businessTransactionManager", readOnly = true)
     @BusinessCache(business = WmWarehouseResource.PREFIX,
             type = BusinessCache.Type.LIST)
-    public WmWarehousePage selectPage(WmWarehouseQueryDto query) {
+    public Page<WmWarehouseEntity> selectPage(WmWarehouseQueryDto query) {
         int offset = query.offset() == null ? 0 : query.offset();
         int limit = query.limit() == null ? 20 : query.limit();
-        if (offset < 0 || limit < 1 || limit > 100) {
-            throw new FoundationException(ErrorCode.BAD_REQUEST);
-        }
+        ParameterChecks.paging(offset, limit, 100);
         WmWarehouseExample example = new WmWarehouseExample();
         WmWarehouseExample.Criteria criteria = example.createCriteria();
         if (query.code() != null) {
@@ -110,8 +110,8 @@ public class WmWarehouseServiceImpl implements IWmWarehouseService {
         if (query.source() != null) criteria.andSourceEqualTo(BusinessSourceRules.required(query.source()).getValue());
         example.setOrderByClause("id desc");
         try (Page<WmWarehouseEntity> page = PageHelper.offsetPage(offset, limit)) {
-            List<WmWarehouseEntity> rows = mapper.selectByExample(example);
-            return new WmWarehousePage(rows, page.getTotal(), offset, limit);
+            mapper.selectByExample(example);
+            return page;
         }
     }
 
@@ -321,7 +321,7 @@ public class WmWarehouseServiceImpl implements IWmWarehouseService {
             if (row != null && BusinessSourceRules.required(row.getSource()) != BusinessSource.EXTERNAL)
                 throw new FoundationException(ErrorCode.BUSINESS_SOURCE_CONFLICT);
             var snapshot = FactoryIntegrationContext.required();
-            var mapping = row == null ? null : knownById.get(row.getId());
+            var mapping = Optional.ofNullable(row).map(nullableValue -> knownById.get(nullableValue.getId())).orElse(null);
             if (row != null && (mapping == null || !Objects.equals(mapping.getExternalId(), input.externalId())))
                 throw new FoundationException(ErrorCode.BUSINESS_SOURCE_CONFLICT);
             if (mapping != null)

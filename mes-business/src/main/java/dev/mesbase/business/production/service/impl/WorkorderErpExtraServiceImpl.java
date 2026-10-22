@@ -1,12 +1,12 @@
 package dev.mesbase.business.production.service.impl;
 
+import dev.mesbase.common.validation.ParameterChecks;
 import com.github.pagehelper.Page;
 import com.github.pagehelper.PageHelper;
 import dev.mesbase.business.production.dao.WorkorderErpExtraMapper;
 import dev.mesbase.business.production.domain.WorkorderErpExtraCreateCommand;
 import dev.mesbase.business.production.domain.WorkorderErpExtraEntity;
 import dev.mesbase.business.production.domain.WorkorderErpExtraExample;
-import dev.mesbase.business.production.domain.WorkorderErpExtraPage;
 import dev.mesbase.business.production.domain.WorkorderErpExtraQueryDto;
 import dev.mesbase.business.production.domain.WorkorderErpExtraResource;
 import dev.mesbase.business.production.domain.WorkorderErpExtraUpdateCommand;
@@ -38,12 +38,10 @@ public class WorkorderErpExtraServiceImpl implements IWorkorderErpExtraService {
     @Transactional(transactionManager = "businessTransactionManager", readOnly = true)
     @BusinessCache(business = WorkorderErpExtraResource.PREFIX,
             type = BusinessCache.Type.LIST)
-    public WorkorderErpExtraPage selectPage(WorkorderErpExtraQueryDto query) {
+    public Page<WorkorderErpExtraEntity> selectPage(WorkorderErpExtraQueryDto query) {
         int offset = query.offset() == null ? 0 : query.offset();
         int limit = query.limit() == null ? 20 : query.limit();
-        if (offset < 0 || limit < 1 || limit > 100) {
-            throw new FoundationException(ErrorCode.BAD_REQUEST);
-        }
+        ParameterChecks.paging(offset, limit, 100);
         WorkorderErpExtraExample example = new WorkorderErpExtraExample();
         WorkorderErpExtraExample.Criteria criteria = example.createCriteria();
         if (query.externalId() != null) {
@@ -57,8 +55,8 @@ public class WorkorderErpExtraServiceImpl implements IWorkorderErpExtraService {
         }
         example.setOrderByClause("id");
         try (Page<WorkorderErpExtraEntity> page = PageHelper.offsetPage(offset, limit)) {
-            List<WorkorderErpExtraEntity> rows = mapper.selectByExample(example);
-            return new WorkorderErpExtraPage(rows, page.getTotal(), offset, limit);
+            mapper.selectByExample(example);
+            return page;
         }
     }
 

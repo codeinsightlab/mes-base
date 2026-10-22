@@ -173,7 +173,7 @@ public class ManagedDatasourceService {
 
     private DatasourceView view(ManagedDatasource s, ManagedFactory f) {
         var loaded = f != null && registry.contains(new BusinessRuntimeBinding(new FactoryId(f.factoryId()), identity(s.datasourceId()), s.revision()));
-        return new DatasourceView(s.datasourceId(), s.datasourceName(), s.dbHost(), s.dbPort(), s.dbName(), s.dbUsername(), s.status(), s.revision(), loaded ? "MANAGED" : "UNMANAGED", f == null ? null : f.factoryId(), f == null ? null : f.factoryName(),
+        return new DatasourceView(s.datasourceId(), s.datasourceName(), s.dbHost(), s.dbPort(), s.dbName(), s.dbUsername(), s.status(), s.revision(), loaded ? "MANAGED" : "UNMANAGED", Optional.ofNullable(f).map(nullableValue -> nullableValue.factoryId()).orElse(null), Optional.ofNullable(f).map(nullableValue -> nullableValue.factoryName()).orElse(null),
                 "ENABLED".equals(s.status()) ? "已加入管理" : "未加入管理", loaded ? "已加载" : "未加载", loaded, null, null, generatedAt(s), nodeId);
     }
 
@@ -266,7 +266,7 @@ public class ManagedDatasourceService {
                 editable(old);
                 if (old.revision() != form.revision()) throw new FoundationException(ErrorCode.RESOURCE_CONFLICT);
             }
-            String password = form.password() == null ? (old == null ? null : old.passwordCipher()) : cipher.encrypt(form.password());
+            String password = form.password() == null ? (Optional.ofNullable(old).map(nullableValue -> nullableValue.passwordCipher()).orElse(null)) : cipher.encrypt(form.password());
             if (password == null) throw new FoundationException(ErrorCode.BAD_REQUEST);
             var row = new ManagedDatasource(form.datasourceId(), form.datasourceName(), form.dbHost(), form.dbPort(), form.dbName(), form.dbUsername(), password, "DISABLED", old == null ? 1 : old.revision());
             if (creating) {
@@ -320,8 +320,8 @@ public class ManagedDatasourceService {
 
     public FactoryView factory(String id) {
         var f = factoryRecord(id);
-        String name = f.datasourceId() == null ? null : required(sources
-                .find(f.datasourceId())).datasourceName();
+        String name = Optional.ofNullable(f.datasourceId()).map(nullableValue -> required(sources
+                .find(nullableValue)).datasourceName()).orElse(null);
         return view(f, name);
     }
 

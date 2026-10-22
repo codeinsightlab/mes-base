@@ -1,12 +1,12 @@
 package dev.mesbase.business.dv.service.impl;
 
+import dev.mesbase.common.validation.ParameterChecks;
 import com.github.pagehelper.Page;
 import com.github.pagehelper.PageHelper;
 import dev.mesbase.business.dv.dao.DvSubjectMapper;
 import dev.mesbase.business.dv.domain.DvSubjectCreateCommand;
 import dev.mesbase.business.dv.domain.DvSubjectEntity;
 import dev.mesbase.business.dv.domain.DvSubjectExample;
-import dev.mesbase.business.dv.domain.DvSubjectPage;
 import dev.mesbase.business.dv.domain.DvSubjectQueryDto;
 import dev.mesbase.business.dv.domain.DvSubjectResource;
 import dev.mesbase.business.dv.domain.DvSubjectUpdateCommand;
@@ -64,12 +64,10 @@ public class DvSubjectServiceImpl implements IDvSubjectService {
     @Transactional(transactionManager = "businessTransactionManager", readOnly = true)
     @BusinessCache(business = DvSubjectResource.PREFIX,
             type = BusinessCache.Type.LIST)
-    public DvSubjectPage selectPage(DvSubjectQueryDto query) {
+    public Page<DvSubjectEntity> selectPage(DvSubjectQueryDto query) {
         int offset = query.offset() == null ? 0 : query.offset();
         int limit = query.limit() == null ? 20 : query.limit();
-        if (offset < 0 || limit < 1 || limit > 100) {
-            throw new FoundationException(ErrorCode.BAD_REQUEST);
-        }
+        ParameterChecks.paging(offset, limit, 100);
         DvSubjectExample example = new DvSubjectExample();
         DvSubjectExample.Criteria criteria = example.createCriteria();
         if (query.subjectCode() != null) {
@@ -95,8 +93,8 @@ public class DvSubjectServiceImpl implements IDvSubjectService {
         }
         example.setOrderByClause("subject_id desc");
         try (Page<DvSubjectEntity> page = PageHelper.offsetPage(offset, limit)) {
-            List<DvSubjectEntity> rows = mapper.selectByExample(example);
-            return new DvSubjectPage(rows, page.getTotal(), offset, limit);
+            mapper.selectByExample(example);
+            return page;
         }
     }
 

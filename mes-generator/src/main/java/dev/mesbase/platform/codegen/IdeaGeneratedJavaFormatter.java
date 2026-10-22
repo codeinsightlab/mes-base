@@ -1,5 +1,7 @@
 package dev.mesbase.platform.codegen;
 
+import java.util.Optional;
+
 import dev.mesbase.platform.codegen.ScaffoldWriter.Artifact;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -34,7 +36,7 @@ public final class IdeaGeneratedJavaFormatter implements UnaryOperator<List<Arti
 
     public IdeaGeneratedJavaFormatter(Path launcher, Path cacheDirectory) {
         this.launcher = launcher.toAbsolutePath().normalize();
-        this.cacheDirectory = cacheDirectory == null ? null : cacheDirectory.toAbsolutePath().normalize();
+        this.cacheDirectory = Optional.ofNullable(cacheDirectory).map(nullableValue -> nullableValue.toAbsolutePath().normalize()).orElse(null);
     }
 
     @Override

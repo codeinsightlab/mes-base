@@ -1,5 +1,7 @@
 package dev.mesbase.business.basic.service;
 
+import java.util.Optional;
+
 import dev.mesbase.business.basic.domain.MaterialType;
 import dev.mesbase.business.shared.enums.EnableStatus;
 import dev.mesbase.core.error.ErrorCode;
@@ -155,25 +157,25 @@ public class BasicDataRules {
     }
 
     public MaterialEntity requireMaterial(Long id) {
-        var row = id == null ? null : material.selectByPrimaryKey(id);
+        var row = Optional.ofNullable(id).map(nullableValue -> material.selectByPrimaryKey(nullableValue)).orElse(null);
         if (row == null) throw new FoundationException(ErrorCode.NOT_FOUND);
         return row;
     }
 
     public MaterialCategoryEntity requireCategory(Long id) {
-        var row = id == null ? null : materialCategory.selectByPrimaryKey(id);
+        var row = Optional.ofNullable(id).map(nullableValue -> materialCategory.selectByPrimaryKey(nullableValue)).orElse(null);
         if (row == null) throw new FoundationException(ErrorCode.NOT_FOUND);
         return row;
     }
 
     public UnitMeasureEntity requireUnit(Long id) {
-        var row = id == null ? null : unitMeasure.selectByPrimaryKey(id);
+        var row = Optional.ofNullable(id).map(nullableValue -> unitMeasure.selectByPrimaryKey(nullableValue)).orElse(null);
         if (row == null) throw new FoundationException(ErrorCode.NOT_FOUND);
         return row;
     }
 
     public WorkshopEntity requireWorkshop(Long id) {
-        var row = id == null ? null : workshop.selectByPrimaryKey(id);
+        var row = Optional.ofNullable(id).map(nullableValue -> workshop.selectByPrimaryKey(nullableValue)).orElse(null);
         if (row == null) throw new FoundationException(ErrorCode.NOT_FOUND);
         return row;
     }

@@ -16,6 +16,7 @@
     <result column="create_time" jdbcType="TIMESTAMP" property="createTime" />
     <result column="request_id" jdbcType="VARCHAR" property="requestId" />
     <result column="command_fingerprint" jdbcType="CHAR" property="commandFingerprint" />
+    <result column="source_quality_event_id" jdbcType="VARCHAR" property="sourceQualityEventId" />
   </resultMap>
   <sql id="Example_Where_Clause">
     <where>
@@ -78,7 +79,7 @@
   <sql id="Base_Column_List">
     id, execution_id, routing_node_id, record_type, quantity_delta, reference_report_id,
     operator_user_id, recorded_by, report_time, workstation_id, reason, create_time,
-    request_id, command_fingerprint
+    request_id, command_fingerprint, source_quality_event_id
   </sql>
   <select id="selectByExample" parameterType="dev.mesbase.business.production.domain.MesProductionReportExample" resultMap="BaseResultMap">
     select
@@ -112,12 +113,12 @@
       quantity_delta, reference_report_id, operator_user_id,
       recorded_by, report_time, workstation_id,
       reason, create_time, request_id,
-      command_fingerprint)
+      command_fingerprint, source_quality_event_id)
     values (#{executionId,jdbcType=BIGINT}, #{routingNodeId,jdbcType=BIGINT}, #{recordType,jdbcType=VARCHAR},
       #{quantityDelta,jdbcType=DECIMAL}, #{referenceReportId,jdbcType=BIGINT}, #{operatorUserId,jdbcType=BIGINT},
       #{recordedBy,jdbcType=BIGINT}, #{reportTime,jdbcType=TIMESTAMP}, #{workstationId,jdbcType=BIGINT},
       #{reason,jdbcType=VARCHAR}, #{createTime,jdbcType=TIMESTAMP}, #{requestId,jdbcType=VARCHAR},
-      #{commandFingerprint,jdbcType=CHAR})
+      #{commandFingerprint,jdbcType=CHAR}, #{sourceQualityEventId,jdbcType=VARCHAR})
   </insert>
   <insert id="insertSelective" keyColumn="id" keyProperty="id" parameterType="dev.mesbase.business.production.domain.MesProductionReportEntity" useGeneratedKeys="true">
     insert into mes_production_report
@@ -161,6 +162,9 @@
       <if test="commandFingerprint != null">
         command_fingerprint,
       </if>
+      <if test="sourceQualityEventId != null">
+        source_quality_event_id,
+      </if>
     </trim>
     <trim prefix="values (" suffix=")" suffixOverrides=",">
       <if test="executionId != null">
@@ -201,6 +205,9 @@
       </if>
       <if test="commandFingerprint != null">
         #{commandFingerprint,jdbcType=CHAR},
+      </if>
+      <if test="sourceQualityEventId != null">
+        #{sourceQualityEventId,jdbcType=VARCHAR},
       </if>
     </trim>
   </insert>
@@ -255,6 +262,9 @@
       <if test="row.commandFingerprint != null">
         command_fingerprint = #{row.commandFingerprint,jdbcType=CHAR},
       </if>
+      <if test="row.sourceQualityEventId != null">
+        source_quality_event_id = #{row.sourceQualityEventId,jdbcType=VARCHAR},
+      </if>
     </set>
     <if test="example != null">
       <include refid="Update_By_Example_Where_Clause" />
@@ -275,7 +285,8 @@
       reason = #{row.reason,jdbcType=VARCHAR},
       create_time = #{row.createTime,jdbcType=TIMESTAMP},
       request_id = #{row.requestId,jdbcType=VARCHAR},
-      command_fingerprint = #{row.commandFingerprint,jdbcType=CHAR}
+      command_fingerprint = #{row.commandFingerprint,jdbcType=CHAR},
+      source_quality_event_id = #{row.sourceQualityEventId,jdbcType=VARCHAR}
     <if test="example != null">
       <include refid="Update_By_Example_Where_Clause" />
     </if>
@@ -322,6 +333,9 @@
       <if test="commandFingerprint != null">
         command_fingerprint = #{commandFingerprint,jdbcType=CHAR},
       </if>
+      <if test="sourceQualityEventId != null">
+        source_quality_event_id = #{sourceQualityEventId,jdbcType=VARCHAR},
+      </if>
     </set>
     where id = #{id,jdbcType=BIGINT}
   </update>
@@ -339,9 +353,17 @@
       reason = #{reason,jdbcType=VARCHAR},
       create_time = #{createTime,jdbcType=TIMESTAMP},
       request_id = #{requestId,jdbcType=VARCHAR},
-      command_fingerprint = #{commandFingerprint,jdbcType=CHAR}
+      command_fingerprint = #{commandFingerprint,jdbcType=CHAR},
+      source_quality_event_id = #{sourceQualityEventId,jdbcType=VARCHAR}
     where id = #{id,jdbcType=BIGINT}
   </update>
+  <select flushCache="true" id="selectByPrimaryKeyForUpdate" parameterType="Long" resultMap="BaseResultMap" useCache="false">
+    select
+    <include refid="Base_Column_List" />
+    from mes_production_report
+    where id = #{id,jdbcType=BIGINT}
+    for update
+  </select>
   <select id="selectByRequestId" resultMap="BaseResultMap">
     SELECT <include refid="Base_Column_List"/> FROM mes_production_report WHERE request_id=#{requestId}
   </select>

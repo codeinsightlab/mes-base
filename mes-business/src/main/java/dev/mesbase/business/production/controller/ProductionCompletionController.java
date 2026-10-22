@@ -1,5 +1,7 @@
 package dev.mesbase.business.production.controller;
 
+import java.util.Optional;
+
 import dev.mesbase.business.production.service.ProductionCompletionService;
 import dev.mesbase.business.production.domain.MesExecutionCompletionEntity;
 import dev.mesbase.platform.web.EndpointAccess;
@@ -39,7 +41,7 @@ public class ProductionCompletionController {
                 .getTargetQty().toPlainString(),
                 s.release().effective().toPlainString(), s.release().released().toPlainString(), s.release()
                 .historicalReleased().toPlainString(), s.release()
-                .basisHash(), s.canComplete(), s.blockedReason(), s.completion() == null ? null : view(s.completion()));
+                .basisHash(), s.canComplete(), s.blockedReason(), Optional.ofNullable(s.completion()).map(nullableValue -> view(nullableValue)).orElse(null));
     }
 
     @PostMapping("/actions/complete")

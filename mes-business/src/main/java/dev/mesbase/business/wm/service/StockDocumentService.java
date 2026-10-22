@@ -1,5 +1,6 @@
 package dev.mesbase.business.wm.service;
 
+import dev.mesbase.common.validation.ParameterChecks;
 import com.github.pagehelper.PageHelper;
 import dev.mesbase.business.basic.dao.MaterialMapper;
 import dev.mesbase.business.basic.dao.UnitMeasureMapper;
@@ -102,7 +103,7 @@ public class StockDocumentService {
     public StockDocumentModels.Page page(StockDocumentModels.Query q) {
         int offset = q.offset() == null ? 0 : q.offset();
         int limit = q.limit() == null ? 20 : q.limit();
-        if (offset < 0 || limit < 1 || limit > 100) bad();
+        if (offset < 0 || limit < 1 || limit > 100) ParameterChecks.reject(ErrorCode.BAD_REQUEST);
         var f = new WmStockDocumentExample();
         var c = f.createCriteria();
         if (q.documentType() != null && !q.documentType().isBlank()) {
@@ -111,11 +112,11 @@ public class StockDocumentService {
         }
         if (q.status() != null && !q.status().isBlank()) {
             if (!List.of(StockDocumentStatus.DRAFT.getValue(), StockDocumentStatus.POSTED.getValue(), StockDocumentStatus.CANCELLED.getValue())
-                    .contains(q.status())) bad();
+                    .contains(q.status())) ParameterChecks.reject(ErrorCode.BAD_REQUEST);
             c.andStatusEqualTo(q.status());
         }
         if (q.documentNo() != null && !q.documentNo().isBlank()) {
-            if (q.documentNo().length() > 64) bad();
+            if (q.documentNo().length() > 64) ParameterChecks.reject(ErrorCode.BAD_REQUEST);
             c.andDocumentNoLike("%" + q.documentNo() + "%");
         }
         f.setOrderByClause("id desc");
@@ -135,11 +136,11 @@ public class StockDocumentService {
         sources.localCreation();
         if (command.sourceExecutionId() != null) {
             if (command.sourceWorkorderId() != null || !StockDocumentType.OTHER_RECEIPT.getValue()
-                    .equals(command.documentType())) bad();
+                    .equals(command.documentType())) ParameterChecks.reject(ErrorCode.BAD_REQUEST);
             productionExecution(command.sourceExecutionId());
         }
         if (command.sourceWorkorderId() != null) {
-            if (!StockDocumentType.OTHER_RECEIPT.getValue().equals(command.documentType())) bad();
+            if (!StockDocumentType.OTHER_RECEIPT.getValue().equals(command.documentType())) ParameterChecks.reject(ErrorCode.BAD_REQUEST);
             cancelled(command.sourceWorkorderId());
         }
         var row = new WmStockDocumentEntity();
@@ -153,7 +154,7 @@ public class StockDocumentService {
         row.setSourceExecutionId(command.sourceExecutionId());
         row.setRevision(0L);
         audit(row, true);
-        if (documents.insert(row) != 1) conflict();
+        if (documents.insert(row) != 1) ParameterChecks.reject(ErrorCode.STOCK_DOCUMENT_CONFLICT);
         return detail(row.getId());
     }
 
@@ -186,7 +187,7 @@ public class StockDocumentService {
         draft(header, command.expectedRevision());
         sources.localCreation();
         var existing = rows(documentId);
-        if (lineId == null && existing.size() >= 100) bad();
+        if (lineId == null && existing.size() >= 100) ParameterChecks.reject(ErrorCode.BAD_REQUEST);
         var line = lineId == null ? new WmStockDocumentLineEntity() : requireLine(documentId, lineId);
         line.setDocumentId(documentId);
         if (lineId == null) {
@@ -203,7 +204,7 @@ public class StockDocumentService {
         line.setRemark(command.remark());
         if (header.getSourceExecutionId() != null) ProductionQuantityInput.check(command.quantity());
         validateIdentity(line);
-        if ((lineId == null ? lines.insert(line) : lines.updateByPrimaryKey(line)) != 1) conflict();
+        if ((lineId == null ? lines.insert(line) : lines.updateByPrimaryKey(line)) != 1) ParameterChecks.reject(ErrorCode.STOCK_DOCUMENT_CONFLICT);
         save(header);
         return line;
     }
@@ -214,7 +215,7 @@ public class StockDocumentService {
         draft(row, command.expectedRevision());
         sources.localCreation();
         requireLine(documentId, lineId);
-        if (lines.deleteByPrimaryKey(lineId) != 1) conflict();
+        if (lines.deleteByPrimaryKey(lineId) != 1) ParameterChecks.reject(ErrorCode.STOCK_DOCUMENT_CONFLICT);
         save(row);
     }
 
@@ -233,13 +234,13 @@ public class StockDocumentService {
         draft(row, command.expectedRevision());
         sources.localCreation();
         var detail = rows(id);
-        if (detail.isEmpty()) conflict();
+        if (detail.isEmpty()) ParameterChecks.reject(ErrorCode.STOCK_DOCUMENT_CONFLICT);
         if (row.getSourceWorkorderId() != null) {
             var basis = cancellationBasis(row.getSourceWorkorderId());
             BigDecimal amount = BigDecimal.ZERO;
             for (var line : detail) {
                 if (!Objects.equals(basis.productId(), line.getMaterialId())
-                        || line.getRemark() == null || line.getRemark().isBlank()) conflict();
+                        || line.getRemark() == null || line.getRemark().isBlank()) ParameterChecks.reject(ErrorCode.STOCK_DOCUMENT_CONFLICT);
                 amount = amount.add(line.getQuantity());
             }
             if (amount.compareTo(basis.remaining()) > 0)
@@ -253,7 +254,7 @@ public class StockDocumentService {
                     .map(WmStockDocumentLineEntity::getWarehouseId).toList());
             BigDecimal amount = BigDecimal.ZERO;
             for (var line : detail) {
-                if (!Objects.equals(basis.productId(), line.getMaterialId())) conflict();
+                if (!Objects.equals(basis.productId(), line.getMaterialId())) ParameterChecks.reject(ErrorCode.STOCK_DOCUMENT_CONFLICT);
                 amount = amount.add(line.getQuantity());
             }
             if (!basis.canReceive() || amount.compareTo(basis.remaining()) > 0)
@@ -273,7 +274,7 @@ public class StockDocumentService {
                 var action = stock.postDocument(row.getDocumentType(), id, line, command.requestId(), actionId,
                         hash, row.getReason(), row.getSourceExecutionId());
                 line.setStockActionId(action.getId());
-                if (lines.updateByPrimaryKey(line) != 1) conflict();
+                if (lines.updateByPrimaryKey(line) != 1) ParameterChecks.reject(ErrorCode.STOCK_DOCUMENT_CONFLICT);
             }
         } catch (DuplicateKeyException failure) {
             throw new FoundationException(ErrorCode.RESOURCE_CONFLICT, failure);
@@ -309,7 +310,7 @@ public class StockDocumentService {
     private MesProductionExecutionEntity productionExecution(Long id) {
         var execution = locks.execution(id);
         if (!List.of(ProductionExecutionStatus.RUNNING.getValue(), ProductionExecutionStatus.COMPLETED.getValue())
-                .contains(execution.getStatus())) conflict();
+                .contains(execution.getStatus())) ParameterChecks.reject(ErrorCode.STOCK_DOCUMENT_CONFLICT);
         sources.finishedOutput(execution, null);
         return execution;
     }
@@ -352,7 +353,7 @@ public class StockDocumentService {
         var row = locks.order(id);
         if (!WorkOrderStatus.CANCELLED.getValue().equals(row.getStatus()) || !BusinessSource.LOCAL.getValue()
                 .equals(row.getSource()))
-            conflict();
+            ParameterChecks.reject(ErrorCode.STOCK_DOCUMENT_CONFLICT);
         return row;
     }
 
@@ -369,24 +370,24 @@ public class StockDocumentService {
                 || !Objects.equals(source.getWarehouseId(), line.getWarehouseId())
                 || !Objects.equals(source.getBatchNo(), line.getBatchNo())
                 || !Objects.equals(source.getBinCode(), line.getBinCode())
-                || !Objects.equals(material.getUnitId(), line.getUnitId())) conflict();
+                || !Objects.equals(material.getUnitId(), line.getUnitId())) ParameterChecks.reject(ErrorCode.STOCK_DOCUMENT_CONFLICT);
     }
 
     private WmStockDocumentLineEntity requireLine(Long documentId, Long id) {
         var row = lines.selectByPrimaryKey(id);
-        if (row == null || !Objects.equals(row.getDocumentId(), documentId)) conflict();
+        if (row == null || !Objects.equals(row.getDocumentId(), documentId)) ParameterChecks.reject(ErrorCode.STOCK_DOCUMENT_CONFLICT);
         return row;
     }
 
     private WmStockDocumentEntity lock(Long id) {
-        if (id == null) bad();
+        if (id == null) ParameterChecks.reject(ErrorCode.BAD_REQUEST);
         var row = documents.selectByPrimaryKeyForUpdate(id);
         if (row == null) throw new FoundationException(ErrorCode.NOT_FOUND);
         return row;
     }
 
     private WmStockDocumentEntity require(Long id) {
-        if (id == null) bad();
+        if (id == null) ParameterChecks.reject(ErrorCode.BAD_REQUEST);
         var row = documents.selectByPrimaryKey(id);
         if (row == null) throw new FoundationException(ErrorCode.NOT_FOUND);
         return row;
@@ -397,21 +398,21 @@ public class StockDocumentService {
         f.createCriteria().andDocumentIdEqualTo(id);
         f.setOrderByClause("line_no,id");
         var found = bounded(() -> lines.selectByExample(f));
-        if (found.size() > 100) conflict();
+        if (found.size() > 100) ParameterChecks.reject(ErrorCode.STOCK_DOCUMENT_CONFLICT);
         return found;
     }
 
     private static boolean replay(WmStockDocumentEntity row, StockDocumentModels.Post command, String hash) {
         if (!StockDocumentStatus.POSTED.getValue().equals(row.getStatus())) return false;
         if (!Objects.equals(row.getPostRequestId(), command.requestId())
-                || !Objects.equals(row.getPostRequestHash(), hash)) conflict();
+                || !Objects.equals(row.getPostRequestHash(), hash)) ParameterChecks.reject(ErrorCode.STOCK_DOCUMENT_CONFLICT);
         return true;
     }
 
     private void save(WmStockDocumentEntity row) {
         row.setRevision(Math.addExact(row.getRevision(), 1));
         audit(row, false);
-        if (documents.updateByPrimaryKey(row) != 1) conflict();
+        if (documents.updateByPrimaryKey(row) != 1) ParameterChecks.reject(ErrorCode.STOCK_DOCUMENT_CONFLICT);
     }
 
     private static void audit(WmStockDocumentEntity row, boolean create) {
@@ -426,22 +427,22 @@ public class StockDocumentService {
     }
 
     private void validate(Object command) {
-        if (command == null || !validator.validate(command).isEmpty()) bad();
+        if (command == null || !validator.validate(command).isEmpty()) ParameterChecks.reject(ErrorCode.BAD_REQUEST);
     }
 
     private static void draft(WmStockDocumentEntity row, Long revision) {
         if (!StockDocumentStatus.DRAFT.getValue()
-                .equals(row.getStatus()) || !Objects.equals(row.getRevision(), revision)) conflict();
+                .equals(row.getStatus()) || !Objects.equals(row.getRevision(), revision)) ParameterChecks.reject(ErrorCode.STOCK_DOCUMENT_CONFLICT);
     }
 
     private static void type(String value) {
         if (!List.of(StockDocumentType.OTHER_RECEIPT.getValue(), StockDocumentType.OTHER_ISSUE.getValue())
-                .contains(value)) bad();
+                .contains(value)) ParameterChecks.reject(ErrorCode.BAD_REQUEST);
     }
 
     private static void uuid(String value) {
         try {
-            if (!UUID.fromString(value).toString().equals(value)) bad();
+            if (!UUID.fromString(value).toString().equals(value)) ParameterChecks.reject(ErrorCode.BAD_REQUEST);
         } catch (IllegalArgumentException | NullPointerException failure) {
             throw new FoundationException(ErrorCode.BAD_REQUEST, failure);
         }
@@ -450,16 +451,10 @@ public class StockDocumentService {
     private static <T> List<T> bounded(Supplier<List<T>> query) {
         try (var page = PageHelper.offsetPage(0, 10001, false)) {
             var rows = List.copyOf(query.get());
-            if (rows.size() > 10000) conflict();
+            if (rows.size() > 10000) ParameterChecks.reject(ErrorCode.STOCK_DOCUMENT_CONFLICT);
             return rows;
         }
     }
 
-    private static void bad() {
-        throw new FoundationException(ErrorCode.BAD_REQUEST);
-    }
 
-    private static void conflict() {
-        throw new FoundationException(ErrorCode.STOCK_DOCUMENT_CONFLICT);
-    }
 }

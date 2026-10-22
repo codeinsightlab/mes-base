@@ -1,12 +1,12 @@
 package dev.mesbase.business.basic.service.impl;
 
+import dev.mesbase.common.validation.ParameterChecks;
 import com.github.pagehelper.Page;
 import com.github.pagehelper.PageHelper;
 import dev.mesbase.business.basic.dao.WorkstationMapper;
 import dev.mesbase.business.basic.domain.WorkstationCreateCommand;
 import dev.mesbase.business.basic.domain.WorkstationEntity;
 import dev.mesbase.business.basic.domain.WorkstationExample;
-import dev.mesbase.business.basic.domain.WorkstationPage;
 import dev.mesbase.business.basic.domain.WorkstationQueryDto;
 import dev.mesbase.business.basic.domain.WorkstationResource;
 import dev.mesbase.business.basic.domain.WorkstationUpdateCommand;
@@ -69,12 +69,10 @@ public class WorkstationServiceImpl implements IWorkstationService {
     @Transactional(transactionManager = "businessTransactionManager", readOnly = true)
     @BusinessCache(business = WorkstationResource.PREFIX,
             type = BusinessCache.Type.LIST)
-    public WorkstationPage selectPage(WorkstationQueryDto query) {
+    public Page<WorkstationEntity> selectPage(WorkstationQueryDto query) {
         int offset = query.offset() == null ? 0 : query.offset();
         int limit = query.limit() == null ? 20 : query.limit();
-        if (offset < 0 || limit < 1 || limit > 100) {
-            throw new FoundationException(ErrorCode.BAD_REQUEST);
-        }
+        ParameterChecks.paging(offset, limit, 100);
         WorkstationExample example = new WorkstationExample();
         WorkstationExample.Criteria criteria = example.createCriteria();
         if (query.code() != null) {
@@ -94,8 +92,8 @@ public class WorkstationServiceImpl implements IWorkstationService {
         }
         example.setOrderByClause("id desc");
         try (Page<WorkstationEntity> page = PageHelper.offsetPage(offset, limit)) {
-            List<WorkstationEntity> rows = mapper.selectByExample(example);
-            return new WorkstationPage(rows, page.getTotal(), offset, limit);
+            mapper.selectByExample(example);
+            return page;
         }
     }
 

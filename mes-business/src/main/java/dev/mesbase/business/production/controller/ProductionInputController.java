@@ -1,5 +1,7 @@
 package dev.mesbase.business.production.controller;
 
+import java.util.Optional;
+
 import dev.mesbase.business.production.service.ProductionInputSupplyService;
 import dev.mesbase.business.production.service.ProductionInputService;
 import dev.mesbase.business.production.service.ProductionInputService.Command;
@@ -78,7 +80,7 @@ public class ProductionInputController {
     @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED, permission = PERMISSION)
     public PreviewView preview(@RequestParam String code, @RequestParam Long workorderId) {
         var p = service.preview(code, workorderId);
-        return new PreviewView(RoutingController.detailView(p.definition()), p.actual() == null ? null : ExecutionActionController.toView(p.actual()));
+        return new PreviewView(RoutingController.detailView(p.definition()), Optional.ofNullable(p.actual()).map(nullableValue -> ExecutionActionController.toView(nullableValue)).orElse(null));
     }
 
     @PostMapping

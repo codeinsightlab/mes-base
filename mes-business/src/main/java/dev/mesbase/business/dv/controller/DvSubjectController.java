@@ -1,10 +1,12 @@
 package dev.mesbase.business.dv.controller;
 
+import com.github.pagehelper.Page;
+import java.util.Objects;
+
 import dev.mesbase.business.dv.controller.vo.DvSubjectPageVo;
 import dev.mesbase.business.dv.controller.vo.DvSubjectVo;
 import dev.mesbase.business.dv.domain.DvSubjectCreateCommand;
 import dev.mesbase.business.dv.domain.DvSubjectEntity;
-import dev.mesbase.business.dv.domain.DvSubjectPage;
 import dev.mesbase.business.dv.domain.DvSubjectQueryDto;
 import dev.mesbase.business.dv.domain.DvSubjectUpdateCommand;
 import dev.mesbase.business.dv.service.IDvSubjectService;
@@ -46,10 +48,10 @@ public class DvSubjectController {
     @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED,
             permission = DvSubjectPermissions.LIST)
     public DvSubjectPageVo list(@Valid @ModelAttribute DvSubjectQueryDto query) {
-        DvSubjectPage page = service.selectPage(query);
+        Page<DvSubjectEntity> page = service.selectPage(query);
         return new DvSubjectPageVo(
-                page.items().stream().map(DvSubjectController::toView).toList(),
-                page.total(), page.offset(), page.limit());
+                page.stream().map(DvSubjectController::toView).toList(),
+                page.getTotal(), (int) page.getStartRow(), page.getPageSize());
     }
 
     @GetMapping("/{id}")
@@ -93,7 +95,7 @@ public class DvSubjectController {
 
     private static DvSubjectVo toView(DvSubjectEntity row) {
         return new DvSubjectVo(
-                row.getSubjectId() == null ? null : row.getSubjectId().toString(),
+                Objects.toString(row.getSubjectId(), null),
 
                 row.getSubjectCode(),
                 row.getSubjectName(),

@@ -1,12 +1,12 @@
 package dev.mesbase.business.basic.service.impl;
 
+import dev.mesbase.common.validation.ParameterChecks;
 import com.github.pagehelper.Page;
 import com.github.pagehelper.PageHelper;
 import dev.mesbase.business.basic.dao.MaterialCategoryMapper;
 import dev.mesbase.business.basic.domain.MaterialCategoryCreateCommand;
 import dev.mesbase.business.basic.domain.MaterialCategoryEntity;
 import dev.mesbase.business.basic.domain.MaterialCategoryExample;
-import dev.mesbase.business.basic.domain.MaterialCategoryPage;
 import dev.mesbase.business.basic.domain.MaterialCategoryQueryDto;
 import dev.mesbase.business.basic.domain.MaterialCategoryResource;
 import dev.mesbase.business.basic.domain.MaterialCategoryUpdateCommand;
@@ -68,12 +68,10 @@ public class MaterialCategoryServiceImpl implements IMaterialCategoryService {
     @Transactional(transactionManager = "businessTransactionManager", readOnly = true)
     @BusinessCache(business = MaterialCategoryResource.PREFIX,
             type = BusinessCache.Type.LIST)
-    public MaterialCategoryPage selectPage(MaterialCategoryQueryDto query) {
+    public Page<MaterialCategoryEntity> selectPage(MaterialCategoryQueryDto query) {
         int offset = query.offset() == null ? 0 : query.offset();
         int limit = query.limit() == null ? 20 : query.limit();
-        if (offset < 0 || limit < 1 || limit > 100) {
-            throw new FoundationException(ErrorCode.BAD_REQUEST);
-        }
+        ParameterChecks.paging(offset, limit, 100);
         MaterialCategoryExample example = new MaterialCategoryExample();
         MaterialCategoryExample.Criteria criteria = example.createCriteria();
         if (query.code() != null) {
@@ -96,8 +94,8 @@ public class MaterialCategoryServiceImpl implements IMaterialCategoryService {
         }
         example.setOrderByClause("id desc");
         try (Page<MaterialCategoryEntity> page = PageHelper.offsetPage(offset, limit)) {
-            List<MaterialCategoryEntity> rows = mapper.selectByExample(example);
-            return new MaterialCategoryPage(rows, page.getTotal(), offset, limit);
+            mapper.selectByExample(example);
+            return page;
         }
     }
 

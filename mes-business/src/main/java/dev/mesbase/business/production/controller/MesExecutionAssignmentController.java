@@ -1,11 +1,12 @@
-// MES-CODEGEN: scaffold; review required.
 package dev.mesbase.business.production.controller;
+
+import com.github.pagehelper.Page;
+import java.util.Objects;
 
 import dev.mesbase.business.production.controller.vo.MesExecutionAssignmentPageVo;
 import dev.mesbase.business.production.controller.vo.MesExecutionAssignmentVo;
 import dev.mesbase.business.production.domain.MesExecutionAssignmentCreateCommand;
 import dev.mesbase.business.production.domain.MesExecutionAssignmentEntity;
-import dev.mesbase.business.production.domain.MesExecutionAssignmentPage;
 import dev.mesbase.business.production.domain.MesExecutionAssignmentQueryDto;
 import dev.mesbase.business.production.domain.MesExecutionAssignmentUpdateCommand;
 import dev.mesbase.business.production.service.IMesExecutionAssignmentService;
@@ -45,10 +46,10 @@ public class MesExecutionAssignmentController {
     @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED,
             permission = MesExecutionAssignmentPermissions.LIST)
     public MesExecutionAssignmentPageVo list(@Valid @ModelAttribute MesExecutionAssignmentQueryDto query) {
-        MesExecutionAssignmentPage page = service.selectPage(query);
+        Page<MesExecutionAssignmentEntity> page = service.selectPage(query);
         return new MesExecutionAssignmentPageVo(
-                page.items().stream().map(MesExecutionAssignmentController::toView).toList(),
-                page.total(), page.offset(), page.limit());
+                page.stream().map(MesExecutionAssignmentController::toView).toList(),
+                page.getTotal(), (int) page.getStartRow(), page.getPageSize());
     }
 
     @GetMapping("/{id}")
@@ -86,11 +87,11 @@ public class MesExecutionAssignmentController {
 
     private static MesExecutionAssignmentVo toView(MesExecutionAssignmentEntity row) {
         return new MesExecutionAssignmentVo(
-                row.getId() == null ? null : row.getId().toString(),
-                row.getExecutionId() == null ? null : row.getExecutionId().toString(),
-                row.getRoutingNodeId() == null ? null : row.getRoutingNodeId().toString(),
-                row.getUserId() == null ? null : row.getUserId().toString(),
-                row.getAssignedBy() == null ? null : row.getAssignedBy().toString(),
+                Objects.toString(row.getId(), null),
+                Objects.toString(row.getExecutionId(), null),
+                Objects.toString(row.getRoutingNodeId(), null),
+                Objects.toString(row.getUserId(), null),
+                Objects.toString(row.getAssignedBy(), null),
                 row.getAssignedAt(),
                 row.getRemark()
         );

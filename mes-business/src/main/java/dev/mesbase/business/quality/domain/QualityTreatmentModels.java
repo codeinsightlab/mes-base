@@ -8,11 +8,17 @@ public final class QualityTreatmentModels {
     private QualityTreatmentModels() {
     }
 
-    public enum Action {ASSESS, ALLOCATE, START, RESULT, CANCEL_ALLOC, CANCEL_START, CORRECT_RESULT}
+    public enum Action {ASSESS, ALLOCATE, START, RESULT, CANCEL_ALLOC, CANCEL_START, CORRECT_RESULT, RETURN_NODE, TRANSFER_WAREHOUSE}
 
-    public enum State {UNVERIFIED, OVERLAP, PENDING, IN_PROGRESS, WAITING_REWORK, FAILED_SCRAPPED, RECOVERED, SCRAPPED, VOIDED}
+    public enum State {UNVERIFIED, OVERLAP, PENDING, IN_PROGRESS, WAITING_REWORK, FAILED_SCRAPPED, RECOVERED, SCRAPPED, VOIDED, RETURNED, TRANSFERRED, DISPOSED}
 
     public enum Attribution {INDEPENDENT, OVERLAP, UNVERIFIED}
+
+    public enum Destination {RETURN_NODE, WAREHOUSE}
+
+    public record Disposition(String requestId, int expectedRevision, Destination destination,
+                              BigDecimal quantity, Long warehouseId, String reason) {
+    }
 
     public record Assessment(Attribution type, String relatedDeclarationId, String basis) {
     }
@@ -29,6 +35,6 @@ public final class QualityTreatmentModels {
                           BigDecimal processedQty, BigDecimal recoveredQty, BigDecimal failedQty,
                           BigDecimal pendingDispositionQty, BigDecimal pendingStartQty, BigDecimal inProgressQty,
                           BigDecimal netDefectQty, String state, String recordAction, String destinationType,
-                          List<MesQualityTreatmentEntity> events) {
+                          List<MesQualityTreatmentEntity> events, BigDecimal returnedQty, BigDecimal transferredQty) {
     }
 }

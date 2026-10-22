@@ -1,5 +1,9 @@
 package dev.mesbase.web.view.post;
 
+import java.util.Optional;
+
+import java.util.Objects;
+
 import dev.mesbase.system.domain.SysPost;
 import java.util.List;
 
@@ -10,10 +14,10 @@ public final class SysPostAssembler {
 
     public static SysPostResult toResult(SysPost row) {
         if (row == null) return null;
-        return new SysPostResult(row.getPostId() == null ? null : row.getPostId().toString(),
+        return new SysPostResult(Objects.toString(row.getPostId(), null),
                 row.getPostCode(),
                 row.getPostName(),
-                row.getPostSort() == null ? null : Integer.valueOf(row.getPostSort()),
+                Optional.ofNullable(row.getPostSort()).map(nullableValue -> Integer.valueOf(nullableValue)).orElse(null),
                 row.getStatus(),
                 row.isFlag(),
                 row.getCreateBy(),
@@ -24,6 +28,7 @@ public final class SysPostAssembler {
     }
 
     public static List<SysPostResult> toResults(List<SysPost> rows) {
-        return rows == null ? null : rows.stream().map(SysPostAssembler::toResult).toList();
+        if (rows == null) return null;
+        return rows.stream().map(SysPostAssembler::toResult).toList();
     }
 }

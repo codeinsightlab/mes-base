@@ -1,9 +1,8 @@
-// MES-CODEGEN: scaffold; review required.
 package dev.mesbase.business.dv.service;
 
+import com.github.pagehelper.Page;
 import dev.mesbase.business.dv.domain.DvSubjectCreateCommand;
 import dev.mesbase.business.dv.domain.DvSubjectEntity;
-import dev.mesbase.business.dv.domain.DvSubjectPage;
 import dev.mesbase.business.dv.domain.DvSubjectQueryDto;
 import dev.mesbase.business.dv.domain.DvSubjectUpdateCommand;
 import dev.mesbase.business.dv.sync.DvSubjectSyncResult;
@@ -17,7 +16,7 @@ import java.util.List;
  * @author MES Base
  */
 public interface IDvSubjectService {
-    DvSubjectPage selectPage(DvSubjectQueryDto query);
+    Page<DvSubjectEntity> selectPage(DvSubjectQueryDto query);
 
     DvSubjectEntity selectById(Long id);
 

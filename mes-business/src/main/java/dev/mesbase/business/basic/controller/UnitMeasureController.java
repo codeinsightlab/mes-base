@@ -1,10 +1,12 @@
 package dev.mesbase.business.basic.controller;
 
+import com.github.pagehelper.Page;
+import java.util.Objects;
+
 import dev.mesbase.business.basic.controller.vo.UnitMeasurePageVo;
 import dev.mesbase.business.basic.controller.vo.UnitMeasureVo;
 import dev.mesbase.business.basic.domain.UnitMeasureCreateCommand;
 import dev.mesbase.business.basic.domain.UnitMeasureEntity;
-import dev.mesbase.business.basic.domain.UnitMeasurePage;
 import dev.mesbase.business.basic.domain.UnitMeasureQueryDto;
 import dev.mesbase.business.basic.domain.UnitMeasureUpdateCommand;
 import dev.mesbase.business.basic.service.IUnitMeasureService;
@@ -46,10 +48,10 @@ public class UnitMeasureController {
     @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED,
             permission = UnitMeasurePermissions.LIST)
     public UnitMeasurePageVo list(@Valid @ModelAttribute UnitMeasureQueryDto query) {
-        UnitMeasurePage page = service.selectPage(query);
+        Page<UnitMeasureEntity> page = service.selectPage(query);
         return new UnitMeasurePageVo(
-                page.items().stream().map(UnitMeasureController::toView).toList(),
-                page.total(), page.offset(), page.limit());
+                page.stream().map(UnitMeasureController::toView).toList(),
+                page.getTotal(), (int) page.getStartRow(), page.getPageSize());
     }
 
     @GetMapping("/{id}")
@@ -93,7 +95,7 @@ public class UnitMeasureController {
 
     private static UnitMeasureVo toView(UnitMeasureEntity row) {
         return new UnitMeasureVo(
-                row.getId() == null ? null : row.getId().toString(),
+                Objects.toString(row.getId(), null),
 
                 row.getCode(),
                 row.getName(),

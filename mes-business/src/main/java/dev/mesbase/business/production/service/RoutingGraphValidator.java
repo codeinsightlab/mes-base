@@ -1,5 +1,6 @@
 package dev.mesbase.business.production.service;
 
+import dev.mesbase.common.validation.ParameterChecks;
 import dev.mesbase.business.production.domain.RoutingEdgeCommand;
 import dev.mesbase.business.production.domain.RoutingNodeCommand;
 import dev.mesbase.core.error.ErrorCode;
@@ -19,7 +20,7 @@ public final class RoutingGraphValidator {
 
     public static void validate(List<RoutingNodeCommand> nodes, List<RoutingEdgeCommand> edges,
                                 boolean publishing) {
-        if (nodes == null || edges == null || nodes.size() > 100 || edges.size() > 400) invalid();
+        if (nodes == null || edges == null || nodes.size() > 100 || edges.size() > 400) ParameterChecks.reject(ErrorCode.ROUTING_GRAPH_INVALID);
         var incoming = new HashMap<String, Integer>();
         var outgoing = new HashMap<String, List<String>>();
         int keys = 0;
@@ -27,21 +28,21 @@ public final class RoutingGraphValidator {
             if (node == null || node.nodeCode() == null || !node.nodeCode().matches("[A-Za-z0-9_-]{1,64}")
                     || node.operationId() == null || node.isKey() == null || node.displayOrder() == null
                     || node.displayOrder() < 0 || node.description() != null && node.description().length() > 1000
-                    || incoming.putIfAbsent(node.nodeCode(), 0) != null) invalid();
+                    || incoming.putIfAbsent(node.nodeCode(), 0) != null) ParameterChecks.reject(ErrorCode.ROUTING_GRAPH_INVALID);
             outgoing.put(node.nodeCode(), new ArrayList<>());
             if (node.isKey()) keys++;
         }
-        if (keys > 1 || publishing && nodes.isEmpty()) invalid();
+        if (keys > 1 || publishing && nodes.isEmpty()) ParameterChecks.reject(ErrorCode.ROUTING_GRAPH_INVALID);
         var unique = new HashSet<RoutingEdgeCommand>();
         for (var edge : edges) {
             if (edge == null || edge.fromNodeCode() == null || edge.toNodeCode() == null
                     || !incoming.containsKey(edge.fromNodeCode()) || !incoming.containsKey(edge.toNodeCode())
-                    || edge.fromNodeCode().equals(edge.toNodeCode()) || !unique.add(edge)) invalid();
+                    || edge.fromNodeCode().equals(edge.toNodeCode()) || !unique.add(edge)) ParameterChecks.reject(ErrorCode.ROUTING_GRAPH_INVALID);
             outgoing.get(edge.fromNodeCode()).add(edge.toNodeCode());
             incoming.compute(edge.toNodeCode(), (code, count) -> count + 1);
         }
         if (publishing && nodes.size() > 1 && incoming.keySet().stream()
-                .anyMatch(code -> incoming.get(code) == 0 && outgoing.get(code).isEmpty())) invalid();
+                .anyMatch(code -> incoming.get(code) == 0 && outgoing.get(code).isEmpty())) ParameterChecks.reject(ErrorCode.ROUTING_GRAPH_INVALID);
         var queue = new ArrayDeque<String>();
         incoming.forEach((code, count) -> {
             if (count == 0) queue.add(code);
@@ -55,10 +56,7 @@ public final class RoutingGraphValidator {
                 if (remaining == 0) queue.add(target);
             }
         }
-        if (visited != nodes.size()) invalid();
+        if (visited != nodes.size()) ParameterChecks.reject(ErrorCode.ROUTING_GRAPH_INVALID);
     }
 
-    private static void invalid() {
-        throw new FoundationException(ErrorCode.ROUTING_GRAPH_INVALID);
-    }
 }

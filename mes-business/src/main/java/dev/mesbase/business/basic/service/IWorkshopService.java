@@ -1,9 +1,8 @@
-// MES-CODEGEN: scaffold; review required.
 package dev.mesbase.business.basic.service;
 
+import com.github.pagehelper.Page;
 import dev.mesbase.business.basic.domain.WorkshopCreateCommand;
 import dev.mesbase.business.basic.domain.WorkshopEntity;
-import dev.mesbase.business.basic.domain.WorkshopPage;
 import dev.mesbase.business.basic.domain.WorkshopQueryDto;
 import dev.mesbase.business.basic.domain.WorkshopUpdateCommand;
 import dev.mesbase.business.basic.sync.ExternalWorkshop;
@@ -17,7 +16,7 @@ import java.util.List;
  * @author MES Base
  */
 public interface IWorkshopService {
-    WorkshopPage selectPage(WorkshopQueryDto query);
+    Page<WorkshopEntity> selectPage(WorkshopQueryDto query);
 
     WorkshopEntity selectById(Long id);
 

@@ -1,12 +1,12 @@
 package dev.mesbase.business.production.service.impl;
 
+import dev.mesbase.common.validation.ParameterChecks;
 import com.github.pagehelper.Page;
 import com.github.pagehelper.PageHelper;
 import dev.mesbase.business.production.dao.MesOperationUserMapper;
 import dev.mesbase.business.production.domain.MesOperationUserCreateCommand;
 import dev.mesbase.business.production.domain.MesOperationUserEntity;
 import dev.mesbase.business.production.domain.MesOperationUserExample;
-import dev.mesbase.business.production.domain.MesOperationUserPage;
 import dev.mesbase.business.production.domain.MesOperationUserQueryDto;
 import dev.mesbase.business.production.domain.MesOperationUserUpdateCommand;
 import dev.mesbase.business.production.service.IMesOperationUserService;
@@ -41,13 +41,11 @@ public class MesOperationUserServiceImpl implements IMesOperationUserService {
 
     @Override
     @Transactional(transactionManager = "businessTransactionManager", readOnly = true)
-    public MesOperationUserPage selectPage(MesOperationUserQueryDto query) {
+    public Page<MesOperationUserEntity> selectPage(MesOperationUserQueryDto query) {
         FactoryContext.required();
         int offset = query.offset() == null ? 0 : query.offset();
         int limit = query.limit() == null ? 20 : query.limit();
-        if (offset < 0 || limit < 1 || limit > 100) {
-            throw new FoundationException(ErrorCode.BAD_REQUEST);
-        }
+        ParameterChecks.paging(offset, limit, 100);
         MesOperationUserExample example = new MesOperationUserExample();
         MesOperationUserExample.Criteria criteria = example.createCriteria();
         if (query.operationId() != null) {
@@ -61,8 +59,8 @@ public class MesOperationUserServiceImpl implements IMesOperationUserService {
         }
         example.setOrderByClause("id desc");
         try (Page<MesOperationUserEntity> page = PageHelper.offsetPage(offset, limit)) {
-            List<MesOperationUserEntity> rows = mapper.selectByExample(example);
-            return new MesOperationUserPage(rows, page.getTotal(), offset, limit);
+            mapper.selectByExample(example);
+            return page;
         }
     }
 

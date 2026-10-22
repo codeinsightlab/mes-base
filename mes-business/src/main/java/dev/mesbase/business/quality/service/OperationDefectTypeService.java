@@ -1,5 +1,6 @@
 package dev.mesbase.business.quality.service;
 
+import dev.mesbase.common.validation.ParameterChecks;
 import com.github.pagehelper.PageHelper;
 import dev.mesbase.business.production.service.RoutingReferenceRules;
 import dev.mesbase.business.production.dao.OperationMapper;
@@ -47,7 +48,7 @@ public class OperationDefectTypeService {
     }
 
     public Page page(Long operation, boolean enabledOnly, int offset, int limit) {
-        if (operation == null || offset < 0 || limit < 1 || limit > 100) bad();
+        if (operation == null || offset < 0 || limit < 1 || limit > 100) ParameterChecks.reject(ErrorCode.BAD_REQUEST);
         if (operations.selectByPrimaryKey(operation) == null) throw new FoundationException(ErrorCode.NOT_FOUND);
         var e = new OperationDefectTypeExample();
         var c = e.createCriteria().andOperationIdEqualTo(operation);
@@ -75,7 +76,7 @@ public class OperationDefectTypeService {
         if (row.getRevision() != revision) throw new FoundationException(ErrorCode.DEFECT_TYPE_STALE);
         if (!EnableStatus.ENABLED.getValue().equals(row.getStatus()))
             throw new FoundationException(ErrorCode.DEFECT_TYPE_INVALID);
-        if (WasteCategory.from(category) == null) bad();
+        if (WasteCategory.from(category) == null) ParameterChecks.reject(ErrorCode.BAD_REQUEST);
         return row;
     }
 
@@ -86,7 +87,7 @@ public class OperationDefectTypeService {
                 || input.name() == null || input.name().isBlank() || input.name().length() > 255
                 || WasteCategory.from(input.defaultWasteCategory()) == null || EnableStatus.from(input.status()) == null
                 || input.sort() == null || input.sort() < 0 || input.remark() != null && input.remark().length() > 500)
-            bad();
+            ParameterChecks.reject(ErrorCode.BAD_REQUEST);
         String code = input.code().strip().toUpperCase(Locale.ROOT);
         var duplicate = new OperationDefectTypeExample();
         var criteria = duplicate.createCriteria().andOperationIdEqualTo(operation).andCodeEqualTo(code);
@@ -95,7 +96,7 @@ public class OperationDefectTypeService {
         var row = id == null ? new OperationDefectTypeEntity() : require(operation, id);
         if (id != null && !row.getRevision().equals(input.expectedRevision()))
             throw new FoundationException(ErrorCode.DEFECT_TYPE_STALE);
-        if (id == null && input.expectedRevision() != null) bad();
+        if (id == null && input.expectedRevision() != null) ParameterChecks.reject(ErrorCode.BAD_REQUEST);
         row.setOperationId(operation);
         row.setCode(code);
         row.setName(input.name().strip());
@@ -109,13 +110,13 @@ public class OperationDefectTypeService {
             row.setRevision(0);
             row.setCreateBy(row.getUpdateBy());
             row.setCreateTime(row.getUpdateTime());
-            if (mapper.insert(row) != 1) stale();
+            if (mapper.insert(row) != 1) ParameterChecks.reject(ErrorCode.DEFECT_TYPE_STALE);
         } else {
             var expected = new OperationDefectTypeExample();
             expected.createCriteria().andIdEqualTo(id).andOperationIdEqualTo(operation)
                     .andRevisionEqualTo(input.expectedRevision());
             row.setRevision(row.getRevision() + 1);
-            if (mapper.updateByExample(row, expected) != 1) stale();
+            if (mapper.updateByExample(row, expected) != 1) ParameterChecks.reject(ErrorCode.DEFECT_TYPE_STALE);
         }
         return require(operation, row.getId());
     }
@@ -124,20 +125,14 @@ public class OperationDefectTypeService {
     public void delete(Long operation, Long id, int expectedRevision) {
         references.lockOperations(List.of(operation), false);
         var row = require(operation, id);
-        if (row.getRevision() != expectedRevision) stale();
+        if (row.getRevision() != expectedRevision) ParameterChecks.reject(ErrorCode.DEFECT_TYPE_STALE);
         var used = new MesProductionDefectExample();
         used.createCriteria().andDefectTypeIdEqualTo(id);
         if (defects.countByExample(used) > 0) throw new FoundationException(ErrorCode.DEFECT_TYPE_REFERENCED);
         var e = new OperationDefectTypeExample();
         e.createCriteria().andIdEqualTo(id).andOperationIdEqualTo(operation).andRevisionEqualTo(expectedRevision);
-        if (mapper.deleteByExample(e) != 1) stale();
+        if (mapper.deleteByExample(e) != 1) ParameterChecks.reject(ErrorCode.DEFECT_TYPE_STALE);
     }
 
-    private static void bad() {
-        throw new FoundationException(ErrorCode.BAD_REQUEST);
-    }
 
-    private static void stale() {
-        throw new FoundationException(ErrorCode.DEFECT_TYPE_STALE);
-    }
 }

@@ -1,11 +1,11 @@
 package dev.mesbase.business.quality.service.impl;
 
+import dev.mesbase.common.validation.ParameterChecks;
 import com.github.pagehelper.Page;
 import com.github.pagehelper.PageHelper;
 import dev.mesbase.business.quality.dao.MesQualityReleaseMapper;
 import dev.mesbase.business.quality.domain.MesQualityReleaseEntity;
 import dev.mesbase.business.quality.domain.MesQualityReleaseExample;
-import dev.mesbase.business.quality.domain.MesQualityReleasePage;
 import dev.mesbase.business.quality.domain.MesQualityReleaseQueryDto;
 import dev.mesbase.business.quality.domain.MesQualityReleaseResource;
 import dev.mesbase.business.quality.service.IMesQualityReleaseService;
@@ -33,12 +33,10 @@ public class MesQualityReleaseServiceImpl implements IMesQualityReleaseService {
     @Transactional(transactionManager = "businessTransactionManager", readOnly = true)
     @BusinessCache(business = MesQualityReleaseResource.PREFIX,
             type = BusinessCache.Type.LIST)
-    public MesQualityReleasePage selectPage(MesQualityReleaseQueryDto query) {
+    public Page<MesQualityReleaseEntity> selectPage(MesQualityReleaseQueryDto query) {
         int offset = query.offset() == null ? 0 : query.offset();
         int limit = query.limit() == null ? 20 : query.limit();
-        if (offset < 0 || limit < 1 || limit > 100) {
-            throw new FoundationException(ErrorCode.BAD_REQUEST);
-        }
+        ParameterChecks.paging(offset, limit, 100);
         MesQualityReleaseExample example = new MesQualityReleaseExample();
         MesQualityReleaseExample.Criteria criteria = example.createCriteria();
         if (query.executionId() != null) {
@@ -73,8 +71,8 @@ public class MesQualityReleaseServiceImpl implements IMesQualityReleaseService {
         }
         example.setOrderByClause("id");
         try (Page<MesQualityReleaseEntity> page = PageHelper.offsetPage(offset, limit)) {
-            List<MesQualityReleaseEntity> rows = mapper.selectByExample(example);
-            return new MesQualityReleasePage(rows, page.getTotal(), offset, limit);
+            mapper.selectByExample(example);
+            return page;
         }
     }
 

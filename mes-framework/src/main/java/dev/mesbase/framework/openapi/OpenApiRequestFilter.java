@@ -1,5 +1,7 @@
 package dev.mesbase.framework.openapi;
 
+import java.util.Optional;
+
 import dev.mesbase.common.openapi.OpenApiPrincipal;
 import dev.mesbase.platform.web.RequestBoundaryFilter;
 import jakarta.servlet.FilterChain;
@@ -66,7 +68,7 @@ public class OpenApiRequestFilter extends OncePerRequestFilter {
         }
         LOG.info("event=http.request.completed method={} path={} status={} durationMs={} factoryId={} userId={} clientId={} appKey={} apiCode={} errorCode={} peerIp={}",
                 method, path, response.getStatus(), durationMs, null, null,
-                identity == null ? null : identity.getClientId(), identity == null ? null : safe(identity.getAppKey()),
+                Optional.ofNullable(identity).map(nullableValue -> nullableValue.getClientId()).orElse(null), Optional.ofNullable(identity).map(nullableValue -> safe(nullableValue.getAppKey())).orElse(null),
                 safe(String.valueOf(request.getAttribute(OpenApiHttp.API_CODE))),
                 request.getAttribute(OpenApiHttp.ERROR), safe(request.getRemoteAddr()));
     }

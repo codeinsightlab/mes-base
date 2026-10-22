@@ -1,5 +1,7 @@
 package dev.mesbase.business.legacy.service;
 
+import java.util.Optional;
+
 import dev.mesbase.business.legacy.dao.LegacyMigrationMapper;
 import dev.mesbase.business.legacy.domain.LegacyHistory.Mapping;
 import dev.mesbase.business.legacy.domain.LegacyHistory.Node;
@@ -55,8 +57,8 @@ public class LegacyHistoryQueryService {
                 var count = counts.get(key);
                 int fullNodes = source.path("routing").path("current_node_ids").size();
                 int reportedNodes = source.path("reported_by_node").size();
-                cards.add(new Card(key, child == null ? null : child.entityId()
-                        .toString(), child == null ? null : child.batchId(),
+                cards.add(new Card(key, Optional.ofNullable(child).map(nullableValue -> nullableValue.entityId()
+                        .toString()).orElse(null), Optional.ofNullable(child).map(nullableValue -> nullableValue.batchId()).orElse(null),
                         child != null, source.path("reports")
                         .size(), count == null ? 0 : count.reportCount(), fullNodes,
                         count == null ? 0 : count.nodeCount(), reportedNodes < fullNodes));

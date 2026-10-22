@@ -1,9 +1,8 @@
-// MES-CODEGEN: scaffold; review required.
 package dev.mesbase.business.basic.service;
 
+import com.github.pagehelper.Page;
 import dev.mesbase.business.basic.domain.WorkstationCreateCommand;
 import dev.mesbase.business.basic.domain.WorkstationEntity;
-import dev.mesbase.business.basic.domain.WorkstationPage;
 import dev.mesbase.business.basic.domain.WorkstationQueryDto;
 import dev.mesbase.business.basic.domain.WorkstationUpdateCommand;
 import dev.mesbase.business.basic.sync.ExternalWorkstation;
@@ -17,7 +16,7 @@ import java.util.List;
  * @author MES Base
  */
 public interface IWorkstationService {
-    WorkstationPage selectPage(WorkstationQueryDto query);
+    Page<WorkstationEntity> selectPage(WorkstationQueryDto query);
 
     WorkstationEntity selectById(Long id);
 

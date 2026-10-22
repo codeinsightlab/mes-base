@@ -1,5 +1,7 @@
 package dev.mesbase.web.view.tree;
 
+import java.util.Objects;
+
 import dev.mesbase.common.core.domain.TreeSelect;
 import java.util.List;
 
@@ -10,12 +12,13 @@ public final class TreeAssembler {
 
     public static TreeResult toResult(TreeSelect tree) {
         if (tree == null) return null;
-        return new TreeResult(tree.getId() == null ? null : tree.getId().toString(),
+        return new TreeResult(Objects.toString(tree.getId(), null),
                 tree.getLabel(),
                 TreeAssembler.toResults(tree.getChildren()));
     }
 
     public static List<TreeResult> toResults(List<TreeSelect> rows) {
-        return rows == null ? null : rows.stream().map(TreeAssembler::toResult).toList();
+        if (rows == null) return null;
+        return rows.stream().map(TreeAssembler::toResult).toList();
     }
 }

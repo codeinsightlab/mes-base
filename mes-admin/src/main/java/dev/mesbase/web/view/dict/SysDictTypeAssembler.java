@@ -1,5 +1,7 @@
 package dev.mesbase.web.view.dict;
 
+import java.util.Objects;
+
 import dev.mesbase.common.core.domain.entity.SysDictType;
 import java.util.List;
 
@@ -10,7 +12,7 @@ public final class SysDictTypeAssembler {
 
     public static SysDictTypeResult toResult(SysDictType row) {
         if (row == null) return null;
-        return new SysDictTypeResult(row.getDictId() == null ? null : row.getDictId().toString(),
+        return new SysDictTypeResult(Objects.toString(row.getDictId(), null),
                 row.getDictName(),
                 row.getDictType(),
                 row.getStatus(),
@@ -22,6 +24,7 @@ public final class SysDictTypeAssembler {
     }
 
     public static List<SysDictTypeResult> toResults(List<SysDictType> rows) {
-        return rows == null ? null : rows.stream().map(SysDictTypeAssembler::toResult).toList();
+        if (rows == null) return null;
+        return rows.stream().map(SysDictTypeAssembler::toResult).toList();
     }
 }

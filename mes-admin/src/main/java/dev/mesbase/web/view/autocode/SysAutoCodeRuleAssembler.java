@@ -1,5 +1,7 @@
 package dev.mesbase.web.view.autocode;
 
+import java.util.Objects;
+
 import dev.mesbase.common.core.domain.entity.SysAutoCodeRule;
 import java.util.List;
 
@@ -10,7 +12,7 @@ public final class SysAutoCodeRuleAssembler {
 
     public static SysAutoCodeRuleResult toResult(SysAutoCodeRule row) {
         if (row == null) return null;
-        return new SysAutoCodeRuleResult(row.getRuleId() == null ? null : row.getRuleId().toString(),
+        return new SysAutoCodeRuleResult(Objects.toString(row.getRuleId(), null),
                 row.getRuleCode(),
                 row.getRuleName(),
                 row.getRuleDesc(),
@@ -27,6 +29,7 @@ public final class SysAutoCodeRuleAssembler {
     }
 
     public static List<SysAutoCodeRuleResult> toResults(List<SysAutoCodeRule> rows) {
-        return rows == null ? null : rows.stream().map(SysAutoCodeRuleAssembler::toResult).toList();
+        if (rows == null) return null;
+        return rows.stream().map(SysAutoCodeRuleAssembler::toResult).toList();
     }
 }

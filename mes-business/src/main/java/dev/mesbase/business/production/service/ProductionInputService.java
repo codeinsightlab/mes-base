@@ -1,5 +1,6 @@
 package dev.mesbase.business.production.service;
 
+import dev.mesbase.common.validation.ParameterChecks;
 import dev.mesbase.business.production.domain.ProductionQuantityInput;
 
 import dev.mesbase.business.integration.warehouse.ErpActionResult.Mode;
@@ -127,11 +128,11 @@ public class ProductionInputService {
         sources.order(workorderId);
         var material = ProductionScanCode.material(code);
         var product = materials.selectByPrimaryKey(order.getProductId());
-        if (product == null) fail();
+        if (product == null) ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
         var identity = new ProductionScanCode(product.getCode(), material.materialCode(), material.lotCode());
         var binding = bindings.selectByPrimaryKey(identity.key());
         if (binding == null) return new Preview(routingService.detail(order.getRoutingId()), null);
-        if (!identity.encode().equals(binding.getEncodedCode())) fail();
+        if (!identity.encode().equals(binding.getEncodedCode())) ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
         var execution = executionMapper.selectByPrimaryKey(binding.getExecutionId());
         if (!Objects.equals(execution.getWorkorderId(), workorderId))
             throw new FoundationException(ErrorCode.PRODUCTION_IDENTITY_CONFLICT);
@@ -140,7 +141,7 @@ public class ProductionInputService {
 
     private WorkorderEntity readOrder(Long id) {
         var order = orderMapper.selectByPrimaryKey(id);
-        if (order == null) fail();
+        if (order == null) ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
         return order;
     }
 
@@ -174,16 +175,16 @@ public class ProductionInputService {
         supply.validateFrozenCalculation(calculation);
         var previous = inputs.selectByPrimaryKey(c.requestId());
         if (previous != null) {
-            if (!previous.getRequestHash().equals(hash)) fail();
+            if (!previous.getRequestHash().equals(hash)) ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
             return submissions.prepare(previous.getIssueId(), FactoryContext.required());
         }
         var product = materials.selectByPrimaryKey(order.getProductId());
         if (!WorkOrderStatus.RELEASED.getValue()
                 .equals(order.getStatus()) || product == null || !Objects.equals(product.getCode(), calculation.order()
                 .productCode())
-                || order.getPlannedQty().compareTo(calculation.order().plannedQty()) != 0) fail();
+                || order.getPlannedQty().compareTo(calculation.order().plannedQty()) != 0) ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
         if (c.code().startsWith("MES1.") && !ProductionScanCode.parse(c.code()).productCode().equals(product.getCode()))
-            fail();
+            ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
         var identity = new ProductionScanCode(product.getCode(), calculation.stock().materialCode(), calculation.stock()
                 .lotCode());
         var binding = bindings.selectByPrimaryKey(identity.key());
@@ -199,18 +200,18 @@ public class ProductionInputService {
             binding.setMaterialLotCode(identity.lotCode());
             binding.setExecutionId(executionId);
             binding.setCreatedAt(LocalDateTime.now());
-            if (bindings.insert(binding) != 1) fail();
+            if (bindings.insert(binding) != 1) ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
             paths.select(executionId, 0, c.routingNodeIds());
         } else {
-            if (!identity.encode().equals(binding.getEncodedCode())) fail();
+            if (!identity.encode().equals(binding.getEncodedCode())) ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
             executionId = binding.getExecutionId();
             var e = locks.execution(executionId);
             if (!Objects.equals(e.getWorkorderId(), order.getId()))
                 throw new FoundationException(ErrorCode.PRODUCTION_IDENTITY_CONFLICT);
             if (!Objects.equals(e.getRoutingId(), c.routingId()) || !List.of(ProductionExecutionStatus.READY.getValue(), ProductionExecutionStatus.RUNNING.getValue())
-                    .contains(e.getStatus())) fail();
+                    .contains(e.getStatus())) ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
             var path = paths.view(executionId);
-            if (!path.selectedNodeIds().equals(c.routingNodeIds())) fail();
+            if (!path.selectedNodeIds().equals(c.routingNodeIds())) ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
         }
         // Reserve output capacity before any external submission. Parent lock serializes concurrent intents.
         var execution = locks.execution(executionId);
@@ -219,10 +220,10 @@ public class ProductionInputService {
         if (required.compareTo(execution.getTargetQty()) > 0) {
             var capacity = allocation.activeAllocation(order.getId(), executionId);
             if (capacity == null || capacity.allocatedTargetQty().add(required).compareTo(capacity.plannedQty()) > 0)
-                fail();
+                ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
             execution.setTargetQty(required);
             execution.setUpdateTime(LocalDateTime.now());
-            if (executionMapper.updateByPrimaryKey(execution) != 1) fail();
+            if (executionMapper.updateByPrimaryKey(execution) != 1) ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
         }
         var issue = issues.insert(new MesMaterialIssueCreateCommand("INPUT-" + c.requestId(), order.getId(), null, order.getProductId(), null,
                 null, c.routingId(), LocalDateTime.now(), MaterialIssueStatus.DRAFT.getValue(), null, executionId));
@@ -246,7 +247,7 @@ public class ProductionInputService {
     }
 
     private Result replay(MesMaterialIssueInputEntity previous, String hash) {
-        if (!previous.getRequestHash().equals(hash)) fail();
+        if (!previous.getRequestHash().equals(hash)) ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
         return transaction.execute(s -> result(previous, issueMapper.selectByPrimaryKey(previous.getIssueId())
                 .getStatus()));
     }
@@ -267,12 +268,9 @@ public class ProductionInputService {
         if (c == null || c.requestId() == null || !c.requestId()
                 .matches("[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}")
                 || c.workorderId() == null || c.routingId() == null || c.routingNodeIds() == null || c.routingNodeIds()
-                .isEmpty() || c.routingNodeIds().size() > 100) fail();
+                .isEmpty() || c.routingNodeIds().size() > 100) ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
         if (!"PRODUCTION_INPUT".equals(c.inputKind()))
             throw new FoundationException(ErrorCode.PRODUCTION_SUPPLEMENT_UNSUPPORTED);
     }
 
-    private static void fail() {
-        throw new FoundationException(ErrorCode.RESOURCE_CONFLICT);
-    }
 }

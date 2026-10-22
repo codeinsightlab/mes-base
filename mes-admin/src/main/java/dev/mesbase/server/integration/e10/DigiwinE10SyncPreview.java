@@ -1,5 +1,7 @@
 package dev.mesbase.server.integration.e10;
 
+import java.util.Optional;
+
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.lixin.capability.digiwin.e10.request.E10QueryRequest;
@@ -64,7 +66,7 @@ public final class DigiwinE10SyncPreview {
                 for (var row : queries.queryMo(request).getRows()) {
                     rows.add(new Candidate(row.getDocNo(), row.getItemName(), text(row.getSource(), "om_site_id"),
                             null, row.getItemNo(), row.getUnitNo(), row.getProcessNo(), row.getStatus(),
-                            row.getPlanQty() == null ? null : row.getPlanQty().toPlainString()));
+                            Optional.ofNullable(row.getPlanQty()).map(nullableValue -> nullableValue.toPlainString()).orElse(null)));
                 }
             } else {
                 for (var row : queries.queryWarehouse(request).getRows()) {
@@ -103,7 +105,8 @@ public final class DigiwinE10SyncPreview {
 
     private static String text(JsonNode source, String key) {
         var value = source.get(key);
-        return value == null || value.isNull() || !value.isValueNode() ? null : value.asText();
+        if (value == null || value.isNull() || !value.isValueNode()) return null;
+        return value.asText();
     }
 
     private static List<String> blockers(Kind kind) {

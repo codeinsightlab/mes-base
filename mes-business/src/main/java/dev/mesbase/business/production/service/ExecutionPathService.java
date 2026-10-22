@@ -1,5 +1,6 @@
 package dev.mesbase.business.production.service;
 
+import dev.mesbase.common.validation.ParameterChecks;
 import dev.mesbase.business.production.domain.ProductionExecutionStatus;
 import dev.mesbase.business.quality.service.ExecutionQualityReferenceQuery;
 import dev.mesbase.business.integration.warehouse.ErpActionResult.Mode;
@@ -216,15 +217,15 @@ public class ExecutionPathService {
     public PathModel select(Long id, Integer revision, List<Long> nodeIds) {
         var e = locks.execution(id);
         locks.requireActiveExecution(id);
-        if (!ProductionExecutionStatus.READY.getValue().equals(e.getStatus()) || e.getStartTime() != null) fail();
+        if (!ProductionExecutionStatus.READY.getValue().equals(e.getStatus()) || e.getStartTime() != null) ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
         rules.checkReadyReferences(e);
         var old = paths.selectByPrimaryKey(id);
-        if (revision == null || !Objects.equals(revision, old == null ? 0 : old.getRevision())) fail();
+        if (revision == null || !Objects.equals(revision, old == null ? 0 : old.getRevision())) ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
         if (old != null && ExecutionPathStatus.LOCKED.getValue().equals(old.getPathStatus()))
-            fail();
+            ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
         if (quality.hasAnyHistory(id))
             throw new FoundationException(ErrorCode.EXECUTION_QUALITY_REFERENCED);
-        if (hasBlockingIssue(id)) fail();
+        if (hasBlockingIssue(id)) ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
         ExecutionPathValidator.validate(nodeIds, nodes(e.getRoutingId()), edges(e.getRoutingId()));
         var path = new MesExecutionPathEntity();
         path.setId(id);
@@ -250,14 +251,14 @@ public class ExecutionPathService {
     public MesExecutionPathEntity requireSelected(MesProductionExecutionEntity e) {
         var p = paths.selectByPrimaryKey(e.getId());
         if (p == null || !Objects.equals(p.getRoutingId(), e.getRoutingId()) || !Set.of(ExecutionPathStatus.SELECTED.getValue(), ExecutionPathStatus.LOCKED.getValue())
-                .contains(p.getPathStatus())) fail();
+                .contains(p.getPathStatus())) ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
         ExecutionPathValidator.validate(nodeIds(e.getId()), nodes(e.getRoutingId()), edges(e.getRoutingId()));
         return p;
     }
 
     public void confirm(MesProductionExecutionEntity e, Integer revision) {
         var p = requireSelected(e);
-        if (!Objects.equals(p.getRevision(), revision)) fail();
+        if (!Objects.equals(p.getRevision(), revision)) ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
         if (ExecutionPathStatus.LOCKED.getValue().equals(p.getPathStatus())) return;
         p.setPathStatus(ExecutionPathStatus.LOCKED.getValue());
         p.setLockedAt(LocalDateTime.now());
@@ -284,17 +285,17 @@ public class ExecutionPathService {
         if (locked == null) locks.requireActiveExecution(id);
         else locks.requireActiveExecution(id, locked);
         if (!Set.of(ProductionExecutionStatus.READY.getValue(), ProductionExecutionStatus.RUNNING.getValue())
-                .contains(e.getStatus())) fail();
+                .contains(e.getStatus())) ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
         if (ProductionExecutionStatus.READY.getValue().equals(e.getStatus())) rules.checkReadyReferences(e);
         if (path != null) path.requireOwner(locked);
         var selectedPath = path == null ? requireSelected(e) : path.model().path();
-        if (!ExecutionPathStatus.LOCKED.getValue().equals(selectedPath.getPathStatus())) fail();
+        if (!ExecutionPathStatus.LOCKED.getValue().equals(selectedPath.getPathStatus())) ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
         if (ProductionExecutionStatus.RUNNING.getValue().equals(e.getStatus())) return e;
         var rows = issueRows(id);
         if (rows.stream()
                 .noneMatch(i -> MaterialIssueStatus.CONFIRMED.getValue().equals(i.getStatus())) || rows.stream()
                 .anyMatch(i -> Set.of(MaterialIssueStatus.VOID_PENDING.getValue(), MaterialIssueStatus.VOID_UNKNOWN.getValue())
-                        .contains(i.getStatus()))) fail();
+                        .contains(i.getStatus()))) ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
         var confirmed = rows.stream().filter(i -> MaterialIssueStatus.CONFIRMED.getValue().equals(i.getStatus()))
                 .toList();
         var filter = new MesMaterialIssueErpExtraExample();
@@ -308,7 +309,7 @@ public class ExecutionPathService {
                     .equals(fact.getSourceExecutionMode()) && ExternalEffect.CONFIRMED.getValue()
                     .equals(fact.getExternalEffect()) && DocumentStatus.EFFECTIVE.getValue()
                     .equals(fact.getDocumentStatus())))
-                fail();
+                ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
         }
         if (ProductionExecutionStatus.RUNNING.getValue().equals(e.getStatus())) return e;
         e.setStatus(ProductionExecutionStatus.RUNNING.getValue());
@@ -329,7 +330,7 @@ public class ExecutionPathService {
     private List<MesMaterialIssueEntity> issueRows(Long id) {
         var f = new MesMaterialIssueExample();
         f.createCriteria().andExecutionIdEqualTo(id);
-        if (issues.countByExample(f) > 1000) fail();
+        if (issues.countByExample(f) > 1000) ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
         return issues.selectByExample(f);
     }
 
@@ -358,10 +359,7 @@ public class ExecutionPathService {
     }
 
     private static void changed(int n) {
-        if (n != 1) fail();
+        if (n != 1) ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
     }
 
-    private static void fail() {
-        throw new FoundationException(ErrorCode.RESOURCE_CONFLICT);
-    }
 }

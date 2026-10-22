@@ -492,3 +492,36 @@ Committed168/202 workorders,1842 executions,23242 original reports; duplicate re
 ### 2026-10-21 15:59 - Completion error during user service shutdown
 
 User reported stopping the backend. Actual user-service PID64314 app.log shows graceful shutdown beginning15:58:22.148, HTTP shutdown complete15:58:31.679, workOrderCompletionExecutor still running after its30000ms wait at15:59:01.695, and WorkOrderCompletionJob logging failure15:59:02.149. Root cause is SQLException: interrupt while PageHelper obtains a Druid connection during QualityTreatmentService.nodeTotals / ProductionQuantityService loading. This is the interrupted automatic completion worker, not a source import transaction failure. The importer had already committed205 orders; the separate activation runner ended15:57:55 with192 successful orders/2326 executions and13 original-function rejections. Formal quality conversion continues in a separate owned Python process and does not depend on the user8081 server. No user-service restart or new code fix was performed for this diagnosis. Evidence: .local/logs/MacBook-Pro-3.local-64314/app.log:1516-1526 and error.log:1441 onward.
+
+
+### 2026-10-21 - Broader import execution receipts
+
+{
+  "status": "FINISHED_WITH_EXCEPTIONS",
+  "import": {
+    "newHistoricalWorkorders": 205,
+    "newExecutions": 2384,
+    "newReports": 27348,
+    "newDraftWorkorders": 10,
+    "sourceReportRowsInFrozenInputs": 170484,
+    "migratedSourceReports": 149519,
+    "remainingSourceReports": 20965,
+    "ordersWithRemainingReports": 171,
+    "fullyUnimportedReportOrders": 92,
+    "partialReportOrders": 79,
+    "unstartedOrdersDeferred": 1759,
+    "creationTimeSourceOrderAbsent": 722,
+    "activationFailedOrders": 13
+  },
+  "activatedOrders": 192,
+  "activatedExecutions": 2326,
+  "formalDefectsWritten": 3501,
+  "creationDatesUpdated": 47,
+  "pendingHistoricalDateRows": 12,
+  "sourceFieldForCreationTime": "prod_j2eedb.pro_workorder.request_date",
+  "stageErrors": {},
+  "outstandingList": "remaining-detail.json",
+  "performance": "performance-import-final.json"
+}
+
+These are committed operation receipts, not additional UI or business-flow acceptance. All exception data is preserved. No source facts, original input/stock facts or completed business facts were overwritten to force admission. Detailed frozen inputs and receipts are under .local/legacy-broader-migration-20261021/.

@@ -1,12 +1,12 @@
 package dev.mesbase.business.basic.service.impl;
 
+import dev.mesbase.common.validation.ParameterChecks;
 import com.github.pagehelper.Page;
 import com.github.pagehelper.PageHelper;
 import dev.mesbase.business.basic.dao.SafetyStockMapper;
 import dev.mesbase.business.basic.domain.SafetyStockCreateCommand;
 import dev.mesbase.business.basic.domain.SafetyStockEntity;
 import dev.mesbase.business.basic.domain.SafetyStockExample;
-import dev.mesbase.business.basic.domain.SafetyStockPage;
 import dev.mesbase.business.basic.domain.SafetyStockQueryDto;
 import dev.mesbase.business.basic.domain.SafetyStockResource;
 import dev.mesbase.business.basic.domain.SafetyStockUpdateCommand;
@@ -68,12 +68,10 @@ public class SafetyStockServiceImpl implements ISafetyStockService {
     @Transactional(transactionManager = "businessTransactionManager", readOnly = true)
     @BusinessCache(business = SafetyStockResource.PREFIX,
             type = BusinessCache.Type.LIST)
-    public SafetyStockPage selectPage(SafetyStockQueryDto query) {
+    public Page<SafetyStockEntity> selectPage(SafetyStockQueryDto query) {
         int offset = query.offset() == null ? 0 : query.offset();
         int limit = query.limit() == null ? 20 : query.limit();
-        if (offset < 0 || limit < 1 || limit > 100) {
-            throw new FoundationException(ErrorCode.BAD_REQUEST);
-        }
+        ParameterChecks.paging(offset, limit, 100);
         SafetyStockExample example = new SafetyStockExample();
         SafetyStockExample.Criteria criteria = example.createCriteria();
         if (query.materialId() != null) {
@@ -90,8 +88,8 @@ public class SafetyStockServiceImpl implements ISafetyStockService {
         }
         example.setOrderByClause("id desc");
         try (Page<SafetyStockEntity> page = PageHelper.offsetPage(offset, limit)) {
-            List<SafetyStockEntity> rows = mapper.selectByExample(example);
-            return new SafetyStockPage(rows, page.getTotal(), offset, limit);
+            mapper.selectByExample(example);
+            return page;
         }
     }
 

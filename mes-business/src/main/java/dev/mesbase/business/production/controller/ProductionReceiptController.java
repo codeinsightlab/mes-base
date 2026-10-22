@@ -1,5 +1,9 @@
 package dev.mesbase.business.production.controller;
 
+import java.util.Optional;
+
+import java.util.Objects;
+
 import dev.mesbase.business.production.domain.ProductionReceiptModels.Query;
 import dev.mesbase.business.production.domain.MesProductionReceiptEntity;
 import dev.mesbase.business.production.domain.ProductionReceiptRow;
@@ -65,16 +69,17 @@ public class ProductionReceiptController {
 
     private static Ledger view(MesProductionReceiptEntity r, Map<Long, String> names) {
         ProductionReceiptRow ref = r instanceof ProductionReceiptRow row ? row : null;
-        return new Ledger(r.getId(), r.getReceiptNo(), id(r.getExecutionId()), ref == null ? null : ref.getExecutionNo(), ref == null ? null : ref.getWorkorderCode(),
-                ref == null ? null : ref.getProductCode(), ref == null ? null : ref.getProductName(), id(r.getWarehouseId()), ref == null ? null : ref.getWarehouseName(), r.getProductLotCode(), r.getRecordType(),
+        return new Ledger(r.getId(), r.getReceiptNo(), id(r.getExecutionId()), Optional.ofNullable(ref).map(nullableValue -> nullableValue.getExecutionNo()).orElse(null), Optional.ofNullable(ref).map(nullableValue -> nullableValue.getWorkorderCode()).orElse(null),
+                Optional.ofNullable(ref).map(nullableValue -> nullableValue.getProductCode()).orElse(null), Optional.ofNullable(ref).map(nullableValue -> nullableValue.getProductName()).orElse(null), id(r.getWarehouseId()), Optional.ofNullable(ref).map(nullableValue -> nullableValue.getWarehouseName()).orElse(null), r.getProductLotCode(), r.getRecordType(),
                 decimal(r.getQuantityDelta()), r.getReferenceReceiptId(), id(r.getOperatorUserId()), names.get(r.getOperatorUserId()), id(r.getRecordedBy()), names.get(r.getRecordedBy()), r.getOccurredAt(), r.getCreateTime(), r.getReason());
     }
 
     private static String id(Long v) {
-        return v == null ? null : v.toString();
+        return Objects.toString(v, null);
     }
 
     private static String decimal(BigDecimal v) {
-        return v == null ? null : v.toPlainString();
+        if (v == null) return null;
+        return v.toPlainString();
     }
 }

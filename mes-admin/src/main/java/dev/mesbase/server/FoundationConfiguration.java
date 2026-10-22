@@ -1,5 +1,9 @@
 package dev.mesbase.server;
 
+import dev.mesbase.core.factory.FactoryScope;
+import java.util.function.Consumer;
+import java.util.Optional;
+
 import dev.mesbase.core.error.ErrorCode;
 import dev.mesbase.core.factory.FactoryCatalog;
 import dev.mesbase.server.managed.ManagedDatasourceService;
@@ -126,6 +130,11 @@ public class FoundationConfiguration {
                 .formLogin(AbstractHttpConfigurer::disable).logout(AbstractHttpConfigurer::disable).build();
     }
 
+    private static Consumer<FactoryScope> admission(ManagedDatasourceService managed) {
+        if (managed == null) return null;
+        return managed::admit;
+    }
+
     @Bean
     WebMvcConfigurer accessRules(FactorySelectionService selection, AuthorizationService authorization,
                                  ObjectProvider<PlatformAuthorization> platform,
@@ -133,7 +142,7 @@ public class FoundationConfiguration {
         return new WebMvcConfigurer() {
             public void addInterceptors(InterceptorRegistry registry) {
                 registry.addInterceptor(new FoundationAccessInterceptor(selection, authorization, platform.getIfAvailable(() -> (actor, permission) -> false),
-                        managed.getIfAvailable() == null ? null : managed.getObject()::admit));
+                        admission(managed.getIfAvailable())));
             }
         };
     }

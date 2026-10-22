@@ -1,5 +1,6 @@
 package dev.mesbase.business.issue.service;
 
+import dev.mesbase.common.validation.ParameterChecks;
 import dev.mesbase.business.integration.warehouse.ErpActionResult.Mode;
 import dev.mesbase.business.wm.service.LocalStockService;
 import dev.mesbase.business.issue.dao.MesMaterialIssueInputMapper;
@@ -36,27 +37,28 @@ public class MaterialIssueInputFacts {
     @Transactional(transactionManager = "businessTransactionManager", propagation = Propagation.MANDATORY)
     public void freeze(MesMaterialIssueInputEntity fact, Calculation calculation) {
         if (Mode.LOCAL_ONLY.getValue().equals(fact.getSourceMode())) inventory.validateInputSource(fact, calculation);
-        if (inputs.insert(fact) != 1) fail();
+        if (inputs.insert(fact) != 1) ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
     }
 
     public MesMaterialIssueInputEntity find(Long issueId) {
         var f = new MesMaterialIssueInputExample();
         f.createCriteria().andIssueIdEqualTo(issueId);
         var rows = inputs.selectByExampleWithBLOBs(f);
-        if (rows.size() > 1) fail();
+        if (rows.size() > 1) ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
         return rows.isEmpty() ? null : rows.getFirst();
     }
 
     public Input snapshot(Long issueId) {
         var f = find(issueId);
-        return f == null ? null : new Input(f.getId(), f.getInputKind(), f.getOutputQty(), json.readValue(f.getCalculationJson(), Calculation.class));
+        if (f == null) return null;
+        return new Input(f.getId(), f.getInputKind(), f.getOutputQty(), json.readValue(f.getCalculationJson(), Calculation.class));
     }
 
     public void confirm(MesMaterialIssueEntity issue, String mode) {
         var fact = find(issue.getId());
         if (fact == null) return; // Historical/administrative issue has no fabricated output contribution.
         if (!Objects.equals(mode, fact.getSourceMode()) || !Objects.equals(fact.getExecutionId(), issue.getExecutionId()))
-            fail();
+            ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
         if (fact.getConfirmedAt() != null) return;
         if (Mode.LOCAL_ONLY.getValue().equals(mode)) {
             var calculation = json.readValue(fact.getCalculationJson(), Calculation.class);
@@ -64,19 +66,16 @@ public class MaterialIssueInputFacts {
             fact.setStockApplied(true);
         }
         fact.setConfirmedAt(LocalDateTime.now());
-        if (inputs.updateByPrimaryKeyWithBLOBs(fact) != 1) fail();
+        if (inputs.updateByPrimaryKeyWithBLOBs(fact) != 1) ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
     }
 
     public void voidConfirmed(MesMaterialIssueEntity issue) {
         var fact = find(issue.getId());
         if (fact == null || !Boolean.TRUE.equals(fact.getStockApplied())) return;
-        if (!Mode.LOCAL_ONLY.getValue().equals(fact.getSourceMode()) || fact.getConfirmedAt() == null) fail();
+        if (!Mode.LOCAL_ONLY.getValue().equals(fact.getSourceMode()) || fact.getConfirmedAt() == null) ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
         inventory.reverse(fact, json.readValue(fact.getCalculationJson(), Calculation.class), issue.getVoidOperationId());
         fact.setStockApplied(false);
-        if (inputs.updateByPrimaryKeyWithBLOBs(fact) != 1) fail();
+        if (inputs.updateByPrimaryKeyWithBLOBs(fact) != 1) ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
     }
 
-    private static void fail() {
-        throw new FoundationException(ErrorCode.RESOURCE_CONFLICT);
-    }
 }

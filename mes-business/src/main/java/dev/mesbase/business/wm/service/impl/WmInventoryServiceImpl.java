@@ -1,5 +1,6 @@
 package dev.mesbase.business.wm.service.impl;
 
+import dev.mesbase.common.validation.ParameterChecks;
 import dev.mesbase.business.production.service.BusinessSourceRules;
 import dev.mesbase.business.shared.enums.BusinessSource;
 
@@ -88,9 +89,7 @@ public class WmInventoryServiceImpl implements IWmInventoryService {
     public WmInventoryPage selectPage(WmInventoryQueryDto query) {
         int offset = query.offset() == null ? 0 : query.offset();
         int limit = query.limit() == null ? 20 : query.limit();
-        if (offset < 0 || limit < 1 || limit > 100) {
-            throw new FoundationException(ErrorCode.BAD_REQUEST);
-        }
+        ParameterChecks.paging(offset, limit, 100);
         WmInventoryExample example = new WmInventoryExample();
         WmInventoryExample.Criteria criteria = example.createCriteria();
         if (query.materialId() != null) {

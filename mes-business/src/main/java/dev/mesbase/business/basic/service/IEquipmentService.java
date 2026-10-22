@@ -1,9 +1,8 @@
-// MES-CODEGEN: scaffold; review required.
 package dev.mesbase.business.basic.service;
 
+import com.github.pagehelper.Page;
 import dev.mesbase.business.basic.domain.EquipmentCreateCommand;
 import dev.mesbase.business.basic.domain.EquipmentEntity;
-import dev.mesbase.business.basic.domain.EquipmentPage;
 import dev.mesbase.business.basic.domain.EquipmentQueryDto;
 import dev.mesbase.business.basic.domain.EquipmentUpdateCommand;
 import java.util.List;
@@ -14,7 +13,7 @@ import java.util.List;
  * @author MES Base
  */
 public interface IEquipmentService {
-    EquipmentPage selectPage(EquipmentQueryDto query);
+    Page<EquipmentEntity> selectPage(EquipmentQueryDto query);
 
     EquipmentEntity selectById(Long id);
 

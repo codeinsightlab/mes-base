@@ -1,9 +1,8 @@
-// MES-CODEGEN: scaffold; review required.
 package dev.mesbase.business.basic.service;
 
+import com.github.pagehelper.Page;
 import dev.mesbase.business.basic.domain.UnitMeasureCreateCommand;
 import dev.mesbase.business.basic.domain.UnitMeasureEntity;
-import dev.mesbase.business.basic.domain.UnitMeasurePage;
 import dev.mesbase.business.basic.domain.UnitMeasureQueryDto;
 import dev.mesbase.business.basic.domain.UnitMeasureUpdateCommand;
 import dev.mesbase.business.basic.sync.ExternalUnitMeasure;
@@ -17,7 +16,7 @@ import java.util.List;
  * @author MES Base
  */
 public interface IUnitMeasureService {
-    UnitMeasurePage selectPage(UnitMeasureQueryDto query);
+    Page<UnitMeasureEntity> selectPage(UnitMeasureQueryDto query);
 
     UnitMeasureEntity selectById(Long id);
 

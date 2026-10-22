@@ -14,6 +14,8 @@ import java.security.MessageDigest;
 import java.util.Base64;
 import java.util.HexFormat;
 import java.util.Map;
+import java.util.List;
+import com.github.pagehelper.Page;
 import java.lang.reflect.Type;
 import java.util.concurrent.TimeUnit;
 import org.slf4j.Logger;
@@ -88,11 +90,23 @@ public class BusinessCacheProcessor {
         return json.constructType(type);
     }
 
+    private record CachedPage<T>(List<T> rows, long total, int offset, int limit) { }
+
     public Object read(String key, JavaType type) {
         try {
             Object cached = redis.getCacheObject(key);
             if (cached == null) return null;
             if (!(cached instanceof byte[] bytes)) throw new IllegalStateException("Invalid business cache payload");
+            if (type.hasRawClass(Page.class)) {
+                JavaType storedType = json.getTypeFactory().constructParametricType(CachedPage.class, type.getContentType());
+                CachedPage<?> stored = json.readValue(bytes, storedType);
+                if (stored.rows() == null || stored.total() < 0 || stored.offset() < 0 || stored.limit() < 1)
+                    throw new IllegalStateException("Invalid cached page metadata");
+                Page<Object> page = new Page<>(new int[]{stored.offset(), stored.limit()}, true);
+                page.setTotal(stored.total());
+                page.addAll(stored.rows());
+                return page;
+            }
             return json.readValue(bytes, type);
         } catch (Exception failure) {
             LOG.warn("Business cache read failed; querying database key={} cause={}", key, failure.getClass()
@@ -104,7 +118,10 @@ public class BusinessCacheProcessor {
     public void write(String key, Object value) {
         if (value == null) return;
         try {
-            redis.setCacheObject(key, json.writeValueAsBytes(value), ttl, TimeUnit.SECONDS);
+            Object payload = value;
+            if (value instanceof Page<?> page)
+                payload = new CachedPage<>(page.getResult(), page.getTotal(), Math.toIntExact(page.getStartRow()), page.getPageSize());
+            redis.setCacheObject(key, json.writeValueAsBytes(payload), ttl, TimeUnit.SECONDS);
         } catch (Exception failure) {
             LOG.warn("Business cache write failed key={} cause={}", key, failure.getClass().getSimpleName());
         }

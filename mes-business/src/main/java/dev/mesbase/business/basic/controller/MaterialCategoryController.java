@@ -1,10 +1,12 @@
 package dev.mesbase.business.basic.controller;
 
+import com.github.pagehelper.Page;
+import java.util.Objects;
+
 import dev.mesbase.business.basic.controller.vo.MaterialCategoryPageVo;
 import dev.mesbase.business.basic.controller.vo.MaterialCategoryVo;
 import dev.mesbase.business.basic.domain.MaterialCategoryCreateCommand;
 import dev.mesbase.business.basic.domain.MaterialCategoryEntity;
-import dev.mesbase.business.basic.domain.MaterialCategoryPage;
 import dev.mesbase.business.basic.domain.MaterialCategoryQueryDto;
 import dev.mesbase.business.basic.domain.MaterialCategoryUpdateCommand;
 import dev.mesbase.business.basic.service.IMaterialCategoryService;
@@ -46,10 +48,10 @@ public class MaterialCategoryController {
     @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED,
             permission = MaterialCategoryPermissions.LIST)
     public MaterialCategoryPageVo list(@Valid @ModelAttribute MaterialCategoryQueryDto query) {
-        MaterialCategoryPage page = service.selectPage(query);
+        Page<MaterialCategoryEntity> page = service.selectPage(query);
         return new MaterialCategoryPageVo(
-                page.items().stream().map(MaterialCategoryController::toView).toList(),
-                page.total(), page.offset(), page.limit());
+                page.stream().map(MaterialCategoryController::toView).toList(),
+                page.getTotal(), (int) page.getStartRow(), page.getPageSize());
     }
 
     @GetMapping("/{id}")
@@ -93,11 +95,11 @@ public class MaterialCategoryController {
 
     private static MaterialCategoryVo toView(MaterialCategoryEntity row) {
         return new MaterialCategoryVo(
-                row.getId() == null ? null : row.getId().toString(),
+                Objects.toString(row.getId(), null),
 
                 row.getCode(),
                 row.getName(),
-                row.getParentId() == null ? null : row.getParentId().toString(),
+                Objects.toString(row.getParentId(), null),
                 row.getSort(),
                 row.getStatus(),
                 row.getRemark()

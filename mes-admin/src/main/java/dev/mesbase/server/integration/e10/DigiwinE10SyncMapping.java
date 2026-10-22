@@ -1,5 +1,7 @@
 package dev.mesbase.server.integration.e10;
 
+import java.util.Optional;
+
 import com.fasterxml.jackson.databind.JsonNode;
 import dev.mesbase.business.basic.dao.MaterialMapper;
 import dev.mesbase.business.basic.dao.UnitMeasureMapper;
@@ -86,8 +88,8 @@ public class DigiwinE10SyncMapping {
             reasons.add("ORGANIZATION_CONFLICT: 组织或据点与契约不一致");
             action = ExternalSyncAction.CONFLICT;
         }
-        String externalStatus = rule == null ? null : value(raw, rule.statusPointer());
-        String targetStatus = externalStatus == null ? null : rule.statuses().get(externalStatus);
+        String externalStatus = Optional.ofNullable(rule).map(nullableValue -> value(raw, nullableValue.statusPointer())).orElse(null);
+        String targetStatus = Optional.ofNullable(externalStatus).map(nullableValue -> rule.statuses().get(nullableValue)).orElse(null);
         if (targetStatus == null) {
             reasons.add("STATUS_UNVERIFIED: 未确认 ERP 业务状态转换");
             if (action == ExternalSyncAction.CREATE) action = ExternalSyncAction.STATUS_UNVERIFIED;
@@ -115,7 +117,7 @@ public class DigiwinE10SyncMapping {
                 else product = found.getFirst();
             }
             if (product != null) {
-                var localUnit = product.getUnitId() == null ? null : units.selectByPrimaryKey(product.getUnitId());
+                var localUnit = Optional.ofNullable(product.getUnitId()).map(nullableValue -> units.selectByPrimaryKey(nullableValue)).orElse(null);
                 if (localUnit == null || !EnableStatus.ENABLED.getValue().equals(localUnit.getStatus())
                         || unit == null || !unit.equals(localUnit.getCode()))
                     reasons.add("MAPPING_REQUIRED: 单位不一致或缺少可信换算；不改变数量");
@@ -136,7 +138,7 @@ public class DigiwinE10SyncMapping {
                 reasons.add("STATUS_UNVERIFIED: 工单审核状态未通过已确认规则");
             try {
                 String number = value(raw, "/plan_qty");
-                quantity = number == null ? null : new BigDecimal(number);
+                quantity = Optional.ofNullable(number).map(nullableValue -> new BigDecimal(nullableValue)).orElse(null);
                 if (quantity == null || quantity.signum() <= 0 || quantity.scale() > 6 || quantity.precision() - quantity.scale() > 14)
                     reasons.add("MAPPING_REQUIRED: 数量不满足 DECIMAL(20,6) 正数规则");
                 start = date(value(raw, "/plan_start_date"));
@@ -178,9 +180,9 @@ public class DigiwinE10SyncMapping {
 
     private static Item item(String code, String identity, ExternalSyncAction action, List<String> reasons,
                              MaterialEntity product, Long routing, BigDecimal quantity, String unit) {
-        return new Item(code, identity, action.getValue(), List.copyOf(reasons), product == null ? null : product.getId()
-                .toString(),
-                routing == null ? null : routing.toString(), quantity == null ? null : quantity.toPlainString(), unit);
+        return new Item(code, identity, action.getValue(), List.copyOf(reasons), Optional.ofNullable(product).map(nullableValue -> nullableValue.getId()
+                .toString()).orElse(null),
+                Objects.toString(routing, null), Optional.ofNullable(quantity).map(nullableValue -> nullableValue.toPlainString()).orElse(null), unit);
     }
 
     private boolean protectedCode(Kind kind, String code) {

@@ -47,6 +47,12 @@ public class MesQualityTreatmentEntity {
 
     private String reason;
 
+    private Long targetWarehouseId;
+
+    private Long stockDocumentId;
+
+    private BigDecimal transferQty;
+
     public String getId() {
         return id;
     }
@@ -213,5 +219,29 @@ public class MesQualityTreatmentEntity {
 
     public void setReason(String reason) {
         this.reason = reason;
+    }
+
+    public Long getTargetWarehouseId() {
+        return targetWarehouseId;
+    }
+
+    public void setTargetWarehouseId(Long targetWarehouseId) {
+        this.targetWarehouseId = targetWarehouseId;
+    }
+
+    public Long getStockDocumentId() {
+        return stockDocumentId;
+    }
+
+    public void setStockDocumentId(Long stockDocumentId) {
+        this.stockDocumentId = stockDocumentId;
+    }
+
+    public BigDecimal getTransferQty() {
+        return transferQty;
+    }
+
+    public void setTransferQty(BigDecimal transferQty) {
+        this.transferQty = transferQty;
     }
 }

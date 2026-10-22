@@ -1,12 +1,12 @@
 package dev.mesbase.business.issue.service.impl;
 
+import dev.mesbase.common.validation.ParameterChecks;
 import com.github.pagehelper.Page;
 import com.github.pagehelper.PageHelper;
 import dev.mesbase.business.issue.dao.MesMaterialIssueErpExtraMapper;
 import dev.mesbase.business.issue.domain.MesMaterialIssueErpExtraCreateCommand;
 import dev.mesbase.business.issue.domain.MesMaterialIssueErpExtraEntity;
 import dev.mesbase.business.issue.domain.MesMaterialIssueErpExtraExample;
-import dev.mesbase.business.issue.domain.MesMaterialIssueErpExtraPage;
 import dev.mesbase.business.issue.domain.MesMaterialIssueErpExtraQueryDto;
 import dev.mesbase.business.issue.domain.MesMaterialIssueErpExtraResource;
 import dev.mesbase.business.issue.domain.MesMaterialIssueErpExtraUpdateCommand;
@@ -38,12 +38,10 @@ public class MesMaterialIssueErpExtraServiceImpl implements IMesMaterialIssueErp
     @Transactional(transactionManager = "businessTransactionManager", readOnly = true)
     @BusinessCache(business = MesMaterialIssueErpExtraResource.PREFIX,
             type = BusinessCache.Type.LIST)
-    public MesMaterialIssueErpExtraPage selectPage(MesMaterialIssueErpExtraQueryDto query) {
+    public Page<MesMaterialIssueErpExtraEntity> selectPage(MesMaterialIssueErpExtraQueryDto query) {
         int offset = query.offset() == null ? 0 : query.offset();
         int limit = query.limit() == null ? 20 : query.limit();
-        if (offset < 0 || limit < 1 || limit > 100) {
-            throw new FoundationException(ErrorCode.BAD_REQUEST);
-        }
+        ParameterChecks.paging(offset, limit, 100);
         MesMaterialIssueErpExtraExample example = new MesMaterialIssueErpExtraExample();
         MesMaterialIssueErpExtraExample.Criteria criteria = example.createCriteria();
         if (query.sourceExecutionMode() != null) {
@@ -93,8 +91,8 @@ public class MesMaterialIssueErpExtraServiceImpl implements IMesMaterialIssueErp
         }
         example.setOrderByClause("id");
         try (Page<MesMaterialIssueErpExtraEntity> page = PageHelper.offsetPage(offset, limit)) {
-            List<MesMaterialIssueErpExtraEntity> rows = mapper.selectByExample(example);
-            return new MesMaterialIssueErpExtraPage(rows, page.getTotal(), offset, limit);
+            mapper.selectByExample(example);
+            return page;
         }
     }
 

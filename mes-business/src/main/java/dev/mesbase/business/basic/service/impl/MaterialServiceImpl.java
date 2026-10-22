@@ -1,12 +1,12 @@
 package dev.mesbase.business.basic.service.impl;
 
+import dev.mesbase.common.validation.ParameterChecks;
 import com.github.pagehelper.Page;
 import com.github.pagehelper.PageHelper;
 import dev.mesbase.business.basic.dao.MaterialMapper;
 import dev.mesbase.business.basic.domain.MaterialCreateCommand;
 import dev.mesbase.business.basic.domain.MaterialEntity;
 import dev.mesbase.business.basic.domain.MaterialExample;
-import dev.mesbase.business.basic.domain.MaterialPage;
 import dev.mesbase.business.basic.domain.MaterialQueryDto;
 import dev.mesbase.business.basic.domain.MaterialResource;
 import dev.mesbase.business.basic.domain.MaterialUpdateCommand;
@@ -69,12 +69,10 @@ public class MaterialServiceImpl implements IMaterialService {
     @Transactional(transactionManager = "businessTransactionManager", readOnly = true)
     @BusinessCache(business = MaterialResource.PREFIX,
             type = BusinessCache.Type.LIST)
-    public MaterialPage selectPage(MaterialQueryDto query) {
+    public Page<MaterialEntity> selectPage(MaterialQueryDto query) {
         int offset = query.offset() == null ? 0 : query.offset();
         int limit = query.limit() == null ? 20 : query.limit();
-        if (offset < 0 || limit < 1 || limit > 100) {
-            throw new FoundationException(ErrorCode.BAD_REQUEST);
-        }
+        ParameterChecks.paging(offset, limit, 100);
         MaterialExample example = new MaterialExample();
         MaterialExample.Criteria criteria = example.createCriteria();
         if (query.code() != null) {
@@ -106,8 +104,8 @@ public class MaterialServiceImpl implements IMaterialService {
         }
         example.setOrderByClause("id desc");
         try (Page<MaterialEntity> page = PageHelper.offsetPage(offset, limit)) {
-            List<MaterialEntity> rows = mapper.selectByExample(example);
-            return new MaterialPage(rows, page.getTotal(), offset, limit);
+            mapper.selectByExample(example);
+            return page;
         }
     }
 

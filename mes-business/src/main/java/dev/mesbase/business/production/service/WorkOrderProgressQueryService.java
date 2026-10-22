@@ -1,5 +1,9 @@
 package dev.mesbase.business.production.service;
 
+import dev.mesbase.common.utils.StringUtils;
+import dev.mesbase.common.validation.ParameterChecks;
+import java.util.Optional;
+
 import com.github.pagehelper.PageHelper;
 import dev.mesbase.business.production.dao.WorkOrderProgressExtraMapper;
 import dev.mesbase.business.production.domain.WorkOrderProgress.Completion;
@@ -37,7 +41,7 @@ public class WorkOrderProgressQueryService {
             isolation = Isolation.REPEATABLE_READ)
     public Page page(Query query) {
         int offset = query.offset(), limit = query.limit();
-        ProductionQuantityService.paging(offset, limit);
+        ParameterChecks.paging(offset, limit);
         String workorderCode = normalize(query.workorderCode());
         String productCode = normalize(query.productCode());
         String status = normalize(query.status());
@@ -63,17 +67,24 @@ public class WorkOrderProgressQueryService {
     }
 
     private static Progress progress(Order order, Completion completion, List<Quality> quality) {
-        String issue = completion != null && (completion.factCount() != completion.executionCount()
-                || completion.invalidCount() > 0 || completion.quantity() == null)
-                ? "正式完工事实重复或数量异常，请核实" : null;
-        BigDecimal completed = issue != null ? null : completion == null ? BigDecimal.ZERO : completion.quantity();
+        String issue = null;
+        BigDecimal completed = BigDecimal.ZERO;
+        if (completion != null) {
+            completed = completion.quantity();
+            if (completion.factCount() != completion.executionCount() || completion.invalidCount() > 0 || completed == null) {
+                issue = "正式完工事实重复或数量异常，请核实";
+                completed = null;
+            }
+        }
         if (order.plannedQty() == null || order.plannedQty().signum() <= 0)
             issue = "计划数量无效，无法计算完成率";
-        BigDecimal percent = issue == null ? completed.multiply(BigDecimal.valueOf(100))
-                .divide(order.plannedQty(), 2, RoundingMode.HALF_UP) : null;
-        BigDecimal gap = issue == null ? order.plannedQty().subtract(completed).max(BigDecimal.ZERO) : null;
+        BigDecimal percent = null, gap = null;
+        if (issue == null) {
+            percent = completed.multiply(BigDecimal.valueOf(100)).divide(order.plannedQty(), 2, RoundingMode.HALF_UP);
+            gap = order.plannedQty().subtract(completed).max(BigDecimal.ZERO);
+        }
         BigDecimal scrap = BigDecimal.ZERO, untreated = BigDecimal.ZERO, waiting = BigDecimal.ZERO,
-                reworking = BigDecimal.ZERO, unverified = BigDecimal.ZERO;
+                reworking = BigDecimal.ZERO, unverified = BigDecimal.ZERO, transferred = BigDecimal.ZERO;
         boolean invalidQuality = false;
         for (var fact : quality) {
             // Returning material to a routing node is reprocessing, not a confirmed loss.
@@ -84,7 +95,8 @@ public class WorkOrderProgressQueryService {
                 continue;
             }
             var disposed = fact.scrapQty().add(fact.failedQty());
-            var pendingDisposition = fact.declaredQty().subtract(fact.scrapQty()).subtract(fact.allocatedReworkQty());
+            var pendingDisposition = fact.declaredQty().subtract(fact.scrapQty()).subtract(fact.allocatedReworkQty())
+                    .subtract(fact.returnedQty()).subtract(fact.transferredQty());
             var pendingStart = fact.allocatedReworkQty().subtract(fact.startedQty());
             var inProgress = fact.startedQty().subtract(fact.processedQty());
             if (fact.scrapQty().signum() < 0 || fact.failedQty().signum() < 0
@@ -94,30 +106,34 @@ public class WorkOrderProgressQueryService {
                     || fact.processedQty().compareTo(fact.failedQty().add(fact.recoveredQty())) != 0)
                 invalidQuality = true;
             scrap = scrap.add(disposed);
+            transferred = transferred.add(fact.transferredQty());
             untreated = untreated.add(pendingDisposition);
             waiting = waiting.add(pendingStart);
             reworking = reworking.add(inProgress);
         }
         if (invalidQuality) issue = "质量处置数量异常，请核实";
-        BigDecimal unfinished = gap == null || invalidQuality ? null
-                : order.plannedQty().subtract(completed).subtract(scrap).max(BigDecimal.ZERO);
+        BigDecimal unfinished = null;
+        if (gap != null && !invalidQuality) unfinished = order.plannedQty().subtract(completed).subtract(scrap).subtract(transferred).max(BigDecimal.ZERO);
         return new Progress(order.id().toString(), order.code(), order.source(), order.status(), order.productCode(),
                 order.productName(), order.unitName(), decimal(order.plannedQty()), decimal(completed), decimal(gap),
                 invalidQuality ? null : decimal(scrap), decimal(unfinished), invalidQuality ? null : decimal(untreated),
                 invalidQuality ? null : decimal(waiting), invalidQuality ? null : decimal(reworking),
                 decimal(unverified), decimal(percent), completion == null ? 0 : completion.executionCount(),
-                completion == null ? null : completion.lastCompletedAt(), issue, order.createTime());
+                Optional.ofNullable(completion).map(nullableValue -> nullableValue.lastCompletedAt()).orElse(null), issue, order.createTime(), invalidQuality ? null : decimal(transferred));
     }
 
     private static String decimal(BigDecimal value) {
-        return value == null ? null : value.toPlainString();
+        if (value == null) return null;
+        return value.toPlainString();
     }
 
     private static String normalize(String text) {
-        return text == null || text.isBlank() ? null : text.trim();
+        if (StringUtils.isBlank(text)) return null;
+        return StringUtils.trim(text);
     }
 
     private static String prefixPattern(String value) {
-        return value == null ? null : value.replace("!", "!!").replace("%", "!%").replace("_", "!_") + "%";
+        if (value == null) return null;
+        return value.replace("!", "!!").replace("%", "!%").replace("_", "!_") + "%";
     }
 }

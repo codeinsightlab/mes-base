@@ -1,5 +1,7 @@
 package dev.mesbase.platform.codegen;
 
+import java.util.Optional;
+
 import dev.mesbase.platform.codegen.ScaffoldWriter.Artifact;
 import dev.mesbase.platform.codegen.TableMetadata.Column;
 import java.io.StringWriter;
@@ -34,7 +36,7 @@ public final class BusinessTemplateRenderer {
     }
 
     public BusinessTemplateRenderer(CodegenTemplateOptions options) {
-        this(options, VelocityTemplateInitializer.initialize(options == null ? null : options.templateRoot()));
+        this(options, VelocityTemplateInitializer.initialize(Optional.ofNullable(options).map(nullableValue -> nullableValue.templateRoot()).orElse(null)));
     }
 
     BusinessTemplateRenderer(CodegenTemplateOptions options, VelocityEngine engine) {
@@ -154,10 +156,10 @@ public final class BusinessTemplateRenderer {
         String n = cap(JdbcMetadataReader.camel(r.tableName())), p = r.packageName(), name = JdbcMetadataReader.camel(r.tableName()), route = "/api/" + r.moduleName() + "/" + r.tableName()
                 .replace('_', '-').toLowerCase(Locale.ROOT), perm = permissionNamespace(r) + ":" + r.tableName()
                 .replace('_', ':');
-        String scopeColumnName = options == null ? null : (String) options.variables().get("serverScopeColumn");
-        Column scopeColumn = scopeColumnName == null ? null : t.columns().stream()
-                .filter(column -> column.name().equalsIgnoreCase(scopeColumnName)).findFirst()
-                .orElseThrow(() -> new CodegenException(CodegenException.Code.INVALID_REQUEST));
+        String scopeColumnName = Optional.ofNullable(options).map(nullableValue -> (String) nullableValue.variables().get("serverScopeColumn")).orElse(null);
+        Column scopeColumn = Optional.ofNullable(scopeColumnName).map(nullableValue -> t.columns().stream()
+                .filter(column -> column.name().equalsIgnoreCase(nullableValue)).findFirst()
+                .orElseThrow(() -> new CodegenException(CodegenException.Code.INVALID_REQUEST))).orElse(null);
         if (scopeColumn != null && (!scoped || scopeColumn.nullable() || !scopeColumn.javaType().equals("String"))) {
             throw new CodegenException(CodegenException.Code.INVALID_REQUEST);
         }
@@ -316,7 +318,6 @@ public final class BusinessTemplateRenderer {
             ctx.put("commandFields", ctx.get("editFields"));
             emitJava(out, ctx, "domain", n + "UpdateCommand", "command.java.vm");
             emitJava(out, ctx, "domain", n + "QueryDto", "query.java.vm");
-            emitJava(out, ctx, "domain", n + "Page", "page.java.vm");
             emitJava(out, ctx, "controller/vo", n + "Vo", "view.java.vm");
             emitJava(out, ctx, "controller/vo", n + "PageVo", "page-view.java.vm");
             if (Boolean.TRUE.equals(ctx.get("scoped"))) {

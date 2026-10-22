@@ -1,5 +1,6 @@
 package dev.mesbase.business.basic.service.impl;
 
+import dev.mesbase.common.validation.ParameterChecks;
 import dev.mesbase.business.shared.enums.EnableStatus;
 import com.github.pagehelper.Page;
 import com.github.pagehelper.PageHelper;
@@ -7,7 +8,6 @@ import dev.mesbase.business.basic.dao.EquipmentMapper;
 import dev.mesbase.business.basic.domain.EquipmentCreateCommand;
 import dev.mesbase.business.basic.domain.EquipmentEntity;
 import dev.mesbase.business.basic.domain.EquipmentExample;
-import dev.mesbase.business.basic.domain.EquipmentPage;
 import dev.mesbase.business.basic.domain.EquipmentQueryDto;
 import dev.mesbase.business.basic.domain.EquipmentResource;
 import dev.mesbase.business.basic.domain.EquipmentUpdateCommand;
@@ -45,12 +45,10 @@ public class EquipmentServiceImpl implements IEquipmentService {
     @Transactional(transactionManager = "businessTransactionManager", readOnly = true)
     @BusinessCache(business = EquipmentResource.PREFIX,
             type = BusinessCache.Type.LIST)
-    public EquipmentPage selectPage(EquipmentQueryDto query) {
+    public Page<EquipmentEntity> selectPage(EquipmentQueryDto query) {
         int offset = query.offset() == null ? 0 : query.offset();
         int limit = query.limit() == null ? 20 : query.limit();
-        if (offset < 0 || limit < 1 || limit > 100) {
-            throw new FoundationException(ErrorCode.BAD_REQUEST);
-        }
+        ParameterChecks.paging(offset, limit, 100);
         EquipmentExample example = new EquipmentExample();
         EquipmentExample.Criteria criteria = example.createCriteria();
         if (query.code() != null) {
@@ -73,8 +71,8 @@ public class EquipmentServiceImpl implements IEquipmentService {
         }
         example.setOrderByClause("id desc");
         try (Page<EquipmentEntity> page = PageHelper.offsetPage(offset, limit)) {
-            List<EquipmentEntity> rows = mapper.selectByExample(example);
-            return new EquipmentPage(rows, page.getTotal(), offset, limit);
+            mapper.selectByExample(example);
+            return page;
         }
     }
 

@@ -1,9 +1,11 @@
 package dev.mesbase.business.production.controller;
 
+import com.github.pagehelper.Page;
+import java.util.Objects;
+
 import dev.mesbase.business.production.controller.vo.MesWorkorderMaterialPageVo;
 import dev.mesbase.business.production.controller.vo.MesWorkorderMaterialVo;
 import dev.mesbase.business.production.domain.MesWorkorderMaterialEntity;
-import dev.mesbase.business.production.domain.MesWorkorderMaterialPage;
 import dev.mesbase.business.production.domain.MesWorkorderMaterialQueryDto;
 import dev.mesbase.business.production.service.IMesWorkorderMaterialService;
 import dev.mesbase.platform.web.EndpointAccess;
@@ -32,10 +34,10 @@ public class MesWorkorderMaterialController {
     @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED,
             permission = MesWorkorderMaterialPermissions.LIST)
     public MesWorkorderMaterialPageVo list(@Valid @ModelAttribute MesWorkorderMaterialQueryDto query) {
-        MesWorkorderMaterialPage page = service.selectPage(query);
+        Page<MesWorkorderMaterialEntity> page = service.selectPage(query);
         return new MesWorkorderMaterialPageVo(
-                page.items().stream().map(MesWorkorderMaterialController::toView).toList(),
-                page.total(), page.offset(), page.limit());
+                page.stream().map(MesWorkorderMaterialController::toView).toList(),
+                page.getTotal(), (int) page.getStartRow(), page.getPageSize());
     }
 
     @GetMapping("/{id}")
@@ -48,16 +50,16 @@ public class MesWorkorderMaterialController {
 
     private static MesWorkorderMaterialVo toView(MesWorkorderMaterialEntity row) {
         return new MesWorkorderMaterialVo(
-                row.getId() == null ? null : row.getId().toString(),
-                row.getMaterialId() == null ? null : row.getMaterialId().toString(),
-                row.getUnitId() == null ? null : row.getUnitId().toString(),
-                row.getTotalRequiredQty() == null ? null : row.getTotalRequiredQty().toString(),
-                row.getPlannedQty() == null ? null : row.getPlannedQty().toString(),
+                Objects.toString(row.getId(), null),
+                Objects.toString(row.getMaterialId(), null),
+                Objects.toString(row.getUnitId(), null),
+                Objects.toString(row.getTotalRequiredQty(), null),
+                Objects.toString(row.getPlannedQty(), null),
                 row.getWarehouseIds(),
                 row.getWorkCenter(),
-                row.getRevision() == null ? null : row.getRevision().toString(),
+                Objects.toString(row.getRevision(), null),
                 row.getStatus(),
-                row.getUpdatedBy() == null ? null : row.getUpdatedBy().toString(),
+                Objects.toString(row.getUpdatedBy(), null),
                 row.getUpdatedAt()
         );
     }

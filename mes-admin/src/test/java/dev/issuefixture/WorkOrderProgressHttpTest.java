@@ -235,4 +235,26 @@ class WorkOrderProgressHttpTest {
             }
         }
     }
+
+    @Test
+    void warehouseTransfersAndReturnedWorkAreDistinctFromScrapAndUntreatedDefects() throws Exception {
+        try (var c = context()) {
+            var j = c.getBean(MaterialIssueHttpTest.Fixture.class).business.get("A");
+            ProductionReportHttpTest.seed(j);
+            j.update("UPDATE workorder SET planned_qty=100 WHERE id=1");
+            complete(j, "TEST ONLY completed90", 1, "90");
+            declaration(j, "TEST ONLY split disposition", 1, "CREATE", "10");
+            treatment(j, "TEST ONLY split disposition", 1, "ASSESS", "INDEPENDENT", "0", "0", "0");
+            treatment(j, "TEST ONLY split disposition", 1, "RETURN_NODE", null, "0", "0", "0", "4");
+            j.update("INSERT INTO mes_quality_treatment(id,request_hash,declaration_id,declaration_revision,execution_id,routing_node_id,action_type,transfer_qty,operator_user_id,confirmed_by,occurred_at,recorded_at,reason) VALUES(?,?,?,1,1,11,'TRANSFER_WAREHOUSE',6,1,1,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,'TEST ONLY')", UUID.randomUUID()
+                    .toString(), "t".repeat(64), "TEST ONLY split disposition");
+            MaterialIssueHttpTest.mvc(c).perform(ProductionReportHttpTest.full(get(URL), "A"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("items[0].scrappedQty").value("0.000000"))
+                    .andExpect(jsonPath("items[0].qualityTransferredQty").value("6.000000"))
+                    .andExpect(jsonPath("items[0].qualityUntreatedQty").value("0.000000"))
+                    .andExpect(jsonPath("items[0].pendingCompletionQty").value("4.000000"));
+        }
+    }
+
 }

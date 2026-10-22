@@ -1,5 +1,7 @@
 package dev.mesbase.business.production.service;
 
+import java.util.Optional;
+
 import dev.mesbase.business.production.domain.ProductionQuantityInput;
 
 import dev.mesbase.business.production.service.BusinessSourceRules;
@@ -160,7 +162,7 @@ public class WorkOrderService {
             var m = materialIndex.get(w.getProductId());
             var r = routingIndex.get(w.getRoutingId());
             return new WorkOrderModels.Summary(w, counts.getOrDefault(w.getId(), 0L)
-                    .intValue(), m == null ? null : m.getCode(), m == null ? null : m.getName(), r == null ? null : r.getCode(), r == null ? null : r.getVersion(), allocations.get(w.getId()), missingExtras.contains(w.getId()));
+                    .intValue(), Optional.ofNullable(m).map(nullableValue -> nullableValue.getCode()).orElse(null), Optional.ofNullable(m).map(nullableValue -> nullableValue.getName()).orElse(null), Optional.ofNullable(r).map(nullableValue -> nullableValue.getCode()).orElse(null), Optional.ofNullable(r).map(nullableValue -> nullableValue.getVersion()).orElse(null), allocations.get(w.getId()), missingExtras.contains(w.getId()));
         }).toList(), total, offset, limit);
     }
 
@@ -169,7 +171,7 @@ public class WorkOrderService {
         var w = order(id, false);
         var m = materials.selectByPrimaryKey(w.getProductId());
         var children = batchRows(id);
-        return new WorkOrderModels.Detail(w, m == null ? null : m.getCode(), m == null ? null : m.getName(),
+        return new WorkOrderModels.Detail(w, Optional.ofNullable(m).map(nullableValue -> nullableValue.getCode()).orElse(null), Optional.ofNullable(m).map(nullableValue -> nullableValue.getName()).orElse(null),
                 routings.selectByPrimaryKey(w.getRoutingId()), children, allocation(id));
     }
 

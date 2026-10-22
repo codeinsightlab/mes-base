@@ -40,7 +40,8 @@ public class WorkorderMaterialController {
     }
 
     private static View view(MesWorkorderMaterialEntity r) {
-        return r == null ? null : new View(r.getId().toString(), r.getMaterialId().toString(), r.getUnitId()
+        if (r == null) return null;
+        return new View(r.getId().toString(), r.getMaterialId().toString(), r.getUnitId()
                 .toString(), r.getTotalRequiredQty().toPlainString(), r.getPlannedQty()
                 .toPlainString(), r.getWarehouseIds(), r.getWorkCenter(), r.getRevision()
                 .toString(), r.getStatus(), r.getUpdatedAt());

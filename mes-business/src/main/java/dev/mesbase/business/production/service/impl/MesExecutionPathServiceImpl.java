@@ -1,12 +1,12 @@
 package dev.mesbase.business.production.service.impl;
 
+import dev.mesbase.common.validation.ParameterChecks;
 import com.github.pagehelper.Page;
 import com.github.pagehelper.PageHelper;
 import dev.mesbase.business.production.dao.MesExecutionPathMapper;
 import dev.mesbase.business.production.domain.MesExecutionPathCreateCommand;
 import dev.mesbase.business.production.domain.MesExecutionPathEntity;
 import dev.mesbase.business.production.domain.MesExecutionPathExample;
-import dev.mesbase.business.production.domain.MesExecutionPathPage;
 import dev.mesbase.business.production.domain.MesExecutionPathQueryDto;
 import dev.mesbase.business.production.domain.MesExecutionPathResource;
 import dev.mesbase.business.production.domain.MesExecutionPathUpdateCommand;
@@ -38,12 +38,10 @@ public class MesExecutionPathServiceImpl implements IMesExecutionPathService {
     @Transactional(transactionManager = "businessTransactionManager", readOnly = true)
     @BusinessCache(business = MesExecutionPathResource.PREFIX,
             type = BusinessCache.Type.LIST)
-    public MesExecutionPathPage selectPage(MesExecutionPathQueryDto query) {
+    public Page<MesExecutionPathEntity> selectPage(MesExecutionPathQueryDto query) {
         int offset = query.offset() == null ? 0 : query.offset();
         int limit = query.limit() == null ? 20 : query.limit();
-        if (offset < 0 || limit < 1 || limit > 100) {
-            throw new FoundationException(ErrorCode.BAD_REQUEST);
-        }
+        ParameterChecks.paging(offset, limit, 100);
         MesExecutionPathExample example = new MesExecutionPathExample();
         MesExecutionPathExample.Criteria criteria = example.createCriteria();
         if (query.routingId() != null) {
@@ -63,8 +61,8 @@ public class MesExecutionPathServiceImpl implements IMesExecutionPathService {
         }
         example.setOrderByClause("id");
         try (Page<MesExecutionPathEntity> page = PageHelper.offsetPage(offset, limit)) {
-            List<MesExecutionPathEntity> rows = mapper.selectByExample(example);
-            return new MesExecutionPathPage(rows, page.getTotal(), offset, limit);
+            mapper.selectByExample(example);
+            return page;
         }
     }
 

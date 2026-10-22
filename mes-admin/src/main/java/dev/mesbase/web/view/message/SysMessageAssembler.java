@@ -29,6 +29,7 @@ public final class SysMessageAssembler {
     }
 
     public static List<SysMessageResult> toResults(List<SysMessage> rows) {
-        return rows == null ? null : rows.stream().map(SysMessageAssembler::toResult).toList();
+        if (rows == null) return null;
+        return rows.stream().map(SysMessageAssembler::toResult).toList();
     }
 }

@@ -1,5 +1,7 @@
 package dev.mesbase.business.quality.service;
 
+import java.util.Optional;
+
 import com.github.pagehelper.PageHelper;
 import dev.mesbase.business.directory.service.BusinessDirectoryService;
 import dev.mesbase.business.production.service.ExecutionPathService;
@@ -67,7 +69,7 @@ class QualityTreatmentProjectionTest {
         e.setDeclarationRevision(revision);
         e.setExecutionId(1L);
         e.setActionType(action.name());
-        e.setAttributionType(type == null ? null : type.name());
+        e.setAttributionType(Optional.ofNullable(type).map(nullableValue -> nullableValue.name()).orElse(null));
         e.setScrapQty(BigDecimal.ZERO);
         e.setReworkQty(new BigDecimal(rework));
         e.setProcessedQty(new BigDecimal(processed));

@@ -1,12 +1,12 @@
 package dev.mesbase.business.production.service.impl;
 
+import dev.mesbase.common.validation.ParameterChecks;
 import com.github.pagehelper.Page;
 import com.github.pagehelper.PageHelper;
 import dev.mesbase.business.production.dao.MesProductionExecutionMapper;
 import dev.mesbase.business.production.domain.MesProductionExecutionCreateCommand;
 import dev.mesbase.business.production.domain.MesProductionExecutionEntity;
 import dev.mesbase.business.production.domain.MesProductionExecutionExample;
-import dev.mesbase.business.production.domain.MesProductionExecutionPage;
 import dev.mesbase.business.production.domain.MesProductionExecutionQueryDto;
 import dev.mesbase.business.production.domain.MesProductionExecutionResource;
 import dev.mesbase.business.production.domain.MesProductionExecutionUpdateCommand;
@@ -42,12 +42,10 @@ public class MesProductionExecutionServiceImpl implements IMesProductionExecutio
     @Transactional(transactionManager = "businessTransactionManager", readOnly = true)
     @BusinessCache(business = MesProductionExecutionResource.PREFIX,
             type = BusinessCache.Type.LIST)
-    public MesProductionExecutionPage selectPage(MesProductionExecutionQueryDto query) {
+    public Page<MesProductionExecutionEntity> selectPage(MesProductionExecutionQueryDto query) {
         int offset = query.offset() == null ? 0 : query.offset();
         int limit = query.limit() == null ? 20 : query.limit();
-        if (offset < 0 || limit < 1 || limit > 100) {
-            throw new FoundationException(ErrorCode.BAD_REQUEST);
-        }
+        ParameterChecks.paging(offset, limit, 100);
         MesProductionExecutionExample example = new MesProductionExecutionExample();
         MesProductionExecutionExample.Criteria criteria = example.createCriteria();
         if (query.executionNo() != null) {
@@ -79,8 +77,8 @@ public class MesProductionExecutionServiceImpl implements IMesProductionExecutio
         }
         example.setOrderByClause("id desc");
         try (Page<MesProductionExecutionEntity> page = PageHelper.offsetPage(offset, limit)) {
-            List<MesProductionExecutionEntity> rows = mapper.selectByExample(example);
-            return new MesProductionExecutionPage(rows, page.getTotal(), offset, limit);
+            mapper.selectByExample(example);
+            return page;
         }
     }
 

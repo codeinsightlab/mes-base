@@ -1,5 +1,7 @@
 package dev.mesbase.server.managed;
 
+import java.util.Optional;
+
 import dev.mesbase.core.error.ErrorCode;
 import dev.mesbase.core.error.FoundationException;
 import dev.mesbase.core.factory.FactoryId;
@@ -95,7 +97,7 @@ public final class FactoryIntegrationRegistry {
                 || factory.erpConfigRef() == null || factory.erpConfigRef().isBlank())
             throw new FoundationException(ErrorCode.INTEGRATION_NOT_CONFIGURED);
         if (DigiwinE10MoQueries.PROVIDER.equals(factory.erpProvider())) {
-            var configured = oapi == null ? null : oapi.connection(factory.factoryId());
+            var configured = Optional.ofNullable(oapi).map(nullableValue -> nullableValue.connection(factory.factoryId())).orElse(null);
             if (configured == null || !Objects.equals(factory.erpConfigRef(), configured.reference()))
                 throw new FoundationException(ErrorCode.INTEGRATION_NOT_CONFIGURED);
             return new FactoryIntegrationSnapshot(new FactoryId(factory.factoryId()), mode, factory.erpProvider(),

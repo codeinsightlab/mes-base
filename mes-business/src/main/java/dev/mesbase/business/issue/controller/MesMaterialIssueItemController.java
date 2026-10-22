@@ -1,10 +1,12 @@
 package dev.mesbase.business.issue.controller;
 
+import com.github.pagehelper.Page;
+import java.util.Objects;
+
 import dev.mesbase.business.issue.controller.vo.MesMaterialIssueItemPageVo;
 import dev.mesbase.business.issue.controller.vo.MesMaterialIssueItemVo;
 import dev.mesbase.business.issue.domain.MesMaterialIssueItemCreateCommand;
 import dev.mesbase.business.issue.domain.MesMaterialIssueItemEntity;
-import dev.mesbase.business.issue.domain.MesMaterialIssueItemPage;
 import dev.mesbase.business.issue.domain.MesMaterialIssueItemQueryDto;
 import dev.mesbase.business.issue.domain.MesMaterialIssueItemUpdateCommand;
 import dev.mesbase.business.issue.service.IMesMaterialIssueItemService;
@@ -44,10 +46,10 @@ public class MesMaterialIssueItemController {
     @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED,
             permission = MesMaterialIssueItemPermissions.LIST)
     public MesMaterialIssueItemPageVo list(@Valid @ModelAttribute MesMaterialIssueItemQueryDto query) {
-        MesMaterialIssueItemPage page = service.selectPage(query);
+        Page<MesMaterialIssueItemEntity> page = service.selectPage(query);
         return new MesMaterialIssueItemPageVo(
-                page.items().stream().map(MesMaterialIssueItemController::toView).toList(),
-                page.total(), page.offset(), page.limit());
+                page.stream().map(MesMaterialIssueItemController::toView).toList(),
+                page.getTotal(), (int) page.getStartRow(), page.getPageSize());
     }
 
     @GetMapping("/{id}")
@@ -85,16 +87,16 @@ public class MesMaterialIssueItemController {
 
     private static MesMaterialIssueItemVo toView(MesMaterialIssueItemEntity row) {
         return new MesMaterialIssueItemVo(
-                row.getId() == null ? null : row.getId().toString(),
+                Objects.toString(row.getId(), null),
 
-                row.getIssueId() == null ? null : row.getIssueId().toString(),
-                row.getMaterialId() == null ? null : row.getMaterialId().toString(),
+                Objects.toString(row.getIssueId(), null),
+                Objects.toString(row.getMaterialId(), null),
                 row.getMaterialCode(),
                 row.getBatchNo(),
-                row.getQuantity() == null ? null : row.getQuantity().toString(),
-                row.getUnitId() == null ? null : row.getUnitId().toString(),
+                Objects.toString(row.getQuantity(), null),
+                Objects.toString(row.getUnitId(), null),
                 row.getUnitCode(),
-                row.getWarehouseId() == null ? null : row.getWarehouseId().toString(),
+                Objects.toString(row.getWarehouseId(), null),
                 row.getWarehouseCode(),
                 row.getRemark(),
                 row.getCreateBy(),

@@ -1,5 +1,7 @@
 package dev.mesbase.web.view.file;
 
+import java.util.Objects;
+
 import dev.mesbase.system.domain.SysAttachment;
 import java.util.List;
 
@@ -11,7 +13,7 @@ public final class SysAttachmentAssembler {
     public static SysAttachmentResult toResult(SysAttachment r) {
         if (r == null) return null;
         return new SysAttachmentResult(String.valueOf(r.getAttachmentId()),
-                r.getSourceDocId() == null ? null : r.getSourceDocId().toString(),
+                Objects.toString(r.getSourceDocId(), null),
                 r.getSourceDocType(),
                 r.getFileId(),
                 r.getFileUrl(),
@@ -26,6 +28,7 @@ public final class SysAttachmentAssembler {
     }
 
     public static List<SysAttachmentResult> toResults(List<SysAttachment> rows) {
-        return rows == null ? null : rows.stream().map(SysAttachmentAssembler::toResult).toList();
+        if (rows == null) return null;
+        return rows.stream().map(SysAttachmentAssembler::toResult).toList();
     }
 }

@@ -1,5 +1,9 @@
 package dev.mesbase.web.view.dept;
 
+import java.util.Optional;
+
+import java.util.Objects;
+
 import dev.mesbase.common.core.domain.entity.SysDept;
 import java.util.List;
 
@@ -10,11 +14,11 @@ public final class SysDeptAssembler {
 
     public static SysDeptResult toResult(SysDept row) {
         if (row == null) return null;
-        return new SysDeptResult(row.getDeptId() == null ? null : row.getDeptId().toString(),
-                row.getParentId() == null ? null : row.getParentId().toString(),
+        return new SysDeptResult(Objects.toString(row.getDeptId(), null),
+                Objects.toString(row.getParentId(), null),
                 row.getAncestors(),
                 row.getDeptName(),
-                row.getOrderNum() == null ? null : Integer.valueOf(row.getOrderNum()),
+                Optional.ofNullable(row.getOrderNum()).map(nullableValue -> Integer.valueOf(nullableValue)).orElse(null),
                 row.getLeader(),
                 row.getPhone(),
                 row.getEmail(),
@@ -30,6 +34,7 @@ public final class SysDeptAssembler {
     }
 
     public static List<SysDeptResult> toResults(List<SysDept> rows) {
-        return rows == null ? null : rows.stream().map(SysDeptAssembler::toResult).toList();
+        if (rows == null) return null;
+        return rows.stream().map(SysDeptAssembler::toResult).toList();
     }
 }

@@ -1,10 +1,12 @@
 package dev.mesbase.business.production.controller;
 
+import com.github.pagehelper.Page;
+import java.util.Objects;
+
 import dev.mesbase.business.production.controller.vo.OperationPageVo;
 import dev.mesbase.business.production.controller.vo.OperationVo;
 import dev.mesbase.business.production.domain.OperationCreateCommand;
 import dev.mesbase.business.production.domain.OperationEntity;
-import dev.mesbase.business.production.domain.OperationPage;
 import dev.mesbase.business.production.domain.OperationQueryDto;
 import dev.mesbase.business.production.domain.OperationUpdateCommand;
 import dev.mesbase.business.production.service.IOperationService;
@@ -46,10 +48,10 @@ public class OperationController {
     @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED,
             permission = OperationPermissions.LIST)
     public OperationPageVo list(@Valid @ModelAttribute OperationQueryDto query) {
-        OperationPage page = service.selectPage(query);
+        Page<OperationEntity> page = service.selectPage(query);
         return new OperationPageVo(
-                page.items().stream().map(OperationController::toView).toList(),
-                page.total(), page.offset(), page.limit());
+                page.stream().map(OperationController::toView).toList(),
+                page.getTotal(), (int) page.getStartRow(), page.getPageSize());
     }
 
     @GetMapping("/{id}")
@@ -93,7 +95,7 @@ public class OperationController {
 
     private static OperationVo toView(OperationEntity row) {
         return new OperationVo(
-                row.getId() == null ? null : row.getId().toString(),
+                Objects.toString(row.getId(), null),
 
                 row.getCode(),
                 row.getName(),

@@ -1,11 +1,11 @@
 package dev.mesbase.business.production.service.impl;
 
+import dev.mesbase.common.validation.ParameterChecks;
 import com.github.pagehelper.Page;
 import com.github.pagehelper.PageHelper;
 import dev.mesbase.business.production.dao.MesWorkorderMaterialMapper;
 import dev.mesbase.business.production.domain.MesWorkorderMaterialEntity;
 import dev.mesbase.business.production.domain.MesWorkorderMaterialExample;
-import dev.mesbase.business.production.domain.MesWorkorderMaterialPage;
 import dev.mesbase.business.production.domain.MesWorkorderMaterialQueryDto;
 import dev.mesbase.business.production.domain.MesWorkorderMaterialResource;
 import dev.mesbase.business.production.service.IMesWorkorderMaterialService;
@@ -33,12 +33,10 @@ public class MesWorkorderMaterialServiceImpl implements IMesWorkorderMaterialSer
     @Transactional(transactionManager = "businessTransactionManager", readOnly = true)
     @BusinessCache(business = MesWorkorderMaterialResource.PREFIX,
             type = BusinessCache.Type.LIST)
-    public MesWorkorderMaterialPage selectPage(MesWorkorderMaterialQueryDto query) {
+    public Page<MesWorkorderMaterialEntity> selectPage(MesWorkorderMaterialQueryDto query) {
         int offset = query.offset() == null ? 0 : query.offset();
         int limit = query.limit() == null ? 20 : query.limit();
-        if (offset < 0 || limit < 1 || limit > 100) {
-            throw new FoundationException(ErrorCode.BAD_REQUEST);
-        }
+        ParameterChecks.paging(offset, limit, 100);
         MesWorkorderMaterialExample example = new MesWorkorderMaterialExample();
         MesWorkorderMaterialExample.Criteria criteria = example.createCriteria();
         if (query.materialId() != null) {
@@ -73,8 +71,8 @@ public class MesWorkorderMaterialServiceImpl implements IMesWorkorderMaterialSer
         }
         example.setOrderByClause("id");
         try (Page<MesWorkorderMaterialEntity> page = PageHelper.offsetPage(offset, limit)) {
-            List<MesWorkorderMaterialEntity> rows = mapper.selectByExample(example);
-            return new MesWorkorderMaterialPage(rows, page.getTotal(), offset, limit);
+            mapper.selectByExample(example);
+            return page;
         }
     }
 

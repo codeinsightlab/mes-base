@@ -131,4 +131,14 @@
     AND execution_id IN <foreach collection="executionIds" item="id" open="(" close=")" separator=",">#{id}</foreach>
     ORDER BY recorded_at DESC,id DESC
   </select>
+  <select id="selectListContexts" resultType="dev.mesbase.business.quality.domain.ProductionDefectModels$ListContext">
+    SELECT d.declaration_id AS declarationId, e.execution_no AS executionNo,
+      w.code AS workorderCode, m.code AS productCode, m.name AS productName,
+      w.status AS workorderStatus, e.status AS executionStatus, w.source AS source
+    FROM mes_production_defect d
+    LEFT JOIN mes_production_execution e ON e.id=d.execution_id
+    LEFT JOIN workorder w ON w.id=e.workorder_id
+    LEFT JOIN material m ON m.id=e.product_id
+    WHERE d.id IN <foreach collection="ids" item="id" open="(" separator="," close=")">#{id}</foreach>
+  </select>
 </mapper>

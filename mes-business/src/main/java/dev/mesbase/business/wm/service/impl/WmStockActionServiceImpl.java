@@ -1,11 +1,11 @@
 package dev.mesbase.business.wm.service.impl;
 
+import dev.mesbase.common.validation.ParameterChecks;
 import com.github.pagehelper.Page;
 import com.github.pagehelper.PageHelper;
 import dev.mesbase.business.wm.dao.WmStockActionMapper;
 import dev.mesbase.business.wm.domain.WmStockActionEntity;
 import dev.mesbase.business.wm.domain.WmStockActionExample;
-import dev.mesbase.business.wm.domain.WmStockActionPage;
 import dev.mesbase.business.wm.domain.WmStockActionQueryDto;
 import dev.mesbase.business.wm.domain.WmStockActionResource;
 import dev.mesbase.business.wm.service.IWmStockActionService;
@@ -31,12 +31,10 @@ public class WmStockActionServiceImpl implements IWmStockActionService {
 
     @Override
     @Transactional(transactionManager = "businessTransactionManager", readOnly = true)
-    public WmStockActionPage selectPage(WmStockActionQueryDto query) {
+    public Page<WmStockActionEntity> selectPage(WmStockActionQueryDto query) {
         int offset = query.offset() == null ? 0 : query.offset();
         int limit = query.limit() == null ? 20 : query.limit();
-        if (offset < 0 || limit < 1 || limit > 100) {
-            throw new FoundationException(ErrorCode.BAD_REQUEST);
-        }
+        ParameterChecks.paging(offset, limit, 100);
         WmStockActionExample example = new WmStockActionExample();
         WmStockActionExample.Criteria criteria = example.createCriteria();
         if (query.requestHash() != null) {
@@ -107,8 +105,8 @@ public class WmStockActionServiceImpl implements IWmStockActionService {
         }
         example.setOrderByClause("recorded_at DESC,id DESC");
         try (Page<WmStockActionEntity> page = PageHelper.offsetPage(offset, limit)) {
-            List<WmStockActionEntity> rows = mapper.selectByExample(example);
-            return new WmStockActionPage(rows, page.getTotal(), offset, limit);
+            mapper.selectByExample(example);
+            return page;
         }
     }
 

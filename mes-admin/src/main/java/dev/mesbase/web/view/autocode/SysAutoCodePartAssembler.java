@@ -1,5 +1,7 @@
 package dev.mesbase.web.view.autocode;
 
+import java.util.Objects;
+
 import dev.mesbase.common.core.domain.entity.SysAutoCodePart;
 import java.util.List;
 
@@ -10,8 +12,8 @@ public final class SysAutoCodePartAssembler {
 
     public static SysAutoCodePartResult toResult(SysAutoCodePart row) {
         if (row == null) return null;
-        return new SysAutoCodePartResult(row.getPartId() == null ? null : row.getPartId().toString(),
-                row.getRuleId() == null ? null : row.getRuleId().toString(),
+        return new SysAutoCodePartResult(Objects.toString(row.getPartId(), null),
+                Objects.toString(row.getRuleId(), null),
                 row.getPartIndex(),
                 row.getPartType(),
                 row.getPartCode(),
@@ -32,6 +34,7 @@ public final class SysAutoCodePartAssembler {
     }
 
     public static List<SysAutoCodePartResult> toResults(List<SysAutoCodePart> rows) {
-        return rows == null ? null : rows.stream().map(SysAutoCodePartAssembler::toResult).toList();
+        if (rows == null) return null;
+        return rows.stream().map(SysAutoCodePartAssembler::toResult).toList();
     }
 }

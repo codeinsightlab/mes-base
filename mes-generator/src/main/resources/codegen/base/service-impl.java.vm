@@ -36,7 +36,7 @@ public class ${ClassName}ServiceImpl implements ${servicePackage}.I${ClassName}S
     @dev.mesbase.infrastructure.cache.annotation.BusinessCache(business = ${domainPackage}.${ClassName}Resource.PREFIX,
             type = dev.mesbase.infrastructure.cache.annotation.BusinessCache.Type.LIST)
 #end
-    public ${domainPackage}.${ClassName}Page selectPage(${domainPackage}.${ClassName}QueryDto query) {
+    public com.github.pagehelper.Page<${domainPackage}.${ClassName}Entity> selectPage(${domainPackage}.${ClassName}QueryDto query) {
         int offset = query.offset() == null ? 0 : query.offset();
         int limit = query.limit() == null ? ${pageDefault} : query.limit();
         if (offset < 0 || limit < 1 || limit > ${pageMaximum}) {
@@ -55,7 +55,7 @@ public class ${ClassName}ServiceImpl implements ${servicePackage}.I${ClassName}S
         example.setOrderByClause("${defaultOrderBy}");
         try (com.github.pagehelper.Page<${domainPackage}.${ClassName}Entity> page = com.github.pagehelper.PageHelper.offsetPage(offset, limit)) {
             java.util.List<${domainPackage}.${ClassName}Entity> rows = mapper.${selectByExampleMethod}(example);
-            return new ${domainPackage}.${ClassName}Page(rows, page.getTotal(), offset, limit);
+            return page;
         }
     }
 

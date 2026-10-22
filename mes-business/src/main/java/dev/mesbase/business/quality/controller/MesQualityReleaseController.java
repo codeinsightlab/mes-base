@@ -1,9 +1,11 @@
 package dev.mesbase.business.quality.controller;
 
+import com.github.pagehelper.Page;
+import java.util.Objects;
+
 import dev.mesbase.business.quality.controller.vo.MesQualityReleasePageVo;
 import dev.mesbase.business.quality.controller.vo.MesQualityReleaseVo;
 import dev.mesbase.business.quality.domain.MesQualityReleaseEntity;
-import dev.mesbase.business.quality.domain.MesQualityReleasePage;
 import dev.mesbase.business.quality.domain.MesQualityReleaseQueryDto;
 import dev.mesbase.business.quality.service.IMesQualityReleaseService;
 import dev.mesbase.platform.web.EndpointAccess;
@@ -32,10 +34,10 @@ public class MesQualityReleaseController {
     @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED,
             permission = MesQualityReleasePermissions.LIST)
     public MesQualityReleasePageVo list(@Valid @ModelAttribute MesQualityReleaseQueryDto query) {
-        MesQualityReleasePage page = service.selectPage(query);
+        Page<MesQualityReleaseEntity> page = service.selectPage(query);
         return new MesQualityReleasePageVo(
-                page.items().stream().map(MesQualityReleaseController::toView).toList(),
-                page.total(), page.offset(), page.limit());
+                page.stream().map(MesQualityReleaseController::toView).toList(),
+                page.getTotal(), (int) page.getStartRow(), page.getPageSize());
     }
 
     @GetMapping("/{id}")
@@ -49,14 +51,14 @@ public class MesQualityReleaseController {
     private static MesQualityReleaseVo toView(MesQualityReleaseEntity row) {
         return new MesQualityReleaseVo(
                 row.getId(),
-                row.getExecutionId() == null ? null : row.getExecutionId().toString(),
-                row.getSequenceNo() == null ? null : row.getSequenceNo().toString(),
+                Objects.toString(row.getExecutionId(), null),
+                Objects.toString(row.getSequenceNo(), null),
                 row.getActionType(),
-                row.getQuantity() == null ? null : row.getQuantity().toString(),
+                Objects.toString(row.getQuantity(), null),
                 row.getBasisHash(),
                 row.getReferenceId(),
                 row.getRequestHash(),
-                row.getOperatorUserId() == null ? null : row.getOperatorUserId().toString(),
+                Objects.toString(row.getOperatorUserId(), null),
                 row.getRecordedAt(),
                 row.getReason()
         );

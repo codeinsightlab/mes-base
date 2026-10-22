@@ -1,5 +1,6 @@
 package dev.mesbase.business.production.service;
 
+import dev.mesbase.common.validation.ParameterChecks;
 import dev.mesbase.business.production.domain.ProductionQuantityInput;
 
 import dev.mesbase.business.production.service.BusinessSourceRules;
@@ -57,7 +58,7 @@ public class ProductionInputSupplyService {
 
     @Transactional(transactionManager = "businessTransactionManager", propagation = Propagation.NOT_SUPPORTED)
     public Context query(String code, Long workorderId, int offset, int limit) {
-        ProductionQuantityService.paging(offset, limit);
+        ParameterChecks.paging(offset, limit);
         if (workorderId != null) readTransaction.executeWithoutResult(status -> sources.order(workorderId));
         var identity = ProductionScanCode.material(code);
         var scope = FactoryContext.required();
@@ -67,7 +68,7 @@ public class ProductionInputSupplyService {
             if (matching.size() != 1) throw new FoundationException(ErrorCode.INTEGRATION_NOT_CONFIGURED);
             var result = matching.getFirst()
                     .query(scope, selection.bindingKey(), identity.materialCode(), identity.lotCode());
-            if (result == null || !Mode.CONNECTED.getValue().equals(result.sourceMode())) fail();
+            if (result == null || !Mode.CONNECTED.getValue().equals(result.sourceMode())) ParameterChecks.reject(ErrorCode.BAD_REQUEST);
             readTransaction.executeWithoutResult(status -> sources.externalCandidates(result));
             var eligible = result.orders().stream()
                     .filter(o -> workorderId == null || workorderId.equals(o.workorderId())).toList();
@@ -96,10 +97,10 @@ public class ProductionInputSupplyService {
         if (required.isEmpty() || required.stream().map(Requirement::materialCode).distinct().count() != 1
                 || required.stream().anyMatch(r -> !r.materialCode()
                 .equals(stock.materialCode()) || !Objects.equals(r.unitId(), stock.unitId()) || !Objects.equals(r.unitCode(), stock.unitCode()))
-                || !order.allowedWarehouses().contains(stock.warehouseId())) fail();
+                || !order.allowedWarehouses().contains(stock.warehouseId())) ParameterChecks.reject(ErrorCode.BAD_REQUEST);
         var total = required.stream().map(Requirement::totalRequiredQty).reduce(BigDecimal.ZERO, BigDecimal::add);
         var quantity = issueQuantity(order.plannedQty(), total, outputQty);
-        if (quantity.compareTo(stock.availableQty()) > 0) fail();
+        if (quantity.compareTo(stock.availableQty()) > 0) ParameterChecks.reject(ErrorCode.BAD_REQUEST);
         return new Calculation(context.sourceMode(), order, stock, outputQty, quantity);
     }
 
@@ -122,13 +123,10 @@ public class ProductionInputSupplyService {
 
     public static BigDecimal issueQuantity(BigDecimal plan, BigDecimal total, BigDecimal output) {
         if (plan == null || total == null || output == null || plan.signum() <= 0 || total.signum() <= 0 || output.signum() <= 0 || output.scale() > 6 || output.precision() - output.scale() > 14)
-            fail();
+            ParameterChecks.reject(ErrorCode.BAD_REQUEST);
         var result = total.multiply(output).divide(plan, 6, RoundingMode.HALF_UP);
-        if (result.signum() <= 0 || result.precision() - result.scale() > 14) fail();
+        if (result.signum() <= 0 || result.precision() - result.scale() > 14) ParameterChecks.reject(ErrorCode.BAD_REQUEST);
         return result;
     }
 
-    private static void fail() {
-        throw new FoundationException(ErrorCode.BAD_REQUEST);
-    }
 }

@@ -24,7 +24,8 @@ public final class WorkOrderProgress {
 
     public record Quality(Long workorderId, BigDecimal declaredQty, String attribution, String destinationType,
                           BigDecimal scrapQty, BigDecimal failedQty, BigDecimal recoveredQty,
-                          BigDecimal allocatedReworkQty, BigDecimal startedQty, BigDecimal processedQty) {
+                          BigDecimal allocatedReworkQty, BigDecimal startedQty, BigDecimal processedQty,
+                          BigDecimal returnedQty, BigDecimal transferredQty) {
     }
 
     /**
@@ -36,7 +37,7 @@ public final class WorkOrderProgress {
                            String qualityUntreatedQty, String qualityWaitingReworkQty, String qualityReworkingQty,
                            String qualityUnverifiedQty, String completionPercent,
                            long completedExecutions, LocalDateTime lastCompletedAt, String issue,
-                           LocalDateTime createTime) {
+                           LocalDateTime createTime, String qualityTransferredQty) {
     }
 
     public record Page(List<Progress> items, long total, int offset, int limit) {

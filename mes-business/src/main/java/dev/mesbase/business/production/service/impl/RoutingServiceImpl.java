@@ -1,5 +1,6 @@
 package dev.mesbase.business.production.service.impl;
 
+import dev.mesbase.common.validation.ParameterChecks;
 import dev.mesbase.business.production.domain.RoutingStatus;
 import dev.mesbase.business.shared.enums.EnableStatus;
 import com.github.pagehelper.Page;
@@ -8,7 +9,6 @@ import dev.mesbase.business.production.dao.RoutingMapper;
 import dev.mesbase.business.production.domain.RoutingCreateCommand;
 import dev.mesbase.business.production.domain.RoutingEntity;
 import dev.mesbase.business.production.domain.RoutingExample;
-import dev.mesbase.business.production.domain.RoutingPage;
 import dev.mesbase.business.production.domain.RoutingQueryDto;
 import dev.mesbase.business.production.domain.RoutingResource;
 import dev.mesbase.business.production.domain.RoutingUpdateCommand;
@@ -118,12 +118,10 @@ public class RoutingServiceImpl implements IRoutingService {
     @Transactional(transactionManager = "businessTransactionManager", readOnly = true)
     @BusinessCache(business = RoutingResource.PREFIX,
             type = BusinessCache.Type.LIST)
-    public RoutingPage selectPage(RoutingQueryDto query) {
+    public Page<RoutingEntity> selectPage(RoutingQueryDto query) {
         int offset = query.offset() == null ? 0 : query.offset();
         int limit = query.limit() == null ? 20 : query.limit();
-        if (offset < 0 || limit < 1 || limit > 100) {
-            throw new FoundationException(ErrorCode.BAD_REQUEST);
-        }
+        ParameterChecks.paging(offset, limit, 100);
         RoutingExample example = new RoutingExample();
         RoutingExample.Criteria criteria = example.createCriteria();
         if (query.code() != null) {
@@ -155,8 +153,8 @@ public class RoutingServiceImpl implements IRoutingService {
         }
         example.setOrderByClause("id desc");
         try (Page<RoutingEntity> page = PageHelper.offsetPage(offset, limit)) {
-            List<RoutingEntity> rows = mapper.selectByExample(example);
-            return new RoutingPage(rows, page.getTotal(), offset, limit);
+            mapper.selectByExample(example);
+            return page;
         }
     }
 

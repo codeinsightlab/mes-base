@@ -1,10 +1,12 @@
 package dev.mesbase.business.basic.controller;
 
+import com.github.pagehelper.Page;
+import java.util.Objects;
+
 import dev.mesbase.business.basic.controller.vo.WorkshopPageVo;
 import dev.mesbase.business.basic.controller.vo.WorkshopVo;
 import dev.mesbase.business.basic.domain.WorkshopCreateCommand;
 import dev.mesbase.business.basic.domain.WorkshopEntity;
-import dev.mesbase.business.basic.domain.WorkshopPage;
 import dev.mesbase.business.basic.domain.WorkshopQueryDto;
 import dev.mesbase.business.basic.domain.WorkshopUpdateCommand;
 import dev.mesbase.business.basic.service.IWorkshopService;
@@ -46,10 +48,10 @@ public class WorkshopController {
     @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED,
             permission = WorkshopPermissions.LIST)
     public WorkshopPageVo list(@Valid @ModelAttribute WorkshopQueryDto query) {
-        WorkshopPage page = service.selectPage(query);
+        Page<WorkshopEntity> page = service.selectPage(query);
         return new WorkshopPageVo(
-                page.items().stream().map(WorkshopController::toView).toList(),
-                page.total(), page.offset(), page.limit());
+                page.stream().map(WorkshopController::toView).toList(),
+                page.getTotal(), (int) page.getStartRow(), page.getPageSize());
     }
 
     @GetMapping("/{id}")
@@ -93,7 +95,7 @@ public class WorkshopController {
 
     private static WorkshopVo toView(WorkshopEntity row) {
         return new WorkshopVo(
-                row.getId() == null ? null : row.getId().toString(),
+                Objects.toString(row.getId(), null),
 
                 row.getCode(),
                 row.getName(),

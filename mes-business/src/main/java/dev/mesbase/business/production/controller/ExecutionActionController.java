@@ -1,5 +1,7 @@
 package dev.mesbase.business.production.controller;
 
+import java.util.Optional;
+
 import dev.mesbase.business.production.domain.ExecutionPathStatus;
 import dev.mesbase.business.production.service.ExecutionPathService;
 import dev.mesbase.business.production.service.ExecutionPathService.PathModel;
@@ -67,7 +69,7 @@ public class ExecutionActionController {
     public static PathView toView(PathModel model) {
         var p = model.path();
         return new PathView(model.executionId().toString(), model.executionStatus(), model.routing().id()
-                .toString(), p == null ? ExecutionPathStatus.UNSELECTED.getValue() : p.getPathStatus(), p == null ? 0 : p.getRevision(), p == null ? null : p.getSelectedAt(), p == null ? null : p.getLockedAt(), model.selectedNodeIds()
+                .toString(), p == null ? ExecutionPathStatus.UNSELECTED.getValue() : p.getPathStatus(), p == null ? 0 : p.getRevision(), Optional.ofNullable(p).map(nullableValue -> nullableValue.getSelectedAt()).orElse(null), Optional.ofNullable(p).map(nullableValue -> nullableValue.getLockedAt()).orElse(null), model.selectedNodeIds()
                 .stream().map(Object::toString).toList(), model.nodes().stream().map(n -> new NodeView(n.getId()
                         .toString(), n.getNodeCode(), n.getOperationName() != null ? n.getOperationName() : model.operationLabels()
                         .containsKey(n.getOperationId()) ? model.operationLabels().get(n.getOperationId())

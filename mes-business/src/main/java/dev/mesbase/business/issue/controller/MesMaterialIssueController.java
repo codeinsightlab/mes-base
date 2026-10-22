@@ -1,10 +1,14 @@
 package dev.mesbase.business.issue.controller;
 
+import com.github.pagehelper.Page;
+import java.util.Optional;
+
+import java.util.Objects;
+
 import dev.mesbase.business.issue.controller.vo.MesMaterialIssuePageVo;
 import dev.mesbase.business.issue.controller.vo.MesMaterialIssueVo;
 import dev.mesbase.business.issue.domain.MesMaterialIssueCreateCommand;
 import dev.mesbase.business.issue.domain.MesMaterialIssueEntity;
-import dev.mesbase.business.issue.domain.MesMaterialIssuePage;
 import dev.mesbase.business.issue.domain.MesMaterialIssueQueryDto;
 import dev.mesbase.business.issue.domain.MesMaterialIssueUpdateCommand;
 import dev.mesbase.business.issue.service.IMesMaterialIssueService;
@@ -44,10 +48,10 @@ public class MesMaterialIssueController {
     @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED,
             permission = MesMaterialIssuePermissions.LIST)
     public MesMaterialIssuePageVo list(@Valid @ModelAttribute MesMaterialIssueQueryDto query) {
-        MesMaterialIssuePage page = service.selectPage(query);
+        Page<MesMaterialIssueEntity> page = service.selectPage(query);
         return new MesMaterialIssuePageVo(
-                page.items().stream().map(MesMaterialIssueController::toView).toList(),
-                page.total(), page.offset(), page.limit());
+                page.stream().map(MesMaterialIssueController::toView).toList(),
+                page.getTotal(), (int) page.getStartRow(), page.getPageSize());
     }
 
     @GetMapping("/{id}")
@@ -85,15 +89,15 @@ public class MesMaterialIssueController {
 
     static MesMaterialIssueVo toView(MesMaterialIssueEntity row) {
         return new MesMaterialIssueVo(
-                row.getId() == null ? null : row.getId().toString(),
+                Objects.toString(row.getId(), null),
 
                 row.getIssueNo(),
-                row.getWorkorderId() == null ? null : row.getWorkorderId().toString(),
+                Objects.toString(row.getWorkorderId(), null),
                 row.getWorkorderCode(),
-                row.getProductId() == null ? null : row.getProductId().toString(),
+                Objects.toString(row.getProductId(), null),
                 row.getProductCode(),
                 row.getFlowCardNo(),
-                row.getRoutingId() == null ? null : row.getRoutingId().toString(),
+                Objects.toString(row.getRoutingId(), null),
                 row.getIssueTime(),
                 row.getStatus(),
                 row.getRemark(),
@@ -101,10 +105,10 @@ public class MesMaterialIssueController {
                 row.getCreateTime(),
                 row.getUpdateBy(),
                 row.getUpdateTime(),
-                row.getExecutionId() == null ? null : row.getExecutionId().toString(),
+                Objects.toString(row.getExecutionId(), null),
                 row.getSourceExecutionMode(), row.getExternalEffect(), row.getExternalBindingKey(), row.getExternalReference(),
-                row.getVoidOperationId(), row.getVoidResultStatus(), row.getVoidExecutionMode(), row.getVoidMessage(), row.getSubmissionId() == null ? null : row.getSubmissionId()
-                .toString()
+                row.getVoidOperationId(), row.getVoidResultStatus(), row.getVoidExecutionMode(), row.getVoidMessage(), Optional.ofNullable(row.getSubmissionId()).map(nullableValue -> nullableValue
+                .toString()).orElse(null)
         );
     }
 }

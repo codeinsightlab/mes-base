@@ -1,12 +1,12 @@
 package dev.mesbase.business.issue.service.impl;
 
+import dev.mesbase.common.validation.ParameterChecks;
 import com.github.pagehelper.Page;
 import com.github.pagehelper.PageHelper;
 import dev.mesbase.business.issue.dao.MesMaterialIssueSubmissionMapper;
 import dev.mesbase.business.issue.domain.MesMaterialIssueSubmissionCreateCommand;
 import dev.mesbase.business.issue.domain.MesMaterialIssueSubmissionEntity;
 import dev.mesbase.business.issue.domain.MesMaterialIssueSubmissionExample;
-import dev.mesbase.business.issue.domain.MesMaterialIssueSubmissionPage;
 import dev.mesbase.business.issue.domain.MesMaterialIssueSubmissionQueryDto;
 import dev.mesbase.business.issue.domain.MesMaterialIssueSubmissionResource;
 import dev.mesbase.business.issue.domain.MesMaterialIssueSubmissionUpdateCommand;
@@ -38,12 +38,10 @@ public class MesMaterialIssueSubmissionServiceImpl implements IMesMaterialIssueS
     @Transactional(transactionManager = "businessTransactionManager", readOnly = true)
     @BusinessCache(business = MesMaterialIssueSubmissionResource.PREFIX,
             type = BusinessCache.Type.LIST)
-    public MesMaterialIssueSubmissionPage selectPage(MesMaterialIssueSubmissionQueryDto query) {
+    public Page<MesMaterialIssueSubmissionEntity> selectPage(MesMaterialIssueSubmissionQueryDto query) {
         int offset = query.offset() == null ? 0 : query.offset();
         int limit = query.limit() == null ? 20 : query.limit();
-        if (offset < 0 || limit < 1 || limit > 100) {
-            throw new FoundationException(ErrorCode.BAD_REQUEST);
-        }
+        ParameterChecks.paging(offset, limit, 100);
         MesMaterialIssueSubmissionExample example = new MesMaterialIssueSubmissionExample();
         MesMaterialIssueSubmissionExample.Criteria criteria = example.createCriteria();
         if (query.issueId() != null) {
@@ -64,7 +62,7 @@ public class MesMaterialIssueSubmissionServiceImpl implements IMesMaterialIssueS
         example.setOrderByClause("id desc");
         try (Page<MesMaterialIssueSubmissionEntity> page = PageHelper.offsetPage(offset, limit)) {
             List<MesMaterialIssueSubmissionEntity> rows = mapper.selectByExampleWithBLOBs(example);
-            return new MesMaterialIssueSubmissionPage(rows, page.getTotal(), offset, limit);
+            return page;
         }
     }
 

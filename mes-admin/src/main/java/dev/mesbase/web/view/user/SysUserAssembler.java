@@ -1,5 +1,9 @@
 package dev.mesbase.web.view.user;
 
+import java.util.Optional;
+
+import java.util.Objects;
+
 import dev.mesbase.common.core.domain.entity.SysUser;
 import dev.mesbase.web.view.dept.SysDeptAssembler;
 import dev.mesbase.web.view.role.SysRoleAssembler;
@@ -13,8 +17,8 @@ public final class SysUserAssembler {
 
     public static SysUserResult toResult(SysUser row) {
         if (row == null) return null;
-        return new SysUserResult(row.getUserId() == null ? null : row.getUserId().toString(),
-                row.getDeptId() == null ? null : row.getDeptId().toString(),
+        return new SysUserResult(Objects.toString(row.getUserId(), null),
+                Objects.toString(row.getDeptId(), null),
                 row.getUserName(),
                 row.getNickName(),
                 row.getUserType(),
@@ -28,9 +32,9 @@ public final class SysUserAssembler {
                 row.getLoginDate(),
                 SysDeptAssembler.toResult(row.getDept()),
                 SysRoleAssembler.toResults(row.getRoles()),
-                row.getRoleIds() == null ? null : Arrays.stream(row.getRoleIds()).map(String::valueOf).toArray(String[]::new),
-                row.getPostIds() == null ? null : Arrays.stream(row.getPostIds()).map(String::valueOf).toArray(String[]::new),
-                row.getRoleId() == null ? null : row.getRoleId().toString(),
+                Optional.ofNullable(row.getRoleIds()).map(nullableValue -> Arrays.stream(nullableValue).map(String::valueOf).toArray(String[]::new)).orElse(null),
+                Optional.ofNullable(row.getPostIds()).map(nullableValue -> Arrays.stream(nullableValue).map(String::valueOf).toArray(String[]::new)).orElse(null),
+                Objects.toString(row.getRoleId(), null),
                 row.getCreateBy(),
                 row.getCreateTime(),
                 row.getUpdateBy(),
@@ -39,6 +43,7 @@ public final class SysUserAssembler {
     }
 
     public static List<SysUserResult> toResults(List<SysUser> rows) {
-        return rows == null ? null : rows.stream().map(SysUserAssembler::toResult).toList();
+        if (rows == null) return null;
+        return rows.stream().map(SysUserAssembler::toResult).toList();
     }
 }

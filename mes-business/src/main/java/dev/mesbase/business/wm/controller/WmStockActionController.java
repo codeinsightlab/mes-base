@@ -1,9 +1,11 @@
 package dev.mesbase.business.wm.controller;
 
+import com.github.pagehelper.Page;
+import java.util.Objects;
+
 import dev.mesbase.business.wm.controller.vo.WmStockActionPageVo;
 import dev.mesbase.business.wm.controller.vo.WmStockActionVo;
 import dev.mesbase.business.wm.domain.WmStockActionEntity;
-import dev.mesbase.business.wm.domain.WmStockActionPage;
 import dev.mesbase.business.wm.domain.WmStockActionQueryDto;
 import dev.mesbase.business.wm.service.IWmStockActionService;
 import dev.mesbase.platform.web.EndpointAccess;
@@ -32,10 +34,10 @@ public class WmStockActionController {
     @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED,
             permission = WmStockActionPermissions.LIST)
     public WmStockActionPageVo list(@Valid @ModelAttribute WmStockActionQueryDto query) {
-        WmStockActionPage page = service.selectPage(query);
+        Page<WmStockActionEntity> page = service.selectPage(query);
         return new WmStockActionPageVo(
-                page.items().stream().map(WmStockActionController::toView).toList(),
-                page.total(), page.offset(), page.limit());
+                page.stream().map(WmStockActionController::toView).toList(),
+                page.getTotal(), (int) page.getStartRow(), page.getPageSize());
     }
 
     @GetMapping("/{id}")
@@ -49,28 +51,28 @@ public class WmStockActionController {
         return new WmStockActionVo(
                 row.getId(),
                 row.getRequestHash(),
-                row.getStockId() == null ? null : row.getStockId().toString(),
-                row.getMaterialId() == null ? null : row.getMaterialId().toString(),
-                row.getUnitId() == null ? null : row.getUnitId().toString(),
-                row.getWarehouseId() == null ? null : row.getWarehouseId().toString(),
+                Objects.toString(row.getStockId(), null),
+                Objects.toString(row.getMaterialId(), null),
+                Objects.toString(row.getUnitId(), null),
+                Objects.toString(row.getWarehouseId(), null),
                 row.getBatchNo(),
                 row.getBinCode(),
                 row.getActionType(),
-                row.getQuantityDelta() == null ? null : row.getQuantityDelta().toString(),
-                row.getAvailableDelta() == null ? null : row.getAvailableDelta().toString(),
-                row.getQuantityBefore() == null ? null : row.getQuantityBefore().toString(),
-                row.getQuantityAfter() == null ? null : row.getQuantityAfter().toString(),
-                row.getAvailableBefore() == null ? null : row.getAvailableBefore().toString(),
-                row.getAvailableAfter() == null ? null : row.getAvailableAfter().toString(),
+                Objects.toString(row.getQuantityDelta(), null),
+                Objects.toString(row.getAvailableDelta(), null),
+                Objects.toString(row.getQuantityBefore(), null),
+                Objects.toString(row.getQuantityAfter(), null),
+                Objects.toString(row.getAvailableBefore(), null),
+                Objects.toString(row.getAvailableAfter(), null),
                 row.getSourceType(),
                 row.getSourceId(),
                 row.getReferenceActionId(),
-                row.getExecutionId() == null ? null : row.getExecutionId().toString(),
-                row.getOperatorUserId() == null ? null : row.getOperatorUserId().toString(),
+                Objects.toString(row.getExecutionId(), null),
+                Objects.toString(row.getOperatorUserId(), null),
                 row.getOccurredAt(),
                 row.getRecordedAt(),
                 row.getReason(),
-                row.getDocumentLineId() == null ? null : row.getDocumentLineId().toString(),
+                Objects.toString(row.getDocumentLineId(), null),
                 row.getOperationId()
         );
     }

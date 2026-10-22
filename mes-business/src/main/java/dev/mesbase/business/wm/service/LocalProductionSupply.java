@@ -1,5 +1,8 @@
 package dev.mesbase.business.wm.service;
 
+import dev.mesbase.common.validation.ParameterChecks;
+import java.util.Optional;
+
 import dev.mesbase.business.production.domain.WorkOrderStatus;
 import dev.mesbase.business.shared.enums.EnableStatus;
 import dev.mesbase.business.integration.production.ProductionSupply.Stock;
@@ -76,7 +79,7 @@ public class LocalProductionSupply {
         }
         var stock = inventory.selectByPrimaryKey(id);
         var order = orders.selectByPrimaryKey(orderId);
-        var warehouse = stock == null ? null : warehouses.selectByPrimaryKey(stock.getWarehouseId());
+        var warehouse = Optional.ofNullable(stock).map(nullableValue -> warehouses.selectByPrimaryKey(nullableValue.getWarehouseId())).orElse(null);
         if (order == null || warehouse == null || !BusinessSource.LOCAL.getValue().equals(order.getSource())
                 || !BusinessSource.LOCAL.getValue().equals(warehouse.getSource()))
             throw new FoundationException(ErrorCode.BUSINESS_SOURCE_CONFLICT);
@@ -89,15 +92,15 @@ public class LocalProductionSupply {
         var matches = materials.selectByExample(mf).stream()
                 .filter(m -> identity.materialCode().equals(m.getCode()) && EnableStatus.ENABLED.getValue()
                         .equals(m.getStatus())).toList();
-        if (matches.size() != 1) fail();
+        if (matches.size() != 1) ParameterChecks.reject(ErrorCode.BAD_REQUEST);
         var material = matches.getFirst();
-        var unit = material.getUnitId() == null ? null : units.selectByPrimaryKey(material.getUnitId());
-        if (unit == null || !EnableStatus.ENABLED.getValue().equals(unit.getStatus())) fail();
+        var unit = Optional.ofNullable(material.getUnitId()).map(nullableValue -> units.selectByPrimaryKey(nullableValue)).orElse(null);
+        if (unit == null || !EnableStatus.ENABLED.getValue().equals(unit.getStatus())) ParameterChecks.reject(ErrorCode.BAD_REQUEST);
         var now = LocalDateTime.now();
         var sf = new WmInventoryExample();
         sf.createCriteria().andMaterialIdEqualTo(material.getId()).andBatchNoEqualTo(identity.lotCode())
                 .andStatusEqualTo(EnableStatus.ENABLED.getValue());
-        if (inventory.countByExample(sf) > 100) fail();
+        if (inventory.countByExample(sf) > 100) ParameterChecks.reject(ErrorCode.BAD_REQUEST);
         sf.setOrderByClause("id desc");
         var stockRows = inventory.selectByExample(sf);
         var warehouseFilter = new WmWarehouseExample();
@@ -127,7 +130,7 @@ public class LocalProductionSupply {
         var database = new HashMap<Long, MesWorkorderMaterialEntity>();
         try (var page = PageHelper.offsetPage(0, 10001, false)) {
             var rows = requirements.selectByExample(dbFilter);
-            if (rows.size() > 10000) fail();
+            if (rows.size() > 10000) ParameterChecks.reject(ErrorCode.BAD_REQUEST);
             rows.forEach(r -> database.put(r.getId(), r));
         }
         var candidateIds = new TreeSet<Long>(legacyIds);
@@ -142,7 +145,7 @@ public class LocalProductionSupply {
                     String key = prefix + id + ".";
                     if (!material.getId().toString().equals(environment.getProperty(key + "material-id"))) return false;
                     String allowed = environment.getProperty(key + "warehouse-ids");
-                    if (allowed == null) fail();
+                    if (allowed == null) ParameterChecks.reject(ErrorCode.BAD_REQUEST);
                     var ids = Arrays.stream(allowed.split(",")).map(String::trim).map(Long::valueOf).toList();
                     return stocks.stream().anyMatch(stock -> ids.contains(stock.warehouseId()));
                 }).toList();
@@ -178,7 +181,7 @@ public class LocalProductionSupply {
         var outputUnitIds = productMap.values().stream().map(m -> m.getUnitId()).filter(Objects::nonNull).distinct()
                 .toList();
         var uf = new UnitMeasureExample();
-        if (outputUnitIds.isEmpty()) fail();
+        if (outputUnitIds.isEmpty()) ParameterChecks.reject(ErrorCode.BAD_REQUEST);
         uf.createCriteria().andIdIn(outputUnitIds);
         var outputUnits = units.selectByExample(uf).stream().collect(Collectors.toMap(u -> u.getId(), u -> u));
         for (var o : orderRows) {
@@ -193,14 +196,14 @@ public class LocalProductionSupply {
             var center = db == null ? environment.getProperty(orderPrefix + "work-center") : db.getWorkCenter();
             var allowed = db == null ? environment.getProperty(orderPrefix + "warehouse-ids") : "database";
             if (product == null || total == null || total.signum() <= 0 || center == null || center.isBlank() || allowed == null)
-                fail();
+                ParameterChecks.reject(ErrorCode.BAD_REQUEST);
             var ids = db == null ? Arrays.stream(allowed.split(",")).map(String::trim).map(Long::valueOf)
                     .toList() : warehouseIds(db);
             if (stocks.stream().noneMatch(s -> ids.contains(s.warehouseId()))) continue;
             if (code.startsWith("MES1.") && !ProductionScanCode.parse(code).productCode().equals(product.getCode()))
                 continue;
             var outputUnit = outputUnits.get(product.getUnitId());
-            if (outputUnit == null || !EnableStatus.ENABLED.getValue().equals(outputUnit.getStatus())) fail();
+            if (outputUnit == null || !EnableStatus.ENABLED.getValue().equals(outputUnit.getStatus())) ParameterChecks.reject(ErrorCode.BAD_REQUEST);
             candidates.add(new Order(o.getId(), o.getCode(), product.getCode(), product.getName(), center, o.getPlannedQty(), outputUnit.getCode(), o.getStatus(), ids,
                     List.of(new Requirement(material.getCode(), material.getId(), unit.getId(), unit.getCode(), total)), "LOCAL-WORKORDER:" + o.getId() + (db == null ? ":LEGACY" : ":R" + db.getRevision()), now));
         }
@@ -218,11 +221,11 @@ public class LocalProductionSupply {
             for (String name : enumerable.getPropertyNames()) {
                 if (!name.startsWith(prefix) || !name.endsWith(".material-id")) continue;
                 String id = name.substring(prefix.length(), name.length() - ".material-id".length());
-                if (!id.matches("[1-9][0-9]{0,18}")) fail();
+                if (!id.matches("[1-9][0-9]{0,18}")) ParameterChecks.reject(ErrorCode.BAD_REQUEST);
                 try {
                     ids.add(Long.valueOf(id));
                 } catch (NumberFormatException invalid) {
-                    fail();
+                    ParameterChecks.reject(ErrorCode.BAD_REQUEST);
                 }
                 if (ids.size() > 10000) throw new FoundationException(ErrorCode.INTEGRATION_NOT_CONFIGURED);
             }
@@ -248,7 +251,4 @@ public class LocalProductionSupply {
         return Arrays.stream(new ObjectMapper().readValue(row.getWarehouseIds(), Long[].class)).toList();
     }
 
-    private static void fail() {
-        throw new FoundationException(ErrorCode.BAD_REQUEST);
-    }
 }

@@ -1,10 +1,12 @@
 package dev.mesbase.business.wm.controller;
 
+import com.github.pagehelper.Page;
+import java.util.Objects;
+
 import dev.mesbase.business.wm.controller.vo.WmWarehousePageVo;
 import dev.mesbase.business.wm.controller.vo.WmWarehouseVo;
 import dev.mesbase.business.wm.domain.WmWarehouseCreateCommand;
 import dev.mesbase.business.wm.domain.WmWarehouseEntity;
-import dev.mesbase.business.wm.domain.WmWarehousePage;
 import dev.mesbase.business.wm.domain.WmWarehouseQueryDto;
 import dev.mesbase.business.wm.domain.WmWarehouseUpdateCommand;
 import dev.mesbase.business.wm.service.IWmWarehouseService;
@@ -46,10 +48,10 @@ public class WmWarehouseController {
     @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED,
             permission = WmWarehousePermissions.LIST)
     public WmWarehousePageVo list(@Valid @ModelAttribute WmWarehouseQueryDto query) {
-        WmWarehousePage page = service.selectPage(query);
+        Page<WmWarehouseEntity> page = service.selectPage(query);
         return new WmWarehousePageVo(
-                page.items().stream().map(WmWarehouseController::toView).toList(),
-                page.total(), page.offset(), page.limit());
+                page.stream().map(WmWarehouseController::toView).toList(),
+                page.getTotal(), (int) page.getStartRow(), page.getPageSize());
     }
 
     @GetMapping("/{id}")
@@ -93,7 +95,7 @@ public class WmWarehouseController {
 
     private static WmWarehouseVo toView(WmWarehouseEntity row) {
         return new WmWarehouseVo(
-                row.getId() == null ? null : row.getId().toString(),
+                Objects.toString(row.getId(), null),
 
                 row.getSource(),
                 row.getCode(),

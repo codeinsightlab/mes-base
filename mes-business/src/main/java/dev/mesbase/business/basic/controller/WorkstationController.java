@@ -1,10 +1,12 @@
 package dev.mesbase.business.basic.controller;
 
+import com.github.pagehelper.Page;
+import java.util.Objects;
+
 import dev.mesbase.business.basic.controller.vo.WorkstationPageVo;
 import dev.mesbase.business.basic.controller.vo.WorkstationVo;
 import dev.mesbase.business.basic.domain.WorkstationCreateCommand;
 import dev.mesbase.business.basic.domain.WorkstationEntity;
-import dev.mesbase.business.basic.domain.WorkstationPage;
 import dev.mesbase.business.basic.domain.WorkstationQueryDto;
 import dev.mesbase.business.basic.domain.WorkstationUpdateCommand;
 import dev.mesbase.business.basic.service.IWorkstationService;
@@ -46,10 +48,10 @@ public class WorkstationController {
     @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED,
             permission = WorkstationPermissions.LIST)
     public WorkstationPageVo list(@Valid @ModelAttribute WorkstationQueryDto query) {
-        WorkstationPage page = service.selectPage(query);
+        Page<WorkstationEntity> page = service.selectPage(query);
         return new WorkstationPageVo(
-                page.items().stream().map(WorkstationController::toView).toList(),
-                page.total(), page.offset(), page.limit());
+                page.stream().map(WorkstationController::toView).toList(),
+                page.getTotal(), (int) page.getStartRow(), page.getPageSize());
     }
 
     @GetMapping("/{id}")
@@ -93,11 +95,11 @@ public class WorkstationController {
 
     private static WorkstationVo toView(WorkstationEntity row) {
         return new WorkstationVo(
-                row.getId() == null ? null : row.getId().toString(),
+                Objects.toString(row.getId(), null),
 
                 row.getCode(),
                 row.getName(),
-                row.getWorkshopId() == null ? null : row.getWorkshopId().toString(),
+                Objects.toString(row.getWorkshopId(), null),
                 row.getStatus(),
                 row.getRemark()
         );

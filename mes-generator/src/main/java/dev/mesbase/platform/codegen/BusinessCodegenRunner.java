@@ -1,5 +1,7 @@
 package dev.mesbase.platform.codegen;
 
+import java.util.Optional;
+
 import dev.mesbase.platform.codegen.ScaffoldWriter.Artifact;
 import java.io.IOException;
 import java.nio.file.Path;
@@ -161,7 +163,7 @@ public final class BusinessCodegenRunner {
         Map<String, String> packages = Map.of("domain", p.domain(), "dao", p.mapper(), "service", p.service(),
                 "service/impl", p.serviceImplementation(), "controller", p.controller(), "controller/vo", p.response());
         Map<String, Object> variables = new HashMap<>();
-        var tableOverride = c.tableOverrides() == null ? null : c.tableOverrides().get(table);
+        var tableOverride = Optional.ofNullable(c.tableOverrides()).map(nullableValue -> nullableValue.get(table)).orElse(null);
         if (tableOverride != null && tableOverride.serverScopeColumn() != null) {
             variables.put("serverScopeColumn", tableOverride.serverScopeColumn());
         }

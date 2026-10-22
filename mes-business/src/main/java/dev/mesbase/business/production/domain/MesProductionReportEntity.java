@@ -1,3 +1,4 @@
+// MES-CODEGEN: MyBatis Generator standard single-table persistence.
 package dev.mesbase.business.production.domain;
 
 import java.math.BigDecimal;
@@ -31,6 +32,8 @@ public class MesProductionReportEntity {
     private String requestId;
 
     private String commandFingerprint;
+
+    private String sourceQualityEventId;
 
     public Long getId() {
         return id;
@@ -142,5 +145,13 @@ public class MesProductionReportEntity {
 
     public void setCommandFingerprint(String commandFingerprint) {
         this.commandFingerprint = commandFingerprint;
+    }
+
+    public String getSourceQualityEventId() {
+        return sourceQualityEventId;
+    }
+
+    public void setSourceQualityEventId(String sourceQualityEventId) {
+        this.sourceQualityEventId = sourceQualityEventId;
     }
 }

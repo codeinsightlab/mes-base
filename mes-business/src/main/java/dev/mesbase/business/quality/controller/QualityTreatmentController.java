@@ -1,5 +1,7 @@
 package dev.mesbase.business.quality.controller;
 
+import java.util.Objects;
+
 import dev.mesbase.business.quality.service.QualityTreatmentService;
 import dev.mesbase.business.quality.domain.QualityTreatmentModels.Command;
 import dev.mesbase.business.quality.domain.QualityTreatmentModels.Summary;
@@ -34,7 +36,8 @@ public class QualityTreatmentController {
                         String basis,
                         String scrapQty, String reworkQty, String processedQty, String recoveredQty, String failedQty,
                         String operatorUserId, String operatorName, String confirmedBy, String confirmedByName,
-                        LocalDateTime occurredAt, LocalDateTime recordedAt, String reason) {
+                        LocalDateTime occurredAt, LocalDateTime recordedAt, String reason,
+                        String targetWarehouseId, String stockDocumentId, String transferQty) {
     }
 
     public record View(String declarationId, int revision, String executionId, String routingNodeId, String defectQty,
@@ -42,7 +45,8 @@ public class QualityTreatmentController {
                        String allocatedReworkQty, String startedQty, String processedQty, String recoveredQty,
                        String failedQty,
                        String pendingDispositionQty, String pendingStartQty, String inProgressQty, String netDefectQty,
-                       String state, String recordAction, String destinationType, List<Event> events) {
+                       String state, String recordAction, String destinationType, List<Event> events,
+                       String returnedQty, String transferredQty) {
     }
 
     @GetMapping("/treatments/recent")
@@ -64,12 +68,12 @@ public class QualityTreatmentController {
         return view(service.execute(id, c));
     }
 
-    private static View view(QualityTreatmentService.Details data) {
+    static View view(QualityTreatmentService.Details data) {
         var s = data.summary();
         return new View(s.declarationId(), s.revision(), s.executionId().toString(), s.routingNodeId()
                 .toString(), d(s.defectQty()), s.attribution()
                 .name(), s.relatedDeclarationId(), s.basis(), d(s.allocatedScrapQty()), d(s.allocatedReworkQty()), d(s.startedQty()), d(s.processedQty()), d(s.recoveredQty()), d(s.failedQty()), d(s.pendingDispositionQty()), d(s.pendingStartQty()), d(s.inProgressQty()), d(s.netDefectQty()), s.state(), s.recordAction(), s.destinationType(), data.history()
-                .stream().map(e -> event(e, data.users())).toList());
+                .stream().map(e -> event(e, data.users())).toList(), d(s.returnedQty()), d(s.transferredQty()));
     }
 
     private static Event event(MesQualityTreatmentEntity e, Map<Long, DirectoryLabel> users) {
@@ -77,15 +81,20 @@ public class QualityTreatmentController {
                 .toString(), e.getRoutingNodeId()
                 .toString(), e.getActionType(), e.getParentId(), e.getAttributionType(), e.getRelatedDeclarationId(), e.getBasis(), d(e.getScrapQty()), d(e.getReworkQty()), d(e.getProcessedQty()), d(e.getRecoveredQty()), d(e.getFailedQty()), e.getOperatorUserId()
                 .toString(), name(users, e.getOperatorUserId()), e.getConfirmedBy()
-                .toString(), name(users, e.getConfirmedBy()), e.getOccurredAt(), e.getRecordedAt(), e.getReason());
+                .toString(), name(users, e.getConfirmedBy()), e.getOccurredAt(), e.getRecordedAt(), e.getReason(), id(e.getTargetWarehouseId()), id(e.getStockDocumentId()), d(e.getTransferQty()));
     }
 
     private static String name(Map<Long, DirectoryLabel> names, Long id) {
         var n = names.get(id);
-        return n == null ? null : n.name();
+        if (n == null) return null;
+        return n.name();
+    }
+
+    private static String id(Long id) {
+        return Objects.toString(id, null);
     }
 
     private static String d(BigDecimal q) {
-        return q.toPlainString();
+        return q == null ? "0" : q.toPlainString();
     }
 }

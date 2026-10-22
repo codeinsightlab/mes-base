@@ -1,5 +1,8 @@
 package dev.mesbase.business.issue.service.impl;
 
+import dev.mesbase.common.validation.ParameterChecks;
+import java.util.Optional;
+
 import dev.mesbase.business.integration.warehouse.ExternalEffect;
 import com.github.pagehelper.Page;
 import com.github.pagehelper.PageHelper;
@@ -7,7 +10,6 @@ import dev.mesbase.business.issue.dao.MesMaterialIssueMapper;
 import dev.mesbase.business.issue.domain.MesMaterialIssueCreateCommand;
 import dev.mesbase.business.issue.domain.MesMaterialIssueEntity;
 import dev.mesbase.business.issue.domain.MesMaterialIssueExample;
-import dev.mesbase.business.issue.domain.MesMaterialIssuePage;
 import dev.mesbase.business.issue.domain.MesMaterialIssueQueryDto;
 import dev.mesbase.business.issue.domain.MesMaterialIssueResource;
 import dev.mesbase.business.issue.domain.MesMaterialIssueUpdateCommand;
@@ -49,12 +51,10 @@ public class MesMaterialIssueServiceImpl implements IMesMaterialIssueService {
     @Transactional(transactionManager = "businessTransactionManager", readOnly = true)
     @BusinessCache(business = MesMaterialIssueResource.PREFIX,
             type = BusinessCache.Type.LIST)
-    public MesMaterialIssuePage selectPage(MesMaterialIssueQueryDto query) {
+    public Page<MesMaterialIssueEntity> selectPage(MesMaterialIssueQueryDto query) {
         int offset = query.offset() == null ? 0 : query.offset();
         int limit = query.limit() == null ? 20 : query.limit();
-        if (offset < 0 || limit < 1 || limit > 100) {
-            throw new FoundationException(ErrorCode.BAD_REQUEST);
-        }
+        ParameterChecks.paging(offset, limit, 100);
         MesMaterialIssueExample example = new MesMaterialIssueExample();
         MesMaterialIssueExample.Criteria criteria = example.createCriteria();
         if (query.executionId() != null) criteria.andExecutionIdEqualTo(query.executionId());
@@ -92,7 +92,7 @@ public class MesMaterialIssueServiceImpl implements IMesMaterialIssueService {
         try (Page<MesMaterialIssueEntity> page = PageHelper.offsetPage(offset, limit)) {
             List<MesMaterialIssueEntity> rows = mapper.selectByExample(example);
             rules.hydrate(rows);
-            return new MesMaterialIssuePage(rows, page.getTotal(), offset, limit);
+            return page;
         }
     }
 
@@ -124,7 +124,7 @@ public class MesMaterialIssueServiceImpl implements IMesMaterialIssueService {
         row.setRemark(input.remark());
         rules.validate(row);
         Mode mode = FactoryContext.current().map(warehouse::configuredMode).orElse(null);
-        row.setSourceExecutionMode(mode == null ? null : mode.getValue());
+        row.setSourceExecutionMode(Optional.ofNullable(mode).map(nullableValue -> nullableValue.getValue()).orElse(null));
         // This administrative CRUD never calls an external issue API.
         row.setExternalEffect(mode == Mode.LOCAL_ONLY ? ExternalEffect.NONE.getValue() : ExternalEffect.UNVERIFIED.getValue());
         rules.audit(row, true);

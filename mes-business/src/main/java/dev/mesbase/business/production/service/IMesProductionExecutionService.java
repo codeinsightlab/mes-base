@@ -1,9 +1,8 @@
-// MES-CODEGEN: scaffold; review required.
 package dev.mesbase.business.production.service;
 
+import com.github.pagehelper.Page;
 import dev.mesbase.business.production.domain.MesProductionExecutionCreateCommand;
 import dev.mesbase.business.production.domain.MesProductionExecutionEntity;
-import dev.mesbase.business.production.domain.MesProductionExecutionPage;
 import dev.mesbase.business.production.domain.MesProductionExecutionQueryDto;
 import dev.mesbase.business.production.domain.MesProductionExecutionUpdateCommand;
 import java.util.List;
@@ -14,7 +13,7 @@ import java.util.List;
  * @author MES Base
  */
 public interface IMesProductionExecutionService {
-    MesProductionExecutionPage selectPage(MesProductionExecutionQueryDto query);
+    Page<MesProductionExecutionEntity> selectPage(MesProductionExecutionQueryDto query);
 
     MesProductionExecutionEntity selectById(Long id);
 

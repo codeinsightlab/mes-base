@@ -1,5 +1,7 @@
 package dev.mesbase.business.wm.controller;
 
+import java.util.Objects;
+
 import dev.mesbase.business.wm.domain.StockDocumentModels;
 import dev.mesbase.business.wm.domain.WmStockDocumentEntity;
 import dev.mesbase.business.wm.domain.WmStockDocumentLineEntity;
@@ -130,7 +132,7 @@ public class StockDocumentController {
     }
 
     private static String string(Long id) {
-        return id == null ? null : id.toString();
+        return Objects.toString(id, null);
     }
 
     public record Header(String id, String documentNo, String documentType, String status, String reason,

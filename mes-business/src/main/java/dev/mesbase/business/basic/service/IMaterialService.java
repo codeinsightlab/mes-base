@@ -1,9 +1,8 @@
-// MES-CODEGEN: scaffold; review required.
 package dev.mesbase.business.basic.service;
 
+import com.github.pagehelper.Page;
 import dev.mesbase.business.basic.domain.MaterialCreateCommand;
 import dev.mesbase.business.basic.domain.MaterialEntity;
-import dev.mesbase.business.basic.domain.MaterialPage;
 import dev.mesbase.business.basic.domain.MaterialQueryDto;
 import dev.mesbase.business.basic.domain.MaterialUpdateCommand;
 import dev.mesbase.business.basic.sync.ExternalMaterial;
@@ -17,7 +16,7 @@ import java.util.List;
  * @author MES Base
  */
 public interface IMaterialService {
-    MaterialPage selectPage(MaterialQueryDto query);
+    Page<MaterialEntity> selectPage(MaterialQueryDto query);
 
     MaterialEntity selectById(Long id);
 

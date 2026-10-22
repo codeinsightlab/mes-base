@@ -1,5 +1,7 @@
 package dev.mesbase.platform.codegen;
 
+import java.util.Optional;
+
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -45,7 +47,7 @@ public final class ConfiguredCodegenService {
                 throw new CodegenException(CodegenException.Code.INVALID_REQUEST);
             }
             validate(plan.metadata());
-            Path templateRoot = plan.templates() == null ? null : plan.templates().templateRoot();
+            Path templateRoot = Optional.ofNullable(plan.templates()).map(nullableValue -> nullableValue.templateRoot()).orElse(null);
             VelocityEngine engine = engines.computeIfAbsent(templateRoot, VelocityTemplateInitializer::initialize);
             BusinessTemplateRenderer renderer = new BusinessTemplateRenderer(plan.templates(), engine);
             artifacts.addAll(renderer.render(request, plan.metadata(), targets));

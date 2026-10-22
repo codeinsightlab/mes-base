@@ -1,5 +1,7 @@
 package dev.mesbase.business.issue.service;
 
+import java.util.Optional;
+
 import dev.mesbase.business.production.service.BusinessSourceRules;
 
 import dev.mesbase.business.issue.domain.MaterialIssueStatus;
@@ -108,7 +110,7 @@ public class MaterialIssueRules {
         if (row.getSubmissionId() != null || row.getVoidOperationId() != null || !Set.of(MaterialIssueStatus.DRAFT.getValue(), MaterialIssueStatus.RECORDED.getValue())
                 .contains(row.getStatus()))
             throw new FoundationException(ErrorCode.ISSUE_VOID_CONFLICT);
-        var execution = row.getExecutionId() == null ? null : executions.lock(row.getExecutionId());
+        var execution = Optional.ofNullable(row.getExecutionId()).map(nullableValue -> executions.lock(nullableValue)).orElse(null);
         if (execution != null) {
             if (ProductionExecutionStatus.COMPLETED.getValue()
                     .equals(execution.getStatus()) || ProductionExecutionStatus.CANCELLED.getValue()

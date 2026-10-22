@@ -1,5 +1,7 @@
 package dev.mesbase.acceptance;
 
+import java.util.Optional;
+
 import dev.mesbase.core.factory.FactoryId;
 import dev.mesbase.core.factory.FactoryRuntimeMode;
 import dev.mesbase.platform.execution.FactoryIntegrationSnapshot;
@@ -28,7 +30,7 @@ public final class FactorySnapshotFixture {
     }
 
     public FactoryIntegrationSnapshot required(String id) {
-        var snapshot = id == null ? null : snapshots.get(id);
+        var snapshot = Optional.ofNullable(id).map(nullableValue -> snapshots.get(nullableValue)).orElse(null);
         if (snapshot == null) throw new IllegalArgumentException("TEST ONLY unknown factory");
         return snapshot;
     }

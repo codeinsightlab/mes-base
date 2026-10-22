@@ -2,6 +2,7 @@ package dev.mesbase.business.quality.domain;
 
 import jakarta.validation.Valid;
 import dev.mesbase.business.quality.domain.QualityTreatmentModels.Assessment;
+import dev.mesbase.business.quality.domain.QualityTreatmentModels.Summary;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
@@ -38,7 +39,13 @@ public final class ProductionDefectModels {
     public record Names(Map<Long, String> nodes, Map<Long, String> users, Map<Long, String> warehouses) {
     }
 
-    public record Page(List<MesProductionDefectEntity> items, long total, int offset, int limit, Names names) {
+    public record ListContext(String declarationId, String executionNo, String workorderCode,
+                              String productCode, String productName, String workorderStatus,
+                              String executionStatus, String source) {
+    }
+
+    public record Page(List<MesProductionDefectEntity> items, long total, int offset, int limit, Names names,
+                       Map<String, Summary> treatments, Map<String, ListContext> contexts) {
     }
 
     public record NodeTotal(Long affectedNodeId, BigDecimal effectiveDefectQty, BigDecimal recoveredQty,

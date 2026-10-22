@@ -202,7 +202,8 @@ public class DigiwinE10SyncService {
     }
 
     private static E10SyncContract.Rule rule(E10SyncContract contract, Kind kind) {
-        return contract == null ? null : kind == Kind.WORKORDER ? contract.workorder() : contract.warehouse();
+        if (contract == null) return null;
+        return kind == Kind.WORKORDER ? contract.workorder() : contract.warehouse();
     }
 
     private static void budget(long deadline) {

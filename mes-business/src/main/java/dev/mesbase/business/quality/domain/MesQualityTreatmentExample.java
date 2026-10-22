@@ -1445,6 +1445,186 @@ public class MesQualityTreatmentExample {
             addCriterion("reason not between", value1, value2, "reason");
             return (Criteria) this;
         }
+
+        public Criteria andTargetWarehouseIdIsNull() {
+            addCriterion("target_warehouse_id is null");
+            return (Criteria) this;
+        }
+
+        public Criteria andTargetWarehouseIdIsNotNull() {
+            addCriterion("target_warehouse_id is not null");
+            return (Criteria) this;
+        }
+
+        public Criteria andTargetWarehouseIdEqualTo(Long value) {
+            addCriterion("target_warehouse_id =", value, "targetWarehouseId");
+            return (Criteria) this;
+        }
+
+        public Criteria andTargetWarehouseIdNotEqualTo(Long value) {
+            addCriterion("target_warehouse_id <>", value, "targetWarehouseId");
+            return (Criteria) this;
+        }
+
+        public Criteria andTargetWarehouseIdGreaterThan(Long value) {
+            addCriterion("target_warehouse_id >", value, "targetWarehouseId");
+            return (Criteria) this;
+        }
+
+        public Criteria andTargetWarehouseIdGreaterThanOrEqualTo(Long value) {
+            addCriterion("target_warehouse_id >=", value, "targetWarehouseId");
+            return (Criteria) this;
+        }
+
+        public Criteria andTargetWarehouseIdLessThan(Long value) {
+            addCriterion("target_warehouse_id <", value, "targetWarehouseId");
+            return (Criteria) this;
+        }
+
+        public Criteria andTargetWarehouseIdLessThanOrEqualTo(Long value) {
+            addCriterion("target_warehouse_id <=", value, "targetWarehouseId");
+            return (Criteria) this;
+        }
+
+        public Criteria andTargetWarehouseIdIn(List<Long> values) {
+            addCriterion("target_warehouse_id in", values, "targetWarehouseId");
+            return (Criteria) this;
+        }
+
+        public Criteria andTargetWarehouseIdNotIn(List<Long> values) {
+            addCriterion("target_warehouse_id not in", values, "targetWarehouseId");
+            return (Criteria) this;
+        }
+
+        public Criteria andTargetWarehouseIdBetween(Long value1, Long value2) {
+            addCriterion("target_warehouse_id between", value1, value2, "targetWarehouseId");
+            return (Criteria) this;
+        }
+
+        public Criteria andTargetWarehouseIdNotBetween(Long value1, Long value2) {
+            addCriterion("target_warehouse_id not between", value1, value2, "targetWarehouseId");
+            return (Criteria) this;
+        }
+
+        public Criteria andStockDocumentIdIsNull() {
+            addCriterion("stock_document_id is null");
+            return (Criteria) this;
+        }
+
+        public Criteria andStockDocumentIdIsNotNull() {
+            addCriterion("stock_document_id is not null");
+            return (Criteria) this;
+        }
+
+        public Criteria andStockDocumentIdEqualTo(Long value) {
+            addCriterion("stock_document_id =", value, "stockDocumentId");
+            return (Criteria) this;
+        }
+
+        public Criteria andStockDocumentIdNotEqualTo(Long value) {
+            addCriterion("stock_document_id <>", value, "stockDocumentId");
+            return (Criteria) this;
+        }
+
+        public Criteria andStockDocumentIdGreaterThan(Long value) {
+            addCriterion("stock_document_id >", value, "stockDocumentId");
+            return (Criteria) this;
+        }
+
+        public Criteria andStockDocumentIdGreaterThanOrEqualTo(Long value) {
+            addCriterion("stock_document_id >=", value, "stockDocumentId");
+            return (Criteria) this;
+        }
+
+        public Criteria andStockDocumentIdLessThan(Long value) {
+            addCriterion("stock_document_id <", value, "stockDocumentId");
+            return (Criteria) this;
+        }
+
+        public Criteria andStockDocumentIdLessThanOrEqualTo(Long value) {
+            addCriterion("stock_document_id <=", value, "stockDocumentId");
+            return (Criteria) this;
+        }
+
+        public Criteria andStockDocumentIdIn(List<Long> values) {
+            addCriterion("stock_document_id in", values, "stockDocumentId");
+            return (Criteria) this;
+        }
+
+        public Criteria andStockDocumentIdNotIn(List<Long> values) {
+            addCriterion("stock_document_id not in", values, "stockDocumentId");
+            return (Criteria) this;
+        }
+
+        public Criteria andStockDocumentIdBetween(Long value1, Long value2) {
+            addCriterion("stock_document_id between", value1, value2, "stockDocumentId");
+            return (Criteria) this;
+        }
+
+        public Criteria andStockDocumentIdNotBetween(Long value1, Long value2) {
+            addCriterion("stock_document_id not between", value1, value2, "stockDocumentId");
+            return (Criteria) this;
+        }
+
+        public Criteria andTransferQtyIsNull() {
+            addCriterion("transfer_qty is null");
+            return (Criteria) this;
+        }
+
+        public Criteria andTransferQtyIsNotNull() {
+            addCriterion("transfer_qty is not null");
+            return (Criteria) this;
+        }
+
+        public Criteria andTransferQtyEqualTo(BigDecimal value) {
+            addCriterion("transfer_qty =", value, "transferQty");
+            return (Criteria) this;
+        }
+
+        public Criteria andTransferQtyNotEqualTo(BigDecimal value) {
+            addCriterion("transfer_qty <>", value, "transferQty");
+            return (Criteria) this;
+        }
+
+        public Criteria andTransferQtyGreaterThan(BigDecimal value) {
+            addCriterion("transfer_qty >", value, "transferQty");
+            return (Criteria) this;
+        }
+
+        public Criteria andTransferQtyGreaterThanOrEqualTo(BigDecimal value) {
+            addCriterion("transfer_qty >=", value, "transferQty");
+            return (Criteria) this;
+        }
+
+        public Criteria andTransferQtyLessThan(BigDecimal value) {
+            addCriterion("transfer_qty <", value, "transferQty");
+            return (Criteria) this;
+        }
+
+        public Criteria andTransferQtyLessThanOrEqualTo(BigDecimal value) {
+            addCriterion("transfer_qty <=", value, "transferQty");
+            return (Criteria) this;
+        }
+
+        public Criteria andTransferQtyIn(List<BigDecimal> values) {
+            addCriterion("transfer_qty in", values, "transferQty");
+            return (Criteria) this;
+        }
+
+        public Criteria andTransferQtyNotIn(List<BigDecimal> values) {
+            addCriterion("transfer_qty not in", values, "transferQty");
+            return (Criteria) this;
+        }
+
+        public Criteria andTransferQtyBetween(BigDecimal value1, BigDecimal value2) {
+            addCriterion("transfer_qty between", value1, value2, "transferQty");
+            return (Criteria) this;
+        }
+
+        public Criteria andTransferQtyNotBetween(BigDecimal value1, BigDecimal value2) {
+            addCriterion("transfer_qty not between", value1, value2, "transferQty");
+            return (Criteria) this;
+        }
     }
 
     public static class Criteria extends GeneratedCriteria {

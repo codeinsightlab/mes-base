@@ -1,5 +1,7 @@
 package dev.mesbase.web.view.menu;
 
+import java.util.Objects;
+
 import dev.mesbase.common.core.domain.entity.SysMenu;
 import java.util.List;
 
@@ -10,10 +12,10 @@ public final class SysMenuAssembler {
 
     public static SysMenuResult toResult(SysMenu row) {
         if (row == null) return null;
-        return new SysMenuResult(row.getMenuId() == null ? null : row.getMenuId().toString(),
+        return new SysMenuResult(Objects.toString(row.getMenuId(), null),
                 row.getMenuName(),
                 row.getParentName(),
-                row.getParentId() == null ? null : row.getParentId().toString(),
+                Objects.toString(row.getParentId(), null),
                 row.getOrderNum(),
                 row.getPath(),
                 row.getComponent(),
@@ -34,6 +36,7 @@ public final class SysMenuAssembler {
     }
 
     public static List<SysMenuResult> toResults(List<SysMenu> rows) {
-        return rows == null ? null : rows.stream().map(SysMenuAssembler::toResult).toList();
+        if (rows == null) return null;
+        return rows.stream().map(SysMenuAssembler::toResult).toList();
     }
 }

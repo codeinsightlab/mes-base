@@ -1,5 +1,6 @@
 package dev.mesbase.business.production.service.impl;
 
+import dev.mesbase.common.validation.ParameterChecks;
 import dev.mesbase.business.shared.enums.EnableStatus;
 import com.github.pagehelper.Page;
 import com.github.pagehelper.PageHelper;
@@ -7,7 +8,6 @@ import dev.mesbase.business.production.dao.OperationMapper;
 import dev.mesbase.business.production.domain.OperationCreateCommand;
 import dev.mesbase.business.production.domain.OperationEntity;
 import dev.mesbase.business.production.domain.OperationExample;
-import dev.mesbase.business.production.domain.OperationPage;
 import dev.mesbase.business.production.domain.OperationQueryDto;
 import dev.mesbase.business.production.domain.OperationResource;
 import dev.mesbase.business.production.domain.OperationUpdateCommand;
@@ -71,12 +71,10 @@ public class OperationServiceImpl implements IOperationService {
     @Transactional(transactionManager = "businessTransactionManager", readOnly = true)
     @BusinessCache(business = OperationResource.PREFIX,
             type = BusinessCache.Type.LIST)
-    public OperationPage selectPage(OperationQueryDto query) {
+    public Page<OperationEntity> selectPage(OperationQueryDto query) {
         int offset = query.offset() == null ? 0 : query.offset();
         int limit = query.limit() == null ? 20 : query.limit();
-        if (offset < 0 || limit < 1 || limit > 100) {
-            throw new FoundationException(ErrorCode.BAD_REQUEST);
-        }
+        ParameterChecks.paging(offset, limit, 100);
         OperationExample example = new OperationExample();
         OperationExample.Criteria criteria = example.createCriteria();
         if (query.code() != null) {
@@ -102,8 +100,8 @@ public class OperationServiceImpl implements IOperationService {
         }
         example.setOrderByClause("id desc");
         try (Page<OperationEntity> page = PageHelper.offsetPage(offset, limit)) {
-            List<OperationEntity> rows = mapper.selectByExample(example);
-            return new OperationPage(rows, page.getTotal(), offset, limit);
+            mapper.selectByExample(example);
+            return page;
         }
     }
 

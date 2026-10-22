@@ -1,12 +1,12 @@
 package dev.mesbase.business.basic.service.impl;
 
+import dev.mesbase.common.validation.ParameterChecks;
 import com.github.pagehelper.Page;
 import com.github.pagehelper.PageHelper;
 import dev.mesbase.business.basic.dao.WorkshopMapper;
 import dev.mesbase.business.basic.domain.WorkshopCreateCommand;
 import dev.mesbase.business.basic.domain.WorkshopEntity;
 import dev.mesbase.business.basic.domain.WorkshopExample;
-import dev.mesbase.business.basic.domain.WorkshopPage;
 import dev.mesbase.business.basic.domain.WorkshopQueryDto;
 import dev.mesbase.business.basic.domain.WorkshopResource;
 import dev.mesbase.business.basic.domain.WorkshopUpdateCommand;
@@ -68,12 +68,10 @@ public class WorkshopServiceImpl implements IWorkshopService {
     @Transactional(transactionManager = "businessTransactionManager", readOnly = true)
     @BusinessCache(business = WorkshopResource.PREFIX,
             type = BusinessCache.Type.LIST)
-    public WorkshopPage selectPage(WorkshopQueryDto query) {
+    public Page<WorkshopEntity> selectPage(WorkshopQueryDto query) {
         int offset = query.offset() == null ? 0 : query.offset();
         int limit = query.limit() == null ? 20 : query.limit();
-        if (offset < 0 || limit < 1 || limit > 100) {
-            throw new FoundationException(ErrorCode.BAD_REQUEST);
-        }
+        ParameterChecks.paging(offset, limit, 100);
         WorkshopExample example = new WorkshopExample();
         WorkshopExample.Criteria criteria = example.createCriteria();
         if (query.code() != null) {
@@ -90,8 +88,8 @@ public class WorkshopServiceImpl implements IWorkshopService {
         }
         example.setOrderByClause("id desc");
         try (Page<WorkshopEntity> page = PageHelper.offsetPage(offset, limit)) {
-            List<WorkshopEntity> rows = mapper.selectByExample(example);
-            return new WorkshopPage(rows, page.getTotal(), offset, limit);
+            mapper.selectByExample(example);
+            return page;
         }
     }
 

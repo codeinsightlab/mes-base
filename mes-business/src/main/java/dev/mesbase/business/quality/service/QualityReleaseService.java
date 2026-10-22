@@ -1,5 +1,8 @@
 package dev.mesbase.business.quality.service;
 
+import dev.mesbase.common.validation.ParameterChecks;
+import java.util.Optional;
+
 import dev.mesbase.business.production.domain.ProductionQuantityInput;
 
 import dev.mesbase.business.quality.dao.MesQualityReleaseMapper;
@@ -101,7 +104,7 @@ public class QualityReleaseService {
         boolean valid = latest != null && issue == null && latest.getBasisHash()
                 .equals(hash) && QualityReleaseAction.RELEASE.getValue()
                 .equals(latest.getActionType()) && latest.getQuantity().compareTo(output) <= 0;
-        return new State(execution, output, valid ? latest.getQuantity() : BigDecimal.ZERO, latest == null ? BigDecimal.ZERO : latest.getQuantity(), latest == null ? null : latest.getId(), hash, valid, issue == null, issue);
+        return new State(execution, output, valid ? latest.getQuantity() : BigDecimal.ZERO, latest == null ? BigDecimal.ZERO : latest.getQuantity(), Optional.ofNullable(latest).map(nullableValue -> nullableValue.getId()).orElse(null), hash, valid, issue == null, issue);
     }
 
     private MesQualityReleaseEntity latest(Long execution) {
@@ -116,7 +119,7 @@ public class QualityReleaseService {
 
     @Transactional(transactionManager = "businessTransactionManager", readOnly = true)
     public History history(Long execution, int offset, int limit) {
-        ProductionQuantityService.paging(offset, limit);
+        ParameterChecks.paging(offset, limit);
         var f = new MesQualityReleaseExample();
         f.createCriteria().andExecutionIdEqualTo(execution);
         f.setOrderByClause("sequence_no DESC");

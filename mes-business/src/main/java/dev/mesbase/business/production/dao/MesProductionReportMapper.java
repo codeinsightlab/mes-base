@@ -19,11 +19,11 @@ public interface MesProductionReportMapper {
     int insert(MesProductionReportEntity row);
 
     @Insert({"<script>INSERT INTO mes_production_report(execution_id,routing_node_id,record_type,quantity_delta,",
-            "reference_report_id,operator_user_id,recorded_by,report_time,workstation_id,reason,create_time,request_id,command_fingerprint) VALUES ",
+            "reference_report_id,operator_user_id,recorded_by,report_time,workstation_id,reason,create_time,request_id,command_fingerprint,source_quality_event_id) VALUES ",
             "<foreach collection='rows' item='r' separator=','>",
             "(#{r.executionId},#{r.routingNodeId},#{r.recordType},#{r.quantityDelta},#{r.referenceReportId},",
             "#{r.operatorUserId},#{r.recordedBy},#{r.reportTime},#{r.workstationId},#{r.reason},#{r.createTime},",
-            "#{r.requestId},#{r.commandFingerprint})</foreach></script>"})
+            "#{r.requestId},#{r.commandFingerprint},#{r.sourceQualityEventId})</foreach></script>"})
     @Options(useGeneratedKeys = true, keyProperty = "rows.id", keyColumn = "id")
     int insertBatch(@Param("rows") List<MesProductionReportEntity> rows);
 

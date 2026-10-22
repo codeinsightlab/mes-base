@@ -1,5 +1,6 @@
 package dev.mesbase.business.production.service;
 
+import dev.mesbase.common.validation.ParameterChecks;
 import dev.mesbase.business.production.dao.MesWorkorderCancellationMapper;
 import dev.mesbase.business.production.dao.WorkorderMapper;
 import dev.mesbase.business.production.domain.MesWorkorderCancellationEntity;
@@ -64,17 +65,17 @@ public class WorkOrderCancellationService {
         String hash = ProductionClosureRules.hash(id, command.requestId(), command.reason(), command.expectedRevision(), actor);
         var previous = cancellations.selectByPrimaryKey(command.requestId());
         if (previous != null) {
-            if (!hash.equals(previous.getRequestFingerprint())) conflict();
+            if (!hash.equals(previous.getRequestFingerprint())) ParameterChecks.reject(ErrorCode.WORKORDER_CANCELLATION_CONFLICT);
             return previous;
         }
         if (WorkOrderStatus.from(row.getStatus()) != WorkOrderStatus.DRAFT && WorkOrderStatus.from(row.getStatus()) != WorkOrderStatus.RELEASED)
-            conflict();
+            ParameterChecks.reject(ErrorCode.WORKORDER_CANCELLATION_CONFLICT);
         if (row.getSource() != null && !BusinessSource.LOCAL.getValue().equals(row.getSource()))
             throw new FoundationException(ErrorCode.EXTERNAL_SOURCE_READ_ONLY);
         // NULL is allowed only here to terminate future local work, never to create or reclassify facts.
         sources.localCreation();
         if (command.expectedRevision() != null && command.expectedRevision() != row.getRevision().intValue())
-            conflict();
+            ParameterChecks.reject(ErrorCode.WORKORDER_CANCELLATION_CONFLICT);
         var fact = new MesWorkorderCancellationEntity();
         fact.setId(command.requestId());
         fact.setWorkorderId(id);
@@ -86,7 +87,7 @@ public class WorkOrderCancellationService {
         fact.setSourceSnapshot(row.getSource());
         fact.setPreviousRevision(row.getRevision());
         try {
-            if (cancellations.insert(fact) != 1) conflict();
+            if (cancellations.insert(fact) != 1) ParameterChecks.reject(ErrorCode.WORKORDER_CANCELLATION_CONFLICT);
         } catch (DuplicateKeyException duplicate) {
             throw new FoundationException(ErrorCode.WORKORDER_CANCELLATION_CONFLICT, duplicate);
         }
@@ -97,11 +98,8 @@ public class WorkOrderCancellationService {
         patch.setStatus(WorkOrderStatus.CANCELLED.getValue());
         patch.setRevision(row.getRevision() + 1);
         patch.setUpdateTime(fact.getRecordedAt());
-        if (orders.updateByExampleSelective(patch, filter) != 1) conflict();
+        if (orders.updateByExampleSelective(patch, filter) != 1) ParameterChecks.reject(ErrorCode.WORKORDER_CANCELLATION_CONFLICT);
         return fact;
     }
 
-    private static void conflict() {
-        throw new FoundationException(ErrorCode.WORKORDER_CANCELLATION_CONFLICT);
-    }
 }

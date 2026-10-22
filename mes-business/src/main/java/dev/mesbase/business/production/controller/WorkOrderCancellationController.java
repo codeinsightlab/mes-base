@@ -41,7 +41,8 @@ public class WorkOrderCancellationController {
     }
 
     private static View view(MesWorkorderCancellationEntity fact) {
-        return fact == null ? null : new View(fact.getWorkorderId()
+        if (fact == null) return null;
+        return new View(fact.getWorkorderId()
                 .toString(), WorkOrderStatus.CANCELLED.getValue(), fact.getId(), fact.getRecordedAt(),
                 fact.getOperatorUserId()
                         .toString(), fact.getReason(), fact.getPreviousStatus(), fact.getSourceSnapshot());

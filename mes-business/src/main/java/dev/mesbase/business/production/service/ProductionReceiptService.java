@@ -1,5 +1,6 @@
 package dev.mesbase.business.production.service;
 
+import dev.mesbase.common.validation.ParameterChecks;
 import com.github.pagehelper.PageHelper;
 import dev.mesbase.business.production.dao.MesProductionReceiptMapper;
 import dev.mesbase.business.production.dao.ProductionReceiptQueryMapper;
@@ -38,8 +39,8 @@ public class ProductionReceiptService {
 
     @Transactional(transactionManager = "businessTransactionManager", readOnly = true)
     public Page page(Query q) {
-        ProductionQuantityService.paging(q.offset(), q.limit());
-        if (q.productLotCode() != null && q.productLotCode().length() > 100) bad();
+        ParameterChecks.paging(q.offset(), q.limit());
+        if (q.productLotCode() != null && q.productLotCode().length() > 100) ParameterChecks.reject(ErrorCode.BAD_REQUEST);
         if (q.referenceReceiptId() != null) uuid(q.referenceReceiptId());
         List<ProductionReceiptRow> rows;
         long total;
@@ -66,10 +67,7 @@ public class ProductionReceiptService {
     }
 
     private static void uuid(String id) {
-        if (id == null || !id.matches("[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}")) bad();
+        if (id == null || !id.matches("[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}")) ParameterChecks.reject(ErrorCode.BAD_REQUEST);
     }
 
-    private static void bad() {
-        throw new FoundationException(ErrorCode.BAD_REQUEST);
-    }
 }

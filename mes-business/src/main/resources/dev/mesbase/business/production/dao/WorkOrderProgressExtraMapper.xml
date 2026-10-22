@@ -47,7 +47,9 @@
         COALESCE(SUM(t.recovered_qty), 0) AS recoveredQty,
         COALESCE(SUM(CASE WHEN t.action_type IN (#{allocateAction}, #{cancelAllocateAction}) THEN t.rework_qty ELSE 0 END), 0) AS allocatedReworkQty,
         COALESCE(SUM(CASE WHEN t.action_type IN (#{startAction}, #{cancelStartAction}) THEN t.rework_qty ELSE 0 END), 0) AS startedQty,
-        COALESCE(SUM(t.processed_qty), 0) AS processedQty
+        COALESCE(SUM(t.processed_qty), 0) AS processedQty,
+        COALESCE(SUM(CASE WHEN t.action_type = 'RETURN_NODE' THEN t.rework_qty ELSE 0 END), 0) AS returnedQty,
+        COALESCE(SUM(t.transfer_qty), 0) AS transferredQty
         FROM mes_production_execution e
         JOIN mes_production_defect d ON d.execution_id = e.id
         LEFT JOIN mes_quality_treatment t ON t.declaration_id = d.declaration_id

@@ -1,5 +1,7 @@
 package dev.mesbase.business.production.controller;
 
+import java.util.Optional;
+
 import dev.mesbase.business.production.controller.vo.ProductionReportViews;
 import dev.mesbase.business.production.service.RecentProductionReportQueryService;
 import dev.mesbase.platform.web.EndpointAccess;
@@ -34,7 +36,7 @@ public class RecentProductionReportController {
                     r.executionNo(), ProductionReportViews.id(r.workorderId()), r.workorderCode(), r.source(),
                     r.productCode(), r.productName(), r.unitName(), ProductionReportViews.id(r.routingNodeId()),
                     r.operationName(), r.recordType(), ProductionReportViews.decimal(r.quantityDelta()),
-                    ProductionReportViews.id(r.operatorUserId()), user == null ? null : user.name(),
+                    ProductionReportViews.id(r.operatorUserId()), Optional.ofNullable(user).map(nullableValue -> nullableValue.name()).orElse(null),
                     r.reportTime(), r.createTime());
         }).toList();
     }

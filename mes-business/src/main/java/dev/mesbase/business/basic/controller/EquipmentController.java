@@ -1,10 +1,12 @@
 package dev.mesbase.business.basic.controller;
 
+import com.github.pagehelper.Page;
+import java.util.Objects;
+
 import dev.mesbase.business.basic.controller.vo.EquipmentPageVo;
 import dev.mesbase.business.basic.controller.vo.EquipmentVo;
 import dev.mesbase.business.basic.domain.EquipmentCreateCommand;
 import dev.mesbase.business.basic.domain.EquipmentEntity;
-import dev.mesbase.business.basic.domain.EquipmentPage;
 import dev.mesbase.business.basic.domain.EquipmentQueryDto;
 import dev.mesbase.business.basic.domain.EquipmentUpdateCommand;
 import dev.mesbase.business.basic.service.IEquipmentService;
@@ -44,10 +46,10 @@ public class EquipmentController {
     @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED,
             permission = EquipmentPermissions.READ)
     public EquipmentPageVo list(@Valid @ModelAttribute EquipmentQueryDto query) {
-        EquipmentPage page = service.selectPage(query);
+        Page<EquipmentEntity> page = service.selectPage(query);
         return new EquipmentPageVo(
-                page.items().stream().map(EquipmentController::toView).toList(),
-                page.total(), page.offset(), page.limit());
+                page.stream().map(EquipmentController::toView).toList(),
+                page.getTotal(), (int) page.getStartRow(), page.getPageSize());
     }
 
     @GetMapping("/{id}")
@@ -85,12 +87,12 @@ public class EquipmentController {
 
     private static EquipmentVo toView(EquipmentEntity row) {
         return new EquipmentVo(
-                row.getId() == null ? null : row.getId().toString(),
+                Objects.toString(row.getId(), null),
 
                 row.getCode(),
                 row.getName(),
                 row.getModel(),
-                row.getWorkstationId() == null ? null : row.getWorkstationId().toString(),
+                Objects.toString(row.getWorkstationId(), null),
                 row.getStatus(),
                 row.getRemark()
         );

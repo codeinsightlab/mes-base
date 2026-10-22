@@ -1,7 +1,7 @@
 package dev.mesbase.business.production.service;
 
+import com.github.pagehelper.Page;
 import dev.mesbase.business.production.domain.MesWorkorderMaterialEntity;
-import dev.mesbase.business.production.domain.MesWorkorderMaterialPage;
 import dev.mesbase.business.production.domain.MesWorkorderMaterialQueryDto;
 
 /**
@@ -10,7 +10,7 @@ import dev.mesbase.business.production.domain.MesWorkorderMaterialQueryDto;
  * @author MES Base
  */
 public interface IMesWorkorderMaterialService {
-    MesWorkorderMaterialPage selectPage(MesWorkorderMaterialQueryDto query);
+    Page<MesWorkorderMaterialEntity> selectPage(MesWorkorderMaterialQueryDto query);
 
     MesWorkorderMaterialEntity selectById(Long id);
 

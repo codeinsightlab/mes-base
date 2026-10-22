@@ -1,5 +1,7 @@
 package dev.mesbase.business.production.controller;
 
+import java.util.Objects;
+
 import dev.mesbase.business.production.domain.ProductionBatchEntity;
 import dev.mesbase.business.production.controller.vo.RoutingDetailVo;
 import dev.mesbase.business.production.domain.RoutingEntity;
@@ -134,7 +136,7 @@ public class WorkOrderController {
     }
 
     private static String id(Long value) {
-        return value == null ? null : value.toString();
+        return Objects.toString(value, null);
     }
 
     private static OrderView order(WorkorderEntity w) {

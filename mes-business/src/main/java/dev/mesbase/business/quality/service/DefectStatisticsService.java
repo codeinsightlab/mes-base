@@ -1,5 +1,6 @@
 package dev.mesbase.business.quality.service;
 
+import dev.mesbase.common.validation.ParameterChecks;
 import com.github.pagehelper.PageHelper;
 import dev.mesbase.business.quality.dao.DefectStatisticsExtraMapper;
 import dev.mesbase.business.quality.domain.DefectStatistics.Query;
@@ -29,12 +30,12 @@ public class DefectStatisticsService {
     public Page summarize(Query q) {
         int offset = q.offset() == null ? 0 : q.offset(), limit = q.limit() == null ? 20 : q.limit();
         if (offset < 0 || limit < 1 || limit > 100 || q.wasteCategory() != null && WasteCategory.from(q.wasteCategory()) == null
-                || q.from() != null && q.to() != null && q.from().isAfter(q.to())) bad();
+                || q.from() != null && q.to() != null && q.from().isAfter(q.to())) ParameterChecks.reject(ErrorCode.BAD_REQUEST);
         if (q.attribution() != null) {
             try {
                 Attribution.valueOf(q.attribution());
             } catch (IllegalArgumentException e) {
-                bad();
+                ParameterChecks.reject(ErrorCode.BAD_REQUEST);
             }
         }
         try (var page = PageHelper.offsetPage(offset, limit)) {
@@ -42,7 +43,4 @@ public class DefectStatisticsService {
         }
     }
 
-    private static void bad() {
-        throw new FoundationException(ErrorCode.BAD_REQUEST);
-    }
 }

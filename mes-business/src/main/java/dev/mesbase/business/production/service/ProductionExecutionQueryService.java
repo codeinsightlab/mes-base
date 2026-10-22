@@ -5,6 +5,7 @@ import dev.mesbase.business.production.domain.MesProductionExecutionEntity;
 import dev.mesbase.business.production.domain.MesProductionExecutionQueryDto;
 import dev.mesbase.business.directory.domain.DirectoryLabel;
 import java.util.List;
+import com.github.pagehelper.Page;
 import dev.mesbase.business.production.dao.WorkorderMapper;
 import dev.mesbase.business.production.domain.WorkorderExample;
 import java.util.stream.Collectors;
@@ -24,8 +25,10 @@ public class ProductionExecutionQueryService {
                           String updateByName, String workorderStatus) {
     }
 
-    public record Page(List<Display> items, long total, int offset, int limit) {
-    }
+    public record References(Map<Long, DirectoryLabel> routings, Map<Long, DirectoryLabel> users, Map<Long, String> workorderStatuses) { }
+
+    public record Search(Page<MesProductionExecutionEntity> records, References references) { }
+
 
     private final IMesProductionExecutionService executions;
     private final BusinessDirectoryService references;
@@ -39,9 +42,9 @@ public class ProductionExecutionQueryService {
     }
 
     @Transactional(transactionManager = "businessTransactionManager", readOnly = true)
-    public Page page(MesProductionExecutionQueryDto query) {
+    public Search page(MesProductionExecutionQueryDto query) {
         var page = executions.selectPage(query); // Retains the existing guarded page cache.
-        return new Page(describe(page.items()), page.total(), page.offset(), page.limit());
+        return new Search(page, references(page));
     }
 
     @Transactional(transactionManager = "businessTransactionManager", readOnly = true)
@@ -50,25 +53,31 @@ public class ProductionExecutionQueryService {
     }
 
     private List<Display> describe(List<MesProductionExecutionEntity> rows) {
+        var data = references(rows);
+        return rows.stream().map(row -> new Display(row, data.routings().get(row.getRoutingId()),
+                name(data.users(), row.getCreateBy()), name(data.users(), row.getUpdateBy()),
+                data.workorderStatuses().get(row.getWorkorderId()))).toList();
+    }
+
+    private References references(List<MesProductionExecutionEntity> rows) {
         var filter = new WorkorderExample();
         var ids = rows.stream().map(MesProductionExecutionEntity::getWorkorderId).distinct().toList();
-        if (ids.isEmpty()) return List.of();
+        if (ids.isEmpty()) return new References(Map.of(), Map.of(), Map.of());
         filter.createCriteria().andIdIn(ids);
         var statuses = orders.selectByExample(filter).stream()
                 .collect(Collectors.toMap(row -> row.getId(), row -> row.getStatus()));
         var routings = references.routingLabels(rows.stream().map(MesProductionExecutionEntity::getRoutingId).toList());
         var users = references.userLabels(rows.stream().flatMap(row -> Stream.of(row.getCreateBy(), row.getUpdateBy()))
                 .map(ProductionExecutionQueryService::userId).filter(id -> id != null).toList());
-        return rows.stream()
-                .map(row -> new Display(row, routings.get(row.getRoutingId()), name(users, row.getCreateBy()), name(users, row.getUpdateBy()), statuses.get(row.getWorkorderId())))
-                .toList();
+        return new References(routings, users, statuses);
     }
 
-    private static String name(Map<Long, DirectoryLabel> users, String value) {
+    public static String name(Map<Long, DirectoryLabel> users, String value) {
         var id = userId(value);
         if (id == null) return null;
         var label = users.get(id);
-        return label == null ? null : label.name();
+        if (label == null) return null;
+        return label.name();
     }
 
     private static Long userId(String value) {

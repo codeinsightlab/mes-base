@@ -1,5 +1,7 @@
 package dev.mesbase.business.production.controller.vo;
 
+import java.util.Objects;
+
 import dev.mesbase.business.production.domain.MesProductionReportEntity;
 import dev.mesbase.business.production.domain.ProductionReportModels.ExecutionQuantity;
 import dev.mesbase.business.production.domain.ProductionReportModels.NodeQuantity;
@@ -81,7 +83,7 @@ public final class ProductionReportViews {
     }
 
     public static String id(Long value) {
-        return value == null ? null : value.toString();
+        return Objects.toString(value, null);
     }
 
     public static String decimal(BigDecimal value) {

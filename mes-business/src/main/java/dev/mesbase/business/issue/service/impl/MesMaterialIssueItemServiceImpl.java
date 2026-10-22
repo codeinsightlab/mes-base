@@ -1,5 +1,6 @@
 package dev.mesbase.business.issue.service.impl;
 
+import dev.mesbase.common.validation.ParameterChecks;
 import dev.mesbase.business.production.domain.ProductionQuantityInput;
 
 import com.github.pagehelper.Page;
@@ -8,7 +9,6 @@ import dev.mesbase.business.issue.dao.MesMaterialIssueItemMapper;
 import dev.mesbase.business.issue.domain.MesMaterialIssueItemCreateCommand;
 import dev.mesbase.business.issue.domain.MesMaterialIssueItemEntity;
 import dev.mesbase.business.issue.domain.MesMaterialIssueItemExample;
-import dev.mesbase.business.issue.domain.MesMaterialIssueItemPage;
 import dev.mesbase.business.issue.domain.MesMaterialIssueItemQueryDto;
 import dev.mesbase.business.issue.domain.MesMaterialIssueItemResource;
 import dev.mesbase.business.issue.domain.MesMaterialIssueItemUpdateCommand;
@@ -44,12 +44,10 @@ public class MesMaterialIssueItemServiceImpl implements IMesMaterialIssueItemSer
     @Transactional(transactionManager = "businessTransactionManager", readOnly = true)
     @BusinessCache(business = MesMaterialIssueItemResource.PREFIX,
             type = BusinessCache.Type.LIST)
-    public MesMaterialIssueItemPage selectPage(MesMaterialIssueItemQueryDto query) {
+    public Page<MesMaterialIssueItemEntity> selectPage(MesMaterialIssueItemQueryDto query) {
         int offset = query.offset() == null ? 0 : query.offset();
         int limit = query.limit() == null ? 20 : query.limit();
-        if (offset < 0 || limit < 1 || limit > 100) {
-            throw new FoundationException(ErrorCode.BAD_REQUEST);
-        }
+        ParameterChecks.paging(offset, limit, 100);
         MesMaterialIssueItemExample example = new MesMaterialIssueItemExample();
         MesMaterialIssueItemExample.Criteria criteria = example.createCriteria();
         if (query.issueId() != null) {
@@ -84,8 +82,8 @@ public class MesMaterialIssueItemServiceImpl implements IMesMaterialIssueItemSer
         }
         example.setOrderByClause("id desc");
         try (Page<MesMaterialIssueItemEntity> page = PageHelper.offsetPage(offset, limit)) {
-            List<MesMaterialIssueItemEntity> rows = mapper.selectByExample(example);
-            return new MesMaterialIssueItemPage(rows, page.getTotal(), offset, limit);
+            mapper.selectByExample(example);
+            return page;
         }
     }
 

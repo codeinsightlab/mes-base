@@ -1,12 +1,12 @@
 package dev.mesbase.business.basic.service.impl;
 
+import dev.mesbase.common.validation.ParameterChecks;
 import com.github.pagehelper.Page;
 import com.github.pagehelper.PageHelper;
 import dev.mesbase.business.basic.dao.UnitMeasureMapper;
 import dev.mesbase.business.basic.domain.UnitMeasureCreateCommand;
 import dev.mesbase.business.basic.domain.UnitMeasureEntity;
 import dev.mesbase.business.basic.domain.UnitMeasureExample;
-import dev.mesbase.business.basic.domain.UnitMeasurePage;
 import dev.mesbase.business.basic.domain.UnitMeasureQueryDto;
 import dev.mesbase.business.basic.domain.UnitMeasureResource;
 import dev.mesbase.business.basic.domain.UnitMeasureUpdateCommand;
@@ -69,12 +69,10 @@ public class UnitMeasureServiceImpl implements IUnitMeasureService {
     @Transactional(transactionManager = "businessTransactionManager", readOnly = true)
     @BusinessCache(business = UnitMeasureResource.PREFIX,
             type = BusinessCache.Type.LIST)
-    public UnitMeasurePage selectPage(UnitMeasureQueryDto query) {
+    public Page<UnitMeasureEntity> selectPage(UnitMeasureQueryDto query) {
         int offset = query.offset() == null ? 0 : query.offset();
         int limit = query.limit() == null ? 20 : query.limit();
-        if (offset < 0 || limit < 1 || limit > 100) {
-            throw new FoundationException(ErrorCode.BAD_REQUEST);
-        }
+        ParameterChecks.paging(offset, limit, 100);
         UnitMeasureExample example = new UnitMeasureExample();
         UnitMeasureExample.Criteria criteria = example.createCriteria();
         if (query.code() != null) {
@@ -91,8 +89,8 @@ public class UnitMeasureServiceImpl implements IUnitMeasureService {
         }
         example.setOrderByClause("id desc");
         try (Page<UnitMeasureEntity> page = PageHelper.offsetPage(offset, limit)) {
-            List<UnitMeasureEntity> rows = mapper.selectByExample(example);
-            return new UnitMeasurePage(rows, page.getTotal(), offset, limit);
+            mapper.selectByExample(example);
+            return page;
         }
     }
 

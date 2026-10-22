@@ -162,6 +162,6 @@ public class AjaxResult extends HashMap<String, Object>
     }
 
     public Object getSuccessDate() {
-        return super.get(DATA_TAG) == null ? null : super.get(DATA_TAG);
+        return super.get(DATA_TAG);
     }
 }

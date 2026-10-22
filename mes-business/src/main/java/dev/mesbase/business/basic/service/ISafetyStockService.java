@@ -1,9 +1,8 @@
-// MES-CODEGEN: scaffold; review required.
 package dev.mesbase.business.basic.service;
 
+import com.github.pagehelper.Page;
 import dev.mesbase.business.basic.domain.SafetyStockCreateCommand;
 import dev.mesbase.business.basic.domain.SafetyStockEntity;
-import dev.mesbase.business.basic.domain.SafetyStockPage;
 import dev.mesbase.business.basic.domain.SafetyStockQueryDto;
 import dev.mesbase.business.basic.domain.SafetyStockUpdateCommand;
 import dev.mesbase.business.basic.sync.ExternalSafetyStock;
@@ -17,7 +16,7 @@ import java.util.List;
  * @author MES Base
  */
 public interface ISafetyStockService {
-    SafetyStockPage selectPage(SafetyStockQueryDto query);
+    Page<SafetyStockEntity> selectPage(SafetyStockQueryDto query);
 
     SafetyStockEntity selectById(Long id);
 

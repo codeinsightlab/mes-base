@@ -1,5 +1,7 @@
 package dev.mesbase.business.production.service;
 
+import java.util.Optional;
+
 import dev.mesbase.business.production.dao.OperationMapper;
 import dev.mesbase.business.production.dao.RoutingNodeMapper;
 import dev.mesbase.business.production.dao.MesProductionExecutionMapper;
@@ -64,14 +66,14 @@ public class OperatorQualificationRules {
 
     public void operation(Long operationId) {
         FactoryContext.required();
-        var operation = operationId == null ? null : operations.selectByPrimaryKey(operationId);
+        var operation = Optional.ofNullable(operationId).map(nullableValue -> operations.selectByPrimaryKey(nullableValue)).orElse(null);
         if (operation == null || !EnableStatus.ENABLED.getValue().equals(operation.getStatus()))
             throw new FoundationException(ErrorCode.ROUTING_REFERENCE_INVALID);
     }
 
     public RoutingNodeEntity node(Long executionId, Long nodeId, boolean editing) {
         FactoryContext.required();
-        var execution = executionId == null ? null : editing ? locks.execution(executionId) : executions.selectByPrimaryKey(executionId);
+        var execution = Optional.ofNullable(executionId).map(nullableValue -> editing ? locks.execution(nullableValue) : executions.selectByPrimaryKey(nullableValue)).orElse(null);
         if (execution == null) throw new FoundationException(ErrorCode.EXECUTION_NOT_FOUND);
         if (editing) {
             locks.requireActiveExecution(executionId);
@@ -85,7 +87,7 @@ public class OperatorQualificationRules {
     }
 
     private RoutingNodeEntity node(MesProductionExecutionEntity execution, Long nodeId) {
-        var node = nodeId == null ? null : nodes.selectByPrimaryKey(nodeId);
+        var node = Optional.ofNullable(nodeId).map(nullableValue -> nodes.selectByPrimaryKey(nullableValue)).orElse(null);
         if (node == null || !Objects.equals(execution.getRoutingId(), node.getRoutingId()))
             throw new FoundationException(ErrorCode.ASSIGNMENT_NODE_INVALID);
         operation(node.getOperationId());

@@ -1,5 +1,7 @@
 package dev.mesbase.business.quality.controller;
 
+import java.util.Optional;
+
 import dev.mesbase.business.quality.domain.DefectStatistics.Query;
 import dev.mesbase.business.quality.service.DefectStatisticsService;
 import dev.mesbase.platform.web.EndpointAccess;
@@ -34,8 +36,8 @@ public class DefectStatisticsController {
     public Page statistics(@ModelAttribute Query query) {
         var p = service.summarize(query);
         return new Page(p.items().stream()
-                .map(r -> new Row(r.operationId().toString(), r.defectTypeId() == null ? null : r.defectTypeId()
-                        .toString(),
+                .map(r -> new Row(r.operationId().toString(), Optional.ofNullable(r.defectTypeId()).map(nullableValue -> nullableValue
+                        .toString()).orElse(null),
                         r.typeName(), r.typeNameVariants(), r.wasteCategory(), r.declaredQty()
                         .toPlainString(), r.independentQty()
                         .toPlainString(), r.overlapQty().toPlainString(),

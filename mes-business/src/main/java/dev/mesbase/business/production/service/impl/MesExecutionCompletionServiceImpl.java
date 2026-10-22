@@ -1,11 +1,11 @@
 package dev.mesbase.business.production.service.impl;
 
+import dev.mesbase.common.validation.ParameterChecks;
 import com.github.pagehelper.Page;
 import com.github.pagehelper.PageHelper;
 import dev.mesbase.business.production.dao.MesExecutionCompletionMapper;
 import dev.mesbase.business.production.domain.MesExecutionCompletionEntity;
 import dev.mesbase.business.production.domain.MesExecutionCompletionExample;
-import dev.mesbase.business.production.domain.MesExecutionCompletionPage;
 import dev.mesbase.business.production.domain.MesExecutionCompletionQueryDto;
 import dev.mesbase.business.production.domain.MesExecutionCompletionResource;
 import dev.mesbase.business.production.service.IMesExecutionCompletionService;
@@ -33,12 +33,10 @@ public class MesExecutionCompletionServiceImpl implements IMesExecutionCompletio
     @Transactional(transactionManager = "businessTransactionManager", readOnly = true)
     @BusinessCache(business = MesExecutionCompletionResource.PREFIX,
             type = BusinessCache.Type.LIST)
-    public MesExecutionCompletionPage selectPage(MesExecutionCompletionQueryDto query) {
+    public Page<MesExecutionCompletionEntity> selectPage(MesExecutionCompletionQueryDto query) {
         int offset = query.offset() == null ? 0 : query.offset();
         int limit = query.limit() == null ? 20 : query.limit();
-        if (offset < 0 || limit < 1 || limit > 100) {
-            throw new FoundationException(ErrorCode.BAD_REQUEST);
-        }
+        ParameterChecks.paging(offset, limit, 100);
         MesExecutionCompletionExample example = new MesExecutionCompletionExample();
         MesExecutionCompletionExample.Criteria criteria = example.createCriteria();
         if (query.executionId() != null) {
@@ -73,8 +71,8 @@ public class MesExecutionCompletionServiceImpl implements IMesExecutionCompletio
         }
         example.setOrderByClause("id");
         try (Page<MesExecutionCompletionEntity> page = PageHelper.offsetPage(offset, limit)) {
-            List<MesExecutionCompletionEntity> rows = mapper.selectByExample(example);
-            return new MesExecutionCompletionPage(rows, page.getTotal(), offset, limit);
+            mapper.selectByExample(example);
+            return page;
         }
     }
 

@@ -1,9 +1,11 @@
 package dev.mesbase.business.production.controller;
 
+import com.github.pagehelper.Page;
+import java.util.Objects;
+
 import dev.mesbase.business.production.controller.vo.MesExecutionCompletionPageVo;
 import dev.mesbase.business.production.controller.vo.MesExecutionCompletionVo;
 import dev.mesbase.business.production.domain.MesExecutionCompletionEntity;
-import dev.mesbase.business.production.domain.MesExecutionCompletionPage;
 import dev.mesbase.business.production.domain.MesExecutionCompletionQueryDto;
 import dev.mesbase.business.production.service.IMesExecutionCompletionService;
 import dev.mesbase.platform.web.EndpointAccess;
@@ -32,10 +34,10 @@ public class MesExecutionCompletionController {
     @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED,
             permission = MesExecutionCompletionPermissions.LIST)
     public MesExecutionCompletionPageVo list(@Valid @ModelAttribute MesExecutionCompletionQueryDto query) {
-        MesExecutionCompletionPage page = service.selectPage(query);
+        Page<MesExecutionCompletionEntity> page = service.selectPage(query);
         return new MesExecutionCompletionPageVo(
-                page.items().stream().map(MesExecutionCompletionController::toView).toList(),
-                page.total(), page.offset(), page.limit());
+                page.stream().map(MesExecutionCompletionController::toView).toList(),
+                page.getTotal(), (int) page.getStartRow(), page.getPageSize());
     }
 
     @GetMapping("/{id}")
@@ -49,14 +51,14 @@ public class MesExecutionCompletionController {
     private static MesExecutionCompletionVo toView(MesExecutionCompletionEntity row) {
         return new MesExecutionCompletionVo(
                 row.getId(),
-                row.getExecutionId() == null ? null : row.getExecutionId().toString(),
-                row.getEffectiveQty() == null ? null : row.getEffectiveQty().toString(),
-                row.getReleasedQty() == null ? null : row.getReleasedQty().toString(),
-                row.getReceiptQty() == null ? null : row.getReceiptQty().toString(),
-                row.getAcceptedQty() == null ? null : row.getAcceptedQty().toString(),
+                Objects.toString(row.getExecutionId(), null),
+                Objects.toString(row.getEffectiveQty(), null),
+                Objects.toString(row.getReleasedQty(), null),
+                Objects.toString(row.getReceiptQty(), null),
+                Objects.toString(row.getAcceptedQty(), null),
                 row.getBasisHash(),
                 row.getRequestHash(),
-                row.getOperatorUserId() == null ? null : row.getOperatorUserId().toString(),
+                Objects.toString(row.getOperatorUserId(), null),
                 row.getRecordedAt(),
                 row.getReason()
         );

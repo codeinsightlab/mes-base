@@ -1,3 +1,4 @@
+// MES-CODEGEN: MyBatis Generator standard single-table persistence.
 package dev.mesbase.business.production.domain;
 
 import java.math.BigDecimal;
@@ -972,6 +973,76 @@ public class MesProductionReportExample {
 
         public Criteria andCommandFingerprintNotBetween(String value1, String value2) {
             addCriterion("command_fingerprint not between", value1, value2, "commandFingerprint");
+            return (Criteria) this;
+        }
+
+        public Criteria andSourceQualityEventIdIsNull() {
+            addCriterion("source_quality_event_id is null");
+            return (Criteria) this;
+        }
+
+        public Criteria andSourceQualityEventIdIsNotNull() {
+            addCriterion("source_quality_event_id is not null");
+            return (Criteria) this;
+        }
+
+        public Criteria andSourceQualityEventIdEqualTo(String value) {
+            addCriterion("source_quality_event_id =", value, "sourceQualityEventId");
+            return (Criteria) this;
+        }
+
+        public Criteria andSourceQualityEventIdNotEqualTo(String value) {
+            addCriterion("source_quality_event_id <>", value, "sourceQualityEventId");
+            return (Criteria) this;
+        }
+
+        public Criteria andSourceQualityEventIdGreaterThan(String value) {
+            addCriterion("source_quality_event_id >", value, "sourceQualityEventId");
+            return (Criteria) this;
+        }
+
+        public Criteria andSourceQualityEventIdGreaterThanOrEqualTo(String value) {
+            addCriterion("source_quality_event_id >=", value, "sourceQualityEventId");
+            return (Criteria) this;
+        }
+
+        public Criteria andSourceQualityEventIdLessThan(String value) {
+            addCriterion("source_quality_event_id <", value, "sourceQualityEventId");
+            return (Criteria) this;
+        }
+
+        public Criteria andSourceQualityEventIdLessThanOrEqualTo(String value) {
+            addCriterion("source_quality_event_id <=", value, "sourceQualityEventId");
+            return (Criteria) this;
+        }
+
+        public Criteria andSourceQualityEventIdLike(String value) {
+            addCriterion("source_quality_event_id like", value, "sourceQualityEventId");
+            return (Criteria) this;
+        }
+
+        public Criteria andSourceQualityEventIdNotLike(String value) {
+            addCriterion("source_quality_event_id not like", value, "sourceQualityEventId");
+            return (Criteria) this;
+        }
+
+        public Criteria andSourceQualityEventIdIn(List<String> values) {
+            addCriterion("source_quality_event_id in", values, "sourceQualityEventId");
+            return (Criteria) this;
+        }
+
+        public Criteria andSourceQualityEventIdNotIn(List<String> values) {
+            addCriterion("source_quality_event_id not in", values, "sourceQualityEventId");
+            return (Criteria) this;
+        }
+
+        public Criteria andSourceQualityEventIdBetween(String value1, String value2) {
+            addCriterion("source_quality_event_id between", value1, value2, "sourceQualityEventId");
+            return (Criteria) this;
+        }
+
+        public Criteria andSourceQualityEventIdNotBetween(String value1, String value2) {
+            addCriterion("source_quality_event_id not between", value1, value2, "sourceQualityEventId");
             return (Criteria) this;
         }
     }

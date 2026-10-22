@@ -1,10 +1,12 @@
 package dev.mesbase.business.basic.controller;
 
+import com.github.pagehelper.Page;
+import java.util.Objects;
+
 import dev.mesbase.business.basic.controller.vo.MaterialPageVo;
 import dev.mesbase.business.basic.controller.vo.MaterialVo;
 import dev.mesbase.business.basic.domain.MaterialCreateCommand;
 import dev.mesbase.business.basic.domain.MaterialEntity;
-import dev.mesbase.business.basic.domain.MaterialPage;
 import dev.mesbase.business.basic.domain.MaterialQueryDto;
 import dev.mesbase.business.basic.domain.MaterialUpdateCommand;
 import dev.mesbase.business.basic.service.IMaterialService;
@@ -46,10 +48,10 @@ public class MaterialController {
     @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED,
             permission = MaterialPermissions.LIST)
     public MaterialPageVo list(@Valid @ModelAttribute MaterialQueryDto query) {
-        MaterialPage page = service.selectPage(query);
+        Page<MaterialEntity> page = service.selectPage(query);
         return new MaterialPageVo(
-                page.items().stream().map(MaterialController::toView).toList(),
-                page.total(), page.offset(), page.limit());
+                page.stream().map(MaterialController::toView).toList(),
+                page.getTotal(), (int) page.getStartRow(), page.getPageSize());
     }
 
     @GetMapping("/{id}")
@@ -93,13 +95,13 @@ public class MaterialController {
 
     private static MaterialVo toView(MaterialEntity row) {
         return new MaterialVo(
-                row.getId() == null ? null : row.getId().toString(),
+                Objects.toString(row.getId(), null),
 
                 row.getCode(),
                 row.getName(),
                 row.getSpecification(),
-                row.getCategoryId() == null ? null : row.getCategoryId().toString(),
-                row.getUnitId() == null ? null : row.getUnitId().toString(),
+                Objects.toString(row.getCategoryId(), null),
+                Objects.toString(row.getUnitId(), null),
                 row.getMaterialType(),
                 row.getStatus(),
                 row.getExternalId(),

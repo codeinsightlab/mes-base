@@ -1,5 +1,6 @@
 package dev.mesbase.business.legacy.service;
 
+import dev.mesbase.common.validation.ParameterChecks;
 import dev.mesbase.business.legacy.dao.LegacyMigrationMapper;
 import dev.mesbase.business.legacy.domain.LegacyHistory.Batch;
 import dev.mesbase.business.legacy.domain.LegacyBatchStatus;
@@ -63,24 +64,24 @@ public class LegacyProductionActivationService {
     public int activate(Long id) {
         sources.localCreation();
         Long actor = SecurityUtils.getUserId();
-        if (actor == null) conflict();
+        if (actor == null) ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
         var order = orders.selectByPrimaryKeyForUpdate(id);
         var original = metadata.order(id);
-        if (order == null || original == null || !BusinessSource.LOCAL.getValue().equals(order.getSource())) conflict();
+        if (order == null || original == null || !BusinessSource.LOCAL.getValue().equals(order.getSource())) ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
         String orderKey = key(original.id());
         if (metadata.find(orderKey) != null) return 0;
-        if (!WorkOrderStatus.HISTORICAL.getValue().equals(order.getStatus())) conflict();
+        if (!WorkOrderStatus.HISTORICAL.getValue().equals(order.getStatus())) ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
         var mappings = metadata.orderExecutions(original.id()).stream()
                 .sorted(Comparator.comparing(Mapping::entityId)).toList();
-        if (mappings.isEmpty()) conflict();
+        if (mappings.isEmpty()) ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
         var now = LocalDateTime.now();
         String batchId = "activate-" + id;
         metadata.prepare(new Batch(batchId, RULE, original.sourceHash(), LegacyBatchStatus.PREPARED.getValue(), "[\"" + orderKey + "\"]", actor, now, null));
         var batch = metadata.batch(batchId);
         if (!RULE.equals(batch.ruleVersion()) || !original.sourceHash().equals(batch.snapshotHash())
-                || !LegacyBatchStatus.PREPARED.getValue().equals(batch.status())) conflict();
+                || !LegacyBatchStatus.PREPARED.getValue().equals(batch.status())) ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
         if (metadata.transition(batchId, LegacyBatchStatus.PREPARED.getValue(), LegacyBatchStatus.RUNNING.getValue(), LegacyBatchStatus.COMPLETED.getValue()) != 1)
-            conflict();
+            ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
         var allocated = BigDecimal.ZERO;
         // Bound batch projections; retain every original node quantity before enabling writes.
         for (int from = 0; from < mappings.size(); from += 100) {
@@ -97,29 +98,29 @@ public class LegacyProductionActivationService {
                         || q.reservedInputQty().signum() != 0 || q.productionInputQty()
                         .compareTo(row.getTargetQty()) != 0
                         || q.nodes().stream()
-                        .anyMatch(n -> n.historicalConflict() || n.unverifiedDefectQty().signum() != 0)) conflict();
+                        .anyMatch(n -> n.historicalConflict() || n.unverifiedDefectQty().signum() != 0)) ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
                 allocated = allocated.add(row.getTargetQty());
                 add(m, batchId, "PRODUCTION_ACTIVATION", now, actor);
             }
         }
-        if (allocated.compareTo(order.getPlannedQty()) > 0) conflict();
+        if (allocated.compareTo(order.getPlannedQty()) > 0) ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
         add(original, batchId, "ORDER_ACTIVATION", now, actor);
         order.setStatus(WorkOrderStatus.RELEASED.getValue());
         order.setRevision(order.getRevision() + 1);
         order.setUpdateTime(now);
-        if (orders.updateByPrimaryKey(order) != 1) conflict();
+        if (orders.updateByPrimaryKey(order) != 1) ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
         for (var m : mappings) {
             var row = executions.selectByPrimaryKeyForUpdate(m.entityId());
             row.setStatus(ProductionExecutionStatus.RUNNING.getValue());
             row.setStartTime(now);
             row.setUpdateTime(now);
             row.setUpdateBy(actor.toString());
-            if (executions.updateByPrimaryKey(row) != 1) conflict();
+            if (executions.updateByPrimaryKey(row) != 1) ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
             // Normal post-commit completion, not a copied external completion status.
             events.publishEvent(new ProductionCompletionRequested(FactoryContext.required(), row.getId()));
         }
         if (metadata.transition(batchId, LegacyBatchStatus.RUNNING.getValue(), LegacyBatchStatus.COMPLETED.getValue(), LegacyBatchStatus.COMPLETED.getValue()) != 1)
-            conflict();
+            ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
         return mappings.size();
     }
 
@@ -127,7 +128,7 @@ public class LegacyProductionActivationService {
         String evidence = "{\"operatorUserId\":\"" + actor + "\",\"basis\":\"REVIEWED_OPENING_QUANTITIES\"}";
         if (metadata.insert(new Mapping(key(original.id()), batch, original.id(), "PRODUCTION_ACTIVATION",
                 original.id(), original.sourceHash(), RULE, kind, original.entityId(), evidence, "{}", now)) != 1)
-            conflict();
+            ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
     }
 
     private static String key(String original) {
@@ -139,7 +140,4 @@ public class LegacyProductionActivationService {
         }
     }
 
-    private static void conflict() {
-        throw new FoundationException(ErrorCode.RESOURCE_CONFLICT);
-    }
 }

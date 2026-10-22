@@ -1,10 +1,12 @@
 package dev.mesbase.business.production.controller;
 
+import com.github.pagehelper.Page;
+import java.util.Objects;
+
 import dev.mesbase.business.production.controller.vo.MesOperationUserPageVo;
 import dev.mesbase.business.production.controller.vo.MesOperationUserVo;
 import dev.mesbase.business.production.domain.MesOperationUserCreateCommand;
 import dev.mesbase.business.production.domain.MesOperationUserEntity;
-import dev.mesbase.business.production.domain.MesOperationUserPage;
 import dev.mesbase.business.production.domain.MesOperationUserQueryDto;
 import dev.mesbase.business.production.domain.MesOperationUserUpdateCommand;
 import dev.mesbase.business.production.service.IMesOperationUserService;
@@ -44,10 +46,10 @@ public class MesOperationUserController {
     @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED,
             permission = MesOperationUserPermissions.LIST)
     public MesOperationUserPageVo list(@Valid @ModelAttribute MesOperationUserQueryDto query) {
-        MesOperationUserPage page = service.selectPage(query);
+        Page<MesOperationUserEntity> page = service.selectPage(query);
         return new MesOperationUserPageVo(
-                page.items().stream().map(MesOperationUserController::toView).toList(),
-                page.total(), page.offset(), page.limit());
+                page.stream().map(MesOperationUserController::toView).toList(),
+                page.getTotal(), (int) page.getStartRow(), page.getPageSize());
     }
 
     @GetMapping("/{id}")
@@ -95,9 +97,9 @@ public class MesOperationUserController {
 
     private static MesOperationUserVo toView(MesOperationUserEntity row) {
         return new MesOperationUserVo(
-                row.getId() == null ? null : row.getId().toString(),
-                row.getOperationId() == null ? null : row.getOperationId().toString(),
-                row.getUserId() == null ? null : row.getUserId().toString(),
+                Objects.toString(row.getId(), null),
+                Objects.toString(row.getOperationId(), null),
+                Objects.toString(row.getUserId(), null),
                 row.getRemark(),
                 row.getCreateBy(),
                 row.getCreateTime()

@@ -1,5 +1,9 @@
 package dev.mesbase.web.view.role;
 
+import java.util.Optional;
+
+import java.util.Objects;
+
 import dev.mesbase.common.core.domain.entity.SysRole;
 import java.util.Arrays;
 import java.util.List;
@@ -13,18 +17,18 @@ public final class SysRoleAssembler {
         if (row == null) return null;
         return new SysRoleResult(row.getKind(),
                 row.getFactoryId(),
-                row.getRoleId() == null ? null : row.getRoleId().toString(),
+                Objects.toString(row.getRoleId(), null),
                 row.getRoleName(),
                 row.getRoleKey(),
-                row.getRoleSort() == null ? null : Integer.valueOf(row.getRoleSort()),
+                Optional.ofNullable(row.getRoleSort()).map(nullableValue -> Integer.valueOf(nullableValue)).orElse(null),
                 row.getDataScope(),
                 row.isMenuCheckStrictly(),
                 row.isDeptCheckStrictly(),
                 row.getStatus(),
                 row.getDelFlag(),
                 row.isFlag(),
-                row.getMenuIds() == null ? null : Arrays.stream(row.getMenuIds()).map(String::valueOf).toArray(String[]::new),
-                row.getDeptIds() == null ? null : Arrays.stream(row.getDeptIds()).map(String::valueOf).toArray(String[]::new),
+                Optional.ofNullable(row.getMenuIds()).map(nullableValue -> Arrays.stream(nullableValue).map(String::valueOf).toArray(String[]::new)).orElse(null),
+                Optional.ofNullable(row.getDeptIds()).map(nullableValue -> Arrays.stream(nullableValue).map(String::valueOf).toArray(String[]::new)).orElse(null),
                 row.getCreateBy(),
                 row.getCreateTime(),
                 row.getUpdateBy(),
@@ -33,6 +37,7 @@ public final class SysRoleAssembler {
     }
 
     public static List<SysRoleResult> toResults(List<SysRole> rows) {
-        return rows == null ? null : rows.stream().map(SysRoleAssembler::toResult).toList();
+        if (rows == null) return null;
+        return rows.stream().map(SysRoleAssembler::toResult).toList();
     }
 }

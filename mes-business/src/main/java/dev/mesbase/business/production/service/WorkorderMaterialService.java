@@ -1,5 +1,8 @@
 package dev.mesbase.business.production.service;
 
+import dev.mesbase.common.validation.ParameterChecks;
+import java.util.Optional;
+
 import dev.mesbase.business.production.domain.ProductionQuantityInput;
 
 import dev.mesbase.business.production.service.BusinessSourceRules;
@@ -80,7 +83,7 @@ public class WorkorderMaterialService {
         var order = locks.order(workorder);
         sources.order(workorder);
         if (!List.of(WorkOrderStatus.DRAFT.getValue(), WorkOrderStatus.RELEASED.getValue()).contains(order.getStatus()))
-            fail();
+            ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
         var f = new MesMaterialIssueExample();
         f.createCriteria().andWorkorderIdEqualTo(workorder);
         // Includes prepared/UNKNOWN intents: their frozen ratio must remain recoverable.
@@ -93,18 +96,19 @@ public class WorkorderMaterialService {
                 || c.totalRequiredQty().precision() - c.totalRequiredQty().scale() > 14 || c.workCenter() == null
                 || c.workCenter().isBlank() || c.workCenter().length() > 100 || c.warehouseIds() == null
                 || c.warehouseIds().isEmpty() || c.warehouseIds().size() > 100 || c.warehouseIds().stream()
-                .anyMatch(Objects::isNull)) fail();
-        ProductionQuantityInput.changed(c.totalRequiredQty(), previous == null ? null : previous.getTotalRequiredQty());
+                .anyMatch(Objects::isNull)) ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
+        ProductionQuantityInput.changed(c.totalRequiredQty(), Optional.ofNullable(previous).map(nullableValue -> nullableValue.getTotalRequiredQty()).orElse(null));
         var ids = c.warehouseIds().stream().distinct().sorted().toList();
         references.lockDemandReferences(c.materialId(), ids);
         sources.warehouses(order.getSource(), ids);
         var material = materials.selectByPrimaryKey(c.materialId());
-        var unit = material == null || material.getUnitId() == null ? null : units.selectByPrimaryKey(material.getUnitId());
+        if (material == null || material.getUnitId() == null) ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
+        var unit = units.selectByPrimaryKey(material.getUnitId());
         if (material == null || unit == null || !EnableStatus.ENABLED.getValue().equals(material.getStatus())
-                || !EnableStatus.ENABLED.getValue().equals(unit.getStatus())) fail();
+                || !EnableStatus.ENABLED.getValue().equals(unit.getStatus())) ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
         var wf = new WmWarehouseExample();
         wf.createCriteria().andIdIn(ids).andStatusEqualTo(EnableStatus.ENABLED.getValue());
-        if (warehouses.countByExample(wf) != ids.size()) fail();
+        if (warehouses.countByExample(wf) != ids.size()) ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
         var row = new MesWorkorderMaterialEntity();
         row.setId(workorder);
         row.setMaterialId(c.materialId());
@@ -112,18 +116,15 @@ public class WorkorderMaterialService {
         row.setTotalRequiredQty(c.totalRequiredQty());
         row.setPlannedQty(order.getPlannedQty());
         String allowed = new ObjectMapper().writeValueAsString(ids);
-        if (allowed.length() > 2000) fail();
+        if (allowed.length() > 2000) ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
         row.setWarehouseIds(allowed);
         row.setWorkCenter(c.workCenter().trim());
         row.setRevision(revision + 1);
         row.setStatus(c.enabled() ? EnableStatus.ENABLED.getValue() : EnableStatus.DISABLED.getValue());
         row.setUpdatedBy(SecurityUtils.getUserId());
         row.setUpdatedAt(LocalDateTime.now());
-        if ((previous == null ? requirements.insert(row) : requirements.updateByPrimaryKey(row)) != 1) fail();
+        if ((previous == null ? requirements.insert(row) : requirements.updateByPrimaryKey(row)) != 1) ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
         return row;
     }
 
-    private static void fail() {
-        throw new FoundationException(ErrorCode.RESOURCE_CONFLICT);
-    }
 }

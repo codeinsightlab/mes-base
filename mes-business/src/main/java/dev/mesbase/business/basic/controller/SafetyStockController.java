@@ -1,10 +1,12 @@
 package dev.mesbase.business.basic.controller;
 
+import com.github.pagehelper.Page;
+import java.util.Objects;
+
 import dev.mesbase.business.basic.controller.vo.SafetyStockPageVo;
 import dev.mesbase.business.basic.controller.vo.SafetyStockVo;
 import dev.mesbase.business.basic.domain.SafetyStockCreateCommand;
 import dev.mesbase.business.basic.domain.SafetyStockEntity;
-import dev.mesbase.business.basic.domain.SafetyStockPage;
 import dev.mesbase.business.basic.domain.SafetyStockQueryDto;
 import dev.mesbase.business.basic.domain.SafetyStockUpdateCommand;
 import dev.mesbase.business.basic.service.ISafetyStockService;
@@ -46,10 +48,10 @@ public class SafetyStockController {
     @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED,
             permission = SafetyStockPermissions.LIST)
     public SafetyStockPageVo list(@Valid @ModelAttribute SafetyStockQueryDto query) {
-        SafetyStockPage page = service.selectPage(query);
+        Page<SafetyStockEntity> page = service.selectPage(query);
         return new SafetyStockPageVo(
-                page.items().stream().map(SafetyStockController::toView).toList(),
-                page.total(), page.offset(), page.limit());
+                page.stream().map(SafetyStockController::toView).toList(),
+                page.getTotal(), (int) page.getStartRow(), page.getPageSize());
     }
 
     @GetMapping("/{id}")
@@ -93,11 +95,11 @@ public class SafetyStockController {
 
     private static SafetyStockVo toView(SafetyStockEntity row) {
         return new SafetyStockVo(
-                row.getId() == null ? null : row.getId().toString(),
+                Objects.toString(row.getId(), null),
 
-                row.getMaterialId() == null ? null : row.getMaterialId().toString(),
-                row.getMinQty() == null ? null : row.getMinQty().toString(),
-                row.getMaxQty() == null ? null : row.getMaxQty().toString(),
+                Objects.toString(row.getMaterialId(), null),
+                Objects.toString(row.getMinQty(), null),
+                Objects.toString(row.getMaxQty(), null),
                 row.getStatus()
         );
     }

@@ -1,5 +1,8 @@
 package dev.mesbase.business.issue.service;
 
+import dev.mesbase.common.validation.ParameterChecks;
+import java.util.Optional;
+
 import dev.mesbase.business.production.service.BusinessSourceRules;
 import java.util.Map;
 import dev.mesbase.business.production.domain.ExecutionPathStatus;
@@ -140,16 +143,16 @@ public class MaterialIssueSubmissionService {
         var row = rules.hydrate(issues.selectByPrimaryKey(id));
         if (row.getSubmissionId() != null) return new Prepared(row, null, null, null);
         if (row.getVoidOperationId() != null || !Set.of(MaterialIssueStatus.DRAFT.getValue(), MaterialIssueStatus.RECORDED.getValue())
-                .contains(row.getStatus()) || row.getExecutionId() == null) fail();
+                .contains(row.getStatus()) || row.getExecutionId() == null) ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
         var e = locks.execution(row.getExecutionId());
         rules.validateExecutionSource(e);
         if (!Set.of(ProductionExecutionStatus.READY.getValue(), ProductionExecutionStatus.RUNNING.getValue())
                 .contains(e.getStatus()) || !Objects.equals(row.getWorkorderId(), e.getWorkorderId()) || !Objects.equals(row.getProductId(), e.getProductId()) || !Objects.equals(row.getRoutingId(), e.getRoutingId()))
-            fail();
+            ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
         if (ProductionExecutionStatus.READY.getValue().equals(e.getStatus())) executions.checkReadyReferences(e);
         var path = paths.requireSelected(e);
         if (ProductionExecutionStatus.RUNNING.getValue().equals(e.getStatus()) && !ExecutionPathStatus.LOCKED.getValue()
-                .equals(path.getPathStatus())) fail();
+                .equals(path.getPathStatus())) ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
         var f = new MesMaterialIssueItemExample();
         f.createCriteria().andIssueIdEqualTo(id);
         f.setOrderByClause("id");
@@ -176,8 +179,8 @@ public class MaterialIssueSubmissionService {
         var integrationSnapshot = FactoryIntegrationContext.required();
         var externalWarehouses = selection.mode() == Mode.CONNECTED ? sources.externalWarehouseIds(lines.stream()
                 .map(line -> line.getWarehouseId()).toList()) : Map.<Long, String>of();
-        var command = new MaterialIssueSubmitCommand(id, "ISSUE-SUBMIT-" + attempt.getId(), row.getIssueNo(), row.getWorkorderId(), row.getWorkorderCode(), external == null ? null : external.getExternalId(), external == null ? null : external.getExternalCode(), e.getId(), e.getExecutionNo(), row.getProductId(), row.getProductCode(), e.getRoutingId(), path.getRevision(), paths.view(e.getId())
-                .selectedNodeIds(), row.getIssueTime() == null ? null : row.getIssueTime().toString(), lines.stream()
+        var command = new MaterialIssueSubmitCommand(id, "ISSUE-SUBMIT-" + attempt.getId(), row.getIssueNo(), row.getWorkorderId(), row.getWorkorderCode(), Optional.ofNullable(external).map(nullableValue -> nullableValue.getExternalId()).orElse(null), Optional.ofNullable(external).map(nullableValue -> nullableValue.getExternalCode()).orElse(null), e.getId(), e.getExecutionNo(), row.getProductId(), row.getProductCode(), e.getRoutingId(), path.getRevision(), paths.view(e.getId())
+                .selectedNodeIds(), Objects.toString(row.getIssueTime(), null), lines.stream()
                 .map(i -> new Line(i.getId(), i.getMaterialId(), i.getMaterialCode(), i.getBatchNo(), i.getQuantity(), i.getUnitId(), i.getUnitCode(), i.getWarehouseId(), i.getWarehouseCode(), externalWarehouses.get(i.getWarehouseId())))
                 .toList(), inputFacts.snapshot(id), new Source(selection.provider(), selection.bindingKey(),
                 integrationSnapshot.revision(),
@@ -217,7 +220,7 @@ public class MaterialIssueSubmissionService {
         if (result.executionMode() == Mode.CONNECTED && result.status() == Status.SUCCEEDED && !result.stockEffective())
             result = new ErpActionResult(Status.UNKNOWN, Mode.CONNECTED, result.externalReference(), result.externalCode(), "ERP库存生效待核实");
         var a = attempts.selectByPrimaryKey(row.getSubmissionId());
-        if (a == null || !Objects.equals(a.getIssueId(), row.getId())) fail();
+        if (a == null || !Objects.equals(a.getIssueId(), row.getId())) ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
         if (result.executionMode() == Mode.CONNECTED) {
             if (result.externalReference() != null) extra.setExternalReference(result.externalReference());
             if (result.externalCode() != null) extra.setExternalCode(result.externalCode());
@@ -253,12 +256,12 @@ public class MaterialIssueSubmissionService {
             rules.lockIssues(List.of(id));
             var row = rules.hydrate(issues.selectByPrimaryKey(id));
             var extra = facts.required(id);
-            if (inputFacts.find(id) != null) fail();
+            if (inputFacts.find(id) != null) ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
             if (!MaterialIssueStatus.SUBMIT_REJECTED.getValue()
                     .equals(row.getStatus()) || row.getVoidOperationId() != null || extra.getExternalReference() != null || extra.getExternalCode() != null || !Status.REJECTED.getValue()
                     .equals(extra.getLastOutcome()) || !ProductionExecutionStatus.READY.getValue()
                     .equals(locks.execution(row.getExecutionId())
-                            .getStatus())) fail();
+                            .getStatus())) ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
             row.setSubmissionId(null);
             row.setStatus(MaterialIssueStatus.DRAFT.getValue());
             changed(issues.updateByPrimaryKey(row));
@@ -301,22 +304,21 @@ public class MaterialIssueSubmissionService {
     public Source source(MesMaterialIssueEntity row) {
         if (row.getSubmissionId() == null) return null;
         var attempt = attempts.selectByPrimaryKey(row.getSubmissionId());
-        if (attempt == null || !Objects.equals(row.getId(), attempt.getIssueId())) fail();
+        if (attempt == null || !Objects.equals(row.getId(), attempt.getIssueId())) ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
         var node = json.readTree(attempt.getCommandJson());
         var source = node.get("source");
         // Historical attempts may contain only {} or predate the frozen source contract.
-        return source == null || source.isNull() ? null : json.treeToValue(source, Source.class);
+        if (source == null || source.isNull()) return null;
+        return json.treeToValue(source, Source.class);
     }
 
     public String operationKey(MesMaterialIssueEntity row) {
-        return row.getSubmissionId() == null ? null : "ISSUE-SUBMIT-" + row.getSubmissionId();
+        if (row.getSubmissionId() == null) return null;
+        return "ISSUE-SUBMIT-" + row.getSubmissionId();
     }
 
     private static void changed(int n) {
-        if (n != 1) fail();
+        if (n != 1) ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
     }
 
-    private static void fail() {
-        throw new FoundationException(ErrorCode.RESOURCE_CONFLICT);
-    }
 }

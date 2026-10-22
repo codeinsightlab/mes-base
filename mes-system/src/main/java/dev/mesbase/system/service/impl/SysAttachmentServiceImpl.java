@@ -52,7 +52,8 @@ public class SysAttachmentServiceImpl {
     }
 
     private String factory(FactoryScope scope) {
-        return scope == null ? null : scope.factoryId().value();
+        if (scope == null) return null;
+        return scope.factoryId().value();
     }
 
     private void policy(String resource) {

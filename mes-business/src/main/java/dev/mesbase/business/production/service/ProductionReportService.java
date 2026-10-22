@@ -1,5 +1,8 @@
 package dev.mesbase.business.production.service;
 
+import dev.mesbase.common.validation.ParameterChecks;
+import java.util.Optional;
+
 import dev.mesbase.business.production.domain.ProductionQuantityInput;
 import dev.mesbase.business.production.domain.ProductionCompletionRequested;
 import dev.mesbase.platform.execution.FactoryContext;
@@ -29,6 +32,9 @@ import java.util.Objects;
 import org.springframework.dao.DuplicateKeyException;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.UUID;
 import java.util.Map;
 import java.util.stream.Collectors;
 import dev.mesbase.business.directory.service.BusinessDirectoryService;
@@ -83,7 +89,7 @@ public class ProductionReportService {
         ProductionQuantityInput.check(command.quantity());
         positive(command.quantity());
         reason(command.reason());
-        if (command.reportTime() == null || command.reportTime().isAfter(LocalDateTime.now())) invalid();
+        if (command.reportTime() == null || command.reportTime().isAfter(LocalDateTime.now())) ParameterChecks.reject(ErrorCode.BAD_REQUEST);
         users.requireExists(command.operatorUserId());
         if (command.workstationId() != null && workstations.selectByPrimaryKey(command.workstationId()) == null)
             throw new FoundationException(ErrorCode.REPORT_REFERENCE_INVALID);
@@ -148,6 +154,61 @@ public class ProductionReportService {
         return append(row, requestId, hash);
     }
 
+    /**
+     * Returns the reported quantity to this node's normal reporting allowance without deleting facts.
+     */
+    @Transactional(transactionManager = "businessTransactionManager", isolation = Isolation.READ_COMMITTED, rollbackFor = Exception.class)
+    public void returnToNode(Long executionId, Long nodeId, BigDecimal quantity, String qualityEventId, String reason) {
+        locks.requireActiveExecution(executionId);
+        sources.execution(locks.execution(executionId), null);
+        positive(quantity);
+        ProductionQuantityInput.check(quantity);
+        var filter = new MesProductionReportExample();
+        filter.createCriteria().andExecutionIdEqualTo(executionId).andRoutingNodeIdEqualTo(nodeId);
+        filter.setOrderByClause("id desc");
+        List<MesProductionReportEntity> rows;
+        try (var page = PageHelper.offsetPage(0, 10001, false)) {
+            rows = List.copyOf(reports.selectByExample(filter));
+        }
+        if (rows.size() > 10000) throw new FoundationException(ErrorCode.REPORT_QUANTITY_CONFLICT);
+        var corrections = new HashMap<Long, BigDecimal>();
+        for (var row : rows)
+            if (row.getReferenceReportId() != null)
+                corrections.merge(row.getReferenceReportId(), row.getQuantityDelta(), BigDecimal::add);
+        var remaining = quantity;
+        var additions = new ArrayList<MesProductionReportEntity>();
+        for (var original : rows) {
+            if (!ReportRecordType.REPORT.getValue().equals(original.getRecordType())) continue;
+            var balance = original.getQuantityDelta().add(corrections.getOrDefault(original.getId(), BigDecimal.ZERO));
+            if (balance.signum() <= 0) continue;
+            var amount = remaining.min(balance);
+            var row = new MesProductionReportEntity();
+            row.setExecutionId(executionId);
+            row.setRoutingNodeId(nodeId);
+            row.setRecordType(ReportRecordType.ADJUSTMENT.getValue());
+            row.setQuantityDelta(amount.negate());
+            row.setReferenceReportId(original.getId());
+            row.setSourceQualityEventId(qualityEventId);
+            row.setOperatorUserId(original.getOperatorUserId());
+            row.setRecordedBy(SecurityUtils.getUserId());
+            row.setReportTime(original.getReportTime());
+            row.setWorkstationId(original.getWorkstationId());
+            row.setReason(reason);
+            row.setCreateTime(LocalDateTime.now());
+            row.setRequestId(UUID.nameUUIDFromBytes((qualityEventId + ":" + original.getId()).getBytes(StandardCharsets.UTF_8))
+                    .toString());
+            row.setCommandFingerprint(fingerprint(AdminAction.ADJUST, qualityEventId, original.getId(), amount, reason));
+            additions.add(row);
+            remaining = remaining.subtract(amount);
+            if (remaining.signum() == 0) break;
+        }
+        if (remaining.signum() != 0) throw new FoundationException(ErrorCode.REPORT_QUANTITY_CONFLICT);
+        quantities.validateReportChange(executionId, nodeId, quantity.negate());
+        if (reports.insertBatch(additions) != additions.size())
+            throw new FoundationException(ErrorCode.REPORT_QUANTITY_CONFLICT);
+        publisher.publishEvent(new ProductionCompletionRequested(FactoryContext.required(), executionId));
+    }
+
     private MesProductionReportEntity lockedOriginal(Long id) {
         var before = require(id);
         locks.execution(before.getExecutionId());
@@ -185,8 +246,8 @@ public class ProductionReportService {
         // Length-prefixed canonical values prevent delimiter ambiguity; decimals compare by numeric value.
         StringBuilder input = new StringBuilder();
         for (Object field : fields) {
-            String value = field == null ? null : field instanceof BigDecimal number
-                    ? number.stripTrailingZeros().toPlainString() : field.toString().trim();
+            String value = Optional.ofNullable(field).map(nullableValue -> nullableValue instanceof BigDecimal number
+                    ? number.stripTrailingZeros().toPlainString() : nullableValue.toString().trim()).orElse(null);
             input.append(value == null ? -1 : value.length()).append(':');
             if (value != null) input.append(value);
         }
@@ -228,7 +289,7 @@ public class ProductionReportService {
     }
 
     private ReportPage page(MesProductionReportExample f, int offset, int limit) {
-        ProductionQuantityService.paging(offset, limit);
+        ParameterChecks.paging(offset, limit);
         f.setOrderByClause("id desc");
         List<MesProductionReportEntity> rows;
         long total;
@@ -253,20 +314,17 @@ public class ProductionReportService {
     }
 
     private static void reason(String reason) {
-        if (reason == null || reason.isBlank() || reason.length() > 500) invalid();
+        if (reason == null || reason.isBlank() || reason.length() > 500) ParameterChecks.reject(ErrorCode.BAD_REQUEST);
     }
 
     private static void positive(BigDecimal value) {
         delta(value);
-        if (value.signum() < 0) invalid();
+        if (value.signum() < 0) ParameterChecks.reject(ErrorCode.BAD_REQUEST);
     }
 
     private static void delta(BigDecimal value) {
         if (value == null || value.signum() == 0 || value.scale() > 6 || value.precision() - value.scale() > 14)
-            invalid();
+            ParameterChecks.reject(ErrorCode.BAD_REQUEST);
     }
 
-    private static void invalid() {
-        throw new FoundationException(ErrorCode.BAD_REQUEST);
-    }
 }

@@ -1,5 +1,6 @@
 package dev.mesbase.business.production.service;
 
+import dev.mesbase.common.validation.ParameterChecks;
 import dev.mesbase.business.production.domain.RoutingNodeEntity;
 import dev.mesbase.business.production.domain.RoutingEdgeEntity;
 import dev.mesbase.core.error.ErrorCode;
@@ -17,20 +18,17 @@ public final class ExecutionPathValidator {
 
     public static void validate(List<Long> path, List<RoutingNodeEntity> nodes, List<RoutingEdgeEntity> edges) {
         if (path == null || path.isEmpty() || path.size() > 100 || path.stream()
-                .anyMatch(x -> x == null) || new HashSet<>(path).size() != path.size()) invalid();
+                .anyMatch(x -> x == null) || new HashSet<>(path).size() != path.size()) ParameterChecks.reject(ErrorCode.ROUTING_GRAPH_INVALID);
         Set<Long> known = new HashSet<>();
         nodes.forEach(n -> known.add(n.getId()));
-        if (!known.containsAll(path)) invalid();
-        for (var n : nodes) if (Boolean.TRUE.equals(n.getIsKey()) && !path.contains(n.getId())) invalid();
+        if (!known.containsAll(path)) ParameterChecks.reject(ErrorCode.ROUTING_GRAPH_INVALID);
+        for (var n : nodes) if (Boolean.TRUE.equals(n.getIsKey()) && !path.contains(n.getId())) ParameterChecks.reject(ErrorCode.ROUTING_GRAPH_INVALID);
         if (edges.stream().anyMatch(e -> e.getToNodeId().equals(path.getFirst())) || edges.stream()
-                .anyMatch(e -> e.getFromNodeId().equals(path.getLast()))) invalid();
+                .anyMatch(e -> e.getFromNodeId().equals(path.getLast()))) ParameterChecks.reject(ErrorCode.ROUTING_GRAPH_INVALID);
         for (int i = 1; i < path.size(); i++) {
             Long from = path.get(i - 1), to = path.get(i);
-            if (edges.stream().noneMatch(e -> from.equals(e.getFromNodeId()) && to.equals(e.getToNodeId()))) invalid();
+            if (edges.stream().noneMatch(e -> from.equals(e.getFromNodeId()) && to.equals(e.getToNodeId()))) ParameterChecks.reject(ErrorCode.ROUTING_GRAPH_INVALID);
         }
     }
 
-    private static void invalid() {
-        throw new FoundationException(ErrorCode.ROUTING_GRAPH_INVALID);
-    }
 }

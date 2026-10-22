@@ -1,5 +1,7 @@
 package dev.mesbase.framework.aspectj;
 
+import java.util.Optional;
+
 import dev.mesbase.common.annotation.Log;
 import dev.mesbase.common.utils.SecurityUtils;
 import dev.mesbase.common.utils.ServletUtils;
@@ -54,7 +56,7 @@ public class LogAspect {
                 row.setFactoryId(FactoryContext.current().map(s -> s.factoryId().value()).orElse(null));
                 row.setExecutionScope(row.getFactoryId() == null ? "PLATFORM" : "FACTORY");
                 row.setStatus(failure == null ? 0 : 1);
-                row.setErrorMsg(failure == null ? null : failure.getClass().getSimpleName());
+                row.setErrorMsg(Optional.ofNullable(failure).map(nullableValue -> nullableValue.getClass().getSimpleName()).orElse(null));
                 row.setCostTime((System.nanoTime() - started) / 1000000L);
                 service.insertOperlog(row);
             } catch (Exception error) {

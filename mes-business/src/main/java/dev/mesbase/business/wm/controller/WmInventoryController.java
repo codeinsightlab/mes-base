@@ -1,5 +1,7 @@
 package dev.mesbase.business.wm.controller;
 
+import java.util.Objects;
+
 import dev.mesbase.business.wm.controller.vo.WmInventoryPageVo;
 import dev.mesbase.business.wm.controller.vo.WmInventoryVo;
 import dev.mesbase.business.wm.domain.WmInventoryCreateCommand;
@@ -94,15 +96,15 @@ public class WmInventoryController {
     private static WmInventoryVo toView(WmInventoryItem item) {
         var row = item.inventory();
         return new WmInventoryVo(
-                row.getId() == null ? null : row.getId().toString(),
+                Objects.toString(row.getId(), null),
 
-                row.getMaterialId() == null ? null : row.getMaterialId().toString(),
-                row.getWarehouseId() == null ? null : row.getWarehouseId().toString(),
+                Objects.toString(row.getMaterialId(), null),
+                Objects.toString(row.getWarehouseId(), null),
                 item.materialName(),
                 item.warehouseName(),
                 item.warehouseSource(),
-                row.getQuantity() == null ? null : row.getQuantity().toString(),
-                row.getAvailableQuantity() == null ? null : row.getAvailableQuantity().toString(),
+                Objects.toString(row.getQuantity(), null),
+                Objects.toString(row.getAvailableQuantity(), null),
                 row.getStatus(),
                 row.getRemark(),
                 row.getCreateBy(),

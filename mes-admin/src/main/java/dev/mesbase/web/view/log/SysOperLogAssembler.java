@@ -1,5 +1,7 @@
 package dev.mesbase.web.view.log;
 
+import java.util.Objects;
+
 import dev.mesbase.system.domain.SysOperLog;
 import java.util.List;
 
@@ -15,7 +17,7 @@ public final class SysOperLogAssembler {
                 row.getFactoryId(),
                 row.getExecutionScope(),
                 row.getCostTime(),
-                row.getOperId() == null ? null : row.getOperId().toString(),
+                Objects.toString(row.getOperId(), null),
                 row.getTitle(),
                 row.getBusinessType(),
                 row.getBusinessTypes(),
@@ -40,6 +42,7 @@ public final class SysOperLogAssembler {
     }
 
     public static List<SysOperLogResult> toResults(List<SysOperLog> rows) {
-        return rows == null ? null : rows.stream().map(SysOperLogAssembler::toResult).toList();
+        if (rows == null) return null;
+        return rows.stream().map(SysOperLogAssembler::toResult).toList();
     }
 }

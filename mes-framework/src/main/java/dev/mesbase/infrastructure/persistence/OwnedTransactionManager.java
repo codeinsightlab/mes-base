@@ -1,5 +1,7 @@
 package dev.mesbase.infrastructure.persistence;
 
+import java.util.Optional;
+
 import dev.mesbase.core.error.ErrorCode;
 import dev.mesbase.core.error.FoundationException;
 
@@ -77,7 +79,7 @@ public final class OwnedTransactionManager extends JdbcTransactionManager {
     protected Object doSuspend(Object transaction) {
         Object connection = super.doSuspend(transaction);
         Object owner = TransactionSynchronizationManager.unbindResource(OWNER);
-        return new Suspended(connection, owner, routing == null ? null : routing.suspend());
+        return new Suspended(connection, owner, Optional.ofNullable(routing).map(nullableValue -> nullableValue.suspend()).orElse(null));
     }
 
     @Override

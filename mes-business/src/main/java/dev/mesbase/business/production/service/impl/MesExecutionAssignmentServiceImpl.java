@@ -1,12 +1,12 @@
 package dev.mesbase.business.production.service.impl;
 
+import dev.mesbase.common.validation.ParameterChecks;
 import com.github.pagehelper.Page;
 import com.github.pagehelper.PageHelper;
 import dev.mesbase.business.production.dao.MesExecutionAssignmentMapper;
 import dev.mesbase.business.production.domain.MesExecutionAssignmentCreateCommand;
 import dev.mesbase.business.production.domain.MesExecutionAssignmentEntity;
 import dev.mesbase.business.production.domain.MesExecutionAssignmentExample;
-import dev.mesbase.business.production.domain.MesExecutionAssignmentPage;
 import dev.mesbase.business.production.domain.MesExecutionAssignmentQueryDto;
 import dev.mesbase.business.production.domain.MesExecutionAssignmentUpdateCommand;
 import dev.mesbase.business.production.service.IMesExecutionAssignmentService;
@@ -42,13 +42,11 @@ public class MesExecutionAssignmentServiceImpl implements IMesExecutionAssignmen
 
     @Override
     @Transactional(transactionManager = "businessTransactionManager", readOnly = true)
-    public MesExecutionAssignmentPage selectPage(MesExecutionAssignmentQueryDto query) {
+    public Page<MesExecutionAssignmentEntity> selectPage(MesExecutionAssignmentQueryDto query) {
         FactoryContext.required();
         int offset = query.offset() == null ? 0 : query.offset();
         int limit = query.limit() == null ? 20 : query.limit();
-        if (offset < 0 || limit < 1 || limit > 100) {
-            throw new FoundationException(ErrorCode.BAD_REQUEST);
-        }
+        ParameterChecks.paging(offset, limit, 100);
         MesExecutionAssignmentExample example = new MesExecutionAssignmentExample();
         MesExecutionAssignmentExample.Criteria criteria = example.createCriteria();
         if (query.executionId() != null) {
@@ -71,8 +69,8 @@ public class MesExecutionAssignmentServiceImpl implements IMesExecutionAssignmen
         }
         example.setOrderByClause("id desc");
         try (Page<MesExecutionAssignmentEntity> page = PageHelper.offsetPage(offset, limit)) {
-            List<MesExecutionAssignmentEntity> rows = mapper.selectByExample(example);
-            return new MesExecutionAssignmentPage(rows, page.getTotal(), offset, limit);
+            mapper.selectByExample(example);
+            return page;
         }
     }
 

@@ -1,10 +1,12 @@
 package dev.mesbase.business.production.controller;
 
+import com.github.pagehelper.Page;
+import java.util.Objects;
+
 import dev.mesbase.business.production.controller.vo.RoutingPageVo;
 import dev.mesbase.business.production.controller.vo.RoutingVo;
 import dev.mesbase.business.production.domain.RoutingCreateCommand;
 import dev.mesbase.business.production.domain.RoutingEntity;
-import dev.mesbase.business.production.domain.RoutingPage;
 import dev.mesbase.business.production.domain.RoutingQueryDto;
 import dev.mesbase.business.production.domain.RoutingUpdateCommand;
 import dev.mesbase.business.production.service.IRoutingService;
@@ -58,10 +60,10 @@ public class RoutingController {
     @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED,
             permission = RoutingPermissions.LIST)
     public RoutingPageVo list(@Valid @ModelAttribute RoutingQueryDto query) {
-        RoutingPage page = service.selectPage(query);
+        Page<RoutingEntity> page = service.selectPage(query);
         return new RoutingPageVo(
-                page.items().stream().map(RoutingController::toView).toList(),
-                page.total(), page.offset(), page.limit());
+                page.stream().map(RoutingController::toView).toList(),
+                page.getTotal(), (int) page.getStartRow(), page.getPageSize());
     }
 
     @GetMapping("/{id}")
@@ -173,7 +175,7 @@ public class RoutingController {
 
     private static RoutingVo toView(RoutingEntity row) {
         return new RoutingVo(
-                row.getId() == null ? null : row.getId().toString(),
+                Objects.toString(row.getId(), null),
 
                 row.getCode(),
                 row.getName(),

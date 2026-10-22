@@ -1,10 +1,14 @@
 package dev.mesbase.business.production.controller;
 
+import com.github.pagehelper.Page;
+import java.util.Optional;
+
+import java.util.Objects;
+
 import dev.mesbase.business.production.controller.vo.MesProductionExecutionPageVo;
 import dev.mesbase.business.production.controller.vo.MesProductionExecutionVo;
 import dev.mesbase.business.production.domain.MesProductionExecutionCreateCommand;
 import dev.mesbase.business.production.domain.MesProductionExecutionEntity;
-import dev.mesbase.business.production.domain.MesProductionExecutionPage;
 import dev.mesbase.business.production.domain.MesProductionExecutionQueryDto;
 import dev.mesbase.business.production.domain.MesProductionExecutionUpdateCommand;
 import dev.mesbase.business.production.service.IMesProductionExecutionService;
@@ -48,10 +52,19 @@ public class MesProductionExecutionController {
     @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED,
             permission = MesProductionExecutionPermissions.LIST)
     public MesProductionExecutionPageVo list(@Valid @ModelAttribute MesProductionExecutionQueryDto query) {
-        var page = queries.page(query);
+        var data = queries.page(query);
+        var page = data.records();
         return new MesProductionExecutionPageVo(
-                page.items().stream().map(MesProductionExecutionController::toView).toList(),
-                page.total(), page.offset(), page.limit());
+                page.stream().map(row -> {
+                    var routing = data.references().routings().get(row.getRoutingId());
+                    return toView(row, Optional.ofNullable(routing).map(value -> value.code()).orElse(null),
+                            Optional.ofNullable(routing).map(value -> value.name()).orElse(null),
+                            Optional.ofNullable(routing).map(value -> value.version()).orElse(null),
+                            ProductionExecutionQueryService.name(data.references().users(), row.getCreateBy()),
+                            ProductionExecutionQueryService.name(data.references().users(), row.getUpdateBy()),
+                            data.references().workorderStatuses().get(row.getWorkorderId()));
+                }).toList(),
+                page.getTotal(), (int) page.getStartRow(), page.getPageSize());
     }
 
     @GetMapping("/{id}")
@@ -88,10 +101,10 @@ public class MesProductionExecutionController {
 
 
     private static MesProductionExecutionVo toView(ProductionExecutionQueryService.Display display) {
-        return toView(display.record(), display.routing() == null ? null : display.routing()
-                .code(), display.routing() == null ? null : display.routing()
-                .name(), display.routing() == null ? null : display.routing()
-                .version(), display.createByName(), display.updateByName(), display.workorderStatus());
+        return toView(display.record(), Optional.ofNullable(display.routing()).map(nullableValue -> nullableValue
+                .code()).orElse(null), Optional.ofNullable(display.routing()).map(nullableValue -> nullableValue
+                .name()).orElse(null), Optional.ofNullable(display.routing()).map(nullableValue -> nullableValue
+                .version()).orElse(null), display.createByName(), display.updateByName(), display.workorderStatus());
     }
 
     static MesProductionExecutionVo toView(MesProductionExecutionEntity row) {
@@ -102,12 +115,12 @@ public class MesProductionExecutionController {
                                                    String routingName, Integer routingVersion, String createByName,
                                                    String updateByName, String workorderStatus) {
         return new MesProductionExecutionVo(
-                row.getId() == null ? null : row.getId().toString(),
+                Objects.toString(row.getId(), null),
                 row.getExecutionNo(),
-                row.getWorkorderId() == null ? null : row.getWorkorderId().toString(),
-                row.getProductId() == null ? null : row.getProductId().toString(),
-                row.getRoutingId() == null ? null : row.getRoutingId().toString(),
-                row.getTargetQty() == null ? null : row.getTargetQty().toString(),
+                Objects.toString(row.getWorkorderId(), null),
+                Objects.toString(row.getProductId(), null),
+                Objects.toString(row.getRoutingId(), null),
+                Objects.toString(row.getTargetQty(), null),
                 row.getStatus(),
                 row.getStartTime(),
                 row.getEndTime(),
