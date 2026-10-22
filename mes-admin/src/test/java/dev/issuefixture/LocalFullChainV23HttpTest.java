@@ -21,7 +21,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class LocalFullChainV23HttpTest {
     @Test
     void simultaneousQualityBasisChangeNeverLeavesAnEffectiveStaleRelease() throws Exception {
-        try (var c = ProductionQualityV13HttpTest.context(100, 100, 100, 100, 100);
+        try (var c = QualityWorkflowHttpTest.context(100, 100, 100, 100, 100);
              var pool = Executors.newFixedThreadPool(2)) {
             var m = MaterialIssueHttpTest.mvc(c);
             var j = ProductionWarehouseFixture.db(c);
@@ -34,7 +34,7 @@ class LocalFullChainV23HttpTest {
             });
             var defect = pool.submit(() -> {
                 barrier.await();
-                return ProductionQualityV13HttpTest.defect(m, 12, "10", "INDEPENDENT", null);
+                return QualityWorkflowHttpTest.defect(m, 12, "10", "INDEPENDENT", null);
             });
             int releaseStatus = release.get();
             assertTrue(List.of(200, 409).contains(releaseStatus));
@@ -50,7 +50,7 @@ class LocalFullChainV23HttpTest {
     @Test
     void cancellationAndPositiveReportShareTheWorkorderLockAndKeepCommittedHistory() throws Exception {
         for (int round = 0; round < 4; round++) {
-            try (var c = ProductionQualityV13HttpTest.context(99, 98, 97, 96, 95);
+            try (var c = QualityWorkflowHttpTest.context(99, 98, 97, 96, 95);
                  var pool = Executors.newFixedThreadPool(2)) {
                 var m = MaterialIssueHttpTest.mvc(c);
                 var j = ProductionWarehouseFixture.db(c);

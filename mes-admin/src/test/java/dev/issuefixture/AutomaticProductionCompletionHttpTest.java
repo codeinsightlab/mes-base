@@ -139,21 +139,21 @@ class AutomaticProductionCompletionHttpTest {
 
     @Test
     void pendingQualityBlocksAutomaticCompletionAndFinalQualityResultTriggersIt() throws Exception {
-        try (var c = ProductionQualityV13HttpTest.context(new Class<?>[]{Async.class}, 100, 100, 100, 100, 100);
+        try (var c = QualityWorkflowHttpTest.context(new Class<?>[]{Async.class}, 100, 100, 100, 100, 100);
              var workers = Executors.newSingleThreadExecutor()) {
             var j = ProductionWarehouseFixture.db(c);
             j.update("DELETE FROM mes_production_execution WHERE id=2");
             j.update("UPDATE workorder SET planned_qty=100 WHERE id=1");
             var m = MaterialIssueHttpTest.mvc(c);
             var tasks = c.getBean(QueuedCompletionExecutor.class);
-            String defect = ProductionQualityV13HttpTest.defect(m, 12, "10", "INDEPENDENT", null);
-            String started = ProductionQualityV13HttpTest.start(m, defect);
+            String defect = QualityWorkflowHttpTest.defect(m, 12, "10", "INDEPENDENT", null);
+            QualityDispositionHttpTest.bindBatch(j, "000LOT-001");
             workers.submit(tasks::runAll).get();
             assertEquals("RUNNING", j.queryForObject("SELECT status FROM mes_production_execution WHERE id=1", String.class));
-            ProductionQualityV13HttpTest.execute(m, defect, ProductionQualityV13HttpTest.command("RESULT", started, "0", "0", "4", "4", "0"));
+            QualityWorkflowHttpTest.transfer(m, defect, "10");
             workers.submit(tasks::runAll).get();
             assertEquals("COMPLETED", j.queryForObject("SELECT status FROM workorder WHERE id=1", String.class));
-            assertEquals(new BigDecimal("94.000000"), j.queryForObject("SELECT effective_qty FROM mes_execution_completion", BigDecimal.class));
+            assertEquals(new BigDecimal("90.000000"), j.queryForObject("SELECT effective_qty FROM mes_execution_completion", BigDecimal.class));
         }
     }
 

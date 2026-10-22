@@ -24,12 +24,12 @@ import java.util.concurrent.Executors;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.web.servlet.MockMvc;
 
-import static dev.issuefixture.ProductionQualityV13HttpTest.context;
-import static dev.issuefixture.ProductionQualityV13HttpTest.defect;
-import static dev.issuefixture.ProductionQualityV13HttpTest.amount;
-import static dev.issuefixture.ProductionQualityV13HttpTest.quantities;
-import static dev.issuefixture.ProductionQualityV13HttpTest.JSON;
-import static dev.issuefixture.ProductionQualityV13HttpTest.Q;
+import static dev.issuefixture.QualityWorkflowHttpTest.context;
+import static dev.issuefixture.QualityWorkflowHttpTest.defect;
+import static dev.issuefixture.QualityWorkflowHttpTest.amount;
+import static dev.issuefixture.QualityWorkflowHttpTest.quantities;
+import static dev.issuefixture.QualityWorkflowHttpTest.JSON;
+import static dev.issuefixture.QualityWorkflowHttpTest.Q;
 import static dev.issuefixture.ProductionReportHttpTest.full;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -82,7 +82,7 @@ class QualityDispositionHttpTest {
             amount(q.get("nodes").get(1), "effectiveOutputQty", "90");
             dispose(m, id, body);
             assertEquals(1, j.queryForObject("SELECT COUNT(*) FROM mes_production_report WHERE source_quality_event_id=?", Integer.class, key));
-            m.perform(full(post("/api/production/reports/supplements"), "A").content(ProductionReportHttpTest.supplement(12, "10")))
+            m.perform(full(post(ProductionReportingHttpTest.ROOT), "A").content(ProductionReportingHttpTest.body(12, "10")))
                     .andExpect(status().isOk());
             amount(quantities(m).get("nodes").get(1), "effectiveOutputQty", "100");
             m.perform(full(post(Q + "/" + id + "/dispositions"), "A").content(command(key, "RETURN_NODE", "9", "null")))
@@ -191,15 +191,16 @@ class QualityDispositionHttpTest {
     }
 
     @Test
-    void returningUnallocatedBalanceDoesNotHideUnfinishedHistoricRework() throws Exception {
-        try (var c = context(EXTRA, 100, 100, 90, 90, 90)) {
-            var m = MaterialIssueHttpTest.mvc(c);
-            var id = defect(m, 12, "10", "INDEPENDENT", null);
-            ProductionQualityV13HttpTest.execute(m, id, ProductionQualityV13HttpTest.command("ALLOCATE", null, "0", "4", "0", "0", "0"));
-            var result = dispose(m, id, command(UUID.randomUUID().toString(), "RETURN_NODE", "6", "null"));
-            amount(result, "pendingDispositionQty", "0");
-            amount(result, "pendingStartQty", "4");
-            assertEquals("WAITING_REWORK", result.get("state").asText());
+    void partialReturnsRemainPendingUntilTheWholeQuantityHasADisposition() throws Exception {
+        try (var c = context(EXTRA,100,100,90,90,90)) {
+            var mvc = MaterialIssueHttpTest.mvc(c);
+            var id = defect(mvc,12,"10","INDEPENDENT",null);
+            var partial = dispose(mvc,id,command(UUID.randomUUID().toString(),"RETURN_NODE","6","null"));
+            amount(partial,"pendingDispositionQty","4");
+            assertEquals("PENDING",partial.get("state").asText());
+            var complete = dispose(mvc,id,command(UUID.randomUUID().toString(),"RETURN_NODE","4","null"));
+            assertEquals("RETURNED",complete.get("state").asText());
+            assertEquals(false,complete.has("pendingStartQty"));
         }
     }
 

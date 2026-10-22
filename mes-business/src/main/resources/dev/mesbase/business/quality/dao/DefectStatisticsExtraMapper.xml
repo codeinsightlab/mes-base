@@ -12,12 +12,12 @@
       SUM(CASE WHEN t.attribution=#{independent} THEN d.defect_qty ELSE 0 END) independent_qty,
       SUM(CASE WHEN t.attribution=#{overlap} THEN d.defect_qty ELSE 0 END) overlap_qty,
       SUM(CASE WHEN COALESCE(t.attribution,#{unverified})=#{unverified} THEN d.defect_qty ELSE 0 END) unverified_qty,
-      SUM(CASE WHEN t.attribution=#{independent} THEN t.recovered ELSE 0 END) recovered_qty,
-      SUM(CASE WHEN t.attribution=#{independent} THEN d.defect_qty-t.recovered-t.returned ELSE 0 END) net_defect_qty
+      SUM(CASE WHEN t.attribution=#{independent} THEN t.returned ELSE 0 END) returned_qty,
+      SUM(CASE WHEN t.attribution=#{independent} THEN d.defect_qty-t.returned ELSE 0 END) net_defect_qty
     FROM mes_production_defect d
     JOIN routing_node n ON n.id=d.affected_node_id
     LEFT JOIN (
-      SELECT declaration_id,declaration_revision, MAX(attribution_type) attribution, SUM(recovered_qty) recovered, SUM(CASE WHEN action_type='RETURN_NODE' THEN rework_qty ELSE 0 END) returned
+      SELECT declaration_id,declaration_revision, MAX(CASE WHEN action_type='ASSESS' THEN attribution_type END) attribution, SUM(CASE WHEN action_type='RETURN_NODE' THEN rework_qty ELSE 0 END) returned
       FROM mes_quality_treatment GROUP BY declaration_id,declaration_revision
     ) t ON t.declaration_id=d.declaration_id AND t.declaration_revision=d.revision_no
     WHERE d.record_action != #{voidAction}

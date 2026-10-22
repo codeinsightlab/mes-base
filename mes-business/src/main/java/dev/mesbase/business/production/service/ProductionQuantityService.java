@@ -243,7 +243,7 @@ public class ProductionQuantityService {
             result.add(new NodeQuantity(executionId, node.getId(), node.getOperationId(), node.getNodeCode(), node.getOperationName() != null ? node.getOperationName() : model.operationLabels()
                     .containsKey(node.getOperationId()) ? model.operationLabels().get(node.getOperationId())
                     .name() + "（当前名称）" : null, i + 1,
-                    BigDecimal.ZERO, reported, defect, BigDecimal.ZERO, BigDecimal.ZERO, true, quality == null ? BigDecimal.ZERO : quality.recoveredQty(), BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, unverified, historyNodes != null ? historyNodes.get(node.getId())
+                    BigDecimal.ZERO, reported, defect, BigDecimal.ZERO, BigDecimal.ZERO, true, quality == null ? BigDecimal.ZERO : quality.returnedQty(), BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, unverified, historyNodes != null ? historyNodes.get(node.getId())
                     .effectiveDefect()
                     .add(quality == null ? BigDecimal.ZERO : quality.directDefectQty()) : quality == null ? BigDecimal.ZERO : quality.directDefectQty()));
         }
@@ -360,15 +360,15 @@ public class ProductionQuantityService {
                 direct = direct.add(defectDelta);
                 found = true;
             }
-            var netDefect = direct.subtract(node.recoveredQty());
-            if (next.signum() < 0 || defect.signum() < 0 || direct.signum() < 0 || node.recoveredQty()
-                    .signum() < 0 || netDefect.signum() < 0 || next.compareTo(direct) < 0)
+            var netDefect = direct.subtract(node.returnedQty());
+            if (next.signum() < 0 || defect.signum() < 0 || direct.signum() < 0 || node.returnedQty()
+                    .signum() < 0 || netDefect.signum() < 0 || next.compareTo(netDefect) < 0)
                 throw new ProductionQuantityConflictException(node.routingNodeId(), upstream, input, next, netDefect);
             var rawAvailable = input.subtract(next);
             var historical = rawAvailable.negate().max(BigDecimal.ZERO);
             var rawOutput = next.subtract(netDefect).subtract(historical);
             var output = rawOutput.max(BigDecimal.ZERO);
-            result.add(new NodeQuantity(node.executionId(), node.routingNodeId(), node.operationId(), node.code(), node.name(), node.sequenceNo(), input, next, defect, output, view.historical() ? BigDecimal.ZERO : rawAvailable.max(BigDecimal.ZERO), node.qualityIntegrated(), node.recoveredQty(), historical, rawOutput, rawAvailable, node.unverifiedDefectQty(), direct));
+            result.add(new NodeQuantity(node.executionId(), node.routingNodeId(), node.operationId(), node.code(), node.name(), node.sequenceNo(), input, next, defect, output, view.historical() ? BigDecimal.ZERO : rawAvailable.max(BigDecimal.ZERO), node.qualityIntegrated(), node.returnedQty(), historical, rawOutput, rawAvailable, node.unverifiedDefectQty(), direct));
             input = output;
             upstream = node.routingNodeId();
         }

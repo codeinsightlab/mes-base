@@ -30,7 +30,7 @@ public final class ProductionReportViews {
     public record Node(String executionId, String routingNodeId, String operationId, String code, String name,
                        int sequenceNo,
                        String inputQty, String reportedQty, String defectQty, String effectiveOutputQty,
-                       String availableQty, boolean qualityIntegrated, String directDefectQty, String recoveredQty,
+                       String availableQty, boolean qualityIntegrated, String directDefectQty, String returnedQty,
                        String netDefectQty, String propagatedLossQty, String historicalOverrunQty,
                        String rawEffectiveOutputQty, String rawAvailableQty, String unverifiedDefectQty,
                        boolean historicalConflict, String positiveReportBlockReason) {
@@ -74,7 +74,7 @@ public final class ProductionReportViews {
 
     private static Node node(NodeQuantity n, String blocked) {
         return new Node(id(n.executionId()), id(n.routingNodeId()), id(n.operationId()), n.code(), n.name(), n.sequenceNo(),
-                decimal(n.inputQty()), decimal(n.reportedQty()), decimal(n.defectQty()), decimal(n.effectiveOutputQty()), decimal(n.availableQty()), n.qualityIntegrated(), decimal(n.directDefectQty()), decimal(n.recoveredQty()), decimal(n.netDefectQty()), decimal(n.propagatedLossQty()), decimal(n.historicalOverrunQty()), decimal(n.rawEffectiveOutputQty()), decimal(n.rawAvailableQty()), decimal(n.unverifiedDefectQty()), n.historicalConflict(), blocked);
+                decimal(n.inputQty()), decimal(n.reportedQty()), decimal(n.defectQty()), decimal(n.effectiveOutputQty()), decimal(n.availableQty()), n.qualityIntegrated(), decimal(n.directDefectQty()), decimal(n.returnedQty()), decimal(n.netDefectQty()), decimal(n.propagatedLossQty()), decimal(n.historicalOverrunQty()), decimal(n.rawEffectiveOutputQty()), decimal(n.rawAvailableQty()), decimal(n.unverifiedDefectQty()), n.historicalConflict(), blocked);
     }
 
     public static Summary summary(ExecutionSummary e, String routingLabel) {

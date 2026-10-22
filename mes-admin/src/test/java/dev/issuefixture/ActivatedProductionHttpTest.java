@@ -46,7 +46,7 @@ class ActivatedProductionHttpTest {
 
     @Test
     void openingQuantitiesSurviveCompletionAndParentRemainsOpenForAnotherExecution() throws Exception {
-        try (var c = ProductionQualityV13HttpTest.context(new Class<?>[]{Opening.class,
+        try (var c = QualityWorkflowHttpTest.context(new Class<?>[]{Opening.class,
                 AutomaticProductionCompletionHttpTest.Async.class}, 100, 90, 90, 90, 90);
              var worker = Executors.newSingleThreadExecutor()) {
             var j = ProductionWarehouseFixture.db(c);
@@ -77,13 +77,13 @@ class ActivatedProductionHttpTest {
             http.perform(ProductionCoreV1HttpTest.full(post("/api/production/mes-production-execution"))
                             .content("{\"workorderId\":\"1\",\"routingId\":\"1\",\"targetQty\":\"900\",\"status\":\"READY\"}"))
                     .andExpect(status().isOk());
-            assertEquals(0, j.queryForObject("SELECT COUNT(*) FROM wm_stock_action", Integer.class));
+            assertEquals(1, j.queryForObject("SELECT COUNT(*) FROM wm_stock_action", Integer.class));
         }
     }
 
     @Test
     void unfinishedOpeningExecutionAcceptsNormalLastReportAndThenAutomaticallyCompletes() throws Exception {
-        try (var c = ProductionQualityV13HttpTest.context(new Class<?>[]{Opening.class,
+        try (var c = QualityWorkflowHttpTest.context(new Class<?>[]{Opening.class,
                 AutomaticProductionCompletionHttpTest.Async.class, ProductionReportingHttpTest.Extra.class}, 100, 90, 90, 90, 80);
              var worker = Executors.newSingleThreadExecutor()) {
             var j = ProductionWarehouseFixture.db(c);
@@ -101,7 +101,7 @@ class ActivatedProductionHttpTest {
             worker.submit(c.getBean(QueuedCompletionExecutor.class)::runAll).get();
             assertEquals("COMPLETED", j.queryForObject("SELECT status FROM mes_production_execution WHERE id=1", String.class));
             assertEquals("COMPLETED", j.queryForObject("SELECT status FROM workorder WHERE id=1", String.class));
-            assertEquals(0, j.queryForObject("SELECT COUNT(*) FROM wm_stock_action", Integer.class));
+            assertEquals(1, j.queryForObject("SELECT COUNT(*) FROM wm_stock_action", Integer.class));
             http.perform(ProductionCoreV1HttpTest.full(get("/api/production/report-quantities/executions/1")))
                     .andExpect(status().isOk()).andExpect(jsonPath("nodes[4].effectiveOutputQty").value("90.000000"));
         }
@@ -109,7 +109,7 @@ class ActivatedProductionHttpTest {
 
     @Test
     void formalImportedDefectReplacesOpeningLossWithoutSubtractingItTwice() throws Exception {
-        try (var c = ProductionQualityV13HttpTest.context(new Class<?>[]{Opening.class}, 100, 90, 90, 90, 90)) {
+        try (var c = QualityWorkflowHttpTest.context(new Class<?>[]{Opening.class}, 100, 90, 90, 90, 90)) {
             var fixtureDb = ProductionWarehouseFixture.db(c);
             for (String table : List.of("mes_material_issue_input", "mes_material_issue_item", "mes_material_issue_submission",
                     "mes_material_issue_erp_extra", "mes_material_issue"))
@@ -122,18 +122,18 @@ class ActivatedProductionHttpTest {
             // This H2 fixture mocks only the opening reader; formal quality uses actual SQL/services.
             when(mapper.nodes(1L)).thenReturn(converted);
             var http = MaterialIssueHttpTest.mvc(c);
-            String declaration = ProductionQualityV13HttpTest.defect(http, 12, "10", "INDEPENDENT", null);
-            var q = ProductionQualityV13HttpTest.quantities(http);
-            ProductionQualityV13HttpTest.amount(q.path("nodes").get(1), "reportedQty", "100");
-            ProductionQualityV13HttpTest.amount(q.path("nodes").get(1), "defectQty", "10");
-            ProductionQualityV13HttpTest.amount(q.path("nodes").get(1), "effectiveOutputQty", "90");
-            var summary = ProductionQualityV13HttpTest.execute(http, declaration,
-                    ProductionQualityV13HttpTest.command("ALLOCATE", null, "10", "0", "0", "0", "0"));
-            assertEquals("SCRAPPED", summary.path("state").asText());
-            q = ProductionQualityV13HttpTest.quantities(http);
-            ProductionQualityV13HttpTest.amount(q.path("nodes").get(4), "effectiveOutputQty", "90");
+            String declaration = QualityWorkflowHttpTest.defect(http, 12, "10", "INDEPENDENT", null);
+            var q = QualityWorkflowHttpTest.quantities(http);
+            QualityWorkflowHttpTest.amount(q.path("nodes").get(1), "reportedQty", "100");
+            QualityWorkflowHttpTest.amount(q.path("nodes").get(1), "defectQty", "10");
+            QualityWorkflowHttpTest.amount(q.path("nodes").get(1), "effectiveOutputQty", "90");
+            QualityDispositionHttpTest.bindBatch(fixtureDb, "000LOT-001");
+            var summary = QualityWorkflowHttpTest.transfer(http, declaration, "10");
+            assertEquals("TRANSFERRED", summary.path("state").asText());
+            q = QualityWorkflowHttpTest.quantities(http);
+            QualityWorkflowHttpTest.amount(q.path("nodes").get(4), "effectiveOutputQty", "90");
             var j = ProductionWarehouseFixture.db(c);
-            assertEquals(0, j.queryForObject("SELECT COUNT(*) FROM wm_stock_action", Integer.class));
+            assertEquals(1, j.queryForObject("SELECT COUNT(*) FROM wm_stock_action", Integer.class));
             assertEquals(90, j.queryForObject("SELECT SUM(quantity_delta) FROM mes_production_report WHERE execution_id=1 AND routing_node_id=12", Integer.class));
         }
     }
@@ -151,7 +151,7 @@ class ActivatedProductionHttpTest {
 
     @Test
     void balancedOpeningWithUnprovenHistoricalDispositionCannotComplete() throws Exception {
-        try (var c = ProductionQualityV13HttpTest.context(new Class<?>[]{Opening.class}, 100, 90, 90, 90, 90)) {
+        try (var c = QualityWorkflowHttpTest.context(new Class<?>[]{Opening.class}, 100, 90, 90, 90, 90)) {
             var mapper = c.getBean(LegacyMigrationMapper.class);
             var pending = mapper.nodes(1L).stream().map(n -> new Node(n.routingNodeId(), n.legacyNet(),
                     n.grossCorrection(), n.effectiveDefect(), n.evidence(),
@@ -160,9 +160,9 @@ class ActivatedProductionHttpTest {
             var http = MaterialIssueHttpTest.mvc(c);
             http.perform(ProductionCoreV1HttpTest.full(get("/api/production/executions/1/closure")))
                     .andExpect(status().isOk()).andExpect(jsonPath("canComplete").value(false));
-            var q = ProductionQualityV13HttpTest.quantities(http);
-            ProductionQualityV13HttpTest.amount(q.path("nodes").get(1), "unverifiedDefectQty", "10");
-            ProductionQualityV13HttpTest.amount(q.path("nodes").get(4), "effectiveOutputQty", "90");
+            var q = QualityWorkflowHttpTest.quantities(http);
+            QualityWorkflowHttpTest.amount(q.path("nodes").get(1), "unverifiedDefectQty", "10");
+            QualityWorkflowHttpTest.amount(q.path("nodes").get(4), "effectiveOutputQty", "90");
         }
     }
 

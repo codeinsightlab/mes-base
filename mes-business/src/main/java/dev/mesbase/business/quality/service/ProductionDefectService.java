@@ -364,14 +364,11 @@ public class ProductionDefectService {
             for (var row : rows) {
                 var t = totals.get(row.getDeclarationId());
                 if (t == null) throw new FoundationException(ErrorCode.QUALITY_TREATMENT_CONFLICT);
-                var pending = row.getDefectQty().subtract(t.scrapQty()).subtract(t.reworkQty())
-                        .subtract(t.returnedQty()).subtract(t.transferredQty());
+                if (t.invalidActions() > 0) throw new FoundationException(ErrorCode.QUALITY_TREATMENT_CONFLICT);
                 var attribution = Attribution.UNVERIFIED;
                 if (t.attribution() != null) attribution = Attribution.valueOf(t.attribution());
-                var state = QualityTreatmentService.processingState(row.getRecordAction(), attribution, pending,
-                        t.startedQty(), t.processedQty(), t.reworkQty(), t.returnedQty(), t.transferredQty(),
-                        t.failedQty(), t.recoveredQty());
-                states.put(row.getDeclarationId(), new Processing(state, pending, t.returnedQty(), t.transferredQty()));
+                states.put(row.getDeclarationId(), Processing.of(row.getRecordAction(), attribution,
+                        row.getDefectQty(), t.returnedQty(), t.transferredQty()));
             }
         }
         return new Page(rows, total, offset, limit, names(rows), Map.copyOf(states), contexts);
@@ -479,22 +476,7 @@ public class ProductionDefectService {
                     .equals(f.affectedNodeId())) ParameterChecks.reject(ErrorCode.BAD_REQUEST);
             return new Facts(f.executionId(), f.affectedNodeId(), f.discoveredNodeId(), f.responsibleNodeId(), f.defectQty(), f.wasteCategory(), f.defectReason(), f.responsibleUserId(), f.responsibilityRemark(), f.destinationType(), f.affectedNodeId(), null, f.destinationRemark(), f.occurredAt());
         }
-        if (DefectDestination.ROUTING_NODE.getValue().equals(f.destinationType())) {
-            if (f.targetWarehouseId() != null) ParameterChecks.reject(ErrorCode.BAD_REQUEST);
-            int index = ids.indexOf(f.discoveredNodeId());
-            Long target = f.targetNodeId();
-            if (target == null && index > 0) target = ids.get(index - 1);
-            if (target == null || ids.indexOf(target) < 0 || ids.indexOf(target) >= index)
-                ParameterChecks.reject(ErrorCode.BAD_REQUEST);
-            return new Facts(f.executionId(), f.affectedNodeId(), f.discoveredNodeId(), f.responsibleNodeId(), f.defectQty(), f.wasteCategory(), f.defectReason(), f.responsibleUserId(), f.responsibilityRemark(), f.destinationType(), target, null, f.destinationRemark(), f.occurredAt());
-        }
-        if (!DefectDestination.WAREHOUSE.getValue()
-                .equals(f.destinationType()) || f.targetNodeId() != null || f.targetWarehouseId() == null)
-            ParameterChecks.reject(ErrorCode.BAD_REQUEST);
-        var w = warehouses.selectByPrimaryKey(f.targetWarehouseId());
-        if (w == null || !EnableStatus.ENABLED.getValue().equals(w.getStatus()))
-            ParameterChecks.reject(ErrorCode.BAD_REQUEST);
-        return f;
+        throw new FoundationException(ErrorCode.BAD_REQUEST);
     }
 
     public static Facts normalize(Facts f) {

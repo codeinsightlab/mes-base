@@ -51,19 +51,19 @@ class QualityReleaseHttpTest {
 
     @Test
     void lateRealDefectPreservesPostedInboundAndBlocksFurtherStockChanges() throws Exception {
-        try (var c = ProductionQualityV13HttpTest.context(100, 100, 100, 100, 100)) {
+        try (var c = QualityWorkflowHttpTest.context(100, 100, 100, 100, 100)) {
             var m = MaterialIssueHttpTest.mvc(c);
             var j = ProductionWarehouseFixture.db(c);
             m.perform(ProductionCoreV1HttpTest.full(post("/api/quality/releases/executions/1"))
                     .content(ProductionCompletionHttpTest.release("98"))).andExpect(status().isOk());
             j.update("INSERT INTO wm_inventory(id,material_id,warehouse_id,batch_no,quantity,available_quantity,status) VALUES(1,1,1,'TEST-FINISHED',0,0,'ENABLED')");
             UnifiedInboundHttpTest.receive(m, "98");
-            String defect = ProductionQualityV13HttpTest.defect(m, 12, "10", null, null);
+            String defect = QualityWorkflowHttpTest.defect(m, 12, "10", null, null);
             m.perform(ProductionCoreV1HttpTest.full(post("/api/quality/releases/executions/1"))
                     .content(ProductionCompletionHttpTest.release("90"))).andExpect(status().isConflict());
-            var assess = (ObjectNode) new ObjectMapper().readTree(ProductionQualityV13HttpTest.command("ASSESS", null, "0", "0", "0", "0", "0"));
+            var assess = (ObjectNode) new ObjectMapper().readTree(QualityWorkflowHttpTest.assessmentCommand());
             assess.putObject("assessment").put("type", "INDEPENDENT").put("basis", "TEST ONLY 晚申报独立依据");
-            ProductionQualityV13HttpTest.execute(m, defect, assess.toString());
+            QualityWorkflowHttpTest.assess(m, defect, assess.toString());
             m.perform(ProductionCoreV1HttpTest.full(get("/api/wm/stock-documents/executions/1/basis")))
                     .andExpect(status().isOk()).andExpect(jsonPath("effective").value("90.000000"))
                     .andExpect(jsonPath("received").value("98.000000")).andExpect(jsonPath("canReceive").value(false));

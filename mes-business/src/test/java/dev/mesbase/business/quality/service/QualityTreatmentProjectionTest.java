@@ -60,21 +60,14 @@ class QualityTreatmentProjectionTest {
     }
 
     private static MesQualityTreatmentEntity event(String id, String declaration, int revision, Action action,
-                                                   Attribution type, String rework, String processed,
-                                                   String recovered, String failed) {
-        var e = new MesQualityTreatmentEntity();
-        e.setId(id);
-        e.setDeclarationId(declaration);
-        e.setDeclarationRevision(revision);
-        e.setExecutionId(1L);
-        e.setActionType(action.name());
-        e.setAttributionType(Optional.ofNullable(type).map(nullableValue -> nullableValue.name()).orElse(null));
-        e.setScrapQty(BigDecimal.ZERO);
-        e.setReworkQty(new BigDecimal(rework));
-        e.setProcessedQty(new BigDecimal(processed));
-        e.setRecoveredQty(new BigDecimal(recovered));
-        e.setFailedQty(new BigDecimal(failed));
-        return e;
+                                                   Attribution type, String quantity) {
+        var event = new MesQualityTreatmentEntity();
+        event.setId(id); event.setDeclarationId(declaration); event.setDeclarationRevision(revision);
+        event.setExecutionId(1L); event.setActionType(action.name());
+        if (type != null) event.setAttributionType(type.name());
+        event.setReturnedQty(action == Action.RETURN_NODE ? new BigDecimal(quantity) : BigDecimal.ZERO);
+        event.setTransferQty(action == Action.TRANSFER_WAREHOUSE ? new BigDecimal(quantity) : BigDecimal.ZERO);
+        return event;
     }
 
     @Test
@@ -113,21 +106,13 @@ class QualityTreatmentProjectionTest {
         var voided = declaration("void", 1, "99", 12);
         voided.setRecordAction(DefectRecordAction.VOID.getValue());
         var unknown = declaration("unknown", 1, "1", 12);
-        var first = event("a2-assess", "a", 2, Action.ASSESS, Attribution.INDEPENDENT, "0", "0", "0", "0");
-        var second = event("a2-later-assess", "a", 2, Action.ASSESS, Attribution.OVERLAP, "0", "0", "0", "0");
-        var overlap = event("b-assess", "b", 1, Action.ASSESS, Attribution.OVERLAP, "0", "0", "0", "0");
+        var first = event("a2-assess", "a", 2, Action.ASSESS, Attribution.INDEPENDENT, "0");
+        var overlap = event("b-assess", "b", 1, Action.ASSESS, Attribution.OVERLAP, "0");
         overlap.setRelatedDeclarationId("a");
-        var rows = List.of(
-                event("a1-old", "a", 1, Action.ASSESS, Attribution.OVERLAP, "0", "0", "0", "0"),
-                first, overlap, second,
-                event("a2-allocate1", "a", 2, Action.ALLOCATE, null, "2", "0", "0", "0"),
-                event("a2-allocate2", "a", 2, Action.ALLOCATE, null, "3", "0", "0", "0"),
-                event("a2-start1", "a", 2, Action.START, null, "2", "0", "0", "0"),
-                event("a2-result1", "a", 2, Action.RESULT, null, "0", "2", "1", "1"),
-                event("a2-start2", "a", 2, Action.START, null, "3", "0", "0", "0"),
-                event("a2-result2", "a", 2, Action.RESULT, null, "0", "3", "3", "0"),
-                event("a2-correction", "a", 2, Action.CORRECT_RESULT, null, "0", "0", "-0.5", "0.5"),
-                event("void-assess", "void", 1, Action.ASSESS, Attribution.INDEPENDENT, "0", "0", "0", "0"));
+        var rows = List.of(event("a1-old", "a", 1, Action.ASSESS, Attribution.OVERLAP, "0"),
+                first,overlap,event("a2-return", "a",2,Action.RETURN_NODE,null,"3.5"),
+                event("a2-transfer", "a",2,Action.TRANSFER_WAREHOUSE,null,"1.5"),
+                event("void-assess","void",1,Action.ASSESS,Attribution.INDEPENDENT,"0"));
         when(events.selectByExample(any())).thenReturn(rows);
         when(defects.selectLatest(1L, null, null)).thenReturn(List.of(a, b, voided, unknown));
         var basis = service.releaseBasis(1L);
@@ -140,14 +125,14 @@ class QualityTreatmentProjectionTest {
         }
         var projected = basis.declarations().getFirst();
         assertEquals(Attribution.INDEPENDENT, projected.attribution());
-        assertEquals(new BigDecimal("3.5"), projected.recoveredQty());
+        assertEquals(new BigDecimal("3.5"), projected.returnedQty());
         assertEquals(new BigDecimal("1.5"), projected.netDefectQty());
         assertThrows(UnsupportedOperationException.class, () -> projected.events().add(first));
-        assertEquals(15, basis.factIdentities().size()); // 3 current non-VOID declarations + all 12 events.
+        assertEquals(9, basis.factIdentities().size()); // 3 current non-VOID declarations and 6 immutable events.
         var totals = service.nodeTotals(1L);
         var n = totals.stream().filter(v -> v.affectedNodeId().equals(11L)).findFirst().orElseThrow();
         assertEquals(new BigDecimal("7"), n.effectiveDefectQty());
-        assertEquals(new BigDecimal("3.5"), n.recoveredQty());
+        assertEquals(new BigDecimal("3.5"), n.returnedQty());
         assertEquals(new BigDecimal("5"), n.directDefectQty());
     }
 
@@ -172,7 +157,7 @@ class QualityTreatmentProjectionTest {
     void eventCapacityRemainsBounded(int count) {
         var rows = new ArrayList<MesQualityTreatmentEntity>();
         for (int i = 0; i < count; i++)
-            rows.add(event("t" + i, "d", 1, Action.ASSESS, Attribution.INDEPENDENT, "0", "0", "0", "0"));
+            rows.add(event("t" + i, "d", 1, Action.ASSESS, Attribution.INDEPENDENT, "0"));
         when(events.selectByExample(any())).thenReturn(rows);
         when(defects.selectLatest(1L, null, null)).thenReturn(List.of(declaration("d", 1, "1", 11)));
         if (count <= 5000) assertEquals(count + 1, service.releaseBasis(1L).factIdentities().size());
@@ -183,16 +168,16 @@ class QualityTreatmentProjectionTest {
     void mutableGuardOnlyUsesCurrentRevisionForOverlapButNeverHidesAnyDispositionHistory() {
         var target = declaration("target", 1, "1", 11);
         var related = declaration("related", 2, "1", 11);
-        var old = event("old-overlap", "related", 1, Action.ASSESS, Attribution.OVERLAP, "0", "0", "0", "0");
+        var old = event("old-overlap", "related", 1, Action.ASSESS, Attribution.OVERLAP, "0");
         old.setRelatedDeclarationId("target");
-        var current = event("new-independent", "related", 2, Action.ASSESS, Attribution.INDEPENDENT, "0", "0", "0", "0");
+        var current = event("new-independent", "related", 2, Action.ASSESS, Attribution.INDEPENDENT, "0");
         when(defects.selectLatest(1L, null, null)).thenReturn(List.of(target, related));
         when(events.selectByExample(any())).thenReturn(List.of(old, current));
         service.assertMutable(target);
         current.setAttributionType(Attribution.OVERLAP.name());
         current.setRelatedDeclarationId("target");
         assertThrows(FoundationException.class, () -> service.assertMutable(target));
-        when(events.selectByExample(any())).thenReturn(List.of(old, event("old-disposition", "target", 1, Action.ALLOCATE, null, "1", "0", "0", "0")));
+        when(events.selectByExample(any())).thenReturn(List.of(old, event("old-disposition", "target", 1, Action.RETURN_NODE, null, "1")));
         assertThrows(FoundationException.class, () -> service.assertMutable(target));
     }
 
@@ -225,11 +210,10 @@ class QualityTreatmentProjectionTest {
             e.setRoutingNodeId(11L);
             e.setActionType(Action.ASSESS.name());
             e.setAttributionType(Attribution.INDEPENDENT.name());
-            e.setScrapQty(BigDecimal.ZERO);
-            e.setReworkQty(BigDecimal.ZERO);
-            e.setProcessedQty(BigDecimal.ZERO);
-            e.setRecoveredQty(BigDecimal.ZERO);
-            e.setFailedQty(BigDecimal.ZERO);
+
+            e.setReturnedQty(BigDecimal.ZERO);
+            e.setTransferQty(BigDecimal.ZERO);
+
             rows.add(e);
         }
         when(events.selectByExample(any())).thenReturn(rows);

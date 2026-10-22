@@ -53,7 +53,7 @@ public final class ProductionReportModels {
     public record NodeQuantity(Long executionId, Long routingNodeId, Long operationId, String code, String name,
                                int sequenceNo, BigDecimal inputQty, BigDecimal reportedQty, BigDecimal defectQty,
                                BigDecimal effectiveOutputQty, BigDecimal availableQty, boolean qualityIntegrated,
-                               BigDecimal recoveredQty, BigDecimal historicalOverrunQty,
+                               BigDecimal returnedQty, BigDecimal historicalOverrunQty,
                                BigDecimal rawEffectiveOutputQty, BigDecimal rawAvailableQty,
                                BigDecimal unverifiedDefectQty, BigDecimal directDefectQty) {
         public NodeQuantity(Long executionId, Long routingNodeId, Long operationId, String code, String name,
@@ -65,13 +65,13 @@ public final class ProductionReportModels {
         public NodeQuantity(Long executionId, Long routingNodeId, Long operationId, String code, String name,
                             int sequenceNo, BigDecimal inputQty, BigDecimal reportedQty, BigDecimal defectQty,
                             BigDecimal effectiveOutputQty, BigDecimal availableQty, boolean qualityIntegrated,
-                            BigDecimal recoveredQty, BigDecimal historicalOverrunQty, BigDecimal rawEffectiveOutputQty,
+                            BigDecimal returnedQty, BigDecimal historicalOverrunQty, BigDecimal rawEffectiveOutputQty,
                             BigDecimal rawAvailableQty, BigDecimal unverifiedDefectQty) {
-            this(executionId, routingNodeId, operationId, code, name, sequenceNo, inputQty, reportedQty, defectQty, effectiveOutputQty, availableQty, qualityIntegrated, recoveredQty, historicalOverrunQty, rawEffectiveOutputQty, rawAvailableQty, unverifiedDefectQty, defectQty);
+            this(executionId, routingNodeId, operationId, code, name, sequenceNo, inputQty, reportedQty, defectQty, effectiveOutputQty, availableQty, qualityIntegrated, returnedQty, historicalOverrunQty, rawEffectiveOutputQty, rawAvailableQty, unverifiedDefectQty, defectQty);
         }
 
         public BigDecimal netDefectQty() {
-            return directDefectQty.subtract(recoveredQty);
+            return directDefectQty.subtract(returnedQty);
         }
 
         public BigDecimal propagatedLossQty() {

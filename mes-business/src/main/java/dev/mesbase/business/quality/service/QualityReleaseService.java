@@ -89,9 +89,8 @@ public class QualityReleaseService {
         else if (q.nodes().stream().anyMatch(n -> n.unverifiedDefectQty().signum() > 0))
             issue = "存在影响放行的待核实质量观察";
         else if (basis.declarations().stream().anyMatch(s -> s.attribution() == Attribution.UNVERIFIED
-                || s.attribution() == Attribution.INDEPENDENT && (s.pendingDispositionQty()
-                .signum() > 0 || s.pendingStartQty().signum() > 0 || s.inProgressQty().signum() > 0)))
-            issue = "质量处置或返工尚未完成，成功返工也须重新明确放行";
+                || s.attribution() == Attribution.INDEPENDENT && s.pendingDispositionQty().signum() > 0))
+            issue = "存在尚未完成的不良处置";
         BigDecimal output = q.nodes().isEmpty() ? BigDecimal.ZERO : q.nodes().getLast().effectiveOutputQty();
         String hash = ProductionClosureRules.hash(q.routingId(), q.pathStatus(), q.confirmedInputQty(),
                 q.nodes().stream()

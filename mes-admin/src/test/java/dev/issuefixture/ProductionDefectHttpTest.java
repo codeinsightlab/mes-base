@@ -82,7 +82,7 @@ class ProductionDefectHttpTest {
     }
 
     static String command(String key, int revision, String quantity) {
-        return "{\"assessment\":{\"type\":\"INDEPENDENT\",\"basis\":\"TEST ONLY explicit independent fixture\"},\"requestKey\":\"" + key + "\"," + (revision == 0 ? "" : "\"expectedRevision\":" + revision + ",\"revisionReason\":\"TEST订正\",") + "\"facts\":{\"executionId\":\"1\",\"affectedNodeId\":\"13\",\"discoveredNodeId\":\"12\",\"defectQty\":\"" + quantity + "\",\"wasteCategory\":\"PROCESS\",\"defectReason\":\"TEST ONLY缺陷\",\"destinationType\":\"ROUTING_NODE\",\"occurredAt\":\"2026-01-01T10:00:00\"}}";
+        return "{\"assessment\":{\"type\":\"INDEPENDENT\",\"basis\":\"TEST ONLY explicit independent fixture\"},\"requestKey\":\"" + key + "\"," + (revision == 0 ? "" : "\"expectedRevision\":" + revision + ",\"revisionReason\":\"TEST订正\",") + "\"facts\":{\"executionId\":\"1\",\"affectedNodeId\":\"13\",\"discoveredNodeId\":\"13\",\"defectQty\":\"" + quantity + "\",\"wasteCategory\":\"PROCESS\",\"defectReason\":\"TEST ONLY缺陷\",\"destinationType\":\"SAME_NODE\",\"occurredAt\":\"2026-01-01T10:00:00\"}}";
     }
 
     static String add(MockMvc m, String body, String factory) throws Exception {
@@ -98,18 +98,18 @@ class ProductionDefectHttpTest {
         try (var c = context()) {
             var jdbc = c.getBean(MaterialIssueHttpTest.Fixture.class).business.get("A");
             for (int i = 0; i < 12; i++)
-                jdbc.update("INSERT INTO mes_quality_treatment(id,request_hash,declaration_id,declaration_revision,execution_id,routing_node_id,action_type,operator_user_id,confirmed_by,occurred_at,recorded_at,reason,recovered_qty,failed_qty) VALUES(?,?,'same-declaration',?,1,11,?,100,1,'2026-01-01 09:00:00',?,'TEST ONLY immutable event',?,?)",
-                        String.format("00000000-0000-0000-0000-%012d", 12 - i), "test-" + i, i < 6 ? 1 : 2,
-                        i == 11 ? "CORRECT_RESULT" : "RESULT", "2026-01-01 10:00:" + String.format("%02d", i),
-                        i == 11 ? "-0.123456" : "0.123456", "0");
+                jdbc.update("INSERT INTO mes_quality_treatment(id,request_hash,declaration_id,declaration_revision,execution_id,routing_node_id,action_type,operator_user_id,confirmed_by,occurred_at,recorded_at,reason,rework_qty,transfer_qty) VALUES(?,?,'same-declaration',?,1,11,?,100,1,'2026-01-01 09:00:00',?,'TEST ONLY immutable event',?,?)",
+                        String.format("00000000-0000-0000-0000-%012d",12-i),"test-"+i,i<6?1:2,
+                        i==11?"TRANSFER_WAREHOUSE":"RETURN_NODE","2026-01-01 10:00:"+String.format("%02d",i),
+                        i==11?"0":"0.123456",i==11?"0.123456":"0");
             var capture = new RecentProductionReportHttpTest.SqlCapture();
             c.getBean(SqlSessionFactory.class).getConfiguration().addInterceptor(capture);
             var mvc = MaterialIssueHttpTest.mvc(c);
             mvc.perform(full(get("/api/quality/treatments/recent"), "A"))
                     .andExpect(status().isOk()).andExpect(jsonPath("$.length()").value(10))
                     .andExpect(jsonPath("[0].id").value("00000000-0000-0000-0000-000000000001"))
-                    .andExpect(jsonPath("[0].actionType").value("CORRECT_RESULT"))
-                    .andExpect(jsonPath("[0].recoveredQty").value("-0.123456"))
+                    .andExpect(jsonPath("[0].actionType").value("TRANSFER_WAREHOUSE"))
+                    .andExpect(jsonPath("[0].transferQty").value("0.123456"))
                     .andExpect(jsonPath("[9].id").value("00000000-0000-0000-0000-000000000010"))
                     .andExpect(jsonPath("[9].declarationRevision").value(1));
             capture.assertNoCount();
@@ -170,53 +170,31 @@ class ProductionDefectHttpTest {
     }
 
     @Test
-    void actualPathDestinationsAndReferences() throws Exception {
-        try (var c = context()) {
-            var m = MaterialIssueHttpTest.mvc(c);
-            var base = command("check", 0, "1");
-            var jdbc = c.getBean(MaterialIssueHttpTest.Fixture.class).business.get("A");
-            jdbc.update("INSERT INTO routing_node(id,routing_id,node_code,operation_id,operation_code,operation_name,display_order,is_key) VALUES(14,1,'ALT',1,'O1','未选分支',0,false)");
-            jdbc.update("INSERT INTO routing_edge(routing_id,from_node_id,to_node_id) VALUES(1,11,14),(1,14,13)");
-            m.perform(full(post(ROOT), "A").content(base.replace("discoveredNodeId\":\"12", "discoveredNodeId\":\"14")))
-                    .andExpect(status().isBadRequest());
-            m.perform(full(post(ROOT), "A").content(base.replace("\"destinationType\"", "\"responsibleNodeId\":\"14\",\"destinationType\"")))
-                    .andExpect(status().isBadRequest());
-            m.perform(full(post(ROOT), "A").content(base.replace("\"destinationType\"", "\"targetNodeId\":\"12\",\"destinationType\"")))
-                    .andExpect(status().isBadRequest());
-            for (String body : List.of(base.replace("check", "downstream")
-                    .replace("discoveredNodeId\":\"12", "discoveredNodeId\":\"11"), base.replace("discoveredNodeId\":\"12", "discoveredNodeId\":\"999"), base.replace("\"destinationType\"", "\"targetNodeId\":\"13\",\"destinationType\""), base.replace("\"destinationType\"", "\"responsibleUserId\":\"999\",\"destinationType\""), command("check", 0, "0"), command("check", 0, "0.0000001")))
-                m.perform(full(post(ROOT), "A").content(body)).andExpect(status().isBadRequest());
-            m.perform(full(post(ROOT), "A").content(base.replace("executionId\":\"1", "executionId\":\"999")))
-                    .andExpect(status().isNotFound());
-            var id = add(m, base.replace("\"destinationType\"", "\"targetNodeId\":\"11\",\"responsibleUserId\":\"100\",\"destinationType\""), "A");
-            m.perform(full(get(ROOT + "/" + id), "A")).andExpect(jsonPath("targetNodeId").value("11"));
-            m.perform(full(post(ROOT + "/" + id + "/revisions"), "A").content(command("move", 1, "3").replace("affectedNodeId\":\"13", "affectedNodeId\":\"12")))
+    void declarationsOnlyAcceptTheReportingNodeAndValidateReferences() throws Exception {
+        try (var c=context()) {
+            var mvc=MaterialIssueHttpTest.mvc(c);
+            var base=new ObjectMapper().readTree(command(UUID.randomUUID().toString(),0,"1"));
+            var facts=(ObjectNode)base.get("facts");
+            facts.put("targetNodeId","12");
+            mvc.perform(full(post(ROOT),"A").content(base.toString())).andExpect(status().isBadRequest());
+            facts.put("targetNodeId","13");facts.put("responsibleUserId","999");
+            mvc.perform(full(post(ROOT),"A").content(base.toString())).andExpect(status().isBadRequest());
+            facts.put("responsibleUserId","100");
+            var id=add(mvc,base.toString(),"A");
+            mvc.perform(full(get(ROOT+"/"+id),"A")).andExpect(jsonPath("targetNodeId").value("13"));
+            mvc.perform(full(post(ROOT+"/"+id+"/revisions"),"A").content(command(UUID.randomUUID().toString(),1,"3").replace("affectedNodeId\":\"13","affectedNodeId\":\"12")))
                     .andExpect(status().isConflict());
-            // An upstream target is relative to the discovery node, never the quantity node or UI display_order.
-            m.perform(full(post(ROOT), "A").content(base.replace("check", "downstream")
-                            .replace("affectedNodeId\":\"13", "affectedNodeId\":\"12")
-                            .replace("\"destinationType\"", "\"targetNodeId\":\"13\",\"destinationType\"")))
-                    .andExpect(status().isBadRequest());
         }
     }
 
     @Test
-    void warehousesAndFailedRequestRetry() throws Exception {
-        try (var c = context()) {
-            var m = MaterialIssueHttpTest.mvc(c);
-            var body = command("warehouse", 0, "2").replace("PROCESS", "MATERIAL").replace("ROUTING_NODE", "WAREHOUSE");
-            m.perform(full(post(ROOT), "A").content(body)).andExpect(status().isBadRequest());
-            m.perform(full(post(ROOT), "A").content(body.replace("\"destinationType\"", "\"targetWarehouseId\":\"999\",\"destinationType\"")))
-                    .andExpect(status().isBadRequest());
-            var jdbc = c.getBean(MaterialIssueHttpTest.Fixture.class).business.get("A");
-            jdbc.update("UPDATE wm_warehouse SET status='DISABLED' WHERE id=1");
-            var valid = body.replace("\"destinationType\"", "\"targetWarehouseId\":\"1\",\"destinationType\"");
-            m.perform(full(post(ROOT), "A").content(valid)).andExpect(status().isBadRequest());
-            jdbc.update("UPDATE wm_warehouse SET status='ENABLED' WHERE id=1");
-            m.perform(full(post(ROOT), "A").content(valid.replace("\"destinationType\"", "\"targetNodeId\":\"11\",\"destinationType\"")))
-                    .andExpect(status().isBadRequest());
-            add(m, valid, "A");
-            assertEquals(1, jdbc.queryForObject("SELECT COUNT(*) FROM mes_production_defect", Integer.class));
+    void declarationRejectsRetiredDestinationChoices() throws Exception {
+        try(var c=context()) {
+            var mvc=MaterialIssueHttpTest.mvc(c);
+            for(var destination:new String[]{"WAREHOUSE","ROUTING_NODE","UNSPECIFIED"})
+                mvc.perform(full(post(ROOT),"A").content(command(UUID.randomUUID().toString(),0,"2").replace("SAME_NODE",destination)))
+                        .andExpect(status().isBadRequest());
+            assertEquals(0,c.getBean(MaterialIssueHttpTest.Fixture.class).business.get("A").queryForObject("SELECT COUNT(*) FROM mes_production_defect",Integer.class));
         }
     }
 

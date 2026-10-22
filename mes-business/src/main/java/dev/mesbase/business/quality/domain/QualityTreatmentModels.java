@@ -3,14 +3,44 @@ package dev.mesbase.business.quality.domain;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
+import java.util.Arrays;
+import java.util.function.Function;
+import java.util.stream.Collectors;
+import com.fasterxml.jackson.annotation.JsonValue;
+import dev.mesbase.core.error.ErrorCode;
+import dev.mesbase.core.error.FoundationException;
 
 public final class QualityTreatmentModels {
     private QualityTreatmentModels() {
     }
 
-    public enum Action {ASSESS, ALLOCATE, START, RESULT, CANCEL_ALLOC, CANCEL_START, CORRECT_RESULT, RETURN_NODE, TRANSFER_WAREHOUSE}
+    public enum Action {
+        ASSESS, RETURN_NODE, TRANSFER_WAREHOUSE;
+        private static final Map<String, Action> BY_VALUE = Arrays.stream(values())
+                .collect(Collectors.toUnmodifiableMap(Enum::name, Function.identity()));
+        public static Action from(String value) {
+            var action = BY_VALUE.get(value);
+            if (action == null) throw new FoundationException(ErrorCode.QUALITY_TREATMENT_CONFLICT);
+            return action;
+        }
+    }
 
-    public enum State {UNVERIFIED, OVERLAP, PENDING, IN_PROGRESS, WAITING_REWORK, FAILED_SCRAPPED, RECOVERED, SCRAPPED, VOIDED, RETURNED, TRANSFERRED, DISPOSED}
+    public enum State {
+        UNVERIFIED, OVERLAP, PENDING, VOIDED, RETURNED, TRANSFERRED, DISPOSED;
+
+        private static final Map<String, State> BY_VALUE = Arrays.stream(values())
+                .collect(Collectors.toUnmodifiableMap(State::getValue, Function.identity()));
+
+        @JsonValue
+        public String getValue() { return name(); }
+
+        public static State from(String value) {
+            var state = BY_VALUE.get(value);
+            if (state == null) throw new FoundationException(ErrorCode.QUALITY_TREATMENT_CONFLICT);
+            return state;
+        }
+    }
 
     public enum Attribution {INDEPENDENT, OVERLAP, UNVERIFIED}
 
@@ -23,18 +53,13 @@ public final class QualityTreatmentModels {
     public record Assessment(Attribution type, String relatedDeclarationId, String basis) {
     }
 
-    public record Command(String requestId, int expectedRevision, Action action, String parentId,
-                          BigDecimal scrapQty, BigDecimal reworkQty, BigDecimal processedQty,
-                          BigDecimal recoveredQty, BigDecimal failedQty, LocalDateTime occurredAt,
-                          String reason, Assessment assessment) {
+    public record AssessmentCommand(String requestId, int expectedRevision, String reason, Assessment assessment) {
     }
 
     public record Summary(String declarationId, int revision, Long executionId, Long routingNodeId,
                           BigDecimal defectQty, Attribution attribution, String relatedDeclarationId, String basis,
-                          BigDecimal allocatedScrapQty, BigDecimal allocatedReworkQty, BigDecimal startedQty,
-                          BigDecimal processedQty, BigDecimal recoveredQty, BigDecimal failedQty,
-                          BigDecimal pendingDispositionQty, BigDecimal pendingStartQty, BigDecimal inProgressQty,
-                          BigDecimal netDefectQty, String state, String recordAction, String destinationType,
-                          List<MesQualityTreatmentEntity> events, BigDecimal returnedQty, BigDecimal transferredQty) {
+                          BigDecimal pendingDispositionQty, BigDecimal netDefectQty, State state,
+                          String recordAction, String destinationType, List<MesQualityTreatmentEntity> events,
+                          BigDecimal returnedQty, BigDecimal transferredQty) {
     }
 }

@@ -83,7 +83,7 @@ public class ProductionDefectController {
     private static Version view(MesProductionDefectEntity r, Names names, Processing treatment, ListContext context) {
         String state = null, pending = null, returned = null, transferred = null;
         if (treatment != null) {
-            state = treatment.state();
+            state = treatment.state().getValue();
             pending = treatment.pendingDispositionQty().toPlainString();
             returned = treatment.returnedQty().toPlainString();
             transferred = treatment.transferredQty().toPlainString();

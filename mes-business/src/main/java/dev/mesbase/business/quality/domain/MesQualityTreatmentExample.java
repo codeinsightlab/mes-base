@@ -1,4 +1,3 @@
-// MES-CODEGEN: MyBatis Generator standard single-table persistence.
 package dev.mesbase.business.quality.domain;
 
 import java.math.BigDecimal;
@@ -556,76 +555,6 @@ public class MesQualityTreatmentExample {
             return (Criteria) this;
         }
 
-        public Criteria andParentIdIsNull() {
-            addCriterion("parent_id is null");
-            return (Criteria) this;
-        }
-
-        public Criteria andParentIdIsNotNull() {
-            addCriterion("parent_id is not null");
-            return (Criteria) this;
-        }
-
-        public Criteria andParentIdEqualTo(String value) {
-            addCriterion("parent_id =", value, "parentId");
-            return (Criteria) this;
-        }
-
-        public Criteria andParentIdNotEqualTo(String value) {
-            addCriterion("parent_id <>", value, "parentId");
-            return (Criteria) this;
-        }
-
-        public Criteria andParentIdGreaterThan(String value) {
-            addCriterion("parent_id >", value, "parentId");
-            return (Criteria) this;
-        }
-
-        public Criteria andParentIdGreaterThanOrEqualTo(String value) {
-            addCriterion("parent_id >=", value, "parentId");
-            return (Criteria) this;
-        }
-
-        public Criteria andParentIdLessThan(String value) {
-            addCriterion("parent_id <", value, "parentId");
-            return (Criteria) this;
-        }
-
-        public Criteria andParentIdLessThanOrEqualTo(String value) {
-            addCriterion("parent_id <=", value, "parentId");
-            return (Criteria) this;
-        }
-
-        public Criteria andParentIdLike(String value) {
-            addCriterion("parent_id like", value, "parentId");
-            return (Criteria) this;
-        }
-
-        public Criteria andParentIdNotLike(String value) {
-            addCriterion("parent_id not like", value, "parentId");
-            return (Criteria) this;
-        }
-
-        public Criteria andParentIdIn(List<String> values) {
-            addCriterion("parent_id in", values, "parentId");
-            return (Criteria) this;
-        }
-
-        public Criteria andParentIdNotIn(List<String> values) {
-            addCriterion("parent_id not in", values, "parentId");
-            return (Criteria) this;
-        }
-
-        public Criteria andParentIdBetween(String value1, String value2) {
-            addCriterion("parent_id between", value1, value2, "parentId");
-            return (Criteria) this;
-        }
-
-        public Criteria andParentIdNotBetween(String value1, String value2) {
-            addCriterion("parent_id not between", value1, value2, "parentId");
-            return (Criteria) this;
-        }
-
         public Criteria andAttributionTypeIsNull() {
             addCriterion("attribution_type is null");
             return (Criteria) this;
@@ -836,303 +765,63 @@ public class MesQualityTreatmentExample {
             return (Criteria) this;
         }
 
-        public Criteria andScrapQtyIsNull() {
-            addCriterion("scrap_qty is null");
-            return (Criteria) this;
-        }
-
-        public Criteria andScrapQtyIsNotNull() {
-            addCriterion("scrap_qty is not null");
-            return (Criteria) this;
-        }
-
-        public Criteria andScrapQtyEqualTo(BigDecimal value) {
-            addCriterion("scrap_qty =", value, "scrapQty");
-            return (Criteria) this;
-        }
-
-        public Criteria andScrapQtyNotEqualTo(BigDecimal value) {
-            addCriterion("scrap_qty <>", value, "scrapQty");
-            return (Criteria) this;
-        }
-
-        public Criteria andScrapQtyGreaterThan(BigDecimal value) {
-            addCriterion("scrap_qty >", value, "scrapQty");
-            return (Criteria) this;
-        }
-
-        public Criteria andScrapQtyGreaterThanOrEqualTo(BigDecimal value) {
-            addCriterion("scrap_qty >=", value, "scrapQty");
-            return (Criteria) this;
-        }
-
-        public Criteria andScrapQtyLessThan(BigDecimal value) {
-            addCriterion("scrap_qty <", value, "scrapQty");
-            return (Criteria) this;
-        }
-
-        public Criteria andScrapQtyLessThanOrEqualTo(BigDecimal value) {
-            addCriterion("scrap_qty <=", value, "scrapQty");
-            return (Criteria) this;
-        }
-
-        public Criteria andScrapQtyIn(List<BigDecimal> values) {
-            addCriterion("scrap_qty in", values, "scrapQty");
-            return (Criteria) this;
-        }
-
-        public Criteria andScrapQtyNotIn(List<BigDecimal> values) {
-            addCriterion("scrap_qty not in", values, "scrapQty");
-            return (Criteria) this;
-        }
-
-        public Criteria andScrapQtyBetween(BigDecimal value1, BigDecimal value2) {
-            addCriterion("scrap_qty between", value1, value2, "scrapQty");
-            return (Criteria) this;
-        }
-
-        public Criteria andScrapQtyNotBetween(BigDecimal value1, BigDecimal value2) {
-            addCriterion("scrap_qty not between", value1, value2, "scrapQty");
-            return (Criteria) this;
-        }
-
-        public Criteria andReworkQtyIsNull() {
+        public Criteria andReturnedQtyIsNull() {
             addCriterion("rework_qty is null");
             return (Criteria) this;
         }
 
-        public Criteria andReworkQtyIsNotNull() {
+        public Criteria andReturnedQtyIsNotNull() {
             addCriterion("rework_qty is not null");
             return (Criteria) this;
         }
 
-        public Criteria andReworkQtyEqualTo(BigDecimal value) {
-            addCriterion("rework_qty =", value, "reworkQty");
+        public Criteria andReturnedQtyEqualTo(BigDecimal value) {
+            addCriterion("rework_qty =", value, "returnedQty");
             return (Criteria) this;
         }
 
-        public Criteria andReworkQtyNotEqualTo(BigDecimal value) {
-            addCriterion("rework_qty <>", value, "reworkQty");
+        public Criteria andReturnedQtyNotEqualTo(BigDecimal value) {
+            addCriterion("rework_qty <>", value, "returnedQty");
             return (Criteria) this;
         }
 
-        public Criteria andReworkQtyGreaterThan(BigDecimal value) {
-            addCriterion("rework_qty >", value, "reworkQty");
+        public Criteria andReturnedQtyGreaterThan(BigDecimal value) {
+            addCriterion("rework_qty >", value, "returnedQty");
             return (Criteria) this;
         }
 
-        public Criteria andReworkQtyGreaterThanOrEqualTo(BigDecimal value) {
-            addCriterion("rework_qty >=", value, "reworkQty");
+        public Criteria andReturnedQtyGreaterThanOrEqualTo(BigDecimal value) {
+            addCriterion("rework_qty >=", value, "returnedQty");
             return (Criteria) this;
         }
 
-        public Criteria andReworkQtyLessThan(BigDecimal value) {
-            addCriterion("rework_qty <", value, "reworkQty");
+        public Criteria andReturnedQtyLessThan(BigDecimal value) {
+            addCriterion("rework_qty <", value, "returnedQty");
             return (Criteria) this;
         }
 
-        public Criteria andReworkQtyLessThanOrEqualTo(BigDecimal value) {
-            addCriterion("rework_qty <=", value, "reworkQty");
+        public Criteria andReturnedQtyLessThanOrEqualTo(BigDecimal value) {
+            addCriterion("rework_qty <=", value, "returnedQty");
             return (Criteria) this;
         }
 
-        public Criteria andReworkQtyIn(List<BigDecimal> values) {
-            addCriterion("rework_qty in", values, "reworkQty");
+        public Criteria andReturnedQtyIn(List<BigDecimal> values) {
+            addCriterion("rework_qty in", values, "returnedQty");
             return (Criteria) this;
         }
 
-        public Criteria andReworkQtyNotIn(List<BigDecimal> values) {
-            addCriterion("rework_qty not in", values, "reworkQty");
+        public Criteria andReturnedQtyNotIn(List<BigDecimal> values) {
+            addCriterion("rework_qty not in", values, "returnedQty");
             return (Criteria) this;
         }
 
-        public Criteria andReworkQtyBetween(BigDecimal value1, BigDecimal value2) {
-            addCriterion("rework_qty between", value1, value2, "reworkQty");
+        public Criteria andReturnedQtyBetween(BigDecimal value1, BigDecimal value2) {
+            addCriterion("rework_qty between", value1, value2, "returnedQty");
             return (Criteria) this;
         }
 
-        public Criteria andReworkQtyNotBetween(BigDecimal value1, BigDecimal value2) {
-            addCriterion("rework_qty not between", value1, value2, "reworkQty");
-            return (Criteria) this;
-        }
-
-        public Criteria andProcessedQtyIsNull() {
-            addCriterion("processed_qty is null");
-            return (Criteria) this;
-        }
-
-        public Criteria andProcessedQtyIsNotNull() {
-            addCriterion("processed_qty is not null");
-            return (Criteria) this;
-        }
-
-        public Criteria andProcessedQtyEqualTo(BigDecimal value) {
-            addCriterion("processed_qty =", value, "processedQty");
-            return (Criteria) this;
-        }
-
-        public Criteria andProcessedQtyNotEqualTo(BigDecimal value) {
-            addCriterion("processed_qty <>", value, "processedQty");
-            return (Criteria) this;
-        }
-
-        public Criteria andProcessedQtyGreaterThan(BigDecimal value) {
-            addCriterion("processed_qty >", value, "processedQty");
-            return (Criteria) this;
-        }
-
-        public Criteria andProcessedQtyGreaterThanOrEqualTo(BigDecimal value) {
-            addCriterion("processed_qty >=", value, "processedQty");
-            return (Criteria) this;
-        }
-
-        public Criteria andProcessedQtyLessThan(BigDecimal value) {
-            addCriterion("processed_qty <", value, "processedQty");
-            return (Criteria) this;
-        }
-
-        public Criteria andProcessedQtyLessThanOrEqualTo(BigDecimal value) {
-            addCriterion("processed_qty <=", value, "processedQty");
-            return (Criteria) this;
-        }
-
-        public Criteria andProcessedQtyIn(List<BigDecimal> values) {
-            addCriterion("processed_qty in", values, "processedQty");
-            return (Criteria) this;
-        }
-
-        public Criteria andProcessedQtyNotIn(List<BigDecimal> values) {
-            addCriterion("processed_qty not in", values, "processedQty");
-            return (Criteria) this;
-        }
-
-        public Criteria andProcessedQtyBetween(BigDecimal value1, BigDecimal value2) {
-            addCriterion("processed_qty between", value1, value2, "processedQty");
-            return (Criteria) this;
-        }
-
-        public Criteria andProcessedQtyNotBetween(BigDecimal value1, BigDecimal value2) {
-            addCriterion("processed_qty not between", value1, value2, "processedQty");
-            return (Criteria) this;
-        }
-
-        public Criteria andRecoveredQtyIsNull() {
-            addCriterion("recovered_qty is null");
-            return (Criteria) this;
-        }
-
-        public Criteria andRecoveredQtyIsNotNull() {
-            addCriterion("recovered_qty is not null");
-            return (Criteria) this;
-        }
-
-        public Criteria andRecoveredQtyEqualTo(BigDecimal value) {
-            addCriterion("recovered_qty =", value, "recoveredQty");
-            return (Criteria) this;
-        }
-
-        public Criteria andRecoveredQtyNotEqualTo(BigDecimal value) {
-            addCriterion("recovered_qty <>", value, "recoveredQty");
-            return (Criteria) this;
-        }
-
-        public Criteria andRecoveredQtyGreaterThan(BigDecimal value) {
-            addCriterion("recovered_qty >", value, "recoveredQty");
-            return (Criteria) this;
-        }
-
-        public Criteria andRecoveredQtyGreaterThanOrEqualTo(BigDecimal value) {
-            addCriterion("recovered_qty >=", value, "recoveredQty");
-            return (Criteria) this;
-        }
-
-        public Criteria andRecoveredQtyLessThan(BigDecimal value) {
-            addCriterion("recovered_qty <", value, "recoveredQty");
-            return (Criteria) this;
-        }
-
-        public Criteria andRecoveredQtyLessThanOrEqualTo(BigDecimal value) {
-            addCriterion("recovered_qty <=", value, "recoveredQty");
-            return (Criteria) this;
-        }
-
-        public Criteria andRecoveredQtyIn(List<BigDecimal> values) {
-            addCriterion("recovered_qty in", values, "recoveredQty");
-            return (Criteria) this;
-        }
-
-        public Criteria andRecoveredQtyNotIn(List<BigDecimal> values) {
-            addCriterion("recovered_qty not in", values, "recoveredQty");
-            return (Criteria) this;
-        }
-
-        public Criteria andRecoveredQtyBetween(BigDecimal value1, BigDecimal value2) {
-            addCriterion("recovered_qty between", value1, value2, "recoveredQty");
-            return (Criteria) this;
-        }
-
-        public Criteria andRecoveredQtyNotBetween(BigDecimal value1, BigDecimal value2) {
-            addCriterion("recovered_qty not between", value1, value2, "recoveredQty");
-            return (Criteria) this;
-        }
-
-        public Criteria andFailedQtyIsNull() {
-            addCriterion("failed_qty is null");
-            return (Criteria) this;
-        }
-
-        public Criteria andFailedQtyIsNotNull() {
-            addCriterion("failed_qty is not null");
-            return (Criteria) this;
-        }
-
-        public Criteria andFailedQtyEqualTo(BigDecimal value) {
-            addCriterion("failed_qty =", value, "failedQty");
-            return (Criteria) this;
-        }
-
-        public Criteria andFailedQtyNotEqualTo(BigDecimal value) {
-            addCriterion("failed_qty <>", value, "failedQty");
-            return (Criteria) this;
-        }
-
-        public Criteria andFailedQtyGreaterThan(BigDecimal value) {
-            addCriterion("failed_qty >", value, "failedQty");
-            return (Criteria) this;
-        }
-
-        public Criteria andFailedQtyGreaterThanOrEqualTo(BigDecimal value) {
-            addCriterion("failed_qty >=", value, "failedQty");
-            return (Criteria) this;
-        }
-
-        public Criteria andFailedQtyLessThan(BigDecimal value) {
-            addCriterion("failed_qty <", value, "failedQty");
-            return (Criteria) this;
-        }
-
-        public Criteria andFailedQtyLessThanOrEqualTo(BigDecimal value) {
-            addCriterion("failed_qty <=", value, "failedQty");
-            return (Criteria) this;
-        }
-
-        public Criteria andFailedQtyIn(List<BigDecimal> values) {
-            addCriterion("failed_qty in", values, "failedQty");
-            return (Criteria) this;
-        }
-
-        public Criteria andFailedQtyNotIn(List<BigDecimal> values) {
-            addCriterion("failed_qty not in", values, "failedQty");
-            return (Criteria) this;
-        }
-
-        public Criteria andFailedQtyBetween(BigDecimal value1, BigDecimal value2) {
-            addCriterion("failed_qty between", value1, value2, "failedQty");
-            return (Criteria) this;
-        }
-
-        public Criteria andFailedQtyNotBetween(BigDecimal value1, BigDecimal value2) {
-            addCriterion("failed_qty not between", value1, value2, "failedQty");
+        public Criteria andReturnedQtyNotBetween(BigDecimal value1, BigDecimal value2) {
+            addCriterion("rework_qty not between", value1, value2, "returnedQty");
             return (Criteria) this;
         }
 

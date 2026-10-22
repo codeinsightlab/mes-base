@@ -23,19 +23,16 @@ public final class WorkOrderProgress {
                              long invalidCount, LocalDateTime lastCompletedAt) {
     }
 
-    public record Quality(Long workorderId, BigDecimal declaredQty, String attribution, String destinationType,
-                          BigDecimal scrapQty, BigDecimal failedQty, BigDecimal recoveredQty,
-                          BigDecimal allocatedReworkQty, BigDecimal startedQty, BigDecimal processedQty,
-                          BigDecimal returnedQty, BigDecimal transferredQty) {
-    }
+    public record Quality(Long workorderId, BigDecimal declaredQty, String attribution,
+                          BigDecimal returnedQty, BigDecimal transferredQty, long invalidActions) { }
 
     /**
      * 业务进度计算结果；ID和数量保持原始类型，展示格式由Controller转换。
      */
     public record Progress(Long id, String code, String source, String status, String productCode,
                            String productName, String unitName, BigDecimal plannedQty, BigDecimal completedQty,
-                           BigDecimal goodOutputGapQty, BigDecimal scrappedQty, BigDecimal pendingCompletionQty,
-                           BigDecimal qualityUntreatedQty, BigDecimal qualityWaitingReworkQty, BigDecimal qualityReworkingQty,
+                           BigDecimal goodOutputGapQty, BigDecimal pendingCompletionQty,
+                           BigDecimal qualityUntreatedQty, BigDecimal qualityReturnedQty,
                            BigDecimal qualityUnverifiedQty, BigDecimal completionPercent,
                            long completedExecutions, LocalDateTime lastCompletedAt, String issue,
                            LocalDateTime createTime, BigDecimal qualityTransferredQty) {

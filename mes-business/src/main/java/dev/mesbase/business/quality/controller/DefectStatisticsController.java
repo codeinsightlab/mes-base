@@ -23,7 +23,7 @@ public class DefectStatisticsController {
     public record Row(String operationId, String defectTypeId, String typeName, Long typeNameVariants,
                       String wasteCategory,
                       String declaredQty, String independentQty, String overlapQty, String unverifiedQty,
-                      String recoveredQty, String netDefectQty) {
+                      String returnedQty, String netDefectQty) {
     }
 
     public record Page(List<Row> items, long total, int offset, int limit) {

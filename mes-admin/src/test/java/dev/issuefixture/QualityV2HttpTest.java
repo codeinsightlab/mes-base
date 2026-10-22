@@ -38,7 +38,7 @@ class QualityV2HttpTest {
     static final String TYPES = "/api/production/operation/1/defect-types";
 
     @Configuration
-    @Import({OperationDefectTypeController.class, OperationDefectTypeService.class, ProductionDefectV2Controller.class,
+    @Import({dev.mesbase.business.quality.service.QualityDispositionService.class,dev.mesbase.business.quality.controller.QualityDispositionController.class,OperationDefectTypeController.class, OperationDefectTypeService.class, ProductionDefectV2Controller.class,
             DefectStatisticsController.class, DefectStatisticsService.class})
     static class Extra {
     }
@@ -251,21 +251,15 @@ class QualityV2HttpTest {
             m.perform(full(post(ROOT + "/declarations"), "A").content(overlap.toString())).andExpect(status().isOk());
             m.perform(full(post(ROOT + "/declarations"), "A").content(declaration(type, "PROCESS").toString()))
                     .andExpect(status().isOk());
-            String allocation = ProductionQualityV13HttpTest.command("ALLOCATE", null, "2", "2", "0", "0", "0");
-            var allocated = JSON.readTree(m.perform(full(post(ROOT + "/" + declaration + "/treatment"), "A").content(allocation))
-                    .andExpect(status().isOk()).andReturn().getResponse().getContentAsString());
-            String parent = allocated.path("events").get(1).path("id").asText();
-            var started = JSON.readTree(m.perform(full(post(ROOT + "/" + declaration + "/treatment"), "A").content(ProductionQualityV13HttpTest.command("START", parent, "0", "2", "0", "0", "0")))
-                    .andExpect(status().isOk()).andReturn().getResponse().getContentAsString());
-            String start = started.path("events").get(2).path("id").asText();
-            m.perform(full(post(ROOT + "/" + declaration + "/treatment"), "A").content(ProductionQualityV13HttpTest.command("RESULT", start, "0", "0", "2", "1", "1")))
+            m.perform(full(post(ROOT + "/" + declaration + "/dispositions"),"A")
+                    .content(QualityDispositionHttpTest.command(UUID.randomUUID().toString(),"RETURN_NODE","1","null")))
                     .andExpect(status().isOk());
             m.perform(full(get(ROOT + "/statistics"), "A").param("wasteCategory", "PROCESS"))
                     .andExpect(status().isOk()).andExpect(jsonPath("items[0].declaredQty").value("7.000000"))
                     .andExpect(jsonPath("items[0].independentQty").value("4.000000"))
                     .andExpect(jsonPath("items[0].overlapQty").value("2.000000"))
                     .andExpect(jsonPath("items[0].unverifiedQty").value("1.000000"))
-                    .andExpect(jsonPath("items[0].recoveredQty").value("1.000000"))
+                    .andExpect(jsonPath("items[0].returnedQty").value("1.000000"))
                     .andExpect(jsonPath("items[0].netDefectQty").value("3.000000"));
             m.perform(full(get(ROOT + "/statistics"), "A").param("attribution", "UNVERIFIED"))
                     .andExpect(jsonPath("items[0].declaredQty").value("1.000000"));
@@ -314,12 +308,12 @@ class QualityV2HttpTest {
                             .header("X-Factory-Id", "A")
                             .contentType("application/json").content(old.toString())).andExpect(status().isOk())
                     .andReturn().getResponse().getContentAsString()).path("record").path("declarationId").asText();
-            var assess = (ObjectNode) JSON.readTree(ProductionQualityV13HttpTest.command("ASSESS", null, "0", "0", "0", "0", "0"));
+            var assess = (ObjectNode) JSON.readTree(QualityWorkflowHttpTest.assessmentCommand());
             assess.set("assessment", JSON.readTree("{\"type\":\"INDEPENDENT\",\"basis\":\"授权人员核实\"}"));
-            m.perform(post(ROOT + "/" + id + "/treatment").header("Authorization", "Bearer CREATE")
+            m.perform(post(ROOT + "/" + id + "/assessments").header("Authorization", "Bearer CREATE")
                     .header("X-Factory-Id", "A")
                     .contentType("application/json").content(assess.toString())).andExpect(status().isForbidden());
-            m.perform(post(ROOT + "/" + id + "/treatment").header("Authorization", "Bearer REVISE")
+            m.perform(post(ROOT + "/" + id + "/assessments").header("Authorization", "Bearer REVISE")
                             .header("X-Factory-Id", "A")
                             .contentType("application/json").content(assess.toString())).andExpect(status().isOk())
                     .andExpect(jsonPath("attribution").value("INDEPENDENT"));

@@ -43,31 +43,31 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class ProductionCompletionHttpTest {
     @Test
     void manualCompensationCompletesProductionBeforeWarehouseAndKeepsImmutableSnapshot() throws Exception {
-        try (var c = ProductionQualityV13HttpTest.context(100, 100, 100, 100, 100)) {
+        try (var c = QualityWorkflowHttpTest.context(100, 100, 100, 100, 100)) {
             var m = MaterialIssueHttpTest.mvc(c);
             var j = ProductionWarehouseFixture.db(c);
             j.update("DELETE FROM mes_production_execution WHERE id=2");
             j.update("UPDATE workorder SET planned_qty=100 WHERE id=1"); // TEST ONLY unused sibling
-            String defect = ProductionQualityV13HttpTest.defect(m, 12, "10", "INDEPENDENT", null);
-            String started = ProductionQualityV13HttpTest.start(m, defect);
+            String defect = QualityWorkflowHttpTest.defect(m, 12, "10", "INDEPENDENT", null);
+            QualityDispositionHttpTest.bindBatch(j, "000LOT-001");
             m.perform(ProductionCoreV1HttpTest.full(post("/api/quality/releases/executions/1")).content(release("90")))
                     .andExpect(status().isConflict());
-            ProductionQualityV13HttpTest.execute(m, defect, ProductionQualityV13HttpTest.command("RESULT", started, "0", "0", "4", "4", "0"));
-            m.perform(ProductionCoreV1HttpTest.full(post("/api/quality/releases/executions/1")).content(release("94")))
+            QualityWorkflowHttpTest.transfer(m, defect, "10");
+            m.perform(ProductionCoreV1HttpTest.full(post("/api/quality/releases/executions/1")).content(release("90")))
                     .andExpect(status().isOk());
-            j.update("INSERT INTO wm_inventory(id,material_id,warehouse_id,batch_no,quantity,available_quantity,status) VALUES(1,1,1,'TEST-FINISHED',0,0,'ENABLED')");
+
             UnifiedInboundHttpTest.receive(m, "60");
             UnifiedInboundHttpTest.receive(m, "20");
             String root = "/api/production/executions/1";
             var state = new ObjectMapper().readTree(m.perform(ProductionCoreV1HttpTest.full(get(root + "/closure")))
-                    .andExpect(status().isOk()).andExpect(jsonPath("effective").value("94.000000"))
+                    .andExpect(status().isOk()).andExpect(jsonPath("effective").value("90.000000"))
                     .andExpect(jsonPath("canComplete").value(true)).andReturn().getResponse()
                     .getContentAsString());
             String id = UUID.randomUUID()
                     .toString(), body = "{\"requestId\":\"" + id + "\",\"expectedBasisHash\":\"" + state.get("basisHash")
                     .asText() + "\",\"reason\":\"TEST ONLY 严格完工\"}";
             m.perform(ProductionCoreV1HttpTest.full(post(root + "/actions/complete")).content(body))
-                    .andExpect(status().isOk()).andExpect(jsonPath("effectiveQty").value("94.000000"));
+                    .andExpect(status().isOk()).andExpect(jsonPath("effectiveQty").value("90.000000"));
             m.perform(ProductionCoreV1HttpTest.full(post(root + "/actions/complete")).content(body))
                     .andExpect(status().isOk()).andExpect(jsonPath("id").value(id));
             // Execution completion leaves the parent RELEASED until the periodic job observes it.
@@ -111,12 +111,12 @@ class ProductionCompletionHttpTest {
 
     @Test
     void unprocessedInputCannotCompleteEvenWhenAllOutputWasReleasedAndAccepted() throws Exception {
-        try (var c = ProductionQualityV13HttpTest.context(80, 80, 80, 80, 80)) {
+        try (var c = QualityWorkflowHttpTest.context(80, 80, 80, 80, 80)) {
             var m = MaterialIssueHttpTest.mvc(c);
             var j = ProductionWarehouseFixture.db(c);
             m.perform(ProductionCoreV1HttpTest.full(post("/api/quality/releases/executions/1")).content(release("80")))
                     .andExpect(status().isOk());
-            j.update("INSERT INTO wm_inventory(id,material_id,warehouse_id,batch_no,quantity,available_quantity,status) VALUES(1,1,1,'TEST-FINISHED',0,0,'ENABLED')");
+
             UnifiedInboundHttpTest.receive(m, "80");
             m.perform(ProductionCoreV1HttpTest.full(get("/api/production/executions/1/closure")))
                     .andExpect(status().isOk()).andExpect(jsonPath("canComplete").value(false))

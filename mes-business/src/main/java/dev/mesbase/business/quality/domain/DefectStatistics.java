@@ -16,6 +16,6 @@ public final class DefectStatistics {
 
     public record Row(Long operationId, Long defectTypeId, String typeName, Long typeNameVariants, String wasteCategory,
                       BigDecimal declaredQty, BigDecimal independentQty, BigDecimal overlapQty,
-                      BigDecimal unverifiedQty, BigDecimal recoveredQty, BigDecimal netDefectQty) {
+                      BigDecimal unverifiedQty, BigDecimal returnedQty, BigDecimal netDefectQty) {
     }
 }

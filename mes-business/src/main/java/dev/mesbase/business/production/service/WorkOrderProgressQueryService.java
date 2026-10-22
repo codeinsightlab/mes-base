@@ -10,7 +10,10 @@ import dev.mesbase.business.production.domain.WorkOrderProgress.Progress;
 import dev.mesbase.business.production.domain.WorkOrderProgress.Quality;
 import dev.mesbase.business.production.domain.WorkOrderProgress.Query;
 import dev.mesbase.business.production.domain.WorkOrderStatus;
-import dev.mesbase.business.quality.domain.DefectDestination;
+import dev.mesbase.business.quality.domain.DefectRecordAction;
+import dev.mesbase.business.quality.domain.ProductionDefectModels.Processing;
+import dev.mesbase.core.error.FoundationException;
+import dev.mesbase.core.error.ErrorCode;
 import dev.mesbase.business.quality.domain.QualityTreatmentModels.Attribution;
 import dev.mesbase.common.utils.StringUtils;
 import dev.mesbase.common.validation.ParameterChecks;
@@ -82,46 +85,29 @@ public class WorkOrderProgressQueryService {
             percent = completed.multiply(BigDecimal.valueOf(100)).divide(order.plannedQty(), 2, RoundingMode.HALF_UP);
             gap = order.plannedQty().subtract(completed).max(BigDecimal.ZERO);
         }
-        BigDecimal scrap = BigDecimal.ZERO, untreated = BigDecimal.ZERO, waiting = BigDecimal.ZERO,
-                reworking = BigDecimal.ZERO, unverified = BigDecimal.ZERO, transferred = BigDecimal.ZERO;
-        boolean invalidQuality = false;
+        BigDecimal untreated = BigDecimal.ZERO, returned = BigDecimal.ZERO,
+                unverified = BigDecimal.ZERO, transferred = BigDecimal.ZERO;
         for (var fact : quality) {
-            // Returning material to a routing node is reprocessing, not a confirmed loss.
-            if (DefectDestination.ROUTING_NODE.getValue().equals(fact.destinationType())) continue;
-            if (Attribution.OVERLAP.name().equals(fact.attribution())) continue;
-            if (!Attribution.INDEPENDENT.name().equals(fact.attribution())) {
-                unverified = unverified.add(fact.declaredQty());
-                continue;
+            var attribution = Attribution.UNVERIFIED;
+            if (fact.attribution() != null) attribution = Attribution.valueOf(fact.attribution());
+            if (fact.invalidActions() > 0) throw new FoundationException(ErrorCode.QUALITY_TREATMENT_CONFLICT);
+            var processing = Processing.of(DefectRecordAction.CREATE.getValue(), attribution,
+                    fact.declaredQty(), fact.returnedQty(), fact.transferredQty());
+            if (attribution == Attribution.UNVERIFIED) unverified = unverified.add(fact.declaredQty());
+            else if (attribution == Attribution.INDEPENDENT) {
+                untreated = untreated.add(processing.pendingDispositionQty());
+                returned = returned.add(processing.returnedQty());
+                transferred = transferred.add(processing.transferredQty());
             }
-            var disposed = fact.scrapQty().add(fact.failedQty());
-            var pendingDisposition = fact.declaredQty().subtract(fact.scrapQty()).subtract(fact.allocatedReworkQty())
-                    .subtract(fact.returnedQty()).subtract(fact.transferredQty());
-            var pendingStart = fact.allocatedReworkQty().subtract(fact.startedQty());
-            var inProgress = fact.startedQty().subtract(fact.processedQty());
-            if (fact.scrapQty().signum() < 0 || fact.failedQty().signum() < 0
-                    || fact.recoveredQty().signum() < 0 || fact.allocatedReworkQty().signum() < 0
-                    || fact.startedQty().signum() < 0 || pendingDisposition.signum() < 0 || pendingStart.signum() < 0
-                    || inProgress.signum() < 0 || fact.processedQty().signum() < 0
-                    || fact.processedQty().compareTo(fact.failedQty().add(fact.recoveredQty())) != 0)
-                invalidQuality = true;
-            scrap = scrap.add(disposed);
-            transferred = transferred.add(fact.transferredQty());
-            untreated = untreated.add(pendingDisposition);
-            waiting = waiting.add(pendingStart);
-            reworking = reworking.add(inProgress);
         }
-        if (invalidQuality) issue = "质量处置数量异常，请核实";
         BigDecimal unfinished = null;
-        if (gap != null && !invalidQuality)
-            unfinished = order.plannedQty().subtract(completed).subtract(scrap).subtract(transferred)
-                    .max(BigDecimal.ZERO);
+        if (gap != null) unfinished = order.plannedQty().subtract(completed).subtract(transferred).max(BigDecimal.ZERO);
         return new Progress(order.id(), order.code(), order.source(), order.status(), order.productCode(),
                 order.productName(), order.unitName(), order.plannedQty(), completed, gap,
-                invalidQuality ? null : scrap, unfinished, invalidQuality ? null : untreated,
-                invalidQuality ? null : waiting, invalidQuality ? null : reworking,
+                unfinished, untreated, returned,
                 unverified, percent, completion == null ? 0 : completion.executionCount(),
                 Optional.ofNullable(completion).map(nullableValue -> nullableValue.lastCompletedAt())
-                        .orElse(null), issue, order.createTime(), invalidQuality ? null : transferred);
+                        .orElse(null), issue, order.createTime(), transferred);
     }
 
 

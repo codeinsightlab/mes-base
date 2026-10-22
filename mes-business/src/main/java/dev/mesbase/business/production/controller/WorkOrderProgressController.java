@@ -24,8 +24,8 @@ public class WorkOrderProgressController {
 
     public record View(String id, String code, String source, String status, String productCode,
                        String productName, String unitName, String plannedQty, String completedQty,
-                       String goodOutputGapQty, String scrappedQty, String pendingCompletionQty,
-                       String qualityUntreatedQty, String qualityWaitingReworkQty, String qualityReworkingQty,
+                       String goodOutputGapQty, String pendingCompletionQty,
+                       String qualityUntreatedQty, String qualityReturnedQty,
                        String qualityUnverifiedQty, String completionPercent, long completedExecutions,
                        LocalDateTime lastCompletedAt, String issue, LocalDateTime createTime, String qualityTransferredQty) { }
 

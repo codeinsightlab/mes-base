@@ -1,4 +1,3 @@
-// MES-CODEGEN: MyBatis Generator standard single-table persistence.
 package dev.mesbase.business.quality.domain;
 
 import java.math.BigDecimal;
@@ -19,23 +18,13 @@ public class MesQualityTreatmentEntity {
 
     private String actionType;
 
-    private String parentId;
-
     private String attributionType;
 
     private String relatedDeclarationId;
 
     private String basis;
 
-    private BigDecimal scrapQty;
-
-    private BigDecimal reworkQty;
-
-    private BigDecimal processedQty;
-
-    private BigDecimal recoveredQty;
-
-    private BigDecimal failedQty;
+    private BigDecimal returnedQty;
 
     private Long operatorUserId;
 
@@ -109,13 +98,6 @@ public class MesQualityTreatmentEntity {
         this.actionType = actionType;
     }
 
-    public String getParentId() {
-        return parentId;
-    }
-
-    public void setParentId(String parentId) {
-        this.parentId = parentId;
-    }
 
     public String getAttributionType() {
         return attributionType;
@@ -141,45 +123,17 @@ public class MesQualityTreatmentEntity {
         this.basis = basis;
     }
 
-    public BigDecimal getScrapQty() {
-        return scrapQty;
+
+    public BigDecimal getReturnedQty() {
+        return returnedQty;
     }
 
-    public void setScrapQty(BigDecimal scrapQty) {
-        this.scrapQty = scrapQty;
+    public void setReturnedQty(BigDecimal returnedQty) {
+        this.returnedQty = returnedQty;
     }
 
-    public BigDecimal getReworkQty() {
-        return reworkQty;
-    }
 
-    public void setReworkQty(BigDecimal reworkQty) {
-        this.reworkQty = reworkQty;
-    }
 
-    public BigDecimal getProcessedQty() {
-        return processedQty;
-    }
-
-    public void setProcessedQty(BigDecimal processedQty) {
-        this.processedQty = processedQty;
-    }
-
-    public BigDecimal getRecoveredQty() {
-        return recoveredQty;
-    }
-
-    public void setRecoveredQty(BigDecimal recoveredQty) {
-        this.recoveredQty = recoveredQty;
-    }
-
-    public BigDecimal getFailedQty() {
-        return failedQty;
-    }
-
-    public void setFailedQty(BigDecimal failedQty) {
-        this.failedQty = failedQty;
-    }
 
     public Long getOperatorUserId() {
         return operatorUserId;

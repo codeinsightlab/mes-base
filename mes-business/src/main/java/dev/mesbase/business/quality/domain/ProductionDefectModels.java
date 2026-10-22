@@ -14,6 +14,10 @@ import java.time.LocalDateTime;
 import java.util.List;
 import dev.mesbase.common.core.page.PageData;
 import java.util.Map;
+import dev.mesbase.business.quality.domain.QualityTreatmentModels.State;
+import dev.mesbase.business.quality.domain.QualityTreatmentModels.Attribution;
+import dev.mesbase.core.error.ErrorCode;
+import dev.mesbase.core.error.FoundationException;
 
 public final class ProductionDefectModels {
     private ProductionDefectModels() {
@@ -45,20 +49,32 @@ public final class ProductionDefectModels {
                               String executionStatus, String source, String batchNo, String specification) {
     }
 
-    /**
-     * Compact list state; no event history, attribution basis or detail-only quantities.
-     */
-    public record Processing(String state, BigDecimal pendingDispositionQty, BigDecimal returnedQty,
+    /** Current workflow balance shared by the list and detail projections. */
+    public record Processing(State state, BigDecimal pendingDispositionQty, BigDecimal returnedQty,
                              BigDecimal transferredQty) {
+        public static Processing of(String recordAction, Attribution attribution, BigDecimal declared,
+                                    BigDecimal returned, BigDecimal transferred) {
+            var pending = declared.subtract(returned).subtract(transferred);
+            if (returned.signum() < 0 || transferred.signum() < 0 || pending.signum() < 0
+                    || attribution != Attribution.INDEPENDENT && (returned.signum() > 0 || transferred.signum() > 0))
+                throw new FoundationException(ErrorCode.QUALITY_TREATMENT_CONFLICT);
+            State state;
+            if (DefectRecordAction.VOID.getValue().equals(recordAction)) state = State.VOIDED;
+            else state = switch (attribution) {
+                case UNVERIFIED -> State.UNVERIFIED;
+                case OVERLAP -> State.OVERLAP;
+                case INDEPENDENT -> {
+                    if (pending.signum() > 0) yield State.PENDING;
+                    if (returned.signum() > 0 && transferred.signum() > 0) yield State.DISPOSED;
+                    yield returned.signum() > 0 ? State.RETURNED : State.TRANSFERRED;
+                }
+            };
+            return new Processing(state, pending, returned, transferred);
+        }
     }
 
-    /**
-     * Indexed aggregation of the exact versions in the current page.
-     */
-    public record TreatmentTotals(String declarationId, String attribution, BigDecimal scrapQty,
-                                  BigDecimal reworkQty, BigDecimal startedQty, BigDecimal processedQty,
-                                  BigDecimal recoveredQty, BigDecimal failedQty, BigDecimal returnedQty,
-                                  BigDecimal transferredQty) {
+    public record TreatmentTotals(String declarationId, String attribution, BigDecimal returnedQty,
+                                  BigDecimal transferredQty, long invalidActions) {
     }
 
     public record Page(List<MesProductionDefectEntity> items, long total, int offset, int limit, Names names,
@@ -66,7 +82,7 @@ public final class ProductionDefectModels {
                        Map<String, ListContext> contexts) implements PageData<MesProductionDefectEntity> {
     }
 
-    public record NodeTotal(Long affectedNodeId, BigDecimal effectiveDefectQty, BigDecimal recoveredQty,
+    public record NodeTotal(Long affectedNodeId, BigDecimal effectiveDefectQty, BigDecimal returnedQty,
                             BigDecimal unverifiedQty, BigDecimal directDefectQty) {
         public NodeTotal(Long affectedNodeId, BigDecimal effectiveDefectQty) {
             this(affectedNodeId, effectiveDefectQty, BigDecimal.ZERO, BigDecimal.ZERO, effectiveDefectQty);

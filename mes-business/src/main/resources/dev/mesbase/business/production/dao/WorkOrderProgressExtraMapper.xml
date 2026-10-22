@@ -35,19 +35,10 @@
         GROUP BY e.workorder_id
     </select>
     <select id="quality" resultType="dev.mesbase.business.production.domain.WorkOrderProgress$Quality">
-        <bind name="allocateAction" value="@dev.mesbase.business.quality.domain.QualityTreatmentModels$Action@ALLOCATE.name()"/>
-        <bind name="cancelAllocateAction" value="@dev.mesbase.business.quality.domain.QualityTreatmentModels$Action@CANCEL_ALLOC.name()"/>
-        <bind name="startAction" value="@dev.mesbase.business.quality.domain.QualityTreatmentModels$Action@START.name()"/>
-        <bind name="cancelStartAction" value="@dev.mesbase.business.quality.domain.QualityTreatmentModels$Action@CANCEL_START.name()"/>
         <bind name="voidAction" value="@dev.mesbase.business.quality.domain.DefectRecordAction@VOID.getValue()"/>
         SELECT e.workorder_id AS workorderId, d.defect_qty AS declaredQty,
-        MAX(t.attribution_type) AS attribution, d.destination_type AS destinationType,
-        COALESCE(SUM(t.scrap_qty), 0) AS scrapQty,
-        COALESCE(SUM(t.failed_qty), 0) AS failedQty,
-        COALESCE(SUM(t.recovered_qty), 0) AS recoveredQty,
-        COALESCE(SUM(CASE WHEN t.action_type IN (#{allocateAction}, #{cancelAllocateAction}) THEN t.rework_qty ELSE 0 END), 0) AS allocatedReworkQty,
-        COALESCE(SUM(CASE WHEN t.action_type IN (#{startAction}, #{cancelStartAction}) THEN t.rework_qty ELSE 0 END), 0) AS startedQty,
-        COALESCE(SUM(t.processed_qty), 0) AS processedQty,
+        MAX(CASE WHEN t.action_type='ASSESS' THEN t.attribution_type END) AS attribution,
+        SUM(CASE WHEN t.action_type IS NOT NULL AND t.action_type NOT IN ('ASSESS','RETURN_NODE','TRANSFER_WAREHOUSE') THEN 1 ELSE 0 END) AS invalidActions,
         COALESCE(SUM(CASE WHEN t.action_type = 'RETURN_NODE' THEN t.rework_qty ELSE 0 END), 0) AS returnedQty,
         COALESCE(SUM(t.transfer_qty), 0) AS transferredQty
         FROM mes_production_execution e
@@ -59,6 +50,6 @@
         AND d.record_action != #{voidAction}
         AND NOT EXISTS (SELECT 1 FROM mes_production_defect newer
         WHERE newer.declaration_id = d.declaration_id AND newer.revision_no &gt; d.revision_no)
-        GROUP BY e.workorder_id, d.declaration_id, d.revision_no, d.defect_qty, d.destination_type
+        GROUP BY e.workorder_id, d.declaration_id, d.revision_no, d.defect_qty
     </select>
 </mapper>

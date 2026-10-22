@@ -75,71 +75,31 @@ class WorkOrderProgressHttpTest {
     }
 
     @Test
-    void distinguishesUnfinishedFromScrappedAndUsesOnlyCurrentNetIndependentQualityFacts() throws Exception {
-        try (var c = context()) {
-            var db = c.getBean(MaterialIssueHttpTest.Fixture.class).business;
-            for (var jdbc : db.values()) {
-                ProductionReportHttpTest.seed(jdbc);
-                jdbc.update("UPDATE workorder SET planned_qty=100 WHERE id=1");
-                complete(jdbc, "good-output", 1, "90");
-            }
-            var jdbc = db.get("A");
-            var mvc = MaterialIssueHttpTest.mvc(c);
-            mvc.perform(ProductionReportHttpTest.full(get(URL), "A"))
-                    .andExpect(jsonPath("items[0].pendingCompletionQty").value("10.000000"))
-                    .andExpect(jsonPath("items[0].scrappedQty").value("0"));
-            declaration(jdbc, "independent", 1, "CREATE", "10");
-            treatment(jdbc, "independent", 1, "ASSESS", "INDEPENDENT", "0", "0", "0");
-            mvc.perform(ProductionReportHttpTest.full(get(URL), "A"))
-                    .andExpect(jsonPath("items[0].qualityUntreatedQty").value("10.000000"))
-                    .andExpect(jsonPath("items[0].scrappedQty").value("0.000000"));
-            treatment(jdbc, "independent", 1, "ALLOCATE", null, "8", "0", "0");
-            treatment(jdbc, "independent", 1, "CANCEL_ALLOC", null, "-2", "0", "0");
-            treatment(jdbc, "independent", 1, "ALLOCATE", null, "0", "0", "0", "4");
-            treatment(jdbc, "independent", 1, "START", null, "0", "0", "0", "2");
-            mvc.perform(ProductionReportHttpTest.full(get(URL), "A"))
+    void currentDispositionQuantitiesUseOnlyLatestIndependentVersions() throws Exception {
+        try(var c=context()) {
+            var jdbc=c.getBean(MaterialIssueHttpTest.Fixture.class).business.get("A");
+            ProductionReportHttpTest.seed(jdbc);
+            jdbc.update("UPDATE workorder SET planned_qty=100 WHERE id=1");
+            complete(jdbc,"completed",1,"90");
+            declaration(jdbc,"independent",1,"CREATE","10");
+            treatment(jdbc,"independent",1,"ASSESS","INDEPENDENT","0","0","0");
+            var mvc=MaterialIssueHttpTest.mvc(c);
+            mvc.perform(ProductionReportHttpTest.full(get(URL),"A")).andExpect(status().isOk())
+                    .andExpect(jsonPath("items[0].qualityUntreatedQty").value("10.000000"));
+            treatment(jdbc,"independent",1,"RETURN_NODE",null,"0","0","0","4");
+            jdbc.update("INSERT INTO mes_quality_treatment(id,request_hash,declaration_id,declaration_revision,execution_id,routing_node_id,action_type,transfer_qty,operator_user_id,confirmed_by,occurred_at,recorded_at,reason) VALUES(?,?,?,1,1,11,'TRANSFER_WAREHOUSE',6,1,1,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,'TEST ONLY')",UUID.randomUUID().toString(),"t".repeat(64),"independent");
+            declaration(jdbc,"overlap",1,"CREATE","2");
+            treatment(jdbc,"overlap",1,"ASSESS","OVERLAP","0","0","0");
+            declaration(jdbc,"unverified",1,"CREATE","3");
+            mvc.perform(ProductionReportHttpTest.full(get(URL),"A")).andExpect(status().isOk())
                     .andExpect(jsonPath("items[0].qualityUntreatedQty").value("0.000000"))
-                    .andExpect(jsonPath("items[0].qualityWaitingReworkQty").value("2.000000"))
-                    .andExpect(jsonPath("items[0].qualityReworkingQty").value("2.000000"));
-            treatment(jdbc, "independent", 1, "START", null, "0", "0", "0", "2");
-            treatment(jdbc, "independent", 1, "RESULT", null, "0", "4", "0");
-            declaration(jdbc, "overlap", 1, "CREATE", "10");
-            treatment(jdbc, "overlap", 1, "ASSESS", "OVERLAP", "0", "0", "0");
-            declaration(jdbc, "unverified", 1, "CREATE", "3");
-            declaration(jdbc, "routed-rework", 1, "CREATE", "50", "ROUTING_NODE");
-            declaration(jdbc, "routed-unverified", 1, "CREATE", "50", "ROUTING_NODE");
-            treatment(jdbc, "routed-rework", 1, "ASSESS", "INDEPENDENT", "0", "0", "0");
-            mvc.perform(ProductionReportHttpTest.full(get(URL), "A"))
-                    .andExpect(jsonPath("items[0].scrappedQty").value("10.000000"))
-                    .andExpect(jsonPath("items[0].pendingCompletionQty").value("0.000000"))
-                    .andExpect(jsonPath("items[0].goodOutputGapQty").value("10.000000"))
+                    .andExpect(jsonPath("items[0].qualityReturnedQty").value("4.000000"))
+                    .andExpect(jsonPath("items[0].qualityTransferredQty").value("6.000000"))
                     .andExpect(jsonPath("items[0].qualityUnverifiedQty").value("3.000000"))
-                    .andExpect(jsonPath("items[0].qualityUntreatedQty").value("0.000000"))
-                    .andExpect(jsonPath("items[0].completionPercent").value("90.00"));
-            mvc.perform(ProductionReportHttpTest.full(get(URL), "B"))
-                    .andExpect(jsonPath("items[0].scrappedQty").value("0"))
-                    .andExpect(jsonPath("items[0].pendingCompletionQty").value("10.000000"));
-            treatment(jdbc, "independent", 1, "CORRECT_RESULT", null, "0", "-1", "1");
-            mvc.perform(ProductionReportHttpTest.full(get(URL), "A"))
-                    .andExpect(jsonPath("items[0].scrappedQty").value("9.000000"))
-                    .andExpect(jsonPath("items[0].pendingCompletionQty").value("1.000000"));
-            declaration(jdbc, "independent", 2, "REVISE", "2");
-            treatment(jdbc, "independent", 2, "ASSESS", "INDEPENDENT", "0", "0", "0");
-            mvc.perform(ProductionReportHttpTest.full(get(URL), "A"))
-                    .andExpect(jsonPath("items[0].scrappedQty").value("0.000000"))
-                    .andExpect(jsonPath("items[0].qualityUntreatedQty").value("2.000000"));
-            declaration(jdbc, "independent", 3, "VOID", "2");
-            mvc.perform(ProductionReportHttpTest.full(get(URL), "A"))
-                    .andExpect(jsonPath("items[0].scrappedQty").value("0"))
-                    .andExpect(jsonPath("items[0].qualityUntreatedQty").value("0"));
-            declaration(jdbc, "invalid-ledger", 1, "CREATE", "1");
-            treatment(jdbc, "invalid-ledger", 1, "ASSESS", "INDEPENDENT", "0", "0", "0");
-            treatment(jdbc, "invalid-ledger", 1, "ALLOCATE", null, "2", "0", "0");
-            mvc.perform(ProductionReportHttpTest.full(get(URL), "A"))
-                    .andExpect(jsonPath("items[0].scrappedQty").isEmpty())
-                    .andExpect(jsonPath("items[0].pendingCompletionQty").isEmpty())
-                    .andExpect(jsonPath("items[0].qualityUntreatedQty").isEmpty())
-                    .andExpect(jsonPath("items[0].issue").value("质量处置数量异常，请核实"));
+                    .andExpect(jsonPath("items[0].pendingCompletionQty").value("4.000000"));
+            declaration(jdbc,"independent",2,"VOID","10");
+            mvc.perform(ProductionReportHttpTest.full(get(URL),"A")).andExpect(status().isOk())
+                    .andExpect(jsonPath("items[0].qualityTransferredQty").value("0"));
         }
     }
 
@@ -161,7 +121,6 @@ class WorkOrderProgressHttpTest {
                     .andExpect(jsonPath("items[0].plannedQty").value("10.000000"))
                     .andExpect(jsonPath("items[0].completedQty").value("5.000000"))
                     .andExpect(jsonPath("items[0].goodOutputGapQty").value("5.000000"))
-                    .andExpect(jsonPath("items[0].scrappedQty").value("0"))
                     .andExpect(jsonPath("items[0].pendingCompletionQty").value("5.000000"))
                     .andExpect(jsonPath("items[0].completionPercent").value("50.00"))
                     .andExpect(jsonPath("items[0].completedExecutions").value(2));
@@ -250,7 +209,6 @@ class WorkOrderProgressHttpTest {
                     .toString(), "t".repeat(64), "TEST ONLY split disposition");
             MaterialIssueHttpTest.mvc(c).perform(ProductionReportHttpTest.full(get(URL), "A"))
                     .andExpect(status().isOk())
-                    .andExpect(jsonPath("items[0].scrappedQty").value("0.000000"))
                     .andExpect(jsonPath("items[0].qualityTransferredQty").value("6.000000"))
                     .andExpect(jsonPath("items[0].qualityUntreatedQty").value("0.000000"))
                     .andExpect(jsonPath("items[0].pendingCompletionQty").value("4.000000"));
