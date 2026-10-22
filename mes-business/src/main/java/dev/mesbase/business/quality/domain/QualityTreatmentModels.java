@@ -1,15 +1,14 @@
 package dev.mesbase.business.quality.domain;
 
-import java.math.BigDecimal;
-import java.time.LocalDateTime;
-import java.util.List;
-import java.util.Map;
-import java.util.Arrays;
-import java.util.function.Function;
-import java.util.stream.Collectors;
 import com.fasterxml.jackson.annotation.JsonValue;
 import dev.mesbase.core.error.ErrorCode;
 import dev.mesbase.core.error.FoundationException;
+import java.math.BigDecimal;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Map;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 public final class QualityTreatmentModels {
     private QualityTreatmentModels() {
@@ -19,9 +18,15 @@ public final class QualityTreatmentModels {
         ASSESS, RETURN_NODE, TRANSFER_WAREHOUSE;
         private static final Map<String, Action> BY_VALUE = Arrays.stream(values())
                 .collect(Collectors.toUnmodifiableMap(Enum::name, Function.identity()));
+
+        @JsonValue
+        public String getValue() {
+            return name();
+        }
+
         public static Action from(String value) {
             var action = BY_VALUE.get(value);
-            if (action == null) throw new FoundationException(ErrorCode.QUALITY_TREATMENT_CONFLICT);
+            if (action == null) throw new FoundationException(ErrorCode.QUALITY_DATA_INVALID);
             return action;
         }
     }
@@ -33,7 +38,9 @@ public final class QualityTreatmentModels {
                 .collect(Collectors.toUnmodifiableMap(State::getValue, Function.identity()));
 
         @JsonValue
-        public String getValue() { return name(); }
+        public String getValue() {
+            return name();
+        }
 
         public static State from(String value) {
             var state = BY_VALUE.get(value);
@@ -42,7 +49,14 @@ public final class QualityTreatmentModels {
         }
     }
 
-    public enum Attribution {INDEPENDENT, OVERLAP, UNVERIFIED}
+    public enum Attribution {
+        INDEPENDENT, OVERLAP, UNVERIFIED;
+
+        @JsonValue
+        public String getValue() {
+            return name();
+        }
+    }
 
     public enum Destination {RETURN_NODE, WAREHOUSE}
 

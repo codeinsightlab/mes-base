@@ -1,47 +1,41 @@
 package dev.issuefixture;
 
-import java.math.BigDecimal;
-import org.springframework.jdbc.core.JdbcTemplate;
-
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import dev.mesbase.business.directory.service.BusinessDirectoryService;
+import dev.mesbase.business.production.service.ProductionQuantityService;
 import dev.mesbase.business.quality.controller.ProductionDefectController;
 import dev.mesbase.business.quality.controller.QualityTreatmentController;
-import dev.mesbase.business.quality.service.ProductionDefectService;
-import dev.mesbase.business.production.service.ProductionQuantityService;
 import dev.mesbase.business.quality.integration.LocalProductionDefectErpGateway;
-import dev.mesbase.business.quality.dao.MesProductionDefectMapper;
-import dev.mesbase.business.directory.service.BusinessDirectoryService;
+import dev.mesbase.business.quality.service.ProductionDefectService;
+import java.math.BigDecimal;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+import java.util.concurrent.Callable;
+import java.util.concurrent.CyclicBarrier;
+import java.util.concurrent.Executors;
 import org.apache.ibatis.session.SqlSessionFactory;
-import org.mybatis.spring.SqlSessionTemplate;
-import org.springframework.context.annotation.Bean;
+import org.junit.jupiter.api.Test;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Import;
 import org.springframework.core.env.MapPropertySource;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.mock.web.MockServletContext;
-import org.springframework.web.context.support.AnnotationConfigWebApplicationContext;
 import org.springframework.test.web.servlet.MockMvc;
-import org.junit.jupiter.api.Test;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ObjectNode;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.util.Map;
-import java.util.List;
-import java.util.UUID;
-import java.util.concurrent.Executors;
-import java.util.concurrent.CyclicBarrier;
-import java.util.concurrent.Callable;
+import org.springframework.web.context.support.AnnotationConfigWebApplicationContext;
 
-import static org.mockito.Mockito.when;
-import static org.mockito.ArgumentMatchers.any;
+import static dev.issuefixture.ProductionReportHttpTest.full;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
-import static dev.issuefixture.ProductionReportHttpTest.full;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
  * TEST ONLY: real SQL / Spring transactions / HTTP authorization / two routed H2 factories.
@@ -99,9 +93,9 @@ class ProductionDefectHttpTest {
             var jdbc = c.getBean(MaterialIssueHttpTest.Fixture.class).business.get("A");
             for (int i = 0; i < 12; i++)
                 jdbc.update("INSERT INTO mes_quality_treatment(id,request_hash,declaration_id,declaration_revision,execution_id,routing_node_id,action_type,operator_user_id,confirmed_by,occurred_at,recorded_at,reason,rework_qty,transfer_qty) VALUES(?,?,'same-declaration',?,1,11,?,100,1,'2026-01-01 09:00:00',?,'TEST ONLY immutable event',?,?)",
-                        String.format("00000000-0000-0000-0000-%012d",12-i),"test-"+i,i<6?1:2,
-                        i==11?"TRANSFER_WAREHOUSE":"RETURN_NODE","2026-01-01 10:00:"+String.format("%02d",i),
-                        i==11?"0":"0.123456",i==11?"0.123456":"0");
+                        String.format("00000000-0000-0000-0000-%012d", 12 - i), "test-" + i, i < 6 ? 1 : 2,
+                        i == 11 ? "TRANSFER_WAREHOUSE" : "RETURN_NODE", "2026-01-01 10:00:" + String.format("%02d", i),
+                        i == 11 ? "0" : "0.123456", i == 11 ? "0.123456" : "0");
             var capture = new RecentProductionReportHttpTest.SqlCapture();
             c.getBean(SqlSessionFactory.class).getConfiguration().addInterceptor(capture);
             var mvc = MaterialIssueHttpTest.mvc(c);
@@ -128,7 +122,7 @@ class ProductionDefectHttpTest {
         try (var c = context()) {
             var m = MaterialIssueHttpTest.mvc(c);
             var id = add(m, command("one", 0, "2"), "A");
-            m.perform(full(get(ROOT + "/" + id), "A")).andExpect(jsonPath("targetNodeId").value("11"))
+            m.perform(full(get(ROOT + "/" + id), "A")).andExpect(jsonPath("targetNodeId").value("13"))
                     .andExpect(jsonPath("reportedBy").value("1"));
             for (int rev = 1; rev <= 2; rev++)
                 m.perform(full(post(ROOT + "/" + id + "/revisions"), "A").content(command("rev" + rev, rev, "4")))
@@ -171,30 +165,34 @@ class ProductionDefectHttpTest {
 
     @Test
     void declarationsOnlyAcceptTheReportingNodeAndValidateReferences() throws Exception {
-        try (var c=context()) {
-            var mvc=MaterialIssueHttpTest.mvc(c);
-            var base=new ObjectMapper().readTree(command(UUID.randomUUID().toString(),0,"1"));
-            var facts=(ObjectNode)base.get("facts");
-            facts.put("targetNodeId","12");
-            mvc.perform(full(post(ROOT),"A").content(base.toString())).andExpect(status().isBadRequest());
-            facts.put("targetNodeId","13");facts.put("responsibleUserId","999");
-            mvc.perform(full(post(ROOT),"A").content(base.toString())).andExpect(status().isBadRequest());
-            facts.put("responsibleUserId","100");
-            var id=add(mvc,base.toString(),"A");
-            mvc.perform(full(get(ROOT+"/"+id),"A")).andExpect(jsonPath("targetNodeId").value("13"));
-            mvc.perform(full(post(ROOT+"/"+id+"/revisions"),"A").content(command(UUID.randomUUID().toString(),1,"3").replace("affectedNodeId\":\"13","affectedNodeId\":\"12")))
+        try (var c = context()) {
+            var mvc = MaterialIssueHttpTest.mvc(c);
+            var base = new ObjectMapper().readTree(command(UUID.randomUUID().toString(), 0, "1"));
+            var facts = (ObjectNode) base.get("facts");
+            facts.put("targetNodeId", "12");
+            mvc.perform(full(post(ROOT), "A").content(base.toString())).andExpect(status().isBadRequest());
+            facts.put("targetNodeId", "13");
+            facts.put("responsibleUserId", "999");
+            mvc.perform(full(post(ROOT), "A").content(base.toString())).andExpect(status().isBadRequest());
+            facts.put("responsibleUserId", "100");
+            var id = add(mvc, base.toString(), "A");
+            mvc.perform(full(get(ROOT + "/" + id), "A")).andExpect(jsonPath("targetNodeId").value("13"));
+            mvc.perform(full(post(ROOT + "/" + id + "/revisions"), "A").content(command(UUID.randomUUID()
+                            .toString(), 1, "3").replace("affectedNodeId\":\"13", "affectedNodeId\":\"12")))
                     .andExpect(status().isConflict());
         }
     }
 
     @Test
     void declarationRejectsRetiredDestinationChoices() throws Exception {
-        try(var c=context()) {
-            var mvc=MaterialIssueHttpTest.mvc(c);
-            for(var destination:new String[]{"WAREHOUSE","ROUTING_NODE","UNSPECIFIED"})
-                mvc.perform(full(post(ROOT),"A").content(command(UUID.randomUUID().toString(),0,"2").replace("SAME_NODE",destination)))
+        try (var c = context()) {
+            var mvc = MaterialIssueHttpTest.mvc(c);
+            for (var destination : new String[]{"WAREHOUSE", "ROUTING_NODE", "UNSPECIFIED"})
+                mvc.perform(full(post(ROOT), "A").content(command(UUID.randomUUID()
+                                .toString(), 0, "2").replace("SAME_NODE", destination)))
                         .andExpect(status().isBadRequest());
-            assertEquals(0,c.getBean(MaterialIssueHttpTest.Fixture.class).business.get("A").queryForObject("SELECT COUNT(*) FROM mes_production_defect",Integer.class));
+            assertEquals(0, c.getBean(MaterialIssueHttpTest.Fixture.class).business.get("A")
+                    .queryForObject("SELECT COUNT(*) FROM mes_production_defect", Integer.class));
         }
     }
 

@@ -1,18 +1,17 @@
 package dev.mesbase.business.production.service;
 
 import com.github.pagehelper.PageHelper;
-import java.util.Objects;
-
 import dev.mesbase.business.basic.dao.MaterialMapper;
 import dev.mesbase.business.production.dao.MesProductionExecutionMapper;
+import dev.mesbase.business.production.dao.MesProductionScanIdentityMapper;
 import dev.mesbase.business.production.dao.RoutingMapper;
 import dev.mesbase.business.production.dao.WorkorderMapper;
+import dev.mesbase.business.production.domain.MesProductionScanIdentityExample;
 import dev.mesbase.business.production.domain.ProductionIdentity;
 import dev.mesbase.business.production.domain.ProductionScanCode;
-import dev.mesbase.business.production.domain.MesProductionScanIdentityExample;
-import dev.mesbase.business.production.dao.MesProductionScanIdentityMapper;
 import dev.mesbase.core.error.ErrorCode;
 import dev.mesbase.core.error.FoundationException;
+import java.util.Objects;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;

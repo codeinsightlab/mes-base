@@ -1,23 +1,22 @@
 package dev.mesbase.business.quality.domain;
 
-import jakarta.validation.Valid;
 import dev.mesbase.business.quality.domain.QualityTreatmentModels.Assessment;
-
-import jakarta.validation.constraints.NotNull;
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.Size;
-import jakarta.validation.constraints.Digits;
+import dev.mesbase.business.quality.domain.QualityTreatmentModels.Attribution;
+import dev.mesbase.business.quality.domain.QualityTreatmentModels.State;
+import dev.mesbase.common.core.page.PageData;
+import dev.mesbase.core.error.ErrorCode;
+import dev.mesbase.core.error.FoundationException;
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.DecimalMin;
+import jakarta.validation.constraints.Digits;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.PastOrPresent;
+import jakarta.validation.constraints.Size;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
-import dev.mesbase.common.core.page.PageData;
 import java.util.Map;
-import dev.mesbase.business.quality.domain.QualityTreatmentModels.State;
-import dev.mesbase.business.quality.domain.QualityTreatmentModels.Attribution;
-import dev.mesbase.core.error.ErrorCode;
-import dev.mesbase.core.error.FoundationException;
 
 public final class ProductionDefectModels {
     private ProductionDefectModels() {
@@ -49,13 +48,15 @@ public final class ProductionDefectModels {
                               String executionStatus, String source, String batchNo, String specification) {
     }
 
-    /** Current workflow balance shared by the list and detail projections. */
+    /**
+     * Current workflow balance shared by the list and detail projections.
+     */
     public record Processing(State state, BigDecimal pendingDispositionQty, BigDecimal returnedQty,
                              BigDecimal transferredQty) {
         public static Processing of(String recordAction, Attribution attribution, BigDecimal declared,
                                     BigDecimal returned, BigDecimal transferred) {
             var pending = declared.subtract(returned).subtract(transferred);
-            if (returned.signum() < 0 || transferred.signum() < 0 || pending.signum() < 0
+            if (DefectRecordAction.from(recordAction) == null || declared.signum() <= 0 || returned.signum() < 0 || transferred.signum() < 0 || pending.signum() < 0
                     || attribution != Attribution.INDEPENDENT && (returned.signum() > 0 || transferred.signum() > 0))
                 throw new FoundationException(ErrorCode.QUALITY_TREATMENT_CONFLICT);
             State state;

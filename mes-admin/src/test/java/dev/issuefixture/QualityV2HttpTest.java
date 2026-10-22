@@ -2,15 +2,17 @@ package dev.issuefixture;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import dev.mesbase.business.quality.controller.DefectStatisticsController;
 import dev.mesbase.business.quality.controller.OperationDefectTypeController;
 import dev.mesbase.business.quality.controller.ProductionDefectV2Controller;
-import dev.mesbase.business.quality.controller.DefectStatisticsController;
-import dev.mesbase.business.quality.service.OperationDefectTypeService;
+import dev.mesbase.business.quality.controller.QualityDispositionController;
 import dev.mesbase.business.quality.service.DefectStatisticsService;
-import java.util.UUID;
+import dev.mesbase.business.quality.service.OperationDefectTypeService;
+import dev.mesbase.business.quality.service.QualityDispositionService;
 import java.util.List;
-import java.util.concurrent.CyclicBarrier;
+import java.util.UUID;
 import java.util.concurrent.Callable;
+import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.Executors;
 import org.junit.jupiter.api.Test;
 import org.springframework.context.annotation.Configuration;
@@ -22,12 +24,12 @@ import static dev.issuefixture.ProductionReportHttpTest.full;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
  * TEST ONLY: two isolated H2 business databases, real Spring services, mapper XML and HTTP authorization.
@@ -38,7 +40,7 @@ class QualityV2HttpTest {
     static final String TYPES = "/api/production/operation/1/defect-types";
 
     @Configuration
-    @Import({dev.mesbase.business.quality.service.QualityDispositionService.class,dev.mesbase.business.quality.controller.QualityDispositionController.class,OperationDefectTypeController.class, OperationDefectTypeService.class, ProductionDefectV2Controller.class,
+    @Import({ProductionReportHttpTest.Extra.class, QualityDispositionService.class, QualityDispositionController.class, OperationDefectTypeController.class, OperationDefectTypeService.class, ProductionDefectV2Controller.class,
             DefectStatisticsController.class, DefectStatisticsService.class})
     static class Extra {
     }
@@ -231,7 +233,7 @@ class QualityV2HttpTest {
     }
 
     @Test
-    void statisticsPreserveAttributionRecoveryLegacyUnknownAndLatestRevision() throws Exception {
+    void statisticsPreserveAttributionReturnsAndLatestRevision() throws Exception {
         try (var c = context()) {
             var m = MaterialIssueHttpTest.mvc(c);
             var type = addType(m, "A", "S", "PROCESS");
@@ -251,8 +253,9 @@ class QualityV2HttpTest {
             m.perform(full(post(ROOT + "/declarations"), "A").content(overlap.toString())).andExpect(status().isOk());
             m.perform(full(post(ROOT + "/declarations"), "A").content(declaration(type, "PROCESS").toString()))
                     .andExpect(status().isOk());
-            m.perform(full(post(ROOT + "/" + declaration + "/dispositions"),"A")
-                    .content(QualityDispositionHttpTest.command(UUID.randomUUID().toString(),"RETURN_NODE","1","null")))
+            m.perform(full(post(ROOT + "/" + declaration + "/dispositions"), "A")
+                            .content(QualityDispositionHttpTest.command(UUID.randomUUID()
+                                    .toString(), "RETURN_NODE", "1", "null")))
                     .andExpect(status().isOk());
             m.perform(full(get(ROOT + "/statistics"), "A").param("wasteCategory", "PROCESS"))
                     .andExpect(status().isOk()).andExpect(jsonPath("items[0].declaredQty").value("7.000000"))

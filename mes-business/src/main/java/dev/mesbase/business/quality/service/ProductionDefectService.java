@@ -17,8 +17,6 @@ import dev.mesbase.business.production.service.ProductionChainLocks;
 import dev.mesbase.business.production.service.ProductionQuantityService;
 import dev.mesbase.business.quality.dao.MesProductionDefectMapper;
 import dev.mesbase.business.quality.dao.ProductionDefectListExtraMapper;
-import dev.mesbase.business.quality.domain.ProductionDefectModels.Processing;
-import dev.mesbase.business.quality.domain.QualityTreatmentModels.Attribution;
 import dev.mesbase.business.quality.domain.DefectDestination;
 import dev.mesbase.business.quality.domain.DefectRecordAction;
 import dev.mesbase.business.quality.domain.MesProductionDefectEntity;
@@ -30,8 +28,10 @@ import dev.mesbase.business.quality.domain.ProductionDefectModels.Names;
 import dev.mesbase.business.quality.domain.ProductionDefectModels.Node;
 import dev.mesbase.business.quality.domain.ProductionDefectModels.NodeTotal;
 import dev.mesbase.business.quality.domain.ProductionDefectModels.Page;
+import dev.mesbase.business.quality.domain.ProductionDefectModels.Processing;
 import dev.mesbase.business.quality.domain.ProductionDefectModels.Warehouse;
 import dev.mesbase.business.quality.domain.ProductionDefectV2Models;
+import dev.mesbase.business.quality.domain.QualityTreatmentModels.Attribution;
 import dev.mesbase.business.quality.domain.WasteCategory;
 import dev.mesbase.business.quality.integration.ProductionDefectErpGateway;
 import dev.mesbase.business.shared.enums.EnableStatus;
@@ -339,7 +339,7 @@ public class ProductionDefectService {
         var e = new MesProductionDefectExample();
         e.createCriteria().andDeclarationIdEqualTo(id);
         e.setOrderByClause("revision_no desc");
-        try (var page = PageHelper.offsetPage(0, 1)) {
+        try (var page = PageHelper.offsetPage(0, 1, false)) {
             var rows = mapper.selectByExample(e);
             if (rows.isEmpty()) throw new FoundationException(ErrorCode.NOT_FOUND);
             return rows.getFirst();
@@ -364,7 +364,7 @@ public class ProductionDefectService {
             for (var row : rows) {
                 var t = totals.get(row.getDeclarationId());
                 if (t == null) throw new FoundationException(ErrorCode.QUALITY_TREATMENT_CONFLICT);
-                if (t.invalidActions() > 0) throw new FoundationException(ErrorCode.QUALITY_TREATMENT_CONFLICT);
+                if (t.invalidActions() > 0) throw new FoundationException(ErrorCode.QUALITY_DATA_INVALID);
                 var attribution = Attribution.UNVERIFIED;
                 if (t.attribution() != null) attribution = Attribution.valueOf(t.attribution());
                 states.put(row.getDeclarationId(), Processing.of(row.getRecordAction(), attribution,

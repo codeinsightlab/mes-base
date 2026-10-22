@@ -16,7 +16,6 @@ import dev.mesbase.core.error.FoundationException;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Optional;
 import java.util.concurrent.atomic.LongAdder;
 import java.util.stream.IntStream;
 import org.junit.jupiter.api.AfterEach;
@@ -62,8 +61,11 @@ class QualityTreatmentProjectionTest {
     private static MesQualityTreatmentEntity event(String id, String declaration, int revision, Action action,
                                                    Attribution type, String quantity) {
         var event = new MesQualityTreatmentEntity();
-        event.setId(id); event.setDeclarationId(declaration); event.setDeclarationRevision(revision);
-        event.setExecutionId(1L); event.setActionType(action.name());
+        event.setId(id);
+        event.setDeclarationId(declaration);
+        event.setDeclarationRevision(revision);
+        event.setExecutionId(1L);
+        event.setActionType(action.name());
         if (type != null) event.setAttributionType(type.name());
         event.setReturnedQty(action == Action.RETURN_NODE ? new BigDecimal(quantity) : BigDecimal.ZERO);
         event.setTransferQty(action == Action.TRANSFER_WAREHOUSE ? new BigDecimal(quantity) : BigDecimal.ZERO);
@@ -110,9 +112,9 @@ class QualityTreatmentProjectionTest {
         var overlap = event("b-assess", "b", 1, Action.ASSESS, Attribution.OVERLAP, "0");
         overlap.setRelatedDeclarationId("a");
         var rows = List.of(event("a1-old", "a", 1, Action.ASSESS, Attribution.OVERLAP, "0"),
-                first,overlap,event("a2-return", "a",2,Action.RETURN_NODE,null,"3.5"),
-                event("a2-transfer", "a",2,Action.TRANSFER_WAREHOUSE,null,"1.5"),
-                event("void-assess","void",1,Action.ASSESS,Attribution.INDEPENDENT,"0"));
+                first, overlap, event("a2-return", "a", 2, Action.RETURN_NODE, null, "3.5"),
+                event("a2-transfer", "a", 2, Action.TRANSFER_WAREHOUSE, null, "1.5"),
+                event("void-assess", "void", 1, Action.ASSESS, Attribution.INDEPENDENT, "0"));
         when(events.selectByExample(any())).thenReturn(rows);
         when(defects.selectLatest(1L, null, null)).thenReturn(List.of(a, b, voided, unknown));
         var basis = service.releaseBasis(1L);

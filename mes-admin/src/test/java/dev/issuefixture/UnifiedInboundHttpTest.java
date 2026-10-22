@@ -1,31 +1,35 @@
 package dev.issuefixture;
 
-import java.util.UUID;
 import java.util.List;
+import java.util.UUID;
 import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.Executors;
 import org.junit.jupiter.api.Test;
-import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.web.servlet.MockMvc;
 
 import static dev.issuefixture.ProductionCoreV1HttpTest.full;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
  * TEST ONLY: real document/stock transactions and generated XML on two isolated routed H2 databases.
  */
 class UnifiedInboundHttpTest {
     static String draft(MockMvc m, String execution, String qty) throws Exception {
+        return draft(m, execution, qty, "TEST-FINISHED");
+    }
+
+    static String draft(MockMvc m, String execution, String qty, String batchNo) throws Exception {
         String body = "{\"documentType\":\"OTHER_RECEIPT\",\"reason\":\"TEST ONLY inbound\"" + (execution == null ? "" : ",\"sourceExecutionId\":\"" + execution + "\"") + "}";
         var d = StockDocumentHttpTest.JSON.readTree(m.perform(full(post(StockDocumentHttpTest.ROOT)).content(body))
                 .andExpect(status().isOk()).andReturn().getResponse().getContentAsString());
         String id = d.get("document").get("id").asText();
-        m.perform(full(post(StockDocumentHttpTest.ROOT + "/" + id + "/lines")).content(StockDocumentHttpTest.line("0", "1", "TEST-FINISHED", qty)
+        m.perform(full(post(StockDocumentHttpTest.ROOT + "/" + id + "/lines")).content(StockDocumentHttpTest.line("0", "1", batchNo, qty)
                 .replace("\"binCode\":\"BIN1\"", "\"binCode\":null"))).andExpect(status().isOk());
         return id;
     }
@@ -36,7 +40,11 @@ class UnifiedInboundHttpTest {
     }
 
     static String receive(MockMvc m, String qty) throws Exception {
-        String id = draft(m, "1", qty);
+        return receive(m, qty, "TEST-FINISHED");
+    }
+
+    static String receive(MockMvc m, String qty, String batchNo) throws Exception {
+        String id = draft(m, "1", qty, batchNo);
         confirm(m, id, 1);
         return id;
     }

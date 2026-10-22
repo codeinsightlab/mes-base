@@ -1,18 +1,18 @@
 package dev.issuefixture;
 
-import com.github.pagehelper.PageHelper;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.github.pagehelper.PageHelper;
 import dev.mesbase.acceptance.AcceptanceBusinessDatabase;
 import dev.mesbase.business.production.dao.WorkOrderProgressExtraMapper;
-import dev.mesbase.business.production.domain.WorkOrderProgress.Order;
 import dev.mesbase.business.production.domain.WorkOrderProgress.Filter;
+import dev.mesbase.business.production.domain.WorkOrderProgress.Order;
 import dev.mesbase.infrastructure.persistence.PersistenceFactories;
-import java.util.List;
 import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
-import org.apache.ibatis.reflection.SystemMetaObject;
 import org.apache.ibatis.mapping.Environment;
+import org.apache.ibatis.reflection.SystemMetaObject;
 import org.apache.ibatis.session.Configuration;
 import org.apache.ibatis.session.SqlSessionFactoryBuilder;
 import org.apache.ibatis.transaction.jdbc.JdbcTransactionFactory;
@@ -111,7 +111,8 @@ class WorkOrderProgressMySqlTest {
                     assertTrue(totals.stream().allMatch(t -> ids.contains(t.workorderId())));
                     var quality = mapper.quality(ids);
                     assertTrue(quality.stream().allMatch(t -> ids.contains(t.workorderId())));
-                    assertTrue(quality.stream().allMatch(t -> t.declaredQty() != null && t.transferredQty() != null && t.returnedQty() != null));
+                    assertTrue(quality.stream()
+                            .allMatch(t -> t.declaredQty() != null && t.transferredQty() != null && t.returnedQty() != null));
                     System.out.println("SIMPLE_B workorder progress: total=" + total + ", page=" + orders.size() + ", completedOrders=" + totals.size());
                 }
             }

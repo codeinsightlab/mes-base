@@ -1,44 +1,41 @@
 package dev.issuefixture;
 
-import java.util.UUID;
-import java.util.List;
 import dev.mesbase.acceptance.FactorySnapshotFixture;
 import dev.mesbase.acceptance.QueuedCompletionExecutor;
 import dev.mesbase.business.production.service.ProductionCompletionService;
 import dev.mesbase.business.production.service.WorkOrderCompletionService;
-import dev.mesbase.core.factory.FactoryCatalog;
+import dev.mesbase.core.error.ErrorCode;
+import dev.mesbase.core.error.FoundationException;
 import dev.mesbase.core.factory.Factory;
+import dev.mesbase.core.factory.FactoryCatalog;
 import dev.mesbase.core.factory.FactoryId;
 import dev.mesbase.core.factory.FactoryStatus;
 import dev.mesbase.framework.sync.SyncCoordinator;
 import dev.mesbase.platform.execution.FactoryIntegrationContext;
 import dev.mesbase.server.WorkOrderCompletionJob;
+import java.math.BigDecimal;
+import java.util.List;
+import java.util.UUID;
+import java.util.concurrent.atomic.AtomicInteger;
+import org.junit.jupiter.api.Test;
 import org.springframework.context.ApplicationContext;
 
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
-import static org.mockito.Mockito.doAnswer;
-import static org.mockito.Mockito.doNothing;
-
-import java.util.concurrent.atomic.AtomicInteger;
-import dev.mesbase.core.error.FoundationException;
-import dev.mesbase.core.error.ErrorCode;
-
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
-
-import java.math.BigDecimal;
-import tools.jackson.databind.ObjectMapper;
-import org.junit.jupiter.api.Test;
-
-import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.doNothing;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+import tools.jackson.databind.ObjectMapper;
 
 /**
- * TEST ONLY H2 exact five-operation 100 -> defect10 -> scrap6/recover4 -> E94 closure.
+ * TEST ONLY H2 exact five-operation 100 -> defect10 -> warehouse10 -> good output90 closure.
  */
 class ProductionCompletionHttpTest {
     @Test
@@ -56,8 +53,8 @@ class ProductionCompletionHttpTest {
             m.perform(ProductionCoreV1HttpTest.full(post("/api/quality/releases/executions/1")).content(release("90")))
                     .andExpect(status().isOk());
 
-            UnifiedInboundHttpTest.receive(m, "60");
-            UnifiedInboundHttpTest.receive(m, "20");
+            UnifiedInboundHttpTest.receive(m, "60", "000LOT-001");
+            UnifiedInboundHttpTest.receive(m, "20", "000LOT-001");
             String root = "/api/production/executions/1";
             var state = new ObjectMapper().readTree(m.perform(ProductionCoreV1HttpTest.full(get(root + "/closure")))
                     .andExpect(status().isOk()).andExpect(jsonPath("effective").value("90.000000"))
@@ -102,7 +99,7 @@ class ProductionCompletionHttpTest {
             assertEquals("100.000000", j.queryForObject("SELECT target_qty FROM mes_production_execution WHERE id=1", BigDecimal.class)
                     .toPlainString());
             // Production is terminal; remaining warehouse work still observes its own release/stock gates.
-            UnifiedInboundHttpTest.receive(m, "14");
+            UnifiedInboundHttpTest.receive(m, "10", "000LOT-001");
             assertEquals(new BigDecimal("80.000000"), j.queryForObject("SELECT accepted_qty FROM mes_execution_completion WHERE execution_id=1", BigDecimal.class));
             m.perform(ProductionCoreV1HttpTest.full(post(root + "/actions/select-path"))
                     .content("{\"revision\":1,\"routingNodeIds\":[11,12,13,14,15]}")).andExpect(status().isConflict());
@@ -117,6 +114,7 @@ class ProductionCompletionHttpTest {
             m.perform(ProductionCoreV1HttpTest.full(post("/api/quality/releases/executions/1")).content(release("80")))
                     .andExpect(status().isOk());
 
+            j.update("INSERT INTO wm_inventory(id,material_id,warehouse_id,batch_no,quantity,available_quantity,status) VALUES(1,1,1,'TEST-FINISHED',0,0,'ENABLED')");
             UnifiedInboundHttpTest.receive(m, "80");
             m.perform(ProductionCoreV1HttpTest.full(get("/api/production/executions/1/closure")))
                     .andExpect(status().isOk()).andExpect(jsonPath("canComplete").value(false))

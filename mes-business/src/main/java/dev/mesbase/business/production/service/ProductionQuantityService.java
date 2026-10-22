@@ -3,7 +3,7 @@ package dev.mesbase.business.production.service;
 import com.github.pagehelper.PageHelper;
 import dev.mesbase.business.directory.domain.DirectoryLabel;
 import dev.mesbase.business.directory.service.BusinessDirectoryService;
-import dev.mesbase.business.legacy.dao.LegacyMigrationMapper;
+import dev.mesbase.business.legacy.dao.LegacyHistoryMapper;
 import dev.mesbase.business.production.dao.MesExecutionPathNodeMapper;
 import dev.mesbase.business.production.dao.MesProductionExecutionMapper;
 import dev.mesbase.business.production.dao.ProductionQuantityMapper;
@@ -51,7 +51,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class ProductionQuantityService {
     private final MesProductionExecutionMapper executions;
     private final WorkorderMapper orders;
-    private LegacyMigrationMapper history;
+    private LegacyHistoryMapper history;
     private final ExecutionPathService paths;
     private final MesExecutionPathNodeMapper pathNodes;
     private final ProductionQuantityMapper quantities;
@@ -75,7 +75,7 @@ public class ProductionQuantityService {
     public ProductionQuantityService(MesProductionExecutionMapper executions, ExecutionPathService paths,
                                      MesExecutionPathNodeMapper pathNodes, ProductionQuantityMapper quantities,
                                      BusinessDirectoryService directory, ProductionDefectQuantityQuery defects,
-                                     WorkorderMapper orders, ObjectProvider<LegacyMigrationMapper> history) {
+                                     WorkorderMapper orders, ObjectProvider<LegacyHistoryMapper> history) {
         this(executions, paths, pathNodes, quantities, directory, defects, orders);
         this.history = history.getIfAvailable();
     }
@@ -301,6 +301,17 @@ public class ProductionQuantityService {
     }
 
     public static void validateChange(ExecutionQuantity view, Long nodeId, BigDecimal delta) {
+        validateChange(view, nodeId, delta, BigDecimal.ZERO);
+    }
+
+    /**
+     * A return reduces gross reporting and its defect loss together in one locked transaction.
+     */
+    public void validateQualityReturn(Long executionId, Long nodeId, BigDecimal quantity) {
+        validateChange(getExecutionQuantities(executionId), nodeId, quantity.negate(), quantity.negate());
+    }
+
+    private static void validateChange(ExecutionQuantity view, Long nodeId, BigDecimal delta, BigDecimal defectDelta) {
         // Historical corrections retain their formal gates even after normal reporting closes.
         if (view.historical()) ParameterChecks.reject(ErrorCode.REPORT_PATH_REQUIRED);
         if (!ExecutionPathStatus.LOCKED.getValue().equals(view.pathStatus()))
@@ -308,7 +319,7 @@ public class ProductionQuantityService {
         var before = calculate(view, null, BigDecimal.ZERO, BigDecimal.ZERO);
         String blocked = positiveReportBlockReason(before, nodeId);
         if (delta.signum() > 0 && blocked != null) throw new ProductionQualityPendingException(blocked);
-        var after = calculate(view, nodeId, delta, BigDecimal.ZERO);
+        var after = calculate(view, nodeId, delta, defectDelta);
         for (int i = 0; i < after.nodes().size(); i++) {
             var n = after.nodes().get(i);
             var old = before.nodes().get(i);

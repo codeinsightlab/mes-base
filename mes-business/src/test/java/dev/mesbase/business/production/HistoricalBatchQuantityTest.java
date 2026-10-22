@@ -1,7 +1,7 @@
 package dev.mesbase.business.production;
 
 import dev.mesbase.business.directory.service.BusinessDirectoryService;
-import dev.mesbase.business.legacy.dao.LegacyMigrationMapper;
+import dev.mesbase.business.legacy.dao.LegacyHistoryMapper;
 import dev.mesbase.business.legacy.domain.LegacyHistory;
 import dev.mesbase.business.production.dao.MesExecutionPathNodeMapper;
 import dev.mesbase.business.production.dao.MesProductionExecutionMapper;
@@ -48,7 +48,7 @@ class HistoricalBatchQuantityTest {
     private final ProductionQuantityMapper quantities = mock(ProductionQuantityMapper.class);
     private final ProductionDefectQuantityQuery defects = mock(ProductionDefectQuantityQuery.class);
     private final WorkorderMapper orders = mock(WorkorderMapper.class);
-    private final LegacyMigrationMapper history = mock(LegacyMigrationMapper.class);
+    private final LegacyHistoryMapper history = mock(LegacyHistoryMapper.class);
     private final Map<Long, MesProductionExecutionEntity> rows = new LinkedHashMap<>();
     private final Map<Long, PathModel> models = new LinkedHashMap<>();
     private final Map<Long, List<MesExecutionPathNodeEntity>> choices = new LinkedHashMap<>();
@@ -56,7 +56,7 @@ class HistoricalBatchQuantityTest {
 
     @SuppressWarnings("unchecked")
     HistoricalBatchQuantityTest() {
-        ObjectProvider<LegacyMigrationMapper> provider = mock(ObjectProvider.class);
+        ObjectProvider<LegacyHistoryMapper> provider = mock(ObjectProvider.class);
         when(provider.getIfAvailable()).thenReturn(history);
         service = new ProductionQuantityService(executions, paths, selected, quantities,
                 mock(BusinessDirectoryService.class), defects, orders, provider);

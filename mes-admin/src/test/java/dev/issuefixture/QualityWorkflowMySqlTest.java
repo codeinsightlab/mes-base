@@ -1,29 +1,18 @@
 package dev.issuefixture;
 
-import dev.mesbase.business.production.service.ProductionQuantityService;
-import dev.mesbase.business.production.service.ProductionReceiptService;
-import dev.mesbase.business.production.service.ProductionIdentityService;
-import dev.mesbase.business.quality.service.QualityTreatmentService;
-import dev.mesbase.business.quality.domain.QualityTreatmentModels.Action;
-import dev.mesbase.business.quality.domain.QualityTreatmentModels.Attribution;
-import dev.mesbase.business.quality.domain.QualityTreatmentModels.Assessment;
-import dev.mesbase.business.quality.domain.ProductionDefectModels;
 import dev.mesbase.business.quality.domain.ProductionDefectModels.Facts;
-import dev.mesbase.core.error.FoundationException;
+import dev.mesbase.business.quality.domain.ProductionDefectModels;
+import dev.mesbase.business.quality.domain.QualityTreatmentModels.Assessment;
+import dev.mesbase.business.quality.domain.QualityTreatmentModels.Attribution;
+import dev.mesbase.business.quality.service.QualityTreatmentService;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
-import java.nio.file.Path;
-import java.nio.file.Files;
-import java.util.concurrent.Executors;
 import org.junit.jupiter.api.Test;
-import org.springframework.dao.DataAccessException;
-
-import static org.junit.jupiter.api.Assertions.assertTrue;
-
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
+import org.springframework.dao.DataAccessException;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -79,17 +68,17 @@ class QualityWorkflowMySqlTest {
     @Test
     void currentQualityProjectionAndImmutableLedgerUseTheLatestContract() throws Exception {
         try (var harness = new ProductionQualityLifecycleMySqlTest.Harness()) {
-            var fixture = fixture(harness,100,100,100,100,100);
-            var id = defect(harness,fixture,1,10);
+            var fixture = fixture(harness, 100, 100, 100, 100, 100);
+            var id = defect(harness, fixture, 1, 10);
             var treatment = harness.context.getBean(QualityTreatmentService.class).summary(id);
-            assertEquals("PENDING",treatment.state().getValue());
-            assertEquals(0,d(10).compareTo(treatment.pendingDispositionQty()));
-            assertEquals(0,treatment.returnedQty().signum());
+            assertEquals("PENDING", treatment.state().getValue());
+            assertEquals(0, d(10).compareTo(treatment.pendingDispositionQty()));
+            assertEquals(0, treatment.returnedQty().signum());
             assertThrows(DataAccessException.class, () -> harness.transaction(() -> {
-                harness.jdbc.update("UPDATE mes_quality_treatment SET reason='TEST ONLY rejected mutation' WHERE declaration_id=?",id);
+                harness.jdbc.update("UPDATE mes_quality_treatment SET reason='TEST ONLY rejected mutation' WHERE declaration_id=?", id);
                 return null;
             }));
-            assertEquals(harness.oldFacts,harness.jdbc.queryForList("SELECT * FROM mes_production_defect WHERE id<=? ORDER BY id",harness.maxOld));
+            assertEquals(harness.oldFacts, harness.jdbc.queryForList("SELECT * FROM mes_production_defect WHERE id<=? ORDER BY id", harness.maxOld));
         }
     }
 }

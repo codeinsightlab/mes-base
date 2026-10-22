@@ -133,8 +133,6 @@ public class MesQualityTreatmentEntity {
     }
 
 
-
-
     public Long getOperatorUserId() {
         return operatorUserId;
     }

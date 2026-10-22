@@ -35,12 +35,15 @@
         GROUP BY e.workorder_id
     </select>
     <select id="quality" resultType="dev.mesbase.business.production.domain.WorkOrderProgress$Quality">
+    <bind name="assessAction" value="@dev.mesbase.business.quality.domain.QualityTreatmentModels$Action@ASSESS.getValue()"/>
+    <bind name="return_nodeAction" value="@dev.mesbase.business.quality.domain.QualityTreatmentModels$Action@RETURN_NODE.getValue()"/>
+    <bind name="transfer_warehouseAction" value="@dev.mesbase.business.quality.domain.QualityTreatmentModels$Action@TRANSFER_WAREHOUSE.getValue()"/>
         <bind name="voidAction" value="@dev.mesbase.business.quality.domain.DefectRecordAction@VOID.getValue()"/>
         SELECT e.workorder_id AS workorderId, d.defect_qty AS declaredQty,
-        MAX(CASE WHEN t.action_type='ASSESS' THEN t.attribution_type END) AS attribution,
-        SUM(CASE WHEN t.action_type IS NOT NULL AND t.action_type NOT IN ('ASSESS','RETURN_NODE','TRANSFER_WAREHOUSE') THEN 1 ELSE 0 END) AS invalidActions,
-        COALESCE(SUM(CASE WHEN t.action_type = 'RETURN_NODE' THEN t.rework_qty ELSE 0 END), 0) AS returnedQty,
-        COALESCE(SUM(t.transfer_qty), 0) AS transferredQty
+        MAX(CASE WHEN t.action_type=#{assessAction} THEN t.attribution_type END) AS attribution,
+        COALESCE(SUM(CASE WHEN t.action_type = #{return_nodeAction} THEN t.rework_qty ELSE 0 END), 0) AS returnedQty,
+        COALESCE(SUM(CASE WHEN t.action_type = #{transfer_warehouseAction} THEN t.transfer_qty ELSE 0 END), 0) AS transferredQty,
+        SUM(CASE WHEN t.action_type IS NOT NULL AND t.action_type NOT IN (#{assessAction},#{return_nodeAction},#{transfer_warehouseAction}) THEN 1 ELSE 0 END) AS invalidActions
         FROM mes_production_execution e
         JOIN mes_production_defect d ON d.execution_id = e.id
         LEFT JOIN mes_quality_treatment t ON t.declaration_id = d.declaration_id

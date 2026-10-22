@@ -13,20 +13,19 @@ import dev.mesbase.business.production.service.ProductionChainLocks;
 import dev.mesbase.business.production.service.ProductionQuantityService;
 import dev.mesbase.business.quality.dao.MesProductionDefectMapper;
 import dev.mesbase.business.quality.dao.MesQualityTreatmentMapper;
-import dev.mesbase.business.quality.domain.DefectDestination;
 import dev.mesbase.business.quality.domain.DefectRecordAction;
 import dev.mesbase.business.quality.domain.MesProductionDefectEntity;
 import dev.mesbase.business.quality.domain.MesProductionDefectExample;
 import dev.mesbase.business.quality.domain.MesQualityTreatmentEntity;
 import dev.mesbase.business.quality.domain.MesQualityTreatmentExample;
 import dev.mesbase.business.quality.domain.ProductionDefectModels.NodeTotal;
+import dev.mesbase.business.quality.domain.ProductionDefectModels.Processing;
 import dev.mesbase.business.quality.domain.QualityTreatmentModels.Action;
 import dev.mesbase.business.quality.domain.QualityTreatmentModels.Assessment;
-import dev.mesbase.business.quality.domain.QualityTreatmentModels.Attribution;
 import dev.mesbase.business.quality.domain.QualityTreatmentModels.AssessmentCommand;
+import dev.mesbase.business.quality.domain.QualityTreatmentModels.Attribution;
 import dev.mesbase.business.quality.domain.QualityTreatmentModels.Destination;
 import dev.mesbase.business.quality.domain.QualityTreatmentModels.Disposition;
-import dev.mesbase.business.quality.domain.ProductionDefectModels.Processing;
 import dev.mesbase.business.quality.domain.QualityTreatmentModels.Summary;
 import dev.mesbase.common.utils.SecurityUtils;
 import dev.mesbase.common.validation.ParameterChecks;
@@ -47,7 +46,6 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
-import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.apache.commons.lang3.StringUtils;
@@ -92,7 +90,7 @@ public class QualityTreatmentService {
         var filter = new MesProductionDefectExample();
         filter.createCriteria().andDeclarationIdEqualTo(id);
         filter.setOrderByClause("revision_no DESC");
-        try (var page = PageHelper.offsetPage(0, 1)) {
+        try (var page = PageHelper.offsetPage(0, 1, false)) {
             var rows = defects.selectByExample(filter);
             if (rows.isEmpty()) ParameterChecks.reject(ErrorCode.QUALITY_TREATMENT_CONFLICT);
             return rows.getFirst();
@@ -115,7 +113,7 @@ public class QualityTreatmentService {
 
     public Details details(String declaration) {
         var d = latest(declaration);
-        var all = executionEvents(d.getExecutionId());
+        var all = declarationEvents(declaration);
         var s = summarize(d, all);
         var history = all.stream().filter(e -> e.getDeclarationId().equals(declaration)).toList();
         history.forEach(event -> Action.from(event.getActionType()));
@@ -126,6 +124,16 @@ public class QualityTreatmentService {
     private List<MesQualityTreatmentEntity> executionEvents(Long execution) {
         var f = new MesQualityTreatmentExample();
         f.createCriteria().andExecutionIdEqualTo(execution);
+        return boundedEvents(f);
+    }
+
+    private List<MesQualityTreatmentEntity> declarationEvents(String declaration) {
+        var filter = new MesQualityTreatmentExample();
+        filter.createCriteria().andDeclarationIdEqualTo(declaration);
+        return boundedEvents(filter);
+    }
+
+    private List<MesQualityTreatmentEntity> boundedEvents(MesQualityTreatmentExample f) {
         f.setOrderByClause("recorded_at,id");
         try (var page = PageHelper.offsetPage(0, 5001, false)) {
             var rows = events.selectByExample(f);
@@ -174,8 +182,8 @@ public class QualityTreatmentService {
         row.setExecutionId(d.getExecutionId());
         row.setRoutingNodeId(d.getAffectedNodeId());
         row.setActionType(command.destination() == Destination.RETURN_NODE ? Action.RETURN_NODE.name() : Action.TRANSFER_WAREHOUSE.name());
-                row.setReturnedQty(command.destination() == Destination.RETURN_NODE ? command.quantity() : ZERO);
-                                row.setTransferQty(command.destination() == Destination.WAREHOUSE ? command.quantity() : ZERO);
+        row.setReturnedQty(command.destination() == Destination.RETURN_NODE ? command.quantity() : ZERO);
+        row.setTransferQty(command.destination() == Destination.WAREHOUSE ? command.quantity() : ZERO);
         row.setTargetWarehouseId(command.warehouseId());
         row.setStockDocumentId(stockDocumentId);
         row.setOperatorUserId(SecurityUtils.getUserId());
@@ -195,7 +203,7 @@ public class QualityTreatmentService {
 
     public Summary summary(String declaration) {
         var d = latest(declaration);
-        return summarize(d, executionEvents(d.getExecutionId()));
+        return summarize(d, declarationEvents(declaration));
     }
 
     private Summary summarize(MesProductionDefectEntity d, List<MesQualityTreatmentEntity> all) {
@@ -230,9 +238,11 @@ public class QualityTreatmentService {
                 .map(MesQualityTreatmentEntity::getTransferQty).reduce(ZERO, BigDecimal::add);
         var processing = Processing.of(d.getRecordAction(), type, d.getDefectQty(), returned, transferred);
         return new Summary(d.getDeclarationId(), d.getRevisionNo(), d.getExecutionId(), d.getAffectedNodeId(),
-                d.getDefectQty(), type, Optional.ofNullable(assessment).map(MesQualityTreatmentEntity::getRelatedDeclarationId)
+                d.getDefectQty(), type, Optional.ofNullable(assessment)
+                .map(MesQualityTreatmentEntity::getRelatedDeclarationId)
                 .orElse(null), Optional.ofNullable(assessment).map(MesQualityTreatmentEntity::getBasis).orElse(null),
-                processing.pendingDispositionQty(), type == Attribution.INDEPENDENT ? d.getDefectQty().subtract(returned) : ZERO,
+                processing.pendingDispositionQty(), type == Attribution.INDEPENDENT ? d.getDefectQty()
+                .subtract(returned) : ZERO,
                 processing.state(), d.getRecordAction(), d.getDestinationType(), rows, returned, transferred);
     }
 
@@ -352,7 +362,8 @@ public class QualityTreatmentService {
                 ParameterChecks.reject(ErrorCode.QUALITY_TREATMENT_CONFLICT);
             return details(declaration);
         }
-        if (command.expectedRevision() != d.getRevisionNo() || DefectRecordAction.VOID.getValue().equals(d.getRecordAction()))
+        if (command.expectedRevision() != d.getRevisionNo() || DefectRecordAction.VOID.getValue()
+                .equals(d.getRecordAction()))
             ParameterChecks.reject(ErrorCode.QUALITY_TREATMENT_CONFLICT);
         locks.requireActiveExecution(d.getExecutionId());
         var path = paths.view(d.getExecutionId());
@@ -375,14 +386,18 @@ public class QualityTreatmentService {
             ParameterChecks.reject(ErrorCode.QUALITY_TREATMENT_CONFLICT);
         ParameterChecks.text(assessment.basis(), true, 500, ErrorCode.QUALITY_TREATMENT_CONFLICT);
         if (assessment.type() == Attribution.OVERLAP) {
-            if (assessment.relatedDeclarationId() == null || assessment.relatedDeclarationId().equals(d.getDeclarationId()))
+            if (assessment.relatedDeclarationId() == null || assessment.relatedDeclarationId()
+                    .equals(d.getDeclarationId()))
                 ParameterChecks.reject(ErrorCode.QUALITY_TREATMENT_CONFLICT);
             var related = latest(assessment.relatedDeclarationId());
             var other = summary(related.getDeclarationId());
-            if (!related.getExecutionId().equals(d.getExecutionId()) || DefectRecordAction.VOID.getValue().equals(related.getRecordAction())
-                    || other.attribution() != Attribution.INDEPENDENT || d.getDefectQty().compareTo(related.getDefectQty()) > 0)
+            if (!related.getExecutionId().equals(d.getExecutionId()) || DefectRecordAction.VOID.getValue()
+                    .equals(related.getRecordAction())
+                    || other.attribution() != Attribution.INDEPENDENT || d.getDefectQty()
+                    .compareTo(related.getDefectQty()) > 0)
                 ParameterChecks.reject(ErrorCode.QUALITY_TREATMENT_CONFLICT);
-        } else if (assessment.relatedDeclarationId() != null) ParameterChecks.reject(ErrorCode.QUALITY_TREATMENT_CONFLICT);
+        } else if (assessment.relatedDeclarationId() != null)
+            ParameterChecks.reject(ErrorCode.QUALITY_TREATMENT_CONFLICT);
         var row = new MesQualityTreatmentEntity();
         row.setId(command.requestId());
         row.setRequestHash(fingerprint);
@@ -409,12 +424,19 @@ public class QualityTreatmentService {
     }
 
     private String hash(AssessmentCommand command) {
-        try { return digest(SecurityUtils.getUserId() + ":" + json.writeValueAsString(command)); }
-        catch (JsonProcessingException failure) { throw new FoundationException(ErrorCode.BAD_REQUEST, failure); }
+        try {
+            return digest(SecurityUtils.getUserId() + ":" + json.writeValueAsString(command));
+        } catch (JsonProcessingException failure) {
+            throw new FoundationException(ErrorCode.BAD_REQUEST, failure);
+        }
     }
 
     private static String digest(String value) {
-        try { return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(value.getBytes(StandardCharsets.UTF_8))); }
-        catch (NoSuchAlgorithmException failure) { throw new IllegalStateException(failure); }
+        try {
+            return HexFormat.of()
+                    .formatHex(MessageDigest.getInstance("SHA-256").digest(value.getBytes(StandardCharsets.UTF_8)));
+        } catch (NoSuchAlgorithmException failure) {
+            throw new IllegalStateException(failure);
+        }
     }
 }

@@ -131,8 +131,8 @@ class ProductionDefectMySqlTest {
     }
 
 
-    static Command command(String key, int revision, Long execution, Long node, Long warehouse, String qty) {
-        return new Command(key, revision == 0 ? null : revision, revision == 0 ? null : "TEST ONLY订正", new Facts(execution, node, node, null, new BigDecimal(qty), "MATERIAL", "TEST_ONLY_DEFECT_PHASE1", null, null, "WAREHOUSE", null, warehouse, null, LocalDateTime.of(2026, 1, 1, 10, 0)), new Assessment(Attribution.INDEPENDENT, null, "TEST ONLY reviewed independent fixture"));
+    static Command command(String key, int revision, Long execution, Long node, String qty) {
+        return new Command(key, revision == 0 ? null : revision, revision == 0 ? null : "TEST ONLY订正", new Facts(execution, node, node, null, new BigDecimal(qty), "MATERIAL", "TEST_ONLY_DEFECT_PHASE1", null, null, "SAME_NODE", null, null, null, LocalDateTime.of(2026, 1, 1, 10, 0)), new Assessment(Attribution.INDEPENDENT, null, "TEST ONLY reviewed independent fixture"));
     }
 
     @Test
@@ -144,14 +144,14 @@ class ProductionDefectMySqlTest {
             var tx = h.tx;
             var fixture = h.fixture();
             ProductionQualityLifecycleMySqlTest.seedGrossReports(h, fixture);
-            Long execution = fixture.execution(), node = fixture.selected().get(1), warehouse = fixture.warehouse();
+            Long execution = fixture.execution(), node = fixture.selected().get(1);
             String tag = "DEFECT_TEST_" + UUID.randomUUID();
             var backup = Path.of(".local/production-quality-phase2b-20261016/quality-regression-before.txt");
             Files.writeString(backup, "SIMPLE_B:192.168.18.25:3306/mes_base_dev_business_simple_b\nrequestPrefix=" + tag + "\nexistingConflict=" + jdbc.queryForObject("SELECT COUNT(*) FROM mes_production_defect WHERE request_key LIKE ?", Integer.class, tag + "%") + "\nproductionReports=" + jdbc.queryForList("SELECT id,execution_id,routing_node_id,quantity_delta FROM mes_production_report WHERE execution_id=?", execution));
             var before = jdbc.queryForList("SELECT * FROM mes_production_report WHERE execution_id=? ORDER BY id", execution);
             ProductionReportMySqlTest.actor();
             try {
-                var create = command(tag, 0, execution, node, warehouse, "2.123456");
+                var create = command(tag, 0, execution, node, "2.123456");
                 var first = tx.execute(s -> service.create(create)).record();
                 h.declarations.add(first.getDeclarationId());
                 assertEquals(first.getId(), tx.execute(s -> service.create(create)).record().getId());
@@ -161,7 +161,7 @@ class ProductionDefectMySqlTest {
                     try {
                         barrier.await();
                         return tx.execute(s -> {
-                            service.revise(first.getDeclarationId(), command("REV_" + UUID.randomUUID(), 1, execution, node, warehouse, "4"));
+                            service.revise(first.getDeclarationId(), command("REV_" + UUID.randomUUID(), 1, execution, node, "4"));
                             return 200;
                         });
                     } catch (FoundationException e) {
@@ -182,14 +182,14 @@ class ProductionDefectMySqlTest {
                 assertEquals(2, rows.size());
                 assertThrows(Exception.class, () -> jdbc.update("UPDATE mes_production_defect SET defect_qty=99 WHERE id=?", first.getId()));
                 assertThrows(Exception.class, () -> jdbc.update("DELETE FROM mes_production_defect WHERE id=?", first.getId()));
-                assertThrows(FoundationException.class, () -> tx.execute(s -> service.create(command(tag, 0, execution, node, warehouse, "3"))));
+                assertThrows(FoundationException.class, () -> tx.execute(s -> service.create(command(tag, 0, execution, node, "3"))));
                 var voidCommand = new Command("VOID_" + UUID.randomUUID(), 2, "TEST ONLY验收结束作废", null);
                 tx.execute(s -> service.voidDeclaration(first.getDeclarationId(), voidCommand));
                 assertEquals(0, effectiveBeforeVoid.subtract(new BigDecimal("4"))
                         .compareTo(tx.execute(s -> service.sumEffectiveDefectQty(execution, node))));
                 assertEquals(3, tx.execute(s -> service.history(first.getDeclarationId(), 0, 20)).total());
                 // Failure rollback then retry leaves exactly one result, including a concurrently repeated key.
-                var retry = command("RETRY_" + UUID.randomUUID(), 0, execution, node, warehouse, "1");
+                var retry = command("RETRY_" + UUID.randomUUID(), 0, execution, node, "1");
                 tx.executeWithoutResult(s -> {
                     service.create(retry);
                     s.setRollbackOnly();

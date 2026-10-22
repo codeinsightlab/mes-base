@@ -41,11 +41,16 @@ class WorkOrderProgressSqlTest {
         var statement = configuration.getMappedStatement(WorkOrderProgressExtraMapper.class.getName() + ".quality");
         var bound = statement.getBoundSql(Map.of("ids", List.of(1L, 2L)));
         String sql = bound.getSql().replaceAll("\\s+", " ");
-        assertEquals(7, bound.getParameterMappings().size());
+        assertEquals(9, bound.getParameterMappings().size());
         assertTrue(sql.contains("t.declaration_revision = d.revision_no"));
         assertTrue(sql.contains("newer.revision_no > d.revision_no"));
         assertTrue(sql.contains("d.record_action != ?"));
         assertEquals("VOID", bound.getAdditionalParameter("voidAction"));
-        assertTrue(sql.contains("SUM(t.failed_qty)"));
+        assertFalse(sql.contains("failed_qty"));
+        assertFalse(sql.contains("recovered_qty"));
+        assertFalse(sql.contains("processed_qty"));
+        assertTrue(sql.contains("AS returnedQty"));
+        assertTrue(sql.contains("AS transferredQty"));
+        assertTrue(sql.contains("AS invalidActions"));
     }
 }

@@ -44,7 +44,9 @@ with zipfile.ZipFile(JAR) as artifact:
                       "ErpSourceContext.class", "ErpRoutingDataSource.class", "PersistenceConfiguration$ErpPersistence.class",
                       "HTMLFilter.class", "ISysAttachmentService.class", "SharedDatabasePersistence.class",
                       "SharedDatabasePersistence$ScopedIdentity.class", "Enterprise.class",
-                      "OpenApiClientExtraMapper.class", "OpenApiClientExtraMapper.xml")
+                      "OpenApiClientExtraMapper.class", "OpenApiClientExtraMapper.xml",
+                      "LegacyHistoryImportService.class", "LegacyProductionActivationService.class",
+                      "LegacyImportCommand.class", "LegacyMigrationMapper.class")
     assert not any(n.rsplit("/", 1)[-1] in legacy_classes for n in names)
     for name in names:
         if name.startswith("BOOT-INF/lib/mes-") and name.endswith(".jar"):

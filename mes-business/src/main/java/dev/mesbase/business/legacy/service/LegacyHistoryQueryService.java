@@ -2,7 +2,7 @@ package dev.mesbase.business.legacy.service;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import dev.mesbase.business.legacy.dao.LegacyMigrationMapper;
+import dev.mesbase.business.legacy.dao.LegacyHistoryMapper;
 import dev.mesbase.business.legacy.domain.LegacyHistory.Mapping;
 import dev.mesbase.business.legacy.domain.LegacyHistory.Node;
 import dev.mesbase.business.production.dao.MesProductionExecutionMapper;
@@ -21,10 +21,10 @@ import org.springframework.transaction.annotation.Transactional;
 @ConditionalOnProperty(name = "mes.business.enabled", havingValue = "true")
 @Transactional(transactionManager = "businessTransactionManager", readOnly = true)
 public class LegacyHistoryQueryService {
-    private final LegacyMigrationMapper metadata;
+    private final LegacyHistoryMapper metadata;
     private final MesProductionExecutionMapper executions;
 
-    public LegacyHistoryQueryService(LegacyMigrationMapper metadata, MesProductionExecutionMapper executions) {
+    public LegacyHistoryQueryService(LegacyHistoryMapper metadata, MesProductionExecutionMapper executions) {
         this.metadata = metadata;
         this.executions = executions;
     }

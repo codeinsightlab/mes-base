@@ -4,13 +4,11 @@ import dev.mesbase.business.directory.domain.DirectoryLabel;
 import dev.mesbase.business.quality.domain.MesQualityTreatmentEntity;
 import dev.mesbase.business.quality.domain.QualityTreatmentModels.AssessmentCommand;
 import dev.mesbase.business.quality.service.QualityTreatmentService;
+import dev.mesbase.common.utils.bean.BeanConversions;
 import dev.mesbase.platform.web.EndpointAccess;
-import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
-import dev.mesbase.common.utils.bean.BeanConversions;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -33,12 +31,15 @@ public class QualityTreatmentController {
                         String routingNodeId, String actionType, String attributionType, String relatedDeclarationId,
                         String basis, String returnedQty, String operatorUserId, String operatorName,
                         String confirmedBy, String confirmedByName, LocalDateTime occurredAt, LocalDateTime recordedAt,
-                        String reason, String targetWarehouseId, String stockDocumentId, String transferQty) { }
+                        String reason, String targetWarehouseId, String stockDocumentId, String transferQty) {
+    }
 
     public record View(String declarationId, int revision, String executionId, String routingNodeId, String defectQty,
                        String attribution, String relatedDeclarationId, String basis, String pendingDispositionQty,
-                       String netDefectQty, String state, String recordAction, String destinationType, List<Event> events,
-                       String returnedQty, String transferredQty) { }
+                       String netDefectQty, String state, String recordAction, String destinationType,
+                       List<Event> events,
+                       String returnedQty, String transferredQty) {
+    }
 
     @GetMapping("/treatments/recent")
     @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED, permission = "business:quality:defect:read")
@@ -59,8 +60,11 @@ public class QualityTreatmentController {
         return view(service.assess(id, c));
     }
 
-    private record History(List<Event> events) { }
-    private record Labels(String operatorName, String confirmedByName) { }
+    private record History(List<Event> events) {
+    }
+
+    private record Labels(String operatorName, String confirmedByName) {
+    }
 
     static View view(QualityTreatmentService.Details data) {
         return BeanConversions.convertWith(data.summary(), new History(data.history().stream()

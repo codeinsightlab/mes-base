@@ -9,7 +9,6 @@ import java.util.UUID;
 
 import static dev.issuefixture.ProductionReportHttpTest.full;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.hasItem;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -33,8 +32,7 @@ class ProductionQualityQuantityHttpTest {
     static String command(long node, String qty) {
         return ProductionDefectHttpTest.command(UUID.randomUUID().toString(), 0, qty)
                 .replace("affectedNodeId\":\"13", "affectedNodeId\":\"" + node)
-                .replace("ROUTING_NODE", "WAREHOUSE")
-                .replace("\"occurredAt\"", "\"targetWarehouseId\":\"1\",\"occurredAt\"");
+                .replace("discoveredNodeId\":\"13", "discoveredNodeId\":\"" + node);
     }
 
     static long report(MockMvc m, long node, String qty) throws Exception {
@@ -53,7 +51,7 @@ class ProductionQualityQuantityHttpTest {
     }
 
     @Test
-    void formulasVersionsVoidAndBothDestinations() throws Exception {
+    void formulasVersionsAndVoidUseTheDeclarationNode() throws Exception {
         try (var c = context()) {
             var m = MaterialIssueHttpTest.mvc(c);
             report(m, 11, "100");
@@ -68,7 +66,8 @@ class ProductionQualityQuantityHttpTest {
                     .andExpect(jsonPath("nodes[2].availableQty").value("2.000000"))
                     .andExpect(jsonPath("nodes[0].qualityIntegrated").value(true));
             String revision = ProductionDefectHttpTest.command("revision", 1, "4")
-                    .replace("affectedNodeId\":\"13", "affectedNodeId\":\"11");
+                    .replace("affectedNodeId\":\"13", "affectedNodeId\":\"11")
+                    .replace("discoveredNodeId\":\"13", "discoveredNodeId\":\"11");
             for (int i = 0; i < 2; i++)
                 m.perform(full(post("/api/quality/defects/" + a + "/revisions"), "A").content(revision))
                         .andExpect(status().isOk()).andExpect(jsonPath("record.targetNodeId").value("11"));

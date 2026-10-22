@@ -1,30 +1,20 @@
 package dev.mesbase.business.legacy.dao;
 
-import dev.mesbase.business.legacy.domain.LegacyHistory.Batch;
-import dev.mesbase.business.legacy.domain.LegacyHistory.Mapping;
-import dev.mesbase.business.legacy.domain.LegacyHistory.MappingIdentity;
 import dev.mesbase.business.legacy.domain.LegacyHistory.ExecutionNode;
+import dev.mesbase.business.legacy.domain.LegacyHistory.Input;
+import dev.mesbase.business.legacy.domain.LegacyHistory.Mapping;
 import dev.mesbase.business.legacy.domain.LegacyHistory.Node;
 import java.math.BigDecimal;
-import dev.mesbase.business.legacy.domain.LegacyHistory.Input;
 import java.util.List;
-import org.apache.ibatis.annotations.Insert;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
-import org.apache.ibatis.annotations.Update;
 
-public interface LegacyMigrationMapper {
+/**
+ * Read-only access to frozen evidence retained after the one-time import was retired.
+ */
+public interface LegacyHistoryMapper {
     // Original status 0/1 is an external scrap-conversion code, not a Base business enum.
     String PENDING_LOSS = "CASE WHEN b.status=#{completed} THEN 0 ELSE COALESCE((SELECT SUM(CAST(JSON_UNQUOTE(JSON_EXTRACT(q.source_payload,'$.quantity')) AS DECIMAL(20,6))) FROM mes_legacy_source_mapping q WHERE q.parent_id=e.id AND q.entity_kind='QUALITY_EVIDENCE' AND JSON_UNQUOTE(JSON_EXTRACT(q.source_payload,'$.process_id'))=SUBSTRING_INDEX(n.source_pk,'/',-1) AND (COALESCE(JSON_UNQUOTE(JSON_EXTRACT(q.source_payload,'$.status')),'') &lt;&gt; '1' OR COALESCE(JSON_UNQUOTE(JSON_EXTRACT(q.source_payload,'$.scrap_code')),'')='')),0) END unverified_loss_qty ";
-
-    @Insert("INSERT INTO mes_legacy_source_lock(id) VALUES(#{id}) ON DUPLICATE KEY UPDATE id=id")
-    int ensureLock(@Param("id") String id);
-
-    @Select("SELECT id FROM mes_legacy_source_lock WHERE id=#{id} FOR UPDATE")
-    String lock(@Param("id") String id);
-
-    @Select("SELECT COALESCE(SUM(CAST(JSON_UNQUOTE(JSON_EXTRACT(conversion_payload,'$.inputQty')) AS DECIMAL(20,6))),0) FROM mes_legacy_source_mapping WHERE parent_id=#{id} AND entity_kind='EXECUTION'")
-    BigDecimal orderInputs(@Param("id") String orderMappingId);
 
     record CardCount(String sourceKey, long reportCount, long nodeCount) {
     }
@@ -37,46 +27,6 @@ public interface LegacyMigrationMapper {
 
     @Select("SELECT id,batch_id,parent_id,source_table,source_pk,source_hash,rule_version,entity_kind,entity_id,source_payload,conversion_payload,created_at FROM mes_legacy_source_mapping WHERE parent_id=#{id} AND entity_kind='EXECUTION'")
     List<Mapping> orderExecutions(@Param("id") String id);
-
-    @Select("SELECT id,batch_id,parent_id,source_table,source_pk,source_hash,rule_version,entity_kind,entity_id,"
-            + "source_payload,conversion_payload,created_at FROM mes_legacy_source_mapping WHERE id=#{id}")
-    Mapping find(@Param("id") String id);
-
-    @Select({"<script>SELECT id,parent_id,source_hash,rule_version,entity_id FROM mes_legacy_source_mapping WHERE id IN ",
-            "<foreach collection='ids' item='id' open='(' separator=',' close=')'>#{id}</foreach></script>"})
-    List<MappingIdentity> findIdentities(@Param("ids") List<String> ids);
-
-    @Insert({"<script>INSERT INTO mes_legacy_source_mapping(id,batch_id,parent_id,source_table,source_pk,source_hash,",
-            "rule_version,entity_kind,entity_id,source_payload,conversion_payload,created_at) VALUES ",
-            "<foreach collection='rows' item='r' separator=','>",
-            "(#{r.id},#{r.batchId},#{r.parentId},#{r.sourceTable},#{r.sourcePk},#{r.sourceHash},#{r.ruleVersion},",
-            "#{r.entityKind},#{r.entityId},#{r.sourcePayload},#{r.conversionPayload},#{r.createdAt})</foreach></script>"})
-    int insertBatch(@Param("rows") List<Mapping> rows);
-
-    @Insert("INSERT INTO mes_legacy_source_mapping(id,batch_id,parent_id,source_table,source_pk,source_hash,"
-            + "rule_version,entity_kind,entity_id,source_payload,conversion_payload,created_at) "
-            + "VALUES(#{id},#{batchId},#{parentId},#{sourceTable},#{sourcePk},#{sourceHash},#{ruleVersion},"
-            + "#{entityKind},#{entityId},#{sourcePayload},#{conversionPayload},#{createdAt})")
-    int insert(Mapping row);
-
-    @Select("SELECT id,rule_version,snapshot_hash,status,approved_scope,operator_user_id,created_at,finished_at "
-            + "FROM mes_legacy_migration_batch WHERE id=#{id} FOR UPDATE")
-    Batch batch(@Param("id") String id);
-
-    @Insert("INSERT INTO mes_legacy_migration_batch(id,rule_version,snapshot_hash,status,approved_scope,"
-            + "operator_user_id,created_at,finished_at) VALUES(#{id},#{ruleVersion},#{snapshotHash},#{status},"
-            + "#{approvedScope},#{operatorUserId},#{createdAt},#{finishedAt}) ON DUPLICATE KEY UPDATE id=id")
-    int prepare(Batch batch);
-
-    @Update("UPDATE mes_legacy_migration_batch SET status=#{next},finished_at=CASE WHEN #{next}=#{completed} "
-            + "THEN NOW(6) ELSE NULL END WHERE id=#{id} AND status=#{expected}")
-    int transition(@Param("id") String id, @Param("expected") String expected, @Param("next") String next,
-                   @Param("completed") String completed);
-
-    @Select("SELECT COUNT(*) FROM mes_legacy_source_mapping a JOIN mes_legacy_source_mapping w ON w.id=a.parent_id "
-            + "WHERE a.entity_kind='ORDER_ACTIVATION' AND a.entity_id=#{id} AND w.entity_kind='WORKORDER' "
-            + "AND w.entity_id=a.entity_id AND a.source_hash=w.source_hash AND a.rule_version='internal-production-activation-v1'")
-    int activatedOrder(@Param("id") Long workorderId);
 
     @Select("SELECT CAST(JSON_UNQUOTE(JSON_EXTRACT(e.conversion_payload,'$.inputQty')) AS DECIMAL(20,6)) "
             + "FROM mes_legacy_source_mapping e JOIN mes_legacy_source_mapping a ON a.parent_id=e.id "

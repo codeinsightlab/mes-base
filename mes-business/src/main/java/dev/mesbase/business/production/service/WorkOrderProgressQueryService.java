@@ -12,8 +12,6 @@ import dev.mesbase.business.production.domain.WorkOrderProgress.Query;
 import dev.mesbase.business.production.domain.WorkOrderStatus;
 import dev.mesbase.business.quality.domain.DefectRecordAction;
 import dev.mesbase.business.quality.domain.ProductionDefectModels.Processing;
-import dev.mesbase.core.error.FoundationException;
-import dev.mesbase.core.error.ErrorCode;
 import dev.mesbase.business.quality.domain.QualityTreatmentModels.Attribution;
 import dev.mesbase.common.utils.StringUtils;
 import dev.mesbase.common.validation.ParameterChecks;
@@ -90,7 +88,7 @@ public class WorkOrderProgressQueryService {
         for (var fact : quality) {
             var attribution = Attribution.UNVERIFIED;
             if (fact.attribution() != null) attribution = Attribution.valueOf(fact.attribution());
-            if (fact.invalidActions() > 0) throw new FoundationException(ErrorCode.QUALITY_TREATMENT_CONFLICT);
+            if (fact.invalidActions() > 0) throw new FoundationException(ErrorCode.QUALITY_DATA_INVALID);
             var processing = Processing.of(DefectRecordAction.CREATE.getValue(), attribution,
                     fact.declaredQty(), fact.returnedQty(), fact.transferredQty());
             if (attribution == Attribution.UNVERIFIED) unverified = unverified.add(fact.declaredQty());

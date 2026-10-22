@@ -76,29 +76,30 @@ class WorkOrderProgressHttpTest {
 
     @Test
     void currentDispositionQuantitiesUseOnlyLatestIndependentVersions() throws Exception {
-        try(var c=context()) {
-            var jdbc=c.getBean(MaterialIssueHttpTest.Fixture.class).business.get("A");
+        try (var c = context()) {
+            var jdbc = c.getBean(MaterialIssueHttpTest.Fixture.class).business.get("A");
             ProductionReportHttpTest.seed(jdbc);
             jdbc.update("UPDATE workorder SET planned_qty=100 WHERE id=1");
-            complete(jdbc,"completed",1,"90");
-            declaration(jdbc,"independent",1,"CREATE","10");
-            treatment(jdbc,"independent",1,"ASSESS","INDEPENDENT","0","0","0");
-            var mvc=MaterialIssueHttpTest.mvc(c);
-            mvc.perform(ProductionReportHttpTest.full(get(URL),"A")).andExpect(status().isOk())
+            complete(jdbc, "completed", 1, "90");
+            declaration(jdbc, "independent", 1, "CREATE", "10");
+            treatment(jdbc, "independent", 1, "ASSESS", "INDEPENDENT", "0", "0", "0");
+            var mvc = MaterialIssueHttpTest.mvc(c);
+            mvc.perform(ProductionReportHttpTest.full(get(URL), "A")).andExpect(status().isOk())
                     .andExpect(jsonPath("items[0].qualityUntreatedQty").value("10.000000"));
-            treatment(jdbc,"independent",1,"RETURN_NODE",null,"0","0","0","4");
-            jdbc.update("INSERT INTO mes_quality_treatment(id,request_hash,declaration_id,declaration_revision,execution_id,routing_node_id,action_type,transfer_qty,operator_user_id,confirmed_by,occurred_at,recorded_at,reason) VALUES(?,?,?,1,1,11,'TRANSFER_WAREHOUSE',6,1,1,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,'TEST ONLY')",UUID.randomUUID().toString(),"t".repeat(64),"independent");
-            declaration(jdbc,"overlap",1,"CREATE","2");
-            treatment(jdbc,"overlap",1,"ASSESS","OVERLAP","0","0","0");
-            declaration(jdbc,"unverified",1,"CREATE","3");
-            mvc.perform(ProductionReportHttpTest.full(get(URL),"A")).andExpect(status().isOk())
+            treatment(jdbc, "independent", 1, "RETURN_NODE", null, "0", "0", "0", "4");
+            jdbc.update("INSERT INTO mes_quality_treatment(id,request_hash,declaration_id,declaration_revision,execution_id,routing_node_id,action_type,transfer_qty,operator_user_id,confirmed_by,occurred_at,recorded_at,reason) VALUES(?,?,?,1,1,11,'TRANSFER_WAREHOUSE',6,1,1,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,'TEST ONLY')", UUID.randomUUID()
+                    .toString(), "t".repeat(64), "independent");
+            declaration(jdbc, "overlap", 1, "CREATE", "2");
+            treatment(jdbc, "overlap", 1, "ASSESS", "OVERLAP", "0", "0", "0");
+            declaration(jdbc, "unverified", 1, "CREATE", "3");
+            mvc.perform(ProductionReportHttpTest.full(get(URL), "A")).andExpect(status().isOk())
                     .andExpect(jsonPath("items[0].qualityUntreatedQty").value("0.000000"))
                     .andExpect(jsonPath("items[0].qualityReturnedQty").value("4.000000"))
                     .andExpect(jsonPath("items[0].qualityTransferredQty").value("6.000000"))
                     .andExpect(jsonPath("items[0].qualityUnverifiedQty").value("3.000000"))
                     .andExpect(jsonPath("items[0].pendingCompletionQty").value("4.000000"));
-            declaration(jdbc,"independent",2,"VOID","10");
-            mvc.perform(ProductionReportHttpTest.full(get(URL),"A")).andExpect(status().isOk())
+            declaration(jdbc, "independent", 2, "VOID", "10");
+            mvc.perform(ProductionReportHttpTest.full(get(URL), "A")).andExpect(status().isOk())
                     .andExpect(jsonPath("items[0].qualityTransferredQty").value("0"));
         }
     }

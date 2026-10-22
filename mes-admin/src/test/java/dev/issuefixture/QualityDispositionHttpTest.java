@@ -2,38 +2,36 @@ package dev.issuefixture;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import dev.mesbase.business.production.domain.ProductionScanCode;
 import dev.mesbase.business.quality.controller.QualityDispositionController;
 import dev.mesbase.business.quality.service.QualityDispositionService;
 import dev.mesbase.business.wm.service.impl.WmInventoryServiceImpl;
-import java.math.BigDecimal;
-import org.springframework.jdbc.core.JdbcTemplate;
-import dev.mesbase.business.production.domain.ProductionScanCode;
 import jakarta.validation.Validator;
-import org.springframework.validation.beanvalidation.LocalValidatorFactoryBean;
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
-import java.util.UUID;
+import java.math.BigDecimal;
 import java.util.Set;
-import org.apache.ibatis.session.SqlSessionFactory;
-
-import static org.junit.jupiter.api.Assertions.assertTrue;
-
+import java.util.UUID;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.Executors;
+import org.apache.ibatis.session.SqlSessionFactory;
 import org.junit.jupiter.api.Test;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.validation.beanvalidation.LocalValidatorFactoryBean;
 
-import static dev.issuefixture.QualityWorkflowHttpTest.context;
-import static dev.issuefixture.QualityWorkflowHttpTest.defect;
-import static dev.issuefixture.QualityWorkflowHttpTest.amount;
-import static dev.issuefixture.QualityWorkflowHttpTest.quantities;
+import static dev.issuefixture.ProductionReportHttpTest.full;
 import static dev.issuefixture.QualityWorkflowHttpTest.JSON;
 import static dev.issuefixture.QualityWorkflowHttpTest.Q;
-import static dev.issuefixture.ProductionReportHttpTest.full;
+import static dev.issuefixture.QualityWorkflowHttpTest.amount;
+import static dev.issuefixture.QualityWorkflowHttpTest.context;
+import static dev.issuefixture.QualityWorkflowHttpTest.defect;
+import static dev.issuefixture.QualityWorkflowHttpTest.quantities;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
@@ -82,6 +80,7 @@ class QualityDispositionHttpTest {
             amount(q.get("nodes").get(1), "effectiveOutputQty", "90");
             dispose(m, id, body);
             assertEquals(1, j.queryForObject("SELECT COUNT(*) FROM mes_production_report WHERE source_quality_event_id=?", Integer.class, key));
+            j.update("INSERT INTO mes_operation_user(operation_id,user_id) VALUES(1,1)");
             m.perform(full(post(ProductionReportingHttpTest.ROOT), "A").content(ProductionReportingHttpTest.body(12, "10")))
                     .andExpect(status().isOk());
             amount(quantities(m).get("nodes").get(1), "effectiveOutputQty", "100");
@@ -100,7 +99,7 @@ class QualityDispositionHttpTest {
             String body = command(UUID.randomUUID().toString(), "WAREHOUSE", "10", "1");
             var result = dispose(m, id, body);
             amount(result, "transferredQty", "10");
-            amount(result, "allocatedScrapQty", "0");
+            assertEquals(false, result.has("allocatedScrapQty"));
             var e = result.get("events").get(result.get("events").size() - 1);
             String doc = e.get("stockDocumentId").asText();
             assertEquals("POSTED", j.queryForObject("SELECT status FROM wm_stock_document WHERE id=?", String.class, doc));
@@ -192,15 +191,15 @@ class QualityDispositionHttpTest {
 
     @Test
     void partialReturnsRemainPendingUntilTheWholeQuantityHasADisposition() throws Exception {
-        try (var c = context(EXTRA,100,100,90,90,90)) {
+        try (var c = context(EXTRA, 100, 100, 90, 90, 90)) {
             var mvc = MaterialIssueHttpTest.mvc(c);
-            var id = defect(mvc,12,"10","INDEPENDENT",null);
-            var partial = dispose(mvc,id,command(UUID.randomUUID().toString(),"RETURN_NODE","6","null"));
-            amount(partial,"pendingDispositionQty","4");
-            assertEquals("PENDING",partial.get("state").asText());
-            var complete = dispose(mvc,id,command(UUID.randomUUID().toString(),"RETURN_NODE","4","null"));
-            assertEquals("RETURNED",complete.get("state").asText());
-            assertEquals(false,complete.has("pendingStartQty"));
+            var id = defect(mvc, 12, "10", "INDEPENDENT", null);
+            var partial = dispose(mvc, id, command(UUID.randomUUID().toString(), "RETURN_NODE", "6", "null"));
+            amount(partial, "pendingDispositionQty", "4");
+            assertEquals("PENDING", partial.get("state").asText());
+            var complete = dispose(mvc, id, command(UUID.randomUUID().toString(), "RETURN_NODE", "4", "null"));
+            assertEquals("RETURNED", complete.get("state").asText());
+            assertEquals(false, complete.has("pendingStartQty"));
         }
     }
 
@@ -285,6 +284,30 @@ class QualityDispositionHttpTest {
                 assertEquals(0, j.queryForObject("SELECT COUNT(*) FROM wm_inventory WHERE material_id=1 AND batch_no LIKE '000LOT-%'", Integer.class));
                 assertEquals(0, j.queryForObject("SELECT COUNT(*) FROM mes_quality_treatment WHERE action_type='TRANSFER_WAREHOUSE'", Integer.class));
             }
+        }
+    }
+
+    @Test
+    void returnAndNormalReportingUseOneQuantityBasisEvenWithDownstreamReports() throws Exception {
+        try (var c = context(EXTRA, 100, 100, 100, 100, 100)) {
+            var mvc = MaterialIssueHttpTest.mvc(c);
+            var jdbc = ProductionWarehouseFixture.db(c);
+            var id = defect(mvc, 12, "10", "INDEPENDENT", null);
+            var before = quantities(mvc);
+            dispose(mvc, id, command(UUID.randomUUID().toString(), "RETURN_NODE", "4", "null"));
+            var returned = quantities(mvc);
+            for (int i = 0; i < 5; i++)
+                assertEquals(before.get("nodes").get(i).get("effectiveOutputQty"), returned.get("nodes").get(i)
+                        .get("effectiveOutputQty"));
+            amount(returned.get("nodes").get(1), "returnedQty", "4");
+            amount(returned.get("nodes").get(1), "availableQty", "4");
+            jdbc.update("INSERT INTO mes_operation_user(operation_id,user_id) VALUES(1,1)");
+            mvc.perform(full(post(ProductionReportingHttpTest.ROOT), "A").content(ProductionReportingHttpTest.body(12, "4")))
+                    .andExpect(status().isOk());
+            var produced = quantities(mvc);
+            amount(produced.get("nodes").get(1), "reportedQty", "100");
+            amount(produced.get("nodes").get(1), "effectiveOutputQty", "94");
+            amount(produced.get("nodes").get(4), "effectiveOutputQty", "94");
         }
     }
 

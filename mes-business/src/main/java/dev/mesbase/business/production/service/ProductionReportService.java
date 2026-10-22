@@ -203,7 +203,7 @@ public class ProductionReportService {
             if (remaining.signum() == 0) break;
         }
         if (remaining.signum() != 0) throw new FoundationException(ErrorCode.REPORT_QUANTITY_CONFLICT);
-        quantities.validateReportChange(executionId, nodeId, quantity.negate());
+        quantities.validateQualityReturn(executionId, nodeId, quantity);
         if (reports.insertBatch(additions) != additions.size())
             throw new FoundationException(ErrorCode.REPORT_QUANTITY_CONFLICT);
         publisher.publishEvent(new ProductionCompletionRequested(FactoryContext.required(), executionId));

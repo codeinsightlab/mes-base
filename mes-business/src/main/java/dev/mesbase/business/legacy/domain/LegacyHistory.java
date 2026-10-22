@@ -7,9 +7,6 @@ public final class LegacyHistory {
     private LegacyHistory() {
     }
 
-    public record ExecutionEvidence(BigDecimal inputQty, String inputBasis) {
-    }
-
     public record Input(Long executionId, BigDecimal quantity) {
     }
 
@@ -34,12 +31,4 @@ public final class LegacyHistory {
                           String sourcePayload, String conversionPayload, LocalDateTime createdAt) {
     }
 
-    public record MappingIdentity(String id, String parentId, String sourceHash, String ruleVersion,
-                                  Long entityId) {
-    }
-
-    public record Batch(String id, String ruleVersion, String snapshotHash, String status,
-                        String approvedScope, Long operatorUserId, LocalDateTime createdAt,
-                        LocalDateTime finishedAt) {
-    }
 }

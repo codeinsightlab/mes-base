@@ -1,18 +1,17 @@
 package dev.mesbase.business.quality.service;
 
-import dev.mesbase.common.validation.ParameterChecks;
-import dev.mesbase.common.core.page.PageData;
 import com.github.pagehelper.PageHelper;
 import dev.mesbase.business.quality.dao.DefectStatisticsExtraMapper;
 import dev.mesbase.business.quality.domain.DefectStatistics.Query;
 import dev.mesbase.business.quality.domain.DefectStatistics.Row;
-import dev.mesbase.business.quality.domain.WasteCategory;
 import dev.mesbase.business.quality.domain.QualityTreatmentModels.Attribution;
+import dev.mesbase.business.quality.domain.WasteCategory;
+import dev.mesbase.common.core.page.PageData;
+import dev.mesbase.common.validation.ParameterChecks;
 import dev.mesbase.core.error.ErrorCode;
-import dev.mesbase.core.error.FoundationException;
 import java.util.List;
-import org.springframework.stereotype.Service;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
@@ -26,12 +25,14 @@ public class DefectStatisticsService {
     }
 
 
-    public record Page(List<Row> items, long total, int offset, int limit) implements PageData<Row> { }
+    public record Page(List<Row> items, long total, int offset, int limit) implements PageData<Row> {
+    }
 
     public Page summarize(Query q) {
         int offset = q.offset() == null ? 0 : q.offset(), limit = q.limit() == null ? 20 : q.limit();
         if (offset < 0 || limit < 1 || limit > 100 || q.wasteCategory() != null && WasteCategory.from(q.wasteCategory()) == null
-                || q.from() != null && q.to() != null && q.from().isAfter(q.to())) ParameterChecks.reject(ErrorCode.BAD_REQUEST);
+                || q.from() != null && q.to() != null && q.from().isAfter(q.to()))
+            ParameterChecks.reject(ErrorCode.BAD_REQUEST);
         if (q.attribution() != null) {
             try {
                 Attribution.valueOf(q.attribution());
@@ -41,6 +42,8 @@ public class DefectStatisticsService {
         }
         try (var page = PageHelper.offsetPage(offset, limit)) {
             var rows = List.copyOf(mapper.summarize(q));
+            if (rows.stream().anyMatch(row -> row.invalidActions() > 0))
+                ParameterChecks.reject(ErrorCode.QUALITY_DATA_INVALID);
             return new Page(rows, page.getTotal(), offset, limit);
         }
     }

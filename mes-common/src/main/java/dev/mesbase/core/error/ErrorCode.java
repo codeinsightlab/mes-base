@@ -1,5 +1,6 @@
 package dev.mesbase.core.error;
 
+
 public enum ErrorCode {
     RECEIPT_QUALITY_UNVERIFIED(409, "缺少当前质量依据下的正式放行或质量核验未通过，禁止新增生产交接"),
     RECEIPT_PATH_REQUIRED(409, "交接需要已锁定的确切实际路径及末道有效产出"),
@@ -8,6 +9,7 @@ public enum ErrorCode {
     RECEIPT_QUANTITY_CONFLICT(409, "交接超出末道有效产出额度，或冲销超过原始剩余余额"),
     RECEIPT_IDEMPOTENCY_CONFLICT(409, "请求UUID已用于其他交接动作、参数或操作人"),
     EXECUTION_QUALITY_REFERENCED(409, "该生产执行已存在质量申报历史，为保证生产追溯，不允许删除或重新选择实际路径"),
+    QUALITY_DATA_INVALID(409, "质量记录不符合当前流程，请由数据导入流程核对转换"),
     QUALITY_TREATMENT_CONFLICT(409, "质量处置数量、版本或归属冲突，请刷新后核实"),
     QUALITY_ATTRIBUTION_REQUIRED(409, "不良归属待核实，暂不能据此继续报工或交接"),
     DEFECT_TYPE_DUPLICATE(409, "同工序已有相同不良类型编码"),

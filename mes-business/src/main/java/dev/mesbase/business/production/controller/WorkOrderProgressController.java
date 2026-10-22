@@ -1,13 +1,11 @@
 package dev.mesbase.business.production.controller;
 
-import dev.mesbase.common.utils.bean.BeanConversions;
-import dev.mesbase.business.production.service.WorkOrderProgressQueryService;
 import dev.mesbase.business.production.domain.WorkOrderProgress.Query;
-import dev.mesbase.business.production.domain.WorkOrderProgress.Progress;
-import java.util.List;
-import java.time.LocalDateTime;
-import static dev.mesbase.business.production.controller.vo.ProductionReportViews.decimal;
+import dev.mesbase.business.production.service.WorkOrderProgressQueryService;
+import dev.mesbase.common.utils.bean.BeanConversions;
 import dev.mesbase.platform.web.EndpointAccess;
+import java.time.LocalDateTime;
+import java.util.List;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -27,9 +25,12 @@ public class WorkOrderProgressController {
                        String goodOutputGapQty, String pendingCompletionQty,
                        String qualityUntreatedQty, String qualityReturnedQty,
                        String qualityUnverifiedQty, String completionPercent, long completedExecutions,
-                       LocalDateTime lastCompletedAt, String issue, LocalDateTime createTime, String qualityTransferredQty) { }
+                       LocalDateTime lastCompletedAt, String issue, LocalDateTime createTime,
+                       String qualityTransferredQty) {
+    }
 
-    public record Page(List<View> items, long total, int offset, int limit) { }
+    public record Page(List<View> items, long total, int offset, int limit) {
+    }
 
     @GetMapping("/api/production/workorder-progress")
     @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED, permission = "workorder:list")

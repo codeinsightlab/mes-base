@@ -16,5 +16,4 @@ public interface MesQualityTreatmentMapper {
 
     MesQualityTreatmentEntity selectByPrimaryKey(String id);
 
-    int updateByPrimaryKey(MesQualityTreatmentEntity row);
 }

@@ -5,40 +5,38 @@ import dev.mesbase.acceptance.QueuedCompletionExecutor;
 import dev.mesbase.business.production.domain.ProductionCompletionRequested;
 import dev.mesbase.business.production.service.ProductionCompletionService;
 import dev.mesbase.business.production.service.WorkOrderCompletionService;
+import dev.mesbase.core.error.ErrorCode;
+import dev.mesbase.core.error.FoundationException;
 import dev.mesbase.core.factory.FactoryCatalog;
+import dev.mesbase.core.factory.FactoryId;
 import dev.mesbase.core.factory.FactoryScope;
 import dev.mesbase.framework.sync.SyncCoordinator;
 import dev.mesbase.platform.execution.ExecutionScope;
 import dev.mesbase.platform.execution.FactoryIntegrationContext;
 import dev.mesbase.server.WorkOrderCompletionJob;
-import java.util.UUID;
-import java.util.concurrent.atomic.AtomicInteger;
-import dev.mesbase.core.error.FoundationException;
-import dev.mesbase.core.error.ErrorCode;
-
-import static org.mockito.Mockito.doAnswer;
-import static org.mockito.Mockito.doNothing;
-
 import java.math.BigDecimal;
-import dev.mesbase.core.factory.FactoryId;
+import java.util.UUID;
 import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.Test;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
  * TEST ONLY actual HTTP, mapped SQL, post-commit listener and fresh worker against isolated H2.

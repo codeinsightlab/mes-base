@@ -1,9 +1,9 @@
 package dev.mesbase.business.production.domain;
 
+import dev.mesbase.common.core.page.PageData;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
-import dev.mesbase.common.core.page.PageData;
 
 public final class WorkOrderProgress {
     private WorkOrderProgress() {
@@ -24,7 +24,8 @@ public final class WorkOrderProgress {
     }
 
     public record Quality(Long workorderId, BigDecimal declaredQty, String attribution,
-                          BigDecimal returnedQty, BigDecimal transferredQty, long invalidActions) { }
+                          BigDecimal returnedQty, BigDecimal transferredQty, long invalidActions) {
+    }
 
     /**
      * 业务进度计算结果；ID和数量保持原始类型，展示格式由Controller转换。

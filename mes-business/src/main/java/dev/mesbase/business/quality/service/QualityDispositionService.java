@@ -1,35 +1,35 @@
 package dev.mesbase.business.quality.service;
 
-import dev.mesbase.common.utils.StringUtils;
-import dev.mesbase.common.validation.ParameterChecks;
 import dev.mesbase.business.basic.dao.MaterialMapper;
+import dev.mesbase.business.production.domain.ProductionExecutionStatus;
+import dev.mesbase.business.production.domain.ProductionQuantityInput;
 import dev.mesbase.business.production.service.BusinessSourceRules;
 import dev.mesbase.business.production.service.ProductionChainLocks;
-import dev.mesbase.business.production.service.ProductionReportService;
 import dev.mesbase.business.production.service.ProductionIdentityService;
-import dev.mesbase.business.production.domain.ProductionQuantityInput;
-import dev.mesbase.business.production.domain.ProductionExecutionStatus;
-import dev.mesbase.business.quality.domain.QualityTreatmentModels.Disposition;
-import dev.mesbase.business.quality.domain.QualityTreatmentModels.Destination;
-import dev.mesbase.business.quality.domain.QualityTreatmentModels.Attribution;
-import dev.mesbase.business.quality.domain.MesQualityTreatmentEntity;
-import dev.mesbase.business.shared.enums.BusinessSource;
-import dev.mesbase.business.shared.enums.EnableStatus;
-import dev.mesbase.business.wm.domain.StockDocumentType;
+import dev.mesbase.business.production.service.ProductionReportService;
 import dev.mesbase.business.quality.domain.DefectDestination;
 import dev.mesbase.business.quality.domain.DefectRecordAction;
+import dev.mesbase.business.quality.domain.MesQualityTreatmentEntity;
+import dev.mesbase.business.quality.domain.QualityTreatmentModels.Attribution;
+import dev.mesbase.business.quality.domain.QualityTreatmentModels.Destination;
+import dev.mesbase.business.quality.domain.QualityTreatmentModels.Disposition;
+import dev.mesbase.business.shared.enums.BusinessSource;
+import dev.mesbase.business.shared.enums.EnableStatus;
 import dev.mesbase.business.wm.dao.WmInventoryMapper;
-import dev.mesbase.business.wm.domain.WmInventoryExample;
-import dev.mesbase.business.wm.domain.WmInventoryCreateCommand;
 import dev.mesbase.business.wm.domain.StockDocumentModels;
+import dev.mesbase.business.wm.domain.StockDocumentType;
+import dev.mesbase.business.wm.domain.WmInventoryCreateCommand;
+import dev.mesbase.business.wm.domain.WmInventoryExample;
 import dev.mesbase.business.wm.service.IWmInventoryService;
 import dev.mesbase.business.wm.service.StockDocumentService;
 import dev.mesbase.business.wm.service.StockReferenceRules;
 import dev.mesbase.common.utils.SecurityUtils;
+import dev.mesbase.common.utils.StringUtils;
+import dev.mesbase.common.validation.ParameterChecks;
 import dev.mesbase.core.error.ErrorCode;
 import dev.mesbase.core.error.FoundationException;
-import dev.mesbase.core.security.AuthorizationService;
 import dev.mesbase.core.security.AuthenticatedActor;
+import dev.mesbase.core.security.AuthorizationService;
 import dev.mesbase.core.security.Permission;
 import dev.mesbase.platform.execution.FactoryContext;
 import java.math.BigDecimal;
@@ -41,13 +41,13 @@ import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
 import org.springframework.beans.factory.ObjectProvider;
-import org.springframework.stereotype.Service;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Isolation;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Atomic disposition of pending defects; historic facts retain their original workflow.
+ * Atomic current-workflow disposition: return to the declaration node or formal warehouse receipt.
  */
 @Service
 @ConditionalOnProperty(name = "mes.business.enabled", havingValue = "true")
@@ -144,10 +144,10 @@ public class QualityDispositionService {
             owner.post(documentId, new StockDocumentModels.Post(c.requestId(), owner.detail(documentId).document()
                     .getRevision()));
         }
-        treatments.recordDisposition(declaration, c, hash, documentId);
         if (c.destination() == Destination.RETURN_NODE)
             reports.returnToNode(execution.getId(), d.getAffectedNodeId(), c.quantity(), c.requestId(), c.reason()
                     .trim());
+        treatments.recordDisposition(declaration, c, hash, documentId);
         return treatments.details(declaration);
     }
 

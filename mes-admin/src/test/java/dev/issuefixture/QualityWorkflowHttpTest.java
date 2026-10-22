@@ -1,20 +1,29 @@
 package dev.issuefixture;
+
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import dev.mesbase.business.quality.controller.QualityDispositionController;
+import dev.mesbase.business.quality.service.QualityDispositionService;
+import dev.mesbase.business.wm.service.impl.WmInventoryServiceImpl;
 import java.math.BigDecimal;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
-import org.springframework.web.context.support.AnnotationConfigWebApplicationContext;
-import org.springframework.test.web.servlet.MockMvc;
 import org.junit.jupiter.api.Test;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.web.context.support.AnnotationConfigWebApplicationContext;
+
 import static dev.issuefixture.ProductionReportHttpTest.full;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-/** TEST ONLY routed H2: current assessments, return-to-node and warehouse disposition. */
+/**
+ * TEST ONLY routed H2: current assessments, return-to-node and warehouse disposition.
+ */
 class QualityWorkflowHttpTest {
     static final ObjectMapper JSON = new ObjectMapper();
     static final String Q = "/api/quality/defects", N = "/api/production/report-quantities/executions/1";
@@ -24,14 +33,13 @@ class QualityWorkflowHttpTest {
     }
 
     static AnnotationConfigWebApplicationContext context(Class<?>[] extra, int... reports) throws Exception {
-        var modules = new java.util.ArrayList<Class<?>>(java.util.List.of(extra));
-        modules.addAll(java.util.List.of(ProductionReportingHttpTest.Extra.class, QualityDispositionHttpTest.Validation.class,
-                dev.mesbase.business.quality.service.QualityDispositionService.class,
-                dev.mesbase.business.quality.controller.QualityDispositionController.class,
-                dev.mesbase.business.wm.service.impl.WmInventoryServiceImpl.class));
+        var modules = new ArrayList<Class<?>>(List.of(extra));
+        modules.addAll(List.of(ProductionReportingHttpTest.Extra.class, QualityDispositionHttpTest.Validation.class,
+                QualityDispositionService.class,
+                QualityDispositionController.class,
+                WmInventoryServiceImpl.class));
         var c = ProductionWarehouseFixture.context(modules.toArray(Class<?>[]::new));
         for (var j : c.getBean(MaterialIssueHttpTest.Fixture.class).business.values()) {
-            j.update("INSERT INTO mes_operation_user(operation_id,user_id) VALUES(1,1)");
             j.update("DELETE FROM mes_production_report");
             j.update("INSERT INTO routing_node(id,routing_id,node_code,operation_id,display_order,operation_name) SELECT 14,routing_id,'D',operation_id,4,operation_name FROM routing_node WHERE id=13");
             j.update("INSERT INTO routing_node(id,routing_id,node_code,operation_id,display_order,operation_name) SELECT 15,routing_id,'E',operation_id,5,operation_name FROM routing_node WHERE id=13");
@@ -85,33 +93,39 @@ class QualityWorkflowHttpTest {
 
     @Test
     void assessmentUsesServerTimeAndReplayKeepsOneImmutableFact() throws Exception {
-        try (var c = context(100,100,90,90,90)) {
+        try (var c = context(100, 100, 90, 90, 90)) {
             var mvc = MaterialIssueHttpTest.mvc(c);
-            var id = defect(mvc,12,"10",null,null);
+            var id = defect(mvc, 12, "10", null, null);
             var body = assessmentCommand();
-            var first = assess(mvc,id,body);
-            var repeated = assess(mvc,id,body);
+            var first = assess(mvc, id, body);
+            var repeated = assess(mvc, id, body);
             assertEquals(first.get("events"), repeated.get("events"));
             assertEquals(1, first.get("events").size());
             assertEquals("PENDING", first.get("state").asText());
             mvc.perform(full(post(Q + "/" + id + "/assessments"), "B").content(body))
                     .andExpect(status().is4xxClientError());
-            mvc.perform(post(Q + "/" + id + "/assessments").header("Authorization","Bearer NONE")
-                    .header("X-Factory-Id","A").contentType("application/json").content(body))
+            mvc.perform(post(Q + "/" + id + "/assessments").header("Authorization", "Bearer NONE")
+                            .header("X-Factory-Id", "A").contentType("application/json").content(body))
                     .andExpect(status().isForbidden());
         }
     }
 
     @Test
     void retiredOperationsHaveNoCommandEndpointAndDoNotWriteFacts() throws Exception {
-        try (var c = context(100,100,90,90,90)) {
+        try (var c = context(100, 100, 90, 90, 90)) {
             var mvc = MaterialIssueHttpTest.mvc(c);
-            var id = defect(mvc,12,"10","INDEPENDENT",null);
-            for (var action : new String[]{"ALLOCATE","START","RESULT","CANCEL_ALLOC","CANCEL_START","CORRECT_RESULT"})
-                mvc.perform(full(post(Q + "/" + id + "/treatment"),"A").content("{\"action\":\""+action+"\"}"))
+            var id = defect(mvc, 12, "10", "INDEPENDENT", null);
+            for (var action : new String[]{"ALLOCATE", "START", "RESULT", "CANCEL_ALLOC", "CANCEL_START", "CORRECT_RESULT"})
+                mvc.perform(full(post(Q + "/" + id + "/treatment"), "A").content("{\"action\":\"" + action + "\"}"))
                         .andExpect(status().is4xxClientError());
             assertEquals(1, ProductionWarehouseFixture.db(c).queryForObject(
-                    "SELECT COUNT(*) FROM mes_quality_treatment WHERE declaration_id=?", Integer.class,id));
+                    "SELECT COUNT(*) FROM mes_quality_treatment WHERE declaration_id=?", Integer.class, id));
+            ProductionWarehouseFixture.db(c)
+                    .update("INSERT INTO mes_quality_treatment(id,request_hash,declaration_id,declaration_revision,execution_id,routing_node_id,action_type,operator_user_id,confirmed_by,occurred_at,recorded_at,reason) VALUES(?,?,?,1,1,12,'ALLOCATE',1,1,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,'TEST ONLY rejected imported workflow')",
+                            UUID.randomUUID().toString(), "x".repeat(64), id);
+            for (var url : new String[]{Q, Q + "/" + id + "/treatment", "/api/quality/treatments/recent"})
+                mvc.perform(full(get(url), "A")).andExpect(status().isConflict())
+                        .andExpect(jsonPath("errorCode").value("QUALITY_DATA_INVALID"));
         }
     }
 }

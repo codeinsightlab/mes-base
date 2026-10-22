@@ -53,7 +53,7 @@ class ProductionQualityQuantityMySqlTest {
     }
 
     static String create(Harness h, Fixture f, long node, String qty) {
-        var id = h.quality.create(ProductionDefectMySqlTest.command("QTY_" + UUID.randomUUID(), 0, f.execution(), node, f.warehouse(), qty))
+        var id = h.quality.create(ProductionDefectMySqlTest.command("QTY_" + UUID.randomUUID(), 0, f.execution(), node, qty))
                 .record().getDeclarationId();
         synchronized (h.declarations) {
             h.declarations.add(id);
@@ -166,9 +166,9 @@ class ProductionQualityQuantityMySqlTest {
             report(reports(h), f, f.selected().getFirst(), "10");
             var id = create(h, f, f.selected().getFirst(), "1");
             ordered(h, () -> h.quality.revise(id, ProductionDefectMySqlTest.command("REV_" + UUID.randomUUID(), 1, f.execution(), f.selected()
-                            .getFirst(), f.warehouse(), "2")),
+                            .getFirst(), "2")),
                     () -> h.quality.revise(id, ProductionDefectMySqlTest.command("REV_" + UUID.randomUUID(), 1, f.execution(), f.selected()
-                            .getFirst(), f.warehouse(), "3")), 409);
+                            .getFirst(), "3")), 409);
             assertEquals(2, h.quality.latest(id).getRevisionNo());
             assertEquals(0, new BigDecimal("2").compareTo(h.quality.sumEffectiveDefectQty(f.execution(), f.selected()
                     .getFirst())));
