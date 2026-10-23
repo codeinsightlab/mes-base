@@ -626,3 +626,36 @@ V59执行前核实`TEST_DEV_PERF_20261019 → datasource 9 → ENABLED / LOCAL �
 - 只读MySQL核对两张QA工单各只有一个Execution、各两次报工/审核入库/结束；原工单1921的Execution行、报工、库存动作、入库头及结束事实与前轮范围快照逐行相等。原100件闭环不因本次2件复验被改写。证据为`runtime-cache-final-db-verification.json`及`runtime-cache-original-order1921-preserved.json`。
 
 结论：本轮所需的LOCAL工单BOM领料、累计额度、同批Execution追加及立即查询刷新已完成真实服务/指定MySQL验证。前轮617项测试与构建回执仍按16.6记录，本轮未重复运行；真实运行证据不外推至EXTERNAL、现场扫码设备或历史用料回填。
+
+
+## 2026-10-24：BOM领料与出入库申请审核边界核查（讨论阶段）
+
+本节承接16.7已完成的真实缓存复验，仅核查当前源码及说明下一步业务边界；没有重新验收该场景，没有修改业务代码、Schema或业务数据，也没有调用ERP或启停服务。以下“当前”来自源码，不冒充本轮真实HTTP验证。
+
+### 当前正式LOCAL领料规则
+
+- 工单须RELEASED，并选择对应产出物料的已发布BOM、工作中心及允许领料仓库。物料管理支持多阶不代表生产领料已展开多阶：WorkorderMaterialService.applyBom当前要求选定BOM恰有一条直接组件，按材料/产出各自基本单位和比例计算，不做多组件配料或多阶自动展开。
+- 投产扫码为“工单号:材料品号#批次原文”；库存来源须属于允许仓库、同材料、同基本单位、同批次且可用量足够。当前一次正式请求选一条库存来源，不自动从多个仓库/库位拼单扣减；页面多候选由用户选择。
+- 本次材料量按累计差额计算：累计投入加本次投入乘BOM组件量/产出基数，6位HALF_UP后减已占用材料量。累计投入不得超过工单计划；未决请求占额度，明确拒绝/已作废按当前SQL排除，不能按已入库正常品数量重置领料额度。依据ProductionInputQuota.next及ProductionInputExtraMapper.quota。
+- 正式LOCAL投产在工单锁和一个本地事务内冻结BOM依据、创建/复用同批Execution、创建领料主单/计算明细/原请求事实、提交确认、扣库存、贡献投入并锁定实际路径。任何失败回滚，不以草稿贡献投入。首次成功后锁定用料依据；同批追加不改工艺路径，FULLY_RECEIVED可在计划余额内恢复RUNNING，旧报工/入库/结束事实保留。已完结工单不允许继续追加。
+
+### 当前审核入口并未完全统一
+
+| 当前业务 | 新增与审核/确认 | 库存生效位置 |
+| --- | --- | --- |
+| 通用入库、其他出库wm_stock_document | create只存DRAFT；明细分别保存；approve独立POST，POSTED后不可普通编辑 | StockDocumentService.approve同事务执行LocalStockService.postDocument，记录审核UUID/人/时间；生产入库随后检查Execution及工单 |
+| 正式扫码投产领料 | ProductionInputService在后端创建领料主单、明细及投入事实，再调用MaterialIssueSubmissionService提交确认，状态CONFIRMED | MaterialIssueInputFacts.confirm调用LocalStockService.issue，尚未调用StockDocumentService.approve，也没有正式MATERIAL_ISSUE类型的通用出库申请单 |
+| 普通领料管理手工建单 | 主单/明细可分别保存，按钮为“提交领料”；submit使用领料update权限 | 没有mes_material_issue_input正式投入事实时confirm直接返回；不能由领料CONFIRMED状态推断本地实际扣库存/新增生产投入。需要统一正式业务入口，不能只改按钮为“审核” |
+| 不良/报废入仓 | QualityDispositionService已在后端编排createQualityReceipt→putLine→approve | 复用同一正式仓储审核及库存动作；这是现有“业务便捷入口调用独立新增+审核”的例子 |
+
+源码入口：ProductionInputService.submit/prepare、MaterialIssueSubmissionService.submit/apply、MaterialIssueInputFacts.confirm、StockDocumentService.createDraft/approve、QualityDispositionService约150—158行。当前生产入库普通页面需要保存主单、保存明细后点击“审核单据”；Execution内办理入库是携带执行身份跳转，尚未等同一键自动新增+审核。
+
+### 与本轮用户方向对应的后续收敛建议（尚未实施）
+
+1. 入库申请、出库申请分别表达方向和规则；生产领料属于出库来源，生产完工属于入库来源，可共用库存底层及通用单据能力，不并行维护两套扣库存算法。
+2. 每种申请的“新增草稿”和“审核生效”各自是独立业务动作；草稿不改变库存、不正式增加生产投入。审核仍检查权限、来源、版本、库存、BOM/工单/Execution数量和幂等，审核通过才执行库存事实。
+3. 领料与生产入库可提供后端“新增并审核”便捷命令，编排同一套新增/明细/审核用例；不能在便捷路径直接扣库存，也不能仅前端连续发几次HTTP就声称一个LOCAL原子事务。普通入口继续支持先保存、稍后审核；同一用户可否兼有创建/审核权限仍按授权，不额外引入多人审批链。
+4. 领料优先补齐正式出库申请来源与统一审核入口，再复用当前BOM计算、单材料限制、累计额度、同批Execution及未知结果恢复；首次Execution/追加投入只在审核成功时正式生效。生产入库保持当前审核数量门禁及审核后收尾，通过便捷命令复用已有单据审核。
+5. “审核通过”目前同时写入库存事实；本讨论没有新增“审批通过后另行实物执行”的第三阶段，也未授权扩大到ERP发料、自动多材料配料或多阶领料。后续实施需沿当前LOCAL/EXTERNAL边界，不将本地成功冒充ERP生效。
+
+本轮仅追加本文档，未运行测试/构建/浏览器或数据库验收；16.7真实结果按原时间线保留，不重报为本轮验证。
