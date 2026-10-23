@@ -1,6 +1,6 @@
 # 单材料扫码投产 V1：独立 MES 与可选 ERP
 
-> 阅读入口：本文保留 2026-10-16、2026-10-20 的历史记录。当前物料/BOM审查见 **2026-10-23：物料与 BOM 完善方案**；最新范围与讨论结论以第13节为准：多阶首期必做、下达不冻结、材料统一库存基本单位。初稿中的单阶首期、下达冻结及“工单收尾后恢复”待确认项已被修订。早期 MES1/永久绑定、配置模式入口等描述不作为当前契约。方案尚未实施，不改历史冻结请求。
+> 阅读入口：本文保留 2026-10-16、2026-10-20 的历史记录。当前物料/BOM审查见 **2026-10-23：物料与 BOM 完善方案**；最新范围与讨论结论见第13—14节：多阶首期必做、下达不冻结、材料统一库存基本单位，采用分类树＋物料列表方向，并按ERPNext的子BOM引用实现多阶。初稿中的单阶首期、下达冻结及“工单收尾后恢复”待确认项已被修订。早期 MES1/永久绑定、配置模式入口等描述不作为当前契约。方案尚未实施，不改历史冻结请求。
 
 2026-10-16。用户补充决定：本轮不实现真实 ERP；MES 必须能独立产生、管理生产数据，ERP 仅保留可选接口。当前以独立 MES 模式验收，CONNECTED 仅作契约验证，不把它标为真实 ERP 联调。
 
@@ -381,3 +381,61 @@ P1—P4是首期LOCAL范围，P5不阻塞独立MES，也不能提前宣称ERP生
 这就是应保留的“执行结束后追加恢复”要求，无需额外让用户决定一个正常情况下不应出现的“工单收尾且仍有余额”场景。异常存量仍按可读事实及正式核实规则处理，不自动重开或清理历史。
 
 本次仅更新本文的阅读入口、初稿标记及本节讨论修订；保留AGENTS.md已有修改。没有修改业务代码、测试、配置、Schema或数据，没有执行数据库/ERP/服务操作。检查范围为相关源码复核、文字/链接和Git差异；后续实现与业务验收均未开展。
+
+### 14. 2026-10-23继续审查：采用ERPNext分类与多阶BOM方向
+
+#### 14.1 用户确认与本轮边界
+
+用户已确认第13.5节的三条业务规则：工单计划100件、原Execution投入并处理90件后可结束，工单仍余10件；再合法投入10件时复用原Execution恢复未完成，保留旧报工/入库/结束事实；工单按100件完成收尾后不可追加第101件，90件正常品＋10件不良不构成剩余10件额度。三条从建议转为后续实现/验收约束，不再要求重复确认。
+
+用户要求继续审查成熟ERP怎样实现多阶，并倾向“树状分类＋物料”的展示。这里继续沿本任务已核实的ERPNext研究，采用其概念方向；仍只更新方案，不修改业务代码、Schema或数据。官方资料访问日2026-10-23，源码沿用固定tag v15.123.1 / commit `40b66a19896d1321964e4fc0746f6bc903a6ffd9`。本节补查官方分类/物料定义、BOM子表、树接口及展开算法；不是ERPNext安装运行或UI截图验收。
+
+#### 14.2 ERPNext是怎样组织分类、物料及多阶的（O）
+
+| 对象 | 官方实现及精确证据 | 可以据此得出的结论 |
+| --- | --- | --- |
+| Item Group分类树 | [官方Item Group文档](https://docs.frappe.io/erpnext/item-group)；[item_group.json:44](https://github.com/frappe/erpnext/blob/v15.123.1/erpnext/setup/doctype/item_group/item_group.json#L44)的parent_item_group、:57的is_group；:135/143声明树及父字段 | 分类自身有父子关系、组节点标识。原料、半成品或其他业务分类是归类维度，不是制造父子关系。 |
+| 分类存储/子树读取 | [item_group.py:11](https://github.com/frappe/erpnext/blob/v15.123.1/erpnext/setup/doctype/item_group/item_group.py#L11)继承NestedSet，:27–30含lft/rgt/parent；[74](https://github.com/frappe/erpnext/blob/v15.123.1/erpnext/setup/doctype/item_group/item_group.py#L74)按左右界读取含自身的子树；[item_group_tree.js:1](https://github.com/frappe/erpnext/blob/v15.123.1/erpnext/setup/doctype/item_group/item_group_tree.js#L1)注册树视图 | ERPNext有真实分类树模型及树交互，不是把分类名称平铺拼接。该存储方式属于其框架实现，并不要求Base改用NestedSet。 |
+| Item物料归类 | [item.json:166](https://github.com/frappe/erpnext/blob/v15.123.1/erpnext/stock/doctype/item/item.json#L166)的item_group是单值Link、必填，字段选择过滤is_group=0 | 一个物料记录关联一个分类；该字段的选择器只选非组节点。不能据字段过滤就宣称所有服务端写入都已作同样校验。也不因ERPNext必填而将Base现可空分类擅自改必填。 |
+| 多阶关系的实际来源 | [bom_item.json:78](https://github.com/frappe/erpnext/blob/v15.123.1/erpnext/manufacturing/doctype/bom_item/bom_item.json#L78)的bom_no链接BOM；[bom.py:35–60](https://github.com/frappe/erpnext/blob/v15.123.1/erpnext/manufacturing/doctype/bom/bom.py#L35)按组件bom_no递归创建BOMTree并逐层乘比例 | 产出有BOM、组件行可引用该组件的BOM，因此形成多阶；不是在物料表加parent_material_id，也不是把材料挂到成品分类下。 |
+| 层级树读取/交互 | [bom.py:1299](https://github.com/frappe/erpnext/blob/v15.123.1/erpnext/manufacturing/doctype/bom/bom.py#L1299)按父BOM返回组件、子BOM、用量、父基准量及expandable；[bom_tree.js:1–29](https://github.com/frappe/erpnext/blob/v15.123.1/erpnext/manufacturing/doctype/bom/bom_tree.js#L1)调用树接口、显示编码/名称/数量/单位 | BOM层级可按节点展开；树是选定BOM的组成投影。同一物料可出现在多个BOM/分支，不需要多个物料身份。 |
+| 展开计算与原始结构 | [bom.py:892–976](https://github.com/frappe/erpnext/blob/v15.123.1/erpnext/manufacturing/doctype/bom/bom.py#L892)分别处理直接组件、子BOM展开结果，并按组件编码汇总；[官方多阶说明](https://docs.frappe.io/erpnext/managing-multi-level-bom)区分直接表与Exploded表 | 直接材料、按层次的组成和展开汇总是不同视图；展开结果是派生数据，不是另一套可手工维护比例。 |
+| 不展开及完整性校验 | [bom_item.json:285](https://github.com/frappe/erpnext/blob/v15.123.1/erpnext/manufacturing/doctype/bom_item/bom_item.json#L285)有do_not_explode；[bom.py:375–380](https://github.com/frappe/erpnext/blob/v15.123.1/erpnext/manufacturing/doctype/bom/bom.py#L375)在对应处理清除子BOM引用；[642–735](https://github.com/frappe/erpnext/blob/v15.123.1/erpnext/manufacturing/doctype/bom/bom.py#L642)校验正用量、停用物料及递归 | 下阶是否展开有明确依据，不能由分类猜测；循环与停用校验属于BOM业务。Base沿已确认业务边界实现，不照搬所有phantom/成本/配置开关。 |
+
+官方文档本身持续更新，具体实现以上述tag交叉核实。没有证据证明ERPNext v15的物料主列表就是本节拟定的“左树右表”布局；左树右表是结合用户偏好给Base的设计建议，不冒称对官方页面像素复刻。
+
+#### 14.3 Base已有基础与本次新增确认的差距（S）
+
+- `J/basic/domain/MaterialCategoryEntity.java:4–17`已有id/code/name/parentId/sort/status/remark；`MaterialEntity.categoryId`关联分类。不需要为了树展示另建一套物料分类模型。
+- `J/basic/service/BasicDataRules.java:91–105`已沿parentId检查祖先和循环；`:195–201`拒绝删除有物料引用或子分类的分类。这些是可复用源码能力，未运行树的并发修改验收。
+- `J/basic/service/impl/MaterialCategoryServiceImpl.java:72–100`目前是分页列表，parentId只筛直接父节点；`J/basic/service/impl/MaterialServiceImpl.java:88–90`只按categoryId精确匹配，尚不是“选父分类查全部后代物料”。
+- `U/src/views/basic/materialCategory/index.vue:39–45,79–94`仍以普通CrudPage显示父分类ID；`U/src/views/basic/material/index.vue:47–55,106–122`是普通物料列表，分类ID为文本字段，没有左侧分类树联动物料列表。字段存在不等于树状管理/展示已接通。
+- 以上沿用第4节路径前缀，均为当前文件静态事实。当前后端/前端工作树已重新检查，前端既有修改未动；本轮不运行旧同步或数据库脚本。
+
+#### 14.4 建议采用的Base交互与模型方向（R）
+
+**物料管理采用“左侧分类树＋右侧物料列表”，选中物料后进入物料详情及BOM管理。** 分类树与BOM结构分别展示，各自有清楚标题和操作对象：
+
+| 区域 | 用户看到/操作什么 | 服务端边界 |
+| --- | --- | --- |
+| 左侧分类树 | 分类名称、展开/折叠、分类搜索；有权限时新增下级、编辑及调整父分类；提供“全部物料”“未分类”视图 | 复用material_category.parentId/sort/status。全部/未分类是查询选项，不写魔法分类ID，不自动补造业务分类。 |
+| 右侧物料表 | 选分类后展示本类及下级物料；建议默认含下级，并提供明确切换；可组合编码/名称/规格/启停查询及分页 | 子树过滤在服务端与分页/total/权限一并计算，不能前端筛当前页或把前100分类当完整树。改分类/含下级条件回第一页，切厂清旧结果及浮层，拒绝迟到响应。 |
+| 物料新增/编辑 | 默认带入当前明确分类，可用树选择器更改；显示分类名称/路径、基本单位名称，不要求手填分类/单位ID | 复用当前material.categoryId和unitId，不因ERPNext的叶节点/必填设定就扩大Base必填字段。分类调整仅归类，不改物料身份、BOM比例或历史库存事实。 |
+| 物料详情/BOM版本列表 | 物料基础信息；作为产出的BOM版本、状态、基准量；可查看被哪些父BOM使用 | 同物料可被多个父BOM引用，不能将BOM关系压成物料单一父ID；多版本明确选择，引用/停用/发布沿第13节。反向引用查询需分页及当前厂/权限校验。 |
+| 选定版本后的BOM工作区 | BOM头及直接组件维护、子BOM选择；“多阶结构”按路径展开；“展开需求”按指定根数量计算 | 复用主子文档组件；树节点按BOM行/路径标识，不能只用materialId导致不同路径的共享子项混淆。直接结构为权威，层级/汇总是只读计算投影，不另开可写比例来源。 |
+
+同一物料B归在某分类，不妨碍它既是A→B的产出、又是B→C的材料。分类树只解决归档与找物料；BOM树解决“生产什么、需要什么、各需多少”。例如分类“金属材料→钢材”包含A；C的BOM结构则为C→B→A，两者无需具有相同父子形状。
+
+**复用与最小实现：** 沿用Base现有parentId分类模型、Service/Mapper和统一列表/选择器，不直接移植ERPNext NestedSet、税务默认、全局唯一名称或框架树代码。按实际数据规模选择有边界的树读取/按父懒加载；查询含后代需完整子树范围、明确预算和缓存失效，不能循环无界查库。分类移动/引用创建的并发保护和实际SQL另在实施前核实，不因已有validate就宣称并发安全。
+
+**区域可读性：** 分类树加载失败时，已取得且有权限读取的物料事实仍可读，单独展示树失败和重试；不能静默解除已选分类后展示另一范围冒充成功。BOM展开失败不隐藏已合法读取的物料详情/原始组件；汇总数量标待确认，不伪装0。无分类读取权限但有物料读取权限时按各自权限呈现允许的区域，不借树接口扩大权限。
+
+**多阶与正式投入衔接：** 按ERPNext“组件行显式引用子BOM”的方向落模型，首期完成多阶管理、展开和校验；当前每张正式生产工单仍按已确认单材料边界从确切库存领直接组件。下达不冻结、材料统一基本单位、首次意图保护及原UUID重放按第13节处理；不把展开原料汇总同时作为扣库存清单。多阶管理可表达结构，但包含多种直接材料的BOM不得经当前单材料入口正式投入；不得用仅选首行规避限制。
+
+#### 14.5 工作包补充、验收与回执
+
+P1拆为连续可验收的两个子包：P1a“复用分类树模型、左树右物料表、树选择器与后代分页查询”；P1b“版本化BOM、明确子BOM引用、结构树/展开需求及循环保护”。P2继续工单用料依据衔接，P3落实已确认追加规则，P4联合验收分类、BOM、投入与追溯；不自动进入业务实现。
+
+新增验收：分类新增/换父/循环/引用删除保护；选父含下级/仅本类/未分类/全部的分页与total；分类迁移后不改物料及BOM事实；树和列表权限独立、切厂及迟到响应；同物料多BOM/共享子项按路径正确展开；子版本变更不悄悄改父版本；分类失败及BOM计算失败时其他合法区域可读。连同第13节多阶数量及三条已确认执行/收尾规则一并验收。
+
+本轮仅在本文追加第14节并更新阅读入口：补充ERPNext固定版本的分类/物料/BOM源码证据，确认三条执行/收尾规则，将分类树＋物料列表列入推荐方案。已做官方源码/本地文件交叉阅读及文档差异检查；未修改业务代码、测试、配置、Schema或数据，未做业务运行验收，未推送/部署。前端及其他仓库未写入。
