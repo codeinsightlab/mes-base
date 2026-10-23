@@ -1,5 +1,13 @@
 package dev.issuefixture;
 
+import dev.mesbase.business.integration.warehouse.WarehouseIntegration;
+import dev.mesbase.business.production.domain.MesProductionExecutionResource;
+import dev.mesbase.common.core.redis.RedisCache;
+import dev.mesbase.core.error.ErrorCode;
+import dev.mesbase.core.error.FoundationException;
+import dev.mesbase.infrastructure.cache.BusinessCacheProcessor;
+import dev.mesbase.infrastructure.cache.annotation.BusinessCacheEvict;
+import dev.mesbase.infrastructure.persistence.SpringCommitActions;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
@@ -9,11 +17,24 @@ import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import tools.jackson.databind.ObjectMapper;
 
 import static dev.issuefixture.ProductionCoreV1HttpTest.full;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.clearInvocations;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.doCallRealMethod;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
@@ -25,6 +46,46 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  */
 class WorkorderBomInputHttpTest {
     private static final ObjectMapper JSON = new ObjectMapper();
+
+    @Test
+    void executionCapacityCacheInvalidatesAfterCommitButNotOnRollbackOrUuidReplay() throws Exception {
+        try (var c = ProductionInputHttpTest.context()) {
+            var j = ProductionInputHttpTest.db(c);
+            var m = MaterialIssueHttpTest.mvc(c);
+            prepare(j, "100", "1", "2.5");
+            select(m, 1, 1);
+            var redis = mock(RedisCache.class);
+            var processor = new BusinessCacheProcessor(redis, new SpringCommitActions(), c.getEnvironment());
+            var caches = c.getBean(BusinessCacheProcessor.class);
+            doAnswer(call -> {
+                assertTrue(TransactionSynchronizationManager.isActualTransactionActive());
+                processor.evict(call.getArgument(0), call.getArgument(1));
+                verify(redis, never()).deleteByPattern(anyString());
+                return null;
+            }).when(caches)
+                    .evict(eq(MesProductionExecutionResource.PREFIX), eq(BusinessCacheEvict.Scope.LIST_AND_DETAIL));
+
+            String first = ProductionInputHttpTest.command(m, UUID.randomUUID().toString(), "L001", "90");
+            long execution = JSON.readTree(ProductionInputHttpTest.submit(m, first)).get("executionId").asLong();
+            verify(redis, times(2)).deleteByPattern(anyString());
+            clearInvocations(redis);
+
+            String append = ProductionInputHttpTest.command(m, UUID.randomUUID().toString(), "L001", "10");
+            var warehouse = c.getBean(WarehouseIntegration.class);
+            doThrow(new FoundationException(ErrorCode.RESOURCE_CONFLICT))
+                    .when(warehouse).createMaterialIssue(any(), any(), any());
+            m.perform(full(post("/api/production/input")).content(append)).andExpect(status().isConflict());
+            verify(redis, never()).deleteByPattern(anyString());
+            assertEquals(0, new BigDecimal("90").compareTo(j.queryForObject(
+                    "SELECT target_qty FROM mes_production_execution WHERE id=?", BigDecimal.class, execution)));
+
+            ProductionInputHttpTest.submit(m, first);
+            verify(redis, never()).deleteByPattern(anyString());
+            doCallRealMethod().when(warehouse).createMaterialIssue(any(), any(), any());
+            assertEquals(execution, input(m, "10"));
+            verify(redis, times(2)).deleteByPattern(anyString());
+        }
+    }
 
     static void prepare(JdbcTemplate j, String plan, String base, String component) {
         j.update("DELETE FROM mes_production_execution"); // Only unused fresh fixture executions.

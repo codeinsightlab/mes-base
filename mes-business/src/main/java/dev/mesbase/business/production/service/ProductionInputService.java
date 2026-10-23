@@ -13,6 +13,9 @@ import dev.mesbase.business.production.domain.WorkOrderStatus;
 import dev.mesbase.business.production.domain.ProductionScanCode;
 import dev.mesbase.business.production.domain.ProductionCodeRules;
 import dev.mesbase.business.production.domain.MesProductionExecutionCreateCommand;
+import dev.mesbase.business.production.domain.MesProductionExecutionResource;
+import dev.mesbase.infrastructure.cache.BusinessCacheProcessor;
+import dev.mesbase.infrastructure.cache.annotation.BusinessCacheEvict;
 import dev.mesbase.business.production.service.IMesProductionExecutionService;
 import dev.mesbase.business.issue.domain.MesMaterialIssueCreateCommand;
 import dev.mesbase.business.issue.domain.MesMaterialIssueInputEntity;
@@ -79,6 +82,7 @@ public class ProductionInputService {
     private final ProductionChainLocks locks;
     private final ProductionQuantityService quantities;
     private final ProductionExecutionRules executionRules;
+    private final BusinessCacheProcessor caches;
     private final WorkorderMapper orderMapper;
     private final MaterialMapper materials;
     private final RoutingMapper routings;
@@ -98,7 +102,8 @@ public class ProductionInputService {
                                   MaterialMapper materials, RoutingMapper routings, IRoutingService routingService,
                                   @Qualifier("businessTransactionManager") PlatformTransactionManager manager,
                                   BusinessSourceRules sources, WorkOrderExtraMapper allocation,
-                                  ProductionExecutionRules executionRules) {
+                                  ProductionExecutionRules executionRules, BusinessCacheProcessor caches) {
+        this.caches = caches;
         this.executionRules = executionRules;
         this.allocation = allocation;
         this.sources = sources;
@@ -256,6 +261,9 @@ public class ProductionInputService {
         f.setStockApplied(false);
         f.setCreatedAt(LocalDateTime.now());
         inputFacts.freeze(f, calculation);
+        // Capacity and resumed status are written through locked Mappers; publish neither stale lists nor details.
+        // The shared processor defers invalidation until this enclosing transaction commits.
+        caches.evict(MesProductionExecutionResource.PREFIX, BusinessCacheEvict.Scope.LIST_AND_DETAIL);
         return submissions.prepare(issue.getId(), FactoryContext.required());
     }
 
