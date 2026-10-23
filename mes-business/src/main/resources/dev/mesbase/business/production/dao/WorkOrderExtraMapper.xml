@@ -65,12 +65,13 @@
   ORDER BY r.id DESC LIMIT 100
  </select>
  <select id="allocationForOrders" resultType="dev.mesbase.business.production.domain.WorkOrderModels$Allocation">
+  <bind name="cancelled" value="@dev.mesbase.business.production.domain.ProductionExecutionStatus@CANCELLED.getValue()"/>
   SELECT w.id AS workorder_id,w.planned_qty,
          COALESCE(SUM(e.target_qty),0) AS allocated_target_qty,
          w.planned_qty-COALESCE(SUM(e.target_qty),0) AS remaining_target_qty,
          CAST(GREATEST(COALESCE(SUM(e.target_qty),0)-w.planned_qty,0) AS DECIMAL(65,6)) AS excess_target_qty,
          COUNT(e.id) AS execution_count
-  FROM workorder w LEFT JOIN mes_production_execution e ON e.workorder_id=w.id
+  FROM workorder w LEFT JOIN mes_production_execution e ON e.workorder_id=w.id AND e.status!=#{cancelled}
   WHERE w.id IN
   <foreach collection="ids" item="id" open="(" separator="," close=")">#{id}</foreach>
   GROUP BY w.id,w.planned_qty

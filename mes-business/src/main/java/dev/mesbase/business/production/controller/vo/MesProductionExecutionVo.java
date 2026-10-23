@@ -9,6 +9,8 @@ public record MesProductionExecutionVo(
         String id,
         String workorderId,
         String productId,
+        String productCode,
+        String productName,
         String batchNo,
         String routingId,
         String targetQty,

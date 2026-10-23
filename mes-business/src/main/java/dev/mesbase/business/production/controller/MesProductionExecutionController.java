@@ -52,8 +52,10 @@ public class MesProductionExecutionController {
         var data = queries.page(query);
         var page = data.records();
         return BeanConversions.convertPage(page, row -> {
+            var product = data.references().products().get(row.getProductId());
             var routing = data.references().routings().get(row.getRoutingId());
-            return toView(row, Optional.ofNullable(routing).map(value -> value.code()).orElse(null),
+            return toView(row, Optional.ofNullable(product).map(value -> value.getCode()).orElse(null),
+                    Optional.ofNullable(product).map(value -> value.getName()).orElse(null), Optional.ofNullable(routing).map(value -> value.code()).orElse(null),
                     Optional.ofNullable(routing).map(value -> value.name()).orElse(null),
                     Optional.ofNullable(routing).map(value -> value.version()).orElse(null),
                     ProductionExecutionQueryService.name(data.references().users(), row.getCreateBy()),
@@ -95,25 +97,26 @@ public class MesProductionExecutionController {
     }
 
 
-    private record Labels(String routingCode, String routingName, Integer routingVersion,
+    private record Labels(String productCode, String productName, String routingCode, String routingName, Integer routingVersion,
                           String createByName, String updateByName, String workorderStatus) {
     }
 
     private static MesProductionExecutionVo toView(ProductionExecutionQueryService.Display display) {
-        return toView(display.record(), Optional.ofNullable(display.routing()).map(nullableValue -> nullableValue
+        return toView(display.record(), Optional.ofNullable(display.product()).map(value -> value.getCode()).orElse(null),
+                Optional.ofNullable(display.product()).map(value -> value.getName()).orElse(null), Optional.ofNullable(display.routing()).map(nullableValue -> nullableValue
                 .code()).orElse(null), Optional.ofNullable(display.routing()).map(nullableValue -> nullableValue
                 .name()).orElse(null), Optional.ofNullable(display.routing()).map(nullableValue -> nullableValue
                 .version()).orElse(null), display.createByName(), display.updateByName(), display.workorderStatus());
     }
 
     static MesProductionExecutionVo toView(MesProductionExecutionEntity row) {
-        return toView(row, null, null, null, null, null, null);
+        return toView(row, null, null, null, null, null, null, null, null);
     }
 
-    private static MesProductionExecutionVo toView(MesProductionExecutionEntity row, String routingCode,
+    private static MesProductionExecutionVo toView(MesProductionExecutionEntity row, String productCode, String productName, String routingCode,
                                                    String routingName, Integer routingVersion, String createByName,
                                                    String updateByName, String workorderStatus) {
-        return BeanConversions.convertWith(row, new Labels(routingCode, routingName, routingVersion,
+        return BeanConversions.convertWith(row, new Labels(productCode, productName, routingCode, routingName, routingVersion,
                 createByName, updateByName, workorderStatus), MesProductionExecutionVo.class);
     }
 }

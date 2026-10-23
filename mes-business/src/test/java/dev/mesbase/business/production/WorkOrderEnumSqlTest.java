@@ -38,6 +38,36 @@ class WorkOrderEnumSqlTest {
     }
 
     @Test
+    void allocationListExcludesCancelledExecutionsAndPreservesTheUnallocatedRemainder() throws Exception {
+        var sql = configuration().getMappedStatement(
+                "dev.mesbase.business.production.dao.WorkOrderExtraMapper.allocationForOrders")
+                .getBoundSql(Map.of("ids", List.of(1L, 2L)));
+        try (var connection = DriverManager.getConnection("jdbc:h2:mem:active_allocations;MODE=MySQL");
+             var statement = connection.createStatement()) {
+            statement.execute("CREATE TABLE workorder(id BIGINT,planned_qty DECIMAL(20,6))");
+            statement.execute("CREATE TABLE mes_production_execution(id BIGINT,workorder_id BIGINT,target_qty DECIMAL(20,6),status VARCHAR(30))");
+            statement.execute("INSERT INTO workorder VALUES (1,100),(2,100)");
+            statement.execute("INSERT INTO mes_production_execution VALUES (1,1,60,'RUNNING'),(2,1,40,'CANCELLED'),(3,2,100,'CANCELLED')");
+            try (var query = connection.prepareStatement(sql.getSql())) {
+                for (int index = 0; index < sql.getParameterMappings().size(); index++) {
+                    query.setObject(index + 1, sql.getAdditionalParameter(sql.getParameterMappings().get(index).getProperty()));
+                }
+                try (var result = query.executeQuery()) {
+                    int seen = 0;
+                    while (result.next()) {
+                        boolean first = result.getLong("workorder_id") == 1;
+                        assertEquals(first ? 60 : 0, result.getBigDecimal("allocated_target_qty").intValueExact());
+                        assertEquals(first ? 40 : 100, result.getBigDecimal("remaining_target_qty").intValueExact());
+                        assertEquals(first ? 1 : 0, result.getLong("execution_count"));
+                        seen++;
+                    }
+                    assertEquals(2, seen);
+                }
+            }
+        }
+    }
+
+    @Test
     void blockingIssueQueryStillRequiresCompleteVoidProof() throws Exception {
         BoundSql sql = configuration().getMappedStatement(
                         "dev.mesbase.business.production.dao.WorkOrderExtraMapper.countBlockingIssues")

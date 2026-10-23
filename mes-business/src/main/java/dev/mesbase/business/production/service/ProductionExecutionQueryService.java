@@ -1,5 +1,8 @@
 package dev.mesbase.business.production.service;
 
+import dev.mesbase.business.basic.dao.MaterialMapper;
+import dev.mesbase.business.basic.domain.MaterialEntity;
+import dev.mesbase.business.basic.domain.MaterialExample;
 import dev.mesbase.business.directory.domain.DirectoryLabel;
 import dev.mesbase.business.directory.service.BusinessDirectoryService;
 import dev.mesbase.business.production.dao.WorkorderMapper;
@@ -21,11 +24,11 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 @ConditionalOnProperty(name = "mes.business.enabled", havingValue = "true")
 public class ProductionExecutionQueryService {
-    public record Display(MesProductionExecutionEntity record, DirectoryLabel routing, String createByName,
+    public record Display(MesProductionExecutionEntity record, MaterialEntity product, DirectoryLabel routing, String createByName,
                           String updateByName, String workorderStatus) {
     }
 
-    public record References(Map<Long, DirectoryLabel> routings, Map<Long, DirectoryLabel> users,
+    public record References(Map<Long, MaterialEntity> products, Map<Long, DirectoryLabel> routings, Map<Long, DirectoryLabel> users,
                              Map<Long, String> workorderStatuses) {
     }
 
@@ -36,9 +39,11 @@ public class ProductionExecutionQueryService {
     private final IMesProductionExecutionService executions;
     private final BusinessDirectoryService references;
     private final WorkorderMapper orders;
+    private final MaterialMapper materials;
 
     public ProductionExecutionQueryService(IMesProductionExecutionService executions,
-                                           BusinessDirectoryService references, WorkorderMapper orders) {
+                                           BusinessDirectoryService references, WorkorderMapper orders, MaterialMapper materials) {
+        this.materials = materials;
         this.orders = orders;
         this.executions = executions;
         this.references = references;
@@ -57,7 +62,7 @@ public class ProductionExecutionQueryService {
 
     private List<Display> describe(List<MesProductionExecutionEntity> rows) {
         var data = references(rows);
-        return rows.stream().map(row -> new Display(row, data.routings().get(row.getRoutingId()),
+        return rows.stream().map(row -> new Display(row, data.products().get(row.getProductId()), data.routings().get(row.getRoutingId()),
                 name(data.users(), row.getCreateBy()), name(data.users(), row.getUpdateBy()),
                 data.workorderStatuses().get(row.getWorkorderId()))).toList();
     }
@@ -65,14 +70,18 @@ public class ProductionExecutionQueryService {
     private References references(List<MesProductionExecutionEntity> rows) {
         var filter = new WorkorderExample();
         var ids = rows.stream().map(MesProductionExecutionEntity::getWorkorderId).distinct().toList();
-        if (ids.isEmpty()) return new References(Map.of(), Map.of(), Map.of());
+        if (ids.isEmpty()) return new References(Map.of(), Map.of(), Map.of(), Map.of());
         filter.createCriteria().andIdIn(ids);
         var statuses = orders.selectByExample(filter).stream()
                 .collect(Collectors.toMap(row -> row.getId(), row -> row.getStatus()));
+        var materialFilter = new MaterialExample();
+        materialFilter.createCriteria().andIdIn(rows.stream().map(MesProductionExecutionEntity::getProductId).distinct().toList());
+        var products = materials.selectByExample(materialFilter).stream()
+                .collect(Collectors.toMap(MaterialEntity::getId, row -> row));
         var routings = references.routingLabels(rows.stream().map(MesProductionExecutionEntity::getRoutingId).toList());
         var users = references.userLabels(rows.stream().flatMap(row -> Stream.of(row.getCreateBy(), row.getUpdateBy()))
                 .map(ProductionExecutionQueryService::userId).filter(id -> id != null).toList());
-        return new References(routings, users, statuses);
+        return new References(products, routings, users, statuses);
     }
 
     public static String name(Map<Long, DirectoryLabel> users, String value) {
