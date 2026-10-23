@@ -118,3 +118,10 @@ V54__remove_redundant_execution_no.sql删除mes_production_execution.execution_n
 本轮核实TEST_DEV_PERF_20261019 / DS9 revision2 / LOCAL → mes_base_dev_perf_test及server_uuid，备份11874条执行、DDL及54条原迁移历史，触发器/视图/例程/外键对该列依赖0。正式info/migrate/validate 54成功，55份迁移校验通过；写后执行其余字段及原历史逐条相同。私有备份在.local/execution-id-only-20261023/，公开摘要见[回执](../operations/data-maintenance/2026-10-23-execution-id-only-receipt.json)。
 
 其他库按版本链升级54，没有自动遍历执行。旧包仍查询旧列，升级窗口须由用户控制旧节点和加载匹配新包；Agent没有启停服务。恢复优先修复并向前升级；如需恢复Schema须根据备份与新增业务另作受控迁移，不能倒改已执行脚本、删除Flyway记录或覆盖新事实。
+
+
+## 2026-10-23 V56 内部生产模型转换审计结构
+
+V55由并行物料组成工作完成后，本任务按正式入口独立info/migrate/validate到V56，仅创建mes_production_conversion_archive（原表、原主键、完整JSON原行、本次转换标识及原因、归档时间），不修改公共升级链中的固定业务数据、不创建运行时兼容入口。目标仍为TEST_DEV_PERF_20261019 / datasource9 / LOCAL / mes_base_dev_perf_test，57份迁移校验通过；未改已发布迁移或其他Factory。
+
+随后按用户授权执行独立数据维护事务：退役动作、旧完工归档及状态恢复，另删除指定58执行整组；44104原行留存只读审计，4条正式完全入库和库存不变。公共版本升级不自动遍历/恢复其他环境的外部数据。完整备份、原始SQL摘要、实际影响数、逐表保全及验证见[维护回执](../operations/data-maintenance/2026-10-23-production-model-normalization-receipt.json)。回退应用不会恢复旧状态模型；需要恢复数据时必须防止覆盖本次之后的正常业务。

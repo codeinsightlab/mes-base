@@ -589,3 +589,40 @@ QualityDispositionHttpTest/QualityV2HttpTest/QualityWorkflowHttpTest及QualityTr
 - 写后11874个Execution均有正式批次，业务三元组精确重复0。逐条比较执行及旧绑定共12984条记录，除新增batch_no外，原所有列均相同，原状态/数量未变、旧绑定未改。质量样例32148/32149对应正式批次260727103，32150为241112107。SQL、备份与核验回执见`.local/execution-scan-20261023/`及`docs/operations/data-maintenance`归档。
 
 当前源码的定位/质量查询不读扫码行为或旧绑定，运行期也不读迁移payload。正式新服务/浏览器全链路仍须用户加载新包后验证，不能将本次MySQL迁移和只读映射SQL验收说成新HTTP链路已运行。独立历史终态、晚质量、历史容量等既有边界没有扩大。
+
+
+## 2026-10-23：全量退役动作治理与内部状态归一（已执行）
+
+### 决策变化与边界
+
+本轮用户明确：ALLOCATE已退役，残留数据须按全部范围恢复当前模型；外部转换数据应成为可用内部数据，不提供“历史已完成/不可处理”产品状态。原计划保留历史终态的安排被本次明确决定取代。随后用户明确删除整组58条HISTORICAL执行及关联数据，而不是补转该组902件不良。旧审查时间线保留，不再作为相冲突实施要求。
+
+### 真实数据执行
+
+再次核实中心Factory TEST_DEV_PERF_20261019及datasource9启用、LOCAL，真实192.168.18.25:3306/mes_base_dev_perf_test，server_uuid=03dbc952-7403-11ef-802c-0242ac130002。完整备份1263981739字节，摘要见回执；正式Flyway V56只建只读转换审计表，57份迁移严格校验通过。数据维护独立事务，不把固定测试数据写入公共版本链。
+
+- 15582 ALLOCATE、8 START、8 RESULT，共15598条退役处置原行归档后移出当前账本；保留15599 ASSESS及3 TRANSFER_WAREHOUSE。没有把旧分配、报废标记改成正式入库，没有新增不良、审核、库存动作。
+- 11558旧完工事实原行归档，11547旧COMPLETED执行恢复RUNNING、清空终态时间；1572旧COMPLETED工单恢复RELEASED、修订号增加1。工单1914之前回退的11执行不再被原完工行阻挡。
+- 58执行仅属于13工单且无库存、领料、正式质量、放行、接收、派工或组外报工引用。整组归档后删除58执行、13工单、13工单Extra、58路径、789路径节点、955报工、1930来源映射、13来源锁；13原转换批次保留审计。130个共享工艺节点仍被组外2573执行引用，未删除任何共享主数据。
+- 共44104条转换前原行完整保存在mes_production_conversion_archive，仅供审计，无运行时查询/计算/业务写入口。相同主键防止重复归档。两次前置/提交前检查失败均回滚，第三次所有断言成立后提交；没有半完成数据残留。
+
+提交后独立连接复核：Execution 11802 RUNNING、10 READY、4 FULLY_RECEIVED；工单1855 RELEASED、12 DRAFT、10 CANCELLED、4 COMPLETED。退役动作0，HISTORICAL/旧执行COMPLETED为0；删除组残留0、执行引用不存在工单0。保留4条当前正式完工事实。
+
+逐条SHA-256序列摘要核验：其余254188报工、15601不良申报、913放行、1814交接、1812接收、2227库存余额、4045库存动作、1122主单及1122明细完全不变；保留的路径、冻结映射、原转换批次和未改状态对象同样核验，详见执行回执。新系统未新增旧流程兼容、迁移激活服务或定时收尾。
+
+### 代码与验证
+
+Execution枚举与前端入口统一READY/RUNNING/FULLY_RECEIVED/CANCELLED，工单去HISTORICAL。数量结果删除historical标记，不再按旧状态分流；openingInput和批量期初同样只读已完成、版本匹配的冻结来源。领料、放行、正式入库准入不再把旧COMPLETED视为可办理状态。未知状态仍可真实展示，但不获得写权限。
+
+共享主仓的并行BOM未完成Scaffold测试引用阻塞全量构建；使用主仓HEAD隔离副本，仅复制本轮24个已跟踪文件和2个新文件验证。选择本机ARM Redis测试程序后，后端verify共903项、853通过、50条件跳过、0失败错误；前端79文件497测试及构建通过。链路重复测试去重后另做定向复核。当前Service真实MySQL只读结果将在本节补记，不将SQL算式复核冒充HTTP业务验收。
+
+全量MySQL数据提取后按当前算式复核：10764组冻结转换数据无负量/超投入；全库另有12个原生性能测试节点既有超投入，保持事实及严格门禁，未制造报工补平。该结果不证明所有记录均能直接收尾；未报完、未入库时应保持正常未完成状态。
+
+[维护回执](../operations/data-maintenance/2026-10-23-production-model-normalization-receipt.json)与[实际变更SQL摘录](../operations/data-maintenance/2026-10-23-production-model-normalization.executed.sql)仅供审计，不可重跑。回退须按归档原行、备份及后续新增事实另定向前修复，不全库覆盖、不删除Flyway成功记录。未启停/重启用户服务、未推送或部署；新代码需用户重启后端加载，真实服务HTTP/浏览器收尾尚未验证。
+
+
+### 本轮最终只读验收补记
+
+ProductionNormalizationReadOnlyMySqlTest在重新核实受管目标后，以真实MyBatis Mapper、当前ProductionQuantityService/QualityTreatmentService/ExecutionPathService读取测试库；仅目录展示标签Mock，事务readOnly。35条执行（工单1914的11条、4条正式完全入库、20条其他转换执行）数量投影均可读取，路径LOCKED、无负产出或样本数量冲突，当前未完成状态writable=true、完全入库writable=false；归档的58个旧HISTORICAL执行均返回EXECUTION_NOT_FOUND，未恢复或补造。该测试1项通过，去重后的ProductionChainHttpTest 5项通过，合计6项无失败；真实库无写入。最终Flyway validate仍通过57份迁移。
+
+此补记是新代码进程内Service与真实DB的只读证明，未启动业务服务，不替代用户后端重启后的HTTP/浏览器与真实入库提交验收。SQL执行与前后原行保护已经独立完成；12个组外原生测试节点数量矛盾仍明确保留。
