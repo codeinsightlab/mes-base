@@ -615,3 +615,14 @@ V59执行前核实`TEST_DEV_PERF_20261019 → datasource 9 → ENABLED / LOCAL �
 **仍待验证：**上述核心业务闭环已在用户重启后的真实服务及指定MySQL库完成；本轮新发现的缓存失效修复还需用户再次重启加载，随后需用另一张独立QA工单验证“先读暖缓存→同批追加→立即读列表和详情”，不能以本轮业务写入成功或隔离回归替代修复后的运行验证。本轮未调用真实ERP，未回填历史用料数据，未验证现场设备。
 
 修复后验证：本轮修改的两个Java文件经项目IntelliJ格式化通过，`git diff --check`通过；BOM链路定向7项测试通过，随后完整`mvn -B -ntp verify`通过（mes-admin 617项，0失败/0错误，50项受控跳过），新JAR已生成。本轮未修改UI或Schema，不重复报告前轮前端测试为本轮新执行。真实浏览器当前工厂页面已显示工单1921只有Execution12372、数量100、完全入库；截图在私有证据目录`screenshots/runtime-final-execution.jpg`，此最终页面读取仍不能代替追加后立即刷新的修复复验。另经正式HTTP准备了已下达、尚未投入的QA工单1922（计划2件）供下次“1件结束→追加1件”缓存复验，复用本轮QA物料、BOM和库存，不触碰原工单1921的已完成事实。
+
+#### 16.7 2026-10-24再次重启后：执行追加缓存修复真实复验完成
+
+用户确认再次重启后，重新核对Factory绑定、运行模式、启用状态和实际`DATABASE()`，目标仍为`TEST_DEV_PERF_20261019 / datasource 9 / LOCAL / mes_base_dev_perf_test`。本节取代16.6中“缓存修复待重启复验”的当前状态，保留原发现与修复时间线。本轮只补真实验收及文档，未修改业务代码、配置或Schema，未启动/停止服务，未调用ERP。
+
+- 使用已准备的独立QA工单1922，正式投入1 PCS，按BOM1∶2.5领取2.5 kg；首次成功创建Execution12373，经正式开工、报工262468、入库1125审核后为FULLY_RECEIVED，工单仍RELEASED。
+- 先后读取执行详情和列表，取得FULLY_RECEIVED、target1作为追加前读取结果；随后原批次`0001023`正式追加1 PCS，仍为Execution12373。紧接着读取同一详情与列表，**两者立即返回RUNNING、target2**，没有等待缓存TTL、手工清缓存或重启。原end_time及首条结束事实与追加前读取结果一致。请求与响应分别保存在私有证据目录`runtime-cache-warm-{detail,list}.json`、`runtime-cache-{detail,list}-immediately-after-append.json`及`runtime-cache-closure-{before,after-append}.json`。
+- 再正式报工262469并审核入库1126，Execution12373再次FULLY_RECEIVED，工单1922按计划2件COMPLETED；保留两条结束事实（累计1与累计2）。本次额外扣料5 kg、入库2 PCS，复用QA库存后最终材料余额745 kg、产出102 PCS；不把它们误报为工单1921单独余额。
+- 只读MySQL核对两张QA工单各只有一个Execution、各两次报工/审核入库/结束；原工单1921的Execution行、报工、库存动作、入库头及结束事实与前轮范围快照逐行相等。原100件闭环不因本次2件复验被改写。证据为`runtime-cache-final-db-verification.json`及`runtime-cache-original-order1921-preserved.json`。
+
+结论：本轮所需的LOCAL工单BOM领料、累计额度、同批Execution追加及立即查询刷新已完成真实服务/指定MySQL验证。前轮617项测试与构建回执仍按16.6记录，本轮未重复运行；真实运行证据不外推至EXTERNAL、现场扫码设备或历史用料回填。
