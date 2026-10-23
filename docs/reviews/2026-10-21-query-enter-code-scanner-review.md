@@ -106,3 +106,72 @@
 日志：`/tmp/mes-submit-tests.log`、`/tmp/mes-submit-build-final.log`、`/tmp/mes-submit-lint.log`、`/tmp/mes-submit-codegen-tests.log`、`/tmp/mes-submit-verify.log`；`/usr/bin/python3 scripts/smoke-packaged.py` 最终 10 项通过、0 失败（`/tmp/mes-submit-smoke.log`），为自有隔离进程检查，未操作用户服务。适配期间构建检查发现批量编辑产生的闭合标签错误，已修正；原 CrudPage 测试的 Element Plus mock 未提供运行时 ElForm，公共组件调整为沿用项目全局组件并仅 type import FormInstance，原隔离/权限测试保留，不删除失败断言。
 
 本轮原文件备份：UI `.local/query-submit-20261021/before/`。回滚仅按本轮差异恢复这些查询表单及模板，不能整体 reset；此前全局键盘拦截已明确废弃，不作为回滚默认方案。无数据库、权限、数据来源或业务命令变化；未操作用户已有服务。
+
+## 2026-10-23 执行定位统一函数与用户扫码行为（当前实施）
+
+### 用户决定、原链复核与结构结论
+
+用户明确报工、不良申报等扫码均以“工单＋产出品号＋批次”定位同一个生产执行器，要求所有Execution扫码走一个函数；type只是使用场景。原mes_production_scan_identity是每个绑定一条，缺当前操作者、场景、逐次结果/错误、耗时，不足以分析重复使用、失败率或行为变化。更严重的是原解析/投产、requiredBatch、质量列表和质量入库证明、执行引用保护均读取它，将扫码绑定作为业务准入；不是普通行为日志。此次重新追踪正式页面和后端调用链后整体退役关联，没有仅隐藏入口。
+
+正式新结构分两项：Execution.batch_no保存生产批次；mes_production_scan_activity逐次保存用户定位尝试。主键关联的生产事实仍引用execution_id；行为表不作为Locator索引、库存凭据或删改引用。旧表保留历史数据，旧Entity/Example/Mapper/XML移除，已发布迁移保留。新表只有主键和普通查询索引，无factory_id（按既有Factory分库），不开放事件新增/编辑/删除CRUD。
+
+### 统一契约与正式调用链
+
+- 前端`src/api/production/productionScan.ts`唯一`scanExecution(type, code, inputMethod='TEXT'): Promise<ProductionIdentity>`，复用request的Factory/身份/迟到响应机制，POST `/api/production/scan`，不trim码值。
+- Controller只解析type/code/inputMethod、校验并经BeanConversions返回统一白名单；拒绝额外字段，不能伪造用户、时间、结果。Service按场景检查当前用户权限，再统一调用ProductionIdentityService.resolve，type不切换定位算法或业务处理器。报工使用原report:submit，不强制附加execution:query；不良使用原defect:create，执行查询使用原execution:query。
+- CodeScanner确认仍第一参数返回字符串，第二参数TEXT/IMAGE；图片识别后人工修改归TEXT。它只负责采集；报工、身份查询、独立不良申报三个定位入口都走同一函数。报工得到identity后才按EXE:id读context，正式报工和不良提交仍为原明确命令；刷新context/节点/类型以及已知ID详情不会伪记扫码。
+- 身份结果包含executionId、工单、产品、工艺版本、状态、计划数及batchNo；移除旧identityType。MES2只无损编码工单码、产出品号、批次，无绑定主键或摘要。EXE:id保留详情读取。材料投产仍用“材料品号#批次”获取可信库存来源；新建/复用Execution在原父工单锁内按正式三元组执行，不混成执行查询。
+- 新查询先使用受控Example普通索引过滤，再以原文精确比较，并按id分页读尽collation近似项；不存在/重复精确命中分别拒绝，不选第一条。不同工单同品号同批次各自定位；同厂并发投产共用工单锁避免重复创建。普通Execution编辑保留原batch且领域规则冻结身份。
+
+### 行为分析可用范围与可信边界
+
+字段包括事件UUID、scan_type、input_method、user_id、execution_id、outcome、error_code、duration_ms、occurred_at、request_id。用户和结果来自服务端，输入方式来自客户端声明，不能据此证明真实硬件扫码。服务端耗时不包含浏览器图片识别、用户等待或网络耗时。不保存原始码、图片、异常内容和请求/响应全文，避免把任意扫码内容写入审计。
+
+该模型足以按人/场景/时间统计已提交定位次数、失败率及服务端耗时，也可按目标Execution追查定位活动。它不提供打开→取消→识别失败→确认的完整漏斗、不证明业务报工/入仓成功、不承诺每个浏览器动作均已送达，不能把扫码次数当产量。审计为分析用best-effort：定位读事务结束后再由独立业务事务落事件；日志故障记录`production.scan.activity.failed`及异常链，不改变定位成功或掩盖授权/来源/数据库原错误。恢复时按requestId/activityId定位数据库或授权故障并修复，后续扫码继续记录；不伪造丢失事件或重放领料/报工/入仓来补日志。不预建通用补偿、埋点SDK或分析大屏。
+
+切厂/撤权/切换中/卸载及Lookup关闭立即失效请求；不良替换执行前确认丢弃脏字段，等待确认期间再次核对请求序号、Factory及权限，未决申报不允许扫码改目标。扫码输入仍不会直接提交领料、报工、质量或库存。
+
+### 数据演进、生成与回退
+
+V52在核实的mes_base_dev_perf_test经正式Flyway执行并验证；同日独立维护只把10764个固定迁入执行的可信批次落正式字段。当前11874批次均非空，原执行/旧绑定12984条记录的旧列逐条相同。无状态、数量、库存或历史处理改写；不制造旧扫码事件。具体SQL身份、备份和核验见数据维护归档与质量专题同日实施修正。
+
+使用mes-crud-codegen技能从真实V52 metadata生成Execution与扫码行为的完整基础后端审查副本，配置`docs/development/production-scan-codegen.yaml`、报告`.local/execution-scan-20261023/codegen-report.json`，两表supported、零rejected。只合入需要的持久化及Execution响应字段，保留原FOR UPDATE的flushCache/useCache保护和手写业务Service；事件CRUD基线留在target审查副本，不装配可达写口。旧投产专用配置移除scan_identity，全量配置排除旧绑定和独立事件，避免重生成开放写接口。未运行菜单SQL或改角色授权。
+
+应用回退保留新增字段/事件和原证据，不能删表/改迁移记录或回滚原生产事实。旧包仍依赖旧绑定，不能正确处理新模型创建而未写旧绑定的执行，因此回退包不等于恢复新业务；优先暂停新增并修复新包，禁止为了回退补造旧绑定。旧MES1新定位/投产拒绝；原已提交UUID的冻结JSON指纹和SHA256算法不变，先读取原结果，不重新扣库存。独立批次维护SQL已执行，不得重跑；若新发现数据冲突，先隔离具体记录再按受控维护处理，不恢复运行期读旧payload兜底。
+
+### 本次验证（与旧章节分列）
+
+- 后端全reactor `mvn -B -ntp verify`：900项，851执行通过、49条件跳过、0失败/错误，已打包；日志`/tmp/mes-execution-scan-verify.log`。
+- 定向两轮分别61项、13项通过。后一轮含4个HTTP/H2真实事务代理测试、3个精确定位纯规则测试、5个Service/Controller合同测试及1个真实MySQL只读映射测试；不是把Mock当真实服务。覆盖旧表移走后可定位、权限/Factory/无身份/无Scope、原UUID、跨工单同批次、审计故障不替换原结果、质量收尾原证明仍有效。
+- 真实MySQL：核实Factory/DS/LOCAL和server_uuid；V52迁移、53份严格校验、10764批次维护已实际执行；当前映射SQL以生产样本读取三元组定位、Q证明、原审核恢复及进度通过。EXPLAIN使用idx_execution_order_product_batch、估算1行；这是索引使用证据，不是主键/普通索引吞吐性能等价证明。
+- 前端Node22全量78文件/481项通过，build通过；定向边界4文件/48项通过。日志`/private/tmp/mes-base-ui-scan-boundaries-all-tests.log`、`/private/tmp/mes-base-ui-scan-boundaries-build.log`。两仓差异检查通过，任务30个Java文件格式检查通过。
+- 浏览器：当前5173/TEST_DEV_PERF_20261019实看不良登记新增扫码定位按钮、公共图片/文本弹窗及取消；报工深链页面显示MES2说明并使用同一控件。截图`.local/execution-scan-20261023/ui-common-scan.png`、`ui-reporting-scan.png`。未点击确认发送新scan请求，旧后端尚未由用户重启；新POST真实服务落库、真实图片识别定位、重启后迁入不良批次回显及三档宽度仍待验，不能沿用前次入库真实闭环当本轮证据。
+- 当前真实行为表0条是未调用新服务的真实结果，没有伪造日志。HTTP/H2的成功/失败事件持久化不等于真实服务已验收。未启停用户服务、提交、推送或部署。
+
+## 2026-10-23 用户追加：物理删除旧扫码表（执行前准备）
+
+用户追加要求物理删除mes_production_scan_identity和废弃代码，并将SQL并入V52。运行期旧Entity/Example/Mapper/XML已在上一阶段删除；本次进一步清理H2底座，不再创建/补列旧表，HTTP测试改为断言旧表不存在，再验证同一正式扫码/报工上下文链。定向49项通过，Java格式化及差异检查通过。
+
+重新核实TEST_DEV_PERF_20261019/DS9 revision2/LOCAL及目标mes_base_dev_perf_test和server_uuid。已新备份11874执行、1110旧绑定、0条行为事件和53条迁移历史，旧绑定与Execution.batch_no承接冲突0、触发器依赖0。私有证据`.local/scan-identity-retirement-20261023/`；`V52.applied.sql`保存已执行原文、`V52.proposed.sql`为用户要求的合并删表审查副本、`drop-table.review.sql`为删表语句。
+
+截至本节：旧表仍存在，未执行DROP、未修改正式V52或Flyway历史。由于V52已执行，直接改原文将造成checksum冲突；已向用户列出新增V53与明确例外修订V52历史两种处理方式，等待版本处理选择。没有将未执行草稿放入正式Flyway目录，也没有启停用户服务。旧HTTP身份已返回401，本轮未验证运行中JVM是否已加载新实现，不以此冒充新代码运行验收。
+
+## 2026-10-23 V53 删除完成（替代上一节待选择状态）
+
+用户确认“保留已执行V52，新增V53删表，其他库顺序升级到V53”。已新增正式`V53__drop_retired_production_scan_identity.sql`并在重新核实的mes_base_dev_perf_test经项目Flyway执行；旧表已物理删除，非仅逻辑退役。V52原文和旧历史不变，无repair、无手工历史修改。旧4个持久化文件已在前阶段删除；本次清理测试底座旧建表/补列，当前H2从不建立该表，正式HTTP测试在确认表不存在时仍定位、读报工上下文并记录独立行为。全量生成排除项保留，避免对尚未升级的其他库误生成旧业务代码；已发布V29/V31/V52必须保留历史升级顺序，不当作残留业务恢复。
+
+重新备份旧1110条绑定和DDL、11874条执行、行为表及53条迁移历史；批次承接冲突、外键/触发器/视图依赖0。info仅V53 Pending，migrate成功，validate通过54份迁移。写后旧表存在数0、缺正式批次0，执行11874条全部字段及原53条迁移历史逐条一致，只新增V53成功历史。私有证据`.local/scan-identity-retirement-20261023/`，公开审计摘要`docs/operations/data-maintenance/2026-10-23-scan-identity-retirement-receipt.json`。删除前记录通过备份保留，不把一条绑定伪造为过去扫码行为。
+
+其他库使用正式版本链升级到53，执行前按升级说明重新核实来源、批次承接和备份，旧应用节点不能继续访问已删表。没有自动遍历其他库，没有启停用户服务。当前真实服务身份过期，本轮不宣称已验证运行中JVM或真实扫码POST；数据库真实迁移和映射只读验证与HTTP/H2分列。
+
+本轮最终验证：`MES_INBOUND_SQL_MYSQL_ACCEPTANCE=true mvn -B -ntp verify`全reactor通过，总900项、实际852项通过（含1项真实perf库只读Mapper验收）、48项条件跳过、0失败/错误；日志`/tmp/mes-scan-retirement-verify.log`。此前清理定向49项通过；2个改动Java文件格式检查、两仓差异检查通过。打包JAR内V52/V53 SQL与工作区逐字节一致。未改前端业务代码，不重复跑无关UI测试；未启停用户服务或宣称真实新扫码HTTP验收。
+
+## 2026-10-23 编码纠正：工单号:品号#批次号（当前有效）
+
+用户明确指出MES2前缀分支不符合实际标签，正式执行扫码必须是`工单号:品号#批次号`，例如`5100-260701568:20213023001#260727103`。本节替代前文MES2/Base64方案；旧章节保留当时实现记录，不再作为当前编码合同。
+
+ProductionScanCode.parse改为按第一个ASCII冒号分工单，再按其后第一个ASCII井号分品号，余下全部文本保留为批次。encode直接拼接同格式，删除Base64编解码和MES2前缀判断；校验非空、字段上限、控制字符及非法Unicode，不trim、不归一大小写/前导零/空格。批次可含井号、冒号；工单号不能包含分隔冒号，品号不能包含分隔井号，编码时明确拒绝无法表示的字段，未引入转义或另一套协议。原料来源查询继续采用原“材料品号#批次”契约，不混同执行定位。
+
+ProductionIdentityService仅对无井号的EXE:ID走现有详情主键读取，其余统一按三元组解析，避免工单号恰好为EXE时误分流；公共扫码各场景仍返回同一个ProductionIdentity，生产二维码输出、投产结果和页面说明同步更新。EXE详情/内部刷新保留；新MES1/MES2执行定位拒绝。原投产命令字段、冻结JSON、UUID优先重放及SHA256请求摘要算法没有改变，旧原UUID仍不重新领料或扣库。业务定位、权限、Factory、审计、数量和库存证明不变。
+
+补充验证覆盖实际字面码、中文/前导零/大小写/尾空格、批次内分隔符、空字段/畸形文本/旧前缀拒绝，以及EXE作为业务工单号和EXE:ID两条路径。前端公共扫码透传测试改用真实文本格式，不继续以MES2样例掩盖契约错误。仅修改解析/显示和相关测试，无数据库Schema或数据更改，V52/V53不变，无需新增SQL迁移。

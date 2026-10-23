@@ -42,7 +42,7 @@ import dev.mesbase.business.production.dao.MesExecutionPathNodeMapper;
 import dev.mesbase.business.production.dao.MesProductionExecutionMapper;
 import dev.mesbase.business.production.dao.MesProductionReceiptMapper;
 import dev.mesbase.business.production.dao.MesProductionReportMapper;
-import dev.mesbase.business.production.dao.MesProductionScanIdentityMapper;
+import dev.mesbase.business.production.dao.MesProductionScanActivityMapper;
 import dev.mesbase.business.production.dao.MesWorkorderCancellationMapper;
 import dev.mesbase.business.production.dao.MesWorkorderMaterialMapper;
 import dev.mesbase.business.production.dao.OperationMapper;
@@ -179,7 +179,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * TEST ONLY: real generated SQL, HTTP authorization and transactions; two separate H2 databases.
  */
 class MaterialIssueHttpTest {
-    static final Set<Class<?>> MAPPERS = Set.of(ProductionDefectListExtraMapper.class, StockDocumentExtraMapper.class, OperationDefectTypeMapper.class, DefectStatisticsExtraMapper.class, WmStockDocumentMapper.class, WmStockDocumentLineMapper.class, MesWorkorderCancellationMapper.class, WmWarehouseErpExtraMapper.class, MesQualityReleaseMapper.class, MesWarehouseAcceptanceMapper.class, MesExecutionCompletionMapper.class, MesWorkorderMaterialMapper.class, WmStockActionMapper.class, MesExecutionAssignmentMapper.class, MesMaterialIssueInputMapper.class, MesProductionScanIdentityMapper.class, WmInventoryMapper.class, MesProductionReceiptMapper.class, ProductionReceiptQueryMapper.class, MesProductionDefectMapper.class, MesQualityTreatmentMapper.class, WorkstationMapper.class, MesProductionReportMapper.class, ProductionQuantityMapper.class, MesExecutionPathMapper.class, MesExecutionPathNodeMapper.class, MesMaterialIssueSubmissionMapper.class, WorkorderErpExtraMapper.class, MesMaterialIssueErpExtraMapper.class, WorkOrderExtraMapper.class, ProductionBatchMapper.class, BatchRouteNodeMapper.class, RoutingNodeMapper.class, RoutingEdgeMapper.class, OperationMapper.class, MesProductionExecutionMapper.class, MaterialMapper.class, UnitMeasureMapper.class, WmWarehouseMapper.class, RoutingMapper.class, RoutingProductMapper.class, WorkorderMapper.class, MesMaterialIssueMapper.class, MesMaterialIssueItemMapper.class);
+    static final Set<Class<?>> MAPPERS = Set.of(ProductionDefectListExtraMapper.class, StockDocumentExtraMapper.class, OperationDefectTypeMapper.class, DefectStatisticsExtraMapper.class, WmStockDocumentMapper.class, WmStockDocumentLineMapper.class, MesWorkorderCancellationMapper.class, WmWarehouseErpExtraMapper.class, MesQualityReleaseMapper.class, MesWarehouseAcceptanceMapper.class, MesExecutionCompletionMapper.class, MesWorkorderMaterialMapper.class, WmStockActionMapper.class, MesExecutionAssignmentMapper.class, MesMaterialIssueInputMapper.class, MesProductionScanActivityMapper.class, WmInventoryMapper.class, MesProductionReceiptMapper.class, ProductionReceiptQueryMapper.class, MesProductionDefectMapper.class, MesQualityTreatmentMapper.class, WorkstationMapper.class, MesProductionReportMapper.class, ProductionQuantityMapper.class, MesExecutionPathMapper.class, MesExecutionPathNodeMapper.class, MesMaterialIssueSubmissionMapper.class, WorkorderErpExtraMapper.class, MesMaterialIssueErpExtraMapper.class, WorkOrderExtraMapper.class, ProductionBatchMapper.class, BatchRouteNodeMapper.class, RoutingNodeMapper.class, RoutingEdgeMapper.class, OperationMapper.class, MesProductionExecutionMapper.class, MaterialMapper.class, UnitMeasureMapper.class, WmWarehouseMapper.class, RoutingMapper.class, RoutingProductMapper.class, WorkorderMapper.class, MesMaterialIssueMapper.class, MesMaterialIssueItemMapper.class);
 
     static class Fixture implements AutoCloseable {
         final RuntimeRegistry registry = new RuntimeRegistry();
@@ -218,7 +218,8 @@ class MaterialIssueHttpTest {
                         ddl = ddl.replace(" CHARACTER SET ascii COLLATE ascii_bin", "")
                                 .replace(",\n ADD UNIQUE KEY uk_report_request_id(request_id)", ";\nALTER TABLE mes_production_report ADD CONSTRAINT uk_report_request_id UNIQUE(request_id)");
                     if (name.equals("V29__single_material_production_input.sql")) {
-                        ddl = ddl.split("-- 旧库存")[0].replace(" CHARACTER SET ascii COLLATE ascii_bin", "");
+                        ddl = ddl.substring(ddl.indexOf("CREATE TABLE mes_material_issue_input"))
+                                .split("-- 旧库存")[0].replace(" CHARACTER SET ascii COLLATE ascii_bin", "");
                         jdbc.execute("ALTER TABLE wm_inventory ADD batch_no VARCHAR(128)");
                         jdbc.execute("ALTER TABLE wm_inventory ADD bin_code VARCHAR(64)");
                         jdbc.execute("ALTER TABLE wm_inventory DROP CONSTRAINT uk_inventory_factory_material_warehouse");
@@ -246,9 +247,11 @@ class MaterialIssueHttpTest {
                 // TEST ONLY: these fresh fixture objects are explicitly local; no production migration default.
                 jdbc.execute("ALTER TABLE workorder ALTER COLUMN source SET DEFAULT 'LOCAL'");
                 jdbc.execute("ALTER TABLE wm_warehouse ALTER COLUMN source SET DEFAULT 'LOCAL'");
-                jdbc.execute("ALTER TABLE mes_production_scan_identity ADD product_code VARCHAR(64)");
-                jdbc.execute("ALTER TABLE mes_production_scan_identity ADD material_code VARCHAR(64)");
-                jdbc.execute("ALTER TABLE mes_production_scan_identity ADD material_lot_code VARCHAR(128)");
+                jdbc.execute("ALTER TABLE mes_production_execution ADD batch_no VARCHAR(128)");
+                String scanDdl = Files.readString(Path.of("mes-admin/src/main/resources/db/business/V52__execution_batch_and_scan_activity.sql"));
+                scanDdl = scanDdl.substring(scanDdl.indexOf("CREATE TABLE mes_production_scan_activity")).split(";")[0]
+                        .replace(") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT=", ") COMMENT ");
+                jdbc.execute(scanDdl);
                 jdbc.update("INSERT INTO material(id,code,name,unit_id,material_type,status) VALUES(1,'M1','物料一',1,'PRODUCT','ENABLED')");
                 jdbc.update("INSERT INTO workorder(id,code,product_id,planned_qty,routing_id,status,revision,create_time,update_time) VALUES(1,'WO1',1,1000,1,'DRAFT',0,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)");
                 jdbc.update("INSERT INTO unit_measure(id,code,name,status) VALUES(1,'KG','千克','ENABLED')");
@@ -375,8 +378,8 @@ class MaterialIssueHttpTest {
         }
 
         @Bean
-        MesProductionScanIdentityMapper scanMapper(SqlSessionFactory f) {
-            return new SqlSessionTemplate(f).getMapper(MesProductionScanIdentityMapper.class);
+        MesProductionScanActivityMapper scanMapper(SqlSessionFactory f) {
+            return new SqlSessionTemplate(f).getMapper(MesProductionScanActivityMapper.class);
         }
 
         @Bean

@@ -251,13 +251,6 @@ public class ProductionQuantityService {
         validateChange(view, nodeId, delta, BigDecimal.ZERO);
     }
 
-    /**
-     * A return reduces gross reporting and its defect loss together in one locked transaction.
-     */
-    public void validateQualityReturn(Long executionId, Long nodeId, BigDecimal quantity) {
-        validateChange(getExecutionQuantities(executionId), nodeId, quantity.negate(), quantity.negate());
-    }
-
     private static void validateChange(ExecutionQuantity view, Long nodeId, BigDecimal delta, BigDecimal defectDelta) {
         if (!ExecutionPathStatus.LOCKED.getValue().equals(view.pathStatus()))
             ParameterChecks.reject(ErrorCode.REPORT_PATH_REQUIRED);

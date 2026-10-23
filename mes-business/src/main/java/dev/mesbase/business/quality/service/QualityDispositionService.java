@@ -6,7 +6,7 @@ import dev.mesbase.business.production.domain.ProductionQuantityInput;
 import dev.mesbase.business.production.service.BusinessSourceRules;
 import dev.mesbase.business.production.service.ProductionChainLocks;
 import dev.mesbase.business.production.service.ProductionIdentityService;
-import dev.mesbase.business.production.service.ProductionReportService;
+import dev.mesbase.business.production.service.ProductionCompletionService;
 import dev.mesbase.business.quality.domain.DefectRecordAction;
 import dev.mesbase.business.quality.domain.MesQualityTreatmentEntity;
 import dev.mesbase.business.quality.domain.QualityTreatmentModels.Attribution;
@@ -48,7 +48,7 @@ import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Atomic current-workflow disposition: return to the declaration node or formal warehouse receipt.
+ * Atomic formal warehouse receipt; historical return requests remain replayable.
  */
 @Service
 @ConditionalOnProperty(name = "mes.business.enabled", havingValue = "true")
@@ -56,7 +56,7 @@ public class QualityDispositionService {
     private final QualityTreatmentService treatments;
     private final ProductionChainLocks locks;
     private final BusinessSourceRules sources;
-    private final ProductionReportService reports;
+    private final ObjectProvider<ProductionCompletionService> completion;
     private final ObjectProvider<StockDocumentService> documents;
     private final ObjectProvider<IWmInventoryService> inventory;
     private final WmInventoryMapper stocks;
@@ -67,7 +67,8 @@ public class QualityDispositionService {
     private final WmWarehouseMapper warehouses;
 
     public QualityDispositionService(QualityTreatmentService treatments, ProductionChainLocks locks,
-                                     BusinessSourceRules sources, ProductionReportService reports,
+                                     BusinessSourceRules sources,
+                                     ObjectProvider<ProductionCompletionService> completion,
                                      ObjectProvider<StockDocumentService> documents,
                                      ObjectProvider<IWmInventoryService> inventory, WmInventoryMapper stocks,
                                      StockReferenceRules references,
@@ -78,7 +79,7 @@ public class QualityDispositionService {
         this.treatments = treatments;
         this.locks = locks;
         this.sources = sources;
-        this.reports = reports;
+        this.completion = completion;
         this.documents = documents;
         this.inventory = inventory;
         this.stocks = stocks;
@@ -103,7 +104,10 @@ public class QualityDispositionService {
         ProductionQuantityInput.check(c.quantity());
         String hash = hash(declaration, c);
         if (replayed(declaration, c.requestId(), hash)) return treatments.details(declaration);
+        if (c.destination() == Destination.RETURN_NODE)
+            ParameterChecks.reject(ErrorCode.QUALITY_TREATMENT_CONFLICT);
         var d = treatments.latest(declaration);
+        completion.getObject().lockInboundChain(d.getExecutionId());
         var execution = locks.execution(d.getExecutionId());
         if (replayed(declaration, c.requestId(), hash)) return treatments.details(declaration);
         locks.requireActiveExecution(execution.getId());
@@ -152,11 +156,6 @@ public class QualityDispositionService {
             treatments.recordDisposition(declaration, c, hash, documentId);
             owner.approve(documentId, new StockDocumentModels.Post(c.requestId(), owner.detail(documentId).document()
                     .getRevision()));
-        }
-        if (c.destination() == Destination.RETURN_NODE) {
-            reports.returnToNode(execution.getId(), d.getAffectedNodeId(), c.quantity(), c.requestId(), c.reason()
-                    .trim());
-            treatments.recordDisposition(declaration, c, hash, null);
         }
         return treatments.details(declaration);
     }

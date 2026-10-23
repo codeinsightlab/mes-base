@@ -1,6 +1,68 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="dev.mesbase.business.wm.dao.StockDocumentExtraMapper">
+ <sql id="formalInboundBindings">
+  <bind name="postedStatus" value="@dev.mesbase.business.wm.domain.StockDocumentStatus@POSTED.getValue()"/>
+  <bind name="productionReceiptType" value="@dev.mesbase.business.wm.domain.StockDocumentType@PRODUCTION_RECEIPT.getValue()"/>
+  <bind name="receiptActionType" value="@dev.mesbase.business.wm.domain.StockActionType@OTHER_RECEIPT.getValue()"/>
+  <bind name="receiptSourceType" value="@dev.mesbase.business.wm.domain.StockSourceType@OTHER_RECEIPT.getValue()"/>
+  <bind name="localSource" value="@dev.mesbase.business.shared.enums.BusinessSource@LOCAL.getValue()"/>
+ </sql>
+ <sql id="formalInboundJoins">
+  <include refid="formalInboundBindings"/>
+  FROM wm_stock_document d LEFT JOIN wm_stock_document_line l ON l.document_id=d.id
+  LEFT JOIN wm_stock_action a ON a.id=l.stock_action_id
+  LEFT JOIN mes_production_execution e ON e.id=d.source_execution_id
+  LEFT JOIN workorder o ON o.id=e.workorder_id
+  LEFT JOIN material m ON m.id=e.product_id
+  LEFT JOIN wm_warehouse w ON w.id=l.warehouse_id
+  WHERE d.source_execution_id=#{executionId} AND d.status=#{postedStatus} AND d.document_type=#{productionReceiptType}
+ </sql>
+ <sql id="formalInboundMatches">
+  e.id IS NOT NULL AND o.id IS NOT NULL AND m.id IS NOT NULL AND w.id IS NOT NULL
+  AND o.source=#{localSource} AND w.source=#{localSource}
+  AND e.product_id=o.product_id AND l.material_id=e.product_id AND l.unit_id=m.unit_id AND l.quantity&gt;0
+  AND d.source_workorder_id IS NULL AND d.post_request_id IS NOT NULL
+  AND d.post_request_hash IS NOT NULL AND d.posted_by IS NOT NULL AND d.posted_at IS NOT NULL
+  AND a.id IS NOT NULL AND a.document_line_id=l.id AND a.execution_id=#{executionId}
+  AND a.operation_id=d.post_request_id AND a.source_type=#{receiptSourceType}
+  AND a.source_id=CONCAT('',d.id) AND a.action_type=#{receiptActionType}
+  AND a.quantity_delta=l.quantity AND a.available_delta=l.quantity
+  AND a.quantity_after-a.quantity_before=l.quantity AND a.available_after-a.available_before=l.quantity
+  AND a.operator_user_id=d.posted_by AND a.request_hash=d.post_request_hash
+  AND a.reference_action_id IS NULL
+  AND NOT EXISTS (SELECT 1 FROM wm_stock_action reversal WHERE reversal.reference_action_id=a.id)
+  AND (SELECT COUNT(*) FROM wm_stock_action duplicate_action WHERE duplicate_action.document_line_id=l.id)=1
+  AND a.stock_id=l.stock_id AND a.material_id=l.material_id
+  AND a.warehouse_id=l.warehouse_id AND a.unit_id=l.unit_id
+  AND (a.batch_no=l.batch_no OR (a.batch_no IS NULL AND l.batch_no IS NULL))
+  AND (a.bin_code=l.bin_code OR (a.bin_code IS NULL AND l.bin_code IS NULL))
+ </sql>
+ <select id="formalProductionInbound" resultType="java.math.BigDecimal">
+  SELECT COALESCE(SUM(l.quantity),0) <include refid="formalInboundJoins"/>
+  AND (<include refid="formalInboundMatches"/>)
+ </select>
+ <select id="invalidProductionInboundLines" resultType="long">
+  SELECT COUNT(*) <include refid="formalInboundJoins"/>
+  AND NOT (COALESCE((<include refid="formalInboundMatches"/>),FALSE))
+ </select>
+ <select id="latestInboundAuditId" resultType="string">
+  <include refid="formalInboundBindings"/>
+  SELECT audit_id FROM (
+   SELECT DISTINCT d.post_request_id AS audit_id,d.posted_at AS posted_at,d.id AS document_id
+   <include refid="formalInboundJoins"/>
+   AND (<include refid="formalInboundMatches"/>)
+   UNION ALL
+   SELECT DISTINCT d.post_request_id AS audit_id,d.posted_at AS posted_at,d.id AS document_id
+   FROM mes_quality_treatment t
+   JOIN (
+    <include refid="dev.mesbase.business.quality.dao.ProductionDefectListExtraMapper.receiptProofRows"/>
+   ) proof ON proof.eventId=t.id AND proof.validCount=1
+   JOIN wm_stock_document d ON d.id=t.stock_document_id
+   WHERE t.execution_id=#{executionId}
+  ) approved
+  ORDER BY posted_at DESC,document_id DESC LIMIT 1
+ </select>
  <select id="netProductionInbound" resultType="java.math.BigDecimal">
  <bind name="posted" value="@dev.mesbase.business.wm.domain.StockDocumentStatus@POSTED.getValue()"/>
  <bind name="productionReceipt" value="@dev.mesbase.business.wm.domain.StockDocumentType@PRODUCTION_RECEIPT.getValue()"/>

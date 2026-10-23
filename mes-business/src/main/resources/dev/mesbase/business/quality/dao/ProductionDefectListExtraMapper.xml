@@ -5,7 +5,7 @@
     SELECT d.declaration_id AS declarationId, e.execution_no AS executionNo,
       w.code AS workorderCode, m.code AS productCode, m.name AS productName,
       w.status AS workorderStatus, e.status AS executionStatus, w.source AS source,
-      (SELECT s.material_lot_code FROM mes_production_scan_identity s WHERE s.execution_id=e.id) AS batchNo,
+      e.batch_no AS batchNo,
       m.specification AS specification
     FROM mes_production_defect d
     LEFT JOIN mes_production_execution e ON e.id=d.execution_id
@@ -27,5 +27,55 @@
     LEFT JOIN mes_quality_treatment t ON t.declaration_id=d.declaration_id AND t.declaration_revision=d.revision_no
     WHERE d.id IN <foreach collection="ids" item="id" open="(" separator="," close=")">#{id}</foreach>
     GROUP BY d.id,d.declaration_id,d.revision_no
+  </select>
+  <sql id="receiptProofRows">
+    <bind name="posted" value="@dev.mesbase.business.wm.domain.StockDocumentStatus@POSTED.getValue()"/>
+    <bind name="defectReceipt" value="@dev.mesbase.business.wm.domain.StockDocumentType@DEFECT_RECEIPT.getValue()"/>
+    <bind name="scrapReceipt" value="@dev.mesbase.business.wm.domain.StockDocumentType@SCRAP_RECEIPT.getValue()"/>
+    <bind name="local" value="@dev.mesbase.business.shared.enums.BusinessSource@LOCAL.getValue()"/>
+    <bind name="defective" value="@dev.mesbase.business.wm.domain.WarehouseType@DEFECTIVE.getValue()"/>
+    <bind name="scrap" value="@dev.mesbase.business.wm.domain.WarehouseType@SCRAP.getValue()"/>
+    <bind name="otherReceipt" value="@dev.mesbase.business.wm.domain.StockActionType@OTHER_RECEIPT.getValue()"/>
+    <bind name="transferWarehouse" value="@dev.mesbase.business.quality.domain.QualityTreatmentModels$Action@TRANSFER_WAREHOUSE.getValue()"/>
+    <bind name="receiptSource" value="@dev.mesbase.business.wm.domain.StockSourceType@OTHER_RECEIPT.getValue()"/>
+    SELECT t.id AS eventId, SUM(CASE WHEN
+      d.status=#{posted} AND d.document_type IN (#{defectReceipt},#{scrapReceipt})
+      AND ((d.document_type=#{defectReceipt} AND w.warehouse_type=#{defective})
+        OR (d.document_type=#{scrapReceipt} AND w.warehouse_type=#{scrap}))
+      AND o.source=#{local} AND w.source=#{local}
+      AND d.source_execution_id IS NULL AND d.source_workorder_id IS NULL
+      AND d.post_request_id=t.id AND d.posted_by=t.operator_user_id AND d.posted_at IS NOT NULL
+      AND l.quantity=t.transfer_qty AND t.transfer_qty&gt;0 AND t.returned_qty=0
+      AND l.warehouse_id=t.target_warehouse_id AND l.material_id=e.product_id AND l.unit_id=m.unit_id
+      AND a.id=l.stock_action_id AND a.document_line_id=l.id AND a.operation_id=t.id
+      AND a.operation_id=d.post_request_id AND a.execution_id=t.execution_id
+      AND a.action_type=#{otherReceipt} AND a.source_type=#{receiptSource}
+      AND a.source_id=CAST(d.id AS CHAR) AND a.reference_action_id IS NULL
+      AND a.stock_id=l.stock_id AND a.material_id=l.material_id AND a.unit_id=l.unit_id
+      AND a.warehouse_id=l.warehouse_id AND a.quantity_delta=l.quantity AND a.available_delta=l.quantity
+      AND a.quantity_after-a.quantity_before=l.quantity
+      AND a.available_after-a.available_before=l.quantity
+      AND a.operator_user_id=d.posted_by AND a.request_hash=d.post_request_hash
+      AND CAST(a.batch_no AS BINARY(512))=CAST(l.batch_no AS BINARY(512))
+      AND CAST(l.batch_no AS BINARY(512))=CAST(e.batch_no AS BINARY(512))
+      AND (a.bin_code=l.bin_code OR (a.bin_code IS NULL AND l.bin_code IS NULL))
+      AND (SELECT COUNT(*) FROM wm_stock_document_line other_line WHERE other_line.document_id=d.id)=1
+      AND (SELECT COUNT(*) FROM wm_stock_action other_action WHERE other_action.document_line_id=l.id)=1
+      AND (SELECT COUNT(*) FROM mes_quality_treatment other_event WHERE other_event.stock_document_id=d.id)=1
+      AND NOT EXISTS (SELECT 1 FROM wm_stock_action reverse_action WHERE reverse_action.reference_action_id=a.id)
+      THEN 1 ELSE 0 END) AS validCount
+    FROM mes_quality_treatment t
+    LEFT JOIN wm_stock_document d ON d.id=t.stock_document_id
+    LEFT JOIN wm_stock_document_line l ON l.document_id=d.id
+    LEFT JOIN wm_stock_action a ON a.id=l.stock_action_id
+    LEFT JOIN mes_production_execution e ON e.id=t.execution_id
+    LEFT JOIN workorder o ON o.id=e.workorder_id
+    LEFT JOIN material m ON m.id=e.product_id
+    LEFT JOIN wm_warehouse w ON w.id=t.target_warehouse_id
+    WHERE t.execution_id=#{executionId} AND t.action_type=#{transferWarehouse}
+    GROUP BY t.id
+  </sql>
+  <select id="selectReceiptProofs" resultType="dev.mesbase.business.quality.domain.QualityTreatmentModels$ReceiptProof">
+    <include refid="receiptProofRows"/>
   </select>
 </mapper>

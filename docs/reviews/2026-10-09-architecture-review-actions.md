@@ -909,3 +909,166 @@ TEST ONLY装配在SQL prepare前检查实际连接catalog，仅允许上述两�
 本轮未改业务源码、前端、生产配置、连接池参数、SyncCoordinator、已发布迁移或生产密钥/密文；未提交/推送。新增/修订仅TEST ONLY工具、隔离环境私有配置/数据与本节及脱敏证据，更新规划入口的执行状态。生产配置hash、原25项源码/工具hash、暂存区与开始时工作区补丁在报告更新前全部保持一致。
 
 证据：[`evidence/2026-10-18-p1-master-acceptance/`](evidence/2026-10-18-p1-master-acceptance/)，含 `results.json`、37个案例条目、故障注入、参数化SQL prepare轨迹、HTTP结果、真实最终SQL/数据库清单、原环境比较、回归和服务清理。TEST ONLY源码：`target/p1-master-acceptance/`；私有原始日志与失败探针：`.local/p1-master-acceptance-20261018/`。没有把缺失/失败的原型探针记录从时间线中抹去。
+
+## 十三、2026-10-23 对照长期产品规划的当前工作树复核（只读源码审查）
+
+### 13.1 输入、范围与证据等级
+
+输入：用户《Base MES 产品长期规划 V1.0》及 `docs/development/next-stage-plan.md` 当日 A—F。后端 HEAD `7302242`，前端 HEAD `e5025d9`，均以 HEAD 加当前已修改、未跟踪文件为准。开始时后端已有三个文档修改及 `docs/operations/`，前端已有大量生产、质量、库存和工作台改动，全部保留。三个子 Agent 只读追踪生产、质量数量、仓储 ERP，主 Agent 复读关键跨模块链并统一更新文档。
+
+本次是**围绕产品规划的业务入口与横切边界审查，不是全仓审计**。未覆盖所有平台管理、设备、OpenAPI、文件和生成器实现。没有读取私有连接配置或凭证，没有连接数据库、业务 HTTP、浏览器或 ERP；没有执行构建、完整测试、lint、迁移或服务烟测。下列“已有实现”只说明当前源码可达，不证明部署或首厂验收通过。
+
+### 13.2 主 Agent 独立复核的横切链
+
+以下路径相对后端仓库；`UI/` 表示相邻 `mes-base-ui/`。行号以本次工作树为准。
+
+| 链路 | 本次确认的实现及局限 | 精确证据 |
+| --- | --- | --- |
+| HTTP 授权与工厂 | 每方法显式访问分类，完整 URL 段区分平台/共享/业务；选厂头不授予权限，业务使用当前 Factory 授权 | `EndpointCatalog.java:10,30`、`FoundationAccessInterceptor.java:51–115`、`EndpointScopePolicy.java:10–48`，均在 `mes-framework/.../platform/web/`；抽查正式报工、质量处置、仓储审核及进度 Controller。角色部署矩阵待验证 |
+| 请求与固定事务 | 管理绑定准入后安装不可变请求快照；事务 begin 取得租约，访问与提交核对固定身份，禁止跨 owner；请求结束清理上下文 | `mes-admin/.../managed/ManagedDatasourceService.java:475–479`；`mes-framework/.../persistence/FactoryBusinessDataSource.java:30–53`、`OwnedTransactionManager.java:29–69`、`PersistenceStatementGuard.java:29–32`、`platform/web/RequestBoundaryFilter.java:49–83`。未实测两厂并发与池退休 |
+| 缓存 | 业务 key 必须带 Factory；只读事务命中前后校验租约，写事务不发布查询结果；成功提交后失效。目录用户白名单不含凭证与权限 | `BusinessCacheAspect.java:65–78`、`BusinessCacheProcessor.java:51–60,124–137`；`business/directory/service/BusinessDirectoryService.java:57,203–229,296–305`。Redis 当前行为待验证，不泛化成所有缓存无风险 |
+| 同步执行权 | 协调表 claim/progress/finish 检查令牌；当前工作站 upsert 未接收 Run，只有写前后外层 progress。九类同模式仍存在，接真实 writer 前必须整改 | `framework/sync/SyncCoordinator.java:42–93`；`basic/service/impl/WorkstationServiceImpl.java:191–217`；另搜索 Material/MaterialCategory/SafetyStock/UnitMeasure/Workshop/DvSubject/Operation/Routing 的 claim/upsert，及 `mes-generator/.../base/service-impl.java.vm:139–162`。对比库存、仓库 writer 已传 Run 并检查 beforeCommit。九类外部 QueryPort 当前默认显式失败；未证明部署发生过失权写入 |
+| 前端范围清理 | 请求头、成功体、错误体、blob 后校验 token/Factory/revision；旧 401 不应清除新上下文。工作台按权限/Factory/revision/卸载同步失效请求序列 | `UI/src/lib/request.ts:5–9,31–36,69–71`；`UI/src/composables/useBusinessWorkspace.ts:35–75`、`useWorkOrderProgress.ts:22–55`；`UI/src/stores/auth.ts:158–225`。源码成立，当前浏览器撤权/切厂待验 |
+
+测试源码已检查 `RequestSnapshotTransactionTest`（49、97、148行）、`AsyncRequestBoundaryHttpTest:136`、`DetailEntityCacheTest:62,88,102` 和 `UI/tests/request.test.ts`。它们分别含固定事务、异步清理、缓存及迟到响应场景；**本轮未运行，不能引用历史通过替代当前结果**。
+
+### 13.3 当前确定缺陷与待复现风险（按首厂影响排序）
+
+#### PLAN-01：普通出入库页生产来源与类型契约断裂（确定缺陷，静态可达）
+
+- 触发：从出入库菜单新建默认“其他入库”，选择生产 Execution 后保存。
+- 当前行为：`UI/src/views/wm/stockDocuments/index.vue:58` 的自定义槽只给 OTHER_RECEIPT/OTHER_ISSUE，59行只在 OTHER_RECEIPT 启用生产选择；`UI/src/api/wm/stockDocuments.ts:49` 原样发送类型。后端 `wm/service/StockDocumentService.java:162–170` 明确要求带 Execution 时类型为 PRODUCTION_RECEIPT，否则 BAD_REQUEST。
+- 影响：普通页面无法按提示建立生产入库草稿，也无法选择采购等已有类型草稿。违反“正式页面可达”与入库来源类型区分目标。后端拒绝是正确门禁，不应放宽。
+- 边界：`ProductionClosurePanel.vue:42` 深链可预置 PRODUCTION_RECEIPT/Execution（页面32–34行）；不能据上述问题断言所有生产入库路径都必然失败。其类型回显、禁用选择及保存仍待浏览器验证。
+- 测试与修复：`UI/tests/stockDocuments.test.ts:38` 手工传正确 PRODUCTION_RECEIPT，仅验证 API，漏了页面槽。最小方向为页面使用已有类型目录、按类型启用来源选择并清理不匹配来源；质量类型仍只能由质量处置生成。验收菜单与完工深链两个真实入口，以及草稿零动作、审核一次入账及不支持类型拒绝。
+
+#### PLAN-02：现场报工结果未确认时可丢失原命令（确定恢复缺陷；重复事实待运行复现）
+
+- 触发：服务器可能已提交报工，但客户端响应丢失；随后再次定位、刷新或离页后返回。
+- 当前行为：`UI/src/views/production/productionReporting/index.vue:20,32–40` 仅用 ref 保存 pending，locate 直接 clear；76–77行输入/定位按钮未按 pending/busy 禁用。51行后续提交新建 UUID。同页网络/5xx 重试保留原命令（62–67行），但跨定位/页面没有恢复。
+- 影响：若还有可报额度，使用新 UUID 可再次追加同一物理完成数量；`production/service/ProductionReportSubmitService.java:113–119,155–161` 的原 UUID/payload/actor 重放不能识别新 UUID。不是宣称所有重试必定重复，也不是后端无幂等。
+- 测试与修复：`UI/tests/productionReporting.test.ts:40–44` 只保同页重试，55–62行还期待切执行清空 pending。投产页32–39、75–83行已有按账号/厂 sessionStorage 恢复，不能泛称所有命令均缺恢复。最小方向复用已有恢复惯例，持久化冻结命令并在核实前阻止替代提交；切厂时只清页面数据，旧命令隔离保存。验收提交后丢响应、再定位、刷新、重新登录/切厂/撤权及同 UUID 不同内容冲突，不盲目重试 ERP 创建。
+
+#### QA-02 / QA-11：引用创建与物理删除边界（当前风险保留）
+
+- QA-02：`wm/service/StockDocumentService.java:215–240,404–418` 仅锁主单后普通读库存再插明细；`wm/service/impl/WmInventoryServiceImpl.java:202–219` 锁库存、检查引用、删除。零余额库存可能在读取与引用提交之间被删除，形成草稿孤立引用。仍为待真实双事务复现风险，不声称已破坏过账余额。最小方向共同锁协议和稳定锁序，覆盖新增/换来源对删除，不能只补按钮。
+- QA-11：`basic/service/EquipmentReferenceRules.java` 的工作站删除保护只检查 equipment；`production/service/ProductionReportSubmitService.java:126` 只确认工作站存在，随后写入报工引用。须同时保护已有历史引用和并发创建；精确生产链见下节。本轮未删工作站，未复现竞态。
+- 两项验收均应包含无引用允许、已有事实拒绝、并发只能一方成功、原历史仍可查。不通过增加业务表 factory_id 或绕过既有 Mapper 解决。
+
+#### QA-04：完整响应超时（本轮隔离探针重新确认）
+
+`UI/src/lib/request.ts:28–30` 在 fetch 响应头完成后清除 timer；错误 json 与成功 text/blob 在其后。主 Agent 使用当前源文件、TypeScript 本地转译、内存 fake fetch + ReadableStream，立即响应头、1300ms 后给体，`timeoutMs=1000`：JSON 1323ms 成功、错误体1302ms后 HTTP_ERROR、blob1302ms成功；三者 aborted=false。无网络、无凭证、无临时文件、无业务写入。第一次误用默认 Node16 缺少所需 Web API，探针 TypeError；切已安装 Node22.23.1后上述三例完成，未更改全局 Node。
+
+这是**当前源码的隔离契约证据**，不是浏览器/代理实测。现有 request 测试有体后切厂守卫，没有体延迟截止时间用例。最小修复应覆盖普通响应体和错误归一化，并为 SSE 保留独立长连接生命周期；验收头快体慢、错误体/下载卡住及切厂中断，不丢失命令原身份。
+
+### 13.4 工作台与首厂运维的当前证据
+
+`UI/src/composables/useBusinessWorkspace.ts:9–18` 的草稿/已下达工单、READY/RUNNING Execution、近期报工和不良流水均调用正式 API。`RecentProductionReportController.java:28–31` → `RecentProductionReportQueryService.recent` → `production/dao/RecentProductionReportExtraMapper.xml:4–23` 只取最近10条，再关联工单/产品/单位/工序；质量近期流水 `MesQualityTreatmentMapper.xml:103–106` 亦限10条，不能据它们推全厂不良率或日/月合格产量。
+
+工单进度入口 `WorkOrderProgressController.java:39–44` → `WorkOrderProgressQueryService.java:43–67` → `WorkOrderProgressExtraMapper.xml:4–56` 使用正式完工事实及最新未VOID申报。完成率以正式完工/计划计算；`pendingCompletionQty=max(计划−正式完工−转仓量,0)`（Service112行），**不是生产在制数，也不是报工进度**。未知/不一致处置返回 null 和 issue（96–109行）。工作台可钻到执行数量和工单，但没有由当前代码证明延期风险、人员/工作站日周月有效产出、贯穿全部质量与库存的统一时间线已交付。这些属新增功能缺口，不要求重做已有页面。
+
+已实际阅读 `scripts/mes-business-flyway:5–43`、`docs/development/database-upgrades.md`、`UI/deploy/nginx.conf.template`、`scripts/smoke-packaged.py` 与 `platform/web/RequestBoundaryFilter.java:53–55,89–96` / `HttpFailureLogging.java:24–45`。已有受控版本升级、备份示例、反向代理及 requestId 定位基础。烟测脚本会启动进程，因此本轮未执行；升级/数据维护文档的当日执行记录都是此前工作，未在本轮重验。没有找到完整首厂恢复演练证据（检索 docs/development、reviews、operations、README、scripts 的 backup/restore/恢复演练/RTO/RPO/交付）；这只说明当前交付证据不足，不断言环境没有备份。首厂需覆盖中心库+业务库+私有文件/对象存储、恢复所需密钥的受控保管、应用及迁移版本和恢复后事实/库存核对，本轮不读取任何密钥。
+
+下一阶段与 A—F 的处置、三个工作包见[计划当日复核追加](../development/next-stage-plan.md)。没有自动实施。
+
+
+### 13.5 生产主链复核与能力边界
+
+实际检查前端productionInput/productionReporting、ExecutionActions、WorkorderMaterialPanel、LocalStockPanel及API；后端对应Controller、WorkOrderService、ProductionExecutionRules、ProductionInputSupply/ProductionInput、ExecutionPath、ReportSubmit/Report、资格规则、生产链锁、完工服务/Job、issue提交/事实/撤销、LocalProductionSupply/LocalStock；Workorder/Execution/Report锁和UUID SQL。未逐一穷尽Routing发布、工单作废负例、每项CRUD缓存、全部资格维护页面及数量SQL；没有运行测试/接口/数据库。以下路径从`mes-business/src/main/java/dev/mesbase/business/`起。
+
+| 能力 | 当前判定及正式调用链 |
+| --- | --- |
+| 工单、独立Execution、工艺版本/路径 | 已有。`production/service/WorkOrderService.java:300–332,359–406`草稿/修订/下游保护；`ProductionExecutionRules.java:102–135`拒普通编辑状态、历史路线/目标改写；`ExecutionPathService.java:159–188`校验实际DAG路径，已有领料/锁定/质量历史后不可重选，201–207正式领料确认锁定。模板分支不等于Execution同时走多条路线 |
+| 扫码正式投入 | 已有。UI productionInput:75–79→ProductionInputController:56–89→ProductionInputService:148–170原UUID重放/重算calculationKey→173–215锁工单、绑定正式扫码身份、创建Execution/选路→218–245保留计划额度、建一条领料明细与InputFact→`issue/service/MaterialIssueSubmissionService.java:235–242`→MaterialIssueInputFacts.confirm:56–68→LocalStockService.issue。当前新建写正式批次身份，不能用旧样本缺身份直接判定新链同样缺失 |
+| 用料/BOM | 单材料投入已有，完整BOM/齐套投产未实现。WorkorderMaterialService:43–45,112–126每工单一个材料需求行；ProductionInputSupplyService:93–104正式计算拒多个不同材料，同材料可求和并校验单位/仓库；ProductionInputService:228–245正式扫码只建一条issue item。行政领料允许1–100明细（MaterialIssueSubmissionService:156–163），但无InputFact时confirm直接返回（InputFacts:56–65），不贡献产品投入或扫码库存扣减；不能称多材料生产已实现，也不能把行政单确认当扫码扣库验收 |
+| 完成报工/不强制派工 | 已有。UI productionReporting:48–67→productionReporting API→ProductionReportingController:64–68→ProductionReportSubmitService:109–152。可信登录人取SecurityUtils；`ReportOperatorEligibilityService.java:44–51`能力必需、无派工可报、有派工才限本人；`OperatorQualificationRules.java:100–105`能力行仍必需，不等同持有报工权限 |
+| 首报开工、关闭与历史 | 已有。SubmitService:128调ExecutionPathService.start:225–263，READY/RUNNING、工单已下达、精确工艺、锁路径、正式CONFIRMED领料，CONNECTED还要库存可信生效。首报自动履行正式开工合同，无需新增开始/结束两次操作。ProductionChainLocks:124–154先工单后Execution；Mapper XML各103/104行FOR UPDATE，串行化同工单事实 |
+| 正负报工/重放 | 已有。SubmitService:113–119锁前后查原UUID，155–161核同执行/节点/数/人/站；成功重放允许之后关闭/资格变化但不添事实。管理纠正追加ADJUSTMENT，不原地改旧报工。未知页恢复缺口见PLAN-02；未验证真实竞争 |
+| 手动/自动完工 | 已有，不重排为待开发。ProductionCompletionService:94–113检查数量守恒/质量处理安全/未决领料；118–137手动LOCAL、UUID+basis；142–171自动执行权检查；174–198不可变完工事实。WorkOrderCompletionJob:63–79提交后异步提示并10分钟扫描补漏，94–110独立线程重建上下文。异步部署/调度时延待验，不把事件发布等同已经完工 |
+| 工作站 | 部分实现。SubmitService:126–127与ProductionReportService:94–95只查存在，正式事实可保存workstationId；现场页51行固定null。WorkstationServiceImpl:151–164→BasicDataRules→EquipmentReferenceRules:44–51只检查equipment引用，漏不可变报工引用。已用站可能被删是确定保护缺口，并发报工/删除仍待复现；先共同锁/历史引用保护，再开放现场选择/启用资格 |
+| 退料/领料撤销 | 未开工无事实的原LOCAL库存退料和净额整单撤销已有；开工后余料退回未覆盖。退料保持产品投入额度是现行明确政策，不把材料数直接减产品数。首厂需明确该组合能否满足实物管理，详见仓储专题；未获新业务决定不直接改算法 |
+
+已阅读ProductionReportingHttpTest、ProductionInputMySqlTest、ProductionReportMySqlTest及UI productionReporting.test.ts；存在可信身份/重放、超报、锁共享、回滚及分支样例，均未在本轮执行。真实库测试带数据写入及结果文件，故未运行。部分前端测试明确锁定丢pending的当前行为，应在PLAN-02修复时同步替换，不能只追求旧测试继续通过。
+
+### 13.6 质量/仓储交叉复核与结论修正
+
+主 Agent 重新读ProductionQuantityService:303–334、ProductionReportService.returnToNode:165–208、QualityDispositionService:90–159、QualityReleaseService.stateFor:81–104、StockDocumentService.productionBasis:336–351及ProductionCompletionBalance:14–26，复核子Agent之间的数量/来源/事务结论，未发现需要通过另建生产核心解决的矛盾。
+
+- **QA-03补证：** QualityTreatmentService:135–148单执行1000最新申报/5000全部事件，先限额后VOID过滤；281–305批量是整批共享预算；返回申报工序还受ProductionReportService:170–173的10000节点报工预算。属确定源码限制和首厂容量风险，规模/响应影响待验；质量测试现有断言上限拒绝，并非只补测试就能解除。
+- **QA-05保留：** 数量查询仍经质量动作Service回环；不是启动故障。改为同一有效事实投影与独立分页历史，保留唯一算法和严格写边界。
+- **晚质量部分实现：** 允许新增记录、旧放行失效、旧入库事实保留且后续入库被挡；已完工工单的待核实申报不能走现核实/处置，属于关闭后独立质量业务缺口，不能简单放开关闭门禁。100/10/返回4/重报/再次不良/晚申报/已入库数字详见[质量当日复核](2026-10-18-quality-v2-gap-review.md)。没有恢复历史废弃流程建议。
+- **质量入库已有：** 同LOCAL事务创建正式单据/明细/处置/审核；“尚缺后续生命周期”不等于“报废入库未实现”。十类型、草稿/审核/执行者/正式入口矩阵和来源隔离/ERP证据见[仓储当日复核](2026-10-17-local-stock-documents-v22-report.md)。POSTED统一单据没有正式冲销入口，现reverse是领料净额逆向，不能借用为质量库存核销。
+- **ERP分层：** 主Agent再次检索implements WarehouseErpAdapter，main仅LocalWarehouseErpService，供应商替身在test；WarehouseIntegration唯一匹配不到时失败关闭。E10真实Query/Read和候选写入源码已有，但本轮没有真实环境契约/调用证据。人触发原身份查询核实不等于已有通用人工裁定入口；不把这些缺口变成LOCAL交付依赖。
+
+QA-01/07/08/09、QA-06环境轮换及QA-12 lint此次未全面重验，保留历史时间线，不重判全部待开发或全部当前通过。QA-10当前静态消费者风险存在，默认未接真实查询不能宣称已发生失权提交；应在对应同步接入前验收。未按模块/页面/测试数量计算完成比例。
+
+### 13.7 文档与验证回执
+
+本轮主Agent仅更新本台账、既有质量/仓储专题和next-stage-plan当日章节，保留原日期段落。执行了工作树/HEAD/源码/测试源码/文档搜索及当前request源文件隔离探针；四个本轮文档diff空白与新增本地链接目标检查通过；三个专题原正文前缀完整保留。前端关键文件差异量与开始一致，后端原有无关文档/operations差异保留。没有运行当前业务测试、构建、lint、数据库读取/写入、真实业务/ERP请求、浏览器、进程启停、提交、推送或部署。当前可交付判定是**LOCAL单材料候选范围，待关键修复与真实验收后放行**，不宣称首厂已经可上线。
+
+
+## 十四、2026-10-23 Execution 原有完结门禁专项核对（只审查）
+
+用户要求核对原门禁，本节不实施新增入库检查。后续讨论已明确不良模块只负责申报及入仓，仓内物流归仓储；专门返工能力拟退出当前范围，但代码尚未调整，以下仍如实描述当前实现。用户提出的是保留原检查并增加“是否已审核入库”，并未要求全部产出入库或重做数量算法。
+
+### 14.1 真实入口与共同检查
+
+- 手动：ProductionCompletionController的POST `/api/production/executions/{id}/actions/complete`，需`business:production:execution:complete`权限 → ProductionCompletionService.complete（118行）。
+- 自动：末道正式报工提交后发布ProductionCompletionRequested（ProductionReportSubmitService:150），部分报工调整及质量变化也发布事件；WorkOrderCompletionJob在提交后异步处理，另每10分钟扫描补漏 → ProductionCompletionService.reconcile（142行）。自动路径不冒用HTTP登录权限，以工厂受管配置和数据库run token执行。
+- 两条路径均调用ProductionCompletionService.summary（94—113行），并在实际落完工事实前调用ProductionExecutionRules.checkReadyReferences（138行）。普通Execution编辑禁止更改status/startTime/endTime（ProductionExecutionRules:111），不能通过基础编辑跳过正式完结。
+
+当前业务条件：
+
+| 原门禁 | 当前代码条件 |
+| --- | --- |
+| 执行状态 | 必须RUNNING |
+| 实际路径 | LOCKED且节点非空 |
+| 正式投入 | confirmedInputQty必须大于0，reservedInputQty必须为0 |
+| 质量安全 | 无待核实观察；申报归属不能UNVERIFIED；独立不良pendingDispositionQty必须为0 |
+| 数量合法 | 各节点rawEffectiveOutputQty不得为负，unverifiedDefectQty为0，netDefectQty不得为负 |
+| 数量守恒 | confirmedInputQty = 末道effectiveOutputQty + 各节点netDefectQty之和；不是各工序报工累加，不以计划数量或入库数量替代 |
+| 领料无未决 | 关联领料仅允许CONFIRMED / VOIDED / SUBMIT_REJECTED，其余状态阻断 |
+| 工单与引用 | 来源/当前模式/相关仓库符合既有BusinessSourceRules；工单必须RELEASED，产品存在，工艺当前为PUBLISHED且有发布时间、适用于工单产品 |
+| 不重复完结 | 已有正式完工事实不能再次创建；原请求重放按原指纹返回 |
+
+数量检查证据：`mes-business/.../production/domain/ProductionCompletionBalance.java:13—24`。质量安全证据：`mes-business/.../quality/service/QualityReleaseService.java:81—104`。**safe与basisValid不同：完结只要求safe，不要求已经建立有效的正式质量放行记录，也不要求released等于effective。**
+
+### 14.2 两条入口的额外保护与入库关系
+
+手动入口：UUID、原因、可信操作者指纹；工单→Execution锁；同UUID原样重放；显式LOCAL_ONLY模式；expectedBasisHash必须等于当前质量/数量依据。自动入口：核对工厂及workorder-completion执行权，多次assertOwner；有最新报工且recordedBy非空；生成稳定自动完工UUID，事务内追加事实及更新状态。全厂自动扫描仅处理LOCAL；不是通过页面按钮执行。
+
+**现有门禁没有“是否入库”检查，也没有“全部入库”检查。** ProductionCompletionService.append:181在已决定通过后，才调用StockDocumentExtraMapper.netProductionInbound记录acceptedQty，允许0；它是完结时快照，不是门禁。自动测试源码AutomaticProductionCompletionHttpTest:65的用例明确以“无正式放行/仓储也能自动完结”为当前合同，随后才办理入库。本轮只读该测试，没有运行。
+
+入库独立条件：StockDocumentService.productionBasis:336—351及productionExecution:354—359均允许RUNNING/COMPLETED，所以入库不要求先完结，没有天然循环；但必须满足当前正式质量放行、来源、产品及剩余额度规则。
+
+若后续实施“增加是否入库”，应放入共同业务判定，让手动与自动一致。注意当前approve完成后未见发布ProductionCompletionRequested；增加门禁后，报工触发可能先被拦住，审核入库后需重新触发检查，或由现有10分钟扫描补漏，不能只增加条件就声称会立即自动完结。本节不实现任何一种方案。
+
+当前netProductionInbound统计已审核且与库存动作对应的生产入库/既有OTHER生产来源入库，加既有净仓储接收；不含当前不良/报废质量入库。若“已入库”将质量入库也算在内，需要按正式质量事件→单据→库存动作关联定义，而非直接复用该数值。全不良、部分入库时是否满足用户的存在性门禁留在具体设计中明确，本轮不擅自改为全量闭合。
+
+### 14.3 验证及文档回执
+
+实际执行源码/引用检索并读取手动与自动服务、任务、数量/质量规则、来源/引用校验、库存入库与统计SQL、对应测试及前端入口源码；未运行测试、构建、浏览器、数据库或服务，不宣称实时环境通过。仅追加本台账第十四节，保留既有dirty内容；未修改业务代码、测试、配置、SQL或数据，未启停服务、提交或推送。
+
+
+## 十四、2026-10-23 实施追加：不良入仓与入库驱动收尾
+
+后续用户决定取代§十三及旧计划中的新返工扩展、末道报工自动完结和定时扫描。实施权威见next-stage-plan顶部用户确认及第七节；原审查时间线保留。
+
+- 新Execution FULLY_RECEIVED与旧COMPLETED分离；普通CRUD不得设置或变更新终态，已收尾执行路线/目标及领料、投入撤销继续冻结。Execution列表/详情缓存经原提交后失效机制清除，工单/进度当前查询不引入第二份缓存或第二套生产算法。
+- 库存审核和质量内部审核同LOCAL事务、同父工单→全部Execution→单据/库存锁序，在动作/POSTED/质量事件可见后统一收尾；使用唯一G/D、严格R和逐申报Q证明，条件不足与真实错误区分。工单按非空/全部执行及R+D=P判定，不修改计划、不增加短结。
+- 专用WorkOrderCompletionJob、WorkOrderCompletionExecutorConfiguration、QueuedCompletionExecutor测试替身、ProductionCompletionRequested/WorkOrderCompletionRequested及对应失效测试/候选SQL退役；报工/调整/质量申报/核实不再发布终态提示。公共SyncCoordinator/Quartz未删、未用异步队列补漏。
+- 老complete只核实/重放原精确身份，不新建；新的显式recheck-receipt只依据可信已审UUID复用唯一规则，填补合法入库后普通阻断解除且无后续审核的恢复路径，不重复库存/放行，不让无正式审核的对象关闭。沿用显式授权/Factory固定事务/引用保护。
+- 工作台完成数与百分比改为新FULLY执行的R+D贡献；好品缺口按P-R，待收尾差额按P-(R+D)，不再重复加Q；历史COMPLETED及其completion事实不冒充新完全入库。质量不可解释派生量继续待确认/null。
+- 前端移除新RETURN/旧manual complete命令与按钮，保留历史及原未知请求只读核实；正常入库类型/Execution契约修正，切厂/撤权/迟到响应测试覆盖新收尾/复查；独立的报工未知恢复、完整响应体超时、工作站引用和质量容量问题未捆绑修复。
+
+主Agent复核了子Agent共享Service与SQL、正式放行在正常/质量反序时的门禁、质量事件先于审核、并发原UUID在胜者收尾后仍可重放，以及恢复查询两路证明。首轮隔离用例暴露并修正零数量测试fixture、测试Factory上下文和record SQL列序错误；完整检查发现旧ProductionChain测试仍期待有Execution时可改工单路线，按现有WorkOrderService冻结规则更正，并补CRUD不能设置FULLY_RECEIVED的负例，未放宽生产保护。
+
+详细行为、测试结果、真实/替身边界、Schema与历史影响、重启后复验及限制在计划第七节、仓储/质量专题当日实施追加维护；没有新建平行报告。未提交、推送、部署或启停用户服务。
+
+本次验证收尾：最终完整verify共886项（837执行通过、49条件跳过），0失败/0错误并打包；UI76文件454项及build通过。用户随后指定默认真实测试库mes_base_dev_perf_test，两仓AGENTS已写入；重新核实TEST_DEV_PERF_20261019/DS9 revision2/LOCAL后，当前Mapper真实MySQL只读测试通过。最初误选SIMPLE_B的V48失败仅保留检查历史，无数据写入，不作为指定测试库缺陷。真实业务审核写入及登录后的浏览器闭环未验收。
+
+## 十五、2026-10-23 用户重启后指定perf库正式验收
+
+本轮在mes_base_dev_perf_test/TEST_DEV_PERF_20261019/DS9 revision2/LOCAL/V51完成4张独立工单1916—1919、执行12368—12371的正式入口真实验收：正常60/40（真实页面菜单及深链）、R90先/Q10后、Q10先/R90后、全不良100（无零量正常单），均仅由入库审核触发FULLY_RECEIVED和父COMPLETED；进度贡献100、待收尾差额0。原审核UUID重复、3笔质量入仓原命令重放及同UUID改内容拒绝已实际验证。写前后13张事实表338831条原记录存在且摘要相同，独立测试事实保留。无直接SQL业务写、业务源码变更、迁移或服务启停。
+
+本轮新增权限证据：新测试工序的V2类型配置create被403拒绝，未改权；质量场景通过当前正式事实申报API完成，不冒充V2页面类型化申报已验。真实并发、故障注入等范围没有扩大。请求/对象、数据保护与截图见next-stage-plan第八节及仓储/质量同日真实验收追加，旧实施阶段未真实写入的记录保留为当时时间线。

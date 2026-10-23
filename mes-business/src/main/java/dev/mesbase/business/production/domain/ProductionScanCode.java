@@ -3,31 +3,24 @@ package dev.mesbase.business.production.domain;
 import dev.mesbase.common.utils.StringUtils;
 import dev.mesbase.core.error.ErrorCode;
 import dev.mesbase.core.error.FoundationException;
-import java.nio.ByteBuffer;
-import java.nio.charset.CharacterCodingException;
-import java.nio.charset.CodingErrorAction;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
-import java.util.Base64;
 import java.util.HexFormat;
 
 /**
- * Byte-exact, versioned identities. No trimming, case folding or Unicode normalization.
+ * Work order:product#batch text. No trimming, case folding or Unicode normalization.
  */
-public record ProductionScanCode(String productCode, String materialCode, String lotCode) {
+public record ProductionScanCode(String workorderCode, String productCode, String batchNo) {
     public ProductionScanCode {
+        field(workorderCode, 64);
         field(productCode, 64);
-        field(materialCode, 64);
-        field(lotCode, 128);
+        field(batchNo, 128);
+        if (workorderCode.indexOf(':') >= 0 || productCode.indexOf('#') >= 0) invalid();
     }
 
     public String encode() {
-        return "MES1." + part(productCode) + "." + part(materialCode) + "." + part(lotCode);
-    }
-
-    public String key() {
-        return digest(encode());
+        return workorderCode + ":" + productCode + "#" + batchNo;
     }
 
     public static String digest(String value) {
@@ -41,21 +34,17 @@ public record ProductionScanCode(String productCode, String materialCode, String
 
     public static ProductionScanCode parse(String value) {
         if (value == null || value.length() > 2048) return invalid();
-        String[] p = value.split("\\.", -1);
-        if (p.length != 4 || !p[0].equals("MES1")) return invalid();
-        var result = new ProductionScanCode(decode(p[1]), decode(p[2]), decode(p[3]));
-        if (!result.encode().equals(value)) return invalid();
-        return result;
+        int orderEnd = value.indexOf(':');
+        int productEnd = value.indexOf('#', orderEnd + 1);
+        if (orderEnd <= 0 || productEnd <= orderEnd + 1 || productEnd >= value.length() - 1) return invalid();
+        return new ProductionScanCode(value.substring(0, orderEnd), value.substring(orderEnd + 1, productEnd),
+                value.substring(productEnd + 1));
     }
 
     public record MaterialLot(String materialCode, String lotCode) {
     }
 
     public static MaterialLot material(String value) {
-        if (value != null && value.startsWith("MES1.")) {
-            var p = parse(value);
-            return new MaterialLot(p.materialCode(), p.lotCode());
-        }
         if (value == null || value.length() > 1024) return invalid();
         String[] p = value.split("#", -1);
         if (p.length != 2) return invalid();
@@ -68,19 +57,6 @@ public record ProductionScanCode(String productCode, String materialCode, String
         if (StringUtils.isBlank(value) || value.codePointCount(0, value.length()) > max || value.codePoints()
                 .anyMatch(c -> Character.isISOControl(c))
                 || !StandardCharsets.UTF_8.newEncoder().canEncode(value)) invalid();
-    }
-
-    private static String part(String value) {
-        return Base64.getUrlEncoder().withoutPadding().encodeToString(value.getBytes(StandardCharsets.UTF_8));
-    }
-
-    private static String decode(String value) {
-        try {
-            return StandardCharsets.UTF_8.newDecoder().onMalformedInput(CodingErrorAction.REPORT)
-                    .decode(ByteBuffer.wrap(Base64.getUrlDecoder().decode(value))).toString();
-        } catch (IllegalArgumentException | CharacterCodingException failure) {
-            return invalid();
-        }
     }
 
     private static <T> T invalid() {

@@ -7,7 +7,6 @@ import dev.mesbase.business.integration.warehouse.ErpActionResult;
 import dev.mesbase.business.production.dao.MesProductionExecutionMapper;
 import dev.mesbase.business.production.dao.RoutingNodeMapper;
 import dev.mesbase.business.production.domain.ExecutionPathStatus;
-import dev.mesbase.business.production.domain.ProductionCompletionRequested;
 import dev.mesbase.business.production.domain.ProductionQuantityInput;
 import dev.mesbase.business.production.domain.RoutingNodeEntity;
 import dev.mesbase.business.production.domain.RoutingNodeExample;
@@ -66,7 +65,6 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
-import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Isolation;
@@ -76,7 +74,6 @@ import org.springframework.transaction.annotation.Transactional;
 @ConditionalOnProperty(name = "mes.business.enabled", havingValue = "true")
 @Transactional(transactionManager = "businessTransactionManager", readOnly = true)
 public class ProductionDefectService {
-    private final ApplicationEventPublisher completionPublisher;
     private final ObjectProvider<AuthorizationService> authorization;
     private final ObjectProvider<OperationDefectTypeService> defectTypes;
     private final MesProductionExecutionMapper executions;
@@ -100,10 +97,8 @@ public class ProductionDefectService {
                                    ObjectProvider<AuthorizationService> authorization,
                                    ObjectProvider<OperationDefectTypeService> defectTypes,
                                    MesProductionExecutionMapper executions, MaterialMapper materials,
-                                   ApplicationEventPublisher completionPublisher,
                                    ProductionDefectListExtraMapper listQueries) {
         this.listQueries = listQueries;
-        this.completionPublisher = completionPublisher;
         this.authorization = authorization;
         this.defectTypes = defectTypes;
         this.executions = executions;
@@ -207,7 +202,6 @@ public class ProductionDefectService {
         }
         if (!action.equals(DefectRecordAction.VOID.getValue())) treatments.assessCreatedVersion(row, c.assessment());
         quantities.validateDefectChange(execution, facts.affectedNodeId(), BigDecimal.ZERO);
-        completionPublisher.publishEvent(new ProductionCompletionRequested(FactoryContext.required(), execution));
         return new Result(row, erp.acknowledge(row));
     }
 

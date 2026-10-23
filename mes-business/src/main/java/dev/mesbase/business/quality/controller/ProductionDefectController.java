@@ -1,5 +1,6 @@
 package dev.mesbase.business.quality.controller;
 
+import dev.mesbase.business.quality.domain.QualityTreatmentModels;
 import com.fasterxml.jackson.annotation.JsonUnwrapped;
 import dev.mesbase.business.integration.warehouse.ErpActionResult.Mode;
 import dev.mesbase.business.integration.warehouse.ErpActionResult.Status;
@@ -51,7 +52,7 @@ public class ProductionDefectController {
                           String returnedQuantity, String transferredQuantity, String executionNo,
                           String workorderCode, String productCode, String productName,
                           String workorderStatus, String executionStatus, String source, String batchNo,
-                          String specification) {
+                          String specification, String receiptState) {
     }
 
     public record Page(List<Version> items, long total, int offset, int limit) {
@@ -75,7 +76,8 @@ public class ProductionDefectController {
     private record Labels(String affectedNodeName,
                           String responsibleUserName,
                           String reportedByName, String recordedByName, String processingState, String pendingQuantity,
-                          String returnedQuantity, String transferredQuantity, @JsonUnwrapped ListContext context) {
+                          String returnedQuantity, String transferredQuantity, String receiptState,
+                          @JsonUnwrapped ListContext context) {
     }
 
     private static Version view(MesProductionDefectEntity r, Names names, Processing treatment, ListContext context) {
@@ -88,11 +90,16 @@ public class ProductionDefectController {
                 transferred = treatment.transferredQty().toPlainString();
             }
         }
+        String receipt = null;
+        if (treatment != null) {
+            var status = QualityTreatmentModels.receiptState(treatment.state(), r.getDefectQty(), treatment.transferredQty());
+            if (status != null) receipt = status.getValue();
+        }
         return BeanConversions.convertWith(r, new Labels(
                 label(names.nodes(), r.getAffectedNodeId()),
                 label(names.users(), r.getResponsibleUserId()),
                 label(names.users(), r.getReportedBy()), label(names.users(), r.getRecordedBy()),
-                state, pending, returned, transferred, context), Version.class);
+                state, pending, returned, transferred, receipt, context), Version.class);
     }
 
     private static String label(Map<Long, String> names, Long id) {

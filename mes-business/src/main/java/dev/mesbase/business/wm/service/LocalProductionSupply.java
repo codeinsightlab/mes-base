@@ -157,16 +157,6 @@ public class LocalProductionSupply {
         var of = new WorkorderExample();
         var criteria = of.createCriteria().andSourceEqualTo(BusinessSource.LOCAL.getValue())
                 .andStatusEqualTo(WorkOrderStatus.RELEASED.getValue()).andIdIn(configuredIds);
-        if (code.startsWith("MES1.")) {
-            var pf = new MaterialExample();
-            pf.createCriteria().andCodeEqualTo(ProductionScanCode.parse(code).productCode());
-            var productIds = materials.selectByExample(pf).stream()
-                    .filter(p -> p.getCode().equals(ProductionScanCode.parse(code).productCode())).map(p -> p.getId())
-                    .toList();
-            if (productIds.isEmpty())
-                return new Context(selection.mode().getValue(), List.copyOf(stocks), List.of(), 0, offset, limit);
-            criteria.andProductIdIn(productIds);
-        }
         of.setOrderByClause("id DESC");
         var candidates = new ArrayList<Order>();
         List<WorkorderEntity> orderRows;
@@ -203,8 +193,6 @@ public class LocalProductionSupply {
             var ids = db == null ? Arrays.stream(allowed.split(",")).map(String::trim).map(Long::valueOf)
                     .toList() : warehouseIds(db);
             if (stocks.stream().noneMatch(s -> ids.contains(s.warehouseId()))) continue;
-            if (code.startsWith("MES1.") && !ProductionScanCode.parse(code).productCode().equals(product.getCode()))
-                continue;
             var outputUnit = outputUnits.get(product.getUnitId());
             if (outputUnit == null || !EnableStatus.ENABLED.getValue().equals(outputUnit.getStatus()))
                 ParameterChecks.reject(ErrorCode.BAD_REQUEST);

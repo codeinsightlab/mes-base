@@ -18,16 +18,27 @@ import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 class ProductionInputRulesTest {
     @Test
     void identityRoundTripPreservesBytesAndRejectsAmbiguity() {
-        var identity = new ProductionScanCode("000P#臂", "M.01", "0001#批次/AbC");
+        var identity = new ProductionScanCode("000WO#臂", "P.01", "0001#批次/AbC:02 ");
+        assertEquals("000WO#臂:P.01#0001#批次/AbC:02 ", identity.encode());
         assertEquals(identity, ProductionScanCode.parse(identity.encode()));
-        assertNotEquals(identity.key(), new ProductionScanCode("000P#臂", "M.01", "0001#批次/abc").key());
-        assertNotEquals(new ProductionScanCode("P", "M", "é").key(), new ProductionScanCode("P", "M", "e\u0301").key());
-        for (String code : List.of("M#L#X", "#L", "M#", " MES1.a.b.c", "MES1.wA.YQ.Yg", "MES1.UA==.TQ.TA"))
-            assertThrows(FoundationException.class, () -> {
-                if (code.startsWith("MES1.")) ProductionScanCode.parse(code);
-                else ProductionScanCode.material(code);
-            });
+        assertNotEquals(identity.encode(), new ProductionScanCode("000WO#臂", "P.01", "0001#批次/abc:02 ").encode());
+        assertNotEquals(new ProductionScanCode("P", "M", "é").encode(), new ProductionScanCode("P", "M", "e\u0301").encode());
+        assertEquals(new ProductionScanCode("WO001", "000P01", "000LOT01"),
+                ProductionScanCode.parse("WO001:000P01#000LOT01"));
+        assertEquals(new ProductionScanCode("EXE", "P1", "LOT1"), ProductionScanCode.parse("EXE:P1#LOT1"));
         assertEquals("001", ProductionScanCode.material("M#001").lotCode());
+    }
+
+    @Test
+    void executionCodeRejectsMissingFieldsInvalidTextAndRetiredEncodings() {
+        for (String code : List.of("WO:P", "WO:P#", "WO:#LOT", ":P#LOT", "WO#P:LOT", "WO:P# ",
+                "WO:P#L\n", "WO:P#\uD800", "MES2.V08x.TTE.TDAwMQ", "MES1.UA.TQ.TA", "WO:P#" + "L".repeat(129)))
+            assertThrows(FoundationException.class, () -> ProductionScanCode.parse(code));
+        assertThrows(FoundationException.class, () -> ProductionScanCode.parse(null));
+        assertThrows(FoundationException.class, () -> new ProductionScanCode("WO:1", "P", "LOT"));
+        assertThrows(FoundationException.class, () -> new ProductionScanCode("WO", "P#1", "LOT"));
+        for (String code : List.of("M#L#X", "#L", "M#"))
+            assertThrows(FoundationException.class, () -> ProductionScanCode.material(code));
     }
 
     @Test

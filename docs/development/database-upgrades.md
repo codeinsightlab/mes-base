@@ -81,3 +81,32 @@ unset FLYWAY_PASSWORD
 `V51__move_business_guards_to_services.sql` 仅删除23个既有业务触发器，不改业务数据。工单草稿编辑、下游依赖检查、退回草稿及LOCAL/EXTERNAL维护边界由当前Service负责；旧迁移中保留CREATE TRIGGER是历史升级记录，不应倒改。
 
 目标测试业务库已通过项目入口升级到51并完成严格校验。其他物理库须独立核实目标及应用代码版本，再使用上述入口以51为目标升级；不要仅从脚本存在推断各库都已执行。应用部署/重启与数据库升级分别验收。V51并非此前未执行的工艺合并草案，本次没有合并工艺或改写工单引用。执行与验证边界见审查记录的“LOCAL规则落地与V51去触发器升级”章节。
+
+
+## 2026-10-23：一次性工艺数据维护与Flyway分离
+
+本次工艺归并只修复指定测试库的已有数据，包含固定业务ID及中断后的特定恢复范围，不应注册为所有环境共用的数据库升级。此前把它登记为V52属于归类错误，现已从Flyway扫描目录移出；SQL和原始执行回执转入[独立数据维护归档](../operations/data-maintenance/README.md)。归档只供审计，已完成的合并不能重跑。
+
+目标库只撤销了这次误登记的V52历史，保留原始记录作为独立审计；其余52条成功历史及checksum不变。业务数据没有回滚，685个重复版本的合并、工单及事实节点引用调整和既有验收结果保持不变。当前正式Flyway业务版本为51，`scripts/mes-business-flyway validate 51`通过52份迁移，`info 51`显示51/Success。
+
+今后同类一次性维护SQL放在Flyway扫描目录之外，按明确的目标、存量映射、事务及结果核验执行，保存独立审计，不借版本升级入口执行，不手工新增Flyway版本记录。正式结构演进和各环境需要一致执行的数据变更继续使用Flyway。此例是对本次误登记的明确纠正，不是允许清理其他成功历史或使用repair掩盖校验异常。
+
+完整历史、合并验收和归类纠正见[审查记录](../reviews/2026-10-20-legacy-production-migration-v22-batch-acceptance.md)。没有启停或重启用户服务。
+
+## 2026-10-23 V52 执行批次与扫码行为分离
+
+正式文件`V52__execution_batch_and_scan_activity.sql`新增Execution.batch_no、工单/产品/批次普通索引和独立mes_production_scan_activity行为表；不新增业务库factory_id、UNIQUE或外键，不删除旧绑定数据，不改已发布V29/V31。不同于上方已归档的工艺归并，这次V52是正式公共Schema演进，没有复用旧checksum或伪造迁移历史。
+
+本次在核实的TEST_DEV_PERF_20261019 / datasource9 revision2 / LOCAL → mes_base_dev_perf_test执行`info 52`（仅V52 Pending）、`migrate 52`、`validate 52`，迁移成功、53份严格校验通过；未启动或重启服务。1110条已有正式批次随V52搬运；10764条冻结迁入批次按独立有目标的数据维护事务执行，不放入通用迁移。备份、写后原列保持和SQL摘要见[数据维护归档](../operations/data-maintenance/README.md)。其他环境未授权升级，没有自动遍历其他Factory。
+
+数据库升级不代表运行中旧JVM已加载新代码，需用户加载新包并重启；扫码入口、新查询及质量批次回显的真实服务验收仍须分列。代码回退保留新增字段/行为表和原历史，不降级/删除迁移记录或重跑已执行维护SQL。
+
+## 2026-10-23 V53 物理删除退役扫码绑定表（用户确认）
+
+用户最终选择保留已执行V52，新增`V53__drop_retired_production_scan_identity.sql`。V52原文和checksum不变，不执行repair或手改迁移记录。V53只删除`mes_production_scan_identity`；Execution正式批次和独立扫码行为表继续保留。
+
+其他业务库按正式版本链升级：V52先新增/搬运正式批次，V53再删旧绑定表。执行前重新核实Factory→Datasource→物理库、备份旧表DDL/全部行和必要关联记录，确认每条旧绑定对应的Execution存在且batch_no与material_lot_code原文一致、无外键/触发器/视图等依赖。V52对缺失或歧义批次不会猜值，发现冲突应先受控核实，不得直接删表丢掉唯一依据。旧版应用仍会访问旧表，升级窗口须确保旧节点不再承接业务；可先升52、由用户加载新包后升53，或在用户控制的离线窗口顺序升53后启动新包。Agent不自行启停服务。
+
+核实并准备私有连接环境后，使用`scripts/mes-business-flyway info 53`检查Pending，再`migrate 53`、`validate 53`；不要手动DROP后补历史或修改V52。已执行53的库不重复执行SQL，不以IF EXISTS掩盖手工漂移。
+
+本次仅实际升级mes_base_dev_perf_test：TEST_DEV_PERF_20261019 / DS9 revision2 / LOCAL，原server_uuid一致。重新备份1110条旧绑定、11874条执行、行为表及53条原迁移历史，批次承接冲突和引用均0；正式info仅53 Pending，migrate成功到53，validate严格校验54份迁移通过。写后旧表不存在，11874条执行含正式批次的全部字段与写前逐条一致，53条原迁移历史全部一致，只新增V53成功记录。回执和恢复边界见[数据维护归档](../operations/data-maintenance/README.md)。未执行其他库或修改中心Factory绑定。

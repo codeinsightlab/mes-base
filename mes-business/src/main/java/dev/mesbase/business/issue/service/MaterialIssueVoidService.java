@@ -100,8 +100,8 @@ public class MaterialIssueVoidService {
                     throw new FoundationException(ErrorCode.ISSUE_VOID_CONFLICT);
                 if (row.getExecutionId() != null) {
                     var e = executions.lock(row.getExecutionId());
-                    if (inputFacts.find(id) == null && (e.getStartTime() != null || Set.of(ProductionExecutionStatus.RUNNING.getValue(), ProductionExecutionStatus.COMPLETED.getValue())
-                            .contains(e.getStatus())) || Set.of(ProductionExecutionStatus.COMPLETED.getValue(), ProductionExecutionStatus.CANCELLED.getValue())
+                    if (inputFacts.find(id) == null && (e.getStartTime() != null || Set.of(ProductionExecutionStatus.RUNNING.getValue(), ProductionExecutionStatus.COMPLETED.getValue(), ProductionExecutionStatus.FULLY_RECEIVED.getValue())
+                            .contains(e.getStatus())) || Set.of(ProductionExecutionStatus.COMPLETED.getValue(), ProductionExecutionStatus.FULLY_RECEIVED.getValue(), ProductionExecutionStatus.CANCELLED.getValue())
                             .contains(e.getStatus()))
                         throw new FoundationException(ErrorCode.EXECUTION_REFERENCED);
                 }

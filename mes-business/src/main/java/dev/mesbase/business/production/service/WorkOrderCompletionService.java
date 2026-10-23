@@ -7,27 +7,28 @@ import dev.mesbase.business.issue.domain.MesMaterialIssueExample;
 import dev.mesbase.business.production.dao.MesProductionExecutionMapper;
 import dev.mesbase.business.production.dao.WorkOrderExtraMapper;
 import dev.mesbase.business.production.dao.WorkorderMapper;
+import dev.mesbase.business.production.domain.MesProductionExecutionEntity;
+import dev.mesbase.business.production.domain.ExecutionPathStatus;
 import dev.mesbase.business.production.domain.MesProductionExecutionExample;
 import dev.mesbase.business.production.domain.ProductionCompletionBalance;
 import dev.mesbase.business.production.domain.ProductionExecutionStatus;
 import dev.mesbase.business.production.domain.WorkOrderStatus;
 import dev.mesbase.business.production.domain.WorkorderEntity;
-import dev.mesbase.business.quality.service.QualityReleaseService;
+import dev.mesbase.business.quality.service.QualityTreatmentService;
 import dev.mesbase.business.shared.enums.BusinessSource;
+import dev.mesbase.business.wm.dao.StockDocumentExtraMapper;
 import dev.mesbase.core.error.ErrorCode;
 import dev.mesbase.core.error.FoundationException;
-import dev.mesbase.framework.sync.SyncCoordinator;
-import dev.mesbase.platform.execution.FactoryContext;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Isolation;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Shared reconciliation for committed execution-completion hints and periodic recovery.
+ * Parent closure is evaluated only inside the successful inbound approval transaction.
  */
 @Service
 @ConditionalOnProperty(name = "mes.business.enabled", havingValue = "true")
@@ -37,86 +38,97 @@ public class WorkOrderCompletionService {
     private final MesProductionExecutionMapper executions;
     private final MesMaterialIssueMapper issues;
     private final ProductionQuantityService quantities;
-    private final QualityReleaseService releases;
+    private final QualityTreatmentService quality;
     private final BusinessSourceRules sources;
-    private final SyncCoordinator coordinator;
+    private final StockDocumentExtraMapper inbound;
 
     public WorkOrderCompletionService(WorkorderMapper orders, WorkOrderExtraMapper queries,
                                       MesProductionExecutionMapper executions, MesMaterialIssueMapper issues,
-                                      ProductionQuantityService quantities, QualityReleaseService releases,
-                                      BusinessSourceRules sources, SyncCoordinator coordinator) {
+                                      ProductionQuantityService quantities, QualityTreatmentService quality,
+                                      BusinessSourceRules sources, StockDocumentExtraMapper inbound) {
         this.orders = orders;
         this.queries = queries;
         this.executions = executions;
         this.issues = issues;
         this.quantities = quantities;
-        this.releases = releases;
+        this.quality = quality;
         this.sources = sources;
-        this.coordinator = coordinator;
+        this.inbound = inbound;
     }
 
     @Transactional(transactionManager = "businessTransactionManager", readOnly = true)
-    public List<Long> executionCandidates(Long after) {
-        return queries.executionCompletionCandidates(after, 100);
-    }
-
-    @Transactional(transactionManager = "businessTransactionManager", readOnly = true)
-    public List<Long> candidates(Long after) {
-        return queries.completionCandidates(after, 100);
-    }
-
-    @Transactional(transactionManager = "businessTransactionManager", isolation = Isolation.READ_COMMITTED, rollbackFor = Exception.class)
-    public boolean reconcile(Long id, SyncCoordinator.Run run) {
-        if (!FactoryContext.required().equals(run.scope()) || !"workorder-completion".equals(run.syncKey()))
-            throw new FoundationException(ErrorCode.SYNC_EXECUTION_LOST);
-        coordinator.assertOwner(run);
-        // Same parent-first lock as all production commands: no execution/input/quality changes race this decision.
-        var order = orders.selectByPrimaryKeyForUpdate(id);
-        if (order == null || !WorkOrderStatus.RELEASED.getValue().equals(order.getStatus())
-                || !BusinessSource.LOCAL.getValue().equals(order.getSource())) return false;
-        sources.current(order.getSource());
+    public String blockedReason(Long id) {
+        var order = orders.selectByPrimaryKey(id);
+        if (order == null) throw new FoundationException(ErrorCode.NOT_FOUND);
+        if (WorkOrderStatus.COMPLETED.getValue().equals(order.getStatus())) return null;
+        if (!WorkOrderStatus.RELEASED.getValue().equals(order.getStatus())
+                || !BusinessSource.LOCAL.getValue().equals(order.getSource())) return "工单状态或来源不允许自动完结";
         var state = queries.completionState(id);
-        if (state == null || !state.allCompleted()) return false;
+        if (state == null || state.activeCount() == 0) return "工单没有正式有效生产执行";
+        if (!state.allCompleted()) return "工单仍有未完全入库的执行或缺少正式收尾事实";
         var allocation = queries.activeAllocation(id, null);
-        if (allocation == null || allocation.allocatedTargetQty().compareTo(allocation.plannedQty()) != 0) return false;
+        if (allocation == null) return "工单执行分配依据缺失";
+        int allocated = allocation.allocatedTargetQty().compareTo(allocation.plannedQty());
+        if (allocated < 0) return "工单执行分配数量不足计划，不能完结";
+        if (allocated > 0) return "工单执行分配数量超过计划，须核实数量异常";
         var pending = new MesMaterialIssueExample();
         pending.createCriteria().andWorkorderIdEqualTo(id).andStatusNotIn(List.of(
                 MaterialIssueStatus.CONFIRMED.getValue(), MaterialIssueStatus.VOIDED.getValue(),
                 MaterialIssueStatus.SUBMIT_REJECTED.getValue()));
-        if (issues.countByExample(pending) > 0 || queries.countUnaccountedInputs(id) > 0) return false;
-        // Bounded pages; reuse the authoritative quantity and quality gates for each formal execution.
-        BigDecimal totalInput = BigDecimal.ZERO;
+        if (issues.countByExample(pending) > 0) return "工单仍有未决领料";
+        if (queries.countUnaccountedInputs(id) > 0) return "工单仍有未归属有效执行的正式投入";
+        BigDecimal total = BigDecimal.ZERO;
         long after = 0;
         while (true) {
             var filter = new MesProductionExecutionExample();
             filter.createCriteria().andWorkorderIdEqualTo(id).andIdGreaterThan(after)
                     .andStatusNotEqualTo(ProductionExecutionStatus.CANCELLED.getValue());
             filter.setOrderByClause("id ASC");
+            List<MesProductionExecutionEntity> rows;
             try (var page = PageHelper.offsetPage(0, 100, false)) {
-                var rows = executions.selectByExample(filter);
-                if (rows.isEmpty()) break;
-                for (var execution : rows) {
-                    coordinator.assertOwner(run);
-                    var projection = quantities.getExecutionQuantities(execution.getId());
-                    if (ProductionCompletionBalance.blockedReason(projection) != null)
-                        return false;
-                    totalInput = totalInput.add(projection.confirmedInputQty());
-                    var release = releases.stateFor(projection);
-                    if (!release.safe()) return false;
-                    after = execution.getId();
-                }
+                rows = List.copyOf(executions.selectByExample(filter));
+            }
+            if (rows.isEmpty()) break;
+            for (var execution : rows) {
+                if (!ProductionExecutionStatus.FULLY_RECEIVED.getValue().equals(execution.getStatus()))
+                    return "工单仍有未完全入库的执行";
+                var projection = quantities.getExecutionQuantities(execution.getId());
+                if (!ExecutionPathStatus.LOCKED.getValue().equals(projection.pathStatus()))
+                    return "执行实际路径尚未锁定";
+                if (projection.nodes().stream().anyMatch(node -> node.historicalConflict()))
+                    return "执行存在历史数量超额，须核实数量异常";
+                var reason = ProductionCompletionBalance.blockedReason(projection);
+                if (reason != null) return reason;
+                if (inbound.invalidProductionInboundLines(execution.getId()) > 0)
+                    return "正式生产入库明细与库存动作不一致";
+                var received = inbound.formalProductionInbound(execution.getId());
+                if (received.compareTo(projection.nodes().getLast().effectiveOutputQty()) != 0)
+                    return "执行正常品入库与有效产出不一致";
+                reason = quality.receiptBlockReason(execution.getId());
+                if (reason != null) return reason;
+                total = total.add(received).add(ProductionCompletionService.defectQty(projection));
+                after = execution.getId();
             }
         }
-        if (totalInput.compareTo(allocation.plannedQty()) != 0) return false;
-        coordinator.assertOwner(run);
+        int compared = total.compareTo(order.getPlannedQty());
+        if (compared < 0) return "正常入库与有效不良合计不足工单计划，不能完结";
+        if (compared > 0) return "正常入库与有效不良合计超过工单计划，须核实数量异常";
+        return null;
+    }
+
+    @Transactional(transactionManager = "businessTransactionManager", propagation = Propagation.MANDATORY, rollbackFor = Exception.class)
+    public void afterInboundApproved(Long id) {
+        // The caller already owns parent and every sibling lock; no document -> sibling lock inversion.
+        var order = orders.selectByPrimaryKey(id);
+        if (order == null) throw new FoundationException(ErrorCode.NOT_FOUND);
+        if (!WorkOrderStatus.RELEASED.getValue().equals(order.getStatus())) return;
+        if (blockedReason(id) != null) return;
+        sources.current(order.getSource());
         var patch = new WorkorderEntity();
         patch.setId(id);
         patch.setStatus(WorkOrderStatus.COMPLETED.getValue());
         patch.setRevision(order.getRevision() + 1);
         patch.setUpdateTime(LocalDateTime.now());
-        if (orders.updateByPrimaryKeySelective(patch) != 1)
-            throw new FoundationException(ErrorCode.RESOURCE_CONFLICT);
-        coordinator.assertOwner(run);
-        return true;
+        if (orders.updateByPrimaryKeySelective(patch) != 1) throw new FoundationException(ErrorCode.RESOURCE_CONFLICT);
     }
 }

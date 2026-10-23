@@ -24,13 +24,14 @@
         ORDER BY w.id DESC
     </select>
     <select id="completions" resultType="dev.mesbase.business.production.domain.WorkOrderProgress$Completion">
-        SELECT e.workorder_id AS workorderId, SUM(c.effective_qty) AS quantity,
+        <bind name="fullyReceived" value="@dev.mesbase.business.production.domain.ProductionExecutionStatus@FULLY_RECEIVED.getValue()"/>
+        SELECT e.workorder_id AS workorderId, SUM(c.accepted_qty) AS quantity,
         COUNT(c.id) AS factCount, COUNT(DISTINCT c.execution_id) AS executionCount,
-        SUM(CASE WHEN c.effective_qty IS NULL OR c.effective_qty &lt; 0 THEN 1 ELSE 0 END) AS invalidCount,
+        SUM(CASE WHEN c.accepted_qty IS NULL OR c.accepted_qty &lt; 0 OR c.accepted_qty != c.effective_qty THEN 1 ELSE 0 END) AS invalidCount,
         MAX(c.recorded_at) AS lastCompletedAt
         FROM mes_production_execution e
         JOIN mes_execution_completion c ON c.execution_id = e.id
-        WHERE e.workorder_id IN
+        WHERE e.status = #{fullyReceived} AND e.workorder_id IN
         <foreach collection="ids" item="id" open="(" separator="," close=")">#{id}</foreach>
         GROUP BY e.workorder_id
     </select>
@@ -43,7 +44,7 @@
         MAX(CASE WHEN t.action_type=#{assessAction} THEN t.attribution_type END) AS attribution,
         COALESCE(SUM(CASE WHEN t.action_type = #{return_nodeAction} THEN t.returned_qty ELSE 0 END), 0) AS returnedQty,
         COALESCE(SUM(CASE WHEN t.action_type = #{transfer_warehouseAction} THEN t.transfer_qty ELSE 0 END), 0) AS transferredQty,
-        SUM(CASE WHEN t.action_type IS NOT NULL AND t.action_type NOT IN (#{assessAction},#{return_nodeAction},#{transfer_warehouseAction}) THEN 1 ELSE 0 END) AS invalidActions
+        SUM(CASE WHEN t.action_type IS NOT NULL AND t.action_type NOT IN (#{assessAction},#{return_nodeAction},#{transfer_warehouseAction}) THEN 1 ELSE 0 END) AS invalidActions, e.status AS executionStatus
         FROM mes_production_execution e
         JOIN mes_production_defect d ON d.execution_id = e.id
         LEFT JOIN mes_quality_treatment t ON t.declaration_id = d.declaration_id
@@ -53,6 +54,6 @@
         AND d.record_action != #{voidAction}
         AND NOT EXISTS (SELECT 1 FROM mes_production_defect newer
         WHERE newer.declaration_id = d.declaration_id AND newer.revision_no &gt; d.revision_no)
-        GROUP BY e.workorder_id, d.declaration_id, d.revision_no, d.defect_qty
+        GROUP BY e.workorder_id, e.status, d.declaration_id, d.revision_no, d.defect_qty
     </select>
 </mapper>

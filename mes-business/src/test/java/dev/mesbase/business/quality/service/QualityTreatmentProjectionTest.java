@@ -6,11 +6,13 @@ import dev.mesbase.business.production.service.ExecutionPathService;
 import dev.mesbase.business.production.service.ProductionChainLocks;
 import dev.mesbase.business.production.service.ProductionQuantityService;
 import dev.mesbase.business.quality.dao.MesProductionDefectMapper;
+import dev.mesbase.business.quality.dao.ProductionDefectListExtraMapper;
 import dev.mesbase.business.quality.dao.MesQualityTreatmentMapper;
 import dev.mesbase.business.quality.domain.DefectRecordAction;
 import dev.mesbase.business.quality.domain.MesProductionDefectEntity;
 import dev.mesbase.business.quality.domain.MesQualityTreatmentEntity;
 import dev.mesbase.business.quality.domain.QualityTreatmentModels.Action;
+import dev.mesbase.business.quality.domain.QualityTreatmentModels.ReceiptProof;
 import dev.mesbase.business.quality.domain.QualityTreatmentModels.Attribution;
 import dev.mesbase.core.error.FoundationException;
 import java.math.BigDecimal;
@@ -25,6 +27,8 @@ import org.junit.jupiter.params.provider.ValueSource;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
@@ -36,10 +40,75 @@ import static org.mockito.Mockito.when;
 class QualityTreatmentProjectionTest {
     private final MesProductionDefectMapper defects = mock(MesProductionDefectMapper.class);
     private final MesQualityTreatmentMapper events = mock(MesQualityTreatmentMapper.class);
+    private final ProductionDefectListExtraMapper receiptProofs = mock(ProductionDefectListExtraMapper.class);
     private final QualityTreatmentService service = new QualityTreatmentService(defects, events,
             mock(ProductionChainLocks.class), mock(ExecutionPathService.class),
-            mock(ProductionQuantityService.class), mock(BusinessDirectoryService.class), event -> {
-    });
+            mock(ProductionQuantityService.class), mock(BusinessDirectoryService.class),
+            receiptProofs);
+
+    @Test
+    void partialQualityReceiptAloneIsFormalInboundProgressAndQueryFailureEscapes() {
+        when(receiptProofs.selectReceiptProofs(1L)).thenReturn(List.of());
+        assertFalse(service.hasFormalReceipt(1L));
+        when(receiptProofs.selectReceiptProofs(1L)).thenReturn(List.of(new ReceiptProof("draft-or-bad", 0)));
+        assertFalse(service.hasFormalReceipt(1L));
+        when(receiptProofs.selectReceiptProofs(1L)).thenReturn(List.of(new ReceiptProof("posted-quality", 1)));
+        assertTrue(service.hasFormalReceipt(1L));
+        when(receiptProofs.selectReceiptProofs(1L)).thenThrow(new IllegalStateException("TEST ONLY database unavailable"));
+        assertThrows(IllegalStateException.class, () -> service.hasFormalReceipt(1L));
+    }
+
+    @Test
+    void qualityReceiptNeedsEachCurrentDeclarationToBeReceivedWithItsOwnPostedProof() {
+        var d = declaration("received", 1, "10", 11);
+        var assessment = event("assess", "received", 1, Action.ASSESS, Attribution.INDEPENDENT, "0");
+        var transfer = event("transfer", "received", 1, Action.TRANSFER_WAREHOUSE, null, "10");
+        assessment.setRoutingNodeId(11L);
+        transfer.setRoutingNodeId(11L);
+        when(defects.selectLatest(1L, null, null)).thenReturn(List.of(d));
+        when(events.selectByExample(any())).thenReturn(List.of(assessment, transfer));
+        when(receiptProofs.selectReceiptProofs(1L)).thenReturn(List.of(new ReceiptProof("transfer", 1)));
+        assertNull(service.receiptBlockReason(1L));
+        when(receiptProofs.selectReceiptProofs(1L)).thenReturn(List.of(new ReceiptProof("unrelated", 1)));
+        assertEquals("不良入仓缺少唯一有效的正式单据、明细或库存动作", service.receiptBlockReason(1L));
+        when(receiptProofs.selectReceiptProofs(1L)).thenReturn(List.of(new ReceiptProof("transfer", 0)));
+        assertEquals("不良入仓缺少唯一有效的正式单据、明细或库存动作", service.receiptBlockReason(1L));
+        when(receiptProofs.selectReceiptProofs(1L)).thenReturn(List.of(new ReceiptProof("transfer", 1)));
+        transfer.setTransferQty(new BigDecimal("6"));
+        assertEquals("有效不良尚未全部正式入仓", service.receiptBlockReason(1L));
+    }
+
+    @Test
+    void historicalReturnReducesPendingButDoesNotBecomeAReceiptAndInfrastructureFailureEscapes() {
+        var d = declaration("historical", 1, "10", 11);
+        var assessment = event("assess", "historical", 1, Action.ASSESS, Attribution.INDEPENDENT, "0");
+        var returned = event("return", "historical", 1, Action.RETURN_NODE, null, "10");
+        assessment.setRoutingNodeId(11L);
+        returned.setRoutingNodeId(11L);
+        when(defects.selectLatest(1L, null, null)).thenReturn(List.of(d));
+        when(defects.selectByExample(any())).thenReturn(List.of(d));
+        when(events.selectByExample(any())).thenReturn(List.of(assessment, returned));
+        when(receiptProofs.selectReceiptProofs(1L)).thenReturn(List.of());
+        assertNull(service.receiptBlockReason(1L));
+        assertEquals("PENDING", service.details("historical").summary().receiptState().name());
+        assertEquals(BigDecimal.ZERO, service.nodeTotals(1L).getFirst().directDefectQty()
+                .subtract(service.nodeTotals(1L).getFirst().returnedQty()));
+        when(receiptProofs.selectReceiptProofs(1L)).thenThrow(new IllegalStateException("TEST ONLY unavailable database"));
+        assertThrows(IllegalStateException.class, () -> service.receiptBlockReason(1L));
+    }
+
+    @Test
+    void unverifiedOrUnknownHistoricalQualityBlocksInboundClosure() {
+        var d = declaration("unverified", 1, "10", 11);
+        when(defects.selectLatest(1L, null, null)).thenReturn(List.of(d));
+        when(events.selectByExample(any())).thenReturn(List.of());
+        when(receiptProofs.selectReceiptProofs(1L)).thenReturn(List.of());
+        assertEquals("存在待核实不良申报", service.receiptBlockReason(1L));
+        var invalid = event("bad", "unverified", 1, Action.ASSESS, Attribution.INDEPENDENT, "0");
+        invalid.setActionType("RETIRED_ACTION");
+        when(events.selectByExample(any())).thenReturn(List.of(invalid));
+        assertEquals("不良申报或历史处置数量待核实", service.receiptBlockReason(1L));
+    }
 
     @AfterEach
     void paginationDoesNotEscapeTheProjection() {

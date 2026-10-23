@@ -23,6 +23,8 @@ import org.springframework.transaction.annotation.Propagation;
 import dev.mesbase.business.wm.dao.StockDocumentExtraMapper;
 import dev.mesbase.business.production.service.BusinessSourceRules;
 import dev.mesbase.business.production.service.ProductionChainLocks;
+import dev.mesbase.business.production.service.ProductionCompletionService;
+import org.springframework.beans.factory.ObjectProvider;
 import dev.mesbase.business.production.domain.ProductionScanCode;
 import dev.mesbase.business.shared.enums.BusinessSource;
 import dev.mesbase.business.shared.enums.EnableStatus;
@@ -81,13 +83,16 @@ public class StockDocumentService {
     private final QualityReleaseService releases;
     private final WorkorderMapper orders;
     private final MesQualityTreatmentMapper qualityEvents;
+    private final ObjectProvider<ProductionCompletionService> completion;
 
     public StockDocumentService(WmStockDocumentMapper documents, WmStockDocumentLineMapper lines,
                                 WmInventoryMapper inventories, MaterialMapper materials, UnitMeasureMapper units,
                                 LocalStockService stock, BusinessSourceRules sources, ProductionChainLocks locks,
                                 MesProductionExecutionMapper executions, MesProductionReceiptMapper receipts,
                                 Validator validator, StockDocumentExtraMapper inbound, QualityReleaseService releases,
-                                WorkorderMapper orders, MesQualityTreatmentMapper qualityEvents) {
+                                WorkorderMapper orders, MesQualityTreatmentMapper qualityEvents,
+                                ObjectProvider<ProductionCompletionService> completion) {
+        this.completion = completion;
         this.qualityEvents = qualityEvents;
         this.orders = orders;
         this.inbound = inbound;
@@ -260,7 +265,14 @@ public class StockDocumentService {
         // Original frozen replay is a read: a later factory mode cannot rewrite already committed LOCAL facts.
         if (replay(before, command, hash)) return detail(id);
         if (before.getSourceWorkorderId() != null) cancelled(before.getSourceWorkorderId());
-        if (before.getSourceExecutionId() != null) productionExecution(before.getSourceExecutionId());
+        Long executionId = before.getSourceExecutionId();
+        if (type(before.getDocumentType()).isQualityReceipt()) {
+            var event = qualityEvents.selectByPrimaryKey(command.requestId());
+            if (event == null || !Objects.equals(id, event.getStockDocumentId()))
+                ParameterChecks.reject(ErrorCode.STOCK_DOCUMENT_SOURCE_PENDING);
+            executionId = event.getExecutionId();
+        }
+        if (executionId != null) completion.getObject().lockInboundChain(executionId);
         var row = lock(id);
         if (replay(row, command, hash)) return detail(id);
         draft(row, command.expectedRevision());
@@ -316,7 +328,7 @@ public class StockDocumentService {
                         : UUID.nameUUIDFromBytes((command.requestId() + ":" + line.getId()).getBytes(StandardCharsets.UTF_8))
                         .toString();
                 var action = stock.postDocument(row.getDocumentType(), id, line, command.requestId(), actionId,
-                        hash, row.getReason(), row.getSourceExecutionId());
+                        hash, row.getReason(), executionId);
                 line.setStockActionId(action.getId());
                 if (lines.updateByPrimaryKey(line) != 1) ParameterChecks.reject(ErrorCode.STOCK_DOCUMENT_CONFLICT);
             }
@@ -329,6 +341,7 @@ public class StockDocumentService {
         row.setPostedBy(SecurityUtils.getUserId());
         row.setPostedAt(LocalDateTime.now());
         save(row);
+        if (executionId != null) completion.getObject().afterInboundApproved(executionId, command.requestId());
         return detail(id);
     }
 

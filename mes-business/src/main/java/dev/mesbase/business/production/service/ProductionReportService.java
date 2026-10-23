@@ -7,7 +7,6 @@ import dev.mesbase.business.production.dao.MesProductionReportMapper;
 import dev.mesbase.business.production.dao.ProductionQuantityMapper;
 import dev.mesbase.business.production.domain.MesProductionReportEntity;
 import dev.mesbase.business.production.domain.MesProductionReportExample;
-import dev.mesbase.business.production.domain.ProductionCompletionRequested;
 import dev.mesbase.business.production.domain.ProductionQuantityInput;
 import dev.mesbase.business.production.domain.ProductionReportModels.Adjustment;
 import dev.mesbase.business.production.domain.ProductionReportModels.Detail;
@@ -20,24 +19,19 @@ import dev.mesbase.common.utils.StringUtils;
 import dev.mesbase.common.validation.ParameterChecks;
 import dev.mesbase.core.error.ErrorCode;
 import dev.mesbase.core.error.FoundationException;
-import dev.mesbase.platform.execution.FactoryContext;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.UUID;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
-import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Isolation;
@@ -47,7 +41,6 @@ import org.springframework.transaction.annotation.Transactional;
 @ConditionalOnProperty(name = "mes.business.enabled", havingValue = "true")
 public class ProductionReportService {
     private final BusinessSourceRules sources;
-    private final ApplicationEventPublisher publisher;
 
     private enum AdminAction {SUPPLEMENT, ADJUST, VOID}
 
@@ -63,8 +56,7 @@ public class ProductionReportService {
                                    ProductionQuantityService quantities,
                                    ProductionChainLocks locks, ReportUserReferenceService users,
                                    WorkstationMapper workstations, BusinessDirectoryService references,
-                                   BusinessSourceRules sources, ApplicationEventPublisher publisher) {
-        this.publisher = publisher;
+                                   BusinessSourceRules sources) {
         this.sources = sources;
         this.reports = reports;
         this.totals = totals;
@@ -154,61 +146,6 @@ public class ProductionReportService {
         return append(row, requestId, hash);
     }
 
-    /**
-     * Returns the reported quantity to this node's normal reporting allowance without deleting facts.
-     */
-    @Transactional(transactionManager = "businessTransactionManager", isolation = Isolation.READ_COMMITTED, rollbackFor = Exception.class)
-    public void returnToNode(Long executionId, Long nodeId, BigDecimal quantity, String qualityEventId, String reason) {
-        locks.requireActiveExecution(executionId);
-        sources.execution(locks.execution(executionId), null);
-        positive(quantity);
-        ProductionQuantityInput.check(quantity);
-        var filter = new MesProductionReportExample();
-        filter.createCriteria().andExecutionIdEqualTo(executionId).andRoutingNodeIdEqualTo(nodeId);
-        filter.setOrderByClause("id desc");
-        List<MesProductionReportEntity> rows;
-        try (var page = PageHelper.offsetPage(0, 10001, false)) {
-            rows = List.copyOf(reports.selectByExample(filter));
-        }
-        if (rows.size() > 10000) throw new FoundationException(ErrorCode.REPORT_QUANTITY_CONFLICT);
-        var corrections = new HashMap<Long, BigDecimal>();
-        for (var row : rows)
-            if (row.getReferenceReportId() != null)
-                corrections.merge(row.getReferenceReportId(), row.getQuantityDelta(), BigDecimal::add);
-        var remaining = quantity;
-        var additions = new ArrayList<MesProductionReportEntity>();
-        for (var original : rows) {
-            if (!ReportRecordType.REPORT.getValue().equals(original.getRecordType())) continue;
-            var balance = original.getQuantityDelta().add(corrections.getOrDefault(original.getId(), BigDecimal.ZERO));
-            if (balance.signum() <= 0) continue;
-            var amount = remaining.min(balance);
-            var row = new MesProductionReportEntity();
-            row.setExecutionId(executionId);
-            row.setRoutingNodeId(nodeId);
-            row.setRecordType(ReportRecordType.ADJUSTMENT.getValue());
-            row.setQuantityDelta(amount.negate());
-            row.setReferenceReportId(original.getId());
-            row.setSourceQualityEventId(qualityEventId);
-            row.setOperatorUserId(original.getOperatorUserId());
-            row.setRecordedBy(SecurityUtils.getUserId());
-            row.setReportTime(original.getReportTime());
-            row.setWorkstationId(original.getWorkstationId());
-            row.setReason(reason);
-            row.setCreateTime(LocalDateTime.now());
-            row.setRequestId(UUID.nameUUIDFromBytes((qualityEventId + ":" + original.getId()).getBytes(StandardCharsets.UTF_8))
-                    .toString());
-            row.setCommandFingerprint(fingerprint(AdminAction.ADJUST, qualityEventId, original.getId(), amount, reason));
-            additions.add(row);
-            remaining = remaining.subtract(amount);
-            if (remaining.signum() == 0) break;
-        }
-        if (remaining.signum() != 0) throw new FoundationException(ErrorCode.REPORT_QUANTITY_CONFLICT);
-        quantities.validateQualityReturn(executionId, nodeId, quantity);
-        if (reports.insertBatch(additions) != additions.size())
-            throw new FoundationException(ErrorCode.REPORT_QUANTITY_CONFLICT);
-        publisher.publishEvent(new ProductionCompletionRequested(FactoryContext.required(), executionId));
-    }
-
     private MesProductionReportEntity lockedOriginal(Long id) {
         var before = require(id);
         locks.execution(before.getExecutionId());
@@ -228,7 +165,6 @@ public class ProductionReportService {
         } catch (DuplicateKeyException collision) {
             throw new FoundationException(ErrorCode.REPORT_REQUEST_CONFLICT, collision);
         }
-        publisher.publishEvent(new ProductionCompletionRequested(FactoryContext.required(), row.getExecutionId()));
         return reports.selectByPrimaryKey(row.getId());
     }
 

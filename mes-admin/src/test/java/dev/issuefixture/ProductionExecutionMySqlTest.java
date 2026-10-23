@@ -44,7 +44,6 @@ import dev.mesbase.business.production.domain.MesProductionExecutionExample;
 import dev.mesbase.business.production.domain.MesProductionExecutionUpdateCommand;
 import dev.mesbase.business.production.service.ProductionExecutionRules;
 import dev.mesbase.business.production.service.ProductionIdentityService;
-import dev.mesbase.business.production.dao.MesProductionScanIdentityMapper;
 import dev.mesbase.business.production.service.impl.MesProductionExecutionServiceImpl;
 import dev.mesbase.common.core.domain.entity.SysUser;
 import dev.mesbase.common.core.domain.model.LoginUser;
@@ -120,7 +119,7 @@ class ProductionExecutionMySqlTest {
             assertEquals("EXE-" + first.getId(), first.getExecutionNo());
             var updated = service.updateById(first.getId(), new MesProductionExecutionUpdateCommand(workorder, routing, new BigDecimal("1.123456"), "READY", null, null, tag));
             assertEquals(first.getExecutionNo(), updated.getExecutionNo());
-            var identity = new ProductionIdentityService(executions, s.getMapper(WorkorderMapper.class), s.getMapper(MaterialMapper.class), s.getMapper(RoutingMapper.class), s.getMapper(MesProductionScanIdentityMapper.class));
+            var identity = new ProductionIdentityService(executions, s.getMapper(WorkorderMapper.class), s.getMapper(MaterialMapper.class), s.getMapper(RoutingMapper.class));
             var before = service.selectById(first.getId()).getUpdateTime();
             assertEquals(first.getId(), identity.resolve("EXE:" + first.getId()).executionId());
             assertEquals(before, service.selectById(first.getId()).getUpdateTime());

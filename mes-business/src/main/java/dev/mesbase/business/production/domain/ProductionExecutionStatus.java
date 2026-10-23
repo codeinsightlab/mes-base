@@ -8,6 +8,7 @@ public enum ProductionExecutionStatus {
     READY("待执行", "READY"),
     RUNNING("执行中", "RUNNING"),
     COMPLETED("已结束", "COMPLETED"),
+    FULLY_RECEIVED("完全入库", "FULLY_RECEIVED"),
     CANCELLED("已取消", "CANCELLED");
 
     private final String description;

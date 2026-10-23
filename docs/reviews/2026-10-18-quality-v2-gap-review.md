@@ -456,3 +456,136 @@ QualityTreatmentPanel详情拆成数量概况、本次处理、处理流水、�
 用户重启后的进程68235正常监听8081，`/health`返回200/UP。刷新5173页面会话后，不良列表及详情读取正常，工单/产品批量投影已在实际页面显示；登记不良窗口可打开，空表单禁止提交，可正常关闭。未提交任何业务写入。截图：`.local/quality-page-20261022-restarted.png`、`.local/quality-page-20261022-detail.png`。此前“连接重置”的运行阻碍已解除，不能继续沿用为当前状态。
 
 当前PERF库只读复核：15598条声明的command_version均为NULL；处置事件包含ASSESS15596、ALLOCATE15582、START8、RESULT8，没有RETURN_NODE/TRANSFER_WAREHOUSE样本。首屏旧导入记录因此显示“状态待确认”，详情旧动作显示“未识别的操作”，没有开放新版处理按钮。本轮不把旧分配转换为新转仓或退回结果，也不为验收修改已有生产事实。当前运行证据覆盖读取与登记窗口开闭；新版两种处置仍以此前HTTP Fixture/UI测试为证据，尚未形成此库新版数据的浏览器提交闭环。此数据准备缺口应在导入/验证材料侧处理，不能以产品历史兼容分支修补。
+
+
+## 2026-10-23：长期规划对照复核——数量、返工与晚质量（只读）
+
+### 本次实际范围与能力判断
+
+按当前工作树重新读取前端 productionDefect 页、DefectDeclarationPanel、QualityTreatmentPanel 及三个质量 API；后端 ProductionDefectV2/ProductionDefect/QualityTreatment/QualityDisposition Controller、ProductionDefectService、QualityTreatmentService、QualityDispositionService、QualityReleaseService、ProductionQuantityService、ProductionReportService.returnToNode、ProductionCompletionService/Balance；对应当前版本、数量、列表、统计及工单进度 Mapper/XML。没有执行测试、浏览器、HTTP、数据库或 ERP；没有修改业务代码。未覆盖完整库存逆向、所有质量统计维度及真实并发。
+
+| 判定 | 当前能力 |
+| --- | --- |
+| 已有正式实现 | 逐次申报、冻结工序类型/原因快照、版本追加/VOID、独立/重复归因、部分返回申报工序、正常重报、质量转不良/报废仓、正式放行及依据变化失效 |
+| 部分实现 | 晚质量事实可新增，既有完工/库存事实保留并阻止继续入库；已关闭生产后的核实/实物处置不完整。列表/详情已有待确认，严格数量读取仍可能整体拒绝 |
+| 明确未实现 | 上一道或任意已经过上游节点可选返工；解除历史条数预算的当前有效投影。库存后续处置见仓储专题，不能由本专题推断已完成 |
+| 当前证据不足 | 当前测试通过、真实环境质量转仓成功、已入库后完整处理、真实并发与首厂容量 |
+
+### 正式入口与关键源码位置
+
+路径 `quality/`、`production/` 均相对 `mes-business/src/main/java/dev/mesbase/business/`；UI 为相邻前端仓库。
+
+- 申报：UI `views/quality/productionDefect/index.vue:76` → `components/business/quality/DefectDeclarationPanel.vue:47–52` → `api/quality/qualityV2.ts:20` → `quality/controller/ProductionDefectV2Controller.java:54–63` → `quality/service/ProductionDefectService.java:239–273,146–211` → MesProductionDefectMapper insert。先锁工单/Execution、重读 UUID、追加版本及校验数量；所有版本保留，当前查询取最新再处理 VOID。
+- 核实：UI QualityTreatmentPanel:80 → qualityTreatment API → `QualityTreatmentController.java:57–60`（revise 权限）→ `QualityTreatmentService.java:351–426`。373行要求活动工单，387–391行禁止重复 ASSESS；OVERLAP 必须指向本 Execution 当前独立申报，不能重复扣损失。
+- 处置：UI QualityTreatmentPanel:124–127 → `QualityDispositionController.java:21–24` → `QualityDispositionService.java:90–118` 校验原 UUID/hash、版本、执行状态、独立归属及剩余量。156–159行固定 affectedNodeId → `production/service/ProductionReportService.java:165–208` 追加原报工的负向 ADJUSTMENT → `QualityTreatmentService.java:157–198` 记录 RETURN_NODE。请求无 targetNode，不能由按钮名称推断支持上游返工。
+- 转仓：QualityDispositionService:120–154 校验额外库存权限、LOCAL、正式批次、DEFECTIVE/SCRAP 目标，调用正式库存主单/明细/审核；同一 LOCAL 事务。已实现不良/报废入库，不意味着库存再返工/核销已实现。
+- 数量：`ProductionQuantityService.java:127–151` → `quality/service/ExecutionQualityReferenceQueryImpl.java:31–41` → `QualityTreatmentService.nodeTotals/nodeTotalsBatch:273–324`；ProductionQuantityService:303–334 顺序计算，261–279 写入校验，299–300 质量变化保留历史超额。放行 `QualityReleaseService.java:81–104`，完工 `ProductionCompletionService.java:93–113`，入库 `wm/service/StockDocumentService.java:336–351`。
+
+### 当前公式与数字推演（源码手算，非运行结果）
+
+例子假定工单 RELEASED、Execution RUNNING，避免在自动完工关闭后虚构仍可返工。仅指当前“返回申报节点”，不代表未来上游返工。
+
+- 首节点投入 I = confirmedInputQty − reservedInputQty；计划数量不代替可信投入。
+- 节点净报工 G = SUM(quantity_delta)，包含追加纠正；独立不良 D 取当前有效申报，重复归因不重复扣，待核实单列并阻止受影响节点及以后正报。
+- 返回量 R，活动不良 N=D−R；历史超额 H=max(G−I,0)。有效产出 O=max(G−N−H,0)；可新增报工 A=max(I−G,0)；下一实际节点 I=上一节点 O。原始负差额另外保留，不改写原报工。
+- 待处置 P=申报−返回−转仓；转仓减少待处置，但不抹去最终生产损失。
+- `production/domain/ProductionCompletionBalance.java:14–26` 要求正式投入=末道有效产出+各节点最终不良损失，同时无待核实/未决投入、质量处理安全、执行 RUNNING。生产完工不以已交接、已接收或已正式入库为前提；成品入库另校验正式放行。
+- 没有可统称“实物在制”的统一字段。节点 available 是待报余额；工单 pendingCompletion 是计划扣正式完工/转仓余额，不能等同在制。
+
+三工序 A→B→C，投入100：
+
+| 步骤 | B 的 G / D / R / N / O / A | C及业务含义 |
+| --- | --- | --- |
+| 三道正常各报100 | 100 / 0 / 0 / 0 / 100 / 0 | 末道100，可按规则完工100 |
+| A/B报100，C未报；B待核实10 | 100 / 独立损失暂0 / 0 / 0 / 100 / 0 | 数量仍显示100，但受待核实门禁阻止新增正报 |
+| B核实独立10 | 100 / 10 / 0 / 10 / 90 / 0 | C输入90；B待处置10 |
+| B部分返回4 | 96 / 10 / 4 / 6 / 90 / 4 | 追加负报工，返回本身不增加产出；待处置6 |
+| B重新报4 | 100 / 10 / 4 / 6 / 94 / 0 | C可报94；余6未处理不能放行/完工 |
+| 重报后另一次独立不良2 | 100 / 12 / 4 / 8 / 92 / 0 | C输入92；不能覆盖已有处置的旧申报 |
+| 剩余8合法转仓，C报92 | 100 / 12 / 4 / 8 / 92 / 0 | 末道92，100=92+8；满足其他门禁时可完工92 |
+
+**下游已报后的晚不良：** A/B/C原净报工均100，B新增独立10，则B有效90；C仍保留净报工100，输入90、历史超额10、有效90。返回4后B净报工96/损失6/有效90，C不变；B重新报4后有效94，C保留报工100、历史超额6、有效94。当前公式没有要求凭空追加C报工。未来“返回更早节点后必须重经后续工序”要独立定义加工贡献，不能只替换目标ID。
+
+**已入库后发现不良：** 原末道100、放行100、入库100；新独立不良10后末道90，basisHash变化，当前released=0/basisValid=false，旧放行/入库100保留；入库额度=min(当前放行,当前有效)−已入库，remaining对外夹0、canReceive=false。普通新申报默认待核实，先阻止继续业务。若工单已COMPLETED，373行活动工单校验拒绝核实；处置还要求Execution可正常报工，不能静默重开或自动扣库存。
+
+### 新增证据、影响与最小方向
+
+1. **QA-03：确定源码容量限制，触发规模待首厂验证。** QualityTreatmentService:135–148 先检查1000最新申报（含VOID）/5000全部历史事件，再过滤当前事实；281–305行批量是整批共享预算，不是每执行各1000/5000。生产数量、放行和完工经同链读取。ProductionReportService:170–173 返回同节点还受10000条报工/调整预算限制。活动事实很少也可能因历史增长阻断整个数量/处理入口。最小方向为有效投影与分页历史分离，保持唯一公式、完整事实及严格写校验，不删除历史、不截断后继续算。验收999/1000/1001、4999/5000/5001、多执行合计、多版本/VOID/纠正、10000/10001返回预算及原请求恢复。
+2. **QA-05：依赖环仍存在，非启动故障。** 数量→ProductionDefectQuantityQuery→ExecutionQualityReferenceQueryImpl→QualityTreatmentService；后者又注入Lazy数量/路径服务。拆当前无副作用投影与动作编排，复用Mapper/模型；不要另造转发Facade或第二套数量公式。测试装配存在不代表容量问题解决。
+3. **关闭后晚质量：新功能/规则缺口。** ProductionDefectService:239–273,276–285,451–465 的申报可达关闭执行；普通UI新建无assessment。核实要求活动工单（ProductionChainLocks:103–115），处置要求READY/RUNNING（QualityDispositionService:109–111）。能记录并保护原事实，但不能完成关闭后待核实处置。应定义独立质量案例/库存后续及权限，不通过删除关闭门禁恢复旧流程。首厂若需已入库后追处置，必须另立闭环验收；否则明确限制和人工处理边界。
+4. **上游返工：明确新功能缺口。** 搜索范围为质量Command/Controller/Service、前端质量API/处置面板，Disposition仅destination/qty/warehouse且Service固定affectedNodeId，未找到目标节点输入及资格校验。需独立返工身份、实际经过目标节点、返回量与后续加工贡献设计；验收C发现回B/回A、部分返回、再次不良、已报下游/已入库、并发重放，不改锁定DAG。
+5. **查询语义部分已经落实。** ProductionDefectService:348–375 列表使用分页SQL+Processing.read；QualityTreatmentService:113–120,231–251详情strict=false保留不可解释事件，派生量null/待确认。数量投影仍strict=true，B应明确读写合同，不能把数据库/授权错误吞为待确认，也不恢复退役处置。WorkOrderProgress独立SQL用MAX ASSESS，数量用首事件；正式核实锁执行且拒绝第二次ASSESS，不能据实现形式差异宣称正常业务必错；异常重复事件列待验证负例。
+
+### 测试源码与验证局限
+
+本轮实际读到 `QualityDispositionHttpTest.java:292–311`（下游已报、返回4再报4、末道94）、`QualityReleaseHttpTest.java:54–71`（晚不良保留已入库98、当前有效90且禁止再入）、`QualityTreatmentProjectionTest.java:92–100,140–165`（明确期待当前容量超限拒绝）。均未运行。测试会断言上限只证明当前合同存在，不证明适合首厂容量；晚不良测试不等于关闭后实物处置已完成。旧验收保留其日期及环境，不作为本轮通过。
+
+计划调整：B补整批预算/10000返回预算和精确口径；C保留为需求驱动新能力；D中库存→返工才依赖返工口径，不良→报废→处置可单独排；E先准确命名待完工余额，再设计真正的在制/有效产出指标。执行工作包统一见 next-stage-plan 当日复核追加。本轮没有实施。
+
+
+## 2026-10-23 实施追加：不良申报与正式入仓，取消新返工
+
+用户随后确认不良模块仅负责申报与入仓，替代本日较早“扩展上游返工”的建议。新业务不编排返回、上游返工、开始/分配/结果或产量恢复；仓内后续物流归仓储，当前不实现调拨和最终核销。
+
+1. `QualityDispositionService.execute`先查原请求精确重放，再明确拒绝新RETURN_NODE；`QualityTreatmentService.recordDisposition`内部也只准WAREHOUSE并固定写TRANSFER_WAREHOUSE/returned0，正式报工Service的returnToNode写方法退役。历史Action/Destination解析、版本查询、RETURN/ADJUSTMENT原数量贡献保留，未改写旧事实或伪造转换。新请求即使改UUID也不能写返工；旧UUID不同payload继续冲突。
+2. 质量execute建库存前调用统一lockInboundChain，保留LOCAL/来源、独立核实、实际节点、版本、剩余额、正式批次、DEFECTIVE/SCRAP用途及库存create/post权限。顺序是正式主明细→质量事件→内部审核→统一收尾；缺质量证明或任一步失败同事务回滚。
+3. `receiptBlockReason`按当前最新未VOID有效申报，保留历史返回抵减和重叠去重；要求逐申报剩余为0、核实唯一、事件所属执行/节点一致，每笔TRANSFER有唯一可信正式入仓。`receiptProofRows`统一检验审核状态/类型/人/UUID/hash、独立单据/明细/动作身份、产品单位、仓库用途、正式批次/库位、动作前后增量及无逆向。不是用Q总数凑D，也不允许“手动已处理”。公共hasFormalReceipt仅用于进度，不把Q加到产量。
+4. 新ReceiptState经枚举返回PENDING/PARTIAL/RECEIVED；列表/详情/处置面板显示待入仓/部分入仓/已入仓。历史返回仍展示历史事实，不能冒称已入仓。RETURN新操作/API适配移除；旧未知RETURN只读核实原事件，不改派为WAREHOUSE、不自动重发创建。
+5. `QualityReleaseService.stateFor`保留正式放行和basisHash；已核实独立损失待入仓不再挡好品放行，待核实/不可靠数量仍阻断。最终收尾另外要求所有有效损失正式交接。故两类入库先后都可达；全不良G=R=0由质量入仓审核直接检查I=D，不制造零数量正常单。
+6. 删除ProductionDefectService、QualityTreatmentService中的旧自动完工事件发布及专用依赖，不良申报/核实本身不落终态；已完成入库后才发现不良的完整独立业务仍不在本包，不能通过重开旧执行处理。
+
+QualityDispositionHttpTest/QualityV2HttpTest/QualityWorkflowHttpTest及QualityTreatmentProjectionTest已同步当前命令：新返工拒绝、历史原UUID读取、历史返回/调整数量不变、部分入仓与重复/并发、全不良、逐笔污染operation/execution/source身份会阻断、基础设施错误传播。已废弃的通过新RETURN制造测试数据改为明确的历史事实fixture，没有恢复生产兼容写口。最终测试与只读MySQL边界见计划第七节验证回执。
+
+当前历史1000申报/5000事件容量、关闭后晚质量完整处置等独立问题仍保留台账，没有借本任务重写数量核心或删除历史解除预算。
+
+本轮初次误选SIMPLE_B的只读检查因V48缺字段失败，无写入。用户明确指定mes_base_dev_perf_test后，重新核实TEST_DEV_PERF_20261019 / DS9 revision2 / LOCAL及DATABASE()，当前质量证明、原审核恢复身份及关联数量查询在该真实MySQL只读执行通过。两仓AGENTS写入今后默认此测试库。没有兼容分支、升级、事实改写或真实质量入仓写入；全不良实际服务闭环仍需加载新包后复验。
+
+## 2026-10-23 重启后真实质量入仓与收尾追加
+
+在重新核实的mes_base_dev_perf_test（TEST_DEV_PERF_20261019/DS9 revision2/LOCAL、V51）正式投产/报工的独立执行12369、12370分别申报并核实末道独立不良10，R90→Q10及Q10→R90均通过；前一审核保留RUNNING/PARTIAL，后一审核FULLY_RECEIVED、工单1917/1918 COMPLETED。12371正式投100、三工序原报100后独立不良100，G=R=0、D=Q=100，仅质量入仓单1121审核即关闭执行/工单1919，无零量正常单或重复放行。没有RETURN、调整报工或修改旧事实。逐申报质量入仓状态RECEIVED、pending0，3笔dispositions及其内部单据审核重放只返回原事实；同UUID改quantity拒409。
+
+本轮类型维护请求403（business:operation:defect:type:create），新测试工序无类型；未改角色权限或直接造配置。本次质量用例采用仍正式开放的POST /api/quality/defects事实契约（PROCESS分类、当前工序/数量/原因/时间），再assessments独立核实、dispositions正式入仓；不把此结果说成V2页面类型新建与类型化申报已验收。该页面/权限路径保留独立待验；仓储普通菜单/Execution深链及工单进度页面已在真实浏览器跑通。
+
+13张关联业务表的338831条既有记录写前后摘要相同、无删除，只有独立TEST前缀新增事实。完整请求、UUID、原单关联、快照及截图存放.local/inbound-closure-live-20261023；详细验收表见next-stage-plan第八节。本节更新前一阶段“全不良尚无真实运行”的边界，不扩展到关闭后晚质量、返工、并发故障注入或所有V2页面。
+
+## 2026-10-23 批次显示与Execution业务定位：当前库只读复核
+
+**本次任务：** 用户指出quality/productionDefect迁移不良显示“批次未记录”，要求核实批次实际是否存在，以及“工单＋品号＋批次号”能否定位具体Execution（生产执行单元，不是后台任务执行器）。本轮只读源码、正式GET、真实MySQL SELECT/元数据及浏览器列表，不修改业务代码、业务数据、Schema或状态，不恢复迁移写入口，不启停服务。
+
+**目标与证据：** 重新由AcceptanceBusinessDatabase.performanceTestSource核实受管绑定TEST_DEV_PERF_20261019 / DS9 revision2 / LOCAL → 192.168.18.25:3306/mes_base_dev_perf_test，DATABASE()、server_uuid 03dbc952-7403-11ef-802c-0242ac130002及版本51一致。证据在`.local/quality-batch-audit-20261023/`：`database-initial.json`、`links.json`、`uniqueness.json`、`api-first20.json`、`api-identity-12355.json`和两个只读取证脚本；不读取旧外部业务库，不输出凭证。以下是当前全量结果，不沿用先前8380执行等历史统计。
+
+### 当前显示链与确定原因
+
+1. `mes-base-ui/src/views/quality/productionDefect/index.vue:37`调用page，`:63`将`row.batchNo`空值显示成“批次未记录”；品号取productCode、工单取workorderCode，前端未丢掉非空批次。
+2. `GET /api/quality/defects` → `ProductionDefectController.page` → `ProductionDefectService.page:343` → `ProductionDefectListExtraMapper.selectContexts` → XML第8行只从`mes_production_scan_identity.material_lot_code`取batchNo，以execution_id关联；不读取execution_no、库存批次或冻结旧证据。Controller经ListContext与BeanConversions.convertWith返回该值。
+3. 当前共有11874个Execution：1110个正式扫码身份，批次均非空；另10764个Execution有唯一EXECUTION迁移映射，每个冻结source_pk均为`[工单号, 原xtransfer_no, 原route_id]`，第二项批次全部非空，与source_payload.key[1]相同，工单号及产品引用一致。但这10764个均没有正式scan_identity。Execution实体自身没有正式batch_no字段，LEGACY_*执行编号是摘要，不是实际批号。
+4. 当前最新版本不良共15600条，其中15579条对应迁移质量映射和上述迁移Execution，这15579条均无正式scan_identity；当前缺失不是API转换误吞，也不是不良没关联Execution。全量不良15601条及处理流水31200条的execution_id、实际工序引用均存在；这里仅检查引用存在，不宣称完成全部状态/数量/工艺版本一致性审计。
+
+例：页面记录32148/32149 → Execution12355 → 工单1913/5100-260701568 → 产品20213023001。冻结原批次为260727103，但正式scan_identity不存在，因此接口batchNo=null。正式`GET /api/production/identity?code=EXE:12355`仍能解析到该Execution、工单、产品及路线17，证明执行关联本身没有丢。另32150/Execution11287的证据批次为241112107，32140/Execution10455为250102126。浏览器实际打开不良列表也观察到这些迁入工单“批次未记录”。
+
+### 三元组能否定位Execution
+
+- 在当前工厂业务库内，对10764个迁移Execution使用冻结原批次、对1110个正式扫码Execution使用正式批次，逐条组成`(workorder_id, product_id, batch原文)`：11874条、11874个不同三元组、重复组0；迁移范围按工单编码＋产出品号＋批次原文比较也为0重复。原品号与当前产出品号不一致数为0。原字符串不trim、不丢前导零、不改大小写。
+- 这证明当前数据可唯一定位，不证明现有模型已建立该业务键或未来并发创建已受此键保护。该键只在已确定Factory业务库内成立，不增加业务表factory_id。
+- 同产出品号＋同批次跨工单重复实际有4组。例产品20216023001、批次260706102，分别属于5100-260701523/Execution10869和5100-260706005/Execution9118。因此不能只用品号＋批次，不能把跨工单同批次合并；原route_id存在冻结证据中，但本轮三元组全量没有需要靠route_id才消歧的样本。
+- 当前扫码实现与约定尚不相同：ProductionScanCode按`productCode＋materialCode＋lotCode`编码散列，不含工单；ProductionInputService.prepare:188先按该散列找绑定，再在已有绑定时校验workorderId，不同工单返回PRODUCTION_IDENTITY_CONFLICT。ProductionIdentityService.resolve的MES1、原料#批次及EXE:id也不是工单＋产出品号＋批次的查询契约；原料#批次还可能多义。现有源表仅有id主键和执行/材料批次普通索引，没有三元组并发唯一性约束。
+
+### 与后续事实的关联及处理建议（未实施）
+
+业务定位建议收敛为：当前Factory下`工单＋产出产品＋生产批次`定位一条Execution；定位后所有操作继续引用不可变execution_id，不将三项字符串复制成各事实表的替代关联。Execution→实际Routing/Path，Report→execution_id＋routing_node_id，Defect→execution_id＋affected_node_id，Treatment→declaration_id＋revision及同一Execution/节点；正常库存单通过source_execution_id，质量库存单通过Treatment.stock_document_id，库存动作通过execution_id、单据/行/原操作UUID，completion也绑定execution_id。工单通过workorder_id聚合这些执行。现有质量入仓QualityDispositionService:130调用requiredBatch，要求唯一正式扫码身份且编码/字段一致，所以这个缺口还会阻挡相关迁入执行入仓，不只是列表文案。
+
+最小方向是先明确并统一Execution正式生产批次/业务身份与扫码材料身份的职责，再补齐经过核实的存量身份，复用同一个三元组定位规则供新投产、扫码查询、质量展示和入仓使用；通过主键/受控协调保证并发唯一、重复解析稳定、冲突明确。库存/报工/质量已有关联保留，不合并Execution，不修改原数量、状态或历史事实。具体Schema方案及受控存量转换尚未实施，不能因本次唯一性统计就直接把旧批号写进execution_no、伪造缺失原料品号，或把迁移快照作为正式页面/入仓的运行时兜底。
+
+当前应归类为“上游正式生产批次身份未落地＋新定位规则与现有扫码键不一致”，不是单独改前端占位文案即可解决。批次可读展示与业务入仓资格须分别验证；其他“处置待确认”原因未在本轮一并处理。本次没有执行修复、迁移、真实业务写入或回归测试；只读数据库、正式GET及页面证据是新增事实，历史验收结果不代替本轮核对。
+
+## 2026-10-23 实施修正：批次归属Execution，退役扫码绑定关联
+
+在上述只读复核后，用户明确取消永久扫码身份，要求所有Execution扫码统一定位并记录分析行为。本次实际修改业务代码及V52正式迁移；旧章节的“未实施”保留其当时含义。
+
+- `ProductionDefectListExtraMapper.selectContexts`直接读e.batch_no；`receiptProofRows`去掉scan_identity JOIN，按Execution正式批次与单据明细/库存动作精确字节核对。StockDocumentExtraMapper跨namespace引用的原审核恢复仍复用同一质量证明，没有另建弱证明。
+- `ProductionIdentityService.requiredBatch`只读Execution.batchNo，缺失仍明确拒绝；QualityDisposition原正式建单/明细/审核及原UUID优先重放保留。数量I/G/D/R/Q算法、返回/调整历史贡献及入库审核收尾门禁未改。
+- `WorkOrderExtraMapper.hasExecutionDependents`移除旧扫码绑定分支，既有领料/报工/质量/库存/入库/收尾引用保护保留。旧绑定持久化Java/Mapper删除，旧表和已发布V29/V31不删除、不改写，不伪造过去扫码事件。
+- 真正批次落地：核实TEST_DEV_PERF_20261019→DS9/revision2→mes_base_dev_perf_test/LOCAL及server_uuid后，备份11874执行、1110旧绑定、338576冻结来源映射及原迁移历史。V52经项目Flyway升级，搬运1110条已核实正式批次并新建独立行为表；10764条迁入执行批次以固定目标的一次性维护事务从一致冻结证据落地，未恢复导入/激活服务，也未把该测试库固定ID写入公共迁移。
+- 写后11874个Execution均有正式批次，业务三元组精确重复0。逐条比较执行及旧绑定共12984条记录，除新增batch_no外，原所有列均相同，原状态/数量未变、旧绑定未改。质量样例32148/32149对应正式批次260727103，32150为241112107。SQL、备份与核验回执见`.local/execution-scan-20261023/`及`docs/operations/data-maintenance`归档。
+
+当前源码的定位/质量查询不读扫码行为或旧绑定，运行期也不读迁移payload。正式新服务/浏览器全链路仍须用户加载新包后验证，不能将本次MySQL迁移和只读映射SQL验收说成新HTTP链路已运行。独立历史终态、晚质量、历史容量等既有边界没有扩大。

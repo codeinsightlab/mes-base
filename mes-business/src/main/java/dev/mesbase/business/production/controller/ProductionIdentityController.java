@@ -2,6 +2,7 @@ package dev.mesbase.business.production.controller;
 
 import dev.mesbase.business.production.controller.vo.ProductionIdentityVo;
 import dev.mesbase.business.production.service.ProductionIdentityService;
+import dev.mesbase.common.utils.bean.BeanConversions;
 import dev.mesbase.platform.web.EndpointAccess;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -22,11 +23,6 @@ public class ProductionIdentityController {
     @GetMapping
     @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED, permission = MesProductionExecutionPermissions.QUERY)
     public ProductionIdentityVo resolve(@RequestParam String code) {
-        var result = service.resolve(code);
-        return new ProductionIdentityVo(result.executionId().toString(), result.executionNo(), result.qrCode(),
-                result.workorderId().toString(), result.workorderCode(), result.productId()
-                .toString(), result.productCode(),
-                result.productName(), result.routingId().toString(), result.routingCode(), result.routingVersion(),
-                result.status(), result.targetQty().toPlainString());
+        return BeanConversions.convert(service.resolve(code), ProductionIdentityVo.class);
     }
 }

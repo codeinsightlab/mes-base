@@ -2,12 +2,18 @@ package dev.issuefixture;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
-import dev.mesbase.business.production.domain.ProductionScanCode;
+import dev.mesbase.core.factory.FactoryId;
+import dev.mesbase.core.factory.FactoryScope;
+import dev.mesbase.platform.execution.FactoryContext;
 import dev.mesbase.business.quality.controller.QualityDispositionController;
 import dev.mesbase.business.quality.service.QualityDispositionService;
+import dev.mesbase.business.quality.service.QualityTreatmentService;
 import dev.mesbase.business.wm.service.impl.WmInventoryServiceImpl;
 import jakarta.validation.Validator;
 import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.util.HexFormat;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.Callable;
@@ -30,6 +36,8 @@ import static dev.issuefixture.QualityWorkflowHttpTest.defect;
 import static dev.issuefixture.QualityWorkflowHttpTest.quantities;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -53,9 +61,7 @@ class QualityDispositionHttpTest {
     }
 
     static void bindBatch(JdbcTemplate jdbc, String batchNo) {
-        var code = new ProductionScanCode("M1", "RM1", batchNo);
-        jdbc.update("INSERT INTO mes_production_scan_identity(id,encoded_code,execution_id,created_at,product_code,material_code,material_lot_code) VALUES(?,?,1,CURRENT_TIMESTAMP,?,?,?)",
-                code.key(), code.encode(), code.productCode(), code.materialCode(), code.lotCode());
+        jdbc.update("UPDATE mes_production_execution SET batch_no=? WHERE id=1", batchNo);
     }
 
     static JsonNode dispose(MockMvc m, String declaration, String body) throws Exception {
@@ -63,15 +69,34 @@ class QualityDispositionHttpTest {
                 .andExpect(status().isOk()).andReturn().getResponse().getContentAsString());
     }
 
+    /**
+     * TEST ONLY immutable historical return, never a current workflow write.
+     */
+    static void historicalReturn(JdbcTemplate jdbc, String declaration, String key, String quantity) throws Exception {
+        String value = String.join("\n", "DISPOSITION", declaration, "1", "1", "RETURN_NODE",
+                new BigDecimal(quantity).stripTrailingZeros().toPlainString(), "", "TEST ONLY disposition");
+        String hash = HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256")
+                .digest(value.getBytes(StandardCharsets.UTF_8)));
+        jdbc.update("INSERT INTO mes_quality_treatment(id,request_hash,declaration_id,declaration_revision,execution_id,routing_node_id,action_type,operator_user_id,recorded_at,reason,returned_qty,transfer_qty) SELECT ?,?,declaration_id,revision_no,execution_id,affected_node_id,'RETURN_NODE',1,CURRENT_TIMESTAMP,'TEST ONLY disposition',?,0 FROM mes_production_defect WHERE declaration_id=? AND revision_no=1",
+                key, hash, new BigDecimal(quantity), declaration);
+        jdbc.update("INSERT INTO mes_production_report(execution_id,routing_node_id,record_type,quantity_delta,reference_report_id,source_quality_event_id,operator_user_id,recorded_by,report_time,reason,create_time,request_id,command_fingerprint) SELECT r.execution_id,r.routing_node_id,'ADJUSTMENT',?,r.id,?,r.operator_user_id,1,r.report_time,'TEST ONLY historical return',CURRENT_TIMESTAMP,?,? FROM mes_production_report r JOIN mes_production_defect d ON d.execution_id=r.execution_id AND d.affected_node_id=r.routing_node_id WHERE d.declaration_id=? AND r.record_type='REPORT' ORDER BY r.id DESC LIMIT 1",
+                new BigDecimal(quantity).negate(), key, UUID.randomUUID().toString(), "x".repeat(64), declaration);
+    }
+
     @Test
-    void returnRestoresNormalAllowanceWithoutDoubleOutputAndKeepsReplayIdentity() throws Exception {
+    void rejectsNewReturnButReplaysHistoricalReturnWithoutChangingItsQuantities() throws Exception {
         try (var c = context(EXTRA, 100, 100, 90, 90, 90)) {
             var m = MaterialIssueHttpTest.mvc(c);
             var j = ProductionWarehouseFixture.db(c);
             var id = defect(m, 12, "10", "INDEPENDENT", null);
             var key = UUID.randomUUID().toString();
             String body = command(key, "RETURN_NODE", "10", "null");
+            m.perform(full(post(Q + "/" + id + "/dispositions"), "A").content(body))
+                    .andExpect(status().isConflict());
+            assertEquals(0, j.queryForObject("SELECT COUNT(*) FROM mes_production_report WHERE source_quality_event_id IS NOT NULL", Integer.class));
+            historicalReturn(j, id, key, "10");
             var result = dispose(m, id, body);
+            assertEquals("PENDING", result.path("receiptState").asText());
             amount(result, "returnedQty", "10");
             amount(result, "pendingDispositionQty", "0");
             assertEquals("RETURNED", result.get("state").asText());
@@ -86,6 +111,37 @@ class QualityDispositionHttpTest {
             amount(quantities(m).get("nodes").get(1), "effectiveOutputQty", "100");
             m.perform(full(post(Q + "/" + id + "/dispositions"), "A").content(command(key, "RETURN_NODE", "9", "null")))
                     .andExpect(status().isConflict());
+        }
+    }
+
+    @Test
+    void allDefectsUseTheirPostedReceiptWithoutAZeroNormalReceiptAndRequireExactProof() throws Exception {
+        try (var c = context(EXTRA, 100, 100, 100, 100, 100)) {
+            var mvc = MaterialIssueHttpTest.mvc(c);
+            var jdbc = ProductionWarehouseFixture.db(c);
+            var declaration = defect(mvc, 15, "100", "INDEPENDENT", null);
+            bindBatch(jdbc, "000ALLBAD-001");
+            var body = command(UUID.randomUUID().toString(), "WAREHOUSE", "100", "1");
+            var first = dispose(mvc, declaration, body);
+            assertEquals("RECEIVED", first.path("receiptState").asText());
+            dispose(mvc, declaration, body);
+            assertEquals(1, jdbc.queryForObject("SELECT COUNT(*) FROM wm_stock_document", Integer.class));
+            assertEquals(0, jdbc.queryForObject("SELECT COUNT(*) FROM wm_stock_document WHERE source_execution_id IS NOT NULL", Integer.class));
+            FactoryContext.runWithScope(new FactoryScope(new FactoryId("A")), () -> {
+                var owner = c.getBean(QualityTreatmentService.class);
+                assertNull(owner.receiptBlockReason(1L));
+                var operation = jdbc.queryForObject("SELECT operation_id FROM wm_stock_action WHERE document_line_id IS NOT NULL", String.class);
+                jdbc.update("UPDATE wm_stock_action SET operation_id=? WHERE document_line_id IS NOT NULL", UUID.randomUUID()
+                        .toString());
+                assertNotNull(owner.receiptBlockReason(1L));
+                jdbc.update("UPDATE wm_stock_action SET operation_id=? WHERE document_line_id IS NOT NULL", operation);
+                assertNull(owner.receiptBlockReason(1L));
+                jdbc.update("UPDATE wm_stock_action SET execution_id=2 WHERE document_line_id IS NOT NULL");
+                assertNotNull(owner.receiptBlockReason(1L));
+                jdbc.update("UPDATE wm_stock_action SET execution_id=1 WHERE document_line_id IS NOT NULL");
+                jdbc.update("UPDATE wm_stock_action SET source_id='unrelated-document' WHERE document_line_id IS NOT NULL");
+                assertNotNull(owner.receiptBlockReason(1L));
+            });
         }
     }
 
@@ -110,7 +166,7 @@ class QualityDispositionHttpTest {
                             .andExpect(status().isOk()).andReturn().getResponse().getContentAsString())
                     .get("items").get(0).get("batchNo").asText());
             // Replaying the original operation reads its immutable result before new-batch admission.
-            j.update("DELETE FROM mes_production_scan_identity");
+            j.update("UPDATE mes_production_execution SET batch_no=NULL WHERE id=1");
             dispose(m, id, body);
             assertEquals(1, j.queryForObject("SELECT COUNT(*) FROM wm_stock_document", Integer.class));
             assertEquals(0, j.queryForObject("SELECT COUNT(*) FROM wm_stock_document WHERE source_execution_id IS NOT NULL", Integer.class));
@@ -175,31 +231,35 @@ class QualityDispositionHttpTest {
             var m = MaterialIssueHttpTest.mvc(c);
             var j = ProductionWarehouseFixture.db(c);
             var id = defect(m, 12, "10", "INDEPENDENT", null);
+            bindBatch(j, "000RACE-001");
             var barrier = new CyclicBarrier(2);
             Callable<Integer> request = () -> {
                 barrier.await();
                 return m.perform(full(post(Q + "/" + id + "/dispositions"), "A")
-                                .content(command(UUID.randomUUID().toString(), "RETURN_NODE", "10", "null")))
+                                .content(command(UUID.randomUUID().toString(), "WAREHOUSE", "10", "1")))
                         .andReturn().getResponse().getStatus();
             };
             var a = pool.submit(request);
             var b = pool.submit(request);
             assertEquals(Set.of(200, 409), Set.of(a.get(), b.get()));
-            assertEquals(1, j.queryForObject("SELECT COUNT(*) FROM mes_quality_treatment WHERE action_type='RETURN_NODE'", Integer.class));
-            assertEquals(1, j.queryForObject("SELECT COUNT(*) FROM mes_production_report WHERE source_quality_event_id IS NOT NULL", Integer.class));
+            assertEquals(1, j.queryForObject("SELECT COUNT(*) FROM mes_quality_treatment WHERE action_type='TRANSFER_WAREHOUSE'", Integer.class));
+            assertEquals(1, j.queryForObject("SELECT COUNT(*) FROM wm_stock_document WHERE status='POSTED'", Integer.class));
         }
     }
 
     @Test
-    void partialReturnsRemainPendingUntilTheWholeQuantityHasADisposition() throws Exception {
+    void partialReceiptsRemainPendingUntilTheWholeQuantityIsReceived() throws Exception {
         try (var c = context(EXTRA, 100, 100, 90, 90, 90)) {
             var mvc = MaterialIssueHttpTest.mvc(c);
             var id = defect(mvc, 12, "10", "INDEPENDENT", null);
-            var partial = dispose(mvc, id, command(UUID.randomUUID().toString(), "RETURN_NODE", "6", "null"));
+            bindBatch(ProductionWarehouseFixture.db(c), "000PARTIAL-001");
+            var partial = dispose(mvc, id, command(UUID.randomUUID().toString(), "WAREHOUSE", "6", "1"));
+            assertEquals("PARTIAL", partial.path("receiptState").asText());
             amount(partial, "pendingDispositionQty", "4");
             assertEquals("PENDING", partial.get("state").asText());
-            var complete = dispose(mvc, id, command(UUID.randomUUID().toString(), "RETURN_NODE", "4", "null"));
-            assertEquals("RETURNED", complete.get("state").asText());
+            var complete = dispose(mvc, id, command(UUID.randomUUID().toString(), "WAREHOUSE", "4", "1"));
+            assertEquals("TRANSFERRED", complete.get("state").asText());
+            assertEquals("RECEIVED", complete.path("receiptState").asText());
             assertEquals(false, complete.has("pendingStartQty"));
         }
     }
@@ -212,7 +272,7 @@ class QualityDispositionHttpTest {
             jdbc.update("UPDATE material SET specification='Φ20×30' WHERE id=1");
             bindBatch(jdbc, "000LOT-001");
             var id = defect(m, 12, "10", "INDEPENDENT", null);
-            dispose(m, id, command(UUID.randomUUID().toString(), "RETURN_NODE", "10", "null"));
+            historicalReturn(jdbc, id, UUID.randomUUID().toString(), "10");
             var capture = new RecentProductionReportHttpTest.SqlCapture();
             c.getBean(SqlSessionFactory.class).getConfiguration().addInterceptor(capture);
             var list = JSON.readTree(m.perform(full(get(Q), "A")).andExpect(status().isOk())
@@ -267,24 +327,17 @@ class QualityDispositionHttpTest {
     }
 
     @Test
-    void transferRejectsMissingAmbiguousAndInconsistentBatchWithoutStockWrites() throws Exception {
+    void transferRejectsMissingBatchWithoutStockWrites() throws Exception {
         try (var c = context(EXTRA, 100, 100, 90, 90, 90)) {
             var m = MaterialIssueHttpTest.mvc(c);
             var j = ProductionWarehouseFixture.db(c);
             var id = defect(m, 12, "10", "INDEPENDENT", null);
-            for (String scenario : new String[]{"missing", "ambiguous", "inconsistent"}) {
-                j.update("DELETE FROM mes_production_scan_identity");
-                if (!scenario.equals("missing")) bindBatch(j, "000LOT-001");
-                if (scenario.equals("ambiguous")) bindBatch(j, "000LOT-002");
-                if (scenario.equals("inconsistent"))
-                    j.update("UPDATE mes_production_scan_identity SET material_lot_code='tampered'");
-                m.perform(full(post(Q + "/" + id + "/dispositions"), "A")
-                                .content(command(UUID.randomUUID().toString(), "WAREHOUSE", "10", "1")))
-                        .andExpect(status().isConflict());
-                assertEquals(0, j.queryForObject("SELECT COUNT(*) FROM wm_stock_document", Integer.class));
-                assertEquals(0, j.queryForObject("SELECT COUNT(*) FROM wm_inventory WHERE material_id=1 AND batch_no LIKE '000LOT-%'", Integer.class));
-                assertEquals(0, j.queryForObject("SELECT COUNT(*) FROM mes_quality_treatment WHERE action_type='TRANSFER_WAREHOUSE'", Integer.class));
-            }
+            m.perform(full(post(Q + "/" + id + "/dispositions"), "A")
+                            .content(command(UUID.randomUUID().toString(), "WAREHOUSE", "10", "1")))
+                    .andExpect(status().isConflict());
+            assertEquals(0, j.queryForObject("SELECT COUNT(*) FROM wm_stock_document", Integer.class));
+            assertEquals(0, j.queryForObject("SELECT COUNT(*) FROM wm_inventory WHERE material_id=1 AND batch_no LIKE '000LOT-%'", Integer.class));
+            assertEquals(0, j.queryForObject("SELECT COUNT(*) FROM mes_quality_treatment WHERE action_type='TRANSFER_WAREHOUSE'", Integer.class));
         }
     }
 
@@ -295,7 +348,7 @@ class QualityDispositionHttpTest {
             var jdbc = ProductionWarehouseFixture.db(c);
             var id = defect(mvc, 12, "10", "INDEPENDENT", null);
             var before = quantities(mvc);
-            dispose(mvc, id, command(UUID.randomUUID().toString(), "RETURN_NODE", "4", "null"));
+            historicalReturn(jdbc, id, UUID.randomUUID().toString(), "4");
             var returned = quantities(mvc);
             for (int i = 0; i < 5; i++)
                 assertEquals(before.get("nodes").get(i).get("effectiveOutputQty"), returned.get("nodes").get(i)

@@ -17,6 +17,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.mock.web.MockServletContext;
 import org.springframework.web.context.support.AnnotationConfigWebApplicationContext;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -48,6 +49,7 @@ class WorkOrderProgressHttpTest {
     }
 
     private static void complete(JdbcTemplate jdbc, String id, long executionId, String quantity) {
+        jdbc.update("UPDATE mes_production_execution SET status='FULLY_RECEIVED' WHERE id=?", executionId);
         jdbc.update("INSERT INTO mes_execution_completion(id,execution_id,effective_qty,released_qty,receipt_qty,accepted_qty,basis_hash,request_hash,operator_user_id,recorded_at,reason) VALUES(?,?, ?,?,?,?, ?,?,1,CURRENT_TIMESTAMP,'TEST ONLY')",
                 id, executionId, quantity, quantity, quantity, quantity, "a".repeat(64), "b".repeat(64));
     }
@@ -131,6 +133,34 @@ class WorkOrderProgressHttpTest {
                     .andExpect(jsonPath("items[0].completionPercent").isEmpty())
                     .andExpect(jsonPath("items[0].completedQty").isEmpty())
                     .andExpect(jsonPath("items[0].issue").value("正式完工事实重复或数量异常，请核实"));
+        }
+    }
+
+    @Test
+    void receiptClosedContributionCountsGoodStockAndNetLossWithoutAddingQualityStockTwice() throws Exception {
+        try (var c = context()) {
+            var j = c.getBean(MaterialIssueHttpTest.Fixture.class).business.get("A");
+            ProductionReportHttpTest.seed(j);
+            j.update("UPDATE workorder SET planned_qty=100 WHERE id=1");
+            complete(j, "TEST ONLY receipt closure90", 1, "90");
+            declaration(j, "TEST ONLY upstream loss", 1, "CREATE", "10");
+            treatment(j, "TEST ONLY upstream loss", 1, "ASSESS", "INDEPENDENT");
+            j.update("INSERT INTO mes_quality_treatment(id,request_hash,declaration_id,declaration_revision,execution_id,routing_node_id,action_type,transfer_qty,operator_user_id,recorded_at,reason) VALUES(?,?,?,1,1,11,'TRANSFER_WAREHOUSE',10,1,CURRENT_TIMESTAMP,'TEST ONLY')",
+                    UUID.randomUUID().toString(), "t".repeat(64), "TEST ONLY upstream loss");
+            var mvc = MaterialIssueHttpTest.mvc(c);
+            mvc.perform(ProductionReportHttpTest.full(get(URL), "A"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("items[0].completedQty").value("100.000000"))
+                    .andExpect(jsonPath("items[0].completionPercent").value("100.00"))
+                    .andExpect(jsonPath("items[0].goodOutputGapQty").value("10.000000"))
+                    .andExpect(jsonPath("items[0].pendingCompletionQty").value("0.000000"));
+            // An old completion fact is still readable elsewhere but is never relabelled receipt closure.
+            j.update("UPDATE mes_production_execution SET status='COMPLETED' WHERE id=1");
+            mvc.perform(ProductionReportHttpTest.full(get(URL), "A"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("items[0].completedQty").value("0"))
+                    .andExpect(jsonPath("items[0].completedExecutions").value(0));
+            assertEquals(1, j.queryForObject("SELECT COUNT(*) FROM mes_execution_completion", Integer.class));
         }
     }
 

@@ -92,14 +92,16 @@ class ProductionChainHttpTest {
                     .andExpect(jsonPath("excessTargetQty").value("0.000000"));
             m.perform(full(put(W + "/1"), "A").content(DEMAND.replace("QA_DEMAND", "WO1")
                             .replace("\"routingId\":\"1\"", "\"routingId\":\"3\"").replace("}", ",\"revision\":0}")))
-                    .andExpect(status().isOk());
+                    .andExpect(status().isConflict()).andExpect(jsonPath("errorCode").value("EXECUTION_FROZEN"));
             m.perform(full(get(E + "/1"), "A")).andExpect(status().isOk()).andExpect(jsonPath("routingId").value("1"));
             String running = one.replace("READY", "RUNNING").replace("}", ",\"startTime\":\"2026-10-14T09:00:00\"}");
             for (String body : List.of(running, running.replace("RUNNING", "COMPLETED")
-                    .replace("}", ",\"endTime\":\"2026-10-14T10:00:00\"}")))
+                            .replace("}", ",\"endTime\":\"2026-10-14T10:00:00\"}"),
+                    running.replace("RUNNING", "FULLY_RECEIVED")
+                            .replace("}", ",\"endTime\":\"2026-10-14T10:00:00\"}")))
                 m.perform(full(put(E + "/1"), "A").content(body)).andExpect(status().isConflict())
                         .andExpect(jsonPath("errorCode").value("EXECUTION_FROZEN"));
-            m.perform(full(post(W + "/1/actions/release"), "A").content("{\"revision\":1}"))
+            m.perform(full(post(W + "/1/actions/release"), "A").content("{\"revision\":0}"))
                     .andExpect(status().isOk());
             m.perform(full(put(E + "/1"), "A").content(running)).andExpect(status().isConflict());
             m.perform(full(post("/api/production/executions/1/actions/start"), "A")).andExpect(status().isConflict());

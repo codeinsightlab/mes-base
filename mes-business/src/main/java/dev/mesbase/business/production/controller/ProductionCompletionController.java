@@ -29,19 +29,30 @@ public class ProductionCompletionController {
 
     public record Summary(String executionId, String executionNo, String status, String targetQty, String effective,
                           String released, String historicalReleased, String basisHash, boolean canComplete,
-                          String blockedReason, Fact completion) {
+                          String blockedReason, Fact completion, String receivedQty, String defectQty,
+                          String receiptState, String orderBlockedReason) {
     }
 
     @GetMapping("/closure")
     @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED, permission = "business:mes:production:execution:query")
     public Summary summary(@PathVariable Long id) {
-        var s = service.summary(id);
+        return summaryView(id, service.summary(id));
+    }
+
+    @PostMapping("/actions/recheck-receipt")
+    @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED, permission = "business:production:execution:complete")
+    public Summary recheckReceipt(@PathVariable Long id) {
+        return summaryView(id, service.recheckReceipt(id));
+    }
+
+    private static Summary summaryView(Long id, ProductionCompletionService.Summary s) {
         return new Summary(id.toString(), s.execution().getExecutionNo(), s.execution().getStatus(), s.execution()
                 .getTargetQty().toPlainString(),
                 s.release().effective().toPlainString(), s.release().released().toPlainString(), s.release()
                 .historicalReleased().toPlainString(), s.release()
                 .basisHash(), s.canComplete(), s.blockedReason(), Optional.ofNullable(s.completion())
-                .map(nullableValue -> view(nullableValue)).orElse(null));
+                .map(nullableValue -> view(nullableValue)).orElse(null), s.receivedQty().toPlainString(),
+                s.defectQty().toPlainString(), s.receiptState(), s.orderBlockedReason());
     }
 
     @PostMapping("/actions/complete")

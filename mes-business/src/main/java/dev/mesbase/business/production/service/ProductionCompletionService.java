@@ -1,58 +1,54 @@
 package dev.mesbase.business.production.service;
 
-
-import dev.mesbase.common.validation.ParameterChecks;
+import com.github.pagehelper.PageHelper;
+import dev.mesbase.business.issue.dao.MesMaterialIssueMapper;
+import dev.mesbase.business.issue.domain.MaterialIssueStatus;
+import dev.mesbase.business.issue.domain.MesMaterialIssueExample;
 import dev.mesbase.business.production.dao.MesExecutionCompletionMapper;
-import dev.mesbase.business.production.dao.MesProductionReportMapper;
-import dev.mesbase.business.production.domain.MesProductionReportExample;
-import dev.mesbase.framework.sync.SyncCoordinator;
-import java.util.UUID;
-import java.nio.charset.StandardCharsets;
 import dev.mesbase.business.production.dao.MesProductionExecutionMapper;
+import dev.mesbase.business.production.domain.ExecutionPathStatus;
 import dev.mesbase.business.production.domain.MesExecutionCompletionEntity;
 import dev.mesbase.business.production.domain.MesExecutionCompletionExample;
 import dev.mesbase.business.production.domain.MesProductionExecutionEntity;
+import dev.mesbase.business.production.domain.MesProductionExecutionExample;
 import dev.mesbase.business.production.domain.MesProductionExecutionResource;
 import dev.mesbase.business.production.domain.ProductionClosureRules;
+import dev.mesbase.business.production.domain.ProductionClosureBlockedException;
 import dev.mesbase.business.production.domain.ProductionCompletionBalance;
-import dev.mesbase.business.production.domain.WorkOrderCompletionRequested;
-import org.springframework.context.ApplicationEventPublisher;
 import dev.mesbase.business.production.domain.ProductionExecutionStatus;
-import dev.mesbase.business.issue.dao.MesMaterialIssueMapper;
-import dev.mesbase.business.issue.domain.MesMaterialIssueExample;
-import dev.mesbase.business.issue.domain.MaterialIssueStatus;
+import dev.mesbase.business.production.domain.ProductionReceiptState;
+import dev.mesbase.business.production.domain.ProductionReportModels.ExecutionQuantity;
 import dev.mesbase.business.quality.service.QualityReleaseService;
+import dev.mesbase.business.quality.service.QualityTreatmentService;
 import dev.mesbase.business.wm.dao.StockDocumentExtraMapper;
-import dev.mesbase.business.integration.warehouse.WarehouseIntegration;
-import dev.mesbase.business.integration.warehouse.ErpActionResult.Mode;
-import dev.mesbase.platform.execution.FactoryContext;
+import dev.mesbase.common.validation.ParameterChecks;
+import dev.mesbase.core.error.ErrorCode;
 import dev.mesbase.infrastructure.cache.annotation.BusinessCacheEvict;
 import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.util.List;
-import com.github.pagehelper.PageHelper;
-import org.springframework.stereotype.Service;
-import org.springframework.dao.DuplicateKeyException;
-import dev.mesbase.core.error.FoundationException;
-import dev.mesbase.core.error.ErrorCode;
+import java.util.Objects;
+import java.util.UUID;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Isolation;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
 
-import static dev.mesbase.business.production.domain.ProductionClosureRules.blocked;
-
+/**
+ * Inbound approval is the only creator of new execution closure facts.
+ */
 @Service
 @ConditionalOnProperty(name = "mes.business.enabled", havingValue = "true")
 public class ProductionCompletionService {
-    private final BusinessSourceRules sources;
-    private final MesProductionReportMapper reports;
-    private final SyncCoordinator coordinator;
-
     public record Command(String requestId, String expectedBasisHash, String reason) {
     }
 
     public record Summary(MesProductionExecutionEntity execution, QualityReleaseService.State release,
-                          MesExecutionCompletionEntity completion, boolean canComplete, String blockedReason) {
+                          MesExecutionCompletionEntity completion, boolean canComplete, String blockedReason,
+                          BigDecimal receivedQty, BigDecimal defectQty, String receiptState,
+                          String orderBlockedReason) {
     }
 
     private final MesExecutionCompletionMapper completions;
@@ -61,141 +57,200 @@ public class ProductionCompletionService {
     private final MesMaterialIssueMapper issues;
     private final ProductionChainLocks locks;
     private final QualityReleaseService releases;
+    private final QualityTreatmentService quality;
     private final ProductionQuantityService quantities;
-    private final ApplicationEventPublisher events;
     private final ProductionExecutionRules rules;
-    private final WarehouseIntegration integration;
+    private final BusinessSourceRules sources;
+    private final WorkOrderCompletionService workorders;
 
     public ProductionCompletionService(MesExecutionCompletionMapper completions,
-                                       MesProductionExecutionMapper executions,
-                                       StockDocumentExtraMapper inbound,
-                                       MesMaterialIssueMapper issues,
-                                       ProductionChainLocks locks, QualityReleaseService releases,
-                                       ProductionExecutionRules rules, WarehouseIntegration integration,
-                                       BusinessSourceRules sources, ProductionQuantityService quantities,
-                                       ApplicationEventPublisher events, MesProductionReportMapper reports,
-                                       SyncCoordinator coordinator) {
-        this.reports = reports;
-        this.coordinator = coordinator;
-        this.events = events;
-        this.quantities = quantities;
-        this.sources = sources;
+                                       MesProductionExecutionMapper executions, StockDocumentExtraMapper inbound,
+                                       MesMaterialIssueMapper issues, ProductionChainLocks locks,
+                                       QualityReleaseService releases, QualityTreatmentService quality,
+                                       ProductionQuantityService quantities, ProductionExecutionRules rules,
+                                       BusinessSourceRules sources, WorkOrderCompletionService workorders) {
         this.completions = completions;
         this.executions = executions;
         this.inbound = inbound;
         this.issues = issues;
         this.locks = locks;
         this.releases = releases;
+        this.quality = quality;
+        this.quantities = quantities;
         this.rules = rules;
-        this.integration = integration;
+        this.sources = sources;
+        this.workorders = workorders;
     }
 
     @Transactional(transactionManager = "businessTransactionManager", readOnly = true, isolation = Isolation.READ_COMMITTED)
     public Summary summary(Long id) {
         var execution = executions.selectByPrimaryKey(id);
-        if (execution == null) ParameterChecks.reject(ErrorCode.BAD_REQUEST);
+        if (execution == null) ParameterChecks.reject(ErrorCode.NOT_FOUND);
         var projection = quantities.getExecutionQuantities(id);
-        var q = releases.stateFor(projection);
-        var f = new MesExecutionCompletionExample();
-        f.createCriteria().andExecutionIdEqualTo(id);
-        MesExecutionCompletionEntity completed;
-        try (var page = PageHelper.offsetPage(0, 2, false)) {
-            var rows = completions.selectByExample(f);
-            if (rows.size() > 1) ParameterChecks.reject(ErrorCode.PRODUCTION_CLOSURE_CONFLICT);
-            completed = rows.isEmpty() ? null : rows.getFirst();
+        var release = releases.stateFor(projection);
+        var completion = completion(id);
+        var received = inbound.formalProductionInbound(id);
+        var defect = defectQty(projection);
+        String reason = blockedReason(execution, projection, received);
+        String state = ProductionExecutionStatus.FULLY_RECEIVED.getValue().equals(execution.getStatus())
+                ? ProductionReceiptState.FULLY_RECEIVED.getValue() : (received.signum() > 0 || quality.hasFormalReceipt(id))
+                ? ProductionReceiptState.PARTIAL.getValue() : ProductionReceiptState.PENDING.getValue();
+        return new Summary(execution, release, completion, false, reason, received, defect, state,
+                workorders.blockedReason(execution.getWorkorderId()));
+    }
+
+    /**
+     * Locks every sibling in ascending order before any document or inventory lock is taken.
+     */
+    @Transactional(transactionManager = "businessTransactionManager", propagation = Propagation.MANDATORY, rollbackFor = Exception.class)
+    public void lockInboundChain(Long id) {
+        var before = executions.selectByPrimaryKey(id);
+        if (before == null) ParameterChecks.reject(ErrorCode.NOT_FOUND);
+        locks.order(before.getWorkorderId());
+        long after = 0;
+        while (true) {
+            var filter = new MesProductionExecutionExample();
+            filter.createCriteria().andWorkorderIdEqualTo(before.getWorkorderId()).andIdGreaterThan(after);
+            filter.setOrderByClause("id ASC");
+            List<MesProductionExecutionEntity> rows;
+            try (var page = PageHelper.offsetPage(0, 100, false)) {
+                rows = List.copyOf(executions.selectByExample(filter));
+            }
+            if (rows.isEmpty()) break;
+            for (var row : rows) {
+                locks.execution(row.getId());
+                after = row.getId();
+            }
         }
+        var current = executions.selectByPrimaryKey(id);
+        if (current == null || !Objects.equals(current.getWorkorderId(), before.getWorkorderId()))
+            ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
+    }
+
+    /**
+     * Caller has locked the entire chain and saved POSTED document plus its stock actions in this transaction.
+     */
+    @Transactional(transactionManager = "businessTransactionManager", propagation = Propagation.MANDATORY, rollbackFor = Exception.class)
+    @BusinessCacheEvict(business = MesProductionExecutionResource.PREFIX, scope = BusinessCacheEvict.Scope.LIST_AND_DETAIL)
+    public void afterInboundApproved(Long id, String auditRequestId) {
+        ProductionClosureRules.uuid(auditRequestId);
+        var execution = executions.selectByPrimaryKey(id);
+        if (execution == null) ParameterChecks.reject(ErrorCode.NOT_FOUND);
+        // Historical COMPLETED is never promoted or backfilled as a new receipt fact.
+        if (ProductionExecutionStatus.RUNNING.getValue().equals(execution.getStatus())) {
+            sources.finishedOutput(execution, null);
+            var projection = quantities.getExecutionQuantities(id);
+            var received = inbound.formalProductionInbound(id);
+            if (blockedReason(execution, projection, received) == null) {
+                rules.checkReadyReferences(execution);
+                append(execution, projection, received, auditRequestId);
+            }
+        }
+        workorders.afterInboundApproved(execution.getWorkorderId());
+    }
+
+    /**
+     * Explicitly rechecks existing posted facts after a former business blocker has been resolved.
+     */
+    @Transactional(transactionManager = "businessTransactionManager", isolation = Isolation.READ_COMMITTED, rollbackFor = Exception.class)
+    @BusinessCacheEvict(business = MesProductionExecutionResource.PREFIX, scope = BusinessCacheEvict.Scope.LIST_AND_DETAIL)
+    public Summary recheckReceipt(Long id) {
+        lockInboundChain(id);
+        var execution = executions.selectByPrimaryKey(id);
+        if (execution == null) ParameterChecks.reject(ErrorCode.NOT_FOUND);
+        sources.finishedOutput(execution, null);
+        String auditRequestId = inbound.latestInboundAuditId(id);
+        if (auditRequestId != null) {
+            afterInboundApproved(id, auditRequestId);
+            return summary(id);
+        }
+        var current = summary(id);
+        return new Summary(current.execution(), current.release(), current.completion(), false,
+                "没有与正式库存动作一致的已审核生产或质量入库，不能复查收尾", current.receivedQty(),
+                current.defectQty(), current.receiptState(), current.orderBlockedReason());
+    }
+
+    /**
+     * Original requests remain verifiable; the retired manual endpoint cannot create a new closure.
+     */
+    @Transactional(transactionManager = "businessTransactionManager", isolation = Isolation.READ_COMMITTED, rollbackFor = Exception.class)
+    public MesExecutionCompletionEntity complete(Long id, Command command) {
+        if (command == null) ParameterChecks.reject(ErrorCode.BAD_REQUEST);
+        ProductionClosureRules.uuid(command.requestId());
+        ProductionClosureRules.reason(command.reason());
+        var existing = completions.selectByPrimaryKey(command.requestId());
+        String hash = ProductionClosureRules.hash(id, command.expectedBasisHash(), command.reason(), ProductionClosureRules.actor());
+        if (existing != null && Objects.equals(id, existing.getExecutionId())
+                && Objects.equals(existing.getOperatorUserId(), ProductionClosureRules.actor())
+                && hash.equals(existing.getRequestHash())) return existing;
+        if (existing != null) ParameterChecks.reject(ErrorCode.PRODUCTION_CLOSURE_CONFLICT);
+        throw new ProductionClosureBlockedException("手动完工已停用；生产及不良入库审核后按统一规则自动收尾");
+    }
+
+    private String blockedReason(MesProductionExecutionEntity execution, ExecutionQuantity projection,
+                                 BigDecimal received) {
+        if (!List.of(ProductionExecutionStatus.RUNNING.getValue(), ProductionExecutionStatus.FULLY_RECEIVED.getValue())
+                .contains(execution.getStatus())) return "执行尚未开工或为历史终态，不能自动完全入库";
+        if (ProductionExecutionStatus.RUNNING.getValue()
+                .equals(execution.getStatus()) && completion(execution.getId()) != null)
+            return "执行已有历史完工事实，不能自动转换为完全入库";
+        if (!ExecutionPathStatus.LOCKED.getValue().equals(projection.pathStatus())) return "实际生产路径尚未锁定";
+        if (projection.nodes().stream().anyMatch(node -> node.historicalConflict()))
+            return "存在历史数量超额，须核实后才能完全入库";
+        var balanceReason = ProductionCompletionBalance.blockedReason(projection);
+        if (balanceReason != null) return balanceReason;
         var unresolved = new MesMaterialIssueExample();
-        unresolved.createCriteria().andExecutionIdEqualTo(id)
-                .andStatusNotIn(List.of(MaterialIssueStatus.CONFIRMED.getValue(), MaterialIssueStatus.VOIDED.getValue(), MaterialIssueStatus.SUBMIT_REJECTED.getValue()));
-        String balanceReason = ProductionCompletionBalance.blockedReason(projection);
-        String reason = !ProductionExecutionStatus.RUNNING.getValue()
-                .equals(execution.getStatus()) ? "执行必须处于RUNNING状态" : !q.safe() ? q.blockedReason() : balanceReason != null ? balanceReason : issues.countByExample(unresolved) > 0 ? "相关领料仍有未决状态，请核实原请求" : null;
-        return new Summary(execution, q, completed, reason == null, reason);
+        unresolved.createCriteria().andExecutionIdEqualTo(execution.getId()).andStatusNotIn(List.of(
+                MaterialIssueStatus.CONFIRMED.getValue(), MaterialIssueStatus.VOIDED.getValue(),
+                MaterialIssueStatus.SUBMIT_REJECTED.getValue()));
+        if (issues.countByExample(unresolved) > 0) return "相关领料仍有未决状态，请核实原请求";
+        if (inbound.invalidProductionInboundLines(execution.getId()) > 0) return "正式生产入库明细与库存动作不一致";
+        var output = projection.nodes().getLast().effectiveOutputQty();
+        if (received.compareTo(output) < 0) return "正常品尚未全部正式入库";
+        if (received.compareTo(output) > 0) return "正常品正式入库超过当前有效产出，须核实数量异常";
+        return quality.receiptBlockReason(execution.getId());
     }
 
-    @Transactional(transactionManager = "businessTransactionManager", isolation = Isolation.READ_COMMITTED, rollbackFor = Exception.class)
-    @BusinessCacheEvict(business = MesProductionExecutionResource.PREFIX, scope = BusinessCacheEvict.Scope.LIST_AND_DETAIL)
-    public MesExecutionCompletionEntity complete(Long id, Command c) {
-        if (c == null) ParameterChecks.reject(ErrorCode.BAD_REQUEST);
-        ProductionClosureRules.uuid(c.requestId());
-        ProductionClosureRules.reason(c.reason());
-        String hash = ProductionClosureRules.hash(id, c.expectedBasisHash(), c.reason(), ProductionClosureRules.actor());
-        var execution = locks.execution(id);
-        var existing = completions.selectByPrimaryKey(c.requestId());
-        if (existing != null) {
-            if (!hash.equals(existing.getRequestHash())) ParameterChecks.reject(ErrorCode.PRODUCTION_CLOSURE_CONFLICT);
-            return existing;
-        }
-        sources.execution(execution, null);
-        if (integration.configuredMode(FactoryContext.required()) != Mode.LOCAL_ONLY)
-            blocked("当前仅支持LOCAL完整完工，ERP未配置时不能假成功");
-        var s = summary(id);
-        if (s.completion() != null) blocked("执行已经正式完工，请查询或重放原完工请求");
-        if (!s.canComplete()) blocked(s.blockedReason());
-        if (c.expectedBasisHash() == null || !c.expectedBasisHash().equals(s.release().basisHash())) ParameterChecks.reject(ErrorCode.PRODUCTION_CLOSURE_CONFLICT);
-        rules.checkReadyReferences(execution);
-        return append(execution, s, c.requestId(), hash, ProductionClosureRules.actor(), c.reason());
-    }
-
-    @Transactional(transactionManager = "businessTransactionManager", isolation = Isolation.READ_COMMITTED, rollbackFor = Exception.class)
-    @BusinessCacheEvict(business = MesProductionExecutionResource.PREFIX, scope = BusinessCacheEvict.Scope.LIST_AND_DETAIL)
-    public boolean reconcile(Long id, SyncCoordinator.Run run) {
-        assertOwner(run);
-        var execution = locks.execution(id);
-        if (!ProductionExecutionStatus.RUNNING.getValue().equals(execution.getStatus())) return false;
-        sources.execution(execution, null);
-        var s = summary(id);
-        if (s.completion() != null || !s.canComplete()) return false;
-        rules.checkReadyReferences(execution);
-        var filter = new MesProductionReportExample();
+    private MesExecutionCompletionEntity completion(Long id) {
+        var filter = new MesExecutionCompletionExample();
         filter.createCriteria().andExecutionIdEqualTo(id);
-        filter.setOrderByClause("id DESC");
-        try (var page = PageHelper.offsetPage(0, 1, false)) {
-            var initiators = reports.selectByExample(filter);
-            if (initiators.isEmpty() || initiators.getFirst().getRecordedBy() == null) return false;
-            var initiator = initiators.getFirst();
-            String request = UUID.nameUUIDFromBytes(("auto-production-completion:" + FactoryContext.required()
-                    .factoryId().value() + ":" + id).getBytes(StandardCharsets.UTF_8)).toString();
-            String reason = "系统自动生产完工；发起依据报工流水 " + initiator.getId() + "，登记用户 " + initiator.getRecordedBy();
-            assertOwner(run);
-            append(execution, s, request, ProductionClosureRules.hash(request, s.release()
-                    .basisHash(), reason), initiator.getRecordedBy(), reason);
-            assertOwner(run);
-            return true;
+        try (var page = PageHelper.offsetPage(0, 2, false)) {
+            var rows = completions.selectByExample(filter);
+            if (rows.size() > 1) ParameterChecks.reject(ErrorCode.PRODUCTION_CLOSURE_CONFLICT);
+            if (rows.isEmpty()) return null;
+            return rows.getFirst();
         }
     }
 
-    private void assertOwner(SyncCoordinator.Run run) {
-        if (!FactoryContext.required().equals(run.scope()) || !"workorder-completion".equals(run.syncKey()))
-            throw new FoundationException(ErrorCode.SYNC_EXECUTION_LOST);
-        coordinator.assertOwner(run);
+    static BigDecimal defectQty(ExecutionQuantity projection) {
+        return projection.nodes().stream().map(node -> node.netDefectQty()).reduce(BigDecimal.ZERO, BigDecimal::add);
     }
 
-    private MesExecutionCompletionEntity append(MesProductionExecutionEntity execution, Summary s, String requestId,
-                                                String hash, Long actor, String reason) {
+    private void append(MesProductionExecutionEntity execution, ExecutionQuantity projection,
+                        BigDecimal received, String auditRequestId) {
+        if (completion(execution.getId()) != null) ParameterChecks.reject(ErrorCode.PRODUCTION_CLOSURE_CONFLICT);
+        var release = releases.stateFor(projection);
+        String requestId = UUID.nameUUIDFromBytes(("fully-received:" + execution.getId() + ":" + auditRequestId)
+                .getBytes(StandardCharsets.UTF_8)).toString();
         var row = new MesExecutionCompletionEntity();
         row.setId(requestId);
         row.setExecutionId(execution.getId());
-        row.setEffectiveQty(s.release().effective());
-        row.setReleasedQty(s.release().released());
+        row.setEffectiveQty(projection.nodes().getLast().effectiveOutputQty());
+        row.setReleasedQty(release.released());
         row.setReceiptQty(BigDecimal.ZERO);
-        row.setAcceptedQty(inbound.netProductionInbound(execution.getId()));
-        row.setBasisHash(s.release().basisHash());
-        row.setRequestHash(hash);
-        row.setOperatorUserId(actor);
+        row.setAcceptedQty(received);
+        row.setBasisHash(ProductionClosureRules.hash(projection.confirmedInputQty(), row.getEffectiveQty(),
+                defectQty(projection), received, auditRequestId, release.basisHash()));
+        row.setRequestHash(ProductionClosureRules.hash(requestId, auditRequestId, row.getBasisHash(), ProductionClosureRules.actor()));
+        row.setOperatorUserId(ProductionClosureRules.actor());
         row.setRecordedAt(LocalDateTime.now());
-        row.setReason(reason);
-        try {
-            if (completions.insert(row) != 1) ParameterChecks.reject(ErrorCode.PRODUCTION_CLOSURE_CONFLICT);
-        } catch (DuplicateKeyException collision) {
-            throw new FoundationException(ErrorCode.PRODUCTION_CLOSURE_CONFLICT, collision);
-        }
-        execution.setStatus(ProductionExecutionStatus.COMPLETED.getValue());
+        row.setReason("正式入库审核驱动完全入库；审核请求 " + auditRequestId);
+        if (completions.insert(row) != 1) ParameterChecks.reject(ErrorCode.PRODUCTION_CLOSURE_CONFLICT);
+        execution.setStatus(ProductionExecutionStatus.FULLY_RECEIVED.getValue());
         execution.setEndTime(row.getRecordedAt());
         execution.setUpdateBy(row.getOperatorUserId().toString());
         execution.setUpdateTime(row.getRecordedAt());
-        if (executions.updateByPrimaryKey(execution) != 1) ParameterChecks.reject(ErrorCode.PRODUCTION_CLOSURE_CONFLICT);
-        events.publishEvent(new WorkOrderCompletionRequested(FactoryContext.required(), execution.getWorkorderId()));
-        return row;
+        if (executions.updateByPrimaryKey(execution) != 1)
+            ParameterChecks.reject(ErrorCode.PRODUCTION_CLOSURE_CONFLICT);
     }
 }

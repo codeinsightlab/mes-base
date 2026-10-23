@@ -24,7 +24,7 @@ source:
 selection:
   # [] 表示全部表；[pro_workorder] 表示只生成这张表。
   # [pro_workorder, person] 表示只生成列出的表。
-  tables: [mes_production_scan_identity, mes_material_issue_input]
+  tables: [mes_material_issue_input]
   # 全量生成时明确跳过的表；默认草案为空，不猜测哪些属于业务表。
   # 排除 Flyway 迁移历史技术表，防止生成其 CRUD/同步接口。
   # pro_workorder 为已退役的 Source 结构，不能重新生成旧技术工单入口。
@@ -171,9 +171,6 @@ execution:
 
 # 当前保留业务表的同步匹配键；均明确选择本表的业务编码，不使用 ERP 编号覆盖 MES 自增主键。
 tableOverrides:
-  mes_production_scan_identity:
-    module: production
-    displayName: 生产永久扫码身份
   mes_material_issue_input:
     module: issue
     displayName: 冻结投产确认

@@ -8,9 +8,7 @@ import dev.mesbase.business.issue.domain.MaterialIssueStatus;
 import dev.mesbase.business.production.domain.ProductionExecutionStatus;
 import dev.mesbase.business.production.domain.WorkOrderStatus;
 import dev.mesbase.business.production.domain.ProductionScanCode;
-import dev.mesbase.business.production.domain.MesProductionScanIdentityEntity;
 import dev.mesbase.business.production.domain.MesProductionExecutionCreateCommand;
-import dev.mesbase.business.production.dao.MesProductionScanIdentityMapper;
 import dev.mesbase.business.production.service.IMesProductionExecutionService;
 import dev.mesbase.business.issue.domain.MesMaterialIssueCreateCommand;
 import dev.mesbase.business.issue.domain.MesMaterialIssueItemCreateCommand;
@@ -65,7 +63,7 @@ public class ProductionInputService {
     }
 
     private final ProductionInputSupplyService supply;
-    private final MesProductionScanIdentityMapper bindings;
+    private final ProductionIdentityService identities;
     private final MesMaterialIssueInputMapper inputs;
     private final MesMaterialIssueMapper issueMapper;
     private final IMesProductionExecutionService executions;
@@ -84,7 +82,7 @@ public class ProductionInputService {
     private final TransactionTemplate transaction;
     private final ObjectMapper json = new ObjectMapper();
 
-    public ProductionInputService(ProductionInputSupplyService supply, MesProductionScanIdentityMapper bindings,
+    public ProductionInputService(ProductionInputSupplyService supply, ProductionIdentityService identities,
                                   MesMaterialIssueInputMapper inputs, MesMaterialIssueMapper issueMapper,
                                   IMesProductionExecutionService executions,
                                   MesProductionExecutionMapper executionMapper, IMesMaterialIssueService issues,
@@ -99,7 +97,7 @@ public class ProductionInputService {
         this.allocation = allocation;
         this.sources = sources;
         this.supply = supply;
-        this.bindings = bindings;
+        this.identities = identities;
         this.inputs = inputs;
         this.issueMapper = issueMapper;
         this.executions = executions;
@@ -129,13 +127,8 @@ public class ProductionInputService {
         var material = ProductionScanCode.material(code);
         var product = materials.selectByPrimaryKey(order.getProductId());
         if (product == null) ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
-        var identity = new ProductionScanCode(product.getCode(), material.materialCode(), material.lotCode());
-        var binding = bindings.selectByPrimaryKey(identity.key());
-        if (binding == null) return new Preview(routingService.detail(order.getRoutingId()), null);
-        if (!identity.encode().equals(binding.getEncodedCode())) ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
-        var execution = executionMapper.selectByPrimaryKey(binding.getExecutionId());
-        if (!Objects.equals(execution.getWorkorderId(), workorderId))
-            throw new FoundationException(ErrorCode.PRODUCTION_IDENTITY_CONFLICT);
+        var execution = identities.findExecution(workorderId, product.getId(), material.lotCode());
+        if (execution == null) return new Preview(routingService.detail(order.getRoutingId()), null);
         return new Preview(routingService.detail(execution.getRoutingId()), paths.view(execution.getId()));
     }
 
@@ -163,8 +156,7 @@ public class ProductionInputService {
             // Entire losing transaction rolled back, including its provisional execution/issue.
             var saved = transaction.execute(s -> inputs.selectByPrimaryKey(command.requestId()));
             if (saved != null) return replay(saved, hash);
-            // A different valid request won this production identity; retry preparation once against its permanent binding.
-            prepared = transaction.execute(s -> prepare(command, calculation, hash));
+            throw new FoundationException(ErrorCode.RESOURCE_CONFLICT, conflict);
         }
         var row = submissions.executePrepared(scope, prepared);
         return transaction.execute(s -> result(inputs.selectByPrimaryKey(command.requestId()), row.getStatus()));
@@ -182,32 +174,22 @@ public class ProductionInputService {
         if (!WorkOrderStatus.RELEASED.getValue()
                 .equals(order.getStatus()) || product == null || !Objects.equals(product.getCode(), calculation.order()
                 .productCode())
-                || order.getPlannedQty().compareTo(calculation.order().plannedQty()) != 0) ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
-        if (c.code().startsWith("MES1.") && !ProductionScanCode.parse(c.code()).productCode().equals(product.getCode()))
+                || order.getPlannedQty().compareTo(calculation.order().plannedQty()) != 0)
             ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
-        var identity = new ProductionScanCode(product.getCode(), calculation.stock().materialCode(), calculation.stock()
-                .lotCode());
-        var binding = bindings.selectByPrimaryKey(identity.key());
+        String batchNo = calculation.stock().lotCode();
+        // The source stock supplies the permanent batch property. The barcode is only a lookup representation.
+        new ProductionScanCode(order.getCode(), product.getCode(), batchNo);
+        var existingExecution = identities.findExecution(order.getId(), product.getId(), batchNo);
         Long executionId;
-        if (binding == null) {
-            var execution = executions.insert(new MesProductionExecutionCreateCommand(order.getId(), c.routingId(), c.outputQty(), ProductionExecutionStatus.READY.getValue(), null, null, "单材料扫码投产"));
+        if (existingExecution == null) {
+            var execution = executions.insert(new MesProductionExecutionCreateCommand(order.getId(), c.routingId(), c.outputQty(), ProductionExecutionStatus.READY.getValue(), null, null, "单材料正式投产"));
+            execution.setBatchNo(batchNo);
+            if (executionMapper.updateByPrimaryKey(execution) != 1) ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
             executionId = execution.getId();
-            binding = new MesProductionScanIdentityEntity();
-            binding.setId(identity.key());
-            binding.setEncodedCode(identity.encode());
-            binding.setProductCode(identity.productCode());
-            binding.setMaterialCode(identity.materialCode());
-            binding.setMaterialLotCode(identity.lotCode());
-            binding.setExecutionId(executionId);
-            binding.setCreatedAt(LocalDateTime.now());
-            if (bindings.insert(binding) != 1) ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
             paths.select(executionId, 0, c.routingNodeIds());
         } else {
-            if (!identity.encode().equals(binding.getEncodedCode())) ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
-            executionId = binding.getExecutionId();
+            executionId = existingExecution.getId();
             var e = locks.execution(executionId);
-            if (!Objects.equals(e.getWorkorderId(), order.getId()))
-                throw new FoundationException(ErrorCode.PRODUCTION_IDENTITY_CONFLICT);
             if (!Objects.equals(e.getRoutingId(), c.routingId()) || !List.of(ProductionExecutionStatus.READY.getValue(), ProductionExecutionStatus.RUNNING.getValue())
                     .contains(e.getStatus())) ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
             var path = paths.view(executionId);
@@ -255,9 +237,9 @@ public class ProductionInputService {
     private Result result(MesMaterialIssueInputEntity f, String status) {
         var execution = executionMapper.selectByPrimaryKey(f.getExecutionId());
         var product = materials.selectByPrimaryKey(execution.getProductId());
-        var c = json.readValue(f.getCalculationJson(), Calculation.class);
-        String code = new ProductionScanCode(c.order().productCode(), c.stock().materialCode(), c.stock()
-                .lotCode()).encode();
+        String code = "EXE:" + execution.getId();
+        if (execution.getBatchNo() != null)
+            code = new ProductionScanCode(readOrder(execution.getWorkorderId()).getCode(), product.getCode(), execution.getBatchNo()).encode();
         var q = quantities.getExecutionQuantities(execution.getId());
         return new Result(f.getId(), f.getIssueId().toString(), f.getExecutionId()
                 .toString(), execution.getExecutionNo(), code, status, q.productionInputQty().toPlainString(), q.nodes()

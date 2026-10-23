@@ -149,7 +149,7 @@ class QualityWorkflowHttpTest {
                     .andExpect(jsonPath("items[0].invalidActions").value(1));
             mvc.perform(full(post(Q + "/" + id + "/dispositions"), "A")
                             .content(QualityDispositionHttpTest.command(UUID.randomUUID()
-                                    .toString(), "RETURN_NODE", "1", null)))
+                                    .toString(), "WAREHOUSE", "1", "1")))
                     .andExpect(status().isConflict()).andExpect(jsonPath("errorCode").value("QUALITY_DATA_INVALID"));
             assertEquals(3, ProductionWarehouseFixture.db(c)
                     .queryForObject("SELECT COUNT(*) FROM mes_quality_treatment", Integer.class));

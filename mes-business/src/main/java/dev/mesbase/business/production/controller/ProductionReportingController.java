@@ -7,6 +7,7 @@ import dev.mesbase.business.production.controller.vo.ProductionReportViews.Ledge
 import dev.mesbase.business.production.controller.ExecutionActionController.PathView;
 import dev.mesbase.business.production.domain.ProductionReportSubmitModels.Command;
 import dev.mesbase.business.production.service.ProductionReportSubmitService;
+import dev.mesbase.common.utils.bean.BeanConversions;
 import dev.mesbase.platform.web.EndpointAccess;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
@@ -51,11 +52,7 @@ public class ProductionReportingController {
     @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED, permission = PERMISSION)
     public Context context(@RequestParam String code) {
         var c = service.context(code);
-        var i = c.identity();
-        var identity = new ProductionIdentityVo(i.executionId().toString(), i.executionNo(), i.qrCode(), i.workorderId()
-                .toString(),
-                i.workorderCode(), i.productId().toString(), i.productCode(), i.productName(), i.routingId().toString(),
-                i.routingCode(), i.routingVersion(), i.status(), i.targetQty().toPlainString());
+        var identity = BeanConversions.convert(c.identity(), ProductionIdentityVo.class);
         return new Context(identity, ProductionReportViews.execution(c.quantities()), ExecutionActionController.toView(c.path()),
                 c.candidates().stream().map(n -> new Candidate(n.routingNodeId().toString(), n.status(), n.reason()))
                         .toList());

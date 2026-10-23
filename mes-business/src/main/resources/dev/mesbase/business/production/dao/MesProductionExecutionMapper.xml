@@ -6,6 +6,7 @@
     <result column="execution_no" jdbcType="VARCHAR" property="executionNo" />
     <result column="workorder_id" jdbcType="BIGINT" property="workorderId" />
     <result column="product_id" jdbcType="BIGINT" property="productId" />
+    <result column="batch_no" jdbcType="VARCHAR" property="batchNo" />
     <result column="routing_id" jdbcType="BIGINT" property="routingId" />
     <result column="target_qty" jdbcType="DECIMAL" property="targetQty" />
     <result column="status" jdbcType="VARCHAR" property="status" />
@@ -76,8 +77,8 @@
     </where>
   </sql>
   <sql id="Base_Column_List">
-    id, execution_no, workorder_id, product_id, routing_id, target_qty, status, start_time,
-    end_time, remark, create_by, create_time, update_by, update_time
+    id, execution_no, workorder_id, product_id, batch_no, routing_id, target_qty, status,
+    start_time, end_time, remark, create_by, create_time, update_by, update_time
   </sql>
   <select id="selectByExample" parameterType="dev.mesbase.business.production.domain.MesProductionExecutionExample" resultMap="BaseResultMap">
     select
@@ -96,13 +97,6 @@
     from mes_production_execution
     where id = #{id,jdbcType=BIGINT}
   </select>
-  <select id="selectByPrimaryKeyForUpdate" flushCache="true" useCache="false" parameterType="Long" resultMap="BaseResultMap">
-    select
-    <include refid="Base_Column_List" />
-    from mes_production_execution
-    where id = #{id,jdbcType=BIGINT}
-    for update
-  </select>
   <delete id="deleteByPrimaryKey" parameterType="Long">
     delete from mes_production_execution
     where id = #{id,jdbcType=BIGINT}
@@ -115,15 +109,15 @@
   </delete>
   <insert id="insert" keyColumn="id" keyProperty="id" parameterType="dev.mesbase.business.production.domain.MesProductionExecutionEntity" useGeneratedKeys="true">
     insert into mes_production_execution (execution_no, workorder_id, product_id,
-      routing_id, target_qty, status,
-      start_time, end_time, remark,
-      create_by, create_time, update_by,
-      update_time)
+      batch_no, routing_id, target_qty,
+      status, start_time, end_time,
+      remark, create_by, create_time,
+      update_by, update_time)
     values (#{executionNo,jdbcType=VARCHAR}, #{workorderId,jdbcType=BIGINT}, #{productId,jdbcType=BIGINT},
-      #{routingId,jdbcType=BIGINT}, #{targetQty,jdbcType=DECIMAL}, #{status,jdbcType=VARCHAR},
-      #{startTime,jdbcType=TIMESTAMP}, #{endTime,jdbcType=TIMESTAMP}, #{remark,jdbcType=VARCHAR},
-      #{createBy,jdbcType=VARCHAR}, #{createTime,jdbcType=TIMESTAMP}, #{updateBy,jdbcType=VARCHAR},
-      #{updateTime,jdbcType=TIMESTAMP})
+      #{batchNo,jdbcType=VARCHAR}, #{routingId,jdbcType=BIGINT}, #{targetQty,jdbcType=DECIMAL},
+      #{status,jdbcType=VARCHAR}, #{startTime,jdbcType=TIMESTAMP}, #{endTime,jdbcType=TIMESTAMP},
+      #{remark,jdbcType=VARCHAR}, #{createBy,jdbcType=VARCHAR}, #{createTime,jdbcType=TIMESTAMP},
+      #{updateBy,jdbcType=VARCHAR}, #{updateTime,jdbcType=TIMESTAMP})
   </insert>
   <insert id="insertSelective" keyColumn="id" keyProperty="id" parameterType="dev.mesbase.business.production.domain.MesProductionExecutionEntity" useGeneratedKeys="true">
     insert into mes_production_execution
@@ -136,6 +130,9 @@
       </if>
       <if test="productId != null">
         product_id,
+      </if>
+      <if test="batchNo != null">
+        batch_no,
       </if>
       <if test="routingId != null">
         routing_id,
@@ -177,6 +174,9 @@
       </if>
       <if test="productId != null">
         #{productId,jdbcType=BIGINT},
+      </if>
+      <if test="batchNo != null">
+        #{batchNo,jdbcType=VARCHAR},
       </if>
       <if test="routingId != null">
         #{routingId,jdbcType=BIGINT},
@@ -231,6 +231,9 @@
       <if test="row.productId != null">
         product_id = #{row.productId,jdbcType=BIGINT},
       </if>
+      <if test="row.batchNo != null">
+        batch_no = #{row.batchNo,jdbcType=VARCHAR},
+      </if>
       <if test="row.routingId != null">
         routing_id = #{row.routingId,jdbcType=BIGINT},
       </if>
@@ -272,6 +275,7 @@
       execution_no = #{row.executionNo,jdbcType=VARCHAR},
       workorder_id = #{row.workorderId,jdbcType=BIGINT},
       product_id = #{row.productId,jdbcType=BIGINT},
+      batch_no = #{row.batchNo,jdbcType=VARCHAR},
       routing_id = #{row.routingId,jdbcType=BIGINT},
       target_qty = #{row.targetQty,jdbcType=DECIMAL},
       status = #{row.status,jdbcType=VARCHAR},
@@ -297,6 +301,9 @@
       </if>
       <if test="productId != null">
         product_id = #{productId,jdbcType=BIGINT},
+      </if>
+      <if test="batchNo != null">
+        batch_no = #{batchNo,jdbcType=VARCHAR},
       </if>
       <if test="routingId != null">
         routing_id = #{routingId,jdbcType=BIGINT},
@@ -336,6 +343,7 @@
     set execution_no = #{executionNo,jdbcType=VARCHAR},
       workorder_id = #{workorderId,jdbcType=BIGINT},
       product_id = #{productId,jdbcType=BIGINT},
+      batch_no = #{batchNo,jdbcType=VARCHAR},
       routing_id = #{routingId,jdbcType=BIGINT},
       target_qty = #{targetQty,jdbcType=DECIMAL},
       status = #{status,jdbcType=VARCHAR},
@@ -348,4 +356,11 @@
       update_time = #{updateTime,jdbcType=TIMESTAMP}
     where id = #{id,jdbcType=BIGINT}
   </update>
+  <select flushCache="true" id="selectByPrimaryKeyForUpdate" parameterType="Long" resultMap="BaseResultMap" useCache="false">
+    select
+    <include refid="Base_Column_List" />
+    from mes_production_execution
+    where id = #{id,jdbcType=BIGINT}
+    for update
+  </select>
 </mapper>

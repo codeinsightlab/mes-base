@@ -88,9 +88,10 @@ public class QualityReleaseService {
             issue = "缺少正式投入或仍有未决投产意图";
         else if (q.nodes().stream().anyMatch(n -> n.unverifiedDefectQty().signum() > 0))
             issue = "存在影响放行的待核实质量观察";
-        else if (basis.declarations().stream().anyMatch(s -> s.attribution() == Attribution.UNVERIFIED
-                || s.attribution() == Attribution.INDEPENDENT && s.pendingDispositionQty().signum() > 0))
-            issue = "存在尚未完成的不良处置";
+        else if (basis.declarations().stream().anyMatch(s -> s.attribution() == Attribution.UNVERIFIED))
+            issue = "存在影响放行的待核实不良";
+        // A verified loss is already deducted from good output. Its warehouse handoff is
+        // checked by receipt-driven closure, so good stock may be received first.
         BigDecimal output = q.nodes().isEmpty() ? BigDecimal.ZERO : q.nodes().getLast().effectiveOutputQty();
         String hash = ProductionClosureRules.hash(q.routingId(), q.pathStatus(), q.confirmedInputQty(),
                 q.nodes().stream()

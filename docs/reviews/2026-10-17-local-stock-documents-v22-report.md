@@ -205,3 +205,82 @@ Java格式化后追加定向23项测试通过（业务枚举3、仓储6、原LOC
 尚未取得：用户现有服务重新加载新Java后的真实命令/API及三档页面验收。现有服务没有被Agent重启；角色100尚未取得新增的通用仓储单权限，授权问题待用户选择，不能把上述H2/构建/打包证据写成该账号真实入库已成功。部署后入口使用服务端菜单配置（当前中心菜单为“物料库存 / 出入库单”），不能以源码目录wm拼猜页面URL。
 
 2026-10-21 用户随后明确授权平台管理员角色100。核实中心目标仍为192.168.18.25:3306/mes_base_dev、角色为启用的platform-admin后，先备份该角色原菜单关联，再执行幂等授权SQL，新增现有菜单2636—2641的list/query/create/update/cancel/post共6项权限；关联总数由384增至390，未删除原授权。数据库复核6项均启用，旧交接/仓储接收4项写权限仍停用。SQL、角色备份和执行回执分别为`.local/unified-inbound-20261021/grant-role100.sql`、`role100-menu-before.sql`和`grant-role100.log`。该授权已完成；用户刷新菜单后可使用“物料库存 / 出入库单”。新Java仍需用户重启后端加载，尚未将该授权复核视为真实入库命令验收。
+
+
+## 2026-10-23：当前库存入口、类型与ERP边界复核（只读）
+
+### 范围与能力矩阵
+
+读取当前工作树 StockDocumentController/Service、StockDocumentType、LocalStockService、StockReferenceRules、WmInventory/WarehouseServiceImpl、QualityDispositionService、BusinessSourceRules、WarehouseIntegration、MaterialIssue提交/核实/撤销、E10同步读取与writer，以及库存单/动作/来源选择、质量处置前端及对应API。阅读StockDocumentHttpTest、UnifiedInboundHttpTest、LocalWarehouseMySqlTest和前端stockDocuments测试的相关源码，没有运行它们。没有访问数据库、ERP、业务接口或浏览器；没有读凭证。未完整覆盖所有同步writer、质量数量、BOM和平台安全，详见跨模块台账。
+
+| 类型 | 后端草稿保存 | 后端审核/来源 | 当前正式入口与执行者 |
+| --- | --- | --- | --- |
+| PURCHASE_RECEIPT | 可 | 禁止，采购来源未接通 | API草稿；当前页面类型槽无此项 |
+| PRODUCTION_RECEIPT | 可，必须Execution | 可，当前生产/质量放行/净入库额度 | 生产闭环深链和库存API→LocalStockService；普通页面有类型断点 |
+| OUTSOURCE_RECEIPT | 可 | 禁止，委外来源未接通 | API草稿，页面无此项 |
+| MATERIAL_RETURN_RECEIPT | 可 | 禁止，该单据来源未接通 | API草稿；另有未开工LOCAL原领料退料命令 |
+| REWORK_RECEIPT | 可 | 禁止，返工任务/检验来源未接通 | API草稿，页面无此项；不能冒充不良入库 |
+| SALES_RETURN_RECEIPT | 可 | 禁止，销售退货来源未接通 | API草稿，页面无此项 |
+| DEFECT_RECEIPT | 普通create禁止，质量用例内部可创建 | 正式TRANSFER_WAREHOUSE事件/版本/数量匹配才可审核 | 不良申报→处置→不良仓→正式单据/明细/审核→LocalStockService |
+| SCRAP_RECEIPT | 同上 | 同上，目标SCRAP仓 | 同上，已决定报废实物入仓，不等于最终核销 |
+| OTHER_RECEIPT | 可 | 可，原因/实物依据；可选合法作废工单依据 | 统一库存单页面→LocalStockService |
+| OTHER_ISSUE | 可 | 可，一般发出原因/实物依据 | 统一库存单页面→LocalStockService；不等同质量最终核销闭环 |
+
+证据：`mes-business/src/main/java/dev/mesbase/business/wm/domain/StockDocumentType.java:9–18`、`wm/service/StockDocumentService.java:147–175,254–305`。以下短路径从`dev/mesbase/business/`起；UI表示相邻前端。
+
+**已有正式实现：** LOCAL零余额来源、受控期初/调整/亏损、扫码领料扣库及原净额撤销、未开工受控退料、草稿/明细/审核、生产及质量来源校验、同事务余额+不可变动作、分页动作读取。**部分实现：** 追溯/对账事实和查询已有，未证明自动全账对账工具；生产入库后端可达而页面契约有缺陷；E10读取/同步准备已有。**明确功能缺口：** 已审核统一单据撤销/冲销、入质量仓后的专用返工发出/质量跨仓/最终核销及五类未接通来源。**待验证：** 当前Schema/绑定、真实成功样本、并发和当前测试/运行版本。
+
+### 实际调用链与事务保护
+
+- UI `views/wm/stockDocuments/index.vue:56–62` → `api/wm/stockDocuments.ts:29–39,49–62` → `wm/controller/StockDocumentController.java:62–103` → `StockDocumentService.create/putLine/approve` → `LocalStockService.postDocument:246–273` → `change:301–350` → Inventory update + StockAction insert。StockDocumentService:67为具名业务事务/READ_COMMITTED/异常回滚。审核锁主单/生产链，307–311按库存/明细排序锁库存，313–331记录动作关联、POSTED、审核人/时间及原UUID/hash；库存改变385–389拒负余额、负可用和可用超过实存，更新/流水检查受影响行数。
+- 生产依据：StockDocumentActions:18 → execution basis → StockDocumentService:335–351 → QualityReleaseService.state + StockDocumentExtraMapper.netProductionInbound。XML:4–15同时计当前POSTED正式单据及原warehouse_acceptance事实，新单据须有关联库存动作。历史只读证据不授权恢复旧接收写流程。
+- 质量转仓：UI QualityTreatmentPanel:84–87,124–127 → disposition → `quality/service/QualityDispositionService.java:90–161` → active/独立/版本/余额校验 →126正式批次→127引用锁→128–132限定DEFECTIVE/SCRAP→正式createQualityReceipt/putLine→recordDisposition→approve。全部同LOCAL事务；不是枚举或测试替身。当前真实可追溯样本仍待验，不能用旧样本失败当作必须增加历史兼容入口。
+- 退料：UI LocalStockPanel:44–50 → localStock API → LocalStockService:114–127,153–178，只允许原LOCAL、stockApplied、未开工且无报工/质量/receipt事实，累计退量不超过原领料。154行明确不改产品投入，不能把材料量直接减产品量；减少投入走`issue/service/MaterialIssueVoidService.java:103–116,147–149`与InputFacts.voidConfirmed。该保守政策在旧仓储专题58–62行已有明确记录，本轮当前源码亦吻合；“全退材料但产品额度仍在”作为首厂场景限制/口径核对，不直接改判为回归缺陷，不宣称已支持开工后余料退库。
+
+### 当前问题、影响与验收方向
+
+1. **PLAN-01确定页面契约断点：** UI库存单58行只允许OTHER入/出，59行却只在OTHER入库可选Execution；API原样发类型；Service167–170只接受PRODUCTION_RECEIPT+Execution，普通菜单路径保存必被拒。完工深链预置正确类型（UI32–34；ProductionClosurePanel:42），不据此断言深链必失败。现有前端测试38行只直接传正确枚举，不覆盖真实页面槽。修正已有类型目录和来源联动，保留后端门禁；验收普通菜单/深链、类型回显/切换、草稿无库存动作、审核一次记账、无来源类型拒绝。优先于新返工/处置能力。
+2. **QA-02待复现并发风险：** putLine215–240/validateIdentity404–418普通读库存后插明细；WmInventoryServiceImpl202–219持库存锁查引用后删除；StockReferenceRules67–75虽然查明细，不能阻止尚未提交引用。V38明细表仅索引、未见后续外键补护（检索V8/V30/V34/V38/V44/V48及后续业务迁移）。可能留下悬空草稿，审核会再锁/拒绝，不扩大成已过账负库存。新增/换源与删除需共同锁序，真实MySQL双事务验收，保留无引用正常删除；本轮未复现。
+3. **专用质量库存生命周期为新功能缺口：** `StockDocumentService.cancel:203–213`只作废草稿，Controller37–122无posted reverse；LocalStockService.reverse222–235是原领料逆向，不是质量入库冲销。检查wm/quality服务及前端warehouse范围，检索reversal/reverse/TRANSFER_WAREHOUSE/stockDocument/核销/返工/对账，未找到质量仓库存→返工、原质量来源贯穿跨仓、正式最终处置服务。一般OTHER_ISSUE能扣账不等于原质量可处置净量闭环。按首厂实际需要拆独立业务服务，复用统一Owner；跨仓扣增同事务、原来源不丢、不得重复投入/核销。库存→返工依赖返工身份规则；不良→报废→最终出库无需等待任意上游返工全部完成。
+
+### LOCAL/EXTERNAL与真实ERP的区分
+
+`production/service/BusinessSourceRules.java:70–84,94–104,113–133,187–215`校验持久化来源、FactoryIntegration模式、同来源仓库及EXTERNAL映射/provider/binding/revision。WmWarehouseServiceImpl133–136服务端写LOCAL来源，155–168普通编辑拒EXTERNAL；WmInventoryServiceImpl141–167仅建LOCAL零余额、179–195禁止改身份/余额、288–309同步限定EXTERNAL并保护事实引用。没有根据当前模式重写旧来源。
+
+`integration/warehouse/WarehouseIntegration.java:27–37`读取受管快照，40–58历史撤销按原冻结来源/provider/binding，112–115必须唯一匹配adapter，否则失败关闭。全仓检索implements WarehouseErpAdapter：main仅LocalWarehouseErpService；Vendor/TestAdapter在test。**真实ERP库存命令尚未交付**，但不能因此说ERP全无实现：`mes-admin/.../integration/e10/DigiwinE10SyncService.java:55–75,82–145,167–189`已有真实Query/Read、部署契约校验、有界全量扫描、唯一身份核对和失败关闭，DigiwinE10SyncWriter:29将已完成远端读取的候选交给本地可信同步。真实目标/账套/环境契约本轮未验。
+
+UNKNOWN链为`issue/service/MaterialIssueSubmissionService.java:105–144,200–251`先冻结意图、事务外外部调用、落结果；异常或未确认库存生效保留UNKNOWN，重复提交不重建；`MaterialIssueErpService.java:110–134`按原快照查询后重新锁记录及版本核实。当前可证明“人触发原身份查询核实”，未找到独立人工录入调查依据并裁定结果的DTO/入口（issue包检索人工/manual/evidence/basis/verify/resolve），不可宣传通用人工裁定系统已交付。V1人工恢复边界继续保留，不排自动跨系统补偿或新增ERP JDBC。
+
+### 本轮测试证据与计划修正
+
+只阅读测试源码：StockDocumentHttpTest:57–100/129–146/187–232/262–283（收发、幂等、回滚、并发审核、来源拒绝）；UnifiedInboundHttpTest:61–82/99–135/175–225（草稿零动作、额度/并发、整体回滚、旧写口退役）；LocalWarehouseMySqlTest相关真实库测试代码及UI adapter测试。**未运行，历史通过不是当前通过**，没发现引用创建对删除的双事务覆盖。
+
+A提前纳入PLAN-01；D拆库存二次处置和返工发出，取消全部硬依赖C；五类来源、采购销售/委外和ERP库存写能力后置；F仍要求真实交付/恢复证据。没有恢复旧接收入口，没有实施业务变更。
+
+
+## 2026-10-23 实施追加：正式入库审核驱动Execution与工单收尾
+
+本节取代此前“生产完工独立于入库”“自动报工完工/扫描”和本日只读审查的相冲突实施建议，历史正文不改写。当前业务决定以next-stage-plan顶部用户确认节为准。
+
+- **唯一自动触发：** StockDocumentService.approve在库存动作及POSTED保存后，同业务事务调用ProductionCompletionService.afterInboundApproved。正常来源直接取sourceExecutionId，质量来源从原TRANSFER事件取可信Execution，均先父工单→全部Execution按ID→单据/库存加锁。质量在写事件后内部approve，收尾能看见本事务质量与库存事实。
+- **数量与状态：** 沿唯一ProductionQuantityService取I、末道G、各实际工序净不良D；formalProductionInbound只计POSTED生产单据并要求明细与库存动作的执行/操作UUID、数量/可用增量、前后余额、物料/仓库/单位/批次/库位/操作者/hash、唯一关联及无逆向完全一致。invalidProductionInboundLines显式阻止无证明明细。I=G+D、R=G、质量逐申报入仓及其余门禁通过才写FULLY_RECEIVED与既有completion事实；历史COMPLETED不转义、不回填。工单进一步校验全部执行、Σ(R+D)=P、分配/未决/未归属投入，Q不再加一次。
+- **合法审核与条件不足分开：** 正常数量不足、计划不足/超额、未决领料等返回实际未收尾原因，合法库存不回滚。基础设施、来源、授权及持久化错误传播并按同事务处理；持久化收尾失败会回滚本次审核及全部库存动作，不留下“已成功但无可靠补漏”的异步窗口。
+- **保留质量放行：** 已核实不良已从G扣除，待入仓不再阻挡好品正式放行；未核实继续阻挡。正常入库仍受当前正式放行额度/版本、产品/来源及历史实际入库额度限制。旧netProductionInbound继续扣已存在历史接收，避免因新R口径而恢复旧对象的入库额度；新FULLY收尾仅接受新正式证明。
+- **恢复：** 入库已合法提交但普通阻断后来解除，通过AUTHORIZED `/api/production/executions/{id}/actions/recheck-receipt`。使用既有complete权限，锁同链并从latestInboundAuditId取得原可信正常/质量审核UUID，复用唯一收尾条件，无已审事实则拒绝收尾；不重复库存/放行、不重开旧终态、不启动扫描。质量候选与正常候选分别复用同一正式证明SQL，不另设弱校验。原审核重放仍只核原内容，不靠重建UUID恢复。
+- **前端：** 统一类型目录及PRODUCTION_RECEIPT/Execution联动，普通菜单/深链均可形成正确契约；质量专用类型禁止手填create。不良模块不新增调拨、处置出库或返工；收尾面板显示待入库/部分入库/完全入库（Q先入也为部分）、执行和工单各自原因及受控复查，不把单次审核成功说成工单已完结。
+
+关键实现：`production/service/ProductionCompletionService`（summary/lockInboundChain/afterInboundApproved/recheckReceipt）、`WorkOrderCompletionService`、`wm/service/StockDocumentService.approve`、`wm/dao/StockDocumentExtraMapper.xml`（formalProductionInbound/invalidProductionInboundLines/latestInboundAuditId）；质量完整证明由`ProductionDefectListExtraMapper.receiptProofRows`复用。后端路径均从mes-business的dev/mesbase/business起。
+
+测试覆盖重写到当前正式审核入口：ProductionCompletionHttpTest的60/40、正常90/上游不良10的两种审核先后、全不良/零正常单、多执行、计划不足/超额、投入未闭合、未决领料、并发同UUID/不同审核、持久化失败回滚及原UUID安全重试、无证据/权限拒绝、两类入库后的受控复查；UnifiedInboundHttpTest保留草稿零动作、正式放行额度、旧实际入库扣额及多行整体回滚。最终运行结果与历史证据区分，统一见next-stage-plan第七节验证回执。
+
+无Schema/Flyway新增，无真实业务库写入，无历史终态/事实转换。本轮初次误选SIMPLE_B的只读检查因V48缺字段失败，未写入该库。用户随后明确默认测试库mes_base_dev_perf_test，重新核实TEST_DEV_PERF_20261019 / datasource9 revision2 / LOCAL及实际DATABASE()后，当前正常/质量证明和进度Mapper真实只读执行通过（1项测试）。两仓AGENTS已写入固定默认测试库规则。只读通过不代表真实收尾写入、并发或部署验收。用户旧服务进程未重启，旧进程中的任务不会因源码删除立即消失；需用户重启加载新构建后复验。旧包不认识新FULLY_RECEIVED，后续已有新事实时不能靠改回COMPLETED/删事实回退。
+
+最终本轮验证：完整verify886项（837执行通过、49条件跳过）、0失败/0错误并打包；指定perf库后的定向32项全部通过（31 H2 + 1真实MySQL只读）。UI76文件454项及build通过，Java36文件格式与两仓差异检查通过。此前失败及测试口径修正在计划第七节保留，不将真实SQL只读成功冒充真实入库写入验收。
+
+## 2026-10-23 重启后真实入库验收追加
+
+本次重新核实perf库、Factory TEST_DEV_PERF_20261019/DS9 revision2/LOCAL/业务版本51。独立TEST_INBOUND_1023_103838对象通过正式HTTP准备原料并扫码投产；正常工单1916/Execution12368通过真实菜单审核60（单据1113）后为部分入库，经Execution面板深链新建并审核40（1122）后FULLY_RECEIVED、父COMPLETED。两次草稿分别核对余额0/60，实际落库生产类型与Execution来源正确。另1917/12369（R90先）、1918/12370（Q10先）、1919/12371（全不良Q100、零正常单）均由最后合法审核同步收尾，R+D贡献100，Q不再加一次。
+
+7张生产/质量已审单据原UUID各重复至少2次，3笔质量入仓命令重放，库存动作/完成事实及余额不增；同UUID改内容409。新增11单据、11明细、15库存动作，与4原料入库、4领料、4正常收货、3质量收货一致；每执行completion唯一。写前后13表338831条既有记录逐主键摘要一致、无删除，范围外不作全库不变保证。独立测试事实保留，无直接SQL写库存/状态，无Schema迁移或服务启停。
+
+真实浏览器已观察部分入库阻断、深链预填及完全入库，工作台四单贡献100/差额0。本次未进行真实并发/故障注入，不能据此扩大第七节已有Mock/H2结论。详细对象、请求、只读备份与截图路径及质量申报权限边界见next-stage-plan第八节；历史“未真实写入”是前一实施阶段快照，本节覆盖本次已完成的真实场景。

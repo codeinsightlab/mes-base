@@ -38,7 +38,7 @@ public class QualityTreatmentController {
                        String attribution, String relatedDeclarationId, String basis, String pendingDispositionQty,
                        String netDefectQty, String state, String recordAction,
                        List<Event> events,
-                       String returnedQty, String transferredQty) {
+                       String returnedQty, String transferredQty, String receiptState) {
     }
 
     @GetMapping("/treatments/recent")

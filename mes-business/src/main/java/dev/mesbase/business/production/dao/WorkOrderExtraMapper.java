@@ -24,10 +24,6 @@ public interface WorkOrderExtraMapper {
 
     WorkOrderModels.CompletionState completionState(@Param("id") Long workorderId);
 
-    List<Long> executionCompletionCandidates(@Param("after") Long after, @Param("limit") int limit);
-
-    List<Long> completionCandidates(@Param("after") Long after, @Param("limit") int limit);
-
     List<WorkOrderModels.Allocation> allocationForOrders(@Param("ids") List<Long> ids);
 
     List<RoutingEntity> publishedForProduct(@Param("productId") Long productId,

@@ -9,12 +9,15 @@ import org.springframework.jdbc.datasource.DriverManagerDataSource;
 import org.yaml.snakeyaml.Yaml;
 
 /**
- * TEST ONLY: resolve and verify the user-designated existing SIMPLE_B binding.
+ * TEST ONLY: current default is performanceTestSource(); source() remains pinned for historical tests.
  */
 public final class AcceptanceBusinessDatabase {
     private AcceptanceBusinessDatabase() {
     }
 
+    /**
+     * Historical SIMPLE_B fixture only; AGENTS.md forbids running it without an explicit different-target authorization.
+     */
     public static DriverManagerDataSource source() throws Exception {
         Map<?, ?> root = new Yaml().load(Files.readString(Path.of("mes-admin/src/main/resources/application-dev.yml")));
         Map<?, ?> mes = (Map<?, ?>) root.get("mes");
@@ -41,4 +44,39 @@ public final class AcceptanceBusinessDatabase {
             }
         }
     }
+
+    /**
+     * Default real test database confirmed by the user on 2026-10-23. Verify its current managed binding.
+     */
+    public static DriverManagerDataSource performanceTestSource() throws Exception {
+        Map<?, ?> root = new Yaml().load(Files.readString(Path.of("mes-admin/src/main/resources/application-dev.yml")));
+        Map<?, ?> mes = (Map<?, ?>) root.get("mes");
+        Map<?, ?> platform = (Map<?, ?>) mes.get("platform");
+        Map<?, ?> runtime = (Map<?, ?>) mes.get("runtime");
+        try (var center = DriverManager.getConnection((String) platform.get("url"),
+                (String) platform.get("username"), (String) platform.get("password"));
+             var query = center.prepareStatement("SELECT f.factory_id,d.datasource_id,d.revision,d.db_host,d.db_port,"
+                     + "d.db_name,d.db_username,d.password_cipher,f.runtime_mode FROM mf_factory f "
+                     + "JOIN mf_datasource d ON d.datasource_id=f.datasource_id "
+                     + "WHERE d.db_name='mes_base_dev_perf_test' AND f.status='ENABLED' AND d.status='ENABLED'")) {
+            try (var binding = query.executeQuery()) {
+                if (!binding.next() || !"LOCAL".equals(binding.getString(9)))
+                    throw new IllegalStateException("No enabled LOCAL Factory binding for mes_base_dev_perf_test");
+                String host = binding.getString(4);
+                int port = binding.getInt(5);
+                String database = binding.getString(6);
+                String username = binding.getString(7);
+                String password = new DatasourcePasswordCipher((String) runtime.get("datasource-key"))
+                        .decrypt(binding.getString(8));
+                System.out.println("Verified test binding: " + binding.getString(1) + " / datasource "
+                        + binding.getString(2) + " revision " + binding.getString(3) + " / " + host + ":" + port
+                        + "/" + database + " / LOCAL");
+                if (binding.next())
+                    throw new IllegalStateException("Ambiguous Factory binding for mes_base_dev_perf_test");
+                return new DriverManagerDataSource("jdbc:mysql://" + host + ":" + port + "/" + database
+                        + "?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Shanghai", username, password);
+            }
+        }
+    }
+
 }

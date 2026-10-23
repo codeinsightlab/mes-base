@@ -271,10 +271,8 @@ class QualityV2HttpTest {
             m.perform(full(post(ROOT + "/declarations"), "A").content(overlap.toString())).andExpect(status().isOk());
             m.perform(full(post(ROOT + "/declarations"), "A").content(declaration(type, "PROCESS").toString()))
                     .andExpect(status().isOk());
-            m.perform(full(post(ROOT + "/" + declaration + "/dispositions"), "A")
-                            .content(QualityDispositionHttpTest.command(UUID.randomUUID()
-                                    .toString(), "RETURN_NODE", "1", "null")))
-                    .andExpect(status().isOk());
+            QualityDispositionHttpTest.historicalReturn(ProductionWarehouseFixture.db(c), declaration, UUID.randomUUID()
+                    .toString(), "1");
             m.perform(full(get(ROOT + "/statistics"), "A").param("wasteCategory", "PROCESS"))
                     .andExpect(status().isOk()).andExpect(jsonPath("items[0].declaredQty").value("7.000000"))
                     .andExpect(jsonPath("items[0].independentQty").value("4.000000"))

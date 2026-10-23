@@ -6,12 +6,12 @@ import com.github.pagehelper.PageHelper;
 import dev.mesbase.business.directory.domain.DirectoryLabel;
 import dev.mesbase.business.directory.service.BusinessDirectoryService;
 import dev.mesbase.business.production.domain.ExecutionPathStatus;
-import dev.mesbase.business.production.domain.ProductionCompletionRequested;
 import dev.mesbase.business.production.domain.ProductionQuantityInput;
 import dev.mesbase.business.production.service.ExecutionPathService;
 import dev.mesbase.business.production.service.ProductionChainLocks;
 import dev.mesbase.business.production.service.ProductionQuantityService;
 import dev.mesbase.business.quality.dao.MesProductionDefectMapper;
+import dev.mesbase.business.quality.dao.ProductionDefectListExtraMapper;
 import dev.mesbase.business.quality.dao.MesQualityTreatmentMapper;
 import dev.mesbase.business.quality.domain.DefectRecordAction;
 import dev.mesbase.business.quality.domain.MesProductionDefectEntity;
@@ -20,6 +20,7 @@ import dev.mesbase.business.quality.domain.MesQualityTreatmentEntity;
 import dev.mesbase.business.quality.domain.MesQualityTreatmentExample;
 import dev.mesbase.business.quality.domain.ProductionDefectModels.NodeTotal;
 import dev.mesbase.business.quality.domain.ProductionDefectModels.Processing;
+import dev.mesbase.business.quality.domain.QualityTreatmentModels;
 import dev.mesbase.business.quality.domain.QualityTreatmentModels.Action;
 import dev.mesbase.business.quality.domain.QualityTreatmentModels.Assessment;
 import dev.mesbase.business.quality.domain.QualityTreatmentModels.AssessmentCommand;
@@ -32,7 +33,6 @@ import dev.mesbase.common.utils.SecurityUtils;
 import dev.mesbase.common.validation.ParameterChecks;
 import dev.mesbase.core.error.ErrorCode;
 import dev.mesbase.core.error.FoundationException;
-import dev.mesbase.platform.execution.FactoryContext;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -50,7 +50,6 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
-import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
@@ -61,7 +60,7 @@ import org.springframework.transaction.annotation.Transactional;
 @ConditionalOnProperty(name = "mes.business.enabled", havingValue = "true")
 @Transactional(transactionManager = "businessTransactionManager", readOnly = true)
 public class QualityTreatmentService {
-    private final ApplicationEventPublisher completionPublisher;
+    private final ProductionDefectListExtraMapper receiptProofs;
 
     private static final BigDecimal ZERO = BigDecimal.ZERO;
     private final MesProductionDefectMapper defects;
@@ -75,8 +74,8 @@ public class QualityTreatmentService {
     public QualityTreatmentService(MesProductionDefectMapper defects, MesQualityTreatmentMapper events,
                                    ProductionChainLocks locks, @Lazy ExecutionPathService paths,
                                    @Lazy ProductionQuantityService quantities, BusinessDirectoryService directory,
-                                   ApplicationEventPublisher completionPublisher) {
-        this.completionPublisher = completionPublisher;
+                                   ProductionDefectListExtraMapper receiptProofs) {
+        this.receiptProofs = receiptProofs;
         this.defects = defects;
         this.events = events;
         this.locks = locks;
@@ -159,13 +158,12 @@ public class QualityTreatmentService {
         var d = latest(declaration);
         locks.execution(d.getExecutionId());
         var s = summary(declaration);
-        if (command.destination() == null || command.expectedRevision() != d.getRevisionNo() || DefectRecordAction.VOID.getValue()
+        if (command.destination() != Destination.WAREHOUSE || command.expectedRevision() != d.getRevisionNo() || DefectRecordAction.VOID.getValue()
                 .equals(d.getRecordAction())
                 || s.attribution() != Attribution.INDEPENDENT || command.quantity() == null
                 || command.quantity().signum() <= 0 || command.quantity().compareTo(s.pendingDispositionQty()) > 0)
             ParameterChecks.reject(ErrorCode.QUALITY_TREATMENT_CONFLICT);
-        if (command.destination() == Destination.RETURN_NODE && (stockDocumentId != null || command.warehouseId() != null)
-                || command.destination() == Destination.WAREHOUSE && (stockDocumentId == null || command.warehouseId() == null))
+        if (stockDocumentId == null || command.warehouseId() == null)
             ParameterChecks.reject(ErrorCode.QUALITY_TREATMENT_CONFLICT);
         var path = paths.view(d.getExecutionId());
         if (path.path() == null || !ExecutionPathStatus.LOCKED.getValue().equals(path.path().getPathStatus())
@@ -180,9 +178,9 @@ public class QualityTreatmentService {
         row.setDeclarationRevision(d.getRevisionNo());
         row.setExecutionId(d.getExecutionId());
         row.setRoutingNodeId(d.getAffectedNodeId());
-        row.setActionType(command.destination() == Destination.RETURN_NODE ? Action.RETURN_NODE.name() : Action.TRANSFER_WAREHOUSE.name());
-        row.setReturnedQty(command.destination() == Destination.RETURN_NODE ? command.quantity() : ZERO);
-        row.setTransferQty(command.destination() == Destination.WAREHOUSE ? command.quantity() : ZERO);
+        row.setActionType(Action.TRANSFER_WAREHOUSE.getValue());
+        row.setReturnedQty(ZERO);
+        row.setTransferQty(command.quantity());
         row.setTargetWarehouseId(command.warehouseId());
         row.setStockDocumentId(stockDocumentId);
         row.setOperatorUserId(SecurityUtils.getUserId());
@@ -193,8 +191,6 @@ public class QualityTreatmentService {
         } catch (DuplicateKeyException failure) {
             throw new FoundationException(ErrorCode.QUALITY_TREATMENT_CONFLICT, failure);
         }
-        if (command.destination() == Destination.WAREHOUSE)
-            completionPublisher.publishEvent(new ProductionCompletionRequested(FactoryContext.required(), d.getExecutionId()));
         return row;
     }
 
@@ -248,7 +244,46 @@ public class QualityTreatmentService {
                 .map(MesQualityTreatmentEntity::getRelatedDeclarationId)
                 .orElse(null), Optional.ofNullable(assessment).map(MesQualityTreatmentEntity::getBasis).orElse(null),
                 processing.pendingDispositionQty(), net,
-                processing.state(), d.getRecordAction(), rows, processing.returnedQty(), processing.transferredQty());
+                processing.state(), d.getRecordAction(), rows, processing.returnedQty(), processing.transferredQty(),
+                QualityTreatmentModels.receiptState(processing.state(), d.getDefectQty(), processing.transferredQty()));
+    }
+
+    /**
+     * Formal quality receipts affect inbound progress, never production output or loss.
+     */
+    public boolean hasFormalReceipt(Long execution) {
+        return receiptProofs.selectReceiptProofs(execution).stream().anyMatch(proof -> proof.validCount() == 1L);
+    }
+
+    /**
+     * Called under the common inbound chain lock after all posted facts are visible.
+     */
+    public String receiptBlockReason(Long execution) {
+        var all = executionEvents(execution);
+        var current = declarations(execution);
+        var grouped = groupedEvents(all);
+        var proofs = receiptProofs.selectReceiptProofs(execution).stream()
+                .collect(Collectors.toMap(QualityTreatmentModels.ReceiptProof::eventId,
+                        QualityTreatmentModels.ReceiptProof::validCount));
+        for (var d : current) {
+            var rows = grouped.getOrDefault(new DeclarationVersion(d.getDeclarationId(), d.getRevisionNo()), List.of());
+            var summary = summarizeRows(d, rows, false);
+            if (summary.state() == State.UNRESOLVED) return "不良申报或历史处置数量待核实";
+            if (summary.attribution() == Attribution.UNVERIFIED) return "存在待核实不良申报";
+            if (summary.attribution() != Attribution.INDEPENDENT) continue;
+            if (rows.stream().filter(e -> Action.ASSESS.name().equals(e.getActionType())).count() != 1)
+                return "不良申报核实依据不唯一";
+            for (var event : rows) {
+                if (!Objects.equals(event.getExecutionId(), execution)
+                        || !Objects.equals(event.getRoutingNodeId(), d.getAffectedNodeId()))
+                    return "不良处置与生产执行或实际工序不一致";
+                if (Action.TRANSFER_WAREHOUSE.name().equals(event.getActionType())
+                        && proofs.getOrDefault(event.getId(), 0L) != 1L)
+                    return "不良入仓缺少唯一有效的正式单据、明细或库存动作";
+            }
+            if (summary.pendingDispositionQty().signum() != 0) return "有效不良尚未全部正式入仓";
+        }
+        return null;
     }
 
     public record ReleaseBasis(List<Summary> declarations, List<String> factIdentities) {
@@ -377,7 +412,6 @@ public class QualityTreatmentService {
             ParameterChecks.reject(ErrorCode.QUALITY_TREATMENT_CONFLICT);
         appendAssessment(d, command, fingerprint);
         quantities.validateDefectChange(d.getExecutionId(), d.getAffectedNodeId(), ZERO);
-        completionPublisher.publishEvent(new ProductionCompletionRequested(FactoryContext.required(), d.getExecutionId()));
         return details(declaration);
     }
 

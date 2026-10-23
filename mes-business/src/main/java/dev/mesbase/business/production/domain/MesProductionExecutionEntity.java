@@ -13,6 +13,8 @@ public class MesProductionExecutionEntity {
 
     private Long productId;
 
+    private String batchNo;
+
     private Long routingId;
 
     private BigDecimal targetQty;
@@ -63,6 +65,14 @@ public class MesProductionExecutionEntity {
 
     public void setProductId(Long productId) {
         this.productId = productId;
+    }
+
+    public String getBatchNo() {
+        return batchNo;
+    }
+
+    public void setBatchNo(String batchNo) {
+        this.batchNo = batchNo;
     }
 
     public Long getRoutingId() {

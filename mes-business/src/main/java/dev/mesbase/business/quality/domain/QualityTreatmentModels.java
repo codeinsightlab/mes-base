@@ -6,6 +6,7 @@ import dev.mesbase.core.error.FoundationException;
 import java.math.BigDecimal;
 import java.util.Arrays;
 import java.util.List;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -70,6 +71,52 @@ public final class QualityTreatmentModels {
 
     public enum Destination {RETURN_NODE, WAREHOUSE}
 
+    public enum ReceiptState {
+        PENDING("待入仓", "PENDING"), PARTIAL("部分入仓", "PARTIAL"), RECEIVED("已入仓", "RECEIVED");
+
+        private final String description;
+        private final String value;
+
+        ReceiptState(String description, String value) {
+            this.description = description;
+            this.value = value;
+        }
+
+        public String getDescription() {
+            return description;
+        }
+
+        @JsonValue
+        public String getValue() {
+            return value;
+        }
+
+        public static ReceiptState from(String value) {
+            for (var state : values()) if (state.getValue().equals(value)) return state;
+            return null;
+        }
+
+        public static Map<String, String> toMap() {
+            var result = new LinkedHashMap<String, String>();
+            for (var state : values()) result.put(state.getValue(), state.getDescription());
+            return result;
+        }
+    }
+
+    public record ReceiptProof(String eventId, long validCount) {
+    }
+
+    /**
+     * Historical returns reduce the pending balance but never count as warehouse receipts.
+     */
+    public static ReceiptState receiptState(State state, BigDecimal declared, BigDecimal transferred) {
+        if (state == null || state == State.UNRESOLVED || state == State.VOIDED
+                || state == State.UNVERIFIED || state == State.OVERLAP || transferred == null) return null;
+        if (transferred.signum() == 0) return ReceiptState.PENDING;
+        if (transferred.compareTo(declared) == 0) return ReceiptState.RECEIVED;
+        return ReceiptState.PARTIAL;
+    }
+
     public record Disposition(String requestId, int expectedRevision, Destination destination,
                               BigDecimal quantity, Long warehouseId, String reason) {
     }
@@ -84,6 +131,6 @@ public final class QualityTreatmentModels {
                           BigDecimal defectQty, Attribution attribution, String relatedDeclarationId, String basis,
                           BigDecimal pendingDispositionQty, BigDecimal netDefectQty, State state,
                           String recordAction, List<MesQualityTreatmentEntity> events,
-                          BigDecimal returnedQty, BigDecimal transferredQty) {
+                          BigDecimal returnedQty, BigDecimal transferredQty, ReceiptState receiptState) {
     }
 }

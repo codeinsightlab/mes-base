@@ -12,7 +12,6 @@
       OR EXISTS(SELECT 1 FROM mes_warehouse_acceptance WHERE execution_id=#{id})
       OR EXISTS(SELECT 1 FROM mes_execution_completion WHERE execution_id=#{id})
       OR EXISTS(SELECT 1 FROM mes_material_issue_input WHERE execution_id=#{id})
-      OR EXISTS(SELECT 1 FROM mes_production_scan_identity WHERE execution_id=#{id})
       OR EXISTS(SELECT 1 FROM wm_stock_action WHERE execution_id=#{id})
       OR EXISTS(SELECT 1 FROM wm_stock_document WHERE source_execution_id=#{id})
  </select>
@@ -35,7 +34,7 @@
  </select>
  <select id="completionState" resultType="dev.mesbase.business.production.domain.WorkOrderModels$CompletionState">
   <bind name="cancelled" value="@dev.mesbase.business.production.domain.ProductionExecutionStatus@CANCELLED.getValue()"/>
-  <bind name="completed" value="@dev.mesbase.business.production.domain.ProductionExecutionStatus@COMPLETED.getValue()"/>
+  <bind name="completed" value="@dev.mesbase.business.production.domain.ProductionExecutionStatus@FULLY_RECEIVED.getValue()"/>
   SELECT COUNT(e.id) AS active_count,
          COALESCE(SUM(CASE WHEN e.status != #{completed} THEN 1 ELSE 0 END),0) AS unfinished_count,
          COALESCE(SUM(CASE WHEN e.status = #{completed} AND c.id IS NULL THEN 1 ELSE 0 END),0) AS missing_completion_count
@@ -46,34 +45,13 @@
  </select>
  <select id="countUnaccountedInputs" resultType="long">
   <bind name="confirmed" value="@dev.mesbase.business.issue.domain.MaterialIssueStatus@CONFIRMED.getValue()"/>
-  <bind name="completed" value="@dev.mesbase.business.production.domain.ProductionExecutionStatus@COMPLETED.getValue()"/>
+  <bind name="completed" value="@dev.mesbase.business.production.domain.ProductionExecutionStatus@FULLY_RECEIVED.getValue()"/>
   SELECT COUNT(i.id) FROM mes_material_issue i
   LEFT JOIN mes_material_issue_input f ON f.issue_id=i.id
   LEFT JOIN mes_production_execution e ON e.id=i.execution_id AND e.workorder_id=i.workorder_id
   WHERE i.workorder_id=#{id} AND i.status=#{confirmed}
     AND (f.id IS NULL OR f.input_kind!='PRODUCTION_INPUT' OR f.confirmed_at IS NULL
          OR f.execution_id!=i.execution_id OR e.id IS NULL OR e.status!=#{completed})
- </select>
- <select id="executionCompletionCandidates" resultType="long">
-  <bind name="released" value="@dev.mesbase.business.production.domain.WorkOrderStatus@RELEASED.getValue()"/>
-  <bind name="running" value="@dev.mesbase.business.production.domain.ProductionExecutionStatus@RUNNING.getValue()"/>
-  <bind name="local" value="@dev.mesbase.business.shared.enums.BusinessSource@LOCAL.getValue()"/>
-  SELECT e.id FROM mes_production_execution e JOIN workorder w ON w.id=e.workorder_id
-  WHERE e.id &gt; #{after} AND e.status=#{running} AND w.status=#{released} AND w.source=#{local}
-  ORDER BY e.id LIMIT #{limit}
- </select>
- <select id="completionCandidates" resultType="long">
-  <bind name="released" value="@dev.mesbase.business.production.domain.WorkOrderStatus@RELEASED.getValue()"/>
-  <bind name="local" value="@dev.mesbase.business.shared.enums.BusinessSource@LOCAL.getValue()"/>
-  <bind name="cancelled" value="@dev.mesbase.business.production.domain.ProductionExecutionStatus@CANCELLED.getValue()"/>
-  <bind name="completed" value="@dev.mesbase.business.production.domain.ProductionExecutionStatus@COMPLETED.getValue()"/>
-  SELECT w.id FROM workorder w
-  JOIN mes_production_execution e ON e.workorder_id=w.id AND e.status != #{cancelled}
-  LEFT JOIN mes_execution_completion c ON c.execution_id=e.id
-  WHERE w.status=#{released} AND w.source=#{local} AND w.id &gt; #{after}
-  GROUP BY w.id
-  HAVING SUM(CASE WHEN e.status != #{completed} OR c.id IS NULL THEN 1 ELSE 0 END)=0
-  ORDER BY w.id LIMIT #{limit}
  </select>
  <select id="publishedForProduct" resultMap="dev.mesbase.business.production.dao.RoutingMapper.BaseResultMap">
     <bind name="enabledStatus" value="@dev.mesbase.business.shared.enums.EnableStatus@ENABLED.getValue()"/>

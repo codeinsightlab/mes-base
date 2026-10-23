@@ -105,14 +105,16 @@ public class ProductionExecutionRules {
         BusinessSourceRules.localEditable(order.getSource());
         sources.current(order.getSource());
         valid(row.getTargetQty() != null);
-        if (ProductionExecutionStatus.COMPLETED.getValue().equals(old.getStatus())
+        if (Set.of(ProductionExecutionStatus.COMPLETED.getValue(), ProductionExecutionStatus.FULLY_RECEIVED.getValue())
+                .contains(old.getStatus())
                 && (!Objects.equals(old.getRoutingId(), row.getRoutingId())
                 || old.getTargetQty().compareTo(row.getTargetQty()) != 0)) frozen();
         if (!Objects.equals(old.getStatus(), row.getStatus()) || !Objects.equals(old.getStartTime(), row.getStartTime()) || !Objects.equals(old.getEndTime(), row.getEndTime()))
             frozen();
         // WorkOrder/product define identity at creation; routing may be corrected only before facts.
         if (!Objects.equals(old.getWorkorderId(), row.getWorkorderId())
-                || !Objects.equals(old.getProductId(), row.getProductId())) frozen();
+                || !Objects.equals(old.getProductId(), row.getProductId())
+                || !Objects.equals(old.getBatchNo(), row.getBatchNo())) frozen();
         if (Objects.equals(old.getRoutingId(), row.getRoutingId())
                 && old.getTargetQty().compareTo(row.getTargetQty()) == 0) {
             audit(row, false);
@@ -179,7 +181,7 @@ public class ProductionExecutionRules {
     }
 
     private boolean started(MesProductionExecutionEntity row) {
-        return row.getStartTime() != null || Set.of(ProductionExecutionStatus.RUNNING.getValue(), ProductionExecutionStatus.COMPLETED.getValue())
+        return row.getStartTime() != null || Set.of(ProductionExecutionStatus.RUNNING.getValue(), ProductionExecutionStatus.COMPLETED.getValue(), ProductionExecutionStatus.FULLY_RECEIVED.getValue())
                 .contains(row.getStatus());
     }
 
@@ -191,7 +193,7 @@ public class ProductionExecutionRules {
         valid(order != null && (row.getProductId() == null || Objects.equals(row.getProductId(), order.getProductId())));
         var product = materials.selectByPrimaryKey(order.getProductId());
         valid(product != null);
-        if (Set.of(ProductionExecutionStatus.RUNNING.getValue(), ProductionExecutionStatus.COMPLETED.getValue())
+        if (Set.of(ProductionExecutionStatus.RUNNING.getValue(), ProductionExecutionStatus.COMPLETED.getValue(), ProductionExecutionStatus.FULLY_RECEIVED.getValue())
                 .contains(row.getStatus()) || row.getStartTime() != null)
             if (!WorkOrderStatus.RELEASED.getValue().equals(order.getStatus()))
                 throw new FoundationException(ErrorCode.WORKORDER_NOT_RELEASED);
@@ -215,9 +217,10 @@ public class ProductionExecutionRules {
                 && row.getTargetQty().scale() <= 6 && row.getTargetQty().precision() - row.getTargetQty()
                 .scale() <= 14);
         valid(row.getStatus() != null && ProductionExecutionStatus.from(row.getStatus()) != null);
-        valid(!Set.of(ProductionExecutionStatus.RUNNING.getValue(), ProductionExecutionStatus.COMPLETED.getValue())
+        valid(!Set.of(ProductionExecutionStatus.RUNNING.getValue(), ProductionExecutionStatus.COMPLETED.getValue(), ProductionExecutionStatus.FULLY_RECEIVED.getValue())
                 .contains(row.getStatus()) || row.getStartTime() != null);
-        valid(!ProductionExecutionStatus.COMPLETED.getValue().equals(row.getStatus()) || row.getEndTime() != null);
+        valid(!Set.of(ProductionExecutionStatus.COMPLETED.getValue(), ProductionExecutionStatus.FULLY_RECEIVED.getValue())
+                .contains(row.getStatus()) || row.getEndTime() != null);
         valid(!ProductionExecutionStatus.READY.getValue()
                 .equals(row.getStatus()) || row.getStartTime() == null && row.getEndTime() == null);
         valid(row.getEndTime() == null || row.getStartTime() != null && !row.getEndTime().isBefore(row.getStartTime()));

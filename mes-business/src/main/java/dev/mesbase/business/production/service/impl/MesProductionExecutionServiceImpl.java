@@ -124,6 +124,7 @@ public class MesProductionExecutionServiceImpl implements IMesProductionExecutio
         row.setId(id);
         row.setExecutionNo(previous.getExecutionNo());
         row.setProductId(previous.getProductId());
+        row.setBatchNo(previous.getBatchNo());
         row.setCreateBy(previous.getCreateBy());
         row.setCreateTime(previous.getCreateTime());
         row.setWorkorderId(input.workorderId());

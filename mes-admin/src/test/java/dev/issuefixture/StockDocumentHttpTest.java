@@ -223,12 +223,28 @@ class StockDocumentHttpTest {
             var a = pool.submit(() -> m.perform(full(post(ROOT + "/" + id + "/actions/approve"))
                     .content(intent(UUID.randomUUID().toString(), 1))).andReturn().getResponse().getStatus());
             var b = pool.submit(() -> m.perform(full(post("/api/production/input"))
-                    .content(production)).andReturn().getResponse().getStatus());
-            var results = List.of(a.get(), b.get());
-            assertEquals(1, results.stream().filter(code -> code == 200).count());
-            assertEquals(1, results.stream().filter(code -> code == 409).count());
-            var balance = j.queryForObject("SELECT quantity FROM wm_inventory WHERE id=1", BigDecimal.class);
-            assertTrue(balance.compareTo(new BigDecimal("20")) == 0 || balance.compareTo(new BigDecimal("30")) == 0);
+                    .content(production)).andReturn().getResponse());
+            int documentStatus = a.get();
+            var input = b.get();
+            int inputStatus = input.getStatus();
+            assertEquals(1, List.of(documentStatus, inputStatus).stream().filter(code -> code == 200).count());
+            if (documentStatus == 200) {
+                // The current supply calculation may observe the committed debit before taking its write lock.
+                assertTrue(inputStatus == 400 || inputStatus == 409);
+                String error = JSON.readTree(input.getContentAsString()).get("errorCode").asText();
+                if (inputStatus == 400) assertEquals("BAD_REQUEST", error);
+                else assertTrue(List.of("PRODUCTION_INPUT_STALE", "RESOURCE_CONFLICT").contains(error), error);
+                assertEquals(0, new BigDecimal("20").compareTo(j.queryForObject(
+                        "SELECT quantity FROM wm_inventory WHERE id=1", BigDecimal.class)));
+                assertEquals(0, j.queryForObject("SELECT COUNT(*) FROM mes_material_issue_input WHERE confirmed_at IS NOT NULL", Integer.class));
+            } else {
+                assertEquals(409, documentStatus);
+                assertEquals(200, inputStatus);
+                assertEquals(0, new BigDecimal("30").compareTo(j.queryForObject(
+                        "SELECT quantity FROM wm_inventory WHERE id=1", BigDecimal.class)));
+                assertEquals(1, j.queryForObject("SELECT COUNT(*) FROM mes_material_issue_input WHERE confirmed_at IS NOT NULL", Integer.class));
+            }
+            assertEquals(1, j.queryForObject("SELECT COUNT(*) FROM wm_stock_action", Integer.class));
         }
     }
 

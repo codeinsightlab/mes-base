@@ -10,6 +10,7 @@ import dev.mesbase.business.production.domain.WorkOrderProgress.Progress;
 import dev.mesbase.business.production.domain.WorkOrderProgress.Quality;
 import dev.mesbase.business.production.domain.WorkOrderProgress.Query;
 import dev.mesbase.business.production.domain.WorkOrderStatus;
+import dev.mesbase.business.production.domain.ProductionExecutionStatus;
 import dev.mesbase.business.quality.domain.DefectRecordAction;
 import dev.mesbase.business.quality.domain.ProductionDefectModels.Processing;
 import dev.mesbase.business.quality.domain.QualityTreatmentModels.Attribution;
@@ -79,11 +80,9 @@ public class WorkOrderProgressQueryService {
         }
         if (order.plannedQty() == null || order.plannedQty().signum() <= 0)
             issue = "计划数量无效，无法计算完成率";
+        BigDecimal received = completed;
+        BigDecimal completedLoss = BigDecimal.ZERO;
         BigDecimal percent = null, gap = null;
-        if (issue == null) {
-            percent = completed.multiply(BigDecimal.valueOf(100)).divide(order.plannedQty(), 2, RoundingMode.HALF_UP);
-            gap = order.plannedQty().subtract(completed).max(BigDecimal.ZERO);
-        }
         BigDecimal untreated = BigDecimal.ZERO, returned = BigDecimal.ZERO,
                 unverified = BigDecimal.ZERO, transferred = BigDecimal.ZERO;
         boolean qualityResolved = true;
@@ -101,6 +100,8 @@ public class WorkOrderProgressQueryService {
                 untreated = untreated.add(processing.pendingDispositionQty());
                 returned = returned.add(processing.returnedQty());
                 transferred = transferred.add(processing.transferredQty());
+                if (ProductionExecutionStatus.FULLY_RECEIVED.getValue().equals(fact.executionStatus()))
+                    completedLoss = completedLoss.add(fact.declaredQty().subtract(processing.returnedQty()));
             }
         }
         if (!qualityResolved) {
@@ -108,8 +109,15 @@ public class WorkOrderProgressQueryService {
             issue = issue == null ? "质量处置数量待确认" : issue + "；质量处置数量待确认";
         }
         BigDecimal unfinished = null;
-        if (gap != null && qualityResolved)
-            unfinished = order.plannedQty().subtract(completed).subtract(transferred).max(BigDecimal.ZERO);
+        if (issue == null) {
+            // Only receipt-closed executions contribute R + D. Q is a handoff, never extra output.
+            completed = received.add(completedLoss);
+            percent = completed.multiply(BigDecimal.valueOf(100)).divide(order.plannedQty(), 2, RoundingMode.HALF_UP);
+            gap = order.plannedQty().subtract(received).max(BigDecimal.ZERO);
+            unfinished = order.plannedQty().subtract(completed).max(BigDecimal.ZERO);
+        } else if (!qualityResolved) {
+            completed = null;
+        }
         return new Progress(order.id(), order.code(), order.source(), order.status(), order.productCode(),
                 order.productName(), order.unitName(), order.plannedQty(), completed, gap,
                 unfinished, untreated, returned,

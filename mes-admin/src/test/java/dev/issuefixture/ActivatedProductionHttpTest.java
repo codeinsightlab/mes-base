@@ -1,17 +1,11 @@
 package dev.issuefixture;
 
-import dev.mesbase.acceptance.QueuedCompletionExecutor;
 import dev.mesbase.business.legacy.dao.LegacyHistoryMapper;
 import dev.mesbase.business.legacy.domain.LegacyHistory.Node;
-import dev.mesbase.business.production.domain.ProductionCompletionRequested;
-import dev.mesbase.core.factory.FactoryId;
-import dev.mesbase.core.factory.FactoryScope;
-import dev.mesbase.server.WorkOrderCompletionJob;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
-import java.util.concurrent.Executors;
 import org.junit.jupiter.api.Test;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -68,10 +62,8 @@ class ActivatedProductionHttpTest {
     }
 
     @Test
-    void openingQuantitiesSurviveCompletionAndParentRemainsOpenForAnotherExecution() throws Exception {
-        try (var c = QualityWorkflowHttpTest.context(new Class<?>[]{Opening.class,
-                AutomaticProductionCompletionHttpTest.Async.class}, 100, 90, 90, 90, 90);
-             var worker = Executors.newSingleThreadExecutor()) {
+    void openingQuantitiesRemainReadableWithoutInboundAndParentRemainsOpen() throws Exception {
+        try (var c = QualityWorkflowHttpTest.context(new Class<?>[]{Opening.class}, 100, 90, 90, 90, 90)) {
             var j = ProductionWarehouseFixture.db(c);
             var http = MaterialIssueHttpTest.mvc(c);
             for (String table : List.of("mes_material_issue_input", "mes_material_issue_item", "mes_material_issue_submission",
@@ -86,12 +78,9 @@ class ActivatedProductionHttpTest {
                     .andExpect(jsonPath("nodes[1].reportedQty").value("100.000000"))
                     .andExpect(jsonPath("nodes[1].defectQty").value("10.000000"))
                     .andExpect(jsonPath("nodes[4].effectiveOutputQty").value("90.000000"));
-            c.getBean(WorkOrderCompletionJob.class)
-                    .reported(new ProductionCompletionRequested(new FactoryScope(new FactoryId("A")), 1L));
-            worker.submit(c.getBean(QueuedCompletionExecutor.class)::runAll).get();
-            assertEquals("COMPLETED", j.queryForObject("SELECT status FROM mes_production_execution WHERE id=1", String.class));
+            assertEquals("RUNNING", j.queryForObject("SELECT status FROM mes_production_execution WHERE id=1", String.class));
             assertEquals("RELEASED", j.queryForObject("SELECT status FROM workorder WHERE id=1", String.class));
-            assertEquals(1, j.queryForObject("SELECT COUNT(*) FROM mes_execution_completion", Integer.class));
+            assertEquals(0, j.queryForObject("SELECT COUNT(*) FROM mes_execution_completion", Integer.class));
             http.perform(ProductionCoreV1HttpTest.full(get("/api/production/report-quantities/executions/1")))
                     .andExpect(status().isOk()).andExpect(jsonPath("nodes[4].effectiveOutputQty").value("90.000000"));
             http.perform(ProductionCoreV1HttpTest.full(post("/api/production/mes-production-execution"))
@@ -105,10 +94,9 @@ class ActivatedProductionHttpTest {
     }
 
     @Test
-    void unfinishedOpeningExecutionAcceptsNormalLastReportAndThenAutomaticallyCompletes() throws Exception {
+    void lastReportPreservesOpeningQuantitiesAndDoesNotCloseExecutionOrOrder() throws Exception {
         try (var c = QualityWorkflowHttpTest.context(new Class<?>[]{Opening.class,
-                AutomaticProductionCompletionHttpTest.Async.class, ProductionReportingHttpTest.Extra.class}, 100, 90, 90, 90, 80);
-             var worker = Executors.newSingleThreadExecutor()) {
+                ProductionReportingHttpTest.Extra.class}, 100, 90, 90, 90, 80)) {
             var j = ProductionWarehouseFixture.db(c);
             var http = MaterialIssueHttpTest.mvc(c);
             for (String table : List.of("mes_material_issue_input", "mes_material_issue_item", "mes_material_issue_submission",
@@ -121,9 +109,8 @@ class ActivatedProductionHttpTest {
                     .andExpect(status().isOk()).andExpect(jsonPath("canComplete").value(false));
             http.perform(ProductionCoreV1HttpTest.full(post(ProductionReportingHttpTest.ROOT))
                     .content(ProductionReportingHttpTest.body(15, "10"))).andExpect(status().isOk());
-            worker.submit(c.getBean(QueuedCompletionExecutor.class)::runAll).get();
-            assertEquals("COMPLETED", j.queryForObject("SELECT status FROM mes_production_execution WHERE id=1", String.class));
-            assertEquals("COMPLETED", j.queryForObject("SELECT status FROM workorder WHERE id=1", String.class));
+            assertEquals("RUNNING", j.queryForObject("SELECT status FROM mes_production_execution WHERE id=1", String.class));
+            assertEquals("RELEASED", j.queryForObject("SELECT status FROM workorder WHERE id=1", String.class));
             assertEquals(0, j.queryForObject("SELECT COUNT(*) FROM wm_stock_action", Integer.class));
             http.perform(ProductionCoreV1HttpTest.full(get("/api/production/report-quantities/executions/1")))
                     .andExpect(status().isOk()).andExpect(jsonPath("nodes[4].effectiveOutputQty").value("90.000000"));

@@ -24,7 +24,8 @@ public final class WorkOrderProgress {
     }
 
     public record Quality(Long workorderId, BigDecimal declaredQty, String attribution,
-                          BigDecimal returnedQty, BigDecimal transferredQty, long invalidActions) {
+                          BigDecimal returnedQty, BigDecimal transferredQty, long invalidActions,
+                          String executionStatus) {
     }
 
     /**

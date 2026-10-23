@@ -41,7 +41,7 @@ import dev.mesbase.core.error.FoundationException;
 @EnabledIfEnvironmentVariable(named = "MES_INPUT_MYSQL_ACCEPTANCE", matches = "true")
 class ProductionInputMySqlTest {
     @Test
-    void localProductionInputsAreAtomicRepeatableAndPermanentlyBound() throws Exception {
+    void localProductionInputsAreAtomicRepeatableWithPersistedBusinessBatch() throws Exception {
         try (var h = new ProductionQualityLifecycleMySqlTest.Harness(); var pool = Executors.newFixedThreadPool(2)) {
             var f = h.fixture();
             var c = h.context;
@@ -84,7 +84,8 @@ class ProductionInputMySqlTest {
             assertEquals(0, quantity.getExecutionQuantities(execution).nodes().getFirst().availableQty()
                     .compareTo(new BigDecimal("220")));
             assertEquals(0, j.queryForObject("SELECT target_qty FROM mes_production_execution WHERE id=?", BigDecimal.class, execution)
-                    .compareTo(new BigDecimal("100")));
+                    .compareTo(new BigDecimal("300")));
+            assertEquals(lot, j.queryForObject("SELECT batch_no FROM mes_production_execution WHERE id=?", String.class, execution));
             assertEquals(0, j.queryForObject("SELECT quantity FROM wm_inventory WHERE id=?", BigDecimal.class, stock)
                     .compareTo(new BigDecimal("9400")));
             var x = pool.submit(() -> {
