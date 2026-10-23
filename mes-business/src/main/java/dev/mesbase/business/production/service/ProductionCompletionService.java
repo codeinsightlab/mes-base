@@ -187,9 +187,6 @@ public class ProductionCompletionService {
                                  BigDecimal received) {
         if (!List.of(ProductionExecutionStatus.RUNNING.getValue(), ProductionExecutionStatus.FULLY_RECEIVED.getValue())
                 .contains(execution.getStatus())) return "执行尚未开工、已取消或状态非法，不能自动完全入库";
-        if (ProductionExecutionStatus.RUNNING.getValue()
-                .equals(execution.getStatus()) && completion(execution.getId()) != null)
-            return "执行状态与已有完结事实不一致，请核实记录";
         if (!ExecutionPathStatus.LOCKED.getValue().equals(projection.pathStatus())) return "实际生产路径尚未锁定";
         if (projection.nodes().stream().anyMatch(node -> node.historicalConflict()))
             return "存在历史数量超额，须核实后才能完全入库";
@@ -210,9 +207,9 @@ public class ProductionCompletionService {
     private MesExecutionCompletionEntity completion(Long id) {
         var filter = new MesExecutionCompletionExample();
         filter.createCriteria().andExecutionIdEqualTo(id);
-        try (var page = PageHelper.offsetPage(0, 2, false)) {
+        filter.setOrderByClause("recorded_at DESC,id DESC");
+        try (var page = PageHelper.offsetPage(0, 1, false)) {
             var rows = completions.selectByExample(filter);
-            if (rows.size() > 1) ParameterChecks.reject(ErrorCode.PRODUCTION_CLOSURE_CONFLICT);
             if (rows.isEmpty()) return null;
             return rows.getFirst();
         }
@@ -224,7 +221,7 @@ public class ProductionCompletionService {
 
     private void append(MesProductionExecutionEntity execution, ExecutionQuantity projection,
                         BigDecimal received, String auditRequestId) {
-        if (completion(execution.getId()) != null) ParameterChecks.reject(ErrorCode.PRODUCTION_CLOSURE_CONFLICT);
+        // Every new completed input cycle appends a fact; prior cycles remain immutable.
         String requestId = UUID.nameUUIDFromBytes(("fully-received:" + execution.getId() + ":" + auditRequestId)
                 .getBytes(StandardCharsets.UTF_8)).toString();
         var row = new MesExecutionCompletionEntity();

@@ -135,6 +135,18 @@ public class ProductionExecutionRules {
         audit(row, false);
     }
 
+    /**
+     * New confirmed input reopens processing. End time and prior completion/report/receipt facts remain untouched.
+     */
+    public void resumeAfterInput(MesProductionExecutionEntity row) {
+        valid(ProductionExecutionStatus.FULLY_RECEIVED.getValue().equals(row.getStatus()));
+        var order = locks.order(row.getWorkorderId());
+        valid(WorkOrderStatus.RELEASED.getValue().equals(order.getStatus()));
+        row.setStatus(ProductionExecutionStatus.RUNNING.getValue());
+        audit(row, false);
+        valid(executions.updateByPrimaryKey(row) == 1);
+    }
+
     public void checkReadyReferences(MesProductionExecutionEntity row) {
         var order = validateReferences(row, true);
         if (!WorkOrderStatus.RELEASED.getValue().equals(order.getStatus()))

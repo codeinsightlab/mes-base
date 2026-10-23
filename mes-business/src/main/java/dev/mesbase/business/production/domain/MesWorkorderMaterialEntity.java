@@ -27,6 +27,16 @@ public class MesWorkorderMaterialEntity {
 
     private LocalDateTime updatedAt;
 
+    private Long bomId;
+
+    private BigDecimal bomBaseQty;
+
+    private BigDecimal bomComponentQty;
+
+    private Long outputUnitId;
+
+    private LocalDateTime frozenAt;
+
     public Long getId() {
         return id;
     }
@@ -113,5 +123,45 @@ public class MesWorkorderMaterialEntity {
 
     public void setUpdatedAt(LocalDateTime updatedAt) {
         this.updatedAt = updatedAt;
+    }
+
+    public Long getBomId() {
+        return bomId;
+    }
+
+    public void setBomId(Long bomId) {
+        this.bomId = bomId;
+    }
+
+    public BigDecimal getBomBaseQty() {
+        return bomBaseQty;
+    }
+
+    public void setBomBaseQty(BigDecimal bomBaseQty) {
+        this.bomBaseQty = bomBaseQty;
+    }
+
+    public BigDecimal getBomComponentQty() {
+        return bomComponentQty;
+    }
+
+    public void setBomComponentQty(BigDecimal bomComponentQty) {
+        this.bomComponentQty = bomComponentQty;
+    }
+
+    public Long getOutputUnitId() {
+        return outputUnitId;
+    }
+
+    public void setOutputUnitId(Long outputUnitId) {
+        this.outputUnitId = outputUnitId;
+    }
+
+    public LocalDateTime getFrozenAt() {
+        return frozenAt;
+    }
+
+    public void setFrozenAt(LocalDateTime frozenAt) {
+        this.frozenAt = frozenAt;
     }
 }

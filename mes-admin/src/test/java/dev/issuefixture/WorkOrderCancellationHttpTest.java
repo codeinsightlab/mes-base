@@ -107,8 +107,7 @@ class WorkOrderCancellationHttpTest {
                     .toList());
             assertEquals("RUNNING", j.queryForObject("SELECT status FROM mes_production_execution WHERE id=1", String.class));
             m.perform(ProductionCoreV1HttpTest.full(post(ProductionCoreV1HttpTest.E))
-                            .content(ProductionCoreV1HttpTest.EXEC)).andExpect(status().isConflict())
-                    .andExpect(jsonPath("errorCode").value("WORKORDER_CANCELLED"));
+                            .content(ProductionCoreV1HttpTest.EXEC)).andExpect(status().isMethodNotAllowed());
             m.perform(ProductionCoreV1HttpTest.full(get("/api/production/input/calculate")).param("code", "WO1:M1#L001")
                             .param("workorderId", "1").param("stockReference", "1").param("outputQty", "1"))
                     .andExpect(status().isConflict()).andExpect(jsonPath("errorCode").value("WORKORDER_CANCELLED"));
@@ -130,22 +129,20 @@ class WorkOrderCancellationHttpTest {
     }
 
     @Test
-    void unknownOriginalInputReconcilesAfterCancellationWithoutNewCreate() throws Exception {
+    void failedLocalInputLeavesNothingToReconcileAndCancellationPreventsAnotherInput() throws Exception {
         try (var c = ProductionInputHttpTest.context()) {
             var m = MaterialIssueHttpTest.mvc(c);
+            var j = ProductionInputHttpTest.db(c);
             var integration = c.getBean(WarehouseIntegration.class);
-            doReturn(new ErpActionResult(Status.UNKNOWN, Mode.LOCAL_ONLY, null, "TEST interrupted original operation"))
+            doReturn(new ErpActionResult(Status.UNKNOWN, Mode.LOCAL_ONLY, null, "TEST interrupted local transaction"))
                     .when(integration).createMaterialIssue(any(), any(), any());
             var body = ProductionInputHttpTest.command(m, UUID.randomUUID().toString(), "L001", "100");
-            var result = m.perform(ProductionCoreV1HttpTest.full(post(ProductionInputHttpTest.ROOT)).content(body))
-                    .andExpect(status().isOk()).andExpect(jsonPath("status").value("SUBMIT_UNKNOWN")).andReturn();
-            var record = new ObjectMapper().readTree(result.getResponse().getContentAsString());
-            cancel(m);
-            m.perform(ProductionCoreV1HttpTest.full(post(MaterialIssueHttpTest.H + "/" + record.get("issueId")
-                            .asString() + "/actions/reconcile-erp")))
-                    .andExpect(status().isOk());
             m.perform(ProductionCoreV1HttpTest.full(post(ProductionInputHttpTest.ROOT)).content(body))
-                    .andExpect(status().isOk()).andExpect(jsonPath("status").value("CONFIRMED"));
+                    .andExpect(status().isConflict());
+            assertEquals(0, j.queryForObject("SELECT COUNT(*) FROM mes_material_issue_input", Integer.class));
+            cancel(m);
+            m.perform(ProductionCoreV1HttpTest.full(post(ProductionInputHttpTest.ROOT)).content(body))
+                    .andExpect(status().isConflict());
             verify(integration, times(1)).createMaterialIssue(any(), any(), any());
         }
     }

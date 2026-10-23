@@ -64,7 +64,7 @@ public class ProductionInputSupplyService {
     public Context query(String code, Long workorderId, int offset, int limit) {
         ParameterChecks.paging(offset, limit);
         var identity = ProductionCodeRules.parse(code);
-        var sourceOrder = readTransaction.execute(status -> identities.requireOrder(identity));
+        var sourceOrder = readTransaction.execute(status -> identities.requireInputOrder(identity));
         if (workorderId != null && !workorderId.equals(sourceOrder.getId()))
             ParameterChecks.reject(ErrorCode.BAD_REQUEST);
         readTransaction.executeWithoutResult(status -> sources.order(sourceOrder.getId()));
@@ -81,7 +81,8 @@ public class ProductionInputSupplyService {
             var eligible = result.orders().stream()
                     .filter(o -> sourceOrder.getId().equals(o.workorderId())
                             && identity.workorderCode().equals(o.workorderCode())
-                            && identity.productCode().equals(o.productCode())).toList();
+                            && o.requirements().stream().anyMatch(r -> identity.productCode().equals(r.materialCode())))
+                    .toList();
             if (eligible.size() > 1) throw new FoundationException(ErrorCode.PRODUCTION_IDENTITY_AMBIGUOUS);
             var stocks = result.stocks().stream().filter(stock -> identity.batchNo().equals(stock.lotCode())
                     && eligible.stream().anyMatch(order -> order.allowedWarehouses().contains(stock.warehouseId())
@@ -116,9 +117,24 @@ public class ProductionInputSupplyService {
                 || !order.allowedWarehouses().contains(stock.warehouseId()))
             ParameterChecks.reject(ErrorCode.BAD_REQUEST);
         var total = required.stream().map(Requirement::totalRequiredQty).reduce(BigDecimal.ZERO, BigDecimal::add);
-        var quantity = issueQuantity(order.plannedQty(), total, outputQty);
-        if (quantity.compareTo(stock.availableQty()) > 0) ParameterChecks.reject(ErrorCode.BAD_REQUEST);
-        return new Calculation(context.sourceMode(), order, stock, outputQty, quantity);
+        Calculation calculation;
+        if (Mode.LOCAL_ONLY.getValue().equals(context.sourceMode()))
+            calculation = readTransaction.execute(status -> local.calculate(context.sourceMode(), order, stock, outputQty));
+        else
+            calculation = new Calculation(context.sourceMode(), order, stock, outputQty, issueQuantity(order.plannedQty(), total, outputQty));
+        if (calculation.issueQty().compareTo(stock.availableQty()) > 0) ParameterChecks.reject(ErrorCode.BAD_REQUEST);
+        return calculation;
+    }
+
+    /**
+     * Common order lock is already held; all LOCAL reads participate in its transaction.
+     */
+    @Transactional(transactionManager = "businessTransactionManager", propagation = Propagation.MANDATORY)
+    public Calculation calculateLocal(String code, Long orderId, String stockReference, BigDecimal outputQty) {
+        var order = sources.order(orderId);
+        if (!BusinessSource.LOCAL.getValue().equals(order.getSource()))
+            throw new FoundationException(ErrorCode.BUSINESS_SOURCE_CONFLICT);
+        return calculate(code, orderId, stockReference, outputQty);
     }
 
     @Transactional(transactionManager = "businessTransactionManager", propagation = Propagation.MANDATORY)
@@ -135,7 +151,8 @@ public class ProductionInputSupplyService {
                 c.sourceMode(), o.workorderId(), o.productCode(), o.workCenter(), o.plannedQty().stripTrailingZeros()
                         .toPlainString(),
                 o.requirements(), o.sourceReference(), s.reference(), s.materialCode(), s.lotCode(), s.warehouseId(), s.binCode() == null ? "" : s.binCode(), s.unitId(), s.unitCode(),
-                c.outputQty().stripTrailingZeros().toPlainString(), c.issueQty().toPlainString())));
+                c.outputQty().stripTrailingZeros().toPlainString(), c.issueQty()
+                        .toPlainString(), c.basis() == null ? "" : c.basis())));
     }
 
     public static BigDecimal issueQuantity(BigDecimal plan, BigDecimal total, BigDecimal output) {

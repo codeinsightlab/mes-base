@@ -37,10 +37,10 @@
   <bind name="completed" value="@dev.mesbase.business.production.domain.ProductionExecutionStatus@FULLY_RECEIVED.getValue()"/>
   SELECT COUNT(e.id) AS active_count,
          COALESCE(SUM(CASE WHEN e.status != #{completed} THEN 1 ELSE 0 END),0) AS unfinished_count,
-         COALESCE(SUM(CASE WHEN e.status = #{completed} AND c.id IS NULL THEN 1 ELSE 0 END),0) AS missing_completion_count
+         COALESCE(SUM(CASE WHEN e.status = #{completed} AND c.execution_id IS NULL THEN 1 ELSE 0 END),0) AS missing_completion_count
   FROM workorder w
   LEFT JOIN mes_production_execution e ON e.workorder_id=w.id AND e.status != #{cancelled}
-  LEFT JOIN mes_execution_completion c ON c.execution_id=e.id
+  LEFT JOIN (SELECT execution_id FROM mes_execution_completion GROUP BY execution_id) c ON c.execution_id=e.id
   WHERE w.id=#{id}
  </select>
  <select id="countUnaccountedInputs" resultType="long">

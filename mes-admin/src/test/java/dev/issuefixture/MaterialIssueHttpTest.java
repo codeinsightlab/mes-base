@@ -45,6 +45,9 @@ import dev.mesbase.business.production.dao.MesProductionReportMapper;
 import dev.mesbase.business.production.dao.MesProductionScanActivityMapper;
 import dev.mesbase.business.production.dao.MesWorkorderCancellationMapper;
 import dev.mesbase.business.production.dao.MesWorkorderMaterialMapper;
+import dev.mesbase.business.production.dao.ProductionInputExtraMapper;
+import dev.mesbase.business.basic.dao.MaterialBomMapper;
+import dev.mesbase.business.basic.dao.MaterialBomItemMapper;
 import dev.mesbase.business.production.dao.OperationMapper;
 import dev.mesbase.business.production.dao.ProductionBatchMapper;
 import dev.mesbase.business.production.dao.ProductionQuantityMapper;
@@ -179,7 +182,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * TEST ONLY: real generated SQL, HTTP authorization and transactions; two separate H2 databases.
  */
 class MaterialIssueHttpTest {
-    static final Set<Class<?>> MAPPERS = Set.of(ProductionDefectListExtraMapper.class, StockDocumentExtraMapper.class, OperationDefectTypeMapper.class, DefectStatisticsExtraMapper.class, WmStockDocumentMapper.class, WmStockDocumentLineMapper.class, MesWorkorderCancellationMapper.class, WmWarehouseErpExtraMapper.class, MesQualityReleaseMapper.class, MesWarehouseAcceptanceMapper.class, MesExecutionCompletionMapper.class, MesWorkorderMaterialMapper.class, WmStockActionMapper.class, MesExecutionAssignmentMapper.class, MesMaterialIssueInputMapper.class, MesProductionScanActivityMapper.class, WmInventoryMapper.class, MesProductionReceiptMapper.class, ProductionReceiptQueryMapper.class, MesProductionDefectMapper.class, MesQualityTreatmentMapper.class, WorkstationMapper.class, MesProductionReportMapper.class, ProductionQuantityMapper.class, MesExecutionPathMapper.class, MesExecutionPathNodeMapper.class, MesMaterialIssueSubmissionMapper.class, WorkorderErpExtraMapper.class, MesMaterialIssueErpExtraMapper.class, WorkOrderExtraMapper.class, ProductionBatchMapper.class, BatchRouteNodeMapper.class, RoutingNodeMapper.class, RoutingEdgeMapper.class, OperationMapper.class, MesProductionExecutionMapper.class, MaterialMapper.class, UnitMeasureMapper.class, WmWarehouseMapper.class, RoutingMapper.class, RoutingProductMapper.class, WorkorderMapper.class, MesMaterialIssueMapper.class, MesMaterialIssueItemMapper.class);
+    static final Set<Class<?>> MAPPERS = Set.of(ProductionInputExtraMapper.class, MaterialBomMapper.class, MaterialBomItemMapper.class, ProductionDefectListExtraMapper.class, StockDocumentExtraMapper.class, OperationDefectTypeMapper.class, DefectStatisticsExtraMapper.class, WmStockDocumentMapper.class, WmStockDocumentLineMapper.class, MesWorkorderCancellationMapper.class, WmWarehouseErpExtraMapper.class, MesQualityReleaseMapper.class, MesWarehouseAcceptanceMapper.class, MesExecutionCompletionMapper.class, MesWorkorderMaterialMapper.class, WmStockActionMapper.class, MesExecutionAssignmentMapper.class, MesMaterialIssueInputMapper.class, MesProductionScanActivityMapper.class, WmInventoryMapper.class, MesProductionReceiptMapper.class, ProductionReceiptQueryMapper.class, MesProductionDefectMapper.class, MesQualityTreatmentMapper.class, WorkstationMapper.class, MesProductionReportMapper.class, ProductionQuantityMapper.class, MesExecutionPathMapper.class, MesExecutionPathNodeMapper.class, MesMaterialIssueSubmissionMapper.class, WorkorderErpExtraMapper.class, MesMaterialIssueErpExtraMapper.class, WorkOrderExtraMapper.class, ProductionBatchMapper.class, BatchRouteNodeMapper.class, RoutingNodeMapper.class, RoutingEdgeMapper.class, OperationMapper.class, MesProductionExecutionMapper.class, MaterialMapper.class, UnitMeasureMapper.class, WmWarehouseMapper.class, RoutingMapper.class, RoutingProductMapper.class, WorkorderMapper.class, MesMaterialIssueMapper.class, MesMaterialIssueItemMapper.class);
 
     static class Fixture implements AutoCloseable {
         final RuntimeRegistry registry = new RuntimeRegistry();
@@ -222,6 +225,9 @@ class MaterialIssueHttpTest {
                                 .split("-- 旧库存")[0].replace(" CHARACTER SET ascii COLLATE ascii_bin", "");
                         jdbc.execute("ALTER TABLE wm_inventory ADD batch_no VARCHAR(128)");
                         jdbc.execute("ALTER TABLE wm_inventory ADD bin_code VARCHAR(64)");
+                        // Match the real V29 precision; four-decimal fixture balances hide cumulative rounding errors.
+                        jdbc.execute("ALTER TABLE wm_inventory ALTER COLUMN quantity SET DATA TYPE DECIMAL(20,6)");
+                        jdbc.execute("ALTER TABLE wm_inventory ALTER COLUMN available_quantity SET DATA TYPE DECIMAL(20,6)");
                         jdbc.execute("ALTER TABLE wm_inventory DROP CONSTRAINT uk_inventory_factory_material_warehouse");
                     }
                     if (name.equals("V36__business_source_isolation.sql"))
@@ -244,6 +250,11 @@ class MaterialIssueHttpTest {
                 try (var connection = source.getConnection()) {
                     ScriptUtils.executeSqlScript(connection, new FileSystemResource("mes-admin/src/main/resources/db/business/V48__warehouse_type.sql"));
                 }
+                try (var connection = source.getConnection()) {
+                    ScriptUtils.executeSqlScript(connection, new FileSystemResource("mes-admin/src/main/resources/db/business/V55__material_bom.sql"));
+                }
+                for (String column : List.of("bom_id BIGINT", "bom_base_qty DECIMAL(20,6)", "bom_component_qty DECIMAL(20,6)", "output_unit_id BIGINT", "frozen_at TIMESTAMP(6)"))
+                    jdbc.execute("ALTER TABLE mes_workorder_material ADD " + column);
                 // TEST ONLY: these fresh fixture objects are explicitly local; no production migration default.
                 jdbc.execute("ALTER TABLE workorder ALTER COLUMN source SET DEFAULT 'LOCAL'");
                 jdbc.execute("ALTER TABLE wm_warehouse ALTER COLUMN source SET DEFAULT 'LOCAL'");
@@ -388,6 +399,21 @@ class MaterialIssueHttpTest {
         @Bean
         MesProductionReceiptMapper receiptMapper(SqlSessionFactory f) {
             return new SqlSessionTemplate(f).getMapper(MesProductionReceiptMapper.class);
+        }
+
+        @Bean
+        MaterialBomMapper materialBomMapper(SqlSessionFactory f) {
+            return new SqlSessionTemplate(f).getMapper(MaterialBomMapper.class);
+        }
+
+        @Bean
+        MaterialBomItemMapper materialBomItemMapper(SqlSessionFactory f) {
+            return new SqlSessionTemplate(f).getMapper(MaterialBomItemMapper.class);
+        }
+
+        @Bean
+        ProductionInputExtraMapper productionInputExtraMapper(SqlSessionFactory f) {
+            return new SqlSessionTemplate(f).getMapper(ProductionInputExtraMapper.class);
         }
 
         @Bean

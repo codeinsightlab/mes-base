@@ -785,6 +785,306 @@ public class MesWorkorderMaterialExample {
             addCriterion("updated_at not between", value1, value2, "updatedAt");
             return (Criteria) this;
         }
+
+        public Criteria andBomIdIsNull() {
+            addCriterion("bom_id is null");
+            return (Criteria) this;
+        }
+
+        public Criteria andBomIdIsNotNull() {
+            addCriterion("bom_id is not null");
+            return (Criteria) this;
+        }
+
+        public Criteria andBomIdEqualTo(Long value) {
+            addCriterion("bom_id =", value, "bomId");
+            return (Criteria) this;
+        }
+
+        public Criteria andBomIdNotEqualTo(Long value) {
+            addCriterion("bom_id <>", value, "bomId");
+            return (Criteria) this;
+        }
+
+        public Criteria andBomIdGreaterThan(Long value) {
+            addCriterion("bom_id >", value, "bomId");
+            return (Criteria) this;
+        }
+
+        public Criteria andBomIdGreaterThanOrEqualTo(Long value) {
+            addCriterion("bom_id >=", value, "bomId");
+            return (Criteria) this;
+        }
+
+        public Criteria andBomIdLessThan(Long value) {
+            addCriterion("bom_id <", value, "bomId");
+            return (Criteria) this;
+        }
+
+        public Criteria andBomIdLessThanOrEqualTo(Long value) {
+            addCriterion("bom_id <=", value, "bomId");
+            return (Criteria) this;
+        }
+
+        public Criteria andBomIdIn(List<Long> values) {
+            addCriterion("bom_id in", values, "bomId");
+            return (Criteria) this;
+        }
+
+        public Criteria andBomIdNotIn(List<Long> values) {
+            addCriterion("bom_id not in", values, "bomId");
+            return (Criteria) this;
+        }
+
+        public Criteria andBomIdBetween(Long value1, Long value2) {
+            addCriterion("bom_id between", value1, value2, "bomId");
+            return (Criteria) this;
+        }
+
+        public Criteria andBomIdNotBetween(Long value1, Long value2) {
+            addCriterion("bom_id not between", value1, value2, "bomId");
+            return (Criteria) this;
+        }
+
+        public Criteria andBomBaseQtyIsNull() {
+            addCriterion("bom_base_qty is null");
+            return (Criteria) this;
+        }
+
+        public Criteria andBomBaseQtyIsNotNull() {
+            addCriterion("bom_base_qty is not null");
+            return (Criteria) this;
+        }
+
+        public Criteria andBomBaseQtyEqualTo(BigDecimal value) {
+            addCriterion("bom_base_qty =", value, "bomBaseQty");
+            return (Criteria) this;
+        }
+
+        public Criteria andBomBaseQtyNotEqualTo(BigDecimal value) {
+            addCriterion("bom_base_qty <>", value, "bomBaseQty");
+            return (Criteria) this;
+        }
+
+        public Criteria andBomBaseQtyGreaterThan(BigDecimal value) {
+            addCriterion("bom_base_qty >", value, "bomBaseQty");
+            return (Criteria) this;
+        }
+
+        public Criteria andBomBaseQtyGreaterThanOrEqualTo(BigDecimal value) {
+            addCriterion("bom_base_qty >=", value, "bomBaseQty");
+            return (Criteria) this;
+        }
+
+        public Criteria andBomBaseQtyLessThan(BigDecimal value) {
+            addCriterion("bom_base_qty <", value, "bomBaseQty");
+            return (Criteria) this;
+        }
+
+        public Criteria andBomBaseQtyLessThanOrEqualTo(BigDecimal value) {
+            addCriterion("bom_base_qty <=", value, "bomBaseQty");
+            return (Criteria) this;
+        }
+
+        public Criteria andBomBaseQtyIn(List<BigDecimal> values) {
+            addCriterion("bom_base_qty in", values, "bomBaseQty");
+            return (Criteria) this;
+        }
+
+        public Criteria andBomBaseQtyNotIn(List<BigDecimal> values) {
+            addCriterion("bom_base_qty not in", values, "bomBaseQty");
+            return (Criteria) this;
+        }
+
+        public Criteria andBomBaseQtyBetween(BigDecimal value1, BigDecimal value2) {
+            addCriterion("bom_base_qty between", value1, value2, "bomBaseQty");
+            return (Criteria) this;
+        }
+
+        public Criteria andBomBaseQtyNotBetween(BigDecimal value1, BigDecimal value2) {
+            addCriterion("bom_base_qty not between", value1, value2, "bomBaseQty");
+            return (Criteria) this;
+        }
+
+        public Criteria andBomComponentQtyIsNull() {
+            addCriterion("bom_component_qty is null");
+            return (Criteria) this;
+        }
+
+        public Criteria andBomComponentQtyIsNotNull() {
+            addCriterion("bom_component_qty is not null");
+            return (Criteria) this;
+        }
+
+        public Criteria andBomComponentQtyEqualTo(BigDecimal value) {
+            addCriterion("bom_component_qty =", value, "bomComponentQty");
+            return (Criteria) this;
+        }
+
+        public Criteria andBomComponentQtyNotEqualTo(BigDecimal value) {
+            addCriterion("bom_component_qty <>", value, "bomComponentQty");
+            return (Criteria) this;
+        }
+
+        public Criteria andBomComponentQtyGreaterThan(BigDecimal value) {
+            addCriterion("bom_component_qty >", value, "bomComponentQty");
+            return (Criteria) this;
+        }
+
+        public Criteria andBomComponentQtyGreaterThanOrEqualTo(BigDecimal value) {
+            addCriterion("bom_component_qty >=", value, "bomComponentQty");
+            return (Criteria) this;
+        }
+
+        public Criteria andBomComponentQtyLessThan(BigDecimal value) {
+            addCriterion("bom_component_qty <", value, "bomComponentQty");
+            return (Criteria) this;
+        }
+
+        public Criteria andBomComponentQtyLessThanOrEqualTo(BigDecimal value) {
+            addCriterion("bom_component_qty <=", value, "bomComponentQty");
+            return (Criteria) this;
+        }
+
+        public Criteria andBomComponentQtyIn(List<BigDecimal> values) {
+            addCriterion("bom_component_qty in", values, "bomComponentQty");
+            return (Criteria) this;
+        }
+
+        public Criteria andBomComponentQtyNotIn(List<BigDecimal> values) {
+            addCriterion("bom_component_qty not in", values, "bomComponentQty");
+            return (Criteria) this;
+        }
+
+        public Criteria andBomComponentQtyBetween(BigDecimal value1, BigDecimal value2) {
+            addCriterion("bom_component_qty between", value1, value2, "bomComponentQty");
+            return (Criteria) this;
+        }
+
+        public Criteria andBomComponentQtyNotBetween(BigDecimal value1, BigDecimal value2) {
+            addCriterion("bom_component_qty not between", value1, value2, "bomComponentQty");
+            return (Criteria) this;
+        }
+
+        public Criteria andOutputUnitIdIsNull() {
+            addCriterion("output_unit_id is null");
+            return (Criteria) this;
+        }
+
+        public Criteria andOutputUnitIdIsNotNull() {
+            addCriterion("output_unit_id is not null");
+            return (Criteria) this;
+        }
+
+        public Criteria andOutputUnitIdEqualTo(Long value) {
+            addCriterion("output_unit_id =", value, "outputUnitId");
+            return (Criteria) this;
+        }
+
+        public Criteria andOutputUnitIdNotEqualTo(Long value) {
+            addCriterion("output_unit_id <>", value, "outputUnitId");
+            return (Criteria) this;
+        }
+
+        public Criteria andOutputUnitIdGreaterThan(Long value) {
+            addCriterion("output_unit_id >", value, "outputUnitId");
+            return (Criteria) this;
+        }
+
+        public Criteria andOutputUnitIdGreaterThanOrEqualTo(Long value) {
+            addCriterion("output_unit_id >=", value, "outputUnitId");
+            return (Criteria) this;
+        }
+
+        public Criteria andOutputUnitIdLessThan(Long value) {
+            addCriterion("output_unit_id <", value, "outputUnitId");
+            return (Criteria) this;
+        }
+
+        public Criteria andOutputUnitIdLessThanOrEqualTo(Long value) {
+            addCriterion("output_unit_id <=", value, "outputUnitId");
+            return (Criteria) this;
+        }
+
+        public Criteria andOutputUnitIdIn(List<Long> values) {
+            addCriterion("output_unit_id in", values, "outputUnitId");
+            return (Criteria) this;
+        }
+
+        public Criteria andOutputUnitIdNotIn(List<Long> values) {
+            addCriterion("output_unit_id not in", values, "outputUnitId");
+            return (Criteria) this;
+        }
+
+        public Criteria andOutputUnitIdBetween(Long value1, Long value2) {
+            addCriterion("output_unit_id between", value1, value2, "outputUnitId");
+            return (Criteria) this;
+        }
+
+        public Criteria andOutputUnitIdNotBetween(Long value1, Long value2) {
+            addCriterion("output_unit_id not between", value1, value2, "outputUnitId");
+            return (Criteria) this;
+        }
+
+        public Criteria andFrozenAtIsNull() {
+            addCriterion("frozen_at is null");
+            return (Criteria) this;
+        }
+
+        public Criteria andFrozenAtIsNotNull() {
+            addCriterion("frozen_at is not null");
+            return (Criteria) this;
+        }
+
+        public Criteria andFrozenAtEqualTo(LocalDateTime value) {
+            addCriterion("frozen_at =", value, "frozenAt");
+            return (Criteria) this;
+        }
+
+        public Criteria andFrozenAtNotEqualTo(LocalDateTime value) {
+            addCriterion("frozen_at <>", value, "frozenAt");
+            return (Criteria) this;
+        }
+
+        public Criteria andFrozenAtGreaterThan(LocalDateTime value) {
+            addCriterion("frozen_at >", value, "frozenAt");
+            return (Criteria) this;
+        }
+
+        public Criteria andFrozenAtGreaterThanOrEqualTo(LocalDateTime value) {
+            addCriterion("frozen_at >=", value, "frozenAt");
+            return (Criteria) this;
+        }
+
+        public Criteria andFrozenAtLessThan(LocalDateTime value) {
+            addCriterion("frozen_at <", value, "frozenAt");
+            return (Criteria) this;
+        }
+
+        public Criteria andFrozenAtLessThanOrEqualTo(LocalDateTime value) {
+            addCriterion("frozen_at <=", value, "frozenAt");
+            return (Criteria) this;
+        }
+
+        public Criteria andFrozenAtIn(List<LocalDateTime> values) {
+            addCriterion("frozen_at in", values, "frozenAt");
+            return (Criteria) this;
+        }
+
+        public Criteria andFrozenAtNotIn(List<LocalDateTime> values) {
+            addCriterion("frozen_at not in", values, "frozenAt");
+            return (Criteria) this;
+        }
+
+        public Criteria andFrozenAtBetween(LocalDateTime value1, LocalDateTime value2) {
+            addCriterion("frozen_at between", value1, value2, "frozenAt");
+            return (Criteria) this;
+        }
+
+        public Criteria andFrozenAtNotBetween(LocalDateTime value1, LocalDateTime value2) {
+            addCriterion("frozen_at not between", value1, value2, "frozenAt");
+            return (Criteria) this;
+        }
     }
 
     public static class Criteria extends GeneratedCriteria {

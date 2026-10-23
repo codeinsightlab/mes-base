@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="dev.mesbase.business.production.dao.ProductionInputExtraMapper">
+  <select id="hasFormalInput" resultType="boolean">
+    SELECT EXISTS(SELECT 1 FROM mes_material_issue i JOIN mes_material_issue_input f ON f.issue_id=i.id
+                  WHERE i.workorder_id=#{workorderId})
+  </select>
+  <select id="quota" resultType="dev.mesbase.business.production.domain.ProductionInputQuota">
+    <bind name="voided" value="@dev.mesbase.business.issue.domain.MaterialIssueStatus@VOIDED.getValue()"/>
+    <bind name="rejected" value="@dev.mesbase.business.issue.domain.MaterialIssueStatus@SUBMIT_REJECTED.getValue()"/>
+    SELECT COALESCE(SUM(f.output_qty),0) AS output_qty,
+           COALESCE(SUM(component_totals.material_qty),0) AS material_qty,
+           COALESCE(SUM(CASE WHEN f.output_qty&gt;0 AND component_totals.line_count=1 AND component_totals.material_id=#{materialId}
+               AND component_totals.unit_id=#{unitId} AND component_totals.material_qty&gt;0 THEN 0 ELSE 1 END),0) AS invalid_count
+    FROM mes_material_issue_input f JOIN mes_material_issue i ON i.id=f.issue_id AND i.execution_id=f.execution_id
+    LEFT JOIN (SELECT l.issue_id,COUNT(*) AS line_count,MIN(l.material_id) AS material_id,
+                      MIN(l.unit_id) AS unit_id,SUM(l.quantity) AS material_qty
+               FROM mes_material_issue_item l JOIN mes_material_issue issue_header ON issue_header.id=l.issue_id
+               WHERE issue_header.workorder_id=#{workorderId} GROUP BY l.issue_id) component_totals ON component_totals.issue_id=i.id
+    WHERE i.workorder_id=#{workorderId} AND f.input_kind='PRODUCTION_INPUT'
+      AND i.status NOT IN (#{voided},#{rejected})
+  </select>
+</mapper>

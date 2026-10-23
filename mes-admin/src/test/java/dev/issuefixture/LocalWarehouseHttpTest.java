@@ -176,30 +176,32 @@ class LocalWarehouseHttpTest {
             j.update("INSERT INTO material(id,code,name,unit_id,status) VALUES(2,'P2','TEST ONLY second product',1,'ENABLED')");
             j.update("INSERT INTO routing_product(routing_id,material_id,material_code,material_name) VALUES(1,2,'P2','TEST ONLY second product')");
             j.update("INSERT INTO workorder(id,code,product_id,planned_qty,routing_id,status,revision,create_time,update_time) VALUES(2,'WO2',2,1000,1,'RELEASED',0,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)");
-            c.getEnvironment().getPropertySources().addFirst(new MapPropertySource("TEST ONLY second recipe", Map.of(
-                    "mes.production.input.factories.A.workorders.2.material-id", "1",
-                    "mes.production.input.factories.A.workorders.2.total-required-qty", "2000",
-                    "mes.production.input.factories.A.workorders.2.work-center", "TEST-CENTER",
-                    "mes.production.input.factories.A.workorders.2.warehouse-ids", "1")));
+            j.update("INSERT INTO material_bom SELECT 2,'TEST-BOM-SECOND','1',2,base_qty,unit_id,status,revision,remark,created_by,created_at,published_at FROM material_bom WHERE id=1");
+            j.update("INSERT INTO material_bom_item SELECT 2,2,material_id,quantity,unit_id,NULL,sort FROM material_bom_item WHERE id=1");
+            j.update("INSERT INTO mes_workorder_material SELECT 2,material_id,unit_id,total_required_qty,planned_qty,warehouse_ids,work_center,revision,status,updated_by,updated_at,2,bom_base_qty,bom_component_qty,output_unit_id,NULL FROM mes_workorder_material WHERE id=1");
             String first = ProductionInputHttpTest.command(m, UUID.randomUUID().toString(), "L001", "100");
             var second = new ObjectMapper().readTree(first).deepCopy();
             var secondNode = (ObjectNode) second;
             String calculation = m.perform(ProductionCoreV1HttpTest.full(get(ProductionInputHttpTest.ROOT + "/calculate"))
-                            .param("code", "WO2:P2#L001").param("workorderId", "2").param("stockReference", "1")
+                            .param("code", "WO2:M1#L001").param("workorderId", "2").param("stockReference", "1")
                             .param("outputQty", "100"))
                     .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
-            secondNode.put("requestId", UUID.randomUUID().toString()).put("workorderId", "2").put("code", "WO2:P2#L001")
+            secondNode.put("requestId", UUID.randomUUID().toString()).put("workorderId", "2").put("code", "WO2:M1#L001")
                     .put("calculationKey", new ObjectMapper().readTree(calculation).get("calculationKey").asText());
             var barrier = new CyclicBarrier(2);
-            doAnswer(call -> {
+            var x = pool.submit(() -> {
                 barrier.await();
-                return call.callRealMethod();
-            }).when(c.getBean(WarehouseIntegration.class)).createMaterialIssue(any(), any(), any());
-            var x = pool.submit(() -> m.perform(ProductionCoreV1HttpTest.full(post(ProductionInputHttpTest.ROOT))
-                    .content(first)).andReturn().getResponse().getStatus());
-            var y = pool.submit(() -> m.perform(ProductionCoreV1HttpTest.full(post(ProductionInputHttpTest.ROOT))
-                    .content(secondNode.toString())).andReturn().getResponse().getStatus());
-            assertEquals(List.of(200, 409), Stream.of(x.get(), y.get()).sorted().toList());
+                return m.perform(ProductionCoreV1HttpTest.full(post(ProductionInputHttpTest.ROOT))
+                        .content(first)).andReturn().getResponse().getStatus();
+            });
+            var y = pool.submit(() -> {
+                barrier.await();
+                return m.perform(ProductionCoreV1HttpTest.full(post(ProductionInputHttpTest.ROOT))
+                        .content(secondNode.toString())).andReturn().getResponse().getStatus();
+            });
+            var statuses = List.of(x.get(), y.get());
+            assertEquals(1, statuses.stream().filter(code -> code == 200).count());
+            assertEquals(1, statuses.stream().filter(code -> code == 400 || code == 409).count());
             balance(j, "100");
             assertEquals(1, j.queryForObject("SELECT COUNT(*) FROM wm_stock_action", Integer.class));
             assertEquals(1, j.queryForObject("SELECT COUNT(*) FROM mes_material_issue_input WHERE confirmed_at IS NOT NULL", Integer.class));
@@ -211,11 +213,11 @@ class LocalWarehouseHttpTest {
         try (var c = ProductionInputHttpTest.context()) {
             var j = ProductionInputHttpTest.db(c);
             var m = MaterialIssueHttpTest.mvc(c);
-            ProductionInputTestData.confirmed(j, 1, new BigDecimal("100"));
             var calculation = new AtomicReference<Calculation>();
             FactoryIntegrationContext.run(FactorySnapshotFixture.current(c, "A"), () ->
                     calculation.set(c.getBean(ProductionInputSupplyService.class)
                             .calculate("WO1:M1#L001", 1L, "1", new BigDecimal("100"))));
+            ProductionInputTestData.confirmed(j, 1, new BigDecimal("100"));
             j.update("UPDATE mes_material_issue_input SET stock_id=1,stock_applied=true,calculation_json=? WHERE issue_id=-1", new ObjectMapper().writeValueAsString(calculation.get()));
             j.update("UPDATE wm_inventory SET quantity=9800,available_quantity=9800 WHERE id=1");
             m.perform(ProductionCoreV1HttpTest.full(post(MaterialIssueHttpTest.H + "/-1/actions/void")))

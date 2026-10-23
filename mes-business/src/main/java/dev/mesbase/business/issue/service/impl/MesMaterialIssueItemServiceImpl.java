@@ -13,6 +13,7 @@ import dev.mesbase.business.issue.domain.MesMaterialIssueItemUpdateCommand;
 import dev.mesbase.business.issue.service.IMesMaterialIssueItemService;
 import dev.mesbase.business.issue.service.MaterialIssueRules;
 import dev.mesbase.business.production.domain.ProductionQuantityInput;
+import dev.mesbase.business.integration.production.ProductionSupply.Calculation;
 import dev.mesbase.common.validation.ParameterChecks;
 import dev.mesbase.core.error.ErrorCode;
 import dev.mesbase.core.error.FoundationException;
@@ -101,6 +102,19 @@ public class MesMaterialIssueItemServiceImpl implements IMesMaterialIssueItemSer
             scope = BusinessCacheEvict.Scope.LIST)
     public MesMaterialIssueItemEntity insert(MesMaterialIssueItemCreateCommand input) {
         ProductionQuantityInput.check(input.quantity());
+        return insertRow(input, false);
+    }
+
+    @Override
+    @Transactional(transactionManager = "businessTransactionManager", isolation = Isolation.READ_COMMITTED, rollbackFor = Exception.class)
+    @BusinessCacheEvict(business = MesMaterialIssueItemResource.PREFIX, scope = BusinessCacheEvict.Scope.LIST)
+    public MesMaterialIssueItemEntity insertCalculated(Long issueId, Calculation calculation) {
+        var stock = calculation.stock();
+        return insertRow(new MesMaterialIssueItemCreateCommand(issueId, stock.materialId(), stock.lotCode(),
+                calculation.issueQty(), stock.unitId(), stock.warehouseId(), null), true);
+    }
+
+    private MesMaterialIssueItemEntity insertRow(MesMaterialIssueItemCreateCommand input, boolean calculated) {
         MesMaterialIssueItemEntity row = new MesMaterialIssueItemEntity();
 
         row.setIssueId(input.issueId());
@@ -110,7 +124,8 @@ public class MesMaterialIssueItemServiceImpl implements IMesMaterialIssueItemSer
         row.setUnitId(input.unitId());
         row.setWarehouseId(input.warehouseId());
         row.setRemark(input.remark());
-        rules.validate(row);
+        if (calculated) rules.validateCalculated(row);
+        else rules.validate(row);
         rules.audit(row, true);
         if (mapper.insert(row) != 1) {
             throw new FoundationException(ErrorCode.RESOURCE_CONFLICT);

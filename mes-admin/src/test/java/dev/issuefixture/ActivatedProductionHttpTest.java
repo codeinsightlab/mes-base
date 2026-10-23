@@ -85,10 +85,10 @@ class ActivatedProductionHttpTest {
                     .andExpect(status().isOk()).andExpect(jsonPath("nodes[4].effectiveOutputQty").value("90.000000"));
             http.perform(ProductionCoreV1HttpTest.full(post("/api/production/mes-production-execution"))
                             .content("{\"workorderId\":\"1\",\"routingId\":\"1\",\"targetQty\":\"901\",\"status\":\"READY\"}"))
-                    .andExpect(status().isUnprocessableEntity());
+                    .andExpect(status().isMethodNotAllowed());
             http.perform(ProductionCoreV1HttpTest.full(post("/api/production/mes-production-execution"))
                             .content("{\"workorderId\":\"1\",\"routingId\":\"1\",\"targetQty\":\"900\",\"status\":\"READY\"}"))
-                    .andExpect(status().isOk());
+                    .andExpect(status().isMethodNotAllowed());
             assertEquals(0, j.queryForObject("SELECT COUNT(*) FROM wm_stock_action", Integer.class));
         }
     }

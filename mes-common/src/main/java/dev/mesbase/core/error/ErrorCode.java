@@ -45,6 +45,7 @@ public enum ErrorCode {
     PRODUCTION_BATCH_REQUIRED(409, "缺少可信生产批次，无法入库，请核对生产执行记录"),
     PRODUCTION_BATCH_CONFLICT(409, "生产批次绑定不一致，无法入库，请核对投产身份"),
     PRODUCTION_IDENTITY_AMBIGUOUS(409, "同一工单、品号及批次匹配多个执行单元，请核对执行记录"),
+    PRODUCTION_INPUT_QUOTA_EXCEEDED(409, "累计正式投入超过工单计划额度，不良同样占用投入额度"),
     PRODUCTION_INPUT_STALE(409, "用料计算依据已变化，请重新计算并确认"),
     PRODUCTION_SINGLE_MATERIAL_REQUIRED(422, "工单包含多种必需材料，不支持当前单材料投产模式"),
     PRODUCTION_IDENTITY_CONFLICT(409, "生产扫码身份已绑定其他工单"),

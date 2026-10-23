@@ -74,7 +74,7 @@ class ProductionChainHttpTest {
     }
 
     @Test
-    void executionsOwnVersionsAllocationAndReleaseAdmissionWithoutMaterialIssue() throws Exception {
+    void existingExecutionsKeepVersionsAllocationAndReleaseAdmissionWithoutInventingIssues() throws Exception {
         try (var c = MaterialIssueHttpTest.context()) {
             var m = MaterialIssueHttpTest.mvc(c);
             var a = c.getBean(MaterialIssueHttpTest.Fixture.class).business.get("A");
@@ -82,10 +82,8 @@ class ProductionChainHttpTest {
             a.update("INSERT INTO routing_product(routing_id,material_id,material_code,material_name) VALUES(3,1,'M1','产品')");
             String one = "{\"workorderId\":\"1\",\"routingId\":\"1\",\"targetQty\":\"400\",\"status\":\"READY\"}";
             String two = one.replace("\"routingId\":\"1\"", "\"routingId\":\"3\"").replace("400", "300");
-            m.perform(full(post(E), "A").content(one)).andExpect(status().isOk())
-                    .andExpect(jsonPath("id").value("1")).andExpect(jsonPath("executionNo").doesNotExist());
-            m.perform(full(post(E), "A").content(two)).andExpect(status().isOk())
-                    .andExpect(jsonPath("routingId").value("3"));
+            // Existing fixture executions only; new executions are created by formal BOM input.
+            a.update("INSERT INTO mes_production_execution(id,workorder_id,product_id,routing_id,target_qty,status) VALUES(1,1,1,1,400,'READY'),(2,1,1,3,300,'READY')");
             m.perform(full(get(W + "/1/allocation"), "A")).andExpect(status().isOk())
                     .andExpect(jsonPath("allocatedTargetQty").value("700.000000"))
                     .andExpect(jsonPath("remainingTargetQty").value("300.000000"))
@@ -136,7 +134,8 @@ class ProductionChainHttpTest {
             m.perform(full(post(W + "/1/actions/release"), "A").content("{\"revision\":1}"))
                     .andExpect(status().isOk());
             m.perform(full(post(E), "A").content("{\"workorderId\":\"1\",\"routingId\":\"1\",\"targetQty\":\"3\",\"status\":\"READY\"}"))
-                    .andExpect(status().isOk()).andExpect(jsonPath("routingId").value("1"));
+                    .andExpect(status().isMethodNotAllowed());
+            a.update("INSERT INTO mes_production_execution(id,workorder_id,product_id,routing_id,target_qty,status) VALUES(1,1,1,1,3,'READY')");
             m.perform(full(get(E + "/1"), "A")).andExpect(status().isOk());
             m.perform(full(post("/api/issue/mes-material-issue"), "A")
                             .content("{\"issueNo\":\"NO_BATCH_PATH\",\"executionId\":\"1\",\"status\":\"DRAFT\"}"))

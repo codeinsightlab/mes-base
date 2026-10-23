@@ -146,8 +146,10 @@ public class MaterialIssueSubmissionService {
             ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
         var e = locks.execution(row.getExecutionId());
         rules.validateExecutionSource(e);
-        if (!Set.of(ProductionExecutionStatus.READY.getValue(), ProductionExecutionStatus.RUNNING.getValue())
+        if (!Set.of(ProductionExecutionStatus.READY.getValue(), ProductionExecutionStatus.RUNNING.getValue(), ProductionExecutionStatus.FULLY_RECEIVED.getValue())
                 .contains(e.getStatus()) || !Objects.equals(row.getWorkorderId(), e.getWorkorderId()) || !Objects.equals(row.getProductId(), e.getProductId()) || !Objects.equals(row.getRoutingId(), e.getRoutingId()))
+            ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
+        if (ProductionExecutionStatus.FULLY_RECEIVED.getValue().equals(e.getStatus()) && inputFacts.find(id) == null)
             ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
         if (ProductionExecutionStatus.READY.getValue().equals(e.getStatus())) executions.checkReadyReferences(e);
         var path = paths.requireSelected(e);
@@ -235,6 +237,9 @@ public class MaterialIssueSubmissionService {
         if (result.status() == Status.SUCCEEDED) {
             var execution = locks.execution(row.getExecutionId());
             inputFacts.confirm(row, result.executionMode().getValue());
+            if (inputFacts.find(row.getId()) != null && ProductionExecutionStatus.FULLY_RECEIVED.getValue()
+                    .equals(execution.getStatus()))
+                executions.resumeAfterInput(execution);
             paths.confirm(execution, a.getPathRevision());
             row.setStatus(MaterialIssueStatus.CONFIRMED.getValue());
             a.setStatus(MaterialIssueSubmissionStatus.SUCCEEDED.getValue());

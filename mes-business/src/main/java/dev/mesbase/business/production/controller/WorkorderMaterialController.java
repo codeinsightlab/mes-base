@@ -3,6 +3,7 @@ package dev.mesbase.business.production.controller;
 import dev.mesbase.business.production.domain.MesWorkorderMaterialEntity;
 import dev.mesbase.business.production.service.WorkorderMaterialService;
 import dev.mesbase.platform.web.EndpointAccess;
+import dev.mesbase.common.utils.bean.BeanConversions;
 import java.time.LocalDateTime;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -22,9 +23,10 @@ public class WorkorderMaterialController {
         this.service = service;
     }
 
-    public record View(String workorderId, String materialId, String unitId, String totalRequiredQty,
+    public record View(String id, String bomId, String bomBaseQty, String bomComponentQty, String outputUnitId,
+                       String materialId, String unitId, String totalRequiredQty,
                        String plannedQty, String warehouseIds, String workCenter, String revision, String status,
-                       LocalDateTime updatedAt) {
+                       LocalDateTime frozenAt, LocalDateTime updatedAt) {
     }
 
     @GetMapping
@@ -40,10 +42,6 @@ public class WorkorderMaterialController {
     }
 
     private static View view(MesWorkorderMaterialEntity r) {
-        if (r == null) return null;
-        return new View(r.getId().toString(), r.getMaterialId().toString(), r.getUnitId()
-                .toString(), r.getTotalRequiredQty().toPlainString(), r.getPlannedQty()
-                .toPlainString(), r.getWarehouseIds(), r.getWorkCenter(), r.getRevision()
-                .toString(), r.getStatus(), r.getUpdatedAt());
+        return BeanConversions.convert(r, View.class);
     }
 }

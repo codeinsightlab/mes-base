@@ -67,6 +67,15 @@ public class ProductionIdentityService {
         return order;
     }
 
+    /**
+     * Input labels name the stock material; the trusted supply provider validates membership in this order.
+     */
+    @Transactional(transactionManager = "businessTransactionManager", readOnly = true)
+    public WorkorderEntity requireInputOrder(ProductionScanCode scanned) {
+        ProductionCodeRules.validate(scanned);
+        return orderByExactCode(scanned.workorderCode());
+    }
+
     private ProductionIdentity identity(MesProductionExecutionEntity execution) {
         var workorder = workorders.selectByPrimaryKey(execution.getWorkorderId());
         var product = products.selectByPrimaryKey(execution.getProductId());
@@ -95,7 +104,7 @@ public class ProductionIdentityService {
         long after = 0;
         while (true) {
             var filter = new MesProductionExecutionExample();
-            filter.createCriteria().andWorkorderIdEqualTo(workorderId).andProductIdEqualTo(productId)
+            filter.createCriteria().andWorkorderIdEqualTo(workorderId)
                     .andBatchNoEqualTo(batchNo).andIdGreaterThan(after);
             filter.setOrderByClause("id ASC");
             List<MesProductionExecutionEntity> rows;
@@ -106,6 +115,8 @@ public class ProductionIdentityService {
             for (var row : rows) {
                 after = row.getId();
                 if (!batchNo.equals(row.getBatchNo())) continue;
+                if (!Objects.equals(productId, row.getProductId()))
+                    throw new FoundationException(ErrorCode.PRODUCTION_IDENTITY_AMBIGUOUS);
                 if (match != null) throw new FoundationException(ErrorCode.PRODUCTION_IDENTITY_AMBIGUOUS);
                 match = row;
             }

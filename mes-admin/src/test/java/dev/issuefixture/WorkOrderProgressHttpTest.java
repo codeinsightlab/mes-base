@@ -128,7 +128,11 @@ class WorkOrderProgressHttpTest {
             mvc.perform(ProductionReportHttpTest.full(get(URL), "A"))
                     .andExpect(jsonPath("items[0].completionPercent").value("250.00"))
                     .andExpect(jsonPath("items[0].pendingCompletionQty").value("0"));
-            complete(db.get("A"), "test-duplicate", 1, "4");
+            complete(db.get("A"), "test-next-cycle", 1, "4");
+            mvc.perform(ProductionReportHttpTest.full(get(URL), "A"))
+                    .andExpect(jsonPath("items[0].completionPercent").value("250.00"))
+                    .andExpect(jsonPath("items[0].completedQty").value("5.000000"));
+            complete(db.get("A"), "zz-invalid-latest", 1, "-1");
             mvc.perform(ProductionReportHttpTest.full(get(URL), "A"))
                     .andExpect(jsonPath("items[0].completionPercent").isEmpty())
                     .andExpect(jsonPath("items[0].completedQty").isEmpty())

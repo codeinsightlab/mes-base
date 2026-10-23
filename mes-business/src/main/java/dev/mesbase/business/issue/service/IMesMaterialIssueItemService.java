@@ -6,6 +6,7 @@ import dev.mesbase.business.issue.domain.MesMaterialIssueItemPage;
 import dev.mesbase.business.issue.domain.MesMaterialIssueItemQueryDto;
 import dev.mesbase.business.issue.domain.MesMaterialIssueItemUpdateCommand;
 import java.util.List;
+import dev.mesbase.business.integration.production.ProductionSupply.Calculation;
 
 /**
  * 领料出库明细 CRUD 用例。
@@ -18,6 +19,8 @@ public interface IMesMaterialIssueItemService {
     MesMaterialIssueItemEntity selectById(Long id);
 
     MesMaterialIssueItemEntity insert(MesMaterialIssueItemCreateCommand input);
+
+    MesMaterialIssueItemEntity insertCalculated(Long issueId, Calculation calculation);
 
     MesMaterialIssueItemEntity updateById(Long id, MesMaterialIssueItemUpdateCommand input);
 

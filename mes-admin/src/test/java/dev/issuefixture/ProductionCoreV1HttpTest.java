@@ -76,7 +76,8 @@ class ProductionCoreV1HttpTest {
             j.update("UPDATE workorder SET status='RELEASED' WHERE id=1");
         } else m.perform(full(post("/api/production/workorder/1/actions/release")).content("{\"revision\":0}"))
                 .andExpect(status().isOk());
-        m.perform(full(post(E)).content(EXEC)).andExpect(status().isOk());
+        // Existing execution fixture for administrative/ERP-intent lifecycle tests; public creation is retired.
+        j.update("INSERT INTO mes_production_execution(id,workorder_id,product_id,routing_id,target_qty,status,create_by,create_time,update_time) VALUES(1,1,1,1,12,'READY','1',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)");
     }
 
     static void select(MockMvc m) throws Exception {
@@ -216,7 +217,7 @@ class ProductionCoreV1HttpTest {
             m.perform(full(put(E + "/1")).content(EXEC.replace("READY", "FULLY_RECEIVED")))
                     .andExpect(status().isConflict());
             m.perform(full(post(E)).content(EXEC.replace("READY", "RUNNING")))
-                    .andExpect(status().isUnprocessableEntity());
+                    .andExpect(status().isMethodNotAllowed());
             assertEquals(0, db(c).queryForObject("SELECT COUNT(*) FROM production_batch", Integer.class));
         }
     }

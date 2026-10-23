@@ -2,7 +2,6 @@ package dev.mesbase.business.production.controller;
 
 import dev.mesbase.business.production.controller.vo.MesProductionExecutionPageVo;
 import dev.mesbase.business.production.controller.vo.MesProductionExecutionVo;
-import dev.mesbase.business.production.domain.MesProductionExecutionCreateCommand;
 import dev.mesbase.business.production.domain.MesProductionExecutionEntity;
 import dev.mesbase.business.production.domain.MesProductionExecutionQueryDto;
 import dev.mesbase.business.production.domain.MesProductionExecutionUpdateCommand;
@@ -22,7 +21,6 @@ import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -55,7 +53,8 @@ public class MesProductionExecutionController {
             var product = data.references().products().get(row.getProductId());
             var routing = data.references().routings().get(row.getRoutingId());
             return toView(row, Optional.ofNullable(product).map(value -> value.getCode()).orElse(null),
-                    Optional.ofNullable(product).map(value -> value.getName()).orElse(null), Optional.ofNullable(routing).map(value -> value.code()).orElse(null),
+                    Optional.ofNullable(product).map(value -> value.getName())
+                            .orElse(null), Optional.ofNullable(routing).map(value -> value.code()).orElse(null),
                     Optional.ofNullable(routing).map(value -> value.name()).orElse(null),
                     Optional.ofNullable(routing).map(value -> value.version()).orElse(null),
                     ProductionExecutionQueryService.name(data.references().users(), row.getCreateBy()),
@@ -69,13 +68,6 @@ public class MesProductionExecutionController {
             permission = MesProductionExecutionPermissions.QUERY)
     public MesProductionExecutionVo detail(@PathVariable Long id) {
         return toView(queries.detail(id));
-    }
-
-    @PostMapping
-    @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED,
-            permission = MesProductionExecutionPermissions.CREATE)
-    public MesProductionExecutionVo create(@Valid @RequestBody MesProductionExecutionCreateCommand input) {
-        return toView(service.insert(input));
     }
 
     @PutMapping("/{id}")
@@ -97,23 +89,28 @@ public class MesProductionExecutionController {
     }
 
 
-    private record Labels(String productCode, String productName, String routingCode, String routingName, Integer routingVersion,
+    private record Labels(String productCode, String productName, String routingCode, String routingName,
+                          Integer routingVersion,
                           String createByName, String updateByName, String workorderStatus) {
     }
 
     private static MesProductionExecutionVo toView(ProductionExecutionQueryService.Display display) {
-        return toView(display.record(), Optional.ofNullable(display.product()).map(value -> value.getCode()).orElse(null),
-                Optional.ofNullable(display.product()).map(value -> value.getName()).orElse(null), Optional.ofNullable(display.routing()).map(nullableValue -> nullableValue
-                .code()).orElse(null), Optional.ofNullable(display.routing()).map(nullableValue -> nullableValue
-                .name()).orElse(null), Optional.ofNullable(display.routing()).map(nullableValue -> nullableValue
-                .version()).orElse(null), display.createByName(), display.updateByName(), display.workorderStatus());
+        return toView(display.record(), Optional.ofNullable(display.product()).map(value -> value.getCode())
+                        .orElse(null),
+                Optional.ofNullable(display.product()).map(value -> value.getName())
+                        .orElse(null), Optional.ofNullable(display.routing()).map(nullableValue -> nullableValue
+                        .code()).orElse(null), Optional.ofNullable(display.routing()).map(nullableValue -> nullableValue
+                        .name()).orElse(null), Optional.ofNullable(display.routing()).map(nullableValue -> nullableValue
+                                .version())
+                        .orElse(null), display.createByName(), display.updateByName(), display.workorderStatus());
     }
 
     static MesProductionExecutionVo toView(MesProductionExecutionEntity row) {
         return toView(row, null, null, null, null, null, null, null, null);
     }
 
-    private static MesProductionExecutionVo toView(MesProductionExecutionEntity row, String productCode, String productName, String routingCode,
+    private static MesProductionExecutionVo toView(MesProductionExecutionEntity row, String productCode,
+                                                   String productName, String routingCode,
                                                    String routingName, Integer routingVersion, String createByName,
                                                    String updateByName, String workorderStatus) {
         return BeanConversions.convertWith(row, new Labels(productCode, productName, routingCode, routingName, routingVersion,

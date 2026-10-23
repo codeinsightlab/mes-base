@@ -1,5 +1,4 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- MES-CODEGEN: MyBatis Generator standard single-table persistence. -->
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="dev.mesbase.business.production.dao.MesWorkorderMaterialMapper">
   <resultMap id="BaseResultMap" type="dev.mesbase.business.production.domain.MesWorkorderMaterialEntity">
@@ -14,6 +13,11 @@
     <result column="status" jdbcType="VARCHAR" property="status" />
     <result column="updated_by" jdbcType="BIGINT" property="updatedBy" />
     <result column="updated_at" jdbcType="TIMESTAMP" property="updatedAt" />
+    <result column="bom_id" jdbcType="BIGINT" property="bomId" />
+    <result column="bom_base_qty" jdbcType="DECIMAL" property="bomBaseQty" />
+    <result column="bom_component_qty" jdbcType="DECIMAL" property="bomComponentQty" />
+    <result column="output_unit_id" jdbcType="BIGINT" property="outputUnitId" />
+    <result column="frozen_at" jdbcType="TIMESTAMP" property="frozenAt" />
   </resultMap>
   <sql id="Example_Where_Clause">
     <where>
@@ -74,8 +78,9 @@
     </where>
   </sql>
   <sql id="Base_Column_List">
-    id, material_id, unit_id, total_required_qty, planned_qty, warehouse_ids, work_center, 
-    revision, status, updated_by, updated_at
+    id, material_id, unit_id, total_required_qty, planned_qty, warehouse_ids, work_center,
+    revision, status, updated_by, updated_at, bom_id, bom_base_qty, bom_component_qty,
+    output_unit_id, frozen_at
   </sql>
   <select id="selectByExample" parameterType="dev.mesbase.business.production.domain.MesWorkorderMaterialExample" resultMap="BaseResultMap">
     select
@@ -89,7 +94,7 @@
     </if>
   </select>
   <select id="selectByPrimaryKey" parameterType="Long" resultMap="BaseResultMap">
-    select 
+    select
     <include refid="Base_Column_List" />
     from mes_workorder_material
     where id = #{id,jdbcType=BIGINT}
@@ -105,14 +110,18 @@
     </if>
   </delete>
   <insert id="insert" parameterType="dev.mesbase.business.production.domain.MesWorkorderMaterialEntity">
-    insert into mes_workorder_material (id, material_id, unit_id, 
-      total_required_qty, planned_qty, warehouse_ids, 
-      work_center, revision, status, 
-      updated_by, updated_at)
-    values (#{id,jdbcType=BIGINT}, #{materialId,jdbcType=BIGINT}, #{unitId,jdbcType=BIGINT}, 
-      #{totalRequiredQty,jdbcType=DECIMAL}, #{plannedQty,jdbcType=DECIMAL}, #{warehouseIds,jdbcType=VARCHAR}, 
-      #{workCenter,jdbcType=VARCHAR}, #{revision,jdbcType=BIGINT}, #{status,jdbcType=VARCHAR}, 
-      #{updatedBy,jdbcType=BIGINT}, #{updatedAt,jdbcType=TIMESTAMP})
+    insert into mes_workorder_material (id, material_id, unit_id,
+      total_required_qty, planned_qty, warehouse_ids,
+      work_center, revision, status,
+      updated_by, updated_at, bom_id,
+      bom_base_qty, bom_component_qty, output_unit_id,
+      frozen_at)
+    values (#{id,jdbcType=BIGINT}, #{materialId,jdbcType=BIGINT}, #{unitId,jdbcType=BIGINT},
+      #{totalRequiredQty,jdbcType=DECIMAL}, #{plannedQty,jdbcType=DECIMAL}, #{warehouseIds,jdbcType=VARCHAR},
+      #{workCenter,jdbcType=VARCHAR}, #{revision,jdbcType=BIGINT}, #{status,jdbcType=VARCHAR},
+      #{updatedBy,jdbcType=BIGINT}, #{updatedAt,jdbcType=TIMESTAMP}, #{bomId,jdbcType=BIGINT},
+      #{bomBaseQty,jdbcType=DECIMAL}, #{bomComponentQty,jdbcType=DECIMAL}, #{outputUnitId,jdbcType=BIGINT},
+      #{frozenAt,jdbcType=TIMESTAMP})
   </insert>
   <insert id="insertSelective" parameterType="dev.mesbase.business.production.domain.MesWorkorderMaterialEntity">
     insert into mes_workorder_material
@@ -150,6 +159,21 @@
       <if test="updatedAt != null">
         updated_at,
       </if>
+      <if test="bomId != null">
+        bom_id,
+      </if>
+      <if test="bomBaseQty != null">
+        bom_base_qty,
+      </if>
+      <if test="bomComponentQty != null">
+        bom_component_qty,
+      </if>
+      <if test="outputUnitId != null">
+        output_unit_id,
+      </if>
+      <if test="frozenAt != null">
+        frozen_at,
+      </if>
     </trim>
     <trim prefix="values (" suffix=")" suffixOverrides=",">
       <if test="id != null">
@@ -184,6 +208,21 @@
       </if>
       <if test="updatedAt != null">
         #{updatedAt,jdbcType=TIMESTAMP},
+      </if>
+      <if test="bomId != null">
+        #{bomId,jdbcType=BIGINT},
+      </if>
+      <if test="bomBaseQty != null">
+        #{bomBaseQty,jdbcType=DECIMAL},
+      </if>
+      <if test="bomComponentQty != null">
+        #{bomComponentQty,jdbcType=DECIMAL},
+      </if>
+      <if test="outputUnitId != null">
+        #{outputUnitId,jdbcType=BIGINT},
+      </if>
+      <if test="frozenAt != null">
+        #{frozenAt,jdbcType=TIMESTAMP},
       </if>
     </trim>
   </insert>
@@ -229,6 +268,21 @@
       <if test="row.updatedAt != null">
         updated_at = #{row.updatedAt,jdbcType=TIMESTAMP},
       </if>
+      <if test="row.bomId != null">
+        bom_id = #{row.bomId,jdbcType=BIGINT},
+      </if>
+      <if test="row.bomBaseQty != null">
+        bom_base_qty = #{row.bomBaseQty,jdbcType=DECIMAL},
+      </if>
+      <if test="row.bomComponentQty != null">
+        bom_component_qty = #{row.bomComponentQty,jdbcType=DECIMAL},
+      </if>
+      <if test="row.outputUnitId != null">
+        output_unit_id = #{row.outputUnitId,jdbcType=BIGINT},
+      </if>
+      <if test="row.frozenAt != null">
+        frozen_at = #{row.frozenAt,jdbcType=TIMESTAMP},
+      </if>
     </set>
     <if test="example != null">
       <include refid="Update_By_Example_Where_Clause" />
@@ -246,7 +300,12 @@
       revision = #{row.revision,jdbcType=BIGINT},
       status = #{row.status,jdbcType=VARCHAR},
       updated_by = #{row.updatedBy,jdbcType=BIGINT},
-      updated_at = #{row.updatedAt,jdbcType=TIMESTAMP}
+      updated_at = #{row.updatedAt,jdbcType=TIMESTAMP},
+      bom_id = #{row.bomId,jdbcType=BIGINT},
+      bom_base_qty = #{row.bomBaseQty,jdbcType=DECIMAL},
+      bom_component_qty = #{row.bomComponentQty,jdbcType=DECIMAL},
+      output_unit_id = #{row.outputUnitId,jdbcType=BIGINT},
+      frozen_at = #{row.frozenAt,jdbcType=TIMESTAMP}
     <if test="example != null">
       <include refid="Update_By_Example_Where_Clause" />
     </if>
@@ -284,6 +343,21 @@
       <if test="updatedAt != null">
         updated_at = #{updatedAt,jdbcType=TIMESTAMP},
       </if>
+      <if test="bomId != null">
+        bom_id = #{bomId,jdbcType=BIGINT},
+      </if>
+      <if test="bomBaseQty != null">
+        bom_base_qty = #{bomBaseQty,jdbcType=DECIMAL},
+      </if>
+      <if test="bomComponentQty != null">
+        bom_component_qty = #{bomComponentQty,jdbcType=DECIMAL},
+      </if>
+      <if test="outputUnitId != null">
+        output_unit_id = #{outputUnitId,jdbcType=BIGINT},
+      </if>
+      <if test="frozenAt != null">
+        frozen_at = #{frozenAt,jdbcType=TIMESTAMP},
+      </if>
     </set>
     where id = #{id,jdbcType=BIGINT}
   </update>
@@ -298,7 +372,19 @@
       revision = #{revision,jdbcType=BIGINT},
       status = #{status,jdbcType=VARCHAR},
       updated_by = #{updatedBy,jdbcType=BIGINT},
-      updated_at = #{updatedAt,jdbcType=TIMESTAMP}
+      updated_at = #{updatedAt,jdbcType=TIMESTAMP},
+      bom_id = #{bomId,jdbcType=BIGINT},
+      bom_base_qty = #{bomBaseQty,jdbcType=DECIMAL},
+      bom_component_qty = #{bomComponentQty,jdbcType=DECIMAL},
+      output_unit_id = #{outputUnitId,jdbcType=BIGINT},
+      frozen_at = #{frozenAt,jdbcType=TIMESTAMP}
     where id = #{id,jdbcType=BIGINT}
   </update>
+  <select flushCache="true" id="selectByPrimaryKeyForUpdate" parameterType="Long" resultMap="BaseResultMap" useCache="false">
+    select
+    <include refid="Base_Column_List" />
+    from mes_workorder_material
+    where id = #{id,jdbcType=BIGINT}
+    for update
+  </select>
 </mapper>

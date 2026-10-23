@@ -8,7 +8,8 @@ import dev.mesbase.business.integration.production.ProductionSupply.Order;
 import dev.mesbase.business.integration.production.ProductionSupply.Requirement;
 import dev.mesbase.business.integration.production.ProductionSupply.Stock;
 import dev.mesbase.business.integration.warehouse.WarehouseIntegration.Selection;
-import dev.mesbase.business.production.dao.MesWorkorderMaterialMapper;
+import dev.mesbase.business.production.service.WorkorderMaterialService;
+import dev.mesbase.business.integration.production.ProductionSupply.Basis;
 import dev.mesbase.business.production.dao.WorkorderMapper;
 import dev.mesbase.business.production.domain.MesWorkorderMaterialEntity;
 import dev.mesbase.business.production.domain.ProductionScanCode;
@@ -34,26 +35,23 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.stream.Collectors;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
-import org.springframework.core.env.Environment;
 import org.springframework.stereotype.Service;
 import tools.jackson.databind.ObjectMapper;
 
 @Service
 @ConditionalOnProperty(name = "mes.business.enabled", havingValue = "true")
 public class LocalProductionSupply {
-    private final Environment environment;
+    private final WorkorderMaterialService demands;
     private final MaterialMapper materials;
     private final UnitMeasureMapper units;
     private final WmInventoryMapper inventory;
     private final WmWarehouseMapper warehouses;
     private final WorkorderMapper orders;
-    private final MesWorkorderMaterialMapper requirements;
 
-    public LocalProductionSupply(Environment environment, MaterialMapper materials, UnitMeasureMapper units,
+    public LocalProductionSupply(MaterialMapper materials, UnitMeasureMapper units,
                                  WmInventoryMapper inventory, WmWarehouseMapper warehouses, WorkorderMapper orders,
-                                 MesWorkorderMaterialMapper requirements) {
-        this.requirements = requirements;
-        this.environment = environment;
+                                 WorkorderMaterialService demands) {
+        this.demands = demands;
         this.materials = materials;
         this.units = units;
         this.inventory = inventory;
@@ -83,34 +81,11 @@ public class LocalProductionSupply {
             throw new FoundationException(ErrorCode.BUSINESS_SOURCE_CONFLICT);
         if (!WorkOrderStatus.RELEASED.getValue().equals(order.getStatus()))
             return new Context(selection.mode().getValue(), List.of(), List.of(), 0, offset, limit);
-        String prefix = "mes.production.input.factories." + scope.factoryId()
-                .value() + ".workorders." + order.getId() + ".";
-        var demand = requirements.selectByPrimaryKey(order.getId());
-        Long materialId;
-        BigDecimal total;
-        String center;
-        List<Long> allowed;
-        if (demand != null) {
-            // An existing disabled database requirement never falls back to legacy configuration.
-            if (!EnableStatus.ENABLED.getValue().equals(demand.getStatus())
-                    || demand.getPlannedQty().compareTo(order.getPlannedQty()) != 0)
-                return new Context(selection.mode().getValue(), List.of(), List.of(), 0, offset, limit);
-            materialId = demand.getMaterialId();
-            total = demand.getTotalRequiredQty();
-            center = demand.getWorkCenter();
-            allowed = warehouseIds(demand);
-        } else {
-            if (!environment.getProperty("mes.production.input.legacy-config.enabled", Boolean.class, true))
-                return new Context(selection.mode().getValue(), List.of(), List.of(), 0, offset, limit);
-            materialId = environment.getProperty(prefix + "material-id", Long.class);
-            if (materialId == null)
-                return new Context(selection.mode().getValue(), List.of(), List.of(), 0, offset, limit);
-            total = environment.getProperty(prefix + "total-required-qty", BigDecimal.class);
-            center = environment.getProperty(prefix + "work-center");
-            String configured = environment.getProperty(prefix + "warehouse-ids");
-            if (configured == null) ParameterChecks.reject(ErrorCode.BAD_REQUEST);
-            allowed = Arrays.stream(configured.split(",")).map(String::trim).map(Long::valueOf).toList();
-        }
+        var demand = demands.basis(order);
+        var materialId = demand.getMaterialId();
+        var total = demand.getTotalRequiredQty();
+        var center = demand.getWorkCenter();
+        var allowed = warehouseIds(demand);
         if (total == null || total.signum() <= 0 || StringUtils.isBlank(center) || allowed.isEmpty())
             ParameterChecks.reject(ErrorCode.BAD_REQUEST);
         var material = materials.selectByPrimaryKey(materialId);
@@ -122,10 +97,11 @@ public class LocalProductionSupply {
             ParameterChecks.reject(ErrorCode.BAD_REQUEST);
         var product = materials.selectByPrimaryKey(order.getProductId());
         if (product == null || !identity.workorderCode().equals(order.getCode())
-                || !identity.productCode().equals(product.getCode()))
+                || !identity.productCode().equals(material.getCode()))
             ParameterChecks.reject(ErrorCode.BAD_REQUEST);
         var outputUnit = Optional.ofNullable(product.getUnitId()).map(units::selectByPrimaryKey).orElse(null);
-        if (outputUnit == null || !EnableStatus.ENABLED.getValue().equals(outputUnit.getStatus()))
+        if (outputUnit == null || !Objects.equals(outputUnit.getId(), demand.getOutputUnitId()) || !EnableStatus.ENABLED.getValue()
+                .equals(outputUnit.getStatus()))
             ParameterChecks.reject(ErrorCode.BAD_REQUEST);
         var sf = new WmInventoryExample();
         sf.createCriteria().andMaterialIdEqualTo(material.getId()).andBatchNoEqualTo(identity.batchNo())
@@ -152,24 +128,29 @@ public class LocalProductionSupply {
         var candidate = new Order(order.getId(), order.getCode(), product.getCode(), product.getName(), center,
                 order.getPlannedQty(), outputUnit.getCode(), order.getStatus(), allowed,
                 List.of(new Requirement(material.getCode(), material.getId(), unit.getId(), unit.getCode(), total)),
-                "LOCAL-WORKORDER:" + order.getId() + (demand == null ? ":LEGACY" : ":R" + demand.getRevision()), now);
+                "LOCAL-WORKORDER:" + order.getId() + ":R" + demand.getRevision(), now);
         // A production code identifies one work order; paging never broadens it to unrelated orders.
         var page = offset == 0 ? List.of(candidate) : List.<Order>of();
         return new Context(selection.mode().getValue(), List.copyOf(stocks), page, 1, offset, limit);
     }
 
     public void validateFrozenCalculation(Calculation calculation) {
-        var row = requirements.selectByPrimaryKey(calculation.order().workorderId());
-        String version = "LOCAL-WORKORDER:" + calculation.order()
-                .workorderId() + (row == null ? ":LEGACY" : ":R" + row.getRevision());
-        if (!version.equals(calculation.order().sourceReference()) || row != null && (!EnableStatus.ENABLED.getValue()
-                .equals(row.getStatus())
-                || !row.getMaterialId().equals(calculation.stock().materialId()) || !row.getUnitId()
-                .equals(calculation.stock().unitId())
+        var row = demands.basis(orders.selectByPrimaryKey(calculation.order().workorderId()));
+        String version = "LOCAL-WORKORDER:" + row.getId() + ":R" + row.getRevision();
+        if (!version.equals(calculation.order().sourceReference())
                 || row.getPlannedQty().compareTo(calculation.order().plannedQty()) != 0
                 || row.getTotalRequiredQty()
-                .compareTo(calculation.order().requirements().getFirst().totalRequiredQty()) != 0))
+                .compareTo(calculation.order().requirements().getFirst().totalRequiredQty()) != 0)
             throw new FoundationException(ErrorCode.PRODUCTION_INPUT_STALE);
+        demands.freeze(calculation);
+    }
+
+    public Calculation calculate(String sourceMode, Order candidate, Stock stock, BigDecimal outputQty) {
+        var order = orders.selectByPrimaryKey(candidate.workorderId());
+        var row = demands.basis(order);
+        var amount = demands.issueQuantity(order, outputQty);
+        return new Calculation(sourceMode, candidate, stock, outputQty, amount,
+                new Basis(row.getBomId(), row.getBomBaseQty(), row.getBomComponentQty(), row.getOutputUnitId()));
     }
 
     private static List<Long> warehouseIds(MesWorkorderMaterialEntity row) {

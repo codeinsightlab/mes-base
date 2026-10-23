@@ -31,7 +31,11 @@
         MAX(c.recorded_at) AS lastCompletedAt
         FROM mes_production_execution e
         JOIN mes_execution_completion c ON c.execution_id = e.id
-        WHERE e.status = #{fullyReceived} AND e.workorder_id IN
+        WHERE e.status = #{fullyReceived}
+        AND NOT EXISTS (SELECT 1 FROM mes_execution_completion newer
+          WHERE newer.execution_id=c.execution_id AND (newer.recorded_at&gt;c.recorded_at
+            OR (newer.recorded_at=c.recorded_at AND newer.id&gt;c.id)))
+        AND e.workorder_id IN
         <foreach collection="ids" item="id" open="(" separator="," close=")">#{id}</foreach>
         GROUP BY e.workorder_id
     </select>

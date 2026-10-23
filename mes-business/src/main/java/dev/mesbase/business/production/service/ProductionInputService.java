@@ -6,6 +6,7 @@ import dev.mesbase.common.validation.ParameterChecks;
 import dev.mesbase.business.production.domain.ProductionQuantityInput;
 
 import dev.mesbase.business.integration.warehouse.ErpActionResult.Mode;
+import dev.mesbase.business.shared.enums.BusinessSource;
 import dev.mesbase.business.issue.domain.MaterialIssueStatus;
 import dev.mesbase.business.production.domain.ProductionExecutionStatus;
 import dev.mesbase.business.production.domain.WorkOrderStatus;
@@ -14,7 +15,6 @@ import dev.mesbase.business.production.domain.ProductionCodeRules;
 import dev.mesbase.business.production.domain.MesProductionExecutionCreateCommand;
 import dev.mesbase.business.production.service.IMesProductionExecutionService;
 import dev.mesbase.business.issue.domain.MesMaterialIssueCreateCommand;
-import dev.mesbase.business.issue.domain.MesMaterialIssueItemCreateCommand;
 import dev.mesbase.business.issue.domain.MesMaterialIssueInputEntity;
 import dev.mesbase.business.issue.dao.MesMaterialIssueInputMapper;
 import dev.mesbase.business.issue.service.IMesMaterialIssueService;
@@ -78,6 +78,7 @@ public class ProductionInputService {
     private final ExecutionPathService paths;
     private final ProductionChainLocks locks;
     private final ProductionQuantityService quantities;
+    private final ProductionExecutionRules executionRules;
     private final WorkorderMapper orderMapper;
     private final MaterialMapper materials;
     private final RoutingMapper routings;
@@ -96,7 +97,9 @@ public class ProductionInputService {
                                   WorkorderMapper orderMapper,
                                   MaterialMapper materials, RoutingMapper routings, IRoutingService routingService,
                                   @Qualifier("businessTransactionManager") PlatformTransactionManager manager,
-                                  BusinessSourceRules sources, WorkOrderExtraMapper allocation) {
+                                  BusinessSourceRules sources, WorkOrderExtraMapper allocation,
+                                  ProductionExecutionRules executionRules) {
+        this.executionRules = executionRules;
         this.allocation = allocation;
         this.sources = sources;
         this.supply = supply;
@@ -126,7 +129,9 @@ public class ProductionInputService {
     @Transactional(transactionManager = "businessTransactionManager", readOnly = true)
     public Preview preview(String code, Long workorderId) {
         var scanned = ProductionCodeRules.parse(code);
-        var order = identities.requireOrder(scanned);
+        var order = identities.requireInputOrder(scanned);
+        if (supply.query(code, workorderId, 0, 1).orders().isEmpty())
+            ParameterChecks.reject(ErrorCode.PRODUCTION_INPUT_STALE);
         if (!Objects.equals(order.getId(), workorderId)) ParameterChecks.reject(ErrorCode.BAD_REQUEST);
         sources.order(workorderId);
         var product = materials.selectByPrimaryKey(order.getProductId());
@@ -150,6 +155,22 @@ public class ProductionInputService {
         var previous = transaction.execute(s -> inputs.selectByPrimaryKey(command.requestId()));
         if (previous != null) return replay(previous, hash); // Never repeat an external create on replay.
         ProductionQuantityInput.check(command.outputQty());
+        var sourceOrder = transaction.execute(s -> sources.order(command.workorderId()));
+        if (BusinessSource.LOCAL.getValue().equals(sourceOrder.getSource())) {
+            return transaction.execute(s -> {
+                locks.order(command.workorderId());
+                var saved = inputs.selectByPrimaryKey(command.requestId());
+                if (saved != null) return replay(saved, hash);
+                var calculation = supply.calculateLocal(command.code(), command.workorderId(), command.stockReference(), command.outputQty());
+                if (!Objects.equals(command.calculationKey(), ProductionInputSupplyService.calculationKey(calculation)))
+                    throw new FoundationException(ErrorCode.PRODUCTION_INPUT_STALE);
+                var localPrepared = prepare(command, calculation, hash);
+                var row = submissions.executePrepared(scope, localPrepared);
+                if (!MaterialIssueStatus.CONFIRMED.getValue().equals(row.getStatus()))
+                    ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
+                return result(inputs.selectByPrimaryKey(command.requestId()), row.getStatus());
+            });
+        }
         var calculation = supply.calculate(command.code(), command.workorderId(), command.stockReference(), command.outputQty());
         if (!Objects.equals(command.calculationKey(), ProductionInputSupplyService.calculationKey(calculation)))
             throw new FoundationException(ErrorCode.PRODUCTION_INPUT_STALE);
@@ -183,7 +204,8 @@ public class ProductionInputService {
         String batchNo = calculation.stock().lotCode();
         // The source stock supplies the permanent batch property. The barcode is only a lookup representation.
         var scanned = ProductionCodeRules.parse(c.code());
-        if (!order.getCode().equals(scanned.workorderCode()) || !product.getCode().equals(scanned.productCode())
+        if (!order.getCode().equals(scanned.workorderCode()) || !calculation.stock().materialCode()
+                .equals(scanned.productCode())
                 || !Objects.equals(batchNo, scanned.batchNo())) ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
         var existingExecution = identities.findExecution(order.getId(), product.getId(), batchNo);
         Long executionId;
@@ -196,7 +218,7 @@ public class ProductionInputService {
         } else {
             executionId = existingExecution.getId();
             var e = locks.execution(executionId);
-            if (!Objects.equals(e.getRoutingId(), c.routingId()) || !List.of(ProductionExecutionStatus.READY.getValue(), ProductionExecutionStatus.RUNNING.getValue())
+            if (!Objects.equals(e.getRoutingId(), c.routingId()) || !List.of(ProductionExecutionStatus.READY.getValue(), ProductionExecutionStatus.RUNNING.getValue(), ProductionExecutionStatus.FULLY_RECEIVED.getValue())
                     .contains(e.getStatus())) ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
             var path = paths.view(executionId);
             if (!path.selectedNodeIds().equals(c.routingNodeIds())) ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
@@ -213,10 +235,13 @@ public class ProductionInputService {
             execution.setUpdateTime(LocalDateTime.now());
             if (executionMapper.updateByPrimaryKey(execution) != 1) ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
         }
+        if (Mode.LOCAL_ONLY.getValue().equals(calculation.sourceMode())
+                && ProductionExecutionStatus.FULLY_RECEIVED.getValue().equals(execution.getStatus()))
+            executionRules.resumeAfterInput(execution);
         var issue = issues.insert(new MesMaterialIssueCreateCommand("INPUT-" + c.requestId(), order.getId(), null, order.getProductId(), null,
                 null, c.routingId(), LocalDateTime.now(), MaterialIssueStatus.DRAFT.getValue(), null, executionId));
         var stock = calculation.stock();
-        items.insert(new MesMaterialIssueItemCreateCommand(issue.getId(), stock.materialId(), stock.lotCode(), calculation.issueQty(), stock.unitId(), stock.warehouseId(), null));
+        items.insertCalculated(issue.getId(), calculation);
         var f = new MesMaterialIssueInputEntity();
         f.setId(c.requestId());
         f.setRequestHash(hash);
@@ -245,7 +270,7 @@ public class ProductionInputService {
         var product = materials.selectByPrimaryKey(execution.getProductId());
         String code = null;
         if (execution.getBatchNo() != null)
-            code = ProductionCodeRules.format(new ProductionScanCode(readOrder(execution.getWorkorderId()).getCode(), product.getCode(), execution.getBatchNo()));
+            code = identities.read(execution.getId()).qrCode();
         var q = quantities.getExecutionQuantities(execution.getId());
         return new Result(f.getId(), f.getIssueId().toString(), f.getExecutionId()
                 .toString(), code, status, q.productionInputQty().toPlainString(), q.nodes()

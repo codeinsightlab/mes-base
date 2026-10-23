@@ -22,6 +22,7 @@ import dev.mesbase.business.production.service.ProductionExecutionRules;
 import dev.mesbase.business.wm.dao.WmWarehouseMapper;
 import dev.mesbase.common.utils.SecurityUtils;
 import dev.mesbase.common.utils.StringUtils;
+import dev.mesbase.business.shared.enums.EnableStatus;
 import dev.mesbase.core.error.ErrorCode;
 import dev.mesbase.core.error.FoundationException;
 import java.time.LocalDateTime;
@@ -155,6 +156,14 @@ public class MaterialIssueRules {
     }
 
     public void validate(MesMaterialIssueItemEntity row) {
+        validate(row, false);
+    }
+
+    public void validateCalculated(MesMaterialIssueItemEntity row) {
+        validate(row, true);
+    }
+
+    private void validate(MesMaterialIssueItemEntity row, boolean calculated) {
         require(row.getIssueId() != null && row.getMaterialId() != null && row.getQuantity() != null);
         lockIssues(List.of(row.getIssueId()));
         var header = issues.selectByPrimaryKey(row.getIssueId());
@@ -165,11 +174,14 @@ public class MaterialIssueRules {
                 && row.getQuantity().precision() - row.getQuantity().scale() <= 14);
         var material = materials.selectByPrimaryKeyForUpdate(row.getMaterialId());
         require(material != null);
+        if (calculated) require(EnableStatus.ENABLED.getValue().equals(material.getStatus())
+                && Objects.equals(material.getUnitId(), row.getUnitId()));
         row.setMaterialCode(material.getCode());
         row.setUnitCode(null);
         if (row.getUnitId() != null) {
             var unit = units.selectByPrimaryKeyForUpdate(row.getUnitId());
             require(unit != null);
+            if (calculated) require(EnableStatus.ENABLED.getValue().equals(unit.getStatus()));
             row.setUnitCode(unit.getCode());
         }
         row.setWarehouseCode(null);

@@ -19,6 +19,8 @@ public interface MesWorkorderMaterialMapper {
 
     List<MesWorkorderMaterialEntity> selectByExample(MesWorkorderMaterialExample example);
 
+    MesWorkorderMaterialEntity selectByPrimaryKeyForUpdate(Long id);
+
     MesWorkorderMaterialEntity selectByPrimaryKey(Long id);
 
     int updateByExampleSelective(@Param("row") MesWorkorderMaterialEntity row,

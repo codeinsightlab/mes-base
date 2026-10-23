@@ -65,7 +65,7 @@ class SourceIsolationHttpTest {
                     .andExpect(status().isConflict())
                     .andExpect(jsonPath("errorCode").value("BUSINESS_SOURCE_CONFLICT"));
             assertEquals(0, j.queryForObject("SELECT COUNT(*) FROM mes_material_issue_input", Integer.class));
-            assertEquals("10000.0000", j.queryForObject("SELECT quantity FROM wm_inventory WHERE id=1", BigDecimal.class)
+            assertEquals("10000.000000", j.queryForObject("SELECT quantity FROM wm_inventory WHERE id=1", BigDecimal.class)
                     .toPlainString());
         }
     }

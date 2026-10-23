@@ -37,6 +37,13 @@ public final class ProductionSupply {
         }
     }
 
-    public record Calculation(String sourceMode, Order order, Stock stock, BigDecimal outputQty, BigDecimal issueQty) {
+    public record Basis(Long bomId, BigDecimal baseQty, BigDecimal componentQty, Long outputUnitId) {
+    }
+
+    public record Calculation(String sourceMode, Order order, Stock stock, BigDecimal outputQty, BigDecimal issueQty,
+                              Basis basis) {
+        public Calculation(String sourceMode, Order order, Stock stock, BigDecimal outputQty, BigDecimal issueQty) {
+            this(sourceMode, order, stock, outputQty, issueQty, null);
+        }
     }
 }

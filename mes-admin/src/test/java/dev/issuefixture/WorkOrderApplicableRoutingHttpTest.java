@@ -42,7 +42,7 @@ class WorkOrderApplicableRoutingHttpTest {
     }
 
     @Test
-    void itemOutputCanCreateEditReleaseAndCreateExecutionWhileReferenceChecksRemain() throws Exception {
+    void itemOutputCanCreateEditReleaseButExecutionRequiresFormalInput() throws Exception {
         try (var context = MaterialIssueHttpTest.context()) {
             var mvc = MaterialIssueHttpTest.mvc(context);
             var jdbc = context.getBean(MaterialIssueHttpTest.Fixture.class).business.get("A");
@@ -68,7 +68,7 @@ class WorkOrderApplicableRoutingHttpTest {
                             .header("X-Factory-Id", "A").contentType("application/json")
                             .content(ProductionExecutionHttpTest.CREATE.replace("12.12", "10")
                                     .replace("\"workorderId\":\"1\"", "\"workorderId\":\"" + id + "\"")))
-                    .andExpect(status().isOk()).andExpect(jsonPath("productId").value("2"));
+                    .andExpect(status().isMethodNotAllowed());
             // Existing material existence/enabled, published version and applicability checks still apply.
             for (String rejected : new String[]{
                     body.replace("\"routingId\":\"1\"", "\"routingId\":\"2\""),
