@@ -95,10 +95,8 @@ class ProductionChainHttpTest {
                     .andExpect(status().isConflict()).andExpect(jsonPath("errorCode").value("EXECUTION_FROZEN"));
             m.perform(full(get(E + "/1"), "A")).andExpect(status().isOk()).andExpect(jsonPath("routingId").value("1"));
             String running = one.replace("READY", "RUNNING").replace("}", ",\"startTime\":\"2026-10-14T09:00:00\"}");
-            for (String body : List.of(running, running.replace("RUNNING", "COMPLETED")
-                            .replace("}", ",\"endTime\":\"2026-10-14T10:00:00\"}"),
-                    running.replace("RUNNING", "FULLY_RECEIVED")
-                            .replace("}", ",\"endTime\":\"2026-10-14T10:00:00\"}")))
+            for (String body : List.of(running, running.replace("RUNNING", "FULLY_RECEIVED")
+                    .replace("}", ",\"endTime\":\"2026-10-14T10:00:00\"}")))
                 m.perform(full(put(E + "/1"), "A").content(body)).andExpect(status().isConflict())
                         .andExpect(jsonPath("errorCode").value("EXECUTION_FROZEN"));
             m.perform(full(post(W + "/1/actions/release"), "A").content("{\"revision\":0}"))

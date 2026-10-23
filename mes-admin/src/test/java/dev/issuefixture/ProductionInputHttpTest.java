@@ -155,7 +155,7 @@ class ProductionInputHttpTest {
                     .andExpect(status().isBadRequest());
             m.perform(ProductionCoreV1HttpTest.full(post(ROOT)).content(body.replace("\"100\"", "\"101\"")))
                     .andExpect(status().isConflict());
-            j.update("UPDATE mes_production_execution SET status='COMPLETED' WHERE id=?", e);
+            j.update("UPDATE mes_production_execution SET status='FULLY_RECEIVED' WHERE id=?", e);
             m.perform(ProductionCoreV1HttpTest.full(post(ROOT))
                     .content(command(m, UUID.randomUUID().toString(), "L001", "10"))).andExpect(status().isConflict());
         }

@@ -4,10 +4,8 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 
 public enum ProductionExecutionStatus {
-    HISTORICAL("待确认（HISTORICAL）", "HISTORICAL"),
     READY("待执行", "READY"),
     RUNNING("执行中", "RUNNING"),
-    COMPLETED("已结束", "COMPLETED"),
     FULLY_RECEIVED("完全入库", "FULLY_RECEIVED"),
     CANCELLED("已取消", "CANCELLED");
 
@@ -38,7 +36,7 @@ public enum ProductionExecutionStatus {
     }
 
     /**
-     * Normal forward reporting accepts READY and RUNNING; historical corrections have separate gates.
+     * Normal forward reporting accepts READY and RUNNING.
      */
     public static boolean allowsNormalReporting(String value) {
         return from(value) == READY || from(value) == RUNNING;

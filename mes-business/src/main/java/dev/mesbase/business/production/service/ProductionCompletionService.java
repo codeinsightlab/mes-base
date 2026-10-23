@@ -136,7 +136,6 @@ public class ProductionCompletionService {
         ProductionClosureRules.uuid(auditRequestId);
         var execution = executions.selectByPrimaryKey(id);
         if (execution == null) ParameterChecks.reject(ErrorCode.NOT_FOUND);
-        // Historical COMPLETED is never promoted or backfilled as a new receipt fact.
         if (ProductionExecutionStatus.RUNNING.getValue().equals(execution.getStatus())) {
             sources.finishedOutput(execution, null);
             var projection = quantities.getExecutionQuantities(id);
@@ -190,10 +189,10 @@ public class ProductionCompletionService {
     private String blockedReason(MesProductionExecutionEntity execution, ExecutionQuantity projection,
                                  BigDecimal received) {
         if (!List.of(ProductionExecutionStatus.RUNNING.getValue(), ProductionExecutionStatus.FULLY_RECEIVED.getValue())
-                .contains(execution.getStatus())) return "执行尚未开工或为历史终态，不能自动完全入库";
+                .contains(execution.getStatus())) return "执行尚未开工、已取消或状态非法，不能自动完全入库";
         if (ProductionExecutionStatus.RUNNING.getValue()
                 .equals(execution.getStatus()) && completion(execution.getId()) != null)
-            return "执行已有历史完工事实，不能自动转换为完全入库";
+            return "执行状态与已有完结事实不一致，请核实记录";
         if (!ExecutionPathStatus.LOCKED.getValue().equals(projection.pathStatus())) return "实际生产路径尚未锁定";
         if (projection.nodes().stream().anyMatch(node -> node.historicalConflict()))
             return "存在历史数量超额，须核实后才能完全入库";

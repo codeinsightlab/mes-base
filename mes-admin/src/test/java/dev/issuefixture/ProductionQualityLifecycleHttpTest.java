@@ -217,7 +217,7 @@ class ProductionQualityLifecycleHttpTest {
                     .andExpect(jsonPath("nodes[0].reportedQty").value("6.000000"))
                     .andExpect(jsonPath("nodes[0].qualityIntegrated").value(true));
             // No complete/void command exists: keep the existing refusal of forged status changes.
-            m.perform(full(put(E + "/1"), "A").content(UPDATE.replace("READY", "COMPLETED")))
+            m.perform(full(put(E + "/1"), "A").content(UPDATE.replace("READY", "FULLY_RECEIVED")))
                     .andExpect(status().isConflict());
         }
     }

@@ -213,7 +213,8 @@ class ProductionCoreV1HttpTest {
             m.perform(full(post(A + "start"))).andExpect(status().isOk());
             assertEquals(started, db(c).queryForObject("SELECT start_time FROM mes_production_execution WHERE id=1", String.class));
             m.perform(full(post(H + "/1/actions/void"))).andExpect(status().isConflict());
-            m.perform(full(put(E + "/1")).content(EXEC.replace("READY", "COMPLETED"))).andExpect(status().isConflict());
+            m.perform(full(put(E + "/1")).content(EXEC.replace("READY", "FULLY_RECEIVED")))
+                    .andExpect(status().isConflict());
             m.perform(full(post(E)).content(EXEC.replace("READY", "RUNNING")))
                     .andExpect(status().isUnprocessableEntity());
             assertEquals(0, db(c).queryForObject("SELECT COUNT(*) FROM production_batch", Integer.class));

@@ -27,18 +27,19 @@ public interface LegacyHistoryMapper {
     @Select("SELECT id,batch_id,parent_id,source_table,source_pk,source_hash,rule_version,entity_kind,entity_id,source_payload,conversion_payload,created_at FROM mes_legacy_source_mapping WHERE parent_id=#{id} AND entity_kind='EXECUTION'")
     List<Mapping> orderExecutions(@Param("id") String id);
 
-    @Select("SELECT CAST(JSON_UNQUOTE(JSON_EXTRACT(e.conversion_payload,'$.inputQty')) AS DECIMAL(20,6)) "
-            + "FROM mes_legacy_source_mapping e JOIN mes_legacy_source_mapping a ON a.parent_id=e.id "
-            + "AND a.entity_kind='PRODUCTION_ACTIVATION' AND a.entity_id=e.entity_id AND a.source_hash=e.source_hash "
-            + "AND a.rule_version='internal-production-activation-v1' WHERE e.entity_kind='EXECUTION' AND e.entity_id=#{id}")
-    BigDecimal activatedInput(@Param("id") Long executionId);
+    @Select("<script><bind name=\"completed\" value=\"@dev.mesbase.business.legacy.domain.LegacyBatchStatus@COMPLETED.getValue()\"/>"
+            + "SELECT CAST(JSON_UNQUOTE(JSON_EXTRACT(e.conversion_payload,'$.inputQty')) AS DECIMAL(20,6)) "
+            + "FROM mes_legacy_source_mapping e JOIN mes_legacy_migration_batch b ON b.id=e.batch_id "
+            + "AND b.rule_version=e.rule_version AND b.status=#{completed} "
+            + "WHERE e.entity_kind='EXECUTION' AND e.entity_id=#{id}</script>")
+    BigDecimal openingInput(@Param("id") Long executionId);
 
     @Select("SELECT CAST(JSON_UNQUOTE(JSON_EXTRACT(conversion_payload,'$.inputQty')) AS DECIMAL(20,6)) "
             + "FROM mes_legacy_source_mapping WHERE entity_kind='EXECUTION' AND entity_id=#{id}")
     BigDecimal input(@Param("id") Long executionId);
 
-    @Select({"<script>SELECT entity_id execution_id, CAST(JSON_UNQUOTE(JSON_EXTRACT(conversion_payload,'$.inputQty')) AS DECIMAL(20,6)) quantity ",
-            "FROM mes_legacy_source_mapping WHERE entity_kind='EXECUTION' AND entity_id IN ",
+    @Select({"<script><bind name=\"completed\" value=\"@dev.mesbase.business.legacy.domain.LegacyBatchStatus@COMPLETED.getValue()\"/>SELECT e.entity_id execution_id, CAST(JSON_UNQUOTE(JSON_EXTRACT(e.conversion_payload,'$.inputQty')) AS DECIMAL(20,6)) quantity ",
+            "FROM mes_legacy_source_mapping e JOIN mes_legacy_migration_batch b ON b.id=e.batch_id AND b.rule_version=e.rule_version AND b.status=#{completed} WHERE e.entity_kind='EXECUTION' AND e.entity_id IN ",
             "<foreach collection='ids' item='id' open='(' separator=',' close=')'>#{id}</foreach></script>"})
     List<Input> inputs(@Param("ids") List<Long> ids);
 

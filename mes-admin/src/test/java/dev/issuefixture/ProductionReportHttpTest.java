@@ -70,7 +70,7 @@ class ProductionReportHttpTest {
                     .andExpect(status().isNotFound());
             m.perform(full(get(ROOT + "?executionId=1&routingNodeId=999"), "A"))
                     .andExpect(status().isConflict());
-            for (String executionStatus : List.of("READY", "RUNNING", "COMPLETED")) {
+            for (String executionStatus : List.of("READY", "RUNNING", "FULLY_RECEIVED")) {
                 jdbc.update("UPDATE mes_production_execution SET status=? WHERE id=1", executionStatus);
                 m.perform(full(get(page), "A")).andExpect(status().isOk())
                         .andExpect(jsonPath("total").value(1));
@@ -192,7 +192,7 @@ class ProductionReportHttpTest {
                 m.perform(full(get(q), "A")).andExpect(status().isOk()).andExpect(jsonPath("writable").value(true));
             }
             long original = add(m, 11, "4");
-            jdbc.update("UPDATE mes_production_execution SET status='COMPLETED' WHERE id=1");
+            jdbc.update("UPDATE mes_production_execution SET status='FULLY_RECEIVED' WHERE id=1");
             m.perform(full(get(q), "A")).andExpect(jsonPath("writable").value(false))
                     .andExpect(jsonPath("nodes[0].reportedQty").value("4.000000"));
             // Historical negative correction has its own permissions and quantity constraints.

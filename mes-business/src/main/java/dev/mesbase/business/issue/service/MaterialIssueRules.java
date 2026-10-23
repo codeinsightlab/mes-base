@@ -112,8 +112,8 @@ public class MaterialIssueRules {
         var execution = Optional.ofNullable(row.getExecutionId()).map(nullableValue -> executions.lock(nullableValue))
                 .orElse(null);
         if (execution != null) {
-            if (Set.of(ProductionExecutionStatus.COMPLETED.getValue(), ProductionExecutionStatus.FULLY_RECEIVED.getValue(), ProductionExecutionStatus.CANCELLED.getValue())
-                    .contains(execution.getStatus())) throw new FoundationException(ErrorCode.EXECUTION_FROZEN);
+            if (!ProductionExecutionStatus.allowsNormalReporting(execution.getStatus()))
+                throw new FoundationException(ErrorCode.EXECUTION_FROZEN);
             require(row.getWorkorderId() == null || Objects.equals(row.getWorkorderId(), execution.getWorkorderId()));
             require(row.getProductId() == null || Objects.equals(row.getProductId(), execution.getProductId()));
             require(row.getRoutingId() == null || Objects.equals(row.getRoutingId(), execution.getRoutingId()));

@@ -149,9 +149,8 @@ public class QualityReleaseService {
         var state = state(execution);
         if (!Objects.equals(c.expectedReleaseId(), state.currentReleaseId()))
             ParameterChecks.reject(ErrorCode.PRODUCTION_CLOSURE_CONFLICT);
-        if (!List.of(ProductionExecutionStatus.RUNNING.getValue(), ProductionExecutionStatus.COMPLETED.getValue())
-                .contains(row.getStatus()))
-            blocked("仅运行或生产已完工的执行可以新增正式放行或撤回");
+        if (!ProductionExecutionStatus.RUNNING.getValue().equals(row.getStatus()))
+            blocked("仅运行中的执行可以新增正式放行或撤回");
         if (!c.revoke() && (!state.safe() || c.quantity().compareTo(state.effective()) > 0))
             blocked(state.blockedReason() == null ? "放行数量不能超过末道有效产出" : state.blockedReason());
         if (c.revoke() && state.currentReleaseId() == null)

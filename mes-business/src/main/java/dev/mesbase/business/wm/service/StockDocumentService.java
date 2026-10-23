@@ -358,8 +358,8 @@ public class StockDocumentService {
         var release = releases.state(executionId);
         var received = inbound.netProductionInbound(executionId);
         var remaining = release.released().min(release.effective()).subtract(received);
-        String blocked = !admitted ? "当前工单状态、来源或模式不允许入库" : !List.of(ProductionExecutionStatus.RUNNING.getValue(), ProductionExecutionStatus.COMPLETED.getValue())
-                .contains(execution.getStatus())
+        String blocked = !admitted ? "当前工单状态、来源或模式不允许入库" : !ProductionExecutionStatus.RUNNING.getValue()
+                .equals(execution.getStatus())
                 ? "执行状态不允许入库" : !release.safe() ? release.blockedReason() : !release.basisValid() ? "缺少当前质量依据下的正式放行"
                 : remaining.signum() <= 0 ? "可入库数量不足或存在历史超额" : null;
         return new StockDocumentModels.ProductionBasis(executionId, execution.getProductId(), release.effective(), release.released(), received, remaining.max(BigDecimal.ZERO), blocked == null, blocked);
@@ -367,8 +367,8 @@ public class StockDocumentService {
 
     private MesProductionExecutionEntity productionExecution(Long id) {
         var execution = locks.execution(id);
-        if (!List.of(ProductionExecutionStatus.RUNNING.getValue(), ProductionExecutionStatus.COMPLETED.getValue())
-                .contains(execution.getStatus())) ParameterChecks.reject(ErrorCode.STOCK_DOCUMENT_CONFLICT);
+        if (!ProductionExecutionStatus.RUNNING.getValue().equals(execution.getStatus()))
+            ParameterChecks.reject(ErrorCode.STOCK_DOCUMENT_CONFLICT);
         sources.finishedOutput(execution, null);
         return execution;
     }

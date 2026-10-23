@@ -26,19 +26,19 @@ class ActivatedProductionHttpTest {
     void importedFactsUseNormalAuditedAdjustmentWithoutMigrationActivationGate() throws Exception {
         try (var c = QualityWorkflowHttpTest.context(new Class<?>[]{Opening.class}, 40, 30, 30, 30, 30)) {
             var j = ProductionWarehouseFixture.db(c);
-            when(c.getBean(LegacyHistoryMapper.class).input(1L)).thenReturn(new BigDecimal("100.000000"));
-            j.update("UPDATE workorder SET status='HISTORICAL' WHERE id=1");
-            j.update("UPDATE mes_production_execution SET status='HISTORICAL' WHERE id=1");
+            for (String table : List.of("mes_material_issue_input", "mes_material_issue_item", "mes_material_issue_submission",
+                    "mes_material_issue_erp_extra", "mes_material_issue"))
+                j.update("DELETE FROM " + table);
             Long original = j.queryForObject("SELECT MIN(id) FROM mes_production_report WHERE execution_id=1 AND routing_node_id=15", Long.class);
             var http = MaterialIssueHttpTest.mvc(c);
             http.perform(ProductionCoreV1HttpTest.full(get("/api/production/report-quantities/executions/1")))
-                    .andExpect(status().isOk()).andExpect(jsonPath("writable").value(false))
+                    .andExpect(status().isOk()).andExpect(jsonPath("writable").value(true))
                     .andExpect(jsonPath("nodes[0].availableQty").value("60.000000"));
             http.perform(ProductionCoreV1HttpTest.full(post("/api/production/reports/" + original + "/adjustments"))
                             .content("{\"requestId\":\"" + UUID.randomUUID() + "\",\"quantityDelta\":\"-1\",\"reason\":\"TEST ONLY audited correction\"}"))
                     .andExpect(status().isOk());
             assertEquals(1, j.queryForObject("SELECT COUNT(*) FROM mes_production_report WHERE record_type='ADJUSTMENT' AND reference_report_id=?", Integer.class, original));
-            assertEquals("HISTORICAL", j.queryForObject("SELECT status FROM workorder WHERE id=1", String.class));
+            assertEquals("RELEASED", j.queryForObject("SELECT status FROM workorder WHERE id=1", String.class));
             http.perform(ProductionCoreV1HttpTest.full(get("/api/production/report-quantities/executions/1")))
                     .andExpect(status().isOk()).andExpect(jsonPath("nodes[4].reportedQty").value("29.000000"));
         }
@@ -49,7 +49,7 @@ class ActivatedProductionHttpTest {
         @Bean
         LegacyHistoryMapper openingEvidence() {
             var m = mock(LegacyHistoryMapper.class);
-            when(m.activatedInput(1L)).thenReturn(new BigDecimal("100.000000"));
+            when(m.openingInput(1L)).thenReturn(new BigDecimal("100.000000"));
             var nodes = new ArrayList<Node>();
             for (long node = 11; node <= 15; node++)
                 nodes.add(new Node(node,
@@ -72,7 +72,7 @@ class ActivatedProductionHttpTest {
             j.update("DELETE FROM mes_production_execution WHERE id=2");
             // Execution has consumed its own 100; the order still has 900 of demand available.
             http.perform(ProductionCoreV1HttpTest.full(get("/api/production/report-quantities/executions/1")))
-                    .andExpect(status().isOk()).andExpect(jsonPath("historical").value(false))
+                    .andExpect(status().isOk()).andExpect(jsonPath("historical").doesNotExist())
                     .andExpect(jsonPath("productionInputQty").value("100.000000"))
                     .andExpect(jsonPath("confirmedInputQty").value("100.000000"))
                     .andExpect(jsonPath("nodes[1].reportedQty").value("100.000000"))

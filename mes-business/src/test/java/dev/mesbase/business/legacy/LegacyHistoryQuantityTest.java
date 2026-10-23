@@ -27,9 +27,9 @@ class LegacyHistoryQuantityTest {
     }
 
     @Test
-    void usesExistingAuthorityForGross400Defect4Net396AndNoWritableAllowance() {
-        var input = new ExecutionQuantity(1L, 1L, 1L, q("400"), "LOCKED", false, "历史只读",
-                List.of(node(1, "400", "0"), node(2, "400", "4"), node(3, "396", "0")), "source", q("400"), BigDecimal.ZERO, BigDecimal.ZERO, true);
+    void closedExecutionKeepsGross400Defect4Net396AndNoWritableAllowance() {
+        var input = new ExecutionQuantity(1L, 1L, 1L, q("400"), "LOCKED", false, "执行已完全入库",
+                List.of(node(1, "400", "0"), node(2, "400", "4"), node(3, "396", "0")), "source", q("400"), BigDecimal.ZERO, BigDecimal.ZERO);
         var result = ProductionQuantityService.project(input);
         assertEquals(q("396"), result.nodes().get(1).effectiveOutputQty());
         assertEquals(q("396"), result.nodes().get(2).inputQty());
@@ -54,7 +54,7 @@ class LegacyHistoryQuantityTest {
     @Test
     void frozenEvidenceDoesNotZeroAllowanceOrBlockAuditedCorrection() {
         var view = new ExecutionQuantity(1L, 1L, 1L, q("100"), "LOCKED", true, null,
-                List.of(node(1, "40", "0")), "source", q("100"), q("100"), BigDecimal.ZERO, true);
+                List.of(node(1, "40", "0")), "source", q("100"), q("100"), BigDecimal.ZERO);
         var projected = ProductionQuantityService.project(view);
         assertEquals(q("60"), projected.nodes().getFirst().availableQty());
         assertNull(ProductionQuantityService.positiveReportBlockReason(projected, 1L));
@@ -62,7 +62,7 @@ class LegacyHistoryQuantityTest {
         assertThrows(FoundationException.class, () -> ProductionQuantityService.validateChange(projected, 1L, q("61")));
 
         var balanced = new ExecutionQuantity(1L, 1L, 1L, q("100"), "LOCKED", false, null,
-                List.of(node(1, "100", "0")), "source", q("100"), q("100"), BigDecimal.ZERO, true);
+                List.of(node(1, "100", "0")), "source", q("100"), q("100"), BigDecimal.ZERO);
         assertNull(ProductionCompletionBalance.blockedReason(ProductionQuantityService.project(balanced)));
     }
 }

@@ -154,8 +154,8 @@ class WorkOrderProgressHttpTest {
                     .andExpect(jsonPath("items[0].completionPercent").value("100.00"))
                     .andExpect(jsonPath("items[0].goodOutputGapQty").value("10.000000"))
                     .andExpect(jsonPath("items[0].pendingCompletionQty").value("0.000000"));
-            // An old completion fact is still readable elsewhere but is never relabelled receipt closure.
-            j.update("UPDATE mes_production_execution SET status='COMPLETED' WHERE id=1");
+            // A running execution is not counted as receipt-closed merely because a completion row exists.
+            j.update("UPDATE mes_production_execution SET status='RUNNING' WHERE id=1");
             mvc.perform(ProductionReportHttpTest.full(get(URL), "A"))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("items[0].completedQty").value("0"))

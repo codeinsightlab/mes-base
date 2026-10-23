@@ -406,7 +406,7 @@ class ProductionCompletionHttpTest {
                     .toString(), basis = "f".repeat(64), reason = "TEST ONLY historical complete";
             String hash = ProductionClosureRules.hash(1L, basis, reason, 1L);
             j.update("INSERT INTO mes_execution_completion(id,execution_id,effective_qty,released_qty,receipt_qty,accepted_qty,basis_hash,request_hash,operator_user_id,recorded_at,reason) VALUES(?,1,100,0,0,0,?,?,1,CURRENT_TIMESTAMP,?)", request, basis, hash, reason);
-            j.update("UPDATE mes_production_execution SET status='COMPLETED',end_time=CURRENT_TIMESTAMP WHERE id=1");
+            j.update("UPDATE mes_production_execution SET status='FULLY_RECEIVED',end_time=CURRENT_TIMESTAMP WHERE id=1");
             String body = "{\"requestId\":\"" + request + "\",\"expectedBasisHash\":\"" + basis + "\",\"reason\":\"" + reason + "\"}";
             m.perform(full(post("/api/production/executions/1/actions/complete")).content(body))
                     .andExpect(status().isOk()).andExpect(jsonPath("id").value(request));
@@ -419,16 +419,15 @@ class ProductionCompletionHttpTest {
     }
 
     @Test
-    void oldCompletedIsNeverPromotedAndHistoricalStockStillConsumesInboundAllowance() throws Exception {
+    void existingStockStillConsumesInboundAllowanceWithoutManufacturingFormalReceipt() throws Exception {
         try (var c = ProductionWarehouseFixture.context()) {
             var m = MaterialIssueHttpTest.mvc(c);
             var j = ProductionWarehouseFixture.db(c);
             String old = ProductionWarehouseFixture.legacy(m, j);
             ProductionWarehouseFixture.legacyAccepted(j, old, "60");
-            j.update("UPDATE mes_production_execution SET status='COMPLETED',end_time=CURRENT_TIMESTAMP WHERE id=1");
             UnifiedInboundHttpTest.release(m, "100");
             UnifiedInboundHttpTest.receive(m, "40");
-            assertEquals("COMPLETED", j.queryForObject("SELECT status FROM mes_production_execution WHERE id=1", String.class));
+            assertEquals("RUNNING", j.queryForObject("SELECT status FROM mes_production_execution WHERE id=1", String.class));
             assertEquals(0, j.queryForObject("SELECT COUNT(*) FROM mes_execution_completion", Integer.class));
             StockDocumentHttpTest.balance(j, "100");
         }

@@ -189,7 +189,7 @@ class OperatorQualificationTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"COMPLETED", "CANCELLED", "UNKNOWN"})
+    @ValueSource(strings = {"FULLY_RECEIVED", "CANCELLED", "UNKNOWN"})
     void endedOrUnknownExecutionCannotBeAssigned(String status) {
         execution.setStatus(status);
         assertEquals(ErrorCode.ASSIGNMENT_EXECUTION_CLOSED, assertThrows(FoundationException.class, () -> new MesExecutionAssignmentServiceImpl(assignments, rules).insert(new MesExecutionAssignmentCreateCommand(40L, 20L, 1L, null))).code());

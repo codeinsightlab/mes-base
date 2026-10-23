@@ -208,7 +208,7 @@ class ProductionReportingHttpTest {
                     .andExpect(status().isUnprocessableEntity())
                     .andExpect(jsonPath("errorCode").value("OPERATOR_CAPABILITY_REQUIRED"));
             j.update("INSERT INTO mes_operation_user(operation_id,user_id) VALUES(1,1)");
-            for (String state : List.of("COMPLETED", "CANCELLED")) {
+            for (String state : List.of("FULLY_RECEIVED", "CANCELLED")) {
                 j.update("UPDATE mes_production_execution SET status=? WHERE id=1", state);
                 m.perform(ProductionCoreV1HttpTest.full(post(ROOT)).content(body(11, "1")))
                         .andExpect(status().is4xxClientError());

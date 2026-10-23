@@ -125,17 +125,16 @@ public class ProductionQuantityService {
     private ExecutionQuantity load(Long executionId, MesProductionExecutionEntity execution, PathModel model,
                                    Supplier<List<MesExecutionPathNodeEntity>> selectedRows) {
         var balance = quantities.inputBalance(executionId);
-        boolean historical = ProductionExecutionStatus.HISTORICAL.getValue().equals(execution.getStatus());
-        if (historical && history == null) ParameterChecks.reject(ErrorCode.REPORT_PATH_REQUIRED);
         BigDecimal opening = null;
-        if (!historical && history != null) opening = history.activatedInput(executionId);
-        boolean imported = historical || opening != null;
+        if (history != null) opening = history.openingInput(executionId);
         if (opening != null)
             balance = new ProductionInputBalance(balance.confirmedQty().add(opening), balance.reservedQty());
-        var inputQty = historical ? history.input(executionId) : balance.usableQty();
+        var inputQty = balance.usableQty();
         if (inputQty == null || inputQty.signum() < 0) ParameterChecks.reject(ErrorCode.REPORT_PATH_REQUIRED);
-        var historyNodes = imported ? history.nodes(executionId).stream()
-                .collect(Collectors.toMap(n -> n.routingNodeId(), n -> new HistoricalNode(n.grossCorrection(), n.effectiveDefect(), n.unverifiedLossQty()))) : null;
+        Map<Long, HistoricalNode> historyNodes = null;
+        if (opening != null)
+            historyNodes = history.nodes(executionId).stream()
+                    .collect(Collectors.toMap(n -> n.routingNodeId(), n -> new HistoricalNode(n.grossCorrection(), n.effectiveDefect(), n.unverifiedLossQty())));
         if (model.path() == null)
             return new ExecutionQuantity(executionId, execution.getWorkorderId(), execution.getRoutingId(), execution.getTargetQty(), ExecutionPathStatus.UNSELECTED.getValue(), false, "执行尚未选择实际路径", List.of(), label(model.routing()), inputQty, balance.confirmedQty(), balance.reservedQty());
         if (!Objects.equals(model.path().getRoutingId(), execution.getRoutingId()))
@@ -146,7 +145,7 @@ public class ProductionQuantityService {
                 .collect(Collectors.toMap(t -> t.routingNodeId(), t -> t.reportedQty()));
         var defectTotals = defects.nodeTotals(executionId).stream()
                 .collect(Collectors.toMap(t -> t.affectedNodeId(), t -> t));
-        return compose(execution, model, new QuantityFacts(balance, inputQty, historical, historyNodes, ordered,
+        return compose(execution, model, new QuantityFacts(balance, inputQty, historyNodes, ordered,
                 totals, defectTotals, orders.selectByPrimaryKey(execution.getWorkorderId())));
     }
 
@@ -154,7 +153,7 @@ public class ProductionQuantityService {
                                   BigDecimal unverifiedLossQty) {
     }
 
-    private record QuantityFacts(ProductionInputBalance balance, BigDecimal inputQty, boolean historical,
+    private record QuantityFacts(ProductionInputBalance balance, BigDecimal inputQty,
                                  Map<Long, HistoricalNode> historyNodes, List<MesExecutionPathNodeEntity> ordered,
                                  Map<Long, BigDecimal> totals, Map<Long, ProductionDefectModels.NodeTotal> defectTotals,
                                  WorkorderEntity order) {
@@ -164,7 +163,6 @@ public class ProductionQuantityService {
         Long executionId = execution.getId();
         var balance = facts.balance();
         var inputQty = facts.inputQty();
-        boolean historical = facts.historical();
         var historyNodes = facts.historyNodes();
         var ordered = facts.ordered();
         var totals = facts.totals();
@@ -204,7 +202,7 @@ public class ProductionQuantityService {
         // writable describes normal forward reporting only, not historical correction authorization.
         return new ExecutionQuantity(executionId, execution.getWorkorderId(), execution.getRoutingId(),
                 execution.getTargetQty(), model.path()
-                .getPathStatus(), boundary == null, boundary, List.copyOf(result), label(model.routing()), inputQty, balance.confirmedQty(), balance.reservedQty(), historical);
+                .getPathStatus(), boundary == null, boundary, List.copyOf(result), label(model.routing()), inputQty, balance.confirmedQty(), balance.reservedQty());
     }
 
     private static String label(DirectoryLabel label) {
@@ -323,7 +321,7 @@ public class ProductionQuantityService {
         if (nodeId != null && !found) ParameterChecks.reject(ErrorCode.REPORT_PATH_REQUIRED);
         return new ExecutionQuantity(view.executionId(), view.workorderId(), view.routingId(), view.targetQty(), view.pathStatus(), view.writable(), result.stream()
                 .anyMatch(n -> n.unverifiedDefectQty()
-                        .signum() > 0) ? "存在待核实不良；从受影响工序起禁止新增正向报工，请核实质量记录，后续流转保持质量门禁" : view.boundary(), List.copyOf(result), view.routingLabel(), view.productionInputQty(), view.confirmedInputQty(), view.reservedInputQty(), view.historical());
+                        .signum() > 0) ? "存在待核实不良；从受影响工序起禁止新增正向报工，请核实质量记录，后续流转保持质量门禁" : view.boundary(), List.copyOf(result), view.routingLabel(), view.productionInputQty(), view.confirmedInputQty(), view.reservedInputQty());
     }
 
     /**
