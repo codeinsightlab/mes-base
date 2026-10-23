@@ -2,6 +2,10 @@ package dev.mesbase.core.error;
 
 
 public enum ErrorCode {
+    MATERIAL_BOM_FROZEN(409, "已发布或停用的BOM不能直接修改，请新建版本"),
+    MATERIAL_BOM_CYCLE(422, "BOM子版本引用存在循环，请检查多阶组成"),
+    MATERIAL_BOM_BUDGET(422, "BOM展开超过层数或规模上限，未返回截断需求"),
+    MATERIAL_BOM_INVALID(422, "BOM缺少有效组件，或材料、基本单位、子版本及标准用量不一致"),
     STOCK_DOCUMENT_SOURCE_PENDING(422, "来源业务尚未接通或关联依据不完整，禁止审核"),
     RECEIPT_QUALITY_UNVERIFIED(409, "缺少当前质量依据下的正式放行或质量核验未通过，禁止新增生产交接"),
     RECEIPT_PATH_REQUIRED(409, "交接需要已锁定的确切实际路径及末道有效产出"),

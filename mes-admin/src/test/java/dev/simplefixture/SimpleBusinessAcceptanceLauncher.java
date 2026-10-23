@@ -36,7 +36,7 @@ public class SimpleBusinessAcceptanceLauncher {
                     throw new IllegalStateException("TEST ONLY source unavailable", failure);
                 }
                 return List.of(new ExternalMaterial("TEST-MES-001", name, "TEST ONLY", null,
-                        1L, "ITEM", "ENABLED", "TEST-ERP-001", "ERP-TEST-M001"));
+                        1L, "ENABLED", "TEST-ERP-001", "ERP-TEST-M001"));
             };
         }
     }

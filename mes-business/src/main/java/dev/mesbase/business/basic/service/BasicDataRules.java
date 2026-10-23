@@ -10,7 +10,6 @@ import dev.mesbase.business.basic.domain.MaterialCategoryEntity;
 import dev.mesbase.business.basic.domain.MaterialCategoryExample;
 import dev.mesbase.business.basic.domain.MaterialEntity;
 import dev.mesbase.business.basic.domain.MaterialExample;
-import dev.mesbase.business.basic.domain.MaterialType;
 import dev.mesbase.business.basic.domain.SafetyStockEntity;
 import dev.mesbase.business.basic.domain.SafetyStockExample;
 import dev.mesbase.business.basic.domain.UnitMeasureEntity;
@@ -24,6 +23,7 @@ import dev.mesbase.business.shared.enums.EnableStatus;
 import dev.mesbase.business.wm.service.StockReferenceRules;
 import dev.mesbase.core.error.ErrorCode;
 import dev.mesbase.core.error.FoundationException;
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
@@ -44,6 +44,7 @@ public class BasicDataRules {
     private final EquipmentReferenceRules equipment;
     private final MaterialMapper material;
     private final MaterialUnitRules metering;
+    private final ObjectProvider<MaterialBomService> bom;
     private final MaterialCategoryMapper materialCategory;
     private final UnitMeasureMapper unitMeasure;
     private final WorkstationMapper workstation;
@@ -54,7 +55,8 @@ public class BasicDataRules {
                           UnitMeasureMapper unitMeasure, WorkstationMapper workstation, WorkshopMapper workshop,
                           SafetyStockMapper safetyStock, ObjectProvider<RoutingReferenceRules> routing,
                           EquipmentReferenceRules equipment, ObjectProvider<StockReferenceRules> stock,
-                          MaterialUnitRules metering) {
+                          MaterialUnitRules metering, ObjectProvider<MaterialBomService> bom) {
+        this.bom = bom;
         this.metering = metering;
         this.stock = stock;
         this.equipment = equipment;
@@ -84,8 +86,27 @@ public class BasicDataRules {
         metering.lockUnit(row.getUnitId());
         requireUnit(row.getUnitId());
         if (row.getCategoryId() != null) requireCategory(row.getCategoryId());
-        if (MaterialType.from(row.getMaterialType()) == null)
-            throw new FoundationException(ErrorCode.BAD_REQUEST);
+    }
+
+    public List<MaterialCategoryEntity> categories() {
+        var filter = new MaterialCategoryExample();
+        if (materialCategory.countByExample(filter) > 10000) throw new FoundationException(ErrorCode.RESOURCE_CONFLICT);
+        filter.setOrderByClause("sort ASC,id ASC");
+        return materialCategory.selectByExample(filter);
+    }
+
+    public List<Long> categoryIds(Long root) {
+        var rows = categories();
+        var ids = new HashSet<Long>();
+        ids.add(root);
+        if (rows.stream().noneMatch(row -> row.getId().equals(root)))
+            throw new FoundationException(ErrorCode.NOT_FOUND);
+        boolean expanded;
+        do {
+            expanded = false;
+            for (var row : rows) if (ids.contains(row.getParentId()) && ids.add(row.getId())) expanded = true;
+        } while (expanded);
+        return new ArrayList<>(ids);
     }
 
     public void validate(MaterialCategoryEntity row) {
@@ -162,7 +183,8 @@ public class BasicDataRules {
     }
 
     public MaterialCategoryEntity requireCategory(Long id) {
-        var row = Optional.ofNullable(id).map(nullableValue -> materialCategory.selectByPrimaryKey(nullableValue))
+        var row = Optional.ofNullable(id)
+                .map(nullableValue -> materialCategory.selectByPrimaryKeyForUpdate(nullableValue))
                 .orElse(null);
         if (row == null) throw new FoundationException(ErrorCode.NOT_FOUND);
         return row;
@@ -182,6 +204,8 @@ public class BasicDataRules {
     }
 
     public void deletingMaterial(List<Long> ids) {
+        var composition = bom.getIfAvailable();
+        if (composition != null) composition.protectMaterials(ids);
         // EXTRA_CODE_REASON: material deletion cannot orphan inventory references.
         var stockRules = stock.getIfAvailable();
         if (stockRules != null) stockRules.deletingMaterials(ids);
@@ -193,6 +217,7 @@ public class BasicDataRules {
     }
 
     public void deletingMaterialCategory(List<Long> ids) {
+        ids.stream().sorted().forEach(this::requireCategory);
         var materialRefs = new MaterialExample();
         materialRefs.createCriteria().andCategoryIdIn(ids);
         reject(material.countByExample(materialRefs) > 0);

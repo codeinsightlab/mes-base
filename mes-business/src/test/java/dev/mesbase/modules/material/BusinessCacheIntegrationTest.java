@@ -157,7 +157,11 @@ class BusinessCacheIntegrationTest {
                 .thenAnswer(call -> mapper.selectByPrimaryKey(call.getArgument(0)));
         when(mapper.selectByExample(any(MaterialExample.class))).thenAnswer(call -> {
             var page = PageHelper.getLocalPage();
-            if (page != null) { page.setTotal(123); page.add(row(1L, "LIST")); return page; }
+            if (page != null) {
+                page.setTotal(123);
+                page.add(row(1L, "LIST"));
+                return page;
+            }
             return List.of(row(1L, "LIST"));
         });
         doAnswer(call -> {
@@ -216,7 +220,7 @@ class BusinessCacheIntegrationTest {
         probe.list(new Query(0, 20, "id desc", b));
         assertEquals(2, probe.calls());
         var original = query(0, 20, "A");
-        var changed = new MaterialQueryDto(0, 20, "A", "name", "spec", 1L, 2L, "ITEM", "ENABLED", "ext", "code");
+        var changed = new MaterialQueryDto(0, 20, "A", "name", "spec", 1L, 2L, "ENABLED", "ext", "code", null, null);
         assertFalse(caches.queryHash(new Object[]{original}, original)
                 .equals(caches.queryHash(new Object[]{changed}, changed)));
     }
@@ -243,12 +247,12 @@ class BusinessCacheIntegrationTest {
     @Test
     void createUpdateDeleteEvictOnlyTheirFactoryBusinessAndType() {
         seed();
-        material.insert(new MaterialCreateCommand("M", "name", null, null, 1L, "ITEM", "ENABLED", null, null));
+        material.insert(new MaterialCreateCommand("M", "name", null, null, 1L, "ENABLED", null, null));
         assertFalse(has("business:material", "list:fixture"));
         assertTrue(has("business:material", "detail:fixture"));
         assertOthersRemain();
         seed();
-        material.updateById(1L, new MaterialUpdateCommand("M", "name", null, null, 1L, "ITEM", "ENABLED", null, null));
+        material.updateById(1L, new MaterialUpdateCommand("M", "name", null, null, 1L, "ENABLED", null, null));
         assertFalse(has("business:material", "list:fixture"));
         assertFalse(has("business:material", "detail:fixture"));
         assertOthersRemain();
@@ -263,7 +267,7 @@ class BusinessCacheIntegrationTest {
     void springProxyDefersUntilActualCommitAndRollbackRetainsCache() {
         seed();
         boundary.run(() -> {
-            material.updateById(1L, new MaterialUpdateCommand("M", "name", null, null, 1L, "ITEM", "ENABLED", null, null));
+            material.updateById(1L, new MaterialUpdateCommand("M", "name", null, null, 1L, "ENABLED", null, null));
             assertTrue(has("business:material", "list:fixture"));
             assertTrue(has("business:material", "detail:fixture"));
             return null;
@@ -343,7 +347,7 @@ class BusinessCacheIntegrationTest {
     @Test
     void syncCreatedUpdatedSkippedAndRollbackFollowDynamicEviction() {
         var writer = context.getBean(IMaterialService.class);
-        var input = new ExternalMaterial("M", "name", null, null, 1L, "ITEM", "ENABLED", null, null);
+        var input = new ExternalMaterial("M", "name", null, null, 1L, "ENABLED", null, null);
 
         seed();
         when(mapper.selectByExample(any())).thenReturn(List.of());
@@ -463,7 +467,7 @@ class BusinessCacheIntegrationTest {
     }
 
     private static MaterialQueryDto query(int offset, int limit, String code) {
-        return new MaterialQueryDto(offset, limit, code, null, null, null, null, null, null, null, null);
+        return new MaterialQueryDto(offset, limit, code, null, null, null, null, null, null, null, null, null);
     }
 
     private static MaterialEntity row(Long id, String name) {
@@ -473,7 +477,6 @@ class BusinessCacheIntegrationTest {
         row.setCode("M");
         row.setName(name);
         row.setUnitId(1L);
-        row.setMaterialType("ITEM");
         row.setStatus("ENABLED");
         return row;
     }

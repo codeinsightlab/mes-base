@@ -280,7 +280,7 @@ class ProductionInputHttpTest {
             m.perform(ProductionCoreV1HttpTest.full(post(ROOT)).content(conflict.toString()))
                     .andExpect(status().isOk());
             assertEquals(2, j.queryForObject("SELECT COUNT(*) FROM mes_production_execution WHERE batch_no IS NOT NULL", Integer.class));
-            j.update("INSERT INTO material(id,code,name,unit_id,material_type,status) VALUES(2,'P2','TEST ONLY second product',1,'PRODUCT','ENABLED')");
+            j.update("INSERT INTO material(id,code,name,unit_id,status) VALUES(2,'P2','TEST ONLY second product',1,'ENABLED')");
             j.update("INSERT INTO routing_product(routing_id,material_id,material_code,material_name) VALUES(1,2,'P2','TEST ONLY second product')");
             j.update("INSERT INTO workorder(id,code,product_id,planned_qty,routing_id,status,revision,create_time,update_time) VALUES(2,'TEST_WO2',2,1000,1,'RELEASED',0,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)");
             j.update("INSERT INTO workorder_erp_extra(id) VALUES(2)");

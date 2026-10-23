@@ -10,7 +10,7 @@ import java.util.List;
  */
 public class TestMaterialQueryAdapter implements MaterialQueryPort {
     public List<ExternalMaterial> query(FactoryScope scope, int maximum) {
-        return List.of(new ExternalMaterial("M001", "测试物料一", "TEST ONLY", null, 1L, "ITEM", "ENABLED", "TEST-001", "ERP-M001"),
-                new ExternalMaterial("M002", "测试物料二", null, null, 2L, "PRODUCT", "ENABLED", "TEST-002", "ERP-M002"));
+        return List.of(new ExternalMaterial("M001", "测试物料一", "TEST ONLY", null, 1L, "ENABLED", "TEST-001", "ERP-M001"),
+                new ExternalMaterial("M002", "测试物料二", null, null, 2L, "ENABLED", "TEST-002", "ERP-M002"));
     }
 }

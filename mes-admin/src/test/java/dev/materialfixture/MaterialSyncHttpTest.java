@@ -40,6 +40,8 @@ import dev.mesbase.infrastructure.persistence.RuntimeRegistry;
 import dev.mesbase.business.basic.controller.MaterialController;
 import dev.mesbase.business.basic.controller.MaterialPermissions;
 import dev.mesbase.business.basic.service.BasicDataRules;
+import dev.mesbase.business.basic.service.MaterialBomService;
+import org.springframework.beans.factory.ObjectProvider;
 import dev.mesbase.business.basic.service.MaterialUnitRules;
 import dev.mesbase.business.basic.service.EquipmentReferenceRules;
 import jakarta.validation.Validation;
@@ -173,12 +175,13 @@ class MaterialSyncHttpTest {
             FoundationErrorAdvice.class})
     static class Web implements WebMvcConfigurer {
         @Bean
-        MaterialUnitRules metering(MaterialMapper materials, UnitMeasureMapper units) {
+        MaterialUnitRules metering(MaterialMapper materials, UnitMeasureMapper units,
+                                   ObjectProvider<MaterialBomService> boms) {
             // Real metering locks; this fixture has no historical-fact tables.
             return new MaterialUnitRules(materials, units, mock(WmInventoryMapper.class),
                     mock(WmStockActionMapper.class), mock(WmStockDocumentLineMapper.class),
                     mock(MesWorkorderMaterialMapper.class), mock(MesMaterialIssueItemMapper.class),
-                    mock(RoutingProductMapper.class), mock(WorkorderMapper.class), mock(MesProductionExecutionMapper.class));
+                    mock(RoutingProductMapper.class), mock(WorkorderMapper.class), mock(MesProductionExecutionMapper.class), boms);
         }
 
         @Bean
@@ -329,7 +332,7 @@ class MaterialSyncHttpTest {
             sync(mvc, "A", 0, 0, 2);
             sync(mvc, "B", 2, 0, 0);
             var old = fixture.data.getFirst();
-            fixture.data = List.of(new ExternalMaterial(old.code(), "测试更新", null, old.categoryId(), old.unitId(), old.materialType(), old.status(), old.externalId(), old.externalCode()), fixture.data.get(1));
+            fixture.data = List.of(new ExternalMaterial(old.code(), "测试更新", null, old.categoryId(), old.unitId(), old.status(), old.externalId(), old.externalCode()), fixture.data.get(1));
             sync(mvc, "A", 0, 1, 1);
             assertEquals(2, fixture.business.get("A").queryForObject("SELECT COUNT(*) FROM material", Integer.class));
             assertEquals("测试更新", fixture.business.get("A")
@@ -365,8 +368,8 @@ class MaterialSyncHttpTest {
         try (var context = context()) {
             var fixture = context.getBean(Fixture.class);
             var mvc = mvc(context);
-            fixture.data = List.of(new ExternalMaterial("Z001", "valid", null, null, 1L, "ITEM", "ENABLED", "1", "1"),
-                    new ExternalMaterial("Z002", "DB_REJECT", null, null, 1L, "ITEM", "ENABLED", "2", "2"));
+            fixture.data = List.of(new ExternalMaterial("Z001", "valid", null, null, 1L, "ENABLED", "1", "1"),
+                    new ExternalMaterial("Z002", "DB_REJECT", null, null, 1L, "ENABLED", "2", "2"));
             mvc.perform(post("/api/basic/material/actions/sync").header("Authorization", "Bearer TEST_ALLOW")
                             .header("X-Factory-Id", "A"))
                     .andExpect(status().isInternalServerError());

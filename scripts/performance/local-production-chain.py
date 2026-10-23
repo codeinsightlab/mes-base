@@ -162,7 +162,7 @@ class Run:
         tag = self.a.tag
         u = self.post(0, 'unit', '/api/basic/unit-measure', {'code': tag+'_U', 'name': '性能验收基本单位', 'symbol': '件', 'status': 'ENABLED'})
         self.unit = u['id']
-        self.raw = self.post(0, 'raw', '/api/basic/material', {'code': tag+'_RAW', 'name': '性能验收通用毛坯', 'unitId': self.unit, 'materialType': 'ITEM', 'status': 'ENABLED'})
+        self.raw = self.post(0, 'raw', '/api/basic/material', {'code': tag+'_RAW', 'name': '性能验收通用毛坯', 'unitId': self.unit, 'status': 'ENABLED'})
         self.warehouses = [self.post(0, 'warehouse'+k, '/api/wm/wm-warehouse', {'code': tag+'_'+k, 'name': '性能验收'+k, 'status': 'ENABLED', 'remark': tag}) for k in ['RAW', 'FG']]
         assert all(w['source'] == 'LOCAL' for w in self.warehouses)
         self.operations = []
@@ -172,7 +172,7 @@ class Run:
             self.post(0, 'capability'+n, '/api/production/mes-operation-user', {'operationId': op['id'], 'userId': self.a.operator_user_id, 'remark': tag})
         self.products, self.routes, self.nodes = [], [], []
         for i in range(3):
-            p = self.post(0, 'product'+str(i), '/api/basic/material', {'code':tag+'_P'+str(i), 'name':'性能验收产品系列'+str(i+1), 'unitId':self.unit, 'materialType':'PRODUCT', 'status':'ENABLED'})
+            p = self.post(0, 'product'+str(i), '/api/basic/material', {'code':tag+'_P'+str(i), 'name':'性能验收产品系列'+str(i+1), 'unitId':self.unit, 'status':'ENABLED'})
             r = self.post(0, 'routing'+str(i), '/api/production/routing', {'code':tag+'_R'+str(i), 'name':'性能验收五工序系列'+str(i+1), 'description':tag})
             graph = self.step(0, 'graph'+str(i), 'PUT', '/api/production/routing/'+r['id']+'/content', {'revision':r['revision'], 'materialIds':[p['id']], 'nodes':[{'nodeCode':n,'operationId':op['id'],'displayOrder':j,'isKey':n=='E','description':tag} for j,(n,op) in enumerate(zip('ABCDE', self.operations))], 'edges':[{'fromNodeCode':a,'toNodeCode':b} for a,b in zip('ABCD','BCDE')]})
             self.post(0, 'publish'+str(i), '/api/production/routing/'+r['id']+'/actions/publish', {'revision':graph['routing']['revision']})

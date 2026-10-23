@@ -101,7 +101,7 @@ class ProductionExecutionMySqlTest {
                 }
             }
             long workorder, routing;
-            try (var q = connection.createStatement(); var rows = q.executeQuery("SELECT w.id,r.id FROM workorder w JOIN material m ON m.id=w.product_id JOIN routing r ON r.id=w.routing_id JOIN routing_product p ON p.routing_id=r.id AND p.material_id=m.id WHERE m.material_type='PRODUCT' AND r.status='PUBLISHED' AND r.published_at IS NOT NULL ORDER BY w.id LIMIT 1")) {
+            try (var q = connection.createStatement(); var rows = q.executeQuery("SELECT w.id,r.id FROM workorder w JOIN material m ON m.id=w.product_id JOIN routing r ON r.id=w.routing_id JOIN routing_product p ON p.routing_id=r.id AND p.material_id=m.id WHERE r.status='PUBLISHED' AND r.published_at IS NOT NULL ORDER BY w.id LIMIT 1")) {
                 assertTrue(rows.next(), "Acceptance database needs an existing valid WorkOrder and published routing");
                 workorder = rows.getLong(1);
                 routing = rows.getLong(2);

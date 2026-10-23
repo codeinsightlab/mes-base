@@ -14,8 +14,6 @@ public class MaterialEntity {
 
     private Long unitId;
 
-    private String materialType;
-
     private String status;
 
     private String externalId;
@@ -68,14 +66,6 @@ public class MaterialEntity {
 
     public void setUnitId(Long unitId) {
         this.unitId = unitId;
-    }
-
-    public String getMaterialType() {
-        return materialType;
-    }
-
-    public void setMaterialType(String materialType) {
-        this.materialType = materialType;
     }
 
     public String getStatus() {

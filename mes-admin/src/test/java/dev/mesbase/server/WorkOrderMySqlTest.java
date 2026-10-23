@@ -190,7 +190,7 @@ class WorkOrderMySqlTest {
         Assumptions.assumeTrue(Boolean.getBoolean("mes.test.workorder.mysql"));
         var business = AcceptanceBusinessDatabase.source();
         var jdbc = new JdbcTemplate(business);
-        var selected = jdbc.queryForList("SELECT w.product_id,w.routing_id FROM workorder w JOIN routing r ON r.id=w.routing_id JOIN material m ON m.id=w.product_id WHERE r.status='PUBLISHED' AND r.published_at IS NOT NULL AND m.status='ENABLED' AND m.material_type='PRODUCT' ORDER BY w.id LIMIT 1")
+        var selected = jdbc.queryForList("SELECT w.product_id,w.routing_id FROM workorder w JOIN routing r ON r.id=w.routing_id JOIN material m ON m.id=w.product_id WHERE r.status='PUBLISHED' AND r.published_at IS NOT NULL AND m.status='ENABLED' ORDER BY w.id LIMIT 1")
                 .getFirst();
         Long product = ((Number) selected.get("product_id")).longValue();
         Long routing = ((Number) selected.get("routing_id")).longValue();

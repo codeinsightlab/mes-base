@@ -1,4 +1,3 @@
-// MES-CODEGEN: MyBatis Generator standard single-table persistence.
 package dev.mesbase.business.basic.dao;
 
 import dev.mesbase.business.basic.domain.MaterialCategoryEntity;
@@ -21,7 +20,10 @@ public interface MaterialCategoryMapper {
 
     MaterialCategoryEntity selectByPrimaryKey(Long id);
 
-    int updateByExampleSelective(@Param("row") MaterialCategoryEntity row, @Param("example") MaterialCategoryExample example);
+    MaterialCategoryEntity selectByPrimaryKeyForUpdate(Long id);
+
+    int updateByExampleSelective(@Param("row") MaterialCategoryEntity row,
+                                 @Param("example") MaterialCategoryExample example);
 
     int updateByExample(@Param("row") MaterialCategoryEntity row, @Param("example") MaterialCategoryExample example);
 

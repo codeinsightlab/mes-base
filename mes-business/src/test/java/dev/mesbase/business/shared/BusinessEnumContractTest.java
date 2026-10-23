@@ -2,7 +2,6 @@ package dev.mesbase.business.shared;
 
 import dev.mesbase.business.quality.domain.QualityReleaseAction;
 import dev.mesbase.business.production.domain.ProductionReceiptType;
-import dev.mesbase.business.basic.domain.MaterialType;
 import dev.mesbase.business.directory.domain.DirectoryDeletionFlag;
 import dev.mesbase.business.directory.domain.DirectoryStatus;
 import dev.mesbase.business.integration.warehouse.ErpActionResult.Status;
@@ -38,7 +37,6 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 
 class BusinessEnumContractTest {
     private static final List<Class<?>> TYPES = List.of(
-            MaterialType.class,
             DirectoryDeletionFlag.class,
             DirectoryStatus.class,
             Status.class,

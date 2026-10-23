@@ -16,6 +16,8 @@ import java.util.List;
  * @author MES Base
  */
 public interface IMaterialCategoryService {
+    MaterialCategoryPage tree();
+
     MaterialCategoryPage selectPage(MaterialCategoryQueryDto query);
 
     MaterialCategoryEntity selectById(Long id);

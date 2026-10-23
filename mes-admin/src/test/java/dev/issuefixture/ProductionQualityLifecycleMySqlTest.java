@@ -93,7 +93,7 @@ class ProductionQualityLifecycleMySqlTest {
             String tag = "TEST_QTY_" + UUID.randomUUID().toString().substring(0, 12);
             assertEquals(0, jdbc.queryForObject("SELECT COUNT(*) FROM workorder WHERE code=?", Integer.class, tag));
             var f = transaction(() -> {
-                Long material = jdbc.queryForObject("SELECT id FROM material WHERE material_type='PRODUCT' AND status='ENABLED' ORDER BY id LIMIT 1", Long.class);
+                Long material = jdbc.queryForObject("SELECT id FROM material WHERE status='ENABLED' ORDER BY id LIMIT 1", Long.class);
                 Long operation = jdbc.queryForObject("SELECT id FROM operation WHERE status='ENABLED' ORDER BY id LIMIT 1", Long.class);
                 Long warehouse = jdbc.queryForObject("SELECT id FROM wm_warehouse WHERE status='ENABLED' ORDER BY id LIMIT 1", Long.class);
                 long routing = ProductionReportMySqlTest.insert(jdbc, "INSERT INTO routing(code,name,version,status,revision,published_at) VALUES(?,?,1,'PUBLISHED',0,NOW())", tag, tag);

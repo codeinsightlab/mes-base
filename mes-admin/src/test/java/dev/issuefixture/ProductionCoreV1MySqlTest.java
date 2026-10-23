@@ -46,7 +46,7 @@ class ProductionCoreV1MySqlTest {
     void configuredFactoryFullBusinessFlowAndRealSchema() throws Exception {
         var business = AcceptanceBusinessDatabase.source();
         var jdbc = new JdbcTemplate(business);
-        var match = jdbc.queryForMap("SELECT r.id AS routing_id,p.material_id FROM routing r JOIN routing_product p ON p.routing_id=r.id JOIN material m ON m.id=p.material_id WHERE r.status='PUBLISHED' AND m.material_type='PRODUCT' AND m.status='ENABLED' AND EXISTS(SELECT 1 FROM routing_node n WHERE n.routing_id=r.id) ORDER BY r.id LIMIT 1");
+        var match = jdbc.queryForMap("SELECT r.id AS routing_id,p.material_id FROM routing r JOIN routing_product p ON p.routing_id=r.id JOIN material m ON m.id=p.material_id WHERE r.status='PUBLISHED' AND m.status='ENABLED' AND EXISTS(SELECT 1 FROM routing_node n WHERE n.routing_id=r.id) ORDER BY r.id LIMIT 1");
         long routing = ((Number) match.get("routing_id")).longValue(), product = ((Number) match.get("material_id")).longValue();
         var nodes = jdbc.queryForList("SELECT id,is_key FROM routing_node WHERE routing_id=?", routing);
         var edges = jdbc.queryForList("SELECT from_node_id,to_node_id FROM routing_edge WHERE routing_id=?", routing);

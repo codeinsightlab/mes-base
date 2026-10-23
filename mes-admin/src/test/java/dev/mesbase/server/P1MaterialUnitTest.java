@@ -22,6 +22,7 @@ import dev.mesbase.business.basic.domain.MaterialUpdateCommand;
 import dev.mesbase.business.basic.domain.UnitMeasureEntity;
 import dev.mesbase.business.basic.domain.SafetyStockEntity;
 import dev.mesbase.business.basic.service.BasicDataRules;
+import dev.mesbase.business.basic.service.MaterialBomService;
 import dev.mesbase.business.basic.service.MaterialUnitRules;
 import dev.mesbase.business.basic.service.EquipmentReferenceRules;
 import dev.mesbase.business.basic.service.impl.MaterialServiceImpl;
@@ -106,13 +107,13 @@ class P1MaterialUnitTest {
             factory.setDataSource(db.source);
             factory.setConfiguration(config);
             sessions = new SqlSessionTemplate(factory.getObject());
+            var empty = new StaticListableBeanFactory();
             units = new MaterialUnitRules(mapper(MaterialMapper.class), mapper(UnitMeasureMapper.class), mapper(WmInventoryMapper.class),
                     mapper(WmStockActionMapper.class), mapper(WmStockDocumentLineMapper.class), mapper(MesWorkorderMaterialMapper.class),
-                    mapper(MesMaterialIssueItemMapper.class), mapper(RoutingProductMapper.class), mapper(WorkorderMapper.class), mapper(MesProductionExecutionMapper.class));
-            var empty = new StaticListableBeanFactory();
+                    mapper(MesMaterialIssueItemMapper.class), mapper(RoutingProductMapper.class), mapper(WorkorderMapper.class), mapper(MesProductionExecutionMapper.class), empty.getBeanProvider(MaterialBomService.class));
             var rules = new BasicDataRules(mapper(MaterialMapper.class), mapper(MaterialCategoryMapper.class), mapper(UnitMeasureMapper.class),
                     mapper(WorkstationMapper.class), mapper(WorkshopMapper.class), mapper(SafetyStockMapper.class), empty.getBeanProvider(RoutingReferenceRules.class),
-                    mock(EquipmentReferenceRules.class), empty.getBeanProvider(StockReferenceRules.class), units);
+                    mock(EquipmentReferenceRules.class), empty.getBeanProvider(StockReferenceRules.class), units, empty.getBeanProvider(MaterialBomService.class));
             service = P1CorrectnessTest.proxy(new MaterialServiceImpl(mapper(MaterialMapper.class), rules,
                     empty.getBeanProvider(MaterialQueryPort.class), mock(SyncCoordinator.class),
                     empty.getBeanProvider(IMaterialService.class), Validation.buildDefaultValidatorFactory()
@@ -121,7 +122,7 @@ class P1MaterialUnitTest {
             references = new StockReferenceRules(mapper(MaterialMapper.class), mock(WmWarehouseMapper.class), mapper(WmInventoryMapper.class),
                     mapper(WmStockActionMapper.class), mock(MesMaterialIssueInputMapper.class), mapper(MesWorkorderMaterialMapper.class), mapper(WmStockDocumentLineMapper.class));
             db.jdbc.update("INSERT INTO unit_measure(id,code,name,status) VALUES(1,'TEST_KG','kg','ENABLED'),(2,'TEST_PCS','pcs','ENABLED')");
-            db.jdbc.update("INSERT INTO material(id,code,name,unit_id,material_type,status) VALUES(1,'TEST_M','TEST material',1,'ITEM','ENABLED')");
+            db.jdbc.update("INSERT INTO material(id,code,name,unit_id,status) VALUES(1,'TEST_M','TEST material',1,'ENABLED')");
         }
 
         <T> T mapper(Class<T> type) {
@@ -140,7 +141,7 @@ class P1MaterialUnitTest {
     }
 
     static MaterialUpdateCommand change(Long unit) {
-        return new MaterialUpdateCommand("TEST_M", "TEST renamed", null, null, unit, "ITEM", "ENABLED", null, null);
+        return new MaterialUpdateCommand("TEST_M", "TEST renamed", null, null, unit, "ENABLED", null, null);
     }
 
     @Test
@@ -170,7 +171,7 @@ class P1MaterialUnitTest {
             assertDoesNotThrow(() -> h.service.updateById(1L, change(1L)));
             var scope = new FactoryScope(new FactoryId("TEST_ONLY"));
             assertThrows(RuntimeException.class, () -> FactoryContext.runWithScope(scope, () -> h.service.upsert(scope,
-                    List.of(new ExternalMaterial("TEST_M", "TEST", null, null, 2L, "ITEM", "ENABLED", null, null)))));
+                    List.of(new ExternalMaterial("TEST_M", "TEST", null, null, 2L, "ENABLED", null, null)))));
             assertEquals(1L, h.db.jdbc.queryForObject("SELECT unit_id FROM material WHERE id=1", Long.class));
             assertEquals(0, h.db.jdbc.queryForObject("SELECT quantity FROM wm_inventory WHERE id=1", Integer.class));
         }

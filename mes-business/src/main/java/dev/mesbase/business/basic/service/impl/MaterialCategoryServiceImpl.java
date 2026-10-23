@@ -9,6 +9,7 @@ import dev.mesbase.business.basic.domain.MaterialCategoryExample;
 import dev.mesbase.business.basic.domain.MaterialCategoryPage;
 import dev.mesbase.business.basic.domain.MaterialCategoryQueryDto;
 import dev.mesbase.business.basic.domain.MaterialCategoryResource;
+import dev.mesbase.business.basic.domain.MaterialResource;
 import dev.mesbase.business.basic.domain.MaterialCategoryUpdateCommand;
 import dev.mesbase.business.basic.service.BasicDataRules;
 import dev.mesbase.business.basic.service.IMaterialCategoryService;
@@ -63,6 +64,13 @@ public class MaterialCategoryServiceImpl implements IMaterialCategoryService {
         this.self = self;
         this.validator = validator;
         this.caches = caches;
+    }
+
+    @Override
+    @Transactional(transactionManager = "businessTransactionManager", readOnly = true)
+    public MaterialCategoryPage tree() {
+        var rows = rules.categories();
+        return new MaterialCategoryPage(rows, rows.size(), 0, rows.size());
     }
 
     @Override
@@ -125,6 +133,7 @@ public class MaterialCategoryServiceImpl implements IMaterialCategoryService {
         if (insertUnique(row) != 1) {
             throw new FoundationException(ErrorCode.RESOURCE_CONFLICT);
         }
+        caches.evict(MaterialResource.PREFIX, BusinessCacheEvict.Scope.LIST);
         return requireRecord(row.getId());
     }
 
@@ -145,6 +154,7 @@ public class MaterialCategoryServiceImpl implements IMaterialCategoryService {
         if (updateUnique(row) != 1) {
             throw new FoundationException(ErrorCode.RESOURCE_CONFLICT);
         }
+        caches.evict(MaterialResource.PREFIX, BusinessCacheEvict.Scope.LIST);
         return requireRecord(id);
     }
 
@@ -158,6 +168,7 @@ public class MaterialCategoryServiceImpl implements IMaterialCategoryService {
             throw new FoundationException(ErrorCode.BAD_REQUEST);
         }
         rules.deletingMaterialCategory(ids);
+        caches.evict(MaterialResource.PREFIX, BusinessCacheEvict.Scope.LIST);
         MaterialCategoryExample example = new MaterialCategoryExample();
         for (var id : ids) requireRecord(id);
         example.createCriteria().andIdIn(ids)
@@ -278,6 +289,7 @@ public class MaterialCategoryServiceImpl implements IMaterialCategoryService {
             caches.evict(MaterialCategoryResource.PREFIX,
                     BusinessCacheEvict.Scope.LIST);
         }
+        if (updated > 0 || created > 0) caches.evict(MaterialResource.PREFIX, BusinessCacheEvict.Scope.LIST);
         return new MaterialCategorySyncResult(inputs.size(), created, updated, skipped);
     }
 

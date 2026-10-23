@@ -1,0 +1,320 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- MES-CODEGEN: MyBatis Generator standard single-table persistence. -->
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="dev.mesbase.business.basic.dao.MaterialBomMapper">
+  <resultMap id="BaseResultMap" type="dev.mesbase.business.basic.domain.MaterialBomEntity">
+    <id column="id" jdbcType="BIGINT" property="id" />
+    <result column="code" jdbcType="VARCHAR" property="code" />
+    <result column="version" jdbcType="VARCHAR" property="version" />
+    <result column="product_id" jdbcType="BIGINT" property="productId" />
+    <result column="base_qty" jdbcType="DECIMAL" property="baseQty" />
+    <result column="unit_id" jdbcType="BIGINT" property="unitId" />
+    <result column="status" jdbcType="VARCHAR" property="status" />
+    <result column="revision" jdbcType="BIGINT" property="revision" />
+    <result column="remark" jdbcType="VARCHAR" property="remark" />
+    <result column="created_by" jdbcType="BIGINT" property="createdBy" />
+    <result column="created_at" jdbcType="TIMESTAMP" property="createdAt" />
+    <result column="published_at" jdbcType="TIMESTAMP" property="publishedAt" />
+  </resultMap>
+  <sql id="Example_Where_Clause">
+    <where>
+      <foreach collection="oredCriteria" item="criteria" separator="or">
+        <if test="criteria.valid">
+          <trim prefix="(" prefixOverrides="and" suffix=")">
+            <foreach collection="criteria.criteria" item="criterion">
+              <choose>
+                <when test="criterion.noValue">
+                  and ${criterion.condition}
+                </when>
+                <when test="criterion.singleValue">
+                  and ${criterion.condition} #{criterion.value}
+                </when>
+                <when test="criterion.betweenValue">
+                  and ${criterion.condition} #{criterion.value} and #{criterion.secondValue}
+                </when>
+                <when test="criterion.listValue">
+                  and ${criterion.condition}
+                  <foreach close=")" collection="criterion.value" item="listItem" open="(" separator=",">
+                    #{listItem}
+                  </foreach>
+                </when>
+              </choose>
+            </foreach>
+          </trim>
+        </if>
+      </foreach>
+    </where>
+  </sql>
+  <sql id="Update_By_Example_Where_Clause">
+    <where>
+      <foreach collection="example.oredCriteria" item="criteria" separator="or">
+        <if test="criteria.valid">
+          <trim prefix="(" prefixOverrides="and" suffix=")">
+            <foreach collection="criteria.criteria" item="criterion">
+              <choose>
+                <when test="criterion.noValue">
+                  and ${criterion.condition}
+                </when>
+                <when test="criterion.singleValue">
+                  and ${criterion.condition} #{criterion.value}
+                </when>
+                <when test="criterion.betweenValue">
+                  and ${criterion.condition} #{criterion.value} and #{criterion.secondValue}
+                </when>
+                <when test="criterion.listValue">
+                  and ${criterion.condition}
+                  <foreach close=")" collection="criterion.value" item="listItem" open="(" separator=",">
+                    #{listItem}
+                  </foreach>
+                </when>
+              </choose>
+            </foreach>
+          </trim>
+        </if>
+      </foreach>
+    </where>
+  </sql>
+  <sql id="Base_Column_List">
+    id, code, version, product_id, base_qty, unit_id, status, revision, remark, created_by,
+    created_at, published_at
+  </sql>
+  <select id="selectByExample" parameterType="dev.mesbase.business.basic.domain.MaterialBomExample" resultMap="BaseResultMap">
+    select
+    <include refid="Base_Column_List" />
+    from material_bom
+    <if test="_parameter != null">
+      <include refid="Example_Where_Clause" />
+    </if>
+    <if test="orderByClause != null">
+      order by ${orderByClause}
+    </if>
+  </select>
+  <select id="selectByPrimaryKey" parameterType="Long" resultMap="BaseResultMap">
+    select
+    <include refid="Base_Column_List" />
+    from material_bom
+    where id = #{id,jdbcType=BIGINT}
+  </select>
+  <delete id="deleteByPrimaryKey" parameterType="Long">
+    delete from material_bom
+    where id = #{id,jdbcType=BIGINT}
+  </delete>
+  <delete id="deleteByExample" parameterType="dev.mesbase.business.basic.domain.MaterialBomExample">
+    delete from material_bom
+    <if test="_parameter != null">
+      <include refid="Example_Where_Clause" />
+    </if>
+  </delete>
+  <insert id="insert" keyColumn="id" keyProperty="id" parameterType="dev.mesbase.business.basic.domain.MaterialBomEntity" useGeneratedKeys="true">
+    insert into material_bom (code, version, product_id,
+      base_qty, unit_id, status,
+      revision, remark, created_by,
+      created_at, published_at)
+    values (#{code,jdbcType=VARCHAR}, #{version,jdbcType=VARCHAR}, #{productId,jdbcType=BIGINT},
+      #{baseQty,jdbcType=DECIMAL}, #{unitId,jdbcType=BIGINT}, #{status,jdbcType=VARCHAR},
+      #{revision,jdbcType=BIGINT}, #{remark,jdbcType=VARCHAR}, #{createdBy,jdbcType=BIGINT},
+      #{createdAt,jdbcType=TIMESTAMP}, #{publishedAt,jdbcType=TIMESTAMP})
+  </insert>
+  <insert id="insertSelective" keyColumn="id" keyProperty="id" parameterType="dev.mesbase.business.basic.domain.MaterialBomEntity" useGeneratedKeys="true">
+    insert into material_bom
+    <trim prefix="(" suffix=")" suffixOverrides=",">
+      <if test="code != null">
+        code,
+      </if>
+      <if test="version != null">
+        version,
+      </if>
+      <if test="productId != null">
+        product_id,
+      </if>
+      <if test="baseQty != null">
+        base_qty,
+      </if>
+      <if test="unitId != null">
+        unit_id,
+      </if>
+      <if test="status != null">
+        status,
+      </if>
+      <if test="revision != null">
+        revision,
+      </if>
+      <if test="remark != null">
+        remark,
+      </if>
+      <if test="createdBy != null">
+        created_by,
+      </if>
+      <if test="createdAt != null">
+        created_at,
+      </if>
+      <if test="publishedAt != null">
+        published_at,
+      </if>
+    </trim>
+    <trim prefix="values (" suffix=")" suffixOverrides=",">
+      <if test="code != null">
+        #{code,jdbcType=VARCHAR},
+      </if>
+      <if test="version != null">
+        #{version,jdbcType=VARCHAR},
+      </if>
+      <if test="productId != null">
+        #{productId,jdbcType=BIGINT},
+      </if>
+      <if test="baseQty != null">
+        #{baseQty,jdbcType=DECIMAL},
+      </if>
+      <if test="unitId != null">
+        #{unitId,jdbcType=BIGINT},
+      </if>
+      <if test="status != null">
+        #{status,jdbcType=VARCHAR},
+      </if>
+      <if test="revision != null">
+        #{revision,jdbcType=BIGINT},
+      </if>
+      <if test="remark != null">
+        #{remark,jdbcType=VARCHAR},
+      </if>
+      <if test="createdBy != null">
+        #{createdBy,jdbcType=BIGINT},
+      </if>
+      <if test="createdAt != null">
+        #{createdAt,jdbcType=TIMESTAMP},
+      </if>
+      <if test="publishedAt != null">
+        #{publishedAt,jdbcType=TIMESTAMP},
+      </if>
+    </trim>
+  </insert>
+  <select id="countByExample" parameterType="dev.mesbase.business.basic.domain.MaterialBomExample" resultType="java.lang.Long">
+    select count(*) from material_bom
+    <if test="_parameter != null">
+      <include refid="Example_Where_Clause" />
+    </if>
+  </select>
+  <update id="updateByExampleSelective" parameterType="map">
+    update material_bom
+    <set>
+      <if test="row.id != null">
+        id = #{row.id,jdbcType=BIGINT},
+      </if>
+      <if test="row.code != null">
+        code = #{row.code,jdbcType=VARCHAR},
+      </if>
+      <if test="row.version != null">
+        version = #{row.version,jdbcType=VARCHAR},
+      </if>
+      <if test="row.productId != null">
+        product_id = #{row.productId,jdbcType=BIGINT},
+      </if>
+      <if test="row.baseQty != null">
+        base_qty = #{row.baseQty,jdbcType=DECIMAL},
+      </if>
+      <if test="row.unitId != null">
+        unit_id = #{row.unitId,jdbcType=BIGINT},
+      </if>
+      <if test="row.status != null">
+        status = #{row.status,jdbcType=VARCHAR},
+      </if>
+      <if test="row.revision != null">
+        revision = #{row.revision,jdbcType=BIGINT},
+      </if>
+      <if test="row.remark != null">
+        remark = #{row.remark,jdbcType=VARCHAR},
+      </if>
+      <if test="row.createdBy != null">
+        created_by = #{row.createdBy,jdbcType=BIGINT},
+      </if>
+      <if test="row.createdAt != null">
+        created_at = #{row.createdAt,jdbcType=TIMESTAMP},
+      </if>
+      <if test="row.publishedAt != null">
+        published_at = #{row.publishedAt,jdbcType=TIMESTAMP},
+      </if>
+    </set>
+    <if test="example != null">
+      <include refid="Update_By_Example_Where_Clause" />
+    </if>
+  </update>
+  <update id="updateByExample" parameterType="map">
+    update material_bom
+    set id = #{row.id,jdbcType=BIGINT},
+      code = #{row.code,jdbcType=VARCHAR},
+      version = #{row.version,jdbcType=VARCHAR},
+      product_id = #{row.productId,jdbcType=BIGINT},
+      base_qty = #{row.baseQty,jdbcType=DECIMAL},
+      unit_id = #{row.unitId,jdbcType=BIGINT},
+      status = #{row.status,jdbcType=VARCHAR},
+      revision = #{row.revision,jdbcType=BIGINT},
+      remark = #{row.remark,jdbcType=VARCHAR},
+      created_by = #{row.createdBy,jdbcType=BIGINT},
+      created_at = #{row.createdAt,jdbcType=TIMESTAMP},
+      published_at = #{row.publishedAt,jdbcType=TIMESTAMP}
+    <if test="example != null">
+      <include refid="Update_By_Example_Where_Clause" />
+    </if>
+  </update>
+  <update id="updateByPrimaryKeySelective" parameterType="dev.mesbase.business.basic.domain.MaterialBomEntity">
+    update material_bom
+    <set>
+      <if test="code != null">
+        code = #{code,jdbcType=VARCHAR},
+      </if>
+      <if test="version != null">
+        version = #{version,jdbcType=VARCHAR},
+      </if>
+      <if test="productId != null">
+        product_id = #{productId,jdbcType=BIGINT},
+      </if>
+      <if test="baseQty != null">
+        base_qty = #{baseQty,jdbcType=DECIMAL},
+      </if>
+      <if test="unitId != null">
+        unit_id = #{unitId,jdbcType=BIGINT},
+      </if>
+      <if test="status != null">
+        status = #{status,jdbcType=VARCHAR},
+      </if>
+      <if test="revision != null">
+        revision = #{revision,jdbcType=BIGINT},
+      </if>
+      <if test="remark != null">
+        remark = #{remark,jdbcType=VARCHAR},
+      </if>
+      <if test="createdBy != null">
+        created_by = #{createdBy,jdbcType=BIGINT},
+      </if>
+      <if test="createdAt != null">
+        created_at = #{createdAt,jdbcType=TIMESTAMP},
+      </if>
+      <if test="publishedAt != null">
+        published_at = #{publishedAt,jdbcType=TIMESTAMP},
+      </if>
+    </set>
+    where id = #{id,jdbcType=BIGINT}
+  </update>
+  <update id="updateByPrimaryKey" parameterType="dev.mesbase.business.basic.domain.MaterialBomEntity">
+    update material_bom
+    set code = #{code,jdbcType=VARCHAR},
+      version = #{version,jdbcType=VARCHAR},
+      product_id = #{productId,jdbcType=BIGINT},
+      base_qty = #{baseQty,jdbcType=DECIMAL},
+      unit_id = #{unitId,jdbcType=BIGINT},
+      status = #{status,jdbcType=VARCHAR},
+      revision = #{revision,jdbcType=BIGINT},
+      remark = #{remark,jdbcType=VARCHAR},
+      created_by = #{createdBy,jdbcType=BIGINT},
+      created_at = #{createdAt,jdbcType=TIMESTAMP},
+      published_at = #{publishedAt,jdbcType=TIMESTAMP}
+    where id = #{id,jdbcType=BIGINT}
+  </update>
+  <select flushCache="true" id="selectByPrimaryKeyForUpdate" parameterType="Long" resultMap="BaseResultMap" useCache="false">
+    select
+    <include refid="Base_Column_List" />
+    from material_bom
+    where id = #{id,jdbcType=BIGINT}
+    for update
+  </select>
+</mapper>

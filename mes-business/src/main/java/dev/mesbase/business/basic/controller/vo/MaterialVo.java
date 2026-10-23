@@ -12,7 +12,6 @@ public record MaterialVo(
         String specification,
         String categoryId,
         String unitId,
-        String materialType,
         String status,
         String externalId,
         String externalCode

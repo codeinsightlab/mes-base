@@ -49,7 +49,7 @@ class MaterialIssueVoidHttpTest {
 
     static void secondProduct(AnnotationConfigWebApplicationContext c) {
         var j = c.getBean(MaterialIssueHttpTest.Fixture.class).business.get("A");
-        j.update("INSERT INTO material(id,code,name,unit_id,material_type,status) VALUES(2,'M2','另一产品',1,'PRODUCT','ENABLED')");
+        j.update("INSERT INTO material(id,code,name,unit_id,status) VALUES(2,'M2','另一产品',1,'ENABLED')");
         j.update("INSERT INTO routing(id,code,name,version,status,revision,published_at) VALUES(3,'R2','另一产品工艺',1,'PUBLISHED',0,CURRENT_TIMESTAMP)");
         j.update("INSERT INTO routing_product(routing_id,material_id,material_code,material_name) VALUES(3,2,'M2','另一产品')");
     }

@@ -85,14 +85,16 @@ public class MaterialServiceImpl implements IMaterialService {
         if (query.specification() != null) {
             criteria.andSpecificationLike("%" + query.specification() + "%");
         }
-        if (query.categoryId() != null) {
-            criteria.andCategoryIdEqualTo(query.categoryId());
+        if (Boolean.TRUE.equals(query.uncategorized())) {
+            if (query.categoryId() != null) ParameterChecks.reject(ErrorCode.BAD_REQUEST);
+            criteria.andCategoryIdIsNull();
+        } else if (query.categoryId() != null) {
+            if (Boolean.TRUE.equals(query.includeDescendants()))
+                criteria.andCategoryIdIn(rules.categoryIds(query.categoryId()));
+            else criteria.andCategoryIdEqualTo(query.categoryId());
         }
         if (query.unitId() != null) {
             criteria.andUnitIdEqualTo(query.unitId());
-        }
-        if (query.materialType() != null) {
-            criteria.andMaterialTypeLike("%" + query.materialType() + "%");
         }
         if (query.status() != null) {
             criteria.andStatusLike("%" + query.status() + "%");
@@ -130,7 +132,6 @@ public class MaterialServiceImpl implements IMaterialService {
         row.setSpecification(input.specification());
         row.setCategoryId(input.categoryId());
         row.setUnitId(input.unitId());
-        row.setMaterialType(input.materialType());
         row.setStatus(input.status());
         row.setExternalId(input.externalId());
         row.setExternalCode(input.externalCode());
@@ -154,7 +155,6 @@ public class MaterialServiceImpl implements IMaterialService {
         row.setSpecification(input.specification());
         row.setCategoryId(input.categoryId());
         row.setUnitId(input.unitId());
-        row.setMaterialType(input.materialType());
         row.setStatus(input.status());
         row.setExternalId(input.externalId());
         row.setExternalCode(input.externalCode());
@@ -281,7 +281,6 @@ public class MaterialServiceImpl implements IMaterialService {
             row.setSpecification(input.specification());
             row.setCategoryId(input.categoryId());
             row.setUnitId(input.unitId());
-            row.setMaterialType(input.materialType());
             row.setStatus(input.status());
             row.setExternalId(input.externalId());
             row.setExternalCode(input.externalCode());
@@ -312,7 +311,6 @@ public class MaterialServiceImpl implements IMaterialService {
                 && Objects.deepEquals(row.getSpecification(), input.specification())
                 && Objects.deepEquals(row.getCategoryId(), input.categoryId())
                 && Objects.deepEquals(row.getUnitId(), input.unitId())
-                && Objects.deepEquals(row.getMaterialType(), input.materialType())
                 && Objects.deepEquals(row.getStatus(), input.status())
                 && Objects.deepEquals(row.getExternalId(), input.externalId())
                 && Objects.deepEquals(row.getExternalCode(), input.externalCode());

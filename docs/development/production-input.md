@@ -1,6 +1,6 @@
 # 单材料扫码投产 V1：独立 MES 与可选 ERP
 
-> 阅读入口：本文保留 2026-10-16、2026-10-20 的历史记录。当前物料/BOM审查见 **2026-10-23：物料与 BOM 完善方案**；最新范围与讨论结论见第13—14节：多阶首期必做、下达不冻结、材料统一库存基本单位，采用分类树＋物料列表方向，并按ERPNext的子BOM引用实现多阶。初稿中的单阶首期、下达冻结及“工单收尾后恢复”待确认项已被修订。早期 MES1/永久绑定、配置模式入口等描述不作为当前契约。方案尚未实施，不改历史冻结请求。
+> 阅读入口：本文保留 2026-10-16、2026-10-20 的历史记录。当前物料/BOM审查见 **2026-10-23：物料与 BOM 完善方案**；最新范围与讨论结论见第13—14节：多阶首期必做、下达不冻结、材料统一库存基本单位，采用分类树＋物料列表方向，并按ERPNext的子BOM引用实现多阶。初稿中的单阶首期、下达冻结及“工单收尾后恢复”待确认项已被修订。早期 MES1/永久绑定、配置模式入口等描述不作为当前契约。第15节记录物料工作区和多阶BOM管理的实施结果；工单用料与正式投入衔接仍按后续工作包推进，不改历史冻结请求。
 
 2026-10-16。用户补充决定：本轮不实现真实 ERP；MES 必须能独立产生、管理生产数据，ERP 仅保留可选接口。当前以独立 MES 模式验收，CONNECTED 仅作契约验证，不把它标为真实 ERP 联调。
 
@@ -439,3 +439,80 @@ P1拆为连续可验收的两个子包：P1a“复用分类树模型、左树右
 新增验收：分类新增/换父/循环/引用删除保护；选父含下级/仅本类/未分类/全部的分页与total；分类迁移后不改物料及BOM事实；树和列表权限独立、切厂及迟到响应；同物料多BOM/共享子项按路径正确展开；子版本变更不悄悄改父版本；分类失败及BOM计算失败时其他合法区域可读。连同第13节多阶数量及三条已确认执行/收尾规则一并验收。
 
 本轮仅在本文追加第14节并更新阅读入口：补充ERPNext固定版本的分类/物料/BOM源码证据，确认三条执行/收尾规则，将分类树＋物料列表列入推荐方案。已做官方源码/本地文件交叉阅读及文档差异检查；未修改业务代码、测试、配置、Schema或数据，未做业务运行验收，未推送/部署。前端及其他仓库未写入。
+
+
+### 15. 2026-10-23实施：物料工作区、独立分类与多阶BOM管理
+
+#### 15.1 本轮授权与最终页面边界
+
+用户由审查转为明确要求实施，删除旧物料管理页，新增物料改在新工作区办理。随后修订：分类增删改查恢复独立“物料分类”页；物料工作区的分类树仅作筛选与管理页跳转。左侧分类区域固定高度（桌面视口高度减220px，最小440px；窄屏320px），节点在区域内滚动，不随分类数量伸缩。
+
+本轮完成P1a/P1b的物料/分类/BOM管理能力。**未把BOM直接替换为正式工单领料比例来源**：工单下达不冻结、首次意图冻结、同批Execution复用/恢复及累计额度仍属P2/P3，不宣称已因新增BOM表而接通。未调用真实ERP，未改造旧公司来源仓库。
+
+#### 15.2 对照ktg实际新增入口（源码事实）
+
+只读来源实际目录为`/Users/user/work/heri/ktg-mes-ui`；目标页面`src/views/mes/md/mditem/index.vue`第229–254行：单位选择器消费`measureOptions`，分类选择器关联`itemTypeOptions`；第321–322行在已保存物料详情的“BOM组成”中嵌入ItemBom。第501–510行分别调用单位列表、分类树接口。这里的单位与分类不是写死枚举。
+
+`src/views/mes/md/mditem/components/itembom.vue`第4–17行新增按钮打开ItemSelect；第224–226行handleAdd只打开选择窗口；第260–279行onItemSelected逐条addBom，并把默认quantity设为1；第32–38行展示编码、名称、规格、单位及使用比例；第281–282行单位名称从单位列表映射。前端这一新增方式并不证明其已有版本化多阶或服务端用量限制。
+
+Base采用其“先选组件、再维护用量”的交互：BOM组件新增先弹出带编码/名称搜索和分页的物料表，展示规格、基本单位；选定后填写明确标准用量，不默认1∶1。保留版本头、基准产出数量及明确子BOM版本。物料新增/编辑的unitId、categoryId通过单位表选择器和分类树选择器维护，不填外键ID。BOM组件列表关联回显名称、规格、基本单位，分页关联读取在Service按本页去重ID批量读取。
+
+#### 15.3 后端与数量语义（实现事实）
+
+- 复用material、material_category、unit_measure。分类树接口`GET /api/basic/material-category/tree`完整有界读取（最多10000）；物料分页支持categoryId＋includeDescendants及uncategorized。分类写入同时失效物料分页缓存。
+- V55创建material_bom / material_bom_item；经真实metadata生成Entity/Example/Mapper/XML，再以MaterialBomService统一聚合写入。没有开放能绕过发布保护的第二套基础Service。
+- BOM头表达产出物料、版本、基准产出数量、产出基本单位、状态、修订号和发布审计；直接组件表达材料、标准用量、材料基本单位、可空子BOM版本。子BOM必须对应组件物料及已发布版本；同一物料能被不同父BOM引用。
+- 草稿可编辑，发布后组成及比例不可直接改写，停用保留历史引用；通过修订号及父BOM/产出物料行锁保护状态转换和组件变更。同父重复组件、非正用量、停用物料/单位、子BOM错配、自引用/递归均拒绝；未擅设损耗、容差或换算系数。
+- 多阶查询一次有界加载图和关联对象（2000版本、10000组件、路径深度100），按每层“当前产出量÷该层基准量×组件标准量”计算；DECIMAL128中间计算，最终显示/汇总保留6位。结构按路径标识，共享子项不会被误判为循环；展开不产生库存动作。
+- 已被BOM引用的物料删除、基本单位变更及单位删除接入现有引用保护。只读原始组件与多阶派生计算分别展示错误，不将计算失败伪装成空组成或0。
+
+具体入口：后端`business/basic/service/MaterialBomService.java`及两个MaterialBom*Controller，前端`src/views/basic/materials/index.vue`、`src/views/basic/materialCategory/index.vue`及`components/business/material/MaterialBomPanel.vue`。主子单据复用MasterDetailDocument，组件先选逻辑经CrudPage可选beforeCreate钩子复用，缺少钩子的原页面行为不变。
+
+#### 15.4 Schema与导航实际执行（真实库事实）
+
+执行前重新核实中心库mes_base_dev的Factory `TEST_DEV_PERF_20261019`：启用、LOCAL、数据源9启用，192.168.18.25:3306/mes_base_dev_perf_test；实际DATABASE()一致。业务库原V54、物料81、分类0、无BOM表。已备份物料/分类/单位及Flyway历史，中心菜单/角色关联及历史；备份在私有`.local/material-workspace-20261023/`，不提交客户数据或凭证。
+
+业务迁移V55通过项目mes-business-flyway执行并validate成功。中心V43先合并旧入口；用户随后要求恢复独立分类，保留已执行V43原文，新增V44恢复分类菜单及其按钮归属；均通过项目FactoryFlyway执行并validate。原菜单ID/角色关联保留，迁移前后有效角色-权限对均为627，集合相同；原物料component退役，物料分类component恢复。
+
+真实数据库Service/Mapper验收通过：隔离事务中新建测试物料/BOM，C基准1用B2，B基准2用A5；C10得B20/A50；发布后修改拒绝、被引用物料保护。随后事务回滚并核对物料/BOM行数恢复。该验收复用真实MySQL和Mapper，使用独立测试SecurityContext及mock辅助设施，**不是HTTP权限、Factory切换或生产领料运行证明**。
+
+私有证据：flyway-{info,migrate,validate}.log、center-migrate*.log、live-service.log。Flyway、页面运行、Mock及生产闭环证据分别记录，不相互替代。
+
+#### 15.5 验证与未覆盖边界
+
+后端完整mvn verify成功；BOM专测补充至7项，覆盖各层比例、共享分支聚合、循环、发布保护、零用量、HTTP授权声明及组件分页批量名称回显。前端完整82文件/502测试通过；构建通过，已有大chunk提示保留。组件测试覆盖先选物料再打开编辑器、必须明确用量及撤权后的迟到选择不能回填；不把Mock测试视为真实服务运行。
+
+用户重启后已在Chrome、指定TEST Factory实际验证：分类新增、物料新增及改归子分类、单位PCS选择、父分类含下级返回1条/仅本类返回0条、BOM草稿新增、组件先选物料再填写2.5、编码/名称/规格/单位回显、产出100计算材料250。UI验收仅新建明确TEST_BOM_UI_1023前缀对象，测试物料、BOM、分类随后经正式页面全部清理；不修改既有业务事实。
+
+工单选择BOM、工单比例权威切换、正式领料冻结/重放、Execution首次创建/追加恢复、外部ERP权威依据均未由本轮管理页面验收覆盖；既有工单用料配置未删除，不长期双轨的切换安排仍见P2。反向父BOM使用清单、修订复制、采购成本、替代料、联副产品、拆合批也未因本轮引入。未推送、未部署，用户已有及并行任务差异单独保留。
+
+
+#### 15.6 用户追加确认：标识合并分类与冗余字段删除
+
+用户确认“物料标识其实就是分类”，并明确授权删除冗余字段、记录Flyway。追踪所有生产源码后确认materialType只在物料CRUD/查询、ExternalMaterial同步输入及合法值校验中使用；工单适用物料、路线、库存和BOM并不依赖ITEM/PRODUCT划分身份，因此移除MaterialType枚举及物料请求/响应/同步参数，分类成为唯一归类入口。物料是否是某次生产的产出由BOM/工单引用关系表达，不重新通过分类名称猜测制造资格。
+
+执行前再次核对指定Factory/数据源及实际DATABASE()，范围备份`before-type-category-merge.sql`。测试库81条物料均无分类：ITEM 12条，PRODUCT 69条。本轮UI测试对象已通过正式页面删除。V57新增根分类“材料”(ITEM)、“产品”(PRODUCT)，将未分类物料按原标识关联，保留既有非空分类；未知旧标识或同分类编码有语义冲突时通过迁移前置检查失败，不静默覆盖。随后DROP material.material_type。V56是并行生产治理任务已执行的迁移，本轮没有改写或重复执行其内容；V57经正式业务Flyway迁移/validate成功。
+
+实际复核：材料12条、产品69条、未分类0条，information_schema确认旧列不存在、Flyway V57成功。物料数量保持81；迁移SQL只更新category_id和删除冗余列，不修改物料ID/unit_id、生产或库存事实。完整原表范围备份在本地保留。
+
+真实V57 metadata经Codegen Skill重新生成物料Entity/Example/Mapper XML，保留生成的行锁查询。清理当前源码、HTTP/API/同步DTO、页面、相关fixture/MySQL测试及性能脚本中的旧字段；已发布V2保留原文，不能为了删除字段重写历史迁移。额外移除无对应Java Mapper/Entity且无引用的旧`modules/material/dao/MaterialMapper.xml`遗留映射，避免旧列仍进入资源扫描。BOM及单位引用关系未改动，物料分类仍允许留空，不擅自增加新建物料必填条件。
+
+生成预检及迁移证据：私有material-regenerated-report.json、flyway-type-merge-{info,migrate,validate}.log、type-merge-verification.txt。用户已重启加载新契约，Chrome读取“材料/产品”分类和81条物料正常，不再展示物料标识。完整mvn verify通过（其中admin 606项、0失败/错误、50项有条件跳过），前端82文件/502测试及生产构建通过；删除类型后再次验证真实Service/Mapper多阶计算及回滚成功。目标Factory的物料/分类缓存通过现有BusinessCacheProcessor定向失效，未清空Redis。
+
+#### 15.7 用户授权：从指定备份库合并物料、分类及单位
+
+用户进一步明确源是 **192.168.18.25/prod_j2eedb备份库**，目标保持 **192.168.18.25/mes_base_dev_perf_test**、Factory `TEST_DEV_PERF_20261019`。同编码物料直接跳过，不覆盖；分类也合并并保留父子关系。此次仅一次性主数据合并，没有新增ERP路由、常驻导入服务、定时任务或旧生产数据迁移入口。
+
+源确认前曾依据ktg当前配置，对192.168.18.34/j2eedb进行只读主数据检查并取得临时快照。用户纠正后弃用并删除该快照、停止旧预检进程；该来源未进入目标写入。最终全部新增主数据都来自用户指定的prod_j2eedb备份快照。备份库实际DATABASE()与服务端UUID均已核对；其物料25208条，与生产检查的25222条不同，不混用统计或数据。
+
+源备份只读事务提取md_unit_measure、md_item_type、md_item的必要主数据字段；不读取/写入库存、生产记录、ERP业务单据，也不复制凭证或专用规则。源分类7条、单位24条、物料25208条，数据库排序规则下编码去重数仍为25208；源单位均能关联，11989条源物料没有分类，如实保留空分类，不推导或补造。
+
+目标执行前重新核对中心绑定、LOCAL模式、启用状态和实际DATABASE()，范围备份material/material_category/unit_measure。通过现有MaterialCategoryServiceImpl、UnitMeasureServiceImpl、MaterialServiceImpl及生成Mapper执行：先合并分类、单位，再以500条一批事务写入物料。分类/单位同编码必须名称及关联语义一致，否则停止，不按名称猜合并；物料同编码完全跳过。源Y/N按已核实契约转为ENABLED/DISABLED，不带入旧物料标识或ERP映射身份。
+
+复用真实PlatformPersistence和SyncCoordinator，在中心mes_master_sync按Factory＋`masterdata:ktg-material:20261023`抢占、每批校验run_token并更新进度/租约；最终SUCCEEDED、processed_count=25208。操作工具显式绑定核实后的Factory和操作人，通过真实Service/Mapper及本地事务写入；辅助未参与的查询端口/缓存为隔离构造，不宣称为HTTP权限或ERP验收。批次分别提交，不宣称整批25208条全局原子事务。
+
+**实际结果：新增物料25152条，重复编码跳过56条；新增分类7条，新增单位23条（已有同编码PCS单位复用）。** 目标最终物料25233条、编码去重25233条，分类9条、单位32条；缺失单位、非空分类悬空、分类父节点悬空均为0，未分类11989条。对原81条物料逐字段比对一致，并记录SHA-256；未覆盖其名称、单位、分类或其他字段。两个V57分类保留，源7分类按原层级新增；没有强行按同义名称合并不同编码。
+
+私有证据：before-ktg-masterdata-import.sql、ktg-backup-snapshot.log、ktg-backup-import-preflight.log、ktg-backup-import-apply.log、ktg-import-receipt.json、ktg-import-verification.txt。快照、备份和逐条主数据不提交Git，文档只记录汇总、映射边界和验证事实。结束后按目标Factory使用现有BusinessCacheProcessor定向失效物料、分类及单位缓存；不清空Redis，不修改其他Factory或已有业务事实。
+
+Chrome刷新后实际显示25233条物料及合并后的9节点分类树，分类、基本单位均回显名称；1280/1440/1920三档宽度截图已复核。900px高视口下分类区域始终为260px宽、680px高，与合并前少量节点一致，节点不撑高容器。截图位于私有screenshots/materials-{1280,1440,1920}.jpg；本轮未推送或部署，未进入P2/P3正式生产领料切换。

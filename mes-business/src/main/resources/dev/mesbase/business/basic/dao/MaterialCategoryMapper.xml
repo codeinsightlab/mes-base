@@ -1,5 +1,4 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- MES-CODEGEN: MyBatis Generator standard single-table persistence. -->
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="dev.mesbase.business.basic.dao.MaterialCategoryMapper">
   <resultMap id="BaseResultMap" type="dev.mesbase.business.basic.domain.MaterialCategoryEntity">
@@ -84,7 +83,7 @@
     </if>
   </select>
   <select id="selectByPrimaryKey" parameterType="Long" resultMap="BaseResultMap">
-    select 
+    select
     <include refid="Base_Column_List" />
     from material_category
     where id = #{id,jdbcType=BIGINT}
@@ -100,10 +99,10 @@
     </if>
   </delete>
   <insert id="insert" keyColumn="id" keyProperty="id" parameterType="dev.mesbase.business.basic.domain.MaterialCategoryEntity" useGeneratedKeys="true">
-    insert into material_category (code, name, parent_id, 
+    insert into material_category (code, name, parent_id,
       sort, status, remark
       )
-    values (#{code,jdbcType=VARCHAR}, #{name,jdbcType=VARCHAR}, #{parentId,jdbcType=BIGINT}, 
+    values (#{code,jdbcType=VARCHAR}, #{name,jdbcType=VARCHAR}, #{parentId,jdbcType=BIGINT},
       #{sort,jdbcType=INTEGER}, #{status,jdbcType=VARCHAR}, #{remark,jdbcType=VARCHAR}
       )
   </insert>
@@ -232,4 +231,7 @@
       remark = #{remark,jdbcType=VARCHAR}
     where id = #{id,jdbcType=BIGINT}
   </update>
+  <select id="selectByPrimaryKeyForUpdate" parameterType="java.lang.Long" resultMap="BaseResultMap">
+    select <include refid="Base_Column_List" /> from material_category where id = #{id,jdbcType=BIGINT} for update
+  </select>
 </mapper>

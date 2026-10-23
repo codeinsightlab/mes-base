@@ -26,6 +26,7 @@ import java.util.List;
 import java.util.Objects;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
+import org.springframework.beans.factory.ObjectProvider;
 
 /**
  * Metering identity guard; all checks use the current Factory's business database.
@@ -34,6 +35,7 @@ import org.springframework.stereotype.Component;
 @ConditionalOnProperty(name = "mes.business.enabled", havingValue = "true")
 public class MaterialUnitRules {
     private final MaterialMapper materials;
+    private final ObjectProvider<MaterialBomService> bom;
     private final UnitMeasureMapper units;
     private final WmInventoryMapper stocks;
     private final WmStockActionMapper actions;
@@ -48,7 +50,8 @@ public class MaterialUnitRules {
                              WmStockActionMapper actions, WmStockDocumentLineMapper documents,
                              MesWorkorderMaterialMapper demands, MesMaterialIssueItemMapper issues,
                              RoutingProductMapper products, WorkorderMapper orders,
-                             MesProductionExecutionMapper executions) {
+                             MesProductionExecutionMapper executions, ObjectProvider<MaterialBomService> bom) {
+        this.bom = bom;
         this.materials = materials;
         this.units = units;
         this.stocks = stocks;
@@ -73,6 +76,8 @@ public class MaterialUnitRules {
     public void changingUnit(MaterialEntity before, Long next) {
         if (Objects.equals(before.getUnitId(), next)) return;
         Long id = before.getId();
+        var composition = bom.getIfAvailable();
+        if (composition != null) composition.protectMaterials(List.of(id));
         var stock = new WmInventoryExample();
         stock.createCriteria().andMaterialIdEqualTo(id);
         var action = new WmStockActionExample();
@@ -104,6 +109,8 @@ public class MaterialUnitRules {
     }
 
     public void deletingUnits(List<Long> ids) {
+        var composition = bom.getIfAvailable();
+        if (composition != null) composition.protectUnits(ids);
         ids.stream().sorted().forEach(this::lockUnit);
         var material = new MaterialExample();
         material.createCriteria().andUnitIdIn(ids);

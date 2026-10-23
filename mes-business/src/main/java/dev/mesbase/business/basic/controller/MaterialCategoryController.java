@@ -88,6 +88,12 @@ public class MaterialCategoryController {
         return service.sync(FactoryContext.required());
     }
 
+    @GetMapping("/tree")
+    @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED, permission = MaterialCategoryPermissions.LIST)
+    public MaterialCategoryPageVo tree() {
+        return BeanConversions.convertPage(service.tree(), MaterialCategoryPageVo.class);
+    }
+
     private static MaterialCategoryVo toView(MaterialCategoryEntity row) {
         return BeanConversions.convert(row, MaterialCategoryVo.class);
     }

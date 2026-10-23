@@ -16,10 +16,11 @@ public record MaterialQueryDto(
         @Size(max = 500) String specification,
         Long categoryId,
         Long unitId,
-        @Size(max = 16) String materialType,
         @Size(max = 16) String status,
         @Size(max = 128) String externalId,
-        @Size(max = 128) String externalCode
+        @Size(max = 128) String externalCode,
+        Boolean includeDescendants,
+        Boolean uncategorized
 ) implements BusinessCacheQuery {
     @Override
     public int cacheOffset() {

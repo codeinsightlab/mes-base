@@ -253,7 +253,7 @@ class MaterialIssueHttpTest {
                 scanDdl = scanDdl.substring(scanDdl.indexOf("CREATE TABLE mes_production_scan_activity")).split(";")[0]
                         .replace(") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT=", ") COMMENT ");
                 jdbc.execute(scanDdl);
-                jdbc.update("INSERT INTO material(id,code,name,unit_id,material_type,status) VALUES(1,'M1','物料一',1,'PRODUCT','ENABLED')");
+                jdbc.update("INSERT INTO material(id,code,name,unit_id,status) VALUES(1,'M1','物料一',1,'ENABLED')");
                 jdbc.update("INSERT INTO workorder(id,code,product_id,planned_qty,routing_id,status,revision,create_time,update_time) VALUES(1,'WO1',1,1000,1,'DRAFT',0,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)");
                 jdbc.update("INSERT INTO unit_measure(id,code,name,status) VALUES(1,'KG','千克','ENABLED')");
                 jdbc.update("INSERT INTO wm_warehouse(id,code,name,status) VALUES(1,'W1','验收仓库','ENABLED')");

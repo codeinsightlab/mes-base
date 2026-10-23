@@ -17,7 +17,7 @@ class WorkOrderApplicableRoutingHttpTest {
         try (var context = MaterialIssueHttpTest.context()) {
             var mvc = MaterialIssueHttpTest.mvc(context);
             var jdbc = context.getBean(MaterialIssueHttpTest.Fixture.class).business.get("A");
-            jdbc.update("INSERT INTO material(id,code,name,unit_id,material_type,status) VALUES(2,'M2','另一产品',1,'PRODUCT','ENABLED')");
+            jdbc.update("INSERT INTO material(id,code,name,unit_id,status) VALUES(2,'M2','另一产品',1,'ENABLED')");
             jdbc.update("INSERT INTO routing(id,code,name,version,status,revision,published_at) VALUES(3,'R2','另一产品工艺',1,'PUBLISHED',0,CURRENT_TIMESTAMP)");
             jdbc.update("INSERT INTO routing_product(routing_id,material_id) VALUES(3,2),(2,1)");
             String url = "/api/production/workorder/references/routings";
@@ -46,7 +46,7 @@ class WorkOrderApplicableRoutingHttpTest {
         try (var context = MaterialIssueHttpTest.context()) {
             var mvc = MaterialIssueHttpTest.mvc(context);
             var jdbc = context.getBean(MaterialIssueHttpTest.Fixture.class).business.get("A");
-            jdbc.update("INSERT INTO material(id,code,name,unit_id,material_type,status) VALUES(2,'STAGE2','阶段产出物料',1,'ITEM','ENABLED')");
+            jdbc.update("INSERT INTO material(id,code,name,unit_id,status) VALUES(2,'STAGE2','阶段产出物料',1,'ENABLED')");
             jdbc.update("INSERT INTO routing_product(routing_id,material_id) VALUES(1,2)");
             String base = "/api/production/workorder";
             mvc.perform(get(base + "/references/routings").header("Authorization", "Bearer FULL")

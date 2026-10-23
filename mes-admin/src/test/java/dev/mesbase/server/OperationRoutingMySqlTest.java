@@ -258,7 +258,7 @@ class OperationRoutingMySqlTest {
             FactoryContext.bind(scope);
             jdbc.update("INSERT INTO unit_measure(code,name,status) VALUES(?,?,'ENABLED')", "TEST-OR-MYSQL-UOM", "TEST ONLY");
             Long unit = jdbc.queryForObject("SELECT id FROM unit_measure WHERE code=?", Long.class, "TEST-OR-MYSQL-UOM");
-            jdbc.update("INSERT INTO material(code,name,unit_id,material_type,status) VALUES(?,?,?,'PRODUCT','ENABLED')", "TEST-OR-MYSQL-PRODUCT", "TEST ONLY", unit);
+            jdbc.update("INSERT INTO material(code,name,unit_id,status) VALUES(?,?,?,'ENABLED')", "TEST-OR-MYSQL-PRODUCT", "TEST ONLY", unit);
             var operations = context.getBean(IOperationService.class);
             var routes = context.getBean(IRoutingService.class);
             var coordinator = context.getBean(SyncCoordinator.class);

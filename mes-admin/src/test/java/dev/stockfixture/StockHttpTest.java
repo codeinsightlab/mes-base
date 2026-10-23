@@ -1,4 +1,5 @@
 package dev.stockfixture;
+
 import com.github.pagehelper.PageInterceptor;
 import dev.mesbase.business.wm.service.WarehouseQueryService;
 import dev.mesbase.business.directory.service.BusinessDirectoryService;
@@ -167,7 +168,7 @@ class StockHttpTest {
                 jdbc.execute("CREATE TABLE wm_warehouse_erp_extra(id BIGINT PRIMARY KEY,external_id VARCHAR(128),provider VARCHAR(128),binding_key VARCHAR(128),configuration_revision BIGINT)");
                 jdbc.execute("ALTER TABLE wm_inventory ADD batch_no VARCHAR(128)");
                 jdbc.execute("ALTER TABLE wm_inventory ADD bin_code VARCHAR(64)");
-                jdbc.update("INSERT INTO material(id,code,name,unit_id,material_type,status) VALUES(1,'M1','物料一',1,'ITEM','ENABLED')");
+                jdbc.update("INSERT INTO material(id,code,name,unit_id,status) VALUES(1,'M1','物料一',1,'ENABLED')");
                 String documentDdl = Files.readString(Path.of("mes-admin/src/main/resources/db/business/V38__local_stock_documents.sql"));
                 documentDdl = documentDdl.substring(documentDdl.indexOf("CREATE TABLE wm_stock_document_line"))
                         .replace(") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT=", ") COMMENT ");

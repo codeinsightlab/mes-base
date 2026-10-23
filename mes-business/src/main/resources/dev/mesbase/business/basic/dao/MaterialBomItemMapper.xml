@@ -1,0 +1,242 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- MES-CODEGEN: MyBatis Generator standard single-table persistence. -->
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="dev.mesbase.business.basic.dao.MaterialBomItemMapper">
+  <resultMap id="BaseResultMap" type="dev.mesbase.business.basic.domain.MaterialBomItemEntity">
+    <id column="id" jdbcType="BIGINT" property="id" />
+    <result column="bom_id" jdbcType="BIGINT" property="bomId" />
+    <result column="material_id" jdbcType="BIGINT" property="materialId" />
+    <result column="quantity" jdbcType="DECIMAL" property="quantity" />
+    <result column="unit_id" jdbcType="BIGINT" property="unitId" />
+    <result column="child_bom_id" jdbcType="BIGINT" property="childBomId" />
+    <result column="sort" jdbcType="INTEGER" property="sort" />
+  </resultMap>
+  <sql id="Example_Where_Clause">
+    <where>
+      <foreach collection="oredCriteria" item="criteria" separator="or">
+        <if test="criteria.valid">
+          <trim prefix="(" prefixOverrides="and" suffix=")">
+            <foreach collection="criteria.criteria" item="criterion">
+              <choose>
+                <when test="criterion.noValue">
+                  and ${criterion.condition}
+                </when>
+                <when test="criterion.singleValue">
+                  and ${criterion.condition} #{criterion.value}
+                </when>
+                <when test="criterion.betweenValue">
+                  and ${criterion.condition} #{criterion.value} and #{criterion.secondValue}
+                </when>
+                <when test="criterion.listValue">
+                  and ${criterion.condition}
+                  <foreach close=")" collection="criterion.value" item="listItem" open="(" separator=",">
+                    #{listItem}
+                  </foreach>
+                </when>
+              </choose>
+            </foreach>
+          </trim>
+        </if>
+      </foreach>
+    </where>
+  </sql>
+  <sql id="Update_By_Example_Where_Clause">
+    <where>
+      <foreach collection="example.oredCriteria" item="criteria" separator="or">
+        <if test="criteria.valid">
+          <trim prefix="(" prefixOverrides="and" suffix=")">
+            <foreach collection="criteria.criteria" item="criterion">
+              <choose>
+                <when test="criterion.noValue">
+                  and ${criterion.condition}
+                </when>
+                <when test="criterion.singleValue">
+                  and ${criterion.condition} #{criterion.value}
+                </when>
+                <when test="criterion.betweenValue">
+                  and ${criterion.condition} #{criterion.value} and #{criterion.secondValue}
+                </when>
+                <when test="criterion.listValue">
+                  and ${criterion.condition}
+                  <foreach close=")" collection="criterion.value" item="listItem" open="(" separator=",">
+                    #{listItem}
+                  </foreach>
+                </when>
+              </choose>
+            </foreach>
+          </trim>
+        </if>
+      </foreach>
+    </where>
+  </sql>
+  <sql id="Base_Column_List">
+    id, bom_id, material_id, quantity, unit_id, child_bom_id, sort
+  </sql>
+  <select id="selectByExample" parameterType="dev.mesbase.business.basic.domain.MaterialBomItemExample" resultMap="BaseResultMap">
+    select
+    <include refid="Base_Column_List" />
+    from material_bom_item
+    <if test="_parameter != null">
+      <include refid="Example_Where_Clause" />
+    </if>
+    <if test="orderByClause != null">
+      order by ${orderByClause}
+    </if>
+  </select>
+  <select id="selectByPrimaryKey" parameterType="Long" resultMap="BaseResultMap">
+    select
+    <include refid="Base_Column_List" />
+    from material_bom_item
+    where id = #{id,jdbcType=BIGINT}
+  </select>
+  <delete id="deleteByPrimaryKey" parameterType="Long">
+    delete from material_bom_item
+    where id = #{id,jdbcType=BIGINT}
+  </delete>
+  <delete id="deleteByExample" parameterType="dev.mesbase.business.basic.domain.MaterialBomItemExample">
+    delete from material_bom_item
+    <if test="_parameter != null">
+      <include refid="Example_Where_Clause" />
+    </if>
+  </delete>
+  <insert id="insert" keyColumn="id" keyProperty="id" parameterType="dev.mesbase.business.basic.domain.MaterialBomItemEntity" useGeneratedKeys="true">
+    insert into material_bom_item (bom_id, material_id, quantity,
+      unit_id, child_bom_id, sort
+      )
+    values (#{bomId,jdbcType=BIGINT}, #{materialId,jdbcType=BIGINT}, #{quantity,jdbcType=DECIMAL},
+      #{unitId,jdbcType=BIGINT}, #{childBomId,jdbcType=BIGINT}, #{sort,jdbcType=INTEGER}
+      )
+  </insert>
+  <insert id="insertSelective" keyColumn="id" keyProperty="id" parameterType="dev.mesbase.business.basic.domain.MaterialBomItemEntity" useGeneratedKeys="true">
+    insert into material_bom_item
+    <trim prefix="(" suffix=")" suffixOverrides=",">
+      <if test="bomId != null">
+        bom_id,
+      </if>
+      <if test="materialId != null">
+        material_id,
+      </if>
+      <if test="quantity != null">
+        quantity,
+      </if>
+      <if test="unitId != null">
+        unit_id,
+      </if>
+      <if test="childBomId != null">
+        child_bom_id,
+      </if>
+      <if test="sort != null">
+        sort,
+      </if>
+    </trim>
+    <trim prefix="values (" suffix=")" suffixOverrides=",">
+      <if test="bomId != null">
+        #{bomId,jdbcType=BIGINT},
+      </if>
+      <if test="materialId != null">
+        #{materialId,jdbcType=BIGINT},
+      </if>
+      <if test="quantity != null">
+        #{quantity,jdbcType=DECIMAL},
+      </if>
+      <if test="unitId != null">
+        #{unitId,jdbcType=BIGINT},
+      </if>
+      <if test="childBomId != null">
+        #{childBomId,jdbcType=BIGINT},
+      </if>
+      <if test="sort != null">
+        #{sort,jdbcType=INTEGER},
+      </if>
+    </trim>
+  </insert>
+  <select id="countByExample" parameterType="dev.mesbase.business.basic.domain.MaterialBomItemExample" resultType="java.lang.Long">
+    select count(*) from material_bom_item
+    <if test="_parameter != null">
+      <include refid="Example_Where_Clause" />
+    </if>
+  </select>
+  <update id="updateByExampleSelective" parameterType="map">
+    update material_bom_item
+    <set>
+      <if test="row.id != null">
+        id = #{row.id,jdbcType=BIGINT},
+      </if>
+      <if test="row.bomId != null">
+        bom_id = #{row.bomId,jdbcType=BIGINT},
+      </if>
+      <if test="row.materialId != null">
+        material_id = #{row.materialId,jdbcType=BIGINT},
+      </if>
+      <if test="row.quantity != null">
+        quantity = #{row.quantity,jdbcType=DECIMAL},
+      </if>
+      <if test="row.unitId != null">
+        unit_id = #{row.unitId,jdbcType=BIGINT},
+      </if>
+      <if test="row.childBomId != null">
+        child_bom_id = #{row.childBomId,jdbcType=BIGINT},
+      </if>
+      <if test="row.sort != null">
+        sort = #{row.sort,jdbcType=INTEGER},
+      </if>
+    </set>
+    <if test="example != null">
+      <include refid="Update_By_Example_Where_Clause" />
+    </if>
+  </update>
+  <update id="updateByExample" parameterType="map">
+    update material_bom_item
+    set id = #{row.id,jdbcType=BIGINT},
+      bom_id = #{row.bomId,jdbcType=BIGINT},
+      material_id = #{row.materialId,jdbcType=BIGINT},
+      quantity = #{row.quantity,jdbcType=DECIMAL},
+      unit_id = #{row.unitId,jdbcType=BIGINT},
+      child_bom_id = #{row.childBomId,jdbcType=BIGINT},
+      sort = #{row.sort,jdbcType=INTEGER}
+    <if test="example != null">
+      <include refid="Update_By_Example_Where_Clause" />
+    </if>
+  </update>
+  <update id="updateByPrimaryKeySelective" parameterType="dev.mesbase.business.basic.domain.MaterialBomItemEntity">
+    update material_bom_item
+    <set>
+      <if test="bomId != null">
+        bom_id = #{bomId,jdbcType=BIGINT},
+      </if>
+      <if test="materialId != null">
+        material_id = #{materialId,jdbcType=BIGINT},
+      </if>
+      <if test="quantity != null">
+        quantity = #{quantity,jdbcType=DECIMAL},
+      </if>
+      <if test="unitId != null">
+        unit_id = #{unitId,jdbcType=BIGINT},
+      </if>
+      <if test="childBomId != null">
+        child_bom_id = #{childBomId,jdbcType=BIGINT},
+      </if>
+      <if test="sort != null">
+        sort = #{sort,jdbcType=INTEGER},
+      </if>
+    </set>
+    where id = #{id,jdbcType=BIGINT}
+  </update>
+  <update id="updateByPrimaryKey" parameterType="dev.mesbase.business.basic.domain.MaterialBomItemEntity">
+    update material_bom_item
+    set bom_id = #{bomId,jdbcType=BIGINT},
+      material_id = #{materialId,jdbcType=BIGINT},
+      quantity = #{quantity,jdbcType=DECIMAL},
+      unit_id = #{unitId,jdbcType=BIGINT},
+      child_bom_id = #{childBomId,jdbcType=BIGINT},
+      sort = #{sort,jdbcType=INTEGER}
+    where id = #{id,jdbcType=BIGINT}
+  </update>
+  <select flushCache="true" id="selectByPrimaryKeyForUpdate" parameterType="Long" resultMap="BaseResultMap" useCache="false">
+    select
+    <include refid="Base_Column_List" />
+    from material_bom_item
+    where id = #{id,jdbcType=BIGINT}
+    for update
+  </select>
+</mapper>

@@ -8,7 +8,6 @@
     <result column="specification" jdbcType="VARCHAR" property="specification" />
     <result column="category_id" jdbcType="BIGINT" property="categoryId" />
     <result column="unit_id" jdbcType="BIGINT" property="unitId" />
-    <result column="material_type" jdbcType="VARCHAR" property="materialType" />
     <result column="status" jdbcType="VARCHAR" property="status" />
     <result column="external_id" jdbcType="VARCHAR" property="externalId" />
     <result column="external_code" jdbcType="VARCHAR" property="externalCode" />
@@ -72,8 +71,7 @@
     </where>
   </sql>
   <sql id="Base_Column_List">
-    id, code, name, specification, category_id, unit_id, material_type, status, external_id, 
-    external_code
+    id, code, name, specification, category_id, unit_id, status, external_id, external_code
   </sql>
   <select id="selectByExample" parameterType="dev.mesbase.business.basic.domain.MaterialExample" resultMap="BaseResultMap">
     select
@@ -87,17 +85,10 @@
     </if>
   </select>
   <select id="selectByPrimaryKey" parameterType="Long" resultMap="BaseResultMap">
-    select 
-    <include refid="Base_Column_List" />
-    from material
-    where id = #{id,jdbcType=BIGINT}
-  </select>
-  <select id="selectByPrimaryKeyForUpdate" flushCache="true" useCache="false" parameterType="Long" resultMap="BaseResultMap">
     select
     <include refid="Base_Column_List" />
     from material
     where id = #{id,jdbcType=BIGINT}
-    for update
   </select>
   <delete id="deleteByPrimaryKey" parameterType="Long">
     delete from material
@@ -110,14 +101,12 @@
     </if>
   </delete>
   <insert id="insert" keyColumn="id" keyProperty="id" parameterType="dev.mesbase.business.basic.domain.MaterialEntity" useGeneratedKeys="true">
-    insert into material (code, name, specification, 
-      category_id, unit_id, material_type, 
-      status, external_id, external_code
-      )
-    values (#{code,jdbcType=VARCHAR}, #{name,jdbcType=VARCHAR}, #{specification,jdbcType=VARCHAR}, 
-      #{categoryId,jdbcType=BIGINT}, #{unitId,jdbcType=BIGINT}, #{materialType,jdbcType=VARCHAR}, 
-      #{status,jdbcType=VARCHAR}, #{externalId,jdbcType=VARCHAR}, #{externalCode,jdbcType=VARCHAR}
-      )
+    insert into material (code, name, specification,
+      category_id, unit_id, status,
+      external_id, external_code)
+    values (#{code,jdbcType=VARCHAR}, #{name,jdbcType=VARCHAR}, #{specification,jdbcType=VARCHAR},
+      #{categoryId,jdbcType=BIGINT}, #{unitId,jdbcType=BIGINT}, #{status,jdbcType=VARCHAR},
+      #{externalId,jdbcType=VARCHAR}, #{externalCode,jdbcType=VARCHAR})
   </insert>
   <insert id="insertSelective" keyColumn="id" keyProperty="id" parameterType="dev.mesbase.business.basic.domain.MaterialEntity" useGeneratedKeys="true">
     insert into material
@@ -136,9 +125,6 @@
       </if>
       <if test="unitId != null">
         unit_id,
-      </if>
-      <if test="materialType != null">
-        material_type,
       </if>
       <if test="status != null">
         status,
@@ -165,9 +151,6 @@
       </if>
       <if test="unitId != null">
         #{unitId,jdbcType=BIGINT},
-      </if>
-      <if test="materialType != null">
-        #{materialType,jdbcType=VARCHAR},
       </if>
       <if test="status != null">
         #{status,jdbcType=VARCHAR},
@@ -207,9 +190,6 @@
       <if test="row.unitId != null">
         unit_id = #{row.unitId,jdbcType=BIGINT},
       </if>
-      <if test="row.materialType != null">
-        material_type = #{row.materialType,jdbcType=VARCHAR},
-      </if>
       <if test="row.status != null">
         status = #{row.status,jdbcType=VARCHAR},
       </if>
@@ -232,7 +212,6 @@
       specification = #{row.specification,jdbcType=VARCHAR},
       category_id = #{row.categoryId,jdbcType=BIGINT},
       unit_id = #{row.unitId,jdbcType=BIGINT},
-      material_type = #{row.materialType,jdbcType=VARCHAR},
       status = #{row.status,jdbcType=VARCHAR},
       external_id = #{row.externalId,jdbcType=VARCHAR},
       external_code = #{row.externalCode,jdbcType=VARCHAR}
@@ -258,9 +237,6 @@
       <if test="unitId != null">
         unit_id = #{unitId,jdbcType=BIGINT},
       </if>
-      <if test="materialType != null">
-        material_type = #{materialType,jdbcType=VARCHAR},
-      </if>
       <if test="status != null">
         status = #{status,jdbcType=VARCHAR},
       </if>
@@ -280,10 +256,16 @@
       specification = #{specification,jdbcType=VARCHAR},
       category_id = #{categoryId,jdbcType=BIGINT},
       unit_id = #{unitId,jdbcType=BIGINT},
-      material_type = #{materialType,jdbcType=VARCHAR},
       status = #{status,jdbcType=VARCHAR},
       external_id = #{externalId,jdbcType=VARCHAR},
       external_code = #{externalCode,jdbcType=VARCHAR}
     where id = #{id,jdbcType=BIGINT}
   </update>
+  <select flushCache="true" id="selectByPrimaryKeyForUpdate" parameterType="Long" resultMap="BaseResultMap" useCache="false">
+    select
+    <include refid="Base_Column_List" />
+    from material
+    where id = #{id,jdbcType=BIGINT}
+    for update
+  </select>
 </mapper>
