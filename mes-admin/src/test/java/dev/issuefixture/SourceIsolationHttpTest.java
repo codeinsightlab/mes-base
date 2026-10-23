@@ -55,12 +55,12 @@ class SourceIsolationHttpTest {
             var m = MaterialIssueHttpTest.mvc(c);
             var j = ProductionInputHttpTest.db(c);
             j.update("UPDATE wm_warehouse SET source='EXTERNAL' WHERE id=1");
-            m.perform(ProductionCoreV1HttpTest.full(get("/api/production/input/calculate")).param("code", "M1#L001")
+            m.perform(ProductionCoreV1HttpTest.full(get("/api/production/input/calculate")).param("code", "WO1:M1#L001")
                             .param("workorderId", "1").param("stockReference", "1").param("outputQty", "1"))
                     .andExpect(status().isConflict())
                     .andExpect(jsonPath("errorCode").value("BUSINESS_SOURCE_CONFLICT"));
             j.update("UPDATE workorder SET source=NULL WHERE id=1");
-            m.perform(ProductionCoreV1HttpTest.full(get("/api/production/input/calculate")).param("code", "M1#L001")
+            m.perform(ProductionCoreV1HttpTest.full(get("/api/production/input/calculate")).param("code", "WO1:M1#L001")
                             .param("workorderId", "1").param("stockReference", "1").param("outputQty", "1"))
                     .andExpect(status().isConflict())
                     .andExpect(jsonPath("errorCode").value("BUSINESS_SOURCE_CONFLICT"));

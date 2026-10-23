@@ -49,8 +49,8 @@ public class MesProductionExecutionServiceImpl implements IMesProductionExecutio
         ParameterChecks.paging(offset, limit, 100);
         MesProductionExecutionExample example = new MesProductionExecutionExample();
         MesProductionExecutionExample.Criteria criteria = example.createCriteria();
-        if (query.executionNo() != null) {
-            criteria.andExecutionNoLike("%" + query.executionNo() + "%");
+        if (query.id() != null) {
+            criteria.andIdEqualTo(query.id());
         }
         if (query.workorderId() != null) {
             criteria.andWorkorderIdEqualTo(query.workorderId());
@@ -108,9 +108,6 @@ public class MesProductionExecutionServiceImpl implements IMesProductionExecutio
         if (mapper.insert(row) != 1) {
             throw new FoundationException(ErrorCode.RESOURCE_CONFLICT);
         }
-        // The temporary number is unobservable outside this transaction. Final number is PK-derived.
-        row.setExecutionNo("EXE-" + row.getId());
-        if (mapper.updateByPrimaryKey(row) != 1) throw new FoundationException(ErrorCode.RESOURCE_CONFLICT);
         return requireRecord(row.getId());
     }
 
@@ -122,7 +119,6 @@ public class MesProductionExecutionServiceImpl implements IMesProductionExecutio
         MesProductionExecutionEntity previous = rules.lock(id);
         MesProductionExecutionEntity row = new MesProductionExecutionEntity();
         row.setId(id);
-        row.setExecutionNo(previous.getExecutionNo());
         row.setProductId(previous.getProductId());
         row.setBatchNo(previous.getBatchNo());
         row.setCreateBy(previous.getCreateBy());

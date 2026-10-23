@@ -112,7 +112,6 @@ class OperatorAssignmentMySqlTest {
             // Work only on a copied synthetic execution; existing domain records remain untouched.
             var original = executions.selectByPrimaryKey(executionId);
             var synthetic = new MesProductionExecutionEntity();
-            synthetic.setExecutionNo(tag);
             synthetic.setWorkorderId(original.getWorkorderId());
             synthetic.setProductId(original.getProductId());
             synthetic.setRoutingId(original.getRoutingId());

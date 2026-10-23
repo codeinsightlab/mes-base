@@ -8,6 +8,7 @@ import dev.mesbase.business.basic.dao.MaterialMapper;
 import dev.mesbase.business.production.dao.RoutingMapper;
 import dev.mesbase.business.production.service.ProductionIdentityService;
 import dev.mesbase.business.production.domain.ProductionScanCode;
+import dev.mesbase.business.production.domain.ProductionCodeRules;
 import dev.mesbase.business.quality.dao.ProductionDefectListExtraMapper;
 import dev.mesbase.business.wm.dao.StockDocumentExtraMapper;
 import java.util.ArrayList;
@@ -54,6 +55,10 @@ class InboundClosureSqlMySqlTest {
                 assertEquals(1, columns.getInt(1),
                         "The mes_base_dev_perf_test database needs the existing V48.1 quality schema upgrade before current queries; this test never migrates it");
             }
+            try (var schema = connection.prepareStatement("SELECT COUNT(*) FROM information_schema.columns WHERE table_schema=DATABASE() AND table_name='mes_production_execution' AND column_name='execution_no'"); var columns = schema.executeQuery()) {
+                assertTrue(columns.next());
+                assertEquals(0, columns.getInt(1), "Current execution mappings require formal V54");
+            }
             var orders = new ArrayList<Long>();
             var executions = new ArrayList<Long>();
             try (var select = connection.prepareStatement(
@@ -69,9 +74,9 @@ class InboundClosureSqlMySqlTest {
                     session.getMapper(WorkorderMapper.class), session.getMapper(MaterialMapper.class),
                     session.getMapper(RoutingMapper.class));
             for (Long execution : executions) {
-                var identity = identities.resolve("EXE:" + execution);
+                var identity = identities.read(execution);
                 assertNotNull(identity.batchNo(), "Current verified samples have formal execution batch properties");
-                String code = new ProductionScanCode(identity.workorderCode(), identity.productCode(), identity.batchNo()).encode();
+                String code = ProductionCodeRules.format(new ProductionScanCode(identity.workorderCode(), identity.productCode(), identity.batchNo()));
                 assertEquals(identity, identities.resolve(code));
                 var inbound = session.getMapper(StockDocumentExtraMapper.class);
                 assertNotNull(inbound.formalProductionInbound(execution));

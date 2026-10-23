@@ -109,7 +109,7 @@ class WorkOrderCancellationHttpTest {
             m.perform(ProductionCoreV1HttpTest.full(post(ProductionCoreV1HttpTest.E))
                             .content(ProductionCoreV1HttpTest.EXEC)).andExpect(status().isConflict())
                     .andExpect(jsonPath("errorCode").value("WORKORDER_CANCELLED"));
-            m.perform(ProductionCoreV1HttpTest.full(get("/api/production/input/calculate")).param("code", "M1#L001")
+            m.perform(ProductionCoreV1HttpTest.full(get("/api/production/input/calculate")).param("code", "WO1:M1#L001")
                             .param("workorderId", "1").param("stockReference", "1").param("outputQty", "1"))
                     .andExpect(status().isConflict()).andExpect(jsonPath("errorCode").value("WORKORDER_CANCELLED"));
             m.perform(ProductionCoreV1HttpTest.full(post(ProductionCoreV1HttpTest.H))

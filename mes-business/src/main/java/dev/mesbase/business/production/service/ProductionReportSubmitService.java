@@ -74,8 +74,8 @@ public class ProductionReportSubmitService {
     }
 
     @Transactional(transactionManager = "businessTransactionManager", readOnly = true, isolation = Isolation.READ_COMMITTED)
-    public Context context(String code) {
-        var identity = identities.resolve(code);
+    public Context context(Long executionId) {
+        var identity = identities.read(executionId);
         var execution = executions.selectByPrimaryKey(identity.executionId());
         var order = orders.selectByPrimaryKey(identity.workorderId());
         var quantity = quantities.getExecutionQuantities(identity.executionId());

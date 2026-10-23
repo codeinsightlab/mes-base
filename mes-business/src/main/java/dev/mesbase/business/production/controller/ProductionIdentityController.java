@@ -8,6 +8,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
@@ -18,6 +19,12 @@ public class ProductionIdentityController {
 
     public ProductionIdentityController(ProductionIdentityService service) {
         this.service = service;
+    }
+
+    @GetMapping("/{executionId}")
+    @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED, permission = MesProductionExecutionPermissions.QUERY)
+    public ProductionIdentityVo read(@PathVariable Long executionId) {
+        return BeanConversions.convert(service.read(executionId), ProductionIdentityVo.class);
     }
 
     @GetMapping

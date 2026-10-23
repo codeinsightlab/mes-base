@@ -36,14 +36,14 @@ public final class ProductionReportViews {
                        boolean historicalConflict, String positiveReportBlockReason) {
     }
 
-    public record Execution(String executionId, String workorderId, String executionNo, String routingId,
+    public record Execution(String executionId, String workorderId, String routingId,
                             String targetQty,
                             String pathStatus, boolean writable, String boundary, List<Node> nodes,
                             String routingLabel, String productionInputQty, String confirmedInputQty,
                             String reservedInputQty, boolean historical) {
     }
 
-    public record Summary(String executionId, String workorderId, String executionNo, String routingId,
+    public record Summary(String executionId, String workorderId, String routingId,
                           String targetQty,
                           String pathStatus, String lastNodeReportedQty, String routingLabel,
                           String productionInputQty) {
@@ -62,7 +62,7 @@ public final class ProductionReportViews {
     }
 
     public static Execution execution(ExecutionQuantity v) {
-        return new Execution(id(v.executionId()), id(v.workorderId()), v.executionNo(), id(v.routingId()), decimal(v.targetQty()),
+        return new Execution(id(v.executionId()), id(v.workorderId()), id(v.routingId()), decimal(v.targetQty()),
                 v.pathStatus(), v.writable(), v.boundary(), v.nodes().stream()
                 .map(n -> node(n, ProductionQuantityService.positiveReportBlockReason(v, n.routingNodeId())))
                 .toList(), v.routingLabel(), decimal(v.productionInputQty()), decimal(v.confirmedInputQty()), decimal(v.reservedInputQty()), v.historical());
@@ -78,7 +78,7 @@ public final class ProductionReportViews {
     }
 
     public static Summary summary(ExecutionSummary e, String routingLabel) {
-        return new Summary(id(e.executionId()), id(e.workorderId()), e.executionNo(), id(e.routingId()), decimal(e.targetQty()), e.pathStatus(), decimal(e.lastNodeReportedQty()), routingLabel, decimal(e.productionInputQty()));
+        return new Summary(id(e.executionId()), id(e.workorderId()), id(e.routingId()), decimal(e.targetQty()), e.pathStatus(), decimal(e.lastNodeReportedQty()), routingLabel, decimal(e.productionInputQty()));
     }
 
     public static String id(Long value) {

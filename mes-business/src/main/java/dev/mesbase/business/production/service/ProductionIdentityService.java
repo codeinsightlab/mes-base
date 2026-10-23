@@ -9,6 +9,7 @@ import dev.mesbase.business.production.domain.MesProductionExecutionEntity;
 import dev.mesbase.business.production.domain.MesProductionExecutionExample;
 import dev.mesbase.business.production.domain.ProductionIdentity;
 import dev.mesbase.business.production.domain.ProductionScanCode;
+import dev.mesbase.business.production.domain.ProductionCodeRules;
 import dev.mesbase.business.production.domain.WorkorderEntity;
 import dev.mesbase.business.production.domain.WorkorderExample;
 import dev.mesbase.common.utils.StringUtils;
@@ -41,28 +42,42 @@ public class ProductionIdentityService {
 
     @Transactional(transactionManager = "businessTransactionManager", readOnly = true)
     public ProductionIdentity resolve(String code) {
-        MesProductionExecutionEntity execution;
-        if (code != null && code.startsWith("EXE:") && code.indexOf('#') < 0) {
-            execution = executions.selectByPrimaryKey(parse(code));
-        } else {
-            var scanned = ProductionScanCode.parse(code);
-            var order = orderByExactCode(scanned.workorderCode());
-            var product = products.selectByPrimaryKey(order.getProductId());
-            if (product == null || !scanned.productCode().equals(product.getCode()))
-                throw new FoundationException(ErrorCode.EXECUTION_NOT_FOUND);
-            execution = findExecution(order.getId(), product.getId(), scanned.batchNo());
-        }
+        var scanned = ProductionCodeRules.parse(code);
+        var order = requireOrder(scanned);
+        var execution = findExecution(order.getId(), order.getProductId(), scanned.batchNo());
         if (execution == null) throw new FoundationException(ErrorCode.EXECUTION_NOT_FOUND);
+        return identity(execution);
+    }
+
+    @Transactional(transactionManager = "businessTransactionManager", readOnly = true)
+    public ProductionIdentity read(Long executionId) {
+        if (executionId == null) throw new FoundationException(ErrorCode.BAD_REQUEST);
+        var execution = executions.selectByPrimaryKey(executionId);
+        if (execution == null) throw new FoundationException(ErrorCode.EXECUTION_NOT_FOUND);
+        return identity(execution);
+    }
+
+    @Transactional(transactionManager = "businessTransactionManager", readOnly = true)
+    public WorkorderEntity requireOrder(ProductionScanCode scanned) {
+        ProductionCodeRules.validate(scanned);
+        var order = orderByExactCode(scanned.workorderCode());
+        var product = products.selectByPrimaryKey(order.getProductId());
+        if (product == null || !scanned.productCode().equals(product.getCode()))
+            throw new FoundationException(ErrorCode.EXECUTION_NOT_FOUND);
+        return order;
+    }
+
+    private ProductionIdentity identity(MesProductionExecutionEntity execution) {
         var workorder = workorders.selectByPrimaryKey(execution.getWorkorderId());
         var product = products.selectByPrimaryKey(execution.getProductId());
         var routing = routings.selectByPrimaryKey(execution.getRoutingId());
         if (workorder == null || product == null || routing == null || routing.getPublishedAt() == null
                 || !Objects.equals(workorder.getProductId(), execution.getProductId()))
             throw new FoundationException(ErrorCode.EXECUTION_INVALID);
-        String outputCode = "EXE:" + execution.getId();
+        String outputCode = null;
         if (execution.getBatchNo() != null)
-            outputCode = new ProductionScanCode(workorder.getCode(), product.getCode(), execution.getBatchNo()).encode();
-        return new ProductionIdentity(execution.getId(), execution.getExecutionNo(), outputCode,
+            outputCode = ProductionCodeRules.format(new ProductionScanCode(workorder.getCode(), product.getCode(), execution.getBatchNo()));
+        return new ProductionIdentity(execution.getId(), outputCode,
                 workorder.getId(), workorder.getCode(), product.getId(), product.getCode(), product.getName(),
                 routing.getId(), routing.getCode(), routing.getVersion(), execution.getStatus(), execution.getTargetQty(),
                 execution.getBatchNo());
@@ -134,13 +149,4 @@ public class ProductionIdentityService {
         return execution.getBatchNo();
     }
 
-    public static Long parse(String code) {
-        if (code == null || !code.matches("EXE:[1-9][0-9]{0,18}"))
-            throw new FoundationException(ErrorCode.EXECUTION_QR_INVALID);
-        try {
-            return Long.valueOf(code.substring(4));
-        } catch (NumberFormatException failure) {
-            throw new FoundationException(ErrorCode.EXECUTION_QR_INVALID, failure);
-        }
-    }
 }

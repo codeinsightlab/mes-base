@@ -9,5 +9,5 @@ import dev.mesbase.business.integration.production.ProductionSupply.Context;
 public interface ProductionErpAdapter {
     boolean supports(FactoryScope scope, String bindingKey);
 
-    Context query(FactoryScope scope, String bindingKey, String materialCode, String lotCode);
+    Context query(FactoryScope scope, String bindingKey, String workorderCode, String productCode, String batchNo);
 }

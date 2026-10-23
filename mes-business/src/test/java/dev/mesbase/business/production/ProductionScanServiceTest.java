@@ -51,7 +51,7 @@ class ProductionScanServiceTest {
     private final MesProductionScanActivityMapper activities = mock(MesProductionScanActivityMapper.class);
     private final PlatformTransactionManager manager = mock(PlatformTransactionManager.class);
     private final FactoryScope scope = new FactoryScope(new FactoryId("A"));
-    private final ProductionIdentity identity = new ProductionIdentity(9007199254740993L, "EX-1", "WO-1:000P#000LOT",
+    private final ProductionIdentity identity = new ProductionIdentity(9007199254740993L, "WO-1:000P#000LOT",
             1L, "WO-1", 2L, "000P", "产品", 3L, "R1", 1, "RUNNING", new BigDecimal("100.000000"), "000LOT");
     private MockedStatic<SecurityUtils> security;
     private ProductionScanService service;

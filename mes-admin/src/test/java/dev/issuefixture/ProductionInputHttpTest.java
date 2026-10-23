@@ -1,5 +1,7 @@
 package dev.issuefixture;
 
+import dev.mesbase.common.utils.RequestFingerprint;
+
 import dev.mesbase.acceptance.FactorySnapshotFixture;
 
 import tools.jackson.databind.node.ObjectNode;
@@ -15,6 +17,7 @@ import dev.mesbase.business.production.service.ProductionInputService;
 import dev.mesbase.business.production.service.ProductionInputSupplyService;
 import dev.mesbase.business.production.service.IRoutingService;
 import dev.mesbase.business.production.domain.ProductionScanCode;
+import dev.mesbase.business.production.domain.ProductionCodeRules;
 import java.math.BigDecimal;
 import java.util.Map;
 import java.util.HashMap;
@@ -91,12 +94,12 @@ class ProductionInputHttpTest {
 
     static String command(MockMvc m, String request, String lot, String qty) throws Exception {
         String stock = lot.equals("L001") ? "1" : "2";
-        var calc = m.perform(ProductionCoreV1HttpTest.full(get(ROOT + "/calculate")).param("code", "M1#" + lot)
+        var calc = m.perform(ProductionCoreV1HttpTest.full(get(ROOT + "/calculate")).param("code", "WO1:M1#" + lot)
                         .param("workorderId", "1").param("stockReference", stock).param("outputQty", qty))
                 .andExpect(status().isOk()).andReturn();
         String key = new ObjectMapper().readTree(calc.getResponse().getContentAsString()).get("calculationKey")
                 .asText();
-        return new ObjectMapper().writeValueAsString(Map.of("requestId", request, "code", "M1#" + lot, "workorderId", "1", "stockReference", stock, "outputQty", qty, "routingId", "1", "routingNodeIds", List.of("11", "12", "13"), "inputKind", "PRODUCTION_INPUT", "calculationKey", key));
+        return new ObjectMapper().writeValueAsString(Map.of("requestId", request, "code", "WO1:M1#" + lot, "workorderId", "1", "stockReference", stock, "outputQty", qty, "routingId", "1", "routingNodeIds", List.of("11", "12", "13"), "inputKind", "PRODUCTION_INPUT", "calculationKey", key));
     }
 
     static String submit(MockMvc mvc, String body) throws Exception {
@@ -126,7 +129,7 @@ class ProductionInputHttpTest {
         try (var c = context()) {
             var m = MaterialIssueHttpTest.mvc(c);
             var j = db(c);
-            m.perform(ProductionCoreV1HttpTest.full(get(ROOT)).param("code", "M1#L001")).andExpect(status().isOk())
+            m.perform(ProductionCoreV1HttpTest.full(get(ROOT)).param("code", "WO1:M1#L001")).andExpect(status().isOk())
                     .andExpect(jsonPath("sourceMode").value("LOCAL_ONLY"))
                     .andExpect(jsonPath("stocks[0].availableQty").value("10000.0000"));
             String request = UUID.randomUUID().toString(), body = command(m, request, "L001", "100");
@@ -264,12 +267,14 @@ class ProductionInputHttpTest {
                             "mes.production.input.factories.A.workorders.3.work-center", "TEST-CENTER",
                             "mes.production.input.factories.A.workorders.3.warehouse-ids", "1")));
             var conflictingCalculation = m.perform(ProductionCoreV1HttpTest.full(get(ROOT + "/calculate"))
-                            .param("code", "M1#L001").param("workorderId", "3").param("stockReference", "1")
+                            .param("code", "TEST_SAME_PRODUCT_OTHER_ORDER:M1#L001").param("workorderId", "3")
+                            .param("stockReference", "1")
                             .param("outputQty", "100"))
                     .andExpect(status().isOk()).andReturn();
             var conflict = (ObjectNode) new ObjectMapper().readTree(body).deepCopy();
             conflict.put("requestId", UUID.randomUUID().toString());
             conflict.put("workorderId", "3");
+            conflict.put("code", "TEST_SAME_PRODUCT_OTHER_ORDER:M1#L001");
             conflict.put("calculationKey", new ObjectMapper().readTree(conflictingCalculation.getResponse()
                     .getContentAsString()).get("calculationKey").asText());
             m.perform(ProductionCoreV1HttpTest.full(post(ROOT)).content(conflict.toString()))
@@ -283,12 +288,14 @@ class ProductionInputHttpTest {
                     .addFirst(new MapPropertySource("TEST ONLY second product recipe", Map.of(
                             "mes.production.input.factories.A.workorders.2.material-id", "1", "mes.production.input.factories.A.workorders.2.total-required-qty", "2000",
                             "mes.production.input.factories.A.workorders.2.work-center", "TEST-CENTER", "mes.production.input.factories.A.workorders.2.warehouse-ids", "1")));
-            var calc = m.perform(ProductionCoreV1HttpTest.full(get(ROOT + "/calculate")).param("code", "M1#L001")
+            var calc = m.perform(ProductionCoreV1HttpTest.full(get(ROOT + "/calculate"))
+                            .param("code", "TEST_WO2:P2#L001")
                             .param("workorderId", "2").param("stockReference", "1").param("outputQty", "50"))
                     .andExpect(status().isOk()).andReturn();
             var payload = (ObjectNode) new ObjectMapper().readTree(body).deepCopy();
             payload.put("requestId", UUID.randomUUID().toString());
             payload.put("workorderId", "2");
+            payload.put("code", "TEST_WO2:P2#L001");
             payload.put("outputQty", "50");
             payload.put("calculationKey", new ObjectMapper().readTree(calc.getResponse().getContentAsString())
                     .get("calculationKey").asText());
@@ -315,14 +322,14 @@ class ProductionInputHttpTest {
             var legacy = (ObjectNode) json.readTree(body);
             legacy.put("code", "MES1.TTE.TTE.TDAwMQ");
             var original = json.treeToValue(legacy, ProductionInputService.Command.class);
-            String fingerprint = ProductionScanCode.digest(json.writeValueAsString(original));
+            String fingerprint = RequestFingerprint.sha256(json.writeValueAsString(original));
             // TEST ONLY frozen pre-upgrade request, deliberately without a business batch. No mapping is consulted.
             j.update("UPDATE mes_material_issue_input SET request_hash=? WHERE id=?", fingerprint, original.requestId());
             j.update("UPDATE mes_production_execution SET batch_no=NULL WHERE id=?", first.get("executionId").asText());
             m.perform(ProductionCoreV1HttpTest.full(post(ROOT)).content(legacy.toString()))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("executionId").value(first.get("executionId").asText()))
-                    .andExpect(jsonPath("code").value("EXE:" + first.get("executionId").asText()));
+                    .andExpect(jsonPath("code").isEmpty());
             assertEquals(1, j.queryForObject("SELECT COUNT(*) FROM mes_material_issue_input WHERE issue_id>0", Integer.class));
             assertEquals(0, new BigDecimal("9800").compareTo(j.queryForObject("SELECT quantity FROM wm_inventory WHERE id=1", BigDecimal.class)));
             legacy.put("requestId", UUID.randomUUID().toString());
@@ -344,57 +351,34 @@ class ProductionInputHttpTest {
                     .andExpect(status().isOk()).andExpect(jsonPath("batchNo").value("L001"))
                     .andExpect(jsonPath("identityType").doesNotExist());
             m.perform(ProductionCoreV1HttpTest.full(get("/api/production/identity"))
-                            .param("code", new ProductionScanCode("wo1", "M1", "L001").encode()))
+                            .param("code", ProductionCodeRules.format(new ProductionScanCode("wo1", "M1", "L001"))))
                     .andExpect(status().isNotFound());
             m.perform(ProductionCoreV1HttpTest.full(get("/api/production/identity"))
-                            .param("code", new ProductionScanCode("WO1", "m1", "L001").encode()))
+                            .param("code", ProductionCodeRules.format(new ProductionScanCode("WO1", "m1", "L001"))))
                     .andExpect(status().isNotFound());
             m.perform(ProductionCoreV1HttpTest.full(get("/api/production/identity"))
-                            .param("code", new ProductionScanCode("WO1", "M1", "L001 ").encode()))
+                            .param("code", ProductionCodeRules.format(new ProductionScanCode("WO1", "M1", "L001 "))))
                     .andExpect(status().isNotFound());
         }
     }
 
     @Test
-    void configuredCandidatesArePagedIndependentlyOfAllReleasedOrders() throws Exception {
+    void scannedWorkorderIsTheOnlyCandidateDespiteUnrelatedReleasedOrders() throws Exception {
         try (var c = context()) {
             var j = db(c);
             var m = MaterialIssueHttpTest.mvc(c);
-            for (int id = 2; id <= 1000; id++)
+            for (int id = 2; id <= 101; id++)
                 j.update("INSERT INTO workorder(id,code,product_id,planned_qty,routing_id,status,revision,create_time,update_time) VALUES(?,?,1,1000,1,'RELEASED',0,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)", id, "TEST_SCALE_" + id);
-            for (int size : new int[]{99, 100, 101, 1000}) {
-                j.update("UPDATE workorder SET status=CASE WHEN id<=? THEN 'RELEASED' ELSE 'DRAFT' END", size);
-                m.perform(ProductionCoreV1HttpTest.full(get(ROOT)).param("code", "M1#L001")).andExpect(status().isOk())
-                        .andExpect(jsonPath("$.total").value(1));
-            }
-            for (int size : new int[]{0, 1, 20, 200}) {
-                var properties = new HashMap<String, Object>();
-                properties.put("mes.production.input.factories.A.workorders.1.material-id", "99");
-                for (int id = 1; id <= size; id++) {
-                    String prefix = "mes.production.input.factories.A.workorders." + id + ".";
-                    properties.put(prefix + "material-id", "1");
-                    properties.put(prefix + "total-required-qty", "20");
-                    properties.put(prefix + "warehouse-ids", "1");
-                    properties.put(prefix + "work-center", "TEST-CENTER");
-                }
-                c.getEnvironment().getPropertySources()
-                        .addFirst(new MapPropertySource("TEST candidate scale", properties));
-                var ids = new ArrayList<Long>();
-                for (int offset = 0; offset < Math.max(1, size); offset += 20) {
-                    var response = m.perform(ProductionCoreV1HttpTest.full(get(ROOT)).param("code", "M1#L001")
-                                    .param("offset", Integer.toString(offset)))
-                            .andExpect(status().isOk()).andExpect(jsonPath("$.total").value(size)).andReturn()
-                            .getResponse().getContentAsString();
-                    for (var order : new ObjectMapper().readTree(response).get("orders"))
-                        ids.add(order.get("workorderId").asLong());
-                }
-                assertEquals(size, new HashSet<>(ids).size());
-                for (int i = 0; i < size; i++) assertEquals(size - i, ids.get(i));
-                if (size == 200)
-                    m.perform(ProductionCoreV1HttpTest.full(get(ROOT + "/calculate")).param("code", "M1#L001")
-                                    .param("workorderId", "1").param("stockReference", "1").param("outputQty", "100"))
-                            .andExpect(status().isOk());
-            }
+            m.perform(ProductionCoreV1HttpTest.full(get(ROOT)).param("code", "WO1:M1#L001"))
+                    .andExpect(status().isOk()).andExpect(jsonPath("total").value(1))
+                    .andExpect(jsonPath("orders.length()").value(1))
+                    .andExpect(jsonPath("orders[0].workorderId").value("1"));
+            m.perform(ProductionCoreV1HttpTest.full(get(ROOT)).param("code", "WO1:M1#L001").param("offset", "1"))
+                    .andExpect(status().isOk()).andExpect(jsonPath("total").value(1))
+                    .andExpect(jsonPath("orders").isEmpty());
+            m.perform(ProductionCoreV1HttpTest.full(get(ROOT + "/calculate")).param("code", "WO1:M1#L001")
+                            .param("workorderId", "2").param("stockReference", "1").param("outputQty", "100"))
+                    .andExpect(status().isBadRequest());
         }
     }
 

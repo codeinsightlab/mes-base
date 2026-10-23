@@ -123,7 +123,7 @@ class ProductionReportingHttpTest {
             facts.put("affectedNodeId", "12");
             facts.put("destinationNodeId", "12");
             ProductionDefectHttpTest.add(m, declaration.toString(), "A");
-            m.perform(ProductionCoreV1HttpTest.full(get(ROOT + "/context").param("code", "EXE:1")))
+            m.perform(ProductionCoreV1HttpTest.full(get(ROOT + "/context").param("executionId", "1")))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("candidates[0].status").value("AVAILABLE"))
                     .andExpect(jsonPath("candidates[1].status").value("QUALITY_PENDING"))
@@ -140,20 +140,20 @@ class ProductionReportingHttpTest {
             var m = MaterialIssueHttpTest.mvc(c);
             var j = db(c);
             for (int i = 0; i < 2; i++)
-                m.perform(ProductionCoreV1HttpTest.full(get(ROOT + "/context").param("code", "EXE:1")))
+                m.perform(ProductionCoreV1HttpTest.full(get(ROOT + "/context").param("executionId", "1")))
                         .andExpect(status().isOk()).andExpect(jsonPath("identity.executionId").value("1"))
                         .andExpect(jsonPath("candidates[0].status").value("AVAILABLE"))
                         .andExpect(jsonPath("candidates[1].status").value("NO_QUANTITY"));
             assertEquals(0, j.queryForObject("SELECT COUNT(*) FROM mes_production_report", Integer.class));
             m.perform(get(ROOT + "/context").header("Authorization", "Bearer CRUD").header("X-Factory-Id", "A")
-                    .param("code", "EXE:1")).andExpect(status().isForbidden());
-            for (String code : List.of("exe:1", "EXE:01", "EXE:0", "ERP:1"))
-                m.perform(ProductionCoreV1HttpTest.full(get(ROOT + "/context").param("code", code)))
+                    .param("executionId", "1")).andExpect(status().isForbidden());
+            for (String code : List.of("EXE:1", "", "9223372036854775808", "ERP:1"))
+                m.perform(ProductionCoreV1HttpTest.full(get(ROOT + "/context").param("executionId", code)))
                         .andExpect(status().isBadRequest());
-            m.perform(ProductionCoreV1HttpTest.full(get(ROOT + "/context").param("code", "EXE:999")))
+            m.perform(ProductionCoreV1HttpTest.full(get(ROOT + "/context").param("executionId", "999")))
                     .andExpect(status().isNotFound());
             j.update("DELETE FROM mes_operation_user");
-            m.perform(ProductionCoreV1HttpTest.full(get(ROOT + "/context").param("code", "EXE:1")))
+            m.perform(ProductionCoreV1HttpTest.full(get(ROOT + "/context").param("executionId", "1")))
                     .andExpect(status().isOk()).andExpect(jsonPath("candidates[0].status").value("NO_CAPABILITY"));
         }
     }
@@ -341,11 +341,11 @@ class ProductionReportingHttpTest {
             for (long node : List.of(14L, 15L))
                 m.perform(ProductionCoreV1HttpTest.full(post(ROOT)).content(body(node, "1")))
                         .andExpect(status().isConflict());
-            m.perform(ProductionCoreV1HttpTest.full(get(ROOT + "/context").param("code", "EXE:1")))
+            m.perform(ProductionCoreV1HttpTest.full(get(ROOT + "/context").param("executionId", "1")))
                     .andExpect(status().isOk()).andExpect(jsonPath("quantities.nodes[2].inputQty").value("2.000000"));
-            m.perform(ProductionReportHttpTest.full(get(ROOT + "/context").param("code", "EXE:1"), "B"))
+            m.perform(ProductionReportHttpTest.full(get(ROOT + "/context").param("executionId", "1"), "B"))
                     .andExpect(status().isOk()).andExpect(jsonPath("quantities.nodes[1].inputQty").value("0"));
-            m.perform(get(ROOT + "/context").header("Authorization", "Bearer FULL").param("code", "EXE:1"))
+            m.perform(get(ROOT + "/context").header("Authorization", "Bearer FULL").param("executionId", "1"))
                     .andExpect(status().isUnprocessableEntity());
             m.perform(post(ROOT).header("Authorization", "Bearer CRUD").header("X-Factory-Id", "A")
                     .contentType("application/json").content(body(11, "1"))).andExpect(status().isForbidden());

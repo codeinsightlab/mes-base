@@ -160,7 +160,7 @@ class ProductionReportHttpTest {
         jdbc.update("INSERT INTO operation(id,code,name,status,sort,revision) VALUES(1,'O1','钻孔','ENABLED',0,0)");
         jdbc.update("INSERT INTO routing_node(id,routing_id,node_code,operation_id,operation_code,operation_name,display_order,is_key) VALUES(11,1,'A',1,'O1','首工序',99,false),(12,1,'B',1,'O1','中工序',1,false),(13,1,'C',1,'O1','末工序',0,false)");
         jdbc.update("INSERT INTO routing_edge(routing_id,from_node_id,to_node_id) VALUES(1,11,12),(1,12,13)");
-        jdbc.update("INSERT INTO mes_production_execution(id,execution_no,workorder_id,product_id,routing_id,target_qty,status) VALUES(1,'EXE-1',1,1,1,10,'READY'),(2,'EXE-2',1,1,1,10,'READY')");
+        jdbc.update("INSERT INTO mes_production_execution(id,workorder_id,product_id,routing_id,target_qty,status) VALUES(1,1,1,1,10,'READY'),(2,1,1,1,10,'READY')");
         jdbc.update("INSERT INTO mes_execution_path(id,routing_id,path_status,revision,selected_at,locked_at) VALUES(1,1,'LOCKED',1,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP),(2,1,'LOCKED',1,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)");
         jdbc.update("INSERT INTO mes_execution_path_node(execution_id,sequence_no,routing_node_id) VALUES(1,1,11),(1,2,12),(1,3,13),(2,1,11),(2,2,12),(2,3,13)");
     }

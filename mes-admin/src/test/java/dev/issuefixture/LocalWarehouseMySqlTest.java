@@ -73,6 +73,7 @@ class LocalWarehouseMySqlTest {
             long material = j.queryForObject("SELECT product_id FROM workorder WHERE id=?", Long.class, f.order());
             String code = j.queryForObject("SELECT code FROM material WHERE id=?", String.class, material);
             String lot = "TEST_WAREHOUSE_" + UUID.randomUUID();
+            String workorderCode = j.queryForObject("SELECT code FROM workorder WHERE id=?", String.class, f.order());
             String prefix = "mes.production.input.factories.SIMPLE_B.workorders." + f.order() + ".";
             c.getEnvironment().getPropertySources().addFirst(new MapPropertySource("TEST ONLY warehouse recipe", Map.of(
                     prefix + "material-id", Long.toString(material),
@@ -102,9 +103,9 @@ class LocalWarehouseMySqlTest {
                 assertThrows(FoundationException.class, () -> service.execute(StockActionType.GAIN, new StockCommand(receipt.requestId(), id, new BigDecimal("301"), receipt.expectedQuantity(), receipt.expectedAvailable(), receipt.reason(), null)));
                 var supply = c.getBean(ProductionInputSupplyService.class);
                 var production = c.getBean(ProductionInputService.class);
-                var calculation = supply.calculate(code + "#" + lot, f.order(), Long.toString(id), new BigDecimal("100"));
+                var calculation = supply.calculate(workorderCode + ":" + code + "#" + lot, f.order(), Long.toString(id), new BigDecimal("100"));
                 var issue = production.submit(new ProductionInputService.Command(UUID.randomUUID()
-                        .toString(), code + "#" + lot, f.order(), Long.toString(id), new BigDecimal("100"), f.routing(), f.selected(), "PRODUCTION_INPUT", ProductionInputSupplyService.calculationKey(calculation)));
+                        .toString(), workorderCode + ":" + code + "#" + lot, f.order(), Long.toString(id), new BigDecimal("100"), f.routing(), f.selected(), "PRODUCTION_INPUT", ProductionInputSupplyService.calculationKey(calculation)));
                 long issueId = Long.parseLong(issue.issueId());
                 balance(j, id, "600");
                 var back = command(id, "20", "600", issueId);

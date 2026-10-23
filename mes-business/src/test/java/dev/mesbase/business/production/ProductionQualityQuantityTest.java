@@ -47,7 +47,7 @@ class ProductionQualityQuantityTest {
     }
 
     static ExecutionQuantity view(List<NodeQuantity> nodes) {
-        return new ExecutionQuantity(1L, 1L, "EXE", 1L, d("100"), "LOCKED", true, null, nodes, null, d("100"), d("100"), BigDecimal.ZERO);
+        return new ExecutionQuantity(1L, 1L, 1L, d("100"), "LOCKED", true, null, nodes, null, d("100"), d("100"), BigDecimal.ZERO);
     }
 
     @ParameterizedTest
@@ -101,7 +101,7 @@ class ProductionQualityQuantityTest {
         selectedNode.setRoutingNodeId(11L);
         selectedNode.setSequenceNo(1);
         when(executions.selectByPrimaryKey(1L)).thenReturn(execution);
-        when(paths.view(1L)).thenReturn(new PathModel(1L, "READY", path, List.of(11L), List.of(node), List.of(), "EXE", null, Map.of()));
+        when(paths.view(1L)).thenReturn(new PathModel(1L, "READY", path, List.of(11L), List.of(node), List.of(), null, Map.of()));
         when(selected.selectByExample(any())).thenReturn(List.of(selectedNode));
         when(reports.nodeTotals(1L)).thenReturn(List.of(new ProductionReportModels.NodeTotal(11L, d("10")), new ProductionReportModels.NodeTotal(99L, d("999"))));
         when(quality.nodeTotals(1L)).thenReturn(List.of(new NodeTotal(11L, d("2")), new NodeTotal(99L, d("900"))));

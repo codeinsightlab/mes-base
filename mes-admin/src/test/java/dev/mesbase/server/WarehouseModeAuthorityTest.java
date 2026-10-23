@@ -64,7 +64,7 @@ class WarehouseModeAuthorityTest {
             assertThrows(FoundationException.class, () -> missing.submissionSelection(scope));
             var selection = service.submissionSelection(scope);
             assertEquals(new WarehouseIntegration.Selection(Mode.CONNECTED, "E10-A", "FROZEN-A"), selection);
-            var command = new MaterialIssueSubmitCommand(1L, "TEST", "TEST", 1L, "TEST", null, null, 1L, "TEST", 1L, "TEST", 1L, 1, List.of(1L), null, List.of(), null);
+            var command = new MaterialIssueSubmitCommand(1L, "TEST", "TEST", 1L, "TEST", null, null, 1L, 1L, "TEST", 1L, 1, List.of(1L), null, List.of(), null);
             when(adapter.createMaterialIssue(any(), any())).thenThrow(new IllegalStateException("TEST ERP unavailable"));
             assertThrows(IllegalStateException.class, () -> service.createMaterialIssue(scope, selection, command));
             verify(adapter).createMaterialIssue(scope, command);

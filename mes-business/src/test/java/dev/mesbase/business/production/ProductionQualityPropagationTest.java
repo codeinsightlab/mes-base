@@ -20,7 +20,7 @@ class ProductionQualityPropagationTest {
         var nodes = new ArrayList<NodeQuantity>();
         for (int i = 0; i < reported.length; i++)
             nodes.add(new NodeQuantity(1L, (long) i + 1, 1L, "N" + i, "TEST", i + 1, d(0), d(reported[i]), d(defects[i]), d(0), d(0), true, d(recovered[i]), d(0), d(0), d(0), d(0)));
-        return ProductionQuantityService.project(new ExecutionQuantity(1L, 1L, "EXE", 1L, d(1), "LOCKED", true, null, nodes, null, d(100), d(100), d(0)));
+        return ProductionQuantityService.project(new ExecutionQuantity(1L, 1L, 1L, d(1), "LOCKED", true, null, nodes, null, d(100), d(100), d(0)));
     }
 
     static void eq(int v, BigDecimal got) {

@@ -7,7 +7,6 @@ import java.time.LocalDateTime;
  */
 public record MesProductionExecutionVo(
         String id,
-        String executionNo,
         String workorderId,
         String productId,
         String batchNo,

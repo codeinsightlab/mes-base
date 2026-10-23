@@ -137,8 +137,7 @@ public class ProductionQuantityService {
         var historyNodes = imported ? history.nodes(executionId).stream()
                 .collect(Collectors.toMap(n -> n.routingNodeId(), n -> new HistoricalNode(n.grossCorrection(), n.effectiveDefect(), n.unverifiedLossQty()))) : null;
         if (model.path() == null)
-            return new ExecutionQuantity(executionId, execution.getWorkorderId(), execution.getExecutionNo(),
-                    execution.getRoutingId(), execution.getTargetQty(), ExecutionPathStatus.UNSELECTED.getValue(), false, "执行尚未选择实际路径", List.of(), label(model.routing()), inputQty, balance.confirmedQty(), balance.reservedQty());
+            return new ExecutionQuantity(executionId, execution.getWorkorderId(), execution.getRoutingId(), execution.getTargetQty(), ExecutionPathStatus.UNSELECTED.getValue(), false, "执行尚未选择实际路径", List.of(), label(model.routing()), inputQty, balance.confirmedQty(), balance.reservedQty());
         if (!Objects.equals(model.path().getRoutingId(), execution.getRoutingId()))
             ParameterChecks.reject(ErrorCode.REPORT_PATH_REQUIRED);
         ExecutionPathValidator.validate(model.selectedNodeIds(), model.nodes(), model.edges());
@@ -203,7 +202,7 @@ public class ProductionQuantityService {
                 : !ProductionExecutionStatus.allowsNormalReporting(execution.getStatus())
                 ? "执行已关闭或状态非法，禁止继续正常报工" : null;
         // writable describes normal forward reporting only, not historical correction authorization.
-        return new ExecutionQuantity(executionId, execution.getWorkorderId(), execution.getExecutionNo(), execution.getRoutingId(),
+        return new ExecutionQuantity(executionId, execution.getWorkorderId(), execution.getRoutingId(),
                 execution.getTargetQty(), model.path()
                 .getPathStatus(), boundary == null, boundary, List.copyOf(result), label(model.routing()), inputQty, balance.confirmedQty(), balance.reservedQty(), historical);
     }
@@ -235,8 +234,8 @@ public class ProductionQuantityService {
         if (history != null && !rows.isEmpty()) {
             var importedInputs = history.inputs(rows.stream().map(ExecutionSummary::executionId).toList()).stream()
                     .collect(Collectors.toMap(v -> v.executionId(), v -> v.quantity()));
-            rows = rows.stream().map(v -> new ExecutionSummary(v.executionId(), v.workorderId(), v.executionNo(),
-                            v.routingId(), v.targetQty(), v.pathStatus(), v.lastNodeReportedQty(),
+            rows = rows.stream()
+                    .map(v -> new ExecutionSummary(v.executionId(), v.workorderId(), v.routingId(), v.targetQty(), v.pathStatus(), v.lastNodeReportedQty(),
                             v.productionInputQty().add(importedInputs.getOrDefault(v.executionId(), BigDecimal.ZERO))))
                     .toList();
         }
@@ -322,7 +321,7 @@ public class ProductionQuantityService {
             upstream = node.routingNodeId();
         }
         if (nodeId != null && !found) ParameterChecks.reject(ErrorCode.REPORT_PATH_REQUIRED);
-        return new ExecutionQuantity(view.executionId(), view.workorderId(), view.executionNo(), view.routingId(), view.targetQty(), view.pathStatus(), view.writable(), result.stream()
+        return new ExecutionQuantity(view.executionId(), view.workorderId(), view.routingId(), view.targetQty(), view.pathStatus(), view.writable(), result.stream()
                 .anyMatch(n -> n.unverifiedDefectQty()
                         .signum() > 0) ? "存在待核实不良；从受影响工序起禁止新增正向报工，请核实质量记录，后续流转保持质量门禁" : view.boundary(), List.copyOf(result), view.routingLabel(), view.productionInputQty(), view.confirmedInputQty(), view.reservedInputQty(), view.historical());
     }

@@ -311,7 +311,13 @@ class ProductionCoreV1HttpTest {
             var v = c.getBean(Vendor.class);
             v.throwOnCreate = true;
             m.perform(full(post(H + "/1/actions/submit"))).andExpect(jsonPath("status").value("SUBMIT_UNKNOWN"));
+            String currentJson = db(c).queryForObject("SELECT command_json FROM mes_material_issue_submission WHERE issue_id=1", String.class);
+            assertFalse(currentJson.contains("executionNo"));
+            // TEST ONLY pre-change frozen payload: a removed display property must not rewrite/recreate an unknown attempt.
+            String historicalJson = "{\"executionNo\":\"EXE-1\"," + currentJson.substring(1);
+            db(c).update("UPDATE mes_material_issue_submission SET command_json=? WHERE issue_id=1", historicalJson);
             m.perform(full(post(H + "/1/actions/submit"))).andExpect(status().isOk());
+            assertEquals(historicalJson, db(c).queryForObject("SELECT command_json FROM mes_material_issue_submission WHERE issue_id=1", String.class));
             assertEquals(1, v.creates.get());
             for (var outcome : List.of(Outcome.UNKNOWN, Outcome.NOT_FOUND)) {
                 v.outcome = outcome;
@@ -325,6 +331,7 @@ class ProductionCoreV1HttpTest {
             v.document = DocumentStatus.EFFECTIVE;
             m.perform(full(post(H + "/1/actions/reconcile-erp"))).andExpect(jsonPath("mesStatus").value("CONFIRMED"));
             assertEquals("LOCKED", db(c).queryForObject("SELECT path_status FROM mes_execution_path WHERE id=1", String.class));
+            assertEquals(historicalJson, db(c).queryForObject("SELECT command_json FROM mes_material_issue_submission WHERE issue_id=1", String.class));
             assertEquals(1, v.creates.get());
         }
     }

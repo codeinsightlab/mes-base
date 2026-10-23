@@ -105,7 +105,7 @@ class ProductionQualityLifecycleMySqlTest {
                     jdbc.update("INSERT INTO routing_edge(routing_id,from_node_id,to_node_id) VALUES(?,?,?)", routing, nodes.get(edge.get(0)), nodes.get(edge.get(1)));
                 long order = ProductionReportMySqlTest.insert(jdbc, "INSERT INTO workorder(source,code,product_id,planned_qty,routing_id,status,revision,create_time,update_time) VALUES('LOCAL',?,?,10,?,'RELEASED',0,NOW(),NOW())", tag, material, routing);
                 jdbc.update("INSERT INTO workorder_erp_extra(id) VALUES(?)", order);
-                long execution = ProductionReportMySqlTest.insert(jdbc, "INSERT INTO mes_production_execution(execution_no,workorder_id,product_id,routing_id,target_qty,status,remark,create_by,create_time) VALUES(?,?,?,?,10,'READY',?,'TEST_ONLY_QREF',NOW())", tag, order, material, routing, tag);
+                long execution = ProductionReportMySqlTest.insert(jdbc, "INSERT INTO mes_production_execution(workorder_id,product_id,routing_id,target_qty,status,remark,create_by,create_time) VALUES(?,?,?,10,'READY',?,'TEST_ONLY_QREF',NOW())", order, material, routing, tag);
                 jdbc.update("INSERT INTO mes_execution_path(id,routing_id,path_status,revision,selected_at) VALUES(?,?,'SELECTED',1,NOW())", execution, routing);
                 var selected = List.of(nodes.get(0), nodes.get(1), nodes.get(3));
                 for (int i = 0; i < selected.size(); i++)

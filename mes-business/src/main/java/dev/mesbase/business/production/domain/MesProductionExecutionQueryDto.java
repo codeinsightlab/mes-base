@@ -15,7 +15,7 @@ import org.springframework.format.annotation.DateTimeFormat;
 public record MesProductionExecutionQueryDto(
         @Min(0) Integer offset,
         @Min(1) @Max(100) Integer limit,
-        @Size(max = 64) String executionNo,
+        @Min(1) Long id,
         Long workorderId,
         Long productId,
         Long routingId,

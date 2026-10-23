@@ -185,10 +185,10 @@ class LocalWarehouseHttpTest {
             var second = new ObjectMapper().readTree(first).deepCopy();
             var secondNode = (ObjectNode) second;
             String calculation = m.perform(ProductionCoreV1HttpTest.full(get(ProductionInputHttpTest.ROOT + "/calculate"))
-                            .param("code", "M1#L001").param("workorderId", "2").param("stockReference", "1")
+                            .param("code", "WO2:P2#L001").param("workorderId", "2").param("stockReference", "1")
                             .param("outputQty", "100"))
                     .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
-            secondNode.put("requestId", UUID.randomUUID().toString()).put("workorderId", "2")
+            secondNode.put("requestId", UUID.randomUUID().toString()).put("workorderId", "2").put("code", "WO2:P2#L001")
                     .put("calculationKey", new ObjectMapper().readTree(calculation).get("calculationKey").asText());
             var barrier = new CyclicBarrier(2);
             doAnswer(call -> {
@@ -215,7 +215,7 @@ class LocalWarehouseHttpTest {
             var calculation = new AtomicReference<Calculation>();
             FactoryIntegrationContext.run(FactorySnapshotFixture.current(c, "A"), () ->
                     calculation.set(c.getBean(ProductionInputSupplyService.class)
-                            .calculate("M1#L001", 1L, "1", new BigDecimal("100"))));
+                            .calculate("WO1:M1#L001", 1L, "1", new BigDecimal("100"))));
             j.update("UPDATE mes_material_issue_input SET stock_id=1,stock_applied=true,calculation_json=? WHERE issue_id=-1", new ObjectMapper().writeValueAsString(calculation.get()));
             j.update("UPDATE wm_inventory SET quantity=9800,available_quantity=9800 WHERE id=1");
             m.perform(ProductionCoreV1HttpTest.full(post(MaterialIssueHttpTest.H + "/-1/actions/void")))

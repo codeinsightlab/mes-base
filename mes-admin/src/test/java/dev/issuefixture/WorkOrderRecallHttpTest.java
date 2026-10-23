@@ -10,7 +10,9 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-/** Actual routed services and SQL in isolated H2; no deployed-service or live MySQL claim. */
+/**
+ * Actual routed services and SQL in isolated H2; no deployed-service or live MySQL claim.
+ */
 class WorkOrderRecallHttpTest {
     private static final String BASE = "/api/production/workorder/40";
 
@@ -47,7 +49,7 @@ class WorkOrderRecallHttpTest {
             var jdbc = context.getBean(MaterialIssueHttpTest.Fixture.class).business.get("A");
             jdbc.update("INSERT INTO workorder(id,source,code,product_id,planned_qty,routing_id,status,revision,create_time,update_time) VALUES(40,'LOCAL','RECALL_BLOCKED',1,10,1,'RELEASED',0,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)");
             jdbc.update("INSERT INTO workorder_erp_extra(id) VALUES(40)");
-            jdbc.update("INSERT INTO mes_production_execution(id,execution_no,workorder_id,product_id,routing_id,target_qty,status) VALUES(40,'RECALL_EXE',40,1,1,10,'READY')");
+            jdbc.update("INSERT INTO mes_production_execution(id,workorder_id,product_id,routing_id,target_qty,status) VALUES(40,40,1,1,10,'READY')");
             var mvc = MaterialIssueHttpTest.mvc(context);
             mvc.perform(command(post(BASE + "/actions/recall"), "{\"revision\":0}"))
                     .andExpect(status().isConflict()).andExpect(jsonPath("errorCode").value("EXECUTION_REFERENCED"));

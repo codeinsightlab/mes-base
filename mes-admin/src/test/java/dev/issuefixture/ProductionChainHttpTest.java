@@ -83,7 +83,7 @@ class ProductionChainHttpTest {
             String one = "{\"workorderId\":\"1\",\"routingId\":\"1\",\"targetQty\":\"400\",\"status\":\"READY\"}";
             String two = one.replace("\"routingId\":\"1\"", "\"routingId\":\"3\"").replace("400", "300");
             m.perform(full(post(E), "A").content(one)).andExpect(status().isOk())
-                    .andExpect(jsonPath("executionNo").value("EXE-1"));
+                    .andExpect(jsonPath("id").value("1")).andExpect(jsonPath("executionNo").doesNotExist());
             m.perform(full(post(E), "A").content(two)).andExpect(status().isOk())
                     .andExpect(jsonPath("routingId").value("3"));
             m.perform(full(get(W + "/1/allocation"), "A")).andExpect(status().isOk())

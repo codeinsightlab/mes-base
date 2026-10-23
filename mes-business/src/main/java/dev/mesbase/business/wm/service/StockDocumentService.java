@@ -1,5 +1,7 @@
 package dev.mesbase.business.wm.service;
 
+import dev.mesbase.common.utils.RequestFingerprint;
+
 import dev.mesbase.common.utils.StringUtils;
 import dev.mesbase.common.validation.ParameterChecks;
 import com.github.pagehelper.PageHelper;
@@ -25,7 +27,6 @@ import dev.mesbase.business.production.service.BusinessSourceRules;
 import dev.mesbase.business.production.service.ProductionChainLocks;
 import dev.mesbase.business.production.service.ProductionCompletionService;
 import org.springframework.beans.factory.ObjectProvider;
-import dev.mesbase.business.production.domain.ProductionScanCode;
 import dev.mesbase.business.shared.enums.BusinessSource;
 import dev.mesbase.business.shared.enums.EnableStatus;
 import dev.mesbase.business.wm.dao.WmInventoryMapper;
@@ -259,7 +260,7 @@ public class StockDocumentService {
     public Detail approve(Long id, StockDocumentModels.Post command) {
         validate(command);
         uuid(command.requestId());
-        String hash = ProductionScanCode.digest(new ObjectMapper().writeValueAsString(
+        String hash = RequestFingerprint.sha256(new ObjectMapper().writeValueAsString(
                 List.of(id, command.requestId(), command.expectedRevision(), SecurityUtils.getUserId())));
         var before = require(id);
         // Original frozen replay is a read: a later factory mode cannot rewrite already committed LOCAL facts.

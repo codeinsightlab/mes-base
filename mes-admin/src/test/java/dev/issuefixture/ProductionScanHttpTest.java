@@ -31,6 +31,7 @@ import org.springframework.mock.web.MockServletContext;
 import org.springframework.web.context.support.AnnotationConfigWebApplicationContext;
 
 import static dev.issuefixture.ProductionReportHttpTest.full;
+import static org.hamcrest.Matchers.containsString;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -74,17 +75,23 @@ class ProductionScanHttpTest {
     }
 
     @Test
-    void businessOrderNamedExeIsNotMistakenForTheDirectIdReadSyntax() throws Exception {
+    void businessOrderNamedExeUsesTheSameCanonicalRuleAndOldMarkersAreRejected() throws Exception {
         try (var c = context()) {
             var m = MaterialIssueHttpTest.mvc(c);
             db(c, "A").update("UPDATE workorder SET code='EXE' WHERE id=1");
             m.perform(full(post(ROOT), "A").content("{\"type\":\"REPORTING\",\"code\":\"EXE:M1#000LOT\",\"inputMethod\":\"TEXT\"}"))
                     .andExpect(status().isOk()).andExpect(jsonPath("executionId").value("1"))
                     .andExpect(jsonPath("qrCode").value("EXE:M1#000LOT"));
-            m.perform(full(get("/api/production/identity"), "A").param("code", "EXE:1"))
+            m.perform(full(get("/api/production/identity/1"), "A"))
                     .andExpect(status().isOk()).andExpect(jsonPath("qrCode").value("EXE:M1#000LOT"));
+            for (String retired : List.of("EXE:1", "MES1.legacy", "M1#000LOT")) {
+                m.perform(full(post(ROOT), "A").content("{\"type\":\"REPORTING\",\"code\":\"" + retired + "\",\"inputMethod\":\"TEXT\"}"))
+                        .andExpect(status().isBadRequest())
+                        .andExpect(jsonPath("errorCode").value("EXECUTION_QR_INVALID"));
+            }
             m.perform(full(post(ROOT), "A").content("{\"type\":\"REPORTING\",\"code\":\"MES2.V08x.TTE.MDAwTE9U\",\"inputMethod\":\"TEXT\"}"))
-                    .andExpect(status().isBadRequest());
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("message", containsString("工单号:品号#批次号")));
         }
     }
 
@@ -125,7 +132,7 @@ class ProductionScanHttpTest {
             }
             m.perform(full(get("/api/production/identity"), "A").param("code", code("000LOT")))
                     .andExpect(status().isOk());
-            m.perform(full(get("/api/production/reporting/context"), "A").param("code", "EXE:1"))
+            m.perform(full(get("/api/production/reporting/context"), "A").param("executionId", "1"))
                     .andExpect(status().isOk());
             assertEquals(3, j.queryForObject("SELECT COUNT(*) FROM mes_production_scan_activity", Integer.class));
             assertEquals(0, j.queryForObject("SELECT COUNT(*) FROM mes_production_report", Integer.class));

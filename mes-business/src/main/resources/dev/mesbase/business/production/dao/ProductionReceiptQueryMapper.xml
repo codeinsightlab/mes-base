@@ -2,10 +2,10 @@
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="dev.mesbase.business.production.dao.ProductionReceiptQueryMapper">
  <resultMap id="Row" type="dev.mesbase.business.production.domain.ProductionReceiptRow" extends="dev.mesbase.business.production.dao.MesProductionReceiptMapper.BaseResultMap">
-  <result column="execution_no" property="executionNo"/><result column="workorder_code" property="workorderCode"/>
+  <result column="workorder_code" property="workorderCode"/>
   <result column="product_code" property="productCode"/><result column="product_name" property="productName"/><result column="warehouse_name" property="warehouseName"/>
  </resultMap>
- <sql id="Projection">r.id,r.receipt_no,r.execution_id,r.product_lot_code,r.warehouse_id,r.record_type,r.quantity_delta,r.reference_receipt_id,r.operator_user_id,r.recorded_by,r.occurred_at,r.create_time,r.reason,e.execution_no,w.code workorder_code,m.code product_code,m.name product_name,h.name warehouse_name</sql>
+ <sql id="Projection">r.id,r.receipt_no,r.execution_id,r.product_lot_code,r.warehouse_id,r.record_type,r.quantity_delta,r.reference_receipt_id,r.operator_user_id,r.recorded_by,r.occurred_at,r.create_time,r.reason,w.code workorder_code,m.code product_code,m.name product_name,h.name warehouse_name</sql>
  <sql id="Joins">FROM mes_production_receipt r LEFT JOIN mes_production_execution e ON e.id=r.execution_id LEFT JOIN workorder w ON w.id=e.workorder_id LEFT JOIN material m ON m.id=e.product_id LEFT JOIN wm_warehouse h ON h.id=r.warehouse_id</sql>
  <select id="page" resultMap="Row">
  SELECT <include refid="Projection"/> <include refid="Joins"/>

@@ -36,7 +36,7 @@ class LocalWarehouseErpTest {
     void localActionsAndQueryNeverInventExternalFacts() {
         var scope = new FactoryScope(new FactoryId("A"));
         var service = new LocalWarehouseErpService();
-        var create = service.createMaterialIssue(scope, new MaterialIssueSubmitCommand(1L, "stable", "ISSUE-1", 1L, "WO", null, null, 1L, "EXE-1", 1L, "P", 1L, 1, List.of(1L), null, List.of(), null));
+        var create = service.createMaterialIssue(scope, new MaterialIssueSubmitCommand(1L, "stable", "ISSUE-1", 1L, "WO", null, null, 1L, 1L, "P", 1L, 1, List.of(1L), null, List.of(), null));
         var cancel = service.cancelMaterialIssue(scope, new MaterialIssueCancelCommand(1L, "stable", "local", null));
         assertEquals(Status.SUCCEEDED, create.status());
         assertEquals(Mode.LOCAL_ONLY, create.executionMode());

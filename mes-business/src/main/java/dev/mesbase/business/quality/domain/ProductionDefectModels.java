@@ -40,7 +40,7 @@ public final class ProductionDefectModels {
     public record Names(Map<Long, String> nodes, Map<Long, String> users) {
     }
 
-    public record ListContext(String declarationId, String executionNo, String workorderCode,
+    public record ListContext(String declarationId, String workorderCode,
                               String productCode, String productName, String workorderStatus,
                               String executionStatus, String source, String batchNo, String specification) {
     }

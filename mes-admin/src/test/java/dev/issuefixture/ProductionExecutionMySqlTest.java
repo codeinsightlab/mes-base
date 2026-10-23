@@ -115,13 +115,12 @@ class ProductionExecutionMySqlTest {
             var first = service.insert(input);
             var second = service.insert(input);
             assertNotEquals(first.getId(), second.getId());
-            assertNotEquals(first.getExecutionNo(), second.getExecutionNo());
-            assertEquals("EXE-" + first.getId(), first.getExecutionNo());
+            assertNotEquals(first.getId(), second.getId());
             var updated = service.updateById(first.getId(), new MesProductionExecutionUpdateCommand(workorder, routing, new BigDecimal("1.123456"), "READY", null, null, tag));
-            assertEquals(first.getExecutionNo(), updated.getExecutionNo());
+            assertEquals(first.getId(), updated.getId());
             var identity = new ProductionIdentityService(executions, s.getMapper(WorkorderMapper.class), s.getMapper(MaterialMapper.class), s.getMapper(RoutingMapper.class));
             var before = service.selectById(first.getId()).getUpdateTime();
-            assertEquals(first.getId(), identity.resolve("EXE:" + first.getId()).executionId());
+            assertEquals(first.getId(), identity.read(first.getId()).executionId());
             assertEquals(before, service.selectById(first.getId()).getUpdateTime());
             var issueRules = new MaterialIssueRules(issues, s.getMapper(MesMaterialIssueItemMapper.class), s.getMapper(MaterialMapper.class), s.getMapper(UnitMeasureMapper.class), s.getMapper(WmWarehouseMapper.class), s.getMapper(WorkorderMapper.class), s.getMapper(RoutingMapper.class), s.getMapper(RoutingProductMapper.class), rules, new MaterialIssueErpFacts(s.getMapper(MesMaterialIssueErpExtraMapper.class)), chainLocks, Mockito.mock(BusinessSourceRules.class));
             var issueService = new MesMaterialIssueServiceImpl(issues, issueRules, new WarehouseIntegration(List.of()));

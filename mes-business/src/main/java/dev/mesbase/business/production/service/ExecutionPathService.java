@@ -83,7 +83,7 @@ public class ExecutionPathService {
 
     public record PathModel(Long executionId, String executionStatus, MesExecutionPathEntity path,
                             List<Long> selectedNodeIds, List<RoutingNodeEntity> nodes, List<RoutingEdgeEntity> edges,
-                            String executionNo, DirectoryLabel routing, Map<Long, DirectoryLabel> operationLabels) {
+                            DirectoryLabel routing, Map<Long, DirectoryLabel> operationLabels) {
     }
 
     @Transactional(transactionManager = "businessTransactionManager", readOnly = true)
@@ -107,7 +107,7 @@ public class ExecutionPathService {
         return new PathModel(id, e.getStatus(), paths.selectByPrimaryKey(id),
                 ordered == null ? nodeIds(id) : ordered.stream().map(MesExecutionPathNodeEntity::getRoutingNodeId)
                         .toList(),
-                actualNodes, edges(e.getRoutingId()), e.getExecutionNo(), routing, operationLabels);
+                actualNodes, edges(e.getRoutingId()), routing, operationLabels);
     }
 
     /**
@@ -159,10 +159,12 @@ public class ExecutionPathService {
     public PathModel select(Long id, Integer revision, List<Long> nodeIds) {
         var e = locks.execution(id);
         locks.requireActiveExecution(id);
-        if (!ProductionExecutionStatus.READY.getValue().equals(e.getStatus()) || e.getStartTime() != null) ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
+        if (!ProductionExecutionStatus.READY.getValue().equals(e.getStatus()) || e.getStartTime() != null)
+            ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
         rules.checkReadyReferences(e);
         var old = paths.selectByPrimaryKey(id);
-        if (revision == null || !Objects.equals(revision, old == null ? 0 : old.getRevision())) ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
+        if (revision == null || !Objects.equals(revision, old == null ? 0 : old.getRevision()))
+            ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
         if (old != null && ExecutionPathStatus.LOCKED.getValue().equals(old.getPathStatus()))
             ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
         if (quality.hasAnyHistory(id))
@@ -231,7 +233,8 @@ public class ExecutionPathService {
         if (ProductionExecutionStatus.READY.getValue().equals(e.getStatus())) rules.checkReadyReferences(e);
         if (path != null) path.requireOwner(locked);
         var selectedPath = path == null ? requireSelected(e) : path.model().path();
-        if (!ExecutionPathStatus.LOCKED.getValue().equals(selectedPath.getPathStatus())) ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
+        if (!ExecutionPathStatus.LOCKED.getValue().equals(selectedPath.getPathStatus()))
+            ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
         if (ProductionExecutionStatus.RUNNING.getValue().equals(e.getStatus())) return e;
         var rows = issueRows(id);
         if (rows.stream()

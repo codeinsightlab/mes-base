@@ -95,7 +95,6 @@ public class ProductionExecutionRules {
         ProductionQuantityInput.check(row.getTargetQty());
         validateValues(row);
         capacity(row);
-        row.setExecutionNo("PENDING");
         audit(row, true);
     }
 

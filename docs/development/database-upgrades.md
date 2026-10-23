@@ -110,3 +110,11 @@ unset FLYWAY_PASSWORD
 核实并准备私有连接环境后，使用`scripts/mes-business-flyway info 53`检查Pending，再`migrate 53`、`validate 53`；不要手动DROP后补历史或修改V52。已执行53的库不重复执行SQL，不以IF EXISTS掩盖手工漂移。
 
 本次仅实际升级mes_base_dev_perf_test：TEST_DEV_PERF_20261019 / DS9 revision2 / LOCAL，原server_uuid一致。重新备份1110条旧绑定、11874条执行、行为表及53条原迁移历史，批次承接冲突和引用均0；正式info仅53 Pending，migrate成功到53，validate严格校验54份迁移通过。写后旧表不存在，11874条执行含正式批次的全部字段与写前逐条一致，53条原迁移历史全部一致，只新增V53成功记录。回执和恢复边界见[数据维护归档](../operations/data-maintenance/README.md)。未执行其他库或修改中心Factory绑定。
+
+## 2026-10-23 V54 移除冗余执行编号
+
+V54__remove_redundant_execution_no.sql删除mes_production_execution.execution_no及普通索引idx_execution_no，保留id、execution_id关联和batch_no。不改写V16/V45等已发布迁移；V49已退役引用旧列的历史触发器，其他库仍须核实自身依赖。
+
+本轮核实TEST_DEV_PERF_20261019 / DS9 revision2 / LOCAL → mes_base_dev_perf_test及server_uuid，备份11874条执行、DDL及54条原迁移历史，触发器/视图/例程/外键对该列依赖0。正式info/migrate/validate 54成功，55份迁移校验通过；写后执行其余字段及原历史逐条相同。私有备份在.local/execution-id-only-20261023/，公开摘要见[回执](../operations/data-maintenance/2026-10-23-execution-id-only-receipt.json)。
+
+其他库按版本链升级54，没有自动遍历执行。旧包仍查询旧列，升级窗口须由用户控制旧节点和加载匹配新包；Agent没有启停服务。恢复优先修复并向前升级；如需恢复Schema须根据备份与新增业务另作受控迁移，不能倒改已执行脚本、删除Flyway记录或覆盖新事实。

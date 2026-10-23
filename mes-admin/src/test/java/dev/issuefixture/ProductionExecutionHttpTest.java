@@ -39,11 +39,11 @@ class ProductionExecutionHttpTest {
                         .andExpect(status().isOk()).andExpect(jsonPath("productId").value("1"))
                         .andExpect(jsonPath("routingId").value(routing)).andExpect(jsonPath("createBy").value("1"));
             }
-            assertEquals(3, a.queryForObject("SELECT COUNT(DISTINCT execution_no) FROM mes_production_execution", Integer.class));
+            assertEquals(3, a.queryForObject("SELECT COUNT(DISTINCT id) FROM mes_production_execution", Integer.class));
             m.perform(full(get(E + "/1"), "A")).andExpect(status().isOk())
-                    .andExpect(jsonPath("executionNo").value("EXE-1"));
+                    .andExpect(jsonPath("id").value("1"));
             m.perform(full(put(E + "/1"), "A").content(CREATE.replace("12.12", "8.01")))
-                    .andExpect(status().isOk()).andExpect(jsonPath("executionNo").value("EXE-1"));
+                    .andExpect(status().isOk()).andExpect(jsonPath("id").value("1"));
             // Route correction is permitted before any execution fact; each execution remains independent.
             m.perform(full(put(E + "/2"), "A").content(CREATE)).andExpect(status().isOk())
                     .andExpect(jsonPath("routingId").value("1"));
@@ -54,23 +54,27 @@ class ProductionExecutionHttpTest {
                             .replace("READY", "RUNNING")
                             .replace("\"status\"", "\"startTime\":\"2026-10-14T09:00:00\",\"status\"")))
                     .andExpect(status().isConflict());
+            m.perform(full(get(E).param("id", "2"), "A")).andExpect(status().isOk())
+                    .andExpect(jsonPath("items.length()").value(1)).andExpect(jsonPath("items[0].id").value("2"))
+                    .andExpect(jsonPath("items[0].executionNo").doesNotExist());
             var before = a.queryForList("SELECT * FROM mes_production_execution ORDER BY id");
-            m.perform(full(get(QR).param("code", "EXE:1"), "A"))
+            m.perform(full(get(QR + "/1"), "A"))
                     .andExpect(status().isOk()).andExpect(jsonPath("executionId").value("1"))
                     .andExpect(jsonPath("workorderCode").value("WO1"))
                     .andExpect(jsonPath("productCode").value("M1"))
-                    .andExpect(jsonPath("routingVersion").value(1)).andExpect(jsonPath("status").value("READY"));
+                    .andExpect(jsonPath("routingVersion").value(1)).andExpect(jsonPath("status").value("READY"))
+                    .andExpect(jsonPath("qrCode").isEmpty()).andExpect(jsonPath("executionNo").doesNotExist());
             assertEquals(before, a.queryForList("SELECT * FROM mes_production_execution ORDER BY id"));
             assertEquals(0, a.queryForObject("SELECT COUNT(*) FROM mes_material_issue", Integer.class));
-            m.perform(full(get(QR).param("code", "EXE:1"), "B")).andExpect(status().isNotFound());
-            m.perform(full(get(QR).param("code", "EXE:99999"), "A")).andExpect(status().isNotFound())
+            m.perform(full(get(QR + "/1"), "B")).andExpect(status().isNotFound());
+            m.perform(full(get(QR + "/99999"), "A")).andExpect(status().isNotFound())
                     .andExpect(jsonPath("errorCode").value("EXECUTION_NOT_FOUND"));
-            for (String code : List.of("exe:1", "EXE:0", "EXE:-1", "EXE:01", "ERP:M1", "EXE:9223372036854775808", "EXE:1 "))
+            for (String code : List.of("EXE:1", "exe:1", "EXE:0", "EXE:-1", "EXE:01", "ERP:M1", "EXE:9223372036854775808", "EXE:1 "))
                 m.perform(full(get(QR).param("code", code), "A")).andExpect(status().isBadRequest())
                         .andExpect(jsonPath("errorCode").value("EXECUTION_QR_INVALID"));
             m.perform(full(post(E), "B").content(CREATE)).andExpect(status().isOk())
                     .andExpect(jsonPath("id").value("1"));
-            m.perform(full(get(QR).param("code", "EXE:1"), "B")).andExpect(status().isOk());
+            m.perform(full(get(QR + "/1"), "B")).andExpect(status().isOk());
             assertEquals(3, a.queryForObject("SELECT COUNT(*) FROM mes_production_execution", Integer.class));
         }
     }
@@ -141,7 +145,7 @@ class ProductionExecutionHttpTest {
             m.perform(full(delete(E), "A").content("[1]")).andExpect(status().isNoContent());
             m.perform(delete(E).header("Authorization", "Bearer CRUD").header("X-Factory-Id", "A")
                     .contentType("application/json").content("[1]")).andExpect(status().isForbidden());
-            m.perform(get(QR).param("code", "EXE:1")).andExpect(status().isForbidden());
+            m.perform(get(QR + "/1")).andExpect(status().isForbidden());
             m.perform(get(QR).header("Authorization", "Bearer FULL").param("code", "EXE:1"))
                     .andExpect(status().isUnprocessableEntity());
             m.perform(full(post(E), "A").content(CREATE)).andExpect(status().isOk());

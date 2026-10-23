@@ -4,19 +4,10 @@ package dev.mesbase.business.production.domain;
  * 当前引用名称仅用于显示，不冒充历史快照。
  */
 public class ProductionReceiptRow extends MesProductionReceiptEntity {
-    private String executionNo;
     private String workorderCode;
     private String productCode;
     private String productName;
     private String warehouseName;
-
-    public String getExecutionNo() {
-        return executionNo;
-    }
-
-    public void setExecutionNo(String v) {
-        executionNo = v;
-    }
 
     public String getWorkorderCode() {
         return workorderCode;

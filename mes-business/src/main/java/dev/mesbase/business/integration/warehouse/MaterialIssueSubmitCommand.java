@@ -10,7 +10,7 @@ import java.util.List;
 public record MaterialIssueSubmitCommand(Long issueId, String operationKey, String issueNo,
                                          Long workorderId, String workorderNo, String externalWorkorderId,
                                          String externalWorkorderCode,
-                                         Long executionId, String executionNo, Long productId, String productCode,
+                                         Long executionId, Long productId, String productCode,
                                          Long routingId,
                                          Integer pathRevision, List<Long> routingNodeIds, String issueTime,
                                          List<Line> lines, Input input, Source source) {
@@ -20,12 +20,12 @@ public record MaterialIssueSubmitCommand(Long issueId, String operationKey, Stri
     public MaterialIssueSubmitCommand(Long issueId, String operationKey, String issueNo,
                                       Long workorderId, String workorderNo, String externalWorkorderId,
                                       String externalWorkorderCode,
-                                      Long executionId, String executionNo, Long productId, String productCode,
+                                      Long executionId, Long productId, String productCode,
                                       Long routingId,
                                       Integer pathRevision, List<Long> routingNodeIds, String issueTime,
                                       List<Line> lines, Input input) {
         this(issueId, operationKey, issueNo, workorderId, workorderNo, externalWorkorderId, externalWorkorderCode,
-                executionId, executionNo, productId, productCode, routingId, pathRevision, routingNodeIds,
+                executionId, productId, productCode, routingId, pathRevision, routingNodeIds,
                 issueTime, lines, input, null);
     }
 

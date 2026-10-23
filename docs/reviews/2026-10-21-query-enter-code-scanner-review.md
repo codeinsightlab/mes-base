@@ -175,3 +175,20 @@ ProductionScanCode.parse改为按第一个ASCII冒号分工单，再按其后第
 ProductionIdentityService仅对无井号的EXE:ID走现有详情主键读取，其余统一按三元组解析，避免工单号恰好为EXE时误分流；公共扫码各场景仍返回同一个ProductionIdentity，生产二维码输出、投产结果和页面说明同步更新。EXE详情/内部刷新保留；新MES1/MES2执行定位拒绝。原投产命令字段、冻结JSON、UUID优先重放及SHA256请求摘要算法没有改变，旧原UUID仍不重新领料或扣库。业务定位、权限、Factory、审计、数量和库存证明不变。
 
 补充验证覆盖实际字面码、中文/前导零/大小写/尾空格、批次内分隔符、空字段/畸形文本/旧前缀拒绝，以及EXE作为业务工单号和EXE:ID两条路径。前端公共扫码透传测试改用真实文本格式，不继续以MES2样例掩盖契约错误。仅修改解析/显示和相关测试，无数据库Schema或数据更改，V52/V53不变，无需新增SQL迁移。
+
+## 2026-10-23 继续收敛：单一生产码、独立规则与Execution主键
+
+用户进一步明确只认可工单号:品号#批次号。本节取代上节仍保留EXE详情文本和材料#批次的当前约定；历史实现记录保留，不再作为现行合同。ProductionCodeRules独立承担解析、校验和格式化，ProductionScanCode仅为值对象。所有生产扫码共用此规则，ID详情及报工刷新显式使用executionId，不再将主键拼成另一种扫码文本。已有请求优先按原UUID/冻结指纹核实，不能因协议清理重新扣库；历史无批次时不伪造EXE码。
+
+审查执行编号：ProductionExecutionRules曾写PENDING，创建Service取得id后写EXE-id；普通索引不提供独立业务编号语义，正式关联均使用execution_id。删除活跃executionNo字段、生成赋值、筛选、响应和重复展示，不将旧字段换成另一份id别名。复杂查询保留原executionId；执行器本身使用id。冻结的旧单据JSON不修改，旧迁移保留原文。
+
+V54只删冗余列和索引；核实perf绑定后备份11874执行和54条原Flyway历史，数据库依赖0；正式迁移54及55份校验成功，其他列与原历史逐条不变。从真实V54 metadata通过mes-crud-codegen生成审查副本，只采用执行器Entity/Example/Mapper/XML，保留FOR UPDATE与flushCache/useCache保护。未改库存、状态或数量，未启停服务。新包加载前旧服务不具备新契约，不能把Schema校验当真实服务验收。
+
+### 本次最终验证与运行边界
+
+- 最新后端 `MES_INBOUND_SQL_MYSQL_ACCEPTANCE=true mvn -B -ntp verify` 全reactor成功：902项，854执行通过、48条件跳过、0失败/错误；日志`/tmp/mes-execution-id-final-verify.log`。包含真实perf库只读Mapper查询、规范码/ID读取一致、V54旧列不存在及质量入仓关联读取，不写业务数据。
+- 定向首轮发现查询测试使用未声明参数，改到正式calculate入口验证工单不匹配；完整首轮发现执行器创建响应断言误用executionId，改为id并断言executionNo不存在。修正后最新完整检查全通过；此前失败日志保留，不把失败轮次写为通过。
+- HTTP/H2覆盖规范码、旧码拒绝、工单名EXE合法三元组、精确批次/歧义、ID详情无批次返回null、id筛选、跨厂/权限、投产来源/并发/事务、原UUID旧格式重放和旧冻结executionNo JSON原样保持。历史指纹SHA256的输入/算法不变。首次投产创建及batch持久化仍在同一工单父锁事务，没有事务外中间态。
+- 前端当前全量79文件/491测试、build通过：`/private/tmp/mes-base-ui-canonical-all-tests.log`、`/private/tmp/mes-base-ui-canonical-build.log`；保留既有大chunk提示。新增选择器ID筛选测试，二维码fixture真实编码规范文本并通过解码。前端不另建解析器。
+- 72个本轮Java文件格式检查、两仓git diff --check通过。打包JAR中V52/V53/V54与工作区逐字节一致，ProductionCodeRules存在，退役绑定类和ProductionScanCode$MaterialLot不存在。
+- 真实MySQL只执行核实后的V54结构升级、备份和只读核验；没有真实ERP、库存、报工、质量或状态写入。48项条件测试未执行，不代表真实业务验收。浏览器报工页当前显示“暂时无法恢复登录状态 / 服务暂时不可用”；未验证新服务HTTP或真实页面交互，需用户加载最新包后重启再验。没有自行启停服务、提交、推送或部署。

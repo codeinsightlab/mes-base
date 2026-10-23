@@ -280,7 +280,7 @@ class QualityDispositionHttpTest {
             var row = list.get("items").get(0);
             assertEquals(id, row.get("declarationId").asText());
             assertEquals("WO1", row.get("workorderCode").asText());
-            assertEquals("EXE-1", row.get("executionNo").asText());
+            assertEquals("1", row.get("executionId").asText());
             assertEquals("M1", row.get("productCode").asText());
             assertEquals("000LOT-001", row.get("batchNo").asText());
             assertEquals("Φ20×30", row.get("specification").asText());

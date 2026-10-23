@@ -48,6 +48,7 @@ class ProductionInputMySqlTest {
             var j = h.jdbc;
             long material = j.queryForObject("SELECT product_id FROM workorder WHERE id=?", Long.class, f.order());
             String materialCode = j.queryForObject("SELECT code FROM material WHERE id=?", String.class, material);
+            String workorderCode = j.queryForObject("SELECT code FROM workorder WHERE id=?", String.class, f.order());
             String lot = "TEST_INPUT_" + UUID.randomUUID();
             long stock = ProductionReportMySqlTest.insert(j, "INSERT INTO wm_inventory(material_id,warehouse_id,quantity,available_quantity,status,batch_no,remark) VALUES(?,?,10000,10000,'ENABLED',?,'TEST ONLY local production input')", material, f.warehouse(), lot);
             String prefix = "mes.production.input.factories.SIMPLE_B.workorders." + f.order() + ".";
@@ -62,9 +63,9 @@ class ProductionInputMySqlTest {
             var quantity = c.getBean(ProductionQuantityService.class);
             var scope = new FactoryScope(new FactoryId("SIMPLE_B"));
             var a = FactoryContext.withScope(scope, () -> {
-                var calculation = supply.calculate(materialCode + "#" + lot, f.order(), Long.toString(stock), new BigDecimal("100"));
+                var calculation = supply.calculate(workorderCode + ":" + materialCode + "#" + lot, f.order(), Long.toString(stock), new BigDecimal("100"));
                 return new ProductionInputService.Command(UUID.randomUUID()
-                        .toString(), materialCode + "#" + lot, f.order(), Long.toString(stock), new BigDecimal("100"), f.routing(), f.selected(), "PRODUCTION_INPUT", ProductionInputSupplyService.calculationKey(calculation));
+                        .toString(), workorderCode + ":" + materialCode + "#" + lot, f.order(), Long.toString(stock), new BigDecimal("100"), f.routing(), f.selected(), "PRODUCTION_INPUT", ProductionInputSupplyService.calculationKey(calculation));
             });
             var first = FactoryContext.withScope(scope, () -> service.submit(a));
             long execution = Long.parseLong(first.executionId());

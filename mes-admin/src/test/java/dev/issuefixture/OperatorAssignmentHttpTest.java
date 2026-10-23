@@ -87,7 +87,7 @@ class OperatorAssignmentHttpTest {
         for (var jdbc : c.getBean(MaterialIssueHttpTest.Fixture.class).business.values()) {
             jdbc.update("INSERT INTO operation(id,code,name,status,sort,revision) VALUES(1,'DRILL','钻孔','ENABLED',0,0),(2,'TURN','车削','ENABLED',0,0)");
             jdbc.update("INSERT INTO routing_node(id,routing_id,node_code,operation_id,operation_code,operation_name,is_key,display_order) VALUES(1,1,'A',1,'DRILL','钻孔',TRUE,0),(2,1,'B',1,'DRILL','钻孔',TRUE,1),(3,2,'WRONG',1,'DRILL','钻孔',TRUE,0)");
-            jdbc.update("INSERT INTO mes_production_execution(id,execution_no,workorder_id,product_id,routing_id,target_qty,status) VALUES(1,'EXE-1',1,1,1,100,'READY'),(2,'EXE-2',1,1,1,100,'COMPLETED')");
+            jdbc.update("INSERT INTO mes_production_execution(id,workorder_id,product_id,routing_id,target_qty,status) VALUES(1,1,1,1,100,'READY'),(2,1,1,1,100,'COMPLETED')");
         }
         return c;
     }

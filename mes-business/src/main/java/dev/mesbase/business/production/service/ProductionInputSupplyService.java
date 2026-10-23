@@ -1,5 +1,7 @@
 package dev.mesbase.business.production.service;
 
+import dev.mesbase.common.utils.RequestFingerprint;
+
 import dev.mesbase.common.validation.ParameterChecks;
 import dev.mesbase.business.production.domain.ProductionQuantityInput;
 
@@ -13,7 +15,7 @@ import dev.mesbase.business.integration.production.ProductionSupply.Calculation;
 import dev.mesbase.business.integration.production.ProductionErpAdapter;
 import dev.mesbase.business.integration.warehouse.WarehouseIntegration;
 import dev.mesbase.business.integration.warehouse.ErpActionResult.Mode;
-import dev.mesbase.business.production.domain.ProductionScanCode;
+import dev.mesbase.business.production.domain.ProductionCodeRules;
 import dev.mesbase.core.error.ErrorCode;
 import dev.mesbase.core.error.FoundationException;
 import dev.mesbase.platform.execution.FactoryContext;
@@ -34,6 +36,7 @@ import org.springframework.beans.factory.annotation.Qualifier;
 @ConditionalOnProperty(name = "mes.business.enabled", havingValue = "true")
 public class ProductionInputSupplyService {
     private final BusinessSourceRules sources;
+    private final ProductionIdentityService identities;
     private final WarehouseIntegration integration;
     private final List<ProductionErpAdapter> adapters;
     private final LocalProductionSupply local;
@@ -42,7 +45,8 @@ public class ProductionInputSupplyService {
     public ProductionInputSupplyService(WarehouseIntegration integration, List<ProductionErpAdapter> adapters,
                                         LocalProductionSupply local,
                                         @Qualifier("businessTransactionManager") PlatformTransactionManager manager,
-                                        BusinessSourceRules sources) {
+                                        BusinessSourceRules sources, ProductionIdentityService identities) {
+        this.identities = identities;
         this.sources = sources;
         this.integration = integration;
         this.adapters = List.copyOf(adapters);
@@ -59,23 +63,35 @@ public class ProductionInputSupplyService {
     @Transactional(transactionManager = "businessTransactionManager", propagation = Propagation.NOT_SUPPORTED)
     public Context query(String code, Long workorderId, int offset, int limit) {
         ParameterChecks.paging(offset, limit);
-        if (workorderId != null) readTransaction.executeWithoutResult(status -> sources.order(workorderId));
-        var identity = ProductionScanCode.material(code);
+        var identity = ProductionCodeRules.parse(code);
+        var sourceOrder = readTransaction.execute(status -> identities.requireOrder(identity));
+        if (workorderId != null && !workorderId.equals(sourceOrder.getId()))
+            ParameterChecks.reject(ErrorCode.BAD_REQUEST);
+        readTransaction.executeWithoutResult(status -> sources.order(sourceOrder.getId()));
         var scope = FactoryContext.required();
         var selection = integration.submissionSelection(scope);
         if (selection.mode() == Mode.CONNECTED) {
             var matching = adapters.stream().filter(a -> a.supports(scope, selection.bindingKey())).toList();
             if (matching.size() != 1) throw new FoundationException(ErrorCode.INTEGRATION_NOT_CONFIGURED);
             var result = matching.getFirst()
-                    .query(scope, selection.bindingKey(), identity.materialCode(), identity.lotCode());
-            if (result == null || !Mode.CONNECTED.getValue().equals(result.sourceMode())) ParameterChecks.reject(ErrorCode.BAD_REQUEST);
+                    .query(scope, selection.bindingKey(), identity.workorderCode(), identity.productCode(), identity.batchNo());
+            if (result == null || !Mode.CONNECTED.getValue().equals(result.sourceMode()))
+                ParameterChecks.reject(ErrorCode.BAD_REQUEST);
             readTransaction.executeWithoutResult(status -> sources.externalCandidates(result));
             var eligible = result.orders().stream()
-                    .filter(o -> workorderId == null || workorderId.equals(o.workorderId())).toList();
-            return new Context(result.sourceMode(), result.stocks(), eligible.stream().skip(offset).limit(limit)
+                    .filter(o -> sourceOrder.getId().equals(o.workorderId())
+                            && identity.workorderCode().equals(o.workorderCode())
+                            && identity.productCode().equals(o.productCode())).toList();
+            if (eligible.size() > 1) throw new FoundationException(ErrorCode.PRODUCTION_IDENTITY_AMBIGUOUS);
+            var stocks = result.stocks().stream().filter(stock -> identity.batchNo().equals(stock.lotCode())
+                    && eligible.stream().anyMatch(order -> order.allowedWarehouses().contains(stock.warehouseId())
+                    && order.requirements().stream()
+                    .anyMatch(requirement -> requirement.materialCode().equals(stock.materialCode())
+                            && Objects.equals(requirement.unitId(), stock.unitId())))).toList();
+            return new Context(result.sourceMode(), stocks, eligible.stream().skip(offset).limit(limit)
                     .toList(), eligible.size(), offset, limit);
         }
-        return readTransaction.execute(status -> local.query(code, identity, scope, selection, workorderId, offset, limit));
+        return readTransaction.execute(status -> local.query(identity, sourceOrder, scope, selection, offset, limit));
     }
 
     @Transactional(transactionManager = "businessTransactionManager", propagation = Propagation.NOT_SUPPORTED)
@@ -97,7 +113,8 @@ public class ProductionInputSupplyService {
         if (required.isEmpty() || required.stream().map(Requirement::materialCode).distinct().count() != 1
                 || required.stream().anyMatch(r -> !r.materialCode()
                 .equals(stock.materialCode()) || !Objects.equals(r.unitId(), stock.unitId()) || !Objects.equals(r.unitCode(), stock.unitCode()))
-                || !order.allowedWarehouses().contains(stock.warehouseId())) ParameterChecks.reject(ErrorCode.BAD_REQUEST);
+                || !order.allowedWarehouses().contains(stock.warehouseId()))
+            ParameterChecks.reject(ErrorCode.BAD_REQUEST);
         var total = required.stream().map(Requirement::totalRequiredQty).reduce(BigDecimal.ZERO, BigDecimal::add);
         var quantity = issueQuantity(order.plannedQty(), total, outputQty);
         if (quantity.compareTo(stock.availableQty()) > 0) ParameterChecks.reject(ErrorCode.BAD_REQUEST);
@@ -114,7 +131,7 @@ public class ProductionInputSupplyService {
     public static String calculationKey(Calculation c) {
         var s = c.stock();
         var o = c.order();
-        return ProductionScanCode.digest(new ObjectMapper().writeValueAsString(List.of(
+        return RequestFingerprint.sha256(new ObjectMapper().writeValueAsString(List.of(
                 c.sourceMode(), o.workorderId(), o.productCode(), o.workCenter(), o.plannedQty().stripTrailingZeros()
                         .toPlainString(),
                 o.requirements(), o.sourceReference(), s.reference(), s.materialCode(), s.lotCode(), s.warehouseId(), s.binCode() == null ? "" : s.binCode(), s.unitId(), s.unitCode(),
@@ -125,7 +142,8 @@ public class ProductionInputSupplyService {
         if (plan == null || total == null || output == null || plan.signum() <= 0 || total.signum() <= 0 || output.signum() <= 0 || output.scale() > 6 || output.precision() - output.scale() > 14)
             ParameterChecks.reject(ErrorCode.BAD_REQUEST);
         var result = total.multiply(output).divide(plan, 6, RoundingMode.HALF_UP);
-        if (result.signum() <= 0 || result.precision() - result.scale() > 14) ParameterChecks.reject(ErrorCode.BAD_REQUEST);
+        if (result.signum() <= 0 || result.precision() - result.scale() > 14)
+            ParameterChecks.reject(ErrorCode.BAD_REQUEST);
         return result;
     }
 

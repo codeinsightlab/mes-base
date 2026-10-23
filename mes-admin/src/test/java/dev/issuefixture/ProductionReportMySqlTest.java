@@ -133,7 +133,7 @@ class ProductionReportMySqlTest {
         var source = jdbc.queryForMap("SELECT e.id,e.workorder_id,e.product_id,e.routing_id FROM mes_production_execution e JOIN mes_execution_path p ON p.id=e.id WHERE p.path_status='LOCKED' AND EXISTS(SELECT 1 FROM mes_execution_path_node n WHERE n.execution_id=e.id) ORDER BY e.id LIMIT 1");
         long order = insert(jdbc, "INSERT INTO workorder(source,code,product_id,planned_qty,routing_id,status,revision,create_time,update_time) VALUES('LOCAL',?,?,10,?,'RELEASED',0,NOW(),NOW())", tag, source.get("product_id"), source.get("routing_id"));
         jdbc.update("INSERT INTO workorder_erp_extra(id) VALUES(?)", order);
-        long execution = insert(jdbc, "INSERT INTO mes_production_execution(execution_no,workorder_id,product_id,routing_id,target_qty,status,remark,create_by,create_time) VALUES(?,?,?,?,10,'READY',?,'TEST_ONLY_REPORT',NOW())", tag, order, source.get("product_id"), source.get("routing_id"), tag);
+        long execution = insert(jdbc, "INSERT INTO mes_production_execution(workorder_id,product_id,routing_id,target_qty,status,remark,create_by,create_time) VALUES(?,?,?,10,'READY',?,'TEST_ONLY_REPORT',NOW())", order, source.get("product_id"), source.get("routing_id"), tag);
         jdbc.update("INSERT INTO mes_execution_path(id,routing_id,path_status,revision,selected_at,locked_at) VALUES(?,?,'LOCKED',1,NOW(),NOW())", execution, source.get("routing_id"));
         jdbc.update("INSERT INTO mes_execution_path_node(execution_id,sequence_no,routing_node_id) SELECT ?,sequence_no,routing_node_id FROM mes_execution_path_node WHERE execution_id=?", execution, source.get("id"));
         long node = jdbc.queryForObject("SELECT routing_node_id FROM mes_execution_path_node WHERE execution_id=? AND sequence_no=1", Long.class, execution);
@@ -228,7 +228,8 @@ class ProductionReportMySqlTest {
                     reports.voidOriginalReport(first.getId(), new VoidOriginal(f.tag()));
                     assertEquals(0, quantities.getNodeQuantity(f.executionId(), f.firstNode()).reportedQty().signum());
                     assertThrows(FoundationException.class, () -> reports.voidOriginalReport(first.getId(), new VoidOriginal(f.tag())));
-                    assertEquals(0, new BigDecimal("4.123456").compareTo(reports.getDetail(first.getId()).record().getQuantityDelta()));
+                    assertEquals(0, new BigDecimal("4.123456").compareTo(reports.getDetail(first.getId()).record()
+                            .getQuantityDelta()));
                     assertThrows(RuntimeException.class, () -> jdbc.update("INSERT INTO mes_production_report(execution_id,routing_node_id,record_type,quantity_delta,operator_user_id,recorded_by,report_time,reason,create_time) VALUES(?,?,'REPORT',0,100,100,NOW(),?,NOW())", f.executionId(), f.firstNode(), f.tag()));
                     var page = reports.page(f.executionId(), f.firstNode(), 0, 20);
                     assertEquals(3, page.total());

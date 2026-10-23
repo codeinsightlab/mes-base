@@ -1,5 +1,7 @@
 package dev.mesbase.business.production.service;
 
+import dev.mesbase.common.utils.RequestFingerprint;
+
 import dev.mesbase.common.validation.ParameterChecks;
 import dev.mesbase.business.production.domain.ProductionQuantityInput;
 
@@ -8,6 +10,7 @@ import dev.mesbase.business.issue.domain.MaterialIssueStatus;
 import dev.mesbase.business.production.domain.ProductionExecutionStatus;
 import dev.mesbase.business.production.domain.WorkOrderStatus;
 import dev.mesbase.business.production.domain.ProductionScanCode;
+import dev.mesbase.business.production.domain.ProductionCodeRules;
 import dev.mesbase.business.production.domain.MesProductionExecutionCreateCommand;
 import dev.mesbase.business.production.service.IMesProductionExecutionService;
 import dev.mesbase.business.issue.domain.MesMaterialIssueCreateCommand;
@@ -58,7 +61,7 @@ public class ProductionInputService {
                           String calculationKey) {
     }
 
-    public record Result(String requestId, String issueId, String executionId, String executionNo, String code,
+    public record Result(String requestId, String issueId, String executionId, String code,
                          String status, String productionInputQty, String availableQty) {
     }
 
@@ -122,12 +125,13 @@ public class ProductionInputService {
 
     @Transactional(transactionManager = "businessTransactionManager", readOnly = true)
     public Preview preview(String code, Long workorderId) {
-        var order = readOrder(workorderId);
+        var scanned = ProductionCodeRules.parse(code);
+        var order = identities.requireOrder(scanned);
+        if (!Objects.equals(order.getId(), workorderId)) ParameterChecks.reject(ErrorCode.BAD_REQUEST);
         sources.order(workorderId);
-        var material = ProductionScanCode.material(code);
         var product = materials.selectByPrimaryKey(order.getProductId());
         if (product == null) ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
-        var execution = identities.findExecution(workorderId, product.getId(), material.lotCode());
+        var execution = identities.findExecution(workorderId, product.getId(), scanned.batchNo());
         if (execution == null) return new Preview(routingService.detail(order.getRoutingId()), null);
         return new Preview(routingService.detail(execution.getRoutingId()), paths.view(execution.getId()));
     }
@@ -142,7 +146,7 @@ public class ProductionInputService {
     public Result submit(Command command) {
         validate(command);
         var scope = FactoryContext.required();
-        String hash = ProductionScanCode.digest(json.writeValueAsString(command));
+        String hash = RequestFingerprint.sha256(json.writeValueAsString(command));
         var previous = transaction.execute(s -> inputs.selectByPrimaryKey(command.requestId()));
         if (previous != null) return replay(previous, hash); // Never repeat an external create on replay.
         ProductionQuantityInput.check(command.outputQty());
@@ -178,7 +182,9 @@ public class ProductionInputService {
             ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
         String batchNo = calculation.stock().lotCode();
         // The source stock supplies the permanent batch property. The barcode is only a lookup representation.
-        new ProductionScanCode(order.getCode(), product.getCode(), batchNo);
+        var scanned = ProductionCodeRules.parse(c.code());
+        if (!order.getCode().equals(scanned.workorderCode()) || !product.getCode().equals(scanned.productCode())
+                || !Objects.equals(batchNo, scanned.batchNo())) ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
         var existingExecution = identities.findExecution(order.getId(), product.getId(), batchNo);
         Long executionId;
         if (existingExecution == null) {
@@ -237,12 +243,12 @@ public class ProductionInputService {
     private Result result(MesMaterialIssueInputEntity f, String status) {
         var execution = executionMapper.selectByPrimaryKey(f.getExecutionId());
         var product = materials.selectByPrimaryKey(execution.getProductId());
-        String code = "EXE:" + execution.getId();
+        String code = null;
         if (execution.getBatchNo() != null)
-            code = new ProductionScanCode(readOrder(execution.getWorkorderId()).getCode(), product.getCode(), execution.getBatchNo()).encode();
+            code = ProductionCodeRules.format(new ProductionScanCode(readOrder(execution.getWorkorderId()).getCode(), product.getCode(), execution.getBatchNo()));
         var q = quantities.getExecutionQuantities(execution.getId());
         return new Result(f.getId(), f.getIssueId().toString(), f.getExecutionId()
-                .toString(), execution.getExecutionNo(), code, status, q.productionInputQty().toPlainString(), q.nodes()
+                .toString(), code, status, q.productionInputQty().toPlainString(), q.nodes()
                 .isEmpty() ? "0" : q.nodes().getFirst().availableQty().toPlainString());
     }
 

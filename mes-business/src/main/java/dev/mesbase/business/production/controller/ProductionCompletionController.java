@@ -27,7 +27,7 @@ public class ProductionCompletionController {
                        String inboundQty, String operatorUserId, LocalDateTime recordedAt, String reason) {
     }
 
-    public record Summary(String executionId, String executionNo, String status, String targetQty, String effective,
+    public record Summary(String executionId, String status, String targetQty, String effective,
                           String released, String historicalReleased, String basisHash, boolean canComplete,
                           String blockedReason, Fact completion, String receivedQty, String defectQty,
                           String receiptState, String orderBlockedReason) {
@@ -46,7 +46,7 @@ public class ProductionCompletionController {
     }
 
     private static Summary summaryView(Long id, ProductionCompletionService.Summary s) {
-        return new Summary(id.toString(), s.execution().getExecutionNo(), s.execution().getStatus(), s.execution()
+        return new Summary(id.toString(), s.execution().getStatus(), s.execution()
                 .getTargetQty().toPlainString(),
                 s.release().effective().toPlainString(), s.release().released().toPlainString(), s.release()
                 .historicalReleased().toPlainString(), s.release()

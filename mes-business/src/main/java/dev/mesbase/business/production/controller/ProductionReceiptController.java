@@ -34,7 +34,7 @@ public class ProductionReceiptController {
         this.service = service;
     }
 
-    public record Ledger(String id, String receiptNo, String executionId, String executionNo, String workorderCode,
+    public record Ledger(String id, String receiptNo, String executionId, String workorderCode,
                          String productCode, String productName, String warehouseId, String warehouseName,
                          String productLotCode, String recordType,
                          String quantityDelta, String referenceReceiptId, String operatorUserId, String operatorName,
@@ -69,7 +69,6 @@ public class ProductionReceiptController {
     private static Ledger view(MesProductionReceiptEntity r, Map<Long, String> names) {
         ProductionReceiptRow ref = r instanceof ProductionReceiptRow row ? row : null;
         return new Ledger(r.getId(), r.getReceiptNo(), id(r.getExecutionId()), Optional.ofNullable(ref)
-                .map(nullableValue -> nullableValue.getExecutionNo()).orElse(null), Optional.ofNullable(ref)
                 .map(nullableValue -> nullableValue.getWorkorderCode()).orElse(null),
                 Optional.ofNullable(ref).map(nullableValue -> nullableValue.getProductCode())
                         .orElse(null), Optional.ofNullable(ref).map(nullableValue -> nullableValue.getProductName())

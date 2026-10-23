@@ -49,8 +49,8 @@ public class ProductionDefectController {
                           String responsibleUserName, String reportedByName, String recordedByName,
                           String defectTypeId, String defectTypeCodeSnapshot, String defectTypeNameSnapshot,
                           Integer defectTypeRevision, String processingState, String pendingQuantity,
-                          String returnedQuantity, String transferredQuantity, String executionNo,
-                          String workorderCode, String productCode, String productName,
+                          String returnedQuantity, String transferredQuantity, String workorderCode, String productCode,
+                          String productName,
                           String workorderStatus, String executionStatus, String source, String batchNo,
                           String specification, String receiptState) {
     }

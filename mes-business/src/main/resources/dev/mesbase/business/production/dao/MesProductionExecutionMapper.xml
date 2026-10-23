@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
+<!-- MES-CODEGEN: MyBatis Generator standard single-table persistence. -->
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="dev.mesbase.business.production.dao.MesProductionExecutionMapper">
   <resultMap id="BaseResultMap" type="dev.mesbase.business.production.domain.MesProductionExecutionEntity">
     <id column="id" jdbcType="BIGINT" property="id" />
-    <result column="execution_no" jdbcType="VARCHAR" property="executionNo" />
     <result column="workorder_id" jdbcType="BIGINT" property="workorderId" />
     <result column="product_id" jdbcType="BIGINT" property="productId" />
     <result column="batch_no" jdbcType="VARCHAR" property="batchNo" />
@@ -77,8 +77,8 @@
     </where>
   </sql>
   <sql id="Base_Column_List">
-    id, execution_no, workorder_id, product_id, batch_no, routing_id, target_qty, status,
-    start_time, end_time, remark, create_by, create_time, update_by, update_time
+    id, workorder_id, product_id, batch_no, routing_id, target_qty, status, start_time,
+    end_time, remark, create_by, create_time, update_by, update_time
   </sql>
   <select id="selectByExample" parameterType="dev.mesbase.business.production.domain.MesProductionExecutionExample" resultMap="BaseResultMap">
     select
@@ -108,23 +108,20 @@
     </if>
   </delete>
   <insert id="insert" keyColumn="id" keyProperty="id" parameterType="dev.mesbase.business.production.domain.MesProductionExecutionEntity" useGeneratedKeys="true">
-    insert into mes_production_execution (execution_no, workorder_id, product_id,
-      batch_no, routing_id, target_qty,
-      status, start_time, end_time,
-      remark, create_by, create_time,
-      update_by, update_time)
-    values (#{executionNo,jdbcType=VARCHAR}, #{workorderId,jdbcType=BIGINT}, #{productId,jdbcType=BIGINT},
-      #{batchNo,jdbcType=VARCHAR}, #{routingId,jdbcType=BIGINT}, #{targetQty,jdbcType=DECIMAL},
-      #{status,jdbcType=VARCHAR}, #{startTime,jdbcType=TIMESTAMP}, #{endTime,jdbcType=TIMESTAMP},
-      #{remark,jdbcType=VARCHAR}, #{createBy,jdbcType=VARCHAR}, #{createTime,jdbcType=TIMESTAMP},
-      #{updateBy,jdbcType=VARCHAR}, #{updateTime,jdbcType=TIMESTAMP})
+    insert into mes_production_execution (workorder_id, product_id, batch_no,
+      routing_id, target_qty, status,
+      start_time, end_time, remark,
+      create_by, create_time, update_by,
+      update_time)
+    values (#{workorderId,jdbcType=BIGINT}, #{productId,jdbcType=BIGINT}, #{batchNo,jdbcType=VARCHAR},
+      #{routingId,jdbcType=BIGINT}, #{targetQty,jdbcType=DECIMAL}, #{status,jdbcType=VARCHAR},
+      #{startTime,jdbcType=TIMESTAMP}, #{endTime,jdbcType=TIMESTAMP}, #{remark,jdbcType=VARCHAR},
+      #{createBy,jdbcType=VARCHAR}, #{createTime,jdbcType=TIMESTAMP}, #{updateBy,jdbcType=VARCHAR},
+      #{updateTime,jdbcType=TIMESTAMP})
   </insert>
   <insert id="insertSelective" keyColumn="id" keyProperty="id" parameterType="dev.mesbase.business.production.domain.MesProductionExecutionEntity" useGeneratedKeys="true">
     insert into mes_production_execution
     <trim prefix="(" suffix=")" suffixOverrides=",">
-      <if test="executionNo != null">
-        execution_no,
-      </if>
       <if test="workorderId != null">
         workorder_id,
       </if>
@@ -166,9 +163,6 @@
       </if>
     </trim>
     <trim prefix="values (" suffix=")" suffixOverrides=",">
-      <if test="executionNo != null">
-        #{executionNo,jdbcType=VARCHAR},
-      </if>
       <if test="workorderId != null">
         #{workorderId,jdbcType=BIGINT},
       </if>
@@ -222,9 +216,6 @@
       <if test="row.id != null">
         id = #{row.id,jdbcType=BIGINT},
       </if>
-      <if test="row.executionNo != null">
-        execution_no = #{row.executionNo,jdbcType=VARCHAR},
-      </if>
       <if test="row.workorderId != null">
         workorder_id = #{row.workorderId,jdbcType=BIGINT},
       </if>
@@ -272,7 +263,6 @@
   <update id="updateByExample" parameterType="map">
     update mes_production_execution
     set id = #{row.id,jdbcType=BIGINT},
-      execution_no = #{row.executionNo,jdbcType=VARCHAR},
       workorder_id = #{row.workorderId,jdbcType=BIGINT},
       product_id = #{row.productId,jdbcType=BIGINT},
       batch_no = #{row.batchNo,jdbcType=VARCHAR},
@@ -293,9 +283,6 @@
   <update id="updateByPrimaryKeySelective" parameterType="dev.mesbase.business.production.domain.MesProductionExecutionEntity">
     update mes_production_execution
     <set>
-      <if test="executionNo != null">
-        execution_no = #{executionNo,jdbcType=VARCHAR},
-      </if>
       <if test="workorderId != null">
         workorder_id = #{workorderId,jdbcType=BIGINT},
       </if>
@@ -340,8 +327,7 @@
   </update>
   <update id="updateByPrimaryKey" parameterType="dev.mesbase.business.production.domain.MesProductionExecutionEntity">
     update mes_production_execution
-    set execution_no = #{executionNo,jdbcType=VARCHAR},
-      workorder_id = #{workorderId,jdbcType=BIGINT},
+    set workorder_id = #{workorderId,jdbcType=BIGINT},
       product_id = #{productId,jdbcType=BIGINT},
       batch_no = #{batchNo,jdbcType=VARCHAR},
       routing_id = #{routingId,jdbcType=BIGINT},

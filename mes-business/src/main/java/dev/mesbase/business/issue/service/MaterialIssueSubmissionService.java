@@ -182,7 +182,7 @@ public class MaterialIssueSubmissionService {
         var command = new MaterialIssueSubmitCommand(id, "ISSUE-SUBMIT-" + attempt.getId(), row.getIssueNo(), row.getWorkorderId(), row.getWorkorderCode(), Optional.ofNullable(external)
                 .map(nullableValue -> nullableValue.getExternalId()).orElse(null), Optional.ofNullable(external)
                 .map(nullableValue -> nullableValue.getExternalCode())
-                .orElse(null), e.getId(), e.getExecutionNo(), row.getProductId(), row.getProductCode(), e.getRoutingId(), path.getRevision(), paths.view(e.getId())
+                .orElse(null), e.getId(), row.getProductId(), row.getProductCode(), e.getRoutingId(), path.getRevision(), paths.view(e.getId())
                 .selectedNodeIds(), Objects.toString(row.getIssueTime(), null), lines.stream()
                 .map(i -> new Line(i.getId(), i.getMaterialId(), i.getMaterialCode(), i.getBatchNo(), i.getQuantity(), i.getUnitId(), i.getUnitCode(), i.getWarehouseId(), i.getWarehouseCode(), externalWarehouses.get(i.getWarehouseId())))
                 .toList(), inputFacts.snapshot(id), new Source(selection.provider(), selection.bindingKey(),

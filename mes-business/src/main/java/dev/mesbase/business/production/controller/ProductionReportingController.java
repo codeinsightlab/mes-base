@@ -50,8 +50,8 @@ public class ProductionReportingController {
 
     @GetMapping("/context")
     @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED, permission = PERMISSION)
-    public Context context(@RequestParam String code) {
-        var c = service.context(code);
+    public Context context(@RequestParam Long executionId) {
+        var c = service.context(executionId);
         var identity = BeanConversions.convert(c.identity(), ProductionIdentityVo.class);
         return new Context(identity, ProductionReportViews.execution(c.quantities()), ExecutionActionController.toView(c.path()),
                 c.candidates().stream().map(n -> new Candidate(n.routingNodeId().toString(), n.status(), n.reason()))

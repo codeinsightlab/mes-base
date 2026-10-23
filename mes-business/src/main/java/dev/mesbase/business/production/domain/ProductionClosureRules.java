@@ -1,5 +1,7 @@
 package dev.mesbase.business.production.domain;
 
+import dev.mesbase.common.utils.RequestFingerprint;
+
 import dev.mesbase.common.validation.ParameterChecks;
 import dev.mesbase.common.utils.SecurityUtils;
 import dev.mesbase.core.error.ErrorCode;
@@ -25,7 +27,8 @@ public final class ProductionClosureRules {
     }
 
     public static void quantity(BigDecimal q, boolean zero) {
-        if (q == null || q.signum() < (zero ? 0 : 1) || q.scale() > 6 || q.precision() - q.scale() > 14) ParameterChecks.reject(ErrorCode.BAD_REQUEST);
+        if (q == null || q.signum() < (zero ? 0 : 1) || q.scale() > 6 || q.precision() - q.scale() > 14)
+            ParameterChecks.reject(ErrorCode.BAD_REQUEST);
     }
 
     public static void reason(String reason) {
@@ -33,7 +36,7 @@ public final class ProductionClosureRules {
     }
 
     public static String hash(Object... values) {
-        return ProductionScanCode.digest(new ObjectMapper().writeValueAsString(Arrays.asList(values)));
+        return RequestFingerprint.sha256(new ObjectMapper().writeValueAsString(Arrays.asList(values)));
     }
 
     public static String number(BigDecimal q) {
@@ -45,7 +48,6 @@ public final class ProductionClosureRules {
         if (id == null) throw new FoundationException(ErrorCode.UNAUTHENTICATED);
         return id;
     }
-
 
 
     public static void blocked(String explanation) {

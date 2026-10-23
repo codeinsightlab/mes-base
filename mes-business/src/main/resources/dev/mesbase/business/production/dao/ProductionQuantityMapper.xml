@@ -36,7 +36,7 @@
         <bind name="inputNONE" value="@dev.mesbase.business.integration.warehouse.ExternalEffect@NONE.getValue()"/>
         <bind name="inputEFFECTIVE"
               value="@dev.mesbase.business.integration.warehouse.ErpIssueQueryResult$DocumentStatus@EFFECTIVE.getValue()"/>
-        SELECT e.id AS executionId,e.workorder_id AS workorderId,e.execution_no AS executionNo,e.routing_id AS
+        SELECT e.id AS executionId,e.workorder_id AS workorderId,e.routing_id AS
         routingId,
         e.target_qty AS targetQty,p.path_status AS pathStatus,COALESCE(SUM(r.quantity_delta),0) AS lastNodeReportedQty,
         COALESCE((SELECT SUM(f.output_qty) FROM mes_material_issue_input f
@@ -54,7 +54,7 @@
         AND n.sequence_no=(SELECT MAX(last.sequence_no) FROM mes_execution_path_node last WHERE last.execution_id=e.id)
         LEFT JOIN mes_production_report r ON r.execution_id=e.id AND r.routing_node_id=n.routing_node_id
         WHERE e.workorder_id=#{workorderId}
-        GROUP BY e.id,e.workorder_id,e.execution_no,e.routing_id,e.target_qty,p.path_status
+        GROUP BY e.id,e.workorder_id,e.routing_id,e.target_qty,p.path_status
         ORDER BY e.id DESC
     </select>
     <sql id="InputBalanceBindings">

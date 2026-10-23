@@ -7,8 +7,6 @@ import java.time.LocalDateTime;
 public class MesProductionExecutionEntity {
     private Long id;
 
-    private String executionNo;
-
     private Long workorderId;
 
     private Long productId;
@@ -41,14 +39,6 @@ public class MesProductionExecutionEntity {
 
     public void setId(Long id) {
         this.id = id;
-    }
-
-    public String getExecutionNo() {
-        return executionNo;
-    }
-
-    public void setExecutionNo(String executionNo) {
-        this.executionNo = executionNo;
     }
 
     public Long getWorkorderId() {

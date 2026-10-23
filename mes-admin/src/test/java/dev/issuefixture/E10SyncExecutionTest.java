@@ -323,14 +323,14 @@ class E10SyncExecutionTest {
                 f.orders(raw("FROZEN"));
                 assertEquals(1, f.service.execute(Kind.WORKORDER, true, 20, 5).created());
                 long id = f.db.queryForObject("SELECT id FROM workorder WHERE code='FROZEN'", Long.class);
-                f.db.update("INSERT INTO mes_production_execution(execution_no,workorder_id,product_id,routing_id,target_qty,status) VALUES('TEST_E10_FACT',?,1,1,10,'READY')", id);
+                f.db.update("INSERT INTO mes_production_execution(workorder_id,product_id,routing_id,target_qty,status) VALUES(?,1,1,10,'READY')", id);
                 f.orders(raw("FROZEN").deepCopy().withObject("").put("plan_qty", "200"));
                 var frozen = f.service.execute(Kind.WORKORDER, true, 20, 5);
                 assertEquals(1, frozen.conflicts());
                 assertTrue(frozen.items().getFirst().reasons().getFirst().contains("EXECUTION_FROZEN"));
                 assertEquals("100.123456", f.db.queryForObject("SELECT planned_qty FROM workorder WHERE id=?", BigDecimal.class, id)
                         .toPlainString());
-                assertEquals(1, f.db.queryForObject("SELECT COUNT(*) FROM mes_production_execution WHERE execution_no='TEST_E10_FACT'", Integer.class));
+                assertEquals(1, f.db.queryForObject("SELECT COUNT(*) FROM mes_production_execution WHERE workorder_id=?", Integer.class, id));
             });
         }
     }

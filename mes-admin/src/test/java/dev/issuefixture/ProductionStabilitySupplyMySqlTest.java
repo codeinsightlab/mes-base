@@ -4,6 +4,7 @@ import dev.mesbase.business.integration.warehouse.WarehouseIntegration;
 import dev.mesbase.business.wm.service.LocalProductionSupply;
 import dev.mesbase.business.production.controller.ProductionInputController;
 import dev.mesbase.business.production.service.ProductionInputService;
+import dev.mesbase.business.production.service.ProductionIdentityService;
 import dev.mesbase.business.production.service.ProductionInputSupplyService;
 import dev.mesbase.core.factory.FactoryId;
 import dev.mesbase.core.factory.FactoryScope;
@@ -28,7 +29,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @EnabledIfEnvironmentVariable(named = "MES_STABILITY_READ_MYSQL", matches = "true")
 class ProductionStabilitySupplyMySqlTest {
     @Test
-    void existing101ReleasedOrdersDoNotBlockConfiguredMaterialQuery() throws Exception {
+    void existing101ReleasedOrdersDoNotBroadenTheScannedProductionOrder() throws Exception {
         try (var c = ProductionDefectMySqlTest.context()) {
             c.getEnvironment().getPropertySources().addFirst(new MapPropertySource("TEST ONLY read supply", Map.of(
                     "mes.production.input.factories.SIMPLE_B.workorders.117.material-id", "1",
@@ -38,10 +39,11 @@ class ProductionStabilitySupplyMySqlTest {
             c.registerBean(WarehouseIntegration.class);
             c.registerBean(LocalProductionSupply.class);
             c.registerBean(ProductionInputSupplyService.class);
+            c.registerBean(ProductionIdentityService.class);
             var jdbc = c.getBean(JdbcTemplate.class);
             long count = jdbc.queryForObject("SELECT COUNT(*) FROM workorder WHERE status='RELEASED'", Long.class);
             assertTrue(count >= 101);
-            var code = jdbc.queryForObject("SELECT CONCAT(m.code,'#',s.batch_no) FROM wm_inventory s JOIN material m ON m.id=s.material_id WHERE s.id=13", String.class);
+            var code = jdbc.queryForObject("SELECT CONCAT(w.code,':',m.code,'#',s.batch_no) FROM workorder w JOIN material m ON m.id=w.product_id JOIN wm_inventory s ON s.id=13 WHERE w.id=117", String.class);
             var mvc = MockMvcBuilders.standaloneSetup(new ProductionInputController(c.getBean(ProductionInputSupplyService.class), mock(ProductionInputService.class)))
                     .build();
             var scope = new FactoryScope(new FactoryId("SIMPLE_B"));

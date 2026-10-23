@@ -6,7 +6,7 @@ import java.time.LocalDateTime;
 /**
  * Read-only ledger projection. Quantity deltas include corrections, not qualified output.
  */
-public record RecentProductionReport(Long id, Long executionId, String executionNo, Long workorderId,
+public record RecentProductionReport(Long id, Long executionId, Long workorderId,
                                      String workorderCode, String source, String productCode, String productName,
                                      String unitName, Long routingNodeId, String operationName, String recordType,
                                      BigDecimal quantityDelta, Long operatorUserId, LocalDateTime reportTime,

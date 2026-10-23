@@ -1,5 +1,7 @@
 package dev.mesbase.business.wm.service;
 
+import dev.mesbase.common.utils.RequestFingerprint;
+
 import dev.mesbase.business.basic.dao.MaterialMapper;
 import dev.mesbase.business.basic.dao.UnitMeasureMapper;
 import dev.mesbase.business.integration.production.ProductionSupply.Calculation;
@@ -14,7 +16,6 @@ import dev.mesbase.business.production.dao.MesProductionReceiptMapper;
 import dev.mesbase.business.production.dao.MesProductionReportMapper;
 import dev.mesbase.business.production.domain.MesProductionReceiptExample;
 import dev.mesbase.business.production.domain.MesProductionReportExample;
-import dev.mesbase.business.production.domain.ProductionScanCode;
 import dev.mesbase.business.production.service.BusinessSourceRules;
 import dev.mesbase.business.production.service.ProductionChainLocks;
 import dev.mesbase.business.quality.dao.MesProductionDefectMapper;
@@ -409,7 +410,7 @@ public class LocalStockService {
     }
 
     private static String digest(Object... values) {
-        return ProductionScanCode.digest(new ObjectMapper().writeValueAsString(Arrays.asList(values)));
+        return RequestFingerprint.sha256(new ObjectMapper().writeValueAsString(Arrays.asList(values)));
     }
 
 

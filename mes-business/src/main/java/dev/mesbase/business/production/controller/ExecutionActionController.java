@@ -43,7 +43,7 @@ public class ExecutionActionController {
 
     public record PathView(String executionId, String executionStatus, String routingId, String pathStatus,
                            int revision, LocalDateTime selectedAt, LocalDateTime lockedAt, List<String> selectedNodeIds,
-                           List<NodeView> nodes, List<EdgeView> edges, String executionNo, String routingCode,
+                           List<NodeView> nodes, List<EdgeView> edges, String routingCode,
                            String routingName, Integer routingVersion) {
     }
 
@@ -78,7 +78,7 @@ public class ExecutionActionController {
                         .toString(), n.getOperationCode()))
                 .toList(), model.edges().stream()
                 .map(e -> new EdgeView(e.getFromNodeId().toString(), e.getToNodeId().toString()))
-                .toList(), model.executionNo(), model.routing().code(), model.routing().name(), model.routing()
+                .toList(), model.routing().code(), model.routing().name(), model.routing()
                 .version());
     }
 }

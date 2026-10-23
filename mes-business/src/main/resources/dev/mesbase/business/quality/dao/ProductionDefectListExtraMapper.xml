@@ -2,7 +2,7 @@
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="dev.mesbase.business.quality.dao.ProductionDefectListExtraMapper">
   <select id="selectContexts" resultType="dev.mesbase.business.quality.domain.ProductionDefectModels$ListContext">
-    SELECT d.declaration_id AS declarationId, e.execution_no AS executionNo,
+    SELECT d.declaration_id AS declarationId,
       w.code AS workorderCode, m.code AS productCode, m.name AS productName,
       w.status AS workorderStatus, e.status AS executionStatus, w.source AS source,
       e.batch_no AS batchNo,
