@@ -452,3 +452,33 @@ MySQL支持按主键 `SELECT ... FOR UPDATE` 同时取得当前行与排他锁�
 DEV两JVM验证同UUID16请求只一事实；不同UUID数量竞争10成功6拒绝、总量10；READY、payload冲突、工单作废、失败完工/回滚、库存重复过账及同库存竞争均按预期。捕获workorder PRIMARY的RECORD/X,REC_NOT_GAP等待及ROLLBACK后放行。新JAR f7025c0e99013aa0ccbc8167258299f5beb764c7df483d150c6f61639b3a62b8。
 
 两版各1280计时请求，1/4/8/16并发吞吐A 2.403/8.311/14.296/24.988，B 2.716/9.191/16.579/26.762 req/s，全部成功。16并发P95 751.91→772.84ms略升，不宣称尾延迟全面改善。旧Source Factory B45表摘要和绑定不变，DEV既有123886行逐字段未改。完整报告、逐条SQL、资源和限制见[性能报告第14节](2026-10-19-dev-production-chain-performance.md#14-2026-10-19-同值-update-锁改为-for-update实施与-dev-对照)及[独立证据](evidence/2026-10-19-production-lock-for-update/README.md)。上文“尚未实施”的结论仅对应前一阶段，现由本节实施证据补充；原失败/成功Trace不覆盖。
+
+
+## 2026-10-23 工单1914历史报工不可查看：只读定位
+
+### 真实页面与目标
+
+用户指出`/production/mesProductionExecution?workorderId=1914`不能查看已迁入报工。本轮直接读取用户Chrome现有页面，当前厂为TEST_DEV_PERF_20261019、用户admin；从Execution12366的更多操作进入“查看生产数量”。正式页面实际显示“当前记录暂不能处理，请先核对处置记录”，节点表显示“暂无已确定的执行路径”，没有加载报工流水。本轮未做业务写入。
+
+只读核对中心绑定：mes_base_dev.mf_factory → datasource9 → 192.168.18.25:3306/mes_base_dev_perf_test，工厂及数据源均ENABLED；实例UUID为03dbc952-7403-11ef-802c-0242ac130002；业务Flyway最新成功版本54。本轮通过START TRANSACTION READ ONLY执行固定SELECT，未执行迁移或修改数据。
+
+工单1914有Execution12357—12367，共11个，当前均COMPLETED。选中样本12366的mes_production_report有18条，分别关联routing_node_id147—164：首节点400，148—162各397，163/164各375；不是报工记录缺失。关联mes_quality_treatment有ASSESS5条、ALLOCATE5条。本次未逐个执行剩余10个Execution的页面和质量查询，不把一个样本外推为全部历史工单的运行验收。
+
+### 根因调用链与证据
+
+1. UI ProductionExecutionList允许当前账号进入数量查看，故不是按钮因历史状态一律隐藏。
+2. UI `src/components/business/production/ProductionReportManager.vue:32—43`：refresh先await api.quantities，只有成功取得nodes后才loadLedger；数量读取失败使报工账本也不可查看。
+3. 后端 `ProductionReportController.quantities → ProductionQuantityService.getExecutionQuantities/load → ExecutionQualityReferenceQueryImpl.nodeTotals → QualityTreatmentService.nodeTotals/nodeTotalsRows → summarizeRows`。summarizeRows双参数重载默认strict=true，232行逐事件调用Action.from。
+4. `QualityTreatmentModels.Action`当前只识别ASSESS/RETURN_NODE/TRANSFER_WAREHOUSE；ALLOCATE被Action.from拒绝为QUALITY_DATA_INVALID。前端request.ts将该码显示为上述实际页面消息。数据库样本与源码拒绝路径吻合；本轮没有取得服务端调用栈，因此不虚构异常堆栈。
+5. 后端原始报工page本身走requireReadableExecutionNode校验实际路径，随后分页读正式报工；这条只读账本查询不需要先完成质量数量投影。主要联动阻断来自页面串行依赖及数量读模型的严格质量动作校验。
+
+### 修复边界建议（本轮未实施）
+
+- 原始报工/节点读取与可计算数量投影分离，数量待确认时仍返回/展示真实报工及分页，不用零数量或“无路径”掩盖投影失败。
+- 质量/生产只读投影对不能解释的动作显式表达待确认和合法nullable派生量；写、领料、质量入库与完结继续严格校验。不恢复ALLOCATE等旧流程的处理入口，不做迁移专用页面/兜底或改写旧事实。
+- 不捕获权限/Factory/网络/数据库异常后当作正常空记录。客户端能显示可读事实不代表允许操作。
+- 需要定向覆盖：质量投影报错仍可查原始账本、未知动作不误算成0、分页/节点选择、撤权/切厂/迟到响应，以及写门禁不被放宽。
+
+### 回执与验证边界
+
+仅追加本文件本节。实际执行浏览器只读复现、目标绑定及样本SQL只读查询、当前源码追踪；未运行测试/构建、未修改业务代码/测试/配置/数据，未启停服务，未调用ERP。数量投影/流水UI及后端均未修复；本节是定位证据和最小修复边界，不能视为问题已解决。提交仅包含本节文档，不夹带两仓其他工作。
