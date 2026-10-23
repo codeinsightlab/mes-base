@@ -1,0 +1,61 @@
+{
+  "date": "2026-10-23",
+  "target": {
+    "host": "192.168.18.25",
+    "port": 3306,
+    "serverUuid": "03dbc952-7403-11ef-802c-0242ac130002",
+    "factory": "TEST_DEV_PERF_20261019",
+    "datasourceId": 9,
+    "businessDatabase": "mes_base_dev_perf_test",
+    "centerDatabase": "mes_base_dev"
+  },
+  "business": {
+    "version": "60",
+    "table": "mes_execution_completion",
+    "releasedQtyNullable": true,
+    "unchangedCompletionRows": 4,
+    "unchangedQualityReleaseAuditRows": 913,
+    "history": [
+      "60",
+      "retire completion release snapshot",
+      "V60__retire_completion_release_snapshot.sql",
+      "604741413",
+      "1"
+    ],
+    "mechanism": "scripts/mes-business-flyway migrate 60; validate 60"
+  },
+  "center": {
+    "version": "45",
+    "removedMenuIds": [
+      2628,
+      2629
+    ],
+    "removedGrantCount": 4,
+    "preservedReadPermissionMenuId": 2627,
+    "unrelatedMenusGrantsAndFactoryConfigurationsUnchanged": true,
+    "history": [
+      "45",
+      "retire quality release commands",
+      "V45__retire_quality_release_commands.sql",
+      "1085260200",
+      "1"
+    ],
+    "mechanism": "current FactoryFlyway.configure with Java V34; migrate target 45; validate"
+  },
+  "backups": {
+    "grants-before.tsv": "4ebc0f698c1722c1b7db4e2b8363ddd9823e9664db161e0c6553ddb31672cfc1",
+    "business-before.sql": "320567b11d35c47fce9eae6c4cb5ddf5977e0c7feeba92b11239f34fb4d0de42",
+    "completion-before.tsv": "46afb6d8b732a34e8872c4fc3eff9983c93a8b23affba0d78197bf0c6ee5720d",
+    "menus-before.tsv": "779ebce889ab7797de5b4eff88413ec744e89c64d8ea5978c7ce48bbce675d09",
+    "release-audit-before.tsv": "1931d9461c5f8382aa7a1d94b9a1ed792fb624396554189611e66adbc3e42bec",
+    "factories-before.tsv": "9360ab2d2391dc419f108eee6b68d911582ecb578160efa3a590b1686b12f40f",
+    "center-before.sql": "b0dc281cd572e93908287675591d69a23f3e2183368107a2e6d47685a2e2e03b",
+    "identity-before.tsv": "c06dd5074f0062d543e3522c4f1a6432b2a551aca1d7058e5314bae163c6895b"
+  },
+  "boundaries": [
+    "No business facts modified",
+    "No user service started/stopped/restarted",
+    "No HTTP/browser acceptance performed",
+    "Existing completion release snapshots retained verbatim; future completion may store NULL"
+  ]
+}
