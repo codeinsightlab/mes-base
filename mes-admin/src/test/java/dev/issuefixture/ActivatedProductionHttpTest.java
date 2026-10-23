@@ -106,7 +106,8 @@ class ActivatedProductionHttpTest {
             j.update("UPDATE workorder SET planned_qty=100 WHERE id=1");
             j.update("INSERT INTO mes_operation_user(operation_id,user_id) VALUES(1,1)");
             http.perform(ProductionCoreV1HttpTest.full(get("/api/production/executions/1/closure")))
-                    .andExpect(status().isOk()).andExpect(jsonPath("canComplete").value(false));
+                    .andExpect(status().isOk()).andExpect(jsonPath("receiptState").value("PENDING"))
+                    .andExpect(jsonPath("canComplete").doesNotExist());
             http.perform(ProductionCoreV1HttpTest.full(post(ProductionReportingHttpTest.ROOT))
                     .content(ProductionReportingHttpTest.body(15, "10"))).andExpect(status().isOk());
             assertEquals("RUNNING", j.queryForObject("SELECT status FROM mes_production_execution WHERE id=1", String.class));
@@ -127,7 +128,8 @@ class ActivatedProductionHttpTest {
             when(mapper.nodes(1L)).thenReturn(pending);
             var http = MaterialIssueHttpTest.mvc(c);
             http.perform(ProductionCoreV1HttpTest.full(get("/api/production/executions/1/closure")))
-                    .andExpect(status().isOk()).andExpect(jsonPath("canComplete").value(false));
+                    .andExpect(status().isOk()).andExpect(jsonPath("receiptState").value("PENDING"))
+                    .andExpect(jsonPath("canComplete").doesNotExist());
             var q = QualityWorkflowHttpTest.quantities(http);
             QualityWorkflowHttpTest.amount(q.path("nodes").get(1), "unverifiedDefectQty", "10");
             QualityWorkflowHttpTest.amount(q.path("nodes").get(4), "effectiveOutputQty", "90");

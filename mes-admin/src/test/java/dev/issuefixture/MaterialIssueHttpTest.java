@@ -247,6 +247,8 @@ class MaterialIssueHttpTest {
                 // TEST ONLY: these fresh fixture objects are explicitly local; no production migration default.
                 jdbc.execute("ALTER TABLE workorder ALTER COLUMN source SET DEFAULT 'LOCAL'");
                 jdbc.execute("ALTER TABLE wm_warehouse ALTER COLUMN source SET DEFAULT 'LOCAL'");
+                // TEST ONLY H2 equivalent of V60: retired release snapshot is absent on new completion facts.
+                jdbc.execute("ALTER TABLE mes_execution_completion ALTER COLUMN released_qty DROP NOT NULL");
                 jdbc.execute("ALTER TABLE mes_production_execution DROP COLUMN execution_no");
                 jdbc.execute("ALTER TABLE mes_production_execution ADD batch_no VARCHAR(128)");
                 String scanDdl = Files.readString(Path.of("mes-admin/src/main/resources/db/business/V52__execution_batch_and_scan_activity.sql"));

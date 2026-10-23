@@ -49,6 +49,7 @@ class ProductionWarehouseFixture {
         c.refresh();
         for (var j : c.getBean(MaterialIssueHttpTest.Fixture.class).business.values()) {
             ProductionReportHttpTest.seed(j);
+            j.update("UPDATE mes_production_execution SET batch_no='TEST-FINISHED' WHERE id IN (1,2)");
             ProductionInputTestData.confirmed(j, 1, new BigDecimal("100"));
             j.update("UPDATE mes_production_execution SET target_qty=100,status='RUNNING',start_time=CURRENT_TIMESTAMP WHERE id=1");
             j.update("INSERT INTO mes_production_report(execution_id,routing_node_id,record_type,quantity_delta,operator_user_id,recorded_by,report_time,reason,create_time) VALUES(1,11,'REPORT',100,1,1,CURRENT_TIMESTAMP,'TEST ONLY',CURRENT_TIMESTAMP),(1,12,'REPORT',100,1,1,CURRENT_TIMESTAMP,'TEST ONLY',CURRENT_TIMESTAMP),(1,13,'REPORT',100,1,1,CURRENT_TIMESTAMP,'TEST ONLY',CURRENT_TIMESTAMP)");

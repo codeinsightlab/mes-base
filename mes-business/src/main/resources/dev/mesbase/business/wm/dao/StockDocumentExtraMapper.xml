@@ -35,7 +35,8 @@
   AND (SELECT COUNT(*) FROM wm_stock_action duplicate_action WHERE duplicate_action.document_line_id=l.id)=1
   AND a.stock_id=l.stock_id AND a.material_id=l.material_id
   AND a.warehouse_id=l.warehouse_id AND a.unit_id=l.unit_id
-  AND (a.batch_no=l.batch_no OR (a.batch_no IS NULL AND l.batch_no IS NULL))
+  AND CAST(a.batch_no AS BINARY(512))=CAST(l.batch_no AS BINARY(512))
+  AND CAST(l.batch_no AS BINARY(512))=CAST(e.batch_no AS BINARY(512))
   AND (a.bin_code=l.bin_code OR (a.bin_code IS NULL AND l.bin_code IS NULL))
  </sql>
  <select id="formalProductionInbound" resultType="java.math.BigDecimal">

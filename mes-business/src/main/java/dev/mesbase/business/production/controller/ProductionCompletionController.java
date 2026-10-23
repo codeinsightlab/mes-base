@@ -3,6 +3,8 @@ package dev.mesbase.business.production.controller;
 import dev.mesbase.business.production.domain.MesExecutionCompletionEntity;
 import dev.mesbase.business.production.service.ProductionCompletionService;
 import dev.mesbase.platform.web.EndpointAccess;
+import dev.mesbase.common.utils.bean.BeanConversions;
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.Optional;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -23,12 +25,11 @@ public class ProductionCompletionController {
         this.service = service;
     }
 
-    public record Fact(String id, String executionId, String effectiveQty, String releasedQty,
+    public record Fact(String id, String executionId, String effectiveQty,
                        String inboundQty, String operatorUserId, LocalDateTime recordedAt, String reason) {
     }
 
     public record Summary(String executionId, String status, String targetQty, String effective,
-                          String released, String historicalReleased, String basisHash, boolean canComplete,
                           String blockedReason, Fact completion, String receivedQty, String defectQty,
                           String receiptState, String orderBlockedReason) {
     }
@@ -48,9 +49,7 @@ public class ProductionCompletionController {
     private static Summary summaryView(Long id, ProductionCompletionService.Summary s) {
         return new Summary(id.toString(), s.execution().getStatus(), s.execution()
                 .getTargetQty().toPlainString(),
-                s.release().effective().toPlainString(), s.release().released().toPlainString(), s.release()
-                .historicalReleased().toPlainString(), s.release()
-                .basisHash(), s.canComplete(), s.blockedReason(), Optional.ofNullable(s.completion())
+                s.effective().toPlainString(), s.blockedReason(), Optional.ofNullable(s.completion())
                 .map(nullableValue -> view(nullableValue)).orElse(null), s.receivedQty().toPlainString(),
                 s.defectQty().toPlainString(), s.receiptState(), s.orderBlockedReason());
     }
@@ -61,10 +60,10 @@ public class ProductionCompletionController {
         return view(service.complete(id, c));
     }
 
-    private static Fact view(MesExecutionCompletionEntity r) {
-        return new Fact(r.getId(), r.getExecutionId().toString(), r.getEffectiveQty()
-                .toPlainString(), r.getReleasedQty().toPlainString(), r.getAcceptedQty()
-                .toPlainString(), r.getOperatorUserId()
-                .toString(), r.getRecordedAt(), r.getReason());
+    private record InboundQuantity(BigDecimal inboundQty) {
+    }
+
+    private static Fact view(MesExecutionCompletionEntity row) {
+        return BeanConversions.convertWith(row, new InboundQuantity(row.getAcceptedQty()), Fact.class);
     }
 }

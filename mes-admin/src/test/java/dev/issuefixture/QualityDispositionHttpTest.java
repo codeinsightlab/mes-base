@@ -331,6 +331,7 @@ class QualityDispositionHttpTest {
         try (var c = context(EXTRA, 100, 100, 90, 90, 90)) {
             var m = MaterialIssueHttpTest.mvc(c);
             var j = ProductionWarehouseFixture.db(c);
+            j.update("UPDATE mes_production_execution SET batch_no=NULL WHERE id=1");
             var id = defect(m, 12, "10", "INDEPENDENT", null);
             m.perform(full(post(Q + "/" + id + "/dispositions"), "A")
                             .content(command(UUID.randomUUID().toString(), "WAREHOUSE", "10", "1")))

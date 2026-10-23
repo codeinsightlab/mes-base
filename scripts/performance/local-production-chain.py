@@ -213,7 +213,6 @@ class Run:
             for n in 'ABCDE':
                 for part in range(self.a.batches):
                     self.post(job,'report'+n+str(part),'/api/production/reporting', {'executionId':eid,'routingNodeId':nodes[n],'reportQty':str(plan/self.a.batches)}, command=True)
-            self.post(job,'quality-release','/api/quality/releases/executions/'+eid, {'expectedReleaseId':None,'quantity':str(plan),'reason':tag+' 完整工序数量核对，放行'}, command=True)
             for split, fraction in enumerate([Decimal('0.6'),Decimal('0.4')]):
                 q = str(plan*fraction)
                 receipt = self.post(job,'handover'+str(split),'/api/production/receipts', {'executionId':eid,'warehouseId':self.warehouses[1]['id'],'productLotCode':fg['batchNo'],'quantity':q}, command=True)

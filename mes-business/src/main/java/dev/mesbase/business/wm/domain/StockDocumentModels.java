@@ -52,9 +52,9 @@ public final class StockDocumentModels {
     }
 
     /**
-     * Only net formal handover not already received is eligible; never infer stock from plans/reports.
+     * Current net production output less formally received stock bounds inbound approval.
      */
-    public record ProductionBasis(Long executionId, Long productId, BigDecimal effective, BigDecimal released,
+    public record ProductionBasis(Long executionId, Long productId, BigDecimal effective,
                                   BigDecimal received, BigDecimal remaining, boolean canReceive, String blockedReason) {
     }
 

@@ -107,12 +107,10 @@ public class StockDocumentController {
     @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED, permission = PERMISSION + "query")
     public ProductionBasis productionBasis(@PathVariable Long id) {
         var b = service.productionBasis(id);
-        return new ProductionBasis(b.executionId().toString(), b.productId().toString(), b.effective()
-                .toPlainString(), b.released().toPlainString(), b.received().toPlainString(), b.remaining()
-                .toPlainString(), b.canReceive(), b.blockedReason());
+        return BeanConversions.convert(b, ProductionBasis.class);
     }
 
-    public record ProductionBasis(String executionId, String productId, String effective, String released,
+    public record ProductionBasis(String executionId, String productId, String effective,
                                   String received, String remaining, boolean canReceive, String blockedReason) {
     }
 

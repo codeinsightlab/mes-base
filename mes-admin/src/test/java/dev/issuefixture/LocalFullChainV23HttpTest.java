@@ -21,34 +21,6 @@ import tools.jackson.databind.ObjectMapper;
  */
 class LocalFullChainV23HttpTest {
     @Test
-    void simultaneousQualityBasisChangeNeverLeavesAnEffectiveStaleRelease() throws Exception {
-        try (var c = QualityWorkflowHttpTest.context(100, 100, 100, 100, 100);
-             var pool = Executors.newFixedThreadPool(2)) {
-            var m = MaterialIssueHttpTest.mvc(c);
-            var j = ProductionWarehouseFixture.db(c);
-            var reports = j.queryForList("SELECT * FROM mes_production_report ORDER BY id");
-            var barrier = new CyclicBarrier(2);
-            var release = pool.submit(() -> {
-                barrier.await();
-                return m.perform(ProductionCoreV1HttpTest.full(post("/api/quality/releases/executions/1"))
-                        .content(ProductionCompletionHttpTest.release("100"))).andReturn().getResponse().getStatus();
-            });
-            var defect = pool.submit(() -> {
-                barrier.await();
-                return QualityWorkflowHttpTest.defect(m, 12, "10", "INDEPENDENT", null);
-            });
-            int releaseStatus = release.get();
-            assertTrue(List.of(200, 409).contains(releaseStatus));
-            assertTrue(defect.get() != null);
-            m.perform(ProductionCoreV1HttpTest.full(get("/api/quality/releases/executions/1")))
-                    .andExpect(status().isOk()).andExpect(jsonPath("released").value("0"));
-            assertEquals(releaseStatus == 200 ? 1 : 0, j.queryForObject("SELECT COUNT(*) FROM mes_quality_release", Integer.class));
-            assertEquals(reports, j.queryForList("SELECT * FROM mes_production_report ORDER BY id"));
-            System.out.println("TEST_V23 exploratory quality-basis/release releaseStatus=" + releaseStatus);
-        }
-    }
-
-    @Test
     void cancellationAndPositiveReportShareTheWorkorderLockAndKeepCommittedHistory() throws Exception {
         for (int round = 0; round < 4; round++) {
             try (var c = QualityWorkflowHttpTest.context(99, 98, 97, 96, 95);

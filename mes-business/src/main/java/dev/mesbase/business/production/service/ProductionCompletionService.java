@@ -18,7 +18,6 @@ import dev.mesbase.business.production.domain.ProductionCompletionBalance;
 import dev.mesbase.business.production.domain.ProductionExecutionStatus;
 import dev.mesbase.business.production.domain.ProductionReceiptState;
 import dev.mesbase.business.production.domain.ProductionReportModels.ExecutionQuantity;
-import dev.mesbase.business.quality.service.QualityReleaseService;
 import dev.mesbase.business.quality.service.QualityTreatmentService;
 import dev.mesbase.business.wm.dao.StockDocumentExtraMapper;
 import dev.mesbase.common.validation.ParameterChecks;
@@ -45,8 +44,8 @@ public class ProductionCompletionService {
     public record Command(String requestId, String expectedBasisHash, String reason) {
     }
 
-    public record Summary(MesProductionExecutionEntity execution, QualityReleaseService.State release,
-                          MesExecutionCompletionEntity completion, boolean canComplete, String blockedReason,
+    public record Summary(MesProductionExecutionEntity execution, BigDecimal effective,
+                          MesExecutionCompletionEntity completion, String blockedReason,
                           BigDecimal receivedQty, BigDecimal defectQty, String receiptState,
                           String orderBlockedReason) {
     }
@@ -56,7 +55,6 @@ public class ProductionCompletionService {
     private final StockDocumentExtraMapper inbound;
     private final MesMaterialIssueMapper issues;
     private final ProductionChainLocks locks;
-    private final QualityReleaseService releases;
     private final QualityTreatmentService quality;
     private final ProductionQuantityService quantities;
     private final ProductionExecutionRules rules;
@@ -66,7 +64,7 @@ public class ProductionCompletionService {
     public ProductionCompletionService(MesExecutionCompletionMapper completions,
                                        MesProductionExecutionMapper executions, StockDocumentExtraMapper inbound,
                                        MesMaterialIssueMapper issues, ProductionChainLocks locks,
-                                       QualityReleaseService releases, QualityTreatmentService quality,
+                                       QualityTreatmentService quality,
                                        ProductionQuantityService quantities, ProductionExecutionRules rules,
                                        BusinessSourceRules sources, WorkOrderCompletionService workorders) {
         this.completions = completions;
@@ -74,7 +72,6 @@ public class ProductionCompletionService {
         this.inbound = inbound;
         this.issues = issues;
         this.locks = locks;
-        this.releases = releases;
         this.quality = quality;
         this.quantities = quantities;
         this.rules = rules;
@@ -87,7 +84,6 @@ public class ProductionCompletionService {
         var execution = executions.selectByPrimaryKey(id);
         if (execution == null) ParameterChecks.reject(ErrorCode.NOT_FOUND);
         var projection = quantities.getExecutionQuantities(id);
-        var release = releases.stateFor(projection);
         var completion = completion(id);
         var received = inbound.formalProductionInbound(id);
         var defect = defectQty(projection);
@@ -95,7 +91,8 @@ public class ProductionCompletionService {
         String state = ProductionExecutionStatus.FULLY_RECEIVED.getValue().equals(execution.getStatus())
                 ? ProductionReceiptState.FULLY_RECEIVED.getValue() : (received.signum() > 0 || quality.hasFormalReceipt(id))
                 ? ProductionReceiptState.PARTIAL.getValue() : ProductionReceiptState.PENDING.getValue();
-        return new Summary(execution, release, completion, false, reason, received, defect, state,
+        return new Summary(execution, projection.nodes().isEmpty() ? BigDecimal.ZERO : projection.nodes().getLast()
+                .effectiveOutputQty(), completion, reason, received, defect, state,
                 workorders.blockedReason(execution.getWorkorderId()));
     }
 
@@ -164,7 +161,7 @@ public class ProductionCompletionService {
             return summary(id);
         }
         var current = summary(id);
-        return new Summary(current.execution(), current.release(), current.completion(), false,
+        return new Summary(current.execution(), current.effective(), current.completion(),
                 "没有与正式库存动作一致的已审核生产或质量入库，不能复查收尾", current.receivedQty(),
                 current.defectQty(), current.receiptState(), current.orderBlockedReason());
     }
@@ -228,18 +225,23 @@ public class ProductionCompletionService {
     private void append(MesProductionExecutionEntity execution, ExecutionQuantity projection,
                         BigDecimal received, String auditRequestId) {
         if (completion(execution.getId()) != null) ParameterChecks.reject(ErrorCode.PRODUCTION_CLOSURE_CONFLICT);
-        var release = releases.stateFor(projection);
         String requestId = UUID.nameUUIDFromBytes(("fully-received:" + execution.getId() + ":" + auditRequestId)
                 .getBytes(StandardCharsets.UTF_8)).toString();
         var row = new MesExecutionCompletionEntity();
         row.setId(requestId);
         row.setExecutionId(execution.getId());
         row.setEffectiveQty(projection.nodes().getLast().effectiveOutputQty());
-        row.setReleasedQty(release.released());
+        row.setReleasedQty(null);
         row.setReceiptQty(BigDecimal.ZERO);
         row.setAcceptedQty(received);
-        row.setBasisHash(ProductionClosureRules.hash(projection.confirmedInputQty(), row.getEffectiveQty(),
-                defectQty(projection), received, auditRequestId, release.basisHash()));
+        row.setBasisHash(ProductionClosureRules.hash(projection.routingId(), projection.pathStatus(),
+                projection.confirmedInputQty(), projection.nodes().stream()
+                        .map(node -> List.of(node.routingNodeId(), ProductionClosureRules.number(node.reportedQty()),
+                                ProductionClosureRules.number(node.effectiveOutputQty()),
+                                ProductionClosureRules.number(node.netDefectQty()),
+                                ProductionClosureRules.number(node.unverifiedDefectQty())))
+                        .toList(), defectQty(projection), received, auditRequestId,
+                quality.productionBasis(execution.getId()).factIdentities()));
         row.setRequestHash(ProductionClosureRules.hash(requestId, auditRequestId, row.getBasisHash(), ProductionClosureRules.actor()));
         row.setOperatorUserId(ProductionClosureRules.actor());
         row.setRecordedAt(LocalDateTime.now());

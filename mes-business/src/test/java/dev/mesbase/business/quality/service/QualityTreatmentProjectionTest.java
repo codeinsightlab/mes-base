@@ -185,7 +185,7 @@ class QualityTreatmentProjectionTest {
                 event("void-assess", "void", 1, Action.ASSESS, Attribution.INDEPENDENT, "0"));
         when(events.selectByExample(any())).thenReturn(rows);
         when(defects.selectLatest(1L, null, null)).thenReturn(List.of(a, b, voided, unknown));
-        var basis = service.releaseBasis(1L);
+        var basis = service.productionBasis(1L);
         assertEquals(3, basis.declarations().size());
         for (var d : List.of(a, b, unknown)) {
             when(defects.selectByExample(any())).thenReturn(List.of(d));
@@ -215,10 +215,10 @@ class QualityTreatmentProjectionTest {
         when(events.selectByExample(any())).thenReturn(List.of());
         if (count <= 1000) {
             assertEquals(List.of(), service.nodeTotals(1L));
-            assertEquals(List.of(), service.releaseBasis(1L).declarations());
+            assertEquals(List.of(), service.productionBasis(1L).declarations());
         } else {
             assertThrows(FoundationException.class, () -> service.nodeTotals(1L));
-            assertThrows(FoundationException.class, () -> service.releaseBasis(1L));
+            assertThrows(FoundationException.class, () -> service.productionBasis(1L));
         }
     }
 
@@ -230,8 +230,8 @@ class QualityTreatmentProjectionTest {
             rows.add(event("t" + i, "d", 1, Action.ASSESS, Attribution.INDEPENDENT, "0"));
         when(events.selectByExample(any())).thenReturn(rows);
         when(defects.selectLatest(1L, null, null)).thenReturn(List.of(declaration("d", 1, "1", 11)));
-        if (count <= 5000) assertEquals(count + 1, service.releaseBasis(1L).factIdentities().size());
-        else assertThrows(FoundationException.class, () -> service.releaseBasis(1L));
+        if (count <= 5000) assertEquals(count + 1, service.productionBasis(1L).factIdentities().size());
+        else assertThrows(FoundationException.class, () -> service.productionBasis(1L));
     }
 
     @Test
@@ -288,7 +288,7 @@ class QualityTreatmentProjectionTest {
         }
         when(events.selectByExample(any())).thenReturn(rows);
         when(defects.selectLatest(1L, null, null)).thenReturn(declarations);
-        var grouped = service.releaseBasis(1L);
+        var grouped = service.productionBasis(1L);
         assertEquals(5000L, reads.sum());
         reads.reset();
         for (int i = 0; i < declarations.size(); i++) {

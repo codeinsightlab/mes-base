@@ -286,13 +286,13 @@ public class QualityTreatmentService {
         return null;
     }
 
-    public record ReleaseBasis(List<Summary> declarations, List<String> factIdentities) {
+    public record ProductionBasis(List<Summary> declarations, List<String> factIdentities) {
     }
 
     /**
-     * Bounded batch reads, reused by release and completion; no per-declaration queries.
+     * Bounded batch reads, reused by inbound approval and completion; no per-declaration queries.
      */
-    public ReleaseBasis releaseBasis(Long execution) {
+    public ProductionBasis productionBasis(Long execution) {
         var all = executionEvents(execution);
         var versions = declarations(execution);
         var grouped = groupedEvents(all);
@@ -300,7 +300,7 @@ public class QualityTreatmentService {
         versions.forEach(d -> facts.add("D:" + d.getDeclarationId() + ":" + d.getRevisionNo()));
         all.forEach(e -> facts.add("T:" + e.getId()));
         facts.sort(String::compareTo);
-        return new ReleaseBasis(versions.stream().map(d -> summarizeRows(d,
+        return new ProductionBasis(versions.stream().map(d -> summarizeRows(d,
                         grouped.getOrDefault(new DeclarationVersion(d.getDeclarationId(), d.getRevisionNo()), List.of())))
                 .toList(), List.copyOf(facts));
     }

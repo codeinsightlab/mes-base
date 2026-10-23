@@ -24,10 +24,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * TEST ONLY: isolated routed H2; all closing commands use formal HTTP approval and real mapped SQL.
  */
 class ProductionCompletionHttpTest {
-    static String release(String qty) {
-        return "{\"requestId\":\"" + UUID.randomUUID() + "\",\"quantity\":\"" + qty + "\",\"reason\":\"TEST ONLY\"}";
-    }
-
     static void oneExecution(JdbcTemplate j, String plan) {
         j.update("DELETE FROM mes_production_execution WHERE id=2");
         j.update("UPDATE workorder SET planned_qty=? WHERE id=1", new BigDecimal(plan));
@@ -40,7 +36,6 @@ class ProductionCompletionHttpTest {
             var j = ProductionWarehouseFixture.db(c);
             oneExecution(j, "100");
             UnifiedInboundHttpTest.stock(j);
-            UnifiedInboundHttpTest.release(m, "100");
             UnifiedInboundHttpTest.receive(m, "60");
             assertEquals("RUNNING", j.queryForObject("SELECT status FROM mes_production_execution WHERE id=1", String.class));
             assertEquals(0, j.queryForObject("SELECT COUNT(*) FROM mes_execution_completion", Integer.class));
@@ -53,11 +48,40 @@ class ProductionCompletionHttpTest {
             assertEquals("COMPLETED", j.queryForObject("SELECT status FROM workorder WHERE id=1", String.class));
             assertEquals(1, j.queryForObject("SELECT COUNT(*) FROM mes_execution_completion", Integer.class));
             assertEquals(2, j.queryForObject("SELECT COUNT(*) FROM wm_stock_action", Integer.class));
+            assertEquals(2, j.queryForObject("SELECT COUNT(*) FROM wm_stock_document_line WHERE batch_no='TEST-FINISHED'", Integer.class));
             StockDocumentHttpTest.balance(j, "100");
             m.perform(full(post(StockDocumentHttpTest.ROOT + "/" + id + "/actions/approve"))
                     .content(command.replace("\"1\"", "\"2\""))).andExpect(status().isConflict());
             m.perform(full(get("/api/production/executions/1/closure")))
                     .andExpect(status().isOk()).andExpect(jsonPath("receiptState").value("FULLY_RECEIVED"));
+        }
+    }
+
+    @Test
+    void administratorFinalNodeAdjustmentUsesOrdinaryInboundApprovalAndNoReleaseFact() throws Exception {
+        try (var c = ProductionWarehouseFixture.context()) {
+            var m = MaterialIssueHttpTest.mvc(c);
+            var j = ProductionWarehouseFixture.db(c);
+            oneExecution(j, "100");
+            j.update("UPDATE mes_production_report SET quantity_delta=90 WHERE execution_id=1 AND routing_node_id=13");
+            var original = j.queryForMap("SELECT * FROM mes_production_report WHERE execution_id=1 AND routing_node_id=13");
+            String reportId = original.get("ID").toString();
+            String command = "{\"requestId\":\"" + UUID.randomUUID() + "\",\"quantityDelta\":\"10\",\"reason\":\"TEST ONLY administrator verified omitted final output\"}";
+            m.perform(full(post("/api/production/reports/" + reportId + "/adjustments")).content(command))
+                    .andExpect(status().isOk());
+            assertEquals(original, j.queryForMap("SELECT * FROM mes_production_report WHERE id=?", reportId));
+            assertEquals("RUNNING", j.queryForObject("SELECT status FROM mes_production_execution WHERE id=1", String.class));
+            assertEquals(0, j.queryForObject("SELECT COUNT(*) FROM mes_execution_completion", Integer.class));
+            UnifiedInboundHttpTest.stock(j);
+            UnifiedInboundHttpTest.receive(m, "100");
+            assertEquals("FULLY_RECEIVED", j.queryForObject("SELECT status FROM mes_production_execution WHERE id=1", String.class));
+            assertEquals("COMPLETED", j.queryForObject("SELECT status FROM workorder WHERE id=1", String.class));
+            assertEquals(0, j.queryForObject("SELECT COUNT(*) FROM mes_quality_release", Integer.class));
+            assertEquals(1, j.queryForObject("SELECT COUNT(*) FROM mes_execution_completion WHERE released_qty IS NULL", Integer.class));
+            m.perform(full(get("/api/production/executions/1/closure")))
+                    .andExpect(status().isOk()).andExpect(jsonPath("receiptState").value("FULLY_RECEIVED"))
+                    .andExpect(jsonPath("released").doesNotExist())
+                    .andExpect(jsonPath("completion.releasedQty").doesNotExist());
         }
     }
 
@@ -72,7 +96,6 @@ class ProductionCompletionHttpTest {
             UnifiedInboundHttpTest.stock(j);
             String defect = QualityWorkflowHttpTest.defect(m, 12, "10", "INDEPENDENT", null);
             if (qualityFirst) QualityWorkflowHttpTest.transfer(m, defect, "10");
-            UnifiedInboundHttpTest.release(m, "90");
             UnifiedInboundHttpTest.receive(m, "90");
             if (!qualityFirst) {
                 assertEquals("RUNNING", j.queryForObject("SELECT status FROM mes_production_execution WHERE id=1", String.class));
@@ -95,7 +118,6 @@ class ProductionCompletionHttpTest {
             QualityDispositionHttpTest.bindBatch(j, "TEST-FINISHED");
             UnifiedInboundHttpTest.stock(j);
             String defect = QualityWorkflowHttpTest.defect(m, 15, "10", "INDEPENDENT", null);
-            UnifiedInboundHttpTest.release(m, "90");
             UnifiedInboundHttpTest.receive(m, "90");
             assertEquals("RUNNING", j.queryForObject("SELECT status FROM mes_production_execution WHERE id=1", String.class));
             QualityWorkflowHttpTest.transfer(m, defect, "10");
@@ -163,7 +185,6 @@ class ProductionCompletionHttpTest {
             oneExecution(j, "100");
             j.update("UPDATE mes_production_report SET quantity_delta=10 WHERE routing_node_id=13");
             UnifiedInboundHttpTest.stock(j);
-            UnifiedInboundHttpTest.release(m, "10");
             UnifiedInboundHttpTest.receive(m, "10");
             assertEquals("RUNNING", j.queryForObject("SELECT status FROM mes_production_execution WHERE id=1", String.class));
             assertEquals("RELEASED", j.queryForObject("SELECT status FROM workorder WHERE id=1", String.class));
@@ -180,7 +201,6 @@ class ProductionCompletionHttpTest {
             var j = ProductionWarehouseFixture.db(c);
             oneExecution(j, plan);
             UnifiedInboundHttpTest.stock(j);
-            UnifiedInboundHttpTest.release(m, "100");
             UnifiedInboundHttpTest.receive(m, "100");
             assertEquals("FULLY_RECEIVED", j.queryForObject("SELECT status FROM mes_production_execution WHERE id=1", String.class));
             assertEquals("RELEASED", j.queryForObject("SELECT status FROM workorder WHERE id=1", String.class));
@@ -197,7 +217,6 @@ class ProductionCompletionHttpTest {
             var j = ProductionWarehouseFixture.db(c);
             oneExecution(j, "100");
             UnifiedInboundHttpTest.stock(j);
-            UnifiedInboundHttpTest.release(m, "100");
             String id = UnifiedInboundHttpTest.draft(m, "1", "100");
             String command = StockDocumentHttpTest.intent(UUID.randomUUID().toString(), 1);
             j.execute("ALTER TABLE mes_execution_completion ADD CONSTRAINT test_only_closure_failure CHECK(accepted_qty != 100)");
@@ -224,9 +243,6 @@ class ProductionCompletionHttpTest {
             ProductionInputTestData.confirmed(j, 2, new BigDecimal("10"));
             j.update("INSERT INTO mes_production_report(execution_id,routing_node_id,record_type,quantity_delta,operator_user_id,recorded_by,report_time,reason,create_time) SELECT 2,routing_node_id,'REPORT',10,1,1,CURRENT_TIMESTAMP,'TEST ONLY sibling',CURRENT_TIMESTAMP FROM mes_production_report WHERE execution_id=1");
             UnifiedInboundHttpTest.stock(j);
-            UnifiedInboundHttpTest.release(m, "100");
-            m.perform(full(post("/api/quality/releases/executions/2")).content(release("10")))
-                    .andExpect(status().isOk());
             UnifiedInboundHttpTest.receive(m, "100");
             assertEquals("FULLY_RECEIVED", j.queryForObject("SELECT status FROM mes_production_execution WHERE id=1", String.class));
             assertEquals("RELEASED", j.queryForObject("SELECT status FROM workorder WHERE id=1", String.class));
@@ -244,7 +260,6 @@ class ProductionCompletionHttpTest {
             var j = ProductionWarehouseFixture.db(c);
             oneExecution(j, "100");
             UnifiedInboundHttpTest.stock(j);
-            UnifiedInboundHttpTest.release(m, "100");
             var ids = List.of(UnifiedInboundHttpTest.draft(m, "1", "60"), UnifiedInboundHttpTest.draft(m, "1", "40"));
             var barrier = new CyclicBarrier(2);
             var tasks = ids.stream().map(id -> workers.submit(() -> {
@@ -268,7 +283,6 @@ class ProductionCompletionHttpTest {
             var j = ProductionWarehouseFixture.db(c);
             oneExecution(j, "100");
             UnifiedInboundHttpTest.stock(j);
-            UnifiedInboundHttpTest.release(m, "100");
             String id = UnifiedInboundHttpTest.draft(m, "1", "100");
             String command = StockDocumentHttpTest.intent(UUID.randomUUID().toString(), 1);
             var barrier = new CyclicBarrier(2);
@@ -292,7 +306,6 @@ class ProductionCompletionHttpTest {
             var j = ProductionWarehouseFixture.db(c);
             oneExecution(j, "100");
             UnifiedInboundHttpTest.stock(j);
-            UnifiedInboundHttpTest.release(m, "100");
             j.update("INSERT INTO mes_material_issue(issue_no,workorder_id,product_id,routing_id,execution_id,status) VALUES('TEST ONLY pending',1,1,1,1,'DRAFT')");
             UnifiedInboundHttpTest.receive(m, "100");
             assertEquals("RUNNING", j.queryForObject("SELECT status FROM mes_production_execution WHERE id=1", String.class));
@@ -318,7 +331,6 @@ class ProductionCompletionHttpTest {
             var j = ProductionWarehouseFixture.db(c);
             oneExecution(j, "100");
             UnifiedInboundHttpTest.stock(j);
-            UnifiedInboundHttpTest.release(m, "100");
             String draft = StockDocumentHttpTest.JSON.readTree(m.perform(full(post(MaterialIssueHttpTest.H))
                             .content("{\"issueNo\":\"TEST_ONLY_PARENT_PENDING\",\"workorderId\":\"1\",\"routingId\":\"1\",\"status\":\"DRAFT\"}"))
                     .andExpect(status().isOk()).andReturn().getResponse().getContentAsString()).get("id").asText();
@@ -346,7 +358,6 @@ class ProductionCompletionHttpTest {
             var j = ProductionWarehouseFixture.db(c);
             oneExecution(j, "100");
             UnifiedInboundHttpTest.stock(j);
-            UnifiedInboundHttpTest.release(m, "100");
             UnifiedInboundHttpTest.draft(m, "1", "100");
             m.perform(post("/api/production/executions/1/actions/recheck-receipt")
                             .header("Authorization", "Bearer NONE").header("X-Factory-Id", "A"))
@@ -369,7 +380,6 @@ class ProductionCompletionHttpTest {
             var j = ProductionWarehouseFixture.db(c);
             oneExecution(j, "100");
             UnifiedInboundHttpTest.stock(j);
-            UnifiedInboundHttpTest.release(m, "100");
             UnifiedInboundHttpTest.receive(m, "60");
             m.perform(full(get("/api/production/executions/1/closure")))
                     .andExpect(status().isOk()).andExpect(jsonPath("receivedQty").value("60.000000"));
@@ -425,7 +435,6 @@ class ProductionCompletionHttpTest {
             var j = ProductionWarehouseFixture.db(c);
             String old = ProductionWarehouseFixture.legacy(m, j);
             ProductionWarehouseFixture.legacyAccepted(j, old, "60");
-            UnifiedInboundHttpTest.release(m, "100");
             UnifiedInboundHttpTest.receive(m, "40");
             assertEquals("RUNNING", j.queryForObject("SELECT status FROM mes_production_execution WHERE id=1", String.class));
             assertEquals(0, j.queryForObject("SELECT COUNT(*) FROM mes_execution_completion", Integer.class));

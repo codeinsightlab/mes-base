@@ -173,7 +173,12 @@ class WorkOrderRequestBudgetTest {
             return true;
         });
         when(sessions.read(anyString())).thenAnswer(call -> payload.get());
-        new JdbcTemplate(business).execute("CREATE TABLE mes_production_execution (id BIGINT COMMENT '执行编号', workorder_id BIGINT COMMENT '所属工单', target_qty DECIMAL(20,6) COMMENT '目标数量') COMMENT '测试执行计划关联'");
+        String executionXml = Files.readString(Path.of("mes-business/src/main/resources/dev/mesbase/business/production/dao/MesProductionExecutionMapper.xml"));
+        var executionColumns = Pattern.compile("column=\"([^\"]+)\" jdbcType=\"([^\"]+)\"").matcher(executionXml);
+        var executionDefinitions = new ArrayList<String>();
+        while (executionColumns.find()) executionDefinitions.add(executionColumns.group(1) + " "
+                + (executionColumns.group(2).equals("VARCHAR") ? "VARCHAR(255)" : executionColumns.group(2)));
+        new JdbcTemplate(business).execute("CREATE TABLE mes_production_execution(" + String.join(",", executionDefinitions) + ")");
         var tokens = new TokenService(sessions, accounts, new MockEnvironment());
         var user = accounts.account(42);
         String raw = tokens.createToken(new LoginUser(42L, 7L, user, Set.of()), new MockHttpServletRequest());

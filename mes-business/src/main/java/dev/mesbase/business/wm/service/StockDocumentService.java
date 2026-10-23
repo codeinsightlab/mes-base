@@ -18,7 +18,10 @@ import dev.mesbase.business.production.domain.MesProductionReceiptExample;
 import dev.mesbase.business.production.domain.WorkorderEntity;
 import dev.mesbase.business.production.domain.ProductionExecutionStatus;
 import dev.mesbase.business.production.domain.ProductionQuantityInput;
-import dev.mesbase.business.quality.service.QualityReleaseService;
+import dev.mesbase.business.quality.service.QualityTreatmentService;
+import dev.mesbase.business.production.service.ProductionQuantityService;
+import dev.mesbase.business.production.domain.ExecutionPathStatus;
+import dev.mesbase.business.quality.domain.QualityTreatmentModels.Attribution;
 import dev.mesbase.business.quality.dao.MesQualityTreatmentMapper;
 import dev.mesbase.business.quality.domain.QualityTreatmentModels.Action;
 import org.springframework.transaction.annotation.Propagation;
@@ -81,7 +84,8 @@ public class StockDocumentService {
     private final MesProductionReceiptMapper receipts;
     private final Validator validator;
     private final StockDocumentExtraMapper inbound;
-    private final QualityReleaseService releases;
+    private final ProductionQuantityService quantities;
+    private final QualityTreatmentService quality;
     private final WorkorderMapper orders;
     private final MesQualityTreatmentMapper qualityEvents;
     private final ObjectProvider<ProductionCompletionService> completion;
@@ -90,14 +94,16 @@ public class StockDocumentService {
                                 WmInventoryMapper inventories, MaterialMapper materials, UnitMeasureMapper units,
                                 LocalStockService stock, BusinessSourceRules sources, ProductionChainLocks locks,
                                 MesProductionExecutionMapper executions, MesProductionReceiptMapper receipts,
-                                Validator validator, StockDocumentExtraMapper inbound, QualityReleaseService releases,
+                                Validator validator, StockDocumentExtraMapper inbound,
+                                ProductionQuantityService quantities, QualityTreatmentService quality,
                                 WorkorderMapper orders, MesQualityTreatmentMapper qualityEvents,
                                 ObjectProvider<ProductionCompletionService> completion) {
         this.completion = completion;
         this.qualityEvents = qualityEvents;
         this.orders = orders;
         this.inbound = inbound;
-        this.releases = releases;
+        this.quantities = quantities;
+        this.quality = quality;
         this.documents = documents;
         this.lines = lines;
         this.inventories = inventories;
@@ -310,7 +316,9 @@ public class StockDocumentService {
                     .map(WmStockDocumentLineEntity::getWarehouseId).toList());
             BigDecimal amount = BigDecimal.ZERO;
             for (var line : detail) {
-                if (!Objects.equals(basis.productId(), line.getMaterialId()))
+                if (!Objects.equals(basis.productId(), line.getMaterialId())
+                        || StringUtils.isBlank(execution.getBatchNo())
+                        || !execution.getBatchNo().equals(line.getBatchNo()))
                     ParameterChecks.reject(ErrorCode.STOCK_DOCUMENT_CONFLICT);
                 amount = amount.add(line.getQuantity());
             }
@@ -355,14 +363,27 @@ public class StockDocumentService {
                 .contains(order.getStatus())
                 && BusinessSource.LOCAL.getValue().equals(order.getSource()) && FactoryIntegrationContext.required()
                 .mode() == FactoryRuntimeMode.LOCAL;
-        var release = releases.state(executionId);
+        var projection = quantities.getExecutionQuantities(executionId);
+        var basis = quality.productionBasis(executionId);
+        var effective = projection.nodes().isEmpty() ? BigDecimal.ZERO : projection.nodes().getLast()
+                .effectiveOutputQty();
         var received = inbound.netProductionInbound(executionId);
-        var remaining = release.released().min(release.effective()).subtract(received);
-        String blocked = !admitted ? "当前工单状态、来源或模式不允许入库" : !ProductionExecutionStatus.RUNNING.getValue()
-                .equals(execution.getStatus())
-                ? "执行状态不允许入库" : !release.safe() ? release.blockedReason() : !release.basisValid() ? "缺少当前质量依据下的正式放行"
-                : remaining.signum() <= 0 ? "可入库数量不足或存在历史超额" : null;
-        return new StockDocumentModels.ProductionBasis(executionId, execution.getProductId(), release.effective(), release.released(), received, remaining.max(BigDecimal.ZERO), blocked == null, blocked);
+        var remaining = effective.subtract(received);
+        String blocked = null;
+        if (!admitted) blocked = "当前工单状态、来源或模式不允许入库";
+        else if (!ProductionExecutionStatus.RUNNING.getValue().equals(execution.getStatus()))
+            blocked = "执行状态不允许入库";
+        else if (!ExecutionPathStatus.LOCKED.getValue().equals(projection.pathStatus()) || projection.nodes().isEmpty())
+            blocked = "实际生产路径尚未锁定";
+        else if (projection.confirmedInputQty().signum() <= 0 || projection.reservedInputQty().signum() > 0)
+            blocked = "缺少正式投入或仍有未决投产意图";
+        else if (projection.nodes().stream().anyMatch(node -> node.unverifiedDefectQty().signum() > 0)
+                || basis.declarations().stream()
+                .anyMatch(declaration -> declaration.attribution() == Attribution.UNVERIFIED))
+            blocked = "存在待核实不良，不能审核生产入库";
+        else if (remaining.signum() <= 0) blocked = "可入库数量不足或存在数量超额";
+        return new StockDocumentModels.ProductionBasis(executionId, execution.getProductId(), effective,
+                received, remaining.max(BigDecimal.ZERO), blocked == null, blocked);
     }
 
     private MesProductionExecutionEntity productionExecution(Long id) {
