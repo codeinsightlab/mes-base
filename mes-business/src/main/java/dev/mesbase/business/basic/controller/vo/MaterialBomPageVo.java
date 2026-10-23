@@ -15,4 +15,3 @@ public record MaterialBomPageVo(
         int limit
 ) implements PageData<MaterialBomVo> {
 }
-

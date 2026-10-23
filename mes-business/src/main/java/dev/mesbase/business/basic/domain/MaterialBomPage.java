@@ -15,4 +15,3 @@ public record MaterialBomPage(
         int limit
 ) implements PageData<MaterialBomEntity> {
 }
-

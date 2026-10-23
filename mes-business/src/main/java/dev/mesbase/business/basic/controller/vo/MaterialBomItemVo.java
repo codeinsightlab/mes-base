@@ -19,4 +19,3 @@ public record MaterialBomItemVo(
         String unitName
 ) {
 }
-

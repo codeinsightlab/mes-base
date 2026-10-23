@@ -11,4 +11,3 @@ public final class MaterialBomItemResource {
     private MaterialBomItemResource() {
     }
 }
-
