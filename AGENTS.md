@@ -398,12 +398,12 @@ Skill 入口：`.agents/skills/mes-crud-codegen/SKILL.md`；配置/CLI 详见 do
 使用 `scripts/mes-business-codegen CONFIG_YAML REPORT_JSON`
 。先读取配置，不能自行填隐藏项目默认值或改用户配置。`selection.tables: []` 表示全量，非空只生成列出的表；产物选择独立。无下划线的模块包段取配置
 fallback（本项目 business）。配置项必须明确提供，schema/关闭的条件注解可显式 null；可选 tableOverrides 不控制选表。菜单 SQL 使用
-add-or-update，保留菜单 ID 和角色绑定，仅生成不执行。当前旧 `scripts/mes-codegen` 为旧 CLI，尚未移除其默认值；不得用它代替新配置入口。
+add-or-update，保留菜单 ID 和角色绑定，仅生成不执行。2026-10-24已移除旧应用JAR生成器shell入口；正式入口仅使用 `scripts/mes-business-codegen`，不从旧CLI补默认值。
 
 2026-10-11 用户补充：生成器不得按 user_id、owner_id、password、secret
 等字段名猜测业务语义并拒绝生成。生成准入仅判断实际生成能力与结构支持；敏感响应、主体及资源授权规则由使用方在生成后审查。
 
-mes-codegen 默认生成基础单表持久化与后台 CRUD；可选 `generateSync` 生成同步脚手架，默认 false，历史配置缺参同样为 false。开启时必须显式配置 `sync.matchKey/batchMaximum`，可用 `tableOverrides.<table>.syncMatchKey` 指定物理匹配列；同步输入仅来自真实 Schema，不猜 code/name/status 等业务字段。默认查询实现明确抛未接入异常，不产生示例业务数据。当前同步生成只支持 Factory 范围及 String/Long/Integer 单匹配键，复杂业务规则由使用方审查。持久化复用 MyBatis Generator 的 MyBatis3 /
+生成器默认生成基础单表持久化与后台 CRUD；可选 `generateSync` 生成同步脚手架，默认 false，历史配置缺参同样为 false。开启时必须显式配置 `sync.matchKey/batchMaximum`，可用 `tableOverrides.<table>.syncMatchKey` 指定物理匹配列；同步输入仅来自真实 Schema，不猜 code/name/status 等业务字段。默认查询实现明确抛未接入异常，不产生示例业务数据。当前同步生成只支持 Factory 范围及 String/Long/Integer 单匹配键，复杂业务规则由使用方审查。持久化复用 MyBatis Generator 的 MyBatis3 /
 XMLMAPPER：Entity、Example/Criteria、Mapper + XML；Service/Controller 必须同步调用该真实生成接口，分页复用 PageHelper，不新增注解
 SQL、锁查询或业务状态规则，不生成 ExtraMapper。
 

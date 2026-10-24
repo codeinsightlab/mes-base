@@ -1,8 +1,10 @@
+> 历史归档：2026-10-24从 `scripts/migration/ktg-mes/README.md` 拆出。下文保留原阶段事实和决定；旧命令、接口及配置不是当前运行入口，部分工具已退役。当前用法见[文档导航](../README.md)。
+
 # Source → Base 最小验证 SQL
 
 2026-10-12。历史首轮保存五份单表 `INSERT INTO ... SELECT ...`，未执行真实数据转换。
 不是生产升级入口，也没有建立 ETL/迁移框架。来源及字段映射见
-[Schema 审查](../../../docs/migration/SIMPLE_SCHEMA_REVIEW.md)。
+[Schema 审查](../migration/SIMPLE_SCHEMA_REVIEW.md)。
 
 ## 执行前提
 

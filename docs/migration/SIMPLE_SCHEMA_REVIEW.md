@@ -77,7 +77,7 @@ Source schema 采用当前 `scripts/mf-upgrade/sql/009-new-factory-business-init
 | dv_subject.subject_name | 可空subject_name | 保留原值；对新记录允许未填写名称，内容仍必填 |
 | dv_subject.subject_type | 无默认值、可空subject_type | Converter保留实际原值（包括0）；不替用户推断字典语义 |
 
-转换 SQL 在 [scripts/migration/ktg-mes](../../scripts/migration/ktg-mes/README.md)。
+转换 SQL 在 [scripts/migration/ktg-mes](../archive/migration-tools-history.md)。
 本轮没有真实隔离数据副本，所以未执行真实数据导入；五份脚本可独立审查。
 合成测试只是验证 INSERT SELECT、精度、字段删除及NULL处理，不证明真实历史数据没有脏值。
 

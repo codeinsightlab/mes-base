@@ -1,28 +1,50 @@
-# MES Base 架构决策
+# 当前架构
 
-2026-10-09 当前入口：六个 JAR 模块 common/system/framework/quartz/generator/admin；仅中心库 + 按 Factory 隔离的独立业务库，两套 DataSource/SqlSessionFactory/TransactionManager。无外部 JDBC 路由或 Shared 实现。以根 README、AGENTS §9 和 ADR-004 最后决定为准。先完善 Base，生成器/UI 对齐在业务接入阶段处理。下方日期化记录保留追溯，不能当作当前装配。
+Base MES采用Java 21 / Spring Boot 4模块化单体。一套生产核心同时服务单个或多个Factory；Factory在当前界面表示工厂，也可按业务或年度组织独立数据空间。
 
-2026-10-05，状态 Accepted。本阶段仅基础能力，部署及生产验收另行进行。
+## 模块与调用边界
 
-| 决策 | 内容 |
+| 模块 | 职责 |
 | --- | --- |
-| [ADR-001](ADR-001-factory-scope.md) | Factory 业务身份、Scope、执行桥与任务生命周期 |
-| [ADR-002](ADR-002-factory-runtime-binding.md) | 运行时身份/版本、事务固定、池替换与 Mapper ownership |
-| [ADR-003](ADR-003-factory-permission-model.md) | 认证、选厂、权限、偏好和 HTTP 分类 |
-| [ADR-004](ADR-004-business-persistence-topology.md) | Dedicated 实现、Shared 契约与验收计划 |
-| [ADR-005](ADR-005-erp-integration-boundary.md) | 历史外部连接决定（2026-10-09 被 ADR-004 取代） |
+| mes-common | 公共类型与工具 |
+| mes-system | RuoYi来源的用户、组织、角色、菜单及系统设置 |
+| mes-framework | 认证授权、工厂上下文、持久化与基础设施 |
+| mes-quartz | 调度与执行日志 |
+| mes-generator | 独立配置、metadata读取、MBG及应用模板生成 |
+| mes-business | 物料/BOM、工艺、生产、质量、仓储 |
+| mes-admin | 应用启动、HTTP装配与Flyway |
 
-2026-10-06 Source Product PORT 后采用一个 Maven reactor、六个模块和一套 Core，不拆微服务。mes-admin/common/framework/system/quartz/generator 沿用 Source 模块职责；具体目录以根 README 为准。`server` 负责装配与 HTTP 协议；`core` 定义业务身份、范围与授权 Port；`platform` 是安全/错误/执行桥；`infrastructure` 实现本地目录、缓存键和 JDBC/MyBatis；`integration.erp` 定义独立 ERP Port。Core 不依赖这些实现。
+Controller负责HTTP输入输出，Service负责业务、事务和外部协调，Mapper负责数据访问。复杂业务编排不由生成器或前端组件代替。
 
-原 Factory 阶段的验收边界见既有报告；本轮新增 Platform 管理、身份会话、Quartz 管理与 Vue3 UI，见 ADR-006 和 Platform/Codegen 报告。本轮已连接用户指定远程测试 MySQL 的隔离 Schema 和私有 Redis。仍无 MES 同步领域、实际ERP调用、持久化 Quartz集群JobStore或生产验收。
+## 数据空间与事务
 
-- [ADR-006 — Platform / Web Base 与来源](ADR-006-platform-and-web-base.md)
+中心库维护平台账号、角色、工厂和数据源配置。每个Factory绑定独立业务库，业务表不叠加factory_id行级隔离；不是多个工厂共用一组业务表的Shared模式。
 
-## 2026-10-06 历史结构与瘦身审计（已被 2026-10-09 决定取代）
+| 归属 | 数据源/会话工厂/事务管理器 |
+| --- | --- |
+| 中心 | masterDataSource / masterSqlSessionFactory / masterTransactionManager |
+| 工厂业务 | businessDataSource / businessSqlSessionFactory / businessTransactionManager |
 
-上面的六模块及 `integration.erp` Port 描述是早期迁入记录，已由当前代码取代。当前是七个 JAR 模块：common/system/framework/quartz/generator/mes/admin；生产 Mapper 按固定包绑定 platform/business/erp 三组工厂，ERP 多连接由 `@ErpSource` 与独立路由数据源负责。
-未接入的 Enterprise/Shared 占位已删除，ADR-001/004 保留历史与未来验收边界。真实隐式请求链、Bean/Context/依赖清单、删减证据及待决事项见 [Architecture Slimming Audit](architecture-slimming-audit.md)。
+业务入口按当前Factory租借受管连接池，不随工厂数量新增SessionFactory。请求准入与事务绑定按[请求准入](../development/request-admission.md)执行；事务内固定工厂和连接，禁止切厂/切库及跨中心/业务混写，缺绑定不回退默认库。
 
-## 2026-10-09 当前持久化结构
+业务缓存按Factory隔离，文件另校验所有者、范围和资源。工厂角色只在所属Factory授权；平台角色的管理权限与业务权限分别处理。只有一个数据空间也沿用同一套实现。
 
-中心库 masterSqlSessionFactory/masterDataSource/masterTransactionManager；多业务库共用 businessSqlSessionFactory/businessDataSource/businessTransactionManager，按 Factory 路由独立池。ERP/HR/WMS/其他外部 JDBC 框架及模板退出 Base。此前三工厂说明属于历史快照，当前规范见 ADR-004 和 AGENTS 第 9 节。
+## 生产与外部边界
+
+Execution关联锁定路径、正式投入、报工、不良和库存交接。正常品或质量入库审核后复用统一数量规则检查Execution与工单，报工或定时任务不另行自动完结。不良负责申报与入仓，仓内物流归仓储。
+
+每厂最多一个ERP；运行模式由受管集成配置决定，业务来源持久化保留。LOCAL库存与ERP权威库存分开，本地事务不承诺回滚远端HTTP，不确定结果保留原身份。详见[LOCAL/ERP边界](local-erp-business-boundary.md)。
+
+## 决策与历史
+
+ADR正文保留原始方案及后续取代记录；存在多轮决定时，按最新生效修订和当前AGENTS理解，不把早期Shared、三会话工厂或旧模块名当作现状。
+
+- [Factory范围](ADR-001-factory-scope.md)
+- [运行时绑定](ADR-002-factory-runtime-binding.md)
+- [权限模型](ADR-003-factory-permission-model.md)
+- [持久化拓扑及后续修订](ADR-004-business-persistence-topology.md)
+- [早期ERP边界（历史）](ADR-005-erp-integration-boundary.md)
+- [平台底座与来源](ADR-006-platform-and-web-base.md)
+- [本入口的早期架构说明](../archive/architecture/overview-history.md)
+
+回到[文档导航](../README.md)。

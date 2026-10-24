@@ -1,16 +1,12 @@
-# 系统 SQL 入口
+# Schema与数据库版本
 
-当前运行 Schema 由 `mes-admin/src/main/resources/db/platform/V1__platform.sql` 和
-`mes-admin/src/main/resources/db/system/V2__…V10__*.sql` 顺序构建。V1 保留原简化底座；V2 将旧表重命名保存，再建立 Source/RuoYi 完整字段表；V3–V10 补通用菜单、字典、消息附件、会话版本、自动编码、监控字段、系统接口菜单和 OpenAPI 通用表/管理菜单。没有复制公司数据或账号。
+当前运行Schema以项目正式Flyway迁移为准：
 
-推荐在空的隔离测试 Schema 用 `mes.platform.migrate=true` 交由 Flyway 管理，成功后关闭迁移开关。现有库不要重新执行 CREATE，也不要修改已应用版本。
+- 中心库：`mes-admin/src/main/resources/db/platform`、`db/system`及注册的Java迁移，由FactoryFlyway执行。
+- 工厂业务库：`mes-admin/src/main/resources/db/business`，由 `scripts/mes-business-flyway` 显式指定目标版本执行。
 
-需要独立 SQL 文件时执行：
+先核实目标和Factory绑定、备份，再按[数据库升级说明](../docs/development/database-upgrades.md)执行。中心库和业务库独立升级，不改写已发布版本、不手工运行SQL后补造迁移历史。
 
-```sh
-/usr/bin/python3 scripts/export-phase1-sql.py
-```
+`sql/ruoyi/sys-schema.sql`仅作为RuoYi来源Schema对照，不含Base扩展，不用于当前初始化。旧Phase1拼接导出缺少Java迁移，现已移除；不再提供另一套SQL安装路径。
 
-输出 `target/phase1/sql/mysql-phase1.sql` 和来源 SHA256 清单，直接从当前十份迁移导出，不维护另一套表字段。只用于空的独立 MySQL Schema；文件包含通用产品菜单和字典初始化，无账号。手工导入不会建立 Flyway 历史，随后必须保持 `mes.platform.migrate=false`，不能让应用再执行 V1–V10。
-
-`ruoyi/sys-schema.sql` 是官方固定版本的 CREATE-only 对照基线，不含 Base 的范围/会话/附件扩展，不能作为当前运行 Schema 的初始化文件。实际字段与验收见 [迁移报告](../docs/development/MES_BASE_REALIGNMENT_REPORT.md) 和 [验收记录](../docs/reviews/2026-10-06-phase1-verification.json)。
+首次环境准备见[平台指南](../docs/development/platform.md)。历史导出与迁入记录保留在[平台历史](../docs/archive/development/platform-history.md)及原审查文档中，旧命令不再适用。

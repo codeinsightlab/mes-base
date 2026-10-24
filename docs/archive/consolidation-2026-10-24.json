@@ -1,0 +1,74 @@
+{
+  "scope": "documentation and reviewed obsolete tooling only",
+  "archives": [
+    {
+      "original": "docs/development/codegen.md",
+      "archive": "docs/archive/development/codegen-history.md",
+      "originalSha256": "bad6298b0255601aeb083b5bb91137003d928191674bb047ca0e7c452badc8b6"
+    },
+    {
+      "original": "docs/development/platform.md",
+      "archive": "docs/archive/development/platform-history.md",
+      "originalSha256": "10dc66b4f606e9d326920231c35e815714e65df0e21d60f928f203ea2d87e2a7"
+    },
+    {
+      "original": "docs/architecture/README.md",
+      "archive": "docs/archive/architecture/overview-history.md",
+      "originalSha256": "2a143a06041f305d537a61ec8b8b92824bd3a6fd9d42bba367595484125aecb0"
+    },
+    {
+      "original": "docs/README.md",
+      "archive": "docs/archive/documentation-audit-2026-10-24.md",
+      "originalSha256": "cd2dfa2835e5f4ecd9184a8ea297c6c4265ffd89826dcfad16abf00e9e4c7fef"
+    },
+    {
+      "original": "scripts/migration/ktg-mes/README.md",
+      "archive": "docs/archive/migration-tools-history.md",
+      "originalSha256": "f30efb154edc60db6ffdbc48b07b1cfa1b13f71dd2a92553ad0dbf9561ef718f"
+    },
+    {
+      "retired": "scripts/mes-codegen",
+      "sha256": "c4ea2e912501a371c9489b22bc180ec36ed8ab0c02d4ce98e1145df6bd23be4a"
+    },
+    {
+      "retired": "scripts/clean-empty-development-archives",
+      "sha256": "adf3f7e8994ea2dd61567fba9703aae3782c07628e2ca3841e22ebd54178321f"
+    },
+    {
+      "retired": "scripts/export-phase1-sql.py",
+      "sha256": "59343c61cd5c91ffcfecaff5d6370544dbd8b7e5a0edcacf0d173fdef98120ef"
+    },
+    {
+      "retired": "scripts/migration/ktg-mes/README.md",
+      "sha256": "f30efb154edc60db6ffdbc48b07b1cfa1b13f71dd2a92553ad0dbf9561ef718f"
+    },
+    {
+      "retired": "scripts/migration/ktg-mes/equipment-subject.sql",
+      "sha256": "6fb1f5130c1412848da37ef25948328d47b3f96c2baa591e8157c43d1da9a4ec"
+    },
+    {
+      "retired": "scripts/migration/ktg-mes/operation-routing.sql",
+      "sha256": "83d45bbce8c960307ffffcc1eacc32ef2787fa68ae20a508d610f5a4e96d2275"
+    },
+    {
+      "retired": "scripts/migration/ktg-mes/simple-base.sql",
+      "sha256": "6d0c26f4764fe8bb47c5c5102fec4edbbc731c9fc25897804c4fadcaf2043530"
+    },
+    {
+      "retired": "scripts/performance/local-production-chain.py",
+      "sha256": "942186742e98762a783580cb49d8be076cf65fe40a36d3dc85c91bde52ebf2f0"
+    },
+    {
+      "retired": "scripts/performance/audit-production-chain.py",
+      "sha256": "a135dcee6c9b59da1407809e76ab07bf3cf40d1e766e59323e87fce13e9731b3"
+    },
+    {
+      "retired": "scripts/performance/production-core-readonly.py",
+      "sha256": "47ab088e3ea72daf0e7432023fbf8fcf4a15bac32b7ef01b262c1589774ccf59"
+    },
+    {
+      "retired": "scripts/performance/read-production-chain.py",
+      "sha256": "9e9a0bcab36f22d2a7b420f3d156f398c7583f1eb3650bf88aa057c5ffb8cadb"
+    }
+  ]
+}

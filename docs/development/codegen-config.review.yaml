@@ -1,4 +1,4 @@
-# 项目配置：由 scripts/mes-business-codegen 读取，旧 scripts/mes-codegen 不读取此格式。
+# 项目配置：由正式入口 scripts/mes-business-codegen 读取；旧应用JAR启动脚本已退役。
 # 本文件显式记录 MES Base 项目取值；生成器不得内置这些项目默认值。
 # 不包含数据库凭证，不执行菜单 SQL，不授予角色。
 version: 1

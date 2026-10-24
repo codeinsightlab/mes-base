@@ -135,7 +135,7 @@ java -jar target/mes-base-0.1.0-SNAPSHOT.jar --spring.profiles.active=dev
 - [架构文档](docs/architecture/README.md)
 - [GitHub / Gitee 双托管](docs/development/dual-hosting.md)
 
-开发过程、专项审查和验收证据保存在 `docs/development`、`docs/reviews` 与 `docs/operations`，与本页的产品介绍分开维护。
+当前指南从[文档导航](docs/README.md)进入；早期过程与旧方案见 `docs/archive`，专项审查和维护证据保留在 `docs/reviews`、`docs/operations`，与当前使用说明分开维护。
 
 ## 来源与第三方声明
 
