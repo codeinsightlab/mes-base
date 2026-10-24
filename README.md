@@ -4,7 +4,7 @@
 
 Base MES 围绕工单、批次和实际加工路径，连接材料领用、工序报工、不良申报、生产入库与库存追溯，帮助工厂看清正在做什么、做到哪一步、完成多少，以及材料和产品流向哪里。
 
-本仓库为后端服务；管理与现场操作界面见 [mes-base-ui](https://github.com/codeinsightlab/mes-base-ui)。
+本仓库为后端服务；管理与现场操作界面见 mes-base-ui（[GitHub](https://github.com/codeinsightlab/mes-base-ui) / [Gitee](https://gitee.com/codeinsightlab/mes-base-ui)）。
 
 代码托管：[GitHub](https://github.com/codeinsightlab/mes-base) · [Gitee](https://gitee.com/codeinsightlab/mes-base)
 
@@ -126,7 +126,7 @@ java -jar target/mes-base-0.1.0-SNAPSHOT.jar --spring.profiles.active=dev
 
 ## 文档与相关项目
 
-- [前端项目](https://github.com/codeinsightlab/mes-base-ui)
+- 前端项目（[GitHub](https://github.com/codeinsightlab/mes-base-ui) / [Gitee](https://gitee.com/codeinsightlab/mes-base-ui)）
 - [文档导航与维护边界](docs/README.md)
 - [当前规划与待办](docs/roadmap.md)
 - [生产投产与 BOM 规则](docs/usage/production.md)
