@@ -8,6 +8,8 @@ import dev.mesbase.business.issue.domain.MesMaterialIssueEntity;
 import dev.mesbase.business.issue.domain.MesMaterialIssueInputEntity;
 import dev.mesbase.business.issue.domain.MesMaterialIssueInputExample;
 import dev.mesbase.business.wm.service.LocalStockService;
+import dev.mesbase.business.wm.service.StockDocumentService;
+import org.springframework.beans.factory.ObjectProvider;
 import dev.mesbase.common.validation.ParameterChecks;
 import dev.mesbase.core.error.ErrorCode;
 import java.time.LocalDateTime;
@@ -26,9 +28,12 @@ import tools.jackson.databind.ObjectMapper;
 public class MaterialIssueInputFacts {
     private final MesMaterialIssueInputMapper inputs;
     private final LocalStockService inventory;
+    private final ObjectProvider<StockDocumentService> documents;
     private final ObjectMapper json = new ObjectMapper();
 
-    public MaterialIssueInputFacts(MesMaterialIssueInputMapper inputs, LocalStockService inventory) {
+    public MaterialIssueInputFacts(MesMaterialIssueInputMapper inputs, LocalStockService inventory,
+                                   ObjectProvider<StockDocumentService> documents) {
+        this.documents = documents;
         this.inputs = inputs;
         this.inventory = inventory;
     }
@@ -55,13 +60,18 @@ public class MaterialIssueInputFacts {
 
     public void confirm(MesMaterialIssueEntity issue, String mode) {
         var fact = find(issue.getId());
-        if (fact == null) return; // Historical/administrative issue has no fabricated output contribution.
+        if (fact == null) {
+            if (Mode.LOCAL_ONLY.getValue().equals(mode))
+                ParameterChecks.reject(ErrorCode.STOCK_DOCUMENT_SOURCE_PENDING);
+            // Existing external submissions recover by their original frozen ERP identity.
+            return;
+        }
         if (!Objects.equals(mode, fact.getSourceMode()) || !Objects.equals(fact.getExecutionId(), issue.getExecutionId()))
             ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
         if (fact.getConfirmedAt() != null) return;
         if (Mode.LOCAL_ONLY.getValue().equals(mode)) {
             var calculation = json.readValue(fact.getCalculationJson(), Calculation.class);
-            inventory.issue(fact, calculation);
+            documents.getObject().postMaterialIssue(issue, fact, calculation);
             fact.setStockApplied(true);
         }
         fact.setConfirmedAt(LocalDateTime.now());

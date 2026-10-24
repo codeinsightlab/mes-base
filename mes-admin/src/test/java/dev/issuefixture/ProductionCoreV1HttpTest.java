@@ -16,6 +16,8 @@ import dev.mesbase.business.integration.warehouse.ErpIssueQueryResult.Outcome;
 import dev.mesbase.business.integration.warehouse.ErpIssueQueryResult.DocumentStatus;
 import dev.mesbase.core.factory.FactoryScope;
 import java.util.Map;
+import java.util.UUID;
+import tools.jackson.databind.ObjectMapper;
 import java.lang.reflect.Proxy;
 import java.lang.reflect.InvocationTargetException;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -192,33 +194,36 @@ class ProductionCoreV1HttpTest {
 
     @Test
     void localFullFlowMultipleIssuesAndLifecycleCannotBeForged() throws Exception {
-        try (var c = MaterialIssueHttpTest.context()) {
-            seed(c);
+        try (var c = ProductionInputHttpTest.context()) {
             var m = MaterialIssueHttpTest.mvc(c);
-            select(m);
-            issue(m, 1);
-            m.perform(full(post(H + "/1/actions/submit"))).andExpect(status().isOk())
-                    .andExpect(jsonPath("status").value("CONFIRMED"))
-                    .andExpect(jsonPath("externalReference").isEmpty());
-            var locked = db(c).queryForObject("SELECT locked_at FROM mes_execution_path WHERE id=1", String.class);
-            m.perform(full(post(H + "/1/actions/submit"))).andExpect(status().isOk());
-            assertEquals(1, db(c).queryForObject("SELECT COUNT(*) FROM mes_material_issue_submission", Integer.class));
-            issue(m, 2);
-            m.perform(full(post(H + "/2/actions/submit"))).andExpect(status().isOk());
-            assertEquals(locked, db(c).queryForObject("SELECT locked_at FROM mes_execution_path WHERE id=1", String.class));
-            m.perform(full(post(A + "select-path")).content("{\"revision\":1,\"routingNodeIds\":[1,2,4,5]}"))
+            var j = db(c);
+            j.update("DELETE FROM mes_production_execution"); // TEST ONLY unused initial fixtures.
+            String body = ProductionInputHttpTest.command(m, UUID.randomUUID().toString(), "L001", "100");
+            var first = new ObjectMapper().readTree(ProductionInputHttpTest.submit(m, body));
+            long execution = first.get("executionId").asLong();
+            String actions = "/api/production/executions/" + execution + "/actions/";
+            var locked = j.queryForObject("SELECT locked_at FROM mes_execution_path WHERE id=?", String.class, execution);
+            ProductionInputHttpTest.submit(m, body);
+            assertEquals(1, j.queryForObject("SELECT COUNT(*) FROM mes_material_issue_submission", Integer.class));
+            ProductionInputHttpTest.submit(m, ProductionInputHttpTest.command(m, UUID.randomUUID()
+                    .toString(), "L001", "100"));
+            assertEquals(locked, j.queryForObject("SELECT locked_at FROM mes_execution_path WHERE id=?", String.class, execution));
+            assertEquals(2, j.queryForObject("SELECT COUNT(*) FROM wm_stock_document WHERE document_type='MATERIAL_ISSUE' AND status='POSTED'", Integer.class));
+            m.perform(full(post(actions + "select-path")).content("{\"revision\":1,\"routingNodeIds\":[11,12]}"))
                     .andExpect(status().isConflict());
-            m.perform(full(post(A + "start"))).andExpect(status().isOk())
+            m.perform(full(post(actions + "start"))).andExpect(status().isOk())
                     .andExpect(jsonPath("status").value("RUNNING"));
-            var started = db(c).queryForObject("SELECT start_time FROM mes_production_execution WHERE id=1", String.class);
-            m.perform(full(post(A + "start"))).andExpect(status().isOk());
-            assertEquals(started, db(c).queryForObject("SELECT start_time FROM mes_production_execution WHERE id=1", String.class));
-            m.perform(full(post(H + "/1/actions/void"))).andExpect(status().isConflict());
-            m.perform(full(put(E + "/1")).content(EXEC.replace("READY", "FULLY_RECEIVED")))
+            var started = j.queryForObject("SELECT start_time FROM mes_production_execution WHERE id=?", String.class, execution);
+            m.perform(full(post(actions + "start"))).andExpect(status().isOk());
+            assertEquals(started, j.queryForObject("SELECT start_time FROM mes_production_execution WHERE id=?", String.class, execution));
+            WorkorderBomInputHttpTest.report(m, execution, "150");
+            m.perform(full(post(H + "/" + first.get("issueId").asText() + "/actions/void")))
+                    .andExpect(status().isConflict());
+            m.perform(full(put(E + "/" + execution)).content(EXEC.replace("READY", "FULLY_RECEIVED")))
                     .andExpect(status().isConflict());
             m.perform(full(post(E)).content(EXEC.replace("READY", "RUNNING")))
                     .andExpect(status().isMethodNotAllowed());
-            assertEquals(0, db(c).queryForObject("SELECT COUNT(*) FROM production_batch", Integer.class));
+            assertEquals(0, j.queryForObject("SELECT COUNT(*) FROM production_batch", Integer.class));
         }
     }
 

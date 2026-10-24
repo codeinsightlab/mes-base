@@ -255,6 +255,9 @@ class MaterialIssueHttpTest {
                 }
                 for (String column : List.of("bom_id BIGINT", "bom_base_qty DECIMAL(20,6)", "bom_component_qty DECIMAL(20,6)", "output_unit_id BIGINT", "frozen_at TIMESTAMP(6)"))
                     jdbc.execute("ALTER TABLE mes_workorder_material ADD " + column);
+                jdbc.execute("ALTER TABLE wm_stock_document ADD source_material_issue_id BIGINT");
+                jdbc.execute("ALTER TABLE wm_stock_document ADD source_request_json VARCHAR(8000)");
+                jdbc.execute("ALTER TABLE wm_stock_document ADD CONSTRAINT uk_stock_document_request_identity UNIQUE(post_request_id)");
                 // TEST ONLY: these fresh fixture objects are explicitly local; no production migration default.
                 jdbc.execute("ALTER TABLE workorder ALTER COLUMN source SET DEFAULT 'LOCAL'");
                 jdbc.execute("ALTER TABLE wm_warehouse ALTER COLUMN source SET DEFAULT 'LOCAL'");

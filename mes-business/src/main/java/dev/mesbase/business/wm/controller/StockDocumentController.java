@@ -140,7 +140,8 @@ public class StockDocumentController {
     }
 
     public record Header(String id, String documentNo, String documentType, String status, String reason,
-                         String remark, String sourceWorkorderId, String sourceExecutionId, String createBy,
+                         String remark, String sourceWorkorderId, String sourceExecutionId,
+                         String sourceMaterialIssueId, String createBy,
                          LocalDateTime createTime,
                          String updateBy, LocalDateTime updateTime, String postedBy, LocalDateTime postedAt,
                          String cancelledBy, LocalDateTime cancelledAt, String revision, String postRequestId) {
@@ -154,7 +155,12 @@ public class StockDocumentController {
     public record QualitySource(String sourceDeclarationId, String sourceTreatmentId, String sourceQualityExecutionId) {
     }
 
-    public record Detail(Header document, List<Line> lines, QualitySource qualitySource) {
+    public record MaterialIssueBasis(String requestId, String code, String workorderId, String outputQty,
+                                     String routingId, List<String> routingNodeIds) {
+    }
+
+    public record Detail(Header document, List<Line> lines, QualitySource qualitySource,
+                         MaterialIssueBasis materialIssueBasis, String materialIssueBasisError) {
     }
 
     public record Page(List<Header> items, long total, int offset, int limit) {

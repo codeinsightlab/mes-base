@@ -70,15 +70,6 @@ class ProductionReportingHttpTest {
         return body(node, qty, UUID.randomUUID().toString());
     }
 
-    static void confirmIssue(MockMvc m) throws Exception {
-        m.perform(ProductionCoreV1HttpTest.full(post(MaterialIssueHttpTest.H)).content(ProductionCoreV1HttpTest.HEADER))
-                .andExpect(status().isOk());
-        m.perform(ProductionCoreV1HttpTest.full(post(MaterialIssueHttpTest.I)).content(MaterialIssueHttpTest.ITEM))
-                .andExpect(status().isOk());
-        m.perform(ProductionCoreV1HttpTest.full(post(MaterialIssueHttpTest.H + "/1/actions/submit")))
-                .andExpect(status().isOk());
-    }
-
     static long submit(MockMvc m, long node, String qty) throws Exception {
         var result = m.perform(ProductionCoreV1HttpTest.full(post(ROOT)).content(body(node, qty)))
                 .andExpect(status().isOk()).andReturn();
@@ -91,7 +82,6 @@ class ProductionReportingHttpTest {
         try (var c = context()) {
             var m = MaterialIssueHttpTest.mvc(c);
             var j = db(c);
-            confirmIssue(m);
             String before = j.queryForObject("SELECT status FROM mes_production_execution WHERE id=1", String.class);
             switch (damage) {
                 case "sequence" ->
@@ -113,7 +103,6 @@ class ProductionReportingHttpTest {
     void pendingQualityCandidateAndPostShareTheSameNodeBoundary() throws Exception {
         try (var c = context()) {
             var m = MaterialIssueHttpTest.mvc(c);
-            confirmIssue(m);
             var j = db(c);
             j.update("INSERT INTO mes_production_report(execution_id,routing_node_id,record_type,quantity_delta,operator_user_id,recorded_by,report_time,reason,create_time) VALUES(1,11,'REPORT',8,1,1,CURRENT_TIMESTAMP,'TEST ONLY stability',CURRENT_TIMESTAMP),(1,12,'REPORT',5,1,1,CURRENT_TIMESTAMP,'TEST ONLY stability',CURRENT_TIMESTAMP),(1,13,'REPORT',3,1,1,CURRENT_TIMESTAMP,'TEST ONLY stability',CURRENT_TIMESTAMP)");
             var json = new ObjectMapper();
@@ -163,7 +152,6 @@ class ProductionReportingHttpTest {
         try (var c = context()) {
             var m = MaterialIssueHttpTest.mvc(c);
             var j = db(c);
-            confirmIssue(m);
             String command = body(11, "3");
             var first = m.perform(ProductionCoreV1HttpTest.full(post(ROOT))
                             .content(command.replace("}", ",\"operatorUserId\":999,\"recordedBy\":999,\"reportTime\":\"2000-01-01T00:00:00\",\"recordType\":\"ADJUSTMENT\",\"factoryId\":\"B\"}")))
@@ -190,7 +178,6 @@ class ProductionReportingHttpTest {
         try (var c = context()) {
             var m = MaterialIssueHttpTest.mvc(c);
             var j = db(c);
-            confirmIssue(m);
             for (String q : List.of("0", "-1", "11", "1.1234567"))
                 m.perform(ProductionCoreV1HttpTest.full(post(ROOT)).content(body(11, q)))
                         .andExpect(status().is4xxClientError());
@@ -232,7 +219,6 @@ class ProductionReportingHttpTest {
             m.perform(ProductionCoreV1HttpTest.full(post(ROOT)).content(command)).andExpect(status().isConflict());
             assertEquals("READY", j.queryForObject("SELECT status FROM mes_production_execution WHERE id=1", String.class));
             assertEquals(0, j.queryForObject("SELECT COUNT(*) FROM mes_production_report", Integer.class));
-            confirmIssue(m);
             j.update("UPDATE mes_material_issue_input SET confirmed_at=CURRENT_TIMESTAMP WHERE execution_id=1");
             j.update("UPDATE mes_execution_path SET path_status='SELECTED' WHERE id=1");
             m.perform(ProductionCoreV1HttpTest.full(post(ROOT)).content(command)).andExpect(status().isConflict());
@@ -246,7 +232,6 @@ class ProductionReportingHttpTest {
         try (var c = context(); var pool = Executors.newFixedThreadPool(2)) {
             var m = MaterialIssueHttpTest.mvc(c);
             var j = db(c);
-            confirmIssue(m);
             String command = body(11, "6");
             var barrier = new CyclicBarrier(2);
             var tasks = List.of(pool.submit(() -> {
@@ -290,7 +275,6 @@ class ProductionReportingHttpTest {
         try (var c = context()) {
             var m = MaterialIssueHttpTest.mvc(c);
             var j = db(c);
-            confirmIssue(m);
             j.execute("ALTER TABLE mes_production_report ADD CONSTRAINT test_only_fail CHECK(quantity_delta<>7)");
             String command = body(11, "7");
             assertTrue(m.perform(ProductionCoreV1HttpTest.full(post(ROOT)).content(command)).andReturn().getResponse()
@@ -307,7 +291,6 @@ class ProductionReportingHttpTest {
         try (var c = context(); var pool = Executors.newFixedThreadPool(2)) {
             var m = MaterialIssueHttpTest.mvc(c);
             var j = db(c);
-            confirmIssue(m);
             long id = submit(m, 11, "6");
             var gate = new CyclicBarrier(2);
             var a = pool.submit(() -> {
@@ -335,7 +318,6 @@ class ProductionReportingHttpTest {
             var j = db(c);
             j.update("INSERT INTO routing_node(id,routing_id,node_code,operation_id,operation_name,display_order,is_key) VALUES(14,1,'OTHER',1,'未选分支',0,false),(15,2,'OTHER_VERSION',1,'其他版本',0,false)");
             j.update("INSERT INTO routing_edge(routing_id,from_node_id,to_node_id) VALUES(1,11,14),(1,14,13)");
-            confirmIssue(m);
             submit(m, 11, "2");
             submit(m, 12, "2");
             for (long node : List.of(14L, 15L))

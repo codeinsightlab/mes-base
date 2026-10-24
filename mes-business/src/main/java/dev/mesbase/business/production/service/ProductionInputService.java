@@ -1,6 +1,15 @@
 package dev.mesbase.business.production.service;
 
 import dev.mesbase.common.utils.RequestFingerprint;
+import tools.jackson.core.JacksonException;
+import dev.mesbase.business.wm.service.StockDocumentService;
+import dev.mesbase.business.wm.domain.StockDocumentModels;
+import dev.mesbase.business.wm.domain.StockDocumentStatus;
+import dev.mesbase.common.utils.SecurityUtils;
+import dev.mesbase.core.security.AuthenticatedActor;
+import dev.mesbase.core.security.AuthorizationService;
+import dev.mesbase.core.security.Permission;
+import org.springframework.beans.factory.ObjectProvider;
 
 import dev.mesbase.common.validation.ParameterChecks;
 import dev.mesbase.business.production.domain.ProductionQuantityInput;
@@ -56,6 +65,8 @@ import dev.mesbase.business.issue.service.MaterialIssueInputFacts;
 @Service
 @ConditionalOnProperty(name = "mes.business.enabled", havingValue = "true")
 public class ProductionInputService {
+    private final ObjectProvider<StockDocumentService> documents;
+    private final AuthorizationService authorization;
     private final WorkOrderExtraMapper allocation;
     private final BusinessSourceRules sources;
 
@@ -102,7 +113,10 @@ public class ProductionInputService {
                                   MaterialMapper materials, RoutingMapper routings, IRoutingService routingService,
                                   @Qualifier("businessTransactionManager") PlatformTransactionManager manager,
                                   BusinessSourceRules sources, WorkOrderExtraMapper allocation,
-                                  ProductionExecutionRules executionRules, BusinessCacheProcessor caches) {
+                                  ProductionExecutionRules executionRules, BusinessCacheProcessor caches,
+                                  ObjectProvider<StockDocumentService> documents, AuthorizationService authorization) {
+        this.documents = documents;
+        this.authorization = authorization;
         this.caches = caches;
         this.executionRules = executionRules;
         this.allocation = allocation;
@@ -162,10 +176,17 @@ public class ProductionInputService {
         ProductionQuantityInput.check(command.outputQty());
         var sourceOrder = transaction.execute(s -> sources.order(command.workorderId()));
         if (BusinessSource.LOCAL.getValue().equals(sourceOrder.getSource())) {
+            requireDocumentPermissions(true);
             return transaction.execute(s -> {
                 locks.order(command.workorderId());
                 var saved = inputs.selectByPrimaryKey(command.requestId());
                 if (saved != null) return replay(saved, hash);
+                var draft = documents.getObject().findMaterialIssueDraft(command);
+                if (draft != null) {
+                    approveDraft(draft.document().getId(), new StockDocumentModels.Post(command.requestId(),
+                            draft.document().getRevision()));
+                    return result(inputs.selectByPrimaryKey(command.requestId()), MaterialIssueStatus.CONFIRMED.getValue());
+                }
                 var calculation = supply.calculateLocal(command.code(), command.workorderId(), command.stockReference(), command.outputQty());
                 if (!Objects.equals(command.calculationKey(), ProductionInputSupplyService.calculationKey(calculation)))
                     throw new FoundationException(ErrorCode.PRODUCTION_INPUT_STALE);
@@ -190,6 +211,80 @@ public class ProductionInputService {
         }
         var row = submissions.executePrepared(scope, prepared);
         return transaction.execute(s -> result(inputs.selectByPrimaryKey(command.requestId()), row.getStatus()));
+    }
+
+    public void requireDocumentPermissions(boolean approve) {
+        permit("business:mes:material:issue:update");
+        permit("business:wm:stock:document:create");
+        permit("business:wm:stock:document:update");
+        if (approve) permit("business:wm:stock:document:post");
+    }
+
+    public void requireApprovalPermissions() {
+        permit("business:mes:material:issue:update");
+        permit("business:wm:stock:document:post");
+    }
+
+    private void permit(String permission) {
+        if (!authorization.hasPermission(new AuthenticatedActor(SecurityUtils.getAuthentication().getName()),
+                FactoryContext.required(), new Permission(permission)))
+            throw new FoundationException(ErrorCode.FORBIDDEN);
+    }
+
+    @Transactional(transactionManager = "businessTransactionManager", rollbackFor = Exception.class)
+    public StockDocumentModels.Detail saveDraft(Command command) {
+        validate(command);
+        ProductionQuantityInput.check(command.outputQty());
+        requireDocumentPermissions(false);
+        locks.order(command.workorderId());
+        var existing = documents.getObject().findMaterialIssueDraft(command);
+        if (existing != null) return existing;
+        if (inputs.selectByPrimaryKey(command.requestId()) != null) ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
+        var calculation = supply.calculateLocal(command.code(), command.workorderId(), command.stockReference(), command.outputQty());
+        if (!Objects.equals(command.calculationKey(), ProductionInputSupplyService.calculationKey(calculation)))
+            throw new FoundationException(ErrorCode.PRODUCTION_INPUT_STALE);
+        return documents.getObject().createMaterialIssueDraft(command, calculation);
+    }
+
+    /**
+     * The warehouse owner enters this method before an input/Execution exists.
+     */
+    @Transactional(transactionManager = "businessTransactionManager", rollbackFor = Exception.class)
+    public StockDocumentModels.Detail approveDraft(Long documentId, StockDocumentModels.Post approval) {
+        requireApprovalPermissions();
+        var owner = documents.getObject();
+        var before = owner.detail(documentId).document();
+        if (before.getSourceRequestJson() == null) ParameterChecks.reject(ErrorCode.STOCK_DOCUMENT_SOURCE_PENDING);
+        Command command;
+        try {
+            command = json.readValue(before.getSourceRequestJson(), Command.class);
+        } catch (JacksonException failure) {
+            throw new FoundationException(ErrorCode.STOCK_DOCUMENT_CONFLICT, failure);
+        }
+        validate(command);
+        if (!Objects.equals(command.requestId(), approval.requestId()))
+            ParameterChecks.reject(ErrorCode.STOCK_DOCUMENT_CONFLICT);
+        locks.order(command.workorderId());
+        // Order serializes all allocation and UUID decisions, then the document is locked by bind/approve.
+        var current = owner.detail(documentId).document();
+        if (current.getSourceMaterialIssueId() != null) return owner.approve(documentId, approval);
+        if (!Objects.equals(current.getRevision(), approval.expectedRevision())
+                || !StockDocumentStatus.DRAFT.getValue().equals(current.getStatus()))
+            ParameterChecks.reject(ErrorCode.STOCK_DOCUMENT_CONFLICT);
+        var calculation = supply.calculateLocal(command.code(), command.workorderId(), command.stockReference(), command.outputQty());
+        if (!Objects.equals(command.calculationKey(), ProductionInputSupplyService.calculationKey(calculation)))
+            throw new FoundationException(ErrorCode.PRODUCTION_INPUT_STALE);
+        String hash = RequestFingerprint.sha256(json.writeValueAsString(command));
+        if (inputs.selectByPrimaryKey(command.requestId()) != null)
+            ParameterChecks.reject(ErrorCode.STOCK_DOCUMENT_CONFLICT);
+        // Current BOM, cumulative issue difference and order/stock balances are recalculated at approval.
+        var prepared = prepare(command, calculation, hash);
+        var input = inputs.selectByPrimaryKey(command.requestId());
+        owner.bindMaterialIssue(documentId, input, calculation);
+        var result = submissions.executePrepared(FactoryContext.required(), prepared);
+        if (!MaterialIssueStatus.CONFIRMED.getValue().equals(result.getStatus()))
+            ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
+        return owner.detail(documentId);
     }
 
     private Prepared prepare(Command c, Calculation calculation, String hash) {
@@ -256,8 +351,8 @@ public class ProductionInputService {
         f.setOutputQty(c.outputQty());
         f.setSourceMode(calculation.sourceMode());
         f.setCalculationJson(json.writeValueAsString(calculation));
-        f.setStockId(Mode.LOCAL_ONLY.getValue()
-                .equals(calculation.sourceMode()) ? Long.valueOf(stock.reference()) : null);
+        if (Mode.LOCAL_ONLY.getValue().equals(calculation.sourceMode()))
+            f.setStockId(Long.valueOf(stock.reference()));
         f.setStockApplied(false);
         f.setCreatedAt(LocalDateTime.now());
         inputFacts.freeze(f, calculation);

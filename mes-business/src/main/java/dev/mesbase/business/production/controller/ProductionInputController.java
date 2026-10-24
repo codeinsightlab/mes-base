@@ -1,6 +1,8 @@
 package dev.mesbase.business.production.controller;
 
 import dev.mesbase.business.integration.production.ProductionSupply.Order;
+import dev.mesbase.business.wm.controller.StockDocumentController;
+import dev.mesbase.common.utils.bean.BeanConversions;
 import dev.mesbase.business.integration.production.ProductionSupply.Stock;
 import dev.mesbase.business.production.controller.ExecutionActionController.PathView;
 import dev.mesbase.business.production.controller.vo.RoutingDetailVo;
@@ -87,6 +89,12 @@ public class ProductionInputController {
     @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED, permission = PERMISSION)
     public Result submit(@RequestBody Command request) {
         return service.submit(request);
+    }
+
+    @PostMapping("/drafts")
+    @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED, permission = PERMISSION)
+    public StockDocumentController.Detail saveDraft(@RequestBody Command request) {
+        return BeanConversions.convert(service.saveDraft(request), StockDocumentController.Detail.class);
     }
 
     private static StockView stock(Stock s) {

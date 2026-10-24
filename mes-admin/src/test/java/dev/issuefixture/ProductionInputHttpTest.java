@@ -13,6 +13,8 @@ import dev.mesbase.business.integration.warehouse.ErpActionResult;
 import dev.mesbase.business.integration.warehouse.WarehouseErpAdapter;
 import dev.mesbase.business.integration.warehouse.WarehouseIntegration;
 import dev.mesbase.business.production.controller.ProductionInputController;
+import dev.mesbase.business.production.controller.ProductionInboundController;
+import dev.mesbase.business.production.service.ProductionInboundService;
 import dev.mesbase.business.production.service.ProductionInputService;
 import dev.mesbase.business.production.service.ProductionInputSupplyService;
 import dev.mesbase.business.production.service.IRoutingService;
@@ -57,7 +59,9 @@ class ProductionInputHttpTest {
     static final String ROOT = "/api/production/input";
 
     @Configuration
-    @Import({ProductionInputController.class, ProductionInputService.class, ProductionInputSupplyService.class, ProductionReportHttpTest.Extra.class})
+    @Import({ProductionInputController.class, ProductionInputService.class, ProductionInputSupplyService.class, ProductionReportHttpTest.Extra.class,
+            ProductionInboundController.class,
+            ProductionInboundService.class})
     static class Extra {
         @Bean
         @Primary

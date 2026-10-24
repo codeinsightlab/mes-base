@@ -117,6 +117,7 @@ public class MaterialIssueSubmissionService {
         try {
             result = warehouse.createMaterialIssue(scope, prepared.selection(), prepared.command());
         } catch (RuntimeException failure) {
+            if (prepared.selection().mode() == Mode.LOCAL_ONLY) throw failure;
             LOG.warn("Material issue submission outcome unknown; operation {}", prepared.command()
                     .operationKey(), failure);
             result = new ErpActionResult(Status.UNKNOWN, prepared.selection().mode(), null, "领料结果待核实");
@@ -170,6 +171,8 @@ public class MaterialIssueSubmissionService {
         var selection = warehouse.submissionSelection(scope);
         if (!selection.mode().getValue().equals(extra.getSourceExecutionMode()))
             throw new FoundationException(ErrorCode.INTEGRATION_NOT_CONFIGURED);
+        if (selection.mode() == Mode.LOCAL_ONLY && inputFacts.find(id) == null)
+            ParameterChecks.reject(ErrorCode.STOCK_DOCUMENT_SOURCE_PENDING);
         var attempt = new MesMaterialIssueSubmissionEntity();
         attempt.setIssueId(id);
         attempt.setPathRevision(path.getRevision());

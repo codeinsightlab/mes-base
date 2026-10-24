@@ -282,7 +282,7 @@ class StockDocumentHttpTest {
             j.update("UPDATE wm_inventory SET quantity=0,available_quantity=0");
             var catalog = JSON.readTree(m.perform(full(get(ROOT + "/types"))).andExpect(status().isOk())
                     .andReturn().getResponse().getContentAsString());
-            assertEquals(10, catalog.size());
+            assertEquals(11, catalog.size());
             for (String type : List.of("PURCHASE_RECEIPT", "OUTSOURCE_RECEIPT", "MATERIAL_RETURN_RECEIPT", "REWORK_RECEIPT", "SALES_RETURN_RECEIPT")) {
                 var draft = create(m, type, null).get("document");
                 String id = draft.get("id").asText();

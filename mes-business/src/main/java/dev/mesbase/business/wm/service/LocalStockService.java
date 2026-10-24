@@ -197,25 +197,6 @@ public class LocalStockService {
     }
 
     /**
-     * Only called from the existing confirmation transaction, after the production chain locks.
-     */
-    @Transactional(transactionManager = "businessTransactionManager", propagation = Propagation.MANDATORY, rollbackFor = Exception.class)
-    @BusinessCacheEvict(business = WmInventoryResource.PREFIX, scope = BusinessCacheEvict.Scope.LIST_AND_DETAIL)
-    public void issue(MesMaterialIssueInputEntity input, Calculation calculation) {
-        requireLocal(input, calculation);
-        sources.frozenLocal(calculation.order().workorderId(), calculation.stock().warehouseId());
-        var stock = lock(input.getStockId());
-        identity(stock, calculation);
-        String hash = digest(StockActionType.ISSUE, input.getId(), input.getRequestHash());
-        if (replay(input.getId(), hash) != null) return;
-        decimal(calculation.issueQty());
-        if (calculation.issueQty().signum() <= 0) ParameterChecks.reject(ErrorCode.BAD_REQUEST);
-        change(stock, input.getId(), hash, StockActionType.ISSUE, calculation.issueQty().negate(),
-                StockSourceType.MATERIAL_ISSUE, input.getIssueId().toString(), null, input.getExecutionId(),
-                SecurityUtils.getUserId(), "正式生产领料");
-    }
-
-    /**
      * Legacy stock_applied remains authoritative; no synthetic historical ISSUE is created.
      */
     @Transactional(transactionManager = "businessTransactionManager", propagation = Propagation.MANDATORY, rollbackFor = Exception.class)
@@ -246,12 +227,16 @@ public class LocalStockService {
     @BusinessCacheEvict(business = WmInventoryResource.PREFIX, scope = BusinessCacheEvict.Scope.LIST_AND_DETAIL)
     public WmStockActionEntity postDocument(String type, Long documentId, WmStockDocumentLineEntity line,
                                             String operationId, String actionId, String requestHash, String reason,
-                                            Long executionId) {
+                                            Long executionId, Long materialIssueId) {
         var purpose = StockDocumentType.from(type);
         if (purpose == null || !purpose.isApprovalAvailable())
             ParameterChecks.reject(ErrorCode.STOCK_DOCUMENT_SOURCE_PENDING);
         var actionType = purpose.isReceipt() ? StockActionType.OTHER_RECEIPT : StockActionType.OTHER_ISSUE;
         var sourceType = purpose.isReceipt() ? StockSourceType.OTHER_RECEIPT : StockSourceType.OTHER_ISSUE;
+        if (purpose == StockDocumentType.MATERIAL_ISSUE) {
+            actionType = StockActionType.ISSUE;
+            sourceType = StockSourceType.MATERIAL_ISSUE;
+        }
         uuid(operationId);
         uuid(actionId);
         decimal(line.getQuantity());
@@ -266,11 +251,17 @@ public class LocalStockService {
                 || !Objects.equals(stock.getBinCode(), line.getBinCode())
                 || material == null || !Objects.equals(material.getUnitId(), line.getUnitId()))
             ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
-        if (actionType == StockActionType.OTHER_ISSUE && (stock.getQuantity().compareTo(line.getQuantity()) < 0
+        if (!purpose.isReceipt() && (stock.getQuantity().compareTo(line.getQuantity()) < 0
                 || available(stock).compareTo(line.getQuantity()) < 0))
             throw new FoundationException(ErrorCode.STOCK_INSUFFICIENT);
-        BigDecimal delta = actionType == StockActionType.OTHER_ISSUE ? line.getQuantity().negate() : line.getQuantity();
-        return change(stock, actionId, requestHash, actionType, delta, sourceType, documentId.toString(),
+        BigDecimal delta = purpose.isReceipt() ? line.getQuantity() : line.getQuantity().negate();
+        String sourceId = documentId.toString();
+        if (purpose == StockDocumentType.MATERIAL_ISSUE) {
+            if (materialIssueId == null) ParameterChecks.reject(ErrorCode.STOCK_DOCUMENT_SOURCE_PENDING);
+            sourceId = materialIssueId.toString();
+        }
+
+        return change(stock, actionId, requestHash, actionType, delta, sourceType, sourceId,
                 null, executionId, SecurityUtils.getUserId(), reason, line.getId(), operationId);
     }
 

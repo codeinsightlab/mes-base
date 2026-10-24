@@ -47,8 +47,13 @@ public final class StockDocumentModels {
     public record QualitySource(String sourceDeclarationId, String sourceTreatmentId, Long sourceQualityExecutionId) {
     }
 
+    public record MaterialIssueBasis(String requestId, String code, Long workorderId, BigDecimal outputQty,
+                                     Long routingId, List<Long> routingNodeIds) {
+    }
+
     public record Detail(WmStockDocumentEntity document, List<WmStockDocumentLineEntity> lines,
-                         QualitySource qualitySource) {
+                         QualitySource qualitySource, MaterialIssueBasis materialIssueBasis,
+                         String materialIssueBasisError) {
     }
 
     /**

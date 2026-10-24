@@ -26,6 +26,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.servlet.MockMvc;
 import jakarta.validation.Validation;
 import java.util.List;
+import java.util.UUID;
 import java.util.Map;
 import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.Callable;
@@ -204,20 +205,27 @@ class ProductionQualityLifecycleHttpTest {
 
     @Test
     void qualityHistoryDoesNotBlockMaterialConfirmationStartOrProductionReports() throws Exception {
-        try (var c = context()) {
+        try (var c = ProductionInputHttpTest.context(ProductionDefectHttpTest.Extra.class)) {
             var m = MaterialIssueHttpTest.mvc(c);
-            create(m, 1);
-            ProductionCoreV1HttpTest.issue(m, 1);
-            m.perform(full(post(MaterialIssueHttpTest.H + "/1/actions/submit"), "A")).andExpect(status().isOk());
-            m.perform(full(post("/api/production/executions/1/actions/start"), "A")).andExpect(status().isOk())
-                    .andExpect(jsonPath("status").value("RUNNING"));
-            m.perform(full(post("/api/production/reports/supplements"), "A").content(ProductionReportHttpTest.supplement(11, "2")))
+            db(c).update("DELETE FROM mes_production_execution"); // TEST ONLY unused fixture executions.
+            var first = new ObjectMapper().readTree(ProductionInputHttpTest.submit(m,
+                    ProductionInputHttpTest.command(m, UUID.randomUUID().toString(), "L001", "10")));
+            long execution = first.get("executionId").asLong();
+            WorkorderBomInputHttpTest.report(m, execution, "4");
+            createQuality(m, execution);
+            // The second actual production input must preserve the earlier quality/report facts.
+            ProductionInputHttpTest.submit(m, ProductionInputHttpTest.command(m, UUID.randomUUID()
+                    .toString(), "L001", "1"));
+            m.perform(full(post("/api/production/executions/" + execution + "/actions/start"), "A"))
+                    .andExpect(status().isOk()).andExpect(jsonPath("status").value("RUNNING"));
+            m.perform(full(post("/api/production/reports/supplements"), "A")
+                            .content(ProductionReportHttpTest.supplement(11, "2")
+                                    .replace("\"executionId\":\"1\"", "\"executionId\":\"" + execution + "\"")))
                     .andExpect(status().isOk());
-            m.perform(full(get("/api/production/report-quantities/executions/1"), "A"))
+            m.perform(full(get("/api/production/report-quantities/executions/" + execution), "A"))
                     .andExpect(jsonPath("nodes[0].reportedQty").value("6.000000"))
                     .andExpect(jsonPath("nodes[0].qualityIntegrated").value(true));
-            // No complete/void command exists: keep the existing refusal of forged status changes.
-            m.perform(full(put(E + "/1"), "A").content(UPDATE.replace("READY", "FULLY_RECEIVED")))
+            m.perform(full(put(E + "/" + execution), "A").content(UPDATE.replace("READY", "FULLY_RECEIVED")))
                     .andExpect(status().isConflict());
         }
     }

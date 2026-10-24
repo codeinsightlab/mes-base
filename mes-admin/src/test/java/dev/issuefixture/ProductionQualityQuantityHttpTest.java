@@ -129,7 +129,6 @@ class ProductionQualityQuantityHttpTest {
     void formalSubmissionUsesQualityCapacityAndCrossFactorySameIdIsIndependent() throws Exception {
         try (var c = context()) {
             var m = MaterialIssueHttpTest.mvc(c);
-            ProductionReportingHttpTest.confirmIssue(m);
             ProductionReportingHttpTest.submit(m, 11, "100");
             quality(m, 11, "5");
             m.perform(full(post(ProductionReportingHttpTest.ROOT), "A").content(ProductionReportingHttpTest.body(12, "96")))
