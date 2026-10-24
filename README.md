@@ -1,96 +1,101 @@
-# MES Base
+# Base MES
 
-Java21 / Spring Boot4.1.1 的模块化单体，正在将 Source Product 能力 COPY/PORT 到 Base。系统管理、系统监控、系统工具、工厂/数据源管理与同步协调已接入；生产监控和人员分析已从当前构建、扫描和前端入口中移除，源码归档，后续接入业务时重新审查；当前阶段集中建设基础架构。
+面向中小型离散制造企业的轻量化生产执行与管理系统。
 
-## 当前阶段与验收入口
+Base MES 围绕工单、批次和实际加工路径，连接材料领用、工序报工、不良申报、生产入库与库存追溯，帮助工厂看清正在做什么、做到哪一步、完成多少，以及材料和产品流向哪里。
 
-2026-10-09：先完成 Base 基础；业务接入阶段再统一生成器与现有 UI/分页契约。生成器及 `CrudPage` 暂作为待改造资产，不是当前生产页面的标准。复核结论、已整改项和待用户审查项见 [架构评审行动复核](docs/reviews/2026-10-09-architecture-review-actions.md#五2026-10-09-复核与整改当前有效)。
+本仓库为后端服务；管理与现场操作界面见 [mes-base-ui](https://github.com/codeinsightlab/mes-base-ui)。
 
+## 产品定位
 
-## 当前入口
+适用于五金加工、机械加工、汽车零部件等离散制造场景，优先服务希望减少纸单和人工统计的中小型工厂。
 
-UI `http://127.0.0.1:15174` → 本轮后端 `127.0.0.1:18081`。用户请求的 admin 已经正式创建，具有显式 PLATFORM 角色；凭证不写文档。原 `15173/18080` 服务保留。
+- **LOCAL 独立运行**：由 MES 管理必要的生产与本地库存业务。
+- **ERP 协同方向**：沿用同一套生产核心，对接 ERP 的工单和库存体系；正式库存命令仍在规划中。
+- **轻量现场操作**：围绕批次扫码、完成报工和不良申报组织操作，派工按需使用。
 
-应用在本机，数据库是用户指定的远程测试 MySQL8.0.40：`mes_base_dev` 为系统开发库，`mes_base_dev_business` 为独立工厂业务库。Redis 使用 `127.0.0.1:16379` 的 DB 1。真实连接保存在已移出当前 Git 索引、按规则忽略且权限为0600的 `mes-admin/src/main/resources/application-dev.yml`，不随 Maven target 清理。
+## 核心能力
 
-- [当前规划与续接入口](docs/development/next-stage-plan.md)
-- [迁移报告、实际命令和失败](docs/development/MES_BASE_REALIGNMENT_REPORT.md)
-- [逐功能迁移矩阵](docs/development/MES_MIGRATION_MATRIX.md)
-- [实际验收记录](docs/reviews/2026-10-06-phase1-verification.json)
-- [配置和操作边界](docs/development/platform.md)
-- [SQL 导出入口](sql/README.md)
-- [数据库版本升级与 Flyway 执行](docs/development/database-upgrades.md)
-
-## 模块与页面
-
-| 模块 | 当前职责 |
+| 领域 | 当前能力 |
 | --- | --- |
-| mes-common | Source 公共对象、Excel、Redis、字典及字符串等工具 |
-| mes-system | SysUser/Dept/Post/Role/Menu/Dict/Config/Notice/Message/Attachment/AutoCode、OpenAPI 客户端的 Source 字段、Service、Mapper/XML |
-| mes-framework | 认证、会话、验证码、密码锁、数据范围、审计、私有文件及 Factory 安全/持久化桥 |
-| mes-quartz | Source 任务/日志、Cron、受控执行、数据库 claim/run token、恢复 |
-| mes-generator | 既有生成实现保留，迁移阶段没有调用 Codegen Skill 或 CLI |
-| mes-admin | 启动类 dev.MesBaseApplication、Controller、YAML 消费/对象装配及 Flyway |
+| 物料与工艺 | 物料、分类、单位、版本化多阶 BOM 维护，工序、工艺路线与执行路径锁定 |
+| 生产执行 | 工单、批次 Execution、BOM 单材料投产领料、同批追加、工序报工及数量追踪 |
+| 质量管理 | 独立不良申报、核实、不良品/报废品入仓及来源追溯 |
+| 本地仓储 | 仓库、库位、库存余额与流水，正式单据草稿和审核，生产分批入库 |
+| 生产收尾 | 正常品或质量入库审核后，按统一数量规则检查 Execution 和工单收尾 |
+| 平台管理 | 用户、角色、菜单、工厂、数据源、私有文件、操作审计、任务及系统监控 |
+| 集成基础 | OpenAPI 客户端管理、Factory 集成配置、ERP 查询与同步准备 |
 
-UI 位于相邻 `../mes-base-ui`，Vue3/TypeScript/Router4/Pinia/Element Plus/Vite。Source 查询、字段、表单、组织岗位关联、角色菜单、字典参数、公告消息、日志、监控和工具页已 PORT；API 与实际浏览器完成项分别记录。
+## 设计亮点
 
-## 构建与 dev/prod 启动
+- **一套生产核心，多工厂隔离**：中心库维护平台配置，工厂业务使用独立业务库；业务请求按当前工厂路由。
+- **围绕批次追溯**：Execution 关联实际工艺路径、投入、报工、不良和入库，批次身份与扫码行为分离。
+- **数量来自业务事实**：统一计算有效产出、不良损失和累计入库，支持分批入库与同批追加，避免重复计量。
+- **审核驱动库存生效**：正式仓储单据审核后记录库存动作；领料入口向同一单据审核模型收敛中。
+- **保留操作身份与留痕**：提交幂等、订正/作废留痕，结果不确定时明确保留状态，便于核实。
 
-沿用用户 Java21 和标准 Maven，不创建项目 `.m2/.mvn` 或私有 mirror：
+## 当前阶段
+
+项目处于开发与交付准备阶段。LOCAL 单材料生产主链已在指定测试环境完成真实业务验收，包含 BOM 比例领料、同批追加、正常品与不良品分批入库，以及审核后的执行/工单收尾。
+
+这不代表所有业务或生产环境已验收。当前优先完善统一领料/出入库审核、请求恢复和数量查询稳定性，再补齐生产退料、调拨、现场工作站与标签、管理统计及首厂交付。
+
+多阶 BOM 的维护能力已具备，生产投产目前只支持一条直接材料组件。部分仓储类型尚未接通正式业务来源；ERP 正式库存交易和完整委外流程尚未交付。
+
+## 技术栈与结构
+
+Java 21 · Spring Boot 4 · MyBatis · MySQL 8 · Redis · Flyway · Maven
+
+采用模块化单体，按 Controller → Service → Mapper 组织业务。
+
+| 模块 | 职责 |
+| --- | --- |
+| `mes-business` | 物料/BOM、生产、质量、仓储等工厂业务 |
+| `mes-system` | 用户、组织、角色、菜单及系统设置 |
+| `mes-framework` | 认证授权、工厂上下文、持久化路由与基础设施 |
+| `mes-common` | 公共类型和工具 |
+| `mes-quartz` | 任务调度与执行记录 |
+| `mes-generator` | 基于数据库元数据的代码生成 |
+| `mes-admin` | 应用启动、装配及数据库版本迁移 |
+
+## 本地运行
+
+准备 Java 21、Maven、MySQL 8 和 Redis，并将前端与本仓库配套使用。
+
+1. 从 [`config/application-dev.example.yml`](config/application-dev.example.yml) 复制开发配置到 `mes-admin/src/main/resources/application-dev.yml`，填写自己的中心库、Redis、文件目录及数据源加密密钥。真实配置被 Git 忽略。
+2. 按[平台配置与初始化说明](docs/development/platform.md)准备中心库和首个管理员；空库没有通用默认账号密码。
+3. 按[数据库升级说明](docs/development/database-upgrades.md)初始化/升级目标业务库，通过平台管理建立工厂与业务数据源绑定，并配置所需权限。中心库迁移与业务库迁移是两个独立步骤。
+4. 构建后，使用实际配置的端口启动：
 
 ```sh
 mvn -B -ntp verify
-/usr/bin/python3 scripts/smoke-packaged.py
-scripts/run-local-redis
-# 另一终端
-scripts/run-local-backend
+java -jar target/mes-base-0.1.0-SNAPSHOT.jar --spring.profiles.active=dev
 ```
 
-实际环境参数直接写在 `mes-admin/src/main/resources/application-dev.yml` 和 `application-prod.yml`，没有环境变量占位符或config.import转接。默认dev，prod通过 `--spring.profiles.active=prod` 激活。两个真实配置在本机保留、权限0600，当前索引已取消跟踪；历史提交仍含旧凭据，本轮未轮换凭据或重写历史。新机器从config/application-dev.example.yml与application-prod.example.yml复制到相应资源路径并填入连接，再构建。
+前端的 `MES_API_TARGET` 需要与后端监听地址一致。`prod` 使用对应的生产配置示例与 `--spring.profiles.active=prod`；环境准备及数据库升级须在目标环境单独核实。本地构建产物会包含本机 profile 配置，应按该环境的运行产物管理。
 
-```sh
-# dev已在18081运行；先构建再启动以应用资源配置修改
-scripts/run-local-backend
-# prod配置默认8080；当前连接同一测试实例的独立prod测试库
-java -jar target/mes-base-0.1.0-SNAPSHOT.jar --spring.profiles.active=prod
-```
+## 路线图
 
-dev系统/业务库为mes_base_dev / mes_base_dev_business，prod测试系统/业务库为mes_base_prod / mes_base_prod_business，分别使用独立账号、DEV/PROD厂、Redis DB1/DB2和文件目录。初始管理员凭证分别在.local/development-admin.json与.local/production-test-admin.json；prod仍启用验证码和12位密码。Redis16379由scripts/run-local-redis启动。本地JAR包含本机环境配置，只作本地运行产物，本轮未部署生产。
+| 阶段 | 方向 |
+| --- | --- |
+| 近期 | 统一业务出入库审核、稳定性收尾、退料与调拨、工作站和标签打印 |
+| 交付完善 | 交期/在制/质量/人员产量统计，安装升级、备份恢复演练和首厂验收 |
+| 后续扩展 | ERP 正式业务、委外闭环、多材料生产 |
+| 长期探索 | 设备运维与采集、辅助排程、只读生产 AI |
 
-工厂与业务连接由系统库 `mf_factory` / `mf_datasource` 管理，不再在 YAML 创建。配置仍直接填写平台库、Redis、文件目录及 `mes.runtime.datasource-key`（32 字节 Base64 密钥）；业务密码加密保存，更换密钥必须迁移密文。新增管理权限需显式分配，平台角色不会自动获得工厂业务权限。生产监控与人员分析备份见 [归档说明](migration-backups/2026-10-06-deferred-production-analytics/README.md)，当前没有业务功能启用开关。
+路线图表达方向，不构成已实现能力或交付日期承诺。专门返工、独立质量放行和定时完结已退出当前产品方案；不良管理负责申报与入仓，入仓后的物流归仓储。
 
-仅验证空装配时明确避开 dev/prod：
+## 文档与相关项目
 
-```sh
-java -jar target/mes-base-0.1.0-SNAPSHOT.jar --spring.profiles.active=default --server.port=0
-```
+- [前端项目](https://github.com/codeinsightlab/mes-base-ui)
+- [当前规划与待办](docs/development/next-stage-plan.md)
+- [生产投产与 BOM 规则](docs/development/production-input.md)
+- [LOCAL / ERP 业务边界](docs/architecture/local-erp-business-boundary.md)
+- [数据库版本升级](docs/development/database-upgrades.md)
+- [架构文档](docs/architecture/README.md)
 
-## 正式契约
+开发过程、专项审查和验收证据保存在 `docs/development`、`docs/reviews` 与 `docs/operations`，与本页的产品介绍分开维护。
 
-Source 系统接口成功沿用 AjaxResult/TableDataInfo；Foundation、会话、私有文件按各自明确 DTO 返回。所有失败是真实 HTTP 状态并带 requestId；内部错误用 `errorCode/message/requestId`，外部 OpenAPI 沿用 Source 的 `errorCode/msg/data/requestId`，前端按真实契约适配。服务端生成 X-Request-Id，审计不采集请求体、凭证或令牌。
+## 来源与第三方声明
 
-`/api/platform/session` 是正式登录/注销入口；`/api/system/**` 是唯一正式可写系统对象链路。旧简化 CRUD 实现已删除、旧表重命名归档保存；空归档可经显式检查清理，非空归档保留。Redis 会话按平台数据库命名空间保存哈希键和身份/版本；权限每请求读取，无长寿命 Token 权限快照。
-
-认证、选厂、平台权限、厂业务权限分别处理，无 User↔Factory 准入绑定，无 userId=1 特权。HTTP 显式分类；平台与业务 Mapper ownership 分开。缺 Scope/连接/版本不回退平台库或首库。文件下载/预览必须证明 owner+scope+resource，公告图片绑定真实 noticeId；无公共裸 URL。
-
-Quartz 保留 Cron/启停/手动运行/日志。暂停只禁止自动触发，授权用户可执行一次；目标是受控登记任务，执行须 DB claim/run token。多节点 cron fire 永久去重与集群 JobStore 未交付。Shared DB、微信/PDA渠道及正式 MES Domain 未自动扩展。
-
-## 外部 OpenAPI
-
-OpenAPI 恢复 Source Product 的客户端管理、Secret/Token、API 授权、独立外部认证链及管理页面。代码随标准构建打包，以 `mes.system.enabled=true` 与 `open-api.enabled=true` 启用，不再使用 `-Popenapi`。
-
-客户端、授权存中心库；外部应用身份与后台用户身份独立，后台 Token 与 OpenAPI Token 不互通。V22 补偿 V16 删除的菜单，历史角色授权需重新审查分配，不自动授予。具体 MES 业务接口及业务数据范围按实际需求接入。详见 [Platform 指南](docs/development/platform.md)。
-
-## SQL 与来源
-
-Flyway 为 platform V1 + system V2–V16；V11 为工厂/数据源，V12 为同步协调，V13 为管理与分析权限菜单，V14 按源库实际结构扩大头像字段，V15 移除两项分析功能的菜单与角色菜单关联，保留工厂/数据源管理。导出命令直接合并当前迁移，不另维护第二套字段：
-
-```sh
-/usr/bin/python3 scripts/export-phase1-sql.py
-```
-
-输出 `target/phase1/sql/mysql-phase1.sql` 和 SHA256 清单。只用于空的隔离库，包含通用产品菜单/字典，无账号或公司业务数据。手工导入不写 Flyway 历史，后续须 `mes.platform.migrate=false`；优先空库应用 Flyway 初始化。许可与逐文件来源位于 docs/legal，Source 仓库只读。
-
-## 持久化：中心库 + 多业务库
-
-只装配 masterSqlSessionFactory/businessSqlSessionFactory 和 masterDataSource/businessDataSource 两个入口。中心库固定；业务入口按当前 Factory 选择独立的版本化业务池。无外部数据库框架、第三工厂或 ERP/HR/WMS 选源。事务/版本/租约与范围保护保留，配置入口沿用 mes.platform.* 和现有业务库管理。详见 docs/architecture/ADR-004-business-persistence-topology.md。
+项目复用并演进了 RuoYi、ktg-mes 等来源产品的部分能力。来源清单、原项目许可及第三方声明见 [`docs/legal`](docs/legal)。这些声明说明各自来源组件的授权，不代表本仓库整体已另行声明同一种许可证。
