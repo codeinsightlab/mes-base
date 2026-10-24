@@ -12,6 +12,8 @@ mes:
     file-root: .local/files
   system:
     enabled: true
+  business:
+    enabled: true
   runtime:
     # 32-byte Base64 AES key. Generate separately per environment; changing an existing key requires ciphertext migration.
     datasource-key: ""
