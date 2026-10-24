@@ -8,6 +8,7 @@ import java.util.stream.Stream;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicBoolean;
 import org.junit.jupiter.api.Test;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -31,6 +32,87 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  */
 class UnifiedStockApprovalHttpTest {
     private static final ObjectMapper JSON = new ObjectMapper();
+
+    @Configuration
+    static class AuditWithoutDraftEditing {
+        @Bean
+        AtomicBoolean auditOnly() {
+            return new AtomicBoolean();
+        }
+
+        @Bean
+        @Primary
+        AuthorizationService warehouseAuditOnly(AtomicBoolean auditOnly) {
+            return (actor, scope, permission) -> !auditOnly.get()
+                    || !List.of("business:wm:stock:document:create", "business:wm:stock:document:update")
+                    .contains(permission.code());
+        }
+    }
+
+    @Test
+    void anAuditorCanApproveAnExistingDraftWithoutObtainingCreateOrEditPermission() throws Exception {
+        try (var context = ProductionInputHttpTest.context(AuditWithoutDraftEditing.class)) {
+            var db = ProductionInputHttpTest.db(context);
+            var mvc = MaterialIssueHttpTest.mvc(context);
+            WorkorderBomInputHttpTest.prepare(db, "100", "1", "2.5");
+            WorkorderBomInputHttpTest.select(mvc, 1, 1);
+            String uuid = UUID.randomUUID().toString();
+            var saved = draft(mvc, ProductionInputHttpTest.command(mvc, uuid, "L001", "1"));
+            context.getBean(AtomicBoolean.class).set(true);
+            mvc.perform(full(post(StockDocumentHttpTest.ROOT + "/" + saved.get("document").get("id")
+                            .asText() + "/actions/approve"))
+                            .content(StockDocumentHttpTest.intent(uuid, saved.get("document").get("revision").asInt())))
+                    .andExpect(status().isOk());
+            BigDecimal after = rawBalance(db);
+            String another = ProductionInputHttpTest.command(mvc, UUID.randomUUID().toString(), "L001", "1");
+            mvc.perform(full(post(ProductionInputHttpTest.ROOT)).content(another)).andExpect(status().isForbidden());
+            assertEquals(1, count(db, "wm_stock_document"));
+            assertEquals(1, count(db, "mes_material_issue_input"));
+            assertEquals(1, count(db, "wm_stock_action"));
+            assertEquals(0, after.compareTo(rawBalance(db)));
+        }
+    }
+
+    @Test
+    void ordinaryApprovalCannotStealAUuidReservedByAnotherProductionDraft() throws Exception {
+        try (var context = ProductionInputHttpTest.context()) {
+            var db = ProductionInputHttpTest.db(context);
+            var mvc = MaterialIssueHttpTest.mvc(context);
+            WorkorderBomInputHttpTest.prepare(db, "100", "1", "2.5");
+            WorkorderBomInputHttpTest.select(mvc, 1, 1);
+            String uuid = UUID.randomUUID().toString();
+            var reserved = draft(mvc, ProductionInputHttpTest.command(mvc, uuid, "L001", "1"));
+            String other = StockDocumentHttpTest.create(mvc, "OTHER_RECEIPT", null).get("document").get("id").asText();
+            StockDocumentHttpTest.add(mvc, other, "0", "2", "L002", "10");
+            BigDecimal otherBalance = db.queryForObject("SELECT quantity FROM wm_inventory WHERE id=2", BigDecimal.class);
+            BigDecimal balance = rawBalance(db);
+            mvc.perform(full(post(StockDocumentHttpTest.ROOT + "/" + other + "/actions/approve"))
+                            .content(StockDocumentHttpTest.intent(uuid, 1)))
+                    .andExpect(status().isConflict())
+                    .andExpect(jsonPath("errorCode").value("STOCK_DOCUMENT_CONFLICT"));
+            assertEquals(0, balance.compareTo(rawBalance(db)));
+            assertEquals(0, count(db, "wm_stock_action"));
+            assertEquals(0, count(db, "mes_production_execution"));
+            assertEquals(0, count(db, "mes_material_issue_input"));
+            assertEquals("DRAFT", db.queryForObject("SELECT status FROM wm_stock_document WHERE id=?", String.class, other));
+            assertEquals("DRAFT", db.queryForObject("SELECT status FROM wm_stock_document WHERE id=?", String.class, reserved.get("document")
+                    .get("id").asText()));
+            assertEquals(0, db.queryForObject("SELECT COUNT(*) FROM wm_stock_document_line WHERE stock_action_id IS NOT NULL", Integer.class));
+            assertEquals(0, otherBalance.compareTo(db.queryForObject("SELECT quantity FROM wm_inventory WHERE id=2", BigDecimal.class)));
+            mvc.perform(full(post(StockDocumentHttpTest.ROOT + "/" + other + "/actions/approve"))
+                            .content(StockDocumentHttpTest.intent(UUID.randomUUID().toString(), 1)))
+                    .andExpect(status().isOk());
+            assertEquals(0, otherBalance.add(BigDecimal.TEN)
+                    .compareTo(db.queryForObject("SELECT quantity FROM wm_inventory WHERE id=2", BigDecimal.class)));
+            mvc.perform(full(post(StockDocumentHttpTest.ROOT + "/" + reserved.get("document").get("id")
+                            .asText() + "/actions/approve"))
+                            .content(StockDocumentHttpTest.intent(uuid, reserved.get("document").get("revision").asInt())))
+                    .andExpect(status().isOk());
+            assertEquals(2, count(db, "wm_stock_action"));
+            assertEquals(1, count(db, "mes_production_execution"));
+            assertEquals(0, balance.subtract(new BigDecimal("2.5")).compareTo(rawBalance(db)));
+        }
+    }
 
     @Test
     void simultaneousCrossOrderDraftsCannotClaimTheSameRequestIdentity() throws Exception {
