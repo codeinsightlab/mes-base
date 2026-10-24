@@ -749,3 +749,106 @@ V59执行前核实`TEST_DEV_PERF_20261019 → datasource 9 → ENABLED / LOCAL �
 
 
 主Agent最后通过真实Chrome普通出入库页打开草稿1149，使用明细“编辑→保存”将数量2改为3；页面仍显示草稿及“待审核执行”。独立只读SQL确认明细3、库存仍5kg、posted_by／posted_at／stock_action_id均NULL、关联库存动作0。证明普通Web实际编辑不会自动审核。精确证据为私有 `ui-draft-edit-verification.json` 与 `ui-draft-1149-after-edit.png`；此前普通API编辑为2的回执按阶段保留，当前草稿数量为3。正式领料单1128及其库存动作也已在真实页面查看：原UUID一致、来源MATERIAL_ISSUE／1116、批次原文一致、变动-2.5、余额10→7.5、操作者100，无新增命令。
+
+
+## 2026-10-24 完整生产链路独立验收
+
+### 授权、所有权及写前计划
+
+本轮依用户完整生产链路要求开展独立验收；总控仅计划、放行、只读交叉审核和维护本章，不开发或修复实现。唯一报告为本文件，由总控维护。各角色证据独占 `/private/tmp/mes-full-chain-20261024-{w,r1,r2,r3,q}`；凭证、完整备份及大文件不提交。起始后端HEAD d931f77、前端HEAD 9a2f7be，两仓既有并行修改全部保护；提交身份不证明运行版本。
+
+W独占主数据、仓储、工单、BOM、投入和正常入库；R1/R2/R3分别负责第一/第二/第三工序，S5单独授权R2/R3竞争末道；Q独占不良申报、独立核实和质量入仓。按容量分批启动，前置未通过时全部只读。子角色不跨角色接管、不编辑公共报告、不并发提交。
+
+预留标记 `FC241024A`，须W查无冲突并核实模型、账号资格后冻结。下表为写前数量方案，尚非已创建事实；工单/Execution/节点/仓库/库存ID均待正式准备。模型拟为1 PCS产出需2.5 kg单材料、三道顺序工序；若合法模型不同，先改表再写入。各场景独立批次和库存预算；材料正式OTHER_RECEIPT拟S1 40kg、其余各27.5kg，共150kg，不借用存量。
+
+| 场景/批次 | 计划/首次投入PCS | 累计耗料kg | 执行者与屏障 | 最终正常/质量入仓PCS | 材料余量kg/最终状态 |
+| --- | --- | --- | --- | --- | --- |
+| S1 / FC241024A-S1 | 12 / 10，原批追加2 | 30 | W审核→总控→R1报10→总控→R2报10→总控→R3报10；入6、4后暖读追加2，逐道报2、入2 | 12 / 0 | 10 / FULLY_RECEIVED，工单COMPLETED |
+| S2 / FC241024A-S2 | 10 / 10 | 25 | W→R1→R2→R3逐道核对；Q申报核实1；W入9后Q入1 | 9 / 1 | 2.5 / 两类入仓均生效才收尾 |
+| S3 / FC241024A-S3 | 10 / 10 | 25 | 同上；Q先入1，W后入9 | 9 / 1 | 2.5 / 两类入仓均生效才收尾 |
+| S4 / FC241024A-S4 | 10 / 10 | 25 | 同上；Q核实并入仓10，不建零数量正常入库单 | 0 / 10 | 2.5 / 质量审核后统一收尾 |
+| S5 / FC241024A-S5 | 10 / 10 | 25 | 前两道各10；末道可报10后R2/R3各6独立UUID各发一次；可信拒绝后报余4，核对原样重放和改内容冲突 | 未安排入库 | 2.5 / 仅报工不自动收尾 |
+
+合计预期投入52 PCS、耗料130kg、余20kg；S1至S4正常入库30 PCS、质量入仓12 PCS，完成贡献42 PCS，质量入仓不再次增加贡献。S5保持10 PCS未入库。额外负例须独立冻结对象及预算。
+
+### 阶段屏障记录
+
+G0：已派W/R1/Q只读核实，未放行真实写入。必须取得运行契约、中心绑定/启用/LOCAL、host/port/database与实际DATABASE()一致、账号权限/资格、编码冲突检查及范围写前快照后，总控复核放行。唯一业务库mes_base_dev_perf_test，预期Factory TEST_DEV_PERF_20261019、datasource9；不一致停止。原90＋10、缓存复验及其他既有对象只读保护。S1关键入口及至少一组质检/入仓须真实浏览器证据。
+
+当前结论：前置核实进行中，S1—S5均未验，不继承前轮成功回执。
+
+
+G0只读补证：W实测Factory与datasource均ENABLED、LOCAL，目标192.168.18.25:3306/mes_base_dev_perf_test，实际DATABASE()一致，V61/V62成功；正式类型目录含MATERIAL_ISSUE。总控另经现有MySQL连接独立核实DATABASE()及user100对启用工序1/2/3的资格关联，并冻结原工单1921/1922、Execution12372/12373的12类事实快照；与前轮哈希全部一致。尚未因这些局部通过放行写入，账号当前授权、QA冲突及完整保护范围仍待W汇总复核。
+
+总控只读证据位于 `/private/tmp/mes-full-chain-20261024-root/`：`independent-http-readonly.json`（5173/8081 health=UP，匿名报工入口401）、`qualification-readonly.tsv`、`protected-before-*.tsv`及`protected-before-hashes.json`。前端实际提供的request.ts、productionReporting/index.vue、reportingRecovery.ts均HTTP200，摘要见`frontend-served-module-check.json`，包含响应deadline和冻结恢复模块；这只证明模块被服务提供，不证明浏览器故障恢复通过。8081进程24753启动时间及磁盘JAR同为08:24:59附近，仅为运行版本辅助证据，不能单独证明加载字节相同。
+
+R1/R2/R3/Q均已分批创建并完成或正在完成独立只读契约检查，证据为各自目录`readonly-contract.md`。R2精确核对S5数量败方应为409/REPORT_QUANTITY_CONFLICT；改内容重放应409/RESOURCE_CONFLICT。未知网络/基础设施结果不能当可信拒绝。Q确认INDEPENDENT为数量归因，不是强制不同账号；若共用admin100，不能宣称双人复核或多人权限隔离。后端HEAD期间由其他任务推进b1190a4，仅文档与旧工具清理，不归因本轮，不修改或回退。
+
+总控实时认证补证：现有私有会话GET /api/session/info确认userId=100、userName=admin；当前report:submit、quality:defect:create/revise、stock:document:create/post五项权限均存在。安全摘要见`current-account-permission-checks.json`。未修改角色、权限或工序资格；后续若共用此账号，只能证明同账号流程与数量控制。
+
+
+G0放行：W的`g0-summary.json`与总控独立中心SQL `binding-independent.tsv`一致，现成admin100权限/三道资格满足。之前W只读ps调用因等待审批卡住约384秒，总控中断该只读阶段，未有业务写入；总控已独立取得必要进程信息，不再等待该查询。当前明确仅放行S1阶段A：正式API准备独立主数据/三节点路线/BOM/仓库/计划12工单及零余额库存，真实页面保存40kg材料入库草稿/明细；新增仓/BOM/批次须先补存冲突0证据。尚不放行材料审核或生产投入。待回报草稿、明细、库存0/动作0和请求证据，再作下一屏障。
+
+
+S1阶段A对象台账：原料25253（kg/unit12）、产出25254（PCS/unit7）、仓19/20/21分别RAW_MATERIAL/FINISHED_GOODS/DEFECTIVE，均LOCAL/ENABLED；BOM8基准1PCS、组件2.5kg；已发布路线830三节点9436→9437→9438，operation1→2→3；工单1932/FC241024A_S1计划12。总控独立SQL确认工单已RELEASED、三个仓来源类型正确、当前Execution0。W首次路线请求因三节点同时标key收到422/ROUTING_GRAPH_INVALID；按正式规则改末道唯一key后继续，保留错误请求/响应，不修改实现或断言凑通过。材料草稿及库存审核屏障尚未完成。
+
+
+S1材料草稿屏障通过：真实浏览器新建OTHER_RECEIPT1155/明细1154、40kg，W截图`s1-opening-draft-ui.png`及正式GET/SQL证据；总控在放行前独立SQL确认DRAFT、审核身份/时间/UUID均NULL、原料2244及产出2245余额0、动作0、Execution0。随后只放行材料审核及领料草稿保存，不放行领料审核。浏览器工具未提供原POST网络捕获，本步骤有真实UI动作与落库/GET事实，缺原始wire body，不以重建请求冒充抓包。
+
+材料审核后总控再次独立SQL取得POSTED，UUID 9d3c7270-89f1-4486-a965-f351e276b2bc，审核人100，时间09:15:52.756147，明细绑定相同stock_action_id，原料2244余额40kg、仅1条动作、Execution仍0；证据`s1-opening-approved-independent.tsv`。该文件是审核后读取，不能用作审核前快照。R1独立标签已实际加载B1恢复模块，资源清单和模块哈希见其`s1-readonly-preparation.md`；故障恢复仍未验。
+
+Q真实页面准备已完成：当前admin可进入登记不良页面；GET operation/3/defect-types实际403，不解释为空目录，不改权限。待Execution建立后按正式declaration-context（create权限）确认类型，S2—S4仍未放行。证据Q目录`readiness-phase2.md`、`ui-declare-ready.png`。
+
+
+S1领料草稿屏障通过：真实页面保存MATERIAL_ISSUE1156/明细1155，UUID b36d7bd3-546f-4c80-ac49-3a25276ed7e1，正式冻结依据为工单1932、原料库存2244、BOM25kg→产出10PCS、路线830/节点9436/9437/9438。总控独立SQL确认DRAFT、审核人/时间NULL、库存仍40kg/产出0、Execution0、正式投入0；证据`s1-input-draft-independent.tsv`。随后仅放行此单审核，预期扣25kg、投入10PCS且仅一个Execution；未放行报工。总控首次投入只读统计误查不存在的workorder_id列，改为经issue_id关联workorder后正确得到0，属于只读取证脚本错误，未修改业务。
+
+Q所需末工序3的operation_defect_type当前SQL0行，与目录接口403分别记录。总控授权W按正式主数据入口尝试新增FC241024A类型，不修改角色/旧类型/生产资格；若403则保留依赖阻碍，不绕过。S1已发布/后续锁定路径不因质量准备调整。
+
+
+S1领料审核屏障通过：单1156正式审核，UUID b36d7bd3-546f-4c80-ac49-3a25276ed7e1、审核人100、09:18:17.884457；领料1125，唯一投入10PCS且stock_applied=1，库存2244扣25kg至15kg，动作与明细1155/Execution12382关联。Execution12382 READY/target10，工单1932 RELEASED。总控独立GET path确认LOCKED/节点9436→9437→9438，reporting context第一道可报10/后两道0，证据`s1-path-before-r1.json`、`s1-context-before-r1.json`；随后明确放行R1仅第一节点9436页面报10。
+
+质量硬依赖：总控独立SQL确认全库operation_defect_type总数0（`quality-type-blocker.tsv`），W实时权限中类型create=false；不能通过旧无类型申报入口、改角色、写SQL或放宽校验完成S2—S4。已向用户询问是否有现成授权账号可在页面准备类型，禁止聊天传密码。S2—S4保持未验/依赖未满足。S1、S5继续；总控已放行W为S5新建独立批次/库存、27.5kg正式材料入库、计划10工单/BOM与25kg→10PCS领料审核，必须零报工回报后再放行R1。
+
+
+S1 R1屏障：第一节点9436真实页面仅提交一次10PCS，流水262481，UUID51219888-eac5-47d0-85a7-b8a81d2d5014，操作者/记录者100，workstation NULL，Execution RUNNING。总控独立SQL/GET context确认仅此流水，第二节点9437可报10、末道9438可报0；证据`s1-after-r1-ledger.tsv`、`s1-after-r1-context.json`，随后明确放行R2仅第二节点页面报10。R1尝试读取官方pending时工具隔离环境不提供sessionStorage，读失败发生在已成功点击之后，未再次发送；原wire body仍未捕获，不以数据库字段重建冒充原始请求。R1旧mysql-dev.cnf读连接无权（1044），未改库或写SQL，后由总控提供本轮已核实只读连接路径与独立流水证据。
+
+
+用户后续明确答复：“应该给admin创建权限。然后执行”。该当次授权覆盖本轮原“禁止修改角色”的不良类型准备特定范围，授权对象仅admin，不授权更改他人权限/生产资格。总控已派W通过正式权限入口核admin角色/成员与类型权限，在不会影响其他人的前提下补齐类型创建及正式页面必要读取；保留变更前后回执，禁止直写SQL或广授。待授权与新QA类型正式完成后，Q必须通过运行申报上下文复核，S2—S4仍不能提前记为已验。
+
+S5准备与上游屏障：W正式API建立工单1933、Execution12383、原料2246/产出2247，27.5kg材料入库1157 UUID8657e8e0-2fcb-4367-a3a6-e15976aa4b02，25kg→10PCS领料1158 UUID2af79eed-ab47-405c-9dea-3451fe474670，原料余2.5kg。总控独立SQL/GET核LOCKED/首次10可报/0报工后放行R1。R1发送前冻结完整原请求，小写UUIDca40a22f-845c-488d-80ec-32b30328ab87，仅一次正式API报10，流水262482；总控独立SQL及context确认第二道可报10、末道0，随后仅放行R2第二道10。S5 API原请求证据位于R1/S5，不能冒充S1浏览器原wire body。
+
+额外N1预算预先冻结：独立FC241024A_N1、计划2PCS、OTHER_RECEIPT10kg；验证超计划3PCS拒绝、领料草稿不生效、OTHER_ISSUE正式耗尽库存后审核原领料拒绝且零半事实。该10kg是新增独立预算，不借用S1/S5库存；由W唯一执行，优先完成用户授权的质量前置，N1未执行部分保留未验。
+
+
+权限准备完成并独立复核：原平台role100同时属于admin100与user6087，W未改其菜单；正式平台API新增role153/FC241024A_ADMIN_DEFECT，kind FACTORY、所属TEST_DEV_PERF_20261019，仅user100持有，仅menu2642 read与2643 create。admin原100/148/149/150/151角色保持，未授update/delete。总控将role100实时388条菜单与W写前快照逐项比对完全一致；独立证据`permission-change-independent.json`。随后正式创建operation3类型id1/FC241024A_DEFECT/ENABLED/PROCESS/revision0，Q继续用正式上下文确认。该权限变化是用户当次明确授权的新例外，不能将原规则写成从未生效。
+
+S1 R2屏障：真实页面第二节点9437报10，流水262483，UUID6a683607-e501-414e-812c-06ba2133c3ee，actor/recordedBy100。总控独立SQL和context确认前两道各10、末道可报10；证据`s1-after-r2-ledger.tsv`、`s1-after-r2-context.json`。R2读取到页面提交中UUID并与SQL相同，仍未取得原HTTP body/status抓包，不扩大证据等级。R3待并发槽释放后明确放行末道，不能将下发工具因容量失败当作已经放行执行。
+
+N1结果：工单1934、独立库存2248，OTHER_RECEIPT+10、OTHER_ISSUE1161 -10，余0；领料草稿1160仍DRAFT、审核NULL、Execution0，无投入/领料半事实。草稿明细9→10保存期间库存仍10。计划2申请3在正式calculate GET得到409/PRODUCTION_INPUT_QUOTA_EXCEEDED，因没有calculationKey未发送POST3PCS，此边界不隐藏。库存耗尽后原领料审核实际400/BAD_REQUEST（服务器requestId87a76e26-1c5b-4df2-87d7-7b227bc7e1e2），不同于预期明确库存不足码；保留现场不重发。只读源码链为ProductionInputService重算→LocalProductionSupply排除available<=0→ProductionInputSupplyService找不到原stockReference抛BAD_REQUEST，不能宣称已得到STOCK_INSUFFICIENT。W/N1保留全部原请求和数量证据；业务零半事实通过，错误可解释性需实施方评估，本验收不修改实现。
+
+
+S2—S4对象与第一道放行：S2工单1935/Execution12384/raw2249/out2250/open1162/input1163；S3工单1936/Execution12385/raw2251/out2252/open1164/input1165；S4工单1937/Execution12386/raw2253/out2254/open1166/input1167。分别独立27.5kg OTHER_RECEIPT与25kg→10PCS投入，余2.5kg、产出0、报工0。总控独立SQL及三个正式reporting context核LOCKED、第一可报10/后两0，证据`s234-before-r1-independent.tsv`及相应JSON，明确放行R1各第一节点9436报10，未放行下游。
+
+S5 R2原完整请求先存再单次API发送，UUIDe49de423-25e6-4b64-b58f-81ce9c9fc13e，流水262484，节点9437=10；待总控核末道可报10后安排两执行者竞争，当前无末道放行。S1 R3已在容量释放后有效放行，仅末node9438页面报10，不得自行入库或接管S5。
+
+
+Q正式读取确认类型前置已解除：declaration-context GET200，operation3、typeTotal1、id1/FC241024A_DEFECT/ENABLED/PROCESS/revision0，页面真实可见。仅将S1执行作为只读类型确认，未在S1申报质量；不能误计S1不良。Q证据`s1-readonly-declaration-context.json`、`ui-type1-available.png`。
+
+S5竞争前总控独立确认前两道10/10、末道0且可报10，证据`s5-before-race-context.json`、`s5-before-race-ledger.tsv`。先派R2仅准备独立UUID/6PCS请求，不发送，待R3准备及两执行者就绪后总控单独GO。准备消息不是执行放行，禁止补报或重试。
+
+
+S1末道屏障通过：R3真实页面仅一次报10，流水262488、UUID986bec2f-95d9-4c5c-baaa-c01d6dc9673b。总控独立SQL核三道各10、Execution RUNNING/target10/endNULL、工单RELEASED/计划12、产出库存0、结束事实0（`s1-after-r3-independent.tsv`），证明未因报工自动完结。仅放行W真实页面首批生产入库6，第二批4及追加2仍须下一屏障。R3原wire body缺失，复原命令明确标reconstructed，不当作原始网络请求。
+
+S2/S3/S4首道分别流水262485/262486/262487，UUID与R1预先冻结原请求一致；总控SQL及context独立确认每场景第二可报10、第三0（`s234-after-r1-ledger.tsv`及三JSON），分别放行R2仅第二道各10。S5双方6请求仅准备，不发送；总控采用只读gate显式放行，两角色分别独占请求/ready/attempted/响应文件，记录真实发送时间，等待gate最多55秒，未到零发送，不用固定等待冒充上游事实。
+
+保护复核：期间再次运行原12类事实哈希只读保护检查，全部unchanged。N1总控独立SQL确认库存0、领料草稿DRAFT/审核NULL、正式投入0、Execution0、仅+10与-10两库存动作（`n1-independent.tsv`）；首次排序误用库存动作表不存在create_time列，只读脚本失败后改按id排序，未修改业务或重发写命令。
+
+
+S2—S4第二/末道与Q放行：R2第二道流水262489/262490/262491；R3末道流水262492/262493/262494，均正式API发送前冻结原请求、各10、各仅一次。R3首次前置检查仅字符串0精度比较失败，发生于所有POST前，改Decimal后沿原冻结UUID各发一次，不修改业务断言或重发已成功请求。总控独立SQL及context确认三执行均三道10、RUNNING/endNULL，三个工单RELEASED/plan10，结束事实0（`s234-after-r3-independent.tsv`及三context）。随后只放行Q申报并INDEPENDENT核实：S2不良1、S3不良1、S4不良10，至少S2真实页面；尚不放行质量入仓，顺序须单独核对。
+
+
+S5竞争及原请求保护完成：总控读取R2/R3实际ready后再次GET末道0/available10，再于01:35:28.728108 UTC创建唯一GO。两发送开始相差0.935ms，响应区间重叠323.427ms；R3 UUID9a42cc9a-914b-4503-b556-88c5bb6567f7成功流水262495=6，R2 UUID6c6c417a-9c0a-48a2-a15f-17768d2a0afe完整409/REPORT_QUANTITY_CONFLICT。各仅一次，失败UUID事实0。总控SQL/context独立确认末道6、剩4，才放行R2新意图UUID2e7595db-b16a-45a6-ab07-e8e65524a8ca补4（流水262496）。随后指定R3原字节重放成功请求200返回同262495；同UUID改数量5、改节点9437均409/RESOURCE_CONFLICT，各一次且流水快照不变。末道6+4=10、available0，Execution仍RUNNING、工单RELEASED、正常入库0/结束0。独立证据`s5-race-overlap-summary.json`、`s5-after-race-independent.tsv`、`s5-final-independent.tsv`；角色原请求/时序/响应在R2/S5-race与S5-remainder、R3/S5-race与S5-replays。请求和HTTP/指定库证据齐全，未注入Mock或自然故障。R3第二冲突响应校验曾误读code字段而停，核实实际errorCode后仅继续第三请求，未重发或改变预期。
+
+S2—S4质量核实屏障通过：S2声明e7e49a41-3de8-47a5-8814-5eb28493487d、S3声明30a6ab6b-3c86-411c-8f8b-7e266b3ae3c0、S4声明e2da0398-ccea-4348-bc81-eca69120a758，均revision1，独立数量1/1/10；S2真实页面申报/核实，S3/S4正式API。总控独立SQL/context确认G/D分别9/1、9/1、0/10，只有ASSESS、质量单/入仓0、原库存0、执行仍RUNNING/结束0；证据`s234-assessment-s5-remainder-independent.tsv`及三after-assessment JSON。随后仅放行Q：S3先质量入仓1、S4全不良入仓10；S2仍须W先正常9，未提前质量入仓。
+
+S1追加前屏障：总控独立确认1169第二批4、累计10、Execution FULLY_RECEIVED/target10/end09:32:35、工单RELEASED/plan12；原结束行cedc3b05-4e33-3995-b8ee-283518441d6e另存`s1-original-completion.tsv`，详见`s1-after10-before-append-independent.tsv`。W已暖读详情/列表，总控随后仅放行原批追加2PCS/5kg，不放行补报或末次入库。
