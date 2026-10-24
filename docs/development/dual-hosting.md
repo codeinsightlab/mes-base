@@ -89,6 +89,16 @@ Git 多 push URL 的语义见[官方 git-push 文档](https://git-scm.com/docs/g
 git -c http.version=HTTP/1.1 push origin main
 ```
 
+2026-10-24后续修复：用户再次遇到 `Error in the HTTP2 framing layer`，在前后端各自仓库按GitHub域名持久设置HTTP/1.1，保留其他站点和全局Git配置：
+
+```sh
+git config --local 'http.https://github.com/.version' HTTP/1.1
+git config --get-urlmatch http.version https://github.com/codeinsightlab/mes-base.git
+```
+
+前端查询时换成mes-base-ui地址。该设置位于本机.git/config，不随克隆传播；IDE使用该仓库Git配置时同样生效。它只调整传输协议，不修改提交、认证、remote或服务端权限。修复后通过正常快进推送与远端提交核对验证，不使用force或关闭证书校验。
+
+
 Git凭证助手另输出credential storage lock告警，但上述推送进程退出0且远端已接受；这不等于凭证保存问题已修复，本轮未读取、变更或清理认证存储。
 
 用户补充：Factory不仅可按物理工厂划分，也可按业务、年度或业务＋年度配置独立空间；两仓README增加实例及权限、数据库、年度承接边界，未修改Factory业务模型或实现自动结转。
