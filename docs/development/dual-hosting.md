@@ -4,8 +4,8 @@ Base MES 前后端分别维护一个 Git 仓库，每个仓库的同一套提交
 
 | 项目 | GitHub | Gitee |
 | --- | --- | --- |
-| 后端 | https://github.com/codeinsightlab/mes-base | https://gitee.com/zlxStudyHome/mes-base |
-| 前端 | https://github.com/codeinsightlab/mes-base-ui | https://gitee.com/zlxStudyHome/mes-base-ui |
+| 后端 | https://github.com/codeinsightlab/mes-base | https://gitee.com/codeinsightlab/mes-base |
+| 前端 | https://github.com/codeinsightlab/mes-base-ui | https://gitee.com/codeinsightlab/mes-base-ui |
 
 ## 日常操作
 
@@ -39,9 +39,9 @@ remote 设置只保存在本地 `.git/config`，不会随克隆或提交自动�
 ```sh
 git clone https://github.com/codeinsightlab/mes-base.git
 cd mes-base
-git remote add gitee https://gitee.com/zlxStudyHome/mes-base.git
+git remote add gitee https://gitee.com/codeinsightlab/mes-base.git
 git remote set-url --add --push origin https://github.com/codeinsightlab/mes-base.git
-git remote set-url --add --push origin https://gitee.com/zlxStudyHome/mes-base.git
+git remote set-url --add --push origin https://gitee.com/codeinsightlab/mes-base.git
 ```
 
 前端：
@@ -49,9 +49,9 @@ git remote set-url --add --push origin https://gitee.com/zlxStudyHome/mes-base.g
 ```sh
 git clone https://github.com/codeinsightlab/mes-base-ui.git
 cd mes-base-ui
-git remote add gitee https://gitee.com/zlxStudyHome/mes-base-ui.git
+git remote add gitee https://gitee.com/codeinsightlab/mes-base-ui.git
 git remote set-url --add --push origin https://github.com/codeinsightlab/mes-base-ui.git
-git remote set-url --add --push origin https://gitee.com/zlxStudyHome/mes-base-ui.git
+git remote set-url --add --push origin https://gitee.com/codeinsightlab/mes-base-ui.git
 ```
 
 已有 remote 时先用下述命令检查，避免重复添加。HTTPS 推送需要该机器分别具备 GitHub 和 Gitee 的有效认证；浏览器已登录不必然代表 Git 可推送。凭证由本机凭证管理器维护，不放进 remote URL、脚本或文档。
