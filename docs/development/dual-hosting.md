@@ -98,6 +98,15 @@ git config --get-urlmatch http.version https://github.com/codeinsightlab/mes-bas
 
 前端查询时换成mes-base-ui地址。该设置位于本机.git/config，不随克隆传播；IDE使用该仓库Git配置时同样生效。它只调整传输协议，不修改提交、认证、remote或服务端权限。修复后通过正常快进推送与远端提交核对验证，不使用force或关闭证书校验。
 
+同次排查还发现macOS已启用本地系统代理，而Git没有代理配置；仅切换协议后仍出现等待。临时指定系统代理的只读远端查询成功后，对本机两仓的GitHub域名补充：
+
+```sh
+git config --local 'http.https://github.com/.proxy' http://127.0.0.1:7897
+```
+
+7897是本机当前代理端口，不是项目通用默认值，其他机器按实际代理配置。此设置要求本地代理运行；停用或更换代理时更新该值，或用 `git config --local --unset 'http.https://github.com/.proxy'` 移除。它不改变Gitee连接、不上传代理配置或凭证，也不关闭TLS证书验证。
+
+
 
 Git凭证助手另输出credential storage lock告警，但上述推送进程退出0且远端已接受；这不等于凭证保存问题已修复，本轮未读取、变更或清理认证存储。
 
