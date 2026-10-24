@@ -485,19 +485,13 @@ REVIEW。不得带入公司身份、客户/生产数据、Secret、内部账号�
 Factory/权限/ownership 行为，允许更换实现和分包；拒绝默认库兜底、HTTP200错误、任意反射 Job。AGENTS 定规则、Skill
 定开发工作流、工具执行，不能用架构或工具反过来定义迁移产品。
 
-## 业务人员 / 部门 / 岗位嵌入组件（2026-10-10）
+## 业务引用目录组件
 
-业务模块需要人员、部门、岗位搜索或选择时，优先复用 mes-base-ui 的
-`src/components/business/directory/PersonnelSelect.vue`、`DepartmentSelect.vue`、`PostSelect.vue`。
-接口统一为 `/api/business/directory/{personnel|departments|posts}` 与 `/{id}`，仅提供 GET
-列表和单个查询；禁止在这组能力中增加新增、修改、删除或角色分配。
-复用中心库 sys_user/sys_dept/sys_post 的平台 Mapper，使用 masterTransactionManager 只读事务；不新增表、不复制目录到业务库。
-HTTP 授权使用当前工厂的 business:directory:{personnel|department|post}:read 权限，不能让组件调用平台管理 API 或要求
-system 权限。
-中心目录为跨厂共享引用，不表示人员所属工厂；不能把选厂过滤误称为目录行隔离。人员只暴露编号、名称、人员编码和部门编号，禁止返回密码、联系方式、角色等
-SysUser 敏感字段。
-组件 ID 使用字符串，切厂/撤权清理已选项与候选数据、拒绝过期响应。平台管理页面保持原有管理能力。
-契约与使用方式见 mes-base 的 docs/development/business-directory.md。
+业务人员选择复用`src/components/business/directory/PersonnelSelect.vue`，执行列表工艺筛选复用`BusinessDirectorySelect.vue`的routings资源。部门、岗位选择器和目录operations资源没有正式消费者，已清理，不为可能的需求恢复空壳。系统部门、岗位维护及工艺编辑自己的工序候选接口保持独立。
+
+当前目录HTTP入口仅为`/api/business/directory/personnel[/{id}]`、`routings[/{id}]`及`report-operators`，按对应业务权限授权。补报人员检索只使用目录report-operators，不恢复重复的生产报工入口。内部userLabels、routingLabels、operationLabels和materialEntities继续复用统一详情缓存，不因HTTP包装清理而删除，不新增竞争缓存。
+
+目录负责只读引用查询，DetailEntityCache及BusinessCacheProcessor负责通用缓存机制。人员来自中心sys_user，禁止泄漏密码、联系方式、角色及权限；历史身份校验实时查询，不以缓存决定生产准入。ID保持字符串，切厂/撤权清理状态并拒绝迟到响应。契约和职责见mes-base的`docs/development/business-directory.md`。
 
 
 ## 2026-10-11 用户确认：业务请求授权与路由缓存

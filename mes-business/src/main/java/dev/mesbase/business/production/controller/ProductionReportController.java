@@ -2,7 +2,6 @@ package dev.mesbase.business.production.controller;
 
 import dev.mesbase.business.production.controller.vo.ProductionReportViews.Detail;
 import dev.mesbase.business.production.controller.vo.ProductionReportViews.Execution;
-import dev.mesbase.business.production.controller.vo.ProductionReportViews.HistoricalUser;
 import dev.mesbase.business.production.controller.vo.ProductionReportViews.Ledger;
 import dev.mesbase.business.production.controller.vo.ProductionReportViews.Page;
 import dev.mesbase.business.production.controller.vo.ProductionReportViews.Summary;
@@ -12,7 +11,6 @@ import dev.mesbase.business.production.domain.ProductionReportModels.Supplement;
 import dev.mesbase.business.production.domain.ProductionReportModels.VoidOriginal;
 import dev.mesbase.business.production.service.ProductionQuantityService;
 import dev.mesbase.business.production.service.ProductionReportService;
-import dev.mesbase.business.production.service.ReportUserReferenceService;
 import dev.mesbase.common.utils.bean.BeanConversions;
 import dev.mesbase.platform.web.EndpointAccess;
 import jakarta.validation.Valid;
@@ -31,13 +29,10 @@ import org.springframework.web.bind.annotation.RestController;
 public class ProductionReportController {
     private final ProductionReportService reports;
     private final ProductionQuantityService quantities;
-    private final ReportUserReferenceService users;
 
-    public ProductionReportController(ProductionReportService reports, ProductionQuantityService quantities,
-                                      ReportUserReferenceService users) {
+    public ProductionReportController(ProductionReportService reports, ProductionQuantityService quantities) {
         this.reports = reports;
         this.quantities = quantities;
-        this.users = users;
     }
 
     @GetMapping("/report-quantities/executions/{id}")
@@ -97,12 +92,4 @@ public class ProductionReportController {
         return ProductionReportViews.ledger(reports.voidOriginalReport(id, command));
     }
 
-    @GetMapping("/report-operators")
-    @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED, permission = ProductionReportPermissions.SUPPLEMENT)
-    public Page<HistoricalUser> users(@RequestParam(required = false) String keyword,
-                                      @RequestParam(defaultValue = "0") int offset,
-                                      @RequestParam(defaultValue = "20") int limit) {
-        var p = users.page(keyword, offset, limit);
-        return BeanConversions.convertPage(p, u -> BeanConversions.convert(u, HistoricalUser.class), Page::new);
-    }
 }

@@ -3,8 +3,6 @@ package dev.mesbase.modules.material;
 import dev.mesbase.common.core.redis.RedisCache;
 import dev.mesbase.business.directory.service.BusinessDirectoryService;
 import dev.mesbase.system.mapper.SysUserMapper;
-import dev.mesbase.system.mapper.SysDeptMapper;
-import dev.mesbase.system.mapper.SysPostMapper;
 import dev.mesbase.business.production.dao.RoutingMapper;
 import dev.mesbase.business.production.dao.OperationMapper;
 import dev.mesbase.infrastructure.persistence.PlatformPersistence;
@@ -38,7 +36,6 @@ import dev.mesbase.business.basic.sync.MaterialQueryPort;
 import dev.mesbase.framework.sync.SyncCoordinator;
 import org.springframework.beans.factory.ObjectProvider;
 import dev.mesbase.platform.execution.FactoryContext;
-import com.github.pagehelper.Page;
 import com.github.pagehelper.PageHelper;
 import jakarta.validation.Validation;
 import java.net.ServerSocket;
@@ -709,7 +706,7 @@ class BusinessCacheIntegrationTest {
                                            ObjectProvider<RoutingMapper> routes,
                                            ObjectProvider<OperationMapper> operations,
                                            ObjectProvider<MaterialMapper> materials) {
-            return new BusinessDirectoryService(mock(SysUserMapper.class), mock(SysDeptMapper.class), mock(SysPostMapper.class),
+            return new BusinessDirectoryService(mock(SysUserMapper.class),
                     new DetailEntityCache(redis, environment), caches, mock(PlatformPersistence.class),
                     transactions, routes, operations, materials);
         }

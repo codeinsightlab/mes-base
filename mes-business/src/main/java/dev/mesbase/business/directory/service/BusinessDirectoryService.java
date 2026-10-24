@@ -12,13 +12,9 @@ import dev.mesbase.business.directory.domain.DirectoryDeletionFlag;
 import com.github.pagehelper.PageHelper;
 import dev.mesbase.business.directory.domain.DirectoryPage;
 import dev.mesbase.business.directory.domain.DirectoryQuery;
-import dev.mesbase.common.core.domain.entity.SysDept;
 import dev.mesbase.common.core.domain.entity.SysUser;
 import dev.mesbase.core.error.ErrorCode;
 import dev.mesbase.core.error.FoundationException;
-import dev.mesbase.system.domain.SysPost;
-import dev.mesbase.system.mapper.SysDeptMapper;
-import dev.mesbase.system.mapper.SysPostMapper;
 import dev.mesbase.system.mapper.SysUserMapper;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
@@ -53,15 +49,14 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 import java.util.function.Supplier;
 
 /**
- * Shared center directory reached through narrowly authorized business capabilities.
+ * Read-only business references: selection queries, batched display data and uncached identity checks.
+ * Cache storage and invalidation are provided by the existing shared cache infrastructure.
  */
 @Service
 @ConditionalOnProperty(name = "mes.system.enabled", havingValue = "true")
 public class BusinessDirectoryService {
     private static final Set<String> USER_CACHE_FIELDS = Set.of("userId", "userName", "nickName", "deptId", "status", "delFlag");
     private final SysUserMapper users;
-    private final SysDeptMapper departments;
-    private final SysPostMapper posts;
     private final DetailEntityCache cache;
     private final BusinessCacheProcessor businessCache;
     private final PlatformPersistence center;
@@ -70,16 +65,13 @@ public class BusinessDirectoryService {
     private final ObjectProvider<OperationMapper> operations;
     private final ObjectProvider<MaterialMapper> materials;
 
-    public BusinessDirectoryService(SysUserMapper users, SysDeptMapper departments,
-                                    SysPostMapper posts, DetailEntityCache cache,
+    public BusinessDirectoryService(SysUserMapper users, DetailEntityCache cache,
                                     BusinessCacheProcessor businessCache, PlatformPersistence center,
                                     @Qualifier("businessTransactionManager") ObjectProvider<OwnedTransactionManager> businessTransactions,
                                     ObjectProvider<RoutingMapper> routings,
                                     ObjectProvider<OperationMapper> operations,
                                     ObjectProvider<MaterialMapper> materials) {
         this.users = users;
-        this.departments = departments;
-        this.posts = posts;
         this.cache = cache;
         this.businessCache = businessCache;
         this.center = center;
@@ -99,22 +91,6 @@ public class BusinessDirectoryService {
     }
 
     @Transactional(transactionManager = "masterTransactionManager", readOnly = true)
-    public DirectoryPage<SysDept> departments(DirectoryQuery query) {
-        var filter = new SysDept();
-        filter.setDeptName(query.keyword());
-        filter.setStatus(DirectoryStatus.NORMAL.getValue());
-        return page(query, "d.dept_id desc", () -> departments.selectDeptList(filter));
-    }
-
-    @Transactional(transactionManager = "masterTransactionManager", readOnly = true)
-    public DirectoryPage<SysPost> posts(DirectoryQuery query) {
-        var filter = new SysPost();
-        filter.setPostName(query.keyword());
-        filter.setStatus(DirectoryStatus.NORMAL.getValue());
-        return page(query, "post_id desc", () -> posts.selectPostList(filter));
-    }
-
-    @Transactional(transactionManager = "masterTransactionManager", readOnly = true)
     public DirectoryLabel personnel(Long id) {
         var row = users.selectUserById(id);
         if (row == null || !DirectoryDeletionFlag.NORMAL.getValue()
@@ -130,33 +106,6 @@ public class BusinessDirectoryService {
         DirectoryLabel label = userLabel(cached);
         center.transactionManager().verifyAccess();
         return label;
-    }
-
-    @Transactional(transactionManager = "masterTransactionManager", readOnly = true)
-    public SysDept department(Long id) {
-        return requireDepartment(id);
-    }
-
-    @Transactional(transactionManager = "masterTransactionManager", readOnly = true)
-    public SysPost post(Long id) {
-        return requirePost(id);
-    }
-
-    private SysDept requireDepartment(Long id) {
-        var row = departments.selectDeptById(id);
-        if (row == null || !DirectoryDeletionFlag.NORMAL.getValue()
-                .equals(row.getDelFlag()) || !DirectoryStatus.NORMAL.getValue().equals(row.getStatus())) {
-            throw new FoundationException(ErrorCode.NOT_FOUND);
-        }
-        return row;
-    }
-
-    private SysPost requirePost(Long id) {
-        var row = posts.selectPostById(id);
-        if (row == null || !DirectoryStatus.NORMAL.getValue().equals(row.getStatus())) {
-            throw new FoundationException(ErrorCode.NOT_FOUND);
-        }
-        return row;
     }
 
     @Transactional(transactionManager = "masterTransactionManager", readOnly = true)
@@ -179,25 +128,6 @@ public class BusinessDirectoryService {
         if (center.transactionManager().foreignTransactionActive())
             return center.readOnly(session -> session.mapper(SysUserMapper.class).selectUserById(id) != null);
         return users.selectUserById(id) != null;
-    }
-
-    /**
-     * Uncached bounded historical identity check, including disabled/deleted accounts.
-     */
-    public boolean historicalUsersExist(Collection<Long> ids) {
-        validateIds(ids);
-        if (ids.stream().anyMatch(Objects::isNull)) return false;
-        var distinct = ids.stream().distinct().toList();
-        if (distinct.isEmpty()) return true;
-        Function<SysUserMapper, Boolean> query = mapper -> mapper.selectUserReferencesByIds(distinct).stream()
-                .map(SysUser::getUserId).collect(Collectors.toSet()).containsAll(distinct);
-        if (center.transactionManager().foreignTransactionActive())
-            return center.readOnly(session -> query.apply(session.mapper(SysUserMapper.class)));
-        return query.apply(users);
-    }
-
-    public DirectoryLabel userLabel(Long id) {
-        return userLabels(List.of(id)).get(id);
     }
 
     public Map<Long, DirectoryLabel> userLabels(Collection<Long> ids) {
@@ -271,11 +201,6 @@ public class BusinessDirectoryService {
     }
 
     @Transactional(transactionManager = "businessTransactionManager", readOnly = true)
-    public DirectoryLabel operationLabel(Long id) {
-        return operationLabels(List.of(id)).get(id);
-    }
-
-    @Transactional(transactionManager = "businessTransactionManager", readOnly = true)
     public Map<Long, DirectoryLabel> operationLabels(Collection<Long> ids) {
         var rows = scoped(OperationResource.PREFIX, ids, OperationEntity.class, OperationEntity::getId, missing -> {
             var filter = new OperationExample();
@@ -297,19 +222,6 @@ public class BusinessDirectoryService {
         var rows = page(query, "id desc", () -> routings.getObject().selectByExample(filter));
         return new DirectoryPage<>(rows.items().stream()
                 .map(row -> new DirectoryLabel(row.getId(), row.getCode(), row.getName(), row.getVersion(), row.getDescription(), row.getStatus(), null, null))
-                .toList(), rows.total(), rows.offset(), rows.limit());
-    }
-
-    @Transactional(transactionManager = "businessTransactionManager", readOnly = true)
-    public DirectoryPage<DirectoryLabel> operations(DirectoryQuery query) {
-        var filter = new OperationExample();
-        if (StringUtils.isNotBlank(query.keyword())) {
-            filter.createCriteria().andNameLike("%" + query.keyword() + "%");
-            filter.or().andCodeLike("%" + query.keyword() + "%");
-        }
-        var rows = page(query, "id desc", () -> operations.getObject().selectByExample(filter));
-        return new DirectoryPage<>(rows.items().stream()
-                .map(row -> new DirectoryLabel(row.getId(), row.getCode(), row.getName(), null, row.getDescription(), row.getStatus(), null, null))
                 .toList(), rows.total(), rows.offset(), rows.limit());
     }
 

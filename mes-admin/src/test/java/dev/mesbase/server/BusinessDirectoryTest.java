@@ -74,8 +74,6 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
-import static org.hamcrest.Matchers.containsString;
 
 /**
  * TEST ONLY H2 database using the real center Mapper/XML and Spring transaction manager.
@@ -144,7 +142,7 @@ class BusinessDirectoryTest {
         }).when(redis).setCacheObjectsIfVersion(any(), any(), any(), anyInt());
         userMapper = spy(persistence.mapper(SysUserMapper.class));
         context.registerBean(BusinessDirectoryService.class, () -> new BusinessDirectoryService(
-                userMapper, persistence.mapper(SysDeptMapper.class), persistence.mapper(SysPostMapper.class),
+                userMapper,
                 new DetailEntityCache(redis, new MockEnvironment()), mock(BusinessCacheProcessor.class), persistence,
                 mock(ObjectProvider.class), mock(ObjectProvider.class), mock(ObjectProvider.class), mock(ObjectProvider.class)));
         context.refresh();
@@ -154,8 +152,7 @@ class BusinessDirectoryTest {
             Optional<FactoryId> selected = call.getArgument(1);
             return selected.map(FactoryScope::new);
         });
-        grants = Set.of(BusinessDirectoryController.PERSONNEL_READ,
-                BusinessDirectoryController.DEPARTMENT_READ, BusinessDirectoryController.POST_READ);
+        grants = Set.of(BusinessDirectoryController.PERSONNEL_READ);
         var access = new FoundationAccessInterceptor(selection,
                 (actor, scope, permission) -> grants.contains(permission.code()));
         http = MockMvcBuilders.standaloneSetup(new BusinessDirectoryController(service))
@@ -208,29 +205,29 @@ class BusinessDirectoryTest {
         assertEquals("1", labels.get(2L).status());
         service.userLabels(List.of(3L, 2L, 9007199254740993L));
         verify(userMapper, times(1)).selectUserReferencesByIds(List.of(2L, 3L, 9007199254740993L));
-        http.perform(get("/api/business/directory/user-references").header("X-Factory-Id", "F1")
-                        .param("ids", "9007199254740993,2"))
-                .andExpect(status().isOk())
-                .andExpect(content().string(containsString("\"name\":\"Reference\"")))
-                .andExpect(jsonPath("$[*].password").isEmpty()).andExpect(jsonPath("$[*].email").isEmpty())
-                .andExpect(jsonPath("$[*].roles").isEmpty());
+
+    }
+
+    @Test
+    void reportOperatorSelectionUsesTheDirectoryEndpointAndItsOwnGrant() throws Exception {
         grants = Set.of();
-        http.perform(get("/api/business/directory/user-references").header("X-Factory-Id", "F1").param("ids", "2"))
+        http.perform(get("/api/business/directory/report-operators").header("X-Factory-Id", "F1"))
                 .andExpect(status().isForbidden());
+        grants = Set.of("business:production:report:supplement");
+        http.perform(get("/api/business/directory/report-operators").header("X-Factory-Id", "F1"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.total").value(2))
+                .andExpect(jsonPath("$.items[*].password").isEmpty())
+                .andExpect(jsonPath("$.items[*].email").isEmpty());
     }
 
     @Test
     void paginationSearchAndActiveReferencesUseRealXml() throws Exception {
-        for (String resource : Set.of("departments", "posts")) {
-            http.perform(get("/api/business/directory/" + resource).header("X-Factory-Id", "F1"))
-                    .andExpect(status().isOk()).andExpect(jsonPath("$.total").value(1));
-        }
         http.perform(get("/api/business/directory/personnel").header("X-Factory-Id", "F1")
                 .param("keyword", "absent")).andExpect(jsonPath("$.total").value(0));
         http.perform(get("/api/business/directory/personnel").header("X-Factory-Id", "F1")
                         .param("offset", "1").param("limit", "1"))
                 .andExpect(jsonPath("$.total").value(1)).andExpect(jsonPath("$.items").isEmpty());
-        for (String resource : Set.of("personnel/2", "personnel/3", "departments/11", "posts/21")) {
+        for (String resource : Set.of("personnel/2", "personnel/3")) {
             http.perform(get("/api/business/directory/" + resource).header("X-Factory-Id", "F1"))
                     .andExpect(status().isNotFound());
         }
@@ -238,19 +235,20 @@ class BusinessDirectoryTest {
 
     @Test
     void permissionsAreIndependentAndMissingFactoryFails() throws Exception {
-        grants = Set.of(BusinessDirectoryController.DEPARTMENT_READ);
+        grants = Set.of();
         http.perform(get("/api/business/directory/personnel").header("X-Factory-Id", "F1"))
                 .andExpect(status().isForbidden());
-        http.perform(get("/api/business/directory/departments").header("X-Factory-Id", "F1"))
+        grants = Set.of(BusinessDirectoryController.PERSONNEL_READ);
+        http.perform(get("/api/business/directory/personnel").header("X-Factory-Id", "F1"))
                 .andExpect(status().isOk());
-        http.perform(get("/api/business/directory/departments"))
+        http.perform(get("/api/business/directory/personnel"))
                 .andExpect(status().isUnprocessableEntity())
                 .andExpect(jsonPath("$.errorCode").value("FACTORY_SELECTION_REQUIRED"));
     }
 
     @Test
     void onlyGetRoutesExistAndPagingBoundsRejectAbuse() throws Exception {
-        for (String resource : Set.of("personnel", "departments", "posts")) {
+        for (String resource : Set.of("personnel")) {
             String url = "/api/business/directory/" + resource;
             http.perform(post(url)).andExpect(status().isMethodNotAllowed());
             http.perform(put(url + "/10")).andExpect(status().isMethodNotAllowed());
@@ -259,6 +257,6 @@ class BusinessDirectoryTest {
                     .andExpect(status().isBadRequest());
         }
         assertEquals(ErrorCode.BAD_REQUEST, assertThrows(FoundationException.class,
-                () -> service.posts(new DirectoryQuery(null, null, -1, 20))).code());
+                () -> service.personnel(new DirectoryQuery(null, null, -1, 20))).code());
     }
 }

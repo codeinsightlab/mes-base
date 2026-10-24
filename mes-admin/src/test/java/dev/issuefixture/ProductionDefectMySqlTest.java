@@ -5,41 +5,27 @@ import dev.mesbase.business.production.service.BusinessSourceRules;
 import dev.mesbase.business.quality.service.ExecutionQualityReferenceQueryImpl;
 
 import dev.mesbase.acceptance.AcceptanceBusinessDatabase;
-import dev.mesbase.business.production.dao.MesProductionReportMapper;
-import dev.mesbase.business.production.dao.MesProductionExecutionMapper;
-import dev.mesbase.business.production.domain.ProductionReportModels.Supplement;
-import dev.mesbase.business.production.domain.ProductionReportModels.Adjustment;
-import dev.mesbase.business.production.domain.ProductionReportModels.VoidOriginal;
-import dev.mesbase.business.production.service.ProductionReportService;
 import dev.mesbase.business.production.service.ProductionQuantityService;
 import dev.mesbase.business.production.service.ProductionExecutionRules;
 import dev.mesbase.business.production.service.ProductionChainLocks;
 import dev.mesbase.business.production.service.ExecutionPathService;
-import dev.mesbase.business.production.service.ReportUserReferenceService;
 import dev.mesbase.business.directory.service.BusinessDirectoryService;
 import dev.mesbase.common.cache.DetailEntityCache;
 import dev.mesbase.common.core.redis.RedisCache;
 import dev.mesbase.infrastructure.cache.BusinessCacheProcessor;
-import dev.mesbase.system.mapper.SysDeptMapper;
-import dev.mesbase.system.mapper.SysPostMapper;
 import dev.mesbase.business.production.dao.RoutingMapper;
-import dev.mesbase.business.production.dao.RoutingNodeMapper;
 import dev.mesbase.business.production.dao.OperationMapper;
 import org.springframework.mock.env.MockEnvironment;
 
 import static org.mockito.Mockito.mock;
 
-import dev.mesbase.common.core.domain.entity.SysUser;
-import dev.mesbase.common.core.domain.model.LoginUser;
 import dev.mesbase.system.mapper.SysUserMapper;
 import dev.mesbase.infrastructure.persistence.OwnedTransactionManager;
 import dev.mesbase.infrastructure.persistence.PersistenceFactories;
 import dev.mesbase.infrastructure.persistence.PlatformPersistence;
 import dev.mesbase.core.error.FoundationException;
-import dev.mesbase.core.error.ErrorCode;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.sql.Statement;
 import java.math.BigDecimal;
 import dev.mesbase.core.security.AuthorizationService;
 import java.time.LocalDateTime;
@@ -57,11 +43,8 @@ import org.springframework.context.annotation.AnnotationConfigApplicationContext
 import org.springframework.context.annotation.Configuration;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
-import org.springframework.jdbc.support.GeneratedKeyHolder;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.transaction.annotation.EnableTransactionManagement;
-import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.core.env.MapPropertySource;
 import org.yaml.snakeyaml.Yaml;
 import org.junit.jupiter.api.Test;
@@ -69,23 +52,17 @@ import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 
-import dev.mesbase.business.quality.service.ProductionDefectService;
 import dev.mesbase.business.quality.service.QualityTreatmentService;
 import dev.mesbase.business.quality.service.QualityReleaseService;
 import dev.mesbase.business.integration.warehouse.WarehouseIntegration;
 import dev.mesbase.business.quality.domain.QualityTreatmentModels.Assessment;
 import dev.mesbase.business.quality.domain.QualityTreatmentModels.Attribution;
 import dev.mesbase.business.production.service.ProductionQuantityService;
-import dev.mesbase.business.quality.integration.LocalProductionDefectErpGateway;
-import dev.mesbase.business.quality.dao.MesProductionDefectMapper;
 import dev.mesbase.business.quality.domain.MesProductionDefectEntity;
 import dev.mesbase.business.quality.domain.ProductionDefectModels.Command;
 import dev.mesbase.business.quality.domain.ProductionDefectModels.Facts;
-import dev.mesbase.business.wm.dao.WmWarehouseMapper;
-import org.springframework.transaction.PlatformTransactionManager;
 
 /**
  * LIVE MYSQL: designated SIMPLE_B binding, real generated SQL, commits, concurrency and trigger immutability.
@@ -120,7 +97,7 @@ class ProductionDefectMySqlTest {
         c.registerBean(PlatformPersistence.class, () -> center);
         c.registerBean(SysUserMapper.class, () -> center.mapper(SysUserMapper.class));
         c.registerBean(BusinessDirectoryService.class, () -> new BusinessDirectoryService(
-                c.getBean(SysUserMapper.class), mock(SysDeptMapper.class), mock(SysPostMapper.class), new DetailEntityCache(mock(RedisCache.class), new MockEnvironment()), mock(BusinessCacheProcessor.class), center, c.getBeanProvider(OwnedTransactionManager.class), c.getBeanProvider(RoutingMapper.class), c.getBeanProvider(OperationMapper.class), c.getBeanProvider(MaterialMapper.class)));
+                c.getBean(SysUserMapper.class), new DetailEntityCache(mock(RedisCache.class), new MockEnvironment()), mock(BusinessCacheProcessor.class), center, c.getBeanProvider(OwnedTransactionManager.class), c.getBeanProvider(RoutingMapper.class), c.getBeanProvider(OperationMapper.class), c.getBeanProvider(MaterialMapper.class)));
         c.registerBean(AuthorizationService.class, () -> (actor, scope, permission) -> true);
         c.register(BusinessSourceRules.class, QualityReleaseService.class, WarehouseIntegration.class, QualityTreatmentService.class, ProductionQuantityService.class, ExecutionQualityReferenceQueryImpl.class, ProductionChainLocks.class, ProductionExecutionRules.class, ExecutionPathService.class);
         c.refresh();

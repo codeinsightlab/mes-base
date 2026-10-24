@@ -49,9 +49,6 @@ public final class ProductionReportViews {
                           String productionInputQty) {
     }
 
-    public record HistoricalUser(String id, String name) {
-    }
-
     public static Ledger ledger(MesProductionReportEntity r) {
         return ledger(r, Map.of());
     }

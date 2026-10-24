@@ -8,8 +8,6 @@ import dev.mesbase.business.quality.service.ExecutionQualityReferenceQueryImpl;
 import dev.mesbase.business.quality.service.QualityTreatmentService;
 
 import dev.mesbase.acceptance.AcceptanceBusinessDatabase;
-import dev.mesbase.business.production.dao.MesProductionReportMapper;
-import dev.mesbase.business.production.dao.MesProductionExecutionMapper;
 import dev.mesbase.business.production.domain.ProductionReportModels.Supplement;
 import dev.mesbase.business.production.domain.ProductionReportModels.Adjustment;
 import dev.mesbase.business.production.domain.ProductionReportModels.VoidOriginal;
@@ -23,8 +21,6 @@ import dev.mesbase.business.directory.service.BusinessDirectoryService;
 import dev.mesbase.common.cache.DetailEntityCache;
 import dev.mesbase.common.core.redis.RedisCache;
 import dev.mesbase.infrastructure.cache.BusinessCacheProcessor;
-import dev.mesbase.system.mapper.SysDeptMapper;
-import dev.mesbase.system.mapper.SysPostMapper;
 import dev.mesbase.business.production.dao.RoutingMapper;
 import dev.mesbase.business.production.dao.OperationMapper;
 import org.springframework.mock.env.MockEnvironment;
@@ -106,7 +102,7 @@ class ProductionReportMySqlTest {
         c.registerBean(PlatformPersistence.class, () -> center);
         c.registerBean(SysUserMapper.class, () -> center.mapper(SysUserMapper.class));
         c.registerBean(BusinessDirectoryService.class, () -> new BusinessDirectoryService(
-                c.getBean(SysUserMapper.class), mock(SysDeptMapper.class), mock(SysPostMapper.class), new DetailEntityCache(mock(RedisCache.class), new MockEnvironment()), mock(BusinessCacheProcessor.class), center, c.getBeanProvider(OwnedTransactionManager.class), c.getBeanProvider(RoutingMapper.class), c.getBeanProvider(OperationMapper.class), c.getBeanProvider(MaterialMapper.class)));
+                c.getBean(SysUserMapper.class), new DetailEntityCache(mock(RedisCache.class), new MockEnvironment()), mock(BusinessCacheProcessor.class), center, c.getBeanProvider(OwnedTransactionManager.class), c.getBeanProvider(RoutingMapper.class), c.getBeanProvider(OperationMapper.class), c.getBeanProvider(MaterialMapper.class)));
         c.register(QualityTreatmentService.class, ExecutionQualityReferenceQueryImpl.class, ProductionReportService.class, ProductionQuantityService.class, ReportUserReferenceService.class, ProductionChainLocks.class, ProductionExecutionRules.class, ExecutionPathService.class);
         c.refresh();
         return c;
