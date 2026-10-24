@@ -3,7 +3,11 @@ package dev.issuefixture;
 import dev.mesbase.core.security.AuthorizationService;
 import java.math.BigDecimal;
 import java.util.Map;
+import java.util.List;
+import java.util.stream.Stream;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executors;
 import org.junit.jupiter.api.Test;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -18,6 +22,8 @@ import static dev.issuefixture.ProductionCoreV1HttpTest.full;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
@@ -25,6 +31,79 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  */
 class UnifiedStockApprovalHttpTest {
     private static final ObjectMapper JSON = new ObjectMapper();
+
+    @Test
+    void simultaneousCrossOrderDraftsCannotClaimTheSameRequestIdentity() throws Exception {
+        try (var context = ProductionInputHttpTest.context(); var pool = Executors.newFixedThreadPool(2)) {
+            var db = ProductionInputHttpTest.db(context);
+            var mvc = MaterialIssueHttpTest.mvc(context);
+            // TEST ONLY fixture uses the V62 request uniqueness constraint; live migration evidence is separate.
+            WorkorderBomInputHttpTest.prepare(db, "100", "1", "2.5");
+            WorkorderBomInputHttpTest.select(mvc, 1, 1);
+            db.update("INSERT INTO workorder(id,code,product_id,planned_qty,routing_id,status,revision,create_time,update_time) VALUES(2,'WO2',99,100,1,'RELEASED',0,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)");
+            db.update("INSERT INTO mes_workorder_material(id,material_id,unit_id,total_required_qty,planned_qty,warehouse_ids,work_center,revision,status,updated_by,updated_at,bom_id,bom_base_qty,bom_component_qty,output_unit_id) SELECT 2,material_id,unit_id,total_required_qty,planned_qty,warehouse_ids,work_center,revision,status,updated_by,updated_at,bom_id,bom_base_qty,bom_component_qty,output_unit_id FROM mes_workorder_material WHERE id=1");
+            String uuid = UUID.randomUUID().toString();
+            String first = ProductionInputHttpTest.command(mvc, uuid, "L001", "1");
+            var second = (ObjectNode) JSON.readTree(first);
+            var calculation = JSON.readTree(mvc.perform(full(get(ProductionInputHttpTest.ROOT + "/calculate"))
+                            .param("code", "WO2:M1#L001").param("workorderId", "2").param("stockReference", "1")
+                            .param("outputQty", "1"))
+                    .andExpect(status().isOk()).andReturn().getResponse().getContentAsString());
+            second.put("code", "WO2:M1#L001");
+            second.put("workorderId", "2");
+            second.put("calculationKey", calculation.get("calculationKey").asText());
+            String secondBody = JSON.writeValueAsString(second);
+            var start = new CountDownLatch(1);
+            var one = pool.submit(() -> {
+                start.await();
+                return mvc.perform(full(post("/api/production/input/drafts")).content(first)).andReturn().getResponse()
+                        .getStatus();
+            });
+            var two = pool.submit(() -> {
+                start.await();
+                return mvc.perform(full(post("/api/production/input/drafts")).content(secondBody)).andReturn()
+                        .getResponse().getStatus();
+            });
+            start.countDown();
+            assertEquals(List.of(200, 409), Stream.of(one.get(), two.get()).sorted().toList());
+            assertEquals(1, count(db, "wm_stock_document"));
+            assertEquals(0, count(db, "wm_stock_action"));
+            assertEquals(0, count(db, "mes_production_execution"));
+        }
+    }
+
+    @Test
+    void unreadableFrozenBasisKeepsDocumentFactsVisibleAndStrictlyRejectsApproval() throws Exception {
+        try (var context = ProductionInputHttpTest.context()) {
+            var db = ProductionInputHttpTest.db(context);
+            var mvc = MaterialIssueHttpTest.mvc(context);
+            WorkorderBomInputHttpTest.prepare(db, "100", "1", "2.5");
+            WorkorderBomInputHttpTest.select(mvc, 1, 1);
+            String uuid = UUID.randomUUID().toString();
+            var created = draft(mvc, ProductionInputHttpTest.command(mvc, uuid, "L001", "10"));
+            String id = created.get("document").get("id").asText();
+            BigDecimal before = rawBalance(db);
+            for (String corrupt : new String[]{"{invalid", "null", "{}"}) {
+                // Fixture-only corrupted source; the ordinary HTTP editor cannot alter the frozen JSON.
+                db.update("UPDATE wm_stock_document SET source_request_json=? WHERE id=?", corrupt, id);
+                mvc.perform(full(get(StockDocumentHttpTest.ROOT + "/" + id)))
+                        .andExpect(status().isOk())
+                        .andExpect(jsonPath("document.id").value(id))
+                        .andExpect(jsonPath("document.status").value("DRAFT"))
+                        .andExpect(jsonPath("lines.length()").value(1))
+                        .andExpect(jsonPath("materialIssueBasis").isEmpty())
+                        .andExpect(jsonPath("materialIssueBasisError").isNotEmpty());
+                mvc.perform(full(post(StockDocumentHttpTest.ROOT + "/" + id + "/actions/approve"))
+                                .content(StockDocumentHttpTest.intent(uuid, created.get("document").get("revision").asInt())))
+                        .andExpect(status().is4xxClientError())
+                        .andExpect(jsonPath("errorCode").isNotEmpty());
+                assertEquals(0, count(db, "mes_production_execution"));
+                assertEquals(0, count(db, "mes_material_issue_input"));
+                assertEquals(0, count(db, "wm_stock_action"));
+                assertEquals(0, before.compareTo(rawBalance(db)));
+            }
+        }
+    }
 
     @Configuration
     static class NoAuditPermission {
@@ -61,7 +140,7 @@ class UnifiedStockApprovalHttpTest {
             WorkorderBomInputHttpTest.prepare(db, "100", "1", "2.5");
             WorkorderBomInputHttpTest.select(mvc, 1, 1);
             String command = ProductionInputHttpTest.command(mvc, UUID.randomUUID().toString(), "L001", "10");
-            // FULL is admitted by the HTTP business permission; domain authorization explicitly denies audit.
+            // FULL passes the HTTP business gate; domain authorization denies a required warehouse permission.
             mvc.perform(full(post(ProductionInputHttpTest.ROOT)).content(command)).andExpect(status().isForbidden());
             mvc.perform(full(post("/api/production/executions/999/inbound")).content(JSON.writeValueAsString(Map.of(
                             "requestId", UUID.randomUUID()
