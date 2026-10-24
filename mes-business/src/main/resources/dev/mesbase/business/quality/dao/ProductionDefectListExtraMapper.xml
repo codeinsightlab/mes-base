@@ -1,6 +1,102 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="dev.mesbase.business.quality.dao.ProductionDefectListExtraMapper">
+  <sql id="currentBindings">
+    <bind name="assess" value="@dev.mesbase.business.quality.domain.QualityTreatmentModels$Action@ASSESS.getValue()"/>
+    <bind name="returned" value="@dev.mesbase.business.quality.domain.QualityTreatmentModels$Action@RETURN_NODE.getValue()"/>
+    <bind name="transfer" value="@dev.mesbase.business.quality.domain.QualityTreatmentModels$Action@TRANSFER_WAREHOUSE.getValue()"/>
+    <bind name="independent" value="@dev.mesbase.business.quality.domain.QualityTreatmentModels$Attribution@INDEPENDENT.getValue()"/>
+    <bind name="overlap" value="@dev.mesbase.business.quality.domain.QualityTreatmentModels$Attribution@OVERLAP.getValue()"/>
+    <bind name="created" value="@dev.mesbase.business.quality.domain.DefectRecordAction@CREATE.getValue()"/>
+    <bind name="revised" value="@dev.mesbase.business.quality.domain.DefectRecordAction@REVISE.getValue()"/>
+    <bind name="voided" value="@dev.mesbase.business.quality.domain.DefectRecordAction@VOID.getValue()"/>
+  </sql>
+  <sql id="currentFactRows">
+    SELECT d.declaration_id AS declarationId, d.revision_no AS revision,
+      d.execution_id AS executionId, d.affected_node_id AS routingNodeId,
+      d.defect_qty AS defectQty, d.record_action AS recordAction,
+      SUM(CASE WHEN CAST(t.action_type AS BINARY(32))=CAST(#{assess} AS BINARY(32)) THEN 1 ELSE 0 END) AS assessmentCount,
+      MAX(CASE WHEN CAST(t.action_type AS BINARY(32))=CAST(#{assess} AS BINARY(32)) THEN t.attribution_type END) AS attribution,
+      MAX(CASE WHEN CAST(t.action_type AS BINARY(32))=CAST(#{assess} AS BINARY(32)) THEN t.related_declaration_id END) AS relatedDeclarationId,
+      MAX(CASE WHEN CAST(t.action_type AS BINARY(32))=CAST(#{assess} AS BINARY(32)) THEN t.basis END) AS basis,
+      COALESCE(SUM(CASE WHEN CAST(t.action_type AS BINARY(32))=CAST(#{returned} AS BINARY(32)) THEN t.returned_qty ELSE 0 END),0) AS returnedQty,
+      COALESCE(SUM(CASE WHEN CAST(t.action_type AS BINARY(32))=CAST(#{transfer} AS BINARY(32)) THEN t.transfer_qty ELSE 0 END),0) AS transferredQty,
+      SUM(CASE WHEN t.id IS NOT NULL AND (
+        CAST(t.action_type AS BINARY(32)) NOT IN (CAST(#{assess} AS BINARY(32)),CAST(#{returned} AS BINARY(32)),CAST(#{transfer} AS BINARY(32)))
+        OR CAST(t.declaration_id AS BINARY(128)) != CAST(d.declaration_id AS BINARY(128))
+        OR t.execution_id != d.execution_id OR t.routing_node_id != d.affected_node_id
+        OR t.returned_qty &lt; 0 OR t.transfer_qty &lt; 0
+        OR (CAST(t.action_type AS BINARY(32))=CAST(#{assess} AS BINARY(32)) AND (CAST(t.attribution_type AS BINARY(32)) IS NULL
+          OR CAST(t.attribution_type AS BINARY(32)) NOT IN (CAST(#{independent} AS BINARY(32)),CAST(#{overlap} AS BINARY(32))) OR t.basis IS NULL
+          OR (CAST(t.attribution_type AS BINARY(32))=CAST(#{independent} AS BINARY(32)) AND t.related_declaration_id IS NOT NULL)
+          OR (CAST(t.attribution_type AS BINARY(32))=CAST(#{overlap} AS BINARY(32)) AND (t.related_declaration_id IS NULL OR t.related_declaration_id=d.declaration_id))
+          OR (CAST(t.attribution_type AS BINARY(32))=CAST(#{overlap} AS BINARY(32)) AND NOT EXISTS (
+            SELECT 1 FROM mes_production_defect related
+            WHERE CAST(related.declaration_id AS BINARY(128))=CAST(t.related_declaration_id AS BINARY(128))
+              AND related.execution_id=d.execution_id AND related.defect_qty&gt;=d.defect_qty
+              AND CAST(related.record_action AS BINARY(32)) IN (CAST(#{created} AS BINARY(32)),CAST(#{revised} AS BINARY(32)))
+              AND NOT EXISTS (SELECT 1 FROM mes_production_defect newer_related
+                WHERE newer_related.declaration_id=related.declaration_id AND newer_related.revision_no&gt;related.revision_no)
+              AND (SELECT COUNT(*) FROM mes_quality_treatment assessment
+                WHERE assessment.declaration_id=related.declaration_id AND assessment.declaration_revision=related.revision_no
+                  AND CAST(assessment.action_type AS BINARY(32))=CAST(#{assess} AS BINARY(32)))=1
+              AND EXISTS (SELECT 1 FROM mes_quality_treatment assessment
+                WHERE assessment.declaration_id=related.declaration_id AND assessment.declaration_revision=related.revision_no
+                  AND assessment.execution_id=related.execution_id AND assessment.routing_node_id=related.affected_node_id
+                  AND CAST(assessment.action_type AS BINARY(32))=CAST(#{assess} AS BINARY(32))
+                  AND CAST(assessment.attribution_type AS BINARY(32))=CAST(#{independent} AS BINARY(32)))
+          ))
+          OR t.returned_qty != 0 OR t.transfer_qty != 0))
+        OR (CAST(t.action_type AS BINARY(32))=CAST(#{returned} AS BINARY(32)) AND (t.returned_qty &lt;= 0 OR t.transfer_qty != 0))
+        OR (CAST(t.action_type AS BINARY(32))=CAST(#{transfer} AS BINARY(32)) AND (t.transfer_qty &lt;= 0 OR t.returned_qty != 0))
+      ) THEN 1 ELSE 0 END) AS invalidFacts,
+      SUM(CASE WHEN t.id IS NOT NULL AND CAST(t.action_type AS BINARY(32)) NOT IN (CAST(#{assess} AS BINARY(32)),CAST(#{returned} AS BINARY(32)),CAST(#{transfer} AS BINARY(32)))
+        THEN 1 ELSE 0 END) AS unknownActions
+    FROM mes_production_defect d
+    LEFT JOIN mes_quality_treatment t ON t.declaration_id=d.declaration_id AND t.declaration_revision=d.revision_no
+    WHERE NOT EXISTS (SELECT 1 FROM mes_production_defect newer
+      WHERE newer.declaration_id=d.declaration_id AND newer.revision_no&gt;d.revision_no)
+    <if test="executionIds != null">
+      AND d.execution_id IN <foreach collection="executionIds" item="id" open="(" separator="," close=")">#{id}</foreach>
+      AND CAST(d.record_action AS BINARY(32)) != CAST(#{voided} AS BINARY(32))
+    </if>
+    <if test="declarationId != null">AND d.declaration_id=#{declarationId}</if>
+    <if test="ids != null">AND d.id IN <foreach collection="ids" item="id" open="(" separator="," close=")">#{id}</foreach></if>
+    GROUP BY d.id,d.declaration_id,d.revision_no,d.execution_id,d.affected_node_id,d.defect_qty,d.record_action
+  </sql>
+  <select id="selectCurrentFacts" resultType="dev.mesbase.business.quality.domain.QualityTreatmentModels$CurrentFact">
+    <include refid="currentBindings"/>
+    <bind name="ids" value="null"/>
+    <include refid="currentFactRows"/>
+  </select>
+  <select id="selectCurrentFactsByIds" resultType="dev.mesbase.business.quality.domain.QualityTreatmentModels$CurrentFact">
+    <include refid="currentBindings"/>
+    <bind name="executionIds" value="null"/>
+    <bind name="declarationId" value="null"/>
+    <include refid="currentFactRows"/>
+  </select>
+  <!-- Preserve the original D:latest-non-VOID + T:all-execution-events identity set and lexical order. -->
+  <select id="selectFactIdentities" resultType="string">
+    <include refid="currentBindings"/>
+    SELECT identity_value FROM (
+      SELECT CONCAT('D:',d.declaration_id,':',d.revision_no) AS identity_value FROM mes_production_defect d
+      WHERE d.execution_id=#{executionId} AND CAST(d.record_action AS BINARY(32))!=CAST(#{voided} AS BINARY(32))
+      AND NOT EXISTS (SELECT 1 FROM mes_production_defect newer
+        WHERE newer.declaration_id=d.declaration_id AND newer.revision_no&gt;d.revision_no)
+      UNION ALL
+      SELECT CONCAT('T:',t.id) AS identity_value FROM mes_quality_treatment t WHERE t.execution_id=#{executionId}
+    ) identities ORDER BY CAST(identity_value AS BINARY(128))
+  </select>
+  <select id="invalidCurrentReceipts" resultType="long">
+    <include refid="currentBindings"/>
+    SELECT COUNT(*) FROM mes_production_defect d
+    JOIN mes_quality_treatment t ON t.declaration_id=d.declaration_id AND t.declaration_revision=d.revision_no
+    LEFT JOIN (<include refid="receiptProofRows"/>) proof ON proof.eventId=t.id
+    WHERE d.execution_id=#{executionId} AND CAST(d.record_action AS BINARY(32))!=CAST(#{voided} AS BINARY(32)) AND t.action_type=#{transfer}
+      AND NOT EXISTS (SELECT 1 FROM mes_production_defect newer
+        WHERE newer.declaration_id=d.declaration_id AND newer.revision_no&gt;d.revision_no)
+      AND COALESCE(proof.validCount,0)!=1
+  </select>
   <select id="selectContexts" resultType="dev.mesbase.business.quality.domain.ProductionDefectModels$ListContext">
     SELECT d.declaration_id AS declarationId,
       w.code AS workorderCode, m.code AS productCode, m.name AS productName,
@@ -12,21 +108,6 @@
     LEFT JOIN workorder w ON w.id=e.workorder_id
     LEFT JOIN material m ON m.id=e.product_id
     WHERE d.id IN <foreach collection="ids" item="id" open="(" separator="," close=")">#{id}</foreach>
-  </select>
-  <select id="selectTreatmentTotals" resultType="dev.mesbase.business.quality.domain.ProductionDefectModels$TreatmentTotals">
-    <bind name="assessAction" value="@dev.mesbase.business.quality.domain.QualityTreatmentModels$Action@ASSESS.getValue()"/>
-    <bind name="return_nodeAction" value="@dev.mesbase.business.quality.domain.QualityTreatmentModels$Action@RETURN_NODE.getValue()"/>
-    <bind name="transfer_warehouseAction" value="@dev.mesbase.business.quality.domain.QualityTreatmentModels$Action@TRANSFER_WAREHOUSE.getValue()"/>
-    SELECT d.declaration_id AS declarationId,
-      <!-- The locked command path permits at most one ASSESS per declaration revision. -->
-      MAX(CASE WHEN t.action_type=#{assessAction} THEN t.attribution_type END) AS attribution,
-      COALESCE(SUM(CASE WHEN t.action_type=#{return_nodeAction} THEN t.returned_qty ELSE 0 END),0) AS returnedQty,
-      COALESCE(SUM(CASE WHEN t.action_type=#{transfer_warehouseAction} THEN t.transfer_qty ELSE 0 END),0) AS transferredQty,
-      SUM(CASE WHEN t.action_type IS NOT NULL AND t.action_type NOT IN (#{assessAction},#{return_nodeAction},#{transfer_warehouseAction}) THEN 1 ELSE 0 END) AS invalidActions
-    FROM mes_production_defect d
-    LEFT JOIN mes_quality_treatment t ON t.declaration_id=d.declaration_id AND t.declaration_revision=d.revision_no
-    WHERE d.id IN <foreach collection="ids" item="id" open="(" separator="," close=")">#{id}</foreach>
-    GROUP BY d.id,d.declaration_id,d.revision_no
   </select>
   <sql id="receiptProofRows">
     <bind name="posted" value="@dev.mesbase.business.wm.domain.StockDocumentStatus@POSTED.getValue()"/>

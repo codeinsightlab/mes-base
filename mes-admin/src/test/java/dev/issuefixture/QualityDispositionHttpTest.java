@@ -156,7 +156,10 @@ class QualityDispositionHttpTest {
             var result = dispose(m, id, body);
             amount(result, "transferredQty", "10");
             assertEquals(false, result.has("allocatedScrapQty"));
-            var e = result.get("events").get(result.get("events").size() - 1);
+            assertEquals(false, result.has("events"));
+            var page = JSON.readTree(m.perform(full(get(Q + "/" + id + "/treatment/events"), "A"))
+                    .andExpect(status().isOk()).andReturn().getResponse().getContentAsString());
+            var e = page.path("items").get(0);
             String doc = e.get("stockDocumentId").asText();
             assertEquals("POSTED", j.queryForObject("SELECT status FROM wm_stock_document WHERE id=?", String.class, doc));
             assertEquals("DEFECT_RECEIPT", j.queryForObject("SELECT document_type FROM wm_stock_document WHERE id=?", String.class, doc));
@@ -284,7 +287,7 @@ class QualityDispositionHttpTest {
             assertEquals("M1", row.get("productCode").asText());
             assertEquals("000LOT-001", row.get("batchNo").asText());
             assertEquals("Φ20×30", row.get("specification").asText());
-            assertEquals(1, capture.statements.stream().filter(sql -> sql.contains("count(")).count());
+            assertEquals(1, capture.statements.stream().filter(sql -> sql.startsWith("select count(")).count());
             assertTrue(capture.statements.stream().filter(sql -> sql.contains("from mes_quality_treatment"))
                     .allMatch(sql -> sql.contains("d.id in") && sql.contains("t.declaration_revision=d.revision_no")
                             && !sql.contains("request_hash") && !sql.contains("operator_user_id")));
@@ -377,7 +380,10 @@ class QualityDispositionHttpTest {
             String key = UUID.randomUUID().toString();
             String body = command(key, "WAREHOUSE", "10", "1");
             var result = dispose(m, declaration, body);
-            var event = result.path("events").get(result.path("events").size() - 1);
+            assertEquals(false, result.has("events"));
+            var page = JSON.readTree(m.perform(full(get(Q + "/" + declaration + "/treatment/events"), "A"))
+                    .andExpect(status().isOk()).andReturn().getResponse().getContentAsString());
+            var event = page.path("items").get(0);
             String documentId = event.path("stockDocumentId").asText();
             assertEquals("SCRAP_RECEIPT", j.queryForObject("SELECT document_type FROM wm_stock_document WHERE id=?", String.class, documentId));
             assertEquals(key, j.queryForObject("SELECT post_request_id FROM wm_stock_document WHERE id=? AND status='POSTED' AND posted_by=1 AND posted_at IS NOT NULL", String.class, documentId));

@@ -98,9 +98,12 @@ class QualityWorkflowHttpTest {
             var body = assessmentCommand();
             var first = assess(mvc, id, body);
             var repeated = assess(mvc, id, body);
-            assertEquals(first.get("events"), repeated.get("events"));
-            assertEquals(1, first.get("events").size());
-            var event = first.get("events").get(0);
+            assertEquals(first, repeated);
+            assertEquals(false, first.has("events"));
+            var history = JSON.readTree(mvc.perform(full(get(Q + "/" + id + "/treatment/events"), "A"))
+                    .andExpect(status().isOk()).andReturn().getResponse().getContentAsString());
+            assertEquals(1, history.path("total").asInt());
+            var event = history.path("items").get(0);
             assertEquals(false, event.has("confirmedBy"));
             assertEquals(false, event.has("confirmedByName"));
             assertEquals(false, event.has("occurredAt"));
@@ -140,7 +143,10 @@ class QualityWorkflowHttpTest {
                     .andExpect(status().isOk()).andReturn().getResponse().getContentAsString());
             assertEquals("UNRESOLVED", detail.path("state").asText());
             assertEquals(true, detail.path("pendingDispositionQty").isNull());
-            assertEquals(2, detail.path("events").size());
+            assertEquals(false, detail.has("events"));
+            var history = JSON.readTree(mvc.perform(full(get(Q + "/" + id + "/treatment/events"), "A"))
+                    .andExpect(status().isOk()).andReturn().getResponse().getContentAsString());
+            assertEquals(2, history.path("total").asInt());
             mvc.perform(full(get("/api/quality/treatments/recent"), "A")).andExpect(status().isOk());
             mvc.perform(full(get("/api/production/workorder-progress"), "A"))
                     .andExpect(status().isOk()).andExpect(jsonPath("items[0].qualityUntreatedQty").doesNotExist());
@@ -155,4 +161,47 @@ class QualityWorkflowHttpTest {
                     .queryForObject("SELECT COUNT(*) FROM mes_quality_treatment", Integer.class));
         }
     }
+
+    @Test
+    void exactOriginalRequestCheckIsIndependentOfHistoryPagesAndCannotDiscloseOtherContent() throws Exception {
+        try (var c = context(100, 100, 90, 90, 90)) {
+            var mvc = MaterialIssueHttpTest.mvc(c);
+            var id = defect(mvc, 12, "10", null, null);
+            var body = assessmentCommand();
+            var command = JSON.readTree(body);
+            assess(mvc, id, body);
+            QualityDispositionHttpTest.bindBatch(ProductionWarehouseFixture.db(c), "B3-EXACT-FIXTURE");
+            for (int i = 0; i < 21; i++) transfer(mvc, id, "0.1");
+            var first = JSON.readTree(mvc.perform(full(get(Q + "/" + id + "/treatment/events"), "A"))
+                    .andExpect(status().isOk()).andReturn().getResponse().getContentAsString());
+            assertEquals(22, first.path("total").asInt());
+            assertEquals(20, first.path("items").size());
+            for (var event : first.path("items"))
+                assertEquals(false, command.path("requestId").equals(event.path("id")));
+            var check = JSON.createObjectNode();
+            check.put("kind", "assess");
+            check.set("assessment", command);
+            var result = JSON.readTree(mvc.perform(full(post(Q + "/" + id + "/treatment/requests/check"), "A").content(check.toString()))
+                    .andExpect(status().isOk()).andReturn().getResponse().getContentAsString());
+            assertEquals(command.path("requestId"), result.path("id"));
+            var last = JSON.readTree(mvc.perform(full(get(Q + "/" + id + "/treatment/events?offset=20&limit=20"), "A"))
+                    .andExpect(status().isOk()).andReturn().getResponse().getContentAsString());
+            assertEquals(2, last.path("items").size());
+            assertEquals(command.path("requestId"), last.path("items").get(1).path("id"));
+            mvc.perform(full(post(Q + "/" + id + "/treatment/requests/check"), "B").content(check.toString()))
+                    .andExpect(status().isNotFound());
+            mvc.perform(post(Q + "/" + id + "/treatment/requests/check").header("Authorization", "Bearer NONE")
+                            .header("X-Factory-Id", "A").contentType("application/json").content(check.toString()))
+                    .andExpect(status().isForbidden());
+            ((ObjectNode) command).put("reason", "different content");
+            mvc.perform(full(post(Q + "/" + id + "/treatment/requests/check"), "A").content(check.toString()))
+                    .andExpect(status().isConflict());
+            var second = defect(mvc, 12, "1", null, null);
+            mvc.perform(full(post(Q + "/" + second + "/treatment/requests/check"), "A").content(check.toString()))
+                    .andExpect(status().isConflict());
+            assertEquals(22, ProductionWarehouseFixture.db(c).queryForObject(
+                    "SELECT COUNT(*) FROM mes_quality_treatment WHERE declaration_id=?", Integer.class, id));
+        }
+    }
+
 }

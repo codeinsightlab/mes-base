@@ -174,7 +174,7 @@ public class QualityDispositionService {
             throw new FoundationException(ErrorCode.FORBIDDEN);
     }
 
-    private static String hash(String declaration, Disposition c) {
+    static String hash(String declaration, Disposition c) {
         try {
             String value = String.join("\n", "DISPOSITION", declaration, SecurityUtils.getUserId().toString(),
                     Integer.toString(c.expectedRevision()), c.destination().name(), c.quantity().stripTrailingZeros()

@@ -19,7 +19,6 @@ import dev.mesbase.business.quality.domain.MesProductionDefectExample;
 import dev.mesbase.business.quality.domain.MesQualityTreatmentEntity;
 import dev.mesbase.business.quality.domain.MesQualityTreatmentExample;
 import dev.mesbase.business.quality.domain.ProductionDefectModels.NodeTotal;
-import dev.mesbase.business.quality.domain.ProductionDefectModels.Processing;
 import dev.mesbase.business.quality.domain.QualityTreatmentModels;
 import dev.mesbase.business.quality.domain.QualityTreatmentModels.Action;
 import dev.mesbase.business.quality.domain.QualityTreatmentModels.Assessment;
@@ -38,14 +37,17 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.LocalDateTime;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HexFormat;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Optional;
+import java.util.Iterator;
+import java.util.NoSuchElementException;
+import dev.mesbase.common.core.page.PageData;
+import dev.mesbase.business.quality.domain.QualityTreatmentModels.CurrentFact;
+import dev.mesbase.business.quality.domain.QualityTreatmentModels.RequestKind;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
@@ -96,7 +98,7 @@ public class QualityTreatmentService {
         }
     }
 
-    public record Details(Summary summary, Map<Long, DirectoryLabel> users, List<MesQualityTreatmentEntity> history) {
+    public record Details(Summary summary) {
     }
 
     public record Recent(List<MesQualityTreatmentEntity> events, Map<Long, DirectoryLabel> users) {
@@ -109,43 +111,39 @@ public class QualityTreatmentService {
         return new Recent(rows, users);
     }
 
+    /**
+     * Summary responses never depend on loading display history or directory names.
+     */
     public Details details(String declaration) {
-        var d = latest(declaration);
-        var all = declarationEvents(declaration);
-        var current = all.stream().filter(e -> e.getDeclarationRevision().equals(d.getRevisionNo())).toList();
-        var s = summarizeRows(d, current, false);
-        var history = all.stream().filter(e -> e.getDeclarationId().equals(declaration)).toList();
-        return new Details(s, directory.userLabels(history.stream()
-                .map(MesQualityTreatmentEntity::getOperatorUserId).distinct().toList()), history);
+        return new Details(current(declaration).summary(false));
     }
 
-    private List<MesQualityTreatmentEntity> executionEvents(Long execution) {
-        var f = new MesQualityTreatmentExample();
-        f.createCriteria().andExecutionIdEqualTo(execution);
-        return boundedEvents(f);
+    public record EventPage(List<MesQualityTreatmentEntity> items, long total, int offset, int limit,
+                            Map<Long, DirectoryLabel> users) implements PageData<MesQualityTreatmentEntity> {
     }
 
-    private List<MesQualityTreatmentEntity> declarationEvents(String declaration) {
+    public EventPage history(String declaration, int offset, int limit) {
+        ParameterChecks.paging(offset, limit);
+        latest(declaration);
         var filter = new MesQualityTreatmentExample();
         filter.createCriteria().andDeclarationIdEqualTo(declaration);
-        return boundedEvents(filter);
+        filter.setOrderByClause("recorded_at DESC,id DESC");
+        List<MesQualityTreatmentEntity> rows;
+        long total;
+        try (var page = PageHelper.offsetPage(offset, limit)) {
+            rows = List.copyOf(events.selectByExample(filter));
+            total = page.getTotal();
+        }
+        var users = rows.isEmpty() ? Map.<Long, DirectoryLabel>of() : directory.userLabels(rows.stream()
+                .map(MesQualityTreatmentEntity::getOperatorUserId).distinct().toList());
+        return new EventPage(rows, total, offset, limit, users);
     }
 
-    private List<MesQualityTreatmentEntity> boundedEvents(MesQualityTreatmentExample f) {
-        f.setOrderByClause("recorded_at,id");
-        try (var page = PageHelper.offsetPage(0, 5001, false)) {
-            var rows = events.selectByExample(f);
-            if (rows.size() > 5000) ParameterChecks.reject(ErrorCode.QUALITY_TREATMENT_CONFLICT);
-            return rows;
-        }
-    }
-
-    private List<MesProductionDefectEntity> declarations(Long execution) {
-        try (var page = PageHelper.offsetPage(0, 1001, false)) {
-            var rows = defects.selectLatest(execution, null, null);
-            if (rows.size() > 1000) ParameterChecks.reject(ErrorCode.QUALITY_TREATMENT_CONFLICT);
-            return rows.stream().filter(r -> !DefectRecordAction.VOID.getValue().equals(r.getRecordAction())).toList();
-        }
+    private CurrentFact current(String declaration) {
+        if (StringUtils.isBlank(declaration)) ParameterChecks.reject(ErrorCode.BAD_REQUEST);
+        var rows = receiptProofs.selectCurrentFacts(null, declaration);
+        if (rows.size() != 1) ParameterChecks.reject(ErrorCode.QUALITY_TREATMENT_CONFLICT);
+        return rows.getFirst();
     }
 
     public MesQualityTreatmentEntity dispositionEvent(String requestId) {
@@ -195,57 +193,7 @@ public class QualityTreatmentService {
     }
 
     public Summary summary(String declaration) {
-        var d = latest(declaration);
-        return summarize(d, declarationEvents(declaration));
-    }
-
-    private Summary summarize(MesProductionDefectEntity d, List<MesQualityTreatmentEntity> all) {
-        var rows = all.stream()
-                .filter(e -> e.getDeclarationId().equals(d.getDeclarationId()) && e.getDeclarationRevision()
-                        .equals(d.getRevisionNo())).toList();
-        return summarizeRows(d, rows);
-    }
-
-    private record DeclarationVersion(String declarationId, Integer revision) {
-    }
-
-    private static Map<DeclarationVersion, List<MesQualityTreatmentEntity>> groupedEvents(
-            List<MesQualityTreatmentEntity> all) {
-        var grouped = new HashMap<DeclarationVersion, List<MesQualityTreatmentEntity>>();
-        for (var event : all)
-            grouped.computeIfAbsent(new DeclarationVersion(event.getDeclarationId(), event.getDeclarationRevision()),
-                    key -> new ArrayList<>()).add(event);
-        // Preserve the original recorded_at,id encounter order and immutable Summary.events contract.
-        grouped.replaceAll((key, rows) -> List.copyOf(rows));
-        return grouped;
-    }
-
-    private Summary summarizeRows(MesProductionDefectEntity d, List<MesQualityTreatmentEntity> rows) {
-        return summarizeRows(d, rows, true);
-    }
-
-    private Summary summarizeRows(MesProductionDefectEntity d, List<MesQualityTreatmentEntity> rows, boolean strict) {
-        var assessment = rows.stream().filter(e -> Action.ASSESS.name().equals(e.getActionType())).findFirst()
-                .orElse(null);
-        var type = assessment == null ? Attribution.UNVERIFIED : Attribution.find(assessment.getAttributionType());
-        long invalidActions = rows.stream().filter(event -> !Action.recognizes(event.getActionType())).count();
-        if (strict) rows.forEach(event -> Action.from(event.getActionType()));
-        var returned = rows.stream().filter(e -> Action.RETURN_NODE.name().equals(e.getActionType()))
-                .map(MesQualityTreatmentEntity::getReturnedQty).reduce(ZERO, BigDecimal::add);
-        var transferred = rows.stream().filter(e -> Action.TRANSFER_WAREHOUSE.name().equals(e.getActionType()))
-                .map(MesQualityTreatmentEntity::getTransferQty).reduce(ZERO, BigDecimal::add);
-        var processing = strict ? Processing.of(d.getRecordAction(), type, d.getDefectQty(), returned, transferred)
-                : Processing.read(d.getRecordAction(), type, d.getDefectQty(), returned, transferred, invalidActions);
-        BigDecimal net = null;
-        if (processing.state() != State.UNRESOLVED)
-            net = type == Attribution.INDEPENDENT ? d.getDefectQty().subtract(returned) : ZERO;
-        return new Summary(d.getDeclarationId(), d.getRevisionNo(), d.getExecutionId(), d.getAffectedNodeId(),
-                d.getDefectQty(), type, Optional.ofNullable(assessment)
-                .map(MesQualityTreatmentEntity::getRelatedDeclarationId)
-                .orElse(null), Optional.ofNullable(assessment).map(MesQualityTreatmentEntity::getBasis).orElse(null),
-                processing.pendingDispositionQty(), net,
-                processing.state(), d.getRecordAction(), rows, processing.returnedQty(), processing.transferredQty(),
-                QualityTreatmentModels.receiptState(processing.state(), d.getDefectQty(), processing.transferredQty()));
+        return current(declaration).summary(true);
     }
 
     /**
@@ -259,100 +207,78 @@ public class QualityTreatmentService {
      * Called under the common inbound chain lock after all posted facts are visible.
      */
     public String receiptBlockReason(Long execution) {
-        var all = executionEvents(execution);
-        var current = declarations(execution);
-        var grouped = groupedEvents(all);
-        var proofs = receiptProofs.selectReceiptProofs(execution).stream()
-                .collect(Collectors.toMap(QualityTreatmentModels.ReceiptProof::eventId,
-                        QualityTreatmentModels.ReceiptProof::validCount));
-        for (var d : current) {
-            var rows = grouped.getOrDefault(new DeclarationVersion(d.getDeclarationId(), d.getRevisionNo()), List.of());
-            var summary = summarizeRows(d, rows, false);
+        var current = receiptProofs.selectCurrentFacts(List.of(execution), null);
+        for (var fact : current) {
+            var summary = fact.summary(false);
             if (summary.state() == State.UNRESOLVED) return "不良申报或历史处置数量待核实";
             if (summary.attribution() == Attribution.UNVERIFIED) return "存在待核实不良申报";
-            if (summary.attribution() != Attribution.INDEPENDENT) continue;
-            if (rows.stream().filter(e -> Action.ASSESS.name().equals(e.getActionType())).count() != 1)
-                return "不良申报核实依据不唯一";
-            for (var event : rows) {
-                if (!Objects.equals(event.getExecutionId(), execution)
-                        || !Objects.equals(event.getRoutingNodeId(), d.getAffectedNodeId()))
-                    return "不良处置与生产执行或实际工序不一致";
-                if (Action.TRANSFER_WAREHOUSE.name().equals(event.getActionType())
-                        && proofs.getOrDefault(event.getId(), 0L) != 1L)
-                    return "不良入仓缺少唯一有效的正式单据、明细或库存动作";
-            }
-            if (summary.pendingDispositionQty().signum() != 0) return "有效不良尚未全部正式入仓";
+            if (summary.attribution() == Attribution.INDEPENDENT && summary.pendingDispositionQty().signum() != 0)
+                return "有效不良尚未全部正式入仓";
         }
+        if (receiptProofs.invalidCurrentReceipts(execution) > 0)
+            return "不良入仓缺少唯一有效的正式单据、明细或库存动作";
         return null;
     }
 
-    public record ProductionBasis(List<Summary> declarations, List<String> factIdentities) {
+    public record ProductionBasis(List<Summary> declarations, Iterable<String> factIdentities) {
     }
 
-    /**
-     * Bounded batch reads, reused by inbound approval and completion; no per-declaration queries.
-     */
     public ProductionBasis productionBasis(Long execution) {
-        var all = executionEvents(execution);
-        var versions = declarations(execution);
-        var grouped = groupedEvents(all);
-        var facts = new ArrayList<String>();
-        versions.forEach(d -> facts.add("D:" + d.getDeclarationId() + ":" + d.getRevisionNo()));
-        all.forEach(e -> facts.add("T:" + e.getId()));
-        facts.sort(String::compareTo);
-        return new ProductionBasis(versions.stream().map(d -> summarizeRows(d,
-                        grouped.getOrDefault(new DeclarationVersion(d.getDeclarationId(), d.getRevisionNo()), List.of())))
-                .toList(), List.copyOf(facts));
+        var summaries = receiptProofs.selectCurrentFacts(List.of(execution), null).stream()
+                .map(fact -> fact.summary(true)).toList();
+        return new ProductionBasis(summaries, () -> new Iterator<>() {
+            private List<String> chunk = List.of();
+            private int offset;
+            private int index;
+            private boolean exhausted;
+
+            @Override
+            public boolean hasNext() {
+                if (index < chunk.size()) return true;
+                if (exhausted) return false;
+                try (var page = PageHelper.offsetPage(offset, 500, false)) {
+                    chunk = List.copyOf(receiptProofs.selectFactIdentities(execution));
+                }
+                offset += chunk.size();
+                index = 0;
+                exhausted = chunk.size() < 500;
+                return !chunk.isEmpty();
+            }
+
+            @Override
+            public String next() {
+                if (!hasNext()) throw new NoSuchElementException();
+                return chunk.get(index++);
+            }
+        });
     }
 
     public List<NodeTotal> nodeTotals(Long execution) {
-        var all = executionEvents(execution);
-        return nodeTotalsRows(declarations(execution), all);
+        return nodeTotalsBatch(List.of(execution)).get(execution);
     }
 
-    /**
-     * Bounded batch read; grouping and the single-node calculation share the existing authority.
-     */
     public Map<Long, List<NodeTotal>> nodeTotalsBatch(List<Long> executions) {
         if (executions == null || executions.size() > 1000 || executions.stream().anyMatch(Objects::isNull))
             ParameterChecks.reject(ErrorCode.QUALITY_TREATMENT_CONFLICT);
         var ids = executions.stream().distinct().toList();
         if (ids.isEmpty()) return Map.of();
-        var f = new MesQualityTreatmentExample();
-        f.createCriteria().andExecutionIdIn(ids);
-        f.setOrderByClause("recorded_at,id");
-        List<MesQualityTreatmentEntity> all;
-        try (var page = PageHelper.offsetPage(0, 5001, false)) {
-            all = events.selectByExample(f);
-            if (all.size() > 5000) ParameterChecks.reject(ErrorCode.QUALITY_TREATMENT_CONFLICT);
-        }
-        List<MesProductionDefectEntity> versions;
-        try (var page = PageHelper.offsetPage(0, 1001, false)) {
-            versions = defects.selectLatestBatch(ids);
-            if (versions.size() > 1000) ParameterChecks.reject(ErrorCode.QUALITY_TREATMENT_CONFLICT);
-        }
-        var byExecution = all.stream().collect(Collectors.groupingBy(MesQualityTreatmentEntity::getExecutionId));
-        var declarations = versions.stream()
-                .filter(r -> !DefectRecordAction.VOID.getValue().equals(r.getRecordAction()))
-                .collect(Collectors.groupingBy(MesProductionDefectEntity::getExecutionId));
+        var grouped = receiptProofs.selectCurrentFacts(ids, null).stream()
+                .collect(Collectors.groupingBy(CurrentFact::executionId));
         var result = new LinkedHashMap<Long, List<NodeTotal>>();
-        for (Long id : ids)
-            result.put(id, nodeTotalsRows(declarations.getOrDefault(id, List.of()), byExecution.getOrDefault(id, List.of())));
+        for (var id : ids) result.put(id, nodeTotalsRows(grouped.getOrDefault(id, List.of())));
         return Map.copyOf(result);
     }
 
-    private List<NodeTotal> nodeTotalsRows(List<MesProductionDefectEntity> versions,
-                                           List<MesQualityTreatmentEntity> all) {
+    private List<NodeTotal> nodeTotalsRows(List<CurrentFact> facts) {
         var totals = new HashMap<Long, BigDecimal[]>();
-        var grouped = groupedEvents(all);
-        for (var d : versions) {
-            var s = summarizeRows(d, grouped.getOrDefault(new DeclarationVersion(d.getDeclarationId(), d.getRevisionNo()), List.of()));
-            var v = totals.computeIfAbsent(d.getAffectedNodeId(), n -> new BigDecimal[]{ZERO, ZERO, ZERO, ZERO});
-            v[0] = v[0].add(d.getDefectQty());
+        for (var fact : facts) {
+            var s = fact.summary(true);
+            var v = totals.computeIfAbsent(fact.routingNodeId(), n -> new BigDecimal[]{ZERO, ZERO, ZERO, ZERO});
+            v[0] = v[0].add(fact.defectQty());
             if (s.attribution() == Attribution.INDEPENDENT) {
-                v[3] = v[3].add(d.getDefectQty());
+                v[3] = v[3].add(fact.defectQty());
                 v[1] = v[1].add(s.returnedQty());
-            } else if (s.attribution() == Attribution.UNVERIFIED) v[2] = v[2].add(d.getDefectQty());
+            } else if (s.attribution() == Attribution.UNVERIFIED) v[2] = v[2].add(fact.defectQty());
         }
         return totals.entrySet().stream()
                 .map(e -> new NodeTotal(e.getKey(), e.getValue()[0], e.getValue()[1], e.getValue()[2], e.getValue()[3]))
@@ -361,13 +287,12 @@ public class QualityTreatmentService {
 
     void assertMutable(MesProductionDefectEntity before) {
         if (before == null) return;
-        var all = executionEvents(before.getExecutionId());
-        if (all.stream().anyMatch(e -> e.getDeclarationId().equals(before.getDeclarationId()) && !Action.ASSESS.name()
-                .equals(e.getActionType()))) ParameterChecks.reject(ErrorCode.QUALITY_TREATMENT_CONFLICT);
-        var versions = declarations(before.getExecutionId());
-        var grouped = groupedEvents(all);
-        for (var d : versions) {
-            var s = summarizeRows(d, grouped.getOrDefault(new DeclarationVersion(d.getDeclarationId(), d.getRevisionNo()), List.of()));
+        var filter = new MesQualityTreatmentExample();
+        filter.createCriteria().andDeclarationIdEqualTo(before.getDeclarationId())
+                .andActionTypeNotEqualTo(Action.ASSESS.getValue());
+        if (events.countByExample(filter) > 0) ParameterChecks.reject(ErrorCode.QUALITY_TREATMENT_CONFLICT);
+        for (var fact : receiptProofs.selectCurrentFacts(List.of(before.getExecutionId()), null)) {
+            var s = fact.summary(true);
             if (s.attribution() == Attribution.OVERLAP && before.getDeclarationId().equals(s.relatedDeclarationId()))
                 ParameterChecks.reject(ErrorCode.QUALITY_TREATMENT_CONFLICT);
         }
@@ -420,8 +345,7 @@ public class QualityTreatmentService {
         var assessment = command.assessment();
         var current = summary(d.getDeclarationId());
         if (assessment == null || assessment.type() == null || assessment.type() == Attribution.UNVERIFIED
-                || current.attribution() != Attribution.UNVERIFIED || current.events().stream()
-                .anyMatch(event -> Action.ASSESS.name().equals(event.getActionType())))
+                || current.attribution() != Attribution.UNVERIFIED)
             ParameterChecks.reject(ErrorCode.QUALITY_TREATMENT_CONFLICT);
         ParameterChecks.text(assessment.basis(), true, 500, ErrorCode.QUALITY_TREATMENT_CONFLICT);
         if (assessment.type() == Attribution.OVERLAP) {
@@ -458,6 +382,40 @@ public class QualityTreatmentService {
         } catch (DuplicateKeyException failure) {
             throw new FoundationException(ErrorCode.QUALITY_TREATMENT_CONFLICT, failure);
         }
+    }
+
+    public record RequestCheck(RequestKind kind, AssessmentCommand assessment, Disposition disposition) {
+    }
+
+    public MesQualityTreatmentEntity checkRequest(String declaration, RequestCheck command) {
+        if (command == null) ParameterChecks.reject(ErrorCode.BAD_REQUEST);
+        String id;
+        String fingerprint;
+        Action action;
+        if (command.kind() == RequestKind.ASSESS && command.assessment() != null && command.disposition() == null) {
+            id = command.assessment().requestId();
+            fingerprint = digest(hash(command.assessment()) + ":" + declaration);
+            action = Action.ASSESS;
+        } else if (command.kind() == RequestKind.DISPOSE && command.disposition() != null && command.assessment() == null) {
+            var disposition = command.disposition();
+            if (disposition.destination() == null || disposition.quantity() == null || disposition.reason() == null)
+                ParameterChecks.reject(ErrorCode.BAD_REQUEST);
+            id = disposition.requestId();
+            fingerprint = QualityDispositionService.hash(declaration, command.disposition());
+            action = Action.TRANSFER_WAREHOUSE;
+        } else throw new FoundationException(ErrorCode.BAD_REQUEST);
+        try {
+            if (id == null || !UUID.fromString(id).toString().equals(id)) ParameterChecks.reject(ErrorCode.BAD_REQUEST);
+        } catch (IllegalArgumentException failure) {
+            throw new FoundationException(ErrorCode.BAD_REQUEST, failure);
+        }
+        var event = events.selectByPrimaryKey(id);
+        if (event == null) throw new FoundationException(ErrorCode.NOT_FOUND);
+        if (!declaration.equals(event.getDeclarationId()) || !action.getValue().equals(event.getActionType())
+                || !Objects.equals(SecurityUtils.getUserId(), event.getOperatorUserId())
+                || !fingerprint.equals(event.getRequestHash()))
+            ParameterChecks.reject(ErrorCode.QUALITY_TREATMENT_CONFLICT);
+        return event;
     }
 
     private String hash(AssessmentCommand command) {

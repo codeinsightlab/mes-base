@@ -16,6 +16,8 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.RequestParam;
+import dev.mesbase.common.core.page.PageData;
 
 @RestController
 @RequestMapping("/api/quality")
@@ -37,7 +39,6 @@ public class QualityTreatmentController {
     public record View(String declarationId, int revision, String executionId, String routingNodeId, String defectQty,
                        String attribution, String relatedDeclarationId, String basis, String pendingDispositionQty,
                        String netDefectQty, String state, String recordAction,
-                       List<Event> events,
                        String returnedQty, String transferredQty, String receiptState) {
     }
 
@@ -60,15 +61,28 @@ public class QualityTreatmentController {
         return view(service.assess(id, c));
     }
 
-    private record History(List<Event> events) {
+    public record EventPage(List<Event> items, long total, int offset, int limit) implements PageData<Event> {
+    }
+
+    @GetMapping("/defects/{id}/treatment/events")
+    @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED, permission = "business:quality:defect:read")
+    public EventPage history(@PathVariable String id, @RequestParam(defaultValue = "0") int offset,
+                             @RequestParam(defaultValue = "20") int limit) {
+        var result = service.history(id, offset, limit);
+        return BeanConversions.convertPage(result, row -> event(row, result.users()), EventPage::new);
+    }
+
+    @PostMapping("/defects/{id}/treatment/requests/check")
+    @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED, permission = "business:quality:defect:revise")
+    public Event check(@PathVariable String id, @RequestBody QualityTreatmentService.RequestCheck command) {
+        return event(service.checkRequest(id, command), Map.of());
     }
 
     private record Labels(String operatorName) {
     }
 
     static View view(QualityTreatmentService.Details data) {
-        return BeanConversions.convertWith(data.summary(), new History(data.history().stream()
-                .map(event -> event(event, data.users())).toList()), View.class);
+        return BeanConversions.convert(data.summary(), View.class);
     }
 
     private static Event event(MesQualityTreatmentEntity event, Map<Long, DirectoryLabel> users) {

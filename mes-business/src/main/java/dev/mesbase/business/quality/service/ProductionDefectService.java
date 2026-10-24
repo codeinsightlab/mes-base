@@ -30,7 +30,7 @@ import dev.mesbase.business.quality.domain.ProductionDefectModels.NodeTotal;
 import dev.mesbase.business.quality.domain.ProductionDefectModels.Page;
 import dev.mesbase.business.quality.domain.ProductionDefectModels.Processing;
 import dev.mesbase.business.quality.domain.ProductionDefectModels.Warehouse;
-import dev.mesbase.business.quality.domain.ProductionDefectModels.TreatmentTotals;
+import dev.mesbase.business.quality.domain.QualityTreatmentModels.CurrentFact;
 import dev.mesbase.business.quality.domain.QualityTreatmentModels.Attribution;
 import dev.mesbase.business.quality.integration.ProductionDefectErpGateway;
 import dev.mesbase.business.shared.enums.EnableStatus;
@@ -352,18 +352,18 @@ public class ProductionDefectService {
                 .collect(Collectors.toMap(ListContext::declarationId, value -> value));
         var states = new HashMap<String, Processing>();
         if (!rows.isEmpty()) {
-            var totals = listQueries.selectTreatmentTotals(rows.stream().map(MesProductionDefectEntity::getId).toList())
-                    .stream().collect(Collectors.toMap(TreatmentTotals::declarationId, t -> t));
+            var totals = listQueries.selectCurrentFactsByIds(rows.stream().map(MesProductionDefectEntity::getId)
+                            .toList())
+                    .stream().collect(Collectors.toMap(CurrentFact::declarationId, t -> t));
             for (var row : rows) {
                 var t = totals.get(row.getDeclarationId());
                 if (t == null) {
                     states.put(row.getDeclarationId(), Processing.unresolved());
                     continue;
                 }
-                var attribution = Attribution.UNVERIFIED;
-                if (t.attribution() != null) attribution = Attribution.find(t.attribution());
-                states.put(row.getDeclarationId(), Processing.read(row.getRecordAction(), attribution,
-                        row.getDefectQty(), t.returnedQty(), t.transferredQty(), t.invalidActions()));
+                var summary = t.summary(false);
+                states.put(row.getDeclarationId(), new Processing(summary.state(), summary.pendingDispositionQty(),
+                        summary.returnedQty(), summary.transferredQty()));
             }
         }
         return new Page(rows, total, offset, limit, names(rows), Map.copyOf(states), contexts);

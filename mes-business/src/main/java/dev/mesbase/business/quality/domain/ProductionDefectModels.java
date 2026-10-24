@@ -89,10 +89,6 @@ public final class ProductionDefectModels {
         }
     }
 
-    public record TreatmentTotals(String declarationId, String attribution, BigDecimal returnedQty,
-                                  BigDecimal transferredQty, long invalidActions) {
-    }
-
     public record Page(List<MesProductionDefectEntity> items, long total, int offset, int limit, Names names,
                        Map<String, Processing> treatments,
                        Map<String, ListContext> contexts) implements PageData<MesProductionDefectEntity> {

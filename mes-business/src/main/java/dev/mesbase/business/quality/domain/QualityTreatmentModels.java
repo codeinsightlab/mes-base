@@ -1,11 +1,12 @@
 package dev.mesbase.business.quality.domain;
 
 import com.fasterxml.jackson.annotation.JsonValue;
+import com.fasterxml.jackson.annotation.JsonCreator;
 import dev.mesbase.core.error.ErrorCode;
+import dev.mesbase.business.quality.domain.ProductionDefectModels.Processing;
 import dev.mesbase.core.error.FoundationException;
 import java.math.BigDecimal;
 import java.util.Arrays;
-import java.util.List;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.function.Function;
@@ -13,6 +14,44 @@ import java.util.stream.Collectors;
 
 public final class QualityTreatmentModels {
     private QualityTreatmentModels() {
+    }
+
+    public enum RequestKind {
+        ASSESS("assess", "核实原请求"), DISPOSE("dispose", "入仓原请求");
+        private final String value;
+        private final String description;
+
+        RequestKind(String value, String description) {
+            this.value = value;
+            this.description = description;
+        }
+
+        @JsonValue
+        public String getValue() {
+            return value;
+        }
+
+        public String getDescription() {
+            return description;
+        }
+
+        public static RequestKind from(String value) {
+            for (var kind : values()) if (kind.value.equals(value)) return kind;
+            return null;
+        }
+
+        @JsonCreator
+        public static RequestKind parse(String value) {
+            var kind = from(value);
+            if (kind == null) throw new FoundationException(ErrorCode.BAD_REQUEST);
+            return kind;
+        }
+
+        public static Map<String, String> toMap() {
+            var result = new LinkedHashMap<String, String>();
+            for (var kind : values()) result.put(kind.value, kind.description);
+            return result;
+        }
     }
 
     public enum Action {
@@ -117,6 +156,42 @@ public final class QualityTreatmentModels {
         return ReceiptState.PARTIAL;
     }
 
+    /**
+     * One latest declaration and its corresponding version facts, never display history.
+     */
+    public record CurrentFact(String declarationId, int revision, Long executionId, Long routingNodeId,
+                              BigDecimal defectQty, String recordAction, long assessmentCount,
+                              String attribution, String relatedDeclarationId, String basis,
+                              BigDecimal returnedQty, BigDecimal transferredQty, long invalidFacts,
+                              long unknownActions) {
+        public Summary summary(boolean strict) {
+            Attribution type = null;
+            String related = null;
+            String assessmentBasis = null;
+            if (assessmentCount == 0) type = Attribution.UNVERIFIED;
+            if (assessmentCount == 1) {
+                type = Attribution.find(attribution);
+                related = relatedDeclarationId;
+                assessmentBasis = basis;
+            }
+            long invalid = invalidFacts;
+            if (revision < 1) invalid++;
+            if (assessmentCount > 1 || assessmentCount == 1 && type == Attribution.UNVERIFIED) invalid++;
+            var processing = Processing.read(recordAction, type, defectQty,
+                    returnedQty, transferredQty, invalid);
+            if (strict && unknownActions > 0) throw new FoundationException(ErrorCode.QUALITY_DATA_INVALID);
+            if (strict && processing.state() == State.UNRESOLVED)
+                throw new FoundationException(ErrorCode.QUALITY_TREATMENT_CONFLICT);
+            BigDecimal net = null;
+            if (processing.state() != State.UNRESOLVED)
+                net = type == Attribution.INDEPENDENT ? defectQty.subtract(returnedQty) : BigDecimal.ZERO;
+            return new Summary(declarationId, revision, executionId, routingNodeId, defectQty, type,
+                    related, assessmentBasis, processing.pendingDispositionQty(), net, processing.state(),
+                    recordAction, processing.returnedQty(), processing.transferredQty(),
+                    receiptState(processing.state(), defectQty, processing.transferredQty()));
+        }
+    }
+
     public record Disposition(String requestId, int expectedRevision, Destination destination,
                               BigDecimal quantity, Long warehouseId, String reason) {
     }
@@ -130,7 +205,7 @@ public final class QualityTreatmentModels {
     public record Summary(String declarationId, int revision, Long executionId, Long routingNodeId,
                           BigDecimal defectQty, Attribution attribution, String relatedDeclarationId, String basis,
                           BigDecimal pendingDispositionQty, BigDecimal netDefectQty, State state,
-                          String recordAction, List<MesQualityTreatmentEntity> events,
+                          String recordAction,
                           BigDecimal returnedQty, BigDecimal transferredQty, ReceiptState receiptState) {
     }
 }
