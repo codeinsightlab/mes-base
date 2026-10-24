@@ -71,89 +71,14 @@ mes:
 
 `RedisCache.deleteByPattern` 将逻辑模式转换为物理模式，并通过实际 key serializer 构造 SCAN 匹配值。单机 SCAN count=200，积累最多 200 个 key 执行 DEL；Cluster 扫描每个主节点，按单 key 删除避免 CROSSSLOT。没有 KEYS、FLUSHDB 或全库清理。
 
-Redis 读取/写入或缓存 payload 恢复失败记录 WARN，继续原数据库查询/结果返回。数据库查询和业务异常直接传播。提交后淘汰失败记录明确的 ERROR，说明数据库写入已成功，不向调用方抛出假回滚失败；旧数据依靠后续淘汰和 TTL 收敛。本轮不引入版本号、锁、延迟双删或一致性协议。
+Redis 读取/写入或缓存 payload 恢复失败记录 WARN，继续原数据库查询/结果返回。数据库查询和业务异常直接传播。提交后淘汰失败记录明确的 ERROR，说明数据库写入已成功，不向调用方抛出假回滚失败；旧数据依靠后续淘汰和 TTL 收敛。
 
 ## 物料真实调用链与权限
 
 `MaterialController` → `IMaterialService` 的 Spring 代理 → `MaterialServiceImpl` → 生成的 `MaterialMapper/XML/Example`。接口路径不变，详情复用 `selectById`，保留缺失/跨厂 NOT_FOUND 语义。列表分页默认 offset=0、limit=20，上限 100；排序固定 `id`。完整筛选包括 code、name、specification、categoryId、unitId、materialType、status、externalId、externalCode。
 
-本轮静态检查未发现物料查询的用户或部门数据权限过滤；查询范围为当前工厂与上述筛选条件。HTTP 的 FoundationAccessInterceptor 在 Controller/Service 前完成当前权限检查；缓存命中不能跳过该入口。工作区同期的独立权限调整将列表和详情权限拆为 list/query，本轮保留该调整，详情 UI 按 query 控制。
+查询范围为当前工厂与上述筛选条件。HTTP 的 FoundationAccessInterceptor 在 Controller/Service 前完成当前权限检查；缓存命中不能跳过该入口。列表和详情分别使用 list/query 权限，详情 UI 按 query 控制。
 
 物料同步入口 → `MaterialSyncService` → 注入的 `MaterialSyncWriter` Spring 代理；写入与动态淘汰在同一事务内。通用缓存组件不依赖物料同步结果类型。
 
-前端 `material/index.vue` 的编辑复用 CrudPage，列表行只取 ID 后调用 `api.detail`；新增只读详情按钮也只按 ID 查询，带 loading/error、权限检查和上下文变化清理。不以列表行作为详情结果。未修改代码生成器或模板，本轮接入不会自动写回生成模板。
-
-## 验证与边界
-
-`BusinessCacheIntegrationTest` 使用独立临时 Redis（随机端口，无持久化，测试结束关闭）及实际 Spring 代理/H2 事务。物料 Mapper 和业务校验为明确标记的 fixture；H2 marker 写入用于证明提交与回滚。未修改用户 Redis 或真实物料数据。
-
-覆盖：offset 0/99 命中、100 绕过；limit/排序/筛选与 Map 顺序；工厂/业务隔离；不存在/null 不缓存；增改删范围；外层提交/回滚；无事务时捕获原工厂；同步新增/更新/跳过/回滚；详情和分页记录类型；写事务不缓存；错误注解；多批 SCAN；payload 损坏、数据库异常和 Redis 故障。Cluster 分支使用连接 fixture 验证主节点扫描和单 key DEL，不代表真实 Redis Cluster 验收。
-
-`GeneratedMaterial.test.ts` 挂载真实物料页、CrudPage、API/request，使用合成 HTTP 响应验证编辑与只读详情调用 ID 接口及上下文变化清理；部分 Element Plus 浮层选择组件为测试 stub，不等于浏览器验收。
-
-浏览器 CUA 初始化超时，本轮真实浏览器视觉与交互验收未完成。未验证生产 Redis、真实 Redis Cluster 或真实物料数据库业务验收；未部署、提交或推送。
-
-### 实际执行结果
-
-- `./scripts/format-java <本轮12个Java文件>`：通过；新增 Cluster fixture 后再次格式化其测试文件，通过。
-- `mvn -B -ntp test`：全 reactor 通过。
-- `mvn -B -ntp verify`：全 reactor 通过，含 13 个 BusinessCacheIntegrationTest；既有环境条件跳过的测试仍按原条件跳过。
-- `/usr/bin/python3 scripts/smoke-packaged.py`：10 passed / 0 failed。
-- UI `.nvmrc` 已安装 Node 22.23.1：`npm run test`，27 文件 / 143 测试通过；`npm run build` 通过，保留已有大 bundle 提示。
-- 两个工作区 `git diff --check`：通过。
-
-### 本轮文件清单
-
-- `mes-framework/src/main/java/dev/mesbase/infrastructure/cache/annotation/BusinessCache.java`：读取意图与显式参数位置。
-- `mes-framework/src/main/java/dev/mesbase/infrastructure/cache/annotation/BusinessCacheEvict.java`：写入淘汰范围。
-- `mes-framework/src/main/java/dev/mesbase/infrastructure/cache/BusinessCacheQuery.java`：有效分页/排序提取约定。
-- `mes-framework/src/main/java/dev/mesbase/infrastructure/cache/BusinessCacheAspect.java`：代理读取、固定租约检查及淘汰调用。
-- `mes-framework/src/main/java/dev/mesbase/infrastructure/cache/BusinessCacheProcessor.java`：稳定 key、类型恢复、TTL、故障降级和提交后淘汰。
-- `mes-common/src/main/java/dev/mesbase/common/core/redis/RedisCache.java`：扩展 SCAN 删除，沿用连接、序列化与前缀。
-- `mes-admin/src/main/java/dev/mesbase/server/PersistenceConfiguration.java`：明确事务 advisor 顺序。
-- `mes-admin/src/main/resources/application.yml`：统一 TTL 配置。
-- `mes-business/src/main/java/dev/mesbase/modules/material/domain/MaterialQueryDto.java`：查询参数约定。
-- `mes-business/src/main/java/dev/mesbase/modules/material/service/impl/MaterialServiceImpl.java`：列表/详情/增改删注解。
-- `mes-business/src/main/java/dev/mesbase/modules/material/sync/MaterialSyncWriter.java`：同步动态淘汰。
-- `mes-business/src/test/java/dev/mesbase/modules/material/BusinessCacheIntegrationTest.java`：13 个缓存测试。
-- `mes-admin/src/test/java/dev/materialfixture/MaterialSyncHttpTest.java`：原 HTTP/SQL fixture 显式提供缓存依赖，保留既有测试边界。
-- `mes-base-ui/src/views/material/material/index.vue`：只读详情与上下文清理。
-- `mes-base-ui/tests/GeneratedMaterial.test.ts`：编辑和详情接口调用测试。
-- 本文：接入规范、事务/权限事实、测试证据与未验证边界。
-
-工作区中生成器、模板和权限迁移文件的其他已有/并行修改未由本任务改写或清理。
-
-
-### 2026-10-12 权限资源前缀统一
-
-缓存 business 改为权限资源前缀，不含操作后缀。新增 `mes-business/src/main/java/dev/mesbase/modules/material/domain/MaterialResource.java`，以 `PREFIX = "business:material"` 统一缓存注解、同步淘汰及权限常量。MaterialPermissions 的最终权限字符串保持不变，未修改生成器或模板。
-
-验证继续覆盖不同承载模块下的同名资源（business:material / erp:material），新增相似资源及嵌套资源边界检查（business:materials / business:material:list）。旧命名空间缓存不会被读取，自然按原 300 秒 TTL 过期，不扩大扫描范围清理历史 key。
-
-本次前缀调整验证：8 个涉及 Java 文件经 `scripts/format-java` 格式化；`mvn -B -ntp test` 全 reactor 通过，13 个缓存测试均通过；`git diff --check` 通过。本次未修改前端，未重复执行前端或生产环境验收。
-
-### 2026-10-12 生成模板接入
-
-用户随后授权修改生成模板。Factory 业务 CRUD 现在生成 Resource.PREFIX、缓存查询参数约定、列表/详情注解及增改删淘汰；同步 Writer 复用提交后动态淘汰。命名来自配置中的完整权限资源前缀：material_category → business:material:category，不以 module 或方法名推断。平台 CRUD 不接入业务缓存。
-
-此前“未修改生成器/模板”的记录是前一轮实现边界；本轮按新授权更新模板，未重新生成覆盖已有物料业务代码。模板文件、生成运行测试与隔离输出说明见 [codegen.md](codegen.md) 的同日“通用业务缓存模板接入”章节。
-
-### 2026-10-13 当前 Redis key 静态梳理
-
-- 实际 Redis 前缀由 SystemCacheNamespace 构造：`mes:[named:<配置名>:]db:<中心库 JDBC URL 的 SHA-256>:`。
-  可选配置名不会替代数据库摘要；相同 URL、相同配置名、相同 Redis DB 的部署会共享命名空间。
-  结构化 CacheKey/PlatformCache/BusinessCache 不是当前注解缓存写入 Redis 的调用链。
-- 业务缓存后缀为 `business:factory:<工厂ID的Base64URL>:resource:<资源字符串长度>:<资源>:list:<SHA-256>`
-  或 `detail:<ID的Base64URL>`。例如工厂 A、物料分类 ID 1：
-  `mes:db:<摘要>:business:factory:QQ:resource:26:business:material:category:detail:MQ`。
-  资源长度边界防止嵌套资源前缀的批量淘汰相互影响。
-- 列表摘要包含所有方法参数和有效 offset/limit/sort；JSON 属性和 Map key 排序后计算摘要。
-  仅 offset 0–99 缓存；业务缓存只在只读事务中读写，统一 TTL 300 秒，命中不续期。
-  当前不是语义归一化查询：参数 null 与显式默认值仍可能生成不同 key，产生重复缓存但不会误命中。
-- 详情不缓存 null；缓存命中按方法泛型返回类型恢复。业务 key 不包含用户 ID，适用于同厂用户
-  得到相同业务结果的查询；含用户数据权限的查询需要额外范围隔离。新增提交后删列表，修改/删除
-  提交后删列表及全部详情；SCAN 删除限制当前命名空间、工厂和资源。
-- 同一外层前缀还承载会话/用户会话索引/撤销版本、登录重试、验证码、参数、字典、OpenAPI Token/限流
-  和 `factory-routing:entry:*` 路由元数据。TTL 按用途配置，参数/字典的无 timeout 写入没有自动 TTL；
-  业务的 300 秒不影响其他用途。个人列配置存中心数据库，不在 Redis。
-- 本次仅检查源码、当前配置和生成业务样例，没有连接 Redis、执行缓存测试或修改业务代码。
+前端 `material/index.vue` 的编辑复用 CrudPage，列表行只取 ID 后调用 `api.detail`；新增只读详情按钮也只按 ID 查询，带 loading/error、权限检查和上下文变化清理。不以列表行作为详情结果。组件接入与生成器模板维护分别处理。

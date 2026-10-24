@@ -71,7 +71,7 @@ Base MES 的基础能力是“一个平台管理多个独立业务数据空间�
 - **缓存和资源保留范围边界**：业务缓存按工厂范围隔离，私有文件继续校验所有者、范围和资源关联，不因共用平台账号而放开读取。
 - **集成配置按工厂维护**：每厂最多绑定一个有效ERP；LOCAL和EXTERNAL业务继续校验原有来源，配置异常不自动降级为本地执行。
 
-当前采用“中心库＋各业务空间独立业务库”，不是同一业务库内按租户字段共享数据。各业务库需要分别升级、备份和维护。按年度建空间时，期初库存、基础资料、未完工单及跨年在制品如何承接，仍须按正式业务规则准备；不会自动结转、自动只读封账或跨空间汇总。这也不等于各空间独立部署、独立故障域或已实现跨空间调度和调拨。实现细节见[持久化架构](docs/architecture/ADR-004-business-persistence-topology.md)与[请求准入和事务](docs/development/request-admission.md)。
+当前采用“中心库＋各业务空间独立业务库”，不是同一业务库内按租户字段共享数据。各业务库需要分别升级、备份和维护。按年度建空间时，期初库存、基础资料、未完工单及跨年在制品如何承接，仍须按正式业务规则准备；不会自动结转、自动只读封账或跨空间汇总。这也不等于各空间独立部署、独立故障域或已实现跨空间调度和调拨。实现细节见[持久化架构](docs/architecture/README.md)与[请求准入和事务](docs/development/request-admission.md)。
 
 ## 当前阶段
 
@@ -128,14 +128,14 @@ java -jar target/mes-base-0.1.0-SNAPSHOT.jar --spring.profiles.active=dev
 
 - [前端项目](https://github.com/codeinsightlab/mes-base-ui)
 - [文档导航与维护边界](docs/README.md)
-- [当前规划与待办](docs/development/next-stage-plan.md)
-- [生产投产与 BOM 规则](docs/development/production-input.md)
+- [当前规划与待办](docs/roadmap.md)
+- [生产投产与 BOM 规则](docs/usage/production.md)
 - [LOCAL / ERP 业务边界](docs/architecture/local-erp-business-boundary.md)
 - [数据库版本升级](docs/development/database-upgrades.md)
 - [架构文档](docs/architecture/README.md)
-- [GitHub / Gitee 双托管](docs/development/dual-hosting.md)
+- [GitHub / Gitee 双托管](CONTRIBUTING.md)
 
-当前指南从[文档导航](docs/README.md)进入；早期过程与旧方案见 `docs/archive`，专项审查和维护证据保留在 `docs/reviews`、`docs/operations`，与当前使用说明分开维护。
+公共文档从[文档导航](docs/README.md)进入，围绕使用、开发、部署和维护组织；本机排障、临时验收与开发流水账不随源码分发。
 
 ## 来源与第三方声明
 

@@ -35,16 +35,4 @@ Execution关联锁定路径、正式投入、报工、不良和库存交接。�
 
 每厂最多一个ERP；运行模式由受管集成配置决定，业务来源持久化保留。LOCAL库存与ERP权威库存分开，本地事务不承诺回滚远端HTTP，不确定结果保留原身份。详见[LOCAL/ERP边界](local-erp-business-boundary.md)。
 
-## 决策与历史
-
-ADR正文保留原始方案及后续取代记录；存在多轮决定时，按最新生效修订和当前AGENTS理解，不把早期Shared、三会话工厂或旧模块名当作现状。
-
-- [Factory范围](ADR-001-factory-scope.md)
-- [运行时绑定](ADR-002-factory-runtime-binding.md)
-- [权限模型](ADR-003-factory-permission-model.md)
-- [持久化拓扑及后续修订](ADR-004-business-persistence-topology.md)
-- [早期ERP边界（历史）](ADR-005-erp-integration-boundary.md)
-- [平台底座与来源](ADR-006-platform-and-web-base.md)
-- [本入口的早期架构说明](../archive/architecture/overview-history.md)
-
-回到[文档导航](../README.md)。
+具体开发遵守仓库AGENTS；使用和维护入口见[文档导航](../README.md)。

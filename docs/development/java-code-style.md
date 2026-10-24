@@ -1,17 +1,13 @@
-# Java code style
+# Java格式与检查
 
-MES Base uses the IntelliJ IDEA native Java formatter:
+`.editorconfig`规定编码、换行和基础缩进。修改仅覆盖本次任务文件，避免格式化无关源码。
 
-- `.editorconfig` supplies UTF-8, LF, final newline, four-space indentation, eight-space continuation indentation, and a 120-column guidance limit.
-- `.idea/codeStyles/Project.xml` is the committed project-level IDEA Code Style.
-- `scripts/format-java` is the repository entry point and calls IntelliJ IDEA's native `format.sh`.
-
-Run from the repository root:
+仓库提供 `scripts/format-java`，调用IntelliJ IDEA原生格式化器。使用前需安装IDEA，必要时通过 `MES_IDEA_HOME` 指定安装目录，并准备脚本引用的项目Code Style。当前脚本依赖本机 `.idea/codeStyles/Project.xml`，该目录不随Git分发；新机器需先准备相同的风格配置。
 
 ```sh
-./scripts/format-java path/to/Changed.java
-mvn -B -ntp test
+scripts/format-java path/to/Changed.java
+scripts/format-java --check path/to/Changed.java
 git diff --check
 ```
 
-Review formatter output before committing and do not include unrelated historical Java files. IntelliJ IDEA must be installed locally, or `IDEA_FORMATTER` must point to its `format.sh`.
+实际测试范围按改动选择；格式检查不能代替业务测试。后端完整验证使用 `mvn -B -ntp verify`，生成器可按[独立构建说明](codegen.md)验证。个人IDE路径、运行日志和本次检查回执不提交到公共指南。

@@ -1,10 +1,10 @@
 # 主子单据组件
 
-2026-10-14，领料出库首先落地。未来主子单据前端按 AGENTS 优先复用本组件，不沿用生成的单表页面；后端仍必须针对主表和明细表分别生成完整基础代码（persistence + backend，通常同时test）。前端页面复用与后端代码生成是独立要求，不得将前端例外扩大成后端跳过生成。
+主子单据前端按 AGENTS 优先复用本组件，不沿用生成的单表页面；后端仍必须针对主表和明细表分别生成完整基础代码（persistence + backend，通常同时test）。前端页面复用与后端代码生成是独立要求，不得将前端例外扩大成后端跳过生成。
 
 ## 已核对的后端复用链路
 
-领料页面将现有 mesMaterialIssue.ts / mesMaterialIssueItem.ts 的API对象传给组件，二者实现CrudApi，通过统一request访问 /api/issue/mes-material-issue 和 /api/issue/mes-material-issue-item。现有Controller委托原业务Service，Service使用生成的MesMaterialIssueMapper / MesMaterialIssueItemMapper与Example/XML，在businessTransactionManager事务内保留引用、工艺及删除规则。组件复用的是这些既有CRUD契约、分页、权限及数据库路由能力，不是一套新通用主子聚合后端；本轮页面抽取未修改后端实现。需要整单原子保存时仍须新增有明确业务边界的聚合接口。
+领料页面将现有 mesMaterialIssue.ts / mesMaterialIssueItem.ts 的API对象传给组件，二者实现CrudApi，通过统一request访问 /api/issue/mes-material-issue 和 /api/issue/mes-material-issue-item。现有Controller委托原业务Service，Service使用生成的MesMaterialIssueMapper / MesMaterialIssueItemMapper与Example/XML，在businessTransactionManager事务内保留引用、工艺及删除规则。组件复用的是这些既有CRUD契约、分页、权限及数据库路由能力，不是一套新通用主子聚合后端。需要整单原子保存时仍须新增有明确业务边界的聚合接口。
 
 前端 `src/components/document/MasterDetailDocument.vue` 负责单据列表、打开/新建主单、上方表单、下方明细、主单删除确认、未保存返回提醒和上下文清理。`DocumentFields.vue` 负责字段控件与业务选择器插槽，同时由普通 CrudPage 的弹窗复用。组件不定义领料字段、工艺状态或引用规则；后端继续是最终规则边界。
 
@@ -16,4 +16,4 @@
 
 领料单据正式入口为 /issue/mesMaterialIssue。旧 /issue/mesMaterialIssueItem 只跳转统一入口，中心旧菜单隐藏但保留 ID、权限与角色关联。已删除旧 IssueRecordDetails 独立详情实现及其失效测试，权限和上下文测试迁到真实主子组件；旧明细 API 保留供统一页面使用。手工维护的页面、菜单 JSON/SQL不带生成归属标记；领料生成配置不再产出前端及菜单。基础 Mapper/XML/Example 的生成仍可复用，不新建第二套数据访问。
 
-当前限制：未保存提醒覆盖页面内部“返回列表”，不提供浏览器关闭或跨路由草稿恢复；无整单原子提交。验证详情见 docs/reviews/2026-10-13-material-issue-review.md 的 2026-10-14 章节。
+当前限制：未保存提醒覆盖页面内部“返回列表”，不提供浏览器关闭或跨路由草稿恢复；无整单原子提交。

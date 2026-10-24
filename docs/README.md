@@ -1,24 +1,25 @@
-# 文档导航
+# Base MES 文档
 
-先看[项目介绍](../README.md)，再按任务选择下列指南。当前规则与历史证据分开维护；具体开发仍须遵守仓库AGENTS。
+公共文档围绕四件事组织：**如何使用、开发、部署和维护 Base MES**。只有可复用、与当前产品有关、对其他使用者有意义的内容进入版本控制。
 
-| 任务 | 当前入口 |
+| 目的 | 阅读入口 |
 | --- | --- |
-| 查看产品状态与计划 | [项目README](../README.md)、[下一阶段计划](development/next-stage-plan.md) |
-| 安装配置、账号与保留工具 | [平台指南](development/platform.md) |
-| 理解数据空间、权限与事务 | [当前架构](architecture/README.md)、[请求准入](development/request-admission.md)、[LOCAL/ERP边界](architecture/local-erp-business-boundary.md) |
-| 理解生产与库存 | [投产与BOM](development/production-input.md)、[库存](development/warehouse-inventory.md) |
-| 开发业务 | [生成器](development/codegen.md)、[主子单据](development/master-detail-documents.md)、[业务目录](development/business-directory.md)、[缓存](development/business-cache.md) |
-| 升级与维护 | [数据库版本](development/database-upgrades.md)、[维护证据](operations/data-maintenance/README.md) |
-| 查来源和授权 | [来源清单](legal/)、根目录LICENSE和NOTICE |
-| 查历史 | [归档入口](archive/README.md)、[专项审查](reviews/)、[早期迁移证据](migration/) |
+| 了解产品和范围 | [项目介绍](../README.md)、[路线图](roadmap.md) |
+| 使用生产和仓储 | [生产流程](usage/production.md)、[库存与审核](usage/inventory.md) |
+| 开发与扩展 | [生成器](development/codegen.md)、[主子单据](development/master-detail-documents.md)、[共享目录](development/business-directory.md)、[缓存](development/business-cache.md)、[列偏好](development/table-preferences.md)、[Java格式](development/java-code-style.md) |
+| 部署与维护 | [平台配置](development/platform.md)、[数据库升级](development/database-upgrades.md) |
+| 理解安全和集成 | [当前架构](architecture/README.md)、[请求与事务](development/request-admission.md)、[LOCAL/ERP边界](architecture/local-erp-business-boundary.md)、[E10接入](development/digiwin-e10-consumer.md) |
+| 贡献和同步代码 | [贡献指南](../CONTRIBUTING.md) |
+| 查授权与来源 | 根目录LICENSE、NOTICE及[来源声明](legal/) |
 
-## 维护约定
+## 什么应当提交
 
-- 一个当前主题保留一个权威说明。正文写现行流程、边界和必要实例；小修复只更新差异，不复制整份规划。
-- 日期化调查、测试回执和旧方案进入历史区域，保留日期、出处及取代关系；历史命令不是当前操作入口。
-- `development`中的业务生成配置不等于可直接执行的通用模板；使用前显式核对目标、选表和写入模式，不在本轮移动这些仍被AGENTS/配置/测试引用的资产。
-- `operations/data-maintenance`中的已执行SQL和回执是证据，正式Flyway迁移独立保留；不将二者合并成可重复运行的安装脚本。
-- `generated`、`prototypes`和旧迁移矩阵保留各自证据范围，不作为产品能力或待办的第二权威来源。
+- 当前使用说明、开发契约、部署维护步骤，以及确有长期价值的设计说明。
+- 可复用的示例、测试夹具和工具配置属于工程资产，放到config或测试/工具目录；不是所有YAML、JSON、SQL都属于文档。
+- 生成器配置位于[config/codegen](../config/codegen/)，不自动执行。正式数据库版本仅由Flyway维护。
 
-本轮已收敛生成器、平台和架构入口。生产专题、ADR、规划和升级说明仍有历史章节，后续在对应主题变更时继续整理，不宣称全量文档已清理。
+## 什么不应当提交
+
+本机代理、个人端口/路径、开发账号、指定测试库排障、一次性验收回执、截图/日志、对话交接和阶段流水账。它们保存在Git忽略的 `.local/knowledge/` 或自有证据目录；已有本地材料可以继续保留，但不作为公共指南的依赖。
+
+不通过把开发流水账改名为archive继续公开。公共说明直接更新当前规则；本地保留原始证据。对已发布Git历史不做自动重写，来源许可和正式迁移不因文档精简而移除。

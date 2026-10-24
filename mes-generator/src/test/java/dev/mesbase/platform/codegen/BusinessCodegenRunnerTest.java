@@ -62,7 +62,7 @@ class BusinessCodegenRunnerTest {
 
     private Path repository() {
         Path current = Path.of("").toAbsolutePath();
-        return Files.exists(current.resolve("docs/development/codegen-config.review.yaml")) ? current : current.getParent();
+        return Files.exists(current.resolve("config/codegen/codegen-config.review.yaml")) ? current : current.getParent();
     }
 
     private BusinessCodegenConfiguration config(String tables, String mode) throws Exception {

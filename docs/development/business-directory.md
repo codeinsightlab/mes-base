@@ -1,6 +1,6 @@
 # 业务目录只读组件
 
-2026-10-10，按用户最终约束：不新增表，只查询中心库现有人员、部门、岗位；不提供新增、修改、删除。
+不新增表，只查询中心库现有人员、部门、岗位；不提供新增、修改、删除。
 
 ## 数据与授权
 
@@ -9,7 +9,6 @@ mes-business 的 BusinessDirectoryService 直接复用 SysUserMapper、SysDeptMa
 
 这些表是中心库共享目录。不同工厂可读取同一套启用引用数据，本接口不宣称按工厂隔离目录行。人员为现有启用且未删除 sys_user，不创建独立花名册；停用/删除人员与部门、停用岗位不供选择和回显（404）。历史单据显示停用引用时应保存业务快照或采用另外明确的历史查询契约。
 
-V18 只添加 sys_menu 的三个 F 类型查询权限节点，不增加页面路由、不自动授予角色、不新增表。角色须显式分配相应权限。未运行真实数据库迁移或角色赋权。
 
 | 接口 | 查询权限 |
 | --- | --- |
@@ -39,44 +38,4 @@ const postId = ref<string | null>(null)
 </template>
 ```
 
-三个组件支持 modelValue/v-model、disabled、clearable、placeholder；人员支持 departmentId。change 返回完整白名单选项或 null。支持远程搜索、加载更多、GET 单项回显、错误重试；无权限不请求。切换工厂、授权修订或过滤部门变更清空选择与候选，过期请求不得回填。不会缓存跨厂目录数据，不提供管理弹窗和写入 API。
-
-## 验证边界
-
-后端 BusinessDirectoryTest 使用 TEST ONLY H2、真实平台 Mapper/XML、PageHelper 和 Spring 中心事务代理验证分页、裁剪、停用/删除引用、独立权限、缺厂拒绝、非 GET 返回405及分页限制。
-前端 businessDirectory.test.ts 验证三个实际组件的资源映射、字符串 ID、分页搜索、回显、清空、无权限、切厂竞态和失败重试。
-测试通过不等于用户 8081 服务已加载新代码；需要用户编译/重启后，迁移 V18、分配查询权限并刷新授权，再在真实业务页嵌入验收。
-
-
-### 本轮验证记录
-
-- IDEA 原生 formatter：目录源码及新增测试已格式化。
-- `mvn -B -ntp verify`：BUILD SUCCESS；BusinessDirectoryTest 4 项通过。既有真实 MySQL 验证未配置而跳过，不将 H2 结果冒充真实数据库。
-- `/usr/bin/python3 scripts/smoke-packaged.py`：10 passed / 0 failed。
-- UI `npm run test`：23 个文件、125 项通过；`npm run build`、`npm run lint` 通过。构建仍有既有大 chunk 警告。
-- 两仓库 `git diff --check` 通过。
-- TEST ONLY 浏览器预览复用正式组件，确认人员单项回显、部门分页/选择、切厂清空、撤权禁用；1440 和390宽度未出现组件溢出。
-- 预览启动：UI 仓库用 Node22 执行 `npx vite --config tests/business-directory-preview/vite.config.ts`，端口18193。该入口只在 tests 中，不注册生产路由、不调用真实数据库。
-- 真实8081服务未重启、中心库迁移未执行、角色未赋权、真实数据库接口未验收。
-
-### 2026-10-13：从 Git 恢复误删的后端目录接口
-
-用户保留前端 src/api/business/directory.ts，但后端对应源码已随旧业务包删除。
-Git 删除提交为 dc873b82e5c9795d6ef2393ac005ca03e7aff727；从其父版本恢复原路径下五个文件：
-BusinessDirectoryController、DirectoryOption、DirectoryPage、DirectoryQuery、BusinessDirectoryService。
-原包 dev.mesbase.modules.directory 保留，没有重新生成或重写这条接口，也未恢复其他已删除业务。
-该能力没有自己的 Mapper；仍复用中心库 SysUser/Dept/Post Mapper 和 masterTransactionManager，
-不改变当前业务 Mapper 根包 dev.mesbase.business。
-
-IDEA 格式化、全 reactor `mvn -B -ntp -DskipTests compile` 和 diff 检查通过。
-原 BusinessDirectoryTest 通过独立编译/执行四项测试，加载当前 reactor classes 与真实 Spring
-事务代理、MockMvc、中心 Mapper/XML 和 H2，覆盖六个只读接口、字段白名单、启停过滤、
-分页/搜索、独立权限、缺厂 422、非 GET 405 和分页限制。原始日志为
-/private/tmp/directory-restore-test.log；独立测试不等于完整 Maven 测试或真实数据库验收。
-未重启服务、执行数据库迁移或部署，保留其他生成器及工作区改动。
-
-
-## 2026-10-13 生产操作人员身份统一
-
-Production Operator = SYS_USER。本目录的 personnel 仅是已有URL/组件的兼容名称，返回id就是sys_user.user_id；没有personnel_id，也不创建人员业务表。
-后续报工、执行及分派直接保存明确的 operator_user_id / reporter_user_id；需要时在业务事实保存姓名快照，不维护第二套人员事实。共享目录与原测试继续保留，独立 `/api/resource/personnel` CRUD 已撤回。
+三个组件支持 modelValue/v-model、disabled、clearable、placeholder；人员支持 departmentId。change 返回完整白名单选项或 null。支持远程搜索、加载更多、GET 单项回显、错误重试；无权限不请求。切换工厂、授权修订或过滤部门变更清空选择与候选，过期请求不得回填。业务目录缓存按当前 Factory 与资源隔离，中心用户等共享引用按中心范围读取，不提供管理弹窗和写入 API。详情与批量回显复用统一详情缓存和提交后失效规则，不能缓存跨厂身份或绕过授权。

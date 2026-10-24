@@ -5,7 +5,7 @@
 ## 当前调用与新业务流程
 
 1. 先确定业务模型及正式Schema，核实元数据连接的目标。配置文件不能替代已存在的数据库表。
-2. 读取[项目配置](codegen-config.review.yaml)。这是项目取值记录，不是对所有表执行写入的默认授权；新任务应复制配置并显式选表、目标及产物。
+2. 读取[项目配置](../../config/codegen/codegen-config.review.yaml)。这是项目取值记录，不是对所有表执行写入的默认授权；新任务应复制配置并显式选表、目标及产物。
 3. 初次审查设置 `execution.mode: dry-run`、`execution.overwrite: fail`，检查报告和文件冲突。预览读取真实metadata，并会写JSON报告，但不发布生成代码。
 4. 审核后改为 `write`；需覆盖生成文件时明确选择 `replace-generated`，不得以覆盖手工文件来消除冲突。
 5. 检查生成SQL、接口、权限、事务和UI，补齐业务规则，再执行适用测试。生成成功不代表已执行DDL、菜单SQL或部署。
@@ -19,7 +19,7 @@ scripts/mes-business-codegen 配置文件.yaml target/business-codegen/report.js
 
 ## 配置与产物
 
-配置字段的完整注释以[项目YAML](codegen-config.review.yaml)为准。
+配置字段的完整注释以[项目YAML](../../config/codegen/codegen-config.review.yaml)为准。
 
 | 配置区域 | 职责 |
 | --- | --- |
@@ -48,6 +48,6 @@ scripts/mes-business-codegen 配置文件.yaml target/business-codegen/report.js
 - Base按独立业务库隔离，业务表不额外保存factory_id；这属于项目建模规则，不是通用生成器按字段名拒绝其他项目的规则。
 - `MES-CODEGEN`标记表示生成器维护归属。手工接管时按AGENTS移除标记；已有不同内容且没有可覆盖标记时返回 `OUTPUT_CONFLICT`，不强行恢复标记。
 - 当前项目 `generateSync: false`。开启可选同步生成需另行明确配置和适用业务，不代表已接通ERP；关闭开关不会自动删除以前生成的独立文件。
-- 生成器仍有内部/测试使用的Java入口和配置类型；本次只移除旧shell启动器，未删除这些仍有调用的Java类。
+- 内部及测试使用的Java入口和配置类型仍保留；对外生成入口使用上述CLI。
 
-Agent工作流见[Codegen Skill](../../.agents/skills/mes-crud-codegen/SKILL.md)。早期方案、生成记录与测试回执完整保留在[生成器历史](../archive/development/codegen-history.md)。
+Agent工作流见[Codegen Skill](../../.agents/skills/mes-crud-codegen/SKILL.md)。生成报告、临时配置和一次性验收证据保存在被Git忽略的本地目录，不追加到本指南。

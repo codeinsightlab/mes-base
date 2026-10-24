@@ -68,5 +68,3 @@ Quartz保留任务、Cron、启停和日志；同步协调使用数据库抢占�
 | scripts/performance/summarize-production-chain.py | 离线读取历史性能journal并输出报告，不发生产请求；不证明当前链路性能 |
 
 旧业务写入压测、固定旧环境的读探针、一次性Source转换SQL及旧生成器启动器已移除。历史结果仍保留，不能用旧回执宣称当前版本已经复验。
-
-配置演进、原迁移与真实环境回执见[平台历史](../archive/development/platform-history.md)，不作为当前命令入口。

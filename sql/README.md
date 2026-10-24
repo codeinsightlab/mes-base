@@ -9,4 +9,4 @@
 
 `sql/ruoyi/sys-schema.sql`仅作为RuoYi来源Schema对照，不含Base扩展，不用于当前初始化。旧Phase1拼接导出缺少Java迁移，现已移除；不再提供另一套SQL安装路径。
 
-首次环境准备见[平台指南](../docs/development/platform.md)。历史导出与迁入记录保留在[平台历史](../docs/archive/development/platform-history.md)及原审查文档中，旧命令不再适用。
+首次环境准备见[平台指南](../docs/development/platform.md)。具体环境执行记录由部署方受控保留，不作为公开安装步骤。

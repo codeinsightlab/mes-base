@@ -7,14 +7,14 @@ description: 根据显式项目配置和已有表 metadata 生成 MBG Mapper/XML
 
 ## 当前入口
 
-先读取仓库 AGENTS.md 第 13/14 节及 [Codegen 使用说明](../../../docs/development/codegen.md) 的“当前调用与新业务流程”。使用用户指定的配置；未指定时读取 docs/development/codegen-config.review.yaml，其当前内容决定所有项目参数，不假定执行模式或覆盖策略。
+先读取仓库 AGENTS.md 第 13/14 节及 [Codegen 使用说明](../../../docs/development/codegen.md) 的“当前调用与新业务流程”。使用用户指定的配置；未指定时读取 config/codegen/codegen-config.review.yaml，其当前内容决定所有项目参数，不假定执行模式或覆盖策略。
 
 ```sh
 mvn -B -ntp -pl mes-generator -am verify
-./scripts/mes-business-codegen docs/development/codegen-config.review.yaml target/business-codegen/report.json
+./scripts/mes-business-codegen config/codegen/codegen-config.review.yaml target/business-codegen/report.json
 ```
 
-脚本需要最新打包 JAR，不自动构建、不启动运行期服务。报告名称不决定是否预览。旧应用JAR生成器shell入口已退役。当前只使用独立mes-generator CLI及显式YAML配置；早期参数和记录见生成器历史归档，不再提供旧脚本调用。
+脚本需要最新打包 JAR，不自动构建、不启动运行期服务。报告名称不决定是否预览。旧应用JAR生成器shell入口已退役。当前只使用独立mes-generator CLI及显式YAML配置；早期参数和个人记录不随源码分发，不再提供旧脚本调用。
 
 ## 模型与生成范围
 

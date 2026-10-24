@@ -1,5 +1,14 @@
 # MES Base 工程规则
 
+## 2026-10-24 用户确认：公共文档与本地工作记录分离
+
+- 公共文档统一围绕“如何使用、开发、部署和维护 Base MES”组织，只提交当前有效、可复用、对其他使用者有意义的说明及必要设计。一个主题一个权威入口；行为变化直接更新当前指南，不在正文不断追加“本轮/本次/某日验收”流水账。
+- 本机代理、个人端口/绝对路径、账号与指定测试库排障、单次Agent交接、验收回执、截图/日志、备份和生成报告不作为公共文档提交。记录保存在Git忽略的 `.local/knowledge/` 或自有证据目录；不能仅改名archive就继续入库。实际产品默认值、可复用配置示例和通用故障处理按说明价值审查，不与个人环境记录混淆。
+- 可复用结论仍须落盘：产品契约更新公共指南，具体环境/过程证据保留本地。落盘不等于加入Git。公共指南不得依赖未分发的个人报告，测试不得靠解析一次性报告获得固定业务ID或环境断言。
+- 生成器项目配置放config/codegen，测试夹具与工具放各自目录；工程资产按真实调用和复现价值保留，不因扩展名或目录名一律删除。正式Flyway迁移、来源许可与版权声明持续保留。
+- 提交前审查文档用途、现行性、引用、敏感信息和公共依赖，检查新克隆仓库能否按公共说明使用。个人记录误入当前分支时退出版本控制并本地保留，不擅自重写已发布Git历史、清除业务事实或执行数据库。
+
+
 ## 2026-10-23 — 转换数据必须成为内部可用数据（用户确认）
 
 - 当前Execution仅使用READY、RUNNING、FULLY_RECEIVED、CANCELLED；工单使用DRAFT、RELEASED、COMPLETED、CANCELLED。不保留HISTORICAL、历史已完成等独立业务状态、处理入口或外部标记。转换后的数据必须按当前正式流程可查询、可处理。
@@ -78,7 +87,7 @@
 
 ## 2026-10-17 — LOCAL / ERP 来源隔离与迁移规则（用户确认）
 
-本节对 LOCAL/ERP 来源及迁移的约束优先于旧文档中的交叉混合单据、自由组合库存管理权和无缝迁移建议；不放宽 Factory 分库、权限、事务、引用保护及不可变事实规则。完整业务方案与实施缺口见 [LOCAL / ERP 业务边界设计方案 V1.0](docs/architecture/local-erp-business-boundary.md)。以下规则持续生效；V1.7 实施状态、真实 SIMPLE_B 验证及历史待核实边界见 [V1.7 实施报告](docs/reviews/2026-10-17-local-external-source-isolation-v17-report.md)。
+本节对 LOCAL/ERP 来源及迁移的约束优先于旧文档中的交叉混合单据、自由组合库存管理权和无缝迁移建议；不放宽 Factory 分库、权限、事务、引用保护及不可变事实规则。完整业务方案与实施缺口见 [LOCAL / ERP 业务边界设计方案 V1.0](docs/architecture/local-erp-business-boundary.md)。以下规则持续生效；实施与验收以当前源码、测试及目标环境核实为准，不依赖未分发的个人报告。
 
 - 每个 Factory 最多一个有效 ERP，必须复用 FactoryIntegrationSnapshot / Context / Registry；新厂明确持久化 LOCAL。ERP 配置缺失、异常或不可解析必须失败，禁止降级 LOCAL、并开两套新业务或新增多 ERP 优先级/自动路由。FactoryScope 仅含 FactoryId，禁止另建全局模式 Resolver 或字典模式体系。
 - WorkOrder、Warehouse 必须持久化可信来源：LOCAL 由 MES 本地创建，EXTERNAL 由当前厂绑定 ERP 同步创建；来源创建后禁止普通编辑或同步改写。同编码不等于同一身份，禁止自动合并。业务来源属于 MES 业务身份；供应商单据标识、映射及配置版本沿用独立 Extra，不在业务表增加 factory_id。
@@ -394,7 +403,7 @@ Skill 入口：`.agents/skills/mes-crud-codegen/SKILL.md`；配置/CLI 详见 do
 
 ### 14.1 基础生成范围与目标位置（2026-10-10 用户约定）
 
-2026-10-11 配置入口：项目参数由 `docs/development/codegen-config.review.yaml` 显式提供，Agent
+2026-10-11 配置入口：项目参数由 `config/codegen/codegen-config.review.yaml` 显式提供，Agent
 使用 `scripts/mes-business-codegen CONFIG_YAML REPORT_JSON`
 。先读取配置，不能自行填隐藏项目默认值或改用户配置。`selection.tables: []` 表示全量，非空只生成列出的表；产物选择独立。无下划线的模块包段取配置
 fallback（本项目 business）。配置项必须明确提供，schema/关闭的条件注解可显式 null；可选 tableOverrides 不控制选表。菜单 SQL 使用
@@ -410,7 +419,7 @@ SQL、锁查询或业务状态规则，不生成 ExtraMapper。
 **Extra 边界（2026-10-11 用户确认）：** 所有单表操作必须复用生成的 Mapper/XML/Example，不得生成或手写 ExtraMapper、Extra XML，也不得通过改名为 DAO/Repository/自定义 Mapper 绕过。查询复杂、条件多、批量、单表统计或业务状态复杂都不是新增 Extra 的理由；单表业务规则由 Service/领域策略编排。生成能力不足时修补通用生成机制及相关测试，不能只为某个业务表另写单表 Extra。只有确需跨表关联（如 JOIN 或涉及其他表的关联子查询）才允许新增 ExtraMapper/XML；该 Extra 只承担跨表查询，不复制单表 CRUD，也不承担授权或业务编排。业务 Service 分别调用多个表的生成 Mapper 不等于需要 Extra；当前生成器不会自动生成跨表 Extra。
 
 配置是项目参数取值的唯一来源，Agent 必须读取用户修改后的配置，不从旧 CLI 默认值补齐。必要参数组为
-source、selection、naming、output、templates、backend、fields、limits、frontend、menu、execution；完整字段和注释见 `docs/development/codegen-config.review.yaml`
+source、selection、naming、output、templates、backend、fields、limits、frontend、menu、execution；完整字段和注释见 `config/codegen/codegen-config.review.yaml`
 。本项目配置可被用户指定的其他配置替代，生成器不硬编码 MES 项目取值。
 
 `output.backendRoot/backendModule/javaPackage/frontendRoot` 决定前后端位置，当前项目承载模块为
@@ -509,7 +518,7 @@ SysUser 敏感字段。
 
 ## 2026-10-12 可选同步生成与统一配置
 
-正式生成唯一参数入口继续为 `docs/development/codegen-config.review.yaml`；不得另建业务专属默认配置或从旧 CLI 补项目参数。`selection.excludeTables` 排除技术表，当前明确排除 `flyway_business_schema_history`。2026-10-12 用户授权时为 `generateSync: true`、全量业务表、`write/replace-generated`；同步开关已由下述新决定取代，表选择及覆盖策略仍由实际配置决定。
+正式生成唯一参数入口继续为 `config/codegen/codegen-config.review.yaml`；不得另建业务专属默认配置或从旧 CLI 补项目参数。`selection.excludeTables` 排除技术表，当前明确排除 `flyway_business_schema_history`。2026-10-12 用户授权时为 `generateSync: true`、全量业务表、`write/replace-generated`；同步开关已由下述新决定取代，表选择及覆盖策略仍由实际配置决定。
 
 2026-10-13 用户决定：当前及后续生成暂不生成同步相关内容，正式配置和开发期业务配置保持 `generateSync: false`，以后需要时再明确开启。此决定只关闭后续生成，不要求删除既有同步业务或协调框架，不自动重新生成已有文件。
 
