@@ -716,3 +716,36 @@ V59执行前核实`TEST_DEV_PERF_20261019 → datasource 9 → ENABLED / LOCAL �
 主Agent已通过现有5173在Chrome只读查看扫码投产初始页1280／1440／1920三档布局，以及原工单1921的Execution12372、入库进度和新便捷弹窗：显示已收100／可入0，提交按钮禁用，未提交命令。这只证明前端只读展示与数量禁用，不冒充新后端命令成功。
 
 回滚边界：业务源码按本轮明确提交回退；V61／V62及后续正式业务事实不自动删列／删除，不手工改Flyway历史。需要Schema或事实回退时重新建模并执行有备份的正式维护，不以清空测试库回滚。
+
+
+### 用户重启后的指定 MySQL／正式 API 验收完成
+
+用户明确确认已重启后端后，重新核对启用的Factory／数据源、LOCAL、host／port／database及实际DATABASE()，目标仍为 `TEST_DEV_PERF_20261019 / datasource9 / 192.168.18.25:3306/mes_base_dev_perf_test`；V61／V62成功，正式类型目录已包含MATERIAL_ISSUE。以下是本轮新代码的真实HTTP／指定MySQL证据，取代前述“尚未加载／等待重启”的当前状态；原等待及构建时间线不删除。
+
+所有准备余额均由新建零余额库存来源及正式OTHER_RECEIPT新增、明细、审核完成；测试工单通过正式API创建、选择已发布单组件BOM并下达。没有直接写SQL库存、状态、报工或质量事实，没有启停用户服务、调用ERP或改角色。
+
+| 场景／独立QA对象 | 实际结果 |
+| --- | --- |
+| 工单1923、Execution12374、材料库存2230、产出库存2231 | 先审核OTHER_RECEIPT取得10kg；领料草稿1128保存不扣库存、不创建Execution。审核后正式领料1116与库存动作生效，审核人100、时间及原UUID完整。原UUID经便捷投产重放不重复建单／扣料。 |
+| 同上，同批次 `000UNIFIED1024082525` 分批领料及入库 | 首次投入1PCS／领2.5kg，便捷生产入库1129审核后完全入库；暖读详情及列表，再追加1PCS，立即两处返回RUNNING／target2，旧endTime和结束事实不变；再审核入库1131，Execution完全入库、工单COMPLETED，保留两次结束事实，累计只计2PCS。材料10→5kg、产出0→2PCS。 |
+| 工单1924、库存2232、领料草稿1133 | 库存足够时计划2申请3PCS返回409／PRODUCTION_INPUT_QUOTA_EXCEEDED；同UUID改内容的草稿与便捷请求拒绝。普通明细错材料／单位／批次拒绝。保存领料草稿后以OTHER_ISSUE正式审核耗尽10kg，再审核原草稿被拒，库存0且无新增动作／投入／Execution，原草稿保留。 |
+| 工单1925／Execution12375，正常先 | 正常9先审核入库、不良1后审核入仓；第一类入库后仍RUNNING／RELEASED，另一类正式审核后才FULLY_RECEIVED／COMPLETED。 |
+| 工单1926／Execution12376，质量先 | 不良1先入仓、正常9后入库，按相同规则收尾；核实不良本身未触发完结，质量原UUID重放不重复入仓。 |
+| 工单1927／Execution12377，全不良 | 10件不良经正式质量单及审核入仓后收尾，没有创建零数量正常入库单，没有独立放行调用。 |
+| 工单1928／1929、共用新库存2239 | 正式入库2.5kg，两独立UUID并发各投入1PCS：HTTP严格为200／409。库存0，仅1个Execution、1套领料／投入、1张已审核MATERIAL_ISSUE及1次ISSUE；失败方无草稿／投入／Execution半事实。 |
+| 普通草稿单1149、库存2230 | 新增草稿、加明细数量1、编辑为2均维持库存5kg，0关联库存动作，状态保持DRAFT。 |
+| 并发胜方工单1928／Execution12378的管理员订正 | 原报工0.5，再正式管理员订正+0.5，末道有效净产出达到1；仍RUNNING／工单RELEASED，0正常入库、0结束事实。没有以订正自动完结。 |
+| 已完成工单1923的新请求 | 更换全新UUID再次投入，409／RESOURCE_CONFLICT；Execution／投入／库存动作／单据／结束事实计数全部不变。原UUID仍按原冻结事实重放。 |
+
+最终只读审计：6个新批次，20张POSTED单据，审核人／时间／原UUID缺失0；明细与库存动作的document_line_id、operation_id及操作者破链0。原工单1921／1922及Execution12372／12373的12类事实SHA256最终全部与冻结基线相等；主Agent另独立运行只读保护复核同样通过。独立QA事实保留供复验，未清空或回写旧事实。
+
+私有证据 `.local/unified-stock-approval-20261024/` 包含逐个冻结请求、原UUID、HTTP响应、summary／negative-summary、NORMAL_FIRST／QUALITY_FIRST／ALL_BAD-summary、concurrency-summary、ordinary-edit-summary、admin-adjust-summary、completed-reject-summary、audit-readback-summary及实际范围TSV。脚本曾将计划超额预期码写成400而实际为409，并把已审核领料也纳入“正常入库”只读统计；已按真实契约／类型收窄断言，从已成功对象与原请求续跑，不重复写入。原失败日志保留，不将脚本错误归为业务代码失败。
+
+仍未验证：没有现成无审核权限真实账号，未调整角色；没有启用EXTERNAL仓可引用，真实非法来源负例未验。两项已有H2授权／来源隔离回归，仍不冒充真实账号或真实来源验收；真实ERP本轮明确不调用。现场原生扫码设备亦不在本轮Web／LOCAL验收范围。
+
+### 提交及并行发布状态补充
+
+主Agent的生产入库便捷命令、真实metadata持久化接回、V62与首轮文档已提交 `19cd060`。本任务各Agent均未执行push。期间另一并行发布任务更新共享分支；只读 `git ls-remote origin refs/heads/main` 证实当时后端远端为 `2780865`、前端为 `4ed0037`：包含本轮后端领料／独立测试及前端提交，尚不包含主提交19cd060。不能把“本任务未执行推送”写成“所有本轮提交仍只在本地”，也不回退其他任务的发布。
+
+
+主Agent最后通过真实Chrome普通出入库页打开草稿1149，使用明细“编辑→保存”将数量2改为3；页面仍显示草稿及“待审核执行”。独立只读SQL确认明细3、库存仍5kg、posted_by／posted_at／stock_action_id均NULL、关联库存动作0。证明普通Web实际编辑不会自动审核。精确证据为私有 `ui-draft-edit-verification.json` 与 `ui-draft-1149-after-edit.png`；此前普通API编辑为2的回执按阶段保留，当前草稿数量为3。正式领料单1128及其库存动作也已在真实页面查看：原UUID一致、来源MATERIAL_ISSUE／1116、批次原文一致、变动-2.5、余额10→7.5、操作者100，无新增命令。
