@@ -16,6 +16,14 @@ Base MES 围绕工单、批次和实际加工路径，连接材料领用、工�
 - **ERP 协同方向**：沿用同一套生产核心，对接 ERP 的工单和库存体系；正式库存命令仍在规划中。
 - **轻量现场操作**：围绕批次扫码、完成报工和不良申报组织操作，派工按需使用。
 
+## 底座来源与代码生成器
+
+Base MES 的基础管理底座迁移自 RuoYi 体系，部分能力经 ktg-mes 来源项目迁入，沿用用户、组织、岗位、角色菜单、字典参数、日志、系统监控与任务调度等成熟后台能力，并适配 Java 21、Spring Boot 4 和当前前后端分离架构。生产、质量、仓储以及业务数据空间在这个基础上继续建设。
+
+**代码生成器进行了重构。** 当前正式入口是独立的 `mes-generator` CLI，通过显式 YAML 配置读取真实数据库元数据，复用 MyBatis Generator 生成 Entity、Example、Mapper/XML，并生成配套 Spring CRUD、Vue 3 页面及菜单等可选产物。支持预览、产物选择和文件覆盖冲突检查；单表基础能力用于减少重复开发，主子关系、权限及复杂业务流程仍由业务模块实现。
+
+因此，本项目既有明确的 RuoYi 来源，也包含面向当前架构的生成器、隔离机制和 MES 业务改造。生成器使用方式见[代码生成说明](docs/development/codegen.md)，原项目许可与来源清单见[第三方声明](docs/legal)。
+
 ## 核心能力
 
 | 领域 | 当前能力 |
@@ -119,6 +127,7 @@ java -jar target/mes-base-0.1.0-SNAPSHOT.jar --spring.profiles.active=dev
 ## 文档与相关项目
 
 - [前端项目](https://github.com/codeinsightlab/mes-base-ui)
+- [文档导航与维护边界](docs/README.md)
 - [当前规划与待办](docs/development/next-stage-plan.md)
 - [生产投产与 BOM 规则](docs/development/production-input.md)
 - [LOCAL / ERP 业务边界](docs/architecture/local-erp-business-boundary.md)
