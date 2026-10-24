@@ -16,18 +16,25 @@ public interface WmStockDocumentMapper {
 
     int insertSelective(WmStockDocumentEntity row);
 
-    List<WmStockDocumentEntity> selectByExample(WmStockDocumentExample example);
+    List<WmStockDocumentEntity> selectByExampleWithBLOBs(WmStockDocumentExample example);
 
-    WmStockDocumentEntity selectByPrimaryKey(Long id);
+    List<WmStockDocumentEntity> selectByExample(WmStockDocumentExample example);
 
     WmStockDocumentEntity selectByPrimaryKeyForUpdate(Long id);
 
+    WmStockDocumentEntity selectByPrimaryKey(Long id);
+
     int updateByExampleSelective(@Param("row") WmStockDocumentEntity row,
+                                 @Param("example") WmStockDocumentExample example);
+
+    int updateByExampleWithBLOBs(@Param("row") WmStockDocumentEntity row,
                                  @Param("example") WmStockDocumentExample example);
 
     int updateByExample(@Param("row") WmStockDocumentEntity row, @Param("example") WmStockDocumentExample example);
 
     int updateByPrimaryKeySelective(WmStockDocumentEntity row);
+
+    int updateByPrimaryKeyWithBLOBs(WmStockDocumentEntity row);
 
     int updateByPrimaryKey(WmStockDocumentEntity row);
 }

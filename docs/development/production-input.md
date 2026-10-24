@@ -659,3 +659,60 @@ V59执行前核实`TEST_DEV_PERF_20261019 → datasource 9 → ENABLED / LOCAL �
 5. “审核通过”目前同时写入库存事实；本讨论没有新增“审批通过后另行实物执行”的第三阶段，也未授权扩大到ERP发料、自动多材料配料或多阶领料。后续实施需沿当前LOCAL/EXTERNAL边界，不将本地成功冒充ERP生效。
 
 本轮仅追加本文档，未运行测试/构建/浏览器或数据库验收；16.7真实结果按原时间线保留，不重报为本轮验证。
+
+
+## 2026-10-24：统一正式出入库与审核链路（实施）
+
+本节承接前述讨论阶段核查；§16.7 的真实缓存验收及原90＋10闭环保持原时间线，不作为本轮新链路验收。任务开始时两仓 `main` 工作树干净；实施期间出现其他任务的前端系统管理/查询交互及 `next-stage-plan.md` 修改，本轮不回滚、不代交这些差异。
+
+### 实现映射与分工
+
+| 入口 | 新增／保存 | 审核与库存生效 |
+| --- | --- | --- |
+| 普通仓储页面 | `StockDocumentService.create / putLine`，草稿与明细分别保存 | 显式 `approve`，经 `LocalStockService.postDocument` 写库存动作；普通保存不自动审核 |
+| 正式生产领料草稿 | `ProductionInputService.saveDraft → StockDocumentService.createMaterialIssueDraft`，冻结原请求、BOM计算明细；保存不创建Execution/投入/库存事实 | 仓储单 `approve → ProductionInputService.approveDraft` 重验当前工单/BOM/额度/来源并建立生产关联，再回到同一个 `StockDocumentService.approve` |
+| 生产领料便捷入口 | `ProductionInputService.submit`，复用原UUID、BOM计算及同批Execution准备；有相同草稿时复用 | `MaterialIssueSubmissionService → MaterialIssueInputFacts.confirm → StockDocumentService.postMaterialIssue → approve → LocalStockService.postDocument`，一个LOCAL事务原子扣料、确认投入和路径 |
+| 生产入库便捷入口 | `ProductionInboundService.receive → StockDocumentService.create → putLine` | 同一LOCAL事务 `approve → postDocument → ProductionCompletionService.afterInboundApproved`，并复用工单收尾检查 |
+| 不良／报废入仓 | 既有 `QualityDispositionService → createQualityReceipt → putLine` | 保持既有 `approve → postDocument → afterInboundApproved`；本轮不增加返工/后续物流处置 |
+
+代码分工：后端子Agent负责领料及共享单据审核；前端子Agent负责普通草稿/审核与生产便捷入口；验证子Agent新增独立HTTP事务回归并核实真实运行条件；主Agent负责生产入库便捷后端、迁移/真实metadata生成、交叉审查及本文档。共享后端暂存和提交串行，前端提交仅取自己差异，不推送。
+
+### V61 实际迁移与生成证据
+
+执行前重新核对中心 `TEST_DEV_PERF_20261019 → datasource 9 → ENABLED / LOCAL`、数据源启用状态、`192.168.18.25:3306/mes_base_dev_perf_test` 及实际 `DATABASE()`；原版本V60、两新列均不存在。范围备份原仓储单完整表及Flyway历史，并冻结原Execution12372/12373和结束事实用于只读对比。
+
+`V61__material_issue_stock_document_source.sql` 经项目 `scripts/mes-business-flyway migrate 61` 执行成功，随后 `validate 61` 成功；增加可空 `source_material_issue_id`（普通索引）及 `source_request_json TEXT`。它们由服务端保存可信关联/草稿原请求，响应白名单不暴露冻结JSON，不以备注解析业务身份。未增加基础表、唯一约束或角色授权。
+
+迁移后的原仓储单全部旧列逐行相等；两新列全部NULL，原两组Execution及结束事实逐行相等。无历史补扣、无库存/状态改写。并行实施期间迁移文件曾拟改为VARCHAR，实库确认已执行TEXT后立即恢复已执行原文，再次Flyway校验通过；没有重写已发布版本或手工修迁移历史。
+
+按项目 `mes-crud-codegen` Skill，从V61真实metadata生成完整基础后端至隔离副本；仅接回审查后的Entity、Example、Mapper和XML，保持当前业务Controller/Service、响应白名单及生成器自带行锁查询，不发布绕过审核的基础CRUD。生成配置、报告、迁移日志和范围证据留在忽略目录 `.local/unified-stock-20261024/`，不提交凭证或业务数据。
+
+### 验证进度与证据边界
+
+当前已完成上述真实Schema迁移及数据保护检查。独立HTTP事务回归、后端完整检查、前端测试/构建尚在实施验证中，结果将在本节继续追加。当前现有8081服务的正式类型目录仍无MATERIAL_ISSUE，证明运行旧版；不得用其成功路径冒充本轮新代码验收。用户拥有服务启停，主Agent在构建完成后交接重启，再执行新入口真实QA。
+
+
+### 跨工单 UUID 并发核查及 V62 待决
+
+独立验证发现：原有工单行锁可串行同工单请求，库存动作／投入原UUID主键可阻止最终双扣，但草稿先写 `post_request_id` 时，不同工单持有不同锁，V38普通索引不能排除同UUID的两张草稿。不能以“最终不会双扣”冒充“不会重复建单”。
+
+已准备 `V62__stock_document_request_identity.sql`，拟对既有 `post_request_id` 增加唯一索引，普通未指定请求身份的草稿仍可为NULL。指定测试库只读预检：重复非空请求UUID组0、非空值1125；尚未执行该迁移。依据AGENTS §13.0“若并发唯一性或幂等性必须依赖数据库约束，先明确冲突并请用户决定”，已把具体SQL及影响提交用户决定；在收到明确答复前不执行、不声称跨工单草稿并发幂等已完成。
+
+
+用户随后明确答复“允许新增并执行V62唯一索引”。再次核对同一Factory/数据源、实际DATABASE()、版本V61、非空UUID重复组0，备份仓储单及Flyway历史后，通过 `scripts/mes-business-flyway migrate 62`、`validate 62` 成功执行。真实 `information_schema.statistics` 确认 `uk_stock_document_request_identity(post_request_id)` 为唯一索引，迁移前后单据所有列逐行相等。此回执取代上文待决状态，保留请求/授权/执行时间线；未手工修改库存或历史请求身份。
+
+
+### 构建、独立回归与当前运行交接
+
+- 后端完整 `mvn -B -ntp verify` 通过：合计932项、0失败／错误、50项环境门控跳过（admin625项）。随后普通领料草稿审核权限细化，最后定向重编运行33项全部通过，其中独立 `UnifiedStockApprovalHttpTest` 9项、ProductionInput9项、WorkorderBom7项、StockDocument8项。最终 `mvn -B -ntp -DskipTests package` 通过。已对所有本任务Java分别执行项目IntelliJ格式化，差异检查通过。
+- 独立9项HTTP／Service／真实XML与LOCAL事务回归覆盖草稿不扣库存、正式审核审计及单据关联、库存审核失败不遗留投入或Execution、便捷入口创建／审核权限、原UUID重放和改内容拒绝、分批追加及旧结束事实保护、冻结依据局部可读且写入严格拒绝、跨工单同UUID单赢家、普通单审核UUID撞领料草稿时整单回滚且两方随后可分别成功。
+- 普通已存领料草稿审核要求原领料业务权限和 `stock:document:post`；审核人不必拥有新建／修改权限。新建草稿及便捷命令仍按其实际新增主单／明细／审核动作分别要求权限。前后端一致，未调整角色或引入多人审批。
+- 首轮全测中旧“无正式投入事实的LOCAL领料确认”准备方式失效；本轮将正向测试接回正式投产入口，或对已有明确历史投入及已锁路径的报工fixture删除多余旧确认步骤，保留权限、隔离、并发、报工及撤销事实保护断言。未通过吞错或放宽审核维持旧测试。
+- 前端Node22全量88文件／554项通过，类型检查及生产构建通过；后续局部依据错误提示补丁定向13项及构建通过；最新审核权限谓词补丁定向29项通过，未重复宣称全量包含这些最后补丁。现有系统管理／样式／README等并行改动保留。前端提交 `a33935a`、`bfcc7e7`、`0c6d65a`；后端领料实现及既有fixture提交 `414f26c`；独立测试提交 `04ab497`、`1c9b038`、`0338367`。均未推送。
+- 最终JAR `target/mes-base-0.1.0-SNAPSHOT.jar` 已经项目 `scripts/smoke-packaged.py` 隔离烟测10项通过；只启动脚本自有、无开发连接的隔离进程，没有启停用户8081服务或调用真实ERP。
+
+证据边界：以上业务测试为隔离H2 HTTP／真实SQL事务层，不能冒充指定MySQL业务验收。真实MySQL已完成的是V61／V62、metadata生成和原两组验收12类事实哈希不变。当前8081类型目录仍无MATERIAL_ISSUE，尚未加载最终代码。独立正式API QA已准备happy、负例、三种质量顺序及原事实保护脚本，均须在再次核对绑定和运行契约后执行；当前尚未执行本轮新业务API写入。真实无审核权限账号、真实并发余额及便捷弹层完整提交也尚未验收。
+
+主Agent已通过现有5173在Chrome只读查看扫码投产初始页1280／1440／1920三档布局，以及原工单1921的Execution12372、入库进度和新便捷弹窗：显示已收100／可入0，提交按钮禁用，未提交命令。这只证明前端只读展示与数量禁用，不冒充新后端命令成功。
+
+回滚边界：业务源码按本轮明确提交回退；V61／V62及后续正式业务事实不自动删列／删除，不手工改Flyway历史。需要Schema或事实回退时重新建模并执行有备份的正式维护，不以清空测试库回滚。

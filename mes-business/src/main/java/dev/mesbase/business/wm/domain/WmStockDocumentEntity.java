@@ -1,4 +1,3 @@
-// MES-CODEGEN: MyBatis Generator standard single-table persistence.
 package dev.mesbase.business.wm.domain;
 
 import java.time.LocalDateTime;
@@ -41,6 +40,10 @@ public class WmStockDocumentEntity {
     private String postRequestHash;
 
     private Long sourceExecutionId;
+
+    private Long sourceMaterialIssueId;
+
+    private String sourceRequestJson;
 
     public Long getId() {
         return id;
@@ -192,5 +195,21 @@ public class WmStockDocumentEntity {
 
     public void setSourceExecutionId(Long sourceExecutionId) {
         this.sourceExecutionId = sourceExecutionId;
+    }
+
+    public Long getSourceMaterialIssueId() {
+        return sourceMaterialIssueId;
+    }
+
+    public void setSourceMaterialIssueId(Long sourceMaterialIssueId) {
+        this.sourceMaterialIssueId = sourceMaterialIssueId;
+    }
+
+    public String getSourceRequestJson() {
+        return sourceRequestJson;
+    }
+
+    public void setSourceRequestJson(String sourceRequestJson) {
+        this.sourceRequestJson = sourceRequestJson;
     }
 }

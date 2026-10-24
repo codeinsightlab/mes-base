@@ -217,3 +217,17 @@ WarehouseQueryService 复用原仓库详情/分页及其缓存，收集当前页
 命令后只读复核：按10个原请求UUID查处置流水、审核单据及库存动作均为0；单据总数仍1111，库存动作仍4030条、quantity_delta汇总仍90973.920000；仓库10/11库存行仍为0，与命令前备份逐项一致。故真实结果是“10条已核对并实际调用，0条成功入库”，尚未完成这10条数据的库存业务闭环。新建不动库存、审核原子入库、质量创建并审核与幂等的成功路径已由H2 HTTP集成测试验证，不能冒充这次真实开发库成功入库。
 
 本地证据位于忽略目录 `.local/quality-inbound-20261022/`：latest10-before-api.json、request-manifest.json、requests/、responses/、api-results.json、binding-live.json、context-live.json、types-live.json、defects-list-live.json、after-api-readonly.json。登录凭证和会话仅在私有文件中用于本地请求，不纳入Git或报告正文。本次续验仅追加此文档，没有改动业务代码或数据库事实。
+
+
+## 2026-10-24 统一生产领料出库及生产入库便捷命令
+
+本节补充当前正式实现；2026-10-22章节中“正式质量放行”不再表示独立放行门禁，当前以有效报工、质量数量及正式入库事实统一校验和收尾。旧执行回执保留，不把其样本拒绝或原有成功路径重新宣称为本轮真实验收。
+
+- 普通仓储单仍为 `create → putLine → 独立approve`。新增／保存主单和明细只写DRAFT，不改库存；POSTED表示审核通过且库存已生效，不增加审批后的第三阶段。审核记录原UUID、操作者、时间及逐行库存动作。
+- 新增 `MATERIAL_ISSUE` 正式生产领料出库类型，禁止普通自由填类型伪造来源；从 `POST /api/production/input/drafts` 创建冻结BOM草稿，再在本页面审核。保存时无Execution/投入/库存事实；审核经当前生产校验建立可信领料关联，调用同一个 `StockDocumentService.approve → LocalStockService.postDocument`。直接便捷投产 `POST /api/production/input` 也复用此链路，全部LOCAL事实同事务提交或回滚。
+- 新增 `POST /api/production/executions/{id}/inbound`，请求为 `{requestId, stockId, quantity, reason}`。后端从Execution及库存行取得产品、仓库、基本单位、批次原文与库位，编排正式新建、明细、审核；返回与普通仓储单相同的详情白名单。严格审核有效净产出减累计已入库余额，正常和质量审核继续触发既有Execution/工单收尾检查。便捷入库要求创建与审核权限；领料新建／便捷命令按创建、明细修改及审核动作要求权限，已有领料草稿审核只要求原业务与审核权限，不要求审核人拥有新建／修改权限，不改变角色授权。
+- 不良／报废入仓继续 `QualityDispositionService.createQualityReceipt → putLine → approve`，不重复实现库存、不新增返工或入仓后物流处置。管理员订正及报工不增加自动完结触发。
+- 领料草稿原请求被冻结，明细不开放脱离BOM的手改；原因／备注仍可保存。数量或依据变化需作废草稿后按新请求建立当前BOM草稿，审核时重验依据与额度。明细保留精确批次／单位／仓库／库位；冻结依据损坏时仅该区域返回明确错误，原头及明细继续可读，审核仍严格拒绝。
+- 旧手工领料页不再新增/确认缺正式投入事实的LOCAL领料；保留已存事实、UNKNOWN核实及合法撤销。已有历史已确认记录不补建仓储单、不补扣库存、不重写UUID或冻结请求。
+
+V61及用户批准的V62已通过正式Flyway在 `TEST_DEV_PERF_20261019 → datasource9 → LOCAL → 192.168.18.25:3306/mes_base_dev_perf_test` 执行并validate成功。V61增加服务端关联及冻结请求两可空列，V62为原请求UUID增加唯一索引，跨工单并发不能重复建草稿。执行前分别核实绑定、DATABASE()、存量和冲突并备份；执行后确认Schema及原单据所有列不变。完整调用映射、生成与迁移证据、验证结果及运行交接统一追加在 [生产投入实施记录](production-input.md#2026-10-24统一正式出入库与审核链路实施)，避免另建平行报告。当前运行旧服务、新代码真实验收待重启，单元／H2结果不冒充指定MySQL业务验收。

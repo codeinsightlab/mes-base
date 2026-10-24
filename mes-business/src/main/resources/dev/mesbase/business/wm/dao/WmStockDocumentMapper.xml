@@ -1,5 +1,4 @@
 <?xml version="1.0" encoding="UTF-8"?>
-
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="dev.mesbase.business.wm.dao.WmStockDocumentMapper">
   <resultMap id="BaseResultMap" type="dev.mesbase.business.wm.domain.WmStockDocumentEntity">
@@ -22,6 +21,10 @@
     <result column="post_request_id" jdbcType="VARCHAR" property="postRequestId" />
     <result column="post_request_hash" jdbcType="CHAR" property="postRequestHash" />
     <result column="source_execution_id" jdbcType="BIGINT" property="sourceExecutionId" />
+    <result column="source_material_issue_id" jdbcType="BIGINT" property="sourceMaterialIssueId" />
+  </resultMap>
+  <resultMap extends="BaseResultMap" id="ResultMapWithBLOBs" type="dev.mesbase.business.wm.domain.WmStockDocumentEntity">
+    <result column="source_request_json" jdbcType="LONGVARCHAR" property="sourceRequestJson" />
   </resultMap>
   <sql id="Example_Where_Clause">
     <where>
@@ -84,8 +87,24 @@
   <sql id="Base_Column_List">
     id, document_no, document_type, status, reason, remark, source_workorder_id, create_by,
     create_time, update_by, update_time, posted_by, posted_at, cancelled_by, cancelled_at,
-    revision, post_request_id, post_request_hash, source_execution_id
+    revision, post_request_id, post_request_hash, source_execution_id, source_material_issue_id
   </sql>
+  <sql id="Blob_Column_List">
+    source_request_json
+  </sql>
+  <select id="selectByExampleWithBLOBs" parameterType="dev.mesbase.business.wm.domain.WmStockDocumentExample" resultMap="ResultMapWithBLOBs">
+    select
+    <include refid="Base_Column_List" />
+    ,
+    <include refid="Blob_Column_List" />
+    from wm_stock_document
+    <if test="_parameter != null">
+      <include refid="Example_Where_Clause" />
+    </if>
+    <if test="orderByClause != null">
+      order by ${orderByClause}
+    </if>
+  </select>
   <select id="selectByExample" parameterType="dev.mesbase.business.wm.domain.WmStockDocumentExample" resultMap="BaseResultMap">
     select
     <include refid="Base_Column_List" />
@@ -97,9 +116,11 @@
       order by ${orderByClause}
     </if>
   </select>
-  <select id="selectByPrimaryKey" parameterType="Long" resultMap="BaseResultMap">
+  <select id="selectByPrimaryKey" parameterType="Long" resultMap="ResultMapWithBLOBs">
     select
     <include refid="Base_Column_List" />
+    ,
+    <include refid="Blob_Column_List" />
     from wm_stock_document
     where id = #{id,jdbcType=BIGINT}
   </select>
@@ -119,14 +140,16 @@
       create_by, create_time, update_by,
       update_time, posted_by, posted_at,
       cancelled_by, cancelled_at, revision,
-      post_request_id, post_request_hash, source_execution_id
+      post_request_id, post_request_hash, source_execution_id,
+      source_material_issue_id, source_request_json
       )
     values (#{documentNo,jdbcType=VARCHAR}, #{documentType,jdbcType=VARCHAR}, #{status,jdbcType=VARCHAR},
       #{reason,jdbcType=VARCHAR}, #{remark,jdbcType=VARCHAR}, #{sourceWorkorderId,jdbcType=BIGINT},
       #{createBy,jdbcType=VARCHAR}, #{createTime,jdbcType=TIMESTAMP}, #{updateBy,jdbcType=VARCHAR},
       #{updateTime,jdbcType=TIMESTAMP}, #{postedBy,jdbcType=BIGINT}, #{postedAt,jdbcType=TIMESTAMP},
       #{cancelledBy,jdbcType=BIGINT}, #{cancelledAt,jdbcType=TIMESTAMP}, #{revision,jdbcType=BIGINT},
-      #{postRequestId,jdbcType=VARCHAR}, #{postRequestHash,jdbcType=CHAR}, #{sourceExecutionId,jdbcType=BIGINT}
+      #{postRequestId,jdbcType=VARCHAR}, #{postRequestHash,jdbcType=CHAR}, #{sourceExecutionId,jdbcType=BIGINT},
+      #{sourceMaterialIssueId,jdbcType=BIGINT}, #{sourceRequestJson,jdbcType=LONGVARCHAR}
       )
   </insert>
   <insert id="insertSelective" keyColumn="id" keyProperty="id" parameterType="dev.mesbase.business.wm.domain.WmStockDocumentEntity" useGeneratedKeys="true">
@@ -186,6 +209,12 @@
       <if test="sourceExecutionId != null">
         source_execution_id,
       </if>
+      <if test="sourceMaterialIssueId != null">
+        source_material_issue_id,
+      </if>
+      <if test="sourceRequestJson != null">
+        source_request_json,
+      </if>
     </trim>
     <trim prefix="values (" suffix=")" suffixOverrides=",">
       <if test="documentNo != null">
@@ -241,6 +270,12 @@
       </if>
       <if test="sourceExecutionId != null">
         #{sourceExecutionId,jdbcType=BIGINT},
+      </if>
+      <if test="sourceMaterialIssueId != null">
+        #{sourceMaterialIssueId,jdbcType=BIGINT},
+      </if>
+      <if test="sourceRequestJson != null">
+        #{sourceRequestJson,jdbcType=LONGVARCHAR},
       </if>
     </trim>
   </insert>
@@ -310,7 +345,40 @@
       <if test="row.sourceExecutionId != null">
         source_execution_id = #{row.sourceExecutionId,jdbcType=BIGINT},
       </if>
+      <if test="row.sourceMaterialIssueId != null">
+        source_material_issue_id = #{row.sourceMaterialIssueId,jdbcType=BIGINT},
+      </if>
+      <if test="row.sourceRequestJson != null">
+        source_request_json = #{row.sourceRequestJson,jdbcType=LONGVARCHAR},
+      </if>
     </set>
+    <if test="example != null">
+      <include refid="Update_By_Example_Where_Clause" />
+    </if>
+  </update>
+  <update id="updateByExampleWithBLOBs" parameterType="map">
+    update wm_stock_document
+    set id = #{row.id,jdbcType=BIGINT},
+      document_no = #{row.documentNo,jdbcType=VARCHAR},
+      document_type = #{row.documentType,jdbcType=VARCHAR},
+      status = #{row.status,jdbcType=VARCHAR},
+      reason = #{row.reason,jdbcType=VARCHAR},
+      remark = #{row.remark,jdbcType=VARCHAR},
+      source_workorder_id = #{row.sourceWorkorderId,jdbcType=BIGINT},
+      create_by = #{row.createBy,jdbcType=VARCHAR},
+      create_time = #{row.createTime,jdbcType=TIMESTAMP},
+      update_by = #{row.updateBy,jdbcType=VARCHAR},
+      update_time = #{row.updateTime,jdbcType=TIMESTAMP},
+      posted_by = #{row.postedBy,jdbcType=BIGINT},
+      posted_at = #{row.postedAt,jdbcType=TIMESTAMP},
+      cancelled_by = #{row.cancelledBy,jdbcType=BIGINT},
+      cancelled_at = #{row.cancelledAt,jdbcType=TIMESTAMP},
+      revision = #{row.revision,jdbcType=BIGINT},
+      post_request_id = #{row.postRequestId,jdbcType=VARCHAR},
+      post_request_hash = #{row.postRequestHash,jdbcType=CHAR},
+      source_execution_id = #{row.sourceExecutionId,jdbcType=BIGINT},
+      source_material_issue_id = #{row.sourceMaterialIssueId,jdbcType=BIGINT},
+      source_request_json = #{row.sourceRequestJson,jdbcType=LONGVARCHAR}
     <if test="example != null">
       <include refid="Update_By_Example_Where_Clause" />
     </if>
@@ -335,7 +403,8 @@
       revision = #{row.revision,jdbcType=BIGINT},
       post_request_id = #{row.postRequestId,jdbcType=VARCHAR},
       post_request_hash = #{row.postRequestHash,jdbcType=CHAR},
-      source_execution_id = #{row.sourceExecutionId,jdbcType=BIGINT}
+      source_execution_id = #{row.sourceExecutionId,jdbcType=BIGINT},
+      source_material_issue_id = #{row.sourceMaterialIssueId,jdbcType=BIGINT}
     <if test="example != null">
       <include refid="Update_By_Example_Where_Clause" />
     </if>
@@ -397,7 +466,37 @@
       <if test="sourceExecutionId != null">
         source_execution_id = #{sourceExecutionId,jdbcType=BIGINT},
       </if>
+      <if test="sourceMaterialIssueId != null">
+        source_material_issue_id = #{sourceMaterialIssueId,jdbcType=BIGINT},
+      </if>
+      <if test="sourceRequestJson != null">
+        source_request_json = #{sourceRequestJson,jdbcType=LONGVARCHAR},
+      </if>
     </set>
+    where id = #{id,jdbcType=BIGINT}
+  </update>
+  <update id="updateByPrimaryKeyWithBLOBs" parameterType="dev.mesbase.business.wm.domain.WmStockDocumentEntity">
+    update wm_stock_document
+    set document_no = #{documentNo,jdbcType=VARCHAR},
+      document_type = #{documentType,jdbcType=VARCHAR},
+      status = #{status,jdbcType=VARCHAR},
+      reason = #{reason,jdbcType=VARCHAR},
+      remark = #{remark,jdbcType=VARCHAR},
+      source_workorder_id = #{sourceWorkorderId,jdbcType=BIGINT},
+      create_by = #{createBy,jdbcType=VARCHAR},
+      create_time = #{createTime,jdbcType=TIMESTAMP},
+      update_by = #{updateBy,jdbcType=VARCHAR},
+      update_time = #{updateTime,jdbcType=TIMESTAMP},
+      posted_by = #{postedBy,jdbcType=BIGINT},
+      posted_at = #{postedAt,jdbcType=TIMESTAMP},
+      cancelled_by = #{cancelledBy,jdbcType=BIGINT},
+      cancelled_at = #{cancelledAt,jdbcType=TIMESTAMP},
+      revision = #{revision,jdbcType=BIGINT},
+      post_request_id = #{postRequestId,jdbcType=VARCHAR},
+      post_request_hash = #{postRequestHash,jdbcType=CHAR},
+      source_execution_id = #{sourceExecutionId,jdbcType=BIGINT},
+      source_material_issue_id = #{sourceMaterialIssueId,jdbcType=BIGINT},
+      source_request_json = #{sourceRequestJson,jdbcType=LONGVARCHAR}
     where id = #{id,jdbcType=BIGINT}
   </update>
   <update id="updateByPrimaryKey" parameterType="dev.mesbase.business.wm.domain.WmStockDocumentEntity">
@@ -419,12 +518,15 @@
       revision = #{revision,jdbcType=BIGINT},
       post_request_id = #{postRequestId,jdbcType=VARCHAR},
       post_request_hash = #{postRequestHash,jdbcType=CHAR},
-      source_execution_id = #{sourceExecutionId,jdbcType=BIGINT}
+      source_execution_id = #{sourceExecutionId,jdbcType=BIGINT},
+      source_material_issue_id = #{sourceMaterialIssueId,jdbcType=BIGINT}
     where id = #{id,jdbcType=BIGINT}
   </update>
-  <select flushCache="true" id="selectByPrimaryKeyForUpdate" parameterType="Long" resultMap="BaseResultMap" useCache="false">
+  <select flushCache="true" id="selectByPrimaryKeyForUpdate" parameterType="Long" resultMap="ResultMapWithBLOBs" useCache="false">
     select
     <include refid="Base_Column_List" />
+    ,
+    <include refid="Blob_Column_List" />
     from wm_stock_document
     where id = #{id,jdbcType=BIGINT}
     for update
