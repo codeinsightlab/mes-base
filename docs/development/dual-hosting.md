@@ -81,4 +81,16 @@ Git 多 push URL 的语义见[官方 git-push 文档](https://git-scm.com/docs/g
 
 发布前只读核查：当前可达历史未发现私有 application-dev/application-prod 配置；后端13,064、前端2,079个 main 可达对象的私钥/GitHub令牌/AWS访问键常见格式检查未命中。该检查不等于完整安全审计；旧README的历史凭据描述未在当前历史复现，不据此改写历史或声称凭据已轮换。
 
-真实仓库创建、推送结果及远端 main 一致性以本节后续回执记录为准。纯许可/文档和本地 Git 配置工作，不执行数据库、ERP、服务启停或业务验收。
+实际结果：前后端Gitee仓库已创建，用户将个人空间改为codeinsightlab后，两仓URL和本地remote均已更新。Gitee公开API确认两仓private=false、默认分支main。首次完整双推成功：后端2780865、前端4ed0037分别包含数据空间说明与新地址，GitHub/Gitee均已收到。
+
+首次GitHub传输遇到HTTP/2错误，使用单次HTTP/1.1覆盖后成功，不修改全局Git设置。若再次出现同类错误，可在对应仓库执行：
+
+```sh
+git -c http.version=HTTP/1.1 push origin main
+```
+
+Git凭证助手另输出credential storage lock告警，但上述推送进程退出0且远端已接受；这不等于凭证保存问题已修复，本轮未读取、变更或清理认证存储。
+
+用户补充：Factory不仅可按物理工厂划分，也可按业务、年度或业务＋年度配置独立空间；两仓README增加实例及权限、数据库、年度承接边界，未修改Factory业务模型或实现自动结转。
+
+本轮只有许可、文档和本地Git远端配置变更。没有修改业务代码、执行数据库或ERP操作、启停服务或运行新的业务验收；并行Agent已提交的业务提交随主线推送，未提交的业务改动未纳入本轮提交。
