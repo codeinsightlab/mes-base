@@ -208,7 +208,7 @@ class E10SyncExecutionTest {
                 assertEquals("STATUS_UNVERIFIED", f.mapping.prepare(Kind.WORKORDER, raw("X").deepCopy().withObject("")
                         .put("approve_status", "N"), rule(true)).item().action());
                 f.db.update("UPDATE routing SET status='PUBLISHED' WHERE id=2");
-                f.db.update("INSERT INTO routing_product(routing_id,material_id,material_code,material_name) VALUES(2,1,'M1','TEST ONLY')");
+                f.db.update("INSERT INTO routing_product(routing_id,material_id) VALUES(2,1)");
                 assertEquals("MAPPING_REQUIRED", f.mapping.prepare(Kind.WORKORDER, raw("X"), rule(true)).item()
                         .action());
             });

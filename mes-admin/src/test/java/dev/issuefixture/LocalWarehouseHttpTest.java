@@ -174,7 +174,7 @@ class LocalWarehouseHttpTest {
             var m = MaterialIssueHttpTest.mvc(c);
             j.update("UPDATE wm_inventory SET quantity=300,available_quantity=300 WHERE id=1");
             j.update("INSERT INTO material(id,code,name,unit_id,status) VALUES(2,'P2','TEST ONLY second product',1,'ENABLED')");
-            j.update("INSERT INTO routing_product(routing_id,material_id,material_code,material_name) VALUES(1,2,'P2','TEST ONLY second product')");
+            j.update("INSERT INTO routing_product(routing_id,material_id) VALUES(1,2)");
             j.update("INSERT INTO workorder(id,code,product_id,planned_qty,routing_id,status,revision,create_time,update_time) VALUES(2,'WO2',2,1000,1,'RELEASED',0,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)");
             j.update("INSERT INTO material_bom SELECT 2,'TEST-BOM-SECOND','1',2,base_qty,unit_id,status,revision,remark,created_by,created_at,published_at FROM material_bom WHERE id=1");
             j.update("INSERT INTO material_bom_item SELECT 2,2,material_id,quantity,unit_id,NULL,sort FROM material_bom_item WHERE id=1");

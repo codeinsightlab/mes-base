@@ -79,7 +79,7 @@ class ProductionChainHttpTest {
             var m = MaterialIssueHttpTest.mvc(c);
             var a = c.getBean(MaterialIssueHttpTest.Fixture.class).business.get("A");
             a.update("INSERT INTO routing(id,code,name,version,status,revision,published_at) VALUES(3,'R1','另一已发布版本',3,'PUBLISHED',0,CURRENT_TIMESTAMP)");
-            a.update("INSERT INTO routing_product(routing_id,material_id,material_code,material_name) VALUES(3,1,'M1','产品')");
+            a.update("INSERT INTO routing_product(routing_id,material_id) VALUES(3,1)");
             String one = "{\"workorderId\":\"1\",\"routingId\":\"1\",\"targetQty\":\"400\",\"status\":\"READY\"}";
             String two = one.replace("\"routingId\":\"1\"", "\"routingId\":\"3\"").replace("400", "300");
             // Existing fixture executions only; new executions are created by formal BOM input.

@@ -97,7 +97,7 @@ class ProductionQualityLifecycleMySqlTest {
                 Long operation = jdbc.queryForObject("SELECT id FROM operation WHERE status='ENABLED' ORDER BY id LIMIT 1", Long.class);
                 Long warehouse = jdbc.queryForObject("SELECT id FROM wm_warehouse WHERE status='ENABLED' ORDER BY id LIMIT 1", Long.class);
                 long routing = ProductionReportMySqlTest.insert(jdbc, "INSERT INTO routing(code,name,version,status,revision,published_at) VALUES(?,?,1,'PUBLISHED',0,NOW())", tag, tag);
-                jdbc.update("INSERT INTO routing_product(routing_id,material_id,material_code,material_name) SELECT ?,id,code,name FROM material WHERE id=?", routing, material);
+                jdbc.update("INSERT INTO routing_product(routing_id,material_id) SELECT ?,id FROM material WHERE id=?", routing, material);
                 List<Long> nodes = new ArrayList<>();
                 for (String code : List.of("A", "B", "C", "D"))
                     nodes.add(ProductionReportMySqlTest.insert(jdbc, "INSERT INTO routing_node(routing_id,node_code,operation_id,operation_code,operation_name,display_order,is_key) SELECT ?,?,id,code,name,0,false FROM operation WHERE id=?", routing, code, operation));

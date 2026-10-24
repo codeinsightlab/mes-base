@@ -164,8 +164,6 @@ class MaterialIssueVoidMySqlTest {
                     var link = new RoutingProductEntity();
                     link.setRoutingId(route.getId());
                     link.setMaterialId(mat.getId());
-                    link.setMaterialCode(mat.getCode());
-                    link.setMaterialName(mat.getName());
                     c.getBean(RoutingProductMapper.class).insert(link);
                     return new long[]{mat.getId(), route.getId()};
                 });

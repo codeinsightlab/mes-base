@@ -2,6 +2,7 @@ package dev.mesbase.business.issue.service;
 
 import dev.mesbase.business.basic.dao.MaterialMapper;
 import dev.mesbase.business.basic.dao.UnitMeasureMapper;
+import dev.mesbase.business.basic.domain.MaterialExample;
 import dev.mesbase.business.integration.warehouse.ExternalEffect;
 import dev.mesbase.business.issue.dao.MesMaterialIssueItemMapper;
 import dev.mesbase.business.issue.dao.MesMaterialIssueMapper;
@@ -146,10 +147,18 @@ public class MaterialIssueRules {
             require(routing != null
                     && routing.getPublishedAt() != null);
             // A previously published disabled version is still a stable historical reference.
-            if (StringUtils.isNotBlank(row.getProductCode())) {
+            if (row.getProductId() == null && StringUtils.isNotBlank(row.getProductCode())) {
+                var byCode = new MaterialExample();
+                byCode.createCriteria().andCodeEqualTo(row.getProductCode());
+                var matches = materials.selectByExample(byCode);
+                require(matches.size() == 1);
+                row.setProductId(matches.getFirst().getId());
+                row.setProductCode(matches.getFirst().getCode());
+            }
+            if (row.getProductId() != null) {
                 var applicable = new RoutingProductExample();
                 applicable.createCriteria().andRoutingIdEqualTo(row.getRoutingId())
-                        .andMaterialCodeEqualTo(row.getProductCode());
+                        .andMaterialIdEqualTo(row.getProductId());
                 require(routingProducts.countByExample(applicable) > 0);
             }
         }

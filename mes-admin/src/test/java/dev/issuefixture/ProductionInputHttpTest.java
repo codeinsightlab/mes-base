@@ -94,7 +94,7 @@ class ProductionInputHttpTest {
 
     static void seedBom(JdbcTemplate j, int quantity) {
         j.update("INSERT INTO material(id,code,name,unit_id,status) VALUES(99,'P1','TEST ONLY output material',1,'ENABLED')");
-        j.update("INSERT INTO routing_product(routing_id,material_id,material_code,material_name) VALUES(1,99,'P1','TEST ONLY output material')");
+        j.update("INSERT INTO routing_product(routing_id,material_id) VALUES(1,99)");
         j.update("UPDATE workorder SET product_id=99 WHERE id=1");
         j.update("INSERT INTO material_bom(id,code,version,product_id,base_qty,unit_id,status,revision,created_by,created_at,published_at) VALUES(1,'TEST-BOM','1',99,1,1,'PUBLISHED',1,1,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)");
         j.update("INSERT INTO material_bom_item(id,bom_id,material_id,quantity,unit_id,sort) VALUES(1,1,1,?,1,0)", quantity);
@@ -277,7 +277,7 @@ class ProductionInputHttpTest {
                     .andExpect(status().isOk());
             assertEquals(2, j.queryForObject("SELECT COUNT(*) FROM mes_production_execution WHERE batch_no IS NOT NULL", Integer.class));
             j.update("INSERT INTO material(id,code,name,unit_id,status) VALUES(3,'P2','TEST ONLY second product',1,'ENABLED')");
-            j.update("INSERT INTO routing_product(routing_id,material_id,material_code,material_name) VALUES(1,3,'P2','TEST ONLY second product')");
+            j.update("INSERT INTO routing_product(routing_id,material_id) VALUES(1,3)");
             j.update("INSERT INTO workorder(id,code,product_id,planned_qty,routing_id,status,revision,create_time,update_time) VALUES(2,'TEST_WO2',3,1000,1,'RELEASED',0,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)");
             j.update("INSERT INTO workorder_erp_extra(id) VALUES(2)");
             j.update("INSERT INTO material_bom SELECT 2,'TEST-BOM-2','1',3,base_qty,unit_id,status,revision,remark,created_by,created_at,published_at FROM material_bom WHERE id=1");

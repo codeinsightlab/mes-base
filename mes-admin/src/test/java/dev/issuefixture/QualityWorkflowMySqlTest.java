@@ -35,7 +35,7 @@ class QualityWorkflowMySqlTest {
             long operation = j.queryForObject("SELECT id FROM operation WHERE status='ENABLED' ORDER BY id LIMIT 1", Long.class);
             long warehouse = j.queryForObject("SELECT id FROM wm_warehouse WHERE status='ENABLED' ORDER BY id LIMIT 1", Long.class);
             long routing = ProductionReportMySqlTest.insert(j, "INSERT INTO routing(code,name,version,status,revision,published_at) VALUES(?,?,1,'PUBLISHED',0,NOW())", tag, tag);
-            j.update("INSERT INTO routing_product(routing_id,material_id,material_code,material_name) SELECT ?,id,code,name FROM material WHERE id=?", routing, material);
+            j.update("INSERT INTO routing_product(routing_id,material_id) SELECT ?,id FROM material WHERE id=?", routing, material);
             var nodes = new ArrayList<Long>();
             for (int i = 0; i < 5; i++)
                 nodes.add(ProductionReportMySqlTest.insert(j, "INSERT INTO routing_node(routing_id,node_code,operation_id,display_order,operation_code,operation_name) SELECT ?,?,id,?,code,name FROM operation WHERE id=?", routing, Character.toString((char) ('A' + i)), i, operation));

@@ -236,21 +236,13 @@ public class RoutingServiceImpl implements IRoutingService {
         }
         var graph = graph(detail);
         RoutingGraphValidator.validate(graph.nodes(), graph.edges(), true);
-        var materialRows = references.lockMaterials(detail.products().stream()
+        references.lockMaterials(detail.products().stream()
                 .map(RoutingProductEntity::getMaterialId).sorted().toList(), true);
         var operationRows = references.lockOperations(detail.nodes().stream()
                 .map(RoutingNodeEntity::getOperationId).distinct().sorted().toList(), true);
-        var materialIndex = new HashMap<Long, MaterialEntity>();
-        for (var material : materialRows) materialIndex.put(material.getId(), material);
         var operationIndex = new HashMap<Long, OperationEntity>();
         for (var operation : operationRows) operationIndex.put(operation.getId(), operation);
-        // Bounded maximum: 100 products + 100 steps, each update checks its exact generated primary key.
-        for (var product : detail.products()) {
-            var material = materialIndex.get(product.getMaterialId());
-            product.setMaterialCode(material.getCode());
-            product.setMaterialName(material.getName());
-            changed(products.updateByPrimaryKey(product));
-        }
+        // At most 100 steps; each snapshot update checks its exact generated primary key.
         for (var step : detail.nodes()) {
             var operation = operationIndex.get(step.getOperationId());
             step.setOperationCode(operation.getCode());
@@ -456,15 +448,6 @@ public class RoutingServiceImpl implements IRoutingService {
                         step.setOperationCode(op.code());
                         step.setOperationName(op.name());
                         step.setOperationDescription(op.description());
-                    }
-                }
-            }
-            if (!productRows.isEmpty()) {
-                for (var product : productRows) {
-                    var material = currentProducts.get(product.getMaterialId());
-                    if (material != null) {
-                        product.setMaterialCode(material.getCode());
-                        product.setMaterialName(material.getName());
                     }
                 }
             }

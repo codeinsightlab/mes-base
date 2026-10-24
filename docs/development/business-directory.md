@@ -60,7 +60,9 @@ personnel/routings列表参数为keyword、offset、limit，分页默认0/20，l
 
 物料按当前工厂与`MaterialResource.PREFIX`隔离，与物料通用详情共享Key；工艺、工序同样使用各自规范资源前缀。不存在另一份reference/directory/label缓存或IDs组合Key。详情与批量查询双向复用同一实体、同一提交后失效规则；回滚不失效。写事务直接读取当前数据库，不向共享缓存发布未提交对象。缓存命中前后保留固定事务/租约校验，缺Factory不回退其他范围。
 
-关联物料缺失时保留原ID并明确待确认。当前编码和名称不代替业务事实快照，也不证明物料已启用、单位正确或库存可用；对应业务写入仍实时校验。
+工艺适用产品表`routing_product`仅保留id、routing_id、material_id，V63移除冗余material_code/material_name。工艺发布仍锁定并校验关联物料，但不再写产品名称快照；响应只提供currentMaterialCode/currentMaterialName作为当前资料。行政领料的工艺适用性也按物料ID校验；仅传品号时先用当前物料主数据解析唯一ID，不依赖已移除的旧编码快照。工序快照及其他业务事实不受影响。
+
+关联物料缺失时保留原ID并明确待确认。当前编码和名称不代替其他业务事实快照，也不证明物料已启用、单位正确或库存可用；对应业务写入仍实时校验。
 
 ## 中心身份与历史查询
 
