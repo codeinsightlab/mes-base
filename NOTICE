@@ -1,0 +1,16 @@
+Base MES
+Copyright 2026 Base MES contributors
+
+Original contributions to this project are licensed under the Apache License,
+Version 2.0. See LICENSE.
+
+This project includes software derived from RuoYi and ktg-mes / ktg-mes-ui.
+The original components retain their copyright notices and MIT license terms;
+the Apache-2.0 license does not replace those upstream licenses.
+
+Upstream notices:
+- Copyright (c) 2018 RuoYi
+- Copyright (c) 2018 ktg
+
+The full upstream licenses and source manifests are retained in docs/legal/.
+Other dependencies retain their respective licenses.

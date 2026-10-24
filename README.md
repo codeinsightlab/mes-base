@@ -6,6 +6,8 @@ Base MES 围绕工单、批次和实际加工路径，连接材料领用、工�
 
 本仓库为后端服务；管理与现场操作界面见 [mes-base-ui](https://github.com/codeinsightlab/mes-base-ui)。
 
+代码托管：[GitHub](https://github.com/codeinsightlab/mes-base) · [Gitee](https://gitee.com/zlxStudyHome/mes-base)
+
 ## 产品定位
 
 适用于五金加工、机械加工、汽车零部件等离散制造场景，优先服务希望减少纸单和人工统计的中小型工厂。
@@ -93,9 +95,10 @@ java -jar target/mes-base-0.1.0-SNAPSHOT.jar --spring.profiles.active=dev
 - [LOCAL / ERP 业务边界](docs/architecture/local-erp-business-boundary.md)
 - [数据库版本升级](docs/development/database-upgrades.md)
 - [架构文档](docs/architecture/README.md)
+- [GitHub / Gitee 双托管](docs/development/dual-hosting.md)
 
 开发过程、专项审查和验收证据保存在 `docs/development`、`docs/reviews` 与 `docs/operations`，与本页的产品介绍分开维护。
 
 ## 来源与第三方声明
 
-项目复用并演进了 RuoYi、ktg-mes 等来源产品的部分能力。来源清单、原项目许可及第三方声明见 [`docs/legal`](docs/legal)。这些声明说明各自来源组件的授权，不代表本仓库整体已另行声明同一种许可证。
+项目原创贡献采用 [Apache License 2.0](LICENSE)，可按许可条款使用、修改和分发。项目复用并演进了 RuoYi、ktg-mes 等来源产品的部分能力，相关组件继续遵守原有 MIT 许可；来源清单和原许可保留在 [`docs/legal`](docs/legal)，归属说明见 [NOTICE](NOTICE)。第三方依赖遵守各自许可证。
