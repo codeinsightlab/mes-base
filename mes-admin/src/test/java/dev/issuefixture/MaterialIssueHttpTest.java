@@ -1,5 +1,7 @@
 package dev.issuefixture;
 
+import dev.mesbase.business.basic.domain.MaterialExample;
+import dev.mesbase.business.basic.domain.MaterialEntity;
 import dev.mesbase.acceptance.FactorySnapshotFixture;
 import dev.mesbase.business.basic.dao.MaterialMapper;
 import dev.mesbase.business.basic.dao.UnitMeasureMapper;
@@ -311,8 +313,19 @@ class MaterialIssueHttpTest {
         }
 
         @Bean
-        BusinessDirectoryService directoryLabels(RoutingMapper routes, OperationMapper operations) {
+        BusinessDirectoryService directoryLabels(RoutingMapper routes, OperationMapper operations,
+                                                 MaterialMapper materials) {
             var directory = mock(BusinessDirectoryService.class);
+            when(directory.materialEntities(any())).thenAnswer(call -> {
+                Collection<Long> ids = call.getArgument(0);
+                var result = new LinkedHashMap<Long, MaterialEntity>();
+                if (!ids.isEmpty()) {
+                    var filter = new MaterialExample();
+                    filter.createCriteria().andIdIn(List.copyOf(ids));
+                    for (var row : materials.selectByExample(filter)) result.put(row.getId(), row);
+                }
+                return result;
+            });
             when(directory.userLabels(any())).thenReturn(Map.of(100L, new DirectoryLabel(100L, null, "历史操作人员", null), 1L, new DirectoryLabel(1L, null, "验收提交人", null)));
             when(directory.routingLabels(any())).thenAnswer(call -> {
                 Collection<Long> ids = call.getArgument(0);

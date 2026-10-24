@@ -61,6 +61,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -211,7 +212,10 @@ public class RoutingServiceImpl implements IRoutingService {
 
     @Transactional(transactionManager = "businessTransactionManager", readOnly = true)
     public RoutingDetail detail(Long id) {
-        return detailRows(requireRecord(id));
+        var detail = detailRows(requireRecord(id));
+        if (RoutingStatus.DRAFT.getValue().equals(detail.routing().getStatus())) return detail;
+        return new RoutingDetail(detail.routing(), detail.products(), detail.nodes(), detail.edges(),
+                currentProducts(detail.products()));
     }
 
     @Transactional(transactionManager = "businessTransactionManager", isolation = Isolation.READ_COMMITTED,
@@ -440,7 +444,9 @@ public class RoutingServiceImpl implements IRoutingService {
         }
         if (stepRows.size() > 100 || productRows.size() > 100)
             throw new FoundationException(ErrorCode.RESOURCE_CONFLICT);
+        Map<Long, MaterialEntity> currentProducts = Map.of();
         if (RoutingStatus.DRAFT.getValue().equals(row.getStatus())) {
+            currentProducts = currentProducts(productRows);
             if (!stepRows.isEmpty()) {
                 var index = directory.operationLabels(stepRows.stream().map(RoutingNodeEntity::getOperationId)
                         .toList());
@@ -454,13 +460,8 @@ public class RoutingServiceImpl implements IRoutingService {
                 }
             }
             if (!productRows.isEmpty()) {
-                var filter = new MaterialExample();
-                filter.createCriteria()
-                        .andIdIn(productRows.stream().map(RoutingProductEntity::getMaterialId).toList());
-                var index = new HashMap<Long, MaterialEntity>();
-                for (var material : materials.selectByExample(filter)) index.put(material.getId(), material);
                 for (var product : productRows) {
-                    var material = index.get(product.getMaterialId());
+                    var material = currentProducts.get(product.getMaterialId());
                     if (material != null) {
                         product.setMaterialCode(material.getCode());
                         product.setMaterialName(material.getName());
@@ -475,9 +476,13 @@ public class RoutingServiceImpl implements IRoutingService {
             edgeRows = edges.selectByExample(edgeFilter);
         }
         if (edgeRows.size() > 400) throw new FoundationException(ErrorCode.ROUTING_GRAPH_INVALID);
-        var detail = new RoutingDetail(row, productRows, stepRows, edgeRows);
+        var detail = new RoutingDetail(row, productRows, stepRows, edgeRows, currentProducts);
         graph(detail);
         return detail;
+    }
+
+    private Map<Long, MaterialEntity> currentProducts(List<RoutingProductEntity> productRows) {
+        return directory.materialEntities(productRows.stream().map(RoutingProductEntity::getMaterialId).toList());
     }
 
     private RoutingExample byId(Long id) {

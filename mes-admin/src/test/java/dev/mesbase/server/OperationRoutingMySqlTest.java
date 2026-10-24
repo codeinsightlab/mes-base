@@ -1,5 +1,7 @@
 package dev.mesbase.server;
 
+import dev.mesbase.business.basic.domain.MaterialExample;
+import dev.mesbase.business.basic.domain.MaterialEntity;
 import dev.mesbase.business.basic.dao.MaterialMapper;
 import dev.mesbase.business.production.dao.OperationMapper;
 import dev.mesbase.business.production.dao.RoutingMapper;
@@ -125,8 +127,18 @@ class OperationRoutingMySqlTest {
     @Import({OperationServiceImpl.class, RoutingServiceImpl.class, RoutingReferenceRules.class})
     static class Config {
         @Bean
-        BusinessDirectoryService directory(OperationMapper operations) {
+        BusinessDirectoryService directory(OperationMapper operations, MaterialMapper materials) {
             var directory = mock(BusinessDirectoryService.class);
+            when(directory.materialEntities(any())).thenAnswer(call -> {
+                Collection<Long> ids = call.getArgument(0);
+                var result = new LinkedHashMap<Long, MaterialEntity>();
+                if (!ids.isEmpty()) {
+                    var filter = new MaterialExample();
+                    filter.createCriteria().andIdIn(List.copyOf(ids));
+                    for (var row : materials.selectByExample(filter)) result.put(row.getId(), row);
+                }
+                return result;
+            });
             when(directory.operationLabels(any())).thenAnswer(call -> {
                 Collection<Long> ids = call.getArgument(0);
                 var labels = new LinkedHashMap<Long, DirectoryLabel>();

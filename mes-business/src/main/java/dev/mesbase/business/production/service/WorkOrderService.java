@@ -27,6 +27,7 @@ import dev.mesbase.business.production.domain.RoutingEntity;
 import dev.mesbase.business.production.domain.RoutingExample;
 import dev.mesbase.business.production.domain.RoutingNodeExample;
 import dev.mesbase.business.production.domain.RoutingProductExample;
+import dev.mesbase.business.production.domain.RoutingProductEntity;
 import dev.mesbase.business.production.domain.RoutingStatus;
 import dev.mesbase.business.production.domain.WorkOrderModels;
 import dev.mesbase.business.production.domain.WorkOrderStatus;
@@ -353,7 +354,11 @@ public class WorkOrderService {
             if (node.getOperationName() == null && labels.containsKey(node.getOperationId()))
                 node.setOperationName(labels.get(node.getOperationId()).name() + "（当前名称）");
         }
-        return new RoutingDetail(routings.selectByPrimaryKey(w.getRoutingId()), products.selectByExample(p), graphNodes, edges.selectByExample(e));
+        var graphProducts = products.selectByExample(p);
+        var currentProducts = directory.materialEntities(graphProducts.stream().map(RoutingProductEntity::getMaterialId)
+                .toList());
+        return new RoutingDetail(routings.selectByPrimaryKey(w.getRoutingId()), graphProducts, graphNodes,
+                edges.selectByExample(e), currentProducts);
     }
 
     public WorkOrderModels.Detail release(Long id, int revision) {

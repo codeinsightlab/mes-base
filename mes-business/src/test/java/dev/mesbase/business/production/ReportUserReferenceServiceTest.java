@@ -76,7 +76,7 @@ class ReportUserReferenceServiceTest {
 
     private BusinessDirectoryService directory(SysUserMapper users, PlatformPersistence center) {
         return new BusinessDirectoryService(users, mock(SysDeptMapper.class), mock(SysPostMapper.class), mock(DetailEntityCache.class),
-                mock(BusinessCacheProcessor.class), center, mock(ObjectProvider.class), mock(ObjectProvider.class), mock(ObjectProvider.class));
+                mock(BusinessCacheProcessor.class), center, mock(ObjectProvider.class), mock(ObjectProvider.class), mock(ObjectProvider.class), mock(ObjectProvider.class));
     }
 
     @Test

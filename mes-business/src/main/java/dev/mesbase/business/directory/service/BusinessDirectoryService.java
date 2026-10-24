@@ -1,5 +1,9 @@
 package dev.mesbase.business.directory.service;
 
+import dev.mesbase.business.basic.dao.MaterialMapper;
+import dev.mesbase.business.basic.domain.MaterialEntity;
+import dev.mesbase.business.basic.domain.MaterialExample;
+import dev.mesbase.business.basic.domain.MaterialResource;
 import dev.mesbase.common.utils.StringUtils;
 import dev.mesbase.system.domain.SysUserCacheResource;
 
@@ -64,13 +68,15 @@ public class BusinessDirectoryService {
     private final ObjectProvider<OwnedTransactionManager> businessTransactions;
     private final ObjectProvider<RoutingMapper> routings;
     private final ObjectProvider<OperationMapper> operations;
+    private final ObjectProvider<MaterialMapper> materials;
 
     public BusinessDirectoryService(SysUserMapper users, SysDeptMapper departments,
                                     SysPostMapper posts, DetailEntityCache cache,
                                     BusinessCacheProcessor businessCache, PlatformPersistence center,
                                     @Qualifier("businessTransactionManager") ObjectProvider<OwnedTransactionManager> businessTransactions,
                                     ObjectProvider<RoutingMapper> routings,
-                                    ObjectProvider<OperationMapper> operations) {
+                                    ObjectProvider<OperationMapper> operations,
+                                    ObjectProvider<MaterialMapper> materials) {
         this.users = users;
         this.departments = departments;
         this.posts = posts;
@@ -80,6 +86,7 @@ public class BusinessDirectoryService {
         this.businessTransactions = businessTransactions;
         this.routings = routings;
         this.operations = operations;
+        this.materials = materials;
     }
 
     @Transactional(transactionManager = "masterTransactionManager", readOnly = true)
@@ -231,6 +238,19 @@ public class BusinessDirectoryService {
     private static DirectoryLabel userLabel(SysUser user) {
         return new DirectoryLabel(user.getUserId(), user.getUserName(), user.getNickName(), null, null,
                 user.getStatus(), user.getDeptId(), user.getDelFlag());
+    }
+
+    /**
+     * Canonical material entities share the same detail keys as MaterialService.selectById.
+     */
+    @Transactional(transactionManager = "businessTransactionManager", readOnly = true)
+    public Map<Long, MaterialEntity> materialEntities(Collection<Long> ids) {
+        return scoped(MaterialResource.PREFIX, ids, MaterialEntity.class, MaterialEntity::getId, missing -> {
+            var filter = new MaterialExample();
+            filter.createCriteria().andIdIn(missing);
+            return materials.getObject().selectByExample(filter).stream()
+                    .collect(Collectors.toMap(MaterialEntity::getId, Function.identity()));
+        });
     }
 
     @Transactional(transactionManager = "businessTransactionManager", readOnly = true)

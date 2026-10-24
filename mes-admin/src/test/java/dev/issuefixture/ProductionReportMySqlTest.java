@@ -1,5 +1,6 @@
 package dev.issuefixture;
 
+import dev.mesbase.business.basic.dao.MaterialMapper;
 import dev.mesbase.core.factory.FactoryId;
 import dev.mesbase.core.factory.FactoryScope;
 import dev.mesbase.platform.execution.FactoryContext;
@@ -105,7 +106,7 @@ class ProductionReportMySqlTest {
         c.registerBean(PlatformPersistence.class, () -> center);
         c.registerBean(SysUserMapper.class, () -> center.mapper(SysUserMapper.class));
         c.registerBean(BusinessDirectoryService.class, () -> new BusinessDirectoryService(
-                c.getBean(SysUserMapper.class), mock(SysDeptMapper.class), mock(SysPostMapper.class), new DetailEntityCache(mock(RedisCache.class), new MockEnvironment()), mock(BusinessCacheProcessor.class), center, c.getBeanProvider(OwnedTransactionManager.class), c.getBeanProvider(RoutingMapper.class), c.getBeanProvider(OperationMapper.class)));
+                c.getBean(SysUserMapper.class), mock(SysDeptMapper.class), mock(SysPostMapper.class), new DetailEntityCache(mock(RedisCache.class), new MockEnvironment()), mock(BusinessCacheProcessor.class), center, c.getBeanProvider(OwnedTransactionManager.class), c.getBeanProvider(RoutingMapper.class), c.getBeanProvider(OperationMapper.class), c.getBeanProvider(MaterialMapper.class)));
         c.register(QualityTreatmentService.class, ExecutionQualityReferenceQueryImpl.class, ProductionReportService.class, ProductionQuantityService.class, ReportUserReferenceService.class, ProductionChainLocks.class, ProductionExecutionRules.class, ExecutionPathService.class);
         c.refresh();
         return c;

@@ -146,7 +146,7 @@ class BusinessDirectoryTest {
         context.registerBean(BusinessDirectoryService.class, () -> new BusinessDirectoryService(
                 userMapper, persistence.mapper(SysDeptMapper.class), persistence.mapper(SysPostMapper.class),
                 new DetailEntityCache(redis, new MockEnvironment()), mock(BusinessCacheProcessor.class), persistence,
-                mock(ObjectProvider.class), mock(ObjectProvider.class), mock(ObjectProvider.class)));
+                mock(ObjectProvider.class), mock(ObjectProvider.class), mock(ObjectProvider.class), mock(ObjectProvider.class)));
         context.refresh();
         service = context.getBean(BusinessDirectoryService.class);
         var selection = mock(FactorySelectionService.class);

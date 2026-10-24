@@ -1,5 +1,6 @@
 package dev.issuefixture;
 
+import dev.mesbase.business.basic.dao.MaterialMapper;
 import dev.mesbase.business.production.service.BusinessSourceRules;
 import dev.mesbase.business.quality.service.ExecutionQualityReferenceQueryImpl;
 
@@ -119,7 +120,7 @@ class ProductionDefectMySqlTest {
         c.registerBean(PlatformPersistence.class, () -> center);
         c.registerBean(SysUserMapper.class, () -> center.mapper(SysUserMapper.class));
         c.registerBean(BusinessDirectoryService.class, () -> new BusinessDirectoryService(
-                c.getBean(SysUserMapper.class), mock(SysDeptMapper.class), mock(SysPostMapper.class), new DetailEntityCache(mock(RedisCache.class), new MockEnvironment()), mock(BusinessCacheProcessor.class), center, c.getBeanProvider(OwnedTransactionManager.class), c.getBeanProvider(RoutingMapper.class), c.getBeanProvider(OperationMapper.class)));
+                c.getBean(SysUserMapper.class), mock(SysDeptMapper.class), mock(SysPostMapper.class), new DetailEntityCache(mock(RedisCache.class), new MockEnvironment()), mock(BusinessCacheProcessor.class), center, c.getBeanProvider(OwnedTransactionManager.class), c.getBeanProvider(RoutingMapper.class), c.getBeanProvider(OperationMapper.class), c.getBeanProvider(MaterialMapper.class)));
         c.registerBean(AuthorizationService.class, () -> (actor, scope, permission) -> true);
         c.register(BusinessSourceRules.class, QualityReleaseService.class, WarehouseIntegration.class, QualityTreatmentService.class, ProductionQuantityService.class, ExecutionQualityReferenceQueryImpl.class, ProductionChainLocks.class, ProductionExecutionRules.class, ExecutionPathService.class);
         c.refresh();

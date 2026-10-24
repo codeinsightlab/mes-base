@@ -154,12 +154,19 @@ public class RoutingController {
         return new RoutingReferenceVo(row.id().toString(), row.code(), row.name());
     }
 
+    private record CurrentProductNames(String currentMaterialCode, String currentMaterialName) {
+    }
+
     static RoutingDetailVo detailView(RoutingDetail detail) {
         var nodeCodes = new HashMap<Long, String>();
         for (var node : detail.nodes()) nodeCodes.put(node.getId(), node.getNodeCode());
         return new RoutingDetailVo(toView(detail.routing()),
-                detail.products().stream().map(row -> new RoutingProductVo(row.getId().toString(),
-                        row.getMaterialId().toString(), row.getMaterialCode(), row.getMaterialName())).toList(),
+                detail.products().stream().map(row -> {
+                    var current = detail.currentProducts().get(row.getMaterialId());
+                    var names = new CurrentProductNames(null, null);
+                    if (current != null) names = new CurrentProductNames(current.getCode(), current.getName());
+                    return BeanConversions.convertWith(row, names, RoutingProductVo.class);
+                }).toList(),
                 detail.nodes().stream().map(row -> new RoutingNodeVo(row.getId().toString(), row.getNodeCode(),
                                 row.getOperationId().toString(), row.getDisplayOrder(), row.getOperationCode(),
                                 row.getOperationName(), row.getOperationDescription(), row.getIsKey(), row.getDescription()))

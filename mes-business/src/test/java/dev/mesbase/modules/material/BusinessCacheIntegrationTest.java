@@ -1,6 +1,14 @@
 package dev.mesbase.modules.material;
 
 import dev.mesbase.common.core.redis.RedisCache;
+import dev.mesbase.business.directory.service.BusinessDirectoryService;
+import dev.mesbase.system.mapper.SysUserMapper;
+import dev.mesbase.system.mapper.SysDeptMapper;
+import dev.mesbase.system.mapper.SysPostMapper;
+import dev.mesbase.business.production.dao.RoutingMapper;
+import dev.mesbase.business.production.dao.OperationMapper;
+import dev.mesbase.infrastructure.persistence.PlatformPersistence;
+import org.springframework.core.env.Environment;
 import dev.mesbase.common.cache.DetailEntityCache;
 import dev.mesbase.common.cache.DetailCacheKeys;
 import dev.mesbase.common.core.redis.SystemCacheNamespace;
@@ -100,6 +108,7 @@ class BusinessCacheIntegrationTest {
     private IMaterialService material;
     private Boundary boundary;
     private Probe probe;
+    private BusinessDirectoryService directory;
 
     @BeforeAll
     static void startRedis() throws Exception {
@@ -150,6 +159,7 @@ class BusinessCacheIntegrationTest {
         material = context.getBean(IMaterialService.class);
         boundary = context.getBean(Boundary.class);
         probe = context.getBean(Probe.class);
+        directory = context.getBean(BusinessDirectoryService.class);
         FactoryContext.bind(scope("A"));
         redis.deleteByPattern("business:*");
         when(mapper.selectByPrimaryKey(anyLong())).thenAnswer(call -> row(call.getArgument(0), "LIST"));
@@ -177,6 +187,71 @@ class BusinessCacheIntegrationTest {
     void cleanup() {
         if (context != null) context.close();
         FactoryContext.clear();
+    }
+
+    @Test
+    void actualMaterialDirectorySharesCrudDetailsAndLoadsOnlyOneMissingBatch() {
+        var one = row(1L, "目录物料一");
+        one.setSpecification("必须保留完整规格");
+        var two = row(2L, "目录物料二");
+        when(mapper.selectByExample(any())).thenReturn(List.of(one, two));
+        var first = directory.materialEntities(List.of(2L, 1L, 2L));
+        assertEquals(Set.of(1L, 2L), first.keySet());
+        verify(mapper, times(1)).selectByExample(any());
+        clearInvocations(mapper);
+        assertEquals(one.getSpecification(), material.selectById(1L).getSpecification());
+        assertEquals(two.getName(), directory.materialEntities(List.of(2L, 1L)).get(2L).getName());
+        verify(mapper, never()).selectByPrimaryKey(anyLong());
+        verify(mapper, never()).selectByExample(any());
+
+        var three = row(3L, "先从详情缓存");
+        when(mapper.selectByPrimaryKey(3L)).thenReturn(three);
+        material.selectById(3L);
+        assertEquals(three.getName(), directory.materialEntities(List.of(3L)).get(3L).getName());
+        verify(mapper, never()).selectByExample(any());
+        var four = row(4L, "仅加载缺失物料");
+        when(mapper.selectByExample(any())).thenAnswer(call -> {
+            MaterialExample query = call.getArgument(0);
+            assertEquals(List.of(4L), query.getOredCriteria().getFirst().getAllCriteria().getFirst().getValue());
+            return List.of(four);
+        });
+        assertEquals(4, directory.materialEntities(List.of(1L, 2L, 3L, 4L, 4L)).size());
+        verify(mapper, times(1)).selectByExample(any());
+        String namespace = caches.prefix("business:material");
+        assertEquals(Set.of(DetailCacheKeys.detail(namespace, 1L), DetailCacheKeys.detail(namespace, 2L),
+                        DetailCacheKeys.detail(namespace, 3L), DetailCacheKeys.detail(namespace, 4L)),
+                Set.copyOf(redis.keys(namespace + "detail:*")));
+    }
+
+    @Test
+    void materialDirectoryUsesCrudCommitEvictionAndBypassesSharedCacheDuringWrites() {
+        var original = row(1L, "原物料");
+        when(mapper.selectByExample(any())).thenReturn(List.of(original));
+        directory.materialEntities(List.of(1L));
+        assertThrows(IllegalStateException.class, () -> boundary.run(() -> {
+            material.updateById(1L, new MaterialUpdateCommand("M", "已回滚名称", null, null, 1L, "ENABLED", null, null));
+            assertTrue(redis.hasKey(DetailCacheKeys.detail(caches.prefix("business:material"), 1L)));
+            return null;
+        }, true));
+        clearInvocations(mapper);
+        assertEquals("原物料", directory.materialEntities(List.of(1L)).get(1L).getName());
+        verify(mapper, never()).selectByExample(any());
+        material.updateById(1L, new MaterialUpdateCommand("M", "已提交名称", null, null, 1L, "ENABLED", null, null));
+        var changed = row(1L, "已提交名称");
+        when(mapper.selectByExample(any())).thenReturn(List.of(changed));
+        assertEquals(changed.getName(), directory.materialEntities(List.of(1L)).get(1L).getName());
+        verify(mapper, times(1)).selectByExample(any());
+
+        boundary.run(() -> {
+            assertEquals("已提交名称", directory.materialEntities(List.of(1L)).get(1L).getName());
+            return null;
+        }, false);
+        verify(mapper, times(2)).selectByExample(any());
+        FactoryContext.bind(scope("B"));
+        directory.materialEntities(List.of(1L));
+        verify(mapper, times(3)).selectByExample(any());
+        FactoryContext.clear();
+        assertThrows(FoundationException.class, () -> directory.materialEntities(List.of(1L)));
     }
 
     @Test
@@ -626,6 +701,17 @@ class BusinessCacheIntegrationTest {
         @Bean
         MaterialMapper mapper() {
             return mock(MaterialMapper.class);
+        }
+
+        @Bean
+        BusinessDirectoryService directory(RedisCache redis, BusinessCacheProcessor caches, Environment environment,
+                                           ObjectProvider<OwnedTransactionManager> transactions,
+                                           ObjectProvider<RoutingMapper> routes,
+                                           ObjectProvider<OperationMapper> operations,
+                                           ObjectProvider<MaterialMapper> materials) {
+            return new BusinessDirectoryService(mock(SysUserMapper.class), mock(SysDeptMapper.class), mock(SysPostMapper.class),
+                    new DetailEntityCache(redis, environment), caches, mock(PlatformPersistence.class),
+                    transactions, routes, operations, materials);
         }
 
         @Bean
