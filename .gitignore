@@ -39,4 +39,8 @@ docs/reviews/evidence
 !/docs/architecture/README.md
 !/docs/architecture/local-erp-business-boundary.md
 /mes-business/docs/generated/
+!/mes-business/docs/generated/
+!/mes-business/docs/generated/basic/
+/mes-business/docs/generated/basic/*
+!/mes-business/docs/generated/basic/material-workspace-menu.sql
 /migration-backups/
