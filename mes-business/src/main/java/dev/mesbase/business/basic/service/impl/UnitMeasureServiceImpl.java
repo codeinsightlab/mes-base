@@ -114,6 +114,7 @@ public class UnitMeasureServiceImpl implements IUnitMeasureService {
         row.setName(input.name());
         row.setSymbol(input.symbol());
         row.setStatus(input.status());
+        setQuantityRules(row, input.mustBeWholeNumber(), input.quantityPrecision());
         rules.validate(row);
         if (insertUnique(row) != 1) {
             throw new FoundationException(ErrorCode.RESOURCE_CONFLICT);
@@ -132,6 +133,7 @@ public class UnitMeasureServiceImpl implements IUnitMeasureService {
         row.setName(input.name());
         row.setSymbol(input.symbol());
         row.setStatus(input.status());
+        setQuantityRules(row, input.mustBeWholeNumber(), input.quantityPrecision());
         rules.validate(row);
         if (updateUnique(row) != 1) {
             throw new FoundationException(ErrorCode.RESOURCE_CONFLICT);
@@ -249,6 +251,13 @@ public class UnitMeasureServiceImpl implements IUnitMeasureService {
             row.setName(input.name());
             row.setSymbol(input.symbol());
             row.setStatus(input.status());
+            if (insert) {
+                row.setMustBeWholeNumber(0);
+                row.setQuantityPrecision(6);
+            } else {
+                row.setMustBeWholeNumber(existing.get(input.code()).getMustBeWholeNumber());
+                row.setQuantityPrecision(existing.get(input.code()).getQuantityPrecision());
+            }
             rules.validate(row);
             int affected;
             try {
@@ -275,6 +284,15 @@ public class UnitMeasureServiceImpl implements IUnitMeasureService {
                 && Objects.deepEquals(row.getName(), input.name())
                 && Objects.deepEquals(row.getSymbol(), input.symbol())
                 && Objects.deepEquals(row.getStatus(), input.status());
+    }
+
+    private static void setQuantityRules(UnitMeasureEntity row, Integer mustBeWholeNumber,
+                                         Integer quantityPrecision) {
+        if (mustBeWholeNumber == null || quantityPrecision == null) {
+            throw new FoundationException(ErrorCode.BAD_REQUEST);
+        }
+        row.setMustBeWholeNumber(mustBeWholeNumber);
+        row.setQuantityPrecision(quantityPrecision);
     }
 }
 
