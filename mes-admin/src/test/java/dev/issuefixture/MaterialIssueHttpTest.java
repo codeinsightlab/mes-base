@@ -1,5 +1,7 @@
 package dev.issuefixture;
 
+import dev.mesbase.business.production.service.MaterialQuantityRules;
+
 import dev.mesbase.acceptance.FactorySnapshotFixture;
 import dev.mesbase.business.basic.dao.MaterialMapper;
 import dev.mesbase.business.basic.dao.UnitMeasureMapper;
@@ -132,6 +134,7 @@ import dev.mesbase.platform.web.RequestBoundaryFilter;
 import jakarta.servlet.Filter;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
+
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -142,6 +145,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+
 import org.apache.ibatis.session.SqlSessionFactory;
 import org.junit.jupiter.api.Test;
 import org.mybatis.spring.SqlSessionTemplate;
@@ -197,7 +201,7 @@ class MaterialIssueHttpTest {
                 var source = source();
                 var jdbc = new JdbcTemplate(source);
                 for (String name : List.of("V2__simple_business_capabilities.sql", "V3__operation_routing.sql", "V4__routing_operation_instruction_snapshot.sql", "V9__routing_graph.sql", "V8__warehouse_inventory.sql", "V11__material_issue.sql", "V12__material_issue_quantity_precision.sql", "V13__workorder_batch_route.sql", "V16__production_execution.sql", "V18__material_issue_void.sql", "V19__local_void_external_effect.sql", "V20__material_issue_erp_extra.sql", "V21__workorder_external_extra.sql", "V22__unverified_legacy_erp_provider.sql", "V23__production_core_v1.sql", "V24__operation_user_execution_assignment.sql", "V25__production_report_ledger.sql", "V26__production_defect.sql", "V27__production_report_request.sql", "V28__production_receipt.sql", "V29__single_material_production_input.sql", "V32__quality_treatment_facts.sql", "V33__admin_report_command_fingerprint.sql", "V34__local_stock_action.sql", "V35__local_production_closure.sql", "V36__business_source_isolation.sql", "V37__workorder_cancellation.sql", "V38__local_stock_documents.sql", "V39__operation_defect_types.sql", "V44__unified_inbound_documents.sql", "V47__quality_disposition_destinations.sql", "V48_1__quality_schema_cleanup.sql", "V50__quality_declaration_single_node.sql")) {
-                    String ddl = Files.readString(Path.of("mes-admin/src/main/resources/db/business/" + name))
+                    String ddl = Files.readString(Path.of("mes-admin/src/main/resources/db/business/" + name)).replace("\r\n", "\n")
                             .replace(") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT=", ") COMMENT ")
                             .replaceAll("(?m)^\\s*factory_id [^\\n]+\\n", "")
                             .replace("factory_id,", "")
@@ -269,6 +273,9 @@ class MaterialIssueHttpTest {
                 scanDdl = scanDdl.substring(scanDdl.indexOf("CREATE TABLE mes_production_scan_activity")).split(";")[0]
                         .replace(") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT=", ") COMMENT ");
                 jdbc.execute(scanDdl);
+                // TEST ONLY H2 equivalent of V64; rules are persisted per business datasource.
+                jdbc.execute("ALTER TABLE unit_measure ADD must_be_whole_number TINYINT DEFAULT 0 NOT NULL");
+                jdbc.execute("ALTER TABLE unit_measure ADD quantity_precision TINYINT DEFAULT 6 NOT NULL");
                 jdbc.update("INSERT INTO material(id,code,name,unit_id,status) VALUES(1,'M1','物料一',1,'ENABLED')");
                 jdbc.update("INSERT INTO workorder(id,code,product_id,planned_qty,routing_id,status,revision,create_time,update_time) VALUES(1,'WO1',1,1000,1,'DRAFT',0,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)");
                 jdbc.update("INSERT INTO unit_measure(id,code,name,status) VALUES(1,'KG','千克','ENABLED')");
@@ -303,7 +310,7 @@ class MaterialIssueHttpTest {
     @EnableWebMvc
     @EnableWebSecurity
     @EnableTransactionManagement
-    @Import({WorkOrderCompletionService.class, StockDocumentService.class, StockDocumentController.class, WorkOrderCancellationService.class, WorkOrderCancellationController.class, BusinessSourceRules.class, StockReferenceRules.class, ProductionCompletionService.class, ProductionCompletionController.class, WarehouseAcceptanceService.class, WarehouseAcceptanceController.class, QualityReleaseService.class, QualityReleaseController.class, WorkorderMaterialService.class, WorkorderMaterialController.class, LocalStockController.class, WmStockActionController.class, WmStockActionServiceImpl.class, LocalStockService.class, LocalProductionSupply.class, QualityTreatmentService.class, MaterialIssueInputFacts.class, ProductionQuantityService.class, ProductionQuantityErrorAdvice.class, ExecutionQualityReferenceQueryImpl.class, ProductionExecutionQueryService.class, ProductionChainLocks.class, ExecutionPathService.class, ExecutionActionController.class, MaterialIssueSubmissionService.class, MaterialIssueSubmissionController.class, WorkorderErpFacts.class, MaterialIssueErpFacts.class, MaterialIssueErpService.class, MaterialIssueErpController.class, WarehouseIntegration.class, MaterialIssueVoidService.class, MaterialIssueVoidController.class, MesMaterialIssueController.class, MesMaterialIssueItemController.class, MesMaterialIssueServiceImpl.class, MesMaterialIssueItemServiceImpl.class, MaterialIssueRules.class, ProductionExecutionRules.class, ProductionIdentityService.class, MesProductionExecutionServiceImpl.class, MesProductionExecutionController.class, ProductionIdentityController.class, WorkOrderController.class, WorkOrderService.class, LegacyBatchHistoryQuery.class, LegacyBatchHistoryController.class, RoutingReferenceRules.class, FoundationErrorAdvice.class})
+    @Import({MaterialQuantityRules.class, WorkOrderCompletionService.class, StockDocumentService.class, StockDocumentController.class, WorkOrderCancellationService.class, WorkOrderCancellationController.class, BusinessSourceRules.class, StockReferenceRules.class, ProductionCompletionService.class, ProductionCompletionController.class, WarehouseAcceptanceService.class, WarehouseAcceptanceController.class, QualityReleaseService.class, QualityReleaseController.class, WorkorderMaterialService.class, WorkorderMaterialController.class, LocalStockController.class, WmStockActionController.class, WmStockActionServiceImpl.class, LocalStockService.class, LocalProductionSupply.class, QualityTreatmentService.class, MaterialIssueInputFacts.class, ProductionQuantityService.class, ProductionQuantityErrorAdvice.class, ExecutionQualityReferenceQueryImpl.class, ProductionExecutionQueryService.class, ProductionChainLocks.class, ExecutionPathService.class, ExecutionActionController.class, MaterialIssueSubmissionService.class, MaterialIssueSubmissionController.class, WorkorderErpFacts.class, MaterialIssueErpFacts.class, MaterialIssueErpService.class, MaterialIssueErpController.class, WarehouseIntegration.class, MaterialIssueVoidService.class, MaterialIssueVoidController.class, MesMaterialIssueController.class, MesMaterialIssueItemController.class, MesMaterialIssueServiceImpl.class, MesMaterialIssueItemServiceImpl.class, MaterialIssueRules.class, ProductionExecutionRules.class, ProductionIdentityService.class, MesProductionExecutionServiceImpl.class, MesProductionExecutionController.class, ProductionIdentityController.class, WorkOrderController.class, WorkOrderService.class, LegacyBatchHistoryQuery.class, LegacyBatchHistoryController.class, RoutingReferenceRules.class, FoundationErrorAdvice.class})
     static class Web implements WebMvcConfigurer {
         @Bean
         FactorySnapshotFixture factorySnapshots() {

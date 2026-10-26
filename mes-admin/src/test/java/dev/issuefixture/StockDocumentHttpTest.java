@@ -1,10 +1,12 @@
 package dev.issuefixture;
 
 import dev.mesbase.acceptance.FactorySnapshotFixture;
+
 import java.math.BigDecimal;
 import java.util.UUID;
 import java.util.List;
 import java.util.concurrent.Executors;
+
 import org.junit.jupiter.api.Test;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.servlet.MockMvc;
@@ -301,4 +303,49 @@ class StockDocumentHttpTest {
         }
     }
 
+
+    @Test
+    void tighteningOldDraftDoesNotRewriteFactsAndPostingRechecksCurrentUnit() throws Exception {
+        try (var c = ProductionInputHttpTest.context()) {
+            var m = MaterialIssueHttpTest.mvc(c);
+            var j = ProductionInputHttpTest.db(c);
+            j.update("UPDATE wm_inventory SET quantity=0,available_quantity=0");
+            String id = create(m, "OTHER_RECEIPT", null).get("document").get("id").asText();
+            add(m, id, "0", "1", "L001", "1.234567");
+            var stored = JSON.readTree(m.perform(full(get(ROOT + "/" + id))).andExpect(status().isOk()).andReturn().getResponse().getContentAsString());
+            String lineId = stored.get("lines").get(0).get("id").asText();
+            j.update("UPDATE unit_measure SET must_be_whole_number=1,quantity_precision=0 WHERE id=1");
+            m.perform(full(put(ROOT + "/" + id + "/lines/" + lineId)).content(line("1", "1", "L001", "1.234567"))).andExpect(status().isOk());
+            m.perform(full(post(ROOT + "/" + id + "/actions/approve")).content(intent(UUID.randomUUID().toString(), 2))).andExpect(status().isBadRequest());
+            balance(j, "0");
+            assertEquals(0, j.queryForObject("SELECT COUNT(*) FROM wm_stock_action", Integer.class));
+            assertEquals(new BigDecimal("1.234567"), j.queryForObject("SELECT quantity FROM wm_stock_document_line WHERE id=?", BigDecimal.class, lineId));
+            m.perform(full(put(ROOT + "/" + id + "/lines/" + lineId)).content(line("2", "1", "L001", "1"))).andExpect(status().isOk());
+            String request = UUID.randomUUID().toString();
+            m.perform(full(post(ROOT + "/" + id + "/actions/approve")).content(intent(request, 3))).andExpect(status().isOk());
+            m.perform(full(post(ROOT + "/" + id + "/actions/approve")).content(intent(request, 3))).andExpect(status().isOk());
+            balance(j, "1");
+            assertEquals(1, j.queryForObject("SELECT COUNT(*) FROM wm_stock_action", Integer.class));
+        }
+    }
+
+    @Test
+    void sameIdsInTwoFactoriesUseTheirOwnPersistedUnitsAndWriteOnlyTheirOwnLedger() throws Exception {
+        try (var c = ProductionInputHttpTest.context()) {
+            var m = MaterialIssueHttpTest.mvc(c);
+            var db = c.getBean(MaterialIssueHttpTest.Fixture.class).business;
+            db.get("A").update("UPDATE unit_measure SET must_be_whole_number=0,quantity_precision=6 WHERE id=1");
+            db.get("B").update("UPDATE unit_measure SET must_be_whole_number=1,quantity_precision=0 WHERE id=1");
+            String a = create(m, "OTHER_RECEIPT", null).get("document").get("id").asText();
+            String b = JSON.readTree(m.perform(ProductionReportHttpTest.full(post(ROOT), "B").content("{\"documentType\":\"OTHER_RECEIPT\",\"reason\":\"isolated factory\"}")).andExpect(status().isOk()).andReturn().getResponse().getContentAsString()).get("document").get("id").asText();
+            assertEquals(a, b);
+            add(m, a, "0", "1", "L001", "1.234567");
+            m.perform(ProductionReportHttpTest.full(post(ROOT + "/" + b + "/lines"), "B").content(line("0", "1", "L001", "1.234567"))).andExpect(status().isBadRequest());
+            m.perform(full(post(ROOT + "/" + a + "/actions/approve")).content(intent(UUID.randomUUID().toString(), 1))).andExpect(status().isOk());
+            assertEquals(1, db.get("A").queryForObject("SELECT COUNT(*) FROM wm_stock_action", Integer.class));
+            assertEquals(0, db.get("B").queryForObject("SELECT COUNT(*) FROM wm_stock_action", Integer.class));
+            assertEquals(0, new BigDecimal("10001.234567").compareTo(db.get("A").queryForObject("SELECT quantity FROM wm_inventory WHERE id=1", BigDecimal.class)));
+            assertEquals(0, new BigDecimal("10000").compareTo(db.get("B").queryForObject("SELECT quantity FROM wm_inventory WHERE id=1", BigDecimal.class)));
+        }
+    }
 }

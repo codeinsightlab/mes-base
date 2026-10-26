@@ -31,6 +31,7 @@ import dev.mesbase.core.error.FoundationException;
 
 import java.time.LocalDateTime;
 import java.util.Objects;
+import java.util.List;
 import java.util.Set;
 
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -211,6 +212,7 @@ public class ProductionExecutionRules {
                 .contains(row.getStatus()) || row.getStartTime() != null)
             if (!WorkOrderStatus.RELEASED.getValue().equals(order.getStatus()))
                 throw new FoundationException(ErrorCode.WORKORDER_NOT_RELEASED);
+        quantityRules.lockForWrite(List.of(order.getProductId()));
         var routing = routings.selectByPrimaryKeyForUpdate(row.getRoutingId());
         valid(routing != null && routing.getPublishedAt() != null && (!newBinding || RoutingStatus.PUBLISHED.getValue()
                 .equals(routing.getStatus())));

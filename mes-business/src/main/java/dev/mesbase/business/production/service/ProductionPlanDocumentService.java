@@ -184,6 +184,7 @@ public class ProductionPlanDocumentService {
                 throw new FoundationException(ErrorCode.UNPROCESSABLE);
             }
         }
+        quantityRules.lockForWrite(requests.stream().map(ProductionPlanLineRequest::materialId).toList());
         for (ProductionPlanLineRequest request : requests)
             quantityRules.checkForWrite(request.plannedQty(), request.materialId());
     }

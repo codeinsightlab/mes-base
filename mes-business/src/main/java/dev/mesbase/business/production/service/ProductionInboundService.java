@@ -92,7 +92,8 @@ public class ProductionInboundService {
                 || !Objects.equals(execution.getProductId(), stock.getMaterialId())
                 || execution.getBatchNo() == null || !execution.getBatchNo().equals(stock.getBatchNo()))
             ParameterChecks.reject(ErrorCode.STOCK_DOCUMENT_CONFLICT);
-        quantityRules.checkForWrite(command.quantity(), material.getId());
+        quantityRules.lockForWrite(List.of(material.getId()));
+        // Document owner validates current rules or exact authoritative remaining production quantity.
         var draft = documents.create(new StockDocumentModels.Create(StockDocumentType.PRODUCTION_RECEIPT.getValue(),
                 command.reason(), null, null, executionId));
         Long id = draft.document().getId();

@@ -105,7 +105,7 @@ public class QualityTreatmentService {
         }
     }
 
-    public record Details(Summary summary) {
+    public record Details(Summary summary, Long productId) {
     }
 
     public record Recent(List<MesQualityTreatmentEntity> events, Map<Long, DirectoryLabel> users) {
@@ -122,7 +122,8 @@ public class QualityTreatmentService {
      * Summary responses never depend on loading display history or directory names.
      */
     public Details details(String declaration) {
-        return new Details(current(declaration).summary(false));
+        var summary = current(declaration).summary(false);
+        return new Details(summary, quantityRules.productIdForExecution(summary.executionId()));
     }
 
     public record EventPage(List<MesQualityTreatmentEntity> items, long total, int offset, int limit,
@@ -174,7 +175,7 @@ public class QualityTreatmentService {
         if (path.path() == null || !ExecutionPathStatus.LOCKED.getValue().equals(path.path().getPathStatus())
                 || !path.selectedNodeIds().contains(d.getAffectedNodeId()))
             ParameterChecks.reject(ErrorCode.QUALITY_TREATMENT_CONFLICT);
-        quantityRules.checkForWrite(command.quantity(), execution.getProductId());
+        quantityRules.checkSettlementForWrite(command.quantity(), s.pendingDispositionQty(), execution.getProductId());
         ParameterChecks.text(command.reason(), true, 500, ErrorCode.QUALITY_TREATMENT_CONFLICT);
         var row = new MesQualityTreatmentEntity();
         row.setId(command.requestId());

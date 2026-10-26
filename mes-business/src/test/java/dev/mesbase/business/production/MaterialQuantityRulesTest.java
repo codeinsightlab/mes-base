@@ -18,6 +18,10 @@ import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.inOrder;
+
+import java.util.List;
+
 import static org.mockito.Mockito.when;
 
 class MaterialQuantityRulesTest {
@@ -66,5 +70,48 @@ class MaterialQuantityRulesTest {
         materialUses(null);
         assertEquals(ErrorCode.RESOURCE_CONFLICT, assertThrows(FoundationException.class,
                 () -> rules.checkForMaterial(BigDecimal.ONE, 3L)).code());
+    }
+
+    @Test
+    void tighteningAllowsOnlyExactTrustedSettlementWithoutRounding() {
+        var unit = unit(1, 0);
+        var material = new MaterialEntity();
+        material.setId(3L);
+        material.setUnitId(7L);
+        when(materials.selectByPrimaryKeyForUpdate(3L)).thenReturn(material);
+        when(units.selectByPrimaryKeyForUpdate(7L)).thenReturn(unit);
+        var remaining = new BigDecimal("1.234567");
+        assertDoesNotThrow(() -> rules.checkSettlementForWrite(remaining, remaining, 3L));
+        assertThrows(FoundationException.class, () -> rules.checkSettlementForWrite(new BigDecimal("0.234567"), remaining, 3L));
+        assertThrows(FoundationException.class, () -> rules.checkSettlementForWrite(new BigDecimal("1.234568"), remaining, 3L));
+        assertDoesNotThrow(() -> rules.checkSettlementForWrite(BigDecimal.ONE, remaining, 3L));
+        unit.setQuantityPrecision(9);
+        assertThrows(FoundationException.class, () -> rules.checkSettlementForWrite(remaining, remaining, 3L));
+    }
+
+    @Test
+    void locksTheCompleteMaterialSetBeforeAnyUnitAndDeduplicatesSharedUnits() {
+        var first = new MaterialEntity();
+        first.setId(2L);
+        first.setUnitId(9L);
+        var second = new MaterialEntity();
+        second.setId(3L);
+        second.setUnitId(7L);
+        var third = new MaterialEntity();
+        third.setId(4L);
+        third.setUnitId(7L);
+        when(materials.selectByPrimaryKeyForUpdate(2L)).thenReturn(first);
+        when(materials.selectByPrimaryKeyForUpdate(3L)).thenReturn(second);
+        when(materials.selectByPrimaryKeyForUpdate(4L)).thenReturn(third);
+        when(units.selectByPrimaryKeyForUpdate(7L)).thenReturn(unit(0, 6));
+        when(units.selectByPrimaryKeyForUpdate(9L)).thenReturn(unit(0, 6));
+        rules.lockForWrite(List.of(4L, 3L, 2L, 3L));
+        var order = inOrder(materials, units);
+        order.verify(materials).selectByPrimaryKeyForUpdate(2L);
+        order.verify(materials).selectByPrimaryKeyForUpdate(3L);
+        order.verify(materials).selectByPrimaryKeyForUpdate(4L);
+        order.verify(units).selectByPrimaryKeyForUpdate(7L);
+        order.verify(units).selectByPrimaryKeyForUpdate(9L);
+        order.verifyNoMoreInteractions();
     }
 }

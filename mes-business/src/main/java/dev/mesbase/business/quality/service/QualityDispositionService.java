@@ -128,12 +128,19 @@ public class QualityDispositionService {
                     .getSource()) != BusinessSource.LOCAL)
                 throw new FoundationException(ErrorCode.INTEGRATION_NOT_CONFIGURED);
             var batchNo = identities.requiredBatch(execution.getId());
-            references.lockDemandReferences(execution.getProductId(), List.of(c.warehouseId()));
+            var owner = documents.getObject();
+            // Material rule validation precedes warehouse/stock locks, including existing stock rows.
             var warehouse = warehouses.selectByPrimaryKey(c.warehouseId());
+            if (warehouse == null) ParameterChecks.reject(ErrorCode.RECEIPT_WAREHOUSE_INVALID);
             var warehouseType = WarehouseType.from(warehouse.getWarehouseType());
             if (warehouseType != WarehouseType.DEFECTIVE && warehouseType != WarehouseType.SCRAP)
                 ParameterChecks.reject(ErrorCode.RECEIPT_WAREHOUSE_INVALID);
             var receiptType = warehouseType == WarehouseType.DEFECTIVE ? StockDocumentType.DEFECT_RECEIPT : StockDocumentType.SCRAP_RECEIPT;
+            var doc = owner.createQualityReceipt(new StockDocumentModels.Create(receiptType.getValue(), c.reason()
+                    .trim(), "质量申报 " + declaration, null, null));
+            documentId = doc.document().getId();
+            treatments.recordDisposition(declaration, c, hash, documentId);
+            references.lockDemandReferences(execution.getProductId(), List.of(c.warehouseId()));
             var material = materials.selectByPrimaryKey(execution.getProductId());
             if (material == null || material.getUnitId() == null)
                 ParameterChecks.reject(ErrorCode.QUALITY_TREATMENT_CONFLICT);
@@ -146,14 +153,10 @@ public class QualityDispositionService {
                     .insert(new WmInventoryCreateCommand(execution.getProductId(),
                             c.warehouseId(), BigDecimal.ZERO, BigDecimal.ZERO, EnableStatus.ENABLED.getValue(), "质量转仓库存来源", batchNo, null))
                     .inventory().getId() : rows.getFirst().getId();
-            var owner = documents.getObject();
-            var doc = owner.createQualityReceipt(new StockDocumentModels.Create(receiptType.getValue(), c.reason()
-                    .trim(), "质量申报 " + declaration, null, null));
-            documentId = doc.document().getId();
+
             owner.putLine(documentId, null, new StockDocumentModels.Line(doc.document().getRevision(), stockId,
                     execution.getProductId(), c.warehouseId(), material.getUnitId(), batchNo, null,
                     c.quantity(), "质量处置 " + c.requestId()));
-            treatments.recordDisposition(declaration, c, hash, documentId);
             owner.approve(documentId, new StockDocumentModels.Post(c.requestId(), owner.detail(documentId).document()
                     .getRevision()));
         }

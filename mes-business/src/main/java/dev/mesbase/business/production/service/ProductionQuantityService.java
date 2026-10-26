@@ -30,6 +30,7 @@ import dev.mesbase.business.quality.service.ProductionDefectQuantityQuery;
 import dev.mesbase.common.validation.ParameterChecks;
 import dev.mesbase.core.error.ErrorCode;
 import dev.mesbase.core.error.FoundationException;
+
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
@@ -37,6 +38,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
+
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -136,7 +138,7 @@ public class ProductionQuantityService {
             historyNodes = history.nodes(executionId).stream()
                     .collect(Collectors.toMap(n -> n.routingNodeId(), n -> new HistoricalNode(n.grossCorrection(), n.effectiveDefect(), n.unverifiedLossQty())));
         if (model.path() == null)
-            return new ExecutionQuantity(executionId, execution.getWorkorderId(), execution.getRoutingId(), execution.getTargetQty(), ExecutionPathStatus.UNSELECTED.getValue(), false, "执行尚未选择实际路径", List.of(), label(model.routing()), inputQty, balance.confirmedQty(), balance.reservedQty());
+            return new ExecutionQuantity(executionId, execution.getWorkorderId(), execution.getRoutingId(), execution.getTargetQty(), ExecutionPathStatus.UNSELECTED.getValue(), false, "执行尚未选择实际路径", List.of(), label(model.routing()), inputQty, balance.confirmedQty(), balance.reservedQty(), execution.getProductId());
         if (!Objects.equals(model.path().getRoutingId(), execution.getRoutingId()))
             ParameterChecks.reject(ErrorCode.REPORT_PATH_REQUIRED);
         ExecutionPathValidator.validate(model.selectedNodeIds(), model.nodes(), model.edges());
@@ -202,7 +204,7 @@ public class ProductionQuantityService {
         // writable describes normal forward reporting only, not historical correction authorization.
         return new ExecutionQuantity(executionId, execution.getWorkorderId(), execution.getRoutingId(),
                 execution.getTargetQty(), model.path()
-                .getPathStatus(), boundary == null, boundary, List.copyOf(result), label(model.routing()), inputQty, balance.confirmedQty(), balance.reservedQty());
+                .getPathStatus(), boundary == null, boundary, List.copyOf(result), label(model.routing()), inputQty, balance.confirmedQty(), balance.reservedQty(), execution.getProductId());
     }
 
     private static String label(DirectoryLabel label) {
@@ -321,7 +323,7 @@ public class ProductionQuantityService {
         if (nodeId != null && !found) ParameterChecks.reject(ErrorCode.REPORT_PATH_REQUIRED);
         return new ExecutionQuantity(view.executionId(), view.workorderId(), view.routingId(), view.targetQty(), view.pathStatus(), view.writable(), result.stream()
                 .anyMatch(n -> n.unverifiedDefectQty()
-                        .signum() > 0) ? "存在待核实不良；从受影响工序起禁止新增正向报工，请核实质量记录，后续流转保持质量门禁" : view.boundary(), List.copyOf(result), view.routingLabel(), view.productionInputQty(), view.confirmedInputQty(), view.reservedInputQty());
+                        .signum() > 0) ? "存在待核实不良；从受影响工序起禁止新增正向报工，请核实质量记录，后续流转保持质量门禁" : view.boundary(), List.copyOf(result), view.routingLabel(), view.productionInputQty(), view.confirmedInputQty(), view.reservedInputQty(), view.productId());
     }
 
     /**

@@ -1,5 +1,7 @@
 package dev.mesbase.business.wm.service;
 
+import dev.mesbase.business.quality.domain.MesQualityTreatmentExample;
+
 import dev.mesbase.common.utils.RequestFingerprint;
 import tools.jackson.core.JacksonException;
 import org.slf4j.Logger;
@@ -276,6 +278,9 @@ public class StockDocumentService {
         var existing = rows(documentId);
         if (lineId == null && existing.size() >= 100) ParameterChecks.reject(ErrorCode.BAD_REQUEST);
         var line = lineId == null ? new WmStockDocumentLineEntity() : requireLine(documentId, lineId);
+        boolean unchanged = lineId != null && Objects.equals(line.getMaterialId(), command.materialId())
+                && Objects.equals(line.getStockId(), command.stockId()) && Objects.equals(line.getUnitId(), command.unitId())
+                && line.getQuantity().compareTo(command.quantity()) == 0;
         line.setDocumentId(documentId);
         if (lineId == null) {
             line.setLineNo(existing.stream().mapToInt(WmStockDocumentLineEntity::getLineNo).max().orElse(0) + 1);
@@ -289,7 +294,7 @@ public class StockDocumentService {
         line.setBinCode(command.binCode());
         line.setQuantity(command.quantity());
         line.setRemark(command.remark());
-        validateIdentity(line);
+        validateIdentity(line, settlement(header, line), !unchanged);
         if ((lineId == null ? lines.insert(line) : lines.updateByPrimaryKey(line)) != 1)
             ParameterChecks.reject(ErrorCode.STOCK_DOCUMENT_CONFLICT);
         save(header);
@@ -381,8 +386,9 @@ public class StockDocumentService {
         // One deterministic inventory order for the complete document, including repeated-stock lines.
         var ordered = detail.stream().sorted(Comparator.comparing(WmStockDocumentLineEntity::getStockId)
                 .thenComparing(WmStockDocumentLineEntity::getId)).toList();
+        quantityRules.lockForWrite(ordered.stream().map(WmStockDocumentLineEntity::getMaterialId).toList());
+        for (var line : ordered) validateIdentity(line, settlement(row, line), true);
         for (var line : ordered) stock.lock(line.getStockId());
-        for (var line : ordered) validateIdentity(line);
         try {
             for (var line : ordered) {
                 // First action uses original UUID: the existing action PK also serializes cross-document UUID reuse.
@@ -587,7 +593,29 @@ public class StockDocumentService {
         return row;
     }
 
-    private void validateIdentity(WmStockDocumentLineEntity line) {
+    private BigDecimal settlement(WmStockDocumentEntity header, WmStockDocumentLineEntity line) {
+        if (type(header.getDocumentType()) == StockDocumentType.PRODUCTION_RECEIPT && header.getSourceExecutionId() != null) {
+            var basis = productionBasis(header.getSourceExecutionId());
+            if (Objects.equals(basis.productId(), line.getMaterialId())) return basis.remaining();
+        }
+        if (type(header.getDocumentType()).isQualityReceipt()) {
+            var filter = new MesQualityTreatmentExample();
+            filter.createCriteria().andStockDocumentIdEqualTo(header.getId());
+            var facts = qualityEvents.selectByExample(filter);
+            if (facts.size() != 1) ParameterChecks.reject(ErrorCode.STOCK_DOCUMENT_SOURCE_PENDING);
+            var fact = facts.getFirst();
+            var execution = productionExecution(fact.getExecutionId());
+            if (!Action.TRANSFER_WAREHOUSE.getValue().equals(fact.getActionType())
+                    || !Objects.equals(execution.getProductId(), line.getMaterialId())
+                    || !Objects.equals(fact.getTargetWarehouseId(), line.getWarehouseId())
+                    || fact.getTransferQty().compareTo(line.getQuantity()) != 0)
+                ParameterChecks.reject(ErrorCode.STOCK_DOCUMENT_SOURCE_PENDING);
+            return fact.getTransferQty();
+        }
+        return null;
+    }
+
+    private void validateIdentity(WmStockDocumentLineEntity line, BigDecimal remaining, boolean checkQuantity) {
         sources.warehouse(BusinessSource.LOCAL.getValue(), line.getWarehouseId());
         var source = inventories.selectByPrimaryKey(line.getStockId());
         var material = materials.selectByPrimaryKey(line.getMaterialId());
@@ -602,7 +630,7 @@ public class StockDocumentService {
                 || !Objects.equals(source.getBinCode(), line.getBinCode())
                 || !Objects.equals(material.getUnitId(), line.getUnitId()))
             ParameterChecks.reject(ErrorCode.STOCK_DOCUMENT_CONFLICT);
-        quantityRules.checkForWrite(line.getQuantity(), material.getId());
+        if (checkQuantity) quantityRules.checkSettlementForWrite(line.getQuantity(), remaining, material.getId());
     }
 
     private WmStockDocumentLineEntity requireLine(Long documentId, Long id) {

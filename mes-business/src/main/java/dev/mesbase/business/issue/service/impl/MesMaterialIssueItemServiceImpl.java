@@ -106,6 +106,7 @@ public class MesMaterialIssueItemServiceImpl implements IMesMaterialIssueItemSer
     @BusinessCacheEvict(business = MesMaterialIssueItemResource.PREFIX,
             scope = BusinessCacheEvict.Scope.LIST)
     public MesMaterialIssueItemEntity insert(MesMaterialIssueItemCreateCommand input) {
+        rules.lockIssues(List.of(input.issueId()));
         quantityRules.checkForWrite(input.quantity(), input.materialId());
         return insertRow(input, false);
     }

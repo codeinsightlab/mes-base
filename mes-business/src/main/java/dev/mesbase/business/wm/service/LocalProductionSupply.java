@@ -26,6 +26,7 @@ import dev.mesbase.common.validation.ParameterChecks;
 import dev.mesbase.core.error.ErrorCode;
 import dev.mesbase.core.error.FoundationException;
 import dev.mesbase.core.factory.FactoryScope;
+
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -34,6 +35,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.stream.Collectors;
+
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 import tools.jackson.databind.ObjectMapper;
@@ -128,7 +130,7 @@ public class LocalProductionSupply {
         var candidate = new Order(order.getId(), order.getCode(), product.getCode(), product.getName(), center,
                 order.getPlannedQty(), outputUnit.getCode(), order.getStatus(), allowed,
                 List.of(new Requirement(material.getCode(), material.getId(), unit.getId(), unit.getCode(), total)),
-                "LOCAL-WORKORDER:" + order.getId() + ":R" + demand.getRevision(), now);
+                "LOCAL-WORKORDER:" + order.getId() + ":R" + demand.getRevision(), now, product.getId());
         // A production code identifies one work order; paging never broadens it to unrelated orders.
         var page = offset == 0 ? List.of(candidate) : List.<Order>of();
         return new Context(selection.mode().getValue(), List.copyOf(stocks), page, 1, offset, limit);

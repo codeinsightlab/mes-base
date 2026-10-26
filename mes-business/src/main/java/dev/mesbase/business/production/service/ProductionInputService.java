@@ -290,6 +290,7 @@ public class ProductionInputService {
 
     private Prepared prepare(Command c, Calculation calculation, String hash) {
         var order = locks.order(c.workorderId());
+        supply.lockQuantityMaterials(calculation);
         supply.validateFrozenCalculation(calculation);
         var previous = inputs.selectByPrimaryKey(c.requestId());
         if (previous != null) {

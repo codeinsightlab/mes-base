@@ -11,10 +11,12 @@ import dev.mesbase.business.production.service.ProductionInputService.Result;
 import dev.mesbase.business.production.service.ProductionInputService;
 import dev.mesbase.business.production.service.ProductionInputSupplyService;
 import dev.mesbase.platform.web.EndpointAccess;
+
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
+
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -44,7 +46,8 @@ public class ProductionInputController {
 
     public record OrderView(String workorderId, String workorderCode, String productCode, String productName,
                             String workCenter,
-                            String plannedQty, String outputUnitCode, String status, List<String> allowedWarehouses) {
+                            String plannedQty, String outputUnitCode, String status, List<String> allowedWarehouses,
+                            String productId) {
     }
 
     public record SupplyView(String sourceMode, List<StockView> stocks, List<OrderView> orders, long total, int offset,
@@ -107,6 +110,6 @@ public class ProductionInputController {
         return new OrderView(o.workorderId()
                 .toString(), o.workorderCode(), o.productCode(), o.productName(), o.workCenter(), o.plannedQty()
                 .toPlainString(), o.outputUnitCode(), o.status(), o.allowedWarehouses().stream().map(Object::toString)
-                .toList());
+                .toList(), o.productId().toString());
     }
 }

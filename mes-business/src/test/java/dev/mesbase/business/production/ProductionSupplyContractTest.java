@@ -51,7 +51,7 @@ class ProductionSupplyContractTest {
         var now = LocalDateTime.now();
         var stock = new Stock("S1", 1L, "M", "L", 1L, "W", "B", 1L, "KG", new BigDecimal("999"), now);
         var order = new Order(1L, "WO", "P", "产品", "CENTER", new BigDecimal("100"), "PCS", "ERP_TEST_APPROVED", List.of(1L), List.of(
-                new Requirement("M", 1L, 1L, "KG", new BigDecimal("200")), new Requirement("M2", 2L, 1L, "KG", new BigDecimal("50"))), "MO_TEST", now);
+                new Requirement("M", 1L, 1L, "KG", new BigDecimal("200")), new Requirement("M2", 2L, 1L, "KG", new BigDecimal("50"))), "MO_TEST", now, 2L);
         when(port.query(scope, "TEST_BINDING", "WO", "M", "L")).thenReturn(new Context(Mode.CONNECTED.getValue(), List.of(stock), List.of(order)));
         var sourceRules = mock(BusinessSourceRules.class);
         var sourceOrder = new WorkorderEntity();

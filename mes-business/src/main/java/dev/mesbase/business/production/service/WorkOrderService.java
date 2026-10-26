@@ -446,8 +446,10 @@ public class WorkOrderService {
     }
 
     private void binding(Long product, Long routing, boolean lock) {
-        if (lock) references.lockMaterials(List.of(product), true);
-        else {
+        if (lock) {
+            quantityRules.lockForWrite(List.of(product));
+            references.lockMaterials(List.of(product), true);
+        } else {
             var material = materials.selectByPrimaryKey(product);
             require(material != null && EnableStatus.ENABLED.getValue().equals(material.getStatus()));
         }

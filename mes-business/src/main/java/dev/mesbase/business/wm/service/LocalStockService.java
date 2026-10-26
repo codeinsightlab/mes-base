@@ -132,11 +132,24 @@ public class LocalStockService {
                     || !Mode.LOCAL_ONLY.getValue().equals(input.getSourceMode()) || !c.stockId()
                     .equals(input.getStockId())) ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
         }
-        var stock = lock(c.stockId());
         var old = replay(id, hash);
         if (old != null) return old;
         if (type == StockActionType.RECEIPT) throw new FoundationException(ErrorCode.STOCK_DOCUMENT_REQUIRED);
-        quantityRules.checkForWrite(c.quantity(), stock.getMaterialId());
+        var identity = inventory.selectByPrimaryKey(c.stockId());
+        if (identity == null) throw new FoundationException(ErrorCode.NOT_FOUND);
+        quantityRules.lockForWrite(List.of(identity.getMaterialId()));
+        identity = inventory.selectByPrimaryKey(c.stockId());
+        if (identity == null) throw new FoundationException(ErrorCode.NOT_FOUND);
+        if (type == StockActionType.LOSS)
+            quantityRules.checkSettlementForWrite(c.quantity(), identity.getQuantity(), identity.getMaterialId());
+        else if (type == StockActionType.CORRECTION && c.quantity().signum() < 0)
+            quantityRules.checkSettlementForWrite(c.quantity().negate(), identity.getQuantity(), identity.getMaterialId());
+        else quantityRules.checkForWrite(c.quantity(), identity.getMaterialId());
+        var stock = lock(c.stockId());
+        if (!Objects.equals(identity.getMaterialId(), stock.getMaterialId()))
+            ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
+        old = replay(id, hash);
+        if (old != null) return old;
         if (input == null) sources.warehouse(BusinessSource.LOCAL.getValue(), stock.getWarehouseId());
         else {
             var originalExecution = locks.execution(input.getExecutionId());

@@ -1,5 +1,7 @@
 package dev.mesbase.business.production.service;
 
+import dev.mesbase.business.production.domain.ProductionQuantityInput;
+
 import com.github.pagehelper.PageHelper;
 import dev.mesbase.business.basic.dao.WorkstationMapper;
 import dev.mesbase.business.directory.service.BusinessDirectoryService;
@@ -112,7 +114,9 @@ public class ProductionReportService {
         if (existing != null) return existing;
         if (command.quantityDelta() != null && command.quantityDelta().signum() > 0)
             locks.requireActiveExecution(original.getExecutionId());
-        quantityRules.checkForExecutionWrite(command.quantityDelta(), original.getExecutionId());
+        if (command.quantityDelta() != null && command.quantityDelta().signum() > 0)
+            quantityRules.checkForExecutionWrite(command.quantityDelta(), original.getExecutionId());
+        else ProductionQuantityInput.check(command.quantityDelta());
         delta(command.quantityDelta());
         reason(command.reason());
         return adjustLocked(original, command.quantityDelta(), command.reason(), command.requestId(), hash);
