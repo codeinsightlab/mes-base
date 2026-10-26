@@ -12,16 +12,18 @@ import dev.mesbase.business.issue.domain.MesMaterialIssueItemResource;
 import dev.mesbase.business.issue.domain.MesMaterialIssueItemUpdateCommand;
 import dev.mesbase.business.issue.service.IMesMaterialIssueItemService;
 import dev.mesbase.business.issue.service.MaterialIssueRules;
-import dev.mesbase.business.production.domain.ProductionQuantityInput;
+import dev.mesbase.business.production.service.MaterialQuantityRules;
 import dev.mesbase.business.integration.production.ProductionSupply.Calculation;
 import dev.mesbase.common.validation.ParameterChecks;
 import dev.mesbase.core.error.ErrorCode;
 import dev.mesbase.core.error.FoundationException;
 import dev.mesbase.infrastructure.cache.annotation.BusinessCache;
 import dev.mesbase.infrastructure.cache.annotation.BusinessCacheEvict;
+
 import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
+
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Isolation;
@@ -35,10 +37,13 @@ import org.springframework.transaction.annotation.Transactional;
 public class MesMaterialIssueItemServiceImpl implements IMesMaterialIssueItemService {
     private final MesMaterialIssueItemMapper mapper;
     private final MaterialIssueRules rules;
+    private final MaterialQuantityRules quantityRules;
 
-    public MesMaterialIssueItemServiceImpl(MesMaterialIssueItemMapper mapper, MaterialIssueRules rules) {
+    public MesMaterialIssueItemServiceImpl(MesMaterialIssueItemMapper mapper, MaterialIssueRules rules,
+                                           MaterialQuantityRules quantityRules) {
         this.mapper = mapper;
         this.rules = rules;
+        this.quantityRules = quantityRules;
     }
 
     @Override
@@ -101,7 +106,8 @@ public class MesMaterialIssueItemServiceImpl implements IMesMaterialIssueItemSer
     @BusinessCacheEvict(business = MesMaterialIssueItemResource.PREFIX,
             scope = BusinessCacheEvict.Scope.LIST)
     public MesMaterialIssueItemEntity insert(MesMaterialIssueItemCreateCommand input) {
-        ProductionQuantityInput.check(input.quantity());
+        rules.lockIssues(List.of(input.issueId()));
+        quantityRules.checkForWrite(input.quantity(), input.materialId());
         return insertRow(input, false);
     }
 
@@ -143,7 +149,9 @@ public class MesMaterialIssueItemServiceImpl implements IMesMaterialIssueItemSer
         if (!Objects.equals(row.getIssueId(), input.issueId())) {
             throw new FoundationException(ErrorCode.BAD_REQUEST);
         }
-        ProductionQuantityInput.changed(input.quantity(), row.getQuantity());
+        if (!Objects.equals(input.materialId(), row.getMaterialId()) || input.quantity() == null
+                || row.getQuantity() == null || input.quantity().compareTo(row.getQuantity()) != 0)
+            quantityRules.checkForWrite(input.quantity(), input.materialId());
         row.setId(id);
         row.setIssueId(input.issueId());
         row.setMaterialId(input.materialId());

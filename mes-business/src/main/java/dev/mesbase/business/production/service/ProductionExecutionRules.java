@@ -1,7 +1,5 @@
 package dev.mesbase.business.production.service;
 
-import dev.mesbase.business.production.domain.ProductionQuantityInput;
-
 import dev.mesbase.business.production.service.BusinessSourceRules;
 
 import dev.mesbase.business.production.domain.WorkOrderStatus;
@@ -30,9 +28,12 @@ import dev.mesbase.business.production.domain.WorkorderEntity;
 import dev.mesbase.common.utils.SecurityUtils;
 import dev.mesbase.core.error.ErrorCode;
 import dev.mesbase.core.error.FoundationException;
+
 import java.time.LocalDateTime;
 import java.util.Objects;
+import java.util.List;
 import java.util.Set;
+
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
@@ -54,6 +55,7 @@ public class ProductionExecutionRules {
     private final MesProductionExecutionMapper executions;
     private final WorkorderMapper workorders;
     private final MaterialMapper materials;
+    private final MaterialQuantityRules quantityRules;
     private final RoutingMapper routings;
     private final RoutingProductMapper products;
     private final MesMaterialIssueMapper issues;
@@ -65,7 +67,7 @@ public class ProductionExecutionRules {
                                     MesExecutionPathNodeMapper pathNodes, MesProductionReportMapper reports,
                                     ProductionQuantityMapper quantities, ExecutionQualityReferenceQuery quality,
                                     MesExecutionAssignmentMapper assignments, BusinessSourceRules sources,
-                                    WorkOrderExtraMapper allocation) {
+                                    WorkOrderExtraMapper allocation, MaterialQuantityRules quantityRules) {
         this.allocation = allocation;
         this.sources = sources;
         this.assignments = assignments;
@@ -78,6 +80,7 @@ public class ProductionExecutionRules {
         this.executions = executions;
         this.workorders = workorders;
         this.materials = materials;
+        this.quantityRules = quantityRules;
         this.routings = routings;
         this.products = products;
         this.issues = issues;
@@ -92,7 +95,7 @@ public class ProductionExecutionRules {
         row.setProductId(order.getProductId());
         valid(ProductionExecutionStatus.READY.getValue()
                 .equals(row.getStatus()) && row.getStartTime() == null && row.getEndTime() == null);
-        ProductionQuantityInput.check(row.getTargetQty());
+        quantityRules.checkForWrite(row.getTargetQty(), row.getProductId());
         validateValues(row);
         capacity(row);
         audit(row, true);
@@ -130,7 +133,9 @@ public class ProductionExecutionRules {
                 || old.getStartTime() != null && row.getStartTime() == null)) frozen();
         validateReferences(row, !Objects.equals(old.getRoutingId(), row.getRoutingId()) || !started(old) && started(row));
         validateValues(row);
-        ProductionQuantityInput.changed(row.getTargetQty(), old.getTargetQty());
+        if (!Objects.equals(row.getProductId(), old.getProductId()) || row.getTargetQty() == null
+                || old.getTargetQty() == null || row.getTargetQty().compareTo(old.getTargetQty()) != 0)
+            quantityRules.checkForWrite(row.getTargetQty(), row.getProductId());
         capacity(row);
         audit(row, false);
     }
@@ -207,6 +212,7 @@ public class ProductionExecutionRules {
                 .contains(row.getStatus()) || row.getStartTime() != null)
             if (!WorkOrderStatus.RELEASED.getValue().equals(order.getStatus()))
                 throw new FoundationException(ErrorCode.WORKORDER_NOT_RELEASED);
+        quantityRules.lockForWrite(List.of(order.getProductId()));
         var routing = routings.selectByPrimaryKeyForUpdate(row.getRoutingId());
         valid(routing != null && routing.getPublishedAt() != null && (!newBinding || RoutingStatus.PUBLISHED.getValue()
                 .equals(routing.getStatus())));

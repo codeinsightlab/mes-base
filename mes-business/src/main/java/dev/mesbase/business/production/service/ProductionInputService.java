@@ -12,7 +12,6 @@ import dev.mesbase.core.security.Permission;
 import org.springframework.beans.factory.ObjectProvider;
 
 import dev.mesbase.common.validation.ParameterChecks;
-import dev.mesbase.business.production.domain.ProductionQuantityInput;
 
 import dev.mesbase.business.integration.warehouse.ErpActionResult.Mode;
 import dev.mesbase.business.shared.enums.BusinessSource;
@@ -46,10 +45,12 @@ import dev.mesbase.business.basic.dao.MaterialMapper;
 import dev.mesbase.platform.execution.FactoryContext;
 import dev.mesbase.core.error.ErrorCode;
 import dev.mesbase.core.error.FoundationException;
+
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Objects;
+
 import tools.jackson.databind.ObjectMapper;
 import org.springframework.stereotype.Service;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -173,7 +174,7 @@ public class ProductionInputService {
         String hash = RequestFingerprint.sha256(json.writeValueAsString(command));
         var previous = transaction.execute(s -> inputs.selectByPrimaryKey(command.requestId()));
         if (previous != null) return replay(previous, hash); // Never repeat an external create on replay.
-        ProductionQuantityInput.check(command.outputQty());
+        supply.validateOutputQuantity(command.outputQty(), command.workorderId());
         var sourceOrder = transaction.execute(s -> sources.order(command.workorderId()));
         if (BusinessSource.LOCAL.getValue().equals(sourceOrder.getSource())) {
             requireDocumentPermissions(true);
@@ -234,9 +235,9 @@ public class ProductionInputService {
     @Transactional(transactionManager = "businessTransactionManager", rollbackFor = Exception.class)
     public StockDocumentModels.Detail saveDraft(Command command) {
         validate(command);
-        ProductionQuantityInput.check(command.outputQty());
         requireDocumentPermissions(false);
         locks.order(command.workorderId());
+        supply.validateOutputQuantity(command.outputQty(), command.workorderId());
         var existing = documents.getObject().findMaterialIssueDraft(command);
         if (existing != null) return existing;
         if (inputs.selectByPrimaryKey(command.requestId()) != null) ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
@@ -289,6 +290,7 @@ public class ProductionInputService {
 
     private Prepared prepare(Command c, Calculation calculation, String hash) {
         var order = locks.order(c.workorderId());
+        supply.lockQuantityMaterials(calculation);
         supply.validateFrozenCalculation(calculation);
         var previous = inputs.selectByPrimaryKey(c.requestId());
         if (previous != null) {

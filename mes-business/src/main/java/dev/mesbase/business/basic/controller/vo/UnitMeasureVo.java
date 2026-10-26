@@ -10,7 +10,9 @@ public record UnitMeasureVo(
         String code,
         String name,
         String symbol,
-        String status
+        String status,
+        Integer mustBeWholeNumber,
+        Integer quantityPrecision
 ) {
 }
 

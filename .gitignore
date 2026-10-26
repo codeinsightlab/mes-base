@@ -32,6 +32,7 @@ docs/reviews/evidence
 !/docs/development/business-cache.md
 !/docs/development/business-directory.md
 !/docs/development/master-detail-documents.md
+!/docs/development/quantity-rules.md
 !/docs/development/table-preferences.md
 !/docs/development/request-admission.md
 !/docs/development/digiwin-e10-consumer.md
@@ -39,4 +40,8 @@ docs/reviews/evidence
 !/docs/architecture/README.md
 !/docs/architecture/local-erp-business-boundary.md
 /mes-business/docs/generated/
+!/mes-business/docs/generated/
+!/mes-business/docs/generated/basic/
+/mes-business/docs/generated/basic/*
+!/mes-business/docs/generated/basic/material-workspace-menu.sql
 /migration-backups/

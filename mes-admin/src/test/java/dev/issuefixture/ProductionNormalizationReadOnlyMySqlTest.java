@@ -27,7 +27,9 @@ import dev.mesbase.core.factory.FactoryScope;
 import dev.mesbase.infrastructure.persistence.OwnedTransactionManager;
 import dev.mesbase.infrastructure.persistence.PersistenceFactories;
 import dev.mesbase.platform.execution.FactoryContext;
+
 import java.util.LinkedHashSet;
+
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 import org.mybatis.spring.SqlSessionTemplate;
@@ -67,7 +69,7 @@ class ProductionNormalizationReadOnlyMySqlTest {
         });
         var quality = new QualityTreatmentService(sql.getMapper(MesProductionDefectMapper.class),
                 sql.getMapper(MesQualityTreatmentMapper.class), null, null, null, directory,
-                sql.getMapper(ProductionDefectListExtraMapper.class));
+                sql.getMapper(ProductionDefectListExtraMapper.class), null);
         var qualityQuery = new ExecutionQualityReferenceQueryImpl(sql.getMapper(MesProductionDefectMapper.class), quality);
         var paths = new ExecutionPathService(null, null, sql.getMapper(MesExecutionPathMapper.class),
                 sql.getMapper(MesExecutionPathNodeMapper.class), sql.getMapper(MesProductionExecutionMapper.class),

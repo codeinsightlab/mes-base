@@ -23,7 +23,8 @@ public final class ProductionSupply {
     public record Order(Long workorderId, String workorderCode, String productCode, String productName,
                         String workCenter, BigDecimal plannedQty, String outputUnitCode, String status,
                         List<Long> allowedWarehouses,
-                        List<Requirement> requirements, String sourceReference, LocalDateTime observedAt) {
+                        List<Requirement> requirements, String sourceReference, LocalDateTime observedAt,
+                        Long productId) {
         public Order {
             allowedWarehouses = List.copyOf(allowedWarehouses);
             requirements = List.copyOf(requirements);

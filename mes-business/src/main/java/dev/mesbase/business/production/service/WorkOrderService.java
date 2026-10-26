@@ -20,7 +20,6 @@ import dev.mesbase.business.production.dao.WorkorderMapper;
 import dev.mesbase.business.production.domain.MesProductionExecutionExample;
 import dev.mesbase.business.production.domain.ProductionBatchEntity;
 import dev.mesbase.business.production.domain.ProductionBatchExample;
-import dev.mesbase.business.production.domain.ProductionQuantityInput;
 import dev.mesbase.business.production.domain.RoutingDetail;
 import dev.mesbase.business.production.domain.RoutingEdgeExample;
 import dev.mesbase.business.production.domain.RoutingEntity;
@@ -46,12 +45,14 @@ import dev.mesbase.core.error.FoundationException;
 import dev.mesbase.framework.sync.SyncCoordinator;
 import dev.mesbase.platform.execution.FactoryContext;
 import dev.mesbase.platform.execution.FactoryIntegrationContext;
+
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.stream.Collectors;
+
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
@@ -80,6 +81,7 @@ public class WorkOrderService {
     private final RoutingNodeMapper nodes;
     private final RoutingEdgeMapper edges;
     private final MaterialMapper materials;
+    private final MaterialQuantityRules quantityRules;
     private final RoutingReferenceRules references;
     private final MesMaterialIssueMapper issues;
     private final WorkOrderExtraMapper queries;
@@ -91,7 +93,8 @@ public class WorkOrderService {
                             MesMaterialIssueMapper issues, WorkOrderExtraMapper queries,
                             MesProductionExecutionMapper executions, WorkorderErpFacts facts,
                             BusinessDirectoryService directory, MesWorkorderMaterialMapper requirements,
-                            BusinessSourceRules sources, WorkorderErpExtraMapper external, SyncCoordinator sync) {
+                            BusinessSourceRules sources, WorkorderErpExtraMapper external, SyncCoordinator sync,
+                            MaterialQuantityRules quantityRules) {
         this.external = external;
         this.sync = sync;
         this.sources = sources;
@@ -105,6 +108,7 @@ public class WorkOrderService {
         this.nodes = nodes;
         this.edges = edges;
         this.materials = materials;
+        this.quantityRules = quantityRules;
         this.references = references;
         this.issues = issues;
         this.queries = queries;
@@ -185,7 +189,7 @@ public class WorkOrderService {
         if (input.externalId() != null || input.externalCode() != null)
             throw new FoundationException(ErrorCode.EXTERNAL_SOURCE_READ_ONLY);
         validate(input);
-        ProductionQuantityInput.check(input.plannedQty());
+        quantityRules.checkForWrite(input.plannedQty(), input.productId());
         uniqueCode(input.code(), null);
         var row = new WorkorderEntity();
         row.setSource(BusinessSource.LOCAL.getValue());
@@ -320,7 +324,10 @@ public class WorkOrderService {
         }
         validateValues(input);
         if (identityChanged) binding(input.productId(), input.routingId());
-        ProductionQuantityInput.changed(input.plannedQty(), row.getPlannedQty());
+        if (!Objects.equals(input.productId(), row.getProductId())
+                || input.plannedQty() == null || row.getPlannedQty() == null
+                || input.plannedQty().compareTo(row.getPlannedQty()) != 0)
+            quantityRules.checkForWrite(input.plannedQty(), input.productId());
         if (quantityChanged) {
             var allocation = queries.activeAllocation(id, null);
             if (allocation == null || allocation.allocatedTargetQty().compareTo(input.plannedQty()) > 0)
@@ -444,8 +451,10 @@ public class WorkOrderService {
     }
 
     private void binding(Long product, Long routing, boolean lock) {
-        if (lock) references.lockMaterials(List.of(product), true);
-        else {
+        if (lock) {
+            quantityRules.lockForWrite(List.of(product));
+            references.lockMaterials(List.of(product), true);
+        } else {
             var material = materials.selectByPrimaryKey(product);
             require(material != null && EnableStatus.ENABLED.getValue().equals(material.getStatus()));
         }

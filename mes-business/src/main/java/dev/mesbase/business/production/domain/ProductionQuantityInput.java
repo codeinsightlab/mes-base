@@ -2,6 +2,7 @@ package dev.mesbase.business.production.domain;
 
 import dev.mesbase.core.error.ErrorCode;
 import dev.mesbase.core.error.FoundationException;
+
 import java.math.BigDecimal;
 
 /**
@@ -12,7 +13,11 @@ public final class ProductionQuantityInput {
     }
 
     public static void check(BigDecimal value) {
-        if (value == null || value.stripTrailingZeros().scale() > 2)
+        if (value == null) throw new FoundationException(ErrorCode.BAD_REQUEST);
+        BigDecimal normalized = value.stripTrailingZeros();
+        int scale = Math.max(0, normalized.scale());
+        int integerDigits = Math.max(0, normalized.precision() - normalized.scale());
+        if (scale > 6 || integerDigits > 14)
             throw new FoundationException(ErrorCode.BAD_REQUEST);
     }
 

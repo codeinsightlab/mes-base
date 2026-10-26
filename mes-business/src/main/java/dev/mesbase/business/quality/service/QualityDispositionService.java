@@ -2,7 +2,6 @@ package dev.mesbase.business.quality.service;
 
 import dev.mesbase.business.basic.dao.MaterialMapper;
 import dev.mesbase.business.production.domain.ProductionExecutionStatus;
-import dev.mesbase.business.production.domain.ProductionQuantityInput;
 import dev.mesbase.business.production.service.BusinessSourceRules;
 import dev.mesbase.business.production.service.ProductionChainLocks;
 import dev.mesbase.business.production.service.ProductionIdentityService;
@@ -33,6 +32,7 @@ import dev.mesbase.core.security.AuthenticatedActor;
 import dev.mesbase.core.security.AuthorizationService;
 import dev.mesbase.core.security.Permission;
 import dev.mesbase.platform.execution.FactoryContext;
+
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -41,6 +41,7 @@ import java.util.HexFormat;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
+
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
@@ -101,7 +102,6 @@ public class QualityDispositionService {
         } catch (IllegalArgumentException failure) {
             ParameterChecks.reject(ErrorCode.BAD_REQUEST);
         }
-        ProductionQuantityInput.check(c.quantity());
         String hash = hash(declaration, c);
         if (replayed(declaration, c.requestId(), hash)) return treatments.details(declaration);
         if (c.destination() == Destination.RETURN_NODE)
@@ -128,12 +128,19 @@ public class QualityDispositionService {
                     .getSource()) != BusinessSource.LOCAL)
                 throw new FoundationException(ErrorCode.INTEGRATION_NOT_CONFIGURED);
             var batchNo = identities.requiredBatch(execution.getId());
-            references.lockDemandReferences(execution.getProductId(), List.of(c.warehouseId()));
+            var owner = documents.getObject();
+            // Material rule validation precedes warehouse/stock locks, including existing stock rows.
             var warehouse = warehouses.selectByPrimaryKey(c.warehouseId());
+            if (warehouse == null) ParameterChecks.reject(ErrorCode.RECEIPT_WAREHOUSE_INVALID);
             var warehouseType = WarehouseType.from(warehouse.getWarehouseType());
             if (warehouseType != WarehouseType.DEFECTIVE && warehouseType != WarehouseType.SCRAP)
                 ParameterChecks.reject(ErrorCode.RECEIPT_WAREHOUSE_INVALID);
             var receiptType = warehouseType == WarehouseType.DEFECTIVE ? StockDocumentType.DEFECT_RECEIPT : StockDocumentType.SCRAP_RECEIPT;
+            var doc = owner.createQualityReceipt(new StockDocumentModels.Create(receiptType.getValue(), c.reason()
+                    .trim(), "质量申报 " + declaration, null, null));
+            documentId = doc.document().getId();
+            treatments.recordDisposition(declaration, c, hash, documentId);
+            references.lockDemandReferences(execution.getProductId(), List.of(c.warehouseId()));
             var material = materials.selectByPrimaryKey(execution.getProductId());
             if (material == null || material.getUnitId() == null)
                 ParameterChecks.reject(ErrorCode.QUALITY_TREATMENT_CONFLICT);
@@ -146,14 +153,10 @@ public class QualityDispositionService {
                     .insert(new WmInventoryCreateCommand(execution.getProductId(),
                             c.warehouseId(), BigDecimal.ZERO, BigDecimal.ZERO, EnableStatus.ENABLED.getValue(), "质量转仓库存来源", batchNo, null))
                     .inventory().getId() : rows.getFirst().getId();
-            var owner = documents.getObject();
-            var doc = owner.createQualityReceipt(new StockDocumentModels.Create(receiptType.getValue(), c.reason()
-                    .trim(), "质量申报 " + declaration, null, null));
-            documentId = doc.document().getId();
+
             owner.putLine(documentId, null, new StockDocumentModels.Line(doc.document().getRevision(), stockId,
                     execution.getProductId(), c.warehouseId(), material.getUnitId(), batchNo, null,
                     c.quantity(), "质量处置 " + c.requestId()));
-            treatments.recordDisposition(declaration, c, hash, documentId);
             owner.approve(documentId, new StockDocumentModels.Post(c.requestId(), owner.detail(documentId).document()
                     .getRevision()));
         }

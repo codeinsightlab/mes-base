@@ -82,3 +82,7 @@ Redis 读取/写入或缓存 payload 恢复失败记录 WARN，继续原数据�
 物料同步入口 → `MaterialSyncService` → 注入的 `MaterialSyncWriter` Spring 代理；写入与动态淘汰在同一事务内。通用缓存组件不依赖物料同步结果类型。
 
 前端 `material/index.vue` 的编辑复用 CrudPage，列表行只取 ID 后调用 `api.detail`；新增只读详情按钮也只按 ID 查询，带 loading/error、权限检查和上下文变化清理。不以列表行作为详情结果。组件接入与生成器模板维护分别处理。
+
+## 集成测试依赖
+
+`BusinessCacheIntegrationTest` 使用独立随机端口的真实 Redis 兼容进程和 H2 事务，不复用应用缓存实例。默认可执行文件为 PATH 中的 `redis-server`；其他兼容运行时可通过测试 JVM 属性 `mes.test.redis.executable` 指定。测试使用临时配置文件关闭持久化，并在结束时关闭自己的进程；此参数不改变应用 Redis 配置。

@@ -7,6 +7,8 @@
     <result column="name" jdbcType="VARCHAR" property="name" />
     <result column="symbol" jdbcType="VARCHAR" property="symbol" />
     <result column="status" jdbcType="VARCHAR" property="status" />
+    <result column="must_be_whole_number" jdbcType="TINYINT" property="mustBeWholeNumber" />
+    <result column="quantity_precision" jdbcType="TINYINT" property="quantityPrecision" />
   </resultMap>
   <sql id="Example_Where_Clause">
     <where>
@@ -67,7 +69,7 @@
     </where>
   </sql>
   <sql id="Base_Column_List">
-    id, code, name, symbol, status
+    id, code, name, symbol, status, must_be_whole_number, quantity_precision
   </sql>
   <select id="selectByExample" parameterType="dev.mesbase.business.basic.domain.UnitMeasureExample" resultMap="BaseResultMap">
     select
@@ -104,10 +106,9 @@
     </if>
   </delete>
   <insert id="insert" keyColumn="id" keyProperty="id" parameterType="dev.mesbase.business.basic.domain.UnitMeasureEntity" useGeneratedKeys="true">
-    insert into unit_measure (code, name, symbol, 
-      status)
-    values (#{code,jdbcType=VARCHAR}, #{name,jdbcType=VARCHAR}, #{symbol,jdbcType=VARCHAR}, 
-      #{status,jdbcType=VARCHAR})
+    insert into unit_measure (code, name, symbol, status, must_be_whole_number, quantity_precision)
+    values (#{code,jdbcType=VARCHAR}, #{name,jdbcType=VARCHAR}, #{symbol,jdbcType=VARCHAR},
+      #{status,jdbcType=VARCHAR}, #{mustBeWholeNumber,jdbcType=TINYINT}, #{quantityPrecision,jdbcType=TINYINT})
   </insert>
   <insert id="insertSelective" keyColumn="id" keyProperty="id" parameterType="dev.mesbase.business.basic.domain.UnitMeasureEntity" useGeneratedKeys="true">
     insert into unit_measure
@@ -124,6 +125,8 @@
       <if test="status != null">
         status,
       </if>
+      <if test="mustBeWholeNumber != null">must_be_whole_number,</if>
+      <if test="quantityPrecision != null">quantity_precision,</if>
     </trim>
     <trim prefix="values (" suffix=")" suffixOverrides=",">
       <if test="code != null">
@@ -138,6 +141,8 @@
       <if test="status != null">
         #{status,jdbcType=VARCHAR},
       </if>
+      <if test="mustBeWholeNumber != null">#{mustBeWholeNumber,jdbcType=TINYINT},</if>
+      <if test="quantityPrecision != null">#{quantityPrecision,jdbcType=TINYINT},</if>
     </trim>
   </insert>
   <select id="countByExample" parameterType="dev.mesbase.business.basic.domain.UnitMeasureExample" resultType="java.lang.Long">
@@ -164,6 +169,8 @@
       <if test="row.status != null">
         status = #{row.status,jdbcType=VARCHAR},
       </if>
+      <if test="row.mustBeWholeNumber != null">must_be_whole_number = #{row.mustBeWholeNumber,jdbcType=TINYINT},</if>
+      <if test="row.quantityPrecision != null">quantity_precision = #{row.quantityPrecision,jdbcType=TINYINT},</if>
     </set>
     <if test="example != null">
       <include refid="Update_By_Example_Where_Clause" />
@@ -176,6 +183,8 @@
       name = #{row.name,jdbcType=VARCHAR},
       symbol = #{row.symbol,jdbcType=VARCHAR},
       status = #{row.status,jdbcType=VARCHAR}
+      ,must_be_whole_number = #{row.mustBeWholeNumber,jdbcType=TINYINT}
+      ,quantity_precision = #{row.quantityPrecision,jdbcType=TINYINT}
     <if test="example != null">
       <include refid="Update_By_Example_Where_Clause" />
     </if>
@@ -195,6 +204,8 @@
       <if test="status != null">
         status = #{status,jdbcType=VARCHAR},
       </if>
+      <if test="mustBeWholeNumber != null">must_be_whole_number = #{mustBeWholeNumber,jdbcType=TINYINT},</if>
+      <if test="quantityPrecision != null">quantity_precision = #{quantityPrecision,jdbcType=TINYINT},</if>
     </set>
     where id = #{id,jdbcType=BIGINT}
   </update>
@@ -204,6 +215,8 @@
       name = #{name,jdbcType=VARCHAR},
       symbol = #{symbol,jdbcType=VARCHAR},
       status = #{status,jdbcType=VARCHAR}
+      ,must_be_whole_number = #{mustBeWholeNumber,jdbcType=TINYINT}
+      ,quantity_precision = #{quantityPrecision,jdbcType=TINYINT}
     where id = #{id,jdbcType=BIGINT}
   </update>
 </mapper>

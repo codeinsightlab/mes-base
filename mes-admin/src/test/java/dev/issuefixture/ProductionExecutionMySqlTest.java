@@ -43,15 +43,18 @@ import dev.mesbase.business.production.domain.MesProductionExecutionCreateComman
 import dev.mesbase.business.production.domain.MesProductionExecutionExample;
 import dev.mesbase.business.production.domain.MesProductionExecutionUpdateCommand;
 import dev.mesbase.business.production.service.ProductionExecutionRules;
+import dev.mesbase.business.production.service.MaterialQuantityRules;
 import dev.mesbase.business.production.service.ProductionIdentityService;
 import dev.mesbase.business.production.service.impl.MesProductionExecutionServiceImpl;
 import dev.mesbase.common.core.domain.entity.SysUser;
 import dev.mesbase.common.core.domain.model.LoginUser;
 import dev.mesbase.core.error.FoundationException;
+
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
+
 import org.apache.ibatis.mapping.Environment;
 import org.apache.ibatis.session.Configuration;
 import org.apache.ibatis.session.SqlSessionFactoryBuilder;
@@ -109,7 +112,7 @@ class ProductionExecutionMySqlTest {
             var executions = s.getMapper(MesProductionExecutionMapper.class);
             var issues = s.getMapper(MesMaterialIssueMapper.class);
             var chainLocks = new ProductionChainLocks(s.getMapper(WorkorderMapper.class), executions, issues);
-            var rules = new ProductionExecutionRules(executions, s.getMapper(WorkorderMapper.class), s.getMapper(MaterialMapper.class), s.getMapper(RoutingMapper.class), s.getMapper(RoutingProductMapper.class), issues, chainLocks, s.getMapper(MesExecutionPathMapper.class), s.getMapper(MesExecutionPathNodeMapper.class), s.getMapper(MesProductionReportMapper.class), s.getMapper(ProductionQuantityMapper.class), new ExecutionQualityReferenceQueryImpl(s.getMapper(MesProductionDefectMapper.class), mock(QualityTreatmentService.class)), s.getMapper(MesExecutionAssignmentMapper.class), Mockito.mock(BusinessSourceRules.class), s.getMapper(WorkOrderExtraMapper.class));
+            var rules = new ProductionExecutionRules(executions, s.getMapper(WorkorderMapper.class), s.getMapper(MaterialMapper.class), s.getMapper(RoutingMapper.class), s.getMapper(RoutingProductMapper.class), issues, chainLocks, s.getMapper(MesExecutionPathMapper.class), s.getMapper(MesExecutionPathNodeMapper.class), s.getMapper(MesProductionReportMapper.class), s.getMapper(ProductionQuantityMapper.class), new ExecutionQualityReferenceQueryImpl(s.getMapper(MesProductionDefectMapper.class), mock(QualityTreatmentService.class)), s.getMapper(MesExecutionAssignmentMapper.class), Mockito.mock(BusinessSourceRules.class), s.getMapper(WorkOrderExtraMapper.class), new MaterialQuantityRules(s.getMapper(MaterialMapper.class), s.getMapper(UnitMeasureMapper.class), executions));
             var service = new MesProductionExecutionServiceImpl(executions, rules);
             var input = new MesProductionExecutionCreateCommand(workorder, routing, new BigDecimal("99999999999999.12"), "READY", null, null, tag);
             var first = service.insert(input);

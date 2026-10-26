@@ -6,9 +6,11 @@ import dev.mesbase.business.quality.domain.QualityTreatmentModels.AssessmentComm
 import dev.mesbase.business.quality.service.QualityTreatmentService;
 import dev.mesbase.common.utils.bean.BeanConversions;
 import dev.mesbase.platform.web.EndpointAccess;
+
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
+
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -39,7 +41,7 @@ public class QualityTreatmentController {
     public record View(String declarationId, int revision, String executionId, String routingNodeId, String defectQty,
                        String attribution, String relatedDeclarationId, String basis, String pendingDispositionQty,
                        String netDefectQty, String state, String recordAction,
-                       String returnedQty, String transferredQty, String receiptState) {
+                       String returnedQty, String transferredQty, String receiptState, String productId) {
     }
 
     @GetMapping("/treatments/recent")
@@ -82,7 +84,7 @@ public class QualityTreatmentController {
     }
 
     static View view(QualityTreatmentService.Details data) {
-        return BeanConversions.convert(data.summary(), View.class);
+        return BeanConversions.convertWith(data.summary(), data, View.class);
     }
 
     private static Event event(MesQualityTreatmentEntity event, Map<Long, DirectoryLabel> users) {

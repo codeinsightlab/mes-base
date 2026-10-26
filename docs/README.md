@@ -6,7 +6,7 @@
 | --- | --- |
 | 了解产品和范围 | [项目介绍](../README.md)、[路线图](roadmap.md) |
 | 使用生产和仓储 | [生产流程](usage/production.md)、[库存与审核](usage/inventory.md) |
-| 开发与扩展 | [生成器](development/codegen.md)、[主子单据](development/master-detail-documents.md)、[共享目录](development/business-directory.md)、[缓存](development/business-cache.md)、[列偏好](development/table-preferences.md)、[Java格式](development/java-code-style.md) |
+| 开发与扩展 | [生成器](development/codegen.md)、[主子单据](development/master-detail-documents.md)、[物料数量规则](development/quantity-rules.md)、[共享目录](development/business-directory.md)、[缓存](development/business-cache.md)、[列偏好](development/table-preferences.md)、[Java格式](development/java-code-style.md) |
 | 部署与维护 | [平台配置](development/platform.md)、[数据库升级](development/database-upgrades.md) |
 | 理解安全和集成 | [当前架构](architecture/README.md)、[请求与事务](development/request-admission.md)、[LOCAL/ERP边界](architecture/local-erp-business-boundary.md)、[E10接入](development/digiwin-e10-consumer.md) |
 | 贡献和同步代码 | [贡献指南](../CONTRIBUTING.md) |

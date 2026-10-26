@@ -26,11 +26,13 @@ import dev.mesbase.infrastructure.cache.annotation.BusinessCache;
 import dev.mesbase.infrastructure.cache.annotation.BusinessCacheEvict;
 import dev.mesbase.platform.execution.FactoryContext;
 import jakarta.validation.Validator;
+
 import java.time.Duration;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
+
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.dao.DuplicateKeyException;
@@ -114,6 +116,7 @@ public class UnitMeasureServiceImpl implements IUnitMeasureService {
         row.setName(input.name());
         row.setSymbol(input.symbol());
         row.setStatus(input.status());
+        setQuantityRules(row, input.mustBeWholeNumber(), input.quantityPrecision());
         rules.validate(row);
         if (insertUnique(row) != 1) {
             throw new FoundationException(ErrorCode.RESOURCE_CONFLICT);
@@ -126,12 +129,14 @@ public class UnitMeasureServiceImpl implements IUnitMeasureService {
     @BusinessCacheEvict(business = UnitMeasureResource.PREFIX,
             scope = BusinessCacheEvict.Scope.LIST_AND_DETAIL)
     public UnitMeasureEntity updateById(Long id, UnitMeasureUpdateCommand input) {
-        UnitMeasureEntity row = requireRecord(id);
+        UnitMeasureEntity row = mapper.selectByPrimaryKeyForUpdate(id);
+        if (row == null) throw new FoundationException(ErrorCode.NOT_FOUND);
         row.setId(id);
         row.setCode(input.code());
         row.setName(input.name());
         row.setSymbol(input.symbol());
         row.setStatus(input.status());
+        setQuantityRules(row, input.mustBeWholeNumber(), input.quantityPrecision());
         rules.validate(row);
         if (updateUnique(row) != 1) {
             throw new FoundationException(ErrorCode.RESOURCE_CONFLICT);
@@ -249,6 +254,13 @@ public class UnitMeasureServiceImpl implements IUnitMeasureService {
             row.setName(input.name());
             row.setSymbol(input.symbol());
             row.setStatus(input.status());
+            if (insert) {
+                row.setMustBeWholeNumber(0);
+                row.setQuantityPrecision(6);
+            } else {
+                row.setMustBeWholeNumber(existing.get(input.code()).getMustBeWholeNumber());
+                row.setQuantityPrecision(existing.get(input.code()).getQuantityPrecision());
+            }
             rules.validate(row);
             int affected;
             try {
@@ -275,6 +287,16 @@ public class UnitMeasureServiceImpl implements IUnitMeasureService {
                 && Objects.deepEquals(row.getName(), input.name())
                 && Objects.deepEquals(row.getSymbol(), input.symbol())
                 && Objects.deepEquals(row.getStatus(), input.status());
+    }
+
+    private static void setQuantityRules(UnitMeasureEntity row, Integer mustBeWholeNumber,
+                                         Integer quantityPrecision) {
+        if (mustBeWholeNumber == null || mustBeWholeNumber < 0 || mustBeWholeNumber > 1
+                || quantityPrecision == null || quantityPrecision < 0 || quantityPrecision > 6) {
+            throw new FoundationException(ErrorCode.BAD_REQUEST);
+        }
+        row.setMustBeWholeNumber(mustBeWholeNumber);
+        row.setQuantityPrecision(quantityPrecision);
     }
 }
 

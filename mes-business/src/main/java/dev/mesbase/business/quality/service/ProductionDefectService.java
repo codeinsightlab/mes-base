@@ -7,11 +7,11 @@ import dev.mesbase.business.integration.warehouse.ErpActionResult;
 import dev.mesbase.business.production.dao.MesProductionExecutionMapper;
 import dev.mesbase.business.production.dao.RoutingNodeMapper;
 import dev.mesbase.business.production.domain.ExecutionPathStatus;
-import dev.mesbase.business.production.domain.ProductionQuantityInput;
 import dev.mesbase.business.production.domain.RoutingNodeEntity;
 import dev.mesbase.business.production.domain.RoutingNodeExample;
 import dev.mesbase.business.production.service.ExecutionPathService;
 import dev.mesbase.business.production.service.ExecutionPathValidator;
+import dev.mesbase.business.production.service.MaterialQuantityRules;
 import dev.mesbase.business.production.service.ProductionChainLocks;
 import dev.mesbase.business.production.service.ProductionQuantityService;
 import dev.mesbase.business.quality.dao.MesProductionDefectMapper;
@@ -46,6 +46,7 @@ import dev.mesbase.core.security.AuthenticatedActor;
 import dev.mesbase.core.security.AuthorizationService;
 import dev.mesbase.core.security.Permission;
 import dev.mesbase.platform.execution.FactoryContext;
+
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -63,6 +64,7 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
+
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.dao.DuplicateKeyException;
@@ -88,6 +90,7 @@ public class ProductionDefectService {
     private final RoutingNodeMapper routingNodes;
     private final ProductionQuantityService quantities;
     private final QualityTreatmentService treatments;
+    private final MaterialQuantityRules quantityRules;
 
     public ProductionDefectService(MesProductionDefectMapper mapper, ProductionChainLocks locks,
                                    ExecutionPathService paths,
@@ -97,12 +100,14 @@ public class ProductionDefectService {
                                    ObjectProvider<AuthorizationService> authorization,
                                    ObjectProvider<OperationDefectTypeService> defectTypes,
                                    MesProductionExecutionMapper executions, MaterialMapper materials,
-                                   ProductionDefectListExtraMapper listQueries) {
+                                   ProductionDefectListExtraMapper listQueries,
+                                   MaterialQuantityRules quantityRules) {
         this.listQueries = listQueries;
         this.authorization = authorization;
         this.defectTypes = defectTypes;
         this.executions = executions;
         this.materials = materials;
+        this.quantityRules = quantityRules;
         this.mapper = mapper;
         this.locks = locks;
         this.paths = paths;
@@ -160,8 +165,8 @@ public class ProductionDefectService {
         retry = byKey(c.requestKey());
         if (retry != null) return replay(retry, fingerprint);
         if (c.facts() != null)
-            ProductionQuantityInput.changed(c.facts().defectQty(), Optional.ofNullable(before)
-                    .map(MesProductionDefectEntity::getDefectQty).orElse(null));
+            quantityRules.changedForExecutionWrite(c.facts().defectQty(), Optional.ofNullable(before)
+                    .map(MesProductionDefectEntity::getDefectQty).orElse(null), execution);
         var row = new MesProductionDefectEntity();
         if (before != null) {
             before = latest(id);
@@ -246,7 +251,6 @@ public class ProductionDefectService {
         locks.execution(c.executionId());
         old = byKey(c.requestId());
         if (old != null) return replay(old, fp);
-        ProductionQuantityInput.check(c.quantity());
         if (c.defectTypeId() == null || c.expectedTypeRevision() == null || c.wasteCategory() == null)
             ParameterChecks.reject(ErrorCode.BAD_REQUEST);
         var node = actualNode(c.executionId(), c.nodeId());

@@ -7,6 +7,7 @@ import dev.mesbase.business.production.dao.WorkorderErpExtraMapper;
 import dev.mesbase.business.production.service.BusinessSourceRules;
 import org.mockito.Mockito;
 import dev.mesbase.business.production.service.ProductionInputSupplyService;
+import dev.mesbase.business.production.service.MaterialQuantityRules;
 import dev.mesbase.business.production.service.ProductionIdentityService;
 import dev.mesbase.business.production.domain.ProductionScanCode;
 import dev.mesbase.business.integration.production.ProductionSupply.Stock;
@@ -23,9 +24,11 @@ import dev.mesbase.core.factory.FactoryId;
 import dev.mesbase.platform.execution.FactoryContext;
 import dev.mesbase.core.error.FoundationException;
 import dev.mesbase.core.error.ErrorCode;
+
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
+
 import org.springframework.transaction.PlatformTransactionManager;
 import org.junit.jupiter.api.Test;
 
@@ -48,7 +51,7 @@ class ProductionSupplyContractTest {
         var now = LocalDateTime.now();
         var stock = new Stock("S1", 1L, "M", "L", 1L, "W", "B", 1L, "KG", new BigDecimal("999"), now);
         var order = new Order(1L, "WO", "P", "产品", "CENTER", new BigDecimal("100"), "PCS", "ERP_TEST_APPROVED", List.of(1L), List.of(
-                new Requirement("M", 1L, 1L, "KG", new BigDecimal("200")), new Requirement("M2", 2L, 1L, "KG", new BigDecimal("50"))), "MO_TEST", now);
+                new Requirement("M", 1L, 1L, "KG", new BigDecimal("200")), new Requirement("M2", 2L, 1L, "KG", new BigDecimal("50"))), "MO_TEST", now, 2L);
         when(port.query(scope, "TEST_BINDING", "WO", "M", "L")).thenReturn(new Context(Mode.CONNECTED.getValue(), List.of(stock), List.of(order)));
         var sourceRules = mock(BusinessSourceRules.class);
         var sourceOrder = new WorkorderEntity();
@@ -57,10 +60,10 @@ class ProductionSupplyContractTest {
         when(sourceRules.order(1L)).thenReturn(sourceOrder);
         var identities = mock(ProductionIdentityService.class);
         when(identities.requireInputOrder(new ProductionScanCode("WO", "M", "L"))).thenReturn(sourceOrder);
-        var service = new ProductionInputSupplyService(integration, List.of(port), mock(LocalProductionSupply.class), mock(PlatformTransactionManager.class), sourceRules, identities);
+        var service = new ProductionInputSupplyService(integration, List.of(port), mock(LocalProductionSupply.class), mock(PlatformTransactionManager.class), sourceRules, identities, mock(MaterialQuantityRules.class));
         var failure = assertThrows(FoundationException.class, () -> FactoryContext.withScope(scope, () -> service.calculate("WO:M#L", 1L, "S1", BigDecimal.ONE)));
         assertEquals(ErrorCode.PRODUCTION_SINGLE_MATERIAL_REQUIRED, failure.code());
-        var absent = new ProductionInputSupplyService(integration, List.of(), mock(LocalProductionSupply.class), mock(PlatformTransactionManager.class), sourceRules, identities);
+        var absent = new ProductionInputSupplyService(integration, List.of(), mock(LocalProductionSupply.class), mock(PlatformTransactionManager.class), sourceRules, identities, mock(MaterialQuantityRules.class));
         assertEquals(ErrorCode.INTEGRATION_NOT_CONFIGURED, assertThrows(FoundationException.class, () -> FactoryContext.withScope(scope, () -> absent.query("WO:M#L"))).code());
     }
 }

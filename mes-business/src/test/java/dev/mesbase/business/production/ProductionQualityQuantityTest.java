@@ -21,10 +21,14 @@ import dev.mesbase.business.quality.dao.MesProductionDefectMapper;
 import dev.mesbase.business.quality.domain.ProductionDefectModels.NodeTotal;
 import dev.mesbase.business.quality.service.ExecutionQualityReferenceQueryImpl;
 import dev.mesbase.business.quality.service.QualityTreatmentService;
+
 import java.math.BigDecimal;
+
 import dev.mesbase.business.production.domain.ProductionInputBalance;
+
 import java.util.List;
 import java.util.Map;
+
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
@@ -47,7 +51,7 @@ class ProductionQualityQuantityTest {
     }
 
     static ExecutionQuantity view(List<NodeQuantity> nodes) {
-        return new ExecutionQuantity(1L, 1L, 1L, d("100"), "LOCKED", true, null, nodes, null, d("100"), d("100"), BigDecimal.ZERO);
+        return new ExecutionQuantity(1L, 1L, 1L, d("100"), "LOCKED", true, null, nodes, null, d("100"), d("100"), BigDecimal.ZERO, 1L);
     }
 
     @ParameterizedTest

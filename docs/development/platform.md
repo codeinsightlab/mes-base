@@ -23,6 +23,8 @@ java -jar target/mes-base-0.1.0-SNAPSHOT.jar --spring.profiles.active=dev
 
 默认profile为dev；prod显式指定 `--spring.profiles.active=prod`。配置变更需重新构建/加载相应运行产物，前端API代理目标应与实际监听端口一致。本机构建可能包含私有profile，按该环境的运行产物管理。
 
+应用打包会重新生成薄 JAR，再由 Spring Boot 加入当前依赖，避免仅修改业务模块后增量打包复用旧的可执行包。运行中的应用使用启动时的独立副本，不能直接运行随后会被 Maven 覆盖的输出文件。
+
 ## 中心初始化与业务库升级
 
 空中心库没有通用默认账号。首次管理员使用 `scripts/mes-platform-admin`，以实际配置为目标，密码通过 `MES_BOOTSTRAP_PASSWORD` 受控提供；脚本检查空用户表，不能用作已初始化系统的通用升级入口。

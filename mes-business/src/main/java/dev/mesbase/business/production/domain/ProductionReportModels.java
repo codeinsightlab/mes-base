@@ -7,6 +7,7 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.PastOrPresent;
 import jakarta.validation.constraints.Size;
+
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -87,7 +88,7 @@ public final class ProductionReportModels {
     public record ExecutionQuantity(Long executionId, Long workorderId, Long routingId,
                                     BigDecimal targetQty, String pathStatus, boolean writable, String boundary,
                                     List<NodeQuantity> nodes, String routingLabel, BigDecimal productionInputQty,
-                                    BigDecimal confirmedInputQty, BigDecimal reservedInputQty) {
+                                    BigDecimal confirmedInputQty, BigDecimal reservedInputQty, Long productId) {
     }
 
     public record ExecutionSummary(Long executionId, Long workorderId, Long routingId,

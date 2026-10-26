@@ -30,6 +30,7 @@ import dev.mesbase.common.utils.SecurityUtils;
 import dev.mesbase.common.validation.ParameterChecks;
 import dev.mesbase.core.error.ErrorCode;
 import dev.mesbase.core.error.FoundationException;
+
 import java.math.BigDecimal;
 import java.math.MathContext;
 import java.math.RoundingMode;
@@ -45,6 +46,7 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Isolation;
@@ -133,6 +135,7 @@ public class MaterialBomService {
 
     public void deleteByIds(List<Long> ids) {
         checkIds(ids);
+        lockMaterials(ids.stream().map(id -> require(id).getProductId()).toList());
         // Lock a stable order and reject referenced versions. Deleting a draft does not delete its components implicitly.
         for (var id : ids.stream().sorted().toList()) {
             editable(id);
@@ -203,6 +206,7 @@ public class MaterialBomService {
     }
 
     public MaterialBomItemEntity insertItem(MaterialBomItemCreateCommand c) {
+        lockMaterials(List.of(require(c.bomId()).getProductId(), c.materialId()));
         var parent = editable(c.bomId());
         var row = new MaterialBomItemEntity();
         row.setBomId(parent.getId());
@@ -214,6 +218,7 @@ public class MaterialBomService {
 
     public MaterialBomItemEntity updateItem(Long id, MaterialBomItemUpdateCommand c) {
         var original = item(id);
+        lockMaterials(List.of(require(original.getBomId()).getProductId(), original.getMaterialId(), c.materialId()));
         var parent = editable(original.getBomId());
         var row = item(id);
         fill(row, c.materialId(), c.quantity(), c.childBomId(), c.sort(), parent);
@@ -225,6 +230,7 @@ public class MaterialBomService {
     public void deleteItems(List<Long> ids) {
         checkIds(ids);
         var rows = ids.stream().map(this::item).toList();
+        lockMaterials(rows.stream().map(row -> require(row.getBomId()).getProductId()).toList());
         var parents = rows.stream().map(MaterialBomItemEntity::getBomId).distinct().sorted().map(this::editable)
                 .toList();
         for (var row : rows) changed(items.deleteByPrimaryKey(row.getId()));
@@ -359,13 +365,24 @@ public class MaterialBomService {
         if (boms.countByExample(roots) > 0 || items.countByExample(lines) > 0) conflict();
     }
 
+    private void lockMaterials(List<Long> ids) {
+        if (ids.stream().anyMatch(Objects::isNull)) conflict();
+        var rows = new ArrayList<MaterialEntity>();
+        for (Long id : ids.stream().distinct().sorted().toList()) {
+            var row = materials.selectByPrimaryKeyForUpdate(id);
+            if (row == null || !EnableStatus.ENABLED.getValue().equals(row.getStatus()) || row.getUnitId() == null)
+                conflict();
+            rows.add(row);
+        }
+        for (Long id : rows.stream().map(MaterialEntity::getUnitId).distinct().sorted().toList()) {
+            var unit = units.selectByPrimaryKeyForUpdate(id);
+            if (unit == null || !EnableStatus.ENABLED.getValue().equals(unit.getStatus())) conflict();
+        }
+    }
+
     private MaterialEntity lockMaterial(Long id) {
-        var row = materials.selectByPrimaryKeyForUpdate(id);
-        if (row == null || !EnableStatus.ENABLED.getValue().equals(row.getStatus()) || row.getUnitId() == null)
-            conflict();
-        var unit = units.selectByPrimaryKeyForUpdate(row.getUnitId());
-        if (unit == null || !EnableStatus.ENABLED.getValue().equals(unit.getStatus())) conflict();
-        return row;
+        lockMaterials(List.of(id));
+        return materials.selectByPrimaryKey(id);
     }
 
     private MaterialBomEntity require(Long id) {

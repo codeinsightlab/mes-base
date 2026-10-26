@@ -1,4 +1,3 @@
-// MES-CODEGEN: MyBatis Generator standard single-table persistence.
 package dev.mesbase.business.basic.domain;
 
 public class UnitMeasureEntity {
@@ -11,6 +10,10 @@ public class UnitMeasureEntity {
     private String symbol;
 
     private String status;
+
+    private Integer mustBeWholeNumber;
+
+    private Integer quantityPrecision;
 
     public Long getId() {
         return id;
@@ -51,4 +54,12 @@ public class UnitMeasureEntity {
     public void setStatus(String status) {
         this.status = status;
     }
+
+    public Integer getMustBeWholeNumber() { return mustBeWholeNumber; }
+
+    public void setMustBeWholeNumber(Integer mustBeWholeNumber) { this.mustBeWholeNumber = mustBeWholeNumber; }
+
+    public Integer getQuantityPrecision() { return quantityPrecision; }
+
+    public void setQuantityPrecision(Integer quantityPrecision) { this.quantityPrecision = quantityPrecision; }
 }

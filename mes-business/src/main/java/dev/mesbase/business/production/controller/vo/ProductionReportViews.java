@@ -5,6 +5,7 @@ import dev.mesbase.business.production.domain.ProductionReportModels.ExecutionQu
 import dev.mesbase.business.production.domain.ProductionReportModels.ExecutionSummary;
 import dev.mesbase.business.production.domain.ProductionReportModels.NodeQuantity;
 import dev.mesbase.business.production.service.ProductionQuantityService;
+
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -40,7 +41,7 @@ public final class ProductionReportViews {
                             String targetQty,
                             String pathStatus, boolean writable, String boundary, List<Node> nodes,
                             String routingLabel, String productionInputQty, String confirmedInputQty,
-                            String reservedInputQty) {
+                            String reservedInputQty, String productId) {
     }
 
     public record Summary(String executionId, String workorderId, String routingId,
@@ -62,7 +63,7 @@ public final class ProductionReportViews {
         return new Execution(id(v.executionId()), id(v.workorderId()), id(v.routingId()), decimal(v.targetQty()),
                 v.pathStatus(), v.writable(), v.boundary(), v.nodes().stream()
                 .map(n -> node(n, ProductionQuantityService.positiveReportBlockReason(v, n.routingNodeId())))
-                .toList(), v.routingLabel(), decimal(v.productionInputQty()), decimal(v.confirmedInputQty()), decimal(v.reservedInputQty()));
+                .toList(), v.routingLabel(), decimal(v.productionInputQty()), decimal(v.confirmedInputQty()), decimal(v.reservedInputQty()), id(v.productId()));
     }
 
     public static Node node(NodeQuantity n) {

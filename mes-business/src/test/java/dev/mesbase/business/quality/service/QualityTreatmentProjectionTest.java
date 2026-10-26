@@ -6,6 +6,7 @@ import dev.mesbase.business.production.domain.ProductionClosureRules;
 import dev.mesbase.business.production.service.ExecutionPathService;
 import dev.mesbase.business.production.service.ProductionChainLocks;
 import dev.mesbase.business.production.service.ProductionQuantityService;
+import dev.mesbase.business.production.service.MaterialQuantityRules;
 import dev.mesbase.business.quality.dao.MesProductionDefectMapper;
 import dev.mesbase.business.quality.dao.MesQualityTreatmentMapper;
 import dev.mesbase.business.quality.dao.ProductionDefectListExtraMapper;
@@ -13,18 +14,22 @@ import dev.mesbase.business.quality.domain.QualityTreatmentModels.CurrentFact;
 import dev.mesbase.business.quality.domain.QualityTreatmentModels.RequestKind;
 import dev.mesbase.business.quality.domain.QualityTreatmentModels.State;
 import dev.mesbase.core.error.FoundationException;
+
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+
 import dev.mesbase.common.utils.SecurityUtils;
 import dev.mesbase.business.quality.domain.MesProductionDefectEntity;
 import dev.mesbase.business.quality.domain.MesQualityTreatmentEntity;
 import dev.mesbase.business.quality.domain.QualityTreatmentModels.Disposition;
 import dev.mesbase.business.quality.domain.QualityTreatmentModels.Destination;
 import dev.mesbase.business.quality.domain.QualityTreatmentModels.Action;
+
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
+
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -49,7 +54,7 @@ class QualityTreatmentProjectionTest {
     private final BusinessDirectoryService directory = mock(BusinessDirectoryService.class);
     private final QualityTreatmentService service = new QualityTreatmentService(defects, events,
             mock(ProductionChainLocks.class), mock(ExecutionPathService.class),
-            mock(ProductionQuantityService.class), directory, mapper);
+            mock(ProductionQuantityService.class), directory, mapper, mock(MaterialQuantityRules.class));
 
     static CurrentFact fact(String id, long execution, long assessments, String attribution, long invalid) {
         return new CurrentFact(id, 1, execution, 11L, BigDecimal.TEN, "CREATE", assessments,
