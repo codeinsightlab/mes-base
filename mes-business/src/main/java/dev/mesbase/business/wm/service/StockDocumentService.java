@@ -25,8 +25,8 @@ import dev.mesbase.business.production.domain.MesProductionExecutionEntity;
 import dev.mesbase.business.production.domain.MesProductionReceiptExample;
 import dev.mesbase.business.production.domain.WorkorderEntity;
 import dev.mesbase.business.production.domain.ProductionExecutionStatus;
-import dev.mesbase.business.production.domain.ProductionQuantityInput;
 import dev.mesbase.business.quality.service.QualityTreatmentService;
+import dev.mesbase.business.production.service.MaterialQuantityRules;
 import dev.mesbase.business.production.service.ProductionQuantityService;
 import dev.mesbase.business.production.domain.ExecutionPathStatus;
 import dev.mesbase.business.quality.domain.QualityTreatmentModels.Attribution;
@@ -58,6 +58,7 @@ import dev.mesbase.common.utils.uuid.IdUtils;
 import dev.mesbase.core.error.ErrorCode;
 import dev.mesbase.core.error.FoundationException;
 import jakarta.validation.Validator;
+
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
@@ -66,6 +67,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.function.Supplier;
+
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
@@ -88,6 +90,7 @@ public class StockDocumentService {
     private final WmInventoryMapper inventories;
     private final MaterialMapper materials;
     private final UnitMeasureMapper units;
+    private final MaterialQuantityRules quantityRules;
     private final LocalStockService stock;
     private final BusinessSourceRules sources;
     private final ProductionChainLocks locks;
@@ -110,7 +113,8 @@ public class StockDocumentService {
                                 WorkorderMapper orders, MesQualityTreatmentMapper qualityEvents,
                                 ObjectProvider<ProductionCompletionService> completion,
                                 ObjectProvider<ProductionInputService> productionInputs,
-                                ObjectProvider<MaterialIssueInputFacts> inputFacts) {
+                                ObjectProvider<MaterialIssueInputFacts> inputFacts,
+                                MaterialQuantityRules quantityRules) {
         this.productionInputs = productionInputs;
         this.inputFacts = inputFacts;
         this.completion = completion;
@@ -124,6 +128,7 @@ public class StockDocumentService {
         this.inventories = inventories;
         this.materials = materials;
         this.units = units;
+        this.quantityRules = quantityRules;
         this.stock = stock;
         this.sources = sources;
         this.locks = locks;
@@ -284,9 +289,6 @@ public class StockDocumentService {
         line.setBinCode(command.binCode());
         line.setQuantity(command.quantity());
         line.setRemark(command.remark());
-        if (header.getSourceExecutionId() != null
-                && type(header.getDocumentType()) != StockDocumentType.MATERIAL_ISSUE)
-            ProductionQuantityInput.check(command.quantity());
         validateIdentity(line);
         if ((lineId == null ? lines.insert(line) : lines.updateByPrimaryKey(line)) != 1)
             ParameterChecks.reject(ErrorCode.STOCK_DOCUMENT_CONFLICT);
@@ -600,6 +602,7 @@ public class StockDocumentService {
                 || !Objects.equals(source.getBinCode(), line.getBinCode())
                 || !Objects.equals(material.getUnitId(), line.getUnitId()))
             ParameterChecks.reject(ErrorCode.STOCK_DOCUMENT_CONFLICT);
+        quantityRules.checkForWrite(line.getQuantity(), material.getId());
     }
 
     private WmStockDocumentLineEntity requireLine(Long documentId, Long id) {

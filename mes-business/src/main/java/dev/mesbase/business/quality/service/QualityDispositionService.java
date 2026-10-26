@@ -2,7 +2,6 @@ package dev.mesbase.business.quality.service;
 
 import dev.mesbase.business.basic.dao.MaterialMapper;
 import dev.mesbase.business.production.domain.ProductionExecutionStatus;
-import dev.mesbase.business.production.domain.ProductionQuantityInput;
 import dev.mesbase.business.production.service.BusinessSourceRules;
 import dev.mesbase.business.production.service.ProductionChainLocks;
 import dev.mesbase.business.production.service.ProductionIdentityService;
@@ -33,6 +32,7 @@ import dev.mesbase.core.security.AuthenticatedActor;
 import dev.mesbase.core.security.AuthorizationService;
 import dev.mesbase.core.security.Permission;
 import dev.mesbase.platform.execution.FactoryContext;
+
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -41,6 +41,7 @@ import java.util.HexFormat;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
+
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
@@ -101,7 +102,6 @@ public class QualityDispositionService {
         } catch (IllegalArgumentException failure) {
             ParameterChecks.reject(ErrorCode.BAD_REQUEST);
         }
-        ProductionQuantityInput.check(c.quantity());
         String hash = hash(declaration, c);
         if (replayed(declaration, c.requestId(), hash)) return treatments.details(declaration);
         if (c.destination() == Destination.RETURN_NODE)

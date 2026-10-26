@@ -21,6 +21,10 @@ import dev.mesbase.common.core.domain.model.LoginUser;
 import dev.mesbase.core.error.ErrorCode;
 import dev.mesbase.core.error.FoundationException;
 import dev.mesbase.infrastructure.cache.annotation.BusinessCacheEvict;
+import dev.mesbase.business.sales.domain.SalesOrderStatus;
+import dev.mesbase.business.shared.enums.EnableStatus;
+import dev.mesbase.business.shared.enums.BusinessSource;
+
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.HashMap;
@@ -30,6 +34,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
+
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.security.core.Authentication;
@@ -47,7 +52,7 @@ public class SalesOrderDocumentService {
     private final IMesSalesOrderItemService itemService;
 
     public SalesOrderDocumentService(MesSalesOrderMapper orders, MesSalesOrderItemMapper items,
-            MesCustomerMapper customers, MaterialMapper materials, IMesSalesOrderItemService itemService) {
+                                     MesCustomerMapper customers, MaterialMapper materials, IMesSalesOrderItemService itemService) {
         this.orders = orders;
         this.items = items;
         this.customers = customers;
@@ -73,8 +78,8 @@ public class SalesOrderDocumentService {
         header.setOrderNo("SO-" + UUID.randomUUID().toString().replace("-", "").toUpperCase());
         header.setCustomerId(input.customerId());
         header.setOrderDate(input.orderDate());
-        header.setStatus("DRAFT");
-        header.setSourceType("LOCAL");
+        header.setStatus(SalesOrderStatus.DRAFT.getValue());
+        header.setSourceType(BusinessSource.LOCAL.getValue());
         header.setExternalId(null);
         header.setRemark(input.remark());
         header.setRevision(0);
@@ -148,7 +153,7 @@ public class SalesOrderDocumentService {
     }
 
     private void saveNewLines(long orderId, List<SalesOrderLineRequest> requests,
-            Map<Long, MaterialEntity> referencedMaterials, long userId, LocalDateTime now) {
+                              Map<Long, MaterialEntity> referencedMaterials, long userId, LocalDateTime now) {
         for (int index = 0; index < requests.size(); index++) {
             SalesOrderLineRequest request = requests.get(index);
             if (request.id() != null) throw new FoundationException(ErrorCode.BAD_REQUEST);
@@ -157,7 +162,7 @@ public class SalesOrderDocumentService {
     }
 
     private void insertLine(long orderId, int lineNumber, SalesOrderLineRequest request,
-            MaterialEntity material, long userId, LocalDateTime now) {
+                            MaterialEntity material, long userId, LocalDateTime now) {
         try {
             MesSalesOrderItemCreateCommand command = new MesSalesOrderItemCreateCommand(orderId, lineNumber,
                     request.materialId(), material.getUnitId(), request.orderedQty(), request.requiredDate(),
@@ -169,7 +174,7 @@ public class SalesOrderDocumentService {
     }
 
     private void updateLine(long orderId, int lineNumber, SalesOrderLineRequest request,
-            MesSalesOrderItemEntity existing, MaterialEntity material, long userId, LocalDateTime now) {
+                            MesSalesOrderItemEntity existing, MaterialEntity material, long userId, LocalDateTime now) {
         try {
             MesSalesOrderItemUpdateCommand command = new MesSalesOrderItemUpdateCommand(orderId,
                     lineNumber, request.materialId(), material.getUnitId(), request.orderedQty(),
@@ -186,7 +191,7 @@ public class SalesOrderDocumentService {
         Map<Long, MaterialEntity> found = new HashMap<>();
         for (Long id : ids) {
             MaterialEntity material = materials.selectByPrimaryKeyForUpdate(id);
-            if (material == null || !"ENABLED".equals(material.getStatus()) || material.getUnitId() == null) {
+            if (material == null || !EnableStatus.ENABLED.getValue().equals(material.getStatus()) || material.getUnitId() == null) {
                 throw new FoundationException(ErrorCode.UNPROCESSABLE);
             }
             found.put(id, material);
@@ -196,7 +201,7 @@ public class SalesOrderDocumentService {
 
     private void validateCustomer(Long customerId, Long allowedDisabledId) {
         MesCustomerEntity customer = customers.selectByPrimaryKeyForUpdate(customerId);
-        if (customer == null || !"ENABLED".equals(customer.getStatus())
+        if (customer == null || !EnableStatus.ENABLED.getValue().equals(customer.getStatus())
                 && !Objects.equals(customerId, allowedDisabledId)) {
             throw new FoundationException(ErrorCode.UNPROCESSABLE);
         }
@@ -210,7 +215,7 @@ public class SalesOrderDocumentService {
     }
 
     private static void requireEditable(MesSalesOrderEntity header, Integer revision) {
-        if (!"DRAFT".equals(header.getStatus()) || !"LOCAL".equals(header.getSourceType())
+        if (!SalesOrderStatus.DRAFT.getValue().equals(header.getStatus()) || !BusinessSource.LOCAL.getValue().equals(header.getSourceType())
                 || !Objects.equals(header.getRevision(), revision)) conflict();
     }
 

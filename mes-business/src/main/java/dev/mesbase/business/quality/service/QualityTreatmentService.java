@@ -6,8 +6,8 @@ import com.github.pagehelper.PageHelper;
 import dev.mesbase.business.directory.domain.DirectoryLabel;
 import dev.mesbase.business.directory.service.BusinessDirectoryService;
 import dev.mesbase.business.production.domain.ExecutionPathStatus;
-import dev.mesbase.business.production.domain.ProductionQuantityInput;
 import dev.mesbase.business.production.service.ExecutionPathService;
+import dev.mesbase.business.production.service.MaterialQuantityRules;
 import dev.mesbase.business.production.service.ProductionChainLocks;
 import dev.mesbase.business.production.service.ProductionQuantityService;
 import dev.mesbase.business.quality.dao.MesProductionDefectMapper;
@@ -32,6 +32,7 @@ import dev.mesbase.common.utils.SecurityUtils;
 import dev.mesbase.common.validation.ParameterChecks;
 import dev.mesbase.core.error.ErrorCode;
 import dev.mesbase.core.error.FoundationException;
+
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -45,11 +46,14 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Iterator;
 import java.util.NoSuchElementException;
+
 import dev.mesbase.common.core.page.PageData;
 import dev.mesbase.business.quality.domain.QualityTreatmentModels.CurrentFact;
 import dev.mesbase.business.quality.domain.QualityTreatmentModels.RequestKind;
+
 import java.util.UUID;
 import java.util.stream.Collectors;
+
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Lazy;
@@ -71,12 +75,14 @@ public class QualityTreatmentService {
     private final ExecutionPathService paths;
     private final ProductionQuantityService quantities;
     private final BusinessDirectoryService directory;
+    private final MaterialQuantityRules quantityRules;
     private final ObjectMapper json = new ObjectMapper().findAndRegisterModules();
 
     public QualityTreatmentService(MesProductionDefectMapper defects, MesQualityTreatmentMapper events,
                                    ProductionChainLocks locks, @Lazy ExecutionPathService paths,
                                    @Lazy ProductionQuantityService quantities, BusinessDirectoryService directory,
-                                   ProductionDefectListExtraMapper receiptProofs) {
+                                   ProductionDefectListExtraMapper receiptProofs,
+                                   MaterialQuantityRules quantityRules) {
         this.receiptProofs = receiptProofs;
         this.defects = defects;
         this.events = events;
@@ -84,6 +90,7 @@ public class QualityTreatmentService {
         this.paths = paths;
         this.quantities = quantities;
         this.directory = directory;
+        this.quantityRules = quantityRules;
     }
 
     public MesProductionDefectEntity latest(String id) {
@@ -154,7 +161,7 @@ public class QualityTreatmentService {
     public MesQualityTreatmentEntity recordDisposition(String declaration, Disposition command, String fingerprint,
                                                        Long stockDocumentId) {
         var d = latest(declaration);
-        locks.execution(d.getExecutionId());
+        var execution = locks.execution(d.getExecutionId());
         var s = summary(declaration);
         if (command.destination() != Destination.WAREHOUSE || command.expectedRevision() != d.getRevisionNo() || DefectRecordAction.VOID.getValue()
                 .equals(d.getRecordAction())
@@ -167,7 +174,7 @@ public class QualityTreatmentService {
         if (path.path() == null || !ExecutionPathStatus.LOCKED.getValue().equals(path.path().getPathStatus())
                 || !path.selectedNodeIds().contains(d.getAffectedNodeId()))
             ParameterChecks.reject(ErrorCode.QUALITY_TREATMENT_CONFLICT);
-        ProductionQuantityInput.check(command.quantity());
+        quantityRules.checkForWrite(command.quantity(), execution.getProductId());
         ParameterChecks.text(command.reason(), true, 500, ErrorCode.QUALITY_TREATMENT_CONFLICT);
         var row = new MesQualityTreatmentEntity();
         row.setId(command.requestId());

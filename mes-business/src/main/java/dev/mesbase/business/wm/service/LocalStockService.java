@@ -18,6 +18,7 @@ import dev.mesbase.business.production.domain.MesProductionReceiptExample;
 import dev.mesbase.business.production.domain.MesProductionReportExample;
 import dev.mesbase.business.production.service.BusinessSourceRules;
 import dev.mesbase.business.production.service.ProductionChainLocks;
+import dev.mesbase.business.production.service.MaterialQuantityRules;
 import dev.mesbase.business.quality.dao.MesProductionDefectMapper;
 import dev.mesbase.business.quality.domain.MesProductionDefectExample;
 import dev.mesbase.business.shared.enums.BusinessSource;
@@ -40,6 +41,7 @@ import dev.mesbase.common.validation.ParameterChecks;
 import dev.mesbase.core.error.ErrorCode;
 import dev.mesbase.core.error.FoundationException;
 import dev.mesbase.infrastructure.cache.annotation.BusinessCacheEvict;
+
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.Arrays;
@@ -47,6 +49,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
+
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Isolation;
@@ -73,6 +76,7 @@ public class LocalStockService {
     private final MesProductionReportMapper reports;
     private final MesProductionDefectMapper defects;
     private final MesProductionReceiptMapper receipts;
+    private final MaterialQuantityRules quantityRules;
     private final ObjectMapper json = new ObjectMapper();
 
     public LocalStockService(WmInventoryMapper inventory, WmStockActionMapper actions, MaterialMapper materials,
@@ -80,11 +84,12 @@ public class LocalStockService {
                              MesMaterialIssueMapper issues, WarehouseIntegration integration,
                              ProductionChainLocks locks, MesProductionReportMapper reports,
                              MesProductionDefectMapper defects, MesProductionReceiptMapper receipts,
-                             BusinessSourceRules sources) {
+                             BusinessSourceRules sources, MaterialQuantityRules quantityRules) {
         this.sources = sources;
         this.reports = reports;
         this.defects = defects;
         this.receipts = receipts;
+        this.quantityRules = quantityRules;
         this.inventory = inventory;
         this.actions = actions;
         this.materials = materials;
@@ -131,6 +136,7 @@ public class LocalStockService {
         var old = replay(id, hash);
         if (old != null) return old;
         if (type == StockActionType.RECEIPT) throw new FoundationException(ErrorCode.STOCK_DOCUMENT_REQUIRED);
+        quantityRules.checkForWrite(c.quantity(), stock.getMaterialId());
         if (input == null) sources.warehouse(BusinessSource.LOCAL.getValue(), stock.getWarehouseId());
         else {
             var originalExecution = locks.execution(input.getExecutionId());

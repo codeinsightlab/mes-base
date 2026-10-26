@@ -10,6 +10,7 @@ import dev.mesbase.business.production.domain.ProductionPlanCreateRequest;
 import dev.mesbase.business.production.domain.ProductionPlanLineRequest;
 import dev.mesbase.business.production.service.IMesProductionPlanItemService;
 import dev.mesbase.business.production.service.ProductionPlanDocumentService;
+import dev.mesbase.business.production.service.MaterialQuantityRules;
 import dev.mesbase.business.sales.dao.MesCustomerMapper;
 import dev.mesbase.business.sales.dao.MesSalesOrderItemMapper;
 import dev.mesbase.business.sales.dao.MesSalesOrderMapper;
@@ -24,6 +25,7 @@ import dev.mesbase.common.core.domain.entity.SysUser;
 import dev.mesbase.common.core.domain.model.LoginUser;
 import dev.mesbase.core.error.FoundationException;
 import dev.mesbase.infrastructure.persistence.OwnedTransactionManager;
+
 import java.math.BigDecimal;
 import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
@@ -34,9 +36,11 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
+
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -48,6 +52,7 @@ import org.springframework.transaction.annotation.EnableTransactionManagement;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+
 class SalesPlanningAggregateTransactionTest {
     private AnnotationConfigApplicationContext context;
     private JdbcTemplate jdbc;
@@ -213,8 +218,8 @@ class SalesPlanningAggregateTransactionTest {
 
         @Bean
         SalesOrderDocumentService salesOrderDocumentService(MesSalesOrderMapper orders,
-                MesSalesOrderItemMapper items, MesCustomerMapper customers, MaterialMapper materials,
-                IMesSalesOrderItemService itemService) {
+                                                            MesSalesOrderItemMapper items, MesCustomerMapper customers, MaterialMapper materials,
+                                                            IMesSalesOrderItemService itemService) {
             return new SalesOrderDocumentService(orders, items, customers, materials, itemService);
         }
 
@@ -258,12 +263,13 @@ class SalesPlanningAggregateTransactionTest {
 
         @Bean
         ProductionPlanDocumentService productionPlanDocumentService(MesProductionPlanMapper plans,
-                MesProductionPlanItemMapper items, MaterialMapper materials, IMesProductionPlanItemService itemService) {
-            return new ProductionPlanDocumentService(plans, items, materials, itemService);
+                                                                    MesProductionPlanItemMapper items, MaterialMapper materials, IMesProductionPlanItemService itemService) {
+            return new ProductionPlanDocumentService(plans, items, materials, itemService,
+                    Mockito.mock(MaterialQuantityRules.class));
         }
 
         private static <T> T proxy(Class<T> type, TestInvocationHandler handler) {
-            Object value = Proxy.newProxyInstance(type.getClassLoader(), new Class<?>[] {type}, (proxy, method, arguments) -> {
+            Object value = Proxy.newProxyInstance(type.getClassLoader(), new Class<?>[]{type}, (proxy, method, arguments) -> {
                 if (method.getDeclaringClass() == Object.class) {
                     if (method.getName().equals("toString")) return type.getSimpleName() + "TestProxy";
                     if (method.getName().equals("hashCode")) return System.identityHashCode(proxy);

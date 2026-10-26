@@ -24,6 +24,7 @@ import dev.mesbase.business.production.domain.WorkorderEntity;
 import dev.mesbase.business.production.service.BusinessSourceRules;
 import dev.mesbase.business.production.service.ProductionChainLocks;
 import dev.mesbase.business.production.service.ProductionExecutionRules;
+import dev.mesbase.business.production.service.MaterialQuantityRules;
 import dev.mesbase.business.production.service.RoutingReferenceRules;
 import dev.mesbase.business.production.service.WorkOrderService;
 import dev.mesbase.business.production.service.WorkorderErpFacts;
@@ -32,8 +33,10 @@ import dev.mesbase.common.utils.SecurityUtils;
 import dev.mesbase.core.error.ErrorCode;
 import dev.mesbase.core.error.FoundationException;
 import dev.mesbase.framework.sync.SyncCoordinator;
+
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -80,7 +83,7 @@ class LocalMaintenanceRulesTest {
                 mock(RoutingProductMapper.class), mock(RoutingNodeMapper.class), mock(RoutingEdgeMapper.class),
                 mock(MaterialMapper.class), mock(RoutingReferenceRules.class), issues, queries, executions,
                 mock(WorkorderErpFacts.class), mock(BusinessDirectoryService.class), mock(MesWorkorderMaterialMapper.class),
-                sources, mock(WorkorderErpExtraMapper.class), mock(SyncCoordinator.class)));
+                sources, mock(WorkorderErpExtraMapper.class), mock(SyncCoordinator.class), mock(MaterialQuantityRules.class)));
         doReturn(null).when(service).detail(1L);
         return service;
     }
@@ -218,7 +221,8 @@ class LocalMaintenanceRulesTest {
         workorders("RELEASED");
         return new ProductionExecutionRules(executions, orders, mock(MaterialMapper.class), mock(RoutingMapper.class),
                 mock(RoutingProductMapper.class), issues, locks, paths, mock(MesExecutionPathNodeMapper.class), reports,
-                mock(ProductionQuantityMapper.class), quality, assignments, sources, queries);
+                mock(ProductionQuantityMapper.class), quality, assignments, sources, queries,
+                mock(MaterialQuantityRules.class));
     }
 
     private MesProductionExecutionEntity execution() {

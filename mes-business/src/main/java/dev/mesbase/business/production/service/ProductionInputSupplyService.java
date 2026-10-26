@@ -3,7 +3,6 @@ package dev.mesbase.business.production.service;
 import dev.mesbase.common.utils.RequestFingerprint;
 
 import dev.mesbase.common.validation.ParameterChecks;
-import dev.mesbase.business.production.domain.ProductionQuantityInput;
 
 import dev.mesbase.business.production.service.BusinessSourceRules;
 import dev.mesbase.business.shared.enums.BusinessSource;
@@ -19,11 +18,15 @@ import dev.mesbase.business.production.domain.ProductionCodeRules;
 import dev.mesbase.core.error.ErrorCode;
 import dev.mesbase.core.error.FoundationException;
 import dev.mesbase.platform.execution.FactoryContext;
+
 import java.math.BigDecimal;
+
 import tools.jackson.databind.ObjectMapper;
+
 import java.math.RoundingMode;
 import java.util.List;
 import java.util.Objects;
+
 import org.springframework.stereotype.Service;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.transaction.annotation.Transactional;
@@ -41,16 +44,19 @@ public class ProductionInputSupplyService {
     private final List<ProductionErpAdapter> adapters;
     private final LocalProductionSupply local;
     private final TransactionTemplate readTransaction;
+    private final MaterialQuantityRules quantityRules;
 
     public ProductionInputSupplyService(WarehouseIntegration integration, List<ProductionErpAdapter> adapters,
                                         LocalProductionSupply local,
                                         @Qualifier("businessTransactionManager") PlatformTransactionManager manager,
-                                        BusinessSourceRules sources, ProductionIdentityService identities) {
+                                        BusinessSourceRules sources, ProductionIdentityService identities,
+                                        MaterialQuantityRules quantityRules) {
         this.identities = identities;
         this.sources = sources;
         this.integration = integration;
         this.adapters = List.copyOf(adapters);
         this.local = local;
+        this.quantityRules = quantityRules;
         readTransaction = new TransactionTemplate(manager);
         readTransaction.setReadOnly(true);
     }
@@ -97,8 +103,8 @@ public class ProductionInputSupplyService {
 
     @Transactional(transactionManager = "businessTransactionManager", propagation = Propagation.NOT_SUPPORTED)
     public Calculation calculate(String code, Long orderId, String stockReference, BigDecimal outputQty) {
-        ProductionQuantityInput.check(outputQty);
         var sourceOrder = readTransaction.execute(status -> sources.order(orderId));
+        quantityRules.checkForMaterial(outputQty, sourceOrder.getProductId());
         if (BusinessSource.LOCAL.getValue().equals(sourceOrder.getSource()))
             readTransaction.executeWithoutResult(status -> local.validateRequestedSource(orderId, stockReference));
         var context = query(code, orderId, 0, 1);
@@ -124,6 +130,11 @@ public class ProductionInputSupplyService {
             calculation = new Calculation(context.sourceMode(), order, stock, outputQty, issueQuantity(order.plannedQty(), total, outputQty));
         if (calculation.issueQty().compareTo(stock.availableQty()) > 0) ParameterChecks.reject(ErrorCode.BAD_REQUEST);
         return calculation;
+    }
+
+    public void validateOutputQuantity(BigDecimal outputQty, Long orderId) {
+        var order = readTransaction.execute(status -> sources.order(orderId));
+        quantityRules.checkForMaterial(outputQty, order.getProductId());
     }
 
     /**

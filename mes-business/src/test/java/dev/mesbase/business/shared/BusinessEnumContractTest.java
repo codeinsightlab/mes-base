@@ -15,18 +15,24 @@ import dev.mesbase.business.production.domain.ExecutionPathStatus;
 import dev.mesbase.business.production.domain.ProductionExecutionStatus;
 import dev.mesbase.business.production.domain.RoutingStatus;
 import dev.mesbase.business.production.domain.WorkOrderStatus;
+import dev.mesbase.business.production.domain.ProductionPlanStatus;
+import dev.mesbase.business.sales.domain.SalesOrderStatus;
 import dev.mesbase.business.shared.enums.EnableStatus;
+
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.HashSet;
+
 import dev.mesbase.business.wm.domain.StockDocumentType;
 import dev.mesbase.business.wm.domain.StockDocumentStatus;
+
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.regex.Pattern;
+
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -50,6 +56,8 @@ class BusinessEnumContractTest {
             ProductionExecutionStatus.class,
             RoutingStatus.class,
             WorkOrderStatus.class,
+            ProductionPlanStatus.class,
+            SalesOrderStatus.class,
             ProductionReceiptType.class,
             EnableStatus.class,
             StockDocumentType.class,

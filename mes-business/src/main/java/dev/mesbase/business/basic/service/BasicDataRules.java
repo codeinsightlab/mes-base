@@ -23,12 +23,14 @@ import dev.mesbase.business.shared.enums.EnableStatus;
 import dev.mesbase.business.wm.service.StockReferenceRules;
 import dev.mesbase.core.error.ErrorCode;
 import dev.mesbase.core.error.FoundationException;
+
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
@@ -128,6 +130,9 @@ public class BasicDataRules {
 
     public void validate(UnitMeasureEntity row) {
         status(row.getStatus());
+        reject(row.getMustBeWholeNumber() == null || row.getMustBeWholeNumber() < 0
+                || row.getMustBeWholeNumber() > 1 || row.getQuantityPrecision() == null
+                || row.getQuantityPrecision() < 0 || row.getQuantityPrecision() > 6);
         var example = new UnitMeasureExample();
         var criteria = example.createCriteria().andCodeEqualTo(row.getCode());
         if (row.getId() != null) criteria.andIdNotEqualTo(row.getId());

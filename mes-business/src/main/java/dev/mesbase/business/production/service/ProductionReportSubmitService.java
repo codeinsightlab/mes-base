@@ -1,6 +1,5 @@
 package dev.mesbase.business.production.service;
 
-import dev.mesbase.business.production.domain.ProductionQuantityInput;
 
 import dev.mesbase.business.basic.dao.WorkstationMapper;
 import dev.mesbase.business.production.dao.MesProductionExecutionMapper;
@@ -12,7 +11,9 @@ import dev.mesbase.business.production.domain.ProductionReportSubmitModels.Comma
 import dev.mesbase.business.production.domain.ProductionIdentity;
 import dev.mesbase.business.production.domain.ProductionReportModels.ExecutionQuantity;
 import dev.mesbase.business.production.service.ExecutionPathService.PathModel;
+
 import java.util.List;
+
 import dev.mesbase.business.production.domain.ProductionReportSubmitModels.Candidate;
 import dev.mesbase.business.production.domain.ProductionExecutionStatus;
 import dev.mesbase.business.production.domain.ReportRecordType;
@@ -20,11 +21,13 @@ import dev.mesbase.business.production.domain.WorkOrderStatus;
 import dev.mesbase.common.utils.SecurityUtils;
 import dev.mesbase.core.error.ErrorCode;
 import dev.mesbase.core.error.FoundationException;
+
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Objects;
 import java.util.Map;
 import java.util.stream.Collectors;
+
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
@@ -51,6 +54,7 @@ public class ProductionReportSubmitService {
     private final MesProductionExecutionMapper executions;
     private final WorkorderMapper orders;
     private final WorkstationMapper workstations;
+    private final MaterialQuantityRules quantityRules;
     private final OwnedTransactionManager transactionManager;
 
     public ProductionReportSubmitService(ProductionIdentityService identities, ProductionQuantityService quantities,
@@ -59,7 +63,8 @@ public class ProductionReportSubmitService {
                                          MesProductionReportMapper reports, MesProductionExecutionMapper executions,
                                          WorkorderMapper orders,
                                          WorkstationMapper workstations, BusinessSourceRules sources,
-                                         @Qualifier("businessTransactionManager") OwnedTransactionManager transactionManager) {
+                                         @Qualifier("businessTransactionManager") OwnedTransactionManager transactionManager,
+                                         MaterialQuantityRules quantityRules) {
         this.transactionManager = transactionManager;
         this.sources = sources;
         this.identities = identities;
@@ -71,6 +76,7 @@ public class ProductionReportSubmitService {
         this.executions = executions;
         this.orders = orders;
         this.workstations = workstations;
+        this.quantityRules = quantityRules;
     }
 
     @Transactional(transactionManager = "businessTransactionManager", readOnly = true, isolation = Isolation.READ_COMMITTED)
@@ -111,7 +117,7 @@ public class ProductionReportSubmitService {
         var execution = locked.execution();
         existing = reports.selectByRequestId(command.requestId());
         if (existing != null) return replay(existing, command, user);
-        ProductionQuantityInput.check(command.reportQty());
+        quantityRules.checkForWrite(command.reportQty(), execution.getProductId());
         sources.execution(execution, null);
         if (!ProductionExecutionStatus.allowsNormalReporting(execution.getStatus()))
             throw new FoundationException(ErrorCode.EXECUTION_INVALID);

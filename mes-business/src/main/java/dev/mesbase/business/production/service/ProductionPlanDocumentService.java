@@ -13,12 +13,15 @@ import dev.mesbase.business.production.domain.MesProductionPlanResource;
 import dev.mesbase.business.production.domain.ProductionPlanCreateRequest;
 import dev.mesbase.business.production.domain.ProductionPlanDocument;
 import dev.mesbase.business.production.domain.ProductionPlanLineRequest;
+import dev.mesbase.business.production.domain.ProductionPlanStatus;
+import dev.mesbase.business.shared.enums.EnableStatus;
 import dev.mesbase.business.production.domain.ProductionPlanUpdateRequest;
 import dev.mesbase.business.production.service.IMesProductionPlanItemService;
 import dev.mesbase.common.core.domain.model.LoginUser;
 import dev.mesbase.core.error.ErrorCode;
 import dev.mesbase.core.error.FoundationException;
 import dev.mesbase.infrastructure.cache.annotation.BusinessCacheEvict;
+
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.HashMap;
@@ -28,6 +31,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
+
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.security.core.Authentication;
@@ -42,13 +46,16 @@ public class ProductionPlanDocumentService {
     private final MesProductionPlanItemMapper items;
     private final MaterialMapper materials;
     private final IMesProductionPlanItemService itemService;
+    private final MaterialQuantityRules quantityRules;
 
     public ProductionPlanDocumentService(MesProductionPlanMapper plans, MesProductionPlanItemMapper items,
-            MaterialMapper materials, IMesProductionPlanItemService itemService) {
+                                         MaterialMapper materials, IMesProductionPlanItemService itemService,
+                                         MaterialQuantityRules quantityRules) {
         this.plans = plans;
         this.items = items;
         this.materials = materials;
         this.itemService = itemService;
+        this.quantityRules = quantityRules;
     }
 
     @Transactional(transactionManager = "businessTransactionManager", readOnly = true)
@@ -67,7 +74,7 @@ public class ProductionPlanDocumentService {
         MesProductionPlanEntity header = new MesProductionPlanEntity();
         header.setPlanNo("PP-" + UUID.randomUUID().toString().replace("-", "").toUpperCase());
         header.setPlanDate(input.planDate());
-        header.setStatus("DRAFT");
+        header.setStatus(ProductionPlanStatus.DRAFT.getValue());
         header.setRemark(input.remark());
         header.setRevision(0);
         header.setCreatedBy(userId);
@@ -145,7 +152,7 @@ public class ProductionPlanDocumentService {
     }
 
     private void insertLine(long planId, int lineNumber, ProductionPlanLineRequest request,
-            long userId, LocalDateTime now) {
+                            long userId, LocalDateTime now) {
         try {
             MesProductionPlanItemCreateCommand command = new MesProductionPlanItemCreateCommand(planId, lineNumber,
                     request.materialId(), request.plannedQty(), request.plannedStartAt(), request.plannedEndAt(),
@@ -157,7 +164,7 @@ public class ProductionPlanDocumentService {
     }
 
     private void updateLine(long planId, int lineNumber, ProductionPlanLineRequest request,
-            MesProductionPlanItemEntity existing, long userId, LocalDateTime now) {
+                            MesProductionPlanItemEntity existing, long userId, LocalDateTime now) {
         try {
             MesProductionPlanItemUpdateCommand command = new MesProductionPlanItemUpdateCommand(planId, lineNumber,
                     request.materialId(), request.plannedQty(), request.plannedStartAt(), request.plannedEndAt(),
@@ -173,10 +180,12 @@ public class ProductionPlanDocumentService {
         List<Long> ids = requests.stream().map(ProductionPlanLineRequest::materialId).distinct().sorted().toList();
         for (Long id : ids) {
             MaterialEntity material = materials.selectByPrimaryKeyForUpdate(id);
-            if (material == null || !"ENABLED".equals(material.getStatus())) {
+            if (material == null || !EnableStatus.ENABLED.getValue().equals(material.getStatus())) {
                 throw new FoundationException(ErrorCode.UNPROCESSABLE);
             }
         }
+        for (ProductionPlanLineRequest request : requests)
+            quantityRules.checkForWrite(request.plannedQty(), request.materialId());
     }
 
     private List<MesProductionPlanItemEntity> lines(long planId) {
@@ -191,7 +200,8 @@ public class ProductionPlanDocumentService {
     }
 
     private static void requireEditable(MesProductionPlanEntity header, Integer revision) {
-        if (!"DRAFT".equals(header.getStatus()) || !Objects.equals(header.getRevision(), revision)) conflict();
+        if (!ProductionPlanStatus.DRAFT.getValue().equals(header.getStatus())
+                || !Objects.equals(header.getRevision(), revision)) conflict();
     }
 
     private static void requireLines(List<ProductionPlanLineRequest> values) {

@@ -97,6 +97,7 @@
                 <artifactId>maven-jar-plugin</artifactId>
                 <configuration>
                     <outputDirectory>${mes.artifact.directory}</outputDirectory>
+                    <forceCreation>true</forceCreation>
                 </configuration>
             </plugin>
             <plugin>

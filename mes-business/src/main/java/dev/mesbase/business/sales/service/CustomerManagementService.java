@@ -8,14 +8,18 @@ import dev.mesbase.business.sales.domain.MesCustomerEntity;
 import dev.mesbase.business.sales.domain.MesCustomerExample;
 import dev.mesbase.business.sales.domain.MesCustomerResource;
 import dev.mesbase.business.sales.domain.MesSalesOrderExample;
+import dev.mesbase.business.shared.enums.BusinessSource;
+import dev.mesbase.business.shared.enums.EnableStatus;
 import dev.mesbase.common.core.domain.model.LoginUser;
 import dev.mesbase.common.utils.StringUtils;
 import dev.mesbase.core.error.ErrorCode;
 import dev.mesbase.core.error.FoundationException;
 import dev.mesbase.infrastructure.cache.annotation.BusinessCacheEvict;
+
 import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
+
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.security.core.Authentication;
@@ -52,8 +56,8 @@ public class CustomerManagementService {
         row.setContactPerson(input.contactPerson());
         row.setContactPhone(input.contactPhone());
         row.setAddress(input.address());
-        row.setStatus("ENABLED");
-        row.setSourceType("LOCAL");
+        row.setStatus(EnableStatus.ENABLED.getValue());
+        row.setSourceType(BusinessSource.LOCAL.getValue());
         row.setRevision(0);
         row.setRemark(input.remark());
         row.setCreatedBy(userId);
@@ -70,7 +74,8 @@ public class CustomerManagementService {
     @BusinessCacheEvict(business = MesCustomerResource.PREFIX, scope = BusinessCacheEvict.Scope.LIST_AND_DETAIL)
     public MesCustomerEntity update(long id, CustomerUpdateRequest input) {
         MesCustomerEntity row = required(customers.selectByPrimaryKeyForUpdate(id));
-        if (!Objects.equals(row.getRevision(), input.revision()) || !"LOCAL".equals(row.getSourceType())) conflict();
+        if (!Objects.equals(row.getRevision(), input.revision()) || !BusinessSource.LOCAL.getValue().equals(row.getSourceType()))
+            conflict();
         validateText(input.code(), true, 64);
         validateText(input.name(), true, 255);
         validateText(input.shortName(), false, 128);
@@ -104,7 +109,7 @@ public class CustomerManagementService {
                 || new HashSet<>(ids).size() != ids.size()) conflict();
         for (Long id : ids.stream().sorted().toList()) {
             MesCustomerEntity row = required(customers.selectByPrimaryKeyForUpdate(id));
-            if (!"LOCAL".equals(row.getSourceType())) conflict();
+            if (!BusinessSource.LOCAL.getValue().equals(row.getSourceType())) conflict();
             MesSalesOrderExample references = new MesSalesOrderExample();
             references.createCriteria().andCustomerIdEqualTo(id);
             if (orders.countByExample(references) > 0) conflict();

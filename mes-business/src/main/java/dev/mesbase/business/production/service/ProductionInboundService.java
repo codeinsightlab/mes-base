@@ -2,7 +2,6 @@ package dev.mesbase.business.production.service;
 
 import com.github.pagehelper.PageHelper;
 import dev.mesbase.business.basic.dao.MaterialMapper;
-import dev.mesbase.business.production.domain.ProductionQuantityInput;
 import dev.mesbase.business.wm.dao.WmInventoryMapper;
 import dev.mesbase.business.wm.dao.WmStockDocumentMapper;
 import dev.mesbase.business.wm.domain.StockDocumentModels;
@@ -23,10 +22,12 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.Size;
+
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
+
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Isolation;
@@ -49,11 +50,12 @@ public class ProductionInboundService {
     private final ProductionCompletionService completion;
     private final ProductionChainLocks locks;
     private final AuthorizationService authorization;
+    private final MaterialQuantityRules quantityRules;
 
     public ProductionInboundService(StockDocumentService documents, WmStockDocumentMapper headers,
                                     WmInventoryMapper inventory, MaterialMapper materials,
                                     ProductionCompletionService completion, ProductionChainLocks locks,
-                                    AuthorizationService authorization) {
+                                    AuthorizationService authorization, MaterialQuantityRules quantityRules) {
         this.documents = documents;
         this.headers = headers;
         this.inventory = inventory;
@@ -61,6 +63,7 @@ public class ProductionInboundService {
         this.completion = completion;
         this.locks = locks;
         this.authorization = authorization;
+        this.quantityRules = quantityRules;
     }
 
     @Transactional(transactionManager = "businessTransactionManager", isolation = Isolation.READ_COMMITTED,
@@ -78,7 +81,6 @@ public class ProductionInboundService {
         } catch (IllegalArgumentException failure) {
             throw new FoundationException(ErrorCode.BAD_REQUEST, failure);
         }
-        ProductionQuantityInput.check(command.quantity());
         // Same order/sibling -> document -> stock lock order as ordinary inbound approval.
         completion.lockInboundChain(executionId);
         var replay = replay(executionId, command);
@@ -90,6 +92,7 @@ public class ProductionInboundService {
                 || !Objects.equals(execution.getProductId(), stock.getMaterialId())
                 || execution.getBatchNo() == null || !execution.getBatchNo().equals(stock.getBatchNo()))
             ParameterChecks.reject(ErrorCode.STOCK_DOCUMENT_CONFLICT);
+        quantityRules.checkForWrite(command.quantity(), material.getId());
         var draft = documents.create(new StockDocumentModels.Create(StockDocumentType.PRODUCTION_RECEIPT.getValue(),
                 command.reason(), null, null, executionId));
         Long id = draft.document().getId();

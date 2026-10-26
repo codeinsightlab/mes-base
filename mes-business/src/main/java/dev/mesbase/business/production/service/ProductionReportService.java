@@ -7,7 +7,6 @@ import dev.mesbase.business.production.dao.MesProductionReportMapper;
 import dev.mesbase.business.production.dao.ProductionQuantityMapper;
 import dev.mesbase.business.production.domain.MesProductionReportEntity;
 import dev.mesbase.business.production.domain.MesProductionReportExample;
-import dev.mesbase.business.production.domain.ProductionQuantityInput;
 import dev.mesbase.business.production.domain.ProductionReportModels.Adjustment;
 import dev.mesbase.business.production.domain.ProductionReportModels.Detail;
 import dev.mesbase.business.production.domain.ProductionReportModels.ReportPage;
@@ -19,6 +18,7 @@ import dev.mesbase.common.utils.StringUtils;
 import dev.mesbase.common.validation.ParameterChecks;
 import dev.mesbase.core.error.ErrorCode;
 import dev.mesbase.core.error.FoundationException;
+
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -31,6 +31,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
+
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
@@ -51,12 +52,13 @@ public class ProductionReportService {
     private final ReportUserReferenceService users;
     private final BusinessDirectoryService references;
     private final WorkstationMapper workstations;
+    private final MaterialQuantityRules quantityRules;
 
     public ProductionReportService(MesProductionReportMapper reports, ProductionQuantityMapper totals,
                                    ProductionQuantityService quantities,
                                    ProductionChainLocks locks, ReportUserReferenceService users,
                                    WorkstationMapper workstations, BusinessDirectoryService references,
-                                   BusinessSourceRules sources) {
+                                   BusinessSourceRules sources, MaterialQuantityRules quantityRules) {
         this.sources = sources;
         this.reports = reports;
         this.totals = totals;
@@ -65,6 +67,7 @@ public class ProductionReportService {
         this.users = users;
         this.references = references;
         this.workstations = workstations;
+        this.quantityRules = quantityRules;
     }
 
     @Transactional(transactionManager = "businessTransactionManager", isolation = Isolation.READ_COMMITTED, rollbackFor = Exception.class)
@@ -76,8 +79,9 @@ public class ProductionReportService {
         locks.execution(command.executionId());
         existing = replay(command.requestId(), hash);
         if (existing != null) return existing;
-        sources.execution(locks.execution(command.executionId()), null);
-        ProductionQuantityInput.check(command.quantity());
+        var execution = locks.execution(command.executionId());
+        sources.execution(execution, null);
+        quantityRules.checkForWrite(command.quantity(), execution.getProductId());
         positive(command.quantity());
         reason(command.reason());
         if (command.reportTime() == null || command.reportTime().isAfter(LocalDateTime.now()))
@@ -108,7 +112,7 @@ public class ProductionReportService {
         if (existing != null) return existing;
         if (command.quantityDelta() != null && command.quantityDelta().signum() > 0)
             locks.requireActiveExecution(original.getExecutionId());
-        ProductionQuantityInput.check(command.quantityDelta());
+        quantityRules.checkForExecutionWrite(command.quantityDelta(), original.getExecutionId());
         delta(command.quantityDelta());
         reason(command.reason());
         return adjustLocked(original, command.quantityDelta(), command.reason(), command.requestId(), hash);

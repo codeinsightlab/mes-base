@@ -26,11 +26,13 @@ import dev.mesbase.infrastructure.cache.annotation.BusinessCache;
 import dev.mesbase.infrastructure.cache.annotation.BusinessCacheEvict;
 import dev.mesbase.platform.execution.FactoryContext;
 import jakarta.validation.Validator;
+
 import java.time.Duration;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
+
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.dao.DuplicateKeyException;
@@ -127,7 +129,8 @@ public class UnitMeasureServiceImpl implements IUnitMeasureService {
     @BusinessCacheEvict(business = UnitMeasureResource.PREFIX,
             scope = BusinessCacheEvict.Scope.LIST_AND_DETAIL)
     public UnitMeasureEntity updateById(Long id, UnitMeasureUpdateCommand input) {
-        UnitMeasureEntity row = requireRecord(id);
+        UnitMeasureEntity row = mapper.selectByPrimaryKeyForUpdate(id);
+        if (row == null) throw new FoundationException(ErrorCode.NOT_FOUND);
         row.setId(id);
         row.setCode(input.code());
         row.setName(input.name());
@@ -288,7 +291,8 @@ public class UnitMeasureServiceImpl implements IUnitMeasureService {
 
     private static void setQuantityRules(UnitMeasureEntity row, Integer mustBeWholeNumber,
                                          Integer quantityPrecision) {
-        if (mustBeWholeNumber == null || quantityPrecision == null) {
+        if (mustBeWholeNumber == null || mustBeWholeNumber < 0 || mustBeWholeNumber > 1
+                || quantityPrecision == null || quantityPrecision < 0 || quantityPrecision > 6) {
             throw new FoundationException(ErrorCode.BAD_REQUEST);
         }
         row.setMustBeWholeNumber(mustBeWholeNumber);

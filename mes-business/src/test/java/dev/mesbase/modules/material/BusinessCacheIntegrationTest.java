@@ -33,6 +33,7 @@ import dev.mesbase.platform.execution.FactoryContext;
 import com.github.pagehelper.Page;
 import com.github.pagehelper.PageHelper;
 import jakarta.validation.Validation;
+
 import java.net.ServerSocket;
 import java.nio.file.Files;
 import java.util.LinkedHashMap;
@@ -41,6 +42,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
+
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
@@ -58,7 +60,9 @@ import org.springframework.data.redis.connection.RedisConnectionFactory;
 import org.springframework.data.redis.core.Cursor;
 import org.springframework.data.redis.core.ScanOptions;
 import org.springframework.test.util.ReflectionTestUtils;
+
 import java.nio.charset.StandardCharsets;
+
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.serializer.JdkSerializationRedisSerializer;
 import org.springframework.data.redis.serializer.StringRedisSerializer;
@@ -107,8 +111,10 @@ class BusinessCacheIntegrationTest {
             redisPort = socket.getLocalPort();
         }
         var log = Files.createTempFile("mes-cache-redis-", ".log");
-        redisProcess = new ProcessBuilder("redis-server", "--bind", "127.0.0.1", "--port", String.valueOf(redisPort),
-                "--save", "", "--appendonly", "no").redirectErrorStream(true).redirectOutput(log.toFile()).start();
+        var config = Files.createTempFile("mes-cache-redis-", ".conf");
+        Files.writeString(config, "bind 127.0.0.1\nport " + redisPort + "\nsave \"\"\nappendonly no\n");
+        redisProcess = new ProcessBuilder(System.getProperty("mes.test.redis.executable", "redis-server"),
+                config.toString()).redirectErrorStream(true).redirectOutput(log.toFile()).start();
         try {
             boolean ready = false;
             for (int attempt = 0; attempt < 100; attempt++) {
