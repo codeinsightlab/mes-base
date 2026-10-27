@@ -7,6 +7,10 @@ import java.util.List;
 public interface SysAutoCodePartMapper {
     public List<SysAutoCodePart> selectSysAutoCodePartList(SysAutoCodePart sysAutoCodePart);
 
+    public List<SysAutoCodePart> selectAllForGeneration();
+
+    public List<SysAutoCodePart> selectByRuleIdForUpdate(Long ruleId);
+
     public SysAutoCodePart findById(Long partId);
 
     public SysAutoCodePart checkPartUnique(SysAutoCodePart sysAutoCodePart);

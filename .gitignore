@@ -30,6 +30,7 @@ docs/reviews/evidence
 !/docs/development/database-upgrades.md
 !/docs/development/java-code-style.md
 !/docs/development/business-cache.md
+!/docs/development/auto-code-numbering.md
 !/docs/development/business-directory.md
 !/docs/development/master-detail-documents.md
 !/docs/development/quantity-rules.md

@@ -26,12 +26,14 @@ public class SysAutoCodePartServiceImpl implements IAutoCodePartService {
     private final SysAutoCodePartMapper mapper;
     private final SysAutoCodeRuleMapper rules;
     private final AutoCodeExtraMapper extra;
+    private final AutoCodeRuleSnapshotCache cache;
 
     public SysAutoCodePartServiceImpl(SysAutoCodePartMapper mapper, SysAutoCodeRuleMapper rules,
-                                      AutoCodeExtraMapper extra) {
+                                      AutoCodeExtraMapper extra, AutoCodeRuleSnapshotCache cache) {
         this.mapper = mapper;
         this.rules = rules;
         this.extra = extra;
+        this.cache = cache;
     }
 
     public List<SysAutoCodePart> listPart(SysAutoCodePart query) {
@@ -52,40 +54,46 @@ public class SysAutoCodePartServiceImpl implements IAutoCodePartService {
     public int insertPart(SysAutoCodePart p) {
         p.setPartId(null);
         prepare(p);
-        return mapper.add(p);
+        int changed = mapper.add(p);
+        if (changed > 0) cache.invalidateAfterCommit();
+        return changed;
     }
 
     @Transactional(transactionManager = "masterTransactionManager", rollbackFor = Exception.class)
     public int updatePart(SysAutoCodePart p) {
         var old = findById(p.getPartId());
         if (!Objects.equals(old.getRuleId(), p.getRuleId())) throw new ServiceException("不能变更所属规则");
+        extra.lockRule(old.getRuleId());
         prepare(p);
-        return mapper.updateSysAutoCodePart(p);
+        int changed = mapper.updateSysAutoCodePart(p);
+        if (changed > 0) cache.invalidateAfterCommit();
+        return changed;
     }
 
     @Transactional(transactionManager = "masterTransactionManager", rollbackFor = Exception.class)
     public int deleteByIds(Long[] ids) {
         if (ids == null || ids.length == 0 || ids.length > 100) throw new ServiceException("请选择规则组成");
-        int count = 0;
-        for (Long id : Arrays.stream(ids).distinct().sorted().toList()) {
-            var p = findById(id);
-            extra.lockRule(p.getRuleId());
-            count += mapper.deleteById(id);
-        }
+        var partIds = Arrays.stream(ids).distinct().sorted().toList();
+        var rows = partIds.stream().map(this::findById).toList();
+        rows.stream().map(SysAutoCodePart::getRuleId).distinct().sorted().forEach(extra::lockRule);
+        int count = partIds.stream().mapToInt(mapper::deleteById).sum();
+        if (count > 0) cache.invalidateAfterCommit();
         return count;
     }
 
     private void prepare(SysAutoCodePart p) {
-        if (p.getRuleId() == null || rules.findById(p.getRuleId()) == null)
+        if (p.getRuleId() == null)
             throw new ServiceException("所属规则不存在");
-        extra.lockRule(p.getRuleId());
+        if (extra.lockRule(p.getRuleId()) == null)
+            throw new ServiceException("所属规则不存在");
+        if (rules.findByIdForUpdate(p.getRuleId()) == null)
+            throw new ServiceException("所属规则不存在");
         validate(p);
         if (UserConstants.NOT_UNIQUE.equals(checkPartUnique(p))) throw new ServiceException("组成编码、名称或顺序重复");
         if ("SERIALNO".equals(p.getPartType())) {
-            var q = new SysAutoCodePart();
-            q.setRuleId(p.getRuleId());
-            q.setPartType("SERIALNO");
-            if (listPart(q).stream().anyMatch(other -> !Objects.equals(other.getPartId(), p.getPartId())))
+            if (mapper.selectByRuleIdForUpdate(p.getRuleId()).stream()
+                    .filter(other -> "SERIALNO".equals(other.getPartType()))
+                    .anyMatch(other -> !Objects.equals(other.getPartId(), p.getPartId())))
                 throw new ServiceException("一个规则只能有一个流水号组成");
         }
         p.setSeriaNowNo(null);

@@ -69,6 +69,43 @@ public class RedisCache {
                 .eval(script, ReturnType.INTEGER, values.size() + 1, arguments.toArray(byte[][]::new)));
     }
 
+    /** Atomically fills a shared snapshot only while its invalidation token is unchanged. */
+    public boolean setCacheObjectIfVersion(String versionKey, String expectedVersion, String key,
+                                           Object value, int ttlSeconds) {
+        byte[] script = ("local v=redis.call('GET',KEYS[1]); "
+                + "if ARGV[1]=='0' then if v then return 0 end "
+                + "else if v~=ARGV[2] then return 0 end end; "
+                + "redis.call('SET',KEYS[2],ARGV[3],'EX',ARGV[4]); return 1")
+                .getBytes(StandardCharsets.UTF_8);
+        byte[] version = redisTemplate.getKeySerializer().serialize(storageKey(versionKey));
+        byte[] snapshot = redisTemplate.getKeySerializer().serialize(storageKey(key));
+        byte[] expected = expectedVersion == null ? new byte[0]
+                : redisTemplate.getValueSerializer().serialize(expectedVersion);
+        byte[] encodedValue = redisTemplate.getValueSerializer().serialize(value);
+        byte[] absent = "0".getBytes(StandardCharsets.UTF_8);
+        byte[] present = "1".getBytes(StandardCharsets.UTF_8);
+        byte[] ttl = Integer.toString(ttlSeconds).getBytes(StandardCharsets.UTF_8);
+        Object rawResult = redisTemplate.execute((RedisCallback<Long>) connection -> connection.scriptingCommands()
+                .eval(script, ReturnType.INTEGER, 2, version, snapshot,
+                        expectedVersion == null ? absent : present, expected, encodedValue, ttl));
+        return rawResult instanceof Number result && result.longValue() == 1L;
+    }
+
+    /** Publishes the committed generation and evicts its snapshot as one Redis operation. */
+    public void invalidateVersionedObject(String versionKey, String snapshotKey, String newVersion) {
+        byte[] script = "redis.call('SET',KEYS[1],ARGV[1]); redis.call('DEL',KEYS[2]); return 1"
+                .getBytes(StandardCharsets.UTF_8);
+        byte[] version = redisTemplate.getKeySerializer().serialize(storageKey(versionKey));
+        byte[] snapshot = redisTemplate.getKeySerializer().serialize(storageKey(snapshotKey));
+        byte[] value = redisTemplate.getValueSerializer().serialize(newVersion);
+        redisTemplate.execute((RedisCallback<Long>) connection -> connection.scriptingCommands()
+                .eval(script, ReturnType.INTEGER, 2, version, snapshot, value));
+    }
+
+    public String getCacheVersion(String key) {
+        return (String) redisTemplate.opsForValue().get(storageKey(key));
+    }
+
     public String storageKey(String logical) {
         return namespace.key(logical);
     }

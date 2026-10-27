@@ -45,10 +45,20 @@
         order by rule_id asc
     </select>
 
+    <select id="selectAllForGeneration" resultMap="SysAutoCodeRuleResult">
+        <include refid="selectSysAutoCodeRuleVo"/>
+        order by d.rule_id asc
+    </select>
+
     <select id="findById" parameterType="Long" resultMap="SysAutoCodeRuleResult">
         <include refid="selectSysAutoCodeRuleVo">
         </include>
         where rule_id = #{ruleId}
+    </select>
+
+    <select id="findByIdForUpdate" parameterType="Long" resultMap="SysAutoCodeRuleResult">
+        <include refid="selectSysAutoCodeRuleVo"/>
+        where rule_id = #{ruleId} for update
     </select>
 
     <select id="checkRuleCodeUnique" parameterType="String" resultMap="SysAutoCodeRuleResult">

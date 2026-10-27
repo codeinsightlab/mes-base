@@ -60,6 +60,17 @@
         order by part_index asc
     </select>
 
+    <select id="selectAllForGeneration" resultMap="SysAutoCodePartResult">
+        <include refid="selectSysAutoCodePartVo"/>
+        order by d.rule_id asc, d.part_index asc
+    </select>
+
+    <select id="selectByRuleIdForUpdate" parameterType="Long" resultMap="SysAutoCodePartResult">
+        <include refid="selectSysAutoCodePartVo"/>
+        where d.rule_id = #{ruleId}
+        order by d.part_index asc for update
+    </select>
+
     <select id="findById" parameterType="Long" resultMap="SysAutoCodePartResult">
         <include refid="selectSysAutoCodePartVo">
         </include>

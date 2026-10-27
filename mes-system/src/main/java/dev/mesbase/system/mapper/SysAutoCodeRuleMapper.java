@@ -8,7 +8,11 @@ public interface SysAutoCodeRuleMapper {
 
     public List<SysAutoCodeRule> selectSysAutoCodeResultList(SysAutoCodeRule sysAutoCodeRule);
 
+    public List<SysAutoCodeRule> selectAllForGeneration();
+
     public SysAutoCodeRule findById(Long ruleId);
+
+    public SysAutoCodeRule findByIdForUpdate(Long ruleId);
 
     public int add(SysAutoCodeRule sysAutoCodeRule);
 

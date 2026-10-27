@@ -22,10 +22,13 @@ import org.springframework.transaction.annotation.Transactional;
 public class SysAutoCodeRuleServiceImpl implements IAutoCodeRuleService {
     private final SysAutoCodeRuleMapper mapper;
     private final AutoCodeExtraMapper extra;
+    private final AutoCodeRuleSnapshotCache cache;
 
-    public SysAutoCodeRuleServiceImpl(SysAutoCodeRuleMapper mapper, AutoCodeExtraMapper extra) {
+    public SysAutoCodeRuleServiceImpl(SysAutoCodeRuleMapper mapper, AutoCodeExtraMapper extra,
+                                     AutoCodeRuleSnapshotCache cache) {
         this.mapper = mapper;
         this.extra = extra;
+        this.cache = cache;
     }
 
     public SysAutoCodeRule getOne(String code) {
@@ -60,7 +63,9 @@ public class SysAutoCodeRuleServiceImpl implements IAutoCodeRuleService {
         validate(rule);
         unique(rule);
         rule.setRuleId(null);
-        return mapper.add(rule);
+        int changed = mapper.add(rule);
+        if (changed > 0) cache.invalidateAfterCommit();
+        return changed;
     }
 
     @Transactional(transactionManager = "masterTransactionManager", rollbackFor = Exception.class)
@@ -70,7 +75,9 @@ public class SysAutoCodeRuleServiceImpl implements IAutoCodeRuleService {
         if (!Objects.equals(old.getRuleCode(), rule.getRuleCode())) throw new ServiceException("规则编码不可变更");
         validate(rule);
         unique(rule);
-        return mapper.updateSysAutoCodeRule(rule);
+        int changed = mapper.updateSysAutoCodeRule(rule);
+        if (changed > 0) cache.invalidateAfterCommit();
+        return changed;
     }
 
     @Transactional(transactionManager = "masterTransactionManager", rollbackFor = Exception.class)
@@ -89,6 +96,7 @@ public class SysAutoCodeRuleServiceImpl implements IAutoCodeRuleService {
                 throw new ServiceException("存在规则组成或生成记录，不能删除规则");
             count += mapper.deleteById(id);
         }
+        if (count > 0) cache.invalidateAfterCommit();
         return count;
     }
 
