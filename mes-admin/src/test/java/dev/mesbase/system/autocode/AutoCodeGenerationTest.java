@@ -1,6 +1,7 @@
 package dev.mesbase.system.autocode;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
@@ -11,10 +12,12 @@ import static org.mockito.Mockito.when;
 import dev.mesbase.common.core.domain.entity.SysAutoCodePart;
 import dev.mesbase.common.core.domain.entity.SysAutoCodeResult;
 import dev.mesbase.common.core.domain.entity.SysAutoCodeRule;
+import dev.mesbase.common.exception.ServiceException;
 import dev.mesbase.system.mapper.AutoCodeExtraMapper;
 import dev.mesbase.system.mapper.SysAutoCodePartMapper;
 import dev.mesbase.system.mapper.SysAutoCodeRuleMapper;
 import dev.mesbase.system.mapper.SysAutoCodeResultMapper;
+import dev.mesbase.system.service.AutoCodeFactoryContext;
 import dev.mesbase.system.service.impl.AutoCodeRuleSnapshotCache;
 import dev.mesbase.system.service.impl.SysAutoCodeGenerationServiceImpl;
 import dev.mesbase.system.strategy.PartTypeFixCharHandler;
@@ -25,9 +28,11 @@ import dev.mesbase.system.strategy.PartTypeSerialNoHandler;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Test;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.TransactionDefinition;
@@ -45,16 +50,16 @@ class AutoCodeGenerationTest {
         var counters = new HashMap<String, SysAutoCodeResult>();
         when(manager.getTransaction(any(TransactionDefinition.class))).thenReturn(new SimpleTransactionStatus());
         when(extra.lockRule(anyLong())).thenAnswer(invocation -> invocation.getArgument(0));
-        when(extra.counter(anyLong(), any(String.class))).thenAnswer(invocation ->
-                counters.get(invocation.getArgument(0) + ":" + invocation.getArgument(1)));
+        when(extra.counter(anyLong(), any(String.class), any(String.class))).thenAnswer(invocation ->
+                counters.get(invocation.getArgument(0) + ":" + invocation.getArgument(1) + ":" + invocation.getArgument(2)));
         doAnswer(invocation -> {
             SysAutoCodeResult row = invocation.getArgument(0);
-            counters.put(row.getRuleId() + ":" + row.getCycleKey(), row);
+            counters.put(row.getRuleId() + ":" + row.getFactoryId() + ":" + row.getCycleKey(), row);
             return null;
         }).when(results).add(any(SysAutoCodeResult.class));
         doAnswer(invocation -> {
             SysAutoCodeResult row = invocation.getArgument(0);
-            counters.put(row.getRuleId() + ":" + row.getCycleKey(), row);
+            counters.put(row.getRuleId() + ":" + row.getFactoryId() + ":" + row.getCycleKey(), row);
             return null;
         }).when(results).updateAutoCodeResult(any(SysAutoCodeResult.class));
         when(cache.get("SALES_ORDER")).thenReturn(config(1, "SALES_ORDER", "SO"));
@@ -66,18 +71,29 @@ class AutoCodeGenerationTest {
         });
         var handler = new PartTypeHandler(new PartTypeInputCharHandler(), new PartTypeNowDateHandler(),
                 new PartTypeFixCharHandler(), new PartTypeSerialNoHandler());
-        var service = new SysAutoCodeGenerationServiceImpl(cache, rules, parts, results, extra, handler, manager);
+        var factory = new AtomicReference<>("FACTORY_A");
+        var factoryContext = mock(AutoCodeFactoryContext.class);
+        when(factoryContext.requiredFactoryId()).thenAnswer(invocation -> factory.get());
+        var service = new SysAutoCodeGenerationServiceImpl(cache, rules, parts, results, extra, handler, manager, factoryContext);
         String date = LocalDate.now(ZoneId.of("Asia/Shanghai")).format(DateTimeFormatter.BASIC_ISO_DATE);
 
         assertEquals("SO" + date + "001", service.getDocNo("SALES_ORDER"));
         assertEquals("RK" + date + "001", service.getDocNo("STOCK_RECEIPT"));
         assertEquals("SO" + date + "002", service.getDocNo("SALES_ORDER"));
-        seed(counters, 1, "DAY:" + date, 998);
+        factory.set("FACTORY_B");
+        assertEquals("SO" + date + "001", service.getDocNo("SALES_ORDER"));
+        factory.set("FACTORY_A");
+        seed(counters, 1, "FACTORY_A", "F:FACTORY_A|DAY:" + date, 998);
         assertEquals("SO" + date + "999", service.getDocNo("SALES_ORDER"));
         assertEquals("SO" + date + "1000", service.getDocNo("SALES_ORDER"));
         assertEquals("SO" + date + "1001", service.getDocNo("SALES_ORDER"));
         assertTrue(service.previewDocNo("SALES_ORDER").endsWith("1002"));
-        assertEquals(1001, counters.get("1:DAY:" + date).getLastSerialNo());
+        assertEquals(1001, counters.get("1:FACTORY_A:F:FACTORY_A|DAY:" + date).getLastSerialNo());
+
+        var malformed = new ArrayList<>(entities("SO", 1));
+        malformed.get(1).setPartLength(null);
+        when(parts.selectByRuleIdForUpdate(1L)).thenReturn(malformed);
+        assertThrows(ServiceException.class, () -> service.previewDocNo("SALES_ORDER"));
     }
 
     private static AutoCodeRuleSnapshotCache.RuleConfig config(long id, String code, String prefix) {
@@ -125,12 +141,13 @@ class AutoCodeGenerationTest {
         return List.of(fixed, date, serial);
     }
 
-    private static void seed(Map<String, SysAutoCodeResult> counters, long ruleId, String cycle, int value) {
+    private static void seed(Map<String, SysAutoCodeResult> counters, long ruleId, String factoryId, String cycle, int value) {
         var row = new SysAutoCodeResult();
         row.setRuleId(ruleId);
+        row.setFactoryId(factoryId);
         row.setCycleKey(cycle);
         row.setLastSerialNo(value);
         row.setGenIndex(value);
-        counters.put(ruleId + ":" + cycle, row);
+        counters.put(ruleId + ":" + factoryId + ":" + cycle, row);
     }
 }

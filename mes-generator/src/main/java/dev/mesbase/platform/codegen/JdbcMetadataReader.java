@@ -72,7 +72,7 @@ public final class JdbcMetadataReader {
                     String name = rows.getString("COLUMN_NAME");
                     identifier(name);
                     int type = rows.getInt("DATA_TYPE");
-                    columns.add(new TableMetadata.Column(name, camel(name), type, javaType(type), rows.getInt("COLUMN_SIZE"), rows.getInt("DECIMAL_DIGITS"), rows.getInt("NULLABLE") == DatabaseMetaData.columnNullable, pk.contains(name), "YES".equals(rows.getString("IS_AUTOINCREMENT")), safe(rows.getString("COLUMN_DEF")), safe(rows.getString("REMARKS"))));
+                    columns.add(new TableMetadata.Column(name, camel(name), type, javaType(type), rows.getInt("COLUMN_SIZE"), rows.getInt("DECIMAL_DIGITS"), rows.getInt("NULLABLE") == DatabaseMetaData.columnNullable, pk.contains(name), "YES".equalsIgnoreCase(rows.getString("IS_AUTOINCREMENT")), "YES".equalsIgnoreCase(rows.getString("IS_GENERATEDCOLUMN")), safe(rows.getString("COLUMN_DEF")), safe(rows.getString("REMARKS"))));
                 }
             }
             record IndexParts(boolean unique, TreeMap<Integer, String> columns) {

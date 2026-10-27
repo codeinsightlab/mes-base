@@ -1,4 +1,4 @@
-// MES-CODEGEN: MyBatis Generator standard single-table persistence.
+// Manually maintained MBG model; defaultVersion maps is_default and requires a reviewed merge before regeneration.
 package dev.mesbase.business.basic.domain;
 
 import java.math.BigDecimal;

@@ -9,5 +9,6 @@ public interface AutoCodeExtraMapper {
     int partCount(long ruleId);
     @Select("SELECT COUNT(*) FROM sys_auto_code_result WHERE rule_id=#{ruleId}")
     int resultCount(long ruleId);
-    SysAutoCodeResult counter(@Param("ruleId") long ruleId, @Param("cycleKey") String cycleKey);
+    SysAutoCodeResult counter(@Param("ruleId") long ruleId, @Param("factoryId") String factoryId,
+                              @Param("cycleKey") String cycleKey);
 }

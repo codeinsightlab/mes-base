@@ -18,6 +18,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Stream;
 import java.util.function.UnaryOperator;
 import javax.tools.ToolProvider;
 import org.junit.jupiter.api.Test;
@@ -75,6 +76,23 @@ class BusinessTemplatePackageTest {
             assertFalse(page.contains("@keydown.enter"));
             assertFalse(page.contains("queryEnter"));
             assertFalse(page.contains("<el-form"));
+        }
+    }
+
+    @Test
+    void generatedAlwaysColumnsAreOmittedFromPersistenceAndBusinessArtifacts() throws Exception {
+        var metadata = new TableMetadata(null, null, "material_bom", "测试", List.of(
+                new Column("id", "id", Types.BIGINT, "Long", 19, 0, false, true, true, null, "编号"),
+                new Column("product_id", "productId", Types.BIGINT, "Long", 19, 0, false, false, false, null, "产品"),
+                new Column("is_default", "isDefault", Types.BOOLEAN, "Boolean", 1, 0, false, false, false, null, "默认"),
+                new Column("default_product_id", "defaultProductId", Types.BIGINT, "Long", 19, 0, true, false, false, true, null, "生成列")),
+                List.of(), List.of());
+        var persistence = new MyBatisPersistenceRenderer().render(request("material_bom", false), metadata, "MaterialBom");
+        var business = new BusinessTemplateRenderer(options(templates(), Map.of()))
+                .render(request("material_bom", false), metadata);
+        for (var artifact : Stream.concat(persistence.stream(), business.stream()).toList()) {
+            assertFalse(artifact.content().contains("default_product_id"), artifact.relativePath());
+            assertFalse(artifact.content().contains("defaultProductId"), artifact.relativePath());
         }
     }
 

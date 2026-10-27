@@ -1,23 +1,23 @@
-# Automatic document numbering
+# 自动单据编号
 
-Automatic numbering is a platform service backed by the center database. `SysAutoCodeGenerationServiceImpl.getDocNo(type)` is the common entry point; `type` is the exact, immutable `ruleCode` configured in the Auto Code Rules page. Each call allocates a new number. It is not an idempotency key: a retried business request must first return its previously stored business result.
+自动编号由中心库服务提供。业务侧公共入口为 `AutoCodeNumbering.getDocNo(type)`；`type` 必须是“自动编码规则”页面中配置的规则编码 `ruleCode`。服务从可信的当前线程 `FactoryContext` 读取工厂 ID，调用方只传规则编码。每次调用都会分配一个新号码，因此它不是请求幂等键。业务请求重试时，应先读取已经保存的业务结果。
 
-## Rule configuration
+## 规则配置
 
-Rules and their ordered components are managed from **System → Auto Code Rules**. To make a rule usable through `getDocNo(type)`, configure exactly three components in this order:
+规则及其组成在“系统 → 自动编码规则”中维护。要让规则符合 `getDocNo(type)` 契约，按顺序配置以下三段：
 
-1. `FIXCHAR` for the configured prefix, such as `SO` or `RK`.
-2. `NOWDATE` with `yyyyMMdd`.
-3. `SERIALNO` with start `1`, step `1`, cycle enabled with `DAY`, and component width at least `3`.
+1. `FIXCHAR`：固定前缀，例如 `SO` 或 `RK`。
+2. `NOWDATE`：日期格式为 `yyyyMMdd`。
+3. `SERIALNO`：起始值为 `1`、步长为 `1`、启用 `DAY` 日周期，段宽至少为 `3`。
 
-Do not enable whole-number padding for these rules. A configuration that does not meet this contract is rejected by `getDocNo`; the service does not substitute a default rule, prefix, or identifier. Existing non-target configuration remains stored as-is.
+此类规则不要启用整号补齐。配置不符合契约时，`getDocNo` 会明确报错，不会替换成默认规则、前缀或其他标识。其他现存配置会原样保留。
 
-The page preview and formal generation both enforce this contract and use the same configuration parser and formatter. Preview does not write the counter; formal generation does. Existing non-target rules and components remain stored as configured, but the `getDocNo` preview/generation actions reject them with a configuration error. A resulting number is the configured prefix followed by the server date and the rule's daily sequence, for example `SO20261027001`. The minimum sequence width is three digits: after `999`, values continue as `1000`, `1001`, and so on. The final result must still fit the rule's configured maximum length and the database's 64-character result field.
+服务接口 `previewDocNo(type)` 和 `getDocNo(type)` 使用同一套配置解析与格式化，并共同校验上述契约。预览不写入计数，正式取号才会推进流水。非目标规则及组成仍保留，但调用这两个接口时会因配置不符合契约而失败。“系统 → 自动编码规则”页面上的通用预览和生成工具属于平台配置检查，不会分配工厂业务单号。业务单号由配置前缀、服务端日期和规则每日流水组成，例如 `WO20261027001`。流水段的宽度是最小宽度：`999` 之后自然变为 `1000`、`1001`。最终号码仍须符合规则最大长度和数据库结果列的 64 字符上限。
 
-## Counter and cache behavior
+## 流水与缓存
 
-Configuration is cached as a complete, immutable platform snapshot indexed by rule code. The snapshot includes all rules and their components; it is not built from a paged HTTP result. Component rows are batch-loaded. Rule and component mutations attempt to invalidate the shared snapshot only after the center transaction commits. A Redis version token prevents an older in-flight load from filling the cache after successful invalidation. If Redis is unavailable, the service loads current configuration from the center database and does not treat an unavailable cache as proof that old configuration is current.
+规则配置以完整、不可变快照缓存，并按规则编码索引。快照包含全部规则及组成，不从分页 HTTP 结果拼接；组成由批量查询读取。规则或组成变更只有在中心事务提交后才会使共享快照失效。Redis 版本令牌阻止失效前启动的旧加载在失效后覆盖新快照。Redis 不可用时，服务从中心库读取当前配置，不会把缓存故障当作旧配置仍然有效的证明。
 
-Counters are persisted independently by rule identity and cycle key (`rule_id` plus `DAY:yyyyMMdd` for daily rules). The center database rule row lock serializes allocation across application instances, including the first counter row creation. Once inside that transaction, the rule and its components are re-read with database locking reads; a stale cache entry or failed Redis invalidation therefore cannot authorize a disabled or outdated configuration. If invalidation fails, an old snapshot can delay visibility of a newly added rule until expiry, while existing-rule validation still uses the locked database rows. The cached rules do not contain mutable current sequence state, and a counter update does not invalidate configuration. The service uses one server-side `Asia/Shanghai` time value for the date component, daily cycle, and generation timestamp.
+计数按规则身份、工厂 ID 和周期键分别持久化。每日业务流水使用 `rule_id + factory_id + F:<factoryId>|DAY:yyyyMMdd`。`cycle_key` 中的工厂标记也避免升级期间旧版读取器仅按规则和周期查询时与新工厂流水冲突。空工厂 ID 保留给历史/平台工具；有效业务工厂 ID 不为空。中心数据库的规则行锁会串行化多实例取号，也保护首次创建计数行。进入事务后，服务会通过数据库锁定读重新读取规则和组成；因此缓存陈旧或 Redis 失效失败都不能让停用或已变更的配置继续授权取号。失效失败时，新规则可能要等缓存 TTL 到期后才对缓存命中可见；对已有规则，服务仍会基于锁定读校验当前配置。缓存规则对象不包含可变流水状态，计数更新也不会淘汰配置缓存。日期段、日周期和生成时间共用同一个 `Asia/Shanghai` 服务端时间值。
 
-The center number allocation and a later Factory business save are separate transactions. A number can be unused if the business save fails; this service does not promise a cross-database transaction or business-request idempotency.
+中心库取号与后续工厂业务保存是两个事务。业务保存失败时号码可能被占用但未使用；本服务不承诺跨库事务或业务请求幂等。当前本地工单新建使用规则编码 `WORK_ORDER`；ERP 同步工单仍使用 ERP 提供的编码。销售订单、生产计划、生产投入领料和库存单据的新建入口尚未接入该取号服务。

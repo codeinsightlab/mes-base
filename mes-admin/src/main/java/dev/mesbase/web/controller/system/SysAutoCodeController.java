@@ -19,8 +19,8 @@ public class SysAutoCodeController {
  private final SysAutoCodeGenerationServiceImpl service;
  public SysAutoCodeController(SysAutoCodeGenerationServiceImpl service){this.service=service;}
  @PostMapping("/preview") @EndpointAccess(value=EndpointAccess.Kind.AUTHORIZED,permission="system:autocode:rule:query",permissionScope=EndpointAccess.PermissionScope.PLATFORM)
- public AjaxResult preview(@RequestBody Input input){return AjaxResult.success(new GeneratedCode(service.previewDocNo(input.ruleCode())));}
+ public AjaxResult preview(@RequestBody Input input){return AjaxResult.success(new GeneratedCode(service.preview(input.ruleCode(), input.inputCharacter())));}
  @PostMapping("/generate") @EndpointAccess(value=EndpointAccess.Kind.AUTHORIZED,permission="system:autocode:rule:generate",permissionScope=EndpointAccess.PermissionScope.PLATFORM)
  @Log(title="生成平台编码",businessType=BusinessType.INSERT)
- public AjaxResult generate(@RequestBody Input input){return AjaxResult.success(new GeneratedCode(service.getDocNo(input.ruleCode())));}
+ public AjaxResult generate(@RequestBody Input input){return AjaxResult.success(new GeneratedCode(service.generate(input.ruleCode(), input.inputCharacter())));}
 }

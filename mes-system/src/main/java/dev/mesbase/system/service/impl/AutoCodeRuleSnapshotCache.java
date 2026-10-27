@@ -70,7 +70,21 @@ public class AutoCodeRuleSnapshotCache {
             }
             snapshot = loadAll();
         }
-        return snapshot.byCode().get(ruleCode);
+        RuleConfig cached = snapshot.byCode().get(ruleCode);
+        if (cached != null || !redisAvailable) return cached;
+        for (int attempt = 0; attempt < 3; attempt++) {
+            Snapshot refreshed = loadAll();
+            try {
+                if (redis.setCacheObjectIfVersion(VERSION_KEY, version, KEY, refreshed, TTL_SECONDS))
+                    return refreshed.byCode().get(ruleCode);
+                version = redis.getCacheVersion(VERSION_KEY);
+            } catch (RuntimeException failure) {
+                LOG.warn("Autocode cache refresh unavailable after rule miss type={}; using current database rules",
+                        failure.getClass().getSimpleName());
+                return refreshed.byCode().get(ruleCode);
+            }
+        }
+        throw new ServiceException("编码规则正在变更，请稍后重试");
     }
 
     public void invalidateAfterCommit() {

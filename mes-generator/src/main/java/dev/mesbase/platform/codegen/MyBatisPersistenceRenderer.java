@@ -65,7 +65,7 @@ final class MyBatisPersistenceRenderer {
         config.setDomainObjectName(className + "Entity");
         config.setMapperName(className + "Mapper");
         config.setDelimitIdentifiers(metadata.requiresDelimiter(metadata.table()));
-        metadata.columns().stream().filter(TableMetadata.Column::autoIncrement).findFirst()
+        metadata.columns().stream().filter(column -> !column.generated() && column.autoIncrement()).findFirst()
                 .ifPresent(column -> config.setGeneratedKey(new GeneratedKey(column.name(), "JDBC", true, null)));
         context.addTableConfiguration(config);
         var table = new IntrospectedTableMyBatis3Impl();
@@ -77,6 +77,7 @@ final class MyBatisPersistenceRenderer {
         table.setRemarks(metadata.comment());
         table.setTableType("TABLE");
         for (TableMetadata.Column source : metadata.columns()) {
+            if (source.generated()) continue;
             var column = new IntrospectedColumn();
             column.setContext(context);
             column.setIntrospectedTable(table);
@@ -95,7 +96,7 @@ final class MyBatisPersistenceRenderer {
             column.setRemarks(source.comment());
             table.addColumn(column);
         }
-        metadata.columns().stream().filter(TableMetadata.Column::primaryKey)
+        metadata.columns().stream().filter(column -> !column.generated() && column.primaryKey())
                 .forEach(column -> table.addPrimaryKeyColumn(column.name()));
         context.getIntrospectedTables().add(table);
         List<GeneratedJavaFile> javaFiles = new ArrayList<>();

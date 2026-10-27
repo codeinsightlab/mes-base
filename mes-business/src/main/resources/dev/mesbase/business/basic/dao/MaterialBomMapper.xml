@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- MES-CODEGEN: MyBatis Generator standard single-table persistence. -->
+<!-- Manually maintained MBG mapping with the product-default business query.
+     Regenerate only after a reviewed merge. The generated-always default_product_id is intentionally absent from all writes. -->
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="dev.mesbase.business.basic.dao.MaterialBomMapper">
   <resultMap id="BaseResultMap" type="dev.mesbase.business.basic.domain.MaterialBomEntity">

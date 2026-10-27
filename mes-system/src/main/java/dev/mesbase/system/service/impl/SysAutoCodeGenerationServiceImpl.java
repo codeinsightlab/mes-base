@@ -9,6 +9,8 @@ import dev.mesbase.system.mapper.AutoCodeExtraMapper;
 import dev.mesbase.system.mapper.SysAutoCodePartMapper;
 import dev.mesbase.system.mapper.SysAutoCodeRuleMapper;
 import dev.mesbase.system.mapper.SysAutoCodeResultMapper;
+import dev.mesbase.system.service.AutoCodeFactoryContext;
+import dev.mesbase.system.service.AutoCodeNumbering;
 import dev.mesbase.system.strategy.PartTypeHandler;
 import java.time.Clock;
 import java.time.LocalDateTime;
@@ -23,12 +25,12 @@ import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /**
- * Source AutoCodeUtil PORT. Platform identifiers only; no MES/Factory consumer registered here.
+ * Source AutoCodeUtil PORT. Business document numbers use the current trusted FactoryContext.
  * A row lock serializes generation across processes; no mutable singleton or ThreadLocal state.
  */
 @Service
 @ConditionalOnProperty(name = "mes.system.enabled", havingValue = "true")
-public class SysAutoCodeGenerationServiceImpl {
+public class SysAutoCodeGenerationServiceImpl implements AutoCodeNumbering {
     private static final ZoneId AUTO_CODE_ZONE = ZoneId.of("Asia/Shanghai");
     private final AutoCodeRuleSnapshotCache configs;
     private final SysAutoCodeRuleMapper rules;
@@ -37,12 +39,14 @@ public class SysAutoCodeGenerationServiceImpl {
     private final AutoCodeExtraMapper extra;
     private final PartTypeHandler handler;
     private final TransactionTemplate transactions;
+    private final AutoCodeFactoryContext factoryContext;
 
     public SysAutoCodeGenerationServiceImpl(AutoCodeRuleSnapshotCache configs, SysAutoCodeRuleMapper rules,
                                             SysAutoCodePartMapper parts,
                                             SysAutoCodeResultMapper results, AutoCodeExtraMapper extra,
                                             PartTypeHandler handler,
-                                            @Qualifier("masterTransactionManager") PlatformTransactionManager manager) {
+                                            @Qualifier("masterTransactionManager") PlatformTransactionManager manager,
+                                            AutoCodeFactoryContext factoryContext) {
         this.configs = configs;
         this.rules = rules;
         this.parts = parts;
@@ -50,15 +54,17 @@ public class SysAutoCodeGenerationServiceImpl {
         this.extra = extra;
         this.handler = handler;
         this.transactions = new TransactionTemplate(manager);
+        this.factoryContext = factoryContext;
     }
 
     public String generate(String ruleCode, String inputCharacter) {
         return run(ruleCode, inputCharacter, true, false);
     }
 
-    /** Public platform numbering entry. Each call allocates a new value; it is not request-idempotent. */
+    /** Each call allocates a new number for the current factory; it is not request-idempotent. */
+    @Override
     public String getDocNo(String type) {
-        return run(type, null, true, true);
+        return run(type, null, true, true, factoryContext.requiredFactoryId());
     }
 
     public String preview(String ruleCode, String inputCharacter) {
@@ -67,19 +73,23 @@ public class SysAutoCodeGenerationServiceImpl {
 
     /** Preview the getDocNo contract without persisting or advancing the daily counter. */
     public String previewDocNo(String type) {
-        return run(type, null, false, true);
+        return run(type, null, false, true, factoryContext.requiredFactoryId());
     }
 
     private String run(String code, String input, boolean persist, boolean docNoContract) {
+        return run(code, input, persist, docNoContract, "");
+    }
+
+    private String run(String code, String input, boolean persist, boolean docNoContract, String factoryId) {
         if (code == null || !code.matches("[A-Za-z][A-Za-z0-9_-]{0,63}") || input != null && input.length() > 64)
             throw new ServiceException("规则编号或输入字符不符合要求");
         var config = configs.get(code);
         if (config == null) throw new ServiceException("未找到编码规则");
-        return transactions.execute(status -> execute(code, input, persist, docNoContract, config));
+        return transactions.execute(status -> execute(code, input, persist, docNoContract, config, factoryId));
     }
 
     private String execute(String code, String input, boolean persist, boolean docNoContract,
-                           AutoCodeRuleSnapshotCache.RuleConfig config) {
+                           AutoCodeRuleSnapshotCache.RuleConfig config, String factoryId) {
         if (extra.lockRule(config.ruleId()) == null) throw new ServiceException("编码规则不存在或已删除");
         // Locking reads bypass an earlier repeatable-read snapshot and see the committed writer
         // that won the rule lock, even if shared-cache invalidation was unavailable.
@@ -95,7 +105,8 @@ public class SysAutoCodeGenerationServiceImpl {
         var now = LocalDateTime.now(Clock.system(AUTO_CODE_ZONE));
         if (docNoContract) validateDocNoContract(rule, components, serial);
         String cycle = serial.isEmpty() ? "GLOBAL" : cycle(serial.get(0), input, now);
-        var previous = extra.counter(rule.getRuleId(), cycle);
+        if (!factoryId.isEmpty()) cycle = "F:" + factoryId + "|" + cycle;
+        var previous = extra.counter(rule.getRuleId(), factoryId, cycle);
         int next = 0;
         if (!serial.isEmpty()) {
             try {
@@ -129,6 +140,7 @@ public class SysAutoCodeGenerationServiceImpl {
         if (persist) {
             var row = previous == null ? new SysAutoCodeResult() : previous;
             row.setRuleId(rule.getRuleId());
+            row.setFactoryId(factoryId);
             row.setCycleKey(cycle);
             row.setGenDate(DateTimeFormatter.ofPattern("yyyyMMddHHmmss").format(now));
             row.setGenIndex(previous == null ? 1 : Math.addExact(previous.getGenIndex(), 1));
@@ -169,10 +181,13 @@ public class SysAutoCodeGenerationServiceImpl {
             List<SysAutoCodePart> parts, List<SysAutoCodePart> serial) {
         boolean prefix = !parts.isEmpty() && "FIXCHAR".equals(parts.get(0).getPartType())
                 && parts.get(0).getFixCharacter() != null
+                && !parts.get(0).getFixCharacter().isEmpty()
                 && parts.get(0).getPartLength() != null
+                && parts.get(0).getPartLength() > 0
                 && parts.get(0).getFixCharacter().length() == parts.get(0).getPartLength();
         boolean date = parts.size() > 1 && "NOWDATE".equals(parts.get(1).getPartType())
-                && "yyyyMMdd".equals(parts.get(1).getDateFormat());
+                && "yyyyMMdd".equals(parts.get(1).getDateFormat())
+                && Integer.valueOf(8).equals(parts.get(1).getPartLength());
         boolean validSerial = serial.size() == 1;
         if (parts.size() == 3) {
             var part = parts.get(2);

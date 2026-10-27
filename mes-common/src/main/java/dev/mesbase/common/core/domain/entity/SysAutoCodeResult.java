@@ -9,6 +9,9 @@ public class SysAutoCodeResult extends BaseEntity {
     private String cycleKey;
     public String getCycleKey() { return cycleKey; }
     public void setCycleKey(String value) { cycleKey=value; }
+    private String factoryId;
+    public String getFactoryId() { return factoryId; }
+    public void setFactoryId(String value) { factoryId=value; }
     private Long codeId;
 
     private Long ruleId;

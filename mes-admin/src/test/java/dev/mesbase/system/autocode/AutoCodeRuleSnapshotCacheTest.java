@@ -3,6 +3,7 @@ package dev.mesbase.system.autocode;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.nullable;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
@@ -15,6 +16,7 @@ import dev.mesbase.system.mapper.SysAutoCodePartMapper;
 import dev.mesbase.system.mapper.SysAutoCodeRuleMapper;
 import dev.mesbase.system.service.impl.AutoCodeRuleSnapshotCache;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Test;
 
@@ -27,8 +29,7 @@ class AutoCodeRuleSnapshotCacheTest {
         var stored = new AtomicReference<AutoCodeRuleSnapshotCache.Snapshot>();
         when(redis.getCacheVersion(anyString())).thenReturn(null);
         when(redis.getCacheObject(anyString())).thenAnswer(invocation -> stored.get());
-        when(redis.setCacheObjectIfVersion(anyString(), nullable(String.class), anyString(),
-                org.mockito.ArgumentMatchers.any(), anyInt()))
+        when(redis.setCacheObjectIfVersion(anyString(), nullable(String.class), anyString(), any(), anyInt()))
                 .thenAnswer(invocation -> {
                     stored.set(invocation.getArgument(3));
                     return true;
@@ -50,6 +51,30 @@ class AutoCodeRuleSnapshotCacheTest {
 
         assertEquals("SO", cache.get("SALES_ORDER").parts().getFirst().fixCharacter());
         assertEquals(7L, cache.get("SALES_ORDER").ruleId());
+
+        verify(rules).selectAllForGeneration();
+        verify(parts).selectAllForGeneration();
+    }
+
+    @Test
+    void ruleMissRefreshesAnExistingSnapshotSoNewMigrationRulesBecomeVisible() {
+        var redis = mock(RedisCache.class);
+        var rules = mock(SysAutoCodeRuleMapper.class);
+        var parts = mock(SysAutoCodePartMapper.class);
+        var oldSnapshot = new AutoCodeRuleSnapshotCache.Snapshot(Map.of("SALES_ORDER",
+                new AutoCodeRuleSnapshotCache.RuleConfig(7L, "SALES_ORDER", 64, "N", null, null, "Y", List.of())));
+        when(redis.getCacheVersion(anyString())).thenReturn("v1");
+        when(redis.getCacheObject(anyString())).thenReturn(oldSnapshot);
+        when(redis.setCacheObjectIfVersion(anyString(), anyString(), anyString(), any(), anyInt())).thenReturn(true);
+        var newRule = new SysAutoCodeRule();
+        newRule.setRuleId(8L);
+        newRule.setRuleCode("WORK_ORDER");
+        newRule.setEnableFlag("Y");
+        when(rules.selectAllForGeneration()).thenReturn(List.of(newRule));
+        when(parts.selectAllForGeneration()).thenReturn(List.of());
+        var cache = new AutoCodeRuleSnapshotCache(redis, rules, parts);
+
+        assertEquals(8L, cache.get("WORK_ORDER").ruleId());
 
         verify(rules).selectAllForGeneration();
         verify(parts).selectAllForGeneration();

@@ -161,11 +161,11 @@ public final class BusinessTemplateRenderer {
         Column scopeColumn = Optional.ofNullable(scopeColumnName).map(nullableValue -> t.columns().stream()
                 .filter(column -> column.name().equalsIgnoreCase(nullableValue)).findFirst()
                 .orElseThrow(() -> new CodegenException(CodegenException.Code.INVALID_REQUEST))).orElse(null);
-        if (scopeColumn != null && (!scoped || scopeColumn.nullable() || !scopeColumn.javaType().equals("String"))) {
+        if (scopeColumn != null && (scopeColumn.generated() || !scoped || scopeColumn.nullable() || !scopeColumn.javaType().equals("String"))) {
             throw new CodegenException(CodegenException.Code.INVALID_REQUEST);
         }
         List<Column> writable = t.columns().stream()
-                .filter(c -> !c.primaryKey() && !auditColumn(c) && c != scopeColumn).toList();
+                .filter(c -> !c.generated() && !c.primaryKey() && !auditColumn(c) && c != scopeColumn).toList();
         List<Column> create = new ArrayList<>();
         if (!pk.autoIncrement()) create.add(pk);
         create.addAll(writable);
@@ -226,7 +226,7 @@ public final class BusinessTemplateRenderer {
         ctx.put("controllerPackage", p + ".controller");
         ctx.put("serviceImplementationPackage", p + ".service.impl");
         ctx.put("transactionManager", scoped ? "businessTransactionManager" : "masterTransactionManager");
-        boolean hasLongText = t.columns().stream().anyMatch(c -> c.jdbcType() == Types.LONGVARCHAR);
+        boolean hasLongText = t.columns().stream().anyMatch(c -> !c.generated() && c.jdbcType() == Types.LONGVARCHAR);
         ctx.put("selectByExampleMethod", hasLongText ? "selectByExampleWithBLOBs" : "selectByExample");
         ctx.put("updateByPrimaryKeyMethod", hasLongText ? "updateByPrimaryKeyWithBLOBs" : "updateByPrimaryKey");
         if (options != null) {
@@ -276,7 +276,7 @@ public final class BusinessTemplateRenderer {
         ctx.put("editFields", writable.stream().map(c -> field(c, !c.nullable())).toList());
         ctx.put("queryFields", writable.stream().filter(c -> c.jdbcType() != Types.LONGVARCHAR)
                 .map(c -> field(c, false)).toList());
-        ctx.put("viewFields", t.columns().stream().map(c -> Map.of(
+        ctx.put("viewFields", t.columns().stream().filter(c -> !c.generated()).map(c -> Map.of(
                 "name", c.javaField(), "type", viewType(c), "getter", "get" + cap(c.javaField()),
                 "stringValue", !viewType(c).equals(entityType(c)))).toList());
         ctx.put("generateSync", r.generateSync());
@@ -350,7 +350,7 @@ public final class BusinessTemplateRenderer {
             }
         }
         ctx.put("pkField", pk.javaField());
-        ctx.put("fields", t.columns().stream()
+        ctx.put("fields", t.columns().stream().filter(c -> !c.generated())
                 .map(c -> Map.of("name", c.javaField(), "type", Set.of("String", "Long", "java.math.BigDecimal")
                         .contains(c.javaType()) ? "string" : c.javaType()
                         .startsWith("java.time") ? "string" : c.javaType()

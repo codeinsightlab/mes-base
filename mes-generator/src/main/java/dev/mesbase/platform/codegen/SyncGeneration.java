@@ -13,7 +13,7 @@ public final class SyncGeneration {
         var key = table.columns().stream().filter(column -> column.name().equalsIgnoreCase(matchKey)
                         || "primary-key".equals(matchKey) && column.primaryKey())
                 .findFirst().orElseThrow(() -> new CodegenException(CodegenException.Code.INVALID_SYNC_KEY));
-        if (!Set.of("Long", "Integer", "String").contains(key.javaType())) {
+        if (key.generated() || !Set.of("Long", "Integer", "String").contains(key.javaType())) {
             throw new CodegenException(CodegenException.Code.INVALID_SYNC_KEY);
         }
         return key;

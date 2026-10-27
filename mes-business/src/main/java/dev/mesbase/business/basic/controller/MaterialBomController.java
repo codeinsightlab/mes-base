@@ -61,7 +61,8 @@ public class MaterialBomController {
     @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED, permission = MaterialBomPermissions.QUERY)
     public MaterialBomVo defaultVersion(@RequestParam Long productId) {
         var row = service.selectDefault(productId);
-        return row == null ? null : toView(row);
+        if (row == null) return null;
+        return toView(row);
     }
 
     @PostMapping

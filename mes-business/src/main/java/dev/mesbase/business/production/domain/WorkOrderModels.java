@@ -12,7 +12,7 @@ public final class WorkOrderModels {
     private WorkOrderModels() {
     }
 
-    public record Save(@NotBlank @Size(max = 64) String code, @NotNull Long productId,
+    public record Save(@Size(max = 64) String code, @NotNull Long productId,
                        @NotNull BigDecimal plannedQty, @NotNull Long routingId,
                        LocalDateTime plannedStartAt, LocalDateTime plannedEndAt,
                        @Size(max = 128) String externalId, @Size(max = 128) String externalCode,

@@ -7,6 +7,7 @@
     <resultMap type="SysAutoCodeResult" id="SysAutoCodeResultResult">
         <id     property="codeId"     column="code_id"     />
         <result property="cycleKey" column="cycle_key"/>
+        <result property="factoryId" column="factory_id"/>
         <result property="ruleId"     column="rule_id"   />
         <result property="genDate"    column="gen_date"   />
         <result property="genIndex"   column="gen_index"   />
@@ -21,7 +22,7 @@
     </resultMap>
 
     <sql id="selectSysAutoCodeResultVo">
-        select d.code_id, d.cycle_key, d.rule_id, d.gen_date, d.gen_index, d.last_result, d.last_serial_no, d.last_input_char
+        select d.code_id, d.cycle_key, d.factory_id, d.rule_id, d.gen_date, d.gen_index, d.last_result, d.last_serial_no, d.last_input_char
         from sys_auto_code_result d
     </sql>
 
@@ -45,6 +46,7 @@
     <insert id="add" useGeneratedKeys="true" keyProperty="codeId" parameterType="SysAutoCodeResult" >
         insert into sys_auto_code_result(
           rule_id,
+          factory_id,
           cycle_key,
           gen_date,
           gen_index,
@@ -54,6 +56,7 @@
           create_time
         )values(
           #{ruleId},
+          #{factoryId},
           #{cycleKey},
           #{genDate},
           #{genIndex},

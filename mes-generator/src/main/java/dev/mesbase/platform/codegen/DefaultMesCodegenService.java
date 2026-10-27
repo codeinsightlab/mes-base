@@ -50,14 +50,14 @@ public final class DefaultMesCodegenService implements MesCodegenService {
         String datasource = profiles.name(request.datasource());
         var table = metadata.read(profiles.datasource(datasource), request.schema(), request.tableName());
         var pk = table.columns().stream().filter(TableMetadata.Column::primaryKey).toList();
-        if (pk.size() != 1 || !Set.of("Long", "Integer", "String")
+        if (pk.size() != 1 || pk.getFirst().generated() || !Set.of("Long", "Integer", "String")
                 .contains(pk.getFirst().javaType()) || !table.references().isEmpty())
             throw new CodegenException(UNSUPPORTED_SCHEMA);
         Set<String> fields = new HashSet<>();
         for (var c : table.columns()) {
             if (!fields.add(c.javaField())) throw new CodegenException(UNSUPPORTED_SCHEMA);
         }
-        if (table.columns().stream().noneMatch(column -> !column.primaryKey())) {
+        if (table.columns().stream().noneMatch(column -> !column.primaryKey() && !column.generated())) {
             throw new CodegenException(UNSUPPORTED_SCHEMA);
         }
         String packageRoot = request.scope() == CodegenRequest.ScopeKind.FACTORY_SCOPED ? "dev.mesbase.modules." : "dev.mesbase.platform.";

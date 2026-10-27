@@ -4,7 +4,6 @@ import tools.jackson.databind.JsonNode;
 import dev.mesbase.business.production.domain.WorkOrderModels;
 import dev.mesbase.core.error.ErrorCode;
 import dev.mesbase.core.error.FoundationException;
-import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import java.math.BigDecimal;
@@ -13,7 +12,7 @@ import java.time.LocalDateTime;
 /**
  * Legacy batches is parsed only to return a clear refusal; it never reaches domain persistence.
  */
-public record WorkOrderSaveRequest(@NotBlank @Size(max = 64) String code, @NotNull Long productId,
+public record WorkOrderSaveRequest(@Size(max = 64) String code, @NotNull Long productId,
                                    @NotNull BigDecimal plannedQty, @NotNull Long routingId,
                                    LocalDateTime plannedStartAt, LocalDateTime plannedEndAt,
                                    @Size(max = 128) String externalId, @Size(max = 128) String externalCode,

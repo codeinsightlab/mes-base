@@ -45,6 +45,7 @@ import dev.mesbase.core.error.FoundationException;
 import dev.mesbase.framework.sync.SyncCoordinator;
 import dev.mesbase.platform.execution.FactoryContext;
 import dev.mesbase.platform.execution.FactoryIntegrationContext;
+import dev.mesbase.system.service.AutoCodeNumbering;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -55,9 +56,14 @@ import java.util.stream.Collectors;
 
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.dao.DuplicateKeyException;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
@@ -86,6 +92,8 @@ public class WorkOrderService {
     private final MesMaterialIssueMapper issues;
     private final WorkOrderExtraMapper queries;
     private final MesProductionExecutionMapper executions;
+    private final AutoCodeNumbering autoCodes;
+    private final TransactionTemplate createTransactions;
 
     public WorkOrderService(WorkorderMapper orders, ProductionBatchMapper batches,
                             RoutingMapper routings, RoutingProductMapper products, RoutingNodeMapper nodes,
@@ -94,7 +102,8 @@ public class WorkOrderService {
                             MesProductionExecutionMapper executions, WorkorderErpFacts facts,
                             BusinessDirectoryService directory, MesWorkorderMaterialMapper requirements,
                             BusinessSourceRules sources, WorkorderErpExtraMapper external, SyncCoordinator sync,
-                            MaterialQuantityRules quantityRules) {
+                            MaterialQuantityRules quantityRules, AutoCodeNumbering autoCodes,
+                            @Qualifier("businessTransactionManager") PlatformTransactionManager businessTransactionManager) {
         this.external = external;
         this.sync = sync;
         this.sources = sources;
@@ -113,6 +122,9 @@ public class WorkOrderService {
         this.issues = issues;
         this.queries = queries;
         this.executions = executions;
+        this.autoCodes = autoCodes;
+        this.createTransactions = new TransactionTemplate(businessTransactionManager);
+        this.createTransactions.setIsolationLevel(TransactionDefinition.ISOLATION_READ_COMMITTED);
     }
 
     private void require(boolean ok) {
@@ -183,15 +195,25 @@ public class WorkOrderService {
                 routings.selectByPrimaryKey(w.getRoutingId()), children, allocation(id));
     }
 
-    @Transactional(transactionManager = "businessTransactionManager", isolation = Isolation.READ_COMMITTED, rollbackFor = Exception.class)
+    @Transactional(transactionManager = "businessTransactionManager", propagation = Propagation.NOT_SUPPORTED)
     public WorkOrderModels.Detail create(WorkOrderModels.Save input) {
+        sources.localCreation();
+        if (input == null) throw new FoundationException(ErrorCode.WORKORDER_INVALID);
+        if (input.externalId() != null || input.externalCode() != null)
+            throw new FoundationException(ErrorCode.EXTERNAL_SOURCE_READ_ONLY);
+        validateValues(input);
+        String code = autoCodes.getDocNo("WORK_ORDER");
+        return createTransactions.execute(status -> createLocal(input, code));
+    }
+
+    private WorkOrderModels.Detail createLocal(WorkOrderModels.Save input, String code) {
         sources.localCreation();
         if (input.externalId() != null || input.externalCode() != null)
             throw new FoundationException(ErrorCode.EXTERNAL_SOURCE_READ_ONLY);
         validate(input);
         quantityRules.checkForWrite(input.plannedQty(), input.productId());
-        uniqueCode(input.code(), null);
         var row = new WorkorderEntity();
+        row.setCode(code);
         row.setSource(BusinessSource.LOCAL.getValue());
         row.setStatus(WorkOrderStatus.DRAFT.getValue());
         row.setRevision(0);
@@ -214,6 +236,7 @@ public class WorkOrderService {
         sync.assertOwner(run);
         var checked = checkExternal(plan, true);
         var input = plan.values();
+        if (input.code() == null || input.code().isBlank() || input.code().length() > 64) conflict();
         var externalId = plan.externalId();
         var externalCode = plan.externalCode();
         var snapshot = FactoryIntegrationContext.required();
@@ -271,6 +294,7 @@ public class WorkOrderService {
                 || plan.externalCode() == null || plan.externalCode().length() > 128
                 || plan.values().externalId() != null || plan.values().externalCode() != null) conflict();
         var input = plan.values();
+        if (StringUtils.isBlank(input.code()) || input.code().length() > 64) conflict();
         validate(input, lock);
         var snapshot = FactoryIntegrationContext.required();
         var filter = new WorkorderExample();
@@ -333,7 +357,6 @@ public class WorkOrderService {
             if (allocation == null || allocation.allocatedTargetQty().compareTo(input.plannedQty()) > 0)
                 throw new FoundationException(ErrorCode.WORKORDER_QUANTITY_CONFLICT);
         }
-        uniqueCode(input.code(), id);
         assign(row, input);
         row.setRevision(row.getRevision() + 1);
         saveOrder(row, false);
@@ -475,8 +498,7 @@ public class WorkOrderService {
     }
 
     private void validateValues(WorkOrderModels.Save input) {
-        require(input != null && input.productId() != null && input.routingId() != null && input.code() != null && !input.code()
-                .isBlank() && input.code().length() <= 64);
+        require(input != null && input.productId() != null && input.routingId() != null);
         BigDecimal quantity = input.plannedQty();
         require(quantity != null && quantity.signum() > 0 && quantity.scale() <= 6
                 && quantity.precision() - quantity.scale() <= 14);
@@ -490,15 +512,7 @@ public class WorkOrderService {
         return executions.countByExample(filter) > 0;
     }
 
-    private void uniqueCode(String code, Long id) {
-        var f = new WorkorderExample();
-        var c = f.createCriteria().andCodeEqualTo(code.trim());
-        if (id != null) c.andIdNotEqualTo(id);
-        if (orders.countByExample(f) > 0) conflict();
-    }
-
     private void assign(WorkorderEntity row, WorkOrderModels.Save input) {
-        row.setCode(input.code().trim());
         row.setProductId(input.productId());
         row.setRoutingId(input.routingId());
         row.setPlannedQty(input.plannedQty());

@@ -47,8 +47,14 @@ public record TableMetadata(String catalog, String schema, String table, String 
     }
 
     public record Column(String name, String javaField, int jdbcType, String javaType, int size, int scale,
-                         boolean nullable, boolean primaryKey, boolean autoIncrement, String defaultValue,
-                         String comment) {
+                         boolean nullable, boolean primaryKey, boolean autoIncrement, boolean generated,
+                         String defaultValue, String comment) {
+        public Column(String name, String javaField, int jdbcType, String javaType, int size, int scale,
+                      boolean nullable, boolean primaryKey, boolean autoIncrement, String defaultValue,
+                      String comment) {
+            this(name, javaField, jdbcType, javaType, size, scale, nullable, primaryKey, autoIncrement, false,
+                    defaultValue, comment);
+        }
     }
 
     public record Index(String name, boolean unique, List<String> columns) {

@@ -1,4 +1,4 @@
-// MES-CODEGEN: MyBatis Generator standard single-table persistence.
+// Manually maintained MBG mapper; merge schema changes before regenerating.
 package dev.mesbase.business.basic.dao;
 
 import dev.mesbase.business.basic.domain.MaterialBomEntity;
@@ -23,6 +23,7 @@ public interface MaterialBomMapper {
 
     MaterialBomEntity selectByPrimaryKey(Long id);
 
+    /** Business query. Preserve when updating standard single-table mappings. */
     MaterialBomEntity selectDefaultByProductId(@Param("productId") Long productId);
 
     int updateByExampleSelective(@Param("row") MaterialBomEntity row, @Param("example") MaterialBomExample example);
