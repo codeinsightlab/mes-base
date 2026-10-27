@@ -44,7 +44,7 @@ import tools.jackson.databind.ObjectMapper;
 public class WorkorderMaterialService {
     private final BusinessSourceRules sources;
 
-    public record Save(Long expectedRevision, Long bomId,
+    public record Save(Long expectedRevision, Long bomId, Long expectedBomRevision,
                        List<Long> warehouseIds, String workCenter, boolean enabled) {
     }
 
@@ -94,6 +94,7 @@ public class WorkorderMaterialService {
         var previous = requirements.selectByPrimaryKey(workorder);
         long revision = previous == null ? 0 : previous.getRevision();
         if (c == null || c.expectedRevision() == null || c.expectedRevision() != revision || c.bomId() == null
+                || c.expectedBomRevision() == null
                 || StringUtils.isBlank(c.workCenter()) || c.workCenter().length() > 100 || c.warehouseIds() == null
                 || c.warehouseIds().isEmpty() || c.warehouseIds().size() > 100
                 || c.warehouseIds().stream().anyMatch(Objects::isNull))
@@ -102,7 +103,9 @@ public class WorkorderMaterialService {
         row.setId(workorder);
         row.setBomId(c.bomId());
         materials.selectByPrimaryKeyForUpdate(order.getProductId());
-        boms.selectByPrimaryKeyForUpdate(c.bomId());
+        var selectedBom = boms.selectByPrimaryKeyForUpdate(c.bomId());
+        if (selectedBom == null || !Objects.equals(selectedBom.getRevision(), c.expectedBomRevision()))
+            ParameterChecks.reject(ErrorCode.PRODUCTION_INPUT_STALE);
         applyBom(row, order, true);
         var ids = c.warehouseIds().stream().distinct().sorted().toList();
         references.lockDemandReferences(row.getMaterialId(), ids);

@@ -99,6 +99,15 @@ public class MaterialBomService {
         return require(id);
     }
 
+    @Transactional(transactionManager = "businessTransactionManager", readOnly = true)
+    public MaterialBomEntity selectDefault(Long productId) {
+        if (productId == null) ParameterChecks.reject(ErrorCode.BAD_REQUEST);
+        var product = materials.selectByPrimaryKey(productId);
+        if (product == null) throw new FoundationException(ErrorCode.NOT_FOUND);
+        if (!EnableStatus.ENABLED.getValue().equals(product.getStatus())) conflict();
+        return boms.selectDefaultByProductId(productId);
+    }
+
     public MaterialBomEntity insert(MaterialBomCreateCommand c) {
         var product = lockMaterial(c.productId());
         decimal(c.baseQty());
@@ -111,6 +120,7 @@ public class MaterialBomService {
         row.setBaseQty(c.baseQty());
         row.setUnitId(product.getUnitId());
         row.setStatus(MaterialBomStatus.DRAFT.getValue());
+        row.setDefaultVersion(false);
         row.setRevision(1L);
         row.setRemark(c.remark());
         row.setCreatedBy(SecurityUtils.getUserId());
@@ -164,9 +174,25 @@ public class MaterialBomService {
         if (row.getRevision() != revision || !MaterialBomStatus.PUBLISHED.getValue().equals(row.getStatus()))
             conflict();
         // Parent versions remain readable; a disabled child prevents new published usage, not historical reads.
+        row.setDefaultVersion(false);
         row.setStatus(MaterialBomStatus.DISABLED.getValue());
         bump(row);
         return row;
+    }
+
+    public MaterialBomEntity setDefault(Long id, long revision) {
+        var selected = lock(id);
+        if (selected.getRevision() != revision
+                || !MaterialBomStatus.PUBLISHED.getValue().equals(selected.getStatus())) conflict();
+        if (Boolean.TRUE.equals(selected.getDefaultVersion())) return selected;
+        var previous = boms.selectDefaultByProductId(selected.getProductId());
+        if (previous != null) {
+            previous.setDefaultVersion(false);
+            changed(boms.updateByPrimaryKey(previous));
+        }
+        selected.setDefaultVersion(true);
+        changed(boms.updateByPrimaryKey(selected));
+        return selected;
     }
 
     @Transactional(transactionManager = "businessTransactionManager", readOnly = true)

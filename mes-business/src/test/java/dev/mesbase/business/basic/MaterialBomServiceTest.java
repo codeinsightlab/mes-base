@@ -22,8 +22,10 @@ import java.util.List;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
@@ -87,6 +89,44 @@ class MaterialBomServiceTest {
         fixture(List.of(root), List.of(line(10, 1, 1, "0", null)));
         assertThrows(FoundationException.class, () -> service.publish(1L, 1));
         verify(boms, never()).updateByPrimaryKey(any());
+    }
+
+    @Test
+    void defaultSwitchIsProductScopedAndRepeatedSelectionHasNoFurtherEffect() {
+        var previous = bom(1, 3, "1");
+        previous.setDefaultVersion(true);
+        var selected = bom(2, 3, "1");
+        var otherProduct = bom(3, 4, "1");
+        otherProduct.setDefaultVersion(true);
+        fixture(List.of(previous, selected, otherProduct), List.of());
+        when(boms.selectDefaultByProductId(3L)).thenReturn(previous, selected);
+        when(boms.updateByPrimaryKey(any())).thenReturn(1);
+
+        var result = service.setDefault(2L, 1L);
+
+        assertTrue(result.getDefaultVersion());
+        assertFalse(previous.getDefaultVersion());
+        assertTrue(otherProduct.getDefaultVersion());
+        verify(boms, times(2)).updateByPrimaryKey(any());
+        assertTrue(service.setDefault(2L, 1L).getDefaultVersion());
+        verify(boms, times(2)).updateByPrimaryKey(any());
+    }
+
+    @Test
+    void draftAndDisabledVersionsCannotBecomeDefaultAndDisableClearsDefault() {
+        var draft = bom(1, 3, "1");
+        draft.setStatus("DRAFT");
+        fixture(List.of(draft), List.of());
+        assertThrows(FoundationException.class, () -> service.setDefault(1L, 1L));
+        verify(boms, never()).updateByPrimaryKey(any());
+
+        var published = bom(2, 3, "1");
+        published.setDefaultVersion(true);
+        fixture(List.of(published), List.of());
+        when(boms.updateByPrimaryKey(any())).thenReturn(1);
+        var disabled = service.disable(2L, 1L);
+        assertFalse(disabled.getDefaultVersion());
+        assertEquals("DISABLED", disabled.getStatus());
     }
 
     @Test

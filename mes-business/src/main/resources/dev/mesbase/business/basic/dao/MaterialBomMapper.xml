@@ -10,6 +10,7 @@
     <result column="base_qty" jdbcType="DECIMAL" property="baseQty" />
     <result column="unit_id" jdbcType="BIGINT" property="unitId" />
     <result column="status" jdbcType="VARCHAR" property="status" />
+    <result column="is_default" jdbcType="TINYINT" property="defaultVersion" />
     <result column="revision" jdbcType="BIGINT" property="revision" />
     <result column="remark" jdbcType="VARCHAR" property="remark" />
     <result column="created_by" jdbcType="BIGINT" property="createdBy" />
@@ -75,7 +76,7 @@
     </where>
   </sql>
   <sql id="Base_Column_List">
-    id, code, version, product_id, base_qty, unit_id, status, revision, remark, created_by,
+    id, code, version, product_id, base_qty, unit_id, status, is_default, revision, remark, created_by,
     created_at, published_at
   </sql>
   <select id="selectByExample" parameterType="dev.mesbase.business.basic.domain.MaterialBomExample" resultMap="BaseResultMap">
@@ -88,6 +89,11 @@
     <if test="orderByClause != null">
       order by ${orderByClause}
     </if>
+  </select>
+  <select id="selectDefaultByProductId" parameterType="Long" resultMap="BaseResultMap">
+    select <include refid="Base_Column_List" />
+    from material_bom
+    where product_id = #{productId,jdbcType=BIGINT} and is_default = 1 and status = 'PUBLISHED'
   </select>
   <select id="selectByPrimaryKey" parameterType="Long" resultMap="BaseResultMap">
     select
@@ -108,11 +114,11 @@
   <insert id="insert" keyColumn="id" keyProperty="id" parameterType="dev.mesbase.business.basic.domain.MaterialBomEntity" useGeneratedKeys="true">
     insert into material_bom (code, version, product_id,
       base_qty, unit_id, status,
-      revision, remark, created_by,
+      is_default, revision, remark, created_by,
       created_at, published_at)
     values (#{code,jdbcType=VARCHAR}, #{version,jdbcType=VARCHAR}, #{productId,jdbcType=BIGINT},
       #{baseQty,jdbcType=DECIMAL}, #{unitId,jdbcType=BIGINT}, #{status,jdbcType=VARCHAR},
-      #{revision,jdbcType=BIGINT}, #{remark,jdbcType=VARCHAR}, #{createdBy,jdbcType=BIGINT},
+      #{defaultVersion,jdbcType=TINYINT}, #{revision,jdbcType=BIGINT}, #{remark,jdbcType=VARCHAR}, #{createdBy,jdbcType=BIGINT},
       #{createdAt,jdbcType=TIMESTAMP}, #{publishedAt,jdbcType=TIMESTAMP})
   </insert>
   <insert id="insertSelective" keyColumn="id" keyProperty="id" parameterType="dev.mesbase.business.basic.domain.MaterialBomEntity" useGeneratedKeys="true">
@@ -135,6 +141,9 @@
       </if>
       <if test="status != null">
         status,
+      </if>
+      <if test="defaultVersion != null">
+        is_default,
       </if>
       <if test="revision != null">
         revision,
@@ -170,6 +179,9 @@
       </if>
       <if test="status != null">
         #{status,jdbcType=VARCHAR},
+      </if>
+      <if test="defaultVersion != null">
+        #{defaultVersion,jdbcType=TINYINT},
       </if>
       <if test="revision != null">
         #{revision,jdbcType=BIGINT},
@@ -218,6 +230,9 @@
       <if test="row.status != null">
         status = #{row.status,jdbcType=VARCHAR},
       </if>
+      <if test="row.defaultVersion != null">
+        is_default = #{row.defaultVersion,jdbcType=TINYINT},
+      </if>
       <if test="row.revision != null">
         revision = #{row.revision,jdbcType=BIGINT},
       </if>
@@ -247,6 +262,7 @@
       base_qty = #{row.baseQty,jdbcType=DECIMAL},
       unit_id = #{row.unitId,jdbcType=BIGINT},
       status = #{row.status,jdbcType=VARCHAR},
+      is_default = #{row.defaultVersion,jdbcType=TINYINT},
       revision = #{row.revision,jdbcType=BIGINT},
       remark = #{row.remark,jdbcType=VARCHAR},
       created_by = #{row.createdBy,jdbcType=BIGINT},
@@ -277,6 +293,9 @@
       <if test="status != null">
         status = #{status,jdbcType=VARCHAR},
       </if>
+      <if test="defaultVersion != null">
+        is_default = #{defaultVersion,jdbcType=TINYINT},
+      </if>
       <if test="revision != null">
         revision = #{revision,jdbcType=BIGINT},
       </if>
@@ -303,6 +322,7 @@
       base_qty = #{baseQty,jdbcType=DECIMAL},
       unit_id = #{unitId,jdbcType=BIGINT},
       status = #{status,jdbcType=VARCHAR},
+      is_default = #{defaultVersion,jdbcType=TINYINT},
       revision = #{revision,jdbcType=BIGINT},
       remark = #{remark,jdbcType=VARCHAR},
       created_by = #{createdBy,jdbcType=BIGINT},

@@ -19,6 +19,8 @@ public class MaterialBomEntity {
 
     private String status;
 
+    private Boolean defaultVersion;
+
     private Long revision;
 
     private String remark;
@@ -83,6 +85,14 @@ public class MaterialBomEntity {
 
     public void setStatus(String status) {
         this.status = status;
+    }
+
+    public Boolean getDefaultVersion() {
+        return defaultVersion;
+    }
+
+    public void setDefaultVersion(Boolean defaultVersion) {
+        this.defaultVersion = defaultVersion;
     }
 
     public Long getRevision() {

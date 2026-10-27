@@ -23,6 +23,8 @@ public interface MaterialBomMapper {
 
     MaterialBomEntity selectByPrimaryKey(Long id);
 
+    MaterialBomEntity selectDefaultByProductId(@Param("productId") Long productId);
+
     int updateByExampleSelective(@Param("row") MaterialBomEntity row, @Param("example") MaterialBomExample example);
 
     int updateByExample(@Param("row") MaterialBomEntity row, @Param("example") MaterialBomExample example);

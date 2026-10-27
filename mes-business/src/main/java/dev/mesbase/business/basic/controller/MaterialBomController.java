@@ -57,6 +57,13 @@ public class MaterialBomController {
         return toView(service.selectById(id));
     }
 
+    @GetMapping("/default")
+    @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED, permission = MaterialBomPermissions.QUERY)
+    public MaterialBomVo defaultVersion(@RequestParam Long productId) {
+        var row = service.selectDefault(productId);
+        return row == null ? null : toView(row);
+    }
+
     @PostMapping
     @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED,
             permission = MaterialBomPermissions.CREATE)
@@ -87,7 +94,7 @@ public class MaterialBomController {
     }
 
     @PostMapping("/{id}/publish")
-    @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED, permission = MaterialPermissions.UPDATE)
+    @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED, permission = MaterialBomPermissions.UPDATE)
     public MaterialBomVo publish(@PathVariable Long id, @RequestBody Transition command) {
         return toView(service.publish(id, command.revision()));
     }
@@ -96,6 +103,12 @@ public class MaterialBomController {
     @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED, permission = MaterialPermissions.UPDATE)
     public MaterialBomVo disable(@PathVariable Long id, @RequestBody Transition command) {
         return toView(service.disable(id, command.revision()));
+    }
+
+    @PostMapping("/{id}/default")
+    @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED, permission = MaterialBomPermissions.UPDATE)
+    public MaterialBomVo setDefault(@PathVariable Long id, @RequestBody Transition command) {
+        return toView(service.setDefault(id, command.revision()));
     }
 
     @GetMapping("/{id}/structure")

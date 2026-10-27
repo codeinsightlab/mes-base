@@ -14,6 +14,7 @@ public record MaterialBomVo(
         String baseQty,
         String unitId,
         String status,
+        Boolean defaultVersion,
         String revision,
         String remark,
         String createdBy,
