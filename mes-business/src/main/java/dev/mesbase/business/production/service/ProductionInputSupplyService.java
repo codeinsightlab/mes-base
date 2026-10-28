@@ -12,7 +12,6 @@ import dev.mesbase.business.integration.production.ProductionSupply.Requirement;
 import dev.mesbase.business.integration.production.ProductionSupply.Order;
 import dev.mesbase.business.integration.production.ProductionSupply.Context;
 import dev.mesbase.business.integration.production.ProductionSupply.Calculation;
-import dev.mesbase.business.integration.production.ProductionErpAdapter;
 import dev.mesbase.business.integration.warehouse.WarehouseIntegration;
 import dev.mesbase.business.integration.warehouse.ErpActionResult.Mode;
 import dev.mesbase.business.production.domain.ProductionCodeRules;
@@ -42,20 +41,17 @@ public class ProductionInputSupplyService {
     private final BusinessSourceRules sources;
     private final ProductionIdentityService identities;
     private final WarehouseIntegration integration;
-    private final List<ProductionErpAdapter> adapters;
     private final LocalProductionSupply local;
     private final TransactionTemplate readTransaction;
     private final MaterialQuantityRules quantityRules;
 
-    public ProductionInputSupplyService(WarehouseIntegration integration, List<ProductionErpAdapter> adapters,
-                                        LocalProductionSupply local,
+    public ProductionInputSupplyService(WarehouseIntegration integration, LocalProductionSupply local,
                                         @Qualifier("businessTransactionManager") PlatformTransactionManager manager,
                                         BusinessSourceRules sources, ProductionIdentityService identities,
                                         MaterialQuantityRules quantityRules) {
         this.identities = identities;
         this.sources = sources;
         this.integration = integration;
-        this.adapters = List.copyOf(adapters);
         this.local = local;
         this.quantityRules = quantityRules;
         readTransaction = new TransactionTemplate(manager);
@@ -74,46 +70,25 @@ public class ProductionInputSupplyService {
         var sourceOrder = readTransaction.execute(status -> identities.requireInputOrder(identity));
         if (workorderId != null && !workorderId.equals(sourceOrder.getId()))
             ParameterChecks.reject(ErrorCode.BAD_REQUEST);
+        if (!BusinessSource.LOCAL.getValue().equals(sourceOrder.getSource()))
+            throw new FoundationException(ErrorCode.BUSINESS_SOURCE_CONFLICT);
         readTransaction.executeWithoutResult(status -> sources.order(sourceOrder.getId()));
         var scope = FactoryContext.required();
-        var selection = integration.submissionSelection(scope);
-        if (selection.mode() == Mode.CONNECTED) {
-            var matching = adapters.stream().filter(a -> a.supports(scope, selection.bindingKey())).toList();
-            if (matching.size() != 1) throw new FoundationException(ErrorCode.INTEGRATION_NOT_CONFIGURED);
-            var result = matching.getFirst()
-                    .query(scope, selection.bindingKey(), identity.workorderCode(), identity.productCode(), identity.batchNo());
-            if (result == null || !Mode.CONNECTED.getValue().equals(result.sourceMode()))
-                ParameterChecks.reject(ErrorCode.BAD_REQUEST);
-            readTransaction.executeWithoutResult(status -> sources.externalCandidates(result));
-            var eligible = result.orders().stream()
-                    .filter(o -> sourceOrder.getId().equals(o.workorderId())
-                            && identity.workorderCode().equals(o.workorderCode())
-                            && o.requirements().stream().anyMatch(r -> identity.productCode().equals(r.materialCode())))
-                    .map(o -> new Order(o.workorderId(), o.workorderCode(), o.productCode(), o.productName(),
-                            o.workCenter(), o.plannedQty(), o.outputUnitCode(), o.status(), o.allowedWarehouses(),
-                            o.requirements(), o.sourceReference(), o.observedAt(), sourceOrder.getProductId()))
-                    .toList();
-            if (eligible.size() > 1) throw new FoundationException(ErrorCode.PRODUCTION_IDENTITY_AMBIGUOUS);
-            var stocks = result.stocks().stream().filter(stock -> identity.batchNo().equals(stock.lotCode())
-                    && eligible.stream().anyMatch(order -> order.allowedWarehouses().contains(stock.warehouseId())
-                    && order.requirements().stream()
-                    .anyMatch(requirement -> requirement.materialCode().equals(stock.materialCode())
-                            && Objects.equals(requirement.unitId(), stock.unitId())))).toList();
-            return new Context(result.sourceMode(), stocks, eligible.stream().skip(offset).limit(limit)
-                    .toList(), eligible.size(), offset, limit);
-        }
-        return readTransaction.execute(status -> local.query(identity, sourceOrder, scope, selection, offset, limit));
+        if (integration.configuredMode(scope) != Mode.LOCAL_ONLY)
+            throw new FoundationException(ErrorCode.INTEGRATION_NOT_CONFIGURED);
+        return readTransaction.execute(status -> local.query(identity, sourceOrder, scope, offset, limit));
     }
 
     @Transactional(transactionManager = "businessTransactionManager", propagation = Propagation.NOT_SUPPORTED)
     public Calculation calculate(String code, Long orderId, String stockReference, BigDecimal outputQty) {
         var sourceOrder = readTransaction.execute(status -> {
             var order = sources.order(orderId);
+            if (!BusinessSource.LOCAL.getValue().equals(order.getSource()))
+                throw new FoundationException(ErrorCode.BUSINESS_SOURCE_CONFLICT);
             quantityRules.checkForMaterial(outputQty, order.getProductId());
             return order;
         });
-        if (BusinessSource.LOCAL.getValue().equals(sourceOrder.getSource()))
-            readTransaction.executeWithoutResult(status -> local.validateRequestedSource(orderId, stockReference));
+        readTransaction.executeWithoutResult(status -> local.validateRequestedSource(orderId, stockReference));
         var context = query(code, orderId, 0, 1);
         var order = context.orders().stream().filter(o -> o.workorderId().equals(orderId)).findFirst()
                 .orElseThrow(() -> new FoundationException(ErrorCode.BAD_REQUEST));
@@ -130,11 +105,7 @@ public class ProductionInputSupplyService {
                 || !order.allowedWarehouses().contains(stock.warehouseId()))
             ParameterChecks.reject(ErrorCode.BAD_REQUEST);
         var total = required.stream().map(Requirement::totalRequiredQty).reduce(BigDecimal.ZERO, BigDecimal::add);
-        Calculation calculation;
-        if (Mode.LOCAL_ONLY.getValue().equals(context.sourceMode()))
-            calculation = readTransaction.execute(status -> local.calculate(context.sourceMode(), order, stock, outputQty));
-        else
-            calculation = new Calculation(context.sourceMode(), order, stock, outputQty, issueQuantity(order.plannedQty(), total, outputQty));
+        Calculation calculation = readTransaction.execute(status -> local.calculate(context.sourceMode(), order, stock, outputQty));
         if (calculation.issueQty().compareTo(stock.availableQty()) > 0) ParameterChecks.reject(ErrorCode.BAD_REQUEST);
         return calculation;
     }
@@ -167,7 +138,10 @@ public class ProductionInputSupplyService {
     public void validateFrozenCalculation(Calculation calculation) {
         var order = sources.order(calculation.order().workorderId());
         sources.warehouse(order.getSource(), calculation.stock().warehouseId());
-        if (Mode.LOCAL_ONLY.getValue().equals(calculation.sourceMode())) local.validateFrozenCalculation(calculation);
+        if (!BusinessSource.LOCAL.getValue().equals(order.getSource())
+                || !Mode.LOCAL_ONLY.getValue().equals(calculation.sourceMode()))
+            throw new FoundationException(ErrorCode.BUSINESS_SOURCE_CONFLICT);
+        local.validateFrozenCalculation(calculation);
     }
 
     public static String calculationKey(Calculation c) {

@@ -1,10 +1,7 @@
 package dev.issuefixture;
 
-import dev.mesbase.business.integration.warehouse.WarehouseIntegration;
 import dev.mesbase.business.production.domain.MesProductionExecutionResource;
 import dev.mesbase.common.core.redis.RedisCache;
-import dev.mesbase.core.error.ErrorCode;
-import dev.mesbase.core.error.FoundationException;
 import dev.mesbase.infrastructure.cache.BusinessCacheProcessor;
 import dev.mesbase.infrastructure.cache.annotation.BusinessCacheEvict;
 import dev.mesbase.infrastructure.persistence.SpringCommitActions;
@@ -24,13 +21,10 @@ import static dev.issuefixture.ProductionCoreV1HttpTest.full;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.doAnswer;
-import static org.mockito.Mockito.doCallRealMethod;
-import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -71,17 +65,15 @@ class WorkorderBomInputHttpTest {
             clearInvocations(redis);
 
             String append = ProductionInputHttpTest.command(m, UUID.randomUUID().toString(), "L001", "10");
-            var warehouse = c.getBean(WarehouseIntegration.class);
-            doThrow(new FoundationException(ErrorCode.RESOURCE_CONFLICT))
-                    .when(warehouse).createMaterialIssue(any(), any(), any());
-            m.perform(full(post("/api/production/input")).content(append)).andExpect(status().isConflict());
+            j.execute("ALTER TABLE wm_stock_action ADD CONSTRAINT test_fail_issue CHECK(action_type <> 'ISSUE')");
+            m.perform(full(post("/api/production/input")).content(append)).andExpect(status().is5xxServerError());
             verify(redis, never()).deleteByPattern(anyString());
             assertEquals(0, new BigDecimal("90").compareTo(j.queryForObject(
                     "SELECT target_qty FROM mes_production_execution WHERE id=?", BigDecimal.class, execution)));
 
             ProductionInputHttpTest.submit(m, first);
             verify(redis, never()).deleteByPattern(anyString());
-            doCallRealMethod().when(warehouse).createMaterialIssue(any(), any(), any());
+            j.execute("ALTER TABLE wm_stock_action DROP CONSTRAINT test_fail_issue");
             assertEquals(execution, input(m, "10"));
             verify(redis, times(2)).deleteByPattern(anyString());
         }
@@ -96,7 +88,8 @@ class WorkorderBomInputHttpTest {
 
     static void select(MockMvc m, int revision, long bomId) throws Exception {
         m.perform(full(put("/api/production/workorder/1/material")).content(JSON.writeValueAsString(Map.of(
-                        "expectedRevision", revision, "bomId", bomId, "warehouseIds", List.of(1), "workCenter", "TEST-BOM", "enabled", true))))
+                        "expectedRevision", revision, "bomId", bomId, "expectedBomRevision", 1,
+                        "warehouseIds", List.of(1), "workCenter", "TEST-BOM", "enabled", true))))
                 .andExpect(status().isOk());
     }
 
@@ -116,7 +109,8 @@ class WorkorderBomInputHttpTest {
 
     static void receive(MockMvc m, long execution, String quantity) throws Exception {
         var document = JSON.readTree(m.perform(full(post(StockDocumentHttpTest.ROOT)).content(JSON.writeValueAsString(Map.of(
-                        "documentType", "PRODUCTION_RECEIPT", "sourceExecutionId", Long.toString(execution), "reason", "TEST ONLY BOM input cycle"))))
+                        "documentType", "PRODUCTION_RECEIPT", "sourceExecutionId", Long.toString(execution),
+                        "reason", "TEST ONLY BOM input cycle", "ruleCode", "TEST_STOCK_IN"))))
                 .andExpect(status().isOk()).andReturn().getResponse().getContentAsString());
         String id = document.get("document").get("id").asText();
         m.perform(full(post(StockDocumentHttpTest.ROOT + "/" + id + "/lines")).content(
@@ -196,7 +190,7 @@ class WorkorderBomInputHttpTest {
             j.update("UPDATE material SET unit_id=2 WHERE id=99");
             j.update("UPDATE material_bom SET unit_id=2 WHERE id=1");
             select(m, 1, 1); // The work order is already released.
-            j.update("INSERT INTO material_bom SELECT 2,'BOM-SECOND','2',product_id,base_qty,unit_id,status,revision,remark,created_by,created_at,published_at FROM material_bom WHERE id=1");
+            j.update("INSERT INTO material_bom(id,code,version,product_id,base_qty,unit_id,status,revision,remark,created_by,created_at,published_at,is_default) SELECT 2,'BOM-SECOND','2',product_id,base_qty,unit_id,status,revision,remark,created_by,created_at,published_at,0 FROM material_bom WHERE id=1");
             j.update("INSERT INTO material_bom_item SELECT 2,2,material_id,5,unit_id,NULL,sort FROM material_bom_item WHERE id=1");
             select(m, 2, 2);
             select(m, 3, 1);
@@ -271,12 +265,13 @@ class WorkorderBomInputHttpTest {
             assertEquals(1, j.queryForObject("SELECT COUNT(*) FROM mes_production_execution", Integer.class));
             // A new work order may select another version; a two-component version must be rejected as a whole.
             j.update("INSERT INTO workorder(id,code,product_id,planned_qty,routing_id,status,revision,source,create_time,update_time) VALUES(7,'TEST-MULTI',99,100,1,'RELEASED',0,'LOCAL',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)");
-            j.update("INSERT INTO material_bom SELECT 7,'TEST-MULTI','1',product_id,base_qty,unit_id,status,revision,remark,created_by,created_at,published_at FROM material_bom WHERE id=1");
+            j.update("INSERT INTO material_bom(id,code,version,product_id,base_qty,unit_id,status,revision,remark,created_by,created_at,published_at,is_default) SELECT 7,'TEST-MULTI','1',product_id,base_qty,unit_id,status,revision,remark,created_by,created_at,published_at,0 FROM material_bom WHERE id=1");
             j.update("INSERT INTO material_bom_item SELECT 7,7,material_id,quantity,unit_id,NULL,sort FROM material_bom_item WHERE id=1");
             j.update("INSERT INTO material(id,code,name,unit_id,status) VALUES(98,'TEST-MATERIAL-OTHER','TEST ONLY additional material',1,'ENABLED')");
             j.update("INSERT INTO material_bom_item(id,bom_id,material_id,quantity,unit_id,sort) VALUES(8,7,98,1,1,1)");
             m.perform(full(put("/api/production/workorder/7/material")).content(JSON.writeValueAsString(Map.of(
-                            "expectedRevision", 0, "bomId", 7, "warehouseIds", List.of(1), "workCenter", "TEST", "enabled", true))))
+                            "expectedRevision", 0, "bomId", 7, "expectedBomRevision", 1,
+                            "warehouseIds", List.of(1), "workCenter", "TEST", "enabled", true))))
                     .andExpect(status().isUnprocessableEntity())
                     .andExpect(jsonPath("errorCode").value("PRODUCTION_SINGLE_MATERIAL_REQUIRED"));
             assertEquals(0, j.queryForObject("SELECT COUNT(*) FROM mes_workorder_material WHERE id=7", Integer.class));

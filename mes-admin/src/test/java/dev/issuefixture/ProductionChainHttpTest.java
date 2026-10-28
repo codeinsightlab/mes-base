@@ -146,10 +146,7 @@ class ProductionChainHttpTest {
                     .andExpect(status().isMethodNotAllowed());
             a.update("INSERT INTO mes_production_execution(id,workorder_id,product_id,routing_id,target_qty,status) VALUES(1,1,1,1,3,'READY')");
             m.perform(full(get(E + "/1"), "A")).andExpect(status().isOk());
-            m.perform(full(post("/api/issue/mes-material-issue"), "A")
-                            .content("{\"issueNo\":\"NO_BATCH_PATH\",\"executionId\":\"1\",\"status\":\"DRAFT\"}"))
-                    .andExpect(status().isOk()).andExpect(jsonPath("executionId").value("1"))
-                    .andExpect(jsonPath("routingId").value("1"));
+
         }
     }
 

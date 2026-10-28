@@ -26,12 +26,10 @@ class BatchQuantitySqlTest {
             s.execute("CREATE TABLE mes_material_issue_input(execution_id BIGINT,issue_id BIGINT,input_kind VARCHAR(40),confirmed_at TIMESTAMP,source_mode VARCHAR(40),output_qty DECIMAL(20,6))");
             s.execute("CREATE TABLE mes_material_issue(id BIGINT,execution_id BIGINT,submission_id BIGINT,status VARCHAR(40))");
             s.execute("CREATE TABLE mes_material_issue_submission(id BIGINT,issue_id BIGINT,status VARCHAR(40))");
-            s.execute("CREATE TABLE mes_material_issue_erp_extra(id BIGINT,source_execution_mode VARCHAR(40),external_effect VARCHAR(40),document_status VARCHAR(40))");
             s.execute("INSERT INTO mes_execution_path_node VALUES(1,11),(2,11),(2,12),(3,11)");
             s.execute("INSERT INTO mes_production_report VALUES(1,11,100),(1,11,-4),(2,11,200),(2,99,999),(3,11,9999)");
             s.execute("INSERT INTO mes_material_issue VALUES(1,1,1,'CONFIRMED'),(2,1,2,'VOID_PENDING'),(3,2,3,'VOID_UNKNOWN'),(4,2,4,'CONFIRMED'),(5,2,5,'CONFIRMED')");
             s.execute("INSERT INTO mes_material_issue_submission VALUES(1,1,'SUCCEEDED'),(2,2,'SUCCEEDED'),(3,3,'SUCCEEDED'),(4,4,'UNKNOWN'),(5,5,'SUCCEEDED')");
-            s.execute("INSERT INTO mes_material_issue_erp_extra VALUES(1,'LOCAL_ONLY','NONE',NULL),(2,'LOCAL_ONLY','NONE',NULL),(3,'CONNECTED','CONFIRMED','EFFECTIVE'),(4,'LOCAL_ONLY','NONE',NULL),(5,'CONNECTED','UNKNOWN','EFFECTIVE')");
             s.execute("INSERT INTO mes_material_issue_input VALUES(1,1,'PRODUCTION_INPUT',CURRENT_TIMESTAMP,'LOCAL_ONLY',100),(1,2,'PRODUCTION_INPUT',CURRENT_TIMESTAMP,'LOCAL_ONLY',3),(2,3,'PRODUCTION_INPUT',CURRENT_TIMESTAMP,'CONNECTED',7),(2,4,'PRODUCTION_INPUT',CURRENT_TIMESTAMP,'LOCAL_ONLY',999),(2,5,'PRODUCTION_INPUT',CURRENT_TIMESTAMP,'CONNECTED',888)");
         }
         var config = new Configuration(new Environment("fixture", new JdbcTransactionFactory(), new UnpooledDataSource("org.h2.Driver", url, null)));

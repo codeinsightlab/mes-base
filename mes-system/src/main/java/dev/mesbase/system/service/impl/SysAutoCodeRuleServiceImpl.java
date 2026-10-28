@@ -104,7 +104,7 @@ public class SysAutoCodeRuleServiceImpl implements IAutoCodeRuleService {
             targetScope.setFactoryId(rule.getFactoryId());
             references.requireUnreferenced(targetScope);
         }
-        return masterTransactions.execute(status -> {
+        Integer updatedCount = masterTransactions.execute(status -> {
             if (extra.lockRule(scanned.getRuleId()) == null)
                 throw new ServiceException("编码规则不存在");
             var current = mapper.findByIdForUpdate(scanned.getRuleId());
@@ -119,8 +119,6 @@ public class SysAutoCodeRuleServiceImpl implements IAutoCodeRuleService {
             var currentParts = parts.selectByRuleIdForUpdate(scanned.getRuleId());
             if (!Objects.equals(scannedPrefix, prefix(currentParts)))
                 throw new ServiceException("规则前缀已变化，请重新执行修改");
-            if (!Objects.equals(current.getRuleCode(), rule.getRuleCode()))
-                throw new ServiceException("规则编码不可变更");
             if (current.getRuleType() != null && !Objects.equals(current.getRuleType(), rule.getRuleType()))
                 throw new ServiceException("规则单据类型不可变更");
             validate(rule);
@@ -129,6 +127,8 @@ public class SysAutoCodeRuleServiceImpl implements IAutoCodeRuleService {
             if (changed > 0) cache.invalidateAfterCommit();
             return changed;
         });
+        if (updatedCount == null) throw new ServiceException("更新编码规则失败");
+        return updatedCount;
     }
 
     @Transactional(transactionManager = "masterTransactionManager", propagation = Propagation.NOT_SUPPORTED,

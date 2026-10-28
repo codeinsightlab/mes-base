@@ -25,6 +25,7 @@ import dev.mesbase.business.shared.enums.BusinessSource;
 import dev.mesbase.business.shared.enums.EnableStatus;
 import dev.mesbase.business.wm.dao.WmInventoryMapper;
 import dev.mesbase.business.wm.dao.WmStockActionMapper;
+import dev.mesbase.business.wm.dao.WmStockDocumentMapper;
 import dev.mesbase.business.wm.dao.WmWarehouseMapper;
 import dev.mesbase.business.wm.domain.StockActionType;
 import dev.mesbase.business.wm.domain.StockDocumentType;
@@ -71,6 +72,7 @@ public class LocalStockService {
     private final WmWarehouseMapper warehouses;
     private final MesMaterialIssueInputMapper inputs;
     private final MesMaterialIssueMapper issues;
+    private final WmStockDocumentMapper documents;
     private final WarehouseIntegration integration;
     private final ProductionChainLocks locks;
     private final MesProductionReportMapper reports;
@@ -81,7 +83,7 @@ public class LocalStockService {
 
     public LocalStockService(WmInventoryMapper inventory, WmStockActionMapper actions, MaterialMapper materials,
                              UnitMeasureMapper units, WmWarehouseMapper warehouses, MesMaterialIssueInputMapper inputs,
-                             MesMaterialIssueMapper issues, WarehouseIntegration integration,
+                             MesMaterialIssueMapper issues, WmStockDocumentMapper documents, WarehouseIntegration integration,
                              ProductionChainLocks locks, MesProductionReportMapper reports,
                              MesProductionDefectMapper defects, MesProductionReceiptMapper receipts,
                              BusinessSourceRules sources, MaterialQuantityRules quantityRules) {
@@ -97,6 +99,7 @@ public class LocalStockService {
         this.warehouses = warehouses;
         this.inputs = inputs;
         this.issues = issues;
+        this.documents = documents;
         this.integration = integration;
         this.locks = locks;
     }
@@ -112,19 +115,28 @@ public class LocalStockService {
         decimal(c.expectedAvailable());
         if (StringUtils.isBlank(c.reason()) || c.reason().length() > 500 || c.stockId() == null)
             ParameterChecks.reject(ErrorCode.BAD_REQUEST);
-        if (type != StockActionType.RETURN && c.issueId() != null) ParameterChecks.reject(ErrorCode.BAD_REQUEST);
+        if (type != StockActionType.RETURN && (c.issueId() != null || c.documentId() != null)) ParameterChecks.reject(ErrorCode.BAD_REQUEST);
+        Long issueId = c.issueId();
         Long actor = SecurityUtils.getUserId();
+        if (type == StockActionType.RETURN && c.documentId() != null) {
+            if (issueId != null) ParameterChecks.reject(ErrorCode.BAD_REQUEST);
+            var document = documents.selectByPrimaryKey(c.documentId());
+            if (document == null || !StockDocumentType.MATERIAL_ISSUE.getValue().equals(document.getDocumentType())
+                    || document.getSourceMaterialIssueId() == null)
+                throw new FoundationException(ErrorCode.STOCK_DOCUMENT_SOURCE_PENDING);
+            issueId = document.getSourceMaterialIssueId();
+        }
+        if (type == StockActionType.RETURN && issueId == null) ParameterChecks.reject(ErrorCode.BAD_REQUEST);
         String hash = digest(type, c.stockId(), normalized(c.quantity()), normalized(c.expectedQuantity()),
-                normalized(c.expectedAvailable()), c.reason(), c.issueId(), actor);
+                normalized(c.expectedAvailable()), c.reason(), issueId, actor);
         MesMaterialIssueInputEntity input = null;
         if (type == StockActionType.RETURN) {
-            if (c.issueId() == null) ParameterChecks.reject(ErrorCode.BAD_REQUEST);
-            locks.issues(List.of(c.issueId()));
-            var issue = issues.selectByPrimaryKey(c.issueId());
-            if (!MaterialIssueStatus.CONFIRMED.getValue().equals(issue.getStatus()))
+            locks.issues(List.of(issueId));
+            var issue = issues.selectByPrimaryKey(issueId);
+            if (issue == null || !MaterialIssueStatus.CONFIRMED.getValue().equals(issue.getStatus()))
                 ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
             var f = new MesMaterialIssueInputExample();
-            f.createCriteria().andIssueIdEqualTo(c.issueId());
+            f.createCriteria().andIssueIdEqualTo(issueId);
             var found = inputs.selectByExampleWithBLOBs(f);
             if (found.size() != 1) ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
             input = found.getFirst();

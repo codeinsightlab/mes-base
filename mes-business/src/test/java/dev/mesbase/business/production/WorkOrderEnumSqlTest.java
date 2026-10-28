@@ -68,17 +68,15 @@ class WorkOrderEnumSqlTest {
     }
 
     @Test
-    void blockingIssueQueryStillRequiresCompleteVoidProof() throws Exception {
+    void blockingIssueQueryRequiresACompleteLocalVoidFact() throws Exception {
         BoundSql sql = configuration().getMappedStatement(
                         "dev.mesbase.business.production.dao.WorkOrderExtraMapper.countBlockingIssues")
                 .getBoundSql(Map.of("workorderId", 1L));
         // Isolated H2 fixture verifies real generated SQL and parameters; it is not live MySQL evidence.
         try (var connection = DriverManager.getConnection("jdbc:h2:mem:enum_void;MODE=MySQL");
              var statement = connection.createStatement()) {
-            statement.execute("CREATE TABLE mes_material_issue(id BIGINT,workorder_id BIGINT,status VARCHAR(30))");
-            statement.execute("CREATE TABLE mes_material_issue_erp_extra(id BIGINT,void_result_status VARCHAR(30),source_execution_mode VARCHAR(30),void_execution_mode VARCHAR(30),external_effect VARCHAR(30))");
-            statement.execute("INSERT INTO mes_material_issue VALUES (1,1,'DRAFT'),(2,1,'VOIDED'),(3,1,'VOIDED'),(4,1,'VOIDED'),(5,1,'VOIDED'),(6,2,'DRAFT')");
-            statement.execute("INSERT INTO mes_material_issue_erp_extra VALUES (2,'SUCCEEDED','LOCAL_ONLY','LOCAL_ONLY','NONE'),(3,'SUCCEEDED','CONNECTED','CONNECTED','REVERSED'),(4,'UNKNOWN','CONNECTED','CONNECTED','UNKNOWN'),(5,'SUCCEEDED','LOCAL_ONLY','CONNECTED','NONE')");
+            statement.execute("CREATE TABLE mes_material_issue(id BIGINT,workorder_id BIGINT,status VARCHAR(30),void_result_status VARCHAR(30),source_mode VARCHAR(30))");
+            statement.execute("INSERT INTO mes_material_issue VALUES (1,1,'DRAFT',NULL,NULL),(2,1,'VOIDED','SUCCEEDED','LOCAL_ONLY'),(3,1,'VOIDED','SUCCEEDED','CONNECTED'),(4,1,'VOIDED','UNKNOWN','CONNECTED'),(5,1,'VOIDED','SUCCEEDED','LOCAL_ONLY'),(6,2,'DRAFT',NULL,NULL)");
             try (var query = connection.prepareStatement(sql.getSql())) {
                 for (int index = 0; index < sql.getParameterMappings().size(); index++) {
                     String name = sql.getParameterMappings().get(index).getProperty();

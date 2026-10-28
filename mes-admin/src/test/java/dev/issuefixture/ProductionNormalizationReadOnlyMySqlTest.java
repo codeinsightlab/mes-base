@@ -3,7 +3,8 @@ package dev.issuefixture;
 import dev.mesbase.acceptance.AcceptanceBusinessDatabase;
 import dev.mesbase.business.directory.domain.DirectoryLabel;
 import dev.mesbase.business.directory.service.BusinessDirectoryService;
-import dev.mesbase.business.issue.dao.MesMaterialIssueErpExtraMapper;
+import dev.mesbase.business.issue.dao.MesMaterialIssueInputMapper;
+import dev.mesbase.business.issue.dao.MesMaterialIssueSubmissionMapper;
 import dev.mesbase.business.issue.dao.MesMaterialIssueMapper;
 import dev.mesbase.business.legacy.dao.LegacyHistoryMapper;
 import dev.mesbase.business.production.dao.MesExecutionPathMapper;
@@ -74,7 +75,8 @@ class ProductionNormalizationReadOnlyMySqlTest {
         var paths = new ExecutionPathService(null, null, sql.getMapper(MesExecutionPathMapper.class),
                 sql.getMapper(MesExecutionPathNodeMapper.class), sql.getMapper(MesProductionExecutionMapper.class),
                 sql.getMapper(RoutingNodeMapper.class), sql.getMapper(RoutingEdgeMapper.class),
-                sql.getMapper(MesMaterialIssueMapper.class), sql.getMapper(MesMaterialIssueErpExtraMapper.class),
+                sql.getMapper(MesMaterialIssueMapper.class), sql.getMapper(MesMaterialIssueInputMapper.class),
+                sql.getMapper(MesMaterialIssueSubmissionMapper.class),
                 directory, qualityQuery);
         var evidence = new StaticListableBeanFactory();
         evidence.addBean("openingEvidence", sql.getMapper(LegacyHistoryMapper.class));

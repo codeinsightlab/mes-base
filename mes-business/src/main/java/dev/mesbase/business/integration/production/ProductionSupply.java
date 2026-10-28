@@ -5,7 +5,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 /**
- * Local and optional ERP providers use the same explicit, immutable supply contract.
+ * Production-input scene contract for LOCAL stock and production facts.
  */
 public final class ProductionSupply {
     private ProductionSupply() {

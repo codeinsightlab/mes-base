@@ -117,7 +117,7 @@ class FactoryIntegrationConfigurationTest {
             env.setProperty("test.secret", "");
             env.setProperty("mes.runtime.enabled", "true");
             env.setProperty("mes.integration.warehouse.factories.A.mode", "LOCAL_ONLY");
-            var integration = new WarehouseIntegration(List.of());
+            var integration = new WarehouseIntegration();
             assertEquals(Mode.CONNECTED, integration.configuredMode(new FactoryScope(admitted.factoryId())));
             assertThrows(FoundationException.class, () -> integration.configuredMode(new FactoryScope(new FactoryId("B"))));
             assertSame(admitted, FactoryIntegrationContext.required());

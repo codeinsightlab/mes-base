@@ -90,7 +90,7 @@ class ProductionCoreV1MySqlTest {
                 var item = items.insert(new MesMaterialIssueItemCreateCommand(issue.getId(), product, "TEST_CORE_LOT", new BigDecimal("1.123456"), null, null, tag));
                 var confirmed = submits.submit(issue.getId());
                 assertEquals("CONFIRMED", confirmed.getStatus());
-                assertEquals("NONE", confirmed.getExternalEffect());
+                assertEquals("LOCAL_ONLY", confirmed.getSourceMode());
                 assertNotNull(confirmed.getSubmissionId());
                 assertEquals(confirmed.getSubmissionId(), submits.submit(issue.getId()).getSubmissionId());
                 assertEquals("LOCKED", paths.view(e.getId()).path().getPathStatus());
@@ -101,7 +101,7 @@ class ProductionCoreV1MySqlTest {
                         .cancel(issue.getId()));
                 assertEquals(0, jdbc.queryForObject("SELECT COUNT(*) FROM information_schema.columns WHERE table_schema=DATABASE() AND table_name='mes_material_issue' AND (column_name LIKE '%external%' OR column_name='factory_id')", Integer.class));
                 assertEquals(0, jdbc.queryForObject("SELECT COUNT(*) FROM information_schema.columns WHERE table_schema=DATABASE() AND table_name IN ('mes_execution_path','mes_execution_path_node','mes_material_issue_submission') AND (column_comment='' OR column_name='factory_id')", Integer.class));
-                assertEquals(0, jdbc.queryForObject("SELECT COUNT(*) FROM mes_material_issue_erp_extra WHERE id=? AND (external_reference IS NOT NULL OR external_code IS NOT NULL)", Integer.class, issue.getId()));
+                assertEquals(0, jdbc.queryForObject("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema=DATABASE() AND table_name='mes_material_issue_erp_extra'", Integer.class));
                 System.out.println("MYSQL_CORE_VERIFIED tag=" + tag + " workorder=" + demand.getId() + " execution=" + e.getId() + " issue=" + issue.getId() + " item=" + item.getId() + " path=" + selected + " mode=LOCAL_ONLY");
                 return null;
             });

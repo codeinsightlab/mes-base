@@ -14,18 +14,10 @@ import dev.mesbase.business.basic.dao.WorkstationMapper;
 import dev.mesbase.business.directory.domain.DirectoryLabel;
 import dev.mesbase.business.directory.service.BusinessDirectoryService;
 import dev.mesbase.business.integration.warehouse.WarehouseIntegration;
-import dev.mesbase.business.issue.controller.MaterialIssueErpController;
-import dev.mesbase.business.issue.controller.MaterialIssueSubmissionController;
-import dev.mesbase.business.issue.controller.MaterialIssueVoidController;
-import dev.mesbase.business.issue.controller.MesMaterialIssueController;
-import dev.mesbase.business.issue.controller.MesMaterialIssueItemController;
-import dev.mesbase.business.issue.dao.MesMaterialIssueErpExtraMapper;
 import dev.mesbase.business.issue.dao.MesMaterialIssueInputMapper;
 import dev.mesbase.business.issue.dao.MesMaterialIssueItemMapper;
 import dev.mesbase.business.issue.dao.MesMaterialIssueMapper;
 import dev.mesbase.business.issue.dao.MesMaterialIssueSubmissionMapper;
-import dev.mesbase.business.issue.service.MaterialIssueErpFacts;
-import dev.mesbase.business.issue.service.MaterialIssueErpService;
 import dev.mesbase.business.issue.service.MaterialIssueInputFacts;
 import dev.mesbase.business.issue.service.MaterialIssueRules;
 import dev.mesbase.business.issue.service.MaterialIssueSubmissionService;
@@ -188,7 +180,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * TEST ONLY: real generated SQL, HTTP authorization and transactions; two separate H2 databases.
  */
 class MaterialIssueHttpTest {
-    static final Set<Class<?>> MAPPERS = Set.of(ProductionInputExtraMapper.class, MaterialBomMapper.class, MaterialBomItemMapper.class, ProductionDefectListExtraMapper.class, StockDocumentExtraMapper.class, OperationDefectTypeMapper.class, DefectStatisticsExtraMapper.class, WmStockDocumentMapper.class, WmStockDocumentLineMapper.class, MesWorkorderCancellationMapper.class, WmWarehouseErpExtraMapper.class, MesQualityReleaseMapper.class, MesWarehouseAcceptanceMapper.class, MesExecutionCompletionMapper.class, MesWorkorderMaterialMapper.class, WmStockActionMapper.class, MesExecutionAssignmentMapper.class, MesMaterialIssueInputMapper.class, MesProductionScanActivityMapper.class, WmInventoryMapper.class, MesProductionReceiptMapper.class, ProductionReceiptQueryMapper.class, MesProductionDefectMapper.class, MesQualityTreatmentMapper.class, WorkstationMapper.class, MesProductionReportMapper.class, ProductionQuantityMapper.class, MesExecutionPathMapper.class, MesExecutionPathNodeMapper.class, MesMaterialIssueSubmissionMapper.class, WorkorderErpExtraMapper.class, MesMaterialIssueErpExtraMapper.class, WorkOrderExtraMapper.class, RoutingNodeMapper.class, RoutingEdgeMapper.class, OperationMapper.class, MesProductionExecutionMapper.class, MaterialMapper.class, UnitMeasureMapper.class, WmWarehouseMapper.class, RoutingMapper.class, RoutingProductMapper.class, WorkorderMapper.class, MesMaterialIssueMapper.class, MesMaterialIssueItemMapper.class);
+    static final Set<Class<?>> MAPPERS = Set.of(ProductionInputExtraMapper.class, MaterialBomMapper.class, MaterialBomItemMapper.class, ProductionDefectListExtraMapper.class, StockDocumentExtraMapper.class, OperationDefectTypeMapper.class, DefectStatisticsExtraMapper.class, WmStockDocumentMapper.class, WmStockDocumentLineMapper.class, MesWorkorderCancellationMapper.class, WmWarehouseErpExtraMapper.class, MesQualityReleaseMapper.class, MesWarehouseAcceptanceMapper.class, MesExecutionCompletionMapper.class, MesWorkorderMaterialMapper.class, WmStockActionMapper.class, MesExecutionAssignmentMapper.class, MesMaterialIssueInputMapper.class, MesProductionScanActivityMapper.class, WmInventoryMapper.class, MesProductionReceiptMapper.class, ProductionReceiptQueryMapper.class, MesProductionDefectMapper.class, MesQualityTreatmentMapper.class, WorkstationMapper.class, MesProductionReportMapper.class, ProductionQuantityMapper.class, MesExecutionPathMapper.class, MesExecutionPathNodeMapper.class, MesMaterialIssueSubmissionMapper.class, WorkorderErpExtraMapper.class, WorkOrderExtraMapper.class, RoutingNodeMapper.class, RoutingEdgeMapper.class, OperationMapper.class, MesProductionExecutionMapper.class, MaterialMapper.class, UnitMeasureMapper.class, WmWarehouseMapper.class, RoutingMapper.class, RoutingProductMapper.class, WorkorderMapper.class, MesMaterialIssueMapper.class, MesMaterialIssueItemMapper.class);
 
     static class Fixture implements AutoCloseable {
         final RuntimeRegistry registry = new RuntimeRegistry();
@@ -257,12 +249,17 @@ class MaterialIssueHttpTest {
                     if (name.equals("V37__workorder_cancellation.sql")) ddl = ddl.split("CREATE TRIGGER")[0];
                     for (String statement : ddl.split(";")) if (!statement.isBlank()) jdbc.execute(statement);
                 }
+                // TEST ONLY: final V69 schema after migrating the issue-local facts out of ERP Extra.
+                jdbc.execute("ALTER TABLE mes_material_issue ADD source_mode VARCHAR(20)");
+                jdbc.execute("ALTER TABLE mes_material_issue ADD void_result_status VARCHAR(20)");
+                jdbc.execute("DROP TABLE mes_material_issue_erp_extra");
                 try (var connection = source.getConnection()) {
                     ScriptUtils.executeSqlScript(connection, new FileSystemResource("mes-admin/src/main/resources/db/business/V48__warehouse_type.sql"));
                 }
                 try (var connection = source.getConnection()) {
                     ScriptUtils.executeSqlScript(connection, new FileSystemResource("mes-admin/src/main/resources/db/business/V55__material_bom.sql"));
                 }
+                jdbc.execute("ALTER TABLE material_bom ADD is_default TINYINT NOT NULL DEFAULT 0");
                 for (String column : List.of("bom_id BIGINT", "bom_base_qty DECIMAL(20,6)", "bom_component_qty DECIMAL(20,6)", "output_unit_id BIGINT", "frozen_at TIMESTAMP(6)"))
                     jdbc.execute("ALTER TABLE mes_workorder_material ADD " + column);
                 jdbc.execute("ALTER TABLE wm_stock_document ADD source_material_issue_id BIGINT");
@@ -316,7 +313,7 @@ class MaterialIssueHttpTest {
     @EnableWebMvc
     @EnableWebSecurity
     @EnableTransactionManagement
-    @Import({MaterialQuantityRules.class, WorkOrderCompletionService.class, StockDocumentService.class, StockDocumentController.class, WorkOrderCancellationService.class, WorkOrderCancellationController.class, BusinessSourceRules.class, StockReferenceRules.class, ProductionCompletionService.class, ProductionCompletionController.class, WarehouseAcceptanceService.class, WarehouseAcceptanceController.class, QualityReleaseService.class, QualityReleaseController.class, WorkorderMaterialService.class, WorkorderMaterialController.class, LocalStockController.class, WmStockActionController.class, WmStockActionServiceImpl.class, LocalStockService.class, LocalProductionSupply.class, QualityTreatmentService.class, MaterialIssueInputFacts.class, ProductionQuantityService.class, ProductionQuantityErrorAdvice.class, ExecutionQualityReferenceQueryImpl.class, ProductionExecutionQueryService.class, ProductionChainLocks.class, ExecutionPathService.class, ExecutionActionController.class, MaterialIssueSubmissionService.class, MaterialIssueSubmissionController.class, WorkorderErpFacts.class, MaterialIssueErpFacts.class, MaterialIssueErpService.class, MaterialIssueErpController.class, WarehouseIntegration.class, MaterialIssueVoidService.class, MaterialIssueVoidController.class, MesMaterialIssueController.class, MesMaterialIssueItemController.class, MesMaterialIssueServiceImpl.class, MesMaterialIssueItemServiceImpl.class, MaterialIssueRules.class, ProductionExecutionRules.class, ProductionIdentityService.class, MesProductionExecutionServiceImpl.class, MesProductionExecutionController.class, ProductionIdentityController.class, WorkOrderController.class, WorkOrderService.class, RoutingReferenceRules.class, FoundationErrorAdvice.class})
+    @Import({MaterialQuantityRules.class, WorkOrderCompletionService.class, StockDocumentService.class, StockDocumentController.class, WorkOrderCancellationService.class, WorkOrderCancellationController.class, BusinessSourceRules.class, StockReferenceRules.class, ProductionCompletionService.class, ProductionCompletionController.class, WarehouseAcceptanceService.class, WarehouseAcceptanceController.class, QualityReleaseService.class, QualityReleaseController.class, WorkorderMaterialService.class, WorkorderMaterialController.class, LocalStockController.class, WmStockActionController.class, WmStockActionServiceImpl.class, LocalStockService.class, LocalProductionSupply.class, QualityTreatmentService.class, MaterialIssueInputFacts.class, ProductionQuantityService.class, ProductionQuantityErrorAdvice.class, ExecutionQualityReferenceQueryImpl.class, ProductionExecutionQueryService.class, ProductionChainLocks.class, ExecutionPathService.class, ExecutionActionController.class, MaterialIssueSubmissionService.class, WorkorderErpFacts.class, WarehouseIntegration.class, MaterialIssueVoidService.class, MesMaterialIssueServiceImpl.class, MesMaterialIssueItemServiceImpl.class, MaterialIssueRules.class, ProductionExecutionRules.class, ProductionIdentityService.class, MesProductionExecutionServiceImpl.class, MesProductionExecutionController.class, ProductionIdentityController.class, WorkOrderController.class, WorkOrderService.class, RoutingReferenceRules.class, FoundationErrorAdvice.class})
     static class Web implements WebMvcConfigurer {
         @Bean
         FactorySnapshotFixture factorySnapshots() {
@@ -533,11 +530,6 @@ class MaterialIssueHttpTest {
         }
 
         @Bean
-        MesMaterialIssueErpExtraMapper extraMapper(SqlSessionFactory f) {
-            return new SqlSessionTemplate(f).getMapper(MesMaterialIssueErpExtraMapper.class);
-        }
-
-        @Bean
         MesProductionExecutionMapper executionMapper(SqlSessionFactory f) {
             return new SqlSessionTemplate(f).getMapper(MesProductionExecutionMapper.class);
         }
@@ -714,123 +706,4 @@ class MaterialIssueHttpTest {
     static final String HEADER = "{\"issueNo\":\"QA_ISSUE\",\"workorderId\":\"1\",\"routingId\":\"1\",\"status\":\"RECORDED\"}";
     static final String ITEM = "{\"issueId\":\"1\",\"materialId\":\"1\",\"batchNo\":\"ERP/ arbitrary-batch\",\"quantity\":\"99999999999999.12\",\"unitId\":\"1\",\"warehouseId\":\"1\"}";
 
-    @Test
-    void listSortsBeforePagingAndKeepsFiltersAndFactoryIsolation() throws Exception {
-        try (var c = context()) {
-            var m = mvc(c);
-            for (int number = 1; number <= 3; number++) {
-                m.perform(post(H).header("Authorization", "Bearer FULL").header("X-Factory-Id", "A")
-                                .contentType("application/json").content(HEADER.replace("QA_ISSUE", "TEST_SORT_" + number)))
-                        .andExpect(status().isOk());
-            }
-            m.perform(get(H).header("Authorization", "Bearer FULL").header("X-Factory-Id", "A")
-                            .param("issueNo", "TEST_SORT").param("limit", "2"))
-                    .andExpect(status().isOk()).andExpect(jsonPath("total").value(3))
-                    .andExpect(jsonPath("items[0].id").value("3"))
-                    .andExpect(jsonPath("items[1].id").value("2"));
-            m.perform(get(H).header("Authorization", "Bearer FULL").header("X-Factory-Id", "A")
-                            .param("issueNo", "TEST_SORT").param("offset", "2").param("limit", "2"))
-                    .andExpect(status().isOk()).andExpect(jsonPath("total").value(3))
-                    .andExpect(jsonPath("items.length()").value(1))
-                    .andExpect(jsonPath("items[0].id").value("1"));
-            m.perform(get(H).header("Authorization", "Bearer FULL").header("X-Factory-Id", "B"))
-                    .andExpect(status().isOk()).andExpect(jsonPath("total").value(0));
-        }
-    }
-
-    @Test
-    void scopedCrudPrecisionSnapshotsAndParentProtection() throws Exception {
-        try (var c = context()) {
-            var m = mvc(c);
-            m.perform(post(H).header("Authorization", "Bearer FULL").header("X-Factory-Id", "A")
-                            .contentType("application/json").content(HEADER))
-                    .andExpect(status().isOk()).andExpect(jsonPath("createBy").value("1"))
-                    .andExpect(jsonPath("workorderCode").value("WO1")).andExpect(jsonPath("productCode").value("M1"));
-            m.perform(post(I).header("Authorization", "Bearer FULL").header("X-Factory-Id", "A")
-                            .contentType("application/json").content(ITEM))
-                    .andExpect(status().isOk()).andExpect(jsonPath("quantity").value("99999999999999.120000"))
-                    .andExpect(jsonPath("materialCode").value("M1")).andExpect(jsonPath("warehouseCode").value("W1"));
-            // Same material and batch can occur repeatedly; no guessed uniqueness.
-            m.perform(post(I).header("Authorization", "Bearer FULL").header("X-Factory-Id", "A")
-                            .contentType("application/json").content(ITEM))
-                    .andExpect(status().isOk());
-            m.perform(get(I).header("Authorization", "Bearer FULL").header("X-Factory-Id", "A").param("issueId", "1")
-                            .param("limit", "1"))
-                    .andExpect(status().isOk()).andExpect(jsonPath("total").value(2))
-                    .andExpect(jsonPath("items.length()").value(1));
-            m.perform(get(H + "/1").header("Authorization", "Bearer FULL").header("X-Factory-Id", "B"))
-                    .andExpect(status().isNotFound());
-            // Identical local IDs are valid in separate databases without row factory fields.
-            m.perform(post(H).header("Authorization", "Bearer FULL").header("X-Factory-Id", "B")
-                            .contentType("application/json").content(HEADER.replace("QA_ISSUE", "QA_ISSUE_B")))
-                    .andExpect(status().isOk()).andExpect(jsonPath("id").value("1"))
-                    .andExpect(jsonPath("factoryId").doesNotExist());
-            m.perform(get(H + "/1").header("Authorization", "Bearer FULL").header("X-Factory-Id", "A"))
-                    .andExpect(status().isOk()).andExpect(jsonPath("issueNo").value("QA_ISSUE"));
-            m.perform(get(H + "/1").header("Authorization", "Bearer FULL").header("X-Factory-Id", "B"))
-                    .andExpect(status().isOk()).andExpect(jsonPath("issueNo").value("QA_ISSUE_B"));
-            m.perform(get(I).header("Authorization", "Bearer FULL").header("X-Factory-Id", "B"))
-                    .andExpect(status().isOk()).andExpect(jsonPath("total").value(0));
-            m.perform(delete(H).header("Authorization", "Bearer FULL").header("X-Factory-Id", "A")
-                            .contentType("application/json").content("[1]"))
-                    .andExpect(status().isConflict());
-            m.perform(put(I + "/1").header("Authorization", "Bearer FULL").header("X-Factory-Id", "A")
-                            .contentType("application/json").content(ITEM.replace("99999999999999.12", "9.12")))
-                    .andExpect(status().isOk()).andExpect(jsonPath("quantity").value("9.120000"));
-            m.perform(delete(I).header("Authorization", "Bearer FULL").header("X-Factory-Id", "A")
-                            .contentType("application/json").content("[1,999]"))
-                    .andExpect(status().isNotFound());
-            assertEquals(2, c.getBean(Fixture.class).business.get("A")
-                    .queryForObject("SELECT COUNT(*) FROM mes_material_issue_item", Integer.class));
-            m.perform(delete(I).header("Authorization", "Bearer FULL").header("X-Factory-Id", "A")
-                            .contentType("application/json").content("[1,2]"))
-                    .andExpect(status().isNoContent());
-            m.perform(delete(H).header("Authorization", "Bearer FULL").header("X-Factory-Id", "A")
-                            .contentType("application/json").content("[1]"))
-                    .andExpect(status().isNoContent());
-        }
-    }
-
-    @Test
-    void readOnlyPermissionsAndInvalidReferences() throws Exception {
-        try (var c = context()) {
-            var m = mvc(c);
-            m.perform(get(H).header("Authorization", "Bearer CRUD").header("X-Factory-Id", "A"))
-                    .andExpect(status().isOk());
-            for (String path : List.of(H, I)) {
-                m.perform(post(path).header("Authorization", "Bearer CRUD").header("X-Factory-Id", "A")
-                                .contentType("application/json").content(path.equals(H) ? HEADER : ITEM))
-                        .andExpect(status().isForbidden());
-                m.perform(delete(path).header("Authorization", "Bearer CRUD").header("X-Factory-Id", "A")
-                                .contentType("application/json").content("[1]"))
-                        .andExpect(status().isForbidden());
-            }
-            m.perform(post(H).header("Authorization", "Bearer FULL").header("X-Factory-Id", "A")
-                            .contentType("application/json")
-                            .content(HEADER.replace("\"routingId\":\"1\"", "\"routingId\":\"2\"")))
-                    .andExpect(status().isBadRequest());
-            m.perform(post(H).header("Authorization", "Bearer FULL").header("X-Factory-Id", "A")
-                    .contentType("application/json").content(HEADER)).andExpect(status().isOk());
-            for (String invalid : List.of(ITEM.replace("\"materialId\":\"1\"", "\"materialId\":\"2\""),
-                    ITEM.replace("\"issueId\":\"1\"", "\"issueId\":\"999\""),
-                    ITEM.replace("99999999999999.12", "-1"), ITEM.replace("99999999999999.12", "1.1234567"))) {
-                m.perform(post(I).header("Authorization", "Bearer FULL").header("X-Factory-Id", "A")
-                                .contentType("application/json").content(invalid))
-                        .andExpect(status().is4xxClientError());
-            }
-            m.perform(get(H + "/1").header("Authorization", "Bearer FULL")).andExpect(status().isUnprocessableEntity());
-            assertEquals(0, c.getBean(Fixture.class).business.get("A")
-                    .queryForObject("SELECT COUNT(*) FROM mes_material_issue_item", Integer.class));
-            for (String quantity : List.of("1.123", "1.123456")) {
-                String response = m.perform(post(I).header("Authorization", "Bearer FULL").header("X-Factory-Id", "A")
-                                .contentType("application/json").content(ITEM.replace("99999999999999.12", quantity)))
-                        .andExpect(status().isOk())
-                        .andExpect(jsonPath("quantity").value(new BigDecimal(quantity).setScale(6).toPlainString()))
-                        .andReturn().getResponse().getContentAsString();
-                Long itemId = new ObjectMapper().readTree(response).get("id").asLong();
-                assertEquals(0, new BigDecimal(quantity).compareTo(c.getBean(Fixture.class).business.get("A")
-                        .queryForObject("SELECT quantity FROM mes_material_issue_item WHERE id = ?", BigDecimal.class, itemId)));
-            }
-        }
-    }
 }

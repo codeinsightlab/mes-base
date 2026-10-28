@@ -30,7 +30,10 @@ class StockDocumentHttpTest {
     static final ObjectMapper JSON = new ObjectMapper();
 
     static JsonNode create(MockMvc m, String type, String order) throws Exception {
-        String body = "{\"documentType\":\"" + type + "\",\"reason\":\"TEST ONLY stock document\""
+        String ruleCode = List.of("PURCHASE_RECEIPT", "PRODUCTION_RECEIPT", "OTHER_RECEIPT", "DEFECT_RECEIPT", "SCRAP_RECEIPT")
+                .contains(type) ? "TEST_STOCK_IN" : "TEST_STOCK_OUT";
+        String body = "{\"documentType\":\"" + type + "\",\"reason\":\"TEST ONLY stock document\",\"ruleCode\":\""
+                + ruleCode + "\""
                 + (order == null ? "" : ",\"sourceWorkorderId\":\"" + order + "\"") + "}";
         return JSON.readTree(m.perform(full(post(ROOT)).content(body)).andExpect(status().isOk())
                 .andReturn().getResponse().getContentAsString());
@@ -62,19 +65,20 @@ class StockDocumentHttpTest {
             var mvc = MaterialIssueHttpTest.mvc(c);
             var db = ProductionInputHttpTest.db(c);
             String valid = "{\"header\":{\"documentType\":\"OTHER_RECEIPT\",\"reason\":\"aggregate receipt\",\"ruleCode\":\"TEST_STOCK_IN\"},"
-                    + "\"items\":[{\"stockId\":\"1\",\"materialId\":\"1\",\"warehouseId\":\"1\",\"unitId\":\"1\",\"batchNo\":\"L001\",\"binCode\":\"BIN1\",\"quantity\":\"1\"}]}";
+                    + "\"items\":[{\"stockId\":\"1\",\"materialId\":\"1\",\"warehouseId\":\"1\",\"unitId\":\"1\",\"batchNo\":\"L001\",\"binCode\":\"BIN1\",\"quantity\":\"1\"},"
+                    + "{\"stockId\":\"1\",\"materialId\":\"1\",\"warehouseId\":\"1\",\"unitId\":\"1\",\"batchNo\":\"L001\",\"binCode\":\"BIN1\",\"quantity\":\"2\"}]}";
             var created = JSON.readTree(mvc.perform(full(post(ROOT + "/aggregate")).content(valid))
                     .andExpect(status().isOk()).andReturn().getResponse().getContentAsString());
-            assertEquals(1, created.get("lines").size());
+            assertEquals(2, created.get("lines").size());
             assertEquals(1, db.queryForObject("SELECT COUNT(*) FROM wm_stock_document", Integer.class));
-            assertEquals(1, db.queryForObject("SELECT COUNT(*) FROM wm_stock_document_line", Integer.class));
+            assertEquals(2, db.queryForObject("SELECT COUNT(*) FROM wm_stock_document_line", Integer.class));
 
             String invalid = "{\"header\":{\"documentType\":\"OTHER_RECEIPT\",\"reason\":\"must rollback\",\"ruleCode\":\"TEST_STOCK_IN\"},"
                     + "\"items\":[{\"stockId\":\"1\",\"materialId\":\"1\",\"warehouseId\":\"1\",\"unitId\":\"1\",\"batchNo\":\"L001\",\"binCode\":\"BIN1\",\"quantity\":\"1\"},"
                     + "{\"stockId\":\"1\",\"materialId\":\"999\",\"warehouseId\":\"1\",\"unitId\":\"1\",\"batchNo\":\"L001\",\"binCode\":\"BIN1\",\"quantity\":\"1\"}]}";
             mvc.perform(full(post(ROOT + "/aggregate")).content(invalid)).andExpect(status().isConflict());
             assertEquals(1, db.queryForObject("SELECT COUNT(*) FROM wm_stock_document", Integer.class));
-            assertEquals(1, db.queryForObject("SELECT COUNT(*) FROM wm_stock_document_line", Integer.class));
+            assertEquals(2, db.queryForObject("SELECT COUNT(*) FROM wm_stock_document_line", Integer.class));
         }
     }
 
@@ -118,7 +122,7 @@ class StockDocumentHttpTest {
             FactorySnapshotFixture.set(c, FactorySnapshotFixture.erp("A", "TEST", "TEST"));
             m.perform(full(post(ROOT + "/" + receipt + "/actions/approve")).content(receive))
                     .andExpect(status().isOk());
-            m.perform(full(post(ROOT)).content("{\"documentType\":\"OTHER_RECEIPT\",\"reason\":\"blocked ERP\"}"))
+            m.perform(full(post(ROOT)).content("{\"documentType\":\"OTHER_RECEIPT\",\"reason\":\"blocked ERP\",\"ruleCode\":\"TEST_STOCK_IN\"}"))
                     .andExpect(status().isConflict());
         }
     }
@@ -277,7 +281,7 @@ class StockDocumentHttpTest {
         try (var c = ProductionInputHttpTest.context()) {
             var m = MaterialIssueHttpTest.mvc(c);
             var j = ProductionInputHttpTest.db(c);
-            m.perform(full(post(ROOT)).content("{\"documentType\":\"OTHER_RECEIPT\",\"reason\":\"TEST ONLY\",\"sourceWorkorderId\":1}"))
+            m.perform(full(post(ROOT)).content("{\"documentType\":\"OTHER_RECEIPT\",\"reason\":\"TEST ONLY\",\"sourceWorkorderId\":1,\"ruleCode\":\"TEST_STOCK_IN\"}"))
                     .andExpect(status().isConflict());
             j.update("UPDATE workorder SET status='CANCELLED' WHERE id=1");
             String cancelled = create(m, "OTHER_RECEIPT", "1").get("document").get("id").asText();
@@ -319,7 +323,7 @@ class StockDocumentHttpTest {
                 balance(j, "0");
             }
             for (String type : List.of("DEFECT_RECEIPT", "SCRAP_RECEIPT"))
-                m.perform(full(post(ROOT)).content("{\"documentType\":\"" + type + "\",\"reason\":\"no quality source\"}"))
+                m.perform(full(post(ROOT)).content("{\"documentType\":\"" + type + "\",\"reason\":\"no quality source\",\"ruleCode\":\"TEST_STOCK_IN\"}"))
                         .andExpect(status().isUnprocessableEntity());
             assertEquals(0, j.queryForObject("SELECT COUNT(*) FROM wm_stock_action", Integer.class));
         }
@@ -359,7 +363,7 @@ class StockDocumentHttpTest {
             db.get("A").update("UPDATE unit_measure SET must_be_whole_number=0,quantity_precision=6 WHERE id=1");
             db.get("B").update("UPDATE unit_measure SET must_be_whole_number=1,quantity_precision=0 WHERE id=1");
             String a = create(m, "OTHER_RECEIPT", null).get("document").get("id").asText();
-            String b = JSON.readTree(m.perform(ProductionReportHttpTest.full(post(ROOT), "B").content("{\"documentType\":\"OTHER_RECEIPT\",\"reason\":\"isolated factory\"}")).andExpect(status().isOk()).andReturn().getResponse().getContentAsString()).get("document").get("id").asText();
+            String b = JSON.readTree(m.perform(ProductionReportHttpTest.full(post(ROOT), "B").content("{\"documentType\":\"OTHER_RECEIPT\",\"reason\":\"isolated factory\",\"ruleCode\":\"TEST_STOCK_IN\"}")).andExpect(status().isOk()).andReturn().getResponse().getContentAsString()).get("document").get("id").asText();
             assertEquals(a, b);
             add(m, a, "0", "1", "L001", "1.234567");
             m.perform(ProductionReportHttpTest.full(post(ROOT + "/" + b + "/lines"), "B").content(line("0", "1", "L001", "1.234567"))).andExpect(status().isBadRequest());

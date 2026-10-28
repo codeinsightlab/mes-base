@@ -67,22 +67,26 @@ class LocalWarehouseHttpTest {
             apply(m, "gain", "300", "500");
             String result = ProductionInputHttpTest.submit(m, ProductionInputHttpTest.command(m, UUID.randomUUID()
                     .toString(), "L001", "100"));
-            String issue = new ObjectMapper().readTree(result).get("issueId").asText();
+            var input = new ObjectMapper().readTree(result);
+            String issue = input.get("issueId").asText();
+            String document = input.get("documentId").asText();
             balance(j, "600");
-            String request = body(UUID.randomUUID().toString(), "20", "600", issue);
+            String requestId = UUID.randomUUID().toString();
+            String request = body(requestId, "20", "600", document);
             m.perform(ProductionCoreV1HttpTest.full(post(ROOT + "return")).content(request)).andExpect(status().isOk());
-            m.perform(ProductionCoreV1HttpTest.full(post(ROOT + "return")).content(request)).andExpect(status().isOk());
+            m.perform(ProductionCoreV1HttpTest.full(post(ROOT + "return"))
+                    .content(body(requestId, "20", "600", issue))).andExpect(status().isOk());
             balance(j, "620");
             apply(m, "loss", "5", "620");
             balance(j, "615");
             assertEquals(5, j.queryForObject("SELECT COUNT(*) FROM wm_stock_action", Integer.class));
             assertEquals(0, j.queryForObject("SELECT COUNT(*) FROM wm_stock_action WHERE quantity_after<>quantity_before+quantity_delta OR available_after<>available_before+available_delta OR operator_user_id IS NULL", Integer.class));
             m.perform(ProductionCoreV1HttpTest.full(post(ROOT + "return"))
-                    .content(body(UUID.randomUUID().toString(), "181", "615", issue))).andExpect(status().isConflict());
-            m.perform(ProductionCoreV1HttpTest.full(post(MaterialIssueHttpTest.H + "/" + issue + "/actions/void")))
+                    .content(body(UUID.randomUUID().toString(), "181", "615", document))).andExpect(status().isConflict());
+            m.perform(ProductionCoreV1HttpTest.full(post(StockDocumentHttpTest.ROOT + "/" + document + "/actions/void")))
                     .andExpect(status().isOk());
             balance(j, "795");
-            m.perform(ProductionCoreV1HttpTest.full(post(MaterialIssueHttpTest.H + "/" + issue + "/actions/void")))
+            m.perform(ProductionCoreV1HttpTest.full(post(StockDocumentHttpTest.ROOT + "/" + document + "/actions/void")))
                     .andExpect(status().isOk());
             balance(j, "795");
             assertEquals(6, j.queryForObject("SELECT COUNT(*) FROM wm_stock_action", Integer.class));
@@ -176,7 +180,7 @@ class LocalWarehouseHttpTest {
             j.update("INSERT INTO material(id,code,name,unit_id,status) VALUES(2,'P2','TEST ONLY second product',1,'ENABLED')");
             j.update("INSERT INTO routing_product(routing_id,material_id) VALUES(1,2)");
             j.update("INSERT INTO workorder(id,code,product_id,planned_qty,routing_id,status,revision,create_time,update_time) VALUES(2,'WO2',2,1000,1,'RELEASED',0,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)");
-            j.update("INSERT INTO material_bom SELECT 2,'TEST-BOM-SECOND','1',2,base_qty,unit_id,status,revision,remark,created_by,created_at,published_at FROM material_bom WHERE id=1");
+            j.update("INSERT INTO material_bom(id,code,version,product_id,base_qty,unit_id,status,revision,remark,created_by,created_at,published_at,is_default) SELECT 2,'TEST-BOM-SECOND','1',2,base_qty,unit_id,status,revision,remark,created_by,created_at,published_at,0 FROM material_bom WHERE id=1");
             j.update("INSERT INTO material_bom_item SELECT 2,2,material_id,quantity,unit_id,NULL,sort FROM material_bom_item WHERE id=1");
             j.update("INSERT INTO mes_workorder_material SELECT 2,material_id,unit_id,total_required_qty,planned_qty,warehouse_ids,work_center,revision,status,updated_by,updated_at,2,bom_base_qty,bom_component_qty,output_unit_id,NULL FROM mes_workorder_material WHERE id=1");
             String first = ProductionInputHttpTest.command(m, UUID.randomUUID().toString(), "L001", "100");
@@ -209,29 +213,6 @@ class LocalWarehouseHttpTest {
     }
 
     @Test
-    void oldSubmissionWithoutSourceSnapshotRemainsCancellable() throws Exception {
-        try (var c = ProductionInputHttpTest.context()) {
-            var j = ProductionInputHttpTest.db(c);
-            var m = MaterialIssueHttpTest.mvc(c);
-            var calculation = new AtomicReference<Calculation>();
-            FactoryIntegrationContext.run(FactorySnapshotFixture.current(c, "A"), () ->
-                    calculation.set(c.getBean(ProductionInputSupplyService.class)
-                            .calculate("WO1:M1#L001", 1L, "1", new BigDecimal("100"))));
-            ProductionInputTestData.confirmed(j, 1, new BigDecimal("100"));
-            j.update("UPDATE mes_material_issue_input SET stock_id=1,stock_applied=true,calculation_json=? WHERE issue_id=-1", new ObjectMapper().writeValueAsString(calculation.get()));
-            j.update("UPDATE wm_inventory SET quantity=9800,available_quantity=9800 WHERE id=1");
-            m.perform(ProductionCoreV1HttpTest.full(post(MaterialIssueHttpTest.H + "/-1/actions/void")))
-                    .andExpect(status().isOk());
-            assertEquals(1, j.queryForObject("SELECT COUNT(*) FROM wm_stock_action WHERE action_type='REVERSAL' AND reference_action_id IS NULL", Integer.class));
-            assertEquals(0, j.queryForObject("SELECT COUNT(*) FROM wm_stock_action WHERE action_type='ISSUE'", Integer.class));
-            balance(j, "10000");
-            m.perform(ProductionCoreV1HttpTest.full(post(MaterialIssueHttpTest.H + "/-1/actions/void")))
-                    .andExpect(status().isOk());
-            balance(j, "10000");
-        }
-    }
-
-    @Test
     void changedBinCannotBeRestoredAndStartedProductionCannotReturnMaterials() throws Exception {
         for (boolean changedIdentity : List.of(true, false)) {
             try (var c = ProductionInputHttpTest.context()) {
@@ -240,15 +221,16 @@ class LocalWarehouseHttpTest {
                 var result = new ObjectMapper().readTree(ProductionInputHttpTest.submit(m, ProductionInputHttpTest.command(m, UUID.randomUUID()
                         .toString(), "L001", "100")));
                 String issue = result.get("issueId").asText();
+                String document = result.get("documentId").asText();
                 if (changedIdentity) {
                     j.update("UPDATE wm_inventory SET bin_code='TEST_TAMPERED_BIN' WHERE id=1");
-                    m.perform(ProductionCoreV1HttpTest.full(post(MaterialIssueHttpTest.H + "/" + issue + "/actions/void")))
+                    m.perform(ProductionCoreV1HttpTest.full(post(StockDocumentHttpTest.ROOT + "/" + document + "/actions/void")))
                             .andExpect(status().isConflict());
                 } else {
                     j.update("UPDATE mes_production_execution SET start_time=CURRENT_TIMESTAMP WHERE id=?", result.get("executionId")
                             .asLong());
                     m.perform(ProductionCoreV1HttpTest.full(post(ROOT + "return"))
-                                    .content(body(UUID.randomUUID().toString(), "20", "9800", issue)))
+                                    .content(body(UUID.randomUUID().toString(), "20", "9800", document)))
                             .andExpect(status().isConflict());
                 }
                 balance(j, "9800");

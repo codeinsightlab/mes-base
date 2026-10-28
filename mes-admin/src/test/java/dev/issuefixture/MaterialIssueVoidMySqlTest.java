@@ -17,9 +17,6 @@ import dev.mesbase.business.production.service.WorkorderErpFacts;
 import dev.mesbase.business.directory.service.BusinessDirectoryService;
 import dev.mesbase.business.quality.service.QualityTreatmentService;
 
-import dev.mesbase.business.issue.service.MaterialIssueErpFacts;
-import dev.mesbase.business.issue.service.MaterialIssueErpService;
-import dev.mesbase.business.integration.warehouse.ErpIssueQueryResult.Outcome;
 
 import dev.mesbase.acceptance.AcceptanceBusinessDatabase;
 import dev.mesbase.business.basic.dao.MaterialMapper;
@@ -88,7 +85,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 class MaterialIssueVoidMySqlTest {
     @Configuration
     @EnableTransactionManagement
-    @Import({LocalStockService.class, QualityTreatmentService.class, MaterialIssueInputFacts.class, ProductionQuantityService.class, ExecutionQualityReferenceQueryImpl.class, MesProductionExecutionServiceImpl.class, MesMaterialIssueItemServiceImpl.class, ProductionChainLocks.class, ExecutionPathService.class, MaterialIssueSubmissionService.class, WorkorderErpFacts.class, MaterialIssueErpService.class, MaterialIssueErpFacts.class, WorkOrderService.class, RoutingReferenceRules.class, ProductionExecutionRules.class, MaterialIssueRules.class, MaterialIssueVoidService.class, MesMaterialIssueServiceImpl.class, WarehouseIntegration.class})
+    @Import({LocalStockService.class, QualityTreatmentService.class, MaterialIssueInputFacts.class, ProductionQuantityService.class, ExecutionQualityReferenceQueryImpl.class, MesProductionExecutionServiceImpl.class, MesMaterialIssueItemServiceImpl.class, ProductionChainLocks.class, ExecutionPathService.class, MaterialIssueSubmissionService.class, WorkorderErpFacts.class, WorkOrderService.class, RoutingReferenceRules.class, ProductionExecutionRules.class, MaterialIssueRules.class, MaterialIssueVoidService.class, MesMaterialIssueServiceImpl.class, WarehouseIntegration.class})
     static class Config {
         @Bean
         BusinessDirectoryService directory() {
@@ -173,17 +170,10 @@ class MaterialIssueVoidMySqlTest {
                 var demand = new WorkOrderModels.Save(tag, product, BigDecimal.TEN, routing, null, null, null, null, "TEST ONLY MYSQL", 0, "WORK_ORDER");
                 long wo = orders.create(demand).workorder().getId();
                 var issue = issues.insert(new MesMaterialIssueCreateCommand(tag, wo, null, null, null, null, null, null, "RECORDED", "TEST ONLY MYSQL", null));
-                var erp = c.getBean(MaterialIssueErpService.class);
-                long beforeQuery = jdbc.queryForObject("SELECT operation_version FROM mes_material_issue_erp_extra WHERE id=?", Long.class, issue.getId());
-                assertEquals(Outcome.NOT_FOUND, erp.queryErpStatus(issue.getId()).result().outcome());
-                assertEquals(beforeQuery, jdbc.queryForObject("SELECT operation_version FROM mes_material_issue_erp_extra WHERE id=?", Long.class, issue.getId()));
-                assertEquals("RECORDED", erp.reconcileErpStatus(issue.getId()).mesStatus());
-                assertEquals("NOT_FOUND", jdbc.queryForObject("SELECT last_outcome FROM mes_material_issue_erp_extra WHERE id=?", String.class, issue.getId()));
                 var correction = new WorkOrderModels.Save(tag, target[0], BigDecimal.TEN, target[1], null, null, null, null, "TEST ONLY MYSQL", 0, "WORK_ORDER");
                 assertEquals(ErrorCode.WORKORDER_ISSUE_REFERENCED, assertThrows(FoundationException.class, () -> orders.update(wo, correction)).code());
                 var cancelled = voids.cancel(issue.getId());
                 assertEquals("VOIDED", cancelled.getStatus());
-                assertEquals("LOCAL_ONLY", cancelled.getVoidExecutionMode());
                 assertEquals(cancelled.getVoidOperationId(), voids.cancel(issue.getId()).getVoidOperationId());
                 assertEquals(target[0], orders.update(wo, correction).workorder().getProductId());
                 assertEquals(product, issues.selectById(issue.getId()).getProductId());

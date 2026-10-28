@@ -57,6 +57,6 @@ V1 不实现 LOCAL Execution 转 ERP Execution、领料转 ERP 出库、已报�
 ## 3. 复用与责任边界
 
 - FactoryIntegrationRegistry 校验工厂当前配置；Snapshot / Context 提供 mode、ERP 类型、配置引用和必要版本。FactoryScope 继续仅含 FactoryId，不新增字典模式或全局 Resolver。
-- WarehouseIntegration 配合业务 Service 校验当前模式、WorkOrder/Warehouse 可信来源、原操作来源及必要 ERP 映射/连接；ProductionErpAdapter、WarehouseErpAdapter 承接权威查询与完整业务行为。业务来源校验不得仅靠页面过滤或某一个新入口，须覆盖普通 CRUD、同步及命令的可绕过路径。
+- WarehouseIntegration 提供受管工厂模式快照校验；当前仓储交易和生产领料仅支持 LOCAL，没有领料专属 ERP 适配器、查询或核实状态。未来接入领料 ERP 时另行设计对应业务契约。业务来源校验不得仅靠页面过滤或某一个新入口，须覆盖普通 CRUD、同步及命令的可绕过路径。
 - LocalStockService 保留本地权威动作；ERP HTTP 不纳入 LOCAL 数据库原子事务承诺。现有权限、资源范围、Factory 分库、具名事务、版本/租约及不可变事实规则继续适用。
 - 供应商标识、映射、配置版本归既有集成/Extra 边界；LOCAL/EXTERNAL 是 MES 业务身份。不能以“ERP 字段不进核心表”为由省略可信业务来源。

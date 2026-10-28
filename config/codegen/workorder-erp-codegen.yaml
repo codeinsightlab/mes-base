@@ -1,4 +1,4 @@
-# 领料出库专用执行配置，沿用已审查项目参数；仅新增两表，不覆盖其他模块。
+# 工单外部身份执行配置，沿用已审查项目参数；仅新增两表，不覆盖其他模块。
 # 尚无已确认的外部匹配键及主子表同步契约，本轮关闭同步生成。
 version: 1
 generateSync: false
@@ -90,17 +90,6 @@ execution:
   publication: "preflight-all"
   unsupportedTable: "fail"
 tableOverrides:
-  mes_material_issue:
-    module: issue
-    displayName: 领料出库单
-  mes_material_issue_item:
-    module: issue
-    displayName: 领料出库明细
-
-  mes_material_issue_erp_extra:
-    module: issue
-    displayName: 领料ERP外部事实
-
   workorder:
     module: production
     displayName: 工单

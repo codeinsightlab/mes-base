@@ -2,15 +2,6 @@ package dev.issuefixture;
 
 import java.math.BigDecimal;
 import tools.jackson.databind.ObjectMapper;
-import dev.mesbase.business.integration.warehouse.WarehouseIntegration;
-import dev.mesbase.business.integration.warehouse.ErpActionResult;
-import dev.mesbase.business.integration.warehouse.ErpActionResult.Status;
-import dev.mesbase.business.integration.warehouse.ErpActionResult.Mode;
-
-import static org.mockito.Mockito.doReturn;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.times;
-import static org.mockito.ArgumentMatchers.any;
 
 import java.util.List;
 import java.util.UUID;
@@ -111,8 +102,6 @@ class WorkOrderCancellationHttpTest {
             m.perform(ProductionCoreV1HttpTest.full(get("/api/production/input/calculate")).param("code", "WO1:M1#L001")
                             .param("workorderId", "1").param("stockReference", "1").param("outputQty", "1"))
                     .andExpect(status().isConflict()).andExpect(jsonPath("errorCode").value("WORKORDER_CANCELLED"));
-            m.perform(ProductionCoreV1HttpTest.full(post(ProductionCoreV1HttpTest.H))
-                    .content(ProductionCoreV1HttpTest.HEADER)).andExpect(status().isConflict());
             m.perform(ProductionCoreV1HttpTest.full(post(ProductionReportHttpTest.ROOT + "/supplements"))
                             .content(ProductionReportHttpTest.supplement(11, "1"))).andExpect(status().isConflict())
                     .andExpect(jsonPath("errorCode").value("WORKORDER_CANCELLED"));
@@ -133,17 +122,14 @@ class WorkOrderCancellationHttpTest {
         try (var c = ProductionInputHttpTest.context()) {
             var m = MaterialIssueHttpTest.mvc(c);
             var j = ProductionInputHttpTest.db(c);
-            var integration = c.getBean(WarehouseIntegration.class);
-            doReturn(new ErpActionResult(Status.UNKNOWN, Mode.LOCAL_ONLY, null, "TEST interrupted local transaction"))
-                    .when(integration).createMaterialIssue(any(), any(), any());
+            j.execute("ALTER TABLE wm_stock_action ADD CONSTRAINT test_fail_issue CHECK(action_type <> 'ISSUE')");
             var body = ProductionInputHttpTest.command(m, UUID.randomUUID().toString(), "L001", "100");
             m.perform(ProductionCoreV1HttpTest.full(post(ProductionInputHttpTest.ROOT)).content(body))
-                    .andExpect(status().isConflict());
+                    .andExpect(status().is5xxServerError());
             assertEquals(0, j.queryForObject("SELECT COUNT(*) FROM mes_material_issue_input", Integer.class));
             cancel(m);
             m.perform(ProductionCoreV1HttpTest.full(post(ProductionInputHttpTest.ROOT)).content(body))
                     .andExpect(status().isConflict());
-            verify(integration, times(1)).createMaterialIssue(any(), any(), any());
         }
     }
 

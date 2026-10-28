@@ -1,7 +1,6 @@
 // MES-CODEGEN: scaffold; review required.
 package dev.mesbase.business.issue;
 
-import dev.mesbase.business.issue.controller.MesMaterialIssueController;
 import dev.mesbase.business.issue.dao.MesMaterialIssueMapper;
 import dev.mesbase.business.issue.domain.MesMaterialIssueCreateCommand;
 import dev.mesbase.business.issue.domain.MesMaterialIssueQueryDto;
@@ -13,7 +12,6 @@ import dev.mesbase.infrastructure.cache.annotation.BusinessCache;
 import dev.mesbase.infrastructure.cache.annotation.BusinessCacheEvict;
 import dev.mesbase.infrastructure.persistence.MapperPackages;
 import dev.mesbase.infrastructure.persistence.PersistenceOwner;
-import dev.mesbase.platform.web.EndpointAccess;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.util.List;
@@ -30,14 +28,6 @@ public class MesMaterialIssueScaffoldTest {
         Assertions.assertEquals(
                 PersistenceOwner.Kind.BUSINESS,
                 MapperPackages.owner(MesMaterialIssueMapper.class));
-        for (Method method : MesMaterialIssueController.class.getDeclaredMethods()) {
-            if (!Modifier.isPublic(method.getModifiers())) {
-                continue;
-            }
-            EndpointAccess access = method.getAnnotation(EndpointAccess.class);
-            Assertions.assertNotNull(access);
-            Assertions.assertEquals(EndpointAccess.Kind.AUTHORIZED, access.value());
-        }
         for (Method method : MesMaterialIssueServiceImpl.class.getDeclaredMethods()) {
             if (!Modifier.isPublic(method.getModifiers())) {
                 continue;

@@ -5,10 +5,6 @@ import dev.mesbase.business.directory.domain.DirectoryDeletionFlag;
 import dev.mesbase.business.directory.domain.DirectoryStatus;
 import dev.mesbase.business.integration.warehouse.ErpActionResult.Status;
 import dev.mesbase.business.integration.warehouse.ErpActionResult.Mode;
-import dev.mesbase.business.integration.warehouse.ErpIssueQueryResult.Outcome;
-import dev.mesbase.business.integration.warehouse.ErpIssueQueryResult.DocumentStatus;
-import dev.mesbase.business.integration.warehouse.ExternalEffect;
-import dev.mesbase.business.issue.domain.MaterialIssueOperation;
 import dev.mesbase.business.issue.domain.MaterialIssueStatus;
 import dev.mesbase.business.issue.domain.MaterialIssueSubmissionStatus;
 import dev.mesbase.business.production.domain.ExecutionPathStatus;
@@ -46,10 +42,6 @@ class BusinessEnumContractTest {
             DirectoryStatus.class,
             Status.class,
             Mode.class,
-            Outcome.class,
-            DocumentStatus.class,
-            ExternalEffect.class,
-            MaterialIssueOperation.class,
             MaterialIssueStatus.class,
             MaterialIssueSubmissionStatus.class,
             ExecutionPathStatus.class,

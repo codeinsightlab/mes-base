@@ -7,10 +7,6 @@ import dev.mesbase.acceptance.FactorySnapshotFixture;
 import tools.jackson.databind.node.ObjectNode;
 import org.springframework.core.env.Environment;
 import org.springframework.context.annotation.Primary;
-import dev.mesbase.business.integration.warehouse.ErpActionResult.Mode;
-import dev.mesbase.business.integration.warehouse.ErpActionResult.Status;
-import dev.mesbase.business.integration.warehouse.ErpActionResult;
-import dev.mesbase.business.integration.warehouse.WarehouseErpAdapter;
 import dev.mesbase.business.integration.warehouse.WarehouseIntegration;
 import dev.mesbase.business.production.controller.ProductionInputController;
 import dev.mesbase.business.production.controller.ProductionInboundController;
@@ -41,11 +37,6 @@ import tools.jackson.databind.ObjectMapper;
 
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.spy;
-import static org.mockito.Mockito.doReturn;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.times;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -65,8 +56,8 @@ class ProductionInputHttpTest {
     static class Extra {
         @Bean
         @Primary
-        WarehouseIntegration inputWarehouse(List<WarehouseErpAdapter> adapters) {
-            return spy(new WarehouseIntegration(adapters));
+        WarehouseIntegration inputWarehouse() {
+            return spy(new WarehouseIntegration());
         }
 
         @Bean
@@ -200,11 +191,9 @@ class ProductionInputHttpTest {
         try (var c = context()) {
             var m = MaterialIssueHttpTest.mvc(c);
             var j = db(c);
-            var integration = c.getBean(WarehouseIntegration.class);
-            doReturn(new ErpActionResult(Status.UNKNOWN, Mode.LOCAL_ONLY, null, "TEST ONLY interrupted local confirmation")).when(integration)
-                    .createMaterialIssue(any(), any(), any());
+            j.execute("ALTER TABLE wm_stock_action ADD CONSTRAINT test_fail_issue CHECK(action_type <> 'ISSUE')");
             var body = command(m, UUID.randomUUID().toString(), "L001", "100");
-            m.perform(ProductionCoreV1HttpTest.full(post(ROOT)).content(body)).andExpect(status().isConflict());
+            m.perform(ProductionCoreV1HttpTest.full(post(ROOT)).content(body)).andExpect(status().is5xxServerError());
             assertEquals(0, j.queryForObject("SELECT COUNT(*) FROM mes_production_execution WHERE batch_no IS NOT NULL", Integer.class));
             assertEquals(0, j.queryForObject("SELECT COUNT(*) FROM mes_material_issue_input", Integer.class));
             assertEquals(0, j.queryForObject("SELECT COUNT(*) FROM mes_workorder_material WHERE frozen_at IS NOT NULL", Integer.class));
@@ -223,18 +212,21 @@ class ProductionInputHttpTest {
             var e = first.get("executionId").asText();
             j.update("UPDATE mes_production_execution SET status='RUNNING',start_time=CURRENT_TIMESTAMP WHERE id=?", e);
             j.update("INSERT INTO mes_production_report(execution_id,routing_node_id,record_type,quantity_delta,operator_user_id,recorded_by,report_time,reason,create_time) VALUES(?,11,'REPORT',280,1,1,CURRENT_TIMESTAMP,'TEST ONLY reduction fixture',CURRENT_TIMESTAMP)", e);
-            m.perform(ProductionCoreV1HttpTest.full(post(MaterialIssueHttpTest.H + "/" + first.get("issueId")
+            m.perform(ProductionCoreV1HttpTest.full(post(StockDocumentHttpTest.ROOT + "/" + first.get("documentId")
                     .asText() + "/actions/void"))).andExpect(status().isConflict());
             assertEquals("CONFIRMED", j.queryForObject("SELECT status FROM mes_material_issue WHERE id=?", String.class, first.get("issueId")
                     .asText()));
             long original = j.queryForObject("SELECT id FROM mes_production_report WHERE execution_id=?", Long.class, e);
             j.update("INSERT INTO mes_production_report(execution_id,routing_node_id,record_type,quantity_delta,reference_report_id,operator_user_id,recorded_by,report_time,reason,create_time) VALUES(?,11,'ADJUSTMENT',-200,?,1,1,CURRENT_TIMESTAMP,'TEST ONLY safe correction',CURRENT_TIMESTAMP)", e, original);
-            var integration = c.getBean(WarehouseIntegration.class);
-            doReturn(new ErpActionResult(Status.UNKNOWN, Mode.LOCAL_ONLY, null, "TEST ONLY cancellation uncertainty")).when(integration)
-                    .execute(any(), any(), anyBoolean());
-            m.perform(ProductionCoreV1HttpTest.full(post(MaterialIssueHttpTest.H + "/" + second.get("issueId")
+            j.execute("ALTER TABLE wm_stock_action ADD CONSTRAINT test_fail_reversal CHECK(action_type <> 'REVERSAL')");
+            m.perform(ProductionCoreV1HttpTest.full(post(StockDocumentHttpTest.ROOT + "/" + second.get("documentId")
+                            .asText() + "/actions/void"))).andExpect(status().is5xxServerError());
+            assertEquals("CONFIRMED", j.queryForObject("SELECT status FROM mes_material_issue WHERE id=?", String.class, second.get("issueId").asText()));
+            j.execute("ALTER TABLE wm_stock_action DROP CONSTRAINT test_fail_reversal");
+            m.perform(ProductionCoreV1HttpTest.full(post(StockDocumentHttpTest.ROOT + "/" + second.get("documentId")
                             .asText() + "/actions/void"))).andExpect(status().isOk())
-                    .andExpect(jsonPath("status").value("VOID_UNKNOWN"));
+                    .andExpect(jsonPath("documentId").value(second.get("documentId").asText()));
+            assertEquals("VOIDED", j.queryForObject("SELECT status FROM mes_material_issue WHERE id=?", String.class, second.get("issueId").asText()));
             m.perform(ProductionCoreV1HttpTest.full(get("/api/production/report-quantities/executions/" + e)))
                     .andExpect(status().isOk()).andExpect(jsonPath("nodes[0].availableQty").value("20.000000"));
             // A historical/admin report entry uses the same quantity guard during the cancellation window.
@@ -280,7 +272,7 @@ class ProductionInputHttpTest {
             j.update("INSERT INTO routing_product(routing_id,material_id) VALUES(1,3)");
             j.update("INSERT INTO workorder(id,code,product_id,planned_qty,routing_id,status,revision,create_time,update_time) VALUES(2,'TEST_WO2',3,1000,1,'RELEASED',0,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)");
             j.update("INSERT INTO workorder_erp_extra(id) VALUES(2)");
-            j.update("INSERT INTO material_bom SELECT 2,'TEST-BOM-2','1',3,base_qty,unit_id,status,revision,remark,created_by,created_at,published_at FROM material_bom WHERE id=1");
+            j.update("INSERT INTO material_bom(id,code,version,product_id,base_qty,unit_id,status,revision,remark,created_by,created_at,published_at,is_default) SELECT 2,'TEST-BOM-2','1',3,base_qty,unit_id,status,revision,remark,created_by,created_at,published_at,0 FROM material_bom WHERE id=1");
             j.update("INSERT INTO material_bom_item SELECT 2,2,material_id,quantity,unit_id,NULL,sort FROM material_bom_item WHERE id=1");
             j.update("INSERT INTO mes_workorder_material SELECT 2,material_id,unit_id,total_required_qty,planned_qty,warehouse_ids,work_center,revision,status,updated_by,updated_at,2,bom_base_qty,bom_component_qty,output_unit_id,NULL FROM mes_workorder_material WHERE id=1");
 

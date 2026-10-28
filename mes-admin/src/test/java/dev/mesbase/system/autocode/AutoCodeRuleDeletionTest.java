@@ -83,7 +83,7 @@ class AutoCodeRuleDeletionTest {
         verifyNoInteractions(cache);
     }
     @Test
-    void ruleUpdateUsesTheSamePrefixReferenceGuardAsDeletion() {
+    void ruleCodeCanChangeWhenItsPrefixIsUnreferenced() {
         var rules = mock(SysAutoCodeRuleMapper.class);
         var extra = mock(AutoCodeExtraMapper.class);
         var cache = mock(AutoCodeRuleSnapshotCache.class);
@@ -92,6 +92,7 @@ class AutoCodeRuleDeletionTest {
         var master = mock(PlatformTransactionManager.class);
         var existing = rule();
         var update = rule();
+        update.setRuleCode("WORK_ORDER_V2");
         update.setRuleName("工单规则");
         update.setMaxLength(64);
         update.setIsPadded("N");
@@ -106,6 +107,8 @@ class AutoCodeRuleDeletionTest {
         var service = new SysAutoCodeRuleServiceImpl(rules, extra, cache, references, parts, master);
 
         assertEquals(1, service.updateInfo(update));
+        verify(rules).checkRuleCodeUnique("WORK_ORDER_V2");
+        verify(rules).updateSysAutoCodeRule(update);
 
         var order = inOrder(references, master);
         order.verify(references).requireUnreferenced(existing);

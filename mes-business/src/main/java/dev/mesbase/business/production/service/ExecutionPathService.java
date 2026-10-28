@@ -1,13 +1,12 @@
 package dev.mesbase.business.production.service;
 
+import dev.mesbase.business.integration.warehouse.ErpActionResult.Mode;
+
 import dev.mesbase.common.validation.ParameterChecks;
 import dev.mesbase.business.production.domain.ProductionExecutionStatus;
 import dev.mesbase.business.quality.service.ExecutionQualityReferenceQuery;
-import dev.mesbase.business.integration.warehouse.ErpActionResult.Mode;
 import dev.mesbase.business.issue.domain.MaterialIssueStatus;
-import dev.mesbase.business.integration.warehouse.ExternalEffect;
 import dev.mesbase.business.production.domain.ExecutionPathStatus;
-import dev.mesbase.business.integration.warehouse.ErpIssueQueryResult.DocumentStatus;
 import dev.mesbase.business.production.dao.MesExecutionPathMapper;
 import dev.mesbase.business.production.dao.MesExecutionPathNodeMapper;
 import dev.mesbase.business.production.dao.MesProductionExecutionMapper;
@@ -25,8 +24,11 @@ import dev.mesbase.business.production.domain.RoutingNodeExample;
 import dev.mesbase.business.production.domain.RoutingEdgeEntity;
 import dev.mesbase.business.production.domain.RoutingEdgeExample;
 import dev.mesbase.business.issue.dao.MesMaterialIssueMapper;
-import dev.mesbase.business.issue.dao.MesMaterialIssueErpExtraMapper;
-import dev.mesbase.business.issue.domain.MesMaterialIssueErpExtraExample;
+import dev.mesbase.business.issue.dao.MesMaterialIssueInputMapper;
+import dev.mesbase.business.issue.dao.MesMaterialIssueSubmissionMapper;
+import dev.mesbase.business.issue.domain.MesMaterialIssueInputExample;
+import dev.mesbase.business.issue.domain.MesMaterialIssueSubmissionExample;
+import dev.mesbase.business.issue.domain.MaterialIssueSubmissionStatus;
 import java.util.stream.Collectors;
 import dev.mesbase.business.issue.domain.MesMaterialIssueExample;
 import dev.mesbase.business.issue.domain.MesMaterialIssueEntity;
@@ -60,13 +62,15 @@ public class ExecutionPathService {
     private final BusinessDirectoryService references;
     private final RoutingEdgeMapper edges;
     private final MesMaterialIssueMapper issues;
-    private final MesMaterialIssueErpExtraMapper extras;
+    private final MesMaterialIssueInputMapper inputs;
+    private final MesMaterialIssueSubmissionMapper submissions;
 
     public ExecutionPathService(ProductionChainLocks locks, ProductionExecutionRules rules,
                                 MesExecutionPathMapper paths,
                                 MesExecutionPathNodeMapper selected, MesProductionExecutionMapper executions,
                                 RoutingNodeMapper nodes, RoutingEdgeMapper edges, MesMaterialIssueMapper issues,
-                                MesMaterialIssueErpExtraMapper extras, BusinessDirectoryService references,
+                                MesMaterialIssueInputMapper inputs, MesMaterialIssueSubmissionMapper submissions,
+                                BusinessDirectoryService references,
                                 ExecutionQualityReferenceQuery quality) {
         this.quality = quality;
         this.locks = locks;
@@ -78,7 +82,8 @@ public class ExecutionPathService {
         this.references = references;
         this.edges = edges;
         this.issues = issues;
-        this.extras = extras;
+        this.inputs = inputs;
+        this.submissions = submissions;
     }
 
     public record PathModel(Long executionId, String executionStatus, MesExecutionPathEntity path,
@@ -243,17 +248,25 @@ public class ExecutionPathService {
                         .contains(i.getStatus()))) ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
         var confirmed = rows.stream().filter(i -> MaterialIssueStatus.CONFIRMED.getValue().equals(i.getStatus()))
                 .toList();
-        var filter = new MesMaterialIssueErpExtraExample();
-        filter.createCriteria().andIdIn(confirmed.stream().map(MesMaterialIssueEntity::getId).toList());
-        var facts = extras.selectByExample(filter).stream().collect(Collectors.toMap(x -> x.getId(), x -> x));
+        var inputFilter = new MesMaterialIssueInputExample();
+        inputFilter.createCriteria().andIssueIdIn(confirmed.stream().map(MesMaterialIssueEntity::getId).toList());
+        var inputFacts = inputs.selectByExample(inputFilter).stream()
+                .collect(Collectors.toMap(f -> f.getIssueId(), f -> f));
+        if (confirmed.stream().anyMatch(issue -> issue.getSubmissionId() == null))
+            ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
+        var submissionFilter = new MesMaterialIssueSubmissionExample();
+        submissionFilter.createCriteria().andIdIn(confirmed.stream().map(MesMaterialIssueEntity::getSubmissionId).toList());
+        var attempts = submissions.selectByExample(submissionFilter).stream()
+                .collect(Collectors.toMap(a -> a.getId(), a -> a));
         for (var issue : confirmed) {
-            var fact = facts.get(issue.getId());
-            if (issue.getSubmissionId() == null || fact == null || !(Mode.LOCAL_ONLY.getValue()
-                    .equals(fact.getSourceExecutionMode()) && ExternalEffect.NONE.getValue()
-                    .equals(fact.getExternalEffect()) || Mode.CONNECTED.getValue()
-                    .equals(fact.getSourceExecutionMode()) && ExternalEffect.CONFIRMED.getValue()
-                    .equals(fact.getExternalEffect()) && DocumentStatus.EFFECTIVE.getValue()
-                    .equals(fact.getDocumentStatus())))
+            var fact = inputFacts.get(issue.getId());
+            var attempt = attempts.get(issue.getSubmissionId());
+            if (fact == null || !Objects.equals(fact.getExecutionId(), id)
+                    || !Mode.LOCAL_ONLY.getValue().equals(fact.getSourceMode())
+                    || !"PRODUCTION_INPUT".equals(fact.getInputKind())
+                    || fact.getConfirmedAt() == null || !Boolean.TRUE.equals(fact.getStockApplied())
+                    || attempt == null || !Objects.equals(attempt.getIssueId(), issue.getId())
+                    || !MaterialIssueSubmissionStatus.SUCCEEDED.getValue().equals(attempt.getStatus()))
                 ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
         }
         if (ProductionExecutionStatus.RUNNING.getValue().equals(e.getStatus())) return e;

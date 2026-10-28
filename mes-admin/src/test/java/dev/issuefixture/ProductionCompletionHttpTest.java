@@ -325,33 +325,6 @@ class ProductionCompletionHttpTest {
     }
 
     @Test
-    void alreadyFullyReceivedExecutionCanRecheckOnlyItsBlockedParentAfterOrdinaryDraftIsDeleted() throws Exception {
-        try (var c = ProductionWarehouseFixture.context()) {
-            var m = MaterialIssueHttpTest.mvc(c);
-            var j = ProductionWarehouseFixture.db(c);
-            oneExecution(j, "100");
-            UnifiedInboundHttpTest.stock(j);
-            String draft = StockDocumentHttpTest.JSON.readTree(m.perform(full(post(MaterialIssueHttpTest.H))
-                            .content("{\"issueNo\":\"TEST_ONLY_PARENT_PENDING\",\"workorderId\":\"1\",\"routingId\":\"1\",\"status\":\"DRAFT\"}"))
-                    .andExpect(status().isOk()).andReturn().getResponse().getContentAsString()).get("id").asText();
-            UnifiedInboundHttpTest.receive(m, "100");
-            assertEquals("FULLY_RECEIVED", j.queryForObject("SELECT status FROM mes_production_execution WHERE id=1", String.class));
-            assertEquals("RELEASED", j.queryForObject("SELECT status FROM workorder WHERE id=1", String.class));
-            m.perform(full(get("/api/production/executions/1/closure")))
-                    .andExpect(status().isOk()).andExpect(jsonPath("orderBlockedReason").isString());
-            m.perform(full(delete(MaterialIssueHttpTest.H)).content("[" + draft + "]"))
-                    .andExpect(status().isNoContent());
-            for (int repeat = 0; repeat < 2; repeat++)
-                m.perform(full(post("/api/production/executions/1/actions/recheck-receipt")))
-                        .andExpect(status().isOk()).andExpect(jsonPath("receiptState").value("FULLY_RECEIVED"));
-            assertEquals("COMPLETED", j.queryForObject("SELECT status FROM workorder WHERE id=1", String.class));
-            assertEquals(1, j.queryForObject("SELECT COUNT(*) FROM mes_execution_completion", Integer.class));
-            assertEquals(1, j.queryForObject("SELECT COUNT(*) FROM wm_stock_action", Integer.class));
-            StockDocumentHttpTest.balance(j, "100");
-        }
-    }
-
-    @Test
     void recheckCannotCloseWithoutPostedInboundOrBypassItsExplicitPermission() throws Exception {
         try (var c = ProductionWarehouseFixture.context()) {
             var m = MaterialIssueHttpTest.mvc(c);

@@ -9,6 +9,14 @@ import java.util.Arrays;
 import dev.mesbase.business.wm.domain.WmStockDocumentEntity;
 import dev.mesbase.business.wm.domain.WmStockDocumentLineEntity;
 import dev.mesbase.business.wm.service.StockDocumentService;
+import dev.mesbase.business.issue.service.MaterialIssueVoidService;
+import dev.mesbase.business.issue.domain.MesMaterialIssueEntity;
+import dev.mesbase.business.issue.domain.MaterialIssueSubmissionStatus;
+import dev.mesbase.common.utils.SecurityUtils;
+import dev.mesbase.core.security.AuthenticatedActor;
+import dev.mesbase.core.security.AuthorizationService;
+import dev.mesbase.core.security.Permission;
+import dev.mesbase.platform.execution.FactoryContext;
 import dev.mesbase.system.service.AutoCodeNumbering;
 import dev.mesbase.system.service.AutoCodeRuleType;
 import dev.mesbase.platform.web.EndpointAccess;
@@ -35,15 +43,27 @@ public class StockDocumentController {
     private static final String PERMISSION = "business:wm:stock:document:";
     private final StockDocumentService service;
     private final AutoCodeNumbering autoCodes;
+    private final MaterialIssueVoidService issueVoid;
+    private final AuthorizationService authorization;
 
-    public StockDocumentController(StockDocumentService service, AutoCodeNumbering autoCodes) {
+    public StockDocumentController(StockDocumentService service, AutoCodeNumbering autoCodes,
+                                   MaterialIssueVoidService issueVoid, AuthorizationService authorization) {
         this.service = service;
         this.autoCodes = autoCodes;
+        this.issueVoid = issueVoid;
+        this.authorization = authorization;
     }
 
     @GetMapping
-    @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED, permission = PERMISSION + "list")
+    @EndpointAccess(EndpointAccess.Kind.AUTHENTICATED)
     public Page page(@ModelAttribute StockDocumentModels.Query query) {
+        if (!hasPermission(PERMISSION + "list")) {
+            if (query.documentType() != null && !StockDocumentType.MATERIAL_ISSUE.getValue().equals(query.documentType()))
+                throw new FoundationException(ErrorCode.FORBIDDEN);
+            requirePermission("business:mes:material:issue:list");
+            query = new StockDocumentModels.Query(StockDocumentType.MATERIAL_ISSUE.getValue(), query.status(),
+                    query.documentNo(), query.offset(), query.limit());
+        }
         var page = service.page(query);
         return BeanConversions.convertPage(page, Page.class);
     }
@@ -53,9 +73,16 @@ public class StockDocumentController {
     }
 
     @GetMapping("/types")
-    @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED, permission = PERMISSION + "query")
+    @EndpointAccess(EndpointAccess.Kind.AUTHENTICATED)
     public List<Type> types() {
-        return Arrays.stream(StockDocumentType.values()).map(type -> new Type(type.getValue(), type.getDescription(),
+        var types = Arrays.stream(StockDocumentType.values());
+        if (!hasPermission(PERMISSION + "query")) {
+            if (!hasPermission("business:mes:material:issue:list")
+                    && !hasPermission("business:mes:material:issue:query"))
+                throw new FoundationException(ErrorCode.FORBIDDEN);
+            types = types.filter(type -> type == StockDocumentType.MATERIAL_ISSUE);
+        }
+        return types.map(type -> new Type(type.getValue(), type.getDescription(),
                         type.getOrigin(), type.getRequiredDocuments(), type.isApprovalAvailable(), type.isQualityReceipt()))
                 .toList();
     }
@@ -71,9 +98,56 @@ public class StockDocumentController {
     }
 
     @GetMapping("/{id}")
-    @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED, permission = PERMISSION + "query")
-    public Detail detail(@PathVariable Long id) {
-        return view(service.detail(id));
+    @EndpointAccess(EndpointAccess.Kind.AUTHENTICATED)
+    public Detail detail(@PathVariable Long id,
+                         @RequestParam(required = false) String documentType) {
+        boolean stockQuery = hasPermission(PERMISSION + "query");
+        if (!stockQuery) {
+            if (!StockDocumentType.MATERIAL_ISSUE.getValue().equals(documentType))
+                throw new FoundationException(ErrorCode.FORBIDDEN);
+            requirePermission("business:mes:material:issue:query");
+        }
+        var detail = service.detail(id);
+        if (!stockQuery && !StockDocumentType.MATERIAL_ISSUE.getValue().equals(detail.document().getDocumentType()))
+            throw new FoundationException(ErrorCode.NOT_FOUND);
+        if (!stockQuery && !hasPermission("business:mes:material:issue:item:list"))
+            detail = new StockDocumentModels.Detail(detail.document(), List.of(), detail.qualitySource(),
+                    detail.materialIssueBasis(), detail.materialIssueBasisError());
+        return view(detail);
+    }
+
+    @GetMapping("/{id}/lines")
+    @EndpointAccess(EndpointAccess.Kind.AUTHENTICATED)
+    public List<Line> lines(@PathVariable Long id,
+                            @RequestParam(required = false) String documentType) {
+        boolean stockQuery = hasPermission(PERMISSION + "query");
+        if (!stockQuery) {
+            if (!StockDocumentType.MATERIAL_ISSUE.getValue().equals(documentType))
+                throw new FoundationException(ErrorCode.FORBIDDEN);
+            requirePermission("business:mes:material:issue:item:list");
+        }
+        var detail = service.detail(id);
+        if (!stockQuery && !StockDocumentType.MATERIAL_ISSUE.getValue().equals(detail.document().getDocumentType()))
+            throw new FoundationException(ErrorCode.NOT_FOUND);
+        return detail.lines().stream().map(StockDocumentController::view).toList();
+    }
+
+    @GetMapping("/{id}/lines/{lineId}")
+    @EndpointAccess(EndpointAccess.Kind.AUTHENTICATED)
+    public Line line(@PathVariable Long id, @PathVariable Long lineId,
+                     @RequestParam(required = false) String documentType) {
+        boolean stockQuery = hasPermission(PERMISSION + "query");
+        if (!stockQuery) {
+            if (!StockDocumentType.MATERIAL_ISSUE.getValue().equals(documentType))
+                throw new FoundationException(ErrorCode.FORBIDDEN);
+            requirePermission("business:mes:material:issue:item:query");
+        }
+        var detail = service.detail(id);
+        if (!stockQuery && !StockDocumentType.MATERIAL_ISSUE.getValue().equals(detail.document().getDocumentType()))
+            throw new FoundationException(ErrorCode.NOT_FOUND);
+        var row = detail.lines().stream().filter(line -> lineId.equals(line.getId())).findFirst()
+                .orElseThrow(() -> new FoundationException(ErrorCode.NOT_FOUND));
+        return view(row);
     }
 
     @PostMapping
@@ -104,15 +178,59 @@ public class StockDocumentController {
     }
 
     @PostMapping("/{id}/actions/cancel")
-    @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED, permission = PERMISSION + "cancel")
+    @EndpointAccess(EndpointAccess.Kind.AUTHENTICATED)
     public Detail cancel(@PathVariable Long id, @Valid @RequestBody StockDocumentModels.Version command) {
+        if (!hasPermission(PERMISSION + "cancel")) {
+            requirePermission("business:mes:material:issue:update");
+            if (!StockDocumentType.MATERIAL_ISSUE.getValue().equals(service.detail(id).document().getDocumentType()))
+                throw new FoundationException(ErrorCode.FORBIDDEN);
+        }
         return view(service.cancel(id, command));
     }
 
     @PostMapping("/{id}/actions/approve")
-    @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED, permission = PERMISSION + "post")
+    @EndpointAccess(EndpointAccess.Kind.AUTHENTICATED)
     public Detail approve(@PathVariable Long id, @Valid @RequestBody StockDocumentModels.Post command) {
+        if (!hasPermission(PERMISSION + "post")) {
+            requirePermission("business:mes:material:issue:update");
+            if (!StockDocumentType.MATERIAL_ISSUE.getValue().equals(service.detail(id).document().getDocumentType()))
+                throw new FoundationException(ErrorCode.FORBIDDEN);
+        }
         return view(service.approve(id, command));
+    }
+
+    @PostMapping("/{id}/actions/void")
+    @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED, permission = "business:mes:material:issue:void")
+    public MaterialIssueVoidResult voidMaterialIssue(@PathVariable Long id) {
+        return materialIssueVoidResult(id, issueVoid.cancel(service.materialIssueIdentity(id)));
+    }
+
+    @PostMapping("/{id}/actions/reconcile-void")
+    @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED, permission = "business:mes:material:issue:void")
+    public MaterialIssueVoidResult reconcileMaterialIssueVoid(@PathVariable Long id) {
+        return materialIssueVoidResult(id, issueVoid.reconcile(service.materialIssueIdentity(id)));
+    }
+
+    private MaterialIssueVoidResult materialIssueVoidResult(Long documentId,
+                                                             MesMaterialIssueEntity issue) {
+        var document = service.detail(documentId).document();
+        return new MaterialIssueVoidResult(documentId.toString(), document.getStatus(), issue.getStatus(),
+                issue.getVoidOperationId(), issue.getVoidResultStatus(), issue.getVoidRequestedAt(),
+                issue.getVoidFinishedAt(), voidMessage(issue));
+    }
+
+    private String voidMessage(MesMaterialIssueEntity issue) {
+        if (MaterialIssueSubmissionStatus.SUCCEEDED.getValue().equals(issue.getVoidResultStatus()))
+            return "本地撤销与库存反向事务已完成";
+        if (MaterialIssueSubmissionStatus.UNKNOWN.getValue().equals(issue.getVoidResultStatus()))
+            return "本地撤销结果待恢复";
+        return null;
+    }
+
+    public record MaterialIssueVoidResult(String documentId, String documentStatus, String productionInputStatus,
+                                          String voidOperationId, String voidResultStatus,
+                                          LocalDateTime voidRequestedAt, LocalDateTime voidFinishedAt,
+                                          String message) {
     }
 
     @PostMapping("/{id}/lines")
@@ -157,6 +275,15 @@ public class StockDocumentController {
 
     private static Detail view(StockDocumentModels.Detail detail) {
         return BeanConversions.convert(detail, Detail.class);
+    }
+
+    private boolean hasPermission(String value) {
+        return authorization.hasPermission(new AuthenticatedActor(SecurityUtils.getAuthentication().getName()),
+                FactoryContext.required(), new Permission(value));
+    }
+
+    private void requirePermission(String value) {
+        if (!hasPermission(value)) throw new FoundationException(ErrorCode.FORBIDDEN);
     }
 
     private static Header view(WmStockDocumentEntity row) {

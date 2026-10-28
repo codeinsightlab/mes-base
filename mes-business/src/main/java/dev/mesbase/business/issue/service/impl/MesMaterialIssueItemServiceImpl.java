@@ -180,7 +180,6 @@ public class MesMaterialIssueItemServiceImpl implements IMesMaterialIssueItemSer
         MesMaterialIssueItemExample example = new MesMaterialIssueItemExample();
         rules.requireEditableIssues(ids.stream().map(id -> requireRecord(id).getIssueId()).distinct().sorted()
                 .toList());
-        rules.changedExtra(ids.stream().map(id -> requireRecord(id).getIssueId()).distinct().sorted().toList());
         example.createCriteria().andIdIn(ids)
 
         ;

@@ -7,7 +7,7 @@ import dev.mesbase.business.integration.production.ProductionSupply.Context;
 import dev.mesbase.business.integration.production.ProductionSupply.Order;
 import dev.mesbase.business.integration.production.ProductionSupply.Requirement;
 import dev.mesbase.business.integration.production.ProductionSupply.Stock;
-import dev.mesbase.business.integration.warehouse.WarehouseIntegration.Selection;
+import dev.mesbase.business.integration.warehouse.ErpActionResult.Mode;
 import dev.mesbase.business.production.service.WorkorderMaterialService;
 import dev.mesbase.business.integration.production.ProductionSupply.Basis;
 import dev.mesbase.business.production.dao.WorkorderMapper;
@@ -78,11 +78,11 @@ public class LocalProductionSupply {
     }
 
     public Context query(ProductionScanCode identity, WorkorderEntity order, FactoryScope scope,
-                         Selection selection, int offset, int limit) {
+                         int offset, int limit) {
         if (!BusinessSource.LOCAL.getValue().equals(order.getSource()))
             throw new FoundationException(ErrorCode.BUSINESS_SOURCE_CONFLICT);
         if (!WorkOrderStatus.RELEASED.getValue().equals(order.getStatus()))
-            return new Context(selection.mode().getValue(), List.of(), List.of(), 0, offset, limit);
+            return new Context(Mode.LOCAL_ONLY.getValue(), List.of(), List.of(), 0, offset, limit);
         var demand = demands.basis(order);
         var materialId = demand.getMaterialId();
         var total = demand.getTotalRequiredQty();
@@ -133,7 +133,7 @@ public class LocalProductionSupply {
                 "LOCAL-WORKORDER:" + order.getId() + ":R" + demand.getRevision(), now, product.getId());
         // A production code identifies one work order; paging never broadens it to unrelated orders.
         var page = offset == 0 ? List.of(candidate) : List.<Order>of();
-        return new Context(selection.mode().getValue(), List.copyOf(stocks), page, 1, offset, limit);
+        return new Context(Mode.LOCAL_ONLY.getValue(), List.copyOf(stocks), page, 1, offset, limit);
     }
 
     public void validateFrozenCalculation(Calculation calculation) {

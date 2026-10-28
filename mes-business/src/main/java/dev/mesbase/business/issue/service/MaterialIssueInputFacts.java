@@ -2,7 +2,6 @@ package dev.mesbase.business.issue.service;
 
 import dev.mesbase.business.integration.production.ProductionSupply.Calculation;
 import dev.mesbase.business.integration.warehouse.ErpActionResult.Mode;
-import dev.mesbase.business.integration.warehouse.MaterialIssueSubmitCommand.Input;
 import dev.mesbase.business.issue.dao.MesMaterialIssueInputMapper;
 import dev.mesbase.business.issue.domain.MesMaterialIssueEntity;
 import dev.mesbase.business.issue.domain.MesMaterialIssueInputEntity;
@@ -13,6 +12,7 @@ import org.springframework.beans.factory.ObjectProvider;
 import dev.mesbase.common.validation.ParameterChecks;
 import dev.mesbase.core.error.ErrorCode;
 import java.time.LocalDateTime;
+import java.math.BigDecimal;
 import java.util.Objects;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
@@ -40,7 +40,10 @@ public class MaterialIssueInputFacts {
 
     @Transactional(transactionManager = "businessTransactionManager", propagation = Propagation.MANDATORY)
     public void freeze(MesMaterialIssueInputEntity fact, Calculation calculation) {
-        if (Mode.LOCAL_ONLY.getValue().equals(fact.getSourceMode())) inventory.validateInputSource(fact, calculation);
+        if (!Mode.LOCAL_ONLY.getValue().equals(fact.getSourceMode())
+                || !Mode.LOCAL_ONLY.getValue().equals(calculation.sourceMode()))
+            ParameterChecks.reject(ErrorCode.BUSINESS_SOURCE_CONFLICT);
+        inventory.validateInputSource(fact, calculation);
         if (inputs.insert(fact) != 1) ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
     }
 
@@ -52,28 +55,32 @@ public class MaterialIssueInputFacts {
         return rows.isEmpty() ? null : rows.getFirst();
     }
 
-    public Input snapshot(Long issueId) {
-        var f = find(issueId);
-        if (f == null) return null;
-        return new Input(f.getId(), f.getInputKind(), f.getOutputQty(), json.readValue(f.getCalculationJson(), Calculation.class));
+    public record LocalInputSnapshot(String requestId, String inputKind, BigDecimal outputQty,
+                                     Calculation calculation) {
+    }
+
+    public LocalInputSnapshot snapshot(Long issueId) {
+        var fact = find(issueId);
+        if (fact == null) return null;
+        return new LocalInputSnapshot(fact.getId(), fact.getInputKind(), fact.getOutputQty(),
+                json.readValue(fact.getCalculationJson(), Calculation.class));
     }
 
     public void confirm(MesMaterialIssueEntity issue, String mode) {
         var fact = find(issue.getId());
-        if (fact == null) {
-            if (Mode.LOCAL_ONLY.getValue().equals(mode))
-                ParameterChecks.reject(ErrorCode.STOCK_DOCUMENT_SOURCE_PENDING);
-            // Existing external submissions recover by their original frozen ERP identity.
+        if (fact == null) ParameterChecks.reject(ErrorCode.STOCK_DOCUMENT_SOURCE_PENDING);
+        if (!Mode.LOCAL_ONLY.getValue().equals(mode) || !Mode.LOCAL_ONLY.getValue().equals(fact.getSourceMode())
+                || !Objects.equals(fact.getExecutionId(), issue.getExecutionId()))
+            ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
+        if (fact.getConfirmedAt() != null) {
+            if (!Boolean.TRUE.equals(fact.getStockApplied())) ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
             return;
         }
-        if (!Objects.equals(mode, fact.getSourceMode()) || !Objects.equals(fact.getExecutionId(), issue.getExecutionId()))
-            ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
-        if (fact.getConfirmedAt() != null) return;
-        if (Mode.LOCAL_ONLY.getValue().equals(mode)) {
-            var calculation = json.readValue(fact.getCalculationJson(), Calculation.class);
-            documents.getObject().postMaterialIssue(issue, fact, calculation);
-            fact.setStockApplied(true);
-        }
+        var calculation = json.readValue(fact.getCalculationJson(), Calculation.class);
+        if (!Mode.LOCAL_ONLY.getValue().equals(calculation.sourceMode()))
+            ParameterChecks.reject(ErrorCode.BUSINESS_SOURCE_CONFLICT);
+        documents.getObject().postMaterialIssue(issue, fact, calculation);
+        fact.setStockApplied(true);
         fact.setConfirmedAt(LocalDateTime.now());
         if (inputs.updateByPrimaryKeyWithBLOBs(fact) != 1) ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
     }

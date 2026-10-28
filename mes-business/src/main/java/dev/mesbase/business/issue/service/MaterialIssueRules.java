@@ -1,9 +1,10 @@
 package dev.mesbase.business.issue.service;
 
+import dev.mesbase.business.integration.warehouse.ErpActionResult.Mode;
+
 import dev.mesbase.business.basic.dao.MaterialMapper;
 import dev.mesbase.business.basic.dao.UnitMeasureMapper;
 import dev.mesbase.business.basic.domain.MaterialExample;
-import dev.mesbase.business.integration.warehouse.ExternalEffect;
 import dev.mesbase.business.issue.dao.MesMaterialIssueItemMapper;
 import dev.mesbase.business.issue.dao.MesMaterialIssueMapper;
 import dev.mesbase.business.issue.domain.MaterialIssueStatus;
@@ -51,13 +52,12 @@ public class MaterialIssueRules {
     private final RoutingProductMapper routingProducts;
     private final ProductionExecutionRules executions;
     private final ProductionChainLocks locks;
-    private final MaterialIssueErpFacts facts;
 
     public MaterialIssueRules(MesMaterialIssueMapper issues, MesMaterialIssueItemMapper items,
                               MaterialMapper materials, UnitMeasureMapper units, WmWarehouseMapper warehouses,
                               WorkorderMapper workorders, RoutingMapper routings,
                               RoutingProductMapper routingProducts, ProductionExecutionRules executions,
-                              MaterialIssueErpFacts facts, ProductionChainLocks locks, BusinessSourceRules sources) {
+                              ProductionChainLocks locks, BusinessSourceRules sources) {
         this.sources = sources;
         this.locks = locks;
         this.issues = issues;
@@ -69,39 +69,28 @@ public class MaterialIssueRules {
         this.routings = routings;
         this.routingProducts = routingProducts;
         this.executions = executions;
-        this.facts = facts;
     }
 
     private void require(boolean valid) {
         if (!valid) throw new FoundationException(ErrorCode.BAD_REQUEST);
     }
 
-    public MesMaterialIssueEntity hydrate(MesMaterialIssueEntity row) {
-        return facts.hydrate(row);
-    }
-
-    public void hydrate(List<MesMaterialIssueEntity> rows) {
-        facts.hydrate(rows);
-    }
-
     public void validateExecutionSource(MesProductionExecutionEntity execution) {
         sources.execution(execution, null);
     }
 
-    public void initializeExtra(MesMaterialIssueEntity row) {
-        facts.initialize(row);
+    public void requireLocalCreation() {
+        sources.localCreation();
     }
 
-    public Long extraVersion(Long id) {
-        return facts.required(id).getOperationVersion();
+    public void requireLocalFacts(MesMaterialIssueEntity row) {
+        if (!Mode.LOCAL_ONLY.getValue().equals(row.getSourceMode()))
+            throw new FoundationException(ErrorCode.RESOURCE_CONFLICT);
     }
 
-    public void changedExtra(List<Long> ids) {
-        for (Long id : ids) facts.changed(id);
-    }
-
-    public void deleteExtra(List<Long> ids) {
-        facts.delete(ids);
+    public void initializeLocalFacts(MesMaterialIssueEntity row) {
+        sources.localCreation();
+        row.setSourceMode(Mode.LOCAL_ONLY.getValue());
     }
 
     public void validate(MesMaterialIssueEntity row) {
@@ -226,9 +215,7 @@ public class MaterialIssueRules {
         var externalRows = new MesMaterialIssueExample();
         externalRows.createCriteria().andIdIn(ids);
         var loaded = issues.selectByExample(externalRows);
-        facts.hydrate(loaded);
-        if (loaded.stream().anyMatch(r -> !ExternalEffect.NONE.getValue().equals(r.getExternalEffect())))
-            throw new FoundationException(ErrorCode.ISSUE_EXTERNAL_UNVERIFIED);
+        loaded.forEach(this::requireLocalFacts);
         if (loaded.stream().anyMatch(r -> r.getSubmissionId() != null))
             throw new FoundationException(ErrorCode.RESOURCE_CONFLICT);
         var protectedRows = new MesMaterialIssueExample();
@@ -254,7 +241,6 @@ public class MaterialIssueRules {
         }
         row.setUpdateBy(user);
         row.setUpdateTime(now);
-        if (!created && row.getId() != null) facts.saveProjection(row);
     }
 
     public void audit(MesMaterialIssueItemEntity row, boolean created) {
@@ -266,6 +252,5 @@ public class MaterialIssueRules {
         }
         row.setUpdateBy(user);
         row.setUpdateTime(now);
-        facts.changed(row.getIssueId());
     }
 }

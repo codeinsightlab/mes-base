@@ -23,9 +23,6 @@ import dev.mesbase.core.factory.FactoryRuntimeMode;
 import dev.mesbase.platform.execution.FactoryIntegrationSnapshot;
 import dev.mesbase.platform.execution.FactoryIntegrationContext;
 import java.util.List;
-import dev.mesbase.business.integration.production.ProductionSupply.Context;
-import dev.mesbase.business.integration.production.ProductionSupply.Order;
-import dev.mesbase.business.integration.production.ProductionSupply.Stock;
 import org.junit.jupiter.api.Test;
 
 import static org.mockito.Mockito.mock;
@@ -42,7 +39,7 @@ class BusinessSourceRulesTest {
     private final WorkorderErpExtraMapper orderExtras = mock(WorkorderErpExtraMapper.class);
     private final WmWarehouseMapper warehouses = mock(WmWarehouseMapper.class);
     private final WmWarehouseErpExtraMapper warehouseExtras = mock(WmWarehouseErpExtraMapper.class);
-    private final WarehouseIntegration integration = new WarehouseIntegration(List.of());
+    private final WarehouseIntegration integration = new WarehouseIntegration();
     private final BusinessSourceRules rules = new BusinessSourceRules(integration, orders, orderExtras, warehouses, warehouseExtras,
             mock(MesMaterialIssueMapper.class), mock(MesMaterialIssueItemMapper.class), mock(MesProductionReceiptMapper.class));
 
@@ -145,7 +142,7 @@ class BusinessSourceRulesTest {
     }
 
     @Test
-    void externalSourcePassesAdmissionButCannotManufactureAnErpAdapter() {
+    void externalSourcePassesAdmissionWithoutCreatingIssueErpCommands() {
         mappings();
         var o = new WorkorderEntity();
         o.setId(1L);
@@ -154,8 +151,7 @@ class BusinessSourceRulesTest {
         when(orders.selectByPrimaryKey(1L)).thenReturn(o);
         mode(false, () -> {
             assertDoesNotThrow(() -> rules.order(1L));
-            assertEquals(ErrorCode.INTEGRATION_NOT_CONFIGURED,
-                    assertThrows(FoundationException.class, () -> integration.submissionSelection(new FactoryScope(id))).code());
+            assertEquals(ErpActionResult.Mode.CONNECTED, integration.configuredMode(new FactoryScope(id)));
         });
         assertFalse(new ErpActionResult(ErpActionResult.Status.SUCCEEDED, ErpActionResult.Mode.CONNECTED, "CREATED", "单据仅创建").stockEffective());
     }
@@ -176,36 +172,6 @@ class BusinessSourceRulesTest {
         mode(false, () -> assertDoesNotThrow(() -> rules.frozenLocal(1L, 10L)));
         warehouse.setSource("EXTERNAL");
         mode(false, () -> assertThrows(FoundationException.class, () -> rules.frozenLocal(1L, 10L)));
-    }
-
-    @Test
-    void erpPreviewCannotPublishLocalOrUnmappedCandidates() {
-        mappings();
-        var sourceOrder = new WorkorderEntity();
-        sourceOrder.setId(1L);
-        sourceOrder.setSource("LOCAL");
-        when(orders.selectByExample(any())).thenReturn(List.of(sourceOrder));
-        var verifiedMapping = orderExtras.selectByPrimaryKey(1L);
-        when(orderExtras.selectByExample(any())).thenReturn(List.of(verifiedMapping));
-        var order = mock(Order.class);
-        when(order.workorderId()).thenReturn(1L);
-        var a = mock(Stock.class);
-        when(a.warehouseId()).thenReturn(10L);
-        var b = mock(Stock.class);
-        when(b.warehouseId()).thenReturn(11L);
-        var wa = new WmWarehouseEntity();
-        wa.setId(10L);
-        wa.setSource("EXTERNAL");
-        var wb = new WmWarehouseEntity();
-        wb.setId(11L);
-        wb.setSource("EXTERNAL");
-        when(warehouses.selectByExample(any())).thenReturn(List.of(wa, wb));
-        var context = new Context("CONNECTED", List.of(a, b), List.of(order));
-        mode(false, () -> assertThrows(FoundationException.class, () -> rules.externalCandidates(context)));
-        sourceOrder.setSource("EXTERNAL");
-        mode(false, () -> assertDoesNotThrow(() -> rules.externalCandidates(context)));
-        when(orderExtras.selectByExample(any())).thenReturn(List.of());
-        mode(false, () -> assertThrows(FoundationException.class, () -> rules.externalCandidates(context)));
     }
 
 }

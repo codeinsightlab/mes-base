@@ -238,8 +238,10 @@ public class StockDocumentService {
             var draft = createDraft(new StockDocumentModels.Create(header.documentType(), header.reason(),
                     header.remark(), header.sourceWorkorderId(), header.sourceExecutionId(), header.ruleCode()), documentNo);
             Long id = draft.document().getId();
-            for (StockDocumentModels.AggregateLine item : command.items())
-                putLine(id, null, lineCommand(draft.document().getRevision(), item));
+            for (StockDocumentModels.AggregateLine item : command.items()) {
+                var latest = require(id);
+                putLine(id, null, lineCommand(latest.getRevision(), item));
+            }
             return detail(id);
         });
     }
@@ -562,6 +564,15 @@ public class StockDocumentService {
         return found.isEmpty() ? null : found.getFirst().getId().toString();
     }
 
+    @Transactional(transactionManager = "businessTransactionManager", readOnly = true)
+    public Long materialIssueIdentity(Long documentId) {
+        var row = require(documentId);
+        if (type(row.getDocumentType()) != StockDocumentType.MATERIAL_ISSUE
+                || row.getSourceMaterialIssueId() == null)
+            ParameterChecks.reject(ErrorCode.STOCK_DOCUMENT_SOURCE_PENDING);
+        return row.getSourceMaterialIssueId();
+    }
+
     private Detail materialIssueDocument(Calculation calculation, String documentNo) {
         var doc = createDraft(new StockDocumentModels.Create(StockDocumentType.MATERIAL_ISSUE.getValue(),
                 "正式生产领料出库", null, calculation.order().workorderId(), null), documentNo);
@@ -599,7 +610,7 @@ public class StockDocumentService {
         if (found.size() > 1) ParameterChecks.reject(ErrorCode.STOCK_DOCUMENT_CONFLICT);
         Long documentId;
         if (found.isEmpty()) {
-            productionInputs.getObject().requireDocumentPermissions(true);
+            productionInputs.getObject().requireDocumentPermission();
             throw new FoundationException(ErrorCode.STOCK_DOCUMENT_SOURCE_PENDING);
         } else documentId = found.getFirst().getId();
         approve(documentId, new StockDocumentModels.Post(input.getId(), require(documentId).getRevision()));

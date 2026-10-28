@@ -3,7 +3,6 @@ package dev.issuefixture;
 import dev.mesbase.acceptance.FactorySnapshotFixture;
 
 import dev.mesbase.business.production.domain.WorkOrderStatus;
-import dev.mesbase.core.error.ErrorCode;
 import dev.mesbase.core.error.FoundationException;
 import dev.mesbase.framework.sync.SyncCoordinator;
 import dev.mesbase.core.factory.FactoryRuntimeMode;
@@ -14,7 +13,6 @@ import dev.mesbase.platform.execution.FactoryIntegrationContext;
 import dev.mesbase.business.production.domain.WorkOrderModels;
 import dev.mesbase.business.production.service.WorkOrderService;
 import java.util.UUID;
-import dev.mesbase.business.integration.warehouse.WarehouseIntegration;
 import java.math.BigDecimal;
 import org.junit.jupiter.api.Test;
 
@@ -103,8 +101,6 @@ class SourceIsolationHttpTest {
                 var collision = new WorkOrderModels.Save("WO1", 1L, new BigDecimal("100"), 1L, null, null, null, null, null, null, null);
                 assertThrows(FoundationException.class, () -> service.syncExternal(new WorkOrderService.ExternalPlan(collision, "OTHER-ERP-ID", null, WorkOrderStatus.RELEASED), run));
                 assertThrows(FoundationException.class, () -> service.update(result.workorder().getId(), input));
-                assertEquals(ErrorCode.INTEGRATION_NOT_CONFIGURED, assertThrows(FoundationException.class, () -> c.getBean(WarehouseIntegration.class)
-                        .submissionSelection(scope)).code());
             });
             assertEquals("LOCAL", j.queryForObject("SELECT source FROM workorder WHERE id=1", String.class));
         }

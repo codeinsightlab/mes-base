@@ -78,15 +78,11 @@
  </select>
   <select id="countBlockingIssues" resultType="long">
     <bind name="voidedStatus" value="@dev.mesbase.business.issue.domain.MaterialIssueStatus@VOIDED.getValue()"/>
-    <bind name="succeededStatus" value="@dev.mesbase.business.integration.warehouse.ErpActionResult$Status@SUCCEEDED.getValue()"/>
+    <bind name="succeededStatus" value="@dev.mesbase.business.issue.domain.MaterialIssueSubmissionStatus@SUCCEEDED.getValue()"/>
     <bind name="localMode" value="@dev.mesbase.business.integration.warehouse.ErpActionResult$Mode@LOCAL_ONLY.getValue()"/>
-    <bind name="connectedMode" value="@dev.mesbase.business.integration.warehouse.ErpActionResult$Mode@CONNECTED.getValue()"/>
-    <bind name="noneEffect" value="@dev.mesbase.business.integration.warehouse.ExternalEffect@NONE.getValue()"/>
-    <bind name="reversedEffect" value="@dev.mesbase.business.integration.warehouse.ExternalEffect@REVERSED.getValue()"/>
-    SELECT COUNT(*) FROM mes_material_issue i LEFT JOIN mes_material_issue_erp_extra e ON e.id=i.id
+    SELECT COUNT(*) FROM mes_material_issue i
     WHERE i.workorder_id=#{workorderId} AND NOT (i.status=#{voidedStatus} AND
-      COALESCE(e.void_result_status,'')=#{succeededStatus} AND
-      ((COALESCE(e.source_execution_mode,'')=#{localMode} AND COALESCE(e.void_execution_mode,'')=#{localMode} AND COALESCE(e.external_effect,'')=#{noneEffect})
-       OR (COALESCE(e.source_execution_mode,'')=#{connectedMode} AND COALESCE(e.void_execution_mode,'')=#{connectedMode} AND COALESCE(e.external_effect,'')=#{reversedEffect})))
+      COALESCE(i.void_result_status,'')=#{succeededStatus} AND
+      COALESCE(i.source_mode,'')=#{localMode})
   </select>
 </mapper>

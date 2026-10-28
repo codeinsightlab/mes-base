@@ -1,29 +1,8 @@
 package dev.mesbase.business.issue.domain;
 
 import java.time.LocalDateTime;
-import dev.mesbase.business.integration.warehouse.MaterialIssueSubmitCommand.Source;
 
 public class MesMaterialIssueEntity {
-    private Source sourceContext;
-
-    public Source getSourceContext() {
-        return sourceContext;
-    }
-
-    public void setSourceContext(Source sourceContext) {
-        this.sourceContext = sourceContext;
-    }
-
-    private String sourceProvider;
-
-    public String getSourceProvider() {
-        return sourceProvider;
-    }
-
-    public void setSourceProvider(String sourceProvider) {
-        this.sourceProvider = sourceProvider;
-    }
-
     private Long id;
 
     private String issueNo;
@@ -234,45 +213,15 @@ public class MesMaterialIssueEntity {
         this.submissionId = submissionId;
     }
 
-    // Compatibility projections, owned by ERP Extra, not mapped into this table.
-    private String sourceExecutionMode;
+    // Persisted source fact; unknown historical values remain null.
+    private String sourceMode;
 
-    public String getSourceExecutionMode() {
-        return sourceExecutionMode;
+    public String getSourceMode() {
+        return sourceMode;
     }
 
-    public void setSourceExecutionMode(String value) {
-        sourceExecutionMode = value;
-    }
-
-    private String externalEffect;
-
-    public String getExternalEffect() {
-        return externalEffect;
-    }
-
-    public void setExternalEffect(String value) {
-        externalEffect = value;
-    }
-
-    private String externalBindingKey;
-
-    public String getExternalBindingKey() {
-        return externalBindingKey;
-    }
-
-    public void setExternalBindingKey(String value) {
-        externalBindingKey = value;
-    }
-
-    private String externalReference;
-
-    public String getExternalReference() {
-        return externalReference;
-    }
-
-    public void setExternalReference(String value) {
-        externalReference = value;
+    public void setSourceMode(String value) {
+        sourceMode = value;
     }
 
     private String voidResultStatus;
@@ -285,23 +234,4 @@ public class MesMaterialIssueEntity {
         voidResultStatus = value;
     }
 
-    private String voidExecutionMode;
-
-    public String getVoidExecutionMode() {
-        return voidExecutionMode;
-    }
-
-    public void setVoidExecutionMode(String value) {
-        voidExecutionMode = value;
-    }
-
-    private String voidMessage;
-
-    public String getVoidMessage() {
-        return voidMessage;
-    }
-
-    public void setVoidMessage(String value) {
-        voidMessage = value;
-    }
 }

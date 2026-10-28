@@ -62,7 +62,6 @@ import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.annotation.Propagation;
-import org.springframework.dao.DuplicateKeyException;
 import dev.mesbase.business.issue.service.MaterialIssueInputFacts;
 
 @Service
@@ -181,63 +180,44 @@ public class ProductionInputService {
     @Transactional(transactionManager = "businessTransactionManager", propagation = Propagation.NOT_SUPPORTED)
     public Result submit(Command command) {
         validate(command);
-        var scope = FactoryContext.required();
         String hash = RequestFingerprint.sha256(json.writeValueAsString(command));
         var previous = transaction.execute(s -> inputs.selectByPrimaryKey(command.requestId()));
-        if (previous != null) return replay(previous, hash); // Never repeat an external create on replay.
+        if (previous != null) return replay(previous, hash); // Resolve replay from the original request identity.
         supply.validateOutputQuantity(command.outputQty(), command.workorderId());
         var sourceOrder = transaction.execute(s -> sources.order(command.workorderId()));
-        if (BusinessSource.LOCAL.getValue().equals(sourceOrder.getSource())) {
-            requireDocumentPermissions(true);
-            // The fast path also creates a formal stock-out document. Reserve it before
-            // entering the factory transaction, through the same numbered draft path.
-            if (documents.getObject().findMaterialIssueDraft(command) == null) saveDraft(command);
-            return transaction.execute(s -> {
-                locks.order(command.workorderId());
-                var saved = inputs.selectByPrimaryKey(command.requestId());
-                if (saved != null) return replay(saved, hash);
-                var draft = documents.getObject().findMaterialIssueDraft(command);
-                if (draft != null) {
-                    approveDraft(draft.document().getId(), new StockDocumentModels.Post(command.requestId(),
-                            draft.document().getRevision()));
-                    return result(inputs.selectByPrimaryKey(command.requestId()), MaterialIssueStatus.CONFIRMED.getValue());
-                }
-                var calculation = supply.calculateLocal(command.code(), command.workorderId(), command.stockReference(), command.outputQty());
-                if (!Objects.equals(command.calculationKey(), ProductionInputSupplyService.calculationKey(calculation)))
-                    throw new FoundationException(ErrorCode.PRODUCTION_INPUT_STALE);
-                var localPrepared = prepare(command, calculation, hash);
-                var row = submissions.executePrepared(scope, localPrepared);
-                if (!MaterialIssueStatus.CONFIRMED.getValue().equals(row.getStatus()))
-                    ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
-                return result(inputs.selectByPrimaryKey(command.requestId()), row.getStatus());
-            });
-        }
-        var calculation = supply.calculate(command.code(), command.workorderId(), command.stockReference(), command.outputQty());
-        if (!Objects.equals(command.calculationKey(), ProductionInputSupplyService.calculationKey(calculation)))
-            throw new FoundationException(ErrorCode.PRODUCTION_INPUT_STALE);
-        Prepared prepared;
-        try {
-            prepared = transaction.execute(s -> prepare(command, calculation, hash));
-        } catch (DuplicateKeyException conflict) {
-            // Entire losing transaction rolled back, including its provisional execution/issue.
-            var saved = transaction.execute(s -> inputs.selectByPrimaryKey(command.requestId()));
+        if (!BusinessSource.LOCAL.getValue().equals(sourceOrder.getSource()))
+            throw new FoundationException(ErrorCode.BUSINESS_SOURCE_CONFLICT);
+        requireDocumentPermission();
+        // The fast path also creates a formal stock-out document. Reserve it before
+        // entering the factory transaction, through the same numbered draft path.
+        if (documents.getObject().findMaterialIssueDraft(command) == null) saveDraft(command);
+        return transaction.execute(s -> {
+            locks.order(command.workorderId());
+            var saved = inputs.selectByPrimaryKey(command.requestId());
             if (saved != null) return replay(saved, hash);
-            throw new FoundationException(ErrorCode.RESOURCE_CONFLICT, conflict);
-        }
-        var row = submissions.executePrepared(scope, prepared);
-        return transaction.execute(s -> result(inputs.selectByPrimaryKey(command.requestId()), row.getStatus()));
+            var draft = documents.getObject().findMaterialIssueDraft(command);
+            if (draft != null) {
+                approveDraft(draft.document().getId(), new StockDocumentModels.Post(command.requestId(),
+                        draft.document().getRevision()));
+                return result(inputs.selectByPrimaryKey(command.requestId()), MaterialIssueStatus.CONFIRMED.getValue());
+            }
+            var calculation = supply.calculateLocal(command.code(), command.workorderId(), command.stockReference(), command.outputQty());
+            if (!Objects.equals(command.calculationKey(), ProductionInputSupplyService.calculationKey(calculation)))
+                throw new FoundationException(ErrorCode.PRODUCTION_INPUT_STALE);
+            var localPrepared = prepare(command, calculation, hash);
+            var row = submissions.executePrepared(localPrepared);
+            if (!MaterialIssueStatus.CONFIRMED.getValue().equals(row.getStatus()))
+                ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
+            return result(inputs.selectByPrimaryKey(command.requestId()), row.getStatus());
+        });
     }
 
-    public void requireDocumentPermissions(boolean approve) {
+    public void requireDocumentPermission() {
         permit("business:mes:material:issue:update");
-        permit("business:wm:stock:document:create");
-        permit("business:wm:stock:document:update");
-        if (approve) permit("business:wm:stock:document:post");
     }
 
     public void requireApprovalPermissions() {
         permit("business:mes:material:issue:update");
-        permit("business:wm:stock:document:post");
     }
 
     private void permit(String permission) {
@@ -250,7 +230,7 @@ public class ProductionInputService {
             rollbackFor = Exception.class)
     public StockDocumentModels.Detail saveDraft(Command command) {
         validate(command);
-        requireDocumentPermissions(false);
+        requireDocumentPermission();
         var existing = documents.getObject().findMaterialIssueDraft(command);
         if (existing != null) return existing;
         String ruleCode = command.ruleCode() == null || command.ruleCode().isBlank()
@@ -261,7 +241,7 @@ public class ProductionInputService {
 
     private StockDocumentModels.Detail saveDraftInTransaction(Command command, String documentNo) {
         validate(command);
-        requireDocumentPermissions(false);
+        requireDocumentPermission();
         locks.order(command.workorderId());
         supply.validateOutputQuantity(command.outputQty(), command.workorderId());
         var existing = documents.getObject().findMaterialIssueDraft(command);
@@ -308,7 +288,7 @@ public class ProductionInputService {
         var prepared = prepare(command, calculation, hash);
         var input = inputs.selectByPrimaryKey(command.requestId());
         owner.bindMaterialIssue(documentId, input, calculation);
-        var result = submissions.executePrepared(FactoryContext.required(), prepared);
+        var result = submissions.executePrepared(prepared);
         if (!MaterialIssueStatus.CONFIRMED.getValue().equals(result.getStatus()))
             ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
         return owner.detail(documentId);

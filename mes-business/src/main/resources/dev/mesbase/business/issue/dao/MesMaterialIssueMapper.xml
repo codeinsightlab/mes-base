@@ -23,6 +23,8 @@
     <result column="void_requested_at" jdbcType="TIMESTAMP" property="voidRequestedAt" />
     <result column="void_finished_at" jdbcType="TIMESTAMP" property="voidFinishedAt" />
     <result column="submission_id" jdbcType="BIGINT" property="submissionId" />
+    <result column="source_mode" jdbcType="VARCHAR" property="sourceMode" />
+    <result column="void_result_status" jdbcType="VARCHAR" property="voidResultStatus" />
   </resultMap>
   <sql id="Example_Where_Clause">
     <where>
@@ -86,7 +88,7 @@
     id, issue_no, workorder_id, execution_id, workorder_code, product_id, product_code, 
     flow_card_no, routing_id, issue_time, status, remark, create_by, create_time, update_by, 
     update_time, void_operation_id, void_from_status, void_requested_at, void_finished_at, 
-    submission_id
+    submission_id, source_mode, void_result_status
   </sql>
   <select id="selectByExample" parameterType="dev.mesbase.business.issue.domain.MesMaterialIssueExample" resultMap="BaseResultMap">
     select
@@ -129,14 +131,14 @@
       status, remark, create_by, 
       create_time, update_by, update_time, 
       void_operation_id, void_from_status, void_requested_at, 
-      void_finished_at, submission_id)
+      void_finished_at, submission_id, source_mode, void_result_status)
     values (#{issueNo,jdbcType=VARCHAR}, #{workorderId,jdbcType=BIGINT}, #{executionId,jdbcType=BIGINT}, 
       #{workorderCode,jdbcType=VARCHAR}, #{productId,jdbcType=BIGINT}, #{productCode,jdbcType=VARCHAR}, 
       #{flowCardNo,jdbcType=VARCHAR}, #{routingId,jdbcType=BIGINT}, #{issueTime,jdbcType=TIMESTAMP}, 
       #{status,jdbcType=VARCHAR}, #{remark,jdbcType=VARCHAR}, #{createBy,jdbcType=VARCHAR}, 
       #{createTime,jdbcType=TIMESTAMP}, #{updateBy,jdbcType=VARCHAR}, #{updateTime,jdbcType=TIMESTAMP}, 
       #{voidOperationId,jdbcType=VARCHAR}, #{voidFromStatus,jdbcType=VARCHAR}, #{voidRequestedAt,jdbcType=TIMESTAMP}, 
-      #{voidFinishedAt,jdbcType=TIMESTAMP}, #{submissionId,jdbcType=BIGINT})
+      #{voidFinishedAt,jdbcType=TIMESTAMP}, #{submissionId,jdbcType=BIGINT}, #{sourceMode,jdbcType=VARCHAR}, #{voidResultStatus,jdbcType=VARCHAR})
   </insert>
   <insert id="insertSelective" keyColumn="id" keyProperty="id" parameterType="dev.mesbase.business.issue.domain.MesMaterialIssueEntity" useGeneratedKeys="true">
     insert into mes_material_issue
@@ -201,6 +203,12 @@
       <if test="submissionId != null">
         submission_id,
       </if>
+      <if test="sourceMode != null">
+        source_mode,
+      </if>
+      <if test="voidResultStatus != null">
+        void_result_status,
+      </if>
     </trim>
     <trim prefix="values (" suffix=")" suffixOverrides=",">
       <if test="issueNo != null">
@@ -262,6 +270,12 @@
       </if>
       <if test="submissionId != null">
         #{submissionId,jdbcType=BIGINT},
+      </if>
+      <if test="sourceMode != null">
+        #{sourceMode,jdbcType=VARCHAR},
+      </if>
+      <if test="voidResultStatus != null">
+        #{voidResultStatus,jdbcType=VARCHAR},
       </if>
     </trim>
   </insert>
@@ -337,6 +351,12 @@
       <if test="row.submissionId != null">
         submission_id = #{row.submissionId,jdbcType=BIGINT},
       </if>
+      <if test="row.sourceMode != null">
+        source_mode = #{row.sourceMode,jdbcType=VARCHAR},
+      </if>
+      <if test="row.voidResultStatus != null">
+        void_result_status = #{row.voidResultStatus,jdbcType=VARCHAR},
+      </if>
     </set>
     <if test="example != null">
       <include refid="Update_By_Example_Where_Clause" />
@@ -364,7 +384,9 @@
       void_from_status = #{row.voidFromStatus,jdbcType=VARCHAR},
       void_requested_at = #{row.voidRequestedAt,jdbcType=TIMESTAMP},
       void_finished_at = #{row.voidFinishedAt,jdbcType=TIMESTAMP},
-      submission_id = #{row.submissionId,jdbcType=BIGINT}
+      submission_id = #{row.submissionId,jdbcType=BIGINT},
+      source_mode = #{row.sourceMode,jdbcType=VARCHAR},
+      void_result_status = #{row.voidResultStatus,jdbcType=VARCHAR}
     <if test="example != null">
       <include refid="Update_By_Example_Where_Clause" />
     </if>
@@ -432,6 +454,12 @@
       <if test="submissionId != null">
         submission_id = #{submissionId,jdbcType=BIGINT},
       </if>
+      <if test="sourceMode != null">
+        source_mode = #{sourceMode,jdbcType=VARCHAR},
+      </if>
+      <if test="voidResultStatus != null">
+        void_result_status = #{voidResultStatus,jdbcType=VARCHAR},
+      </if>
     </set>
     where id = #{id,jdbcType=BIGINT}
   </update>
@@ -456,7 +484,9 @@
       void_from_status = #{voidFromStatus,jdbcType=VARCHAR},
       void_requested_at = #{voidRequestedAt,jdbcType=TIMESTAMP},
       void_finished_at = #{voidFinishedAt,jdbcType=TIMESTAMP},
-      submission_id = #{submissionId,jdbcType=BIGINT}
+      submission_id = #{submissionId,jdbcType=BIGINT},
+      source_mode = #{sourceMode,jdbcType=VARCHAR},
+      void_result_status = #{voidResultStatus,jdbcType=VARCHAR}
     where id = #{id,jdbcType=BIGINT}
   </update>
 </mapper>

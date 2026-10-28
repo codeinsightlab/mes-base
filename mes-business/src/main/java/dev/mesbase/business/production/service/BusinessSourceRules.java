@@ -14,7 +14,6 @@ import dev.mesbase.business.production.domain.MesProductionExecutionEntity;
 import dev.mesbase.business.production.domain.WorkorderEntity;
 import dev.mesbase.business.production.domain.WorkorderExample;
 import dev.mesbase.business.production.domain.WorkorderErpExtraExample;
-import dev.mesbase.business.integration.production.ProductionSupply.Context;
 import java.util.stream.Collectors;
 import dev.mesbase.business.wm.dao.WmWarehouseMapper;
 import dev.mesbase.business.wm.dao.WmWarehouseErpExtraMapper;
@@ -149,32 +148,6 @@ public class BusinessSourceRules {
             binding(row.getProvider(), row.getBindingKey(), row.getConfigurationRevision());
         }
         return rows.stream().collect(Collectors.toMap(row -> row.getId(), row -> row.getExternalId()));
-    }
-
-    public void externalCandidates(Context context) {
-        current(BusinessSource.EXTERNAL.getValue());
-        if (context == null || context.orders() == null || context.stocks() == null || context.orders()
-                .size() > 10000 || context.stocks().size() > 10000) ParameterChecks.reject(ErrorCode.BUSINESS_SOURCE_CONFLICT);
-        var ids = context.orders().stream().map(row -> row.workorderId()).distinct().toList();
-        if (ids.stream().anyMatch(Objects::isNull)) ParameterChecks.reject(ErrorCode.BUSINESS_SOURCE_CONFLICT);
-        if (!ids.isEmpty()) {
-            var filter = new WorkorderExample();
-            filter.createCriteria().andIdIn(ids);
-            var rows = orders.selectByExample(filter);
-            if (rows.size() != ids.size()) ParameterChecks.reject(ErrorCode.BUSINESS_SOURCE_CONFLICT);
-            var mapping = new WorkorderErpExtraExample();
-            mapping.createCriteria().andIdIn(ids);
-            var extras = orderExtras.selectByExample(mapping).stream()
-                    .collect(Collectors.toMap(row -> row.getId(), row -> row));
-            for (var row : rows) {
-                if (required(row.getSource()) != BusinessSource.EXTERNAL) ParameterChecks.reject(ErrorCode.BUSINESS_SOURCE_CONFLICT);
-                var extra = extras.get(row.getId());
-                if (extra == null || StringUtils.isBlank(extra.getExternalId())) ParameterChecks.reject(ErrorCode.BUSINESS_SOURCE_CONFLICT);
-                binding(extra.getProvider(), extra.getBindingKey(), extra.getConfigurationRevision());
-            }
-        }
-        warehouses(BusinessSource.EXTERNAL.getValue(), context.stocks().stream().map(row -> row.warehouseId())
-                .toList());
     }
 
     public void execution(MesProductionExecutionEntity execution, Long finishedWarehouse) {
