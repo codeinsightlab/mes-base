@@ -21,6 +21,33 @@ import org.junit.jupiter.api.Test;
 
 class AutoCodeRuleReferenceGuardTest {
     @Test
+    void firstPrefixChecksOnlyMatchingNumbersNotTheWholeDocumentCategory() {
+        var factories = mock(ManagedDatasourceService.class);
+        var business = mock(BusinessPersistence.class);
+        var parts = mock(SysAutoCodePartMapper.class);
+        var session = mock(OwnedSqlSession.class);
+        var documents = mock(AutoCodeDocumentReferenceMapper.class);
+        var factory = new ManagedDatasourceService.FactoryView("A", "E", "A", "工厂A", 8L, "ENABLED", 1,
+                "业务库A", "LOCAL", null, null, 1, false);
+        when(factories.factoryList(0, 100)).thenReturn(List.of(factory));
+        when(parts.selectSysAutoCodePartList(any(SysAutoCodePart.class))).thenReturn(List.of());
+        when(session.mapper(AutoCodeDocumentReferenceMapper.class)).thenReturn(documents);
+        when(documents.hasStockDocumentPrefix("IN%", "STOCK_IN")).thenReturn(0);
+        when(business.transaction(any(FactoryScope.class), any())).thenAnswer(invocation -> {
+            @SuppressWarnings("unchecked")
+            Function<OwnedSqlSession, Boolean> work = invocation.getArgument(1);
+            return work.apply(session);
+        });
+        var guard = new SystemAutoCodeRuleReferenceGuard(factories, business, parts);
+        var rule = new SysAutoCodeRule();
+        rule.setRuleId(9L);
+        rule.setRuleType("STOCK_IN");
+
+        guard.requirePrefixChangeUnreferenced(rule, "", "IN");
+        verify(documents).hasStockDocumentPrefix("IN%", "STOCK_IN");
+    }
+
+    @Test
     void scansOnlyBoundFactoryPagesWithinTheSupportedPageSizeAndUsesTheLeadingPrefix() {
         var factories = mock(ManagedDatasourceService.class);
         var business = mock(BusinessPersistence.class);
