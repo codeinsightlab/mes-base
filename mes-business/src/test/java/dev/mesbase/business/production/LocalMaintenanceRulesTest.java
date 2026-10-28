@@ -92,7 +92,7 @@ class LocalMaintenanceRulesTest {
 
     private WorkOrderModels.Save input(String quantity) {
         return new WorkOrderModels.Save("LOCAL-WO", 2L, new BigDecimal(quantity), 3L,
-                null, null, null, null, "edited remark", 0);
+                null, null, null, null, "edited remark", 0, null);
     }
 
     @Test
@@ -139,7 +139,7 @@ class LocalMaintenanceRulesTest {
         var service = workorders("DRAFT");
         when(executions.countByExample(any())).thenReturn(1L);
         var changed = new WorkOrderModels.Save("LOCAL-WO", 2L, BigDecimal.TEN, 4L,
-                null, null, null, null, null, 0);
+                null, null, null, null, null, 0, null);
         assertEquals(ErrorCode.EXECUTION_FROZEN,
                 assertThrows(FoundationException.class, () -> service.update(1L, changed)).code());
     }

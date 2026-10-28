@@ -220,7 +220,8 @@ class SalesPlanningAggregateTransactionTest {
         SalesOrderDocumentService salesOrderDocumentService(MesSalesOrderMapper orders,
                                                             MesSalesOrderItemMapper items, MesCustomerMapper customers, MaterialMapper materials,
                                                             IMesSalesOrderItemService itemService) {
-            return new SalesOrderDocumentService(orders, items, customers, materials, itemService);
+            return new SalesOrderDocumentService(orders, items, customers, materials, itemService,
+                    Mockito.mock(MaterialQuantityRules.class));
         }
 
         @Bean

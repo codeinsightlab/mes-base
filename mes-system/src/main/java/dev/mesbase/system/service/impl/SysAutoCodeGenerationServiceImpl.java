@@ -11,6 +11,7 @@ import dev.mesbase.system.mapper.SysAutoCodeRuleMapper;
 import dev.mesbase.system.mapper.SysAutoCodeResultMapper;
 import dev.mesbase.system.service.AutoCodeFactoryContext;
 import dev.mesbase.system.service.AutoCodeNumbering;
+import dev.mesbase.system.service.AutoCodeRuleType;
 import dev.mesbase.system.strategy.PartTypeHandler;
 import java.time.Clock;
 import java.time.LocalDateTime;
@@ -67,6 +68,27 @@ public class SysAutoCodeGenerationServiceImpl implements AutoCodeNumbering {
         return run(type, null, true, true, factoryContext.requiredFactoryId());
     }
 
+    @Override
+    public String getDocNo(String ruleCode, String expectedRuleType) {
+        if (!AutoCodeRuleType.supports(expectedRuleType)) throw new ServiceException("单据编码类型无效");
+        return run(ruleCode, null, true, true, factoryContext.requiredFactoryId(), expectedRuleType);
+    }
+
+    @Override
+    public List<RuleOption> rules(String ruleType) {
+        if (!AutoCodeRuleType.supports(ruleType)) throw new ServiceException("单据编码类型无效");
+        return configs.byType(ruleType).stream().filter(rule -> "Y".equals(rule.enableFlag()))
+                .map(rule -> new RuleOption(rule.ruleCode(), rule.ruleName(), rulePrefix(rule)))
+                .toList();
+    }
+
+    @Override
+    public String uniqueRuleCode(String ruleType) {
+        List<RuleOption> options = rules(ruleType);
+        if (options.size() != 1) throw new ServiceException("当前单据类型必须且只能启用一条编码规则");
+        return options.get(0).ruleCode();
+    }
+
     public String preview(String ruleCode, String inputCharacter) {
         return run(ruleCode, inputCharacter, false, false);
     }
@@ -81,20 +103,28 @@ public class SysAutoCodeGenerationServiceImpl implements AutoCodeNumbering {
     }
 
     private String run(String code, String input, boolean persist, boolean docNoContract, String factoryId) {
+        return run(code, input, persist, docNoContract, factoryId, null);
+    }
+
+    private String run(String code, String input, boolean persist, boolean docNoContract, String factoryId,
+                       String expectedRuleType) {
         if (code == null || !code.matches("[A-Za-z][A-Za-z0-9_-]{0,63}") || input != null && input.length() > 64)
             throw new ServiceException("规则编号或输入字符不符合要求");
         var config = configs.get(code);
         if (config == null) throw new ServiceException("未找到编码规则");
-        return transactions.execute(status -> execute(code, input, persist, docNoContract, config, factoryId));
+        return transactions.execute(status -> execute(code, input, persist, docNoContract, config, factoryId,
+                expectedRuleType));
     }
 
     private String execute(String code, String input, boolean persist, boolean docNoContract,
-                           AutoCodeRuleSnapshotCache.RuleConfig config, String factoryId) {
+                           AutoCodeRuleSnapshotCache.RuleConfig config, String factoryId, String expectedRuleType) {
         if (extra.lockRule(config.ruleId()) == null) throw new ServiceException("编码规则不存在或已删除");
         // Locking reads bypass an earlier repeatable-read snapshot and see the committed writer
         // that won the rule lock, even if shared-cache invalidation was unavailable.
         SysAutoCodeRule rule = rules.findByIdForUpdate(config.ruleId());
         if (rule == null || !code.equals(rule.getRuleCode())) throw new ServiceException("编码规则不存在或已删除");
+        if (expectedRuleType != null && !expectedRuleType.equals(rule.getRuleType()))
+            throw new ServiceException("所选编码规则不属于当前单据类型");
         if (!"Y".equals(rule.getEnableFlag())) throw new ServiceException("编码规则已停用");
         if (rule.getMaxLength() == null || rule.getMaxLength() < 1 || rule.getMaxLength() > 64)
             throw new ServiceException("规则最大长度必须在1到64之间");
@@ -151,6 +181,10 @@ public class SysAutoCodeGenerationServiceImpl implements AutoCodeNumbering {
             else results.updateAutoCodeResult(row);
         }
         return generated;
+    }
+
+    private static String rulePrefix(AutoCodeRuleSnapshotCache.RuleConfig rule) {
+        return AutoCodeRuleSnapshotCache.fixedPrefix(rule);
     }
 
     static String padding(SysAutoCodeRule rule, String value) {

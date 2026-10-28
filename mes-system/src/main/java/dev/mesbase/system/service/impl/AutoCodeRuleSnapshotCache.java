@@ -7,6 +7,7 @@ import dev.mesbase.system.mapper.SysAutoCodePartMapper;
 import dev.mesbase.system.mapper.SysAutoCodeRuleMapper;
 import java.io.Serializable;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -23,8 +24,8 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 @ConditionalOnProperty(name = "mes.system.enabled", havingValue = "true")
 public class AutoCodeRuleSnapshotCache {
     private static final Logger LOG = LoggerFactory.getLogger(AutoCodeRuleSnapshotCache.class);
-    private static final String KEY = "autocode:{rules:v1}:snapshot";
-    private static final String VERSION_KEY = "autocode:{rules:v1}:version";
+    private static final String KEY = "autocode:{rules:v2}:snapshot";
+    private static final String VERSION_KEY = "autocode:{rules:v2}:version";
     private static final int TTL_SECONDS = 3600;
     private final RedisCache redis;
     private final SysAutoCodeRuleMapper rules;
@@ -87,6 +88,41 @@ public class AutoCodeRuleSnapshotCache {
         throw new ServiceException("编码规则正在变更，请稍后重试");
     }
 
+    public List<RuleConfig> byType(String ruleType) {
+        if (TransactionSynchronizationManager.isActualTransactionActive())
+            return loadAll().byCode().values().stream().filter(rule -> ruleType.equals(rule.ruleType())).toList();
+        Snapshot snapshot = null;
+        try {
+            String version = redis.getCacheVersion(VERSION_KEY);
+            snapshot = redis.getCacheObject(KEY);
+            if (snapshot == null) {
+                Snapshot loaded = loadAll();
+                if (!redis.setCacheObjectIfVersion(VERSION_KEY, version, KEY, loaded, TTL_SECONDS))
+                    throw new ServiceException("编码规则正在变更，请稍后重试");
+                snapshot = loaded;
+            }
+        } catch (ServiceException failure) {
+            throw failure;
+        } catch (RuntimeException failure) {
+            LOG.warn("Autocode shared cache unavailable; loading current rules by type type={}",
+                    failure.getClass().getSimpleName());
+            snapshot = loadAll();
+        }
+        return snapshot.byCode().values().stream().filter(rule -> ruleType.equals(rule.ruleType())).toList();
+    }
+
+    public static String fixedPrefix(RuleConfig rule) {
+        var ordered = rule.parts().stream()
+                .sorted(Comparator.comparing(part -> part.partIndex() == null ? Integer.MAX_VALUE : part.partIndex()))
+                .toList();
+        var prefix = new StringBuilder();
+        for (PartConfig part : ordered) {
+            if (!"FIXCHAR".equals(part.partType())) break;
+            if (part.fixCharacter() != null) prefix.append(part.fixCharacter());
+        }
+        return prefix.toString();
+    }
+
     public void invalidateAfterCommit() {
         Runnable invalidate = () -> {
             try {
@@ -118,7 +154,7 @@ public class AutoCodeRuleSnapshotCache {
         }
         Map<String, RuleConfig> byCode = new LinkedHashMap<>();
         for (var rule : ruleRows) {
-            var config = new RuleConfig(rule.getRuleId(), rule.getRuleCode(), rule.getMaxLength(), rule.getIsPadded(),
+            var config = new RuleConfig(rule.getRuleId(), rule.getRuleCode(), rule.getRuleType(), rule.getRuleName(), rule.getMaxLength(), rule.getIsPadded(),
                     rule.getPaddedChar(), rule.getPaddedMethod(), rule.getEnableFlag(),
                     List.copyOf(partsByRule.getOrDefault(rule.getRuleId(), List.of())));
             if (byCode.put(rule.getRuleCode(), config) != null)
@@ -135,7 +171,7 @@ public class AutoCodeRuleSnapshotCache {
 
     public record Snapshot(Map<String, RuleConfig> byCode) implements Serializable { }
 
-    public record RuleConfig(long ruleId, String ruleCode, Integer maxLength, String isPadded,
+    public record RuleConfig(long ruleId, String ruleCode, String ruleType, String ruleName, Integer maxLength, String isPadded,
                              String paddedChar, String paddedMethod, String enableFlag,
                              List<PartConfig> parts) implements Serializable { }
 
