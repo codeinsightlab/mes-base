@@ -12,6 +12,8 @@ import dev.mesbase.system.service.AutoCodeRuleReferenceGuard;
 import dev.mesbase.system.service.AutoCodeRuleType;
 import dev.mesbase.server.managed.ManagedDatasourceService;
 import java.util.List;
+import java.util.Objects;
+
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
@@ -32,6 +34,23 @@ public class SystemAutoCodeRuleReferenceGuard implements AutoCodeRuleReferenceGu
         this.factories = factories;
         this.business = business;
         this.parts = parts;
+    }
+
+    @Override
+    public void requireEnabledFactory(String factoryId) {
+        if (factoryId == null || factoryId.isBlank()) return;
+        ManagedDatasourceService.FactoryView target = null;
+        for (int offset = 0; ; offset += PAGE_SIZE) {
+            List<ManagedDatasourceService.FactoryView> page = factories.factoryList(offset, PAGE_SIZE);
+            target = page.stream().filter(factory -> factoryId.equals(factory.factoryId())).findFirst().orElse(null);
+            if (target != null || page.size() < PAGE_SIZE) break;
+        }
+        if (target == null) throw new ServiceException("所选工厂不存在");
+        if (!"ENABLED".equals(target.status()) || target.datasourceId() == null)
+            throw new ServiceException("编码规则只能配置到已启用且绑定业务库的工厂");
+        if (factories.platformDatasourceIds(List.of(target.datasourceId())).contains(target.datasourceId()))
+            throw new ServiceException("编码规则不能配置到绑定中心库的工厂");
+        factories.resolve(new FactoryScope(new FactoryId(factoryId)));
     }
 
     @Override
@@ -61,12 +80,20 @@ public class SystemAutoCodeRuleReferenceGuard implements AutoCodeRuleReferenceGu
             case "STOCK_OUT" -> AutoCodeRuleType.STOCK_OUT.name();
             default -> null;
         };
+        boolean scopedFactoryFound = rule.getFactoryId() == null || rule.getFactoryId().isBlank();
         for (int offset = 0; ; offset += PAGE_SIZE) {
             List<ManagedDatasourceService.FactoryView> page = factories.factoryList(offset, PAGE_SIZE);
-            var datasourceIds = page.stream().map(ManagedDatasourceService.FactoryView::datasourceId)
-                    .filter(id -> id != null).distinct().toList();
+            if (!scopedFactoryFound && page.stream().anyMatch(factory -> rule.getFactoryId().equals(factory.factoryId())))
+                scopedFactoryFound = true;
+            var enabledFactories = page.stream()
+                    .filter(factory -> "ENABLED".equals(factory.status()))
+                    .filter(factory -> rule.getFactoryId() == null || rule.getFactoryId().isBlank()
+                            || rule.getFactoryId().equals(factory.factoryId()))
+                    .toList();
+            var datasourceIds = enabledFactories.stream().map(ManagedDatasourceService.FactoryView::datasourceId)
+                    .filter(Objects::nonNull).distinct().toList();
             var platformDatasourceIds = factories.platformDatasourceIds(datasourceIds);
-            for (var factory : page) {
+            for (var factory : enabledFactories) {
                 if (factory.datasourceId() == null || platformDatasourceIds.contains(factory.datasourceId())) continue;
                 var scope = new FactoryScope(new FactoryId(factory.factoryId()));
                 boolean referenced = business.transaction(scope, session -> {
@@ -83,6 +110,7 @@ public class SystemAutoCodeRuleReferenceGuard implements AutoCodeRuleReferenceGu
             }
             if (page.size() < PAGE_SIZE) break;
         }
+        if (!scopedFactoryFound) throw new ServiceException("规则配置的工厂不存在，无法核对单据引用");
     }
 
     private String prefix(SysAutoCodeRule rule) {

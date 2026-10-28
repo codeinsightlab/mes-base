@@ -18,6 +18,7 @@ import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.Objects;
 
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
@@ -77,7 +78,10 @@ public class SysAutoCodeGenerationServiceImpl implements AutoCodeNumbering {
     @Override
     public List<RuleOption> rules(String ruleType) {
         if (!AutoCodeRuleType.supports(ruleType)) throw new ServiceException("单据编码类型无效");
-        return configs.byType(ruleType).stream().filter(rule -> "Y".equals(rule.enableFlag()))
+        String factoryId = factoryContext.requiredFactoryId();
+        return configs.byType(ruleType).stream().filter(rule -> rule.factoryId() == null
+                        || rule.factoryId().isBlank() || rule.factoryId().equals(factoryId))
+                .filter(rule -> "Y".equals(rule.enableFlag()))
                 .map(rule -> new RuleOption(rule.ruleCode(), rule.ruleName(), rulePrefix(rule)))
                 .toList();
     }
@@ -85,12 +89,22 @@ public class SysAutoCodeGenerationServiceImpl implements AutoCodeNumbering {
     @Override
     public String uniqueRuleCode(String ruleType) {
         List<RuleOption> options = rules(ruleType);
+        String factoryId = factoryContext.requiredFactoryId();
+        var scopedRules = configs.byType(ruleType).stream().filter(rule -> factoryId.equals(rule.factoryId()))
+                .filter(rule -> "Y".equals(rule.enableFlag())).toList();
+        if (!scopedRules.isEmpty()) {
+            if (scopedRules.size() != 1) throw new ServiceException("当前工厂和单据类型必须且只能启用一条编码规则");
+            return scopedRules.get(0).ruleCode();
+        }
         if (options.size() != 1) throw new ServiceException("当前单据类型必须且只能启用一条编码规则");
         return options.get(0).ruleCode();
     }
 
     public String preview(String ruleCode, String inputCharacter) {
-        return run(ruleCode, inputCharacter, false, false);
+        var config = configs.get(ruleCode);
+        if (config == null) throw new ServiceException("未找到编码规则");
+        String factoryId = config.factoryId() == null ? "" : config.factoryId();
+        return run(ruleCode, inputCharacter, false, false, factoryId);
     }
 
     /** Preview the getDocNo contract without persisting or advancing the daily counter. */
@@ -112,6 +126,11 @@ public class SysAutoCodeGenerationServiceImpl implements AutoCodeNumbering {
             throw new ServiceException("规则编码格式、长度或输入字符不符合要求");
         var config = configs.get(code);
         if (config == null) throw new ServiceException("未找到编码规则");
+        if (persist && !docNoContract && config.factoryId() != null && !config.factoryId().isBlank())
+            throw new ServiceException("工厂专属规则只能通过对应工厂的业务取号入口生成");
+        if (docNoContract && config.factoryId() != null && !config.factoryId().isBlank()
+                && !config.factoryId().equals(factoryId))
+            throw new ServiceException("该编码规则仅适用于指定工厂");
         return transactions.execute(status -> execute(code, input, persist, docNoContract, config, factoryId,
                 expectedRuleType));
     }
@@ -123,6 +142,8 @@ public class SysAutoCodeGenerationServiceImpl implements AutoCodeNumbering {
         // that won the rule lock, even if shared-cache invalidation was unavailable.
         SysAutoCodeRule rule = rules.findByIdForUpdate(config.ruleId());
         if (rule == null || !code.equals(rule.getRuleCode())) throw new ServiceException("编码规则不存在或已删除");
+        if (!Objects.equals(config.factoryId(), rule.getFactoryId()))
+            throw new ServiceException("规则适用工厂已变化，请重试");
         if (expectedRuleType != null && !expectedRuleType.equals(rule.getRuleType()))
             throw new ServiceException("所选编码规则不属于当前单据类型");
         if (!"Y".equals(rule.getEnableFlag())) throw new ServiceException("编码规则已停用");

@@ -84,10 +84,23 @@ public class StockDocumentController {
         return view(service.create(command));
     }
 
+    @PostMapping("/aggregate")
+    @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED, permission = PERMISSION + "create")
+    public Detail createAggregate(@Valid @RequestBody StockDocumentModels.AggregateSave command) {
+        return view(service.createAggregate(command));
+    }
+
     @PutMapping("/{id}")
     @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED, permission = PERMISSION + "update")
     public Detail edit(@PathVariable Long id, @Valid @RequestBody StockDocumentModels.Edit command) {
         return view(service.edit(id, command));
+    }
+
+    @PutMapping("/{id}/aggregate")
+    @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED, permission = PERMISSION + "update")
+    public Detail updateAggregate(@PathVariable Long id,
+                                  @Valid @RequestBody StockDocumentModels.AggregateSave command) {
+        return view(service.updateAggregate(id, command));
     }
 
     @PostMapping("/{id}/actions/cancel")

@@ -24,8 +24,8 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 @ConditionalOnProperty(name = "mes.system.enabled", havingValue = "true")
 public class AutoCodeRuleSnapshotCache {
     private static final Logger LOG = LoggerFactory.getLogger(AutoCodeRuleSnapshotCache.class);
-    private static final String KEY = "autocode:{rules:v2}:snapshot";
-    private static final String VERSION_KEY = "autocode:{rules:v2}:version";
+    private static final String KEY = "autocode:{rules:v3}:snapshot";
+    private static final String VERSION_KEY = "autocode:{rules:v3}:version";
     private static final int TTL_SECONDS = 3600;
     private final RedisCache redis;
     private final SysAutoCodeRuleMapper rules;
@@ -154,7 +154,7 @@ public class AutoCodeRuleSnapshotCache {
         }
         Map<String, RuleConfig> byCode = new LinkedHashMap<>();
         for (var rule : ruleRows) {
-            var config = new RuleConfig(rule.getRuleId(), rule.getRuleCode(), rule.getRuleType(), rule.getRuleName(), rule.getMaxLength(), rule.getIsPadded(),
+            var config = new RuleConfig(rule.getRuleId(), rule.getRuleCode(), rule.getRuleType(), rule.getFactoryId(), rule.getRuleName(), rule.getMaxLength(), rule.getIsPadded(),
                     rule.getPaddedChar(), rule.getPaddedMethod(), rule.getEnableFlag(),
                     List.copyOf(partsByRule.getOrDefault(rule.getRuleId(), List.of())));
             if (byCode.put(rule.getRuleCode(), config) != null)
@@ -171,9 +171,16 @@ public class AutoCodeRuleSnapshotCache {
 
     public record Snapshot(Map<String, RuleConfig> byCode) implements Serializable { }
 
-    public record RuleConfig(long ruleId, String ruleCode, String ruleType, String ruleName, Integer maxLength, String isPadded,
-                             String paddedChar, String paddedMethod, String enableFlag,
-                             List<PartConfig> parts) implements Serializable { }
+    public record RuleConfig(long ruleId, String ruleCode, String ruleType, String factoryId, String ruleName,
+                             Integer maxLength, String isPadded, String paddedChar, String paddedMethod,
+                             String enableFlag, List<PartConfig> parts) implements Serializable {
+        public RuleConfig(long ruleId, String ruleCode, String ruleType, String ruleName, Integer maxLength,
+                          String isPadded, String paddedChar, String paddedMethod, String enableFlag,
+                          List<PartConfig> parts) {
+            this(ruleId, ruleCode, ruleType, null, ruleName, maxLength, isPadded, paddedChar, paddedMethod,
+                    enableFlag, parts);
+        }
+    }
 
     public record PartConfig(long partId, long ruleId, Integer partIndex, String partType,
                              Integer partLength, String dateFormat, String fixCharacter,

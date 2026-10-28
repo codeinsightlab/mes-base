@@ -57,10 +57,10 @@ class AutoCodeRuleSnapshotCacheTest {
 
         verify(rules).selectAllForGeneration();
         verify(parts).selectAllForGeneration();
-        verify(redis, times(3)).getCacheVersion("autocode:{rules:v2}:version");
-        verify(redis, times(3)).getCacheObject("autocode:{rules:v2}:snapshot");
-        verify(redis).setCacheObjectIfVersion("autocode:{rules:v2}:version", null,
-                "autocode:{rules:v2}:snapshot", stored.get(), 3600);
+        verify(redis, times(3)).getCacheVersion("autocode:{rules:v3}:version");
+        verify(redis, times(3)).getCacheObject("autocode:{rules:v3}:snapshot");
+        verify(redis).setCacheObjectIfVersion("autocode:{rules:v3}:version", null,
+                "autocode:{rules:v3}:snapshot", stored.get(), 3600);
     }
 
     @Test

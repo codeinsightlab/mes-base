@@ -111,6 +111,75 @@ class AutoCodeRuleReferenceGuardTest {
         verify(documents, times(1)).hasWorkorderPrefix("WO%");
     }
 
+    @Test
+    void doesNotOpenDisabledFactoryWhenCheckingReferences() {
+        var factories = mock(ManagedDatasourceService.class);
+        var business = mock(BusinessPersistence.class);
+        var parts = mock(SysAutoCodePartMapper.class);
+        var enabled = new ManagedDatasourceService.FactoryView("A", "E", "A", "启用工厂", 8L,
+                "ENABLED", 1, "业务库A", "LOCAL", null, null, 1, false);
+        var disabled = new ManagedDatasourceService.FactoryView("OLD", "E", "OLD", "停用工厂", 9L,
+                "DISABLED", 1, "旧业务库", "LOCAL", null, null, 1, false);
+        when(factories.factoryList(0, 100)).thenReturn(List.of(enabled, disabled));
+        when(factories.platformDatasourceIds(List.of(8L))).thenReturn(Set.of());
+        when(parts.selectSysAutoCodePartList(any(SysAutoCodePart.class))).thenReturn(List.of(prefixPart()));
+        var session = mock(OwnedSqlSession.class);
+        var documents = mock(AutoCodeDocumentReferenceMapper.class);
+        when(session.mapper(AutoCodeDocumentReferenceMapper.class)).thenReturn(documents);
+        when(documents.hasWorkorderPrefix("WO%")).thenReturn(0);
+        when(business.transaction(any(FactoryScope.class), any())).thenAnswer(invocation -> {
+            @SuppressWarnings("unchecked")
+            Function<OwnedSqlSession, Boolean> work = invocation.getArgument(1);
+            return work.apply(session);
+        });
+
+        var guard = new SystemAutoCodeRuleReferenceGuard(factories, business, parts);
+        var rule = new SysAutoCodeRule();
+        rule.setRuleId(7L);
+        rule.setRuleType("WORK_ORDER");
+
+        guard.requirePrefixChangeUnreferenced(rule, "WO", "WO");
+
+        verify(factories).platformDatasourceIds(List.of(8L));
+        verify(business, times(1)).transaction(any(FactoryScope.class), any());
+        verify(documents, times(1)).hasWorkorderPrefix("WO%");
+    }
+
+    @Test
+    void factoryScopedRuleChecksOnlyItsAssignedFactory() {
+        var factories = mock(ManagedDatasourceService.class);
+        var business = mock(BusinessPersistence.class);
+        var parts = mock(SysAutoCodePartMapper.class);
+        var factoryA = new ManagedDatasourceService.FactoryView("A", "E", "A", "工厂A", 8L,
+                "ENABLED", 1, "业务库A", "LOCAL", null, null, 1, false);
+        var factoryB = new ManagedDatasourceService.FactoryView("B", "E", "B", "工厂B", 9L,
+                "ENABLED", 1, "业务库B", "LOCAL", null, null, 1, false);
+        when(factories.factoryList(0, 100)).thenReturn(List.of(factoryA, factoryB));
+        when(factories.platformDatasourceIds(List.of(9L))).thenReturn(Set.of());
+        when(parts.selectSysAutoCodePartList(any(SysAutoCodePart.class))).thenReturn(List.of(prefixPart()));
+        var session = mock(OwnedSqlSession.class);
+        var documents = mock(AutoCodeDocumentReferenceMapper.class);
+        when(session.mapper(AutoCodeDocumentReferenceMapper.class)).thenReturn(documents);
+        when(documents.hasWorkorderPrefix("WO%")).thenReturn(0);
+        when(business.transaction(any(FactoryScope.class), any())).thenAnswer(invocation -> {
+            @SuppressWarnings("unchecked")
+            Function<OwnedSqlSession, Boolean> work = invocation.getArgument(1);
+            return work.apply(session);
+        });
+
+        var guard = new SystemAutoCodeRuleReferenceGuard(factories, business, parts);
+        var rule = new SysAutoCodeRule();
+        rule.setRuleId(7L);
+        rule.setRuleType("WORK_ORDER");
+        rule.setFactoryId("B");
+
+        guard.requireUnreferenced(rule);
+
+        verify(factories).platformDatasourceIds(List.of(9L));
+        verify(business, times(1)).transaction(any(FactoryScope.class), any());
+        verify(documents, times(1)).hasWorkorderPrefix("WO%");
+    }
+
     private static SysAutoCodePart prefixPart() {
         var part = new SysAutoCodePart();
         part.setPartIndex(1);

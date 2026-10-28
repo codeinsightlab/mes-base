@@ -1,6 +1,7 @@
 package dev.issuefixture;
 
 import java.math.BigDecimal;
+import java.util.concurrent.atomic.AtomicInteger;
 import tools.jackson.databind.ObjectMapper;
 
 import dev.mesbase.business.basic.domain.MaterialExample;
@@ -104,6 +105,7 @@ import dev.mesbase.business.wm.dao.WmWarehouseMapper;
 import dev.mesbase.business.wm.service.LocalProductionSupply;
 import dev.mesbase.business.wm.service.LocalStockService;
 import dev.mesbase.business.wm.service.StockDocumentService;
+import dev.mesbase.system.service.AutoCodeNumbering;
 import dev.mesbase.business.wm.service.StockReferenceRules;
 import dev.mesbase.business.wm.service.WarehouseAcceptanceService;
 import dev.mesbase.business.wm.service.impl.WmStockActionServiceImpl;
@@ -377,6 +379,14 @@ class MaterialIssueHttpTest {
         }
 
         @Bean
+        AutoCodeNumbering autoCodeNumbering() {
+            var numbering = mock(AutoCodeNumbering.class);
+            var generated = new AtomicInteger();
+            when(numbering.getDocNo(any(), any())).thenAnswer(call -> "TEST_WO_" + generated.incrementAndGet());
+            return numbering;
+        }
+
+        @Bean
         BusinessCacheProcessor caches() {
             return mock(BusinessCacheProcessor.class);
         }
@@ -625,7 +635,7 @@ class MaterialIssueHttpTest {
                 if (value == null) return null;
                 var user = new SysUser();
                 user.setUserId(1L);
-                user.setUserName(value.endsWith("NONE") ? "none" : value.endsWith("CRUD") ? "crud" : value.endsWith("CREATE") ? "create" : value.endsWith("REVISE") ? "revise" : "full");
+                user.setUserName(value.endsWith("NONE") ? "none" : value.endsWith("CRUD") ? "crud" : value.endsWith("CREATE") ? "create" : value.endsWith("REVISE") ? "revise" : value.endsWith("QUERY") ? "query" : "full");
                 return new LoginUser(1L, 1L, user, Set.of());
             });
             return http.csrf(c -> c.disable())
@@ -638,6 +648,7 @@ class MaterialIssueHttpTest {
                 var f = fixture();
                 r.addInterceptor(new FoundationAccessInterceptor(new FactorySelectionService(f.catalog, new InMemoryFactoryPreference()),
                         (actor, scope, permission) -> "full".equals(actor.id())
+                                || "query".equals(actor.id()) && permission.code().equals("workorder:query")
                                 || "create".equals(actor.id()) && permission.code()
                                 .equals("business:quality:defect:create")
                                 || "revise".equals(actor.id()) && permission.code()

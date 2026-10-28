@@ -84,7 +84,7 @@ public class ProductionInputService {
         }
     }
 
-    public record Result(String requestId, String issueId, String executionId, String code,
+    public record Result(String requestId, String issueId, String documentId, String executionId, String code,
                          String status, String productionInputQty, String availableQty) {
     }
 
@@ -403,7 +403,8 @@ public class ProductionInputService {
         if (execution.getBatchNo() != null)
             code = identities.read(execution.getId()).qrCode();
         var q = quantities.getExecutionQuantities(execution.getId());
-        return new Result(f.getId(), f.getIssueId().toString(), f.getExecutionId()
+        String documentId = documents.getObject().findDocumentIdForRequest(f.getId());
+        return new Result(f.getId(), f.getIssueId().toString(), documentId, f.getExecutionId()
                 .toString(), code, status, q.productionInputQty().toPlainString(), q.nodes()
                 .isEmpty() ? "0" : q.nodes().getFirst().availableQty().toPlainString());
     }

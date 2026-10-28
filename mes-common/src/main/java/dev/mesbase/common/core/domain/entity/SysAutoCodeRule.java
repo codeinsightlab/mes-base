@@ -13,6 +13,8 @@ public class SysAutoCodeRule extends BaseEntity {
 
     private String ruleType;
 
+    private String factoryId;
+
     private String ruleName;
 
     private String ruleDesc;
@@ -46,6 +48,10 @@ public class SysAutoCodeRule extends BaseEntity {
     public String getRuleType() { return ruleType; }
 
     public void setRuleType(String ruleType) { this.ruleType = ruleType; }
+
+    public String getFactoryId() { return factoryId; }
+
+    public void setFactoryId(String factoryId) { this.factoryId = factoryId; }
 
     public String getRuleName() {
         return ruleName;
@@ -109,6 +115,7 @@ public class SysAutoCodeRule extends BaseEntity {
                 "ruleId=" + ruleId +
                 ", ruleCode='" + ruleCode + '\'' +
                 ", ruleName='" + ruleName + '\'' +
+                ", factoryId='" + factoryId + '\'' +
                 ", ruleDesc='" + ruleDesc + '\'' +
                 ", maxLength=" + maxLength +
                 ", isPadded='" + isPadded + '\'' +

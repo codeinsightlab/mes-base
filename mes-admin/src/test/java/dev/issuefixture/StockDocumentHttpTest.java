@@ -57,6 +57,28 @@ class StockDocumentHttpTest {
     }
 
     @Test
+    void aggregateSaveCreatesHeaderAndItemsAtomically() throws Exception {
+        try (var c = ProductionInputHttpTest.context()) {
+            var mvc = MaterialIssueHttpTest.mvc(c);
+            var db = ProductionInputHttpTest.db(c);
+            String valid = "{\"header\":{\"documentType\":\"OTHER_RECEIPT\",\"reason\":\"aggregate receipt\",\"ruleCode\":\"TEST_STOCK_IN\"},"
+                    + "\"items\":[{\"stockId\":\"1\",\"materialId\":\"1\",\"warehouseId\":\"1\",\"unitId\":\"1\",\"batchNo\":\"L001\",\"binCode\":\"BIN1\",\"quantity\":\"1\"}]}";
+            var created = JSON.readTree(mvc.perform(full(post(ROOT + "/aggregate")).content(valid))
+                    .andExpect(status().isOk()).andReturn().getResponse().getContentAsString());
+            assertEquals(1, created.get("lines").size());
+            assertEquals(1, db.queryForObject("SELECT COUNT(*) FROM wm_stock_document", Integer.class));
+            assertEquals(1, db.queryForObject("SELECT COUNT(*) FROM wm_stock_document_line", Integer.class));
+
+            String invalid = "{\"header\":{\"documentType\":\"OTHER_RECEIPT\",\"reason\":\"must rollback\",\"ruleCode\":\"TEST_STOCK_IN\"},"
+                    + "\"items\":[{\"stockId\":\"1\",\"materialId\":\"1\",\"warehouseId\":\"1\",\"unitId\":\"1\",\"batchNo\":\"L001\",\"binCode\":\"BIN1\",\"quantity\":\"1\"},"
+                    + "{\"stockId\":\"1\",\"materialId\":\"999\",\"warehouseId\":\"1\",\"unitId\":\"1\",\"batchNo\":\"L001\",\"binCode\":\"BIN1\",\"quantity\":\"1\"}]}";
+            mvc.perform(full(post(ROOT + "/aggregate")).content(invalid)).andExpect(status().isConflict());
+            assertEquals(1, db.queryForObject("SELECT COUNT(*) FROM wm_stock_document", Integer.class));
+            assertEquals(1, db.queryForObject("SELECT COUNT(*) FROM wm_stock_document_line", Integer.class));
+        }
+    }
+
+    @Test
     void receiptIssueReplayAndWholeDocumentRollback() throws Exception {
         try (var c = ProductionInputHttpTest.context()) {
             var m = MaterialIssueHttpTest.mvc(c);

@@ -163,7 +163,7 @@ public class DigiwinE10SyncMapping {
             try {
                 if (kind == Kind.WORKORDER) {
                     plan = new WorkOrderService.ExternalPlan(new WorkOrderModels.Save(code, product.getId(), quantity, routing,
-                            start, end, null, null, null, null), identity, code, WorkOrderStatus.from(targetStatus));
+                            start, end, null, null, null, null, null), identity, code, WorkOrderStatus.from(targetStatus));
                     checked = workorders.inspectExternal(plan);
                 } else {
                     warehouse = new ExternalWmWarehouse(code, value(raw, "/warehouse_name"), targetStatus, null, identity);

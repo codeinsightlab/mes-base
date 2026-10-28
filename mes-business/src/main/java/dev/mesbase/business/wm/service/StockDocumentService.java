@@ -66,6 +66,7 @@ import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
@@ -220,6 +221,75 @@ public class StockDocumentService {
                 ? autoCodes.uniqueRuleCode(category) : command.ruleCode();
         String documentNo = autoCodes.getDocNo(ruleCode, category);
         return businessTransactions.execute(status -> createDraft(command, documentNo));
+    }
+
+    @Transactional(transactionManager = "businessTransactionManager", propagation = Propagation.NOT_SUPPORTED,
+            rollbackFor = Exception.class)
+    public Detail createAggregate(StockDocumentModels.AggregateSave command) {
+        validateAggregate(command, true);
+        var header = command.header();
+        StockDocumentType purpose = type(header.documentType());
+        if (purpose.isQualityReceipt() || purpose == StockDocumentType.MATERIAL_ISSUE)
+            ParameterChecks.reject(ErrorCode.STOCK_DOCUMENT_SOURCE_PENDING);
+        String category = purpose.isReceipt() ? AutoCodeRuleType.STOCK_IN.name() : AutoCodeRuleType.STOCK_OUT.name();
+        if (header.ruleCode() == null || header.ruleCode().isBlank()) ParameterChecks.reject(ErrorCode.BAD_REQUEST);
+        String documentNo = autoCodes.getDocNo(header.ruleCode(), category);
+        return businessTransactions.execute(status -> {
+            var draft = createDraft(new StockDocumentModels.Create(header.documentType(), header.reason(),
+                    header.remark(), header.sourceWorkorderId(), header.sourceExecutionId(), header.ruleCode()), documentNo);
+            Long id = draft.document().getId();
+            for (StockDocumentModels.AggregateLine item : command.items())
+                putLine(id, null, lineCommand(draft.document().getRevision(), item));
+            return detail(id);
+        });
+    }
+
+    @Transactional(transactionManager = "businessTransactionManager", rollbackFor = Exception.class)
+    public Detail updateAggregate(Long id, StockDocumentModels.AggregateSave command) {
+        validateAggregate(command, false);
+        var header = command.header();
+        var current = require(id);
+        if (type(current.getDocumentType()) == StockDocumentType.MATERIAL_ISSUE
+                || current.getSourceRequestJson() != null
+                || !Objects.equals(current.getDocumentType(), header.documentType()))
+            ParameterChecks.reject(ErrorCode.STOCK_DOCUMENT_CONFLICT);
+        edit(id, new StockDocumentModels.Edit(header.expectedRevision(), header.reason(), header.remark()));
+        var existing = rows(id);
+        var retained = new HashSet<Long>();
+        for (StockDocumentModels.AggregateLine item : command.items()) {
+            if (item.id() != null && !retained.add(item.id())) ParameterChecks.reject(ErrorCode.STOCK_DOCUMENT_CONFLICT);
+            var latest = require(id);
+            putLine(id, item.id(), lineCommand(latest.getRevision(), item));
+        }
+        for (WmStockDocumentLineEntity line : existing) {
+            if (!retained.contains(line.getId())) {
+                var latest = require(id);
+                removeLine(id, line.getId(), new StockDocumentModels.Version(latest.getRevision()));
+            }
+        }
+        return detail(id);
+    }
+
+    private static StockDocumentModels.Line lineCommand(Long revision, StockDocumentModels.AggregateLine item) {
+        return new StockDocumentModels.Line(revision, item.stockId(), item.materialId(), item.warehouseId(),
+                item.unitId(), item.batchNo(), item.binCode(), item.quantity(), item.remark());
+    }
+
+    private void validateAggregate(StockDocumentModels.AggregateSave command, boolean creating) {
+        if (command == null || command.header() == null || command.items() == null || command.items().isEmpty()
+                || command.items().size() > 100) ParameterChecks.reject(ErrorCode.BAD_REQUEST);
+        if (creating && command.header().expectedRevision() != null
+                || !creating && command.header().expectedRevision() == null)
+            ParameterChecks.reject(ErrorCode.BAD_REQUEST);
+        validate(new StockDocumentModels.Create(command.header().documentType(), command.header().reason(),
+                command.header().remark(), command.header().sourceWorkorderId(), command.header().sourceExecutionId(),
+                command.header().ruleCode()));
+        for (StockDocumentModels.AggregateLine item : command.items()) {
+            if (item == null || item.stockId() == null || item.materialId() == null || item.warehouseId() == null
+                    || item.unitId() == null || item.quantity() == null || item.quantity().signum() <= 0
+                    || item.id() != null && creating)
+                ParameterChecks.reject(ErrorCode.BAD_REQUEST);
+        }
     }
 
     @Transactional(transactionManager = "businessTransactionManager", propagation = Propagation.MANDATORY, rollbackFor = Exception.class)
@@ -480,6 +550,16 @@ public class StockDocumentService {
             throw new FoundationException(ErrorCode.STOCK_DOCUMENT_CONFLICT, failure);
         }
         return detail(existing.getFirst().getId());
+    }
+
+    @Transactional(transactionManager = "businessTransactionManager", readOnly = true)
+    public String findDocumentIdForRequest(String requestId) {
+        if (requestId == null) ParameterChecks.reject(ErrorCode.BAD_REQUEST);
+        var filter = new WmStockDocumentExample();
+        filter.createCriteria().andPostRequestIdEqualTo(requestId);
+        var found = bounded(() -> documents.selectByExampleWithBLOBs(filter));
+        if (found.size() > 1) ParameterChecks.reject(ErrorCode.STOCK_DOCUMENT_CONFLICT);
+        return found.isEmpty() ? null : found.getFirst().getId().toString();
     }
 
     private Detail materialIssueDocument(Calculation calculation, String documentNo) {

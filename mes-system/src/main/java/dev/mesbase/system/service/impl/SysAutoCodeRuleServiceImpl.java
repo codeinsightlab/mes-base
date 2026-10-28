@@ -80,6 +80,7 @@ public class SysAutoCodeRuleServiceImpl implements IAutoCodeRuleService {
     @Transactional(transactionManager = "masterTransactionManager", rollbackFor = Exception.class)
     public int insertInfo(SysAutoCodeRule rule) {
         validate(rule);
+        references.requireEnabledFactory(rule.getFactoryId());
         unique(rule);
         rule.setRuleId(null);
         int changed = mapper.add(rule);
@@ -92,14 +93,29 @@ public class SysAutoCodeRuleServiceImpl implements IAutoCodeRuleService {
     public int updateInfo(SysAutoCodeRule rule) {
         var scanned = findById(rule.getRuleId());
         String scannedPrefix = references.requireUnreferenced(scanned);
+        if (!Objects.equals(scanned.getFactoryId(), rule.getFactoryId())) {
+            if (extra.resultCount(scanned.getRuleId()) > 0)
+                throw new ServiceException("规则已生成单据号，不能变更适用工厂");
+            references.requireEnabledFactory(rule.getFactoryId());
+            SysAutoCodeRule targetScope = new SysAutoCodeRule();
+            targetScope.setRuleId(scanned.getRuleId());
+            targetScope.setRuleCode(scanned.getRuleCode());
+            targetScope.setRuleType(scanned.getRuleType());
+            targetScope.setFactoryId(rule.getFactoryId());
+            references.requireUnreferenced(targetScope);
+        }
         return masterTransactions.execute(status -> {
             if (extra.lockRule(scanned.getRuleId()) == null)
                 throw new ServiceException("编码规则不存在");
             var current = mapper.findByIdForUpdate(scanned.getRuleId());
             if (current == null) throw new ServiceException("编码规则不存在");
             if (!Objects.equals(scanned.getRuleCode(), current.getRuleCode())
-                    || !Objects.equals(scanned.getRuleType(), current.getRuleType()))
+                    || !Objects.equals(scanned.getRuleType(), current.getRuleType())
+                    || !Objects.equals(scanned.getFactoryId(), current.getFactoryId()))
                 throw new ServiceException("规则配置已变化，请重新执行修改");
+            if (!Objects.equals(current.getFactoryId(), rule.getFactoryId())
+                    && extra.resultCount(current.getRuleId()) > 0)
+                throw new ServiceException("规则已生成单据号，不能变更适用工厂");
             var currentParts = parts.selectByRuleIdForUpdate(scanned.getRuleId());
             if (!Objects.equals(scannedPrefix, prefix(currentParts)))
                 throw new ServiceException("规则前缀已变化，请重新执行修改");
@@ -180,10 +196,12 @@ public class SysAutoCodeRuleServiceImpl implements IAutoCodeRuleService {
     }
 
     private void validate(SysAutoCodeRule r) {
+        if (r.getFactoryId() != null && r.getFactoryId().isBlank()) r.setFactoryId(null);
         if (r.getRuleCode() == null || !r.getRuleCode()
                 .matches("[A-Za-z0-9][A-Za-z0-9_-]{0,63}") || r.getRuleName() == null || r.getRuleName()
                 .isBlank() || r.getRuleName().length() > 255 || r.getRuleDesc() != null && r.getRuleDesc()
-                .length() > 500 || r.getRemark() != null && r.getRemark().length() > 500)
+                .length() > 500 || r.getRemark() != null && r.getRemark().length() > 500
+                || r.getFactoryId() != null && !r.getFactoryId().matches("[A-Za-z0-9_-]{1,64}"))
             throw new ServiceException("规则编码、名称或描述不符合要求");
         if (!AutoCodeRuleType.supports(r.getRuleType())) throw new ServiceException("请选择有效的单据编码类型");
         if (r.getMaxLength() == null || r.getMaxLength() < 1 || r.getMaxLength() > 64 || (r.getIsPadded() == null || !Set.of("Y", "N")

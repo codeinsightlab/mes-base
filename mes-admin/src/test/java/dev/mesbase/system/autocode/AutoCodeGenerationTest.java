@@ -3,6 +3,7 @@ package dev.mesbase.system.autocode;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertIterableEquals;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
@@ -19,6 +20,7 @@ import dev.mesbase.system.mapper.SysAutoCodePartMapper;
 import dev.mesbase.system.mapper.SysAutoCodeRuleMapper;
 import dev.mesbase.system.mapper.SysAutoCodeResultMapper;
 import dev.mesbase.system.service.AutoCodeFactoryContext;
+import dev.mesbase.system.service.AutoCodeNumbering;
 import dev.mesbase.system.service.impl.AutoCodeRuleSnapshotCache;
 import dev.mesbase.system.service.impl.SysAutoCodeGenerationServiceImpl;
 import dev.mesbase.system.strategy.PartTypeFixCharHandler;
@@ -40,6 +42,38 @@ import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.support.SimpleTransactionStatus;
 
 class AutoCodeGenerationTest {
+    @Test
+    void ruleOptionsIncludeGlobalAndCurrentFactoryRulesOnly() {
+        var cache = mock(AutoCodeRuleSnapshotCache.class);
+        var factoryContext = mock(AutoCodeFactoryContext.class);
+        when(factoryContext.requiredFactoryId()).thenReturn("FACTORY_A");
+        when(cache.byType("WORK_ORDER")).thenReturn(List.of(
+                config(1, "GLOBAL", "WORK_ORDER", null, "GL"),
+                config(2, "LOCAL_A", "WORK_ORDER", "FACTORY_A", "A"),
+                config(3, "LOCAL_B", "WORK_ORDER", "FACTORY_B", "B")));
+        var service = service(cache, mock(SysAutoCodeRuleMapper.class), mock(SysAutoCodePartMapper.class),
+                mock(SysAutoCodeResultMapper.class), mock(AutoCodeExtraMapper.class),
+                mock(PlatformTransactionManager.class), factoryContext);
+
+        assertIterableEquals(List.of("GLOBAL", "LOCAL_A"), service.rules("WORK_ORDER").stream()
+                .map(AutoCodeNumbering.RuleOption::ruleCode).toList());
+        assertEquals("LOCAL_A", service.uniqueRuleCode("WORK_ORDER"));
+    }
+
+    @Test
+    void factoryRuleCannotBeGeneratedOutsideItsFactoryScope() {
+        var cache = mock(AutoCodeRuleSnapshotCache.class);
+        var rules = mock(SysAutoCodeRuleMapper.class);
+        var factoryContext = mock(AutoCodeFactoryContext.class);
+        when(factoryContext.requiredFactoryId()).thenReturn("FACTORY_A");
+        when(cache.get("LOCAL_B")).thenReturn(config(3, "LOCAL_B", "WORK_ORDER", "FACTORY_B", "LB"));
+        var service = service(cache, rules, mock(SysAutoCodePartMapper.class), mock(SysAutoCodeResultMapper.class),
+                mock(AutoCodeExtraMapper.class), mock(PlatformTransactionManager.class), factoryContext);
+
+        assertThrows(ServiceException.class, () -> service.getDocNo("LOCAL_B"));
+        org.mockito.Mockito.verifyNoInteractions(rules);
+    }
+
     @Test
     void numericLeadingRuleCodeCanBeGenerated() {
         var cache = mock(AutoCodeRuleSnapshotCache.class);
@@ -138,6 +172,27 @@ class AutoCodeGenerationTest {
                         null, null, null, null, null),
                 new AutoCodeRuleSnapshotCache.PartConfig(id * 10 + 2, id, 3, "SERIALNO", 3, null,
                         null, 1, 1, "Y", "DAY")));
+    }
+
+    private static AutoCodeRuleSnapshotCache.RuleConfig config(long id, String code, String type,
+                                                                String factoryId, String prefix) {
+        return new AutoCodeRuleSnapshotCache.RuleConfig(id, code, type, factoryId, code, 64, "N", null, null,
+                "Y", List.of(
+                new AutoCodeRuleSnapshotCache.PartConfig(id * 10, id, 1, "FIXCHAR", prefix.length(), null,
+                        prefix, null, null, null, null),
+                new AutoCodeRuleSnapshotCache.PartConfig(id * 10 + 1, id, 2, "NOWDATE", 8, "yyyyMMdd",
+                        null, null, null, null, null),
+                new AutoCodeRuleSnapshotCache.PartConfig(id * 10 + 2, id, 3, "SERIALNO", 3, null,
+                        null, 1, 1, "Y", "DAY")));
+    }
+
+    private static SysAutoCodeGenerationServiceImpl service(AutoCodeRuleSnapshotCache cache,
+            SysAutoCodeRuleMapper rules, SysAutoCodePartMapper parts, SysAutoCodeResultMapper results,
+            AutoCodeExtraMapper extra, PlatformTransactionManager manager, AutoCodeFactoryContext factoryContext) {
+        var handler = new PartTypeHandler(new PartTypeInputCharHandler(), new PartTypeNowDateHandler(),
+                new PartTypeFixCharHandler(), new PartTypeSerialNoHandler());
+        return new SysAutoCodeGenerationServiceImpl(cache, rules, parts, results, extra, handler, manager,
+                factoryContext);
     }
 
     private static SysAutoCodeRule rule(long id) {

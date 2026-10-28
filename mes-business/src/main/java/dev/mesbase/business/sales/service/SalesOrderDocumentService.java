@@ -2,6 +2,7 @@ package dev.mesbase.business.sales.service;
 
 import dev.mesbase.business.basic.dao.MaterialMapper;
 import dev.mesbase.business.basic.domain.MaterialEntity;
+import dev.mesbase.business.production.service.MaterialQuantityRules;
 import dev.mesbase.business.sales.dao.MesCustomerMapper;
 import dev.mesbase.business.sales.dao.MesSalesOrderItemMapper;
 import dev.mesbase.business.sales.dao.MesSalesOrderMapper;
@@ -50,14 +51,17 @@ public class SalesOrderDocumentService {
     private final MesCustomerMapper customers;
     private final MaterialMapper materials;
     private final IMesSalesOrderItemService itemService;
+    private final MaterialQuantityRules quantityRules;
 
     public SalesOrderDocumentService(MesSalesOrderMapper orders, MesSalesOrderItemMapper items,
-                                     MesCustomerMapper customers, MaterialMapper materials, IMesSalesOrderItemService itemService) {
+                                     MesCustomerMapper customers, MaterialMapper materials,
+                                     IMesSalesOrderItemService itemService, MaterialQuantityRules quantityRules) {
         this.orders = orders;
         this.items = items;
         this.customers = customers;
         this.materials = materials;
         this.itemService = itemService;
+        this.quantityRules = quantityRules;
     }
 
     @Transactional(transactionManager = "businessTransactionManager", readOnly = true)
@@ -195,6 +199,10 @@ public class SalesOrderDocumentService {
                 throw new FoundationException(ErrorCode.UNPROCESSABLE);
             }
             found.put(id, material);
+        }
+        quantityRules.lockForWrite(ids);
+        for (SalesOrderLineRequest request : requests) {
+            quantityRules.checkForWrite(request.orderedQty(), request.materialId());
         }
         return found;
     }

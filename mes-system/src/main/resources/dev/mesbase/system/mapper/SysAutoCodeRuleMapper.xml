@@ -8,6 +8,7 @@
         <id     property="ruleId"     column="rule_id"     />
         <result property="ruleCode"     column="rule_code"   />
         <result property="ruleType"     column="rule_type"   />
+        <result property="factoryId"    column="factory_id" />
         <result property="ruleName"    column="rule_name"   />
         <result property="ruleDesc"   column="rule_desc"   />
         <result property="maxLength" column="max_length"   />
@@ -23,7 +24,7 @@
     </resultMap>
 
     <sql id="selectSysAutoCodeRuleVo">
-        select d.rule_id, d.rule_code, d.rule_type, d.rule_name, d.rule_desc, d.max_length,
+        select d.rule_id, d.rule_code, d.rule_type, d.factory_id, d.rule_name, d.rule_desc, d.max_length,
         is_padded,padded_char,padded_method,enable_flag,remark,create_by,create_time,update_by,update_time
         from sys_auto_code_rule d
     </sql>
@@ -38,6 +39,7 @@
             AND rule_code = #{ruleCode}
         </if>
         <if test="ruleType != null and ruleType != ''">AND rule_type = #{ruleType}</if>
+        <if test="factoryId != null and factoryId != ''">AND factory_id = #{factoryId}</if>
 
         <if test="ruleName != null and ruleName != ''">
             AND rule_name like concat('%', #{ruleName}, '%')
@@ -79,6 +81,7 @@
       insert into sys_auto_code_rule(
         rule_code,
         rule_type,
+        factory_id,
         rule_name,
         <if test="ruleDesc !=null and ruleDesc !=''">
             rule_desc,
@@ -98,6 +101,7 @@
       )values(
         #{ruleCode},
         #{ruleType},
+        #{factoryId},
         #{ruleName},
         <if test="ruleDesc !=null and ruleDesc !=''">
             #{ruleDesc},
@@ -122,6 +126,7 @@
         <set>
             rule_name = #{ruleName},
             rule_type = #{ruleType},
+            factory_id = #{factoryId},
             rule_desc = #{ruleDesc},
             max_length = #{maxLength},
             is_padded = #{isPadded},
