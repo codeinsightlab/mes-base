@@ -234,13 +234,13 @@ class WorkOrderMySqlTest {
                         assertNotNull(node.getExecutionOrder());
                     }
                 }
-                var input = new WorkOrderModels.Save(tag, product, new BigDecimal("1000"), routing, null, null, null, null, "TEST ONLY ROLLBACK", 0);
+                var input = new WorkOrderModels.Save(tag, product, new BigDecimal("1000"), routing, null, null, null, null, "TEST ONLY ROLLBACK", 0, "WORK_ORDER");
                 var created = service.create(input);
                 Long order = created.workorder().getId();
                 assertEquals(0, created.batches().size());
                 assertEquals(0, created.allocation().executionCount());
                 assertThrows(FoundationException.class, () -> service.create(input));
-                assertThrows(FoundationException.class, () -> service.update(order, new WorkOrderModels.Save(tag, product, new BigDecimal("1000"), routing, null, null, null, null, null, 99)));
+                assertThrows(FoundationException.class, () -> service.update(order, new WorkOrderModels.Save(tag, product, new BigDecimal("1000"), routing, null, null, null, null, null, 99, "WORK_ORDER")));
                 var e = executionService.insert(new MesProductionExecutionCreateCommand(order, routing, new BigDecimal("400"), "READY", null, null, tag));
                 executionService.insert(new MesProductionExecutionCreateCommand(order, routing, new BigDecimal("300"), "READY", null, null, tag));
                 assertEquals(new BigDecimal("700.000000"), service.allocation(order).allocatedTargetQty());

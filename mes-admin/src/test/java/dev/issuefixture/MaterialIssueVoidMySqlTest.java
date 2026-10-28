@@ -170,7 +170,7 @@ class MaterialIssueVoidMySqlTest {
                 var orders = c.getBean(WorkOrderService.class);
                 var issues = c.getBean(IMesMaterialIssueService.class);
                 var voids = c.getBean(MaterialIssueVoidService.class);
-                var demand = new WorkOrderModels.Save(tag, product, BigDecimal.TEN, routing, null, null, null, null, "TEST ONLY MYSQL", 0);
+                var demand = new WorkOrderModels.Save(tag, product, BigDecimal.TEN, routing, null, null, null, null, "TEST ONLY MYSQL", 0, "WORK_ORDER");
                 long wo = orders.create(demand).workorder().getId();
                 var issue = issues.insert(new MesMaterialIssueCreateCommand(tag, wo, null, null, null, null, null, null, "RECORDED", "TEST ONLY MYSQL", null));
                 var erp = c.getBean(MaterialIssueErpService.class);
@@ -179,7 +179,7 @@ class MaterialIssueVoidMySqlTest {
                 assertEquals(beforeQuery, jdbc.queryForObject("SELECT operation_version FROM mes_material_issue_erp_extra WHERE id=?", Long.class, issue.getId()));
                 assertEquals("RECORDED", erp.reconcileErpStatus(issue.getId()).mesStatus());
                 assertEquals("NOT_FOUND", jdbc.queryForObject("SELECT last_outcome FROM mes_material_issue_erp_extra WHERE id=?", String.class, issue.getId()));
-                var correction = new WorkOrderModels.Save(tag, target[0], BigDecimal.TEN, target[1], null, null, null, null, "TEST ONLY MYSQL", 0);
+                var correction = new WorkOrderModels.Save(tag, target[0], BigDecimal.TEN, target[1], null, null, null, null, "TEST ONLY MYSQL", 0, "WORK_ORDER");
                 assertEquals(ErrorCode.WORKORDER_ISSUE_REFERENCED, assertThrows(FoundationException.class, () -> orders.update(wo, correction)).code());
                 var cancelled = voids.cancel(issue.getId());
                 assertEquals("VOIDED", cancelled.getStatus());
@@ -187,7 +187,7 @@ class MaterialIssueVoidMySqlTest {
                 assertEquals(cancelled.getVoidOperationId(), voids.cancel(issue.getId()).getVoidOperationId());
                 assertEquals(target[0], orders.update(wo, correction).workorder().getProductId());
                 assertEquals(product, issues.selectById(issue.getId()).getProductId());
-                var raceDemand = new WorkOrderModels.Save(tag + "_RACE", product, BigDecimal.TEN, routing, null, null, null, null, "TEST ONLY MYSQL", 0);
+                var raceDemand = new WorkOrderModels.Save(tag + "_RACE", product, BigDecimal.TEN, routing, null, null, null, null, "TEST ONLY MYSQL", 0, "WORK_ORDER");
                 long race = orders.create(raceDemand).workorder().getId();
                 var start = new CountDownLatch(1);
                 try (var pool = Executors.newFixedThreadPool(2)) {
@@ -203,7 +203,7 @@ class MaterialIssueVoidMySqlTest {
                     var b = pool.submit(() -> scoped(() -> {
                         start.await();
                         try {
-                            orders.update(race, new WorkOrderModels.Save(tag + "_RACE", target[0], BigDecimal.TEN, target[1], null, null, null, null, "TEST ONLY MYSQL", 0));
+                            orders.update(race, new WorkOrderModels.Save(tag + "_RACE", target[0], BigDecimal.TEN, target[1], null, null, null, null, "TEST ONLY MYSQL", 0, "WORK_ORDER"));
                             return "CHANGED";
                         } catch (FoundationException e) {
                             return e.code().name();

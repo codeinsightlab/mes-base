@@ -38,6 +38,7 @@ class AutoCodeRuleSnapshotCacheTest {
         var rule = new SysAutoCodeRule();
         rule.setRuleId(7L);
         rule.setRuleCode("SALES_ORDER");
+        rule.setRuleType("WORK_ORDER");
         rule.setEnableFlag("Y");
         when(rules.selectAllForGeneration()).thenReturn(List.of(rule));
         var part = new SysAutoCodePart();
@@ -52,13 +53,14 @@ class AutoCodeRuleSnapshotCacheTest {
 
         assertEquals("SO", cache.get("SALES_ORDER").parts().getFirst().fixCharacter());
         assertEquals(7L, cache.get("SALES_ORDER").ruleId());
+        assertEquals(1, cache.byType("WORK_ORDER").size());
 
         verify(rules).selectAllForGeneration();
         verify(parts).selectAllForGeneration();
-        verify(redis, times(2)).getCacheVersion("autocode:{rules:v1}:version");
-        verify(redis, times(2)).getCacheObject("autocode:{rules:v1}:snapshot");
-        verify(redis).setCacheObjectIfVersion("autocode:{rules:v1}:version", null,
-                "autocode:{rules:v1}:snapshot", stored.get(), 3600);
+        verify(redis, times(3)).getCacheVersion("autocode:{rules:v2}:version");
+        verify(redis, times(3)).getCacheObject("autocode:{rules:v2}:snapshot");
+        verify(redis).setCacheObjectIfVersion("autocode:{rules:v2}:version", null,
+                "autocode:{rules:v2}:snapshot", stored.get(), 3600);
     }
 
     @Test
@@ -67,7 +69,7 @@ class AutoCodeRuleSnapshotCacheTest {
         var rules = mock(SysAutoCodeRuleMapper.class);
         var parts = mock(SysAutoCodePartMapper.class);
         var oldSnapshot = new AutoCodeRuleSnapshotCache.Snapshot(Map.of("SALES_ORDER",
-                new AutoCodeRuleSnapshotCache.RuleConfig(7L, "SALES_ORDER", 64, "N", null, null, "Y", List.of())));
+                new AutoCodeRuleSnapshotCache.RuleConfig(7L, "SALES_ORDER", "WORK_ORDER", "Sales", 64, "N", null, null, "Y", List.of())));
         when(redis.getCacheVersion(anyString())).thenReturn("v1");
         when(redis.getCacheObject(anyString())).thenReturn(oldSnapshot);
         when(redis.setCacheObjectIfVersion(anyString(), anyString(), anyString(), any(), anyInt())).thenReturn(true);

@@ -63,7 +63,7 @@ class AutoCodeGenerationTest {
             return null;
         }).when(results).updateAutoCodeResult(any(SysAutoCodeResult.class));
         when(cache.get("SALES_ORDER")).thenReturn(config(1, "SALES_ORDER", "SO"));
-        when(cache.get("STOCK_RECEIPT")).thenReturn(config(2, "STOCK_RECEIPT", "RK"));
+        when(cache.get("STOCK_RECEIPT")).thenReturn(config(2, "STOCK_RECEIPT", "STOCK_IN", "RK"));
         when(rules.findByIdForUpdate(anyLong())).thenAnswer(invocation -> rule(invocation.getArgument(0)));
         when(parts.selectByRuleIdForUpdate(anyLong())).thenAnswer(invocation -> {
             long id = invocation.getArgument(0);
@@ -79,6 +79,8 @@ class AutoCodeGenerationTest {
 
         assertEquals("SO" + date + "001", service.getDocNo("SALES_ORDER"));
         assertEquals("RK" + date + "001", service.getDocNo("STOCK_RECEIPT"));
+        assertEquals("RK" + date + "002", service.getDocNo("STOCK_RECEIPT", "STOCK_IN"));
+        assertThrows(ServiceException.class, () -> service.getDocNo("STOCK_RECEIPT", "STOCK_OUT"));
         assertEquals("SO" + date + "002", service.getDocNo("SALES_ORDER"));
         factory.set("FACTORY_B");
         assertEquals("SO" + date + "001", service.getDocNo("SALES_ORDER"));
@@ -97,7 +99,11 @@ class AutoCodeGenerationTest {
     }
 
     private static AutoCodeRuleSnapshotCache.RuleConfig config(long id, String code, String prefix) {
-        return new AutoCodeRuleSnapshotCache.RuleConfig(id, code, 64, "N", null, null, "Y", List.of(
+        return config(id, code, "WORK_ORDER", prefix);
+    }
+
+    private static AutoCodeRuleSnapshotCache.RuleConfig config(long id, String code, String type, String prefix) {
+        return new AutoCodeRuleSnapshotCache.RuleConfig(id, code, type, code, 64, "N", null, null, "Y", List.of(
                 new AutoCodeRuleSnapshotCache.PartConfig(id * 10, id, 1, "FIXCHAR", prefix.length(), null,
                         prefix, null, null, null, null),
                 new AutoCodeRuleSnapshotCache.PartConfig(id * 10 + 1, id, 2, "NOWDATE", 8, "yyyyMMdd",
@@ -110,6 +116,7 @@ class AutoCodeGenerationTest {
         var row = new SysAutoCodeRule();
         row.setRuleId(id);
         row.setRuleCode(id == 1 ? "SALES_ORDER" : "STOCK_RECEIPT");
+        row.setRuleType(id == 1 ? "WORK_ORDER" : "STOCK_IN");
         row.setMaxLength(64);
         row.setIsPadded("N");
         row.setEnableFlag("Y");

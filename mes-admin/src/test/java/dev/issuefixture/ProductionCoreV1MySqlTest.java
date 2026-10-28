@@ -79,7 +79,7 @@ class ProductionCoreV1MySqlTest {
                 var issues = c.getBean(IMesMaterialIssueService.class);
                 var items = c.getBean(IMesMaterialIssueItemService.class);
                 var submits = c.getBean(MaterialIssueSubmissionService.class);
-                var demand = orders.create(new WorkOrderModels.Save(tag, product, BigDecimal.TEN, routing, null, null, null, null, "TEST ONLY Production Core V1", null))
+                var demand = orders.create(new WorkOrderModels.Save(tag, product, BigDecimal.TEN, routing, null, null, null, null, "TEST ONLY Production Core V1", null, "WORK_ORDER"))
                         .workorder();
                 orders.release(demand.getId(), demand.getRevision());
                 var e = executions.insert(new MesProductionExecutionCreateCommand(demand.getId(), routing, BigDecimal.TEN, "READY", null, null, tag));

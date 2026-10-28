@@ -94,13 +94,13 @@ class SourceIsolationHttpTest {
             var scope = new FactoryScope(new FactoryId("A"));
             var snapshot = new FactoryIntegrationSnapshot(scope.factoryId(), FactoryRuntimeMode.ERP, "TEST-ERP", "TEST-BINDING", 1, 1L);
             var run = new SyncCoordinator.Run(scope, "workorder.erp", "TEST-OWNER");
-            var input = new WorkOrderModels.Save("TEST_EXTERNAL_SYNC", 1L, new BigDecimal("100"), 1L, null, null, null, null, null, null);
+            var input = new WorkOrderModels.Save("TEST_EXTERNAL_SYNC", 1L, new BigDecimal("100"), 1L, null, null, null, null, null, null, null);
             FactoryIntegrationContext.run(snapshot, () -> {
                 var result = service.syncExternal(new WorkOrderService.ExternalPlan(input, "ERP-ORDER-1", "ERP-MO-1", WorkOrderStatus.RELEASED), run);
                 assertEquals("EXTERNAL", result.workorder().getSource());
                 assertEquals("TEST-BINDING", j.queryForObject("SELECT binding_key FROM workorder_erp_extra WHERE id=?", String.class, result.workorder()
                         .getId()));
-                var collision = new WorkOrderModels.Save("WO1", 1L, new BigDecimal("100"), 1L, null, null, null, null, null, null);
+                var collision = new WorkOrderModels.Save("WO1", 1L, new BigDecimal("100"), 1L, null, null, null, null, null, null, null);
                 assertThrows(FoundationException.class, () -> service.syncExternal(new WorkOrderService.ExternalPlan(collision, "OTHER-ERP-ID", null, WorkOrderStatus.RELEASED), run));
                 assertThrows(FoundationException.class, () -> service.update(result.workorder().getId(), input));
                 assertEquals(ErrorCode.INTEGRATION_NOT_CONFIGURED, assertThrows(FoundationException.class, () -> c.getBean(WarehouseIntegration.class)
