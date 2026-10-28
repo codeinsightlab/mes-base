@@ -73,7 +73,7 @@ class LocalFullChainV23HttpTest {
             LocalWarehouseHttpTest.apply(m, "gain", "200", "0");
             String inputBody = ProductionInputHttpTest.command(m, UUID.randomUUID().toString(), "L001", "50");
             var input = new ObjectMapper().readTree(ProductionInputHttpTest.submit(m, inputBody));
-            var frozen = j.queryForList("SELECT * FROM mes_material_issue_input WHERE document_id=?", input.get("documentId")
+            var frozen = j.queryForList("SELECT production_request_id,production_request_hash,production_calculation_json FROM wm_stock_document WHERE id=?", input.get("documentId")
                     .asString());
             LocalWarehouseHttpTest.balance(j, "100");
             String body = LocalWarehouseHttpTest.body(UUID.randomUUID().toString(), "20", "100", input.get("documentId")
@@ -84,7 +84,7 @@ class LocalFullChainV23HttpTest {
                     .andExpect(status().isOk());
             ProductionInputHttpTest.submit(m, inputBody);
             LocalWarehouseHttpTest.balance(j, "120");
-            assertEquals(frozen, j.queryForList("SELECT * FROM mes_material_issue_input WHERE document_id=?", input.get("documentId")
+            assertEquals(frozen, j.queryForList("SELECT production_request_id,production_request_hash,production_calculation_json FROM wm_stock_document WHERE id=?", input.get("documentId")
                     .asString()));
             var q = new ObjectMapper().readTree(m.perform(ProductionCoreV1HttpTest.full(get("/api/production/report-quantities/executions/" + input.get("executionId")
                             .asString())))

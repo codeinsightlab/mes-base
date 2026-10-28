@@ -39,11 +39,11 @@ class StockDocumentProductionInputBasisHttpTest {
                     .andExpect(jsonPath("routingNodeIds[1]").value("12"))
                     .andExpect(jsonPath("routingNodeIds[2]").value("13"))
                     .andExpect(jsonPath("stockApplied").value(true));
-            assertEquals(db.queryForObject("SELECT confirmed_at FROM mes_material_issue_input WHERE document_id=?",
+            assertEquals(db.queryForObject("SELECT production_confirmed_at FROM wm_stock_document WHERE id=?",
                             LocalDateTime.class, documentId),
-                    db.queryForObject("SELECT business_occurred_at FROM mes_material_issue_input WHERE document_id=?",
+                    db.queryForObject("SELECT production_business_occurred_at FROM wm_stock_document WHERE id=?",
                             LocalDateTime.class, documentId));
-            assertEquals(1, db.queryForObject("SELECT COUNT(*) FROM mes_material_issue_input WHERE document_id=?", Integer.class, documentId));
+            assertEquals(1, db.queryForObject("SELECT COUNT(*) FROM wm_stock_document WHERE id=?", Integer.class, documentId));
         }
     }
 

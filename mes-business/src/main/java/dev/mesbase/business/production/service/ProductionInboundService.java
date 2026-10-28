@@ -5,6 +5,7 @@ import dev.mesbase.business.basic.dao.MaterialMapper;
 import dev.mesbase.business.wm.dao.WmInventoryMapper;
 import dev.mesbase.business.wm.dao.WmStockDocumentMapper;
 import dev.mesbase.business.wm.domain.StockDocumentModels;
+import dev.mesbase.business.wm.domain.StockDocumentDirection;
 import dev.mesbase.business.wm.domain.StockDocumentStatus;
 import dev.mesbase.business.wm.domain.StockDocumentType;
 import dev.mesbase.business.wm.domain.WmStockDocumentExample;
@@ -95,10 +96,10 @@ public class ProductionInboundService {
         } catch (IllegalArgumentException failure) {
             throw new FoundationException(ErrorCode.BAD_REQUEST, failure);
         }
-        var replay = replay(executionId, command);
+        var replay = businessTransactions.execute(status -> replay(executionId, command));
         if (replay != null) return replay;
-        String ruleCode = autoCodes.uniqueRuleCode(AutoCodeRuleType.STOCK_IN.name());
-        String documentNo = autoCodes.getDocNo(ruleCode, AutoCodeRuleType.STOCK_IN.name());
+        String ruleCode = StockDocumentType.PRODUCTION_RECEIPT.getValue();
+        String documentNo = autoCodes.getBusinessDocNo(ruleCode, AutoCodeRuleType.STOCK_IN.name());
         return businessTransactions.execute(status -> receiveInTransaction(executionId, command, documentNo));
     }
 
@@ -117,7 +118,7 @@ public class ProductionInboundService {
         quantityRules.lockForWrite(List.of(material.getId()));
         // Document owner validates current rules or exact authoritative remaining production quantity.
         var draft = documents.createWithNumber(new StockDocumentModels.Create(
-                StockDocumentType.PRODUCTION_RECEIPT.getValue(), command.reason(), null, null, executionId), documentNo);
+                StockDocumentDirection.IN.getValue(), StockDocumentType.PRODUCTION_RECEIPT.getValue(), command.reason(), null, null, executionId, ruleCode), documentNo);
         Long id = draft.document().getId();
         documents.putLine(id, null, new StockDocumentModels.Line(draft.document().getRevision(), command.stockId(),
                 execution.getProductId(), stock.getWarehouseId(), material.getUnitId(), stock.getBatchNo(),

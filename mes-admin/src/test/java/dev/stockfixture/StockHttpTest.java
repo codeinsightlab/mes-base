@@ -31,7 +31,6 @@ import dev.mesbase.business.wm.service.StockReferenceRules;
 import dev.mesbase.business.production.dao.MesWorkorderMaterialMapper;
 import dev.mesbase.business.wm.service.impl.WmInventoryServiceImpl;
 import dev.mesbase.business.wm.dao.WmStockActionMapper;
-import dev.mesbase.business.issue.dao.MesMaterialIssueInputMapper;
 import dev.mesbase.business.integration.warehouse.WarehouseIntegration;
 import dev.mesbase.business.wm.service.impl.WmWarehouseServiceImpl;
 import dev.mesbase.business.wm.sync.ExternalWmInventory;
@@ -117,7 +116,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * TEST ONLY: real generated SQL, HTTP authorization and transactions; two separate H2 databases.
  */
 class StockHttpTest {
-    static final Set<Class<?>> MAPPERS = Set.of(WmStockDocumentLineMapper.class, WmWarehouseErpExtraMapper.class, MesWorkorderMaterialMapper.class, WmStockActionMapper.class, MesMaterialIssueInputMapper.class, MaterialMapper.class, WmWarehouseMapper.class, WmInventoryMapper.class);
+    static final Set<Class<?>> MAPPERS = Set.of(WmStockDocumentLineMapper.class, WmWarehouseErpExtraMapper.class, MesWorkorderMaterialMapper.class, WmStockActionMapper.class, MaterialMapper.class, WmWarehouseMapper.class, WmInventoryMapper.class);
 
     static class Fixture implements AutoCloseable {
         final RuntimeRegistry registry = new RuntimeRegistry();
@@ -249,10 +248,6 @@ class StockHttpTest {
             return new SqlSessionTemplate(f).getMapper(WmStockActionMapper.class);
         }
 
-        @Bean
-        MesMaterialIssueInputMapper inputs(SqlSessionFactory f) {
-            return new SqlSessionTemplate(f).getMapper(MesMaterialIssueInputMapper.class);
-        }
 
         @Bean
         MaterialMapper materials(SqlSessionFactory f) {

@@ -1,7 +1,7 @@
 -- Convert legacy material-issue identities and lines into the unified stock-document identities.
 -- Historical stock actions are linked to the new lines; no inventory action is replayed or inserted.
 -- Run only after the new application version is loaded and business writes are quiesced.
--- The existing source_material_issue_id column is the in-session mapping carrier and is dropped below.
+-- The existing source_material_issue_id column carries the explicit identity map only during conversion.
 DELIMITER $$
 DROP PROCEDURE IF EXISTS mes_v70_converge_material_issue$$
 CREATE PROCEDURE mes_v70_converge_material_issue()
@@ -39,13 +39,18 @@ BEGIN
         SELECT 'mes_material_issue_item','quantity' UNION ALL SELECT 'mes_material_issue_item','remark' UNION ALL
         SELECT 'mes_material_issue_item','material_code' UNION ALL SELECT 'mes_material_issue_item','unit_code' UNION ALL
         SELECT 'mes_material_issue_item','warehouse_code' UNION ALL
+        SELECT 'mes_material_issue_item','create_by' UNION ALL SELECT 'mes_material_issue_item','create_time' UNION ALL
+        SELECT 'mes_material_issue_item','update_by' UNION ALL SELECT 'mes_material_issue_item','update_time' UNION ALL
         SELECT 'mes_material_issue_input','id' UNION ALL SELECT 'mes_material_issue_input','issue_id' UNION ALL
+        SELECT 'mes_material_issue_input','request_hash' UNION ALL SELECT 'mes_material_issue_input','input_kind' UNION ALL
+        SELECT 'mes_material_issue_input','output_qty' UNION ALL SELECT 'mes_material_issue_input','created_at' UNION ALL
         SELECT 'mes_material_issue_input','execution_id' UNION ALL SELECT 'mes_material_issue_input','source_mode' UNION ALL
         SELECT 'mes_material_issue_input','stock_applied' UNION ALL SELECT 'mes_material_issue_input','confirmed_at' UNION ALL
         SELECT 'mes_material_issue_input','calculation_json' UNION ALL SELECT 'mes_material_issue_input','stock_id' UNION ALL
         SELECT 'mes_material_issue_submission','id' UNION ALL SELECT 'mes_material_issue_submission','issue_id' UNION ALL
         SELECT 'mes_material_issue_submission','path_revision' UNION ALL SELECT 'mes_material_issue_submission','command_json' UNION ALL
         SELECT 'mes_material_issue_submission','status' UNION ALL
+        SELECT 'mes_material_issue_submission','created_at' UNION ALL SELECT 'mes_material_issue_submission','finished_at' UNION ALL
         SELECT 'wm_stock_document','id' UNION ALL SELECT 'wm_stock_document','document_no' UNION ALL
         SELECT 'wm_stock_document','document_type' UNION ALL SELECT 'wm_stock_document','status' UNION ALL
         SELECT 'wm_stock_document','reason' UNION ALL SELECT 'wm_stock_document','remark' UNION ALL
@@ -123,6 +128,7 @@ BEGIN
         (table_name='mes_material_issue_input' AND column_name='document_id')
         OR (table_name='mes_material_issue_submission' AND column_name='document_id')
         OR (table_name='mes_material_issue_input' AND column_name='business_occurred_at')
+        OR (table_name='wm_stock_document' AND column_name LIKE 'production\_%')
     );
     IF bad_rows<>0 THEN
         SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='Document identity columns already exist; partial V70 state requires explicit repair';
@@ -130,8 +136,8 @@ BEGIN
 
     SELECT COUNT(*) INTO bad_rows
     FROM mes_material_issue
-    WHERE issue_no IS NULL OR status IS NULL OR status NOT IN ('DRAFT','CONFIRMED','VOIDED')
-       OR source_mode IS NULL OR source_mode <> 'LOCAL_ONLY';
+    WHERE issue_no IS NULL OR status IS NULL
+       OR status NOT IN ('DRAFT','SUBMITTING','REJECTED','UNKNOWN','CONFIRMED','VOIDED');
     IF bad_rows <> 0 THEN
         SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='Material issue status/source is not safely convertible';
     END IF;
@@ -218,10 +224,11 @@ BEGIN
     FROM mes_material_issue_item x
     JOIN mes_material_issue i ON i.id=x.issue_id
     LEFT JOIN mes_material_issue_input f ON f.issue_id=x.issue_id
-    WHERE x.unit_id IS NULL OR (f.id IS NULL AND i.status<>'DRAFT')
-       OR (f.id IS NOT NULL AND i.status='DRAFT')
+    WHERE x.unit_id IS NULL
+       OR (f.id IS NOT NULL AND i.status IN ('DRAFT','SUBMITTING','REJECTED','UNKNOWN')
+           AND (f.confirmed_at IS NOT NULL OR NOT (f.stock_applied <=> 0)))
        OR (f.id IS NOT NULL AND i.status='CONFIRMED' AND (NOT (f.stock_applied <=> 1)
-            OR f.confirmed_at IS NULL OR i.void_result_status IN ('SUBMITTING','UNKNOWN','SUCCEEDED')))
+            OR f.confirmed_at IS NULL OR i.void_result_status='SUCCEEDED'))
        OR (f.id IS NOT NULL AND i.status='VOIDED' AND (NOT (f.stock_applied <=> 0) OR f.confirmed_at IS NULL
             OR i.void_operation_id IS NULL OR NOT (i.void_result_status <=> 'SUCCEEDED')));
     IF bad_rows <> 0 THEN
@@ -236,10 +243,7 @@ BEGIN
     WHERE (f.id IS NOT NULL AND (NOT (i.execution_id <=> f.execution_id)
         OR NOT (i.source_mode <=> f.source_mode)
         OR s.id IS NULL OR NOT (i.submission_id <=> s.id)
-        OR s.status<>'SUCCEEDED'))
-       OR (f.id IS NULL AND (i.submission_id IS NOT NULL OR i.void_operation_id IS NOT NULL
-        OR i.void_from_status IS NOT NULL OR i.void_requested_at IS NOT NULL
-        OR i.void_finished_at IS NOT NULL OR i.void_result_status IS NOT NULL));
+        OR (f.confirmed_at IS NOT NULL AND s.status<>'SUCCEEDED')));
     IF bad_rows <> 0 THEN
         SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='A production input, submission, or reversal identity is inconsistent';
     END IF;
@@ -247,16 +251,17 @@ BEGIN
     SELECT COUNT(*) INTO bad_rows
     FROM mes_material_issue i
     LEFT JOIN mes_material_issue_input f ON f.issue_id=i.id
-    WHERE i.flow_card_no IS NOT NULL OR (f.id IS NULL AND i.issue_time IS NOT NULL);
+    WHERE i.flow_card_no IS NOT NULL;
     IF bad_rows <> 0 THEN
-        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='A historical flow-card or draft business time has no lossless production-fact destination';
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='A historical flow-card has no lossless production-fact destination';
     END IF;
 
     SELECT COUNT(*) INTO bad_rows
     FROM mes_material_issue i
     JOIN mes_material_issue_input f ON f.issue_id=i.id
-    JOIN mes_production_execution e ON e.id=f.execution_id
+    LEFT JOIN mes_production_execution e ON e.id=f.execution_id
     WHERE NOT JSON_VALID(f.calculation_json)
+       OR e.id IS NULL
        OR NOT (i.workorder_id <=> e.workorder_id)
        OR NOT (i.workorder_code <=> JSON_UNQUOTE(JSON_EXTRACT(f.calculation_json,'$.order.workorderCode')))
        OR NOT (i.product_id <=> CAST(JSON_UNQUOTE(JSON_EXTRACT(f.calculation_json,'$.order.productId')) AS UNSIGNED))
@@ -264,6 +269,17 @@ BEGIN
        OR NOT (i.routing_id <=> e.routing_id);
     IF bad_rows <> 0 THEN
         SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='A legacy production snapshot differs from its retained input calculation or Execution identity';
+    END IF;
+
+    SELECT COUNT(*) INTO bad_rows
+    FROM mes_material_issue_item x
+    JOIN mes_material_issue i ON i.id=x.issue_id
+    WHERE NOT (x.create_by <=> i.create_by)
+       OR NOT (x.create_time <=> i.create_time)
+       OR NOT (x.update_by <=> i.update_by)
+       OR NOT (x.update_time <=> i.update_time);
+    IF bad_rows <> 0 THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='A material-issue line has distinct audit identity or time that has no lossless destination';
     END IF;
 
     SELECT COUNT(*) INTO bad_rows
@@ -288,7 +304,7 @@ BEGIN
           LEFT JOIN mes_material_issue_input f ON f.issue_id=i.id
           LEFT JOIN mes_material_issue_submission s ON s.issue_id=i.id
           GROUP BY i.id
-          HAVING (COUNT(DISTINCT f.id)=0 AND COUNT(DISTINCT s.id)<>0)
+          HAVING COUNT(DISTINCT s.id)>1
               OR (COUNT(DISTINCT f.id)=1 AND COUNT(DISTINCT s.id)<>1)) orphan_submission_facts;
     IF bad_rows <> 0 THEN
         SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='A production issue has orphaned or duplicate submission facts';
@@ -322,9 +338,9 @@ BEGIN
     FROM mes_material_issue i
     JOIN mes_material_issue_input f ON f.issue_id=i.id
     LEFT JOIN mes_material_issue_submission s ON s.issue_id=i.id AND s.id=i.submission_id
-    WHERE f.source_mode <> 'LOCAL_ONLY' OR s.id IS NULL OR s.status <> 'SUCCEEDED';
+    WHERE s.id IS NULL OR (f.confirmed_at IS NOT NULL AND s.status <> 'SUCCEEDED');
     IF bad_rows <> 0 THEN
-        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='A production-input request lacks a successful LOCAL submission fact';
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='A production-input request lacks its original confirmation command';
     END IF;
 
     SELECT COUNT(*) INTO bad_rows
@@ -332,10 +348,11 @@ BEGIN
     JOIN mes_material_issue_input f ON f.issue_id=x.issue_id
     LEFT JOIN wm_stock_action a ON a.source_type='MATERIAL_ISSUE'
         AND a.action_type='ISSUE' AND a.source_id=CAST(x.issue_id AS CHAR)
-    WHERE a.id IS NULL OR a.material_id<>x.material_id OR a.unit_id<>x.unit_id
+    WHERE (a.id IS NULL AND f.source_mode='LOCAL_ONLY' AND f.confirmed_at IS NOT NULL)
+       OR (a.id IS NOT NULL AND (a.material_id<>x.material_id OR a.unit_id<>x.unit_id
        OR a.quantity_delta<>-x.quantity OR NOT (a.warehouse_id <=> x.warehouse_id)
        OR NOT (a.batch_no <=> x.batch_no) OR NOT (a.stock_id <=> f.stock_id)
-       OR NOT (a.execution_id <=> f.execution_id);
+       OR NOT (a.execution_id <=> f.execution_id)));
     IF bad_rows <> 0 THEN
         SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='A prior inventory action does not match its material-issue fact';
     END IF;
@@ -357,12 +374,15 @@ BEGIN
     LEFT JOIN mes_material_issue_input f ON f.issue_id=i.id
     LEFT JOIN wm_stock_action a ON a.source_type='MATERIAL_ISSUE'
        AND a.action_type='ISSUE' AND a.source_id=CAST(i.id AS CHAR)
-    LEFT JOIN wm_stock_document_line l ON l.document_id=d.id AND l.stock_action_id=a.id
-    WHERE x.id IS NULL OR a.id IS NULL OR l.id IS NULL
+    LEFT JOIN wm_stock_document_line l ON l.document_id=d.id AND l.line_no=1
+    WHERE x.id IS NULL OR l.id IS NULL
+       OR (a.id IS NULL AND f.source_mode='LOCAL_ONLY' AND f.confirmed_at IS NOT NULL)
        OR l.material_id<>x.material_id OR l.unit_id<>x.unit_id OR l.quantity<>x.quantity
        OR NOT (l.warehouse_id <=> x.warehouse_id) OR NOT (l.batch_no <=> x.batch_no)
-       OR NOT (l.stock_id <=> f.stock_id) OR NOT (l.bin_code <=> a.bin_code)
-       OR (a.document_line_id IS NOT NULL AND a.document_line_id<>l.id);
+       OR NOT (l.stock_id <=> CASE WHEN f.id IS NOT NULL THEN f.stock_id ELSE a.stock_id END)
+       OR (a.id IS NOT NULL AND (NOT (l.bin_code <=> a.bin_code)
+           OR NOT (l.stock_action_id <=> a.id)
+           OR (a.document_line_id IS NOT NULL AND a.document_line_id<>l.id)));
     IF bad_rows <> 0 THEN
         SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='An already-linked document line or action does not match its source';
     END IF;
@@ -380,7 +400,7 @@ BEGIN
     SELECT COUNT(*) INTO bad_rows
     FROM mes_material_issue_submission s
     LEFT JOIN mes_material_issue i ON i.id=s.issue_id
-    WHERE i.id IS NULL;
+    WHERE i.id IS NULL OR NOT (i.submission_id <=> s.id);
     IF bad_rows <> 0 THEN
         SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='A submission fact has no legacy issue mapping';
     END IF;
@@ -417,7 +437,7 @@ BEGIN
     WHERE d.document_type='MATERIAL_ISSUE'
       AND (l.material_id<>x.material_id OR l.unit_id<>x.unit_id OR l.quantity<>x.quantity
         OR NOT (l.warehouse_id <=> x.warehouse_id) OR NOT (l.batch_no <=> x.batch_no)
-        OR NOT (l.stock_id <=> f.stock_id) OR NOT (l.bin_code <=> a.bin_code));
+        OR NOT (l.stock_id <=> CASE WHEN f.id IS NOT NULL THEN f.stock_id ELSE a.stock_id END) OR NOT (l.bin_code <=> a.bin_code));
     IF bad_rows <> 0 THEN
         SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='An existing document line differs from its legacy item';
     END IF;
@@ -446,7 +466,7 @@ BEGIN
     WHERE d.id IS NOT NULL
       AND (NOT (d.source_workorder_id <=> i.workorder_id)
         OR NOT (d.source_execution_id <=> i.execution_id)
-        OR d.status <> CASE WHEN i.status='DRAFT' THEN 'DRAFT' ELSE 'POSTED' END);
+        OR d.status <> CASE WHEN i.status IN ('CONFIRMED','VOIDED') THEN 'POSTED' ELSE 'DRAFT' END);
     IF bad_rows <> 0 THEN
         SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='Existing stock-document source differs from the legacy issue';
     END IF;
@@ -462,6 +482,32 @@ BEGIN
         SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='A differing historical issue number is not recoverable from its retained request identity';
     END IF;
 
+    SELECT COUNT(*) INTO bad_rows
+    FROM mes_material_issue_submission s
+    WHERE NOT JSON_VALID(s.command_json)
+       OR JSON_UNQUOTE(JSON_EXTRACT(s.command_json,'$.operationKey')) IS NULL
+       OR JSON_EXTRACT(s.command_json,'$.routingNodeIds') IS NULL
+       OR JSON_TYPE(JSON_EXTRACT(s.command_json,'$.routingNodeIds'))<>'ARRAY'
+       OR NOT (CAST(JSON_UNQUOTE(JSON_EXTRACT(s.command_json,'$.pathRevision')) AS SIGNED) <=> s.path_revision);
+    IF bad_rows<>0 THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='A confirmation command lacks a valid frozen operation, path nodes, or path revision';
+    END IF;
+
+    SELECT COUNT(*) INTO bad_rows
+    FROM wm_stock_action linked_action
+    JOIN wm_stock_action original_action ON original_action.id=linked_action.reference_action_id
+        AND original_action.source_type='MATERIAL_ISSUE' AND original_action.action_type='ISSUE'
+    JOIN mes_material_issue i ON original_action.source_id=CAST(i.id AS CHAR)
+    JOIN wm_stock_document d ON d.source_material_issue_id=i.id AND d.document_type='MATERIAL_ISSUE'
+    JOIN wm_stock_document_line l ON l.document_id=d.id AND l.line_no=1
+    WHERE linked_action.source_type='MATERIAL_ISSUE'
+      AND linked_action.action_type IN ('RETURN','REVERSAL')
+      AND linked_action.document_line_id IS NOT NULL
+      AND linked_action.document_line_id<>l.id;
+    IF bad_rows<>0 THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='A return or reversal already has a conflicting document-line association';
+    END IF;
+
     ALTER TABLE wm_stock_document
         MODIFY create_by VARCHAR(64) NULL,
         MODIFY create_time DATETIME(6) NULL,
@@ -472,11 +518,40 @@ BEGIN
         MODIFY warehouse_id BIGINT NULL,
         MODIFY stock_id BIGINT NULL;
 
+    ALTER TABLE wm_stock_document
+        ADD COLUMN production_request_id VARCHAR(36) CHARACTER SET ascii COLLATE ascii_bin NULL COMMENT '原生产领料请求UUID；与过账请求身份分离',
+        ADD COLUMN production_workorder_code VARCHAR(64) NULL COMMENT '原生产工单编号快照',
+        ADD COLUMN production_product_id BIGINT NULL COMMENT '原生产产出产品身份快照',
+        ADD COLUMN production_product_code VARCHAR(64) NULL COMMENT '原生产产出品号快照',
+        ADD COLUMN production_routing_id BIGINT NULL COMMENT '原生产工艺版本身份',
+        ADD COLUMN production_request_hash CHAR(64) CHARACTER SET ascii COLLATE ascii_bin NULL COMMENT '原生产领料请求指纹',
+        ADD COLUMN production_input_kind VARCHAR(24) NULL COMMENT 'PRODUCTION_INPUT或MATERIAL_SUPPLEMENT',
+        ADD COLUMN production_output_qty DECIMAL(20,6) NULL COMMENT '该单据唯一贡献的生产产出量',
+        ADD COLUMN production_source_mode VARCHAR(20) NULL COMMENT '由原可信事实迁移的生产业务来源',
+        ADD COLUMN production_calculation_json LONGTEXT NULL COMMENT '版本化ProductionSupply.Calculation冻结依据，仅供原请求恢复与核对',
+        ADD COLUMN production_request_created_at DATETIME(3) NULL COMMENT '生产领料请求建立时间，独立于单据创建时间',
+        ADD COLUMN production_confirmed_at DATETIME(3) NULL COMMENT '生产投入确认时间，独立于单据过账时间',
+        ADD COLUMN production_business_occurred_at DATETIME(3) NULL COMMENT '生产领料业务发生时间',
+        ADD COLUMN production_stock_applied BOOLEAN NULL COMMENT '原生产事实确认时记录的本地库存生效状态',
+        ADD COLUMN production_path_revision INT NULL COMMENT '确认时冻结的Execution路径版本',
+        ADD COLUMN production_confirmation_operation_id VARCHAR(64) NULL COMMENT '原确认操作键',
+        ADD COLUMN production_confirmation_command_json LONGTEXT NULL COMMENT '原确认冻结命令原文，恢复和审计专用，不参与数量计算',
+        ADD COLUMN production_confirmation_status VARCHAR(20) NULL COMMENT '原确认命令结果状态',
+        ADD COLUMN production_submission_created_at DATETIME(3) NULL COMMENT '原确认命令创建时间',
+        ADD COLUMN production_submission_finished_at DATETIME(3) NULL COMMENT '原确认命令完成时间',
+        ADD COLUMN production_confirmed_path_node_ids LONGTEXT NULL COMMENT '原确认命令冻结的Execution路径节点ID列表',
+        ADD COLUMN production_void_operation_id VARCHAR(64) NULL COMMENT '原撤销操作UUID',
+        ADD COLUMN production_void_from_status VARCHAR(20) NULL COMMENT '撤销前生产事实状态',
+        ADD COLUMN production_void_requested_at DATETIME(3) NULL COMMENT '生产事实撤销请求时间',
+        ADD COLUMN production_void_finished_at DATETIME(3) NULL COMMENT '生产事实撤销完成时间',
+        ADD COLUMN production_void_result_status VARCHAR(20) NULL COMMENT '生产事实撤销结果；UNKNOWN保持未知',
+        ADD UNIQUE KEY uk_stock_document_production_request (production_request_id);
+
     INSERT INTO wm_stock_document(document_no,document_type,status,reason,remark,source_workorder_id,
         create_by,create_time,update_by,update_time,posted_by,posted_at,revision,source_execution_id,
         source_material_issue_id,source_request_json)
     SELECT i.issue_no,'MATERIAL_ISSUE',
-        CASE WHEN i.status='DRAFT' THEN 'DRAFT' ELSE 'POSTED' END,
+        CASE WHEN i.status IN ('CONFIRMED','VOIDED') THEN 'POSTED' ELSE 'DRAFT' END,
         '生产领料历史单据迁移',i.remark,i.workorder_id,
         i.create_by,i.create_time,i.update_by,i.update_time,NULL,NULL,0,i.execution_id,i.id,NULL
     FROM mes_material_issue i
@@ -495,7 +570,8 @@ BEGIN
 
     INSERT INTO wm_stock_document_line(document_id,line_no,material_id,warehouse_id,stock_id,batch_no,bin_code,
         unit_id,quantity,remark,stock_action_id,revision)
-    SELECT d.id,1,x.material_id,x.warehouse_id,f.stock_id,x.batch_no,a.bin_code,
+    SELECT d.id,1,x.material_id,x.warehouse_id,
+        CASE WHEN f.id IS NOT NULL THEN f.stock_id ELSE a.stock_id END,x.batch_no,a.bin_code,
         x.unit_id,x.quantity,x.remark,a.id,0
     FROM mes_material_issue_item x
     JOIN wm_stock_document d ON d.source_material_issue_id=x.issue_id
@@ -516,6 +592,15 @@ BEGIN
     WHERE a.source_type='MATERIAL_ISSUE'
       AND a.action_type='ISSUE'
       AND a.document_line_id IS NULL;
+
+    UPDATE wm_stock_action linked_action
+    JOIN wm_stock_action original_action ON original_action.id=linked_action.reference_action_id
+        AND original_action.source_type='MATERIAL_ISSUE' AND original_action.action_type='ISSUE'
+    JOIN wm_stock_document_line l ON l.id=original_action.document_line_id
+    SET linked_action.document_line_id=l.id
+    WHERE linked_action.source_type='MATERIAL_ISSUE'
+      AND linked_action.action_type IN ('RETURN','REVERSAL')
+      AND linked_action.document_line_id IS NULL;
 
     SELECT COUNT(*) INTO bad_rows
     FROM mes_material_issue i
@@ -550,68 +635,102 @@ BEGIN
     JOIN wm_stock_document d ON d.source_material_issue_id=i.id
        AND d.document_type='MATERIAL_ISSUE'
     JOIN mes_material_issue_submission s ON s.id=i.submission_id AND s.issue_id=i.id
-    WHERE i.execution_id<>f.execution_id OR s.status<>'SUCCEEDED'
+    WHERE i.execution_id<>f.execution_id OR (f.confirmed_at IS NOT NULL AND s.status<>'SUCCEEDED')
        OR s.id<>i.submission_id;
     IF bad_rows<>0 THEN
         SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='Production input conversion preconditions changed during document creation';
     END IF;
 
-    ALTER TABLE mes_material_issue_input
-        ADD COLUMN document_id BIGINT NULL COMMENT 'Unified stock-document identity',
-        ADD COLUMN submission_id BIGINT NULL COMMENT 'Original production-input submission fact',
-        ADD COLUMN path_revision INT NULL COMMENT 'Frozen execution-path revision',
-        ADD COLUMN business_occurred_at DATETIME(3) NULL COMMENT 'Original production-issue business time; distinct from posting and reversal audit time',
-        ADD COLUMN void_operation_id VARCHAR(64) NULL COMMENT 'Original LOCAL reversal operation identity',
-        ADD COLUMN void_from_status VARCHAR(20) NULL COMMENT 'Original production lifecycle state before reversal',
-        ADD COLUMN void_requested_at DATETIME NULL,
-        ADD COLUMN void_finished_at DATETIME NULL,
-        ADD COLUMN void_result_status VARCHAR(20) NULL COMMENT 'LOCAL reversal result only';
+    UPDATE wm_stock_document d
+    JOIN mes_material_issue i ON i.id=d.source_material_issue_id
+        AND d.document_type='MATERIAL_ISSUE'
+    LEFT JOIN mes_material_issue_input f ON f.issue_id=i.id
+    LEFT JOIN mes_material_issue_submission s ON s.id=i.submission_id AND s.issue_id=i.id
+    SET d.production_request_id=f.id,
+        d.production_workorder_code=i.workorder_code,
+        d.production_product_id=i.product_id,
+        d.production_product_code=i.product_code,
+        d.production_routing_id=i.routing_id,
+        d.production_request_hash=f.request_hash,
+        d.production_input_kind=f.input_kind,
+        d.production_output_qty=f.output_qty,
+        d.production_source_mode=CASE WHEN f.id IS NULL THEN i.source_mode ELSE f.source_mode END,
+        d.production_calculation_json=f.calculation_json,
+        d.production_request_created_at=f.created_at,
+        d.production_confirmed_at=f.confirmed_at,
+        d.production_business_occurred_at=i.issue_time,
+        d.production_stock_applied=f.stock_applied,
+        d.production_path_revision=s.path_revision,
+        d.production_confirmation_operation_id=JSON_UNQUOTE(JSON_EXTRACT(s.command_json,'$.operationKey')),
+        d.production_confirmation_command_json=s.command_json,
+        d.production_confirmation_status=CASE WHEN s.id IS NOT NULL THEN s.status
+            WHEN i.status IN ('SUBMITTING','REJECTED','UNKNOWN') THEN i.status ELSE NULL END,
+        d.production_submission_created_at=s.created_at,
+        d.production_submission_finished_at=s.finished_at,
+        d.production_confirmed_path_node_ids=JSON_EXTRACT(s.command_json,'$.routingNodeIds'),
+        d.production_void_operation_id=i.void_operation_id,
+        d.production_void_from_status=i.void_from_status,
+        d.production_void_requested_at=i.void_requested_at,
+        d.production_void_finished_at=i.void_finished_at,
+        d.production_void_result_status=i.void_result_status;
 
-    ALTER TABLE mes_material_issue_submission
-        ADD COLUMN document_id BIGINT NULL COMMENT 'Unified stock-document identity';
-
-    UPDATE mes_material_issue_input f
-    JOIN mes_material_issue i ON i.id=f.issue_id
+    SELECT COUNT(*) INTO bad_rows
+    FROM mes_material_issue i
     JOIN wm_stock_document d ON d.source_material_issue_id=i.id
         AND d.document_type='MATERIAL_ISSUE'
-    JOIN mes_material_issue_submission s ON s.id=i.submission_id AND s.issue_id=i.id
-    SET f.document_id=d.id,f.submission_id=s.id,f.path_revision=s.path_revision,
-        f.business_occurred_at=i.issue_time,
-        f.void_operation_id=i.void_operation_id,f.void_from_status=i.void_from_status,
-        f.void_requested_at=i.void_requested_at,f.void_finished_at=i.void_finished_at,
-        f.void_result_status=i.void_result_status;
-
-    UPDATE mes_material_issue_submission s
-    JOIN wm_stock_document d ON d.source_material_issue_id=s.issue_id
-        AND d.document_type='MATERIAL_ISSUE'
-    SET s.document_id=d.id;
-
-    SELECT COUNT(*) INTO bad_rows FROM mes_material_issue_input WHERE document_id IS NULL;
+    JOIN mes_material_issue_input f ON f.issue_id=i.id
+    WHERE d.production_request_id IS NULL OR d.production_request_hash IS NULL
+       OR d.production_input_kind IS NULL
+       OR NOT (d.production_source_mode <=> f.source_mode)
+       OR d.production_calculation_json IS NULL OR d.production_request_created_at IS NULL
+       OR NOT (d.production_output_qty <=> f.output_qty)
+       OR NOT (d.production_confirmed_at <=> f.confirmed_at)
+       OR NOT (d.production_stock_applied <=> f.stock_applied)
+       OR BINARY d.production_request_id<>BINARY f.id
+       OR BINARY d.production_request_hash<>BINARY f.request_hash
+       OR BINARY d.production_input_kind<>BINARY f.input_kind
+       OR BINARY d.production_calculation_json<>BINARY f.calculation_json
+       OR NOT (d.production_request_created_at <=> f.created_at)
+       OR NOT (d.production_business_occurred_at <=> i.issue_time)
+       OR NOT (d.production_void_operation_id <=> i.void_operation_id)
+       OR NOT (d.production_void_from_status <=> i.void_from_status)
+       OR NOT (d.production_void_requested_at <=> i.void_requested_at)
+       OR NOT (d.production_void_finished_at <=> i.void_finished_at)
+       OR NOT (d.production_void_result_status <=> i.void_result_status)
+       OR NOT (d.production_workorder_code <=> i.workorder_code)
+       OR NOT (d.production_product_id <=> i.product_id)
+       OR NOT (d.production_product_code <=> i.product_code)
+       OR NOT (d.production_routing_id <=> i.routing_id);
     IF bad_rows <> 0 THEN
         SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='A production-input fact was not mapped to a stock document';
     END IF;
-    SELECT COUNT(*) INTO bad_rows FROM mes_material_issue_submission WHERE document_id IS NULL;
+    SELECT COUNT(*) INTO bad_rows
+    FROM mes_material_issue i
+    JOIN mes_material_issue_submission s ON s.issue_id=i.id
+    JOIN wm_stock_document d ON d.source_material_issue_id=i.id
+        AND d.document_type='MATERIAL_ISSUE'
+    WHERE NOT JSON_VALID(s.command_json)
+       OR JSON_UNQUOTE(JSON_EXTRACT(s.command_json,'$.operationKey')) IS NULL
+       OR JSON_EXTRACT(s.command_json,'$.routingNodeIds') IS NULL
+       OR d.production_confirmation_operation_id IS NULL
+       OR d.production_confirmation_status IS NULL
+       OR d.production_submission_created_at IS NULL
+       OR d.production_confirmed_path_node_ids IS NULL
+       OR BINARY d.production_confirmation_command_json<>BINARY s.command_json
+       OR NOT (d.production_confirmation_status <=> s.status)
+       OR NOT (d.production_path_revision <=> s.path_revision)
+       OR NOT (d.production_submission_created_at <=> s.created_at)
+       OR NOT (d.production_submission_finished_at <=> s.finished_at);
     IF bad_rows <> 0 THEN
-        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='A submission fact was not mapped to a stock document';
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='A production confirmation command lost its operation, path, status, or timestamps';
     END IF;
-    ALTER TABLE mes_material_issue_input
-        MODIFY document_id BIGINT NOT NULL,
-        DROP INDEX idx_input_execution,
-        DROP INDEX idx_input_issue,
-        DROP COLUMN issue_id,
-        ADD UNIQUE KEY uk_material_issue_input_document (document_id),
-        ADD KEY idx_input_execution (execution_id,document_id);
-
-    ALTER TABLE mes_material_issue_submission
-        MODIFY document_id BIGINT NOT NULL,
-        DROP INDEX idx_issue_submission,
-        DROP COLUMN issue_id,
-        ADD KEY idx_submission_document (document_id,id);
 
     ALTER TABLE wm_stock_document
         DROP INDEX idx_stock_document_material_issue,
         DROP COLUMN source_material_issue_id;
 
+    DROP TABLE mes_material_issue_input;
+    DROP TABLE mes_material_issue_submission;
     DROP TABLE mes_material_issue_item;
     DROP TABLE mes_material_issue;
 END$$

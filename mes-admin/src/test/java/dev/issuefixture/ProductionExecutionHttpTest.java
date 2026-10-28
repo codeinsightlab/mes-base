@@ -38,7 +38,7 @@ class ProductionExecutionHttpTest {
             m.perform(full(get("/api/production/identity/" + id))).andExpect(status().isOk())
                     .andExpect(jsonPath("qrCode").value("WO1:P1#L001")).andExpect(jsonPath("productCode").value("P1"));
             assertEquals(before, j.queryForList("SELECT * FROM mes_production_execution ORDER BY id"));
-            assertEquals(1, j.queryForObject("SELECT COUNT(*) FROM mes_material_issue_input WHERE confirmed_at IS NOT NULL", Integer.class));
+            assertEquals(1, j.queryForObject("SELECT COUNT(*) FROM wm_stock_document WHERE production_confirmed_at IS NOT NULL", Integer.class));
             m.perform(ProductionReportHttpTest.full(get(E + "/" + id), "B")).andExpect(status().isNotFound());
         }
     }

@@ -26,8 +26,6 @@ class ActivatedProductionHttpTest {
     private static void clearMaterialIssueFixtures(JdbcTemplate jdbc) {
         String documents = "SELECT id FROM wm_stock_document WHERE document_type='MATERIAL_ISSUE'";
         jdbc.update("DELETE FROM wm_stock_document_line WHERE document_id IN (" + documents + ")");
-        jdbc.update("DELETE FROM mes_material_issue_input WHERE document_id IN (" + documents + ")");
-        jdbc.update("DELETE FROM mes_material_issue_submission WHERE document_id IN (" + documents + ")");
         jdbc.update("DELETE FROM wm_stock_document WHERE document_type='MATERIAL_ISSUE'");
     }
 

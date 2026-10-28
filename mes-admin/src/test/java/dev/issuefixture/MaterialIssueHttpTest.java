@@ -14,8 +14,6 @@ import dev.mesbase.business.basic.dao.WorkstationMapper;
 import dev.mesbase.business.directory.domain.DirectoryLabel;
 import dev.mesbase.business.directory.service.BusinessDirectoryService;
 import dev.mesbase.business.integration.warehouse.WarehouseIntegration;
-import dev.mesbase.business.issue.dao.MesMaterialIssueInputMapper;
-import dev.mesbase.business.issue.dao.MesMaterialIssueSubmissionMapper;
 import dev.mesbase.business.issue.service.MaterialIssueInputFacts;
 import dev.mesbase.business.issue.service.MaterialIssueSubmissionService;
 import dev.mesbase.business.issue.service.MaterialIssueVoidService;
@@ -175,7 +173,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * TEST ONLY: real generated SQL, HTTP authorization and transactions; two separate H2 databases.
  */
 class MaterialIssueHttpTest {
-    static final Set<Class<?>> MAPPERS = Set.of(ProductionInputExtraMapper.class, MaterialBomMapper.class, MaterialBomItemMapper.class, ProductionDefectListExtraMapper.class, StockDocumentExtraMapper.class, OperationDefectTypeMapper.class, DefectStatisticsExtraMapper.class, WmStockDocumentMapper.class, WmStockDocumentLineMapper.class, MesWorkorderCancellationMapper.class, WmWarehouseErpExtraMapper.class, MesQualityReleaseMapper.class, MesWarehouseAcceptanceMapper.class, MesExecutionCompletionMapper.class, MesWorkorderMaterialMapper.class, WmStockActionMapper.class, MesExecutionAssignmentMapper.class, MesMaterialIssueInputMapper.class, MesProductionScanActivityMapper.class, WmInventoryMapper.class, MesProductionReceiptMapper.class, ProductionReceiptQueryMapper.class, MesProductionDefectMapper.class, MesQualityTreatmentMapper.class, WorkstationMapper.class, MesProductionReportMapper.class, ProductionQuantityMapper.class, MesExecutionPathMapper.class, MesExecutionPathNodeMapper.class, MesMaterialIssueSubmissionMapper.class, WorkorderErpExtraMapper.class, WorkOrderExtraMapper.class, RoutingNodeMapper.class, RoutingEdgeMapper.class, OperationMapper.class, MesProductionExecutionMapper.class, MaterialMapper.class, UnitMeasureMapper.class, WmWarehouseMapper.class, RoutingMapper.class, RoutingProductMapper.class, WorkorderMapper.class);
+    static final Set<Class<?>> MAPPERS = Set.of(ProductionInputExtraMapper.class, MaterialBomMapper.class, MaterialBomItemMapper.class, ProductionDefectListExtraMapper.class, StockDocumentExtraMapper.class, OperationDefectTypeMapper.class, DefectStatisticsExtraMapper.class, WmStockDocumentMapper.class, WmStockDocumentLineMapper.class, MesWorkorderCancellationMapper.class, WmWarehouseErpExtraMapper.class, MesQualityReleaseMapper.class, MesWarehouseAcceptanceMapper.class, MesExecutionCompletionMapper.class, MesWorkorderMaterialMapper.class, WmStockActionMapper.class, MesExecutionAssignmentMapper.class, MesProductionScanActivityMapper.class, WmInventoryMapper.class, MesProductionReceiptMapper.class, ProductionReceiptQueryMapper.class, MesProductionDefectMapper.class, MesQualityTreatmentMapper.class, WorkstationMapper.class, MesProductionReportMapper.class, ProductionQuantityMapper.class, MesExecutionPathMapper.class, MesExecutionPathNodeMapper.class, WorkorderErpExtraMapper.class, WorkOrderExtraMapper.class, RoutingNodeMapper.class, RoutingEdgeMapper.class, OperationMapper.class, MesProductionExecutionMapper.class, MaterialMapper.class, UnitMeasureMapper.class, WmWarehouseMapper.class, RoutingMapper.class, RoutingProductMapper.class, WorkorderMapper.class);
 
     static class Fixture implements AutoCloseable {
         final RuntimeRegistry registry = new RuntimeRegistry();
@@ -247,12 +245,35 @@ class MaterialIssueHttpTest {
                 // Final internal schema: only unified document identities remain.
                 jdbc.execute("DROP TABLE mes_material_issue_item");
                 jdbc.execute("DROP TABLE mes_material_issue");
-                jdbc.execute("ALTER TABLE mes_material_issue_input RENAME COLUMN issue_id TO document_id");
-                jdbc.execute("ALTER TABLE mes_material_issue_submission RENAME COLUMN issue_id TO document_id");
-                for (String column : List.of("submission_id BIGINT", "path_revision INT", "business_occurred_at TIMESTAMP",
-                        "void_operation_id VARCHAR(64)",
-                        "void_from_status VARCHAR(24)", "void_requested_at TIMESTAMP", "void_finished_at TIMESTAMP", "void_result_status VARCHAR(24)"))
-                    jdbc.execute("ALTER TABLE mes_material_issue_input ADD " + column);
+                jdbc.execute("DROP TABLE mes_material_issue_input");
+                jdbc.execute("DROP TABLE mes_material_issue_submission");
+                for (String column : List.of("production_request_id VARCHAR(64)",
+                        "production_workorder_code VARCHAR(64)",
+                        "production_product_id BIGINT",
+                        "production_product_code VARCHAR(64)",
+                        "production_routing_id BIGINT",
+                        "production_request_hash CHAR(64)",
+                        "production_input_kind VARCHAR(32)",
+                        "production_output_qty DECIMAL(20,6)",
+                        "production_source_mode VARCHAR(20)",
+                        "production_calculation_json CLOB",
+                        "production_request_created_at TIMESTAMP",
+                        "production_confirmed_at TIMESTAMP",
+                        "production_business_occurred_at TIMESTAMP",
+                        "production_stock_applied BOOLEAN",
+                        "production_path_revision INT",
+                        "production_confirmation_operation_id VARCHAR(128)",
+                        "production_confirmation_status VARCHAR(24)",
+                        "production_submission_created_at TIMESTAMP",
+                        "production_submission_finished_at TIMESTAMP",
+                        "production_confirmed_path_node_ids CLOB",
+                        "production_confirmation_command_json CLOB",
+                        "production_void_operation_id VARCHAR(64)",
+                        "production_void_from_status VARCHAR(24)",
+                        "production_void_requested_at TIMESTAMP",
+                        "production_void_finished_at TIMESTAMP",
+                        "production_void_result_status VARCHAR(24)"))
+                    jdbc.execute("ALTER TABLE wm_stock_document ADD " + column);
                 jdbc.execute("DROP TABLE mes_material_issue_erp_extra");
                 try (var connection = source.getConnection()) {
                     ScriptUtils.executeSqlScript(connection, new FileSystemResource("mes-admin/src/main/resources/db/business/V48__warehouse_type.sql"));
@@ -421,10 +442,6 @@ class MaterialIssueHttpTest {
             return new SqlSessionTemplate(f).getMapper(MesExecutionPathNodeMapper.class);
         }
 
-        @Bean
-        MesMaterialIssueInputMapper inputMapper(SqlSessionFactory f) {
-            return new SqlSessionTemplate(f).getMapper(MesMaterialIssueInputMapper.class);
-        }
 
         @Bean
         MesProductionScanActivityMapper scanMapper(SqlSessionFactory f) {
@@ -529,10 +546,6 @@ class MaterialIssueHttpTest {
             return new SqlSessionTemplate(f).getMapper(WmInventoryMapper.class);
         }
 
-        @Bean
-        MesMaterialIssueSubmissionMapper submissionMapper(SqlSessionFactory f) {
-            return new SqlSessionTemplate(f).getMapper(MesMaterialIssueSubmissionMapper.class);
-        }
 
         @Bean
         WorkorderErpExtraMapper workorderErpMapper(SqlSessionFactory f) {

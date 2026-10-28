@@ -7,27 +7,29 @@ import java.util.Map;
  * Business purpose is distinct from the receipt/issue direction.
  */
 public enum StockDocumentType {
-    PURCHASE_RECEIPT("PURCHASE_RECEIPT", "采购入库", "供应商交货", "采购订单、收货单", false),
-    PRODUCTION_RECEIPT("PRODUCTION_RECEIPT", "生产完工入库", "工单生产完成", "工单、Execution、有效报工及质量数量依据", true),
-    OUTSOURCE_RECEIPT("OUTSOURCE_RECEIPT", "委外加工入库", "外协厂加工完成", "委外单、委外发料记录", false),
-    MATERIAL_RETURN_RECEIPT("MATERIAL_RETURN_RECEIPT", "退料入库", "生产领料后退回", "原领料单、工单", false),
-    REWORK_RECEIPT("REWORK_RECEIPT", "返工入库", "返工完成并检验合格", "原不良记录、返工任务及检验依据", false),
-    SALES_RETURN_RECEIPT("SALES_RETURN_RECEIPT", "销售退货入库", "客户退回产品", "销售出库单、退货单", false),
-    DEFECT_RECEIPT("DEFECT_RECEIPT", "不良品入库", "不良品转入不良品仓", "原不良记录、处置流水", true),
-    SCRAP_RECEIPT("SCRAP_RECEIPT", "报废品入库", "不良品转入报废品仓", "原不良记录、处置流水", true),
-    OTHER_RECEIPT("OTHER_RECEIPT", "其他入库", "盘盈、期初等特殊业务", "原因及实物、审批或调整依据", true),
-    MATERIAL_ISSUE("MATERIAL_ISSUE", "生产领料出库", "工单生产投入", "已发布BOM、生产领料意图、实际路径", true),
-    OTHER_ISSUE("OTHER_ISSUE", "其他出库", "其他库存发出", "原因及实物、审批或调整依据", true);
+    PURCHASE_RECEIPT("PURCHASE_RECEIPT", StockDocumentDirection.IN, "采购入库", "供应商交货", "采购订单、收货单", false),
+    PRODUCTION_RECEIPT("PRODUCTION_RECEIPT", StockDocumentDirection.IN, "生产完工入库", "工单生产完成", "工单、Execution、有效报工及质量数量依据", true),
+    OUTSOURCE_RECEIPT("OUTSOURCE_RECEIPT", StockDocumentDirection.IN, "委外加工入库", "外协厂加工完成", "委外单、委外发料记录", false),
+    MATERIAL_RETURN_RECEIPT("MATERIAL_RETURN_RECEIPT", StockDocumentDirection.IN, "退料入库", "生产领料后退回", "原领料单、工单", false),
+    REWORK_RECEIPT("REWORK_RECEIPT", StockDocumentDirection.IN, "返工入库", "返工完成并检验合格", "原不良记录、返工任务及检验依据", false),
+    SALES_RETURN_RECEIPT("SALES_RETURN_RECEIPT", StockDocumentDirection.IN, "销售退货入库", "客户退回产品", "销售出库单、退货单", false),
+    DEFECT_RECEIPT("DEFECT_RECEIPT", StockDocumentDirection.IN, "不良品入库", "不良品转入不良品仓", "原不良记录、处置流水", true),
+    SCRAP_RECEIPT("SCRAP_RECEIPT", StockDocumentDirection.IN, "报废品入库", "不良品转入报废品仓", "原不良记录、处置流水", true),
+    OTHER_RECEIPT("OTHER_RECEIPT", StockDocumentDirection.IN, "其他入库", "盘盈、期初等特殊业务", "原因及实物、审批或调整依据", true),
+    MATERIAL_ISSUE("MATERIAL_ISSUE", StockDocumentDirection.OUT, "生产领料出库", "工单生产投入", "已发布BOM、生产领料意图、实际路径", true),
+    OTHER_ISSUE("OTHER_ISSUE", StockDocumentDirection.OUT, "其他出库", "其他库存发出", "原因及实物、审批或调整依据", true);
 
     private final String value;
+    private final StockDocumentDirection direction;
     private final String description;
     private final String origin;
     private final String requiredDocuments;
     private final boolean approvalAvailable;
 
-    StockDocumentType(String value, String description, String origin, String requiredDocuments,
+    StockDocumentType(String value, StockDocumentDirection direction, String description, String origin, String requiredDocuments,
                       boolean approvalAvailable) {
         this.value = value;
+        this.direction = direction;
         this.description = description;
         this.origin = origin;
         this.requiredDocuments = requiredDocuments;
@@ -40,6 +42,10 @@ public enum StockDocumentType {
 
     public String getValue() {
         return value;
+    }
+
+    public StockDocumentDirection getDirection() {
+        return direction;
     }
 
     public String getOrigin() {
@@ -55,7 +61,7 @@ public enum StockDocumentType {
     }
 
     public boolean isReceipt() {
-        return this != OTHER_ISSUE && this != MATERIAL_ISSUE;
+        return direction == StockDocumentDirection.IN;
     }
 
     public boolean isQualityReceipt() {

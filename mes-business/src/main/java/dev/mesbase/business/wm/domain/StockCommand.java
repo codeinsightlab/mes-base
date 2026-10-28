@@ -13,9 +13,9 @@ public record StockCommand(@NotBlank String requestId, @NotNull Long stockId,
                            @NotNull @Digits(integer = 14, fraction = 6) BigDecimal quantity,
                            @NotNull @Digits(integer = 14, fraction = 6) BigDecimal expectedQuantity,
                            @NotNull @Digits(integer = 14, fraction = 6) BigDecimal expectedAvailable,
-                           @NotBlank @Size(max = 500) String reason, Long issueId, Long documentId) {
+                           @NotBlank @Size(max = 500) String reason, Long documentId) {
     public StockCommand(String requestId, Long stockId, BigDecimal quantity, BigDecimal expectedQuantity,
-                        BigDecimal expectedAvailable, String reason, Long issueId) {
-        this(requestId, stockId, quantity, expectedQuantity, expectedAvailable, reason, issueId, null);
+                        BigDecimal expectedAvailable, String reason) {
+        this(requestId, stockId, quantity, expectedQuantity, expectedAvailable, reason, null);
     }
 }

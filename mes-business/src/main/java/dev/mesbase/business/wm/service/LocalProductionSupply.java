@@ -13,6 +13,7 @@ import dev.mesbase.business.integration.production.ProductionSupply.Basis;
 import dev.mesbase.business.production.dao.WorkorderMapper;
 import dev.mesbase.business.production.domain.MesWorkorderMaterialEntity;
 import dev.mesbase.business.production.domain.ProductionScanCode;
+import dev.mesbase.business.production.domain.ProductionCodeRules;
 import dev.mesbase.business.production.domain.WorkOrderStatus;
 import dev.mesbase.business.production.domain.WorkorderEntity;
 import dev.mesbase.business.shared.enums.BusinessSource;
@@ -75,6 +76,21 @@ public class LocalProductionSupply {
         if (order == null || warehouse == null || !BusinessSource.LOCAL.getValue().equals(order.getSource())
                 || !BusinessSource.LOCAL.getValue().equals(warehouse.getSource()))
             throw new FoundationException(ErrorCode.BUSINESS_SOURCE_CONFLICT);
+    }
+
+    public String productionCode(Long orderId, String reference) {
+        Long stockId;
+        try {
+            stockId = Long.valueOf(reference);
+        } catch (NumberFormatException failure) {
+            throw new FoundationException(ErrorCode.BAD_REQUEST, failure);
+        }
+        var order = orders.selectByPrimaryKey(orderId);
+        var stock = inventory.selectByPrimaryKey(stockId);
+        var material = stock == null ? null : materials.selectByPrimaryKey(stock.getMaterialId());
+        if (order == null || stock == null || material == null)
+            throw new FoundationException(ErrorCode.BAD_REQUEST);
+        return ProductionCodeRules.format(new ProductionScanCode(order.getCode(), material.getCode(), stock.getBatchNo()));
     }
 
     public Context query(ProductionScanCode identity, WorkorderEntity order, FactoryScope scope,

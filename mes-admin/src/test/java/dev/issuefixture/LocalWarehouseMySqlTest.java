@@ -158,7 +158,7 @@ class LocalWarehouseMySqlTest {
 
     static StockCommand command(long stock, String quantity, String before, Long document) {
         return new StockCommand(UUID.randomUUID()
-                .toString(), stock, new BigDecimal(quantity), new BigDecimal(before), new BigDecimal(before), "TEST ONLY local warehouse closure", null, document);
+                .toString(), stock, new BigDecimal(quantity), new BigDecimal(before), new BigDecimal(before), "TEST ONLY local warehouse closure", document);
     }
 
     static void balance(JdbcTemplate j, long id, String expected) {

@@ -17,19 +17,29 @@ public final class StockDocumentModels {
     private StockDocumentModels() {
     }
 
-    public record Create(@NotBlank String documentType, @NotBlank @Size(max = 500) String reason,
+    public record Create(@NotBlank String direction, @NotBlank String documentType, @NotBlank @Size(max = 500) String reason,
                          @Size(max = 500) String remark, Long sourceWorkorderId, Long sourceExecutionId,
                          @Size(max = 64) String ruleCode) {
+        public Create(String documentType, String reason, String remark, Long sourceWorkorderId,
+                      Long sourceExecutionId, String ruleCode) {
+            this(StockDocumentType.from(documentType) == null ? null : StockDocumentType.from(documentType).getDirection().getValue(),
+                    documentType, reason, remark, sourceWorkorderId, sourceExecutionId, ruleCode);
+        }
         public Create(String documentType, String reason, String remark, Long sourceWorkorderId,
                       Long sourceExecutionId) {
             this(documentType, reason, remark, sourceWorkorderId, sourceExecutionId, null);
         }
     }
 
-    public record AggregateHeader(@NotBlank String documentType, @NotBlank @Size(max = 500) String reason,
+    public record AggregateHeader(@NotBlank String direction, @NotBlank String documentType, @NotBlank @Size(max = 500) String reason,
                                   @Size(max = 500) String remark, Long sourceWorkorderId,
                                   Long sourceExecutionId, @Size(max = 64) String ruleCode,
                                   Long expectedRevision) {
+        public AggregateHeader(String documentType, String reason, String remark, Long sourceWorkorderId,
+                               Long sourceExecutionId, String ruleCode, Long expectedRevision) {
+            this(StockDocumentType.from(documentType) == null ? null : StockDocumentType.from(documentType).getDirection().getValue(),
+                    documentType, reason, remark, sourceWorkorderId, sourceExecutionId, ruleCode, expectedRevision);
+        }
     }
 
     public record AggregateLine(Long id, @NotNull Long stockId, @NotNull Long materialId,
@@ -39,8 +49,20 @@ public final class StockDocumentModels {
                                 @Size(max = 500) String remark) {
     }
 
+    public record ProductionIssueIntent(@NotBlank @Size(max = 36) String requestId,
+                                        @NotNull @Positive @Digits(integer = 14, fraction = 6) BigDecimal outputQty,
+                                        @NotNull Long routingId,
+                                        @NotNull @Size(min = 1, max = 100) List<@NotNull Long> routingNodeIds,
+                                        @NotBlank @Size(max = 24) String inputKind,
+                                        @NotBlank @Size(max = 64) String calculationKey) {
+    }
+
     public record AggregateSave(@NotNull AggregateHeader header,
-                                @NotNull @Size(min = 1, max = 100) List<@NotNull @Valid AggregateLine> items) {
+                                @NotNull @Size(min = 1, max = 100) List<@NotNull @Valid AggregateLine> items,
+                                @Valid ProductionIssueIntent productionIssue) {
+        public AggregateSave(AggregateHeader header, List<AggregateLine> items) {
+            this(header, items, null);
+        }
     }
 
     public record Edit(@NotNull Long expectedRevision, @NotBlank @Size(max = 500) String reason,
@@ -60,7 +82,10 @@ public final class StockDocumentModels {
     public record Post(@NotBlank String requestId, @NotNull Long expectedRevision) {
     }
 
-    public record Query(String documentType, String status, String documentNo, Integer offset, Integer limit) {
+    public record Query(String direction, String documentType, String status, String documentNo, Integer offset, Integer limit) {
+        public Query(String documentType, String status, String documentNo, Integer offset, Integer limit) {
+            this(null, documentType, status, documentNo, offset, limit);
+        }
     }
 
     public record Page(List<WmStockDocumentEntity> items, long total, int offset,

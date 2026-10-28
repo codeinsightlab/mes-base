@@ -91,7 +91,7 @@ class WorkOrderCancellationHttpTest {
             var j = ProductionWarehouseFixture.db(c);
             String receipt = ProductionWarehouseFixture.legacy(m, j);
             String acceptance = ProductionWarehouseFixture.legacyAccepted(j, receipt, "60");
-            var tables = List.of("mes_production_execution", "wm_stock_document", "mes_material_issue_input", "mes_production_report", "mes_production_defect", "mes_quality_treatment", "mes_quality_release", "mes_production_receipt", "mes_warehouse_acceptance", "wm_inventory", "wm_stock_action");
+            var tables = List.of("mes_production_execution", "wm_stock_document", "mes_production_report", "mes_production_defect", "mes_quality_treatment", "mes_quality_release", "mes_production_receipt", "mes_warehouse_acceptance", "wm_inventory", "wm_stock_action");
             var baseline = tables.stream().map(t -> j.queryForList("SELECT * FROM " + t + " ORDER BY id")).toList();
             cancel(m);
             assertEquals(baseline, tables.stream().map(t -> j.queryForList("SELECT * FROM " + t + " ORDER BY id"))
@@ -126,7 +126,7 @@ class WorkOrderCancellationHttpTest {
             var body = ProductionInputHttpTest.command(m, UUID.randomUUID().toString(), "L001", "100");
             m.perform(ProductionCoreV1HttpTest.full(post(ProductionInputHttpTest.ROOT)).content(body))
                     .andExpect(status().is5xxServerError());
-            assertEquals(0, j.queryForObject("SELECT COUNT(*) FROM mes_material_issue_input", Integer.class));
+            assertEquals(0, j.queryForObject("SELECT COUNT(*) FROM wm_stock_document WHERE production_confirmation_status IS NOT NULL", Integer.class));
             cancel(m);
             m.perform(ProductionCoreV1HttpTest.full(post(ProductionInputHttpTest.ROOT)).content(body))
                     .andExpect(status().isConflict());

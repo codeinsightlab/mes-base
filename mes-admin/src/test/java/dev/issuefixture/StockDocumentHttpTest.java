@@ -264,13 +264,13 @@ class StockDocumentHttpTest {
                 else assertTrue(List.of("PRODUCTION_INPUT_STALE", "RESOURCE_CONFLICT").contains(error), error);
                 assertEquals(0, new BigDecimal("20").compareTo(j.queryForObject(
                         "SELECT quantity FROM wm_inventory WHERE id=1", BigDecimal.class)));
-                assertEquals(0, j.queryForObject("SELECT COUNT(*) FROM mes_material_issue_input WHERE confirmed_at IS NOT NULL", Integer.class));
+                assertEquals(0, j.queryForObject("SELECT COUNT(*) FROM wm_stock_document WHERE production_confirmed_at IS NOT NULL", Integer.class));
             } else {
                 assertEquals(409, documentStatus);
                 assertEquals(200, inputStatus);
                 assertEquals(0, new BigDecimal("30").compareTo(j.queryForObject(
                         "SELECT quantity FROM wm_inventory WHERE id=1", BigDecimal.class)));
-                assertEquals(1, j.queryForObject("SELECT COUNT(*) FROM mes_material_issue_input WHERE confirmed_at IS NOT NULL", Integer.class));
+                assertEquals(1, j.queryForObject("SELECT COUNT(*) FROM wm_stock_document WHERE production_confirmed_at IS NOT NULL", Integer.class));
             }
             assertEquals(1, j.queryForObject("SELECT COUNT(*) FROM wm_stock_action", Integer.class));
         }

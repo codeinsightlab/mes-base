@@ -239,6 +239,11 @@ public class WmStockDocumentExample {
             return (Criteria) this;
         }
 
+        public Criteria andDirectionEqualTo(String value) {
+            addCriterion("direction =", value, "direction");
+            return (Criteria) this;
+        }
+
         public Criteria andDocumentTypeNotEqualTo(String value) {
             addCriterion("document_type <>", value, "documentType");
             return (Criteria) this;
@@ -1269,6 +1274,11 @@ public class WmStockDocumentExample {
             return (Criteria) this;
         }
 
+        public Criteria andProductionRequestIdEqualTo(String value) {
+            addCriterion("production_request_id =", value, "productionRequestId");
+            return (Criteria) this;
+        }
+
         public Criteria andSourceExecutionIdIsNotNull() {
             addCriterion("source_execution_id is not null");
             return (Criteria) this;
@@ -1324,65 +1334,6 @@ public class WmStockDocumentExample {
             return (Criteria) this;
         }
 
-        public Criteria andSourceMaterialIssueIdIsNull() {
-            addCriterion("source_material_issue_id is null");
-            return (Criteria) this;
-        }
-
-        public Criteria andSourceMaterialIssueIdIsNotNull() {
-            addCriterion("source_material_issue_id is not null");
-            return (Criteria) this;
-        }
-
-        public Criteria andSourceMaterialIssueIdEqualTo(Long value) {
-            addCriterion("source_material_issue_id =", value, "sourceMaterialIssueId");
-            return (Criteria) this;
-        }
-
-        public Criteria andSourceMaterialIssueIdNotEqualTo(Long value) {
-            addCriterion("source_material_issue_id <>", value, "sourceMaterialIssueId");
-            return (Criteria) this;
-        }
-
-        public Criteria andSourceMaterialIssueIdGreaterThan(Long value) {
-            addCriterion("source_material_issue_id >", value, "sourceMaterialIssueId");
-            return (Criteria) this;
-        }
-
-        public Criteria andSourceMaterialIssueIdGreaterThanOrEqualTo(Long value) {
-            addCriterion("source_material_issue_id >=", value, "sourceMaterialIssueId");
-            return (Criteria) this;
-        }
-
-        public Criteria andSourceMaterialIssueIdLessThan(Long value) {
-            addCriterion("source_material_issue_id <", value, "sourceMaterialIssueId");
-            return (Criteria) this;
-        }
-
-        public Criteria andSourceMaterialIssueIdLessThanOrEqualTo(Long value) {
-            addCriterion("source_material_issue_id <=", value, "sourceMaterialIssueId");
-            return (Criteria) this;
-        }
-
-        public Criteria andSourceMaterialIssueIdIn(List<Long> values) {
-            addCriterion("source_material_issue_id in", values, "sourceMaterialIssueId");
-            return (Criteria) this;
-        }
-
-        public Criteria andSourceMaterialIssueIdNotIn(List<Long> values) {
-            addCriterion("source_material_issue_id not in", values, "sourceMaterialIssueId");
-            return (Criteria) this;
-        }
-
-        public Criteria andSourceMaterialIssueIdBetween(Long value1, Long value2) {
-            addCriterion("source_material_issue_id between", value1, value2, "sourceMaterialIssueId");
-            return (Criteria) this;
-        }
-
-        public Criteria andSourceMaterialIssueIdNotBetween(Long value1, Long value2) {
-            addCriterion("source_material_issue_id not between", value1, value2, "sourceMaterialIssueId");
-            return (Criteria) this;
-        }
     }
 
     public static class Criteria extends GeneratedCriteria {

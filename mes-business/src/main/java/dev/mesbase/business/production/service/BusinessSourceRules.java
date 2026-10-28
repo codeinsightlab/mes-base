@@ -19,10 +19,11 @@ import dev.mesbase.business.wm.dao.WmWarehouseMapper;
 import dev.mesbase.business.wm.dao.WmWarehouseErpExtraMapper;
 import dev.mesbase.business.wm.domain.WmWarehouseExample;
 import dev.mesbase.business.wm.domain.WmWarehouseErpExtraExample;
-import dev.mesbase.business.issue.dao.MesMaterialIssueMapper;
-import dev.mesbase.business.issue.dao.MesMaterialIssueItemMapper;
-import dev.mesbase.business.issue.domain.MesMaterialIssueExample;
-import dev.mesbase.business.issue.domain.MesMaterialIssueItemExample;
+import dev.mesbase.business.wm.dao.WmStockDocumentMapper;
+import dev.mesbase.business.wm.dao.WmStockDocumentLineMapper;
+import dev.mesbase.business.wm.domain.WmStockDocumentExample;
+import dev.mesbase.business.wm.domain.StockDocumentType;
+import dev.mesbase.business.wm.domain.WmStockDocumentLineExample;
 import dev.mesbase.core.error.ErrorCode;
 import dev.mesbase.core.error.FoundationException;
 import dev.mesbase.platform.execution.FactoryContext;
@@ -47,14 +48,14 @@ public class BusinessSourceRules {
     private final WorkorderErpExtraMapper orderExtras;
     private final WmWarehouseMapper warehouses;
     private final WmWarehouseErpExtraMapper warehouseExtras;
-    private final MesMaterialIssueMapper issues;
-    private final MesMaterialIssueItemMapper items;
+    private final WmStockDocumentMapper issues;
+    private final WmStockDocumentLineMapper items;
     private final MesProductionReceiptMapper receipts;
 
     public BusinessSourceRules(WarehouseIntegration integration, WorkorderMapper orders,
                                WorkorderErpExtraMapper orderExtras, WmWarehouseMapper warehouses,
                                WmWarehouseErpExtraMapper warehouseExtras,
-                               MesMaterialIssueMapper issues, MesMaterialIssueItemMapper items,
+                               WmStockDocumentMapper issues, WmStockDocumentLineMapper items,
                                MesProductionReceiptMapper receipts) {
         this.integration = integration;
         this.orders = orders;
@@ -165,13 +166,13 @@ public class BusinessSourceRules {
         var order = order(execution.getWorkorderId(), output);
         var ids = new ArrayList<Long>();
         if (finishedWarehouse != null) ids.add(finishedWarehouse);
-        var f = new MesMaterialIssueExample();
-        f.createCriteria().andExecutionIdEqualTo(execution.getId());
+        var f = new WmStockDocumentExample();
+        f.createCriteria().andSourceExecutionIdEqualTo(execution.getId()).andDocumentTypeEqualTo(StockDocumentType.MATERIAL_ISSUE.getValue());
         var linked = bounded(() -> issues.selectByExample(f));
         if (linked.size() > 10000) ParameterChecks.reject(ErrorCode.BUSINESS_SOURCE_CONFLICT);
         if (!linked.isEmpty()) {
-            var i = new MesMaterialIssueItemExample();
-            i.createCriteria().andIssueIdIn(linked.stream().map(x -> x.getId()).toList());
+            var i = new WmStockDocumentLineExample();
+            i.createCriteria().andDocumentIdIn(linked.stream().map(x -> x.getId()).toList());
             var lines = bounded(() -> items.selectByExample(i));
             if (lines.size() > 10000) ParameterChecks.reject(ErrorCode.BUSINESS_SOURCE_CONFLICT);
             for (var line : lines) {

@@ -2,22 +2,28 @@
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="dev.mesbase.business.production.dao.ProductionInputExtraMapper">
   <select id="hasFormalInput" resultType="boolean">
-    SELECT EXISTS(SELECT 1 FROM mes_material_issue i JOIN mes_material_issue_input f ON f.issue_id=i.id
-                  WHERE i.workorder_id=#{workorderId})
+    SELECT EXISTS(SELECT 1 FROM wm_stock_document d
+                  WHERE d.source_workorder_id=#{workorderId} AND d.document_type='MATERIAL_ISSUE'
+                    AND d.production_request_id IS NOT NULL
+                    AND (d.production_confirmation_status IS NOT NULL OR d.production_confirmed_at IS NOT NULL))
   </select>
   <select id="quota" resultType="dev.mesbase.business.production.domain.ProductionInputQuota">
-    <bind name="voided" value="@dev.mesbase.business.issue.domain.MaterialIssueStatus@VOIDED.getValue()"/>
-    <bind name="rejected" value="@dev.mesbase.business.issue.domain.MaterialIssueStatus@SUBMIT_REJECTED.getValue()"/>
-    SELECT COALESCE(SUM(f.output_qty),0) AS output_qty,
+    <bind name="voided" value="@dev.mesbase.business.issue.domain.MaterialIssueSubmissionStatus@SUCCEEDED.getValue()"/>
+    <bind name="rejected" value="@dev.mesbase.business.issue.domain.MaterialIssueSubmissionStatus@REJECTED.getValue()"/>
+    SELECT COALESCE(SUM(d.production_output_qty),0) AS output_qty,
            COALESCE(SUM(component_totals.material_qty),0) AS material_qty,
-           COALESCE(SUM(CASE WHEN f.output_qty&gt;0 AND component_totals.line_count=1 AND component_totals.material_id=#{materialId}
+           COALESCE(SUM(CASE WHEN d.production_output_qty&gt;0 AND component_totals.line_count=1 AND component_totals.material_id=#{materialId}
                AND component_totals.unit_id=#{unitId} AND component_totals.material_qty&gt;0 THEN 0 ELSE 1 END),0) AS invalid_count
-    FROM mes_material_issue_input f JOIN mes_material_issue i ON i.id=f.issue_id AND i.execution_id=f.execution_id
-    LEFT JOIN (SELECT l.issue_id,COUNT(*) AS line_count,MIN(l.material_id) AS material_id,
+    FROM wm_stock_document d
+    LEFT JOIN (SELECT l.document_id,COUNT(*) AS line_count,MIN(l.material_id) AS material_id,
                       MIN(l.unit_id) AS unit_id,SUM(l.quantity) AS material_qty
-               FROM mes_material_issue_item l JOIN mes_material_issue issue_header ON issue_header.id=l.issue_id
-               WHERE issue_header.workorder_id=#{workorderId} GROUP BY l.issue_id) component_totals ON component_totals.issue_id=i.id
-    WHERE i.workorder_id=#{workorderId} AND f.input_kind='PRODUCTION_INPUT'
-      AND i.status NOT IN (#{voided},#{rejected})
+               FROM wm_stock_document_line l JOIN wm_stock_document issue_header ON issue_header.id=l.document_id
+               WHERE issue_header.source_workorder_id=#{workorderId} GROUP BY l.document_id) component_totals ON component_totals.document_id=d.id
+    WHERE d.source_workorder_id=#{workorderId} AND d.document_type='MATERIAL_ISSUE'
+      AND d.status!='CANCELLED' AND d.production_request_id IS NOT NULL
+      AND (d.production_confirmation_status IS NOT NULL OR d.production_confirmed_at IS NOT NULL)
+      AND d.production_input_kind='PRODUCTION_INPUT'
+      AND COALESCE(d.production_void_result_status,'') != #{voided}
+      AND (d.production_confirmation_status IS NULL OR d.production_confirmation_status != #{rejected})
   </select>
 </mapper>

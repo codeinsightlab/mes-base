@@ -76,6 +76,24 @@ public class SysAutoCodeGenerationServiceImpl implements AutoCodeNumbering {
     }
 
     @Override
+    public String getBusinessDocNo(String businessTypeKey, String expectedRuleType) {
+        requireBusinessRule(businessTypeKey, expectedRuleType);
+        return run(businessTypeKey, null, true, true, factoryContext.requiredFactoryId(), expectedRuleType);
+    }
+
+    @Override
+    public String previewBusinessDocNo(String businessTypeKey, String expectedRuleType) {
+        requireBusinessRule(businessTypeKey, expectedRuleType);
+        return run(businessTypeKey, null, false, true, factoryContext.requiredFactoryId(), expectedRuleType);
+    }
+
+    private void requireBusinessRule(String key, String expectedRuleType) {
+        if (!AutoCodeRuleType.supports(expectedRuleType) || key == null
+                || rules(expectedRuleType).stream().noneMatch(rule -> key.equals(rule.ruleCode())))
+            throw new ServiceException("当前工厂未启用该单据类型对应的编码规则");
+    }
+
+    @Override
     public List<RuleOption> rules(String ruleType) {
         if (!AutoCodeRuleType.supports(ruleType)) throw new ServiceException("单据编码类型无效");
         String factoryId = factoryContext.requiredFactoryId();

@@ -152,7 +152,7 @@ class LocalWarehouseHttpTest {
     @Test
     void failureAfterDeductionOrDuringActionOrAfterInputRollsBackAllLocalFacts() throws Exception {
         for (String constraint : List.of(
-                "ALTER TABLE mes_material_issue_input ADD CONSTRAINT test_fail CHECK(confirmed_at IS NULL)",
+                "ALTER TABLE wm_stock_document ADD CONSTRAINT test_fail CHECK(production_confirmed_at IS NULL)",
                 "ALTER TABLE wm_stock_action ADD CONSTRAINT test_fail CHECK(quantity_delta>=0)",
                 "ALTER TABLE mes_execution_path ADD CONSTRAINT test_fail CHECK(id<=2 OR path_status<>'LOCKED')")) {
             try (var c = ProductionInputHttpTest.context()) {
@@ -165,7 +165,7 @@ class LocalWarehouseHttpTest {
                 assertTrue(response >= 400);
                 balance(j, "10000");
                 assertEquals(0, j.queryForObject("SELECT COUNT(*) FROM wm_stock_action", Integer.class));
-                assertEquals(0, j.queryForObject("SELECT COUNT(*) FROM mes_material_issue_input WHERE confirmed_at IS NOT NULL OR stock_applied=true", Integer.class));
+                assertEquals(0, j.queryForObject("SELECT COUNT(*) FROM wm_stock_document WHERE production_confirmed_at IS NOT NULL OR production_stock_applied=true", Integer.class));
                 assertEquals(0, j.queryForObject("SELECT COUNT(*) FROM wm_stock_document WHERE document_type='MATERIAL_ISSUE' AND status='POSTED'", Integer.class));
             }
         }
@@ -208,7 +208,7 @@ class LocalWarehouseHttpTest {
             assertEquals(1, statuses.stream().filter(code -> code == 400 || code == 409).count());
             balance(j, "100");
             assertEquals(1, j.queryForObject("SELECT COUNT(*) FROM wm_stock_action", Integer.class));
-            assertEquals(1, j.queryForObject("SELECT COUNT(*) FROM mes_material_issue_input WHERE confirmed_at IS NOT NULL", Integer.class));
+            assertEquals(1, j.queryForObject("SELECT COUNT(*) FROM wm_stock_document WHERE production_confirmed_at IS NOT NULL", Integer.class));
         }
     }
 

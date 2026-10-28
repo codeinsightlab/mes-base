@@ -5,6 +5,7 @@ import tools.jackson.core.JacksonException;
 import dev.mesbase.business.wm.service.StockDocumentService;
 import dev.mesbase.business.wm.domain.StockDocumentModels;
 import dev.mesbase.business.wm.domain.StockDocumentStatus;
+import dev.mesbase.business.wm.domain.StockDocumentType;
 import dev.mesbase.common.utils.SecurityUtils;
 import dev.mesbase.core.security.AuthenticatedActor;
 import dev.mesbase.core.security.AuthorizationService;
@@ -15,7 +16,6 @@ import dev.mesbase.common.validation.ParameterChecks;
 
 import dev.mesbase.business.integration.warehouse.ErpActionResult.Mode;
 import dev.mesbase.business.shared.enums.BusinessSource;
-import dev.mesbase.business.issue.domain.MaterialIssueStatus;
 import dev.mesbase.business.production.domain.ProductionExecutionStatus;
 import dev.mesbase.business.production.domain.WorkOrderStatus;
 import dev.mesbase.business.production.domain.ProductionScanCode;
@@ -25,11 +25,7 @@ import dev.mesbase.business.production.domain.MesProductionExecutionResource;
 import dev.mesbase.infrastructure.cache.BusinessCacheProcessor;
 import dev.mesbase.infrastructure.cache.annotation.BusinessCacheEvict;
 import dev.mesbase.business.production.service.IMesProductionExecutionService;
-import dev.mesbase.business.issue.domain.MesMaterialIssueCreateCommand;
-import dev.mesbase.business.issue.domain.MesMaterialIssueInputEntity;
-import dev.mesbase.business.issue.dao.MesMaterialIssueInputMapper;
-import dev.mesbase.business.issue.service.IMesMaterialIssueService;
-import dev.mesbase.business.issue.service.IMesMaterialIssueItemService;
+import dev.mesbase.business.wm.domain.WmStockDocumentEntity;
 import dev.mesbase.business.issue.service.MaterialIssueSubmissionService;
 import dev.mesbase.business.issue.service.MaterialIssueSubmissionService.Prepared;
 import dev.mesbase.business.integration.production.ProductionSupply.Calculation;
@@ -37,7 +33,6 @@ import dev.mesbase.business.production.dao.MesProductionExecutionMapper;
 import dev.mesbase.business.production.dao.WorkorderMapper;
 import dev.mesbase.business.production.dao.WorkOrderExtraMapper;
 import dev.mesbase.business.production.domain.WorkorderEntity;
-import dev.mesbase.business.issue.dao.MesMaterialIssueMapper;
 import dev.mesbase.business.production.dao.RoutingMapper;
 import dev.mesbase.business.production.domain.RoutingDetail;
 import dev.mesbase.business.production.service.ExecutionPathService.PathModel;
@@ -83,18 +78,16 @@ public class ProductionInputService {
         }
     }
 
-    public record Result(String requestId, String issueId, String documentId, String executionId, String code,
+    public record Result(String requestId, String documentId, String executionId, String code,
                          String status, String productionInputQty, String availableQty) {
     }
 
+    public record ManualCalculation(String code, Calculation calculation) { }
+
     private final ProductionInputSupplyService supply;
     private final ProductionIdentityService identities;
-    private final MesMaterialIssueInputMapper inputs;
-    private final MesMaterialIssueMapper issueMapper;
     private final IMesProductionExecutionService executions;
     private final MesProductionExecutionMapper executionMapper;
-    private final IMesMaterialIssueService issues;
-    private final IMesMaterialIssueItemService items;
     private final MaterialIssueSubmissionService submissions;
     private final MaterialIssueInputFacts inputFacts;
     private final ExecutionPathService paths;
@@ -111,10 +104,8 @@ public class ProductionInputService {
     private final ObjectMapper json = new ObjectMapper();
 
     public ProductionInputService(ProductionInputSupplyService supply, ProductionIdentityService identities,
-                                  MesMaterialIssueInputMapper inputs, MesMaterialIssueMapper issueMapper,
                                   IMesProductionExecutionService executions,
-                                  MesProductionExecutionMapper executionMapper, IMesMaterialIssueService issues,
-                                  IMesMaterialIssueItemService items,
+                                  MesProductionExecutionMapper executionMapper,
                                   MaterialIssueSubmissionService submissions, MaterialIssueInputFacts inputFacts,
                                   ExecutionPathService paths,
                                   ProductionChainLocks locks, ProductionQuantityService quantities,
@@ -134,12 +125,8 @@ public class ProductionInputService {
         this.sources = sources;
         this.supply = supply;
         this.identities = identities;
-        this.inputs = inputs;
-        this.issueMapper = issueMapper;
         this.executions = executions;
         this.executionMapper = executionMapper;
-        this.issues = issues;
-        this.items = items;
         this.submissions = submissions;
         this.inputFacts = inputFacts;
         this.paths = paths;
@@ -181,7 +168,7 @@ public class ProductionInputService {
     public Result submit(Command command) {
         validate(command);
         String hash = RequestFingerprint.sha256(json.writeValueAsString(command));
-        var previous = transaction.execute(s -> inputs.selectByPrimaryKey(command.requestId()));
+        var previous = transaction.execute(s -> inputFacts.findByRequestId(command.requestId()));
         if (previous != null) return replay(previous, hash); // Resolve replay from the original request identity.
         supply.validateOutputQuantity(command.outputQty(), command.workorderId());
         var sourceOrder = transaction.execute(s -> sources.order(command.workorderId()));
@@ -193,22 +180,13 @@ public class ProductionInputService {
         if (documents.getObject().findMaterialIssueDraft(command) == null) saveDraft(command);
         return transaction.execute(s -> {
             locks.order(command.workorderId());
-            var saved = inputs.selectByPrimaryKey(command.requestId());
+            var saved = inputFacts.findByRequestId(command.requestId());
             if (saved != null) return replay(saved, hash);
             var draft = documents.getObject().findMaterialIssueDraft(command);
-            if (draft != null) {
-                approveDraft(draft.document().getId(), new StockDocumentModels.Post(command.requestId(),
-                        draft.document().getRevision()));
-                return result(inputs.selectByPrimaryKey(command.requestId()), MaterialIssueStatus.CONFIRMED.getValue());
-            }
-            var calculation = supply.calculateLocal(command.code(), command.workorderId(), command.stockReference(), command.outputQty());
-            if (!Objects.equals(command.calculationKey(), ProductionInputSupplyService.calculationKey(calculation)))
-                throw new FoundationException(ErrorCode.PRODUCTION_INPUT_STALE);
-            var localPrepared = prepare(command, calculation, hash);
-            var row = submissions.executePrepared(localPrepared);
-            if (!MaterialIssueStatus.CONFIRMED.getValue().equals(row.getStatus()))
-                ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
-            return result(inputs.selectByPrimaryKey(command.requestId()), row.getStatus());
+            if (draft == null) ParameterChecks.reject(ErrorCode.STOCK_DOCUMENT_CONFLICT);
+            approveDraft(draft.document().getId(), new StockDocumentModels.Post(command.requestId(),
+                    draft.document().getRevision()));
+            return result(inputFacts.findByRequestId(command.requestId()), StockDocumentStatus.POSTED.getValue());
         });
     }
 
@@ -220,6 +198,12 @@ public class ProductionInputService {
         permit("business:mes:material:issue:update");
     }
 
+    public ManualCalculation calculateManual(Long workorderId, String stockReference, BigDecimal outputQty) {
+        requireStockDocumentCreatePermission();
+        var calculated = supply.calculateManual(workorderId, stockReference, outputQty);
+        return new ManualCalculation(calculated.code(), calculated.calculation());
+    }
+
     private void permit(String permission) {
         if (!authorization.hasPermission(new AuthenticatedActor(SecurityUtils.getAuthentication().getName()),
                 FactoryContext.required(), new Permission(permission)))
@@ -229,24 +213,95 @@ public class ProductionInputService {
     @Transactional(transactionManager = "businessTransactionManager", propagation = Propagation.NOT_SUPPORTED,
             rollbackFor = Exception.class)
     public StockDocumentModels.Detail saveDraft(Command command) {
+        return saveDraft(command, true);
+    }
+
+    public StockDocumentModels.Detail createAggregateDraft(StockDocumentModels.AggregateSave aggregate) {
+        if (aggregate == null || aggregate.header() == null || aggregate.productionIssue() == null
+                || !StockDocumentType.MATERIAL_ISSUE.getValue().equals(aggregate.header().documentType())
+                || aggregate.header().sourceWorkorderId() == null || aggregate.header().sourceExecutionId() != null
+                || aggregate.header().expectedRevision() != null || aggregate.header().ruleCode() == null
+                || aggregate.header().ruleCode().isBlank() || aggregate.items() == null
+                || aggregate.items().size() != 1 || aggregate.items().getFirst().id() != null)
+            ParameterChecks.reject(ErrorCode.BAD_REQUEST);
+        requireStockDocumentCreatePermission();
+        var intent = aggregate.productionIssue();
+        if (!StockDocumentType.MATERIAL_ISSUE.getValue().equals(aggregate.header().ruleCode()))
+            ParameterChecks.reject(ErrorCode.BAD_REQUEST);
+        var requestedLine = aggregate.items().getFirst();
+        if (requestedLine.stockId() == null || requestedLine.materialId() == null || requestedLine.warehouseId() == null
+                || requestedLine.unitId() == null || requestedLine.quantity() == null)
+            ParameterChecks.reject(ErrorCode.BAD_REQUEST);
+        String stockReference = requestedLine.stockId().toString();
+        var replay = documents.getObject().findMaterialIssueDraftByRequestId(intent.requestId());
+        if (replay != null) {
+            Command saved;
+            try {
+                saved = json.readValue(replay.document().getSourceRequestJson(), Command.class);
+            } catch (JacksonException failure) {
+                throw new FoundationException(ErrorCode.STOCK_DOCUMENT_CONFLICT, failure);
+            }
+            validate(saved);
+            if (!Objects.equals(saved.requestId(), intent.requestId())
+                    || !Objects.equals(saved.workorderId(), aggregate.header().sourceWorkorderId())
+                    || !Objects.equals(saved.stockReference(), stockReference)
+                    || saved.outputQty().compareTo(intent.outputQty()) != 0
+                    || !Objects.equals(saved.routingId(), intent.routingId())
+                    || !Objects.equals(saved.routingNodeIds(), intent.routingNodeIds())
+                    || !Objects.equals(saved.inputKind(), intent.inputKind())
+                    || !Objects.equals(saved.calculationKey(), intent.calculationKey())
+                    || !Objects.equals(saved.ruleCode(), aggregate.header().ruleCode()))
+                ParameterChecks.reject(ErrorCode.STOCK_DOCUMENT_CONFLICT);
+            return replay;
+        }
+        String code = supply.manualCode(aggregate.header().sourceWorkorderId(), stockReference);
+        var command = new Command(intent.requestId(), code, aggregate.header().sourceWorkorderId(), stockReference,
+                intent.outputQty(), intent.routingId(), intent.routingNodeIds(), intent.inputKind(),
+                intent.calculationKey(), aggregate.header().ruleCode());
         validate(command);
-        requireDocumentPermission();
+        var existing = documents.getObject().findMaterialIssueDraft(command);
+        if (existing != null) return existing;
+        var calculated = supply.calculateManual(aggregate.header().sourceWorkorderId(),
+                stockReference, intent.outputQty());
+        var calculation = calculated.calculation();
+        if (!Objects.equals(intent.calculationKey(), ProductionInputSupplyService.calculationKey(calculation)))
+            throw new FoundationException(ErrorCode.PRODUCTION_INPUT_STALE);
+        var source = calculation.stock();
+        if (!Objects.equals(source.reference(), requestedLine.stockId().toString())
+                || !Objects.equals(source.materialId(), requestedLine.materialId())
+                || !Objects.equals(source.warehouseId(), requestedLine.warehouseId())
+                || !Objects.equals(source.unitId(), requestedLine.unitId())
+                || !Objects.equals(source.lotCode(), requestedLine.batchNo())
+                || !Objects.equals(source.binCode(), requestedLine.binCode())
+                || calculation.issueQty().compareTo(requestedLine.quantity()) != 0)
+            ParameterChecks.reject(ErrorCode.STOCK_DOCUMENT_CONFLICT);
+        if (!Objects.equals(code, calculated.code())) ParameterChecks.reject(ErrorCode.STOCK_DOCUMENT_CONFLICT);
+        return saveDraft(command, false);
+    }
+
+    private StockDocumentModels.Detail saveDraft(Command command, boolean issuePermission) {
+        validate(command);
+        if (issuePermission) requireDocumentPermission();
+        else requireStockDocumentCreatePermission();
         var existing = documents.getObject().findMaterialIssueDraft(command);
         if (existing != null) return existing;
         String ruleCode = command.ruleCode() == null || command.ruleCode().isBlank()
-                ? autoCodes.uniqueRuleCode(AutoCodeRuleType.STOCK_OUT.name()) : command.ruleCode();
-        String documentNo = autoCodes.getDocNo(ruleCode, AutoCodeRuleType.STOCK_OUT.name());
-        return transaction.execute(status -> saveDraftInTransaction(command, documentNo));
+                ? StockDocumentType.MATERIAL_ISSUE.getValue() : command.ruleCode();
+        if (!StockDocumentType.MATERIAL_ISSUE.getValue().equals(ruleCode)) ParameterChecks.reject(ErrorCode.BAD_REQUEST);
+        String documentNo = autoCodes.getBusinessDocNo(ruleCode, AutoCodeRuleType.STOCK_OUT.name());
+        return transaction.execute(status -> saveDraftInTransaction(command, documentNo, issuePermission));
     }
 
-    private StockDocumentModels.Detail saveDraftInTransaction(Command command, String documentNo) {
+    private StockDocumentModels.Detail saveDraftInTransaction(Command command, String documentNo,
+                                                               boolean issuePermission) {
         validate(command);
-        requireDocumentPermission();
+        if (issuePermission) requireDocumentPermission();
+        else requireStockDocumentCreatePermission();
         locks.order(command.workorderId());
         supply.validateOutputQuantity(command.outputQty(), command.workorderId());
         var existing = documents.getObject().findMaterialIssueDraft(command);
         if (existing != null) return existing;
-        if (inputs.selectByPrimaryKey(command.requestId()) != null) ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
+        if (inputFacts.findByRequestId(command.requestId()) != null) ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
         var calculation = supply.calculateLocal(command.code(), command.workorderId(), command.stockReference(), command.outputQty());
         if (!Objects.equals(command.calculationKey(), ProductionInputSupplyService.calculationKey(calculation)))
             throw new FoundationException(ErrorCode.PRODUCTION_INPUT_STALE);
@@ -274,7 +329,6 @@ public class ProductionInputService {
         locks.order(command.workorderId());
         // Order serializes all allocation and UUID decisions, then the document is locked by bind/approve.
         var current = owner.detail(documentId).document();
-        if (current.getSourceMaterialIssueId() != null) return owner.approve(documentId, approval);
         if (!Objects.equals(current.getRevision(), approval.expectedRevision())
                 || !StockDocumentStatus.DRAFT.getValue().equals(current.getStatus()))
             ParameterChecks.reject(ErrorCode.STOCK_DOCUMENT_CONFLICT);
@@ -282,26 +336,26 @@ public class ProductionInputService {
         if (!Objects.equals(command.calculationKey(), ProductionInputSupplyService.calculationKey(calculation)))
             throw new FoundationException(ErrorCode.PRODUCTION_INPUT_STALE);
         String hash = RequestFingerprint.sha256(json.writeValueAsString(command));
-        if (inputs.selectByPrimaryKey(command.requestId()) != null)
+        if (inputFacts.findByRequestId(command.requestId()) != null)
             ParameterChecks.reject(ErrorCode.STOCK_DOCUMENT_CONFLICT);
         // Current BOM, cumulative issue difference and order/stock balances are recalculated at approval.
-        var prepared = prepare(command, calculation, hash);
-        var input = inputs.selectByPrimaryKey(command.requestId());
-        owner.bindMaterialIssue(documentId, input, calculation);
+        var prepared = prepare(command, calculation, hash, documentId);
         var result = submissions.executePrepared(prepared);
-        if (!MaterialIssueStatus.CONFIRMED.getValue().equals(result.getStatus()))
+        if (!StockDocumentStatus.POSTED.getValue().equals(result.getStatus()))
             ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
         return owner.detail(documentId);
     }
 
-    private Prepared prepare(Command c, Calculation calculation, String hash) {
+    private Prepared prepare(Command c, Calculation calculation, String hash, Long documentId) {
         var order = locks.order(c.workorderId());
         supply.lockQuantityMaterials(calculation);
         supply.validateFrozenCalculation(calculation);
-        var previous = inputs.selectByPrimaryKey(c.requestId());
+        var previous = inputFacts.findByRequestId(c.requestId());
         if (previous != null) {
-            if (!previous.getRequestHash().equals(hash)) ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
-            return submissions.prepare(previous.getIssueId(), FactoryContext.required());
+            if (!Objects.equals(previous.getProductionRequestHash(), hash)) ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
+            if (!Objects.equals(previous.getId(), documentId)) ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
+            documents.getObject().bindMaterialIssue(documentId, previous, calculation);
+            return submissions.prepare(documentId, FactoryContext.required());
         }
         var product = materials.selectByPrimaryKey(order.getProductId());
         if (!WorkOrderStatus.RELEASED.getValue()
@@ -346,45 +400,40 @@ public class ProductionInputService {
         if (Mode.LOCAL_ONLY.getValue().equals(calculation.sourceMode())
                 && ProductionExecutionStatus.FULLY_RECEIVED.getValue().equals(execution.getStatus()))
             executionRules.resumeAfterInput(execution);
-        var issue = issues.insert(new MesMaterialIssueCreateCommand("INPUT-" + c.requestId(), order.getId(), null, order.getProductId(), null,
-                null, c.routingId(), LocalDateTime.now(), MaterialIssueStatus.DRAFT.getValue(), null, executionId));
         var stock = calculation.stock();
-        items.insertCalculated(issue.getId(), calculation);
-        var f = new MesMaterialIssueInputEntity();
-        f.setId(c.requestId());
-        f.setRequestHash(hash);
-        f.setIssueId(issue.getId());
-        f.setExecutionId(executionId);
-        f.setInputKind(c.inputKind());
-        f.setOutputQty(c.outputQty());
-        f.setSourceMode(calculation.sourceMode());
-        f.setCalculationJson(json.writeValueAsString(calculation));
-        if (Mode.LOCAL_ONLY.getValue().equals(calculation.sourceMode()))
-            f.setStockId(Long.valueOf(stock.reference()));
-        f.setStockApplied(false);
-        f.setCreatedAt(LocalDateTime.now());
-        inputFacts.freeze(f, calculation);
+        var fact = documents.getObject().detail(documentId).document();
+        fact.setSourceExecutionId(executionId);
+        fact.setProductionRequestId(c.requestId());
+        fact.setProductionRequestHash(hash);
+        fact.setProductionInputKind(c.inputKind());
+        fact.setProductionOutputQty(c.outputQty());
+        fact.setProductionSourceMode(calculation.sourceMode());
+        fact.setProductionCalculationJson(json.writeValueAsString(calculation));
+        fact.setProductionRequestCreatedAt(LocalDateTime.now());
+        fact.setProductionStockApplied(false);
+        inputFacts.freeze(fact, calculation);
+        documents.getObject().bindMaterialIssue(documentId, fact, calculation);
         // Capacity and resumed status are written through locked Mappers; publish neither stale lists nor details.
         // The shared processor defers invalidation until this enclosing transaction commits.
         caches.evict(MesProductionExecutionResource.PREFIX, BusinessCacheEvict.Scope.LIST_AND_DETAIL);
-        return submissions.prepare(issue.getId(), FactoryContext.required());
+        return submissions.prepare(documentId, FactoryContext.required());
     }
 
-    private Result replay(MesMaterialIssueInputEntity previous, String hash) {
-        if (!previous.getRequestHash().equals(hash)) ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
-        return transaction.execute(s -> result(previous, issueMapper.selectByPrimaryKey(previous.getIssueId())
-                .getStatus()));
+    private Result replay(WmStockDocumentEntity previous, String hash) {
+        if (!Objects.equals(previous.getProductionRequestHash(), hash)) ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
+        return transaction.execute(s -> result(previous,
+                documents.getObject().detail(previous.getId()).document().getStatus()));
     }
 
-    private Result result(MesMaterialIssueInputEntity f, String status) {
-        var execution = executionMapper.selectByPrimaryKey(f.getExecutionId());
+    private Result result(WmStockDocumentEntity f, String status) {
+        var execution = executionMapper.selectByPrimaryKey(f.getSourceExecutionId());
         var product = materials.selectByPrimaryKey(execution.getProductId());
         String code = null;
         if (execution.getBatchNo() != null)
             code = identities.read(execution.getId()).qrCode();
         var q = quantities.getExecutionQuantities(execution.getId());
-        String documentId = documents.getObject().findDocumentIdForRequest(f.getId());
-        return new Result(f.getId(), f.getIssueId().toString(), documentId, f.getExecutionId()
+        String documentId = f.getId().toString();
+        return new Result(f.getProductionRequestId(), documentId, f.getSourceExecutionId()
                 .toString(), code, status, q.productionInputQty().toPlainString(), q.nodes()
                 .isEmpty() ? "0" : q.nodes().getFirst().availableQty().toPlainString());
     }

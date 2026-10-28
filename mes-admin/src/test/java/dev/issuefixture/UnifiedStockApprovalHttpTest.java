@@ -65,16 +65,17 @@ class UnifiedStockApprovalHttpTest {
                             .content(StockDocumentHttpTest.intent(uuid, saved.get("document").get("revision").asInt())))
                     .andExpect(status().isOk());
             BigDecimal after = rawBalance(db);
+            int documentsBeforeDeniedSave = count(db, "wm_stock_document");
+            int linesBeforeDeniedSave = count(db, "wm_stock_document_line");
+            int actionsBeforeDeniedSave = count(db, "wm_stock_action");
+            int inputsBeforeDeniedSave = count(db, "wm_stock_document WHERE production_confirmation_status IS NOT NULL");
             mvc.perform(full(post(StockDocumentHttpTest.ROOT + "/aggregate"))
                             .content(genericAggregate()))
                     .andExpect(status().isForbidden());
-            assertEquals(1, count(db, "wm_stock_document"));
-            assertEquals(1, count(db, "wm_stock_document_line"));
-            assertEquals(0, count(db, "mes_material_issue_input"));
-            assertEquals(0, count(db, "wm_stock_action"));
-            assertEquals(1, count(db, "wm_stock_document"));
-            assertEquals(1, count(db, "mes_material_issue_input"));
-            assertEquals(1, count(db, "wm_stock_action"));
+            assertEquals(documentsBeforeDeniedSave, count(db, "wm_stock_document"));
+            assertEquals(linesBeforeDeniedSave, count(db, "wm_stock_document_line"));
+            assertEquals(actionsBeforeDeniedSave, count(db, "wm_stock_action"));
+            assertEquals(inputsBeforeDeniedSave, count(db, "wm_stock_document WHERE production_confirmation_status IS NOT NULL"));
             assertEquals(0, after.compareTo(rawBalance(db)));
         }
     }
@@ -99,7 +100,7 @@ class UnifiedStockApprovalHttpTest {
             assertEquals(0, balance.compareTo(rawBalance(db)));
             assertEquals(0, count(db, "wm_stock_action"));
             assertEquals(0, count(db, "mes_production_execution"));
-            assertEquals(0, count(db, "mes_material_issue_input"));
+            assertEquals(0, count(db, "wm_stock_document WHERE production_confirmation_status IS NOT NULL"));
             assertEquals("DRAFT", db.queryForObject("SELECT status FROM wm_stock_document WHERE id=?", String.class, other));
             assertEquals("DRAFT", db.queryForObject("SELECT status FROM wm_stock_document WHERE id=?", String.class, reserved.get("document")
                     .get("id").asText()));
@@ -186,7 +187,7 @@ class UnifiedStockApprovalHttpTest {
                         .andExpect(status().is4xxClientError())
                         .andExpect(jsonPath("errorCode").isNotEmpty());
                 assertEquals(0, count(db, "mes_production_execution"));
-                assertEquals(0, count(db, "mes_material_issue_input"));
+                assertEquals(0, count(db, "wm_stock_document WHERE production_confirmation_status IS NOT NULL"));
                 assertEquals(0, count(db, "wm_stock_action"));
                 assertEquals(0, before.compareTo(rawBalance(db)));
             }
@@ -242,7 +243,7 @@ class UnifiedStockApprovalHttpTest {
             assertEquals(0, count(db, "wm_stock_action"));
             draft(mvc, command);
             assertEquals(1, count(db, "wm_stock_document"));
-            assertEquals(0, count(db, "mes_material_issue_input"));
+            assertEquals(0, count(db, "wm_stock_document WHERE production_confirmation_status IS NOT NULL"));
             assertEquals(0, count(db, "wm_stock_action"));
         }
     }
@@ -324,7 +325,7 @@ class UnifiedStockApprovalHttpTest {
             assertEquals(0, count(db, "wm_stock_action"));
             assertEquals(0, count(db, "mes_production_execution"));
             assertEquals("DRAFT", db.queryForObject("SELECT status FROM wm_stock_document WHERE id=?", String.class, id));
-            assertEquals(0, db.queryForObject("SELECT COUNT(*) FROM mes_material_issue_input WHERE confirmed_at IS NOT NULL", Integer.class));
+            assertEquals(0, db.queryForObject("SELECT COUNT(*) FROM wm_stock_document WHERE production_confirmed_at IS NOT NULL", Integer.class));
         }
     }
 

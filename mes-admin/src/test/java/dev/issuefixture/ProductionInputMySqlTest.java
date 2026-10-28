@@ -95,7 +95,7 @@ class ProductionInputMySqlTest {
             });
             x.get();
             y.get();
-            assertEquals(2, j.queryForObject("SELECT COUNT(*) FROM mes_material_issue_input WHERE execution_id=?", Integer.class, execution));
+            assertEquals(2, j.queryForObject("SELECT COUNT(*) FROM wm_stock_document WHERE source_execution_id=?", Integer.class, execution));
             long original = j.queryForObject("SELECT id FROM mes_production_report WHERE execution_id=? AND record_type='REPORT'", Long.class, execution);
             j.update("INSERT INTO mes_production_report(execution_id,routing_node_id,record_type,quantity_delta,reference_report_id,operator_user_id,recorded_by,report_time,reason,create_time) VALUES(?,?,'ADJUSTMENT',200,?,100,100,NOW(),'TEST ONLY immutable adjustment fixture',NOW())", execution, f.selected()
                     .getFirst(), original);

@@ -1,6 +1,7 @@
 package dev.mesbase.business.production.controller;
 
 import dev.mesbase.business.integration.production.ProductionSupply.Order;
+import dev.mesbase.business.integration.production.ProductionSupply.Calculation;
 import dev.mesbase.business.wm.controller.StockDocumentController;
 import dev.mesbase.common.utils.bean.BeanConversions;
 import dev.mesbase.business.integration.production.ProductionSupply.Stock;
@@ -58,6 +59,8 @@ public class ProductionInputController {
                                   String issueQty, String calculationKey) {
     }
 
+    public record ManualCalculationView(String code, CalculationView calculation) { }
+
     @GetMapping
     @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED, permission = PERMISSION)
     public SupplyView query(@RequestParam String code, @RequestParam(defaultValue = "0") int offset,
@@ -73,8 +76,16 @@ public class ProductionInputController {
     public CalculationView calculate(@RequestParam String code, @RequestParam Long workorderId,
                                      @RequestParam String stockReference, @RequestParam BigDecimal outputQty) {
         var c = supply.calculate(code, workorderId, stockReference, outputQty);
-        return new CalculationView(c.sourceMode(), order(c.order()), stock(c.stock()), c.outputQty()
-                .toPlainString(), c.issueQty().toPlainString(), ProductionInputSupplyService.calculationKey(c));
+        return calculation(c);
+    }
+
+    @GetMapping("/manual-calculate")
+    @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED, permission = "business:wm:stock:document:create")
+    public ManualCalculationView calculateManual(@RequestParam Long workorderId,
+                                                  @RequestParam String stockReference,
+                                                  @RequestParam BigDecimal outputQty) {
+        var manual = service.calculateManual(workorderId, stockReference, outputQty);
+        return new ManualCalculationView(manual.code(), calculation(manual.calculation()));
     }
 
     public record PreviewView(RoutingDetailVo definition, PathView actual) {
@@ -83,6 +94,14 @@ public class ProductionInputController {
     @GetMapping("/preview")
     @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED, permission = PERMISSION)
     public PreviewView preview(@RequestParam String code, @RequestParam Long workorderId) {
+        var p = service.preview(code, workorderId);
+        return new PreviewView(RoutingController.detailView(p.definition()), Optional.ofNullable(p.actual())
+                .map(nullableValue -> ExecutionActionController.toView(nullableValue)).orElse(null));
+    }
+
+    @GetMapping("/manual-preview")
+    @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED, permission = "business:wm:stock:document:create")
+    public PreviewView manualPreview(@RequestParam String code, @RequestParam Long workorderId) {
         var p = service.preview(code, workorderId);
         return new PreviewView(RoutingController.detailView(p.definition()), Optional.ofNullable(p.actual())
                 .map(nullableValue -> ExecutionActionController.toView(nullableValue)).orElse(null));
@@ -104,6 +123,11 @@ public class ProductionInputController {
         return new StockView(s.reference(), s.materialId().toString(), s.materialCode(), s.lotCode(), s.warehouseId()
                 .toString(), s.warehouseCode(), s.binCode(), s.unitId().toString(), s.unitCode(), s.availableQty()
                 .toPlainString(), s.observedAt());
+    }
+
+    private static CalculationView calculation(Calculation c) {
+        return new CalculationView(c.sourceMode(), order(c.order()), stock(c.stock()), c.outputQty()
+                .toPlainString(), c.issueQty().toPlainString(), ProductionInputSupplyService.calculationKey(c));
     }
 
     private static OrderView order(Order o) {

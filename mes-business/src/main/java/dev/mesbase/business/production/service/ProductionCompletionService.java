@@ -1,9 +1,12 @@
 package dev.mesbase.business.production.service;
 
 import com.github.pagehelper.PageHelper;
-import dev.mesbase.business.issue.dao.MesMaterialIssueMapper;
-import dev.mesbase.business.issue.domain.MaterialIssueStatus;
-import dev.mesbase.business.issue.domain.MesMaterialIssueExample;
+import dev.mesbase.business.wm.dao.WmStockDocumentMapper;
+import dev.mesbase.business.wm.domain.StockDocumentStatus;
+import dev.mesbase.business.issue.domain.MaterialIssueSubmissionStatus;
+import dev.mesbase.business.wm.domain.WmStockDocumentEntity;
+import dev.mesbase.business.wm.domain.WmStockDocumentExample;
+import dev.mesbase.business.wm.domain.StockDocumentType;
 import dev.mesbase.business.production.dao.MesExecutionCompletionMapper;
 import dev.mesbase.business.production.dao.MesProductionExecutionMapper;
 import dev.mesbase.business.production.domain.ExecutionPathStatus;
@@ -53,7 +56,7 @@ public class ProductionCompletionService {
     private final MesExecutionCompletionMapper completions;
     private final MesProductionExecutionMapper executions;
     private final StockDocumentExtraMapper inbound;
-    private final MesMaterialIssueMapper issues;
+    private final WmStockDocumentMapper issues;
     private final ProductionChainLocks locks;
     private final QualityTreatmentService quality;
     private final ProductionQuantityService quantities;
@@ -63,7 +66,8 @@ public class ProductionCompletionService {
 
     public ProductionCompletionService(MesExecutionCompletionMapper completions,
                                        MesProductionExecutionMapper executions, StockDocumentExtraMapper inbound,
-                                       MesMaterialIssueMapper issues, ProductionChainLocks locks,
+                                       WmStockDocumentMapper issues,
+                                       ProductionChainLocks locks,
                                        QualityTreatmentService quality,
                                        ProductionQuantityService quantities, ProductionExecutionRules rules,
                                        BusinessSourceRules sources, WorkOrderCompletionService workorders) {
@@ -192,11 +196,9 @@ public class ProductionCompletionService {
             return "存在历史数量超额，须核实后才能完全入库";
         var balanceReason = ProductionCompletionBalance.blockedReason(projection);
         if (balanceReason != null) return balanceReason;
-        var unresolved = new MesMaterialIssueExample();
-        unresolved.createCriteria().andExecutionIdEqualTo(execution.getId()).andStatusNotIn(List.of(
-                MaterialIssueStatus.CONFIRMED.getValue(), MaterialIssueStatus.VOIDED.getValue(),
-                MaterialIssueStatus.SUBMIT_REJECTED.getValue()));
-        if (issues.countByExample(unresolved) > 0) return "相关领料仍有未决状态，请核实原请求";
+        var unresolved = new WmStockDocumentExample();
+        unresolved.createCriteria().andSourceExecutionIdEqualTo(execution.getId()).andDocumentTypeEqualTo(StockDocumentType.MATERIAL_ISSUE.getValue());
+        if (hasPendingIssues(issues.selectByExample(unresolved))) return "相关领料仍有未决状态，请核实原请求";
         if (inbound.invalidProductionInboundLines(execution.getId()) > 0) return "正式生产入库明细与库存动作不一致";
         var output = projection.nodes().getLast().effectiveOutputQty();
         if (received.compareTo(output) < 0) return "正常品尚未全部正式入库";
@@ -250,5 +252,24 @@ public class ProductionCompletionService {
         execution.setUpdateTime(row.getRecordedAt());
         if (executions.updateByPrimaryKey(execution) != 1)
             ParameterChecks.reject(ErrorCode.PRODUCTION_CLOSURE_CONFLICT);
+    }
+
+    private boolean hasPendingIssues(List<WmStockDocumentEntity> documents) {
+        for (var document : documents) {
+            if (StockDocumentStatus.CANCELLED.getValue().equals(document.getStatus())) continue;
+            if (!StockDocumentStatus.POSTED.getValue().equals(document.getStatus())
+                    && !StockDocumentStatus.DRAFT.getValue().equals(document.getStatus())) return true;
+            String reversal = document.getProductionVoidResultStatus();
+            if ((document.getProductionVoidOperationId() != null || reversal != null)
+                    && (reversal == null || !List.of(MaterialIssueSubmissionStatus.SUCCEEDED.getValue(),
+                    MaterialIssueSubmissionStatus.REJECTED.getValue()).contains(reversal))) return true;
+            String confirmation = document.getProductionConfirmationStatus();
+            if (document.getProductionConfirmationOperationId() != null && confirmation == null) return true;
+            if (confirmation != null && !List.of(MaterialIssueSubmissionStatus.SUCCEEDED.getValue(),
+                    MaterialIssueSubmissionStatus.REJECTED.getValue()).contains(confirmation)) return true;
+            if (StockDocumentStatus.DRAFT.getValue().equals(document.getStatus())
+                    && !MaterialIssueSubmissionStatus.REJECTED.getValue().equals(confirmation)) return true;
+        }
+        return false;
     }
 }

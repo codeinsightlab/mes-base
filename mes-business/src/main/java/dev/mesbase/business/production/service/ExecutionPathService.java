@@ -5,7 +5,6 @@ import dev.mesbase.business.integration.warehouse.ErpActionResult.Mode;
 import dev.mesbase.common.validation.ParameterChecks;
 import dev.mesbase.business.production.domain.ProductionExecutionStatus;
 import dev.mesbase.business.quality.service.ExecutionQualityReferenceQuery;
-import dev.mesbase.business.issue.domain.MaterialIssueStatus;
 import dev.mesbase.business.production.domain.ExecutionPathStatus;
 import dev.mesbase.business.production.dao.MesExecutionPathMapper;
 import dev.mesbase.business.production.dao.MesExecutionPathNodeMapper;
@@ -23,15 +22,7 @@ import dev.mesbase.business.production.domain.RoutingNodeEntity;
 import dev.mesbase.business.production.domain.RoutingNodeExample;
 import dev.mesbase.business.production.domain.RoutingEdgeEntity;
 import dev.mesbase.business.production.domain.RoutingEdgeExample;
-import dev.mesbase.business.issue.dao.MesMaterialIssueMapper;
-import dev.mesbase.business.issue.dao.MesMaterialIssueInputMapper;
-import dev.mesbase.business.issue.dao.MesMaterialIssueSubmissionMapper;
-import dev.mesbase.business.issue.domain.MesMaterialIssueInputExample;
-import dev.mesbase.business.issue.domain.MesMaterialIssueSubmissionExample;
 import dev.mesbase.business.issue.domain.MaterialIssueSubmissionStatus;
-import java.util.stream.Collectors;
-import dev.mesbase.business.issue.domain.MesMaterialIssueExample;
-import dev.mesbase.business.issue.domain.MesMaterialIssueEntity;
 import dev.mesbase.common.utils.SecurityUtils;
 import dev.mesbase.core.error.ErrorCode;
 import dev.mesbase.core.error.FoundationException;
@@ -47,6 +38,9 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.annotation.Isolation;
 import dev.mesbase.business.production.service.ProductionChainLocks.LockedExecution;
+import dev.mesbase.business.wm.dao.WmStockDocumentMapper;
+import dev.mesbase.business.wm.domain.WmStockDocumentExample;
+import dev.mesbase.business.wm.domain.StockDocumentType;
 
 @Service
 @ConditionalOnProperty(name = "mes.business.enabled", havingValue = "true")
@@ -61,15 +55,13 @@ public class ExecutionPathService {
     private final RoutingNodeMapper nodes;
     private final BusinessDirectoryService references;
     private final RoutingEdgeMapper edges;
-    private final MesMaterialIssueMapper issues;
-    private final MesMaterialIssueInputMapper inputs;
-    private final MesMaterialIssueSubmissionMapper submissions;
+    private final WmStockDocumentMapper documents;
 
     public ExecutionPathService(ProductionChainLocks locks, ProductionExecutionRules rules,
                                 MesExecutionPathMapper paths,
                                 MesExecutionPathNodeMapper selected, MesProductionExecutionMapper executions,
-                                RoutingNodeMapper nodes, RoutingEdgeMapper edges, MesMaterialIssueMapper issues,
-                                MesMaterialIssueInputMapper inputs, MesMaterialIssueSubmissionMapper submissions,
+                                RoutingNodeMapper nodes, RoutingEdgeMapper edges,
+                                WmStockDocumentMapper documents,
                                 BusinessDirectoryService references,
                                 ExecutionQualityReferenceQuery quality) {
         this.quality = quality;
@@ -81,9 +73,7 @@ public class ExecutionPathService {
         this.nodes = nodes;
         this.references = references;
         this.edges = edges;
-        this.issues = issues;
-        this.inputs = inputs;
-        this.submissions = submissions;
+        this.documents = documents;
     }
 
     public record PathModel(Long executionId, String executionStatus, MesExecutionPathEntity path,
@@ -241,32 +231,21 @@ public class ExecutionPathService {
         if (!ExecutionPathStatus.LOCKED.getValue().equals(selectedPath.getPathStatus()))
             ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
         if (ProductionExecutionStatus.RUNNING.getValue().equals(e.getStatus())) return e;
-        var rows = issueRows(id);
-        if (rows.stream()
-                .noneMatch(i -> MaterialIssueStatus.CONFIRMED.getValue().equals(i.getStatus())) || rows.stream()
-                .anyMatch(i -> Set.of(MaterialIssueStatus.VOID_PENDING.getValue(), MaterialIssueStatus.VOID_UNKNOWN.getValue())
-                        .contains(i.getStatus()))) ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
-        var confirmed = rows.stream().filter(i -> MaterialIssueStatus.CONFIRMED.getValue().equals(i.getStatus()))
-                .toList();
-        var inputFilter = new MesMaterialIssueInputExample();
-        inputFilter.createCriteria().andIssueIdIn(confirmed.stream().map(MesMaterialIssueEntity::getId).toList());
-        var inputFacts = inputs.selectByExample(inputFilter).stream()
-                .collect(Collectors.toMap(f -> f.getIssueId(), f -> f));
-        if (confirmed.stream().anyMatch(issue -> issue.getSubmissionId() == null))
+        var inputFilter = new WmStockDocumentExample();
+        inputFilter.createCriteria().andSourceExecutionIdEqualTo(id)
+                .andDocumentTypeEqualTo(StockDocumentType.MATERIAL_ISSUE.getValue());
+        var inputFacts = documents.selectByExample(inputFilter);
+        if (inputFacts.stream().anyMatch(f -> f.getProductionVoidOperationId() != null &&
+                !MaterialIssueSubmissionStatus.SUCCEEDED.getValue().equals(f.getProductionVoidResultStatus())))
             ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
-        var submissionFilter = new MesMaterialIssueSubmissionExample();
-        submissionFilter.createCriteria().andIdIn(confirmed.stream().map(MesMaterialIssueEntity::getSubmissionId).toList());
-        var attempts = submissions.selectByExample(submissionFilter).stream()
-                .collect(Collectors.toMap(a -> a.getId(), a -> a));
-        for (var issue : confirmed) {
-            var fact = inputFacts.get(issue.getId());
-            var attempt = attempts.get(issue.getSubmissionId());
-            if (fact == null || !Objects.equals(fact.getExecutionId(), id)
-                    || !Mode.LOCAL_ONLY.getValue().equals(fact.getSourceMode())
-                    || !"PRODUCTION_INPUT".equals(fact.getInputKind())
-                    || fact.getConfirmedAt() == null || !Boolean.TRUE.equals(fact.getStockApplied())
-                    || attempt == null || !Objects.equals(attempt.getIssueId(), issue.getId())
-                    || !MaterialIssueSubmissionStatus.SUCCEEDED.getValue().equals(attempt.getStatus()))
+        var confirmed = inputFacts.stream().filter(f -> f.getProductionConfirmedAt() != null
+                && Boolean.TRUE.equals(f.getProductionStockApplied())).toList();
+        if (confirmed.isEmpty()) ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
+        for (var fact : confirmed) {
+            if (!Mode.LOCAL_ONLY.getValue().equals(fact.getProductionSourceMode())
+                    || !"PRODUCTION_INPUT".equals(fact.getProductionInputKind())
+                    || fact.getProductionConfirmationOperationId() == null
+                    || !MaterialIssueSubmissionStatus.SUCCEEDED.getValue().equals(fact.getProductionConfirmationStatus()))
                 ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
         }
         if (ProductionExecutionStatus.RUNNING.getValue().equals(e.getStatus())) return e;
@@ -280,16 +259,11 @@ public class ExecutionPathService {
     }
 
     public boolean hasBlockingIssue(Long id) {
-        return issueRows(id).stream()
-                .anyMatch(i -> i.getSubmissionId() != null || Set.of(MaterialIssueStatus.VOID_PENDING.getValue(), MaterialIssueStatus.VOID_UNKNOWN.getValue())
-                        .contains(i.getStatus()));
-    }
-
-    private List<MesMaterialIssueEntity> issueRows(Long id) {
-        var f = new MesMaterialIssueExample();
-        f.createCriteria().andExecutionIdEqualTo(id);
-        if (issues.countByExample(f) > 1000) ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
-        return issues.selectByExample(f);
+        var filter = new WmStockDocumentExample();
+        filter.createCriteria().andSourceExecutionIdEqualTo(id)
+                .andDocumentTypeEqualTo(StockDocumentType.MATERIAL_ISSUE.getValue());
+        return documents.selectByExample(filter).stream().anyMatch(f -> f.getProductionConfirmationOperationId() != null
+                || f.getProductionVoidOperationId() != null);
     }
 
     private List<Long> nodeIds(Long id) {

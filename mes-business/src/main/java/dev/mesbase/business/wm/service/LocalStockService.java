@@ -7,11 +7,6 @@ import dev.mesbase.business.basic.dao.UnitMeasureMapper;
 import dev.mesbase.business.integration.production.ProductionSupply.Calculation;
 import dev.mesbase.business.integration.warehouse.ErpActionResult.Mode;
 import dev.mesbase.business.integration.warehouse.WarehouseIntegration;
-import dev.mesbase.business.issue.dao.MesMaterialIssueInputMapper;
-import dev.mesbase.business.issue.dao.MesMaterialIssueMapper;
-import dev.mesbase.business.issue.domain.MaterialIssueStatus;
-import dev.mesbase.business.issue.domain.MesMaterialIssueInputEntity;
-import dev.mesbase.business.issue.domain.MesMaterialIssueInputExample;
 import dev.mesbase.business.production.dao.MesProductionReceiptMapper;
 import dev.mesbase.business.production.dao.MesProductionReportMapper;
 import dev.mesbase.business.production.domain.MesProductionReceiptExample;
@@ -26,9 +21,13 @@ import dev.mesbase.business.shared.enums.EnableStatus;
 import dev.mesbase.business.wm.dao.WmInventoryMapper;
 import dev.mesbase.business.wm.dao.WmStockActionMapper;
 import dev.mesbase.business.wm.dao.WmStockDocumentMapper;
+import dev.mesbase.business.wm.dao.WmStockDocumentLineMapper;
+import dev.mesbase.business.wm.domain.WmStockDocumentEntity;
+import dev.mesbase.business.wm.domain.WmStockDocumentLineExample;
 import dev.mesbase.business.wm.dao.WmWarehouseMapper;
 import dev.mesbase.business.wm.domain.StockActionType;
 import dev.mesbase.business.wm.domain.StockDocumentType;
+import dev.mesbase.business.wm.domain.StockDocumentStatus;
 import dev.mesbase.business.wm.domain.StockCommand;
 import dev.mesbase.business.wm.domain.StockSourceType;
 import dev.mesbase.business.wm.domain.WmInventoryEntity;
@@ -70,8 +69,7 @@ public class LocalStockService {
     private final MaterialMapper materials;
     private final UnitMeasureMapper units;
     private final WmWarehouseMapper warehouses;
-    private final MesMaterialIssueInputMapper inputs;
-    private final MesMaterialIssueMapper issues;
+    private final WmStockDocumentLineMapper documentLines;
     private final WmStockDocumentMapper documents;
     private final WarehouseIntegration integration;
     private final ProductionChainLocks locks;
@@ -79,11 +77,10 @@ public class LocalStockService {
     private final MesProductionDefectMapper defects;
     private final MesProductionReceiptMapper receipts;
     private final MaterialQuantityRules quantityRules;
-    private final ObjectMapper json = new ObjectMapper();
 
     public LocalStockService(WmInventoryMapper inventory, WmStockActionMapper actions, MaterialMapper materials,
-                             UnitMeasureMapper units, WmWarehouseMapper warehouses, MesMaterialIssueInputMapper inputs,
-                             MesMaterialIssueMapper issues, WmStockDocumentMapper documents, WarehouseIntegration integration,
+                             UnitMeasureMapper units, WmWarehouseMapper warehouses, WmStockDocumentLineMapper documentLines,
+                             WmStockDocumentMapper documents, WarehouseIntegration integration,
                              ProductionChainLocks locks, MesProductionReportMapper reports,
                              MesProductionDefectMapper defects, MesProductionReceiptMapper receipts,
                              BusinessSourceRules sources, MaterialQuantityRules quantityRules) {
@@ -97,8 +94,7 @@ public class LocalStockService {
         this.materials = materials;
         this.units = units;
         this.warehouses = warehouses;
-        this.inputs = inputs;
-        this.issues = issues;
+        this.documentLines = documentLines;
         this.documents = documents;
         this.integration = integration;
         this.locks = locks;
@@ -115,34 +111,50 @@ public class LocalStockService {
         decimal(c.expectedAvailable());
         if (StringUtils.isBlank(c.reason()) || c.reason().length() > 500 || c.stockId() == null)
             ParameterChecks.reject(ErrorCode.BAD_REQUEST);
-        if (type != StockActionType.RETURN && (c.issueId() != null || c.documentId() != null)) ParameterChecks.reject(ErrorCode.BAD_REQUEST);
-        Long issueId = c.issueId();
+        if (type != StockActionType.RETURN && c.documentId() != null) ParameterChecks.reject(ErrorCode.BAD_REQUEST);
         Long actor = SecurityUtils.getUserId();
-        if (type == StockActionType.RETURN && c.documentId() != null) {
-            if (issueId != null) ParameterChecks.reject(ErrorCode.BAD_REQUEST);
+        // Old return request hashes are recognized from the immutable original action source identity.
+        Long requestIdentity = c.documentId();
+        String hash = digest(type, c.stockId(), normalized(c.quantity()), normalized(c.expectedQuantity()),
+                normalized(c.expectedAvailable()), c.reason(), requestIdentity, actor);
+        var saved = actions.selectByPrimaryKey(id);
+        if (saved != null && !hash.equals(saved.getRequestHash()) && type == StockActionType.RETURN
+                && c.documentId() != null) {
+            var candidate = documents.selectByPrimaryKey(c.documentId());
+            if (candidate != null && candidate.getProductionRequestId() != null) {
+                var original = actions.selectByPrimaryKey(candidate.getProductionRequestId());
+                if (original != null && StockActionType.ISSUE.getValue().equals(original.getActionType())
+                        && Objects.equals(saved.getReferenceActionId(), original.getId())
+                        && Objects.equals(saved.getStockId(), c.stockId())
+                        && original.getSourceId() != null && original.getSourceId().matches("[0-9]+")) {
+                    String frozenHash = digest(type, c.stockId(), normalized(c.quantity()), normalized(c.expectedQuantity()),
+                            normalized(c.expectedAvailable()), c.reason(), Long.valueOf(original.getSourceId()), actor);
+                    if (frozenHash.equals(saved.getRequestHash())) return saved;
+                }
+            }
+        }
+        var replayed = replay(id, hash);
+        if (replayed != null) return replayed;
+        if (type == StockActionType.RETURN && c.documentId() == null) ParameterChecks.reject(ErrorCode.BAD_REQUEST);
+        WmStockDocumentEntity input = null;
+        if (type == StockActionType.RETURN) {
             var document = documents.selectByPrimaryKey(c.documentId());
             if (document == null || !StockDocumentType.MATERIAL_ISSUE.getValue().equals(document.getDocumentType())
-                    || document.getSourceMaterialIssueId() == null)
-                throw new FoundationException(ErrorCode.STOCK_DOCUMENT_SOURCE_PENDING);
-            issueId = document.getSourceMaterialIssueId();
-        }
-        if (type == StockActionType.RETURN && issueId == null) ParameterChecks.reject(ErrorCode.BAD_REQUEST);
-        String hash = digest(type, c.stockId(), normalized(c.quantity()), normalized(c.expectedQuantity()),
-                normalized(c.expectedAvailable()), c.reason(), issueId, actor);
-        MesMaterialIssueInputEntity input = null;
-        if (type == StockActionType.RETURN) {
-            locks.issues(List.of(issueId));
-            var issue = issues.selectByPrimaryKey(issueId);
-            if (issue == null || !MaterialIssueStatus.CONFIRMED.getValue().equals(issue.getStatus()))
+                    || !StockDocumentStatus.POSTED.getValue().equals(document.getStatus())
+                    || document.getSourceExecutionId() == null)
                 ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
-            var f = new MesMaterialIssueInputExample();
-            f.createCriteria().andIssueIdEqualTo(issueId);
-            var found = inputs.selectByExampleWithBLOBs(f);
-            if (found.size() != 1) ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
-            input = found.getFirst();
-            if (!Boolean.TRUE.equals(input.getStockApplied()) || input.getConfirmedAt() == null
-                    || !Mode.LOCAL_ONLY.getValue().equals(input.getSourceMode()) || !c.stockId()
-                    .equals(input.getStockId())) ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
+            Long executionId = document.getSourceExecutionId();
+            locks.execution(executionId);
+            document = documents.selectByPrimaryKey(c.documentId());
+            if (document == null || !Objects.equals(executionId, document.getSourceExecutionId())
+                    || !StockDocumentType.MATERIAL_ISSUE.getValue().equals(document.getDocumentType())
+                    || !StockDocumentStatus.POSTED.getValue().equals(document.getStatus()))
+                ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
+            input = document;
+            if (input.getProductionRequestId() == null) ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
+            if (!Boolean.TRUE.equals(input.getProductionStockApplied()) || input.getProductionConfirmedAt() == null
+                    || !Mode.LOCAL_ONLY.getValue().equals(input.getProductionSourceMode()) || !c.stockId()
+                    .equals(productionLine(input).getStockId())) ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
         }
         var old = replay(id, hash);
         if (old != null) return old;
@@ -164,7 +176,7 @@ public class LocalStockService {
         if (old != null) return old;
         if (input == null) sources.warehouse(BusinessSource.LOCAL.getValue(), stock.getWarehouseId());
         else {
-            var originalExecution = locks.execution(input.getExecutionId());
+            var originalExecution = locks.execution(input.getSourceExecutionId());
             sources.frozenLocal(originalExecution.getWorkorderId(), stock.getWarehouseId());
         }
         if (stock.getQuantity()
@@ -184,29 +196,29 @@ public class LocalStockService {
         String reference = null;
         if (input != null) {
             // No physical consumption attribution exists after production starts. Keep product input unchanged.
-            var execution = locks.execution(input.getExecutionId());
+            var execution = locks.execution(input.getSourceExecutionId());
             sources.frozenLocal(execution.getWorkorderId(), stock.getWarehouseId());
             var rf = new MesProductionReportExample();
-            rf.createCriteria().andExecutionIdEqualTo(input.getExecutionId());
+            rf.createCriteria().andExecutionIdEqualTo(input.getSourceExecutionId());
             var df = new MesProductionDefectExample();
-            df.createCriteria().andExecutionIdEqualTo(input.getExecutionId());
+            df.createCriteria().andExecutionIdEqualTo(input.getSourceExecutionId());
             var pf = new MesProductionReceiptExample();
-            pf.createCriteria().andExecutionIdEqualTo(input.getExecutionId());
+            pf.createCriteria().andExecutionIdEqualTo(input.getSourceExecutionId());
             if (execution.getStartTime() != null || reports.countByExample(rf) != 0
                     || defects.countByExample(df) != 0 || receipts.countByExample(pf) != 0)
                 ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
-            var original = actions.selectByPrimaryKey(input.getId());
+            var original = actions.selectByPrimaryKey(input.getProductionRequestId());
             if (original == null || !StockActionType.ISSUE.getValue().equals(original.getActionType()))
                 ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
-            var calculation = json.readValue(input.getCalculationJson(), Calculation.class);
-            identity(stock, calculation);
-            if (returned(original.getId()).add(delta).compareTo(calculation.issueQty()) > 0)
+            var line = productionLine(input);
+            identity(stock, line);
+            if (returned(original.getId()).add(delta).compareTo(line.getQuantity()) > 0)
                 ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
             reference = original.getId();
         }
         return change(stock, id, hash, type, delta, input == null ? StockSourceType.INVENTORY : StockSourceType.MATERIAL_ISSUE,
-                input == null ? stock.getId().toString() : input.getIssueId().toString(), reference,
-                Optional.ofNullable(input).map(nullableValue -> nullableValue.getExecutionId())
+                input == null ? stock.getId().toString() : input.getId().toString(), reference,
+                Optional.ofNullable(input).map(nullableValue -> nullableValue.getSourceExecutionId())
                         .orElse(null), actor, c.reason());
     }
 
@@ -214,12 +226,12 @@ public class LocalStockService {
      * Serialize the first Input reference with zero-source deletion; does not apply stock.
      */
     @Transactional(transactionManager = "businessTransactionManager", propagation = Propagation.MANDATORY)
-    public void validateInputSource(MesMaterialIssueInputEntity input, Calculation calculation) {
+    public void validateInputSource(WmStockDocumentEntity input, Calculation calculation) {
         requireLocal(input, calculation);
         locks.order(calculation.order().workorderId());
         var sourceOrder = sources.order(calculation.order().workorderId());
         sources.warehouse(sourceOrder.getSource(), calculation.stock().warehouseId());
-        var stock = lock(input.getStockId());
+        var stock = lock(productionLine(input).getStockId());
         identity(stock, calculation);
         if (!EnableStatus.ENABLED.getValue().equals(stock.getStatus())
                 || stock.getQuantity().compareTo(calculation.issueQty()) < 0
@@ -228,24 +240,43 @@ public class LocalStockService {
     }
 
     /**
-     * Legacy stock_applied remains authoritative; no synthetic historical ISSUE is created.
+     * Reverse the unified line quantity against its original issue action; preserve the original request hash.
      */
     @Transactional(transactionManager = "businessTransactionManager", propagation = Propagation.MANDATORY, rollbackFor = Exception.class)
     @BusinessCacheEvict(business = WmInventoryResource.PREFIX, scope = BusinessCacheEvict.Scope.LIST_AND_DETAIL)
-    public void reverse(MesMaterialIssueInputEntity input, Calculation calculation, String operationId) {
+    public void reverse(WmStockDocumentEntity input, Calculation calculation, String operationId) {
         requireLocal(input, calculation);
-        sources.frozenLocal(calculation.order().workorderId(), calculation.stock().warehouseId());
-        var stock = lock(input.getStockId());
-        identity(stock, calculation);
-        String id = uuid(operationId), hash = digest(StockActionType.REVERSAL, input.getId(), operationId);
+        var line = productionLine(input);
+        sources.frozenLocal(input.getSourceWorkorderId(), line.getWarehouseId());
+        var stock = lock(line.getStockId());
+        identity(stock, line);
+        String id = uuid(operationId), hash = digest(StockActionType.REVERSAL, input.getProductionRequestId(), operationId);
         if (replay(id, hash) != null) return;
-        var original = actions.selectByPrimaryKey(input.getId());
-        BigDecimal delta = calculation.issueQty().subtract(returned(input.getId()));
+        var original = actions.selectByPrimaryKey(input.getProductionRequestId());
+        BigDecimal delta = line.getQuantity().subtract(returned(input.getProductionRequestId()));
         if (delta.signum() < 0) ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
         change(stock, id, hash, StockActionType.REVERSAL, delta, StockSourceType.MATERIAL_ISSUE,
-                input.getIssueId().toString(), Optional.ofNullable(original).map(nullableValue -> nullableValue.getId())
-                        .orElse(null), input.getExecutionId(),
+                input.getId().toString(), Optional.ofNullable(original).map(nullableValue -> nullableValue.getId())
+                        .orElse(null), input.getSourceExecutionId(),
                 SecurityUtils.getUserId(), original == null ? "历史领料撤销，按原冻结投入恢复余额" : "原领料整单撤销，扣除已退材料后恢复");
+    }
+
+    public boolean hasRecordedReversal(WmStockDocumentEntity input, Calculation calculation,
+                                       String operationId) {
+        String id = uuid(operationId);
+        var action = actions.selectByPrimaryKey(id);
+        if (action == null) return false;
+        String hash = digest(StockActionType.REVERSAL, input.getProductionRequestId(), operationId);
+        BigDecimal expectedDelta = productionLine(input).getQuantity().subtract(returned(input.getProductionRequestId()));
+        if (!hash.equals(action.getRequestHash())
+                || !StockActionType.REVERSAL.getValue().equals(action.getActionType())
+                || !StockSourceType.MATERIAL_ISSUE.getValue().equals(action.getSourceType())
+                || !Objects.equals(input.getProductionRequestId(), action.getReferenceActionId())
+                || !Objects.equals(productionLine(input).getStockId(), action.getStockId())
+                || !Objects.equals(input.getSourceExecutionId(), action.getExecutionId())
+                || action.getQuantityDelta().compareTo(expectedDelta) != 0)
+            ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
+        return true;
     }
 
     /**
@@ -256,15 +287,16 @@ public class LocalStockService {
      */
     @Transactional(transactionManager = "businessTransactionManager", propagation = Propagation.MANDATORY, rollbackFor = Exception.class)
     @BusinessCacheEvict(business = WmInventoryResource.PREFIX, scope = BusinessCacheEvict.Scope.LIST_AND_DETAIL)
-    public WmStockActionEntity postDocument(String type, Long documentId, WmStockDocumentLineEntity line,
+    public WmStockActionEntity postDocument(String direction, String type, Long documentId, WmStockDocumentLineEntity line,
                                             String operationId, String actionId, String requestHash, String reason,
-                                            Long executionId, Long materialIssueId) {
+                                            Long executionId) {
         var purpose = StockDocumentType.from(type);
-        if (purpose == null || !purpose.isApprovalAvailable())
+        var flow = StockDocumentDirection.from(direction);
+        if (purpose == null || flow == null || purpose.getDirection() != flow || !purpose.isApprovalAvailable())
             ParameterChecks.reject(ErrorCode.STOCK_DOCUMENT_SOURCE_PENDING);
-        var actionType = purpose.isReceipt() ? StockActionType.OTHER_RECEIPT : StockActionType.OTHER_ISSUE;
-        var sourceType = purpose.isReceipt() ? StockSourceType.OTHER_RECEIPT : StockSourceType.OTHER_ISSUE;
-        if (purpose == StockDocumentType.MATERIAL_ISSUE) {
+        var actionType = flow == StockDocumentDirection.IN ? StockActionType.OTHER_RECEIPT : StockActionType.OTHER_ISSUE;
+        var sourceType = flow == StockDocumentDirection.IN ? StockSourceType.OTHER_RECEIPT : StockSourceType.OTHER_ISSUE;
+        if (purpose == StockDocumentType.MATERIAL_ISSUE && flow == StockDocumentDirection.OUT) {
             actionType = StockActionType.ISSUE;
             sourceType = StockSourceType.MATERIAL_ISSUE;
         }
@@ -282,15 +314,11 @@ public class LocalStockService {
                 || !Objects.equals(stock.getBinCode(), line.getBinCode())
                 || material == null || !Objects.equals(material.getUnitId(), line.getUnitId()))
             ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
-        if (!purpose.isReceipt() && (stock.getQuantity().compareTo(line.getQuantity()) < 0
+        if (flow == StockDocumentDirection.OUT && (stock.getQuantity().compareTo(line.getQuantity()) < 0
                 || available(stock).compareTo(line.getQuantity()) < 0))
             throw new FoundationException(ErrorCode.STOCK_INSUFFICIENT);
-        BigDecimal delta = purpose.isReceipt() ? line.getQuantity() : line.getQuantity().negate();
+        BigDecimal delta = flow == StockDocumentDirection.IN ? line.getQuantity() : line.getQuantity().negate();
         String sourceId = documentId.toString();
-        if (purpose == StockDocumentType.MATERIAL_ISSUE) {
-            if (materialIssueId == null) ParameterChecks.reject(ErrorCode.STOCK_DOCUMENT_SOURCE_PENDING);
-            sourceId = materialIssueId.toString();
-        }
 
         return change(stock, actionId, requestHash, actionType, delta, sourceType, sourceId,
                 null, executionId, SecurityUtils.getUserId(), reason, line.getId(), operationId);
@@ -308,9 +336,9 @@ public class LocalStockService {
     public boolean referenced(Long stockId) {
         var f = new WmStockActionExample();
         f.createCriteria().andStockIdEqualTo(stockId);
-        var i = new MesMaterialIssueInputExample();
-        i.createCriteria().andStockIdEqualTo(stockId);
-        return actions.countByExample(f) > 0 || inputs.countByExample(i) > 0;
+        var line = new WmStockDocumentLineExample();
+        line.createCriteria().andStockIdEqualTo(stockId);
+        return actions.countByExample(f) > 0 || documentLines.countByExample(line) > 0;
     }
 
     private WmStockActionEntity change(WmInventoryEntity stock, String id, String hash, StockActionType type,
@@ -385,9 +413,29 @@ public class LocalStockService {
         return actions.sumReturns(original, StockActionType.RETURN.getValue());
     }
 
-    private static void requireLocal(MesMaterialIssueInputEntity input, Calculation calculation) {
-        if (!Mode.LOCAL_ONLY.getValue().equals(input.getSourceMode())
+    private WmStockDocumentLineEntity productionLine(WmStockDocumentEntity document) {
+        var filter = new WmStockDocumentLineExample();
+        filter.createCriteria().andDocumentIdEqualTo(document.getId());
+        var lines = documentLines.selectByExample(filter);
+        if (lines.size() != 1 || lines.getFirst().getStockId() == null)
+            throw new FoundationException(ErrorCode.RESOURCE_CONFLICT);
+        return lines.getFirst();
+    }
+
+    private static void requireLocal(WmStockDocumentEntity input, Calculation calculation) {
+        if (!Mode.LOCAL_ONLY.getValue().equals(input.getProductionSourceMode())
                 || !Mode.LOCAL_ONLY.getValue().equals(calculation.sourceMode()))
+            ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
+    }
+
+    private void identity(WmInventoryEntity stock, WmStockDocumentLineEntity line) {
+        var material = materials.selectByPrimaryKey(stock.getMaterialId());
+        if (!Objects.equals(stock.getId(), line.getStockId())
+                || !Objects.equals(stock.getMaterialId(), line.getMaterialId())
+                || !Objects.equals(stock.getWarehouseId(), line.getWarehouseId())
+                || !Objects.equals(stock.getBatchNo(), line.getBatchNo())
+                || !Objects.equals(stock.getBinCode(), line.getBinCode())
+                || material == null || !Objects.equals(material.getUnitId(), line.getUnitId()))
             ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
     }
 

@@ -4,8 +4,6 @@ import dev.mesbase.business.basic.dao.MaterialMapper;
 import dev.mesbase.business.basic.dao.UnitMeasureMapper;
 import dev.mesbase.business.basic.domain.MaterialEntity;
 import dev.mesbase.business.basic.domain.MaterialExample;
-import dev.mesbase.business.issue.dao.MesMaterialIssueItemMapper;
-import dev.mesbase.business.issue.domain.MesMaterialIssueItemExample;
 import dev.mesbase.business.production.dao.MesWorkorderMaterialMapper;
 import dev.mesbase.business.production.domain.MesWorkorderMaterialExample;
 import dev.mesbase.business.production.dao.RoutingProductMapper;
@@ -41,14 +39,13 @@ public class MaterialUnitRules {
     private final WmStockActionMapper actions;
     private final WmStockDocumentLineMapper documents;
     private final MesWorkorderMaterialMapper demands;
-    private final MesMaterialIssueItemMapper issues;
     private final RoutingProductMapper products;
     private final WorkorderMapper orders;
     private final MesProductionExecutionMapper executions;
 
     public MaterialUnitRules(MaterialMapper materials, UnitMeasureMapper units, WmInventoryMapper stocks,
                              WmStockActionMapper actions, WmStockDocumentLineMapper documents,
-                             MesWorkorderMaterialMapper demands, MesMaterialIssueItemMapper issues,
+                             MesWorkorderMaterialMapper demands,
                              RoutingProductMapper products, WorkorderMapper orders,
                              MesProductionExecutionMapper executions, ObjectProvider<MaterialBomService> bom) {
         this.bom = bom;
@@ -58,7 +55,6 @@ public class MaterialUnitRules {
         this.actions = actions;
         this.documents = documents;
         this.demands = demands;
-        this.issues = issues;
         this.products = products;
         this.orders = orders;
         this.executions = executions;
@@ -86,8 +82,6 @@ public class MaterialUnitRules {
         document.createCriteria().andMaterialIdEqualTo(id);
         var demand = new MesWorkorderMaterialExample();
         demand.createCriteria().andMaterialIdEqualTo(id);
-        var issue = new MesMaterialIssueItemExample();
-        issue.createCriteria().andMaterialIdEqualTo(id);
         var product = new RoutingProductExample();
         product.createCriteria().andMaterialIdEqualTo(id);
         var order = new WorkorderExample();
@@ -96,7 +90,7 @@ public class MaterialUnitRules {
         execution.createCriteria().andProductIdEqualTo(id);
         if (stocks.countByExample(stock) > 0 || actions.countByExample(action) > 0
                 || documents.countByExample(document) > 0 || demands.countByExample(demand) > 0
-                || issues.countByExample(issue) > 0 || products.countByExample(product) > 0
+                || products.countByExample(product) > 0
                 || orders.countByExample(order) > 0 || executions.countByExample(execution) > 0) conflict();
     }
 
@@ -120,11 +114,8 @@ public class MaterialUnitRules {
         document.createCriteria().andUnitIdIn(ids);
         var demand = new MesWorkorderMaterialExample();
         demand.createCriteria().andUnitIdIn(ids);
-        var issue = new MesMaterialIssueItemExample();
-        issue.createCriteria().andUnitIdIn(ids);
         if (materials.countByExample(material) > 0 || actions.countByExample(action) > 0
-                || documents.countByExample(document) > 0 || demands.countByExample(demand) > 0
-                || issues.countByExample(issue) > 0) conflict();
+                || documents.countByExample(document) > 0 || demands.countByExample(demand) > 0) conflict();
     }
 
     private void missing() {

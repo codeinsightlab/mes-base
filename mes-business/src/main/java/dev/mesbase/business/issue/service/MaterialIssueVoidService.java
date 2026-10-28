@@ -1,121 +1,126 @@
 package dev.mesbase.business.issue.service;
 
-import dev.mesbase.business.issue.dao.MesMaterialIssueMapper;
-import dev.mesbase.business.integration.warehouse.ErpActionResult.Mode;
-import dev.mesbase.business.issue.domain.MaterialIssueStatus;
 import dev.mesbase.business.issue.domain.MaterialIssueSubmissionStatus;
-import dev.mesbase.business.issue.domain.MesMaterialIssueEntity;
-import dev.mesbase.business.issue.domain.MesMaterialIssueResource;
-import dev.mesbase.business.production.dao.WorkorderMapper;
-import dev.mesbase.business.production.domain.ProductionExecutionStatus;
 import dev.mesbase.business.production.service.ProductionExecutionRules;
 import dev.mesbase.business.production.service.ProductionQuantityService;
+import dev.mesbase.business.wm.domain.StockDocumentModels;
+import dev.mesbase.business.wm.domain.StockDocumentStatus;
+import dev.mesbase.business.wm.domain.StockDocumentType;
+import dev.mesbase.business.wm.domain.WmStockDocumentEntity;
+import dev.mesbase.business.wm.service.StockDocumentService;
 import dev.mesbase.core.error.ErrorCode;
 import dev.mesbase.core.error.FoundationException;
 import dev.mesbase.infrastructure.cache.annotation.BusinessCacheEvict;
 import java.time.LocalDateTime;
-import java.util.List;
-import java.util.Set;
+import java.util.Objects;
 import java.util.UUID;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
 
-/** LOCAL cancellation, input reduction and reversal commit in one business transaction. */
+/** LOCAL production-input reversal, stored on the production-input fact and unified stock document. */
 @Service
 @ConditionalOnProperty(name = "mes.business.enabled", havingValue = "true")
 public class MaterialIssueVoidService {
-    private static final String LOCAL_SOURCE = Mode.LOCAL_ONLY.getValue();
-    private final MesMaterialIssueMapper issues;
-    private final WorkorderMapper orders;
-    private final MaterialIssueRules rules;
-    private final ProductionExecutionRules executions;
+    private final StockDocumentService documents;
     private final MaterialIssueInputFacts inputFacts;
+    private final ProductionExecutionRules executions;
     private final ProductionQuantityService quantities;
 
-    public MaterialIssueVoidService(MesMaterialIssueMapper issues, WorkorderMapper orders, MaterialIssueRules rules,
-                                    ProductionExecutionRules executions, MaterialIssueInputFacts inputFacts,
-                                    ProductionQuantityService quantities) {
-        this.issues = issues;
-        this.orders = orders;
-        this.rules = rules;
-        this.executions = executions;
+    public MaterialIssueVoidService(StockDocumentService documents, MaterialIssueInputFacts inputFacts,
+                                    ProductionExecutionRules executions, ProductionQuantityService quantities) {
+        this.documents = documents;
         this.inputFacts = inputFacts;
+        this.executions = executions;
         this.quantities = quantities;
     }
 
     @Transactional(transactionManager = "businessTransactionManager", isolation = Isolation.READ_COMMITTED,
             rollbackFor = Exception.class)
-    @BusinessCacheEvict(business = MesMaterialIssueResource.PREFIX, scope = BusinessCacheEvict.Scope.LIST_AND_DETAIL)
-    public MesMaterialIssueEntity cancel(Long id) {
-        return perform(id, false);
+    @BusinessCacheEvict(business = "business:wm:stock:document", scope = BusinessCacheEvict.Scope.LIST_AND_DETAIL)
+    public Result cancel(Long documentId) {
+        return perform(documentId, false);
     }
 
     @Transactional(transactionManager = "businessTransactionManager", isolation = Isolation.READ_COMMITTED,
             rollbackFor = Exception.class)
-    @BusinessCacheEvict(business = MesMaterialIssueResource.PREFIX, scope = BusinessCacheEvict.Scope.LIST_AND_DETAIL)
-    public MesMaterialIssueEntity reconcile(Long id) {
-        return perform(id, true);
+    @BusinessCacheEvict(business = "business:wm:stock:document", scope = BusinessCacheEvict.Scope.LIST_AND_DETAIL)
+    public Result reconcile(Long documentId) {
+        return perform(documentId, true);
     }
 
-    private MesMaterialIssueEntity perform(Long id, boolean recovering) {
-        var row = lock(id);
-        rules.requireLocalFacts(row);
-        boolean pending = Set.of(MaterialIssueStatus.VOID_PENDING.getValue(), MaterialIssueStatus.VOID_UNKNOWN.getValue())
-                .contains(row.getStatus());
-        if (recovering && !pending) return row;
-        if (!recovering && row.getVoidOperationId() != null) return row;
-        if (pending) {
-            if (row.getVoidOperationId() == null || row.getVoidFromStatus() == null)
+    private Result perform(Long documentId, boolean recovering) {
+        var detail = documents.detail(documentId);
+        var document = detail.document();
+        if (!StockDocumentType.MATERIAL_ISSUE.getValue().equals(document.getDocumentType()))
+            throw new FoundationException(ErrorCode.STOCK_DOCUMENT_CONFLICT);
+        var input = inputFacts.find(documentId);
+        if (input == null) {
+            if (recovering) throw new FoundationException(ErrorCode.ISSUE_VOID_CONFLICT);
+            if (!StockDocumentStatus.DRAFT.getValue().equals(document.getStatus()))
                 throw new FoundationException(ErrorCode.ISSUE_VOID_CONFLICT);
-        } else {
-            if (!Set.of(MaterialIssueStatus.DRAFT.getValue(), MaterialIssueStatus.RECORDED.getValue(), MaterialIssueStatus.CONFIRMED.getValue())
-                    .contains(row.getStatus())) throw new FoundationException(ErrorCode.ISSUE_VOID_CONFLICT);
-            validateExecution(row);
-            row.setVoidOperationId(UUID.randomUUID().toString());
-            row.setVoidFromStatus(row.getStatus());
-            row.setVoidRequestedAt(LocalDateTime.now());
-            row.setStatus(MaterialIssueStatus.VOID_PENDING.getValue());
-            save(row);
+            documents.cancel(documentId, new StockDocumentModels.Version(document.getRevision()));
+            return result(documentId, StockDocumentStatus.CANCELLED.getValue(), null);
         }
-        var input = inputFacts.find(id);
-        if (MaterialIssueStatus.CONFIRMED.getValue().equals(row.getVoidFromStatus())
-                && (input == null || input.getConfirmedAt() == null || !Boolean.TRUE.equals(input.getStockApplied())))
-            throw new FoundationException(ErrorCode.RESOURCE_CONFLICT);
-        if (input != null) {
-            if (!LOCAL_SOURCE.equals(input.getSourceMode())) throw new FoundationException(ErrorCode.BUSINESS_SOURCE_CONFLICT);
-            quantities.validateInputReduction(input.getExecutionId());
+        if (!"LOCAL_ONLY".equals(input.getProductionSourceMode()))
+            throw new FoundationException(ErrorCode.BUSINESS_SOURCE_CONFLICT);
+        Long initialExecutionId = input.getSourceExecutionId();
+        executions.lock(initialExecutionId);
+        // All production commands lock WorkOrder -> Execution -> StockDocument. Re-read both
+        // mutable facts only after the shared execution lock, so a waiter observes the winner.
+        document = documents.lockMaterialIssueForVoid(documentId);
+        input = inputFacts.find(documentId);
+        if (input == null || !Objects.equals(initialExecutionId, input.getSourceExecutionId())
+                || !Objects.equals(document.getSourceExecutionId(), input.getSourceExecutionId()))
+            throw new FoundationException(ErrorCode.ISSUE_VOID_CONFLICT);
+        if (!"LOCAL_ONLY".equals(input.getProductionSourceMode()))
+            throw new FoundationException(ErrorCode.BUSINESS_SOURCE_CONFLICT);
+        if (input.getProductionVoidOperationId() != null
+                && MaterialIssueSubmissionStatus.SUCCEEDED.getValue().equals(input.getProductionVoidResultStatus()))
+            return result(documentId, document.getStatus(), input);
+        if (recovering && input.getProductionVoidOperationId() == null)
+            throw new FoundationException(ErrorCode.ISSUE_VOID_CONFLICT);
+        if (!recovering && input.getProductionVoidOperationId() != null)
+            throw new FoundationException(ErrorCode.ISSUE_VOID_CONFLICT);
+        if (!StockDocumentStatus.POSTED.getValue().equals(document.getStatus())
+                || input.getProductionConfirmedAt() == null || !Boolean.TRUE.equals(input.getProductionStockApplied()))
+            throw new FoundationException(ErrorCode.ISSUE_VOID_CONFLICT);
+        if (!recovering) {
+            input.setProductionVoidOperationId(UUID.randomUUID().toString());
+            input.setProductionVoidFromStatus(document.getStatus());
+            input.setProductionVoidRequestedAt(LocalDateTime.now());
+            input.setProductionVoidResultStatus(MaterialIssueSubmissionStatus.SUBMITTING.getValue());
+            save(input);
         }
-        // This appends/replays the real reversal with the original cancellation UUID.
-        inputFacts.voidConfirmed(row);
-        row.setStatus(MaterialIssueStatus.VOIDED.getValue());
-        row.setVoidResultStatus(MaterialIssueSubmissionStatus.SUCCEEDED.getValue());
-        row.setVoidFinishedAt(LocalDateTime.now());
-        save(row);
-        return row;
+        // Pending reversal output is excluded from confirmed production-input quantity.
+        // Validate only after marking this input pending, in the same transaction.
+        quantities.validateInputReduction(input.getSourceExecutionId());
+        inputFacts.voidConfirmed(documentId, input.getProductionVoidOperationId());
+        input.setProductionStockApplied(false);
+        input.setProductionVoidResultStatus(MaterialIssueSubmissionStatus.SUCCEEDED.getValue());
+        input.setProductionVoidFinishedAt(LocalDateTime.now());
+        save(input);
+        return result(documentId, documents.detail(documentId).document().getStatus(), input);
     }
 
-    private void validateExecution(MesMaterialIssueEntity row) {
-        if (row.getExecutionId() == null) return;
-        var execution = executions.lock(row.getExecutionId());
-        if (inputFacts.find(row.getId()) == null && (execution.getStartTime() != null
-                || Set.of(ProductionExecutionStatus.RUNNING.getValue(), ProductionExecutionStatus.FULLY_RECEIVED.getValue())
-                .contains(execution.getStatus())) || !ProductionExecutionStatus.allowsNormalReporting(execution.getStatus()))
-            throw new FoundationException(ErrorCode.EXECUTION_REFERENCED);
+    private void save(WmStockDocumentEntity input) {
+        if (inputFacts.updateVoid(input) != 1) throw new FoundationException(ErrorCode.RESOURCE_CONFLICT);
     }
 
-    private MesMaterialIssueEntity lock(Long id) {
-        rules.lockIssues(List.of(id));
-        var row = issues.selectByPrimaryKey(id);
-        if (row == null) throw new FoundationException(ErrorCode.NOT_FOUND);
-        if (row.getWorkorderId() != null && orders.selectByPrimaryKeyForUpdate(row.getWorkorderId()) == null)
-            throw new FoundationException(ErrorCode.NOT_FOUND);
-        return row;
+    private Result result(Long documentId, String documentStatus, WmStockDocumentEntity input) {
+        if (input == null) return new Result(documentId.toString(), documentStatus, "CANCELLED", null, null, null, null);
+        String productionStatus = switch (input.getProductionVoidResultStatus() == null ? "" : input.getProductionVoidResultStatus()) {
+            case "SUCCEEDED" -> "VOIDED";
+            case "SUBMITTING" -> "VOID_PENDING";
+            case "UNKNOWN" -> "VOID_UNKNOWN";
+            default -> "CONFIRMED";
+        };
+        return new Result(documentId.toString(), documentStatus, productionStatus, input.getProductionVoidOperationId(),
+                input.getProductionVoidResultStatus(), input.getProductionVoidRequestedAt(), input.getProductionVoidFinishedAt());
     }
 
-    private void save(MesMaterialIssueEntity row) {
-        rules.audit(row, false);
-        if (issues.updateByPrimaryKey(row) != 1) throw new FoundationException(ErrorCode.RESOURCE_CONFLICT);
-    }
+    public record Result(String documentId, String documentStatus, String productionInputStatus,
+                         String voidOperationId, String voidResultStatus,
+                         LocalDateTime voidRequestedAt, LocalDateTime voidFinishedAt) { }
 }

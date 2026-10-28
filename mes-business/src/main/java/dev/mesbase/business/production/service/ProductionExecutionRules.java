@@ -7,8 +7,9 @@ import dev.mesbase.business.quality.service.ExecutionQualityReferenceQuery;
 import dev.mesbase.business.production.domain.RoutingStatus;
 import dev.mesbase.business.production.domain.ProductionExecutionStatus;
 import dev.mesbase.business.basic.dao.MaterialMapper;
-import dev.mesbase.business.issue.dao.MesMaterialIssueMapper;
-import dev.mesbase.business.issue.domain.MesMaterialIssueExample;
+import dev.mesbase.business.wm.dao.WmStockDocumentMapper;
+import dev.mesbase.business.wm.domain.WmStockDocumentExample;
+import dev.mesbase.business.wm.domain.StockDocumentType;
 import dev.mesbase.business.production.dao.MesProductionExecutionMapper;
 import dev.mesbase.business.production.dao.RoutingMapper;
 import dev.mesbase.business.production.dao.RoutingProductMapper;
@@ -58,11 +59,11 @@ public class ProductionExecutionRules {
     private final MaterialQuantityRules quantityRules;
     private final RoutingMapper routings;
     private final RoutingProductMapper products;
-    private final MesMaterialIssueMapper issues;
+    private final WmStockDocumentMapper issues;
 
     public ProductionExecutionRules(MesProductionExecutionMapper executions, WorkorderMapper workorders,
                                     MaterialMapper materials, RoutingMapper routings,
-                                    RoutingProductMapper products, MesMaterialIssueMapper issues,
+                                    RoutingProductMapper products, WmStockDocumentMapper issues,
                                     ProductionChainLocks locks, MesExecutionPathMapper paths,
                                     MesExecutionPathNodeMapper pathNodes, MesProductionReportMapper reports,
                                     ProductionQuantityMapper quantities, ExecutionQualityReferenceQuery quality,
@@ -190,8 +191,8 @@ public class ProductionExecutionRules {
     }
 
     private boolean hasIssues(Long id) {
-        var filter = new MesMaterialIssueExample();
-        filter.createCriteria().andExecutionIdEqualTo(id);
+        var filter = new WmStockDocumentExample();
+        filter.createCriteria().andSourceExecutionIdEqualTo(id).andDocumentTypeEqualTo(StockDocumentType.MATERIAL_ISSUE.getValue());
         return issues.countByExample(filter) > 0;
     }
 

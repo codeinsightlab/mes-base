@@ -5,13 +5,14 @@ import dev.mesbase.core.error.ErrorCode;
 import dev.mesbase.core.error.FoundationException;
 import dev.mesbase.business.wm.domain.StockDocumentModels;
 import dev.mesbase.business.wm.domain.StockDocumentType;
+import dev.mesbase.business.wm.domain.StockDocumentDirection;
 import java.util.Arrays;
+import java.time.LocalDateTime;
 import dev.mesbase.business.wm.domain.WmStockDocumentEntity;
 import dev.mesbase.business.wm.domain.WmStockDocumentLineEntity;
 import dev.mesbase.business.wm.service.StockDocumentService;
 import dev.mesbase.business.issue.service.MaterialIssueVoidService;
-import dev.mesbase.business.issue.domain.MesMaterialIssueEntity;
-import dev.mesbase.business.issue.domain.MaterialIssueSubmissionStatus;
+import dev.mesbase.business.issue.service.MaterialIssueVoidService.Result;
 import dev.mesbase.common.utils.SecurityUtils;
 import dev.mesbase.core.security.AuthenticatedActor;
 import dev.mesbase.core.security.AuthorizationService;
@@ -21,9 +22,9 @@ import dev.mesbase.system.service.AutoCodeNumbering;
 import dev.mesbase.system.service.AutoCodeRuleType;
 import dev.mesbase.platform.web.EndpointAccess;
 import jakarta.validation.Valid;
-import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Objects;
+import java.math.BigDecimal;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -58,43 +59,63 @@ public class StockDocumentController {
     @EndpointAccess(EndpointAccess.Kind.AUTHENTICATED)
     public Page page(@ModelAttribute StockDocumentModels.Query query) {
         if (!hasPermission(PERMISSION + "list")) {
-            if (query.documentType() != null && !StockDocumentType.MATERIAL_ISSUE.getValue().equals(query.documentType()))
+            if (!StockDocumentDirection.OUT.getValue().equals(query.direction())
+                    || query.documentType() != null && !StockDocumentType.MATERIAL_ISSUE.getValue().equals(query.documentType()))
                 throw new FoundationException(ErrorCode.FORBIDDEN);
             requirePermission("business:mes:material:issue:list");
-            query = new StockDocumentModels.Query(StockDocumentType.MATERIAL_ISSUE.getValue(), query.status(),
+            query = new StockDocumentModels.Query(StockDocumentDirection.OUT.getValue(), StockDocumentType.MATERIAL_ISSUE.getValue(), query.status(),
                     query.documentNo(), query.offset(), query.limit());
         }
         var page = service.page(query);
         return BeanConversions.convertPage(page, Page.class);
     }
 
-    public record Type(String value, String label, String origin, String requiredDocuments, boolean approvalAvailable,
+    public record Type(String value, String direction, String label, String origin, String requiredDocuments, boolean approvalAvailable,
                        boolean qualityReceipt) {
     }
 
     @GetMapping("/types")
     @EndpointAccess(EndpointAccess.Kind.AUTHENTICATED)
-    public List<Type> types() {
+    public List<Type> types(@RequestParam String direction) {
+        if (StockDocumentDirection.from(direction) == null) throw new FoundationException(ErrorCode.BAD_REQUEST);
         var types = Arrays.stream(StockDocumentType.values());
         if (!hasPermission(PERMISSION + "query")) {
             if (!hasPermission("business:mes:material:issue:list")
                     && !hasPermission("business:mes:material:issue:query"))
                 throw new FoundationException(ErrorCode.FORBIDDEN);
+            if (!StockDocumentDirection.OUT.getValue().equals(direction)) throw new FoundationException(ErrorCode.FORBIDDEN);
             types = types.filter(type -> type == StockDocumentType.MATERIAL_ISSUE);
         }
-        return types.map(type -> new Type(type.getValue(), type.getDescription(),
+        return types.filter(type -> type.getDirection().getValue().equals(direction))
+                .map(type -> new Type(type.getValue(), type.getDirection().getValue(), type.getDescription(),
                         type.getOrigin(), type.getRequiredDocuments(), type.isApprovalAvailable(), type.isQualityReceipt()))
                 .toList();
     }
 
-    public record NumberingRule(String ruleCode, String ruleName, String prefix) { }
+    public record NumberingRule(String typeKey, String ruleCode, String ruleName, String prefix, String preview,
+                                boolean available, String issue) { }
 
     @GetMapping("/numbering-rules")
     @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED, permission = PERMISSION + "create")
-    public List<NumberingRule> numberingRules(@RequestParam String type) {
-        if (!AutoCodeRuleType.supports(type)) throw new FoundationException(ErrorCode.BAD_REQUEST);
-        return autoCodes.rules(type).stream()
-                .map(rule -> new NumberingRule(rule.ruleCode(), rule.ruleName(), rule.prefix())).toList();
+    public List<NumberingRule> numberingRules(@RequestParam String direction) {
+        if (StockDocumentDirection.from(direction) == null) throw new FoundationException(ErrorCode.BAD_REQUEST);
+        String category = StockDocumentDirection.IN.getValue().equals(direction)
+                ? AutoCodeRuleType.STOCK_IN.name() : AutoCodeRuleType.STOCK_OUT.name();
+        var configured = autoCodes.rules(category);
+        return Arrays.stream(StockDocumentType.values())
+                .filter(type -> type.getDirection().getValue().equals(direction))
+                .map(type -> {
+                    var rule = configured.stream().filter(candidate -> type.getValue().equals(candidate.ruleCode())).findFirst();
+                    if (rule.isEmpty()) return new NumberingRule(type.getValue(), type.getValue(), null, null, null, false,
+                            "当前工厂未启用该单据类型对应的编码规则");
+                    try {
+                        return new NumberingRule(type.getValue(), rule.get().ruleCode(), rule.get().ruleName(),
+                                rule.get().prefix(), autoCodes.previewBusinessDocNo(type.getValue(), category), true, null);
+                    } catch (RuntimeException failure) {
+                        return new NumberingRule(type.getValue(), rule.get().ruleCode(), rule.get().ruleName(),
+                                rule.get().prefix(), null, false, "当前编码规则不可用，请检查规则组成");
+                    }
+                }).toList();
     }
 
     @GetMapping("/{id}")
@@ -150,6 +171,31 @@ public class StockDocumentController {
         return view(row);
     }
 
+    @GetMapping("/{id}/production-input-basis")
+    @EndpointAccess(EndpointAccess.Kind.AUTHENTICATED)
+    public ProductionInputBasis productionInputBasis(@PathVariable Long id,
+                                                       @RequestParam(required = false) String documentType) {
+        boolean stockQuery = hasPermission(PERMISSION + "query");
+        if (!stockQuery) {
+            if (!StockDocumentType.MATERIAL_ISSUE.getValue().equals(documentType))
+                throw new FoundationException(ErrorCode.FORBIDDEN);
+            requirePermission("business:mes:material:issue:item:list");
+        }
+        var basis = service.productionInputBasis(id);
+        if (basis == null) return null;
+        return BeanConversions.convert(basis, ProductionInputBasis.class);
+    }
+
+    public record ProductionInputBasis(String requestId, String inputKind, String sourceMode,
+                                       String executionId, String workorderId, String workorderCode,
+                                       String outputQty, String issueQty, String materialId,
+                                       String materialCode, String warehouseId, String unitId, String batchNo,
+                                       String bomId, String bomBaseQty, String bomComponentQty,
+                                       String pathRevision, List<String> routingNodeIds,
+                                       LocalDateTime businessOccurredAt,
+                                       LocalDateTime confirmedAt, Boolean stockApplied,
+                                       String voidOperationId, String voidResultStatus, String pathError) { }
+
     @PostMapping
     @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED, permission = PERMISSION + "create")
     public Detail create(@Valid @RequestBody StockDocumentModels.Create command) {
@@ -202,27 +248,25 @@ public class StockDocumentController {
     @PostMapping("/{id}/actions/void")
     @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED, permission = "business:mes:material:issue:void")
     public MaterialIssueVoidResult voidMaterialIssue(@PathVariable Long id) {
-        return materialIssueVoidResult(id, issueVoid.cancel(service.materialIssueIdentity(id)));
+        return materialIssueVoidResult(issueVoid.cancel(id));
     }
 
     @PostMapping("/{id}/actions/reconcile-void")
     @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED, permission = "business:mes:material:issue:void")
     public MaterialIssueVoidResult reconcileMaterialIssueVoid(@PathVariable Long id) {
-        return materialIssueVoidResult(id, issueVoid.reconcile(service.materialIssueIdentity(id)));
+        return materialIssueVoidResult(issueVoid.reconcile(id));
     }
 
-    private MaterialIssueVoidResult materialIssueVoidResult(Long documentId,
-                                                             MesMaterialIssueEntity issue) {
-        var document = service.detail(documentId).document();
-        return new MaterialIssueVoidResult(documentId.toString(), document.getStatus(), issue.getStatus(),
-                issue.getVoidOperationId(), issue.getVoidResultStatus(), issue.getVoidRequestedAt(),
-                issue.getVoidFinishedAt(), voidMessage(issue));
+    private MaterialIssueVoidResult materialIssueVoidResult(Result result) {
+        return new MaterialIssueVoidResult(result.documentId(), result.documentStatus(), result.productionInputStatus(),
+                result.voidOperationId(), result.voidResultStatus(), result.voidRequestedAt(),
+                result.voidFinishedAt(), voidMessage(result));
     }
 
-    private String voidMessage(MesMaterialIssueEntity issue) {
-        if (MaterialIssueSubmissionStatus.SUCCEEDED.getValue().equals(issue.getVoidResultStatus()))
+    private String voidMessage(Result result) {
+        if ("SUCCEEDED".equals(result.voidResultStatus()))
             return "本地撤销与库存反向事务已完成";
-        if (MaterialIssueSubmissionStatus.UNKNOWN.getValue().equals(issue.getVoidResultStatus()))
+        if ("UNKNOWN".equals(result.voidResultStatus()))
             return "本地撤销结果待恢复";
         return null;
     }
@@ -300,7 +344,7 @@ public class StockDocumentController {
 
     public record Header(String id, String documentNo, String documentType, String status, String reason,
                          String remark, String sourceWorkorderId, String sourceExecutionId,
-                         String sourceMaterialIssueId, String createBy,
+                         String createBy,
                          LocalDateTime createTime,
                          String updateBy, LocalDateTime updateTime, String postedBy, LocalDateTime postedAt,
                          String cancelledBy, LocalDateTime cancelledAt, String revision, String postRequestId) {

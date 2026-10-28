@@ -43,13 +43,13 @@ class MaterialIssueEndpointRetirementHttpTest {
                     .andExpect(status().isOk()).andExpect(jsonPath("document.status").value("DRAFT"))
                     .andReturn().getResponse().getContentAsString();
             var draft = new ObjectMapper().readTree(response).get("document");
-            assertEquals(0, db.queryForObject("SELECT COUNT(*) FROM mes_material_issue_input", Integer.class));
+            assertEquals(0, db.queryForObject("SELECT COUNT(*) FROM wm_stock_document WHERE production_confirmation_status IS NOT NULL", Integer.class));
             assertEquals(0, db.queryForObject("SELECT COUNT(*) FROM wm_stock_action", Integer.class));
             mvc.perform(full(post(StockDocumentHttpTest.ROOT + "/" + draft.get("id").asText() + "/actions/approve"))
                             .content("{\"requestId\":\"" + requestId + "\",\"expectedRevision\":\""
                                     + draft.get("revision").asText() + "\"}"))
                     .andExpect(status().isOk()).andExpect(jsonPath("document.status").value("POSTED"));
-            assertEquals(1, db.queryForObject("SELECT COUNT(*) FROM mes_material_issue_input WHERE confirmed_at IS NOT NULL", Integer.class));
+            assertEquals(1, db.queryForObject("SELECT COUNT(*) FROM wm_stock_document WHERE production_confirmed_at IS NOT NULL", Integer.class));
             assertEquals(1, db.queryForObject("SELECT COUNT(*) FROM wm_stock_action", Integer.class));
         }
     }

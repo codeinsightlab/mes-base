@@ -8,6 +8,10 @@ public interface AutoCodeNumbering {
 
     String getDocNo(String ruleCode, String expectedRuleType);
 
+    String getBusinessDocNo(String businessTypeKey, String expectedRuleType);
+
+    String previewBusinessDocNo(String businessTypeKey, String expectedRuleType);
+
     List<RuleOption> rules(String ruleType);
 
     String uniqueRuleCode(String ruleType);

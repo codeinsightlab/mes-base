@@ -1,9 +1,12 @@
 package dev.mesbase.business.production.service;
 
 import com.github.pagehelper.PageHelper;
-import dev.mesbase.business.issue.dao.MesMaterialIssueMapper;
-import dev.mesbase.business.issue.domain.MaterialIssueStatus;
-import dev.mesbase.business.issue.domain.MesMaterialIssueExample;
+import dev.mesbase.business.wm.dao.WmStockDocumentMapper;
+import dev.mesbase.business.wm.domain.StockDocumentStatus;
+import dev.mesbase.business.issue.domain.MaterialIssueSubmissionStatus;
+import dev.mesbase.business.wm.domain.WmStockDocumentEntity;
+import dev.mesbase.business.wm.domain.WmStockDocumentExample;
+import dev.mesbase.business.wm.domain.StockDocumentType;
 import dev.mesbase.business.production.dao.MesProductionExecutionMapper;
 import dev.mesbase.business.production.dao.WorkOrderExtraMapper;
 import dev.mesbase.business.production.dao.WorkorderMapper;
@@ -36,14 +39,14 @@ public class WorkOrderCompletionService {
     private final WorkorderMapper orders;
     private final WorkOrderExtraMapper queries;
     private final MesProductionExecutionMapper executions;
-    private final MesMaterialIssueMapper issues;
+    private final WmStockDocumentMapper issues;
     private final ProductionQuantityService quantities;
     private final QualityTreatmentService quality;
     private final BusinessSourceRules sources;
     private final StockDocumentExtraMapper inbound;
 
     public WorkOrderCompletionService(WorkorderMapper orders, WorkOrderExtraMapper queries,
-                                      MesProductionExecutionMapper executions, MesMaterialIssueMapper issues,
+                                      MesProductionExecutionMapper executions, WmStockDocumentMapper issues,
                                       ProductionQuantityService quantities, QualityTreatmentService quality,
                                       BusinessSourceRules sources, StockDocumentExtraMapper inbound) {
         this.orders = orders;
@@ -71,11 +74,9 @@ public class WorkOrderCompletionService {
         int allocated = allocation.allocatedTargetQty().compareTo(allocation.plannedQty());
         if (allocated < 0) return "工单执行分配数量不足计划，不能完结";
         if (allocated > 0) return "工单执行分配数量超过计划，须核实数量异常";
-        var pending = new MesMaterialIssueExample();
-        pending.createCriteria().andWorkorderIdEqualTo(id).andStatusNotIn(List.of(
-                MaterialIssueStatus.CONFIRMED.getValue(), MaterialIssueStatus.VOIDED.getValue(),
-                MaterialIssueStatus.SUBMIT_REJECTED.getValue()));
-        if (issues.countByExample(pending) > 0) return "工单仍有未决领料";
+        var pending = new WmStockDocumentExample();
+        pending.createCriteria().andSourceWorkorderIdEqualTo(id).andDocumentTypeEqualTo(StockDocumentType.MATERIAL_ISSUE.getValue());
+        if (hasPendingIssues(issues.selectByExample(pending))) return "工单仍有未决领料";
         if (queries.countUnaccountedInputs(id) > 0) return "工单仍有未归属有效执行的正式投入";
         BigDecimal total = BigDecimal.ZERO;
         long after = 0;
@@ -130,5 +131,24 @@ public class WorkOrderCompletionService {
         patch.setRevision(order.getRevision() + 1);
         patch.setUpdateTime(LocalDateTime.now());
         if (orders.updateByPrimaryKeySelective(patch) != 1) throw new FoundationException(ErrorCode.RESOURCE_CONFLICT);
+    }
+
+    private boolean hasPendingIssues(List<WmStockDocumentEntity> documents) {
+        for (var document : documents) {
+            if (StockDocumentStatus.CANCELLED.getValue().equals(document.getStatus())) continue;
+            if (!StockDocumentStatus.POSTED.getValue().equals(document.getStatus())
+                    && !StockDocumentStatus.DRAFT.getValue().equals(document.getStatus())) return true;
+            String reversal = document.getProductionVoidResultStatus();
+            if ((document.getProductionVoidOperationId() != null || reversal != null)
+                    && (reversal == null || !List.of(MaterialIssueSubmissionStatus.SUCCEEDED.getValue(),
+                    MaterialIssueSubmissionStatus.REJECTED.getValue()).contains(reversal))) return true;
+            String confirmation = document.getProductionConfirmationStatus();
+            if (document.getProductionConfirmationOperationId() != null && confirmation == null) return true;
+            if (confirmation != null && !List.of(MaterialIssueSubmissionStatus.SUCCEEDED.getValue(),
+                    MaterialIssueSubmissionStatus.REJECTED.getValue()).contains(confirmation)) return true;
+            if (StockDocumentStatus.DRAFT.getValue().equals(document.getStatus())
+                    && !MaterialIssueSubmissionStatus.REJECTED.getValue().equals(confirmation)) return true;
+        }
+        return false;
     }
 }

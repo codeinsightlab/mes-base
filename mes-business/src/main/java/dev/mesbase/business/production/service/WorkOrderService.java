@@ -5,8 +5,9 @@ import com.github.pagehelper.PageHelper;
 import dev.mesbase.business.basic.dao.MaterialMapper;
 import dev.mesbase.business.basic.domain.MaterialExample;
 import dev.mesbase.business.directory.service.BusinessDirectoryService;
-import dev.mesbase.business.issue.dao.MesMaterialIssueMapper;
-import dev.mesbase.business.issue.domain.MesMaterialIssueExample;
+import dev.mesbase.business.wm.dao.WmStockDocumentMapper;
+import dev.mesbase.business.wm.domain.WmStockDocumentExample;
+import dev.mesbase.business.wm.domain.StockDocumentType;
 import dev.mesbase.business.production.dao.MesProductionExecutionMapper;
 import dev.mesbase.business.production.dao.MesWorkorderMaterialMapper;
 import dev.mesbase.business.production.dao.RoutingEdgeMapper;
@@ -86,7 +87,7 @@ public class WorkOrderService {
     private final MaterialMapper materials;
     private final MaterialQuantityRules quantityRules;
     private final RoutingReferenceRules references;
-    private final MesMaterialIssueMapper issues;
+    private final WmStockDocumentMapper issues;
     private final WorkOrderExtraMapper queries;
     private final MesProductionExecutionMapper executions;
     private final AutoCodeNumbering autoCodes;
@@ -95,7 +96,7 @@ public class WorkOrderService {
     public WorkOrderService(WorkorderMapper orders, RoutingMapper routings, RoutingProductMapper products,
                             RoutingNodeMapper nodes,
                             RoutingEdgeMapper edges, MaterialMapper materials, RoutingReferenceRules references,
-                            MesMaterialIssueMapper issues, WorkOrderExtraMapper queries,
+                            WmStockDocumentMapper issues, WorkOrderExtraMapper queries,
                             MesProductionExecutionMapper executions, WorkorderErpFacts facts,
                             BusinessDirectoryService directory, MesWorkorderMaterialMapper requirements,
                             BusinessSourceRules sources, WorkorderErpExtraMapper external, SyncCoordinator sync,
@@ -417,8 +418,8 @@ public class WorkOrderService {
 
     private void ensureNoDownstream(Long id) {
         if (hasExecutions(id)) throw new FoundationException(ErrorCode.EXECUTION_REFERENCED);
-        var issueFilter = new MesMaterialIssueExample();
-        issueFilter.createCriteria().andWorkorderIdEqualTo(id);
+        var issueFilter = new WmStockDocumentExample();
+        issueFilter.createCriteria().andSourceWorkorderIdEqualTo(id).andDocumentTypeEqualTo(StockDocumentType.MATERIAL_ISSUE.getValue());
         if (issues.countByExample(issueFilter) > 0)
             throw new FoundationException(ErrorCode.WORKORDER_ISSUE_REFERENCED);
         if (queries.hasOrderDependents(id))

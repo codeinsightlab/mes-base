@@ -215,11 +215,11 @@ class ProductionReportingHttpTest {
             var m = MaterialIssueHttpTest.mvc(c);
             var j = db(c);
             String command = body(11, "1");
-            j.update("UPDATE mes_material_issue_input SET confirmed_at=NULL WHERE execution_id=1");
+            j.update("UPDATE wm_stock_document SET production_confirmed_at=NULL WHERE source_execution_id=1");
             m.perform(ProductionCoreV1HttpTest.full(post(ROOT)).content(command)).andExpect(status().isConflict());
             assertEquals("READY", j.queryForObject("SELECT status FROM mes_production_execution WHERE id=1", String.class));
             assertEquals(0, j.queryForObject("SELECT COUNT(*) FROM mes_production_report", Integer.class));
-            j.update("UPDATE mes_material_issue_input SET confirmed_at=CURRENT_TIMESTAMP WHERE execution_id=1");
+            j.update("UPDATE wm_stock_document SET production_confirmed_at=CURRENT_TIMESTAMP WHERE source_execution_id=1");
             j.update("UPDATE mes_execution_path SET path_status='SELECTED' WHERE id=1");
             m.perform(ProductionCoreV1HttpTest.full(post(ROOT)).content(command)).andExpect(status().isConflict());
             j.update("UPDATE mes_execution_path SET path_status='LOCKED' WHERE id=1");

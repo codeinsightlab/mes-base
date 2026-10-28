@@ -17,6 +17,7 @@ import dev.mesbase.business.wm.dao.WmInventoryMapper;
 import dev.mesbase.business.wm.dao.WmWarehouseMapper;
 import dev.mesbase.business.wm.domain.WarehouseType;
 import dev.mesbase.business.wm.domain.StockDocumentModels;
+import dev.mesbase.business.wm.domain.StockDocumentDirection;
 import dev.mesbase.business.wm.domain.StockDocumentType;
 import dev.mesbase.business.wm.domain.WmInventoryCreateCommand;
 import dev.mesbase.business.wm.domain.WmInventoryExample;
@@ -111,8 +112,14 @@ public class QualityDispositionService {
         if (replayed(declaration, c.requestId(), requestHash)) return treatments.details(declaration);
         String documentNo = null;
         if (c.destination() == Destination.WAREHOUSE) {
-            String ruleCode = autoCodes.uniqueRuleCode(AutoCodeRuleType.STOCK_IN.name());
-            documentNo = autoCodes.getDocNo(ruleCode, AutoCodeRuleType.STOCK_IN.name());
+            var warehouse = warehouses.selectByPrimaryKey(c.warehouseId());
+            if (warehouse == null) ParameterChecks.reject(ErrorCode.RECEIPT_WAREHOUSE_INVALID);
+            var warehouseType = WarehouseType.from(warehouse.getWarehouseType());
+            if (warehouseType != WarehouseType.DEFECTIVE && warehouseType != WarehouseType.SCRAP)
+                ParameterChecks.reject(ErrorCode.RECEIPT_WAREHOUSE_INVALID);
+            var receiptType = warehouseType == WarehouseType.DEFECTIVE
+                    ? StockDocumentType.DEFECT_RECEIPT : StockDocumentType.SCRAP_RECEIPT;
+            documentNo = autoCodes.getBusinessDocNo(receiptType.getValue(), AutoCodeRuleType.STOCK_IN.name());
         }
         String reservedDocumentNo = documentNo;
         return businessTransactions.execute(status -> executeInTransaction(declaration, c, reservedDocumentNo));
@@ -165,8 +172,9 @@ public class QualityDispositionService {
             if (warehouseType != WarehouseType.DEFECTIVE && warehouseType != WarehouseType.SCRAP)
                 ParameterChecks.reject(ErrorCode.RECEIPT_WAREHOUSE_INVALID);
             var receiptType = warehouseType == WarehouseType.DEFECTIVE ? StockDocumentType.DEFECT_RECEIPT : StockDocumentType.SCRAP_RECEIPT;
-            var doc = owner.createQualityReceipt(new StockDocumentModels.Create(receiptType.getValue(), c.reason()
-                    .trim(), "质量申报 " + declaration, null, null), documentNo);
+            var doc = owner.createQualityReceipt(new StockDocumentModels.Create(
+                    StockDocumentDirection.IN.getValue(), receiptType.getValue(), c.reason().trim(),
+                    "质量申报 " + declaration, null, null, receiptType.getValue()), documentNo);
             documentId = doc.document().getId();
             treatments.recordDisposition(declaration, c, hash, documentId);
             references.lockDemandReferences(execution.getProductId(), List.of(c.warehouseId()));

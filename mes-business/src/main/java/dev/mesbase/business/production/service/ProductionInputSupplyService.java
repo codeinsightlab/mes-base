@@ -45,6 +45,8 @@ public class ProductionInputSupplyService {
     private final TransactionTemplate readTransaction;
     private final MaterialQuantityRules quantityRules;
 
+    public record ManualCalculation(String code, Calculation calculation) { }
+
     public ProductionInputSupplyService(WarehouseIntegration integration, LocalProductionSupply local,
                                         @Qualifier("businessTransactionManager") PlatformTransactionManager manager,
                                         BusinessSourceRules sources, ProductionIdentityService identities,
@@ -108,6 +110,24 @@ public class ProductionInputSupplyService {
         Calculation calculation = readTransaction.execute(status -> local.calculate(context.sourceMode(), order, stock, outputQty));
         if (calculation.issueQty().compareTo(stock.availableQty()) > 0) ParameterChecks.reject(ErrorCode.BAD_REQUEST);
         return calculation;
+    }
+
+    @Transactional(transactionManager = "businessTransactionManager", propagation = Propagation.NOT_SUPPORTED)
+    public ManualCalculation calculateManual(Long orderId, String stockReference, BigDecimal outputQty) {
+        String code = manualCode(orderId, stockReference);
+        return new ManualCalculation(code, calculate(code, orderId, stockReference, outputQty));
+    }
+
+    @Transactional(transactionManager = "businessTransactionManager", propagation = Propagation.NOT_SUPPORTED)
+    public String manualCode(Long orderId, String stockReference) {
+        String code = readTransaction.execute(status -> {
+            var order = sources.order(orderId);
+            if (!BusinessSource.LOCAL.getValue().equals(order.getSource()))
+                throw new FoundationException(ErrorCode.BUSINESS_SOURCE_CONFLICT);
+            local.validateRequestedSource(orderId, stockReference);
+            return local.productionCode(orderId, stockReference);
+        });
+        return code;
     }
 
     @Transactional(transactionManager = "businessTransactionManager", propagation = Propagation.MANDATORY)

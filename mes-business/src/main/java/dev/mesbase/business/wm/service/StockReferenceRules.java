@@ -7,8 +7,6 @@ import dev.mesbase.business.wm.dao.WmStockActionMapper;
 import dev.mesbase.business.wm.dao.WmStockDocumentLineMapper;
 import dev.mesbase.business.wm.domain.WmStockDocumentLineExample;
 import dev.mesbase.business.wm.domain.WmStockActionExample;
-import dev.mesbase.business.issue.dao.MesMaterialIssueInputMapper;
-import dev.mesbase.business.issue.domain.MesMaterialIssueInputExample;
 import dev.mesbase.business.basic.dao.MaterialMapper;
 import dev.mesbase.business.basic.domain.MaterialEntity;
 import dev.mesbase.business.basic.domain.MaterialExample;
@@ -40,15 +38,13 @@ public class StockReferenceRules {
     private final WmWarehouseMapper warehouses;
     private final WmInventoryMapper inventories;
     private final WmStockActionMapper actions;
-    private final MesMaterialIssueInputMapper inputs;
 
     public StockReferenceRules(MaterialMapper materials, WmWarehouseMapper warehouses, WmInventoryMapper inventories,
-                               WmStockActionMapper actions, MesMaterialIssueInputMapper inputs,
+                               WmStockActionMapper actions,
                                MesWorkorderMaterialMapper demand, WmStockDocumentLineMapper documentLines) {
         this.documentLines = documentLines;
         this.demand = demand;
         this.actions = actions;
-        this.inputs = inputs;
         this.materials = materials;
         this.warehouses = warehouses;
         this.inventories = inventories;
@@ -67,12 +63,9 @@ public class StockReferenceRules {
     public boolean inventoryReferenced(Long id) {
         var action = new WmStockActionExample();
         action.createCriteria().andStockIdEqualTo(id);
-        var input = new MesMaterialIssueInputExample();
-        input.createCriteria().andStockIdEqualTo(id);
         var document = new WmStockDocumentLineExample();
         document.createCriteria().andStockIdEqualTo(id);
-        return actions.countByExample(action) > 0 || inputs.countByExample(input) > 0
-                || documentLines.countByExample(document) > 0;
+        return actions.countByExample(action) > 0 || documentLines.countByExample(document) > 0;
     }
 
     private void status(String status) {
@@ -169,7 +162,9 @@ public class StockReferenceRules {
         if (demand.countByExample(demandFilter) > 0) throw new FoundationException(ErrorCode.WAREHOUSE_REFERENCED);
         var filter = new WmInventoryExample();
         filter.createCriteria().andWarehouseIdIn(ids);
-        if (inventories.countByExample(filter) > 0)
+        var documentFilter = new WmStockDocumentLineExample();
+        documentFilter.createCriteria().andWarehouseIdIn(ids);
+        if (inventories.countByExample(filter) > 0 || documentLines.countByExample(documentFilter) > 0)
             throw new FoundationException(ErrorCode.WAREHOUSE_REFERENCED);
     }
 
@@ -181,7 +176,9 @@ public class StockReferenceRules {
             throw new FoundationException(ErrorCode.MATERIAL_INVENTORY_REFERENCED);
         var filter = new WmInventoryExample();
         filter.createCriteria().andMaterialIdIn(ids);
-        if (inventories.countByExample(filter) > 0)
+        var documentFilter = new WmStockDocumentLineExample();
+        documentFilter.createCriteria().andMaterialIdIn(ids);
+        if (inventories.countByExample(filter) > 0 || documentLines.countByExample(documentFilter) > 0)
             throw new FoundationException(ErrorCode.MATERIAL_INVENTORY_REFERENCED);
     }
 }

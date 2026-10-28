@@ -5,6 +5,7 @@
     <id column="id" jdbcType="BIGINT" property="id" />
     <result column="document_no" jdbcType="VARCHAR" property="documentNo" />
     <result column="document_type" jdbcType="VARCHAR" property="documentType" />
+    <result column="direction" jdbcType="VARCHAR" property="direction" />
     <result column="status" jdbcType="VARCHAR" property="status" />
     <result column="reason" jdbcType="VARCHAR" property="reason" />
     <result column="remark" jdbcType="VARCHAR" property="remark" />
@@ -21,10 +22,36 @@
     <result column="post_request_id" jdbcType="VARCHAR" property="postRequestId" />
     <result column="post_request_hash" jdbcType="CHAR" property="postRequestHash" />
     <result column="source_execution_id" jdbcType="BIGINT" property="sourceExecutionId" />
-    <result column="source_material_issue_id" jdbcType="BIGINT" property="sourceMaterialIssueId" />
+    <result column="production_workorder_code" jdbcType="VARCHAR" property="productionWorkorderCode" />
+    <result column="production_product_id" jdbcType="BIGINT" property="productionProductId" />
+    <result column="production_product_code" jdbcType="VARCHAR" property="productionProductCode" />
+    <result column="production_routing_id" jdbcType="BIGINT" property="productionRoutingId" />
+    <result column="production_request_id" jdbcType="VARCHAR" property="productionRequestId" />
+    <result column="production_request_hash" jdbcType="CHAR" property="productionRequestHash" />
+    <result column="production_input_kind" jdbcType="VARCHAR" property="productionInputKind" />
+    <result column="production_output_qty" jdbcType="DECIMAL" property="productionOutputQty" />
+    <result column="production_source_mode" jdbcType="VARCHAR" property="productionSourceMode" />
+    <result column="production_request_created_at" jdbcType="TIMESTAMP" property="productionRequestCreatedAt" />
+    <result column="production_confirmed_at" jdbcType="TIMESTAMP" property="productionConfirmedAt" />
+    <result column="production_business_occurred_at" jdbcType="TIMESTAMP" property="productionBusinessOccurredAt" />
+    <result column="production_stock_applied" jdbcType="BIT" property="productionStockApplied" />
+    <result column="production_path_revision" jdbcType="INTEGER" property="productionPathRevision" />
+    <result column="production_confirmation_operation_id" jdbcType="VARCHAR" property="productionConfirmationOperationId" />
+    <result column="production_confirmation_status" jdbcType="VARCHAR" property="productionConfirmationStatus" />
+    <result column="production_submission_created_at" jdbcType="TIMESTAMP" property="productionSubmissionCreatedAt" />
+    <result column="production_submission_finished_at" jdbcType="TIMESTAMP" property="productionSubmissionFinishedAt" />
+    <result column="production_confirmed_path_node_ids" jdbcType="LONGVARCHAR" property="productionConfirmedPathNodeIds" />
+    <result column="production_void_operation_id" jdbcType="VARCHAR" property="productionVoidOperationId" />
+    <result column="production_void_from_status" jdbcType="VARCHAR" property="productionVoidFromStatus" />
+    <result column="production_void_requested_at" jdbcType="TIMESTAMP" property="productionVoidRequestedAt" />
+    <result column="production_void_finished_at" jdbcType="TIMESTAMP" property="productionVoidFinishedAt" />
+    <result column="production_void_result_status" jdbcType="VARCHAR" property="productionVoidResultStatus" />
   </resultMap>
   <resultMap extends="BaseResultMap" id="ResultMapWithBLOBs" type="dev.mesbase.business.wm.domain.WmStockDocumentEntity">
     <result column="source_request_json" jdbcType="LONGVARCHAR" property="sourceRequestJson" />
+    <result column="production_calculation_json" jdbcType="LONGVARCHAR" property="productionCalculationJson" />
+    <result column="production_confirmation_command_json" jdbcType="LONGVARCHAR" property="productionConfirmationCommandJson" />
+
   </resultMap>
   <sql id="Example_Where_Clause">
     <where>
@@ -85,12 +112,12 @@
     </where>
   </sql>
   <sql id="Base_Column_List">
-    id, document_no, document_type, status, reason, remark, source_workorder_id, create_by,
+    id, document_no, document_type, direction, status, reason, remark, source_workorder_id, create_by,
     create_time, update_by, update_time, posted_by, posted_at, cancelled_by, cancelled_at,
-    revision, post_request_id, post_request_hash, source_execution_id, source_material_issue_id
+    revision, post_request_id, post_request_hash, source_execution_id, production_workorder_code, production_product_id, production_product_code, production_routing_id, production_request_id, production_request_hash, production_input_kind, production_output_qty, production_source_mode, production_request_created_at, production_confirmed_at, production_business_occurred_at, production_stock_applied, production_path_revision, production_confirmation_operation_id, production_confirmation_status, production_submission_created_at, production_submission_finished_at, production_confirmed_path_node_ids, production_void_operation_id, production_void_from_status, production_void_requested_at, production_void_finished_at, production_void_result_status
   </sql>
   <sql id="Blob_Column_List">
-    source_request_json
+    source_request_json, production_calculation_json, production_confirmation_command_json
   </sql>
   <select id="selectByExampleWithBLOBs" parameterType="dev.mesbase.business.wm.domain.WmStockDocumentExample" resultMap="ResultMapWithBLOBs">
     select
@@ -135,21 +162,21 @@
     </if>
   </delete>
   <insert id="insert" keyColumn="id" keyProperty="id" parameterType="dev.mesbase.business.wm.domain.WmStockDocumentEntity" useGeneratedKeys="true">
-    insert into wm_stock_document (document_no, document_type, status,
+    insert into wm_stock_document (document_no, document_type, direction, status,
       reason, remark, source_workorder_id,
       create_by, create_time, update_by,
       update_time, posted_by, posted_at,
       cancelled_by, cancelled_at, revision,
-      post_request_id, post_request_hash, source_execution_id,
-      source_material_issue_id, source_request_json
+      post_request_id, post_request_hash, source_execution_id, production_workorder_code, production_product_id, production_product_code, production_routing_id,
+      production_request_id, production_request_hash, production_input_kind, production_output_qty, production_source_mode, production_request_created_at, production_confirmed_at, production_business_occurred_at, production_stock_applied, production_path_revision, production_confirmation_operation_id, production_confirmation_status, production_submission_created_at, production_submission_finished_at, production_confirmed_path_node_ids, production_void_operation_id, production_void_from_status, production_void_requested_at, production_void_finished_at, production_void_result_status, source_request_json, production_calculation_json, production_confirmation_command_json
       )
-    values (#{documentNo,jdbcType=VARCHAR}, #{documentType,jdbcType=VARCHAR}, #{status,jdbcType=VARCHAR},
+    values (#{documentNo,jdbcType=VARCHAR}, #{documentType,jdbcType=VARCHAR}, #{direction,jdbcType=VARCHAR}, #{status,jdbcType=VARCHAR},
       #{reason,jdbcType=VARCHAR}, #{remark,jdbcType=VARCHAR}, #{sourceWorkorderId,jdbcType=BIGINT},
       #{createBy,jdbcType=VARCHAR}, #{createTime,jdbcType=TIMESTAMP}, #{updateBy,jdbcType=VARCHAR},
       #{updateTime,jdbcType=TIMESTAMP}, #{postedBy,jdbcType=BIGINT}, #{postedAt,jdbcType=TIMESTAMP},
       #{cancelledBy,jdbcType=BIGINT}, #{cancelledAt,jdbcType=TIMESTAMP}, #{revision,jdbcType=BIGINT},
-      #{postRequestId,jdbcType=VARCHAR}, #{postRequestHash,jdbcType=CHAR}, #{sourceExecutionId,jdbcType=BIGINT},
-      #{sourceMaterialIssueId,jdbcType=BIGINT}, #{sourceRequestJson,jdbcType=LONGVARCHAR}
+      #{postRequestId,jdbcType=VARCHAR}, #{postRequestHash,jdbcType=CHAR}, #{sourceExecutionId,jdbcType=BIGINT}, #{productionWorkorderCode,jdbcType=VARCHAR}, #{productionProductId,jdbcType=BIGINT}, #{productionProductCode,jdbcType=VARCHAR}, #{productionRoutingId,jdbcType=BIGINT},
+      #{productionRequestId,jdbcType=VARCHAR}, #{productionRequestHash,jdbcType=CHAR}, #{productionInputKind,jdbcType=VARCHAR}, #{productionOutputQty,jdbcType=DECIMAL}, #{productionSourceMode,jdbcType=VARCHAR}, #{productionRequestCreatedAt,jdbcType=TIMESTAMP}, #{productionConfirmedAt,jdbcType=TIMESTAMP}, #{productionBusinessOccurredAt,jdbcType=TIMESTAMP}, #{productionStockApplied,jdbcType=BIT}, #{productionPathRevision,jdbcType=INTEGER}, #{productionConfirmationOperationId,jdbcType=VARCHAR}, #{productionConfirmationStatus,jdbcType=VARCHAR}, #{productionSubmissionCreatedAt,jdbcType=TIMESTAMP}, #{productionSubmissionFinishedAt,jdbcType=TIMESTAMP}, #{productionConfirmedPathNodeIds,jdbcType=LONGVARCHAR}, #{productionVoidOperationId,jdbcType=VARCHAR}, #{productionVoidFromStatus,jdbcType=VARCHAR}, #{productionVoidRequestedAt,jdbcType=TIMESTAMP}, #{productionVoidFinishedAt,jdbcType=TIMESTAMP}, #{productionVoidResultStatus,jdbcType=VARCHAR}, #{sourceRequestJson,jdbcType=LONGVARCHAR}, #{productionCalculationJson,jdbcType=LONGVARCHAR}, #{productionConfirmationCommandJson,jdbcType=LONGVARCHAR}
       )
   </insert>
   <insert id="insertSelective" keyColumn="id" keyProperty="id" parameterType="dev.mesbase.business.wm.domain.WmStockDocumentEntity" useGeneratedKeys="true">
@@ -160,6 +187,9 @@
       </if>
       <if test="documentType != null">
         document_type,
+      </if>
+      <if test="direction != null">
+        direction,
       </if>
       <if test="status != null">
         status,
@@ -209,12 +239,88 @@
       <if test="sourceExecutionId != null">
         source_execution_id,
       </if>
-      <if test="sourceMaterialIssueId != null">
-        source_material_issue_id,
+      <if test="productionWorkorderCode != null">
+        production_workorder_code,
       </if>
-      <if test="sourceRequestJson != null">
+      <if test="productionProductId != null">
+        production_product_id,
+      </if>
+      <if test="productionProductCode != null">
+        production_product_code,
+      </if>
+      <if test="productionRoutingId != null">
+        production_routing_id,
+      </if>
+      <if test="productionRequestId != null">
+        production_request_id,
+      </if>
+      <if test="productionRequestHash != null">
+        production_request_hash,
+      </if>
+      <if test="productionInputKind != null">
+        production_input_kind,
+      </if>
+      <if test="productionOutputQty != null">
+        production_output_qty,
+      </if>
+      <if test="productionSourceMode != null">
+        production_source_mode,
+      </if>
+      <if test="productionRequestCreatedAt != null">
+        production_request_created_at,
+      </if>
+      <if test="productionConfirmedAt != null">
+        production_confirmed_at,
+      </if>
+      <if test="productionBusinessOccurredAt != null">
+        production_business_occurred_at,
+      </if>
+      <if test="productionStockApplied != null">
+        production_stock_applied,
+      </if>
+      <if test="productionPathRevision != null">
+        production_path_revision,
+      </if>
+      <if test="productionConfirmationOperationId != null">
+        production_confirmation_operation_id,
+      </if>
+      <if test="productionConfirmationStatus != null">
+        production_confirmation_status,
+      </if>
+      <if test="productionSubmissionCreatedAt != null">
+        production_submission_created_at,
+      </if>
+      <if test="productionSubmissionFinishedAt != null">
+        production_submission_finished_at,
+      </if>
+      <if test="productionConfirmedPathNodeIds != null">
+        production_confirmed_path_node_ids,
+      </if>
+      <if test="productionVoidOperationId != null">
+        production_void_operation_id,
+      </if>
+      <if test="productionVoidFromStatus != null">
+        production_void_from_status,
+      </if>
+      <if test="productionVoidRequestedAt != null">
+        production_void_requested_at,
+      </if>
+      <if test="productionVoidFinishedAt != null">
+        production_void_finished_at,
+      </if>
+      <if test="productionVoidResultStatus != null">
+        production_void_result_status,
+      </if>
+<if test="sourceRequestJson != null">
         source_request_json,
       </if>
+      <if test="productionCalculationJson != null">
+        production_calculation_json,
+      </if>
+      <if test="productionConfirmationCommandJson != null">
+        production_confirmation_command_json,
+      </if>
+
     </trim>
     <trim prefix="values (" suffix=")" suffixOverrides=",">
       <if test="documentNo != null">
@@ -222,6 +328,9 @@
       </if>
       <if test="documentType != null">
         #{documentType,jdbcType=VARCHAR},
+      </if>
+      <if test="direction != null">
+        #{direction,jdbcType=VARCHAR},
       </if>
       <if test="status != null">
         #{status,jdbcType=VARCHAR},
@@ -271,12 +380,88 @@
       <if test="sourceExecutionId != null">
         #{sourceExecutionId,jdbcType=BIGINT},
       </if>
-      <if test="sourceMaterialIssueId != null">
-        #{sourceMaterialIssueId,jdbcType=BIGINT},
+      <if test="productionWorkorderCode != null">
+        #{productionWorkorderCode,jdbcType=VARCHAR},
       </if>
-      <if test="sourceRequestJson != null">
+      <if test="productionProductId != null">
+        #{productionProductId,jdbcType=BIGINT},
+      </if>
+      <if test="productionProductCode != null">
+        #{productionProductCode,jdbcType=VARCHAR},
+      </if>
+      <if test="productionRoutingId != null">
+        #{productionRoutingId,jdbcType=BIGINT},
+      </if>
+      <if test="productionRequestId != null">
+        #{productionRequestId,jdbcType=VARCHAR},
+      </if>
+      <if test="productionRequestHash != null">
+        #{productionRequestHash,jdbcType=CHAR},
+      </if>
+      <if test="productionInputKind != null">
+        #{productionInputKind,jdbcType=VARCHAR},
+      </if>
+      <if test="productionOutputQty != null">
+        #{productionOutputQty,jdbcType=DECIMAL},
+      </if>
+      <if test="productionSourceMode != null">
+        #{productionSourceMode,jdbcType=VARCHAR},
+      </if>
+      <if test="productionRequestCreatedAt != null">
+        #{productionRequestCreatedAt,jdbcType=TIMESTAMP},
+      </if>
+      <if test="productionConfirmedAt != null">
+        #{productionConfirmedAt,jdbcType=TIMESTAMP},
+      </if>
+      <if test="productionBusinessOccurredAt != null">
+        #{productionBusinessOccurredAt,jdbcType=TIMESTAMP},
+      </if>
+      <if test="productionStockApplied != null">
+        #{productionStockApplied,jdbcType=BIT},
+      </if>
+      <if test="productionPathRevision != null">
+        #{productionPathRevision,jdbcType=INTEGER},
+      </if>
+      <if test="productionConfirmationOperationId != null">
+        #{productionConfirmationOperationId,jdbcType=VARCHAR},
+      </if>
+      <if test="productionConfirmationStatus != null">
+        #{productionConfirmationStatus,jdbcType=VARCHAR},
+      </if>
+      <if test="productionSubmissionCreatedAt != null">
+        #{productionSubmissionCreatedAt,jdbcType=TIMESTAMP},
+      </if>
+      <if test="productionSubmissionFinishedAt != null">
+        #{productionSubmissionFinishedAt,jdbcType=TIMESTAMP},
+      </if>
+      <if test="productionConfirmedPathNodeIds != null">
+        #{productionConfirmedPathNodeIds,jdbcType=LONGVARCHAR},
+      </if>
+      <if test="productionVoidOperationId != null">
+        #{productionVoidOperationId,jdbcType=VARCHAR},
+      </if>
+      <if test="productionVoidFromStatus != null">
+        #{productionVoidFromStatus,jdbcType=VARCHAR},
+      </if>
+      <if test="productionVoidRequestedAt != null">
+        #{productionVoidRequestedAt,jdbcType=TIMESTAMP},
+      </if>
+      <if test="productionVoidFinishedAt != null">
+        #{productionVoidFinishedAt,jdbcType=TIMESTAMP},
+      </if>
+      <if test="productionVoidResultStatus != null">
+        #{productionVoidResultStatus,jdbcType=VARCHAR},
+      </if>
+<if test="sourceRequestJson != null">
         #{sourceRequestJson,jdbcType=LONGVARCHAR},
       </if>
+      <if test="productionCalculationJson != null">
+        #{productionCalculationJson,jdbcType=LONGVARCHAR},
+      </if>
+      <if test="productionConfirmationCommandJson != null">
+        #{productionConfirmationCommandJson,jdbcType=LONGVARCHAR},
+      </if>
+
     </trim>
   </insert>
   <select id="countByExample" parameterType="dev.mesbase.business.wm.domain.WmStockDocumentExample" resultType="java.lang.Long">
@@ -296,6 +481,9 @@
       </if>
       <if test="row.documentType != null">
         document_type = #{row.documentType,jdbcType=VARCHAR},
+      </if>
+      <if test="row.direction != null">
+        direction = #{row.direction,jdbcType=VARCHAR},
       </if>
       <if test="row.status != null">
         status = #{row.status,jdbcType=VARCHAR},
@@ -345,12 +533,88 @@
       <if test="row.sourceExecutionId != null">
         source_execution_id = #{row.sourceExecutionId,jdbcType=BIGINT},
       </if>
-      <if test="row.sourceMaterialIssueId != null">
-        source_material_issue_id = #{row.sourceMaterialIssueId,jdbcType=BIGINT},
+      <if test="row.productionWorkorderCode != null">
+        production_workorder_code = #{row.productionWorkorderCode,jdbcType=VARCHAR},
       </if>
-      <if test="row.sourceRequestJson != null">
+      <if test="row.productionProductId != null">
+        production_product_id = #{row.productionProductId,jdbcType=BIGINT},
+      </if>
+      <if test="row.productionProductCode != null">
+        production_product_code = #{row.productionProductCode,jdbcType=VARCHAR},
+      </if>
+      <if test="row.productionRoutingId != null">
+        production_routing_id = #{row.productionRoutingId,jdbcType=BIGINT},
+      </if>
+      <if test="row.productionRequestId != null">
+        production_request_id = #{row.productionRequestId,jdbcType=VARCHAR},
+      </if>
+      <if test="row.productionRequestHash != null">
+        production_request_hash = #{row.productionRequestHash,jdbcType=CHAR},
+      </if>
+      <if test="row.productionInputKind != null">
+        production_input_kind = #{row.productionInputKind,jdbcType=VARCHAR},
+      </if>
+      <if test="row.productionOutputQty != null">
+        production_output_qty = #{row.productionOutputQty,jdbcType=DECIMAL},
+      </if>
+      <if test="row.productionSourceMode != null">
+        production_source_mode = #{row.productionSourceMode,jdbcType=VARCHAR},
+      </if>
+      <if test="row.productionRequestCreatedAt != null">
+        production_request_created_at = #{row.productionRequestCreatedAt,jdbcType=TIMESTAMP},
+      </if>
+      <if test="row.productionConfirmedAt != null">
+        production_confirmed_at = #{row.productionConfirmedAt,jdbcType=TIMESTAMP},
+      </if>
+      <if test="row.productionBusinessOccurredAt != null">
+        production_business_occurred_at = #{row.productionBusinessOccurredAt,jdbcType=TIMESTAMP},
+      </if>
+      <if test="row.productionStockApplied != null">
+        production_stock_applied = #{row.productionStockApplied,jdbcType=BIT},
+      </if>
+      <if test="row.productionPathRevision != null">
+        production_path_revision = #{row.productionPathRevision,jdbcType=INTEGER},
+      </if>
+      <if test="row.productionConfirmationOperationId != null">
+        production_confirmation_operation_id = #{row.productionConfirmationOperationId,jdbcType=VARCHAR},
+      </if>
+      <if test="row.productionConfirmationStatus != null">
+        production_confirmation_status = #{row.productionConfirmationStatus,jdbcType=VARCHAR},
+      </if>
+      <if test="row.productionSubmissionCreatedAt != null">
+        production_submission_created_at = #{row.productionSubmissionCreatedAt,jdbcType=TIMESTAMP},
+      </if>
+      <if test="row.productionSubmissionFinishedAt != null">
+        production_submission_finished_at = #{row.productionSubmissionFinishedAt,jdbcType=TIMESTAMP},
+      </if>
+      <if test="row.productionConfirmedPathNodeIds != null">
+        production_confirmed_path_node_ids = #{row.productionConfirmedPathNodeIds,jdbcType=LONGVARCHAR},
+      </if>
+      <if test="row.productionVoidOperationId != null">
+        production_void_operation_id = #{row.productionVoidOperationId,jdbcType=VARCHAR},
+      </if>
+      <if test="row.productionVoidFromStatus != null">
+        production_void_from_status = #{row.productionVoidFromStatus,jdbcType=VARCHAR},
+      </if>
+      <if test="row.productionVoidRequestedAt != null">
+        production_void_requested_at = #{row.productionVoidRequestedAt,jdbcType=TIMESTAMP},
+      </if>
+      <if test="row.productionVoidFinishedAt != null">
+        production_void_finished_at = #{row.productionVoidFinishedAt,jdbcType=TIMESTAMP},
+      </if>
+      <if test="row.productionVoidResultStatus != null">
+        production_void_result_status = #{row.productionVoidResultStatus,jdbcType=VARCHAR},
+      </if>
+<if test="row.sourceRequestJson != null">
         source_request_json = #{row.sourceRequestJson,jdbcType=LONGVARCHAR},
       </if>
+      <if test="row.productionCalculationJson != null">
+        production_calculation_json = #{row.productionCalculationJson,jdbcType=LONGVARCHAR},
+      </if>
+      <if test="row.productionConfirmationCommandJson != null">
+        production_confirmation_command_json = #{row.productionConfirmationCommandJson,jdbcType=LONGVARCHAR},
+      </if>
+
     </set>
     <if test="example != null">
       <include refid="Update_By_Example_Where_Clause" />
@@ -361,6 +625,7 @@
     set id = #{row.id,jdbcType=BIGINT},
       document_no = #{row.documentNo,jdbcType=VARCHAR},
       document_type = #{row.documentType,jdbcType=VARCHAR},
+      direction = #{row.direction,jdbcType=VARCHAR},
       status = #{row.status,jdbcType=VARCHAR},
       reason = #{row.reason,jdbcType=VARCHAR},
       remark = #{row.remark,jdbcType=VARCHAR},
@@ -377,8 +642,33 @@
       post_request_id = #{row.postRequestId,jdbcType=VARCHAR},
       post_request_hash = #{row.postRequestHash,jdbcType=CHAR},
       source_execution_id = #{row.sourceExecutionId,jdbcType=BIGINT},
-      source_material_issue_id = #{row.sourceMaterialIssueId,jdbcType=BIGINT},
-      source_request_json = #{row.sourceRequestJson,jdbcType=LONGVARCHAR}
+      production_workorder_code = #{row.productionWorkorderCode,jdbcType=VARCHAR},
+      production_product_id = #{row.productionProductId,jdbcType=BIGINT},
+      production_product_code = #{row.productionProductCode,jdbcType=VARCHAR},
+      production_routing_id = #{row.productionRoutingId,jdbcType=BIGINT},
+      production_request_id = #{row.productionRequestId,jdbcType=VARCHAR},
+      production_request_hash = #{row.productionRequestHash,jdbcType=CHAR},
+      production_input_kind = #{row.productionInputKind,jdbcType=VARCHAR},
+      production_output_qty = #{row.productionOutputQty,jdbcType=DECIMAL},
+      production_source_mode = #{row.productionSourceMode,jdbcType=VARCHAR},
+      production_request_created_at = #{row.productionRequestCreatedAt,jdbcType=TIMESTAMP},
+      production_confirmed_at = #{row.productionConfirmedAt,jdbcType=TIMESTAMP},
+      production_business_occurred_at = #{row.productionBusinessOccurredAt,jdbcType=TIMESTAMP},
+      production_stock_applied = #{row.productionStockApplied,jdbcType=BIT},
+      production_path_revision = #{row.productionPathRevision,jdbcType=INTEGER},
+      production_confirmation_operation_id = #{row.productionConfirmationOperationId,jdbcType=VARCHAR},
+      production_confirmation_status = #{row.productionConfirmationStatus,jdbcType=VARCHAR},
+      production_submission_created_at = #{row.productionSubmissionCreatedAt,jdbcType=TIMESTAMP},
+      production_submission_finished_at = #{row.productionSubmissionFinishedAt,jdbcType=TIMESTAMP},
+      production_confirmed_path_node_ids = #{row.productionConfirmedPathNodeIds,jdbcType=LONGVARCHAR},
+      production_void_operation_id = #{row.productionVoidOperationId,jdbcType=VARCHAR},
+      production_void_from_status = #{row.productionVoidFromStatus,jdbcType=VARCHAR},
+      production_void_requested_at = #{row.productionVoidRequestedAt,jdbcType=TIMESTAMP},
+      production_void_finished_at = #{row.productionVoidFinishedAt,jdbcType=TIMESTAMP},
+      production_void_result_status = #{row.productionVoidResultStatus,jdbcType=VARCHAR},
+      source_request_json = #{row.sourceRequestJson,jdbcType=LONGVARCHAR},
+      production_calculation_json = #{row.productionCalculationJson,jdbcType=LONGVARCHAR},
+      production_confirmation_command_json = #{row.productionConfirmationCommandJson,jdbcType=LONGVARCHAR}
     <if test="example != null">
       <include refid="Update_By_Example_Where_Clause" />
     </if>
@@ -388,6 +678,7 @@
     set id = #{row.id,jdbcType=BIGINT},
       document_no = #{row.documentNo,jdbcType=VARCHAR},
       document_type = #{row.documentType,jdbcType=VARCHAR},
+      direction = #{row.direction,jdbcType=VARCHAR},
       status = #{row.status,jdbcType=VARCHAR},
       reason = #{row.reason,jdbcType=VARCHAR},
       remark = #{row.remark,jdbcType=VARCHAR},
@@ -404,7 +695,30 @@
       post_request_id = #{row.postRequestId,jdbcType=VARCHAR},
       post_request_hash = #{row.postRequestHash,jdbcType=CHAR},
       source_execution_id = #{row.sourceExecutionId,jdbcType=BIGINT},
-      source_material_issue_id = #{row.sourceMaterialIssueId,jdbcType=BIGINT}
+      production_workorder_code = #{row.productionWorkorderCode,jdbcType=VARCHAR},
+      production_product_id = #{row.productionProductId,jdbcType=BIGINT},
+      production_product_code = #{row.productionProductCode,jdbcType=VARCHAR},
+      production_routing_id = #{row.productionRoutingId,jdbcType=BIGINT},
+      production_request_id = #{row.productionRequestId,jdbcType=VARCHAR},
+      production_request_hash = #{row.productionRequestHash,jdbcType=CHAR},
+      production_input_kind = #{row.productionInputKind,jdbcType=VARCHAR},
+      production_output_qty = #{row.productionOutputQty,jdbcType=DECIMAL},
+      production_source_mode = #{row.productionSourceMode,jdbcType=VARCHAR},
+      production_request_created_at = #{row.productionRequestCreatedAt,jdbcType=TIMESTAMP},
+      production_confirmed_at = #{row.productionConfirmedAt,jdbcType=TIMESTAMP},
+      production_business_occurred_at = #{row.productionBusinessOccurredAt,jdbcType=TIMESTAMP},
+      production_stock_applied = #{row.productionStockApplied,jdbcType=BIT},
+      production_path_revision = #{row.productionPathRevision,jdbcType=INTEGER},
+      production_confirmation_operation_id = #{row.productionConfirmationOperationId,jdbcType=VARCHAR},
+      production_confirmation_status = #{row.productionConfirmationStatus,jdbcType=VARCHAR},
+      production_submission_created_at = #{row.productionSubmissionCreatedAt,jdbcType=TIMESTAMP},
+      production_submission_finished_at = #{row.productionSubmissionFinishedAt,jdbcType=TIMESTAMP},
+      production_confirmed_path_node_ids = #{row.productionConfirmedPathNodeIds,jdbcType=LONGVARCHAR},
+      production_void_operation_id = #{row.productionVoidOperationId,jdbcType=VARCHAR},
+      production_void_from_status = #{row.productionVoidFromStatus,jdbcType=VARCHAR},
+      production_void_requested_at = #{row.productionVoidRequestedAt,jdbcType=TIMESTAMP},
+      production_void_finished_at = #{row.productionVoidFinishedAt,jdbcType=TIMESTAMP},
+      production_void_result_status = #{row.productionVoidResultStatus,jdbcType=VARCHAR}
     <if test="example != null">
       <include refid="Update_By_Example_Where_Clause" />
     </if>
@@ -417,6 +731,9 @@
       </if>
       <if test="documentType != null">
         document_type = #{documentType,jdbcType=VARCHAR},
+      </if>
+      <if test="direction != null">
+        direction = #{direction,jdbcType=VARCHAR},
       </if>
       <if test="status != null">
         status = #{status,jdbcType=VARCHAR},
@@ -466,12 +783,88 @@
       <if test="sourceExecutionId != null">
         source_execution_id = #{sourceExecutionId,jdbcType=BIGINT},
       </if>
-      <if test="sourceMaterialIssueId != null">
-        source_material_issue_id = #{sourceMaterialIssueId,jdbcType=BIGINT},
+      <if test="productionWorkorderCode != null">
+        production_workorder_code = #{productionWorkorderCode,jdbcType=VARCHAR},
       </if>
-      <if test="sourceRequestJson != null">
+      <if test="productionProductId != null">
+        production_product_id = #{productionProductId,jdbcType=BIGINT},
+      </if>
+      <if test="productionProductCode != null">
+        production_product_code = #{productionProductCode,jdbcType=VARCHAR},
+      </if>
+      <if test="productionRoutingId != null">
+        production_routing_id = #{productionRoutingId,jdbcType=BIGINT},
+      </if>
+      <if test="productionRequestId != null">
+        production_request_id = #{productionRequestId,jdbcType=VARCHAR},
+      </if>
+      <if test="productionRequestHash != null">
+        production_request_hash = #{productionRequestHash,jdbcType=CHAR},
+      </if>
+      <if test="productionInputKind != null">
+        production_input_kind = #{productionInputKind,jdbcType=VARCHAR},
+      </if>
+      <if test="productionOutputQty != null">
+        production_output_qty = #{productionOutputQty,jdbcType=DECIMAL},
+      </if>
+      <if test="productionSourceMode != null">
+        production_source_mode = #{productionSourceMode,jdbcType=VARCHAR},
+      </if>
+      <if test="productionRequestCreatedAt != null">
+        production_request_created_at = #{productionRequestCreatedAt,jdbcType=TIMESTAMP},
+      </if>
+      <if test="productionConfirmedAt != null">
+        production_confirmed_at = #{productionConfirmedAt,jdbcType=TIMESTAMP},
+      </if>
+      <if test="productionBusinessOccurredAt != null">
+        production_business_occurred_at = #{productionBusinessOccurredAt,jdbcType=TIMESTAMP},
+      </if>
+      <if test="productionStockApplied != null">
+        production_stock_applied = #{productionStockApplied,jdbcType=BIT},
+      </if>
+      <if test="productionPathRevision != null">
+        production_path_revision = #{productionPathRevision,jdbcType=INTEGER},
+      </if>
+      <if test="productionConfirmationOperationId != null">
+        production_confirmation_operation_id = #{productionConfirmationOperationId,jdbcType=VARCHAR},
+      </if>
+      <if test="productionConfirmationStatus != null">
+        production_confirmation_status = #{productionConfirmationStatus,jdbcType=VARCHAR},
+      </if>
+      <if test="productionSubmissionCreatedAt != null">
+        production_submission_created_at = #{productionSubmissionCreatedAt,jdbcType=TIMESTAMP},
+      </if>
+      <if test="productionSubmissionFinishedAt != null">
+        production_submission_finished_at = #{productionSubmissionFinishedAt,jdbcType=TIMESTAMP},
+      </if>
+      <if test="productionConfirmedPathNodeIds != null">
+        production_confirmed_path_node_ids = #{productionConfirmedPathNodeIds,jdbcType=LONGVARCHAR},
+      </if>
+      <if test="productionVoidOperationId != null">
+        production_void_operation_id = #{productionVoidOperationId,jdbcType=VARCHAR},
+      </if>
+      <if test="productionVoidFromStatus != null">
+        production_void_from_status = #{productionVoidFromStatus,jdbcType=VARCHAR},
+      </if>
+      <if test="productionVoidRequestedAt != null">
+        production_void_requested_at = #{productionVoidRequestedAt,jdbcType=TIMESTAMP},
+      </if>
+      <if test="productionVoidFinishedAt != null">
+        production_void_finished_at = #{productionVoidFinishedAt,jdbcType=TIMESTAMP},
+      </if>
+      <if test="productionVoidResultStatus != null">
+        production_void_result_status = #{productionVoidResultStatus,jdbcType=VARCHAR},
+      </if>
+<if test="sourceRequestJson != null">
         source_request_json = #{sourceRequestJson,jdbcType=LONGVARCHAR},
       </if>
+      <if test="productionCalculationJson != null">
+        production_calculation_json = #{productionCalculationJson,jdbcType=LONGVARCHAR},
+      </if>
+      <if test="productionConfirmationCommandJson != null">
+        production_confirmation_command_json = #{productionConfirmationCommandJson,jdbcType=LONGVARCHAR},
+      </if>
+
     </set>
     where id = #{id,jdbcType=BIGINT}
   </update>
@@ -479,6 +872,7 @@
     update wm_stock_document
     set document_no = #{documentNo,jdbcType=VARCHAR},
       document_type = #{documentType,jdbcType=VARCHAR},
+      direction = #{direction,jdbcType=VARCHAR},
       status = #{status,jdbcType=VARCHAR},
       reason = #{reason,jdbcType=VARCHAR},
       remark = #{remark,jdbcType=VARCHAR},
@@ -495,14 +889,40 @@
       post_request_id = #{postRequestId,jdbcType=VARCHAR},
       post_request_hash = #{postRequestHash,jdbcType=CHAR},
       source_execution_id = #{sourceExecutionId,jdbcType=BIGINT},
-      source_material_issue_id = #{sourceMaterialIssueId,jdbcType=BIGINT},
-      source_request_json = #{sourceRequestJson,jdbcType=LONGVARCHAR}
+      production_workorder_code = #{productionWorkorderCode,jdbcType=VARCHAR},
+      production_product_id = #{productionProductId,jdbcType=BIGINT},
+      production_product_code = #{productionProductCode,jdbcType=VARCHAR},
+      production_routing_id = #{productionRoutingId,jdbcType=BIGINT},
+      production_request_id = #{productionRequestId,jdbcType=VARCHAR},
+      production_request_hash = #{productionRequestHash,jdbcType=CHAR},
+      production_input_kind = #{productionInputKind,jdbcType=VARCHAR},
+      production_output_qty = #{productionOutputQty,jdbcType=DECIMAL},
+      production_source_mode = #{productionSourceMode,jdbcType=VARCHAR},
+      production_request_created_at = #{productionRequestCreatedAt,jdbcType=TIMESTAMP},
+      production_confirmed_at = #{productionConfirmedAt,jdbcType=TIMESTAMP},
+      production_business_occurred_at = #{productionBusinessOccurredAt,jdbcType=TIMESTAMP},
+      production_stock_applied = #{productionStockApplied,jdbcType=BIT},
+      production_path_revision = #{productionPathRevision,jdbcType=INTEGER},
+      production_confirmation_operation_id = #{productionConfirmationOperationId,jdbcType=VARCHAR},
+      production_confirmation_status = #{productionConfirmationStatus,jdbcType=VARCHAR},
+      production_submission_created_at = #{productionSubmissionCreatedAt,jdbcType=TIMESTAMP},
+      production_submission_finished_at = #{productionSubmissionFinishedAt,jdbcType=TIMESTAMP},
+      production_confirmed_path_node_ids = #{productionConfirmedPathNodeIds,jdbcType=LONGVARCHAR},
+      production_void_operation_id = #{productionVoidOperationId,jdbcType=VARCHAR},
+      production_void_from_status = #{productionVoidFromStatus,jdbcType=VARCHAR},
+      production_void_requested_at = #{productionVoidRequestedAt,jdbcType=TIMESTAMP},
+      production_void_finished_at = #{productionVoidFinishedAt,jdbcType=TIMESTAMP},
+      production_void_result_status = #{productionVoidResultStatus,jdbcType=VARCHAR},
+      source_request_json = #{sourceRequestJson,jdbcType=LONGVARCHAR},
+      production_calculation_json = #{productionCalculationJson,jdbcType=LONGVARCHAR},
+      production_confirmation_command_json = #{productionConfirmationCommandJson,jdbcType=LONGVARCHAR}
     where id = #{id,jdbcType=BIGINT}
   </update>
   <update id="updateByPrimaryKey" parameterType="dev.mesbase.business.wm.domain.WmStockDocumentEntity">
     update wm_stock_document
     set document_no = #{documentNo,jdbcType=VARCHAR},
       document_type = #{documentType,jdbcType=VARCHAR},
+      direction = #{direction,jdbcType=VARCHAR},
       status = #{status,jdbcType=VARCHAR},
       reason = #{reason,jdbcType=VARCHAR},
       remark = #{remark,jdbcType=VARCHAR},
@@ -519,7 +939,30 @@
       post_request_id = #{postRequestId,jdbcType=VARCHAR},
       post_request_hash = #{postRequestHash,jdbcType=CHAR},
       source_execution_id = #{sourceExecutionId,jdbcType=BIGINT},
-      source_material_issue_id = #{sourceMaterialIssueId,jdbcType=BIGINT}
+      production_workorder_code = #{productionWorkorderCode,jdbcType=VARCHAR},
+      production_product_id = #{productionProductId,jdbcType=BIGINT},
+      production_product_code = #{productionProductCode,jdbcType=VARCHAR},
+      production_routing_id = #{productionRoutingId,jdbcType=BIGINT},
+      production_request_id = #{productionRequestId,jdbcType=VARCHAR},
+      production_request_hash = #{productionRequestHash,jdbcType=CHAR},
+      production_input_kind = #{productionInputKind,jdbcType=VARCHAR},
+      production_output_qty = #{productionOutputQty,jdbcType=DECIMAL},
+      production_source_mode = #{productionSourceMode,jdbcType=VARCHAR},
+      production_request_created_at = #{productionRequestCreatedAt,jdbcType=TIMESTAMP},
+      production_confirmed_at = #{productionConfirmedAt,jdbcType=TIMESTAMP},
+      production_business_occurred_at = #{productionBusinessOccurredAt,jdbcType=TIMESTAMP},
+      production_stock_applied = #{productionStockApplied,jdbcType=BIT},
+      production_path_revision = #{productionPathRevision,jdbcType=INTEGER},
+      production_confirmation_operation_id = #{productionConfirmationOperationId,jdbcType=VARCHAR},
+      production_confirmation_status = #{productionConfirmationStatus,jdbcType=VARCHAR},
+      production_submission_created_at = #{productionSubmissionCreatedAt,jdbcType=TIMESTAMP},
+      production_submission_finished_at = #{productionSubmissionFinishedAt,jdbcType=TIMESTAMP},
+      production_confirmed_path_node_ids = #{productionConfirmedPathNodeIds,jdbcType=LONGVARCHAR},
+      production_void_operation_id = #{productionVoidOperationId,jdbcType=VARCHAR},
+      production_void_from_status = #{productionVoidFromStatus,jdbcType=VARCHAR},
+      production_void_requested_at = #{productionVoidRequestedAt,jdbcType=TIMESTAMP},
+      production_void_finished_at = #{productionVoidFinishedAt,jdbcType=TIMESTAMP},
+      production_void_result_status = #{productionVoidResultStatus,jdbcType=VARCHAR}
     where id = #{id,jdbcType=BIGINT}
   </update>
   <select flushCache="true" id="selectByPrimaryKeyForUpdate" parameterType="Long" resultMap="ResultMapWithBLOBs" useCache="false">

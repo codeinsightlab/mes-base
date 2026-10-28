@@ -4,8 +4,9 @@ import dev.mesbase.business.production.dao.WorkorderMapper;
 import dev.mesbase.business.production.dao.MesProductionExecutionMapper;
 import dev.mesbase.business.production.domain.WorkorderEntity;
 import dev.mesbase.business.production.domain.MesProductionExecutionEntity;
-import dev.mesbase.business.issue.dao.MesMaterialIssueMapper;
-import dev.mesbase.business.issue.domain.MesMaterialIssueExample;
+import dev.mesbase.business.wm.dao.WmStockDocumentMapper;
+import dev.mesbase.business.wm.domain.WmStockDocumentExample;
+import dev.mesbase.business.wm.domain.StockDocumentType;
 import dev.mesbase.core.error.ErrorCode;
 import dev.mesbase.core.error.FoundationException;
 import dev.mesbase.core.factory.FactoryScope;
@@ -21,14 +22,14 @@ import org.springframework.stereotype.Component;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 
 /**
- * Current production commands share WorkOrder -> Execution -> Issue lock order.
+ * Current production commands share WorkOrder -> Execution -> StockDocument lock order.
  */
 @Component
 @ConditionalOnProperty(name = "mes.business.enabled", havingValue = "true")
 public class ProductionChainLocks {
     private final WorkorderMapper orders;
     private final MesProductionExecutionMapper executions;
-    private final MesMaterialIssueMapper issues;
+    private final WmStockDocumentMapper issues;
 
     /**
      * Issued only after current locking reads; invalid across threads, transactions, suspension or completion.
@@ -94,7 +95,7 @@ public class ProductionChainLocks {
     }
 
     public ProductionChainLocks(WorkorderMapper orders, MesProductionExecutionMapper executions,
-                                MesMaterialIssueMapper issues) {
+                                WmStockDocumentMapper issues) {
         this.orders = orders;
         this.executions = executions;
         this.issues = issues;
@@ -164,15 +165,15 @@ public class ProductionChainLocks {
 
     private void issues(List<Long> ids, Long targetOrder, Long targetExecution) {
         if (ids.isEmpty() || ids.size() > 100) throw new FoundationException(ErrorCode.BAD_REQUEST);
-        var f = new MesMaterialIssueExample();
-        f.createCriteria().andIdIn(ids);
+        var f = new WmStockDocumentExample();
+        f.createCriteria().andIdIn(ids).andDocumentTypeEqualTo(StockDocumentType.MATERIAL_ISSUE.getValue());
         var before = issues.selectByExample(f);
         if (before.size() != ids.stream().distinct().count()) throw new FoundationException(ErrorCode.NOT_FOUND);
         var orderIds = new ArrayList<Long>();
         var executionIds = new ArrayList<Long>();
         before.forEach(row -> {
-            if (row.getWorkorderId() != null) orderIds.add(row.getWorkorderId());
-            if (row.getExecutionId() != null) executionIds.add(row.getExecutionId());
+            if (row.getSourceWorkorderId() != null) orderIds.add(row.getSourceWorkorderId());
+            if (row.getSourceExecutionId() != null) executionIds.add(row.getSourceExecutionId());
         });
         if (targetOrder != null) orderIds.add(targetOrder);
         if (targetExecution != null) executionIds.add(targetExecution);
@@ -187,7 +188,7 @@ public class ProductionChainLocks {
         for (var row : before.stream().sorted((a, b) -> a.getId().compareTo(b.getId())).toList()) {
             var current = issues.selectByPrimaryKeyForUpdate(row.getId());
             if (current == null) throw new FoundationException(ErrorCode.NOT_FOUND);
-            if (!Objects.equals(row.getWorkorderId(), current.getWorkorderId()) || !Objects.equals(row.getExecutionId(), current.getExecutionId()))
+            if (!Objects.equals(row.getSourceWorkorderId(), current.getSourceWorkorderId()) || !Objects.equals(row.getSourceExecutionId(), current.getSourceExecutionId()))
                 throw new FoundationException(ErrorCode.RESOURCE_CONFLICT);
         }
     }
