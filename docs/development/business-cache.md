@@ -29,7 +29,7 @@ public MaterialEntity updateById(Long id, MaterialUpdateCommand input)
 - `business` 使用权限资源前缀（承载模块 + 完整资源名，不含操作），例如 `business:material`、`business:pro:workorder`、`erp:material`。允许安全的冒号分段标识，禁止 glob 元字符和空段。物料注解、同步淘汰与 MaterialPermissions 复用领域侧 `MaterialResource.PREFIX`，不让 Service 依赖 Controller。
 - `argument` 默认 0，显式指定查询参数或 ID 所在的位置，不猜参数名，不提供表达式框架。
 - 列表参数实现 `BusinessCacheQuery`，提供有效的 `cacheOffset()`、`cacheLimit()`、`cacheSort()`。DTO 保留全部结果相关筛选条件，不能只提供分页。
-- 列表 Key 序列化全部方法参数及有效分页/排序；JSON 属性和 Map key 排序，保留字段名、类型、null/空字符串/空集合的差异。不得依赖对象默认 `toString()` 或身份 hash。无序集合若语义上相同，调用方应先规范化顺序。
+- 列表 Key 序列化全部方法参数及有效分页/排序；JSON 属性和 Map key 排序，保留字段名、类型、null/空字符串/空集合的差异。Key 中直接显示 JSON 结构、字段名和普通值；仅字符串字段名和值里的特殊字节使用百分号转义，例如 `READY` 保持可读、`x*?[]` 写为 `x%2A%3F%5B%5D`。不得依赖对象默认 `toString()` 或身份 hash。无序集合若语义上相同，调用方应先规范化顺序。
 - 参数名或递归序列化后的对象字段名含 `password`、`secret`、`token`、`credential` 或 `authorization`（大小写不敏感）时，跳过该次缓存；转义后条件超过2048字符或无法序列化时也跳过缓存，仍执行原数据库查询。不得截断条件或以摘要/临时查询ID兜底。
 - `offset` 是从 0 开始的查询起始位置；只缓存 `0 <= offset < 100`。不是 key 数量上限。无效分页参数交还原方法处理，不改业务异常语义。
 - 详情 ID 明确为 String、Long 或 Integer；不缓存 null，不捕获业务的 NOT_FOUND 等异常。
@@ -46,10 +46,10 @@ public MaterialEntity updateById(Long id, MaterialUpdateCommand input)
 
 ```text
 mes:default:center:localhost:3306:mes_base:business:{factory:A:resource:business:material}:detail:1
-mes:default:center:localhost:3306:mes_base:business:{factory:A:resource:business:material}:list:conditions:%7B%22...%22%7D
+mes:default:center:localhost:3306:mes_base:business:{factory:A:resource:business:material}:list:conditions:{"arguments":{"query":{"status":"READY"}},"pagination":{"limit":6,"offset":0,"sort":"id%20desc"}}
 ```
 
-例如ID `lot:01*{x}`会成为`lot%3A01%2A%7Bx%7D`，保持大小写和前导零，并且不会被模式删除误认为通配符。列表条件以排序后的JSON作为Key条件段，不作摘要；对完整编码结果使用上述2048字符上限，过长时绕过缓存但正常查库。工厂上下文缺失调用 `FactoryContext.required()`，沿用现有异常，不回退默认厂。
+例如ID `lot:01*{x}`会成为`lot%3A01%2A%7Bx%7D`，保持大小写和前导零，并且不会被模式删除误认为通配符。列表条件以排序后的JSON作为Key条件段，不作摘要；JSON 标点作为可读结构保留，数据字段中的 Redis glob、百分号和可能影响 hash-tag 的字符仍转义。对最终Key条件结果使用2048字符上限，过长时绕过缓存但正常查库。工厂上下文缺失调用 `FactoryContext.required()`，沿用现有异常，不回退默认厂。
 
 TTL 配置在 `mes-admin/src/main/resources/application.yml`：
 

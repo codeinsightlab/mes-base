@@ -322,6 +322,10 @@ class BusinessCacheIntegrationTest {
         assertNull(caches.queryKey(new Object[]{Map.of("nested", Map.of("secretToken", "TEST ONLY"))},
                 new Parameter[0], original));
         assertNull(caches.queryKey(new Object[]{Map.of("query", "x".repeat(3000))}, new Parameter[0], original));
+        String readable = caches.queryKey(new Object[]{Map.of("status", "READY", "filter", "x*?[]")},
+                new Parameter[0], original);
+        assertTrue(readable.contains("\"status\":\"READY\""));
+        assertTrue(readable.contains("\"filter\":\"x%2A%3F%5B%5D\""));
     }
 
     @Test

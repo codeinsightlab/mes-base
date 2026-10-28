@@ -87,10 +87,10 @@ public class BusinessCacheProcessor {
             pagination.put("limit", query.cacheLimit());
             pagination.put("sort", query.cacheSort());
             conditions.put("pagination", pagination);
-            String serialized = json.writeValueAsString(conditions);
-            String encoded = RedisKeySegment.encode(serialized);
-            if (encoded.length() > 2048) return null;
-            return "conditions:" + encoded;
+            JsonNode canonical = json.valueToTree(conditions);
+            String serialized = json.writeValueAsString(readableConditionNode(canonical));
+            if (serialized.length() > 2048) return null;
+            return "conditions:" + serialized;
         } catch (Exception failure) {
             return null;
         }
@@ -116,6 +116,25 @@ public class BusinessCacheProcessor {
             for (var item : node) if (sensitiveNode(item)) return true;
         }
         return false;
+    }
+
+    private JsonNode readableConditionNode(JsonNode node) {
+        if (node.isObject()) {
+            var result = json.createObjectNode();
+            var fields = node.fields();
+            while (fields.hasNext()) {
+                var field = fields.next();
+                result.set(RedisKeySegment.encode(field.getKey()), readableConditionNode(field.getValue()));
+            }
+            return result;
+        }
+        if (node.isArray()) {
+            var result = json.createArrayNode();
+            for (JsonNode item : node) result.add(readableConditionNode(item));
+            return result;
+        }
+        if (node.isTextual()) return json.getNodeFactory().textNode(RedisKeySegment.encode(node.textValue()));
+        return node.deepCopy();
     }
 
     private static boolean sensitiveName(String name) {
