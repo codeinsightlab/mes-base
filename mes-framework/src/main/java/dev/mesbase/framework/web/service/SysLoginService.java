@@ -1,6 +1,7 @@
 package dev.mesbase.framework.web.service;
 
 import dev.mesbase.common.core.redis.SystemCacheNamespace;
+import dev.mesbase.common.core.redis.RedisKeySegment;
 import dev.mesbase.common.utils.SecurityUtils;
 import dev.mesbase.common.core.domain.model.LoginUser;
 import dev.mesbase.system.service.*;
@@ -57,7 +58,7 @@ public class SysLoginService {
         // The database collation can resolve multiple input spellings to one user.
         // Existing accounts must share the canonical persisted retry identity.
         String canonical = user == null ? username : user.getUserName();
-        String key = namespace.key("mes:system:retry:" + TokenService.hash(canonical));
+        String key = namespace.key("mes:system:retry:" + RedisKeySegment.encode(canonical));
         String current = redis.opsForValue().get(key);
         if (current != null && Integer.parseInt(current) >= maxRetries) throw denied();
         boolean correct = SecurityUtils.matchesPassword(password, user == null ? dummy : user.getPassword());

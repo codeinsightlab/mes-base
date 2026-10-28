@@ -2,12 +2,19 @@ package dev.mesbase.framework.openapi;
 
 
 /**
- * Redis仅存随机Token的摘要作为key，value不含Token或secret。
+ * Token locator and verifier are stored as value fields; neither is used as a credential by itself.
  */
 public class OpenApiTokenRecord {
     private Long clientId;
     private long credentialVersion;
     private long expiresAt;
+    private String tokenId;
+    private String tokenDigest;
+
+    public String getTokenId() { return tokenId; }
+    public void setTokenId(String tokenId) { this.tokenId = tokenId; }
+    public String getTokenDigest() { return tokenDigest; }
+    public void setTokenDigest(String tokenDigest) { this.tokenDigest = tokenDigest; }
 
     public Long getClientId() {
         return clientId;

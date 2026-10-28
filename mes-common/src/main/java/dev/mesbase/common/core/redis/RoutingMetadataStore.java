@@ -20,7 +20,10 @@ public class RoutingMetadataStore {
     }
 
     private String key(String field) {
-        return namespace.key("factory-routing:entry:" + field);
+        int separator = field.indexOf(':');
+        String readable = separator < 0 ? RedisKeySegment.encode(field)
+                : field.substring(0, separator + 1) + RedisKeySegment.encode(field.substring(separator + 1));
+        return namespace.key("factory-routing:entry:" + readable);
     }
 
     public String read(String field) {

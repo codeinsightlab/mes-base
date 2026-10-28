@@ -3,6 +3,7 @@ package dev.mesbase.framework.openapi;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.mesbase.common.core.redis.SystemCacheNamespace;
+import dev.mesbase.common.core.redis.RedisKeySegment;
 import dev.mesbase.common.openapi.OpenApiError;
 import dev.mesbase.common.openapi.OpenApiException;
 import dev.mesbase.common.openapi.OpenApiPrincipal;
@@ -16,6 +17,7 @@ import java.security.SecureRandom;
 import java.time.Clock;
 import java.util.Base64;
 import java.util.Collections;
+import java.util.UUID;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -40,10 +42,11 @@ public class OpenApiTokenService {
                     "local previous=redis.call('GET',KEYS[1]); " +
                     "if previous then local old=cjson.decode(previous); " +
                     "if old.credentialVersion==candidate.credentialVersion and old.expiresAt>tonumber(ARGV[4]) " +
-                    "and redis.call('EXISTS',ARGV[3]..old.tokenDigest)==1 then " +
-                    "candidate.accessToken=old.accessToken; candidate.tokenDigest=old.tokenDigest; " +
-                    "else redis.call('DEL',ARGV[3]..old.tokenDigest); end; end; " +
-                    "redis.call('SET',ARGV[3]..candidate.tokenDigest,cjson.encode(record),'EX',ARGV[5]); " +
+                    "and redis.call('EXISTS',ARGV[3]..old.tokenId)==1 then " +
+                    "candidate.accessToken=old.accessToken; candidate.tokenDigest=old.tokenDigest; candidate.tokenId=old.tokenId; " +
+                    "else redis.call('DEL',ARGV[3]..old.tokenId); end; end; " +
+                    "record.tokenDigest=candidate.tokenDigest; record.tokenId=candidate.tokenId; " +
+                    "redis.call('SET',ARGV[3]..candidate.tokenId,cjson.encode(record),'EX',ARGV[5]); " +
                     "redis.call('SET',KEYS[1],cjson.encode(candidate),'EX',ARGV[5]); return candidate.accessToken;", String.class);
 
     public OpenApiTokenService(StringRedisTemplate redis, OpenApiClientService clients, OpenApiProperties properties,
@@ -70,18 +73,23 @@ public class OpenApiTokenService {
     OpenApiTokenVo issueVerified(OpenApiPrincipal principal) {
         byte[] bytes = new byte[32];
         random.nextBytes(bytes);
-        String token = "oa_" + Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
+        String secret = Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
+        String tokenId = UUID.randomUUID().toString();
+        String token = "oa_" + tokenId + "." + secret;
         OpenApiTokenRecord record = new OpenApiTokenRecord();
         record.setClientId(principal.getClientId());
         record.setCredentialVersion(principal.getCredentialVersion());
         record.setExpiresAt(clock.millis() + properties.getTokenTtlSeconds() * 1000L);
+        record.setTokenId(tokenId);
+        record.setTokenDigest(digest(secret));
         OpenApiClientTokenRecord current = new OpenApiClientTokenRecord();
         current.setAccessToken(token);
-        current.setTokenDigest(digest(token));
+        current.setTokenDigest(digest(secret));
+        current.setTokenId(tokenId);
         current.setCredentialVersion(principal.getCredentialVersion());
         current.setExpiresAt(record.getExpiresAt());
         try {
-            token = redis.execute(ISSUE, Collections.singletonList(tokenPrefix() + "client:" + principal.getClientId()),
+            token = redis.execute(ISSUE, Collections.singletonList(tokenPrefix() + "client:" + RedisKeySegment.encode(String.valueOf(principal.getClientId()))),
                     json.writeValueAsString(current), json.writeValueAsString(record), tokenPrefix() + "token:",
                     String.valueOf(clock.millis()), String.valueOf(properties.getTokenTtlSeconds()));
             if (token == null) throw new OpenApiException(OpenApiError.DEPENDENCY_UNAVAILABLE);
@@ -92,8 +100,8 @@ public class OpenApiTokenService {
     }
 
     public OpenApiPrincipal authenticate(String token) {
-        validateFormat(token);
-        String value = redis.opsForValue().get(key(token));
+        TokenParts parts = validateFormat(token);
+        String value = redis.opsForValue().get(key(parts.tokenId()));
         if (value == null) throw new OpenApiException(OpenApiError.INVALID_CREDENTIALS);
         OpenApiTokenRecord record;
         try {
@@ -103,18 +111,32 @@ public class OpenApiTokenService {
         }
         if (record == null || record.getClientId() == null || record.getCredentialVersion() < 1)
             throw new OpenApiException(OpenApiError.DEPENDENCY_UNAVAILABLE);
+        if (!constantTimeEquals(record.getTokenDigest(), digest(parts.secret())))
+            throw new OpenApiException(OpenApiError.INVALID_CREDENTIALS);
         if (record.getExpiresAt() <= clock.millis()) throw new OpenApiException(OpenApiError.INVALID_CREDENTIALS);
         return clients.validateToken(new OpenApiTokenCheck(record.getClientId(), record.getCredentialVersion()));
     }
 
     public void revoke(String token) {
-        validateFormat(token);
-        redis.delete(key(token));
+        TokenParts parts = validateFormat(token);
+        String key = key(parts.tokenId());
+        String value = redis.opsForValue().get(key);
+        if (value == null) return;
+        try {
+            OpenApiTokenRecord record = json.readValue(value, OpenApiTokenRecord.class);
+            if (record == null || !constantTimeEquals(record.getTokenDigest(), digest(parts.secret())))
+                throw new OpenApiException(OpenApiError.INVALID_CREDENTIALS);
+            redis.delete(key);
+        } catch (JsonProcessingException e) {
+            throw new OpenApiException(OpenApiError.DEPENDENCY_UNAVAILABLE, e);
+        }
     }
 
-    private void validateFormat(String token) {
-        if (token == null || !token.matches("oa_[A-Za-z0-9_-]{43}"))
+    private TokenParts validateFormat(String token) {
+        if (token == null || !token.matches("oa_[A-Fa-f0-9-]{36}\\.[A-Za-z0-9_-]{43}"))
             throw new OpenApiException(OpenApiError.INVALID_CREDENTIALS);
+        int separator = token.indexOf('.');
+        return new TokenParts(token.substring(3, separator), token.substring(separator + 1));
     }
 
     // 相关key使用同一hash tag，Lua涉及的动态Token key也落在同一Redis Cluster slot。
@@ -122,9 +144,15 @@ public class OpenApiTokenService {
         return namespace.key(properties.keyPrefix() + "{tokens}:");
     }
 
-    private String key(String token) {
-        return tokenPrefix() + "token:" + digest(token);
+    private String key(String tokenId) {
+        return tokenPrefix() + "token:" + tokenId;
     }
+
+    private static boolean constantTimeEquals(String first, String second) {
+        return first != null && MessageDigest.isEqual(first.getBytes(StandardCharsets.UTF_8), second.getBytes(StandardCharsets.UTF_8));
+    }
+
+    private record TokenParts(String tokenId, String secret) { }
 
     static String digest(String value) {
         try {

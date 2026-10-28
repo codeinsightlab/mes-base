@@ -1,6 +1,7 @@
 package dev.mesbase.framework.openapi;
 
 import dev.mesbase.common.core.redis.SystemCacheNamespace;
+import dev.mesbase.common.core.redis.RedisKeySegment;
 import dev.mesbase.common.openapi.OpenApiError;
 import dev.mesbase.common.openapi.OpenApiException;
 import dev.mesbase.common.openapi.OpenApiPrincipal;
@@ -31,16 +32,16 @@ public class OpenApiRateLimiter {
     }
 
     public void tokenRequest(String peer) {
-        check("token-ip:" + OpenApiTokenService.digest(peer), properties.getTokenRateLimit());
+        check("token-ip:" + RedisKeySegment.encode(peer), properties.getTokenRateLimit());
     }
 
     public void tokenClient(OpenApiPrincipal principal) {
-        check("token-client:" + principal.getClientId(), properties.getTokenRateLimit());
+        check("token-client:" + RedisKeySegment.encode(String.valueOf(principal.getClientId())), properties.getTokenRateLimit());
     }
 
     public void api(OpenApiInvocation invocation) {
-        check("client:" + invocation.getPrincipal()
-                .getClientId() + ":api:" + invocation.getApiCode(), properties.getApiRateLimit());
+        check("client:" + RedisKeySegment.encode(String.valueOf(invocation.getPrincipal().getClientId()))
+                + ":api:" + RedisKeySegment.encode(invocation.getApiCode()), properties.getApiRateLimit());
     }
 
     private void check(String suffix, int count) {

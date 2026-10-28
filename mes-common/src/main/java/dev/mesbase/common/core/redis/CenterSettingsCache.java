@@ -29,7 +29,7 @@ public class CenterSettingsCache {
         // A transaction may hold a snapshot or its own uncommitted writes: never share either.
         if (TransactionSynchronizationManager.isActualTransactionActive()) return null;
         try {
-            return redis.getCacheObject(VERSION + key);
+            return redis.getCacheObject(VERSION + readable(key));
         } catch (RuntimeException failure) {
             LOG.warn("Settings cache read unavailable; using database type={}", failure.getClass().getSimpleName());
             return null;
@@ -39,7 +39,7 @@ public class CenterSettingsCache {
     public void put(String key, Object value) {
         if (value == null || TransactionSynchronizationManager.isActualTransactionActive()) return;
         try {
-            redis.setCacheObject(VERSION + key, value, TTL_SECONDS, TimeUnit.SECONDS);
+            redis.setCacheObject(VERSION + readable(key), value, TTL_SECONDS, TimeUnit.SECONDS);
         } catch (RuntimeException failure) {
             LOG.warn("Settings cache fill unavailable type={}", failure.getClass().getSimpleName());
         }
@@ -47,16 +47,23 @@ public class CenterSettingsCache {
 
     public void invalidate(String key) {
         afterCommit(() -> {
-            redis.deleteObject(VERSION + key);
-            redis.deleteObject(key); // Retire the previous permanent-cache key as well.
+            redis.deleteObject(VERSION + readable(key));
+            redis.deleteObject(readable(key)); // Retire the previous permanent-cache key as well.
         });
     }
 
     public void clear(String prefix) {
         afterCommit(() -> {
-            redis.deleteObject(redis.keys(VERSION + prefix + "*"));
-            redis.deleteObject(redis.keys(prefix + "*"));
+            String safePrefix = readable(prefix);
+            redis.deleteObject(redis.keys(VERSION + safePrefix + "*"));
+            redis.deleteObject(redis.keys(safePrefix + "*"));
         });
+    }
+
+    private static String readable(String value) {
+        int separator = value.indexOf(':');
+        if (separator < 0) return RedisKeySegment.encode(value);
+        return value.substring(0, separator + 1) + RedisKeySegment.encode(value.substring(separator + 1));
     }
 
     private void afterCommit(Runnable action) {

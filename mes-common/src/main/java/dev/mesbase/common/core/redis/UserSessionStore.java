@@ -2,6 +2,8 @@ package dev.mesbase.common.core.redis;
 
 import java.time.Instant;
 import java.util.List;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -14,14 +16,14 @@ import org.springframework.stereotype.Component;
 @Component
 @ConditionalOnProperty(name = "mes.system.enabled", havingValue = "true")
 public class UserSessionStore {
-    public static final String PREFIX = "mes:system:session:v2:";
+    public static final String PREFIX = "mes:system:{sessions}:session:v3:";
     private static final DefaultRedisScript<Long> ISSUE = new DefaultRedisScript<>("""
             local epoch=redis.call('GET',KEYS[2])
             if epoch and tonumber(epoch)>tonumber(ARGV[2]) then return 0 end
             local expired=redis.call('ZRANGEBYSCORE',KEYS[3],'-inf',ARGV[4])
             for _,k in ipairs(expired) do redis.call('ZREM',KEYS[3],k) end
             redis.call('SET',KEYS[2],ARGV[2])
-            redis.call('HSET',KEYS[1],'payload',ARGV[1],'revision',ARGV[2],'userId',ARGV[3])
+            redis.call('HSET',KEYS[1],'payload',ARGV[1],'revision',ARGV[2],'userId',ARGV[3],'secretDigest',ARGV[6])
             redis.call('PEXPIREAT',KEYS[1],ARGV[5])
             redis.call('ZADD',KEYS[3],ARGV[5],KEYS[1])
             local last=redis.call('ZREVRANGE',KEYS[3],0,0,'WITHSCORES')
@@ -55,34 +57,40 @@ public class UserSessionStore {
         this.namespace = namespace;
     }
 
-    public boolean issue(String digest, long userId, long revision, String payload, Instant expires) {
+    public boolean issue(String sessionId, String secretDigest, long userId, long revision, String payload, Instant expires) {
         return Long.valueOf(1).equals(redis.execute(ISSUE,
-                List.of(key(digest), epoch(userId), index(userId)), payload, Long.toString(revision),
+                List.of(key(sessionId), epoch(userId), index(userId)), payload, Long.toString(revision),
                 Long.toString(userId), Long.toString(Instant.now()
-                        .toEpochMilli()), Long.toString(expires.toEpochMilli())));
+                        .toEpochMilli()), Long.toString(expires.toEpochMilli()), secretDigest));
     }
 
-    public String read(String digest) {
-        return (String) redis.opsForHash().get(key(digest), "payload");
+    public String read(String sessionId, String secretDigest) {
+        String key = key(sessionId);
+        if (secretDigest == null) return (String) redis.opsForHash().get(key, "payload");
+        Object stored = redis.opsForHash().get(key, "secretDigest");
+        if (!(stored instanceof String value) || !MessageDigest.isEqual(
+                value.getBytes(StandardCharsets.UTF_8), secretDigest.getBytes(StandardCharsets.UTF_8))) return null;
+        return (String) redis.opsForHash().get(key, "payload");
     }
 
-    public void logout(String digest) {
-        redis.execute(LOGOUT, List.of(key(digest)), namespace.key("mes:system:user-sessions:"));
+    public void logout(String sessionId) {
+        redis.execute(LOGOUT, List.of(key(sessionId)), namespace.key("mes:system:{sessions}:user-sessions:"));
     }
 
     public void revoke(long userId, long revision) {
         redis.execute(REVOKE, List.of(epoch(userId), index(userId)), Long.toString(revision));
     }
 
-    private String key(String digest) {
-        return namespace.key(PREFIX + digest);
+    private String key(String sessionId) {
+        if (sessionId == null || !sessionId.matches("[A-Za-z0-9-]{1,64}")) throw new IllegalArgumentException("Session locator invalid");
+        return namespace.key(PREFIX + RedisKeySegment.encode(sessionId));
     }
 
     private String epoch(long userId) {
-        return namespace.key("mes:system:session-epoch:" + userId);
+        return namespace.key("mes:system:{sessions}:session-epoch:" + RedisKeySegment.encode(Long.toString(userId)));
     }
 
     private String index(long userId) {
-        return namespace.key("mes:system:user-sessions:" + userId);
+        return namespace.key("mes:system:{sessions}:user-sessions:" + RedisKeySegment.encode(Long.toString(userId)));
     }
 }

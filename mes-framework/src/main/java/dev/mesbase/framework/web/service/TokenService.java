@@ -17,6 +17,7 @@ import java.time.Instant;
 import java.util.Base64;
 import java.util.HexFormat;
 import java.util.Set;
+import java.util.UUID;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.core.env.Environment;
 import org.springframework.stereotype.Service;
@@ -40,10 +41,10 @@ public class TokenService {
         if (ttl < 1 || ttl > 1440) throw new IllegalArgumentException("Token lifetime invalid");
     }
 
-    public static String hash(String token) {
+    public static String secretDigest(String secret) {
         try {
             return HexFormat.of()
-                    .formatHex(MessageDigest.getInstance("SHA-256").digest(token.getBytes(StandardCharsets.UTF_8)));
+                    .formatHex(MessageDigest.getInstance("SHA-256").digest(secret.getBytes(StandardCharsets.UTF_8)));
         } catch (NoSuchAlgorithmException impossible) {
             throw new IllegalStateException(impossible);
         }
@@ -59,13 +60,15 @@ public class TokenService {
         valid(current, user.getUserId(), user.getUsername(), user.getUser().getAuthRevision());
         byte[] bytes = new byte[32];
         new SecureRandom().nextBytes(bytes);
-        String raw = Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
+        String secret = Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
+        String sessionId = UUID.randomUUID().toString();
+        String raw = sessionId + "." + secret;
         ClientAgent agent = ClientAgent.parse(request.getHeader("User-Agent"));
         Identity identity = new Identity(user.getUserId(), user.getUsername(), user.getDeptId(),
                 user.getUser().getNickName(), user.getUser().getAvatar(), System.currentTimeMillis(),
                 request.getRemoteAddr(), agent.browser(), agent.os(), user.getUser().getAuthRevision());
         try {
-            if (!sessions.issue(hash(raw), identity.userId(), identity.authRevision(), json.writeValueAsString(identity),
+            if (!sessions.issue(sessionId, secretDigest(secret), identity.userId(), identity.authRevision(), json.writeValueAsString(identity),
                     Instant.now().plusSeconds(ttl * 60L))) throw denied();
         } catch (JsonProcessingException impossible) {
             throw new IllegalStateException(impossible);
@@ -79,8 +82,8 @@ public class TokenService {
         return resolve(header.substring(7));
     }
 
-    public Identity identity(String digest) {
-        String payload = sessions.read(digest);
+    public Identity identity(String sessionId) {
+        String payload = sessions.read(sessionId, null);
         if (payload == null) return null;
         try {
             return json.readValue(payload, Identity.class);
@@ -90,16 +93,17 @@ public class TokenService {
     }
 
     public LoginUser resolve(String raw) {
-        if (!raw.matches("[A-Za-z0-9_-]{43}")) throw denied();
-        String digest = hash(raw);
-        Identity identity = identity(digest);
+        String[] parts = splitToken(raw);
+        String sessionId = parts[0];
+        String secret = parts[1];
+        Identity identity = identity(sessionId, secretDigest(secret));
         if (identity == null) throw denied();
         // One password-free admission query loads current roles and the durable account fence.
         // It also rejects stale credentials when DB committed but Redis delivery is pending.
         SysUser user = accounts.account(identity.userId());
         valid(user, identity.userId(), identity.username(), identity.authRevision());
         LoginUser login = new LoginUser(user.getUserId(), user.getDeptId(), user, Set.of());
-        login.setToken(digest);
+        login.setToken(sessionId);
         login.setLoginTime(identity.loginTime());
         login.setIpaddr(identity.ip());
         login.setBrowser(identity.browser());
@@ -113,8 +117,25 @@ public class TokenService {
             throw denied();
     }
 
-    public void delLoginUser(String digest) {
-        sessions.logout(digest);
+    public void delLoginUser(String sessionId) {
+        sessions.logout(sessionId);
+    }
+
+    private Identity identity(String sessionId, String secretDigest) {
+        String payload = sessions.read(sessionId, secretDigest);
+        if (payload == null) return null;
+        try {
+            return json.readValue(payload, Identity.class);
+        } catch (JsonProcessingException invalid) {
+            throw denied();
+        }
+    }
+
+    private static String[] splitToken(String raw) {
+        if (raw == null) throw denied();
+        String[] parts = raw.split("\\.", -1);
+        if (parts.length != 2 || !parts[0].matches("[A-Fa-f0-9-]{36}") || !parts[1].matches("[A-Za-z0-9_-]{43}")) throw denied();
+        return parts;
     }
 
     public int ttlMinutes() {

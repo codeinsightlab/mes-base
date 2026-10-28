@@ -7,6 +7,10 @@ package dev.mesbase.framework.openapi;
 public class OpenApiClientTokenRecord {
     private String accessToken;
     private String tokenDigest;
+    private String tokenId;
+
+    public String getTokenId() { return tokenId; }
+    public void setTokenId(String tokenId) { this.tokenId = tokenId; }
     private long credentialVersion;
     private long expiresAt;
 

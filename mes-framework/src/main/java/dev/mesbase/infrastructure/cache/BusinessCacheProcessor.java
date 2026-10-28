@@ -1,6 +1,7 @@
 package dev.mesbase.infrastructure.cache;
 
 import com.fasterxml.jackson.databind.JavaType;
+import com.fasterxml.jackson.databind.JsonNode;
 import dev.mesbase.common.cache.DetailEntityCache;
 import com.fasterxml.jackson.databind.MapperFeature;
 import com.fasterxml.jackson.databind.SerializationFeature;
@@ -9,14 +10,12 @@ import dev.mesbase.common.core.redis.RedisCache;
 import dev.mesbase.infrastructure.cache.annotation.BusinessCacheEvict.Scope;
 import dev.mesbase.infrastructure.persistence.SpringCommitActions;
 import dev.mesbase.platform.execution.FactoryContext;
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.util.Base64;
-import java.util.HexFormat;
+import dev.mesbase.common.core.redis.RedisKeySegment;
 import java.util.Map;
-import java.util.List;
-import com.github.pagehelper.Page;
+import java.util.Locale;
+import java.util.TreeMap;
 import java.lang.reflect.Type;
+import java.lang.reflect.Parameter;
 import java.util.concurrent.TimeUnit;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -51,11 +50,7 @@ public class BusinessCacheProcessor {
     public String prefix(String business) {
         validateBusiness(business);
         String factory = FactoryContext.required().factoryId().value();
-        // Encode arbitrary factory IDs to avoid delimiters and Redis glob metacharacters.
-        String segment = Base64.getUrlEncoder().withoutPadding()
-                .encodeToString(factory.getBytes(StandardCharsets.UTF_8));
-        // Length-delimit the resource to isolate even a nested namespace such as business:material:list.
-        return "business:factory:" + segment + ":resource:" + business.length() + ":" + business + ":";
+        return "business:{factory:" + RedisKeySegment.encode(factory) + ":resource:" + business + "}:";
     }
 
     public DetailEntityCache.Generation detailGeneration(String resourcePrefix) {
@@ -76,14 +71,55 @@ public class BusinessCacheProcessor {
             throw new IllegalArgumentException("Business cache namespace must be a permission resource prefix, e.g. business:material");
     }
 
-    public String queryHash(Object[] arguments, BusinessCacheQuery query) {
+    public String queryKey(Object[] arguments, Parameter[] parameters, BusinessCacheQuery query) {
         try {
-            byte[] bytes = json.writeValueAsBytes(Map.of("arguments", arguments,
-                    "offset", query.cacheOffset(), "limit", query.cacheLimit(), "sort", query.cacheSort()));
-            return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(bytes));
+            var namedArguments = new TreeMap<String, Object>();
+            for (int i = 0; i < arguments.length; i++) {
+                String name = i < parameters.length && parameters[i] != null && parameters[i].isNamePresent()
+                        ? parameters[i].getName() : "arg" + i;
+                if (sensitiveName(name) || containsSensitiveField(arguments[i])) return null;
+                namedArguments.put(name, arguments[i]);
+            }
+            var conditions = new TreeMap<String, Object>();
+            conditions.put("arguments", namedArguments);
+            var pagination = new TreeMap<String, Object>();
+            pagination.put("offset", query.cacheOffset());
+            pagination.put("limit", query.cacheLimit());
+            pagination.put("sort", query.cacheSort());
+            conditions.put("pagination", pagination);
+            String serialized = json.writeValueAsString(conditions);
+            String encoded = RedisKeySegment.encode(serialized);
+            if (encoded.length() > 2048) return null;
+            return "conditions:" + encoded;
         } catch (Exception failure) {
-            throw new IllegalArgumentException("Business cache query cannot be serialized stably", failure);
+            return null;
         }
+    }
+
+    private boolean containsSensitiveField(Object value) {
+        if (value == null) return false;
+        try {
+            return sensitiveNode(json.valueToTree(value));
+        } catch (IllegalArgumentException failure) {
+            return true;
+        }
+    }
+
+    private boolean sensitiveNode(JsonNode node) {
+        if (node.isObject()) {
+            var fields = node.fields();
+            while (fields.hasNext()) {
+                var field = fields.next();
+                if (sensitiveName(field.getKey()) || sensitiveNode(field.getValue())) return true;
+            }
+        } else if (node.isArray()) {
+            for (var item : node) if (sensitiveNode(item)) return true;
+        }
+        return false;
+    }
+
+    private static boolean sensitiveName(String name) {
+        return name.toLowerCase(Locale.ROOT).matches(".*(password|secret|token|credential|authorization).*");
     }
 
     public JavaType returnType(Type type) {

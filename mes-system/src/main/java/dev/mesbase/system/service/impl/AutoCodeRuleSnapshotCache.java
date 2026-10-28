@@ -23,8 +23,8 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 @ConditionalOnProperty(name = "mes.system.enabled", havingValue = "true")
 public class AutoCodeRuleSnapshotCache {
     private static final Logger LOG = LoggerFactory.getLogger(AutoCodeRuleSnapshotCache.class);
-    private static final String KEY = "autocode:rules:v1";
-    private static final String VERSION_KEY = "autocode:rules:v1:version";
+    private static final String KEY = "autocode:{rules:v1}:snapshot";
+    private static final String VERSION_KEY = "autocode:{rules:v1}:version";
     private static final int TTL_SECONDS = 3600;
     private final RedisCache redis;
     private final SysAutoCodeRuleMapper rules;

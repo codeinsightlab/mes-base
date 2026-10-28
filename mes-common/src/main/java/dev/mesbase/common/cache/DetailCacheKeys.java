@@ -1,7 +1,6 @@
 package dev.mesbase.common.cache;
 
-import java.nio.charset.StandardCharsets;
-import java.util.Base64;
+import dev.mesbase.common.core.redis.RedisKeySegment;
 
 /**
  * One object key contract shared by CRUD detail reads and directory batch reads.
@@ -11,8 +10,7 @@ public final class DetailCacheKeys {
     }
 
     public static String detail(String resourcePrefix, Object id) {
-        return prefix(resourcePrefix) + "detail:" + Base64.getUrlEncoder().withoutPadding()
-                .encodeToString(id.toString().getBytes(StandardCharsets.UTF_8));
+        return prefix(resourcePrefix) + "detail:" + RedisKeySegment.encode(id.toString());
     }
 
     /**

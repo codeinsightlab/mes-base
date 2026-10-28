@@ -48,6 +48,7 @@ public class BusinessCacheAspect {
         JavaType type = caches.returnType(method.getGenericReturnType());
         if (type.isJavaLangObject() || type.hasRawClass(Void.TYPE))
             throw new IllegalArgumentException("Business cache requires a concrete return type");
+        transactions.verifyAccess();
         Object argument = args[intent.argument()];
         String key;
         if (intent.type() == BusinessCache.Type.LIST) {
@@ -56,13 +57,14 @@ public class BusinessCacheAspect {
             if (query.cacheSort() == null)
                 throw new IllegalArgumentException("Business cache effective ordering required");
             if (query.cacheOffset() < 0 || query.cacheLimit() < 1 || query.cacheOffset() >= 100) return call.proceed();
-            key = prefix + "list:" + caches.queryHash(args, query);
+            String conditions = caches.queryKey(args, method.getParameters(), query);
+            if (conditions == null) return call.proceed();
+            key = prefix + "list:" + conditions;
         } else {
             if (!(argument instanceof Long || argument instanceof Integer || argument instanceof String))
                 throw new IllegalArgumentException("DETAIL argument must be a non-null String/Long/Integer ID");
             key = DetailCacheKeys.detail(prefix, argument);
         }
-        transactions.verifyAccess();
         // Never reuse/populate shared query data from a write transaction (including an outer write unit).
         if (!TransactionSynchronizationManager.isCurrentTransactionReadOnly())
             return call.proceed();
