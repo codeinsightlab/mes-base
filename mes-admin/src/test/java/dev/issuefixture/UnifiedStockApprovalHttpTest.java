@@ -32,7 +32,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  */
 class UnifiedStockApprovalHttpTest {
     private static final ObjectMapper JSON = new ObjectMapper();
-    private static final String GENERIC_AGGREGATE = "{\"header\":{\"documentType\":\"OTHER_RECEIPT\",\"reason\":\"TEST ONLY permission\",\"ruleCode\":\"TEST\"},\"items\":[{\"stockId\":1,\"materialId\":1,\"warehouseId\":1,\"unitId\":1,\"quantity\":1}]}";
+    private static final String GENERIC_AGGREGATE = "{\"header\":{\"documentType\":\"OTHER_RECEIPT\",\"reason\":\"TEST ONLY permission\",\"ruleCode\":\"TEST_STOCK_IN\"},\"items\":[{\"stockId\":\"1\",\"materialId\":\"1\",\"warehouseId\":\"1\",\"unitId\":\"1\",\"batchNo\":\"L001\",\"binCode\":\"BIN1\",\"quantity\":\"1\"}]}";
 
     @Configuration
     static class AuditWithoutDraftEditing {
@@ -65,8 +65,13 @@ class UnifiedStockApprovalHttpTest {
                             .content(StockDocumentHttpTest.intent(uuid, saved.get("document").get("revision").asInt())))
                     .andExpect(status().isOk());
             BigDecimal after = rawBalance(db);
-            mvc.perform(full(post(StockDocumentHttpTest.ROOT + "/aggregate")).content(GENERIC_AGGREGATE))
+            mvc.perform(full(post(StockDocumentHttpTest.ROOT + "/aggregate"))
+                            .content(genericAggregate()))
                     .andExpect(status().isForbidden());
+            assertEquals(1, count(db, "wm_stock_document"));
+            assertEquals(1, count(db, "wm_stock_document_line"));
+            assertEquals(0, count(db, "mes_material_issue_input"));
+            assertEquals(0, count(db, "wm_stock_action"));
             assertEquals(1, count(db, "wm_stock_document"));
             assertEquals(1, count(db, "mes_material_issue_input"));
             assertEquals(1, count(db, "wm_stock_action"));
@@ -229,8 +234,12 @@ class UnifiedStockApprovalHttpTest {
             WorkorderBomInputHttpTest.prepare(db, "100", "1", "2.5");
             WorkorderBomInputHttpTest.select(mvc, 1, 1);
             String command = ProductionInputHttpTest.command(mvc, UUID.randomUUID().toString(), "L001", "10");
-            mvc.perform(full(post(StockDocumentHttpTest.ROOT + "/aggregate")).content(GENERIC_AGGREGATE))
+            mvc.perform(full(post(StockDocumentHttpTest.ROOT + "/aggregate"))
+                            .content(genericAggregate()))
                     .andExpect(status().isForbidden());
+            assertEquals(0, count(db, "wm_stock_document"));
+            assertEquals(0, count(db, "wm_stock_document_line"));
+            assertEquals(0, count(db, "wm_stock_action"));
             draft(mvc, command);
             assertEquals(1, count(db, "wm_stock_document"));
             assertEquals(0, count(db, "mes_material_issue_input"));
@@ -241,6 +250,10 @@ class UnifiedStockApprovalHttpTest {
     private static JsonNode draft(MockMvc mvc, String command) throws Exception {
         return JSON.readTree(mvc.perform(full(post("/api/production/input/drafts")).content(command))
                 .andExpect(status().isOk()).andReturn().getResponse().getContentAsString());
+    }
+
+    private static String genericAggregate() {
+        return GENERIC_AGGREGATE;
     }
 
     private static int count(JdbcTemplate db, String table) {

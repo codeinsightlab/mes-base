@@ -1,6 +1,7 @@
 package dev.issuefixture;
 
 import java.util.UUID;
+import java.time.LocalDateTime;
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.ObjectMapper;
 
@@ -33,10 +34,15 @@ class StockDocumentProductionInputBasisHttpTest {
                     .andExpect(jsonPath("bomId").value("1"))
                     .andExpect(jsonPath("bomBaseQty").value("1.000000"))
                     .andExpect(jsonPath("bomComponentQty").value("2.000000"))
+                    .andExpect(jsonPath("businessOccurredAt").isNotEmpty())
                     .andExpect(jsonPath("routingNodeIds[0]").value("11"))
                     .andExpect(jsonPath("routingNodeIds[1]").value("12"))
                     .andExpect(jsonPath("routingNodeIds[2]").value("13"))
                     .andExpect(jsonPath("stockApplied").value(true));
+            assertEquals(db.queryForObject("SELECT confirmed_at FROM mes_material_issue_input WHERE document_id=?",
+                            LocalDateTime.class, documentId),
+                    db.queryForObject("SELECT business_occurred_at FROM mes_material_issue_input WHERE document_id=?",
+                            LocalDateTime.class, documentId));
             assertEquals(1, db.queryForObject("SELECT COUNT(*) FROM mes_material_issue_input WHERE document_id=?", Integer.class, documentId));
         }
     }

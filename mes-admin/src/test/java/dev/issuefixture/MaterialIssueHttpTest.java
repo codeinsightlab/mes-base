@@ -249,7 +249,8 @@ class MaterialIssueHttpTest {
                 jdbc.execute("DROP TABLE mes_material_issue");
                 jdbc.execute("ALTER TABLE mes_material_issue_input RENAME COLUMN issue_id TO document_id");
                 jdbc.execute("ALTER TABLE mes_material_issue_submission RENAME COLUMN issue_id TO document_id");
-                for (String column : List.of("submission_id BIGINT", "path_revision INT", "void_operation_id VARCHAR(64)",
+                for (String column : List.of("submission_id BIGINT", "path_revision INT", "business_occurred_at TIMESTAMP",
+                        "void_operation_id VARCHAR(64)",
                         "void_from_status VARCHAR(24)", "void_requested_at TIMESTAMP", "void_finished_at TIMESTAMP", "void_result_status VARCHAR(24)"))
                     jdbc.execute("ALTER TABLE mes_material_issue_input ADD " + column);
                 jdbc.execute("DROP TABLE mes_material_issue_erp_extra");
@@ -314,6 +315,9 @@ class MaterialIssueHttpTest {
     @EnableTransactionManagement
     @Import({MaterialQuantityRules.class, WorkOrderCompletionService.class, StockDocumentService.class, StockDocumentController.class, WorkOrderCancellationService.class, WorkOrderCancellationController.class, BusinessSourceRules.class, StockReferenceRules.class, ProductionCompletionService.class, ProductionCompletionController.class, WarehouseAcceptanceService.class, WarehouseAcceptanceController.class, QualityReleaseService.class, QualityReleaseController.class, WorkorderMaterialService.class, WorkorderMaterialController.class, LocalStockController.class, WmStockActionController.class, WmStockActionServiceImpl.class, LocalStockService.class, LocalProductionSupply.class, QualityTreatmentService.class, MaterialIssueInputFacts.class, ProductionQuantityService.class, ProductionQuantityErrorAdvice.class, ExecutionQualityReferenceQueryImpl.class, ProductionExecutionQueryService.class, ProductionChainLocks.class, ExecutionPathService.class, ExecutionActionController.class, MaterialIssueSubmissionService.class, WorkorderErpFacts.class, WarehouseIntegration.class, MaterialIssueVoidService.class, ProductionExecutionRules.class, ProductionIdentityService.class, MesProductionExecutionServiceImpl.class, MesProductionExecutionController.class, ProductionIdentityController.class, WorkOrderController.class, WorkOrderService.class, RoutingReferenceRules.class, FoundationErrorAdvice.class})
     static class Web implements WebMvcConfigurer {
+        @org.springframework.beans.factory.annotation.Autowired
+        private AuthorizationService authorization;
+
         @Bean
         FactorySnapshotFixture factorySnapshots() {
             return new FactorySnapshotFixture();
@@ -471,8 +475,13 @@ class MaterialIssueHttpTest {
         AuthorizationService qualityAuthorization() {
             return (actor, scope, permission) -> "full".equals(actor.id())
                     || "revise".equals(actor.id()) && permission.code().equals("business:quality:defect:revise")
+                    || "query".equals(actor.id()) && permission.code().equals("workorder:query")
+                    || "create".equals(actor.id()) && permission.code().equals("business:quality:defect:create")
                     || "issue_query".equals(actor.id()) && permission.code().equals("business:mes:material:issue:query")
-                    || "issue_item".equals(actor.id()) && permission.code().equals("business:mes:material:issue:item:list");
+                    || "issue_item".equals(actor.id()) && permission.code().equals("business:mes:material:issue:item:list")
+                    || "crud".equals(actor.id()) && (permission.code().endsWith(":list")
+                    || permission.code().endsWith(":query") || permission.code().equals("business:quality:defect:read")
+                    || permission.code().equals("business:quality:defect:create"));
         }
 
         @Bean
@@ -630,18 +639,7 @@ class MaterialIssueHttpTest {
             try {
                 var f = fixture();
                 r.addInterceptor(new FoundationAccessInterceptor(new FactorySelectionService(f.catalog, new InMemoryFactoryPreference()),
-                        (actor, scope, permission) -> "full".equals(actor.id())
-                                || "query".equals(actor.id()) && permission.code().equals("workorder:query")
-                                || "issue_query".equals(actor.id()) && permission.code().equals("business:mes:material:issue:query")
-                                || "issue_item".equals(actor.id()) && permission.code().equals("business:mes:material:issue:item:list")
-                                || "create".equals(actor.id()) && permission.code()
-                                .equals("business:quality:defect:create")
-                                || "revise".equals(actor.id()) && permission.code()
-                                .equals("business:quality:defect:revise")
-                                || "crud".equals(actor.id()) && (permission.code()
-                                .endsWith(":list") || permission.code().endsWith(":query") || permission.code()
-                                .equals("business:quality:defect:read") || permission.code()
-                                .equals("business:quality:defect:create"))));
+                        authorization));
             } catch (Exception failure) {
                 throw new IllegalStateException(failure);
             }
