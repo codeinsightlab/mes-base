@@ -9,6 +9,7 @@ import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import dev.mesbase.common.core.domain.entity.SysAutoCodePart;
@@ -71,7 +72,30 @@ class AutoCodeGenerationTest {
                 mock(AutoCodeExtraMapper.class), mock(PlatformTransactionManager.class), factoryContext);
 
         assertThrows(ServiceException.class, () -> service.getDocNo("LOCAL_B"));
-        org.mockito.Mockito.verifyNoInteractions(rules);
+        verifyNoInteractions(rules);
+    }
+
+    @Test
+    void lockedRuleScopeChangeInvalidatesCachedFactoryAuthorization() {
+        var cache = mock(AutoCodeRuleSnapshotCache.class);
+        var rules = mock(SysAutoCodeRuleMapper.class);
+        var results = mock(SysAutoCodeResultMapper.class);
+        var extra = mock(AutoCodeExtraMapper.class);
+        var manager = mock(PlatformTransactionManager.class);
+        var currentRule = rule(3L);
+        currentRule.setRuleCode("LOCAL_A");
+        currentRule.setFactoryId("FACTORY_B");
+        when(manager.getTransaction(any(TransactionDefinition.class))).thenReturn(new SimpleTransactionStatus());
+        when(cache.get("LOCAL_A")).thenReturn(config(3, "LOCAL_A", "WORK_ORDER", "FACTORY_A", "LA"));
+        when(extra.lockRule(3L)).thenReturn(3L);
+        when(rules.findByIdForUpdate(3L)).thenReturn(currentRule);
+        var factoryContext = mock(AutoCodeFactoryContext.class);
+        when(factoryContext.requiredFactoryId()).thenReturn("FACTORY_A");
+        var service = service(cache, rules, mock(SysAutoCodePartMapper.class), results,
+                extra, manager, factoryContext);
+
+        assertThrows(ServiceException.class, () -> service.getDocNo("LOCAL_A"));
+        verifyNoInteractions(results);
     }
 
     @Test

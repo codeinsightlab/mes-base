@@ -6,6 +6,7 @@ import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -27,6 +28,60 @@ import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.support.SimpleTransactionStatus;
 
 class AutoCodeRuleDeletionTest {
+    @Test
+    void ruleWithGeneratedNumbersCannotChangeFactoryScope() {
+        var rules = mock(SysAutoCodeRuleMapper.class);
+        var extra = mock(AutoCodeExtraMapper.class);
+        var references = mock(AutoCodeRuleReferenceGuard.class);
+        var cache = mock(AutoCodeRuleSnapshotCache.class);
+        var master = mock(PlatformTransactionManager.class);
+        var service = new SysAutoCodeRuleServiceImpl(rules, extra, cache,
+                references, mock(SysAutoCodePartMapper.class), master);
+        var existing = rule();
+        existing.setFactoryId("FACTORY_A");
+        var update = rule();
+        update.setFactoryId("FACTORY_B");
+        when(rules.findById(7L)).thenReturn(existing);
+        when(references.requireUnreferenced(existing)).thenReturn("WO");
+        when(extra.resultCount(7L)).thenReturn(1);
+
+        assertThrows(ServiceException.class, () -> service.updateInfo(update));
+
+        verify(references, never()).requireEnabledFactory("FACTORY_B");
+        verify(rules, never()).findByIdForUpdate(7L);
+        verify(rules, never()).updateSysAutoCodeRule(any(SysAutoCodeRule.class));
+        verifyNoInteractions(cache, master);
+    }
+
+    @Test
+    void factoryScopeChangeRechecksGeneratedNumbersAfterRuleLock() {
+        var rules = mock(SysAutoCodeRuleMapper.class);
+        var extra = mock(AutoCodeExtraMapper.class);
+        var cache = mock(AutoCodeRuleSnapshotCache.class);
+        var references = mock(AutoCodeRuleReferenceGuard.class);
+        var parts = mock(SysAutoCodePartMapper.class);
+        var master = mock(PlatformTransactionManager.class);
+        var existing = rule();
+        existing.setFactoryId("FACTORY_A");
+        var update = rule();
+        update.setFactoryId("FACTORY_B");
+        when(rules.findById(7L)).thenReturn(existing);
+        when(rules.findByIdForUpdate(7L)).thenReturn(existing);
+        when(references.requireUnreferenced(existing)).thenReturn("WO");
+        when(references.requireUnreferenced(any(SysAutoCodeRule.class))).thenReturn("WO");
+        when(extra.resultCount(7L)).thenReturn(0, 1);
+        when(extra.lockRule(7L)).thenReturn(7L);
+        when(parts.selectByRuleIdForUpdate(7L)).thenReturn(List.of(prefixPart("WO")));
+        when(master.getTransaction(any(TransactionDefinition.class))).thenReturn(new SimpleTransactionStatus());
+        var service = new SysAutoCodeRuleServiceImpl(rules, extra, cache,
+                references, parts, master);
+
+        assertThrows(ServiceException.class, () -> service.updateInfo(update));
+
+        verify(extra, times(2)).resultCount(7L);
+        verify(rules, never()).updateSysAutoCodeRule(any(SysAutoCodeRule.class));
+        verifyNoInteractions(cache);
+    }
     @Test
     void ruleUpdateUsesTheSamePrefixReferenceGuardAsDeletion() {
         var rules = mock(SysAutoCodeRuleMapper.class);
