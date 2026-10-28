@@ -11,6 +11,8 @@ public class SysAutoCodeRule extends BaseEntity {
 
     private String ruleCode;
 
+    private String ruleType;
+
     private String ruleName;
 
     private String ruleDesc;
@@ -40,6 +42,10 @@ public class SysAutoCodeRule extends BaseEntity {
     public void setRuleCode(String ruleCode) {
         this.ruleCode = ruleCode;
     }
+
+    public String getRuleType() { return ruleType; }
+
+    public void setRuleType(String ruleType) { this.ruleType = ruleType; }
 
     public String getRuleName() {
         return ruleName;

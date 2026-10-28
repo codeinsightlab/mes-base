@@ -5,6 +5,8 @@ import dev.mesbase.business.production.domain.ProductionBatchEntity;
 import dev.mesbase.business.production.domain.WorkOrderModels;
 import dev.mesbase.business.production.domain.WorkorderEntity;
 import dev.mesbase.business.production.service.WorkOrderService;
+import dev.mesbase.system.service.AutoCodeNumbering;
+import dev.mesbase.system.service.AutoCodeRuleType;
 import dev.mesbase.common.utils.bean.BeanConversions;
 import dev.mesbase.platform.web.EndpointAccess;
 import jakarta.validation.Valid;
@@ -30,9 +32,11 @@ import org.springframework.web.bind.annotation.RestController;
 @ConditionalOnProperty(name = "mes.business.enabled", havingValue = "true")
 public class WorkOrderController {
     private final WorkOrderService service;
+    private final AutoCodeNumbering autoCodes;
 
-    public WorkOrderController(WorkOrderService service) {
+    public WorkOrderController(WorkOrderService service, AutoCodeNumbering autoCodes) {
         this.service = service;
+        this.autoCodes = autoCodes;
     }
 
     public record OrderView(String id, String source, String code, String productId, BigDecimal plannedQty,
@@ -64,6 +68,15 @@ public class WorkOrderController {
     }
 
     public record PageView(List<SummaryView> items, long total, int offset, int limit) {
+    }
+
+    public record NumberingRule(String ruleCode, String ruleName, String prefix) { }
+
+    @GetMapping("/workorder/numbering-rules")
+    @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED, permission = "workorder:create")
+    public List<NumberingRule> numberingRules() {
+        return autoCodes.rules(AutoCodeRuleType.WORK_ORDER.name()).stream()
+                .map(rule -> new NumberingRule(rule.ruleCode(), rule.ruleName(), rule.prefix())).toList();
     }
 
     @GetMapping("/workorder")

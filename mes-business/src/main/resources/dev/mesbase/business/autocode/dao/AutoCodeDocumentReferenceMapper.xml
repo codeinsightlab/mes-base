@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="dev.mesbase.business.autocode.dao.AutoCodeDocumentReferenceMapper">
+    <select id="hasWorkorderPrefix" resultType="int">
+        select case when exists (
+            select 1 from workorder where code like #{pattern} escape '!' limit 1
+        ) then 1 else 0 end
+    </select>
+    <select id="hasStockDocumentPrefix" resultType="int">
+        select case when exists (
+            select 1 from wm_stock_document
+            where document_no like #{pattern} escape '!'
+            <if test="direction == 'STOCK_IN'">
+                and document_type in ('PURCHASE_RECEIPT','PRODUCTION_RECEIPT','OUTSOURCE_RECEIPT',
+                    'MATERIAL_RETURN_RECEIPT','REWORK_RECEIPT','SALES_RETURN_RECEIPT','DEFECT_RECEIPT',
+                    'SCRAP_RECEIPT','OTHER_RECEIPT')
+            </if>
+            <if test="direction == 'STOCK_OUT'">
+                and document_type in ('MATERIAL_ISSUE','OTHER_ISSUE')
+            </if>
+            limit 1
+        ) then 1 else 0 end
+    </select>
+</mapper>

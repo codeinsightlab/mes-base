@@ -17,7 +17,12 @@ public final class StockDocumentModels {
     }
 
     public record Create(@NotBlank String documentType, @NotBlank @Size(max = 500) String reason,
-                         @Size(max = 500) String remark, Long sourceWorkorderId, Long sourceExecutionId) {
+                         @Size(max = 500) String remark, Long sourceWorkorderId, Long sourceExecutionId,
+                         @Size(max = 64) String ruleCode) {
+        public Create(String documentType, String reason, String remark, Long sourceWorkorderId,
+                      Long sourceExecutionId) {
+            this(documentType, reason, remark, sourceWorkorderId, sourceExecutionId, null);
+        }
     }
 
     public record Edit(@NotNull Long expectedRevision, @NotBlank @Size(max = 500) String reason,

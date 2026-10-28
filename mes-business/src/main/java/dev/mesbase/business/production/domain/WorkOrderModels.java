@@ -16,7 +16,7 @@ public final class WorkOrderModels {
                        @NotNull BigDecimal plannedQty, @NotNull Long routingId,
                        LocalDateTime plannedStartAt, LocalDateTime plannedEndAt,
                        @Size(max = 128) String externalId, @Size(max = 128) String externalCode,
-                       @Size(max = 500) String remark, Integer revision) {
+                       @Size(max = 500) String remark, Integer revision, @Size(max = 64) String ruleCode) {
     }
 
     public record Revision(@NotNull Integer revision) {

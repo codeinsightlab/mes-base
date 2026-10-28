@@ -32,6 +32,8 @@ import dev.mesbase.core.security.AuthenticatedActor;
 import dev.mesbase.core.security.AuthorizationService;
 import dev.mesbase.core.security.Permission;
 import dev.mesbase.platform.execution.FactoryContext;
+import dev.mesbase.system.service.AutoCodeNumbering;
+import dev.mesbase.system.service.AutoCodeRuleType;
 
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
@@ -45,7 +47,12 @@ import java.util.UUID;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.transaction.annotation.Isolation;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
@@ -66,6 +73,8 @@ public class QualityDispositionService {
     private final AuthorizationService authorization;
     private final ProductionIdentityService identities;
     private final WmWarehouseMapper warehouses;
+    private final AutoCodeNumbering autoCodes;
+    private final TransactionTemplate businessTransactions;
 
     public QualityDispositionService(QualityTreatmentService treatments, ProductionChainLocks locks,
                                      BusinessSourceRules sources,
@@ -74,7 +83,9 @@ public class QualityDispositionService {
                                      ObjectProvider<IWmInventoryService> inventory, WmInventoryMapper stocks,
                                      StockReferenceRules references,
                                      MaterialMapper materials, AuthorizationService authorization,
-                                     ProductionIdentityService identities, WmWarehouseMapper warehouses) {
+                                     ProductionIdentityService identities, WmWarehouseMapper warehouses,
+                                     AutoCodeNumbering autoCodes,
+                                     @Qualifier("businessTransactionManager") PlatformTransactionManager businessManager) {
         this.warehouses = warehouses;
         this.identities = identities;
         this.treatments = treatments;
@@ -87,10 +98,28 @@ public class QualityDispositionService {
         this.references = references;
         this.materials = materials;
         this.authorization = authorization;
+        this.autoCodes = autoCodes;
+        this.businessTransactions = new TransactionTemplate(businessManager);
+        this.businessTransactions.setIsolationLevel(TransactionDefinition.ISOLATION_READ_COMMITTED);
     }
 
-    @Transactional(transactionManager = "businessTransactionManager", isolation = Isolation.READ_COMMITTED, rollbackFor = Exception.class)
+    @Transactional(transactionManager = "businessTransactionManager", propagation = Propagation.NOT_SUPPORTED,
+            rollbackFor = Exception.class)
     public QualityTreatmentService.Details execute(String declaration, Disposition c) {
+        if (c == null || c.destination() == null) ParameterChecks.reject(ErrorCode.BAD_REQUEST);
+        String requestHash = hash(declaration, c);
+        if (replayed(declaration, c.requestId(), requestHash)) return treatments.details(declaration);
+        String documentNo = null;
+        if (c.destination() == Destination.WAREHOUSE) {
+            String ruleCode = autoCodes.uniqueRuleCode(AutoCodeRuleType.STOCK_IN.name());
+            documentNo = autoCodes.getDocNo(ruleCode, AutoCodeRuleType.STOCK_IN.name());
+        }
+        String reservedDocumentNo = documentNo;
+        return businessTransactions.execute(status -> executeInTransaction(declaration, c, reservedDocumentNo));
+    }
+
+    private QualityTreatmentService.Details executeInTransaction(String declaration, Disposition c,
+                                                                  String documentNo) {
         if (c == null || c.destination() == null || c.requestId() == null || c.quantity() == null
                 || c.quantity().signum() <= 0 || StringUtils.isBlank(c.reason()) || c.reason().length() > 500
                 || c.destination() == Destination.RETURN_NODE && c.warehouseId() != null
@@ -137,7 +166,7 @@ public class QualityDispositionService {
                 ParameterChecks.reject(ErrorCode.RECEIPT_WAREHOUSE_INVALID);
             var receiptType = warehouseType == WarehouseType.DEFECTIVE ? StockDocumentType.DEFECT_RECEIPT : StockDocumentType.SCRAP_RECEIPT;
             var doc = owner.createQualityReceipt(new StockDocumentModels.Create(receiptType.getValue(), c.reason()
-                    .trim(), "质量申报 " + declaration, null, null));
+                    .trim(), "质量申报 " + declaration, null, null), documentNo);
             documentId = doc.document().getId();
             treatments.recordDisposition(declaration, c, hash, documentId);
             references.lockDemandReferences(execution.getProductId(), List.of(c.warehouseId()));

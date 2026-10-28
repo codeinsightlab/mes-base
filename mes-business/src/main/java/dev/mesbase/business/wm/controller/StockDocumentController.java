@@ -1,12 +1,16 @@
 package dev.mesbase.business.wm.controller;
 
 import dev.mesbase.common.utils.bean.BeanConversions;
+import dev.mesbase.core.error.ErrorCode;
+import dev.mesbase.core.error.FoundationException;
 import dev.mesbase.business.wm.domain.StockDocumentModels;
 import dev.mesbase.business.wm.domain.StockDocumentType;
 import java.util.Arrays;
 import dev.mesbase.business.wm.domain.WmStockDocumentEntity;
 import dev.mesbase.business.wm.domain.WmStockDocumentLineEntity;
 import dev.mesbase.business.wm.service.StockDocumentService;
+import dev.mesbase.system.service.AutoCodeNumbering;
+import dev.mesbase.system.service.AutoCodeRuleType;
 import dev.mesbase.platform.web.EndpointAccess;
 import jakarta.validation.Valid;
 import java.time.LocalDateTime;
@@ -21,6 +25,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
@@ -29,9 +34,11 @@ import org.springframework.web.bind.annotation.RestController;
 public class StockDocumentController {
     private static final String PERMISSION = "business:wm:stock:document:";
     private final StockDocumentService service;
+    private final AutoCodeNumbering autoCodes;
 
-    public StockDocumentController(StockDocumentService service) {
+    public StockDocumentController(StockDocumentService service, AutoCodeNumbering autoCodes) {
         this.service = service;
+        this.autoCodes = autoCodes;
     }
 
     @GetMapping
@@ -53,6 +60,16 @@ public class StockDocumentController {
                 .toList();
     }
 
+    public record NumberingRule(String ruleCode, String ruleName, String prefix) { }
+
+    @GetMapping("/numbering-rules")
+    @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED, permission = PERMISSION + "create")
+    public List<NumberingRule> numberingRules(@RequestParam String type) {
+        if (!AutoCodeRuleType.supports(type)) throw new FoundationException(ErrorCode.BAD_REQUEST);
+        return autoCodes.rules(type).stream()
+                .map(rule -> new NumberingRule(rule.ruleCode(), rule.ruleName(), rule.prefix())).toList();
+    }
+
     @GetMapping("/{id}")
     @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED, permission = PERMISSION + "query")
     public Detail detail(@PathVariable Long id) {
@@ -62,6 +79,8 @@ public class StockDocumentController {
     @PostMapping
     @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED, permission = PERMISSION + "create")
     public Detail create(@Valid @RequestBody StockDocumentModels.Create command) {
+        if (command.ruleCode() == null || command.ruleCode().isBlank())
+            throw new FoundationException(ErrorCode.BAD_REQUEST);
         return view(service.create(command));
     }
 

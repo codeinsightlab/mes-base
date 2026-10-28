@@ -43,6 +43,8 @@ import dev.mesbase.business.production.domain.RoutingDetail;
 import dev.mesbase.business.production.service.ExecutionPathService.PathModel;
 import dev.mesbase.business.basic.dao.MaterialMapper;
 import dev.mesbase.platform.execution.FactoryContext;
+import dev.mesbase.system.service.AutoCodeNumbering;
+import dev.mesbase.system.service.AutoCodeRuleType;
 import dev.mesbase.core.error.ErrorCode;
 import dev.mesbase.core.error.FoundationException;
 
@@ -73,7 +75,13 @@ public class ProductionInputService {
 
     public record Command(String requestId, String code, Long workorderId, String stockReference,
                           BigDecimal outputQty, Long routingId, List<Long> routingNodeIds, String inputKind,
-                          String calculationKey) {
+                          String calculationKey, String ruleCode) {
+        public Command(String requestId, String code, Long workorderId, String stockReference,
+                       BigDecimal outputQty, Long routingId, List<Long> routingNodeIds, String inputKind,
+                       String calculationKey) {
+            this(requestId, code, workorderId, stockReference, outputQty, routingId, routingNodeIds, inputKind,
+                    calculationKey, null);
+        }
     }
 
     public record Result(String requestId, String issueId, String executionId, String code,
@@ -100,6 +108,7 @@ public class ProductionInputService {
     private final RoutingMapper routings;
     private final IRoutingService routingService;
     private final TransactionTemplate transaction;
+    private final AutoCodeNumbering autoCodes;
     private final ObjectMapper json = new ObjectMapper();
 
     public ProductionInputService(ProductionInputSupplyService supply, ProductionIdentityService identities,
@@ -115,9 +124,11 @@ public class ProductionInputService {
                                   @Qualifier("businessTransactionManager") PlatformTransactionManager manager,
                                   BusinessSourceRules sources, WorkOrderExtraMapper allocation,
                                   ProductionExecutionRules executionRules, BusinessCacheProcessor caches,
-                                  ObjectProvider<StockDocumentService> documents, AuthorizationService authorization) {
+                                  ObjectProvider<StockDocumentService> documents, AuthorizationService authorization,
+                                  AutoCodeNumbering autoCodes) {
         this.documents = documents;
         this.authorization = authorization;
+        this.autoCodes = autoCodes;
         this.caches = caches;
         this.executionRules = executionRules;
         this.allocation = allocation;
@@ -178,6 +189,9 @@ public class ProductionInputService {
         var sourceOrder = transaction.execute(s -> sources.order(command.workorderId()));
         if (BusinessSource.LOCAL.getValue().equals(sourceOrder.getSource())) {
             requireDocumentPermissions(true);
+            // The fast path also creates a formal stock-out document. Reserve it before
+            // entering the factory transaction, through the same numbered draft path.
+            if (documents.getObject().findMaterialIssueDraft(command) == null) saveDraft(command);
             return transaction.execute(s -> {
                 locks.order(command.workorderId());
                 var saved = inputs.selectByPrimaryKey(command.requestId());
@@ -232,8 +246,20 @@ public class ProductionInputService {
             throw new FoundationException(ErrorCode.FORBIDDEN);
     }
 
-    @Transactional(transactionManager = "businessTransactionManager", rollbackFor = Exception.class)
+    @Transactional(transactionManager = "businessTransactionManager", propagation = Propagation.NOT_SUPPORTED,
+            rollbackFor = Exception.class)
     public StockDocumentModels.Detail saveDraft(Command command) {
+        validate(command);
+        requireDocumentPermissions(false);
+        var existing = documents.getObject().findMaterialIssueDraft(command);
+        if (existing != null) return existing;
+        String ruleCode = command.ruleCode() == null || command.ruleCode().isBlank()
+                ? autoCodes.uniqueRuleCode(AutoCodeRuleType.STOCK_OUT.name()) : command.ruleCode();
+        String documentNo = autoCodes.getDocNo(ruleCode, AutoCodeRuleType.STOCK_OUT.name());
+        return transaction.execute(status -> saveDraftInTransaction(command, documentNo));
+    }
+
+    private StockDocumentModels.Detail saveDraftInTransaction(Command command, String documentNo) {
         validate(command);
         requireDocumentPermissions(false);
         locks.order(command.workorderId());
@@ -244,7 +270,7 @@ public class ProductionInputService {
         var calculation = supply.calculateLocal(command.code(), command.workorderId(), command.stockReference(), command.outputQty());
         if (!Objects.equals(command.calculationKey(), ProductionInputSupplyService.calculationKey(calculation)))
             throw new FoundationException(ErrorCode.PRODUCTION_INPUT_STALE);
-        return documents.getObject().createMaterialIssueDraft(command, calculation);
+        return documents.getObject().createMaterialIssueDraft(command, calculation, documentNo);
     }
 
     /**

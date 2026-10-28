@@ -18,6 +18,8 @@ import dev.mesbase.core.security.AuthenticatedActor;
 import dev.mesbase.core.security.AuthorizationService;
 import dev.mesbase.core.security.Permission;
 import dev.mesbase.platform.execution.FactoryContext;
+import dev.mesbase.system.service.AutoCodeNumbering;
+import dev.mesbase.system.service.AutoCodeRuleType;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
@@ -30,7 +32,12 @@ import java.util.UUID;
 
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.transaction.annotation.Isolation;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
@@ -51,11 +58,15 @@ public class ProductionInboundService {
     private final ProductionChainLocks locks;
     private final AuthorizationService authorization;
     private final MaterialQuantityRules quantityRules;
+    private final AutoCodeNumbering autoCodes;
+    private final TransactionTemplate businessTransactions;
 
     public ProductionInboundService(StockDocumentService documents, WmStockDocumentMapper headers,
                                     WmInventoryMapper inventory, MaterialMapper materials,
                                     ProductionCompletionService completion, ProductionChainLocks locks,
-                                    AuthorizationService authorization, MaterialQuantityRules quantityRules) {
+                                    AuthorizationService authorization, MaterialQuantityRules quantityRules,
+                                    AutoCodeNumbering autoCodes,
+                                    @Qualifier("businessTransactionManager") PlatformTransactionManager businessManager) {
         this.documents = documents;
         this.headers = headers;
         this.inventory = inventory;
@@ -64,9 +75,12 @@ public class ProductionInboundService {
         this.locks = locks;
         this.authorization = authorization;
         this.quantityRules = quantityRules;
+        this.autoCodes = autoCodes;
+        this.businessTransactions = new TransactionTemplate(businessManager);
+        this.businessTransactions.setIsolationLevel(TransactionDefinition.ISOLATION_READ_COMMITTED);
     }
 
-    @Transactional(transactionManager = "businessTransactionManager", isolation = Isolation.READ_COMMITTED,
+    @Transactional(transactionManager = "businessTransactionManager", propagation = Propagation.NOT_SUPPORTED,
             rollbackFor = Exception.class)
     public StockDocumentModels.Detail receive(Long executionId, Command command) {
         permit("business:wm:stock:document:create");
@@ -81,6 +95,14 @@ public class ProductionInboundService {
         } catch (IllegalArgumentException failure) {
             throw new FoundationException(ErrorCode.BAD_REQUEST, failure);
         }
+        var replay = replay(executionId, command);
+        if (replay != null) return replay;
+        String ruleCode = autoCodes.uniqueRuleCode(AutoCodeRuleType.STOCK_IN.name());
+        String documentNo = autoCodes.getDocNo(ruleCode, AutoCodeRuleType.STOCK_IN.name());
+        return businessTransactions.execute(status -> receiveInTransaction(executionId, command, documentNo));
+    }
+
+    private StockDocumentModels.Detail receiveInTransaction(Long executionId, Command command, String documentNo) {
         // Same order/sibling -> document -> stock lock order as ordinary inbound approval.
         completion.lockInboundChain(executionId);
         var replay = replay(executionId, command);
@@ -94,8 +116,8 @@ public class ProductionInboundService {
             ParameterChecks.reject(ErrorCode.STOCK_DOCUMENT_CONFLICT);
         quantityRules.lockForWrite(List.of(material.getId()));
         // Document owner validates current rules or exact authoritative remaining production quantity.
-        var draft = documents.create(new StockDocumentModels.Create(StockDocumentType.PRODUCTION_RECEIPT.getValue(),
-                command.reason(), null, null, executionId));
+        var draft = documents.createWithNumber(new StockDocumentModels.Create(
+                StockDocumentType.PRODUCTION_RECEIPT.getValue(), command.reason(), null, null, executionId), documentNo);
         Long id = draft.document().getId();
         documents.putLine(id, null, new StockDocumentModels.Line(draft.document().getRevision(), command.stockId(),
                 execution.getProductId(), stock.getWarehouseId(), material.getUnitId(), stock.getBatchNo(),

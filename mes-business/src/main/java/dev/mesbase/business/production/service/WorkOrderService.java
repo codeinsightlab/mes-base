@@ -46,6 +46,7 @@ import dev.mesbase.framework.sync.SyncCoordinator;
 import dev.mesbase.platform.execution.FactoryContext;
 import dev.mesbase.platform.execution.FactoryIntegrationContext;
 import dev.mesbase.system.service.AutoCodeNumbering;
+import dev.mesbase.system.service.AutoCodeRuleType;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -202,7 +203,9 @@ public class WorkOrderService {
         if (input.externalId() != null || input.externalCode() != null)
             throw new FoundationException(ErrorCode.EXTERNAL_SOURCE_READ_ONLY);
         validateValues(input);
-        String code = autoCodes.getDocNo("WORK_ORDER");
+        if (input.ruleCode() == null || input.ruleCode().isBlank())
+            throw new FoundationException(ErrorCode.WORKORDER_INVALID);
+        String code = autoCodes.getDocNo(input.ruleCode(), AutoCodeRuleType.WORK_ORDER.name());
         return createTransactions.execute(status -> createLocal(input, code));
     }
 

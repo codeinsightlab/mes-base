@@ -20,4 +20,6 @@ public interface SysAutoCodePartMapper {
     public int updateSysAutoCodePart(SysAutoCodePart sysAutoCodePart);
 
     public int deleteById(Long partId);
+
+    public int deleteByRuleId(Long ruleId);
 }

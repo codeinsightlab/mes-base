@@ -39,7 +39,7 @@ Key段统一采用UTF-8字节百分号转义：仅`A-Z a-z 0-9 . _ -`原样保�
 - `platform:resource:{sys_user}:detail:<userId>`及`platform:resource:{sys_user}:detail-version`：用户安全详情与回填代际，共用`{sys_user}`同槽标记；与业务目录和平台用户CRUD共享同一详情缓存及失效入口。
 - `committed-v1:sys_dict:<type>`：字典类型；`committed-v1:sys_config:<code>`：系统参数编码。系统设置TTL为30秒，账号安全开关仍直接读数据库。
 - `factory-routing:entry:binding:<factoryId>`与`factory-routing:entry:default`：Factory路由定义，默认TTL为300秒，按变更事务提交后删除。
-- `autocode:{rules:v1}:snapshot`与`autocode:{rules:v1}:version`：完整编码规则快照及回填代际，共用`{rules:v1}`同槽标记，快照TTL为3600秒；流水计数仍在数据库，不在Redis。
+- `autocode:{rules:v2}:snapshot`与`autocode:{rules:v2}:version`：完整编码规则快照（含类别及组成）及回填代际，共用`{rules:v2}`同槽标记，快照TTL为3600秒；流水计数仍在数据库，不在Redis。
 
 新增系统Key应在公共`SystemCacheNamespace`下集中构造，对每个动态定位段使用`RedisKeySegment.encode`；需模式失效时先验证只覆盖目标资源。不得自行拼第二套根前缀、哈希业务ID或把完整JDBC URL放入Key。版本代际、session-epoch、撤销数据与普通可重建缓存的生命周期不同，不能统一加TTL或清空。
 
