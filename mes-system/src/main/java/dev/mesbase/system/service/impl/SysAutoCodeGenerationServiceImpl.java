@@ -108,8 +108,8 @@ public class SysAutoCodeGenerationServiceImpl implements AutoCodeNumbering {
 
     private String run(String code, String input, boolean persist, boolean docNoContract, String factoryId,
                        String expectedRuleType) {
-        if (code == null || !code.matches("[A-Za-z][A-Za-z0-9_-]{0,63}") || input != null && input.length() > 64)
-            throw new ServiceException("规则编号或输入字符不符合要求");
+        if (code == null || !code.matches("[A-Za-z0-9][A-Za-z0-9_-]{0,63}") || input != null && input.length() > 64)
+            throw new ServiceException("规则编码格式、长度或输入字符不符合要求");
         var config = configs.get(code);
         if (config == null) throw new ServiceException("未找到编码规则");
         return transactions.execute(status -> execute(code, input, persist, docNoContract, config, factoryId,

@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -39,6 +40,33 @@ import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.support.SimpleTransactionStatus;
 
 class AutoCodeGenerationTest {
+    @Test
+    void numericLeadingRuleCodeCanBeGenerated() {
+        var cache = mock(AutoCodeRuleSnapshotCache.class);
+        var rules = mock(SysAutoCodeRuleMapper.class);
+        var parts = mock(SysAutoCodePartMapper.class);
+        var results = mock(SysAutoCodeResultMapper.class);
+        var extra = mock(AutoCodeExtraMapper.class);
+        var manager = mock(PlatformTransactionManager.class);
+        var rule = rule(1L);
+        rule.setRuleCode("5600-");
+        when(manager.getTransaction(any(TransactionDefinition.class))).thenReturn(new SimpleTransactionStatus());
+        when(extra.lockRule(1L)).thenReturn(1L);
+        when(extra.counter(eq(1L), eq("FACTORY_A"), any(String.class))).thenReturn(null);
+        when(cache.get("5600-")).thenReturn(config(1, "5600-", "WO"));
+        when(rules.findByIdForUpdate(1L)).thenReturn(rule);
+        when(parts.selectByRuleIdForUpdate(1L)).thenReturn(entities("WO", 1));
+        var handler = new PartTypeHandler(new PartTypeInputCharHandler(), new PartTypeNowDateHandler(),
+                new PartTypeFixCharHandler(), new PartTypeSerialNoHandler());
+        var factoryContext = mock(AutoCodeFactoryContext.class);
+        when(factoryContext.requiredFactoryId()).thenReturn("FACTORY_A");
+        var service = new SysAutoCodeGenerationServiceImpl(cache, rules, parts, results, extra, handler,
+                manager, factoryContext);
+        String date = LocalDate.now(ZoneId.of("Asia/Shanghai")).format(DateTimeFormatter.BASIC_ISO_DATE);
+
+        assertEquals("WO" + date + "001", service.getDocNo("5600-"));
+    }
+
     @Test
     void formalCallsKeepIndependentDailyCountersAndGrowPastMinimumWidth() {
         var cache = mock(AutoCodeRuleSnapshotCache.class);

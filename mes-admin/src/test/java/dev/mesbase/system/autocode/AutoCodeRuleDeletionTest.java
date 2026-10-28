@@ -28,6 +28,58 @@ import org.springframework.transaction.support.SimpleTransactionStatus;
 
 class AutoCodeRuleDeletionTest {
     @Test
+    void ruleUpdateUsesTheSamePrefixReferenceGuardAsDeletion() {
+        var rules = mock(SysAutoCodeRuleMapper.class);
+        var extra = mock(AutoCodeExtraMapper.class);
+        var cache = mock(AutoCodeRuleSnapshotCache.class);
+        var references = mock(AutoCodeRuleReferenceGuard.class);
+        var parts = mock(SysAutoCodePartMapper.class);
+        var master = mock(PlatformTransactionManager.class);
+        var existing = rule();
+        var update = rule();
+        update.setRuleName("工单规则");
+        update.setMaxLength(64);
+        update.setIsPadded("N");
+        update.setEnableFlag("Y");
+        when(rules.findById(7L)).thenReturn(existing);
+        when(rules.findByIdForUpdate(7L)).thenReturn(existing);
+        when(extra.lockRule(7L)).thenReturn(7L);
+        when(references.requireUnreferenced(existing)).thenReturn("WO");
+        when(parts.selectByRuleIdForUpdate(7L)).thenReturn(List.of(prefixPart("WO")));
+        when(master.getTransaction(any(TransactionDefinition.class))).thenReturn(new SimpleTransactionStatus());
+        when(rules.updateSysAutoCodeRule(update)).thenReturn(1);
+        var service = new SysAutoCodeRuleServiceImpl(rules, extra, cache, references, parts, master);
+
+        assertEquals(1, service.updateInfo(update));
+
+        var order = inOrder(references, master);
+        order.verify(references).requireUnreferenced(existing);
+        order.verify(master).getTransaction(any(TransactionDefinition.class));
+        verify(cache).invalidateAfterCommit();
+    }
+
+    @Test
+    void ruleUpdateIsRejectedOnlyWhenItsPrefixIsReferenced() {
+        var rules = mock(SysAutoCodeRuleMapper.class);
+        var extra = mock(AutoCodeExtraMapper.class);
+        var cache = mock(AutoCodeRuleSnapshotCache.class);
+        var references = mock(AutoCodeRuleReferenceGuard.class);
+        var parts = mock(SysAutoCodePartMapper.class);
+        var master = mock(PlatformTransactionManager.class);
+        var existing = rule();
+        var update = rule();
+        when(rules.findById(7L)).thenReturn(existing);
+        doThrow(new ServiceException("编码规则前缀已被单据引用，不能删除或修改"))
+                .when(references).requireUnreferenced(existing);
+        var service = new SysAutoCodeRuleServiceImpl(rules, extra, cache, references, parts, master);
+
+        assertThrows(ServiceException.class, () -> service.updateInfo(update));
+
+        verifyNoInteractions(master, extra, parts, cache);
+        verify(rules, never()).updateSysAutoCodeRule(any(SysAutoCodeRule.class));
+    }
+
+    @Test
     void businessReferenceScanRunsBeforeTheShortCenterTransaction() {
         var rules = mock(SysAutoCodeRuleMapper.class);
         var extra = mock(AutoCodeExtraMapper.class);

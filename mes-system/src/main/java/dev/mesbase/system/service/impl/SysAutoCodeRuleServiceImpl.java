@@ -87,20 +87,32 @@ public class SysAutoCodeRuleServiceImpl implements IAutoCodeRuleService {
         return changed;
     }
 
-    @Transactional(transactionManager = "masterTransactionManager", rollbackFor = Exception.class)
+    @Transactional(transactionManager = "masterTransactionManager", propagation = Propagation.NOT_SUPPORTED,
+            rollbackFor = Exception.class)
     public int updateInfo(SysAutoCodeRule rule) {
-        var old = findById(rule.getRuleId());
-        extra.lockRule(old.getRuleId());
-        old = mapper.findByIdForUpdate(old.getRuleId());
-        if (old == null) throw new ServiceException("编码规则不存在");
-        if (!Objects.equals(old.getRuleCode(), rule.getRuleCode())) throw new ServiceException("规则编码不可变更");
-        if (old.getRuleType() != null && !Objects.equals(old.getRuleType(), rule.getRuleType()))
-            throw new ServiceException("规则单据类型不可变更");
-        validate(rule);
-        unique(rule);
-        int changed = mapper.updateSysAutoCodeRule(rule);
-        if (changed > 0) cache.invalidateAfterCommit();
-        return changed;
+        var scanned = findById(rule.getRuleId());
+        String scannedPrefix = references.requireUnreferenced(scanned);
+        return masterTransactions.execute(status -> {
+            if (extra.lockRule(scanned.getRuleId()) == null)
+                throw new ServiceException("编码规则不存在");
+            var current = mapper.findByIdForUpdate(scanned.getRuleId());
+            if (current == null) throw new ServiceException("编码规则不存在");
+            if (!Objects.equals(scanned.getRuleCode(), current.getRuleCode())
+                    || !Objects.equals(scanned.getRuleType(), current.getRuleType()))
+                throw new ServiceException("规则配置已变化，请重新执行修改");
+            var currentParts = parts.selectByRuleIdForUpdate(scanned.getRuleId());
+            if (!Objects.equals(scannedPrefix, prefix(currentParts)))
+                throw new ServiceException("规则前缀已变化，请重新执行修改");
+            if (!Objects.equals(current.getRuleCode(), rule.getRuleCode()))
+                throw new ServiceException("规则编码不可变更");
+            if (current.getRuleType() != null && !Objects.equals(current.getRuleType(), rule.getRuleType()))
+                throw new ServiceException("规则单据类型不可变更");
+            validate(rule);
+            unique(rule);
+            int changed = mapper.updateSysAutoCodeRule(rule);
+            if (changed > 0) cache.invalidateAfterCommit();
+            return changed;
+        });
     }
 
     @Transactional(transactionManager = "masterTransactionManager", propagation = Propagation.NOT_SUPPORTED,
@@ -169,7 +181,7 @@ public class SysAutoCodeRuleServiceImpl implements IAutoCodeRuleService {
 
     private void validate(SysAutoCodeRule r) {
         if (r.getRuleCode() == null || !r.getRuleCode()
-                .matches("[A-Za-z][A-Za-z0-9_-]{0,63}") || r.getRuleName() == null || r.getRuleName()
+                .matches("[A-Za-z0-9][A-Za-z0-9_-]{0,63}") || r.getRuleName() == null || r.getRuleName()
                 .isBlank() || r.getRuleName().length() > 255 || r.getRuleDesc() != null && r.getRuleDesc()
                 .length() > 500 || r.getRemark() != null && r.getRemark().length() > 500)
             throw new ServiceException("规则编码、名称或描述不符合要求");

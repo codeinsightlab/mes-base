@@ -2,8 +2,9 @@ package dev.mesbase.system.service;
 
 import dev.mesbase.common.core.domain.entity.SysAutoCodeRule;
 
-/** Checks legacy document-number references before a platform rule can be removed. */
+/** Checks document-number prefix references before a platform rule is edited or removed. */
 public interface AutoCodeRuleReferenceGuard {
+    /** Returns the current fixed prefix only when no matching business document references it. */
     String requireUnreferenced(SysAutoCodeRule rule);
 
     /** Checks whether a leading FIXCHAR prefix can change without losing historical attribution. */
