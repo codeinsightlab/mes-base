@@ -1,5 +1,6 @@
 package dev.mesbase.server.managed;
 
+import com.alibaba.druid.pool.DruidDataSource;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.github.pagehelper.Page;
 import com.github.pagehelper.PageHelper;
@@ -29,6 +30,7 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import java.io.IOException;
+import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -37,10 +39,13 @@ import java.nio.file.attribute.PosixFilePermissions;
 import java.sql.SQLException;
 import java.time.Instant;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -319,6 +324,44 @@ public class ManagedDatasourceService {
         if (!ids.isEmpty()) sources.byIds(ids)
                 .forEach(d -> names.put(d.datasourceId(), d.datasourceName()));
         return rows.stream().map(f -> view(f, names.get(f.datasourceId()))).toList();
+    }
+
+    /** Returns managed datasource IDs that resolve to the configured platform database. */
+    public Set<Long> platformDatasourceIds(List<Long> datasourceIds) {
+        if (datasourceIds == null || datasourceIds.isEmpty()) return Set.of();
+        DatabaseLocation platformLocation = DatabaseLocation.fromJdbcUrl(platformJdbcUrl());
+        var platformIds = new HashSet<Long>();
+        for (ManagedDatasource source : sources.byIds(datasourceIds.stream().filter(Objects::nonNull).distinct().toList())) {
+            if (platformLocation.equals(DatabaseLocation.fromJdbcUrl(source.jdbcUrl())))
+                platformIds.add(source.datasourceId());
+        }
+        return Set.copyOf(platformIds);
+    }
+
+    private String platformJdbcUrl() {
+        if (platform instanceof DruidDataSource druid) return druid.getUrl();
+        try (var connection = platform.getConnection()) {
+            return connection.getMetaData().getURL();
+        } catch (SQLException failure) {
+            throw new IllegalStateException("Cannot identify configured platform database", failure);
+        }
+    }
+
+    private record DatabaseLocation(String host, int port, String database) {
+        private static DatabaseLocation fromJdbcUrl(String jdbcUrl) {
+            if (jdbcUrl == null || !jdbcUrl.startsWith("jdbc:mysql://"))
+                throw new IllegalStateException("Unsupported managed MySQL datasource URL");
+            try {
+                URI uri = URI.create(jdbcUrl.substring("jdbc:".length()));
+                String path = uri.getPath();
+                if (uri.getHost() == null || path == null || path.length() < 2)
+                    throw new IllegalStateException("Incomplete managed MySQL datasource URL");
+                int port = uri.getPort() < 0 ? 3306 : uri.getPort();
+                return new DatabaseLocation(uri.getHost().toLowerCase(Locale.ROOT), port, path.substring(1));
+            } catch (IllegalArgumentException failure) {
+                throw new IllegalStateException("Invalid managed MySQL datasource URL", failure);
+            }
+        }
     }
 
     public FactoryView factory(String id) {

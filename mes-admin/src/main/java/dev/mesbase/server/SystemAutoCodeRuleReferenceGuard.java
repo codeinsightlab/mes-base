@@ -63,8 +63,11 @@ public class SystemAutoCodeRuleReferenceGuard implements AutoCodeRuleReferenceGu
         };
         for (int offset = 0; ; offset += PAGE_SIZE) {
             List<ManagedDatasourceService.FactoryView> page = factories.factoryList(offset, PAGE_SIZE);
+            var datasourceIds = page.stream().map(ManagedDatasourceService.FactoryView::datasourceId)
+                    .filter(id -> id != null).distinct().toList();
+            var platformDatasourceIds = factories.platformDatasourceIds(datasourceIds);
             for (var factory : page) {
-                if (factory.datasourceId() == null) continue;
+                if (factory.datasourceId() == null || platformDatasourceIds.contains(factory.datasourceId())) continue;
                 var scope = new FactoryScope(new FactoryId(factory.factoryId()));
                 boolean referenced = business.transaction(scope, session -> {
                     var mapper = session.mapper(AutoCodeDocumentReferenceMapper.class);

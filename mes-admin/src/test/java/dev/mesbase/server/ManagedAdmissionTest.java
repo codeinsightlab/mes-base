@@ -1,5 +1,6 @@
 package dev.mesbase.server;
 
+import com.alibaba.druid.pool.DruidDataSource;
 import dev.mesbase.core.error.FoundationException;
 import dev.mesbase.core.factory.FactoryId;
 import dev.mesbase.core.factory.FactoryScope;
@@ -8,8 +9,10 @@ import dev.mesbase.infrastructure.persistence.DatasourceIdentity;
 import dev.mesbase.infrastructure.persistence.PlatformPersistence;
 import dev.mesbase.infrastructure.persistence.RuntimeRegistry;
 import dev.mesbase.server.managed.DatasourcePasswordCipher;
+import dev.mesbase.server.managed.FactoryMetadataCache;
 import dev.mesbase.server.managed.ManagedDatasourceService;
 import dev.mesbase.server.managed.ManagedDatasourceService.FactoryForm;
+import dev.mesbase.system.factory.ManagedDatasource;
 import dev.mesbase.system.factory.ManagedDatasourceMapper;
 import dev.mesbase.system.factory.RoutingMetadataMapper;
 import dev.mesbase.system.factory.ManagedFactoryMapper;
@@ -33,11 +36,30 @@ import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.never;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.when;
 
 /**
  * TEST ONLY: center configuration SQL and a preloaded synthetic pool; never creates a MySQL connection.
  */
 class ManagedAdmissionTest {
+    @Test
+    void configuredPlatformDatabaseIsClassifiedSeparatelyFromFactoryBusinessDatabases() {
+        var mapper = mock(ManagedDatasourceMapper.class);
+        var center = new ManagedDatasource(1L, "中心库连接", "center-db", 3306, "mes_base_dev", "app", "cipher",
+                "ENABLED", 1);
+        var business = new ManagedDatasource(2L, "工厂业务库", "center-db", 3306, "mes_factory_a", "app",
+                "cipher", "ENABLED", 1);
+        when(mapper.byIds(List.of(2L, 1L))).thenReturn(List.of(business, center));
+        try (var platformSource = new DruidDataSource(); var registry = new RuntimeRegistry()) {
+            platformSource.setUrl("jdbc:mysql://CENTER-DB:3306/mes_base_dev?useUnicode=true");
+            var service = new ManagedDatasourceService(mock(PlatformPersistence.class), mapper,
+                    mock(ManagedFactoryMapper.class), mock(DatasourcePasswordCipher.class), registry, platformSource,
+                    null, Set.of(), Path.of("target/TEST-ONLY-unused-ddl"), mock(FactoryMetadataCache.class));
+
+            assertEquals(Set.of(1L), service.platformDatasourceIds(List.of(2L, 1L, 2L)));
+        }
+    }
+
     @Test
     void selectionOptionsRequireEnabledFactoryAndEnabledBoundDatasourceBeforePagination() {
         var source = new DriverManagerDataSource("jdbc:h2:mem:" + UUID.randomUUID()
