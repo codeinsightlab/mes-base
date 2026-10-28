@@ -7,6 +7,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -22,13 +23,19 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * Real H2 production commands; only the immutable opening-evidence reader is mocked.
  */
 class ActivatedProductionHttpTest {
+    private static void clearMaterialIssueFixtures(JdbcTemplate jdbc) {
+        String documents = "SELECT id FROM wm_stock_document WHERE document_type='MATERIAL_ISSUE'";
+        jdbc.update("DELETE FROM wm_stock_document_line WHERE document_id IN (" + documents + ")");
+        jdbc.update("DELETE FROM mes_material_issue_input WHERE document_id IN (" + documents + ")");
+        jdbc.update("DELETE FROM mes_material_issue_submission WHERE document_id IN (" + documents + ")");
+        jdbc.update("DELETE FROM wm_stock_document WHERE document_type='MATERIAL_ISSUE'");
+    }
+
     @Test
     void importedFactsUseNormalAuditedAdjustmentWithoutMigrationActivationGate() throws Exception {
         try (var c = QualityWorkflowHttpTest.context(new Class<?>[]{Opening.class}, 40, 30, 30, 30, 30)) {
             var j = ProductionWarehouseFixture.db(c);
-            for (String table : List.of("mes_material_issue_input", "mes_material_issue_item", "mes_material_issue_submission",
-                    "wm_stock_document"))
-                j.update("DELETE FROM " + table);
+            clearMaterialIssueFixtures(j);
             Long original = j.queryForObject("SELECT MIN(id) FROM mes_production_report WHERE execution_id=1 AND routing_node_id=15", Long.class);
             var http = MaterialIssueHttpTest.mvc(c);
             http.perform(ProductionCoreV1HttpTest.full(get("/api/production/report-quantities/executions/1")))
@@ -66,9 +73,7 @@ class ActivatedProductionHttpTest {
         try (var c = QualityWorkflowHttpTest.context(new Class<?>[]{Opening.class}, 100, 90, 90, 90, 90)) {
             var j = ProductionWarehouseFixture.db(c);
             var http = MaterialIssueHttpTest.mvc(c);
-            for (String table : List.of("mes_material_issue_input", "mes_material_issue_item", "mes_material_issue_submission",
-                    "wm_stock_document"))
-                j.update("DELETE FROM " + table);
+            clearMaterialIssueFixtures(j);
             j.update("DELETE FROM mes_production_execution WHERE id=2");
             // Execution has consumed its own 100; the order still has 900 of demand available.
             http.perform(ProductionCoreV1HttpTest.full(get("/api/production/report-quantities/executions/1")))
@@ -99,9 +104,7 @@ class ActivatedProductionHttpTest {
                 ProductionReportingHttpTest.Extra.class}, 100, 90, 90, 90, 80)) {
             var j = ProductionWarehouseFixture.db(c);
             var http = MaterialIssueHttpTest.mvc(c);
-            for (String table : List.of("mes_material_issue_input", "mes_material_issue_item", "mes_material_issue_submission",
-                    "wm_stock_document"))
-                j.update("DELETE FROM " + table);
+            clearMaterialIssueFixtures(j);
             j.update("DELETE FROM mes_production_execution WHERE id=2");
             j.update("UPDATE workorder SET planned_qty=100 WHERE id=1");
             j.update("INSERT INTO mes_operation_user(operation_id,user_id) VALUES(1,1)");

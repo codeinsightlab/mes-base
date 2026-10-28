@@ -220,12 +220,6 @@ tableOverrides:
     module: production
   routing_product:
     module: production
-  mes_material_issue:
-    module: issue
-    displayName: 领料出库单
-  mes_material_issue_item:
-    module: issue
-    displayName: 领料出库明细
   wm_warehouse:
     module: wm
     displayName: 仓库管理

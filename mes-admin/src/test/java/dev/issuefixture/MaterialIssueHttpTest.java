@@ -469,8 +469,10 @@ class MaterialIssueHttpTest {
 
         @Bean
         AuthorizationService qualityAuthorization() {
-            return (actor, scope, permission) -> "full".equals(actor.id()) || "revise".equals(actor.id()) && permission.code()
-                    .equals("business:quality:defect:revise");
+            return (actor, scope, permission) -> "full".equals(actor.id())
+                    || "revise".equals(actor.id()) && permission.code().equals("business:quality:defect:revise")
+                    || "issue_query".equals(actor.id()) && permission.code().equals("business:mes:material:issue:query")
+                    || "issue_item".equals(actor.id()) && permission.code().equals("business:mes:material:issue:item:list");
         }
 
         @Bean
@@ -616,7 +618,7 @@ class MaterialIssueHttpTest {
                 if (value == null) return null;
                 var user = new SysUser();
                 user.setUserId(1L);
-                user.setUserName(value.endsWith("NONE") ? "none" : value.endsWith("CRUD") ? "crud" : value.endsWith("CREATE") ? "create" : value.endsWith("REVISE") ? "revise" : value.endsWith("QUERY") ? "query" : "full");
+                user.setUserName(value.endsWith("NONE") ? "none" : value.endsWith("CRUD") ? "crud" : value.endsWith("CREATE") ? "create" : value.endsWith("REVISE") ? "revise" : value.endsWith("ISSUE_QUERY") ? "issue_query" : value.endsWith("ISSUE_ITEM") ? "issue_item" : value.endsWith("QUERY") ? "query" : "full");
                 return new LoginUser(1L, 1L, user, Set.of());
             });
             return http.csrf(c -> c.disable())
@@ -630,6 +632,8 @@ class MaterialIssueHttpTest {
                 r.addInterceptor(new FoundationAccessInterceptor(new FactorySelectionService(f.catalog, new InMemoryFactoryPreference()),
                         (actor, scope, permission) -> "full".equals(actor.id())
                                 || "query".equals(actor.id()) && permission.code().equals("workorder:query")
+                                || "issue_query".equals(actor.id()) && permission.code().equals("business:mes:material:issue:query")
+                                || "issue_item".equals(actor.id()) && permission.code().equals("business:mes:material:issue:item:list")
                                 || "create".equals(actor.id()) && permission.code()
                                 .equals("business:quality:defect:create")
                                 || "revise".equals(actor.id()) && permission.code()

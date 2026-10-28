@@ -64,8 +64,10 @@ class WorkorderBomInputHttpTest {
             verify(redis, times(2)).deleteByPattern(anyString());
             clearInvocations(redis);
 
-            String append = ProductionInputHttpTest.command(m, UUID.randomUUID().toString(), "L001", "10");
-            j.execute("ALTER TABLE wm_stock_action ADD CONSTRAINT test_fail_issue CHECK(action_type <> 'ISSUE')");
+            String appendRequestId = UUID.randomUUID().toString();
+            String append = ProductionInputHttpTest.command(m, appendRequestId, "L001", "10");
+            j.execute("ALTER TABLE wm_stock_action ADD CONSTRAINT test_fail_issue CHECK(action_type <> 'ISSUE' OR id <> '"
+                    + appendRequestId + "')");
             m.perform(full(post("/api/production/input")).content(append)).andExpect(status().is5xxServerError());
             verify(redis, never()).deleteByPattern(anyString());
             assertEquals(0, new BigDecimal("90").compareTo(j.queryForObject(
@@ -153,7 +155,7 @@ class WorkorderBomInputHttpTest {
             m.perform(full(get("/api/production/workorder-progress")).param("workorderCode", "WO1"))
                     .andExpect(status().isOk()).andExpect(jsonPath("items[0].completedQty").value("100.000000"))
                     .andExpect(jsonPath("items[0].completedExecutions").value(1));
-            assertEquals(0, new BigDecimal("250").compareTo(j.queryForObject("SELECT SUM(quantity) FROM mes_material_issue_item", BigDecimal.class)));
+            assertEquals(0, new BigDecimal("250").compareTo(j.queryForObject("SELECT SUM(l.quantity) FROM wm_stock_document_line l JOIN wm_stock_document d ON d.id=l.document_id WHERE d.document_type='MATERIAL_ISSUE'", BigDecimal.class)));
             m.perform(full(get("/api/production/input/calculate")).param("code", "WO1:M1#L001")
                     .param("workorderId", "1")
                     .param("stockReference", "1").param("outputQty", "1")).andExpect(status().is4xxClientError());
@@ -173,8 +175,8 @@ class WorkorderBomInputHttpTest {
                     .toString(), "L002", "1"));
             input(m, "1");
             assertEquals(List.of(new BigDecimal("0.333333"), new BigDecimal("0.333334"), new BigDecimal("0.333333")),
-                    j.queryForList("SELECT quantity FROM mes_material_issue_item ORDER BY id", BigDecimal.class));
-            assertEquals(0, new BigDecimal("1").compareTo(j.queryForObject("SELECT SUM(quantity) FROM mes_material_issue_item", BigDecimal.class)));
+                    j.queryForList("SELECT l.quantity FROM wm_stock_document_line l JOIN wm_stock_document d ON d.id=l.document_id WHERE d.document_type='MATERIAL_ISSUE' ORDER BY l.id", BigDecimal.class));
+            assertEquals(0, new BigDecimal("1").compareTo(j.queryForObject("SELECT SUM(l.quantity) FROM wm_stock_document_line l JOIN wm_stock_document d ON d.id=l.document_id WHERE d.document_type='MATERIAL_ISSUE'", BigDecimal.class)));
             assertEquals(0, new BigDecimal("19999").compareTo(j.queryForObject("SELECT SUM(quantity) FROM wm_inventory WHERE id IN (1,2)", BigDecimal.class)));
             assertEquals(0, new BigDecimal("-1").compareTo(j.queryForObject("SELECT SUM(quantity_delta) FROM wm_stock_action WHERE action_type='ISSUE'", BigDecimal.class)));
         }
@@ -209,7 +211,7 @@ class WorkorderBomInputHttpTest {
                     .andExpect(jsonPath("issueQty").value("150.000000"))
                     .andExpect(jsonPath("stock.unitCode").value("KG"));
             input(m, "60");
-            assertEquals(0, new BigDecimal("250").compareTo(j.queryForObject("SELECT SUM(quantity) FROM mes_material_issue_item", BigDecimal.class)));
+            assertEquals(0, new BigDecimal("250").compareTo(j.queryForObject("SELECT SUM(l.quantity) FROM wm_stock_document_line l JOIN wm_stock_document d ON d.id=l.document_id WHERE d.document_type='MATERIAL_ISSUE'", BigDecimal.class)));
         }
     }
 
@@ -246,7 +248,7 @@ class WorkorderBomInputHttpTest {
             assertEquals(first.get(), second.get());
             assertEquals(1, j.queryForObject("SELECT COUNT(*) FROM mes_material_issue_input", Integer.class));
             assertEquals(1, j.queryForObject("SELECT COUNT(*) FROM mes_production_execution", Integer.class));
-            assertEquals(0, new BigDecimal("250").compareTo(j.queryForObject("SELECT SUM(quantity) FROM mes_material_issue_item", BigDecimal.class)));
+            assertEquals(0, new BigDecimal("250").compareTo(j.queryForObject("SELECT SUM(l.quantity) FROM wm_stock_document_line l JOIN wm_stock_document d ON d.id=l.document_id WHERE d.document_type='MATERIAL_ISSUE'", BigDecimal.class)));
         }
     }
 

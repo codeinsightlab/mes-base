@@ -32,6 +32,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  */
 class UnifiedStockApprovalHttpTest {
     private static final ObjectMapper JSON = new ObjectMapper();
+    private static final String GENERIC_AGGREGATE = "{\"header\":{\"documentType\":\"OTHER_RECEIPT\",\"reason\":\"TEST ONLY permission\",\"ruleCode\":\"TEST\"},\"items\":[{\"stockId\":1,\"materialId\":1,\"warehouseId\":1,\"unitId\":1,\"quantity\":1}]}";
 
     @Configuration
     static class AuditWithoutDraftEditing {
@@ -50,7 +51,7 @@ class UnifiedStockApprovalHttpTest {
     }
 
     @Test
-    void anAuditorCanApproveAnExistingDraftWithoutObtainingCreateOrEditPermission() throws Exception {
+    void productionPermissionApprovesIssuesWithoutGrantingGenericDocumentCreation() throws Exception {
         try (var context = ProductionInputHttpTest.context(AuditWithoutDraftEditing.class)) {
             var db = ProductionInputHttpTest.db(context);
             var mvc = MaterialIssueHttpTest.mvc(context);
@@ -64,8 +65,8 @@ class UnifiedStockApprovalHttpTest {
                             .content(StockDocumentHttpTest.intent(uuid, saved.get("document").get("revision").asInt())))
                     .andExpect(status().isOk());
             BigDecimal after = rawBalance(db);
-            String another = ProductionInputHttpTest.command(mvc, UUID.randomUUID().toString(), "L001", "1");
-            mvc.perform(full(post(ProductionInputHttpTest.ROOT)).content(another)).andExpect(status().isForbidden());
+            mvc.perform(full(post(StockDocumentHttpTest.ROOT + "/aggregate")).content(GENERIC_AGGREGATE))
+                    .andExpect(status().isForbidden());
             assertEquals(1, count(db, "wm_stock_document"));
             assertEquals(1, count(db, "mes_material_issue_input"));
             assertEquals(1, count(db, "wm_stock_action"));
@@ -206,31 +207,34 @@ class UnifiedStockApprovalHttpTest {
     }
 
     @Test
-    void businessPermissionsCannotReplaceTheFormalAuditPermission() throws Exception {
-        assertConveniencePermissionRequired(NoAuditPermission.class);
+    void productionIssuePermissionCannotApproveAnUnrelatedStockDocument() throws Exception {
+        try (var context = ProductionInputHttpTest.context(NoAuditPermission.class)) {
+            var db = ProductionInputHttpTest.db(context);
+            var mvc = MaterialIssueHttpTest.mvc(context);
+            String other = StockDocumentHttpTest.create(mvc, "OTHER_RECEIPT", null).get("document").get("id").asText();
+            StockDocumentHttpTest.add(mvc, other, "0", "2", "L002", "10");
+            mvc.perform(full(post(StockDocumentHttpTest.ROOT + "/" + other + "/actions/approve"))
+                            .content(StockDocumentHttpTest.intent(UUID.randomUUID().toString(), 1)))
+                    .andExpect(status().isForbidden());
+            assertEquals("DRAFT", db.queryForObject("SELECT status FROM wm_stock_document WHERE id=?", String.class, other));
+            assertEquals(0, count(db, "wm_stock_action"));
+        }
     }
 
     @Test
-    void businessPermissionsCannotReplaceTheFormalDocumentCreatePermission() throws Exception {
-        assertConveniencePermissionRequired(NoCreatePermission.class);
-    }
-
-    private static void assertConveniencePermissionRequired(Class<?> configuration) throws Exception {
-        try (var context = ProductionInputHttpTest.context(configuration)) {
+    void productionIssuePermissionCannotCreateAnUnrelatedStockDocument() throws Exception {
+        try (var context = ProductionInputHttpTest.context(NoCreatePermission.class)) {
             var db = ProductionInputHttpTest.db(context);
             var mvc = MaterialIssueHttpTest.mvc(context);
             WorkorderBomInputHttpTest.prepare(db, "100", "1", "2.5");
             WorkorderBomInputHttpTest.select(mvc, 1, 1);
             String command = ProductionInputHttpTest.command(mvc, UUID.randomUUID().toString(), "L001", "10");
-            // FULL passes the HTTP business gate; domain authorization denies a required warehouse permission.
-            mvc.perform(full(post(ProductionInputHttpTest.ROOT)).content(command)).andExpect(status().isForbidden());
-            mvc.perform(full(post("/api/production/executions/999/inbound")).content(JSON.writeValueAsString(Map.of(
-                            "requestId", UUID.randomUUID()
-                                    .toString(), "stockId", "1", "quantity", "1", "reason", "TEST ONLY permission"))))
+            mvc.perform(full(post(StockDocumentHttpTest.ROOT + "/aggregate")).content(GENERIC_AGGREGATE))
                     .andExpect(status().isForbidden());
-            assertEquals(0, count(db, "wm_stock_document"));
+            draft(mvc, command);
+            assertEquals(1, count(db, "wm_stock_document"));
+            assertEquals(0, count(db, "mes_material_issue_input"));
             assertEquals(0, count(db, "wm_stock_action"));
-            assertEquals(0, count(db, "mes_production_execution"));
         }
     }
 

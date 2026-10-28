@@ -16,8 +16,8 @@ import dev.mesbase.core.factory.FactoryRuntimeMode;
 import dev.mesbase.platform.execution.FactoryIntegrationSnapshot;
 import dev.mesbase.platform.execution.FactoryIntegrationContext;
 import dev.mesbase.business.wm.dao.WmWarehouseErpExtraMapper;
-import dev.mesbase.business.issue.dao.MesMaterialIssueItemMapper;
-import dev.mesbase.business.issue.dao.MesMaterialIssueMapper;
+import dev.mesbase.business.wm.dao.WmStockDocumentLineMapper;
+import dev.mesbase.business.wm.dao.WmStockDocumentMapper;
 import dev.mesbase.business.production.dao.MesProductionReceiptMapper;
 import dev.mesbase.business.production.dao.WorkorderErpExtraMapper;
 import dev.mesbase.business.production.dao.WorkorderMapper;
@@ -267,7 +267,7 @@ class StockHttpTest {
         @Bean
         BusinessSourceRules sourceRules(WarehouseIntegration integration, WmWarehouseMapper warehouses,
                                         WmWarehouseErpExtraMapper external) {
-            return new BusinessSourceRules(integration, mock(WorkorderMapper.class), mock(WorkorderErpExtraMapper.class), warehouses, external, mock(MesMaterialIssueMapper.class), mock(MesMaterialIssueItemMapper.class), mock(MesProductionReceiptMapper.class));
+            return new BusinessSourceRules(integration, mock(WorkorderMapper.class), mock(WorkorderErpExtraMapper.class), warehouses, external, mock(WmStockDocumentMapper.class), mock(WmStockDocumentLineMapper.class), mock(MesProductionReceiptMapper.class));
         }
 
         @Bean

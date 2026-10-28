@@ -46,7 +46,7 @@ public final class SourceIsolationAcceptanceFixture {
                     check(c, "SELECT COUNT(*) FROM wm_stock_action WHERE stock_id=?", 0, stock);
                     check(c, "SELECT COUNT(*) FROM wm_stock_document WHERE source_workorder_id=?", 0, order);
                     check(c, "SELECT COUNT(*) FROM mes_production_execution WHERE workorder_id=?", 0, order);
-                    check(c, "SELECT COUNT(*) FROM mes_material_issue_item WHERE warehouse_id=?", 0, w);
+                    check(c, "SELECT COUNT(*) FROM wm_stock_document_line WHERE warehouse_id=?", 0, w);
                     check(c, "SELECT COUNT(*) FROM mes_production_receipt WHERE warehouse_id=?", 0, w);
                     for (var operation : Map.of("workorder_erp_extra", order, "workorder", order, "wm_inventory", stock, "wm_warehouse", w)
                             .entrySet()) {
