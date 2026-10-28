@@ -18,8 +18,6 @@ import dev.mesbase.business.issue.dao.MesMaterialIssueMapper;
 import dev.mesbase.business.production.dao.MesProductionExecutionMapper;
 import dev.mesbase.business.production.domain.WorkOrderModels;
 import dev.mesbase.business.production.service.WorkOrderService;
-import dev.mesbase.business.production.service.LegacyBatchHistoryQuery;
-import dev.mesbase.business.production.controller.LegacyBatchHistoryController;
 import dev.mesbase.business.production.service.ProductionExecutionRules;
 import dev.mesbase.business.production.service.impl.MesProductionExecutionServiceImpl;
 import dev.mesbase.business.production.service.IMesProductionExecutionService;
@@ -65,13 +63,10 @@ import org.springframework.transaction.annotation.EnableTransactionManagement;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import dev.mesbase.business.production.dao.WorkorderMapper;
-import dev.mesbase.business.production.dao.ProductionBatchMapper;
-import dev.mesbase.business.production.dao.BatchRouteNodeMapper;
 import dev.mesbase.business.production.dao.RoutingMapper;
 import dev.mesbase.business.production.dao.RoutingNodeMapper;
 import dev.mesbase.business.production.dao.RoutingEdgeMapper;
@@ -83,11 +78,11 @@ import dev.mesbase.business.production.dao.WorkOrderExtraMapper;
  * TEST ONLY demand and execution convergence against configured acceptance MySQL; all writes roll back.
  */
 class WorkOrderMySqlTest {
-    static final Set<Class<?>> MAPPERS = Set.of(MesProductionDefectMapper.class, MesExecutionPathMapper.class, MesExecutionPathNodeMapper.class, WorkorderErpExtraMapper.class, WorkorderMapper.class, ProductionBatchMapper.class, BatchRouteNodeMapper.class, RoutingMapper.class, RoutingNodeMapper.class, RoutingEdgeMapper.class, RoutingProductMapper.class, OperationMapper.class, WorkOrderExtraMapper.class, MaterialMapper.class, MesMaterialIssueMapper.class, MesProductionExecutionMapper.class);
+    static final Set<Class<?>> MAPPERS = Set.of(MesProductionDefectMapper.class, MesExecutionPathMapper.class, MesExecutionPathNodeMapper.class, WorkorderErpExtraMapper.class, WorkorderMapper.class, RoutingMapper.class, RoutingNodeMapper.class, RoutingEdgeMapper.class, RoutingProductMapper.class, OperationMapper.class, WorkOrderExtraMapper.class, MaterialMapper.class, MesMaterialIssueMapper.class, MesProductionExecutionMapper.class);
 
     @Configuration
     @EnableTransactionManagement
-    @Import({ExecutionQualityReferenceQueryImpl.class, ProductionChainLocks.class, WorkorderErpFacts.class, WorkOrderService.class, LegacyBatchHistoryQuery.class, LegacyBatchHistoryController.class, RoutingReferenceRules.class, ProductionExecutionRules.class, MesProductionExecutionServiceImpl.class})
+    @Import({ExecutionQualityReferenceQueryImpl.class, ProductionChainLocks.class, WorkorderErpFacts.class, WorkOrderService.class, RoutingReferenceRules.class, ProductionExecutionRules.class, MesProductionExecutionServiceImpl.class})
     static class Config {
         @Bean
         BusinessDirectoryService directory() {
@@ -127,16 +122,6 @@ class WorkOrderMySqlTest {
         @Bean
         WorkorderMapper mapperWorkorder(SqlSessionFactory s) {
             return new SqlSessionTemplate(s).getMapper(WorkorderMapper.class);
-        }
-
-        @Bean
-        ProductionBatchMapper mapperProductionBatch(SqlSessionFactory s) {
-            return new SqlSessionTemplate(s).getMapper(ProductionBatchMapper.class);
-        }
-
-        @Bean
-        BatchRouteNodeMapper mapperBatchRouteNode(SqlSessionFactory s) {
-            return new SqlSessionTemplate(s).getMapper(BatchRouteNodeMapper.class);
         }
 
         @Bean
@@ -218,26 +203,9 @@ class WorkOrderMySqlTest {
             var executionService = context.getBean(IMesProductionExecutionService.class);
             var manager = context.getBean("businessTransactionManager", OwnedTransactionManager.class);
             new TransactionTemplate(manager).execute(status -> {
-                var batchesBefore = jdbc.queryForList("SELECT * FROM production_batch ORDER BY id");
-                var pathsBefore = jdbc.queryForList("SELECT * FROM batch_route_node ORDER BY id");
-                var history = context.getBean(LegacyBatchHistoryQuery.class);
-                for (var batchRow : batchesBefore) {
-                    Long batchId = ((Number) batchRow.get("id")).longValue();
-                    var historical = history.detail(batchId);
-                    var expectedNodes = pathsBefore.stream()
-                            .filter(n -> batchId.equals(((Number) n.get("batch_id")).longValue())).toList();
-                    assertEquals(expectedNodes.size(), historical.path().size());
-                    assertEquals(batchId, historical.batch().getId());
-                    for (var node : historical.path()) {
-                        assertEquals(batchId, node.getBatchId());
-                        assertNotNull(node.getRoutingNodeId());
-                        assertNotNull(node.getExecutionOrder());
-                    }
-                }
                 var input = new WorkOrderModels.Save(tag, product, new BigDecimal("1000"), routing, null, null, null, null, "TEST ONLY ROLLBACK", 0, "WORK_ORDER");
                 var created = service.create(input);
                 Long order = created.workorder().getId();
-                assertEquals(0, created.batches().size());
                 assertEquals(0, created.allocation().executionCount());
                 assertThrows(FoundationException.class, () -> service.create(input));
                 assertThrows(FoundationException.class, () -> service.update(order, new WorkOrderModels.Save(tag, product, new BigDecimal("1000"), routing, null, null, null, null, null, 99, "WORK_ORDER")));
@@ -252,8 +220,6 @@ class WorkOrderMySqlTest {
                 assertEquals(new BigDecimal("1400.000000"), service.allocation(order).allocatedTargetQty());
                 assertEquals(new BigDecimal("-400.000000"), service.allocation(order).remainingTargetQty());
                 assertEquals(new BigDecimal("400.000000"), service.allocation(order).excessTargetQty());
-                assertEquals(batchesBefore, jdbc.queryForList("SELECT * FROM production_batch ORDER BY id"));
-                assertEquals(pathsBefore, jdbc.queryForList("SELECT * FROM batch_route_node ORDER BY id"));
                 status.setRollbackOnly();
                 return null;
             });

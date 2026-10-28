@@ -56,8 +56,6 @@ public enum ErrorCode {
     WORKORDER_REFERENCED(409, "工单存在作废记录或仓储单据等下游关联，不能删除或退回草稿"),
     WORKORDER_INVALID(422, "工单产品、计划数量、默认工艺或计划日期不符合规则"),
     WORKORDER_NOT_RELEASED(422, "工单尚未下达，只能预建待执行身份，不能开工或结束生产"),
-    WORKORDER_LEGACY_REFERENCED(409, "工单含旧批次历史，不能删除或更换产品及默认工艺"),
-    LEGACY_BATCH_READ_ONLY(410, "旧生产批次和路径仅供历史查询，分批生产请使用生产执行单元"),
     ROUTING_GRAPH_INVALID(422, "路线拓扑无效：请检查节点、连接、环路及孤立节点"),
     STOCK_REFERENCE_INVALID(422, "物料和仓库必须存在且属于当前工厂"),
     WAREHOUSE_REFERENCED(409, "仓库已被库存引用，不能删除"),

@@ -223,7 +223,6 @@ class ProductionCoreV1HttpTest {
                     .andExpect(status().isConflict());
             m.perform(full(post(E)).content(EXEC.replace("READY", "RUNNING")))
                     .andExpect(status().isMethodNotAllowed());
-            assertEquals(0, j.queryForObject("SELECT COUNT(*) FROM production_batch", Integer.class));
         }
     }
 

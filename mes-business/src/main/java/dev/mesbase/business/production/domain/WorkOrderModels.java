@@ -22,9 +22,7 @@ public final class WorkOrderModels {
     public record Revision(@NotNull Integer revision) {
     }
 
-    /**
-     * Only formal terminal execution facts qualify for the scheduled work-order transition.
-     */
+    /** Formal receipt approval evaluates whether the work order can be completed. */
     public record CompletionState(long activeCount, long unfinishedCount, long missingCompletionCount) {
         public boolean allCompleted() {
             return activeCount > 0 && unfinishedCount == 0 && missingCompletionCount == 0;
@@ -32,10 +30,10 @@ public final class WorkOrderModels {
     }
 
     public record Detail(WorkorderEntity workorder, String productCode, String productName,
-                         RoutingEntity routing, List<ProductionBatchEntity> batches, Allocation allocation) {
+                         RoutingEntity routing, Allocation allocation) {
     }
 
-    public record Summary(WorkorderEntity workorder, int batchCount, String productCode, String productName,
+    public record Summary(WorkorderEntity workorder, String productCode, String productName,
                           String routingCode, Integer routingVersion, Allocation allocation, boolean erpExtraMissing) {
     }
 

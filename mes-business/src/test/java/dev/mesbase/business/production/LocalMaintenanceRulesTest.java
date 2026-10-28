@@ -9,7 +9,6 @@ import dev.mesbase.business.production.dao.MesExecutionPathNodeMapper;
 import dev.mesbase.business.production.dao.MesProductionExecutionMapper;
 import dev.mesbase.business.production.dao.MesProductionReportMapper;
 import dev.mesbase.business.production.dao.MesWorkorderMaterialMapper;
-import dev.mesbase.business.production.dao.ProductionBatchMapper;
 import dev.mesbase.business.production.dao.ProductionQuantityMapper;
 import dev.mesbase.business.production.dao.RoutingEdgeMapper;
 import dev.mesbase.business.production.dao.RoutingMapper;
@@ -81,8 +80,8 @@ class LocalMaintenanceRulesTest {
         when(orders.deleteByPrimaryKey(1L)).thenReturn(1);
         when(queries.activeAllocation(1L, null)).thenReturn(new WorkOrderModels.Allocation(
                 1L, new BigDecimal("10"), new BigDecimal("6"), new BigDecimal("4"), BigDecimal.ZERO, 1L));
-        var service = spy(new WorkOrderService(orders, mock(ProductionBatchMapper.class), mock(RoutingMapper.class),
-                mock(RoutingProductMapper.class), mock(RoutingNodeMapper.class), mock(RoutingEdgeMapper.class),
+        var service = spy(new WorkOrderService(orders, mock(RoutingMapper.class), mock(RoutingProductMapper.class),
+                mock(RoutingNodeMapper.class), mock(RoutingEdgeMapper.class),
                 mock(MaterialMapper.class), mock(RoutingReferenceRules.class), issues, queries, executions,
                 mock(WorkorderErpFacts.class), mock(BusinessDirectoryService.class), mock(MesWorkorderMaterialMapper.class),
                 sources, mock(WorkorderErpExtraMapper.class), mock(SyncCoordinator.class), mock(MaterialQuantityRules.class), mock(AutoCodeNumbering.class), mock(PlatformTransactionManager.class)));

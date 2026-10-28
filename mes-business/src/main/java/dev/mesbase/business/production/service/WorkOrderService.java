@@ -9,7 +9,6 @@ import dev.mesbase.business.issue.dao.MesMaterialIssueMapper;
 import dev.mesbase.business.issue.domain.MesMaterialIssueExample;
 import dev.mesbase.business.production.dao.MesProductionExecutionMapper;
 import dev.mesbase.business.production.dao.MesWorkorderMaterialMapper;
-import dev.mesbase.business.production.dao.ProductionBatchMapper;
 import dev.mesbase.business.production.dao.RoutingEdgeMapper;
 import dev.mesbase.business.production.dao.RoutingMapper;
 import dev.mesbase.business.production.dao.RoutingNodeMapper;
@@ -18,8 +17,6 @@ import dev.mesbase.business.production.dao.WorkOrderExtraMapper;
 import dev.mesbase.business.production.dao.WorkorderErpExtraMapper;
 import dev.mesbase.business.production.dao.WorkorderMapper;
 import dev.mesbase.business.production.domain.MesProductionExecutionExample;
-import dev.mesbase.business.production.domain.ProductionBatchEntity;
-import dev.mesbase.business.production.domain.ProductionBatchExample;
 import dev.mesbase.business.production.domain.RoutingDetail;
 import dev.mesbase.business.production.domain.RoutingEdgeExample;
 import dev.mesbase.business.production.domain.RoutingEntity;
@@ -69,7 +66,7 @@ import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 /**
- * WorkOrder owns demand. Legacy batch summaries are read-only references; historical paths have a separate query entry.
+ * WorkOrder owns demand; current production facts belong to formal Execution records.
  */
 @Service
 @ConditionalOnProperty(name = "mes.business.enabled", havingValue = "true")
@@ -82,7 +79,6 @@ public class WorkOrderService {
     private final WorkorderMapper orders;
     private final WorkorderErpFacts facts;
     private final BusinessDirectoryService directory;
-    private final ProductionBatchMapper batches;
     private final RoutingMapper routings;
     private final RoutingProductMapper products;
     private final RoutingNodeMapper nodes;
@@ -96,8 +92,8 @@ public class WorkOrderService {
     private final AutoCodeNumbering autoCodes;
     private final TransactionTemplate createTransactions;
 
-    public WorkOrderService(WorkorderMapper orders, ProductionBatchMapper batches,
-                            RoutingMapper routings, RoutingProductMapper products, RoutingNodeMapper nodes,
+    public WorkOrderService(WorkorderMapper orders, RoutingMapper routings, RoutingProductMapper products,
+                            RoutingNodeMapper nodes,
                             RoutingEdgeMapper edges, MaterialMapper materials, RoutingReferenceRules references,
                             MesMaterialIssueMapper issues, WorkOrderExtraMapper queries,
                             MesProductionExecutionMapper executions, WorkorderErpFacts facts,
@@ -112,7 +108,6 @@ public class WorkOrderService {
         this.orders = orders;
         this.facts = facts;
         this.directory = directory;
-        this.batches = batches;
         this.routings = routings;
         this.products = products;
         this.nodes = nodes;
@@ -153,14 +148,6 @@ public class WorkOrderService {
             total = page.getTotal();
         }
         var missingExtras = facts.hydrateAvailable(rows);
-        var children = new ProductionBatchExample();
-        List<ProductionBatchEntity> all = List.of();
-        if (!rows.isEmpty()) {
-            children.createCriteria().andWorkorderIdIn(rows.stream().map(WorkorderEntity::getId).toList());
-            all = batches.selectByExample(children);
-        }
-        var counts = all.stream()
-                .collect(Collectors.groupingBy(ProductionBatchEntity::getWorkorderId, Collectors.counting()));
         var materialFilter = new MaterialExample();
         var routingFilter = new RoutingExample();
         if (rows.isEmpty()) return new WorkOrderModels.Page(List.of(), total, offset, limit);
@@ -177,8 +164,7 @@ public class WorkOrderService {
         return new WorkOrderModels.Page(rows.stream().map(w -> {
             var m = materialIndex.get(w.getProductId());
             var r = routingIndex.get(w.getRoutingId());
-            return new WorkOrderModels.Summary(w, counts.getOrDefault(w.getId(), 0L)
-                    .intValue(), Optional.ofNullable(m).map(nullableValue -> nullableValue.getCode())
+            return new WorkOrderModels.Summary(w, Optional.ofNullable(m).map(nullableValue -> nullableValue.getCode())
                     .orElse(null), Optional.ofNullable(m).map(nullableValue -> nullableValue.getName())
                     .orElse(null), Optional.ofNullable(r).map(nullableValue -> nullableValue.getCode())
                     .orElse(null), Optional.ofNullable(r).map(nullableValue -> nullableValue.getVersion())
@@ -190,10 +176,9 @@ public class WorkOrderService {
     public WorkOrderModels.Detail detail(Long id) {
         var w = order(id, false);
         var m = materials.selectByPrimaryKey(w.getProductId());
-        var children = batchRows(id);
         return new WorkOrderModels.Detail(w, Optional.ofNullable(m).map(nullableValue -> nullableValue.getCode())
                 .orElse(null), Optional.ofNullable(m).map(nullableValue -> nullableValue.getName()).orElse(null),
-                routings.selectByPrimaryKey(w.getRoutingId()), children, allocation(id));
+                routings.selectByPrimaryKey(w.getRoutingId()), allocation(id));
     }
 
     @Transactional(transactionManager = "businessTransactionManager", propagation = Propagation.NOT_SUPPORTED)
@@ -323,7 +308,7 @@ public class WorkOrderService {
                 && Objects.equals(row.getPlannedStartAt(), input.plannedStartAt()) && Objects.equals(row.getPlannedEndAt(), input.plannedEndAt())
                 && Objects.equals(row.getRemark(), input.remark()) && Objects.equals(mapping.getExternalCode(), plan.externalCode()))
             return new ExternalSyncCheck(ExternalSyncAction.UNCHANGED, row.getId());
-        if (hasExecutions(row.getId()) || hasLegacyBatches(row.getId()) || queries.countBlockingIssues(row.getId()) > 0)
+        if (hasExecutions(row.getId()) || queries.countBlockingIssues(row.getId()) > 0)
             throw new FoundationException(ErrorCode.EXECUTION_FROZEN);
         if (!WorkOrderStatus.DRAFT.getValue().equals(row.getStatus())) conflict();
         return new ExternalSyncCheck(ExternalSyncAction.UPDATE, row.getId());
@@ -342,9 +327,6 @@ public class WorkOrderService {
                 || input.plannedQty().compareTo(row.getPlannedQty()) != 0;
         if (identityChanged && hasExecutions(id))
             throw new FoundationException(ErrorCode.EXECUTION_FROZEN);
-        if (hasLegacyBatches(id) && (!Objects.equals(row.getProductId(), input.productId())
-                || !Objects.equals(row.getRoutingId(), input.routingId())))
-            throw new FoundationException(ErrorCode.WORKORDER_LEGACY_REFERENCED);
         if (!Objects.equals(row.getProductId(), input.productId())) {
             if (queries.countBlockingIssues(id) > 0)
                 throw new FoundationException(ErrorCode.WORKORDER_ISSUE_REFERENCED);
@@ -441,7 +423,6 @@ public class WorkOrderService {
             throw new FoundationException(ErrorCode.WORKORDER_ISSUE_REFERENCED);
         if (queries.hasOrderDependents(id))
             throw new FoundationException(ErrorCode.WORKORDER_REFERENCED);
-        if (hasLegacyBatches(id)) throw new FoundationException(ErrorCode.WORKORDER_LEGACY_REFERENCED);
     }
 
     @Transactional(transactionManager = "businessTransactionManager", readOnly = true)
@@ -451,25 +432,12 @@ public class WorkOrderService {
         return rows.getFirst();
     }
 
-    private boolean hasLegacyBatches(Long id) {
-        var filter = new ProductionBatchExample();
-        filter.createCriteria().andWorkorderIdEqualTo(id);
-        return batches.countByExample(filter) > 0;
-    }
-
     private WorkorderEntity order(Long id, boolean lock) {
         require(id != null);
         var row = lock ? orders.selectByPrimaryKeyForUpdate(id) : orders.selectByPrimaryKey(id);
         if (row == null) throw new FoundationException(ErrorCode.NOT_FOUND);
         facts.hydrate(List.of(row));
         return row;
-    }
-
-    private List<ProductionBatchEntity> batchRows(Long id) {
-        var f = new ProductionBatchExample();
-        f.createCriteria().andWorkorderIdEqualTo(id);
-        f.setOrderByClause("id desc");
-        return batches.selectByExample(f);
     }
 
     private void binding(Long product, Long routing) {

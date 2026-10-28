@@ -8,7 +8,6 @@ import dev.mesbase.business.production.service.WorkorderErpFacts;
 import dev.mesbase.business.directory.service.BusinessDirectoryService;
 import dev.mesbase.business.production.dao.WorkorderErpExtraMapper;
 
-import dev.mesbase.business.production.dao.ProductionBatchMapper;
 import dev.mesbase.business.production.dao.WorkOrderExtraMapper;
 import dev.mesbase.business.production.dao.RoutingMapper;
 import dev.mesbase.business.production.dao.RoutingProductMapper;
@@ -147,13 +146,13 @@ class WorkOrderRequestBudgetTest {
         new JdbcTemplate(business).execute("INSERT INTO workorder(id,code,revision,product_id,routing_id,planned_qty,status,source) VALUES(1,'TEST ONLY',0,1,1,1000,'DRAFT','LOCAL')");
         new JdbcTemplate(business).execute("CREATE TABLE workorder_erp_extra(id BIGINT PRIMARY KEY,external_id VARCHAR(128),external_code VARCHAR(128),provider VARCHAR(128),binding_key VARCHAR(128),configuration_revision BIGINT)");
         new JdbcTemplate(business).execute("INSERT INTO workorder_erp_extra(id) VALUES(1)");
-        for (String type : List.of("ProductionBatch", "Routing")) {
-            String xml = Files.readString(Path.of("mes-business/src/main/resources/dev/mesbase/business/production/dao/" + type + "Mapper.xml"));
+        {
+            String xml = Files.readString(Path.of("mes-business/src/main/resources/dev/mesbase/business/production/dao/RoutingMapper.xml"));
             var matches = Pattern.compile("column=\"([^\"]+)\" jdbcType=\"([^\"]+)\"").matcher(xml);
             var fields = new ArrayList<String>();
             while (matches.find()) fields.add(matches.group(1) + " " + (matches.group(2)
                     .equals("VARCHAR") ? "VARCHAR(255)" : matches.group(2)));
-            new JdbcTemplate(business).execute("CREATE TABLE " + (type.equals("Routing") ? "routing" : "production_batch") + "(" + String.join(",", fields) + ")");
+            new JdbcTemplate(business).execute("CREATE TABLE routing(" + String.join(",", fields) + ")");
         }
         String xml = Files.readString(Path.of("mes-business/src/main/resources/dev/mesbase/business/basic/dao/MaterialMapper.xml"));
         var matches = Pattern.compile("column=\"([^\"]+)\" jdbcType=\"([^\"]+)\"").matcher(xml);
@@ -189,18 +188,18 @@ class WorkOrderRequestBudgetTest {
         String raw = tokens.createToken(new LoginUser(42L, 7L, user, Set.of()), new MockHttpServletRequest());
         try (var registry = new RuntimeRegistry()) {
             registry.registerDedicated(new FactoryId("A"), new DatasourceIdentity("managed-1"), 1, business, () -> {
-            }, Set.of(WorkorderErpExtraMapper.class, WorkOrderExtraMapper.class, WorkorderMapper.class, ProductionBatchMapper.class, MaterialMapper.class, RoutingMapper.class));
+            }, Set.of(WorkorderErpExtraMapper.class, WorkOrderExtraMapper.class, WorkorderMapper.class, MaterialMapper.class, RoutingMapper.class));
             var routingStore = RoutingCacheFixture.store();
             var metadata = new FactoryMetadataCache(platform, routingStore, platform.mapper(RoutingMetadataMapper.class));
             var managed = new ManagedDatasourceService(platform, platform.mapper(ManagedDatasourceMapper.class), platform.mapper(ManagedFactoryMapper.class), mock(DatasourcePasswordCipher.class), registry,
-                    center, null, Set.of(WorkorderErpExtraMapper.class, WorkOrderExtraMapper.class, WorkorderMapper.class, ProductionBatchMapper.class, MaterialMapper.class, RoutingMapper.class), Path.of("target/TEST-ONLY-unused-ddl"), metadata);
+                    center, null, Set.of(WorkorderErpExtraMapper.class, WorkOrderExtraMapper.class, WorkorderMapper.class, MaterialMapper.class, RoutingMapper.class), Path.of("target/TEST-ONLY-unused-ddl"), metadata);
             var source = new FactoryBusinessDataSource(managed::resolve, registry);
             var manager = new OwnedTransactionManager(source);
-            var factory = PersistenceFactories.create(source, Set.of(WorkorderErpExtraMapper.class, WorkOrderExtraMapper.class, WorkorderMapper.class, ProductionBatchMapper.class, MaterialMapper.class, RoutingMapper.class), c -> {
+            var factory = PersistenceFactories.create(source, Set.of(WorkorderErpExtraMapper.class, WorkOrderExtraMapper.class, WorkorderMapper.class, MaterialMapper.class, RoutingMapper.class), c -> {
                 PersistenceFactories.pagination(c);
                 c.addInterceptor(businessSql);
             }, manager::verifyAccess);
-            var controller = new WorkOrderController(new WorkOrderService(new SqlSessionTemplate(factory).getMapper(WorkorderMapper.class), new SqlSessionTemplate(factory).getMapper(ProductionBatchMapper.class), new SqlSessionTemplate(factory).getMapper(RoutingMapper.class), mock(RoutingProductMapper.class), mock(RoutingNodeMapper.class), mock(RoutingEdgeMapper.class), new SqlSessionTemplate(factory).getMapper(MaterialMapper.class), mock(RoutingReferenceRules.class), mock(MesMaterialIssueMapper.class), new SqlSessionTemplate(factory).getMapper(WorkOrderExtraMapper.class), mock(MesProductionExecutionMapper.class), new WorkorderErpFacts(new SqlSessionTemplate(factory).getMapper(WorkorderErpExtraMapper.class)), mock(BusinessDirectoryService.class), mock(MesWorkorderMaterialMapper.class), Mockito.mock(BusinessSourceRules.class), Mockito.mock(WorkorderErpExtraMapper.class), Mockito.mock(SyncCoordinator.class), Mockito.mock(MaterialQuantityRules.class), Mockito.mock(AutoCodeNumbering.class), Mockito.mock(PlatformTransactionManager.class)), Mockito.mock(AutoCodeNumbering.class));
+            var controller = new WorkOrderController(new WorkOrderService(new SqlSessionTemplate(factory).getMapper(WorkorderMapper.class), new SqlSessionTemplate(factory).getMapper(RoutingMapper.class), mock(RoutingProductMapper.class), mock(RoutingNodeMapper.class), mock(RoutingEdgeMapper.class), new SqlSessionTemplate(factory).getMapper(MaterialMapper.class), mock(RoutingReferenceRules.class), mock(MesMaterialIssueMapper.class), new SqlSessionTemplate(factory).getMapper(WorkOrderExtraMapper.class), mock(MesProductionExecutionMapper.class), new WorkorderErpFacts(new SqlSessionTemplate(factory).getMapper(WorkorderErpExtraMapper.class)), mock(BusinessDirectoryService.class), mock(MesWorkorderMaterialMapper.class), Mockito.mock(BusinessSourceRules.class), Mockito.mock(WorkorderErpExtraMapper.class), Mockito.mock(SyncCoordinator.class), Mockito.mock(MaterialQuantityRules.class), Mockito.mock(AutoCodeNumbering.class), Mockito.mock(PlatformTransactionManager.class)), Mockito.mock(AutoCodeNumbering.class));
             var permissions = new SystemPermissionService(platform.mapper(SysMenuMapper.class), platform.mapper(SysRoleMapper.class), platform.mapper(ManagedFactoryMapper.class));
             FactoryCatalog catalog = new FactoryCatalog() {
                 public Optional<Factory> find(FactoryId id) {

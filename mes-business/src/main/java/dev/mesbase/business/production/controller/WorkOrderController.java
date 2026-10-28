@@ -1,7 +1,6 @@
 package dev.mesbase.business.production.controller;
 
 import dev.mesbase.business.production.controller.vo.RoutingDetailVo;
-import dev.mesbase.business.production.domain.ProductionBatchEntity;
 import dev.mesbase.business.production.domain.WorkOrderModels;
 import dev.mesbase.business.production.domain.WorkorderEntity;
 import dev.mesbase.business.production.service.WorkOrderService;
@@ -49,16 +48,11 @@ public class WorkOrderController {
     public record RoutingView(String id, String code, String name, int version, String status) {
     }
 
-    public record BatchSummaryView(String id, String workorderId, String batchNo, BigDecimal plannedQty,
-                                   String status, String routeStatus, LocalDateTime lockedAt, int revision,
-                                   String remark) {
-    }
-
     public record DetailView(OrderView workorder, String productCode, String productName, RoutingView routing,
-                             List<BatchSummaryView> batches, AllocationView allocation) {
+                             AllocationView allocation) {
     }
 
-    public record SummaryView(OrderView workorder, int batchCount, String productCode, String productName,
+    public record SummaryView(OrderView workorder, String productCode, String productName,
                               String routingCode, Integer routingVersion, AllocationView allocation,
                               boolean erpExtraMissing) {
     }
@@ -154,10 +148,6 @@ public class WorkOrderController {
 
     private static OrderView order(WorkorderEntity w) {
         return BeanConversions.convert(w, OrderView.class);
-    }
-
-    private static BatchSummaryView batch(ProductionBatchEntity b) {
-        return BeanConversions.convert(b, BatchSummaryView.class);
     }
 
     private static DetailView view(WorkOrderModels.Detail detail) {

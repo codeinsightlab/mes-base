@@ -20,7 +20,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  */
 class ProductionChainHttpTest {
     private static final String W = "/api/production/workorder", E = "/api/production/mes-production-execution";
-    private static final String DEMAND = "{\"code\":\"QA_DEMAND\",\"productId\":\"1\",\"plannedQty\":\"1000\",\"routingId\":\"1\"}";
+    private static final String DEMAND = "{\"code\":\"QA_DEMAND\",\"productId\":\"1\",\"plannedQty\":\"1000\",\"routingId\":\"1\",\"ruleCode\":\"WORK_ORDER\"}";
 
     private MockHttpServletRequestBuilder full(MockHttpServletRequestBuilder request, String factory) {
         return request.header("Authorization", "Bearer FULL").header("X-Factory-Id", factory)
@@ -50,20 +50,34 @@ class ProductionChainHttpTest {
     }
 
     @Test
-    void demandExistsWithoutBatchOrExecutionAndLegacyWritesAreExplicitlyRejected() throws Exception {
+    void demandExistsWithoutBatchOrExecutionAndUnknownLegacyFieldsAreRejected() throws Exception {
         try (var c = MaterialIssueHttpTest.context()) {
             var m = MaterialIssueHttpTest.mvc(c);
             var a = c.getBean(MaterialIssueHttpTest.Fixture.class).business.get("A");
             m.perform(full(post(W), "A").content(DEMAND)).andExpect(status().isOk())
-                    .andExpect(jsonPath("batches.length()").value(0))
+                    .andExpect(jsonPath("batches").doesNotExist())
                     .andExpect(jsonPath("allocation.executionCount").value(0))
                     .andExpect(jsonPath("allocation.remainingTargetQty").value("1000.000000"));
-            assertEquals(0, a.queryForObject("SELECT COUNT(*) FROM production_batch", Integer.class));
             assertEquals(0, a.queryForObject("SELECT COUNT(*) FROM mes_production_execution", Integer.class));
-            for (String legacy : List.of("[]", "null", "[{\"batchNo\":\"B\",\"plannedQty\":\"1000\"}]"))
+            for (String legacy : List.of("[]", "null", "{}", "7", "[{\"batchNo\":\"B\",\"plannedQty\":\"1000\"}]"))
                 m.perform(full(post(W), "A").content(DEMAND.replace("QA_DEMAND", "LEGACY")
                                 .replace("}", ",\"batches\":" + legacy + "}")))
-                        .andExpect(status().isGone()).andExpect(jsonPath("errorCode").value("LEGACY_BATCH_READ_ONLY"));
+                        .andExpect(status().isBadRequest()).andExpect(jsonPath("errorCode").value("BAD_REQUEST"));
+            m.perform(full(post(W), "A").content(DEMAND.replace("}", ",\"retiredPath\":[]}")))
+                    .andExpect(status().isBadRequest());
+            m.perform(full(put(W + "/2"), "A").content(DEMAND.replace("QA_DEMAND", "WO1")
+                            .replace("}", ",\"revision\":0,\"batches\":null}")))
+                    .andExpect(status().isBadRequest());
+            assertEquals(0, a.queryForObject("SELECT COUNT(*) FROM workorder WHERE code='LEGACY'", Integer.class));
+            assertEquals(0, a.queryForObject("SELECT COUNT(*) FROM mes_production_execution", Integer.class));
+            assertEquals(0, a.queryForObject("SELECT COUNT(*) FROM mes_material_issue", Integer.class));
+            assertEquals(0, a.queryForObject("SELECT COUNT(*) FROM mes_material_issue_input", Integer.class));
+            assertEquals(0, a.queryForObject("SELECT COUNT(*) FROM mes_execution_path", Integer.class));
+            assertEquals(0, a.queryForObject("SELECT COUNT(*) FROM mes_execution_path_node", Integer.class));
+            assertEquals(0, a.queryForObject("SELECT COUNT(*) FROM wm_stock_action", Integer.class));
+            assertEquals(2, a.queryForObject("SELECT COUNT(*) FROM workorder", Integer.class));
+            assertEquals(0, a.queryForObject("SELECT revision FROM workorder WHERE id=2", Integer.class));
+            m.perform(full(get(W), "A")).andExpect(status().isOk());
             m.perform(full(post(W + "/2/actions/release"), "A").content("{\"revision\":0}"))
                     .andExpect(status().isOk()).andExpect(jsonPath("workorder.status").value("RELEASED"));
             m.perform(post(W).header("Authorization", "Bearer CRUD").header("X-Factory-Id", "A")
@@ -109,22 +123,17 @@ class ProductionChainHttpTest {
                     .andExpect(jsonPath("excessTargetQty").value("0.000000"));
             m.perform(full(get(W + "/1/allocation"), "B")).andExpect(status().isOk())
                     .andExpect(jsonPath("executionCount").value(0));
-            assertEquals(0, a.queryForObject("SELECT COUNT(*) FROM production_batch", Integer.class));
             assertEquals(0, a.queryForObject("SELECT COUNT(*) FROM mes_material_issue", Integer.class));
         }
     }
 
     @Test
-    void currentCommandsDoNotNeedLegacyPathTableEvenWhenHistoricalBatchesExist() throws Exception {
+    void currentCommandsWorkWithoutRetiredBatchTables() throws Exception {
         try (var c = MaterialIssueHttpTest.context()) {
             var m = MaterialIssueHttpTest.mvc(c);
             var a = c.getBean(MaterialIssueHttpTest.Fixture.class).business.get("A");
-            a.update("INSERT INTO production_batch(id,workorder_id,batch_no,planned_qty,status,route_status,revision,create_time,update_time) VALUES(1,1,'OLD_BATCH',1000,'ISSUED','LOCKED',2,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)");
-            // TEST ONLY: remove the retired table in this isolated H2 fixture to detect hidden coupling.
-            a.execute("DROP TABLE batch_route_node");
             m.perform(full(get(W + "/1"), "A")).andExpect(status().isOk())
-                    .andExpect(jsonPath("batches[0].routeStatus").value("LOCKED"))
-                    .andExpect(jsonPath("batches[0].path").doesNotExist());
+                    .andExpect(jsonPath("batches").doesNotExist());
             m.perform(full(put(W + "/1"), "A").content(DEMAND.replace("QA_DEMAND", "WO1")
                     .replace("}", ",\"revision\":0}"))).andExpect(status().isOk());
             m.perform(full(post(W), "A").content(DEMAND)).andExpect(status().isOk());
@@ -141,36 +150,18 @@ class ProductionChainHttpTest {
                             .content("{\"issueNo\":\"NO_BATCH_PATH\",\"executionId\":\"1\",\"status\":\"DRAFT\"}"))
                     .andExpect(status().isOk()).andExpect(jsonPath("executionId").value("1"))
                     .andExpect(jsonPath("routingId").value("1"));
-            assertEquals(1, a.queryForObject("SELECT COUNT(*) FROM production_batch", Integer.class));
         }
     }
 
     @Test
-    void historicalBatchAndPathStayReadableButCannotBeMutatedOrOrphaned() throws Exception {
+    void retiredBatchRoutesHaveNoHandler() throws Exception {
         try (var c = MaterialIssueHttpTest.context()) {
             var m = MaterialIssueHttpTest.mvc(c);
-            var a = c.getBean(MaterialIssueHttpTest.Fixture.class).business.get("A");
-            a.update("INSERT INTO production_batch(id,workorder_id,batch_no,planned_qty,status,route_status,revision,create_time,update_time) VALUES(1,1,'OLD_BATCH',1000,'ISSUED','LOCKED',2,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)");
-            a.update("INSERT INTO batch_route_node(id,batch_id,routing_node_id,execution_order) VALUES(1,1,55,1)");
-            var before = a.queryForList("SELECT * FROM production_batch");
-            var path = a.queryForList("SELECT * FROM batch_route_node");
-            m.perform(full(get("/api/production/batch/1"), "A")).andExpect(status().isOk())
-                    .andExpect(jsonPath("routeStatus").value("LOCKED")).andExpect(jsonPath("path.length()").value(1));
-            m.perform(full(get("/api/production/batch/1"), "B")).andExpect(status().isNotFound());
-            m.perform(get("/api/production/batch/1").header("Authorization", "Bearer NONE").header("X-Factory-Id", "A"))
-                    .andExpect(status().isForbidden());
-            // This fixture uses Spring Security default anonymous rejection (403).
-            m.perform(get("/api/production/batch/1")).andExpect(status().isForbidden());
-            m.perform(full(put("/api/production/batch/1/path"), "A").content("{\"revision\":2,\"nodeIds\":[55]}"))
+            m.perform(full(get("/api/production/batch/workorder/1"), "A")).andExpect(status().isNotFound());
+            m.perform(full(get("/api/production/batch/1"), "A")).andExpect(status().isNotFound());
+            m.perform(full(put("/api/production/batch/1/path"), "A")
+                            .content("{\"revision\":2,\"nodeIds\":[55]}"))
                     .andExpect(status().isNotFound());
-            m.perform(full(delete(W + "/1"), "A").content("{\"revision\":0}"))
-                    .andExpect(status().isConflict())
-                    .andExpect(jsonPath("errorCode").value("WORKORDER_LEGACY_REFERENCED"));
-            m.perform(full(put(W + "/1"), "A").content(DEMAND.replace("QA_DEMAND", "WO1")
-                            .replace("}", ",\"revision\":0}")))
-                    .andExpect(status().isOk());
-            assertEquals(before, a.queryForList("SELECT * FROM production_batch"));
-            assertEquals(path, a.queryForList("SELECT * FROM batch_route_node"));
         }
     }
 }

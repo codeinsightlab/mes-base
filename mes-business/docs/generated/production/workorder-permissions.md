@@ -1,6 +1,5 @@
-# 工单与历史批次权限（2026-10-15）
+# 工单与历史记录权限
 
-工单：workorder:list/query/create/update/delete/release。工单只管理需求，不新建旧批次或路径。
-历史批次：batch:query，仅 GET /api/production/batch/{id}，按当前业务库读取旧状态与所选节点。
-旧 batch:selectRoute 不再对应任何运行时接口或前端按钮；历史 V27 及已有授权记录保留，不能赋予路径写入能力。
-历史批次存在时保留工单删除及产品/默认工艺修改保护。新执行使用 ProductionExecution 及其确切 Routing 版本。
+工单：workorder:list/query/create/update/delete/release。工单只管理需求，不创建批次、投入、Execution 或路径事实。
+旧工单批次/路径接口、页面及专用权限已退役。V50 删除 `batch:query`、`batch:selectRoute`、`workorder:history:query` 菜单项及角色授权；V27/V47 已发布迁移保持原文。
+`production_batch` 和 `batch_route_node` 由业务迁移 V68 退役删除。当前 Execution 使用自身正式批次及锁定路径；已发布报工、质量和入库事实沿现有只读查询保留。
