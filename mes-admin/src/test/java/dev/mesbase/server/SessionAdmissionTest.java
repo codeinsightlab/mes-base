@@ -104,17 +104,19 @@ class SessionAdmissionTest {
         var f = fixture();
         var redis = mock(UserSessionStore.class);
         var payload = new AtomicReference<String>();
-        when(redis.issue(anyString(), anyLong(), anyLong(), anyString(), any(Instant.class))).thenAnswer(call -> {
-            payload.set(call.getArgument(3));
+        when(redis.issue(anyString(), anyString(), anyLong(), anyLong(), anyString(), any(Instant.class))).thenAnswer(call -> {
+            payload.set(call.getArgument(4));
             return true;
         });
-        when(redis.read(anyString())).thenAnswer(call -> payload.get());
+        when(redis.read(anyString(), any())).thenAnswer(call -> payload.get());
         var tokens = new TokenService(redis, f.accounts(), new MockEnvironment());
         SysUser account = f.accounts().account(42);
         assertNull(account.getPassword());
         assertEquals("4", account.getRoles().getFirst().getDataScope());
         String raw = tokens.createToken(new LoginUser(42L, 7L, account, Set.of()), new MockHttpServletRequest());
-        assertEquals(43, raw.length());
+        assertTrue(raw.matches("[A-Fa-f0-9-]{36}\\.[A-Za-z0-9_-]{43}"));
+        String sessionId = raw.substring(0, raw.indexOf('.'));
+        assertThrows(FoundationException.class, () -> tokens.resolve(sessionId));
         assertFalse(payload.get().contains("password"));
         assertFalse(payload.get().contains("roles"));
         assertFalse(payload.get().contains("TEST ONLY secret"));
@@ -132,8 +134,8 @@ class SessionAdmissionTest {
         f.jdbc().update("UPDATE sys_role SET status='1' WHERE role_id=8");
         assertEquals(9L, tokens.resolve(raw).getDeptId());
         assertEquals(List.of(), tokens.resolve(raw).getUser().getRoles());
-        tokens.delLoginUser(TokenService.hash(raw));
-        verify(redis).logout(TokenService.hash(raw));
+        tokens.delLoginUser(sessionId);
+        verify(redis).logout(sessionId);
     }
 
     @Test

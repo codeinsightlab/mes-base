@@ -54,30 +54,30 @@ class IndexedRedisSessionTest {
                     .withProperty("mes.platform.url", "jdbc:h2:mem:TEST-ONLY-" + UUID.randomUUID()));
             var sessions = new UserSessionStore(redis, namespace);
             Instant expires = Instant.now().plusSeconds(60);
-            assertTrue(sessions.issue("first", 42, 1, "SAFE IDENTITY", expires));
+            assertTrue(sessions.issue("first", "digest-first", 42, 1, "SAFE IDENTITY", expires));
             String key = namespace.key(UserSessionStore.PREFIX + "first");
             long ttl = redis.getExpire(key, TimeUnit.MILLISECONDS);
-            sessions.read("first");
+            sessions.read("first", "digest-first");
             assertTrue(redis.getExpire(key, TimeUnit.MILLISECONDS) <= ttl);
             sessions.logout("first");
-            assertNull(sessions.read("first"));
+            assertNull(sessions.read("first", "digest-first"));
             try (var workers = Executors.newFixedThreadPool(4)) {
                 var tasks = new ArrayList<Future<?>>();
                 for (int i = 0; i < 40; i++) {
                     String digest = "old-" + i;
-                    tasks.add(workers.submit(() -> sessions.issue(digest, 42, 1, "OLD", expires)));
+                    tasks.add(workers.submit(() -> sessions.issue(digest, "digest-old", 42, 1, "OLD", expires)));
                     tasks.add(workers.submit(() -> sessions.revoke(42, 2)));
                 }
                 for (var task : tasks) task.get(10, TimeUnit.SECONDS);
             }
-            for (int i = 0; i < 40; i++) assertNull(sessions.read("old-" + i));
-            assertFalse(sessions.issue("stale-login", 42, 1, "OLD", expires));
-            assertTrue(sessions.issue("new-login", 42, 2, "NEW", expires));
+            for (int i = 0; i < 40; i++) assertNull(sessions.read("old-" + i, "digest-old"));
+            assertFalse(sessions.issue("stale-login", "digest-stale", 42, 1, "OLD", expires));
+            assertTrue(sessions.issue("new-login", "digest-new", 42, 2, "NEW", expires));
             sessions.revoke(42, 2);
             sessions.revoke(42, 1);
-            assertNotNull(sessions.read("new-login"));
+            assertNotNull(sessions.read("new-login", "digest-new"));
             sessions.revoke(42, 3);
-            assertNull(sessions.read("new-login"));
+            assertNull(sessions.read("new-login", "digest-new"));
         } finally {
             connections.destroy();
             process.destroy();

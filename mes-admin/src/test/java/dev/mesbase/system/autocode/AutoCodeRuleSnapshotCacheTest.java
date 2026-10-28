@@ -6,6 +6,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.nullable;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -54,6 +55,10 @@ class AutoCodeRuleSnapshotCacheTest {
 
         verify(rules).selectAllForGeneration();
         verify(parts).selectAllForGeneration();
+        verify(redis, times(2)).getCacheVersion("autocode:{rules:v1}:version");
+        verify(redis, times(2)).getCacheObject("autocode:{rules:v1}:snapshot");
+        verify(redis).setCacheObjectIfVersion("autocode:{rules:v1}:version", null,
+                "autocode:{rules:v1}:snapshot", stored.get(), 3600);
     }
 
     @Test

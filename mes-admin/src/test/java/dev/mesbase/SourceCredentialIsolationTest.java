@@ -1,6 +1,7 @@
 package dev.mesbase;
 
 import dev.mesbase.common.core.redis.SystemCacheNamespace;
+import dev.mesbase.common.core.redis.RedisKeySegment;
 import dev.mesbase.common.utils.PasswordPolicy;
 import dev.mesbase.common.utils.SecurityUtils;
 import org.junit.jupiter.api.Test;
@@ -26,5 +27,21 @@ class SourceCredentialIsolationTest {
         assertThrows(IllegalArgumentException.class,()->second.logical(first.key("session:identity")));
         assertEquals("session:identity",first.logical(first.key("session:identity")));
         assertThrows(IllegalArgumentException.class,()->new SystemCacheNamespace(new MockEnvironment().withProperty("mes.system.cache-namespace","foreign:*")));
+    }
+    @Test void readableSegmentsRoundTripAndLoopbackJdbcAliasesNormalize() {
+        for (String value : new String[] {"0007", "AbC", "a:b%*?[]{x}", "工厂#一"})
+            assertEquals(value, RedisKeySegment.decode(RedisKeySegment.encode(value)));
+        var localName = new SystemCacheNamespace(new MockEnvironment()
+                .withProperty("mes.platform.url", "jdbc:mysql://localhost/platform"));
+        var ipv4 = new SystemCacheNamespace(new MockEnvironment()
+                .withProperty("mes.platform.url", "jdbc:mysql://127.0.0.1:3306/platform"));
+        var ipv6 = new SystemCacheNamespace(new MockEnvironment()
+                .withProperty("mes.platform.url", "jdbc:mysql://[::1]:3306/platform"));
+        var sqlServer = new SystemCacheNamespace(new MockEnvironment()
+                .withProperty("mes.platform.url", "jdbc:sqlserver://DB.EXAMPLE:1433;databaseName=platform"));
+        assertEquals(localName.key("sample"), ipv4.key("sample"));
+        assertEquals(localName.key("sample"), ipv6.key("sample"));
+        assertTrue(sqlServer.key("sample").contains(":center:db.example:1433:platform:"));
+        assertTrue(localName.key("sample").contains(":center:localhost:3306:platform:"));
     }
 }

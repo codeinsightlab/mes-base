@@ -199,6 +199,14 @@ class OpenApiRestorationTest {
             http.perform(get("/open-api/v1/diagnostics/ping").header("Authorization", "Bearer " + token)
                             .header("X-Factory-Id", "IGNORED"))
                     .andExpect(status().isOk()).andExpect(jsonPath("$.data.message").value("pong"));
+            int split = token.indexOf('.');
+            String secret = token.substring(split + 1);
+            String changedSecret = (secret.charAt(0) == 'A' ? "B" : "A") + secret.substring(1);
+            String forgedToken = token.substring(0, split + 1) + changedSecret;
+            http.perform(post("/open-api/token/revoke").header("Authorization", "Bearer " + forgedToken))
+                    .andExpect(status().isUnauthorized());
+            http.perform(get("/open-api/v1/diagnostics/ping").header("Authorization", "Bearer " + token))
+                    .andExpect(status().isOk());
             http.perform(get("/open-api/v1/diagnostics/client").header("Authorization", "Bearer " + token))
                     .andExpect(status().isForbidden());
             http.perform(get("/open-api/v1/diagnostics/ping").header("Authorization", "Bearer INTERNAL_TEST_ONLY"))

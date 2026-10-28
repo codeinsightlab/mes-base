@@ -80,10 +80,10 @@ class RedisRevocationCapacityTest {
                         // Exactly count active sessions: 90% old and 10% new; also one dangling index entry.
                         int old = count - count / 10;
                         for (int i = 0; i < count; i++) {
-                            assertTrue(sessions.issue(user + "-" + i, user, i < old ? 1 : 2, "SAFE TEST IDENTITY", expires));
+                            assertTrue(sessions.issue(user + "-" + i, "test-digest-" + i, user, i < old ? 1 : 2, "SAFE TEST IDENTITY", expires));
                         }
-                        String index = namespace.key("mes:system:user-sessions:" + user);
-                        redis.opsForZSet().add(index, namespace.key("missing-" + user), expires.toEpochMilli());
+                        String index = namespace.key("mes:system:{sessions}:user-sessions:" + user);
+                        redis.opsForZSet().add(index, namespace.key(UserSessionStore.PREFIX + "missing-" + user), expires.toEpochMilli());
                         var running = new AtomicBoolean(true);
                         var readyProbe = new CountDownLatch(1);
                         Future<?> probe = worker.submit(() -> {
@@ -101,8 +101,8 @@ class RedisRevocationCapacityTest {
                         running.set(false);
                         probe.get(5, TimeUnit.SECONDS);
                         for (int i = 0; i < count; i++) {
-                            if (i < old) assertNull(sessions.read(user + "-" + i));
-                            else assertNotNull(sessions.read(user + "-" + i));
+                            if (i < old) assertNull(sessions.read(user + "-" + i, "test-digest-" + i));
+                            else assertNotNull(sessions.read(user + "-" + i, "test-digest-" + i));
                         }
                         assertEquals((long) count / 10, redis.opsForZSet().zCard(index));
                         start = System.nanoTime();
@@ -110,10 +110,10 @@ class RedisRevocationCapacityTest {
                         repeatTimes.add((System.nanoTime() - start) / 1_000_000.0);
                         sessions.revoke(user, 1);
                         assertEquals((long) count / 10, redis.opsForZSet().zCard(index));
-                        assertFalse(sessions.issue("stale-" + user, user, 1, "OLD", expires));
+                        assertFalse(sessions.issue("stale-" + user, "stale", user, 1, "OLD", expires));
                         sessions.revoke(user, 3);
                         assertEquals(0L, redis.opsForZSet().zCard(index));
-                        assertEquals(-1L, redis.getExpire(namespace.key("mes:system:session-epoch:" + user)));
+                        assertEquals(-1L, redis.getExpire(namespace.key("mes:system:{sessions}:session-epoch:" + user)));
                     }
                     rows.add("{\"sessions\":" + count + ",\"samples\":5,\"revokeMs\":" + revokeTimes
                             + ",\"repeatMs\":" + repeatTimes + ",\"concurrentPingCount\":" + pingTimes.size()
