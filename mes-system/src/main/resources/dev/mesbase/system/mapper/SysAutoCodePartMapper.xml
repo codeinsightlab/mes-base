@@ -186,4 +186,8 @@
         delete from sys_auto_code_part where part_id = #{partId}
     </delete>
 
+    <delete id="deleteByRuleId" parameterType="Long">
+        delete from sys_auto_code_part where rule_id = #{ruleId}
+    </delete>
+
 </mapper>
