@@ -14,7 +14,6 @@ import dev.mesbase.business.directory.service.BusinessDirectoryService;
 import dev.mesbase.business.production.dao.WorkorderErpExtraMapper;
 
 import dev.mesbase.business.basic.dao.MaterialMapper;
-import dev.mesbase.business.issue.dao.MesMaterialIssueMapper;
 import dev.mesbase.business.production.dao.MesProductionExecutionMapper;
 import dev.mesbase.business.production.domain.WorkOrderModels;
 import dev.mesbase.business.production.service.WorkOrderService;
@@ -78,7 +77,7 @@ import dev.mesbase.business.production.dao.WorkOrderExtraMapper;
  * TEST ONLY demand and execution convergence against configured acceptance MySQL; all writes roll back.
  */
 class WorkOrderMySqlTest {
-    static final Set<Class<?>> MAPPERS = Set.of(MesProductionDefectMapper.class, MesExecutionPathMapper.class, MesExecutionPathNodeMapper.class, WorkorderErpExtraMapper.class, WorkorderMapper.class, RoutingMapper.class, RoutingNodeMapper.class, RoutingEdgeMapper.class, RoutingProductMapper.class, OperationMapper.class, WorkOrderExtraMapper.class, MaterialMapper.class, MesMaterialIssueMapper.class, MesProductionExecutionMapper.class);
+    static final Set<Class<?>> MAPPERS = Set.of(MesProductionDefectMapper.class, MesExecutionPathMapper.class, MesExecutionPathNodeMapper.class, WorkorderErpExtraMapper.class, WorkorderMapper.class, RoutingMapper.class, RoutingNodeMapper.class, RoutingEdgeMapper.class, RoutingProductMapper.class, OperationMapper.class, WorkOrderExtraMapper.class, MaterialMapper.class, MesProductionExecutionMapper.class);
 
     @Configuration
     @EnableTransactionManagement
@@ -157,11 +156,6 @@ class WorkOrderMySqlTest {
         @Bean
         MaterialMapper mapperMaterial(SqlSessionFactory s) {
             return new SqlSessionTemplate(s).getMapper(MaterialMapper.class);
-        }
-
-        @Bean
-        MesMaterialIssueMapper mapperMesMaterialIssue(SqlSessionFactory s) {
-            return new SqlSessionTemplate(s).getMapper(MesMaterialIssueMapper.class);
         }
 
         @Bean

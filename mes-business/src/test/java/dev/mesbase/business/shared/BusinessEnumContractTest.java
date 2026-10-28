@@ -5,7 +5,6 @@ import dev.mesbase.business.directory.domain.DirectoryDeletionFlag;
 import dev.mesbase.business.directory.domain.DirectoryStatus;
 import dev.mesbase.business.integration.warehouse.ErpActionResult.Status;
 import dev.mesbase.business.integration.warehouse.ErpActionResult.Mode;
-import dev.mesbase.business.issue.domain.MaterialIssueStatus;
 import dev.mesbase.business.issue.domain.MaterialIssueSubmissionStatus;
 import dev.mesbase.business.production.domain.ExecutionPathStatus;
 import dev.mesbase.business.production.domain.ProductionExecutionStatus;
@@ -42,7 +41,6 @@ class BusinessEnumContractTest {
             DirectoryStatus.class,
             Status.class,
             Mode.class,
-            MaterialIssueStatus.class,
             MaterialIssueSubmissionStatus.class,
             ExecutionPathStatus.class,
             ProductionExecutionStatus.class,
@@ -82,7 +80,6 @@ class BusinessEnumContractTest {
     void persistedCodesRemainCompatible() {
         assertEquals("ENABLED", EnableStatus.ENABLED.getValue());
         assertEquals("DRAFT", WorkOrderStatus.DRAFT.getValue());
-        assertEquals("CONFIRMED", MaterialIssueStatus.CONFIRMED.getValue());
         assertEquals("SUCCEEDED", MaterialIssueSubmissionStatus.SUCCEEDED.getValue());
         assertEquals("LOCAL_ONLY", Mode.LOCAL_ONLY.getValue());
         assertEquals("0", DirectoryStatus.NORMAL.getValue());

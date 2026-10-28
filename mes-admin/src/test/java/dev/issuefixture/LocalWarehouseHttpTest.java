@@ -42,7 +42,7 @@ class LocalWarehouseHttpTest {
         var data = new ObjectMapper().createObjectNode().put("requestId", id).put("stockId", "1")
                 .put("quantity", qty).put("expectedQuantity", before).put("expectedAvailable", before)
                 .put("reason", "TEST ONLY warehouse closure");
-        if (issue != null) data.put("issueId", issue);
+        if (issue != null) data.put("documentId", issue);
         return data.toString();
     }
 
@@ -68,7 +68,7 @@ class LocalWarehouseHttpTest {
             String result = ProductionInputHttpTest.submit(m, ProductionInputHttpTest.command(m, UUID.randomUUID()
                     .toString(), "L001", "100"));
             var input = new ObjectMapper().readTree(result);
-            String issue = input.get("issueId").asText();
+            String issue = input.get("documentId").asText();
             String document = input.get("documentId").asText();
             balance(j, "600");
             String requestId = UUID.randomUUID().toString();
@@ -166,7 +166,7 @@ class LocalWarehouseHttpTest {
                 balance(j, "10000");
                 assertEquals(0, j.queryForObject("SELECT COUNT(*) FROM wm_stock_action", Integer.class));
                 assertEquals(0, j.queryForObject("SELECT COUNT(*) FROM mes_material_issue_input WHERE confirmed_at IS NOT NULL OR stock_applied=true", Integer.class));
-                assertEquals(0, j.queryForObject("SELECT COUNT(*) FROM mes_material_issue WHERE status='CONFIRMED'", Integer.class));
+                assertEquals(0, j.queryForObject("SELECT COUNT(*) FROM wm_stock_document WHERE document_type='MATERIAL_ISSUE' AND status='POSTED'", Integer.class));
             }
         }
     }
@@ -220,7 +220,7 @@ class LocalWarehouseHttpTest {
                 var m = MaterialIssueHttpTest.mvc(c);
                 var result = new ObjectMapper().readTree(ProductionInputHttpTest.submit(m, ProductionInputHttpTest.command(m, UUID.randomUUID()
                         .toString(), "L001", "100")));
-                String issue = result.get("issueId").asText();
+                String issue = result.get("documentId").asText();
                 String document = result.get("documentId").asText();
                 if (changedIdentity) {
                     j.update("UPDATE wm_inventory SET bin_code='TEST_TAMPERED_BIN' WHERE id=1");

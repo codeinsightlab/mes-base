@@ -107,7 +107,7 @@ class ProductionInputHttpTest {
 
     static String submit(MockMvc mvc, String body) throws Exception {
         return mvc.perform(ProductionCoreV1HttpTest.full(post(ROOT)).content(body)).andExpect(status().isOk())
-                .andExpect(jsonPath("status").value("CONFIRMED")).andReturn().getResponse().getContentAsString();
+                .andExpect(jsonPath("status").value("POSTED")).andReturn().getResponse().getContentAsString();
     }
 
     @Test
@@ -118,11 +118,11 @@ class ProductionInputHttpTest {
             j.update("DELETE FROM mes_production_execution"); // TEST ONLY unused seeded executions
             submit(m, command(m, UUID.randomUUID().toString(), "L001", "100"));
             submit(m, command(m, UUID.randomUUID().toString(), "L001", "900"));
-            int issues = j.queryForObject("SELECT COUNT(*) FROM mes_material_issue", Integer.class);
+            int issues = j.queryForObject("SELECT COUNT(*) FROM wm_stock_document WHERE document_type='MATERIAL_ISSUE'", Integer.class);
             m.perform(ProductionCoreV1HttpTest.full(get(ROOT + "/calculate")).param("code", "WO1:M1#L001")
                             .param("workorderId", "1").param("stockReference", "1").param("outputQty", "1"))
                     .andExpect(status().isConflict());
-            assertEquals(issues, j.queryForObject("SELECT COUNT(*) FROM mes_material_issue", Integer.class));
+            assertEquals(issues, j.queryForObject("SELECT COUNT(*) FROM wm_stock_document WHERE document_type='MATERIAL_ISSUE'", Integer.class));
             assertEquals(0, new BigDecimal("1000").compareTo(j.queryForObject("SELECT target_qty FROM mes_production_execution", BigDecimal.class)));
         }
     }
@@ -176,13 +176,13 @@ class ProductionInputHttpTest {
             a.get();
             b.get();
             assertEquals(1, j.queryForObject("SELECT COUNT(*) FROM mes_production_execution WHERE batch_no IS NOT NULL", Integer.class));
-            assertEquals(2, j.queryForObject("SELECT COUNT(*) FROM mes_material_issue_input WHERE issue_id>0", Integer.class));
+            assertEquals(2, j.queryForObject("SELECT COUNT(*) FROM mes_material_issue_input WHERE document_id>0", Integer.class));
             assertEquals(0, j.queryForObject("SELECT COUNT(*) FROM wm_inventory WHERE id=1 AND quantity<>9400", Integer.class));
             var aa = pool.submit(() -> submit(m, one));
             var bb = pool.submit(() -> submit(m, one));
             aa.get();
             bb.get();
-            assertEquals(2, j.queryForObject("SELECT COUNT(*) FROM mes_material_issue_input WHERE issue_id>0", Integer.class));
+            assertEquals(2, j.queryForObject("SELECT COUNT(*) FROM mes_material_issue_input WHERE document_id>0", Integer.class));
         }
     }
 
@@ -214,19 +214,19 @@ class ProductionInputHttpTest {
             j.update("INSERT INTO mes_production_report(execution_id,routing_node_id,record_type,quantity_delta,operator_user_id,recorded_by,report_time,reason,create_time) VALUES(?,11,'REPORT',280,1,1,CURRENT_TIMESTAMP,'TEST ONLY reduction fixture',CURRENT_TIMESTAMP)", e);
             m.perform(ProductionCoreV1HttpTest.full(post(StockDocumentHttpTest.ROOT + "/" + first.get("documentId")
                     .asText() + "/actions/void"))).andExpect(status().isConflict());
-            assertEquals("CONFIRMED", j.queryForObject("SELECT status FROM mes_material_issue WHERE id=?", String.class, first.get("issueId")
+            assertEquals("POSTED", j.queryForObject("SELECT status FROM wm_stock_document WHERE id=?", String.class, first.get("documentId")
                     .asText()));
             long original = j.queryForObject("SELECT id FROM mes_production_report WHERE execution_id=?", Long.class, e);
             j.update("INSERT INTO mes_production_report(execution_id,routing_node_id,record_type,quantity_delta,reference_report_id,operator_user_id,recorded_by,report_time,reason,create_time) VALUES(?,11,'ADJUSTMENT',-200,?,1,1,CURRENT_TIMESTAMP,'TEST ONLY safe correction',CURRENT_TIMESTAMP)", e, original);
             j.execute("ALTER TABLE wm_stock_action ADD CONSTRAINT test_fail_reversal CHECK(action_type <> 'REVERSAL')");
             m.perform(ProductionCoreV1HttpTest.full(post(StockDocumentHttpTest.ROOT + "/" + second.get("documentId")
                             .asText() + "/actions/void"))).andExpect(status().is5xxServerError());
-            assertEquals("CONFIRMED", j.queryForObject("SELECT status FROM mes_material_issue WHERE id=?", String.class, second.get("issueId").asText()));
+            assertEquals("POSTED", j.queryForObject("SELECT status FROM wm_stock_document WHERE id=?", String.class, second.get("documentId").asText()));
             j.execute("ALTER TABLE wm_stock_action DROP CONSTRAINT test_fail_reversal");
             m.perform(ProductionCoreV1HttpTest.full(post(StockDocumentHttpTest.ROOT + "/" + second.get("documentId")
                             .asText() + "/actions/void"))).andExpect(status().isOk())
                     .andExpect(jsonPath("documentId").value(second.get("documentId").asText()));
-            assertEquals("VOIDED", j.queryForObject("SELECT status FROM mes_material_issue WHERE id=?", String.class, second.get("issueId").asText()));
+            assertEquals("SUCCEEDED", j.queryForObject("SELECT void_result_status FROM mes_material_issue_input WHERE document_id=?", String.class, second.get("documentId").asText()));
             m.perform(ProductionCoreV1HttpTest.full(get("/api/production/report-quantities/executions/" + e)))
                     .andExpect(status().isOk()).andExpect(jsonPath("nodes[0].availableQty").value("20.000000"));
             // A historical/admin report entry uses the same quantity guard during the cancellation window.
@@ -318,7 +318,7 @@ class ProductionInputHttpTest {
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("executionId").value(first.get("executionId").asText()))
                     .andExpect(jsonPath("code").isEmpty());
-            assertEquals(1, j.queryForObject("SELECT COUNT(*) FROM mes_material_issue_input WHERE issue_id>0", Integer.class));
+            assertEquals(1, j.queryForObject("SELECT COUNT(*) FROM mes_material_issue_input WHERE document_id>0", Integer.class));
             assertEquals(0, new BigDecimal("9800").compareTo(j.queryForObject("SELECT quantity FROM wm_inventory WHERE id=1", BigDecimal.class)));
             legacy.put("requestId", UUID.randomUUID().toString());
             m.perform(ProductionCoreV1HttpTest.full(post(ROOT)).content(legacy.toString()))

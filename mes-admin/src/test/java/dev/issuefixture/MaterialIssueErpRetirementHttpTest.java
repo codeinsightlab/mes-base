@@ -15,9 +15,9 @@ class MaterialIssueErpRetirementHttpTest {
     void materialIssueErpQueryAndReconciliationAreNotExposed() throws Exception {
         try (var context = MaterialIssueHttpTest.context()) {
             var mvc = MaterialIssueHttpTest.mvc(context);
-            mvc.perform(full(get(MaterialIssueHttpTest.H + "/1/erp-status")))
+            mvc.perform(full(get("/api/issue/mes-material-issue" + "/1/erp-status")))
                     .andExpect(status().isNotFound());
-            mvc.perform(full(post(MaterialIssueHttpTest.H + "/1/actions/reconcile-erp")))
+            mvc.perform(full(post("/api/issue/mes-material-issue" + "/1/actions/reconcile-erp")))
                     .andExpect(status().isNotFound());
         }
     }

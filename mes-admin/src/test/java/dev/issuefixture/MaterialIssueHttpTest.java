@@ -15,15 +15,10 @@ import dev.mesbase.business.directory.domain.DirectoryLabel;
 import dev.mesbase.business.directory.service.BusinessDirectoryService;
 import dev.mesbase.business.integration.warehouse.WarehouseIntegration;
 import dev.mesbase.business.issue.dao.MesMaterialIssueInputMapper;
-import dev.mesbase.business.issue.dao.MesMaterialIssueItemMapper;
-import dev.mesbase.business.issue.dao.MesMaterialIssueMapper;
 import dev.mesbase.business.issue.dao.MesMaterialIssueSubmissionMapper;
 import dev.mesbase.business.issue.service.MaterialIssueInputFacts;
-import dev.mesbase.business.issue.service.MaterialIssueRules;
 import dev.mesbase.business.issue.service.MaterialIssueSubmissionService;
 import dev.mesbase.business.issue.service.MaterialIssueVoidService;
-import dev.mesbase.business.issue.service.impl.MesMaterialIssueItemServiceImpl;
-import dev.mesbase.business.issue.service.impl.MesMaterialIssueServiceImpl;
 import dev.mesbase.business.production.controller.ExecutionActionController;
 import dev.mesbase.business.production.controller.MesProductionExecutionController;
 import dev.mesbase.business.production.controller.ProductionCompletionController;
@@ -180,7 +175,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * TEST ONLY: real generated SQL, HTTP authorization and transactions; two separate H2 databases.
  */
 class MaterialIssueHttpTest {
-    static final Set<Class<?>> MAPPERS = Set.of(ProductionInputExtraMapper.class, MaterialBomMapper.class, MaterialBomItemMapper.class, ProductionDefectListExtraMapper.class, StockDocumentExtraMapper.class, OperationDefectTypeMapper.class, DefectStatisticsExtraMapper.class, WmStockDocumentMapper.class, WmStockDocumentLineMapper.class, MesWorkorderCancellationMapper.class, WmWarehouseErpExtraMapper.class, MesQualityReleaseMapper.class, MesWarehouseAcceptanceMapper.class, MesExecutionCompletionMapper.class, MesWorkorderMaterialMapper.class, WmStockActionMapper.class, MesExecutionAssignmentMapper.class, MesMaterialIssueInputMapper.class, MesProductionScanActivityMapper.class, WmInventoryMapper.class, MesProductionReceiptMapper.class, ProductionReceiptQueryMapper.class, MesProductionDefectMapper.class, MesQualityTreatmentMapper.class, WorkstationMapper.class, MesProductionReportMapper.class, ProductionQuantityMapper.class, MesExecutionPathMapper.class, MesExecutionPathNodeMapper.class, MesMaterialIssueSubmissionMapper.class, WorkorderErpExtraMapper.class, WorkOrderExtraMapper.class, RoutingNodeMapper.class, RoutingEdgeMapper.class, OperationMapper.class, MesProductionExecutionMapper.class, MaterialMapper.class, UnitMeasureMapper.class, WmWarehouseMapper.class, RoutingMapper.class, RoutingProductMapper.class, WorkorderMapper.class, MesMaterialIssueMapper.class, MesMaterialIssueItemMapper.class);
+    static final Set<Class<?>> MAPPERS = Set.of(ProductionInputExtraMapper.class, MaterialBomMapper.class, MaterialBomItemMapper.class, ProductionDefectListExtraMapper.class, StockDocumentExtraMapper.class, OperationDefectTypeMapper.class, DefectStatisticsExtraMapper.class, WmStockDocumentMapper.class, WmStockDocumentLineMapper.class, MesWorkorderCancellationMapper.class, WmWarehouseErpExtraMapper.class, MesQualityReleaseMapper.class, MesWarehouseAcceptanceMapper.class, MesExecutionCompletionMapper.class, MesWorkorderMaterialMapper.class, WmStockActionMapper.class, MesExecutionAssignmentMapper.class, MesMaterialIssueInputMapper.class, MesProductionScanActivityMapper.class, WmInventoryMapper.class, MesProductionReceiptMapper.class, ProductionReceiptQueryMapper.class, MesProductionDefectMapper.class, MesQualityTreatmentMapper.class, WorkstationMapper.class, MesProductionReportMapper.class, ProductionQuantityMapper.class, MesExecutionPathMapper.class, MesExecutionPathNodeMapper.class, MesMaterialIssueSubmissionMapper.class, WorkorderErpExtraMapper.class, WorkOrderExtraMapper.class, RoutingNodeMapper.class, RoutingEdgeMapper.class, OperationMapper.class, MesProductionExecutionMapper.class, MaterialMapper.class, UnitMeasureMapper.class, WmWarehouseMapper.class, RoutingMapper.class, RoutingProductMapper.class, WorkorderMapper.class);
 
     static class Fixture implements AutoCloseable {
         final RuntimeRegistry registry = new RuntimeRegistry();
@@ -249,9 +244,14 @@ class MaterialIssueHttpTest {
                     if (name.equals("V37__workorder_cancellation.sql")) ddl = ddl.split("CREATE TRIGGER")[0];
                     for (String statement : ddl.split(";")) if (!statement.isBlank()) jdbc.execute(statement);
                 }
-                // TEST ONLY: final V69 schema after migrating the issue-local facts out of ERP Extra.
-                jdbc.execute("ALTER TABLE mes_material_issue ADD source_mode VARCHAR(20)");
-                jdbc.execute("ALTER TABLE mes_material_issue ADD void_result_status VARCHAR(20)");
+                // Final internal schema: only unified document identities remain.
+                jdbc.execute("DROP TABLE mes_material_issue_item");
+                jdbc.execute("DROP TABLE mes_material_issue");
+                jdbc.execute("ALTER TABLE mes_material_issue_input RENAME COLUMN issue_id TO document_id");
+                jdbc.execute("ALTER TABLE mes_material_issue_submission RENAME COLUMN issue_id TO document_id");
+                for (String column : List.of("submission_id BIGINT", "path_revision INT", "void_operation_id VARCHAR(64)",
+                        "void_from_status VARCHAR(24)", "void_requested_at TIMESTAMP", "void_finished_at TIMESTAMP", "void_result_status VARCHAR(24)"))
+                    jdbc.execute("ALTER TABLE mes_material_issue_input ADD " + column);
                 jdbc.execute("DROP TABLE mes_material_issue_erp_extra");
                 try (var connection = source.getConnection()) {
                     ScriptUtils.executeSqlScript(connection, new FileSystemResource("mes-admin/src/main/resources/db/business/V48__warehouse_type.sql"));
@@ -262,7 +262,6 @@ class MaterialIssueHttpTest {
                 jdbc.execute("ALTER TABLE material_bom ADD is_default TINYINT NOT NULL DEFAULT 0");
                 for (String column : List.of("bom_id BIGINT", "bom_base_qty DECIMAL(20,6)", "bom_component_qty DECIMAL(20,6)", "output_unit_id BIGINT", "frozen_at TIMESTAMP(6)"))
                     jdbc.execute("ALTER TABLE mes_workorder_material ADD " + column);
-                jdbc.execute("ALTER TABLE wm_stock_document ADD source_material_issue_id BIGINT");
                 jdbc.execute("ALTER TABLE wm_stock_document ADD source_request_json VARCHAR(8000)");
                 jdbc.execute("ALTER TABLE wm_stock_document ADD CONSTRAINT uk_stock_document_request_identity UNIQUE(post_request_id)");
                 // TEST ONLY: these fresh fixture objects are explicitly local; no production migration default.
@@ -313,7 +312,7 @@ class MaterialIssueHttpTest {
     @EnableWebMvc
     @EnableWebSecurity
     @EnableTransactionManagement
-    @Import({MaterialQuantityRules.class, WorkOrderCompletionService.class, StockDocumentService.class, StockDocumentController.class, WorkOrderCancellationService.class, WorkOrderCancellationController.class, BusinessSourceRules.class, StockReferenceRules.class, ProductionCompletionService.class, ProductionCompletionController.class, WarehouseAcceptanceService.class, WarehouseAcceptanceController.class, QualityReleaseService.class, QualityReleaseController.class, WorkorderMaterialService.class, WorkorderMaterialController.class, LocalStockController.class, WmStockActionController.class, WmStockActionServiceImpl.class, LocalStockService.class, LocalProductionSupply.class, QualityTreatmentService.class, MaterialIssueInputFacts.class, ProductionQuantityService.class, ProductionQuantityErrorAdvice.class, ExecutionQualityReferenceQueryImpl.class, ProductionExecutionQueryService.class, ProductionChainLocks.class, ExecutionPathService.class, ExecutionActionController.class, MaterialIssueSubmissionService.class, WorkorderErpFacts.class, WarehouseIntegration.class, MaterialIssueVoidService.class, MesMaterialIssueServiceImpl.class, MesMaterialIssueItemServiceImpl.class, MaterialIssueRules.class, ProductionExecutionRules.class, ProductionIdentityService.class, MesProductionExecutionServiceImpl.class, MesProductionExecutionController.class, ProductionIdentityController.class, WorkOrderController.class, WorkOrderService.class, RoutingReferenceRules.class, FoundationErrorAdvice.class})
+    @Import({MaterialQuantityRules.class, WorkOrderCompletionService.class, StockDocumentService.class, StockDocumentController.class, WorkOrderCancellationService.class, WorkOrderCancellationController.class, BusinessSourceRules.class, StockReferenceRules.class, ProductionCompletionService.class, ProductionCompletionController.class, WarehouseAcceptanceService.class, WarehouseAcceptanceController.class, QualityReleaseService.class, QualityReleaseController.class, WorkorderMaterialService.class, WorkorderMaterialController.class, LocalStockController.class, WmStockActionController.class, WmStockActionServiceImpl.class, LocalStockService.class, LocalProductionSupply.class, QualityTreatmentService.class, MaterialIssueInputFacts.class, ProductionQuantityService.class, ProductionQuantityErrorAdvice.class, ExecutionQualityReferenceQueryImpl.class, ProductionExecutionQueryService.class, ProductionChainLocks.class, ExecutionPathService.class, ExecutionActionController.class, MaterialIssueSubmissionService.class, WorkorderErpFacts.class, WarehouseIntegration.class, MaterialIssueVoidService.class, ProductionExecutionRules.class, ProductionIdentityService.class, MesProductionExecutionServiceImpl.class, MesProductionExecutionController.class, ProductionIdentityController.class, WorkOrderController.class, WorkOrderService.class, RoutingReferenceRules.class, FoundationErrorAdvice.class})
     static class Web implements WebMvcConfigurer {
         @Bean
         FactorySnapshotFixture factorySnapshots() {
@@ -590,16 +589,6 @@ class MaterialIssueHttpTest {
         }
 
         @Bean
-        MesMaterialIssueMapper mapperMesMaterialIssueMapper(SqlSessionFactory f) {
-            return new SqlSessionTemplate(f).getMapper(MesMaterialIssueMapper.class);
-        }
-
-        @Bean
-        MesMaterialIssueItemMapper mapperMesMaterialIssueItemMapper(SqlSessionFactory f) {
-            return new SqlSessionTemplate(f).getMapper(MesMaterialIssueItemMapper.class);
-        }
-
-        @Bean
         UnitMeasureMapper mapperUnitMeasureMapper(SqlSessionFactory f) {
             return new SqlSessionTemplate(f).getMapper(UnitMeasureMapper.class);
         }
@@ -701,9 +690,5 @@ class MaterialIssueHttpTest {
                     if (servlet[0] != null) throw servlet[0];
                 }, c.getBean(FilterChainProxy.class)).build();
     }
-
-    static final String H = "/api/issue/mes-material-issue", I = H + "-item";
-    static final String HEADER = "{\"issueNo\":\"QA_ISSUE\",\"workorderId\":\"1\",\"routingId\":\"1\",\"status\":\"RECORDED\"}";
-    static final String ITEM = "{\"issueId\":\"1\",\"materialId\":\"1\",\"batchNo\":\"ERP/ arbitrary-batch\",\"quantity\":\"99999999999999.12\",\"unitId\":\"1\",\"warehouseId\":\"1\"}";
 
 }

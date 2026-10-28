@@ -70,7 +70,7 @@ class ProductionChainHttpTest {
                     .andExpect(status().isBadRequest());
             assertEquals(0, a.queryForObject("SELECT COUNT(*) FROM workorder WHERE code='LEGACY'", Integer.class));
             assertEquals(0, a.queryForObject("SELECT COUNT(*) FROM mes_production_execution", Integer.class));
-            assertEquals(0, a.queryForObject("SELECT COUNT(*) FROM mes_material_issue", Integer.class));
+            assertEquals(0, a.queryForObject("SELECT COUNT(*) FROM wm_stock_document WHERE document_type='MATERIAL_ISSUE'", Integer.class));
             assertEquals(0, a.queryForObject("SELECT COUNT(*) FROM mes_material_issue_input", Integer.class));
             assertEquals(0, a.queryForObject("SELECT COUNT(*) FROM mes_execution_path", Integer.class));
             assertEquals(0, a.queryForObject("SELECT COUNT(*) FROM mes_execution_path_node", Integer.class));
@@ -123,7 +123,7 @@ class ProductionChainHttpTest {
                     .andExpect(jsonPath("excessTargetQty").value("0.000000"));
             m.perform(full(get(W + "/1/allocation"), "B")).andExpect(status().isOk())
                     .andExpect(jsonPath("executionCount").value(0));
-            assertEquals(0, a.queryForObject("SELECT COUNT(*) FROM mes_material_issue", Integer.class));
+            assertEquals(0, a.queryForObject("SELECT COUNT(*) FROM wm_stock_document WHERE document_type='MATERIAL_ISSUE'", Integer.class));
         }
     }
 

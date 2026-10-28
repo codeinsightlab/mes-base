@@ -2,7 +2,7 @@ package dev.mesbase.business.production;
 
 import dev.mesbase.business.basic.dao.MaterialMapper;
 import dev.mesbase.business.directory.service.BusinessDirectoryService;
-import dev.mesbase.business.issue.dao.MesMaterialIssueMapper;
+import dev.mesbase.business.wm.dao.WmStockDocumentMapper;
 import dev.mesbase.business.production.dao.MesExecutionAssignmentMapper;
 import dev.mesbase.business.production.dao.MesExecutionPathMapper;
 import dev.mesbase.business.production.dao.MesExecutionPathNodeMapper;
@@ -57,7 +57,7 @@ class LocalMaintenanceRulesTest {
     private final WorkorderMapper orders = mock(WorkorderMapper.class);
     private final MesProductionExecutionMapper executions = mock(MesProductionExecutionMapper.class);
     private final WorkOrderExtraMapper queries = mock(WorkOrderExtraMapper.class);
-    private final MesMaterialIssueMapper issues = mock(MesMaterialIssueMapper.class);
+    private final WmStockDocumentMapper issues = mock(WmStockDocumentMapper.class);
     private final MesProductionReportMapper reports = mock(MesProductionReportMapper.class);
     private final MesExecutionAssignmentMapper assignments = mock(MesExecutionAssignmentMapper.class);
     private final ProductionChainLocks locks = mock(ProductionChainLocks.class);

@@ -75,8 +75,10 @@ class WorkOrderEnumSqlTest {
         // Isolated H2 fixture verifies real generated SQL and parameters; it is not live MySQL evidence.
         try (var connection = DriverManager.getConnection("jdbc:h2:mem:enum_void;MODE=MySQL");
              var statement = connection.createStatement()) {
-            statement.execute("CREATE TABLE mes_material_issue(id BIGINT,workorder_id BIGINT,status VARCHAR(30),void_result_status VARCHAR(30),source_mode VARCHAR(30))");
-            statement.execute("INSERT INTO mes_material_issue VALUES (1,1,'DRAFT',NULL,NULL),(2,1,'VOIDED','SUCCEEDED','LOCAL_ONLY'),(3,1,'VOIDED','SUCCEEDED','CONNECTED'),(4,1,'VOIDED','UNKNOWN','CONNECTED'),(5,1,'VOIDED','SUCCEEDED','LOCAL_ONLY'),(6,2,'DRAFT',NULL,NULL)");
+            statement.execute("CREATE TABLE wm_stock_document(id BIGINT,source_workorder_id BIGINT,document_type VARCHAR(30),status VARCHAR(30))");
+            statement.execute("CREATE TABLE mes_material_issue_input(document_id BIGINT,void_result_status VARCHAR(30),source_mode VARCHAR(30))");
+            statement.execute("INSERT INTO wm_stock_document VALUES (1,1,'MATERIAL_ISSUE','DRAFT'),(2,1,'MATERIAL_ISSUE','POSTED'),(3,1,'MATERIAL_ISSUE','POSTED'),(4,1,'MATERIAL_ISSUE','POSTED'),(5,1,'MATERIAL_ISSUE','POSTED'),(6,2,'MATERIAL_ISSUE','DRAFT')");
+            statement.execute("INSERT INTO mes_material_issue_input VALUES (2,'SUCCEEDED','LOCAL_ONLY'),(3,'SUCCEEDED','CONNECTED'),(4,'UNKNOWN','CONNECTED'),(5,'SUCCEEDED','LOCAL_ONLY')");
             try (var query = connection.prepareStatement(sql.getSql())) {
                 for (int index = 0; index < sql.getParameterMappings().size(); index++) {
                     String name = sql.getParameterMappings().get(index).getProperty();

@@ -44,7 +44,7 @@ public final class SourceIsolationAcceptanceFixture {
                     check(c, "SELECT COUNT(*) FROM wm_warehouse WHERE id=? AND code=?", 1, w, tag + "_EXTERNAL_NEGATIVE");
                     check(c, "SELECT COUNT(*) FROM workorder WHERE id=? AND code=?", 1, order, tag + "_EXTERNAL_NEGATIVE");
                     check(c, "SELECT COUNT(*) FROM wm_stock_action WHERE stock_id=?", 0, stock);
-                    check(c, "SELECT COUNT(*) FROM mes_material_issue WHERE workorder_id=?", 0, order);
+                    check(c, "SELECT COUNT(*) FROM wm_stock_document WHERE source_workorder_id=?", 0, order);
                     check(c, "SELECT COUNT(*) FROM mes_production_execution WHERE workorder_id=?", 0, order);
                     check(c, "SELECT COUNT(*) FROM mes_material_issue_item WHERE warehouse_id=?", 0, w);
                     check(c, "SELECT COUNT(*) FROM mes_production_receipt WHERE warehouse_id=?", 0, w);

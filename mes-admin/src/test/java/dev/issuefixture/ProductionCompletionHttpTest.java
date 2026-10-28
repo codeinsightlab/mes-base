@@ -162,12 +162,12 @@ class ProductionCompletionHttpTest {
             oneExecution(j, "100");
             QualityDispositionHttpTest.bindBatch(j, "TEST-FINISHED");
             String defect = QualityWorkflowHttpTest.defect(m, 11, "100", "INDEPENDENT", null);
-            j.update("INSERT INTO mes_material_issue(issue_no,workorder_id,product_id,routing_id,execution_id,status) VALUES('TEST ONLY pending',1,1,1,1,'DRAFT')");
+            j.update("INSERT INTO wm_stock_document(document_no,document_type,status,reason,source_workorder_id,source_execution_id,create_by,create_time,update_by,update_time,revision) VALUES('TEST ONLY pending','MATERIAL_ISSUE','DRAFT','TEST ONLY pending',1,1,'1',CURRENT_TIMESTAMP,'1',CURRENT_TIMESTAMP,0)");
             QualityWorkflowHttpTest.transfer(m, defect, "100");
             assertEquals("RUNNING", j.queryForObject("SELECT status FROM mes_production_execution WHERE id=1", String.class));
             assertEquals(0, j.queryForObject("SELECT COUNT(*) FROM mes_execution_completion", Integer.class));
             assertEquals(0, j.queryForObject("SELECT COUNT(*) FROM wm_stock_document WHERE document_type='PRODUCTION_RECEIPT'", Integer.class));
-            j.update("UPDATE mes_material_issue SET status='SUBMIT_REJECTED' WHERE issue_no='TEST ONLY pending'");
+            j.update("UPDATE wm_stock_document SET status='CANCELLED' WHERE document_no='TEST ONLY pending'");
             for (int repeat = 0; repeat < 2; repeat++)
                 m.perform(full(post("/api/production/executions/1/actions/recheck-receipt")))
                         .andExpect(status().isOk()).andExpect(jsonPath("receiptState").value("FULLY_RECEIVED"));
@@ -306,14 +306,14 @@ class ProductionCompletionHttpTest {
             var j = ProductionWarehouseFixture.db(c);
             oneExecution(j, "100");
             UnifiedInboundHttpTest.stock(j);
-            j.update("INSERT INTO mes_material_issue(issue_no,workorder_id,product_id,routing_id,execution_id,status) VALUES('TEST ONLY pending',1,1,1,1,'DRAFT')");
+            j.update("INSERT INTO wm_stock_document(document_no,document_type,status,reason,source_workorder_id,source_execution_id,create_by,create_time,update_by,update_time,revision) VALUES('TEST ONLY pending','MATERIAL_ISSUE','DRAFT','TEST ONLY pending',1,1,'1',CURRENT_TIMESTAMP,'1',CURRENT_TIMESTAMP,0)");
             UnifiedInboundHttpTest.receive(m, "100");
             assertEquals("RUNNING", j.queryForObject("SELECT status FROM mes_production_execution WHERE id=1", String.class));
             assertEquals("RELEASED", j.queryForObject("SELECT status FROM workorder WHERE id=1", String.class));
             assertEquals(0, j.queryForObject("SELECT COUNT(*) FROM mes_execution_completion", Integer.class));
             StockDocumentHttpTest.balance(j, "100");
             // TEST ONLY: the separately tested issue workflow has resolved the former blocker.
-            j.update("UPDATE mes_material_issue SET status='SUBMIT_REJECTED' WHERE issue_no='TEST ONLY pending'");
+            j.update("UPDATE wm_stock_document SET status='CANCELLED' WHERE document_no='TEST ONLY pending'");
             for (int repeat = 0; repeat < 2; repeat++)
                 m.perform(full(post("/api/production/executions/1/actions/recheck-receipt")))
                         .andExpect(status().isOk()).andExpect(jsonPath("receiptState").value("FULLY_RECEIVED"));

@@ -91,7 +91,7 @@ class WorkOrderCancellationHttpTest {
             var j = ProductionWarehouseFixture.db(c);
             String receipt = ProductionWarehouseFixture.legacy(m, j);
             String acceptance = ProductionWarehouseFixture.legacyAccepted(j, receipt, "60");
-            var tables = List.of("mes_production_execution", "mes_material_issue", "mes_material_issue_input", "mes_production_report", "mes_production_defect", "mes_quality_treatment", "mes_quality_release", "mes_production_receipt", "mes_warehouse_acceptance", "wm_inventory", "wm_stock_action");
+            var tables = List.of("mes_production_execution", "wm_stock_document", "mes_material_issue_input", "mes_production_report", "mes_production_defect", "mes_quality_treatment", "mes_quality_release", "mes_production_receipt", "mes_warehouse_acceptance", "wm_inventory", "wm_stock_action");
             var baseline = tables.stream().map(t -> j.queryForList("SELECT * FROM " + t + " ORDER BY id")).toList();
             cancel(m);
             assertEquals(baseline, tables.stream().map(t -> j.queryForList("SELECT * FROM " + t + " ORDER BY id"))

@@ -28,9 +28,7 @@ import dev.mesbase.business.basic.service.EquipmentReferenceRules;
 import dev.mesbase.business.basic.service.impl.MaterialServiceImpl;
 import dev.mesbase.business.basic.service.IMaterialService;
 import dev.mesbase.business.basic.sync.ExternalMaterial;
-import dev.mesbase.business.issue.dao.MesMaterialIssueItemMapper;
 import dev.mesbase.business.issue.dao.MesMaterialIssueInputMapper;
-import dev.mesbase.business.issue.domain.MesMaterialIssueItemEntity;
 import dev.mesbase.business.production.dao.MesWorkorderMaterialMapper;
 import dev.mesbase.business.production.dao.RoutingProductMapper;
 import dev.mesbase.business.production.dao.WorkorderMapper;
@@ -93,7 +91,6 @@ class P1MaterialUnitTest {
             db.table("wm_stock_action", WmStockActionEntity.class, "id");
             db.table("wm_stock_document_line", WmStockDocumentLineEntity.class, "id");
             db.table("mes_workorder_material", MesWorkorderMaterialEntity.class, "id");
-            db.table("mes_material_issue_item", MesMaterialIssueItemEntity.class, "id");
             db.table("routing_product", RoutingProductEntity.class, "id");
             db.table("workorder", WorkorderEntity.class, "id");
             db.table("mes_production_execution", MesProductionExecutionEntity.class, "id");
@@ -101,7 +98,7 @@ class P1MaterialUnitTest {
             for (var mapper : Set.of(MaterialMapper.class, UnitMeasureMapper.class, MaterialCategoryMapper.class,
                     WorkshopMapper.class, WorkstationMapper.class, SafetyStockMapper.class, WmInventoryMapper.class,
                     WmStockActionMapper.class, WmStockDocumentLineMapper.class, MesWorkorderMaterialMapper.class,
-                    MesMaterialIssueItemMapper.class, RoutingProductMapper.class, WorkorderMapper.class, MesProductionExecutionMapper.class))
+                    RoutingProductMapper.class, WorkorderMapper.class, MesProductionExecutionMapper.class))
                 config.addMapper(mapper);
             var factory = new SqlSessionFactoryBean();
             factory.setDataSource(db.source);
@@ -110,7 +107,7 @@ class P1MaterialUnitTest {
             var empty = new StaticListableBeanFactory();
             units = new MaterialUnitRules(mapper(MaterialMapper.class), mapper(UnitMeasureMapper.class), mapper(WmInventoryMapper.class),
                     mapper(WmStockActionMapper.class), mapper(WmStockDocumentLineMapper.class), mapper(MesWorkorderMaterialMapper.class),
-                    mapper(MesMaterialIssueItemMapper.class), mapper(RoutingProductMapper.class), mapper(WorkorderMapper.class), mapper(MesProductionExecutionMapper.class), empty.getBeanProvider(MaterialBomService.class));
+                    mapper(RoutingProductMapper.class), mapper(WorkorderMapper.class), mapper(MesProductionExecutionMapper.class), empty.getBeanProvider(MaterialBomService.class));
             var rules = new BasicDataRules(mapper(MaterialMapper.class), mapper(MaterialCategoryMapper.class), mapper(UnitMeasureMapper.class),
                     mapper(WorkstationMapper.class), mapper(WorkshopMapper.class), mapper(SafetyStockMapper.class), empty.getBeanProvider(RoutingReferenceRules.class),
                     mock(EquipmentReferenceRules.class), empty.getBeanProvider(StockReferenceRules.class), units, empty.getBeanProvider(MaterialBomService.class));
@@ -155,7 +152,6 @@ class P1MaterialUnitTest {
                     "INSERT INTO wm_stock_action(id,material_id,unit_id) VALUES(1,1,1)",
                     "INSERT INTO wm_stock_document_line(id,material_id,unit_id) VALUES(1,1,1)",
                     "INSERT INTO mes_workorder_material(id,material_id,unit_id) VALUES(1,1,1)",
-                    "INSERT INTO mes_material_issue_item(id,material_id,unit_id) VALUES(1,1,1)",
                     "INSERT INTO routing_product(id,material_id) VALUES(1,1)",
                     "INSERT INTO workorder(id,product_id) VALUES(1,1)",
                     "INSERT INTO mes_production_execution(id,product_id) VALUES(1,1)");

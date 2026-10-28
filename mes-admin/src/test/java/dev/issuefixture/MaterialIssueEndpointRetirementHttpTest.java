@@ -19,7 +19,7 @@ class MaterialIssueEndpointRetirementHttpTest {
     void legacyCrudSubmitAndVoidRoutesHaveNoHandler() throws Exception {
         try (var context = MaterialIssueHttpTest.context()) {
             var mvc = MaterialIssueHttpTest.mvc(context);
-            for (String path : new String[]{MaterialIssueHttpTest.H, MaterialIssueHttpTest.I}) {
+            for (String path : new String[]{"/api/issue/mes-material-issue", "/api/issue/mes-material-issue-item"}) {
                 mvc.perform(full(get(path))).andExpect(status().isNotFound());
                 mvc.perform(full(get(path + "/1"))).andExpect(status().isNotFound());
                 mvc.perform(full(post(path)).content("{}")).andExpect(status().isNotFound());
@@ -27,7 +27,7 @@ class MaterialIssueEndpointRetirementHttpTest {
                 mvc.perform(full(delete(path)).content("[1]")).andExpect(status().isNotFound());
             }
             for (String action : new String[]{"submit", "reopen-rejected", "void", "reconcile-void"})
-                mvc.perform(full(post(MaterialIssueHttpTest.H + "/1/actions/" + action)))
+                mvc.perform(full(post("/api/issue/mes-material-issue" + "/1/actions/" + action)))
                         .andExpect(status().isNotFound());
         }
     }

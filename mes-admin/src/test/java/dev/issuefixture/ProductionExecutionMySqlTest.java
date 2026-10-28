@@ -23,11 +23,9 @@ import org.springframework.mock.env.MockEnvironment;
 
 import dev.mesbase.acceptance.AcceptanceBusinessDatabase;
 import dev.mesbase.business.basic.dao.MaterialMapper;
-import dev.mesbase.business.issue.dao.MesMaterialIssueMapper;
-import dev.mesbase.business.issue.dao.MesMaterialIssueItemMapper;
-import dev.mesbase.business.issue.domain.MesMaterialIssueCreateCommand;
-import dev.mesbase.business.issue.service.MaterialIssueRules;
-import dev.mesbase.business.issue.service.impl.MesMaterialIssueServiceImpl;
+import dev.mesbase.business.wm.dao.WmStockDocumentMapper;
+import dev.mesbase.business.wm.domain.WmStockDocumentEntity;
+import dev.mesbase.business.wm.dao.WmStockDocumentLineMapper;
 import dev.mesbase.business.production.dao.MesProductionExecutionMapper;
 import dev.mesbase.business.production.dao.MesExecutionAssignmentMapper;
 import dev.mesbase.business.production.dao.RoutingMapper;
@@ -49,6 +47,7 @@ import dev.mesbase.core.error.FoundationException;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.time.LocalDateTime;
 import java.util.Set;
 import java.util.UUID;
 
@@ -107,7 +106,7 @@ class ProductionExecutionMySqlTest {
                 routing = rows.getLong(2);
             }
             var executions = s.getMapper(MesProductionExecutionMapper.class);
-            var issues = s.getMapper(MesMaterialIssueMapper.class);
+            var issues = s.getMapper(WmStockDocumentMapper.class);
             var chainLocks = new ProductionChainLocks(s.getMapper(WorkorderMapper.class), executions, issues);
             var rules = new ProductionExecutionRules(executions, s.getMapper(WorkorderMapper.class), s.getMapper(MaterialMapper.class), s.getMapper(RoutingMapper.class), s.getMapper(RoutingProductMapper.class), issues, chainLocks, s.getMapper(MesExecutionPathMapper.class), s.getMapper(MesExecutionPathNodeMapper.class), s.getMapper(MesProductionReportMapper.class), s.getMapper(ProductionQuantityMapper.class), new ExecutionQualityReferenceQueryImpl(s.getMapper(MesProductionDefectMapper.class), mock(QualityTreatmentService.class)), s.getMapper(MesExecutionAssignmentMapper.class), Mockito.mock(BusinessSourceRules.class), s.getMapper(WorkOrderExtraMapper.class), new MaterialQuantityRules(s.getMapper(MaterialMapper.class), s.getMapper(UnitMeasureMapper.class), executions));
             var service = new MesProductionExecutionServiceImpl(executions, rules);
@@ -122,11 +121,19 @@ class ProductionExecutionMySqlTest {
             var before = service.selectById(first.getId()).getUpdateTime();
             assertEquals(first.getId(), identity.read(first.getId()).executionId());
             assertEquals(before, service.selectById(first.getId()).getUpdateTime());
-            var issueRules = new MaterialIssueRules(issues, s.getMapper(MesMaterialIssueItemMapper.class), s.getMapper(MaterialMapper.class), s.getMapper(UnitMeasureMapper.class), s.getMapper(WmWarehouseMapper.class), s.getMapper(WorkorderMapper.class), s.getMapper(RoutingMapper.class), s.getMapper(RoutingProductMapper.class), rules, chainLocks, Mockito.mock(BusinessSourceRules.class));
-            var issueService = new MesMaterialIssueServiceImpl(issues, issueRules);
-            var issue = issueService.insert(new MesMaterialIssueCreateCommand(tag, workorder, null, null, null, null, null, null, "RECORDED", tag, first.getId()));
-            assertEquals(first.getId(), issue.getExecutionId());
-            assertEquals(routing, issue.getRoutingId());
+            var issue = new WmStockDocumentEntity();
+            issue.setDocumentNo(tag);
+            issue.setDocumentType("MATERIAL_ISSUE");
+            issue.setStatus("DRAFT");
+            issue.setReason(tag);
+            issue.setSourceWorkorderId(workorder);
+            issue.setSourceExecutionId(first.getId());
+            issue.setCreateBy("1");
+            issue.setUpdateBy("1");
+            issue.setCreateTime(LocalDateTime.now());
+            issue.setUpdateTime(LocalDateTime.now());
+            issue.setRevision(0L);
+            issues.insert(issue);
             assertThrows(FoundationException.class, () -> service.deleteByIds(List.of(first.getId())));
             s.rollback();
         } finally {

@@ -14,7 +14,7 @@ import dev.mesbase.business.production.dao.RoutingProductMapper;
 import dev.mesbase.business.production.dao.RoutingNodeMapper;
 import dev.mesbase.business.production.dao.RoutingEdgeMapper;
 import dev.mesbase.business.basic.dao.MaterialMapper;
-import dev.mesbase.business.issue.dao.MesMaterialIssueMapper;
+import dev.mesbase.business.wm.dao.WmStockDocumentMapper;
 import dev.mesbase.business.production.service.RoutingReferenceRules;
 
 
@@ -199,7 +199,7 @@ class WorkOrderRequestBudgetTest {
                 PersistenceFactories.pagination(c);
                 c.addInterceptor(businessSql);
             }, manager::verifyAccess);
-            var controller = new WorkOrderController(new WorkOrderService(new SqlSessionTemplate(factory).getMapper(WorkorderMapper.class), new SqlSessionTemplate(factory).getMapper(RoutingMapper.class), mock(RoutingProductMapper.class), mock(RoutingNodeMapper.class), mock(RoutingEdgeMapper.class), new SqlSessionTemplate(factory).getMapper(MaterialMapper.class), mock(RoutingReferenceRules.class), mock(MesMaterialIssueMapper.class), new SqlSessionTemplate(factory).getMapper(WorkOrderExtraMapper.class), mock(MesProductionExecutionMapper.class), new WorkorderErpFacts(new SqlSessionTemplate(factory).getMapper(WorkorderErpExtraMapper.class)), mock(BusinessDirectoryService.class), mock(MesWorkorderMaterialMapper.class), Mockito.mock(BusinessSourceRules.class), Mockito.mock(WorkorderErpExtraMapper.class), Mockito.mock(SyncCoordinator.class), Mockito.mock(MaterialQuantityRules.class), Mockito.mock(AutoCodeNumbering.class), Mockito.mock(PlatformTransactionManager.class)), Mockito.mock(AutoCodeNumbering.class));
+            var controller = new WorkOrderController(new WorkOrderService(new SqlSessionTemplate(factory).getMapper(WorkorderMapper.class), new SqlSessionTemplate(factory).getMapper(RoutingMapper.class), mock(RoutingProductMapper.class), mock(RoutingNodeMapper.class), mock(RoutingEdgeMapper.class), new SqlSessionTemplate(factory).getMapper(MaterialMapper.class), mock(RoutingReferenceRules.class), mock(WmStockDocumentMapper.class), new SqlSessionTemplate(factory).getMapper(WorkOrderExtraMapper.class), mock(MesProductionExecutionMapper.class), new WorkorderErpFacts(new SqlSessionTemplate(factory).getMapper(WorkorderErpExtraMapper.class)), mock(BusinessDirectoryService.class), mock(MesWorkorderMaterialMapper.class), Mockito.mock(BusinessSourceRules.class), Mockito.mock(WorkorderErpExtraMapper.class), Mockito.mock(SyncCoordinator.class), Mockito.mock(MaterialQuantityRules.class), Mockito.mock(AutoCodeNumbering.class), Mockito.mock(PlatformTransactionManager.class)), Mockito.mock(AutoCodeNumbering.class));
             var permissions = new SystemPermissionService(platform.mapper(SysMenuMapper.class), platform.mapper(SysRoleMapper.class), platform.mapper(ManagedFactoryMapper.class));
             FactoryCatalog catalog = new FactoryCatalog() {
                 public Optional<Factory> find(FactoryId id) {

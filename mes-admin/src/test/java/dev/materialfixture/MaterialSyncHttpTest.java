@@ -5,7 +5,6 @@ import dev.mesbase.business.production.dao.MesProductionExecutionMapper;
 
 import dev.mesbase.business.production.dao.RoutingProductMapper;
 
-import dev.mesbase.business.issue.dao.MesMaterialIssueItemMapper;
 
 import dev.mesbase.business.production.dao.MesWorkorderMaterialMapper;
 
@@ -180,7 +179,7 @@ class MaterialSyncHttpTest {
             // Real metering locks; this fixture has no historical-fact tables.
             return new MaterialUnitRules(materials, units, mock(WmInventoryMapper.class),
                     mock(WmStockActionMapper.class), mock(WmStockDocumentLineMapper.class),
-                    mock(MesWorkorderMaterialMapper.class), mock(MesMaterialIssueItemMapper.class),
+                    mock(MesWorkorderMaterialMapper.class),
                     mock(RoutingProductMapper.class), mock(WorkorderMapper.class), mock(MesProductionExecutionMapper.class), boms);
         }
 

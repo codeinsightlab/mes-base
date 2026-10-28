@@ -5,7 +5,7 @@ import dev.mesbase.acceptance.AcceptanceBusinessDatabase;
 import dev.mesbase.business.production.dao.OperationMapper;
 import dev.mesbase.business.production.dao.RoutingMapper;
 import dev.mesbase.business.production.dao.WorkorderMapper;
-import dev.mesbase.business.issue.dao.MesMaterialIssueMapper;
+import dev.mesbase.business.wm.dao.WmStockDocumentMapper;
 import dev.mesbase.business.production.dao.RoutingNodeMapper;
 import dev.mesbase.business.production.dao.MesProductionExecutionMapper;
 import dev.mesbase.business.production.dao.MesOperationUserMapper;
@@ -104,7 +104,7 @@ class OperatorAssignmentMySqlTest {
             var caps = session.getMapper(MesOperationUserMapper.class);
             var assignments = session.getMapper(MesExecutionAssignmentMapper.class);
             var executions = session.getMapper(MesProductionExecutionMapper.class);
-            var locks = new ProductionChainLocks(session.getMapper(WorkorderMapper.class), executions, session.getMapper(MesMaterialIssueMapper.class));
+            var locks = new ProductionChainLocks(session.getMapper(WorkorderMapper.class), executions, session.getMapper(WmStockDocumentMapper.class));
             var rules = new OperatorQualificationRules(session.getMapper(OperationMapper.class), session.getMapper(RoutingNodeMapper.class), executions, caps, directory, locks);
             var capability = new MesOperationUserServiceImpl(caps, rules);
             var assignment = new MesExecutionAssignmentServiceImpl(assignments, rules);

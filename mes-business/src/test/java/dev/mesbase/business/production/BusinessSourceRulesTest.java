@@ -11,8 +11,8 @@ import dev.mesbase.business.wm.dao.WmWarehouseMapper;
 import dev.mesbase.business.wm.dao.WmWarehouseErpExtraMapper;
 import dev.mesbase.business.wm.domain.WmWarehouseEntity;
 import dev.mesbase.business.wm.domain.WmWarehouseErpExtraEntity;
-import dev.mesbase.business.issue.dao.MesMaterialIssueMapper;
-import dev.mesbase.business.issue.dao.MesMaterialIssueItemMapper;
+import dev.mesbase.business.wm.dao.WmStockDocumentMapper;
+import dev.mesbase.business.wm.dao.WmStockDocumentLineMapper;
 import dev.mesbase.business.integration.warehouse.WarehouseIntegration;
 import dev.mesbase.business.integration.warehouse.ErpActionResult;
 import dev.mesbase.core.error.FoundationException;
@@ -41,7 +41,7 @@ class BusinessSourceRulesTest {
     private final WmWarehouseErpExtraMapper warehouseExtras = mock(WmWarehouseErpExtraMapper.class);
     private final WarehouseIntegration integration = new WarehouseIntegration();
     private final BusinessSourceRules rules = new BusinessSourceRules(integration, orders, orderExtras, warehouses, warehouseExtras,
-            mock(MesMaterialIssueMapper.class), mock(MesMaterialIssueItemMapper.class), mock(MesProductionReceiptMapper.class));
+            mock(WmStockDocumentMapper.class), mock(WmStockDocumentLineMapper.class), mock(MesProductionReceiptMapper.class));
 
     private void mode(boolean local, Runnable task) {
         FactoryIntegrationContext.run(new FactoryIntegrationSnapshot(id, local ? FactoryRuntimeMode.LOCAL : FactoryRuntimeMode.ERP,

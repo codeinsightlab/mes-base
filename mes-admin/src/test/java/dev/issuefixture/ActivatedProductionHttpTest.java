@@ -27,7 +27,7 @@ class ActivatedProductionHttpTest {
         try (var c = QualityWorkflowHttpTest.context(new Class<?>[]{Opening.class}, 40, 30, 30, 30, 30)) {
             var j = ProductionWarehouseFixture.db(c);
             for (String table : List.of("mes_material_issue_input", "mes_material_issue_item", "mes_material_issue_submission",
-                    "mes_material_issue"))
+                    "wm_stock_document"))
                 j.update("DELETE FROM " + table);
             Long original = j.queryForObject("SELECT MIN(id) FROM mes_production_report WHERE execution_id=1 AND routing_node_id=15", Long.class);
             var http = MaterialIssueHttpTest.mvc(c);
@@ -67,7 +67,7 @@ class ActivatedProductionHttpTest {
             var j = ProductionWarehouseFixture.db(c);
             var http = MaterialIssueHttpTest.mvc(c);
             for (String table : List.of("mes_material_issue_input", "mes_material_issue_item", "mes_material_issue_submission",
-                    "mes_material_issue"))
+                    "wm_stock_document"))
                 j.update("DELETE FROM " + table);
             j.update("DELETE FROM mes_production_execution WHERE id=2");
             // Execution has consumed its own 100; the order still has 900 of demand available.
@@ -100,7 +100,7 @@ class ActivatedProductionHttpTest {
             var j = ProductionWarehouseFixture.db(c);
             var http = MaterialIssueHttpTest.mvc(c);
             for (String table : List.of("mes_material_issue_input", "mes_material_issue_item", "mes_material_issue_submission",
-                    "mes_material_issue"))
+                    "wm_stock_document"))
                 j.update("DELETE FROM " + table);
             j.update("DELETE FROM mes_production_execution WHERE id=2");
             j.update("UPDATE workorder SET planned_qty=100 WHERE id=1");

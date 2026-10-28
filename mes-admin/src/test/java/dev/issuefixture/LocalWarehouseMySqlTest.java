@@ -14,12 +14,9 @@ import dev.mesbase.business.wm.domain.WmInventoryCreateCommand;
 import dev.mesbase.business.wm.domain.WmInventoryUpdateCommand;
 import dev.mesbase.business.wm.dao.WmInventoryMapper;
 import dev.mesbase.business.integration.warehouse.WarehouseIntegration;
-import dev.mesbase.business.issue.service.MaterialIssueRules;
 import dev.mesbase.business.issue.service.MaterialIssueInputFacts;
 import dev.mesbase.business.issue.service.MaterialIssueSubmissionService;
 import dev.mesbase.business.issue.service.MaterialIssueVoidService;
-import dev.mesbase.business.issue.service.impl.MesMaterialIssueServiceImpl;
-import dev.mesbase.business.issue.service.impl.MesMaterialIssueItemServiceImpl;
 import dev.mesbase.business.production.service.ProductionInputService;
 import dev.mesbase.business.production.service.ProductionInputSupplyService;
 import dev.mesbase.business.production.service.ProductionIdentityService;
@@ -78,8 +75,8 @@ class LocalWarehouseMySqlTest {
                     prefix + "material-id", Long.toString(material),
                     prefix + "total-required-qty", "20", prefix + "warehouse-ids", Long.toString(f.warehouse()), prefix + "work-center", "TEST_WAREHOUSE_CENTER")));
             for (var type : new Class<?>[]{WarehouseIntegration.class, LocalStockService.class, LocalProductionSupply.class,
-                    StockReferenceRules.class, MaterialIssueRules.class, MaterialIssueInputFacts.class,
-                    MesMaterialIssueServiceImpl.class, MesMaterialIssueItemServiceImpl.class, MaterialIssueSubmissionService.class,
+                    StockReferenceRules.class, MaterialIssueInputFacts.class,
+                    MaterialIssueSubmissionService.class,
                     MaterialIssueVoidService.class, ProductionInputSupplyService.class, ProductionInputService.class, ProductionIdentityService.class})
                 c.registerBean(type);
             c.registerBean(IRoutingService.class, () -> mock(IRoutingService.class));
@@ -105,22 +102,22 @@ class LocalWarehouseMySqlTest {
                 var calculation = supply.calculate(workorderCode + ":" + code + "#" + lot, f.order(), Long.toString(id), new BigDecimal("100"));
                 var issue = production.submit(new ProductionInputService.Command(UUID.randomUUID()
                         .toString(), workorderCode + ":" + code + "#" + lot, f.order(), Long.toString(id), new BigDecimal("100"), f.routing(), f.selected(), "PRODUCTION_INPUT", ProductionInputSupplyService.calculationKey(calculation)));
-                long issueId = Long.parseLong(issue.issueId());
+                long documentId = Long.parseLong(issue.documentId());
                 balance(j, id, "600");
-                var back = command(id, "20", "600", issueId);
+                var back = command(id, "20", "600", documentId);
                 service.execute(StockActionType.RETURN, back);
                 service.execute(StockActionType.RETURN, back);
                 service.execute(StockActionType.LOSS, command(id, "5", "620", null));
                 balance(j, id, "615");
                 assertEquals(5, j.queryForObject("SELECT COUNT(*) FROM wm_stock_action WHERE stock_id=?", Integer.class, id));
-                assertThrows(FoundationException.class, () -> service.execute(StockActionType.RETURN, command(id, "181", "615", issueId)));
+                assertThrows(FoundationException.class, () -> service.execute(StockActionType.RETURN, command(id, "181", "615", documentId)));
                 assertThrows(FoundationException.class, () -> crud.updateById(id, new WmInventoryUpdateCommand(material, f.warehouse(), BigDecimal.ZERO, BigDecimal.ZERO, "ENABLED", null, lot, "TEST_BIN")));
                 assertThrows(FoundationException.class, () -> crud.deleteByIds(List.of(id)));
                 assertThrows(RuntimeException.class, () -> j.update("UPDATE wm_stock_action SET reason='TEST forbidden' WHERE id=?", receipt.requestId()));
                 assertThrows(RuntimeException.class, () -> j.update("DELETE FROM wm_stock_action WHERE id=?", receipt.requestId()));
                 try {
                     Files.writeString(Path.of(".local/warehouse-closure-20261017/mysql-closure-result.txt"),
-                            "SIMPLE_B datasource8 stock=" + id + " lot=" + lot + " execution=" + issue.executionId() + " issue=" + issueId + " closure=615 actions=5 retained=" + !reversal + "\n",
+                            "SIMPLE_B datasource8 stock=" + id + " lot=" + lot + " execution=" + issue.executionId() + " document=" + documentId + " closure=615 actions=5 retained=" + !reversal + "\n",
                             StandardOpenOption.CREATE, StandardOpenOption.APPEND);
                 } catch (Exception failure) {
                     throw new IllegalStateException(failure);
@@ -144,14 +141,14 @@ class LocalWarehouseMySqlTest {
                     throw new IllegalStateException(failure);
                 }
                 balance(j, id, "622");
-                c.getBean(MaterialIssueVoidService.class).cancel(issueId);
+                c.getBean(MaterialIssueVoidService.class).cancel(documentId);
                 balance(j, id, "802");
-                c.getBean(MaterialIssueVoidService.class).cancel(issueId);
+                c.getBean(MaterialIssueVoidService.class).cancel(documentId);
                 balance(j, id, "802");
                 assertEquals(7, j.queryForObject("SELECT COUNT(*) FROM wm_stock_action WHERE stock_id=?", Integer.class, id));
                 assertEquals(0, j.queryForObject("SELECT COUNT(*) FROM wm_stock_action WHERE stock_id=? AND (quantity_after<>quantity_before+quantity_delta OR available_after<>available_before+available_delta)", Integer.class, id));
                 try {
-                    Files.writeString(Path.of(".local/warehouse-closure-20261017/mysql-reversal-result.txt"), "SIMPLE_B datasource8 192.168.18.25:3306/mes_base_dev_business_simple_b\nTEST stock=" + id + " lot=" + lot + " execution=" + issue.executionId() + " issue=" + issueId + "\n500 -> 800 -> 600 -> 620 -> 615; 5 actions; concurrent replay +7 once ->622; net reversal +180 once ->802; 7 immutable actions; zero role grants\n");
+                    Files.writeString(Path.of(".local/warehouse-closure-20261017/mysql-reversal-result.txt"), "SIMPLE_B datasource8 192.168.18.25:3306/mes_base_dev_business_simple_b\nTEST stock=" + id + " lot=" + lot + " execution=" + issue.executionId() + " document=" + documentId + "\n500 -> 800 -> 600 -> 620 -> 615; 5 actions; concurrent replay +7 once ->622; net reversal +180 once ->802; 7 immutable actions; zero role grants\n");
                 } catch (Exception failure) {
                     throw new IllegalStateException(failure);
                 }
@@ -159,9 +156,9 @@ class LocalWarehouseMySqlTest {
         }
     }
 
-    static StockCommand command(long stock, String quantity, String before, Long issue) {
+    static StockCommand command(long stock, String quantity, String before, Long document) {
         return new StockCommand(UUID.randomUUID()
-                .toString(), stock, new BigDecimal(quantity), new BigDecimal(before), new BigDecimal(before), "TEST ONLY local warehouse closure", issue);
+                .toString(), stock, new BigDecimal(quantity), new BigDecimal(before), new BigDecimal(before), "TEST ONLY local warehouse closure", null, document);
     }
 
     static void balance(JdbcTemplate j, long id, String expected) {

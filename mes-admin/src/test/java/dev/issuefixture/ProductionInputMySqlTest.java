@@ -5,9 +5,6 @@ import dev.mesbase.business.production.service.ProductionInputSupplyService;
 import dev.mesbase.business.production.service.ProductionIdentityService;
 import dev.mesbase.business.production.service.IRoutingService;
 import dev.mesbase.business.production.service.impl.MesProductionExecutionServiceImpl;
-import dev.mesbase.business.issue.service.impl.MesMaterialIssueServiceImpl;
-import dev.mesbase.business.issue.service.impl.MesMaterialIssueItemServiceImpl;
-import dev.mesbase.business.issue.service.MaterialIssueRules;
 import dev.mesbase.business.issue.service.MaterialIssueInputFacts;
 import dev.mesbase.business.issue.service.MaterialIssueSubmissionService;
 import dev.mesbase.business.issue.service.MaterialIssueVoidService;
@@ -55,7 +52,7 @@ class ProductionInputMySqlTest {
                     .addFirst(new MapPropertySource("TEST ONLY local input recipe", Map.of(
                             prefix + "material-id", Long.toString(material), prefix + "total-required-qty", "20", prefix + "warehouse-ids", Long.toString(f.warehouse()), prefix + "work-center", "TEST_LOCAL_CENTER")));
             c.registerBean(IRoutingService.class, () -> mock(IRoutingService.class));
-            for (var type : new Class<?>[]{LocalStockService.class, LocalProductionSupply.class, WarehouseIntegration.class, MaterialIssueRules.class, MaterialIssueInputFacts.class, MesProductionExecutionServiceImpl.class, MesMaterialIssueServiceImpl.class, MesMaterialIssueItemServiceImpl.class, MaterialIssueSubmissionService.class, MaterialIssueVoidService.class, ProductionInputSupplyService.class, ProductionInputService.class, ProductionIdentityService.class})
+            for (var type : new Class<?>[]{LocalStockService.class, LocalProductionSupply.class, WarehouseIntegration.class, MaterialIssueInputFacts.class, MesProductionExecutionServiceImpl.class, MaterialIssueSubmissionService.class, MaterialIssueVoidService.class, ProductionInputSupplyService.class, ProductionInputService.class, ProductionIdentityService.class})
                 c.registerBean(type);
             var service = c.getBean(ProductionInputService.class);
             var supply = c.getBean(ProductionInputSupplyService.class);
@@ -103,8 +100,8 @@ class ProductionInputMySqlTest {
             j.update("INSERT INTO mes_production_report(execution_id,routing_node_id,record_type,quantity_delta,reference_report_id,operator_user_id,recorded_by,report_time,reason,create_time) VALUES(?,?,'ADJUSTMENT',200,?,100,100,NOW(),'TEST ONLY immutable adjustment fixture',NOW())", execution, f.selected()
                     .getFirst(), original);
             var voids = c.getBean(MaterialIssueVoidService.class);
-            assertThrows(FoundationException.class, () -> FactoryContext.withScope(scope, () -> voids.cancel(Long.valueOf(first.issueId()))));
-            Files.writeString(Path.of(".local/production-input-20261016/mysql-input-result.txt"), "SIMPLE_B datasource=8; LOCAL_ONLY real MySQL; execution=" + execution + "; issue1=" + first.issueId() + "; issue2=" + repeated.issueId() + "; code=" + first.code() + "; input=300; plan=100; stock=9400; replay requests=2\n");
+            assertThrows(FoundationException.class, () -> FactoryContext.withScope(scope, () -> voids.cancel(Long.valueOf(first.documentId()))));
+            Files.writeString(Path.of(".local/production-input-20261016/mysql-input-result.txt"), "SIMPLE_B datasource=8; LOCAL_ONLY real MySQL; execution=" + execution + "; document1=" + first.documentId() + "; document2=" + repeated.documentId() + "; code=" + first.code() + "; input=300; plan=100; stock=9400; replay requests=2\n");
         }
     }
 }

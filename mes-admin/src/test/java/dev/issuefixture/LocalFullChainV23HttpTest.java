@@ -73,10 +73,10 @@ class LocalFullChainV23HttpTest {
             LocalWarehouseHttpTest.apply(m, "gain", "200", "0");
             String inputBody = ProductionInputHttpTest.command(m, UUID.randomUUID().toString(), "L001", "50");
             var input = new ObjectMapper().readTree(ProductionInputHttpTest.submit(m, inputBody));
-            var frozen = j.queryForList("SELECT * FROM mes_material_issue_input WHERE issue_id=?", input.get("issueId")
+            var frozen = j.queryForList("SELECT * FROM mes_material_issue_input WHERE document_id=?", input.get("documentId")
                     .asString());
             LocalWarehouseHttpTest.balance(j, "100");
-            String body = LocalWarehouseHttpTest.body(UUID.randomUUID().toString(), "20", "100", input.get("issueId")
+            String body = LocalWarehouseHttpTest.body(UUID.randomUUID().toString(), "20", "100", input.get("documentId")
                     .asString());
             m.perform(ProductionCoreV1HttpTest.full(post(LocalWarehouseHttpTest.ROOT + "return")).content(body))
                     .andExpect(status().isOk());
@@ -84,14 +84,14 @@ class LocalFullChainV23HttpTest {
                     .andExpect(status().isOk());
             ProductionInputHttpTest.submit(m, inputBody);
             LocalWarehouseHttpTest.balance(j, "120");
-            assertEquals(frozen, j.queryForList("SELECT * FROM mes_material_issue_input WHERE issue_id=?", input.get("issueId")
+            assertEquals(frozen, j.queryForList("SELECT * FROM mes_material_issue_input WHERE document_id=?", input.get("documentId")
                     .asString()));
             var q = new ObjectMapper().readTree(m.perform(ProductionCoreV1HttpTest.full(get("/api/production/report-quantities/executions/" + input.get("executionId")
                             .asString())))
                     .andExpect(status().isOk()).andReturn().getResponse().getContentAsString());
             assertTrue(new BigDecimal(q.get("productionInputQty").asString()).compareTo(new BigDecimal("50")) <= 0);
             m.perform(ProductionCoreV1HttpTest.full(post(LocalWarehouseHttpTest.ROOT + "return"))
-                            .content(LocalWarehouseHttpTest.body(UUID.randomUUID().toString(), "81", "120", input.get("issueId")
+                            .content(LocalWarehouseHttpTest.body(UUID.randomUUID().toString(), "81", "120", input.get("documentId")
                                     .asString())))
                     .andExpect(status().isConflict());
             LocalWarehouseHttpTest.balance(j, "120");

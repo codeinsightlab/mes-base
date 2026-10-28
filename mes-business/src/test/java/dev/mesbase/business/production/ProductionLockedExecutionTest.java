@@ -1,6 +1,6 @@
 package dev.mesbase.business.production;
 
-import dev.mesbase.business.issue.dao.MesMaterialIssueMapper;
+import dev.mesbase.business.wm.dao.WmStockDocumentMapper;
 import dev.mesbase.business.production.dao.MesProductionExecutionMapper;
 import dev.mesbase.business.production.dao.WorkorderMapper;
 import dev.mesbase.business.production.domain.MesProductionExecutionEntity;
@@ -37,7 +37,7 @@ import static org.mockito.Mockito.when;
 class ProductionLockedExecutionTest {
     private final WorkorderMapper orders = mock(WorkorderMapper.class);
     private final MesProductionExecutionMapper executions = mock(MesProductionExecutionMapper.class);
-    private final ProductionChainLocks locks = new ProductionChainLocks(orders, executions, mock(MesMaterialIssueMapper.class));
+    private final ProductionChainLocks locks = new ProductionChainLocks(orders, executions, mock(WmStockDocumentMapper.class));
     private OwnedTransactionManager manager;
     private MesProductionExecutionEntity execution;
 
