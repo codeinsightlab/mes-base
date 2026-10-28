@@ -57,7 +57,7 @@ public class SystemOnlineController {
     @DeleteMapping("/{tokenId}")
     @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED, permission = "monitor:online:forceLogout", permissionScope = EndpointAccess.PermissionScope.PLATFORM)
     public AjaxResult revoke(@PathVariable String tokenId) {
-        if (!tokenId.matches("[a-f0-9]{64}"))
+        if (!tokenId.matches("[A-Fa-f0-9-]{36}"))
             throw new FoundationException(ErrorCode.BAD_REQUEST);
         tokens.delLoginUser(tokenId);
         return AjaxResult.success();

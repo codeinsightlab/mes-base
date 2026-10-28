@@ -1,6 +1,7 @@
 package dev.mesbase.modules.material;
 
 import dev.mesbase.common.core.redis.RedisCache;
+import java.lang.reflect.Parameter;
 import dev.mesbase.business.directory.service.BusinessDirectoryService;
 import dev.mesbase.system.mapper.SysUserMapper;
 import dev.mesbase.business.production.dao.RoutingMapper;
@@ -44,6 +45,7 @@ import java.nio.file.Files;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Collections;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
@@ -80,6 +82,8 @@ import org.springframework.transaction.annotation.Transactional;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -283,6 +287,14 @@ class BusinessCacheIntegrationTest {
 
     @Test
     void paginationSortFiltersAndStableMapOrderHaveSeparateKeys() {
+        String materialPrefix = caches.prefix("business:material");
+        assertEquals(materialPrefix, caches.prefix("business:material"));
+        assertTrue(materialPrefix.contains("{factory:A:resource:business:material}:"));
+        assertFalse(materialPrefix.contains("{factory:A:resource:business:material:category}"));
+        FactoryContext.bind(scope("B"));
+        assertNotEquals(materialPrefix, caches.prefix("business:material"));
+        FactoryContext.bind(scope("A"));
+        assertNotEquals(materialPrefix, caches.prefix("business:material:category"));
         material.selectPage(query(0, 20, "A"));
         material.selectPage(query(0, 10, "A"));
         material.selectPage(query(0, 20, "B"));
@@ -299,8 +311,17 @@ class BusinessCacheIntegrationTest {
         assertEquals(2, probe.calls());
         var original = query(0, 20, "A");
         var changed = new MaterialQueryDto(0, 20, "A", "name", "spec", 1L, 2L, "ENABLED", "ext", "code", null, null);
-        assertFalse(caches.queryHash(new Object[]{original}, original)
-                .equals(caches.queryHash(new Object[]{changed}, changed)));
+        assertFalse(caches.queryKey(new Object[]{original}, new Parameter[0], original)
+                .equals(caches.queryKey(new Object[]{changed}, new Parameter[0], changed)));
+        assertEquals(caches.queryKey(new Object[]{a}, new Parameter[0], original),
+                caches.queryKey(new Object[]{b}, new Parameter[0], original));
+        assertFalse(caches.queryKey(new Object[]{Map.of("filter", "")}, new Parameter[0], original)
+                .equals(caches.queryKey(new Object[]{Map.of("filter", "x")}, new Parameter[0], original)));
+        assertFalse(caches.queryKey(new Object[]{Collections.singletonMap("filter", null)}, new Parameter[0], original)
+                .equals(caches.queryKey(new Object[]{Map.of("filter", "")}, new Parameter[0], original)));
+        assertNull(caches.queryKey(new Object[]{Map.of("nested", Map.of("secretToken", "TEST ONLY"))},
+                new Parameter[0], original));
+        assertNull(caches.queryKey(new Object[]{Map.of("query", "x".repeat(3000))}, new Parameter[0], original));
     }
 
     @Test

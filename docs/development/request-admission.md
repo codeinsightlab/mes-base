@@ -11,9 +11,47 @@
 
 ## 会话撤销与恢复
 
-会话仍为 32 字节随机 opaque Bearer，Redis 键使用 SHA-256 摘要，不存原 Token。Identity 白名单为用户编号/账号、部门、昵称/头像、登录时间、客户端信息及 authRevision，不含密码、完整 Entity、角色、菜单或权限。`token.expire-time` 绝对有效期保持，请求不续期。
+内部Bearer采用`<sessionId>.<secret>`：sessionId是UUID公开定位符，secret仍为32字节随机值的Base64URL形式。Redis会话Key按sessionId定位；认证时对secret计算SHA-256摘要，并与会话Hash的`secretDigest`字段以常量时间比较。仅知道sessionId不能完成认证。原始Bearer、secret、密码及摘要不放入Key、日志或本指南。Identity白名单为用户编号/账号、部门、昵称/头像、登录时间、客户端信息及authRevision，不含密码、完整Entity、角色、菜单或权限。`token.expire-time`绝对有效期保持，请求不续期。
 
-`SystemCacheNamespace` 保持中心 DB 隔离。逻辑键为 `mes:system:session:v2:<digest>` hash、`mes:system:user-sessions:<userId>` sorted set、`mes:system:session-epoch:<userId>` 撤销下界。索引跟随最后会话到期。ISSUE/LOGOUT/REVOKE Lua 顺序化登录、注销与撤销，只访问该用户索引，不扫描全部在线会话。在线监控既有 bounded SCAN 仅用于展示。
+物理Key均以公共前缀`mes:<namespace>:center:<host>:<port>:<database>:`开头。`namespace`来自现有`mes.system.cache-namespace`，默认`default`；非空标签符合`[A-Za-z][A-Za-z0-9_-]{0,63}`。中心身份从JDBC URL提取host/port/database，不包含连接凭据和参数。Host大小写及末尾点规范化，localhost/127.0.0.1/::1归一为localhost，并补数据库驱动默认端口。DNS别名不会自动解析；同部署所有实例必须使用相同规范化host/port/database与namespace，不同中心库即使标签相同仍隔离。
+
+Key段统一采用UTF-8字节百分号转义：仅`A-Z a-z 0-9 . _ -`原样保留，其余使用大写`%HH`；转义可逆，并覆盖分隔符、转义符、Redis glob与花括号。业务缓存的Factory/ID保持原文可读；资源权限前缀中段间冒号改为点号，资源身份位于`{factory:<factoryId>:resource:<resource>}` Cluster同槽标记内，以支持详情代际CAS并按Factory/资源分槽。资源末尾边界标记保证相邻/嵌套资源失效不重叠。新增Redis Key应复用`SystemCacheNamespace.key(...)`和现有业务/详情构造器，不在调用点自行拼接、清洗或截断定位值。
+
+当前认证Key结构（下列均在中心前缀内）：
+
+| 用途 | 逻辑Key | 值/生命周期 |
+| --- | --- | --- |
+| 内部会话 | `mes:system:{sessions}:session:v3:<sessionId>` | Hash，存Identity、authRevision与secret摘要；绝对会话TTL不变 |
+| 用户会话索引 | `mes:system:{sessions}:user-sessions:<userId>` | ZSET，成员为完整物理会话Key，随最后一条会话过期 |
+| 用户认证版本下界 | `mes:system:{sessions}:session-epoch:<userId>` | 无TTL，保留发行/撤销下界 |
+| 登录失败计数 | `mes:system:retry:<canonicalUserName>` | 首次失败时设置锁定TTL，默认10分钟；账号名按持久化规范名并安全转义 |
+| 验证码 | `mes:system:captcha:<uuid>` | 一次性值，默认2分钟 |
+| OpenAPI客户端Token索引 | `open-api:<namespace>:v1:{tokens}:client:<clientId>` | JSON，存tokenId及Bearer用于并发复用；按Token TTL过期 |
+| OpenAPI Token | `open-api:<namespace>:v1:{tokens}:token:<tokenId>` | JSON记录Token摘要、clientId及credentialVersion；默认7200秒 |
+| OpenAPI令牌来源限流 | `open-api:<namespace>:v1:rate:token-ip:<peer>` | 原子计数，默认窗口60秒 |
+| OpenAPI取Token限流 | `open-api:<namespace>:v1:rate:token-client:<clientId>` | 原子计数，默认窗口60秒 |
+| OpenAPI业务接口限流 | `open-api:<namespace>:v1:rate:client:<clientId>:api:<apiCode>` | 原子计数，默认窗口60秒 |
+
+`open-api:<namespace>:v1:`中的namespace来自现有OpenAPI配置，默认`base`；peer、clientId和apiCode均按通用段规则转义。限流Key不包含Token或摘要，窗口与计数上限仍由现有OpenAPI配置控制。
+
+其他中心缓存沿用相同物理前缀，逻辑Key包括：
+
+- `platform:resource:{sys_user}:detail:<userId>`及`platform:resource:{sys_user}:detail-version`：用户安全详情与回填代际，共用`{sys_user}`同槽标记；与业务目录和平台用户CRUD共享同一详情缓存及失效入口。
+- `committed-v1:sys_dict:<type>`：字典类型；`committed-v1:sys_config:<code>`：系统参数编码。系统设置TTL为30秒，账号安全开关仍直接读数据库。
+- `factory-routing:entry:binding:<factoryId>`与`factory-routing:entry:default`：Factory路由定义，默认TTL为300秒，按变更事务提交后删除。
+- `autocode:{rules:v1}:snapshot`与`autocode:{rules:v1}:version`：完整编码规则快照及回填代际，共用`{rules:v1}`同槽标记，快照TTL为3600秒；流水计数仍在数据库，不在Redis。
+
+新增系统Key应在公共`SystemCacheNamespace`下集中构造，对每个动态定位段使用`RedisKeySegment.encode`；需模式失效时先验证只覆盖目标资源。不得自行拼第二套根前缀、哈希业务ID或把完整JDBC URL放入Key。版本代际、session-epoch、撤销数据与普通可重建缓存的生命周期不同，不能统一加TTL或清空。
+
+OpenAPI Bearer形如`oa_<tokenId>.<secret>`，tokenId是UUID，随机secret单独验证；Redis Key只含tokenId，token摘要留在Value。`{factory:...}`、`{sys_user}`、`{rules:v1}`、`{sessions}`与`{tokens}`是Redis Cluster同槽标记，不是Hash摘要；同一Lua脚本涉及的业务/用户详情代际与详情Key、编码快照/代际、会话/epoch/索引及OpenAPI令牌动态Key都保持在对应同槽标记下。不能删除标签或把这些Lua多Key访问拆成不同slot。
+
+`SystemOnlineController`仅扫描新版会话前缀并通过sessionId读取展示Identity；sessionId只用于监控定位和强退，不构成认证凭据。旧版摘要Key不会被新代码双读，升级后原内部Bearer和OpenAPI Token均失效，需要重新登录/取Token。新namespace中的session-epoch由登录时数据库已校验的authRevision初始化；待交付的撤销outbox继续更新新namespace，数据库准入fence保护Redis交付前的旧会话。旧namespace的epoch、会话索引及撤销信息不迁移、不清除，保留在旧前缀下。
+
+### Key版本切换
+
+namespace改变会令普通缓存冷启动；由原有cache-aside路径回源，不需复制旧缓存。每次整体Key格式切换都必须将现有`mes.system.cache-namespace`设置为一个全新、非空、永久固定的标签，且不同于旧值（旧值为空时也必须不同于`default`）；所有节点同时使用该标签。认证及限流不得新旧版本并行：由运维确认共享窗口后，排空入口并让所有节点一次切到同一版本和配置，再恢复流量。旧内部会话和OpenAPI Token不转换，要求重新登录/取Token；数据库authRevision和撤销outbox继续生效，旧namespace下epoch不清理，新namespace的epoch根据数据库当前版本重新建立。旧登录失败计数和限流窗口在新前缀下不可见，会从新窗口计数；登录失败锁定默认10分钟，OpenAPI限流默认60秒。窗口期间必须确保旧节点不再承接请求。
+
+上线后永久保留新的`mes.system.cache-namespace`标签，绝不恢复旧标签或空值；回滚若读取旧namespace，残留旧会话可能让旧Token重新有效，撤销和限流也会分裂。回滚只允许使用继续读取新namespace并遵守新凭据格式的版本。旧Key仅在所有旧实例退出、最长有效期已过、E等并行任务无依赖且确认不回滚旧namespace后，按精确前缀另行评估清理；epoch、撤销队列和会话索引不作普通旧缓存清理。禁止`FLUSHDB`或无边界清理。此切换尚未在真实环境执行，隔离测试不构成运行切换证据。
 
 禁用/状态改变、删除、改密在同一中心事务增加认证版本并写 `sys_session_revocation`，提交后删除旧版本会话。表内记录表示“尚未持久确认完成”，不一定表示 Redis 撤销失败：提交后成功也不立即开启确认事务，后台再次幂等交付并按版本确认删除。角色/菜单/数据权限修改不改变认证版本，无需重新登录。新版本登录不会被延迟旧交付误删，回滚不交付 Redis。注销/强退删除对应会话和索引项。
 
@@ -25,7 +63,7 @@ epoch 无 TTL：它是用户认证版本的发行下界，不能因最后一个�
 
 路由配置低频修改，允许下述有界缓存不一致。账号 authRevision 与会话撤销 outbox 独立运行。
 
-`FactoryMetadataCache` / `RoutingMetadataStore` 使用共享 Redis cache-aside。独立 string 键为 `factory-routing:entry:binding:<factoryId>`、`factory-routing:entry:default`，沿用 SystemCacheNamespace 项目/中心 JDBC URL SHA-256 前缀；不同环境须显式设置不同 `mes.system.cache-namespace`，同一中心库集群保持一致。只存工厂/绑定/数据源状态、连接定义、现有配置 revision 与加密 cipher。未知工厂不写缓存；无默认候选不缓存空值。不存明文密码、池、Connection、Session 或用户权限。
+`FactoryMetadataCache` / `RoutingMetadataStore` 使用共享 Redis cache-aside。独立string Key为`factory-routing:entry:binding:<factoryId>`、`factory-routing:entry:default`，沿用本指南的可读中心前缀与段转义。只存工厂/绑定/数据源状态、连接定义、现有配置revision与加密cipher。未知工厂不写缓存；无默认候选不缓存空值。不存明文密码、池、Connection、Session或用户权限。
 
 每条 SET 带固定 `mes.datasource.metadata-ttl-seconds`（application.yml 显式 300 秒），GET 不续期，其他键写入不延长旧键有效期。未命中一次 JOIN 获取定义；默认候选筛选和定义同一 JOIN，沿用数字 ID 排序规则。HTTP 请求内复用不可变定义；非 HTTP 独立事务查当前 Redis。账号准入不读取路由代际，也不依赖路由状态表。
 

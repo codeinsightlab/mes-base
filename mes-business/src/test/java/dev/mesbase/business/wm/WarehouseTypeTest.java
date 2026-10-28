@@ -6,6 +6,7 @@ import dev.mesbase.business.wm.controller.vo.WmWarehouseVo;
 import dev.mesbase.common.utils.bean.BeanConversions;
 import org.junit.jupiter.api.Test;
 import java.util.List;
+import java.lang.reflect.Parameter;
 
 import dev.mesbase.business.wm.domain.WmWarehouseQueryDto;
 import dev.mesbase.infrastructure.cache.BusinessCacheProcessor;
@@ -49,7 +50,8 @@ class WarehouseTypeTest {
         var caches = new BusinessCacheProcessor(mock(RedisCache.class), mock(SpringCommitActions.class), new StandardEnvironment());
         var raw = new WmWarehouseQueryDto(0, 20, null, null, null, null, null, WarehouseType.RAW_MATERIAL.getValue());
         var wip = new WmWarehouseQueryDto(0, 20, null, null, null, null, null, WarehouseType.WIP.getValue());
-        assertNotEquals(caches.queryHash(new Object[]{raw}, raw), caches.queryHash(new Object[]{wip}, wip));
+        assertNotEquals(caches.queryKey(new Object[]{raw}, new Parameter[0], raw),
+                caches.queryKey(new Object[]{wip}, new Parameter[0], wip));
         assertEquals(0, raw.cacheOffset());
         assertEquals(20, raw.cacheLimit());
         assertEquals("id desc", raw.cacheSort());

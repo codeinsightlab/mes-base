@@ -29,24 +29,27 @@ public MaterialEntity updateById(Long id, MaterialUpdateCommand input)
 - `business` 使用权限资源前缀（承载模块 + 完整资源名，不含操作），例如 `business:material`、`business:pro:workorder`、`erp:material`。允许安全的冒号分段标识，禁止 glob 元字符和空段。物料注解、同步淘汰与 MaterialPermissions 复用领域侧 `MaterialResource.PREFIX`，不让 Service 依赖 Controller。
 - `argument` 默认 0，显式指定查询参数或 ID 所在的位置，不猜参数名，不提供表达式框架。
 - 列表参数实现 `BusinessCacheQuery`，提供有效的 `cacheOffset()`、`cacheLimit()`、`cacheSort()`。DTO 保留全部结果相关筛选条件，不能只提供分页。
-- 摘要序列化全部方法参数及有效分页/排序；对象属性和 Map key 排序后计算 SHA-256。筛选参数不使用 `toString()` 或身份 hash。集合若表示无序条件，调用方应先规范化其顺序。
+- 列表 Key 序列化全部方法参数及有效分页/排序；JSON 属性和 Map key 排序，保留字段名、类型、null/空字符串/空集合的差异。不得依赖对象默认 `toString()` 或身份 hash。无序集合若语义上相同，调用方应先规范化顺序。
+- 参数名或递归序列化后的对象字段名含 `password`、`secret`、`token`、`credential` 或 `authorization`（大小写不敏感）时，跳过该次缓存；转义后条件超过2048字符或无法序列化时也跳过缓存，仍执行原数据库查询。不得截断条件或以摘要/临时查询ID兜底。
 - `offset` 是从 0 开始的查询起始位置；只缓存 `0 <= offset < 100`。不是 key 数量上限。无效分页参数交还原方法处理，不改业务异常语义。
 - 详情 ID 明确为 String、Long 或 Integer；不缓存 null，不捕获业务的 NOT_FOUND 等异常。
 - 返回值按被代理目标方法声明的完整返回类型恢复。分页内部记录和泛型类型保留，不开启多态默认类型。Redis value 沿用 JDK 序列化，其中存放按声明类型恢复的 JSON 字节，不要求所有业务 DTO 实现 Serializable。
-- 该通用组件不决定权限范围。后续查询如有用户、部门、资源权限差异，必须将有效范围作为查询参数纳入摘要，或暂不接入；详情若按用户裁剪结果，也不能直接使用当前只按业务/工厂/ID 的共享详情缓存。
+- 该通用组件不决定权限范围。后续查询如有用户、部门、资源权限差异，必须将有效范围作为查询参数纳入完整Key条件，或暂不接入；详情若按用户裁剪结果，也不能直接使用当前只按业务/工厂/ID 的共享详情缓存。
 
 ## Key 与 TTL
 
-物理 key 使用 `SystemCacheNamespace` 的前缀，保留可选命名空间与可信中心库 URL 的 SHA-256 标识，隔离共用 Redis 的不同部署。工厂 ID 与详情 ID 使用无补位 Base64 URL 编码，避免冒号、Redis glob 元字符及相似业务名误删；列表 key 使用查询摘要。资源前缀带长度边界，避免 `business:material` 的列表淘汰误删 `business:material:list` 的缓存。
+物理 Key 由公共 `SystemCacheNamespace` 统一添加部署及中心库身份，再由 `BusinessCacheProcessor` 构造工厂和资源段，详情使用 `DetailCacheKeys`。部署标签沿用 `mes.system.cache-namespace`，默认是 `default`；非空值须符合`[A-Za-z][A-Za-z0-9_-]{0,63}`，且标签不是唯一隔离依据。中心身份只使用 JDBC URL 可解析的 host、port、database，不包含用户名、密码、完整连接串或连接参数。Host 小写、去末尾点，默认端口补齐；localhost、127.0.0.1 和 ::1 统一为 localhost。DNS 地址别名不能自动推断，同一部署的所有实例须使用相同规范化 JDBC host/port/database 与 namespace；不同中心库即使配置了相同标签也会隔离。
 
-示例：工厂 `A`、业务 `business:material`、详情 ID `1`，未配置 named 前缀时：
+通用Key段使用 UTF-8 字节的可读百分号转义：`A-Z`、`a-z`、`0-9`、`.`、`_`、`-` 原样保留，其余字节写为大写 `%HH`，解码唯一且不改大小写、前导零或内容。Factory ID 与详情 ID 不再使用 Base64。业务资源名由权限资源格式校验，只允许字母、数字、下划线、连字符及层级冒号，因此资源名中的冒号直接保留可读；它位于 `{factory:<factoryId>:resource:<resource>}` Cluster 同槽标记内，结束花括号明确资源边界，后缀 `}:detail:` / `}:list:` 隔开用途。这样 detail-version CAS 与详情Key同槽，同时相邻或嵌套资源仍有独立Key范围。
+
+示例：namespace未配置（`default`）、中心库`localhost:3306/mes_base`、工厂`A`、业务`business:material`、详情ID`1`：
 
 ```text
-mes:db:<中心库URL摘要>:business:factory:QQ:resource:17:business:material:detail:MQ
-mes:db:<中心库URL摘要>:business:factory:QQ:resource:17:business:material:list:<查询SHA-256>
+mes:default:center:localhost:3306:mes_base:business:{factory:A:resource:business:material}:detail:1
+mes:default:center:localhost:3306:mes_base:business:{factory:A:resource:business:material}:list:conditions:%7B%22...%22%7D
 ```
 
-工厂 `B` 编码为 `Qg`；`business:material`、`business:materials` 与 `erp:material` 有明确的冒号边界。工厂上下文缺失调用 `FactoryContext.required()`，沿用现有异常，不回退默认厂。
+例如ID `lot:01*{x}`会成为`lot%3A01%2A%7Bx%7D`，保持大小写和前导零，并且不会被模式删除误认为通配符。列表条件以排序后的JSON作为Key条件段，不作摘要；对完整编码结果使用上述2048字符上限，过长时绕过缓存但正常查库。工厂上下文缺失调用 `FactoryContext.required()`，沿用现有异常，不回退默认厂。
 
 TTL 配置在 `mes-admin/src/main/resources/application.yml`：
 
