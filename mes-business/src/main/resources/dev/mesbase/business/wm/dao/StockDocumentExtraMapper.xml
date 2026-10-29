@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="dev.mesbase.business.wm.dao.StockDocumentExtraMapper">
+ <select id="pairedDocumentId" resultType="long">SELECT p.id FROM wm_stock_document d JOIN wm_stock_document p ON p.id=d.paired_document_id WHERE d.id=#{id}</select>
  <sql id="formalInboundBindings">
   <bind name="postedStatus" value="@dev.mesbase.business.wm.domain.StockDocumentStatus@POSTED.getValue()"/>
   <bind name="productionReceiptType" value="@dev.mesbase.business.wm.domain.StockDocumentType@PRODUCTION_RECEIPT.getValue()"/>

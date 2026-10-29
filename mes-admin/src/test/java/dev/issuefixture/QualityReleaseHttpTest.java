@@ -32,7 +32,7 @@ class QualityReleaseHttpTest {
                     .andExpect(status().isNotFound());
             UnifiedInboundHttpTest.stock(j);
             UnifiedInboundHttpTest.receive(m, "60");
-            m.perform(ProductionCoreV1HttpTest.full(get("/api/wm/stock-documents/executions/1/basis")))
+            m.perform(ProductionCoreV1HttpTest.full(get("/api/wm/inbound-documents/executions/1/basis")))
                     .andExpect(status().isOk()).andExpect(jsonPath("remaining").value("40.000000"));
             assertEquals(before, j.queryForList("SELECT * FROM mes_quality_release ORDER BY id"));
         }
@@ -47,7 +47,7 @@ class QualityReleaseHttpTest {
             UnifiedInboundHttpTest.receive(m, "98");
             String defect = QualityWorkflowHttpTest.defect(m, 12, "10", null, null);
             String draft = UnifiedInboundHttpTest.draft(m, "1", "1");
-            m.perform(ProductionCoreV1HttpTest.full(get("/api/wm/stock-documents/executions/1/basis")))
+            m.perform(ProductionCoreV1HttpTest.full(get("/api/wm/inbound-documents/executions/1/basis")))
                     .andExpect(status().isOk()).andExpect(jsonPath("canReceive").value(false));
             m.perform(ProductionCoreV1HttpTest.full(post(StockDocumentHttpTest.ROOT + "/" + draft + "/actions/approve"))
                             .content(StockDocumentHttpTest.intent(UUID.randomUUID().toString(), 1)))
@@ -55,7 +55,7 @@ class QualityReleaseHttpTest {
             var assess = (ObjectNode) new ObjectMapper().readTree(QualityWorkflowHttpTest.assessmentCommand());
             assess.putObject("assessment").put("type", "INDEPENDENT").put("basis", "TEST ONLY late independent loss");
             QualityWorkflowHttpTest.assess(m, defect, assess.toString());
-            m.perform(ProductionCoreV1HttpTest.full(get("/api/wm/stock-documents/executions/1/basis")))
+            m.perform(ProductionCoreV1HttpTest.full(get("/api/wm/inbound-documents/executions/1/basis")))
                     .andExpect(status().isOk()).andExpect(jsonPath("effective").value("90.000000"))
                     .andExpect(jsonPath("received").value("98.000000")).andExpect(jsonPath("canReceive").value(false));
             assertEquals(0, j.queryForObject("SELECT COUNT(*) FROM mes_quality_release", Integer.class));

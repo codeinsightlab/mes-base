@@ -60,7 +60,7 @@ class UnifiedStockApprovalHttpTest {
             String uuid = UUID.randomUUID().toString();
             var saved = draft(mvc, ProductionInputHttpTest.command(mvc, uuid, "L001", "1"));
             context.getBean(AtomicBoolean.class).set(true);
-            mvc.perform(full(post(StockDocumentHttpTest.ROOT + "/" + saved.get("document").get("id")
+            mvc.perform(full(post(StockDocumentHttpTest.OUT_ROOT + "/" + saved.get("document").get("id")
                             .asText() + "/actions/approve"))
                             .content(StockDocumentHttpTest.intent(uuid, saved.get("document").get("revision").asInt())))
                     .andExpect(status().isOk());
@@ -162,14 +162,14 @@ class UnifiedStockApprovalHttpTest {
             for (String corrupt : new String[]{"{invalid", "null", "{}"}) {
                 // Fixture-only corrupted source; the ordinary HTTP editor cannot alter the frozen JSON.
                 db.update("UPDATE wm_stock_document SET source_request_json=? WHERE id=?", corrupt, id);
-                mvc.perform(full(get(StockDocumentHttpTest.ROOT + "/" + id)))
+                mvc.perform(full(get(StockDocumentHttpTest.OUT_ROOT + "/" + id)))
                         .andExpect(status().isOk())
                         .andExpect(jsonPath("document.id").value(id))
                         .andExpect(jsonPath("document.status").value("DRAFT"))
                         .andExpect(jsonPath("lines.length()").value(1))
                         .andExpect(jsonPath("materialIssueBasis").isEmpty())
                         .andExpect(jsonPath("materialIssueBasisError").isNotEmpty());
-                mvc.perform(full(post(StockDocumentHttpTest.ROOT + "/" + id + "/actions/approve"))
+                mvc.perform(full(post(StockDocumentHttpTest.OUT_ROOT + "/" + id + "/actions/approve"))
                                 .content(StockDocumentHttpTest.intent(uuid, created.get("document").get("revision").asInt())))
                         .andExpect(status().is4xxClientError())
                         .andExpect(jsonPath("errorCode").isNotEmpty());
@@ -272,7 +272,7 @@ class UnifiedStockApprovalHttpTest {
             assertEquals(0, count(db, "mes_production_execution"));
             assertEquals(0, count(db, "wm_stock_action"));
             String approval = StockDocumentHttpTest.intent(uuid, created.get("document").get("revision").asInt());
-            String path = StockDocumentHttpTest.ROOT + "/" + id + "/actions/approve";
+            String path = StockDocumentHttpTest.OUT_ROOT + "/" + id + "/actions/approve";
             mvc.perform(full(post(path)).content(approval)).andExpect(status().isOk());
             assertEquals(0, before.subtract(new BigDecimal("25")).compareTo(rawBalance(db)));
             assertEquals(1, count(db, "mes_production_execution"));
@@ -306,7 +306,7 @@ class UnifiedStockApprovalHttpTest {
             String id = created.get("document").get("id").asText();
             // Fixture-only competing consumption between save and approve; no production database is used.
             db.update("UPDATE wm_inventory SET quantity=0,available_quantity=0 WHERE id=1");
-            mvc.perform(full(post(StockDocumentHttpTest.ROOT + "/" + id + "/actions/approve"))
+            mvc.perform(full(post(StockDocumentHttpTest.OUT_ROOT + "/" + id + "/actions/approve"))
                             .content(StockDocumentHttpTest.intent(uuid, created.get("document").get("revision").asInt())))
                     .andExpect(status().isBadRequest());
             assertEquals(0, count(db, "wm_stock_action"));

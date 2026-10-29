@@ -79,7 +79,8 @@ class ProductionCoreV1HttpTest {
             m.perform(full(post(actions + "start"))).andExpect(status().isOk());
             assertEquals(started, j.queryForObject("SELECT start_time FROM mes_production_execution WHERE id=?", String.class, execution));
             WorkorderBomInputHttpTest.report(m, execution, "150");
-            m.perform(full(post(StockDocumentHttpTest.ROOT + "/" + first.get("documentId").asText() + "/actions/void")))
+            m.perform(full(post(StockDocumentHttpTest.OUT_ROOT + "/" + first.get("documentId")
+                            .asText() + "/actions/void")))
                     .andExpect(status().isConflict());
             m.perform(full(put(E + "/" + execution)).content(EXEC.replace("READY", "FULLY_RECEIVED")))
                     .andExpect(status().isConflict());

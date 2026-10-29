@@ -27,7 +27,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * TEST ONLY H2: real generated SQL and Spring document/stock transactions; not a live MySQL receipt.
  */
 class StockDocumentHttpTest {
-    static final String ROOT = "/api/wm/stock-documents";
+    static final String ROOT = "/api/wm/inbound-documents";
+    static final String OUT_ROOT = "/api/wm/outbound-documents";
     static final ObjectMapper JSON = new ObjectMapper();
 
     static JsonNode create(MockMvc m, String type, String order) throws Exception {
@@ -37,7 +38,8 @@ class StockDocumentHttpTest {
         String body = "{\"direction\":\"" + direction + "\",\"documentType\":\"" + type + "\",\"reason\":\"TEST ONLY stock document\",\"ruleCode\":\""
                 + ruleCode + "\""
                 + (order == null ? "" : ",\"sourceWorkorderId\":\"" + order + "\"") + "}";
-        return JSON.readTree(m.perform(full(post(ROOT)).content(body)).andExpect(status().isOk())
+        return JSON.readTree(m.perform(full(post(purpose.isReceipt() ? ROOT : OUT_ROOT)).content(body))
+                .andExpect(status().isOk())
                 .andReturn().getResponse().getContentAsString());
     }
 
@@ -50,6 +52,11 @@ class StockDocumentHttpTest {
 
     static void add(MockMvc m, String id, String revision, String stock, String batch, String qty) throws Exception {
         m.perform(full(post(ROOT + "/" + id + "/lines")).content(line(revision, stock, batch, qty)))
+                .andExpect(status().isOk());
+    }
+
+    static void addOut(MockMvc m, String id, String revision, String stock, String batch, String qty) throws Exception {
+        m.perform(full(post(OUT_ROOT + "/" + id + "/lines")).content(line(revision, stock, batch, qty)))
                 .andExpect(status().isOk());
     }
 
@@ -107,16 +114,16 @@ class StockDocumentHttpTest {
                     .andExpect(status().isConflict());
             m.perform(full(delete(ROOT + "/" + receipt))).andExpect(status().isMethodNotAllowed());
             String issue = create(m, "OTHER_ISSUE", null).get("document").get("id").asText();
-            add(m, issue, "0", "1", "L001", "30");
+            addOut(m, issue, "0", "1", "L001", "30");
             String out = intent(UUID.randomUUID().toString(), 1);
-            m.perform(full(post(ROOT + "/" + issue + "/actions/approve")).content(out)).andExpect(status().isOk());
-            m.perform(full(post(ROOT + "/" + issue + "/actions/approve")).content(out)).andExpect(status().isOk());
+            m.perform(full(post(OUT_ROOT + "/" + issue + "/actions/approve")).content(out)).andExpect(status().isOk());
+            m.perform(full(post(OUT_ROOT + "/" + issue + "/actions/approve")).content(out)).andExpect(status().isOk());
             balance(j, "70");
             assertEquals(2, j.queryForObject("SELECT COUNT(*) FROM wm_stock_action WHERE operation_id IS NOT NULL AND document_line_id IS NOT NULL", Integer.class));
             String atomic = create(m, "OTHER_ISSUE", null).get("document").get("id").asText();
-            add(m, atomic, "0", "1", "L001", "10");
-            add(m, atomic, "1", "2", "L002", "1");
-            m.perform(full(post(ROOT + "/" + atomic + "/actions/approve")).content(intent(UUID.randomUUID()
+            addOut(m, atomic, "0", "1", "L001", "10");
+            addOut(m, atomic, "1", "2", "L002", "1");
+            m.perform(full(post(OUT_ROOT + "/" + atomic + "/actions/approve")).content(intent(UUID.randomUUID()
                     .toString(), 2))).andExpect(status().isConflict());
             balance(j, "70");
             assertEquals("DRAFT", j.queryForObject("SELECT status FROM wm_stock_document WHERE id=?", String.class, atomic));
@@ -162,11 +169,11 @@ class StockDocumentHttpTest {
             var j = ProductionInputHttpTest.db(c);
             j.update("UPDATE wm_inventory SET quantity=70,available_quantity=70 WHERE id=1");
             String id = create(m, "OTHER_ISSUE", null).get("document").get("id").asText();
-            add(m, id, "0", "1", "L001", "30");
-            add(m, id, "1", "1", "L001", "30");
-            var a = pool.submit(() -> m.perform(full(post(ROOT + "/" + id + "/actions/approve")).content(intent(UUID.randomUUID()
+            addOut(m, id, "0", "1", "L001", "30");
+            addOut(m, id, "1", "1", "L001", "30");
+            var a = pool.submit(() -> m.perform(full(post(OUT_ROOT + "/" + id + "/actions/approve")).content(intent(UUID.randomUUID()
                     .toString(), 2))).andReturn().getResponse().getStatus());
-            var b = pool.submit(() -> m.perform(full(post(ROOT + "/" + id + "/actions/approve")).content(intent(UUID.randomUUID()
+            var b = pool.submit(() -> m.perform(full(post(OUT_ROOT + "/" + id + "/actions/approve")).content(intent(UUID.randomUUID()
                     .toString(), 2))).andReturn().getResponse().getStatus());
             var results = List.of(a.get(), b.get());
             assertEquals(1, results.stream().filter(code -> code == 200).count());
@@ -248,9 +255,9 @@ class StockDocumentHttpTest {
             var j = ProductionInputHttpTest.db(c);
             j.update("UPDATE wm_inventory SET quantity=70,available_quantity=70 WHERE id=1");
             String id = create(m, "OTHER_ISSUE", null).get("document").get("id").asText();
-            add(m, id, "0", "1", "L001", "50");
+            addOut(m, id, "0", "1", "L001", "50");
             String production = ProductionInputHttpTest.command(m, UUID.randomUUID().toString(), "L001", "20");
-            var a = pool.submit(() -> m.perform(full(post(ROOT + "/" + id + "/actions/approve"))
+            var a = pool.submit(() -> m.perform(full(post(OUT_ROOT + "/" + id + "/actions/approve"))
                     .content(intent(UUID.randomUUID().toString(), 1))).andReturn().getResponse().getStatus());
             var b = pool.submit(() -> m.perform(full(post("/api/production/input"))
                     .content(production)).andReturn().getResponse());
@@ -310,9 +317,10 @@ class StockDocumentHttpTest {
             var m = MaterialIssueHttpTest.mvc(c);
             var j = ProductionInputHttpTest.db(c);
             j.update("UPDATE wm_inventory SET quantity=0,available_quantity=0");
-            var catalog = JSON.readTree(m.perform(full(get(ROOT + "/types")).param("direction", "IN")).andExpect(status().isOk())
+            var catalog = JSON.readTree(m.perform(full(get(ROOT + "/types")).param("direction", "IN"))
+                    .andExpect(status().isOk())
                     .andReturn().getResponse().getContentAsString());
-            assertEquals(9, catalog.size());
+            assertEquals(10, catalog.size());
             for (String type : List.of("PURCHASE_RECEIPT", "OUTSOURCE_RECEIPT", "MATERIAL_RETURN_RECEIPT", "REWORK_RECEIPT", "SALES_RETURN_RECEIPT")) {
                 var draft = create(m, type, null).get("document");
                 String id = draft.get("id").asText();
@@ -340,18 +348,24 @@ class StockDocumentHttpTest {
             j.update("UPDATE wm_inventory SET quantity=0,available_quantity=0");
             String id = create(m, "OTHER_RECEIPT", null).get("document").get("id").asText();
             add(m, id, "0", "1", "L001", "1.234567");
-            var stored = JSON.readTree(m.perform(full(get(ROOT + "/" + id))).andExpect(status().isOk()).andReturn().getResponse().getContentAsString());
+            var stored = JSON.readTree(m.perform(full(get(ROOT + "/" + id))).andExpect(status().isOk()).andReturn()
+                    .getResponse().getContentAsString());
             String lineId = stored.get("lines").get(0).get("id").asText();
             j.update("UPDATE unit_measure SET must_be_whole_number=1,quantity_precision=0 WHERE id=1");
-            m.perform(full(put(ROOT + "/" + id + "/lines/" + lineId)).content(line("1", "1", "L001", "1.234567"))).andExpect(status().isOk());
-            m.perform(full(post(ROOT + "/" + id + "/actions/approve")).content(intent(UUID.randomUUID().toString(), 2))).andExpect(status().isBadRequest());
+            m.perform(full(put(ROOT + "/" + id + "/lines/" + lineId)).content(line("1", "1", "L001", "1.234567")))
+                    .andExpect(status().isOk());
+            m.perform(full(post(ROOT + "/" + id + "/actions/approve")).content(intent(UUID.randomUUID().toString(), 2)))
+                    .andExpect(status().isBadRequest());
             balance(j, "0");
             assertEquals(0, j.queryForObject("SELECT COUNT(*) FROM wm_stock_action", Integer.class));
             assertEquals(new BigDecimal("1.234567"), j.queryForObject("SELECT quantity FROM wm_stock_document_line WHERE id=?", BigDecimal.class, lineId));
-            m.perform(full(put(ROOT + "/" + id + "/lines/" + lineId)).content(line("2", "1", "L001", "1"))).andExpect(status().isOk());
+            m.perform(full(put(ROOT + "/" + id + "/lines/" + lineId)).content(line("2", "1", "L001", "1")))
+                    .andExpect(status().isOk());
             String request = UUID.randomUUID().toString();
-            m.perform(full(post(ROOT + "/" + id + "/actions/approve")).content(intent(request, 3))).andExpect(status().isOk());
-            m.perform(full(post(ROOT + "/" + id + "/actions/approve")).content(intent(request, 3))).andExpect(status().isOk());
+            m.perform(full(post(ROOT + "/" + id + "/actions/approve")).content(intent(request, 3)))
+                    .andExpect(status().isOk());
+            m.perform(full(post(ROOT + "/" + id + "/actions/approve")).content(intent(request, 3)))
+                    .andExpect(status().isOk());
             balance(j, "1");
             assertEquals(1, j.queryForObject("SELECT COUNT(*) FROM wm_stock_action", Integer.class));
         }
@@ -365,15 +379,22 @@ class StockDocumentHttpTest {
             db.get("A").update("UPDATE unit_measure SET must_be_whole_number=0,quantity_precision=6 WHERE id=1");
             db.get("B").update("UPDATE unit_measure SET must_be_whole_number=1,quantity_precision=0 WHERE id=1");
             String a = create(m, "OTHER_RECEIPT", null).get("document").get("id").asText();
-            String b = JSON.readTree(m.perform(ProductionReportHttpTest.full(post(ROOT), "B").content("{\"direction\":\"IN\",\"documentType\":\"OTHER_RECEIPT\",\"reason\":\"isolated factory\",\"ruleCode\":\"OTHER_RECEIPT\"}")).andExpect(status().isOk()).andReturn().getResponse().getContentAsString()).get("document").get("id").asText();
+            String b = JSON.readTree(m.perform(ProductionReportHttpTest.full(post(ROOT), "B")
+                                    .content("{\"direction\":\"IN\",\"documentType\":\"OTHER_RECEIPT\",\"reason\":\"isolated factory\",\"ruleCode\":\"OTHER_RECEIPT\"}"))
+                            .andExpect(status().isOk()).andReturn().getResponse().getContentAsString()).get("document")
+                    .get("id").asText();
             assertEquals(a, b);
             add(m, a, "0", "1", "L001", "1.234567");
-            m.perform(ProductionReportHttpTest.full(post(ROOT + "/" + b + "/lines"), "B").content(line("0", "1", "L001", "1.234567"))).andExpect(status().isBadRequest());
-            m.perform(full(post(ROOT + "/" + a + "/actions/approve")).content(intent(UUID.randomUUID().toString(), 1))).andExpect(status().isOk());
+            m.perform(ProductionReportHttpTest.full(post(ROOT + "/" + b + "/lines"), "B")
+                    .content(line("0", "1", "L001", "1.234567"))).andExpect(status().isBadRequest());
+            m.perform(full(post(ROOT + "/" + a + "/actions/approve")).content(intent(UUID.randomUUID().toString(), 1)))
+                    .andExpect(status().isOk());
             assertEquals(1, db.get("A").queryForObject("SELECT COUNT(*) FROM wm_stock_action", Integer.class));
             assertEquals(0, db.get("B").queryForObject("SELECT COUNT(*) FROM wm_stock_action", Integer.class));
-            assertEquals(0, new BigDecimal("10001.234567").compareTo(db.get("A").queryForObject("SELECT quantity FROM wm_inventory WHERE id=1", BigDecimal.class)));
-            assertEquals(0, new BigDecimal("10000").compareTo(db.get("B").queryForObject("SELECT quantity FROM wm_inventory WHERE id=1", BigDecimal.class)));
+            assertEquals(0, new BigDecimal("10001.234567").compareTo(db.get("A")
+                    .queryForObject("SELECT quantity FROM wm_inventory WHERE id=1", BigDecimal.class)));
+            assertEquals(0, new BigDecimal("10000").compareTo(db.get("B")
+                    .queryForObject("SELECT quantity FROM wm_inventory WHERE id=1", BigDecimal.class)));
         }
     }
 }

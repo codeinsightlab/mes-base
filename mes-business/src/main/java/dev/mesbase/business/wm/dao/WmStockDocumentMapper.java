@@ -6,6 +6,8 @@ import java.util.List;
 import org.apache.ibatis.annotations.Param;
 
 public interface WmStockDocumentMapper {
+    int pairDocuments(@Param("id") Long id, @Param("pairedId") Long pairedId);
+
     long countByExample(WmStockDocumentExample example);
 
     int deleteByExample(WmStockDocumentExample example);

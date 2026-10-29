@@ -212,21 +212,23 @@ class ProductionInputHttpTest {
             var e = first.get("executionId").asText();
             j.update("UPDATE mes_production_execution SET status='RUNNING',start_time=CURRENT_TIMESTAMP WHERE id=?", e);
             j.update("INSERT INTO mes_production_report(execution_id,routing_node_id,record_type,quantity_delta,operator_user_id,recorded_by,report_time,reason,create_time) VALUES(?,11,'REPORT',280,1,1,CURRENT_TIMESTAMP,'TEST ONLY reduction fixture',CURRENT_TIMESTAMP)", e);
-            m.perform(ProductionCoreV1HttpTest.full(post(StockDocumentHttpTest.ROOT + "/" + first.get("documentId")
+            m.perform(ProductionCoreV1HttpTest.full(post(StockDocumentHttpTest.OUT_ROOT + "/" + first.get("documentId")
                     .asText() + "/actions/void"))).andExpect(status().isConflict());
             assertEquals("POSTED", j.queryForObject("SELECT status FROM wm_stock_document WHERE id=?", String.class, first.get("documentId")
                     .asText()));
             long original = j.queryForObject("SELECT id FROM mes_production_report WHERE execution_id=?", Long.class, e);
             j.update("INSERT INTO mes_production_report(execution_id,routing_node_id,record_type,quantity_delta,reference_report_id,operator_user_id,recorded_by,report_time,reason,create_time) VALUES(?,11,'ADJUSTMENT',-200,?,1,1,CURRENT_TIMESTAMP,'TEST ONLY safe correction',CURRENT_TIMESTAMP)", e, original);
             j.execute("ALTER TABLE wm_stock_action ADD CONSTRAINT test_fail_reversal CHECK(action_type <> 'REVERSAL')");
-            m.perform(ProductionCoreV1HttpTest.full(post(StockDocumentHttpTest.ROOT + "/" + second.get("documentId")
-                            .asText() + "/actions/void"))).andExpect(status().is5xxServerError());
-            assertEquals("POSTED", j.queryForObject("SELECT status FROM wm_stock_document WHERE id=?", String.class, second.get("documentId").asText()));
+            m.perform(ProductionCoreV1HttpTest.full(post(StockDocumentHttpTest.OUT_ROOT + "/" + second.get("documentId")
+                    .asText() + "/actions/void"))).andExpect(status().is5xxServerError());
+            assertEquals("POSTED", j.queryForObject("SELECT status FROM wm_stock_document WHERE id=?", String.class, second.get("documentId")
+                    .asText()));
             j.execute("ALTER TABLE wm_stock_action DROP CONSTRAINT test_fail_reversal");
-            m.perform(ProductionCoreV1HttpTest.full(post(StockDocumentHttpTest.ROOT + "/" + second.get("documentId")
+            m.perform(ProductionCoreV1HttpTest.full(post(StockDocumentHttpTest.OUT_ROOT + "/" + second.get("documentId")
                             .asText() + "/actions/void"))).andExpect(status().isOk())
                     .andExpect(jsonPath("documentId").value(second.get("documentId").asText()));
-            assertEquals("SUCCEEDED", j.queryForObject("SELECT CASE WHEN COUNT(*)=1 THEN 'SUCCEEDED' ELSE NULL END FROM wm_stock_document_line l JOIN wm_stock_action r ON r.reference_action_id=l.stock_action_id WHERE l.document_id=? AND r.action_type='REVERSAL'", String.class, second.get("documentId").asText()));
+            assertEquals("SUCCEEDED", j.queryForObject("SELECT CASE WHEN COUNT(*)=1 THEN 'SUCCEEDED' ELSE NULL END FROM wm_stock_document_line l JOIN wm_stock_action r ON r.reference_action_id=l.stock_action_id WHERE l.document_id=? AND r.action_type='REVERSAL'", String.class, second.get("documentId")
+                    .asText()));
             m.perform(ProductionCoreV1HttpTest.full(get("/api/production/report-quantities/executions/" + e)))
                     .andExpect(status().isOk()).andExpect(jsonPath("nodes[0].availableQty").value("20.000000"));
             // A historical/admin report entry uses the same quantity guard during the cancellation window.

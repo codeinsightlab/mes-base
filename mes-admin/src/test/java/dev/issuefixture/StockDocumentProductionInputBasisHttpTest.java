@@ -11,7 +11,9 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-/** Isolated H2: document identity, frozen input basis and HTTP conversion. */
+/**
+ * Isolated H2: document identity, frozen input basis and HTTP conversion.
+ */
 class StockDocumentProductionInputBasisHttpTest {
     @Test
     void documentIdResolvesFrozenInputBomAndSelectedPath() throws Exception {
@@ -23,7 +25,7 @@ class StockDocumentProductionInputBasisHttpTest {
                     ProductionInputHttpTest.command(mvc, requestId, "L001", "10")));
             String documentId = result.get("documentId").asText();
             db.update("UPDATE material_bom_item SET quantity=99 WHERE bom_id=1");
-            mvc.perform(full(get(StockDocumentHttpTest.ROOT + "/" + documentId + "/production-input-basis")))
+            var basis = mvc.perform(full(get(StockDocumentHttpTest.OUT_ROOT + "/" + documentId + "/production-input-basis")))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("requestId").value(requestId))
                     .andExpect(jsonPath("executionId").value(result.get("executionId").asText()))
@@ -38,11 +40,12 @@ class StockDocumentProductionInputBasisHttpTest {
                     .andExpect(jsonPath("routingNodeIds[0]").value("11"))
                     .andExpect(jsonPath("routingNodeIds[1]").value("12"))
                     .andExpect(jsonPath("routingNodeIds[2]").value("13"))
-                    .andExpect(jsonPath("stockApplied").value(true));
-            assertEquals(db.queryForObject("SELECT production_confirmed_at FROM wm_stock_document WHERE id=?",
-                            LocalDateTime.class, documentId),
-                    db.queryForObject("SELECT production_business_occurred_at FROM wm_stock_document WHERE id=?",
-                            LocalDateTime.class, documentId));
+                    .andExpect(jsonPath("stockApplied").value(true)).andReturn();
+            var payload = new ObjectMapper().readTree(basis.getResponse().getContentAsString());
+            assertEquals(db.queryForObject("SELECT confirmed_at FROM mes_material_issue_input WHERE document_id=?", LocalDateTime.class, documentId),
+                    LocalDateTime.parse(payload.get("confirmedAt").asText()));
+            assertEquals(db.queryForObject("SELECT business_occurred_at FROM mes_material_issue_input WHERE document_id=?", LocalDateTime.class, documentId),
+                    LocalDateTime.parse(payload.get("businessOccurredAt").asText()));
             assertEquals(1, db.queryForObject("SELECT COUNT(*) FROM wm_stock_document WHERE id=?", Integer.class, documentId));
         }
     }
@@ -52,7 +55,7 @@ class StockDocumentProductionInputBasisHttpTest {
         try (var context = ProductionInputHttpTest.context()) {
             var mvc = MaterialIssueHttpTest.mvc(context);
             var document = StockDocumentHttpTest.create(mvc, "OTHER_RECEIPT", null);
-            mvc.perform(full(get(StockDocumentHttpTest.ROOT + "/" + document.get("document").get("id").asText()
+            mvc.perform(full(get(StockDocumentHttpTest.OUT_ROOT + "/" + document.get("document").get("id").asText()
                     + "/production-input-basis"))).andExpect(status().isNotFound());
         }
     }
@@ -64,11 +67,11 @@ class StockDocumentProductionInputBasisHttpTest {
             var input = new ObjectMapper().readTree(ProductionInputHttpTest.submit(mvc,
                     ProductionInputHttpTest.command(mvc, UUID.randomUUID().toString(), "L001", "10")));
             String documentId = input.get("documentId").asText();
-            mvc.perform(get(StockDocumentHttpTest.ROOT + "/" + documentId + "/production-input-basis")
+            mvc.perform(get(StockDocumentHttpTest.OUT_ROOT + "/" + documentId + "/production-input-basis")
                             .header("Authorization", "Bearer ISSUE_QUERY").header("X-Factory-Id", "A")
                             .param("documentType", "MATERIAL_ISSUE"))
                     .andExpect(status().isForbidden());
-            mvc.perform(get(StockDocumentHttpTest.ROOT + "/" + documentId + "/production-input-basis")
+            mvc.perform(get(StockDocumentHttpTest.OUT_ROOT + "/" + documentId + "/production-input-basis")
                             .header("Authorization", "Bearer ISSUE_ITEM").header("X-Factory-Id", "A")
                             .param("documentType", "MATERIAL_ISSUE"))
                     .andExpect(status().isOk())

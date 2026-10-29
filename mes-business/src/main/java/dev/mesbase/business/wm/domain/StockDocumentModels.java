@@ -1,6 +1,8 @@
 package dev.mesbase.business.wm.domain;
 
 import dev.mesbase.common.core.page.PageData;
+import dev.mesbase.core.error.ErrorCode;
+import dev.mesbase.core.error.FoundationException;
 import jakarta.validation.constraints.Digits;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -17,27 +19,37 @@ public final class StockDocumentModels {
     private StockDocumentModels() {
     }
 
-    public record Create(@NotBlank String direction, @NotBlank String documentType, @NotBlank @Size(max = 500) String reason,
+    private static String directionForType(String value) {
+        var type = StockDocumentType.from(value);
+        if (type == null) throw new FoundationException(ErrorCode.BAD_REQUEST);
+        return type.getDirection().getValue();
+    }
+
+    public record Create(String direction, @NotBlank String documentType, @NotBlank @Size(max = 500) String reason,
                          @Size(max = 500) String remark, Long sourceWorkorderId, Long sourceExecutionId,
                          @Size(max = 64) String ruleCode) {
         public Create(String documentType, String reason, String remark, Long sourceWorkorderId,
                       Long sourceExecutionId, String ruleCode) {
-            this(StockDocumentType.from(documentType) == null ? null : StockDocumentType.from(documentType).getDirection().getValue(),
+            this(StockDocumentType.from(documentType) == null ? null : StockDocumentType.from(documentType)
+                            .getDirection().getValue(),
                     documentType, reason, remark, sourceWorkorderId, sourceExecutionId, ruleCode);
         }
+
         public Create(String documentType, String reason, String remark, Long sourceWorkorderId,
                       Long sourceExecutionId) {
             this(documentType, reason, remark, sourceWorkorderId, sourceExecutionId, null);
         }
     }
 
-    public record AggregateHeader(@NotBlank String direction, @NotBlank String documentType, @NotBlank @Size(max = 500) String reason,
+    public record AggregateHeader(String direction, @NotBlank String documentType,
+                                  @NotBlank @Size(max = 500) String reason,
                                   @Size(max = 500) String remark, Long sourceWorkorderId,
                                   Long sourceExecutionId, @Size(max = 64) String ruleCode,
                                   Long expectedRevision) {
         public AggregateHeader(String documentType, String reason, String remark, Long sourceWorkorderId,
                                Long sourceExecutionId, String ruleCode, Long expectedRevision) {
-            this(StockDocumentType.from(documentType) == null ? null : StockDocumentType.from(documentType).getDirection().getValue(),
+            this(StockDocumentType.from(documentType) == null ? null : StockDocumentType.from(documentType)
+                            .getDirection().getValue(),
                     documentType, reason, remark, sourceWorkorderId, sourceExecutionId, ruleCode, expectedRevision);
         }
     }
@@ -82,7 +94,8 @@ public final class StockDocumentModels {
     public record Post(@NotBlank String requestId, @NotNull Long expectedRevision) {
     }
 
-    public record Query(String direction, String documentType, String status, String documentNo, Integer offset, Integer limit) {
+    public record Query(String direction, String documentType, String status, String documentNo, Integer offset,
+                        Integer limit) {
         public Query(String documentType, String status, String documentNo, Integer offset, Integer limit) {
             this(null, documentType, status, documentNo, offset, limit);
         }

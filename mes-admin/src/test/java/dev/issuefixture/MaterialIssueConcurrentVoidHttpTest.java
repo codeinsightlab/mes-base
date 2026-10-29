@@ -22,7 +22,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-/** Deterministic isolated H2 regression: both callers read before competing for the real lock. */
+/**
+ * Deterministic isolated H2 regression: both callers read before competing for the real lock.
+ */
 class MaterialIssueConcurrentVoidHttpTest {
     @Configuration
     @EnableAspectJAutoProxy(proxyTargetClass = true)
@@ -61,9 +63,9 @@ class MaterialIssueConcurrentVoidHttpTest {
             String document = input.get("documentId").asText();
             var gate = context.getBean(LockGate.class);
             gate.enabled.set(true);
-            var first = pool.submit(() -> mvc.perform(full(post(StockDocumentHttpTest.ROOT + "/" + document + "/actions/void")))
+            var first = pool.submit(() -> mvc.perform(full(post(StockDocumentHttpTest.OUT_ROOT + "/" + document + "/actions/void")))
                     .andExpect(status().isOk()).andReturn().getResponse().getContentAsString());
-            var second = pool.submit(() -> mvc.perform(full(post(StockDocumentHttpTest.ROOT + "/" + document + "/actions/void")))
+            var second = pool.submit(() -> mvc.perform(full(post(StockDocumentHttpTest.OUT_ROOT + "/" + document + "/actions/void")))
                     .andExpect(status().isOk()).andReturn().getResponse().getContentAsString());
             var a = json.readTree(first.get(15, TimeUnit.SECONDS));
             var b = json.readTree(second.get(15, TimeUnit.SECONDS));

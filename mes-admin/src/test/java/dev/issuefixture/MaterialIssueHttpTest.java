@@ -256,6 +256,7 @@ class MaterialIssueHttpTest {
                 jdbc.execute("DROP TABLE mes_material_issue_submission");
                 jdbc.execute("ALTER TABLE wm_stock_document ADD direction VARCHAR(8) DEFAULT 'OUT'");
                 jdbc.execute("ALTER TABLE wm_stock_document ADD create_request_id VARCHAR(36)");
+                jdbc.execute("ALTER TABLE wm_stock_document ADD paired_document_id BIGINT");
                 jdbc.execute("ALTER TABLE wm_stock_document ADD CONSTRAINT uk_stock_document_create_request UNIQUE(create_request_id)");
                 jdbc.update("UPDATE wm_stock_document SET direction='IN' WHERE document_type IN ('PURCHASE_RECEIPT','PRODUCTION_RECEIPT','OTHER_RECEIPT','DEFECT_RECEIPT','SCRAP_RECEIPT')");
                 jdbc.execute("DROP TABLE mes_material_issue_erp_extra");
@@ -268,7 +269,7 @@ class MaterialIssueHttpTest {
                 jdbc.execute("ALTER TABLE material_bom ADD is_default TINYINT NOT NULL DEFAULT 0");
                 for (String column : List.of("bom_id BIGINT", "bom_base_qty DECIMAL(20,6)", "bom_component_qty DECIMAL(20,6)", "output_unit_id BIGINT", "frozen_at TIMESTAMP(6)"))
                     jdbc.execute("ALTER TABLE mes_workorder_material ADD " + column);
-                jdbc.execute("ALTER TABLE wm_stock_document ADD source_request_json VARCHAR(8000)");
+                jdbc.execute("ALTER TABLE wm_stock_document ADD source_request_json TEXT");
                 jdbc.execute("ALTER TABLE wm_stock_document ADD CONSTRAINT uk_stock_document_request_identity UNIQUE(post_request_id)");
                 // TEST ONLY: these fresh fixture objects are explicitly local; no production migration default.
                 jdbc.execute("ALTER TABLE workorder ALTER COLUMN source SET DEFAULT 'LOCAL'");
@@ -318,7 +319,7 @@ class MaterialIssueHttpTest {
     @EnableWebMvc
     @EnableWebSecurity
     @EnableTransactionManagement
-    @Import({MaterialQuantityRules.class, WorkOrderCompletionService.class, StockDocumentService.class, StockDocumentController.class, WorkOrderCancellationService.class, WorkOrderCancellationController.class, BusinessSourceRules.class, StockReferenceRules.class, ProductionCompletionService.class, ProductionCompletionController.class, WarehouseAcceptanceService.class, WarehouseAcceptanceController.class, QualityReleaseService.class, QualityReleaseController.class, WorkorderMaterialService.class, WorkorderMaterialController.class, LocalStockController.class, WmStockActionController.class, WmStockActionServiceImpl.class, LocalStockService.class, LocalProductionSupply.class, QualityTreatmentService.class, MaterialIssueInputFacts.class, ProductionQuantityService.class, ProductionQuantityErrorAdvice.class, ExecutionQualityReferenceQueryImpl.class, ProductionExecutionQueryService.class, ProductionChainLocks.class, ExecutionPathService.class, ExecutionActionController.class, MaterialIssueSubmissionService.class, WorkorderErpFacts.class, WarehouseIntegration.class, MaterialIssueVoidService.class, ProductionExecutionRules.class, ProductionIdentityService.class, MesProductionExecutionServiceImpl.class, MesProductionExecutionController.class, ProductionIdentityController.class, WorkOrderController.class, WorkOrderService.class, RoutingReferenceRules.class, FoundationErrorAdvice.class})
+    @Import({StockDocumentOwnedTransactionsHttpTest.GuardedCenter.class, MaterialQuantityRules.class, WorkOrderCompletionService.class, StockDocumentService.class, StockDocumentController.class, WorkOrderCancellationService.class, WorkOrderCancellationController.class, BusinessSourceRules.class, StockReferenceRules.class, ProductionCompletionService.class, ProductionCompletionController.class, WarehouseAcceptanceService.class, WarehouseAcceptanceController.class, QualityReleaseService.class, QualityReleaseController.class, WorkorderMaterialService.class, WorkorderMaterialController.class, LocalStockController.class, WmStockActionController.class, WmStockActionServiceImpl.class, LocalStockService.class, LocalProductionSupply.class, QualityTreatmentService.class, MaterialIssueInputFacts.class, ProductionQuantityService.class, ProductionQuantityErrorAdvice.class, ExecutionQualityReferenceQueryImpl.class, ProductionExecutionQueryService.class, ProductionChainLocks.class, ExecutionPathService.class, ExecutionActionController.class, MaterialIssueSubmissionService.class, WorkorderErpFacts.class, WarehouseIntegration.class, MaterialIssueVoidService.class, ProductionExecutionRules.class, ProductionIdentityService.class, MesProductionExecutionServiceImpl.class, MesProductionExecutionController.class, ProductionIdentityController.class, WorkOrderController.class, WorkOrderService.class, RoutingReferenceRules.class, FoundationErrorAdvice.class})
     static class Web implements WebMvcConfigurer {
         @org.springframework.beans.factory.annotation.Autowired
         private AuthorizationService authorization;
@@ -503,7 +504,8 @@ class MaterialIssueHttpTest {
                     || "query".equals(actor.id()) && permission.code().equals("workorder:query")
                     || "create".equals(actor.id()) && permission.code().equals("business:quality:defect:create")
                     || "issue_query".equals(actor.id()) && permission.code().equals("business:mes:material:issue:query")
-                    || "issue_item".equals(actor.id()) && permission.code().equals("business:mes:material:issue:item:list")
+                    || "issue_item".equals(actor.id()) && permission.code()
+                    .equals("business:mes:material:issue:item:list")
                     || "crud".equals(actor.id()) && (permission.code().endsWith(":list")
                     || permission.code().endsWith(":query") || permission.code().equals("business:quality:defect:read")
                     || permission.code().equals("business:quality:defect:create"));

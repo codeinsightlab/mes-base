@@ -22,16 +22,21 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-/** Read-only recovery uses the real transaction/statement guards in GuardedCenter. */
+/**
+ * Read-only recovery uses the real transaction/statement guards in GuardedCenter.
+ */
 class StockDocumentRequestRecoveryHttpTest {
     private static final ObjectMapper JSON = new ObjectMapper();
-    private static final String ROOT = StockDocumentHttpTest.ROOT;
-    enum Access { FULL, ISSUE_QUERY, NONE }
+    private static final String ROOT = StockDocumentHttpTest.OUT_ROOT;
+
+    enum Access {FULL, ISSUE_QUERY, NONE}
 
     @Configuration
     static class Permissions {
         @Bean
-        AtomicReference<Access> recoveryAccess() { return new AtomicReference<>(Access.FULL); }
+        AtomicReference<Access> recoveryAccess() {
+            return new AtomicReference<>(Access.FULL);
+        }
 
         @Bean
         @Primary
@@ -100,7 +105,8 @@ class StockDocumentRequestRecoveryHttpTest {
             String id = input.get("documentId").asText();
             var other = StockDocumentHttpTest.create(mvc, "OTHER_RECEIPT", null);
             String otherRequest = UUID.randomUUID().toString();
-            db.update("UPDATE wm_stock_document SET create_request_id=? WHERE id=?", otherRequest, other.get("document").get("id").asText());
+            db.update("UPDATE wm_stock_document SET create_request_id=? WHERE id=?", otherRequest, other.get("document")
+                    .get("id").asText());
             var before = snapshot(db);
             int numberCount = context.getBean(AtomicInteger.class).get();
             access.set(Access.ISSUE_QUERY);
@@ -118,7 +124,8 @@ class StockDocumentRequestRecoveryHttpTest {
             access.set(Access.FULL);
             mvc.perform(full(get(ROOT + "/by-request/" + otherRequest))).andExpect(status().isNotFound());
             // A corrupted production association cannot turn this recovery entry into another-type reader.
-            db.update("UPDATE mes_material_issue_input SET document_id=? WHERE id=?", other.get("document").get("id").asText(), request);
+            db.update("UPDATE mes_material_issue_input SET document_id=? WHERE id=?", other.get("document").get("id")
+                    .asText(), request);
             mvc.perform(full(get(ROOT + "/by-request/" + request))).andExpect(status().isNotFound());
             access.set(Access.ISSUE_QUERY);
             mvc.perform(full(get(ROOT + "/by-request/" + request))).andExpect(status().isNotFound());
@@ -130,7 +137,7 @@ class StockDocumentRequestRecoveryHttpTest {
 
     private static List<List<Map<String, Object>>> snapshot(JdbcTemplate jdbc) {
         return List.of("wm_stock_document", "wm_stock_document_line", "wm_stock_action", "wm_inventory", "mes_material_issue_input",
-                "mes_production_execution", "mes_execution_path", "mes_execution_path_node")
+                        "mes_production_execution", "mes_execution_path", "mes_execution_path_node")
                 .stream().map(table -> jdbc.queryForList("SELECT * FROM " + table + " ORDER BY id")).toList();
     }
 

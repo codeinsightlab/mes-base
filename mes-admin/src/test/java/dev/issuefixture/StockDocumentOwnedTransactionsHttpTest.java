@@ -34,8 +34,10 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-/** H2 HTTP regression with actual factory routing, transaction ownership and SQL statement guards.
- * Number formatting is a test double; its center reads/writes use the real ownership manager. */
+/**
+ * H2 HTTP regression with actual factory routing, transaction ownership and SQL statement guards.
+ * Number formatting is a test double; its center reads/writes use the real ownership manager.
+ */
 class StockDocumentOwnedTransactionsHttpTest {
     @Configuration
     static class GuardedCenter {
@@ -47,10 +49,12 @@ class StockDocumentOwnedTransactionsHttpTest {
             jdbc.execute("CREATE TABLE sys_dict_data(dict_code BIGINT PRIMARY KEY,dict_sort BIGINT,dict_label VARCHAR(80),dict_value VARCHAR(64),dict_type VARCHAR(80),css_class VARCHAR(64),list_class VARCHAR(64),is_default VARCHAR(1),status VARCHAR(1),create_by VARCHAR(64),create_time TIMESTAMP,remark VARCHAR(64))");
             int id = 0;
             for (var type : StockDocumentType.values()) {
-                String dictionary = "IN".equals(type.getDirection().getValue()) ? "stock_document_in_type" : "stock_document_out_type";
+                String dictionary = "IN".equals(type.getDirection()
+                        .getValue()) ? "stock_document_in_type" : "stock_document_out_type";
                 jdbc.update("INSERT INTO sys_dict_data(dict_code,dict_sort,dict_label,dict_value,dict_type,status) VALUES(?,?,?,?,?,'0')", ++id, id, type.getValue(), type.getValue(), dictionary);
             }
-            return new PlatformPersistence(source, Set.of(SysDictDataMapper.class), c -> c.getTypeAliasRegistry().registerAlias(SysDictData.class));
+            return new PlatformPersistence(source, Set.of(SysDictDataMapper.class), c -> c.getTypeAliasRegistry()
+                    .registerAlias(SysDictData.class));
         }
 
         @Bean
@@ -62,33 +66,48 @@ class StockDocumentOwnedTransactionsHttpTest {
         }
 
         @Bean
-        AtomicInteger guardedAllocations() { return new AtomicInteger(); }
+        AtomicInteger guardedAllocations() {
+            return new AtomicInteger();
+        }
 
         @Bean
         @Primary
         AutoCodeNumbering guardedNumbering(PlatformPersistence platform, AtomicInteger guardedAllocations) {
             return new AutoCodeNumbering() {
                 private final AtomicInteger serial = guardedAllocations;
-                public String getDocNo(String type) { return getBusinessDocNo(type, "STOCK_OUT"); }
-                public String getDocNo(String type, String category) { return getBusinessDocNo(type, category); }
+
+                public String getDocNo(String type) {
+                    return getBusinessDocNo(type, "STOCK_OUT");
+                }
+
+                public String getDocNo(String type, String category) {
+                    return getBusinessDocNo(type, category);
+                }
+
                 public String getBusinessDocNo(String type, String category) {
                     return platform.run(() -> {
                         platform.mapper(SysDictDataMapper.class).selectDictDataByType("stock_document_in_type");
                         return "OWNED_TEST_" + serial.incrementAndGet();
                     });
                 }
+
                 public String previewBusinessDocNo(String type, String category) {
                     return platform.readOnly(s -> {
                         s.mapper(SysDictDataMapper.class).selectDictDataByType("stock_document_in_type");
                         return "OWNED_PREVIEW";
                     });
                 }
+
                 public List<RuleOption> rules(String category) {
                     return platform.readOnly(s -> s.mapper(SysDictDataMapper.class)
                             .selectDictDataByType("STOCK_IN".equals(category) ? "stock_document_in_type" : "stock_document_out_type")
-                            .stream().map(row -> new RuleOption(row.getDictValue(), row.getDictLabel(), "TEST")).toList());
+                            .stream().map(row -> new RuleOption(row.getDictValue(), row.getDictLabel(), "TEST"))
+                            .toList());
                 }
-                public String uniqueRuleCode(String category) { return rules(category).getFirst().ruleCode(); }
+
+                public String uniqueRuleCode(String category) {
+                    return rules(category).getFirst().ruleCode();
+                }
             };
         }
     }
@@ -98,7 +117,8 @@ class StockDocumentOwnedTransactionsHttpTest {
         try (var context = ProductionInputHttpTest.context(GuardedCenter.class)) {
             var mvc = MaterialIssueHttpTest.mvc(context);
             for (String direction : List.of("IN", "OUT"))
-                mvc.perform(full(get(StockDocumentHttpTest.ROOT).param("direction", direction))).andExpect(status().isOk());
+                mvc.perform(full(get("IN".equals(direction) ? StockDocumentHttpTest.ROOT : StockDocumentHttpTest.OUT_ROOT)))
+                        .andExpect(status().isOk());
         }
     }
 
@@ -108,10 +128,13 @@ class StockDocumentOwnedTransactionsHttpTest {
             var mvc = MaterialIssueHttpTest.mvc(context);
             String root = StockDocumentHttpTest.ROOT;
             for (String direction : List.of("IN", "OUT")) {
-                mvc.perform(full(get(root + "/types").param("direction", direction))).andExpect(status().isOk());
-                mvc.perform(full(get(root + "/numbering-rules").param("direction", direction))).andExpect(status().isOk());
+                mvc.perform(full(get(("IN".equals(direction) ? root : StockDocumentHttpTest.OUT_ROOT) + "/types")))
+                        .andExpect(status().isOk());
+                mvc.perform(full(get(("IN".equals(direction) ? root : StockDocumentHttpTest.OUT_ROOT) + "/numbering-rules")))
+                        .andExpect(status().isOk());
             }
-            mvc.perform(full(get(root + "/numbering-rules/preview").param("direction", "IN").param("typeKey", "OTHER_RECEIPT")))
+            mvc.perform(full(get(root + "/numbering-rules/preview").param("direction", "IN")
+                            .param("typeKey", "OTHER_RECEIPT")))
                     .andExpect(status().isOk());
             String body = "{\"header\":{\"direction\":\"IN\",\"documentType\":\"OTHER_RECEIPT\",\"reason\":\"guarded aggregate\",\"ruleCode\":\"OTHER_RECEIPT\"},\"items\":[{\"stockId\":\"1\",\"materialId\":\"1\",\"warehouseId\":\"1\",\"unitId\":\"1\",\"batchNo\":\"L001\",\"binCode\":\"BIN1\",\"quantity\":\"1\"}]}";
             var saved = new ObjectMapper().readTree(mvc.perform(full(post(root + "/aggregate")).content(body))
@@ -119,7 +142,8 @@ class StockDocumentOwnedTransactionsHttpTest {
             mvc.perform(full(get(root + "/" + saved.get("document").get("id").asText()))).andExpect(status().isOk());
             String command = ProductionInputHttpTest.command(mvc, UUID.randomUUID().toString(), "L001", "10");
             var input = new ObjectMapper().readTree(ProductionInputHttpTest.submit(mvc, command));
-            mvc.perform(full(get(root + "/" + input.get("documentId").asText() + "/production-input-basis")))
+            mvc.perform(full(get(StockDocumentHttpTest.OUT_ROOT + "/" + input.get("documentId")
+                            .asText() + "/production-input-basis")))
                     .andExpect(status().isOk());
         }
     }
@@ -135,9 +159,11 @@ class StockDocumentOwnedTransactionsHttpTest {
                 var business = new TransactionTemplate(context.getBean("businessTransactionManager", OwnedTransactionManager.class));
                 business.executeWithoutResult(status -> {
                     assertEquals(0, mapper.countByExample(new WmStockDocumentExample()));
-                    assertCode(ErrorCode.CONFLICT, () -> platform.mapper(SysDictDataMapper.class).selectDictDataByType("stock_document_in_type"));
+                    assertCode(ErrorCode.CONFLICT, () -> platform.mapper(SysDictDataMapper.class)
+                            .selectDictDataByType("stock_document_in_type"));
                     assertCode(ErrorCode.CONFLICT, () -> platform.run(() -> "foreign write transaction"));
-                    assertEquals(true, !platform.readOnly(s -> s.mapper(SysDictDataMapper.class).selectDictDataByType("stock_document_in_type")).isEmpty());
+                    assertEquals(true, !platform.readOnly(s -> s.mapper(SysDictDataMapper.class)
+                            .selectDictDataByType("stock_document_in_type")).isEmpty());
                     assertEquals(0, mapper.countByExample(new WmStockDocumentExample()));
                 });
             } finally {
@@ -145,6 +171,7 @@ class StockDocumentOwnedTransactionsHttpTest {
             }
         }
     }
+
     private static void assertCode(ErrorCode expected, Runnable work) {
         Throwable failure = assertThrows(RuntimeException.class, work::run);
         while (!(failure instanceof FoundationException) && failure.getCause() != null) failure = failure.getCause();

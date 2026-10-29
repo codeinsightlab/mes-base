@@ -89,6 +89,18 @@ public class StockReferenceRules {
         lockWarehouses(List.of(row.getWarehouseId()));
     }
 
+    public void lockInventoryReferences(List<Long> materialIds, List<Long> warehouseIds) {
+        lockMaterials(materialIds.stream().distinct().sorted().toList());
+        var ids = warehouseIds.stream().distinct().sorted().toList();
+        lockWarehouses(ids);
+        var query = new WmWarehouseExample();
+        query.createCriteria().andIdIn(ids);
+        for (var warehouse : warehouses.selectByExample(query)) {
+            if (!EnableStatus.ENABLED.getValue().equals(warehouse.getStatus()))
+                throw new FoundationException(ErrorCode.STOCK_REFERENCE_INVALID);
+        }
+    }
+
     public void lockDemandReferences(Long material, List<Long> warehouseIds) {
         lockMaterials(List.of(material));
         lockWarehouses(warehouseIds);

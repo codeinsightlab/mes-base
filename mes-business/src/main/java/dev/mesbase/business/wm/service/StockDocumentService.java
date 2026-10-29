@@ -131,7 +131,8 @@ public class StockDocumentService {
                                 MesProductionExecutionMapper executions, MesProductionReceiptMapper receipts,
                                 Validator validator, StockDocumentExtraMapper inbound,
                                 ProductionQuantityService quantities, QualityTreatmentService quality,
-                                WorkorderMapper orders, MesWorkorderMaterialMapper workorderMaterials, MesQualityTreatmentMapper qualityEvents,
+                                WorkorderMapper orders, MesWorkorderMaterialMapper workorderMaterials,
+                                MesQualityTreatmentMapper qualityEvents,
                                 ObjectProvider<ProductionCompletionService> completion,
                                 ObjectProvider<ProductionInputService> productionInputs,
                                 ObjectProvider<MaterialIssueInputFacts> inputFacts,
@@ -202,9 +203,8 @@ public class StockDocumentService {
     @Transactional(transactionManager = "businessTransactionManager", readOnly = true)
     public Detail detail(Long id) {
         var row = require(id);
-        requireDirection(row.getDirection(), type(row.getDocumentType()));
-        StockDocumentModels.QualitySource qualitySource = null;
         var purpose = StockDocumentType.from(row.getDocumentType());
+        StockDocumentModels.QualitySource qualitySource = null;
         if (purpose != null && purpose.isQualityReceipt() && row.getPostRequestId() != null) {
             var event = qualityEvents.selectByPrimaryKey(row.getPostRequestId());
             if (event != null && Objects.equals(id, event.getStockDocumentId()))
@@ -289,11 +289,13 @@ public class StockDocumentService {
                                        Integer pathRevision, List<Long> routingNodeIds,
                                        LocalDateTime businessOccurredAt,
                                        LocalDateTime confirmedAt, Boolean stockApplied,
-                                       String voidOperationId, String voidResultStatus, String pathError) { }
+                                       String voidOperationId, String voidResultStatus, String pathError) {
+    }
 
     public record DocumentTypeOption(String value, String direction, String label, String origin,
                                      String requiredDocuments, boolean approvalAvailable,
-                                     boolean qualityReceipt, boolean enabled, int sort) { }
+                                     boolean qualityReceipt, boolean enabled, int sort) {
+    }
 
     @Transactional(transactionManager = "businessTransactionManager", readOnly = true)
     public List<DocumentTypeOption> typeOptions(String direction) {
@@ -337,7 +339,7 @@ public class StockDocumentService {
     public Detail create(StockDocumentModels.Create command) {
         validate(command);
         StockDocumentType purpose = type(command.documentType());
-        if (purpose.isQualityReceipt() || purpose == StockDocumentType.MATERIAL_ISSUE)
+        if (purpose.isTransfer() || purpose.isQualityReceipt() || purpose == StockDocumentType.MATERIAL_ISSUE)
             ParameterChecks.reject(ErrorCode.STOCK_DOCUMENT_SOURCE_PENDING);
         requireDirection(command.direction(), purpose);
         requireTypeActive(command.direction(), command.documentType());
@@ -359,7 +361,7 @@ public class StockDocumentService {
         requireTypeActive(header.direction(), header.documentType());
         if (purpose == StockDocumentType.MATERIAL_ISSUE)
             return productionInputs.getObject().createAggregateDraft(command);
-        if (purpose.isQualityReceipt())
+        if (purpose.isTransfer() || purpose.isQualityReceipt())
             ParameterChecks.reject(ErrorCode.STOCK_DOCUMENT_SOURCE_PENDING);
         String category = numberingCategory(header.direction());
         if (header.ruleCode() == null || !header.documentType().equals(header.ruleCode()))
@@ -383,7 +385,7 @@ public class StockDocumentService {
         var header = command.header();
         var current = require(id);
         if (type(current.getDocumentType()) == StockDocumentType.MATERIAL_ISSUE
-                || current.getSourceRequestJson() != null
+                || current.getSourceRequestJson() != null && !type(current.getDocumentType()).isTransfer()
                 || !Objects.equals(current.getDocumentType(), header.documentType())
                 || !Objects.equals(current.getDirection(), header.direction()))
             ParameterChecks.reject(ErrorCode.STOCK_DOCUMENT_CONFLICT);
@@ -391,7 +393,8 @@ public class StockDocumentService {
         var existing = rows(id);
         var retained = new HashSet<Long>();
         for (StockDocumentModels.AggregateLine item : command.items()) {
-            if (item.id() != null && !retained.add(item.id())) ParameterChecks.reject(ErrorCode.STOCK_DOCUMENT_CONFLICT);
+            if (item.id() != null && !retained.add(item.id()))
+                ParameterChecks.reject(ErrorCode.STOCK_DOCUMENT_CONFLICT);
             var latest = require(id);
             putLine(id, item.id(), lineCommand(latest.getRevision(), item));
         }
@@ -415,7 +418,8 @@ public class StockDocumentService {
         if (creating && command.header().expectedRevision() != null
                 || !creating && command.header().expectedRevision() == null)
             ParameterChecks.reject(ErrorCode.BAD_REQUEST);
-        validate(new StockDocumentModels.Create(command.header().direction(), command.header().documentType(), command.header().reason(),
+        validate(new StockDocumentModels.Create(command.header().direction(), command.header()
+                .documentType(), command.header().reason(),
                 command.header().remark(), command.header().sourceWorkorderId(), command.header().sourceExecutionId(),
                 command.header().ruleCode()));
         requireDirection(command.header().direction(), type(command.header().documentType()));
@@ -513,7 +517,8 @@ public class StockDocumentService {
         var header = lock(documentId);
         draft(header, command.expectedRevision());
         sources.localCreation();
-        if (header.getSourceRequestJson() != null) ParameterChecks.reject(ErrorCode.STOCK_DOCUMENT_CONFLICT);
+        if (header.getSourceRequestJson() != null && !type(header.getDocumentType()).isTransfer())
+            ParameterChecks.reject(ErrorCode.STOCK_DOCUMENT_CONFLICT);
         var existing = rows(documentId);
         if (lineId == null && existing.size() >= 100) ParameterChecks.reject(ErrorCode.BAD_REQUEST);
         var line = lineId == null ? new WmStockDocumentLineEntity() : requireLine(documentId, lineId);
@@ -545,13 +550,16 @@ public class StockDocumentService {
         var row = lock(documentId);
         draft(row, command.expectedRevision());
         sources.localCreation();
-        if (row.getSourceRequestJson() != null) ParameterChecks.reject(ErrorCode.STOCK_DOCUMENT_CONFLICT);
+        if (row.getSourceRequestJson() != null && !type(row.getDocumentType()).isTransfer())
+            ParameterChecks.reject(ErrorCode.STOCK_DOCUMENT_CONFLICT);
         requireLine(documentId, lineId);
         if (lines.deleteByPrimaryKey(lineId) != 1) ParameterChecks.reject(ErrorCode.STOCK_DOCUMENT_CONFLICT);
         save(row);
     }
 
-    /** Lock the unified issue header after its work order and execution locks have been acquired. */
+    /**
+     * Lock the unified issue header after its work order and execution locks have been acquired.
+     */
     public WmStockDocumentEntity lockMaterialIssueForVoid(Long documentId) {
         var row = lock(documentId);
         if (!StockDocumentType.MATERIAL_ISSUE.getValue().equals(row.getDocumentType()))
@@ -570,6 +578,7 @@ public class StockDocumentService {
                 List.of(id, command.requestId(), command.expectedRevision(), SecurityUtils.getUserId())));
         var before = require(id);
         var purposeBefore = type(before.getDocumentType());
+        if (purposeBefore.isTransfer()) ParameterChecks.reject(ErrorCode.STOCK_DOCUMENT_SOURCE_PENDING);
         if (purposeBefore == StockDocumentType.MATERIAL_ISSUE && !productionCommand
                 && StockDocumentStatus.DRAFT.getValue().equals(before.getStatus())) {
             productionInputs.getObject().requireApprovalPermissions();
@@ -671,7 +680,7 @@ public class StockDocumentService {
     @Transactional(transactionManager = "businessTransactionManager", propagation = Propagation.MANDATORY,
             rollbackFor = Exception.class)
     public Detail createMaterialIssueDraft(ProductionInputService.Command command, Calculation calculation,
-                                          String documentNo) {
+                                           String documentNo) {
         String frozen = new ObjectMapper().writeValueAsString(command);
         if (frozen.length() > 8000) ParameterChecks.reject(ErrorCode.BAD_REQUEST);
         var existing = findMaterialIssueDraft(command);
@@ -706,7 +715,9 @@ public class StockDocumentService {
         return detail(existing.getFirst().getId());
     }
 
-    /** Finds the original request identity before recalculating against mutable stock or production state. */
+    /**
+     * Finds the original request identity before recalculating against mutable stock or production state.
+     */
     public Detail findMaterialIssueDraftByRequestId(String requestId) {
         if (requestId == null || requestId.isBlank()) ParameterChecks.reject(ErrorCode.BAD_REQUEST);
         var filter = new WmStockDocumentExample();

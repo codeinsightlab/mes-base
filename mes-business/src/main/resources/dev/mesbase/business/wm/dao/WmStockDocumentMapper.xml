@@ -542,4 +542,8 @@ where id = #{id,jdbcType=BIGINT}
     where id = #{id,jdbcType=BIGINT}
     for update
   </select>
+  <update id="pairDocuments">
+    UPDATE wm_stock_document SET paired_document_id=#{pairedId}
+    WHERE id=#{id} AND paired_document_id IS NULL
+  </update>
 </mapper>

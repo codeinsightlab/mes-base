@@ -17,6 +17,8 @@ public enum StockDocumentType {
     SCRAP_RECEIPT("SCRAP_RECEIPT", StockDocumentDirection.IN, "报废品入库", "不良品转入报废品仓", "原不良记录、处置流水", true),
     OTHER_RECEIPT("OTHER_RECEIPT", StockDocumentDirection.IN, "其他入库", "盘盈、期初等特殊业务", "原因及实物、审批或调整依据", true),
     MATERIAL_ISSUE("MATERIAL_ISSUE", StockDocumentDirection.OUT, "生产领料出库", "工单生产投入", "已发布BOM、生产领料意图、实际路径", true),
+    TRANSFER_RECEIPT("TRANSFER_RECEIPT", StockDocumentDirection.IN, "调拨入库", "本厂LOCAL库存调拨", "关联调拨出库单", true),
+    TRANSFER_ISSUE("TRANSFER_ISSUE", StockDocumentDirection.OUT, "调拨出库", "本厂LOCAL库存调拨", "关联调拨入库单", true),
     OTHER_ISSUE("OTHER_ISSUE", StockDocumentDirection.OUT, "其他出库", "其他库存发出", "原因及实物、审批或调整依据", true);
 
     private final String value;
@@ -26,7 +28,8 @@ public enum StockDocumentType {
     private final String requiredDocuments;
     private final boolean approvalAvailable;
 
-    StockDocumentType(String value, StockDocumentDirection direction, String description, String origin, String requiredDocuments,
+    StockDocumentType(String value, StockDocumentDirection direction, String description, String origin,
+                      String requiredDocuments,
                       boolean approvalAvailable) {
         this.value = value;
         this.direction = direction;
@@ -58,6 +61,10 @@ public enum StockDocumentType {
 
     public boolean isApprovalAvailable() {
         return approvalAvailable;
+    }
+
+    public boolean isTransfer() {
+        return this == TRANSFER_RECEIPT || this == TRANSFER_ISSUE;
     }
 
     public boolean isReceipt() {
