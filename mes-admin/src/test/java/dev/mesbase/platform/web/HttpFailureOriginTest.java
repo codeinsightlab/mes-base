@@ -53,6 +53,32 @@ class HttpFailureOriginTest {
     }
 
     @Test
+    void serviceValidatorParameterChecksReportsBusinessOriginAndActualThrowSite() {
+        MockHttpServletRequest request = new MockHttpServletRequest("POST", "/api/test-only");
+        request.setQueryString("secret=must-not-log");
+        request.setAttribute(RequestBoundaryFilter.REQUEST_ID, "TEST_ONLY_ORIGIN");
+        try {
+            Service.validate();
+        } catch (FoundationException failure) {
+            HttpFailureLogging.known(request, failure);
+        }
+        String line = events.list.getFirst().getFormattedMessage();
+        assertTrue(line.contains("method=POST path=/api/test-only"), line);
+        assertTrue(line.contains("origin=at dev.mesbase.business."), line);
+        assertTrue(line.contains("throwSite=at dev.mesbase.common.validation.ParameterChecks.reject"), line);
+        assertFalse(line.contains("secret"), line);
+        assertFalse(line.contains("requestId="), line);
+    }
+
+    static final class Service {
+        static void execute() { Validator.validate(); }
+    }
+
+    static final class Validator {
+        static void validate() { dev.mesbase.common.validation.ParameterChecks.reject(ErrorCode.BAD_REQUEST); }
+    }
+
+    @Test
     void actualCreationFramesPointToSourceForBothKnownTypes() throws Exception {
         var foundation = new FoundationException(ErrorCode.UNPROCESSABLE);
         var service = new ServiceException("TEST_ONLY_SECRET");

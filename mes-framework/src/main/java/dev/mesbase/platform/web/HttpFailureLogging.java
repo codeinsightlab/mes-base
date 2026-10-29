@@ -25,35 +25,53 @@ public final class HttpFailureLogging {
         if (!first(request, failure)) return;
         if (failure.code().httpStatus() >= 500) {
             if (OpenApiHttp.isOpenApi(request)) logSanitized(request, failure, failure.code().name());
-            else LOG.error("event=http.request.failed errorCode={}",
-                    failure.code(), failure);
+            else LOG.error("event=http.request.failed method={} path={} errorCode={}",
+                    method(request), path(request), failure.code(), failure);
         } else {
-            logBusiness(failure, failure.code().name());
+            logBusiness(request, failure, failure.code().name());
         }
     }
 
     public static void known(HttpServletRequest request, ServiceException failure, String code) {
-        if (first(request, failure)) logBusiness(failure, code);
+        if (first(request, failure)) logBusiness(request, failure, code);
     }
 
-    private static void logBusiness(Throwable failure, String code) {
+    private static void logBusiness(HttpServletRequest request, Throwable failure, String code) {
         if (failure.getCause() == null) {
-            LOG.warn("event=http.request.rejected errorCode={} exception={} origin={}",
-                    code, failure.getClass().getName(), origin(failure));
+            LOG.warn("event=http.request.rejected method={} path={} errorCode={} exception={} origin={} throwSite={}",
+                    method(request), path(request), code, failure.getClass().getName(), origin(failure), throwSite(failure));
         } else {
-            LOG.warn("event=http.request.rejected errorCode={} exception={} origin={} rootCauseOrigin={}",
-                    code, failure.getClass().getName(), origin(failure), rootCauseOrigin(failure));
+            LOG.warn("event=http.request.rejected method={} path={} errorCode={} exception={} origin={} throwSite={} rootCauseOrigin={}",
+                    method(request), path(request), code, failure.getClass().getName(), origin(failure), throwSite(failure), rootCauseOrigin(failure));
         }
     }
 
     private static String origin(Throwable failure) {
+        for (StackTraceElement frame : failure.getStackTrace()) {
+            if (frame.getClassName().startsWith("dev.mesbase.business.") && valid(frame)) return format(frame);
+        }
+        return "unknown";
+    }
+
+    private static String throwSite(Throwable failure) {
         StackTraceElement[] frames = failure.getStackTrace();
-        if (frames.length == 0) return "unknown";
-        StackTraceElement frame = frames[0];
+        return frames.length == 0 ? "unknown" : format(frames[0]);
+    }
+
+    private static String format(StackTraceElement frame) {
         if (frame.getLineNumber() <= 0 || unavailable(frame.getFileName())
                 || unavailable(frame.getClassName()) || unavailable(frame.getMethodName())) return "unknown";
         return "at " + frame.getClassName() + "." + frame.getMethodName()
                 + "(" + frame.getFileName() + ":" + frame.getLineNumber() + ")";
+    }
+
+    private static boolean valid(StackTraceElement frame) { return !"unknown".equals(format(frame)); }
+
+    private static String method(HttpServletRequest request) { return safe(request.getMethod()); }
+    private static String path(HttpServletRequest request) { return safe(request.getRequestURI()); }
+    private static String safe(String value) {
+        if (value == null || value.codePoints().anyMatch(Character::isISOControl)) return "unknown";
+        return value;
     }
 
     private static boolean unavailable(String value) {
@@ -74,8 +92,7 @@ public final class HttpFailureLogging {
     public static void unexpected(HttpServletRequest request, Throwable failure) {
         if (first(request, failure)) {
             if (OpenApiHttp.isOpenApi(request)) logSanitized(request, failure, "INTERNAL_ERROR");
-            else LOG.error("event=http.request.failed errorCode=INTERNAL_ERROR",
-                    failure);
+            else LOG.error("event=http.request.failed method={} path={} errorCode=INTERNAL_ERROR", method(request), path(request), failure);
         }
     }
 
