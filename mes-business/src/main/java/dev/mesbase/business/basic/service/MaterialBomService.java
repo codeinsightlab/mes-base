@@ -61,6 +61,8 @@ import org.springframework.transaction.annotation.Transactional;
 public class MaterialBomService {
     private static final int MAX_BOMS = 2000;
     private static final int MAX_LINES = 10000;
+    private static final int READ_BATCH_SIZE = 500;
+    private static final int MAX_DEPTH = 100;
     private final MaterialBomMapper boms;
     private final MaterialBomItemMapper items;
     private final MaterialMapper materials;
@@ -295,12 +297,38 @@ public class MaterialBomService {
     private MaterialBomGraph graph(Long id, BigDecimal outputQty, boolean publishing) {
         decimal(outputQty);
         require(id);
-        if (boms.countByExample(new MaterialBomExample()) > MAX_BOMS || items.countByExample(new MaterialBomItemExample()) > MAX_LINES)
-            ParameterChecks.reject(ErrorCode.MATERIAL_BOM_BUDGET);
-        // A bounded snapshot avoids I/O in recursive traversal and preserves every referenced version.
-        var versions = boms.selectByExample(new MaterialBomExample()).stream()
-                .collect(Collectors.toMap(MaterialBomEntity::getId, Function.identity()));
-        var lines = items.selectByExample(new MaterialBomItemExample());
+        // Load only explicit references reachable from this root. Each bounded frontier is read
+        // in batches; shared subassemblies are loaded once, while walk preserves every path.
+        var versions = new HashMap<Long, MaterialBomEntity>();
+        var lines = new ArrayList<MaterialBomItemEntity>();
+        var requested = new HashSet<Long>();
+        var frontier = List.of(id);
+        int level = 0;
+        while (!frontier.isEmpty()) {
+            if (level++ >= MAX_DEPTH || requested.size() + frontier.size() > MAX_BOMS)
+                ParameterChecks.reject(ErrorCode.MATERIAL_BOM_BUDGET);
+            requested.addAll(frontier);
+            var next = new HashSet<Long>();
+            for (int start = 0; start < frontier.size(); start += READ_BATCH_SIZE) {
+                var batch = frontier.subList(start, Math.min(frontier.size(), start + READ_BATCH_SIZE));
+                var versionFilter = new MaterialBomExample();
+                versionFilter.createCriteria().andIdIn(batch);
+                for (var version : boms.selectByExample(versionFilter)) versions.put(version.getId(), version);
+                var lineFilter = new MaterialBomItemExample();
+                lineFilter.createCriteria().andBomIdIn(batch);
+                // Limit the result as well as the IN list, so corrupt high-fanout data stays bounded.
+                try (var page = PageHelper.offsetPage(0, MAX_LINES - lines.size() + 1, false)) {
+                    var rows = items.selectByExample(lineFilter);
+                    lines.addAll(rows);
+                    if (lines.size() > MAX_LINES) ParameterChecks.reject(ErrorCode.MATERIAL_BOM_BUDGET);
+                    for (var line : rows) {
+                        if (line.getChildBomId() != null && !requested.contains(line.getChildBomId()))
+                            next.add(line.getChildBomId());
+                    }
+                }
+            }
+            frontier = next.stream().sorted().toList();
+        }
         var materialIds = new HashSet<Long>();
         versions.values().forEach(v -> materialIds.add(v.getProductId()));
         lines.forEach(l -> materialIds.add(l.getMaterialId()));
@@ -331,7 +359,7 @@ public class MaterialBomService {
                                              Map<Long, UnitMeasureEntity> unitMap,
                                              Map<Long, MaterialBomGraph.Total> totals, boolean publishing, int depth,
                                              int[] visited) {
-        if (depth >= 100) ParameterChecks.reject(ErrorCode.MATERIAL_BOM_BUDGET);
+        if (depth >= MAX_DEPTH) ParameterChecks.reject(ErrorCode.MATERIAL_BOM_BUDGET);
         if (!ancestors.add(id)) ParameterChecks.reject(ErrorCode.MATERIAL_BOM_CYCLE);
         var version = versions.get(id);
         if (version == null) conflict();
@@ -347,7 +375,8 @@ public class MaterialBomService {
         var result = new ArrayList<MaterialBomGraph.Node>();
         var seenMaterials = new HashSet<Long>();
         for (var line : rows) {
-            if (++visited[0] > MAX_LINES || !seenMaterials.add(line.getMaterialId())) conflict();
+            if (++visited[0] > MAX_LINES) ParameterChecks.reject(ErrorCode.MATERIAL_BOM_BUDGET);
+            if (!seenMaterials.add(line.getMaterialId())) conflict();
             decimal(line.getQuantity());
             var material = materialMap.get(line.getMaterialId());
             if (material == null || !Objects.equals(material.getUnitId(), line.getUnitId()) || Objects.equals(material.getId(), version.getProductId()))

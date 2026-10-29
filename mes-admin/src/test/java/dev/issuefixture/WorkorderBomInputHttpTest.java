@@ -42,6 +42,21 @@ class WorkorderBomInputHttpTest {
     private static final ObjectMapper JSON = new ObjectMapper();
 
     @Test
+    void largeUnrelatedBomCatalogDoesNotBlockFormalWorkorderInput() throws Exception {
+        try (var c = ProductionInputHttpTest.context()) {
+            var j = ProductionInputHttpTest.db(c);
+            var m = MaterialIssueHttpTest.mvc(c);
+            prepare(j, "100", "1", "2.5");
+            j.update("INSERT INTO material_bom(id,code,version,product_id,base_qty,unit_id,status,revision,created_by,created_at,is_default) "
+                    + "SELECT n,'TEST ONLY unrelated ' || n,'v1',99,1,1,'DRAFT',1,1,CURRENT_TIMESTAMP,0 FROM SYSTEM_RANGE(100,2600) AS generated(n)");
+            j.update("INSERT INTO material_bom_item(id,bom_id,material_id,quantity,unit_id,sort) "
+                    + "SELECT n,100,1,1,1,0 FROM SYSTEM_RANGE(100,10200) AS generated(n)");
+            select(m, 1, 1);
+            assertTrue(input(m, "10") > 0);
+        }
+    }
+
+    @Test
     void executionCapacityCacheInvalidatesAfterCommitButNotOnRollbackOrUuidReplay() throws Exception {
         try (var c = ProductionInputHttpTest.context()) {
             var j = ProductionInputHttpTest.db(c);

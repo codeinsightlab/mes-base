@@ -7,6 +7,8 @@ import dev.mesbase.business.basic.dao.MaterialBomItemMapper;
 import dev.mesbase.business.basic.dao.MaterialMapper;
 import dev.mesbase.business.basic.dao.UnitMeasureMapper;
 import dev.mesbase.business.basic.domain.MaterialBomEntity;
+import dev.mesbase.business.basic.domain.MaterialBomExample;
+import dev.mesbase.business.basic.domain.MaterialBomItemExample;
 import dev.mesbase.business.basic.domain.MaterialBomItemEntity;
 import dev.mesbase.business.basic.domain.MaterialBomItemQueryDto;
 import dev.mesbase.business.basic.domain.MaterialBomItemUpdateCommand;
@@ -15,10 +17,12 @@ import dev.mesbase.business.basic.domain.MaterialEntity;
 import dev.mesbase.business.basic.domain.UnitMeasureEntity;
 import dev.mesbase.business.basic.service.MaterialBomService;
 import dev.mesbase.core.error.FoundationException;
+import dev.mesbase.core.error.ErrorCode;
 import dev.mesbase.platform.web.EndpointAccess;
 import java.math.BigDecimal;
 import java.lang.reflect.Modifier;
 import java.util.List;
+import java.util.ArrayList;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -29,6 +33,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -55,6 +60,51 @@ class MaterialBomServiceTest {
     }
 
     @Test
+    void unrelatedCatalogLargerThanBudgetDoesNotPreventSmallGraph() {
+        var catalog = new ArrayList<MaterialBomEntity>();
+        for (int id = 1; id <= 2500; id++) catalog.add(bom(id, 3, "1"));
+        fixture(catalog, List.of(line(10, 1, 1, "2", null)));
+        assertEquals(new BigDecimal("2.000000"), service.graph(1L, BigDecimal.ONE).totals().getFirst().quantity());
+        verify(boms, never()).countByExample(any());
+        verify(items, never()).countByExample(any());
+        verify(boms, times(1)).selectByExample(any());
+        verify(items, times(1)).selectByExample(any());
+    }
+
+    @Test
+    void danglingExplicitChildIsRejected() {
+        fixture(List.of(bom(1, 3, "1")), List.of(line(10, 1, 2, "1", 999L)));
+        assertThrows(FoundationException.class, () -> service.graph(1L, BigDecimal.ONE));
+    }
+
+    @Test
+    void excessiveReachableFanoutIsRejectedBeforeMoreQueries() {
+        var rows = new ArrayList<MaterialBomItemEntity>();
+        for (int id = 1; id <= 2001; id++) rows.add(line(id, 1, 2, "1", (long) id + 1));
+        fixture(List.of(bom(1, 3, "1")), rows);
+        assertThrows(FoundationException.class, () -> service.graph(1L, BigDecimal.ONE));
+        verify(boms, times(1)).selectByExample(any());
+    }
+
+    @Test
+    void excessiveDepthAndLineCountRetainTheirOwnBudgetErrors() {
+        var versions = new ArrayList<MaterialBomEntity>();
+        var rows = new ArrayList<MaterialBomItemEntity>();
+        for (int id = 1; id <= 101; id++) {
+            versions.add(bom(id, 3, "1"));
+            rows.add(line(id, id, 2, "1", (long) id + 1));
+        }
+        fixture(versions, rows);
+        assertEquals(ErrorCode.MATERIAL_BOM_BUDGET,
+                assertThrows(FoundationException.class, () -> service.graph(1L, BigDecimal.ONE)).code());
+        rows.clear();
+        for (int id = 1; id <= 10001; id++) rows.add(line(id, 1, 2, "1", null));
+        fixture(List.of(bom(1, 3, "1")), rows);
+        assertEquals(ErrorCode.MATERIAL_BOM_BUDGET,
+                assertThrows(FoundationException.class, () -> service.graph(1L, BigDecimal.ONE)).code());
+    }
+
+    @Test
     void indirectCycleFailsInsteadOfReturningATruncatedTree() {
         fixture(List.of(bom(1, 3, "1"), bom(2, 2, "1")), List.of(line(10, 1, 2, "1", 2L), line(20, 2, 3, "1", 1L)));
         assertThrows(FoundationException.class, () -> service.graph(1L, BigDecimal.ONE));
@@ -69,6 +119,8 @@ class MaterialBomServiceTest {
         assertEquals(new BigDecimal("25.000000"), graph.totals().getFirst().quantity());
         assertNotEquals(graph.items().get(0).children().getFirst().path(), graph.items().get(1).children().getFirst()
                 .children().getFirst().path());
+        verify(boms, times(2)).selectByExample(any());
+        verify(items, times(2)).selectByExample(any());
     }
 
     @Test
@@ -154,8 +206,18 @@ class MaterialBomServiceTest {
     }
 
     private void fixture(List<MaterialBomEntity> versions, List<MaterialBomItemEntity> lines) {
-        when(boms.selectByExample(any())).thenReturn(versions);
-        when(items.selectByExample(any())).thenReturn(lines);
+        doAnswer(invocation -> {
+            MaterialBomExample filter = invocation.getArgument(0);
+            var ids = (List<?>) filter.getOredCriteria().getFirst().getAllCriteria().getFirst().getValue();
+            return versions.stream().filter(row -> ids.contains(row.getId())).toList();
+        }).when(boms).selectByExample(any());
+        doAnswer(invocation -> {
+            MaterialBomItemExample filter = invocation.getArgument(0);
+            var criterion = filter.getOredCriteria().getFirst().getAllCriteria().getFirst();
+            if (criterion.getValue() instanceof List<?> ids)
+                return lines.stream().filter(row -> ids.contains(row.getBomId())).toList();
+            return lines.stream().filter(row -> row.getBomId().equals(criterion.getValue())).toList();
+        }).when(items).selectByExample(any());
         for (var row : versions) {
             when(boms.selectByPrimaryKey(row.getId())).thenReturn(row);
             when(boms.selectByPrimaryKeyForUpdate(row.getId())).thenReturn(row);
