@@ -3,7 +3,6 @@ package dev.mesbase.business.production.service;
 import com.github.pagehelper.PageHelper;
 import dev.mesbase.business.wm.dao.WmStockDocumentMapper;
 import dev.mesbase.business.wm.domain.StockDocumentStatus;
-import dev.mesbase.business.issue.domain.MaterialIssueSubmissionStatus;
 import dev.mesbase.business.wm.domain.WmStockDocumentEntity;
 import dev.mesbase.business.wm.domain.WmStockDocumentExample;
 import dev.mesbase.business.wm.domain.StockDocumentType;
@@ -255,21 +254,9 @@ public class ProductionCompletionService {
     }
 
     private boolean hasPendingIssues(List<WmStockDocumentEntity> documents) {
-        for (var document : documents) {
-            if (StockDocumentStatus.CANCELLED.getValue().equals(document.getStatus())) continue;
-            if (!StockDocumentStatus.POSTED.getValue().equals(document.getStatus())
-                    && !StockDocumentStatus.DRAFT.getValue().equals(document.getStatus())) return true;
-            String reversal = document.getProductionVoidResultStatus();
-            if ((document.getProductionVoidOperationId() != null || reversal != null)
-                    && (reversal == null || !List.of(MaterialIssueSubmissionStatus.SUCCEEDED.getValue(),
-                    MaterialIssueSubmissionStatus.REJECTED.getValue()).contains(reversal))) return true;
-            String confirmation = document.getProductionConfirmationStatus();
-            if (document.getProductionConfirmationOperationId() != null && confirmation == null) return true;
-            if (confirmation != null && !List.of(MaterialIssueSubmissionStatus.SUCCEEDED.getValue(),
-                    MaterialIssueSubmissionStatus.REJECTED.getValue()).contains(confirmation)) return true;
-            if (StockDocumentStatus.DRAFT.getValue().equals(document.getStatus())
-                    && !MaterialIssueSubmissionStatus.REJECTED.getValue().equals(confirmation)) return true;
-        }
-        return false;
+        // LOCAL posting and reversal commit atomically; a draft or unknown document state still blocks closure.
+        return documents.stream().anyMatch(document ->
+                !StockDocumentStatus.CANCELLED.getValue().equals(document.getStatus())
+                && !StockDocumentStatus.POSTED.getValue().equals(document.getStatus()));
     }
 }

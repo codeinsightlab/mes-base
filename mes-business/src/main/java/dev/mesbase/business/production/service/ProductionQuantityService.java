@@ -3,7 +3,6 @@ package dev.mesbase.business.production.service;
 import com.github.pagehelper.PageHelper;
 import dev.mesbase.business.directory.domain.DirectoryLabel;
 import dev.mesbase.business.directory.service.BusinessDirectoryService;
-import dev.mesbase.business.legacy.dao.LegacyHistoryMapper;
 import dev.mesbase.business.production.dao.MesExecutionPathNodeMapper;
 import dev.mesbase.business.production.dao.MesProductionExecutionMapper;
 import dev.mesbase.business.production.dao.ProductionQuantityMapper;
@@ -39,8 +38,6 @@ import java.util.Objects;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
-import org.springframework.beans.factory.ObjectProvider;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -51,7 +48,6 @@ import org.springframework.transaction.annotation.Transactional;
 public class ProductionQuantityService {
     private final MesProductionExecutionMapper executions;
     private final WorkorderMapper orders;
-    private LegacyHistoryMapper history;
     private final ExecutionPathService paths;
     private final MesExecutionPathNodeMapper pathNodes;
     private final ProductionQuantityMapper quantities;
@@ -69,15 +65,6 @@ public class ProductionQuantityService {
         this.quantities = quantities;
         this.directory = directory;
         this.defects = defects;
-    }
-
-    @Autowired
-    public ProductionQuantityService(MesProductionExecutionMapper executions, ExecutionPathService paths,
-                                     MesExecutionPathNodeMapper pathNodes, ProductionQuantityMapper quantities,
-                                     BusinessDirectoryService directory, ProductionDefectQuantityQuery defects,
-                                     WorkorderMapper orders, ObjectProvider<LegacyHistoryMapper> history) {
-        this(executions, paths, pathNodes, quantities, directory, defects, orders);
-        this.history = history.getIfAvailable();
     }
 
     public ExecutionQuantity getExecutionQuantities(Long executionId) {
@@ -127,16 +114,8 @@ public class ProductionQuantityService {
     private ExecutionQuantity load(Long executionId, MesProductionExecutionEntity execution, PathModel model,
                                    Supplier<List<MesExecutionPathNodeEntity>> selectedRows) {
         var balance = quantities.inputBalance(executionId);
-        BigDecimal opening = null;
-        if (history != null) opening = history.openingInput(executionId);
-        if (opening != null)
-            balance = new ProductionInputBalance(balance.confirmedQty().add(opening), balance.reservedQty());
         var inputQty = balance.usableQty();
         if (inputQty == null || inputQty.signum() < 0) ParameterChecks.reject(ErrorCode.REPORT_PATH_REQUIRED);
-        Map<Long, HistoricalNode> historyNodes = null;
-        if (opening != null)
-            historyNodes = history.nodes(executionId).stream()
-                    .collect(Collectors.toMap(n -> n.routingNodeId(), n -> new HistoricalNode(n.grossCorrection(), n.effectiveDefect(), n.unverifiedLossQty())));
         if (model.path() == null)
             return new ExecutionQuantity(executionId, execution.getWorkorderId(), execution.getRoutingId(), execution.getTargetQty(), ExecutionPathStatus.UNSELECTED.getValue(), false, "执行尚未选择实际路径", List.of(), label(model.routing()), inputQty, balance.confirmedQty(), balance.reservedQty(), execution.getProductId());
         if (!Objects.equals(model.path().getRoutingId(), execution.getRoutingId()))
@@ -147,16 +126,12 @@ public class ProductionQuantityService {
                 .collect(Collectors.toMap(t -> t.routingNodeId(), t -> t.reportedQty()));
         var defectTotals = defects.nodeTotals(executionId).stream()
                 .collect(Collectors.toMap(t -> t.affectedNodeId(), t -> t));
-        return compose(execution, model, new QuantityFacts(balance, inputQty, historyNodes, ordered,
+        return compose(execution, model, new QuantityFacts(balance, inputQty, ordered,
                 totals, defectTotals, orders.selectByPrimaryKey(execution.getWorkorderId())));
     }
 
-    private record HistoricalNode(BigDecimal grossCorrection, BigDecimal effectiveDefect,
-                                  BigDecimal unverifiedLossQty) {
-    }
-
     private record QuantityFacts(ProductionInputBalance balance, BigDecimal inputQty,
-                                 Map<Long, HistoricalNode> historyNodes, List<MesExecutionPathNodeEntity> ordered,
+                                 List<MesExecutionPathNodeEntity> ordered,
                                  Map<Long, BigDecimal> totals, Map<Long, ProductionDefectModels.NodeTotal> defectTotals,
                                  WorkorderEntity order) {
     }
@@ -165,7 +140,6 @@ public class ProductionQuantityService {
         Long executionId = execution.getId();
         var balance = facts.balance();
         var inputQty = facts.inputQty();
-        var historyNodes = facts.historyNodes();
         var ordered = facts.ordered();
         var totals = facts.totals();
         var defectTotals = facts.defectTotals();
@@ -177,21 +151,11 @@ public class ProductionQuantityService {
             var reported = totals.getOrDefault(node.getId(), BigDecimal.ZERO);
             var quality = defectTotals.get(node.getId());
             var defect = quality == null ? BigDecimal.ZERO : quality.effectiveDefectQty();
-            if (historyNodes != null) {
-                var evidence = historyNodes.get(node.getId());
-                if (evidence == null)
-                    ParameterChecks.reject(ErrorCode.REPORT_PATH_REQUIRED);
-                reported = reported.add(evidence.grossCorrection());
-                defect = defect.add(evidence.effectiveDefect());
-            }
             BigDecimal unverified = quality == null ? BigDecimal.ZERO : quality.unverifiedQty();
-            if (historyNodes != null) unverified = unverified.add(historyNodes.get(node.getId()).unverifiedLossQty());
             result.add(new NodeQuantity(executionId, node.getId(), node.getOperationId(), node.getNodeCode(), node.getOperationName() != null ? node.getOperationName() : model.operationLabels()
                     .containsKey(node.getOperationId()) ? model.operationLabels().get(node.getOperationId())
                     .name() + "（当前名称）" : null, i + 1,
-                    BigDecimal.ZERO, reported, defect, BigDecimal.ZERO, BigDecimal.ZERO, true, quality == null ? BigDecimal.ZERO : quality.returnedQty(), BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, unverified, historyNodes != null ? historyNodes.get(node.getId())
-                    .effectiveDefect()
-                    .add(quality == null ? BigDecimal.ZERO : quality.directDefectQty()) : quality == null ? BigDecimal.ZERO : quality.directDefectQty()));
+                    BigDecimal.ZERO, reported, defect, BigDecimal.ZERO, BigDecimal.ZERO, true, quality == null ? BigDecimal.ZERO : quality.returnedQty(), BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, unverified, quality == null ? BigDecimal.ZERO : quality.directDefectQty()));
         }
         boolean locked = ExecutionPathStatus.LOCKED.getValue().equals(model.path().getPathStatus());
         String boundary = !locked ? "实际路径尚未锁定，禁止写入报工数量"
@@ -231,14 +195,6 @@ public class ProductionQuantityService {
         }
         var labels = directory.routingLabels(rows.stream().map(ExecutionSummary::routingId).toList()).entrySet()
                 .stream().collect(Collectors.toMap(entry -> entry.getKey(), entry -> label(entry.getValue())));
-        if (history != null && !rows.isEmpty()) {
-            var importedInputs = history.inputs(rows.stream().map(ExecutionSummary::executionId).toList()).stream()
-                    .collect(Collectors.toMap(v -> v.executionId(), v -> v.quantity()));
-            rows = rows.stream()
-                    .map(v -> new ExecutionSummary(v.executionId(), v.workorderId(), v.routingId(), v.targetQty(), v.pathStatus(), v.lastNodeReportedQty(),
-                            v.productionInputQty().add(importedInputs.getOrDefault(v.executionId(), BigDecimal.ZERO))))
-                    .toList();
-        }
         return new ExecutionPage(rows, total, offset, limit, labels);
     }
 

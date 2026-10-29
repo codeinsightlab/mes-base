@@ -20,7 +20,7 @@ class WorkorderMaterialHttpTest {
             var m = MaterialIssueHttpTest.mvc(c);
             ProductionInputHttpTest.db(c).update("UPDATE material_bom_item SET quantity=3 WHERE id=1");
             String path = "/api/production/workorder/1/material";
-            String save = "{\"expectedRevision\":1,\"bomId\":\"1\",\"warehouseIds\":[\"1\"],\"workCenter\":\"MES维护\",\"enabled\":true}";
+            String save = "{\"expectedRevision\":1,\"expectedBomRevision\":1,\"bomId\":\"1\",\"warehouseIds\":[\"1\"],\"workCenter\":\"MES维护\",\"enabled\":true}";
             m.perform(ProductionCoreV1HttpTest.full(put(path)).content(save)).andExpect(status().isOk())
                     .andExpect(jsonPath("revision").value("2"));
             m.perform(ProductionCoreV1HttpTest.full(get("/api/production/input/calculate")).param("code", "WO1:M1#L001")
@@ -44,7 +44,7 @@ class WorkorderMaterialHttpTest {
         try (var c = ProductionInputHttpTest.context()) {
             var m = MaterialIssueHttpTest.mvc(c);
             m.perform(ProductionCoreV1HttpTest.full(put("/api/production/workorder/1/material"))
-                            .content("{\"expectedRevision\":1,\"bomId\":\"1\",\"warehouseIds\":[\"1\"],\"workCenter\":\"MES维护\",\"enabled\":false}"))
+                            .content("{\"expectedRevision\":1,\"expectedBomRevision\":1,\"bomId\":\"1\",\"warehouseIds\":[\"1\"],\"workCenter\":\"MES维护\",\"enabled\":false}"))
                     .andExpect(status().isOk());
             m.perform(ProductionCoreV1HttpTest.full(get("/api/production/input")).param("code", "WO1:M1#L001"))
                     .andExpect(status().isConflict());

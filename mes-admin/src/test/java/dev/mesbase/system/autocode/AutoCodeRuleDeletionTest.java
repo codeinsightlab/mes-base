@@ -83,7 +83,7 @@ class AutoCodeRuleDeletionTest {
         verifyNoInteractions(cache);
     }
     @Test
-    void ruleCodeCanChangeWhenItsPrefixIsUnreferenced() {
+    void ruleCodeIsNotEditableAsAnOrdinaryLabel() {
         var rules = mock(SysAutoCodeRuleMapper.class);
         var extra = mock(AutoCodeExtraMapper.class);
         var cache = mock(AutoCodeRuleSnapshotCache.class);
@@ -106,18 +106,13 @@ class AutoCodeRuleDeletionTest {
         when(rules.updateSysAutoCodeRule(update)).thenReturn(1);
         var service = new SysAutoCodeRuleServiceImpl(rules, extra, cache, references, parts, master);
 
-        assertEquals(1, service.updateInfo(update));
-        verify(rules).checkRuleCodeUnique("WORK_ORDER_V2");
-        verify(rules).updateSysAutoCodeRule(update);
-
-        var order = inOrder(references, master);
-        order.verify(references).requireUnreferenced(existing);
-        order.verify(master).getTransaction(any(TransactionDefinition.class));
-        verify(cache).invalidateAfterCommit();
+        assertThrows(ServiceException.class, () -> service.updateInfo(update));
+        verifyNoInteractions(master, extra, parts, cache, references);
+        verify(rules, never()).updateSysAutoCodeRule(any(SysAutoCodeRule.class));
     }
 
     @Test
-    void ruleUpdateIsRejectedOnlyWhenItsPrefixIsReferenced() {
+    void nameUpdateDoesNotScanBusinessDatabasesOrBlockOnDocumentReferences() {
         var rules = mock(SysAutoCodeRuleMapper.class);
         var extra = mock(AutoCodeExtraMapper.class);
         var cache = mock(AutoCodeRuleSnapshotCache.class);
@@ -127,14 +122,17 @@ class AutoCodeRuleDeletionTest {
         var existing = rule();
         var update = rule();
         when(rules.findById(7L)).thenReturn(existing);
-        doThrow(new ServiceException("编码规则前缀已被单据引用，不能删除或修改"))
-                .when(references).requireUnreferenced(existing);
+        update.setRuleName("新名称");
+        when(extra.lockRule(7L)).thenReturn(7L);
+        when(rules.findByIdForUpdate(7L)).thenReturn(existing);
+        when(parts.selectByRuleIdForUpdate(7L)).thenReturn(List.of());
+        when(master.getTransaction(any(TransactionDefinition.class))).thenReturn(new SimpleTransactionStatus());
+        when(rules.updateSysAutoCodeRule(update)).thenReturn(1);
         var service = new SysAutoCodeRuleServiceImpl(rules, extra, cache, references, parts, master);
 
-        assertThrows(ServiceException.class, () -> service.updateInfo(update));
-
-        verifyNoInteractions(master, extra, parts, cache);
-        verify(rules, never()).updateSysAutoCodeRule(any(SysAutoCodeRule.class));
+        assertEquals(1, service.updateInfo(update));
+        verifyNoInteractions(references);
+        verify(cache).invalidateAfterCommit();
     }
 
     @Test
@@ -232,6 +230,10 @@ class AutoCodeRuleDeletionTest {
         rule.setRuleId(7L);
         rule.setRuleCode("WORK_ORDER");
         rule.setRuleType("WORK_ORDER");
+        rule.setRuleName("工单编码");
+        rule.setMaxLength(64);
+        rule.setIsPadded("N");
+        rule.setEnableFlag("Y");
         return rule;
     }
 

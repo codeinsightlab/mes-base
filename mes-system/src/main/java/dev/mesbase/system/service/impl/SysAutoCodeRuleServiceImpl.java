@@ -1,6 +1,10 @@
 package dev.mesbase.system.service.impl;
 
 import dev.mesbase.common.constant.UserConstants;
+import dev.mesbase.common.utils.RequestFingerprint;
+import dev.mesbase.common.validation.ParameterChecks;
+import dev.mesbase.core.error.ErrorCode;
+import dev.mesbase.system.dto.AutoCodeRuleDocument;
 import dev.mesbase.common.core.domain.entity.SysAutoCodeRule;
 import dev.mesbase.common.exception.ServiceException;
 import dev.mesbase.system.mapper.AutoCodeExtraMapper;
@@ -88,23 +92,59 @@ public class SysAutoCodeRuleServiceImpl implements IAutoCodeRuleService {
         return changed;
     }
 
+    @Transactional(transactionManager = "masterTransactionManager", readOnly = true)
+    public AutoCodeRuleDocument document(Long id) {
+        var rule = findById(id);
+        var query = new SysAutoCodePart();
+        query.setRuleId(id);
+        return document(rule, parts.selectSysAutoCodePartList(query));
+    }
+
+    @Transactional(transactionManager = "masterTransactionManager", rollbackFor = Exception.class)
+    public AutoCodeRuleDocument createDocument(SysAutoCodeRule rule, String prefix, String actor) {
+        ParameterChecks.text(actor, true, 64, ErrorCode.BAD_REQUEST);
+        rule.setCreateBy(actor);
+        validatePrefix(rule, prefix);
+        insertInfo(rule);
+        initializeParts(rule, prefix, actor);
+        return document(mapper.findById(rule.getRuleId()), parts.selectByRuleIdForUpdate(rule.getRuleId()));
+    }
+
+    @Transactional(transactionManager = "masterTransactionManager", propagation = Propagation.NOT_SUPPORTED,
+            rollbackFor = Exception.class)
+    public AutoCodeRuleDocument updateDocument(SysAutoCodeRule rule, String prefix, String version, String actor) {
+        ParameterChecks.text(actor, true, 64, ErrorCode.BAD_REQUEST);
+        rule.setUpdateBy(actor);
+        if (version == null || version.isBlank()) throw new ServiceException("请重新加载规则后保存");
+        return update(rule, prefix, version, actor);
+    }
+
     @Transactional(transactionManager = "masterTransactionManager", propagation = Propagation.NOT_SUPPORTED,
             rollbackFor = Exception.class)
     public int updateInfo(SysAutoCodeRule rule) {
+        update(rule, null, null, rule.getUpdateBy());
+        return 1;
+    }
+
+    private AutoCodeRuleDocument update(SysAutoCodeRule rule, String prefix, String version, String actor) {
+        validate(rule);
         var scanned = findById(rule.getRuleId());
-        String scannedPrefix = references.requireUnreferenced(scanned);
+        // ruleCode is the caller's business type identity, never a normal editable label.
+        if (!Objects.equals(scanned.getRuleCode(), rule.getRuleCode()))
+            throw new ServiceException("规则编码是业务type身份，不能在普通编辑中修改；改码须先审查调用与引用");
         if (!Objects.equals(scanned.getFactoryId(), rule.getFactoryId())) {
             if (extra.resultCount(scanned.getRuleId()) > 0)
                 throw new ServiceException("规则已生成单据号，不能变更适用工厂");
+            references.requireUnreferenced(scanned);
             references.requireEnabledFactory(rule.getFactoryId());
-            SysAutoCodeRule targetScope = new SysAutoCodeRule();
+            var targetScope = new SysAutoCodeRule();
             targetScope.setRuleId(scanned.getRuleId());
             targetScope.setRuleCode(scanned.getRuleCode());
             targetScope.setRuleType(scanned.getRuleType());
             targetScope.setFactoryId(rule.getFactoryId());
             references.requireUnreferenced(targetScope);
         }
-        Integer updatedCount = masterTransactions.execute(status -> {
+        return masterTransactions.execute(status -> {
             if (extra.lockRule(scanned.getRuleId()) == null)
                 throw new ServiceException("编码规则不存在");
             var current = mapper.findByIdForUpdate(scanned.getRuleId());
@@ -112,23 +152,97 @@ public class SysAutoCodeRuleServiceImpl implements IAutoCodeRuleService {
             if (!Objects.equals(scanned.getRuleCode(), current.getRuleCode())
                     || !Objects.equals(scanned.getRuleType(), current.getRuleType())
                     || !Objects.equals(scanned.getFactoryId(), current.getFactoryId()))
-                throw new ServiceException("规则配置已变化，请重新执行修改");
+                throw new ServiceException("规则配置已变化，请重新加载后保存");
             if (!Objects.equals(current.getFactoryId(), rule.getFactoryId())
                     && extra.resultCount(current.getRuleId()) > 0)
                 throw new ServiceException("规则已生成单据号，不能变更适用工厂");
-            var currentParts = parts.selectByRuleIdForUpdate(scanned.getRuleId());
-            if (!Objects.equals(scannedPrefix, prefix(currentParts)))
-                throw new ServiceException("规则前缀已变化，请重新执行修改");
+            var configured = parts.selectByRuleIdForUpdate(current.getRuleId());
+            if (version != null && !version.equals(version(current, configured)))
+                throw new ServiceException("规则或组成已被其他操作修改，请重新加载后保存");
             if (current.getRuleType() != null && !Objects.equals(current.getRuleType(), rule.getRuleType()))
                 throw new ServiceException("规则单据类型不可变更");
-            validate(rule);
             unique(rule);
-            int changed = mapper.updateSysAutoCodeRule(rule);
-            if (changed > 0) cache.invalidateAfterCommit();
-            return changed;
+            if (mapper.updateSysAutoCodeRule(rule) != 1) throw new ServiceException("更新编码规则失败");
+            if (prefix != null) {
+                if (!prefixEditable(rule, configured))
+                    throw new ServiceException("此规则使用高级组成，请保留原配置并在组成页维护");
+                validatePrefix(rule, prefix);
+                if (configured.isEmpty()) configured = initializeParts(rule, prefix, actor);
+                else {
+                    var fixed = configured.getFirst();
+                    if (!Objects.equals(prefix, fixed.getFixCharacter())) {
+                        fixed.setFixCharacter(prefix);
+                        fixed.setPartLength(prefix.length());
+                        fixed.setUpdateBy(rule.getUpdateBy());
+                        if (parts.updateSysAutoCodePart(fixed) != 1)
+                            throw new ServiceException("规则组成已变化，请重新加载后保存");
+                    }
+                }
+            }
+            cache.invalidateAfterCommit();
+            return document(mapper.findById(current.getRuleId()), parts.selectByRuleIdForUpdate(current.getRuleId()));
         });
-        if (updatedCount == null) throw new ServiceException("更新编码规则失败");
-        return updatedCount;
+    }
+
+    private List<SysAutoCodePart> initializeParts(SysAutoCodeRule rule, String prefix, String actor) {
+        var initialized = new ArrayList<SysAutoCodePart>();
+        String[] types = {"FIXCHAR", "NOWDATE", "SERIALNO"};
+        String[] codes = {"PREFIX", "DATE", "SERIAL"};
+        String[] names = {"固定前缀", "服务端日期", "每日流水"};
+        for (int index = 0; index < types.length; index++) {
+            var part = new SysAutoCodePart();
+            part.setRuleId(rule.getRuleId());
+            part.setPartIndex(index + 1);
+            part.setPartType(types[index]);
+            part.setPartCode(codes[index]);
+            part.setPartName(names[index]);
+            part.setCreateBy(actor);
+            if (index == 0) { part.setFixCharacter(prefix); part.setPartLength(prefix.length()); }
+            if (index == 1) { part.setDateFormat("yyyyMMdd"); part.setPartLength(8); }
+            if (index == 2) {
+                part.setPartLength(3);
+                part.setSeriaStartNo(1);
+                part.setSeriaStep(1);
+                part.setCycleFlag("Y");
+                part.setCycleMethod("DAY");
+            }
+            if (parts.add(part) != 1) throw new ServiceException("初始化规则组成失败");
+            initialized.add(part);
+        }
+        return initialized;
+    }
+
+    private static void validatePrefix(SysAutoCodeRule rule, String prefix) {
+        if (prefix == null || prefix.isBlank() || prefix.length() > 53
+                || rule.getMaxLength() == null || prefix.length() + 11 > rule.getMaxLength()
+                || !"N".equals(rule.getIsPadded()))
+            throw new ServiceException("请填写固定前缀；前缀+8位日期+至少3位流水不能超过最大长度，且不启用整号补齐");
+    }
+
+    private static boolean prefixEditable(SysAutoCodeRule rule, List<SysAutoCodePart> configured) {
+        if (configured.isEmpty()) return true;
+        return SysAutoCodeGenerationServiceImpl.standardDocNoConfiguration(rule, configured);
+    }
+
+    private static AutoCodeRuleDocument document(SysAutoCodeRule rule, List<SysAutoCodePart> configured) {
+        return new AutoCodeRuleDocument(rule, List.copyOf(configured), version(rule, configured),
+                prefixEditable(rule, configured));
+    }
+
+    private static String version(SysAutoCodeRule rule, List<SysAutoCodePart> configured) {
+        var values = new ArrayList<Object>(Arrays.asList(rule.getRuleId(), rule.getRuleCode(), rule.getRuleType(),
+                rule.getFactoryId(), rule.getRuleName(), rule.getRuleDesc(), rule.getMaxLength(), rule.getIsPadded(),
+                rule.getPaddedChar(), rule.getPaddedMethod(), rule.getEnableFlag(), rule.getRemark()));
+        for (var part : configured) values.addAll(Arrays.asList(part.getPartId(), part.getPartIndex(),
+                part.getPartType(), part.getPartCode(), part.getPartName(), part.getPartLength(), part.getDateFormat(),
+                part.getInputCharacter(), part.getFixCharacter(), part.getSeriaStartNo(), part.getSeriaStep(),
+                part.getCycleFlag(), part.getCycleMethod(), part.getRemark()));
+        var canonical = new StringBuilder();
+        for (Object value : values) {
+            if (value == null) canonical.append("N;");
+            else { String text = value.toString(); canonical.append(text.length()).append(':').append(text); }
+        }
+        return RequestFingerprint.sha256(canonical.toString());
     }
 
     @Transactional(transactionManager = "masterTransactionManager", propagation = Propagation.NOT_SUPPORTED,

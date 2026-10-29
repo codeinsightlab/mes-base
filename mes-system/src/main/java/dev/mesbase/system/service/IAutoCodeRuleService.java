@@ -1,10 +1,17 @@
 package dev.mesbase.system.service;
 
 import dev.mesbase.common.core.domain.entity.SysAutoCodeRule;
+import dev.mesbase.system.dto.AutoCodeRuleDocument;
 
 import java.util.List;
 
 public interface IAutoCodeRuleService {
+
+    AutoCodeRuleDocument document(Long ruleId);
+
+    AutoCodeRuleDocument createDocument(SysAutoCodeRule rule, String prefix, String actor);
+
+    AutoCodeRuleDocument updateDocument(SysAutoCodeRule rule, String prefix, String version, String actor);
 
     public SysAutoCodeRule getOne(String ruleCode);
 

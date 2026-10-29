@@ -29,13 +29,10 @@
         SELECT e.id AS executionId,e.workorder_id AS workorderId,e.routing_id AS
         routingId,
         e.target_qty AS targetQty,p.path_status AS pathStatus,COALESCE(SUM(r.quantity_delta),0) AS lastNodeReportedQty,
-        COALESCE((SELECT SUM(d.production_output_qty) FROM wm_stock_document d
-        WHERE d.document_type='MATERIAL_ISSUE' AND d.production_request_id IS NOT NULL
-        AND d.production_confirmation_status=#{inputSUCCEEDED} AND d.status='POSTED'
-        AND d.source_execution_id=e.id AND d.production_input_kind='PRODUCTION_INPUT'
-        AND d.production_confirmed_at IS NOT NULL AND d.production_stock_applied=TRUE AND
-        COALESCE(d.production_void_result_status,'') NOT IN (#{inputSUBMITTING},#{inputUNKNOWN},#{inputSUCCEEDED})
-        AND d.production_source_mode=#{inputLOCAL_ONLY}),0) AS productionInputQty
+        COALESCE((SELECT SUM(f.output_qty) FROM mes_material_issue_input f JOIN wm_stock_document d ON d.id=f.document_id AND d.source_execution_id=f.execution_id WHERE f.execution_id=e.id AND f.input_kind='PRODUCTION_INPUT' AND f.confirmed_at IS NOT NULL AND f.stock_applied=TRUE
+        AND f.source_mode='LOCAL_ONLY' AND d.document_type='MATERIAL_ISSUE' AND d.status='POSTED'
+        AND NOT EXISTS(SELECT 1 FROM wm_stock_document_line original_line JOIN wm_stock_action reversal ON reversal.reference_action_id=original_line.stock_action_id
+          WHERE original_line.document_id=f.document_id AND reversal.action_type='REVERSAL')),0) AS productionInputQty
         FROM mes_production_execution e LEFT JOIN mes_execution_path p ON p.id=e.id
         LEFT JOIN mes_execution_path_node n ON n.execution_id=e.id
         AND n.sequence_no=(SELECT MAX(last.sequence_no) FROM mes_execution_path_node last WHERE last.execution_id=e.id)
@@ -44,52 +41,22 @@
         GROUP BY e.id,e.workorder_id,e.routing_id,e.target_qty,p.path_status
         ORDER BY e.id DESC
     </select>
-    <sql id="InputBalanceBindings">
-        <bind name="inputSUBMITTING" value="@dev.mesbase.business.issue.domain.MaterialIssueSubmissionStatus@SUBMITTING.getValue()"/>
-        <bind name="inputUNKNOWN" value="@dev.mesbase.business.issue.domain.MaterialIssueSubmissionStatus@UNKNOWN.getValue()"/>
-        <bind name="inputSUCCEEDED"
-              value="@dev.mesbase.business.issue.domain.MaterialIssueSubmissionStatus@SUCCEEDED.getValue()"/>
-        <bind name="inputLOCAL_ONLY" value="@dev.mesbase.business.integration.warehouse.ErpActionResult$Mode@LOCAL_ONLY.getValue()"/>
-    </sql>
     <sql id="InputBalanceFrom">
-        FROM wm_stock_document d
-        WHERE d.document_type='MATERIAL_ISSUE' AND d.production_request_id IS NOT NULL
-            AND d.production_confirmation_status IN (#{inputSUCCEEDED},#{inputSUBMITTING},#{inputUNKNOWN})
-            AND d.status!='CANCELLED'
-            AND d.production_input_kind='PRODUCTION_INPUT'
-            AND (d.production_confirmation_status!=#{inputSUCCEEDED}
-                 OR (d.production_confirmed_at IS NOT NULL AND d.production_stock_applied=TRUE))
-            AND d.production_source_mode=#{inputLOCAL_ONLY}
+        FROM mes_material_issue_input f JOIN wm_stock_document d ON d.id=f.document_id AND d.source_execution_id=f.execution_id WHERE f.input_kind='PRODUCTION_INPUT' AND f.confirmed_at IS NOT NULL AND f.stock_applied=TRUE
+        AND f.source_mode='LOCAL_ONLY' AND d.document_type='MATERIAL_ISSUE' AND d.status='POSTED'
+        AND NOT EXISTS(SELECT 1 FROM wm_stock_document_line original_line JOIN wm_stock_action reversal ON reversal.reference_action_id=original_line.stock_action_id
+          WHERE original_line.document_id=f.document_id AND reversal.action_type='REVERSAL')
     </sql>
     <select id="inputBalance" resultType="dev.mesbase.business.production.domain.ProductionInputBalance">
-        <include refid="InputBalanceBindings"/>
-        SELECT COALESCE(SUM(CASE WHEN d.production_confirmation_status=#{inputSUCCEEDED}
-             AND d.production_confirmed_at IS NOT NULL AND d.production_stock_applied=TRUE
-             AND COALESCE(d.production_void_result_status,'')!=#{inputSUCCEEDED}
-             THEN d.production_output_qty ELSE 0 END),0) AS confirmedQty,
-        COALESCE(SUM(CASE WHEN d.production_confirmation_status IN (#{inputSUBMITTING},#{inputUNKNOWN})
-             OR d.production_void_result_status IN (#{inputSUBMITTING},#{inputUNKNOWN})
-             THEN d.production_output_qty ELSE 0 END),0)
-        AS reservedQty
-        <include refid="InputBalanceFrom"/>
-        AND d.source_execution_id=#{executionId}
+        SELECT COALESCE(SUM(f.output_qty),0) AS confirmedQty, CAST(0 AS DECIMAL(20,6)) AS reservedQty
+        <include refid="InputBalanceFrom"/> AND f.execution_id=#{executionId}
     </select>
-    <select id="inputBalances"
-            resultType="dev.mesbase.business.production.domain.ProductionReportModels$ExecutionInputBalance">
-        <include refid="InputBalanceBindings"/>
-        SELECT d.source_execution_id executionId,
-        COALESCE(SUM(CASE WHEN d.production_confirmation_status=#{inputSUCCEEDED}
-             AND d.production_confirmed_at IS NOT NULL AND d.production_stock_applied=TRUE
-             AND COALESCE(d.production_void_result_status,'')!=#{inputSUCCEEDED}
-             THEN d.production_output_qty ELSE 0 END),0) AS confirmedQty,
-        COALESCE(SUM(CASE WHEN d.production_confirmation_status IN (#{inputSUBMITTING},#{inputUNKNOWN})
-             OR d.production_void_result_status IN (#{inputSUBMITTING},#{inputUNKNOWN})
-             THEN d.production_output_qty ELSE 0 END),0)
-        AS reservedQty
-        <include refid="InputBalanceFrom"/>
-        AND d.source_execution_id IN
+    <select id="inputBalances" resultType="dev.mesbase.business.production.domain.ProductionReportModels$ExecutionInputBalance">
+        SELECT f.execution_id AS executionId,COALESCE(SUM(f.output_qty),0) AS confirmedQty,
+               CAST(0 AS DECIMAL(20,6)) AS reservedQty
+        <include refid="InputBalanceFrom"/> AND f.execution_id IN
         <foreach collection="executionIds" item="id" open="(" close=")" separator=",">#{id}</foreach>
-        GROUP BY d.source_execution_id
+        GROUP BY f.execution_id
     </select>
     <select id="nodeTotalsBatch"
             resultType="dev.mesbase.business.production.domain.ProductionReportModels$ExecutionNodeTotal">

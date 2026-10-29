@@ -201,7 +201,10 @@ BEGIN
         SELECT 1 FROM mes_v53_permission_before before_row
         WHERE NOT EXISTS(SELECT 1 FROM mes_v53_permission_after after_row
                          WHERE after_row.role_id=before_row.role_id AND after_row.perms=before_row.perms)
-    ) OR EXISTS(
+    ) THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='Role permission set lost an existing capability during issue retirement';
+    END IF;
+    IF EXISTS(
         SELECT 1 FROM mes_v53_permission_after after_row
         WHERE NOT EXISTS(SELECT 1 FROM mes_v53_permission_before before_row
                          WHERE before_row.role_id=after_row.role_id AND before_row.perms=after_row.perms)

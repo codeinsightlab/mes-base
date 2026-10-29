@@ -1,11 +1,10 @@
 package dev.issuefixture;
 
-import dev.mesbase.business.wm.dao.WmStockDocumentMapper;
+import dev.mesbase.business.issue.dao.MesMaterialIssueInputMapper;
 
 import dev.mesbase.acceptance.AcceptanceBusinessDatabase;
 import dev.mesbase.business.directory.domain.DirectoryLabel;
 import dev.mesbase.business.directory.service.BusinessDirectoryService;
-import dev.mesbase.business.legacy.dao.LegacyHistoryMapper;
 import dev.mesbase.business.production.dao.MesExecutionPathMapper;
 import dev.mesbase.business.production.dao.MesExecutionPathNodeMapper;
 import dev.mesbase.business.production.dao.MesProductionExecutionMapper;
@@ -33,7 +32,6 @@ import java.util.LinkedHashSet;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 import org.mybatis.spring.SqlSessionTemplate;
-import org.springframework.beans.factory.support.StaticListableBeanFactory;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.support.TransactionTemplate;
 
@@ -59,7 +57,6 @@ class ProductionNormalizationReadOnlyMySqlTest {
         assertEquals("03dbc952-7403-11ef-802c-0242ac130002", jdbc.queryForObject("SELECT @@server_uuid", String.class));
         var manager = new OwnedTransactionManager(source);
         var mapperTypes = new LinkedHashSet<>(MaterialIssueHttpTest.MAPPERS);
-        mapperTypes.add(LegacyHistoryMapper.class);
         var factory = PersistenceFactories.create(source, mapperTypes, PersistenceFactories::pagination, manager::verifyAccess);
         var sql = new SqlSessionTemplate(factory);
         var directory = mock(BusinessDirectoryService.class);
@@ -74,13 +71,11 @@ class ProductionNormalizationReadOnlyMySqlTest {
         var paths = new ExecutionPathService(null, null, sql.getMapper(MesExecutionPathMapper.class),
                 sql.getMapper(MesExecutionPathNodeMapper.class), sql.getMapper(MesProductionExecutionMapper.class),
                 sql.getMapper(RoutingNodeMapper.class), sql.getMapper(RoutingEdgeMapper.class),
-                sql.getMapper(WmStockDocumentMapper.class),
+                sql.getMapper(MesMaterialIssueInputMapper.class),
                 directory, qualityQuery);
-        var evidence = new StaticListableBeanFactory();
-        evidence.addBean("openingEvidence", sql.getMapper(LegacyHistoryMapper.class));
         var quantities = new ProductionQuantityService(sql.getMapper(MesProductionExecutionMapper.class), paths,
                 sql.getMapper(MesExecutionPathNodeMapper.class), sql.getMapper(ProductionQuantityMapper.class),
-                directory, qualityQuery, sql.getMapper(WorkorderMapper.class), evidence.getBeanProvider(LegacyHistoryMapper.class));
+                directory, qualityQuery, sql.getMapper(WorkorderMapper.class));
         var transaction = new TransactionTemplate(manager);
         transaction.setReadOnly(true);
         FactoryContext.bind(new FactoryScope(new FactoryId("TEST_DEV_PERF_20261019")));
@@ -95,8 +90,7 @@ class ProductionNormalizationReadOnlyMySqlTest {
                     assertEquals(ErrorCode.EXECUTION_NOT_FOUND, missing.code());
                 }
                 ids.clear();
-                ids.addAll(jdbc.queryForList("SELECT id FROM mes_production_execution WHERE workorder_id=1914 OR status='FULLY_RECEIVED' ORDER BY id", Long.class));
-                ids.addAll(jdbc.queryForList("SELECT e.id FROM mes_production_execution e JOIN mes_legacy_source_mapping m ON m.entity_id=e.id AND m.entity_kind='EXECUTION' WHERE e.status='RUNNING' ORDER BY e.id LIMIT 20", Long.class));
+                ids.addAll(jdbc.queryForList("SELECT DISTINCT e.id FROM mes_production_execution e JOIN mes_material_issue_input f ON f.execution_id=e.id WHERE e.status='RUNNING' AND f.confirmed_at IS NOT NULL AND f.stock_applied=1 ORDER BY e.id LIMIT 20", Long.class));
                 for (Long id : ids) {
                     var view = quantities.getExecutionQuantities(id);
                     assertEquals("LOCKED", view.pathStatus(), "execution " + id);

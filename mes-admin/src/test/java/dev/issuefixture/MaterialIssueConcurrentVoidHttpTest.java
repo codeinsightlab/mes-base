@@ -74,7 +74,7 @@ class MaterialIssueConcurrentVoidHttpTest {
             assertEquals(a.get("voidOperationId").asText(), b.get("voidOperationId").asText());
             assertEquals(1, db.queryForObject("SELECT COUNT(*) FROM wm_stock_action WHERE action_type='REVERSAL'", Integer.class));
             assertEquals(0, new BigDecimal("10000").compareTo(db.queryForObject("SELECT quantity FROM wm_inventory WHERE id=1", BigDecimal.class)));
-            assertEquals(false, db.queryForObject("SELECT production_stock_applied FROM wm_stock_document WHERE id=?", Boolean.class, document));
+            assertEquals(false, db.queryForObject("SELECT stock_applied FROM mes_material_issue_input WHERE document_id=?", Boolean.class, document));
         }
     }
 }

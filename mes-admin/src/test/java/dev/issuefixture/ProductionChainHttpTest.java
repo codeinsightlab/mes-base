@@ -71,7 +71,7 @@ class ProductionChainHttpTest {
             assertEquals(0, a.queryForObject("SELECT COUNT(*) FROM workorder WHERE code='LEGACY'", Integer.class));
             assertEquals(0, a.queryForObject("SELECT COUNT(*) FROM mes_production_execution", Integer.class));
             assertEquals(0, a.queryForObject("SELECT COUNT(*) FROM wm_stock_document WHERE document_type='MATERIAL_ISSUE'", Integer.class));
-            assertEquals(0, a.queryForObject("SELECT COUNT(*) FROM wm_stock_document WHERE production_confirmation_status IS NOT NULL", Integer.class));
+            assertEquals(0, a.queryForObject("SELECT COUNT(*) FROM mes_material_issue_input WHERE confirmed_at IS NOT NULL", Integer.class));
             assertEquals(0, a.queryForObject("SELECT COUNT(*) FROM mes_execution_path", Integer.class));
             assertEquals(0, a.queryForObject("SELECT COUNT(*) FROM mes_execution_path_node", Integer.class));
             assertEquals(0, a.queryForObject("SELECT COUNT(*) FROM wm_stock_action", Integer.class));

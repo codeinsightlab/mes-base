@@ -136,7 +136,7 @@ class ProductionScanHttpTest {
                     .andExpect(status().isOk());
             assertEquals(3, j.queryForObject("SELECT COUNT(*) FROM mes_production_scan_activity", Integer.class));
             assertEquals(0, j.queryForObject("SELECT COUNT(*) FROM mes_production_report", Integer.class));
-            assertEquals(0, j.queryForObject("SELECT COUNT(*) FROM wm_stock_document WHERE production_confirmation_status IS NOT NULL", Integer.class));
+            assertEquals(0, j.queryForObject("SELECT COUNT(*) FROM mes_material_issue_input WHERE confirmed_at IS NOT NULL", Integer.class));
             assertEquals(0, j.queryForObject("SELECT COUNT(*) FROM wm_stock_action", Integer.class));
         }
     }

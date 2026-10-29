@@ -6,6 +6,7 @@ import dev.mesbase.business.wm.service.StockDocumentService;
 import dev.mesbase.business.wm.domain.StockDocumentModels;
 import dev.mesbase.business.wm.domain.StockDocumentStatus;
 import dev.mesbase.business.wm.domain.StockDocumentType;
+import dev.mesbase.business.wm.domain.StockDocumentDirection;
 import dev.mesbase.common.utils.SecurityUtils;
 import dev.mesbase.core.security.AuthenticatedActor;
 import dev.mesbase.core.security.AuthorizationService;
@@ -18,14 +19,13 @@ import dev.mesbase.business.integration.warehouse.ErpActionResult.Mode;
 import dev.mesbase.business.shared.enums.BusinessSource;
 import dev.mesbase.business.production.domain.ProductionExecutionStatus;
 import dev.mesbase.business.production.domain.WorkOrderStatus;
-import dev.mesbase.business.production.domain.ProductionScanCode;
 import dev.mesbase.business.production.domain.ProductionCodeRules;
 import dev.mesbase.business.production.domain.MesProductionExecutionCreateCommand;
 import dev.mesbase.business.production.domain.MesProductionExecutionResource;
 import dev.mesbase.infrastructure.cache.BusinessCacheProcessor;
 import dev.mesbase.infrastructure.cache.annotation.BusinessCacheEvict;
 import dev.mesbase.business.production.service.IMesProductionExecutionService;
-import dev.mesbase.business.wm.domain.WmStockDocumentEntity;
+import dev.mesbase.business.issue.domain.MesMaterialIssueInputEntity;
 import dev.mesbase.business.issue.service.MaterialIssueSubmissionService;
 import dev.mesbase.business.issue.service.MaterialIssueSubmissionService.Prepared;
 import dev.mesbase.business.integration.production.ProductionSupply.Calculation;
@@ -198,8 +198,14 @@ public class ProductionInputService {
         permit("business:mes:material:issue:update");
     }
 
+    private void requireStockDocumentCreatePermission() {
+        permit("business:wm:stock:document:create");
+    }
+
     public ManualCalculation calculateManual(Long workorderId, String stockReference, BigDecimal outputQty) {
         requireStockDocumentCreatePermission();
+        documents.getObject().requireTypeActive(StockDocumentDirection.OUT.getValue(),
+                StockDocumentType.MATERIAL_ISSUE.getValue());
         var calculated = supply.calculateManual(workorderId, stockReference, outputQty);
         return new ManualCalculation(calculated.code(), calculated.calculation());
     }
@@ -324,8 +330,6 @@ public class ProductionInputService {
             throw new FoundationException(ErrorCode.STOCK_DOCUMENT_CONFLICT, failure);
         }
         validate(command);
-        if (!Objects.equals(command.requestId(), approval.requestId()))
-            ParameterChecks.reject(ErrorCode.STOCK_DOCUMENT_CONFLICT);
         locks.order(command.workorderId());
         // Order serializes all allocation and UUID decisions, then the document is locked by bind/approve.
         var current = owner.detail(documentId).document();
@@ -340,7 +344,8 @@ public class ProductionInputService {
             ParameterChecks.reject(ErrorCode.STOCK_DOCUMENT_CONFLICT);
         // Current BOM, cumulative issue difference and order/stock balances are recalculated at approval.
         var prepared = prepare(command, calculation, hash, documentId);
-        var result = submissions.executePrepared(prepared);
+        var result = submissions.executePrepared(new Prepared(prepared.documentId(), prepared.pathRevision(),
+                prepared.confirmationRequired(), approval.requestId()));
         if (!StockDocumentStatus.POSTED.getValue().equals(result.getStatus()))
             ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
         return owner.detail(documentId);
@@ -352,8 +357,8 @@ public class ProductionInputService {
         supply.validateFrozenCalculation(calculation);
         var previous = inputFacts.findByRequestId(c.requestId());
         if (previous != null) {
-            if (!Objects.equals(previous.getProductionRequestHash(), hash)) ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
-            if (!Objects.equals(previous.getId(), documentId)) ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
+            if (!Objects.equals(previous.getRequestHash(), hash)) ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
+            if (!Objects.equals(previous.getDocumentId(), documentId)) ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
             documents.getObject().bindMaterialIssue(documentId, previous, calculation);
             return submissions.prepare(documentId, FactoryContext.required());
         }
@@ -403,37 +408,34 @@ public class ProductionInputService {
         var stock = calculation.stock();
         var fact = documents.getObject().detail(documentId).document();
         fact.setSourceExecutionId(executionId);
-        fact.setProductionRequestId(c.requestId());
-        fact.setProductionRequestHash(hash);
-        fact.setProductionInputKind(c.inputKind());
-        fact.setProductionOutputQty(c.outputQty());
-        fact.setProductionSourceMode(calculation.sourceMode());
-        fact.setProductionCalculationJson(json.writeValueAsString(calculation));
-        fact.setProductionRequestCreatedAt(LocalDateTime.now());
-        fact.setProductionStockApplied(false);
-        inputFacts.freeze(fact, calculation);
-        documents.getObject().bindMaterialIssue(documentId, fact, calculation);
+        var input = new MesMaterialIssueInputEntity();
+        input.setId(c.requestId());input.setRequestHash(hash);input.setDocumentId(documentId);
+        input.setExecutionId(executionId);input.setInputKind(c.inputKind());input.setOutputQty(c.outputQty());
+        input.setSourceMode(calculation.sourceMode());input.setCalculationJson(json.writeValueAsString(calculation));
+        input.setCreatedAt(LocalDateTime.now());input.setBusinessOccurredAt(LocalDateTime.now());input.setStockApplied(false);input.setStockId(Long.valueOf(stock.reference()));
+        inputFacts.freeze(fact, input, calculation);
+        documents.getObject().bindMaterialIssue(documentId, input, calculation);
         // Capacity and resumed status are written through locked Mappers; publish neither stale lists nor details.
         // The shared processor defers invalidation until this enclosing transaction commits.
         caches.evict(MesProductionExecutionResource.PREFIX, BusinessCacheEvict.Scope.LIST_AND_DETAIL);
         return submissions.prepare(documentId, FactoryContext.required());
     }
 
-    private Result replay(WmStockDocumentEntity previous, String hash) {
-        if (!Objects.equals(previous.getProductionRequestHash(), hash)) ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
+    private Result replay(MesMaterialIssueInputEntity previous, String hash) {
+        if (!Objects.equals(previous.getRequestHash(), hash)) ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
         return transaction.execute(s -> result(previous,
-                documents.getObject().detail(previous.getId()).document().getStatus()));
+                documents.getObject().detail(previous.getDocumentId()).document().getStatus()));
     }
 
-    private Result result(WmStockDocumentEntity f, String status) {
-        var execution = executionMapper.selectByPrimaryKey(f.getSourceExecutionId());
+    private Result result(MesMaterialIssueInputEntity f, String status) {
+        var execution = executionMapper.selectByPrimaryKey(f.getExecutionId());
         var product = materials.selectByPrimaryKey(execution.getProductId());
         String code = null;
         if (execution.getBatchNo() != null)
             code = identities.read(execution.getId()).qrCode();
         var q = quantities.getExecutionQuantities(execution.getId());
-        String documentId = f.getId().toString();
-        return new Result(f.getProductionRequestId(), documentId, f.getSourceExecutionId()
+        String documentId = f.getDocumentId().toString();
+        return new Result(f.getId(), documentId, f.getExecutionId()
                 .toString(), code, status, q.productionInputQty().toPlainString(), q.nodes()
                 .isEmpty() ? "0" : q.nodes().getFirst().availableQty().toPlainString());
     }

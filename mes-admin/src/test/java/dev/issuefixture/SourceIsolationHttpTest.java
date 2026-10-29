@@ -32,13 +32,13 @@ class SourceIsolationHttpTest {
     void localWorkorderCreationHasTrustedSourceAndForgedSourceCannotOverrideIt() throws Exception {
         try (var c = ProductionInputHttpTest.context()) {
             var m = MaterialIssueHttpTest.mvc(c);
-            String body = "{\"code\":\"TEST_SOURCE_NEW\",\"productId\":1,\"plannedQty\":\"100\",\"routingId\":1}";
+            String body = "{\"ruleCode\":\"WORK_ORDER\",\"code\":\"TEST_SOURCE_NEW\",\"productId\":1,\"plannedQty\":\"100\",\"routingId\":1}";
             m.perform(ProductionCoreV1HttpTest.full(post("/api/production/workorder")).content(body))
                     .andExpect(status().isOk()).andExpect(jsonPath("workorder.source").value("LOCAL"));
             m.perform(ProductionCoreV1HttpTest.full(post("/api/production/workorder"))
                             .content(body.replace("TEST_SOURCE_NEW", "TEST_FORGED")
                                     .replace("\"routingId\":1", "\"routingId\":1,\"source\":\"EXTERNAL\"")))
-                    .andExpect(status().isOk()).andExpect(jsonPath("workorder.source").value("LOCAL"));
+                    .andExpect(status().isBadRequest());
             FactorySnapshotFixture.set(c, FactorySnapshotFixture.erp("A", "TEST_PROVIDER", "TEST_A"));
             m.perform(ProductionCoreV1HttpTest.full(post("/api/production/workorder"))
                             .content(body.replace("TEST_SOURCE_NEW", "TEST_MODE_BYPASS")))

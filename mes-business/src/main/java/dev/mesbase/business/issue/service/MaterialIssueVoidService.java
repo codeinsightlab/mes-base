@@ -1,12 +1,10 @@
 package dev.mesbase.business.issue.service;
 
-import dev.mesbase.business.issue.domain.MaterialIssueSubmissionStatus;
 import dev.mesbase.business.production.service.ProductionExecutionRules;
 import dev.mesbase.business.production.service.ProductionQuantityService;
 import dev.mesbase.business.wm.domain.StockDocumentModels;
 import dev.mesbase.business.wm.domain.StockDocumentStatus;
 import dev.mesbase.business.wm.domain.StockDocumentType;
-import dev.mesbase.business.wm.domain.WmStockDocumentEntity;
 import dev.mesbase.business.wm.service.StockDocumentService;
 import dev.mesbase.core.error.ErrorCode;
 import dev.mesbase.core.error.FoundationException;
@@ -63,61 +61,34 @@ public class MaterialIssueVoidService {
             documents.cancel(documentId, new StockDocumentModels.Version(document.getRevision()));
             return result(documentId, StockDocumentStatus.CANCELLED.getValue(), null);
         }
-        if (!"LOCAL_ONLY".equals(input.getProductionSourceMode()))
-            throw new FoundationException(ErrorCode.BUSINESS_SOURCE_CONFLICT);
-        Long initialExecutionId = input.getSourceExecutionId();
-        executions.lock(initialExecutionId);
-        // All production commands lock WorkOrder -> Execution -> StockDocument. Re-read both
-        // mutable facts only after the shared execution lock, so a waiter observes the winner.
+        if (!"LOCAL_ONLY".equals(input.getSourceMode())) throw new FoundationException(ErrorCode.BUSINESS_SOURCE_CONFLICT);
+        Long executionId = input.getExecutionId();
+        executions.lock(executionId);
         document = documents.lockMaterialIssueForVoid(documentId);
         input = inputFacts.find(documentId);
-        if (input == null || !Objects.equals(initialExecutionId, input.getSourceExecutionId())
-                || !Objects.equals(document.getSourceExecutionId(), input.getSourceExecutionId()))
+        if (input == null || !Objects.equals(executionId, input.getExecutionId())
+                || !Objects.equals(document.getSourceExecutionId(), input.getExecutionId()))
             throw new FoundationException(ErrorCode.ISSUE_VOID_CONFLICT);
-        if (!"LOCAL_ONLY".equals(input.getProductionSourceMode()))
-            throw new FoundationException(ErrorCode.BUSINESS_SOURCE_CONFLICT);
-        if (input.getProductionVoidOperationId() != null
-                && MaterialIssueSubmissionStatus.SUCCEEDED.getValue().equals(input.getProductionVoidResultStatus()))
-            return result(documentId, document.getStatus(), input);
-        if (recovering && input.getProductionVoidOperationId() == null)
+        var reversal = inputFacts.recordedReversal(documentId);
+        if (reversal != null) return new Result(documentId.toString(), document.getStatus(), "VOIDED", reversal.getId(),
+                "SUCCEEDED", reversal.getOccurredAt(), reversal.getRecordedAt());
+        if (recovering || !StockDocumentStatus.POSTED.getValue().equals(document.getStatus())
+                || input.getConfirmedAt() == null || !Boolean.TRUE.equals(input.getStockApplied()))
             throw new FoundationException(ErrorCode.ISSUE_VOID_CONFLICT);
-        if (!recovering && input.getProductionVoidOperationId() != null)
-            throw new FoundationException(ErrorCode.ISSUE_VOID_CONFLICT);
-        if (!StockDocumentStatus.POSTED.getValue().equals(document.getStatus())
-                || input.getProductionConfirmedAt() == null || !Boolean.TRUE.equals(input.getProductionStockApplied()))
-            throw new FoundationException(ErrorCode.ISSUE_VOID_CONFLICT);
-        if (!recovering) {
-            input.setProductionVoidOperationId(UUID.randomUUID().toString());
-            input.setProductionVoidFromStatus(document.getStatus());
-            input.setProductionVoidRequestedAt(LocalDateTime.now());
-            input.setProductionVoidResultStatus(MaterialIssueSubmissionStatus.SUBMITTING.getValue());
-            save(input);
-        }
-        // Pending reversal output is excluded from confirmed production-input quantity.
-        // Validate only after marking this input pending, in the same transaction.
-        quantities.validateInputReduction(input.getSourceExecutionId());
-        inputFacts.voidConfirmed(documentId, input.getProductionVoidOperationId());
-        input.setProductionStockApplied(false);
-        input.setProductionVoidResultStatus(MaterialIssueSubmissionStatus.SUCCEEDED.getValue());
-        input.setProductionVoidFinishedAt(LocalDateTime.now());
-        save(input);
-        return result(documentId, documents.detail(documentId).document().getStatus(), input);
-    }
-
-    private void save(WmStockDocumentEntity input) {
+        String operationId = UUID.randomUUID().toString();
+        // Both contribution removal and inverse stock action are in this LOCAL transaction.
+        input.setStockApplied(false);
         if (inputFacts.updateVoid(input) != 1) throw new FoundationException(ErrorCode.RESOURCE_CONFLICT);
+        quantities.validateInputReduction(input.getExecutionId());
+        inputFacts.voidConfirmed(documentId, operationId);
+        reversal = inputFacts.recordedReversal(documentId);
+        if (reversal == null) throw new FoundationException(ErrorCode.ISSUE_VOID_CONFLICT);
+        return new Result(documentId.toString(), document.getStatus(), "VOIDED", reversal.getId(), "SUCCEEDED",
+                reversal.getOccurredAt(), reversal.getRecordedAt());
     }
 
-    private Result result(Long documentId, String documentStatus, WmStockDocumentEntity input) {
-        if (input == null) return new Result(documentId.toString(), documentStatus, "CANCELLED", null, null, null, null);
-        String productionStatus = switch (input.getProductionVoidResultStatus() == null ? "" : input.getProductionVoidResultStatus()) {
-            case "SUCCEEDED" -> "VOIDED";
-            case "SUBMITTING" -> "VOID_PENDING";
-            case "UNKNOWN" -> "VOID_UNKNOWN";
-            default -> "CONFIRMED";
-        };
-        return new Result(documentId.toString(), documentStatus, productionStatus, input.getProductionVoidOperationId(),
-                input.getProductionVoidResultStatus(), input.getProductionVoidRequestedAt(), input.getProductionVoidFinishedAt());
+    private Result result(Long documentId, String status, Object ignored) {
+        return new Result(documentId.toString(), status, "CANCELLED", null, null, null, null);
     }
 
     public record Result(String documentId, String documentStatus, String productionInputStatus,

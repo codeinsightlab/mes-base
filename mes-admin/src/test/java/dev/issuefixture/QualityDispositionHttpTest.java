@@ -125,8 +125,8 @@ class QualityDispositionHttpTest {
             var first = dispose(mvc, declaration, body);
             assertEquals("RECEIVED", first.path("receiptState").asText());
             dispose(mvc, declaration, body);
-            assertEquals(1, jdbc.queryForObject("SELECT COUNT(*) FROM wm_stock_document", Integer.class));
-            assertEquals(0, jdbc.queryForObject("SELECT COUNT(*) FROM wm_stock_document WHERE source_execution_id IS NOT NULL", Integer.class));
+            assertEquals(1, jdbc.queryForObject("SELECT COUNT(*) FROM wm_stock_document WHERE document_type IN ('DEFECT_RECEIPT','SCRAP_RECEIPT')", Integer.class));
+            assertEquals(0, jdbc.queryForObject("SELECT COUNT(*) FROM wm_stock_document WHERE document_type IN ('DEFECT_RECEIPT','SCRAP_RECEIPT') AND source_execution_id IS NOT NULL", Integer.class));
             FactoryContext.runWithScope(new FactoryScope(new FactoryId("A")), () -> {
                 var owner = c.getBean(QualityTreatmentService.class);
                 assertNull(owner.receiptBlockReason(1L));
@@ -171,8 +171,8 @@ class QualityDispositionHttpTest {
             // Replaying the original operation reads its immutable result before new-batch admission.
             j.update("UPDATE mes_production_execution SET batch_no=NULL WHERE id=1");
             dispose(m, id, body);
-            assertEquals(1, j.queryForObject("SELECT COUNT(*) FROM wm_stock_document", Integer.class));
-            assertEquals(0, j.queryForObject("SELECT COUNT(*) FROM wm_stock_document WHERE source_execution_id IS NOT NULL", Integer.class));
+            assertEquals(1, j.queryForObject("SELECT COUNT(*) FROM wm_stock_document WHERE document_type IN ('DEFECT_RECEIPT','SCRAP_RECEIPT')", Integer.class));
+            assertEquals(0, j.queryForObject("SELECT COUNT(*) FROM wm_stock_document WHERE document_type IN ('DEFECT_RECEIPT','SCRAP_RECEIPT') AND source_execution_id IS NOT NULL", Integer.class));
         }
     }
 
@@ -188,7 +188,7 @@ class QualityDispositionHttpTest {
                 m.perform(full(post(Q + "/" + id + "/dispositions"), "A").content(body))
                         .andExpect(status().is4xxClientError());
             assertEquals(0, j.queryForObject("SELECT COUNT(*) FROM mes_quality_treatment WHERE action_type IN ('RETURN_NODE','TRANSFER_WAREHOUSE')", Integer.class));
-            assertEquals(0, j.queryForObject("SELECT COUNT(*) FROM wm_stock_document", Integer.class));
+            assertEquals(0, j.queryForObject("SELECT COUNT(*) FROM wm_stock_document WHERE document_type IN ('DEFECT_RECEIPT','SCRAP_RECEIPT')", Integer.class));
         }
     }
 
@@ -203,7 +203,7 @@ class QualityDispositionHttpTest {
             var response = m.perform(full(post(Q + "/" + id + "/dispositions"), "A")
                     .content(command(UUID.randomUUID().toString(), "WAREHOUSE", "10", "1"))).andReturn().getResponse();
             assertEquals(409, response.getStatus());
-            assertEquals(0, j.queryForObject("SELECT COUNT(*) FROM wm_stock_document", Integer.class));
+            assertEquals(0, j.queryForObject("SELECT COUNT(*) FROM wm_stock_document WHERE document_type IN ('DEFECT_RECEIPT','SCRAP_RECEIPT')", Integer.class));
             assertEquals(0, j.queryForObject("SELECT COUNT(*) FROM wm_inventory WHERE batch_no='000LOT-001' ", Integer.class));
             assertEquals(0, j.queryForObject("SELECT COUNT(*) FROM mes_quality_treatment WHERE action_type='TRANSFER_WAREHOUSE'", Integer.class));
         }
@@ -223,7 +223,7 @@ class QualityDispositionHttpTest {
             m.perform(full(post(Q + "/" + id + "/dispositions"), "A")
                             .content(command(UUID.randomUUID().toString(), "WAREHOUSE", "10", "1")))
                     .andExpect(status().isConflict());
-            assertEquals(0, j.queryForObject("SELECT COUNT(*) FROM wm_stock_document", Integer.class));
+            assertEquals(0, j.queryForObject("SELECT COUNT(*) FROM wm_stock_document WHERE document_type IN ('DEFECT_RECEIPT','SCRAP_RECEIPT')", Integer.class));
         }
     }
 
@@ -246,7 +246,7 @@ class QualityDispositionHttpTest {
             var b = pool.submit(request);
             assertEquals(Set.of(200, 409), Set.of(a.get(), b.get()));
             assertEquals(1, j.queryForObject("SELECT COUNT(*) FROM mes_quality_treatment WHERE action_type='TRANSFER_WAREHOUSE'", Integer.class));
-            assertEquals(1, j.queryForObject("SELECT COUNT(*) FROM wm_stock_document WHERE status='POSTED'", Integer.class));
+            assertEquals(1, j.queryForObject("SELECT COUNT(*) FROM wm_stock_document WHERE document_type IN ('DEFECT_RECEIPT','SCRAP_RECEIPT') AND status='POSTED'", Integer.class));
         }
     }
 
@@ -339,7 +339,7 @@ class QualityDispositionHttpTest {
             m.perform(full(post(Q + "/" + id + "/dispositions"), "A")
                             .content(command(UUID.randomUUID().toString(), "WAREHOUSE", "10", "1")))
                     .andExpect(status().isConflict());
-            assertEquals(0, j.queryForObject("SELECT COUNT(*) FROM wm_stock_document", Integer.class));
+            assertEquals(0, j.queryForObject("SELECT COUNT(*) FROM wm_stock_document WHERE document_type IN ('DEFECT_RECEIPT','SCRAP_RECEIPT')", Integer.class));
             assertEquals(0, j.queryForObject("SELECT COUNT(*) FROM wm_inventory WHERE material_id=1 AND batch_no LIKE '000LOT-%'", Integer.class));
             assertEquals(0, j.queryForObject("SELECT COUNT(*) FROM mes_quality_treatment WHERE action_type='TRANSFER_WAREHOUSE'", Integer.class));
         }
@@ -393,7 +393,7 @@ class QualityDispositionHttpTest {
             assertEquals(key, document.path("qualitySource").path("sourceTreatmentId").asText());
             assertEquals(1, j.queryForObject("SELECT COUNT(*) FROM wm_stock_document_line l JOIN wm_stock_action a ON a.id=l.stock_action_id AND a.document_line_id=l.id WHERE l.document_id=?", Integer.class, documentId));
             dispose(m, declaration, body);
-            assertEquals(1, j.queryForObject("SELECT COUNT(*) FROM wm_stock_document", Integer.class));
+            assertEquals(1, j.queryForObject("SELECT COUNT(*) FROM wm_stock_document WHERE document_type IN ('DEFECT_RECEIPT','SCRAP_RECEIPT')", Integer.class));
             assertEquals(0, new BigDecimal("10").compareTo(j.queryForObject("SELECT SUM(quantity) FROM wm_inventory WHERE batch_no='000SCRAP-001'", BigDecimal.class)));
         }
     }

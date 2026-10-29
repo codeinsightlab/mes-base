@@ -112,7 +112,7 @@ class WorkorderBomInputHttpTest {
     static void receive(MockMvc m, long execution, String quantity) throws Exception {
         var document = JSON.readTree(m.perform(full(post(StockDocumentHttpTest.ROOT)).content(JSON.writeValueAsString(Map.of(
                         "documentType", "PRODUCTION_RECEIPT", "sourceExecutionId", Long.toString(execution),
-                        "reason", "TEST ONLY BOM input cycle", "ruleCode", "TEST_STOCK_IN"))))
+                        "direction", "IN", "reason", "TEST ONLY BOM input cycle", "ruleCode", "PRODUCTION_RECEIPT"))))
                 .andExpect(status().isOk()).andReturn().getResponse().getContentAsString());
         String id = document.get("document").get("id").asText();
         m.perform(full(post(StockDocumentHttpTest.ROOT + "/" + id + "/lines")).content(
@@ -231,7 +231,7 @@ class WorkorderBomInputHttpTest {
                     .getResponse().getStatus());
             assertEquals(List.of(200, 409), Stream.of(a.get(), b.get()).sorted().toList());
             assertEquals(1, j.queryForObject("SELECT COUNT(*) FROM mes_production_execution", Integer.class));
-            assertEquals(2, j.queryForObject("SELECT COUNT(*) FROM wm_stock_document WHERE production_confirmation_status IS NOT NULL", Integer.class));
+            assertEquals(2, j.queryForObject("SELECT COUNT(*) FROM mes_material_issue_input WHERE confirmed_at IS NOT NULL", Integer.class));
         }
     }
 
@@ -246,7 +246,7 @@ class WorkorderBomInputHttpTest {
             var first = pool.submit(() -> ProductionInputHttpTest.submit(m, body));
             var second = pool.submit(() -> ProductionInputHttpTest.submit(m, body));
             assertEquals(first.get(), second.get());
-            assertEquals(1, j.queryForObject("SELECT COUNT(*) FROM wm_stock_document WHERE production_confirmation_status IS NOT NULL", Integer.class));
+            assertEquals(1, j.queryForObject("SELECT COUNT(*) FROM mes_material_issue_input WHERE confirmed_at IS NOT NULL", Integer.class));
             assertEquals(1, j.queryForObject("SELECT COUNT(*) FROM mes_production_execution", Integer.class));
             assertEquals(0, new BigDecimal("250").compareTo(j.queryForObject("SELECT SUM(l.quantity) FROM wm_stock_document_line l JOIN wm_stock_document d ON d.id=l.document_id WHERE d.document_type='MATERIAL_ISSUE'", BigDecimal.class)));
         }

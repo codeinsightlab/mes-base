@@ -252,6 +252,12 @@ public class SysAutoCodeGenerationServiceImpl implements AutoCodeNumbering {
 
     private static void validateDocNoContract(SysAutoCodeRule rule,
             List<SysAutoCodePart> parts, List<SysAutoCodePart> serial) {
+        if (!standardDocNoConfiguration(rule, parts))
+            throw new ServiceException("规则不符合getDocNo(type)契约：需依次配置FIXCHAR前缀、yyyyMMdd日期、DAY每日流水（起始1、步长1、最小宽度3），且不启用整号补齐");
+    }
+
+    static boolean standardDocNoConfiguration(SysAutoCodeRule rule, List<SysAutoCodePart> parts) {
+        var serial = parts.stream().filter(p -> "SERIALNO".equals(p.getPartType())).toList();
         boolean prefix = !parts.isEmpty() && "FIXCHAR".equals(parts.get(0).getPartType())
                 && parts.get(0).getFixCharacter() != null
                 && !parts.get(0).getFixCharacter().isEmpty()
@@ -270,8 +276,7 @@ public class SysAutoCodeGenerationServiceImpl implements AutoCodeNumbering {
                     && "Y".equals(part.getCycleFlag()) && "DAY".equals(part.getCycleMethod())
                     && part.getPartLength() != null && part.getPartLength() >= 3;
         } else validSerial = false;
-        if (!prefix || !date || !validSerial || rule.getMaxLength() == null || rule.getMaxLength() > 64
-                || "Y".equals(rule.getIsPadded()))
-            throw new ServiceException("规则不符合getDocNo(type)契约：需依次配置FIXCHAR前缀、yyyyMMdd日期、DAY每日流水（起始1、步长1、最小宽度3），且不启用整号补齐");
+        return prefix && date && validSerial && rule.getMaxLength() != null && rule.getMaxLength() <= 64
+                && !"Y".equals(rule.getIsPadded());
     }
 }

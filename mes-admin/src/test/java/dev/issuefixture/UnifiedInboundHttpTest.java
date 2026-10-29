@@ -34,7 +34,8 @@ class UnifiedInboundHttpTest {
     }
 
     static String draft(MockMvc m, String execution, String qty, String batchNo) throws Exception {
-        String body = "{\"documentType\":\"" + (execution == null ? "OTHER_RECEIPT" : "PRODUCTION_RECEIPT") + "\",\"reason\":\"TEST ONLY inbound\"" + (execution == null ? "" : ",\"sourceExecutionId\":\"" + execution + "\"") + "}";
+        String ruleCode = execution == null ? "OTHER_RECEIPT" : "PRODUCTION_RECEIPT";
+        String body = "{\"ruleCode\":\"" + ruleCode + "\",\"direction\":\"IN\",\"documentType\":\"" + (execution == null ? "OTHER_RECEIPT" : "PRODUCTION_RECEIPT") + "\",\"reason\":\"TEST ONLY inbound\"" + (execution == null ? "" : ",\"sourceExecutionId\":\"" + execution + "\"") + "}";
         var d = StockDocumentHttpTest.JSON.readTree(m.perform(full(post(StockDocumentHttpTest.ROOT)).content(body))
                 .andExpect(status().isOk()).andReturn().getResponse().getContentAsString());
         String id = d.get("document").get("id").asText();
@@ -122,7 +123,7 @@ class UnifiedInboundHttpTest {
             var j = ProductionWarehouseFixture.db(c);
             j.update("INSERT INTO wm_inventory(id,material_id,warehouse_id,batch_no,quantity,available_quantity,status) VALUES(2,1,1,?,0,0,'ENABLED')", wrongBatch);
             String id = StockDocumentHttpTest.JSON.readTree(m.perform(full(post(StockDocumentHttpTest.ROOT))
-                                    .content("{\"documentType\":\"PRODUCTION_RECEIPT\",\"sourceExecutionId\":\"1\",\"reason\":\"TEST ONLY mismatched batch\"}"))
+                                    .content("{\"direction\":\"IN\",\"ruleCode\":\"PRODUCTION_RECEIPT\",\"documentType\":\"PRODUCTION_RECEIPT\",\"sourceExecutionId\":\"1\",\"reason\":\"TEST ONLY mismatched batch\"}"))
                             .andExpect(status().isOk()).andReturn().getResponse().getContentAsString()).get("document")
                     .get("id").asText();
             m.perform(full(post(StockDocumentHttpTest.ROOT + "/" + id + "/lines"))

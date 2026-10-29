@@ -66,7 +66,7 @@ class ProductionCoreV1HttpTest {
             String actions = "/api/production/executions/" + execution + "/actions/";
             var locked = j.queryForObject("SELECT locked_at FROM mes_execution_path WHERE id=?", String.class, execution);
             ProductionInputHttpTest.submit(m, body);
-            assertEquals(1, j.queryForObject("SELECT COUNT(*) FROM wm_stock_document WHERE production_confirmation_status IS NOT NULL", Integer.class));
+            assertEquals(1, j.queryForObject("SELECT COUNT(*) FROM mes_material_issue_input WHERE confirmed_at IS NOT NULL", Integer.class));
             ProductionInputHttpTest.submit(m, ProductionInputHttpTest.command(m, UUID.randomUUID()
                     .toString(), "L001", "100"));
             assertEquals(locked, j.queryForObject("SELECT locked_at FROM mes_execution_path WHERE id=?", String.class, execution));

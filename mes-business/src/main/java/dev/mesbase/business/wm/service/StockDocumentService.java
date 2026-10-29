@@ -8,6 +8,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import dev.mesbase.business.integration.production.ProductionSupply.Calculation;
 import dev.mesbase.business.issue.service.MaterialIssueInputFacts;
+import dev.mesbase.business.issue.domain.MesMaterialIssueInputEntity;
 import dev.mesbase.business.production.service.ProductionInputService;
 import dev.mesbase.business.production.service.ExecutionPathService;
 
@@ -18,6 +19,7 @@ import dev.mesbase.business.basic.dao.MaterialMapper;
 import dev.mesbase.business.basic.dao.UnitMeasureMapper;
 import dev.mesbase.business.production.dao.MesProductionExecutionMapper;
 import dev.mesbase.business.production.dao.WorkorderMapper;
+import dev.mesbase.business.production.dao.MesWorkorderMaterialMapper;
 import dev.mesbase.platform.execution.FactoryIntegrationContext;
 import dev.mesbase.core.factory.FactoryRuntimeMode;
 import dev.mesbase.business.production.dao.MesProductionReceiptMapper;
@@ -40,6 +42,10 @@ import dev.mesbase.business.production.service.ProductionChainLocks;
 import dev.mesbase.business.production.service.ProductionCompletionService;
 import dev.mesbase.system.service.AutoCodeNumbering;
 import dev.mesbase.system.service.AutoCodeRuleType;
+import dev.mesbase.common.utils.DictDataLookup;
+import dev.mesbase.infrastructure.persistence.PlatformPersistence;
+import dev.mesbase.system.mapper.SysDictDataMapper;
+import dev.mesbase.common.core.domain.entity.SysDictData;
 import org.springframework.beans.factory.ObjectProvider;
 import dev.mesbase.business.shared.enums.BusinessSource;
 import dev.mesbase.business.shared.enums.EnableStatus;
@@ -48,6 +54,7 @@ import dev.mesbase.business.wm.dao.WmStockDocumentMapper;
 import dev.mesbase.business.wm.dao.WmStockDocumentLineMapper;
 import dev.mesbase.business.wm.domain.StockDocumentModels;
 import dev.mesbase.business.wm.domain.StockDocumentStatus;
+import dev.mesbase.business.wm.domain.StockDocumentDirection;
 import dev.mesbase.business.wm.domain.StockDocumentType;
 import dev.mesbase.business.production.domain.WorkOrderStatus;
 import dev.mesbase.business.wm.domain.StockDocumentModels.CancellationBasis;
@@ -65,6 +72,7 @@ import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.util.Comparator;
+import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
@@ -109,9 +117,12 @@ public class StockDocumentService {
     private final ProductionQuantityService quantities;
     private final QualityTreatmentService quality;
     private final WorkorderMapper orders;
+    private final MesWorkorderMaterialMapper workorderMaterials;
     private final MesQualityTreatmentMapper qualityEvents;
     private final ObjectProvider<ProductionCompletionService> completion;
     private final AutoCodeNumbering autoCodes;
+    private final DictDataLookup documentTypeDictionary;
+    private final PlatformPersistence center;
     private final TransactionTemplate businessTransactions;
 
     public StockDocumentService(WmStockDocumentMapper documents, WmStockDocumentLineMapper lines,
@@ -120,14 +131,18 @@ public class StockDocumentService {
                                 MesProductionExecutionMapper executions, MesProductionReceiptMapper receipts,
                                 Validator validator, StockDocumentExtraMapper inbound,
                                 ProductionQuantityService quantities, QualityTreatmentService quality,
-                                WorkorderMapper orders, MesQualityTreatmentMapper qualityEvents,
+                                WorkorderMapper orders, MesWorkorderMaterialMapper workorderMaterials, MesQualityTreatmentMapper qualityEvents,
                                 ObjectProvider<ProductionCompletionService> completion,
                                 ObjectProvider<ProductionInputService> productionInputs,
                                 ObjectProvider<MaterialIssueInputFacts> inputFacts,
                                 ExecutionPathService executionPaths, MaterialQuantityRules quantityRules,
                                 AutoCodeNumbering autoCodes,
+                                DictDataLookup documentTypeDictionary,
+                                PlatformPersistence center,
                                 @Qualifier("businessTransactionManager") PlatformTransactionManager businessManager) {
         this.autoCodes = autoCodes;
+        this.documentTypeDictionary = documentTypeDictionary;
+        this.center = center;
         this.businessTransactions = new TransactionTemplate(businessManager);
         this.businessTransactions.setIsolationLevel(TransactionDefinition.ISOLATION_READ_COMMITTED);
         this.productionInputs = productionInputs;
@@ -136,6 +151,7 @@ public class StockDocumentService {
         this.completion = completion;
         this.qualityEvents = qualityEvents;
         this.orders = orders;
+        this.workorderMaterials = workorderMaterials;
         this.inbound = inbound;
         this.quantities = quantities;
         this.quality = quality;
@@ -221,30 +237,48 @@ public class StockDocumentService {
         var document = require(documentId);
         if (!StockDocumentType.MATERIAL_ISSUE.getValue().equals(document.getDocumentType()))
             throw new FoundationException(ErrorCode.NOT_FOUND);
-        if (document.getProductionRequestId() == null) return null;
+        var input = inputFacts.getObject().find(documentId);
+        if (input == null) return null;
         var snapshot = inputFacts.getObject().snapshot(documentId);
         var calculation = snapshot.calculation();
         List<Long> selectedNodes = List.of();
+        Integer pathRevision = null;
         String pathError = null;
         if (document.getSourceExecutionId() != null) {
             try {
-                selectedNodes = executionPaths.view(document.getSourceExecutionId()).selectedNodeIds();
+                var path = executionPaths.view(document.getSourceExecutionId());
+                selectedNodes = path.selectedNodeIds();
+                if (path.path() != null) pathRevision = path.path().getRevision();
             } catch (FoundationException failure) {
+                if (failure.code() != ErrorCode.RESOURCE_CONFLICT
+                        && failure.code() != ErrorCode.EXECUTION_NOT_FOUND) throw failure;
                 pathError = "实际路径读取失败；领料投入与库存明细仍可查看";
             }
         }
-        var bom = calculation.basis();
-        return new ProductionInputBasis(document.getProductionRequestId(), document.getProductionInputKind(),
-                document.getProductionSourceMode(), document.getSourceExecutionId(),
-                calculation.order().workorderId(), calculation.order().workorderCode(),
-                document.getProductionOutputQty(), calculation.issueQty(), calculation.stock().materialId(),
+        Long bomId = null;
+        BigDecimal bomBase = null;
+        BigDecimal bomComponent = null;
+        var material = workorderMaterials.selectByPrimaryKey(document.getSourceWorkorderId());
+        if (material != null) {
+            bomId = material.getBomId();
+            bomBase = material.getBomBaseQty();
+            bomComponent = material.getBomComponentQty();
+        }
+        String voidOperationId = null;
+        String voidResultStatus = null;
+        var reversal = inputFacts.getObject().recordedReversal(documentId);
+        if (reversal != null) {
+            voidOperationId = reversal.getId();
+            voidResultStatus = "VOIDED";
+        }
+        return new ProductionInputBasis(input.getId(), input.getInputKind(), input.getSourceMode(),
+                input.getExecutionId(), calculation.order().workorderId(), calculation.order().workorderCode(),
+                input.getOutputQty(), calculation.issueQty(), calculation.stock().materialId(),
                 calculation.stock().materialCode(), calculation.stock().warehouseId(),
                 calculation.stock().unitId(), calculation.stock().lotCode(),
-                bom == null ? null : bom.bomId(), bom == null ? null : bom.baseQty(),
-                bom == null ? null : bom.componentQty(), document.getProductionPathRevision(), selectedNodes,
-                document.getProductionBusinessOccurredAt(), document.getProductionConfirmedAt(),
-                document.getProductionStockApplied(), document.getProductionVoidOperationId(),
-                document.getProductionVoidResultStatus(), pathError);
+                bomId, bomBase, bomComponent, pathRevision, selectedNodes,
+                input.getBusinessOccurredAt(), input.getConfirmedAt(), input.getStockApplied(),
+                voidOperationId, voidResultStatus, pathError);
     }
 
     public record ProductionInputBasis(String requestId, String inputKind, String sourceMode,
@@ -257,6 +291,47 @@ public class StockDocumentService {
                                        LocalDateTime confirmedAt, Boolean stockApplied,
                                        String voidOperationId, String voidResultStatus, String pathError) { }
 
+    public record DocumentTypeOption(String value, String direction, String label, String origin,
+                                     String requiredDocuments, boolean approvalAvailable,
+                                     boolean qualityReceipt, boolean enabled, int sort) { }
+
+    @Transactional(transactionManager = "businessTransactionManager", readOnly = true)
+    public List<DocumentTypeOption> typeOptions(String direction) {
+        StockDocumentDirection flow = StockDocumentDirection.from(direction);
+        if (flow == null) ParameterChecks.reject(ErrorCode.BAD_REQUEST);
+        String dictionary = flow == StockDocumentDirection.IN ? "stock_document_in_type" : "stock_document_out_type";
+        List<SysDictData> selectedRows = dictionaryRows(dictionary);
+        List<SysDictData> rows = selectedRows == null ? List.of() : selectedRows;
+        return Arrays.stream(StockDocumentType.values()).filter(type -> type.getDirection() == flow)
+                .map(type -> {
+                    SysDictData row = rows.stream().filter(value -> type.getValue().equals(value.getDictValue()))
+                            .findFirst().orElse(null);
+                    return new DocumentTypeOption(type.getValue(), direction,
+                            row == null ? type.getDescription() : row.getDictLabel(), type.getOrigin(),
+                            type.getRequiredDocuments(), type.isApprovalAvailable(), type.isQualityReceipt(),
+                            row != null && "0".equals(row.getStatus()), row == null || row.getDictSort() == null
+                            ? Integer.MAX_VALUE : row.getDictSort().intValue());
+                }).sorted(Comparator.comparingInt(DocumentTypeOption::sort)).toList();
+    }
+
+    @Transactional(transactionManager = "businessTransactionManager", propagation = Propagation.NOT_SUPPORTED,
+            readOnly = true)
+    public void requireTypeActive(String direction, String typeKey) {
+        StockDocumentType purpose = type(typeKey);
+        requireDirection(direction, purpose);
+        String dictionary = StockDocumentDirection.IN.getValue().equals(direction)
+                ? "stock_document_in_type" : "stock_document_out_type";
+        List<SysDictData> rows = dictionaryRows(dictionary);
+        if (rows == null || rows.stream().noneMatch(row -> typeKey.equals(row.getDictValue())
+                && "0".equals(row.getStatus()))) ParameterChecks.reject(ErrorCode.STOCK_DOCUMENT_SOURCE_PENDING);
+    }
+
+    private List<SysDictData> dictionaryRows(String dictionary) {
+        if (center.transactionManager().foreignTransactionActive())
+            return center.readOnly(session -> session.mapper(SysDictDataMapper.class).selectDictDataByType(dictionary));
+        return documentTypeDictionary.selectDictDataByType(dictionary);
+    }
+
     @Transactional(transactionManager = "businessTransactionManager", propagation = Propagation.NOT_SUPPORTED,
             rollbackFor = Exception.class)
     public Detail create(StockDocumentModels.Create command) {
@@ -265,6 +340,7 @@ public class StockDocumentService {
         if (purpose.isQualityReceipt() || purpose == StockDocumentType.MATERIAL_ISSUE)
             ParameterChecks.reject(ErrorCode.STOCK_DOCUMENT_SOURCE_PENDING);
         requireDirection(command.direction(), purpose);
+        requireTypeActive(command.direction(), command.documentType());
         String category = numberingCategory(command.direction());
         String ruleCode = command.ruleCode() == null || command.ruleCode().isBlank()
                 ? purpose.getValue() : command.ruleCode();
@@ -280,6 +356,7 @@ public class StockDocumentService {
         var header = command.header();
         StockDocumentType purpose = type(header.documentType());
         requireDirection(header.direction(), purpose);
+        requireTypeActive(header.direction(), header.documentType());
         if (purpose == StockDocumentType.MATERIAL_ISSUE)
             return productionInputs.getObject().createAggregateDraft(command);
         if (purpose.isQualityReceipt())
@@ -355,6 +432,8 @@ public class StockDocumentService {
         validate(command);
         if (!type(command.documentType()).isQualityReceipt() || command.sourceExecutionId() != null || command.sourceWorkorderId() != null)
             ParameterChecks.reject(ErrorCode.BAD_REQUEST);
+        if (!command.documentType().equals(command.ruleCode())) ParameterChecks.reject(ErrorCode.BAD_REQUEST);
+        requireTypeActive(command.direction(), command.documentType());
         return createDraft(command, documentNo);
     }
 
@@ -364,6 +443,8 @@ public class StockDocumentService {
         validate(command);
         StockDocumentType purpose = type(command.documentType());
         requireDirection(command.direction(), purpose);
+        if (!command.documentType().equals(command.ruleCode())) ParameterChecks.reject(ErrorCode.BAD_REQUEST);
+        requireTypeActive(command.direction(), command.documentType());
         if (purpose.isQualityReceipt() || purpose == StockDocumentType.MATERIAL_ISSUE)
             ParameterChecks.reject(ErrorCode.STOCK_DOCUMENT_SOURCE_PENDING);
         return createDraft(command, documentNo);
@@ -565,7 +646,7 @@ public class StockDocumentService {
                 String actionId = line.getId().equals(detail.getFirst().getId()) ? command.requestId()
                         : UUID.nameUUIDFromBytes((command.requestId() + ":" + line.getId()).getBytes(StandardCharsets.UTF_8))
                         .toString();
-                var action = stock.postDocument(row.getDocumentType(), id, line, command.requestId(), actionId,
+                var action = stock.postDocument(row.getDirection(), row.getDocumentType(), id, line, command.requestId(), actionId,
                         hash, row.getReason(), executionId);
                 line.setStockActionId(action.getId());
                 if (lines.updateByPrimaryKey(line) != 1) ParameterChecks.reject(ErrorCode.STOCK_DOCUMENT_CONFLICT);
@@ -598,15 +679,7 @@ public class StockDocumentService {
         var draft = materialIssueDocument(calculation, documentNo);
         var row = lock(draft.document().getId());
         row.setSourceRequestJson(frozen);
-        row.setPostRequestId(command.requestId());
-        row.setProductionRequestId(command.requestId());
-        row.setProductionRequestHash(RequestFingerprint.sha256(new ObjectMapper().writeValueAsString(command)));
-        row.setProductionInputKind(command.inputKind());
-        row.setProductionOutputQty(command.outputQty());
-        row.setProductionSourceMode(calculation.sourceMode());
-        row.setProductionCalculationJson(new ObjectMapper().writeValueAsString(calculation));
-        row.setProductionRequestCreatedAt(LocalDateTime.now());
-        row.setProductionStockApplied(false);
+        row.setCreateRequestId(command.requestId());
         try {
             if (documents.updateByPrimaryKeyWithBLOBs(row) != 1)
                 ParameterChecks.reject(ErrorCode.STOCK_DOCUMENT_CONFLICT);
@@ -618,7 +691,7 @@ public class StockDocumentService {
 
     public Detail findMaterialIssueDraft(ProductionInputService.Command command) {
         var filter = new WmStockDocumentExample();
-        filter.createCriteria().andPostRequestIdEqualTo(command.requestId());
+        filter.createCriteria().andCreateRequestIdEqualTo(command.requestId());
         var existing = bounded(() -> documents.selectByExampleWithBLOBs(filter));
         if (existing.isEmpty()) return null;
         if (existing.size() != 1)
@@ -637,7 +710,7 @@ public class StockDocumentService {
     public Detail findMaterialIssueDraftByRequestId(String requestId) {
         if (requestId == null || requestId.isBlank()) ParameterChecks.reject(ErrorCode.BAD_REQUEST);
         var filter = new WmStockDocumentExample();
-        filter.createCriteria().andPostRequestIdEqualTo(requestId);
+        filter.createCriteria().andCreateRequestIdEqualTo(requestId);
         var existing = bounded(() -> documents.selectByExampleWithBLOBs(filter));
         if (existing.isEmpty()) return null;
         if (existing.size() != 1 || type(existing.getFirst().getDocumentType()) != StockDocumentType.MATERIAL_ISSUE)
@@ -647,12 +720,21 @@ public class StockDocumentService {
 
     @Transactional(transactionManager = "businessTransactionManager", readOnly = true)
     public String findDocumentIdForRequest(String requestId) {
-        if (requestId == null) ParameterChecks.reject(ErrorCode.BAD_REQUEST);
+        uuid(requestId);
+        var input = inputFacts.getObject().findByRequestId(requestId);
+        if (input != null) {
+            var document = require(input.getDocumentId());
+            if (type(document.getDocumentType()) != StockDocumentType.MATERIAL_ISSUE)
+                throw new FoundationException(ErrorCode.NOT_FOUND);
+            return document.getId().toString();
+        }
         var filter = new WmStockDocumentExample();
-        filter.createCriteria().andProductionRequestIdEqualTo(requestId);
-        var found = bounded(() -> documents.selectByExampleWithBLOBs(filter));
+        filter.createCriteria().andCreateRequestIdEqualTo(requestId)
+                .andDocumentTypeEqualTo(StockDocumentType.MATERIAL_ISSUE.getValue());
+        var found = documents.selectByExample(filter);
         if (found.size() > 1) ParameterChecks.reject(ErrorCode.STOCK_DOCUMENT_CONFLICT);
-        return found.isEmpty() ? null : found.getFirst().getId().toString();
+        if (found.isEmpty()) return null;
+        return found.getFirst().getId().toString();
     }
 
     private Detail materialIssueDocument(Calculation calculation, String documentNo) {
@@ -669,33 +751,33 @@ public class StockDocumentService {
     /**
      * Approval has already obtained the order lock; binding cannot be supplied by a client.
      */
-    public void bindMaterialIssue(Long documentId, WmStockDocumentEntity input, Calculation calculation) {
+    public void bindMaterialIssue(Long documentId, MesMaterialIssueInputEntity input, Calculation calculation) {
         var row = lock(documentId);
         if (type(row.getDocumentType()) != StockDocumentType.MATERIAL_ISSUE
                 || !StockDocumentStatus.DRAFT.getValue().equals(row.getStatus())
                 || !Objects.equals(row.getSourceWorkorderId(), calculation.order().workorderId())
-                || !Objects.equals(row.getProductionRequestId(), input.getProductionRequestId()))
+                || !Objects.equals(row.getId(), input.getDocumentId()))
             ParameterChecks.reject(ErrorCode.STOCK_DOCUMENT_CONFLICT);
-        row.setSourceExecutionId(input.getSourceExecutionId());
+        row.setSourceExecutionId(input.getExecutionId());
         if (documents.updateByPrimaryKeyWithBLOBs(row) != 1) ParameterChecks.reject(ErrorCode.STOCK_DOCUMENT_CONFLICT);
     }
 
     /**
      * The existing issue confirmation enters the same owner and approval algorithm as the Web page.
      */
-    public void postMaterialIssue(Long documentId, WmStockDocumentEntity input,
-                                  Calculation calculation) {
+    public void postMaterialIssue(Long documentId, MesMaterialIssueInputEntity input,
+                                  Calculation calculation, String postRequestId) {
         productionInputs.getObject().requireApprovalPermissions();
-        if (!Objects.equals(input.getId(), documentId))
+        if (!Objects.equals(input.getDocumentId(), documentId))
             ParameterChecks.reject(ErrorCode.STOCK_DOCUMENT_CONFLICT);
-        approve(documentId, new StockDocumentModels.Post(input.getProductionRequestId(), require(documentId).getRevision()), true);
+        approve(documentId, new StockDocumentModels.Post(postRequestId, require(documentId).getRevision()), true);
     }
 
     private void validateMaterialIssue(WmStockDocumentEntity document, List<WmStockDocumentLineEntity> detail,
                                        StockDocumentModels.Post command) {
         var input = inputFacts.getObject().find(document.getId());
-        if (input == null || !Objects.equals(input.getProductionRequestId(), command.requestId())
-                || !Objects.equals(input.getSourceExecutionId(), document.getSourceExecutionId()) || detail.size() != 1)
+        if (input == null || !Objects.equals(input.getDocumentId(), document.getId())
+                || !Objects.equals(input.getExecutionId(), document.getSourceExecutionId()) || detail.size() != 1)
             ParameterChecks.reject(ErrorCode.STOCK_DOCUMENT_SOURCE_PENDING);
         var calculation = inputFacts.getObject().snapshot(document.getId()).calculation();
         var line = detail.getFirst();

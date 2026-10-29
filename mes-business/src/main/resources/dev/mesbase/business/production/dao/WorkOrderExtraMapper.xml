@@ -11,19 +11,12 @@
       OR EXISTS(SELECT 1 FROM mes_quality_release WHERE execution_id=#{id})
       OR EXISTS(SELECT 1 FROM mes_warehouse_acceptance WHERE execution_id=#{id})
       OR EXISTS(SELECT 1 FROM mes_execution_completion WHERE execution_id=#{id})
+      OR EXISTS(SELECT 1 FROM mes_material_issue_input WHERE execution_id=#{id})
       OR EXISTS(SELECT 1 FROM wm_stock_action WHERE execution_id=#{id})
       OR EXISTS(SELECT 1 FROM wm_stock_document WHERE source_execution_id=#{id})
  </select>
  <select id="pendingExecutionInput" resultType="java.math.BigDecimal">
-  <bind name="voided" value="@dev.mesbase.business.issue.domain.MaterialIssueSubmissionStatus@SUCCEEDED.getValue()"/>
-  <bind name="rejected" value="@dev.mesbase.business.issue.domain.MaterialIssueSubmissionStatus@REJECTED.getValue()"/>
-  SELECT COALESCE(SUM(d.production_output_qty),0) FROM wm_stock_document d
-  WHERE d.source_execution_id=#{id} AND d.document_type='MATERIAL_ISSUE'
-    AND d.status!='CANCELLED' AND d.production_request_id IS NOT NULL
-      AND (d.production_confirmation_status IS NOT NULL OR d.production_confirmed_at IS NOT NULL)
-    AND d.production_input_kind='PRODUCTION_INPUT' AND d.production_confirmed_at IS NULL
-    AND COALESCE(d.production_void_result_status,'') != #{voided}
-    AND (d.production_confirmation_status IS NULL OR d.production_confirmation_status != #{rejected})
+  SELECT CAST(0 AS DECIMAL(20,6))
  </select>
  <select id="activeAllocation" resultType="dev.mesbase.business.production.domain.WorkOrderModels$Allocation">
   <bind name="cancelled" value="@dev.mesbase.business.production.domain.ProductionExecutionStatus@CANCELLED.getValue()"/>
@@ -46,17 +39,15 @@
   WHERE w.id=#{id}
  </select>
  <select id="countUnaccountedInputs" resultType="long">
-  <bind name="posted" value="@dev.mesbase.business.wm.domain.StockDocumentStatus@POSTED.getValue()"/>
-  <bind name="issue" value="@dev.mesbase.business.wm.domain.StockDocumentType@MATERIAL_ISSUE.getValue()"/>
-  <bind name="succeeded" value="@dev.mesbase.business.issue.domain.MaterialIssueSubmissionStatus@SUCCEEDED.getValue()"/>
-  <bind name="completed" value="@dev.mesbase.business.production.domain.ProductionExecutionStatus@FULLY_RECEIVED.getValue()"/>
   SELECT COUNT(d.id) FROM wm_stock_document d
+  LEFT JOIN mes_material_issue_input f ON f.document_id=d.id
   LEFT JOIN mes_production_execution e ON e.id=d.source_execution_id AND e.workorder_id=d.source_workorder_id
-  WHERE d.source_workorder_id=#{id} AND d.document_type=#{issue} AND d.status=#{posted}
-    AND COALESCE(d.production_void_result_status,'') != #{succeeded}
-    AND (d.production_request_id IS NULL OR d.production_input_kind!='PRODUCTION_INPUT' OR d.production_confirmed_at IS NULL
-         OR COALESCE(d.production_confirmation_status,'')!=#{succeeded}
-         OR e.id IS NULL OR e.status!=#{completed})
+  WHERE d.source_workorder_id=#{id} AND d.document_type='MATERIAL_ISSUE' AND d.status='POSTED'
+    AND (NOT EXISTS(SELECT 1 FROM wm_stock_document_line l WHERE l.document_id=d.id)
+      OR EXISTS(SELECT 1 FROM wm_stock_document_line l WHERE l.document_id=d.id
+        AND NOT EXISTS(SELECT 1 FROM wm_stock_action r WHERE r.reference_action_id=l.stock_action_id AND r.action_type='REVERSAL')))
+    AND (f.id IS NULL OR f.input_kind!='PRODUCTION_INPUT' OR f.confirmed_at IS NULL
+         OR f.stock_applied!=TRUE OR f.execution_id!=d.source_execution_id OR e.id IS NULL OR e.status!='FULLY_RECEIVED')
  </select>
  <select id="publishedForProduct" resultMap="dev.mesbase.business.production.dao.RoutingMapper.BaseResultMap">
     <bind name="enabledStatus" value="@dev.mesbase.business.shared.enums.EnableStatus@ENABLED.getValue()"/>
@@ -82,12 +73,11 @@
   GROUP BY w.id,w.planned_qty
  </select>
   <select id="countBlockingIssues" resultType="long">
-    <bind name="cancelled" value="@dev.mesbase.business.wm.domain.StockDocumentStatus@CANCELLED.getValue()"/>
-    <bind name="issue" value="@dev.mesbase.business.wm.domain.StockDocumentType@MATERIAL_ISSUE.getValue()"/>
-    <bind name="succeeded" value="@dev.mesbase.business.issue.domain.MaterialIssueSubmissionStatus@SUCCEEDED.getValue()"/>
-    <bind name="localMode" value="@dev.mesbase.business.integration.warehouse.ErpActionResult$Mode@LOCAL_ONLY.getValue()"/>
     SELECT COUNT(*) FROM wm_stock_document d
-    WHERE d.source_workorder_id=#{workorderId} AND d.document_type=#{issue} AND d.status != #{cancelled}
-      AND NOT (COALESCE(d.production_void_result_status,'')=#{succeeded} AND COALESCE(d.production_source_mode,'')=#{localMode})
+    WHERE d.source_workorder_id=#{workorderId} AND d.document_type='MATERIAL_ISSUE' AND d.status!='CANCELLED'
+      AND (NOT EXISTS(SELECT 1 FROM wm_stock_document_line l WHERE l.document_id=d.id)
+        OR EXISTS(SELECT 1 FROM wm_stock_document_line l
+          WHERE l.document_id=d.id AND NOT EXISTS(SELECT 1 FROM wm_stock_action r
+            WHERE r.reference_action_id=l.stock_action_id AND r.action_type='REVERSAL')))
   </select>
 </mapper>

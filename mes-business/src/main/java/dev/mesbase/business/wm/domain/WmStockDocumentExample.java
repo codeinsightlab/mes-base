@@ -1144,6 +1144,11 @@ public class WmStockDocumentExample {
             return (Criteria) this;
         }
 
+        public Criteria andCreateRequestIdEqualTo(String value) {
+            addCriterion("create_request_id =", value, "createRequestId");
+            return (Criteria) this;
+        }
+
         public Criteria andPostRequestIdNotEqualTo(String value) {
             addCriterion("post_request_id <>", value, "postRequestId");
             return (Criteria) this;
@@ -1274,10 +1279,6 @@ public class WmStockDocumentExample {
             return (Criteria) this;
         }
 
-        public Criteria andProductionRequestIdEqualTo(String value) {
-            addCriterion("production_request_id =", value, "productionRequestId");
-            return (Criteria) this;
-        }
 
         public Criteria andSourceExecutionIdIsNotNull() {
             addCriterion("source_execution_id is not null");

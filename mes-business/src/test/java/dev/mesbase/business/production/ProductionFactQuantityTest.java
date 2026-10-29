@@ -1,4 +1,4 @@
-package dev.mesbase.business.legacy;
+package dev.mesbase.business.production;
 
 import dev.mesbase.business.production.domain.ProductionReportModels.ExecutionQuantity;
 import dev.mesbase.business.production.domain.ProductionReportModels.NodeQuantity;
@@ -19,13 +19,13 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertNull;
 
-class LegacyHistoryQuantityTest {
+class ProductionFactQuantityTest {
     private static BigDecimal q(String value) {
         return new BigDecimal(value);
     }
 
     private static NodeQuantity node(long id, String gross, String defect) {
-        return new NodeQuantity(1L, id, id, "N" + id, "historical", (int) id, BigDecimal.ZERO, q(gross), q(defect), BigDecimal.ZERO, BigDecimal.ZERO, true);
+        return new NodeQuantity(1L, id, id, "N" + id, "formal", (int) id, BigDecimal.ZERO, q(gross), q(defect), BigDecimal.ZERO, BigDecimal.ZERO, true);
     }
 
     @Test
@@ -54,7 +54,7 @@ class LegacyHistoryQuantityTest {
     }
 
     @Test
-    void frozenEvidenceDoesNotZeroAllowanceOrBlockAuditedCorrection() {
+    void formalInputPreservesAllowanceAndAuditedCorrection() {
         var view = new ExecutionQuantity(1L, 1L, 1L, q("100"), "LOCKED", true, null,
                 List.of(node(1, "40", "0")), "source", q("100"), q("100"), BigDecimal.ZERO, 1L);
         var projected = ProductionQuantityService.project(view);

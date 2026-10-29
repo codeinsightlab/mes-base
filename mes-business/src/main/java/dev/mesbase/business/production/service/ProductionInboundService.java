@@ -118,7 +118,8 @@ public class ProductionInboundService {
         quantityRules.lockForWrite(List.of(material.getId()));
         // Document owner validates current rules or exact authoritative remaining production quantity.
         var draft = documents.createWithNumber(new StockDocumentModels.Create(
-                StockDocumentDirection.IN.getValue(), StockDocumentType.PRODUCTION_RECEIPT.getValue(), command.reason(), null, null, executionId, ruleCode), documentNo);
+                StockDocumentDirection.IN.getValue(), StockDocumentType.PRODUCTION_RECEIPT.getValue(), command.reason(),
+                null, null, executionId, StockDocumentType.PRODUCTION_RECEIPT.getValue()), documentNo);
         Long id = draft.document().getId();
         documents.putLine(id, null, new StockDocumentModels.Line(draft.document().getRevision(), command.stockId(),
                 execution.getProductId(), stock.getWarehouseId(), material.getUnitId(), stock.getBatchNo(),

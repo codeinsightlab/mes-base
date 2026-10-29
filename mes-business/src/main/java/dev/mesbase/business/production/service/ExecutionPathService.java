@@ -17,12 +17,10 @@ import dev.mesbase.business.production.domain.MesExecutionPathEntity;
 import dev.mesbase.business.production.domain.MesExecutionPathNodeEntity;
 import dev.mesbase.business.production.domain.MesExecutionPathNodeExample;
 import dev.mesbase.business.production.domain.MesProductionExecutionEntity;
-import java.util.ArrayList;
 import dev.mesbase.business.production.domain.RoutingNodeEntity;
 import dev.mesbase.business.production.domain.RoutingNodeExample;
 import dev.mesbase.business.production.domain.RoutingEdgeEntity;
 import dev.mesbase.business.production.domain.RoutingEdgeExample;
-import dev.mesbase.business.issue.domain.MaterialIssueSubmissionStatus;
 import dev.mesbase.common.utils.SecurityUtils;
 import dev.mesbase.core.error.ErrorCode;
 import dev.mesbase.core.error.FoundationException;
@@ -38,9 +36,8 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.annotation.Isolation;
 import dev.mesbase.business.production.service.ProductionChainLocks.LockedExecution;
-import dev.mesbase.business.wm.dao.WmStockDocumentMapper;
-import dev.mesbase.business.wm.domain.WmStockDocumentExample;
-import dev.mesbase.business.wm.domain.StockDocumentType;
+import dev.mesbase.business.issue.dao.MesMaterialIssueInputMapper;
+import dev.mesbase.business.issue.domain.MesMaterialIssueInputExample;
 
 @Service
 @ConditionalOnProperty(name = "mes.business.enabled", havingValue = "true")
@@ -55,13 +52,13 @@ public class ExecutionPathService {
     private final RoutingNodeMapper nodes;
     private final BusinessDirectoryService references;
     private final RoutingEdgeMapper edges;
-    private final WmStockDocumentMapper documents;
+    private final MesMaterialIssueInputMapper inputs;
 
     public ExecutionPathService(ProductionChainLocks locks, ProductionExecutionRules rules,
                                 MesExecutionPathMapper paths,
                                 MesExecutionPathNodeMapper selected, MesProductionExecutionMapper executions,
                                 RoutingNodeMapper nodes, RoutingEdgeMapper edges,
-                                WmStockDocumentMapper documents,
+                                MesMaterialIssueInputMapper inputs,
                                 BusinessDirectoryService references,
                                 ExecutionQualityReferenceQuery quality) {
         this.quality = quality;
@@ -73,7 +70,7 @@ public class ExecutionPathService {
         this.nodes = nodes;
         this.references = references;
         this.edges = edges;
-        this.documents = documents;
+        this.inputs = inputs;
     }
 
     public record PathModel(Long executionId, String executionStatus, MesExecutionPathEntity path,
@@ -231,21 +228,13 @@ public class ExecutionPathService {
         if (!ExecutionPathStatus.LOCKED.getValue().equals(selectedPath.getPathStatus()))
             ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
         if (ProductionExecutionStatus.RUNNING.getValue().equals(e.getStatus())) return e;
-        var inputFilter = new WmStockDocumentExample();
-        inputFilter.createCriteria().andSourceExecutionIdEqualTo(id)
-                .andDocumentTypeEqualTo(StockDocumentType.MATERIAL_ISSUE.getValue());
-        var inputFacts = documents.selectByExample(inputFilter);
-        if (inputFacts.stream().anyMatch(f -> f.getProductionVoidOperationId() != null &&
-                !MaterialIssueSubmissionStatus.SUCCEEDED.getValue().equals(f.getProductionVoidResultStatus())))
-            ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
-        var confirmed = inputFacts.stream().filter(f -> f.getProductionConfirmedAt() != null
-                && Boolean.TRUE.equals(f.getProductionStockApplied())).toList();
+        var inputFilter = new MesMaterialIssueInputExample();
+        inputFilter.createCriteria().andExecutionIdEqualTo(id);
+        var confirmed = inputs.selectByExample(inputFilter).stream().filter(f -> f.getConfirmedAt() != null
+                && Boolean.TRUE.equals(f.getStockApplied())).toList();
         if (confirmed.isEmpty()) ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
         for (var fact : confirmed) {
-            if (!Mode.LOCAL_ONLY.getValue().equals(fact.getProductionSourceMode())
-                    || !"PRODUCTION_INPUT".equals(fact.getProductionInputKind())
-                    || fact.getProductionConfirmationOperationId() == null
-                    || !MaterialIssueSubmissionStatus.SUCCEEDED.getValue().equals(fact.getProductionConfirmationStatus()))
+            if (!Mode.LOCAL_ONLY.getValue().equals(fact.getSourceMode()) || !"PRODUCTION_INPUT".equals(fact.getInputKind()))
                 ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
         }
         if (ProductionExecutionStatus.RUNNING.getValue().equals(e.getStatus())) return e;
@@ -259,11 +248,9 @@ public class ExecutionPathService {
     }
 
     public boolean hasBlockingIssue(Long id) {
-        var filter = new WmStockDocumentExample();
-        filter.createCriteria().andSourceExecutionIdEqualTo(id)
-                .andDocumentTypeEqualTo(StockDocumentType.MATERIAL_ISSUE.getValue());
-        return documents.selectByExample(filter).stream().anyMatch(f -> f.getProductionConfirmationOperationId() != null
-                || f.getProductionVoidOperationId() != null);
+        var filter = new MesMaterialIssueInputExample();
+        filter.createCriteria().andExecutionIdEqualTo(id).andConfirmedAtIsNotNull();
+        return inputs.countByExample(filter) > 0;
     }
 
     private List<Long> nodeIds(Long id) {

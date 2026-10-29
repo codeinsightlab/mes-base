@@ -1,7 +1,6 @@
 package dev.mesbase.business.issue.service;
 
 import dev.mesbase.business.integration.warehouse.ErpActionResult.Mode;
-import dev.mesbase.business.issue.domain.MaterialIssueSubmissionStatus;
 import dev.mesbase.business.production.domain.ExecutionPathStatus;
 import dev.mesbase.business.production.domain.ProductionExecutionStatus;
 import dev.mesbase.business.production.service.BusinessSourceRules;
@@ -17,10 +16,8 @@ import dev.mesbase.core.error.ErrorCode;
 import dev.mesbase.core.error.FoundationException;
 import dev.mesbase.core.factory.FactoryScope;
 import dev.mesbase.platform.execution.FactoryContext;
-import java.time.LocalDateTime;
 import java.util.Objects;
 import java.util.Set;
-import java.util.UUID;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
@@ -51,68 +48,54 @@ public class MaterialIssueSubmissionService {
         this.documents = documents;
     }
 
-    public record Prepared(WmStockDocumentEntity row, Integer pathRevision, boolean confirmationRequired) { }
+    public record Prepared(Long documentId, Integer pathRevision, boolean confirmationRequired, String postRequestId) { }
 
     @Transactional(transactionManager = "businessTransactionManager", propagation = Propagation.MANDATORY)
     public Prepared prepare(Long documentId, FactoryScope scope) {
+        var input = facts.find(documentId);
+        if (input == null) ParameterChecks.reject(ErrorCode.STOCK_DOCUMENT_SOURCE_PENDING);
+        return prepare(documentId, scope, input.getId());
+    }
+
+    @Transactional(transactionManager = "businessTransactionManager", propagation = Propagation.MANDATORY)
+    public Prepared prepare(Long documentId, FactoryScope scope, String postRequestId) {
         if (!FactoryContext.required().equals(scope)) throw new FoundationException(ErrorCode.CONFLICT);
         sources.localCreation();
-        var detail = documents.getObject().detail(documentId);
-        var row = detail.document();
-        if (!StockDocumentType.MATERIAL_ISSUE.getValue().equals(row.getDocumentType())
-                || facts.find(documentId) == null
-                || !Mode.LOCAL_ONLY.getValue().equals(row.getProductionSourceMode())
-                || !Objects.equals(row.getSourceExecutionId(), facts.find(documentId).getSourceExecutionId()))
+        var row = documents.getObject().detail(documentId).document();
+        var input = facts.find(documentId);
+        if (input == null || !StockDocumentType.MATERIAL_ISSUE.getValue().equals(row.getDocumentType())
+                || !Mode.LOCAL_ONLY.getValue().equals(input.getSourceMode())
+                || !Objects.equals(row.getSourceExecutionId(), input.getExecutionId()))
             ParameterChecks.reject(ErrorCode.STOCK_DOCUMENT_SOURCE_PENDING);
-        var execution = locks.execution(row.getSourceExecutionId());
-        if (row.getProductionVoidOperationId() != null) ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
-        if (row.getProductionConfirmationOperationId() != null) {
-            if (MaterialIssueSubmissionStatus.SUCCEEDED.getValue().equals(row.getProductionConfirmationStatus())
-                    && row.getProductionConfirmedAt() != null && Boolean.TRUE.equals(row.getProductionStockApplied()))
-                return new Prepared(row, row.getProductionPathRevision(), false);
-            // A persisted in-flight/unknown command is never reconstructed or submitted again.
-            ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
+        var execution = locks.execution(input.getExecutionId());
+        var path = paths.requireSelected(execution);
+        if (input.getConfirmedAt() != null) {
+            if (!StockDocumentStatus.POSTED.getValue().equals(row.getStatus()) || !Boolean.TRUE.equals(input.getStockApplied()))
+                ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
+            return new Prepared(documentId, path.getRevision(), false, postRequestId);
         }
-        if (!StockDocumentStatus.DRAFT.getValue().equals(row.getStatus()) || detail.lines().isEmpty())
-            ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
+        if (!StockDocumentStatus.DRAFT.getValue().equals(row.getStatus())) ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
         sources.execution(execution, null);
         if (!Set.of(ProductionExecutionStatus.READY.getValue(), ProductionExecutionStatus.RUNNING.getValue(),
                 ProductionExecutionStatus.FULLY_RECEIVED.getValue()).contains(execution.getStatus()))
             ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
         if (ProductionExecutionStatus.READY.getValue().equals(execution.getStatus())) executions.checkReadyReferences(execution);
-        var path = paths.requireSelected(execution);
         if (ProductionExecutionStatus.RUNNING.getValue().equals(execution.getStatus())
                 && !ExecutionPathStatus.LOCKED.getValue().equals(path.getPathStatus()))
             ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
-
-        row.setProductionPathRevision(path.getRevision());
-        row.setProductionConfirmationOperationId("ISSUE-SUBMIT-" + UUID.randomUUID());
-        row.setProductionConfirmationStatus(MaterialIssueSubmissionStatus.SUBMITTING.getValue());
-        row.setProductionSubmissionCreatedAt(LocalDateTime.now());
-        row.setProductionConfirmedPathNodeIds(json.writeValueAsString(paths.view(execution.getId()).selectedNodeIds()));
-        if (facts.updateVoid(row) != 1) ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
-        return new Prepared(row, path.getRevision(), true);
+        return new Prepared(documentId, path.getRevision(), true, postRequestId);
     }
 
     @Transactional(transactionManager = "businessTransactionManager", propagation = Propagation.MANDATORY, rollbackFor = Exception.class)
     public WmStockDocumentEntity executePrepared(Prepared prepared) {
-        Long documentId = prepared.row().getId();
-        var row = facts.find(documentId);
-        if (row == null || !Objects.equals(row.getProductionPathRevision(), prepared.pathRevision()))
-            ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
-        var execution = locks.execution(row.getSourceExecutionId());
-        if (!prepared.confirmationRequired()) return documents.getObject().detail(documentId).document();
-        if (!MaterialIssueSubmissionStatus.SUBMITTING.getValue().equals(row.getProductionConfirmationStatus())
-                || row.getProductionConfirmationOperationId() == null
-                || row.getProductionSubmissionCreatedAt() == null)
-            ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
-        facts.confirm(documentId, execution.getId(), Mode.LOCAL_ONLY.getValue());
-        if (ProductionExecutionStatus.FULLY_RECEIVED.getValue().equals(execution.getStatus())) executions.resumeAfterInput(execution);
-        paths.confirm(execution, prepared.pathRevision());
-        row = facts.find(documentId);
-        row.setProductionConfirmationStatus(MaterialIssueSubmissionStatus.SUCCEEDED.getValue());
-        row.setProductionSubmissionFinishedAt(LocalDateTime.now());
-        if (facts.updateVoid(row) != 1) ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
-        return documents.getObject().detail(documentId).document();
+        var input = facts.find(prepared.documentId());
+        if (input == null) ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
+        var execution = locks.execution(input.getExecutionId());
+        if (prepared.confirmationRequired()) {
+            facts.confirm(prepared.documentId(), execution.getId(), Mode.LOCAL_ONLY.getValue(), prepared.postRequestId());
+            if (ProductionExecutionStatus.FULLY_RECEIVED.getValue().equals(execution.getStatus())) executions.resumeAfterInput(execution);
+            paths.confirm(execution, prepared.pathRevision());
+        }
+        return documents.getObject().detail(prepared.documentId()).document();
     }
 }

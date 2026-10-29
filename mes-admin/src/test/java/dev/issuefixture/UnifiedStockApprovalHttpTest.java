@@ -32,7 +32,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  */
 class UnifiedStockApprovalHttpTest {
     private static final ObjectMapper JSON = new ObjectMapper();
-    private static final String GENERIC_AGGREGATE = "{\"header\":{\"documentType\":\"OTHER_RECEIPT\",\"reason\":\"TEST ONLY permission\",\"ruleCode\":\"TEST_STOCK_IN\"},\"items\":[{\"stockId\":\"1\",\"materialId\":\"1\",\"warehouseId\":\"1\",\"unitId\":\"1\",\"batchNo\":\"L001\",\"binCode\":\"BIN1\",\"quantity\":\"1\"}]}";
+    private static final String GENERIC_AGGREGATE = "{\"header\":{\"direction\":\"IN\",\"documentType\":\"OTHER_RECEIPT\",\"reason\":\"TEST ONLY permission\",\"ruleCode\":\"OTHER_RECEIPT\"},\"items\":[{\"stockId\":\"1\",\"materialId\":\"1\",\"warehouseId\":\"1\",\"unitId\":\"1\",\"batchNo\":\"L001\",\"binCode\":\"BIN1\",\"quantity\":\"1\"}]}";
 
     @Configuration
     static class AuditWithoutDraftEditing {
@@ -68,20 +68,20 @@ class UnifiedStockApprovalHttpTest {
             int documentsBeforeDeniedSave = count(db, "wm_stock_document");
             int linesBeforeDeniedSave = count(db, "wm_stock_document_line");
             int actionsBeforeDeniedSave = count(db, "wm_stock_action");
-            int inputsBeforeDeniedSave = count(db, "wm_stock_document WHERE production_confirmation_status IS NOT NULL");
+            int inputsBeforeDeniedSave = count(db, "mes_material_issue_input WHERE confirmed_at IS NOT NULL");
             mvc.perform(full(post(StockDocumentHttpTest.ROOT + "/aggregate"))
                             .content(genericAggregate()))
                     .andExpect(status().isForbidden());
             assertEquals(documentsBeforeDeniedSave, count(db, "wm_stock_document"));
             assertEquals(linesBeforeDeniedSave, count(db, "wm_stock_document_line"));
             assertEquals(actionsBeforeDeniedSave, count(db, "wm_stock_action"));
-            assertEquals(inputsBeforeDeniedSave, count(db, "wm_stock_document WHERE production_confirmation_status IS NOT NULL"));
+            assertEquals(inputsBeforeDeniedSave, count(db, "mes_material_issue_input WHERE confirmed_at IS NOT NULL"));
             assertEquals(0, after.compareTo(rawBalance(db)));
         }
     }
 
     @Test
-    void ordinaryApprovalCannotStealAUuidReservedByAnotherProductionDraft() throws Exception {
+    void creationAndApprovalRequestIdentitiesUseIndependentNamespaces() throws Exception {
         try (var context = ProductionInputHttpTest.context()) {
             var db = ProductionInputHttpTest.db(context);
             var mvc = MaterialIssueHttpTest.mvc(context);
@@ -91,33 +91,20 @@ class UnifiedStockApprovalHttpTest {
             var reserved = draft(mvc, ProductionInputHttpTest.command(mvc, uuid, "L001", "1"));
             String other = StockDocumentHttpTest.create(mvc, "OTHER_RECEIPT", null).get("document").get("id").asText();
             StockDocumentHttpTest.add(mvc, other, "0", "2", "L002", "10");
-            BigDecimal otherBalance = db.queryForObject("SELECT quantity FROM wm_inventory WHERE id=2", BigDecimal.class);
-            BigDecimal balance = rawBalance(db);
+            BigDecimal before = db.queryForObject("SELECT quantity FROM wm_inventory WHERE id=2", BigDecimal.class);
+            String approval = StockDocumentHttpTest.intent(uuid, 1);
             mvc.perform(full(post(StockDocumentHttpTest.ROOT + "/" + other + "/actions/approve"))
-                            .content(StockDocumentHttpTest.intent(uuid, 1)))
-                    .andExpect(status().isConflict())
-                    .andExpect(jsonPath("errorCode").value("STOCK_DOCUMENT_CONFLICT"));
-            assertEquals(0, balance.compareTo(rawBalance(db)));
-            assertEquals(0, count(db, "wm_stock_action"));
-            assertEquals(0, count(db, "mes_production_execution"));
-            assertEquals(0, count(db, "wm_stock_document WHERE production_confirmation_status IS NOT NULL"));
-            assertEquals("DRAFT", db.queryForObject("SELECT status FROM wm_stock_document WHERE id=?", String.class, other));
-            assertEquals("DRAFT", db.queryForObject("SELECT status FROM wm_stock_document WHERE id=?", String.class, reserved.get("document")
-                    .get("id").asText()));
-            assertEquals(0, db.queryForObject("SELECT COUNT(*) FROM wm_stock_document_line WHERE stock_action_id IS NOT NULL", Integer.class));
-            assertEquals(0, otherBalance.compareTo(db.queryForObject("SELECT quantity FROM wm_inventory WHERE id=2", BigDecimal.class)));
+                    .content(approval)).andExpect(status().isOk());
             mvc.perform(full(post(StockDocumentHttpTest.ROOT + "/" + other + "/actions/approve"))
-                            .content(StockDocumentHttpTest.intent(UUID.randomUUID().toString(), 1)))
-                    .andExpect(status().isOk());
-            assertEquals(0, otherBalance.add(BigDecimal.TEN)
-                    .compareTo(db.queryForObject("SELECT quantity FROM wm_inventory WHERE id=2", BigDecimal.class)));
-            mvc.perform(full(post(StockDocumentHttpTest.ROOT + "/" + reserved.get("document").get("id")
-                            .asText() + "/actions/approve"))
-                            .content(StockDocumentHttpTest.intent(uuid, reserved.get("document").get("revision").asInt())))
-                    .andExpect(status().isOk());
-            assertEquals(2, count(db, "wm_stock_action"));
-            assertEquals(1, count(db, "mes_production_execution"));
-            assertEquals(0, balance.subtract(new BigDecimal("2.5")).compareTo(rawBalance(db)));
+                    .content(approval)).andExpect(status().isOk());
+            assertEquals(0, before.add(new BigDecimal("10")).compareTo(
+                    db.queryForObject("SELECT quantity FROM wm_inventory WHERE id=2", BigDecimal.class)));
+            assertEquals(1, count(db, "wm_stock_action"));
+            assertEquals(0, count(db, "mes_material_issue_input"));
+            assertEquals("DRAFT", db.queryForObject("SELECT status FROM wm_stock_document WHERE id=?",
+                    String.class, reserved.get("document").get("id").asText()));
+            assertEquals(uuid, db.queryForObject("SELECT create_request_id FROM wm_stock_document WHERE id=?",
+                    String.class, reserved.get("document").get("id").asText()));
         }
     }
 
@@ -187,7 +174,7 @@ class UnifiedStockApprovalHttpTest {
                         .andExpect(status().is4xxClientError())
                         .andExpect(jsonPath("errorCode").isNotEmpty());
                 assertEquals(0, count(db, "mes_production_execution"));
-                assertEquals(0, count(db, "wm_stock_document WHERE production_confirmation_status IS NOT NULL"));
+                assertEquals(0, count(db, "mes_material_issue_input WHERE confirmed_at IS NOT NULL"));
                 assertEquals(0, count(db, "wm_stock_action"));
                 assertEquals(0, before.compareTo(rawBalance(db)));
             }
@@ -243,7 +230,7 @@ class UnifiedStockApprovalHttpTest {
             assertEquals(0, count(db, "wm_stock_action"));
             draft(mvc, command);
             assertEquals(1, count(db, "wm_stock_document"));
-            assertEquals(0, count(db, "wm_stock_document WHERE production_confirmation_status IS NOT NULL"));
+            assertEquals(0, count(db, "mes_material_issue_input WHERE confirmed_at IS NOT NULL"));
             assertEquals(0, count(db, "wm_stock_action"));
         }
     }
@@ -325,7 +312,7 @@ class UnifiedStockApprovalHttpTest {
             assertEquals(0, count(db, "wm_stock_action"));
             assertEquals(0, count(db, "mes_production_execution"));
             assertEquals("DRAFT", db.queryForObject("SELECT status FROM wm_stock_document WHERE id=?", String.class, id));
-            assertEquals(0, db.queryForObject("SELECT COUNT(*) FROM wm_stock_document WHERE production_confirmed_at IS NOT NULL", Integer.class));
+            assertEquals(0, db.queryForObject("SELECT COUNT(*) FROM mes_material_issue_input WHERE confirmed_at IS NOT NULL", Integer.class));
         }
     }
 

@@ -52,11 +52,11 @@ class WorkOrderApplicableRoutingHttpTest {
             mvc.perform(get(base + "/references/routings").header("Authorization", "Bearer FULL")
                             .header("X-Factory-Id", "A").param("productId", "2"))
                     .andExpect(status().isOk()).andExpect(jsonPath("[0].id").value("1"));
-            String body = "{\"code\":\"ITEM_OUTPUT\",\"productId\":\"2\",\"routingId\":\"1\",\"plannedQty\":\"10\"}";
+            String body = "{\"ruleCode\":\"WORK_ORDER\",\"code\":\"ITEM_OUTPUT\",\"productId\":\"2\",\"routingId\":\"1\",\"plannedQty\":\"10\"}";
             mvc.perform(post(base).header("Authorization", "Bearer FULL").header("X-Factory-Id", "A")
                             .contentType("application/json").content(body))
                     .andExpect(status().isOk()).andExpect(jsonPath("workorder.productId").value("2"));
-            Long id = jdbc.queryForObject("SELECT id FROM workorder WHERE code='ITEM_OUTPUT'", Long.class);
+            Long id = jdbc.queryForObject("SELECT id FROM workorder WHERE product_id=2", Long.class);
             mvc.perform(put(base + "/" + id).header("Authorization", "Bearer FULL").header("X-Factory-Id", "A")
                             .contentType("application/json")
                             .content(body.replace("\"plannedQty\"", "\"revision\":0,\"plannedQty\"")))

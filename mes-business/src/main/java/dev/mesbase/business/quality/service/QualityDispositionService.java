@@ -112,7 +112,7 @@ public class QualityDispositionService {
         if (replayed(declaration, c.requestId(), requestHash)) return treatments.details(declaration);
         String documentNo = null;
         if (c.destination() == Destination.WAREHOUSE) {
-            var warehouse = warehouses.selectByPrimaryKey(c.warehouseId());
+            var warehouse = businessTransactions.execute(status -> warehouses.selectByPrimaryKey(c.warehouseId()));
             if (warehouse == null) ParameterChecks.reject(ErrorCode.RECEIPT_WAREHOUSE_INVALID);
             var warehouseType = WarehouseType.from(warehouse.getWarehouseType());
             if (warehouseType != WarehouseType.DEFECTIVE && warehouseType != WarehouseType.SCRAP)

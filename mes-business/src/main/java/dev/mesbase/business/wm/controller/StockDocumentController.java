@@ -6,6 +6,7 @@ import dev.mesbase.core.error.FoundationException;
 import dev.mesbase.business.wm.domain.StockDocumentModels;
 import dev.mesbase.business.wm.domain.StockDocumentType;
 import dev.mesbase.business.wm.domain.StockDocumentDirection;
+import dev.mesbase.common.exception.ServiceException;
 import java.util.Arrays;
 import java.time.LocalDateTime;
 import dev.mesbase.business.wm.domain.WmStockDocumentEntity;
@@ -24,6 +25,7 @@ import dev.mesbase.platform.web.EndpointAccess;
 import jakarta.validation.Valid;
 import java.util.List;
 import java.util.Objects;
+import java.util.stream.Collectors;
 import java.math.BigDecimal;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -70,25 +72,24 @@ public class StockDocumentController {
         return BeanConversions.convertPage(page, Page.class);
     }
 
-    public record Type(String value, String direction, String label, String origin, String requiredDocuments, boolean approvalAvailable,
-                       boolean qualityReceipt) {
-    }
+    public record Type(String value, String direction, String label, String origin, String requiredDocuments,
+                       boolean approvalAvailable, boolean qualityReceipt, boolean enabled) { }
 
     @GetMapping("/types")
     @EndpointAccess(EndpointAccess.Kind.AUTHENTICATED)
     public List<Type> types(@RequestParam String direction) {
         if (StockDocumentDirection.from(direction) == null) throw new FoundationException(ErrorCode.BAD_REQUEST);
-        var types = Arrays.stream(StockDocumentType.values());
+        var canQueryAll = hasPermission(PERMISSION + "query");
         if (!hasPermission(PERMISSION + "query")) {
             if (!hasPermission("business:mes:material:issue:list")
                     && !hasPermission("business:mes:material:issue:query"))
                 throw new FoundationException(ErrorCode.FORBIDDEN);
             if (!StockDocumentDirection.OUT.getValue().equals(direction)) throw new FoundationException(ErrorCode.FORBIDDEN);
-            types = types.filter(type -> type == StockDocumentType.MATERIAL_ISSUE);
         }
-        return types.filter(type -> type.getDirection().getValue().equals(direction))
-                .map(type -> new Type(type.getValue(), type.getDirection().getValue(), type.getDescription(),
-                        type.getOrigin(), type.getRequiredDocuments(), type.isApprovalAvailable(), type.isQualityReceipt()))
+        return service.typeOptions(direction).stream()
+                .filter(type -> canQueryAll || StockDocumentType.MATERIAL_ISSUE.getValue().equals(type.value()))
+                .map(type -> new Type(type.value(), type.direction(), type.label(), type.origin(),
+                        type.requiredDocuments(), type.approvalAvailable(), type.qualityReceipt(), type.enabled()))
                 .toList();
     }
 
@@ -96,31 +97,67 @@ public class StockDocumentController {
                                 boolean available, String issue) { }
 
     @GetMapping("/numbering-rules")
-    @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED, permission = PERMISSION + "create")
+    @EndpointAccess(EndpointAccess.Kind.AUTHENTICATED)
     public List<NumberingRule> numberingRules(@RequestParam String direction) {
         if (StockDocumentDirection.from(direction) == null) throw new FoundationException(ErrorCode.BAD_REQUEST);
+        boolean canCreateAny = hasPermission(PERMISSION + "create");
+        if (!canCreateAny) {
+            requirePermission("business:mes:material:issue:update");
+            if (!StockDocumentDirection.OUT.getValue().equals(direction))
+                throw new FoundationException(ErrorCode.FORBIDDEN);
+        }
         String category = StockDocumentDirection.IN.getValue().equals(direction)
                 ? AutoCodeRuleType.STOCK_IN.name() : AutoCodeRuleType.STOCK_OUT.name();
         var configured = autoCodes.rules(category);
+        var activeTypes = service.typeOptions(direction).stream().filter(StockDocumentService.DocumentTypeOption::enabled)
+                .map(StockDocumentService.DocumentTypeOption::value).collect(Collectors.toSet());
         return Arrays.stream(StockDocumentType.values())
                 .filter(type -> type.getDirection().getValue().equals(direction))
+                .filter(type -> canCreateAny || type == StockDocumentType.MATERIAL_ISSUE)
                 .map(type -> {
                     var rule = configured.stream().filter(candidate -> type.getValue().equals(candidate.ruleCode())).findFirst();
-                    if (rule.isEmpty()) return new NumberingRule(type.getValue(), type.getValue(), null, null, null, false,
+                    if (rule.isEmpty() || !activeTypes.contains(type.getValue())) return new NumberingRule(type.getValue(), type.getValue(), null, null, null, false,
                             "当前工厂未启用该单据类型对应的编码规则");
                     try {
                         return new NumberingRule(type.getValue(), rule.get().ruleCode(), rule.get().ruleName(),
                                 rule.get().prefix(), autoCodes.previewBusinessDocNo(type.getValue(), category), true, null);
-                    } catch (RuntimeException failure) {
+                    } catch (ServiceException failure) {
                         return new NumberingRule(type.getValue(), rule.get().ruleCode(), rule.get().ruleName(),
                                 rule.get().prefix(), null, false, "当前编码规则不可用，请检查规则组成");
                     }
                 }).toList();
     }
 
+    @GetMapping("/numbering-rules/preview")
+    @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED, permission = PERMISSION + "create")
+    public NumberingRule numberingRulePreview(@RequestParam String typeKey, @RequestParam String direction) {
+        StockDocumentType type = StockDocumentType.from(typeKey);
+        if (type == null || !type.getDirection().getValue().equals(direction))
+            throw new FoundationException(ErrorCode.BAD_REQUEST);
+        service.requireTypeActive(direction, typeKey);
+        String category = StockDocumentDirection.IN.getValue().equals(direction)
+                ? AutoCodeRuleType.STOCK_IN.name() : AutoCodeRuleType.STOCK_OUT.name();
+        var rule = autoCodes.rules(category).stream().filter(candidate -> typeKey.equals(candidate.ruleCode()))
+                .findFirst().orElseThrow(() -> new FoundationException(ErrorCode.STOCK_DOCUMENT_SOURCE_PENDING));
+        return new NumberingRule(typeKey, rule.ruleCode(), rule.ruleName(), rule.prefix(),
+                autoCodes.previewBusinessDocNo(typeKey, category), true, null);
+    }
+
+    /** Read-only recovery of the original production request, using the same scoped detail policy. */
+    @GetMapping("/by-request/{requestId}")
+    @EndpointAccess(EndpointAccess.Kind.AUTHENTICATED)
+    public Detail byRequest(@PathVariable String requestId) {
+        if (!hasPermission(PERMISSION + "query")) requirePermission("business:mes:material:issue:query");
+        String documentId = service.findDocumentIdForRequest(requestId);
+        if (documentId == null) throw new FoundationException(ErrorCode.NOT_FOUND);
+        return detail(Long.valueOf(documentId), StockDocumentDirection.OUT.getValue(),
+                StockDocumentType.MATERIAL_ISSUE.getValue());
+    }
+
     @GetMapping("/{id}")
     @EndpointAccess(EndpointAccess.Kind.AUTHENTICATED)
     public Detail detail(@PathVariable Long id,
+                         @RequestParam(required = false) String direction,
                          @RequestParam(required = false) String documentType) {
         boolean stockQuery = hasPermission(PERMISSION + "query");
         if (!stockQuery) {
@@ -129,6 +166,7 @@ public class StockDocumentController {
             requirePermission("business:mes:material:issue:query");
         }
         var detail = service.detail(id);
+        requireDirectionIfPresent(detail, direction);
         if (!stockQuery && !StockDocumentType.MATERIAL_ISSUE.getValue().equals(detail.document().getDocumentType()))
             throw new FoundationException(ErrorCode.NOT_FOUND);
         if (!stockQuery && !hasPermission("business:mes:material:issue:item:list"))
@@ -140,6 +178,7 @@ public class StockDocumentController {
     @GetMapping("/{id}/lines")
     @EndpointAccess(EndpointAccess.Kind.AUTHENTICATED)
     public List<Line> lines(@PathVariable Long id,
+                            @RequestParam(required = false) String direction,
                             @RequestParam(required = false) String documentType) {
         boolean stockQuery = hasPermission(PERMISSION + "query");
         if (!stockQuery) {
@@ -148,6 +187,7 @@ public class StockDocumentController {
             requirePermission("business:mes:material:issue:item:list");
         }
         var detail = service.detail(id);
+        requireDirectionIfPresent(detail, direction);
         if (!stockQuery && !StockDocumentType.MATERIAL_ISSUE.getValue().equals(detail.document().getDocumentType()))
             throw new FoundationException(ErrorCode.NOT_FOUND);
         return detail.lines().stream().map(StockDocumentController::view).toList();
@@ -156,6 +196,7 @@ public class StockDocumentController {
     @GetMapping("/{id}/lines/{lineId}")
     @EndpointAccess(EndpointAccess.Kind.AUTHENTICATED)
     public Line line(@PathVariable Long id, @PathVariable Long lineId,
+                     @RequestParam(required = false) String direction,
                      @RequestParam(required = false) String documentType) {
         boolean stockQuery = hasPermission(PERMISSION + "query");
         if (!stockQuery) {
@@ -164,6 +205,7 @@ public class StockDocumentController {
             requirePermission("business:mes:material:issue:item:query");
         }
         var detail = service.detail(id);
+        requireDirectionIfPresent(detail, direction);
         if (!stockQuery && !StockDocumentType.MATERIAL_ISSUE.getValue().equals(detail.document().getDocumentType()))
             throw new FoundationException(ErrorCode.NOT_FOUND);
         var row = detail.lines().stream().filter(line -> lineId.equals(line.getId())).findFirst()
@@ -174,6 +216,7 @@ public class StockDocumentController {
     @GetMapping("/{id}/production-input-basis")
     @EndpointAccess(EndpointAccess.Kind.AUTHENTICATED)
     public ProductionInputBasis productionInputBasis(@PathVariable Long id,
+                                                       @RequestParam(required = false) String direction,
                                                        @RequestParam(required = false) String documentType) {
         boolean stockQuery = hasPermission(PERMISSION + "query");
         if (!stockQuery) {
@@ -181,6 +224,7 @@ public class StockDocumentController {
                 throw new FoundationException(ErrorCode.FORBIDDEN);
             requirePermission("business:mes:material:issue:item:list");
         }
+        requireDirectionIfPresent(service.detail(id), direction);
         var basis = service.productionInputBasis(id);
         if (basis == null) return null;
         return BeanConversions.convert(basis, ProductionInputBasis.class);
@@ -225,7 +269,9 @@ public class StockDocumentController {
 
     @PostMapping("/{id}/actions/cancel")
     @EndpointAccess(EndpointAccess.Kind.AUTHENTICATED)
-    public Detail cancel(@PathVariable Long id, @Valid @RequestBody StockDocumentModels.Version command) {
+    public Detail cancel(@PathVariable Long id, @RequestParam(required = false) String direction,
+                         @Valid @RequestBody StockDocumentModels.Version command) {
+        requireDirectionIfPresent(service.detail(id), direction);
         if (!hasPermission(PERMISSION + "cancel")) {
             requirePermission("business:mes:material:issue:update");
             if (!StockDocumentType.MATERIAL_ISSUE.getValue().equals(service.detail(id).document().getDocumentType()))
@@ -236,7 +282,9 @@ public class StockDocumentController {
 
     @PostMapping("/{id}/actions/approve")
     @EndpointAccess(EndpointAccess.Kind.AUTHENTICATED)
-    public Detail approve(@PathVariable Long id, @Valid @RequestBody StockDocumentModels.Post command) {
+    public Detail approve(@PathVariable Long id, @RequestParam(required = false) String direction,
+                          @Valid @RequestBody StockDocumentModels.Post command) {
+        requireDirectionIfPresent(service.detail(id), direction);
         if (!hasPermission(PERMISSION + "post")) {
             requirePermission("business:mes:material:issue:update");
             if (!StockDocumentType.MATERIAL_ISSUE.getValue().equals(service.detail(id).document().getDocumentType()))
@@ -247,13 +295,17 @@ public class StockDocumentController {
 
     @PostMapping("/{id}/actions/void")
     @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED, permission = "business:mes:material:issue:void")
-    public MaterialIssueVoidResult voidMaterialIssue(@PathVariable Long id) {
+    public MaterialIssueVoidResult voidMaterialIssue(@PathVariable Long id,
+            @RequestParam(required = false) String direction) {
+        requireDirectionIfPresent(service.detail(id), direction);
         return materialIssueVoidResult(issueVoid.cancel(id));
     }
 
     @PostMapping("/{id}/actions/reconcile-void")
     @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED, permission = "business:mes:material:issue:void")
-    public MaterialIssueVoidResult reconcileMaterialIssueVoid(@PathVariable Long id) {
+    public MaterialIssueVoidResult reconcileMaterialIssueVoid(@PathVariable Long id,
+            @RequestParam(required = false) String direction) {
+        requireDirectionIfPresent(service.detail(id), direction);
         return materialIssueVoidResult(issueVoid.reconcile(id));
     }
 
@@ -330,6 +382,11 @@ public class StockDocumentController {
         if (!hasPermission(value)) throw new FoundationException(ErrorCode.FORBIDDEN);
     }
 
+    private static void requireDirectionIfPresent(StockDocumentModels.Detail detail, String direction) {
+        if (direction != null && !direction.equals(detail.document().getDirection()))
+            throw new FoundationException(ErrorCode.NOT_FOUND);
+    }
+
     private static Header view(WmStockDocumentEntity row) {
         return BeanConversions.convert(row, Header.class);
     }
@@ -342,7 +399,7 @@ public class StockDocumentController {
         return Objects.toString(id, null);
     }
 
-    public record Header(String id, String documentNo, String documentType, String status, String reason,
+    public record Header(String id, String documentNo, String direction, String documentType, String status, String reason,
                          String remark, String sourceWorkorderId, String sourceExecutionId,
                          String createBy,
                          LocalDateTime createTime,

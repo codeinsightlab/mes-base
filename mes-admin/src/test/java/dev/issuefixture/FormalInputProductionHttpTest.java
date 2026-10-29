@@ -1,39 +1,36 @@
 package dev.issuefixture;
 
-import dev.mesbase.business.legacy.dao.LegacyHistoryMapper;
-import dev.mesbase.business.legacy.domain.LegacyHistory.Node;
 import java.math.BigDecimal;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
-import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
+import org.springframework.web.context.support.AnnotationConfigWebApplicationContext;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
- * Real H2 production commands; only the immutable opening-evidence reader is mocked.
+ * TEST ONLY H2: formal input, report adjustments and defects use current production queries.
  */
-class ActivatedProductionHttpTest {
-    private static void clearMaterialIssueFixtures(JdbcTemplate jdbc) {
+class FormalInputProductionHttpTest {
+    private static void formalOpening(AnnotationConfigWebApplicationContext context) throws Exception {
+        var jdbc = ProductionWarehouseFixture.db(context);
         String documents = "SELECT id FROM wm_stock_document WHERE document_type='MATERIAL_ISSUE'";
+        jdbc.update("DELETE FROM mes_material_issue_input WHERE document_id IN (" + documents + ")");
         jdbc.update("DELETE FROM wm_stock_document_line WHERE document_id IN (" + documents + ")");
         jdbc.update("DELETE FROM wm_stock_document WHERE document_type='MATERIAL_ISSUE'");
+        ProductionInputTestData.confirmed(jdbc, 1, new BigDecimal("100"));
+        jdbc.update("INSERT INTO mes_production_report(execution_id,routing_node_id,record_type,quantity_delta,reference_report_id,operator_user_id,recorded_by,report_time,reason,create_time) SELECT execution_id,routing_node_id,'ADJUSTMENT',10,id,operator_user_id,1,report_time,'TEST ONLY reviewed quantity correction',CURRENT_TIMESTAMP FROM mes_production_report WHERE execution_id=1 AND routing_node_id=12 AND record_type='REPORT' ORDER BY id LIMIT 1");
+        QualityWorkflowHttpTest.defect(MaterialIssueHttpTest.mvc(context), 12, "10", "INDEPENDENT", null);
     }
 
     @Test
     void importedFactsUseNormalAuditedAdjustmentWithoutMigrationActivationGate() throws Exception {
-        try (var c = QualityWorkflowHttpTest.context(new Class<?>[]{Opening.class}, 40, 30, 30, 30, 30)) {
+        try (var c = QualityWorkflowHttpTest.context(new Class<?>[]{StockDocumentOwnedTransactionsHttpTest.GuardedCenter.class}, 40, 30, 30, 30, 30)) {
             var j = ProductionWarehouseFixture.db(c);
-            clearMaterialIssueFixtures(j);
+            formalOpening(c);
             Long original = j.queryForObject("SELECT MIN(id) FROM mes_production_report WHERE execution_id=1 AND routing_node_id=15", Long.class);
             var http = MaterialIssueHttpTest.mvc(c);
             http.perform(ProductionCoreV1HttpTest.full(get("/api/production/report-quantities/executions/1")))
@@ -49,29 +46,12 @@ class ActivatedProductionHttpTest {
         }
     }
 
-    @Configuration(proxyBeanMethods = false)
-    static class Opening {
-        @Bean
-        LegacyHistoryMapper openingEvidence() {
-            var m = mock(LegacyHistoryMapper.class);
-            when(m.openingInput(1L)).thenReturn(new BigDecimal("100.000000"));
-            var nodes = new ArrayList<Node>();
-            for (long node = 11; node <= 15; node++)
-                nodes.add(new Node(node,
-                        new BigDecimal(node == 11 ? "100.000000" : "90.000000"),
-                        new BigDecimal(node == 12 ? "10.000000" : "0.000000"),
-                        new BigDecimal(node == 12 ? "10.000000" : "0.000000"), "{}"));
-            when(m.nodes(1L)).thenReturn(List.copyOf(nodes));
-            return m;
-        }
-    }
-
     @Test
-    void openingQuantitiesRemainReadableWithoutInboundAndParentRemainsOpen() throws Exception {
-        try (var c = QualityWorkflowHttpTest.context(new Class<?>[]{Opening.class}, 100, 90, 90, 90, 90)) {
+    void formalInputQuantitiesRemainReadableAndParentRemainsOpen() throws Exception {
+        try (var c = QualityWorkflowHttpTest.context(new Class<?>[]{StockDocumentOwnedTransactionsHttpTest.GuardedCenter.class}, 100, 90, 90, 90, 90)) {
             var j = ProductionWarehouseFixture.db(c);
             var http = MaterialIssueHttpTest.mvc(c);
-            clearMaterialIssueFixtures(j);
+            formalOpening(c);
             j.update("DELETE FROM mes_production_execution WHERE id=2");
             // Execution has consumed its own 100; the order still has 900 of demand available.
             http.perform(ProductionCoreV1HttpTest.full(get("/api/production/report-quantities/executions/1")))
@@ -98,11 +78,10 @@ class ActivatedProductionHttpTest {
 
     @Test
     void lastReportPreservesOpeningQuantitiesAndDoesNotCloseExecutionOrOrder() throws Exception {
-        try (var c = QualityWorkflowHttpTest.context(new Class<?>[]{Opening.class,
-                ProductionReportingHttpTest.Extra.class}, 100, 90, 90, 90, 80)) {
+        try (var c = QualityWorkflowHttpTest.context(new Class<?>[]{StockDocumentOwnedTransactionsHttpTest.GuardedCenter.class, ProductionReportingHttpTest.Extra.class}, 100, 90, 90, 90, 80)) {
             var j = ProductionWarehouseFixture.db(c);
             var http = MaterialIssueHttpTest.mvc(c);
-            clearMaterialIssueFixtures(j);
+            formalOpening(c);
             j.update("DELETE FROM mes_production_execution WHERE id=2");
             j.update("UPDATE workorder SET planned_qty=100 WHERE id=1");
             j.update("INSERT INTO mes_operation_user(operation_id,user_id) VALUES(1,1)");
@@ -120,13 +99,10 @@ class ActivatedProductionHttpTest {
     }
 
     @Test
-    void balancedOpeningWithUnprovenHistoricalDispositionCannotComplete() throws Exception {
-        try (var c = QualityWorkflowHttpTest.context(new Class<?>[]{Opening.class}, 100, 90, 90, 90, 90)) {
-            var mapper = c.getBean(LegacyHistoryMapper.class);
-            var pending = mapper.nodes(1L).stream().map(n -> new Node(n.routingNodeId(), n.legacyNet(),
-                    n.grossCorrection(), n.effectiveDefect(), n.evidence(),
-                    n.routingNodeId() == 12 ? new BigDecimal("10") : BigDecimal.ZERO)).toList();
-            when(mapper.nodes(1L)).thenReturn(pending);
+    void pendingFormalDefectKeepsClosureBlocked() throws Exception {
+        try (var c = QualityWorkflowHttpTest.context(new Class<?>[]{StockDocumentOwnedTransactionsHttpTest.GuardedCenter.class}, 100, 90, 90, 90, 90)) {
+            formalOpening(c);
+            QualityWorkflowHttpTest.defect(MaterialIssueHttpTest.mvc(c), 12, "10", null, null);
             var http = MaterialIssueHttpTest.mvc(c);
             http.perform(ProductionCoreV1HttpTest.full(get("/api/production/executions/1/closure")))
                     .andExpect(status().isOk()).andExpect(jsonPath("receiptState").value("PENDING"))
