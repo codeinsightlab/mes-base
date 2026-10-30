@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="dev.mesbase.business.production.dao.ManufacturedInputSourceExtraMapper">
+    <select id="selectSources" resultType="dev.mesbase.business.production.domain.ManufacturedInputSource">
+        <bind name="posted" value="@dev.mesbase.business.wm.domain.StockDocumentStatus@POSTED.getValue()"/>
+        <bind name="receipt" value="@dev.mesbase.business.wm.domain.StockDocumentType@PRODUCTION_RECEIPT.getValue()"/>
+        <bind name="inbound" value="@dev.mesbase.business.wm.domain.StockDocumentDirection@IN.getValue()"/>
+        <bind name="enabled" value="@dev.mesbase.business.shared.enums.EnableStatus@ENABLED.getValue()"/>
+        <bind name="local" value="@dev.mesbase.business.shared.enums.BusinessSource@LOCAL.getValue()"/>
+        <bind name="documentSource" value="@dev.mesbase.business.wm.domain.StockSourceType@OTHER_RECEIPT.getValue()"/>
+        SELECT d.id AS document_id, d.document_no, l.id AS line_id, a.id AS stock_action_id,
+               e.id AS execution_id, o.id AS workorder_id, wm.bom_id, s.id AS stock_id,
+               l.material_id, l.warehouse_id, l.unit_id, l.batch_no, l.bin_code,
+               l.quantity AS received_qty,
+               LEAST(s.quantity, COALESCE(s.available_quantity, s.quantity)) AS stock_available_qty
+        FROM wm_stock_document d
+        JOIN wm_stock_document_line l ON l.document_id = d.id
+        JOIN wm_stock_action a ON a.id = l.stock_action_id AND a.document_line_id = l.id
+            AND a.source_type = #{documentSource} AND a.source_id = CAST(d.id AS CHAR)
+            AND a.operation_id = d.post_request_id
+            AND a.stock_id = l.stock_id AND a.material_id = l.material_id AND a.unit_id = l.unit_id
+            AND a.warehouse_id = l.warehouse_id AND a.quantity_delta = l.quantity
+            AND a.batch_no = l.batch_no AND (a.bin_code = l.bin_code OR (a.bin_code IS NULL AND l.bin_code IS NULL))
+        JOIN mes_production_execution e ON e.id = d.source_execution_id AND e.id = a.execution_id
+            AND e.product_id = l.material_id AND e.batch_no = l.batch_no
+        JOIN workorder o ON o.id = e.workorder_id AND o.product_id = e.product_id AND o.source = #{local}
+        JOIN mes_workorder_material wm ON wm.id = o.id AND wm.bom_id = #{bomId} AND wm.frozen_at IS NOT NULL
+        JOIN material_bom b ON b.id = wm.bom_id AND b.product_id = l.material_id AND b.unit_id = l.unit_id
+        JOIN wm_inventory s ON s.id = l.stock_id AND s.material_id = l.material_id
+            AND s.warehouse_id = l.warehouse_id AND s.batch_no = l.batch_no
+            AND (s.bin_code = l.bin_code OR (s.bin_code IS NULL AND l.bin_code IS NULL))
+        JOIN wm_warehouse w ON w.id = s.warehouse_id AND w.status = #{enabled} AND w.source = #{local}
+        JOIN material m ON m.id = l.material_id AND m.unit_id = l.unit_id AND m.status = #{enabled}
+        JOIN unit_measure u ON u.id = l.unit_id AND u.status = #{enabled}
+        WHERE d.status = #{posted} AND d.document_type = #{receipt} AND d.direction = #{inbound}
+            AND d.posted_by IS NOT NULL AND d.posted_at IS NOT NULL AND d.post_request_id IS NOT NULL
+            AND l.material_id = #{materialId} AND l.unit_id = #{unitId} AND l.quantity > 0
+            AND s.status = #{enabled} AND s.quantity > 0
+            AND COALESCE(s.available_quantity, s.quantity) > 0
+            AND NOT EXISTS(SELECT 1 FROM wm_stock_action reversal WHERE reversal.reference_action_id = a.id)
+            AND l.warehouse_id IN
+            <foreach collection="warehouseIds" item="warehouseId" open="(" separator="," close=")">#{warehouseId}</foreach>
+        ORDER BY d.id DESC, l.id DESC
+    </select>
+</mapper>
