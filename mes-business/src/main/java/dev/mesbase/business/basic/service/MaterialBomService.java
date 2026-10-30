@@ -9,6 +9,7 @@ import dev.mesbase.business.basic.domain.MaterialBomCreateCommand;
 import dev.mesbase.business.basic.domain.MaterialBomEntity;
 import dev.mesbase.business.basic.domain.MaterialBomExample;
 import dev.mesbase.business.basic.domain.MaterialBomGraph;
+import dev.mesbase.business.basic.domain.MaterialBomExplosion;
 import dev.mesbase.business.basic.domain.MaterialBomItemCreateCommand;
 import dev.mesbase.business.basic.domain.MaterialBomItemEntity;
 import dev.mesbase.business.basic.domain.MaterialBomItemExample;
@@ -297,6 +298,188 @@ public class MaterialBomService {
     private MaterialBomGraph graph(Long id, BigDecimal outputQty, boolean publishing) {
         decimal(outputQty);
         require(id);
+        var data = loadGraph(id);
+        var versions = data.versions();
+        var lines = data.lines();
+        var materialMap = data.materials();
+        var unitMap = data.units();
+        if (materialMap.values().stream().noneMatch(material -> material.getUnitId() != null)) conflict();
+        var grouped = lines.stream().collect(Collectors.groupingBy(MaterialBomItemEntity::getBomId));
+        var totals = new LinkedHashMap<Long, MaterialBomGraph.Total>();
+        var nodes = walk(id, outputQty, "", new HashSet<>(), versions, grouped, materialMap, unitMap, totals, publishing, 0, new int[]{0});
+        var rounded = totals.values().stream()
+                .map(t -> new MaterialBomGraph.Total(t.materialId(), t.code(), t.name(), t.quantity()
+                        .setScale(6, RoundingMode.HALF_UP), t.unitName())).toList();
+        return new MaterialBomGraph(id, outputQty, nodes, rounded);
+    }
+
+    @Transactional(transactionManager = "businessTransactionManager", readOnly = true)
+    public MaterialBomExplosion explode(String materialCode, Long bomId, BigDecimal outputQty,
+                                        int versionOffset, int versionLimit) {
+        ParameterChecks.text(materialCode, true, 64, ErrorCode.BAD_REQUEST);
+        ParameterChecks.paging(versionOffset, versionLimit, 100);
+        decimal(outputQty);
+        var materialFilter = new MaterialExample();
+        materialFilter.createCriteria().andCodeEqualTo(materialCode);
+        List<MaterialEntity> matches;
+        try (var page = PageHelper.offsetPage(0, 2, false)) {
+            matches = materials.selectByExample(materialFilter);
+        }
+        if (matches.isEmpty()) throw new FoundationException(ErrorCode.NOT_FOUND);
+        if (matches.size() != 1) throw new FoundationException(ErrorCode.MATERIAL_CODE_AMBIGUOUS);
+        var product = matches.getFirst();
+        var root = product;
+        var filter = new MaterialBomExample();
+        filter.createCriteria().andProductIdEqualTo(product.getId());
+        filter.setOrderByClause("id DESC");
+        MaterialBomExplosion.Versions candidates;
+        try (var page = PageHelper.offsetPage(versionOffset, versionLimit)) {
+            var rows = boms.selectByExample(filter);
+            candidates = new MaterialBomExplosion.Versions(List.copyOf(rows),
+                    page.getTotal(), versionOffset, versionLimit);
+        }
+        var problems = new ArrayList<MaterialBomExplosion.Problem>();
+        if (bomId == null && candidates.total() > 1) {
+            problems.add(problem("", null, null, ErrorCode.MATERIAL_BOM_AMBIGUOUS));
+            return new MaterialBomExplosion(root, outputQty, null, candidates, true, false,
+                    List.of(), List.of(), problems);
+        }
+        MaterialBomEntity selected = null;
+        if (bomId != null) {
+            selected = boms.selectByPrimaryKey(bomId);
+            if (selected != null && !Objects.equals(selected.getProductId(), product.getId())) {
+                problems.add(problem("", bomId, null, ErrorCode.MATERIAL_BOM_INVALID));
+                return new MaterialBomExplosion(root, outputQty, null, candidates, false, false,
+                        List.of(), List.of(), problems);
+            }
+        } else if (candidates.total() == 1) {
+            // Candidate paging must not change the identity of a uniquely determined root version.
+            try (var page = PageHelper.offsetPage(0, 1, false)) {
+                var rows = boms.selectByExample(filter);
+                if (!rows.isEmpty()) selected = rows.getFirst();
+            }
+        }
+        if (selected == null) {
+            problems.add(problem("", bomId, null, ErrorCode.MATERIAL_BOM_MISSING));
+            return new MaterialBomExplosion(root, outputQty, null, candidates, false, false,
+                    List.of(), List.of(), problems);
+        }
+        var totals = new LinkedHashMap<Long, MaterialBomExplosion.Total>();
+        List<MaterialBomExplosion.Node> nodes;
+        try {
+            var data = loadGraph(selected.getId());
+            var grouped = data.lines().stream().collect(Collectors.groupingBy(MaterialBomItemEntity::getBomId));
+            nodes = walkReadable(selected.getId(), outputQty, "", new HashSet<>(), data, grouped, totals,
+                    problems, 0, new int[]{0});
+        } catch (FoundationException failure) {
+            if (failure.code() != ErrorCode.MATERIAL_BOM_BUDGET) throw failure;
+            // Never present a budget-truncated tree or total as a complete requirement.
+            problems.clear();
+            problems.add(problem("", selected.getId(), null, failure.code()));
+            nodes = List.of();
+            totals.clear();
+        }
+        var rounded = totals.values().stream().map(t -> new MaterialBomExplosion.Total(t.materialId(), t.code(),
+                t.name(), t.unitId(), t.unitName(), t.quantity()
+                .setScale(6, RoundingMode.HALF_UP), List.copyOf(t.paths()))).toList();
+        return new MaterialBomExplosion(root, outputQty, selected, candidates, false, problems.isEmpty(),
+                nodes, rounded, List.copyOf(problems));
+    }
+
+    private List<MaterialBomExplosion.Node> walkReadable(Long id, BigDecimal output, String path,
+                                                         Set<Long> ancestors, GraphData data,
+                                                         Map<Long, List<MaterialBomItemEntity>> grouped,
+                                                         Map<Long, MaterialBomExplosion.Total> totals,
+                                                         List<MaterialBomExplosion.Problem> problems,
+                                                         int depth, int[] visited) {
+        if (depth >= MAX_DEPTH) ParameterChecks.reject(ErrorCode.MATERIAL_BOM_BUDGET);
+        var current = data.versions().get(id);
+        if (current == null) {
+            problems.add(problem(path, id, null, ErrorCode.MATERIAL_BOM_MISSING));
+            return List.of();
+        }
+        if (!ancestors.add(id)) {
+            problems.add(problem(path, id, null, ErrorCode.MATERIAL_BOM_CYCLE));
+            return List.of();
+        }
+        var product = data.materials().get(current.getProductId());
+        boolean validVersion = coefficientValid(current.getBaseQty()) && product != null
+                && Objects.equals(product.getUnitId(), current.getUnitId())
+                && data.units().containsKey(current.getUnitId());
+        if (!validVersion) problems.add(problem(path, id, null, ErrorCode.MATERIAL_BOM_INVALID));
+        var rows = grouped.getOrDefault(id, List.of()).stream()
+                .sorted(Comparator.comparing(MaterialBomItemEntity::getSort)
+                        .thenComparing(MaterialBomItemEntity::getId)).toList();
+        if (rows.isEmpty()) problems.add(problem(path, id, null, ErrorCode.MATERIAL_BOM_INVALID));
+        var seen = new HashSet<Long>();
+        var nodes = new ArrayList<MaterialBomExplosion.Node>();
+        for (var line : rows) {
+            if (++visited[0] > MAX_LINES) ParameterChecks.reject(ErrorCode.MATERIAL_BOM_BUDGET);
+            String childPath = path + "/" + line.getId();
+            var material = data.materials().get(line.getMaterialId());
+            var unit = data.units().get(line.getUnitId());
+            boolean validLine = seen.add(line.getMaterialId()) && coefficientValid(line.getQuantity())
+                    && material != null && unit != null && Objects.equals(material.getUnitId(), line.getUnitId())
+                    && !Objects.equals(line.getMaterialId(), current.getProductId());
+            if (!validLine) problems.add(problem(childPath, id, line.getId(), ErrorCode.MATERIAL_BOM_INVALID));
+            BigDecimal quantity = null;
+            if (validVersion && validLine && output != null)
+                quantity = output.multiply(line.getQuantity()).divide(current.getBaseQty(), MathContext.DECIMAL128);
+            List<MaterialBomExplosion.Node> children = List.of();
+            boolean leaf = line.getChildBomId() == null;
+            if (!leaf) {
+                var child = data.versions().get(line.getChildBomId());
+                if (child == null) {
+                    problems.add(problem(childPath, line.getChildBomId(), line.getId(), ErrorCode.MATERIAL_BOM_MISSING));
+                } else if (!Objects.equals(child.getProductId(), line.getMaterialId())) {
+                    problems.add(problem(childPath, line.getChildBomId(), line.getId(), ErrorCode.MATERIAL_BOM_INVALID));
+                } else {
+                    children = walkReadable(child.getId(), quantity, childPath, ancestors, data, grouped, totals,
+                            problems, depth + 1, visited);
+                }
+            } else if (quantity != null) {
+                List<String> paths = new ArrayList<>();
+                var prior = totals.get(line.getMaterialId());
+                BigDecimal sum = quantity;
+                if (prior != null) {
+                    sum = sum.add(prior.quantity());
+                    paths = prior.paths();
+                }
+                paths.add(childPath);
+                totals.put(line.getMaterialId(), new MaterialBomExplosion.Total(material.getId(), material.getCode(),
+                        material.getName(), unit.getId(), unit.getName(), sum, paths));
+            }
+            String code = null;
+            String name = null;
+            String unitName = null;
+            if (material != null) {
+                code = material.getCode();
+                name = material.getName();
+            }
+            if (unit != null) unitName = unit.getName();
+            BigDecimal displayedQuantity = null;
+            if (quantity != null) displayedQuantity = quantity.setScale(6, RoundingMode.HALF_UP);
+            nodes.add(new MaterialBomExplosion.Node(childPath, depth + 1, line.getId(), id, current.getVersion(),
+                    line.getMaterialId(), code, name, line.getUnitId(), unitName, line.getQuantity(), current.getBaseQty(),
+                    displayedQuantity, line.getChildBomId(), leaf, children));
+        }
+        ancestors.remove(id);
+        return List.copyOf(nodes);
+    }
+
+    private static boolean coefficientValid(BigDecimal value) {
+        return value != null && value.signum() > 0 && value.scale() <= 6 && value.precision() - value.scale() <= 14;
+    }
+
+    private static MaterialBomExplosion.Problem problem(String path, Long bomId, Long lineId, ErrorCode code) {
+        return new MaterialBomExplosion.Problem(path, bomId, lineId, code.name(), code.safeMessage());
+    }
+
+    private record GraphData(Map<Long, MaterialBomEntity> versions, List<MaterialBomItemEntity> lines,
+                             Map<Long, MaterialEntity> materials, Map<Long, UnitMeasureEntity> units) {
+    }
+
+    private GraphData loadGraph(Long id) {
         // Load only explicit references reachable from this root. Each bounded frontier is read
         // in batches; shared subassemblies are loaded once, while walk preserves every path.
         var versions = new HashMap<Long, MaterialBomEntity>();
@@ -338,18 +521,14 @@ public class MaterialBomService {
                 .collect(Collectors.toMap(MaterialEntity::getId, Function.identity()));
         var unitIds = materialMap.values().stream().map(MaterialEntity::getUnitId).filter(Objects::nonNull).distinct()
                 .toList();
-        if (unitIds.isEmpty()) conflict();
-        var unitFilter = new UnitMeasureExample();
-        unitFilter.createCriteria().andIdIn(unitIds);
-        var unitMap = units.selectByExample(unitFilter).stream()
-                .collect(Collectors.toMap(UnitMeasureEntity::getId, Function.identity()));
-        var grouped = lines.stream().collect(Collectors.groupingBy(MaterialBomItemEntity::getBomId));
-        var totals = new LinkedHashMap<Long, MaterialBomGraph.Total>();
-        var nodes = walk(id, outputQty, "", new HashSet<>(), versions, grouped, materialMap, unitMap, totals, publishing, 0, new int[]{0});
-        var rounded = totals.values().stream()
-                .map(t -> new MaterialBomGraph.Total(t.materialId(), t.code(), t.name(), t.quantity()
-                        .setScale(6, RoundingMode.HALF_UP), t.unitName())).toList();
-        return new MaterialBomGraph(id, outputQty, nodes, rounded);
+        Map<Long, UnitMeasureEntity> unitMap = Map.of();
+        if (!unitIds.isEmpty()) {
+            var unitFilter = new UnitMeasureExample();
+            unitFilter.createCriteria().andIdIn(unitIds);
+            unitMap = units.selectByExample(unitFilter).stream()
+                    .collect(Collectors.toMap(UnitMeasureEntity::getId, Function.identity()));
+        }
+        return new GraphData(versions, lines, materialMap, unitMap);
     }
 
     private List<MaterialBomGraph.Node> walk(Long id, BigDecimal output, String path, Set<Long> ancestors,
@@ -477,8 +656,7 @@ public class MaterialBomService {
     }
 
     private static void decimal(BigDecimal value) {
-        if (value == null || value.signum() <= 0 || value.scale() > 6 || value.precision() - value.scale() > 14)
-            ParameterChecks.reject(ErrorCode.BAD_REQUEST);
+        if (!coefficientValid(value)) ParameterChecks.reject(ErrorCode.BAD_REQUEST);
     }
 
     private static void checkIds(List<Long> ids) {
