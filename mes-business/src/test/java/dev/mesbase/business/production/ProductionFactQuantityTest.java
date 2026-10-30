@@ -7,6 +7,7 @@ import dev.mesbase.business.production.domain.ProductionCompletionBalance;
 import dev.mesbase.business.production.service.ProductionChainLocks;
 import dev.mesbase.business.production.service.ProductionQuantityService;
 import dev.mesbase.core.error.FoundationException;
+import dev.mesbase.core.error.ErrorCode;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -45,7 +46,12 @@ class ProductionFactQuantityTest {
         var order = new WorkorderEntity();
         for (String state : List.of("HISTORICAL", "UNRECOGNIZED", "COMPLETED", "CANCELLED")) {
             order.setStatus(state);
-            assertThrows(FoundationException.class, () -> ProductionChainLocks.requireActive(order));
+            var failure = assertThrows(FoundationException.class, () -> ProductionChainLocks.requireActive(order));
+            if ("CANCELLED".equals(state)) assertEquals(ErrorCode.WORKORDER_CANCELLED, failure.code());
+            else {
+                assertEquals(ErrorCode.RESOURCE_CONFLICT, failure.code());
+                assertEquals("当前工单状态不允许继续生产操作", failure.safeMessage());
+            }
         }
         for (String state : List.of("DRAFT", "RELEASED")) {
             order.setStatus(state);

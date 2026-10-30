@@ -42,6 +42,7 @@ import dev.mesbase.common.utils.StringUtils;
 import dev.mesbase.common.validation.ParameterChecks;
 import dev.mesbase.core.error.ErrorCode;
 import dev.mesbase.core.error.FoundationException;
+import dev.mesbase.core.error.SafeBusinessMessage;
 import dev.mesbase.infrastructure.cache.annotation.BusinessCacheEvict;
 
 import java.math.BigDecimal;
@@ -238,7 +239,8 @@ public class LocalStockService {
         if (!EnableStatus.ENABLED.getValue().equals(stock.getStatus())
                 || stock.getQuantity().compareTo(calculation.issueQty()) < 0
                 || available(stock).compareTo(calculation.issueQty()) < 0)
-            ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
+            throw new FoundationException(ErrorCode.RESOURCE_CONFLICT,
+                    new SafeBusinessMessage("库存不可用或可用数量不足，无法完成生产领料"));
     }
 
     /**

@@ -61,7 +61,7 @@ public final class RequestBoundaryFilter extends OncePerRequestFilter {
         } catch (FoundationException failure) {
             HttpFailureLogging.known(request, failure);
             if (response.isCommitted()) throw failure;
-            ErrorWriter.write(failure.code(), request, response);
+            ErrorWriter.write(failure, request, response);
         } catch (IOException | ServletException | RuntimeException failure) {
             HttpFailureLogging.unexpected(request, failure);
             throw failure;

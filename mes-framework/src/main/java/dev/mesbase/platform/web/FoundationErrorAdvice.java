@@ -46,7 +46,11 @@ public final class FoundationErrorAdvice {
     @ExceptionHandler(FoundationException.class)
     public ResponseEntity<ErrorResponse> known(FoundationException failure, HttpServletRequest request) {
         HttpFailureLogging.known(request, failure);
-        return error(failure.code(), request);
+        ErrorCode code = ErrorWriter.responseCode(failure.code(), request);
+        var response = ResponseEntity.status(code.httpStatus());
+        if (code == ErrorCode.UNAUTHENTICATED)
+            response.header("WWW-Authenticate", "Bearer".equals(request.getAttribute("mes.authScheme")) ? "Bearer realm=mes-base" : "Basic realm=mes-base");
+        return response.body(ErrorWriter.body(failure, request));
     }
 
     @ExceptionHandler({MissingServletRequestParameterException.class, HttpMessageNotReadableException.class, MethodArgumentNotValidException.class, MethodArgumentTypeMismatchException.class, HandlerMethodValidationException.class, ConstraintViolationException.class})

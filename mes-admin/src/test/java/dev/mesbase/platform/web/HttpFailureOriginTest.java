@@ -58,19 +58,20 @@ class HttpFailureOriginTest {
         request.setQueryString("secret=must-not-log");
         request.setAttribute(RequestBoundaryFilter.REQUEST_ID, "TEST_ONLY_ORIGIN");
         try {
-            Service.validate();
+            dev.mesbase.business.production.service.BusinessValidationPathFixture.service();
         } catch (FoundationException failure) {
             HttpFailureLogging.known(request, failure);
         }
         String line = events.list.getFirst().getFormattedMessage();
         assertTrue(line.contains("method=POST path=/api/test-only"), line);
-        assertTrue(line.contains("origin=at dev.mesbase.business."), line);
+        assertTrue(line.contains("origin=at dev.mesbase.business.production.service.BusinessValidationPathFixture.validator"), line);
         assertTrue(line.contains("throwSite=at dev.mesbase.common.validation.ParameterChecks.reject"), line);
         assertFalse(line.contains("secret"), line);
         assertFalse(line.contains("requestId="), line);
     }
 
     static final class Service {
+        static void validate() { Validator.validate(); }
         static void execute() { Validator.validate(); }
     }
 
@@ -97,7 +98,8 @@ class HttpFailureOriginTest {
             assertEquals(Level.WARN, event.getLevel());
             assertNull(event.getThrowableProxy());
             assertTrue(event.getFormattedMessage().contains("exception=" + failure.getClass().getName()));
-            assertTrue(event.getFormattedMessage().contains("origin=at " + frame));
+            assertTrue(event.getFormattedMessage().contains("origin=unknown"));
+            assertTrue(event.getFormattedMessage().contains("throwSite=at " + frame));
             assertFalse(event.getFormattedMessage().contains("TEST_ONLY_SECRET"));
             assertFalse(event.getFormattedMessage().contains("requestId="));
             assertFalse(event.getFormattedMessage().contains("rootCauseOrigin="));
@@ -113,21 +115,21 @@ class HttpFailureOriginTest {
                         : kind.equals("control") ? "Fixture\n.java" : "Fixture.java",
                         kind.equals("native") ? -2 : kind.equals("no-line") ? -1 : 42)});
         HttpFailureLogging.known(new MockHttpServletRequest(), failure);
-        assertTrue(events.list.getFirst().getFormattedMessage().endsWith("origin=unknown"));
+        assertTrue(events.list.getFirst().getFormattedMessage().contains("origin=unknown"));
         assertFalse(events.list.getFirst().getFormattedMessage().contains("\n"));
         assertNull(events.list.getFirst().getThrowableProxy());
     }
 
     @Test
     void deepestCauseIsAdditionalOriginWithoutReplacingWrapperOrLeakingMessages() {
-        var cause = new IllegalArgumentException("TEST_ONLY_SECRET_ROOT");
-        cause.setStackTrace(new StackTraceElement[]{new StackTraceElement("TEST_ONLY.Root", "execute", "Root.java", 17)});
+        var cause = dev.mesbase.business.production.service.BusinessValidationPathFixture.cause();
         var failure = new FoundationException(ErrorCode.UNPROCESSABLE, new IllegalStateException("TEST_ONLY_SECRET_WRAPPER", cause));
         failure.setStackTrace(new StackTraceElement[]{new StackTraceElement("TEST_ONLY.Wrapper", "translate", "Wrapper.java", 29)});
         HttpFailureLogging.known(new MockHttpServletRequest("GET", "/open-api/test-only"), failure);
         String text = events.list.getFirst().getFormattedMessage();
-        assertTrue(text.contains("origin=at TEST_ONLY.Wrapper.translate(Wrapper.java:29)"));
-        assertTrue(text.contains("rootCauseOrigin=at TEST_ONLY.Root.execute(Root.java:17)"));
+        assertTrue(text.contains("origin=unknown"));
+        assertTrue(text.contains("throwSite=at TEST_ONLY.Wrapper.translate(Wrapper.java:29)"));
+        assertTrue(text.contains("rootCauseOrigin=at dev.mesbase.business.production.service.BusinessValidationPathFixture.cause"));
         assertFalse(text.contains("TEST_ONLY_SECRET"));
         assertNull(events.list.getFirst().getThrowableProxy());
     }
@@ -147,8 +149,7 @@ class HttpFailureOriginTest {
         assertEquals(first, second);
         assertEquals("BUSINESS_REJECTED", first.getBody().errorCode());
         assertEquals(1, events.list.size());
-        assertTrue(events.list.getFirst().getFormattedMessage()
-                .contains("rootCauseOrigin=at " + cause.getStackTrace()[0]));
+        assertTrue(events.list.getFirst().getFormattedMessage().contains("rootCauseOrigin=unknown"));
     }
 
     @Test
@@ -179,7 +180,8 @@ class HttpFailureOriginTest {
                 .filter(line -> line.contains("WARN") && line.contains("event=http.request.rejected ")).count());
         for (String line : console.lines().filter(value -> value.contains("event=http.request.rejected ")).toList()) {
             assertEquals(1, line.split("requestId=", -1).length - 1);
-            assertTrue(line.matches(".*origin=at .*\\.main\\(HttpFailureOriginTest.java:[0-9]+\\).*"), line);
+            assertTrue(line.contains("origin=unknown"), line);
+            assertTrue(line.matches(".*throwSite=at .*\\.main\\(HttpFailureOriginTest.java:[0-9]+\\).*"), line);
         }
         assertFalse(console.contains("TEST_ONLY_SECRET"));
         assertTrue(console.contains("ERROR"));

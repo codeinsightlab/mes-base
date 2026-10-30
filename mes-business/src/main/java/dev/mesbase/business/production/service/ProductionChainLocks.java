@@ -9,6 +9,7 @@ import dev.mesbase.business.wm.domain.WmStockDocumentExample;
 import dev.mesbase.business.wm.domain.StockDocumentType;
 import dev.mesbase.core.error.ErrorCode;
 import dev.mesbase.core.error.FoundationException;
+import dev.mesbase.core.error.SafeBusinessMessage;
 import dev.mesbase.core.factory.FactoryScope;
 import dev.mesbase.infrastructure.persistence.OwnedTransactionManager;
 import dev.mesbase.platform.execution.FactoryContext;
@@ -107,7 +108,8 @@ public class ProductionChainLocks {
             throw new FoundationException(ErrorCode.WORKORDER_CANCELLED);
         if (!WorkOrderStatus.DRAFT.getValue().equals(row.getStatus())
                 && !WorkOrderStatus.RELEASED.getValue().equals(row.getStatus()))
-            throw new FoundationException(ErrorCode.RESOURCE_CONFLICT);
+            throw new FoundationException(ErrorCode.RESOURCE_CONFLICT,
+                    new SafeBusinessMessage("当前工单状态不允许继续生产操作"));
     }
 
     public void requireActiveExecution(Long id) {

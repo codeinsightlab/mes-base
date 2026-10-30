@@ -40,6 +40,7 @@ import dev.mesbase.business.shared.enums.EnableStatus;
 import dev.mesbase.common.utils.StringUtils;
 import dev.mesbase.core.error.ErrorCode;
 import dev.mesbase.core.error.FoundationException;
+import dev.mesbase.core.error.SafeBusinessMessage;
 import dev.mesbase.framework.sync.SyncCoordinator;
 import dev.mesbase.platform.execution.FactoryContext;
 import dev.mesbase.platform.execution.FactoryIntegrationContext;
@@ -311,7 +312,9 @@ public class WorkOrderService {
             return new ExternalSyncCheck(ExternalSyncAction.UNCHANGED, row.getId());
         if (hasExecutions(row.getId()) || queries.countBlockingIssues(row.getId()) > 0)
             throw new FoundationException(ErrorCode.EXECUTION_FROZEN);
-        if (!WorkOrderStatus.DRAFT.getValue().equals(row.getStatus())) conflict();
+        if (!WorkOrderStatus.DRAFT.getValue().equals(row.getStatus()))
+            throw new FoundationException(ErrorCode.RESOURCE_CONFLICT,
+                    new SafeBusinessMessage("工单不处于草稿状态，当前不能修改"));
         return new ExternalSyncCheck(ExternalSyncAction.UPDATE, row.getId());
     }
 

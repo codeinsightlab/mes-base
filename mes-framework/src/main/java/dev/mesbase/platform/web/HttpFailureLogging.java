@@ -48,9 +48,17 @@ public final class HttpFailureLogging {
 
     private static String origin(Throwable failure) {
         for (StackTraceElement frame : failure.getStackTrace()) {
-            if (frame.getClassName().startsWith("dev.mesbase.business.") && valid(frame)) return format(frame);
+            if (isApplicationFrame(frame) && valid(frame)) return format(frame);
         }
         return "unknown";
+    }
+
+    private static boolean isApplicationFrame(StackTraceElement frame) {
+        String name = frame.getClassName();
+        return name.startsWith("dev.mesbase.business.")
+                || name.startsWith("dev.mesbase.system.service.")
+                || name.startsWith("dev.mesbase.quartz.service.")
+                || name.startsWith("dev.mesbase.server.");
     }
 
     private static String throwSite(Throwable failure) {

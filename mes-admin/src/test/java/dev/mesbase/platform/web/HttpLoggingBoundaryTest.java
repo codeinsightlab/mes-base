@@ -215,7 +215,8 @@ class HttpLoggingBoundaryTest {
                 assertEquals(1, events.list.size());
                 assertEquals(Level.WARN, events.list.getFirst().getLevel());
                 assertNull(events.list.getFirst().getThrowableProxy());
-                assertTrue(events.list.getFirst().getFormattedMessage().contains("origin=at " + getClass().getName()));
+                assertTrue(events.list.getFirst().getFormattedMessage().contains("origin=unknown"));
+                assertTrue(events.list.getFirst().getFormattedMessage().contains("throwSite=at " + getClass().getName()));
                 events.list.clear();
             }
         } finally {
