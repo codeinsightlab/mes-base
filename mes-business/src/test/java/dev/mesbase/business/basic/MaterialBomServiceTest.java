@@ -4,6 +4,7 @@ import dev.mesbase.business.basic.controller.MaterialBomController;
 import dev.mesbase.business.basic.controller.MaterialBomItemController;
 import dev.mesbase.business.basic.dao.MaterialBomMapper;
 import dev.mesbase.business.basic.dao.MaterialBomItemMapper;
+import dev.mesbase.business.basic.dao.MaterialBomCopyMapper;
 import dev.mesbase.business.basic.dao.MaterialMapper;
 import dev.mesbase.business.basic.dao.UnitMeasureMapper;
 import dev.mesbase.business.basic.domain.MaterialBomEntity;
@@ -44,7 +45,7 @@ class MaterialBomServiceTest {
     private final MaterialBomItemMapper items = mock(MaterialBomItemMapper.class);
     private final MaterialMapper materials = mock(MaterialMapper.class);
     private final UnitMeasureMapper units = mock(UnitMeasureMapper.class);
-    private final MaterialBomService service = new MaterialBomService(boms, items, materials, units);
+    private final MaterialBomService service = new MaterialBomService(boms, items, mock(MaterialBomCopyMapper.class), materials, units);
 
     @Test
     void threeLevelRatiosUseEachBaseAndKeepTheDirectComponents() {

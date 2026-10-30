@@ -40,6 +40,7 @@ import dev.mesbase.business.production.dao.MesWorkorderMaterialMapper;
 import dev.mesbase.business.production.dao.ProductionInputExtraMapper;
 import dev.mesbase.business.basic.dao.MaterialBomMapper;
 import dev.mesbase.business.basic.dao.MaterialBomItemMapper;
+import dev.mesbase.business.basic.dao.MaterialBomCopyMapper;
 import dev.mesbase.business.production.dao.OperationMapper;
 import dev.mesbase.business.production.dao.ProductionQuantityMapper;
 import dev.mesbase.business.production.dao.ProductionReceiptQueryMapper;
@@ -179,7 +180,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * TEST ONLY: real generated SQL, HTTP authorization and transactions; two separate H2 databases.
  */
 class MaterialIssueHttpTest {
-    static final Set<Class<?>> MAPPERS = Set.of(MesMaterialIssueInputMapper.class, ProductionInputExtraMapper.class, MaterialBomMapper.class, MaterialBomItemMapper.class, ProductionDefectListExtraMapper.class, StockDocumentExtraMapper.class, OperationDefectTypeMapper.class, DefectStatisticsExtraMapper.class, WmStockDocumentMapper.class, WmStockDocumentLineMapper.class, MesWorkorderCancellationMapper.class, WmWarehouseErpExtraMapper.class, MesQualityReleaseMapper.class, MesWarehouseAcceptanceMapper.class, MesExecutionCompletionMapper.class, MesWorkorderMaterialMapper.class, WmStockActionMapper.class, MesExecutionAssignmentMapper.class, MesProductionScanActivityMapper.class, WmInventoryMapper.class, MesProductionReceiptMapper.class, ProductionReceiptQueryMapper.class, MesProductionDefectMapper.class, MesQualityTreatmentMapper.class, WorkstationMapper.class, MesProductionReportMapper.class, ProductionQuantityMapper.class, MesExecutionPathMapper.class, MesExecutionPathNodeMapper.class, WorkorderErpExtraMapper.class, WorkOrderExtraMapper.class, RoutingNodeMapper.class, RoutingEdgeMapper.class, OperationMapper.class, MesProductionExecutionMapper.class, MaterialMapper.class, UnitMeasureMapper.class, WmWarehouseMapper.class, RoutingMapper.class, RoutingProductMapper.class, WorkorderMapper.class);
+    static final Set<Class<?>> MAPPERS = Set.of(MesMaterialIssueInputMapper.class, ProductionInputExtraMapper.class, MaterialBomMapper.class, MaterialBomItemMapper.class, MaterialBomCopyMapper.class, ProductionDefectListExtraMapper.class, StockDocumentExtraMapper.class, OperationDefectTypeMapper.class, DefectStatisticsExtraMapper.class, WmStockDocumentMapper.class, WmStockDocumentLineMapper.class, MesWorkorderCancellationMapper.class, WmWarehouseErpExtraMapper.class, MesQualityReleaseMapper.class, MesWarehouseAcceptanceMapper.class, MesExecutionCompletionMapper.class, MesWorkorderMaterialMapper.class, WmStockActionMapper.class, MesExecutionAssignmentMapper.class, MesProductionScanActivityMapper.class, WmInventoryMapper.class, MesProductionReceiptMapper.class, ProductionReceiptQueryMapper.class, MesProductionDefectMapper.class, MesQualityTreatmentMapper.class, WorkstationMapper.class, MesProductionReportMapper.class, ProductionQuantityMapper.class, MesExecutionPathMapper.class, MesExecutionPathNodeMapper.class, WorkorderErpExtraMapper.class, WorkOrderExtraMapper.class, RoutingNodeMapper.class, RoutingEdgeMapper.class, OperationMapper.class, MesProductionExecutionMapper.class, MaterialMapper.class, UnitMeasureMapper.class, WmWarehouseMapper.class, RoutingMapper.class, RoutingProductMapper.class, WorkorderMapper.class);
 
     static class Fixture implements AutoCloseable {
         final RuntimeRegistry registry = new RuntimeRegistry();
@@ -468,6 +469,11 @@ class MaterialIssueHttpTest {
         }
 
         @Bean
+        MaterialBomCopyMapper materialBomCopyMapper(SqlSessionFactory f) {
+            return new SqlSessionTemplate(f).getMapper(MaterialBomCopyMapper.class);
+        }
+
+        @Bean
         MesMaterialIssueInputMapper materialIssueInputMapper(SqlSessionFactory f) {
             return new SqlSessionTemplate(f).getMapper(MesMaterialIssueInputMapper.class);
         }
@@ -500,6 +506,7 @@ class MaterialIssueHttpTest {
         @Bean
         AuthorizationService qualityAuthorization() {
             return (actor, scope, permission) -> "full".equals(actor.id())
+                    || "bom_create".equals(actor.id()) && permission.code().equals("business:material:create")
                     || "revise".equals(actor.id()) && permission.code().equals("business:quality:defect:revise")
                     || "query".equals(actor.id()) && permission.code().equals("workorder:query")
                     || "create".equals(actor.id()) && permission.code().equals("business:quality:defect:create")
@@ -650,7 +657,7 @@ class MaterialIssueHttpTest {
                 if (value == null) return null;
                 var user = new SysUser();
                 user.setUserId(1L);
-                user.setUserName(value.endsWith("NONE") ? "none" : value.endsWith("CRUD") ? "crud" : value.endsWith("CREATE") ? "create" : value.endsWith("REVISE") ? "revise" : value.endsWith("ISSUE_QUERY") ? "issue_query" : value.endsWith("ISSUE_ITEM") ? "issue_item" : value.endsWith("QUERY") ? "query" : "full");
+                user.setUserName(value.endsWith("NONE") ? "none" : value.endsWith("CRUD") ? "crud" : value.endsWith("BOM_CREATE") ? "bom_create" : value.endsWith("CREATE") ? "create" : value.endsWith("REVISE") ? "revise" : value.endsWith("ISSUE_QUERY") ? "issue_query" : value.endsWith("ISSUE_ITEM") ? "issue_item" : value.endsWith("QUERY") ? "query" : "full");
                 return new LoginUser(1L, 1L, user, Set.of());
             });
             return http.csrf(c -> c.disable())

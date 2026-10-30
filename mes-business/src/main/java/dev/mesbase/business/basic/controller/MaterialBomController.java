@@ -7,11 +7,19 @@ import java.math.BigDecimal;
 import org.springframework.web.bind.annotation.RequestParam;
 import dev.mesbase.business.basic.controller.vo.MaterialBomVo;
 import dev.mesbase.business.basic.domain.MaterialBomCreateCommand;
+import dev.mesbase.business.basic.domain.MaterialBomCopyCommand;
 import dev.mesbase.business.basic.domain.MaterialBomEntity;
 import dev.mesbase.business.basic.domain.MaterialBomQueryDto;
 import dev.mesbase.business.basic.domain.MaterialBomUpdateCommand;
 import dev.mesbase.business.basic.service.MaterialBomService;
 import dev.mesbase.common.utils.bean.BeanConversions;
+import dev.mesbase.common.utils.SecurityUtils;
+import dev.mesbase.core.error.ErrorCode;
+import dev.mesbase.core.error.FoundationException;
+import dev.mesbase.core.security.AuthenticatedActor;
+import dev.mesbase.core.security.AuthorizationService;
+import dev.mesbase.core.security.Permission;
+import dev.mesbase.platform.execution.FactoryContext;
 import dev.mesbase.platform.web.EndpointAccess;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotEmpty;
@@ -39,9 +47,11 @@ import org.springframework.web.bind.annotation.RestController;
 @ConditionalOnProperty(name = "mes.business.enabled", havingValue = "true")
 public class MaterialBomController {
     private final MaterialBomService service;
+    private final AuthorizationService authorization;
 
-    public MaterialBomController(MaterialBomService service) {
+    public MaterialBomController(MaterialBomService service, AuthorizationService authorization) {
         this.service = service;
+        this.authorization = authorization;
     }
 
     @GetMapping
@@ -84,6 +94,15 @@ public class MaterialBomController {
         return toView(service.insert(input));
     }
 
+    @PostMapping("/{id}/copy")
+    @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED, permission = MaterialBomPermissions.CREATE)
+    public MaterialBomVo copy(@PathVariable Long id, @Valid @RequestBody MaterialBomCopyCommand input) {
+        if (!authorization.hasPermission(new AuthenticatedActor(SecurityUtils.getAuthentication().getName()),
+                FactoryContext.required(), new Permission(MaterialBomPermissions.QUERY)))
+            throw new FoundationException(ErrorCode.FORBIDDEN);
+        return toView(service.copy(id, input));
+    }
+
     @PutMapping("/{id}")
     @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED,
             permission = MaterialBomPermissions.UPDATE)
@@ -116,6 +135,12 @@ public class MaterialBomController {
     @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED, permission = MaterialPermissions.UPDATE)
     public MaterialBomVo disable(@PathVariable Long id, @RequestBody Transition command) {
         return toView(service.disable(id, command.revision()));
+    }
+
+    @PostMapping("/{id}/enable")
+    @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED, permission = MaterialBomPermissions.UPDATE)
+    public MaterialBomVo enable(@PathVariable Long id, @RequestBody Transition command) {
+        return toView(service.enable(id, command.revision()));
     }
 
     @PostMapping("/{id}/default")

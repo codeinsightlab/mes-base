@@ -2,10 +2,12 @@ package dev.mesbase.business.basic.service;
 
 import com.github.pagehelper.PageHelper;
 import dev.mesbase.business.basic.dao.MaterialBomItemMapper;
+import dev.mesbase.business.basic.dao.MaterialBomCopyMapper;
 import dev.mesbase.business.basic.dao.MaterialBomMapper;
 import dev.mesbase.business.basic.dao.MaterialMapper;
 import dev.mesbase.business.basic.dao.UnitMeasureMapper;
 import dev.mesbase.business.basic.domain.MaterialBomCreateCommand;
+import dev.mesbase.business.basic.domain.MaterialBomCopyCommand;
 import dev.mesbase.business.basic.domain.MaterialBomEntity;
 import dev.mesbase.business.basic.domain.MaterialBomExample;
 import dev.mesbase.business.basic.domain.MaterialBomGraph;
@@ -66,13 +68,16 @@ public class MaterialBomService {
     private static final int MAX_DEPTH = 100;
     private final MaterialBomMapper boms;
     private final MaterialBomItemMapper items;
+    private final MaterialBomCopyMapper copies;
     private final MaterialMapper materials;
     private final UnitMeasureMapper units;
 
-    public MaterialBomService(MaterialBomMapper boms, MaterialBomItemMapper items, MaterialMapper materials,
+    public MaterialBomService(MaterialBomMapper boms, MaterialBomItemMapper items, MaterialBomCopyMapper copies,
+                              MaterialMapper materials,
                               UnitMeasureMapper units) {
         this.boms = boms;
         this.items = items;
+        this.copies = copies;
         this.materials = materials;
         this.units = units;
     }
@@ -132,6 +137,31 @@ public class MaterialBomService {
         return row;
     }
 
+    public MaterialBomEntity copy(Long sourceId, MaterialBomCopyCommand command) {
+        var source = lock(sourceId);
+        if (!Objects.equals(source.getRevision(), command.revision())) conflict();
+        unique(source.getCode(), command.version(), source.getProductId(), null);
+        var filter = new MaterialBomItemExample();
+        filter.createCriteria().andBomIdEqualTo(sourceId);
+        long count = items.countByExample(filter);
+        if (count > MAX_LINES) ParameterChecks.reject(ErrorCode.MATERIAL_BOM_BUDGET);
+        var draft = new MaterialBomEntity();
+        draft.setCode(source.getCode());
+        draft.setVersion(command.version());
+        draft.setProductId(source.getProductId());
+        draft.setBaseQty(source.getBaseQty());
+        draft.setUnitId(source.getUnitId());
+        draft.setRemark(source.getRemark());
+        draft.setStatus(MaterialBomStatus.DRAFT.getValue());
+        draft.setDefaultVersion(false);
+        draft.setRevision(1L);
+        draft.setCreatedBy(SecurityUtils.getUserId());
+        draft.setCreatedAt(LocalDateTime.now());
+        changed(boms.insert(draft));
+        if (copies.copyItems(sourceId, draft.getId()) != count) conflict();
+        return draft;
+    }
+
     public MaterialBomEntity updateById(Long id, MaterialBomUpdateCommand c) {
         var row = editable(id);
         if (!Objects.equals(row.getRevision(), c.revision())) conflict();
@@ -179,6 +209,16 @@ public class MaterialBomService {
         // Parent versions remain readable; a disabled child prevents new published usage, not historical reads.
         row.setDefaultVersion(false);
         row.setStatus(MaterialBomStatus.DISABLED.getValue());
+        bump(row);
+        return row;
+    }
+
+    public MaterialBomEntity enable(Long id, long revision) {
+        var row = lock(id);
+        if (row.getRevision() != revision || !MaterialBomStatus.DISABLED.getValue().equals(row.getStatus())) conflict();
+        graph(id, row.getBaseQty(), true);
+        row.setStatus(MaterialBomStatus.PUBLISHED.getValue());
+        row.setDefaultVersion(false);
         bump(row);
         return row;
     }
