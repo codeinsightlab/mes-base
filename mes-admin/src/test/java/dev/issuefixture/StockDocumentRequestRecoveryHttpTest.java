@@ -2,8 +2,8 @@ package dev.issuefixture;
 
 import dev.mesbase.core.security.AuthorizationService;
 import java.util.List;
-import java.util.Map;
 import java.util.Locale;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
@@ -19,7 +19,6 @@ import static dev.issuefixture.ProductionCoreV1HttpTest.full;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
@@ -47,7 +46,7 @@ class StockDocumentRequestRecoveryHttpTest {
     }
 
     @Test
-    void creatingUuidRecoversDraftAndPostedDocumentWithoutAllocatingOrWriting() throws Exception {
+    void mesRequestUuidRecoversThePostedDocumentWithoutAllocatingOrWriting() throws Exception {
         try (var context = ProductionInputHttpTest.context(StockDocumentOwnedTransactionsHttpTest.GuardedCenter.class, Permissions.class)) {
             var mvc = MaterialIssueHttpTest.mvc(context);
             var db = ProductionInputHttpTest.db(context);
@@ -56,9 +55,8 @@ class StockDocumentRequestRecoveryHttpTest {
             WorkorderBomInputHttpTest.select(mvc, 1, 1);
             String creating = UUID.randomUUID().toString();
             String command = ProductionInputHttpTest.command(mvc, creating, "L001", "1");
-            var draft = JSON.readTree(mvc.perform(full(post("/api/production/input/drafts")).content(command))
-                    .andExpect(status().isOk()).andReturn().getResponse().getContentAsString());
-            String id = draft.get("document").get("id").asText();
+            var input = JSON.readTree(ProductionInputHttpTest.submit(mvc, command));
+            String id = input.get("documentId").asText();
             var before = snapshot(db);
             int allocationCount = numbers.get();
             var recovered = JSON.readTree(mvc.perform(full(get(ROOT + "/by-request/" + creating)))
@@ -67,18 +65,11 @@ class StockDocumentRequestRecoveryHttpTest {
             assertNoSecrets(recovered);
             assertEquals(before, snapshot(db));
             assertEquals(allocationCount, numbers.get());
-
-            String approving = UUID.randomUUID().toString();
-            String approval = StockDocumentHttpTest.intent(approving, draft.get("document").get("revision").asInt());
-            String approvePath = ROOT + "/" + id + "/actions/approve";
-            mvc.perform(full(post(approvePath)).content(approval)).andExpect(status().isOk());
-            var posted = snapshot(db);
-            mvc.perform(full(post(approvePath)).content(approval)).andExpect(status().isOk());
             var replay = JSON.readTree(ProductionInputHttpTest.submit(mvc, command));
             assertEquals(id, replay.get("documentId").asText());
-            assertEquals(posted, snapshot(db));
+            assertEquals(before, snapshot(db));
             assertEquals(creating, db.queryForObject("SELECT id FROM mes_material_issue_input WHERE document_id=?", String.class, id));
-            assertEquals(approving, db.queryForObject("SELECT post_request_id FROM wm_stock_document WHERE id=?", String.class, id));
+            assertEquals(creating, db.queryForObject("SELECT post_request_id FROM wm_stock_document WHERE id=?", String.class, id));
 
             // A migrated input can have the original UUID only on its retained production fact.
             db.update("UPDATE wm_stock_document SET create_request_id=NULL WHERE id=?", id);

@@ -2,10 +2,10 @@ package dev.mesbase.business.production;
 
 import dev.mesbase.business.basic.dao.MaterialMapper;
 import dev.mesbase.business.directory.service.BusinessDirectoryService;
-import dev.mesbase.business.wm.dao.WmStockDocumentMapper;
 import dev.mesbase.business.production.dao.MesExecutionAssignmentMapper;
 import dev.mesbase.business.production.dao.MesExecutionPathMapper;
 import dev.mesbase.business.production.dao.MesExecutionPathNodeMapper;
+import dev.mesbase.business.production.dao.MesProductionCombinationMapper;
 import dev.mesbase.business.production.dao.MesProductionExecutionMapper;
 import dev.mesbase.business.production.dao.MesProductionReportMapper;
 import dev.mesbase.business.production.dao.MesWorkorderMaterialMapper;
@@ -21,27 +21,27 @@ import dev.mesbase.business.production.domain.MesProductionExecutionEntity;
 import dev.mesbase.business.production.domain.WorkOrderModels;
 import dev.mesbase.business.production.domain.WorkorderEntity;
 import dev.mesbase.business.production.service.BusinessSourceRules;
+import dev.mesbase.business.production.service.MaterialQuantityRules;
 import dev.mesbase.business.production.service.ProductionChainLocks;
 import dev.mesbase.business.production.service.ProductionExecutionRules;
-import dev.mesbase.business.production.service.MaterialQuantityRules;
-import dev.mesbase.system.service.AutoCodeNumbering;
-import org.springframework.transaction.PlatformTransactionManager;
 import dev.mesbase.business.production.service.RoutingReferenceRules;
 import dev.mesbase.business.production.service.WorkOrderService;
-import dev.mesbase.business.production.service.WorkorderMaterialService;
 import dev.mesbase.business.production.service.WorkorderErpFacts;
+import dev.mesbase.business.production.service.WorkorderMaterialService;
 import dev.mesbase.business.quality.service.ExecutionQualityReferenceQuery;
+import dev.mesbase.business.wm.dao.WmStockDocumentMapper;
 import dev.mesbase.common.utils.SecurityUtils;
 import dev.mesbase.core.error.ErrorCode;
 import dev.mesbase.core.error.FoundationException;
 import dev.mesbase.framework.sync.SyncCoordinator;
-
+import dev.mesbase.system.service.AutoCodeNumbering;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
-
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.mockito.Mockito;
+import org.springframework.transaction.PlatformTransactionManager;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -85,7 +85,7 @@ class LocalMaintenanceRulesTest {
                 mock(RoutingNodeMapper.class), mock(RoutingEdgeMapper.class),
                 mock(MaterialMapper.class), mock(RoutingReferenceRules.class), issues, queries, executions,
                 mock(WorkorderErpFacts.class), mock(BusinessDirectoryService.class), mock(MesWorkorderMaterialMapper.class),
-                sources, mock(WorkorderErpExtraMapper.class), mock(SyncCoordinator.class), mock(MaterialQuantityRules.class), mock(AutoCodeNumbering.class), mock(WorkorderMaterialService.class), mock(PlatformTransactionManager.class)));
+                sources, mock(WorkorderErpExtraMapper.class), mock(SyncCoordinator.class), mock(MaterialQuantityRules.class), mock(AutoCodeNumbering.class), mock(WorkorderMaterialService.class), Mockito.mock(MesProductionCombinationMapper.class), mock(PlatformTransactionManager.class)));
         doReturn(null).when(service).detail(1L);
         return service;
     }

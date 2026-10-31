@@ -1,5 +1,10 @@
 package dev.issuefixture;
 
+import dev.mesbase.business.wm.dao.StockDocumentExtraMapper;
+import dev.mesbase.core.factory.FactoryId;
+import dev.mesbase.core.factory.FactoryScope;
+import dev.mesbase.platform.execution.FactoryContext;
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CyclicBarrier;
@@ -7,11 +12,6 @@ import java.util.concurrent.Executors;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
-import dev.mesbase.business.wm.dao.StockDocumentExtraMapper;
-import dev.mesbase.platform.execution.FactoryContext;
-import dev.mesbase.core.factory.FactoryScope;
-import dev.mesbase.core.factory.FactoryId;
-import java.math.BigDecimal;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -44,8 +44,17 @@ class UnifiedInboundHttpTest {
         return id;
     }
 
+    static String approval(MockMvc m, String id) throws Exception {
+        var detail = StockDocumentHttpTest.JSON.readTree(m.perform(full(get(StockDocumentHttpTest.ROOT + "/" + id)))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString()).get("document");
+        if (detail.get("documentType").asText().equals("PRODUCTION_RECEIPT") && !detail.get("sourceExecutionId")
+                .isNull())
+            return "/api/production/inbound-documents/" + id + "/actions/approve";
+        return StockDocumentHttpTest.ROOT + "/" + id + "/actions/approve";
+    }
+
     static void confirm(MockMvc m, String id, int revision) throws Exception {
-        m.perform(full(post(StockDocumentHttpTest.ROOT + "/" + id + "/actions/approve")).content(StockDocumentHttpTest.intent(UUID.randomUUID()
+        m.perform(full(post(approval(m, id))).content(StockDocumentHttpTest.intent(UUID.randomUUID()
                 .toString(), revision))).andExpect(status().isOk());
     }
 
@@ -73,7 +82,7 @@ class UnifiedInboundHttpTest {
             StockDocumentHttpTest.balance(j, "0");
             String intent = StockDocumentHttpTest.intent(UUID.randomUUID().toString(), 1);
             for (int i = 0; i < 2; i++)
-                m.perform(full(post(StockDocumentHttpTest.ROOT + "/" + id + "/actions/approve")).content(intent))
+                m.perform(full(post(approval(m, id))).content(intent))
                         .andExpect(status().isOk()).andExpect(jsonPath("document.sourceExecutionId").value("1"));
             StockDocumentHttpTest.balance(j, "60");
             assertEquals("RUNNING", j.queryForObject("SELECT status FROM mes_production_execution WHERE id=1", String.class));
@@ -108,7 +117,7 @@ class UnifiedInboundHttpTest {
             String id = draft(m, "1", "60");
             m.perform(full(post(StockDocumentHttpTest.ROOT + "/" + id + "/lines")).content(StockDocumentHttpTest.line("1", "1", "TEST-FINISHED", "50")
                     .replace("\"binCode\":\"BIN1\"", "\"binCode\":null"))).andExpect(status().isOk());
-            m.perform(full(post(StockDocumentHttpTest.ROOT + "/" + id + "/actions/approve")).content(StockDocumentHttpTest.intent(UUID.randomUUID()
+            m.perform(full(post(approval(m, id))).content(StockDocumentHttpTest.intent(UUID.randomUUID()
                     .toString(), 2))).andExpect(status().isConflict());
             StockDocumentHttpTest.balance(j, "0");
             assertEquals(0, j.queryForObject("SELECT COUNT(*) FROM wm_stock_action", Integer.class));
@@ -130,7 +139,7 @@ class UnifiedInboundHttpTest {
                             .content(StockDocumentHttpTest.line("0", "2", wrongBatch, "1")
                                     .replace("\"binCode\":\"BIN1\"", "\"binCode\":null")))
                     .andExpect(status().isOk());
-            m.perform(full(post(StockDocumentHttpTest.ROOT + "/" + id + "/actions/approve"))
+            m.perform(full(post(approval(m, id)))
                             .content(StockDocumentHttpTest.intent(UUID.randomUUID().toString(), 1)))
                     .andExpect(status().isConflict());
             assertEquals("DRAFT", j.queryForObject("SELECT status FROM wm_stock_document WHERE id=?", String.class, id));
@@ -181,7 +190,7 @@ class UnifiedInboundHttpTest {
             var barrier = new CyclicBarrier(2);
             var tasks = ids.stream().map(id -> pool.submit(() -> {
                 barrier.await();
-                return m.perform(full(post(StockDocumentHttpTest.ROOT + "/" + id + "/actions/approve")).content(StockDocumentHttpTest.intent(UUID.randomUUID()
+                return m.perform(full(post(approval(m, id))).content(StockDocumentHttpTest.intent(UUID.randomUUID()
                         .toString(), 1))).andReturn().getResponse().getStatus();
             })).toList();
             var statuses = List.of(tasks.get(0).get(), tasks.get(1).get());
@@ -200,7 +209,7 @@ class UnifiedInboundHttpTest {
             ProductionWarehouseFixture.legacyAccepted(j, old, "60");
             var before = j.queryForList("SELECT * FROM mes_warehouse_acceptance");
             String excessive = draft(m, "1", "50");
-            m.perform(full(post(StockDocumentHttpTest.ROOT + "/" + excessive + "/actions/approve")).content(StockDocumentHttpTest.intent(UUID.randomUUID()
+            m.perform(full(post(approval(m, excessive))).content(StockDocumentHttpTest.intent(UUID.randomUUID()
                     .toString(), 1))).andExpect(status().isConflict());
             receive(m, "40");
             StockDocumentHttpTest.balance(j, "100");
@@ -236,13 +245,13 @@ class UnifiedInboundHttpTest {
                     .replace("\"binCode\":\"BIN1\"", "\"binCode\":null"))).andExpect(status().isOk());
             String intent = StockDocumentHttpTest.intent(UUID.randomUUID().toString(), 2);
             j.execute("ALTER TABLE wm_stock_action ADD CONSTRAINT test_only_post_failure CHECK(quantity_delta != 30)");
-            m.perform(full(post(StockDocumentHttpTest.ROOT + "/" + id + "/actions/approve")).content(intent))
+            m.perform(full(post(approval(m, id))).content(intent))
                     .andExpect(status().is5xxServerError());
             StockDocumentHttpTest.balance(j, "0");
             assertEquals(0, j.queryForObject("SELECT COUNT(*) FROM wm_stock_action", Integer.class));
             assertEquals("DRAFT", j.queryForObject("SELECT status FROM wm_stock_document WHERE id=?", String.class, id));
             j.execute("ALTER TABLE wm_stock_action DROP CONSTRAINT test_only_post_failure");
-            m.perform(full(post(StockDocumentHttpTest.ROOT + "/" + id + "/actions/approve")).content(intent))
+            m.perform(full(post(approval(m, id))).content(intent))
                     .andExpect(status().isOk());
             StockDocumentHttpTest.balance(j, "80");
         }

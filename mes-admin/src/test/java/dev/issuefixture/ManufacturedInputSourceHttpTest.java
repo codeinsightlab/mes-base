@@ -97,15 +97,11 @@ class ManufacturedInputSourceHttpTest {
                     .andExpect(status().isOk()).andExpect(jsonPath("total").value(1))
                     .andExpect(jsonPath("items").isEmpty());
 
-            String key = JSON.readTree(mvc.perform(full(get("/api/production/input/calculate"))
-                                    .param("code", "TEST-TOP:P1#L001").param("workorderId", "7")
-                                    .param("stockReference", "10").param("outputQty", "10"))
-                            .andExpect(status().isOk()).andReturn().getResponse().getContentAsString())
-                    .get("calculationKey").asText();
-            String command = JSON.writeValueAsString(Map.of("requestId", UUID.randomUUID().toString(),
-                    "code", "TEST-TOP:P1#L001", "workorderId", "7", "stockReference", "10", "outputQty", "10",
-                    "routingId", "1", "routingNodeIds", List.of("11", "12", "13"),
-                    "inputKind", "PRODUCTION_INPUT", "calculationKey", key));
+            var plan = JSON.readTree(mvc.perform(full(post("/api/production/combinations")).content("{\"workorderId\":\"7\",\"quantity\":\"10\"}"))
+                    .andExpect(status().isOk()).andReturn().getResponse().getContentAsString());
+            String combinationCode = plan.get("combination").get("code").asText();
+            String command = ProductionInputHttpTest.confirmCommand(mvc, UUID.randomUUID()
+                    .toString(), combinationCode, "10");
             long parent = JSON.readTree(ProductionInputHttpTest.submit(mvc, command)).get("executionId").asLong();
             assertEquals(0, BigDecimal.ZERO.compareTo(db.queryForObject(
                     "SELECT quantity FROM wm_inventory WHERE id=10", BigDecimal.class)));
@@ -115,6 +111,7 @@ class ManufacturedInputSourceHttpTest {
             assertEquals("RELEASED", db.queryForObject("SELECT status FROM workorder WHERE id=7", String.class));
             assertEquals(0, BigDecimal.ZERO.compareTo(db.queryForObject(
                     "SELECT quantity FROM wm_inventory WHERE id=20", BigDecimal.class)));
+            db.update("UPDATE wm_inventory SET batch_no=(SELECT batch_no FROM mes_production_execution WHERE id=?) WHERE id=20 AND quantity=0", parent);
             mvc.perform(full(post("/api/production/executions/" + parent + "/inbound"))
                             .content(JSON.writeValueAsString(Map.of("requestId", UUID.randomUUID().toString(),
                                     "stockId", "20", "quantity", "10", "reason", "TEST ONLY final top receipt"))))

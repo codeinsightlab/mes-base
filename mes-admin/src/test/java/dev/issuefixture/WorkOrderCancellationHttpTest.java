@@ -1,8 +1,6 @@
 package dev.issuefixture;
 
 import java.math.BigDecimal;
-import tools.jackson.databind.ObjectMapper;
-
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CyclicBarrier;
@@ -14,9 +12,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
  * TEST ONLY: real HTTP, generated SQL, transactions, two independent business databases.
@@ -98,9 +95,9 @@ class WorkOrderCancellationHttpTest {
                     .toList());
             assertEquals("RUNNING", j.queryForObject("SELECT status FROM mes_production_execution WHERE id=1", String.class));
             m.perform(ProductionCoreV1HttpTest.full(post(ProductionCoreV1HttpTest.E))
-                            .content(ProductionCoreV1HttpTest.EXEC)).andExpect(status().isMethodNotAllowed());
-            m.perform(ProductionCoreV1HttpTest.full(get("/api/production/input/calculate")).param("code", "WO1:M1#L001")
-                            .param("workorderId", "1").param("stockReference", "1").param("outputQty", "1"))
+                    .content(ProductionCoreV1HttpTest.EXEC)).andExpect(status().isMethodNotAllowed());
+            m.perform(ProductionCoreV1HttpTest.full(post("/api/production/combinations"))
+                            .content("{\"workorderId\":\"1\",\"quantity\":\"1\"}"))
                     .andExpect(status().isConflict()).andExpect(jsonPath("errorCode").value("WORKORDER_CANCELLED"));
             m.perform(ProductionCoreV1HttpTest.full(post(ProductionReportHttpTest.ROOT + "/supplements"))
                             .content(ProductionReportHttpTest.supplement(11, "1"))).andExpect(status().isConflict())
@@ -126,7 +123,7 @@ class WorkOrderCancellationHttpTest {
             var body = ProductionInputHttpTest.command(m, UUID.randomUUID().toString(), "L001", "100");
             m.perform(ProductionCoreV1HttpTest.full(post(ProductionInputHttpTest.ROOT)).content(body))
                     .andExpect(status().is5xxServerError());
-            assertEquals(0, j.queryForObject("SELECT COUNT(*) FROM wm_stock_document WHERE production_confirmation_status IS NOT NULL", Integer.class));
+            assertEquals(0, j.queryForObject("SELECT COUNT(*) FROM mes_material_issue_input", Integer.class));
             cancel(m);
             m.perform(ProductionCoreV1HttpTest.full(post(ProductionInputHttpTest.ROOT)).content(body))
                     .andExpect(status().isConflict());

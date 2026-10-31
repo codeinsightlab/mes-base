@@ -1,28 +1,26 @@
 package dev.issuefixture;
 
-import java.math.BigDecimal;
-import java.util.Arrays;
-import java.util.concurrent.atomic.AtomicInteger;
-import tools.jackson.databind.ObjectMapper;
-
-import dev.mesbase.business.basic.domain.MaterialExample;
-import dev.mesbase.business.basic.domain.MaterialEntity;
-import dev.mesbase.business.production.service.MaterialQuantityRules;
 import dev.mesbase.acceptance.FactorySnapshotFixture;
+import dev.mesbase.business.basic.dao.MaterialBomCopyMapper;
+import dev.mesbase.business.basic.dao.MaterialBomItemMapper;
+import dev.mesbase.business.basic.dao.MaterialBomMapper;
 import dev.mesbase.business.basic.dao.MaterialMapper;
 import dev.mesbase.business.basic.dao.UnitMeasureMapper;
 import dev.mesbase.business.basic.dao.WorkstationMapper;
+import dev.mesbase.business.basic.domain.MaterialEntity;
+import dev.mesbase.business.basic.domain.MaterialExample;
+import dev.mesbase.business.basic.service.MaterialBomService;
 import dev.mesbase.business.directory.domain.DirectoryLabel;
 import dev.mesbase.business.directory.service.BusinessDirectoryService;
 import dev.mesbase.business.integration.warehouse.WarehouseIntegration;
-import dev.mesbase.business.issue.service.MaterialIssueInputFacts;
 import dev.mesbase.business.issue.dao.MesMaterialIssueInputMapper;
-import dev.mesbase.business.issue.service.MaterialIssueSubmissionService;
+import dev.mesbase.business.issue.service.MaterialIssueInputFacts;
 import dev.mesbase.business.issue.service.MaterialIssueVoidService;
 import dev.mesbase.business.production.controller.ExecutionActionController;
 import dev.mesbase.business.production.controller.MesProductionExecutionController;
 import dev.mesbase.business.production.controller.ProductionCompletionController;
 import dev.mesbase.business.production.controller.ProductionIdentityController;
+import dev.mesbase.business.production.controller.ProductionInboundController;
 import dev.mesbase.business.production.controller.ProductionQuantityErrorAdvice;
 import dev.mesbase.business.production.controller.WorkOrderCancellationController;
 import dev.mesbase.business.production.controller.WorkOrderController;
@@ -31,18 +29,16 @@ import dev.mesbase.business.production.dao.MesExecutionAssignmentMapper;
 import dev.mesbase.business.production.dao.MesExecutionCompletionMapper;
 import dev.mesbase.business.production.dao.MesExecutionPathMapper;
 import dev.mesbase.business.production.dao.MesExecutionPathNodeMapper;
+import dev.mesbase.business.production.dao.MesProductionCombinationItemMapper;
+import dev.mesbase.business.production.dao.MesProductionCombinationMapper;
 import dev.mesbase.business.production.dao.MesProductionExecutionMapper;
 import dev.mesbase.business.production.dao.MesProductionReceiptMapper;
 import dev.mesbase.business.production.dao.MesProductionReportMapper;
 import dev.mesbase.business.production.dao.MesProductionScanActivityMapper;
 import dev.mesbase.business.production.dao.MesWorkorderCancellationMapper;
 import dev.mesbase.business.production.dao.MesWorkorderMaterialMapper;
-import dev.mesbase.business.production.dao.ProductionInputExtraMapper;
-import dev.mesbase.business.basic.dao.MaterialBomMapper;
-import dev.mesbase.business.basic.service.MaterialBomService;
-import dev.mesbase.business.basic.dao.MaterialBomItemMapper;
-import dev.mesbase.business.basic.dao.MaterialBomCopyMapper;
 import dev.mesbase.business.production.dao.OperationMapper;
+import dev.mesbase.business.production.dao.ProductionInputExtraMapper;
 import dev.mesbase.business.production.dao.ProductionQuantityMapper;
 import dev.mesbase.business.production.dao.ProductionReceiptQueryMapper;
 import dev.mesbase.business.production.dao.RoutingEdgeMapper;
@@ -56,11 +52,13 @@ import dev.mesbase.business.production.domain.OperationExample;
 import dev.mesbase.business.production.domain.RoutingExample;
 import dev.mesbase.business.production.service.BusinessSourceRules;
 import dev.mesbase.business.production.service.ExecutionPathService;
+import dev.mesbase.business.production.service.MaterialQuantityRules;
 import dev.mesbase.business.production.service.ProductionChainLocks;
 import dev.mesbase.business.production.service.ProductionCompletionService;
 import dev.mesbase.business.production.service.ProductionExecutionQueryService;
 import dev.mesbase.business.production.service.ProductionExecutionRules;
 import dev.mesbase.business.production.service.ProductionIdentityService;
+import dev.mesbase.business.production.service.ProductionInboundService;
 import dev.mesbase.business.production.service.ProductionQuantityService;
 import dev.mesbase.business.production.service.RoutingReferenceRules;
 import dev.mesbase.business.production.service.WorkOrderCancellationService;
@@ -81,8 +79,6 @@ import dev.mesbase.business.quality.service.QualityReleaseService;
 import dev.mesbase.business.quality.service.QualityTreatmentService;
 import dev.mesbase.business.wm.controller.LocalStockController;
 import dev.mesbase.business.wm.controller.StockDocumentController;
-import dev.mesbase.business.wm.domain.StockDocumentDirection;
-import dev.mesbase.business.wm.domain.StockDocumentType;
 import dev.mesbase.business.wm.controller.WarehouseAcceptanceController;
 import dev.mesbase.business.wm.controller.WmStockActionController;
 import dev.mesbase.business.wm.dao.MesWarehouseAcceptanceMapper;
@@ -93,15 +89,15 @@ import dev.mesbase.business.wm.dao.WmStockDocumentLineMapper;
 import dev.mesbase.business.wm.dao.WmStockDocumentMapper;
 import dev.mesbase.business.wm.dao.WmWarehouseErpExtraMapper;
 import dev.mesbase.business.wm.dao.WmWarehouseMapper;
-import dev.mesbase.business.wm.service.LocalProductionSupply;
+import dev.mesbase.business.wm.domain.StockDocumentDirection;
+import dev.mesbase.business.wm.domain.StockDocumentType;
 import dev.mesbase.business.wm.service.LocalStockService;
 import dev.mesbase.business.wm.service.StockDocumentService;
-import dev.mesbase.system.service.AutoCodeNumbering;
 import dev.mesbase.business.wm.service.StockReferenceRules;
 import dev.mesbase.business.wm.service.WarehouseAcceptanceService;
 import dev.mesbase.business.wm.service.impl.WmStockActionServiceImpl;
-import dev.mesbase.common.core.domain.entity.SysUser;
 import dev.mesbase.common.core.domain.entity.SysDictData;
+import dev.mesbase.common.core.domain.entity.SysUser;
 import dev.mesbase.common.core.domain.model.LoginUser;
 import dev.mesbase.common.utils.DictDataLookup;
 import dev.mesbase.core.factory.Factory;
@@ -126,13 +122,14 @@ import dev.mesbase.platform.execution.FactoryIntegrationContext;
 import dev.mesbase.platform.web.FoundationAccessInterceptor;
 import dev.mesbase.platform.web.FoundationErrorAdvice;
 import dev.mesbase.platform.web.RequestBoundaryFilter;
+import dev.mesbase.system.service.AutoCodeNumbering;
 import jakarta.servlet.Filter;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
-
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -140,10 +137,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
-
+import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.ibatis.session.SqlSessionFactory;
-import org.junit.jupiter.api.Test;
 import org.mybatis.spring.SqlSessionTemplate;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Import;
@@ -166,22 +163,18 @@ import org.springframework.web.servlet.config.annotation.EnableWebMvc;
 import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
 
 /**
  * TEST ONLY: real generated SQL, HTTP authorization and transactions; two separate H2 databases.
  */
 class MaterialIssueHttpTest {
-    static final Set<Class<?>> MAPPERS = Set.of(MesMaterialIssueInputMapper.class, ProductionInputExtraMapper.class, MaterialBomMapper.class, MaterialBomItemMapper.class, MaterialBomCopyMapper.class, ProductionDefectListExtraMapper.class, StockDocumentExtraMapper.class, OperationDefectTypeMapper.class, DefectStatisticsExtraMapper.class, WmStockDocumentMapper.class, WmStockDocumentLineMapper.class, MesWorkorderCancellationMapper.class, WmWarehouseErpExtraMapper.class, MesQualityReleaseMapper.class, MesWarehouseAcceptanceMapper.class, MesExecutionCompletionMapper.class, MesWorkorderMaterialMapper.class, WmStockActionMapper.class, MesExecutionAssignmentMapper.class, MesProductionScanActivityMapper.class, WmInventoryMapper.class, MesProductionReceiptMapper.class, ProductionReceiptQueryMapper.class, MesProductionDefectMapper.class, MesQualityTreatmentMapper.class, WorkstationMapper.class, MesProductionReportMapper.class, ProductionQuantityMapper.class, MesExecutionPathMapper.class, MesExecutionPathNodeMapper.class, WorkorderErpExtraMapper.class, WorkOrderExtraMapper.class, RoutingNodeMapper.class, RoutingEdgeMapper.class, OperationMapper.class, MesProductionExecutionMapper.class, MaterialMapper.class, UnitMeasureMapper.class, WmWarehouseMapper.class, RoutingMapper.class, RoutingProductMapper.class, WorkorderMapper.class);
+    static final Set<Class<?>> MAPPERS = Set.of(MesProductionCombinationMapper.class, MesProductionCombinationItemMapper.class, MesMaterialIssueInputMapper.class, ProductionInputExtraMapper.class, MaterialBomMapper.class, MaterialBomItemMapper.class, MaterialBomCopyMapper.class, ProductionDefectListExtraMapper.class, StockDocumentExtraMapper.class, OperationDefectTypeMapper.class, DefectStatisticsExtraMapper.class, WmStockDocumentMapper.class, WmStockDocumentLineMapper.class, MesWorkorderCancellationMapper.class, WmWarehouseErpExtraMapper.class, MesQualityReleaseMapper.class, MesWarehouseAcceptanceMapper.class, MesExecutionCompletionMapper.class, MesWorkorderMaterialMapper.class, WmStockActionMapper.class, MesExecutionAssignmentMapper.class, MesProductionScanActivityMapper.class, WmInventoryMapper.class, MesProductionReceiptMapper.class, ProductionReceiptQueryMapper.class, MesProductionDefectMapper.class, MesQualityTreatmentMapper.class, WorkstationMapper.class, MesProductionReportMapper.class, ProductionQuantityMapper.class, MesExecutionPathMapper.class, MesExecutionPathNodeMapper.class, WorkorderErpExtraMapper.class, WorkOrderExtraMapper.class, RoutingNodeMapper.class, RoutingEdgeMapper.class, OperationMapper.class, MesProductionExecutionMapper.class, MaterialMapper.class, UnitMeasureMapper.class, WmWarehouseMapper.class, RoutingMapper.class, RoutingProductMapper.class, WorkorderMapper.class);
 
     static class Fixture implements AutoCloseable {
         final RuntimeRegistry registry = new RuntimeRegistry();
@@ -288,6 +281,12 @@ class MaterialIssueHttpTest {
                 jdbc.execute("ALTER TABLE unit_measure ADD must_be_whole_number TINYINT DEFAULT 0 NOT NULL");
                 jdbc.execute("ALTER TABLE unit_measure ADD quantity_precision TINYINT DEFAULT 6 NOT NULL");
                 WorkorderMaterialFixture.upgrade(jdbc);
+                // TEST ONLY H2 equivalent of V80; no real database is opened by this fixture.
+                String combinationDdl = Files.readString(Path.of("mes-admin/src/main/resources/db/business/V80__production_combination_codes.sql"))
+                        .replace(" CHARACTER SET utf8mb4 COLLATE utf8mb4_bin", "")
+                        .replace(" ENGINE=InnoDB DEFAULT CHARSET=utf8mb4", "")
+                        .replace(",\n    ADD INDEX idx_stock_document_line_demand (demand_line_id)", "");
+                for (String sql : combinationDdl.split(";")) if (!sql.isBlank()) jdbc.execute(sql);
                 jdbc.update("INSERT INTO material(id,code,name,unit_id,status) VALUES(1,'M1','物料一',1,'ENABLED')");
                 jdbc.update("INSERT INTO workorder(id,code,product_id,planned_qty,routing_id,status,revision,create_time,update_time) VALUES(1,'WO1',1,1000,1,'DRAFT',0,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)");
                 jdbc.update("INSERT INTO unit_measure(id,code,name,status) VALUES(1,'KG','千克','ENABLED')");
@@ -322,9 +321,9 @@ class MaterialIssueHttpTest {
     @EnableWebMvc
     @EnableWebSecurity
     @EnableTransactionManagement
-    @Import({MaterialBomService.class, StockDocumentOwnedTransactionsHttpTest.GuardedCenter.class, MaterialQuantityRules.class, WorkOrderCompletionService.class, StockDocumentService.class, StockDocumentController.class, WorkOrderCancellationService.class, WorkOrderCancellationController.class, BusinessSourceRules.class, StockReferenceRules.class, ProductionCompletionService.class, ProductionCompletionController.class, WarehouseAcceptanceService.class, WarehouseAcceptanceController.class, QualityReleaseService.class, QualityReleaseController.class, WorkorderMaterialService.class, WorkorderMaterialController.class, LocalStockController.class, WmStockActionController.class, WmStockActionServiceImpl.class, LocalStockService.class, LocalProductionSupply.class, QualityTreatmentService.class, MaterialIssueInputFacts.class, ProductionQuantityService.class, ProductionQuantityErrorAdvice.class, ExecutionQualityReferenceQueryImpl.class, ProductionExecutionQueryService.class, ProductionChainLocks.class, ExecutionPathService.class, ExecutionActionController.class, MaterialIssueSubmissionService.class, WorkorderErpFacts.class, WarehouseIntegration.class, MaterialIssueVoidService.class, ProductionExecutionRules.class, ProductionIdentityService.class, MesProductionExecutionServiceImpl.class, MesProductionExecutionController.class, ProductionIdentityController.class, WorkOrderController.class, WorkOrderService.class, RoutingReferenceRules.class, FoundationErrorAdvice.class})
+    @Import({ProductionInboundService.class, ProductionInboundController.class, MaterialBomService.class, StockDocumentOwnedTransactionsHttpTest.GuardedCenter.class, MaterialQuantityRules.class, WorkOrderCompletionService.class, StockDocumentService.class, StockDocumentController.class, WorkOrderCancellationService.class, WorkOrderCancellationController.class, BusinessSourceRules.class, StockReferenceRules.class, ProductionCompletionService.class, ProductionCompletionController.class, WarehouseAcceptanceService.class, WarehouseAcceptanceController.class, QualityReleaseService.class, QualityReleaseController.class, WorkorderMaterialService.class, WorkorderMaterialController.class, LocalStockController.class, WmStockActionController.class, WmStockActionServiceImpl.class, LocalStockService.class, QualityTreatmentService.class, MaterialIssueInputFacts.class, ProductionQuantityService.class, ProductionQuantityErrorAdvice.class, ExecutionQualityReferenceQueryImpl.class, ProductionExecutionQueryService.class, ProductionChainLocks.class, ExecutionPathService.class, ExecutionActionController.class, WorkorderErpFacts.class, WarehouseIntegration.class, MaterialIssueVoidService.class, ProductionExecutionRules.class, ProductionIdentityService.class, MesProductionExecutionServiceImpl.class, MesProductionExecutionController.class, ProductionIdentityController.class, WorkOrderController.class, WorkOrderService.class, RoutingReferenceRules.class, FoundationErrorAdvice.class})
     static class Web implements WebMvcConfigurer {
-        @org.springframework.beans.factory.annotation.Autowired
+        @Autowired
         private AuthorizationService authorization;
 
         @Bean
@@ -478,6 +477,16 @@ class MaterialIssueHttpTest {
         @Bean
         MesMaterialIssueInputMapper materialIssueInputMapper(SqlSessionFactory f) {
             return new SqlSessionTemplate(f).getMapper(MesMaterialIssueInputMapper.class);
+        }
+
+        @Bean
+        MesProductionCombinationMapper combinationMapper(SqlSessionFactory f) {
+            return new SqlSessionTemplate(f).getMapper(MesProductionCombinationMapper.class);
+        }
+
+        @Bean
+        MesProductionCombinationItemMapper combinationItemMapper(SqlSessionFactory f) {
+            return new SqlSessionTemplate(f).getMapper(MesProductionCombinationItemMapper.class);
         }
 
         @Bean

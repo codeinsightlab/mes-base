@@ -1,35 +1,22 @@
 package dev.issuefixture;
 
-import java.util.UUID;
-import dev.mesbase.platform.execution.FactoryIntegrationContext;
-import dev.mesbase.acceptance.FactorySnapshotFixture;
-import dev.mesbase.business.integration.production.ProductionSupply.Calculation;
-import java.util.concurrent.atomic.AtomicReference;
-import dev.mesbase.business.production.service.ProductionInputSupplyService;
-import tools.jackson.databind.node.ObjectNode;
-import java.util.stream.Stream;
-import org.springframework.core.env.MapPropertySource;
-import java.util.Map;
-import dev.mesbase.business.integration.warehouse.WarehouseIntegration;
-
-import static org.mockito.Mockito.doAnswer;
-import static org.mockito.ArgumentMatchers.any;
-
-import org.springframework.jdbc.core.JdbcTemplate;
-import java.util.List;
 import java.math.BigDecimal;
-import java.util.concurrent.Executors;
+import java.util.List;
+import java.util.UUID;
 import java.util.concurrent.CyclicBarrier;
+import java.util.concurrent.Executors;
 import org.junit.jupiter.api.Test;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.servlet.MockMvc;
 import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.node.ObjectNode;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
@@ -178,6 +165,7 @@ class LocalWarehouseHttpTest {
             var j = ProductionInputHttpTest.db(c);
             var m = MaterialIssueHttpTest.mvc(c);
             j.update("UPDATE wm_inventory SET quantity=300,available_quantity=300 WHERE id=1");
+            j.update("UPDATE wm_inventory SET available_quantity=0 WHERE id=2");
             j.update("INSERT INTO material(id,code,name,unit_id,status) VALUES(2,'P2','TEST ONLY second product',1,'ENABLED')");
             j.update("INSERT INTO routing_product(routing_id,material_id) VALUES(1,2)");
             j.update("INSERT INTO workorder(id,code,product_id,planned_qty,routing_id,status,revision,create_time,update_time) VALUES(2,'WO2',2,1000,1,'RELEASED',0,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)");
@@ -188,12 +176,15 @@ class LocalWarehouseHttpTest {
             String first = ProductionInputHttpTest.command(m, UUID.randomUUID().toString(), "L001", "100");
             var second = new ObjectMapper().readTree(first).deepCopy();
             var secondNode = (ObjectNode) second;
-            String calculation = m.perform(ProductionCoreV1HttpTest.full(get(ProductionInputHttpTest.ROOT + "/calculate"))
-                            .param("code", "WO2:M1#L001").param("workorderId", "2").param("stockReference", "1")
-                            .param("outputQty", "100"))
-                    .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
-            secondNode.put("requestId", UUID.randomUUID().toString()).put("workorderId", "2").put("code", "WO2:M1#L001")
-                    .put("calculationKey", new ObjectMapper().readTree(calculation).get("calculationKey").asText());
+            var planned = new ObjectMapper().readTree(m.perform(ProductionCoreV1HttpTest.full(post("/api/production/combinations"))
+                            .content("{\"workorderId\":\"2\",\"quantity\":\"100\"}")).andExpect(status().isOk()).andReturn()
+                    .getResponse().getContentAsString());
+            String combinationCode = planned.get("combination").get("code").asText();
+            var calculation = new ObjectMapper().readTree(m.perform(ProductionCoreV1HttpTest.full(get("/api/production/combinations/calculate"))
+                            .param("code", combinationCode).param("quantity", "100")).andExpect(status().isOk()).andReturn()
+                    .getResponse().getContentAsString());
+            secondNode.put("requestId", UUID.randomUUID().toString()).put("code", combinationCode)
+                    .put("calculationKey", calculation.get("calculationKey").asText());
             var barrier = new CyclicBarrier(2);
             var x = pool.submit(() -> {
                 barrier.await();

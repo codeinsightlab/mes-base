@@ -1,48 +1,43 @@
 package dev.issuefixture;
 
-import dev.mesbase.business.production.service.ProductionQuantityService;
-import dev.mesbase.business.issue.service.MaterialIssueInputFacts;
-import dev.mesbase.business.wm.service.LocalStockService;
-import dev.mesbase.business.quality.service.ExecutionQualityReferenceQueryImpl;
-
-import static org.mockito.Mockito.mock;
-
-import dev.mesbase.business.production.service.ProductionChainLocks;
-import dev.mesbase.business.production.service.ExecutionPathService;
-import dev.mesbase.business.production.service.impl.MesProductionExecutionServiceImpl;
-import dev.mesbase.business.issue.service.MaterialIssueSubmissionService;
-
-import dev.mesbase.business.production.service.WorkorderErpFacts;
 import dev.mesbase.business.directory.service.BusinessDirectoryService;
-import dev.mesbase.business.quality.service.QualityTreatmentService;
-
-
-import dev.mesbase.business.production.service.WorkOrderService;
-import dev.mesbase.business.production.service.RoutingReferenceRules;
-import dev.mesbase.business.production.service.ProductionExecutionRules;
-import dev.mesbase.business.issue.service.MaterialIssueVoidService;
 import dev.mesbase.business.integration.warehouse.WarehouseIntegration;
+import dev.mesbase.business.issue.service.MaterialIssueInputFacts;
+import dev.mesbase.business.issue.service.MaterialIssueVoidService;
+import dev.mesbase.business.production.service.ExecutionPathService;
+import dev.mesbase.business.production.service.ProductionChainLocks;
+import dev.mesbase.business.production.service.ProductionExecutionRules;
+import dev.mesbase.business.production.service.ProductionQuantityService;
+import dev.mesbase.business.production.service.RoutingReferenceRules;
+import dev.mesbase.business.production.service.WorkOrderService;
+import dev.mesbase.business.production.service.WorkorderErpFacts;
+import dev.mesbase.business.production.service.impl.MesProductionExecutionServiceImpl;
+import dev.mesbase.business.quality.service.ExecutionQualityReferenceQueryImpl;
+import dev.mesbase.business.quality.service.QualityTreatmentService;
+import dev.mesbase.business.wm.service.LocalStockService;
+import dev.mesbase.common.core.domain.entity.SysUser;
+import dev.mesbase.common.core.domain.model.LoginUser;
 import dev.mesbase.core.factory.FactoryId;
 import dev.mesbase.core.factory.FactoryScope;
 import dev.mesbase.infrastructure.persistence.FactoryBusinessDataSource;
 import dev.mesbase.infrastructure.persistence.OwnedTransactionManager;
 import dev.mesbase.infrastructure.persistence.PersistenceFactories;
 import dev.mesbase.platform.execution.FactoryContext;
-import dev.mesbase.common.core.domain.entity.SysUser;
-import dev.mesbase.common.core.domain.model.LoginUser;
-import java.util.Set;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.Callable;
 import org.apache.ibatis.session.SqlSessionFactory;
-import org.mybatis.spring.SqlSessionTemplate;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
-import org.springframework.context.annotation.Configuration;
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Import;
+import org.mybatis.spring.SqlSessionTemplate;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
-import org.springframework.transaction.annotation.EnableTransactionManagement;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Import;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.transaction.annotation.EnableTransactionManagement;
+
+import static org.mockito.Mockito.mock;
 
 
 /**
@@ -52,7 +47,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 class MaterialIssueVoidMySqlTest {
     @Configuration
     @EnableTransactionManagement
-    @Import({LocalStockService.class, QualityTreatmentService.class, MaterialIssueInputFacts.class, ProductionQuantityService.class, ExecutionQualityReferenceQueryImpl.class, MesProductionExecutionServiceImpl.class, ProductionChainLocks.class, ExecutionPathService.class, MaterialIssueSubmissionService.class, WorkorderErpFacts.class, WorkOrderService.class, RoutingReferenceRules.class, ProductionExecutionRules.class, MaterialIssueVoidService.class, WarehouseIntegration.class})
+    @Import({LocalStockService.class, QualityTreatmentService.class, MaterialIssueInputFacts.class, ProductionQuantityService.class, ExecutionQualityReferenceQueryImpl.class, MesProductionExecutionServiceImpl.class, ProductionChainLocks.class, ExecutionPathService.class, WorkorderErpFacts.class, WorkOrderService.class, RoutingReferenceRules.class, ProductionExecutionRules.class, MaterialIssueVoidService.class, WarehouseIntegration.class})
     static class Config {
         @Bean
         BusinessDirectoryService directory() {

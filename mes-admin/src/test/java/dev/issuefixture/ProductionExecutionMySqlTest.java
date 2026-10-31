@@ -1,62 +1,48 @@
 package dev.issuefixture;
 
-import dev.mesbase.business.wm.dao.WmWarehouseErpExtraMapper;
-import dev.mesbase.framework.sync.SyncCoordinator;
-import dev.mesbase.business.production.dao.WorkorderErpExtraMapper;
-import dev.mesbase.business.production.service.BusinessSourceRules;
-import org.mockito.Mockito;
-
-import static org.mockito.Mockito.mock;
-
-import dev.mesbase.business.quality.service.ExecutionQualityReferenceQueryImpl;
-import dev.mesbase.business.quality.service.QualityTreatmentService;
-import dev.mesbase.business.quality.dao.MesProductionDefectMapper;
-
-import dev.mesbase.business.production.service.ProductionChainLocks;
-import dev.mesbase.business.production.dao.MesProductionReportMapper;
-import dev.mesbase.business.production.dao.ProductionQuantityMapper;
-import dev.mesbase.business.production.dao.MesExecutionPathMapper;
-import dev.mesbase.business.production.dao.MesExecutionPathNodeMapper;
-
-
-import org.springframework.mock.env.MockEnvironment;
-
 import dev.mesbase.acceptance.AcceptanceBusinessDatabase;
 import dev.mesbase.business.basic.dao.MaterialMapper;
-import dev.mesbase.business.wm.dao.WmStockDocumentMapper;
-import dev.mesbase.business.wm.domain.WmStockDocumentEntity;
-import dev.mesbase.business.wm.dao.WmStockDocumentLineMapper;
-import dev.mesbase.business.production.dao.MesProductionExecutionMapper;
+import dev.mesbase.business.basic.dao.UnitMeasureMapper;
 import dev.mesbase.business.production.dao.MesExecutionAssignmentMapper;
+import dev.mesbase.business.production.dao.MesExecutionPathMapper;
+import dev.mesbase.business.production.dao.MesExecutionPathNodeMapper;
+import dev.mesbase.business.production.dao.MesProductionCombinationMapper;
+import dev.mesbase.business.production.dao.MesProductionExecutionMapper;
+import dev.mesbase.business.production.dao.MesProductionReportMapper;
+import dev.mesbase.business.production.dao.ProductionQuantityMapper;
 import dev.mesbase.business.production.dao.RoutingMapper;
 import dev.mesbase.business.production.dao.RoutingProductMapper;
-import dev.mesbase.business.production.dao.WorkorderMapper;
 import dev.mesbase.business.production.dao.WorkOrderExtraMapper;
-import dev.mesbase.business.basic.dao.UnitMeasureMapper;
-import dev.mesbase.business.wm.dao.WmWarehouseMapper;
+import dev.mesbase.business.production.dao.WorkorderMapper;
 import dev.mesbase.business.production.domain.MesProductionExecutionCreateCommand;
 import dev.mesbase.business.production.domain.MesProductionExecutionExample;
 import dev.mesbase.business.production.domain.MesProductionExecutionUpdateCommand;
-import dev.mesbase.business.production.service.ProductionExecutionRules;
+import dev.mesbase.business.production.service.BusinessSourceRules;
 import dev.mesbase.business.production.service.MaterialQuantityRules;
+import dev.mesbase.business.production.service.ProductionChainLocks;
+import dev.mesbase.business.production.service.ProductionExecutionRules;
 import dev.mesbase.business.production.service.ProductionIdentityService;
 import dev.mesbase.business.production.service.impl.MesProductionExecutionServiceImpl;
+import dev.mesbase.business.quality.dao.MesProductionDefectMapper;
+import dev.mesbase.business.quality.service.ExecutionQualityReferenceQueryImpl;
+import dev.mesbase.business.quality.service.QualityTreatmentService;
+import dev.mesbase.business.wm.dao.WmStockDocumentMapper;
+import dev.mesbase.business.wm.domain.WmStockDocumentEntity;
 import dev.mesbase.common.core.domain.entity.SysUser;
 import dev.mesbase.common.core.domain.model.LoginUser;
 import dev.mesbase.core.error.FoundationException;
-
 import java.math.BigDecimal;
-import java.util.List;
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Set;
 import java.util.UUID;
-
 import org.apache.ibatis.mapping.Environment;
 import org.apache.ibatis.session.Configuration;
 import org.apache.ibatis.session.SqlSessionFactoryBuilder;
 import org.apache.ibatis.transaction.jdbc.JdbcTransactionFactory;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
+import org.mockito.Mockito;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 
@@ -64,6 +50,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.mock;
 
 /**
  * LIVE MYSQL: designated SIMPLE_B, generated XML and real rules; one explicit rollback-only transaction.
@@ -117,7 +104,7 @@ class ProductionExecutionMySqlTest {
             assertNotEquals(first.getId(), second.getId());
             var updated = service.updateById(first.getId(), new MesProductionExecutionUpdateCommand(workorder, routing, new BigDecimal("1.123456"), "READY", null, null, tag));
             assertEquals(first.getId(), updated.getId());
-            var identity = new ProductionIdentityService(executions, s.getMapper(WorkorderMapper.class), s.getMapper(MaterialMapper.class), s.getMapper(RoutingMapper.class));
+            var identity = new ProductionIdentityService(executions, s.getMapper(WorkorderMapper.class), s.getMapper(MaterialMapper.class), s.getMapper(RoutingMapper.class), s.getMapper(MesProductionCombinationMapper.class));
             var before = service.selectById(first.getId()).getUpdateTime();
             assertEquals(first.getId(), identity.read(first.getId()).executionId());
             assertEquals(before, service.selectById(first.getId()).getUpdateTime());

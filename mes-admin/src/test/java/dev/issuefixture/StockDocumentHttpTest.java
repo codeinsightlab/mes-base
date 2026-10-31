@@ -2,12 +2,10 @@ package dev.issuefixture;
 
 import dev.mesbase.acceptance.FactorySnapshotFixture;
 import dev.mesbase.business.wm.domain.StockDocumentType;
-
 import java.math.BigDecimal;
-import java.util.UUID;
 import java.util.List;
+import java.util.UUID;
 import java.util.concurrent.Executors;
-
 import org.junit.jupiter.api.Test;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.servlet.MockMvc;
@@ -17,10 +15,10 @@ import tools.jackson.databind.ObjectMapper;
 import static dev.issuefixture.ProductionCoreV1HttpTest.full;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
@@ -270,7 +268,9 @@ class StockDocumentHttpTest {
                 assertTrue(inputStatus == 400 || inputStatus == 409);
                 String error = JSON.readTree(input.getContentAsString()).get("errorCode").asText();
                 if (inputStatus == 400) assertEquals("BAD_REQUEST", error);
-                else assertTrue(List.of("PRODUCTION_INPUT_STALE", "RESOURCE_CONFLICT").contains(error), error);
+                else
+                    assertTrue(List.of("PRODUCTION_COMBINATION_STOCK_CHANGED", "PRODUCTION_INPUT_STALE", "RESOURCE_CONFLICT")
+                            .contains(error), error);
                 assertEquals(0, new BigDecimal("20").compareTo(j.queryForObject(
                         "SELECT quantity FROM wm_inventory WHERE id=1", BigDecimal.class)));
                 assertEquals(0, j.queryForObject("SELECT COUNT(*) FROM mes_material_issue_input WHERE confirmed_at IS NOT NULL", Integer.class));

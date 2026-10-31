@@ -1,6 +1,7 @@
 package dev.mesbase.business.production;
 
 import dev.mesbase.business.basic.dao.MaterialMapper;
+import dev.mesbase.business.production.dao.MesProductionCombinationMapper;
 import dev.mesbase.business.production.dao.MesProductionExecutionMapper;
 import dev.mesbase.business.production.dao.RoutingMapper;
 import dev.mesbase.business.production.dao.WorkorderMapper;
@@ -22,7 +23,7 @@ import static org.mockito.Mockito.when;
 class ProductionIdentityLookupTest {
     private static ProductionIdentityService service(MesProductionExecutionMapper executions) {
         return new ProductionIdentityService(executions, mock(WorkorderMapper.class), mock(MaterialMapper.class),
-                mock(RoutingMapper.class));
+                mock(RoutingMapper.class), mock(MesProductionCombinationMapper.class));
     }
 
     private static MesProductionExecutionEntity execution(long id, String batch) {

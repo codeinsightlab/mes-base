@@ -1,47 +1,44 @@
 package dev.issuefixture;
 
-import dev.mesbase.common.utils.RequestFingerprint;
-
-import dev.mesbase.acceptance.FactorySnapshotFixture;
-
-import tools.jackson.databind.node.ObjectNode;
-import org.springframework.core.env.Environment;
-import org.springframework.context.annotation.Primary;
 import dev.mesbase.business.integration.warehouse.WarehouseIntegration;
-import dev.mesbase.business.production.controller.ProductionInputController;
+import dev.mesbase.business.production.controller.ProductionCombinationController;
 import dev.mesbase.business.production.controller.ProductionInboundController;
+import dev.mesbase.business.production.controller.ProductionInputController;
+import dev.mesbase.business.production.domain.ProductionCombinationModels.Demand;
+import dev.mesbase.business.production.domain.ProductionCombinationModels.Selection;
+import dev.mesbase.business.production.domain.ProductionCombinationRules;
+import dev.mesbase.business.production.service.IRoutingService;
+import dev.mesbase.business.production.service.ProductionCombinationService;
 import dev.mesbase.business.production.service.ProductionInboundService;
 import dev.mesbase.business.production.service.ProductionInputService;
-import dev.mesbase.business.production.service.ProductionInputSupplyService;
-import dev.mesbase.business.production.service.IRoutingService;
-import dev.mesbase.business.production.domain.ProductionScanCode;
-import dev.mesbase.business.production.domain.ProductionCodeRules;
 import java.math.BigDecimal;
-import java.util.Map;
-import java.util.HashMap;
-import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.Executors;
+import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Import;
+import org.springframework.context.annotation.Primary;
 import org.springframework.core.env.MapPropertySource;
-import org.springframework.web.context.support.AnnotationConfigWebApplicationContext;
-import org.springframework.mock.web.MockServletContext;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.mock.web.MockServletContext;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.web.context.support.AnnotationConfigWebApplicationContext;
+import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.spy;
-import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
  * TEST ONLY two separate H2 business databases; real local commands/SQL/locks, no simulated ERP success.
@@ -50,7 +47,7 @@ class ProductionInputHttpTest {
     static final String ROOT = "/api/production/input";
 
     @Configuration
-    @Import({ProductionInputController.class, ProductionInputService.class, ProductionInputSupplyService.class, ProductionReportHttpTest.Extra.class,
+    @Import({ProductionCombinationService.class, ProductionCombinationController.class, ProductionInputController.class, ProductionInputService.class, ProductionReportHttpTest.Extra.class,
             ProductionInboundController.class,
             ProductionInboundService.class})
     static class Extra {
@@ -96,14 +93,40 @@ class ProductionInputHttpTest {
         return c.getBean(MaterialIssueHttpTest.Fixture.class).business.get("A");
     }
 
+    /**
+     * TEST ONLY fixed planning identity for existing downstream tests; new planner tests use generate().
+     */
     static String command(MockMvc m, String request, String lot, String qty) throws Exception {
-        String stock = lot.equals("L001") ? "1" : "2";
-        var calc = m.perform(ProductionCoreV1HttpTest.full(get(ROOT + "/calculate")).param("code", "WO1:M1#" + lot)
-                        .param("workorderId", "1").param("stockReference", stock).param("outputQty", qty))
+        var context = (AnnotationConfigWebApplicationContext) m.getDispatcherServlet().getWebApplicationContext();
+        var j = db(context);
+        var rows = j.query("SELECT id,line_no,material_id,unit_id,total_required_qty FROM mes_workorder_material WHERE workorder_id=1 ORDER BY line_no,id",
+                (r, n) -> new Demand(r.getLong(1), r.getInt(2), r.getLong(3), "M1", r.getLong(4), r.getBigDecimal(5), 6));
+        var selected = rows.stream().map(row -> new Selection(row.id(), List.of(lot))).toList();
+        String hash = ProductionCombinationRules.fingerprint(1L, rows, selected);
+        var found = j.queryForList("SELECT id FROM mes_production_combination WHERE workorder_id=1 AND fingerprint=?", Long.class, hash);
+        long id;
+        if (found.isEmpty()) {
+            j.update("INSERT INTO mes_production_combination(workorder_id,product_id,output_unit_id,demand_revision,planned_qty,fingerprint,created_by,created_at) SELECT id,product_id,1,material_revision,planned_qty,?,1,CURRENT_TIMESTAMP FROM workorder WHERE id=1", hash);
+            id = j.queryForObject("SELECT id FROM mes_production_combination WHERE fingerprint=?", Long.class, hash);
+            for (var row : rows)
+                j.update("INSERT INTO mes_production_combination_item(combination_id,demand_line_id,line_no,material_id,material_code,unit_id,required_qty,batch_no) VALUES(?,?,?,?,?,?,?,?)", id, row.id(), row.lineNo(), row.materialId(), row.materialCode(), row.unitId(), row.totalRequiredQty(), lot);
+        } else id = found.getFirst();
+        return confirmCommand(m, request, "COMB:A:" + id, qty);
+    }
+
+    static String confirmCommand(MockMvc m, String request, String code, String qty) throws Exception {
+        var calc = m.perform(ProductionCoreV1HttpTest.full(get("/api/production/combinations/calculate"))
+                        .param("code", code).param("quantity", qty))
                 .andExpect(status().isOk()).andReturn();
         String key = new ObjectMapper().readTree(calc.getResponse().getContentAsString()).get("calculationKey")
                 .asText();
-        return new ObjectMapper().writeValueAsString(Map.of("requestId", request, "code", "WO1:M1#" + lot, "workorderId", "1", "stockReference", stock, "outputQty", qty, "routingId", "1", "routingNodeIds", List.of("11", "12", "13"), "inputKind", "PRODUCTION_INPUT", "calculationKey", key));
+        return new ObjectMapper().writeValueAsString(Map.of("requestId", request, "code", code, "outputQty", qty, "routingId", "1", "routingNodeIds", List.of("11", "12", "13"), "calculationKey", key));
+    }
+
+    static JsonNode generate(MockMvc m, String quantity) throws Exception {
+        return new ObjectMapper().readTree(m.perform(ProductionCoreV1HttpTest.full(post("/api/production/combinations"))
+                        .content("{\"workorderId\":\"1\",\"quantity\":\"" + quantity + "\"}"))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString());
     }
 
     static String submit(MockMvc mvc, String body) throws Exception {
@@ -112,267 +135,186 @@ class ProductionInputHttpTest {
     }
 
     @Test
-    void repeatedInputReservesOrderCapacityAndRejectsOverflowWithoutAnotherIssue() throws Exception {
+    void generatedIdentityIgnoresPrintQuantityAndLocationAndNeverCreatesProductionFacts() throws Exception {
         try (var c = context()) {
             var j = db(c);
             var m = MaterialIssueHttpTest.mvc(c);
-            j.update("DELETE FROM mes_production_execution"); // TEST ONLY unused seeded executions
-            submit(m, command(m, UUID.randomUUID().toString(), "L001", "100"));
-            submit(m, command(m, UUID.randomUUID().toString(), "L001", "900"));
-            int issues = j.queryForObject("SELECT COUNT(*) FROM wm_stock_document WHERE document_type='MATERIAL_ISSUE'", Integer.class);
-            m.perform(ProductionCoreV1HttpTest.full(get(ROOT + "/calculate")).param("code", "WO1:M1#L001")
-                            .param("workorderId", "1").param("stockReference", "1").param("outputQty", "1"))
-                    .andExpect(status().isConflict());
-            assertEquals(issues, j.queryForObject("SELECT COUNT(*) FROM wm_stock_document WHERE document_type='MATERIAL_ISSUE'", Integer.class));
-            assertEquals(0, new BigDecimal("1000").compareTo(j.queryForObject("SELECT target_qty FROM mes_production_execution", BigDecimal.class)));
+            var a = generate(m, "100");
+            var b = generate(m, "50");
+            assertEquals(a.get("combination").get("id"), b.get("combination").get("id"));
+            assertEquals(0, j.queryForObject("SELECT COUNT(*) FROM mes_material_issue_input", Integer.class));
+            assertEquals(0, j.queryForObject("SELECT COUNT(*) FROM wm_stock_document", Integer.class));
+            assertEquals(0, j.queryForObject("SELECT COUNT(*) FROM mes_production_execution WHERE batch_no IS NOT NULL", Integer.class));
+            j.update("UPDATE wm_inventory SET bin_code='MOVED' WHERE id=1");
+            assertEquals(a.get("combination").get("id"), generate(m, "80").get("combination").get("id"));
+            m.perform(ProductionCoreV1HttpTest.full(get("/api/production/combinations/" + a.get("combination").get("id")
+                            .asText() + "/qr")))
+                    .andExpect(status().isOk());
         }
     }
 
     @Test
-    void firstRepeatRunningDifferentLotsIdempotenceAndPersistedBusinessBatch() throws Exception {
+    void fixedCombinationAccumulatesConfirmedSetsReplaysAndNeverReopensEndedExecution() throws Exception {
         try (var c = context()) {
-            var m = MaterialIssueHttpTest.mvc(c);
             var j = db(c);
-            m.perform(ProductionCoreV1HttpTest.full(get(ROOT)).param("code", "WO1:M1#L001")).andExpect(status().isOk())
-                    .andExpect(jsonPath("sourceMode").value("LOCAL_ONLY"))
-                    .andExpect(jsonPath("stocks[0].availableQty").value("10000.000000"));
-            String request = UUID.randomUUID().toString(), body = command(m, request, "L001", "100");
-            var first = new ObjectMapper().readTree(submit(m, body));
-            long e = first.get("executionId").asLong();
-            assertEquals(1, j.queryForObject("SELECT COUNT(*) FROM mes_production_execution WHERE batch_no IS NOT NULL", Integer.class));
-            assertEquals(first, new ObjectMapper().readTree(submit(m, body)));
-            assertEquals(0, j.queryForObject("SELECT COUNT(*) FROM mes_material_issue_input WHERE execution_id=? AND output_qty<>100", Integer.class, e));
-            j.update("UPDATE mes_production_execution SET status='RUNNING',start_time=CURRENT_TIMESTAMP WHERE id=?", e);
-            j.update("INSERT INTO mes_production_report(execution_id,routing_node_id,record_type,quantity_delta,operator_user_id,recorded_by,report_time,reason,create_time) VALUES(?,11,'REPORT',80,1,1,CURRENT_TIMESTAMP,'TEST ONLY running fixture',CURRENT_TIMESTAMP)", e);
-            var next = new ObjectMapper().readTree(submit(m, command(m, UUID.randomUUID().toString(), "L001", "200")));
-            assertEquals(e, next.get("executionId").asLong());
-            m.perform(ProductionCoreV1HttpTest.full(get("/api/production/report-quantities/executions/" + e)))
-                    .andExpect(status().isOk()).andExpect(jsonPath("productionInputQty").value("300.000000"))
-                    .andExpect(jsonPath("nodes[0].availableQty").value("220.000000"));
-            var other = new ObjectMapper().readTree(submit(m, command(m, UUID.randomUUID().toString(), "L002", "150")));
-            assertEquals(2, j.queryForObject("SELECT COUNT(*) FROM mes_production_execution WHERE batch_no IS NOT NULL", Integer.class));
-            assertEquals(0, j.queryForObject("SELECT COUNT(*) FROM mes_production_execution WHERE id=? AND target_qty<>300", Integer.class, e));
-            m.perform(ProductionCoreV1HttpTest.full(get("/api/production/identity"))
-                            .param("code", first.get("code").asText())).andExpect(status().isOk())
-                    .andExpect(jsonPath("executionId").value(Long.toString(e)));
-            m.perform(ProductionCoreV1HttpTest.full(get("/api/production/identity")).param("code", "M1#L001"))
-                    .andExpect(status().isBadRequest());
-            m.perform(ProductionCoreV1HttpTest.full(post(ROOT)).content(body.replace("\"100\"", "\"101\"")))
-                    .andExpect(status().isConflict());
-            j.update("UPDATE mes_production_execution SET status='FULLY_RECEIVED' WHERE id=?", e);
-            submit(m, command(m, UUID.randomUUID().toString(), "L001", "10"));
-            assertEquals("RUNNING", j.queryForObject("SELECT status FROM mes_production_execution WHERE id=?", String.class, e));
+            var m = MaterialIssueHttpTest.mvc(c);
+            j.update("UPDATE wm_inventory SET quantity=0,available_quantity=0 WHERE id=2");
+            String code = generate(m, "100").get("combination").get("code").asText();
+            String firstBody = confirmCommand(m, UUID.randomUUID().toString(), code, "50");
+            var first = new ObjectMapper().readTree(submit(m, firstBody));
+            long execution = first.get("executionId").asLong();
+            submit(m, firstBody);
+            var second = new ObjectMapper().readTree(submit(m, confirmCommand(m, UUID.randomUUID()
+                    .toString(), code, "30")));
+            assertEquals(execution, second.get("executionId").asLong());
+            assertEquals(0, new BigDecimal("80").compareTo(j.queryForObject("SELECT SUM(output_qty) FROM mes_material_issue_input", BigDecimal.class)));
+            assertEquals(0, new BigDecimal("9840").compareTo(j.queryForObject("SELECT quantity FROM wm_inventory WHERE id=1", BigDecimal.class)));
+            assertEquals(2, j.queryForObject("SELECT COUNT(*) FROM wm_stock_document WHERE status='POSTED'", Integer.class));
+            m.perform(ProductionCoreV1HttpTest.full(get("/api/production/identity")).param("code", code))
+                    .andExpect(status().isOk()).andExpect(jsonPath("executionId").value(Long.toString(execution)));
+            j.update("UPDATE mes_production_execution SET status='FULLY_RECEIVED' WHERE id=?", execution);
+            m.perform(ProductionCoreV1HttpTest.full(get("/api/production/combinations/calculate")).param("code", code))
+                    .andExpect(status().isConflict())
+                    .andExpect(jsonPath("errorCode").value("PRODUCTION_COMBINATION_CLOSED"));
+            assertEquals(code, generate(m, "10").get("combination").get("code").asText());
+            m.perform(ProductionCoreV1HttpTest.full(post(ROOT)).content(firstBody)).andExpect(status().isOk());
         }
     }
 
     @Test
-    void concurrentNewRequestsReuseOneBusinessBatchAndRepeatedRequestCreditsOnce() throws Exception {
+    void stockChangeReturnsLatestLimitAndFailedConfirmationLeavesNoExecutionOrInput() throws Exception {
+        try (var c = context()) {
+            var j = db(c);
+            var m = MaterialIssueHttpTest.mvc(c);
+            j.update("UPDATE wm_inventory SET quantity=0,available_quantity=0 WHERE id=2");
+            String code = generate(m, "100").get("combination").get("code").asText();
+            String command = confirmCommand(m, UUID.randomUUID().toString(), code, "100");
+            j.update("UPDATE wm_inventory SET quantity=80,available_quantity=80 WHERE id=1");
+            m.perform(ProductionCoreV1HttpTest.full(post(ROOT)).content(command)).andExpect(status().isConflict())
+                    .andExpect(jsonPath("errorCode").value("PRODUCTION_COMBINATION_STOCK_CHANGED"))
+                    .andExpect(jsonPath("maximumQty").value("40.000000"));
+            assertEquals(0, j.queryForObject("SELECT COUNT(*) FROM mes_production_execution WHERE batch_no IS NOT NULL", Integer.class));
+            assertEquals(0, j.queryForObject("SELECT COUNT(*) FROM mes_material_issue_input", Integer.class));
+            assertEquals(0, j.queryForObject("SELECT COUNT(*) FROM wm_stock_action", Integer.class));
+            m.perform(ProductionCoreV1HttpTest.full(get("/api/production/combinations/calculate")).param("code", code))
+                    .andExpect(status().isOk()).andExpect(jsonPath("maximumQty").value("40.000000"));
+        }
+    }
+
+    static void multiMaterial(JdbcTemplate j) {
+        j.update("UPDATE wm_inventory SET quantity=120,available_quantity=120,batch_no='B01' WHERE id=1");
+        j.update("UPDATE wm_inventory SET quantity=80,available_quantity=80,batch_no='B02' WHERE id=2");
+        j.update("INSERT INTO material(id,code,name,unit_id,status) VALUES(2,'C','TEST ONLY second component',1,'ENABLED')");
+        j.update("INSERT INTO mes_workorder_material(id,workorder_id,line_no,material_id,unit_id,total_required_qty,planned_qty,manually_adjusted,updated_by,updated_at) SELECT 2,1,2,2,1,planned_qty,planned_qty,TRUE,1,CURRENT_TIMESTAMP FROM workorder WHERE id=1");
+        j.update("INSERT INTO wm_inventory(id,material_id,warehouse_id,quantity,available_quantity,status,batch_no,bin_code) VALUES(3,2,1,100,100,'ENABLED','C01','BIN2')");
+    }
+
+    @Test
+    void fixedMultiMaterialBatchesSupportSmallerRequestsAndConcurrentFirstIssues() throws Exception {
         try (var c = context(); var pool = Executors.newFixedThreadPool(2)) {
-            var m = MaterialIssueHttpTest.mvc(c);
             var j = db(c);
-            String one = command(m, UUID.randomUUID().toString(), "L001", "100"), two = command(m, UUID.randomUUID()
-                    .toString(), "L001", "200");
+            var m = MaterialIssueHttpTest.mvc(c);
+            multiMaterial(j);
+            var plan = generate(m, "100");
+            String code = plan.get("combination").get("code").asText();
+            assertEquals(2, plan.get("combination").get("items").get(0).get("batches").size());
+            String one = confirmCommand(m, UUID.randomUUID()
+                    .toString(), code, "50"), two = confirmCommand(m, UUID.randomUUID().toString(), code, "30");
             var a = pool.submit(() -> submit(m, one));
             var b = pool.submit(() -> submit(m, two));
-            a.get();
-            b.get();
+            var first = new ObjectMapper().readTree(a.get());
+            var second = new ObjectMapper().readTree(b.get());
+            assertEquals(first.get("executionId"), second.get("executionId"));
             assertEquals(1, j.queryForObject("SELECT COUNT(*) FROM mes_production_execution WHERE batch_no IS NOT NULL", Integer.class));
-            assertEquals(2, j.queryForObject("SELECT COUNT(*) FROM mes_material_issue_input WHERE document_id>0 AND confirmed_at IS NOT NULL", Integer.class));
-            assertEquals(0, j.queryForObject("SELECT COUNT(*) FROM wm_inventory WHERE id=1 AND quantity<>9400", Integer.class));
-            var aa = pool.submit(() -> submit(m, one));
-            var bb = pool.submit(() -> submit(m, one));
-            aa.get();
-            bb.get();
-            assertEquals(2, j.queryForObject("SELECT COUNT(*) FROM mes_material_issue_input WHERE document_id>0 AND confirmed_at IS NOT NULL", Integer.class));
+            assertEquals(0, new BigDecimal("80").compareTo(j.queryForObject("SELECT SUM(output_qty) FROM mes_material_issue_input", BigDecimal.class)));
+            assertEquals(0, new BigDecimal("160").compareTo(j.queryForObject("SELECT SUM(quantity) FROM wm_stock_document_line WHERE material_id=1", BigDecimal.class)));
+            assertEquals(0, new BigDecimal("80").compareTo(j.queryForObject("SELECT SUM(quantity) FROM wm_stock_document_line WHERE material_id=2", BigDecimal.class)));
+            assertEquals(0, new BigDecimal("40").compareTo(j.queryForObject("SELECT SUM(quantity) FROM wm_inventory WHERE material_id=1", BigDecimal.class)));
+            assertEquals(0, j.queryForObject("SELECT COUNT(*) FROM wm_stock_document_line WHERE demand_line_id IS NULL", Integer.class));
+            m.perform(ProductionCoreV1HttpTest.full(get("/api/production/combinations/calculate")).param("code", code))
+                    .andExpect(status().isOk()).andExpect(jsonPath("maximumQty").value("20.000000"))
+                    .andExpect(jsonPath("warehouses[0].name").value("验收仓库"));
+            m.perform(get("/api/production/combinations/calculate").header("Authorization", "Bearer FULL")
+                    .header("X-Factory-Id", "B").param("code", code)).andExpect(status().isBadRequest());
         }
     }
 
     @Test
-    void localFailureRollsBackExecutionIntentBasisAndStock() throws Exception {
+    void failureOnSecondMaterialRollsBackTheWholeLocalTransactionAndSameRequestCanRetry() throws Exception {
         try (var c = context()) {
-            var m = MaterialIssueHttpTest.mvc(c);
             var j = db(c);
-            j.execute("ALTER TABLE wm_stock_action ADD CONSTRAINT test_fail_issue CHECK(action_type <> 'ISSUE')");
-            var body = command(m, UUID.randomUUID().toString(), "L001", "100");
-            m.perform(ProductionCoreV1HttpTest.full(post(ROOT)).content(body)).andExpect(status().is5xxServerError());
+            var m = MaterialIssueHttpTest.mvc(c);
+            multiMaterial(j);
+            String code = generate(m, "100").get("combination").get("code").asText();
+            String command = confirmCommand(m, UUID.randomUUID().toString(), code, "50");
+            j.execute("ALTER TABLE wm_stock_action ADD CONSTRAINT test_reject_second CHECK(material_id<>2)");
+            m.perform(ProductionCoreV1HttpTest.full(post(ROOT)).content(command))
+                    .andExpect(status().is5xxServerError());
+            assertEquals(0, j.queryForObject("SELECT COUNT(*) FROM wm_stock_document", Integer.class));
+            assertEquals(0, j.queryForObject("SELECT COUNT(*) FROM wm_stock_action", Integer.class));
+            assertEquals(0, j.queryForObject("SELECT COUNT(*) FROM mes_material_issue_input", Integer.class));
             assertEquals(0, j.queryForObject("SELECT COUNT(*) FROM mes_production_execution WHERE batch_no IS NOT NULL", Integer.class));
-            assertEquals(0, j.queryForObject("SELECT COUNT(*) FROM mes_material_issue_input WHERE confirmed_at IS NOT NULL", Integer.class));
-            assertEquals(0, j.queryForObject("SELECT COUNT(*) FROM workorder WHERE material_frozen_at IS NOT NULL", Integer.class));
-            assertEquals(0, new BigDecimal("10000").compareTo(j.queryForObject("SELECT quantity FROM wm_inventory WHERE id=1", BigDecimal.class)));
+            assertEquals(0, new BigDecimal("120").compareTo(j.queryForObject("SELECT quantity FROM wm_inventory WHERE id=1", BigDecimal.class)));
+            assertEquals(0, j.queryForObject("SELECT COUNT(*) FROM mes_production_combination WHERE execution_id IS NOT NULL", Integer.class));
+            j.execute("ALTER TABLE wm_stock_action DROP CONSTRAINT test_reject_second");
+            submit(m, command);
+            submit(m, command);
+            assertEquals(1, j.queryForObject("SELECT COUNT(*) FROM mes_material_issue_input", Integer.class));
         }
     }
 
     @Test
-    void pendingReductionReservesCapacityBeforeExternalWindowAndSuccessRestoresStockOnce() throws Exception {
-        try (var c = context()) {
-            var m = MaterialIssueHttpTest.mvc(c);
+    void differentCodesOnOneOrderCannotConcurrentlySpendThePlanTwice() throws Exception {
+        try (var c = context(); var pool = Executors.newFixedThreadPool(2)) {
             var j = db(c);
-            var first = new ObjectMapper().readTree(submit(m, command(m, UUID.randomUUID().toString(), "L001", "100")));
-            var second = new ObjectMapper().readTree(submit(m, command(m, UUID.randomUUID()
-                    .toString(), "L001", "200")));
-            var e = first.get("executionId").asText();
-            j.update("UPDATE mes_production_execution SET status='RUNNING',start_time=CURRENT_TIMESTAMP WHERE id=?", e);
-            j.update("INSERT INTO mes_production_report(execution_id,routing_node_id,record_type,quantity_delta,operator_user_id,recorded_by,report_time,reason,create_time) VALUES(?,11,'REPORT',280,1,1,CURRENT_TIMESTAMP,'TEST ONLY reduction fixture',CURRENT_TIMESTAMP)", e);
-            m.perform(ProductionCoreV1HttpTest.full(post(StockDocumentHttpTest.OUT_ROOT + "/" + first.get("documentId")
-                    .asText() + "/actions/void"))).andExpect(status().isConflict());
-            assertEquals("POSTED", j.queryForObject("SELECT status FROM wm_stock_document WHERE id=?", String.class, first.get("documentId")
-                    .asText()));
-            long original = j.queryForObject("SELECT id FROM mes_production_report WHERE execution_id=?", Long.class, e);
-            j.update("INSERT INTO mes_production_report(execution_id,routing_node_id,record_type,quantity_delta,reference_report_id,operator_user_id,recorded_by,report_time,reason,create_time) VALUES(?,11,'ADJUSTMENT',-200,?,1,1,CURRENT_TIMESTAMP,'TEST ONLY safe correction',CURRENT_TIMESTAMP)", e, original);
-            j.execute("ALTER TABLE wm_stock_action ADD CONSTRAINT test_fail_reversal CHECK(action_type <> 'REVERSAL')");
-            m.perform(ProductionCoreV1HttpTest.full(post(StockDocumentHttpTest.OUT_ROOT + "/" + second.get("documentId")
-                    .asText() + "/actions/void"))).andExpect(status().is5xxServerError());
-            assertEquals("POSTED", j.queryForObject("SELECT status FROM wm_stock_document WHERE id=?", String.class, second.get("documentId")
-                    .asText()));
-            j.execute("ALTER TABLE wm_stock_action DROP CONSTRAINT test_fail_reversal");
-            m.perform(ProductionCoreV1HttpTest.full(post(StockDocumentHttpTest.OUT_ROOT + "/" + second.get("documentId")
-                            .asText() + "/actions/void"))).andExpect(status().isOk())
-                    .andExpect(jsonPath("documentId").value(second.get("documentId").asText()));
-            assertEquals("SUCCEEDED", j.queryForObject("SELECT CASE WHEN COUNT(*)=1 THEN 'SUCCEEDED' ELSE NULL END FROM wm_stock_document_line l JOIN wm_stock_action r ON r.reference_action_id=l.stock_action_id WHERE l.document_id=? AND r.action_type='REVERSAL'", String.class, second.get("documentId")
-                    .asText()));
-            m.perform(ProductionCoreV1HttpTest.full(get("/api/production/report-quantities/executions/" + e)))
-                    .andExpect(status().isOk()).andExpect(jsonPath("nodes[0].availableQty").value("20.000000"));
-            // A historical/admin report entry uses the same quantity guard during the cancellation window.
-            m.perform(ProductionCoreV1HttpTest.full(post("/api/production/reports/supplements"))
-                    .content(ProductionReportHttpTest.supplement(11, "21")
-                            .replace("executionId\":\"1", "executionId\":\"" + e))).andExpect(status().isConflict());
+            var m = MaterialIssueHttpTest.mvc(c);
+            j.update("DELETE FROM mes_execution_path_node");
+            j.update("DELETE FROM mes_execution_path");
+            j.update("DELETE FROM mes_production_execution");
+            j.update("UPDATE workorder SET planned_qty=100 WHERE id=1");
+            j.update("UPDATE mes_workorder_material SET planned_qty=100,total_required_qty=200 WHERE id=1");
+            j.update("UPDATE wm_inventory SET quantity=120,available_quantity=120");
+            String first = generate(m, "60").get("combination").get("code").asText();
+            j.update("UPDATE wm_inventory SET quantity=0,available_quantity=0 WHERE id=1");
+            String second = generate(m, "60").get("combination").get("code").asText();
+            j.update("UPDATE wm_inventory SET quantity=120,available_quantity=120 WHERE id=1");
+            assertNotEquals(first, second);
+            String one = confirmCommand(m, UUID.randomUUID().toString(), first, "60");
+            String two = confirmCommand(m, UUID.randomUUID().toString(), second, "60");
+            var start = new CyclicBarrier(2);
+            var a = pool.submit(() -> {
+                start.await();
+                return m.perform(ProductionCoreV1HttpTest.full(post(ROOT)).content(one)).andReturn().getResponse()
+                        .getStatus();
+            });
+            var b = pool.submit(() -> {
+                start.await();
+                return m.perform(ProductionCoreV1HttpTest.full(post(ROOT)).content(two)).andReturn().getResponse()
+                        .getStatus();
+            });
+            assertEquals(List.of(200, 409), Stream.of(a.get(), b.get()).sorted().toList());
+            assertEquals(1, j.queryForObject("SELECT COUNT(*) FROM mes_production_execution", Integer.class));
+            assertEquals(0, new BigDecimal("60").compareTo(j.queryForObject("SELECT SUM(output_qty) FROM mes_material_issue_input", BigDecimal.class)));
+            assertEquals(0, new BigDecimal("120").compareTo(j.queryForObject("SELECT SUM(quantity) FROM wm_inventory", BigDecimal.class)));
         }
     }
 
     @Test
-    void factoriesAndWorkordersKeepSameProductLotIndependentWithoutMaterialCodeGuessing() throws Exception {
+    void ordinaryWarehouseMaterialIssueWithOrderReferenceNeverCreatesMesInput() throws Exception {
         try (var c = context()) {
-            var m = MaterialIssueHttpTest.mvc(c);
             var j = db(c);
-
-            var body = command(m, UUID.randomUUID().toString(), "L001", "100");
-            var a = new ObjectMapper().readTree(submit(m, body));
-            var b = m.perform(ProductionReportHttpTest.full(post(ROOT), "B").content(body)).andExpect(status().isOk())
-                    .andReturn();
-            var secondFactory = new ObjectMapper().readTree(b.getResponse().getContentAsString());
-            assertEquals(a.get("executionId"), secondFactory.get("executionId"));
-            assertEquals(1, c.getBean(MaterialIssueHttpTest.Fixture.class).business.get("B")
-                    .queryForObject("SELECT COUNT(*) FROM mes_production_execution WHERE batch_no IS NOT NULL", Integer.class));
-            j.update("INSERT INTO workorder(id,code,product_id,planned_qty,routing_id,status,revision,create_time,update_time) VALUES(3,'TEST_SAME_PRODUCT_OTHER_ORDER',99,1000,1,'RELEASED',0,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)");
-            j.update("INSERT INTO workorder_erp_extra(id) VALUES(3)");
-            j.update("INSERT INTO mes_workorder_material(id,material_id,unit_id,total_required_qty,planned_qty,warehouse_ids,work_center,revision,status,updated_by,updated_at,bom_id,bom_base_qty,bom_component_qty,output_unit_id,frozen_at) SELECT 3,material_id,unit_id,total_required_qty,planned_qty,warehouse_ids,work_center,revision,status,updated_by,updated_at,bom_id,bom_base_qty,bom_component_qty,output_unit_id,NULL FROM mes_workorder_material WHERE id=1");
-            WorkorderMaterialFixture.seedSnapshot(j);
-
-            var conflictingCalculation = m.perform(ProductionCoreV1HttpTest.full(get(ROOT + "/calculate"))
-                            .param("code", "TEST_SAME_PRODUCT_OTHER_ORDER:M1#L001").param("workorderId", "3")
-                            .param("stockReference", "1")
-                            .param("outputQty", "100"))
+            var m = MaterialIssueHttpTest.mvc(c);
+            var response = m.perform(ProductionCoreV1HttpTest.full(post("/api/wm/outbound-documents/aggregate"))
+                            .content("{\"header\":{\"direction\":\"OUT\",\"documentType\":\"MATERIAL_ISSUE\",\"ruleCode\":\"MATERIAL_ISSUE\",\"reason\":\"TEST ONLY ordinary warehouse issue\",\"sourceWorkorderId\":\"1\"},\"items\":[{\"stockId\":\"1\",\"materialId\":\"1\",\"warehouseId\":\"1\",\"unitId\":\"1\",\"batchNo\":\"L001\",\"binCode\":\"BIN1\",\"quantity\":\"20\"}]}"))
                     .andExpect(status().isOk()).andReturn();
-            var conflict = (ObjectNode) new ObjectMapper().readTree(body).deepCopy();
-            conflict.put("requestId", UUID.randomUUID().toString());
-            conflict.put("workorderId", "3");
-            conflict.put("code", "TEST_SAME_PRODUCT_OTHER_ORDER:M1#L001");
-            conflict.put("calculationKey", new ObjectMapper().readTree(conflictingCalculation.getResponse()
-                    .getContentAsString()).get("calculationKey").asText());
-            m.perform(ProductionCoreV1HttpTest.full(post(ROOT)).content(conflict.toString()))
-                    .andExpect(status().isOk());
-            assertEquals(2, j.queryForObject("SELECT COUNT(*) FROM mes_production_execution WHERE batch_no IS NOT NULL", Integer.class));
-            j.update("INSERT INTO material(id,code,name,unit_id,status) VALUES(3,'P2','TEST ONLY second product',1,'ENABLED')");
-            j.update("INSERT INTO routing_product(routing_id,material_id) VALUES(1,3)");
-            j.update("INSERT INTO workorder(id,code,product_id,planned_qty,routing_id,status,revision,create_time,update_time) VALUES(2,'TEST_WO2',3,1000,1,'RELEASED',0,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)");
-            j.update("INSERT INTO workorder_erp_extra(id) VALUES(2)");
-            j.update("INSERT INTO material_bom(id,code,version,product_id,base_qty,unit_id,status,revision,remark,created_by,created_at,published_at,is_default) SELECT 2,'TEST-BOM-2','1',3,base_qty,unit_id,status,revision,remark,created_by,created_at,published_at,0 FROM material_bom WHERE id=1");
-            j.update("INSERT INTO material_bom_item SELECT 2,2,material_id,quantity,unit_id,NULL,sort FROM material_bom_item WHERE id=1");
-            j.update("INSERT INTO mes_workorder_material(id,material_id,unit_id,total_required_qty,planned_qty,warehouse_ids,work_center,revision,status,updated_by,updated_at,bom_id,bom_base_qty,bom_component_qty,output_unit_id,frozen_at) SELECT 2,material_id,unit_id,total_required_qty,planned_qty,warehouse_ids,work_center,revision,status,updated_by,updated_at,2,bom_base_qty,bom_component_qty,output_unit_id,NULL FROM mes_workorder_material WHERE id=1");
-            WorkorderMaterialFixture.seedSnapshot(j);
-
-            var calc = m.perform(ProductionCoreV1HttpTest.full(get(ROOT + "/calculate"))
-                            .param("code", "TEST_WO2:M1#L001")
-                            .param("workorderId", "2").param("stockReference", "1").param("outputQty", "50"))
-                    .andExpect(status().isOk()).andReturn();
-            var payload = (ObjectNode) new ObjectMapper().readTree(body).deepCopy();
-            payload.put("requestId", UUID.randomUUID().toString());
-            payload.put("workorderId", "2");
-            payload.put("code", "TEST_WO2:M1#L001");
-            payload.put("outputQty", "50");
-            payload.put("calculationKey", new ObjectMapper().readTree(calc.getResponse().getContentAsString())
-                    .get("calculationKey").asText());
-            var other = new ObjectMapper().readTree(submit(m, payload.toString()));
-            m.perform(ProductionCoreV1HttpTest.full(get("/api/production/identity")).param("code", "M1#L001"))
-                    .andExpect(status().isBadRequest());
-            m.perform(ProductionCoreV1HttpTest.full(get("/api/production/identity"))
-                            .param("code", other.get("code").asText())).andExpect(status().isOk())
-                    .andExpect(jsonPath("productCode").value("P2"));
-            m.perform(ProductionReportHttpTest.full(get("/api/production/identity"), "B")
-                            .param("code", a.get("code").asText()))
-                    .andExpect(status().isOk());
-        }
-    }
-
-    @Test
-    void legacyMes1RequestReplaysItsFrozenUuidWithoutBindingOrBatchBackfill() throws Exception {
-        try (var c = context()) {
-            var m = MaterialIssueHttpTest.mvc(c);
-            var j = db(c);
-            var json = new ObjectMapper();
-            String body = command(m, UUID.randomUUID().toString(), "L001", "100");
-            var first = json.readTree(submit(m, body));
-            var legacy = (ObjectNode) json.readTree(body);
-            legacy.put("code", "MES1.TTE.TTE.TDAwMQ");
-            var original = json.treeToValue(legacy, ProductionInputService.Command.class);
-            String fingerprint = RequestFingerprint.sha256(json.writeValueAsString(original));
-            // TEST ONLY frozen pre-upgrade request, deliberately without a business batch. No mapping is consulted.
-            j.update("UPDATE mes_material_issue_input SET request_hash=? WHERE id=?", fingerprint, original.requestId());
-            j.update("UPDATE mes_production_execution SET batch_no=NULL WHERE id=?", first.get("executionId").asText());
-            m.perform(ProductionCoreV1HttpTest.full(post(ROOT)).content(legacy.toString()))
-                    .andExpect(status().isOk())
-                    .andExpect(jsonPath("executionId").value(first.get("executionId").asText()))
-                    .andExpect(jsonPath("code").isEmpty());
-            assertEquals(1, j.queryForObject("SELECT COUNT(*) FROM mes_material_issue_input WHERE document_id>0 AND confirmed_at IS NOT NULL", Integer.class));
-            assertEquals(0, new BigDecimal("9800").compareTo(j.queryForObject("SELECT quantity FROM wm_inventory WHERE id=1", BigDecimal.class)));
-            legacy.put("requestId", UUID.randomUUID().toString());
-            m.perform(ProductionCoreV1HttpTest.full(post(ROOT)).content(legacy.toString()))
-                    .andExpect(status().isBadRequest());
+            var header = new ObjectMapper().readTree(response.getResponse().getContentAsString()).get("document");
+            m.perform(ProductionCoreV1HttpTest.full(post("/api/wm/outbound-documents/" + header.get("id")
+                            .asText() + "/actions/approve"))
+                    .content(StockDocumentHttpTest.intent(UUID.randomUUID().toString(), header.get("revision")
+                            .asInt()))).andExpect(status().isOk());
+            assertEquals(0, j.queryForObject("SELECT COUNT(*) FROM mes_material_issue_input", Integer.class));
             assertEquals(0, j.queryForObject("SELECT COUNT(*) FROM mes_production_execution WHERE batch_no IS NOT NULL", Integer.class));
+            assertEquals(0, new BigDecimal("9980").compareTo(j.queryForObject("SELECT quantity FROM wm_inventory WHERE id=1", BigDecimal.class)));
         }
     }
-
-    @Test
-    void generatedLookupContainsWorkorderProductAndPersistedBatchWithoutLegacyIdentityType() throws Exception {
-        try (var c = context()) {
-            var m = MaterialIssueHttpTest.mvc(c);
-            var json = new ObjectMapper();
-            var saved = json.readTree(submit(m, command(m, UUID.randomUUID().toString(), "L001", "100")));
-            String code = "WO1:P1#L001";
-            assertEquals(code, saved.get("code").asText());
-            m.perform(ProductionCoreV1HttpTest.full(get("/api/production/identity")).param("code", code))
-                    .andExpect(status().isOk()).andExpect(jsonPath("batchNo").value("L001"))
-                    .andExpect(jsonPath("identityType").doesNotExist());
-            m.perform(ProductionCoreV1HttpTest.full(get("/api/production/identity"))
-                            .param("code", ProductionCodeRules.format(new ProductionScanCode("wo1", "M1", "L001"))))
-                    .andExpect(status().isNotFound());
-            m.perform(ProductionCoreV1HttpTest.full(get("/api/production/identity"))
-                            .param("code", ProductionCodeRules.format(new ProductionScanCode("WO1", "m1", "L001"))))
-                    .andExpect(status().isNotFound());
-            m.perform(ProductionCoreV1HttpTest.full(get("/api/production/identity"))
-                            .param("code", ProductionCodeRules.format(new ProductionScanCode("WO1", "M1", "L001 "))))
-                    .andExpect(status().isNotFound());
-        }
-    }
-
-    @Test
-    void scannedWorkorderIsTheOnlyCandidateDespiteUnrelatedReleasedOrders() throws Exception {
-        try (var c = context()) {
-            var j = db(c);
-            var m = MaterialIssueHttpTest.mvc(c);
-            for (int id = 2; id <= 101; id++)
-                j.update("INSERT INTO workorder(id,code,product_id,planned_qty,routing_id,status,revision,create_time,update_time) VALUES(?,?,1,1000,1,'RELEASED',0,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)", id, "TEST_SCALE_" + id);
-            m.perform(ProductionCoreV1HttpTest.full(get(ROOT)).param("code", "WO1:M1#L001"))
-                    .andExpect(status().isOk()).andExpect(jsonPath("total").value(1))
-                    .andExpect(jsonPath("orders.length()").value(1))
-                    .andExpect(jsonPath("orders[0].workorderId").value("1"));
-            m.perform(ProductionCoreV1HttpTest.full(get(ROOT)).param("code", "WO1:M1#L001").param("offset", "1"))
-                    .andExpect(status().isOk()).andExpect(jsonPath("total").value(1))
-                    .andExpect(jsonPath("orders").isEmpty());
-            m.perform(ProductionCoreV1HttpTest.full(get(ROOT + "/calculate")).param("code", "WO1:M1#L001")
-                            .param("workorderId", "2").param("stockReference", "1").param("outputQty", "100"))
-                    .andExpect(status().isBadRequest());
-        }
-    }
-
 }

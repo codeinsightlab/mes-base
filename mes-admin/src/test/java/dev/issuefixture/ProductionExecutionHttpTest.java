@@ -28,7 +28,7 @@ class ProductionExecutionHttpTest {
             var j = ProductionInputHttpTest.db(c);
             j.update("DELETE FROM mes_production_execution"); // Unused fresh fixture rows only.
             m.perform(full(post(E)).content(CREATE)).andExpect(status().isMethodNotAllowed());
-            m.perform(full(get(ProductionInputHttpTest.ROOT)).param("code", "WO1:M1#L001")).andExpect(status().isOk());
+            ProductionInputHttpTest.generate(m, "12.12");
             assertEquals(0, j.queryForObject("SELECT COUNT(*) FROM mes_production_execution", Integer.class));
             var result = JSON.readTree(ProductionInputHttpTest.submit(m,
                     ProductionInputHttpTest.command(m, UUID.randomUUID().toString(), "L001", "12.12")));
@@ -36,9 +36,10 @@ class ProductionExecutionHttpTest {
             var before = j.queryForList("SELECT * FROM mes_production_execution ORDER BY id");
             m.perform(full(get(E + "/" + id))).andExpect(status().isOk()).andExpect(jsonPath("productId").value("99"));
             m.perform(full(get("/api/production/identity/" + id))).andExpect(status().isOk())
-                    .andExpect(jsonPath("qrCode").value("WO1:P1#L001")).andExpect(jsonPath("productCode").value("P1"));
+                    .andExpect(jsonPath("qrCode").value(result.get("code").asText()))
+                    .andExpect(jsonPath("productCode").value("P1"));
             assertEquals(before, j.queryForList("SELECT * FROM mes_production_execution ORDER BY id"));
-            assertEquals(1, j.queryForObject("SELECT COUNT(*) FROM wm_stock_document WHERE production_confirmed_at IS NOT NULL", Integer.class));
+            assertEquals(1, j.queryForObject("SELECT COUNT(*) FROM mes_material_issue_input WHERE confirmed_at IS NOT NULL", Integer.class));
             m.perform(ProductionReportHttpTest.full(get(E + "/" + id), "B")).andExpect(status().isNotFound());
         }
     }

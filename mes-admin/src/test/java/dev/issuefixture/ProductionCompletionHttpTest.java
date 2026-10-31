@@ -1,9 +1,9 @@
 package dev.issuefixture;
 
-import java.math.BigDecimal;
 import dev.mesbase.business.production.domain.ProductionClosureRules;
-import java.util.UUID;
+import java.math.BigDecimal;
 import java.util.List;
+import java.util.UUID;
 import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.Executors;
 import java.util.stream.IntStream;
@@ -15,7 +15,6 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import static dev.issuefixture.ProductionCoreV1HttpTest.full;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -42,7 +41,7 @@ class ProductionCompletionHttpTest {
             String id = UnifiedInboundHttpTest.draft(m, "1", "40");
             String command = StockDocumentHttpTest.intent(UUID.randomUUID().toString(), 1);
             for (int replay = 0; replay < 2; replay++)
-                m.perform(full(post(StockDocumentHttpTest.ROOT + "/" + id + "/actions/approve")).content(command))
+                m.perform(full(post("/api/production/inbound-documents/" + id + "/actions/approve")).content(command))
                         .andExpect(status().isOk());
             assertEquals("FULLY_RECEIVED", j.queryForObject("SELECT status FROM mes_production_execution WHERE id=1", String.class));
             assertEquals("COMPLETED", j.queryForObject("SELECT status FROM workorder WHERE id=1", String.class));
@@ -50,7 +49,7 @@ class ProductionCompletionHttpTest {
             assertEquals(2, j.queryForObject("SELECT COUNT(*) FROM wm_stock_action", Integer.class));
             assertEquals(2, j.queryForObject("SELECT COUNT(*) FROM wm_stock_document_line WHERE batch_no='TEST-FINISHED'", Integer.class));
             StockDocumentHttpTest.balance(j, "100");
-            m.perform(full(post(StockDocumentHttpTest.ROOT + "/" + id + "/actions/approve"))
+            m.perform(full(post("/api/production/inbound-documents/" + id + "/actions/approve"))
                     .content(command.replace("\"1\"", "\"2\""))).andExpect(status().isConflict());
             m.perform(full(get("/api/production/executions/1/closure")))
                     .andExpect(status().isOk()).andExpect(jsonPath("receiptState").value("FULLY_RECEIVED"));
@@ -220,14 +219,14 @@ class ProductionCompletionHttpTest {
             String id = UnifiedInboundHttpTest.draft(m, "1", "100");
             String command = StockDocumentHttpTest.intent(UUID.randomUUID().toString(), 1);
             j.execute("ALTER TABLE mes_execution_completion ADD CONSTRAINT test_only_closure_failure CHECK(accepted_qty != 100)");
-            m.perform(full(post(StockDocumentHttpTest.ROOT + "/" + id + "/actions/approve")).content(command))
+            m.perform(full(post("/api/production/inbound-documents/" + id + "/actions/approve")).content(command))
                     .andExpect(status().is5xxServerError());
             StockDocumentHttpTest.balance(j, "0");
             assertEquals("DRAFT", j.queryForObject("SELECT status FROM wm_stock_document WHERE id=?", String.class, id));
             assertEquals("RUNNING", j.queryForObject("SELECT status FROM mes_production_execution WHERE id=1", String.class));
             assertEquals(0, j.queryForObject("SELECT COUNT(*) FROM wm_stock_action", Integer.class));
             j.execute("ALTER TABLE mes_execution_completion DROP CONSTRAINT test_only_closure_failure");
-            m.perform(full(post(StockDocumentHttpTest.ROOT + "/" + id + "/actions/approve")).content(command))
+            m.perform(full(post("/api/production/inbound-documents/" + id + "/actions/approve")).content(command))
                     .andExpect(status().isOk());
             assertEquals("COMPLETED", j.queryForObject("SELECT status FROM workorder WHERE id=1", String.class));
         }
@@ -264,7 +263,7 @@ class ProductionCompletionHttpTest {
             var barrier = new CyclicBarrier(2);
             var tasks = ids.stream().map(id -> workers.submit(() -> {
                 barrier.await();
-                return m.perform(full(post(StockDocumentHttpTest.ROOT + "/" + id + "/actions/approve"))
+                return m.perform(full(post("/api/production/inbound-documents/" + id + "/actions/approve"))
                                 .content(StockDocumentHttpTest.intent(UUID.randomUUID().toString(), 1))).andReturn()
                         .getResponse().getStatus();
             })).toList();
@@ -288,7 +287,7 @@ class ProductionCompletionHttpTest {
             var barrier = new CyclicBarrier(2);
             var tasks = IntStream.range(0, 2).mapToObj(ignored -> workers.submit(() -> {
                 barrier.await();
-                return m.perform(full(post(StockDocumentHttpTest.ROOT + "/" + id + "/actions/approve"))
+                return m.perform(full(post("/api/production/inbound-documents/" + id + "/actions/approve"))
                         .content(command)).andReturn().getResponse().getStatus();
             })).toList();
             assertEquals(200, tasks.get(0).get());

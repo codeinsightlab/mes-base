@@ -1,50 +1,40 @@
 package dev.stockfixture;
 
 import com.github.pagehelper.PageInterceptor;
-import dev.mesbase.business.wm.service.WarehouseQueryService;
-import dev.mesbase.business.directory.service.BusinessDirectoryService;
-
-import dev.mesbase.business.wm.dao.WmStockDocumentLineMapper;
-
 import dev.mesbase.acceptance.FactorySnapshotFixture;
-
-import java.io.IOException;
-import jakarta.servlet.http.HttpServletRequest;
-import jakarta.servlet.ServletException;
-import jakarta.servlet.Filter;
-import dev.mesbase.core.factory.FactoryRuntimeMode;
-import dev.mesbase.platform.execution.FactoryIntegrationSnapshot;
-import dev.mesbase.platform.execution.FactoryIntegrationContext;
-import dev.mesbase.business.wm.dao.WmWarehouseErpExtraMapper;
-import dev.mesbase.business.wm.dao.WmStockDocumentLineMapper;
-import dev.mesbase.business.wm.dao.WmStockDocumentMapper;
+import dev.mesbase.business.basic.dao.MaterialMapper;
+import dev.mesbase.business.directory.service.BusinessDirectoryService;
+import dev.mesbase.business.integration.warehouse.WarehouseIntegration;
 import dev.mesbase.business.production.dao.MesProductionReceiptMapper;
+import dev.mesbase.business.production.dao.MesWorkorderMaterialMapper;
 import dev.mesbase.business.production.dao.WorkorderErpExtraMapper;
 import dev.mesbase.business.production.dao.WorkorderMapper;
 import dev.mesbase.business.production.service.BusinessSourceRules;
-import dev.mesbase.business.basic.dao.MaterialMapper;
 import dev.mesbase.business.wm.controller.WmInventoryController;
 import dev.mesbase.business.wm.controller.WmWarehouseController;
 import dev.mesbase.business.wm.dao.WmInventoryMapper;
+import dev.mesbase.business.wm.dao.WmStockActionMapper;
+import dev.mesbase.business.wm.dao.WmStockDocumentLineMapper;
+import dev.mesbase.business.wm.dao.WmStockDocumentMapper;
+import dev.mesbase.business.wm.dao.WmWarehouseErpExtraMapper;
 import dev.mesbase.business.wm.dao.WmWarehouseMapper;
 import dev.mesbase.business.wm.service.StockReferenceRules;
-import dev.mesbase.business.production.dao.MesWorkorderMaterialMapper;
+import dev.mesbase.business.wm.service.WarehouseQueryService;
 import dev.mesbase.business.wm.service.impl.WmInventoryServiceImpl;
-import dev.mesbase.business.wm.dao.WmStockActionMapper;
-import dev.mesbase.business.integration.warehouse.WarehouseIntegration;
 import dev.mesbase.business.wm.service.impl.WmWarehouseServiceImpl;
 import dev.mesbase.business.wm.sync.ExternalWmInventory;
 import dev.mesbase.business.wm.sync.ExternalWmWarehouse;
-import dev.mesbase.business.wm.sync.WmWarehouseQueryPort;
+import dev.mesbase.business.wm.sync.UnconfiguredWmInventoryQueryAdapter;
 import dev.mesbase.business.wm.sync.UnconfiguredWmWarehouseQueryAdapter;
 import dev.mesbase.business.wm.sync.WmInventoryQueryPort;
-import dev.mesbase.business.wm.sync.UnconfiguredWmInventoryQueryAdapter;
+import dev.mesbase.business.wm.sync.WmWarehouseQueryPort;
 import dev.mesbase.common.core.domain.entity.SysUser;
 import dev.mesbase.common.core.domain.model.LoginUser;
 import dev.mesbase.core.factory.Factory;
 import dev.mesbase.core.factory.FactoryId;
-import dev.mesbase.core.factory.FactoryStatus;
+import dev.mesbase.core.factory.FactoryRuntimeMode;
 import dev.mesbase.core.factory.FactorySelectionService;
+import dev.mesbase.core.factory.FactoryStatus;
 import dev.mesbase.framework.security.SystemTokenFilter;
 import dev.mesbase.framework.sync.SyncCoordinator;
 import dev.mesbase.framework.web.service.TokenService;
@@ -59,13 +49,18 @@ import dev.mesbase.infrastructure.persistence.OwnedTransactionManager;
 import dev.mesbase.infrastructure.persistence.PersistenceFactories;
 import dev.mesbase.infrastructure.persistence.PlatformPersistence;
 import dev.mesbase.infrastructure.persistence.RuntimeRegistry;
+import dev.mesbase.platform.execution.FactoryIntegrationContext;
+import dev.mesbase.platform.execution.FactoryIntegrationSnapshot;
 import dev.mesbase.platform.web.FoundationAccessInterceptor;
 import dev.mesbase.platform.web.FoundationErrorAdvice;
 import dev.mesbase.platform.web.RequestBoundaryFilter;
 import dev.mesbase.system.sync.MasterSyncMapper;
+import jakarta.servlet.Filter;
+import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Validation;
 import jakarta.validation.Validator;
+import java.io.IOException;
 import java.math.BigDecimal;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -74,8 +69,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
-import org.springframework.jdbc.datasource.init.ScriptUtils;
-import org.springframework.core.io.FileSystemResource;
 import org.apache.ibatis.session.SqlSessionFactory;
 import org.junit.jupiter.api.Test;
 import org.mybatis.spring.SqlSessionTemplate;
@@ -83,8 +76,10 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Import;
 import org.springframework.core.env.MapPropertySource;
+import org.springframework.core.io.FileSystemResource;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
+import org.springframework.jdbc.datasource.init.ScriptUtils;
 import org.springframework.mock.web.MockServletContext;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
@@ -101,22 +96,22 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.spy;
-import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
  * TEST ONLY: real generated SQL, HTTP authorization and transactions; two separate H2 databases.
  */
 class StockHttpTest {
-    static final Set<Class<?>> MAPPERS = Set.of(WmStockDocumentLineMapper.class, WmWarehouseErpExtraMapper.class, MesWorkorderMaterialMapper.class, WmStockActionMapper.class, MaterialMapper.class, WmWarehouseMapper.class, WmInventoryMapper.class);
+    static final Set<Class<?>> MAPPERS = Set.of(WorkorderMapper.class, WmStockDocumentLineMapper.class, WmWarehouseErpExtraMapper.class, MesWorkorderMaterialMapper.class, WmStockActionMapper.class, MaterialMapper.class, WmWarehouseMapper.class, WmInventoryMapper.class);
 
     static class Fixture implements AutoCloseable {
         final RuntimeRegistry registry = new RuntimeRegistry();
@@ -172,6 +167,8 @@ class StockHttpTest {
                 documentDdl = documentDdl.substring(documentDdl.indexOf("CREATE TABLE wm_stock_document_line"))
                         .replace(") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT=", ") COMMENT ");
                 jdbc.execute(documentDdl);
+                jdbc.execute("ALTER TABLE wm_stock_document_line ADD demand_line_id BIGINT");
+                jdbc.execute("CREATE TABLE workorder(id BIGINT PRIMARY KEY, material_warehouse_ids VARCHAR(2000))");
                 business.put(id, jdbc);
                 var identity = new DatasourceIdentity("TEST_ONLY_" + id);
                 var factoryId = new FactoryId(id);
@@ -231,6 +228,11 @@ class StockHttpTest {
             return PersistenceFactories.create(source, MAPPERS, c -> {
                 c.addInterceptor(new PageInterceptor());
             }, manager::verifyAccess);
+        }
+
+        @Bean
+        WorkorderMapper workorders(SqlSessionFactory f) {
+            return new SqlSessionTemplate(f).getMapper(WorkorderMapper.class);
         }
 
         @Bean

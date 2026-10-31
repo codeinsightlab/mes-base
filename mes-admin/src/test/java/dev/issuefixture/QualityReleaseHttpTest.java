@@ -49,7 +49,7 @@ class QualityReleaseHttpTest {
             String draft = UnifiedInboundHttpTest.draft(m, "1", "1");
             m.perform(ProductionCoreV1HttpTest.full(get("/api/wm/inbound-documents/executions/1/basis")))
                     .andExpect(status().isOk()).andExpect(jsonPath("canReceive").value(false));
-            m.perform(ProductionCoreV1HttpTest.full(post(StockDocumentHttpTest.ROOT + "/" + draft + "/actions/approve"))
+            m.perform(ProductionCoreV1HttpTest.full(post(UnifiedInboundHttpTest.approval(m, draft)))
                             .content(StockDocumentHttpTest.intent(UUID.randomUUID().toString(), 1)))
                     .andExpect(status().isConflict());
             var assess = (ObjectNode) new ObjectMapper().readTree(QualityWorkflowHttpTest.assessmentCommand());

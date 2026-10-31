@@ -40,7 +40,7 @@ class WorkOrderEnumSqlTest {
     @Test
     void allocationListExcludesCancelledExecutionsAndPreservesTheUnallocatedRemainder() throws Exception {
         var sql = configuration().getMappedStatement(
-                "dev.mesbase.business.production.dao.WorkOrderExtraMapper.allocationForOrders")
+                        "dev.mesbase.business.production.dao.WorkOrderExtraMapper.allocationForOrders")
                 .getBoundSql(Map.of("ids", List.of(1L, 2L)));
         try (var connection = DriverManager.getConnection("jdbc:h2:mem:active_allocations;MODE=MySQL");
              var statement = connection.createStatement()) {
@@ -50,7 +50,8 @@ class WorkOrderEnumSqlTest {
             statement.execute("INSERT INTO mes_production_execution VALUES (1,1,60,'RUNNING'),(2,1,40,'CANCELLED'),(3,2,100,'CANCELLED')");
             try (var query = connection.prepareStatement(sql.getSql())) {
                 for (int index = 0; index < sql.getParameterMappings().size(); index++) {
-                    query.setObject(index + 1, sql.getAdditionalParameter(sql.getParameterMappings().get(index).getProperty()));
+                    query.setObject(index + 1, sql.getAdditionalParameter(sql.getParameterMappings().get(index)
+                            .getProperty()));
                 }
                 try (var result = query.executeQuery()) {
                     int seen = 0;
@@ -68,7 +69,7 @@ class WorkOrderEnumSqlTest {
     }
 
     @Test
-    void blockingIssueQueryRequiresACompleteLocalVoidFact() throws Exception {
+    void blockingIssueQueryRequiresEveryOriginalLineToBeReversed() throws Exception {
         BoundSql sql = configuration().getMappedStatement(
                         "dev.mesbase.business.production.dao.WorkOrderExtraMapper.countBlockingIssues")
                 .getBoundSql(Map.of("workorderId", 1L));
@@ -76,14 +77,21 @@ class WorkOrderEnumSqlTest {
         try (var connection = DriverManager.getConnection("jdbc:h2:mem:enum_void;MODE=MySQL");
              var statement = connection.createStatement()) {
             statement.execute("CREATE TABLE wm_stock_document(id BIGINT,source_workorder_id BIGINT,document_type VARCHAR(30),status VARCHAR(30))");
-            statement.execute("CREATE TABLE mes_material_issue_input(document_id BIGINT,void_result_status VARCHAR(30),source_mode VARCHAR(30))");
+            statement.execute("CREATE TABLE wm_stock_document_line(id BIGINT,document_id BIGINT,stock_action_id VARCHAR(64))");
+            statement.execute("CREATE TABLE wm_stock_action(id VARCHAR(64),reference_action_id VARCHAR(64),action_type VARCHAR(30))");
             statement.execute("INSERT INTO wm_stock_document VALUES (1,1,'MATERIAL_ISSUE','DRAFT'),(2,1,'MATERIAL_ISSUE','POSTED'),(3,1,'MATERIAL_ISSUE','POSTED'),(4,1,'MATERIAL_ISSUE','POSTED'),(5,1,'MATERIAL_ISSUE','POSTED'),(6,2,'MATERIAL_ISSUE','DRAFT')");
-            statement.execute("INSERT INTO mes_material_issue_input VALUES (2,'SUCCEEDED','LOCAL_ONLY'),(3,'SUCCEEDED','CONNECTED'),(4,'UNKNOWN','CONNECTED'),(5,'SUCCEEDED','LOCAL_ONLY')");
+            statement.execute("INSERT INTO wm_stock_document_line VALUES (2,2,'A2'),(3,3,'A3'),(4,4,'A4'),(5,5,'A5'),(6,5,'A6')");
+            statement.execute("INSERT INTO wm_stock_action VALUES ('R2','A2','REVERSAL'),('R5','A5','REVERSAL')");
             try (var query = connection.prepareStatement(sql.getSql())) {
                 for (int index = 0; index < sql.getParameterMappings().size(); index++) {
                     String name = sql.getParameterMappings().get(index).getProperty();
                     query.setObject(index + 1, sql.hasAdditionalParameter(name) ? sql.getAdditionalParameter(name) : 1L);
                 }
+                try (var result = query.executeQuery()) {
+                    result.next();
+                    assertEquals(4, result.getLong(1));
+                }
+                statement.execute("INSERT INTO wm_stock_action VALUES ('R6','A6','REVERSAL')");
                 try (var result = query.executeQuery()) {
                     result.next();
                     assertEquals(3, result.getLong(1));

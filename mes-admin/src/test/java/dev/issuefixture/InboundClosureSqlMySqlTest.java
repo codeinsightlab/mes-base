@@ -1,14 +1,15 @@
 package dev.issuefixture;
 
 import dev.mesbase.acceptance.AcceptanceBusinessDatabase;
-import dev.mesbase.business.production.dao.WorkOrderProgressExtraMapper;
-import dev.mesbase.business.production.dao.MesProductionExecutionMapper;
-import dev.mesbase.business.production.dao.WorkorderMapper;
 import dev.mesbase.business.basic.dao.MaterialMapper;
+import dev.mesbase.business.production.dao.MesProductionCombinationMapper;
+import dev.mesbase.business.production.dao.MesProductionExecutionMapper;
 import dev.mesbase.business.production.dao.RoutingMapper;
-import dev.mesbase.business.production.service.ProductionIdentityService;
-import dev.mesbase.business.production.domain.ProductionScanCode;
+import dev.mesbase.business.production.dao.WorkOrderProgressExtraMapper;
+import dev.mesbase.business.production.dao.WorkorderMapper;
 import dev.mesbase.business.production.domain.ProductionCodeRules;
+import dev.mesbase.business.production.domain.ProductionScanCode;
+import dev.mesbase.business.production.service.ProductionIdentityService;
 import dev.mesbase.business.quality.dao.ProductionDefectListExtraMapper;
 import dev.mesbase.business.wm.dao.StockDocumentExtraMapper;
 import java.util.ArrayList;
@@ -72,7 +73,7 @@ class InboundClosureSqlMySqlTest {
             assertTrue(!executions.isEmpty(), "The verified database needs existing read-only production samples");
             var identities = new ProductionIdentityService(session.getMapper(MesProductionExecutionMapper.class),
                     session.getMapper(WorkorderMapper.class), session.getMapper(MaterialMapper.class),
-                    session.getMapper(RoutingMapper.class));
+                    session.getMapper(RoutingMapper.class), session.getMapper(MesProductionCombinationMapper.class));
             for (Long execution : executions) {
                 var identity = identities.read(execution);
                 assertNotNull(identity.batchNo(), "Current verified samples have formal execution batch properties");

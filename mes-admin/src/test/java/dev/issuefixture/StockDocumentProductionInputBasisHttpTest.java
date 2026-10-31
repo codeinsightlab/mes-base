@@ -1,7 +1,7 @@
 package dev.issuefixture;
 
-import java.util.UUID;
 import java.time.LocalDateTime;
+import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.ObjectMapper;
 
@@ -32,10 +32,8 @@ class StockDocumentProductionInputBasisHttpTest {
                     .andExpect(jsonPath("workorderId").value("1"))
                     .andExpect(jsonPath("sourceMode").value("LOCAL_ONLY"))
                     .andExpect(jsonPath("outputQty").value("10.000000"))
-                    .andExpect(jsonPath("issueQty").value("20.000000"))
+                    .andExpect(jsonPath("allocations[0].quantity").value("20.000000"))
                     .andExpect(jsonPath("bomId").value("1"))
-                    .andExpect(jsonPath("bomBaseQty").value("1.000000"))
-                    .andExpect(jsonPath("bomComponentQty").value("2.000000"))
                     .andExpect(jsonPath("businessOccurredAt").isNotEmpty())
                     .andExpect(jsonPath("routingNodeIds[0]").value("11"))
                     .andExpect(jsonPath("routingNodeIds[1]").value("12"))
@@ -75,8 +73,8 @@ class StockDocumentProductionInputBasisHttpTest {
                             .header("Authorization", "Bearer ISSUE_ITEM").header("X-Factory-Id", "A")
                             .param("documentType", "MATERIAL_ISSUE"))
                     .andExpect(status().isOk())
-                    .andExpect(jsonPath("materialId").value("1"))
-                    .andExpect(jsonPath("issueQty").value("20.000000"));
+                    .andExpect(jsonPath("allocations[0].materialId").value("1"))
+                    .andExpect(jsonPath("allocations[0].quantity").value("20.000000"));
         }
     }
 }

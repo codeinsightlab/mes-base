@@ -1,23 +1,20 @@
 package dev.mesbase.business.production;
 
-import dev.mesbase.business.production.domain.ProductionScanCode;
 import dev.mesbase.business.production.domain.ProductionCodeRules;
-import dev.mesbase.common.utils.RequestFingerprint;
-import dev.mesbase.business.production.service.ProductionInputSupplyService;
-import dev.mesbase.business.production.service.ProductionQuantityService;
 import dev.mesbase.business.production.domain.ProductionReportModels.ExecutionQuantity;
 import dev.mesbase.business.production.domain.ProductionReportModels.NodeQuantity;
+import dev.mesbase.business.production.domain.ProductionScanCode;
+import dev.mesbase.business.production.service.ProductionQuantityService;
+import dev.mesbase.common.utils.RequestFingerprint;
 import dev.mesbase.core.error.FoundationException;
-
 import java.math.BigDecimal;
 import java.util.List;
-
 import org.junit.jupiter.api.Test;
 
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 
 class ProductionInputRulesTest {
     @Test
@@ -43,13 +40,6 @@ class ProductionInputRulesTest {
         assertThrows(FoundationException.class, () -> ProductionCodeRules.validate(new ProductionScanCode("WO", "P#1", "LOT")));
         for (String code : List.of("M#L#X", "#L", "M#"))
             assertThrows(FoundationException.class, () -> ProductionCodeRules.parse(code));
-    }
-
-    @Test
-    void outputDrivenRequirementsUseOneDivisionAndExactHalfUp() {
-        assertEquals(new BigDecimal("200.000000"), ProductionInputSupplyService.issueQuantity(new BigDecimal("1000"), new BigDecimal("2000"), new BigDecimal("100")));
-        assertEquals(new BigDecimal("0.166667"), ProductionInputSupplyService.issueQuantity(new BigDecimal("6"), BigDecimal.ONE, BigDecimal.ONE));
-        assertThrows(FoundationException.class, () -> ProductionInputSupplyService.issueQuantity(BigDecimal.ZERO, BigDecimal.ONE, BigDecimal.ONE));
     }
 
     @Test

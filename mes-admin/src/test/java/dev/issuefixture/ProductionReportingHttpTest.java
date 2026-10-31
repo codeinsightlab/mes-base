@@ -1,14 +1,12 @@
 package dev.issuefixture;
 
-import dev.mesbase.business.production.controller.ProductionReportingController;
-import dev.mesbase.business.production.service.ProductionReportSubmitService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.util.Map;
+import dev.mesbase.business.production.controller.ProductionReportingController;
+import dev.mesbase.business.production.service.ProductionReportSubmitService;
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.Executors;
@@ -18,17 +16,17 @@ import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Import;
 import org.springframework.core.env.MapPropertySource;
-import org.springframework.mock.web.MockServletContext;
-import org.springframework.web.context.support.AnnotationConfigWebApplicationContext;
-import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.mock.web.MockServletContext;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.web.context.support.AnnotationConfigWebApplicationContext;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
  * TEST ONLY: two isolated H2 databases, real generated XML/transaction locks/qualification; center users mocked.
@@ -215,11 +213,11 @@ class ProductionReportingHttpTest {
             var m = MaterialIssueHttpTest.mvc(c);
             var j = db(c);
             String command = body(11, "1");
-            j.update("UPDATE wm_stock_document SET production_confirmed_at=NULL WHERE source_execution_id=1");
+            j.update("UPDATE mes_material_issue_input SET confirmed_at=NULL WHERE execution_id=1");
             m.perform(ProductionCoreV1HttpTest.full(post(ROOT)).content(command)).andExpect(status().isConflict());
             assertEquals("READY", j.queryForObject("SELECT status FROM mes_production_execution WHERE id=1", String.class));
             assertEquals(0, j.queryForObject("SELECT COUNT(*) FROM mes_production_report", Integer.class));
-            j.update("UPDATE wm_stock_document SET production_confirmed_at=CURRENT_TIMESTAMP WHERE source_execution_id=1");
+            j.update("UPDATE mes_material_issue_input SET confirmed_at=CURRENT_TIMESTAMP WHERE execution_id=1");
             j.update("UPDATE mes_execution_path SET path_status='SELECTED' WHERE id=1");
             m.perform(ProductionCoreV1HttpTest.full(post(ROOT)).content(command)).andExpect(status().isConflict());
             j.update("UPDATE mes_execution_path SET path_status='LOCKED' WHERE id=1");

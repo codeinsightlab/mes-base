@@ -1,28 +1,25 @@
 package dev.issuefixture;
 
 import dev.mesbase.acceptance.FactorySnapshotFixture;
-
-import dev.mesbase.business.production.domain.WorkOrderStatus;
-import dev.mesbase.core.error.FoundationException;
-import dev.mesbase.framework.sync.SyncCoordinator;
-import dev.mesbase.core.factory.FactoryRuntimeMode;
-import dev.mesbase.core.factory.FactoryId;
-import dev.mesbase.core.factory.FactoryScope;
-import dev.mesbase.platform.execution.FactoryIntegrationSnapshot;
-import dev.mesbase.platform.execution.FactoryIntegrationContext;
 import dev.mesbase.business.production.domain.WorkOrderModels;
+import dev.mesbase.business.production.domain.WorkOrderStatus;
 import dev.mesbase.business.production.service.WorkOrderService;
-import java.util.UUID;
+import dev.mesbase.core.error.FoundationException;
+import dev.mesbase.core.factory.FactoryId;
+import dev.mesbase.core.factory.FactoryRuntimeMode;
+import dev.mesbase.core.factory.FactoryScope;
+import dev.mesbase.framework.sync.SyncCoordinator;
+import dev.mesbase.platform.execution.FactoryIntegrationContext;
+import dev.mesbase.platform.execution.FactoryIntegrationSnapshot;
 import java.math.BigDecimal;
+import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
  * TEST ONLY: real controllers, mapper SQL and transaction boundaries on two independent H2 databases.
@@ -54,16 +51,16 @@ class SourceIsolationHttpTest {
             var m = MaterialIssueHttpTest.mvc(c);
             var j = ProductionInputHttpTest.db(c);
             j.update("UPDATE wm_warehouse SET source='EXTERNAL' WHERE id=1");
-            m.perform(ProductionCoreV1HttpTest.full(get("/api/production/input/calculate")).param("code", "WO1:M1#L001")
-                            .param("workorderId", "1").param("stockReference", "1").param("outputQty", "1"))
+            m.perform(ProductionCoreV1HttpTest.full(post("/api/production/combinations"))
+                            .content("{\"workorderId\":\"1\",\"quantity\":\"1\"}"))
                     .andExpect(status().isConflict())
                     .andExpect(jsonPath("errorCode").value("BUSINESS_SOURCE_CONFLICT"));
             j.update("UPDATE workorder SET source=NULL WHERE id=1");
-            m.perform(ProductionCoreV1HttpTest.full(get("/api/production/input/calculate")).param("code", "WO1:M1#L001")
-                            .param("workorderId", "1").param("stockReference", "1").param("outputQty", "1"))
+            m.perform(ProductionCoreV1HttpTest.full(post("/api/production/combinations"))
+                            .content("{\"workorderId\":\"1\",\"quantity\":\"1\"}"))
                     .andExpect(status().isConflict())
                     .andExpect(jsonPath("errorCode").value("BUSINESS_SOURCE_CONFLICT"));
-            assertEquals(0, j.queryForObject("SELECT COUNT(*) FROM wm_stock_document WHERE production_confirmation_status IS NOT NULL", Integer.class));
+            assertEquals(0, j.queryForObject("SELECT COUNT(*) FROM mes_material_issue_input", Integer.class));
             assertEquals("10000.000000", j.queryForObject("SELECT quantity FROM wm_inventory WHERE id=1", BigDecimal.class)
                     .toPlainString());
         }
@@ -77,7 +74,7 @@ class SourceIsolationHttpTest {
             j.update("INSERT INTO wm_inventory(id,material_id,warehouse_id,batch_no,quantity,available_quantity,status) VALUES(1,1,1,'TEST-FINISHED',0,0,'ENABLED')");
             String document = UnifiedInboundHttpTest.draft(m, "1", "10");
             j.update("UPDATE wm_warehouse SET source='EXTERNAL' WHERE id=1");
-            m.perform(ProductionCoreV1HttpTest.full(post(StockDocumentHttpTest.ROOT + "/" + document + "/actions/approve"))
+            m.perform(ProductionCoreV1HttpTest.full(post(UnifiedInboundHttpTest.approval(m, document)))
                             .content(StockDocumentHttpTest.intent(UUID.randomUUID().toString(), 1)))
                     .andExpect(status().isConflict())
                     .andExpect(jsonPath("errorCode").value("BUSINESS_SOURCE_CONFLICT"));

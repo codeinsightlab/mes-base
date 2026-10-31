@@ -2,7 +2,6 @@ package dev.issuefixture;
 
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
-import tools.jackson.databind.ObjectMapper;
 
 import static dev.issuefixture.ProductionCoreV1HttpTest.full;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -10,7 +9,6 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
@@ -35,24 +33,17 @@ class MaterialIssueEndpointRetirementHttpTest {
     }
 
     @Test
-    void productionSceneSavesDraftAndUnifiedDocumentApprovesIt() throws Exception {
+    void retiredDraftFlowCannotCreateAnExecutionAndMesConfirmationPostsAtomically() throws Exception {
         try (var context = ProductionInputHttpTest.context()) {
             var mvc = MaterialIssueHttpTest.mvc(context);
             var db = ProductionInputHttpTest.db(context);
-            String requestId = UUID.randomUUID().toString();
-            String command = ProductionInputHttpTest.command(mvc, requestId, "L001", "10");
-            String response = mvc.perform(full(post(ProductionInputHttpTest.ROOT + "/drafts")).content(command))
-                    .andExpect(status().isOk()).andExpect(jsonPath("document.status").value("DRAFT"))
-                    .andReturn().getResponse().getContentAsString();
-            var draft = new ObjectMapper().readTree(response).get("document");
-            assertEquals(0, db.queryForObject("SELECT COUNT(*) FROM mes_material_issue_input WHERE confirmed_at IS NOT NULL", Integer.class));
-            assertEquals(0, db.queryForObject("SELECT COUNT(*) FROM wm_stock_action", Integer.class));
-            mvc.perform(full(post(StockDocumentHttpTest.OUT_ROOT + "/" + draft.get("id").asText() + "/actions/approve"))
-                            .content("{\"requestId\":\"" + requestId + "\",\"expectedRevision\":\""
-                                    + draft.get("revision").asText() + "\"}"))
-                    .andExpect(status().isOk()).andExpect(jsonPath("document.status").value("POSTED"));
+            String command = ProductionInputHttpTest.command(mvc, UUID.randomUUID().toString(), "L001", "10");
+            mvc.perform(full(post(ProductionInputHttpTest.ROOT + "/drafts")).content(command))
+                    .andExpect(status().isNotFound());
+            assertEquals(0, db.queryForObject("SELECT COUNT(*) FROM mes_material_issue_input", Integer.class));
+            ProductionInputHttpTest.submit(mvc, command);
             assertEquals(1, db.queryForObject("SELECT COUNT(*) FROM mes_material_issue_input WHERE confirmed_at IS NOT NULL", Integer.class));
-            assertEquals(1, db.queryForObject("SELECT COUNT(*) FROM wm_stock_action", Integer.class));
+            assertEquals(1, db.queryForObject("SELECT COUNT(*) FROM wm_stock_document WHERE status='POSTED'", Integer.class));
         }
     }
 }

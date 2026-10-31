@@ -1,23 +1,25 @@
 package dev.mesbase.server;
 
-import dev.mesbase.business.wm.dao.WmWarehouseErpExtraMapper;
-import dev.mesbase.framework.sync.SyncCoordinator;
-import dev.mesbase.business.production.service.BusinessSourceRules;
-import org.mockito.Mockito;
-import dev.mesbase.business.production.service.WorkorderErpFacts;
-import dev.mesbase.business.directory.service.BusinessDirectoryService;
-import dev.mesbase.business.production.dao.WorkorderErpExtraMapper;
-
-import dev.mesbase.business.production.dao.WorkOrderExtraMapper;
-import dev.mesbase.business.production.dao.RoutingMapper;
-import dev.mesbase.business.production.dao.RoutingProductMapper;
-import dev.mesbase.business.production.dao.RoutingNodeMapper;
-import dev.mesbase.business.production.dao.RoutingEdgeMapper;
 import dev.mesbase.business.basic.dao.MaterialMapper;
-import dev.mesbase.business.wm.dao.WmStockDocumentMapper;
+import dev.mesbase.business.directory.service.BusinessDirectoryService;
+import dev.mesbase.business.production.controller.WorkOrderController;
+import dev.mesbase.business.production.dao.MesProductionCombinationMapper;
+import dev.mesbase.business.production.dao.MesProductionExecutionMapper;
+import dev.mesbase.business.production.dao.MesWorkorderMaterialMapper;
+import dev.mesbase.business.production.dao.RoutingEdgeMapper;
+import dev.mesbase.business.production.dao.RoutingMapper;
+import dev.mesbase.business.production.dao.RoutingNodeMapper;
+import dev.mesbase.business.production.dao.RoutingProductMapper;
+import dev.mesbase.business.production.dao.WorkOrderExtraMapper;
+import dev.mesbase.business.production.dao.WorkorderErpExtraMapper;
+import dev.mesbase.business.production.dao.WorkorderMapper;
+import dev.mesbase.business.production.service.BusinessSourceRules;
+import dev.mesbase.business.production.service.MaterialQuantityRules;
 import dev.mesbase.business.production.service.RoutingReferenceRules;
-
-
+import dev.mesbase.business.production.service.WorkOrderService;
+import dev.mesbase.business.production.service.WorkorderErpFacts;
+import dev.mesbase.business.production.service.WorkorderMaterialService;
+import dev.mesbase.business.wm.dao.WmStockDocumentMapper;
 import dev.mesbase.common.core.domain.model.LoginUser;
 import dev.mesbase.common.core.redis.UserSessionStore;
 import dev.mesbase.core.factory.Factory;
@@ -25,6 +27,7 @@ import dev.mesbase.core.factory.FactoryCatalog;
 import dev.mesbase.core.factory.FactoryId;
 import dev.mesbase.core.factory.FactorySelectionService;
 import dev.mesbase.framework.security.SystemTokenFilter;
+import dev.mesbase.framework.sync.SyncCoordinator;
 import dev.mesbase.framework.web.service.TokenService;
 import dev.mesbase.infrastructure.catalog.InMemoryFactoryPreference;
 import dev.mesbase.infrastructure.persistence.DatasourceIdentity;
@@ -33,30 +36,20 @@ import dev.mesbase.infrastructure.persistence.OwnedTransactionManager;
 import dev.mesbase.infrastructure.persistence.PersistenceFactories;
 import dev.mesbase.infrastructure.persistence.PlatformPersistence;
 import dev.mesbase.infrastructure.persistence.RuntimeRegistry;
-import dev.mesbase.business.production.controller.WorkOrderController;
-import dev.mesbase.business.production.dao.WorkorderMapper;
-import dev.mesbase.business.production.dao.MesProductionExecutionMapper;
-
-import dev.mesbase.business.production.service.WorkOrderService;
-import dev.mesbase.business.production.service.WorkorderMaterialService;
-import dev.mesbase.business.production.service.MaterialQuantityRules;
-import dev.mesbase.system.service.AutoCodeNumbering;
-import org.springframework.transaction.PlatformTransactionManager;
-import dev.mesbase.business.production.dao.MesWorkorderMaterialMapper;
 import dev.mesbase.platform.web.FoundationAccessInterceptor;
 import dev.mesbase.platform.web.RequestBoundaryFilter;
 import dev.mesbase.server.managed.DatasourcePasswordCipher;
-import dev.mesbase.server.managed.ManagedDatasourceService;
 import dev.mesbase.server.managed.FactoryMetadataCache;
-import dev.mesbase.system.factory.RoutingMetadataMapper;
+import dev.mesbase.server.managed.ManagedDatasourceService;
 import dev.mesbase.system.factory.ManagedDatasourceMapper;
 import dev.mesbase.system.factory.ManagedFactoryMapper;
+import dev.mesbase.system.factory.RoutingMetadataMapper;
 import dev.mesbase.system.mapper.SessionAccountMapper;
 import dev.mesbase.system.mapper.SysMenuMapper;
 import dev.mesbase.system.mapper.SysRoleMapper;
 import dev.mesbase.system.mapper.SysUserMapper;
+import dev.mesbase.system.service.AutoCodeNumbering;
 import dev.mesbase.system.service.SystemPermissionService;
-
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.sql.Connection;
@@ -68,13 +61,13 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.regex.Pattern;
-
 import org.apache.ibatis.executor.statement.StatementHandler;
 import org.apache.ibatis.plugin.Interceptor;
 import org.apache.ibatis.plugin.Intercepts;
 import org.apache.ibatis.plugin.Invocation;
 import org.apache.ibatis.plugin.Signature;
 import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
 import org.mybatis.spring.SqlSessionTemplate;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
@@ -82,6 +75,7 @@ import org.springframework.mock.env.MockEnvironment;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
@@ -92,11 +86,11 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.clearInvocations;
-import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 /**
  * TEST ONLY: real entry/permission/router/workorder SQL, H2 and synthetic Redis payload; no HTTP/network timing claim.
@@ -200,7 +194,7 @@ class WorkOrderRequestBudgetTest {
                 PersistenceFactories.pagination(c);
                 c.addInterceptor(businessSql);
             }, manager::verifyAccess);
-            var controller = new WorkOrderController(new WorkOrderService(new SqlSessionTemplate(factory).getMapper(WorkorderMapper.class), new SqlSessionTemplate(factory).getMapper(RoutingMapper.class), mock(RoutingProductMapper.class), mock(RoutingNodeMapper.class), mock(RoutingEdgeMapper.class), new SqlSessionTemplate(factory).getMapper(MaterialMapper.class), mock(RoutingReferenceRules.class), mock(WmStockDocumentMapper.class), new SqlSessionTemplate(factory).getMapper(WorkOrderExtraMapper.class), mock(MesProductionExecutionMapper.class), new WorkorderErpFacts(new SqlSessionTemplate(factory).getMapper(WorkorderErpExtraMapper.class)), mock(BusinessDirectoryService.class), mock(MesWorkorderMaterialMapper.class), Mockito.mock(BusinessSourceRules.class), Mockito.mock(WorkorderErpExtraMapper.class), Mockito.mock(SyncCoordinator.class), Mockito.mock(MaterialQuantityRules.class), Mockito.mock(AutoCodeNumbering.class), Mockito.mock(WorkorderMaterialService.class), Mockito.mock(PlatformTransactionManager.class)), Mockito.mock(AutoCodeNumbering.class));
+            var controller = new WorkOrderController(new WorkOrderService(new SqlSessionTemplate(factory).getMapper(WorkorderMapper.class), new SqlSessionTemplate(factory).getMapper(RoutingMapper.class), mock(RoutingProductMapper.class), mock(RoutingNodeMapper.class), mock(RoutingEdgeMapper.class), new SqlSessionTemplate(factory).getMapper(MaterialMapper.class), mock(RoutingReferenceRules.class), mock(WmStockDocumentMapper.class), new SqlSessionTemplate(factory).getMapper(WorkOrderExtraMapper.class), mock(MesProductionExecutionMapper.class), new WorkorderErpFacts(new SqlSessionTemplate(factory).getMapper(WorkorderErpExtraMapper.class)), mock(BusinessDirectoryService.class), mock(MesWorkorderMaterialMapper.class), Mockito.mock(BusinessSourceRules.class), Mockito.mock(WorkorderErpExtraMapper.class), Mockito.mock(SyncCoordinator.class), Mockito.mock(MaterialQuantityRules.class), Mockito.mock(AutoCodeNumbering.class), Mockito.mock(WorkorderMaterialService.class), Mockito.mock(MesProductionCombinationMapper.class), Mockito.mock(PlatformTransactionManager.class)), Mockito.mock(AutoCodeNumbering.class));
             var permissions = new SystemPermissionService(platform.mapper(SysMenuMapper.class), platform.mapper(SysRoleMapper.class), platform.mapper(ManagedFactoryMapper.class));
             FactoryCatalog catalog = new FactoryCatalog() {
                 public Optional<Factory> find(FactoryId id) {
