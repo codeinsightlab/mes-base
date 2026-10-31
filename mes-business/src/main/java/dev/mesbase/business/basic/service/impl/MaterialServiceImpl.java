@@ -9,7 +9,6 @@ import dev.mesbase.business.basic.domain.MaterialExample;
 import dev.mesbase.business.basic.domain.MaterialPage;
 import dev.mesbase.business.basic.domain.MaterialQueryDto;
 import dev.mesbase.business.basic.domain.MaterialResource;
-import dev.mesbase.business.basic.domain.MaterialSearchExample;
 import dev.mesbase.business.basic.domain.MaterialUpdateCommand;
 import dev.mesbase.business.basic.service.BasicDataRules;
 import dev.mesbase.business.basic.service.IMaterialService;
@@ -75,45 +74,51 @@ public class MaterialServiceImpl implements IMaterialService {
         int offset = query.offset() == null ? 0 : query.offset();
         int limit = query.limit() == null ? 20 : query.limit();
         ParameterChecks.paging(offset, limit, 100);
-        MaterialSearchExample example = new MaterialSearchExample();
+        MaterialExample example = new MaterialExample();
+        List<Long> categoryIds = categoryIds(query);
         if (query.keyword() != null && !query.keyword().isBlank()) {
-            example.setKeywordPrefix(query.keyword());
-        }
-        MaterialExample.Criteria criteria = example.createCriteria();
-        if (query.code() != null) {
-            criteria.andCodeLike("%" + query.code() + "%");
-        }
-        if (query.name() != null) {
-            criteria.andNameLike("%" + query.name() + "%");
-        }
-        if (query.specification() != null) {
-            criteria.andSpecificationLike("%" + query.specification() + "%");
-        }
-        if (Boolean.TRUE.equals(query.uncategorized())) {
-            if (query.categoryId() != null) ParameterChecks.reject(ErrorCode.BAD_REQUEST);
-            criteria.andCategoryIdIsNull();
-        } else if (query.categoryId() != null) {
-            if (Boolean.TRUE.equals(query.includeDescendants()))
-                criteria.andCategoryIdIn(rules.categoryIds(query.categoryId()));
-            else criteria.andCategoryIdEqualTo(query.categoryId());
-        }
-        if (query.unitId() != null) {
-            criteria.andUnitIdEqualTo(query.unitId());
-        }
-        if (query.status() != null) {
-            criteria.andStatusLike("%" + query.status() + "%");
-        }
-        if (query.externalId() != null) {
-            criteria.andExternalIdLike("%" + query.externalId() + "%");
-        }
-        if (query.externalCode() != null) {
-            criteria.andExternalCodeLike("%" + query.externalCode() + "%");
+            MaterialExample.Criteria codeMatch = example.createCriteria();
+            codeMatch.andCodeLike(query.keyword() + "%");
+            addFilters(codeMatch, query, categoryIds);
+
+            MaterialExample.Criteria nameMatch = example.or();
+            nameMatch.andNameLike(query.keyword() + "%");
+            addFilters(nameMatch, query, categoryIds);
+        } else {
+            addFilters(example.createCriteria(), query, categoryIds);
         }
         example.setOrderByClause("id desc");
         try (Page<MaterialEntity> page = PageHelper.offsetPage(offset, limit)) {
             List<MaterialEntity> rows = mapper.selectByExample(example);
             return new MaterialPage(rows, page.getTotal(), offset, limit);
         }
+    }
+
+    private List<Long> categoryIds(MaterialQueryDto query) {
+        if (Boolean.TRUE.equals(query.uncategorized()) && query.categoryId() != null) {
+            ParameterChecks.reject(ErrorCode.BAD_REQUEST);
+        }
+        if (query.categoryId() != null && Boolean.TRUE.equals(query.includeDescendants())) {
+            return rules.categoryIds(query.categoryId());
+        }
+        return List.of();
+    }
+
+    private void addFilters(MaterialExample.Criteria criteria, MaterialQueryDto query,
+                            List<Long> categoryIds) {
+        if (query.code() != null) criteria.andCodeLike("%" + query.code() + "%");
+        if (query.name() != null) criteria.andNameLike("%" + query.name() + "%");
+        if (query.specification() != null) criteria.andSpecificationLike("%" + query.specification() + "%");
+        if (Boolean.TRUE.equals(query.uncategorized())) {
+            criteria.andCategoryIdIsNull();
+        } else if (query.categoryId() != null) {
+            if (Boolean.TRUE.equals(query.includeDescendants())) criteria.andCategoryIdIn(categoryIds);
+            else criteria.andCategoryIdEqualTo(query.categoryId());
+        }
+        if (query.unitId() != null) criteria.andUnitIdEqualTo(query.unitId());
+        if (query.status() != null) criteria.andStatusLike("%" + query.status() + "%");
+        if (query.externalId() != null) criteria.andExternalIdLike("%" + query.externalId() + "%");
+        if (query.externalCode() != null) criteria.andExternalCodeLike("%" + query.externalCode() + "%");
     }
 
     @Override
