@@ -54,6 +54,19 @@ public class MaterialBomController {
         this.authorization = authorization;
     }
 
+    public record DirectView(MaterialBomVo version, List<DirectComponentView> items) {
+    }
+
+    public record DirectComponentView(String lineId, String materialId, String unitId, String componentQty,
+                                      String baseQty, String quantity) {
+    }
+
+    @GetMapping("/{id}/direct-components")
+    @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED, permission = MaterialBomPermissions.QUERY)
+    public DirectView direct(@PathVariable Long id, @RequestParam BigDecimal quantity) {
+        return BeanConversions.convert(service.direct(id, quantity), DirectView.class);
+    }
+
     @GetMapping
     @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED,
             permission = MaterialBomPermissions.LIST)

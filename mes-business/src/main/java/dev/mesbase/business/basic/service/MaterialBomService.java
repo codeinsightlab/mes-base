@@ -7,6 +7,7 @@ import dev.mesbase.business.basic.dao.MaterialBomMapper;
 import dev.mesbase.business.basic.dao.MaterialMapper;
 import dev.mesbase.business.basic.dao.UnitMeasureMapper;
 import dev.mesbase.business.basic.domain.MaterialBomCreateCommand;
+import dev.mesbase.business.basic.domain.MaterialBomDirect;
 import dev.mesbase.business.basic.domain.MaterialBomCopyCommand;
 import dev.mesbase.business.basic.domain.MaterialBomEntity;
 import dev.mesbase.business.basic.domain.MaterialBomExample;
@@ -335,6 +336,66 @@ public class MaterialBomService {
         return graph(id, outputQty, false);
     }
 
+    /**
+     * Only the current stage is validated; explicit child BOMs are not traversed.
+     */
+    @Transactional(transactionManager = "businessTransactionManager", readOnly = true)
+    public MaterialBomDirect direct(Long id, BigDecimal outputQty) {
+        decimal(outputQty);
+        var version = require(id);
+        if (!MaterialBomStatus.PUBLISHED.getValue().equals(version.getStatus())) conflict();
+        decimal(version.getBaseQty());
+        var filter = new MaterialBomItemExample();
+        filter.createCriteria().andBomIdEqualTo(id);
+        filter.setOrderByClause("sort ASC,id ASC");
+        List<MaterialBomItemEntity> rows;
+        try (var page = PageHelper.offsetPage(0, 101, false)) {
+            rows = items.selectByExample(filter);
+        }
+        if (rows.isEmpty()) ParameterChecks.reject(ErrorCode.MATERIAL_BOM_INVALID);
+        if (rows.size() > 100) ParameterChecks.reject(ErrorCode.MATERIAL_BOM_BUDGET);
+        var ids = new HashSet<Long>();
+        ids.add(version.getProductId());
+        rows.forEach(row -> ids.add(row.getMaterialId()));
+        var materialFilter = new MaterialExample();
+        materialFilter.createCriteria().andIdIn(new ArrayList<>(ids));
+        var materialMap = materials.selectByExample(materialFilter).stream()
+                .collect(Collectors.toMap(MaterialEntity::getId, Function.identity()));
+        if (materialMap.size() != ids.size()) ParameterChecks.reject(ErrorCode.MATERIAL_BOM_INVALID);
+        var unitFilter = new UnitMeasureExample();
+        unitFilter.createCriteria().andIdIn(materialMap.values().stream().map(MaterialEntity::getUnitId)
+                .filter(Objects::nonNull).distinct().toList());
+        var unitMap = units.selectByExample(unitFilter).stream()
+                .collect(Collectors.toMap(UnitMeasureEntity::getId, Function.identity()));
+        checkDirectMaterial(version.getProductId(), version.getUnitId(), materialMap, unitMap);
+        var seen = new HashSet<Long>();
+        var result = new ArrayList<MaterialBomDirect.Component>();
+        for (var row : rows) {
+            decimal(row.getQuantity());
+            if (!seen.add(row.getMaterialId()) || Objects.equals(row.getMaterialId(), version.getProductId()))
+                conflict();
+            checkDirectMaterial(row.getMaterialId(), row.getUnitId(), materialMap, unitMap);
+            result.add(new MaterialBomDirect.Component(row.getId(), row.getMaterialId(), row.getUnitId(),
+                    row.getQuantity(), version.getBaseQty(), componentQuantity(outputQty, row.getQuantity(),
+                    version.getBaseQty()).setScale(6, RoundingMode.HALF_UP)));
+        }
+        return new MaterialBomDirect(version, List.copyOf(result));
+    }
+
+    private static void checkDirectMaterial(Long id, Long unitId, Map<Long, MaterialEntity> materials,
+                                            Map<Long, UnitMeasureEntity> units) {
+        var material = materials.get(id);
+        var unit = units.get(unitId);
+        if (material == null || unit == null || !Objects.equals(material.getUnitId(), unitId)
+                || !EnableStatus.ENABLED.getValue().equals(material.getStatus())
+                || !EnableStatus.ENABLED.getValue().equals(unit.getStatus()))
+            ParameterChecks.reject(ErrorCode.MATERIAL_BOM_INVALID);
+    }
+
+    private static BigDecimal componentQuantity(BigDecimal output, BigDecimal component, BigDecimal base) {
+        return output.multiply(component).divide(base, MathContext.DECIMAL128);
+    }
+
     private MaterialBomGraph graph(Long id, BigDecimal outputQty, boolean publishing) {
         decimal(outputQty);
         require(id);
@@ -464,7 +525,7 @@ public class MaterialBomService {
             if (!validLine) problems.add(problem(childPath, id, line.getId(), ErrorCode.MATERIAL_BOM_INVALID));
             BigDecimal quantity = null;
             if (validVersion && validLine && output != null)
-                quantity = output.multiply(line.getQuantity()).divide(current.getBaseQty(), MathContext.DECIMAL128);
+                quantity = componentQuantity(output, line.getQuantity(), current.getBaseQty());
             List<MaterialBomExplosion.Node> children = List.of();
             boolean leaf = line.getChildBomId() == null;
             if (!leaf) {
@@ -604,7 +665,7 @@ public class MaterialBomService {
             if (unit == null || publishing && (!EnableStatus.ENABLED.getValue()
                     .equals(material.getStatus()) || !EnableStatus.ENABLED.getValue().equals(unit.getStatus())))
                 conflict();
-            var quantity = output.multiply(line.getQuantity()).divide(version.getBaseQty(), MathContext.DECIMAL128);
+            var quantity = componentQuantity(output, line.getQuantity(), version.getBaseQty());
             var childPath = path + "/" + line.getId();
             List<MaterialBomGraph.Node> children = List.of();
             if (line.getChildBomId() != null) {

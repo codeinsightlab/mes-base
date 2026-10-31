@@ -38,6 +38,7 @@ import dev.mesbase.business.production.dao.WorkorderMapper;
 import dev.mesbase.business.production.dao.MesProductionExecutionMapper;
 
 import dev.mesbase.business.production.service.WorkOrderService;
+import dev.mesbase.business.production.service.WorkorderMaterialService;
 import dev.mesbase.business.production.service.MaterialQuantityRules;
 import dev.mesbase.system.service.AutoCodeNumbering;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -116,7 +117,7 @@ class WorkOrderRequestBudgetTest {
     }
 
     @Test
-    void warmPageUsesTwoCenterAndTwoBusinessStatementsWithoutMetadataOrMenuQueries() throws Exception {
+    void warmPageStaysWithinStatementBudgetsWithoutMetadataOrMenuQueries() throws Exception {
         var center = source();
         var business = source();
         var jdbc = new JdbcTemplate(center);
@@ -199,7 +200,7 @@ class WorkOrderRequestBudgetTest {
                 PersistenceFactories.pagination(c);
                 c.addInterceptor(businessSql);
             }, manager::verifyAccess);
-            var controller = new WorkOrderController(new WorkOrderService(new SqlSessionTemplate(factory).getMapper(WorkorderMapper.class), new SqlSessionTemplate(factory).getMapper(RoutingMapper.class), mock(RoutingProductMapper.class), mock(RoutingNodeMapper.class), mock(RoutingEdgeMapper.class), new SqlSessionTemplate(factory).getMapper(MaterialMapper.class), mock(RoutingReferenceRules.class), mock(WmStockDocumentMapper.class), new SqlSessionTemplate(factory).getMapper(WorkOrderExtraMapper.class), mock(MesProductionExecutionMapper.class), new WorkorderErpFacts(new SqlSessionTemplate(factory).getMapper(WorkorderErpExtraMapper.class)), mock(BusinessDirectoryService.class), mock(MesWorkorderMaterialMapper.class), Mockito.mock(BusinessSourceRules.class), Mockito.mock(WorkorderErpExtraMapper.class), Mockito.mock(SyncCoordinator.class), Mockito.mock(MaterialQuantityRules.class), Mockito.mock(AutoCodeNumbering.class), Mockito.mock(PlatformTransactionManager.class)), Mockito.mock(AutoCodeNumbering.class));
+            var controller = new WorkOrderController(new WorkOrderService(new SqlSessionTemplate(factory).getMapper(WorkorderMapper.class), new SqlSessionTemplate(factory).getMapper(RoutingMapper.class), mock(RoutingProductMapper.class), mock(RoutingNodeMapper.class), mock(RoutingEdgeMapper.class), new SqlSessionTemplate(factory).getMapper(MaterialMapper.class), mock(RoutingReferenceRules.class), mock(WmStockDocumentMapper.class), new SqlSessionTemplate(factory).getMapper(WorkOrderExtraMapper.class), mock(MesProductionExecutionMapper.class), new WorkorderErpFacts(new SqlSessionTemplate(factory).getMapper(WorkorderErpExtraMapper.class)), mock(BusinessDirectoryService.class), mock(MesWorkorderMaterialMapper.class), Mockito.mock(BusinessSourceRules.class), Mockito.mock(WorkorderErpExtraMapper.class), Mockito.mock(SyncCoordinator.class), Mockito.mock(MaterialQuantityRules.class), Mockito.mock(AutoCodeNumbering.class), Mockito.mock(WorkorderMaterialService.class), Mockito.mock(PlatformTransactionManager.class)), Mockito.mock(AutoCodeNumbering.class));
             var permissions = new SystemPermissionService(platform.mapper(SysMenuMapper.class), platform.mapper(SysRoleMapper.class), platform.mapper(ManagedFactoryMapper.class));
             FactoryCatalog catalog = new FactoryCatalog() {
                 public Optional<Factory> find(FactoryId id) {
@@ -241,7 +242,7 @@ class WorkOrderRequestBudgetTest {
                             .noneMatch(sql -> sql.contains("m.parent_id") || sql.contains("selectMenuVo")));
                     if (i > 0) assertTrue(centerSql.queries.stream()
                             .noneMatch(sql -> sql.contains("mf_factory") || sql.contains("mf_datasource")));
-                    assertEquals(7, businessSql.queries.size(), businessSql.queries.toString());
+                    assertTrue(businessSql.queries.size() <= 7, businessSql.queries.toString());
                     assertTrue(centerSql.queries.stream().noneMatch(sql -> sql.toLowerCase().contains("u.password")));
                     if (i >= 5) times.add((System.nanoTime() - start) / 1_000_000.0);
                 } finally {

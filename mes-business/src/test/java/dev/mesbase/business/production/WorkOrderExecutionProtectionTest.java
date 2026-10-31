@@ -21,6 +21,7 @@ import dev.mesbase.business.production.domain.WorkorderEntity;
 import dev.mesbase.business.production.domain.WorkOrderModels;
 import dev.mesbase.business.production.service.RoutingReferenceRules;
 import dev.mesbase.business.production.service.WorkOrderService;
+import dev.mesbase.business.production.service.WorkorderMaterialService;
 import dev.mesbase.business.production.service.MaterialQuantityRules;
 import dev.mesbase.system.service.AutoCodeNumbering;
 import dev.mesbase.business.production.dao.MesWorkorderMaterialMapper;
@@ -54,7 +55,7 @@ class WorkOrderExecutionProtectionTest {
         when(orders.selectByPrimaryKey(1L)).thenReturn(row);
         when(orders.selectByPrimaryKeyForUpdate(1L)).thenReturn(row);
         when(executions.countByExample(any(MesProductionExecutionExample.class))).thenReturn(1L);
-        var service = new WorkOrderService(orders, mock(RoutingMapper.class), mock(RoutingProductMapper.class), mock(RoutingNodeMapper.class), mock(RoutingEdgeMapper.class), mock(MaterialMapper.class), mock(RoutingReferenceRules.class), mock(WmStockDocumentMapper.class), mock(WorkOrderExtraMapper.class), executions, mock(WorkorderErpFacts.class), mock(BusinessDirectoryService.class), mock(MesWorkorderMaterialMapper.class), Mockito.mock(BusinessSourceRules.class), Mockito.mock(WorkorderErpExtraMapper.class), Mockito.mock(SyncCoordinator.class), Mockito.mock(MaterialQuantityRules.class), Mockito.mock(AutoCodeNumbering.class), Mockito.mock(PlatformTransactionManager.class));
+        var service = new WorkOrderService(orders, mock(RoutingMapper.class), mock(RoutingProductMapper.class), mock(RoutingNodeMapper.class), mock(RoutingEdgeMapper.class), mock(MaterialMapper.class), mock(RoutingReferenceRules.class), mock(WmStockDocumentMapper.class), mock(WorkOrderExtraMapper.class), executions, mock(WorkorderErpFacts.class), mock(BusinessDirectoryService.class), mock(MesWorkorderMaterialMapper.class), Mockito.mock(BusinessSourceRules.class), Mockito.mock(WorkorderErpExtraMapper.class), Mockito.mock(SyncCoordinator.class), Mockito.mock(MaterialQuantityRules.class), Mockito.mock(AutoCodeNumbering.class), Mockito.mock(WorkorderMaterialService.class), Mockito.mock(PlatformTransactionManager.class));
         assertEquals(ErrorCode.EXECUTION_REFERENCED, assertThrows(FoundationException.class, () -> service.delete(1L, 0)).code());
         var input = new WorkOrderModels.Save("WO", 2L, null, 1L, null, null, null, null, null, 0, null);
         assertEquals(ErrorCode.EXECUTION_FROZEN, assertThrows(FoundationException.class, () -> service.update(1L, input)).code());

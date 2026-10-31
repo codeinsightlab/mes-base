@@ -30,6 +30,24 @@ public class WorkorderEntity {
 
     private String source;
 
+    private Long bomId;
+
+    private Long bomRevision;
+
+    private Long materialRevision;
+
+    private String materialWarehouseIds;
+
+    private String materialWorkCenter;
+
+    private String materialStatus;
+
+    private LocalDateTime materialFrozenAt;
+
+    private Long materialUpdatedBy;
+
+    private LocalDateTime materialUpdatedAt;
+
     public Long getId() {
         return id;
     }
@@ -134,6 +152,77 @@ public class WorkorderEntity {
         this.source = source;
     }
 
+    public Long getBomId() {
+        return bomId;
+    }
+
+    public void setBomId(Long bomId) {
+        this.bomId = bomId;
+    }
+
+    public Long getBomRevision() {
+        return bomRevision;
+    }
+
+    public void setBomRevision(Long bomRevision) {
+        this.bomRevision = bomRevision;
+    }
+
+    public Long getMaterialRevision() {
+        return materialRevision;
+    }
+
+    public void setMaterialRevision(Long materialRevision) {
+        this.materialRevision = materialRevision;
+    }
+
+    public String getMaterialWarehouseIds() {
+        return materialWarehouseIds;
+    }
+
+    public void setMaterialWarehouseIds(String materialWarehouseIds) {
+        this.materialWarehouseIds = materialWarehouseIds;
+    }
+
+    public String getMaterialWorkCenter() {
+        return materialWorkCenter;
+    }
+
+    public void setMaterialWorkCenter(String materialWorkCenter) {
+        this.materialWorkCenter = materialWorkCenter;
+    }
+
+    public String getMaterialStatus() {
+        return materialStatus;
+    }
+
+    public void setMaterialStatus(String materialStatus) {
+        this.materialStatus = materialStatus;
+    }
+
+    public LocalDateTime getMaterialFrozenAt() {
+        return materialFrozenAt;
+    }
+
+    public void setMaterialFrozenAt(LocalDateTime materialFrozenAt) {
+        this.materialFrozenAt = materialFrozenAt;
+    }
+
+    public Long getMaterialUpdatedBy() {
+        return materialUpdatedBy;
+    }
+
+    public void setMaterialUpdatedBy(Long materialUpdatedBy) {
+        this.materialUpdatedBy = materialUpdatedBy;
+    }
+
+    public LocalDateTime getMaterialUpdatedAt() {
+        return materialUpdatedAt;
+    }
+
+    public void setMaterialUpdatedAt(LocalDateTime materialUpdatedAt) {
+        this.materialUpdatedAt = materialUpdatedAt;
+    }
     private String externalId;
     private String externalCode;
 

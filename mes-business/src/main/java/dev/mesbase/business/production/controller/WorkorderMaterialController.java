@@ -1,10 +1,11 @@
 package dev.mesbase.business.production.controller;
 
-import dev.mesbase.business.production.domain.MesWorkorderMaterialEntity;
+import dev.mesbase.business.production.domain.WorkorderMaterialModels;
 import dev.mesbase.business.production.service.WorkorderMaterialService;
 import dev.mesbase.platform.web.EndpointAccess;
 import dev.mesbase.common.utils.bean.BeanConversions;
 import java.time.LocalDateTime;
+import java.util.List;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -23,10 +24,14 @@ public class WorkorderMaterialController {
         this.service = service;
     }
 
-    public record View(String id, String bomId, String bomBaseQty, String bomComponentQty, String outputUnitId,
-                       String materialId, String unitId, String totalRequiredQty,
-                       String plannedQty, String warehouseIds, String workCenter, String revision, String status,
-                       LocalDateTime frozenAt, LocalDateTime updatedAt) {
+    public record View(String workorderId, String bomId, String bomRevision, String revision,
+                       String warehouseIds, String workCenter, String status, LocalDateTime frozenAt,
+                       LocalDateTime updatedAt, List<ItemView> items) {
+    }
+
+    public record ItemView(String id, String bomItemId, String materialId, String unitId,
+                           String totalRequiredQty, String standardRequiredQty, String bomBaseQty,
+                           String bomComponentQty, String plannedQty, String outputUnitId, boolean manuallyAdjusted) {
     }
 
     @GetMapping
@@ -37,11 +42,11 @@ public class WorkorderMaterialController {
 
     @PutMapping
     @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED, permission = "workorder:material:update")
-    public View save(@PathVariable Long id, @RequestBody WorkorderMaterialService.Save c) {
+    public View save(@PathVariable Long id, @RequestBody WorkorderMaterialModels.Save c) {
         return view(service.save(id, c));
     }
 
-    private static View view(MesWorkorderMaterialEntity r) {
+    private static View view(WorkorderMaterialModels.Document r) {
         return BeanConversions.convert(r, View.class);
     }
 }

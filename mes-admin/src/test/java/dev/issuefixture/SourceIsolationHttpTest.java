@@ -33,6 +33,7 @@ class SourceIsolationHttpTest {
         try (var c = ProductionInputHttpTest.context()) {
             var m = MaterialIssueHttpTest.mvc(c);
             String body = "{\"ruleCode\":\"WORK_ORDER\",\"code\":\"TEST_SOURCE_NEW\",\"productId\":1,\"plannedQty\":\"100\",\"routingId\":1}";
+            body = WorkorderMaterialFixture.command(ProductionInputHttpTest.db(c), body, null);
             m.perform(ProductionCoreV1HttpTest.full(post("/api/production/workorder")).content(body))
                     .andExpect(status().isOk()).andExpect(jsonPath("workorder.source").value("LOCAL"));
             m.perform(ProductionCoreV1HttpTest.full(post("/api/production/workorder"))

@@ -2,6 +2,8 @@ package dev.mesbase.business.wm.service;
 
 import dev.mesbase.business.shared.enums.EnableStatus;
 import dev.mesbase.business.production.dao.MesWorkorderMaterialMapper;
+import dev.mesbase.business.production.dao.WorkorderMapper;
+import dev.mesbase.business.production.domain.WorkorderExample;
 import dev.mesbase.business.production.domain.MesWorkorderMaterialExample;
 import dev.mesbase.business.wm.dao.WmStockActionMapper;
 import dev.mesbase.business.wm.dao.WmStockDocumentLineMapper;
@@ -33,6 +35,7 @@ import org.springframework.stereotype.Component;
 @ConditionalOnProperty(name = "mes.business.enabled", havingValue = "true")
 public class StockReferenceRules {
     private final MesWorkorderMaterialMapper demand;
+    private final WorkorderMapper workorders;
     private final WmStockDocumentLineMapper documentLines;
     private final MaterialMapper materials;
     private final WmWarehouseMapper warehouses;
@@ -41,7 +44,9 @@ public class StockReferenceRules {
 
     public StockReferenceRules(MaterialMapper materials, WmWarehouseMapper warehouses, WmInventoryMapper inventories,
                                WmStockActionMapper actions,
-                               MesWorkorderMaterialMapper demand, WmStockDocumentLineMapper documentLines) {
+                               MesWorkorderMaterialMapper demand, WmStockDocumentLineMapper documentLines,
+                               WorkorderMapper workorders) {
+        this.workorders = workorders;
         this.documentLines = documentLines;
         this.demand = demand;
         this.actions = actions;
@@ -163,15 +168,15 @@ public class StockReferenceRules {
 
     public void deletingWarehouses(List<Long> ids) {
         lockWarehouses(ids);
-        var demandFilter = new MesWorkorderMaterialExample();
+        var demandFilter = new WorkorderExample();
         for (var id : ids) {
             String v = id.toString();
-            demandFilter.or().andWarehouseIdsEqualTo("[" + v + "]");
-            demandFilter.or().andWarehouseIdsLike("[" + v + ",%");
-            demandFilter.or().andWarehouseIdsLike("%," + v + ",%");
-            demandFilter.or().andWarehouseIdsLike("%," + v + "]");
+            demandFilter.or().andMaterialWarehouseIdsEqualTo("[" + v + "]");
+            demandFilter.or().andMaterialWarehouseIdsLike("[" + v + ",%");
+            demandFilter.or().andMaterialWarehouseIdsLike("%," + v + ",%");
+            demandFilter.or().andMaterialWarehouseIdsLike("%," + v + "]");
         }
-        if (demand.countByExample(demandFilter) > 0) throw new FoundationException(ErrorCode.WAREHOUSE_REFERENCED);
+        if (workorders.countByExample(demandFilter) > 0) throw new FoundationException(ErrorCode.WAREHOUSE_REFERENCED);
         var filter = new WmInventoryExample();
         filter.createCriteria().andWarehouseIdIn(ids);
         var documentFilter = new WmStockDocumentLineExample();

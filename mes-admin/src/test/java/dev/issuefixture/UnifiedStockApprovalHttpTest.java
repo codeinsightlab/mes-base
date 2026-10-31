@@ -118,6 +118,7 @@ class UnifiedStockApprovalHttpTest {
             WorkorderBomInputHttpTest.select(mvc, 1, 1);
             db.update("INSERT INTO workorder(id,code,product_id,planned_qty,routing_id,status,revision,create_time,update_time) VALUES(2,'WO2',99,100,1,'RELEASED',0,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)");
             db.update("INSERT INTO mes_workorder_material(id,material_id,unit_id,total_required_qty,planned_qty,warehouse_ids,work_center,revision,status,updated_by,updated_at,bom_id,bom_base_qty,bom_component_qty,output_unit_id) SELECT 2,material_id,unit_id,total_required_qty,planned_qty,warehouse_ids,work_center,revision,status,updated_by,updated_at,bom_id,bom_base_qty,bom_component_qty,output_unit_id FROM mes_workorder_material WHERE id=1");
+            WorkorderMaterialFixture.seedSnapshot(db);
             String uuid = UUID.randomUUID().toString();
             String first = ProductionInputHttpTest.command(mvc, uuid, "L001", "1");
             var second = (ObjectNode) JSON.readTree(first);

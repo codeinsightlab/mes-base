@@ -18,6 +18,7 @@ import dev.mesbase.business.production.dao.WorkOrderExtraMapper;
 import dev.mesbase.business.production.dao.WorkorderErpExtraMapper;
 import dev.mesbase.business.production.dao.WorkorderMapper;
 import dev.mesbase.business.production.domain.MesProductionExecutionExample;
+import dev.mesbase.business.production.domain.MesWorkorderMaterialExample;
 import dev.mesbase.business.production.domain.RoutingDetail;
 import dev.mesbase.business.production.domain.RoutingEdgeExample;
 import dev.mesbase.business.production.domain.RoutingEntity;
@@ -78,6 +79,7 @@ public class WorkOrderService {
     private final WorkorderErpExtraMapper external;
     private final SyncCoordinator sync;
     private final MesWorkorderMaterialMapper requirements;
+    private final WorkorderMaterialService materialDemands;
     private final WorkorderMapper orders;
     private final WorkorderErpFacts facts;
     private final BusinessDirectoryService directory;
@@ -102,11 +104,13 @@ public class WorkOrderService {
                             BusinessDirectoryService directory, MesWorkorderMaterialMapper requirements,
                             BusinessSourceRules sources, WorkorderErpExtraMapper external, SyncCoordinator sync,
                             MaterialQuantityRules quantityRules, AutoCodeNumbering autoCodes,
+                            WorkorderMaterialService materialDemands,
                             @Qualifier("businessTransactionManager") PlatformTransactionManager businessTransactionManager) {
         this.external = external;
         this.sync = sync;
         this.sources = sources;
         this.requirements = requirements;
+        this.materialDemands = materialDemands;
         this.orders = orders;
         this.facts = facts;
         this.directory = directory;
@@ -207,9 +211,11 @@ public class WorkOrderService {
         row.setSource(BusinessSource.LOCAL.getValue());
         row.setStatus(WorkOrderStatus.DRAFT.getValue());
         row.setRevision(0);
+        row.setMaterialRevision(0L);
         row.setCreateTime(LocalDateTime.now());
         assign(row, input);
         saveOrder(row, true);
+        materialDemands.replace(row, input.material());
         return detail(row.getId());
     }
 
@@ -243,6 +249,7 @@ public class WorkOrderService {
             row.setSource(BusinessSource.EXTERNAL.getValue());
             row.setStatus(WorkOrderStatus.DRAFT.getValue());
             row.setRevision(0);
+            row.setMaterialRevision(0L);
             row.setCreateTime(LocalDateTime.now());
         }
         row.setStatus(plan.status().getValue());
@@ -337,6 +344,7 @@ public class WorkOrderService {
         }
         validateValues(input);
         if (identityChanged) binding(input.productId(), input.routingId());
+        materialDemands.requireUpdatePermission();
         if (!Objects.equals(input.productId(), row.getProductId())
                 || input.plannedQty() == null || row.getPlannedQty() == null
                 || input.plannedQty().compareTo(row.getPlannedQty()) != 0)
@@ -349,6 +357,7 @@ public class WorkOrderService {
         assign(row, input);
         row.setRevision(row.getRevision() + 1);
         saveOrder(row, false);
+        materialDemands.replace(row, input.material());
         return detail(id);
     }
 
@@ -400,7 +409,9 @@ public class WorkOrderService {
         sources.current(row.getSource());
         if (row.getRevision() != revision) conflict();
         ensureNoDownstream(id);
-        requirements.deleteByPrimaryKey(id);
+        var materialFilter = new MesWorkorderMaterialExample();
+        materialFilter.createCriteria().andWorkorderIdEqualTo(id);
+        requirements.deleteByExample(materialFilter);
         facts.delete(id);
         if (orders.deleteByPrimaryKey(id) != 1) conflict();
     }

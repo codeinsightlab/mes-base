@@ -1,5 +1,7 @@
 package dev.mesbase.business.production.controller;
 
+import dev.mesbase.business.production.domain.WorkorderMaterialModels;
+
 import com.fasterxml.jackson.annotation.JsonAnySetter;
 import dev.mesbase.business.production.domain.WorkOrderModels;
 import dev.mesbase.common.validation.ParameterChecks;
@@ -13,7 +15,8 @@ public record WorkOrderSaveRequest(@Size(max = 64) String code, @NotNull Long pr
                                    @NotNull BigDecimal plannedQty, @NotNull Long routingId,
                                    LocalDateTime plannedStartAt, LocalDateTime plannedEndAt,
                                    @Size(max = 128) String externalId, @Size(max = 128) String externalCode,
-                                   @Size(max = 500) String remark, Integer revision, @Size(max = 64) String ruleCode) {
+                                   @Size(max = 500) String remark, Integer revision, @Size(max = 64) String ruleCode,
+                                   @NotNull WorkorderMaterialModels.Save material) {
     @JsonAnySetter
     public void rejectUnexpected(String field, Object value) {
         ParameterChecks.reject(ErrorCode.BAD_REQUEST);
@@ -21,6 +24,6 @@ public record WorkOrderSaveRequest(@Size(max = 64) String code, @NotNull Long pr
 
     public WorkOrderModels.Save toCommand() {
         return new WorkOrderModels.Save(code, productId, plannedQty, routingId, plannedStartAt, plannedEndAt,
-                externalId, externalCode, remark, revision, ruleCode);
+                externalId, externalCode, remark, revision, ruleCode, material);
     }
 }

@@ -39,6 +39,7 @@ import dev.mesbase.business.production.dao.MesWorkorderCancellationMapper;
 import dev.mesbase.business.production.dao.MesWorkorderMaterialMapper;
 import dev.mesbase.business.production.dao.ProductionInputExtraMapper;
 import dev.mesbase.business.basic.dao.MaterialBomMapper;
+import dev.mesbase.business.basic.service.MaterialBomService;
 import dev.mesbase.business.basic.dao.MaterialBomItemMapper;
 import dev.mesbase.business.basic.dao.MaterialBomCopyMapper;
 import dev.mesbase.business.production.dao.OperationMapper;
@@ -286,6 +287,7 @@ class MaterialIssueHttpTest {
                 // TEST ONLY H2 equivalent of V64; rules are persisted per business datasource.
                 jdbc.execute("ALTER TABLE unit_measure ADD must_be_whole_number TINYINT DEFAULT 0 NOT NULL");
                 jdbc.execute("ALTER TABLE unit_measure ADD quantity_precision TINYINT DEFAULT 6 NOT NULL");
+                WorkorderMaterialFixture.upgrade(jdbc);
                 jdbc.update("INSERT INTO material(id,code,name,unit_id,status) VALUES(1,'M1','物料一',1,'ENABLED')");
                 jdbc.update("INSERT INTO workorder(id,code,product_id,planned_qty,routing_id,status,revision,create_time,update_time) VALUES(1,'WO1',1,1000,1,'DRAFT',0,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)");
                 jdbc.update("INSERT INTO unit_measure(id,code,name,status) VALUES(1,'KG','千克','ENABLED')");
@@ -320,7 +322,7 @@ class MaterialIssueHttpTest {
     @EnableWebMvc
     @EnableWebSecurity
     @EnableTransactionManagement
-    @Import({StockDocumentOwnedTransactionsHttpTest.GuardedCenter.class, MaterialQuantityRules.class, WorkOrderCompletionService.class, StockDocumentService.class, StockDocumentController.class, WorkOrderCancellationService.class, WorkOrderCancellationController.class, BusinessSourceRules.class, StockReferenceRules.class, ProductionCompletionService.class, ProductionCompletionController.class, WarehouseAcceptanceService.class, WarehouseAcceptanceController.class, QualityReleaseService.class, QualityReleaseController.class, WorkorderMaterialService.class, WorkorderMaterialController.class, LocalStockController.class, WmStockActionController.class, WmStockActionServiceImpl.class, LocalStockService.class, LocalProductionSupply.class, QualityTreatmentService.class, MaterialIssueInputFacts.class, ProductionQuantityService.class, ProductionQuantityErrorAdvice.class, ExecutionQualityReferenceQueryImpl.class, ProductionExecutionQueryService.class, ProductionChainLocks.class, ExecutionPathService.class, ExecutionActionController.class, MaterialIssueSubmissionService.class, WorkorderErpFacts.class, WarehouseIntegration.class, MaterialIssueVoidService.class, ProductionExecutionRules.class, ProductionIdentityService.class, MesProductionExecutionServiceImpl.class, MesProductionExecutionController.class, ProductionIdentityController.class, WorkOrderController.class, WorkOrderService.class, RoutingReferenceRules.class, FoundationErrorAdvice.class})
+    @Import({MaterialBomService.class, StockDocumentOwnedTransactionsHttpTest.GuardedCenter.class, MaterialQuantityRules.class, WorkOrderCompletionService.class, StockDocumentService.class, StockDocumentController.class, WorkOrderCancellationService.class, WorkOrderCancellationController.class, BusinessSourceRules.class, StockReferenceRules.class, ProductionCompletionService.class, ProductionCompletionController.class, WarehouseAcceptanceService.class, WarehouseAcceptanceController.class, QualityReleaseService.class, QualityReleaseController.class, WorkorderMaterialService.class, WorkorderMaterialController.class, LocalStockController.class, WmStockActionController.class, WmStockActionServiceImpl.class, LocalStockService.class, LocalProductionSupply.class, QualityTreatmentService.class, MaterialIssueInputFacts.class, ProductionQuantityService.class, ProductionQuantityErrorAdvice.class, ExecutionQualityReferenceQueryImpl.class, ProductionExecutionQueryService.class, ProductionChainLocks.class, ExecutionPathService.class, ExecutionActionController.class, MaterialIssueSubmissionService.class, WorkorderErpFacts.class, WarehouseIntegration.class, MaterialIssueVoidService.class, ProductionExecutionRules.class, ProductionIdentityService.class, MesProductionExecutionServiceImpl.class, MesProductionExecutionController.class, ProductionIdentityController.class, WorkOrderController.class, WorkOrderService.class, RoutingReferenceRules.class, FoundationErrorAdvice.class})
     static class Web implements WebMvcConfigurer {
         @org.springframework.beans.factory.annotation.Autowired
         private AuthorizationService authorization;

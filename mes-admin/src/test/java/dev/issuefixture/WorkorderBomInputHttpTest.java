@@ -211,10 +211,10 @@ class WorkorderBomInputHttpTest {
             j.update("INSERT INTO material_bom_item SELECT 2,2,material_id,5,unit_id,NULL,sort FROM material_bom_item WHERE id=1");
             select(m, 2, 2);
             select(m, 3, 1);
-            assertEquals(0, j.queryForObject("SELECT COUNT(*) FROM mes_workorder_material WHERE frozen_at IS NOT NULL", Integer.class));
+            assertEquals(0, j.queryForObject("SELECT COUNT(*) FROM workorder WHERE material_frozen_at IS NOT NULL", Integer.class));
             String body = ProductionInputHttpTest.command(m, UUID.randomUUID().toString(), "L001", "40");
             var first = ProductionInputHttpTest.submit(m, body);
-            assertNotNull(j.queryForObject("SELECT frozen_at FROM mes_workorder_material WHERE id=1", Object.class));
+            assertNotNull(j.queryForObject("SELECT material_frozen_at FROM workorder WHERE id=1", Object.class));
             j.update("UPDATE material_bom SET status='DISABLED' WHERE id=1");
             assertEquals(first, ProductionInputHttpTest.submit(m, body));
             m.perform(full(put("/api/production/workorder/1/material")).content(JSON.writeValueAsString(Map.of(
@@ -268,7 +268,7 @@ class WorkorderBomInputHttpTest {
     }
 
     @Test
-    void componentMembershipAndSingleMaterialScopeAreValidatedInsteadOfSelectingFirstLine() throws Exception {
+    void componentMembershipAndMultiLineDemandNeverSelectsTheFirstIssueLine() throws Exception {
         try (var c = ProductionInputHttpTest.context()) {
             var j = ProductionInputHttpTest.db(c);
             var m = MaterialIssueHttpTest.mvc(c);
@@ -280,7 +280,7 @@ class WorkorderBomInputHttpTest {
             m.perform(full(get("/api/production/identity")).param("code", "WO1:P1#L001"))
                     .andExpect(status().isOk()).andExpect(jsonPath("executionId").value(Long.toString(execution)));
             assertEquals(1, j.queryForObject("SELECT COUNT(*) FROM mes_production_execution", Integer.class));
-            // A new work order may select another version; a two-component version must be rejected as a whole.
+            // Multi-component work-order demand is saved; the unextended issue flow must reject it as a whole.
             j.update("INSERT INTO workorder(id,code,product_id,planned_qty,routing_id,status,revision,source,create_time,update_time) VALUES(7,'TEST-MULTI',99,100,1,'RELEASED',0,'LOCAL',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)");
             j.update("INSERT INTO material_bom(id,code,version,product_id,base_qty,unit_id,status,revision,remark,created_by,created_at,published_at,is_default) SELECT 7,'TEST-MULTI','1',product_id,base_qty,unit_id,status,revision,remark,created_by,created_at,published_at,0 FROM material_bom WHERE id=1");
             j.update("INSERT INTO material_bom_item SELECT 7,7,material_id,quantity,unit_id,NULL,sort FROM material_bom_item WHERE id=1");
@@ -289,9 +289,11 @@ class WorkorderBomInputHttpTest {
             m.perform(full(put("/api/production/workorder/7/material")).content(JSON.writeValueAsString(Map.of(
                             "expectedRevision", 0, "bomId", 7, "expectedBomRevision", 1,
                             "warehouseIds", List.of(1), "workCenter", "TEST", "enabled", true))))
+                    .andExpect(status().isOk()).andExpect(jsonPath("items.length()").value(2));
+            assertEquals(2, j.queryForObject("SELECT COUNT(*) FROM mes_workorder_material WHERE workorder_id=7", Integer.class));
+            m.perform(full(get("/api/production/input")).param("code", "TEST-MULTI:M1#L001"))
                     .andExpect(status().isUnprocessableEntity())
                     .andExpect(jsonPath("errorCode").value("PRODUCTION_SINGLE_MATERIAL_REQUIRED"));
-            assertEquals(0, j.queryForObject("SELECT COUNT(*) FROM mes_workorder_material WHERE id=7", Integer.class));
         }
     }
 

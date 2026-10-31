@@ -32,7 +32,7 @@ class ProductionChainHttpTest {
         try (var c = MaterialIssueHttpTest.context(); var pool = Executors.newFixedThreadPool(2)) {
             var m = MaterialIssueHttpTest.mvc(c);
             var start = new CountDownLatch(1);
-            String body = DEMAND.replace("QA_DEMAND", "WO1").replace("}", ",\"revision\":0}");
+            String body = WorkorderMaterialFixture.command(c.getBean(MaterialIssueHttpTest.Fixture.class).business.get("A"), DEMAND.replace("QA_DEMAND", "WO1").replace("}", ",\"revision\":0}"), 1L);
             var first = pool.submit(() -> {
                 start.await();
                 return m.perform(full(put(W + "/1"), "A").content(body)).andReturn().getResponse().getStatus();
@@ -54,7 +54,7 @@ class ProductionChainHttpTest {
         try (var c = MaterialIssueHttpTest.context()) {
             var m = MaterialIssueHttpTest.mvc(c);
             var a = c.getBean(MaterialIssueHttpTest.Fixture.class).business.get("A");
-            m.perform(full(post(W), "A").content(DEMAND)).andExpect(status().isOk())
+            m.perform(full(post(W), "A").content(WorkorderMaterialFixture.command(a, DEMAND, null))).andExpect(status().isOk())
                     .andExpect(jsonPath("batches").doesNotExist())
                     .andExpect(jsonPath("allocation.executionCount").value(0))
                     .andExpect(jsonPath("allocation.remainingTargetQty").value("1000.000000"));
@@ -102,8 +102,8 @@ class ProductionChainHttpTest {
                     .andExpect(jsonPath("allocatedTargetQty").value("700.000000"))
                     .andExpect(jsonPath("remainingTargetQty").value("300.000000"))
                     .andExpect(jsonPath("excessTargetQty").value("0.000000"));
-            m.perform(full(put(W + "/1"), "A").content(DEMAND.replace("QA_DEMAND", "WO1")
-                            .replace("\"routingId\":\"1\"", "\"routingId\":\"3\"").replace("}", ",\"revision\":0}")))
+            m.perform(full(put(W + "/1"), "A").content(WorkorderMaterialFixture.command(a, DEMAND.replace("QA_DEMAND", "WO1")
+                            .replace("\"routingId\":\"1\"", "\"routingId\":\"3\"").replace("}", ",\"revision\":0}"), 1L)))
                     .andExpect(status().isConflict()).andExpect(jsonPath("errorCode").value("EXECUTION_FROZEN"));
             m.perform(full(get(E + "/1"), "A")).andExpect(status().isOk()).andExpect(jsonPath("routingId").value("1"));
             String running = one.replace("READY", "RUNNING").replace("}", ",\"startTime\":\"2026-10-14T09:00:00\"}");
@@ -134,9 +134,9 @@ class ProductionChainHttpTest {
             var a = c.getBean(MaterialIssueHttpTest.Fixture.class).business.get("A");
             m.perform(full(get(W + "/1"), "A")).andExpect(status().isOk())
                     .andExpect(jsonPath("batches").doesNotExist());
-            m.perform(full(put(W + "/1"), "A").content(DEMAND.replace("QA_DEMAND", "WO1")
-                    .replace("}", ",\"revision\":0}"))).andExpect(status().isOk());
-            m.perform(full(post(W), "A").content(DEMAND)).andExpect(status().isOk());
+            m.perform(full(put(W + "/1"), "A").content(WorkorderMaterialFixture.command(a, DEMAND.replace("QA_DEMAND", "WO1")
+                    .replace("}", ",\"revision\":0}"), 1L))).andExpect(status().isOk());
+            m.perform(full(post(W), "A").content(WorkorderMaterialFixture.command(a, DEMAND, null))).andExpect(status().isOk());
             m.perform(full(delete(W + "/2"), "A").content("{\"revision\":0}"))
                     .andExpect(status().isNoContent());
             m.perform(full(get(W), "A")).andExpect(status().isOk());

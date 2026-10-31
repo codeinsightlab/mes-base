@@ -29,6 +29,7 @@ class WorkOrderRecallHttpTest {
             jdbc.update("INSERT INTO workorder_erp_extra(id) VALUES(40)");
             var mvc = MaterialIssueHttpTest.mvc(context);
             String edit = "{\"code\":\"RECALL_TEST\",\"productId\":\"1\",\"routingId\":\"1\",\"plannedQty\":\"12\",\"revision\":0}";
+            edit = WorkorderMaterialFixture.command(jdbc, edit, 40L);
             mvc.perform(command(put(BASE), edit)).andExpect(status().isUnprocessableEntity());
             mvc.perform(command(post(BASE + "/actions/recall"), "{\"revision\":0}"))
                     .andExpect(status().isOk()).andExpect(jsonPath("workorder.status").value("DRAFT"))

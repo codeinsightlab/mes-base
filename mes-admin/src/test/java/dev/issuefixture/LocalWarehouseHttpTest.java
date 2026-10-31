@@ -183,7 +183,8 @@ class LocalWarehouseHttpTest {
             j.update("INSERT INTO workorder(id,code,product_id,planned_qty,routing_id,status,revision,create_time,update_time) VALUES(2,'WO2',2,1000,1,'RELEASED',0,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)");
             j.update("INSERT INTO material_bom(id,code,version,product_id,base_qty,unit_id,status,revision,remark,created_by,created_at,published_at,is_default) SELECT 2,'TEST-BOM-SECOND','1',2,base_qty,unit_id,status,revision,remark,created_by,created_at,published_at,0 FROM material_bom WHERE id=1");
             j.update("INSERT INTO material_bom_item SELECT 2,2,material_id,quantity,unit_id,NULL,sort FROM material_bom_item WHERE id=1");
-            j.update("INSERT INTO mes_workorder_material SELECT 2,material_id,unit_id,total_required_qty,planned_qty,warehouse_ids,work_center,revision,status,updated_by,updated_at,2,bom_base_qty,bom_component_qty,output_unit_id,NULL FROM mes_workorder_material WHERE id=1");
+            j.update("INSERT INTO mes_workorder_material(id,material_id,unit_id,total_required_qty,planned_qty,warehouse_ids,work_center,revision,status,updated_by,updated_at,bom_id,bom_base_qty,bom_component_qty,output_unit_id,frozen_at) SELECT 2,material_id,unit_id,total_required_qty,planned_qty,warehouse_ids,work_center,revision,status,updated_by,updated_at,2,bom_base_qty,bom_component_qty,output_unit_id,NULL FROM mes_workorder_material WHERE id=1");
+            WorkorderMaterialFixture.seedSnapshot(j);
             String first = ProductionInputHttpTest.command(m, UUID.randomUUID().toString(), "L001", "100");
             var second = new ObjectMapper().readTree(first).deepCopy();
             var secondNode = (ObjectNode) second;

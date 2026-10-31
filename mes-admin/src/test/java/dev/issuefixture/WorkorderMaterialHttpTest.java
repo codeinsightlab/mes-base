@@ -15,6 +15,39 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  */
 class WorkorderMaterialHttpTest {
     @Test
+    void adjustedSingleDemandCannotBeSilentlyReplacedByItsStandardBomQuantity() throws Exception {
+        try (var context = ProductionInputHttpTest.context()) {
+            var jdbc = ProductionInputHttpTest.db(context);
+            var mvc = MaterialIssueHttpTest.mvc(context);
+            jdbc.update("UPDATE mes_workorder_material SET manually_adjusted=TRUE,total_required_qty=2001 WHERE workorder_id=1");
+            mvc.perform(ProductionCoreV1HttpTest.full(get("/api/production/input/calculate"))
+                            .param("code", "WO1:M1#L001").param("workorderId", "1")
+                            .param("stockReference", "1").param("outputQty", "1"))
+                    .andExpect(status().isUnprocessableEntity())
+                    .andExpect(jsonPath("errorCode").value("PRODUCTION_ADJUSTED_MATERIAL_PENDING"));
+            assertEquals(0, new BigDecimal("2001").compareTo(jdbc.queryForObject(
+                    "SELECT total_required_qty FROM mes_workorder_material WHERE workorder_id=1", BigDecimal.class)));
+        }
+    }
+
+    @Test
+    void inconsistentRatioRemainsReadableButCannotBeUsedForFormalIssue() throws Exception {
+        try (var context = ProductionInputHttpTest.context()) {
+            var jdbc = ProductionInputHttpTest.db(context);
+            var mvc = MaterialIssueHttpTest.mvc(context);
+            jdbc.update("UPDATE mes_workorder_material SET bom_base_qty=0 WHERE workorder_id=1");
+            mvc.perform(ProductionCoreV1HttpTest.full(get("/api/production/workorder/1/material")))
+                    .andExpect(status().isOk()).andExpect(jsonPath("items[0].totalRequiredQty").value("2000.000000"))
+                    .andExpect(jsonPath("items[0].standardRequiredQty").isEmpty());
+            mvc.perform(ProductionCoreV1HttpTest.full(get("/api/production/input/calculate"))
+                            .param("code", "WO1:M1#L001").param("workorderId", "1")
+                            .param("stockReference", "1").param("outputQty", "1"))
+                    .andExpect(status().isConflict()).andExpect(jsonPath("errorCode").value("PRODUCTION_INPUT_STALE"));
+            assertEquals(0, jdbc.queryForObject("SELECT COUNT(*) FROM mes_material_issue_input", Integer.class));
+        }
+    }
+
+    @Test
     void businessDemandOwnsRatioAndCannotChangeAfterPreparation() throws Exception {
         try (var c = ProductionInputHttpTest.context()) {
             var m = MaterialIssueHttpTest.mvc(c);

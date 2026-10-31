@@ -49,17 +49,17 @@ public class ManufacturedInputSourceService {
             ParameterChecks.reject(ErrorCode.BUSINESS_SOURCE_CONFLICT);
         var requirement = requirements.basis(order);
         var filter = new MaterialBomItemExample();
-        filter.createCriteria().andBomIdEqualTo(requirement.getBomId());
+        filter.createCriteria().andBomIdEqualTo(requirement.bomId());
         if (components.countByExample(filter) != 1)
             ParameterChecks.reject(ErrorCode.PRODUCTION_SINGLE_MATERIAL_REQUIRED);
         var component = components.selectByExample(filter).getFirst();
-        if (!Objects.equals(component.getMaterialId(), requirement.getMaterialId())
-                || !Objects.equals(component.getUnitId(), requirement.getUnitId()))
+        if (!Objects.equals(component.getMaterialId(), requirement.materialId())
+                || !Objects.equals(component.getUnitId(), requirement.unitId()))
             ParameterChecks.reject(ErrorCode.PRODUCTION_INPUT_STALE);
         // A leaf reference does not authorize guessing a default/latest child version or outsourcing.
         if (component.getChildBomId() == null)
             ParameterChecks.reject(ErrorCode.STOCK_DOCUMENT_SOURCE_PENDING);
-        var warehouseIds = Arrays.asList(new ObjectMapper().readValue(requirement.getWarehouseIds(), Long[].class));
+        var warehouseIds = Arrays.asList(new ObjectMapper().readValue(requirement.warehouseIds(), Long[].class));
         if (warehouseIds.isEmpty() || warehouseIds.size() > 100 || warehouseIds.stream().anyMatch(Objects::isNull))
             ParameterChecks.reject(ErrorCode.PRODUCTION_INPUT_STALE);
         sources.warehouses(order.getSource(), warehouseIds);

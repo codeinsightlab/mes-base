@@ -20,6 +20,7 @@ import dev.mesbase.business.basic.dao.UnitMeasureMapper;
 import dev.mesbase.business.production.dao.MesProductionExecutionMapper;
 import dev.mesbase.business.production.dao.WorkorderMapper;
 import dev.mesbase.business.production.dao.MesWorkorderMaterialMapper;
+import dev.mesbase.business.production.domain.MesWorkorderMaterialExample;
 import dev.mesbase.platform.execution.FactoryIntegrationContext;
 import dev.mesbase.core.factory.FactoryRuntimeMode;
 import dev.mesbase.business.production.dao.MesProductionReceiptMapper;
@@ -258,9 +259,13 @@ public class StockDocumentService {
         Long bomId = null;
         BigDecimal bomBase = null;
         BigDecimal bomComponent = null;
-        var material = workorderMaterials.selectByPrimaryKey(document.getSourceWorkorderId());
-        if (material != null) {
-            bomId = material.getBomId();
+        var materialOrder = orders.selectByPrimaryKey(document.getSourceWorkorderId());
+        if (materialOrder != null) bomId = materialOrder.getBomId();
+        var materialFilter = new MesWorkorderMaterialExample();
+        materialFilter.createCriteria().andWorkorderIdEqualTo(document.getSourceWorkorderId());
+        var materialRows = workorderMaterials.selectByExample(materialFilter);
+        if (materialRows.size() == 1) {
+            var material = materialRows.getFirst();
             bomBase = material.getBomBaseQty();
             bomComponent = material.getBomComponentQty();
         }

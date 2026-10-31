@@ -28,6 +28,7 @@ import dev.mesbase.system.service.AutoCodeNumbering;
 import org.springframework.transaction.PlatformTransactionManager;
 import dev.mesbase.business.production.service.RoutingReferenceRules;
 import dev.mesbase.business.production.service.WorkOrderService;
+import dev.mesbase.business.production.service.WorkorderMaterialService;
 import dev.mesbase.business.production.service.WorkorderErpFacts;
 import dev.mesbase.business.quality.service.ExecutionQualityReferenceQuery;
 import dev.mesbase.common.utils.SecurityUtils;
@@ -84,7 +85,7 @@ class LocalMaintenanceRulesTest {
                 mock(RoutingNodeMapper.class), mock(RoutingEdgeMapper.class),
                 mock(MaterialMapper.class), mock(RoutingReferenceRules.class), issues, queries, executions,
                 mock(WorkorderErpFacts.class), mock(BusinessDirectoryService.class), mock(MesWorkorderMaterialMapper.class),
-                sources, mock(WorkorderErpExtraMapper.class), mock(SyncCoordinator.class), mock(MaterialQuantityRules.class), mock(AutoCodeNumbering.class), mock(PlatformTransactionManager.class)));
+                sources, mock(WorkorderErpExtraMapper.class), mock(SyncCoordinator.class), mock(MaterialQuantityRules.class), mock(AutoCodeNumbering.class), mock(WorkorderMaterialService.class), mock(PlatformTransactionManager.class)));
         doReturn(null).when(service).detail(1L);
         return service;
     }

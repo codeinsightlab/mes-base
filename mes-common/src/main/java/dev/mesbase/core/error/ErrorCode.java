@@ -51,6 +51,7 @@ public enum ErrorCode {
     PRODUCTION_INPUT_QUOTA_EXCEEDED(409, "累计正式投入超过工单计划额度，不良同样占用投入额度"),
     PRODUCTION_INPUT_STALE(409, "用料计算依据已变化，请重新计算并确认"),
     PRODUCTION_SINGLE_MATERIAL_REQUIRED(422, "工单包含多种必需材料，不支持当前单材料投产模式"),
+    PRODUCTION_ADJUSTED_MATERIAL_PENDING(422, "当前领料入口尚未适配人工调整的工单用料"),
     PRODUCTION_IDENTITY_CONFLICT(409, "生产扫码身份已绑定其他工单"),
     PRODUCTION_SUPPLEMENT_UNSUPPORTED(422, "当前版本尚不支持纯材料补料提交"),
     EXECUTION_QR_INVALID(400, "扫码格式无效：请使用工单号:品号#批次号"),

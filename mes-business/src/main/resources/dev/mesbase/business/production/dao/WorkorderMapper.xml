@@ -1,4 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
+<!-- MES-CODEGEN: MyBatis Generator standard single-table persistence. -->
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="dev.mesbase.business.production.dao.WorkorderMapper">
   <resultMap id="BaseResultMap" type="dev.mesbase.business.production.domain.WorkorderEntity">
@@ -15,6 +16,15 @@
     <result column="create_time" jdbcType="TIMESTAMP" property="createTime" />
     <result column="update_time" jdbcType="TIMESTAMP" property="updateTime" />
     <result column="source" jdbcType="VARCHAR" property="source" />
+    <result column="bom_id" jdbcType="BIGINT" property="bomId" />
+    <result column="bom_revision" jdbcType="BIGINT" property="bomRevision" />
+    <result column="material_revision" jdbcType="BIGINT" property="materialRevision" />
+    <result column="material_warehouse_ids" jdbcType="VARCHAR" property="materialWarehouseIds" />
+    <result column="material_work_center" jdbcType="VARCHAR" property="materialWorkCenter" />
+    <result column="material_status" jdbcType="VARCHAR" property="materialStatus" />
+    <result column="material_frozen_at" jdbcType="TIMESTAMP" property="materialFrozenAt" />
+    <result column="material_updated_by" jdbcType="BIGINT" property="materialUpdatedBy" />
+    <result column="material_updated_at" jdbcType="TIMESTAMP" property="materialUpdatedAt" />
   </resultMap>
   <sql id="Example_Where_Clause">
     <where>
@@ -76,7 +86,9 @@
   </sql>
   <sql id="Base_Column_List">
     id, code, product_id, planned_qty, routing_id, status, planned_start_at, planned_end_at,
-    remark, revision, create_time, update_time, source
+    remark, revision, create_time, update_time, source, bom_id, bom_revision, material_revision,
+    material_warehouse_ids, material_work_center, material_status, material_frozen_at,
+    material_updated_by, material_updated_at
   </sql>
   <select id="selectByExample" parameterType="dev.mesbase.business.production.domain.WorkorderExample" resultMap="BaseResultMap">
     select
@@ -95,13 +107,6 @@
     from workorder
     where id = #{id,jdbcType=BIGINT}
   </select>
-  <select id="selectByPrimaryKeyForUpdate" flushCache="true" useCache="false" parameterType="Long" resultMap="BaseResultMap">
-    select
-    <include refid="Base_Column_List" />
-    from workorder
-    where id = #{id,jdbcType=BIGINT}
-    for update
-  </select>
   <delete id="deleteByPrimaryKey" parameterType="Long">
     delete from workorder
     where id = #{id,jdbcType=BIGINT}
@@ -116,13 +121,19 @@
     insert into workorder (code, product_id, planned_qty,
       routing_id, status, planned_start_at,
       planned_end_at, remark, revision,
-      create_time, update_time, source
-      )
+      create_time, update_time, source,
+      bom_id, bom_revision, material_revision,
+      material_warehouse_ids, material_work_center,
+      material_status, material_frozen_at, material_updated_by,
+      material_updated_at)
     values (#{code,jdbcType=VARCHAR}, #{productId,jdbcType=BIGINT}, #{plannedQty,jdbcType=DECIMAL},
       #{routingId,jdbcType=BIGINT}, #{status,jdbcType=VARCHAR}, #{plannedStartAt,jdbcType=TIMESTAMP},
       #{plannedEndAt,jdbcType=TIMESTAMP}, #{remark,jdbcType=VARCHAR}, #{revision,jdbcType=INTEGER},
-      #{createTime,jdbcType=TIMESTAMP}, #{updateTime,jdbcType=TIMESTAMP}, #{source,jdbcType=VARCHAR}
-      )
+      #{createTime,jdbcType=TIMESTAMP}, #{updateTime,jdbcType=TIMESTAMP}, #{source,jdbcType=VARCHAR},
+      #{bomId,jdbcType=BIGINT}, #{bomRevision,jdbcType=BIGINT}, #{materialRevision,jdbcType=BIGINT},
+      #{materialWarehouseIds,jdbcType=VARCHAR}, #{materialWorkCenter,jdbcType=VARCHAR},
+      #{materialStatus,jdbcType=VARCHAR}, #{materialFrozenAt,jdbcType=TIMESTAMP}, #{materialUpdatedBy,jdbcType=BIGINT},
+      #{materialUpdatedAt,jdbcType=TIMESTAMP})
   </insert>
   <insert id="insertSelective" keyColumn="id" keyProperty="id" parameterType="dev.mesbase.business.production.domain.WorkorderEntity" useGeneratedKeys="true">
     insert into workorder
@@ -163,6 +174,33 @@
       <if test="source != null">
         source,
       </if>
+      <if test="bomId != null">
+        bom_id,
+      </if>
+      <if test="bomRevision != null">
+        bom_revision,
+      </if>
+      <if test="materialRevision != null">
+        material_revision,
+      </if>
+      <if test="materialWarehouseIds != null">
+        material_warehouse_ids,
+      </if>
+      <if test="materialWorkCenter != null">
+        material_work_center,
+      </if>
+      <if test="materialStatus != null">
+        material_status,
+      </if>
+      <if test="materialFrozenAt != null">
+        material_frozen_at,
+      </if>
+      <if test="materialUpdatedBy != null">
+        material_updated_by,
+      </if>
+      <if test="materialUpdatedAt != null">
+        material_updated_at,
+      </if>
     </trim>
     <trim prefix="values (" suffix=")" suffixOverrides=",">
       <if test="code != null">
@@ -200,6 +238,33 @@
       </if>
       <if test="source != null">
         #{source,jdbcType=VARCHAR},
+      </if>
+      <if test="bomId != null">
+        #{bomId,jdbcType=BIGINT},
+      </if>
+      <if test="bomRevision != null">
+        #{bomRevision,jdbcType=BIGINT},
+      </if>
+      <if test="materialRevision != null">
+        #{materialRevision,jdbcType=BIGINT},
+      </if>
+      <if test="materialWarehouseIds != null">
+        #{materialWarehouseIds,jdbcType=VARCHAR},
+      </if>
+      <if test="materialWorkCenter != null">
+        #{materialWorkCenter,jdbcType=VARCHAR},
+      </if>
+      <if test="materialStatus != null">
+        #{materialStatus,jdbcType=VARCHAR},
+      </if>
+      <if test="materialFrozenAt != null">
+        #{materialFrozenAt,jdbcType=TIMESTAMP},
+      </if>
+      <if test="materialUpdatedBy != null">
+        #{materialUpdatedBy,jdbcType=BIGINT},
+      </if>
+      <if test="materialUpdatedAt != null">
+        #{materialUpdatedAt,jdbcType=TIMESTAMP},
       </if>
     </trim>
   </insert>
@@ -251,6 +316,33 @@
       <if test="row.source != null">
         source = #{row.source,jdbcType=VARCHAR},
       </if>
+      <if test="row.bomId != null">
+        bom_id = #{row.bomId,jdbcType=BIGINT},
+      </if>
+      <if test="row.bomRevision != null">
+        bom_revision = #{row.bomRevision,jdbcType=BIGINT},
+      </if>
+      <if test="row.materialRevision != null">
+        material_revision = #{row.materialRevision,jdbcType=BIGINT},
+      </if>
+      <if test="row.materialWarehouseIds != null">
+        material_warehouse_ids = #{row.materialWarehouseIds,jdbcType=VARCHAR},
+      </if>
+      <if test="row.materialWorkCenter != null">
+        material_work_center = #{row.materialWorkCenter,jdbcType=VARCHAR},
+      </if>
+      <if test="row.materialStatus != null">
+        material_status = #{row.materialStatus,jdbcType=VARCHAR},
+      </if>
+      <if test="row.materialFrozenAt != null">
+        material_frozen_at = #{row.materialFrozenAt,jdbcType=TIMESTAMP},
+      </if>
+      <if test="row.materialUpdatedBy != null">
+        material_updated_by = #{row.materialUpdatedBy,jdbcType=BIGINT},
+      </if>
+      <if test="row.materialUpdatedAt != null">
+        material_updated_at = #{row.materialUpdatedAt,jdbcType=TIMESTAMP},
+      </if>
     </set>
     <if test="example != null">
       <include refid="Update_By_Example_Where_Clause" />
@@ -270,7 +362,16 @@
       revision = #{row.revision,jdbcType=INTEGER},
       create_time = #{row.createTime,jdbcType=TIMESTAMP},
       update_time = #{row.updateTime,jdbcType=TIMESTAMP},
-      source = #{row.source,jdbcType=VARCHAR}
+      source = #{row.source,jdbcType=VARCHAR},
+      bom_id = #{row.bomId,jdbcType=BIGINT},
+      bom_revision = #{row.bomRevision,jdbcType=BIGINT},
+      material_revision = #{row.materialRevision,jdbcType=BIGINT},
+      material_warehouse_ids = #{row.materialWarehouseIds,jdbcType=VARCHAR},
+      material_work_center = #{row.materialWorkCenter,jdbcType=VARCHAR},
+      material_status = #{row.materialStatus,jdbcType=VARCHAR},
+      material_frozen_at = #{row.materialFrozenAt,jdbcType=TIMESTAMP},
+      material_updated_by = #{row.materialUpdatedBy,jdbcType=BIGINT},
+      material_updated_at = #{row.materialUpdatedAt,jdbcType=TIMESTAMP}
     <if test="example != null">
       <include refid="Update_By_Example_Where_Clause" />
     </if>
@@ -314,6 +415,33 @@
       <if test="source != null">
         source = #{source,jdbcType=VARCHAR},
       </if>
+      <if test="bomId != null">
+        bom_id = #{bomId,jdbcType=BIGINT},
+      </if>
+      <if test="bomRevision != null">
+        bom_revision = #{bomRevision,jdbcType=BIGINT},
+      </if>
+      <if test="materialRevision != null">
+        material_revision = #{materialRevision,jdbcType=BIGINT},
+      </if>
+      <if test="materialWarehouseIds != null">
+        material_warehouse_ids = #{materialWarehouseIds,jdbcType=VARCHAR},
+      </if>
+      <if test="materialWorkCenter != null">
+        material_work_center = #{materialWorkCenter,jdbcType=VARCHAR},
+      </if>
+      <if test="materialStatus != null">
+        material_status = #{materialStatus,jdbcType=VARCHAR},
+      </if>
+      <if test="materialFrozenAt != null">
+        material_frozen_at = #{materialFrozenAt,jdbcType=TIMESTAMP},
+      </if>
+      <if test="materialUpdatedBy != null">
+        material_updated_by = #{materialUpdatedBy,jdbcType=BIGINT},
+      </if>
+      <if test="materialUpdatedAt != null">
+        material_updated_at = #{materialUpdatedAt,jdbcType=TIMESTAMP},
+      </if>
     </set>
     where id = #{id,jdbcType=BIGINT}
   </update>
@@ -330,7 +458,23 @@
       revision = #{revision,jdbcType=INTEGER},
       create_time = #{createTime,jdbcType=TIMESTAMP},
       update_time = #{updateTime,jdbcType=TIMESTAMP},
-      source = #{source,jdbcType=VARCHAR}
+      source = #{source,jdbcType=VARCHAR},
+      bom_id = #{bomId,jdbcType=BIGINT},
+      bom_revision = #{bomRevision,jdbcType=BIGINT},
+      material_revision = #{materialRevision,jdbcType=BIGINT},
+      material_warehouse_ids = #{materialWarehouseIds,jdbcType=VARCHAR},
+      material_work_center = #{materialWorkCenter,jdbcType=VARCHAR},
+      material_status = #{materialStatus,jdbcType=VARCHAR},
+      material_frozen_at = #{materialFrozenAt,jdbcType=TIMESTAMP},
+      material_updated_by = #{materialUpdatedBy,jdbcType=BIGINT},
+      material_updated_at = #{materialUpdatedAt,jdbcType=TIMESTAMP}
     where id = #{id,jdbcType=BIGINT}
   </update>
+  <select flushCache="true" id="selectByPrimaryKeyForUpdate" parameterType="Long" resultMap="BaseResultMap" useCache="false">
+    select
+    <include refid="Base_Column_List" />
+    from workorder
+    where id = #{id,jdbcType=BIGINT}
+    for update
+  </select>
 </mapper>

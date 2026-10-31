@@ -18,6 +18,7 @@ class WorkorderExtraLifecycleHttpTest {
         try (var c = MaterialIssueHttpTest.context()) {
             var m = MaterialIssueHttpTest.mvc(c);
             String body = "{\"code\":\"WO_EXTRA_TEST\",\"productId\":1,\"routingId\":1,\"plannedQty\":10,\"ruleCode\":\"WORK_ORDER\"}";
+            body = WorkorderMaterialFixture.command(c.getBean(MaterialIssueHttpTest.Fixture.class).business.get("A"), body, null);
             m.perform(full(post("/api/production/workorder")).content(body.replace("\"ruleCode\":", "\"externalId\":\"FORGED\",\"ruleCode\":")))
                     .andExpect(status().isConflict());
             m.perform(full(post("/api/production/workorder")).content(body))

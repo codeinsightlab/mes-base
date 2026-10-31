@@ -915,6 +915,576 @@ public class WorkorderExample {
             addCriterion("source not between", value1, value2, "source");
             return (Criteria) this;
         }
+
+        public Criteria andBomIdIsNull() {
+            addCriterion("bom_id is null");
+            return (Criteria) this;
+        }
+
+        public Criteria andBomIdIsNotNull() {
+            addCriterion("bom_id is not null");
+            return (Criteria) this;
+        }
+
+        public Criteria andBomIdEqualTo(Long value) {
+            addCriterion("bom_id =", value, "bomId");
+            return (Criteria) this;
+        }
+
+        public Criteria andBomIdNotEqualTo(Long value) {
+            addCriterion("bom_id <>", value, "bomId");
+            return (Criteria) this;
+        }
+
+        public Criteria andBomIdGreaterThan(Long value) {
+            addCriterion("bom_id >", value, "bomId");
+            return (Criteria) this;
+        }
+
+        public Criteria andBomIdGreaterThanOrEqualTo(Long value) {
+            addCriterion("bom_id >=", value, "bomId");
+            return (Criteria) this;
+        }
+
+        public Criteria andBomIdLessThan(Long value) {
+            addCriterion("bom_id <", value, "bomId");
+            return (Criteria) this;
+        }
+
+        public Criteria andBomIdLessThanOrEqualTo(Long value) {
+            addCriterion("bom_id <=", value, "bomId");
+            return (Criteria) this;
+        }
+
+        public Criteria andBomIdIn(List<Long> values) {
+            addCriterion("bom_id in", values, "bomId");
+            return (Criteria) this;
+        }
+
+        public Criteria andBomIdNotIn(List<Long> values) {
+            addCriterion("bom_id not in", values, "bomId");
+            return (Criteria) this;
+        }
+
+        public Criteria andBomIdBetween(Long value1, Long value2) {
+            addCriterion("bom_id between", value1, value2, "bomId");
+            return (Criteria) this;
+        }
+
+        public Criteria andBomIdNotBetween(Long value1, Long value2) {
+            addCriterion("bom_id not between", value1, value2, "bomId");
+            return (Criteria) this;
+        }
+
+        public Criteria andBomRevisionIsNull() {
+            addCriterion("bom_revision is null");
+            return (Criteria) this;
+        }
+
+        public Criteria andBomRevisionIsNotNull() {
+            addCriterion("bom_revision is not null");
+            return (Criteria) this;
+        }
+
+        public Criteria andBomRevisionEqualTo(Long value) {
+            addCriterion("bom_revision =", value, "bomRevision");
+            return (Criteria) this;
+        }
+
+        public Criteria andBomRevisionNotEqualTo(Long value) {
+            addCriterion("bom_revision <>", value, "bomRevision");
+            return (Criteria) this;
+        }
+
+        public Criteria andBomRevisionGreaterThan(Long value) {
+            addCriterion("bom_revision >", value, "bomRevision");
+            return (Criteria) this;
+        }
+
+        public Criteria andBomRevisionGreaterThanOrEqualTo(Long value) {
+            addCriterion("bom_revision >=", value, "bomRevision");
+            return (Criteria) this;
+        }
+
+        public Criteria andBomRevisionLessThan(Long value) {
+            addCriterion("bom_revision <", value, "bomRevision");
+            return (Criteria) this;
+        }
+
+        public Criteria andBomRevisionLessThanOrEqualTo(Long value) {
+            addCriterion("bom_revision <=", value, "bomRevision");
+            return (Criteria) this;
+        }
+
+        public Criteria andBomRevisionIn(List<Long> values) {
+            addCriterion("bom_revision in", values, "bomRevision");
+            return (Criteria) this;
+        }
+
+        public Criteria andBomRevisionNotIn(List<Long> values) {
+            addCriterion("bom_revision not in", values, "bomRevision");
+            return (Criteria) this;
+        }
+
+        public Criteria andBomRevisionBetween(Long value1, Long value2) {
+            addCriterion("bom_revision between", value1, value2, "bomRevision");
+            return (Criteria) this;
+        }
+
+        public Criteria andBomRevisionNotBetween(Long value1, Long value2) {
+            addCriterion("bom_revision not between", value1, value2, "bomRevision");
+            return (Criteria) this;
+        }
+
+        public Criteria andMaterialRevisionIsNull() {
+            addCriterion("material_revision is null");
+            return (Criteria) this;
+        }
+
+        public Criteria andMaterialRevisionIsNotNull() {
+            addCriterion("material_revision is not null");
+            return (Criteria) this;
+        }
+
+        public Criteria andMaterialRevisionEqualTo(Long value) {
+            addCriterion("material_revision =", value, "materialRevision");
+            return (Criteria) this;
+        }
+
+        public Criteria andMaterialRevisionNotEqualTo(Long value) {
+            addCriterion("material_revision <>", value, "materialRevision");
+            return (Criteria) this;
+        }
+
+        public Criteria andMaterialRevisionGreaterThan(Long value) {
+            addCriterion("material_revision >", value, "materialRevision");
+            return (Criteria) this;
+        }
+
+        public Criteria andMaterialRevisionGreaterThanOrEqualTo(Long value) {
+            addCriterion("material_revision >=", value, "materialRevision");
+            return (Criteria) this;
+        }
+
+        public Criteria andMaterialRevisionLessThan(Long value) {
+            addCriterion("material_revision <", value, "materialRevision");
+            return (Criteria) this;
+        }
+
+        public Criteria andMaterialRevisionLessThanOrEqualTo(Long value) {
+            addCriterion("material_revision <=", value, "materialRevision");
+            return (Criteria) this;
+        }
+
+        public Criteria andMaterialRevisionIn(List<Long> values) {
+            addCriterion("material_revision in", values, "materialRevision");
+            return (Criteria) this;
+        }
+
+        public Criteria andMaterialRevisionNotIn(List<Long> values) {
+            addCriterion("material_revision not in", values, "materialRevision");
+            return (Criteria) this;
+        }
+
+        public Criteria andMaterialRevisionBetween(Long value1, Long value2) {
+            addCriterion("material_revision between", value1, value2, "materialRevision");
+            return (Criteria) this;
+        }
+
+        public Criteria andMaterialRevisionNotBetween(Long value1, Long value2) {
+            addCriterion("material_revision not between", value1, value2, "materialRevision");
+            return (Criteria) this;
+        }
+
+        public Criteria andMaterialWarehouseIdsIsNull() {
+            addCriterion("material_warehouse_ids is null");
+            return (Criteria) this;
+        }
+
+        public Criteria andMaterialWarehouseIdsIsNotNull() {
+            addCriterion("material_warehouse_ids is not null");
+            return (Criteria) this;
+        }
+
+        public Criteria andMaterialWarehouseIdsEqualTo(String value) {
+            addCriterion("material_warehouse_ids =", value, "materialWarehouseIds");
+            return (Criteria) this;
+        }
+
+        public Criteria andMaterialWarehouseIdsNotEqualTo(String value) {
+            addCriterion("material_warehouse_ids <>", value, "materialWarehouseIds");
+            return (Criteria) this;
+        }
+
+        public Criteria andMaterialWarehouseIdsGreaterThan(String value) {
+            addCriterion("material_warehouse_ids >", value, "materialWarehouseIds");
+            return (Criteria) this;
+        }
+
+        public Criteria andMaterialWarehouseIdsGreaterThanOrEqualTo(String value) {
+            addCriterion("material_warehouse_ids >=", value, "materialWarehouseIds");
+            return (Criteria) this;
+        }
+
+        public Criteria andMaterialWarehouseIdsLessThan(String value) {
+            addCriterion("material_warehouse_ids <", value, "materialWarehouseIds");
+            return (Criteria) this;
+        }
+
+        public Criteria andMaterialWarehouseIdsLessThanOrEqualTo(String value) {
+            addCriterion("material_warehouse_ids <=", value, "materialWarehouseIds");
+            return (Criteria) this;
+        }
+
+        public Criteria andMaterialWarehouseIdsLike(String value) {
+            addCriterion("material_warehouse_ids like", value, "materialWarehouseIds");
+            return (Criteria) this;
+        }
+
+        public Criteria andMaterialWarehouseIdsNotLike(String value) {
+            addCriterion("material_warehouse_ids not like", value, "materialWarehouseIds");
+            return (Criteria) this;
+        }
+
+        public Criteria andMaterialWarehouseIdsIn(List<String> values) {
+            addCriterion("material_warehouse_ids in", values, "materialWarehouseIds");
+            return (Criteria) this;
+        }
+
+        public Criteria andMaterialWarehouseIdsNotIn(List<String> values) {
+            addCriterion("material_warehouse_ids not in", values, "materialWarehouseIds");
+            return (Criteria) this;
+        }
+
+        public Criteria andMaterialWarehouseIdsBetween(String value1, String value2) {
+            addCriterion("material_warehouse_ids between", value1, value2, "materialWarehouseIds");
+            return (Criteria) this;
+        }
+
+        public Criteria andMaterialWarehouseIdsNotBetween(String value1, String value2) {
+            addCriterion("material_warehouse_ids not between", value1, value2, "materialWarehouseIds");
+            return (Criteria) this;
+        }
+
+        public Criteria andMaterialWorkCenterIsNull() {
+            addCriterion("material_work_center is null");
+            return (Criteria) this;
+        }
+
+        public Criteria andMaterialWorkCenterIsNotNull() {
+            addCriterion("material_work_center is not null");
+            return (Criteria) this;
+        }
+
+        public Criteria andMaterialWorkCenterEqualTo(String value) {
+            addCriterion("material_work_center =", value, "materialWorkCenter");
+            return (Criteria) this;
+        }
+
+        public Criteria andMaterialWorkCenterNotEqualTo(String value) {
+            addCriterion("material_work_center <>", value, "materialWorkCenter");
+            return (Criteria) this;
+        }
+
+        public Criteria andMaterialWorkCenterGreaterThan(String value) {
+            addCriterion("material_work_center >", value, "materialWorkCenter");
+            return (Criteria) this;
+        }
+
+        public Criteria andMaterialWorkCenterGreaterThanOrEqualTo(String value) {
+            addCriterion("material_work_center >=", value, "materialWorkCenter");
+            return (Criteria) this;
+        }
+
+        public Criteria andMaterialWorkCenterLessThan(String value) {
+            addCriterion("material_work_center <", value, "materialWorkCenter");
+            return (Criteria) this;
+        }
+
+        public Criteria andMaterialWorkCenterLessThanOrEqualTo(String value) {
+            addCriterion("material_work_center <=", value, "materialWorkCenter");
+            return (Criteria) this;
+        }
+
+        public Criteria andMaterialWorkCenterLike(String value) {
+            addCriterion("material_work_center like", value, "materialWorkCenter");
+            return (Criteria) this;
+        }
+
+        public Criteria andMaterialWorkCenterNotLike(String value) {
+            addCriterion("material_work_center not like", value, "materialWorkCenter");
+            return (Criteria) this;
+        }
+
+        public Criteria andMaterialWorkCenterIn(List<String> values) {
+            addCriterion("material_work_center in", values, "materialWorkCenter");
+            return (Criteria) this;
+        }
+
+        public Criteria andMaterialWorkCenterNotIn(List<String> values) {
+            addCriterion("material_work_center not in", values, "materialWorkCenter");
+            return (Criteria) this;
+        }
+
+        public Criteria andMaterialWorkCenterBetween(String value1, String value2) {
+            addCriterion("material_work_center between", value1, value2, "materialWorkCenter");
+            return (Criteria) this;
+        }
+
+        public Criteria andMaterialWorkCenterNotBetween(String value1, String value2) {
+            addCriterion("material_work_center not between", value1, value2, "materialWorkCenter");
+            return (Criteria) this;
+        }
+
+        public Criteria andMaterialStatusIsNull() {
+            addCriterion("material_status is null");
+            return (Criteria) this;
+        }
+
+        public Criteria andMaterialStatusIsNotNull() {
+            addCriterion("material_status is not null");
+            return (Criteria) this;
+        }
+
+        public Criteria andMaterialStatusEqualTo(String value) {
+            addCriterion("material_status =", value, "materialStatus");
+            return (Criteria) this;
+        }
+
+        public Criteria andMaterialStatusNotEqualTo(String value) {
+            addCriterion("material_status <>", value, "materialStatus");
+            return (Criteria) this;
+        }
+
+        public Criteria andMaterialStatusGreaterThan(String value) {
+            addCriterion("material_status >", value, "materialStatus");
+            return (Criteria) this;
+        }
+
+        public Criteria andMaterialStatusGreaterThanOrEqualTo(String value) {
+            addCriterion("material_status >=", value, "materialStatus");
+            return (Criteria) this;
+        }
+
+        public Criteria andMaterialStatusLessThan(String value) {
+            addCriterion("material_status <", value, "materialStatus");
+            return (Criteria) this;
+        }
+
+        public Criteria andMaterialStatusLessThanOrEqualTo(String value) {
+            addCriterion("material_status <=", value, "materialStatus");
+            return (Criteria) this;
+        }
+
+        public Criteria andMaterialStatusLike(String value) {
+            addCriterion("material_status like", value, "materialStatus");
+            return (Criteria) this;
+        }
+
+        public Criteria andMaterialStatusNotLike(String value) {
+            addCriterion("material_status not like", value, "materialStatus");
+            return (Criteria) this;
+        }
+
+        public Criteria andMaterialStatusIn(List<String> values) {
+            addCriterion("material_status in", values, "materialStatus");
+            return (Criteria) this;
+        }
+
+        public Criteria andMaterialStatusNotIn(List<String> values) {
+            addCriterion("material_status not in", values, "materialStatus");
+            return (Criteria) this;
+        }
+
+        public Criteria andMaterialStatusBetween(String value1, String value2) {
+            addCriterion("material_status between", value1, value2, "materialStatus");
+            return (Criteria) this;
+        }
+
+        public Criteria andMaterialStatusNotBetween(String value1, String value2) {
+            addCriterion("material_status not between", value1, value2, "materialStatus");
+            return (Criteria) this;
+        }
+
+        public Criteria andMaterialFrozenAtIsNull() {
+            addCriterion("material_frozen_at is null");
+            return (Criteria) this;
+        }
+
+        public Criteria andMaterialFrozenAtIsNotNull() {
+            addCriterion("material_frozen_at is not null");
+            return (Criteria) this;
+        }
+
+        public Criteria andMaterialFrozenAtEqualTo(LocalDateTime value) {
+            addCriterion("material_frozen_at =", value, "materialFrozenAt");
+            return (Criteria) this;
+        }
+
+        public Criteria andMaterialFrozenAtNotEqualTo(LocalDateTime value) {
+            addCriterion("material_frozen_at <>", value, "materialFrozenAt");
+            return (Criteria) this;
+        }
+
+        public Criteria andMaterialFrozenAtGreaterThan(LocalDateTime value) {
+            addCriterion("material_frozen_at >", value, "materialFrozenAt");
+            return (Criteria) this;
+        }
+
+        public Criteria andMaterialFrozenAtGreaterThanOrEqualTo(LocalDateTime value) {
+            addCriterion("material_frozen_at >=", value, "materialFrozenAt");
+            return (Criteria) this;
+        }
+
+        public Criteria andMaterialFrozenAtLessThan(LocalDateTime value) {
+            addCriterion("material_frozen_at <", value, "materialFrozenAt");
+            return (Criteria) this;
+        }
+
+        public Criteria andMaterialFrozenAtLessThanOrEqualTo(LocalDateTime value) {
+            addCriterion("material_frozen_at <=", value, "materialFrozenAt");
+            return (Criteria) this;
+        }
+
+        public Criteria andMaterialFrozenAtIn(List<LocalDateTime> values) {
+            addCriterion("material_frozen_at in", values, "materialFrozenAt");
+            return (Criteria) this;
+        }
+
+        public Criteria andMaterialFrozenAtNotIn(List<LocalDateTime> values) {
+            addCriterion("material_frozen_at not in", values, "materialFrozenAt");
+            return (Criteria) this;
+        }
+
+        public Criteria andMaterialFrozenAtBetween(LocalDateTime value1, LocalDateTime value2) {
+            addCriterion("material_frozen_at between", value1, value2, "materialFrozenAt");
+            return (Criteria) this;
+        }
+
+        public Criteria andMaterialFrozenAtNotBetween(LocalDateTime value1, LocalDateTime value2) {
+            addCriterion("material_frozen_at not between", value1, value2, "materialFrozenAt");
+            return (Criteria) this;
+        }
+
+        public Criteria andMaterialUpdatedByIsNull() {
+            addCriterion("material_updated_by is null");
+            return (Criteria) this;
+        }
+
+        public Criteria andMaterialUpdatedByIsNotNull() {
+            addCriterion("material_updated_by is not null");
+            return (Criteria) this;
+        }
+
+        public Criteria andMaterialUpdatedByEqualTo(Long value) {
+            addCriterion("material_updated_by =", value, "materialUpdatedBy");
+            return (Criteria) this;
+        }
+
+        public Criteria andMaterialUpdatedByNotEqualTo(Long value) {
+            addCriterion("material_updated_by <>", value, "materialUpdatedBy");
+            return (Criteria) this;
+        }
+
+        public Criteria andMaterialUpdatedByGreaterThan(Long value) {
+            addCriterion("material_updated_by >", value, "materialUpdatedBy");
+            return (Criteria) this;
+        }
+
+        public Criteria andMaterialUpdatedByGreaterThanOrEqualTo(Long value) {
+            addCriterion("material_updated_by >=", value, "materialUpdatedBy");
+            return (Criteria) this;
+        }
+
+        public Criteria andMaterialUpdatedByLessThan(Long value) {
+            addCriterion("material_updated_by <", value, "materialUpdatedBy");
+            return (Criteria) this;
+        }
+
+        public Criteria andMaterialUpdatedByLessThanOrEqualTo(Long value) {
+            addCriterion("material_updated_by <=", value, "materialUpdatedBy");
+            return (Criteria) this;
+        }
+
+        public Criteria andMaterialUpdatedByIn(List<Long> values) {
+            addCriterion("material_updated_by in", values, "materialUpdatedBy");
+            return (Criteria) this;
+        }
+
+        public Criteria andMaterialUpdatedByNotIn(List<Long> values) {
+            addCriterion("material_updated_by not in", values, "materialUpdatedBy");
+            return (Criteria) this;
+        }
+
+        public Criteria andMaterialUpdatedByBetween(Long value1, Long value2) {
+            addCriterion("material_updated_by between", value1, value2, "materialUpdatedBy");
+            return (Criteria) this;
+        }
+
+        public Criteria andMaterialUpdatedByNotBetween(Long value1, Long value2) {
+            addCriterion("material_updated_by not between", value1, value2, "materialUpdatedBy");
+            return (Criteria) this;
+        }
+
+        public Criteria andMaterialUpdatedAtIsNull() {
+            addCriterion("material_updated_at is null");
+            return (Criteria) this;
+        }
+
+        public Criteria andMaterialUpdatedAtIsNotNull() {
+            addCriterion("material_updated_at is not null");
+            return (Criteria) this;
+        }
+
+        public Criteria andMaterialUpdatedAtEqualTo(LocalDateTime value) {
+            addCriterion("material_updated_at =", value, "materialUpdatedAt");
+            return (Criteria) this;
+        }
+
+        public Criteria andMaterialUpdatedAtNotEqualTo(LocalDateTime value) {
+            addCriterion("material_updated_at <>", value, "materialUpdatedAt");
+            return (Criteria) this;
+        }
+
+        public Criteria andMaterialUpdatedAtGreaterThan(LocalDateTime value) {
+            addCriterion("material_updated_at >", value, "materialUpdatedAt");
+            return (Criteria) this;
+        }
+
+        public Criteria andMaterialUpdatedAtGreaterThanOrEqualTo(LocalDateTime value) {
+            addCriterion("material_updated_at >=", value, "materialUpdatedAt");
+            return (Criteria) this;
+        }
+
+        public Criteria andMaterialUpdatedAtLessThan(LocalDateTime value) {
+            addCriterion("material_updated_at <", value, "materialUpdatedAt");
+            return (Criteria) this;
+        }
+
+        public Criteria andMaterialUpdatedAtLessThanOrEqualTo(LocalDateTime value) {
+            addCriterion("material_updated_at <=", value, "materialUpdatedAt");
+            return (Criteria) this;
+        }
+
+        public Criteria andMaterialUpdatedAtIn(List<LocalDateTime> values) {
+            addCriterion("material_updated_at in", values, "materialUpdatedAt");
+            return (Criteria) this;
+        }
+
+        public Criteria andMaterialUpdatedAtNotIn(List<LocalDateTime> values) {
+            addCriterion("material_updated_at not in", values, "materialUpdatedAt");
+            return (Criteria) this;
+        }
+
+        public Criteria andMaterialUpdatedAtBetween(LocalDateTime value1, LocalDateTime value2) {
+            addCriterion("material_updated_at between", value1, value2, "materialUpdatedAt");
+            return (Criteria) this;
+        }
+
+        public Criteria andMaterialUpdatedAtNotBetween(LocalDateTime value1, LocalDateTime value2) {
+            addCriterion("material_updated_at not between", value1, value2, "materialUpdatedAt");
+            return (Criteria) this;
+        }
     }
 
     public static class Criteria extends GeneratedCriteria {

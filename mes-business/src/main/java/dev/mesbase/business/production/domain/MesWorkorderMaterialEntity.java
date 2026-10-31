@@ -37,6 +37,14 @@ public class MesWorkorderMaterialEntity {
 
     private LocalDateTime frozenAt;
 
+    private Long workorderId;
+
+    private Integer lineNo;
+
+    private Long bomItemId;
+
+    private Boolean manuallyAdjusted;
+
     public Long getId() {
         return id;
     }
@@ -163,5 +171,37 @@ public class MesWorkorderMaterialEntity {
 
     public void setFrozenAt(LocalDateTime frozenAt) {
         this.frozenAt = frozenAt;
+    }
+
+    public Long getWorkorderId() {
+        return workorderId;
+    }
+
+    public void setWorkorderId(Long workorderId) {
+        this.workorderId = workorderId;
+    }
+
+    public Integer getLineNo() {
+        return lineNo;
+    }
+
+    public void setLineNo(Integer lineNo) {
+        this.lineNo = lineNo;
+    }
+
+    public Long getBomItemId() {
+        return bomItemId;
+    }
+
+    public void setBomItemId(Long bomItemId) {
+        this.bomItemId = bomItemId;
+    }
+
+    public Boolean getManuallyAdjusted() {
+        return manuallyAdjusted;
+    }
+
+    public void setManuallyAdjusted(Boolean manuallyAdjusted) {
+        this.manuallyAdjusted = manuallyAdjusted;
     }
 }

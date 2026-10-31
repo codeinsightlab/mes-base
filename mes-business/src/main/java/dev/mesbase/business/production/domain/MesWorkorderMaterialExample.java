@@ -1085,6 +1085,246 @@ public class MesWorkorderMaterialExample {
             addCriterion("frozen_at not between", value1, value2, "frozenAt");
             return (Criteria) this;
         }
+
+        public Criteria andWorkorderIdIsNull() {
+            addCriterion("workorder_id is null");
+            return (Criteria) this;
+        }
+
+        public Criteria andWorkorderIdIsNotNull() {
+            addCriterion("workorder_id is not null");
+            return (Criteria) this;
+        }
+
+        public Criteria andWorkorderIdEqualTo(Long value) {
+            addCriterion("workorder_id =", value, "workorderId");
+            return (Criteria) this;
+        }
+
+        public Criteria andWorkorderIdNotEqualTo(Long value) {
+            addCriterion("workorder_id <>", value, "workorderId");
+            return (Criteria) this;
+        }
+
+        public Criteria andWorkorderIdGreaterThan(Long value) {
+            addCriterion("workorder_id >", value, "workorderId");
+            return (Criteria) this;
+        }
+
+        public Criteria andWorkorderIdGreaterThanOrEqualTo(Long value) {
+            addCriterion("workorder_id >=", value, "workorderId");
+            return (Criteria) this;
+        }
+
+        public Criteria andWorkorderIdLessThan(Long value) {
+            addCriterion("workorder_id <", value, "workorderId");
+            return (Criteria) this;
+        }
+
+        public Criteria andWorkorderIdLessThanOrEqualTo(Long value) {
+            addCriterion("workorder_id <=", value, "workorderId");
+            return (Criteria) this;
+        }
+
+        public Criteria andWorkorderIdIn(List<Long> values) {
+            addCriterion("workorder_id in", values, "workorderId");
+            return (Criteria) this;
+        }
+
+        public Criteria andWorkorderIdNotIn(List<Long> values) {
+            addCriterion("workorder_id not in", values, "workorderId");
+            return (Criteria) this;
+        }
+
+        public Criteria andWorkorderIdBetween(Long value1, Long value2) {
+            addCriterion("workorder_id between", value1, value2, "workorderId");
+            return (Criteria) this;
+        }
+
+        public Criteria andWorkorderIdNotBetween(Long value1, Long value2) {
+            addCriterion("workorder_id not between", value1, value2, "workorderId");
+            return (Criteria) this;
+        }
+
+        public Criteria andLineNoIsNull() {
+            addCriterion("line_no is null");
+            return (Criteria) this;
+        }
+
+        public Criteria andLineNoIsNotNull() {
+            addCriterion("line_no is not null");
+            return (Criteria) this;
+        }
+
+        public Criteria andLineNoEqualTo(Integer value) {
+            addCriterion("line_no =", value, "lineNo");
+            return (Criteria) this;
+        }
+
+        public Criteria andLineNoNotEqualTo(Integer value) {
+            addCriterion("line_no <>", value, "lineNo");
+            return (Criteria) this;
+        }
+
+        public Criteria andLineNoGreaterThan(Integer value) {
+            addCriterion("line_no >", value, "lineNo");
+            return (Criteria) this;
+        }
+
+        public Criteria andLineNoGreaterThanOrEqualTo(Integer value) {
+            addCriterion("line_no >=", value, "lineNo");
+            return (Criteria) this;
+        }
+
+        public Criteria andLineNoLessThan(Integer value) {
+            addCriterion("line_no <", value, "lineNo");
+            return (Criteria) this;
+        }
+
+        public Criteria andLineNoLessThanOrEqualTo(Integer value) {
+            addCriterion("line_no <=", value, "lineNo");
+            return (Criteria) this;
+        }
+
+        public Criteria andLineNoIn(List<Integer> values) {
+            addCriterion("line_no in", values, "lineNo");
+            return (Criteria) this;
+        }
+
+        public Criteria andLineNoNotIn(List<Integer> values) {
+            addCriterion("line_no not in", values, "lineNo");
+            return (Criteria) this;
+        }
+
+        public Criteria andLineNoBetween(Integer value1, Integer value2) {
+            addCriterion("line_no between", value1, value2, "lineNo");
+            return (Criteria) this;
+        }
+
+        public Criteria andLineNoNotBetween(Integer value1, Integer value2) {
+            addCriterion("line_no not between", value1, value2, "lineNo");
+            return (Criteria) this;
+        }
+
+        public Criteria andBomItemIdIsNull() {
+            addCriterion("bom_item_id is null");
+            return (Criteria) this;
+        }
+
+        public Criteria andBomItemIdIsNotNull() {
+            addCriterion("bom_item_id is not null");
+            return (Criteria) this;
+        }
+
+        public Criteria andBomItemIdEqualTo(Long value) {
+            addCriterion("bom_item_id =", value, "bomItemId");
+            return (Criteria) this;
+        }
+
+        public Criteria andBomItemIdNotEqualTo(Long value) {
+            addCriterion("bom_item_id <>", value, "bomItemId");
+            return (Criteria) this;
+        }
+
+        public Criteria andBomItemIdGreaterThan(Long value) {
+            addCriterion("bom_item_id >", value, "bomItemId");
+            return (Criteria) this;
+        }
+
+        public Criteria andBomItemIdGreaterThanOrEqualTo(Long value) {
+            addCriterion("bom_item_id >=", value, "bomItemId");
+            return (Criteria) this;
+        }
+
+        public Criteria andBomItemIdLessThan(Long value) {
+            addCriterion("bom_item_id <", value, "bomItemId");
+            return (Criteria) this;
+        }
+
+        public Criteria andBomItemIdLessThanOrEqualTo(Long value) {
+            addCriterion("bom_item_id <=", value, "bomItemId");
+            return (Criteria) this;
+        }
+
+        public Criteria andBomItemIdIn(List<Long> values) {
+            addCriterion("bom_item_id in", values, "bomItemId");
+            return (Criteria) this;
+        }
+
+        public Criteria andBomItemIdNotIn(List<Long> values) {
+            addCriterion("bom_item_id not in", values, "bomItemId");
+            return (Criteria) this;
+        }
+
+        public Criteria andBomItemIdBetween(Long value1, Long value2) {
+            addCriterion("bom_item_id between", value1, value2, "bomItemId");
+            return (Criteria) this;
+        }
+
+        public Criteria andBomItemIdNotBetween(Long value1, Long value2) {
+            addCriterion("bom_item_id not between", value1, value2, "bomItemId");
+            return (Criteria) this;
+        }
+
+        public Criteria andManuallyAdjustedIsNull() {
+            addCriterion("manually_adjusted is null");
+            return (Criteria) this;
+        }
+
+        public Criteria andManuallyAdjustedIsNotNull() {
+            addCriterion("manually_adjusted is not null");
+            return (Criteria) this;
+        }
+
+        public Criteria andManuallyAdjustedEqualTo(Boolean value) {
+            addCriterion("manually_adjusted =", value, "manuallyAdjusted");
+            return (Criteria) this;
+        }
+
+        public Criteria andManuallyAdjustedNotEqualTo(Boolean value) {
+            addCriterion("manually_adjusted <>", value, "manuallyAdjusted");
+            return (Criteria) this;
+        }
+
+        public Criteria andManuallyAdjustedGreaterThan(Boolean value) {
+            addCriterion("manually_adjusted >", value, "manuallyAdjusted");
+            return (Criteria) this;
+        }
+
+        public Criteria andManuallyAdjustedGreaterThanOrEqualTo(Boolean value) {
+            addCriterion("manually_adjusted >=", value, "manuallyAdjusted");
+            return (Criteria) this;
+        }
+
+        public Criteria andManuallyAdjustedLessThan(Boolean value) {
+            addCriterion("manually_adjusted <", value, "manuallyAdjusted");
+            return (Criteria) this;
+        }
+
+        public Criteria andManuallyAdjustedLessThanOrEqualTo(Boolean value) {
+            addCriterion("manually_adjusted <=", value, "manuallyAdjusted");
+            return (Criteria) this;
+        }
+
+        public Criteria andManuallyAdjustedIn(List<Boolean> values) {
+            addCriterion("manually_adjusted in", values, "manuallyAdjusted");
+            return (Criteria) this;
+        }
+
+        public Criteria andManuallyAdjustedNotIn(List<Boolean> values) {
+            addCriterion("manually_adjusted not in", values, "manuallyAdjusted");
+            return (Criteria) this;
+        }
+
+        public Criteria andManuallyAdjustedBetween(Boolean value1, Boolean value2) {
+            addCriterion("manually_adjusted between", value1, value2, "manuallyAdjusted");
+            return (Criteria) this;
+        }
+
+        public Criteria andManuallyAdjustedNotBetween(Boolean value1, Boolean value2) {
+            addCriterion("manually_adjusted not between", value1, value2, "manuallyAdjusted");
+            return (Criteria) this;
+        }
     }
 
     public static class Criteria extends GeneratedCriteria {

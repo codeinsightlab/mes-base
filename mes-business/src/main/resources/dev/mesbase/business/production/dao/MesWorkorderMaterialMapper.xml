@@ -1,4 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
+<!-- MES-CODEGEN: MyBatis Generator standard single-table persistence. -->
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="dev.mesbase.business.production.dao.MesWorkorderMaterialMapper">
   <resultMap id="BaseResultMap" type="dev.mesbase.business.production.domain.MesWorkorderMaterialEntity">
@@ -18,6 +19,10 @@
     <result column="bom_component_qty" jdbcType="DECIMAL" property="bomComponentQty" />
     <result column="output_unit_id" jdbcType="BIGINT" property="outputUnitId" />
     <result column="frozen_at" jdbcType="TIMESTAMP" property="frozenAt" />
+    <result column="workorder_id" jdbcType="BIGINT" property="workorderId" />
+    <result column="line_no" jdbcType="INTEGER" property="lineNo" />
+    <result column="bom_item_id" jdbcType="BIGINT" property="bomItemId" />
+    <result column="manually_adjusted" jdbcType="BIT" property="manuallyAdjusted" />
   </resultMap>
   <sql id="Example_Where_Clause">
     <where>
@@ -80,7 +85,7 @@
   <sql id="Base_Column_List">
     id, material_id, unit_id, total_required_qty, planned_qty, warehouse_ids, work_center,
     revision, status, updated_by, updated_at, bom_id, bom_base_qty, bom_component_qty,
-    output_unit_id, frozen_at
+    output_unit_id, frozen_at, workorder_id, line_no, bom_item_id, manually_adjusted
   </sql>
   <select id="selectByExample" parameterType="dev.mesbase.business.production.domain.MesWorkorderMaterialExample" resultMap="BaseResultMap">
     select
@@ -109,26 +114,25 @@
       <include refid="Example_Where_Clause" />
     </if>
   </delete>
-  <insert id="insert" parameterType="dev.mesbase.business.production.domain.MesWorkorderMaterialEntity">
-    insert into mes_workorder_material (id, material_id, unit_id,
-      total_required_qty, planned_qty, warehouse_ids,
-      work_center, revision, status,
-      updated_by, updated_at, bom_id,
-      bom_base_qty, bom_component_qty, output_unit_id,
-      frozen_at)
-    values (#{id,jdbcType=BIGINT}, #{materialId,jdbcType=BIGINT}, #{unitId,jdbcType=BIGINT},
-      #{totalRequiredQty,jdbcType=DECIMAL}, #{plannedQty,jdbcType=DECIMAL}, #{warehouseIds,jdbcType=VARCHAR},
-      #{workCenter,jdbcType=VARCHAR}, #{revision,jdbcType=BIGINT}, #{status,jdbcType=VARCHAR},
-      #{updatedBy,jdbcType=BIGINT}, #{updatedAt,jdbcType=TIMESTAMP}, #{bomId,jdbcType=BIGINT},
-      #{bomBaseQty,jdbcType=DECIMAL}, #{bomComponentQty,jdbcType=DECIMAL}, #{outputUnitId,jdbcType=BIGINT},
-      #{frozenAt,jdbcType=TIMESTAMP})
+  <insert id="insert" keyColumn="id" keyProperty="id" parameterType="dev.mesbase.business.production.domain.MesWorkorderMaterialEntity" useGeneratedKeys="true">
+    insert into mes_workorder_material (material_id, unit_id, total_required_qty,
+      planned_qty, warehouse_ids, work_center,
+      revision, status, updated_by,
+      updated_at, bom_id, bom_base_qty,
+      bom_component_qty, output_unit_id, frozen_at,
+      workorder_id, line_no, bom_item_id,
+      manually_adjusted)
+    values (#{materialId,jdbcType=BIGINT}, #{unitId,jdbcType=BIGINT}, #{totalRequiredQty,jdbcType=DECIMAL},
+      #{plannedQty,jdbcType=DECIMAL}, #{warehouseIds,jdbcType=VARCHAR}, #{workCenter,jdbcType=VARCHAR},
+      #{revision,jdbcType=BIGINT}, #{status,jdbcType=VARCHAR}, #{updatedBy,jdbcType=BIGINT},
+      #{updatedAt,jdbcType=TIMESTAMP}, #{bomId,jdbcType=BIGINT}, #{bomBaseQty,jdbcType=DECIMAL},
+      #{bomComponentQty,jdbcType=DECIMAL}, #{outputUnitId,jdbcType=BIGINT}, #{frozenAt,jdbcType=TIMESTAMP},
+      #{workorderId,jdbcType=BIGINT}, #{lineNo,jdbcType=INTEGER}, #{bomItemId,jdbcType=BIGINT},
+      #{manuallyAdjusted,jdbcType=BIT})
   </insert>
-  <insert id="insertSelective" parameterType="dev.mesbase.business.production.domain.MesWorkorderMaterialEntity">
+  <insert id="insertSelective" keyColumn="id" keyProperty="id" parameterType="dev.mesbase.business.production.domain.MesWorkorderMaterialEntity" useGeneratedKeys="true">
     insert into mes_workorder_material
     <trim prefix="(" suffix=")" suffixOverrides=",">
-      <if test="id != null">
-        id,
-      </if>
       <if test="materialId != null">
         material_id,
       </if>
@@ -174,11 +178,20 @@
       <if test="frozenAt != null">
         frozen_at,
       </if>
+      <if test="workorderId != null">
+        workorder_id,
+      </if>
+      <if test="lineNo != null">
+        line_no,
+      </if>
+      <if test="bomItemId != null">
+        bom_item_id,
+      </if>
+      <if test="manuallyAdjusted != null">
+        manually_adjusted,
+      </if>
     </trim>
     <trim prefix="values (" suffix=")" suffixOverrides=",">
-      <if test="id != null">
-        #{id,jdbcType=BIGINT},
-      </if>
       <if test="materialId != null">
         #{materialId,jdbcType=BIGINT},
       </if>
@@ -223,6 +236,18 @@
       </if>
       <if test="frozenAt != null">
         #{frozenAt,jdbcType=TIMESTAMP},
+      </if>
+      <if test="workorderId != null">
+        #{workorderId,jdbcType=BIGINT},
+      </if>
+      <if test="lineNo != null">
+        #{lineNo,jdbcType=INTEGER},
+      </if>
+      <if test="bomItemId != null">
+        #{bomItemId,jdbcType=BIGINT},
+      </if>
+      <if test="manuallyAdjusted != null">
+        #{manuallyAdjusted,jdbcType=BIT},
       </if>
     </trim>
   </insert>
@@ -283,6 +308,18 @@
       <if test="row.frozenAt != null">
         frozen_at = #{row.frozenAt,jdbcType=TIMESTAMP},
       </if>
+      <if test="row.workorderId != null">
+        workorder_id = #{row.workorderId,jdbcType=BIGINT},
+      </if>
+      <if test="row.lineNo != null">
+        line_no = #{row.lineNo,jdbcType=INTEGER},
+      </if>
+      <if test="row.bomItemId != null">
+        bom_item_id = #{row.bomItemId,jdbcType=BIGINT},
+      </if>
+      <if test="row.manuallyAdjusted != null">
+        manually_adjusted = #{row.manuallyAdjusted,jdbcType=BIT},
+      </if>
     </set>
     <if test="example != null">
       <include refid="Update_By_Example_Where_Clause" />
@@ -305,7 +342,11 @@
       bom_base_qty = #{row.bomBaseQty,jdbcType=DECIMAL},
       bom_component_qty = #{row.bomComponentQty,jdbcType=DECIMAL},
       output_unit_id = #{row.outputUnitId,jdbcType=BIGINT},
-      frozen_at = #{row.frozenAt,jdbcType=TIMESTAMP}
+      frozen_at = #{row.frozenAt,jdbcType=TIMESTAMP},
+      workorder_id = #{row.workorderId,jdbcType=BIGINT},
+      line_no = #{row.lineNo,jdbcType=INTEGER},
+      bom_item_id = #{row.bomItemId,jdbcType=BIGINT},
+      manually_adjusted = #{row.manuallyAdjusted,jdbcType=BIT}
     <if test="example != null">
       <include refid="Update_By_Example_Where_Clause" />
     </if>
@@ -358,6 +399,18 @@
       <if test="frozenAt != null">
         frozen_at = #{frozenAt,jdbcType=TIMESTAMP},
       </if>
+      <if test="workorderId != null">
+        workorder_id = #{workorderId,jdbcType=BIGINT},
+      </if>
+      <if test="lineNo != null">
+        line_no = #{lineNo,jdbcType=INTEGER},
+      </if>
+      <if test="bomItemId != null">
+        bom_item_id = #{bomItemId,jdbcType=BIGINT},
+      </if>
+      <if test="manuallyAdjusted != null">
+        manually_adjusted = #{manuallyAdjusted,jdbcType=BIT},
+      </if>
     </set>
     where id = #{id,jdbcType=BIGINT}
   </update>
@@ -377,7 +430,11 @@
       bom_base_qty = #{bomBaseQty,jdbcType=DECIMAL},
       bom_component_qty = #{bomComponentQty,jdbcType=DECIMAL},
       output_unit_id = #{outputUnitId,jdbcType=BIGINT},
-      frozen_at = #{frozenAt,jdbcType=TIMESTAMP}
+      frozen_at = #{frozenAt,jdbcType=TIMESTAMP},
+      workorder_id = #{workorderId,jdbcType=BIGINT},
+      line_no = #{lineNo,jdbcType=INTEGER},
+      bom_item_id = #{bomItemId,jdbcType=BIGINT},
+      manually_adjusted = #{manuallyAdjusted,jdbcType=BIT}
     where id = #{id,jdbcType=BIGINT}
   </update>
   <select flushCache="true" id="selectByPrimaryKeyForUpdate" parameterType="Long" resultMap="BaseResultMap" useCache="false">

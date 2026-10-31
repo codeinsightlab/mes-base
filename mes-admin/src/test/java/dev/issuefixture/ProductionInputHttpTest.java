@@ -78,6 +78,7 @@ class ProductionInputHttpTest {
             ProductionReportHttpTest.seed(j);
             seedBom(j, 2);
             j.update("INSERT INTO mes_workorder_material(id,material_id,unit_id,total_required_qty,planned_qty,warehouse_ids,work_center,revision,status,updated_by,updated_at,bom_id,bom_base_qty,bom_component_qty,output_unit_id) VALUES(1,1,1,2000,1000,'[1]','TEST-CENTER',1,'ENABLED',1,CURRENT_TIMESTAMP,1,1,2,1)");
+            WorkorderMaterialFixture.seedSnapshot(j);
             j.update("INSERT INTO wm_inventory(id,material_id,warehouse_id,quantity,available_quantity,status,batch_no,bin_code) VALUES(1,1,1,10000,10000,'ENABLED','L001','BIN1'),(2,1,1,10000,10000,'ENABLED','L002','BIN1')");
         }
         return c;
@@ -196,7 +197,7 @@ class ProductionInputHttpTest {
             m.perform(ProductionCoreV1HttpTest.full(post(ROOT)).content(body)).andExpect(status().is5xxServerError());
             assertEquals(0, j.queryForObject("SELECT COUNT(*) FROM mes_production_execution WHERE batch_no IS NOT NULL", Integer.class));
             assertEquals(0, j.queryForObject("SELECT COUNT(*) FROM mes_material_issue_input WHERE confirmed_at IS NOT NULL", Integer.class));
-            assertEquals(0, j.queryForObject("SELECT COUNT(*) FROM mes_workorder_material WHERE frozen_at IS NOT NULL", Integer.class));
+            assertEquals(0, j.queryForObject("SELECT COUNT(*) FROM workorder WHERE material_frozen_at IS NOT NULL", Integer.class));
             assertEquals(0, new BigDecimal("10000").compareTo(j.queryForObject("SELECT quantity FROM wm_inventory WHERE id=1", BigDecimal.class)));
         }
     }
@@ -254,7 +255,8 @@ class ProductionInputHttpTest {
                     .queryForObject("SELECT COUNT(*) FROM mes_production_execution WHERE batch_no IS NOT NULL", Integer.class));
             j.update("INSERT INTO workorder(id,code,product_id,planned_qty,routing_id,status,revision,create_time,update_time) VALUES(3,'TEST_SAME_PRODUCT_OTHER_ORDER',99,1000,1,'RELEASED',0,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)");
             j.update("INSERT INTO workorder_erp_extra(id) VALUES(3)");
-            j.update("INSERT INTO mes_workorder_material SELECT 3,material_id,unit_id,total_required_qty,planned_qty,warehouse_ids,work_center,revision,status,updated_by,updated_at,bom_id,bom_base_qty,bom_component_qty,output_unit_id,NULL FROM mes_workorder_material WHERE id=1");
+            j.update("INSERT INTO mes_workorder_material(id,material_id,unit_id,total_required_qty,planned_qty,warehouse_ids,work_center,revision,status,updated_by,updated_at,bom_id,bom_base_qty,bom_component_qty,output_unit_id,frozen_at) SELECT 3,material_id,unit_id,total_required_qty,planned_qty,warehouse_ids,work_center,revision,status,updated_by,updated_at,bom_id,bom_base_qty,bom_component_qty,output_unit_id,NULL FROM mes_workorder_material WHERE id=1");
+            WorkorderMaterialFixture.seedSnapshot(j);
 
             var conflictingCalculation = m.perform(ProductionCoreV1HttpTest.full(get(ROOT + "/calculate"))
                             .param("code", "TEST_SAME_PRODUCT_OTHER_ORDER:M1#L001").param("workorderId", "3")
@@ -276,7 +278,8 @@ class ProductionInputHttpTest {
             j.update("INSERT INTO workorder_erp_extra(id) VALUES(2)");
             j.update("INSERT INTO material_bom(id,code,version,product_id,base_qty,unit_id,status,revision,remark,created_by,created_at,published_at,is_default) SELECT 2,'TEST-BOM-2','1',3,base_qty,unit_id,status,revision,remark,created_by,created_at,published_at,0 FROM material_bom WHERE id=1");
             j.update("INSERT INTO material_bom_item SELECT 2,2,material_id,quantity,unit_id,NULL,sort FROM material_bom_item WHERE id=1");
-            j.update("INSERT INTO mes_workorder_material SELECT 2,material_id,unit_id,total_required_qty,planned_qty,warehouse_ids,work_center,revision,status,updated_by,updated_at,2,bom_base_qty,bom_component_qty,output_unit_id,NULL FROM mes_workorder_material WHERE id=1");
+            j.update("INSERT INTO mes_workorder_material(id,material_id,unit_id,total_required_qty,planned_qty,warehouse_ids,work_center,revision,status,updated_by,updated_at,bom_id,bom_base_qty,bom_component_qty,output_unit_id,frozen_at) SELECT 2,material_id,unit_id,total_required_qty,planned_qty,warehouse_ids,work_center,revision,status,updated_by,updated_at,2,bom_base_qty,bom_component_qty,output_unit_id,NULL FROM mes_workorder_material WHERE id=1");
+            WorkorderMaterialFixture.seedSnapshot(j);
 
             var calc = m.perform(ProductionCoreV1HttpTest.full(get(ROOT + "/calculate"))
                             .param("code", "TEST_WO2:M1#L001")

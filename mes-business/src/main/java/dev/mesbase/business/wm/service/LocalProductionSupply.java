@@ -11,7 +11,7 @@ import dev.mesbase.business.integration.warehouse.ErpActionResult.Mode;
 import dev.mesbase.business.production.service.WorkorderMaterialService;
 import dev.mesbase.business.integration.production.ProductionSupply.Basis;
 import dev.mesbase.business.production.dao.WorkorderMapper;
-import dev.mesbase.business.production.domain.MesWorkorderMaterialEntity;
+import dev.mesbase.business.production.domain.WorkorderMaterialModels;
 import dev.mesbase.business.production.domain.ProductionScanCode;
 import dev.mesbase.business.production.domain.ProductionCodeRules;
 import dev.mesbase.business.production.domain.WorkOrderStatus;
@@ -100,9 +100,9 @@ public class LocalProductionSupply {
         if (!WorkOrderStatus.RELEASED.getValue().equals(order.getStatus()))
             return new Context(Mode.LOCAL_ONLY.getValue(), List.of(), List.of(), 0, offset, limit);
         var demand = demands.basis(order);
-        var materialId = demand.getMaterialId();
-        var total = demand.getTotalRequiredQty();
-        var center = demand.getWorkCenter();
+        var materialId = demand.materialId();
+        var total = demand.totalRequiredQty();
+        var center = demand.workCenter();
         var allowed = warehouseIds(demand);
         if (total == null || total.signum() <= 0 || StringUtils.isBlank(center) || allowed.isEmpty())
             ParameterChecks.reject(ErrorCode.BAD_REQUEST);
@@ -111,14 +111,14 @@ public class LocalProductionSupply {
             ParameterChecks.reject(ErrorCode.BAD_REQUEST);
         var unit = Optional.ofNullable(material.getUnitId()).map(units::selectByPrimaryKey).orElse(null);
         if (unit == null || !EnableStatus.ENABLED.getValue().equals(unit.getStatus())
-                || demand != null && !Objects.equals(demand.getUnitId(), unit.getId()))
+                || demand != null && !Objects.equals(demand.unitId(), unit.getId()))
             ParameterChecks.reject(ErrorCode.BAD_REQUEST);
         var product = materials.selectByPrimaryKey(order.getProductId());
         if (product == null || !identity.workorderCode().equals(order.getCode())
                 || !identity.productCode().equals(material.getCode()))
             ParameterChecks.reject(ErrorCode.BAD_REQUEST);
         var outputUnit = Optional.ofNullable(product.getUnitId()).map(units::selectByPrimaryKey).orElse(null);
-        if (outputUnit == null || !Objects.equals(outputUnit.getId(), demand.getOutputUnitId()) || !EnableStatus.ENABLED.getValue()
+        if (outputUnit == null || !Objects.equals(outputUnit.getId(), demand.outputUnitId()) || !EnableStatus.ENABLED.getValue()
                 .equals(outputUnit.getStatus()))
             ParameterChecks.reject(ErrorCode.BAD_REQUEST);
         var sf = new WmInventoryExample();
@@ -146,7 +146,7 @@ public class LocalProductionSupply {
         var candidate = new Order(order.getId(), order.getCode(), product.getCode(), product.getName(), center,
                 order.getPlannedQty(), outputUnit.getCode(), order.getStatus(), allowed,
                 List.of(new Requirement(material.getCode(), material.getId(), unit.getId(), unit.getCode(), total)),
-                "LOCAL-WORKORDER:" + order.getId() + ":R" + demand.getRevision(), now, product.getId());
+                "LOCAL-WORKORDER:" + order.getId() + ":R" + demand.revision(), now, product.getId());
         // A production code identifies one work order; paging never broadens it to unrelated orders.
         var page = offset == 0 ? List.of(candidate) : List.<Order>of();
         return new Context(Mode.LOCAL_ONLY.getValue(), List.copyOf(stocks), page, 1, offset, limit);
@@ -154,10 +154,10 @@ public class LocalProductionSupply {
 
     public void validateFrozenCalculation(Calculation calculation) {
         var row = demands.basis(orders.selectByPrimaryKey(calculation.order().workorderId()));
-        String version = "LOCAL-WORKORDER:" + row.getId() + ":R" + row.getRevision();
+        String version = "LOCAL-WORKORDER:" + row.workorderId() + ":R" + row.revision();
         if (!version.equals(calculation.order().sourceReference())
-                || row.getPlannedQty().compareTo(calculation.order().plannedQty()) != 0
-                || row.getTotalRequiredQty()
+                || row.plannedQty().compareTo(calculation.order().plannedQty()) != 0
+                || row.totalRequiredQty()
                 .compareTo(calculation.order().requirements().getFirst().totalRequiredQty()) != 0)
             throw new FoundationException(ErrorCode.PRODUCTION_INPUT_STALE);
         demands.freeze(calculation);
@@ -168,11 +168,11 @@ public class LocalProductionSupply {
         var row = demands.basis(order);
         var amount = demands.issueQuantity(order, outputQty);
         return new Calculation(sourceMode, candidate, stock, outputQty, amount,
-                new Basis(row.getBomId(), row.getBomBaseQty(), row.getBomComponentQty(), row.getOutputUnitId()));
+                new Basis(row.bomId(), row.bomBaseQty(), row.bomComponentQty(), row.outputUnitId()));
     }
 
-    private static List<Long> warehouseIds(MesWorkorderMaterialEntity row) {
-        return Arrays.stream(new ObjectMapper().readValue(row.getWarehouseIds(), Long[].class)).toList();
+    private static List<Long> warehouseIds(WorkorderMaterialModels.Single row) {
+        return Arrays.stream(new ObjectMapper().readValue(row.warehouseIds(), Long[].class)).toList();
     }
 
 }
