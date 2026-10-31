@@ -1,33 +1,33 @@
 package dev.mesbase.business.wm.controller;
 
-import dev.mesbase.common.utils.bean.BeanConversions;
-import dev.mesbase.core.error.ErrorCode;
-import dev.mesbase.core.error.FoundationException;
+import dev.mesbase.business.issue.domain.MaterialIssueSubmissionStatus;
+import dev.mesbase.business.issue.service.MaterialIssueVoidService.Result;
+import dev.mesbase.business.issue.service.MaterialIssueVoidService;
+import dev.mesbase.business.wm.domain.StockDocumentDirection;
 import dev.mesbase.business.wm.domain.StockDocumentModels;
 import dev.mesbase.business.wm.domain.StockDocumentType;
-import dev.mesbase.business.wm.domain.StockDocumentDirection;
-import dev.mesbase.common.exception.ServiceException;
-import java.util.Arrays;
-import java.time.LocalDateTime;
 import dev.mesbase.business.wm.domain.WmStockDocumentEntity;
 import dev.mesbase.business.wm.domain.WmStockDocumentLineEntity;
 import dev.mesbase.business.wm.service.StockDocumentService;
-import dev.mesbase.business.issue.service.MaterialIssueVoidService;
-import dev.mesbase.business.issue.service.MaterialIssueVoidService.Result;
+import dev.mesbase.common.exception.ServiceException;
 import dev.mesbase.common.utils.SecurityUtils;
+import dev.mesbase.common.utils.bean.BeanConversions;
+import dev.mesbase.core.error.ErrorCode;
+import dev.mesbase.core.error.FoundationException;
 import dev.mesbase.core.security.AuthenticatedActor;
 import dev.mesbase.core.security.AuthorizationService;
 import dev.mesbase.core.security.Permission;
 import dev.mesbase.platform.execution.FactoryContext;
+import dev.mesbase.platform.web.EndpointAccess;
 import dev.mesbase.system.service.AutoCodeNumbering;
 import dev.mesbase.system.service.AutoCodeRuleType;
-import dev.mesbase.platform.web.EndpointAccess;
-import jakarta.validation.Valid;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.validation.Valid;
+import java.time.LocalDateTime;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
 import java.util.stream.Collectors;
-import java.math.BigDecimal;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -260,7 +260,12 @@ public class StockDocumentController {
                                        String pathRevision, List<String> routingNodeIds,
                                        LocalDateTime businessOccurredAt,
                                        LocalDateTime confirmedAt, Boolean stockApplied,
-                                       String voidOperationId, String voidResultStatus, String pathError) {
+                                       String voidOperationId, String voidResultStatus, String pathError,
+                                       String combinationId, List<ProductionAllocation> allocations) {
+    }
+
+    public record ProductionAllocation(String demandLineId, String stockId, String materialId, String warehouseId,
+                                       String binCode, String batchNo, String unitId, String quantity) {
     }
 
     @PostMapping
@@ -299,11 +304,7 @@ public class StockDocumentController {
                          @Valid @RequestBody StockDocumentModels.Version command) {
         requireResource(id);
         requireDirectionIfPresent(service.detail(id), direction);
-        if (!hasPermission(PERMISSION + "cancel")) {
-            requirePermission("business:mes:material:issue:update");
-            if (!StockDocumentType.MATERIAL_ISSUE.getValue().equals(service.detail(id).document().getDocumentType()))
-                throw new FoundationException(ErrorCode.FORBIDDEN);
-        }
+        requirePermission(PERMISSION + "cancel");
         return view(service.cancel(id, command));
     }
 
@@ -313,11 +314,7 @@ public class StockDocumentController {
                           @Valid @RequestBody StockDocumentModels.Post command) {
         requireResource(id);
         requireDirectionIfPresent(service.detail(id), direction);
-        if (!hasPermission(PERMISSION + "post")) {
-            requirePermission("business:mes:material:issue:update");
-            if (!StockDocumentType.MATERIAL_ISSUE.getValue().equals(service.detail(id).document().getDocumentType()))
-                throw new FoundationException(ErrorCode.FORBIDDEN);
-        }
+        requirePermission(PERMISSION + "post");
         return view(service.approve(id, command));
     }
 
@@ -346,9 +343,9 @@ public class StockDocumentController {
     }
 
     private String voidMessage(Result result) {
-        if ("SUCCEEDED".equals(result.voidResultStatus()))
+        if (MaterialIssueSubmissionStatus.SUCCEEDED.getValue().equals(result.voidResultStatus()))
             return "本地撤销与库存反向事务已完成";
-        if ("UNKNOWN".equals(result.voidResultStatus()))
+        if (MaterialIssueSubmissionStatus.UNKNOWN.getValue().equals(result.voidResultStatus()))
             return "本地撤销结果待恢复";
         return null;
     }
@@ -474,7 +471,7 @@ public class StockDocumentController {
 
     public record Line(String id, String documentId, int lineNo, String materialId, String warehouseId,
                        String stockId, String batchNo, String binCode, String unitId, String quantity,
-                       String remark, String stockActionId, String revision) {
+                       String remark, String stockActionId, String revision, String demandLineId) {
     }
 
     public record QualitySource(String sourceDeclarationId, String sourceTreatmentId, String sourceQualityExecutionId) {

@@ -6,7 +6,7 @@ import dev.mesbase.core.error.FoundationException;
 import java.nio.charset.StandardCharsets;
 
 /**
- * The sole production code format is work-order:finished-product#batch, with byte-exact field semantics.
+ * Exact output-batch identity for existing executions; new material issue uses ProductionCombinationRules.
  */
 public final class ProductionCodeRules {
     private ProductionCodeRules() {

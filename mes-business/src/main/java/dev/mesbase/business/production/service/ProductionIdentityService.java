@@ -2,19 +2,23 @@ package dev.mesbase.business.production.service;
 
 import com.github.pagehelper.PageHelper;
 import dev.mesbase.business.basic.dao.MaterialMapper;
+import dev.mesbase.business.production.dao.MesProductionCombinationMapper;
 import dev.mesbase.business.production.dao.MesProductionExecutionMapper;
 import dev.mesbase.business.production.dao.RoutingMapper;
 import dev.mesbase.business.production.dao.WorkorderMapper;
+import dev.mesbase.business.production.domain.MesProductionCombinationExample;
 import dev.mesbase.business.production.domain.MesProductionExecutionEntity;
 import dev.mesbase.business.production.domain.MesProductionExecutionExample;
+import dev.mesbase.business.production.domain.ProductionCodeRules;
+import dev.mesbase.business.production.domain.ProductionCombinationRules;
 import dev.mesbase.business.production.domain.ProductionIdentity;
 import dev.mesbase.business.production.domain.ProductionScanCode;
-import dev.mesbase.business.production.domain.ProductionCodeRules;
 import dev.mesbase.business.production.domain.WorkorderEntity;
 import dev.mesbase.business.production.domain.WorkorderExample;
 import dev.mesbase.common.utils.StringUtils;
 import dev.mesbase.core.error.ErrorCode;
 import dev.mesbase.core.error.FoundationException;
+import dev.mesbase.platform.execution.FactoryContext;
 import java.util.List;
 import java.util.Objects;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -31,17 +35,27 @@ public class ProductionIdentityService {
     private final WorkorderMapper workorders;
     private final MaterialMapper products;
     private final RoutingMapper routings;
+    private final MesProductionCombinationMapper combinations;
 
     public ProductionIdentityService(MesProductionExecutionMapper executions, WorkorderMapper workorders,
-                                     MaterialMapper products, RoutingMapper routings) {
+                                     MaterialMapper products, RoutingMapper routings,
+                                     MesProductionCombinationMapper combinations) {
         this.executions = executions;
         this.workorders = workorders;
         this.products = products;
         this.routings = routings;
+        this.combinations = combinations;
     }
 
     @Transactional(transactionManager = "businessTransactionManager", readOnly = true)
     public ProductionIdentity resolve(String code) {
+        if (ProductionCombinationRules.isCombination(code)) {
+            var combination = combinations.selectByPrimaryKey(ProductionCombinationRules.parse(code, FactoryContext.required()
+                    .factoryId().value()));
+            if (combination == null || combination.getExecutionId() == null)
+                throw new FoundationException(ErrorCode.EXECUTION_NOT_FOUND);
+            return read(combination.getExecutionId());
+        }
         var scanned = ProductionCodeRules.parse(code);
         var order = requireOrder(scanned);
         var execution = findExecution(order.getId(), order.getProductId(), scanned.batchNo());
@@ -86,6 +100,12 @@ public class ProductionIdentityService {
         String outputCode = null;
         if (execution.getBatchNo() != null)
             outputCode = ProductionCodeRules.format(new ProductionScanCode(workorder.getCode(), product.getCode(), execution.getBatchNo()));
+        var filter = new MesProductionCombinationExample();
+        filter.createCriteria().andExecutionIdEqualTo(execution.getId());
+        var linked = combinations.selectByExample(filter);
+        if (linked.size() > 1) throw new FoundationException(ErrorCode.PRODUCTION_IDENTITY_AMBIGUOUS);
+        if (!linked.isEmpty()) outputCode = ProductionCombinationRules.code(FactoryContext.required().factoryId()
+                .value(), linked.getFirst().getId());
         return new ProductionIdentity(execution.getId(), outputCode,
                 workorder.getId(), workorder.getCode(), product.getId(), product.getCode(), product.getName(),
                 routing.getId(), routing.getCode(), routing.getVersion(), execution.getStatus(), execution.getTargetQty(),

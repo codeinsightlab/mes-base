@@ -1,0 +1,289 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="dev.mesbase.business.production.dao.MesProductionCombinationMapper">
+  <resultMap id="BaseResultMap" type="dev.mesbase.business.production.domain.MesProductionCombinationEntity">
+    <id column="id" jdbcType="BIGINT" property="id" />
+    <result column="workorder_id" jdbcType="BIGINT" property="workorderId" />
+    <result column="product_id" jdbcType="BIGINT" property="productId" />
+    <result column="output_unit_id" jdbcType="BIGINT" property="outputUnitId" />
+    <result column="demand_revision" jdbcType="BIGINT" property="demandRevision" />
+    <result column="planned_qty" jdbcType="DECIMAL" property="plannedQty" />
+    <result column="fingerprint" jdbcType="CHAR" property="fingerprint" />
+    <result column="execution_id" jdbcType="BIGINT" property="executionId" />
+    <result column="created_by" jdbcType="BIGINT" property="createdBy" />
+    <result column="created_at" jdbcType="TIMESTAMP" property="createdAt" />
+  </resultMap>
+  <sql id="Example_Where_Clause">
+    <where>
+      <foreach collection="oredCriteria" item="criteria" separator="or">
+        <if test="criteria.valid">
+          <trim prefix="(" prefixOverrides="and" suffix=")">
+            <foreach collection="criteria.criteria" item="criterion">
+              <choose>
+                <when test="criterion.noValue">
+                  and ${criterion.condition}
+                </when>
+                <when test="criterion.singleValue">
+                  and ${criterion.condition} #{criterion.value}
+                </when>
+                <when test="criterion.betweenValue">
+                  and ${criterion.condition} #{criterion.value} and #{criterion.secondValue}
+                </when>
+                <when test="criterion.listValue">
+                  and ${criterion.condition}
+                  <foreach close=")" collection="criterion.value" item="listItem" open="(" separator=",">
+                    #{listItem}
+                  </foreach>
+                </when>
+              </choose>
+            </foreach>
+          </trim>
+        </if>
+      </foreach>
+    </where>
+  </sql>
+  <sql id="Update_By_Example_Where_Clause">
+    <where>
+      <foreach collection="example.oredCriteria" item="criteria" separator="or">
+        <if test="criteria.valid">
+          <trim prefix="(" prefixOverrides="and" suffix=")">
+            <foreach collection="criteria.criteria" item="criterion">
+              <choose>
+                <when test="criterion.noValue">
+                  and ${criterion.condition}
+                </when>
+                <when test="criterion.singleValue">
+                  and ${criterion.condition} #{criterion.value}
+                </when>
+                <when test="criterion.betweenValue">
+                  and ${criterion.condition} #{criterion.value} and #{criterion.secondValue}
+                </when>
+                <when test="criterion.listValue">
+                  and ${criterion.condition}
+                  <foreach close=")" collection="criterion.value" item="listItem" open="(" separator=",">
+                    #{listItem}
+                  </foreach>
+                </when>
+              </choose>
+            </foreach>
+          </trim>
+        </if>
+      </foreach>
+    </where>
+  </sql>
+  <sql id="Base_Column_List">
+    id, workorder_id, product_id, output_unit_id, demand_revision, planned_qty, fingerprint,
+    execution_id, created_by, created_at
+  </sql>
+  <select id="selectByExample" parameterType="dev.mesbase.business.production.domain.MesProductionCombinationExample" resultMap="BaseResultMap">
+    select
+    <include refid="Base_Column_List" />
+    from mes_production_combination
+    <if test="_parameter != null">
+      <include refid="Example_Where_Clause" />
+    </if>
+    <if test="orderByClause != null">
+      order by ${orderByClause}
+    </if>
+  </select>
+  <select id="selectByPrimaryKey" parameterType="Long" resultMap="BaseResultMap">
+    select
+    <include refid="Base_Column_List" />
+    from mes_production_combination
+    where id = #{id,jdbcType=BIGINT}
+  </select>
+  <delete id="deleteByPrimaryKey" parameterType="Long">
+    delete from mes_production_combination
+    where id = #{id,jdbcType=BIGINT}
+  </delete>
+  <delete id="deleteByExample" parameterType="dev.mesbase.business.production.domain.MesProductionCombinationExample">
+    delete from mes_production_combination
+    <if test="_parameter != null">
+      <include refid="Example_Where_Clause" />
+    </if>
+  </delete>
+  <insert id="insert" keyColumn="id" keyProperty="id" parameterType="dev.mesbase.business.production.domain.MesProductionCombinationEntity" useGeneratedKeys="true">
+    insert into mes_production_combination (workorder_id, product_id, output_unit_id,
+      demand_revision, planned_qty, fingerprint,
+      execution_id, created_by, created_at
+      )
+    values (#{workorderId,jdbcType=BIGINT}, #{productId,jdbcType=BIGINT}, #{outputUnitId,jdbcType=BIGINT},
+      #{demandRevision,jdbcType=BIGINT}, #{plannedQty,jdbcType=DECIMAL}, #{fingerprint,jdbcType=CHAR},
+      #{executionId,jdbcType=BIGINT}, #{createdBy,jdbcType=BIGINT}, #{createdAt,jdbcType=TIMESTAMP}
+      )
+  </insert>
+  <insert id="insertSelective" keyColumn="id" keyProperty="id" parameterType="dev.mesbase.business.production.domain.MesProductionCombinationEntity" useGeneratedKeys="true">
+    insert into mes_production_combination
+    <trim prefix="(" suffix=")" suffixOverrides=",">
+      <if test="workorderId != null">
+        workorder_id,
+      </if>
+      <if test="productId != null">
+        product_id,
+      </if>
+      <if test="outputUnitId != null">
+        output_unit_id,
+      </if>
+      <if test="demandRevision != null">
+        demand_revision,
+      </if>
+      <if test="plannedQty != null">
+        planned_qty,
+      </if>
+      <if test="fingerprint != null">
+        fingerprint,
+      </if>
+      <if test="executionId != null">
+        execution_id,
+      </if>
+      <if test="createdBy != null">
+        created_by,
+      </if>
+      <if test="createdAt != null">
+        created_at,
+      </if>
+    </trim>
+    <trim prefix="values (" suffix=")" suffixOverrides=",">
+      <if test="workorderId != null">
+        #{workorderId,jdbcType=BIGINT},
+      </if>
+      <if test="productId != null">
+        #{productId,jdbcType=BIGINT},
+      </if>
+      <if test="outputUnitId != null">
+        #{outputUnitId,jdbcType=BIGINT},
+      </if>
+      <if test="demandRevision != null">
+        #{demandRevision,jdbcType=BIGINT},
+      </if>
+      <if test="plannedQty != null">
+        #{plannedQty,jdbcType=DECIMAL},
+      </if>
+      <if test="fingerprint != null">
+        #{fingerprint,jdbcType=CHAR},
+      </if>
+      <if test="executionId != null">
+        #{executionId,jdbcType=BIGINT},
+      </if>
+      <if test="createdBy != null">
+        #{createdBy,jdbcType=BIGINT},
+      </if>
+      <if test="createdAt != null">
+        #{createdAt,jdbcType=TIMESTAMP},
+      </if>
+    </trim>
+  </insert>
+  <select id="countByExample" parameterType="dev.mesbase.business.production.domain.MesProductionCombinationExample" resultType="java.lang.Long">
+    select count(*) from mes_production_combination
+    <if test="_parameter != null">
+      <include refid="Example_Where_Clause" />
+    </if>
+  </select>
+  <update id="updateByExampleSelective" parameterType="map">
+    update mes_production_combination
+    <set>
+      <if test="row.id != null">
+        id = #{row.id,jdbcType=BIGINT},
+      </if>
+      <if test="row.workorderId != null">
+        workorder_id = #{row.workorderId,jdbcType=BIGINT},
+      </if>
+      <if test="row.productId != null">
+        product_id = #{row.productId,jdbcType=BIGINT},
+      </if>
+      <if test="row.outputUnitId != null">
+        output_unit_id = #{row.outputUnitId,jdbcType=BIGINT},
+      </if>
+      <if test="row.demandRevision != null">
+        demand_revision = #{row.demandRevision,jdbcType=BIGINT},
+      </if>
+      <if test="row.plannedQty != null">
+        planned_qty = #{row.plannedQty,jdbcType=DECIMAL},
+      </if>
+      <if test="row.fingerprint != null">
+        fingerprint = #{row.fingerprint,jdbcType=CHAR},
+      </if>
+      <if test="row.executionId != null">
+        execution_id = #{row.executionId,jdbcType=BIGINT},
+      </if>
+      <if test="row.createdBy != null">
+        created_by = #{row.createdBy,jdbcType=BIGINT},
+      </if>
+      <if test="row.createdAt != null">
+        created_at = #{row.createdAt,jdbcType=TIMESTAMP},
+      </if>
+    </set>
+    <if test="example != null">
+      <include refid="Update_By_Example_Where_Clause" />
+    </if>
+  </update>
+  <update id="updateByExample" parameterType="map">
+    update mes_production_combination
+    set id = #{row.id,jdbcType=BIGINT},
+      workorder_id = #{row.workorderId,jdbcType=BIGINT},
+      product_id = #{row.productId,jdbcType=BIGINT},
+      output_unit_id = #{row.outputUnitId,jdbcType=BIGINT},
+      demand_revision = #{row.demandRevision,jdbcType=BIGINT},
+      planned_qty = #{row.plannedQty,jdbcType=DECIMAL},
+      fingerprint = #{row.fingerprint,jdbcType=CHAR},
+      execution_id = #{row.executionId,jdbcType=BIGINT},
+      created_by = #{row.createdBy,jdbcType=BIGINT},
+      created_at = #{row.createdAt,jdbcType=TIMESTAMP}
+    <if test="example != null">
+      <include refid="Update_By_Example_Where_Clause" />
+    </if>
+  </update>
+  <update id="updateByPrimaryKeySelective" parameterType="dev.mesbase.business.production.domain.MesProductionCombinationEntity">
+    update mes_production_combination
+    <set>
+      <if test="workorderId != null">
+        workorder_id = #{workorderId,jdbcType=BIGINT},
+      </if>
+      <if test="productId != null">
+        product_id = #{productId,jdbcType=BIGINT},
+      </if>
+      <if test="outputUnitId != null">
+        output_unit_id = #{outputUnitId,jdbcType=BIGINT},
+      </if>
+      <if test="demandRevision != null">
+        demand_revision = #{demandRevision,jdbcType=BIGINT},
+      </if>
+      <if test="plannedQty != null">
+        planned_qty = #{plannedQty,jdbcType=DECIMAL},
+      </if>
+      <if test="fingerprint != null">
+        fingerprint = #{fingerprint,jdbcType=CHAR},
+      </if>
+      <if test="executionId != null">
+        execution_id = #{executionId,jdbcType=BIGINT},
+      </if>
+      <if test="createdBy != null">
+        created_by = #{createdBy,jdbcType=BIGINT},
+      </if>
+      <if test="createdAt != null">
+        created_at = #{createdAt,jdbcType=TIMESTAMP},
+      </if>
+    </set>
+    where id = #{id,jdbcType=BIGINT}
+  </update>
+  <update id="updateByPrimaryKey" parameterType="dev.mesbase.business.production.domain.MesProductionCombinationEntity">
+    update mes_production_combination
+    set workorder_id = #{workorderId,jdbcType=BIGINT},
+      product_id = #{productId,jdbcType=BIGINT},
+      output_unit_id = #{outputUnitId,jdbcType=BIGINT},
+      demand_revision = #{demandRevision,jdbcType=BIGINT},
+      planned_qty = #{plannedQty,jdbcType=DECIMAL},
+      fingerprint = #{fingerprint,jdbcType=CHAR},
+      execution_id = #{executionId,jdbcType=BIGINT},
+      created_by = #{createdBy,jdbcType=BIGINT},
+      created_at = #{createdAt,jdbcType=TIMESTAMP}
+    where id = #{id,jdbcType=BIGINT}
+  </update>
+  <select flushCache="true" id="selectByPrimaryKeyForUpdate" parameterType="Long" resultMap="BaseResultMap" useCache="false">
+    select
+    <include refid="Base_Column_List" />
+    from mes_production_combination
+    where id = #{id,jdbcType=BIGINT}
+    for update
+  </select>
+</mapper>

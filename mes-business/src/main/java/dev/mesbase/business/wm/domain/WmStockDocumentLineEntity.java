@@ -30,6 +30,8 @@ public class WmStockDocumentLineEntity {
 
     private Long revision;
 
+    private Long demandLineId;
+
     public Long getId() {
         return id;
     }
@@ -132,5 +134,13 @@ public class WmStockDocumentLineEntity {
 
     public void setRevision(Long revision) {
         this.revision = revision;
+    }
+
+    public Long getDemandLineId() {
+        return demandLineId;
+    }
+
+    public void setDemandLineId(Long demandLineId) {
+        this.demandLineId = demandLineId;
     }
 }

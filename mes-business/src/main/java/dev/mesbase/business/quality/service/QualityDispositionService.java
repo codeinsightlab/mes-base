@@ -4,8 +4,8 @@ import dev.mesbase.business.basic.dao.MaterialMapper;
 import dev.mesbase.business.production.domain.ProductionExecutionStatus;
 import dev.mesbase.business.production.service.BusinessSourceRules;
 import dev.mesbase.business.production.service.ProductionChainLocks;
-import dev.mesbase.business.production.service.ProductionIdentityService;
 import dev.mesbase.business.production.service.ProductionCompletionService;
+import dev.mesbase.business.production.service.ProductionIdentityService;
 import dev.mesbase.business.quality.domain.DefectRecordAction;
 import dev.mesbase.business.quality.domain.MesQualityTreatmentEntity;
 import dev.mesbase.business.quality.domain.QualityTreatmentModels.Attribution;
@@ -15,10 +15,10 @@ import dev.mesbase.business.shared.enums.BusinessSource;
 import dev.mesbase.business.shared.enums.EnableStatus;
 import dev.mesbase.business.wm.dao.WmInventoryMapper;
 import dev.mesbase.business.wm.dao.WmWarehouseMapper;
-import dev.mesbase.business.wm.domain.WarehouseType;
-import dev.mesbase.business.wm.domain.StockDocumentModels;
 import dev.mesbase.business.wm.domain.StockDocumentDirection;
+import dev.mesbase.business.wm.domain.StockDocumentModels;
 import dev.mesbase.business.wm.domain.StockDocumentType;
+import dev.mesbase.business.wm.domain.WarehouseType;
 import dev.mesbase.business.wm.domain.WmInventoryCreateCommand;
 import dev.mesbase.business.wm.domain.WmInventoryExample;
 import dev.mesbase.business.wm.service.IWmInventoryService;
@@ -35,7 +35,6 @@ import dev.mesbase.core.security.Permission;
 import dev.mesbase.platform.execution.FactoryContext;
 import dev.mesbase.system.service.AutoCodeNumbering;
 import dev.mesbase.system.service.AutoCodeRuleType;
-
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -44,17 +43,15 @@ import java.util.HexFormat;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
-
 import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
-import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.TransactionDefinition;
-import org.springframework.transaction.support.TransactionTemplate;
-import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 /**
  * Atomic formal warehouse receipt; historical return requests remain replayable.
@@ -126,7 +123,7 @@ public class QualityDispositionService {
     }
 
     private QualityTreatmentService.Details executeInTransaction(String declaration, Disposition c,
-                                                                  String documentNo) {
+                                                                 String documentNo) {
         if (c == null || c.destination() == null || c.requestId() == null || c.quantity() == null
                 || c.quantity().signum() <= 0 || StringUtils.isBlank(c.reason()) || c.reason().length() > 500
                 || c.destination() == Destination.RETURN_NODE && c.warehouseId() != null
@@ -197,6 +194,7 @@ public class QualityDispositionService {
             owner.approve(documentId, new StockDocumentModels.Post(c.requestId(), owner.detail(documentId).document()
                     .getRevision()));
         }
+        completion.getObject().afterInboundApproved(execution.getId(), c.requestId());
         return treatments.details(declaration);
     }
 

@@ -2,6 +2,7 @@ package dev.mesbase.business.production.controller;
 
 import dev.mesbase.business.production.service.ProductionInboundService;
 import dev.mesbase.business.wm.controller.StockDocumentController.Detail;
+import dev.mesbase.business.wm.domain.StockDocumentModels;
 import dev.mesbase.common.utils.bean.BeanConversions;
 import dev.mesbase.platform.web.EndpointAccess;
 import jakarta.validation.Valid;
@@ -24,5 +25,11 @@ public class ProductionInboundController {
     @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED, permission = "business:wm:stock:document:post")
     public Detail receive(@PathVariable Long id, @Valid @RequestBody ProductionInboundService.Command command) {
         return BeanConversions.convert(service.receive(id, command), Detail.class);
+    }
+
+    @PostMapping("/api/production/inbound-documents/{id}/actions/approve")
+    @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED, permission = "business:wm:stock:document:post")
+    public Detail approve(@PathVariable Long id, @Valid @RequestBody StockDocumentModels.Post command) {
+        return BeanConversions.convert(service.approveDocument(id, command), Detail.class);
     }
 }

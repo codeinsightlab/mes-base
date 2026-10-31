@@ -914,6 +914,66 @@ public class WmStockDocumentLineExample {
             addCriterion("revision not between", value1, value2, "revision");
             return (Criteria) this;
         }
+
+        public Criteria andDemandLineIdIsNull() {
+            addCriterion("demand_line_id is null");
+            return (Criteria) this;
+        }
+
+        public Criteria andDemandLineIdIsNotNull() {
+            addCriterion("demand_line_id is not null");
+            return (Criteria) this;
+        }
+
+        public Criteria andDemandLineIdEqualTo(Long value) {
+            addCriterion("demand_line_id =", value, "demandLineId");
+            return (Criteria) this;
+        }
+
+        public Criteria andDemandLineIdNotEqualTo(Long value) {
+            addCriterion("demand_line_id <>", value, "demandLineId");
+            return (Criteria) this;
+        }
+
+        public Criteria andDemandLineIdGreaterThan(Long value) {
+            addCriterion("demand_line_id >", value, "demandLineId");
+            return (Criteria) this;
+        }
+
+        public Criteria andDemandLineIdGreaterThanOrEqualTo(Long value) {
+            addCriterion("demand_line_id >=", value, "demandLineId");
+            return (Criteria) this;
+        }
+
+        public Criteria andDemandLineIdLessThan(Long value) {
+            addCriterion("demand_line_id <", value, "demandLineId");
+            return (Criteria) this;
+        }
+
+        public Criteria andDemandLineIdLessThanOrEqualTo(Long value) {
+            addCriterion("demand_line_id <=", value, "demandLineId");
+            return (Criteria) this;
+        }
+
+        public Criteria andDemandLineIdIn(List<Long> values) {
+            addCriterion("demand_line_id in", values, "demandLineId");
+            return (Criteria) this;
+        }
+
+        public Criteria andDemandLineIdNotIn(List<Long> values) {
+            addCriterion("demand_line_id not in", values, "demandLineId");
+            return (Criteria) this;
+        }
+
+        public Criteria andDemandLineIdBetween(Long value1, Long value2) {
+            addCriterion("demand_line_id between", value1, value2, "demandLineId");
+            return (Criteria) this;
+        }
+
+        public Criteria andDemandLineIdNotBetween(Long value1, Long value2) {
+            addCriterion("demand_line_id not between", value1, value2, "demandLineId");
+            return (Criteria) this;
+        }
     }
 
     public static class Criteria extends GeneratedCriteria {

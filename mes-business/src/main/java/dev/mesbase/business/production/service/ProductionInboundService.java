@@ -4,12 +4,12 @@ import com.github.pagehelper.PageHelper;
 import dev.mesbase.business.basic.dao.MaterialMapper;
 import dev.mesbase.business.wm.dao.WmInventoryMapper;
 import dev.mesbase.business.wm.dao.WmStockDocumentMapper;
-import dev.mesbase.business.wm.domain.StockDocumentModels;
 import dev.mesbase.business.wm.domain.StockDocumentDirection;
+import dev.mesbase.business.wm.domain.StockDocumentModels;
 import dev.mesbase.business.wm.domain.StockDocumentStatus;
 import dev.mesbase.business.wm.domain.StockDocumentType;
-import dev.mesbase.business.wm.domain.WmStockDocumentExample;
 import dev.mesbase.business.wm.domain.WmStockDocumentEntity;
+import dev.mesbase.business.wm.domain.WmStockDocumentExample;
 import dev.mesbase.business.wm.service.StockDocumentService;
 import dev.mesbase.common.utils.SecurityUtils;
 import dev.mesbase.common.validation.ParameterChecks;
@@ -25,21 +25,18 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.Size;
-
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
-
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
-import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.TransactionDefinition;
-import org.springframework.transaction.support.TransactionTemplate;
-import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 /**
  * Creates and approves the same formal document used by the ordinary warehouse page.
@@ -124,8 +121,25 @@ public class ProductionInboundService {
         documents.putLine(id, null, new StockDocumentModels.Line(draft.document().getRevision(), command.stockId(),
                 execution.getProductId(), stock.getWarehouseId(), material.getUnitId(), stock.getBatchNo(),
                 stock.getBinCode(), command.quantity(), null));
-        return documents.approve(id, new StockDocumentModels.Post(command.requestId(),
+        var posted = documents.approveMesReceipt(id, new StockDocumentModels.Post(command.requestId(),
                 documents.detail(id).document().getRevision()));
+        completion.afterInboundApproved(executionId, command.requestId());
+        return posted;
+    }
+
+    @Transactional(transactionManager = "businessTransactionManager", rollbackFor = Exception.class)
+    public StockDocumentModels.Detail approveDocument(Long documentId, StockDocumentModels.Post command) {
+        permit("business:wm:stock:document:post");
+        var document = documents.detail(documentId).document();
+        if (!StockDocumentType.PRODUCTION_RECEIPT.getValue().equals(document.getDocumentType())
+                || document.getSourceExecutionId() == null)
+            ParameterChecks.reject(ErrorCode.STOCK_DOCUMENT_SOURCE_PENDING);
+        Long executionId = document.getSourceExecutionId();
+        completion.lockInboundChain(executionId);
+        var result = documents.approveMesReceipt(documentId, command);
+        if (!StockDocumentStatus.POSTED.getValue().equals(document.getStatus()))
+            completion.afterInboundApproved(executionId, command.requestId());
+        return result;
     }
 
     private StockDocumentModels.Detail replay(Long executionId, Command command) {

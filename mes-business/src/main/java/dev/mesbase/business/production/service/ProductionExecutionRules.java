@@ -1,40 +1,37 @@
 package dev.mesbase.business.production.service;
 
-import dev.mesbase.business.production.service.BusinessSourceRules;
-
-import dev.mesbase.business.production.domain.WorkOrderStatus;
-import dev.mesbase.business.quality.service.ExecutionQualityReferenceQuery;
-import dev.mesbase.business.production.domain.RoutingStatus;
-import dev.mesbase.business.production.domain.ProductionExecutionStatus;
 import dev.mesbase.business.basic.dao.MaterialMapper;
-import dev.mesbase.business.wm.dao.WmStockDocumentMapper;
-import dev.mesbase.business.wm.domain.WmStockDocumentExample;
-import dev.mesbase.business.wm.domain.StockDocumentType;
+import dev.mesbase.business.production.dao.MesExecutionAssignmentMapper;
+import dev.mesbase.business.production.dao.MesExecutionPathMapper;
+import dev.mesbase.business.production.dao.MesExecutionPathNodeMapper;
 import dev.mesbase.business.production.dao.MesProductionExecutionMapper;
+import dev.mesbase.business.production.dao.MesProductionReportMapper;
+import dev.mesbase.business.production.dao.ProductionQuantityMapper;
 import dev.mesbase.business.production.dao.RoutingMapper;
 import dev.mesbase.business.production.dao.RoutingProductMapper;
-import dev.mesbase.business.production.dao.WorkorderMapper;
 import dev.mesbase.business.production.dao.WorkOrderExtraMapper;
-import dev.mesbase.business.production.dao.MesExecutionPathMapper;
-import dev.mesbase.business.production.dao.MesProductionReportMapper;
-import dev.mesbase.business.production.dao.MesExecutionAssignmentMapper;
+import dev.mesbase.business.production.dao.WorkorderMapper;
 import dev.mesbase.business.production.domain.MesExecutionAssignmentExample;
-import dev.mesbase.business.production.dao.ProductionQuantityMapper;
-import dev.mesbase.business.production.domain.MesProductionReportExample;
-import dev.mesbase.business.production.dao.MesExecutionPathNodeMapper;
 import dev.mesbase.business.production.domain.MesExecutionPathNodeExample;
 import dev.mesbase.business.production.domain.MesProductionExecutionEntity;
+import dev.mesbase.business.production.domain.MesProductionReportExample;
+import dev.mesbase.business.production.domain.ProductionExecutionStatus;
 import dev.mesbase.business.production.domain.RoutingProductExample;
+import dev.mesbase.business.production.domain.RoutingStatus;
+import dev.mesbase.business.production.domain.WorkOrderStatus;
 import dev.mesbase.business.production.domain.WorkorderEntity;
+import dev.mesbase.business.production.service.BusinessSourceRules;
+import dev.mesbase.business.quality.service.ExecutionQualityReferenceQuery;
+import dev.mesbase.business.wm.dao.WmStockDocumentMapper;
+import dev.mesbase.business.wm.domain.StockDocumentType;
+import dev.mesbase.business.wm.domain.WmStockDocumentExample;
 import dev.mesbase.common.utils.SecurityUtils;
 import dev.mesbase.core.error.ErrorCode;
 import dev.mesbase.core.error.FoundationException;
-
 import java.time.LocalDateTime;
-import java.util.Objects;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
-
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
@@ -141,18 +138,6 @@ public class ProductionExecutionRules {
         audit(row, false);
     }
 
-    /**
-     * New confirmed input reopens processing. End time and prior completion/report/receipt facts remain untouched.
-     */
-    public void resumeAfterInput(MesProductionExecutionEntity row) {
-        valid(ProductionExecutionStatus.FULLY_RECEIVED.getValue().equals(row.getStatus()));
-        var order = locks.order(row.getWorkorderId());
-        valid(WorkOrderStatus.RELEASED.getValue().equals(order.getStatus()));
-        row.setStatus(ProductionExecutionStatus.RUNNING.getValue());
-        audit(row, false);
-        valid(executions.updateByPrimaryKey(row) == 1);
-    }
-
     public void checkReadyReferences(MesProductionExecutionEntity row) {
         var order = validateReferences(row, true);
         if (!WorkOrderStatus.RELEASED.getValue().equals(order.getStatus()))
@@ -192,7 +177,8 @@ public class ProductionExecutionRules {
 
     private boolean hasIssues(Long id) {
         var filter = new WmStockDocumentExample();
-        filter.createCriteria().andSourceExecutionIdEqualTo(id).andDocumentTypeEqualTo(StockDocumentType.MATERIAL_ISSUE.getValue());
+        filter.createCriteria().andSourceExecutionIdEqualTo(id)
+                .andDocumentTypeEqualTo(StockDocumentType.MATERIAL_ISSUE.getValue());
         return issues.countByExample(filter) > 0;
     }
 

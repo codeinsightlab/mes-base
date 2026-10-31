@@ -19,6 +19,8 @@ public interface WmStockDocumentLineMapper {
 
     List<WmStockDocumentLineEntity> selectByExample(WmStockDocumentLineExample example);
 
+    WmStockDocumentLineEntity selectByPrimaryKeyForUpdate(Long id);
+
     WmStockDocumentLineEntity selectByPrimaryKey(Long id);
 
     int updateByExampleSelective(@Param("row") WmStockDocumentLineEntity row,

@@ -7,16 +7,27 @@
         ) then 1 else 0 end
     </select>
     <select id="hasStockDocumentPrefix" resultType="int">
+    <bind name="enumPurchaseReceipt" value="@dev.mesbase.business.wm.domain.StockDocumentType@PURCHASE_RECEIPT.getValue()"/>
+    <bind name="enumProductionReceipt" value="@dev.mesbase.business.wm.domain.StockDocumentType@PRODUCTION_RECEIPT.getValue()"/>
+    <bind name="enumOutsourceReceipt" value="@dev.mesbase.business.wm.domain.StockDocumentType@OUTSOURCE_RECEIPT.getValue()"/>
+    <bind name="enumMaterialReturnReceipt" value="@dev.mesbase.business.wm.domain.StockDocumentType@MATERIAL_RETURN_RECEIPT.getValue()"/>
+    <bind name="enumReworkReceipt" value="@dev.mesbase.business.wm.domain.StockDocumentType@REWORK_RECEIPT.getValue()"/>
+    <bind name="enumSalesReturnReceipt" value="@dev.mesbase.business.wm.domain.StockDocumentType@SALES_RETURN_RECEIPT.getValue()"/>
+    <bind name="enumDefectReceipt" value="@dev.mesbase.business.wm.domain.StockDocumentType@DEFECT_RECEIPT.getValue()"/>
+    <bind name="enumScrapReceipt" value="@dev.mesbase.business.wm.domain.StockDocumentType@SCRAP_RECEIPT.getValue()"/>
+    <bind name="enumOtherReceipt" value="@dev.mesbase.business.wm.domain.StockDocumentType@OTHER_RECEIPT.getValue()"/>
+    <bind name="enumMaterialIssue" value="@dev.mesbase.business.wm.domain.StockDocumentType@MATERIAL_ISSUE.getValue()"/>
+    <bind name="enumOtherIssue" value="@dev.mesbase.business.wm.domain.StockDocumentType@OTHER_ISSUE.getValue()"/>
         select case when exists (
             select 1 from wm_stock_document
             where document_no like #{pattern} escape '!'
             <if test="direction == 'STOCK_IN'">
-                and document_type in ('PURCHASE_RECEIPT','PRODUCTION_RECEIPT','OUTSOURCE_RECEIPT',
-                    'MATERIAL_RETURN_RECEIPT','REWORK_RECEIPT','SALES_RETURN_RECEIPT','DEFECT_RECEIPT',
-                    'SCRAP_RECEIPT','OTHER_RECEIPT')
+                and document_type in (#{enumPurchaseReceipt},#{enumProductionReceipt},#{enumOutsourceReceipt},
+                    #{enumMaterialReturnReceipt},#{enumReworkReceipt},#{enumSalesReturnReceipt},#{enumDefectReceipt},
+                    #{enumScrapReceipt},#{enumOtherReceipt})
             </if>
             <if test="direction == 'STOCK_OUT'">
-                and document_type in ('MATERIAL_ISSUE','OTHER_ISSUE')
+                and document_type in (#{enumMaterialIssue},#{enumOtherIssue})
             </if>
             limit 1
         ) then 1 else 0 end

@@ -92,9 +92,10 @@
     </if>
   </select>
   <select id="selectDefaultByProductId" parameterType="Long" resultMap="BaseResultMap">
+    <bind name="enumPublished" value="@dev.mesbase.business.basic.domain.MaterialBomStatus@PUBLISHED.getValue()"/>
     select <include refid="Base_Column_List" />
     from material_bom
-    where product_id = #{productId,jdbcType=BIGINT} and is_default = 1 and status = 'PUBLISHED'
+    where product_id = #{productId,jdbcType=BIGINT} and is_default = 1 and status = #{enumPublished}
   </select>
   <select id="selectByPrimaryKey" parameterType="Long" resultMap="BaseResultMap">
     select

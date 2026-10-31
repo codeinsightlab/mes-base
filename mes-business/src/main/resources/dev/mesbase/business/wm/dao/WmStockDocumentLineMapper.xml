@@ -1,5 +1,4 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- MES-CODEGEN: MyBatis Generator standard single-table persistence. -->
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="dev.mesbase.business.wm.dao.WmStockDocumentLineMapper">
   <resultMap id="BaseResultMap" type="dev.mesbase.business.wm.domain.WmStockDocumentLineEntity">
@@ -16,6 +15,7 @@
     <result column="remark" jdbcType="VARCHAR" property="remark" />
     <result column="stock_action_id" jdbcType="VARCHAR" property="stockActionId" />
     <result column="revision" jdbcType="BIGINT" property="revision" />
+    <result column="demand_line_id" jdbcType="BIGINT" property="demandLineId" />
   </resultMap>
   <sql id="Example_Where_Clause">
     <where>
@@ -77,7 +77,7 @@
   </sql>
   <sql id="Base_Column_List">
     id, document_id, line_no, material_id, warehouse_id, stock_id, batch_no, bin_code,
-    unit_id, quantity, remark, stock_action_id, revision
+    unit_id, quantity, remark, stock_action_id, revision, demand_line_id
   </sql>
   <select id="selectByExample" parameterType="dev.mesbase.business.wm.domain.WmStockDocumentLineExample" resultMap="BaseResultMap">
     select
@@ -110,13 +110,13 @@
     insert into wm_stock_document_line (document_id, line_no, material_id,
       warehouse_id, stock_id, batch_no,
       bin_code, unit_id, quantity,
-      remark, stock_action_id, revision
-      )
+      remark, stock_action_id, revision,
+      demand_line_id)
     values (#{documentId,jdbcType=BIGINT}, #{lineNo,jdbcType=INTEGER}, #{materialId,jdbcType=BIGINT},
       #{warehouseId,jdbcType=BIGINT}, #{stockId,jdbcType=BIGINT}, #{batchNo,jdbcType=VARCHAR},
       #{binCode,jdbcType=VARCHAR}, #{unitId,jdbcType=BIGINT}, #{quantity,jdbcType=DECIMAL},
-      #{remark,jdbcType=VARCHAR}, #{stockActionId,jdbcType=VARCHAR}, #{revision,jdbcType=BIGINT}
-      )
+      #{remark,jdbcType=VARCHAR}, #{stockActionId,jdbcType=VARCHAR}, #{revision,jdbcType=BIGINT},
+      #{demandLineId,jdbcType=BIGINT})
   </insert>
   <insert id="insertSelective" keyColumn="id" keyProperty="id" parameterType="dev.mesbase.business.wm.domain.WmStockDocumentLineEntity" useGeneratedKeys="true">
     insert into wm_stock_document_line
@@ -157,6 +157,9 @@
       <if test="revision != null">
         revision,
       </if>
+      <if test="demandLineId != null">
+        demand_line_id,
+      </if>
     </trim>
     <trim prefix="values (" suffix=")" suffixOverrides=",">
       <if test="documentId != null">
@@ -194,6 +197,9 @@
       </if>
       <if test="revision != null">
         #{revision,jdbcType=BIGINT},
+      </if>
+      <if test="demandLineId != null">
+        #{demandLineId,jdbcType=BIGINT},
       </if>
     </trim>
   </insert>
@@ -245,6 +251,9 @@
       <if test="row.revision != null">
         revision = #{row.revision,jdbcType=BIGINT},
       </if>
+      <if test="row.demandLineId != null">
+        demand_line_id = #{row.demandLineId,jdbcType=BIGINT},
+      </if>
     </set>
     <if test="example != null">
       <include refid="Update_By_Example_Where_Clause" />
@@ -264,7 +273,8 @@
       quantity = #{row.quantity,jdbcType=DECIMAL},
       remark = #{row.remark,jdbcType=VARCHAR},
       stock_action_id = #{row.stockActionId,jdbcType=VARCHAR},
-      revision = #{row.revision,jdbcType=BIGINT}
+      revision = #{row.revision,jdbcType=BIGINT},
+      demand_line_id = #{row.demandLineId,jdbcType=BIGINT}
     <if test="example != null">
       <include refid="Update_By_Example_Where_Clause" />
     </if>
@@ -308,6 +318,9 @@
       <if test="revision != null">
         revision = #{revision,jdbcType=BIGINT},
       </if>
+      <if test="demandLineId != null">
+        demand_line_id = #{demandLineId,jdbcType=BIGINT},
+      </if>
     </set>
     where id = #{id,jdbcType=BIGINT}
   </update>
@@ -324,7 +337,15 @@
       quantity = #{quantity,jdbcType=DECIMAL},
       remark = #{remark,jdbcType=VARCHAR},
       stock_action_id = #{stockActionId,jdbcType=VARCHAR},
-      revision = #{revision,jdbcType=BIGINT}
+      revision = #{revision,jdbcType=BIGINT},
+      demand_line_id = #{demandLineId,jdbcType=BIGINT}
     where id = #{id,jdbcType=BIGINT}
   </update>
+  <select flushCache="true" id="selectByPrimaryKeyForUpdate" parameterType="Long" resultMap="BaseResultMap" useCache="false">
+    select
+    <include refid="Base_Column_List" />
+    from wm_stock_document_line
+    where id = #{id,jdbcType=BIGINT}
+    for update
+  </select>
 </mapper>

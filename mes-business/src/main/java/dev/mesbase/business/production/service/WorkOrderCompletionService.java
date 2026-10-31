@@ -1,16 +1,11 @@
 package dev.mesbase.business.production.service;
 
 import com.github.pagehelper.PageHelper;
-import dev.mesbase.business.wm.dao.WmStockDocumentMapper;
-import dev.mesbase.business.wm.domain.StockDocumentStatus;
-import dev.mesbase.business.wm.domain.WmStockDocumentEntity;
-import dev.mesbase.business.wm.domain.WmStockDocumentExample;
-import dev.mesbase.business.wm.domain.StockDocumentType;
 import dev.mesbase.business.production.dao.MesProductionExecutionMapper;
 import dev.mesbase.business.production.dao.WorkOrderExtraMapper;
 import dev.mesbase.business.production.dao.WorkorderMapper;
-import dev.mesbase.business.production.domain.MesProductionExecutionEntity;
 import dev.mesbase.business.production.domain.ExecutionPathStatus;
+import dev.mesbase.business.production.domain.MesProductionExecutionEntity;
 import dev.mesbase.business.production.domain.MesProductionExecutionExample;
 import dev.mesbase.business.production.domain.ProductionCompletionBalance;
 import dev.mesbase.business.production.domain.ProductionExecutionStatus;
@@ -19,6 +14,11 @@ import dev.mesbase.business.production.domain.WorkorderEntity;
 import dev.mesbase.business.quality.service.QualityTreatmentService;
 import dev.mesbase.business.shared.enums.BusinessSource;
 import dev.mesbase.business.wm.dao.StockDocumentExtraMapper;
+import dev.mesbase.business.wm.dao.WmStockDocumentMapper;
+import dev.mesbase.business.wm.domain.StockDocumentStatus;
+import dev.mesbase.business.wm.domain.StockDocumentType;
+import dev.mesbase.business.wm.domain.WmStockDocumentEntity;
+import dev.mesbase.business.wm.domain.WmStockDocumentExample;
 import dev.mesbase.core.error.ErrorCode;
 import dev.mesbase.core.error.FoundationException;
 import java.math.BigDecimal;
@@ -74,7 +74,8 @@ public class WorkOrderCompletionService {
         if (allocated < 0) return "工单执行分配数量不足计划，不能完结";
         if (allocated > 0) return "工单执行分配数量超过计划，须核实数量异常";
         var pending = new WmStockDocumentExample();
-        pending.createCriteria().andSourceWorkorderIdEqualTo(id).andDocumentTypeEqualTo(StockDocumentType.MATERIAL_ISSUE.getValue());
+        pending.createCriteria().andSourceWorkorderIdEqualTo(id)
+                .andDocumentTypeEqualTo(StockDocumentType.MATERIAL_ISSUE.getValue());
         if (hasPendingIssues(issues.selectByExample(pending))) return "工单仍有未决领料";
         if (queries.countUnaccountedInputs(id) > 0) return "工单仍有未归属有效执行的正式投入";
         BigDecimal total = BigDecimal.ZERO;
@@ -134,8 +135,10 @@ public class WorkOrderCompletionService {
 
     private boolean hasPendingIssues(List<WmStockDocumentEntity> documents) {
         // LOCAL posting and reversal commit atomically; a draft or unknown document state still blocks closure.
-        return documents.stream().anyMatch(document ->
-                !StockDocumentStatus.CANCELLED.getValue().equals(document.getStatus())
-                && !StockDocumentStatus.POSTED.getValue().equals(document.getStatus()));
+        return documents.stream()
+                .filter(document -> document.getSourceExecutionId() != null || document.getSourceRequestJson() != null)
+                .anyMatch(document ->
+                        !StockDocumentStatus.CANCELLED.getValue().equals(document.getStatus())
+                                && !StockDocumentStatus.POSTED.getValue().equals(document.getStatus()));
     }
 }

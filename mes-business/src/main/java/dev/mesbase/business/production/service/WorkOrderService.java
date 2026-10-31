@@ -5,9 +5,7 @@ import com.github.pagehelper.PageHelper;
 import dev.mesbase.business.basic.dao.MaterialMapper;
 import dev.mesbase.business.basic.domain.MaterialExample;
 import dev.mesbase.business.directory.service.BusinessDirectoryService;
-import dev.mesbase.business.wm.dao.WmStockDocumentMapper;
-import dev.mesbase.business.wm.domain.WmStockDocumentExample;
-import dev.mesbase.business.wm.domain.StockDocumentType;
+import dev.mesbase.business.production.dao.MesProductionCombinationMapper;
 import dev.mesbase.business.production.dao.MesProductionExecutionMapper;
 import dev.mesbase.business.production.dao.MesWorkorderMaterialMapper;
 import dev.mesbase.business.production.dao.RoutingEdgeMapper;
@@ -17,6 +15,7 @@ import dev.mesbase.business.production.dao.RoutingProductMapper;
 import dev.mesbase.business.production.dao.WorkOrderExtraMapper;
 import dev.mesbase.business.production.dao.WorkorderErpExtraMapper;
 import dev.mesbase.business.production.dao.WorkorderMapper;
+import dev.mesbase.business.production.domain.MesProductionCombinationExample;
 import dev.mesbase.business.production.domain.MesProductionExecutionExample;
 import dev.mesbase.business.production.domain.MesWorkorderMaterialExample;
 import dev.mesbase.business.production.domain.RoutingDetail;
@@ -24,8 +23,8 @@ import dev.mesbase.business.production.domain.RoutingEdgeExample;
 import dev.mesbase.business.production.domain.RoutingEntity;
 import dev.mesbase.business.production.domain.RoutingExample;
 import dev.mesbase.business.production.domain.RoutingNodeExample;
-import dev.mesbase.business.production.domain.RoutingProductExample;
 import dev.mesbase.business.production.domain.RoutingProductEntity;
+import dev.mesbase.business.production.domain.RoutingProductExample;
 import dev.mesbase.business.production.domain.RoutingStatus;
 import dev.mesbase.business.production.domain.WorkOrderModels;
 import dev.mesbase.business.production.domain.WorkOrderStatus;
@@ -38,6 +37,9 @@ import dev.mesbase.business.shared.ExternalSyncAction;
 import dev.mesbase.business.shared.ExternalSyncCheck;
 import dev.mesbase.business.shared.enums.BusinessSource;
 import dev.mesbase.business.shared.enums.EnableStatus;
+import dev.mesbase.business.wm.dao.WmStockDocumentMapper;
+import dev.mesbase.business.wm.domain.StockDocumentType;
+import dev.mesbase.business.wm.domain.WmStockDocumentExample;
 import dev.mesbase.common.utils.StringUtils;
 import dev.mesbase.core.error.ErrorCode;
 import dev.mesbase.core.error.FoundationException;
@@ -47,26 +49,24 @@ import dev.mesbase.platform.execution.FactoryContext;
 import dev.mesbase.platform.execution.FactoryIntegrationContext;
 import dev.mesbase.system.service.AutoCodeNumbering;
 import dev.mesbase.system.service.AutoCodeRuleType;
-
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.stream.Collectors;
-
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.dao.DuplicateKeyException;
-import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.TransactionDefinition;
-import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Isolation;
-import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.annotation.Propagation;
-import org.springframework.transaction.support.TransactionTemplate;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 /**
  * WorkOrder owns demand; current production facts belong to formal Execution records.
@@ -93,6 +93,7 @@ public class WorkOrderService {
     private final WmStockDocumentMapper issues;
     private final WorkOrderExtraMapper queries;
     private final MesProductionExecutionMapper executions;
+    private final MesProductionCombinationMapper combinations;
     private final AutoCodeNumbering autoCodes;
     private final TransactionTemplate createTransactions;
 
@@ -105,7 +106,9 @@ public class WorkOrderService {
                             BusinessSourceRules sources, WorkorderErpExtraMapper external, SyncCoordinator sync,
                             MaterialQuantityRules quantityRules, AutoCodeNumbering autoCodes,
                             WorkorderMaterialService materialDemands,
+                            MesProductionCombinationMapper combinations,
                             @Qualifier("businessTransactionManager") PlatformTransactionManager businessTransactionManager) {
+        this.combinations = combinations;
         this.external = external;
         this.sync = sync;
         this.sources = sources;
@@ -409,6 +412,10 @@ public class WorkOrderService {
         sources.current(row.getSource());
         if (row.getRevision() != revision) conflict();
         ensureNoDownstream(id);
+        var combinationFilter = new MesProductionCombinationExample();
+        combinationFilter.createCriteria().andWorkorderIdEqualTo(id);
+        if (combinations.countByExample(combinationFilter) > 0)
+            throw new FoundationException(ErrorCode.WORKORDER_REFERENCED);
         var materialFilter = new MesWorkorderMaterialExample();
         materialFilter.createCriteria().andWorkorderIdEqualTo(id);
         requirements.deleteByExample(materialFilter);
@@ -433,7 +440,8 @@ public class WorkOrderService {
     private void ensureNoDownstream(Long id) {
         if (hasExecutions(id)) throw new FoundationException(ErrorCode.EXECUTION_REFERENCED);
         var issueFilter = new WmStockDocumentExample();
-        issueFilter.createCriteria().andSourceWorkorderIdEqualTo(id).andDocumentTypeEqualTo(StockDocumentType.MATERIAL_ISSUE.getValue());
+        issueFilter.createCriteria().andSourceWorkorderIdEqualTo(id)
+                .andDocumentTypeEqualTo(StockDocumentType.MATERIAL_ISSUE.getValue());
         if (issues.countByExample(issueFilter) > 0)
             throw new FoundationException(ErrorCode.WORKORDER_ISSUE_REFERENCED);
         if (queries.hasOrderDependents(id))
