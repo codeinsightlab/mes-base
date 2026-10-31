@@ -12,7 +12,7 @@ import java.time.LocalDateTime;
  */
 public record MesProductionExecutionUpdateCommand(
         @NotNull Long workorderId,
-        @NotNull Long routingId,
+        Long routingId,
         @NotNull @Digits(integer = 14, fraction = 6) BigDecimal targetQty,
         @NotBlank @Size(max = 20) String status,
         LocalDateTime startTime,

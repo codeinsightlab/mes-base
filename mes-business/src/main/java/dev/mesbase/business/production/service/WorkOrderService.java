@@ -51,6 +51,8 @@ import dev.mesbase.system.service.AutoCodeNumbering;
 import dev.mesbase.system.service.AutoCodeRuleType;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -162,12 +164,14 @@ public class WorkOrderService {
         if (rows.isEmpty()) return new WorkOrderModels.Page(List.of(), total, offset, limit);
         materialFilter.createCriteria()
                 .andIdIn(rows.stream().map(WorkorderEntity::getProductId).distinct().toList());
-        routingFilter.createCriteria()
-                .andIdIn(rows.stream().map(WorkorderEntity::getRoutingId).distinct().toList());
+        var routingIds = rows.stream().map(WorkorderEntity::getRoutingId).filter(Objects::nonNull).distinct().toList();
         var materialIndex = materials.selectByExample(materialFilter).stream()
                 .collect(Collectors.toMap(m -> m.getId(), m -> m));
-        var routingIndex = routings.selectByExample(routingFilter).stream()
-                .collect(Collectors.toMap(r -> r.getId(), r -> r));
+        var routingIndex = new HashMap<Long, RoutingEntity>();
+        if (!routingIds.isEmpty()) {
+            routingFilter.createCriteria().andIdIn(routingIds);
+            routings.selectByExample(routingFilter).forEach(r -> routingIndex.put(r.getId(), r));
+        }
         var allocations = queries.allocationForOrders(rows.stream().map(WorkorderEntity::getId).toList()).stream()
                 .collect(Collectors.toMap(WorkOrderModels.Allocation::workorderId, a -> a));
         return new WorkOrderModels.Page(rows.stream().map(w -> {
@@ -185,9 +189,11 @@ public class WorkOrderService {
     public WorkOrderModels.Detail detail(Long id) {
         var w = order(id, false);
         var m = materials.selectByPrimaryKey(w.getProductId());
+        RoutingEntity routing = null;
+        if (w.getRoutingId() != null) routing = routings.selectByPrimaryKey(w.getRoutingId());
         return new WorkOrderModels.Detail(w, Optional.ofNullable(m).map(nullableValue -> nullableValue.getCode())
                 .orElse(null), Optional.ofNullable(m).map(nullableValue -> nullableValue.getName()).orElse(null),
-                routings.selectByPrimaryKey(w.getRoutingId()), allocation(id));
+                routing, allocation(id));
     }
 
     @Transactional(transactionManager = "businessTransactionManager", propagation = Propagation.NOT_SUPPORTED)
@@ -295,6 +301,8 @@ public class WorkOrderService {
                 || plan.values().externalId() != null || plan.values().externalCode() != null) conflict();
         var input = plan.values();
         if (StringUtils.isBlank(input.code()) || input.code().length() > 64) conflict();
+        // Optional routing is a LOCAL production contract; ERP synchronization retains its verified mapping rule.
+        require(input.routingId() != null);
         validate(input, lock);
         var snapshot = FactoryIntegrationContext.required();
         var filter = new WorkorderExample();
@@ -346,7 +354,7 @@ public class WorkOrderService {
                 throw new FoundationException(ErrorCode.WORKORDER_ISSUE_REFERENCED);
         }
         validateValues(input);
-        if (identityChanged) binding(input.productId(), input.routingId());
+        if (identityChanged || row.getRoutingId() == null) binding(input.productId(), input.routingId());
         materialDemands.requireUpdatePermission();
         if (!Objects.equals(input.productId(), row.getProductId())
                 || input.plannedQty() == null || row.getPlannedQty() == null
@@ -373,6 +381,8 @@ public class WorkOrderService {
     @Transactional(transactionManager = "businessTransactionManager", readOnly = true)
     public RoutingDetail graph(Long id) {
         var w = order(id, false);
+        if (w.getRoutingId() == null)
+            return new RoutingDetail(null, List.of(), List.of(), List.of(), Map.of());
         var n = new RoutingNodeExample();
         n.createCriteria().andRoutingIdEqualTo(w.getRoutingId());
         var e = new RoutingEdgeExample();
@@ -475,6 +485,10 @@ public class WorkOrderService {
             var material = materials.selectByPrimaryKey(product);
             require(material != null && EnableStatus.ENABLED.getValue().equals(material.getStatus()));
         }
+        if (routing == null) {
+            require(queries.publishedForProduct(product, null).isEmpty());
+            return;
+        }
         var r = lock ? routings.selectByPrimaryKeyForUpdate(routing) : routings.selectByPrimaryKey(routing);
         require(r != null && RoutingStatus.PUBLISHED.getValue().equals(r.getStatus()));
         var p = new RoutingProductExample();
@@ -492,7 +506,7 @@ public class WorkOrderService {
     }
 
     private void validateValues(WorkOrderModels.Save input) {
-        require(input != null && input.productId() != null && input.routingId() != null);
+        require(input != null && input.productId() != null);
         BigDecimal quantity = input.plannedQty();
         require(quantity != null && quantity.signum() > 0 && quantity.scale() <= 6
                 && quantity.precision() - quantity.scale() <= 14);

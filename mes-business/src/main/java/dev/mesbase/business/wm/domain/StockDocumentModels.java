@@ -121,7 +121,8 @@ public final class StockDocumentModels {
      * Current net production output less formally received stock bounds inbound approval.
      */
     public record ProductionBasis(Long executionId, Long productId, BigDecimal effective,
-                                  BigDecimal received, BigDecimal remaining, boolean canReceive, String blockedReason) {
+                                  BigDecimal received, BigDecimal remaining, boolean canReceive, String blockedReason,
+                                  boolean reportingRequired) {
     }
 
     public record CancellationBasis(Long workorderId, Long productId, String status,

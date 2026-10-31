@@ -1,5 +1,7 @@
 package dev.mesbase.business.production;
 
+import dev.mesbase.business.wm.dao.StockDocumentExtraMapper;
+
 import dev.mesbase.business.production.domain.ProductionReportModels.ExecutionQuantity;
 import dev.mesbase.business.production.domain.ProductionReportModels;
 import dev.mesbase.business.production.domain.ProductionReportModels.NodeQuantity;
@@ -110,7 +112,7 @@ class ProductionQualityQuantityTest {
         when(reports.nodeTotals(1L)).thenReturn(List.of(new ProductionReportModels.NodeTotal(11L, d("10")), new ProductionReportModels.NodeTotal(99L, d("999"))));
         when(quality.nodeTotals(1L)).thenReturn(List.of(new NodeTotal(11L, d("2")), new NodeTotal(99L, d("900"))));
         when(reports.inputBalance(1L)).thenReturn(new ProductionInputBalance(d("100"), d("0")));
-        var service = new ProductionQuantityService(executions, paths, selected, reports, mock(BusinessDirectoryService.class), quality, mock(WorkorderMapper.class));
+        var service = new ProductionQuantityService(executions, paths, selected, reports, mock(BusinessDirectoryService.class), quality, mock(WorkorderMapper.class), mock(StockDocumentExtraMapper.class));
         var result = service.getExecutionQuantities(1L);
         assertEquals(1, result.nodes().size());
         assertEquals(d("8"), result.nodes().getFirst().effectiveOutputQty());

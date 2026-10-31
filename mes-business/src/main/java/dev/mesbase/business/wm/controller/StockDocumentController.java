@@ -388,7 +388,8 @@ public class StockDocumentController {
     }
 
     public record ProductionBasis(String executionId, String productId, String effective,
-                                  String received, String remaining, boolean canReceive, String blockedReason) {
+                                  String received, String remaining, boolean canReceive, String blockedReason,
+                                  boolean reportingRequired) {
     }
 
     @GetMapping("/cancelled-workorders/{id}/basis")

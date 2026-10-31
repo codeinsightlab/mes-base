@@ -14,7 +14,7 @@ public final class WorkOrderModels {
     }
 
     public record Save(@Size(max = 64) String code, @NotNull Long productId,
-                       @NotNull BigDecimal plannedQty, @NotNull Long routingId,
+                       @NotNull BigDecimal plannedQty, Long routingId,
                        LocalDateTime plannedStartAt, LocalDateTime plannedEndAt,
                        @Size(max = 128) String externalId, @Size(max = 128) String externalCode,
                        @Size(max = 500) String remark, Integer revision, @Size(max = 64) String ruleCode,

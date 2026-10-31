@@ -51,7 +51,7 @@ public class MesProductionExecutionController {
         var page = data.records();
         return BeanConversions.convertPage(page, row -> {
             var product = data.references().products().get(row.getProductId());
-            var routing = data.references().routings().get(row.getRoutingId());
+            var routing = Optional.ofNullable(row.getRoutingId()).map(data.references().routings()::get).orElse(null);
             return toView(row, Optional.ofNullable(product).map(value -> value.getCode()).orElse(null),
                     Optional.ofNullable(product).map(value -> value.getName())
                             .orElse(null), Optional.ofNullable(routing).map(value -> value.code()).orElse(null),

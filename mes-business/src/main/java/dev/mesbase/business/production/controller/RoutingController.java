@@ -158,6 +158,7 @@ public class RoutingController {
     }
 
     static RoutingDetailVo detailView(RoutingDetail detail) {
+        if (detail == null) return null;
         var nodeCodes = new HashMap<Long, String>();
         for (var node : detail.nodes()) nodeCodes.put(node.getId(), node.getNodeCode());
         return new RoutingDetailVo(toView(detail.routing()),

@@ -123,6 +123,7 @@ public class ProductionInputService {
         if (!Objects.equals(combination.workorderId(), workorderId)) ParameterChecks.reject(ErrorCode.BAD_REQUEST);
         var order = orders.selectByPrimaryKey(workorderId);
         if (order == null) ParameterChecks.reject(ErrorCode.NOT_FOUND);
+        if (order.getRoutingId() == null) return new Preview(null, null);
         if (combination.executionId() == null) return new Preview(routings.detail(order.getRoutingId()), null);
         var execution = executionMapper.selectByPrimaryKey(combination.executionId());
         if (execution == null) ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
@@ -186,7 +187,7 @@ public class ProductionInputService {
             created.setBatchNo("P-" + UUID.randomUUID());
             if (executionMapper.updateByPrimaryKey(created) != 1) ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
             executionId = created.getId();
-            paths.select(executionId, 0, command.routingNodeIds());
+            if (command.routingId() != null) paths.select(executionId, 0, command.routingNodeIds());
             combinations.bind(combinationId, executionId);
         } else {
             var execution = locks.execution(executionId);
@@ -194,7 +195,8 @@ public class ProductionInputService {
                     .contains(execution.getStatus())
                     || !Objects.equals(execution.getRoutingId(), command.routingId()))
                 ParameterChecks.reject(ErrorCode.PRODUCTION_COMBINATION_CLOSED);
-            if (!paths.view(executionId).selectedNodeIds().equals(command.routingNodeIds()))
+            if (command.routingId() != null && !paths.view(executionId).selectedNodeIds()
+                    .equals(command.routingNodeIds()))
                 ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
             var target = inputQueries.confirmedExecutionOutput(executionId).add(command.outputQty());
             if (target.compareTo(execution.getTargetQty()) > 0) {
@@ -215,8 +217,10 @@ public class ProductionInputService {
         facts.recordMesConfirmation(document.document(), command.requestId(), hash, executionId,
                 new CombinationInput(2, combinationId, order.getId(), header.getDemandRevision(), command.outputQty(), calculation.allocations()));
         var execution = locks.execution(executionId);
-        var path = paths.requireSelected(execution);
-        paths.confirm(execution, path.getRevision());
+        if (execution.getRoutingId() != null) {
+            var path = paths.requireSelected(execution);
+            paths.confirm(execution, path.getRevision());
+        }
         caches.evict(MesProductionExecutionResource.PREFIX, BusinessCacheEvict.Scope.LIST_AND_DETAIL);
         return result(command.requestId(), document.document().getId(), executionId, command.code());
     }
@@ -235,7 +239,9 @@ public class ProductionInputService {
 
     private static void validate(Confirm c) {
         if (c == null || c.requestId() == null || c.outputQty() == null || c.outputQty().signum() <= 0
-                || c.routingId() == null || c.routingNodeIds() == null || c.routingNodeIds().isEmpty()
+                || c.routingNodeIds() == null
+                || c.routingId() == null && !c.routingNodeIds().isEmpty()
+                || c.routingId() != null && c.routingNodeIds().isEmpty()
                 || c.routingNodeIds().size() > 100 || c.calculationKey() == null || c.calculationKey().length() != 64)
             ParameterChecks.reject(ErrorCode.BAD_REQUEST);
         try {

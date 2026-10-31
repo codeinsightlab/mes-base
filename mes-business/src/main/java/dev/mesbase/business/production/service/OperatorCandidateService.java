@@ -48,6 +48,7 @@ public class OperatorCandidateService {
         FactoryContext.required();
         var execution = executions.selectByPrimaryKey(executionId);
         if (execution == null) throw new FoundationException(ErrorCode.EXECUTION_NOT_FOUND);
+        if (execution.getRoutingId() == null) return new ExecutionNodes(execution.getStatus(), List.of());
         var filter = new RoutingNodeExample();
         filter.createCriteria().andRoutingIdEqualTo(execution.getRoutingId());
         filter.setOrderByClause("display_order,id");

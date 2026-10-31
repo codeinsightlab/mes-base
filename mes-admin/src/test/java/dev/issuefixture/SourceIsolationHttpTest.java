@@ -92,6 +92,8 @@ class SourceIsolationHttpTest {
             var run = new SyncCoordinator.Run(scope, "workorder.erp", "TEST-OWNER");
             var input = new WorkOrderModels.Save("TEST_EXTERNAL_SYNC", 1L, new BigDecimal("100"), 1L, null, null, null, null, null, null, null);
             FactoryIntegrationContext.run(snapshot, () -> {
+                var withoutRouting = new WorkOrderModels.Save("TEST_EXTERNAL_NO_ROUTE", 1L, new BigDecimal("100"), null, null, null, null, null, null, null, null);
+                assertThrows(FoundationException.class, () -> service.inspectExternal(new WorkOrderService.ExternalPlan(withoutRouting, "ERP-NO-ROUTE", "ERP-NO-ROUTE", WorkOrderStatus.RELEASED)));
                 var result = service.syncExternal(new WorkOrderService.ExternalPlan(input, "ERP-ORDER-1", "ERP-MO-1", WorkOrderStatus.RELEASED), run);
                 assertEquals("EXTERNAL", result.workorder().getSource());
                 assertEquals("TEST-BINDING", j.queryForObject("SELECT binding_key FROM workorder_erp_extra WHERE id=?", String.class, result.workorder()

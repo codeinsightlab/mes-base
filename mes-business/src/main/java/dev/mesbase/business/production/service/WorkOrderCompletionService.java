@@ -94,7 +94,8 @@ public class WorkOrderCompletionService {
                 if (!ProductionExecutionStatus.FULLY_RECEIVED.getValue().equals(execution.getStatus()))
                     return "工单仍有未完全入库的执行";
                 var projection = quantities.getExecutionQuantities(execution.getId());
-                if (!ExecutionPathStatus.LOCKED.getValue().equals(projection.pathStatus()))
+                if (execution.getRoutingId() != null && !ExecutionPathStatus.LOCKED.getValue()
+                        .equals(projection.pathStatus()))
                     return "执行实际路径尚未锁定";
                 if (projection.nodes().stream().anyMatch(node -> node.historicalConflict()))
                     return "执行存在历史数量超额，须核实数量异常";
@@ -103,7 +104,9 @@ public class WorkOrderCompletionService {
                 if (inbound.invalidProductionInboundLines(execution.getId()) > 0)
                     return "正式生产入库明细与库存动作不一致";
                 var received = inbound.formalProductionInbound(execution.getId());
-                if (received.compareTo(projection.nodes().getLast().effectiveOutputQty()) != 0)
+                BigDecimal output = projection.confirmedInputQty();
+                if (execution.getRoutingId() != null) output = projection.nodes().getLast().effectiveOutputQty();
+                if (received.compareTo(output) != 0)
                     return "执行正常品入库与有效产出不一致";
                 reason = quality.receiptBlockReason(execution.getId());
                 if (reason != null) return reason;

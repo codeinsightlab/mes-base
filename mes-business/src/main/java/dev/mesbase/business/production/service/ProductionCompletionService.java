@@ -94,8 +94,11 @@ public class ProductionCompletionService {
         String state = ProductionExecutionStatus.FULLY_RECEIVED.getValue().equals(execution.getStatus())
                 ? ProductionReceiptState.FULLY_RECEIVED.getValue() : (received.signum() > 0 || quality.hasFormalReceipt(id))
                 ? ProductionReceiptState.PARTIAL.getValue() : ProductionReceiptState.PENDING.getValue();
-        return new Summary(execution, projection.nodes().isEmpty() ? BigDecimal.ZERO : projection.nodes().getLast()
-                .effectiveOutputQty(), completion, reason, received, defect, state,
+        BigDecimal effective = received;
+        if (execution.getRoutingId() != null)
+            effective = projection.nodes().isEmpty() ? BigDecimal.ZERO : projection.nodes().getLast()
+                    .effectiveOutputQty();
+        return new Summary(execution, effective, completion, reason, received, defect, state,
                 workorders.blockedReason(execution.getWorkorderId()));
     }
 
@@ -136,6 +139,14 @@ public class ProductionCompletionService {
         ProductionClosureRules.uuid(auditRequestId);
         var execution = executions.selectByPrimaryKey(id);
         if (execution == null) ParameterChecks.reject(ErrorCode.NOT_FOUND);
+        if (execution.getRoutingId() == null && ProductionExecutionStatus.READY.getValue()
+                .equals(execution.getStatus())) {
+            execution.setStatus(ProductionExecutionStatus.RUNNING.getValue());
+            execution.setStartTime(LocalDateTime.now());
+            execution.setUpdateTime(execution.getStartTime());
+            if (executions.updateByPrimaryKey(execution) != 1)
+                ParameterChecks.reject(ErrorCode.PRODUCTION_CLOSURE_CONFLICT);
+        }
         if (ProductionExecutionStatus.RUNNING.getValue().equals(execution.getStatus())) {
             sources.finishedOutput(execution, null);
             var projection = quantities.getExecutionQuantities(id);
@@ -190,16 +201,19 @@ public class ProductionCompletionService {
                                  BigDecimal received) {
         if (!List.of(ProductionExecutionStatus.RUNNING.getValue(), ProductionExecutionStatus.FULLY_RECEIVED.getValue())
                 .contains(execution.getStatus())) return "执行尚未开工、已取消或状态非法，不能自动完全入库";
-        if (!ExecutionPathStatus.LOCKED.getValue().equals(projection.pathStatus())) return "实际生产路径尚未锁定";
+        if (execution.getRoutingId() != null && !ExecutionPathStatus.LOCKED.getValue().equals(projection.pathStatus()))
+            return "实际生产路径尚未锁定";
         if (projection.nodes().stream().anyMatch(node -> node.historicalConflict()))
             return "存在历史数量超额，须核实后才能完全入库";
         var balanceReason = ProductionCompletionBalance.blockedReason(projection);
         if (balanceReason != null) return balanceReason;
         var unresolved = new WmStockDocumentExample();
-        unresolved.createCriteria().andSourceExecutionIdEqualTo(execution.getId()).andDocumentTypeEqualTo(StockDocumentType.MATERIAL_ISSUE.getValue());
+        unresolved.createCriteria().andSourceExecutionIdEqualTo(execution.getId())
+                .andDocumentTypeEqualTo(StockDocumentType.MATERIAL_ISSUE.getValue());
         if (hasPendingIssues(issues.selectByExample(unresolved))) return "相关领料仍有未决状态，请核实原请求";
         if (inbound.invalidProductionInboundLines(execution.getId()) > 0) return "正式生产入库明细与库存动作不一致";
-        var output = projection.nodes().getLast().effectiveOutputQty();
+        var output = projection.confirmedInputQty();
+        if (execution.getRoutingId() != null) output = projection.nodes().getLast().effectiveOutputQty();
         if (received.compareTo(output) < 0) return "正常品尚未全部正式入库";
         if (received.compareTo(output) > 0) return "正常品正式入库超过当前有效产出，须核实数量异常";
         return quality.receiptBlockReason(execution.getId());
@@ -228,7 +242,9 @@ public class ProductionCompletionService {
         var row = new MesExecutionCompletionEntity();
         row.setId(requestId);
         row.setExecutionId(execution.getId());
-        row.setEffectiveQty(projection.nodes().getLast().effectiveOutputQty());
+        BigDecimal effective = received;
+        if (execution.getRoutingId() != null) effective = projection.nodes().getLast().effectiveOutputQty();
+        row.setEffectiveQty(effective);
         row.setReleasedQty(null);
         row.setReceiptQty(BigDecimal.ZERO);
         row.setAcceptedQty(received);
@@ -257,6 +273,6 @@ public class ProductionCompletionService {
         // LOCAL posting and reversal commit atomically; a draft or unknown document state still blocks closure.
         return documents.stream().anyMatch(document ->
                 !StockDocumentStatus.CANCELLED.getValue().equals(document.getStatus())
-                && !StockDocumentStatus.POSTED.getValue().equals(document.getStatus()));
+                        && !StockDocumentStatus.POSTED.getValue().equals(document.getStatus()));
     }
 }

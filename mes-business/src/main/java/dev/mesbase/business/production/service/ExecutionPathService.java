@@ -91,6 +91,11 @@ public class ExecutionPathService {
 
     private PathModel view(MesProductionExecutionEntity e, List<MesExecutionPathNodeEntity> ordered) {
         Long id = e.getId();
+        if (e.getRoutingId() == null) {
+            if (paths.selectByPrimaryKey(id) != null || !nodeIds(id).isEmpty())
+                throw new FoundationException(ErrorCode.RESOURCE_CONFLICT);
+            return new PathModel(id, e.getStatus(), null, List.of(), List.of(), List.of(), null, Map.of());
+        }
         var routing = references.routingLabel(e.getRoutingId());
         var actualNodes = nodes(e.getRoutingId());
         var operationLabels = references.operationLabels(actualNodes.stream().map(RoutingNodeEntity::getOperationId)
@@ -150,6 +155,7 @@ public class ExecutionPathService {
 
     public PathModel select(Long id, Integer revision, List<Long> nodeIds) {
         var e = locks.execution(id);
+        if (e.getRoutingId() == null) ParameterChecks.reject(ErrorCode.REPORT_PATH_REQUIRED);
         locks.requireActiveExecution(id);
         if (!ProductionExecutionStatus.READY.getValue().equals(e.getStatus()) || e.getStartTime() != null)
             ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
@@ -234,7 +240,8 @@ public class ExecutionPathService {
                 && Boolean.TRUE.equals(f.getStockApplied())).toList();
         if (confirmed.isEmpty()) ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
         for (var fact : confirmed) {
-            if (!Mode.LOCAL_ONLY.getValue().equals(fact.getSourceMode()) || !"PRODUCTION_INPUT".equals(fact.getInputKind()))
+            if (!Mode.LOCAL_ONLY.getValue()
+                    .equals(fact.getSourceMode()) || !"PRODUCTION_INPUT".equals(fact.getInputKind()))
                 ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
         }
         if (ProductionExecutionStatus.RUNNING.getValue().equals(e.getStatus())) return e;

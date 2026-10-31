@@ -206,8 +206,10 @@ public class StockDocumentService {
             try {
                 var request = new ObjectMapper().readValue(row.getSourceRequestJson(), ProductionInputService.Command.class);
                 if (request == null || request.requestId() == null || request.code() == null
-                        || request.workorderId() == null || request.outputQty() == null || request.routingId() == null
-                        || request.routingNodeIds() == null || request.routingNodeIds().isEmpty()) {
+                        || request.workorderId() == null || request.outputQty() == null
+                        || request.routingNodeIds() == null
+                        || request.routingId() != null && request.routingNodeIds().isEmpty()
+                        || request.routingId() == null && !request.routingNodeIds().isEmpty()) {
                     LOG.warn("Material issue draft basis lacks required fields; document {}", id);
                     materialIssueBasisError = "领料投入依据缺失，原单据及明细仍可查看，暂不能审核";
                 } else {
@@ -747,13 +749,17 @@ public class StockDocumentService {
         var basis = quality.productionBasis(executionId);
         var effective = projection.nodes().isEmpty() ? BigDecimal.ZERO : projection.nodes().getLast()
                 .effectiveOutputQty();
+        boolean reportingRequired = execution.getRoutingId() != null;
+        if (!reportingRequired) effective = projection.confirmedInputQty();
         var received = inbound.netProductionInbound(executionId);
         var remaining = effective.subtract(received);
         String blocked = null;
         if (!admitted) blocked = "当前工单状态、来源或模式不允许入库";
-        else if (!ProductionExecutionStatus.RUNNING.getValue().equals(execution.getStatus()))
+        else if (!ProductionExecutionStatus.RUNNING.getValue().equals(execution.getStatus())
+                && (reportingRequired || !ProductionExecutionStatus.READY.getValue().equals(execution.getStatus())))
             blocked = "执行状态不允许入库";
-        else if (!ExecutionPathStatus.LOCKED.getValue().equals(projection.pathStatus()) || projection.nodes().isEmpty())
+        else if (reportingRequired && (!ExecutionPathStatus.LOCKED.getValue()
+                .equals(projection.pathStatus()) || projection.nodes().isEmpty()))
             blocked = "实际生产路径尚未锁定";
         else if (projection.confirmedInputQty().signum() <= 0 || projection.reservedInputQty().signum() > 0)
             blocked = "缺少正式投入或仍有未决投产意图";
@@ -763,12 +769,14 @@ public class StockDocumentService {
             blocked = "存在待核实不良，不能审核生产入库";
         else if (remaining.signum() <= 0) blocked = "可入库数量不足或存在数量超额";
         return new StockDocumentModels.ProductionBasis(executionId, execution.getProductId(), effective,
-                received, remaining.max(BigDecimal.ZERO), blocked == null, blocked);
+                received, remaining.max(BigDecimal.ZERO), blocked == null, blocked, reportingRequired);
     }
 
     private MesProductionExecutionEntity productionExecution(Long id) {
         var execution = locks.execution(id);
-        if (!ProductionExecutionStatus.RUNNING.getValue().equals(execution.getStatus()))
+        if (!ProductionExecutionStatus.RUNNING.getValue().equals(execution.getStatus())
+                && (execution.getRoutingId() != null || !ProductionExecutionStatus.READY.getValue()
+                .equals(execution.getStatus())))
             ParameterChecks.reject(ErrorCode.STOCK_DOCUMENT_CONFLICT);
         sources.finishedOutput(execution, null);
         return execution;

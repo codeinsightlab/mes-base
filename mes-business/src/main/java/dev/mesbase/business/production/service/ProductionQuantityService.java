@@ -26,6 +26,7 @@ import dev.mesbase.business.production.service.ExecutionPathService.PathModel;
 import dev.mesbase.business.production.service.ProductionChainLocks.LockedExecution;
 import dev.mesbase.business.quality.domain.ProductionDefectModels;
 import dev.mesbase.business.quality.service.ProductionDefectQuantityQuery;
+import dev.mesbase.business.wm.dao.StockDocumentExtraMapper;
 import dev.mesbase.common.validation.ParameterChecks;
 import dev.mesbase.core.error.ErrorCode;
 import dev.mesbase.core.error.FoundationException;
@@ -53,11 +54,13 @@ public class ProductionQuantityService {
     private final ProductionQuantityMapper quantities;
     private final BusinessDirectoryService directory;
     private final ProductionDefectQuantityQuery defects;
+    private final StockDocumentExtraMapper inbound;
 
     public ProductionQuantityService(MesProductionExecutionMapper executions, ExecutionPathService paths,
                                      MesExecutionPathNodeMapper pathNodes, ProductionQuantityMapper quantities,
                                      BusinessDirectoryService directory, ProductionDefectQuantityQuery defects,
-                                     WorkorderMapper orders) {
+                                     WorkorderMapper orders, StockDocumentExtraMapper inbound) {
+        this.inbound = inbound;
         this.orders = orders;
         this.executions = executions;
         this.paths = paths;
@@ -104,6 +107,14 @@ public class ProductionQuantityService {
     private ExecutionQuantity load(Long executionId) {
         var execution = executions.selectByPrimaryKey(executionId);
         if (execution == null) throw new FoundationException(ErrorCode.EXECUTION_NOT_FOUND);
+        if (execution.getRoutingId() == null) {
+            var balance = quantities.inputBalance(executionId);
+            var input = balance.usableQty();
+            if (input == null || input.signum() < 0) ParameterChecks.reject(ErrorCode.REPORT_PATH_REQUIRED);
+            return new ExecutionQuantity(executionId, execution.getWorkorderId(), null, execution.getTargetQty(),
+                    null, false, "无工艺工单无需工序报工，按正式领料确认量办理成品入库", List.of(), null,
+                    input, balance.confirmedQty(), balance.reservedQty(), execution.getProductId());
+        }
         return load(executionId, execution, paths.view(executionId));
     }
 
@@ -193,7 +204,8 @@ public class ProductionQuantityService {
             rows = List.copyOf(quantities.workorderQuantities(workorderId));
             total = page.getTotal();
         }
-        var labels = directory.routingLabels(rows.stream().map(ExecutionSummary::routingId).toList()).entrySet()
+        var labels = directory.routingLabels(rows.stream().map(ExecutionSummary::routingId).filter(Objects::nonNull)
+                        .toList()).entrySet()
                 .stream().collect(Collectors.toMap(entry -> entry.getKey(), entry -> label(entry.getValue())));
         return new ExecutionPage(rows, total, offset, limit, labels);
     }
@@ -302,6 +314,9 @@ public class ProductionQuantityService {
 
     public void validateInputReduction(Long executionId) {
         var view = getExecutionQuantities(executionId);
+        if (view.routingId() == null && (inbound.invalidProductionInboundLines(executionId) > 0
+                || inbound.formalProductionInbound(executionId).compareTo(view.confirmedInputQty()) > 0))
+            throw new FoundationException(ErrorCode.REPORT_QUANTITY_CONFLICT);
         if (view.nodes().stream().anyMatch(n -> n.historicalConflict() || n.unverifiedDefectQty().signum() > 0))
             throw new FoundationException(ErrorCode.REPORT_QUANTITY_CONFLICT);
     }

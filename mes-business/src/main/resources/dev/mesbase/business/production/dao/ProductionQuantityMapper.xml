@@ -33,7 +33,8 @@
         <bind name="inputLOCAL_ONLY" value="@dev.mesbase.business.integration.warehouse.ErpActionResult$Mode@LOCAL_ONLY.getValue()"/>
         SELECT e.id AS executionId,e.workorder_id AS workorderId,e.routing_id AS
         routingId,
-        e.target_qty AS targetQty,p.path_status AS pathStatus,COALESCE(SUM(r.quantity_delta),0) AS lastNodeReportedQty,
+        e.target_qty AS targetQty,p.path_status AS pathStatus,
+        CASE WHEN e.routing_id IS NULL THEN NULL ELSE COALESCE(SUM(r.quantity_delta),0) END AS lastNodeReportedQty,
         COALESCE((SELECT SUM(f.output_qty) FROM mes_material_issue_input f JOIN wm_stock_document d ON d.id=f.document_id AND d.source_execution_id=f.execution_id WHERE f.execution_id=e.id AND f.input_kind=#{enumProductionInput} AND f.confirmed_at IS NOT NULL AND f.stock_applied=TRUE
         AND f.source_mode=#{enumLocalOnly} AND d.document_type=#{enumMaterialIssue} AND d.status=#{enumPosted}
         AND NOT EXISTS(SELECT 1 FROM wm_stock_document_line original_line JOIN wm_stock_action reversal ON reversal.reference_action_id=original_line.stock_action_id

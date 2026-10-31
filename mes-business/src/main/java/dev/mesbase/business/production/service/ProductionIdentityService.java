@@ -9,6 +9,7 @@ import dev.mesbase.business.production.dao.WorkorderMapper;
 import dev.mesbase.business.production.domain.MesProductionCombinationExample;
 import dev.mesbase.business.production.domain.MesProductionExecutionEntity;
 import dev.mesbase.business.production.domain.MesProductionExecutionExample;
+import dev.mesbase.business.production.domain.RoutingEntity;
 import dev.mesbase.business.production.domain.ProductionCodeRules;
 import dev.mesbase.business.production.domain.ProductionCombinationRules;
 import dev.mesbase.business.production.domain.ProductionIdentity;
@@ -93,8 +94,10 @@ public class ProductionIdentityService {
     private ProductionIdentity identity(MesProductionExecutionEntity execution) {
         var workorder = workorders.selectByPrimaryKey(execution.getWorkorderId());
         var product = products.selectByPrimaryKey(execution.getProductId());
-        var routing = routings.selectByPrimaryKey(execution.getRoutingId());
-        if (workorder == null || product == null || routing == null || routing.getPublishedAt() == null
+        RoutingEntity routing = null;
+        if (execution.getRoutingId() != null) routing = routings.selectByPrimaryKey(execution.getRoutingId());
+        if (workorder == null || product == null
+                || execution.getRoutingId() != null && (routing == null || routing.getPublishedAt() == null)
                 || !Objects.equals(workorder.getProductId(), execution.getProductId()))
             throw new FoundationException(ErrorCode.EXECUTION_INVALID);
         String outputCode = null;
@@ -106,9 +109,17 @@ public class ProductionIdentityService {
         if (linked.size() > 1) throw new FoundationException(ErrorCode.PRODUCTION_IDENTITY_AMBIGUOUS);
         if (!linked.isEmpty()) outputCode = ProductionCombinationRules.code(FactoryContext.required().factoryId()
                 .value(), linked.getFirst().getId());
+        Long routingId = null;
+        String routingCode = null;
+        Integer routingVersion = null;
+        if (routing != null) {
+            routingId = routing.getId();
+            routingCode = routing.getCode();
+            routingVersion = routing.getVersion();
+        }
         return new ProductionIdentity(execution.getId(), outputCode,
                 workorder.getId(), workorder.getCode(), product.getId(), product.getCode(), product.getName(),
-                routing.getId(), routing.getCode(), routing.getVersion(), execution.getStatus(), execution.getTargetQty(),
+                routingId, routingCode, routingVersion, execution.getStatus(), execution.getTargetQty(),
                 execution.getBatchNo());
     }
 

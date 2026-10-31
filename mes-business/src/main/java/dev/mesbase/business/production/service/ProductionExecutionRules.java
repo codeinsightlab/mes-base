@@ -188,7 +188,7 @@ public class ProductionExecutionRules {
     }
 
     private WorkorderEntity validateReferences(MesProductionExecutionEntity row, boolean newBinding) {
-        valid(row.getWorkorderId() != null && row.getRoutingId() != null);
+        valid(row.getWorkorderId() != null);
         var order = workorders.selectByPrimaryKeyForUpdate(row.getWorkorderId());
         valid(order != null);
         sources.order(row.getWorkorderId());
@@ -200,6 +200,12 @@ public class ProductionExecutionRules {
             if (!WorkOrderStatus.RELEASED.getValue().equals(order.getStatus()))
                 throw new FoundationException(ErrorCode.WORKORDER_NOT_RELEASED);
         quantityRules.lockForWrite(List.of(order.getProductId()));
+        if (row.getRoutingId() == null) {
+            valid(order.getRoutingId() == null);
+            if (order.getMaterialFrozenAt() == null)
+                valid(allocation.publishedForProduct(order.getProductId(), null).isEmpty());
+            return order;
+        }
         var routing = routings.selectByPrimaryKeyForUpdate(row.getRoutingId());
         valid(routing != null && routing.getPublishedAt() != null && (!newBinding || RoutingStatus.PUBLISHED.getValue()
                 .equals(routing.getStatus())));

@@ -298,9 +298,11 @@ public class ProductionCombinationService {
                 .andStatusEqualTo(EnableStatus.ENABLED.getValue());
         if (order.getMaterialWarehouseIds() != null && !order.getMaterialWarehouseIds().isBlank()) {
             var allowed = Arrays.asList(new ObjectMapper().readValue(order.getMaterialWarehouseIds(), Long[].class));
-            if (allowed.isEmpty() || allowed.size() > 100) ParameterChecks.reject(ErrorCode.PRODUCTION_INPUT_STALE);
-            sources.warehouses(order.getSource(), allowed);
-            wc.andIdIn(allowed);
+            if (allowed.size() > 100) ParameterChecks.reject(ErrorCode.PRODUCTION_INPUT_STALE);
+            if (!allowed.isEmpty()) {
+                sources.warehouses(order.getSource(), allowed);
+                wc.andIdIn(allowed);
+            }
         }
         var warehouseRows = warehouses.selectByExample(warehouseFilter);
         var warehouseLabels = warehouseRows.stream().collect(Collectors.toMap(w -> w.getId(),

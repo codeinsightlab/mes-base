@@ -287,6 +287,9 @@ class MaterialIssueHttpTest {
                         .replace(" ENGINE=InnoDB DEFAULT CHARSET=utf8mb4", "")
                         .replace(",\n    ADD INDEX idx_stock_document_line_demand (demand_line_id)", "");
                 for (String sql : combinationDdl.split(";")) if (!sql.isBlank()) jdbc.execute(sql);
+                // TEST ONLY H2 equivalent of V81; existing routed rows retain their identities.
+                jdbc.execute("ALTER TABLE workorder ALTER COLUMN routing_id DROP NOT NULL");
+                jdbc.execute("ALTER TABLE mes_production_execution ALTER COLUMN routing_id DROP NOT NULL");
                 jdbc.update("INSERT INTO material(id,code,name,unit_id,status) VALUES(1,'M1','物料一',1,'ENABLED')");
                 jdbc.update("INSERT INTO workorder(id,code,product_id,planned_qty,routing_id,status,revision,create_time,update_time) VALUES(1,'WO1',1,1000,1,'DRAFT',0,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)");
                 jdbc.update("INSERT INTO unit_measure(id,code,name,status) VALUES(1,'KG','千克','ENABLED')");

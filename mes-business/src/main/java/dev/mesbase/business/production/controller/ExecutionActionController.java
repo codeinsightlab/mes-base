@@ -66,6 +66,9 @@ public class ExecutionActionController {
     }
 
     public static PathView toView(PathModel model) {
+        if (model.routing() == null)
+            return new PathView(model.executionId().toString(), model.executionStatus(), null, null,
+                    0, null, null, List.of(), List.of(), List.of(), null, null, null);
         var p = model.path();
         return new PathView(model.executionId().toString(), model.executionStatus(), model.routing().id()
                 .toString(), p == null ? ExecutionPathStatus.UNSELECTED.getValue() : p.getPathStatus(), p == null ? 0 : p.getRevision(), Optional.ofNullable(p)
