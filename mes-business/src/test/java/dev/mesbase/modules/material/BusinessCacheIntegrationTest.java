@@ -310,7 +310,7 @@ class BusinessCacheIntegrationTest {
         probe.list(new Query(0, 20, "id desc", b));
         assertEquals(2, probe.calls());
         var original = query(0, 20, "A");
-        var changed = new MaterialQueryDto(0, 20, "A", "name", "spec", 1L, 2L, "ENABLED", "ext", "code", null, null);
+        var changed = new MaterialQueryDto(0, 20, "A", "name", "spec", 1L, 2L, "ENABLED", "ext", "code", null, null, null);
         assertFalse(caches.queryKey(new Object[]{original}, new Parameter[0], original)
                 .equals(caches.queryKey(new Object[]{changed}, new Parameter[0], changed)));
         assertEquals(caches.queryKey(new Object[]{a}, new Parameter[0], original),
@@ -570,7 +570,7 @@ class BusinessCacheIntegrationTest {
     }
 
     private static MaterialQueryDto query(int offset, int limit, String code) {
-        return new MaterialQueryDto(offset, limit, code, null, null, null, null, null, null, null, null, null);
+        return new MaterialQueryDto(offset, limit, code, null, null, null, null, null, null, null, null, null, null);
     }
 
     private static MaterialEntity row(Long id, String name) {

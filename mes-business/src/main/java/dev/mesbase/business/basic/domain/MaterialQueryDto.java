@@ -20,7 +20,8 @@ public record MaterialQueryDto(
         @Size(max = 128) String externalId,
         @Size(max = 128) String externalCode,
         Boolean includeDescendants,
-        Boolean uncategorized
+        Boolean uncategorized,
+        @Size(max = 255) String keyword
 ) implements BusinessCacheQuery {
     @Override
     public int cacheOffset() {

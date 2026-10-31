@@ -9,6 +9,7 @@ import dev.mesbase.business.basic.domain.MaterialExample;
 import dev.mesbase.business.basic.domain.MaterialPage;
 import dev.mesbase.business.basic.domain.MaterialQueryDto;
 import dev.mesbase.business.basic.domain.MaterialResource;
+import dev.mesbase.business.basic.domain.MaterialSearchExample;
 import dev.mesbase.business.basic.domain.MaterialUpdateCommand;
 import dev.mesbase.business.basic.service.BasicDataRules;
 import dev.mesbase.business.basic.service.IMaterialService;
@@ -74,7 +75,10 @@ public class MaterialServiceImpl implements IMaterialService {
         int offset = query.offset() == null ? 0 : query.offset();
         int limit = query.limit() == null ? 20 : query.limit();
         ParameterChecks.paging(offset, limit, 100);
-        MaterialExample example = new MaterialExample();
+        MaterialSearchExample example = new MaterialSearchExample();
+        if (query.keyword() != null && !query.keyword().isBlank()) {
+            example.setKeywordPrefix(query.keyword());
+        }
         MaterialExample.Criteria criteria = example.createCriteria();
         if (query.code() != null) {
             criteria.andCodeLike("%" + query.code() + "%");

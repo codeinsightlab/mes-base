@@ -170,7 +170,7 @@ public class StockDocumentService {
         var c = f.createCriteria();
         if (StringUtils.isNotBlank(q.documentType())) {
             var selectedType = type(q.documentType());
-            if (selectedType.getDirection().getValue().equals(q.direction()) == false)
+            if (!selectedType.getDirection().getValue().equals(q.direction()))
                 ParameterChecks.reject(ErrorCode.BAD_REQUEST);
             c.andDocumentTypeEqualTo(q.documentType());
         }
@@ -189,6 +189,7 @@ public class StockDocumentService {
             return new StockDocumentModels.Page(List.copyOf(documents.selectByExampleWithBLOBs(f)), page.getTotal(), offset, limit);
         }
     }
+
 
     @Transactional(transactionManager = "businessTransactionManager", readOnly = true)
     public Detail detail(Long id) {
