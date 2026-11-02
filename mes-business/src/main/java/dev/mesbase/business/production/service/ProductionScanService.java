@@ -9,6 +9,7 @@ import dev.mesbase.business.production.domain.ProductionScanType;
 import dev.mesbase.common.utils.SecurityUtils;
 import dev.mesbase.common.validation.ParameterChecks;
 import dev.mesbase.core.error.ErrorCode;
+import dev.mesbase.core.error.SafeBusinessMessage;
 import dev.mesbase.core.error.FoundationException;
 import dev.mesbase.core.security.AuthenticatedActor;
 import dev.mesbase.core.security.AuthorizationService;
@@ -52,8 +53,10 @@ public class ProductionScanService {
     @Transactional(transactionManager = "businessTransactionManager", propagation = Propagation.NOT_SUPPORTED)
     public ProductionIdentity scan(ProductionScanType type, String code, ProductionScanInputMethod method,
                                    String requestId) {
-        if (type == null || method == null) ParameterChecks.reject(ErrorCode.BAD_REQUEST);
-        ParameterChecks.text(code, true, 2048, ErrorCode.BAD_REQUEST);
+        if (type == null || method == null)
+            ParameterChecks.reject(ErrorCode.BAD_REQUEST, new SafeBusinessMessage("请指定扫码业务类型和录入方式"));
+        ParameterChecks.text(code, true, 2048, ErrorCode.BAD_REQUEST,
+                new SafeBusinessMessage("扫码内容不能为空且不能超过2048个字符"));
         var scope = FactoryContext.required();
         var user = SecurityUtils.getUserId();
         var occurredAt = LocalDateTime.now();

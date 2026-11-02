@@ -15,6 +15,7 @@ import dev.mesbase.common.utils.SecurityUtils;
 import dev.mesbase.common.validation.ParameterChecks;
 import dev.mesbase.core.error.ErrorCode;
 import dev.mesbase.core.error.FoundationException;
+import dev.mesbase.core.error.SafeBusinessMessage;
 import dev.mesbase.core.security.AuthenticatedActor;
 import dev.mesbase.core.security.AuthorizationService;
 import dev.mesbase.core.security.Permission;
@@ -86,12 +87,14 @@ public class ProductionInboundService {
         if (executionId == null || command == null || command.stockId() == null || command.quantity() == null
                 || command.quantity().signum() <= 0 || command.reason() == null || command.reason().isBlank()
                 || command.reason().length() > 500 || command.requestId() == null)
-            ParameterChecks.reject(ErrorCode.BAD_REQUEST);
+            ParameterChecks.reject(ErrorCode.BAD_REQUEST,
+                    new SafeBusinessMessage("生产入库须填写执行、库存和请求标识；数量须大于零，原因不能为空且不能超过500个字符"));
         try {
             if (!UUID.fromString(command.requestId()).toString().equals(command.requestId()))
-                ParameterChecks.reject(ErrorCode.BAD_REQUEST);
+                ParameterChecks.reject(ErrorCode.BAD_REQUEST, new SafeBusinessMessage("生产入库请求标识格式无效，请使用标准UUID"));
         } catch (IllegalArgumentException failure) {
-            throw new FoundationException(ErrorCode.BAD_REQUEST, failure);
+            throw new FoundationException(ErrorCode.BAD_REQUEST, failure,
+                    new SafeBusinessMessage("生产入库请求标识格式无效，请使用标准UUID"));
         }
         var replay = businessTransactions.execute(status -> replay(executionId, command));
         if (replay != null) return replay;

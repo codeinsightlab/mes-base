@@ -20,6 +20,7 @@ import dev.mesbase.common.utils.StringUtils;
 import dev.mesbase.common.validation.ParameterChecks;
 import dev.mesbase.core.error.ErrorCode;
 import dev.mesbase.core.error.FoundationException;
+import dev.mesbase.core.error.SafeBusinessMessage;
 
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
@@ -87,7 +88,7 @@ public class ProductionReportService {
         positive(command.quantity());
         reason(command.reason());
         if (command.reportTime() == null || command.reportTime().isAfter(LocalDateTime.now()))
-            ParameterChecks.reject(ErrorCode.BAD_REQUEST);
+            ParameterChecks.reject(ErrorCode.BAD_REQUEST, new SafeBusinessMessage("报工时间不能为空且不能晚于当前时间"));
         users.requireExists(command.operatorUserId());
         if (command.workstationId() != null && workstations.selectByPrimaryKey(command.workstationId()) == null)
             throw new FoundationException(ErrorCode.REPORT_REFERENCE_INVALID);
@@ -258,17 +259,20 @@ public class ProductionReportService {
     }
 
     private static void reason(String reason) {
-        if (StringUtils.isBlank(reason) || reason.length() > 500) ParameterChecks.reject(ErrorCode.BAD_REQUEST);
+        if (StringUtils.isBlank(reason) || reason.length() > 500)
+            ParameterChecks.reject(ErrorCode.BAD_REQUEST, new SafeBusinessMessage("报工原因不能为空且不能超过500个字符"));
     }
 
     private static void positive(BigDecimal value) {
         delta(value);
-        if (value.signum() < 0) ParameterChecks.reject(ErrorCode.BAD_REQUEST);
+        if (value.signum() < 0)
+            ParameterChecks.reject(ErrorCode.BAD_REQUEST, new SafeBusinessMessage("报工数量不能为负数"));
     }
 
     private static void delta(BigDecimal value) {
         if (value == null || value.signum() == 0 || value.scale() > 6 || value.precision() - value.scale() > 14)
-            ParameterChecks.reject(ErrorCode.BAD_REQUEST);
+            ParameterChecks.reject(ErrorCode.BAD_REQUEST,
+                    new SafeBusinessMessage("报工数量不能为空、不能为零，最多支持6位小数且整数位不能超过14位"));
     }
 
 }

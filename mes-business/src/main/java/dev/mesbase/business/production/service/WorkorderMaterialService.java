@@ -26,6 +26,7 @@ import dev.mesbase.common.utils.SecurityUtils;
 import dev.mesbase.common.validation.ParameterChecks;
 import dev.mesbase.core.error.ErrorCode;
 import dev.mesbase.core.error.FoundationException;
+import dev.mesbase.core.error.SafeBusinessMessage;
 import dev.mesbase.core.security.AuthenticatedActor;
 import dev.mesbase.core.security.AuthorizationService;
 import dev.mesbase.core.security.Permission;
@@ -138,7 +139,8 @@ public class WorkorderMaterialService {
             throw new FoundationException(ErrorCode.INTEGRATION_NOT_CONFIGURED);
         sources.order(order.getId());
         if (!List.of(WorkOrderStatus.DRAFT.getValue(), WorkOrderStatus.RELEASED.getValue()).contains(order.getStatus()))
-            ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
+            ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT,
+                    new SafeBusinessMessage("当前工单状态不允许修改用料，仅待执行或已下达工单可调整"));
         if (order.getMaterialFrozenAt() != null || quotas.hasFormalInput(order.getId()))
             throw new FoundationException(ErrorCode.EXECUTION_FROZEN);
         if (command == null || command.expectedRevision() == null
@@ -147,13 +149,15 @@ public class WorkorderMaterialService {
                 || command.warehouseIds() == null || command.warehouseIds().size() > 100
                 || command.warehouseIds().stream().anyMatch(Objects::isNull)
                 || command.workCenter() == null || command.workCenter().length() > 100)
-            ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
+            ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT,
+                    new SafeBusinessMessage("工单用料版本已变化，或BOM版本、仓库、工作中心信息不完整或超限，请刷新并核对后保存"));
         var previous = lines(order.getId());
         boolean basisChanged = !Objects.equals(command.bomId(), order.getBomId()) || previous.stream()
                 .anyMatch(row -> row.getPlannedQty().compareTo(order.getPlannedQty()) != 0);
         if (basisChanged && previous.stream().anyMatch(row -> Boolean.TRUE.equals(row.getManuallyAdjusted()))
                 && !Boolean.TRUE.equals(command.adjustmentsConfirmed()))
-            ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
+            ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT,
+                    new SafeBusinessMessage("工单数量或BOM版本变化会影响人工调整的用料，请确认后再保存"));
         var input = command.items();
         if (input != null && (input.isEmpty() || input.size() > 100 || input.stream().anyMatch(Objects::isNull)))
             ParameterChecks.reject(ErrorCode.BAD_REQUEST);
@@ -175,7 +179,8 @@ public class WorkorderMaterialService {
                 .collect(Collectors.toMap(MesWorkorderMaterialEntity::getBomItemId, Function.identity()));
         if (input == null) {
             if (previous.stream().anyMatch(row -> Boolean.TRUE.equals(row.getManuallyAdjusted())))
-                ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
+                ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT,
+                        new SafeBusinessMessage("当前工单用料包含人工调整，请确认后再重新生成BOM用料"));
             input = direct.items().stream().map(component -> {
                 Long existingId = null;
                 var existing = previousComponents.get(component.lineId());

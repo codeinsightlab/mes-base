@@ -24,6 +24,7 @@ import dev.mesbase.common.utils.SecurityUtils;
 import dev.mesbase.common.validation.ParameterChecks;
 import dev.mesbase.core.error.ErrorCode;
 import dev.mesbase.core.error.FoundationException;
+import dev.mesbase.core.error.SafeBusinessMessage;
 import dev.mesbase.core.security.AuthenticatedActor;
 import dev.mesbase.core.security.AuthorizationService;
 import dev.mesbase.core.security.Permission;
@@ -243,12 +244,14 @@ public class ProductionInputService {
                 || c.routingId() == null && !c.routingNodeIds().isEmpty()
                 || c.routingId() != null && c.routingNodeIds().isEmpty()
                 || c.routingNodeIds().size() > 100 || c.calculationKey() == null || c.calculationKey().length() != 64)
-            ParameterChecks.reject(ErrorCode.BAD_REQUEST);
+            ParameterChecks.reject(ErrorCode.BAD_REQUEST,
+                    new SafeBusinessMessage("生产投入信息不完整、数量或计算依据无效，或工艺节点与工艺版本不匹配，请重新计算并核对后提交"));
         try {
             if (!UUID.fromString(c.requestId()).toString().equals(c.requestId()))
-                ParameterChecks.reject(ErrorCode.BAD_REQUEST);
+                ParameterChecks.reject(ErrorCode.BAD_REQUEST, new SafeBusinessMessage("生产投入请求标识格式无效，请使用标准UUID"));
         } catch (IllegalArgumentException failure) {
-            throw new FoundationException(ErrorCode.BAD_REQUEST, failure);
+            throw new FoundationException(ErrorCode.BAD_REQUEST, failure,
+                    new SafeBusinessMessage("生产投入请求标识格式无效，请使用标准UUID"));
         }
         ProductionCombinationRules.parse(c.code(), FactoryContext.required().factoryId().value());
     }

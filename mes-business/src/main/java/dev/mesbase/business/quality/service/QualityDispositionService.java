@@ -29,6 +29,7 @@ import dev.mesbase.common.utils.StringUtils;
 import dev.mesbase.common.validation.ParameterChecks;
 import dev.mesbase.core.error.ErrorCode;
 import dev.mesbase.core.error.FoundationException;
+import dev.mesbase.core.error.SafeBusinessMessage;
 import dev.mesbase.core.security.AuthenticatedActor;
 import dev.mesbase.core.security.AuthorizationService;
 import dev.mesbase.core.security.Permission;
@@ -104,7 +105,8 @@ public class QualityDispositionService {
     @Transactional(transactionManager = "businessTransactionManager", propagation = Propagation.NOT_SUPPORTED,
             rollbackFor = Exception.class)
     public QualityTreatmentService.Details execute(String declaration, Disposition c) {
-        if (c == null || c.destination() == null) ParameterChecks.reject(ErrorCode.BAD_REQUEST);
+        if (c == null || c.destination() == null)
+            ParameterChecks.reject(ErrorCode.BAD_REQUEST, new SafeBusinessMessage("请选择质量处置去向"));
         String requestHash = hash(declaration, c);
         if (replayed(declaration, c.requestId(), requestHash)) return treatments.details(declaration);
         String documentNo = null;
@@ -128,12 +130,14 @@ public class QualityDispositionService {
                 || c.quantity().signum() <= 0 || StringUtils.isBlank(c.reason()) || c.reason().length() > 500
                 || c.destination() == Destination.RETURN_NODE && c.warehouseId() != null
                 || c.destination() == Destination.WAREHOUSE && c.warehouseId() == null)
-            ParameterChecks.reject(ErrorCode.BAD_REQUEST);
+            ParameterChecks.reject(ErrorCode.BAD_REQUEST,
+                    new SafeBusinessMessage("质量处置须填写请求标识和原因，数量须大于零；入仓需选择仓库，退回工序不能指定仓库"));
         try {
             if (!UUID.fromString(c.requestId()).toString().equals(c.requestId()))
-                ParameterChecks.reject(ErrorCode.BAD_REQUEST);
+                ParameterChecks.reject(ErrorCode.BAD_REQUEST, new SafeBusinessMessage("质量处置请求标识格式无效，请使用标准UUID"));
         } catch (IllegalArgumentException failure) {
-            ParameterChecks.reject(ErrorCode.BAD_REQUEST);
+            throw new FoundationException(ErrorCode.BAD_REQUEST, failure,
+                    new SafeBusinessMessage("质量处置请求标识格式无效，请使用标准UUID"));
         }
         String hash = hash(declaration, c);
         if (replayed(declaration, c.requestId(), hash)) return treatments.details(declaration);

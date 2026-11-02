@@ -5,7 +5,7 @@ public class FoundationException extends RuntimeException {
     public FoundationException(ErrorCode code) { this(code, (Throwable) null); }
     public FoundationException(ErrorCode code, Throwable cause) { this(code, cause, null); }
     public FoundationException(ErrorCode code, SafeBusinessMessage businessMessage) { this(code, null, businessMessage); }
-    private FoundationException(ErrorCode code, Throwable cause, SafeBusinessMessage businessMessage) {
+    public FoundationException(ErrorCode code, Throwable cause, SafeBusinessMessage businessMessage) {
         super(businessMessage == null ? code.safeMessage() : businessMessage.value(), cause);
         this.code = code;
         this.businessMessage = businessMessage;

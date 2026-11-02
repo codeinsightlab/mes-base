@@ -42,6 +42,7 @@ import dev.mesbase.common.utils.StringUtils;
 import dev.mesbase.common.validation.ParameterChecks;
 import dev.mesbase.core.error.ErrorCode;
 import dev.mesbase.core.error.FoundationException;
+import dev.mesbase.core.error.SafeBusinessMessage;
 import dev.mesbase.core.security.AuthenticatedActor;
 import dev.mesbase.core.security.AuthorizationService;
 import dev.mesbase.core.security.Permission;
@@ -146,15 +147,20 @@ public class ProductionDefectService {
     private Result execute(String action, String id, Command c, MesProductionDefectEntity typed,
                            String typedFingerprint) {
         if (c == null || StringUtils.isBlank(c.requestKey()) || c.requestKey().length() > 64)
-            ParameterChecks.reject(ErrorCode.BAD_REQUEST);
+            ParameterChecks.reject(ErrorCode.BAD_REQUEST,
+                    new SafeBusinessMessage("不良申报请求标识不能为空且不能超过64个字符"));
         if (action.equals(DefectRecordAction.CREATE.getValue())) {
             if (c.expectedRevision() != null || c.revisionReason() != null || c.facts() == null)
-                ParameterChecks.reject(ErrorCode.BAD_REQUEST);
+                ParameterChecks.reject(ErrorCode.BAD_REQUEST,
+                        new SafeBusinessMessage("新建不良申报不能携带修订信息，且必须提供不良明细"));
         } else {
-            ParameterChecks.text(c.revisionReason(), true, 500, ErrorCode.BAD_REQUEST);
-            if (c.expectedRevision() == null || c.expectedRevision() < 1) ParameterChecks.reject(ErrorCode.BAD_REQUEST);
+            ParameterChecks.text(c.revisionReason(), true, 500, ErrorCode.BAD_REQUEST,
+                    new SafeBusinessMessage("修订或作废不良申报必须填写原因，且不能超过500个字符"));
+            if (c.expectedRevision() == null || c.expectedRevision() < 1)
+                ParameterChecks.reject(ErrorCode.BAD_REQUEST, new SafeBusinessMessage("请提供有效的不良申报版本号"));
             if (action.equals(DefectRecordAction.VOID.getValue()) && c.facts() != null || action.equals(DefectRecordAction.REVISE.getValue()) && c.facts() == null)
-                ParameterChecks.reject(ErrorCode.BAD_REQUEST);
+                ParameterChecks.reject(ErrorCode.BAD_REQUEST,
+                        new SafeBusinessMessage("作废操作不能提交不良明细；修订操作必须提交不良明细"));
         }
         var fingerprint = typedFingerprint == null ? fingerprint(action, id, c, SecurityUtils.getUserId()) : typedFingerprint;
         var retry = byKey(c.requestKey());
@@ -236,12 +242,14 @@ public class ProductionDefectService {
 
     @Transactional(transactionManager = "businessTransactionManager", isolation = Isolation.READ_COMMITTED, rollbackFor = Exception.class)
     public Result declare(ProductionDefectV2Models.Command c) {
-        if (c == null || c.requestId() == null) ParameterChecks.reject(ErrorCode.BAD_REQUEST);
+        if (c == null || c.requestId() == null)
+            ParameterChecks.reject(ErrorCode.BAD_REQUEST, new SafeBusinessMessage("不良申报必须提供请求标识"));
         try {
             if (!UUID.fromString(c.requestId()).toString().equals(c.requestId()))
-                ParameterChecks.reject(ErrorCode.BAD_REQUEST);
+                ParameterChecks.reject(ErrorCode.BAD_REQUEST, new SafeBusinessMessage("不良申报请求标识格式无效，请使用标准UUID"));
         } catch (IllegalArgumentException e) {
-            ParameterChecks.reject(ErrorCode.BAD_REQUEST);
+            throw new FoundationException(ErrorCode.BAD_REQUEST, e,
+                    new SafeBusinessMessage("不良申报请求标识格式无效，请使用标准UUID"));
         }
         // Authorization is shared by old/new entry points; no caller can self-assess using create alone.
         authorizeAssessment(new Command(c.requestId(), null, null, null, c.assessment()));
@@ -252,7 +260,8 @@ public class ProductionDefectService {
         old = byKey(c.requestId());
         if (old != null) return replay(old, fp);
         if (c.defectTypeId() == null || c.expectedTypeRevision() == null || c.wasteCategory() == null)
-            ParameterChecks.reject(ErrorCode.BAD_REQUEST);
+            ParameterChecks.reject(ErrorCode.BAD_REQUEST,
+                    new SafeBusinessMessage("不良申报必须指定执行、工序、不良类型版本和不良类别"));
         var node = actualNode(c.executionId(), c.nodeId());
         var type = defectTypes.getObject()
                 .lockForDeclaration(node.getOperationId(), c.defectTypeId(), c.expectedTypeRevision(), c.wasteCategory());
@@ -272,7 +281,8 @@ public class ProductionDefectService {
     }
 
     private RoutingNodeEntity actualNode(Long executionId, Long nodeId) {
-        if (executionId == null || nodeId == null) ParameterChecks.reject(ErrorCode.BAD_REQUEST);
+        if (executionId == null || nodeId == null)
+            ParameterChecks.reject(ErrorCode.BAD_REQUEST, new SafeBusinessMessage("请指定生产执行和实际工序"));
         var p = paths.view(executionId);
         if (p.path() == null || !ExecutionPathStatus.LOCKED.getValue().equals(p.path().getPathStatus())
                 || !p.selectedNodeIds().contains(nodeId)) throw new FoundationException(ErrorCode.REPORT_PATH_REQUIRED);

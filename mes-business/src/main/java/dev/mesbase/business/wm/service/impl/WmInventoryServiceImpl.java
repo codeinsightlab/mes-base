@@ -24,6 +24,7 @@ import dev.mesbase.business.wm.sync.WmInventoryQueryPort;
 import dev.mesbase.business.wm.sync.WmInventorySyncResult;
 import dev.mesbase.core.error.ErrorCode;
 import dev.mesbase.core.error.FoundationException;
+import dev.mesbase.core.error.SafeBusinessMessage;
 import dev.mesbase.core.factory.FactoryScope;
 import dev.mesbase.framework.sync.SyncCoordinator;
 import dev.mesbase.infrastructure.cache.BusinessCacheProcessor;
@@ -144,7 +145,8 @@ public class WmInventoryServiceImpl implements IWmInventoryService {
         LocalStockService.validateBalances(input.quantity(), input.availableQuantity() == null ? input.quantity() : input.availableQuantity());
         if (input.quantity().signum() != 0 || input.availableQuantity() != null && input.availableQuantity()
                 .signum() != 0)
-            throw new FoundationException(ErrorCode.RESOURCE_CONFLICT);
+            throw new FoundationException(ErrorCode.RESOURCE_CONFLICT,
+                    new SafeBusinessMessage("新建库存身份的实存和可用量必须为0，请通过正式入库单增加库存"));
         WmInventoryEntity row = new WmInventoryEntity();
 
         row.setMaterialId(input.materialId());
@@ -164,7 +166,9 @@ public class WmInventoryServiceImpl implements IWmInventoryService {
         if (row.getBinCode() == null) identityCriteria.andBinCodeIsNull();
         else identityCriteria.andBinCodeEqualTo(row.getBinCode());
         // Reference row locks above serialize all source creation for the same material, across nodes.
-        if (mapper.countByExample(identity) != 0) throw new FoundationException(ErrorCode.RESOURCE_CONFLICT);
+        if (mapper.countByExample(identity) != 0)
+            throw new FoundationException(ErrorCode.RESOURCE_CONFLICT,
+                    new SafeBusinessMessage("相同物料、仓库、批次和库位的库存身份已存在，请查看现有库存"));
         audit(row, true);
         if (write(row, true) != 1) {
             throw new FoundationException(ErrorCode.RESOURCE_CONFLICT);
@@ -184,7 +188,8 @@ public class WmInventoryServiceImpl implements IWmInventoryService {
                 || input.quantity() == null || row.getQuantity().compareTo(input.quantity()) != 0
                 || (row.getAvailableQuantity() == null ? row.getQuantity() : row.getAvailableQuantity())
                 .compareTo(input.availableQuantity() == null ? input.quantity() : input.availableQuantity()) != 0)
-            throw new FoundationException(ErrorCode.RESOURCE_CONFLICT);
+            throw new FoundationException(ErrorCode.RESOURCE_CONFLICT,
+                    new SafeBusinessMessage("库存身份和余额不能直接编辑，请使用正式库存单据调整库存"));
         row.setStatus(input.status());
         row.setRemark(input.remark());
         rules.validateInventoryFields(row);
@@ -210,7 +215,8 @@ public class WmInventoryServiceImpl implements IWmInventoryService {
             sources.localCreation();
             sources.warehouse(BusinessSource.LOCAL.getValue(), row.getWarehouseId());
             if (rules.inventoryReferenced(id) || row.getQuantity().signum() != 0)
-                throw new FoundationException(ErrorCode.RESOURCE_CONFLICT);
+                throw new FoundationException(ErrorCode.RESOURCE_CONFLICT,
+                        new SafeBusinessMessage("库存已有业务流水或余额不为零，不能删除"));
         }
         example.createCriteria().andIdIn(ids)
 

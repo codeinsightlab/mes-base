@@ -53,6 +53,7 @@ import dev.mesbase.common.utils.StringUtils;
 import dev.mesbase.common.validation.ParameterChecks;
 import dev.mesbase.core.error.ErrorCode;
 import dev.mesbase.core.error.FoundationException;
+import dev.mesbase.core.error.SafeBusinessMessage;
 import dev.mesbase.core.factory.FactoryRuntimeMode;
 import dev.mesbase.infrastructure.persistence.PlatformPersistence;
 import dev.mesbase.platform.execution.FactoryIntegrationContext;
@@ -162,26 +163,30 @@ public class StockDocumentService {
 
     @Transactional(transactionManager = "businessTransactionManager", readOnly = true)
     public StockDocumentModels.Page page(StockDocumentModels.Query q) {
-        if (StockDocumentDirection.from(q.direction()) == null) ParameterChecks.reject(ErrorCode.BAD_REQUEST);
+        if (StockDocumentDirection.from(q.direction()) == null)
+            ParameterChecks.reject(ErrorCode.BAD_REQUEST, new SafeBusinessMessage("收发方向无效，请选择入库或出库"));
         int offset = q.offset() == null ? 0 : q.offset();
         int limit = q.limit() == null ? 20 : q.limit();
-        if (offset < 0 || limit < 1 || limit > 100) ParameterChecks.reject(ErrorCode.BAD_REQUEST);
+        if (offset < 0 || limit < 1 || limit > 100)
+            ParameterChecks.reject(ErrorCode.BAD_REQUEST, new SafeBusinessMessage("分页参数无效，请检查起始位置和每页条数"));
         var f = new WmStockDocumentExample();
         var c = f.createCriteria();
         if (StringUtils.isNotBlank(q.documentType())) {
             var selectedType = type(q.documentType());
             if (!selectedType.getDirection().getValue().equals(q.direction()))
-                ParameterChecks.reject(ErrorCode.BAD_REQUEST);
+                ParameterChecks.reject(ErrorCode.BAD_REQUEST, new SafeBusinessMessage("所选单据类型与收发方向不匹配"));
             c.andDocumentTypeEqualTo(q.documentType());
         }
         c.andDirectionEqualTo(q.direction());
         if (StringUtils.isNotBlank(q.status())) {
             if (!List.of(StockDocumentStatus.DRAFT.getValue(), StockDocumentStatus.POSTED.getValue(), StockDocumentStatus.CANCELLED.getValue())
-                    .contains(q.status())) ParameterChecks.reject(ErrorCode.BAD_REQUEST);
+                    .contains(q.status()))
+                ParameterChecks.reject(ErrorCode.BAD_REQUEST, new SafeBusinessMessage("单据状态筛选值无效，请重新选择"));
             c.andStatusEqualTo(q.status());
         }
         if (StringUtils.isNotBlank(q.documentNo())) {
-            if (q.documentNo().length() > 64) ParameterChecks.reject(ErrorCode.BAD_REQUEST);
+            if (q.documentNo().length() > 64)
+                ParameterChecks.reject(ErrorCode.BAD_REQUEST, new SafeBusinessMessage("单据编号筛选不能超过64个字符"));
             c.andDocumentNoLike("%" + q.documentNo() + "%");
         }
         f.setOrderByClause("id desc");
@@ -427,10 +432,11 @@ public class StockDocumentService {
 
     private void validateAggregate(StockDocumentModels.AggregateSave command, boolean creating) {
         if (command == null || command.header() == null || command.items() == null || command.items().isEmpty()
-                || command.items().size() > 100) ParameterChecks.reject(ErrorCode.BAD_REQUEST);
+                || command.items().size() > 100)
+            ParameterChecks.reject(ErrorCode.BAD_REQUEST, new SafeBusinessMessage("单据必须包含主单信息及1至100条明细"));
         if (creating && command.header().expectedRevision() != null
                 || !creating && command.header().expectedRevision() == null)
-            ParameterChecks.reject(ErrorCode.BAD_REQUEST);
+            ParameterChecks.reject(ErrorCode.BAD_REQUEST, new SafeBusinessMessage("单据版本信息与新建或编辑操作不匹配，请刷新后重试"));
         validate(new StockDocumentModels.Create(command.header().direction(), command.header()
                 .documentType(), command.header().reason(),
                 command.header().remark(), command.header().sourceWorkorderId(), command.header().sourceExecutionId(),
@@ -440,7 +446,8 @@ public class StockDocumentService {
             if (item == null || item.stockId() == null || item.materialId() == null || item.warehouseId() == null
                     || item.unitId() == null || item.quantity() == null || item.quantity().signum() <= 0
                     || item.id() != null && creating)
-                ParameterChecks.reject(ErrorCode.BAD_REQUEST);
+                ParameterChecks.reject(ErrorCode.BAD_REQUEST,
+                    new SafeBusinessMessage("每条单据明细必须指定库存、物料、仓库、单位及大于零的数量；新建时不能携带已有明细ID"));
         }
     }
 
@@ -448,8 +455,9 @@ public class StockDocumentService {
     public Detail createQualityReceipt(StockDocumentModels.Create command, String documentNo) {
         validate(command);
         if (!type(command.documentType()).isQualityReceipt() || command.sourceExecutionId() != null || command.sourceWorkorderId() != null)
-            ParameterChecks.reject(ErrorCode.BAD_REQUEST);
-        if (!command.documentType().equals(command.ruleCode())) ParameterChecks.reject(ErrorCode.BAD_REQUEST);
+            ParameterChecks.reject(ErrorCode.BAD_REQUEST, new SafeBusinessMessage("质量入库必须通过质量处置流程创建"));
+        if (!command.documentType().equals(command.ruleCode()))
+            ParameterChecks.reject(ErrorCode.BAD_REQUEST, new SafeBusinessMessage("单据类型与编号规则不匹配"));
         requireTypeActive(command.direction(), command.documentType());
         return createDraft(command, documentNo);
     }
@@ -460,7 +468,8 @@ public class StockDocumentService {
         validate(command);
         StockDocumentType purpose = type(command.documentType());
         requireDirection(command.direction(), purpose);
-        if (!command.documentType().equals(command.ruleCode())) ParameterChecks.reject(ErrorCode.BAD_REQUEST);
+        if (!command.documentType().equals(command.ruleCode()))
+            ParameterChecks.reject(ErrorCode.BAD_REQUEST, new SafeBusinessMessage("单据类型与编号规则不匹配"));
         requireTypeActive(command.direction(), command.documentType());
         if (purpose.isQualityReceipt())
             ParameterChecks.reject(ErrorCode.STOCK_DOCUMENT_SOURCE_PENDING);
@@ -475,14 +484,17 @@ public class StockDocumentService {
         sources.localCreation();
         if (command.sourceExecutionId() != null) {
             if (purpose == StockDocumentType.PRODUCTION_RECEIPT) {
-                if (command.sourceWorkorderId() != null) ParameterChecks.reject(ErrorCode.BAD_REQUEST);
+                if (command.sourceWorkorderId() != null)
+                    ParameterChecks.reject(ErrorCode.BAD_REQUEST, new SafeBusinessMessage("生产入库不能同时指定工单来源"));
                 productionExecution(command.sourceExecutionId());
-            } else if (purpose != StockDocumentType.MATERIAL_ISSUE) ParameterChecks.reject(ErrorCode.BAD_REQUEST);
+            } else if (purpose != StockDocumentType.MATERIAL_ISSUE)
+                ParameterChecks.reject(ErrorCode.BAD_REQUEST, new SafeBusinessMessage("当前单据类型不能关联生产执行"));
         }
         if (command.sourceWorkorderId() != null) {
             if (purpose == StockDocumentType.MATERIAL_ISSUE) sources.order(command.sourceWorkorderId());
             else {
-                if (purpose != StockDocumentType.OTHER_RECEIPT) ParameterChecks.reject(ErrorCode.BAD_REQUEST);
+                if (purpose != StockDocumentType.OTHER_RECEIPT)
+                    ParameterChecks.reject(ErrorCode.BAD_REQUEST, new SafeBusinessMessage("当前单据类型不能关联工单来源"));
                 cancelled(command.sourceWorkorderId());
             }
         }
