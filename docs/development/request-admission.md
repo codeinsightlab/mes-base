@@ -1,5 +1,9 @@
 # 认证、请求授权与业务事务准入
 
+## API错误响应
+
+统一错误响应包含稳定的 `errorCode`、面向调用方的 `message` 和 `requestId`。`ErrorCode.safeMessage()` 是未提供业务专属提示时的默认消息，必须使用清晰、可执行的中文；不得返回英文内部描述、框架术语或原始异常。业务校验能够识别具体字段或规则时，应通过 `SafeBusinessMessage` 返回对应提示，不能依赖通用 `BAD_REQUEST` 文案掩盖具体原因。
+
 ## 请求到数据库
 
 1. `RequestBoundaryFilter` 建立 requestId、清理线程 Scope/PageHelper。`SystemTokenFilter` 恢复 Redis 安全 Identity，`SessionAccountMapper.account` 一次读取无密码的账号状态/authRevision、当前部门、有效角色/dataScope，映射到既有 LoginUser 消费者。完整用户查询只在登录、个人改密等明确需要的入口执行。Redis/DB 不可用拒绝准入，基础设施故障为 503。
