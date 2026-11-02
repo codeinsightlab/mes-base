@@ -183,7 +183,7 @@ public class MaterialBomService {
     public void deleteByIds(List<Long> ids) {
         checkIds(ids);
         lockMaterials(ids.stream().map(id -> require(id).getProductId()).toList());
-        // Lock a stable order and reject referenced versions. Deleting a draft does not delete its components implicitly.
+        // Lock a stable order, reject referenced versions, then remove this draft's own components atomically.
         for (var id : ids.stream().sorted().toList()) {
             editable(id);
             var f = new MaterialBomItemExample();
@@ -191,7 +191,7 @@ public class MaterialBomService {
             if (items.countByExample(f) > 0) conflict();
             f = new MaterialBomItemExample();
             f.createCriteria().andBomIdEqualTo(id);
-            if (items.countByExample(f) > 0) conflict();
+            items.deleteByExample(f);
             changed(boms.deleteByPrimaryKey(id));
         }
     }
