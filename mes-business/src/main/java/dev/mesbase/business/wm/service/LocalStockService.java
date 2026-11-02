@@ -445,8 +445,12 @@ public class LocalStockService {
     public static void validateBalances(BigDecimal quantity, BigDecimal available) {
         decimal(quantity);
         decimal(available);
-        if (quantity.signum() < 0 || available.signum() < 0 || available.compareTo(quantity) > 0)
-            ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
+        if (quantity.signum() < 0)
+            ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT, new SafeBusinessMessage("本次操作会使库存实存数量变为负数"));
+        if (available.signum() < 0)
+            ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT, new SafeBusinessMessage("本次操作会使库存可用数量变为负数"));
+        if (available.compareTo(quantity) > 0)
+            ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT, new SafeBusinessMessage("库存可用数量不能大于实存数量"));
     }
 
     private static void decimal(BigDecimal value) {

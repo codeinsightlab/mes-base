@@ -37,12 +37,14 @@ public final class HttpFailureLogging {
     }
 
     private static void logBusiness(HttpServletRequest request, Throwable failure, String code) {
+        String safeMessage = failure instanceof FoundationException foundation
+                ? foundation.safeMessage() : "未提供安全业务提示";
         if (failure.getCause() == null) {
-            LOG.warn("event=http.request.rejected method={} path={} errorCode={} exception={} origin={} throwSite={}",
-                    method(request), path(request), code, failure.getClass().getName(), origin(failure), throwSite(failure));
+            LOG.warn("event=http.request.rejected method={} path={} errorCode={} message={} exception={} origin={} throwSite={}",
+                    method(request), path(request), code, safeMessage, failure.getClass().getName(), origin(failure), throwSite(failure));
         } else {
-            LOG.warn("event=http.request.rejected method={} path={} errorCode={} exception={} origin={} throwSite={} rootCauseOrigin={}",
-                    method(request), path(request), code, failure.getClass().getName(), origin(failure), throwSite(failure), rootCauseOrigin(failure));
+            LOG.warn("event=http.request.rejected method={} path={} errorCode={} message={} exception={} origin={} throwSite={} rootCauseOrigin={}",
+                    method(request), path(request), code, safeMessage, failure.getClass().getName(), origin(failure), throwSite(failure), rootCauseOrigin(failure));
         }
     }
 

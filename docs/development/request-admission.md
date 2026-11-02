@@ -2,7 +2,7 @@
 
 ## API错误响应
 
-统一错误响应包含稳定的 `errorCode`、面向调用方的 `message` 和 `requestId`。`ErrorCode.safeMessage()` 是未提供业务专属提示时的默认消息，必须使用清晰、可执行的中文；不得返回英文内部描述、框架术语或原始异常。业务校验能够识别具体字段或规则时，应通过 `SafeBusinessMessage` 返回对应提示，不能依赖通用 `BAD_REQUEST` 文案掩盖具体原因。
+统一错误响应包含稳定的 `errorCode`、面向调用方的 `message` 和 `requestId`。`ErrorCode.safeMessage()` 是未提供业务专属提示时的默认消息，必须使用清晰、可执行的中文；不得返回英文内部描述、框架术语或原始异常。业务校验能够识别具体字段或规则时，应通过 `SafeBusinessMessage` 返回对应提示，不能依赖通用 `BAD_REQUEST` 文案掩盖具体原因。已知业务拒绝日志记录同一安全消息及业务调用位置 `origin`；`throwSite` 标记通用异常/校验工具的位置。不要把原始请求值或未经筛选的异常消息加入业务拒绝日志。
 
 ## 请求到数据库
 
