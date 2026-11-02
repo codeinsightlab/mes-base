@@ -45,7 +45,7 @@ BOM 展开仅沿明确的 `child_bom_id` 批量读取根版本可达的子图；
 
 ## 展示与提交分离
 
-`displayQuantity`、`quantityColumn` 和 `QuantityText` 统一去除无意义尾零，保留全部有效小数及原始值的追溯提示。展示函数不读取单位，不按单位精度截断历史事实，不改变提交数据。
+前端数量展示的唯一通用格式实现位于 `mes-base-ui/src/lib/quantity.ts`：页面使用 `formatQuantity`，表格使用其 `quantityColumn`，组件展示使用 `QuantityText`（内部委托给 `formatQuantity`）。页面不得各自实现数量格式化。它们去除无意义尾零，保留全部有效小数及原始值的追溯提示；不读取单位、不按单位精度截断历史事实、不改变提交数据。
 
 | 原值 | 展示或新输入归一化 |
 |---|---|
