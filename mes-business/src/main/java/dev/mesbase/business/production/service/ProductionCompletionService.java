@@ -24,6 +24,7 @@ import dev.mesbase.business.quality.service.QualityTreatmentService;
 import dev.mesbase.business.wm.dao.StockDocumentExtraMapper;
 import dev.mesbase.common.validation.ParameterChecks;
 import dev.mesbase.core.error.ErrorCode;
+import dev.mesbase.core.error.SafeBusinessMessage;
 import dev.mesbase.infrastructure.cache.annotation.BusinessCacheEvict;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
@@ -185,7 +186,8 @@ public class ProductionCompletionService {
      */
     @Transactional(transactionManager = "businessTransactionManager", isolation = Isolation.READ_COMMITTED, rollbackFor = Exception.class)
     public MesExecutionCompletionEntity complete(Long id, Command command) {
-        if (command == null) ParameterChecks.reject(ErrorCode.BAD_REQUEST);
+        if (command == null)
+            ParameterChecks.reject(ErrorCode.BAD_REQUEST, new SafeBusinessMessage("完工请求不能为空"));
         ProductionClosureRules.uuid(command.requestId());
         ProductionClosureRules.reason(command.reason());
         var existing = completions.selectByPrimaryKey(command.requestId());

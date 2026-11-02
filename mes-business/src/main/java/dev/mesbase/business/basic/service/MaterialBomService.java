@@ -34,6 +34,7 @@ import dev.mesbase.common.utils.SecurityUtils;
 import dev.mesbase.common.validation.ParameterChecks;
 import dev.mesbase.core.error.ErrorCode;
 import dev.mesbase.core.error.FoundationException;
+import dev.mesbase.core.error.SafeBusinessMessage;
 
 import java.math.BigDecimal;
 import java.math.MathContext;
@@ -93,7 +94,8 @@ public class MaterialBomService {
         if (q.code() != null) c.andCodeLike("%" + q.code() + "%");
         if (q.version() != null) c.andVersionEqualTo(q.version());
         if (q.status() != null) {
-            if (MaterialBomStatus.from(q.status()) == null) ParameterChecks.reject(ErrorCode.BAD_REQUEST);
+            if (MaterialBomStatus.from(q.status()) == null)
+                ParameterChecks.reject(ErrorCode.BAD_REQUEST, new SafeBusinessMessage("BOM状态筛选值无效，请重新选择"));
             c.andStatusEqualTo(q.status());
         }
         filter.setOrderByClause("id DESC");
@@ -110,7 +112,8 @@ public class MaterialBomService {
 
     @Transactional(transactionManager = "businessTransactionManager", readOnly = true)
     public MaterialBomEntity selectDefault(Long productId) {
-        if (productId == null) ParameterChecks.reject(ErrorCode.BAD_REQUEST);
+        if (productId == null)
+            ParameterChecks.reject(ErrorCode.BAD_REQUEST, new SafeBusinessMessage("请指定产出物料"));
         var product = materials.selectByPrimaryKey(productId);
         if (product == null) throw new FoundationException(ErrorCode.NOT_FOUND);
         if (!EnableStatus.ENABLED.getValue().equals(product.getStatus())) conflict();
@@ -241,7 +244,8 @@ public class MaterialBomService {
 
     @Transactional(transactionManager = "businessTransactionManager", readOnly = true)
     public MaterialBomItemPage itemPage(MaterialBomItemQueryDto q) {
-        if (q.bomId() == null) ParameterChecks.reject(ErrorCode.BAD_REQUEST);
+        if (q.bomId() == null)
+            ParameterChecks.reject(ErrorCode.BAD_REQUEST, new SafeBusinessMessage("请指定BOM版本"));
         require(q.bomId());
         ParameterChecks.paging(q.cacheOffset(), q.cacheLimit());
         var f = new MaterialBomItemExample();
@@ -312,7 +316,8 @@ public class MaterialBomService {
         decimal(quantity);
         ProductionQuantityInput.check(quantity);
         if (sort == null || sort < 0 || Objects.equals(materialId, parent.getProductId()))
-            ParameterChecks.reject(ErrorCode.BAD_REQUEST);
+            ParameterChecks.reject(ErrorCode.BAD_REQUEST,
+                    new SafeBusinessMessage("组件排序值不能为负数，组件物料不能与产出物料相同"));
         var material = lockMaterial(materialId);
         var f = new MaterialBomItemExample();
         var c = f.createCriteria().andBomIdEqualTo(parent.getId()).andMaterialIdEqualTo(materialId);
@@ -417,7 +422,8 @@ public class MaterialBomService {
     @Transactional(transactionManager = "businessTransactionManager", readOnly = true)
     public MaterialBomExplosion explode(String materialCode, Long bomId, BigDecimal outputQty,
                                         int versionOffset, int versionLimit) {
-        ParameterChecks.text(materialCode, true, 64, ErrorCode.BAD_REQUEST);
+        ParameterChecks.text(materialCode, true, 64, ErrorCode.BAD_REQUEST,
+                new SafeBusinessMessage("物料编码不能为空且不能超过64个字符"));
         ParameterChecks.paging(versionOffset, versionLimit, 100);
         decimal(outputQty);
         var materialFilter = new MaterialExample();
@@ -743,8 +749,10 @@ public class MaterialBomService {
     }
 
     private void unique(String code, String version, Long productId, Long excluding) {
-        ParameterChecks.text(code, true, 64, ErrorCode.BAD_REQUEST);
-        ParameterChecks.text(version, true, 32, ErrorCode.BAD_REQUEST);
+        ParameterChecks.text(code, true, 64, ErrorCode.BAD_REQUEST,
+                new SafeBusinessMessage("BOM编码不能为空且不能超过64个字符"));
+        ParameterChecks.text(version, true, 32, ErrorCode.BAD_REQUEST,
+                new SafeBusinessMessage("BOM版本不能为空且不能超过32个字符"));
         var f = new MaterialBomExample();
         var c = f.createCriteria().andCodeEqualTo(code).andVersionEqualTo(version).andProductIdEqualTo(productId);
         if (excluding != null) c.andIdNotEqualTo(excluding);
@@ -757,13 +765,16 @@ public class MaterialBomService {
     }
 
     private static void decimal(BigDecimal value) {
-        if (!coefficientValid(value)) ParameterChecks.reject(ErrorCode.BAD_REQUEST);
+        if (!coefficientValid(value))
+            ParameterChecks.reject(ErrorCode.BAD_REQUEST,
+                    new SafeBusinessMessage("BOM基数和组件用量必须大于零，最多支持14位整数和6位小数"));
     }
 
     private static void checkIds(List<Long> ids) {
         if (ids == null || ids.isEmpty() || ids.size() > 100 || ids.stream()
                 .anyMatch(Objects::isNull) || new HashSet<>(ids).size() != ids.size())
-            ParameterChecks.reject(ErrorCode.BAD_REQUEST);
+            ParameterChecks.reject(ErrorCode.BAD_REQUEST,
+                    new SafeBusinessMessage("请提供1至100个不重复且有效的BOM ID或明细ID"));
     }
 
     private static void changed(int n) {

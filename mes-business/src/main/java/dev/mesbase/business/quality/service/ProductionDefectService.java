@@ -233,7 +233,9 @@ public class ProductionDefectService {
         var node = actualNode(executionId, nodeId);
         var execution = executions.selectByPrimaryKey(executionId);
         var product = materials.selectByPrimaryKey(execution.getProductId());
-        if (product == null) ParameterChecks.reject(ErrorCode.BAD_REQUEST);
+        if (product == null)
+            ParameterChecks.reject(ErrorCode.BAD_REQUEST,
+                    new SafeBusinessMessage("当前生产执行对应的产品不存在，暂不能申报不良"));
         var page = defectTypes.getObject().page(node.getOperationId(), true, offset, limit);
         return new ProductionDefectV2Models.Context(executionId, nodeId, node.getOperationId(), node.getOperationName(),
                 product.getId(), product.getCode(), product.getName(), page.items(), page.total(), offset, limit,
@@ -342,7 +344,8 @@ public class ProductionDefectService {
     }
 
     public MesProductionDefectEntity latest(String id) {
-        if (StringUtils.isBlank(id)) ParameterChecks.reject(ErrorCode.BAD_REQUEST);
+        if (StringUtils.isBlank(id))
+            ParameterChecks.reject(ErrorCode.BAD_REQUEST, new SafeBusinessMessage("不良申报ID不能为空"));
         var e = new MesProductionDefectExample();
         e.createCriteria().andDeclarationIdEqualTo(id);
         e.setOrderByClause("revision_no desc");
@@ -423,20 +426,23 @@ public class ProductionDefectService {
     }
 
     public BigDecimal sumEffectiveDefectQty(Long executionId, Long affectedNodeId) {
-        if (executionId == null || affectedNodeId == null) ParameterChecks.reject(ErrorCode.BAD_REQUEST);
+        if (executionId == null || affectedNodeId == null)
+            ParameterChecks.reject(ErrorCode.BAD_REQUEST, new SafeBusinessMessage("请指定生产执行和受影响工序"));
         return treatments.nodeTotals(executionId).stream().filter(t -> t.affectedNodeId().equals(affectedNodeId))
                 .map(NodeTotal::effectiveDefectQty).reduce(BigDecimal.ZERO, BigDecimal::add);
     }
 
     public List<NodeTotal> nodeTotals(Long executionId) {
-        if (executionId == null) ParameterChecks.reject(ErrorCode.BAD_REQUEST);
+        if (executionId == null)
+            ParameterChecks.reject(ErrorCode.BAD_REQUEST, new SafeBusinessMessage("请指定生产执行"));
         return treatments.nodeTotals(executionId);
     }
 
     public List<Node> nodes(Long executionId) {
         var p = paths.view(executionId);
         if (p.path() == null || !Objects.equals(p.path().getRoutingId(), p.routing().id()))
-            ParameterChecks.reject(ErrorCode.BAD_REQUEST);
+            ParameterChecks.reject(ErrorCode.BAD_REQUEST,
+                    new SafeBusinessMessage("当前执行缺少有效的工艺路径，暂不能读取工序"));
         ExecutionPathValidator.validate(p.selectedNodeIds(), p.nodes(), p.edges());
         return p.selectedNodeIds().stream().map(id -> {
             var n = p.nodes().stream().filter(x -> x.getId().equals(id)).findFirst().orElseThrow();
@@ -457,19 +463,30 @@ public class ProductionDefectService {
     }
 
     private Facts validate(Facts f) {
-        if (f.executionId() == null || f.affectedNodeId() == null || f.defectQty() == null || f.defectQty()
-                .signum() <= 0 || f.defectQty().scale() > 6 || f.defectQty().precision() - f.defectQty().scale() > 14)
-            ParameterChecks.reject(ErrorCode.BAD_REQUEST);
-        if (WasteCategory.from(f.wasteCategory()) == null) ParameterChecks.reject(ErrorCode.BAD_REQUEST);
-        ParameterChecks.text(f.defectReason(), true, 500, ErrorCode.BAD_REQUEST);
-        ParameterChecks.text(f.responsibilityRemark(), false, 500, ErrorCode.BAD_REQUEST);
+        if (f.executionId() == null) ParameterChecks.reject(ErrorCode.BAD_REQUEST,
+                new SafeBusinessMessage("请指定生产执行"));
+        if (f.affectedNodeId() == null) ParameterChecks.reject(ErrorCode.BAD_REQUEST,
+                new SafeBusinessMessage("请选择受影响工序"));
+        if (f.defectQty() == null || f.defectQty().signum() <= 0 || f.defectQty().scale() > 6
+                || f.defectQty().precision() - f.defectQty().scale() > 14)
+            ParameterChecks.reject(ErrorCode.BAD_REQUEST,
+                    new SafeBusinessMessage("不良数量必须大于零，最多支持14位整数和6位小数"));
+        if (WasteCategory.from(f.wasteCategory()) == null)
+            ParameterChecks.reject(ErrorCode.BAD_REQUEST, new SafeBusinessMessage("请选择有效的工废/料废类别"));
+        ParameterChecks.text(f.defectReason(), true, 500, ErrorCode.BAD_REQUEST,
+                new SafeBusinessMessage("不良原因不能为空且不能超过500个字符"));
+        ParameterChecks.text(f.responsibilityRemark(), false, 500, ErrorCode.BAD_REQUEST,
+                new SafeBusinessMessage("责任说明不能超过500个字符"));
         if (f.occurredAt() == null || f.occurredAt().isAfter(LocalDateTime.now()))
-            ParameterChecks.reject(ErrorCode.BAD_REQUEST);
+            ParameterChecks.reject(ErrorCode.BAD_REQUEST,
+                    new SafeBusinessMessage("不良发生时间不能为空且不能晚于当前时间"));
         var ids = nodes(f.executionId()).stream().map(n -> Long.valueOf(n.id())).toList();
         if (!ids.contains(f.affectedNodeId()))
-            ParameterChecks.reject(ErrorCode.BAD_REQUEST);
+            ParameterChecks.reject(ErrorCode.BAD_REQUEST,
+                    new SafeBusinessMessage("所选受影响工序不属于当前生产执行"));
         if (f.responsibleUserId() != null && !directory.historicalUserExists(f.responsibleUserId()))
-            ParameterChecks.reject(ErrorCode.BAD_REQUEST);
+            ParameterChecks.reject(ErrorCode.BAD_REQUEST,
+                    new SafeBusinessMessage("所选责任人员不存在，请重新选择"));
         return f;
     }
 

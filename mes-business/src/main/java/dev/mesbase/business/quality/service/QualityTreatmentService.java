@@ -32,6 +32,7 @@ import dev.mesbase.common.utils.SecurityUtils;
 import dev.mesbase.common.validation.ParameterChecks;
 import dev.mesbase.core.error.ErrorCode;
 import dev.mesbase.core.error.FoundationException;
+import dev.mesbase.core.error.SafeBusinessMessage;
 
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
@@ -148,7 +149,8 @@ public class QualityTreatmentService {
     }
 
     private CurrentFact current(String declaration) {
-        if (StringUtils.isBlank(declaration)) ParameterChecks.reject(ErrorCode.BAD_REQUEST);
+        if (StringUtils.isBlank(declaration))
+            ParameterChecks.reject(ErrorCode.BAD_REQUEST, new SafeBusinessMessage("不良申报ID不能为空"));
         var rows = receiptProofs.selectCurrentFacts(null, declaration);
         if (rows.size() != 1) ParameterChecks.reject(ErrorCode.QUALITY_TREATMENT_CONFLICT);
         return rows.getFirst();
@@ -396,7 +398,8 @@ public class QualityTreatmentService {
     }
 
     public MesQualityTreatmentEntity checkRequest(String declaration, RequestCheck command) {
-        if (command == null) ParameterChecks.reject(ErrorCode.BAD_REQUEST);
+        if (command == null)
+            ParameterChecks.reject(ErrorCode.BAD_REQUEST, new SafeBusinessMessage("请求核对内容不能为空"));
         String id;
         String fingerprint;
         Action action;
@@ -406,16 +409,24 @@ public class QualityTreatmentService {
             action = Action.ASSESS;
         } else if (command.kind() == RequestKind.DISPOSE && command.disposition() != null && command.assessment() == null) {
             var disposition = command.disposition();
-            if (disposition.destination() == null || disposition.quantity() == null || disposition.reason() == null)
-                ParameterChecks.reject(ErrorCode.BAD_REQUEST);
+            if (disposition.destination() == null)
+                ParameterChecks.reject(ErrorCode.BAD_REQUEST, new SafeBusinessMessage("请选择质量处置去向"));
+            if (disposition.quantity() == null)
+                ParameterChecks.reject(ErrorCode.BAD_REQUEST, new SafeBusinessMessage("请填写质量处置数量"));
+            if (disposition.reason() == null)
+                ParameterChecks.reject(ErrorCode.BAD_REQUEST, new SafeBusinessMessage("请填写质量处置原因"));
             id = disposition.requestId();
             fingerprint = QualityDispositionService.hash(declaration, command.disposition());
             action = Action.TRANSFER_WAREHOUSE;
-        } else throw new FoundationException(ErrorCode.BAD_REQUEST);
+        } else throw new FoundationException(ErrorCode.BAD_REQUEST,
+                new SafeBusinessMessage("请选择要核实的质量评估或处置请求"));
         try {
-            if (id == null || !UUID.fromString(id).toString().equals(id)) ParameterChecks.reject(ErrorCode.BAD_REQUEST);
+            if (id == null || !UUID.fromString(id).toString().equals(id))
+                ParameterChecks.reject(ErrorCode.BAD_REQUEST,
+                        new SafeBusinessMessage("请求标识格式无效，请使用标准UUID"));
         } catch (IllegalArgumentException failure) {
-            throw new FoundationException(ErrorCode.BAD_REQUEST, failure);
+            throw new FoundationException(ErrorCode.BAD_REQUEST, failure,
+                    new SafeBusinessMessage("请求标识格式无效，请使用标准UUID"));
         }
         var event = events.selectByPrimaryKey(id);
         if (event == null) throw new FoundationException(ErrorCode.NOT_FOUND);

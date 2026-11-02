@@ -8,6 +8,7 @@ import dev.mesbase.business.production.service.ProductionScanService;
 import dev.mesbase.common.utils.bean.BeanConversions;
 import dev.mesbase.common.validation.ParameterChecks;
 import dev.mesbase.core.error.ErrorCode;
+import dev.mesbase.core.error.SafeBusinessMessage;
 import dev.mesbase.platform.web.EndpointAccess;
 import dev.mesbase.platform.web.RequestBoundaryFilter;
 import jakarta.servlet.http.HttpServletRequest;
@@ -34,7 +35,8 @@ public class ProductionScanController {
                         @NotBlank String inputMethod) {
         @JsonAnySetter
         public void rejectUnexpected(String field, Object value) {
-            ParameterChecks.reject(ErrorCode.BAD_REQUEST);
+            ParameterChecks.reject(ErrorCode.BAD_REQUEST,
+                    new SafeBusinessMessage("扫码请求包含不支持的字段，请检查提交内容"));
         }
     }
 
@@ -43,7 +45,9 @@ public class ProductionScanController {
     public ProductionIdentityVo scan(@Valid @RequestBody Input input, HttpServletRequest request) {
         var type = ProductionScanType.from(input.type());
         var method = ProductionScanInputMethod.from(input.inputMethod());
-        if (type == null || method == null) ParameterChecks.reject(ErrorCode.BAD_REQUEST);
+        if (type == null || method == null)
+            ParameterChecks.reject(ErrorCode.BAD_REQUEST,
+                    new SafeBusinessMessage("扫码业务类型或录入方式无效，请重新选择"));
         return BeanConversions.convert(scans.scan(type, input.code(), method,
                 RequestBoundaryFilter.requestId(request)), ProductionIdentityVo.class);
     }

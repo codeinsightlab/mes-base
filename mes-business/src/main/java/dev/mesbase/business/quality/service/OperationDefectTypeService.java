@@ -16,6 +16,7 @@ import dev.mesbase.business.shared.enums.EnableStatus;
 import dev.mesbase.common.utils.SecurityUtils;
 import dev.mesbase.core.error.ErrorCode;
 import dev.mesbase.core.error.FoundationException;
+import dev.mesbase.core.error.SafeBusinessMessage;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Locale;
@@ -52,7 +53,9 @@ public class OperationDefectTypeService {
     }
 
     public Page page(Long operation, boolean enabledOnly, int offset, int limit) {
-        if (operation == null || offset < 0 || limit < 1 || limit > 100) ParameterChecks.reject(ErrorCode.BAD_REQUEST);
+        if (operation == null)
+            ParameterChecks.reject(ErrorCode.BAD_REQUEST, new SafeBusinessMessage("请指定工序"));
+        ParameterChecks.paging(offset, limit, 100);
         if (operations.selectByPrimaryKey(operation) == null) throw new FoundationException(ErrorCode.NOT_FOUND);
         var e = new OperationDefectTypeExample();
         var c = e.createCriteria().andOperationIdEqualTo(operation);
@@ -80,18 +83,28 @@ public class OperationDefectTypeService {
         if (row.getRevision() != revision) throw new FoundationException(ErrorCode.DEFECT_TYPE_STALE);
         if (!EnableStatus.ENABLED.getValue().equals(row.getStatus()))
             throw new FoundationException(ErrorCode.DEFECT_TYPE_INVALID);
-        if (WasteCategory.from(category) == null) ParameterChecks.reject(ErrorCode.BAD_REQUEST);
+        if (WasteCategory.from(category) == null)
+            ParameterChecks.reject(ErrorCode.BAD_REQUEST, new SafeBusinessMessage("请选择有效的工废/料废类别"));
         return row;
     }
 
     @Transactional(transactionManager = "businessTransactionManager", isolation = Isolation.READ_COMMITTED, rollbackFor = Exception.class)
     public OperationDefectTypeEntity save(Long operation, Long id, Input input) {
         references.lockOperations(List.of(operation), id == null);
-        if (input == null || StringUtils.isBlank(input.code()) || input.code().length() > 64
-                || StringUtils.isBlank(input.name()) || input.name().length() > 255
-                || WasteCategory.from(input.defaultWasteCategory()) == null || EnableStatus.from(input.status()) == null
-                || input.sort() == null || input.sort() < 0 || input.remark() != null && input.remark().length() > 500)
-            ParameterChecks.reject(ErrorCode.BAD_REQUEST);
+        if (input == null)
+            ParameterChecks.reject(ErrorCode.BAD_REQUEST, new SafeBusinessMessage("不良类型信息不能为空"));
+        ParameterChecks.text(input.code(), true, 64, ErrorCode.BAD_REQUEST,
+                new SafeBusinessMessage("不良类型编码不能为空且不能超过64个字符"));
+        ParameterChecks.text(input.name(), true, 255, ErrorCode.BAD_REQUEST,
+                new SafeBusinessMessage("不良类型名称不能为空且不能超过255个字符"));
+        if (WasteCategory.from(input.defaultWasteCategory()) == null)
+            ParameterChecks.reject(ErrorCode.BAD_REQUEST, new SafeBusinessMessage("请选择有效的默认工废/料废类别"));
+        if (EnableStatus.from(input.status()) == null)
+            ParameterChecks.reject(ErrorCode.BAD_REQUEST, new SafeBusinessMessage("请选择有效的启用状态"));
+        if (input.sort() == null || input.sort() < 0)
+            ParameterChecks.reject(ErrorCode.BAD_REQUEST, new SafeBusinessMessage("排序值不能为负数"));
+        ParameterChecks.text(input.remark(), false, 500, ErrorCode.BAD_REQUEST,
+                new SafeBusinessMessage("备注不能超过500个字符"));
         String code = input.code().strip().toUpperCase(Locale.ROOT);
         var duplicate = new OperationDefectTypeExample();
         var criteria = duplicate.createCriteria().andOperationIdEqualTo(operation).andCodeEqualTo(code);
@@ -100,7 +113,8 @@ public class OperationDefectTypeService {
         var row = id == null ? new OperationDefectTypeEntity() : require(operation, id);
         if (id != null && !row.getRevision().equals(input.expectedRevision()))
             throw new FoundationException(ErrorCode.DEFECT_TYPE_STALE);
-        if (id == null && input.expectedRevision() != null) ParameterChecks.reject(ErrorCode.BAD_REQUEST);
+        if (id == null && input.expectedRevision() != null)
+            ParameterChecks.reject(ErrorCode.BAD_REQUEST, new SafeBusinessMessage("新建不良类型不能携带版本号"));
         row.setOperationId(operation);
         row.setCode(code);
         row.setName(input.name().strip());

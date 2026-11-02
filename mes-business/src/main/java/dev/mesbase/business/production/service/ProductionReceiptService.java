@@ -12,6 +12,7 @@ import dev.mesbase.business.production.domain.ProductionReceiptType;
 import dev.mesbase.business.directory.service.BusinessDirectoryService;
 import dev.mesbase.core.error.ErrorCode;
 import dev.mesbase.core.error.FoundationException;
+import dev.mesbase.core.error.SafeBusinessMessage;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Stream;
@@ -40,7 +41,8 @@ public class ProductionReceiptService {
     @Transactional(transactionManager = "businessTransactionManager", readOnly = true)
     public Page page(Query q) {
         ParameterChecks.paging(q.offset(), q.limit());
-        if (q.productLotCode() != null && q.productLotCode().length() > 100) ParameterChecks.reject(ErrorCode.BAD_REQUEST);
+        if (q.productLotCode() != null && q.productLotCode().length() > 100)
+            ParameterChecks.reject(ErrorCode.BAD_REQUEST, new SafeBusinessMessage("产品批次号筛选不能超过100个字符"));
         if (q.referenceReceiptId() != null) uuid(q.referenceReceiptId());
         List<ProductionReceiptRow> rows;
         long total;
@@ -67,7 +69,8 @@ public class ProductionReceiptService {
     }
 
     private static void uuid(String id) {
-        if (id == null || !id.matches("[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}")) ParameterChecks.reject(ErrorCode.BAD_REQUEST);
+        if (id == null || !id.matches("[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"))
+            ParameterChecks.reject(ErrorCode.BAD_REQUEST, new SafeBusinessMessage("请求标识格式无效，请使用标准UUID"));
     }
 
 }

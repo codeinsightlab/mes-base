@@ -314,7 +314,7 @@ public class StockDocumentService {
     @Transactional(transactionManager = "businessTransactionManager", readOnly = true)
     public List<DocumentTypeOption> typeOptions(String direction) {
         StockDocumentDirection flow = StockDocumentDirection.from(direction);
-        if (flow == null) ParameterChecks.reject(ErrorCode.BAD_REQUEST);
+        if (flow == null) ParameterChecks.reject(ErrorCode.BAD_REQUEST, new SafeBusinessMessage("库存单方向无效，请选择入库或出库"));
         String dictionary = flow == StockDocumentDirection.IN ? "stock_document_in_type" : "stock_document_out_type";
         List<SysDictData> selectedRows = dictionaryRows(dictionary);
         List<SysDictData> rows = selectedRows == null ? List.of() : selectedRows;
@@ -354,7 +354,7 @@ public class StockDocumentService {
         validate(command);
         StockDocumentType purpose = type(command.documentType());
         if (purpose == StockDocumentType.MATERIAL_ISSUE && command.sourceExecutionId() != null)
-            ParameterChecks.reject(ErrorCode.BAD_REQUEST);
+            ParameterChecks.reject(ErrorCode.BAD_REQUEST, new SafeBusinessMessage("普通领料单不能关联生产执行，请使用生产领料入口"));
         if (purpose.isTransfer() || purpose.isQualityReceipt())
             ParameterChecks.reject(ErrorCode.STOCK_DOCUMENT_SOURCE_PENDING);
         requireDirection(command.direction(), purpose);
@@ -362,7 +362,8 @@ public class StockDocumentService {
         String category = numberingCategory(command.direction());
         String ruleCode = command.ruleCode() == null || command.ruleCode().isBlank()
                 ? purpose.getValue() : command.ruleCode();
-        if (!purpose.getValue().equals(ruleCode)) ParameterChecks.reject(ErrorCode.BAD_REQUEST);
+        if (!purpose.getValue().equals(ruleCode))
+            ParameterChecks.reject(ErrorCode.BAD_REQUEST, new SafeBusinessMessage("单据编号规则必须与单据类型一致"));
         String documentNo = autoCodes.getBusinessDocNo(ruleCode, category);
         return businessTransactions.execute(status -> createDraft(command, documentNo));
     }
@@ -376,12 +377,12 @@ public class StockDocumentService {
         requireDirection(header.direction(), purpose);
         requireTypeActive(header.direction(), header.documentType());
         if (command.productionIssue() != null || purpose == StockDocumentType.MATERIAL_ISSUE && header.sourceExecutionId() != null)
-            ParameterChecks.reject(ErrorCode.BAD_REQUEST);
+            ParameterChecks.reject(ErrorCode.BAD_REQUEST, new SafeBusinessMessage("普通库存单不能携带生产领料数据或关联生产执行"));
         if (purpose.isTransfer() || purpose.isQualityReceipt())
             ParameterChecks.reject(ErrorCode.STOCK_DOCUMENT_SOURCE_PENDING);
         String category = numberingCategory(header.direction());
         if (header.ruleCode() == null || !header.documentType().equals(header.ruleCode()))
-            ParameterChecks.reject(ErrorCode.BAD_REQUEST);
+            ParameterChecks.reject(ErrorCode.BAD_REQUEST, new SafeBusinessMessage("单据编号规则必须与单据类型一致"));
         String documentNo = autoCodes.getBusinessDocNo(header.ruleCode(), category);
         return businessTransactions.execute(status -> {
             var draft = createDraft(new StockDocumentModels.Create(header.direction(), header.documentType(), header.reason(),
@@ -400,7 +401,8 @@ public class StockDocumentService {
         validateAggregate(command, false);
         var header = command.header();
         var current = require(id);
-        if (command.productionIssue() != null) ParameterChecks.reject(ErrorCode.BAD_REQUEST);
+        if (command.productionIssue() != null)
+            ParameterChecks.reject(ErrorCode.BAD_REQUEST, new SafeBusinessMessage("普通库存单不能携带生产领料数据"));
         if (current.getSourceRequestJson() != null && !type(current.getDocumentType()).isTransfer()
                 || !Objects.equals(current.getSourceWorkorderId(), header.sourceWorkorderId())
                 || !Objects.equals(current.getSourceExecutionId(), header.sourceExecutionId())
@@ -499,7 +501,8 @@ public class StockDocumentService {
             }
         }
         var row = new WmStockDocumentEntity();
-        if (documentNo == null || documentNo.isBlank()) ParameterChecks.reject(ErrorCode.BAD_REQUEST);
+        if (documentNo == null || documentNo.isBlank())
+            ParameterChecks.reject(ErrorCode.BAD_REQUEST, new SafeBusinessMessage("库存单编号不能为空"));
         row.setDocumentNo(documentNo);
         row.setDocumentType(command.documentType());
         row.setDirection(command.direction());
@@ -545,7 +548,8 @@ public class StockDocumentService {
         if (header.getSourceRequestJson() != null && !type(header.getDocumentType()).isTransfer())
             ParameterChecks.reject(ErrorCode.STOCK_DOCUMENT_CONFLICT);
         var existing = rows(documentId);
-        if (lineId == null && existing.size() >= 100) ParameterChecks.reject(ErrorCode.BAD_REQUEST);
+        if (lineId == null && existing.size() >= 100)
+            ParameterChecks.reject(ErrorCode.BAD_REQUEST, new SafeBusinessMessage("单据明细不能超过100行"));
         var line = lineId == null ? new WmStockDocumentLineEntity() : requireLine(documentId, lineId);
         boolean unchanged = lineId != null && Objects.equals(line.getMaterialId(), command.materialId())
                 && Objects.equals(line.getStockId(), command.stockId()) && Objects.equals(line.getUnitId(), command.unitId())
@@ -885,14 +889,14 @@ public class StockDocumentService {
     }
 
     private WmStockDocumentEntity lock(Long id) {
-        if (id == null) ParameterChecks.reject(ErrorCode.BAD_REQUEST);
+        if (id == null) ParameterChecks.reject(ErrorCode.BAD_REQUEST, new SafeBusinessMessage("库存单ID不能为空"));
         var row = documents.selectByPrimaryKeyForUpdate(id);
         if (row == null) throw new FoundationException(ErrorCode.NOT_FOUND);
         return row;
     }
 
     private WmStockDocumentEntity require(Long id) {
-        if (id == null) ParameterChecks.reject(ErrorCode.BAD_REQUEST);
+        if (id == null) ParameterChecks.reject(ErrorCode.BAD_REQUEST, new SafeBusinessMessage("库存单ID不能为空"));
         var row = documents.selectByPrimaryKey(id);
         if (row == null) throw new FoundationException(ErrorCode.NOT_FOUND);
         return row;
@@ -938,18 +942,20 @@ public class StockDocumentService {
     }
 
     private void validate(Object command) {
-        if (command == null || !validator.validate(command).isEmpty()) ParameterChecks.reject(ErrorCode.BAD_REQUEST);
+        if (command == null || !validator.validate(command).isEmpty())
+            ParameterChecks.reject(ErrorCode.BAD_REQUEST, new SafeBusinessMessage("库存单数据校验失败，请检查必填项和字段格式"));
     }
 
     private static void requireDirection(String direction, StockDocumentType purpose) {
         var flow = StockDocumentDirection.from(direction);
-        if (flow == null || flow != purpose.getDirection()) ParameterChecks.reject(ErrorCode.BAD_REQUEST);
+        if (flow == null || flow != purpose.getDirection())
+            ParameterChecks.reject(ErrorCode.BAD_REQUEST, new SafeBusinessMessage("单据方向与单据类型不匹配"));
     }
 
     private static String numberingCategory(String direction) {
         if (StockDocumentDirection.IN.getValue().equals(direction)) return AutoCodeRuleType.STOCK_IN.name();
         if (StockDocumentDirection.OUT.getValue().equals(direction)) return AutoCodeRuleType.STOCK_OUT.name();
-        ParameterChecks.reject(ErrorCode.BAD_REQUEST);
+        ParameterChecks.reject(ErrorCode.BAD_REQUEST, new SafeBusinessMessage("库存单方向无效，请选择入库或出库"));
         return null;
     }
 
@@ -961,15 +967,16 @@ public class StockDocumentService {
 
     private static StockDocumentType type(String value) {
         var type = StockDocumentType.from(value);
-        if (type == null) ParameterChecks.reject(ErrorCode.BAD_REQUEST);
+        if (type == null) ParameterChecks.reject(ErrorCode.BAD_REQUEST, new SafeBusinessMessage("库存单类型无效"));
         return type;
     }
 
     private static void uuid(String value) {
         try {
-            if (!UUID.fromString(value).toString().equals(value)) ParameterChecks.reject(ErrorCode.BAD_REQUEST);
+            if (!UUID.fromString(value).toString().equals(value))
+                ParameterChecks.reject(ErrorCode.BAD_REQUEST, new SafeBusinessMessage("请求标识格式无效，请使用标准UUID"));
         } catch (IllegalArgumentException | NullPointerException failure) {
-            throw new FoundationException(ErrorCode.BAD_REQUEST, failure);
+            throw new FoundationException(ErrorCode.BAD_REQUEST, failure, new SafeBusinessMessage("请求标识格式无效，请使用标准UUID"));
         }
     }
 

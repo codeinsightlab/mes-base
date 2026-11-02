@@ -12,6 +12,7 @@ import dev.mesbase.business.production.domain.ProductionClosureRules;
 import dev.mesbase.business.shared.enums.BusinessSource;
 import dev.mesbase.core.error.ErrorCode;
 import dev.mesbase.core.error.FoundationException;
+import dev.mesbase.core.error.SafeBusinessMessage;
 import com.github.pagehelper.PageHelper;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
@@ -56,10 +57,12 @@ public class WorkOrderCancellationService {
 
     @Transactional(transactionManager = "businessTransactionManager", isolation = Isolation.READ_COMMITTED, rollbackFor = Exception.class)
     public MesWorkorderCancellationEntity cancel(Long id, Command command) {
-        if (command == null) ParameterChecks.reject(ErrorCode.BAD_REQUEST);
+        if (command == null)
+            ParameterChecks.reject(ErrorCode.BAD_REQUEST, new SafeBusinessMessage("作废请求不能为空"));
         ProductionClosureRules.uuid(command.requestId());
         ProductionClosureRules.reason(command.reason());
-        if (command.expectedRevision() != null && command.expectedRevision() < 0) ParameterChecks.reject(ErrorCode.BAD_REQUEST);
+        if (command.expectedRevision() != null && command.expectedRevision() < 0)
+            ParameterChecks.reject(ErrorCode.BAD_REQUEST, new SafeBusinessMessage("工单版本号不能为负数"));
         var actor = ProductionClosureRules.actor();
         var row = locks.order(id);
         String hash = ProductionClosureRules.hash(id, command.requestId(), command.reason(), command.expectedRevision(), actor);

@@ -6,6 +6,7 @@ import com.fasterxml.jackson.annotation.JsonAnySetter;
 import dev.mesbase.business.production.domain.WorkOrderModels;
 import dev.mesbase.common.validation.ParameterChecks;
 import dev.mesbase.core.error.ErrorCode;
+import dev.mesbase.core.error.SafeBusinessMessage;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import java.math.BigDecimal;
@@ -19,7 +20,8 @@ public record WorkOrderSaveRequest(@Size(max = 64) String code, @NotNull Long pr
                                    @NotNull WorkorderMaterialModels.Save material) {
     @JsonAnySetter
     public void rejectUnexpected(String field, Object value) {
-        ParameterChecks.reject(ErrorCode.BAD_REQUEST);
+        ParameterChecks.reject(ErrorCode.BAD_REQUEST,
+                new SafeBusinessMessage("工单请求包含不支持的字段，请检查提交内容"));
     }
 
     public WorkOrderModels.Save toCommand() {

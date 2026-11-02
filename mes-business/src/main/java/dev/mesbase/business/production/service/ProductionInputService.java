@@ -121,7 +121,9 @@ public class ProductionInputService {
     public Preview preview(String code, Long workorderId) {
         var combination = combinations.detail(ProductionCombinationRules.parse(code, FactoryContext.required()
                 .factoryId().value()));
-        if (!Objects.equals(combination.workorderId(), workorderId)) ParameterChecks.reject(ErrorCode.BAD_REQUEST);
+        if (!Objects.equals(combination.workorderId(), workorderId))
+            ParameterChecks.reject(ErrorCode.BAD_REQUEST,
+                    new SafeBusinessMessage("所选工单与二维码组合不匹配，请扫描该组合所属工单"));
         var order = orders.selectByPrimaryKey(workorderId);
         if (order == null) ParameterChecks.reject(ErrorCode.NOT_FOUND);
         if (order.getRoutingId() == null) return new Preview(null, null);

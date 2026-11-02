@@ -40,6 +40,7 @@ import dev.mesbase.common.utils.StringUtils;
 import dev.mesbase.common.validation.ParameterChecks;
 import dev.mesbase.core.error.ErrorCode;
 import dev.mesbase.core.error.FoundationException;
+import dev.mesbase.core.error.SafeBusinessMessage;
 import dev.mesbase.infrastructure.cache.annotation.BusinessCacheEvict;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
@@ -105,14 +106,15 @@ public class LocalStockService {
     @BusinessCacheEvict(business = WmInventoryResource.PREFIX, scope = BusinessCacheEvict.Scope.LIST_AND_DETAIL)
     public WmStockActionEntity execute(StockActionType type, StockCommand c) {
         if (type == null || !List.of(StockActionType.OPENING, StockActionType.RECEIPT, StockActionType.GAIN, StockActionType.LOSS, StockActionType.CORRECTION, StockActionType.RETURN)
-                .contains(type)) ParameterChecks.reject(ErrorCode.BAD_REQUEST);
+                .contains(type)) ParameterChecks.reject(ErrorCode.BAD_REQUEST, new SafeBusinessMessage("库存动作类型无效"));
         String id = uuid(c.requestId());
         decimal(c.quantity());
         decimal(c.expectedQuantity());
         decimal(c.expectedAvailable());
         if (StringUtils.isBlank(c.reason()) || c.reason().length() > 500 || c.stockId() == null)
-            ParameterChecks.reject(ErrorCode.BAD_REQUEST);
-        if (type != StockActionType.RETURN && c.documentId() != null) ParameterChecks.reject(ErrorCode.BAD_REQUEST);
+            ParameterChecks.reject(ErrorCode.BAD_REQUEST, new SafeBusinessMessage("库存操作必须填写有效库存ID和不超过500个字符的原因"));
+        if (type != StockActionType.RETURN && c.documentId() != null)
+            ParameterChecks.reject(ErrorCode.BAD_REQUEST, new SafeBusinessMessage("仅退料操作可以关联原库存单"));
         Long actor = SecurityUtils.getUserId();
         // Old return request hashes are recognized from the immutable original action source identity.
         Long requestIdentity = c.documentId();
@@ -137,7 +139,8 @@ public class LocalStockService {
         }
         var replayed = replay(id, hash);
         if (replayed != null) return replayed;
-        if (type == StockActionType.RETURN && c.documentId() == null) ParameterChecks.reject(ErrorCode.BAD_REQUEST);
+        if (type == StockActionType.RETURN && c.documentId() == null)
+            ParameterChecks.reject(ErrorCode.BAD_REQUEST, new SafeBusinessMessage("退料操作必须关联原库存单"));
         WmStockDocumentEntity input = null;
         if (type == StockActionType.RETURN) {
             var document = documents.selectByPrimaryKey(c.documentId());
@@ -192,9 +195,11 @@ public class LocalStockService {
                     .signum() != 0 || available(stock).signum() != 0 || referenced(stock.getId()))
                 ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
         } else if (type == StockActionType.CORRECTION) {
-            if (delta.signum() == 0) ParameterChecks.reject(ErrorCode.BAD_REQUEST);
+            if (delta.signum() == 0)
+                ParameterChecks.reject(ErrorCode.BAD_REQUEST, new SafeBusinessMessage("库存调整数量不能为零"));
         } else {
-            if (delta.signum() <= 0) ParameterChecks.reject(ErrorCode.BAD_REQUEST);
+            if (delta.signum() <= 0)
+                ParameterChecks.reject(ErrorCode.BAD_REQUEST, new SafeBusinessMessage("该库存动作的数量必须大于零"));
             if (type == StockActionType.LOSS) delta = delta.negate();
         }
         String reference = null;
@@ -292,7 +297,7 @@ public class LocalStockService {
         uuid(actionId);
         decimal(line.getQuantity());
         if (line.getQuantity().signum() <= 0 || !Objects.equals(documentId, line.getDocumentId()))
-            ParameterChecks.reject(ErrorCode.BAD_REQUEST);
+            ParameterChecks.reject(ErrorCode.BAD_REQUEST, new SafeBusinessMessage("库存单明细数量必须大于零且属于当前库存单"));
         var stock = lock(line.getStockId());
         sources.warehouse(BusinessSource.LOCAL.getValue(), stock.getWarehouseId());
         var material = materials.selectByPrimaryKey(stock.getMaterialId());
@@ -446,7 +451,7 @@ public class LocalStockService {
 
     private static void decimal(BigDecimal value) {
         if (value == null || value.scale() > 6 || value.precision() - value.scale() > 14)
-            ParameterChecks.reject(ErrorCode.BAD_REQUEST);
+            ParameterChecks.reject(ErrorCode.BAD_REQUEST, new SafeBusinessMessage("库存数量最多支持14位整数和6位小数"));
     }
 
     private static String normalized(BigDecimal value) {
@@ -456,10 +461,12 @@ public class LocalStockService {
     private static String uuid(String value) {
         try {
             String id = UUID.fromString(value).toString();
-            if (!id.equals(value)) ParameterChecks.reject(ErrorCode.BAD_REQUEST);
+            if (!id.equals(value))
+                ParameterChecks.reject(ErrorCode.BAD_REQUEST, new SafeBusinessMessage("请求标识格式无效，请使用标准UUID"));
             return id;
         } catch (IllegalArgumentException | NullPointerException failure) {
-            throw new FoundationException(ErrorCode.BAD_REQUEST, failure);
+            throw new FoundationException(ErrorCode.BAD_REQUEST, failure,
+                    new SafeBusinessMessage("请求标识格式无效，请使用标准UUID"));
         }
     }
 

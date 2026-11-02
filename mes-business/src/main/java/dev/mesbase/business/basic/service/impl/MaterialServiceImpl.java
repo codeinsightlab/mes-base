@@ -18,6 +18,7 @@ import dev.mesbase.business.basic.sync.MaterialSyncResult;
 import dev.mesbase.business.basic.sync.UnconfiguredMaterialQueryAdapter;
 import dev.mesbase.common.validation.ParameterChecks;
 import dev.mesbase.core.error.ErrorCode;
+import dev.mesbase.core.error.SafeBusinessMessage;
 import dev.mesbase.core.error.FoundationException;
 import dev.mesbase.core.factory.FactoryScope;
 import dev.mesbase.framework.sync.SyncCoordinator;
@@ -96,7 +97,8 @@ public class MaterialServiceImpl implements IMaterialService {
 
     private List<Long> categoryIds(MaterialQueryDto query) {
         if (Boolean.TRUE.equals(query.uncategorized()) && query.categoryId() != null) {
-            ParameterChecks.reject(ErrorCode.BAD_REQUEST);
+            ParameterChecks.reject(ErrorCode.BAD_REQUEST,
+                    new SafeBusinessMessage("不能同时选择未分类物料和指定物料类别"));
         }
         if (query.categoryId() != null && Boolean.TRUE.equals(query.includeDescendants())) {
             return rules.categoryIds(query.categoryId());

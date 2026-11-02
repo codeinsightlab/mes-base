@@ -160,13 +160,15 @@ public class WorkorderMaterialService {
                     new SafeBusinessMessage("工单数量或BOM版本变化会影响人工调整的用料，请确认后再保存"));
         var input = command.items();
         if (input != null && (input.isEmpty() || input.size() > 100 || input.stream().anyMatch(Objects::isNull)))
-            ParameterChecks.reject(ErrorCode.BAD_REQUEST);
+            ParameterChecks.reject(ErrorCode.BAD_REQUEST,
+                    new SafeBusinessMessage("工单用料明细必须为1至100行且不能包含空行"));
         var direct = bomService.direct(command.bomId(), order.getPlannedQty());
         var materialIds = new ArrayList<Long>();
         materialIds.add(order.getProductId());
         materialIds.addAll(direct.items().stream().map(MaterialBomDirect.Component::materialId).toList());
         if (input != null) materialIds.addAll(input.stream().map(WorkorderMaterialModels.Line::materialId).toList());
-        if (materialIds.stream().anyMatch(Objects::isNull)) ParameterChecks.reject(ErrorCode.BAD_REQUEST);
+        if (materialIds.stream().anyMatch(Objects::isNull))
+            ParameterChecks.reject(ErrorCode.BAD_REQUEST, new SafeBusinessMessage("每条工单用料都必须选择物料"));
         // At most 100 lines; use the existing sorted material/unit lock protocol before locking the BOM.
         quantities.lockForWrite(materialIds);
         var selected = boms.selectByPrimaryKeyForUpdate(command.bomId());
@@ -197,21 +199,25 @@ public class WorkorderMaterialService {
         for (var line : input) {
             if (line.materialId() == null || line.unitId() == null || line.totalRequiredQty() == null
                     || Objects.equals(line.materialId(), order.getProductId()))
-                ParameterChecks.reject(ErrorCode.BAD_REQUEST);
+                ParameterChecks.reject(ErrorCode.BAD_REQUEST,
+                        new SafeBusinessMessage("用料行必须选择组件物料、基本单位并填写需求量，不能选择工单产出物料本身"));
             var row = new MesWorkorderMaterialEntity();
             if (line.id() != null) {
                 if (!seenIds.add(line.id()) || !prior.containsKey(line.id()))
-                    ParameterChecks.reject(ErrorCode.BAD_REQUEST);
+                    ParameterChecks.reject(ErrorCode.BAD_REQUEST,
+                            new SafeBusinessMessage("用料明细ID重复或不属于当前工单，请刷新后重试"));
                 row = prior.get(line.id());
             }
             var component = components.get(line.bomItemId());
             if (line.bomItemId() != null && (component == null || !seenComponents.add(line.bomItemId())))
-                ParameterChecks.reject(ErrorCode.BAD_REQUEST);
+                ParameterChecks.reject(ErrorCode.BAD_REQUEST,
+                        new SafeBusinessMessage("BOM组件明细不存在或重复，请刷新BOM用料后重试"));
             if (!line.manuallyAdjusted() && (component == null
                     || !Objects.equals(component.materialId(), line.materialId())
                     || !Objects.equals(component.unitId(), line.unitId())
                     || component.quantity().compareTo(line.totalRequiredQty()) != 0))
-                ParameterChecks.reject(ErrorCode.BAD_REQUEST);
+                ParameterChecks.reject(ErrorCode.BAD_REQUEST,
+                        new SafeBusinessMessage("未调整的BOM用料行必须与当前BOM的物料、单位和标准数量一致"));
             quantities.checkForWrite(line.totalRequiredQty(), line.materialId());
             var material = materials.selectByPrimaryKey(line.materialId());
             var unit = units.selectByPrimaryKey(line.unitId());
@@ -249,7 +255,8 @@ public class WorkorderMaterialService {
                 ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
         }
         String allowed = new ObjectMapper().writeValueAsString(warehouseIds);
-        if (allowed.length() > 2000) ParameterChecks.reject(ErrorCode.BAD_REQUEST);
+        if (allowed.length() > 2000)
+            ParameterChecks.reject(ErrorCode.BAD_REQUEST, new SafeBusinessMessage("允许使用的仓库范围过长，请减少仓库数量后重试"));
         order.setBomId(command.bomId());
         order.setBomRevision(command.expectedBomRevision());
         order.setMaterialWarehouseIds(allowed);

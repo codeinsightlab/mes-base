@@ -9,6 +9,7 @@ import dev.mesbase.business.shared.enums.BusinessSource;
 import dev.mesbase.common.core.page.PageData;
 import dev.mesbase.common.validation.ParameterChecks;
 import dev.mesbase.core.error.ErrorCode;
+import dev.mesbase.core.error.SafeBusinessMessage;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
@@ -43,7 +44,8 @@ public class ManufacturedInputSourceService {
     @Transactional(transactionManager = "businessTransactionManager", readOnly = true)
     public Page query(Long workorderId, int offset, int limit) {
         ParameterChecks.paging(offset, limit, 100);
-        if (workorderId == null) ParameterChecks.reject(ErrorCode.BAD_REQUEST);
+        if (workorderId == null)
+            ParameterChecks.reject(ErrorCode.BAD_REQUEST, new SafeBusinessMessage("请指定工单"));
         var order = sources.order(workorderId);
         if (!BusinessSource.LOCAL.getValue().equals(order.getSource()))
             ParameterChecks.reject(ErrorCode.BUSINESS_SOURCE_CONFLICT);

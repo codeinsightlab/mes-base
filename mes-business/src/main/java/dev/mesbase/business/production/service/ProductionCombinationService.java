@@ -42,6 +42,7 @@ import dev.mesbase.common.utils.SecurityUtils;
 import dev.mesbase.common.validation.ParameterChecks;
 import dev.mesbase.core.error.ErrorCode;
 import dev.mesbase.core.error.FoundationException;
+import dev.mesbase.core.error.SafeBusinessMessage;
 import dev.mesbase.platform.execution.FactoryContext;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -116,7 +117,8 @@ public class ProductionCombinationService {
         if (!List.of(WorkOrderStatus.DRAFT.getValue(), WorkOrderStatus.RELEASED.getValue()).contains(order.getStatus()))
             ParameterChecks.reject(ErrorCode.WORKORDER_NOT_RELEASED);
         quantities.checkForMaterial(requested, order.getProductId());
-        if (requested.signum() <= 0) ParameterChecks.reject(ErrorCode.BAD_REQUEST);
+        if (requested.signum() <= 0)
+            ParameterChecks.reject(ErrorCode.BAD_REQUEST, new SafeBusinessMessage("规划产出数量必须大于零"));
         var context = context(order, null);
         var plan = ProductionCombinationPlanner.generate(context.demands(), context.stocks(), order.getPlannedQty(),
                 context.confirmed(), context.issued(), requested, context.remaining(), context.outputPrecision());
@@ -197,7 +199,8 @@ public class ProductionCombinationService {
         var filter = new MesProductionCombinationItemExample();
         filter.createCriteria().andCombinationIdEqualTo(id);
         filter.setOrderByClause("line_no ASC,demand_line_id ASC,id ASC");
-        if (items.countByExample(filter) > 10000) ParameterChecks.reject(ErrorCode.BAD_REQUEST);
+        if (items.countByExample(filter) > 10000)
+            ParameterChecks.reject(ErrorCode.BAD_REQUEST, new SafeBusinessMessage("组合明细超过读取上限，请联系管理员核查数据"));
         return items.selectByExample(filter);
     }
 
@@ -235,7 +238,8 @@ public class ProductionCombinationService {
                 .outputQty();
         var quantity = requested;
         if (quantity == null) quantity = maximum;
-        if (quantity.signum() < 0) ParameterChecks.reject(ErrorCode.BAD_REQUEST);
+        if (quantity.signum() < 0)
+            ParameterChecks.reject(ErrorCode.BAD_REQUEST, new SafeBusinessMessage("配套数量不能为负数"));
         List<Allocation> allocation = List.of();
         if (quantity.signum() > 0) {
             quantities.checkForMaterial(quantity, order.getProductId());
