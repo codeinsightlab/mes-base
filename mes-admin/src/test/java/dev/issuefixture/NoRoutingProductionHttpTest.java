@@ -89,39 +89,39 @@ class NoRoutingProductionHttpTest {
                     .andExpect(status().isOk()).andExpect(jsonPath("definition").isEmpty());
             String firstCommand = confirm(mvc, code, "2");
             var first = json.readTree(ProductionInputHttpTest.submit(mvc, firstCommand));
-            long execution = first.get("executionId").asLong();
-            assertNull(db.queryForObject("SELECT routing_id FROM mes_production_execution WHERE id=?", Long.class, execution));
+            String execution = first.get("executionCode").asText();
+            assertNull(db.queryForObject("SELECT routing_id FROM mes_production_execution WHERE execution_code=?", Long.class, execution));
             mvc.perform(full(get("/api/production/identity")).param("code", code))
                     .andExpect(status().isOk()).andExpect(jsonPath("routingId").isEmpty());
-            mvc.perform(full(get("/api/wm/inbound-documents/executions/" + execution + "/basis")))
+            mvc.perform(full(get("/api/wm/inbound-documents/executions/{code}/basis", execution)))
                     .andExpect(status().isOk()).andExpect(jsonPath("reportingRequired").value(false))
                     .andExpect(jsonPath("remaining").value("2.000000"));
-            mvc.perform(full(get("/api/production/reporting/context")).param("executionId", Long.toString(execution)))
+            mvc.perform(full(get("/api/production/reporting/context")).param("executionCode", execution))
                     .andExpect(status().isOk()).andExpect(jsonPath("quantities.writable").value(false))
                     .andExpect(jsonPath("quantities.nodes.length()").value(0));
             mvc.perform(full(post("/api/production/reporting")).content(json.writeValueAsString(Map.of(
                             "requestId", UUID.randomUUID()
-                                    .toString(), "executionId", execution, "routingNodeId", 11, "reportQty", "1"))))
+                                    .toString(), "executionCode", execution, "routingNodeId", 11, "reportQty", "1"))))
                     .andExpect(status().is4xxClientError())
                     .andExpect(jsonPath("errorCode").value("REPORT_PATH_REQUIRED"));
-            mvc.perform(full(get("/api/production/executions/" + execution + "/path")))
+            mvc.perform(full(get("/api/production/executions/{code}/path", execution)))
                     .andExpect(status().isOk()).andExpect(jsonPath("routingId").isEmpty());
-            mvc.perform(full(get("/api/production/executions/" + execution + "/assignment-nodes")))
+            mvc.perform(full(get("/api/production/executions/{code}/assignment-nodes", execution)))
                     .andExpect(status().isOk()).andExpect(jsonPath("nodes.length()").value(0));
             mvc.perform(full(get("/api/production/workorder")))
                     .andExpect(status().isOk());
             mvc.perform(full(get("/api/production/report-quantities/workorders/" + order.get("id").asText())))
                     .andExpect(status().isOk())
-                    .andExpect(jsonPath("items[0].executionId").value(Long.toString(execution)))
+                    .andExpect(jsonPath("items[0].executionCode").value(execution))
                     .andExpect(jsonPath("items[0].routingId").isEmpty())
                     .andExpect(jsonPath("items[0].lastNodeReportedQty").isEmpty());
             WorkorderBomInputHttpTest.receive(mvc, execution, "1");
-            assertEquals("RUNNING", db.queryForObject("SELECT status FROM mes_production_execution WHERE id=?", String.class, execution));
+            assertEquals("RUNNING", db.queryForObject("SELECT status FROM mes_production_execution WHERE execution_code=?", String.class, execution));
             assertEquals("RELEASED", db.queryForObject("SELECT status FROM workorder WHERE id=?", String.class, order.get("id")
                     .asLong()));
-            long outputStock = db.queryForObject("SELECT s.id FROM wm_inventory s JOIN mes_production_execution e ON e.product_id=s.material_id AND e.batch_no=s.batch_no WHERE e.id=?", Long.class, execution);
+            long outputStock = db.queryForObject("SELECT s.id FROM wm_inventory s JOIN mes_production_execution e ON e.product_id=s.material_id AND e.batch_no=s.batch_no WHERE e.execution_code=?", Long.class, execution);
             long documents = db.queryForObject("SELECT COUNT(*) FROM wm_stock_document", Long.class);
-            mvc.perform(full(post("/api/production/executions/" + execution + "/inbound"))
+            mvc.perform(full(post("/api/production/executions/{code}/inbound", execution))
                             .content(json.writeValueAsString(Map.of("requestId", UUID.randomUUID()
                                             .toString(), "stockId", outputStock,
                                     "quantity", "2", "reason", "TEST ONLY reject excess receipt"))))
@@ -133,16 +133,16 @@ class NoRoutingProductionHttpTest {
             // Later master-data publication does not rewrite this execution's frozen no-routing basis.
             db.update("INSERT INTO routing_product(routing_id,material_id) VALUES(1,99)");
             var second = json.readTree(ProductionInputHttpTest.submit(mvc, confirm(mvc, code, "4")));
-            assertEquals(execution, second.get("executionId").asLong());
+            assertEquals(execution, second.get("executionCode").asText());
             WorkorderBomInputHttpTest.receive(mvc, execution, "2");
-            assertEquals("RUNNING", db.queryForObject("SELECT status FROM mes_production_execution WHERE id=?", String.class, execution));
+            assertEquals("RUNNING", db.queryForObject("SELECT status FROM mes_production_execution WHERE execution_code=?", String.class, execution));
             WorkorderBomInputHttpTest.receive(mvc, execution, "3");
-            assertEquals("FULLY_RECEIVED", db.queryForObject("SELECT status FROM mes_production_execution WHERE id=?", String.class, execution));
+            assertEquals("FULLY_RECEIVED", db.queryForObject("SELECT status FROM mes_production_execution WHERE execution_code=?", String.class, execution));
             assertEquals("COMPLETED", db.queryForObject("SELECT status FROM workorder WHERE id=?", String.class, order.get("id")
                     .asLong()));
-            assertEquals(0, db.queryForObject("SELECT COUNT(*) FROM mes_production_report WHERE execution_id=?", Integer.class, execution));
-            assertEquals(0, db.queryForObject("SELECT COUNT(*) FROM mes_execution_path WHERE id=?", Integer.class, execution));
-            assertEquals(0, new BigDecimal("6").compareTo(db.queryForObject("SELECT SUM(output_qty) FROM mes_material_issue_input WHERE execution_id=?", BigDecimal.class, execution)));
+            assertEquals(0, db.queryForObject("SELECT COUNT(*) FROM mes_production_report WHERE execution_code=?", Integer.class, execution));
+            assertEquals(0, db.queryForObject("SELECT COUNT(*) FROM mes_execution_path WHERE execution_code=?", Integer.class, execution));
+            assertEquals(0, new BigDecimal("6").compareTo(db.queryForObject("SELECT SUM(output_qty) FROM mes_material_issue_input WHERE execution_code=?", BigDecimal.class, execution)));
             mvc.perform(full(post("/api/production/input")).content(firstCommand)).andExpect(status().isOk());
             mvc.perform(full(get("/api/production/combinations/calculate")).param("code", code))
                     .andExpect(status().isConflict())

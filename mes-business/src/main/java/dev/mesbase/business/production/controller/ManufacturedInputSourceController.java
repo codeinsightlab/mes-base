@@ -21,7 +21,7 @@ public class ManufacturedInputSourceController {
     }
 
     public record Source(String documentId, String documentNo, String lineId, String stockActionId,
-                         String executionId, String workorderId, String bomId, String stockId,
+                         String executionCode, String workorderId, String bomId, String stockId,
                          String materialId, String warehouseId, String unitId, String batchNo,
                          String binCode, String receivedQty, String stockAvailableQty) {
     }

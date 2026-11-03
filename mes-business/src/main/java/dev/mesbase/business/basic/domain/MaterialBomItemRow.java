@@ -7,14 +7,17 @@ import java.math.BigDecimal;
  */
 public record MaterialBomItemRow(Long id, Long bomId, Long materialId, BigDecimal quantity,
                                  Long unitId, Long childBomId, Integer sort, String materialCode, String materialName,
-                                 String specification, String unitName) {
-    public static MaterialBomItemRow of(MaterialBomItemEntity row, MaterialEntity material, UnitMeasureEntity unit) {
+                                 String specification, String unitName, String childBomCode, String childBomVersion) {
+    public static MaterialBomItemRow of(MaterialBomItemEntity row, MaterialEntity material, UnitMeasureEntity unit,
+                                        MaterialBomEntity childBom) {
+        String childCode = childBom == null ? null : childBom.getCode();
+        String childVersion = childBom == null ? null : childBom.getVersion();
         if (material == null || unit == null) {
             return new MaterialBomItemRow(row.getId(), row.getBomId(), row.getMaterialId(), row.getQuantity(),
-                    row.getUnitId(), row.getChildBomId(), row.getSort(), null, null, null, null);
+                    row.getUnitId(), row.getChildBomId(), row.getSort(), null, null, null, null, childCode, childVersion);
         }
         return new MaterialBomItemRow(row.getId(), row.getBomId(), row.getMaterialId(), row.getQuantity(),
                 row.getUnitId(), row.getChildBomId(), row.getSort(), material.getCode(), material.getName(),
-                material.getSpecification(), unit.getName());
+                material.getSpecification(), unit.getName(), childCode, childVersion);
     }
 }

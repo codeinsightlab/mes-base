@@ -28,7 +28,7 @@ class StockDocumentProductionInputBasisHttpTest {
             var basis = mvc.perform(full(get(StockDocumentHttpTest.OUT_ROOT + "/" + documentId + "/production-input-basis")))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("requestId").value(requestId))
-                    .andExpect(jsonPath("executionId").value(result.get("executionId").asText()))
+                    .andExpect(jsonPath("executionCode").value(result.get("executionCode").asText()))
                     .andExpect(jsonPath("workorderId").value("1"))
                     .andExpect(jsonPath("sourceMode").value("LOCAL_ONLY"))
                     .andExpect(jsonPath("outputQty").value("10.000000"))

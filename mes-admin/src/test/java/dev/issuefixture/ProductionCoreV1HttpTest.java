@@ -62,7 +62,7 @@ class ProductionCoreV1HttpTest {
             j.update("DELETE FROM mes_production_execution"); // TEST ONLY unused initial fixtures.
             String body = ProductionInputHttpTest.command(m, UUID.randomUUID().toString(), "L001", "100");
             var first = new ObjectMapper().readTree(ProductionInputHttpTest.submit(m, body));
-            long execution = first.get("executionId").asLong();
+            String execution = first.get("executionCode").asText();
             String actions = "/api/production/executions/" + execution + "/actions/";
             var locked = j.queryForObject("SELECT locked_at FROM mes_execution_path WHERE id=?", String.class, execution);
             ProductionInputHttpTest.submit(m, body);

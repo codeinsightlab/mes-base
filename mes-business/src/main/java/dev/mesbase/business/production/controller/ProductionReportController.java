@@ -37,7 +37,7 @@ public class ProductionReportController {
 
     @GetMapping("/report-quantities/executions/{id}")
     @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED, permission = ProductionReportPermissions.QUANTITY)
-    public Execution quantities(@PathVariable Long id) {
+    public Execution quantities(@PathVariable String id) {
         return ProductionReportViews.execution(quantities.getExecutionQuantities(id));
     }
 
@@ -52,10 +52,10 @@ public class ProductionReportController {
 
     @GetMapping("/reports")
     @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED, permission = ProductionReportPermissions.DETAIL)
-    public Page<Ledger> page(@RequestParam Long executionId, @RequestParam Long routingNodeId,
+    public Page<Ledger> page(@RequestParam String executionCode, @RequestParam Long routingNodeId,
                              @RequestParam(defaultValue = "0") int offset,
                              @RequestParam(defaultValue = "20") int limit) {
-        var p = reports.page(executionId, routingNodeId, offset, limit);
+        var p = reports.page(executionCode, routingNodeId, offset, limit);
         return BeanConversions.convertPage(p, row -> ProductionReportViews.ledger(row, p.userNames()), Page::new);
     }
 

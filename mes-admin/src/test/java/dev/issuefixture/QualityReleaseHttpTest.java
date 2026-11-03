@@ -21,7 +21,7 @@ class QualityReleaseHttpTest {
         try (var c = ProductionWarehouseFixture.context()) {
             var m = MaterialIssueHttpTest.mvc(c);
             var j = ProductionWarehouseFixture.db(c);
-            j.update("INSERT INTO mes_quality_release(id,execution_id,sequence_no,action_type,quantity,basis_hash,request_hash,operator_user_id,recorded_at,reason) VALUES('test-audit-release',1,1,'RELEASE',20,REPEAT('a',64),REPEAT('b',64),1,CURRENT_TIMESTAMP,'TEST ONLY retired fact')");
+            j.update("INSERT INTO mes_quality_release(id,execution_code,sequence_no,action_type,quantity,basis_hash,request_hash,operator_user_id,recorded_at,reason) VALUES('test-audit-release',1,1,'RELEASE',20,REPEAT('a',64),REPEAT('b',64),1,CURRENT_TIMESTAMP,'TEST ONLY retired fact')");
             var before = j.queryForList("SELECT * FROM mes_quality_release ORDER BY id");
             String path = "/api/quality/releases/executions/1";
             m.perform(ProductionCoreV1HttpTest.full(get(path + "/history")))

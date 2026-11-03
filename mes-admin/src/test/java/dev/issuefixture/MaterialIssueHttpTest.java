@@ -29,8 +29,6 @@ import dev.mesbase.business.production.dao.MesExecutionAssignmentMapper;
 import dev.mesbase.business.production.dao.MesExecutionCompletionMapper;
 import dev.mesbase.business.production.dao.MesExecutionPathMapper;
 import dev.mesbase.business.production.dao.MesExecutionPathNodeMapper;
-import dev.mesbase.business.production.dao.MesProductionCombinationItemMapper;
-import dev.mesbase.business.production.dao.MesProductionCombinationMapper;
 import dev.mesbase.business.production.dao.MesProductionExecutionMapper;
 import dev.mesbase.business.production.dao.MesProductionReceiptMapper;
 import dev.mesbase.business.production.dao.MesProductionReportMapper;
@@ -174,7 +172,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
  * TEST ONLY: real generated SQL, HTTP authorization and transactions; two separate H2 databases.
  */
 class MaterialIssueHttpTest {
-    static final Set<Class<?>> MAPPERS = Set.of(MesProductionCombinationMapper.class, MesProductionCombinationItemMapper.class, MesMaterialIssueInputMapper.class, ProductionInputExtraMapper.class, MaterialBomMapper.class, MaterialBomItemMapper.class, MaterialBomCopyMapper.class, ProductionDefectListExtraMapper.class, StockDocumentExtraMapper.class, OperationDefectTypeMapper.class, DefectStatisticsExtraMapper.class, WmStockDocumentMapper.class, WmStockDocumentLineMapper.class, MesWorkorderCancellationMapper.class, WmWarehouseErpExtraMapper.class, MesQualityReleaseMapper.class, MesWarehouseAcceptanceMapper.class, MesExecutionCompletionMapper.class, MesWorkorderMaterialMapper.class, WmStockActionMapper.class, MesExecutionAssignmentMapper.class, MesProductionScanActivityMapper.class, WmInventoryMapper.class, MesProductionReceiptMapper.class, ProductionReceiptQueryMapper.class, MesProductionDefectMapper.class, MesQualityTreatmentMapper.class, WorkstationMapper.class, MesProductionReportMapper.class, ProductionQuantityMapper.class, MesExecutionPathMapper.class, MesExecutionPathNodeMapper.class, WorkorderErpExtraMapper.class, WorkOrderExtraMapper.class, RoutingNodeMapper.class, RoutingEdgeMapper.class, OperationMapper.class, MesProductionExecutionMapper.class, MaterialMapper.class, UnitMeasureMapper.class, WmWarehouseMapper.class, RoutingMapper.class, RoutingProductMapper.class, WorkorderMapper.class);
+    static final Set<Class<?>> MAPPERS = Set.of(MesMaterialIssueInputMapper.class, ProductionInputExtraMapper.class, MaterialBomMapper.class, MaterialBomItemMapper.class, MaterialBomCopyMapper.class, ProductionDefectListExtraMapper.class, StockDocumentExtraMapper.class, OperationDefectTypeMapper.class, DefectStatisticsExtraMapper.class, WmStockDocumentMapper.class, WmStockDocumentLineMapper.class, MesWorkorderCancellationMapper.class, WmWarehouseErpExtraMapper.class, MesQualityReleaseMapper.class, MesWarehouseAcceptanceMapper.class, MesExecutionCompletionMapper.class, MesWorkorderMaterialMapper.class, WmStockActionMapper.class, MesExecutionAssignmentMapper.class, MesProductionScanActivityMapper.class, WmInventoryMapper.class, MesProductionReceiptMapper.class, ProductionReceiptQueryMapper.class, MesProductionDefectMapper.class, MesQualityTreatmentMapper.class, WorkstationMapper.class, MesProductionReportMapper.class, ProductionQuantityMapper.class, MesExecutionPathMapper.class, MesExecutionPathNodeMapper.class, WorkorderErpExtraMapper.class, WorkOrderExtraMapper.class, RoutingNodeMapper.class, RoutingEdgeMapper.class, OperationMapper.class, MesProductionExecutionMapper.class, MaterialMapper.class, UnitMeasureMapper.class, WmWarehouseMapper.class, RoutingMapper.class, RoutingProductMapper.class, WorkorderMapper.class);
 
     static class Fixture implements AutoCloseable {
         final RuntimeRegistry registry = new RuntimeRegistry();
@@ -281,12 +279,23 @@ class MaterialIssueHttpTest {
                 jdbc.execute("ALTER TABLE unit_measure ADD must_be_whole_number TINYINT DEFAULT 0 NOT NULL");
                 jdbc.execute("ALTER TABLE unit_measure ADD quantity_precision TINYINT DEFAULT 6 NOT NULL");
                 WorkorderMaterialFixture.upgrade(jdbc);
-                // TEST ONLY H2 equivalent of V80; no real database is opened by this fixture.
-                String combinationDdl = Files.readString(Path.of("mes-admin/src/main/resources/db/business/V80__production_combination_codes.sql"))
-                        .replace(" CHARACTER SET utf8mb4 COLLATE utf8mb4_bin", "")
-                        .replace(" ENGINE=InnoDB DEFAULT CHARSET=utf8mb4", "")
-                        .replace(",\n    ADD INDEX idx_stock_document_line_demand (demand_line_id)", "");
-                for (String sql : combinationDdl.split(";")) if (!sql.isBlank()) jdbc.execute(sql);
+                jdbc.execute("ALTER TABLE material ADD work_order_rule_code VARCHAR(64)");
+                // Current workorder mapper includes the separate BOM-build feature.
+                for (String column : List.of("bom_build_id VARCHAR(36)", "bom_build_parent_workorder_id BIGINT", "bom_build_source_line_id BIGINT", "bom_build_path VARCHAR(2048)", "bom_build_request_id VARCHAR(64)", "bom_build_request_hash CHAR(64)"))
+                    jdbc.execute("ALTER TABLE workorder ADD " + column);
+                // TEST ONLY final code schema; planning has no persistence tables.
+                jdbc.execute("ALTER TABLE wm_stock_document_line ADD demand_line_id BIGINT");
+                jdbc.execute("ALTER TABLE mes_production_execution ADD execution_code VARCHAR(2048)");
+                jdbc.execute("CREATE UNIQUE INDEX uk_execution_code ON mes_production_execution(execution_code)");
+                for (String table : List.of("mes_execution_assignment", "mes_execution_completion", "mes_execution_path_node", "mes_material_issue_input", "mes_production_defect", "mes_production_receipt", "mes_production_report", "mes_production_scan_activity", "mes_quality_release", "mes_quality_treatment", "mes_warehouse_acceptance", "wm_stock_action")) {
+                    jdbc.execute("ALTER TABLE " + table + " ALTER COLUMN execution_id RENAME TO execution_code");
+                    jdbc.execute("ALTER TABLE " + table + " ALTER COLUMN execution_code SET DATA TYPE VARCHAR(2048)");
+                }
+                jdbc.execute("ALTER TABLE wm_stock_document ALTER COLUMN source_execution_id RENAME TO source_execution_code");
+                jdbc.execute("ALTER TABLE wm_stock_document ALTER COLUMN source_execution_code SET DATA TYPE VARCHAR(2048)");
+                jdbc.execute("ALTER TABLE mes_execution_path ADD execution_code VARCHAR(2048)");
+                jdbc.execute("CREATE UNIQUE INDEX uk_path_execution_code ON mes_execution_path(execution_code)");
+                jdbc.execute("ALTER TABLE mes_execution_path ALTER COLUMN id BIGINT AUTO_INCREMENT");
                 // TEST ONLY H2 equivalent of V81; existing routed rows retain their identities.
                 jdbc.execute("ALTER TABLE workorder ALTER COLUMN routing_id DROP NOT NULL");
                 jdbc.execute("ALTER TABLE mes_production_execution ALTER COLUMN routing_id DROP NOT NULL");
@@ -332,6 +341,11 @@ class MaterialIssueHttpTest {
         @Bean
         FactorySnapshotFixture factorySnapshots() {
             return new FactorySnapshotFixture();
+        }
+
+        @Bean
+        dev.mesbase.business.production.service.WorkOrderBomBuildService bomBuildService() {
+            return mock(dev.mesbase.business.production.service.WorkOrderBomBuildService.class);
         }
 
         @Bean
@@ -482,15 +496,6 @@ class MaterialIssueHttpTest {
             return new SqlSessionTemplate(f).getMapper(MesMaterialIssueInputMapper.class);
         }
 
-        @Bean
-        MesProductionCombinationMapper combinationMapper(SqlSessionFactory f) {
-            return new SqlSessionTemplate(f).getMapper(MesProductionCombinationMapper.class);
-        }
-
-        @Bean
-        MesProductionCombinationItemMapper combinationItemMapper(SqlSessionFactory f) {
-            return new SqlSessionTemplate(f).getMapper(MesProductionCombinationItemMapper.class);
-        }
 
         @Bean
         ProductionInputExtraMapper productionInputExtraMapper(SqlSessionFactory f) {

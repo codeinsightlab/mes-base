@@ -6,14 +6,14 @@
       OR EXISTS(SELECT 1 FROM wm_stock_document WHERE source_workorder_id=#{id})
  </select>
  <select id="hasExecutionDependents" resultType="boolean">
-  SELECT EXISTS(SELECT 1 FROM mes_production_receipt WHERE execution_id=#{id})
-      OR EXISTS(SELECT 1 FROM mes_quality_treatment WHERE execution_id=#{id})
-      OR EXISTS(SELECT 1 FROM mes_quality_release WHERE execution_id=#{id})
-      OR EXISTS(SELECT 1 FROM mes_warehouse_acceptance WHERE execution_id=#{id})
-      OR EXISTS(SELECT 1 FROM mes_execution_completion WHERE execution_id=#{id})
-      OR EXISTS(SELECT 1 FROM mes_material_issue_input WHERE execution_id=#{id})
-      OR EXISTS(SELECT 1 FROM wm_stock_action WHERE execution_id=#{id})
-      OR EXISTS(SELECT 1 FROM wm_stock_document WHERE source_execution_id=#{id})
+  SELECT EXISTS(SELECT 1 FROM mes_production_receipt WHERE execution_code=#{id})
+      OR EXISTS(SELECT 1 FROM mes_quality_treatment WHERE execution_code=#{id})
+      OR EXISTS(SELECT 1 FROM mes_quality_release WHERE execution_code=#{id})
+      OR EXISTS(SELECT 1 FROM mes_warehouse_acceptance WHERE execution_code=#{id})
+      OR EXISTS(SELECT 1 FROM mes_execution_completion WHERE execution_code=#{id})
+      OR EXISTS(SELECT 1 FROM mes_material_issue_input WHERE execution_code=#{id})
+      OR EXISTS(SELECT 1 FROM wm_stock_action WHERE execution_code=#{id})
+      OR EXISTS(SELECT 1 FROM wm_stock_document WHERE source_execution_code=#{id})
  </select>
  <select id="pendingExecutionInput" resultType="java.math.BigDecimal">
   SELECT CAST(0 AS DECIMAL(20,6))
@@ -24,7 +24,7 @@
          w.planned_qty-COALESCE(SUM(e.target_qty),0) AS remaining_target_qty,
          GREATEST(COALESCE(SUM(e.target_qty),0)-w.planned_qty,0) AS excess_target_qty,COUNT(e.id) AS execution_count
   FROM workorder w LEFT JOIN mes_production_execution e ON e.workorder_id=w.id AND e.status!=#{cancelled}
-  <if test="excluding != null">AND e.id!=#{excluding}</if>
+  <if test="excluding != null">AND e.execution_code!=#{excluding}</if>
   WHERE w.id=#{id} GROUP BY w.id,w.planned_qty
  </select>
  <select id="completionState" resultType="dev.mesbase.business.production.domain.WorkOrderModels$CompletionState">
@@ -32,10 +32,10 @@
   <bind name="completed" value="@dev.mesbase.business.production.domain.ProductionExecutionStatus@FULLY_RECEIVED.getValue()"/>
   SELECT COUNT(e.id) AS active_count,
          COALESCE(SUM(CASE WHEN e.status != #{completed} THEN 1 ELSE 0 END),0) AS unfinished_count,
-         COALESCE(SUM(CASE WHEN e.status = #{completed} AND c.execution_id IS NULL THEN 1 ELSE 0 END),0) AS missing_completion_count
+         COALESCE(SUM(CASE WHEN e.status = #{completed} AND c.execution_code IS NULL THEN 1 ELSE 0 END),0) AS missing_completion_count
   FROM workorder w
   LEFT JOIN mes_production_execution e ON e.workorder_id=w.id AND e.status != #{cancelled}
-  LEFT JOIN (SELECT execution_id FROM mes_execution_completion GROUP BY execution_id) c ON c.execution_id=e.id
+  LEFT JOIN (SELECT execution_code FROM mes_execution_completion GROUP BY execution_code) c ON c.execution_code=e.execution_code
   WHERE w.id=#{id}
  </select>
  <select id="countUnaccountedInputs" resultType="long">
@@ -46,14 +46,14 @@
     <bind name="enumMaterialIssue" value="@dev.mesbase.business.wm.domain.StockDocumentType@MATERIAL_ISSUE.getValue()"/>
   SELECT COUNT(d.id) FROM wm_stock_document d
   LEFT JOIN mes_material_issue_input f ON f.document_id=d.id
-  LEFT JOIN mes_production_execution e ON e.id=d.source_execution_id AND e.workorder_id=d.source_workorder_id
+  LEFT JOIN mes_production_execution e ON e.execution_code=d.source_execution_code AND e.workorder_id=d.source_workorder_id
   WHERE d.source_workorder_id=#{id} AND d.document_type=#{enumMaterialIssue} AND d.status=#{enumPosted}
-    AND (d.source_execution_id IS NOT NULL OR d.source_request_json IS NOT NULL OR f.id IS NOT NULL)
+    AND (d.source_execution_code IS NOT NULL OR d.source_request_json IS NOT NULL OR f.id IS NOT NULL)
     AND (NOT EXISTS(SELECT 1 FROM wm_stock_document_line l WHERE l.document_id=d.id)
       OR EXISTS(SELECT 1 FROM wm_stock_document_line l WHERE l.document_id=d.id
         AND NOT EXISTS(SELECT 1 FROM wm_stock_action r WHERE r.reference_action_id=l.stock_action_id AND r.action_type=#{enumReversal})))
     AND (f.id IS NULL OR f.input_kind!=#{enumProductionInput} OR f.confirmed_at IS NULL
-         OR f.stock_applied!=TRUE OR f.execution_id!=d.source_execution_id OR e.id IS NULL OR e.status!=#{enumFullyReceived})
+         OR f.stock_applied!=TRUE OR f.execution_code!=d.source_execution_code OR e.id IS NULL OR e.status!=#{enumFullyReceived})
  </select>
  <select id="publishedForProduct" resultMap="dev.mesbase.business.production.dao.RoutingMapper.BaseResultMap">
     <bind name="enabledStatus" value="@dev.mesbase.business.shared.enums.EnableStatus@ENABLED.getValue()"/>

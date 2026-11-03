@@ -11,7 +11,7 @@ import dev.mesbase.business.production.domain.MesProductionExecutionCreateComman
 import dev.mesbase.business.production.domain.MesProductionExecutionResource;
 import dev.mesbase.business.production.domain.ProductionCombinationModels.Confirm;
 import dev.mesbase.business.production.domain.ProductionCombinationModels;
-import dev.mesbase.business.production.domain.ProductionCombinationRules;
+import dev.mesbase.business.production.domain.ProductionQrCode;
 import dev.mesbase.business.production.domain.ProductionExecutionStatus;
 import dev.mesbase.business.production.domain.ProductionInputKind;
 import dev.mesbase.business.production.domain.RoutingDetail;
@@ -119,18 +119,17 @@ public class ProductionInputService {
 
     @Transactional(transactionManager = "businessTransactionManager", readOnly = true)
     public Preview preview(String code, Long workorderId) {
-        var combination = combinations.detail(ProductionCombinationRules.parse(code, FactoryContext.required()
-                .factoryId().value()));
+        var combination = combinations.detail(code);
         if (!Objects.equals(combination.workorderId(), workorderId))
             ParameterChecks.reject(ErrorCode.BAD_REQUEST,
                     new SafeBusinessMessage("所选工单与二维码组合不匹配，请扫描该组合所属工单"));
         var order = orders.selectByPrimaryKey(workorderId);
         if (order == null) ParameterChecks.reject(ErrorCode.NOT_FOUND);
         if (order.getRoutingId() == null) return new Preview(null, null);
-        if (combination.executionId() == null) return new Preview(routings.detail(order.getRoutingId()), null);
-        var execution = executionMapper.selectByPrimaryKey(combination.executionId());
+        if (combination.executionCode() == null) return new Preview(routings.detail(order.getRoutingId()), null);
+        var execution = executionMapper.selectByCode(combination.executionCode());
         if (execution == null) ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
-        return new Preview(routings.detail(execution.getRoutingId()), paths.view(execution.getId()));
+        return new Preview(routings.detail(execution.getRoutingId()), paths.view(execution.getExecutionCode()));
     }
 
     public void requireDocumentPermission() {
@@ -147,8 +146,6 @@ public class ProductionInputService {
     public ProductionCombinationModels.Result confirm(Confirm command) {
         requireDocumentPermission();
         validate(command);
-        Long combinationId = ProductionCombinationRules.parse(command.code(), FactoryContext.required().factoryId()
-                .value());
         record Intent(Long actor, String code, String quantity, Long routingId, List<Long> nodes, String key) {
         }
         String hash = RequestFingerprint.sha256(json.writeValueAsString(new Intent(SecurityUtils.getUserId(), command.code(),
@@ -156,52 +153,51 @@ public class ProductionInputService {
                         .toPlainString(), command.routingId(), command.routingNodeIds(), command.calculationKey())));
         var previous = transaction.execute(s -> facts.findByRequestId(command.requestId()));
         if (previous != null) return replay(previous, hash, command.code());
+        String code = ProductionQrCode.normalize(command.code());
         documents.requireTypeActive(StockDocumentDirection.OUT.getValue(), StockDocumentType.MATERIAL_ISSUE.getValue());
         String number = autoCodes.getBusinessDocNo(StockDocumentType.MATERIAL_ISSUE.getValue(), AutoCodeRuleType.STOCK_OUT.name());
         try {
-            return transaction.execute(status -> confirmInTransaction(combinationId, command, hash, number));
+            return transaction.execute(status -> confirmInTransaction(code, command, hash, number));
         } catch (DuplicateKeyException failure) {
             throw new FoundationException(ErrorCode.RESOURCE_CONFLICT, failure);
         }
     }
 
-    private ProductionCombinationModels.Result confirmInTransaction(Long combinationId, Confirm command, String hash,
+    private ProductionCombinationModels.Result confirmInTransaction(String code, Confirm command, String hash,
                                                                     String number) {
-        var before = combinations.require(combinationId);
-        var order = locks.order(before.getWorkorderId());
+        var before = combinations.order(code);
+        var order = locks.order(before.getId());
         var existing = facts.findByRequestId(command.requestId());
         if (existing != null) return replay(existing, hash, command.code());
-        var header = combinations.require(combinationId);
-        var detail = combinations.detail(combinationId);
+        var detail = combinations.detail(code);
         if (detail.closed()) ParameterChecks.reject(ErrorCode.PRODUCTION_COMBINATION_CLOSED);
         var materialIds = new ArrayList<>(detail.items().stream().map(i -> i.materialId()).distinct().toList());
         materialIds.add(order.getProductId());
         quantityRules.lockForWrite(materialIds);
-        var calculation = combinations.calculate(header, order, command.outputQty());
+        var calculation = combinations.calculate(detail, order, command.outputQty());
         if (!Objects.equals(command.calculationKey(), calculation.calculationKey()))
             ParameterChecks.reject(ErrorCode.PRODUCTION_INPUT_STALE);
         if (!Objects.equals(command.routingId(), order.getRoutingId()))
             ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
-        Long executionId = header.getExecutionId();
-        if (executionId == null) {
-            var created = executions.insert(new MesProductionExecutionCreateCommand(order.getId(), command.routingId(),
+        String executionCode = detail.executionCode();
+        if (executionCode == null) {
+            var created = executions.insert(new MesProductionExecutionCreateCommand(code, order.getId(), command.routingId(),
                     command.outputQty(), ProductionExecutionStatus.READY.getValue(), null, null, "组合二维码MES扫码投产"));
             // A logical output batch is generated once, independently of every material lot.
             created.setBatchNo("P-" + UUID.randomUUID());
             if (executionMapper.updateByPrimaryKey(created) != 1) ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
-            executionId = created.getId();
-            if (command.routingId() != null) paths.select(executionId, 0, command.routingNodeIds());
-            combinations.bind(combinationId, executionId);
+            executionCode = code;
+            if (command.routingId() != null) paths.select(executionCode, 0, command.routingNodeIds());
         } else {
-            var execution = locks.execution(executionId);
+            var execution = locks.execution(executionCode);
             if (!List.of(ProductionExecutionStatus.READY.getValue(), ProductionExecutionStatus.RUNNING.getValue())
                     .contains(execution.getStatus())
                     || !Objects.equals(execution.getRoutingId(), command.routingId()))
                 ParameterChecks.reject(ErrorCode.PRODUCTION_COMBINATION_CLOSED);
-            if (command.routingId() != null && !paths.view(executionId).selectedNodeIds()
+            if (command.routingId() != null && !paths.view(executionCode).selectedNodeIds()
                     .equals(command.routingNodeIds()))
                 ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
-            var target = inputQueries.confirmedExecutionOutput(executionId).add(command.outputQty());
+            var target = inputQueries.confirmedExecutionOutput(executionCode).add(command.outputQty());
             if (target.compareTo(execution.getTargetQty()) > 0) {
                 execution.setTargetQty(target);
                 execution.setUpdateTime(LocalDateTime.now());
@@ -215,28 +211,29 @@ public class ProductionInputService {
         }
         var frozen = new Command(command.requestId(), command.code(), order.getId(), null, command.outputQty(),
                 command.routingId(), command.routingNodeIds(), ProductionInputKind.PRODUCTION_INPUT.getValue(), command.calculationKey(), StockDocumentType.MATERIAL_ISSUE.getValue());
-        var document = documents.createMesIssue(order.getId(), executionId, number, command.requestId(),
+        var document = documents.createMesIssue(order.getId(), executionCode, number, command.requestId(),
                 json.writeValueAsString(frozen), calculation.allocations());
-        facts.recordMesConfirmation(document.document(), command.requestId(), hash, executionId,
-                new CombinationInput(2, combinationId, order.getId(), header.getDemandRevision(), command.outputQty(), calculation.allocations()));
-        var execution = locks.execution(executionId);
+        facts.recordMesConfirmation(document.document(), command.requestId(), hash, executionCode,
+                new CombinationInput(3, null, order.getId(), order.getMaterialRevision(), command.outputQty(), calculation.allocations(), code));
+        var execution = locks.execution(executionCode);
         if (execution.getRoutingId() != null) {
             var path = paths.requireSelected(execution);
             paths.confirm(execution, path.getRevision());
         }
         caches.evict(MesProductionExecutionResource.PREFIX, BusinessCacheEvict.Scope.LIST_AND_DETAIL);
-        return result(command.requestId(), document.document().getId(), executionId, command.code());
+        return result(command.requestId(), document.document().getId(), executionCode, command.code());
     }
 
     private ProductionCombinationModels.Result replay(MesMaterialIssueInputEntity previous, String hash, String code) {
         if (!hash.equals(previous.getRequestHash())) ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
-        return transaction.execute(s -> result(previous.getId(), previous.getDocumentId(), previous.getExecutionId(), code));
+        return transaction.execute(s -> result(previous.getId(), previous.getDocumentId(), previous.getExecutionCode(), code));
     }
 
-    private ProductionCombinationModels.Result result(String requestId, Long documentId, Long executionId,
+    private ProductionCombinationModels.Result result(String requestId, Long documentId, String executionCode,
                                                       String code) {
-        return new ProductionCombinationModels.Result(requestId, documentId, executionId, code,
-                documents.detail(documentId).document().getStatus(), inputQueries.confirmedExecutionOutput(executionId),
+        return new ProductionCombinationModels.Result(requestId, documentId, executionCode, code,
+                documents.detail(documentId).document()
+                        .getStatus(), inputQueries.confirmedExecutionOutput(executionCode),
                 Boolean.TRUE.equals(facts.findByRequestId(requestId).getStockApplied()));
     }
 
@@ -255,6 +252,5 @@ public class ProductionInputService {
             throw new FoundationException(ErrorCode.BAD_REQUEST, failure,
                     new SafeBusinessMessage("生产投入请求标识格式无效，请使用标准UUID"));
         }
-        ProductionCombinationRules.parse(c.code(), FactoryContext.required().factoryId().value());
     }
 }

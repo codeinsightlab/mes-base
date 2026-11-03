@@ -2,13 +2,10 @@ package dev.issuefixture;
 
 import dev.mesbase.acceptance.AcceptanceBusinessDatabase;
 import dev.mesbase.business.basic.dao.MaterialMapper;
-import dev.mesbase.business.production.dao.MesProductionCombinationMapper;
 import dev.mesbase.business.production.dao.MesProductionExecutionMapper;
 import dev.mesbase.business.production.dao.RoutingMapper;
 import dev.mesbase.business.production.dao.WorkOrderProgressExtraMapper;
 import dev.mesbase.business.production.dao.WorkorderMapper;
-import dev.mesbase.business.production.domain.ProductionCodeRules;
-import dev.mesbase.business.production.domain.ProductionScanCode;
 import dev.mesbase.business.production.service.ProductionIdentityService;
 import dev.mesbase.business.quality.dao.ProductionDefectListExtraMapper;
 import dev.mesbase.business.wm.dao.StockDocumentExtraMapper;
@@ -61,23 +58,23 @@ class InboundClosureSqlMySqlTest {
                 assertEquals(0, columns.getInt(1), "Current execution mappings require formal V54");
             }
             var orders = new ArrayList<Long>();
-            var executions = new ArrayList<Long>();
+            var executions = new ArrayList<String>();
             try (var select = connection.prepareStatement(
-                    "SELECT id,workorder_id FROM mes_production_execution ORDER BY id DESC LIMIT 3");
+                    "SELECT execution_code,workorder_id FROM mes_production_execution ORDER BY id DESC LIMIT 3");
                  var rows = select.executeQuery()) {
                 while (rows.next()) {
-                    executions.add(rows.getLong(1));
+                    executions.add(rows.getString(1));
                     orders.add(rows.getLong(2));
                 }
             }
             assertTrue(!executions.isEmpty(), "The verified database needs existing read-only production samples");
             var identities = new ProductionIdentityService(session.getMapper(MesProductionExecutionMapper.class),
                     session.getMapper(WorkorderMapper.class), session.getMapper(MaterialMapper.class),
-                    session.getMapper(RoutingMapper.class), session.getMapper(MesProductionCombinationMapper.class));
-            for (Long execution : executions) {
+                    session.getMapper(RoutingMapper.class));
+            for (String execution : executions) {
                 var identity = identities.read(execution);
                 assertNotNull(identity.batchNo(), "Current verified samples have formal execution batch properties");
-                String code = ProductionCodeRules.format(new ProductionScanCode(identity.workorderCode(), identity.productCode(), identity.batchNo()));
+                String code = identity.executionCode();
                 assertEquals(identity, identities.resolve(code));
                 var inbound = session.getMapper(StockDocumentExtraMapper.class);
                 assertNotNull(inbound.formalProductionInbound(execution));

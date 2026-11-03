@@ -44,9 +44,9 @@ public class OperatorCandidateService {
     }
 
     @Transactional(transactionManager = "businessTransactionManager", readOnly = true)
-    public ExecutionNodes nodes(Long executionId) {
+    public ExecutionNodes nodes(String executionCode) {
         FactoryContext.required();
-        var execution = executions.selectByPrimaryKey(executionId);
+        var execution = executions.selectByCode(executionCode);
         if (execution == null) throw new FoundationException(ErrorCode.EXECUTION_NOT_FOUND);
         if (execution.getRoutingId() == null) return new ExecutionNodes(execution.getStatus(), List.of());
         var filter = new RoutingNodeExample();

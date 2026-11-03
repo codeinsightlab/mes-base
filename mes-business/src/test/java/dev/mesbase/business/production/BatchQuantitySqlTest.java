@@ -21,10 +21,10 @@ class BatchQuantitySqlTest {
     void batchBalancesAndReportTotalsMatchConfirmedDocumentsAndReversals() throws Exception {
         String url = "jdbc:h2:mem:quantity_batch;MODE=MySQL;DB_CLOSE_DELAY=-1";
         try (var c = DriverManager.getConnection(url); var s = c.createStatement()) {
-            s.execute("CREATE TABLE mes_execution_path_node(execution_id BIGINT,routing_node_id BIGINT)");
-            s.execute("CREATE TABLE mes_production_report(execution_id BIGINT,routing_node_id BIGINT,quantity_delta DECIMAL(20,6))");
-            s.execute("CREATE TABLE mes_material_issue_input(execution_id BIGINT,document_id BIGINT,input_kind VARCHAR(40),confirmed_at TIMESTAMP,source_mode VARCHAR(40),output_qty DECIMAL(20,6),stock_applied BOOLEAN)");
-            s.execute("CREATE TABLE wm_stock_document(id BIGINT,source_execution_id BIGINT,document_type VARCHAR(40),status VARCHAR(16))");
+            s.execute("CREATE TABLE mes_execution_path_node(execution_code BIGINT,routing_node_id BIGINT)");
+            s.execute("CREATE TABLE mes_production_report(execution_code BIGINT,routing_node_id BIGINT,quantity_delta DECIMAL(20,6))");
+            s.execute("CREATE TABLE mes_material_issue_input(execution_code BIGINT,document_id BIGINT,input_kind VARCHAR(40),confirmed_at TIMESTAMP,source_mode VARCHAR(40),output_qty DECIMAL(20,6),stock_applied BOOLEAN)");
+            s.execute("CREATE TABLE wm_stock_document(id BIGINT,source_execution_code BIGINT,document_type VARCHAR(40),status VARCHAR(16))");
             s.execute("CREATE TABLE wm_stock_document_line(id BIGINT,document_id BIGINT,stock_action_id VARCHAR(36))");
             s.execute("CREATE TABLE wm_stock_action(id VARCHAR(36),reference_action_id VARCHAR(36),action_type VARCHAR(24))");
             s.execute("INSERT INTO mes_execution_path_node VALUES(1,11),(2,11),(2,12),(3,11)");
@@ -38,18 +38,18 @@ class BatchQuantitySqlTest {
         config.addMapper(ProductionQuantityMapper.class);
         try (var session = new SqlSessionFactoryBuilder().build(config).openSession()) {
             var mapper = session.getMapper(ProductionQuantityMapper.class);
-            var balances = mapper.inputBalances(List.of(1L, 2L, 3L));
+            var balances = mapper.inputBalances(List.of("1", "2", "3"));
             assertEquals(2, balances.size());
-            assertEquals(103, mapper.inputBalance(1L).confirmedQty().intValueExact());
-            assertEquals(0, mapper.inputBalance(1L).reservedQty().intValueExact());
-            assertEquals(7, mapper.inputBalance(2L).confirmedQty().intValueExact());
-            assertEquals(0, mapper.inputBalance(2L).reservedQty().intValueExact());
+            assertEquals(103, mapper.inputBalance("1").confirmedQty().intValueExact());
+            assertEquals(0, mapper.inputBalance("1").reservedQty().intValueExact());
+            assertEquals(7, mapper.inputBalance("2").confirmedQty().intValueExact());
+            assertEquals(0, mapper.inputBalance("2").reservedQty().intValueExact());
             for (var balance : balances)
-                assertEquals(mapper.inputBalance(balance.executionId()), new ProductionInputBalance(balance.confirmedQty(), balance.reservedQty()));
-            var totals = mapper.nodeTotalsBatch(List.of(1L, 2L));
+                assertEquals(mapper.inputBalance(balance.executionCode()), new ProductionInputBalance(balance.confirmedQty(), balance.reservedQty()));
+            var totals = mapper.nodeTotalsBatch(List.of("1", "2"));
             assertEquals(3, totals.size());
             for (var total : totals)
-                assertEquals(0, total.reportedQty().compareTo(mapper.nodeTotals(total.executionId()).stream()
+                assertEquals(0, total.reportedQty().compareTo(mapper.nodeTotals(total.executionCode()).stream()
                         .filter(n -> n.routingNodeId().equals(total.routingNodeId())).findFirst().orElseThrow()
                         .reportedQty()));
         }

@@ -74,8 +74,8 @@ class RecentProductionReportHttpTest {
     private static void seed(JdbcTemplate jdbc, String code, String quantity) {
         ProductionReportHttpTest.seed(jdbc);
         jdbc.update("UPDATE workorder SET code=? WHERE id=1", code);
-        jdbc.update("INSERT INTO mes_production_report(id,execution_id,routing_node_id,record_type,quantity_delta,operator_user_id,recorded_by,report_time,create_time,reason,request_id,command_fingerprint) VALUES(9007199254740993,1,11,'REPORT',?,100,1,'2026-10-20 09:00:00','2026-10-20 10:00:00','TEST ONLY',?, 'test')", quantity, code);
-        jdbc.update("INSERT INTO mes_production_report(id,execution_id,routing_node_id,record_type,quantity_delta,reference_report_id,operator_user_id,recorded_by,report_time,create_time,reason,request_id,command_fingerprint) VALUES(9007199254740994,1,11,'ADJUSTMENT',-1,9007199254740993,100,1,'2026-10-19 09:00:00','2026-10-19 10:00:00','TEST ONLY',?, 'test')", code + "-adjust");
+        jdbc.update("INSERT INTO mes_production_report(id,execution_code,routing_node_id,record_type,quantity_delta,operator_user_id,recorded_by,report_time,create_time,reason,request_id,command_fingerprint) VALUES(9007199254740993,1,11,'REPORT',?,100,1,'2026-10-20 09:00:00','2026-10-20 10:00:00','TEST ONLY',?, 'test')", quantity, code);
+        jdbc.update("INSERT INTO mes_production_report(id,execution_code,routing_node_id,record_type,quantity_delta,reference_report_id,operator_user_id,recorded_by,report_time,create_time,reason,request_id,command_fingerprint) VALUES(9007199254740994,1,11,'ADJUSTMENT',-1,9007199254740993,100,1,'2026-10-19 09:00:00','2026-10-19 10:00:00','TEST ONLY',?, 'test')", code + "-adjust");
     }
 
     @Test
@@ -100,7 +100,7 @@ class RecentProductionReportHttpTest {
             capture.assertNoCount();
             for (int i = 0; i < 12; i++)
                 jdbc.get("A")
-                        .update("INSERT INTO mes_production_report(execution_id,routing_node_id,record_type,quantity_delta,operator_user_id,recorded_by,report_time,create_time,reason,request_id,command_fingerprint) VALUES(1,11,'REPORT',1,100,1,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,'TEST ONLY',?, 'test')", "bounded-" + i);
+                        .update("INSERT INTO mes_production_report(execution_code,routing_node_id,record_type,quantity_delta,operator_user_id,recorded_by,report_time,create_time,reason,request_id,command_fingerprint) VALUES(1,11,'REPORT',1,100,1,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,'TEST ONLY',?, 'test')", "bounded-" + i);
             mvc.perform(ProductionReportHttpTest.full(get(URL).param("offset", "100").param("limit", "1000"), "A"))
                     .andExpect(status().isOk()).andExpect(jsonPath("$.length()").value(10));
             capture.assertNoCount();

@@ -93,11 +93,12 @@ class OperatorAssignmentMySqlTest {
             actor.setUserName("TEST_ONLY");
             SecurityContextHolder.getContext()
                     .setAuthentication(new UsernamePasswordAuthenticationToken(new LoginUser(user, 1L, actor, Set.of()), null, List.of()));
-            long executionId, nodeId, operationId;
+            String executionCode;
+            long nodeId, operationId;
             try (var q = session.getConnection()
-                    .createStatement(); var rs = q.executeQuery("SELECT e.id,n.id,n.operation_id FROM mes_production_execution e JOIN routing_node n ON n.routing_id=e.routing_id JOIN operation o ON o.id=n.operation_id WHERE e.status IN ('READY','RUNNING') AND o.status='ENABLED' ORDER BY e.id,n.id LIMIT 1")) {
+                    .createStatement(); var rs = q.executeQuery("SELECT e.execution_code,n.id,n.operation_id FROM mes_production_execution e JOIN routing_node n ON n.routing_id=e.routing_id JOIN operation o ON o.id=n.operation_id WHERE e.status IN ('READY','RUNNING') AND o.status='ENABLED' ORDER BY e.id,n.id LIMIT 1")) {
                 assertTrue(rs.next(), "Needs existing active execution and routing node");
-                executionId = rs.getLong(1);
+                executionCode = rs.getString(1);
                 nodeId = rs.getLong(2);
                 operationId = rs.getLong(3);
             }
@@ -110,16 +111,17 @@ class OperatorAssignmentMySqlTest {
             var assignment = new MesExecutionAssignmentServiceImpl(assignments, rules);
             var eligibility = new ReportOperatorEligibilityService(rules, assignments);
             // Work only on a copied synthetic execution; existing domain records remain untouched.
-            var original = executions.selectByPrimaryKey(executionId);
+            var original = executions.selectByCode(executionCode);
             var synthetic = new MesProductionExecutionEntity();
             synthetic.setWorkorderId(original.getWorkorderId());
+            synthetic.setExecutionCode(executionCode.substring(0, executionCode.indexOf(':')) + ":TEST_ONLY#" + tag);
             synthetic.setProductId(original.getProductId());
             synthetic.setRoutingId(original.getRoutingId());
             synthetic.setTargetQty(original.getTargetQty());
             synthetic.setStatus("READY");
             synthetic.setRemark(tag);
             assertEquals(1, executions.insert(synthetic));
-            executionId = synthetic.getId();
+            executionCode = synthetic.getExecutionCode();
             // Existing users may already be qualified. Isolate the whole definition instead of deleting their capability.
             var opMapper = session.getMapper(OperationMapper.class);
             var testOperation = opMapper.selectByPrimaryKey(operationId);
@@ -146,7 +148,8 @@ class OperatorAssignmentMySqlTest {
             executions.updateByPrimaryKey(synthetic);
             nodeId = testNode.getId();
             operationId = testOperation.getId();
-            final long eid = executionId, nid = nodeId, oid = operationId;
+            final String eid = executionCode;
+            final long nid = nodeId, oid = operationId;
             var pre = new MesOperationUserExample();
             pre.createCriteria().andOperationIdEqualTo(oid).andUserIdEqualTo(user);
             assertEquals(0, caps.countByExample(pre), "Refuse collision with existing operator configuration");
@@ -165,7 +168,7 @@ class OperatorAssignmentMySqlTest {
             capability.deleteByIds(List.of(c.getId()));
             assertEquals(ErrorCode.OPERATOR_CAPABILITY_REQUIRED, assertThrows(FoundationException.class, () -> eligibility.requireEligible(eid, nid, user)).code());
             var own = new MesExecutionAssignmentExample();
-            own.createCriteria().andExecutionIdEqualTo(eid);
+            own.createCriteria().andExecutionCodeEqualTo(eid);
             assertEquals(1, assignments.countByExample(own));
             assignment.deleteByIds(List.of(a.getId()));
             capability.insert(new MesOperationUserCreateCommand(oid, user, tag));

@@ -45,9 +45,9 @@ class QualityWorkflowHttpTest {
             j.update("INSERT INTO routing_node(id,routing_id,node_code,operation_id,display_order,operation_name) SELECT 14,routing_id,'D',operation_id,4,operation_name FROM routing_node WHERE id=13");
             j.update("INSERT INTO routing_node(id,routing_id,node_code,operation_id,display_order,operation_name) SELECT 15,routing_id,'E',operation_id,5,operation_name FROM routing_node WHERE id=13");
             j.update("INSERT INTO routing_edge(routing_id,from_node_id,to_node_id) VALUES(1,13,14),(1,14,15)");
-            j.update("INSERT INTO mes_execution_path_node(execution_id,sequence_no,routing_node_id) VALUES(1,4,14),(1,5,15)");
+            j.update("INSERT INTO mes_execution_path_node(execution_code,sequence_no,routing_node_id) VALUES(1,4,14),(1,5,15)");
             for (int i = 0; i < reports.length; i++)
-                j.update("INSERT INTO mes_production_report(execution_id,routing_node_id,record_type,quantity_delta,operator_user_id,recorded_by,report_time,reason,create_time) VALUES(1,?,'REPORT',?,100,1,CURRENT_TIMESTAMP,'TEST ONLY V13 normal immutable report',CURRENT_TIMESTAMP)", 11 + i, reports[i]);
+                j.update("INSERT INTO mes_production_report(execution_code,routing_node_id,record_type,quantity_delta,operator_user_id,recorded_by,report_time,reason,create_time) VALUES(1,?,'REPORT',?,100,1,CURRENT_TIMESTAMP,'TEST ONLY V13 normal immutable report',CURRENT_TIMESTAMP)", 11 + i, reports[i]);
         }
         return c;
     }
@@ -130,7 +130,7 @@ class QualityWorkflowHttpTest {
                     "SELECT COUNT(*) FROM mes_quality_treatment WHERE declaration_id=?", Integer.class, id));
             var healthy = defect(mvc, 12, "1", "INDEPENDENT", null);
             ProductionWarehouseFixture.db(c)
-                    .update("INSERT INTO mes_quality_treatment(id,request_hash,declaration_id,declaration_revision,execution_id,routing_node_id,action_type,operator_user_id,recorded_at,reason) VALUES(?,?,?,1,1,12,'ALLOCATE',1,CURRENT_TIMESTAMP,'TEST ONLY rejected imported workflow')",
+                    .update("INSERT INTO mes_quality_treatment(id,request_hash,declaration_id,declaration_revision,execution_code,routing_node_id,action_type,operator_user_id,recorded_at,reason) VALUES(?,?,?,1,1,12,'ALLOCATE',1,CURRENT_TIMESTAMP,'TEST ONLY rejected imported workflow')",
                             UUID.randomUUID().toString(), "x".repeat(64), id);
             var list = JSON.readTree(mvc.perform(full(get(Q), "A")).andExpect(status().isOk())
                     .andReturn().getResponse().getContentAsString());

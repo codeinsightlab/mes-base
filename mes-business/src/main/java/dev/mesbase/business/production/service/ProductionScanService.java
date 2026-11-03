@@ -72,12 +72,12 @@ public class ProductionScanService {
             record(type, method, user, null, ProductionScanOutcome.FAILURE, error, occurredAt, started, requestId);
             throw failure;
         }
-        record(type, method, user, identity.executionId(), ProductionScanOutcome.SUCCESS, null,
+        record(type, method, user, identity.executionCode(), ProductionScanOutcome.SUCCESS, null,
                 occurredAt, started, requestId);
         return identity;
     }
 
-    private void record(ProductionScanType type, ProductionScanInputMethod method, Long user, Long execution,
+    private void record(ProductionScanType type, ProductionScanInputMethod method, Long user, String execution,
                         ProductionScanOutcome outcome, ErrorCode error, LocalDateTime occurredAt,
                         long started, String requestId) {
         var event = new MesProductionScanActivityEntity();
@@ -85,7 +85,7 @@ public class ProductionScanService {
         event.setScanType(type.getValue());
         event.setInputMethod(method.getValue());
         event.setUserId(user);
-        event.setExecutionId(execution);
+        event.setExecutionCode(execution);
         event.setOutcome(outcome.getValue());
         if (error != null) event.setErrorCode(error.name());
         event.setDurationMs(Math.max(0L, (System.nanoTime() - started) / 1_000_000));

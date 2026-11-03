@@ -5,7 +5,7 @@
   <resultMap id="BaseResultMap" type="dev.mesbase.business.production.domain.MesProductionReceiptEntity">
     <id column="id" jdbcType="VARCHAR" property="id" />
     <result column="receipt_no" jdbcType="VARCHAR" property="receiptNo" />
-    <result column="execution_id" jdbcType="BIGINT" property="executionId" />
+    <result column="execution_code" jdbcType="VARCHAR" property="executionCode" />
     <result column="product_lot_code" jdbcType="VARCHAR" property="productLotCode" />
     <result column="warehouse_id" jdbcType="BIGINT" property="warehouseId" />
     <result column="record_type" jdbcType="VARCHAR" property="recordType" />
@@ -76,7 +76,7 @@
     </where>
   </sql>
   <sql id="Base_Column_List">
-    id, receipt_no, execution_id, product_lot_code, warehouse_id, record_type, quantity_delta, 
+    id, receipt_no, execution_code, product_lot_code, warehouse_id, record_type, quantity_delta,
     reference_receipt_id, operator_user_id, recorded_by, occurred_at, create_time, reason
   </sql>
   <select id="selectByExample" parameterType="dev.mesbase.business.production.domain.MesProductionReceiptExample" resultMap="BaseResultMap">
@@ -107,12 +107,12 @@
     </if>
   </delete>
   <insert id="insert" parameterType="dev.mesbase.business.production.domain.MesProductionReceiptEntity">
-    insert into mes_production_receipt (id, receipt_no, execution_id, 
+    insert into mes_production_receipt (id, receipt_no, execution_code,
       product_lot_code, warehouse_id, record_type, 
       quantity_delta, reference_receipt_id, operator_user_id, 
       recorded_by, occurred_at, create_time, 
       reason)
-    values (#{id,jdbcType=VARCHAR}, #{receiptNo,jdbcType=VARCHAR}, #{executionId,jdbcType=BIGINT}, 
+    values (#{id,jdbcType=VARCHAR}, #{receiptNo,jdbcType=VARCHAR}, #{executionCode,jdbcType=VARCHAR},
       #{productLotCode,jdbcType=VARCHAR}, #{warehouseId,jdbcType=BIGINT}, #{recordType,jdbcType=VARCHAR}, 
       #{quantityDelta,jdbcType=DECIMAL}, #{referenceReceiptId,jdbcType=VARCHAR}, #{operatorUserId,jdbcType=BIGINT}, 
       #{recordedBy,jdbcType=BIGINT}, #{occurredAt,jdbcType=TIMESTAMP}, #{createTime,jdbcType=TIMESTAMP}, 
@@ -127,8 +127,8 @@
       <if test="receiptNo != null">
         receipt_no,
       </if>
-      <if test="executionId != null">
-        execution_id,
+      <if test="executionCode != null">
+        execution_code,
       </if>
       <if test="productLotCode != null">
         product_lot_code,
@@ -168,8 +168,8 @@
       <if test="receiptNo != null">
         #{receiptNo,jdbcType=VARCHAR},
       </if>
-      <if test="executionId != null">
-        #{executionId,jdbcType=BIGINT},
+      <if test="executionCode != null">
+        #{executionCode,jdbcType=VARCHAR},
       </if>
       <if test="productLotCode != null">
         #{productLotCode,jdbcType=VARCHAR},
@@ -218,8 +218,8 @@
       <if test="row.receiptNo != null">
         receipt_no = #{row.receiptNo,jdbcType=VARCHAR},
       </if>
-      <if test="row.executionId != null">
-        execution_id = #{row.executionId,jdbcType=BIGINT},
+      <if test="row.executionCode != null">
+        execution_code = #{row.executionCode,jdbcType=VARCHAR},
       </if>
       <if test="row.productLotCode != null">
         product_lot_code = #{row.productLotCode,jdbcType=VARCHAR},
@@ -260,7 +260,7 @@
     update mes_production_receipt
     set id = #{row.id,jdbcType=VARCHAR},
       receipt_no = #{row.receiptNo,jdbcType=VARCHAR},
-      execution_id = #{row.executionId,jdbcType=BIGINT},
+      execution_code = #{row.executionCode,jdbcType=VARCHAR},
       product_lot_code = #{row.productLotCode,jdbcType=VARCHAR},
       warehouse_id = #{row.warehouseId,jdbcType=BIGINT},
       record_type = #{row.recordType,jdbcType=VARCHAR},
@@ -281,8 +281,8 @@
       <if test="receiptNo != null">
         receipt_no = #{receiptNo,jdbcType=VARCHAR},
       </if>
-      <if test="executionId != null">
-        execution_id = #{executionId,jdbcType=BIGINT},
+      <if test="executionCode != null">
+        execution_code = #{executionCode,jdbcType=VARCHAR},
       </if>
       <if test="productLotCode != null">
         product_lot_code = #{productLotCode,jdbcType=VARCHAR},
@@ -320,7 +320,7 @@
   <update id="updateByPrimaryKey" parameterType="dev.mesbase.business.production.domain.MesProductionReceiptEntity">
     update mes_production_receipt
     set receipt_no = #{receiptNo,jdbcType=VARCHAR},
-      execution_id = #{executionId,jdbcType=BIGINT},
+      execution_code = #{executionCode,jdbcType=VARCHAR},
       product_lot_code = #{productLotCode,jdbcType=VARCHAR},
       warehouse_id = #{warehouseId,jdbcType=BIGINT},
       record_type = #{recordType,jdbcType=VARCHAR},
@@ -334,7 +334,7 @@
     where id = #{id,jdbcType=VARCHAR}
   </update>
   <select id="netQuantity" resultType="java.math.BigDecimal">
-    SELECT COALESCE(SUM(quantity_delta),0) FROM mes_production_receipt WHERE execution_id=#{executionId}
+    SELECT COALESCE(SUM(quantity_delta),0) FROM mes_production_receipt WHERE execution_code=#{executionCode}
   </select>
   <select id="originalBalance" resultType="java.math.BigDecimal">
     SELECT COALESCE(SUM(quantity_delta),0) FROM mes_production_receipt WHERE id=#{id} OR reference_receipt_id=#{id}

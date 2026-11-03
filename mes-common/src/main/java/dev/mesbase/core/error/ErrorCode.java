@@ -50,6 +50,7 @@ public enum ErrorCode {
     PRODUCTION_IDENTITY_AMBIGUOUS(409, "同一工单、品号及批次匹配多个执行单元，请核对执行记录"),
     PRODUCTION_INPUT_QUOTA_EXCEEDED(409, "累计正式投入超过工单计划额度，不良同样占用投入额度"),
     PRODUCTION_INPUT_STALE(409, "用料计算依据已变化，请重新计算并确认"),
+    PRODUCTION_COMBINATION_SPLIT_BATCH_REQUIRED(422, "材料单批次不足，需补料或合并批次后重新打码"),
     PRODUCTION_COMBINATION_CLOSED(409, "组合对应的执行已结束，不能再次领料或重新打开"),
     PRODUCTION_COMBINATION_BUDGET(422, "组合库存候选超出计算范围，请缩小查询范围"),
     PRODUCTION_COMBINATION_STOCK_CHANGED(409, "固定组合库存已变化，请按最新可领数量重新确认"),

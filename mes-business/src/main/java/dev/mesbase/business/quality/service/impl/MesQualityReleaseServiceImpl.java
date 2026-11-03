@@ -40,8 +40,8 @@ public class MesQualityReleaseServiceImpl implements IMesQualityReleaseService {
         ParameterChecks.paging(offset, limit, 100);
         MesQualityReleaseExample example = new MesQualityReleaseExample();
         MesQualityReleaseExample.Criteria criteria = example.createCriteria();
-        if (query.executionId() != null) {
-            criteria.andExecutionIdEqualTo(query.executionId());
+        if (query.executionCode() != null) {
+            criteria.andExecutionCodeEqualTo(query.executionCode());
         }
         if (query.sequenceNo() != null) {
             criteria.andSequenceNoEqualTo(query.sequenceNo());

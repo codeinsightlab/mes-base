@@ -64,10 +64,10 @@ import org.springframework.transaction.annotation.Transactional;
 @ConditionalOnProperty(name = "mes.business.enabled", havingValue = "true")
 @Transactional(transactionManager = "businessTransactionManager", isolation = Isolation.READ_COMMITTED, rollbackFor = Exception.class)
 public class MaterialBomService {
-    private static final int MAX_BOMS = 2000;
-    private static final int MAX_LINES = 10000;
+    static final int MAX_BOMS = 2000;
+    static final int MAX_LINES = 10000;
     private static final int READ_BATCH_SIZE = 500;
-    private static final int MAX_DEPTH = 100;
+    static final int MAX_DEPTH = 100;
     private final MaterialBomMapper boms;
     private final MaterialBomItemMapper items;
     private final MaterialBomCopyMapper copies;
@@ -265,8 +265,20 @@ public class MaterialBomService {
                     .andIdIn(rows.stream().map(MaterialBomItemEntity::getUnitId).distinct().toList());
             var unitMap = units.selectByExample(unitFilter).stream()
                     .collect(Collectors.toMap(UnitMeasureEntity::getId, Function.identity()));
+            var childBomIds = rows.stream().map(MaterialBomItemEntity::getChildBomId).filter(Objects::nonNull)
+                    .distinct().toList();
+            Map<Long, MaterialBomEntity> childBomMap;
+            if (childBomIds.isEmpty()) {
+                childBomMap = Map.of();
+            } else {
+                var childBomFilter = new MaterialBomExample();
+                childBomFilter.createCriteria().andIdIn(childBomIds);
+                childBomMap = boms.selectByExample(childBomFilter).stream()
+                        .collect(Collectors.toMap(MaterialBomEntity::getId, Function.identity()));
+            }
             var result = rows.stream()
-                    .map(row -> MaterialBomItemRow.of(row, materialMap.get(row.getMaterialId()), unitMap.get(row.getUnitId())))
+                    .map(row -> MaterialBomItemRow.of(row, materialMap.get(row.getMaterialId()),
+                            unitMap.get(row.getUnitId()), row.getChildBomId() == null ? null : childBomMap.get(row.getChildBomId())))
                     .toList();
             return new MaterialBomItemPage(result, total, q.cacheOffset(), q.cacheLimit());
         }
@@ -286,6 +298,7 @@ public class MaterialBomService {
         row.setBomId(parent.getId());
         fill(row, c.materialId(), c.quantity(), c.childBomId(), c.sort(), parent);
         changed(items.insert(row));
+        if (row.getChildBomId() != null) checkDraftGraph(parent.getId());
         bump(parent);
         return row;
     }
@@ -297,6 +310,7 @@ public class MaterialBomService {
         var row = item(id);
         fill(row, c.materialId(), c.quantity(), c.childBomId(), c.sort(), parent);
         changed(items.updateByPrimaryKey(row));
+        if (row.getChildBomId() != null) checkDraftGraph(parent.getId());
         bump(parent);
         return row;
     }
@@ -326,8 +340,7 @@ public class MaterialBomService {
         if (child != null) {
             var version = boms.selectByPrimaryKeyForUpdate(child);
             if (version == null || !Objects.equals(version.getProductId(), materialId)
-                    || !MaterialBomStatus.PUBLISHED.getValue()
-                    .equals(version.getStatus()) || Objects.equals(child, parent.getId())) conflict();
+                    || !List.of(MaterialBomStatus.PUBLISHED.getValue(), MaterialBomStatus.DRAFT.getValue()).contains(version.getStatus()) || Objects.equals(child, parent.getId())) conflict();
         }
         row.setMaterialId(materialId);
         row.setUnitId(material.getUnitId());
@@ -574,6 +587,31 @@ public class MaterialBomService {
         return List.copyOf(nodes);
     }
 
+    // Draft subassemblies may still have empty components; topology must already be valid.
+    private void checkDraftGraph(Long root) {
+        var data = loadGraph(root);
+        var edges = data.lines().stream().collect(Collectors.groupingBy(MaterialBomItemEntity::getBomId));
+        checkDraftPath(root, edges, new HashSet<>(), new int[1]);
+        // A concurrent edit deeper in another branch must not close a cycle after our read.
+        // Every line mutation bumps its parent revision in the same transaction.
+        for (var id : data.versions().keySet().stream().sorted().toList()) {
+            var observed = data.versions().get(id);
+            if (!MaterialBomStatus.DRAFT.getValue().equals(observed.getStatus())) continue;
+            var locked = boms.selectByPrimaryKeyForUpdate(id);
+            if (locked == null || !Objects.equals(locked.getRevision(), observed.getRevision())) conflict();
+        }
+    }
+
+    private void checkDraftPath(Long id, Map<Long,List<MaterialBomItemEntity>> edges, Set<Long> path, int[] visits) {
+        if (!path.add(id)) ParameterChecks.reject(ErrorCode.MATERIAL_BOM_CYCLE);
+        if (path.size() > MAX_DEPTH) ParameterChecks.reject(ErrorCode.MATERIAL_BOM_BUDGET);
+        for (var edge : edges.getOrDefault(id,List.of())) {
+            if (++visits[0] > MAX_LINES) ParameterChecks.reject(ErrorCode.MATERIAL_BOM_BUDGET);
+            if (edge.getChildBomId() != null) checkDraftPath(edge.getChildBomId(), edges, path, visits);
+        }
+        path.remove(id);
+    }
+
     private static boolean coefficientValid(BigDecimal value) {
         return value != null && value.signum() > 0 && value.scale() <= 6 && value.precision() - value.scale() <= 14;
     }
@@ -582,11 +620,11 @@ public class MaterialBomService {
         return new MaterialBomExplosion.Problem(path, bomId, lineId, code.name(), code.safeMessage());
     }
 
-    private record GraphData(Map<Long, MaterialBomEntity> versions, List<MaterialBomItemEntity> lines,
+    record GraphData(Map<Long, MaterialBomEntity> versions, List<MaterialBomItemEntity> lines,
                              Map<Long, MaterialEntity> materials, Map<Long, UnitMeasureEntity> units) {
     }
 
-    private GraphData loadGraph(Long id) {
+    GraphData loadGraph(Long id) {
         // Load only explicit references reachable from this root. Each bounded frontier is read
         // in batches; shared subassemblies are loaded once, while walk preserves every path.
         var versions = new HashMap<Long, MaterialBomEntity>();
@@ -674,17 +712,20 @@ public class MaterialBomService {
             var quantity = componentQuantity(output, line.getQuantity(), version.getBaseQty());
             var childPath = path + "/" + line.getId();
             List<MaterialBomGraph.Node> children = List.of();
+            MaterialBomEntity childBom = null;
             if (line.getChildBomId() != null) {
-                var child = versions.get(line.getChildBomId());
-                if (child == null || !Objects.equals(child.getProductId(), material.getId())) conflict();
-                children = walk(child.getId(), quantity, childPath, ancestors, versions, grouped, materialMap, unitMap, totals, publishing, depth + 1, visited);
+                childBom = versions.get(line.getChildBomId());
+                if (childBom == null || !Objects.equals(childBom.getProductId(), material.getId())) conflict();
+                children = walk(childBom.getId(), quantity, childPath, ancestors, versions, grouped, materialMap, unitMap, totals, publishing, depth + 1, visited);
             } else {
                 var prior = totals.get(material.getId());
                 BigDecimal sum = quantity;
                 if (prior != null) sum = sum.add(prior.quantity());
                 totals.put(material.getId(), new MaterialBomGraph.Total(material.getId(), material.getCode(), material.getName(), sum, unit.getName()));
             }
-            result.add(new MaterialBomGraph.Node(childPath, material.getId(), material.getCode(), material.getName(), quantity.setScale(6, RoundingMode.HALF_UP), unit.getName(), line.getChildBomId(), children));
+            result.add(new MaterialBomGraph.Node(childPath, material.getId(), material.getCode(), material.getName(),
+                    quantity.setScale(6, RoundingMode.HALF_UP), unit.getName(), line.getChildBomId(),
+                    childBom == null ? null : childBom.getCode(), childBom == null ? null : childBom.getVersion(), children));
         }
         ancestors.remove(id);
         return result;
@@ -706,7 +747,23 @@ public class MaterialBomService {
         if (boms.countByExample(roots) > 0 || items.countByExample(lines) > 0) conflict();
     }
 
-    private void lockMaterials(List<Long> ids) {
+    @Transactional(transactionManager = "businessTransactionManager", readOnly = true)
+    void checkPlanMaterials(List<Long> ids) {
+        for (int i = 0; i < ids.size(); i += READ_BATCH_SIZE) {
+            var batch = ids.subList(i, Math.min(i + READ_BATCH_SIZE, ids.size()));
+            var f = new MaterialExample();
+            f.createCriteria().andIdIn(batch);
+            var rows = materials.selectByExample(f);
+            if (rows.size() != batch.size() || rows.stream().anyMatch(m -> m.getUnitId() == null)) conflict();
+            var uf = new UnitMeasureExample();
+            uf.createCriteria().andIdIn(rows.stream().map(MaterialEntity::getUnitId).distinct().toList());
+            var unitMap = units.selectByExample(uf).stream().collect(Collectors.toMap(UnitMeasureEntity::getId, Function.identity()));
+            var materialMap = rows.stream().collect(Collectors.toMap(MaterialEntity::getId, Function.identity()));
+            rows.forEach(m -> checkDirectMaterial(m.getId(), m.getUnitId(), materialMap, unitMap));
+        }
+    }
+
+    void lockMaterials(List<Long> ids) {
         if (ids.stream().anyMatch(Objects::isNull)) conflict();
         var rows = new ArrayList<MaterialEntity>();
         for (Long id : ids.stream().distinct().sorted().toList()) {
@@ -732,7 +789,7 @@ public class MaterialBomService {
         return row;
     }
 
-    private MaterialBomEntity lock(Long id) {
+    MaterialBomEntity lock(Long id) {
         // The product lock serializes duplicate code/version creation and edits for a product.
         var original = require(id);
         lockMaterial(original.getProductId());
@@ -748,7 +805,13 @@ public class MaterialBomService {
         return row;
     }
 
-    private void unique(String code, String version, Long productId, Long excluding) {
+    Set<String> versionsFor(Long productId, String code) {
+        var f = new MaterialBomExample();
+        f.createCriteria().andProductIdEqualTo(productId).andCodeEqualTo(code);
+        return boms.selectByExample(f).stream().map(MaterialBomEntity::getVersion).collect(Collectors.toSet());
+    }
+
+    void unique(String code, String version, Long productId, Long excluding) {
         ParameterChecks.text(code, true, 64, ErrorCode.BAD_REQUEST,
                 new SafeBusinessMessage("BOM编码不能为空且不能超过64个字符"));
         ParameterChecks.text(version, true, 32, ErrorCode.BAD_REQUEST,

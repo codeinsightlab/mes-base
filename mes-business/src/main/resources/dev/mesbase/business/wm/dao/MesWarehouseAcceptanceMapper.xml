@@ -4,7 +4,7 @@
   <resultMap id="BaseResultMap" type="dev.mesbase.business.wm.domain.MesWarehouseAcceptanceEntity">
     <id column="id" jdbcType="VARCHAR" property="id" />
     <result column="receipt_id" jdbcType="VARCHAR" property="receiptId" />
-    <result column="execution_id" jdbcType="BIGINT" property="executionId" />
+    <result column="execution_code" jdbcType="VARCHAR" property="executionCode" />
     <result column="product_id" jdbcType="BIGINT" property="productId" />
     <result column="stock_id" jdbcType="BIGINT" property="stockId" />
     <result column="quantity_delta" jdbcType="DECIMAL" property="quantityDelta" />
@@ -74,7 +74,7 @@
     </where>
   </sql>
   <sql id="Base_Column_List">
-    id, receipt_id, execution_id, product_id, stock_id, quantity_delta, reference_id, 
+    id, receipt_id, execution_code, product_id, stock_id, quantity_delta, reference_id,
     stock_action_id, request_hash, operator_user_id, recorded_at, reason
   </sql>
   <select id="selectByExample" parameterType="dev.mesbase.business.wm.domain.MesWarehouseAcceptanceExample" resultMap="BaseResultMap">
@@ -105,12 +105,12 @@
     </if>
   </delete>
   <insert id="insert" parameterType="dev.mesbase.business.wm.domain.MesWarehouseAcceptanceEntity">
-    insert into mes_warehouse_acceptance (id, receipt_id, execution_id, 
+    insert into mes_warehouse_acceptance (id, receipt_id, execution_code,
       product_id, stock_id, quantity_delta, 
       reference_id, stock_action_id, request_hash, 
       operator_user_id, recorded_at, reason
       )
-    values (#{id,jdbcType=VARCHAR}, #{receiptId,jdbcType=VARCHAR}, #{executionId,jdbcType=BIGINT}, 
+    values (#{id,jdbcType=VARCHAR}, #{receiptId,jdbcType=VARCHAR}, #{executionCode,jdbcType=VARCHAR},
       #{productId,jdbcType=BIGINT}, #{stockId,jdbcType=BIGINT}, #{quantityDelta,jdbcType=DECIMAL}, 
       #{referenceId,jdbcType=VARCHAR}, #{stockActionId,jdbcType=VARCHAR}, #{requestHash,jdbcType=CHAR}, 
       #{operatorUserId,jdbcType=BIGINT}, #{recordedAt,jdbcType=TIMESTAMP}, #{reason,jdbcType=VARCHAR}
@@ -125,8 +125,8 @@
       <if test="receiptId != null">
         receipt_id,
       </if>
-      <if test="executionId != null">
-        execution_id,
+      <if test="executionCode != null">
+        execution_code,
       </if>
       <if test="productId != null">
         product_id,
@@ -163,8 +163,8 @@
       <if test="receiptId != null">
         #{receiptId,jdbcType=VARCHAR},
       </if>
-      <if test="executionId != null">
-        #{executionId,jdbcType=BIGINT},
+      <if test="executionCode != null">
+        #{executionCode,jdbcType=VARCHAR},
       </if>
       <if test="productId != null">
         #{productId,jdbcType=BIGINT},
@@ -210,8 +210,8 @@
       <if test="row.receiptId != null">
         receipt_id = #{row.receiptId,jdbcType=VARCHAR},
       </if>
-      <if test="row.executionId != null">
-        execution_id = #{row.executionId,jdbcType=BIGINT},
+      <if test="row.executionCode != null">
+        execution_code = #{row.executionCode,jdbcType=VARCHAR},
       </if>
       <if test="row.productId != null">
         product_id = #{row.productId,jdbcType=BIGINT},
@@ -249,7 +249,7 @@
     update mes_warehouse_acceptance
     set id = #{row.id,jdbcType=VARCHAR},
       receipt_id = #{row.receiptId,jdbcType=VARCHAR},
-      execution_id = #{row.executionId,jdbcType=BIGINT},
+      execution_code = #{row.executionCode,jdbcType=VARCHAR},
       product_id = #{row.productId,jdbcType=BIGINT},
       stock_id = #{row.stockId,jdbcType=BIGINT},
       quantity_delta = #{row.quantityDelta,jdbcType=DECIMAL},
@@ -269,8 +269,8 @@
       <if test="receiptId != null">
         receipt_id = #{receiptId,jdbcType=VARCHAR},
       </if>
-      <if test="executionId != null">
-        execution_id = #{executionId,jdbcType=BIGINT},
+      <if test="executionCode != null">
+        execution_code = #{executionCode,jdbcType=VARCHAR},
       </if>
       <if test="productId != null">
         product_id = #{productId,jdbcType=BIGINT},
@@ -305,7 +305,7 @@
   <update id="updateByPrimaryKey" parameterType="dev.mesbase.business.wm.domain.MesWarehouseAcceptanceEntity">
     update mes_warehouse_acceptance
     set receipt_id = #{receiptId,jdbcType=VARCHAR},
-      execution_id = #{executionId,jdbcType=BIGINT},
+      execution_code = #{executionCode,jdbcType=VARCHAR},
       product_id = #{productId,jdbcType=BIGINT},
       stock_id = #{stockId,jdbcType=BIGINT},
       quantity_delta = #{quantityDelta,jdbcType=DECIMAL},
@@ -318,6 +318,6 @@
     where id = #{id,jdbcType=VARCHAR}
   </update>
   <select id="netReceipt" resultType="java.math.BigDecimal">SELECT COALESCE(SUM(quantity_delta),0) FROM mes_warehouse_acceptance WHERE receipt_id=#{receiptId}</select>
-  <select id="netExecution" resultType="java.math.BigDecimal">SELECT COALESCE(SUM(quantity_delta),0) FROM mes_warehouse_acceptance WHERE execution_id=#{executionId}</select>
+  <select id="netExecution" resultType="java.math.BigDecimal">SELECT COALESCE(SUM(quantity_delta),0) FROM mes_warehouse_acceptance WHERE execution_code=#{executionCode}</select>
   <select id="originalBalance" resultType="java.math.BigDecimal">SELECT COALESCE(SUM(quantity_delta),0) FROM mes_warehouse_acceptance WHERE id=#{id} OR reference_id=#{id}</select>
 </mapper>

@@ -11,6 +11,7 @@ import java.time.LocalDateTime;
  * 生产执行单元写入参数，字段来自已审查的表结构。
  */
 public record MesProductionExecutionCreateCommand(
+        @jakarta.validation.constraints.NotBlank @jakarta.validation.constraints.Size(max = 2048) String executionCode,
         @NotNull Long workorderId,
         Long routingId,
         @NotNull @Digits(integer = 14, fraction = 6) BigDecimal targetQty,

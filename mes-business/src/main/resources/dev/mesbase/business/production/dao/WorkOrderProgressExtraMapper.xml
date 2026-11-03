@@ -26,14 +26,14 @@
     <select id="completions" resultType="dev.mesbase.business.production.domain.WorkOrderProgress$Completion">
         <bind name="fullyReceived" value="@dev.mesbase.business.production.domain.ProductionExecutionStatus@FULLY_RECEIVED.getValue()"/>
         SELECT e.workorder_id AS workorderId, SUM(c.accepted_qty) AS quantity,
-        COUNT(c.id) AS factCount, COUNT(DISTINCT c.execution_id) AS executionCount,
+        COUNT(c.id) AS factCount, COUNT(DISTINCT c.execution_code) AS executionCount,
         SUM(CASE WHEN c.accepted_qty IS NULL OR c.accepted_qty &lt; 0 OR c.accepted_qty != c.effective_qty THEN 1 ELSE 0 END) AS invalidCount,
         MAX(c.recorded_at) AS lastCompletedAt
         FROM mes_production_execution e
-        JOIN mes_execution_completion c ON c.execution_id = e.id
+        JOIN mes_execution_completion c ON c.execution_code = e.execution_code
         WHERE e.status = #{fullyReceived}
         AND NOT EXISTS (SELECT 1 FROM mes_execution_completion newer
-          WHERE newer.execution_id=c.execution_id AND (newer.recorded_at&gt;c.recorded_at
+          WHERE newer.execution_code=c.execution_code AND (newer.recorded_at&gt;c.recorded_at
             OR (newer.recorded_at=c.recorded_at AND newer.id&gt;c.id)))
         AND e.workorder_id IN
         <foreach collection="ids" item="id" open="(" separator="," close=")">#{id}</foreach>
@@ -50,9 +50,9 @@
         COALESCE(SUM(CASE WHEN t.action_type = #{transfer_warehouseAction} THEN t.transfer_qty ELSE 0 END), 0) AS transferredQty,
         SUM(CASE WHEN t.action_type IS NOT NULL AND t.action_type NOT IN (#{assessAction},#{return_nodeAction},#{transfer_warehouseAction}) THEN 1 ELSE 0 END) AS invalidActions, e.status AS executionStatus
         FROM mes_production_execution e
-        JOIN mes_production_defect d ON d.execution_id = e.id
+        JOIN mes_production_defect d ON d.execution_code = e.execution_code
         LEFT JOIN mes_quality_treatment t ON t.declaration_id = d.declaration_id
-        AND t.declaration_revision = d.revision_no AND t.execution_id = d.execution_id
+        AND t.declaration_revision = d.revision_no AND t.execution_code = d.execution_code
         WHERE e.workorder_id IN
         <foreach collection="ids" item="id" open="(" separator="," close=")">#{id}</foreach>
         AND d.record_action != #{voidAction}

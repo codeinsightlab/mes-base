@@ -27,28 +27,28 @@ public class ProductionDefectV2Controller {
         this.service = service;
     }
 
-    public record Context(String executionId, String nodeId, String operationId, String operationName,
+    public record Context(String executionCode, String nodeId, String operationId, String operationName,
                           String productId, String productCode, String productName, List<View> types,
                           long typeTotal, int offset, int limit, boolean canOverrideWasteCategory) {
     }
 
-    @GetMapping("/executions/{executionId}/nodes/{nodeId}/declaration-context")
+    @GetMapping("/executions/{executionCode}/nodes/{nodeId}/declaration-context")
     @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED, permission = "business:quality:defect:create")
-    public Context context(@PathVariable Long executionId, @PathVariable Long nodeId,
+    public Context context(@PathVariable String executionCode, @PathVariable Long nodeId,
                            @RequestParam(defaultValue = "0") int offset,
                            @RequestParam(defaultValue = "100") int limit) {
-        var c = service.declarationContext(executionId, nodeId, offset, limit);
-        return new Context(c.executionId().toString(), c.nodeId().toString(), c.operationId()
+        var c = service.declarationContext(executionCode, nodeId, offset, limit);
+        return new Context(c.executionCode().toString(), c.nodeId().toString(), c.operationId()
                 .toString(), c.operationName(),
                 c.productId().toString(), c.productCode(), c.productName(), c.types().stream()
                 .map(OperationDefectTypeController::view).toList(),
                 c.typeTotal(), offset, limit, c.canOverrideWasteCategory());
     }
 
-    @GetMapping("/executions/{executionId}/declaration-nodes")
+    @GetMapping("/executions/{executionCode}/declaration-nodes")
     @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED, permission = "business:quality:defect:create")
-    public List<Node> nodes(@PathVariable Long executionId) {
-        return service.nodes(executionId);
+    public List<Node> nodes(@PathVariable String executionCode) {
+        return service.nodes(executionCode);
     }
 
     @PostMapping("/declarations")

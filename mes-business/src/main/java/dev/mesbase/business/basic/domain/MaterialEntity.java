@@ -20,6 +20,8 @@ public class MaterialEntity {
 
     private String externalCode;
 
+    private String workOrderRuleCode;
+
     public Long getId() {
         return id;
     }
@@ -90,5 +92,13 @@ public class MaterialEntity {
 
     public void setExternalCode(String externalCode) {
         this.externalCode = externalCode;
+    }
+
+    public String getWorkOrderRuleCode() {
+        return workOrderRuleCode;
+    }
+
+    public void setWorkOrderRuleCode(String workOrderRuleCode) {
+        this.workOrderRuleCode = workOrderRuleCode;
     }
 }

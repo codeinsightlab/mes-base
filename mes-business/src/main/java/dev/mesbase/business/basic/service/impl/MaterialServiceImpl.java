@@ -146,6 +146,7 @@ public class MaterialServiceImpl implements IMaterialService {
         row.setStatus(input.status());
         row.setExternalId(input.externalId());
         row.setExternalCode(input.externalCode());
+        row.setWorkOrderRuleCode(input.workOrderRuleCode());
         rules.validate(row);
         if (insertUnique(row) != 1) {
             throw new FoundationException(ErrorCode.RESOURCE_CONFLICT);
@@ -169,6 +170,7 @@ public class MaterialServiceImpl implements IMaterialService {
         row.setStatus(input.status());
         row.setExternalId(input.externalId());
         row.setExternalCode(input.externalCode());
+        row.setWorkOrderRuleCode(input.workOrderRuleCode());
         rules.validate(row);
         if (updateUnique(row) != 1) {
             throw new FoundationException(ErrorCode.RESOURCE_CONFLICT);

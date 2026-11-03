@@ -204,7 +204,7 @@ public class StockDocumentService {
         if (purpose != null && purpose.isQualityReceipt() && row.getPostRequestId() != null) {
             var event = qualityEvents.selectByPrimaryKey(row.getPostRequestId());
             if (event != null && Objects.equals(id, event.getStockDocumentId()))
-                qualitySource = new StockDocumentModels.QualitySource(event.getDeclarationId(), event.getId(), event.getExecutionId());
+                qualitySource = new StockDocumentModels.QualitySource(event.getDeclarationId(), event.getId(), event.getExecutionCode());
         }
         StockDocumentModels.MaterialIssueBasis materialIssueBasis = null;
         String materialIssueBasisError = null;
@@ -243,9 +243,9 @@ public class StockDocumentService {
         List<Long> selectedNodes = List.of();
         Integer pathRevision = null;
         String pathError = null;
-        if (document.getSourceExecutionId() != null) {
+        if (document.getSourceExecutionCode() != null) {
             try {
-                var path = executionPaths.view(document.getSourceExecutionId());
+                var path = executionPaths.view(document.getSourceExecutionCode());
                 selectedNodes = path.selectedNodeIds();
                 if (path.path() != null) pathRevision = path.path().getRevision();
             } catch (FoundationException failure) {
@@ -279,13 +279,13 @@ public class StockDocumentService {
             String code = null;
             if (order != null) code = order.getCode();
             return new ProductionInputBasis(input.getId(), input.getInputKind(), input.getSourceMode(),
-                    input.getExecutionId(), combination.workorderId(), code, input.getOutputQty(), null,
+                    input.getExecutionCode(), combination.workorderId(), code, input.getOutputQty(), null,
                     null, null, null, null, null, bomId, null, null, pathRevision, selectedNodes,
                     input.getBusinessOccurredAt(), input.getConfirmedAt(), input.getStockApplied(),
                     voidOperationId, voidResultStatus, pathError, combination.combinationId(), combination.allocations());
         }
         return new ProductionInputBasis(input.getId(), input.getInputKind(), input.getSourceMode(),
-                input.getExecutionId(), calculation.order().workorderId(), calculation.order().workorderCode(),
+                input.getExecutionCode(), calculation.order().workorderId(), calculation.order().workorderCode(),
                 input.getOutputQty(), calculation.issueQty(), calculation.stock().materialId(),
                 calculation.stock().materialCode(), calculation.stock().warehouseId(),
                 calculation.stock().unitId(), calculation.stock().lotCode(),
@@ -295,7 +295,7 @@ public class StockDocumentService {
     }
 
     public record ProductionInputBasis(String requestId, String inputKind, String sourceMode,
-                                       Long executionId, Long workorderId, String workorderCode,
+                                       String executionCode, Long workorderId, String workorderCode,
                                        BigDecimal outputQty, BigDecimal issueQty, Long materialId,
                                        String materialCode, Long warehouseId, Long unitId, String batchNo,
                                        Long bomId, BigDecimal bomBaseQty, BigDecimal bomComponentQty,
@@ -314,7 +314,8 @@ public class StockDocumentService {
     @Transactional(transactionManager = "businessTransactionManager", readOnly = true)
     public List<DocumentTypeOption> typeOptions(String direction) {
         StockDocumentDirection flow = StockDocumentDirection.from(direction);
-        if (flow == null) ParameterChecks.reject(ErrorCode.BAD_REQUEST, new SafeBusinessMessage("库存单方向无效，请选择入库或出库"));
+        if (flow == null)
+            ParameterChecks.reject(ErrorCode.BAD_REQUEST, new SafeBusinessMessage("库存单方向无效，请选择入库或出库"));
         String dictionary = flow == StockDocumentDirection.IN ? "stock_document_in_type" : "stock_document_out_type";
         List<SysDictData> selectedRows = dictionaryRows(dictionary);
         List<SysDictData> rows = selectedRows == null ? List.of() : selectedRows;
@@ -353,7 +354,7 @@ public class StockDocumentService {
     public Detail create(StockDocumentModels.Create command) {
         validate(command);
         StockDocumentType purpose = type(command.documentType());
-        if (purpose == StockDocumentType.MATERIAL_ISSUE && command.sourceExecutionId() != null)
+        if (purpose == StockDocumentType.MATERIAL_ISSUE && command.sourceExecutionCode() != null)
             ParameterChecks.reject(ErrorCode.BAD_REQUEST, new SafeBusinessMessage("普通领料单不能关联生产执行，请使用生产领料入口"));
         if (purpose.isTransfer() || purpose.isQualityReceipt())
             ParameterChecks.reject(ErrorCode.STOCK_DOCUMENT_SOURCE_PENDING);
@@ -376,7 +377,7 @@ public class StockDocumentService {
         StockDocumentType purpose = type(header.documentType());
         requireDirection(header.direction(), purpose);
         requireTypeActive(header.direction(), header.documentType());
-        if (command.productionIssue() != null || purpose == StockDocumentType.MATERIAL_ISSUE && header.sourceExecutionId() != null)
+        if (command.productionIssue() != null || purpose == StockDocumentType.MATERIAL_ISSUE && header.sourceExecutionCode() != null)
             ParameterChecks.reject(ErrorCode.BAD_REQUEST, new SafeBusinessMessage("普通库存单不能携带生产领料数据或关联生产执行"));
         if (purpose.isTransfer() || purpose.isQualityReceipt())
             ParameterChecks.reject(ErrorCode.STOCK_DOCUMENT_SOURCE_PENDING);
@@ -386,7 +387,7 @@ public class StockDocumentService {
         String documentNo = autoCodes.getBusinessDocNo(header.ruleCode(), category);
         return businessTransactions.execute(status -> {
             var draft = createDraft(new StockDocumentModels.Create(header.direction(), header.documentType(), header.reason(),
-                    header.remark(), header.sourceWorkorderId(), header.sourceExecutionId(), header.ruleCode()), documentNo);
+                    header.remark(), header.sourceWorkorderId(), header.sourceExecutionCode(), header.ruleCode()), documentNo);
             Long id = draft.document().getId();
             for (StockDocumentModels.AggregateLine item : command.items()) {
                 var latest = require(id);
@@ -405,7 +406,7 @@ public class StockDocumentService {
             ParameterChecks.reject(ErrorCode.BAD_REQUEST, new SafeBusinessMessage("普通库存单不能携带生产领料数据"));
         if (current.getSourceRequestJson() != null && !type(current.getDocumentType()).isTransfer()
                 || !Objects.equals(current.getSourceWorkorderId(), header.sourceWorkorderId())
-                || !Objects.equals(current.getSourceExecutionId(), header.sourceExecutionId())
+                || !Objects.equals(current.getSourceExecutionCode(), header.sourceExecutionCode())
                 || !Objects.equals(current.getDocumentType(), header.documentType())
                 || !Objects.equals(current.getDirection(), header.direction()))
             ParameterChecks.reject(ErrorCode.STOCK_DOCUMENT_CONFLICT);
@@ -441,7 +442,7 @@ public class StockDocumentService {
             ParameterChecks.reject(ErrorCode.BAD_REQUEST, new SafeBusinessMessage("单据版本信息与新建或编辑操作不匹配，请刷新后重试"));
         validate(new StockDocumentModels.Create(command.header().direction(), command.header()
                 .documentType(), command.header().reason(),
-                command.header().remark(), command.header().sourceWorkorderId(), command.header().sourceExecutionId(),
+                command.header().remark(), command.header().sourceWorkorderId(), command.header().sourceExecutionCode(),
                 command.header().ruleCode()));
         requireDirection(command.header().direction(), type(command.header().documentType()));
         for (StockDocumentModels.AggregateLine item : command.items()) {
@@ -449,14 +450,14 @@ public class StockDocumentService {
                     || item.unitId() == null || item.quantity() == null || item.quantity().signum() <= 0
                     || item.id() != null && creating)
                 ParameterChecks.reject(ErrorCode.BAD_REQUEST,
-                    new SafeBusinessMessage("每条单据明细必须指定库存、物料、仓库、单位及大于零的数量；新建时不能携带已有明细ID"));
+                        new SafeBusinessMessage("每条单据明细必须指定库存、物料、仓库、单位及大于零的数量；新建时不能携带已有明细ID"));
         }
     }
 
     @Transactional(transactionManager = "businessTransactionManager", propagation = Propagation.MANDATORY, rollbackFor = Exception.class)
     public Detail createQualityReceipt(StockDocumentModels.Create command, String documentNo) {
         validate(command);
-        if (!type(command.documentType()).isQualityReceipt() || command.sourceExecutionId() != null || command.sourceWorkorderId() != null)
+        if (!type(command.documentType()).isQualityReceipt() || command.sourceExecutionCode() != null || command.sourceWorkorderId() != null)
             ParameterChecks.reject(ErrorCode.BAD_REQUEST, new SafeBusinessMessage("质量入库必须通过质量处置流程创建"));
         if (!command.documentType().equals(command.ruleCode()))
             ParameterChecks.reject(ErrorCode.BAD_REQUEST, new SafeBusinessMessage("单据类型与编号规则不匹配"));
@@ -481,14 +482,14 @@ public class StockDocumentService {
     private Detail createDraft(StockDocumentModels.Create command, String documentNo) {
         var purpose = type(command.documentType());
         requireDirection(command.direction(), purpose);
-        if (purpose == StockDocumentType.PRODUCTION_RECEIPT && command.sourceExecutionId() == null)
+        if (purpose == StockDocumentType.PRODUCTION_RECEIPT && command.sourceExecutionCode() == null)
             ParameterChecks.reject(ErrorCode.STOCK_DOCUMENT_SOURCE_PENDING);
         sources.localCreation();
-        if (command.sourceExecutionId() != null) {
+        if (command.sourceExecutionCode() != null) {
             if (purpose == StockDocumentType.PRODUCTION_RECEIPT) {
                 if (command.sourceWorkorderId() != null)
                     ParameterChecks.reject(ErrorCode.BAD_REQUEST, new SafeBusinessMessage("生产入库不能同时指定工单来源"));
-                productionExecution(command.sourceExecutionId());
+                productionExecution(command.sourceExecutionCode());
             } else if (purpose != StockDocumentType.MATERIAL_ISSUE)
                 ParameterChecks.reject(ErrorCode.BAD_REQUEST, new SafeBusinessMessage("当前单据类型不能关联生产执行"));
         }
@@ -510,7 +511,7 @@ public class StockDocumentService {
         row.setReason(command.reason());
         row.setRemark(command.remark());
         row.setSourceWorkorderId(command.sourceWorkorderId());
-        row.setSourceExecutionId(command.sourceExecutionId());
+        row.setSourceExecutionCode(command.sourceExecutionCode());
         row.setRevision(0L);
         audit(row, true);
         if (documents.insert(row) != 1) ParameterChecks.reject(ErrorCode.STOCK_DOCUMENT_CONFLICT);
@@ -599,7 +600,7 @@ public class StockDocumentService {
     public Detail approve(Long id, StockDocumentModels.Post command) {
         var before = require(id);
         if (StockDocumentType.PRODUCTION_RECEIPT.getValue().equals(before.getDocumentType())
-                && before.getSourceExecutionId() != null)
+                && before.getSourceExecutionCode() != null)
             ParameterChecks.reject(ErrorCode.STOCK_DOCUMENT_SOURCE_PENDING);
         return approve(id, command, false);
     }
@@ -608,7 +609,7 @@ public class StockDocumentService {
     public Detail approveMesReceipt(Long id, StockDocumentModels.Post command) {
         var row = require(id);
         if (!StockDocumentType.PRODUCTION_RECEIPT.getValue()
-                .equals(row.getDocumentType()) || row.getSourceExecutionId() == null)
+                .equals(row.getDocumentType()) || row.getSourceExecutionCode() == null)
             ParameterChecks.reject(ErrorCode.STOCK_DOCUMENT_SOURCE_PENDING);
         return approve(id, command, true);
     }
@@ -617,10 +618,10 @@ public class StockDocumentService {
      * Called only by a MES command already owning its production transaction and authorization.
      */
     @Transactional(transactionManager = "businessTransactionManager", propagation = Propagation.MANDATORY, rollbackFor = Exception.class)
-    public Detail createMesIssue(Long workorderId, Long executionId, String documentNo, String requestId,
+    public Detail createMesIssue(Long workorderId, String executionCode, String documentNo, String requestId,
                                  String frozenRequest, List<Allocation> allocations) {
         var draft = createDraft(new StockDocumentModels.Create(StockDocumentDirection.OUT.getValue(),
-                StockDocumentType.MATERIAL_ISSUE.getValue(), "MES扫码生产领料", null, workorderId, executionId,
+                StockDocumentType.MATERIAL_ISSUE.getValue(), "MES扫码生产领料", null, workorderId, executionCode,
                 StockDocumentType.MATERIAL_ISSUE.getValue()), documentNo);
         for (var allocation : allocations) {
             var current = require(draft.document().getId());
@@ -653,12 +654,12 @@ public class StockDocumentService {
         if (replay(before, command, hash)) return detail(id);
         if (before.getSourceWorkorderId() != null && purposeBefore != StockDocumentType.MATERIAL_ISSUE)
             cancelled(before.getSourceWorkorderId());
-        Long executionId = before.getSourceExecutionId();
+        String executionCode = before.getSourceExecutionCode();
         if (type(before.getDocumentType()).isQualityReceipt()) {
             var event = qualityEvents.selectByPrimaryKey(command.requestId());
             if (event == null || !Objects.equals(id, event.getStockDocumentId()))
                 ParameterChecks.reject(ErrorCode.STOCK_DOCUMENT_SOURCE_PENDING);
-            executionId = event.getExecutionId();
+            executionCode = event.getExecutionCode();
         }
         var row = lock(id);
         if (replay(row, command, hash)) return detail(id);
@@ -688,9 +689,9 @@ public class StockDocumentService {
             if (amount.compareTo(basis.remaining()) > 0)
                 throw new FoundationException(ErrorCode.STOCK_DOCUMENT_BASIS_INVALID);
         }
-        if (row.getSourceExecutionId() != null && purpose != StockDocumentType.MATERIAL_ISSUE) {
-            var basis = productionBasis(row.getSourceExecutionId());
-            var execution = productionExecution(row.getSourceExecutionId());
+        if (row.getSourceExecutionCode() != null && purpose != StockDocumentType.MATERIAL_ISSUE) {
+            var basis = productionBasis(row.getSourceExecutionCode());
+            var execution = productionExecution(row.getSourceExecutionCode());
             sources.finishedOutput(execution, null);
             sources.warehouses(BusinessSource.LOCAL.getValue(), detail.stream()
                     .map(WmStockDocumentLineEntity::getWarehouseId).toList());
@@ -718,7 +719,7 @@ public class StockDocumentService {
                         : UUID.nameUUIDFromBytes((command.requestId() + ":" + line.getId()).getBytes(StandardCharsets.UTF_8))
                         .toString();
                 var action = stock.postDocument(row.getDirection(), row.getDocumentType(), id, line, command.requestId(), actionId,
-                        hash, row.getReason(), executionId);
+                        hash, row.getReason(), executionCode);
                 line.setStockActionId(action.getId());
                 if (lines.updateByPrimaryKey(line) != 1) ParameterChecks.reject(ErrorCode.STOCK_DOCUMENT_CONFLICT);
             }
@@ -754,21 +755,21 @@ public class StockDocumentService {
     }
 
     @Transactional(transactionManager = "businessTransactionManager", readOnly = true)
-    public StockDocumentModels.ProductionBasis productionBasis(Long executionId) {
-        var execution = executions.selectByPrimaryKey(executionId);
+    public StockDocumentModels.ProductionBasis productionBasis(String executionCode) {
+        var execution = executions.selectByCode(executionCode);
         if (execution == null) throw new FoundationException(ErrorCode.NOT_FOUND);
         var order = orders.selectByPrimaryKey(execution.getWorkorderId());
         boolean admitted = order != null && List.of(WorkOrderStatus.RELEASED.getValue(), WorkOrderStatus.COMPLETED.getValue())
                 .contains(order.getStatus())
                 && BusinessSource.LOCAL.getValue().equals(order.getSource()) && FactoryIntegrationContext.required()
                 .mode() == FactoryRuntimeMode.LOCAL;
-        var projection = quantities.getExecutionQuantities(executionId);
-        var basis = quality.productionBasis(executionId);
+        var projection = quantities.getExecutionQuantities(executionCode);
+        var basis = quality.productionBasis(executionCode);
         var effective = projection.nodes().isEmpty() ? BigDecimal.ZERO : projection.nodes().getLast()
                 .effectiveOutputQty();
         boolean reportingRequired = execution.getRoutingId() != null;
         if (!reportingRequired) effective = projection.confirmedInputQty();
-        var received = inbound.netProductionInbound(executionId);
+        var received = inbound.netProductionInbound(executionCode);
         var remaining = effective.subtract(received);
         String blocked = null;
         if (!admitted) blocked = "当前工单状态、来源或模式不允许入库";
@@ -785,11 +786,11 @@ public class StockDocumentService {
                 .anyMatch(declaration -> declaration.attribution() == Attribution.UNVERIFIED))
             blocked = "存在待核实不良，不能审核生产入库";
         else if (remaining.signum() <= 0) blocked = "可入库数量不足或存在数量超额";
-        return new StockDocumentModels.ProductionBasis(executionId, execution.getProductId(), effective,
+        return new StockDocumentModels.ProductionBasis(executionCode, execution.getProductId(), effective,
                 received, remaining.max(BigDecimal.ZERO), blocked == null, blocked, reportingRequired);
     }
 
-    private MesProductionExecutionEntity productionExecution(Long id) {
+    private MesProductionExecutionEntity productionExecution(String id) {
         var execution = locks.execution(id);
         if (!ProductionExecutionStatus.RUNNING.getValue().equals(execution.getStatus())
                 && (execution.getRoutingId() != null || !ProductionExecutionStatus.READY.getValue()
@@ -808,13 +809,13 @@ public class StockDocumentService {
         e.createCriteria().andWorkorderIdEqualTo(workorderId);
         e.setOrderByClause("id");
         var executionRows = bounded(() -> executions.selectByExample(e));
-        for (var execution : executionRows) locks.execution(execution.getId());
+        for (var execution : executionRows) locks.execution(execution.getExecutionCode());
         BigDecimal handed = BigDecimal.ZERO;
         BigDecimal accepted = inbound.netProductionInboundForOrder(workorderId);
         if (!executionRows.isEmpty()) {
-            var ids = executionRows.stream().map(row -> row.getId()).toList();
+            var ids = executionRows.stream().map(row -> row.getExecutionCode()).toList();
             var r = new MesProductionReceiptExample();
-            r.createCriteria().andExecutionIdIn(ids);
+            r.createCriteria().andExecutionCodeIn(ids);
             for (var receipt : bounded(() -> receipts.selectByExample(r)))
                 handed = handed.add(receipt.getQuantityDelta());
 
@@ -842,8 +843,8 @@ public class StockDocumentService {
     }
 
     private BigDecimal settlement(WmStockDocumentEntity header, WmStockDocumentLineEntity line) {
-        if (type(header.getDocumentType()) == StockDocumentType.PRODUCTION_RECEIPT && header.getSourceExecutionId() != null) {
-            var basis = productionBasis(header.getSourceExecutionId());
+        if (type(header.getDocumentType()) == StockDocumentType.PRODUCTION_RECEIPT && header.getSourceExecutionCode() != null) {
+            var basis = productionBasis(header.getSourceExecutionCode());
             if (Objects.equals(basis.productId(), line.getMaterialId())) return basis.remaining();
         }
         if (type(header.getDocumentType()).isQualityReceipt()) {
@@ -852,7 +853,7 @@ public class StockDocumentService {
             var facts = qualityEvents.selectByExample(filter);
             if (facts.size() != 1) ParameterChecks.reject(ErrorCode.STOCK_DOCUMENT_SOURCE_PENDING);
             var fact = facts.getFirst();
-            var execution = productionExecution(fact.getExecutionId());
+            var execution = productionExecution(fact.getExecutionCode());
             if (!Action.TRANSFER_WAREHOUSE.getValue().equals(fact.getActionType())
                     || !Objects.equals(execution.getProductId(), line.getMaterialId())
                     || !Objects.equals(fact.getTargetWarehouseId(), line.getWarehouseId())

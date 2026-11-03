@@ -8,7 +8,7 @@ import java.time.LocalDateTime;
  */
 public record MesQualityReleaseVo(
         String id,
-        String executionId,
+        String executionCode,
         String sequenceNo,
         String actionType,
         String quantity,

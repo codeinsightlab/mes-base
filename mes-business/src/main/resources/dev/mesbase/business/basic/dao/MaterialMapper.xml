@@ -11,6 +11,7 @@
     <result column="status" jdbcType="VARCHAR" property="status" />
     <result column="external_id" jdbcType="VARCHAR" property="externalId" />
     <result column="external_code" jdbcType="VARCHAR" property="externalCode" />
+    <result column="work_order_rule_code" jdbcType="VARCHAR" property="workOrderRuleCode" />
   </resultMap>
   <sql id="Example_Where_Clause">
     <where>
@@ -71,7 +72,7 @@
     </where>
   </sql>
   <sql id="Base_Column_List">
-    id, code, name, specification, category_id, unit_id, status, external_id, external_code
+    id, code, name, specification, category_id, unit_id, status, external_id, external_code, work_order_rule_code
   </sql>
   <select id="selectByExample" parameterType="dev.mesbase.business.basic.domain.MaterialExample" resultMap="BaseResultMap">
     select
@@ -103,10 +104,10 @@
   <insert id="insert" keyColumn="id" keyProperty="id" parameterType="dev.mesbase.business.basic.domain.MaterialEntity" useGeneratedKeys="true">
     insert into material (code, name, specification,
       category_id, unit_id, status,
-      external_id, external_code)
+      external_id, external_code, work_order_rule_code)
     values (#{code,jdbcType=VARCHAR}, #{name,jdbcType=VARCHAR}, #{specification,jdbcType=VARCHAR},
       #{categoryId,jdbcType=BIGINT}, #{unitId,jdbcType=BIGINT}, #{status,jdbcType=VARCHAR},
-      #{externalId,jdbcType=VARCHAR}, #{externalCode,jdbcType=VARCHAR})
+      #{externalId,jdbcType=VARCHAR}, #{externalCode,jdbcType=VARCHAR}, #{workOrderRuleCode,jdbcType=VARCHAR})
   </insert>
   <insert id="insertSelective" keyColumn="id" keyProperty="id" parameterType="dev.mesbase.business.basic.domain.MaterialEntity" useGeneratedKeys="true">
     insert into material
@@ -135,6 +136,9 @@
       <if test="externalCode != null">
         external_code,
       </if>
+      <if test="workOrderRuleCode != null">
+        work_order_rule_code,
+      </if>
     </trim>
     <trim prefix="values (" suffix=")" suffixOverrides=",">
       <if test="code != null">
@@ -160,6 +164,9 @@
       </if>
       <if test="externalCode != null">
         #{externalCode,jdbcType=VARCHAR},
+      </if>
+      <if test="workOrderRuleCode != null">
+        #{workOrderRuleCode,jdbcType=VARCHAR},
       </if>
     </trim>
   </insert>
@@ -199,6 +206,9 @@
       <if test="row.externalCode != null">
         external_code = #{row.externalCode,jdbcType=VARCHAR},
       </if>
+      <if test="row.workOrderRuleCode != null">
+        work_order_rule_code = #{row.workOrderRuleCode,jdbcType=VARCHAR},
+      </if>
     </set>
     <if test="example != null">
       <include refid="Update_By_Example_Where_Clause" />
@@ -214,7 +224,8 @@
       unit_id = #{row.unitId,jdbcType=BIGINT},
       status = #{row.status,jdbcType=VARCHAR},
       external_id = #{row.externalId,jdbcType=VARCHAR},
-      external_code = #{row.externalCode,jdbcType=VARCHAR}
+      external_code = #{row.externalCode,jdbcType=VARCHAR},
+      work_order_rule_code = #{row.workOrderRuleCode,jdbcType=VARCHAR}
     <if test="example != null">
       <include refid="Update_By_Example_Where_Clause" />
     </if>
@@ -246,6 +257,9 @@
       <if test="externalCode != null">
         external_code = #{externalCode,jdbcType=VARCHAR},
       </if>
+      <if test="workOrderRuleCode != null">
+        work_order_rule_code = #{workOrderRuleCode,jdbcType=VARCHAR},
+      </if>
     </set>
     where id = #{id,jdbcType=BIGINT}
   </update>
@@ -258,7 +272,8 @@
       unit_id = #{unitId,jdbcType=BIGINT},
       status = #{status,jdbcType=VARCHAR},
       external_id = #{externalId,jdbcType=VARCHAR},
-      external_code = #{externalCode,jdbcType=VARCHAR}
+      external_code = #{externalCode,jdbcType=VARCHAR},
+      work_order_rule_code = #{workOrderRuleCode,jdbcType=VARCHAR}
     where id = #{id,jdbcType=BIGINT}
   </update>
   <select flushCache="true" id="selectByPrimaryKeyForUpdate" parameterType="Long" resultMap="BaseResultMap" useCache="false">

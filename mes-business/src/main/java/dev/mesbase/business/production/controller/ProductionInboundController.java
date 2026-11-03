@@ -23,7 +23,7 @@ public class ProductionInboundController {
 
     @PostMapping("/api/production/executions/{id}/inbound")
     @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED, permission = "business:wm:stock:document:post")
-    public Detail receive(@PathVariable Long id, @Valid @RequestBody ProductionInboundService.Command command) {
+    public Detail receive(@PathVariable String id, @Valid @RequestBody ProductionInboundService.Command command) {
         return BeanConversions.convert(service.receive(id, command), Detail.class);
     }
 

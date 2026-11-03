@@ -16,6 +16,8 @@ public record MaterialBomItemVo(
         String materialCode,
         String materialName,
         String specification,
-        String unitName
+        String unitName,
+        String childBomCode,
+        String childBomVersion
 ) {
 }

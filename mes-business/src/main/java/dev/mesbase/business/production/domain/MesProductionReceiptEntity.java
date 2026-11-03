@@ -1,4 +1,3 @@
-// MES-CODEGEN: MyBatis Generator standard single-table persistence.
 package dev.mesbase.business.production.domain;
 
 import java.math.BigDecimal;
@@ -9,7 +8,7 @@ public class MesProductionReceiptEntity {
 
     private String receiptNo;
 
-    private Long executionId;
+    private String executionCode;
 
     private String productLotCode;
 
@@ -47,12 +46,12 @@ public class MesProductionReceiptEntity {
         this.receiptNo = receiptNo;
     }
 
-    public Long getExecutionId() {
-        return executionId;
+    public String getExecutionCode() {
+        return executionCode;
     }
 
-    public void setExecutionId(Long executionId) {
-        this.executionId = executionId;
+    public void setExecutionCode(String executionCode) {
+        this.executionCode = executionCode;
     }
 
     public String getProductLotCode() {

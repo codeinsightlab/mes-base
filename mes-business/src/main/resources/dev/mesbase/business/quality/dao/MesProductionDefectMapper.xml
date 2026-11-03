@@ -8,7 +8,7 @@
     <result column="revision_no" jdbcType="INTEGER" property="revisionNo" />
     <result column="record_action" jdbcType="VARCHAR" property="recordAction" />
     <result column="revision_reason" jdbcType="VARCHAR" property="revisionReason" />
-    <result column="execution_id" jdbcType="BIGINT" property="executionId" />
+    <result column="execution_code" jdbcType="VARCHAR" property="executionCode" />
     <result column="affected_node_id" jdbcType="BIGINT" property="affectedNodeId" />
     <result column="defect_qty" jdbcType="DECIMAL" property="defectQty" />
     <result column="waste_category" jdbcType="VARCHAR" property="wasteCategory" />
@@ -56,7 +56,7 @@
     </where>
   </sql>
   <sql id="Base_Column_List">
-    id, declaration_id, revision_no, record_action, revision_reason, execution_id, affected_node_id,
+    id, declaration_id, revision_no, record_action, revision_reason, execution_code, affected_node_id,
     defect_qty, waste_category, defect_reason,
     responsible_user_id, responsibility_remark, request_key, request_fingerprint, reported_by, occurred_at, recorded_by,
     recorded_at, defect_type_id, defect_type_code_snapshot, defect_type_name_snapshot,
@@ -81,7 +81,7 @@
   </select>
   <insert id="insert" keyColumn="id" keyProperty="id" parameterType="dev.mesbase.business.quality.domain.MesProductionDefectEntity" useGeneratedKeys="true">
     insert into mes_production_defect (declaration_id, revision_no, record_action,
-      revision_reason, execution_id, affected_node_id,
+      revision_reason, execution_code, affected_node_id,
       defect_qty,
       waste_category, defect_reason, responsible_user_id,
       responsibility_remark, request_key, request_fingerprint, reported_by,
@@ -89,7 +89,7 @@
       defect_type_id, defect_type_code_snapshot, defect_type_name_snapshot,
       defect_type_revision)
     values (#{declarationId,jdbcType=VARCHAR}, #{revisionNo,jdbcType=INTEGER}, #{recordAction,jdbcType=VARCHAR},
-      #{revisionReason,jdbcType=VARCHAR}, #{executionId,jdbcType=BIGINT}, #{affectedNodeId,jdbcType=BIGINT},
+      #{revisionReason,jdbcType=VARCHAR}, #{executionCode,jdbcType=VARCHAR}, #{affectedNodeId,jdbcType=BIGINT},
       #{defectQty,jdbcType=DECIMAL},
       #{wasteCategory,jdbcType=VARCHAR}, #{defectReason,jdbcType=VARCHAR}, #{responsibleUserId,jdbcType=BIGINT},
       #{responsibilityRemark,jdbcType=VARCHAR}, #{requestKey,jdbcType=VARCHAR}, #{requestFingerprint,jdbcType=VARCHAR}, #{reportedBy,jdbcType=BIGINT},
@@ -104,19 +104,19 @@
     </if>
   </select>
   <select id="existsExecutionHistory" resultType="boolean" useCache="false" flushCache="true">
-    SELECT EXISTS (SELECT 1 FROM mes_production_defect WHERE execution_id = #{executionId,jdbcType=BIGINT})
+    SELECT EXISTS (SELECT 1 FROM mes_production_defect WHERE execution_code = #{executionCode,jdbcType=VARCHAR})
   </select>
   <sql id="Latest">NOT EXISTS (SELECT 1 FROM mes_production_defect newer WHERE newer.declaration_id=mes_production_defect.declaration_id AND newer.revision_no &gt; mes_production_defect.revision_no)</sql>
   <select id="selectLatest" resultMap="BaseResultMap">
     SELECT <include refid="Base_Column_List"/> FROM mes_production_defect WHERE <include refid="Latest"/>
-    <if test="executionId != null">AND execution_id=#{executionId}</if>
+    <if test="executionCode != null">AND execution_code=#{executionCode}</if>
     <if test="affectedNodeId != null">AND affected_node_id=#{affectedNodeId}</if>
-    <if test="workorderId != null">AND EXISTS (SELECT 1 FROM mes_production_execution e WHERE e.id=execution_id AND e.workorder_id=#{workorderId})</if>
+    <if test="workorderId != null">AND EXISTS (SELECT 1 FROM mes_production_execution e WHERE e.execution_code=mes_production_defect.execution_code AND e.workorder_id=#{workorderId})</if>
     ORDER BY id DESC
   </select>
   <select id="selectLatestBatch" resultMap="BaseResultMap">
     SELECT <include refid="Base_Column_List"/> FROM mes_production_defect WHERE <include refid="Latest"/>
-    AND execution_id IN <foreach collection="executionIds" item="id" open="(" close=")" separator=",">#{id}</foreach>
+    AND execution_code IN <foreach collection="executionCodes" item="id" open="(" close=")" separator=",">#{id}</foreach>
     ORDER BY recorded_at DESC,id DESC
   </select>
 </mapper>

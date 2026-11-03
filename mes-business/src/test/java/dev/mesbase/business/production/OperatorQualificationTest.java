@@ -87,10 +87,11 @@ class OperatorQualificationTest {
         when(nodes.selectByPrimaryKey(21L)).thenReturn(repeated);
         execution = new MesProductionExecutionEntity();
         execution.setId(40L);
+        execution.setExecutionCode("40");
         execution.setRoutingId(30L);
         execution.setStatus("READY");
-        when(executions.selectByPrimaryKey(40L)).thenReturn(execution);
-        when(locks.execution(40L)).thenReturn(execution);
+        when(executions.selectByCode("40")).thenReturn(execution);
+        when(locks.execution("40")).thenReturn(execution);
         var user = new SysUser();
         user.setUserId(99L);
         user.setUserName("TEST_ONLY");
@@ -109,8 +110,8 @@ class OperatorQualificationTest {
     void completeEligibilityMatrix(boolean capable, boolean hasAssignments, boolean assigned, boolean allowed) {
         when(capabilities.countByExample(any(MesOperationUserExample.class))).thenReturn(capable ? 1L : 0L);
         when(assignments.countByExample(any(MesExecutionAssignmentExample.class))).thenReturn(hasAssignments ? 1L : 0L, assigned ? 1L : 0L);
-        if (allowed) assertDoesNotThrow(() -> eligibility.requireEligible(40L, 20L, 1L));
-        else assertThrows(FoundationException.class, () -> eligibility.requireEligible(40L, 20L, 1L));
+        if (allowed) assertDoesNotThrow(() -> eligibility.requireEligible("40", 20L, 1L));
+        else assertThrows(FoundationException.class, () -> eligibility.requireEligible("40", 20L, 1L));
     }
 
     @Test
@@ -119,13 +120,13 @@ class OperatorQualificationTest {
         var assigned = new AtomicBoolean(true);
         when(capabilities.countByExample(any())).thenAnswer(i -> capable.get() ? 1L : 0L);
         when(assignments.countByExample(any())).thenAnswer(i -> assigned.get() ? 1L : 0L);
-        eligibility.requireEligible(40L, 20L, 1L);
+        eligibility.requireEligible("40", 20L, 1L);
         capable.set(false);
-        assertEquals(ErrorCode.OPERATOR_CAPABILITY_REQUIRED, assertThrows(FoundationException.class, () -> eligibility.requireEligible(40L, 20L, 1L)).code());
+        assertEquals(ErrorCode.OPERATOR_CAPABILITY_REQUIRED, assertThrows(FoundationException.class, () -> eligibility.requireEligible("40", 20L, 1L)).code());
         verify(assignments, never()).deleteByExample(any());
         capable.set(true);
         assigned.set(false);
-        eligibility.requireEligible(40L, 20L, 1L);
+        eligibility.requireEligible("40", 20L, 1L);
     }
 
     @Test
@@ -138,39 +139,39 @@ class OperatorQualificationTest {
                     .getValue();
             return node.equals(20L) ? 1L : cs.size() == 2 ? 1L : 0L;
         });
-        eligibility.requireEligible(40L, 20L, 1L);
-        assertEquals(ErrorCode.OPERATOR_NOT_ASSIGNED, assertThrows(FoundationException.class, () -> eligibility.requireEligible(40L, 21L, 1L)).code());
+        eligibility.requireEligible("40", 20L, 1L);
+        assertEquals(ErrorCode.OPERATOR_NOT_ASSIGNED, assertThrows(FoundationException.class, () -> eligibility.requireEligible("40", 21L, 1L)).code());
     }
 
     @Test
     void missingFactoryFailsClosed() {
         FactoryContext.clear();
-        assertEquals(ErrorCode.FACTORY_SCOPE_REQUIRED, assertThrows(FoundationException.class, () -> eligibility.requireEligible(40L, 20L, 1L)).code());
-        verify(executions, never()).selectByPrimaryKey(any());
+        assertEquals(ErrorCode.FACTORY_SCOPE_REQUIRED, assertThrows(FoundationException.class, () -> eligibility.requireEligible("40", 20L, 1L)).code());
+        verify(executions, never()).selectByCode(any());
     }
 
     @Test
     void wrongRoutingVersionFails() {
         execution.setRoutingId(31L);
-        assertEquals(ErrorCode.ASSIGNMENT_NODE_INVALID, assertThrows(FoundationException.class, () -> eligibility.requireEligible(40L, 20L, 1L)).code());
+        assertEquals(ErrorCode.ASSIGNMENT_NODE_INVALID, assertThrows(FoundationException.class, () -> eligibility.requireEligible("40", 20L, 1L)).code());
     }
 
     @Test
     void deletedExecutionOrNodeFails() {
-        assertEquals(ErrorCode.EXECUTION_NOT_FOUND, assertThrows(FoundationException.class, () -> eligibility.requireEligible(41L, 20L, 1L)).code());
-        assertEquals(ErrorCode.ASSIGNMENT_NODE_INVALID, assertThrows(FoundationException.class, () -> eligibility.requireEligible(40L, 22L, 1L)).code());
+        assertEquals(ErrorCode.EXECUTION_NOT_FOUND, assertThrows(FoundationException.class, () -> eligibility.requireEligible("41", 20L, 1L)).code());
+        assertEquals(ErrorCode.ASSIGNMENT_NODE_INVALID, assertThrows(FoundationException.class, () -> eligibility.requireEligible("40", 22L, 1L)).code());
     }
 
     @Test
     void inactiveOrUnauthorizedIdentityIsRejected() {
         doThrow(new FoundationException(ErrorCode.OPERATOR_NOT_AUTHORIZED)).when(users).requireValid(1L);
-        assertEquals(ErrorCode.OPERATOR_NOT_AUTHORIZED, assertThrows(FoundationException.class, () -> eligibility.requireEligible(40L, 20L, 1L)).code());
+        assertEquals(ErrorCode.OPERATOR_NOT_AUTHORIZED, assertThrows(FoundationException.class, () -> eligibility.requireEligible("40", 20L, 1L)).code());
     }
 
     @Test
     void failedQueryNeverAllowsReporting() {
         when(capabilities.countByExample(any())).thenThrow(new IllegalStateException("TEST_ONLY query failure"));
-        assertThrows(IllegalStateException.class, () -> eligibility.requireEligible(40L, 20L, 1L));
+        assertThrows(IllegalStateException.class, () -> eligibility.requireEligible("40", 20L, 1L));
     }
 
     @Test
@@ -192,20 +193,20 @@ class OperatorQualificationTest {
     @ValueSource(strings = {"FULLY_RECEIVED", "CANCELLED", "UNKNOWN"})
     void endedOrUnknownExecutionCannotBeAssigned(String status) {
         execution.setStatus(status);
-        assertEquals(ErrorCode.ASSIGNMENT_EXECUTION_CLOSED, assertThrows(FoundationException.class, () -> new MesExecutionAssignmentServiceImpl(assignments, rules).insert(new MesExecutionAssignmentCreateCommand(40L, 20L, 1L, null))).code());
+        assertEquals(ErrorCode.ASSIGNMENT_EXECUTION_CLOSED, assertThrows(FoundationException.class, () -> new MesExecutionAssignmentServiceImpl(assignments, rules).insert(new MesExecutionAssignmentCreateCommand("40", 20L, 1L, null))).code());
         verify(assignments, never()).insert(any());
     }
 
     @Test
     void incapableUserCannotBeAssigned() {
-        assertEquals(ErrorCode.OPERATOR_CAPABILITY_REQUIRED, assertThrows(FoundationException.class, () -> new MesExecutionAssignmentServiceImpl(assignments, rules).insert(new MesExecutionAssignmentCreateCommand(40L, 20L, 1L, null))).code());
+        assertEquals(ErrorCode.OPERATOR_CAPABILITY_REQUIRED, assertThrows(FoundationException.class, () -> new MesExecutionAssignmentServiceImpl(assignments, rules).insert(new MesExecutionAssignmentCreateCommand("40", 20L, 1L, null))).code());
     }
 
     @Test
     void duplicateAssignmentIsSafeConflict() {
         when(capabilities.countByExample(any())).thenReturn(1L);
         when(assignments.insert(any())).thenThrow(new DuplicateKeyException("TEST_ONLY"));
-        assertEquals(ErrorCode.RESOURCE_CONFLICT, assertThrows(FoundationException.class, () -> new MesExecutionAssignmentServiceImpl(assignments, rules).insert(new MesExecutionAssignmentCreateCommand(40L, 20L, 1L, null))).code());
+        assertEquals(ErrorCode.RESOURCE_CONFLICT, assertThrows(FoundationException.class, () -> new MesExecutionAssignmentServiceImpl(assignments, rules).insert(new MesExecutionAssignmentCreateCommand("40", 20L, 1L, null))).code());
     }
 
     @Test
@@ -219,7 +220,7 @@ class OperatorQualificationTest {
             return 1;
         });
         when(assignments.selectByPrimaryKey(1L)).thenReturn(new MesExecutionAssignmentEntity());
-        new MesExecutionAssignmentServiceImpl(assignments, rules).insert(new MesExecutionAssignmentCreateCommand(40L, 20L, 1L, null));
+        new MesExecutionAssignmentServiceImpl(assignments, rules).insert(new MesExecutionAssignmentCreateCommand("40", 20L, 1L, null));
     }
 
     @Test
@@ -232,10 +233,10 @@ class OperatorQualificationTest {
         assertThrows(FoundationException.class, () -> new MesOperationUserServiceImpl(capabilities, rules).updateById(1L, new MesOperationUserUpdateCommand(10L, 2L, null)));
         var a = new MesExecutionAssignmentEntity();
         a.setId(2L);
-        a.setExecutionId(40L);
+        a.setExecutionCode("40");
         a.setRoutingNodeId(20L);
         a.setUserId(1L);
         when(assignments.selectByPrimaryKey(2L)).thenReturn(a);
-        assertThrows(FoundationException.class, () -> new MesExecutionAssignmentServiceImpl(assignments, rules).updateById(2L, new MesExecutionAssignmentUpdateCommand(40L, 21L, 1L, null)));
+        assertThrows(FoundationException.class, () -> new MesExecutionAssignmentServiceImpl(assignments, rules).updateById(2L, new MesExecutionAssignmentUpdateCommand("40", 21L, 1L, null)));
     }
 }

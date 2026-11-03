@@ -66,16 +66,16 @@ public class MesProductionExecutionController {
     @GetMapping("/{id}")
     @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED,
             permission = MesProductionExecutionPermissions.QUERY)
-    public MesProductionExecutionVo detail(@PathVariable Long id) {
+    public MesProductionExecutionVo detail(@PathVariable String id) {
         return toView(queries.detail(id));
     }
 
     @PutMapping("/{id}")
     @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED,
             permission = MesProductionExecutionPermissions.UPDATE)
-    public MesProductionExecutionVo update(@PathVariable Long id,
+    public MesProductionExecutionVo update(@PathVariable String id,
                                            @Valid @RequestBody MesProductionExecutionUpdateCommand input) {
-        return toView(service.updateById(id, input));
+        return toView(service.updateByCode(id, input));
     }
 
     @DeleteMapping
@@ -84,8 +84,8 @@ public class MesProductionExecutionController {
             permission = MesProductionExecutionPermissions.DELETE)
     public void delete(@RequestBody
                        @NotEmpty @Size(max = 100)
-                       List<@NotNull Long> ids) {
-        service.deleteByIds(ids);
+                       List<@NotNull String> ids) {
+        service.deleteByCodes(ids);
     }
 
 

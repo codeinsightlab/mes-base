@@ -19,20 +19,20 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 
 class ProductionDefectContractTest {
-    private static Command command(String quantity, String reason, Long execution) {
+    private static Command command(String quantity, String reason, String execution) {
         return new Command("key", null, null, new Facts(execution, 13L, new BigDecimal(quantity), "PROCESS", reason, null, null, LocalDateTime.of(2026, 1, 1, 0, 0)));
     }
 
     @Test
     void fingerprintIsCanonicalAndSeparatesActorCommandAndExecution() {
-        var a = command("2.000000", " 缺陷 ", 1L);
-        var b = command("2", "缺陷", 1L);
+        var a = command("2.000000", " 缺陷 ", "1");
+        var b = command("2", "缺陷", "1");
         var fp = ProductionDefectService.fingerprint("CREATE", null, a, 1L);
         assertEquals(fp, ProductionDefectService.fingerprint("CREATE", null, b, 1L));
         assertNotEquals(fp, ProductionDefectService.fingerprint("REVISE", "id", b, 1L));
         assertNotEquals(fp, ProductionDefectService.fingerprint("CREATE", null, b, 2L));
-        assertNotEquals(fp, ProductionDefectService.fingerprint("CREATE", null, command("2", "缺陷", 2L), 1L));
-        assertNotEquals(fp, ProductionDefectService.fingerprint("CREATE", null, command("2", "缺陷2", 1L), 1L));
+        assertNotEquals(fp, ProductionDefectService.fingerprint("CREATE", null, command("2", "缺陷", "2"), 1L));
+        assertNotEquals(fp, ProductionDefectService.fingerprint("CREATE", null, command("2", "缺陷2", "1"), 1L));
     }
 
     @Test

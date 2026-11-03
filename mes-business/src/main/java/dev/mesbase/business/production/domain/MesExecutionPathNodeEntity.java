@@ -1,10 +1,9 @@
-// MES-CODEGEN: MyBatis Generator standard single-table persistence.
 package dev.mesbase.business.production.domain;
 
 public class MesExecutionPathNodeEntity {
     private Long id;
 
-    private Long executionId;
+    private String executionCode;
 
     private Integer sequenceNo;
 
@@ -18,12 +17,12 @@ public class MesExecutionPathNodeEntity {
         this.id = id;
     }
 
-    public Long getExecutionId() {
-        return executionId;
+    public String getExecutionCode() {
+        return executionCode;
     }
 
-    public void setExecutionId(Long executionId) {
-        this.executionId = executionId;
+    public void setExecutionCode(String executionCode) {
+        this.executionCode = executionCode;
     }
 
     public Integer getSequenceNo() {

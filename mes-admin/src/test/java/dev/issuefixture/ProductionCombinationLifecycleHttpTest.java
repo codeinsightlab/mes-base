@@ -37,6 +37,7 @@ class ProductionCombinationLifecycleHttpTest {
             j.update("DELETE FROM mes_execution_path");
             j.update("DELETE FROM mes_production_execution");
             ProductionInputHttpTest.multiMaterial(j);
+            j.update("UPDATE wm_inventory SET quantity=200,available_quantity=200 WHERE id=1");
             j.update("UPDATE workorder SET planned_qty=50 WHERE id=1");
             j.update("UPDATE mes_workorder_material SET planned_qty=50,total_required_qty=200 WHERE id=1");
             j.update("UPDATE mes_workorder_material SET planned_qty=50,total_required_qty=50 WHERE id=2");
@@ -55,7 +56,7 @@ class ProductionCombinationLifecycleHttpTest {
             }
             j.update("INSERT INTO mes_operation_user(operation_id,user_id) VALUES(1,1)");
             j.update("INSERT INTO wm_warehouse(id,code,name,status,source,warehouse_type) VALUES(2,'TEST-Q','TEST ONLY quality warehouse','ENABLED','LOCAL','DEFECTIVE')");
-            var plan = ProductionInputHttpTest.generate(m, "100");
+            var plan = ProductionInputHttpTest.generate(m, "50");
             String code = plan.get("combination").get("code").asText();
             String scan = json.writeValueAsString(Map.of("type", "REPORTING", "code", code, "inputMethod", "TEXT"));
             m.perform(full(post("/api/production/scan")).content(scan)).andExpect(status().isNotFound());
@@ -63,26 +64,30 @@ class ProductionCombinationLifecycleHttpTest {
             assertEquals(0, j.queryForObject("SELECT COUNT(*) FROM mes_material_issue_input", Integer.class));
             var input = json.readTree(ProductionInputHttpTest.submit(m, ProductionInputHttpTest.confirmCommand(m, UUID.randomUUID()
                     .toString(), code, "50")));
-            long execution = input.get("executionId").asLong();
+            String execution = input.get("executionCode").asText();
             String document = input.get("documentId").asText();
             m.perform(full(post("/api/production/scan")).content(scan)).andExpect(status().isOk())
-                    .andExpect(jsonPath("executionId").value(Long.toString(execution)));
+                    .andExpect(jsonPath("executionCode").value(execution));
             for (String quantity : List.of("30", "20")) {
                 for (long node : List.of(11L, 12L, 13L))
                     m.perform(full(post("/api/production/reporting")).content(json.writeValueAsString(Map.of("requestId", UUID.randomUUID()
-                                    .toString(), "executionId", execution, "routingNodeId", node, "reportQty", quantity))))
+                                    .toString(), "executionCode", execution, "routingNodeId", node, "reportQty", quantity))))
                             .andExpect(status().isOk());
                 if (quantity.equals("30")) WorkorderBomInputHttpTest.receive(m, execution, "20");
             }
             String declaration = ProductionDefectHttpTest.add(m, ProductionDefectHttpTest.command("TEST-COMBO-QUALITY", 0, "5")
-                    .replace("executionId\":\"1", "executionId\":\"" + execution), "A");
+                    .replace("executionCode\":\"1", "executionCode\":\"" + execution), "A");
+            m.perform(full(get("/api/quality/defects")).param("workorderId", "1"))
+                    .andExpect(status().isOk()).andExpect(jsonPath("total").value(1));
+            m.perform(full(get("/api/quality/defects")).param("workorderId", "999"))
+                    .andExpect(status().isOk()).andExpect(jsonPath("total").value(0));
             WorkorderBomInputHttpTest.receive(m, execution, "25");
-            assertEquals("RUNNING", j.queryForObject("SELECT status FROM mes_production_execution WHERE id=?", String.class, execution));
+            assertEquals("RUNNING", j.queryForObject("SELECT status FROM mes_production_execution WHERE execution_code=?", String.class, execution));
             QualityDispositionHttpTest.dispose(m, declaration, QualityDispositionHttpTest.command(UUID.randomUUID()
                     .toString(), "WAREHOUSE", "5", "2"));
-            assertEquals("FULLY_RECEIVED", j.queryForObject("SELECT status FROM mes_production_execution WHERE id=?", String.class, execution));
+            assertEquals("FULLY_RECEIVED", j.queryForObject("SELECT status FROM mes_production_execution WHERE execution_code=?", String.class, execution));
             assertEquals("COMPLETED", j.queryForObject("SELECT status FROM workorder WHERE id=1", String.class));
-            assertEquals(1, j.queryForObject("SELECT COUNT(*) FROM mes_execution_completion WHERE execution_id=?", Integer.class, execution));
+            assertEquals(1, j.queryForObject("SELECT COUNT(*) FROM mes_execution_completion WHERE execution_code=?", Integer.class, execution));
             assertEquals(0, new BigDecimal("50").compareTo(j.queryForObject("SELECT SUM(output_qty) FROM mes_material_issue_input WHERE stock_applied=TRUE", BigDecimal.class)));
             var before = j.queryForList("SELECT * FROM wm_stock_action ORDER BY id");
             m.perform(full(post(StockDocumentHttpTest.OUT_ROOT + "/" + document + "/actions/void")))
@@ -95,30 +100,26 @@ class ProductionCombinationLifecycleHttpTest {
                     .andExpect(jsonPath("closed").value(true));
             m.perform(full(post("/api/production/combinations")).content("{\"workorderId\":\"1\",\"quantity\":\"50\"}"))
                     .andExpect(status().isConflict());
-            m.perform(full(get("/api/production/combinations/" + plan.get("combination").get("id").asText() + "/qr")))
+            m.perform(full(get("/api/production/combinations/qr")).param("code", code))
                     .andExpect(status().isOk());
             assertEquals(1, j.queryForObject("SELECT COUNT(*) FROM mes_production_execution WHERE batch_no IS NOT NULL", Integer.class));
         }
     }
 
     @Test
-    void duplicateMaterialDemandSharesStockAndLineSpecificReturnAndWholeReversalStayTraceable() throws Exception {
+    void multiMaterialIssueLineReturnAndWholeReversalStayTraceable() throws Exception {
         try (var c = ProductionInputHttpTest.context()) {
             var j = ProductionInputHttpTest.db(c);
             var m = MaterialIssueHttpTest.mvc(c);
-            j.update("UPDATE unit_measure SET must_be_whole_number=1 WHERE id=1");
-            j.update("UPDATE wm_inventory SET quantity=100,available_quantity=100 WHERE id=1");
-            j.update("UPDATE wm_inventory SET quantity=0,available_quantity=0 WHERE id=2");
-            j.update("INSERT INTO mes_workorder_material(id,workorder_id,line_no,material_id,unit_id,total_required_qty,planned_qty,manually_adjusted,updated_by,updated_at) VALUES(2,1,2,1,1,1000,1000,TRUE,1,CURRENT_TIMESTAMP)");
-            var plan = ProductionInputHttpTest.generate(m, "100");
+            ProductionInputHttpTest.multiMaterial(j);
+            var plan = ProductionInputHttpTest.generate(m, "50");
             String code = plan.get("combination").get("code").asText();
-            assertEquals(0, new BigDecimal("33").compareTo(new BigDecimal(plan.get("suggestedQty").asText())));
             String confirmedCommand = ProductionInputHttpTest.confirmCommand(m, UUID.randomUUID()
-                    .toString(), code, "20");
+                    .toString(), code, "50");
             var input = json.readTree(ProductionInputHttpTest.submit(m, confirmedCommand));
             long document = input.get("documentId").asLong();
             String request = UUID.randomUUID().toString();
-            var back = new LinkedHashMap<String, Object>(Map.of("requestId", request, "stockId", "1", "quantity", "5", "expectedQuantity", "40", "expectedAvailable", "40", "reason", "TEST ONLY line return", "documentId", document));
+            var back = new LinkedHashMap<String, Object>(Map.of("requestId", request, "stockId", "1", "quantity", "5", "expectedQuantity", "20", "expectedAvailable", "20", "reason", "TEST ONLY line return", "documentId", document));
             m.perform(full(post("/api/wm/local-stock/return")).content(json.writeValueAsString(back)))
                     .andExpect(status().isBadRequest());
             long line = j.queryForObject("SELECT id FROM wm_stock_document_line WHERE document_id=? AND demand_line_id=1", Long.class, document);
@@ -126,14 +127,14 @@ class ProductionCombinationLifecycleHttpTest {
             for (int retry = 0; retry < 2; retry++)
                 m.perform(full(post("/api/wm/local-stock/return")).content(json.writeValueAsString(back)))
                         .andExpect(status().isOk());
-            assertEquals(0, new BigDecimal("45").compareTo(j.queryForObject("SELECT quantity FROM wm_inventory WHERE id=1", BigDecimal.class)));
+            assertEquals(0, new BigDecimal("25").compareTo(j.queryForObject("SELECT quantity FROM wm_inventory WHERE id=1", BigDecimal.class)));
             var response = m.perform(full(post(StockDocumentHttpTest.OUT_ROOT + "/" + document + "/actions/void")))
                     .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
             m.perform(full(post(StockDocumentHttpTest.OUT_ROOT + "/" + document + "/actions/void")))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("voidOperationId").value(json.readTree(response).get("voidOperationId")
                             .asText()));
-            assertEquals(0, new BigDecimal("100").compareTo(j.queryForObject("SELECT quantity FROM wm_inventory WHERE id=1", BigDecimal.class)));
+            assertEquals(0, new BigDecimal("120").compareTo(j.queryForObject("SELECT quantity FROM wm_inventory WHERE id=1", BigDecimal.class)));
             assertEquals(2, j.queryForObject("SELECT COUNT(*) FROM wm_stock_action WHERE action_type='REVERSAL'", Integer.class));
             assertEquals(1, j.queryForObject("SELECT COUNT(DISTINCT operation_id) FROM wm_stock_action WHERE action_type='REVERSAL'", Integer.class));
             assertEquals(false, j.queryForObject("SELECT stock_applied FROM mes_material_issue_input WHERE document_id=?", Boolean.class, document));

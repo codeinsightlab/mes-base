@@ -77,9 +77,9 @@ class QualityDispositionHttpTest {
                 new BigDecimal(quantity).stripTrailingZeros().toPlainString(), "", "TEST ONLY disposition");
         String hash = HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256")
                 .digest(value.getBytes(StandardCharsets.UTF_8)));
-        jdbc.update("INSERT INTO mes_quality_treatment(id,request_hash,declaration_id,declaration_revision,execution_id,routing_node_id,action_type,operator_user_id,recorded_at,reason,returned_qty,transfer_qty) SELECT ?,?,declaration_id,revision_no,execution_id,affected_node_id,'RETURN_NODE',1,CURRENT_TIMESTAMP,'TEST ONLY disposition',?,0 FROM mes_production_defect WHERE declaration_id=? AND revision_no=1",
+        jdbc.update("INSERT INTO mes_quality_treatment(id,request_hash,declaration_id,declaration_revision,execution_code,routing_node_id,action_type,operator_user_id,recorded_at,reason,returned_qty,transfer_qty) SELECT ?,?,declaration_id,revision_no,execution_code,affected_node_id,'RETURN_NODE',1,CURRENT_TIMESTAMP,'TEST ONLY disposition',?,0 FROM mes_production_defect WHERE declaration_id=? AND revision_no=1",
                 key, hash, new BigDecimal(quantity), declaration);
-        jdbc.update("INSERT INTO mes_production_report(execution_id,routing_node_id,record_type,quantity_delta,reference_report_id,source_quality_event_id,operator_user_id,recorded_by,report_time,reason,create_time,request_id,command_fingerprint) SELECT r.execution_id,r.routing_node_id,'ADJUSTMENT',?,r.id,?,r.operator_user_id,1,r.report_time,'TEST ONLY historical return',CURRENT_TIMESTAMP,?,? FROM mes_production_report r JOIN mes_production_defect d ON d.execution_id=r.execution_id AND d.affected_node_id=r.routing_node_id WHERE d.declaration_id=? AND r.record_type='REPORT' ORDER BY r.id DESC LIMIT 1",
+        jdbc.update("INSERT INTO mes_production_report(execution_code,routing_node_id,record_type,quantity_delta,reference_report_id,source_quality_event_id,operator_user_id,recorded_by,report_time,reason,create_time,request_id,command_fingerprint) SELECT r.execution_code,r.routing_node_id,'ADJUSTMENT',?,r.id,?,r.operator_user_id,1,r.report_time,'TEST ONLY historical return',CURRENT_TIMESTAMP,?,? FROM mes_production_report r JOIN mes_production_defect d ON d.execution_code=r.execution_code AND d.affected_node_id=r.routing_node_id WHERE d.declaration_id=? AND r.record_type='REPORT' ORDER BY r.id DESC LIMIT 1",
                 new BigDecimal(quantity).negate(), key, UUID.randomUUID().toString(), "x".repeat(64), declaration);
     }
 
@@ -100,7 +100,7 @@ class QualityDispositionHttpTest {
             amount(result, "returnedQty", "10");
             amount(result, "pendingDispositionQty", "0");
             assertEquals("RETURNED", result.get("state").asText());
-            assertEquals(0, new BigDecimal("90").compareTo(j.queryForObject("SELECT SUM(quantity_delta) FROM mes_production_report WHERE execution_id=1 AND routing_node_id=12", BigDecimal.class)));
+            assertEquals(0, new BigDecimal("90").compareTo(j.queryForObject("SELECT SUM(quantity_delta) FROM mes_production_report WHERE execution_code=1 AND routing_node_id=12", BigDecimal.class)));
             var q = quantities(m);
             amount(q.get("nodes").get(1), "effectiveOutputQty", "90");
             dispose(m, id, body);
@@ -126,21 +126,21 @@ class QualityDispositionHttpTest {
             assertEquals("RECEIVED", first.path("receiptState").asText());
             dispose(mvc, declaration, body);
             assertEquals(1, jdbc.queryForObject("SELECT COUNT(*) FROM wm_stock_document WHERE document_type IN ('DEFECT_RECEIPT','SCRAP_RECEIPT')", Integer.class));
-            assertEquals(0, jdbc.queryForObject("SELECT COUNT(*) FROM wm_stock_document WHERE document_type IN ('DEFECT_RECEIPT','SCRAP_RECEIPT') AND source_execution_id IS NOT NULL", Integer.class));
+            assertEquals(0, jdbc.queryForObject("SELECT COUNT(*) FROM wm_stock_document WHERE document_type IN ('DEFECT_RECEIPT','SCRAP_RECEIPT') AND source_execution_code IS NOT NULL", Integer.class));
             FactoryContext.runWithScope(new FactoryScope(new FactoryId("A")), () -> {
                 var owner = c.getBean(QualityTreatmentService.class);
-                assertNull(owner.receiptBlockReason(1L));
+                assertNull(owner.receiptBlockReason("1"));
                 var operation = jdbc.queryForObject("SELECT operation_id FROM wm_stock_action WHERE document_line_id IS NOT NULL", String.class);
                 jdbc.update("UPDATE wm_stock_action SET operation_id=? WHERE document_line_id IS NOT NULL", UUID.randomUUID()
                         .toString());
-                assertNotNull(owner.receiptBlockReason(1L));
+                assertNotNull(owner.receiptBlockReason("1"));
                 jdbc.update("UPDATE wm_stock_action SET operation_id=? WHERE document_line_id IS NOT NULL", operation);
-                assertNull(owner.receiptBlockReason(1L));
-                jdbc.update("UPDATE wm_stock_action SET execution_id=2 WHERE document_line_id IS NOT NULL");
-                assertNotNull(owner.receiptBlockReason(1L));
-                jdbc.update("UPDATE wm_stock_action SET execution_id=1 WHERE document_line_id IS NOT NULL");
+                assertNull(owner.receiptBlockReason("1"));
+                jdbc.update("UPDATE wm_stock_action SET execution_code=2 WHERE document_line_id IS NOT NULL");
+                assertNotNull(owner.receiptBlockReason("1"));
+                jdbc.update("UPDATE wm_stock_action SET execution_code=1 WHERE document_line_id IS NOT NULL");
                 jdbc.update("UPDATE wm_stock_action SET source_id='unrelated-document' WHERE document_line_id IS NOT NULL");
-                assertNotNull(owner.receiptBlockReason(1L));
+                assertNotNull(owner.receiptBlockReason("1"));
             });
         }
     }
@@ -172,7 +172,7 @@ class QualityDispositionHttpTest {
             j.update("UPDATE mes_production_execution SET batch_no=NULL WHERE id=1");
             dispose(m, id, body);
             assertEquals(1, j.queryForObject("SELECT COUNT(*) FROM wm_stock_document WHERE document_type IN ('DEFECT_RECEIPT','SCRAP_RECEIPT')", Integer.class));
-            assertEquals(0, j.queryForObject("SELECT COUNT(*) FROM wm_stock_document WHERE document_type IN ('DEFECT_RECEIPT','SCRAP_RECEIPT') AND source_execution_id IS NOT NULL", Integer.class));
+            assertEquals(0, j.queryForObject("SELECT COUNT(*) FROM wm_stock_document WHERE document_type IN ('DEFECT_RECEIPT','SCRAP_RECEIPT') AND source_execution_code IS NOT NULL", Integer.class));
         }
     }
 
@@ -283,7 +283,7 @@ class QualityDispositionHttpTest {
             var row = list.get("items").get(0);
             assertEquals(id, row.get("declarationId").asText());
             assertEquals("WO1", row.get("workorderCode").asText());
-            assertEquals("1", row.get("executionId").asText());
+            assertEquals("1", row.get("executionCode").asText());
             assertEquals("M1", row.get("productCode").asText());
             assertEquals("000LOT-001", row.get("batchNo").asText());
             assertEquals("Φ20×30", row.get("specification").asText());

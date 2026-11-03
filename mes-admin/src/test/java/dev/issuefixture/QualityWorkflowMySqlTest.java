@@ -20,7 +20,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
  */
 @EnabledIfEnvironmentVariable(named = "MES_QUALITY_WORKFLOW_MYSQL", matches = "true")
 class QualityWorkflowMySqlTest {
-    record Fixture(long execution, long order, long routing, long warehouse, List<Long> nodes, String tag) {
+    record Fixture(String execution, long order, long routing, long warehouse, List<Long> nodes, String tag) {
     }
 
     static BigDecimal d(int v) {
@@ -43,11 +43,12 @@ class QualityWorkflowMySqlTest {
                 j.update("INSERT INTO routing_edge(routing_id,from_node_id,to_node_id) VALUES(?,?,?)", routing, nodes.get(i - 1), nodes.get(i));
             long order = ProductionReportMySqlTest.insert(j, "INSERT INTO workorder(source,code,product_id,planned_qty,routing_id,status,revision,create_time,update_time) VALUES('LOCAL',?,?,100,?,'RELEASED',0,NOW(),NOW())", tag, material, routing);
             j.update("INSERT INTO workorder_erp_extra(id) VALUES(?)", order);
-            long execution = ProductionReportMySqlTest.insert(j, "INSERT INTO mes_production_execution(workorder_id,product_id,routing_id,target_qty,status,start_time,remark,create_by,create_time) VALUES(?,?,?,100,'RUNNING',NOW(),?,'TEST_ONLY_Q13',NOW())", order, material, routing, tag);
-            j.update("INSERT INTO mes_execution_path(id,routing_id,path_status,revision,selected_at,locked_at) VALUES(?,?,'LOCKED',1,NOW(),NOW())", execution, routing);
+            String execution = tag + ":TEST_ONLY#BATCH";
+            ProductionReportMySqlTest.insert(j, "INSERT INTO mes_production_execution(execution_code,workorder_id,product_id,routing_id,target_qty,status,start_time,remark,create_by,create_time) VALUES(?,?,?,?,100,'RUNNING',NOW(),?,'TEST_ONLY_Q13',NOW())", execution, order, material, routing, tag);
+            j.update("INSERT INTO mes_execution_path(execution_code,routing_id,path_status,revision,selected_at,locked_at) VALUES(?,?,'LOCKED',1,NOW(),NOW())", execution, routing);
             for (int i = 0; i < 5; i++) {
-                j.update("INSERT INTO mes_execution_path_node(execution_id,sequence_no,routing_node_id) VALUES(?,?,?)", execution, i + 1, nodes.get(i));
-                j.update("INSERT INTO mes_production_report(execution_id,routing_node_id,record_type,quantity_delta,operator_user_id,recorded_by,report_time,reason,create_time) VALUES(?,?,'REPORT',?,100,100,NOW(),'TEST ONLY V13 historical normal report',NOW())", execution, nodes.get(i), reports[i]);
+                j.update("INSERT INTO mes_execution_path_node(execution_code,sequence_no,routing_node_id) VALUES(?,?,?)", execution, i + 1, nodes.get(i));
+                j.update("INSERT INTO mes_production_report(execution_code,routing_node_id,record_type,quantity_delta,operator_user_id,recorded_by,report_time,reason,create_time) VALUES(?,?,'REPORT',?,100,100,NOW(),'TEST ONLY V13 historical normal report',NOW())", execution, nodes.get(i), reports[i]);
             }
             ProductionInputTestData.confirmed(j, execution, d(100));
             return new Fixture(execution, order, routing, warehouse, List.copyOf(nodes), tag);

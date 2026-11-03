@@ -35,9 +35,9 @@ public class MaterialQuantityRules {
         this.executions = executions;
     }
 
-    public Long productIdForExecution(Long id) {
+    public Long productIdForExecution(String id) {
         if (id == null) return null;
-        var execution = executions.selectByPrimaryKey(id);
+        var execution = executions.selectByCode(id);
         if (execution == null) return null;
         return execution.getProductId();
     }
@@ -79,9 +79,9 @@ public class MaterialQuantityRules {
         checkForMaterial(value, materialId, true);
     }
 
-    public void checkForExecutionWrite(BigDecimal value, Long executionId) {
-        if (executionId == null) conflict();
-        MesProductionExecutionEntity execution = executions.selectByPrimaryKeyForUpdate(executionId);
+    public void checkForExecutionWrite(BigDecimal value, String executionCode) {
+        if (executionCode == null) conflict();
+        MesProductionExecutionEntity execution = executions.selectByCodeForUpdate(executionCode);
         if (execution == null || execution.getProductId() == null) conflict();
         checkForWrite(value, execution.getProductId());
     }
@@ -97,9 +97,9 @@ public class MaterialQuantityRules {
         check(value, material, unit);
     }
 
-    public void changedForExecutionWrite(BigDecimal value, BigDecimal previous, Long executionId) {
+    public void changedForExecutionWrite(BigDecimal value, BigDecimal previous, String executionCode) {
         if (value == null || previous == null || value.compareTo(previous) != 0)
-            checkForExecutionWrite(value, executionId);
+            checkForExecutionWrite(value, executionCode);
     }
 
     private static void validateConfiguration(MaterialEntity material, UnitMeasureEntity unit) {

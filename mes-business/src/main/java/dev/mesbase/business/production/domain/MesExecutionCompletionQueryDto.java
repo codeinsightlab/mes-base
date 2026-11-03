@@ -16,7 +16,7 @@ import org.springframework.format.annotation.DateTimeFormat;
 public record MesExecutionCompletionQueryDto(
         @Min(0) Integer offset,
         @Min(1) @Max(100) Integer limit,
-        Long executionId,
+        String executionCode,
         @Digits(integer = 14, fraction = 6) BigDecimal effectiveQty,
         @Digits(integer = 14, fraction = 6) BigDecimal releasedQty,
         @Digits(integer = 14, fraction = 6) BigDecimal receiptQty,

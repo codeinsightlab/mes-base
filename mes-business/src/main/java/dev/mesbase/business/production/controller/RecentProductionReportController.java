@@ -19,7 +19,7 @@ public class RecentProductionReportController {
         this.service = service;
     }
 
-    public record Row(String id, String executionId, String workorderId, String workorderCode,
+    public record Row(String id, String executionCode, String workorderId, String workorderCode,
                       String source, String productCode, String productName, String unitName, String routingNodeId,
                       String operationName, String recordType, String quantityDelta, String operatorUserId,
                       String operatorName, LocalDateTime reportTime, LocalDateTime createTime) {
@@ -31,7 +31,7 @@ public class RecentProductionReportController {
         var result = service.recent();
         return result.items().stream().map(r -> {
             var user = result.users().get(r.operatorUserId());
-            return new Row(ProductionReportViews.id(r.id()), ProductionReportViews.id(r.executionId()),
+            return new Row(ProductionReportViews.id(r.id()), r.executionCode(),
                     ProductionReportViews.id(r.workorderId()), r.workorderCode(), r.source(),
                     r.productCode(), r.productName(), r.unitName(), ProductionReportViews.id(r.routingNodeId()),
                     r.operationName(), r.recordType(), ProductionReportViews.decimal(r.quantityDelta()),

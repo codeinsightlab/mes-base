@@ -7,7 +7,7 @@
     <bind name="enumReversal" value="@dev.mesbase.business.wm.domain.StockActionType@REVERSAL.getValue()"/>
     <bind name="enumProductionInput" value="@dev.mesbase.business.production.domain.ProductionInputKind@PRODUCTION_INPUT.getValue()"/>
     <bind name="enumMaterialIssue" value="@dev.mesbase.business.wm.domain.StockDocumentType@MATERIAL_ISSUE.getValue()"/>
-    FROM mes_material_issue_input f JOIN wm_stock_document d ON d.id=f.document_id AND d.source_execution_id=f.execution_id
+    FROM mes_material_issue_input f JOIN wm_stock_document d ON d.id=f.document_id AND d.source_execution_code=f.execution_code
     WHERE d.source_workorder_id=#{workorderId} AND f.input_kind=#{enumProductionInput} AND f.confirmed_at IS NOT NULL
       AND f.stock_applied=TRUE AND f.source_mode=#{enumLocalOnly} AND d.document_type=#{enumMaterialIssue} AND d.status=#{enumPosted}
       AND NOT EXISTS(SELECT 1 FROM wm_stock_document_line original_line JOIN wm_stock_action reversal
@@ -24,8 +24,8 @@
     <bind name="enumProductionInput" value="@dev.mesbase.business.production.domain.ProductionInputKind@PRODUCTION_INPUT.getValue()"/>
     <bind name="enumMaterialIssue" value="@dev.mesbase.business.wm.domain.StockDocumentType@MATERIAL_ISSUE.getValue()"/>
     SELECT COALESCE(SUM(f.output_qty),0) FROM mes_material_issue_input f JOIN wm_stock_document d
-      ON d.id=f.document_id AND d.source_execution_id=f.execution_id
-    WHERE f.execution_id=#{executionId} AND f.input_kind=#{enumProductionInput} AND f.confirmed_at IS NOT NULL
+      ON d.id=f.document_id AND d.source_execution_code=f.execution_code
+    WHERE f.execution_code=#{executionCode} AND f.input_kind=#{enumProductionInput} AND f.confirmed_at IS NOT NULL
       AND f.stock_applied=TRUE AND f.source_mode=#{enumLocalOnly} AND d.document_type=#{enumMaterialIssue} AND d.status=#{enumPosted}
       AND NOT EXISTS(SELECT 1 FROM wm_stock_document_line l JOIN wm_stock_action a ON a.reference_action_id=l.stock_action_id
         WHERE l.document_id=f.document_id AND a.action_type=#{enumReversal})
@@ -42,7 +42,7 @@
       (SELECT d.id <include refid="EffectiveMesInput"/>)
   </select>
   <select id="hasFormalInput" resultType="boolean">
-    SELECT EXISTS(SELECT 1 FROM mes_material_issue_input f JOIN wm_stock_document d ON d.id=f.document_id AND d.source_execution_id=f.execution_id WHERE d.source_workorder_id=#{workorderId}
+    SELECT EXISTS(SELECT 1 FROM mes_material_issue_input f JOIN wm_stock_document d ON d.id=f.document_id AND d.source_execution_code=f.execution_code WHERE d.source_workorder_id=#{workorderId}
         AND f.confirmed_at IS NOT NULL)
   </select>
   <select id="quota" resultType="dev.mesbase.business.production.domain.ProductionInputQuota">
@@ -55,7 +55,7 @@
            COALESCE(SUM(component_totals.material_qty),0) AS material_qty,
            COALESCE(SUM(CASE WHEN f.output_qty&gt;0 AND component_totals.line_count=1 AND component_totals.material_id=#{materialId}
                AND component_totals.unit_id=#{unitId} AND component_totals.material_qty&gt;0 THEN 0 ELSE 1 END),0) AS invalid_count
-    FROM mes_material_issue_input f JOIN wm_stock_document d ON d.id=f.document_id AND d.source_execution_id=f.execution_id
+    FROM mes_material_issue_input f JOIN wm_stock_document d ON d.id=f.document_id AND d.source_execution_code=f.execution_code
     LEFT JOIN (SELECT document_id,COUNT(*) line_count,MIN(material_id) material_id,MIN(unit_id) unit_id,SUM(quantity) material_qty
                FROM wm_stock_document_line GROUP BY document_id) component_totals ON component_totals.document_id=d.id
     WHERE d.source_workorder_id=#{workorderId} AND f.input_kind=#{enumProductionInput} AND f.confirmed_at IS NOT NULL AND f.stock_applied=TRUE

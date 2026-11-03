@@ -117,7 +117,7 @@ class WorkOrderProgressMySqlTest {
                 }
             }
             try (var statement = session.getConnection().prepareStatement(
-                    "SELECT w.id, w.code, SUM(c.effective_qty) AS quantity FROM workorder w JOIN mes_production_execution e ON e.workorder_id=w.id JOIN mes_execution_completion c ON c.execution_id=e.id GROUP BY w.id,w.code ORDER BY w.id DESC LIMIT 1");
+                    "SELECT w.id, w.code, SUM(c.effective_qty) AS quantity FROM workorder w JOIN mes_production_execution e ON e.workorder_id=w.id JOIN mes_execution_completion c ON c.execution_code=e.id GROUP BY w.id,w.code ORDER BY w.id DESC LIMIT 1");
                  var completed = statement.executeQuery()) {
                 if (completed.next()) {
                     long id = completed.getLong("id");
@@ -132,7 +132,7 @@ class WorkOrderProgressMySqlTest {
             }
             var qualityOrderIds = new ArrayList<Long>();
             try (var statement = session.getConnection().prepareStatement(
-                    "SELECT DISTINCT e.workorder_id FROM mes_production_execution e JOIN mes_production_defect d ON d.execution_id=e.id ORDER BY e.workorder_id DESC LIMIT 5");
+                    "SELECT DISTINCT e.workorder_id FROM mes_production_execution e JOIN mes_production_defect d ON d.execution_code=e.id ORDER BY e.workorder_id DESC LIMIT 5");
                  var result = statement.executeQuery()) {
                 while (result.next()) qualityOrderIds.add(result.getLong(1));
             }

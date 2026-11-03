@@ -11,7 +11,7 @@ public interface MesExecutionPathMapper {
 
     int deleteByExample(MesExecutionPathExample example);
 
-    int deleteByPrimaryKey(Long id);
+    int deleteByPrimaryKey(String id);
 
     int insert(MesExecutionPathEntity row);
 
@@ -19,7 +19,7 @@ public interface MesExecutionPathMapper {
 
     List<MesExecutionPathEntity> selectByExample(MesExecutionPathExample example);
 
-    MesExecutionPathEntity selectByPrimaryKey(Long id);
+    MesExecutionPathEntity selectByPrimaryKey(String id);
 
     int updateByExampleSelective(@Param("row") MesExecutionPathEntity row,
                                  @Param("example") MesExecutionPathExample example);

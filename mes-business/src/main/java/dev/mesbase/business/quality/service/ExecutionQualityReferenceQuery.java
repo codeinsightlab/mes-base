@@ -5,5 +5,5 @@ package dev.mesbase.business.quality.service;
  * Destructive callers must hold the shared WorkOrder-to-Execution locks in their business transaction.
  */
 public interface ExecutionQualityReferenceQuery {
-    boolean hasAnyHistory(Long executionId);
+    boolean hasAnyHistory(String executionCode);
 }

@@ -89,8 +89,8 @@ public class WmStockActionServiceImpl implements IWmStockActionService {
         if (query.referenceActionId() != null) {
             criteria.andReferenceActionIdLike("%" + query.referenceActionId() + "%");
         }
-        if (query.executionId() != null) {
-            criteria.andExecutionIdEqualTo(query.executionId());
+        if (query.executionCode() != null) {
+            criteria.andExecutionCodeEqualTo(query.executionCode());
         }
         if (query.operatorUserId() != null) {
             criteria.andOperatorUserIdEqualTo(query.operatorUserId());

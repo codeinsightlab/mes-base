@@ -6,7 +6,6 @@ import dev.mesbase.business.basic.dao.UnitMeasureMapper;
 import dev.mesbase.business.production.dao.MesExecutionAssignmentMapper;
 import dev.mesbase.business.production.dao.MesExecutionPathMapper;
 import dev.mesbase.business.production.dao.MesExecutionPathNodeMapper;
-import dev.mesbase.business.production.dao.MesProductionCombinationMapper;
 import dev.mesbase.business.production.dao.MesProductionExecutionMapper;
 import dev.mesbase.business.production.dao.MesProductionReportMapper;
 import dev.mesbase.business.production.dao.ProductionQuantityMapper;
@@ -97,16 +96,18 @@ class ProductionExecutionMySqlTest {
             var chainLocks = new ProductionChainLocks(s.getMapper(WorkorderMapper.class), executions, issues);
             var rules = new ProductionExecutionRules(executions, s.getMapper(WorkorderMapper.class), s.getMapper(MaterialMapper.class), s.getMapper(RoutingMapper.class), s.getMapper(RoutingProductMapper.class), issues, chainLocks, s.getMapper(MesExecutionPathMapper.class), s.getMapper(MesExecutionPathNodeMapper.class), s.getMapper(MesProductionReportMapper.class), s.getMapper(ProductionQuantityMapper.class), new ExecutionQualityReferenceQueryImpl(s.getMapper(MesProductionDefectMapper.class), mock(QualityTreatmentService.class)), s.getMapper(MesExecutionAssignmentMapper.class), Mockito.mock(BusinessSourceRules.class), s.getMapper(WorkOrderExtraMapper.class), new MaterialQuantityRules(s.getMapper(MaterialMapper.class), s.getMapper(UnitMeasureMapper.class), executions));
             var service = new MesProductionExecutionServiceImpl(executions, rules);
-            var input = new MesProductionExecutionCreateCommand(workorder, routing, new BigDecimal("99999999999999.12"), "READY", null, null, tag);
+            var input = new MesProductionExecutionCreateCommand(s.getMapper(WorkorderMapper.class)
+                    .selectByPrimaryKey(workorder)
+                    .getCode() + ":TEST_ONLY#" + tag, workorder, routing, new BigDecimal("99999999999999.12"), "READY", null, null, tag);
             var first = service.insert(input);
             var second = service.insert(input);
             assertNotEquals(first.getId(), second.getId());
             assertNotEquals(first.getId(), second.getId());
             var updated = service.updateById(first.getId(), new MesProductionExecutionUpdateCommand(workorder, routing, new BigDecimal("1.123456"), "READY", null, null, tag));
             assertEquals(first.getId(), updated.getId());
-            var identity = new ProductionIdentityService(executions, s.getMapper(WorkorderMapper.class), s.getMapper(MaterialMapper.class), s.getMapper(RoutingMapper.class), s.getMapper(MesProductionCombinationMapper.class));
+            var identity = new ProductionIdentityService(executions, s.getMapper(WorkorderMapper.class), s.getMapper(MaterialMapper.class), s.getMapper(RoutingMapper.class));
             var before = service.selectById(first.getId()).getUpdateTime();
-            assertEquals(first.getId(), identity.read(first.getId()).executionId());
+            assertEquals(first.getExecutionCode(), identity.read(first.getExecutionCode()).executionCode());
             assertEquals(before, service.selectById(first.getId()).getUpdateTime());
             var issue = new WmStockDocumentEntity();
             issue.setDocumentNo(tag);
@@ -114,7 +115,7 @@ class ProductionExecutionMySqlTest {
             issue.setStatus("DRAFT");
             issue.setReason(tag);
             issue.setSourceWorkorderId(workorder);
-            issue.setSourceExecutionId(first.getId());
+            issue.setSourceExecutionCode(first.getExecutionCode());
             issue.setCreateBy("1");
             issue.setUpdateBy("1");
             issue.setCreateTime(LocalDateTime.now());

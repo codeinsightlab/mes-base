@@ -33,8 +33,8 @@ public final class ProductionCombinationModels {
                        BigDecimal totalRequiredQty, List<String> batches) {
     }
 
-    public record Detail(Long id, String code, Long workorderId, String workorderCode, Long productId,
-                         Long outputUnitId, Long demandRevision, Long executionId, String executionStatus,
+    public record Detail(String code, Long workorderId, String workorderCode, Long productId,
+                         Long outputUnitId, Long demandRevision, String executionCode, String executionStatus,
                          boolean closed, List<Item> items) {
     }
 
@@ -50,7 +50,7 @@ public final class ProductionCombinationModels {
                           List<Long> routingNodeIds, String calculationKey) {
     }
 
-    public record Result(String requestId, Long documentId, Long executionId, String code,
+    public record Result(String requestId, Long documentId, String executionCode, String code,
                          String status, BigDecimal confirmedInputQty, boolean stockApplied) {
     }
 }

@@ -40,8 +40,8 @@ public class MesExecutionCompletionServiceImpl implements IMesExecutionCompletio
         ParameterChecks.paging(offset, limit, 100);
         MesExecutionCompletionExample example = new MesExecutionCompletionExample();
         MesExecutionCompletionExample.Criteria criteria = example.createCriteria();
-        if (query.executionId() != null) {
-            criteria.andExecutionIdEqualTo(query.executionId());
+        if (query.executionCode() != null) {
+            criteria.andExecutionCodeEqualTo(query.executionCode());
         }
         if (query.effectiveQty() != null) {
             criteria.andEffectiveQtyEqualTo(query.effectiveQty());

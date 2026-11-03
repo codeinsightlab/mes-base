@@ -34,7 +34,7 @@ public class ProductionReceiptController {
         this.service = service;
     }
 
-    public record Ledger(String id, String receiptNo, String executionId, String workorderCode,
+    public record Ledger(String id, String receiptNo, String executionCode, String workorderCode,
                          String productCode, String productName, String warehouseId, String warehouseName,
                          String productLotCode, String recordType,
                          String quantityDelta, String referenceReceiptId, String operatorUserId, String operatorName,
@@ -50,12 +50,13 @@ public class ProductionReceiptController {
 
     @GetMapping
     @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED, permission = LIST)
-    public Page page(@RequestParam(required = false) Long workorderId, @RequestParam(required = false) Long executionId,
+    public Page page(@RequestParam(required = false) Long workorderId,
+                     @RequestParam(required = false) String executionCode,
                      @RequestParam(required = false) Long warehouseId,
                      @RequestParam(required = false) String productLotCode,
                      @RequestParam(required = false) String referenceReceiptId,
                      @RequestParam(defaultValue = "0") int offset, @RequestParam(defaultValue = "20") int limit) {
-        var p = service.page(new Query(workorderId, executionId, warehouseId, productLotCode, referenceReceiptId, offset, limit));
+        var p = service.page(new Query(workorderId, executionCode, warehouseId, productLotCode, referenceReceiptId, offset, limit));
         return BeanConversions.convertPage(p, r -> view(r, p.userNames()), Page::new);
     }
 
@@ -68,7 +69,7 @@ public class ProductionReceiptController {
 
     private static Ledger view(MesProductionReceiptEntity r, Map<Long, String> names) {
         ProductionReceiptRow ref = r instanceof ProductionReceiptRow row ? row : null;
-        return new Ledger(r.getId(), r.getReceiptNo(), id(r.getExecutionId()), Optional.ofNullable(ref)
+        return new Ledger(r.getId(), r.getReceiptNo(), r.getExecutionCode(), Optional.ofNullable(ref)
                 .map(nullableValue -> nullableValue.getWorkorderCode()).orElse(null),
                 Optional.ofNullable(ref).map(nullableValue -> nullableValue.getProductCode())
                         .orElse(null), Optional.ofNullable(ref).map(nullableValue -> nullableValue.getProductName())

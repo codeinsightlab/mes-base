@@ -6,7 +6,7 @@ public final class ProductionReportSubmitModels {
     private ProductionReportSubmitModels() {
     }
 
-    public record Command(Long executionId, Long routingNodeId, BigDecimal reportQty, Long workstationId,
+    public record Command(String executionCode, Long routingNodeId, BigDecimal reportQty, Long workstationId,
                           String requestId) {
     }
 

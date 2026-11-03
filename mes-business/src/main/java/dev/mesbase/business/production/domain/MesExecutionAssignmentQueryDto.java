@@ -12,7 +12,7 @@ import org.springframework.format.annotation.DateTimeFormat;
 public record MesExecutionAssignmentQueryDto(
         @Min(0) Integer offset,
         @Min(1) @Max(100) Integer limit,
-        Long executionId,
+        String executionCode,
         Long routingNodeId,
         Long userId,
         Long assignedBy,

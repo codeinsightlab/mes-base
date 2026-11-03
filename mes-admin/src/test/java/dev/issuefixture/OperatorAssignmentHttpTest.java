@@ -99,12 +99,12 @@ class OperatorAssignmentHttpTest {
         try (var c = context()) {
             var m = MaterialIssueHttpTest.mvc(c);
             var j = c.getBean(MaterialIssueHttpTest.Fixture.class).business.get("A");
-            j.update("INSERT INTO mes_execution_assignment(execution_id,routing_node_id,user_id,assigned_by,assigned_at) VALUES(1,1,1,1,CURRENT_TIMESTAMP)");
+            j.update("INSERT INTO mes_execution_assignment(execution_code,routing_node_id,user_id,assigned_by,assigned_at) VALUES(1,1,1,1,CURRENT_TIMESTAMP)");
             m.perform(full(delete("/api/production/mes-production-execution"), "A").content("[1]"))
                     .andExpect(status().isConflict()).andExpect(jsonPath("errorCode").value("EXECUTION_REFERENCED"));
             m.perform(full(put("/api/production/mes-production-execution/1"), "A").content("{\"workorderId\":\"1\",\"routingId\":\"2\",\"targetQty\":\"100\",\"status\":\"READY\"}"))
                     .andExpect(status().isConflict()).andExpect(jsonPath("errorCode").value("EXECUTION_FROZEN"));
-            assertEquals(1, j.queryForObject("SELECT COUNT(*) FROM mes_execution_assignment WHERE execution_id=1", Integer.class));
+            assertEquals(1, j.queryForObject("SELECT COUNT(*) FROM mes_execution_assignment WHERE execution_code=1", Integer.class));
             assertEquals(1, j.queryForObject("SELECT routing_id FROM mes_production_execution WHERE id=1", Integer.class));
         }
     }
@@ -137,7 +137,7 @@ class OperatorAssignmentHttpTest {
             http.perform(get(C).header("Authorization", "Bearer FULL").header("X-Factory-Id", "B"))
                     .andExpect(status().isOk()).andExpect(jsonPath("total").value(0));
             http.perform(post(A).header("Authorization", "Bearer FULL").header("X-Factory-Id", "B")
-                            .contentType("application/json").content("{\"executionId\":1,\"routingNodeId\":1,\"userId\":1}"))
+                            .contentType("application/json").content("{\"executionCode\":1,\"routingNodeId\":1,\"userId\":1}"))
                     .andExpect(status().isUnprocessableEntity());
             http.perform(post(C).header("Authorization", "Bearer FULL").header("X-Factory-Id", "A")
                             .contentType("application/json").content("{\"operationId\":1,\"userId\":999}"))
@@ -155,7 +155,7 @@ class OperatorAssignmentHttpTest {
             http.perform(post(C + "/bind-users").header("Authorization", "Bearer FULL").header("X-Factory-Id", "A")
                             .contentType("application/json").content("{\"operationId\":1,\"userIds\":[1,2]}"))
                     .andExpect(status().isNoContent());
-            String body = "{\"executionId\":1,\"routingNodeId\":1,\"userId\":1}";
+            String body = "{\"executionCode\":1,\"routingNodeId\":1,\"userId\":1}";
             http.perform(post(A).header("Authorization", "Bearer FULL").header("X-Factory-Id", "A")
                             .contentType("application/json").content(body)).andExpect(status().isOk())
                     .andExpect(jsonPath("assignedBy").value("1")).andExpect(jsonPath("assignedAt").isNotEmpty());
@@ -172,17 +172,18 @@ class OperatorAssignmentHttpTest {
                             .content(body.replace("\"routingNodeId\":1", "\"routingNodeId\":3")))
                     .andExpect(status().isUnprocessableEntity());
             http.perform(post(A).header("Authorization", "Bearer FULL").header("X-Factory-Id", "A")
-                            .contentType("application/json").content(body.replace("\"executionId\":1", "\"executionId\":2")))
+                            .contentType("application/json")
+                            .content(body.replace("\"executionCode\":1", "\"executionCode\":2")))
                     .andExpect(status().isConflict());
             var eligibility = c.getBean(ReportOperatorEligibilityService.class);
             FactoryContext.runWithScope(new FactoryScope(new FactoryId("A")), () -> {
-                eligibility.requireEligible(1L, 1L, 1L);
-                assertEquals(ErrorCode.OPERATOR_NOT_ASSIGNED, assertThrows(FoundationException.class, () -> eligibility.requireEligible(1L, 2L, 1L)).code());
+                eligibility.requireEligible("1", 1L, 1L);
+                assertEquals(ErrorCode.OPERATOR_NOT_ASSIGNED, assertThrows(FoundationException.class, () -> eligibility.requireEligible("1", 2L, 1L)).code());
             });
             http.perform(delete(A).header("Authorization", "Bearer CRUD").header("X-Factory-Id", "A")
                     .contentType("application/json").content("[1]")).andExpect(status().isForbidden());
             http.perform(get(A).header("Authorization", "Bearer FULL").header("X-Factory-Id", "A")
-                            .param("executionId", "1").param("routingNodeId", "1")).andExpect(status().isOk())
+                            .param("executionCode", "1").param("routingNodeId", "1")).andExpect(status().isOk())
                     .andExpect(jsonPath("total").value(2));
             http.perform(get("/api/production/executions/1/assignment-nodes").header("Authorization", "Bearer FULL")
                             .header("X-Factory-Id", "A")).andExpect(status().isOk())

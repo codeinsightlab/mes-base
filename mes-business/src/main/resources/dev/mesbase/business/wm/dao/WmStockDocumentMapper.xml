@@ -22,7 +22,7 @@
     <result column="create_request_id" jdbcType="VARCHAR" property="createRequestId" />
     <result column="post_request_id" jdbcType="VARCHAR" property="postRequestId" />
     <result column="post_request_hash" jdbcType="CHAR" property="postRequestHash" />
-    <result column="source_execution_id" jdbcType="BIGINT" property="sourceExecutionId" />
+    <result column="source_execution_code" jdbcType="VARCHAR" property="sourceExecutionCode" />
   </resultMap>
   <resultMap extends="BaseResultMap" id="ResultMapWithBLOBs" type="dev.mesbase.business.wm.domain.WmStockDocumentEntity">
     <result column="source_request_json" jdbcType="LONGVARCHAR" property="sourceRequestJson" />
@@ -88,7 +88,7 @@
   <sql id="Base_Column_List">
     id, document_no, document_type, direction, status, reason, remark, source_workorder_id, create_by,
     create_time, update_by, update_time, posted_by, posted_at, cancelled_by, cancelled_at,
-    revision, create_request_id, post_request_id, post_request_hash, source_execution_id
+    revision, create_request_id, post_request_id, post_request_hash, source_execution_code
   </sql>
   <sql id="Blob_Column_List">
     source_request_json
@@ -141,14 +141,14 @@
       create_by, create_time, update_by,
       update_time, posted_by, posted_at,
       cancelled_by, cancelled_at, revision,
-      create_request_id, post_request_id, post_request_hash, source_execution_id, source_request_json
+      create_request_id, post_request_id, post_request_hash, source_execution_code, source_request_json
       )
     values (#{documentNo,jdbcType=VARCHAR}, #{documentType,jdbcType=VARCHAR}, #{direction,jdbcType=VARCHAR}, #{status,jdbcType=VARCHAR},
       #{reason,jdbcType=VARCHAR}, #{remark,jdbcType=VARCHAR}, #{sourceWorkorderId,jdbcType=BIGINT},
       #{createBy,jdbcType=VARCHAR}, #{createTime,jdbcType=TIMESTAMP}, #{updateBy,jdbcType=VARCHAR},
       #{updateTime,jdbcType=TIMESTAMP}, #{postedBy,jdbcType=BIGINT}, #{postedAt,jdbcType=TIMESTAMP},
       #{cancelledBy,jdbcType=BIGINT}, #{cancelledAt,jdbcType=TIMESTAMP}, #{revision,jdbcType=BIGINT},
-      #{createRequestId,jdbcType=VARCHAR}, #{postRequestId,jdbcType=VARCHAR}, #{postRequestHash,jdbcType=CHAR}, #{sourceExecutionId,jdbcType=BIGINT}, #{sourceRequestJson,jdbcType=LONGVARCHAR}
+      #{createRequestId,jdbcType=VARCHAR}, #{postRequestId,jdbcType=VARCHAR}, #{postRequestHash,jdbcType=CHAR}, #{sourceExecutionCode,jdbcType=VARCHAR}, #{sourceRequestJson,jdbcType=LONGVARCHAR}
       )
   </insert>
   <insert id="insertSelective" keyColumn="id" keyProperty="id" parameterType="dev.mesbase.business.wm.domain.WmStockDocumentEntity" useGeneratedKeys="true">
@@ -211,8 +211,8 @@
       <if test="postRequestHash != null">
         post_request_hash,
       </if>
-      <if test="sourceExecutionId != null">
-        source_execution_id,
+      <if test="sourceExecutionCode != null">
+        source_execution_code,
       </if>
 <if test="sourceRequestJson != null">
         source_request_json,
@@ -276,8 +276,8 @@
       <if test="postRequestHash != null">
         #{postRequestHash,jdbcType=CHAR},
       </if>
-      <if test="sourceExecutionId != null">
-        #{sourceExecutionId,jdbcType=BIGINT},
+      <if test="sourceExecutionCode != null">
+        #{sourceExecutionCode,jdbcType=VARCHAR},
       </if>
 <if test="sourceRequestJson != null">
         #{sourceRequestJson,jdbcType=LONGVARCHAR},
@@ -353,8 +353,8 @@
       <if test="row.postRequestHash != null">
         post_request_hash = #{row.postRequestHash,jdbcType=CHAR},
       </if>
-      <if test="row.sourceExecutionId != null">
-        source_execution_id = #{row.sourceExecutionId,jdbcType=BIGINT},
+      <if test="row.sourceExecutionCode != null">
+        source_execution_code = #{row.sourceExecutionCode,jdbcType=VARCHAR},
       </if>
 <if test="row.sourceRequestJson != null">
         source_request_json = #{row.sourceRequestJson,jdbcType=LONGVARCHAR},
@@ -385,7 +385,7 @@
       revision = #{row.revision,jdbcType=BIGINT},
       create_request_id = #{row.createRequestId,jdbcType=VARCHAR}, post_request_id = #{row.postRequestId,jdbcType=VARCHAR},
       post_request_hash = #{row.postRequestHash,jdbcType=CHAR},
-      source_execution_id = #{row.sourceExecutionId,jdbcType=BIGINT},
+      source_execution_code = #{row.sourceExecutionCode,jdbcType=VARCHAR},
       source_request_json = #{row.sourceRequestJson,jdbcType=LONGVARCHAR}
     <if test="example != null">
       <include refid="Update_By_Example_Where_Clause" />
@@ -412,7 +412,7 @@
       revision = #{row.revision,jdbcType=BIGINT},
       create_request_id = #{row.createRequestId,jdbcType=VARCHAR}, post_request_id = #{row.postRequestId,jdbcType=VARCHAR},
       post_request_hash = #{row.postRequestHash,jdbcType=CHAR},
-      source_execution_id = #{row.sourceExecutionId,jdbcType=BIGINT}
+      source_execution_code = #{row.sourceExecutionCode,jdbcType=VARCHAR}
     <if test="example != null">
       <include refid="Update_By_Example_Where_Clause" />
     </if>
@@ -477,8 +477,8 @@
       <if test="postRequestHash != null">
         post_request_hash = #{postRequestHash,jdbcType=CHAR},
       </if>
-      <if test="sourceExecutionId != null">
-        source_execution_id = #{sourceExecutionId,jdbcType=BIGINT},
+      <if test="sourceExecutionCode != null">
+        source_execution_code = #{sourceExecutionCode,jdbcType=VARCHAR},
       </if>
 <if test="sourceRequestJson != null">
         source_request_json = #{sourceRequestJson,jdbcType=LONGVARCHAR},
@@ -506,7 +506,7 @@
       revision = #{revision,jdbcType=BIGINT},
       create_request_id = #{createRequestId,jdbcType=VARCHAR}, post_request_id = #{postRequestId,jdbcType=VARCHAR},
       post_request_hash = #{postRequestHash,jdbcType=CHAR},
-      source_execution_id = #{sourceExecutionId,jdbcType=BIGINT},
+      source_execution_code = #{sourceExecutionCode,jdbcType=VARCHAR},
       source_request_json = #{sourceRequestJson,jdbcType=LONGVARCHAR}
 where id = #{id,jdbcType=BIGINT}
   </update>
@@ -530,7 +530,7 @@ where id = #{id,jdbcType=BIGINT}
       revision = #{revision,jdbcType=BIGINT},
       create_request_id = #{createRequestId,jdbcType=VARCHAR}, post_request_id = #{postRequestId,jdbcType=VARCHAR},
       post_request_hash = #{postRequestHash,jdbcType=CHAR},
-      source_execution_id = #{sourceExecutionId,jdbcType=BIGINT}
+      source_execution_code = #{sourceExecutionCode,jdbcType=VARCHAR}
 where id = #{id,jdbcType=BIGINT}
   </update>
   <select flushCache="true" id="selectByPrimaryKeyForUpdate" parameterType="Long" resultMap="ResultMapWithBLOBs" useCache="false">

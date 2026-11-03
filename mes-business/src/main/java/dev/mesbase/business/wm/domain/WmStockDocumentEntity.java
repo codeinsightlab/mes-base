@@ -43,7 +43,7 @@ public class WmStockDocumentEntity {
 
     private String postRequestHash;
 
-    private Long sourceExecutionId;
+    private String sourceExecutionCode;
 
 
     private String sourceRequestJson;
@@ -205,12 +205,12 @@ public class WmStockDocumentEntity {
         this.postRequestHash = postRequestHash;
     }
 
-    public Long getSourceExecutionId() {
-        return sourceExecutionId;
+    public String getSourceExecutionCode() {
+        return sourceExecutionCode;
     }
 
-    public void setSourceExecutionId(Long sourceExecutionId) {
-        this.sourceExecutionId = sourceExecutionId;
+    public void setSourceExecutionCode(String sourceExecutionCode) {
+        this.sourceExecutionCode = sourceExecutionCode;
     }
 
 

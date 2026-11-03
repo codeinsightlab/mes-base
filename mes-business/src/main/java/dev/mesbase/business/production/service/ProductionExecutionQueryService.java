@@ -61,8 +61,8 @@ public class ProductionExecutionQueryService {
     }
 
     @Transactional(transactionManager = "businessTransactionManager", readOnly = true)
-    public Display detail(Long id) {
-        return describe(List.of(executions.selectById(id))).getFirst();
+    public Display detail(String code) {
+        return describe(List.of(executions.selectByCode(code))).getFirst();
     }
 
     private List<Display> describe(List<MesProductionExecutionEntity> rows) {

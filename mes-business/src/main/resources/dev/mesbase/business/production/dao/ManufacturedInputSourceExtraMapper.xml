@@ -9,7 +9,7 @@
         <bind name="local" value="@dev.mesbase.business.shared.enums.BusinessSource@LOCAL.getValue()"/>
         <bind name="documentSource" value="@dev.mesbase.business.wm.domain.StockSourceType@OTHER_RECEIPT.getValue()"/>
         SELECT d.id AS document_id, d.document_no, l.id AS line_id, a.id AS stock_action_id,
-               e.id AS execution_id, o.id AS workorder_id, o.bom_id, s.id AS stock_id,
+               e.execution_code AS execution_code, o.id AS workorder_id, o.bom_id, s.id AS stock_id,
                l.material_id, l.warehouse_id, l.unit_id, l.batch_no, l.bin_code,
                l.quantity AS received_qty,
                LEAST(s.quantity, COALESCE(s.available_quantity, s.quantity)) AS stock_available_qty
@@ -21,7 +21,7 @@
             AND a.stock_id = l.stock_id AND a.material_id = l.material_id AND a.unit_id = l.unit_id
             AND a.warehouse_id = l.warehouse_id AND a.quantity_delta = l.quantity
             AND a.batch_no = l.batch_no AND (a.bin_code = l.bin_code OR (a.bin_code IS NULL AND l.bin_code IS NULL))
-        JOIN mes_production_execution e ON e.id = d.source_execution_id AND e.id = a.execution_id
+        JOIN mes_production_execution e ON e.execution_code = d.source_execution_code AND e.execution_code = a.execution_code
             AND e.product_id = l.material_id AND e.batch_no = l.batch_no
         JOIN workorder o ON o.id = e.workorder_id AND o.product_id = e.product_id AND o.source = #{local}
         JOIN material_bom b ON b.id = o.bom_id AND o.bom_id = #{bomId}

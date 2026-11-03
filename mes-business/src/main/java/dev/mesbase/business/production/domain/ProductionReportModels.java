@@ -18,13 +18,13 @@ public final class ProductionReportModels {
     private ProductionReportModels() {
     }
 
-    public record Supplement(@NotNull Long executionId, @NotNull Long routingNodeId,
+    public record Supplement(@NotNull String executionCode, @NotNull Long routingNodeId,
                              @NotNull @DecimalMin(value = "0", inclusive = false) @Digits(integer = 14, fraction = 6) BigDecimal quantity,
                              @NotNull Long operatorUserId, @NotNull @PastOrPresent LocalDateTime reportTime,
                              Long workstationId, @NotBlank @Size(max = 500) String reason, String requestId) {
-        public Supplement(Long executionId, Long routingNodeId, BigDecimal quantity, Long operatorUserId,
+        public Supplement(String executionCode, Long routingNodeId, BigDecimal quantity, Long operatorUserId,
                           LocalDateTime reportTime, Long workstationId, String reason) {
-            this(executionId, routingNodeId, quantity, operatorUserId, reportTime, workstationId, reason, UUID.randomUUID()
+            this(executionCode, routingNodeId, quantity, operatorUserId, reportTime, workstationId, reason, UUID.randomUUID()
                     .toString());
         }
     }
@@ -45,30 +45,30 @@ public final class ProductionReportModels {
     public record NodeTotal(Long routingNodeId, BigDecimal reportedQty) {
     }
 
-    public record ExecutionNodeTotal(Long executionId, Long routingNodeId, BigDecimal reportedQty) {
+    public record ExecutionNodeTotal(String executionCode, Long routingNodeId, BigDecimal reportedQty) {
     }
 
-    public record ExecutionInputBalance(Long executionId, BigDecimal confirmedQty, BigDecimal reservedQty) {
+    public record ExecutionInputBalance(String executionCode, BigDecimal confirmedQty, BigDecimal reservedQty) {
     }
 
-    public record NodeQuantity(Long executionId, Long routingNodeId, Long operationId, String code, String name,
+    public record NodeQuantity(String executionCode, Long routingNodeId, Long operationId, String code, String name,
                                int sequenceNo, BigDecimal inputQty, BigDecimal reportedQty, BigDecimal defectQty,
                                BigDecimal effectiveOutputQty, BigDecimal availableQty, boolean qualityIntegrated,
                                BigDecimal returnedQty, BigDecimal historicalOverrunQty,
                                BigDecimal rawEffectiveOutputQty, BigDecimal rawAvailableQty,
                                BigDecimal unverifiedDefectQty, BigDecimal directDefectQty) {
-        public NodeQuantity(Long executionId, Long routingNodeId, Long operationId, String code, String name,
+        public NodeQuantity(String executionCode, Long routingNodeId, Long operationId, String code, String name,
                             int sequenceNo, BigDecimal inputQty, BigDecimal reportedQty, BigDecimal defectQty,
                             BigDecimal effectiveOutputQty, BigDecimal availableQty, boolean qualityIntegrated) {
-            this(executionId, routingNodeId, operationId, code, name, sequenceNo, inputQty, reportedQty, defectQty, effectiveOutputQty, availableQty, qualityIntegrated, BigDecimal.ZERO, BigDecimal.ZERO, effectiveOutputQty, availableQty, BigDecimal.ZERO, defectQty);
+            this(executionCode, routingNodeId, operationId, code, name, sequenceNo, inputQty, reportedQty, defectQty, effectiveOutputQty, availableQty, qualityIntegrated, BigDecimal.ZERO, BigDecimal.ZERO, effectiveOutputQty, availableQty, BigDecimal.ZERO, defectQty);
         }
 
-        public NodeQuantity(Long executionId, Long routingNodeId, Long operationId, String code, String name,
+        public NodeQuantity(String executionCode, Long routingNodeId, Long operationId, String code, String name,
                             int sequenceNo, BigDecimal inputQty, BigDecimal reportedQty, BigDecimal defectQty,
                             BigDecimal effectiveOutputQty, BigDecimal availableQty, boolean qualityIntegrated,
                             BigDecimal returnedQty, BigDecimal historicalOverrunQty, BigDecimal rawEffectiveOutputQty,
                             BigDecimal rawAvailableQty, BigDecimal unverifiedDefectQty) {
-            this(executionId, routingNodeId, operationId, code, name, sequenceNo, inputQty, reportedQty, defectQty, effectiveOutputQty, availableQty, qualityIntegrated, returnedQty, historicalOverrunQty, rawEffectiveOutputQty, rawAvailableQty, unverifiedDefectQty, defectQty);
+            this(executionCode, routingNodeId, operationId, code, name, sequenceNo, inputQty, reportedQty, defectQty, effectiveOutputQty, availableQty, qualityIntegrated, returnedQty, historicalOverrunQty, rawEffectiveOutputQty, rawAvailableQty, unverifiedDefectQty, defectQty);
         }
 
         public BigDecimal netDefectQty() {
@@ -85,13 +85,13 @@ public final class ProductionReportModels {
 
     }
 
-    public record ExecutionQuantity(Long executionId, Long workorderId, Long routingId,
+    public record ExecutionQuantity(String executionCode, Long workorderId, Long routingId,
                                     BigDecimal targetQty, String pathStatus, boolean writable, String boundary,
                                     List<NodeQuantity> nodes, String routingLabel, BigDecimal productionInputQty,
                                     BigDecimal confirmedInputQty, BigDecimal reservedInputQty, Long productId) {
     }
 
-    public record ExecutionSummary(Long executionId, Long workorderId, Long routingId,
+    public record ExecutionSummary(String executionCode, Long workorderId, Long routingId,
                                    BigDecimal targetQty, String pathStatus, BigDecimal lastNodeReportedQty,
                                    BigDecimal productionInputQty) {
     }

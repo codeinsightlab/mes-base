@@ -27,7 +27,7 @@
     ) t ON t.declaration_id=d.declaration_id AND t.declaration_revision=d.revision_no
     WHERE d.record_action != #{voidAction}
       AND NOT EXISTS (SELECT 1 FROM mes_production_defect newer WHERE newer.declaration_id=d.declaration_id AND newer.revision_no&gt;d.revision_no)
-    <if test="executionId != null">AND d.execution_id=#{executionId}</if>
+    <if test="executionCode != null">AND d.execution_code=#{executionCode}</if>
     <if test="operationId != null">AND n.operation_id=#{operationId}</if>
     <if test="defectTypeId != null">AND d.defect_type_id=#{defectTypeId}</if>
     <if test="wasteCategory != null">AND d.waste_category=#{wasteCategory}</if>

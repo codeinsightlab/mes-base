@@ -62,7 +62,7 @@ class QualityV2HttpTest {
     static ObjectNode declaration(String type, String category) {
         var n = JSON.createObjectNode();
         n.put("requestId", UUID.randomUUID().toString());
-        n.put("executionId", "1");
+        n.put("executionCode", "1");
         n.put("nodeId", "12");
         n.put("defectTypeId", type);
         n.put("expectedTypeRevision", 0);
@@ -196,7 +196,7 @@ class QualityV2HttpTest {
             assertEquals(before, c.getBean(MaterialIssueHttpTest.Fixture.class).business.get("A")
                     .queryForObject("SELECT COUNT(*) FROM mes_production_defect", Integer.class));
             m.perform(full(post(ROOT + "/declarations"), "A").content(body.toString())).andExpect(status().isOk());
-            m.perform(full(get(ROOT + "/statistics"), "A").param("executionId", "1")).andExpect(status().isOk())
+            m.perform(full(get(ROOT + "/statistics"), "A").param("executionCode", "1")).andExpect(status().isOk())
                     .andExpect(jsonPath("items[0].independentQty").value("1.000000"))
                     .andExpect(jsonPath("items[0].netDefectQty").value("1.000000"));
             var material = declaration(type, "MATERIAL");

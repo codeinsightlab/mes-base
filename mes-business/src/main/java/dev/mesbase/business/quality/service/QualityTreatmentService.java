@@ -124,7 +124,7 @@ public class QualityTreatmentService {
      */
     public Details details(String declaration) {
         var summary = current(declaration).summary(false);
-        return new Details(summary, quantityRules.productIdForExecution(summary.executionId()));
+        return new Details(summary, quantityRules.productIdForExecution(summary.executionCode()));
     }
 
     public record EventPage(List<MesQualityTreatmentEntity> items, long total, int offset, int limit,
@@ -164,7 +164,7 @@ public class QualityTreatmentService {
     public MesQualityTreatmentEntity recordDisposition(String declaration, Disposition command, String fingerprint,
                                                        Long stockDocumentId) {
         var d = latest(declaration);
-        var execution = locks.execution(d.getExecutionId());
+        var execution = locks.execution(d.getExecutionCode());
         var s = summary(declaration);
         if (command.destination() != Destination.WAREHOUSE || command.expectedRevision() != d.getRevisionNo() || DefectRecordAction.VOID.getValue()
                 .equals(d.getRecordAction())
@@ -173,7 +173,7 @@ public class QualityTreatmentService {
             ParameterChecks.reject(ErrorCode.QUALITY_TREATMENT_CONFLICT);
         if (stockDocumentId == null || command.warehouseId() == null)
             ParameterChecks.reject(ErrorCode.QUALITY_TREATMENT_CONFLICT);
-        var path = paths.view(d.getExecutionId());
+        var path = paths.view(d.getExecutionCode());
         if (path.path() == null || !ExecutionPathStatus.LOCKED.getValue().equals(path.path().getPathStatus())
                 || !path.selectedNodeIds().contains(d.getAffectedNodeId()))
             ParameterChecks.reject(ErrorCode.QUALITY_TREATMENT_CONFLICT);
@@ -184,7 +184,7 @@ public class QualityTreatmentService {
         row.setRequestHash(fingerprint);
         row.setDeclarationId(declaration);
         row.setDeclarationRevision(d.getRevisionNo());
-        row.setExecutionId(d.getExecutionId());
+        row.setExecutionCode(d.getExecutionCode());
         row.setRoutingNodeId(d.getAffectedNodeId());
         row.setActionType(Action.TRANSFER_WAREHOUSE.getValue());
         row.setReturnedQty(ZERO);
@@ -209,14 +209,14 @@ public class QualityTreatmentService {
     /**
      * Formal quality receipts affect inbound progress, never production output or loss.
      */
-    public boolean hasFormalReceipt(Long execution) {
+    public boolean hasFormalReceipt(String execution) {
         return receiptProofs.selectReceiptProofs(execution).stream().anyMatch(proof -> proof.validCount() == 1L);
     }
 
     /**
      * Called under the common inbound chain lock after all posted facts are visible.
      */
-    public String receiptBlockReason(Long execution) {
+    public String receiptBlockReason(String execution) {
         var current = receiptProofs.selectCurrentFacts(List.of(execution), null);
         for (var fact : current) {
             var summary = fact.summary(false);
@@ -233,7 +233,7 @@ public class QualityTreatmentService {
     public record ProductionBasis(List<Summary> declarations, Iterable<String> factIdentities) {
     }
 
-    public ProductionBasis productionBasis(Long execution) {
+    public ProductionBasis productionBasis(String execution) {
         var summaries = receiptProofs.selectCurrentFacts(List.of(execution), null).stream()
                 .map(fact -> fact.summary(true)).toList();
         return new ProductionBasis(summaries, () -> new Iterator<>() {
@@ -263,18 +263,18 @@ public class QualityTreatmentService {
         });
     }
 
-    public List<NodeTotal> nodeTotals(Long execution) {
+    public List<NodeTotal> nodeTotals(String execution) {
         return nodeTotalsBatch(List.of(execution)).get(execution);
     }
 
-    public Map<Long, List<NodeTotal>> nodeTotalsBatch(List<Long> executions) {
+    public Map<String, List<NodeTotal>> nodeTotalsBatch(List<String> executions) {
         if (executions == null || executions.size() > 1000 || executions.stream().anyMatch(Objects::isNull))
             ParameterChecks.reject(ErrorCode.QUALITY_TREATMENT_CONFLICT);
         var ids = executions.stream().distinct().toList();
         if (ids.isEmpty()) return Map.of();
         var grouped = receiptProofs.selectCurrentFacts(ids, null).stream()
-                .collect(Collectors.groupingBy(CurrentFact::executionId));
-        var result = new LinkedHashMap<Long, List<NodeTotal>>();
+                .collect(Collectors.groupingBy(CurrentFact::executionCode));
+        var result = new LinkedHashMap<String, List<NodeTotal>>();
         for (var id : ids) result.put(id, nodeTotalsRows(grouped.getOrDefault(id, List.of())));
         return Map.copyOf(result);
     }
@@ -301,7 +301,7 @@ public class QualityTreatmentService {
         filter.createCriteria().andDeclarationIdEqualTo(before.getDeclarationId())
                 .andActionTypeNotEqualTo(Action.ASSESS.getValue());
         if (events.countByExample(filter) > 0) ParameterChecks.reject(ErrorCode.QUALITY_TREATMENT_CONFLICT);
-        for (var fact : receiptProofs.selectCurrentFacts(List.of(before.getExecutionId()), null)) {
+        for (var fact : receiptProofs.selectCurrentFacts(List.of(before.getExecutionCode()), null)) {
             var s = fact.summary(true);
             if (s.attribution() == Attribution.OVERLAP && before.getDeclarationId().equals(s.relatedDeclarationId()))
                 ParameterChecks.reject(ErrorCode.QUALITY_TREATMENT_CONFLICT);
@@ -328,7 +328,7 @@ public class QualityTreatmentService {
             throw new FoundationException(ErrorCode.QUALITY_TREATMENT_CONFLICT, failure);
         }
         var d = latest(declaration);
-        locks.execution(d.getExecutionId());
+        locks.execution(d.getExecutionCode());
         d = latest(declaration);
         var fingerprint = digest(hash(command) + ":" + declaration);
         var retry = events.selectByPrimaryKey(command.requestId());
@@ -340,13 +340,13 @@ public class QualityTreatmentService {
         if (command.expectedRevision() != d.getRevisionNo() || DefectRecordAction.VOID.getValue()
                 .equals(d.getRecordAction()))
             ParameterChecks.reject(ErrorCode.QUALITY_TREATMENT_CONFLICT);
-        locks.requireActiveExecution(d.getExecutionId());
-        var path = paths.view(d.getExecutionId());
+        locks.requireActiveExecution(d.getExecutionCode());
+        var path = paths.view(d.getExecutionCode());
         if (path.path() == null || !ExecutionPathStatus.LOCKED.getValue().equals(path.path().getPathStatus())
                 || !path.selectedNodeIds().contains(d.getAffectedNodeId()))
             ParameterChecks.reject(ErrorCode.QUALITY_TREATMENT_CONFLICT);
         appendAssessment(d, command, fingerprint);
-        quantities.validateDefectChange(d.getExecutionId(), d.getAffectedNodeId(), ZERO);
+        quantities.validateDefectChange(d.getExecutionCode(), d.getAffectedNodeId(), ZERO);
         return details(declaration);
     }
 
@@ -364,7 +364,7 @@ public class QualityTreatmentService {
                 ParameterChecks.reject(ErrorCode.QUALITY_TREATMENT_CONFLICT);
             var related = latest(assessment.relatedDeclarationId());
             var other = summary(related.getDeclarationId());
-            if (!related.getExecutionId().equals(d.getExecutionId()) || DefectRecordAction.VOID.getValue()
+            if (!related.getExecutionCode().equals(d.getExecutionCode()) || DefectRecordAction.VOID.getValue()
                     .equals(related.getRecordAction())
                     || other.attribution() != Attribution.INDEPENDENT || d.getDefectQty()
                     .compareTo(related.getDefectQty()) > 0)
@@ -376,7 +376,7 @@ public class QualityTreatmentService {
         row.setRequestHash(fingerprint);
         row.setDeclarationId(d.getDeclarationId());
         row.setDeclarationRevision(d.getRevisionNo());
-        row.setExecutionId(d.getExecutionId());
+        row.setExecutionCode(d.getExecutionCode());
         row.setRoutingNodeId(d.getAffectedNodeId());
         row.setActionType(Action.ASSESS.name());
         row.setAttributionType(assessment.type().name());

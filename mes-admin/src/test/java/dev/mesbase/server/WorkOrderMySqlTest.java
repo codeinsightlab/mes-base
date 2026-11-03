@@ -203,8 +203,8 @@ class WorkOrderMySqlTest {
                 assertEquals(0, created.allocation().executionCount());
                 assertThrows(FoundationException.class, () -> service.create(input));
                 assertThrows(FoundationException.class, () -> service.update(order, new WorkOrderModels.Save(tag, product, new BigDecimal("1000"), routing, null, null, null, null, null, 99, "WORK_ORDER")));
-                var e = executionService.insert(new MesProductionExecutionCreateCommand(order, routing, new BigDecimal("400"), "READY", null, null, tag));
-                executionService.insert(new MesProductionExecutionCreateCommand(order, routing, new BigDecimal("300"), "READY", null, null, tag));
+                var e = executionService.insert(new MesProductionExecutionCreateCommand(tag + ":TEST_ONLY#A", order, routing, new BigDecimal("400"), "READY", null, null, tag));
+                executionService.insert(new MesProductionExecutionCreateCommand(tag + ":TEST_ONLY#B", order, routing, new BigDecimal("300"), "READY", null, null, tag));
                 assertEquals(new BigDecimal("700.000000"), service.allocation(order).allocatedTargetQty());
                 assertEquals(new BigDecimal("300.000000"), service.allocation(order).remainingTargetQty());
                 assertThrows(FoundationException.class, () -> executionService.updateById(e.getId(), new MesProductionExecutionUpdateCommand(order, routing, new BigDecimal("400"), "RUNNING", LocalDateTime.now(), null, tag)));

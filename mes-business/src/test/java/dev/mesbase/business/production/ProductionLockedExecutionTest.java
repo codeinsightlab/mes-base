@@ -47,12 +47,13 @@ class ProductionLockedExecutionTest {
         manager = new OwnedTransactionManager(new DriverManagerDataSource("jdbc:h2:mem:" + UUID.randomUUID(), "sa", ""));
         execution = new MesProductionExecutionEntity();
         execution.setId(17L);
+        execution.setExecutionCode("17");
         execution.setWorkorderId(11L);
         var order = new WorkorderEntity();
         order.setId(11L);
         order.setStatus("RELEASED");
-        when(executions.selectByPrimaryKey(17L)).thenReturn(execution);
-        when(executions.selectByPrimaryKeyForUpdate(17L)).thenReturn(execution);
+        when(executions.selectByCode("17")).thenReturn(execution);
+        when(executions.selectByCodeForUpdate("17")).thenReturn(execution);
         when(orders.selectByPrimaryKeyForUpdate(11L)).thenReturn(order);
     }
 
@@ -63,7 +64,7 @@ class ProductionLockedExecutionTest {
 
     @Test
     void noTransactionCannotIssueALockedViewOrTouchMappers() {
-        assertThrows(FoundationException.class, () -> locks.lockedExecution(17L, manager));
+        assertThrows(FoundationException.class, () -> locks.lockedExecution("17", manager));
         verifyNoInteractions(orders, executions);
     }
 
@@ -71,17 +72,17 @@ class ProductionLockedExecutionTest {
     void requiredCallsShareThePhysicalUnitButCommitExpiresTheView() {
         var captured = new AtomicReference<LockedExecution>();
         new TransactionTemplate(manager).execute(status -> {
-            var locked = locks.lockedExecution(17L, manager);
+            var locked = locks.lockedExecution("17", manager);
             captured.set(locked);
             assertSame(execution, locked.execution());
             new TransactionTemplate(manager).execute(nested -> {
                 assertSame(execution, locked.execution());
                 return null;
             });
-            locks.requireActiveExecution(17L, locked);
+            locks.requireActiveExecution("17", locked);
             // The original discovery and current locking read are retained, but the joined guard reuses them.
-            verify(executions, times(1)).selectByPrimaryKey(17L);
-            verify(executions, times(1)).selectByPrimaryKeyForUpdate(17L);
+            verify(executions, times(1)).selectByCode("17");
+            verify(executions, times(1)).selectByCodeForUpdate("17");
             verify(orders, times(1)).selectByPrimaryKeyForUpdate(11L);
             return null;
         });
@@ -95,7 +96,7 @@ class ProductionLockedExecutionTest {
     @Test
     void suspensionAndResumePermanentlyInvalidateTheOldView() {
         new TransactionTemplate(manager).execute(status -> {
-            var locked = locks.lockedExecution(17L, manager);
+            var locked = locks.lockedExecution("17", manager);
             var nested = new TransactionTemplate(manager);
             nested.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
             nested.execute(inner -> {
@@ -111,19 +112,19 @@ class ProductionLockedExecutionTest {
     void rollbackFactoryChangeAndCrossThreadUseCannotReuseTheView() {
         var captured = new AtomicReference<LockedExecution>();
         new TransactionTemplate(manager).execute(status -> {
-            var locked = locks.lockedExecution(17L, manager);
+            var locked = locks.lockedExecution("17", manager);
             captured.set(locked);
             status.setRollbackOnly();
             return null;
         });
         assertThrows(FoundationException.class, () -> captured.get().execution());
         new TransactionTemplate(manager).execute(status -> {
-            var locked = locks.lockedExecution(17L, manager);
+            var locked = locks.lockedExecution("17", manager);
             FactoryContext.bind(new FactoryScope(new FactoryId("B")));
             assertThrows(FoundationException.class, locked::verify);
             FactoryContext.bind(new FactoryScope(new FactoryId("A")));
             assertThrows(FoundationException.class, locked::verify);
-            var other = locks.lockedExecution(17L, manager);
+            var other = locks.lockedExecution("17", manager);
             try (var pool = Executors.newSingleThreadExecutor()) {
                 assertTrue(pool.submit(() -> {
                     assertThrows(FoundationException.class, other::verify);

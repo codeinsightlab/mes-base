@@ -5,17 +5,17 @@
         SELECT p.routing_node_id AS routingNodeId, COALESCE(SUM(r.quantity_delta), 0) AS reportedQty
         FROM mes_execution_path_node p
                  LEFT JOIN mes_production_report r
-                           ON r.execution_id = p.execution_id AND r.routing_node_id = p.routing_node_id
-        WHERE p.execution_id = #{executionId}
+                           ON r.execution_code = p.execution_code AND r.routing_node_id = p.routing_node_id
+        WHERE p.execution_code = #{executionCode}
         GROUP BY p.routing_node_id
     </select>
     <select id="originalBalance" resultType="dev.mesbase.business.production.domain.ProductionReportModels$Balance">
         SELECT r.id AS reportId, r.quantity_delta + COALESCE(SUM(a.quantity_delta), 0) AS effectiveQty
         FROM mes_production_execution e
-                 JOIN mes_production_report r ON r.execution_id = e.id
-                 LEFT JOIN mes_production_report a ON a.reference_report_id = r.id AND a.execution_id = e.id AND
+                 JOIN mes_production_report r ON r.execution_code = e.execution_code
+                 LEFT JOIN mes_production_report a ON a.reference_report_id = r.id AND a.execution_code = e.execution_code AND
                                                       a.routing_node_id = r.routing_node_id
-        WHERE e.id = #{executionId}
+        WHERE e.execution_code = #{executionCode}
           AND r.id = #{reportId}
         GROUP BY r.id, r.quantity_delta
     </select>
@@ -31,18 +31,18 @@
         <bind name="inputSUCCEEDED"
               value="@dev.mesbase.business.issue.domain.MaterialIssueSubmissionStatus@SUCCEEDED.getValue()"/>
         <bind name="inputLOCAL_ONLY" value="@dev.mesbase.business.integration.warehouse.ErpActionResult$Mode@LOCAL_ONLY.getValue()"/>
-        SELECT e.id AS executionId,e.workorder_id AS workorderId,e.routing_id AS
+        SELECT e.execution_code AS executionCode,e.workorder_id AS workorderId,e.routing_id AS
         routingId,
         e.target_qty AS targetQty,p.path_status AS pathStatus,
         CASE WHEN e.routing_id IS NULL THEN NULL ELSE COALESCE(SUM(r.quantity_delta),0) END AS lastNodeReportedQty,
-        COALESCE((SELECT SUM(f.output_qty) FROM mes_material_issue_input f JOIN wm_stock_document d ON d.id=f.document_id AND d.source_execution_id=f.execution_id WHERE f.execution_id=e.id AND f.input_kind=#{enumProductionInput} AND f.confirmed_at IS NOT NULL AND f.stock_applied=TRUE
+        COALESCE((SELECT SUM(f.output_qty) FROM mes_material_issue_input f JOIN wm_stock_document d ON d.id=f.document_id AND d.source_execution_code=f.execution_code WHERE f.execution_code=e.execution_code AND f.input_kind=#{enumProductionInput} AND f.confirmed_at IS NOT NULL AND f.stock_applied=TRUE
         AND f.source_mode=#{enumLocalOnly} AND d.document_type=#{enumMaterialIssue} AND d.status=#{enumPosted}
         AND NOT EXISTS(SELECT 1 FROM wm_stock_document_line original_line JOIN wm_stock_action reversal ON reversal.reference_action_id=original_line.stock_action_id
           WHERE original_line.document_id=f.document_id AND reversal.action_type=#{enumReversal})),0) AS productionInputQty
-        FROM mes_production_execution e LEFT JOIN mes_execution_path p ON p.id=e.id
-        LEFT JOIN mes_execution_path_node n ON n.execution_id=e.id
-        AND n.sequence_no=(SELECT MAX(last.sequence_no) FROM mes_execution_path_node last WHERE last.execution_id=e.id)
-        LEFT JOIN mes_production_report r ON r.execution_id=e.id AND r.routing_node_id=n.routing_node_id
+        FROM mes_production_execution e LEFT JOIN mes_execution_path p ON p.execution_code=e.execution_code
+        LEFT JOIN mes_execution_path_node n ON n.execution_code=e.execution_code
+        AND n.sequence_no=(SELECT MAX(last.sequence_no) FROM mes_execution_path_node last WHERE last.execution_code=e.execution_code)
+        LEFT JOIN mes_production_report r ON r.execution_code=e.execution_code AND r.routing_node_id=n.routing_node_id
         WHERE e.workorder_id=#{workorderId}
         GROUP BY e.id,e.workorder_id,e.routing_id,e.target_qty,p.path_status
         ORDER BY e.id DESC
@@ -53,29 +53,29 @@
     <bind name="enumReversal" value="@dev.mesbase.business.wm.domain.StockActionType@REVERSAL.getValue()"/>
     <bind name="enumProductionInput" value="@dev.mesbase.business.production.domain.ProductionInputKind@PRODUCTION_INPUT.getValue()"/>
     <bind name="enumMaterialIssue" value="@dev.mesbase.business.wm.domain.StockDocumentType@MATERIAL_ISSUE.getValue()"/>
-        FROM mes_material_issue_input f JOIN wm_stock_document d ON d.id=f.document_id AND d.source_execution_id=f.execution_id WHERE f.input_kind=#{enumProductionInput} AND f.confirmed_at IS NOT NULL AND f.stock_applied=TRUE
+        FROM mes_material_issue_input f JOIN wm_stock_document d ON d.id=f.document_id AND d.source_execution_code=f.execution_code WHERE f.input_kind=#{enumProductionInput} AND f.confirmed_at IS NOT NULL AND f.stock_applied=TRUE
         AND f.source_mode=#{enumLocalOnly} AND d.document_type=#{enumMaterialIssue} AND d.status=#{enumPosted}
         AND NOT EXISTS(SELECT 1 FROM wm_stock_document_line original_line JOIN wm_stock_action reversal ON reversal.reference_action_id=original_line.stock_action_id
           WHERE original_line.document_id=f.document_id AND reversal.action_type=#{enumReversal})
     </sql>
     <select id="inputBalance" resultType="dev.mesbase.business.production.domain.ProductionInputBalance">
         SELECT COALESCE(SUM(f.output_qty),0) AS confirmedQty, CAST(0 AS DECIMAL(20,6)) AS reservedQty
-        <include refid="InputBalanceFrom"/> AND f.execution_id=#{executionId}
+        <include refid="InputBalanceFrom"/> AND f.execution_code=#{executionCode}
     </select>
     <select id="inputBalances" resultType="dev.mesbase.business.production.domain.ProductionReportModels$ExecutionInputBalance">
-        SELECT f.execution_id AS executionId,COALESCE(SUM(f.output_qty),0) AS confirmedQty,
+        SELECT f.execution_code AS executionCode,COALESCE(SUM(f.output_qty),0) AS confirmedQty,
                CAST(0 AS DECIMAL(20,6)) AS reservedQty
-        <include refid="InputBalanceFrom"/> AND f.execution_id IN
-        <foreach collection="executionIds" item="id" open="(" close=")" separator=",">#{id}</foreach>
-        GROUP BY f.execution_id
+        <include refid="InputBalanceFrom"/> AND f.execution_code IN
+        <foreach collection="executionCodes" item="id" open="(" close=")" separator=",">#{id}</foreach>
+        GROUP BY f.execution_code
     </select>
     <select id="nodeTotalsBatch"
             resultType="dev.mesbase.business.production.domain.ProductionReportModels$ExecutionNodeTotal">
-        SELECT p.execution_id executionId,p.routing_node_id routingNodeId,COALESCE(SUM(r.quantity_delta),0) reportedQty
+        SELECT p.execution_code executionCode,p.routing_node_id routingNodeId,COALESCE(SUM(r.quantity_delta),0) reportedQty
         FROM mes_execution_path_node p LEFT JOIN mes_production_report r
-        ON r.execution_id=p.execution_id AND r.routing_node_id=p.routing_node_id
-        WHERE p.execution_id IN
-        <foreach collection="executionIds" item="id" open="(" close=")" separator=",">#{id}</foreach>
-        GROUP BY p.execution_id,p.routing_node_id
+        ON r.execution_code=p.execution_code AND r.routing_node_id=p.routing_node_id
+        WHERE p.execution_code IN
+        <foreach collection="executionCodes" item="id" open="(" close=")" separator=",">#{id}</foreach>
+        GROUP BY p.execution_code,p.routing_node_id
     </select>
 </mapper>

@@ -144,10 +144,10 @@ public class QualityDispositionService {
         if (c.destination() == Destination.RETURN_NODE)
             ParameterChecks.reject(ErrorCode.QUALITY_TREATMENT_CONFLICT);
         var d = treatments.latest(declaration);
-        completion.getObject().lockInboundChain(d.getExecutionId());
-        var execution = locks.execution(d.getExecutionId());
+        completion.getObject().lockInboundChain(d.getExecutionCode());
+        var execution = locks.execution(d.getExecutionCode());
         if (replayed(declaration, c.requestId(), hash)) return treatments.details(declaration);
-        locks.requireActiveExecution(execution.getId());
+        locks.requireActiveExecution(execution.getExecutionCode());
         if (!ProductionExecutionStatus.allowsNormalReporting(execution.getStatus()))
             ParameterChecks.reject(ErrorCode.QUALITY_TREATMENT_CONFLICT);
         sources.execution(execution, c.warehouseId());
@@ -164,7 +164,7 @@ public class QualityDispositionService {
             if (BusinessSourceRules.required(sources.order(execution.getWorkorderId())
                     .getSource()) != BusinessSource.LOCAL)
                 throw new FoundationException(ErrorCode.INTEGRATION_NOT_CONFIGURED);
-            var batchNo = identities.requiredBatch(execution.getId());
+            var batchNo = identities.requiredBatch(execution.getExecutionCode());
             var owner = documents.getObject();
             // Material rule validation precedes warehouse/stock locks, including existing stock rows.
             var warehouse = warehouses.selectByPrimaryKey(c.warehouseId());
@@ -198,7 +198,7 @@ public class QualityDispositionService {
             owner.approve(documentId, new StockDocumentModels.Post(c.requestId(), owner.detail(documentId).document()
                     .getRevision()));
         }
-        completion.getObject().afterInboundApproved(execution.getId(), c.requestId());
+        completion.getObject().afterInboundApproved(execution.getExecutionCode(), c.requestId());
         return treatments.details(declaration);
     }
 

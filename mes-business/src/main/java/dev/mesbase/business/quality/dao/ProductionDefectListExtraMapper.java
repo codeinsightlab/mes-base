@@ -10,14 +10,14 @@ import org.apache.ibatis.annotations.Param;
  * Current version projections, immutable proof reads and page-scoped display references.
  */
 public interface ProductionDefectListExtraMapper {
-    List<CurrentFact> selectCurrentFacts(@Param("executionIds") List<Long> executionIds,
+    List<CurrentFact> selectCurrentFacts(@Param("executionCodes") List<String> executionCodes,
                                          @Param("declarationId") String declarationId);
 
-    List<String> selectFactIdentities(@Param("executionId") Long executionId);
+    List<String> selectFactIdentities(@Param("executionCode") String executionCode);
 
-    long invalidCurrentReceipts(@Param("executionId") Long executionId);
+    long invalidCurrentReceipts(@Param("executionCode") String executionCode);
 
-    List<ReceiptProof> selectReceiptProofs(@Param("executionId") Long executionId);
+    List<ReceiptProof> selectReceiptProofs(@Param("executionCode") String executionCode);
 
     List<ListContext> selectContexts(@Param("ids") List<Long> ids);
 

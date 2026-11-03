@@ -7,7 +7,7 @@ import java.math.BigDecimal;
  * into that stock; it is not a remaining allocation for this particular receipt line.
  */
 public record ManufacturedInputSource(Long documentId, String documentNo, Long lineId, String stockActionId,
-                                      Long executionId, Long workorderId, Long bomId, Long stockId,
+                                      String executionCode, Long workorderId, Long bomId, Long stockId,
                                       Long materialId, Long warehouseId, Long unitId, String batchNo,
                                       String binCode, BigDecimal receivedQty, BigDecimal stockAvailableQty) {
 }

@@ -3,7 +3,7 @@
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="dev.mesbase.business.production.dao.MesExecutionPathMapper">
   <resultMap id="BaseResultMap" type="dev.mesbase.business.production.domain.MesExecutionPathEntity">
-    <id column="id" jdbcType="BIGINT" property="id" />
+    <id column="execution_code" jdbcType="VARCHAR" property="id" />
     <result column="routing_id" jdbcType="BIGINT" property="routingId" />
     <result column="path_status" jdbcType="VARCHAR" property="pathStatus" />
     <result column="revision" jdbcType="INTEGER" property="revision" />
@@ -69,7 +69,7 @@
     </where>
   </sql>
   <sql id="Base_Column_List">
-    id, routing_id, path_status, revision, selected_at, locked_at
+    execution_code, routing_id, path_status, revision, selected_at, locked_at
   </sql>
   <select id="selectByExample" parameterType="dev.mesbase.business.production.domain.MesExecutionPathExample" resultMap="BaseResultMap">
     select
@@ -82,15 +82,15 @@
       order by ${orderByClause}
     </if>
   </select>
-  <select id="selectByPrimaryKey" parameterType="Long" resultMap="BaseResultMap">
+  <select id="selectByPrimaryKey" parameterType="String" resultMap="BaseResultMap">
     select 
     <include refid="Base_Column_List" />
     from mes_execution_path
-    where id = #{id,jdbcType=BIGINT}
+    where execution_code = #{id,jdbcType=VARCHAR}
   </select>
-  <delete id="deleteByPrimaryKey" parameterType="Long">
+  <delete id="deleteByPrimaryKey" parameterType="String">
     delete from mes_execution_path
-    where id = #{id,jdbcType=BIGINT}
+    where execution_code = #{id,jdbcType=VARCHAR}
   </delete>
   <delete id="deleteByExample" parameterType="dev.mesbase.business.production.domain.MesExecutionPathExample">
     delete from mes_execution_path
@@ -99,10 +99,10 @@
     </if>
   </delete>
   <insert id="insert" parameterType="dev.mesbase.business.production.domain.MesExecutionPathEntity">
-    insert into mes_execution_path (id, routing_id, path_status, 
+    insert into mes_execution_path (execution_code, routing_id, path_status,
       revision, selected_at, locked_at
       )
-    values (#{id,jdbcType=BIGINT}, #{routingId,jdbcType=BIGINT}, #{pathStatus,jdbcType=VARCHAR}, 
+    values (#{id,jdbcType=VARCHAR}, #{routingId,jdbcType=BIGINT}, #{pathStatus,jdbcType=VARCHAR},
       #{revision,jdbcType=INTEGER}, #{selectedAt,jdbcType=TIMESTAMP}, #{lockedAt,jdbcType=TIMESTAMP}
       )
   </insert>
@@ -110,7 +110,7 @@
     insert into mes_execution_path
     <trim prefix="(" suffix=")" suffixOverrides=",">
       <if test="id != null">
-        id,
+        execution_code,
       </if>
       <if test="routingId != null">
         routing_id,
@@ -130,7 +130,7 @@
     </trim>
     <trim prefix="values (" suffix=")" suffixOverrides=",">
       <if test="id != null">
-        #{id,jdbcType=BIGINT},
+        #{id,jdbcType=VARCHAR},
       </if>
       <if test="routingId != null">
         #{routingId,jdbcType=BIGINT},
@@ -159,7 +159,7 @@
     update mes_execution_path
     <set>
       <if test="row.id != null">
-        id = #{row.id,jdbcType=BIGINT},
+        execution_code = #{row.id,jdbcType=VARCHAR},
       </if>
       <if test="row.routingId != null">
         routing_id = #{row.routingId,jdbcType=BIGINT},
@@ -183,7 +183,7 @@
   </update>
   <update id="updateByExample" parameterType="map">
     update mes_execution_path
-    set id = #{row.id,jdbcType=BIGINT},
+    set execution_code = #{row.id,jdbcType=VARCHAR},
       routing_id = #{row.routingId,jdbcType=BIGINT},
       path_status = #{row.pathStatus,jdbcType=VARCHAR},
       revision = #{row.revision,jdbcType=INTEGER},
@@ -212,7 +212,7 @@
         locked_at = #{lockedAt,jdbcType=TIMESTAMP},
       </if>
     </set>
-    where id = #{id,jdbcType=BIGINT}
+    where execution_code = #{id,jdbcType=VARCHAR}
   </update>
   <update id="updateByPrimaryKey" parameterType="dev.mesbase.business.production.domain.MesExecutionPathEntity">
     update mes_execution_path
@@ -221,6 +221,6 @@
       revision = #{revision,jdbcType=INTEGER},
       selected_at = #{selectedAt,jdbcType=TIMESTAMP},
       locked_at = #{lockedAt,jdbcType=TIMESTAMP}
-    where id = #{id,jdbcType=BIGINT}
+    where execution_code = #{id,jdbcType=VARCHAR}
   </update>
 </mapper>

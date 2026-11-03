@@ -8,6 +8,8 @@ import dev.mesbase.business.production.domain.ProductionCombinationModels.Stock;
 import dev.mesbase.core.error.ErrorCode;
 import dev.mesbase.core.error.FoundationException;
 import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
+import java.util.Collections;
 import java.math.BigInteger;
 import java.math.RoundingMode;
 import java.util.ArrayDeque;
@@ -26,6 +28,31 @@ import java.util.Set;
  * Pure bounded integer-capacity planning. No database, stock reservation or execution side effects.
  */
 public final class ProductionCombinationPlanner {
+    private static final Comparator<String> BATCH_ORDER = Comparator.nullsFirst(Comparator.naturalOrder());
+
+    private static List<Selection> canonical(List<Demand> demands, List<Selection> selected) {
+        var byId = new HashMap<Long, List<String>>();
+        for (var row : selected) {
+            if (row == null || row.demandLineId() == null || row.batches() == null || row.batches().isEmpty()
+                    || row.batches().size() > 100 || byId.putIfAbsent(row.demandLineId(), row.batches()) != null)
+                throw new FoundationException(ErrorCode.BAD_REQUEST);
+        }
+        if (byId.size() != demands.size()) throw new FoundationException(ErrorCode.BAD_REQUEST);
+        var result = new ArrayList<Selection>();
+        for (var demand : demands.stream().sorted(Comparator.comparingInt(Demand::lineNo).thenComparing(Demand::id))
+                .toList()) {
+            var values = byId.get(demand.id());
+            if (values == null) throw new FoundationException(ErrorCode.BAD_REQUEST);
+            var batches = new ArrayList<>(values.stream().distinct().sorted(BATCH_ORDER).toList());
+            if (batches.stream().anyMatch(v -> v != null && (v.codePointCount(0, v.length()) > 128
+                    || !StandardCharsets.UTF_8.newEncoder().canEncode(v)
+                    || v.codePoints().anyMatch(Character::isISOControl))))
+                throw new FoundationException(ErrorCode.BAD_REQUEST);
+            result.add(new Selection(demand.id(), Collections.unmodifiableList(batches)));
+        }
+        return List.copyOf(result);
+    }
+
     private static final BigInteger ZERO = BigInteger.ZERO;
     private static final BigInteger ONE = BigInteger.ONE;
     private static final BigInteger TWO = BigInteger.TWO;
@@ -71,36 +98,36 @@ public final class ProductionCombinationPlanner {
         validate(demands, stocks, plan);
         var budget = new Budget();
         var lots = lots(stocks, demands);
-        var all = selections(demands, lots);
-        var maximum = maximum(demands, lots, all, plan, confirmed, issued, requested.min(remaining), outputPrecision, budget);
-        if (maximum.signum() <= 0) return new Plan(BigDecimal.ZERO, List.of(), List.of());
-        // The same material has the same allowed source set during generation. Largest lots first
-        // attain the minimum number of distinct lots needed for its total material requirement.
-        var needs = requirements(demands, plan, confirmed, issued, maximum);
-        var totalByMaterial = new HashMap<Long, BigInteger>();
-        for (int i = 0; i < demands.size(); i++)
-            totalByMaterial.merge(demands.get(i).materialId(), needs.get(i), BigInteger::add);
+        if (requested == null || requested.signum() <= 0 || requested.compareTo(remaining) > 0
+                || scaled(requested).remainder(quantum(outputPrecision)).signum() != 0)
+            throw new FoundationException(ErrorCode.PRODUCTION_INPUT_QUOTA_EXCEEDED);
+        var needs = requirements(demands, plan, confirmed, issued, requested);
+        var seen = new HashSet<Long>();
         var chosen = new ArrayList<Lot>();
-        for (var material : totalByMaterial.keySet().stream().sorted().toList()) {
-            var rest = totalByMaterial.get(material);
-            boolean hasBatch = false;
-            for (var lot : lots.stream().filter(l -> l.batch().materialId().equals(material))
+        for (int i = 0; i < demands.size(); i++) {
+            var demand = demands.get(i);
+            if (!seen.add(demand.materialId())) throw new FoundationException(ErrorCode.PRODUCTION_INPUT_STALE);
+            var need = needs.get(i);
+            if (need.signum() < 0 || need.remainder(quantum(demand.quantityPrecision())).signum() != 0)
+                throw new FoundationException(ErrorCode.BAD_REQUEST);
+            var candidates = lots.stream().filter(l -> l.batch().materialId().equals(demand.materialId()))
                     .sorted(Comparator.comparing(Lot::available).reversed()
-                            .thenComparing(l -> l.batch().batchNo(), ProductionCombinationRules.BATCH_ORDER))
-                    .toList()) {
-                // Every required material keeps a fixed source identity, even when this
-                // small planning quantity rounds its current cumulative increment to zero.
-                if (rest.signum() <= 0 && hasBatch) break;
-                chosen.add(lot);
-                hasBatch = true;
-                rest = rest.subtract(lot.available());
+                            .thenComparing(l -> l.batch().batchNo(), BATCH_ORDER)).toList();
+            var candidate = candidates.stream().filter(l -> l.available().compareTo(need) >= 0).findFirst();
+            if (candidate.isEmpty()) {
+                var available = candidates.stream().map(Lot::available).reduce(ZERO, BigInteger::add);
+                if (available.compareTo(need) >= 0 && candidates.size() > 1)
+                    throw new FoundationException(ErrorCode.PRODUCTION_COMBINATION_SPLIT_BATCH_REQUIRED);
+                throw new FoundationException(ErrorCode.STOCK_INSUFFICIENT);
             }
+            chosen.add(candidate.get());
         }
-        var allocation = allocate(demands, chosen, selections(demands, chosen), needs, true, budget);
-        if (allocation == null) throw new FoundationException(ErrorCode.RESOURCE_CONFLICT);
-        // Include the selected material lot set on every same-material demand line. A zero
-        // allocation now must not make a later positive cumulative rounding delta impossible.
-        return new Plan(maximum, ProductionCombinationRules.canonical(demands, selections(demands, chosen)), allocation);
+        if (needs.stream().allMatch(n -> n.signum() == 0))
+            throw new FoundationException(ErrorCode.STOCK_INSUFFICIENT);
+        var selected = selections(demands, chosen);
+        var allocation = allocate(demands, chosen, selected, needs, true, budget);
+        if (allocation == null || allocation.isEmpty()) throw new FoundationException(ErrorCode.STOCK_INSUFFICIENT);
+        return new Plan(requested, canonical(demands, selected), allocation);
     }
 
     public static Plan fixed(List<Demand> demands, List<Stock> stocks, List<Selection> selected,
@@ -108,7 +135,7 @@ public final class ProductionCombinationPlanner {
                              BigDecimal requested, BigDecimal remaining, int outputPrecision) {
         validate(demands, stocks, plan);
         var budget = new Budget();
-        var canonical = ProductionCombinationRules.canonical(demands, selected);
+        var canonical = canonical(demands, selected);
         var lots = lots(stocks, demands);
         var maximum = maximum(demands, lots, canonical, plan, confirmed, issued, remaining, outputPrecision, budget);
         if (requested == null) return new Plan(maximum, canonical, List.of());
@@ -146,7 +173,7 @@ public final class ProductionCombinationPlanner {
         var groups = new LinkedHashMap<Batch, List<Stock>>();
         var seen = new HashSet<Long>();
         for (var stock : usable.stream().sorted(Comparator.comparing(Stock::materialId)
-                        .thenComparing(Stock::batchNo, ProductionCombinationRules.BATCH_ORDER).thenComparing(Stock::id))
+                        .thenComparing(Stock::batchNo, BATCH_ORDER).thenComparing(Stock::id))
                 .toList()) {
             if (!seen.add(stock.id()) || stock.availableQty().signum() < 0)
                 throw new FoundationException(ErrorCode.RESOURCE_CONFLICT);
@@ -164,7 +191,7 @@ public final class ProductionCombinationPlanner {
     private static List<Selection> selections(List<Demand> demands, List<Lot> lots) {
         return demands.stream()
                 .map(d -> new Selection(d.id(), lots.stream().filter(l -> l.batch().materialId().equals(d.materialId()))
-                        .map(l -> l.batch().batchNo()).sorted(ProductionCombinationRules.BATCH_ORDER).toList()))
+                        .map(l -> l.batch().batchNo()).sorted(BATCH_ORDER).toList()))
                 .toList();
     }
 

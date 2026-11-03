@@ -22,7 +22,7 @@ public final class ProductionDefectModels {
     private ProductionDefectModels() {
     }
 
-    public record Facts(@NotNull Long executionId, @NotNull Long affectedNodeId,
+    public record Facts(@NotNull String executionCode, @NotNull Long affectedNodeId,
                         @NotNull @DecimalMin(value = "0", inclusive = false) @Digits(integer = 14, fraction = 6) BigDecimal defectQty,
                         @NotBlank String wasteCategory, @NotBlank @Size(max = 500) String defectReason,
                         Long responsibleUserId,

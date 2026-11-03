@@ -40,7 +40,7 @@ public class OperatorDirectoryController {
 
     @GetMapping("/api/production/executions/{id}/assignment-nodes")
     @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED, permission = MesExecutionAssignmentPermissions.LIST)
-    public ExecutionNodes nodes(@PathVariable Long id) {
+    public ExecutionNodes nodes(@PathVariable String id) {
         var result = candidates.nodes(id);
         return new ExecutionNodes(result.status(), result.nodes().stream()
                 .map(n -> new Node(n.id().toString(), n.operationId().toString(), n.code(), n.name())).toList());

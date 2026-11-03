@@ -3,7 +3,7 @@
 <mapper namespace="dev.mesbase.business.production.dao.MesProductionReportMapper">
   <resultMap id="BaseResultMap" type="dev.mesbase.business.production.domain.MesProductionReportEntity">
     <id column="id" jdbcType="BIGINT" property="id" />
-    <result column="execution_id" jdbcType="BIGINT" property="executionId" />
+    <result column="execution_code" jdbcType="VARCHAR" property="executionCode" />
     <result column="routing_node_id" jdbcType="BIGINT" property="routingNodeId" />
     <result column="record_type" jdbcType="VARCHAR" property="recordType" />
     <result column="quantity_delta" jdbcType="DECIMAL" property="quantityDelta" />
@@ -77,7 +77,7 @@
     </where>
   </sql>
   <sql id="Base_Column_List">
-    id, execution_id, routing_node_id, record_type, quantity_delta, reference_report_id,
+    id, execution_code, routing_node_id, record_type, quantity_delta, reference_report_id,
     operator_user_id, recorded_by, report_time, workstation_id, reason, create_time,
     request_id, command_fingerprint, source_quality_event_id
   </sql>
@@ -109,12 +109,12 @@
     </if>
   </delete>
   <insert id="insert" keyColumn="id" keyProperty="id" parameterType="dev.mesbase.business.production.domain.MesProductionReportEntity" useGeneratedKeys="true">
-    insert into mes_production_report (execution_id, routing_node_id, record_type,
+    insert into mes_production_report (execution_code, routing_node_id, record_type,
       quantity_delta, reference_report_id, operator_user_id,
       recorded_by, report_time, workstation_id,
       reason, create_time, request_id,
       command_fingerprint, source_quality_event_id)
-    values (#{executionId,jdbcType=BIGINT}, #{routingNodeId,jdbcType=BIGINT}, #{recordType,jdbcType=VARCHAR},
+    values (#{executionCode,jdbcType=VARCHAR}, #{routingNodeId,jdbcType=BIGINT}, #{recordType,jdbcType=VARCHAR},
       #{quantityDelta,jdbcType=DECIMAL}, #{referenceReportId,jdbcType=BIGINT}, #{operatorUserId,jdbcType=BIGINT},
       #{recordedBy,jdbcType=BIGINT}, #{reportTime,jdbcType=TIMESTAMP}, #{workstationId,jdbcType=BIGINT},
       #{reason,jdbcType=VARCHAR}, #{createTime,jdbcType=TIMESTAMP}, #{requestId,jdbcType=VARCHAR},
@@ -123,8 +123,8 @@
   <insert id="insertSelective" keyColumn="id" keyProperty="id" parameterType="dev.mesbase.business.production.domain.MesProductionReportEntity" useGeneratedKeys="true">
     insert into mes_production_report
     <trim prefix="(" suffix=")" suffixOverrides=",">
-      <if test="executionId != null">
-        execution_id,
+      <if test="executionCode != null">
+        execution_code,
       </if>
       <if test="routingNodeId != null">
         routing_node_id,
@@ -167,8 +167,8 @@
       </if>
     </trim>
     <trim prefix="values (" suffix=")" suffixOverrides=",">
-      <if test="executionId != null">
-        #{executionId,jdbcType=BIGINT},
+      <if test="executionCode != null">
+        #{executionCode,jdbcType=VARCHAR},
       </if>
       <if test="routingNodeId != null">
         #{routingNodeId,jdbcType=BIGINT},
@@ -223,8 +223,8 @@
       <if test="row.id != null">
         id = #{row.id,jdbcType=BIGINT},
       </if>
-      <if test="row.executionId != null">
-        execution_id = #{row.executionId,jdbcType=BIGINT},
+      <if test="row.executionCode != null">
+        execution_code = #{row.executionCode,jdbcType=VARCHAR},
       </if>
       <if test="row.routingNodeId != null">
         routing_node_id = #{row.routingNodeId,jdbcType=BIGINT},
@@ -273,7 +273,7 @@
   <update id="updateByExample" parameterType="map">
     update mes_production_report
     set id = #{row.id,jdbcType=BIGINT},
-      execution_id = #{row.executionId,jdbcType=BIGINT},
+      execution_code = #{row.executionCode,jdbcType=VARCHAR},
       routing_node_id = #{row.routingNodeId,jdbcType=BIGINT},
       record_type = #{row.recordType,jdbcType=VARCHAR},
       quantity_delta = #{row.quantityDelta,jdbcType=DECIMAL},
@@ -294,8 +294,8 @@
   <update id="updateByPrimaryKeySelective" parameterType="dev.mesbase.business.production.domain.MesProductionReportEntity">
     update mes_production_report
     <set>
-      <if test="executionId != null">
-        execution_id = #{executionId,jdbcType=BIGINT},
+      <if test="executionCode != null">
+        execution_code = #{executionCode,jdbcType=VARCHAR},
       </if>
       <if test="routingNodeId != null">
         routing_node_id = #{routingNodeId,jdbcType=BIGINT},
@@ -341,7 +341,7 @@
   </update>
   <update id="updateByPrimaryKey" parameterType="dev.mesbase.business.production.domain.MesProductionReportEntity">
     update mes_production_report
-    set execution_id = #{executionId,jdbcType=BIGINT},
+    set execution_code = #{executionCode,jdbcType=VARCHAR},
       routing_node_id = #{routingNodeId,jdbcType=BIGINT},
       record_type = #{recordType,jdbcType=VARCHAR},
       quantity_delta = #{quantityDelta,jdbcType=DECIMAL},

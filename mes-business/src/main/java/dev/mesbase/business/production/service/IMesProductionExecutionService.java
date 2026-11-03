@@ -17,6 +17,12 @@ public interface IMesProductionExecutionService {
 
     MesProductionExecutionEntity selectById(Long id);
 
+    MesProductionExecutionEntity selectByCode(String code);
+
+    MesProductionExecutionEntity updateByCode(String code, MesProductionExecutionUpdateCommand input);
+
+    void deleteByCodes(List<String> codes);
+
     MesProductionExecutionEntity insert(MesProductionExecutionCreateCommand input);
 
     MesProductionExecutionEntity updateById(Long id, MesProductionExecutionUpdateCommand input);

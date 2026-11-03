@@ -1,10 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- MES-CODEGEN: MyBatis Generator standard single-table persistence. -->
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="dev.mesbase.business.production.dao.MesExecutionAssignmentMapper">
   <resultMap id="BaseResultMap" type="dev.mesbase.business.production.domain.MesExecutionAssignmentEntity">
     <id column="id" jdbcType="BIGINT" property="id" />
-    <result column="execution_id" jdbcType="BIGINT" property="executionId" />
+    <result column="execution_code" jdbcType="VARCHAR" property="executionCode" />
     <result column="routing_node_id" jdbcType="BIGINT" property="routingNodeId" />
     <result column="user_id" jdbcType="BIGINT" property="userId" />
     <result column="assigned_by" jdbcType="BIGINT" property="assignedBy" />
@@ -70,7 +69,7 @@
     </where>
   </sql>
   <sql id="Base_Column_List">
-    id, execution_id, routing_node_id, user_id, assigned_by, assigned_at, remark
+    id, execution_code, routing_node_id, user_id, assigned_by, assigned_at, remark
   </sql>
   <select id="selectByExample" parameterType="dev.mesbase.business.production.domain.MesExecutionAssignmentExample" resultMap="BaseResultMap">
     select
@@ -100,18 +99,18 @@
     </if>
   </delete>
   <insert id="insert" keyColumn="id" keyProperty="id" parameterType="dev.mesbase.business.production.domain.MesExecutionAssignmentEntity" useGeneratedKeys="true">
-    insert into mes_execution_assignment (execution_id, routing_node_id, user_id, 
+    insert into mes_execution_assignment (execution_code, routing_node_id, user_id,
       assigned_by, assigned_at, remark
       )
-    values (#{executionId,jdbcType=BIGINT}, #{routingNodeId,jdbcType=BIGINT}, #{userId,jdbcType=BIGINT}, 
+    values (#{executionCode,jdbcType=VARCHAR}, #{routingNodeId,jdbcType=BIGINT}, #{userId,jdbcType=BIGINT},
       #{assignedBy,jdbcType=BIGINT}, #{assignedAt,jdbcType=TIMESTAMP}, #{remark,jdbcType=VARCHAR}
       )
   </insert>
   <insert id="insertSelective" keyColumn="id" keyProperty="id" parameterType="dev.mesbase.business.production.domain.MesExecutionAssignmentEntity" useGeneratedKeys="true">
     insert into mes_execution_assignment
     <trim prefix="(" suffix=")" suffixOverrides=",">
-      <if test="executionId != null">
-        execution_id,
+      <if test="executionCode != null">
+        execution_code,
       </if>
       <if test="routingNodeId != null">
         routing_node_id,
@@ -130,8 +129,8 @@
       </if>
     </trim>
     <trim prefix="values (" suffix=")" suffixOverrides=",">
-      <if test="executionId != null">
-        #{executionId,jdbcType=BIGINT},
+      <if test="executionCode != null">
+        #{executionCode,jdbcType=VARCHAR},
       </if>
       <if test="routingNodeId != null">
         #{routingNodeId,jdbcType=BIGINT},
@@ -162,8 +161,8 @@
       <if test="row.id != null">
         id = #{row.id,jdbcType=BIGINT},
       </if>
-      <if test="row.executionId != null">
-        execution_id = #{row.executionId,jdbcType=BIGINT},
+      <if test="row.executionCode != null">
+        execution_code = #{row.executionCode,jdbcType=VARCHAR},
       </if>
       <if test="row.routingNodeId != null">
         routing_node_id = #{row.routingNodeId,jdbcType=BIGINT},
@@ -188,7 +187,7 @@
   <update id="updateByExample" parameterType="map">
     update mes_execution_assignment
     set id = #{row.id,jdbcType=BIGINT},
-      execution_id = #{row.executionId,jdbcType=BIGINT},
+      execution_code = #{row.executionCode,jdbcType=VARCHAR},
       routing_node_id = #{row.routingNodeId,jdbcType=BIGINT},
       user_id = #{row.userId,jdbcType=BIGINT},
       assigned_by = #{row.assignedBy,jdbcType=BIGINT},
@@ -201,8 +200,8 @@
   <update id="updateByPrimaryKeySelective" parameterType="dev.mesbase.business.production.domain.MesExecutionAssignmentEntity">
     update mes_execution_assignment
     <set>
-      <if test="executionId != null">
-        execution_id = #{executionId,jdbcType=BIGINT},
+      <if test="executionCode != null">
+        execution_code = #{executionCode,jdbcType=VARCHAR},
       </if>
       <if test="routingNodeId != null">
         routing_node_id = #{routingNodeId,jdbcType=BIGINT},
@@ -224,7 +223,7 @@
   </update>
   <update id="updateByPrimaryKey" parameterType="dev.mesbase.business.production.domain.MesExecutionAssignmentEntity">
     update mes_execution_assignment
-    set execution_id = #{executionId,jdbcType=BIGINT},
+    set execution_code = #{executionCode,jdbcType=VARCHAR},
       routing_node_id = #{routingNodeId,jdbcType=BIGINT},
       user_id = #{userId,jdbcType=BIGINT},
       assigned_by = #{assignedBy,jdbcType=BIGINT},

@@ -77,6 +77,7 @@ class BusinessSourceRulesTest {
         when(orders.selectByPrimaryKey(1L)).thenReturn(order);
         var execution = new MesProductionExecutionEntity();
         execution.setId(1L);
+        execution.setExecutionCode("1");
         execution.setWorkorderId(1L);
         mode(true, () -> {
             assertDoesNotThrow(() -> rules.finishedOutput(execution, null));

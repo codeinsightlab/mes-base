@@ -24,7 +24,7 @@ class LockingReadCacheTest {
             sql.execute("CREATE TABLE workorder (id BIGINT PRIMARY KEY, code VARCHAR(64), "
                     + "product_id BIGINT, planned_qty DECIMAL(20,6), routing_id BIGINT, status VARCHAR(32), "
                     + "planned_start_at TIMESTAMP, planned_end_at TIMESTAMP, remark VARCHAR(255), "
-                    + "revision INT, create_time TIMESTAMP, update_time TIMESTAMP, source VARCHAR(32), bom_id BIGINT, bom_revision BIGINT, material_revision BIGINT DEFAULT 0, material_warehouse_ids VARCHAR(2000), material_work_center VARCHAR(100), material_status VARCHAR(16), material_frozen_at TIMESTAMP, material_updated_by BIGINT, material_updated_at TIMESTAMP)");
+                    + "revision INT, create_time TIMESTAMP, update_time TIMESTAMP, source VARCHAR(32), bom_id BIGINT, bom_revision BIGINT, material_revision BIGINT DEFAULT 0, material_warehouse_ids VARCHAR(2000), material_work_center VARCHAR(100), material_status VARCHAR(16), material_frozen_at TIMESTAMP, material_updated_by BIGINT, material_updated_at TIMESTAMP, bom_build_id VARCHAR(36), bom_build_parent_workorder_id BIGINT, bom_build_source_line_id BIGINT, bom_build_path VARCHAR(500), bom_build_request_id VARCHAR(36), bom_build_request_hash VARCHAR(64))");
             sql.execute("INSERT INTO workorder(id,status) VALUES(1,'DRAFT')");
         }
         var config = new Configuration(new Environment("cache-fixture", new JdbcTransactionFactory(), source));

@@ -58,9 +58,9 @@ public class OperatorQualificationRules {
             throw new FoundationException(ErrorCode.OPERATOR_NOT_AUTHORIZED);
     }
 
-    public void cancelAssignment(Long executionId) {
+    public void cancelAssignment(String executionCode) {
         FactoryContext.required();
-        locks.execution(executionId);
+        locks.execution(executionCode);
     }
 
     public void operation(Long operationId) {
@@ -71,14 +71,14 @@ public class OperatorQualificationRules {
             throw new FoundationException(ErrorCode.ROUTING_REFERENCE_INVALID);
     }
 
-    public RoutingNodeEntity node(Long executionId, Long nodeId, boolean editing) {
+    public RoutingNodeEntity node(String executionCode, Long nodeId, boolean editing) {
         FactoryContext.required();
-        var execution = Optional.ofNullable(executionId)
-                .map(nullableValue -> editing ? locks.execution(nullableValue) : executions.selectByPrimaryKey(nullableValue))
+        var execution = Optional.ofNullable(executionCode)
+                .map(nullableValue -> editing ? locks.execution(nullableValue) : executions.selectByCode(nullableValue))
                 .orElse(null);
         if (execution == null) throw new FoundationException(ErrorCode.EXECUTION_NOT_FOUND);
         if (editing) {
-            locks.requireActiveExecution(executionId);
+            locks.requireActiveExecution(executionCode);
             requireMutable(execution);
         }
         return node(execution, nodeId);

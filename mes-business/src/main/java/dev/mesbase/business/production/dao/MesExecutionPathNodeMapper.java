@@ -15,9 +15,9 @@ public interface MesExecutionPathNodeMapper {
 
     int insert(MesExecutionPathNodeEntity row);
 
-    @Insert({"<script>INSERT INTO mes_execution_path_node(execution_id,routing_node_id,sequence_no) VALUES ",
+    @Insert({"<script>INSERT INTO mes_execution_path_node(execution_code,routing_node_id,sequence_no) VALUES ",
             "<foreach collection='rows' item='r' separator=','>",
-            "(#{r.executionId},#{r.routingNodeId},#{r.sequenceNo})</foreach></script>"})
+            "(#{r.executionCode},#{r.routingNodeId},#{r.sequenceNo})</foreach></script>"})
     int insertBatch(@Param("rows") List<MesExecutionPathNodeEntity> rows);
 
     int insertSelective(MesExecutionPathNodeEntity row);

@@ -6,7 +6,7 @@
     <result column="request_hash" jdbcType="CHAR" property="requestHash" />
     <result column="declaration_id" jdbcType="VARCHAR" property="declarationId" />
     <result column="declaration_revision" jdbcType="INTEGER" property="declarationRevision" />
-    <result column="execution_id" jdbcType="BIGINT" property="executionId" />
+    <result column="execution_code" jdbcType="VARCHAR" property="executionCode" />
     <result column="routing_node_id" jdbcType="BIGINT" property="routingNodeId" />
     <result column="action_type" jdbcType="VARCHAR" property="actionType" />
     <result column="attribution_type" jdbcType="VARCHAR" property="attributionType" />
@@ -50,7 +50,7 @@
     </where>
   </sql>
   <sql id="Base_Column_List">
-    id, request_hash, declaration_id, declaration_revision, execution_id, routing_node_id,
+    id, request_hash, declaration_id, declaration_revision, execution_code, routing_node_id,
     action_type, attribution_type, related_declaration_id, basis, returned_qty, operator_user_id,
     recorded_at, reason, target_warehouse_id, stock_document_id, transfer_qty
   </sql>
@@ -73,14 +73,14 @@
   </select>
   <insert id="insert" parameterType="dev.mesbase.business.quality.domain.MesQualityTreatmentEntity">
     insert into mes_quality_treatment (id, request_hash, declaration_id,
-      declaration_revision, execution_id, routing_node_id,
+      declaration_revision, execution_code, routing_node_id,
       action_type, attribution_type,
       related_declaration_id, basis, returned_qty, operator_user_id,
       recorded_at, reason,
       target_warehouse_id, stock_document_id, transfer_qty
       )
     values (#{id,jdbcType=VARCHAR}, #{requestHash,jdbcType=CHAR}, #{declarationId,jdbcType=VARCHAR},
-      #{declarationRevision,jdbcType=INTEGER}, #{executionId,jdbcType=BIGINT}, #{routingNodeId,jdbcType=BIGINT},
+      #{declarationRevision,jdbcType=INTEGER}, #{executionCode,jdbcType=VARCHAR}, #{routingNodeId,jdbcType=BIGINT},
       #{actionType,jdbcType=VARCHAR}, #{attributionType,jdbcType=VARCHAR},
       #{relatedDeclarationId,jdbcType=VARCHAR}, #{basis,jdbcType=VARCHAR}, #{returnedQty,jdbcType=DECIMAL}, #{operatorUserId,jdbcType=BIGINT},
       #{recordedAt,jdbcType=TIMESTAMP}, #{reason,jdbcType=VARCHAR},

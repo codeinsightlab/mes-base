@@ -1274,64 +1274,64 @@ public class WmStockDocumentExample {
             return (Criteria) this;
         }
 
-        public Criteria andSourceExecutionIdIsNull() {
-            addCriterion("source_execution_id is null");
+        public Criteria andSourceExecutionCodeIsNull() {
+            addCriterion("source_execution_code is null");
             return (Criteria) this;
         }
 
 
-        public Criteria andSourceExecutionIdIsNotNull() {
-            addCriterion("source_execution_id is not null");
+        public Criteria andSourceExecutionCodeIsNotNull() {
+            addCriterion("source_execution_code is not null");
             return (Criteria) this;
         }
 
-        public Criteria andSourceExecutionIdEqualTo(Long value) {
-            addCriterion("source_execution_id =", value, "sourceExecutionId");
+        public Criteria andSourceExecutionCodeEqualTo(String value) {
+            addCriterion("source_execution_code =", value, "sourceExecutionCode");
             return (Criteria) this;
         }
 
-        public Criteria andSourceExecutionIdNotEqualTo(Long value) {
-            addCriterion("source_execution_id <>", value, "sourceExecutionId");
+        public Criteria andSourceExecutionCodeNotEqualTo(String value) {
+            addCriterion("source_execution_code <>", value, "sourceExecutionCode");
             return (Criteria) this;
         }
 
-        public Criteria andSourceExecutionIdGreaterThan(Long value) {
-            addCriterion("source_execution_id >", value, "sourceExecutionId");
+        public Criteria andSourceExecutionCodeGreaterThan(String value) {
+            addCriterion("source_execution_code >", value, "sourceExecutionCode");
             return (Criteria) this;
         }
 
-        public Criteria andSourceExecutionIdGreaterThanOrEqualTo(Long value) {
-            addCriterion("source_execution_id >=", value, "sourceExecutionId");
+        public Criteria andSourceExecutionCodeGreaterThanOrEqualTo(String value) {
+            addCriterion("source_execution_code >=", value, "sourceExecutionCode");
             return (Criteria) this;
         }
 
-        public Criteria andSourceExecutionIdLessThan(Long value) {
-            addCriterion("source_execution_id <", value, "sourceExecutionId");
+        public Criteria andSourceExecutionCodeLessThan(String value) {
+            addCriterion("source_execution_code <", value, "sourceExecutionCode");
             return (Criteria) this;
         }
 
-        public Criteria andSourceExecutionIdLessThanOrEqualTo(Long value) {
-            addCriterion("source_execution_id <=", value, "sourceExecutionId");
+        public Criteria andSourceExecutionCodeLessThanOrEqualTo(String value) {
+            addCriterion("source_execution_code <=", value, "sourceExecutionCode");
             return (Criteria) this;
         }
 
-        public Criteria andSourceExecutionIdIn(List<Long> values) {
-            addCriterion("source_execution_id in", values, "sourceExecutionId");
+        public Criteria andSourceExecutionCodeIn(List<String> values) {
+            addCriterion("source_execution_code in", values, "sourceExecutionCode");
             return (Criteria) this;
         }
 
-        public Criteria andSourceExecutionIdNotIn(List<Long> values) {
-            addCriterion("source_execution_id not in", values, "sourceExecutionId");
+        public Criteria andSourceExecutionCodeNotIn(List<String> values) {
+            addCriterion("source_execution_code not in", values, "sourceExecutionCode");
             return (Criteria) this;
         }
 
-        public Criteria andSourceExecutionIdBetween(Long value1, Long value2) {
-            addCriterion("source_execution_id between", value1, value2, "sourceExecutionId");
+        public Criteria andSourceExecutionCodeBetween(String value1, Long value2) {
+            addCriterion("source_execution_code between", value1, value2, "sourceExecutionCode");
             return (Criteria) this;
         }
 
-        public Criteria andSourceExecutionIdNotBetween(Long value1, Long value2) {
-            addCriterion("source_execution_id not between", value1, value2, "sourceExecutionId");
+        public Criteria andSourceExecutionCodeNotBetween(String value1, Long value2) {
+            addCriterion("source_execution_code not between", value1, value2, "sourceExecutionCode");
             return (Criteria) this;
         }
 

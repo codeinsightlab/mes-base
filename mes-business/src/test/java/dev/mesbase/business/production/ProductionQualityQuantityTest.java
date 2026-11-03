@@ -49,11 +49,11 @@ class ProductionQualityQuantityTest {
     }
 
     static NodeQuantity node(long id, String r, String defects) {
-        return new NodeQuantity(1L, id, 1L, "N" + id, "工序", (int) id, BigDecimal.ZERO, d(r), d(defects), BigDecimal.ZERO, BigDecimal.ZERO, true);
+        return new NodeQuantity("1", id, 1L, "N" + id, "工序", (int) id, BigDecimal.ZERO, d(r), d(defects), BigDecimal.ZERO, BigDecimal.ZERO, true);
     }
 
     static ExecutionQuantity view(List<NodeQuantity> nodes) {
-        return new ExecutionQuantity(1L, 1L, 1L, d("100"), "LOCKED", true, null, nodes, null, d("100"), d("100"), BigDecimal.ZERO, 1L);
+        return new ExecutionQuantity("1", 1L, 1L, d("100"), "LOCKED", true, null, nodes, null, d("100"), d("100"), BigDecimal.ZERO, 1L);
     }
 
     @ParameterizedTest
@@ -78,11 +78,11 @@ class ProductionQualityQuantityTest {
         var treatments = mock(QualityTreatmentService.class);
         var query = new ExecutionQualityReferenceQueryImpl(mapper, treatments);
         var values = List.of(new NodeTotal(11L, d("5")), new NodeTotal(12L, d("3")));
-        when(treatments.nodeTotals(1L)).thenReturn(values);
-        assertEquals(values, query.nodeTotals(1L));
-        verify(treatments).nodeTotals(1L);
-        when(treatments.nodeTotals(2L)).thenThrow(new IllegalStateException("TEST ONLY query failure"));
-        assertThrows(IllegalStateException.class, () -> query.nodeTotals(2L));
+        when(treatments.nodeTotals("1")).thenReturn(values);
+        assertEquals(values, query.nodeTotals("1"));
+        verify(treatments).nodeTotals("1");
+        when(treatments.nodeTotals("2")).thenThrow(new IllegalStateException("TEST ONLY query failure"));
+        assertThrows(IllegalStateException.class, () -> query.nodeTotals("2"));
     }
 
     @Test
@@ -94,6 +94,7 @@ class ProductionQualityQuantityTest {
         var quality = mock(ProductionDefectQuantityQuery.class);
         var execution = new MesProductionExecutionEntity();
         execution.setId(1L);
+        execution.setExecutionCode("1");
         execution.setRoutingId(1L);
         execution.setTargetQty(d("100"));
         var path = new MesExecutionPathEntity();
@@ -106,17 +107,17 @@ class ProductionQualityQuantityTest {
         var selectedNode = new MesExecutionPathNodeEntity();
         selectedNode.setRoutingNodeId(11L);
         selectedNode.setSequenceNo(1);
-        when(executions.selectByPrimaryKey(1L)).thenReturn(execution);
-        when(paths.view(1L)).thenReturn(new PathModel(1L, "READY", path, List.of(11L), List.of(node), List.of(), null, Map.of()));
+        when(executions.selectByCode("1")).thenReturn(execution);
+        when(paths.view("1")).thenReturn(new PathModel("1", "READY", path, List.of(11L), List.of(node), List.of(), null, Map.of()));
         when(selected.selectByExample(any())).thenReturn(List.of(selectedNode));
-        when(reports.nodeTotals(1L)).thenReturn(List.of(new ProductionReportModels.NodeTotal(11L, d("10")), new ProductionReportModels.NodeTotal(99L, d("999"))));
-        when(quality.nodeTotals(1L)).thenReturn(List.of(new NodeTotal(11L, d("2")), new NodeTotal(99L, d("900"))));
-        when(reports.inputBalance(1L)).thenReturn(new ProductionInputBalance(d("100"), d("0")));
+        when(reports.nodeTotals("1")).thenReturn(List.of(new ProductionReportModels.NodeTotal(11L, d("10")), new ProductionReportModels.NodeTotal(99L, d("999"))));
+        when(quality.nodeTotals("1")).thenReturn(List.of(new NodeTotal(11L, d("2")), new NodeTotal(99L, d("900"))));
+        when(reports.inputBalance("1")).thenReturn(new ProductionInputBalance(d("100"), d("0")));
         var service = new ProductionQuantityService(executions, paths, selected, reports, mock(BusinessDirectoryService.class), quality, mock(WorkorderMapper.class), mock(StockDocumentExtraMapper.class));
-        var result = service.getExecutionQuantities(1L);
+        var result = service.getExecutionQuantities("1");
         assertEquals(1, result.nodes().size());
         assertEquals(d("8"), result.nodes().getFirst().effectiveOutputQty());
-        verify(quality).nodeTotals(1L);
-        verify(reports).nodeTotals(1L);
+        verify(quality).nodeTotals("1");
+        verify(reports).nodeTotals("1");
     }
 }

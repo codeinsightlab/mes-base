@@ -159,7 +159,7 @@ public final class QualityTreatmentModels {
     /**
      * One latest declaration and its corresponding version facts, never display history.
      */
-    public record CurrentFact(String declarationId, int revision, Long executionId, Long routingNodeId,
+    public record CurrentFact(String declarationId, int revision, String executionCode, Long routingNodeId,
                               BigDecimal defectQty, String recordAction, long assessmentCount,
                               String attribution, String relatedDeclarationId, String basis,
                               BigDecimal returnedQty, BigDecimal transferredQty, long invalidFacts,
@@ -185,7 +185,7 @@ public final class QualityTreatmentModels {
             BigDecimal net = null;
             if (processing.state() != State.UNRESOLVED)
                 net = type == Attribution.INDEPENDENT ? defectQty.subtract(returnedQty) : BigDecimal.ZERO;
-            return new Summary(declarationId, revision, executionId, routingNodeId, defectQty, type,
+            return new Summary(declarationId, revision, executionCode, routingNodeId, defectQty, type,
                     related, assessmentBasis, processing.pendingDispositionQty(), net, processing.state(),
                     recordAction, processing.returnedQty(), processing.transferredQty(),
                     receiptState(processing.state(), defectQty, processing.transferredQty()));
@@ -202,7 +202,7 @@ public final class QualityTreatmentModels {
     public record AssessmentCommand(String requestId, int expectedRevision, String reason, Assessment assessment) {
     }
 
-    public record Summary(String declarationId, int revision, Long executionId, Long routingNodeId,
+    public record Summary(String declarationId, int revision, String executionCode, Long routingNodeId,
                           BigDecimal defectQty, Attribution attribution, String relatedDeclarationId, String basis,
                           BigDecimal pendingDispositionQty, BigDecimal netDefectQty, State state,
                           String recordAction,

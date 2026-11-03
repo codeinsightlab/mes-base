@@ -13,15 +13,15 @@ import dev.mesbase.business.production.domain.ProductionReportModels.ExecutionIn
  * Only cross-table quantity projections; single-table persistence uses the generated mapper.
  */
 public interface ProductionQuantityMapper {
-    ProductionInputBalance inputBalance(@Param("executionId") Long executionId);
+    ProductionInputBalance inputBalance(@Param("executionCode") String executionCode);
 
-    List<NodeTotal> nodeTotals(@Param("executionId") Long executionId);
+    List<NodeTotal> nodeTotals(@Param("executionCode") String executionCode);
 
-    List<ExecutionNodeTotal> nodeTotalsBatch(@Param("executionIds") List<Long> executionIds);
+    List<ExecutionNodeTotal> nodeTotalsBatch(@Param("executionCodes") List<String> executionCodes);
 
-    List<ExecutionInputBalance> inputBalances(@Param("executionIds") List<Long> executionIds);
+    List<ExecutionInputBalance> inputBalances(@Param("executionCodes") List<String> executionCodes);
 
-    Balance originalBalance(@Param("executionId") Long executionId, @Param("reportId") Long reportId);
+    Balance originalBalance(@Param("executionCode") String executionCode, @Param("reportId") Long reportId);
 
     List<ExecutionSummary> workorderQuantities(@Param("workorderId") Long workorderId);
 }

@@ -14,7 +14,8 @@ public record MaterialVo(
         String unitId,
         String status,
         String externalId,
-        String externalCode
+        String externalCode,
+        String workOrderRuleCode
 ) {
 }
 

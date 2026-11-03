@@ -35,7 +35,7 @@ public class ProductionReportingController {
         this.service = service;
     }
 
-    public record SubmitRequest(@NotNull Long executionId, @NotNull Long routingNodeId,
+    public record SubmitRequest(@NotNull String executionCode, @NotNull Long routingNodeId,
                                 @NotNull @DecimalMin(value = "0", inclusive = false) @Digits(integer = 14, fraction = 6) BigDecimal reportQty,
                                 Long workstationId,
                                 @NotNull @Pattern(regexp = "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}") String requestId) {
@@ -50,8 +50,8 @@ public class ProductionReportingController {
 
     @GetMapping("/context")
     @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED, permission = PERMISSION)
-    public Context context(@RequestParam Long executionId) {
-        var c = service.context(executionId);
+    public Context context(@RequestParam String executionCode) {
+        var c = service.context(executionCode);
         var identity = BeanConversions.convert(c.identity(), ProductionIdentityVo.class);
         return new Context(identity, ProductionReportViews.execution(c.quantities()), ExecutionActionController.toView(c.path()),
                 c.candidates().stream().map(n -> new Candidate(n.routingNodeId().toString(), n.status(), n.reason()))
@@ -61,7 +61,7 @@ public class ProductionReportingController {
     @PostMapping
     @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED, permission = PERMISSION)
     public Ledger submit(@RequestBody @Valid SubmitRequest request) {
-        return ProductionReportViews.ledger(service.submit(new Command(request.executionId(), request.routingNodeId(),
+        return ProductionReportViews.ledger(service.submit(new Command(request.executionCode(), request.routingNodeId(),
                 request.reportQty(), request.workstationId(), request.requestId())));
     }
 }

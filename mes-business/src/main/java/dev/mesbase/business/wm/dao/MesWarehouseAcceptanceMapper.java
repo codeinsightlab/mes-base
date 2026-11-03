@@ -9,7 +9,7 @@ import org.apache.ibatis.annotations.Param;
 public interface MesWarehouseAcceptanceMapper {
     BigDecimal netReceipt(@Param("receiptId") String receiptId);
 
-    BigDecimal netExecution(@Param("executionId") Long executionId);
+    BigDecimal netExecution(@Param("executionCode") String executionCode);
 
     BigDecimal originalBalance(@Param("id") String id);
 

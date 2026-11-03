@@ -1,10 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- MES-CODEGEN: MyBatis Generator standard single-table persistence. -->
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="dev.mesbase.business.production.dao.MesExecutionPathNodeMapper">
   <resultMap id="BaseResultMap" type="dev.mesbase.business.production.domain.MesExecutionPathNodeEntity">
     <id column="id" jdbcType="BIGINT" property="id" />
-    <result column="execution_id" jdbcType="BIGINT" property="executionId" />
+    <result column="execution_code" jdbcType="VARCHAR" property="executionCode" />
     <result column="sequence_no" jdbcType="INTEGER" property="sequenceNo" />
     <result column="routing_node_id" jdbcType="BIGINT" property="routingNodeId" />
   </resultMap>
@@ -67,7 +66,7 @@
     </where>
   </sql>
   <sql id="Base_Column_List">
-    id, execution_id, sequence_no, routing_node_id
+    id, execution_code, sequence_no, routing_node_id
   </sql>
   <select id="selectByExample" parameterType="dev.mesbase.business.production.domain.MesExecutionPathNodeExample" resultMap="BaseResultMap">
     select
@@ -97,16 +96,16 @@
     </if>
   </delete>
   <insert id="insert" keyColumn="id" keyProperty="id" parameterType="dev.mesbase.business.production.domain.MesExecutionPathNodeEntity" useGeneratedKeys="true">
-    insert into mes_execution_path_node (execution_id, sequence_no, routing_node_id
+    insert into mes_execution_path_node (execution_code, sequence_no, routing_node_id
       )
-    values (#{executionId,jdbcType=BIGINT}, #{sequenceNo,jdbcType=INTEGER}, #{routingNodeId,jdbcType=BIGINT}
+    values (#{executionCode,jdbcType=VARCHAR}, #{sequenceNo,jdbcType=INTEGER}, #{routingNodeId,jdbcType=BIGINT}
       )
   </insert>
   <insert id="insertSelective" keyColumn="id" keyProperty="id" parameterType="dev.mesbase.business.production.domain.MesExecutionPathNodeEntity" useGeneratedKeys="true">
     insert into mes_execution_path_node
     <trim prefix="(" suffix=")" suffixOverrides=",">
-      <if test="executionId != null">
-        execution_id,
+      <if test="executionCode != null">
+        execution_code,
       </if>
       <if test="sequenceNo != null">
         sequence_no,
@@ -116,8 +115,8 @@
       </if>
     </trim>
     <trim prefix="values (" suffix=")" suffixOverrides=",">
-      <if test="executionId != null">
-        #{executionId,jdbcType=BIGINT},
+      <if test="executionCode != null">
+        #{executionCode,jdbcType=VARCHAR},
       </if>
       <if test="sequenceNo != null">
         #{sequenceNo,jdbcType=INTEGER},
@@ -139,8 +138,8 @@
       <if test="row.id != null">
         id = #{row.id,jdbcType=BIGINT},
       </if>
-      <if test="row.executionId != null">
-        execution_id = #{row.executionId,jdbcType=BIGINT},
+      <if test="row.executionCode != null">
+        execution_code = #{row.executionCode,jdbcType=VARCHAR},
       </if>
       <if test="row.sequenceNo != null">
         sequence_no = #{row.sequenceNo,jdbcType=INTEGER},
@@ -156,7 +155,7 @@
   <update id="updateByExample" parameterType="map">
     update mes_execution_path_node
     set id = #{row.id,jdbcType=BIGINT},
-      execution_id = #{row.executionId,jdbcType=BIGINT},
+      execution_code = #{row.executionCode,jdbcType=VARCHAR},
       sequence_no = #{row.sequenceNo,jdbcType=INTEGER},
       routing_node_id = #{row.routingNodeId,jdbcType=BIGINT}
     <if test="example != null">
@@ -166,8 +165,8 @@
   <update id="updateByPrimaryKeySelective" parameterType="dev.mesbase.business.production.domain.MesExecutionPathNodeEntity">
     update mes_execution_path_node
     <set>
-      <if test="executionId != null">
-        execution_id = #{executionId,jdbcType=BIGINT},
+      <if test="executionCode != null">
+        execution_code = #{executionCode,jdbcType=VARCHAR},
       </if>
       <if test="sequenceNo != null">
         sequence_no = #{sequenceNo,jdbcType=INTEGER},
@@ -180,7 +179,7 @@
   </update>
   <update id="updateByPrimaryKey" parameterType="dev.mesbase.business.production.domain.MesExecutionPathNodeEntity">
     update mes_execution_path_node
-    set execution_id = #{executionId,jdbcType=BIGINT},
+    set execution_code = #{executionCode,jdbcType=VARCHAR},
       sequence_no = #{sequenceNo,jdbcType=INTEGER},
       routing_node_id = #{routingNodeId,jdbcType=BIGINT}
     where id = #{id,jdbcType=BIGINT}

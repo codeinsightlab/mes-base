@@ -167,7 +167,7 @@ public class BusinessSourceRules {
         var ids = new ArrayList<Long>();
         if (finishedWarehouse != null) ids.add(finishedWarehouse);
         var f = new WmStockDocumentExample();
-        f.createCriteria().andSourceExecutionIdEqualTo(execution.getId()).andDocumentTypeEqualTo(StockDocumentType.MATERIAL_ISSUE.getValue());
+        f.createCriteria().andSourceExecutionCodeEqualTo(execution.getExecutionCode()).andDocumentTypeEqualTo(StockDocumentType.MATERIAL_ISSUE.getValue());
         var linked = bounded(() -> issues.selectByExample(f));
         if (linked.size() > 10000) ParameterChecks.reject(ErrorCode.BUSINESS_SOURCE_CONFLICT);
         if (!linked.isEmpty()) {
@@ -181,7 +181,7 @@ public class BusinessSourceRules {
             }
         }
         var r = new MesProductionReceiptExample();
-        r.createCriteria().andExecutionIdEqualTo(execution.getId());
+        r.createCriteria().andExecutionCodeEqualTo(execution.getExecutionCode());
         var received = bounded(() -> receipts.selectByExample(r));
         if (received.size() > 10000) ParameterChecks.reject(ErrorCode.BUSINESS_SOURCE_CONFLICT);
         received.forEach(x -> ids.add(x.getWarehouseId()));

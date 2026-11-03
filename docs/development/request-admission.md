@@ -13,6 +13,12 @@
 5. SQL、缓存返回前与提交前 guard 只检查已固定工厂/binding/lease 和会话归属，不重查最新管理配置。同厂 REQUIRED 共享事务，同一 HTTP 请求内 REQUIRES_NEW 复用原快照；非 HTTP 新独立事务重新准入，挂起恢复原工厂/租约；切厂、切库及双向中心业务混用拒绝。Spring 异常、超时与回滚保持。
 6. 事务 completion 归还租约，退休池已有租约排空后关闭；请求快照不持有池资源，ASYNC redispatch 使用请求自身保存的绑定；请求边界清理线程状态。A/B 并发请求独立；前端在 fetch 返回及错误/JSON/text/blob body 读取后检查 token/factoryId/revision，旧 A 响应及 401 不得改变 B 页面或新登录态。
 
+## BOM 展阶建单事务
+
+[BOM 展阶创建工单](../usage/production.md#bom-展阶创建工单)沿用上述业务事务准入。`WorkOrderBomBuildService.confirm` 挂起调用方事务，使用具名 `businessTransactionManager` 的只读 `TransactionTemplate` 重读预览并核对指纹；同类调用 `preview` 不能依赖其注解开启事务。确认先组装完整工单及直接用料计划，再读取中心编码规则并取号。编码规则读取和正式取号均在业务事务之外完成。
+
+`WorkOrderService.createBomBuild` 的首次幂等查询、失败回滚后的重放查询同样在受管只读业务事务内执行。全部工单头、父子关联和用料通过现有 `createTransactions` 共享一次业务写事务；逐张调用 `createLocal`，保留产品、工艺、单位精度和直接 BOM 校验，不在保存循环中重新递归展阶。任一工单保存失败整体回滚，中心编号可以空耗；成功请求依靠原请求键及内容摘要返回原创建集合。不得通过关闭 Mapper/Factory guard、把中心取号纳入业务事务或跳过普通工单校验解决事务错误。
+
 ## 会话撤销与恢复
 
 内部Bearer采用`<sessionId>.<secret>`：sessionId是UUID公开定位符，secret仍为32字节随机值的Base64URL形式。Redis会话Key按sessionId定位；认证时对secret计算SHA-256摘要，并与会话Hash的`secretDigest`字段以常量时间比较。仅知道sessionId不能完成认证。原始Bearer、secret、密码及摘要不放入Key、日志或本指南。Identity白名单为用户编号/账号、部门、昵称/头像、登录时间、客户端信息及authRevision，不含密码、完整Entity、角色、菜单或权限。`token.expire-time`绝对有效期保持，请求不续期。

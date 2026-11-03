@@ -73,14 +73,14 @@ public class ExecutionPathService {
         this.inputs = inputs;
     }
 
-    public record PathModel(Long executionId, String executionStatus, MesExecutionPathEntity path,
+    public record PathModel(String executionCode, String executionStatus, MesExecutionPathEntity path,
                             List<Long> selectedNodeIds, List<RoutingNodeEntity> nodes, List<RoutingEdgeEntity> edges,
                             DirectoryLabel routing, Map<Long, DirectoryLabel> operationLabels) {
     }
 
     @Transactional(transactionManager = "businessTransactionManager", readOnly = true)
-    public PathModel view(Long id) {
-        var e = executions.selectByPrimaryKey(id);
+    public PathModel view(String id) {
+        var e = executions.selectByCode(id);
         if (e == null) throw new FoundationException(ErrorCode.EXECUTION_NOT_FOUND);
         return view(e);
     }
@@ -90,7 +90,7 @@ public class ExecutionPathService {
     }
 
     private PathModel view(MesProductionExecutionEntity e, List<MesExecutionPathNodeEntity> ordered) {
-        Long id = e.getId();
+        String id = e.getExecutionCode();
         if (e.getRoutingId() == null) {
             if (paths.selectByPrimaryKey(id) != null || !nodeIds(id).isEmpty())
                 throw new FoundationException(ErrorCode.RESOURCE_CONFLICT);
@@ -140,7 +140,7 @@ public class ExecutionPathService {
 
     public LockedPath lockedPath(LockedExecution locked) {
         var e = locked.execution();
-        var ordered = selectedRows(e.getId());
+        var ordered = selectedRows(e.getExecutionCode());
         var model = view(e, ordered);
         if (model.path() == null || !Objects.equals(model.path().getRoutingId(), e.getRoutingId()))
             throw new FoundationException(ErrorCode.REPORT_PATH_REQUIRED);
@@ -153,7 +153,7 @@ public class ExecutionPathService {
         return new LockedPath(locked, model, ordered);
     }
 
-    public PathModel select(Long id, Integer revision, List<Long> nodeIds) {
+    public PathModel select(String id, Integer revision, List<Long> nodeIds) {
         var e = locks.execution(id);
         if (e.getRoutingId() == null) ParameterChecks.reject(ErrorCode.REPORT_PATH_REQUIRED);
         locks.requireActiveExecution(id);
@@ -177,12 +177,12 @@ public class ExecutionPathService {
         path.setSelectedAt(LocalDateTime.now());
         changed(old == null ? paths.insert(path) : paths.updateByPrimaryKey(path));
         var f = new MesExecutionPathNodeExample();
-        f.createCriteria().andExecutionIdEqualTo(id);
+        f.createCriteria().andExecutionCodeEqualTo(id);
         selected.deleteByExample(f);
         // At most 100 nodes, with execution locked; generated single-table writes each verify row count.
         for (int i = 0; i < nodeIds.size(); i++) {
             var n = new MesExecutionPathNodeEntity();
-            n.setExecutionId(id);
+            n.setExecutionCode(id);
             n.setSequenceNo(i + 1);
             n.setRoutingNodeId(nodeIds.get(i));
             changed(selected.insert(n));
@@ -191,10 +191,10 @@ public class ExecutionPathService {
     }
 
     public MesExecutionPathEntity requireSelected(MesProductionExecutionEntity e) {
-        var p = paths.selectByPrimaryKey(e.getId());
+        var p = paths.selectByPrimaryKey(e.getExecutionCode());
         if (p == null || !Objects.equals(p.getRoutingId(), e.getRoutingId()) || !Set.of(ExecutionPathStatus.SELECTED.getValue(), ExecutionPathStatus.LOCKED.getValue())
                 .contains(p.getPathStatus())) ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
-        ExecutionPathValidator.validate(nodeIds(e.getId()), nodes(e.getRoutingId()), edges(e.getRoutingId()));
+        ExecutionPathValidator.validate(nodeIds(e.getExecutionCode()), nodes(e.getRoutingId()), edges(e.getRoutingId()));
         return p;
     }
 
@@ -208,7 +208,7 @@ public class ExecutionPathService {
     }
 
     @BusinessCacheEvict(business = MesProductionExecutionResource.PREFIX, scope = BusinessCacheEvict.Scope.LIST_AND_DETAIL)
-    public MesProductionExecutionEntity start(Long id) {
+    public MesProductionExecutionEntity start(String id) {
         return start(id, null, null);
     }
 
@@ -216,13 +216,13 @@ public class ExecutionPathService {
     public MesProductionExecutionEntity start(LockedExecution locked, LockedPath path) {
         try {
             path.requireOwner(locked);
-            return start(locked.execution().getId(), locked, path);
+            return start(locked.execution().getExecutionCode(), locked, path);
         } finally {
             locked.invalidate();
         }
     }
 
-    private MesProductionExecutionEntity start(Long id, LockedExecution locked, LockedPath path) {
+    private MesProductionExecutionEntity start(String id, LockedExecution locked, LockedPath path) {
         var e = locked == null ? locks.execution(id) : locked.execution();
         if (locked == null) locks.requireActiveExecution(id);
         else locks.requireActiveExecution(id, locked);
@@ -235,7 +235,7 @@ public class ExecutionPathService {
             ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
         if (ProductionExecutionStatus.RUNNING.getValue().equals(e.getStatus())) return e;
         var inputFilter = new MesMaterialIssueInputExample();
-        inputFilter.createCriteria().andExecutionIdEqualTo(id);
+        inputFilter.createCriteria().andExecutionCodeEqualTo(id);
         var confirmed = inputs.selectByExample(inputFilter).stream().filter(f -> f.getConfirmedAt() != null
                 && Boolean.TRUE.equals(f.getStockApplied())).toList();
         if (confirmed.isEmpty()) ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
@@ -251,22 +251,22 @@ public class ExecutionPathService {
         e.setUpdateBy(String.valueOf(SecurityUtils.getUserId()));
         changed(executions.updateByPrimaryKey(e));
         // Return the persisted DATETIME precision, so repeated start has the same canonical response.
-        return executions.selectByPrimaryKey(id);
+        return executions.selectByCode(id);
     }
 
-    public boolean hasBlockingIssue(Long id) {
+    public boolean hasBlockingIssue(String id) {
         var filter = new MesMaterialIssueInputExample();
-        filter.createCriteria().andExecutionIdEqualTo(id).andConfirmedAtIsNotNull();
+        filter.createCriteria().andExecutionCodeEqualTo(id).andConfirmedAtIsNotNull();
         return inputs.countByExample(filter) > 0;
     }
 
-    private List<Long> nodeIds(Long id) {
+    private List<Long> nodeIds(String id) {
         return selectedRows(id).stream().map(MesExecutionPathNodeEntity::getRoutingNodeId).toList();
     }
 
-    private List<MesExecutionPathNodeEntity> selectedRows(Long id) {
+    private List<MesExecutionPathNodeEntity> selectedRows(String id) {
         var f = new MesExecutionPathNodeExample();
-        f.createCriteria().andExecutionIdEqualTo(id);
+        f.createCriteria().andExecutionCodeEqualTo(id);
         f.setOrderByClause("sequence_no,id");
         return selected.selectByExample(f);
     }

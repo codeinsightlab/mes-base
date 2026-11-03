@@ -51,7 +51,7 @@ class ProductionScanServiceTest {
     private final MesProductionScanActivityMapper activities = mock(MesProductionScanActivityMapper.class);
     private final PlatformTransactionManager manager = mock(PlatformTransactionManager.class);
     private final FactoryScope scope = new FactoryScope(new FactoryId("A"));
-    private final ProductionIdentity identity = new ProductionIdentity(9007199254740993L, "WO-1:000P#000LOT",
+    private final ProductionIdentity identity = new ProductionIdentity("9007199254740993", "WO-1:000P#000LOT",
             1L, "WO-1", 2L, "000P", "产品", 3L, "R1", 1, "RUNNING", new BigDecimal("100.000000"), "000LOT");
     private MockedStatic<SecurityUtils> security;
     private ProductionScanService service;
@@ -91,7 +91,7 @@ class ProductionScanServiceTest {
         verify(activities, times(3)).insert(captured.capture());
         for (var event : captured.getAllValues()) {
             assertEquals(17L, event.getUserId());
-            assertEquals(identity.executionId(), event.getExecutionId());
+            assertEquals(identity.executionCode(), event.getExecutionCode());
             assertEquals(ProductionScanOutcome.SUCCESS.getValue(), event.getOutcome());
             assertEquals(ProductionScanInputMethod.IMAGE.getValue(), event.getInputMethod());
             assertEquals("server-request", event.getRequestId());
@@ -111,7 +111,7 @@ class ProductionScanServiceTest {
         verify(activities).insert(captured.capture());
         assertEquals("FORBIDDEN", captured.getValue().getErrorCode());
         assertEquals(ProductionScanOutcome.FAILURE.getValue(), captured.getValue().getOutcome());
-        assertNull(captured.getValue().getExecutionId());
+        assertNull(captured.getValue().getExecutionCode());
     }
 
     @Test
@@ -137,7 +137,7 @@ class ProductionScanServiceTest {
     @Test
     void controllerRejectsSpoofedFieldsAndUsesServerTraceAndSafeIdentityConversion() throws Exception {
         var mapper = new ObjectMapper();
-        for (var field : List.of("userId", "occurredAt", "outcome", "executionId", "requestId")) {
+        for (var field : List.of("userId", "occurredAt", "outcome", "executionCode", "requestId")) {
             String json = "{\"type\":\"REPORTING\",\"code\":\"exact-code\",\"inputMethod\":\"TEXT\",\"" + field + "\":\"spoofed\"}";
             assertThrows(Exception.class, () -> mapper.readValue(json, ProductionScanController.Input.class));
         }
@@ -147,7 +147,7 @@ class ProductionScanServiceTest {
         request.addHeader("X-Request-Id", "client-spoof");
         request.setAttribute("mes.requestId", "trusted-server-trace");
         var view = controller.scan(new ProductionScanController.Input("REPORTING", "exact-code", "TEXT"), request);
-        assertEquals("9007199254740993", view.executionId());
+        assertEquals("9007199254740993", view.executionCode());
         assertEquals("000LOT", view.batchNo());
         var captured = ArgumentCaptor.forClass(MesProductionScanActivityEntity.class);
         verify(activities).insert(captured.capture());

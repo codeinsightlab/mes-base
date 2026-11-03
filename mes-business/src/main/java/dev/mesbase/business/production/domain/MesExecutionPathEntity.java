@@ -4,7 +4,7 @@ package dev.mesbase.business.production.domain;
 import java.time.LocalDateTime;
 
 public class MesExecutionPathEntity {
-    private Long id;
+    private String id;
 
     private Long routingId;
 
@@ -16,11 +16,11 @@ public class MesExecutionPathEntity {
 
     private LocalDateTime lockedAt;
 
-    public Long getId() {
+    public String getId() {
         return id;
     }
 
-    public void setId(Long id) {
+    public void setId(String id) {
         this.id = id;
     }
 

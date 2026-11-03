@@ -21,10 +21,10 @@ public class ProductionIdentityController {
         this.service = service;
     }
 
-    @GetMapping("/{executionId}")
+    @GetMapping("/{executionCode}")
     @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED, permission = MesProductionExecutionPermissions.QUERY)
-    public ProductionIdentityVo read(@PathVariable Long executionId) {
-        return BeanConversions.convert(service.read(executionId), ProductionIdentityVo.class);
+    public ProductionIdentityVo read(@PathVariable String executionCode) {
+        return BeanConversions.convert(service.read(executionCode), ProductionIdentityVo.class);
     }
 
     @GetMapping

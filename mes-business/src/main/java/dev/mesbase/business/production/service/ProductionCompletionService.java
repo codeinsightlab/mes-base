@@ -84,8 +84,8 @@ public class ProductionCompletionService {
     }
 
     @Transactional(transactionManager = "businessTransactionManager", readOnly = true, isolation = Isolation.READ_COMMITTED)
-    public Summary summary(Long id) {
-        var execution = executions.selectByPrimaryKey(id);
+    public Summary summary(String id) {
+        var execution = executions.selectByCode(id);
         if (execution == null) ParameterChecks.reject(ErrorCode.NOT_FOUND);
         var projection = quantities.getExecutionQuantities(id);
         var completion = completion(id);
@@ -107,8 +107,8 @@ public class ProductionCompletionService {
      * Locks every sibling in ascending order before any document or inventory lock is taken.
      */
     @Transactional(transactionManager = "businessTransactionManager", propagation = Propagation.MANDATORY, rollbackFor = Exception.class)
-    public void lockInboundChain(Long id) {
-        var before = executions.selectByPrimaryKey(id);
+    public void lockInboundChain(String id) {
+        var before = executions.selectByCode(id);
         if (before == null) ParameterChecks.reject(ErrorCode.NOT_FOUND);
         locks.order(before.getWorkorderId());
         long after = 0;
@@ -122,11 +122,11 @@ public class ProductionCompletionService {
             }
             if (rows.isEmpty()) break;
             for (var row : rows) {
-                locks.execution(row.getId());
+                locks.execution(row.getExecutionCode());
                 after = row.getId();
             }
         }
-        var current = executions.selectByPrimaryKey(id);
+        var current = executions.selectByCode(id);
         if (current == null || !Objects.equals(current.getWorkorderId(), before.getWorkorderId()))
             ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
     }
@@ -136,9 +136,9 @@ public class ProductionCompletionService {
      */
     @Transactional(transactionManager = "businessTransactionManager", propagation = Propagation.MANDATORY, rollbackFor = Exception.class)
     @BusinessCacheEvict(business = MesProductionExecutionResource.PREFIX, scope = BusinessCacheEvict.Scope.LIST_AND_DETAIL)
-    public void afterInboundApproved(Long id, String auditRequestId) {
+    public void afterInboundApproved(String id, String auditRequestId) {
         ProductionClosureRules.uuid(auditRequestId);
-        var execution = executions.selectByPrimaryKey(id);
+        var execution = executions.selectByCode(id);
         if (execution == null) ParameterChecks.reject(ErrorCode.NOT_FOUND);
         if (execution.getRoutingId() == null && ProductionExecutionStatus.READY.getValue()
                 .equals(execution.getStatus())) {
@@ -165,9 +165,9 @@ public class ProductionCompletionService {
      */
     @Transactional(transactionManager = "businessTransactionManager", isolation = Isolation.READ_COMMITTED, rollbackFor = Exception.class)
     @BusinessCacheEvict(business = MesProductionExecutionResource.PREFIX, scope = BusinessCacheEvict.Scope.LIST_AND_DETAIL)
-    public Summary recheckReceipt(Long id) {
+    public Summary recheckReceipt(String id) {
         lockInboundChain(id);
-        var execution = executions.selectByPrimaryKey(id);
+        var execution = executions.selectByCode(id);
         if (execution == null) ParameterChecks.reject(ErrorCode.NOT_FOUND);
         sources.finishedOutput(execution, null);
         String auditRequestId = inbound.latestInboundAuditId(id);
@@ -185,14 +185,14 @@ public class ProductionCompletionService {
      * Original requests remain verifiable; the retired manual endpoint cannot create a new closure.
      */
     @Transactional(transactionManager = "businessTransactionManager", isolation = Isolation.READ_COMMITTED, rollbackFor = Exception.class)
-    public MesExecutionCompletionEntity complete(Long id, Command command) {
+    public MesExecutionCompletionEntity complete(String id, Command command) {
         if (command == null)
             ParameterChecks.reject(ErrorCode.BAD_REQUEST, new SafeBusinessMessage("完工请求不能为空"));
         ProductionClosureRules.uuid(command.requestId());
         ProductionClosureRules.reason(command.reason());
         var existing = completions.selectByPrimaryKey(command.requestId());
         String hash = ProductionClosureRules.hash(id, command.expectedBasisHash(), command.reason(), ProductionClosureRules.actor());
-        if (existing != null && Objects.equals(id, existing.getExecutionId())
+        if (existing != null && Objects.equals(id, existing.getExecutionCode())
                 && Objects.equals(existing.getOperatorUserId(), ProductionClosureRules.actor())
                 && hash.equals(existing.getRequestHash())) return existing;
         if (existing != null) ParameterChecks.reject(ErrorCode.PRODUCTION_CLOSURE_CONFLICT);
@@ -210,20 +210,20 @@ public class ProductionCompletionService {
         var balanceReason = ProductionCompletionBalance.blockedReason(projection);
         if (balanceReason != null) return balanceReason;
         var unresolved = new WmStockDocumentExample();
-        unresolved.createCriteria().andSourceExecutionIdEqualTo(execution.getId())
+        unresolved.createCriteria().andSourceExecutionCodeEqualTo(execution.getExecutionCode())
                 .andDocumentTypeEqualTo(StockDocumentType.MATERIAL_ISSUE.getValue());
         if (hasPendingIssues(issues.selectByExample(unresolved))) return "相关领料仍有未决状态，请核实原请求";
-        if (inbound.invalidProductionInboundLines(execution.getId()) > 0) return "正式生产入库明细与库存动作不一致";
+        if (inbound.invalidProductionInboundLines(execution.getExecutionCode()) > 0) return "正式生产入库明细与库存动作不一致";
         var output = projection.confirmedInputQty();
         if (execution.getRoutingId() != null) output = projection.nodes().getLast().effectiveOutputQty();
         if (received.compareTo(output) < 0) return "正常品尚未全部正式入库";
         if (received.compareTo(output) > 0) return "正常品正式入库超过当前有效产出，须核实数量异常";
-        return quality.receiptBlockReason(execution.getId());
+        return quality.receiptBlockReason(execution.getExecutionCode());
     }
 
-    private MesExecutionCompletionEntity completion(Long id) {
+    private MesExecutionCompletionEntity completion(String id) {
         var filter = new MesExecutionCompletionExample();
-        filter.createCriteria().andExecutionIdEqualTo(id);
+        filter.createCriteria().andExecutionCodeEqualTo(id);
         filter.setOrderByClause("recorded_at DESC,id DESC");
         try (var page = PageHelper.offsetPage(0, 1, false)) {
             var rows = completions.selectByExample(filter);
@@ -239,11 +239,11 @@ public class ProductionCompletionService {
     private void append(MesProductionExecutionEntity execution, ExecutionQuantity projection,
                         BigDecimal received, String auditRequestId) {
         // Every new completed input cycle appends a fact; prior cycles remain immutable.
-        String requestId = UUID.nameUUIDFromBytes(("fully-received:" + execution.getId() + ":" + auditRequestId)
+        String requestId = UUID.nameUUIDFromBytes(("fully-received:" + execution.getExecutionCode() + ":" + auditRequestId)
                 .getBytes(StandardCharsets.UTF_8)).toString();
         var row = new MesExecutionCompletionEntity();
         row.setId(requestId);
-        row.setExecutionId(execution.getId());
+        row.setExecutionCode(execution.getExecutionCode());
         BigDecimal effective = received;
         if (execution.getRoutingId() != null) effective = projection.nodes().getLast().effectiveOutputQty();
         row.setEffectiveQty(effective);
@@ -257,7 +257,7 @@ public class ProductionCompletionService {
                                 ProductionClosureRules.number(node.netDefectQty()),
                                 ProductionClosureRules.number(node.unverifiedDefectQty())))
                         .toList(), defectQty(projection), received, auditRequestId,
-                quality.productionBasis(execution.getId()).factIdentities()));
+                quality.productionBasis(execution.getExecutionCode()).factIdentities()));
         row.setRequestHash(ProductionClosureRules.hash(requestId, auditRequestId, row.getBasisHash(), ProductionClosureRules.actor()));
         row.setOperatorUserId(ProductionClosureRules.actor());
         row.setRecordedAt(LocalDateTime.now());

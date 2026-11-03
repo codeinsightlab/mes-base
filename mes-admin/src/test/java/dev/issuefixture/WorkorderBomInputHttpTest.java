@@ -20,6 +20,7 @@ import tools.jackson.databind.ObjectMapper;
 
 import static dev.issuefixture.ProductionCoreV1HttpTest.full;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -53,7 +54,7 @@ class WorkorderBomInputHttpTest {
             j.update("INSERT INTO material_bom_item(id,bom_id,material_id,quantity,unit_id,sort) "
                     + "SELECT n,100,1,1,1,0 FROM SYSTEM_RANGE(100,10200) AS generated(n)");
             select(m, 1, 1);
-            assertTrue(input(m, "10") > 0);
+            assertTrue(input(m, "10").startsWith("WO1:"));
         }
     }
 
@@ -76,7 +77,7 @@ class WorkorderBomInputHttpTest {
                     .evict(eq(MesProductionExecutionResource.PREFIX), eq(BusinessCacheEvict.Scope.LIST_AND_DETAIL));
 
             String first = ProductionInputHttpTest.command(m, UUID.randomUUID().toString(), "L001", "90");
-            long execution = JSON.readTree(ProductionInputHttpTest.submit(m, first)).get("executionId").asLong();
+            String execution = JSON.readTree(ProductionInputHttpTest.submit(m, first)).get("executionCode").asText();
             verify(redis, times(2)).deleteByPattern(anyString());
             clearInvocations(redis);
 
@@ -87,7 +88,7 @@ class WorkorderBomInputHttpTest {
             m.perform(full(post("/api/production/input")).content(append)).andExpect(status().is5xxServerError());
             verify(redis, never()).deleteByPattern(anyString());
             assertEquals(0, new BigDecimal("90").compareTo(j.queryForObject(
-                    "SELECT target_qty FROM mes_production_execution WHERE id=?", BigDecimal.class, execution)));
+                    "SELECT target_qty FROM mes_production_execution WHERE execution_code=?", BigDecimal.class, execution)));
 
             ProductionInputHttpTest.submit(m, first);
             verify(redis, never()).deleteByPattern(anyString());
@@ -111,24 +112,24 @@ class WorkorderBomInputHttpTest {
                 .andExpect(status().isOk());
     }
 
-    static long input(MockMvc m, String output) throws Exception {
+    static String input(MockMvc m, String output) throws Exception {
         return JSON.readTree(ProductionInputHttpTest.submit(m, ProductionInputHttpTest.command(m, UUID.randomUUID()
                         .toString(), "L001", output)))
-                .get("executionId").asLong();
+                .get("executionCode").asText();
     }
 
-    static void report(MockMvc m, long execution, String quantity) throws Exception {
+    static void report(MockMvc m, String execution, String quantity) throws Exception {
         for (long node : List.of(11L, 12L, 13L)) {
             String body = ProductionReportHttpTest.supplement(node, quantity)
-                    .replace("\"executionId\":\"1\"", "\"executionId\":\"" + execution + "\"");
+                    .replace("\"executionCode\":\"1\"", "\"executionCode\":\"" + execution + "\"");
             m.perform(full(post("/api/production/reports/supplements")).content(body)).andExpect(status().isOk());
         }
     }
 
-    static void receive(MockMvc m, long execution, String quantity) throws Exception {
+    static void receive(MockMvc m, String execution, String quantity) throws Exception {
         var context = (AnnotationConfigWebApplicationContext) m.getDispatcherServlet().getWebApplicationContext();
         var j = ProductionInputHttpTest.db(context);
-        var identity = JSON.readTree(m.perform(full(get("/api/production/identity/" + execution)))
+        var identity = JSON.readTree(m.perform(full(get("/api/production/identity/{code}", execution)))
                 .andExpect(status().isOk()).andReturn().getResponse().getContentAsString());
         String batch = identity.get("batchNo").asText();
         long product = identity.get("productId").asLong();
@@ -144,7 +145,7 @@ class WorkorderBomInputHttpTest {
                 j.update("UPDATE wm_inventory SET batch_no=? WHERE id=?", batch, stockId);
             }
         } else stockId = matches.getFirst();
-        m.perform(full(post("/api/production/executions/" + execution + "/inbound")).content(JSON.writeValueAsString(Map.of("requestId", UUID.randomUUID()
+        m.perform(full(post("/api/production/executions/{code}/inbound", execution)).content(JSON.writeValueAsString(Map.of("requestId", UUID.randomUUID()
                         .toString(), "stockId", stockId, "quantity", quantity, "reason", "TEST ONLY MES inbound"))))
                 .andExpect(status().isOk());
     }
@@ -156,27 +157,27 @@ class WorkorderBomInputHttpTest {
             var m = MaterialIssueHttpTest.mvc(c);
             prepare(j, "100", "1", "2.5");
             select(m, 1, 1);
-            long execution = input(m, "90");
-            m.perform(full(post("/api/production/executions/" + execution + "/actions/start")))
+            String execution = input(m, "90");
+            m.perform(full(post("/api/production/executions/{code}/actions/start", execution)))
                     .andExpect(status().isOk());
             report(m, execution, "90");
             receive(m, execution, "60");
-            assertEquals("RUNNING", j.queryForObject("SELECT status FROM mes_production_execution WHERE id=?", String.class, execution));
+            assertEquals("RUNNING", j.queryForObject("SELECT status FROM mes_production_execution WHERE execution_code=?", String.class, execution));
             receive(m, execution, "30");
-            assertEquals("FULLY_RECEIVED", j.queryForObject("SELECT status FROM mes_production_execution WHERE id=?", String.class, execution));
-            var facts = j.queryForList("SELECT * FROM mes_production_report WHERE execution_id=? ORDER BY id", execution);
-            String code = JSON.readTree(m.perform(full(get("/api/production/identity/" + execution)))
+            assertEquals("FULLY_RECEIVED", j.queryForObject("SELECT status FROM mes_production_execution WHERE execution_code=?", String.class, execution));
+            var facts = j.queryForList("SELECT * FROM mes_production_report WHERE execution_code=? ORDER BY id", execution);
+            String code = JSON.readTree(m.perform(full(get("/api/production/identity/{code}", execution)))
                     .andExpect(status().isOk()).andReturn().getResponse().getContentAsString()).get("qrCode").asText();
             m.perform(full(get("/api/production/combinations/calculate")).param("code", code))
                     .andExpect(status().isConflict())
                     .andExpect(jsonPath("errorCode").value("PRODUCTION_COMBINATION_CLOSED"));
-            long next = JSON.readTree(ProductionInputHttpTest.submit(m, ProductionInputHttpTest.command(m, UUID.randomUUID()
-                    .toString(), "L002", "10"))).get("executionId").asLong();
-            assertTrue(execution != next);
-            m.perform(full(post("/api/production/executions/" + next + "/actions/start"))).andExpect(status().isOk());
+            String next = JSON.readTree(ProductionInputHttpTest.submit(m, ProductionInputHttpTest.command(m, UUID.randomUUID()
+                    .toString(), "L002", "10"))).get("executionCode").asText();
+            assertNotEquals(execution, next);
+            m.perform(full(post("/api/production/executions/{code}/actions/start", next))).andExpect(status().isOk());
             report(m, next, "10");
             receive(m, next, "10");
-            assertEquals(facts, j.queryForList("SELECT * FROM mes_production_report WHERE execution_id=? ORDER BY id", execution));
+            assertEquals(facts, j.queryForList("SELECT * FROM mes_production_report WHERE execution_code=? ORDER BY id", execution));
             assertEquals("COMPLETED", j.queryForObject("SELECT status FROM workorder WHERE id=1", String.class));
             assertEquals(2, j.queryForObject("SELECT COUNT(*) FROM mes_execution_completion", Integer.class));
         }

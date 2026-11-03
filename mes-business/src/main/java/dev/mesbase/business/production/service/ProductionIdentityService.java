@@ -2,18 +2,14 @@ package dev.mesbase.business.production.service;
 
 import com.github.pagehelper.PageHelper;
 import dev.mesbase.business.basic.dao.MaterialMapper;
-import dev.mesbase.business.production.dao.MesProductionCombinationMapper;
+import dev.mesbase.business.production.domain.ProductionQrCode;
 import dev.mesbase.business.production.dao.MesProductionExecutionMapper;
 import dev.mesbase.business.production.dao.RoutingMapper;
 import dev.mesbase.business.production.dao.WorkorderMapper;
-import dev.mesbase.business.production.domain.MesProductionCombinationExample;
 import dev.mesbase.business.production.domain.MesProductionExecutionEntity;
 import dev.mesbase.business.production.domain.MesProductionExecutionExample;
 import dev.mesbase.business.production.domain.RoutingEntity;
-import dev.mesbase.business.production.domain.ProductionCodeRules;
-import dev.mesbase.business.production.domain.ProductionCombinationRules;
 import dev.mesbase.business.production.domain.ProductionIdentity;
-import dev.mesbase.business.production.domain.ProductionScanCode;
 import dev.mesbase.business.production.domain.WorkorderEntity;
 import dev.mesbase.business.production.domain.WorkorderExample;
 import dev.mesbase.common.utils.StringUtils;
@@ -36,59 +32,28 @@ public class ProductionIdentityService {
     private final WorkorderMapper workorders;
     private final MaterialMapper products;
     private final RoutingMapper routings;
-    private final MesProductionCombinationMapper combinations;
 
     public ProductionIdentityService(MesProductionExecutionMapper executions, WorkorderMapper workorders,
-                                     MaterialMapper products, RoutingMapper routings,
-                                     MesProductionCombinationMapper combinations) {
+                                     MaterialMapper products, RoutingMapper routings) {
         this.executions = executions;
         this.workorders = workorders;
         this.products = products;
         this.routings = routings;
-        this.combinations = combinations;
     }
 
     @Transactional(transactionManager = "businessTransactionManager", readOnly = true)
     public ProductionIdentity resolve(String code) {
-        if (ProductionCombinationRules.isCombination(code)) {
-            var combination = combinations.selectByPrimaryKey(ProductionCombinationRules.parse(code, FactoryContext.required()
-                    .factoryId().value()));
-            if (combination == null || combination.getExecutionId() == null)
-                throw new FoundationException(ErrorCode.EXECUTION_NOT_FOUND);
-            return read(combination.getExecutionId());
-        }
-        var scanned = ProductionCodeRules.parse(code);
-        var order = requireOrder(scanned);
-        var execution = findExecution(order.getId(), order.getProductId(), scanned.batchNo());
+        var execution = executions.selectByCode(ProductionQrCode.normalize(code));
         if (execution == null) throw new FoundationException(ErrorCode.EXECUTION_NOT_FOUND);
         return identity(execution);
     }
 
     @Transactional(transactionManager = "businessTransactionManager", readOnly = true)
-    public ProductionIdentity read(Long executionId) {
-        if (executionId == null) throw new FoundationException(ErrorCode.BAD_REQUEST);
-        var execution = executions.selectByPrimaryKey(executionId);
+    public ProductionIdentity read(String executionCode) {
+        if (executionCode == null) throw new FoundationException(ErrorCode.BAD_REQUEST);
+        var execution = executions.selectByCode(executionCode);
         if (execution == null) throw new FoundationException(ErrorCode.EXECUTION_NOT_FOUND);
         return identity(execution);
-    }
-
-    @Transactional(transactionManager = "businessTransactionManager", readOnly = true)
-    public WorkorderEntity requireOrder(ProductionScanCode scanned) {
-        ProductionCodeRules.validate(scanned);
-        var order = orderByExactCode(scanned.workorderCode());
-        var product = products.selectByPrimaryKey(order.getProductId());
-        if (product == null || !scanned.productCode().equals(product.getCode()))
-            throw new FoundationException(ErrorCode.EXECUTION_NOT_FOUND);
-        return order;
-    }
-
-    /**
-     * Input labels name the stock material; the trusted supply provider validates membership in this order.
-     */
-    @Transactional(transactionManager = "businessTransactionManager", readOnly = true)
-    public WorkorderEntity requireInputOrder(ProductionScanCode scanned) {
-        ProductionCodeRules.validate(scanned);
-        return orderByExactCode(scanned.workorderCode());
     }
 
     private ProductionIdentity identity(MesProductionExecutionEntity execution) {
@@ -100,15 +65,7 @@ public class ProductionIdentityService {
                 || execution.getRoutingId() != null && (routing == null || routing.getPublishedAt() == null)
                 || !Objects.equals(workorder.getProductId(), execution.getProductId()))
             throw new FoundationException(ErrorCode.EXECUTION_INVALID);
-        String outputCode = null;
-        if (execution.getBatchNo() != null)
-            outputCode = ProductionCodeRules.format(new ProductionScanCode(workorder.getCode(), product.getCode(), execution.getBatchNo()));
-        var filter = new MesProductionCombinationExample();
-        filter.createCriteria().andExecutionIdEqualTo(execution.getId());
-        var linked = combinations.selectByExample(filter);
-        if (linked.size() > 1) throw new FoundationException(ErrorCode.PRODUCTION_IDENTITY_AMBIGUOUS);
-        if (!linked.isEmpty()) outputCode = ProductionCombinationRules.code(FactoryContext.required().factoryId()
-                .value(), linked.getFirst().getId());
+        String outputCode = execution.getExecutionCode();
         Long routingId = null;
         String routingCode = null;
         Integer routingVersion = null;
@@ -117,74 +74,19 @@ public class ProductionIdentityService {
             routingCode = routing.getCode();
             routingVersion = routing.getVersion();
         }
-        return new ProductionIdentity(execution.getId(), outputCode,
+        return new ProductionIdentity(execution.getExecutionCode(), outputCode,
                 workorder.getId(), workorder.getCode(), product.getId(), product.getCode(), product.getName(),
                 routingId, routingCode, routingVersion, execution.getStatus(), execution.getTargetQty(),
                 execution.getBatchNo());
     }
 
     /**
-     * Generated indexed predicates narrow the query; Java equality preserves exact UTF-8 text semantics even on
-     * case-insensitive or PAD SPACE database collations. Never limit approximate candidates before exact comparison.
-     */
-    @Transactional(transactionManager = "businessTransactionManager", readOnly = true)
-    public MesProductionExecutionEntity findExecution(Long workorderId, Long productId, String batchNo) {
-        if (workorderId == null || productId == null || batchNo == null)
-            throw new FoundationException(ErrorCode.BAD_REQUEST);
-        MesProductionExecutionEntity match = null;
-        long after = 0;
-        while (true) {
-            var filter = new MesProductionExecutionExample();
-            filter.createCriteria().andWorkorderIdEqualTo(workorderId)
-                    .andBatchNoEqualTo(batchNo).andIdGreaterThan(after);
-            filter.setOrderByClause("id ASC");
-            List<MesProductionExecutionEntity> rows;
-            try (var page = PageHelper.offsetPage(0, 100, false)) {
-                rows = List.copyOf(executions.selectByExample(filter));
-            }
-            if (rows.isEmpty()) return match;
-            for (var row : rows) {
-                after = row.getId();
-                if (!batchNo.equals(row.getBatchNo())) continue;
-                if (!Objects.equals(productId, row.getProductId()))
-                    throw new FoundationException(ErrorCode.PRODUCTION_IDENTITY_AMBIGUOUS);
-                if (match != null) throw new FoundationException(ErrorCode.PRODUCTION_IDENTITY_AMBIGUOUS);
-                match = row;
-            }
-        }
-    }
-
-    private WorkorderEntity orderByExactCode(String code) {
-        WorkorderEntity match = null;
-        long after = 0;
-        while (true) {
-            var filter = new WorkorderExample();
-            filter.createCriteria().andCodeEqualTo(code).andIdGreaterThan(after);
-            filter.setOrderByClause("id ASC");
-            List<WorkorderEntity> rows;
-            try (var page = PageHelper.offsetPage(0, 100, false)) {
-                rows = List.copyOf(workorders.selectByExample(filter));
-            }
-            if (rows.isEmpty()) {
-                if (match == null) throw new FoundationException(ErrorCode.EXECUTION_NOT_FOUND);
-                return match;
-            }
-            for (var row : rows) {
-                after = row.getId();
-                if (!code.equals(row.getCode())) continue;
-                if (match != null) throw new FoundationException(ErrorCode.PRODUCTION_IDENTITY_AMBIGUOUS);
-                match = row;
-            }
-        }
-    }
-
-    /**
      * Batch is a persisted production property; no barcode mapping or historical reconstruction is consulted.
      */
     @Transactional(transactionManager = "businessTransactionManager", readOnly = true)
-    public String requiredBatch(Long executionId) {
-        if (executionId == null) throw new FoundationException(ErrorCode.BAD_REQUEST);
-        var execution = executions.selectByPrimaryKey(executionId);
+    public String requiredBatch(String executionCode) {
+        if (executionCode == null) throw new FoundationException(ErrorCode.BAD_REQUEST);
+        var execution = executions.selectByCode(executionCode);
         if (execution == null) throw new FoundationException(ErrorCode.EXECUTION_NOT_FOUND);
         if (StringUtils.isBlank(execution.getBatchNo()))
             throw new FoundationException(ErrorCode.PRODUCTION_BATCH_REQUIRED);

@@ -12,11 +12,11 @@ import org.apache.ibatis.annotations.Param;
 public interface WorkOrderExtraMapper {
     boolean hasOrderDependents(@Param("id") Long workorderId);
 
-    boolean hasExecutionDependents(@Param("id") Long executionId);
+    boolean hasExecutionDependents(@Param("id") String executionCode);
 
-    WorkOrderModels.Allocation activeAllocation(@Param("id") Long workorderId, @Param("excluding") Long excluding);
+    WorkOrderModels.Allocation activeAllocation(@Param("id") Long workorderId, @Param("excluding") String excluding);
 
-    BigDecimal pendingExecutionInput(@Param("id") Long executionId);
+    BigDecimal pendingExecutionInput(@Param("id") String executionCode);
 
     long countBlockingIssues(Long workorderId);
 

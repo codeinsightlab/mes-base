@@ -2,7 +2,9 @@ package dev.mesbase.business.production.controller;
 
 import dev.mesbase.business.production.controller.vo.RoutingDetailVo;
 import dev.mesbase.business.production.domain.WorkOrderModels;
+import dev.mesbase.business.production.domain.WorkOrderBomBuildModels;
 import dev.mesbase.business.production.domain.WorkorderEntity;
+import dev.mesbase.business.production.service.WorkOrderBomBuildService;
 import dev.mesbase.business.production.service.WorkOrderService;
 import dev.mesbase.system.service.AutoCodeNumbering;
 import dev.mesbase.system.service.AutoCodeRuleType;
@@ -32,17 +34,22 @@ import org.springframework.web.bind.annotation.RestController;
 public class WorkOrderController {
     private final WorkOrderService service;
     private final AutoCodeNumbering autoCodes;
+    private final WorkOrderBomBuildService bomBuilds;
 
-    public WorkOrderController(WorkOrderService service, AutoCodeNumbering autoCodes) {
+    public WorkOrderController(WorkOrderService service, AutoCodeNumbering autoCodes,
+                               WorkOrderBomBuildService bomBuilds) {
         this.service = service;
         this.autoCodes = autoCodes;
+        this.bomBuilds = bomBuilds;
     }
 
     public record OrderView(String id, String source, String code, String productId, BigDecimal plannedQty,
                             String routingId,
                             String status, LocalDateTime plannedStartAt, LocalDateTime plannedEndAt,
                             String externalId, String externalCode, String remark, int revision,
-                            LocalDateTime createTime, LocalDateTime updateTime) {
+                            LocalDateTime createTime, LocalDateTime updateTime, String bomId, Long bomRevision,
+                            String bomBuildId, String bomBuildParentWorkorderId, String bomBuildSourceLineId,
+                            String bomBuildPath) {
     }
 
     public record RoutingView(String id, String code, String name, int version, String status) {
@@ -51,6 +58,10 @@ public class WorkOrderController {
     public record DetailView(OrderView workorder, String productCode, String productName, RoutingView routing,
                              AllocationView allocation) {
     }
+
+    public record BomBuildCreatedOrderView(String path, String parentPath, String sourceBomLineId,
+                                           String bomId, Long bomRevision, DetailView workorder) { }
+    public record BomBuildResultView(String buildId, List<BomBuildCreatedOrderView> orders) { }
 
     public record SummaryView(OrderView workorder, String productCode, String productName,
                               String routingCode, Integer routingVersion, AllocationView allocation,
@@ -111,6 +122,27 @@ public class WorkOrderController {
     @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED, permission = "workorder:create")
     public DetailView create(@Valid @RequestBody WorkOrderSaveRequest input) {
         return view(service.create(input.toCommand()));
+    }
+
+    @PostMapping("/workorder/bom-build/preview")
+    @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED, permission = "workorder:create")
+    public WorkOrderBomBuildModels.Preview previewBomBuild(
+            @Valid @RequestBody WorkOrderBomBuildModels.PreviewRequest input) {
+        return bomBuilds.preview(input);
+    }
+
+    @PostMapping("/workorder/bom-build/confirm")
+    @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED, permission = "workorder:create")
+    public BomBuildResultView confirmBomBuild(
+            @Valid @RequestBody WorkOrderBomBuildModels.Confirmation input) {
+        var result = bomBuilds.confirm(input.source(), input.confirmation());
+        return new BomBuildResultView(result.buildId(), result.orders().stream().map(detail -> {
+            var order = detail.workorder();
+            return new BomBuildCreatedOrderView(order.getBomBuildPath(), order.getBomBuildParentWorkorderId() == null
+                    ? null : order.getBomBuildParentWorkorderId().toString(), order.getBomBuildSourceLineId() == null
+                    ? null : order.getBomBuildSourceLineId().toString(), order.getBomId() == null
+                    ? null : order.getBomId().toString(), order.getBomRevision(), view(detail));
+        }).toList());
     }
 
     @PutMapping("/workorder/{id}")

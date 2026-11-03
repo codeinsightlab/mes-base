@@ -253,7 +253,7 @@ public class StockDocumentController {
     }
 
     public record ProductionInputBasis(String requestId, String inputKind, String sourceMode,
-                                       String executionId, String workorderId, String workorderCode,
+                                       String executionCode, String workorderId, String workorderCode,
                                        String outputQty, String issueQty, String materialId,
                                        String materialCode, String warehouseId, String unitId, String batchNo,
                                        String bomId, String bomBaseQty, String bomComponentQty,
@@ -273,7 +273,7 @@ public class StockDocumentController {
     public Detail create(@Valid @RequestBody StockDocumentModels.Create command) {
         if (command.ruleCode() == null || command.ruleCode().isBlank())
             throw new FoundationException(ErrorCode.BAD_REQUEST);
-        command = new StockDocumentModels.Create(fixedDirection(command.direction()), command.documentType(), command.reason(), command.remark(), command.sourceWorkorderId(), command.sourceExecutionId(), command.ruleCode());
+        command = new StockDocumentModels.Create(fixedDirection(command.direction()), command.documentType(), command.reason(), command.remark(), command.sourceWorkorderId(), command.sourceExecutionCode(), command.ruleCode());
         return view(service.create(command));
     }
 
@@ -381,13 +381,13 @@ public class StockDocumentController {
 
     @GetMapping("/executions/{id}/basis")
     @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED, permission = PERMISSION + "query")
-    public ProductionBasis productionBasis(@PathVariable Long id) {
+    public ProductionBasis productionBasis(@PathVariable String id) {
         fixedDirection(StockDocumentDirection.IN.getValue());
         var b = service.productionBasis(id);
         return BeanConversions.convert(b, ProductionBasis.class);
     }
 
-    public record ProductionBasis(String executionId, String productId, String effective,
+    public record ProductionBasis(String executionCode, String productId, String effective,
                                   String received, String remaining, boolean canReceive, String blockedReason,
                                   boolean reportingRequired) {
     }
@@ -444,7 +444,7 @@ public class StockDocumentController {
     private StockDocumentModels.AggregateSave fixedAggregate(StockDocumentModels.AggregateSave command) {
         var h = command.header();
         return new StockDocumentModels.AggregateSave(new StockDocumentModels.AggregateHeader(fixedDirection(h.direction()),
-                h.documentType(), h.reason(), h.remark(), h.sourceWorkorderId(), h.sourceExecutionId(), h.ruleCode(),
+                h.documentType(), h.reason(), h.remark(), h.sourceWorkorderId(), h.sourceExecutionCode(), h.ruleCode(),
                 h.expectedRevision()), command.items(), command.productionIssue());
     }
 
@@ -462,7 +462,7 @@ public class StockDocumentController {
 
     public record Header(String id, String documentNo, String direction, String documentType, String status,
                          String reason,
-                         String remark, String sourceWorkorderId, String sourceExecutionId,
+                         String remark, String sourceWorkorderId, String sourceExecutionCode,
                          String createBy,
                          LocalDateTime createTime,
                          String updateBy, LocalDateTime updateTime, String postedBy, LocalDateTime postedAt,
@@ -475,7 +475,8 @@ public class StockDocumentController {
                        String remark, String stockActionId, String revision, String demandLineId) {
     }
 
-    public record QualitySource(String sourceDeclarationId, String sourceTreatmentId, String sourceQualityExecutionId) {
+    public record QualitySource(String sourceDeclarationId, String sourceTreatmentId,
+                                String sourceQualityExecutionCode) {
     }
 
     public record MaterialIssueBasis(String requestId, String code, String workorderId, String outputQty,

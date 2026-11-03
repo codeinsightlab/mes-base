@@ -62,8 +62,8 @@ class ProductionCompletionHttpTest {
             var m = MaterialIssueHttpTest.mvc(c);
             var j = ProductionWarehouseFixture.db(c);
             oneExecution(j, "100");
-            j.update("UPDATE mes_production_report SET quantity_delta=90 WHERE execution_id=1 AND routing_node_id=13");
-            var original = j.queryForMap("SELECT * FROM mes_production_report WHERE execution_id=1 AND routing_node_id=13");
+            j.update("UPDATE mes_production_report SET quantity_delta=90 WHERE execution_code=1 AND routing_node_id=13");
+            var original = j.queryForMap("SELECT * FROM mes_production_report WHERE execution_code=1 AND routing_node_id=13");
             String reportId = original.get("ID").toString();
             String command = "{\"requestId\":\"" + UUID.randomUUID() + "\",\"quantityDelta\":\"10\",\"reason\":\"TEST ONLY administrator verified omitted final output\"}";
             m.perform(full(post("/api/production/reports/" + reportId + "/adjustments")).content(command))
@@ -126,7 +126,7 @@ class ProductionCompletionHttpTest {
                     .andExpect(jsonPath("receivedQty").value("90.000000"))
                     .andExpect(jsonPath("receiptState").value("FULLY_RECEIVED"));
             assertEquals(0, new BigDecimal("100").compareTo(j.queryForObject(
-                    "SELECT SUM(quantity_delta) FROM mes_production_report WHERE execution_id=1 AND routing_node_id=15", BigDecimal.class)));
+                    "SELECT SUM(quantity_delta) FROM mes_production_report WHERE execution_code=1 AND routing_node_id=15", BigDecimal.class)));
             assertEquals(0, new BigDecimal("90").compareTo(j.queryForObject("SELECT accepted_qty FROM mes_execution_completion", BigDecimal.class)));
             assertEquals(0, new BigDecimal("10").compareTo(j.queryForObject(
                     "SELECT SUM(l.quantity) FROM wm_stock_document d JOIN wm_stock_document_line l ON l.document_id=d.id WHERE d.document_type='DEFECT_RECEIPT' AND d.status='POSTED'", BigDecimal.class)));
@@ -161,7 +161,7 @@ class ProductionCompletionHttpTest {
             oneExecution(j, "100");
             QualityDispositionHttpTest.bindBatch(j, "TEST-FINISHED");
             String defect = QualityWorkflowHttpTest.defect(m, 11, "100", "INDEPENDENT", null);
-            j.update("INSERT INTO wm_stock_document(document_no,document_type,status,reason,source_workorder_id,source_execution_id,create_by,create_time,update_by,update_time,revision) VALUES('TEST ONLY pending','MATERIAL_ISSUE','DRAFT','TEST ONLY pending',1,1,'1',CURRENT_TIMESTAMP,'1',CURRENT_TIMESTAMP,0)");
+            j.update("INSERT INTO wm_stock_document(document_no,document_type,status,reason,source_workorder_id,source_execution_code,create_by,create_time,update_by,update_time,revision) VALUES('TEST ONLY pending','MATERIAL_ISSUE','DRAFT','TEST ONLY pending',1,1,'1',CURRENT_TIMESTAMP,'1',CURRENT_TIMESTAMP,0)");
             QualityWorkflowHttpTest.transfer(m, defect, "100");
             assertEquals("RUNNING", j.queryForObject("SELECT status FROM mes_production_execution WHERE id=1", String.class));
             assertEquals(0, j.queryForObject("SELECT COUNT(*) FROM mes_execution_completion", Integer.class));
@@ -240,7 +240,7 @@ class ProductionCompletionHttpTest {
             j.update("UPDATE workorder SET planned_qty=110 WHERE id=1");
             j.update("UPDATE mes_production_execution SET status='RUNNING',start_time=CURRENT_TIMESTAMP WHERE id=2");
             ProductionInputTestData.confirmed(j, 2, new BigDecimal("10"));
-            j.update("INSERT INTO mes_production_report(execution_id,routing_node_id,record_type,quantity_delta,operator_user_id,recorded_by,report_time,reason,create_time) SELECT 2,routing_node_id,'REPORT',10,1,1,CURRENT_TIMESTAMP,'TEST ONLY sibling',CURRENT_TIMESTAMP FROM mes_production_report WHERE execution_id=1");
+            j.update("INSERT INTO mes_production_report(execution_code,routing_node_id,record_type,quantity_delta,operator_user_id,recorded_by,report_time,reason,create_time) SELECT 2,routing_node_id,'REPORT',10,1,1,CURRENT_TIMESTAMP,'TEST ONLY sibling',CURRENT_TIMESTAMP FROM mes_production_report WHERE execution_code=1");
             UnifiedInboundHttpTest.stock(j);
             UnifiedInboundHttpTest.receive(m, "100");
             assertEquals("FULLY_RECEIVED", j.queryForObject("SELECT status FROM mes_production_execution WHERE id=1", String.class));
@@ -305,7 +305,7 @@ class ProductionCompletionHttpTest {
             var j = ProductionWarehouseFixture.db(c);
             oneExecution(j, "100");
             UnifiedInboundHttpTest.stock(j);
-            j.update("INSERT INTO wm_stock_document(document_no,document_type,status,reason,source_workorder_id,source_execution_id,create_by,create_time,update_by,update_time,revision) VALUES('TEST ONLY pending','MATERIAL_ISSUE','DRAFT','TEST ONLY pending',1,1,'1',CURRENT_TIMESTAMP,'1',CURRENT_TIMESTAMP,0)");
+            j.update("INSERT INTO wm_stock_document(document_no,document_type,status,reason,source_workorder_id,source_execution_code,create_by,create_time,update_by,update_time,revision) VALUES('TEST ONLY pending','MATERIAL_ISSUE','DRAFT','TEST ONLY pending',1,1,'1',CURRENT_TIMESTAMP,'1',CURRENT_TIMESTAMP,0)");
             UnifiedInboundHttpTest.receive(m, "100");
             assertEquals("RUNNING", j.queryForObject("SELECT status FROM mes_production_execution WHERE id=1", String.class));
             assertEquals("RELEASED", j.queryForObject("SELECT status FROM workorder WHERE id=1", String.class));
@@ -387,7 +387,7 @@ class ProductionCompletionHttpTest {
             String request = UUID.randomUUID()
                     .toString(), basis = "f".repeat(64), reason = "TEST ONLY historical complete";
             String hash = ProductionClosureRules.hash(1L, basis, reason, 1L);
-            j.update("INSERT INTO mes_execution_completion(id,execution_id,effective_qty,released_qty,receipt_qty,accepted_qty,basis_hash,request_hash,operator_user_id,recorded_at,reason) VALUES(?,1,100,0,0,0,?,?,1,CURRENT_TIMESTAMP,?)", request, basis, hash, reason);
+            j.update("INSERT INTO mes_execution_completion(id,execution_code,effective_qty,released_qty,receipt_qty,accepted_qty,basis_hash,request_hash,operator_user_id,recorded_at,reason) VALUES(?,1,100,0,0,0,?,?,1,CURRENT_TIMESTAMP,?)", request, basis, hash, reason);
             j.update("UPDATE mes_production_execution SET status='FULLY_RECEIVED',end_time=CURRENT_TIMESTAMP WHERE id=1");
             String body = "{\"requestId\":\"" + request + "\",\"expectedBasisHash\":\"" + basis + "\",\"reason\":\"" + reason + "\"}";
             m.perform(full(post("/api/production/executions/1/actions/complete")).content(body))

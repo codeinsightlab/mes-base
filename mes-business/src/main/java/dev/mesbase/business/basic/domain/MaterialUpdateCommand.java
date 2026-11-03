@@ -16,7 +16,8 @@ public record MaterialUpdateCommand(
         @NotNull Long unitId,
         @NotBlank @Size(max = 16) String status,
         @Size(max = 128) String externalId,
-        @Size(max = 128) String externalCode
+        @Size(max = 128) String externalCode,
+        @Size(max = 64) String workOrderRuleCode
 ) {
 }
 

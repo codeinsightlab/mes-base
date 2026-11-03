@@ -82,7 +82,7 @@ class WorkOrderCancellationMySqlTest {
                 ProductionReportMySqlTest.actor();
                 try {
                     race.await();
-                    return executions.insert(new MesProductionExecutionCreateCommand(b, ((Number) order.get("routing_id")).longValue(), BigDecimal.ONE, "READY", null, null, "TEST ONLY V18 race"))
+                    return executions.insert(new MesProductionExecutionCreateCommand(order.get("code") + ":TEST_ONLY#RACE", b, ((Number) order.get("routing_id")).longValue(), BigDecimal.ONE, "READY", null, null, "TEST ONLY V18 race"))
                             .getId().toString();
                 } catch (FoundationException e) {
                     return e.code().name();
@@ -93,7 +93,7 @@ class WorkOrderCancellationMySqlTest {
             assertTrue(stop.get().matches("[0-9a-f-]{36}"));
             String positive = forward.get();
             assertTrue(positive.equals("WORKORDER_CANCELLED") || positive.matches("[0-9]+"));
-            assertThrows(FoundationException.class, () -> executions.insert(new MesProductionExecutionCreateCommand(b, ((Number) order.get("routing_id")).longValue(), BigDecimal.ONE, "READY", null, null, "TEST ONLY blocked")));
+            assertThrows(FoundationException.class, () -> executions.insert(new MesProductionExecutionCreateCommand(order.get("code") + ":TEST_ONLY#RACE", b, ((Number) order.get("routing_id")).longValue(), BigDecimal.ONE, "READY", null, null, "TEST ONLY blocked")));
             assertEquals(baseline, j.queryForList("SELECT * FROM wm_inventory ORDER BY id"));
             var original = cancel.history(a);
             var replay = cancel.cancel(a, new Command(original.getId(), original.getReason(), 0));

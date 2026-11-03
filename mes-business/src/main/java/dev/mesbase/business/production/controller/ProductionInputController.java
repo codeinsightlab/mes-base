@@ -27,7 +27,7 @@ public class ProductionInputController {
     public record PreviewView(RoutingDetailVo definition, ExecutionActionController.PathView actual) {
     }
 
-    public record ResultView(String requestId, String documentId, String executionId, String code,
+    public record ResultView(String requestId, String documentId, String executionCode, String code,
                              String status, String confirmedInputQty, boolean stockApplied) {
     }
 

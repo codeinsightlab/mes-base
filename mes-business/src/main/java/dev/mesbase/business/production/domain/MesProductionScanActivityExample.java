@@ -1,4 +1,3 @@
-// MES-CODEGEN: MyBatis Generator standard single-table persistence.
 package dev.mesbase.business.production.domain;
 
 import java.time.LocalDateTime;
@@ -365,63 +364,63 @@ public class MesProductionScanActivityExample {
             return (Criteria) this;
         }
 
-        public Criteria andExecutionIdIsNull() {
-            addCriterion("execution_id is null");
+        public Criteria andExecutionCodeIsNull() {
+            addCriterion("execution_code is null");
             return (Criteria) this;
         }
 
-        public Criteria andExecutionIdIsNotNull() {
-            addCriterion("execution_id is not null");
+        public Criteria andExecutionCodeIsNotNull() {
+            addCriterion("execution_code is not null");
             return (Criteria) this;
         }
 
-        public Criteria andExecutionIdEqualTo(Long value) {
-            addCriterion("execution_id =", value, "executionId");
+        public Criteria andExecutionCodeEqualTo(String value) {
+            addCriterion("execution_code =", value, "executionCode");
             return (Criteria) this;
         }
 
-        public Criteria andExecutionIdNotEqualTo(Long value) {
-            addCriterion("execution_id <>", value, "executionId");
+        public Criteria andExecutionCodeNotEqualTo(String value) {
+            addCriterion("execution_code <>", value, "executionCode");
             return (Criteria) this;
         }
 
-        public Criteria andExecutionIdGreaterThan(Long value) {
-            addCriterion("execution_id >", value, "executionId");
+        public Criteria andExecutionCodeGreaterThan(String value) {
+            addCriterion("execution_code >", value, "executionCode");
             return (Criteria) this;
         }
 
-        public Criteria andExecutionIdGreaterThanOrEqualTo(Long value) {
-            addCriterion("execution_id >=", value, "executionId");
+        public Criteria andExecutionCodeGreaterThanOrEqualTo(String value) {
+            addCriterion("execution_code >=", value, "executionCode");
             return (Criteria) this;
         }
 
-        public Criteria andExecutionIdLessThan(Long value) {
-            addCriterion("execution_id <", value, "executionId");
+        public Criteria andExecutionCodeLessThan(String value) {
+            addCriterion("execution_code <", value, "executionCode");
             return (Criteria) this;
         }
 
-        public Criteria andExecutionIdLessThanOrEqualTo(Long value) {
-            addCriterion("execution_id <=", value, "executionId");
+        public Criteria andExecutionCodeLessThanOrEqualTo(String value) {
+            addCriterion("execution_code <=", value, "executionCode");
             return (Criteria) this;
         }
 
-        public Criteria andExecutionIdIn(List<Long> values) {
-            addCriterion("execution_id in", values, "executionId");
+        public Criteria andExecutionCodeIn(List<String> values) {
+            addCriterion("execution_code in", values, "executionCode");
             return (Criteria) this;
         }
 
-        public Criteria andExecutionIdNotIn(List<Long> values) {
-            addCriterion("execution_id not in", values, "executionId");
+        public Criteria andExecutionCodeNotIn(List<String> values) {
+            addCriterion("execution_code not in", values, "executionCode");
             return (Criteria) this;
         }
 
-        public Criteria andExecutionIdBetween(Long value1, Long value2) {
-            addCriterion("execution_id between", value1, value2, "executionId");
+        public Criteria andExecutionCodeBetween(String value1, Long value2) {
+            addCriterion("execution_code between", value1, value2, "executionCode");
             return (Criteria) this;
         }
 
-        public Criteria andExecutionIdNotBetween(Long value1, Long value2) {
-            addCriterion("execution_id not between", value1, value2, "executionId");
+        public Criteria andExecutionCodeNotBetween(String value1, Long value2) {
+            addCriterion("execution_code not between", value1, value2, "executionCode");
             return (Criteria) this;
         }
 

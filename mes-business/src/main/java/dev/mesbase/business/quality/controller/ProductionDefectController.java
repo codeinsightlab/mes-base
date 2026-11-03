@@ -41,7 +41,7 @@ public class ProductionDefectController {
     }
 
     public record Version(String id, String declarationId, Integer revisionNo, String recordAction,
-                          String revisionReason, String executionId, String affectedNodeId,
+                          String revisionReason, String executionCode, String affectedNodeId,
                           String responsibleUserId, String reportedBy, String recordedBy,
                           String wasteCategory,
                           String defectReason, String responsibilityRemark, String defectQty, LocalDateTime occurredAt,
@@ -119,10 +119,11 @@ public class ProductionDefectController {
 
     @GetMapping
     @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED, permission = "business:quality:defect:read")
-    public Page page(@RequestParam(required = false) Long executionId, @RequestParam(required = false) Long workorderId,
+    public Page page(@RequestParam(required = false) String executionCode,
+                     @RequestParam(required = false) Long workorderId,
                      @RequestParam(required = false) Long affectedNodeId, @RequestParam(defaultValue = "0") int offset,
                      @RequestParam(defaultValue = "20") int limit) {
-        var p = service.page(executionId, workorderId, affectedNodeId, offset, limit);
+        var p = service.page(executionCode, workorderId, affectedNodeId, offset, limit);
         return BeanConversions.convertPage(p, r -> view(r, p.names(), p.treatments().get(r.getDeclarationId()),
                 p.contexts().get(r.getDeclarationId())), Page::new);
     }
@@ -143,14 +144,14 @@ public class ProductionDefectController {
 
     @GetMapping("/executions/{id}/totals")
     @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED, permission = "business:quality:defect:read")
-    public List<Total> totals(@PathVariable Long id) {
+    public List<Total> totals(@PathVariable String id) {
         return service.nodeTotals(id).stream()
                 .map(t -> new Total(t.affectedNodeId().toString(), t.effectiveDefectQty().toPlainString())).toList();
     }
 
     @GetMapping("/executions/{id}/nodes")
     @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED, permission = "business:quality:defect:read")
-    public List<Node> nodes(@PathVariable Long id) {
+    public List<Node> nodes(@PathVariable String id) {
         return service.nodes(id);
     }
 

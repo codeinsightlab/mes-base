@@ -31,14 +31,14 @@ public class QualityTreatmentController {
         this.service = service;
     }
 
-    public record Event(String id, String declarationId, int declarationRevision, String executionId,
+    public record Event(String id, String declarationId, int declarationRevision, String executionCode,
                         String routingNodeId, String actionType, String attributionType, String relatedDeclarationId,
                         String basis, String returnedQty, String operatorUserId, String operatorName,
                         LocalDateTime recordedAt,
                         String reason, String targetWarehouseId, String stockDocumentId, String transferQty) {
     }
 
-    public record View(String declarationId, int revision, String executionId, String routingNodeId, String defectQty,
+    public record View(String declarationId, int revision, String executionCode, String routingNodeId, String defectQty,
                        String attribution, String relatedDeclarationId, String basis, String pendingDispositionQty,
                        String netDefectQty, String state, String recordAction,
                        String returnedQty, String transferredQty, String receiptState, String productId) {

@@ -8,7 +8,7 @@ import java.util.Map;
  * One current-business-database query, latest non-VOID contribution by affected node.
  */
 public interface ProductionDefectQuantityQuery {
-    List<NodeTotal> nodeTotals(Long executionId);
+    List<NodeTotal> nodeTotals(String executionCode);
 
-    Map<Long, List<NodeTotal>> nodeTotalsBatch(List<Long> executionIds);
+    Map<String, List<NodeTotal>> nodeTotalsBatch(List<String> executionCodes);
 }

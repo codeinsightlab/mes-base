@@ -109,7 +109,7 @@ class ProductionDefectMySqlTest {
     }
 
 
-    static Command command(String key, int revision, Long execution, Long node, String qty) {
+    static Command command(String key, int revision, String execution, Long node, String qty) {
         return new Command(key, revision == 0 ? null : revision, revision == 0 ? null : "TEST ONLY订正", new Facts(execution, node, new BigDecimal(qty), "MATERIAL", "TEST_ONLY_DEFECT_PHASE1", null, null, LocalDateTime.of(2026, 1, 1, 10, 0)), new Assessment(Attribution.INDEPENDENT, null, "TEST ONLY reviewed independent fixture"));
     }
 
@@ -122,11 +122,12 @@ class ProductionDefectMySqlTest {
             var tx = h.tx;
             var fixture = h.fixture();
             ProductionQualityLifecycleMySqlTest.seedGrossReports(h, fixture);
-            Long execution = fixture.execution(), node = fixture.selected().get(1);
+            String execution = fixture.execution();
+            Long node = fixture.selected().get(1);
             String tag = "DEFECT_TEST_" + UUID.randomUUID();
             var backup = Path.of(".local/production-quality-phase2b-20261016/quality-regression-before.txt");
-            Files.writeString(backup, "SIMPLE_B:192.168.18.25:3306/mes_base_dev_business_simple_b\nrequestPrefix=" + tag + "\nexistingConflict=" + jdbc.queryForObject("SELECT COUNT(*) FROM mes_production_defect WHERE request_key LIKE ?", Integer.class, tag + "%") + "\nproductionReports=" + jdbc.queryForList("SELECT id,execution_id,routing_node_id,quantity_delta FROM mes_production_report WHERE execution_id=?", execution));
-            var before = jdbc.queryForList("SELECT * FROM mes_production_report WHERE execution_id=? ORDER BY id", execution);
+            Files.writeString(backup, "SIMPLE_B:192.168.18.25:3306/mes_base_dev_business_simple_b\nrequestPrefix=" + tag + "\nexistingConflict=" + jdbc.queryForObject("SELECT COUNT(*) FROM mes_production_defect WHERE request_key LIKE ?", Integer.class, tag + "%") + "\nproductionReports=" + jdbc.queryForList("SELECT id,execution_code,routing_node_id,quantity_delta FROM mes_production_report WHERE execution_code=?", execution));
+            var before = jdbc.queryForList("SELECT * FROM mes_production_report WHERE execution_code=? ORDER BY id", execution);
             ProductionReportMySqlTest.actor();
             try {
                 var create = command(tag, 0, execution, node, "2.123456");
@@ -187,7 +188,7 @@ class ProductionDefectMySqlTest {
                 h.declarations.add(one.getDeclarationId());
                 assertEquals(one.getId(), y.get().getId());
                 tx.execute(s -> service.voidDeclaration(one.getDeclarationId(), new Command("VOID_" + UUID.randomUUID(), 1, "TEST ONLY验收作废", null)));
-                assertEquals(before, jdbc.queryForList("SELECT * FROM mes_production_report WHERE execution_id=? ORDER BY id", execution));
+                assertEquals(before, jdbc.queryForList("SELECT * FROM mes_production_report WHERE execution_code=? ORDER BY id", execution));
                 Files.writeString(Path.of(".local/production-quality-phase2b-20261016/quality-regression-acceptance.txt"), "SIMPLE_B verified\nexecution=" + execution + "\naffectedNode=" + node + "\ndeclaration=" + first.getDeclarationId() + "\nretryDeclaration=" + one.getDeclarationId() + "\nversions=3 and 2; all VOID; report rows unchanged; no inventory or external ERP writes\n");
             } finally {
                 SecurityContextHolder.clearContext();

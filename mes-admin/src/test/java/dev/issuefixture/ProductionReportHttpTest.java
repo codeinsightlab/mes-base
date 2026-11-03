@@ -57,18 +57,18 @@ class ProductionReportHttpTest {
             long original = add(m, 11, "4");
             m.perform(full(post(ROOT + "/supplements"), "B").content(supplement(11, "2")))
                     .andExpect(status().isOk());
-            String page = ROOT + "?executionId=1&routingNodeId=11&offset=0&limit=1";
+            String page = ROOT + "?executionCode=1&routingNodeId=11&offset=0&limit=1";
             m.perform(full(get(page), "A")).andExpect(status().isOk())
                     .andExpect(jsonPath("total").value(1))
                     .andExpect(jsonPath("items[0].id").value(String.valueOf(original)))
                     .andExpect(jsonPath("items[0].quantityDelta").value("4.000000"));
             m.perform(full(get(page), "B")).andExpect(status().isOk())
                     .andExpect(jsonPath("items[0].quantityDelta").value("2.000000"));
-            m.perform(full(get(ROOT + "?executionId=2&routingNodeId=11"), "A"))
+            m.perform(full(get(ROOT + "?executionCode=2&routingNodeId=11"), "A"))
                     .andExpect(status().isOk()).andExpect(jsonPath("total").value(0));
-            m.perform(full(get(ROOT + "?executionId=999&routingNodeId=11"), "A"))
+            m.perform(full(get(ROOT + "?executionCode=999&routingNodeId=11"), "A"))
                     .andExpect(status().isNotFound());
-            m.perform(full(get(ROOT + "?executionId=1&routingNodeId=999"), "A"))
+            m.perform(full(get(ROOT + "?executionCode=1&routingNodeId=999"), "A"))
                     .andExpect(status().isConflict());
             for (String executionStatus : List.of("READY", "RUNNING", "FULLY_RECEIVED")) {
                 jdbc.update("UPDATE mes_production_execution SET status=? WHERE id=1", executionStatus);
@@ -79,7 +79,7 @@ class ProductionReportHttpTest {
             jdbc.update("UPDATE mes_execution_path SET path_status='SELECTED' WHERE id=1");
             m.perform(full(get(page), "A")).andExpect(status().isOk())
                     .andExpect(jsonPath("items[0].quantityDelta").value("4.000000"));
-            m.perform(full(get(ROOT + "?executionId=1&routingNodeId=11&offset=1&limit=1"), "A"))
+            m.perform(full(get(ROOT + "?executionCode=1&routingNodeId=11&offset=1&limit=1"), "A"))
                     .andExpect(status().isOk()).andExpect(jsonPath("total").value(1))
                     .andExpect(jsonPath("items").isEmpty());
         }
@@ -92,14 +92,14 @@ class ProductionReportHttpTest {
             var jdbc = c.getBean(MaterialIssueHttpTest.Fixture.class).business.get("A");
             jdbc.update("INSERT INTO routing_node(id,routing_id,node_code,operation_id,operation_code,operation_name,display_order,is_key) VALUES(14,1,'ALT',1,'O1','Unselected',4,false)");
             jdbc.update("INSERT INTO routing_edge(routing_id,from_node_id,to_node_id) VALUES(1,11,14),(1,14,13)");
-            m.perform(full(get(ROOT + "?executionId=1&routingNodeId=14"), "A"))
+            m.perform(full(get(ROOT + "?executionCode=1&routingNodeId=14"), "A"))
                     .andExpect(status().isConflict());
             jdbc.update("UPDATE mes_execution_path SET routing_id=999 WHERE id=1");
-            m.perform(full(get(ROOT + "?executionId=1&routingNodeId=11"), "A"))
+            m.perform(full(get(ROOT + "?executionCode=1&routingNodeId=11"), "A"))
                     .andExpect(status().isConflict());
             jdbc.update("UPDATE mes_execution_path SET routing_id=1 WHERE id=1");
-            jdbc.update("UPDATE mes_execution_path_node SET sequence_no=4 WHERE execution_id=1 AND routing_node_id=13");
-            m.perform(full(get(ROOT + "?executionId=1&routingNodeId=11"), "A"))
+            jdbc.update("UPDATE mes_execution_path_node SET sequence_no=4 WHERE execution_code=1 AND routing_node_id=13");
+            m.perform(full(get(ROOT + "?executionCode=1&routingNodeId=11"), "A"))
                     .andExpect(status().isConflict());
         }
     }
@@ -114,7 +114,7 @@ class ProductionReportHttpTest {
             jdbc.execute("ALTER TABLE mes_quality_treatment RENAME TO unavailable_quality_ledger_fixture");
             m.perform(full(get("/api/production/report-quantities/executions/1"), "A"))
                     .andExpect(status().is5xxServerError());
-            m.perform(full(get(ROOT + "?executionId=1&routingNodeId=11"), "A"))
+            m.perform(full(get(ROOT + "?executionCode=1&routingNodeId=11"), "A"))
                     .andExpect(status().isOk()).andExpect(jsonPath("total").value(1))
                     .andExpect(jsonPath("items[0].id").value(String.valueOf(original)));
         }
@@ -160,9 +160,9 @@ class ProductionReportHttpTest {
         jdbc.update("INSERT INTO operation(id,code,name,status,sort,revision) VALUES(1,'O1','钻孔','ENABLED',0,0)");
         jdbc.update("INSERT INTO routing_node(id,routing_id,node_code,operation_id,operation_code,operation_name,display_order,is_key) VALUES(11,1,'A',1,'O1','首工序',99,false),(12,1,'B',1,'O1','中工序',1,false),(13,1,'C',1,'O1','末工序',0,false)");
         jdbc.update("INSERT INTO routing_edge(routing_id,from_node_id,to_node_id) VALUES(1,11,12),(1,12,13)");
-        jdbc.update("INSERT INTO mes_production_execution(id,workorder_id,product_id,routing_id,target_qty,status) VALUES(1,1,1,1,10,'READY'),(2,1,1,1,10,'READY')");
-        jdbc.update("INSERT INTO mes_execution_path(id,routing_id,path_status,revision,selected_at,locked_at) VALUES(1,1,'LOCKED',1,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP),(2,1,'LOCKED',1,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)");
-        jdbc.update("INSERT INTO mes_execution_path_node(execution_id,sequence_no,routing_node_id) VALUES(1,1,11),(1,2,12),(1,3,13),(2,1,11),(2,2,12),(2,3,13)");
+        jdbc.update("INSERT INTO mes_production_execution(id,execution_code,workorder_id,product_id,routing_id,target_qty,status) VALUES(1,'1',1,1,1,10,'READY'),(2,'2',1,1,1,10,'READY')");
+        jdbc.update("INSERT INTO mes_execution_path(id,execution_code,routing_id,path_status,revision,selected_at,locked_at) VALUES(1,'1',1,'LOCKED',1,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP),(2,'2',1,'LOCKED',1,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)");
+        jdbc.update("INSERT INTO mes_execution_path_node(execution_code,sequence_no,routing_node_id) VALUES(1,1,11),(1,2,12),(1,3,13),(2,1,11),(2,2,12),(2,3,13)");
     }
 
     static MockHttpServletRequestBuilder full(MockHttpServletRequestBuilder request, String factory) {
@@ -171,7 +171,7 @@ class ProductionReportHttpTest {
     }
 
     static String supplement(long node, String quantity) {
-        return "{\"requestId\":\"" + UUID.randomUUID() + "\",\"executionId\":\"1\",\"routingNodeId\":\"" + node + "\",\"quantity\":\"" + quantity + "\",\"operatorUserId\":\"100\",\"reportTime\":\"2026-01-01T10:00:00\",\"reason\":\"TEST ONLY历史补录\",\"recordedBy\":999}";
+        return "{\"requestId\":\"" + UUID.randomUUID() + "\",\"executionCode\":\"1\",\"routingNodeId\":\"" + node + "\",\"quantity\":\"" + quantity + "\",\"operatorUserId\":\"100\",\"reportTime\":\"2026-01-01T10:00:00\",\"reason\":\"TEST ONLY历史补录\",\"recordedBy\":999}";
     }
 
     static long add(MockMvc m, long node, String quantity) throws Exception {
@@ -207,7 +207,7 @@ class ProductionReportHttpTest {
             jdbc.update("UPDATE workorder SET status='RELEASED' WHERE id=1");
             jdbc.update("UPDATE mes_execution_path SET path_status='SELECTED' WHERE id=1");
             m.perform(full(get(q), "A")).andExpect(jsonPath("writable").value(false));
-            jdbc.update("DELETE FROM mes_execution_path_node WHERE execution_id=1");
+            jdbc.update("DELETE FROM mes_execution_path_node WHERE execution_code=1");
             jdbc.update("DELETE FROM mes_execution_path WHERE id=1");
             m.perform(full(get(q), "A")).andExpect(jsonPath("writable").value(false))
                     .andExpect(jsonPath("nodes").isEmpty());

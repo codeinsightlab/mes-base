@@ -63,20 +63,20 @@ class ProductionDefectHttpTest {
             ProductionReportHttpTest.seed(jdbc);
             ProductionInputTestData.confirmed(jdbc, 1, new BigDecimal("10"));
             ProductionInputTestData.confirmed(jdbc, 2, new BigDecimal("10"));
-            seedReports(jdbc, 1);
-            seedReports(jdbc, 2);
+            seedReports(jdbc, "1");
+            seedReports(jdbc, "2");
 
         }
         return c;
     }
 
-    static void seedReports(JdbcTemplate jdbc, long execution) {
+    static void seedReports(JdbcTemplate jdbc, String execution) {
         for (long node : List.of(11L, 12L, 13L))
-            jdbc.update("INSERT INTO mes_production_report(execution_id,routing_node_id,record_type,quantity_delta,operator_user_id,recorded_by,report_time,reason,create_time) VALUES(?,?,'REPORT',10,100,1,CURRENT_TIMESTAMP,'TEST ONLY gross processed fixture',CURRENT_TIMESTAMP)", execution, node);
+            jdbc.update("INSERT INTO mes_production_report(execution_code,routing_node_id,record_type,quantity_delta,operator_user_id,recorded_by,report_time,reason,create_time) VALUES(?,?,'REPORT',10,100,1,CURRENT_TIMESTAMP,'TEST ONLY gross processed fixture',CURRENT_TIMESTAMP)", execution, node);
     }
 
     static String command(String key, int revision, String quantity) {
-        return "{\"assessment\":{\"type\":\"INDEPENDENT\",\"basis\":\"TEST ONLY explicit independent fixture\"},\"requestKey\":\"" + key + "\"," + (revision == 0 ? "" : "\"expectedRevision\":" + revision + ",\"revisionReason\":\"TEST订正\",") + "\"facts\":{\"executionId\":\"1\",\"affectedNodeId\":\"13\",\"defectQty\":\"" + quantity + "\",\"wasteCategory\":\"PROCESS\",\"defectReason\":\"TEST ONLY缺陷\",\"occurredAt\":\"2026-01-01T10:00:00\"}}";
+        return "{\"assessment\":{\"type\":\"INDEPENDENT\",\"basis\":\"TEST ONLY explicit independent fixture\"},\"requestKey\":\"" + key + "\"," + (revision == 0 ? "" : "\"expectedRevision\":" + revision + ",\"revisionReason\":\"TEST订正\",") + "\"facts\":{\"executionCode\":\"1\",\"affectedNodeId\":\"13\",\"defectQty\":\"" + quantity + "\",\"wasteCategory\":\"PROCESS\",\"defectReason\":\"TEST ONLY缺陷\",\"occurredAt\":\"2026-01-01T10:00:00\"}}";
     }
 
     static String add(MockMvc m, String body, String factory) throws Exception {
@@ -92,7 +92,7 @@ class ProductionDefectHttpTest {
         try (var c = context()) {
             var jdbc = c.getBean(MaterialIssueHttpTest.Fixture.class).business.get("A");
             for (int i = 0; i < 12; i++)
-                jdbc.update("INSERT INTO mes_quality_treatment(id,request_hash,declaration_id,declaration_revision,execution_id,routing_node_id,action_type,operator_user_id,recorded_at,reason,returned_qty,transfer_qty) VALUES(?,?,'same-declaration',?,1,11,?,100,?,'TEST ONLY immutable event',?,?)",
+                jdbc.update("INSERT INTO mes_quality_treatment(id,request_hash,declaration_id,declaration_revision,execution_code,routing_node_id,action_type,operator_user_id,recorded_at,reason,returned_qty,transfer_qty) VALUES(?,?,'same-declaration',?,1,11,?,100,?,'TEST ONLY immutable event',?,?)",
                         String.format("00000000-0000-0000-0000-%012d", 12 - i), "test-" + i, i < 6 ? 1 : 2,
                         i == 11 ? "TRANSFER_WAREHOUSE" : "RETURN_NODE", "2026-01-01 10:00:" + String.format("%02d", i),
                         i == 11 ? "0" : "0.123456", i == 11 ? "0.123456" : "0");
@@ -158,7 +158,7 @@ class ProductionDefectHttpTest {
                     .andExpect(status().isConflict());
             add(m, body, "B");
             m.perform(full(get(ROOT + "/" + id), "B")).andExpect(status().isNotFound());
-            m.perform(full(post(ROOT), "A").content(command("same", 0, "2").replace("executionId\":\"1", "executionId\":\"2")))
+            m.perform(full(post(ROOT), "A").content(command("same", 0, "2").replace("executionCode\":\"1", "executionCode\":\"2")))
                     .andExpect(status().isConflict());
         }
     }
@@ -245,7 +245,7 @@ class ProductionDefectHttpTest {
             };
             Callable<Integer> crossB = () -> {
                 barrier.await();
-                return m.perform(full(post(ROOT), "A").content(command("cross", 0, "1").replace("executionId\":\"1", "executionId\":\"2")))
+                return m.perform(full(post(ROOT), "A").content(command("cross", 0, "1").replace("executionCode\":\"1", "executionCode\":\"2")))
                         .andReturn().getResponse().getStatus();
             };
             var ca = pool.submit(crossA);

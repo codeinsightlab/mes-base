@@ -23,7 +23,7 @@ public class QualityReleaseController {
         this.service = service;
     }
 
-    public record Fact(String id, String executionId, String sequenceNo, String actionType, String quantity,
+    public record Fact(String id, String executionCode, String sequenceNo, String actionType, String quantity,
                        String basisHash, String referenceId, String operatorUserId, LocalDateTime recordedAt,
                        String reason) {
     }
@@ -33,7 +33,7 @@ public class QualityReleaseController {
 
     @GetMapping("/history")
     @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED, permission = "business:quality:release:read")
-    public History history(@PathVariable Long id, @RequestParam(defaultValue = "0") int offset,
+    public History history(@PathVariable String id, @RequestParam(defaultValue = "0") int offset,
                            @RequestParam(defaultValue = "20") int limit) {
         var p = service.history(id, offset, limit);
         return new History(p.items().stream().map(QualityReleaseController::view).toList(), p.total(), offset, limit);

@@ -220,7 +220,7 @@ class LocalWarehouseHttpTest {
                     m.perform(ProductionCoreV1HttpTest.full(post(StockDocumentHttpTest.OUT_ROOT + "/" + document + "/actions/void")))
                             .andExpect(status().isConflict());
                 } else {
-                    j.update("UPDATE mes_production_execution SET start_time=CURRENT_TIMESTAMP WHERE id=?", result.get("executionId")
+                    j.update("UPDATE mes_production_execution SET start_time=CURRENT_TIMESTAMP WHERE id=?", result.get("executionCode")
                             .asLong());
                     m.perform(ProductionCoreV1HttpTest.full(post(ROOT + "return"))
                                     .content(body(UUID.randomUUID().toString(), "20", "9800", document)))

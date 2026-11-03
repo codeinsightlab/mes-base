@@ -30,21 +30,21 @@ public class ReportOperatorEligibilityService {
     }
 
     @Transactional(transactionManager = "businessTransactionManager", isolation = Isolation.READ_COMMITTED, readOnly = true)
-    public void requireEligible(Long executionId, Long routingNodeId, Long userId) {
-        var node = rules.node(executionId, routingNodeId, false);
-        requireEligible(executionId, routingNodeId, node.getOperationId(), userId);
+    public void requireEligible(String executionCode, Long routingNodeId, Long userId) {
+        var node = rules.node(executionCode, routingNodeId, false);
+        requireEligible(executionCode, routingNodeId, node.getOperationId(), userId);
     }
 
     @Transactional(transactionManager = "businessTransactionManager", isolation = Isolation.READ_COMMITTED, readOnly = true)
     public void requireEligible(LockedExecution locked, Long routingNodeId, Long userId) {
         var node = rules.node(locked, routingNodeId);
-        requireEligible(locked.execution().getId(), routingNodeId, node.getOperationId(), userId);
+        requireEligible(locked.execution().getExecutionCode(), routingNodeId, node.getOperationId(), userId);
     }
 
-    private void requireEligible(Long executionId, Long routingNodeId, Long operationId, Long userId) {
+    private void requireEligible(String executionCode, Long routingNodeId, Long operationId, Long userId) {
         rules.requireCapability(operationId, userId);
         var filter = new MesExecutionAssignmentExample();
-        var criteria = filter.createCriteria().andExecutionIdEqualTo(executionId)
+        var criteria = filter.createCriteria().andExecutionCodeEqualTo(executionCode)
                 .andRoutingNodeIdEqualTo(routingNodeId);
         if (assignments.countByExample(filter) == 0) return;
         criteria.andUserIdEqualTo(userId);
@@ -54,12 +54,13 @@ public class ReportOperatorEligibilityService {
     /**
      * nodeOperations comes from the server's validated actual-path quantity model; submission also validates node membership.
      */
-    public Map<Long, ErrorCode> ineligibilityReasons(Long executionId, Map<Long, Long> nodeOperations, Long userId) {
+    public Map<Long, ErrorCode> ineligibilityReasons(String executionCode, Map<Long, Long> nodeOperations,
+                                                     Long userId) {
         var failures = rules.capabilityFailures(List.copyOf(nodeOperations.values()), userId);
         var result = new HashMap<Long, ErrorCode>();
         if (nodeOperations.isEmpty()) return result;
         var filter = new MesExecutionAssignmentExample();
-        filter.createCriteria().andExecutionIdEqualTo(executionId)
+        filter.createCriteria().andExecutionCodeEqualTo(executionCode)
                 .andRoutingNodeIdIn(List.copyOf(nodeOperations.keySet()));
         var assigned = assignments.selectByExample(filter).stream()
                 .collect(Collectors.groupingBy(row -> row.getRoutingNodeId()));

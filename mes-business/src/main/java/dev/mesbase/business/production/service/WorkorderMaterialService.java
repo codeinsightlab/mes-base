@@ -192,11 +192,15 @@ public class WorkorderMaterialService {
             }).toList();
         }
         var prior = previous.stream().collect(Collectors.toMap(MesWorkorderMaterialEntity::getId, Function.identity()));
+        var seenMaterials = new HashSet<Long>();
         var seenIds = new HashSet<Long>();
         var seenComponents = new HashSet<Long>();
         var prepared = new ArrayList<MesWorkorderMaterialEntity>();
         int lineNo = 0;
         for (var line : input) {
+            if (!seenMaterials.add(line.materialId()))
+                ParameterChecks.reject(ErrorCode.BAD_REQUEST,
+                        new SafeBusinessMessage("同一工单的相同材料必须收敛为一条需求，请合并重复材料后保存"));
             if (line.materialId() == null || line.unitId() == null || line.totalRequiredQty() == null
                     || Objects.equals(line.materialId(), order.getProductId()))
                 ParameterChecks.reject(ErrorCode.BAD_REQUEST,

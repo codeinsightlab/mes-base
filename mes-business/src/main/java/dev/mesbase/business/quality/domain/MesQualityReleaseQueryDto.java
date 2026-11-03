@@ -16,7 +16,7 @@ import org.springframework.format.annotation.DateTimeFormat;
 public record MesQualityReleaseQueryDto(
         @Min(0) Integer offset,
         @Min(1) @Max(100) Integer limit,
-        Long executionId,
+        String executionCode,
         Long sequenceNo,
         @Size(max = 16) String actionType,
         @Digits(integer = 14, fraction = 6) BigDecimal quantity,

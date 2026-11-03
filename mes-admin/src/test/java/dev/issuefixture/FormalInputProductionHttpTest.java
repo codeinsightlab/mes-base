@@ -22,7 +22,7 @@ class FormalInputProductionHttpTest {
         jdbc.update("DELETE FROM wm_stock_document_line WHERE document_id IN (" + documents + ")");
         jdbc.update("DELETE FROM wm_stock_document WHERE document_type='MATERIAL_ISSUE'");
         ProductionInputTestData.confirmed(jdbc, 1, new BigDecimal("100"));
-        jdbc.update("INSERT INTO mes_production_report(execution_id,routing_node_id,record_type,quantity_delta,reference_report_id,operator_user_id,recorded_by,report_time,reason,create_time) SELECT execution_id,routing_node_id,'ADJUSTMENT',10,id,operator_user_id,1,report_time,'TEST ONLY reviewed quantity correction',CURRENT_TIMESTAMP FROM mes_production_report WHERE execution_id=1 AND routing_node_id=12 AND record_type='REPORT' ORDER BY id LIMIT 1");
+        jdbc.update("INSERT INTO mes_production_report(execution_code,routing_node_id,record_type,quantity_delta,reference_report_id,operator_user_id,recorded_by,report_time,reason,create_time) SELECT execution_code,routing_node_id,'ADJUSTMENT',10,id,operator_user_id,1,report_time,'TEST ONLY reviewed quantity correction',CURRENT_TIMESTAMP FROM mes_production_report WHERE execution_code=1 AND routing_node_id=12 AND record_type='REPORT' ORDER BY id LIMIT 1");
         QualityWorkflowHttpTest.defect(MaterialIssueHttpTest.mvc(context), 12, "10", "INDEPENDENT", null);
     }
 
@@ -31,7 +31,7 @@ class FormalInputProductionHttpTest {
         try (var c = QualityWorkflowHttpTest.context(new Class<?>[]{StockDocumentOwnedTransactionsHttpTest.GuardedCenter.class}, 40, 30, 30, 30, 30)) {
             var j = ProductionWarehouseFixture.db(c);
             formalOpening(c);
-            Long original = j.queryForObject("SELECT MIN(id) FROM mes_production_report WHERE execution_id=1 AND routing_node_id=15", Long.class);
+            Long original = j.queryForObject("SELECT MIN(id) FROM mes_production_report WHERE execution_code=1 AND routing_node_id=15", Long.class);
             var http = MaterialIssueHttpTest.mvc(c);
             http.perform(ProductionCoreV1HttpTest.full(get("/api/production/report-quantities/executions/1")))
                     .andExpect(status().isOk()).andExpect(jsonPath("writable").value(true))

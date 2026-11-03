@@ -6,7 +6,7 @@
     <result column="scan_type" jdbcType="VARCHAR" property="scanType" />
     <result column="input_method" jdbcType="VARCHAR" property="inputMethod" />
     <result column="user_id" jdbcType="BIGINT" property="userId" />
-    <result column="execution_id" jdbcType="BIGINT" property="executionId" />
+    <result column="execution_code" jdbcType="VARCHAR" property="executionCode" />
     <result column="outcome" jdbcType="VARCHAR" property="outcome" />
     <result column="error_code" jdbcType="VARCHAR" property="errorCode" />
     <result column="duration_ms" jdbcType="BIGINT" property="durationMs" />
@@ -72,7 +72,7 @@
     </where>
   </sql>
   <sql id="Base_Column_List">
-    id, scan_type, input_method, user_id, execution_id, outcome, error_code, duration_ms,
+    id, scan_type, input_method, user_id, execution_code, outcome, error_code, duration_ms,
     occurred_at, request_id
   </sql>
   <select id="selectByExample" parameterType="dev.mesbase.business.production.domain.MesProductionScanActivityExample" resultMap="BaseResultMap">
@@ -104,11 +104,11 @@
   </delete>
   <insert id="insert" parameterType="dev.mesbase.business.production.domain.MesProductionScanActivityEntity">
     insert into mes_production_scan_activity (id, scan_type, input_method,
-      user_id, execution_id, outcome,
+      user_id, execution_code, outcome,
       error_code, duration_ms, occurred_at,
       request_id)
     values (#{id,jdbcType=CHAR}, #{scanType,jdbcType=VARCHAR}, #{inputMethod,jdbcType=VARCHAR},
-      #{userId,jdbcType=BIGINT}, #{executionId,jdbcType=BIGINT}, #{outcome,jdbcType=VARCHAR},
+      #{userId,jdbcType=BIGINT}, #{executionCode,jdbcType=VARCHAR}, #{outcome,jdbcType=VARCHAR},
       #{errorCode,jdbcType=VARCHAR}, #{durationMs,jdbcType=BIGINT}, #{occurredAt,jdbcType=TIMESTAMP},
       #{requestId,jdbcType=VARCHAR})
   </insert>
@@ -127,8 +127,8 @@
       <if test="userId != null">
         user_id,
       </if>
-      <if test="executionId != null">
-        execution_id,
+      <if test="executionCode != null">
+        execution_code,
       </if>
       <if test="outcome != null">
         outcome,
@@ -159,8 +159,8 @@
       <if test="userId != null">
         #{userId,jdbcType=BIGINT},
       </if>
-      <if test="executionId != null">
-        #{executionId,jdbcType=BIGINT},
+      <if test="executionCode != null">
+        #{executionCode,jdbcType=VARCHAR},
       </if>
       <if test="outcome != null">
         #{outcome,jdbcType=VARCHAR},
@@ -200,8 +200,8 @@
       <if test="row.userId != null">
         user_id = #{row.userId,jdbcType=BIGINT},
       </if>
-      <if test="row.executionId != null">
-        execution_id = #{row.executionId,jdbcType=BIGINT},
+      <if test="row.executionCode != null">
+        execution_code = #{row.executionCode,jdbcType=VARCHAR},
       </if>
       <if test="row.outcome != null">
         outcome = #{row.outcome,jdbcType=VARCHAR},
@@ -229,7 +229,7 @@
       scan_type = #{row.scanType,jdbcType=VARCHAR},
       input_method = #{row.inputMethod,jdbcType=VARCHAR},
       user_id = #{row.userId,jdbcType=BIGINT},
-      execution_id = #{row.executionId,jdbcType=BIGINT},
+      execution_code = #{row.executionCode,jdbcType=VARCHAR},
       outcome = #{row.outcome,jdbcType=VARCHAR},
       error_code = #{row.errorCode,jdbcType=VARCHAR},
       duration_ms = #{row.durationMs,jdbcType=BIGINT},
@@ -251,8 +251,8 @@
       <if test="userId != null">
         user_id = #{userId,jdbcType=BIGINT},
       </if>
-      <if test="executionId != null">
-        execution_id = #{executionId,jdbcType=BIGINT},
+      <if test="executionCode != null">
+        execution_code = #{executionCode,jdbcType=VARCHAR},
       </if>
       <if test="outcome != null">
         outcome = #{outcome,jdbcType=VARCHAR},
@@ -277,7 +277,7 @@
     set scan_type = #{scanType,jdbcType=VARCHAR},
       input_method = #{inputMethod,jdbcType=VARCHAR},
       user_id = #{userId,jdbcType=BIGINT},
-      execution_id = #{executionId,jdbcType=BIGINT},
+      execution_code = #{executionCode,jdbcType=VARCHAR},
       outcome = #{outcome,jdbcType=VARCHAR},
       error_code = #{errorCode,jdbcType=VARCHAR},
       duration_ms = #{durationMs,jdbcType=BIGINT},

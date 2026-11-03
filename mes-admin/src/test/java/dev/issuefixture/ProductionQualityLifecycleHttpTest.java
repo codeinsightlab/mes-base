@@ -89,22 +89,22 @@ class ProductionQualityLifecycleHttpTest {
         return c.getBean(MaterialIssueHttpTest.Fixture.class).business.get("A");
     }
 
-    static String create(MockMvc m, long execution) throws Exception {
+    static String create(MockMvc m, String execution) throws Exception {
         var j = m.getDispatcherServlet().getWebApplicationContext()
                 .getBean(MaterialIssueHttpTest.Fixture.class).business.get("A");
         seedReports(j, execution);
         return createQuality(m, execution);
     }
 
-    static void seedReports(JdbcTemplate j, long execution) {
+    static void seedReports(JdbcTemplate j, String execution) {
         ProductionInputTestData.confirmed(j, execution, new BigDecimal("10"));
         for (long node : List.of(11L, 12L, 13L))
-            j.update("INSERT INTO mes_production_report(execution_id,routing_node_id,record_type,quantity_delta,operator_user_id,recorded_by,report_time,reason,create_time) VALUES(?,?,'REPORT',4,100,1,CURRENT_TIMESTAMP,'TEST ONLY prerequisite gross report',CURRENT_TIMESTAMP)", execution, node);
+            j.update("INSERT INTO mes_production_report(execution_code,routing_node_id,record_type,quantity_delta,operator_user_id,recorded_by,report_time,reason,create_time) VALUES(?,?,'REPORT',4,100,1,CURRENT_TIMESTAMP,'TEST ONLY prerequisite gross report',CURRENT_TIMESTAMP)", execution, node);
     }
 
-    static String createQuality(MockMvc m, long execution) throws Exception {
+    static String createQuality(MockMvc m, String execution) throws Exception {
         return ProductionDefectHttpTest.add(m, ProductionDefectHttpTest.command("quality-" + execution, 0, "2")
-                .replace("executionId\":\"1", "executionId\":\"" + execution), "A");
+                .replace("executionCode\":\"1", "executionCode\":\"" + execution), "A");
     }
 
     @Test
@@ -113,7 +113,7 @@ class ProductionQualityLifecycleHttpTest {
             var m = MaterialIssueHttpTest.mvc(c);
             m.perform(full(post(PATH), "A").content(SELECT)).andExpect(status().isOk());
             m.perform(full(delete(E), "A").content("[1]")).andExpect(status().isNoContent());
-            assertEquals(0, db(c).queryForObject("SELECT COUNT(*) FROM mes_execution_path_node WHERE execution_id=1", Integer.class));
+            assertEquals(0, db(c).queryForObject("SELECT COUNT(*) FROM mes_execution_path_node WHERE execution_code=1", Integer.class));
             assertEquals(0, db(c).queryForObject("SELECT COUNT(*) FROM mes_production_execution WHERE id=1", Integer.class));
         }
     }
@@ -123,7 +123,7 @@ class ProductionQualityLifecycleHttpTest {
     void everyHistoryIncludingZeroEffectiveVoidedDeclarationProtectsIdentity(String action) throws Exception {
         try (var c = context()) {
             var m = MaterialIssueHttpTest.mvc(c);
-            var id = create(m, 1);
+            var id = create(m, "1");
             if (action.equals("REVISE"))
                 m.perform(full(post(Q + "/" + id + "/revisions"), "A").content(ProductionDefectHttpTest.command("revise", 1, "4")))
                         .andExpect(status().isOk());
@@ -154,13 +154,13 @@ class ProductionQualityLifecycleHttpTest {
     void batchDeletionRollsBackEarlierCleanupAndFactoriesDoNotShareHistory() throws Exception {
         try (var c = context()) {
             var m = MaterialIssueHttpTest.mvc(c);
-            create(m, 2);
+            create(m, "2");
             var nodes = db(c).queryForList("SELECT * FROM mes_execution_path_node ORDER BY id");
             m.perform(full(delete(E), "A").content("[1,2]")).andExpect(status().isConflict());
             assertEquals(nodes, db(c).queryForList("SELECT * FROM mes_execution_path_node ORDER BY id"));
             assertEquals(2, db(c).queryForObject("SELECT COUNT(*) FROM mes_production_execution", Integer.class));
             m.perform(full(delete(E), "B").content("[2]")).andExpect(status().isNoContent());
-            assertEquals(1, db(c).queryForObject("SELECT COUNT(*) FROM mes_production_defect WHERE execution_id=2", Integer.class));
+            assertEquals(1, db(c).queryForObject("SELECT COUNT(*) FROM mes_production_defect WHERE execution_code=2", Integer.class));
         }
     }
 
@@ -168,7 +168,7 @@ class ProductionQualityLifecycleHttpTest {
     void existingWorkorderAndPublishedRoutingGuardsProtectReferencedNodes() throws Exception {
         try (var c = context()) {
             var m = MaterialIssueHttpTest.mvc(c);
-            create(m, 1);
+            create(m, "1");
             db(c).update("UPDATE workorder SET status='DRAFT' WHERE id=1");
             m.perform(full(delete("/api/production/workorder/1"), "A").content("{\"revision\":0}"))
                     .andExpect(status().isConflict()).andExpect(jsonPath("errorCode").value("EXECUTION_REFERENCED"));
@@ -185,7 +185,7 @@ class ProductionQualityLifecycleHttpTest {
     void queryFailureFailsClosedForQuantityWritesButOrdinaryUpdatesRemainIndependent() throws Exception {
         try (var c = context()) {
             var m = MaterialIssueHttpTest.mvc(c);
-            create(m, 1);
+            create(m, "1");
             var facts = db(c).queryForList("SELECT * FROM mes_production_defect ORDER BY id");
             db(c).execute("ALTER TABLE mes_production_defect RENAME TO unavailable_quality_fixture");
             m.perform(full(delete(E), "A").content("[1]")).andExpect(status().isConflict());
@@ -210,7 +210,7 @@ class ProductionQualityLifecycleHttpTest {
             db(c).update("DELETE FROM mes_production_execution"); // TEST ONLY unused fixture executions.
             var first = new ObjectMapper().readTree(ProductionInputHttpTest.submit(m,
                     ProductionInputHttpTest.command(m, UUID.randomUUID().toString(), "L001", "10")));
-            long execution = first.get("executionId").asLong();
+            String execution = first.get("executionCode").asText();
             WorkorderBomInputHttpTest.report(m, execution, "4");
             createQuality(m, execution);
             // The second actual production input must preserve the earlier quality/report facts.
@@ -220,7 +220,7 @@ class ProductionQualityLifecycleHttpTest {
                     .andExpect(status().isOk()).andExpect(jsonPath("status").value("RUNNING"));
             m.perform(full(post("/api/production/reports/supplements"), "A")
                             .content(ProductionReportHttpTest.supplement(11, "2")
-                                    .replace("\"executionId\":\"1\"", "\"executionId\":\"" + execution + "\"")))
+                                    .replace("\"executionCode\":\"1\"", "\"executionCode\":\"" + execution + "\"")))
                     .andExpect(status().isOk());
             m.perform(full(get("/api/production/report-quantities/executions/" + execution), "A"))
                     .andExpect(jsonPath("nodes[0].reportedQty").value("6.000000"))
@@ -234,7 +234,7 @@ class ProductionQualityLifecycleHttpTest {
     void concurrentDeleteAndCreateCannotBothCommit() throws Exception {
         try (var c = context(); var pool = Executors.newFixedThreadPool(2)) {
             var m = MaterialIssueHttpTest.mvc(c);
-            seedReports(db(c), 1);
+            seedReports(db(c), "1");
             var barrier = new CyclicBarrier(2);
             Callable<Integer> remove = () -> {
                 barrier.await();
@@ -250,7 +250,7 @@ class ProductionQualityLifecycleHttpTest {
             var left = a.get();
             var right = b.get();
             assertTrue(left == 204 && right != 200 || left != 204 && right == 200);
-            assertEquals(0, db(c).queryForObject("SELECT COUNT(*) FROM mes_production_defect d LEFT JOIN mes_production_execution e ON e.id=d.execution_id WHERE e.id IS NULL", Integer.class));
+            assertEquals(0, db(c).queryForObject("SELECT COUNT(*) FROM mes_production_defect d LEFT JOIN mes_production_execution e ON e.id=d.execution_code WHERE e.id IS NULL", Integer.class));
         }
     }
 }

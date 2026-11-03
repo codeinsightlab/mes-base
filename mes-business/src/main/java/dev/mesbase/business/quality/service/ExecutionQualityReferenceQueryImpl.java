@@ -23,21 +23,21 @@ public class ExecutionQualityReferenceQueryImpl implements ExecutionQualityRefer
 
     @Override
     @Transactional(transactionManager = "businessTransactionManager", readOnly = true)
-    public boolean hasAnyHistory(Long executionId) {
-        if (executionId == null) throw new FoundationException(ErrorCode.BAD_REQUEST);
-        return mapper.existsExecutionHistory(executionId);
+    public boolean hasAnyHistory(String executionCode) {
+        if (executionCode == null) throw new FoundationException(ErrorCode.BAD_REQUEST);
+        return mapper.existsExecutionHistory(executionCode);
     }
 
     @Override
     @Transactional(transactionManager = "businessTransactionManager", readOnly = true)
-    public List<NodeTotal> nodeTotals(Long executionId) {
-        if (executionId == null) throw new FoundationException(ErrorCode.BAD_REQUEST);
-        return treatments.nodeTotals(executionId);
+    public List<NodeTotal> nodeTotals(String executionCode) {
+        if (executionCode == null) throw new FoundationException(ErrorCode.BAD_REQUEST);
+        return treatments.nodeTotals(executionCode);
     }
 
     @Override
     @Transactional(transactionManager = "businessTransactionManager", readOnly = true)
-    public Map<Long, List<NodeTotal>> nodeTotalsBatch(List<Long> executionIds) {
-        return treatments.nodeTotalsBatch(executionIds);
+    public Map<String, List<NodeTotal>> nodeTotalsBatch(List<String> executionCodes) {
+        return treatments.nodeTotalsBatch(executionCodes);
     }
 }

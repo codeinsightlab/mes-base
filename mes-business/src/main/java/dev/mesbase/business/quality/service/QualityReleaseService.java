@@ -31,11 +31,11 @@ public class QualityReleaseService {
     }
 
     @Transactional(transactionManager = "businessTransactionManager", readOnly = true)
-    public History history(Long execution, int offset, int limit) {
+    public History history(String execution, int offset, int limit) {
         ParameterChecks.paging(offset, limit);
-        if (executions.selectByPrimaryKey(execution) == null) throw new FoundationException(ErrorCode.NOT_FOUND);
+        if (executions.selectByCode(execution) == null) throw new FoundationException(ErrorCode.NOT_FOUND);
         var filter = new MesQualityReleaseExample();
-        filter.createCriteria().andExecutionIdEqualTo(execution);
+        filter.createCriteria().andExecutionCodeEqualTo(execution);
         filter.setOrderByClause("sequence_no DESC");
         try (var page = PageHelper.offsetPage(offset, limit)) {
             var rows = List.copyOf(releases.selectByExample(filter));

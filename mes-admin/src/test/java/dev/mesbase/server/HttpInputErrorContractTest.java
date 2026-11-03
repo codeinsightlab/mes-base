@@ -24,20 +24,30 @@ class HttpInputErrorContractTest {
 
     @RestController
     static class InputProbe {
-        record Body(@NotBlank String value) { }
+        record Body(@NotBlank String value) {
+        }
+
         @GetMapping("/api/production/reports")
-        String reports(@RequestParam Long executionId, @RequestParam Long routingNodeId) { return "ok"; }
+        String reports(@RequestParam String executionCode, @RequestParam Long routingNodeId) {
+            return "ok";
+        }
+
         @PostMapping("/input")
-        String body(@Valid @RequestBody Body body) { return body.value(); }
+        String body(@Valid @RequestBody Body body) {
+            return body.value();
+        }
+
         @GetMapping("/internal-failure")
-        String internal() { throw new IllegalStateException("TEST ONLY private diagnostic"); }
+        String internal() {
+            throw new IllegalStateException("TEST ONLY private diagnostic");
+        }
     }
 
     @Test
     void malformedInputUsesExistingSafe400Protocol() throws Exception {
-        http.perform(get("/api/production/reports").param("executionId", "204"))
+        http.perform(get("/api/production/reports").param("executionCode", "204"))
                 .andExpect(status().isBadRequest()).andExpect(jsonPath("$.errorCode").value("BAD_REQUEST"));
-        http.perform(get("/api/production/reports").param("executionId", "invalid").param("routingNodeId", "1024"))
+        http.perform(get("/api/production/reports").param("executionCode", "invalid").param("routingNodeId", "1024"))
                 .andExpect(status().isBadRequest()).andExpect(jsonPath("$.errorCode").value("BAD_REQUEST"));
         http.perform(post("/input").contentType(MediaType.APPLICATION_JSON).content("{"))
                 .andExpect(status().isBadRequest()).andExpect(jsonPath("$.errorCode").value("BAD_REQUEST"));

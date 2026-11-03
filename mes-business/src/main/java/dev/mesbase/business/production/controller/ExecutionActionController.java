@@ -41,7 +41,7 @@ public class ExecutionActionController {
     public record EdgeView(String fromNodeId, String toNodeId) {
     }
 
-    public record PathView(String executionId, String executionStatus, String routingId, String pathStatus,
+    public record PathView(String executionCode, String executionStatus, String routingId, String pathStatus,
                            int revision, LocalDateTime selectedAt, LocalDateTime lockedAt, List<String> selectedNodeIds,
                            List<NodeView> nodes, List<EdgeView> edges, String routingCode,
                            String routingName, Integer routingVersion) {
@@ -49,28 +49,28 @@ public class ExecutionActionController {
 
     @GetMapping("/api/production/executions/{id}/path")
     @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED, permission = "business:mes:production:execution:query")
-    public PathView view(@PathVariable @NotNull Long id) {
+    public PathView view(@PathVariable @NotNull String id) {
         return toView(service.view(id));
     }
 
     @PostMapping("/api/production/executions/{id}/actions/select-path")
     @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED, permission = "business:mes:production:execution:update")
-    public PathView select(@PathVariable @NotNull Long id, @RequestBody @Valid SelectRequest input) {
+    public PathView select(@PathVariable @NotNull String id, @RequestBody @Valid SelectRequest input) {
         return toView(service.select(id, input.revision(), input.routingNodeIds()));
     }
 
     @PostMapping("/api/production/executions/{id}/actions/start")
     @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED, permission = "business:mes:production:execution:update")
-    public MesProductionExecutionVo start(@PathVariable @NotNull Long id) {
+    public MesProductionExecutionVo start(@PathVariable @NotNull String id) {
         return MesProductionExecutionController.toView(service.start(id));
     }
 
     public static PathView toView(PathModel model) {
         if (model.routing() == null)
-            return new PathView(model.executionId().toString(), model.executionStatus(), null, null,
+            return new PathView(model.executionCode().toString(), model.executionStatus(), null, null,
                     0, null, null, List.of(), List.of(), List.of(), null, null, null);
         var p = model.path();
-        return new PathView(model.executionId().toString(), model.executionStatus(), model.routing().id()
+        return new PathView(model.executionCode().toString(), model.executionStatus(), model.routing().id()
                 .toString(), p == null ? ExecutionPathStatus.UNSELECTED.getValue() : p.getPathStatus(), p == null ? 0 : p.getRevision(), Optional.ofNullable(p)
                 .map(nullableValue -> nullableValue.getSelectedAt()).orElse(null), Optional.ofNullable(p)
                 .map(nullableValue -> nullableValue.getLockedAt()).orElse(null), model.selectedNodeIds()

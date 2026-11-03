@@ -50,8 +50,8 @@ public class MesExecutionAssignmentServiceImpl implements IMesExecutionAssignmen
         ParameterChecks.paging(offset, limit, 100);
         MesExecutionAssignmentExample example = new MesExecutionAssignmentExample();
         MesExecutionAssignmentExample.Criteria criteria = example.createCriteria();
-        if (query.executionId() != null) {
-            criteria.andExecutionIdEqualTo(query.executionId());
+        if (query.executionCode() != null) {
+            criteria.andExecutionCodeEqualTo(query.executionCode());
         }
         if (query.routingNodeId() != null) {
             criteria.andRoutingNodeIdEqualTo(query.routingNodeId());
@@ -84,10 +84,10 @@ public class MesExecutionAssignmentServiceImpl implements IMesExecutionAssignmen
     @Override
     @Transactional(transactionManager = "businessTransactionManager", isolation = Isolation.READ_COMMITTED, rollbackFor = Exception.class)
     public MesExecutionAssignmentEntity insert(MesExecutionAssignmentCreateCommand input) {
-        var node = rules.node(input.executionId(), input.routingNodeId(), true);
+        var node = rules.node(input.executionCode(), input.routingNodeId(), true);
         rules.requireCapability(node.getOperationId(), input.userId());
         MesExecutionAssignmentEntity row = new MesExecutionAssignmentEntity();
-        row.setExecutionId(input.executionId());
+        row.setExecutionCode(input.executionCode());
         row.setRoutingNodeId(input.routingNodeId());
         row.setUserId(input.userId());
         row.setAssignedBy(SecurityUtils.getUserId());
@@ -103,12 +103,12 @@ public class MesExecutionAssignmentServiceImpl implements IMesExecutionAssignmen
     @Transactional(transactionManager = "businessTransactionManager", isolation = Isolation.READ_COMMITTED, rollbackFor = Exception.class)
     public MesExecutionAssignmentEntity updateById(Long id, MesExecutionAssignmentUpdateCommand input) {
         MesExecutionAssignmentEntity row = requireRecord(id);
-        if (!Objects.equals(row.getExecutionId(), input.executionId()) || !Objects.equals(row.getRoutingNodeId(), input.routingNodeId()) || !Objects.equals(row.getUserId(), input.userId()))
+        if (!Objects.equals(row.getExecutionCode(), input.executionCode()) || !Objects.equals(row.getRoutingNodeId(), input.routingNodeId()) || !Objects.equals(row.getUserId(), input.userId()))
             throw new FoundationException(ErrorCode.BAD_REQUEST);
-        var node = rules.node(row.getExecutionId(), row.getRoutingNodeId(), true);
+        var node = rules.node(row.getExecutionCode(), row.getRoutingNodeId(), true);
         rules.requireCapability(node.getOperationId(), row.getUserId());
         row.setId(id);
-        row.setExecutionId(input.executionId());
+        row.setExecutionCode(input.executionCode());
         row.setRoutingNodeId(input.routingNodeId());
         row.setUserId(input.userId());
         row.setRemark(input.remark());
@@ -128,8 +128,8 @@ public class MesExecutionAssignmentServiceImpl implements IMesExecutionAssignmen
         MesExecutionAssignmentExample example = new MesExecutionAssignmentExample();
         // At most 100 rows; acquire parent locks in a stable order before deleting.
         var rows = ids.stream().map(this::requireRecord)
-                .sorted(Comparator.comparing(MesExecutionAssignmentEntity::getExecutionId)).toList();
-        for (var row : rows) rules.cancelAssignment(row.getExecutionId());
+                .sorted(Comparator.comparing(MesExecutionAssignmentEntity::getExecutionCode)).toList();
+        for (var row : rows) rules.cancelAssignment(row.getExecutionCode());
         example.createCriteria().andIdIn(ids)
         ;
         if (mapper.deleteByExample(example) != ids.size()) {

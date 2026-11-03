@@ -121,19 +121,20 @@ class ProductionReportMySqlTest {
                 .setAuthentication(new UsernamePasswordAuthenticationToken(new LoginUser(100L, 1L, user, Set.of()), null, List.of()));
     }
 
-    record Fixture(long executionId, long firstNode, String tag) {
+    record Fixture(String executionCode, long firstNode, String tag) {
     }
 
     static Fixture createFixture(JdbcTemplate jdbc) {
         String tag = "TEST_REPORT_" + UUID.randomUUID().toString().substring(0, 12);
         assertEquals(0, jdbc.queryForObject("SELECT COUNT(*) FROM workorder WHERE code=?", Integer.class, tag));
-        var source = jdbc.queryForMap("SELECT e.id,e.workorder_id,e.product_id,e.routing_id FROM mes_production_execution e JOIN mes_execution_path p ON p.id=e.id WHERE p.path_status='LOCKED' AND EXISTS(SELECT 1 FROM mes_execution_path_node n WHERE n.execution_id=e.id) ORDER BY e.id LIMIT 1");
+        var source = jdbc.queryForMap("SELECT e.id,e.execution_code,e.workorder_id,e.product_id,e.routing_id FROM mes_production_execution e JOIN mes_execution_path p ON p.execution_code=e.execution_code WHERE p.path_status='LOCKED' AND EXISTS(SELECT 1 FROM mes_execution_path_node n WHERE n.execution_code=e.execution_code) ORDER BY e.id LIMIT 1");
         long order = insert(jdbc, "INSERT INTO workorder(source,code,product_id,planned_qty,routing_id,status,revision,create_time,update_time) VALUES('LOCAL',?,?,10,?,'RELEASED',0,NOW(),NOW())", tag, source.get("product_id"), source.get("routing_id"));
         jdbc.update("INSERT INTO workorder_erp_extra(id) VALUES(?)", order);
-        long execution = insert(jdbc, "INSERT INTO mes_production_execution(workorder_id,product_id,routing_id,target_qty,status,remark,create_by,create_time) VALUES(?,?,?,10,'READY',?,'TEST_ONLY_REPORT',NOW())", order, source.get("product_id"), source.get("routing_id"), tag);
-        jdbc.update("INSERT INTO mes_execution_path(id,routing_id,path_status,revision,selected_at,locked_at) VALUES(?,?,'LOCKED',1,NOW(),NOW())", execution, source.get("routing_id"));
-        jdbc.update("INSERT INTO mes_execution_path_node(execution_id,sequence_no,routing_node_id) SELECT ?,sequence_no,routing_node_id FROM mes_execution_path_node WHERE execution_id=?", execution, source.get("id"));
-        long node = jdbc.queryForObject("SELECT routing_node_id FROM mes_execution_path_node WHERE execution_id=? AND sequence_no=1", Long.class, execution);
+        String execution = tag + ":TEST_ONLY#BATCH";
+        insert(jdbc, "INSERT INTO mes_production_execution(execution_code,workorder_id,product_id,routing_id,target_qty,status,remark,create_by,create_time) VALUES(?,?,?,?,10,'READY',?,'TEST_ONLY_REPORT',NOW())", execution, order, source.get("product_id"), source.get("routing_id"), tag);
+        jdbc.update("INSERT INTO mes_execution_path(execution_code,routing_id,path_status,revision,selected_at,locked_at) VALUES(?,?,'LOCKED',1,NOW(),NOW())", execution, source.get("routing_id"));
+        jdbc.update("INSERT INTO mes_execution_path_node(execution_code,sequence_no,routing_node_id) SELECT ?,sequence_no,routing_node_id FROM mes_execution_path_node WHERE execution_code=?", execution, source.get("execution_code"));
+        long node = jdbc.queryForObject("SELECT routing_node_id FROM mes_execution_path_node WHERE execution_code=? AND sequence_no=1", Long.class, execution);
         ProductionInputTestData.confirmed(jdbc, execution, BigDecimal.TEN);
         return new Fixture(execution, node, tag);
     }
@@ -149,7 +150,7 @@ class ProductionReportMySqlTest {
     }
 
     static Supplement command(Fixture f, String quantity) {
-        return new Supplement(f.executionId(), f.firstNode(), new BigDecimal(quantity), 100L, LocalDateTime.of(2026, 1, 1, 10, 0), null, f.tag());
+        return new Supplement(f.executionCode(), f.firstNode(), new BigDecimal(quantity), 100L, LocalDateTime.of(2026, 1, 1, 10, 0), null, f.tag());
     }
 
     @Test
@@ -178,7 +179,7 @@ class ProductionReportMySqlTest {
             actor();
             try {
                 assertEquals(original, reports.supplement(cmd).getId());
-                var changed = new Supplement(cmd.executionId(), cmd.routingNodeId(), BigDecimal.ONE, cmd.operatorUserId(), cmd.reportTime(), null, cmd.reason(), cmd.requestId());
+                var changed = new Supplement(cmd.executionCode(), cmd.routingNodeId(), BigDecimal.ONE, cmd.operatorUserId(), cmd.reportTime(), null, cmd.reason(), cmd.requestId());
                 assertEquals(ErrorCode.REPORT_REQUEST_CONFLICT, assertThrows(FoundationException.class, () -> reports.supplement(changed)).code());
                 var login = new SysUser();
                 login.setUserId(101L);
@@ -192,11 +193,11 @@ class ProductionReportMySqlTest {
                 var cancel = new VoidOriginal(f.tag());
                 var voided = reports.voidOriginalReport(original, cancel);
                 assertEquals(voided.getId(), reports.voidOriginalReport(original, cancel).getId());
-                assertEquals(3, jdbc.queryForObject("SELECT COUNT(*) FROM mes_production_report WHERE execution_id=?", Integer.class, f.executionId()));
-                assertEquals(0, jdbc.queryForObject("SELECT SUM(quantity_delta) FROM mes_production_report WHERE execution_id=?", BigDecimal.class, f.executionId())
+                assertEquals(3, jdbc.queryForObject("SELECT COUNT(*) FROM mes_production_report WHERE execution_code=?", Integer.class, f.executionCode()));
+                assertEquals(0, jdbc.queryForObject("SELECT SUM(quantity_delta) FROM mes_production_report WHERE execution_code=?", BigDecimal.class, f.executionCode())
                         .signum());
                 assertEquals(cmd.reason().trim(), reports.getDetail(original).record().getReason());
-                System.out.println("STABILITY_ADMIN_REPLAY_MYSQL execution=" + f.executionId() + " facts=3 net=0");
+                System.out.println("STABILITY_ADMIN_REPLAY_MYSQL execution=" + f.executionCode() + " facts=3 net=0");
             } finally {
                 SecurityContextHolder.clearContext();
                 FactoryContext.clear();
@@ -211,32 +212,33 @@ class ProductionReportMySqlTest {
             var reports = c.getBean(ProductionReportService.class);
             var quantities = c.getBean(ProductionQuantityService.class);
             var tx = new TransactionTemplate(c.getBean("businessTransactionManager", OwnedTransactionManager.class));
-            long[] execution = {0};
+            String[] execution = {null};
             actor();
             try {
                 tx.executeWithoutResult(status -> {
                     var f = createFixture(jdbc);
-                    execution[0] = f.executionId();
+                    execution[0] = f.executionCode();
                     var first = reports.supplement(command(f, "4.123456"));
                     reports.adjust(first.getId(), new Adjustment(new BigDecimal("1.000001"), f.tag()));
-                    assertEquals(0, new BigDecimal("5.123457").compareTo(quantities.getNodeQuantity(f.executionId(), f.firstNode())
+                    assertEquals(0, new BigDecimal("5.123457").compareTo(quantities.getNodeQuantity(f.executionCode(), f.firstNode())
                             .reportedQty()));
                     assertThrows(FoundationException.class, () -> reports.adjust(first.getId(), new Adjustment(new BigDecimal("-6"), f.tag())));
                     reports.voidOriginalReport(first.getId(), new VoidOriginal(f.tag()));
-                    assertEquals(0, quantities.getNodeQuantity(f.executionId(), f.firstNode()).reportedQty().signum());
+                    assertEquals(0, quantities.getNodeQuantity(f.executionCode(), f.firstNode()).reportedQty()
+                            .signum());
                     assertThrows(FoundationException.class, () -> reports.voidOriginalReport(first.getId(), new VoidOriginal(f.tag())));
                     assertEquals(0, new BigDecimal("4.123456").compareTo(reports.getDetail(first.getId()).record()
                             .getQuantityDelta()));
-                    assertThrows(RuntimeException.class, () -> jdbc.update("INSERT INTO mes_production_report(execution_id,routing_node_id,record_type,quantity_delta,operator_user_id,recorded_by,report_time,reason,create_time) VALUES(?,?,'REPORT',0,100,100,NOW(),?,NOW())", f.executionId(), f.firstNode(), f.tag()));
-                    var page = reports.page(f.executionId(), f.firstNode(), 0, 20);
+                    assertThrows(RuntimeException.class, () -> jdbc.update("INSERT INTO mes_production_report(execution_code,routing_node_id,record_type,quantity_delta,operator_user_id,recorded_by,report_time,reason,create_time) VALUES(?,?,'REPORT',0,100,100,NOW(),?,NOW())", f.executionCode(), f.firstNode(), f.tag()));
+                    var page = reports.page(f.executionCode(), f.firstNode(), 0, 20);
                     assertEquals(3, page.total());
                     assertEquals(3, page.items().size());
                     assertTrue(page.userNames().containsKey(100L));
                     assertTrue(reports.getDetail(first.getId()).userNames().containsKey(100L));
                     status.setRollbackOnly();
                 });
-                assertEquals(0, jdbc.queryForObject("SELECT COUNT(*) FROM mes_production_report WHERE execution_id=?", Integer.class, execution[0]));
-                assertEquals(0, jdbc.queryForObject("SELECT COUNT(*) FROM mes_production_execution WHERE id=?", Integer.class, execution[0]));
+                assertEquals(0, jdbc.queryForObject("SELECT COUNT(*) FROM mes_production_report WHERE execution_code=?", Integer.class, execution[0]));
+                assertEquals(0, jdbc.queryForObject("SELECT COUNT(*) FROM mes_production_execution WHERE execution_code=?", Integer.class, execution[0]));
             } finally {
                 SecurityContextHolder.clearContext();
                 FactoryContext.clear();
@@ -269,8 +271,8 @@ class ProductionReportMySqlTest {
             var a = executor.submit(submit);
             var b = executor.submit(submit);
             assertEquals(1, (a.get() ? 1 : 0) + (b.get() ? 1 : 0));
-            assertEquals(6, jdbc.queryForObject("SELECT SUM(quantity_delta) FROM mes_production_report WHERE execution_id=?", Integer.class, f.executionId()));
-            long original = jdbc.queryForObject("SELECT id FROM mes_production_report WHERE execution_id=?", Long.class, f.executionId());
+            assertEquals(6, jdbc.queryForObject("SELECT SUM(quantity_delta) FROM mes_production_report WHERE execution_code=?", Integer.class, f.executionCode()));
+            long original = jdbc.queryForObject("SELECT id FROM mes_production_report WHERE execution_code=?", Long.class, f.executionCode());
             actor();
             try {
                 reports.voidOriginalReport(original, new VoidOriginal(f.tag() + " 并发验收后归零"));
@@ -278,9 +280,9 @@ class ProductionReportMySqlTest {
                 SecurityContextHolder.clearContext();
                 FactoryContext.clear();
             }
-            assertEquals(0, jdbc.queryForObject("SELECT SUM(quantity_delta) FROM mes_production_report WHERE execution_id=?", Integer.class, f.executionId()));
-            assertEquals(2, jdbc.queryForObject("SELECT COUNT(*) FROM mes_production_report WHERE execution_id=?", Integer.class, f.executionId()));
-            Files.writeString(Path.of(".local/production-report-20261015/live-acceptance.txt"), "SIMPLE_B datasource=8 host=192.168.18.25 port=3306 database=mes_base_dev_business_simple_b\nexecutionId=" + f.executionId() + "\nfirstNode=" + f.firstNode() + "\ntag=" + f.tag() + "\nconcurrentSuccess=1 concurrentRejected=1 ledgerRows=2 effectiveQuantity=0\n");
+            assertEquals(0, jdbc.queryForObject("SELECT SUM(quantity_delta) FROM mes_production_report WHERE execution_code=?", Integer.class, f.executionCode()));
+            assertEquals(2, jdbc.queryForObject("SELECT COUNT(*) FROM mes_production_report WHERE execution_code=?", Integer.class, f.executionCode()));
+            Files.writeString(Path.of(".local/production-report-20261015/live-acceptance.txt"), "SIMPLE_B datasource=8 host=192.168.18.25 port=3306 database=mes_base_dev_business_simple_b\nexecutionCode=" + f.executionCode() + "\nfirstNode=" + f.firstNode() + "\ntag=" + f.tag() + "\nconcurrentSuccess=1 concurrentRejected=1 ledgerRows=2 effectiveQuantity=0\n");
         }
     }
 }

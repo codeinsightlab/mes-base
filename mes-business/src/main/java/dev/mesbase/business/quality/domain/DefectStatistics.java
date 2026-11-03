@@ -8,7 +8,8 @@ public final class DefectStatistics {
     private DefectStatistics() {
     }
 
-    public record Query(Long executionId, Long operationId, Long defectTypeId, String wasteCategory, String attribution,
+    public record Query(String executionCode, Long operationId, Long defectTypeId, String wasteCategory,
+                        String attribution,
                         @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime from,
                         @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime to,
                         Integer offset, Integer limit) {

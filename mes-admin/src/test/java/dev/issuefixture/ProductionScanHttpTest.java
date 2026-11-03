@@ -57,7 +57,7 @@ class ProductionScanHttpTest {
         c.refresh();
         for (var j : c.getBean(MaterialIssueHttpTest.Fixture.class).business.values()) {
             ProductionReportHttpTest.seed(j);
-            j.update("UPDATE mes_production_execution SET batch_no='000LOT' WHERE id=1");
+            j.update("UPDATE mes_production_execution SET batch_no='000LOT',execution_code='WO1:M1#000LOT' WHERE id=1");
         }
         return c;
     }
@@ -79,10 +79,11 @@ class ProductionScanHttpTest {
         try (var c = context()) {
             var m = MaterialIssueHttpTest.mvc(c);
             db(c, "A").update("UPDATE workorder SET code='EXE' WHERE id=1");
+            db(c, "A").update("UPDATE mes_production_execution SET execution_code='EXE:M1#000LOT' WHERE id=1");
             m.perform(full(post(ROOT), "A").content("{\"type\":\"REPORTING\",\"code\":\"EXE:M1#000LOT\",\"inputMethod\":\"TEXT\"}"))
-                    .andExpect(status().isOk()).andExpect(jsonPath("executionId").value("1"))
+                    .andExpect(status().isOk()).andExpect(jsonPath("executionCode").value("EXE:M1#000LOT"))
                     .andExpect(jsonPath("qrCode").value("EXE:M1#000LOT"));
-            m.perform(full(get("/api/production/identity/1"), "A"))
+            m.perform(full(get("/api/production/identity/{code}", "EXE:M1#000LOT"), "A"))
                     .andExpect(status().isOk()).andExpect(jsonPath("qrCode").value("EXE:M1#000LOT"));
             for (String retired : List.of("EXE:1", "MES1.legacy", "M1#000LOT")) {
                 m.perform(full(post(ROOT), "A").content("{\"type\":\"REPORTING\",\"code\":\"" + retired + "\",\"inputMethod\":\"TEXT\"}"))
@@ -112,7 +113,7 @@ class ProductionScanHttpTest {
                 String request = "TEST_SCAN_" + scene;
                 var response = m.perform(full(post(ROOT), "A").requestAttr(RequestBoundaryFilter.REQUEST_ID, request)
                                 .content(body(scene, "000LOT", method)))
-                        .andExpect(status().isOk()).andExpect(jsonPath("executionId").value("1"))
+                        .andExpect(status().isOk()).andExpect(jsonPath("executionCode").value(code("000LOT")))
                         .andExpect(jsonPath("workorderCode").value("WO1"))
                         .andExpect(jsonPath("productCode").value("M1"))
                         .andExpect(jsonPath("batchNo").value("000LOT"))
@@ -124,7 +125,7 @@ class ProductionScanHttpTest {
                 assertEquals(scene, event.get("scan_type"));
                 assertEquals(method, event.get("input_method"));
                 assertEquals(1L, ((Number) event.get("user_id")).longValue());
-                assertEquals(1L, ((Number) event.get("execution_id")).longValue());
+                assertEquals(code("000LOT"), event.get("execution_code"));
                 assertEquals("SUCCESS", event.get("outcome"));
                 assertNotNull(event.get("occurred_at"));
                 assertTrue(((Number) event.get("duration_ms")).longValue() >= 0);
@@ -132,7 +133,7 @@ class ProductionScanHttpTest {
             }
             m.perform(full(get("/api/production/identity"), "A").param("code", code("000LOT")))
                     .andExpect(status().isOk());
-            m.perform(full(get("/api/production/reporting/context"), "A").param("executionId", "1"))
+            m.perform(full(get("/api/production/reporting/context"), "A").param("executionCode", code("000LOT")))
                     .andExpect(status().isOk());
             assertEquals(3, j.queryForObject("SELECT COUNT(*) FROM mes_production_scan_activity", Integer.class));
             assertEquals(0, j.queryForObject("SELECT COUNT(*) FROM mes_production_report", Integer.class));
@@ -157,7 +158,7 @@ class ProductionScanHttpTest {
                 assertEquals("FAILURE", event.get("outcome"));
                 assertEquals("REPORTING", event.get("scan_type"));
                 assertEquals(1L, ((Number) event.get("user_id")).longValue());
-                assertEquals(null, event.get("execution_id"));
+                assertEquals(null, event.get("execution_code"));
             }
             assertEquals(0, db(c, "B").queryForObject("SELECT COUNT(*) FROM mes_production_scan_activity", Integer.class));
         }
@@ -170,7 +171,7 @@ class ProductionScanHttpTest {
             var j = db(c, "A");
             j.execute("DROP TABLE mes_production_scan_activity");
             m.perform(full(post(ROOT), "A").content(body("EXECUTION_LOOKUP", "000LOT", "TEXT")))
-                    .andExpect(status().isOk()).andExpect(jsonPath("executionId").value("1"));
+                    .andExpect(status().isOk()).andExpect(jsonPath("executionCode").value(code("000LOT")));
             m.perform(full(post(ROOT), "A").content(body("EXECUTION_LOOKUP", "MISSING", "TEXT")))
                     .andExpect(status().isNotFound()).andExpect(jsonPath("errorCode").value("EXECUTION_NOT_FOUND"));
             assertEquals("000LOT", j.queryForObject("SELECT batch_no FROM mes_production_execution WHERE id=1", String.class));
@@ -194,13 +195,13 @@ class ProductionScanHttpTest {
             assertEquals(0, counter.calls.get());
             assertEquals(0, db(c, "A").queryForObject("SELECT COUNT(*) FROM mes_production_scan_activity", Integer.class));
             assertEquals(0, db(c, "B").queryForObject("SELECT COUNT(*) FROM mes_production_scan_activity", Integer.class));
-            db(c, "B").update("UPDATE mes_production_execution SET batch_no='B_ONLY' WHERE id=1");
+            db(c, "B").update("UPDATE mes_production_execution SET batch_no='B_ONLY',execution_code='WO1:M1#B_ONLY' WHERE id=1");
             m.perform(full(post(ROOT), "A").content(body("EXECUTION_LOOKUP", "000LOT", "TEXT")))
                     .andExpect(status().isOk());
             m.perform(full(post(ROOT), "B").content(body("EXECUTION_LOOKUP", "000LOT", "TEXT")))
                     .andExpect(status().isNotFound());
             m.perform(full(post(ROOT), "B").content(body("EXECUTION_LOOKUP", "B_ONLY", "IMAGE")))
-                    .andExpect(status().isOk()).andExpect(jsonPath("executionId").value("1"));
+                    .andExpect(status().isOk()).andExpect(jsonPath("executionCode").value(code("B_ONLY")));
             assertTrue(counter.calls.get() > 0);
             assertEquals(1, db(c, "A").queryForObject("SELECT COUNT(*) FROM mes_production_scan_activity", Integer.class));
             assertEquals(2, db(c, "B").queryForObject("SELECT COUNT(*) FROM mes_production_scan_activity", Integer.class));

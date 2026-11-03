@@ -70,26 +70,26 @@ public class ProductionQuantityService {
         this.defects = defects;
     }
 
-    public ExecutionQuantity getExecutionQuantities(Long executionId) {
-        return project(load(executionId));
+    public ExecutionQuantity getExecutionQuantities(String executionCode) {
+        return project(load(executionCode));
     }
 
     /**
      * Historical ledger access validates the actual path without calculating mutable production quantities.
      */
-    public void requireReadableExecutionNode(Long executionId, Long nodeId) {
-        var model = paths.view(executionId);
+    public void requireReadableExecutionNode(String executionCode, Long nodeId) {
+        var model = paths.view(executionCode);
         if (model.path() == null || !Objects.equals(model.path().getRoutingId(), model.routing().id()))
             ParameterChecks.reject(ErrorCode.REPORT_PATH_REQUIRED);
         ExecutionPathValidator.validate(model.selectedNodeIds(), model.nodes(), model.edges());
-        if (orderedPathNodes(executionId, model).stream()
+        if (orderedPathNodes(executionCode, model).stream()
                 .noneMatch(row -> Objects.equals(row.getRoutingNodeId(), nodeId)))
             ParameterChecks.reject(ErrorCode.REPORT_PATH_REQUIRED);
     }
 
-    private List<MesExecutionPathNodeEntity> orderedPathNodes(Long executionId, PathModel model) {
+    private List<MesExecutionPathNodeEntity> orderedPathNodes(String executionCode, PathModel model) {
         var f = new MesExecutionPathNodeExample();
-        f.createCriteria().andExecutionIdEqualTo(executionId);
+        f.createCriteria().andExecutionCodeEqualTo(executionCode);
         f.setOrderByClause("sequence_no,id");
         return validateOrdered(pathNodes.selectByExample(f), model);
     }
@@ -104,38 +104,38 @@ public class ProductionQuantityService {
         return ordered;
     }
 
-    private ExecutionQuantity load(Long executionId) {
-        var execution = executions.selectByPrimaryKey(executionId);
+    private ExecutionQuantity load(String executionCode) {
+        var execution = executions.selectByCode(executionCode);
         if (execution == null) throw new FoundationException(ErrorCode.EXECUTION_NOT_FOUND);
         if (execution.getRoutingId() == null) {
-            var balance = quantities.inputBalance(executionId);
+            var balance = quantities.inputBalance(executionCode);
             var input = balance.usableQty();
             if (input == null || input.signum() < 0) ParameterChecks.reject(ErrorCode.REPORT_PATH_REQUIRED);
-            return new ExecutionQuantity(executionId, execution.getWorkorderId(), null, execution.getTargetQty(),
+            return new ExecutionQuantity(executionCode, execution.getWorkorderId(), null, execution.getTargetQty(),
                     null, false, "无工艺工单无需工序报工，按正式领料确认量办理成品入库", List.of(), null,
                     input, balance.confirmedQty(), balance.reservedQty(), execution.getProductId());
         }
-        return load(executionId, execution, paths.view(executionId));
+        return load(executionCode, execution, paths.view(executionCode));
     }
 
-    private ExecutionQuantity load(Long executionId, MesProductionExecutionEntity execution, PathModel model) {
-        return load(executionId, execution, model, () -> orderedPathNodes(executionId, model));
+    private ExecutionQuantity load(String executionCode, MesProductionExecutionEntity execution, PathModel model) {
+        return load(executionCode, execution, model, () -> orderedPathNodes(executionCode, model));
     }
 
-    private ExecutionQuantity load(Long executionId, MesProductionExecutionEntity execution, PathModel model,
+    private ExecutionQuantity load(String executionCode, MesProductionExecutionEntity execution, PathModel model,
                                    Supplier<List<MesExecutionPathNodeEntity>> selectedRows) {
-        var balance = quantities.inputBalance(executionId);
+        var balance = quantities.inputBalance(executionCode);
         var inputQty = balance.usableQty();
         if (inputQty == null || inputQty.signum() < 0) ParameterChecks.reject(ErrorCode.REPORT_PATH_REQUIRED);
         if (model.path() == null)
-            return new ExecutionQuantity(executionId, execution.getWorkorderId(), execution.getRoutingId(), execution.getTargetQty(), ExecutionPathStatus.UNSELECTED.getValue(), false, "执行尚未选择实际路径", List.of(), label(model.routing()), inputQty, balance.confirmedQty(), balance.reservedQty(), execution.getProductId());
+            return new ExecutionQuantity(executionCode, execution.getWorkorderId(), execution.getRoutingId(), execution.getTargetQty(), ExecutionPathStatus.UNSELECTED.getValue(), false, "执行尚未选择实际路径", List.of(), label(model.routing()), inputQty, balance.confirmedQty(), balance.reservedQty(), execution.getProductId());
         if (!Objects.equals(model.path().getRoutingId(), execution.getRoutingId()))
             ParameterChecks.reject(ErrorCode.REPORT_PATH_REQUIRED);
         ExecutionPathValidator.validate(model.selectedNodeIds(), model.nodes(), model.edges());
         var ordered = selectedRows.get();
-        var totals = quantities.nodeTotals(executionId).stream()
+        var totals = quantities.nodeTotals(executionCode).stream()
                 .collect(Collectors.toMap(t -> t.routingNodeId(), t -> t.reportedQty()));
-        var defectTotals = defects.nodeTotals(executionId).stream()
+        var defectTotals = defects.nodeTotals(executionCode).stream()
                 .collect(Collectors.toMap(t -> t.affectedNodeId(), t -> t));
         return compose(execution, model, new QuantityFacts(balance, inputQty, ordered,
                 totals, defectTotals, orders.selectByPrimaryKey(execution.getWorkorderId())));
@@ -148,7 +148,7 @@ public class ProductionQuantityService {
     }
 
     private ExecutionQuantity compose(MesProductionExecutionEntity execution, PathModel model, QuantityFacts facts) {
-        Long executionId = execution.getId();
+        String executionCode = execution.getExecutionCode();
         var balance = facts.balance();
         var inputQty = facts.inputQty();
         var ordered = facts.ordered();
@@ -163,7 +163,7 @@ public class ProductionQuantityService {
             var quality = defectTotals.get(node.getId());
             var defect = quality == null ? BigDecimal.ZERO : quality.effectiveDefectQty();
             BigDecimal unverified = quality == null ? BigDecimal.ZERO : quality.unverifiedQty();
-            result.add(new NodeQuantity(executionId, node.getId(), node.getOperationId(), node.getNodeCode(), node.getOperationName() != null ? node.getOperationName() : model.operationLabels()
+            result.add(new NodeQuantity(executionCode, node.getId(), node.getOperationId(), node.getNodeCode(), node.getOperationName() != null ? node.getOperationName() : model.operationLabels()
                     .containsKey(node.getOperationId()) ? model.operationLabels().get(node.getOperationId())
                     .name() + "（当前名称）" : null, i + 1,
                     BigDecimal.ZERO, reported, defect, BigDecimal.ZERO, BigDecimal.ZERO, true, quality == null ? BigDecimal.ZERO : quality.returnedQty(), BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, unverified, quality == null ? BigDecimal.ZERO : quality.directDefectQty()));
@@ -177,7 +177,7 @@ public class ProductionQuantityService {
                 : !ProductionExecutionStatus.allowsNormalReporting(execution.getStatus())
                 ? "执行已关闭或状态非法，禁止继续正常报工" : null;
         // writable describes normal forward reporting only, not historical correction authorization.
-        return new ExecutionQuantity(executionId, execution.getWorkorderId(), execution.getRoutingId(),
+        return new ExecutionQuantity(executionCode, execution.getWorkorderId(), execution.getRoutingId(),
                 execution.getTargetQty(), model.path()
                 .getPathStatus(), boundary == null, boundary, List.copyOf(result), label(model.routing()), inputQty, balance.confirmedQty(), balance.reservedQty(), execution.getProductId());
     }
@@ -187,12 +187,12 @@ public class ProductionQuantityService {
         return label.code() + " / V" + label.version() + " · " + label.name();
     }
 
-    public List<NodeQuantity> getNodeQuantities(Long executionId) {
-        return getExecutionQuantities(executionId).nodes();
+    public List<NodeQuantity> getNodeQuantities(String executionCode) {
+        return getExecutionQuantities(executionCode).nodes();
     }
 
-    public NodeQuantity getNodeQuantity(Long executionId, Long nodeId) {
-        return getNodeQuantities(executionId).stream().filter(n -> n.routingNodeId().equals(nodeId)).findFirst()
+    public NodeQuantity getNodeQuantity(String executionCode, Long nodeId) {
+        return getNodeQuantities(executionCode).stream().filter(n -> n.routingNodeId().equals(nodeId)).findFirst()
                 .orElseThrow(() -> new FoundationException(ErrorCode.REPORT_PATH_REQUIRED));
     }
 
@@ -242,22 +242,22 @@ public class ProductionQuantityService {
     /**
      * Caller must hold the common WorkOrder -> Execution locks in its write transaction.
      */
-    public void validateReportChange(Long executionId, Long nodeId, BigDecimal delta) {
-        validateChange(load(executionId), nodeId, delta);
+    public void validateReportChange(String executionCode, Long nodeId, BigDecimal delta) {
+        validateChange(load(executionCode), nodeId, delta);
     }
 
     public LockedPath validateReportChange(LockedExecution locked, Long nodeId, BigDecimal delta) {
         var path = paths.lockedPath(locked);
         var execution = locked.execution();
-        validateChange(load(execution.getId(), execution, path.model(), path::orderedRows), nodeId, delta);
+        validateChange(load(execution.getExecutionCode(), execution, path.model(), path::orderedRows), nodeId, delta);
         return path;
     }
 
     /**
      * Quality may exist before path locking; only report writes require LOCKED.
      */
-    public void validateDefectChange(Long executionId, Long nodeId, BigDecimal contributionDelta) {
-        calculate(load(executionId), nodeId, BigDecimal.ZERO, contributionDelta);
+    public void validateDefectChange(String executionCode, Long nodeId, BigDecimal contributionDelta) {
+        calculate(load(executionCode), nodeId, BigDecimal.ZERO, contributionDelta);
     }
 
     private static ExecutionQuantity calculate(ExecutionQuantity view, Long nodeId, BigDecimal reportDelta,
@@ -284,12 +284,12 @@ public class ProductionQuantityService {
             var historical = rawAvailable.negate().max(BigDecimal.ZERO);
             var rawOutput = next.subtract(netDefect).subtract(historical);
             var output = rawOutput.max(BigDecimal.ZERO);
-            result.add(new NodeQuantity(node.executionId(), node.routingNodeId(), node.operationId(), node.code(), node.name(), node.sequenceNo(), input, next, defect, output, rawAvailable.max(BigDecimal.ZERO), node.qualityIntegrated(), node.returnedQty(), historical, rawOutput, rawAvailable, node.unverifiedDefectQty(), direct));
+            result.add(new NodeQuantity(node.executionCode(), node.routingNodeId(), node.operationId(), node.code(), node.name(), node.sequenceNo(), input, next, defect, output, rawAvailable.max(BigDecimal.ZERO), node.qualityIntegrated(), node.returnedQty(), historical, rawOutput, rawAvailable, node.unverifiedDefectQty(), direct));
             input = output;
             upstream = node.routingNodeId();
         }
         if (nodeId != null && !found) ParameterChecks.reject(ErrorCode.REPORT_PATH_REQUIRED);
-        return new ExecutionQuantity(view.executionId(), view.workorderId(), view.routingId(), view.targetQty(), view.pathStatus(), view.writable(), result.stream()
+        return new ExecutionQuantity(view.executionCode(), view.workorderId(), view.routingId(), view.targetQty(), view.pathStatus(), view.writable(), result.stream()
                 .anyMatch(n -> n.unverifiedDefectQty()
                         .signum() > 0) ? "存在待核实不良；从受影响工序起禁止新增正向报工，请核实质量记录，后续流转保持质量门禁" : view.boundary(), List.copyOf(result), view.routingLabel(), view.productionInputQty(), view.confirmedInputQty(), view.reservedInputQty(), view.productId());
     }
@@ -312,10 +312,10 @@ public class ProductionQuantityService {
         throw new FoundationException(ErrorCode.REPORT_PATH_REQUIRED);
     }
 
-    public void validateInputReduction(Long executionId) {
-        var view = getExecutionQuantities(executionId);
-        if (view.routingId() == null && (inbound.invalidProductionInboundLines(executionId) > 0
-                || inbound.formalProductionInbound(executionId).compareTo(view.confirmedInputQty()) > 0))
+    public void validateInputReduction(String executionCode) {
+        var view = getExecutionQuantities(executionCode);
+        if (view.routingId() == null && (inbound.invalidProductionInboundLines(executionCode) > 0
+                || inbound.formalProductionInbound(executionCode).compareTo(view.confirmedInputQty()) > 0))
             throw new FoundationException(ErrorCode.REPORT_QUANTITY_CONFLICT);
         if (view.nodes().stream().anyMatch(n -> n.historicalConflict() || n.unverifiedDefectQty().signum() > 0))
             throw new FoundationException(ErrorCode.REPORT_QUANTITY_CONFLICT);

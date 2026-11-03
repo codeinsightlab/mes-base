@@ -32,7 +32,7 @@ class ProductionExecutionHttpTest {
             assertEquals(0, j.queryForObject("SELECT COUNT(*) FROM mes_production_execution", Integer.class));
             var result = JSON.readTree(ProductionInputHttpTest.submit(m,
                     ProductionInputHttpTest.command(m, UUID.randomUUID().toString(), "L001", "12.12")));
-            String id = result.get("executionId").asText();
+            String id = result.get("executionCode").asText();
             var before = j.queryForList("SELECT * FROM mes_production_execution ORDER BY id");
             m.perform(full(get(E + "/" + id))).andExpect(status().isOk()).andExpect(jsonPath("productId").value("99"));
             m.perform(full(get("/api/production/identity/" + id))).andExpect(status().isOk())
@@ -50,7 +50,7 @@ class ProductionExecutionHttpTest {
             var m = MaterialIssueHttpTest.mvc(c);
             String id = JSON.readTree(ProductionInputHttpTest.submit(m,
                             ProductionInputHttpTest.command(m, UUID.randomUUID().toString(), "L001", "12.12")))
-                    .get("executionId").asText();
+                    .get("executionCode").asText();
             m.perform(full(put(E + "/" + id)).content(CREATE.replace("12.12", "10"))).andExpect(status().isConflict());
             m.perform(full(put(E + "/" + id)).content(CREATE.replace("READY", "RUNNING")))
                     .andExpect(status().isConflict());
@@ -66,7 +66,7 @@ class ProductionExecutionHttpTest {
             var m = MaterialIssueHttpTest.mvc(c);
             String id = JSON.readTree(ProductionInputHttpTest.submit(m,
                             ProductionInputHttpTest.command(m, UUID.randomUUID().toString(), "L001", "12.12")))
-                    .get("executionId").asText();
+                    .get("executionCode").asText();
             m.perform(put(E + "/" + id).header("Authorization", "Bearer CRUD").header("X-Factory-Id", "A")
                     .contentType("application/json").content(CREATE)).andExpect(status().isForbidden());
             m.perform(delete(E).header("Authorization", "Bearer CRUD").header("X-Factory-Id", "A")

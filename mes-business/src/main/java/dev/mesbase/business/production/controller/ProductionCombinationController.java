@@ -1,7 +1,6 @@
 package dev.mesbase.business.production.controller;
 
-import dev.mesbase.business.production.domain.ProductionCombinationQr;
-import dev.mesbase.business.production.domain.ProductionCombinationRules;
+import dev.mesbase.business.production.domain.ProductionQrCode;
 import dev.mesbase.business.production.service.ProductionCombinationService;
 import dev.mesbase.common.utils.bean.BeanConversions;
 import dev.mesbase.platform.execution.FactoryContext;
@@ -40,8 +39,8 @@ public class ProductionCombinationController {
                        String totalRequiredQty, List<String> batches) {
     }
 
-    public record Detail(String id, String code, String workorderId, String workorderCode, String productId,
-                         String outputUnitId, String demandRevision, String executionId, String executionStatus,
+    public record Detail(String code, String workorderId, String workorderCode, String productId,
+                         String outputUnitId, String demandRevision, String executionCode, String executionStatus,
                          boolean closed, List<Item> items) {
     }
 
@@ -69,21 +68,14 @@ public class ProductionCombinationController {
     @GetMapping("/resolve")
     @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED, permission = ProductionInputController.PERMISSION)
     public Detail resolve(@RequestParam String code) {
-        return BeanConversions.convert(service.detail(ProductionCombinationRules.parse(code, FactoryContext.required()
-                .factoryId().value())), Detail.class);
+        return BeanConversions.convert(service.detail(code), Detail.class);
     }
 
-    @GetMapping("/{id}")
+    @GetMapping(value = "/qr", produces = "image/svg+xml")
     @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED, permission = ProductionInputController.PERMISSION)
-    public Detail detail(@PathVariable Long id) {
-        return BeanConversions.convert(service.detail(id), Detail.class);
-    }
-
-    @GetMapping(value = "/{id}/qr", produces = "image/svg+xml")
-    @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED, permission = ProductionInputController.PERMISSION)
-    public ResponseEntity<String> qr(@PathVariable Long id) {
+    public ResponseEntity<String> qr(@RequestParam String code) {
         return ResponseEntity.ok().header("Cache-Control", "private, no-store")
-                .body(ProductionCombinationQr.svg(service.detail(id).code()));
+                .body(ProductionQrCode.svg(service.detail(code).code()));
     }
 
     @GetMapping("/calculate")

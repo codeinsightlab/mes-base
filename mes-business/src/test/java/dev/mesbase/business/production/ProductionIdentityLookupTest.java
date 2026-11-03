@@ -1,68 +1,64 @@
 package dev.mesbase.business.production;
 
 import dev.mesbase.business.basic.dao.MaterialMapper;
-import dev.mesbase.business.production.dao.MesProductionCombinationMapper;
+import dev.mesbase.business.basic.domain.MaterialEntity;
 import dev.mesbase.business.production.dao.MesProductionExecutionMapper;
 import dev.mesbase.business.production.dao.RoutingMapper;
 import dev.mesbase.business.production.dao.WorkorderMapper;
 import dev.mesbase.business.production.domain.MesProductionExecutionEntity;
-import dev.mesbase.business.production.domain.MesProductionExecutionExample;
+import dev.mesbase.business.production.domain.WorkorderEntity;
 import dev.mesbase.business.production.service.ProductionIdentityService;
 import dev.mesbase.core.error.ErrorCode;
 import dev.mesbase.core.error.FoundationException;
-import java.util.List;
-import java.util.stream.IntStream;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.*;
 
 class ProductionIdentityLookupTest {
-    private static ProductionIdentityService service(MesProductionExecutionMapper executions) {
-        return new ProductionIdentityService(executions, mock(WorkorderMapper.class), mock(MaterialMapper.class),
-                mock(RoutingMapper.class), mock(MesProductionCombinationMapper.class));
-    }
-
-    private static MesProductionExecutionEntity execution(long id, String batch) {
+    @Test
+    void normalizedCodeDirectlySelectsExecutionWithoutPlanningTableOrIdHop() {
+        var mapper = mock(MesProductionExecutionMapper.class);
+        var orders = mock(WorkorderMapper.class);
+        var materials = mock(MaterialMapper.class);
         var row = new MesProductionExecutionEntity();
-        row.setId(id);
-        row.setWorkorderId(10L);
+        row.setId(17L);
+        row.setExecutionCode("WO:A#001$B#002");
+        row.setWorkorderId(11L);
         row.setProductId(20L);
-        row.setBatchNo(batch);
-        return row;
-    }
-
-    @Test
-    void exactBatchBeyondOnePageOfCollationNeighborsIsNotHiddenByAQueryLimit() {
-        var mapper = mock(MesProductionExecutionMapper.class);
-        var approximate = IntStream.rangeClosed(1, 100).mapToObj(id -> execution(id, "LOT")).toList();
-        var exact = execution(101, "Lot");
-        when(mapper.selectByExample(any(MesProductionExecutionExample.class)))
-                .thenReturn(approximate, List.of(exact), List.of());
-        assertEquals(101L, service(mapper).findExecution(10L, 20L, "Lot").getId());
-    }
-
-    @Test
-    void duplicateExactBusinessKeysAreRejectedRatherThanSelectingTheFirstExecution() {
-        var mapper = mock(MesProductionExecutionMapper.class);
-        when(mapper.selectByExample(any(MesProductionExecutionExample.class)))
-                .thenReturn(List.of(execution(1, "001 "), execution(2, "001 ")));
-        var failure = assertThrows(FoundationException.class, () -> service(mapper).findExecution(10L, 20L, "001 "));
-        assertEquals(ErrorCode.PRODUCTION_IDENTITY_AMBIGUOUS, failure.code());
-    }
-
-    @Test
-    void requiredBatchReadsOnlyTheExecutionPropertyAndPreservesItsOriginalText() {
-        var mapper = mock(MesProductionExecutionMapper.class);
-        var row = execution(1, null);
-        when(mapper.selectByPrimaryKey(1L)).thenReturn(row);
-        var identities = service(mapper);
-        assertEquals(ErrorCode.PRODUCTION_BATCH_REQUIRED,
-                assertThrows(FoundationException.class, () -> identities.requiredBatch(1L)).code());
         row.setBatchNo(" 001 ");
-        assertEquals(" 001 ", identities.requiredBatch(1L));
+        var order = new WorkorderEntity();
+        order.setId(11L);
+        order.setProductId(20L);
+        order.setCode("WO");
+        var material = new MaterialEntity();
+        material.setId(20L);
+        material.setCode("OUT");
+        when(mapper.selectByCode("WO:A#001$B#002")).thenReturn(row);
+        when(orders.selectByPrimaryKey(11L)).thenReturn(order);
+        when(materials.selectByPrimaryKey(20L)).thenReturn(material);
+        var service = new ProductionIdentityService(mapper, orders, materials, mock(RoutingMapper.class));
+        var result = service.resolve("WO:B#002$A#001");
+        assertEquals(row.getExecutionCode(), result.executionCode());
+        assertEquals(row.getExecutionCode(), result.qrCode());
+        assertEquals(" 001 ", result.batchNo());
+        verify(mapper, never()).selectByPrimaryKey(anyLong());
+        assertEquals(ErrorCode.EXECUTION_NOT_FOUND,
+                assertThrows(FoundationException.class, () -> service.resolve("WO:A#001$B#002 ")).code());
+    }
+
+    @Test
+    void requiredBatchReadsOnlyTheExecutionPropertyAndPreservesOriginalText() {
+        var mapper = mock(MesProductionExecutionMapper.class);
+        var row = new MesProductionExecutionEntity();
+        row.setExecutionCode("WO:A#001");
+        when(mapper.selectByCode(row.getExecutionCode())).thenReturn(row);
+        var service = new ProductionIdentityService(mapper, mock(WorkorderMapper.class), mock(MaterialMapper.class),
+                mock(RoutingMapper.class));
+        assertEquals(ErrorCode.PRODUCTION_BATCH_REQUIRED,
+                assertThrows(FoundationException.class, () -> service.requiredBatch(row.getExecutionCode())).code());
+        row.setBatchNo(" 001 ");
+        assertEquals(" 001 ", service.requiredBatch(row.getExecutionCode()));
     }
 }

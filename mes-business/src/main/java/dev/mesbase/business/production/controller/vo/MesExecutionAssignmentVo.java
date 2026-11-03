@@ -8,7 +8,7 @@ import java.time.LocalDateTime;
  */
 public record MesExecutionAssignmentVo(
         String id,
-        String executionId,
+        String executionCode,
         String routingNodeId,
         String userId,
         String assignedBy,

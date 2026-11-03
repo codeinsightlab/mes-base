@@ -5,7 +5,6 @@ import dev.mesbase.business.directory.service.BusinessDirectoryService;
 import dev.mesbase.business.production.dao.MesExecutionAssignmentMapper;
 import dev.mesbase.business.production.dao.MesExecutionPathMapper;
 import dev.mesbase.business.production.dao.MesExecutionPathNodeMapper;
-import dev.mesbase.business.production.dao.MesProductionCombinationMapper;
 import dev.mesbase.business.production.dao.MesProductionExecutionMapper;
 import dev.mesbase.business.production.dao.MesProductionReportMapper;
 import dev.mesbase.business.production.dao.MesWorkorderMaterialMapper;
@@ -85,7 +84,7 @@ class LocalMaintenanceRulesTest {
                 mock(RoutingNodeMapper.class), mock(RoutingEdgeMapper.class),
                 mock(MaterialMapper.class), mock(RoutingReferenceRules.class), issues, queries, executions,
                 mock(WorkorderErpFacts.class), mock(BusinessDirectoryService.class), mock(MesWorkorderMaterialMapper.class),
-                sources, mock(WorkorderErpExtraMapper.class), mock(SyncCoordinator.class), mock(MaterialQuantityRules.class), mock(AutoCodeNumbering.class), mock(WorkorderMaterialService.class), Mockito.mock(MesProductionCombinationMapper.class), mock(PlatformTransactionManager.class)));
+                sources, mock(WorkorderErpExtraMapper.class), mock(SyncCoordinator.class), mock(MaterialQuantityRules.class), mock(AutoCodeNumbering.class), mock(WorkorderMaterialService.class), mock(PlatformTransactionManager.class)));
         doReturn(null).when(service).detail(1L);
         return service;
     }
@@ -230,13 +229,15 @@ class LocalMaintenanceRulesTest {
     private MesProductionExecutionEntity execution() {
         var row = new MesProductionExecutionEntity();
         row.setId(5L);
+        row.setExecutionCode("5");
         row.setWorkorderId(1L);
         row.setProductId(2L);
         row.setRoutingId(3L);
         row.setTargetQty(BigDecimal.TEN);
         row.setStatus("RUNNING");
         row.setStartTime(LocalDateTime.of(2026, 1, 1, 10, 0));
-        when(locks.execution(5L)).thenReturn(row);
+        when(locks.execution("5")).thenReturn(row);
+        when(executions.selectByPrimaryKey(5L)).thenReturn(row);
         return row;
     }
 
@@ -245,15 +246,15 @@ class LocalMaintenanceRulesTest {
         var rules = executionRules();
         execution();
         rules.deleting(5L);
-        verify(queries).hasExecutionDependents(5L);
-        verify(quality).hasAnyHistory(5L);
+        verify(queries).hasExecutionDependents("5");
+        verify(quality).hasAnyHistory("5");
     }
 
     @Test
     void receiptOrOtherDownstreamBlocksExecutionDeletion() {
         var rules = executionRules();
         execution();
-        when(queries.hasExecutionDependents(5L)).thenReturn(true);
+        when(queries.hasExecutionDependents("5")).thenReturn(true);
         assertEquals(ErrorCode.EXECUTION_REFERENCED,
                 assertThrows(FoundationException.class, () -> rules.deleting(5L)).code());
     }
@@ -271,7 +272,7 @@ class LocalMaintenanceRulesTest {
     void qualityHistoryBlocksExecutionDeletion() {
         var rules = executionRules();
         execution();
-        when(quality.hasAnyHistory(5L)).thenReturn(true);
+        when(quality.hasAnyHistory("5")).thenReturn(true);
         assertEquals(ErrorCode.EXECUTION_QUALITY_REFERENCED,
                 assertThrows(FoundationException.class, () -> rules.deleting(5L)).code());
     }

@@ -1,12 +1,11 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- MES-CODEGEN: MyBatis Generator standard single-table persistence. -->
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="dev.mesbase.business.issue.dao.MesMaterialIssueInputMapper">
   <resultMap id="BaseResultMap" type="dev.mesbase.business.issue.domain.MesMaterialIssueInputEntity">
     <id column="id" jdbcType="VARCHAR" property="id" />
     <result column="request_hash" jdbcType="CHAR" property="requestHash" />
     <result column="document_id" jdbcType="BIGINT" property="documentId" />
-    <result column="execution_id" jdbcType="BIGINT" property="executionId" />
+    <result column="execution_code" jdbcType="VARCHAR" property="executionCode" />
     <result column="input_kind" jdbcType="VARCHAR" property="inputKind" />
     <result column="output_qty" jdbcType="DECIMAL" property="outputQty" />
     <result column="source_mode" jdbcType="VARCHAR" property="sourceMode" />
@@ -78,7 +77,7 @@
     </where>
   </sql>
   <sql id="Base_Column_List">
-    id, request_hash, document_id, execution_id, input_kind, output_qty, source_mode, stock_id,
+    id, request_hash, document_id, execution_code, input_kind, output_qty, source_mode, stock_id,
     confirmed_at, stock_applied, created_at, business_occurred_at
   </sql>
   <sql id="Blob_Column_List">
@@ -128,12 +127,12 @@
   </delete>
   <insert id="insert" parameterType="dev.mesbase.business.issue.domain.MesMaterialIssueInputEntity">
     insert into mes_material_issue_input (id, request_hash, document_id,
-      execution_id, input_kind, output_qty,
+      execution_code, input_kind, output_qty,
       source_mode, stock_id, confirmed_at,
       stock_applied, created_at, business_occurred_at, calculation_json
       )
     values (#{id,jdbcType=VARCHAR}, #{requestHash,jdbcType=CHAR}, #{documentId,jdbcType=BIGINT},
-      #{executionId,jdbcType=BIGINT}, #{inputKind,jdbcType=VARCHAR}, #{outputQty,jdbcType=DECIMAL},
+      #{executionCode,jdbcType=VARCHAR}, #{inputKind,jdbcType=VARCHAR}, #{outputQty,jdbcType=DECIMAL},
       #{sourceMode,jdbcType=VARCHAR}, #{stockId,jdbcType=BIGINT}, #{confirmedAt,jdbcType=TIMESTAMP},
       #{stockApplied,jdbcType=BIT}, #{createdAt,jdbcType=TIMESTAMP}, #{businessOccurredAt,jdbcType=TIMESTAMP}, #{calculationJson,jdbcType=LONGVARCHAR}
       )
@@ -150,8 +149,8 @@
       <if test="documentId != null">
         document_id,
       </if>
-      <if test="executionId != null">
-        execution_id,
+      <if test="executionCode != null">
+        execution_code,
       </if>
       <if test="inputKind != null">
         input_kind,
@@ -191,8 +190,8 @@
       <if test="documentId != null">
         #{documentId,jdbcType=BIGINT},
       </if>
-      <if test="executionId != null">
-        #{executionId,jdbcType=BIGINT},
+      <if test="executionCode != null">
+        #{executionCode,jdbcType=VARCHAR},
       </if>
       <if test="inputKind != null">
         #{inputKind,jdbcType=VARCHAR},
@@ -241,8 +240,8 @@
       <if test="row.documentId != null">
         document_id = #{row.documentId,jdbcType=BIGINT},
       </if>
-      <if test="row.executionId != null">
-        execution_id = #{row.executionId,jdbcType=BIGINT},
+      <if test="row.executionCode != null">
+        execution_code = #{row.executionCode,jdbcType=VARCHAR},
       </if>
       <if test="row.inputKind != null">
         input_kind = #{row.inputKind,jdbcType=VARCHAR},
@@ -281,7 +280,7 @@
     set id = #{row.id,jdbcType=VARCHAR},
       request_hash = #{row.requestHash,jdbcType=CHAR},
       document_id = #{row.documentId,jdbcType=BIGINT},
-      execution_id = #{row.executionId,jdbcType=BIGINT},
+      execution_code = #{row.executionCode,jdbcType=VARCHAR},
       input_kind = #{row.inputKind,jdbcType=VARCHAR},
       output_qty = #{row.outputQty,jdbcType=DECIMAL},
       source_mode = #{row.sourceMode,jdbcType=VARCHAR},
@@ -300,7 +299,7 @@
     set id = #{row.id,jdbcType=VARCHAR},
       request_hash = #{row.requestHash,jdbcType=CHAR},
       document_id = #{row.documentId,jdbcType=BIGINT},
-      execution_id = #{row.executionId,jdbcType=BIGINT},
+      execution_code = #{row.executionCode,jdbcType=VARCHAR},
       input_kind = #{row.inputKind,jdbcType=VARCHAR},
       output_qty = #{row.outputQty,jdbcType=DECIMAL},
       source_mode = #{row.sourceMode,jdbcType=VARCHAR},
@@ -322,8 +321,8 @@
       <if test="documentId != null">
         document_id = #{documentId,jdbcType=BIGINT},
       </if>
-      <if test="executionId != null">
-        execution_id = #{executionId,jdbcType=BIGINT},
+      <if test="executionCode != null">
+        execution_code = #{executionCode,jdbcType=VARCHAR},
       </if>
       <if test="inputKind != null">
         input_kind = #{inputKind,jdbcType=VARCHAR},
@@ -359,7 +358,7 @@
     update mes_material_issue_input
     set request_hash = #{requestHash,jdbcType=CHAR},
       document_id = #{documentId,jdbcType=BIGINT},
-      execution_id = #{executionId,jdbcType=BIGINT},
+      execution_code = #{executionCode,jdbcType=VARCHAR},
       input_kind = #{inputKind,jdbcType=VARCHAR},
       output_qty = #{outputQty,jdbcType=DECIMAL},
       source_mode = #{sourceMode,jdbcType=VARCHAR},
@@ -375,7 +374,7 @@
     update mes_material_issue_input
     set request_hash = #{requestHash,jdbcType=CHAR},
       document_id = #{documentId,jdbcType=BIGINT},
-      execution_id = #{executionId,jdbcType=BIGINT},
+      execution_code = #{executionCode,jdbcType=VARCHAR},
       input_kind = #{inputKind,jdbcType=VARCHAR},
       output_qty = #{outputQty,jdbcType=DECIMAL},
       source_mode = #{sourceMode,jdbcType=VARCHAR},

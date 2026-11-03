@@ -166,7 +166,7 @@ public class ProductionDefectService {
         var retry = byKey(c.requestKey());
         if (retry != null) return replay(retry, fingerprint);
         var before = Optional.ofNullable(id).map(nullableValue -> latest(nullableValue)).orElse(null);
-        Long execution = before == null ? c.facts().executionId() : before.getExecutionId();
+        String execution = before == null ? c.facts().executionCode() : before.getExecutionCode();
         locks.execution(execution); // existing WorkOrder -> Execution lock order, then version read
         retry = byKey(c.requestKey());
         if (retry != null) return replay(retry, fingerprint);
@@ -180,7 +180,7 @@ public class ProductionDefectService {
                     .equals(before.getRecordAction()) || !Objects.equals(c.expectedRevision(), before.getRevisionNo()))
                 ParameterChecks.reject(ErrorCode.DEFECT_REVISION_CONFLICT);
             if (!action.equals(DefectRecordAction.VOID.getValue()) && (!Objects.equals(c.facts()
-                    .executionId(), before.getExecutionId()) || !Objects.equals(c.facts()
+                    .executionCode(), before.getExecutionCode()) || !Objects.equals(c.facts()
                     .affectedNodeId(), before.getAffectedNodeId())))
                 ParameterChecks.reject(ErrorCode.DEFECT_REVISION_CONFLICT);
         }
@@ -229,15 +229,16 @@ public class ProductionDefectService {
             throw new FoundationException(ErrorCode.FORBIDDEN);
     }
 
-    public ProductionDefectV2Models.Context declarationContext(Long executionId, Long nodeId, int offset, int limit) {
-        var node = actualNode(executionId, nodeId);
-        var execution = executions.selectByPrimaryKey(executionId);
+    public ProductionDefectV2Models.Context declarationContext(String executionCode, Long nodeId, int offset,
+                                                               int limit) {
+        var node = actualNode(executionCode, nodeId);
+        var execution = executions.selectByCode(executionCode);
         var product = materials.selectByPrimaryKey(execution.getProductId());
         if (product == null)
             ParameterChecks.reject(ErrorCode.BAD_REQUEST,
                     new SafeBusinessMessage("当前生产执行对应的产品不存在，暂不能申报不良"));
         var page = defectTypes.getObject().page(node.getOperationId(), true, offset, limit);
-        return new ProductionDefectV2Models.Context(executionId, nodeId, node.getOperationId(), node.getOperationName(),
+        return new ProductionDefectV2Models.Context(executionCode, nodeId, node.getOperationId(), node.getOperationName(),
                 product.getId(), product.getCode(), product.getName(), page.items(), page.total(), offset, limit,
                 permitted("business:quality:defect:waste:override"));
     }
@@ -258,13 +259,13 @@ public class ProductionDefectService {
         String fp = v2Fingerprint(c);
         var old = byKey(c.requestId());
         if (old != null) return replay(old, fp);
-        locks.execution(c.executionId());
+        locks.execution(c.executionCode());
         old = byKey(c.requestId());
         if (old != null) return replay(old, fp);
         if (c.defectTypeId() == null || c.expectedTypeRevision() == null || c.wasteCategory() == null)
             ParameterChecks.reject(ErrorCode.BAD_REQUEST,
                     new SafeBusinessMessage("不良申报必须指定执行、工序、不良类型版本和不良类别"));
-        var node = actualNode(c.executionId(), c.nodeId());
+        var node = actualNode(c.executionCode(), c.nodeId());
         var type = defectTypes.getObject()
                 .lockForDeclaration(node.getOperationId(), c.defectTypeId(), c.expectedTypeRevision(), c.wasteCategory());
         if (!Objects.equals(type.getDefaultWasteCategory(), c.wasteCategory()) && !permitted("business:quality:defect:waste:override"))
@@ -276,16 +277,16 @@ public class ProductionDefectService {
         typed.setDefectTypeRevision(type.getRevision());
         String reason = StringUtils.trimToNull(c.remark());
         if (reason == null) reason = type.getName();
-        var facts = new Facts(c.executionId(), c.nodeId(), c.quantity(), c.wasteCategory(), reason,
+        var facts = new Facts(c.executionCode(), c.nodeId(), c.quantity(), c.wasteCategory(), reason,
                 null, null, c.occurredAt());
         return execute(DefectRecordAction.CREATE.getValue(), null,
                 new Command(c.requestId(), null, null, facts, c.assessment()), typed, fp);
     }
 
-    private RoutingNodeEntity actualNode(Long executionId, Long nodeId) {
-        if (executionId == null || nodeId == null)
+    private RoutingNodeEntity actualNode(String executionCode, Long nodeId) {
+        if (executionCode == null || nodeId == null)
             ParameterChecks.reject(ErrorCode.BAD_REQUEST, new SafeBusinessMessage("请指定生产执行和实际工序"));
-        var p = paths.view(executionId);
+        var p = paths.view(executionCode);
         if (p.path() == null || !ExecutionPathStatus.LOCKED.getValue().equals(p.path().getPathStatus())
                 || !p.selectedNodeIds().contains(nodeId)) throw new FoundationException(ErrorCode.REPORT_PATH_REQUIRED);
         if (p.routing() == null || !Objects.equals(p.path().getRoutingId(), p.routing().id()))
@@ -297,7 +298,7 @@ public class ProductionDefectService {
 
     private String v2Fingerprint(ProductionDefectV2Models.Command c) {
         var b = new StringBuilder("V2:");
-        for (Object value : new Object[]{SecurityUtils.getUserId(), c.requestId(), c.executionId(), c.nodeId(), c.defectTypeId(),
+        for (Object value : new Object[]{SecurityUtils.getUserId(), c.requestId(), c.executionCode(), c.nodeId(), c.defectTypeId(),
                 c.expectedTypeRevision(), Optional.ofNullable(c.quantity())
                 .map(BigDecimal::stripTrailingZeros).orElse(null), c.wasteCategory(),
                 StringUtils.trimToNull(c.remark()), Optional.ofNullable(c.occurredAt())
@@ -356,12 +357,12 @@ public class ProductionDefectService {
         }
     }
 
-    public Page page(Long executionId, Long workorderId, Long affectedNodeId, int offset, int limit) {
+    public Page page(String executionCode, Long workorderId, Long affectedNodeId, int offset, int limit) {
         ParameterChecks.paging(offset, limit);
         List<MesProductionDefectEntity> rows;
         long total;
         try (var page = PageHelper.offsetPage(offset, limit)) {
-            rows = List.copyOf(mapper.selectLatest(executionId, workorderId, affectedNodeId));
+            rows = List.copyOf(mapper.selectLatest(executionCode, workorderId, affectedNodeId));
             total = page.getTotal();
         }
         var contexts = rows.isEmpty() ? Map.<String, ListContext>of() : listQueries.selectContexts(rows.stream()
@@ -425,21 +426,21 @@ public class ProductionDefectService {
         return new Names(nodeNames, userNames);
     }
 
-    public BigDecimal sumEffectiveDefectQty(Long executionId, Long affectedNodeId) {
-        if (executionId == null || affectedNodeId == null)
+    public BigDecimal sumEffectiveDefectQty(String executionCode, Long affectedNodeId) {
+        if (executionCode == null || affectedNodeId == null)
             ParameterChecks.reject(ErrorCode.BAD_REQUEST, new SafeBusinessMessage("请指定生产执行和受影响工序"));
-        return treatments.nodeTotals(executionId).stream().filter(t -> t.affectedNodeId().equals(affectedNodeId))
+        return treatments.nodeTotals(executionCode).stream().filter(t -> t.affectedNodeId().equals(affectedNodeId))
                 .map(NodeTotal::effectiveDefectQty).reduce(BigDecimal.ZERO, BigDecimal::add);
     }
 
-    public List<NodeTotal> nodeTotals(Long executionId) {
-        if (executionId == null)
+    public List<NodeTotal> nodeTotals(String executionCode) {
+        if (executionCode == null)
             ParameterChecks.reject(ErrorCode.BAD_REQUEST, new SafeBusinessMessage("请指定生产执行"));
-        return treatments.nodeTotals(executionId);
+        return treatments.nodeTotals(executionCode);
     }
 
-    public List<Node> nodes(Long executionId) {
-        var p = paths.view(executionId);
+    public List<Node> nodes(String executionCode) {
+        var p = paths.view(executionCode);
         if (p.path() == null || !Objects.equals(p.path().getRoutingId(), p.routing().id()))
             ParameterChecks.reject(ErrorCode.BAD_REQUEST,
                     new SafeBusinessMessage("当前执行缺少有效的工艺路径，暂不能读取工序"));
@@ -463,7 +464,7 @@ public class ProductionDefectService {
     }
 
     private Facts validate(Facts f) {
-        if (f.executionId() == null) ParameterChecks.reject(ErrorCode.BAD_REQUEST,
+        if (f.executionCode() == null) ParameterChecks.reject(ErrorCode.BAD_REQUEST,
                 new SafeBusinessMessage("请指定生产执行"));
         if (f.affectedNodeId() == null) ParameterChecks.reject(ErrorCode.BAD_REQUEST,
                 new SafeBusinessMessage("请选择受影响工序"));
@@ -480,7 +481,7 @@ public class ProductionDefectService {
         if (f.occurredAt() == null || f.occurredAt().isAfter(LocalDateTime.now()))
             ParameterChecks.reject(ErrorCode.BAD_REQUEST,
                     new SafeBusinessMessage("不良发生时间不能为空且不能晚于当前时间"));
-        var ids = nodes(f.executionId()).stream().map(n -> Long.valueOf(n.id())).toList();
+        var ids = nodes(f.executionCode()).stream().map(n -> Long.valueOf(n.id())).toList();
         if (!ids.contains(f.affectedNodeId()))
             ParameterChecks.reject(ErrorCode.BAD_REQUEST,
                     new SafeBusinessMessage("所选受影响工序不属于当前生产执行"));
@@ -492,7 +493,7 @@ public class ProductionDefectService {
 
     public static Facts normalize(Facts f) {
         if (f == null) return null;
-        return new Facts(f.executionId(), f.affectedNodeId(), Optional.ofNullable(f.defectQty())
+        return new Facts(f.executionCode(), f.affectedNodeId(), Optional.ofNullable(f.defectQty())
                 .map(BigDecimal::stripTrailingZeros)
                 .orElse(null), f.wasteCategory(), StringUtils.trimToNull(f.defectReason()), f.responsibleUserId(), StringUtils.trimToNull(f.responsibilityRemark()), Optional.ofNullable(f.occurredAt())
                 .map(nullableValue -> nullableValue
@@ -505,7 +506,7 @@ public class ProductionDefectService {
         var b = new StringBuilder();
         Object[] factFields = new Object[8];
         if (f != null) {
-            factFields = new Object[]{f.executionId(), f.affectedNodeId(),
+            factFields = new Object[]{f.executionCode(), f.affectedNodeId(),
                     f.defectQty(), f.wasteCategory(), f.defectReason(), f.responsibleUserId(), f.responsibilityRemark(),
                     f.occurredAt()};
         }
@@ -525,11 +526,11 @@ public class ProductionDefectService {
     }
 
     public static Facts facts(MesProductionDefectEntity r) {
-        return new Facts(r.getExecutionId(), r.getAffectedNodeId(), r.getDefectQty(), r.getWasteCategory(), r.getDefectReason(), r.getResponsibleUserId(), r.getResponsibilityRemark(), r.getOccurredAt());
+        return new Facts(r.getExecutionCode(), r.getAffectedNodeId(), r.getDefectQty(), r.getWasteCategory(), r.getDefectReason(), r.getResponsibleUserId(), r.getResponsibilityRemark(), r.getOccurredAt());
     }
 
     private static void apply(MesProductionDefectEntity r, Facts f) {
-        r.setExecutionId(f.executionId());
+        r.setExecutionCode(f.executionCode());
         r.setAffectedNodeId(f.affectedNodeId());
         r.setDefectQty(f.defectQty());
         r.setWasteCategory(f.wasteCategory());

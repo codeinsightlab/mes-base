@@ -45,7 +45,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 class ProductionQualityLifecycleMySqlTest {
     static final Path DIR = Path.of(".local/production-quality-phase2b-20261016");
 
-    record Fixture(long execution, long order, long routing, List<Long> selected, List<Long> alternate, long warehouse,
+    record Fixture(String execution, long order, long routing, List<Long> selected, List<Long> alternate, long warehouse,
                    String tag) {
     }
 
@@ -105,11 +105,12 @@ class ProductionQualityLifecycleMySqlTest {
                     jdbc.update("INSERT INTO routing_edge(routing_id,from_node_id,to_node_id) VALUES(?,?,?)", routing, nodes.get(edge.get(0)), nodes.get(edge.get(1)));
                 long order = ProductionReportMySqlTest.insert(jdbc, "INSERT INTO workorder(source,code,product_id,planned_qty,routing_id,status,revision,create_time,update_time) VALUES('LOCAL',?,?,10,?,'RELEASED',0,NOW(),NOW())", tag, material, routing);
                 jdbc.update("INSERT INTO workorder_erp_extra(id) VALUES(?)", order);
-                long execution = ProductionReportMySqlTest.insert(jdbc, "INSERT INTO mes_production_execution(workorder_id,product_id,routing_id,target_qty,status,remark,create_by,create_time) VALUES(?,?,?,10,'READY',?,'TEST_ONLY_QREF',NOW())", order, material, routing, tag);
-                jdbc.update("INSERT INTO mes_execution_path(id,routing_id,path_status,revision,selected_at) VALUES(?,?,'SELECTED',1,NOW())", execution, routing);
+                String execution = tag + ":TEST_ONLY#BATCH";
+                ProductionReportMySqlTest.insert(jdbc, "INSERT INTO mes_production_execution(execution_code,workorder_id,product_id,routing_id,target_qty,status,remark,create_by,create_time) VALUES(?,?,?,?,10,'READY',?,'TEST_ONLY_QREF',NOW())", execution, order, material, routing, tag);
+                jdbc.update("INSERT INTO mes_execution_path(execution_code,routing_id,path_status,revision,selected_at) VALUES(?,?,'SELECTED',1,NOW())", execution, routing);
                 var selected = List.of(nodes.get(0), nodes.get(1), nodes.get(3));
                 for (int i = 0; i < selected.size(); i++)
-                    jdbc.update("INSERT INTO mes_execution_path_node(execution_id,sequence_no,routing_node_id) VALUES(?,?,?)", execution, i + 1, selected.get(i));
+                    jdbc.update("INSERT INTO mes_execution_path_node(execution_code,sequence_no,routing_node_id) VALUES(?,?,?)", execution, i + 1, selected.get(i));
                 return new Fixture(execution, order, routing, selected, List.of(nodes.get(0), nodes.get(2), nodes.get(3)), warehouse, tag);
             });
             try {
@@ -134,8 +135,8 @@ class ProductionQualityLifecycleMySqlTest {
         }
 
         void invariant(Fixture f) {
-            assertEquals(0, jdbc.queryForObject("SELECT COUNT(*) FROM mes_production_defect d LEFT JOIN mes_production_execution e ON e.id=d.execution_id WHERE d.execution_id=? AND e.id IS NULL", Integer.class, f.execution()));
-            assertEquals(0, jdbc.queryForObject("SELECT COUNT(*) FROM mes_production_defect d LEFT JOIN mes_execution_path_node n ON n.execution_id=d.execution_id AND n.routing_node_id=d.affected_node_id WHERE d.execution_id=? AND n.id IS NULL", Integer.class, f.execution()));
+            assertEquals(0, jdbc.queryForObject("SELECT COUNT(*) FROM mes_production_defect d LEFT JOIN mes_production_execution e ON e.id=d.execution_code WHERE d.execution_code=? AND e.id IS NULL", Integer.class, f.execution()));
+            assertEquals(0, jdbc.queryForObject("SELECT COUNT(*) FROM mes_production_defect d LEFT JOIN mes_execution_path_node n ON n.execution_code=d.execution_code AND n.routing_node_id=d.affected_node_id WHERE d.execution_code=? AND n.id IS NULL", Integer.class, f.execution()));
 
         }
 
@@ -192,7 +193,7 @@ class ProductionQualityLifecycleMySqlTest {
                 ProductionReportMySqlTest.actor();
                 try {
                     await(gate);
-                    h.executions.deleteByIds(List.of(f.execution()));
+                    h.executions.deleteByCodes(List.of(f.execution()));
                     return 204;
                 } finally {
                     SecurityContextHolder.clearContext();
@@ -209,7 +210,7 @@ class ProductionQualityLifecycleMySqlTest {
     static void seedGrossReports(Harness h, Fixture f) {
         ProductionInputTestData.confirmed(h.jdbc, f.execution(), BigDecimal.TEN);
         for (long node : f.selected().subList(0, 2))
-            h.jdbc.update("INSERT INTO mes_production_report(execution_id,routing_node_id,record_type,quantity_delta,operator_user_id,recorded_by,report_time,reason,create_time) VALUES(?,?,'REPORT',10,100,100,NOW(),'TEST ONLY Phase 2B gross report',NOW())", f.execution(), node);
+            h.jdbc.update("INSERT INTO mes_production_report(execution_code,routing_node_id,record_type,quantity_delta,operator_user_id,recorded_by,report_time,reason,create_time) VALUES(?,?,'REPORT',10,100,100,NOW(),'TEST ONLY Phase 2B gross report',NOW())", f.execution(), node);
     }
 
     @Test
@@ -222,7 +223,7 @@ class ProductionQualityLifecycleMySqlTest {
             assertEquals(0, h.transaction(() -> h.quality.sumEffectiveDefectQty(f.execution(), f.selected().get(1)))
                     .signum());
             assertTrue(h.transaction(() -> h.references.hasAnyHistory(f.execution())));
-            assertEquals(ErrorCode.EXECUTION_REFERENCED, assertThrows(FoundationException.class, () -> h.executions.deleteByIds(List.of(f.execution()))).code());
+            assertEquals(ErrorCode.EXECUTION_REFERENCED, assertThrows(FoundationException.class, () -> h.executions.deleteByCodes(List.of(f.execution()))).code());
             assertThrows(FoundationException.class, () -> h.paths.select(f.execution(), 1, f.alternate()));
             assertEquals(2, h.transaction(() -> h.quality.history(id, 0, 20)).total());
             h.invariant(f);

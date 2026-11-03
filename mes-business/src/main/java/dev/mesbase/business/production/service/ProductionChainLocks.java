@@ -112,14 +112,14 @@ public class ProductionChainLocks {
                     new SafeBusinessMessage("当前工单状态不允许继续生产操作"));
     }
 
-    public void requireActiveExecution(Long id) {
+    public void requireActiveExecution(String id) {
         var row = execution(id);
         requireActive(orders.selectByPrimaryKey(row.getWorkorderId()));
     }
 
-    public void requireActiveExecution(Long id, LockedExecution locked) {
+    public void requireActiveExecution(String id, LockedExecution locked) {
         locked.verify();
-        if (!Objects.equals(id, locked.execution().getId()))
+        if (!Objects.equals(id, locked.execution().getExecutionCode()))
             throw new FoundationException(ErrorCode.RESOURCE_CONFLICT);
         requireActive(locked.order());
     }
@@ -131,11 +131,11 @@ public class ProductionChainLocks {
         return row;
     }
 
-    public MesProductionExecutionEntity execution(Long id) {
+    public MesProductionExecutionEntity execution(String id) {
         return lockRows(id).execution();
     }
 
-    public LockedExecution lockedExecution(Long id, OwnedTransactionManager manager) {
+    public LockedExecution lockedExecution(String id, OwnedTransactionManager manager) {
         if (!TransactionSynchronizationManager.isActualTransactionActive()
                 || !TransactionSynchronizationManager.isSynchronizationActive())
             throw new FoundationException(ErrorCode.RESOURCE_CONFLICT);
@@ -146,11 +146,11 @@ public class ProductionChainLocks {
         return new LockedExecution(lockRows(id), manager, holder);
     }
 
-    private LockedRows lockRows(Long id) {
-        var before = executions.selectByPrimaryKey(id);
+    private LockedRows lockRows(String id) {
+        var before = executions.selectByCode(id);
         if (before == null) throw new FoundationException(ErrorCode.EXECUTION_NOT_FOUND);
         var order = order(before.getWorkorderId());
-        var current = executions.selectByPrimaryKeyForUpdate(id);
+        var current = executions.selectByCodeForUpdate(id);
         if (current == null) throw new FoundationException(ErrorCode.EXECUTION_NOT_FOUND);
         if (!Objects.equals(before.getWorkorderId(), current.getWorkorderId()))
             throw new FoundationException(ErrorCode.RESOURCE_CONFLICT);
@@ -161,36 +161,36 @@ public class ProductionChainLocks {
         issues(ids, null, null);
     }
 
-    public void issueUpdate(Long id, Long workorderId, Long executionId) {
-        issues(List.of(id), workorderId, executionId);
+    public void issueUpdate(Long id, Long workorderId, String executionCode) {
+        issues(List.of(id), workorderId, executionCode);
     }
 
-    private void issues(List<Long> ids, Long targetOrder, Long targetExecution) {
+    private void issues(List<Long> ids, Long targetOrder, String targetExecution) {
         if (ids.isEmpty() || ids.size() > 100) throw new FoundationException(ErrorCode.BAD_REQUEST);
         var f = new WmStockDocumentExample();
         f.createCriteria().andIdIn(ids).andDocumentTypeEqualTo(StockDocumentType.MATERIAL_ISSUE.getValue());
         var before = issues.selectByExample(f);
         if (before.size() != ids.stream().distinct().count()) throw new FoundationException(ErrorCode.NOT_FOUND);
         var orderIds = new ArrayList<Long>();
-        var executionIds = new ArrayList<Long>();
+        var executionCodes = new ArrayList<String>();
         before.forEach(row -> {
             if (row.getSourceWorkorderId() != null) orderIds.add(row.getSourceWorkorderId());
-            if (row.getSourceExecutionId() != null) executionIds.add(row.getSourceExecutionId());
+            if (row.getSourceExecutionCode() != null) executionCodes.add(row.getSourceExecutionCode());
         });
         if (targetOrder != null) orderIds.add(targetOrder);
-        if (targetExecution != null) executionIds.add(targetExecution);
+        if (targetExecution != null) executionCodes.add(targetExecution);
         // Bounded to at most 100 existing headers plus one proposed association.
-        for (Long id : executionIds.stream().distinct().toList()) {
-            var execution = executions.selectByPrimaryKey(id);
+        for (String id : executionCodes.stream().distinct().toList()) {
+            var execution = executions.selectByCode(id);
             if (execution == null) throw new FoundationException(ErrorCode.EXECUTION_NOT_FOUND);
             orderIds.add(execution.getWorkorderId());
         }
         for (Long id : orderIds.stream().distinct().sorted().toList()) order(id);
-        for (Long id : executionIds.stream().distinct().sorted().toList()) execution(id);
+        for (String id : executionCodes.stream().distinct().sorted().toList()) execution(id);
         for (var row : before.stream().sorted((a, b) -> a.getId().compareTo(b.getId())).toList()) {
             var current = issues.selectByPrimaryKeyForUpdate(row.getId());
             if (current == null) throw new FoundationException(ErrorCode.NOT_FOUND);
-            if (!Objects.equals(row.getSourceWorkorderId(), current.getSourceWorkorderId()) || !Objects.equals(row.getSourceExecutionId(), current.getSourceExecutionId()))
+            if (!Objects.equals(row.getSourceWorkorderId(), current.getSourceWorkorderId()) || !Objects.equals(row.getSourceExecutionCode(), current.getSourceExecutionCode()))
                 throw new FoundationException(ErrorCode.RESOURCE_CONFLICT);
         }
     }

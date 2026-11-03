@@ -1,10 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- MES-CODEGEN: MyBatis Generator standard single-table persistence. -->
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="dev.mesbase.business.production.dao.MesExecutionCompletionMapper">
   <resultMap id="BaseResultMap" type="dev.mesbase.business.production.domain.MesExecutionCompletionEntity">
     <id column="id" jdbcType="VARCHAR" property="id" />
-    <result column="execution_id" jdbcType="BIGINT" property="executionId" />
+    <result column="execution_code" jdbcType="VARCHAR" property="executionCode" />
     <result column="effective_qty" jdbcType="DECIMAL" property="effectiveQty" />
     <result column="released_qty" jdbcType="DECIMAL" property="releasedQty" />
     <result column="receipt_qty" jdbcType="DECIMAL" property="receiptQty" />
@@ -74,7 +73,7 @@
     </where>
   </sql>
   <sql id="Base_Column_List">
-    id, execution_id, effective_qty, released_qty, receipt_qty, accepted_qty, basis_hash, 
+    id, execution_code, effective_qty, released_qty, receipt_qty, accepted_qty, basis_hash,
     request_hash, operator_user_id, recorded_at, reason
   </sql>
   <select id="selectByExample" parameterType="dev.mesbase.business.production.domain.MesExecutionCompletionExample" resultMap="BaseResultMap">
@@ -105,11 +104,11 @@
     </if>
   </delete>
   <insert id="insert" parameterType="dev.mesbase.business.production.domain.MesExecutionCompletionEntity">
-    insert into mes_execution_completion (id, execution_id, effective_qty, 
+    insert into mes_execution_completion (id, execution_code, effective_qty,
       released_qty, receipt_qty, accepted_qty, 
       basis_hash, request_hash, operator_user_id, 
       recorded_at, reason)
-    values (#{id,jdbcType=VARCHAR}, #{executionId,jdbcType=BIGINT}, #{effectiveQty,jdbcType=DECIMAL}, 
+    values (#{id,jdbcType=VARCHAR}, #{executionCode,jdbcType=VARCHAR}, #{effectiveQty,jdbcType=DECIMAL},
       #{releasedQty,jdbcType=DECIMAL}, #{receiptQty,jdbcType=DECIMAL}, #{acceptedQty,jdbcType=DECIMAL}, 
       #{basisHash,jdbcType=CHAR}, #{requestHash,jdbcType=CHAR}, #{operatorUserId,jdbcType=BIGINT}, 
       #{recordedAt,jdbcType=TIMESTAMP}, #{reason,jdbcType=VARCHAR})
@@ -120,8 +119,8 @@
       <if test="id != null">
         id,
       </if>
-      <if test="executionId != null">
-        execution_id,
+      <if test="executionCode != null">
+        execution_code,
       </if>
       <if test="effectiveQty != null">
         effective_qty,
@@ -155,8 +154,8 @@
       <if test="id != null">
         #{id,jdbcType=VARCHAR},
       </if>
-      <if test="executionId != null">
-        #{executionId,jdbcType=BIGINT},
+      <if test="executionCode != null">
+        #{executionCode,jdbcType=VARCHAR},
       </if>
       <if test="effectiveQty != null">
         #{effectiveQty,jdbcType=DECIMAL},
@@ -199,8 +198,8 @@
       <if test="row.id != null">
         id = #{row.id,jdbcType=VARCHAR},
       </if>
-      <if test="row.executionId != null">
-        execution_id = #{row.executionId,jdbcType=BIGINT},
+      <if test="row.executionCode != null">
+        execution_code = #{row.executionCode,jdbcType=VARCHAR},
       </if>
       <if test="row.effectiveQty != null">
         effective_qty = #{row.effectiveQty,jdbcType=DECIMAL},
@@ -237,7 +236,7 @@
   <update id="updateByExample" parameterType="map">
     update mes_execution_completion
     set id = #{row.id,jdbcType=VARCHAR},
-      execution_id = #{row.executionId,jdbcType=BIGINT},
+      execution_code = #{row.executionCode,jdbcType=VARCHAR},
       effective_qty = #{row.effectiveQty,jdbcType=DECIMAL},
       released_qty = #{row.releasedQty,jdbcType=DECIMAL},
       receipt_qty = #{row.receiptQty,jdbcType=DECIMAL},
@@ -254,8 +253,8 @@
   <update id="updateByPrimaryKeySelective" parameterType="dev.mesbase.business.production.domain.MesExecutionCompletionEntity">
     update mes_execution_completion
     <set>
-      <if test="executionId != null">
-        execution_id = #{executionId,jdbcType=BIGINT},
+      <if test="executionCode != null">
+        execution_code = #{executionCode,jdbcType=VARCHAR},
       </if>
       <if test="effectiveQty != null">
         effective_qty = #{effectiveQty,jdbcType=DECIMAL},
@@ -289,7 +288,7 @@
   </update>
   <update id="updateByPrimaryKey" parameterType="dev.mesbase.business.production.domain.MesExecutionCompletionEntity">
     update mes_execution_completion
-    set execution_id = #{executionId,jdbcType=BIGINT},
+    set execution_code = #{executionCode,jdbcType=VARCHAR},
       effective_qty = #{effectiveQty,jdbcType=DECIMAL},
       released_qty = #{releasedQty,jdbcType=DECIMAL},
       receipt_qty = #{receiptQty,jdbcType=DECIMAL},

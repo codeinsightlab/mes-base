@@ -48,6 +48,13 @@ public class WorkorderEntity {
 
     private LocalDateTime materialUpdatedAt;
 
+    private String bomBuildId;
+    private Long bomBuildParentWorkorderId;
+    private Long bomBuildSourceLineId;
+    private String bomBuildPath;
+    private String bomBuildRequestId;
+    private String bomBuildRequestHash;
+
     public Long getId() {
         return id;
     }
@@ -241,5 +248,18 @@ public class WorkorderEntity {
     public void setExternalCode(String externalCode) {
         this.externalCode = externalCode;
     }
+
+    public String getBomBuildId() { return bomBuildId; }
+    public void setBomBuildId(String value) { this.bomBuildId = value; }
+    public Long getBomBuildParentWorkorderId() { return bomBuildParentWorkorderId; }
+    public void setBomBuildParentWorkorderId(Long value) { this.bomBuildParentWorkorderId = value; }
+    public Long getBomBuildSourceLineId() { return bomBuildSourceLineId; }
+    public void setBomBuildSourceLineId(Long value) { this.bomBuildSourceLineId = value; }
+    public String getBomBuildPath() { return bomBuildPath; }
+    public void setBomBuildPath(String value) { this.bomBuildPath = value; }
+    public String getBomBuildRequestId() { return bomBuildRequestId; }
+    public void setBomBuildRequestId(String value) { this.bomBuildRequestId = value; }
+    public String getBomBuildRequestHash() { return bomBuildRequestHash; }
+    public void setBomBuildRequestHash(String value) { this.bomBuildRequestHash = value; }
 
 }

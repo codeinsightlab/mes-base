@@ -25,6 +25,12 @@
     <result column="material_frozen_at" jdbcType="TIMESTAMP" property="materialFrozenAt" />
     <result column="material_updated_by" jdbcType="BIGINT" property="materialUpdatedBy" />
     <result column="material_updated_at" jdbcType="TIMESTAMP" property="materialUpdatedAt" />
+    <result column="bom_build_id" jdbcType="VARCHAR" property="bomBuildId" />
+    <result column="bom_build_parent_workorder_id" jdbcType="BIGINT" property="bomBuildParentWorkorderId" />
+    <result column="bom_build_source_line_id" jdbcType="BIGINT" property="bomBuildSourceLineId" />
+    <result column="bom_build_path" jdbcType="VARCHAR" property="bomBuildPath" />
+    <result column="bom_build_request_id" jdbcType="VARCHAR" property="bomBuildRequestId" />
+    <result column="bom_build_request_hash" jdbcType="VARCHAR" property="bomBuildRequestHash" />
   </resultMap>
   <sql id="Example_Where_Clause">
     <where>
@@ -88,7 +94,8 @@
     id, code, product_id, planned_qty, routing_id, status, planned_start_at, planned_end_at,
     remark, revision, create_time, update_time, source, bom_id, bom_revision, material_revision,
     material_warehouse_ids, material_work_center, material_status, material_frozen_at,
-    material_updated_by, material_updated_at
+    material_updated_by, material_updated_at, bom_build_id, bom_build_parent_workorder_id,
+    bom_build_source_line_id, bom_build_path, bom_build_request_id, bom_build_request_hash
   </sql>
   <select id="selectByExample" parameterType="dev.mesbase.business.production.domain.WorkorderExample" resultMap="BaseResultMap">
     select
@@ -106,6 +113,13 @@
     <include refid="Base_Column_List" />
     from workorder
     where id = #{id,jdbcType=BIGINT}
+  </select>
+  <select id="selectByBomBuildId" parameterType="String" resultMap="BaseResultMap">
+    select <include refid="Base_Column_List" /> from workorder where bom_build_id = #{id}
+    order by case when bom_build_parent_workorder_id is null then 0 else 1 end, bom_build_path
+  </select>
+  <select id="selectByBomBuildRequestId" parameterType="String" resultMap="BaseResultMap">
+    select <include refid="Base_Column_List" /> from workorder where bom_build_request_id = #{id} limit 1
   </select>
   <delete id="deleteByPrimaryKey" parameterType="Long">
     delete from workorder
@@ -125,7 +139,8 @@
       bom_id, bom_revision, material_revision,
       material_warehouse_ids, material_work_center,
       material_status, material_frozen_at, material_updated_by,
-      material_updated_at)
+      material_updated_at, bom_build_id, bom_build_parent_workorder_id, bom_build_source_line_id,
+      bom_build_path, bom_build_request_id, bom_build_request_hash)
     values (#{code,jdbcType=VARCHAR}, #{productId,jdbcType=BIGINT}, #{plannedQty,jdbcType=DECIMAL},
       #{routingId,jdbcType=BIGINT}, #{status,jdbcType=VARCHAR}, #{plannedStartAt,jdbcType=TIMESTAMP},
       #{plannedEndAt,jdbcType=TIMESTAMP}, #{remark,jdbcType=VARCHAR}, #{revision,jdbcType=INTEGER},
@@ -133,7 +148,10 @@
       #{bomId,jdbcType=BIGINT}, #{bomRevision,jdbcType=BIGINT}, #{materialRevision,jdbcType=BIGINT},
       #{materialWarehouseIds,jdbcType=VARCHAR}, #{materialWorkCenter,jdbcType=VARCHAR},
       #{materialStatus,jdbcType=VARCHAR}, #{materialFrozenAt,jdbcType=TIMESTAMP}, #{materialUpdatedBy,jdbcType=BIGINT},
-      #{materialUpdatedAt,jdbcType=TIMESTAMP})
+      #{materialUpdatedAt,jdbcType=TIMESTAMP}, #{bomBuildId,jdbcType=VARCHAR},
+      #{bomBuildParentWorkorderId,jdbcType=BIGINT}, #{bomBuildSourceLineId,jdbcType=BIGINT},
+      #{bomBuildPath,jdbcType=VARCHAR}, #{bomBuildRequestId,jdbcType=VARCHAR},
+      #{bomBuildRequestHash,jdbcType=VARCHAR})
   </insert>
   <insert id="insertSelective" keyColumn="id" keyProperty="id" parameterType="dev.mesbase.business.production.domain.WorkorderEntity" useGeneratedKeys="true">
     insert into workorder

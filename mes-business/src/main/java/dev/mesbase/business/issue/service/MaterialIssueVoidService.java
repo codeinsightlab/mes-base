@@ -68,12 +68,12 @@ public class MaterialIssueVoidService {
         }
         if (!Mode.LOCAL_ONLY.getValue().equals(input.getSourceMode()))
             throw new FoundationException(ErrorCode.BUSINESS_SOURCE_CONFLICT);
-        Long executionId = input.getExecutionId();
-        executions.lock(executionId);
+        String executionCode = input.getExecutionCode();
+        executions.lockCode(executionCode);
         document = documents.lockMaterialIssueForVoid(documentId);
         input = inputFacts.find(documentId);
-        if (input == null || !Objects.equals(executionId, input.getExecutionId())
-                || !Objects.equals(document.getSourceExecutionId(), input.getExecutionId()))
+        if (input == null || !Objects.equals(executionCode, input.getExecutionCode())
+                || !Objects.equals(document.getSourceExecutionCode(), input.getExecutionCode()))
             throw new FoundationException(ErrorCode.ISSUE_VOID_CONFLICT);
         var reversal = inputFacts.recordedReversal(documentId);
         if (reversal != null) return new Result(documentId.toString(), document.getStatus(), "VOIDED", reversal.getId(),
@@ -85,7 +85,7 @@ public class MaterialIssueVoidService {
         // Both contribution removal and inverse stock action are in this LOCAL transaction.
         input.setStockApplied(false);
         if (inputFacts.updateVoid(input) != 1) throw new FoundationException(ErrorCode.RESOURCE_CONFLICT);
-        quantities.validateInputReduction(input.getExecutionId());
+        quantities.validateInputReduction(input.getExecutionCode());
         inputFacts.voidConfirmed(documentId, operationId);
         reversal = inputFacts.recordedReversal(documentId);
         if (reversal == null) throw new FoundationException(ErrorCode.ISSUE_VOID_CONFLICT);

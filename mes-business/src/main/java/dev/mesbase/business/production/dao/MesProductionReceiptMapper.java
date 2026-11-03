@@ -7,7 +7,7 @@ import org.apache.ibatis.annotations.Param;
 import java.math.BigDecimal;
 
 public interface MesProductionReceiptMapper {
-    BigDecimal netQuantity(@Param("executionId") Long executionId);
+    BigDecimal netQuantity(@Param("executionCode") String executionCode);
 
     BigDecimal originalBalance(@Param("id") String id);
 

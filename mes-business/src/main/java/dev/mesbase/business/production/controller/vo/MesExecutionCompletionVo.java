@@ -8,7 +8,7 @@ import java.time.LocalDateTime;
  */
 public record MesExecutionCompletionVo(
         String id,
-        String executionId,
+        String executionCode,
         String effectiveQty,
         String releasedQty,
         String receiptQty,

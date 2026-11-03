@@ -26,31 +26,31 @@ public final class StockDocumentModels {
     }
 
     public record Create(String direction, @NotBlank String documentType, @NotBlank @Size(max = 500) String reason,
-                         @Size(max = 500) String remark, Long sourceWorkorderId, Long sourceExecutionId,
+                         @Size(max = 500) String remark, Long sourceWorkorderId, String sourceExecutionCode,
                          @Size(max = 64) String ruleCode) {
         public Create(String documentType, String reason, String remark, Long sourceWorkorderId,
-                      Long sourceExecutionId, String ruleCode) {
+                      String sourceExecutionCode, String ruleCode) {
             this(StockDocumentType.from(documentType) == null ? null : StockDocumentType.from(documentType)
                             .getDirection().getValue(),
-                    documentType, reason, remark, sourceWorkorderId, sourceExecutionId, ruleCode);
+                    documentType, reason, remark, sourceWorkorderId, sourceExecutionCode, ruleCode);
         }
 
         public Create(String documentType, String reason, String remark, Long sourceWorkorderId,
-                      Long sourceExecutionId) {
-            this(documentType, reason, remark, sourceWorkorderId, sourceExecutionId, null);
+                      String sourceExecutionCode) {
+            this(documentType, reason, remark, sourceWorkorderId, sourceExecutionCode, null);
         }
     }
 
     public record AggregateHeader(String direction, @NotBlank String documentType,
                                   @NotBlank @Size(max = 500) String reason,
                                   @Size(max = 500) String remark, Long sourceWorkorderId,
-                                  Long sourceExecutionId, @Size(max = 64) String ruleCode,
+                                  String sourceExecutionCode, @Size(max = 64) String ruleCode,
                                   Long expectedRevision) {
         public AggregateHeader(String documentType, String reason, String remark, Long sourceWorkorderId,
-                               Long sourceExecutionId, String ruleCode, Long expectedRevision) {
+                               String sourceExecutionCode, String ruleCode, Long expectedRevision) {
             this(StockDocumentType.from(documentType) == null ? null : StockDocumentType.from(documentType)
                             .getDirection().getValue(),
-                    documentType, reason, remark, sourceWorkorderId, sourceExecutionId, ruleCode, expectedRevision);
+                    documentType, reason, remark, sourceWorkorderId, sourceExecutionCode, ruleCode, expectedRevision);
         }
     }
 
@@ -105,7 +105,8 @@ public final class StockDocumentModels {
                        int limit) implements PageData<WmStockDocumentEntity> {
     }
 
-    public record QualitySource(String sourceDeclarationId, String sourceTreatmentId, Long sourceQualityExecutionId) {
+    public record QualitySource(String sourceDeclarationId, String sourceTreatmentId,
+                                String sourceQualityExecutionCode) {
     }
 
     public record MaterialIssueBasis(String requestId, String code, Long workorderId, BigDecimal outputQty,
@@ -120,7 +121,7 @@ public final class StockDocumentModels {
     /**
      * Current net production output less formally received stock bounds inbound approval.
      */
-    public record ProductionBasis(Long executionId, Long productId, BigDecimal effective,
+    public record ProductionBasis(String executionCode, Long productId, BigDecimal effective,
                                   BigDecimal received, BigDecimal remaining, boolean canReceive, String blockedReason,
                                   boolean reportingRequired) {
     }

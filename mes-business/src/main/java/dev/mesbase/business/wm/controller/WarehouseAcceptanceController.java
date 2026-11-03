@@ -23,7 +23,7 @@ public class WarehouseAcceptanceController {
         this.service = service;
     }
 
-    public record Fact(String id, String receiptId, String executionId, String productId, String stockId,
+    public record Fact(String id, String receiptId, String executionCode, String productId, String stockId,
                        String quantityDelta, String referenceId, String stockActionId, String operatorUserId,
                        LocalDateTime recordedAt, String reason) {
     }

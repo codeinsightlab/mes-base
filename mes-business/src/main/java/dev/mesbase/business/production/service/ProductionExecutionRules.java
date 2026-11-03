@@ -85,12 +85,22 @@ public class ProductionExecutionRules {
     }
 
     public MesProductionExecutionEntity lock(Long id) {
-        return locks.execution(id);
+        var row = executions.selectByPrimaryKey(id);
+        if (row == null) throw new FoundationException(ErrorCode.EXECUTION_NOT_FOUND);
+        return locks.execution(row.getExecutionCode());
+    }
+
+    public MesProductionExecutionEntity lockCode(String code) {
+        return locks.execution(code);
     }
 
     public void initialize(MesProductionExecutionEntity row) {
         var order = validateReferences(row, true);
         row.setProductId(order.getProductId());
+        var identity = dev.mesbase.business.production.domain.ProductionQrCode.parse(row.getExecutionCode());
+        if (!Objects.equals(identity.workorderCode(), order.getCode()))
+            throw new FoundationException(ErrorCode.EXECUTION_QR_INVALID);
+        row.setExecutionCode(dev.mesbase.business.production.domain.ProductionQrCode.normalize(row.getExecutionCode()));
         valid(ProductionExecutionStatus.READY.getValue()
                 .equals(row.getStatus()) && row.getStartTime() == null && row.getEndTime() == null);
         quantityRules.checkForWrite(row.getTargetQty(), row.getProductId());
@@ -119,10 +129,10 @@ public class ProductionExecutionRules {
             audit(row, false);
             return;
         }
-        if (!Objects.equals(old.getRoutingId(), row.getRoutingId()) && (paths.selectByPrimaryKey(old.getId()) != null || hasAssignments(old.getId())))
+        if (!Objects.equals(old.getRoutingId(), row.getRoutingId()) && (paths.selectByPrimaryKey(old.getExecutionCode()) != null || hasAssignments(old.getExecutionCode())))
             frozen();
-        boolean reportFacts = hasReports(old.getId());
-        boolean facts = started(old) || hasIssues(old.getId()) || reportFacts;
+        boolean reportFacts = hasReports(old.getExecutionCode());
+        boolean facts = started(old) || hasIssues(old.getExecutionCode()) || reportFacts;
         valid(row.getTargetQty() != null);
         if (facts && row.getTargetQty().compareTo(old.getTargetQty()) < 0) frozen();
         if (facts && (!Objects.equals(old.getRoutingId(), row.getRoutingId())
@@ -150,34 +160,34 @@ public class ProductionExecutionRules {
         valid(order != null);
         BusinessSourceRules.localEditable(order.getSource());
         sources.current(order.getSource());
-        if (hasIssues(id) || hasReports(id) || hasAssignments(id) || allocation.hasExecutionDependents(id))
+        if (hasIssues(row.getExecutionCode()) || hasReports(row.getExecutionCode()) || hasAssignments(row.getExecutionCode()) || allocation.hasExecutionDependents(row.getExecutionCode()))
             throw new FoundationException(ErrorCode.EXECUTION_REFERENCED);
-        if (quality.hasAnyHistory(id))
+        if (quality.hasAnyHistory(row.getExecutionCode()))
             throw new FoundationException(ErrorCode.EXECUTION_QUALITY_REFERENCED);
-        var path = paths.selectByPrimaryKey(id);
+        var path = paths.selectByPrimaryKey(row.getExecutionCode());
         if (path != null) {
             var filter = new MesExecutionPathNodeExample();
-            filter.createCriteria().andExecutionIdEqualTo(id);
+            filter.createCriteria().andExecutionCodeEqualTo(row.getExecutionCode());
             pathNodes.deleteByExample(filter);
-            if (paths.deleteByPrimaryKey(id) != 1) frozen();
+            if (paths.deleteByPrimaryKey(row.getExecutionCode()) != 1) frozen();
         }
     }
 
-    private boolean hasAssignments(Long id) {
+    private boolean hasAssignments(String id) {
         var filter = new MesExecutionAssignmentExample();
-        filter.createCriteria().andExecutionIdEqualTo(id);
+        filter.createCriteria().andExecutionCodeEqualTo(id);
         return assignments.countByExample(filter) > 0;
     }
 
-    private boolean hasReports(Long id) {
+    private boolean hasReports(String id) {
         var filter = new MesProductionReportExample();
-        filter.createCriteria().andExecutionIdEqualTo(id);
+        filter.createCriteria().andExecutionCodeEqualTo(id);
         return reports.countByExample(filter) > 0;
     }
 
-    private boolean hasIssues(Long id) {
+    private boolean hasIssues(String id) {
         var filter = new WmStockDocumentExample();
-        filter.createCriteria().andSourceExecutionIdEqualTo(id)
+        filter.createCriteria().andSourceExecutionCodeEqualTo(id)
                 .andDocumentTypeEqualTo(StockDocumentType.MATERIAL_ISSUE.getValue());
         return issues.countByExample(filter) > 0;
     }
@@ -216,7 +226,7 @@ public class ProductionExecutionRules {
     }
 
     private void capacity(MesProductionExecutionEntity row) {
-        var capacity = allocation.activeAllocation(row.getWorkorderId(), row.getId());
+        var capacity = allocation.activeAllocation(row.getWorkorderId(), row.getExecutionCode());
         valid(capacity != null && capacity.allocatedTargetQty().add(row.getTargetQty())
                 .compareTo(capacity.plannedQty()) <= 0);
     }

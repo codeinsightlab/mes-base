@@ -49,8 +49,8 @@ public class MesProductionExecutionServiceImpl implements IMesProductionExecutio
         ParameterChecks.paging(offset, limit, 100);
         MesProductionExecutionExample example = new MesProductionExecutionExample();
         MesProductionExecutionExample.Criteria criteria = example.createCriteria();
-        if (query.id() != null) {
-            criteria.andIdEqualTo(query.id());
+        if (query.executionCode() != null) {
+            criteria.andExecutionCodeEqualTo(query.executionCode());
         }
         if (query.workorderId() != null) {
             criteria.andWorkorderIdEqualTo(query.workorderId());
@@ -98,6 +98,7 @@ public class MesProductionExecutionServiceImpl implements IMesProductionExecutio
     public MesProductionExecutionEntity insert(MesProductionExecutionCreateCommand input) {
         MesProductionExecutionEntity row = new MesProductionExecutionEntity();
         row.setWorkorderId(input.workorderId());
+        row.setExecutionCode(input.executionCode());
         row.setRoutingId(input.routingId());
         row.setTargetQty(input.targetQty());
         row.setStatus(input.status());
@@ -121,6 +122,7 @@ public class MesProductionExecutionServiceImpl implements IMesProductionExecutio
         row.setId(id);
         row.setProductId(previous.getProductId());
         row.setBatchNo(previous.getBatchNo());
+        row.setExecutionCode(previous.getExecutionCode());
         row.setCreateBy(previous.getCreateBy());
         row.setCreateTime(previous.getCreateTime());
         row.setWorkorderId(input.workorderId());
@@ -153,6 +155,34 @@ public class MesProductionExecutionServiceImpl implements IMesProductionExecutio
         if (mapper.deleteByExample(example) != ids.size()) {
             throw new FoundationException(ErrorCode.RESOURCE_CONFLICT);
         }
+    }
+
+    @Override
+    @Transactional(transactionManager = "businessTransactionManager", readOnly = true)
+    public MesProductionExecutionEntity selectByCode(String code) {
+        var row = mapper.selectByCode(code);
+        if (row == null) throw new FoundationException(ErrorCode.EXECUTION_NOT_FOUND);
+        return row;
+    }
+
+    @Override
+    @Transactional(transactionManager = "businessTransactionManager", rollbackFor = Exception.class)
+    @BusinessCacheEvict(business = MesProductionExecutionResource.PREFIX, scope = BusinessCacheEvict.Scope.LIST_AND_DETAIL)
+    public MesProductionExecutionEntity updateByCode(String code, MesProductionExecutionUpdateCommand input) {
+        return updateById(selectByCode(code).getId(), input);
+    }
+
+    @Override
+    @Transactional(transactionManager = "businessTransactionManager", rollbackFor = Exception.class)
+    @BusinessCacheEvict(business = MesProductionExecutionResource.PREFIX, scope = BusinessCacheEvict.Scope.LIST_AND_DETAIL)
+    public void deleteByCodes(List<String> codes) {
+        if (codes == null || codes.isEmpty() || codes.size() > 100 || codes.stream().anyMatch(Objects::isNull)
+                || new HashSet<>(codes).size() != codes.size()) throw new FoundationException(ErrorCode.BAD_REQUEST);
+        var filter = new MesProductionExecutionExample();
+        filter.createCriteria().andExecutionCodeIn(codes);
+        var rows = mapper.selectByExample(filter);
+        if (rows.size() != codes.size()) throw new FoundationException(ErrorCode.EXECUTION_NOT_FOUND);
+        deleteByIds(rows.stream().map(MesProductionExecutionEntity::getId).toList());
     }
 
     private MesProductionExecutionEntity requireRecord(Long id) {

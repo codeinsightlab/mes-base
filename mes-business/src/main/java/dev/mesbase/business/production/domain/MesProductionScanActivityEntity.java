@@ -1,4 +1,3 @@
-// MES-CODEGEN: MyBatis Generator standard single-table persistence.
 package dev.mesbase.business.production.domain;
 
 import java.time.LocalDateTime;
@@ -12,7 +11,7 @@ public class MesProductionScanActivityEntity {
 
     private Long userId;
 
-    private Long executionId;
+    private String executionCode;
 
     private String outcome;
 
@@ -56,12 +55,12 @@ public class MesProductionScanActivityEntity {
         this.userId = userId;
     }
 
-    public Long getExecutionId() {
-        return executionId;
+    public String getExecutionCode() {
+        return executionCode;
     }
 
-    public void setExecutionId(Long executionId) {
-        this.executionId = executionId;
+    public void setExecutionCode(String executionCode) {
+        this.executionCode = executionCode;
     }
 
     public String getOutcome() {

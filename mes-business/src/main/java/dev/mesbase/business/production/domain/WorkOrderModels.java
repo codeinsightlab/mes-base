@@ -50,6 +50,8 @@ public final class WorkOrderModels {
     public record Page(List<Summary> items, long total, int offset, int limit) implements PageData<Summary> {
     }
 
+    public record BomBuildReplay(String buildId, List<Detail> orders) { }
+
     /**
      * Read-only planned allocation, summed over every execution status; never actual output.
      */

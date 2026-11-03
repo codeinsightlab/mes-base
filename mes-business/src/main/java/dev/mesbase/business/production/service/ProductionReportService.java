@@ -75,14 +75,14 @@ public class ProductionReportService {
 
     @Transactional(transactionManager = "businessTransactionManager", isolation = Isolation.READ_COMMITTED, rollbackFor = Exception.class)
     public MesProductionReportEntity supplement(Supplement command) {
-        String hash = fingerprint(AdminAction.SUPPLEMENT, command.executionId(), command.routingNodeId(), command.quantity(),
+        String hash = fingerprint(AdminAction.SUPPLEMENT, command.executionCode(), command.routingNodeId(), command.quantity(),
                 command.operatorUserId(), command.reportTime(), command.workstationId(), command.reason());
         var existing = replay(command.requestId(), hash);
         if (existing != null) return existing;
-        locks.execution(command.executionId());
+        locks.execution(command.executionCode());
         existing = replay(command.requestId(), hash);
         if (existing != null) return existing;
-        var execution = locks.execution(command.executionId());
+        var execution = locks.execution(command.executionCode());
         sources.execution(execution, null);
         quantityRules.checkForWrite(command.quantity(), execution.getProductId());
         positive(command.quantity());
@@ -92,9 +92,9 @@ public class ProductionReportService {
         users.requireExists(command.operatorUserId());
         if (command.workstationId() != null && workstations.selectByPrimaryKey(command.workstationId()) == null)
             throw new FoundationException(ErrorCode.REPORT_REFERENCE_INVALID);
-        quantities.validateReportChange(command.executionId(), command.routingNodeId(), command.quantity());
+        quantities.validateReportChange(command.executionCode(), command.routingNodeId(), command.quantity());
         var row = new MesProductionReportEntity();
-        row.setExecutionId(command.executionId());
+        row.setExecutionCode(command.executionCode());
         row.setRoutingNodeId(command.routingNodeId());
         row.setRecordType(ReportRecordType.REPORT.getValue());
         row.setQuantityDelta(command.quantity());
@@ -114,9 +114,9 @@ public class ProductionReportService {
         existing = replay(command.requestId(), hash);
         if (existing != null) return existing;
         if (command.quantityDelta() != null && command.quantityDelta().signum() > 0)
-            locks.requireActiveExecution(original.getExecutionId());
+            locks.requireActiveExecution(original.getExecutionCode());
         if (command.quantityDelta() != null && command.quantityDelta().signum() > 0)
-            quantityRules.checkForExecutionWrite(command.quantityDelta(), original.getExecutionId());
+            quantityRules.checkForExecutionWrite(command.quantityDelta(), original.getExecutionCode());
         else ProductionQuantityInput.check(command.quantityDelta());
         delta(command.quantityDelta());
         reason(command.reason());
@@ -132,18 +132,18 @@ public class ProductionReportService {
         existing = replay(command.requestId(), hash);
         if (existing != null) return existing;
         reason(command.reason());
-        var balance = totals.originalBalance(original.getExecutionId(), id).effectiveQty();
+        var balance = totals.originalBalance(original.getExecutionCode(), id).effectiveQty();
         if (balance.signum() <= 0) throw new FoundationException(ErrorCode.REPORT_ORIGINAL_EMPTY);
         return adjustLocked(original, balance.negate(), command.reason(), command.requestId(), hash);
     }
 
     private MesProductionReportEntity adjustLocked(MesProductionReportEntity original, BigDecimal delta,
                                                    String reason, String requestId, String hash) {
-        var balance = totals.originalBalance(original.getExecutionId(), original.getId()).effectiveQty();
+        var balance = totals.originalBalance(original.getExecutionCode(), original.getId()).effectiveQty();
         if (balance.add(delta).signum() < 0) throw new FoundationException(ErrorCode.REPORT_QUANTITY_CONFLICT);
-        quantities.validateReportChange(original.getExecutionId(), original.getRoutingNodeId(), delta);
+        quantities.validateReportChange(original.getExecutionCode(), original.getRoutingNodeId(), delta);
         var row = new MesProductionReportEntity();
-        row.setExecutionId(original.getExecutionId());
+        row.setExecutionCode(original.getExecutionCode());
         row.setRoutingNodeId(original.getRoutingNodeId());
         row.setRecordType(ReportRecordType.ADJUSTMENT.getValue());
         row.setQuantityDelta(delta);
@@ -157,7 +157,7 @@ public class ProductionReportService {
 
     private MesProductionReportEntity lockedOriginal(Long id) {
         var before = require(id);
-        locks.execution(before.getExecutionId());
+        locks.execution(before.getExecutionCode());
         var original = require(id);
         if (!ReportRecordType.REPORT.getValue().equals(original.getRecordType()))
             throw new FoundationException(ErrorCode.REPORT_REFERENCE_INVALID);
@@ -210,16 +210,16 @@ public class ProductionReportService {
         var row = require(id);
         Long original = ReportRecordType.REPORT.getValue()
                 .equals(row.getRecordType()) ? row.getId() : row.getReferenceReportId();
-        var balance = totals.originalBalance(row.getExecutionId(), original);
+        var balance = totals.originalBalance(row.getExecutionCode(), original);
         if (balance == null) throw new FoundationException(ErrorCode.REPORT_REFERENCE_INVALID);
         return new Detail(row, balance.effectiveQty(), names(List.of(row)));
     }
 
     @Transactional(transactionManager = "businessTransactionManager", readOnly = true)
-    public ReportPage page(Long executionId, Long nodeId, int offset, int limit) {
-        quantities.requireReadableExecutionNode(executionId, nodeId);
+    public ReportPage page(String executionCode, Long nodeId, int offset, int limit) {
+        quantities.requireReadableExecutionNode(executionCode, nodeId);
         var f = new MesProductionReportExample();
-        f.createCriteria().andExecutionIdEqualTo(executionId).andRoutingNodeIdEqualTo(nodeId);
+        f.createCriteria().andExecutionCodeEqualTo(executionCode).andRoutingNodeIdEqualTo(nodeId);
         return page(f, offset, limit);
     }
 
@@ -229,7 +229,7 @@ public class ProductionReportService {
         if (!ReportRecordType.REPORT.getValue().equals(original.getRecordType()))
             throw new FoundationException(ErrorCode.REPORT_REFERENCE_INVALID);
         var f = new MesProductionReportExample();
-        f.createCriteria().andReferenceReportIdEqualTo(originalId).andExecutionIdEqualTo(original.getExecutionId());
+        f.createCriteria().andReferenceReportIdEqualTo(originalId).andExecutionCodeEqualTo(original.getExecutionCode());
         return page(f, offset, limit);
     }
 

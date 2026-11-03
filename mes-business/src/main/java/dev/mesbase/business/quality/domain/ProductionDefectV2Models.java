@@ -10,12 +10,12 @@ public final class ProductionDefectV2Models {
     private ProductionDefectV2Models() {
     }
 
-    public record Command(String requestId, Long executionId, Long nodeId, Long defectTypeId,
+    public record Command(String requestId, String executionCode, Long nodeId, Long defectTypeId,
                           Integer expectedTypeRevision, BigDecimal quantity, String wasteCategory,
                           String remark, LocalDateTime occurredAt, Assessment assessment) {
     }
 
-    public record Context(Long executionId, Long nodeId, Long operationId, String operationName,
+    public record Context(String executionCode, Long nodeId, Long operationId, String operationName,
                           Long productId, String productCode, String productName,
                           List<OperationDefectTypeEntity> types, long typeTotal, int offset, int limit,
                           boolean canOverrideWasteCategory) {

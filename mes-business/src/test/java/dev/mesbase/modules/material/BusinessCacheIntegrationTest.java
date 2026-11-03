@@ -236,14 +236,14 @@ class BusinessCacheIntegrationTest {
         when(mapper.selectByExample(any())).thenReturn(List.of(original));
         directory.materialEntities(List.of(1L));
         assertThrows(IllegalStateException.class, () -> boundary.run(() -> {
-            material.updateById(1L, new MaterialUpdateCommand("M", "已回滚名称", null, null, 1L, "ENABLED", null, null));
+            material.updateById(1L, new MaterialUpdateCommand("M", "已回滚名称", null, null, 1L, "ENABLED", null, null, null));
             assertTrue(redis.hasKey(DetailCacheKeys.detail(caches.prefix("business:material"), 1L)));
             return null;
         }, true));
         clearInvocations(mapper);
         assertEquals("原物料", directory.materialEntities(List.of(1L)).get(1L).getName());
         verify(mapper, never()).selectByExample(any());
-        material.updateById(1L, new MaterialUpdateCommand("M", "已提交名称", null, null, 1L, "ENABLED", null, null));
+        material.updateById(1L, new MaterialUpdateCommand("M", "已提交名称", null, null, 1L, "ENABLED", null, null, null));
         var changed = row(1L, "已提交名称");
         when(mapper.selectByExample(any())).thenReturn(List.of(changed));
         assertEquals(changed.getName(), directory.materialEntities(List.of(1L)).get(1L).getName());
@@ -350,12 +350,12 @@ class BusinessCacheIntegrationTest {
     @Test
     void createUpdateDeleteEvictOnlyTheirFactoryBusinessAndType() {
         seed();
-        material.insert(new MaterialCreateCommand("M", "name", null, null, 1L, "ENABLED", null, null));
+        material.insert(new MaterialCreateCommand("M", "name", null, null, 1L, "ENABLED", null, null, null));
         assertFalse(has("business:material", "list:fixture"));
         assertTrue(has("business:material", "detail:fixture"));
         assertOthersRemain();
         seed();
-        material.updateById(1L, new MaterialUpdateCommand("M", "name", null, null, 1L, "ENABLED", null, null));
+        material.updateById(1L, new MaterialUpdateCommand("M", "name", null, null, 1L, "ENABLED", null, null, null));
         assertFalse(has("business:material", "list:fixture"));
         assertFalse(has("business:material", "detail:fixture"));
         assertOthersRemain();
@@ -370,7 +370,7 @@ class BusinessCacheIntegrationTest {
     void springProxyDefersUntilActualCommitAndRollbackRetainsCache() {
         seed();
         boundary.run(() -> {
-            material.updateById(1L, new MaterialUpdateCommand("M", "name", null, null, 1L, "ENABLED", null, null));
+            material.updateById(1L, new MaterialUpdateCommand("M", "name", null, null, 1L, "ENABLED", null, null, null));
             assertTrue(has("business:material", "list:fixture"));
             assertTrue(has("business:material", "detail:fixture"));
             return null;

@@ -20,6 +20,10 @@ public interface WorkorderMapper {
 
     WorkorderEntity selectByPrimaryKey(Long id);
 
+    List<WorkorderEntity> selectByBomBuildId(String id);
+
+    WorkorderEntity selectByBomBuildRequestId(String id);
+
     WorkorderEntity selectByPrimaryKeyForUpdate(Long id);
 
     int updateByExampleSelective(@Param("row") WorkorderEntity row, @Param("example") WorkorderExample example);

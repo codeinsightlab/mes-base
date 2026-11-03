@@ -7,6 +7,10 @@ import java.util.List;
 import org.apache.ibatis.annotations.Param;
 
 public interface MesProductionExecutionMapper {
+    MesProductionExecutionEntity selectByCode(@Param("executionCode") String executionCode);
+
+    MesProductionExecutionEntity selectByCodeForUpdate(@Param("executionCode") String executionCode);
+
     long countByExample(MesProductionExecutionExample example);
 
     int deleteByExample(MesProductionExecutionExample example);

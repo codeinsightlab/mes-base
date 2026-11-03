@@ -33,8 +33,16 @@ import tools.jackson.databind.ObjectMapper;
 @Service
 @ConditionalOnProperty(name = "mes.business.enabled", havingValue = "true")
 public class MaterialIssueInputFacts {
+    @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
     public record CombinationInput(int schemaVersion, Long combinationId, Long workorderId, Long demandRevision,
-                                   BigDecimal outputQty, List<Allocation> allocations) {
+                                   BigDecimal outputQty, List<Allocation> allocations, String code) {
+        /**
+         * Original version-two snapshots remain read-only evidence, without a planning-table lookup.
+         */
+        public CombinationInput(int schemaVersion, Long combinationId, Long workorderId, Long demandRevision,
+                                BigDecimal outputQty, List<Allocation> allocations) {
+            this(schemaVersion, combinationId, workorderId, demandRevision, outputQty, allocations, null);
+        }
     }
 
     private final MesMaterialIssueInputMapper inputs;
@@ -66,11 +74,11 @@ public class MaterialIssueInputFacts {
 
     @Transactional(transactionManager = "businessTransactionManager", propagation = Propagation.MANDATORY)
     public MesMaterialIssueInputEntity recordMesConfirmation(WmStockDocumentEntity document, String requestId,
-                                                             String requestHash, Long executionId,
+                                                             String requestHash, String executionCode,
                                                              CombinationInput calculation) {
         if (!StockDocumentStatus.POSTED.getValue().equals(document.getStatus())
                 || !StockDocumentType.MATERIAL_ISSUE.getValue().equals(document.getDocumentType())
-                || !Objects.equals(document.getSourceExecutionId(), executionId)
+                || !Objects.equals(document.getSourceExecutionCode(), executionCode)
                 || !Objects.equals(document.getSourceWorkorderId(), calculation.workorderId())
                 || calculation.outputQty().signum() <= 0 || calculation.allocations().isEmpty())
             ParameterChecks.reject(ErrorCode.STOCK_DOCUMENT_CONFLICT);
@@ -78,7 +86,7 @@ public class MaterialIssueInputFacts {
         row.setId(requestId);
         row.setRequestHash(requestHash);
         row.setDocumentId(document.getId());
-        row.setExecutionId(executionId);
+        row.setExecutionCode(executionCode);
         row.setInputKind(ProductionInputKind.PRODUCTION_INPUT.getValue());
         row.setSourceMode(Mode.LOCAL_ONLY.getValue());
         row.setOutputQty(calculation.outputQty());
@@ -98,7 +106,8 @@ public class MaterialIssueInputFacts {
         var tree = json.readTree(input.getCalculationJson());
         if (!tree.has("schemaVersion")) return null;
         var result = json.readValue(input.getCalculationJson(), CombinationInput.class);
-        if (result.schemaVersion() != 2) ParameterChecks.reject(ErrorCode.STOCK_DOCUMENT_CONFLICT);
+        if (result.schemaVersion() != 2 && result.schemaVersion() != 3)
+            ParameterChecks.reject(ErrorCode.STOCK_DOCUMENT_CONFLICT);
         return result;
     }
 

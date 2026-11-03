@@ -6,7 +6,7 @@ import java.util.List;
 import org.apache.ibatis.annotations.Param;
 
 public interface MesProductionDefectMapper {
-    boolean existsExecutionHistory(@Param("executionId") Long executionId);
+    boolean existsExecutionHistory(@Param("executionCode") String executionCode);
 
     long countByExample(MesProductionDefectExample example);
 
@@ -16,11 +16,11 @@ public interface MesProductionDefectMapper {
 
     MesProductionDefectEntity selectByPrimaryKey(Long id);
 
-    List<MesProductionDefectEntity> selectLatest(@Param("executionId") Long executionId,
+    List<MesProductionDefectEntity> selectLatest(@Param("executionCode") String executionCode,
                                                  @Param("workorderId") Long workorderId,
                                                  @Param("affectedNodeId") Long affectedNodeId);
 
-    List<MesProductionDefectEntity> selectLatestBatch(@Param("executionIds") List<Long> executionIds);
+    List<MesProductionDefectEntity> selectLatestBatch(@Param("executionCodes") List<String> executionCodes);
 
 
 }

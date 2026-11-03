@@ -16,7 +16,7 @@ public final class ProductionReportViews {
     private ProductionReportViews() {
     }
 
-    public record Ledger(String id, String executionId, String routingNodeId, String recordType, String quantityDelta,
+    public record Ledger(String id, String executionCode, String routingNodeId, String recordType, String quantityDelta,
                          String referenceReportId, String operatorUserId, String recordedBy, LocalDateTime reportTime,
                          String workstationId, String reason, LocalDateTime createTime, String operatorName,
                          String recordedByName) {
@@ -28,7 +28,7 @@ public final class ProductionReportViews {
     public record Page<T>(List<T> items, long total, int offset, int limit) {
     }
 
-    public record Node(String executionId, String routingNodeId, String operationId, String code, String name,
+    public record Node(String executionCode, String routingNodeId, String operationId, String code, String name,
                        int sequenceNo,
                        String inputQty, String reportedQty, String defectQty, String effectiveOutputQty,
                        String availableQty, boolean qualityIntegrated, String directDefectQty, String returnedQty,
@@ -37,14 +37,14 @@ public final class ProductionReportViews {
                        boolean historicalConflict, String positiveReportBlockReason) {
     }
 
-    public record Execution(String executionId, String workorderId, String routingId,
+    public record Execution(String executionCode, String workorderId, String routingId,
                             String targetQty,
                             String pathStatus, boolean writable, String boundary, List<Node> nodes,
                             String routingLabel, String productionInputQty, String confirmedInputQty,
                             String reservedInputQty, String productId) {
     }
 
-    public record Summary(String executionId, String workorderId, String routingId,
+    public record Summary(String executionCode, String workorderId, String routingId,
                           String targetQty,
                           String pathStatus, String lastNodeReportedQty, String routingLabel,
                           String productionInputQty) {
@@ -55,12 +55,12 @@ public final class ProductionReportViews {
     }
 
     public static Ledger ledger(MesProductionReportEntity r, Map<Long, String> names) {
-        return new Ledger(id(r.getId()), id(r.getExecutionId()), id(r.getRoutingNodeId()), r.getRecordType(), decimal(r.getQuantityDelta()),
+        return new Ledger(id(r.getId()), r.getExecutionCode(), id(r.getRoutingNodeId()), r.getRecordType(), decimal(r.getQuantityDelta()),
                 id(r.getReferenceReportId()), id(r.getOperatorUserId()), id(r.getRecordedBy()), r.getReportTime(), id(r.getWorkstationId()), r.getReason(), r.getCreateTime(), names.get(r.getOperatorUserId()), names.get(r.getRecordedBy()));
     }
 
     public static Execution execution(ExecutionQuantity v) {
-        return new Execution(id(v.executionId()), id(v.workorderId()), id(v.routingId()), decimal(v.targetQty()),
+        return new Execution(v.executionCode(), id(v.workorderId()), id(v.routingId()), decimal(v.targetQty()),
                 v.pathStatus(), v.writable(), v.boundary(), v.nodes().stream()
                 .map(n -> node(n, ProductionQuantityService.positiveReportBlockReason(v, n.routingNodeId())))
                 .toList(), v.routingLabel(), decimal(v.productionInputQty()), decimal(v.confirmedInputQty()), decimal(v.reservedInputQty()), id(v.productId()));
@@ -71,12 +71,12 @@ public final class ProductionReportViews {
     }
 
     private static Node node(NodeQuantity n, String blocked) {
-        return new Node(id(n.executionId()), id(n.routingNodeId()), id(n.operationId()), n.code(), n.name(), n.sequenceNo(),
+        return new Node(n.executionCode(), id(n.routingNodeId()), id(n.operationId()), n.code(), n.name(), n.sequenceNo(),
                 decimal(n.inputQty()), decimal(n.reportedQty()), decimal(n.defectQty()), decimal(n.effectiveOutputQty()), decimal(n.availableQty()), n.qualityIntegrated(), decimal(n.directDefectQty()), decimal(n.returnedQty()), decimal(n.netDefectQty()), decimal(n.propagatedLossQty()), decimal(n.historicalOverrunQty()), decimal(n.rawEffectiveOutputQty()), decimal(n.rawAvailableQty()), decimal(n.unverifiedDefectQty()), n.historicalConflict(), blocked);
     }
 
     public static Summary summary(ExecutionSummary e, String routingLabel) {
-        return new Summary(id(e.executionId()), id(e.workorderId()), id(e.routingId()), decimal(e.targetQty()), e.pathStatus(), decimal(e.lastNodeReportedQty()), routingLabel, decimal(e.productionInputQty()));
+        return new Summary(e.executionCode(), id(e.workorderId()), id(e.routingId()), decimal(e.targetQty()), e.pathStatus(), decimal(e.lastNodeReportedQty()), routingLabel, decimal(e.productionInputQty()));
     }
 
     public static String id(Long value) {

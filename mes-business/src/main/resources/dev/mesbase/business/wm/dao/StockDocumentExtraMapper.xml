@@ -13,11 +13,11 @@
   <include refid="formalInboundBindings"/>
   FROM wm_stock_document d LEFT JOIN wm_stock_document_line l ON l.document_id=d.id
   LEFT JOIN wm_stock_action a ON a.id=l.stock_action_id
-  LEFT JOIN mes_production_execution e ON e.id=d.source_execution_id
+  LEFT JOIN mes_production_execution e ON e.execution_code=d.source_execution_code
   LEFT JOIN workorder o ON o.id=e.workorder_id
   LEFT JOIN material m ON m.id=e.product_id
   LEFT JOIN wm_warehouse w ON w.id=l.warehouse_id
-  WHERE d.source_execution_id=#{executionId} AND d.status=#{postedStatus} AND d.document_type=#{productionReceiptType}
+  WHERE d.source_execution_code=#{executionCode} AND d.status=#{postedStatus} AND d.document_type=#{productionReceiptType}
  </sql>
  <sql id="formalInboundMatches">
   e.id IS NOT NULL AND o.id IS NOT NULL AND m.id IS NOT NULL AND w.id IS NOT NULL
@@ -25,7 +25,7 @@
   AND e.product_id=o.product_id AND l.material_id=e.product_id AND l.unit_id=m.unit_id AND l.quantity&gt;0
   AND d.source_workorder_id IS NULL AND d.post_request_id IS NOT NULL
   AND d.post_request_hash IS NOT NULL AND d.posted_by IS NOT NULL AND d.posted_at IS NOT NULL
-  AND a.id IS NOT NULL AND a.document_line_id=l.id AND a.execution_id=#{executionId}
+  AND a.id IS NOT NULL AND a.document_line_id=l.id AND a.execution_code=#{executionCode}
   AND a.operation_id=d.post_request_id AND a.source_type=#{receiptSourceType}
   AND a.source_id=CONCAT('',d.id) AND a.action_type=#{receiptActionType}
   AND a.quantity_delta=l.quantity AND a.available_delta=l.quantity
@@ -61,7 +61,7 @@
     <include refid="dev.mesbase.business.quality.dao.ProductionDefectListExtraMapper.receiptProofRows"/>
    ) proof ON proof.eventId=t.id AND proof.validCount=1
    JOIN wm_stock_document d ON d.id=t.stock_document_id
-   WHERE t.execution_id=#{executionId}
+   WHERE t.execution_code=#{executionCode}
   ) approved
   ORDER BY posted_at DESC,document_id DESC LIMIT 1
  </select>
@@ -72,10 +72,10 @@
  SELECT COALESCE(SUM(f.quantity),0) FROM (
   SELECT l.quantity FROM wm_stock_document d
   JOIN wm_stock_document_line l ON l.document_id=d.id
-  JOIN wm_stock_action a ON a.id=l.stock_action_id AND a.document_line_id=l.id AND a.execution_id=d.source_execution_id
-  WHERE d.source_execution_id=#{executionId} AND d.status=#{posted} AND d.document_type IN (#{receipt},#{productionReceipt})
+  JOIN wm_stock_action a ON a.id=l.stock_action_id AND a.document_line_id=l.id AND a.execution_code=d.source_execution_code
+  WHERE d.source_execution_code=#{executionCode} AND d.status=#{posted} AND d.document_type IN (#{receipt},#{productionReceipt})
   UNION ALL
-  SELECT quantity_delta FROM mes_warehouse_acceptance WHERE execution_id=#{executionId}
+  SELECT quantity_delta FROM mes_warehouse_acceptance WHERE execution_code=#{executionCode}
  ) f
  </select>
  <select id="netProductionInboundForOrder" resultType="java.math.BigDecimal">
@@ -84,12 +84,12 @@
  <bind name="receipt" value="@dev.mesbase.business.wm.domain.StockDocumentType@OTHER_RECEIPT.getValue()"/>
  SELECT COALESCE(SUM(f.quantity),0) FROM (
   SELECT l.quantity FROM mes_production_execution e
-  JOIN wm_stock_document d ON d.source_execution_id=e.id AND d.status=#{posted} AND d.document_type IN (#{receipt},#{productionReceipt})
+  JOIN wm_stock_document d ON d.source_execution_code=e.execution_code AND d.status=#{posted} AND d.document_type IN (#{receipt},#{productionReceipt})
   JOIN wm_stock_document_line l ON l.document_id=d.id
-  JOIN wm_stock_action a ON a.id=l.stock_action_id AND a.document_line_id=l.id AND a.execution_id=e.id
+  JOIN wm_stock_action a ON a.id=l.stock_action_id AND a.document_line_id=l.id AND a.execution_code=e.execution_code
   WHERE e.workorder_id=#{workorderId}
   UNION ALL
-  SELECT a.quantity_delta FROM mes_warehouse_acceptance a JOIN mes_production_execution e ON e.id=a.execution_id
+  SELECT a.quantity_delta FROM mes_warehouse_acceptance a JOIN mes_production_execution e ON e.execution_code=a.execution_code
   WHERE e.workorder_id=#{workorderId}
  ) f
  </select>

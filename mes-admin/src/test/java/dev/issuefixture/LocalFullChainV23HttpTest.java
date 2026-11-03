@@ -85,7 +85,7 @@ class LocalFullChainV23HttpTest {
             LocalWarehouseHttpTest.balance(j, "120");
             assertEquals(frozen, j.queryForList("SELECT id,request_hash,calculation_json FROM mes_material_issue_input WHERE document_id=?", input.get("documentId")
                     .asString()));
-            var q = new ObjectMapper().readTree(m.perform(ProductionCoreV1HttpTest.full(get("/api/production/report-quantities/executions/" + input.get("executionId")
+            var q = new ObjectMapper().readTree(m.perform(ProductionCoreV1HttpTest.full(get("/api/production/report-quantities/executions/" + input.get("executionCode")
                             .asString())))
                     .andExpect(status().isOk()).andReturn().getResponse().getContentAsString());
             assertTrue(new BigDecimal(q.get("productionInputQty").asString()).compareTo(new BigDecimal("50")) <= 0);

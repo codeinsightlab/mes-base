@@ -56,7 +56,7 @@ class QualityTreatmentProjectionTest {
             mock(ProductionChainLocks.class), mock(ExecutionPathService.class),
             mock(ProductionQuantityService.class), directory, mapper, mock(MaterialQuantityRules.class));
 
-    static CurrentFact fact(String id, long execution, long assessments, String attribution, long invalid) {
+    static CurrentFact fact(String id, String execution, long assessments, String attribution, long invalid) {
         return new CurrentFact(id, 1, execution, 11L, BigDecimal.TEN, "CREATE", assessments,
                 attribution, null, "证据", BigDecimal.ZERO, BigDecimal.ZERO, invalid, 0);
     }
@@ -64,30 +64,30 @@ class QualityTreatmentProjectionTest {
     @ParameterizedTest
     @ValueSource(ints = {999, 1000, 1001})
     void legalCurrentDeclarationsAreNotLimitedByHistoryBudget(int count) {
-        var facts = IntStream.range(0, count).mapToObj(i -> fact("d" + i, 1, 1, "INDEPENDENT", 0)).toList();
-        when(mapper.selectCurrentFacts(List.of(1L), null)).thenReturn(facts);
+        var facts = IntStream.range(0, count).mapToObj(i -> fact("d" + i, "1", 1, "INDEPENDENT", 0)).toList();
+        when(mapper.selectCurrentFacts(List.of("1"), null)).thenReturn(facts);
         assertEquals(0, BigDecimal.TEN.multiply(BigDecimal.valueOf(count))
-                .compareTo(service.nodeTotals(1L).getFirst().directDefectQty()));
+                .compareTo(service.nodeTotals("1").getFirst().directDefectQty()));
         verifyNoInteractions(events, defects, directory);
     }
 
     @Test
     void batchHasNoSharedDeclarationBudgetAndMatchesSingles() {
-        var first = IntStream.range(0, 600).mapToObj(i -> fact("a" + i, 1, 1, "INDEPENDENT", 0)).toList();
-        var second = IntStream.range(0, 600).mapToObj(i -> fact("b" + i, 2, 0, null, 0)).toList();
-        when(mapper.selectCurrentFacts(List.of(1L), null)).thenReturn(first);
-        when(mapper.selectCurrentFacts(List.of(2L), null)).thenReturn(second);
-        when(mapper.selectCurrentFacts(List.of(1L, 2L), null)).thenReturn(
+        var first = IntStream.range(0, 600).mapToObj(i -> fact("a" + i, "1", 1, "INDEPENDENT", 0)).toList();
+        var second = IntStream.range(0, 600).mapToObj(i -> fact("b" + i, "2", 0, null, 0)).toList();
+        when(mapper.selectCurrentFacts(List.of("1"), null)).thenReturn(first);
+        when(mapper.selectCurrentFacts(List.of("2"), null)).thenReturn(second);
+        when(mapper.selectCurrentFacts(List.of("1", "2"), null)).thenReturn(
                 Stream.concat(first.stream(), second.stream()).toList());
-        var batch = service.nodeTotalsBatch(List.of(1L, 2L));
-        assertEquals(service.nodeTotals(1L), batch.get(1L));
-        assertEquals(service.nodeTotals(2L), batch.get(2L));
+        var batch = service.nodeTotalsBatch(List.of("1", "2"));
+        assertEquals(service.nodeTotals("1"), batch.get("1"));
+        assertEquals(service.nodeTotals("2"), batch.get("2"));
     }
 
     @Test
     void unknownAndDuplicateFactsAreReadableButStrictConsumersReject() {
-        for (var fact : List.of(fact("unknown", 1, 1, "INVALID", 0),
-                fact("duplicate", 1, 2, "INDEPENDENT", 0), fact("identity", 1, 1, "INDEPENDENT", 1))) {
+        for (var fact : List.of(fact("unknown", "1", 1, "INVALID", 0),
+                fact("duplicate", "1", 2, "INDEPENDENT", 0), fact("identity", "1", 1, "INDEPENDENT", 1))) {
             assertEquals(State.UNRESOLVED, fact.summary(false).state());
             assertNull(fact.summary(false).pendingDispositionQty());
             assertNull(fact.summary(false).netDefectQty());
@@ -102,7 +102,7 @@ class QualityTreatmentProjectionTest {
 
     @Test
     void summaryDoesNotReadDisplayHistoryOrDirectoryAndDatabaseFailureEscapes() {
-        when(mapper.selectCurrentFacts(null, "d")).thenReturn(List.of(fact("d", 1, 1, "INDEPENDENT", 0)));
+        when(mapper.selectCurrentFacts(null, "d")).thenReturn(List.of(fact("d", "1", 1, "INDEPENDENT", 0)));
         assertEquals(State.PENDING, service.details("d").summary().state());
         verifyNoInteractions(events, directory, defects);
         when(mapper.selectCurrentFacts(null, "d")).thenThrow(new IllegalStateException("database unavailable"));
@@ -111,44 +111,44 @@ class QualityTreatmentProjectionTest {
 
     @Test
     void receiptClosureStillRequiresUniqueFormalProofAndPropagatesFailures() {
-        var closed = new CurrentFact("d", 1, 1L, 11L, BigDecimal.TEN, "CREATE", 1,
+        var closed = new CurrentFact("d", 1, "1", 11L, BigDecimal.TEN, "CREATE", 1,
                 "INDEPENDENT", null, "证据", BigDecimal.ZERO, BigDecimal.TEN, 0, 0);
-        when(mapper.selectCurrentFacts(List.of(1L), null)).thenReturn(List.of(closed));
-        when(mapper.invalidCurrentReceipts(1L)).thenReturn(1L);
-        assertTrue(service.receiptBlockReason(1L).contains("唯一有效"));
-        when(mapper.invalidCurrentReceipts(1L)).thenReturn(0L);
-        assertNull(service.receiptBlockReason(1L));
-        when(mapper.invalidCurrentReceipts(1L)).thenThrow(new IllegalStateException("database unavailable"));
-        assertThrows(IllegalStateException.class, () -> service.receiptBlockReason(1L));
+        when(mapper.selectCurrentFacts(List.of("1"), null)).thenReturn(List.of(closed));
+        when(mapper.invalidCurrentReceipts("1")).thenReturn(1L);
+        assertTrue(service.receiptBlockReason("1").contains("唯一有效"));
+        when(mapper.invalidCurrentReceipts("1")).thenReturn(0L);
+        assertNull(service.receiptBlockReason("1"));
+        when(mapper.invalidCurrentReceipts("1")).thenThrow(new IllegalStateException("database unavailable"));
+        assertThrows(IllegalStateException.class, () -> service.receiptBlockReason("1"));
     }
 
     @Test
     void pagedAuditIdentitiesKeepTheOriginalJsonAndDigest() {
-        when(mapper.selectCurrentFacts(List.of(1L), null)).thenReturn(List.of());
+        when(mapper.selectCurrentFacts(List.of("1"), null)).thenReturn(List.of());
         var original = IntStream.range(0, 1201).mapToObj(i -> "T:" + String.format("%05d", i)).toList();
-        when(mapper.selectFactIdentities(1L)).thenAnswer(invocation -> {
+        when(mapper.selectFactIdentities("1")).thenAnswer(invocation -> {
             var page = PageHelper.getLocalPage();
             return original.subList((int) page.getStartRow(), Math.min(original.size(), (int) page.getStartRow() + page.getPageSize()));
         });
         assertEquals(ProductionClosureRules.hash("same", original),
-                ProductionClosureRules.hash("same", service.productionBasis(1L).factIdentities()));
-        verify(mapper, times(3)).selectFactIdentities(1L);
+                ProductionClosureRules.hash("same", service.productionBasis("1").factIdentities()));
+        verify(mapper, times(3)).selectFactIdentities("1");
     }
 
     @Test
     void historicalDispositionAndCurrentOverlapStillProtectRevisionCommands() {
         var before = new MesProductionDefectEntity();
         before.setDeclarationId("target");
-        before.setExecutionId(1L);
+        before.setExecutionCode("1");
         when(events.countByExample(any())).thenReturn(1L);
         assertThrows(FoundationException.class, () -> service.assertMutable(before));
         verifyNoInteractions(mapper);
         when(events.countByExample(any())).thenReturn(0L);
-        var overlap = new CurrentFact("dependent", 7, 1L, 11L, BigDecimal.ONE, "REVISE", 1,
+        var overlap = new CurrentFact("dependent", 7, "1", 11L, BigDecimal.ONE, "REVISE", 1,
                 "OVERLAP", "target", "证据", BigDecimal.ZERO, BigDecimal.ZERO, 0, 0);
-        when(mapper.selectCurrentFacts(List.of(1L), null)).thenReturn(List.of(overlap));
+        when(mapper.selectCurrentFacts(List.of("1"), null)).thenReturn(List.of(overlap));
         assertThrows(FoundationException.class, () -> service.assertMutable(before));
-        when(mapper.selectCurrentFacts(List.of(1L), null)).thenReturn(List.of());
+        when(mapper.selectCurrentFacts(List.of("1"), null)).thenReturn(List.of());
         service.assertMutable(before);
     }
 

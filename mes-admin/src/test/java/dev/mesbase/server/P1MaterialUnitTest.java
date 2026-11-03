@@ -137,7 +137,7 @@ class P1MaterialUnitTest {
     }
 
     static MaterialUpdateCommand change(Long unit) {
-        return new MaterialUpdateCommand("TEST_M", "TEST renamed", null, null, unit, "ENABLED", null, null);
+        return new MaterialUpdateCommand("TEST_M", "TEST renamed", null, null, unit, "ENABLED", null, null, null);
     }
 
     @Test
@@ -169,6 +169,20 @@ class P1MaterialUnitTest {
                     List.of(new ExternalMaterial("TEST_M", "TEST", null, null, 2L, "ENABLED", null, null)))));
             assertEquals(1L, h.db.jdbc.queryForObject("SELECT unit_id FROM material WHERE id=1", Long.class));
             assertEquals(0, h.db.jdbc.queryForObject("SELECT quantity FROM wm_inventory WHERE id=1", Integer.class));
+        }
+    }
+
+    @Test
+    void localWorkOrderRuleDefaultSurvivesExternalMaterialRefresh() throws Exception {
+        try (var h = new Harness()) {
+            h.service.updateById(1L, new MaterialUpdateCommand("TEST_M", "TEST material", null, null,
+                    1L, "ENABLED", null, null, "WO_DEFAULT"));
+            var scope = new FactoryScope(new FactoryId("TEST_ONLY"));
+            FactoryContext.runWithScope(scope, () -> h.service.upsert(scope,
+                    List.of(new ExternalMaterial("TEST_M", "ERP name", "ERP specification", null,
+                            1L, "ENABLED", "ERP-1", "ERP-TEST_M"))));
+            assertEquals("WO_DEFAULT", h.service.selectById(1L).getWorkOrderRuleCode());
+            assertEquals("ERP name", h.service.selectById(1L).getName());
         }
     }
 

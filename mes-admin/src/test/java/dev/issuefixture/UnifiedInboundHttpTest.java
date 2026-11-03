@@ -35,7 +35,7 @@ class UnifiedInboundHttpTest {
 
     static String draft(MockMvc m, String execution, String qty, String batchNo) throws Exception {
         String ruleCode = execution == null ? "OTHER_RECEIPT" : "PRODUCTION_RECEIPT";
-        String body = "{\"ruleCode\":\"" + ruleCode + "\",\"direction\":\"IN\",\"documentType\":\"" + (execution == null ? "OTHER_RECEIPT" : "PRODUCTION_RECEIPT") + "\",\"reason\":\"TEST ONLY inbound\"" + (execution == null ? "" : ",\"sourceExecutionId\":\"" + execution + "\"") + "}";
+        String body = "{\"ruleCode\":\"" + ruleCode + "\",\"direction\":\"IN\",\"documentType\":\"" + (execution == null ? "OTHER_RECEIPT" : "PRODUCTION_RECEIPT") + "\",\"reason\":\"TEST ONLY inbound\"" + (execution == null ? "" : ",\"sourceExecutionCode\":\"" + execution + "\"") + "}";
         var d = StockDocumentHttpTest.JSON.readTree(m.perform(full(post(StockDocumentHttpTest.ROOT)).content(body))
                 .andExpect(status().isOk()).andReturn().getResponse().getContentAsString());
         String id = d.get("document").get("id").asText();
@@ -47,7 +47,7 @@ class UnifiedInboundHttpTest {
     static String approval(MockMvc m, String id) throws Exception {
         var detail = StockDocumentHttpTest.JSON.readTree(m.perform(full(get(StockDocumentHttpTest.ROOT + "/" + id)))
                 .andExpect(status().isOk()).andReturn().getResponse().getContentAsString()).get("document");
-        if (detail.get("documentType").asText().equals("PRODUCTION_RECEIPT") && !detail.get("sourceExecutionId")
+        if (detail.get("documentType").asText().equals("PRODUCTION_RECEIPT") && !detail.get("sourceExecutionCode")
                 .isNull())
             return "/api/production/inbound-documents/" + id + "/actions/approve";
         return StockDocumentHttpTest.ROOT + "/" + id + "/actions/approve";
@@ -83,12 +83,12 @@ class UnifiedInboundHttpTest {
             String intent = StockDocumentHttpTest.intent(UUID.randomUUID().toString(), 1);
             for (int i = 0; i < 2; i++)
                 m.perform(full(post(approval(m, id))).content(intent))
-                        .andExpect(status().isOk()).andExpect(jsonPath("document.sourceExecutionId").value("1"));
+                        .andExpect(status().isOk()).andExpect(jsonPath("document.sourceExecutionCode").value("1"));
             StockDocumentHttpTest.balance(j, "60");
             assertEquals("RUNNING", j.queryForObject("SELECT status FROM mes_production_execution WHERE id=1", String.class));
             assertEquals(0, j.queryForObject("SELECT COUNT(*) FROM mes_production_receipt", Integer.class));
             assertEquals(0, j.queryForObject("SELECT COUNT(*) FROM mes_warehouse_acceptance", Integer.class));
-            assertEquals(1, j.queryForObject("SELECT COUNT(*) FROM wm_stock_action WHERE execution_id=1 AND document_line_id IS NOT NULL", Integer.class));
+            assertEquals(1, j.queryForObject("SELECT COUNT(*) FROM wm_stock_action WHERE execution_code=1 AND document_line_id IS NOT NULL", Integer.class));
             m.perform(full(get(StockDocumentHttpTest.ROOT + "/executions/1/basis"))).andExpect(status().isOk())
                     .andExpect(jsonPath("remaining").value("40.000000"));
         }
@@ -104,7 +104,7 @@ class UnifiedInboundHttpTest {
             confirm(m, id, 1);
             StockDocumentHttpTest.balance(j, "20");
             assertEquals(0, j.queryForObject("SELECT COUNT(*) FROM mes_quality_release", Integer.class));
-            assertEquals(1, j.queryForObject("SELECT COUNT(*) FROM wm_stock_document WHERE source_execution_id IS NULL AND status='POSTED'", Integer.class));
+            assertEquals(1, j.queryForObject("SELECT COUNT(*) FROM wm_stock_document WHERE source_execution_code IS NULL AND status='POSTED'", Integer.class));
         }
     }
 
@@ -132,7 +132,7 @@ class UnifiedInboundHttpTest {
             var j = ProductionWarehouseFixture.db(c);
             j.update("INSERT INTO wm_inventory(id,material_id,warehouse_id,batch_no,quantity,available_quantity,status) VALUES(2,1,1,?,0,0,'ENABLED')", wrongBatch);
             String id = StockDocumentHttpTest.JSON.readTree(m.perform(full(post(StockDocumentHttpTest.ROOT))
-                                    .content("{\"direction\":\"IN\",\"ruleCode\":\"PRODUCTION_RECEIPT\",\"documentType\":\"PRODUCTION_RECEIPT\",\"sourceExecutionId\":\"1\",\"reason\":\"TEST ONLY mismatched batch\"}"))
+                                    .content("{\"direction\":\"IN\",\"ruleCode\":\"PRODUCTION_RECEIPT\",\"documentType\":\"PRODUCTION_RECEIPT\",\"sourceExecutionCode\":\"1\",\"reason\":\"TEST ONLY mismatched batch\"}"))
                             .andExpect(status().isOk()).andReturn().getResponse().getContentAsString()).get("document")
                     .get("id").asText();
             m.perform(full(post(StockDocumentHttpTest.ROOT + "/" + id + "/lines"))
@@ -160,21 +160,21 @@ class UnifiedInboundHttpTest {
             FactoryContext.runWithScope(new FactoryScope(new FactoryId("A")), () -> {
                 var proof = c.getBean(StockDocumentExtraMapper.class);
                 transaction.executeWithoutResult(status -> {
-                    assertEquals(0, new BigDecimal("60").compareTo(proof.formalProductionInbound(1L)));
-                    assertEquals(0, proof.invalidProductionInboundLines(1L));
+                    assertEquals(0, new BigDecimal("60").compareTo(proof.formalProductionInbound("1")));
+                    assertEquals(0, proof.invalidProductionInboundLines("1"));
                 });
                 // TEST ONLY corruption injection; each proof read gets a fresh fixed business lease/session.
                 j.update("UPDATE wm_stock_document_line SET batch_no='test-finished' WHERE document_id=?", id);
                 j.update("UPDATE wm_stock_action SET batch_no='test-finished' WHERE document_line_id IN (SELECT id FROM wm_stock_document_line WHERE document_id=?)", id);
                 transaction.executeWithoutResult(status -> {
-                    assertEquals(0, BigDecimal.ZERO.compareTo(proof.formalProductionInbound(1L)));
-                    assertEquals(1, proof.invalidProductionInboundLines(1L));
+                    assertEquals(0, BigDecimal.ZERO.compareTo(proof.formalProductionInbound("1")));
+                    assertEquals(1, proof.invalidProductionInboundLines("1"));
                 });
                 j.update("UPDATE wm_stock_document_line SET batch_no='TEST-FINISHED' WHERE document_id=?", id);
                 j.update("UPDATE wm_stock_action SET batch_no='TEST-FINISHED' WHERE document_line_id IN (SELECT id FROM wm_stock_document_line WHERE document_id=?)", id);
                 transaction.executeWithoutResult(status -> {
-                    assertEquals(0, new BigDecimal("60").compareTo(proof.formalProductionInbound(1L)));
-                    assertEquals(0, proof.invalidProductionInboundLines(1L));
+                    assertEquals(0, new BigDecimal("60").compareTo(proof.formalProductionInbound("1")));
+                    assertEquals(0, proof.invalidProductionInboundLines("1"));
                 });
             });
         }

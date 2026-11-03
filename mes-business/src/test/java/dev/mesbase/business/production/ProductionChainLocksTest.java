@@ -27,6 +27,7 @@ class ProductionChainLocksTest {
     private MesProductionExecutionEntity execution(long order) {
         var row = new MesProductionExecutionEntity();
         row.setId(17L);
+        row.setExecutionCode("17");
         row.setWorkorderId(order);
         return row;
     }
@@ -36,31 +37,31 @@ class ProductionChainLocksTest {
         var before = execution(11L);
         var current = execution(11L);
         current.setStatus("RUNNING");
-        when(executions.selectByPrimaryKey(17L)).thenReturn(before);
+        when(executions.selectByCode("17")).thenReturn(before);
         when(orders.selectByPrimaryKeyForUpdate(11L)).thenReturn(new WorkorderEntity());
-        when(executions.selectByPrimaryKeyForUpdate(17L)).thenReturn(current);
-        assertSame(current, locks.execution(17L));
+        when(executions.selectByCodeForUpdate("17")).thenReturn(current);
+        assertSame(current, locks.execution("17"));
         var ordered = inOrder(executions, orders);
-        ordered.verify(executions).selectByPrimaryKey(17L);
+        ordered.verify(executions).selectByCode("17");
         ordered.verify(orders).selectByPrimaryKeyForUpdate(11L);
-        ordered.verify(executions).selectByPrimaryKeyForUpdate(17L);
+        ordered.verify(executions).selectByCodeForUpdate("17");
         verifyNoMoreInteractions(orders, executions);
     }
 
     @Test
     void rejectsParentChangedWhileWaitingForTheLock() {
-        when(executions.selectByPrimaryKey(17L)).thenReturn(execution(11L));
+        when(executions.selectByCode("17")).thenReturn(execution(11L));
         when(orders.selectByPrimaryKeyForUpdate(11L)).thenReturn(new WorkorderEntity());
-        when(executions.selectByPrimaryKeyForUpdate(17L)).thenReturn(execution(12L));
+        when(executions.selectByCodeForUpdate("17")).thenReturn(execution(12L));
         assertEquals(ErrorCode.RESOURCE_CONFLICT,
-                assertThrows(FoundationException.class, () -> locks.execution(17L)).code());
+                assertThrows(FoundationException.class, () -> locks.execution("17")).code());
     }
 
     @Test
     void rejectsExecutionDeletedBetweenDiscoveryAndLocking() {
-        when(executions.selectByPrimaryKey(17L)).thenReturn(execution(11L));
+        when(executions.selectByCode("17")).thenReturn(execution(11L));
         when(orders.selectByPrimaryKeyForUpdate(11L)).thenReturn(new WorkorderEntity());
         assertEquals(ErrorCode.EXECUTION_NOT_FOUND,
-                assertThrows(FoundationException.class, () -> locks.execution(17L)).code());
+                assertThrows(FoundationException.class, () -> locks.execution("17")).code());
     }
 }

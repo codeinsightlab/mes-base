@@ -14,7 +14,7 @@ public interface ProductionInputExtraMapper {
 
     BigDecimal confirmedOutput(@Param("workorderId") Long workorderId);
 
-    BigDecimal confirmedExecutionOutput(@Param("executionId") Long executionId);
+    BigDecimal confirmedExecutionOutput(@Param("executionCode") String executionCode);
 
     List<DemandIssued> issuedByDemand(@Param("workorderId") Long workorderId);
 

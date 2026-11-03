@@ -80,18 +80,18 @@ public class ProductionReportSubmitService {
     }
 
     @Transactional(transactionManager = "businessTransactionManager", readOnly = true, isolation = Isolation.READ_COMMITTED)
-    public Context context(Long executionId) {
-        var identity = identities.read(executionId);
-        var execution = executions.selectByPrimaryKey(identity.executionId());
+    public Context context(String executionCode) {
+        var identity = identities.read(executionCode);
+        var execution = executions.selectByCode(identity.executionCode());
         var order = orders.selectByPrimaryKey(identity.workorderId());
-        var quantity = quantities.getExecutionQuantities(identity.executionId());
+        var quantity = quantities.getExecutionQuantities(identity.executionCode());
         boolean ready = WorkOrderStatus.RELEASED.getValue()
                 .equals(order.getStatus()) && ProductionExecutionStatus.allowsNormalReporting(execution.getStatus())
                 && ExecutionPathStatus.LOCKED.getValue().equals(quantity.pathStatus());
         var candidates = new ArrayList<Candidate>();
         Long user = SecurityUtils.getUserId();
         // One batch reads current capability/authorization/assignment for at most 100 actual nodes.
-        var failures = ready ? eligibility.ineligibilityReasons(identity.executionId(), quantity.nodes().stream()
+        var failures = ready ? eligibility.ineligibilityReasons(identity.executionCode(), quantity.nodes().stream()
                 .collect(Collectors.toMap(n -> n.routingNodeId(), n -> n.operationId())), user) : Map.<Long, ErrorCode>of();
         for (var node : quantity.nodes()) {
             var failure = failures.get(node.routingNodeId());
@@ -103,7 +103,7 @@ public class ProductionReportSubmitService {
                     : node.availableQty().signum() <= 0 ? "当前节点没有剩余可报数量" : null;
             candidates.add(new Candidate(node.routingNodeId(), status, reason));
         }
-        return new Context(identity, quantity, paths.view(identity.executionId()), candidates);
+        return new Context(identity, quantity, paths.view(identity.executionCode()), candidates);
     }
 
     @Transactional(transactionManager = "businessTransactionManager", isolation = Isolation.READ_COMMITTED, rollbackFor = Exception.class)
@@ -113,7 +113,7 @@ public class ProductionReportSubmitService {
         // A successful replay remains readable even if execution/qualification later changes; it creates no new fact.
         var existing = reports.selectByRequestId(command.requestId());
         if (existing != null) return replay(existing, command, user);
-        var locked = locks.lockedExecution(command.executionId(), transactionManager);
+        var locked = locks.lockedExecution(command.executionCode(), transactionManager);
         var execution = locked.execution();
         existing = reports.selectByRequestId(command.requestId());
         if (existing != null) return replay(existing, command, user);
@@ -129,7 +129,7 @@ public class ProductionReportSubmitService {
         paths.start(locked, path);
         var now = LocalDateTime.now();
         var row = new MesProductionReportEntity();
-        row.setExecutionId(command.executionId());
+        row.setExecutionCode(command.executionCode());
         row.setRoutingNodeId(command.routingNodeId());
         row.setRequestId(command.requestId());
         row.setRecordType(ReportRecordType.REPORT.getValue());
@@ -150,7 +150,7 @@ public class ProductionReportSubmitService {
     }
 
     private static MesProductionReportEntity replay(MesProductionReportEntity row, Command command, Long user) {
-        if (row.getCommandFingerprint() != null || !Objects.equals(row.getExecutionId(), command.executionId()) || !Objects.equals(row.getRoutingNodeId(), command.routingNodeId())
+        if (row.getCommandFingerprint() != null || !Objects.equals(row.getExecutionCode(), command.executionCode()) || !Objects.equals(row.getRoutingNodeId(), command.routingNodeId())
                 || !Objects.equals(row.getOperatorUserId(), user) || !Objects.equals(row.getRecordedBy(), user)
                 || !Objects.equals(row.getWorkstationId(), command.workstationId()) || row.getQuantityDelta()
                 .compareTo(command.reportQty()) != 0)
@@ -159,7 +159,7 @@ public class ProductionReportSubmitService {
     }
 
     private static void validate(Command c) {
-        if (c == null || c.executionId() == null || c.routingNodeId() == null || c.reportQty() == null || c.reportQty()
+        if (c == null || c.executionCode() == null || c.routingNodeId() == null || c.reportQty() == null || c.reportQty()
                 .signum() <= 0
                 || c.reportQty().scale() > 6 || c.reportQty().precision() - c.reportQty()
                 .scale() > 14 || c.requestId() == null

@@ -81,10 +81,10 @@ public class ProductionInboundService {
 
     @Transactional(transactionManager = "businessTransactionManager", propagation = Propagation.NOT_SUPPORTED,
             rollbackFor = Exception.class)
-    public StockDocumentModels.Detail receive(Long executionId, Command command) {
+    public StockDocumentModels.Detail receive(String executionCode, Command command) {
         permit("business:wm:stock:document:create");
         permit("business:wm:stock:document:post");
-        if (executionId == null || command == null || command.stockId() == null || command.quantity() == null
+        if (executionCode == null || command == null || command.stockId() == null || command.quantity() == null
                 || command.quantity().signum() <= 0 || command.reason() == null || command.reason().isBlank()
                 || command.reason().length() > 500 || command.requestId() == null)
             ParameterChecks.reject(ErrorCode.BAD_REQUEST,
@@ -96,19 +96,19 @@ public class ProductionInboundService {
             throw new FoundationException(ErrorCode.BAD_REQUEST, failure,
                     new SafeBusinessMessage("生产入库请求标识格式无效，请使用标准UUID"));
         }
-        var replay = businessTransactions.execute(status -> replay(executionId, command));
+        var replay = businessTransactions.execute(status -> replay(executionCode, command));
         if (replay != null) return replay;
         String ruleCode = StockDocumentType.PRODUCTION_RECEIPT.getValue();
         String documentNo = autoCodes.getBusinessDocNo(ruleCode, AutoCodeRuleType.STOCK_IN.name());
-        return businessTransactions.execute(status -> receiveInTransaction(executionId, command, documentNo));
+        return businessTransactions.execute(status -> receiveInTransaction(executionCode, command, documentNo));
     }
 
-    private StockDocumentModels.Detail receiveInTransaction(Long executionId, Command command, String documentNo) {
+    private StockDocumentModels.Detail receiveInTransaction(String executionCode, Command command, String documentNo) {
         // Same order/sibling -> document -> stock lock order as ordinary inbound approval.
-        completion.lockInboundChain(executionId);
-        var replay = replay(executionId, command);
+        completion.lockInboundChain(executionCode);
+        var replay = replay(executionCode, command);
         if (replay != null) return replay;
-        var execution = locks.execution(executionId);
+        var execution = locks.execution(executionCode);
         var stock = inventory.selectByPrimaryKey(command.stockId());
         var material = materials.selectByPrimaryKey(execution.getProductId());
         if (stock == null || material == null || material.getUnitId() == null
@@ -119,14 +119,14 @@ public class ProductionInboundService {
         // Document owner validates current rules or exact authoritative remaining production quantity.
         var draft = documents.createWithNumber(new StockDocumentModels.Create(
                 StockDocumentDirection.IN.getValue(), StockDocumentType.PRODUCTION_RECEIPT.getValue(), command.reason(),
-                null, null, executionId, StockDocumentType.PRODUCTION_RECEIPT.getValue()), documentNo);
+                null, null, executionCode, StockDocumentType.PRODUCTION_RECEIPT.getValue()), documentNo);
         Long id = draft.document().getId();
         documents.putLine(id, null, new StockDocumentModels.Line(draft.document().getRevision(), command.stockId(),
                 execution.getProductId(), stock.getWarehouseId(), material.getUnitId(), stock.getBatchNo(),
                 stock.getBinCode(), command.quantity(), null));
         var posted = documents.approveMesReceipt(id, new StockDocumentModels.Post(command.requestId(),
                 documents.detail(id).document().getRevision()));
-        completion.afterInboundApproved(executionId, command.requestId());
+        completion.afterInboundApproved(executionCode, command.requestId());
         return posted;
     }
 
@@ -135,17 +135,17 @@ public class ProductionInboundService {
         permit("business:wm:stock:document:post");
         var document = documents.detail(documentId).document();
         if (!StockDocumentType.PRODUCTION_RECEIPT.getValue().equals(document.getDocumentType())
-                || document.getSourceExecutionId() == null)
+                || document.getSourceExecutionCode() == null)
             ParameterChecks.reject(ErrorCode.STOCK_DOCUMENT_SOURCE_PENDING);
-        Long executionId = document.getSourceExecutionId();
-        completion.lockInboundChain(executionId);
+        String executionCode = document.getSourceExecutionCode();
+        completion.lockInboundChain(executionCode);
         var result = documents.approveMesReceipt(documentId, command);
         if (!StockDocumentStatus.POSTED.getValue().equals(document.getStatus()))
-            completion.afterInboundApproved(executionId, command.requestId());
+            completion.afterInboundApproved(executionCode, command.requestId());
         return result;
     }
 
-    private StockDocumentModels.Detail replay(Long executionId, Command command) {
+    private StockDocumentModels.Detail replay(String executionCode, Command command) {
         var filter = new WmStockDocumentExample();
         filter.createCriteria().andPostRequestIdEqualTo(command.requestId());
         List<WmStockDocumentEntity> existing;
@@ -157,7 +157,7 @@ public class ProductionInboundService {
         var header = existing.getFirst();
         if (!StockDocumentStatus.POSTED.getValue().equals(header.getStatus())
                 || !StockDocumentType.PRODUCTION_RECEIPT.getValue().equals(header.getDocumentType())
-                || !Objects.equals(executionId, header.getSourceExecutionId())
+                || !Objects.equals(executionCode, header.getSourceExecutionCode())
                 || !Objects.equals(SecurityUtils.getUserId(), header.getPostedBy())
                 || !Objects.equals(command.reason(), header.getReason()) || header.getRemark() != null)
             ParameterChecks.reject(ErrorCode.STOCK_DOCUMENT_CONFLICT);

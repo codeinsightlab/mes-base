@@ -14,7 +14,7 @@ public class MesProductionDefectEntity {
 
     private String revisionReason;
 
-    private Long executionId;
+    private String executionCode;
 
     private Long affectedNodeId;
 
@@ -91,12 +91,12 @@ public class MesProductionDefectEntity {
         this.revisionReason = revisionReason;
     }
 
-    public Long getExecutionId() {
-        return executionId;
+    public String getExecutionCode() {
+        return executionCode;
     }
 
-    public void setExecutionId(Long executionId) {
-        this.executionId = executionId;
+    public void setExecutionCode(String executionCode) {
+        this.executionCode = executionCode;
     }
 
     public Long getAffectedNodeId() {

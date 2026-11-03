@@ -9,7 +9,7 @@ public final class ProductionReceiptModels {
     private ProductionReceiptModels() {
     }
 
-    public record Query(Long workorderId, Long executionId, Long warehouseId, String productLotCode,
+    public record Query(Long workorderId, String executionCode, Long warehouseId, String productLotCode,
                         String referenceReceiptId, int offset, int limit) {
     }
 

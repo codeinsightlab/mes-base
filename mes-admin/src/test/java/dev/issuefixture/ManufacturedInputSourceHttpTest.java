@@ -62,10 +62,10 @@ class ManufacturedInputSourceHttpTest {
                 .andExpect(status().isOk());
     }
 
-    private static long produceChild(MockMvc mvc) throws Exception {
+    private static String produceChild(MockMvc mvc) throws Exception {
         WorkorderBomInputHttpTest.select(mvc, 1, 1);
-        long child = WorkorderBomInputHttpTest.input(mvc, "10");
-        mvc.perform(full(post("/api/production/executions/" + child + "/actions/start")))
+        String child = WorkorderBomInputHttpTest.input(mvc, "10");
+        mvc.perform(full(post("/api/production/executions/{code}/actions/start", child)))
                 .andExpect(status().isOk());
         WorkorderBomInputHttpTest.report(mvc, child, "10");
         return child;
@@ -80,14 +80,14 @@ class ManufacturedInputSourceHttpTest {
             selectParent(mvc);
             mvc.perform(full(get(ROOT)).param("workorderId", "7")).andExpect(status().isOk())
                     .andExpect(jsonPath("total").value(0));
-            long child = produceChild(mvc);
+            String child = produceChild(mvc);
             mvc.perform(full(get(ROOT)).param("workorderId", "7")).andExpect(status().isOk())
                     .andExpect(jsonPath("total").value(0)); // Reporting has not put anything in stock.
             WorkorderBomInputHttpTest.receive(mvc, child, "10");
             mvc.perform(full(get(ROOT)).param("workorderId", "7")).andExpect(status().isOk())
                     .andExpect(jsonPath("total").value(1))
                     .andExpect(jsonPath("items[0].stockId").value("10"))
-                    .andExpect(jsonPath("items[0].executionId").value(Long.toString(child)))
+                    .andExpect(jsonPath("items[0].executionCode").value(child))
                     .andExpect(jsonPath("items[0].bomId").value("1"))
                     .andExpect(jsonPath("items[0].lineId").isString())
                     .andExpect(jsonPath("items[0].stockActionId").isString())
@@ -102,23 +102,23 @@ class ManufacturedInputSourceHttpTest {
             String combinationCode = plan.get("combination").get("code").asText();
             String command = ProductionInputHttpTest.confirmCommand(mvc, UUID.randomUUID()
                     .toString(), combinationCode, "10");
-            long parent = JSON.readTree(ProductionInputHttpTest.submit(mvc, command)).get("executionId").asLong();
+            String parent = JSON.readTree(ProductionInputHttpTest.submit(mvc, command)).get("executionCode").asText();
             assertEquals(0, BigDecimal.ZERO.compareTo(db.queryForObject(
                     "SELECT quantity FROM wm_inventory WHERE id=10", BigDecimal.class)));
-            mvc.perform(full(post("/api/production/executions/" + parent + "/actions/start")))
+            mvc.perform(full(post("/api/production/executions/{code}/actions/start", parent)))
                     .andExpect(status().isOk());
             WorkorderBomInputHttpTest.report(mvc, parent, "10");
             assertEquals("RELEASED", db.queryForObject("SELECT status FROM workorder WHERE id=7", String.class));
             assertEquals(0, BigDecimal.ZERO.compareTo(db.queryForObject(
                     "SELECT quantity FROM wm_inventory WHERE id=20", BigDecimal.class)));
-            db.update("UPDATE wm_inventory SET batch_no=(SELECT batch_no FROM mes_production_execution WHERE id=?) WHERE id=20 AND quantity=0", parent);
-            mvc.perform(full(post("/api/production/executions/" + parent + "/inbound"))
+            db.update("UPDATE wm_inventory SET batch_no=(SELECT batch_no FROM mes_production_execution WHERE execution_code=?) WHERE id=20 AND quantity=0", parent);
+            mvc.perform(full(post("/api/production/executions/{code}/inbound", parent))
                             .content(JSON.writeValueAsString(Map.of("requestId", UUID.randomUUID().toString(),
                                     "stockId", "20", "quantity", "10", "reason", "TEST ONLY final top receipt"))))
                     .andExpect(status().isOk());
             assertEquals("COMPLETED", db.queryForObject("SELECT status FROM workorder WHERE id=7", String.class));
             assertEquals("FULLY_RECEIVED", db.queryForObject(
-                    "SELECT status FROM mes_production_execution WHERE id=?", String.class, parent));
+                    "SELECT status FROM mes_production_execution WHERE execution_code=?", String.class, parent));
             assertEquals(0, new BigDecimal("10").compareTo(db.queryForObject(
                     "SELECT quantity FROM wm_inventory WHERE id=20", BigDecimal.class)));
             assertEquals(0, db.queryForObject(
@@ -159,7 +159,7 @@ class ManufacturedInputSourceHttpTest {
             var mvc = MaterialIssueHttpTest.mvc(context);
             prepareParent(db);
             selectParent(mvc);
-            long child = produceChild(mvc);
+            String child = produceChild(mvc);
             WorkorderBomInputHttpTest.receive(mvc, child, "10");
             mvc.perform(get(ROOT).header("Authorization", "Bearer NONE").header("X-Factory-Id", "A")
                             .param("workorderId", "7"))
@@ -200,7 +200,7 @@ class ManufacturedInputSourceHttpTest {
             var mvc = MaterialIssueHttpTest.mvc(context);
             prepareParent(db);
             selectParent(mvc);
-            long child = produceChild(mvc);
+            String child = produceChild(mvc);
             WorkorderBomInputHttpTest.receive(mvc, child, "4");
             WorkorderBomInputHttpTest.receive(mvc, child, "6");
             mvc.perform(full(get(ROOT)).param("workorderId", "7")).andExpect(status().isOk())

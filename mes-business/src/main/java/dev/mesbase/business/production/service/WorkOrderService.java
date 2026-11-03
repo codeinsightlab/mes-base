@@ -5,7 +5,6 @@ import com.github.pagehelper.PageHelper;
 import dev.mesbase.business.basic.dao.MaterialMapper;
 import dev.mesbase.business.basic.domain.MaterialExample;
 import dev.mesbase.business.directory.service.BusinessDirectoryService;
-import dev.mesbase.business.production.dao.MesProductionCombinationMapper;
 import dev.mesbase.business.production.dao.MesProductionExecutionMapper;
 import dev.mesbase.business.production.dao.MesWorkorderMaterialMapper;
 import dev.mesbase.business.production.dao.RoutingEdgeMapper;
@@ -15,7 +14,6 @@ import dev.mesbase.business.production.dao.RoutingProductMapper;
 import dev.mesbase.business.production.dao.WorkOrderExtraMapper;
 import dev.mesbase.business.production.dao.WorkorderErpExtraMapper;
 import dev.mesbase.business.production.dao.WorkorderMapper;
-import dev.mesbase.business.production.domain.MesProductionCombinationExample;
 import dev.mesbase.business.production.domain.MesProductionExecutionExample;
 import dev.mesbase.business.production.domain.MesWorkorderMaterialExample;
 import dev.mesbase.business.production.domain.RoutingDetail;
@@ -95,9 +93,9 @@ public class WorkOrderService {
     private final WmStockDocumentMapper issues;
     private final WorkOrderExtraMapper queries;
     private final MesProductionExecutionMapper executions;
-    private final MesProductionCombinationMapper combinations;
     private final AutoCodeNumbering autoCodes;
     private final TransactionTemplate createTransactions;
+    private final TransactionTemplate replayTransactions;
 
     public WorkOrderService(WorkorderMapper orders, RoutingMapper routings, RoutingProductMapper products,
                             RoutingNodeMapper nodes,
@@ -108,9 +106,7 @@ public class WorkOrderService {
                             BusinessSourceRules sources, WorkorderErpExtraMapper external, SyncCoordinator sync,
                             MaterialQuantityRules quantityRules, AutoCodeNumbering autoCodes,
                             WorkorderMaterialService materialDemands,
-                            MesProductionCombinationMapper combinations,
                             @Qualifier("businessTransactionManager") PlatformTransactionManager businessTransactionManager) {
-        this.combinations = combinations;
         this.external = external;
         this.sync = sync;
         this.sources = sources;
@@ -132,6 +128,9 @@ public class WorkOrderService {
         this.autoCodes = autoCodes;
         this.createTransactions = new TransactionTemplate(businessTransactionManager);
         this.createTransactions.setIsolationLevel(TransactionDefinition.ISOLATION_READ_COMMITTED);
+        this.replayTransactions = new TransactionTemplate(businessTransactionManager);
+        this.replayTransactions.setReadOnly(true);
+        this.replayTransactions.setIsolationLevel(TransactionDefinition.ISOLATION_READ_COMMITTED);
     }
 
     private void require(boolean ok) {
@@ -210,6 +209,10 @@ public class WorkOrderService {
     }
 
     private WorkOrderModels.Detail createLocal(WorkOrderModels.Save input, String code) {
+        return createLocal(input, code, null);
+    }
+
+    private WorkOrderModels.Detail createLocal(WorkOrderModels.Save input, String code, BomBuildLink link) {
         sources.localCreation();
         if (input.externalId() != null || input.externalCode() != null)
             throw new FoundationException(ErrorCode.EXTERNAL_SOURCE_READ_ONLY);
@@ -223,9 +226,91 @@ public class WorkOrderService {
         row.setMaterialRevision(0L);
         row.setCreateTime(LocalDateTime.now());
         assign(row, input);
+        if (link != null) {
+            row.setBomBuildId(link.buildId());
+            row.setBomBuildParentWorkorderId(link.parentId());
+            row.setBomBuildSourceLineId(link.sourceLineId());
+            row.setBomBuildPath(link.path());
+            row.setBomBuildRequestId(link.requestId());
+            row.setBomBuildRequestHash(link.requestHash());
+        }
         saveOrder(row, true);
         materialDemands.replace(row, input.material());
         return detail(row.getId());
+    }
+
+    public record BomBuildOrder(WorkOrderModels.Save values, String path, String parentPath, Long sourceLineId) {
+    }
+
+    public record BomBuildCommand(String buildId, String requestId, String requestHash, List<BomBuildOrder> orders) {
+    }
+
+    public record BomBuildLink(String buildId, Long parentId, Long sourceLineId, String path,
+                               String requestId, String requestHash) {
+    }
+
+    @Transactional(transactionManager = "businessTransactionManager", readOnly = true)
+    public WorkOrderModels.BomBuildReplay bomBuildReplay(String requestId, String requestHash) {
+        // Also used by NOT_SUPPORTED creation and its post-rollback replay paths.
+        return replayTransactions.execute(status -> {
+            var root = orders.selectByBomBuildRequestId(requestId);
+            if (root == null) return null;
+            return new WorkOrderModels.BomBuildReplay(root.getBomBuildId(),
+                    existingBomBuild(root, requestHash));
+        });
+    }
+
+    @Transactional(transactionManager = "businessTransactionManager", propagation = Propagation.NOT_SUPPORTED)
+    public List<WorkOrderModels.Detail> createBomBuild(BomBuildCommand command) {
+        sources.localCreation();
+        if (command == null || command.orders() == null || command.orders().isEmpty()
+                || command.buildId() == null || command.requestId() == null
+                || command.requestHash() == null) throw new FoundationException(ErrorCode.WORKORDER_INVALID);
+        var existing = bomBuildReplay(command.requestId(), command.requestHash());
+        if (existing != null) return existing.orders();
+        var codes = new java.util.ArrayList<String>();
+        for (var item : command.orders()) {
+            if (item == null || item.values() == null || item.path() == null || item.path().isBlank())
+                throw new FoundationException(ErrorCode.WORKORDER_INVALID);
+            var input = item.values();
+            validateValues(input);
+            if (input.externalId() != null || input.externalCode() != null || input.ruleCode() == null
+                    || input.ruleCode().isBlank()) throw new FoundationException(ErrorCode.WORKORDER_INVALID);
+            codes.add(autoCodes.getDocNo(input.ruleCode(), AutoCodeRuleType.WORK_ORDER.name()));
+        }
+        try {
+            return createTransactions.execute(status -> {
+                var replay = orders.selectByBomBuildRequestId(command.requestId());
+                if (replay != null) return existingBomBuild(replay, command.requestHash());
+                var idsByPath = new HashMap<String, Long>();
+                var result = new java.util.ArrayList<WorkOrderModels.Detail>();
+                for (int i = 0; i < command.orders().size(); i++) {
+                    var item = command.orders().get(i);
+                    Long parentId = item.parentPath() == null ? null : idsByPath.get(item.parentPath());
+                    if (item.parentPath() != null && parentId == null)
+                        throw new FoundationException(ErrorCode.WORKORDER_INVALID);
+                    var link = new BomBuildLink(command.buildId(), parentId, item.sourceLineId(), item.path(),
+                            i == 0 ? command.requestId() : null, i == 0 ? command.requestHash() : null);
+                    var detail = createLocal(item.values(), codes.get(i), link);
+                    idsByPath.put(item.path(), detail.workorder().getId());
+                    result.add(detail);
+                }
+                return List.copyOf(result);
+            });
+        } catch (DuplicateKeyException failure) {
+            var replay = bomBuildReplay(command.requestId(), command.requestHash());
+            if (replay != null) return replay.orders();
+            throw new FoundationException(ErrorCode.RESOURCE_CONFLICT, failure);
+        } catch (FoundationException failure) {
+            var replay = bomBuildReplay(command.requestId(), command.requestHash());
+            if (replay != null) return replay.orders();
+            throw failure;
+        }
+    }
+
+    private List<WorkOrderModels.Detail> existingBomBuild(WorkorderEntity root, String requestHash) {
+        if (!Objects.equals(root.getBomBuildRequestHash(), requestHash)) conflict();
+        return orders.selectByBomBuildId(root.getBomBuildId()).stream().map(row -> detail(row.getId())).toList();
     }
 
     /**
@@ -421,11 +506,8 @@ public class WorkOrderService {
         BusinessSourceRules.localEditable(row.getSource());
         sources.current(row.getSource());
         if (row.getRevision() != revision) conflict();
+        if (row.getBomBuildId() != null) throw new FoundationException(ErrorCode.WORKORDER_REFERENCED);
         ensureNoDownstream(id);
-        var combinationFilter = new MesProductionCombinationExample();
-        combinationFilter.createCriteria().andWorkorderIdEqualTo(id);
-        if (combinations.countByExample(combinationFilter) > 0)
-            throw new FoundationException(ErrorCode.WORKORDER_REFERENCED);
         var materialFilter = new MesWorkorderMaterialExample();
         materialFilter.createCriteria().andWorkorderIdEqualTo(id);
         requirements.deleteByExample(materialFilter);

@@ -96,6 +96,16 @@ public class MesProductionExecutionExample {
             criteria.add(new Criterion(condition, value1, value2));
         }
 
+        public Criteria andExecutionCodeEqualTo(String value) {
+            addCriterion("execution_code =", value, "executionCode");
+            return (Criteria) this;
+        }
+
+        public Criteria andExecutionCodeIn(List<String> values) {
+            addCriterion("execution_code in", values, "executionCode");
+            return (Criteria) this;
+        }
+
         public Criteria andIdIsNull() {
             addCriterion("id is null");
             return (Criteria) this;

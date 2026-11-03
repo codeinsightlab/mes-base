@@ -24,7 +24,7 @@ public record WmStockActionVo(
         String sourceType,
         String sourceId,
         String referenceActionId,
-        String executionId,
+        String executionCode,
         String operatorUserId,
         LocalDateTime occurredAt,
         LocalDateTime recordedAt,
