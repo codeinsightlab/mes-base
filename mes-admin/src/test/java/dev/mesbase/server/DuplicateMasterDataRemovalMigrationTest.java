@@ -45,9 +45,9 @@ class DuplicateMasterDataRemovalMigrationTest {
                     + "('codegen.md_unit_measure'),('codegen.workshop')");
             for (int repeat = 0; repeat < 2; repeat++) {
                 ScriptUtils.executeSqlScript(connection,
-                        new ClassPathResource("db/system/V28__remove_duplicate_master_data_capabilities.sql"));
+                        new ClassPathResource("db/legacy/system/V28__remove_duplicate_master_data_capabilities.sql"));
                 ScriptUtils.executeSqlScript(connection,
-                        new ClassPathResource("db/business/V17__remove_duplicate_master_data_tables.sql"));
+                        new ClassPathResource("db/legacy/business/V17__remove_duplicate_master_data_tables.sql"));
             }
             assertEquals(0, count(sql, "SELECT COUNT(*) FROM information_schema.tables WHERE table_name IN ('MD_WORKSHOP','MD_UNIT_MEASURE')"));
             assertEquals(3, count(sql, "SELECT COUNT(*) FROM sys_menu"));

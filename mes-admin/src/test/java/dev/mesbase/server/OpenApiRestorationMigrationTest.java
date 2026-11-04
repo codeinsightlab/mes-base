@@ -28,9 +28,9 @@ class OpenApiRestorationMigrationTest {
                 statement.execute("INSERT INTO open_api_client VALUES(20)");
                 statement.execute("INSERT INTO open_api_client_api VALUES(20,'TEST_ONLY')");
             }
-            ScriptUtils.executeSqlScript(connection, new ClassPathResource("db/system/V16__retire_openapi_permissions.sql"));
+            ScriptUtils.executeSqlScript(connection, new ClassPathResource("db/legacy/system/V16__retire_openapi_permissions.sql"));
             for (int run = 0; run < 2; run++) {
-                ScriptUtils.executeSqlScript(connection, new ClassPathResource("db/system/V22__restore_openapi_permissions.sql"));
+                ScriptUtils.executeSqlScript(connection, new ClassPathResource("db/legacy/system/V22__restore_openapi_permissions.sql"));
                 try (var statement = connection.createStatement()) {
                     for (String table : new String[]{"sys_role_menu", "open_api_client", "open_api_client_api"}) {
                         try (var rows = statement.executeQuery("SELECT COUNT(*) FROM " + table)) {

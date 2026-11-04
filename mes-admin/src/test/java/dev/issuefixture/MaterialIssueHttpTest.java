@@ -187,8 +187,8 @@ class MaterialIssueHttpTest {
                 var source = source();
                 var jdbc = new JdbcTemplate(source);
                 for (String name : List.of("V2__simple_business_capabilities.sql", "V3__operation_routing.sql", "V4__routing_operation_instruction_snapshot.sql", "V9__routing_graph.sql", "V8__warehouse_inventory.sql", "V11__material_issue.sql", "V12__material_issue_quantity_precision.sql", "V13__workorder_batch_route.sql", "V16__production_execution.sql", "V18__material_issue_void.sql", "V19__local_void_external_effect.sql", "V20__material_issue_erp_extra.sql", "V21__workorder_external_extra.sql", "V22__unverified_legacy_erp_provider.sql", "V23__production_core_v1.sql", "V24__operation_user_execution_assignment.sql", "V25__production_report_ledger.sql", "V26__production_defect.sql", "V27__production_report_request.sql", "V28__production_receipt.sql", "V29__single_material_production_input.sql", "V32__quality_treatment_facts.sql", "V33__admin_report_command_fingerprint.sql", "V34__local_stock_action.sql", "V35__local_production_closure.sql", "V36__business_source_isolation.sql", "V37__workorder_cancellation.sql", "V38__local_stock_documents.sql", "V39__operation_defect_types.sql", "V44__unified_inbound_documents.sql", "V47__quality_disposition_destinations.sql", "V48_1__quality_schema_cleanup.sql", "V50__quality_declaration_single_node.sql", "V63__remove_routing_product_material_snapshots.sql")) {
-                    String directory = name.startsWith("V63__") ? "db/history/business-v63/" : "db/business/";
-                    String ddl = Files.readString(Path.of("mes-admin/src/main/resources/" + directory + name))
+                    String directory = name.startsWith("V63__") ? "history/business-v63/" : "business/";
+                    String ddl = Files.readString(Path.of("mes-admin/src/test/resources/db/legacy/" + directory + name))
                             .replace("\r\n", "\n")
                             .replace(") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT=", ") COMMENT ")
                             .replaceAll("(?m)^\\s*factory_id [^\\n]+\\n", "")
@@ -254,10 +254,10 @@ class MaterialIssueHttpTest {
                 jdbc.update("UPDATE wm_stock_document SET direction='IN' WHERE document_type IN ('PURCHASE_RECEIPT','PRODUCTION_RECEIPT','OTHER_RECEIPT','DEFECT_RECEIPT','SCRAP_RECEIPT')");
                 jdbc.execute("DROP TABLE mes_material_issue_erp_extra");
                 try (var connection = source.getConnection()) {
-                    ScriptUtils.executeSqlScript(connection, new FileSystemResource("mes-admin/src/main/resources/db/business/V48__warehouse_type.sql"));
+                    ScriptUtils.executeSqlScript(connection, new FileSystemResource("mes-admin/src/test/resources/db/legacy/business/V48__warehouse_type.sql"));
                 }
                 try (var connection = source.getConnection()) {
-                    ScriptUtils.executeSqlScript(connection, new FileSystemResource("mes-admin/src/main/resources/db/business/V55__material_bom.sql"));
+                    ScriptUtils.executeSqlScript(connection, new FileSystemResource("mes-admin/src/test/resources/db/legacy/business/V55__material_bom.sql"));
                 }
                 jdbc.execute("ALTER TABLE material_bom ADD is_default TINYINT NOT NULL DEFAULT 0");
                 for (String column : List.of("bom_id BIGINT", "bom_base_qty DECIMAL(20,6)", "bom_component_qty DECIMAL(20,6)", "output_unit_id BIGINT", "frozen_at TIMESTAMP(6)"))
@@ -271,7 +271,7 @@ class MaterialIssueHttpTest {
                 jdbc.execute("ALTER TABLE mes_execution_completion ALTER COLUMN released_qty DROP NOT NULL");
                 jdbc.execute("ALTER TABLE mes_production_execution DROP COLUMN execution_no");
                 jdbc.execute("ALTER TABLE mes_production_execution ADD batch_no VARCHAR(128)");
-                String scanDdl = Files.readString(Path.of("mes-admin/src/main/resources/db/business/V52__execution_batch_and_scan_activity.sql"));
+                String scanDdl = Files.readString(Path.of("mes-admin/src/test/resources/db/legacy/business/V52__execution_batch_and_scan_activity.sql"));
                 scanDdl = scanDdl.substring(scanDdl.indexOf("CREATE TABLE mes_production_scan_activity")).split(";")[0]
                         .replace(") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT=", ") COMMENT ");
                 jdbc.execute(scanDdl);

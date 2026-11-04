@@ -102,7 +102,7 @@ public class AutoCodeRuleDocumentTest {
             when(redis.setCacheObjectIfVersion(anyString(), nullable(String.class), anyString(), any(), anyInt())).thenReturn(true);
             jdbc = new JdbcTemplate(source);
             if (initializeH2) {
-            String schema = new ClassPathResource("db/system/V6__source_autocode_rules.sql")
+            String schema = new ClassPathResource("db/legacy/system/V6__source_autocode_rules.sql")
                     .getContentAsString(StandardCharsets.UTF_8).split("INSERT INTO sys_menu")[0];
             try (var connection = source.getConnection()) {
                 ScriptUtils.executeSqlScript(connection, new ByteArrayResource(schema.getBytes(StandardCharsets.UTF_8)));

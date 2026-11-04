@@ -5,7 +5,7 @@ No connections to MySQL, no filesystem databases and no persisted test tables.
 from pathlib import Path
 import re,sqlite3,unittest
 ROOT=Path(__file__).resolve().parents[2]
-MIGRATIONS=ROOT/'mes-admin/src/main/resources/db/business'
+MIGRATIONS=ROOT/'mes-admin/src/test/resources/db/legacy/business'
 class Rejected(Exception):pass
 class GuardFixture:
     def __init__(self,old=False):

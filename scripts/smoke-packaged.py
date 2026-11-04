@@ -21,6 +21,9 @@ WITH_DOCS = "--openapi-docs" in sys.argv[1:]
 checks = []
 with zipfile.ZipFile(JAR) as artifact:
     names = artifact.namelist()
+    assert {n for n in names if n.startswith("BOOT-INF/classes/db/") and n.endswith(".sql")} == {
+        "BOOT-INF/classes/db/center/V1__init.sql", "BOOT-INF/classes/db/business/V1__init.sql"}
+    assert not any("V34__FactoryBusinessIntegration" in n for n in names)
     assert not any(n.startswith("BOOT-INF/lib/mes-openapi-") for n in names)
     assert not any("RuntimeFixture" in n or "FoundationHttpTest" in n or "h2-" in n for n in names)
     assert not any(n.startswith("BOOT-INF/lib/mes-mes-") for n in names)

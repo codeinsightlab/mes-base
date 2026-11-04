@@ -31,7 +31,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 @EnabledIfEnvironmentVariable(named = "MES_WAREHOUSE_TYPE_MYSQL", matches = "true")
 class WarehouseTypeMySqlTest {
     @Test
-    void verifiedV48MetadataAndSevenTypesRoundTripWithoutRetainingTestRows() throws Exception {
+    void verifiedInitMetadataAndSevenTypesRoundTripWithoutRetainingTestRows() throws Exception {
         Map<?, ?> root = new Yaml().load(Files.readString(Path.of(".local/codegen-simple-b.yml")));
         Map<?, ?> profiles = (Map<?, ?>) ((Map<?, ?>) ((Map<?, ?>) root.get("mes")).get("codegen")).get("profiles");
         Map<?, ?> profile = (Map<?, ?>) profiles.get("acceptance");
@@ -40,7 +40,7 @@ class WarehouseTypeMySqlTest {
         var source = new DriverManagerDataSource(url, (String) profile.get("username"), (String) profile.get("password"));
         var jdbc = new JdbcTemplate(source);
         assertEquals(1, jdbc.queryForObject("SELECT COUNT(*) FROM mes_base_dev.mf_factory f JOIN mes_base_dev.mf_datasource d ON f.datasource_id=d.datasource_id WHERE f.factory_id='SIMPLE_B' AND f.status='ENABLED' AND d.status='ENABLED' AND d.db_host='192.168.18.25' AND d.db_port=3306 AND d.db_name=DATABASE()", Integer.class));
-        assertEquals(1, jdbc.queryForObject("SELECT COUNT(*) FROM flyway_business_schema_history WHERE version='48' AND success=1", Integer.class));
+        assertEquals(1, jdbc.queryForObject("SELECT COUNT(*) FROM flyway_business_schema_history WHERE version='1' AND success=1", Integer.class));
         assertEquals("YES", jdbc.queryForObject("SELECT is_nullable FROM information_schema.columns WHERE table_schema=DATABASE() AND table_name='wm_warehouse' AND column_name='warehouse_type' AND character_maximum_length=32", String.class));
         long before = jdbc.queryForObject("SELECT COUNT(*) FROM wm_warehouse", Long.class);
         var balances = jdbc.queryForList("SELECT COUNT(*) AS records, SUM(quantity) AS quantity, SUM(available_quantity) AS available FROM wm_inventory");

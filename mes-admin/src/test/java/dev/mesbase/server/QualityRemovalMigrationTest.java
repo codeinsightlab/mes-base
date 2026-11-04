@@ -40,8 +40,8 @@ class QualityRemovalMigrationTest {
             sql.execute("INSERT INTO sys_user_table_preference VALUES('TEST_ONLY_QUALITY','/qc/qcIndex'),"
                     + "('business:material:list','/basic/material')");
             for (int repeat = 0; repeat < 2; repeat++) {
-                ScriptUtils.executeSqlScript(connection, new ClassPathResource("db/business/V7__remove_early_quality_tables.sql"));
-                ScriptUtils.executeSqlScript(connection, new ClassPathResource("db/system/V25__remove_early_quality_capabilities.sql"));
+                ScriptUtils.executeSqlScript(connection, new ClassPathResource("db/legacy/business/V7__remove_early_quality_tables.sql"));
+                ScriptUtils.executeSqlScript(connection, new ClassPathResource("db/legacy/system/V25__remove_early_quality_capabilities.sql"));
             }
             assertEquals(0, count(sql, "SELECT COUNT(*) FROM information_schema.tables WHERE table_name IN ('QC_INDEX','QC_DEFECT')"));
             assertEquals(0, count(sql, "SELECT COUNT(*) FROM sys_menu WHERE perms LIKE 'business:qc:%' OR perms LIKE 'qc:%'"));

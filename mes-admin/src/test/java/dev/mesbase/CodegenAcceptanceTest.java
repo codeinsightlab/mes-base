@@ -609,7 +609,7 @@ class CodegenAcceptanceTest {
         var result = generator.generate(request(null, false));
         Path sql = Path.of(result.files().stream().filter(file -> file.path().endsWith("-menu.sql"))
                 .findFirst().orElseThrow().path());
-        String migration = Files.readString(Path.of("mes-admin/src/main/resources/db/system/V2__source_product_system.sql"));
+        String migration = Files.readString(Path.of("mes-admin/src/test/resources/db/legacy/system/V2__source_product_system.sql"));
         int start = migration.indexOf("create table sys_menu (");
         int end = migration.indexOf(";", start);
         String ddl = migration.substring(start, end).replaceAll("\\) engine=.*", ")");

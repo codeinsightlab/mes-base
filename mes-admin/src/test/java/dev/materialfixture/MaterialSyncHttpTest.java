@@ -129,7 +129,7 @@ class MaterialSyncHttpTest {
             catalog = new InMemoryFactoryCatalog(List.of(
                     factory("A"), factory("B"), factory("C")));
             Map<FactoryId, BusinessRuntimeBinding> bindings = new HashMap<>();
-            String ddl = Files.readString(Path.of("mes-admin/src/main/resources/db/business/V2__simple_business_capabilities.sql"))
+            String ddl = Files.readString(Path.of("mes-admin/src/test/resources/db/legacy/business/V2__simple_business_capabilities.sql"))
                     .replace(") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT=", ") COMMENT ")
                     .replaceAll("(?m)^\\s*factory_id [^\\n]+\\n", "")
                     .replace("factory_id,", "")
@@ -138,6 +138,13 @@ class MaterialSyncHttpTest {
                 var source = source();
                 var jdbc = new JdbcTemplate(source);
                 for (String statement : ddl.split(";")) {
+                    if (!statement.isBlank()) jdbc.execute(statement);
+                }
+                jdbc.execute(Files.readString(Path.of("mes-admin/src/test/resources/db/legacy/business/V83__material_workorder_rule_code.sql")));
+                String unitRules = Files.readString(Path.of("mes-admin/src/test/resources/db/legacy/business/V64__unit_quantity_rules.sql"))
+                        .replace("TINYINT UNSIGNED", "SMALLINT")
+                        .replace(",\n    ADD COLUMN", ";\nALTER TABLE unit_measure ADD COLUMN");
+                for (String statement : unitRules.split(";")) {
                     if (!statement.isBlank()) jdbc.execute(statement);
                 }
                 jdbc.execute("INSERT INTO unit_measure(code,name,status) VALUES('PCS','件','ENABLED'),('KG','千克','ENABLED')");

@@ -35,7 +35,7 @@ scripts/mes-platform-admin --username=admin --config=mes-admin/src/main/resource
 
 执行前先准备目标库、配置和应用JAR，核实权限及密码策略。命令中的账号是初始化示例，不是系统内置凭证。
 
-中心库迁移由FactoryFlyway受控执行，包含SQL和Java迁移；业务库由 `scripts/mes-business-flyway` 分别升级。`mes.platform.migrate=true` 不升级业务库。完整目标核对、备份、版本及失败恢复流程见[数据库升级](database-upgrades.md)。
+中心库迁移由FactoryFlyway或 `scripts/mes-center-flyway` 受控执行，活动链为 `db/center`；业务库由 `scripts/mes-business-flyway` 分别升级。两库均从当前 `V1__init.sql` 开始，既有库需按升级指南受控重建基线。`mes.platform.migrate=true` 不升级业务库。完整目标核对、备份、版本及失败恢复流程见[数据库升级](database-upgrades.md)。
 
 不再提供Phase1拼接SQL导出或旧空归档清理脚本。`sql/ruoyi`仅是来源Schema对照，不作为当前初始化脚本；正式Flyway版本和已执行维护证据保留。
 

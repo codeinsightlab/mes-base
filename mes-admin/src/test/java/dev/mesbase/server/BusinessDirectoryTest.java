@@ -96,7 +96,7 @@ class BusinessDirectoryTest {
         var source = new DriverManagerDataSource("jdbc:h2:mem:" + UUID.randomUUID()
                 + ";MODE=MySQL;DB_CLOSE_DELAY=-1", "sa", "");
         var jdbc = new JdbcTemplate(source);
-        String schema = new ClassPathResource("db/system/V2__source_product_system.sql")
+        String schema = new ClassPathResource("db/legacy/system/V2__source_product_system.sql")
                 .getContentAsString(StandardCharsets.UTF_8);
         for (String table : Set.of("sys_user", "sys_dept", "sys_post", "sys_role", "sys_user_role", "sys_menu")) {
             var pattern = Pattern.compile("create table " + table + "\\s*\\(.*?;", Pattern.DOTALL);
@@ -105,7 +105,7 @@ class BusinessDirectoryTest {
             jdbc.execute(match.group());
         }
         var catalog = new ResourceDatabasePopulator(new ClassPathResource(
-                "db/system/V18__business_directory_read_permissions.sql"));
+                "db/legacy/system/V18__business_directory_read_permissions.sql"));
         catalog.execute(source);
         catalog.execute(source);
         assertEquals(3, jdbc.queryForObject("SELECT COUNT(*) FROM sys_menu WHERE menu_type='F' AND perms LIKE 'business:directory:%:read'", Integer.class));

@@ -61,7 +61,7 @@ public final class PlatformAdminCli {
                 String password = env.getRequiredProperty("MES_BOOTSTRAP_PASSWORD");
                 String encodedPassword = new PasswordPolicy(env).encode(password);
                 try (var pool = DruidPools.create(DruidPools.settings(env), "system-bootstrap", env.getRequiredProperty("mes.platform.url"), env.getRequiredProperty("mes.platform.username"), env.getRequiredProperty("mes.platform.password"))) {
-                    if (migrate) FactoryFlyway.configure(pool, env).load().migrate();
+                    if (migrate) FactoryFlyway.configure(pool).load().migrate();
                     var persistence = new PlatformPersistence(pool, Set.of(SystemBootstrapMapper.class, SysUserMapper.class, SysRoleMapper.class, SysMenuMapper.class, SysRoleMenuMapper.class, SysUserRoleMapper.class), c -> {
                         c.getTypeAliasRegistry().registerAliases("dev.mesbase.common.core.domain.entity");
                         c.getTypeAliasRegistry().registerAliases("dev.mesbase.system.domain");

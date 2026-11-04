@@ -39,7 +39,7 @@ class FactoryOapiPersistenceTest {
         var source = new DriverManagerDataSource("jdbc:h2:mem:" + UUID.randomUUID() + ";MODE=MySQL;DB_CLOSE_DELAY=-1", "sa", "");
         jdbc = new JdbcTemplate(source);
         jdbc.execute("CREATE TABLE mf_factory(factory_id VARCHAR(64) PRIMARY KEY,enterprise_id VARCHAR(64),factory_code VARCHAR(64),factory_name VARCHAR(64),datasource_id BIGINT,status VARCHAR(16),revision BIGINT,runtime_mode VARCHAR(16),erp_provider VARCHAR(128),erp_config_ref VARCHAR(128),integration_revision BIGINT,integration_locked BOOLEAN)");
-        new ResourceDatabasePopulator(new ClassPathResource("db/system/V38__factory_oapi_configuration.sql")).execute(source);
+        new ResourceDatabasePopulator(new ClassPathResource("db/legacy/system/V38__factory_oapi_configuration.sql")).execute(source);
         jdbc.update("INSERT INTO mf_factory(factory_id,revision,runtime_mode,integration_locked,integration_revision) VALUES('A',1,'LOCAL',TRUE,1),('B',1,'LOCAL',FALSE,1)");
         persistence = new PlatformPersistence(source, Set.of(ManagedFactoryMapper.class));
         mapper = persistence.mapper(ManagedFactoryMapper.class);

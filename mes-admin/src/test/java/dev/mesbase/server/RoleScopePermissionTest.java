@@ -139,7 +139,7 @@ class RoleScopePermissionTest {
     @Test
     void platformBusinessGrantsApplyToSelectedFactoriesWithoutFactoryRoleEscalation() throws Exception {
         var source = new DriverManagerDataSource("jdbc:h2:mem:" + UUID.randomUUID() + ";MODE=MySQL;DB_CLOSE_DELAY=-1", "sa", "");
-        String migration = Files.readString(Path.of("mes-admin/src/main/resources/db/system/V2__source_product_system.sql"));
+        String migration = Files.readString(Path.of("mes-admin/src/test/resources/db/legacy/system/V2__source_product_system.sql"));
         int start = migration.indexOf("create table sys_menu (");
         String menuDdl = migration.substring(start, migration.indexOf(';', start)).replaceAll("\\) engine=.*", ")");
         try (var connection = source.getConnection(); var sql = connection.createStatement()) {

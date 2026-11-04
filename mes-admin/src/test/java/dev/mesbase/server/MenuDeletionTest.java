@@ -63,7 +63,7 @@ class MenuDeletionTest {
         var source = new DriverManagerDataSource("jdbc:h2:mem:" + UUID.randomUUID()
                 + ";MODE=MySQL;DB_CLOSE_DELAY=-1", "sa", "");
         jdbc = new JdbcTemplate(source);
-        String schema = new ClassPathResource("db/system/V2__source_product_system.sql")
+        String schema = new ClassPathResource("db/legacy/system/V2__source_product_system.sql")
                 .getContentAsString(StandardCharsets.UTF_8);
         for (String table : Set.of("sys_menu", "sys_role", "sys_role_menu", "sys_user", "sys_user_role")) {
             var match = Pattern.compile("create table " + table + "\\s*\\(.*?;", Pattern.DOTALL).matcher(schema);

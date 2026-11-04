@@ -39,7 +39,7 @@ public class PersistenceConfiguration {
         DruidDataSource source = DruidPools.create(DruidPools.settings(env), "platform", env.getRequiredProperty("mes.platform.url"), env.getRequiredProperty("mes.platform.username"), env.getRequiredProperty("mes.platform.password"));
         try {
             if (env.getProperty("mes.platform.migrate", Boolean.class, false))
-                FactoryFlyway.configure(source, env).load()
+                FactoryFlyway.configure(source).load()
                         .migrate();
             return source;
         } catch (RuntimeException | Error failure) {

@@ -114,7 +114,7 @@ class WorkOrderRequestBudgetTest {
         var center = source();
         var business = source();
         var jdbc = new JdbcTemplate(center);
-        String migration = Files.readString(Path.of("mes-admin/src/main/resources/db/system/V2__source_product_system.sql"));
+        String migration = Files.readString(Path.of("mes-admin/src/test/resources/db/legacy/system/V2__source_product_system.sql"));
         for (String table : List.of("sys_user", "sys_dept", "sys_role", "sys_user_role", "sys_menu", "sys_role_menu")) {
             int start = migration.indexOf("create table " + table + " (");
             jdbc.execute(migration.substring(start, migration.indexOf(';', start)).replaceAll("\\) engine=.*", ")"));

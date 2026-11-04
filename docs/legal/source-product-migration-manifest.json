@@ -4170,7 +4170,7 @@
     },
     {
       "source": "sql/openapi/20260930-open-api-platform.sql",
-      "target": "mes-admin/src/main/resources/db/system/V10__source_openapi.sql",
+      "target": "mes-admin/src/test/resources/db/legacy/system/V10__source_openapi.sql",
       "sourceSha256": "f5d2129182db2180338e15be2616368a28e866bd21186a3b7c709cd93298fb89",
       "targetSha256": "2f86b23d3d51f455132e1c8d9beaaaaf0300348b5d731520e5abd778a95f1958",
       "strategy": "PORT",

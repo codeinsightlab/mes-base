@@ -10,7 +10,7 @@ ver/prod/timezone/ip/id/lang/acct，以及 service 的 prod/ip/id。host.id 必�
 
 真实连接值只通过管理页面填写，不写进文档、测试、样例或日志。
 
-复用现有中心表 `mf_factory`，正式 Flyway V38 增加：
+复用现有中心表 `mf_factory`，当前中心库 `db/center/V1__init.sql` 包含以下字段：
 
 - `oapi_config_ref`：首次保存生成的不透明稳定连接引用。
 - `oapi_config_cipher`：整个连接参数 JSON，经现有 AES-GCM 机制加密。

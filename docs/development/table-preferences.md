@@ -4,7 +4,7 @@
 
 ## 存储与接口
 
-中心库 Flyway 迁移 `mes-admin/src/main/resources/db/system/V23__personal_table_preferences.sql` 创建
+中心库 Flyway 迁移 `mes-admin/src/main/resources/db/center/V1__init.sql` 创建
 `sys_user_table_preference`。访问使用已有 `masterTransactionManager` 和中心 Mapper 扫描包。
 四维唯一约束为 factory_id + user_id + url + table_key；URL 使用 512 字符二进制 utf8mb4，table_key 使用
 192 字符 ascii，完整索引长度在 MySQL 3072 字节限制内。保存使用原子 upsert，恢复默认删除记录。

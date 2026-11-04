@@ -199,7 +199,7 @@ class TablePreferenceTest {
             var jdbc = new JdbcTemplate(source);
             Path root = Path.of("").toAbsolutePath();
             if (!Files.exists(root.resolve("mes-admin"))) root = root.getParent();
-            String migration = Files.readString(root.resolve("mes-admin/src/main/resources/db/system/V23__personal_table_preferences.sql"))
+            String migration = Files.readString(root.resolve("mes-admin/src/test/resources/db/legacy/system/V23__personal_table_preferences.sql"))
                     .replaceAll("(?i)COLLATE utf8mb4_bin", "")
                     .replaceAll("(?i)CHARACTER SET ascii COLLATE ascii_bin", "")
                     .replace("ENGINE=InnoDB DEFAULT CHARSET=utf8mb4", "");

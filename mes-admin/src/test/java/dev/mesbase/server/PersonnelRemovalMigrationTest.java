@@ -46,8 +46,8 @@ class PersonnelRemovalMigrationTest {
                     + "('business:equipment:list','/basic/equipment')");
 
             for (int repeat = 0; repeat < 2; repeat++) {
-                ScriptUtils.executeSqlScript(connection, new ClassPathResource("db/business/V6__remove_personnel_projection.sql"));
-                ScriptUtils.executeSqlScript(connection, new ClassPathResource("db/system/V24__remove_personnel_capability.sql"));
+                ScriptUtils.executeSqlScript(connection, new ClassPathResource("db/legacy/business/V6__remove_personnel_projection.sql"));
+                ScriptUtils.executeSqlScript(connection, new ClassPathResource("db/legacy/system/V24__remove_personnel_capability.sql"));
             }
 
             assertEquals(0, count(sql, "SELECT COUNT(*) FROM information_schema.tables WHERE table_name='PERSONNEL'"));

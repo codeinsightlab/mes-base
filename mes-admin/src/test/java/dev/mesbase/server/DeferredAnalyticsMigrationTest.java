@@ -27,7 +27,7 @@ class DeferredAnalyticsMigrationTest {
             sql.execute("CREATE TABLE sys_role_menu (role_id BIGINT, menu_id BIGINT)");
             sql.execute("INSERT INTO sys_menu(menu_name,path,menu_type) VALUES ('TEST ONLY system','system','M')");
             ScriptUtils.executeSqlScript(connection,
-                    new ClassPathResource("db/system/V13__factory_analytics_capabilities.sql"));
+                    new ClassPathResource("db/legacy/system/V13__factory_analytics_capabilities.sql"));
             if (sharedGroup) {
                 sql.execute("INSERT INTO sys_menu(menu_name,parent_id,path,menu_type,perms) "
                         + "SELECT 'TEST ONLY unrelated feature',menu_id,'other','C','TEST_ONLY:other:read' "
@@ -40,7 +40,7 @@ class DeferredAnalyticsMigrationTest {
             sql.execute("INSERT INTO business_marker VALUES (1)");
 
             ScriptUtils.executeSqlScript(connection,
-                    new ClassPathResource("db/system/V15__defer_production_analytics.sql"));
+                    new ClassPathResource("db/legacy/system/V15__defer_production_analytics.sql"));
 
             assertEquals(0, count(sql, "SELECT COUNT(*) FROM sys_menu WHERE "
                     + "component IN ('mes/pro/productionMonitor/index','mes/pro/personnelAnalysis/index') "

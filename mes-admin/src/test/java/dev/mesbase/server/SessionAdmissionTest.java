@@ -84,8 +84,8 @@ class SessionAdmissionTest {
         jdbc.execute("CREATE TABLE sys_role(role_id BIGINT,role_name VARCHAR(30),role_key VARCHAR(30),role_sort INT,"
                 + "data_scope VARCHAR(1),kind VARCHAR(10),factory_id VARCHAR(30),status VARCHAR(1),del_flag VARCHAR(1))");
         jdbc.execute("CREATE TABLE sys_user_role(user_id BIGINT,role_id BIGINT)");
-        jdbc.execute(Files.readString(Path.of("mes-admin/src/main/resources/db/system/V19__indexed_session_revocation.sql")));
-        for (String sql : Files.readString(Path.of("mes-admin/src/main/resources/db/system/V20__session_revocation_retry_schedule.sql"))
+        jdbc.execute(Files.readString(Path.of("mes-admin/src/test/resources/db/legacy/system/V19__indexed_session_revocation.sql")));
+        for (String sql : Files.readString(Path.of("mes-admin/src/test/resources/db/legacy/system/V20__session_revocation_retry_schedule.sql"))
                 .split(";")) {
             if (!sql.isBlank()) jdbc.execute(sql);
         }

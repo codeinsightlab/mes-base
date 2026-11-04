@@ -140,8 +140,8 @@ class StockHttpTest {
             for (String id : List.of("A", "B")) {
                 var source = source();
                 var jdbc = new JdbcTemplate(source);
-                for (String name : List.of("V2__simple_business_capabilities.sql", "V8__warehouse_inventory.sql")) {
-                    String ddl = Files.readString(Path.of("mes-admin/src/main/resources/db/business/" + name))
+                for (String name : List.of("V2__simple_business_capabilities.sql", "V8__warehouse_inventory.sql", "V83__material_workorder_rule_code.sql")) {
+                    String ddl = Files.readString(Path.of("mes-admin/src/test/resources/db/legacy/business/" + name))
                             .replace(") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT=", ") COMMENT ")
                             .replaceAll("(?m)^\\s*factory_id [^\\n]+\\n", "")
                             .replace("factory_id,", "")
@@ -149,21 +149,21 @@ class StockHttpTest {
                     for (String statement : ddl.split(";")) if (!statement.isBlank()) jdbc.execute(statement);
                 }
                 for (String fact : List.of("V35__local_production_closure.sql", "V29__single_material_production_input.sql", "V34__local_stock_action.sql")) {
-                    String ddl = Files.readString(Path.of("mes-admin/src/main/resources/db/business/" + fact))
+                    String ddl = Files.readString(Path.of("mes-admin/src/test/resources/db/legacy/business/" + fact))
                             .split("CREATE TRIGGER")[0].split("-- 旧库存")[0]
                             .replace(" CHARACTER SET ascii COLLATE ascii_bin", "")
                             .replace(") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT=", ") COMMENT ");
                     for (String statement : ddl.split(";")) if (!statement.isBlank()) jdbc.execute(statement);
                 }
                 try (var connection = source.getConnection()) {
-                    ScriptUtils.executeSqlScript(connection, new FileSystemResource("mes-admin/src/main/resources/db/business/V48__warehouse_type.sql"));
+                    ScriptUtils.executeSqlScript(connection, new FileSystemResource("mes-admin/src/test/resources/db/legacy/business/V48__warehouse_type.sql"));
                 }
                 jdbc.execute("ALTER TABLE wm_warehouse ADD source VARCHAR(16) DEFAULT 'LOCAL'");
                 jdbc.execute("CREATE TABLE wm_warehouse_erp_extra(id BIGINT PRIMARY KEY,external_id VARCHAR(128),provider VARCHAR(128),binding_key VARCHAR(128),configuration_revision BIGINT)");
                 jdbc.execute("ALTER TABLE wm_inventory ADD batch_no VARCHAR(128)");
                 jdbc.execute("ALTER TABLE wm_inventory ADD bin_code VARCHAR(64)");
                 jdbc.update("INSERT INTO material(id,code,name,unit_id,status) VALUES(1,'M1','物料一',1,'ENABLED')");
-                String documentDdl = Files.readString(Path.of("mes-admin/src/main/resources/db/business/V38__local_stock_documents.sql"));
+                String documentDdl = Files.readString(Path.of("mes-admin/src/test/resources/db/legacy/business/V38__local_stock_documents.sql"));
                 documentDdl = documentDdl.substring(documentDdl.indexOf("CREATE TABLE wm_stock_document_line"))
                         .replace(") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT=", ") COMMENT ");
                 jdbc.execute(documentDdl);
