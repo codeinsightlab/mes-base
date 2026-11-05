@@ -46,3 +46,4 @@ docs/reviews/evidence
 /mes-business/docs/generated/basic/*
 !/mes-business/docs/generated/basic/material-workspace-menu.sql
 /migration-backups/
+mes-admin/src/main/resources/application-local.yml
