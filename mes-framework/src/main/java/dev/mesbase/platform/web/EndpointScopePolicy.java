@@ -29,7 +29,7 @@ public final class EndpointScopePolicy {
     }
 
     public static EndpointAccess.PermissionScope scope(String path) {
-        return platformManagement(path) || shared(path)
+        return platformManagement(path) || shared(path) || relative(path).equals("/foundation/preference")
                 ? EndpointAccess.PermissionScope.PLATFORM : EndpointAccess.PermissionScope.FACTORY;
     }
 

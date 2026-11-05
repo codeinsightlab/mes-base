@@ -273,6 +273,60 @@ class ManagedColdPoolTest {
         return new DatasourceIdentity("managed-" + id).hashCode();
     }
 
+    private static final class OutagePool extends RequestDrivenDataSource {
+        int attempts;
+        boolean firstIdentity;
+        OutagePool(DatasourceRecovery recovery, boolean firstIdentity) {
+            super(recovery);
+            this.firstIdentity = firstIdentity;
+            setUrl("jdbc:h2:mem:" + UUID.randomUUID());
+            setInitialSize(0); setMinIdle(0); setMaxActive(5); setTestWhileIdle(false);
+        }
+        @Override public DruidPooledConnection getConnection() throws SQLException {
+            if (firstIdentity) {
+                firstIdentity = false;
+                try { return (DruidPooledConnection) probe("business-A"); }
+                catch (Exception failure) { throw new SQLException(failure); }
+            }
+            return super.getConnection();
+        }
+        @Override public PhysicalConnectionInfo createPhysicalConnection() throws SQLException {
+            attempts++;
+            throw new SQLException("TEST ONLY physical outage", "08001");
+        }
+    }
+
+    @Test
+    void registeredPoolOutageAndDdlShareOneSourceCircuitAndBudget() throws Exception {
+        var clock = new java.util.concurrent.atomic.AtomicLong();
+        var created = new ArrayList<OutagePool>();
+        try (var fixture = fixture(clock::get); var factory = org.mockito.Mockito.mockStatic(DruidPools.class)) {
+            factory.when(() -> DruidPools.createBusiness(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.anyString(),
+                    org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.anyString(),
+                    org.mockito.ArgumentMatchers.nullable(String.class), org.mockito.ArgumentMatchers.any(DatasourceRecovery.class)))
+                    .thenAnswer(call -> {
+                        var pool = new OutagePool(call.getArgument(5), created.isEmpty());
+                        created.add(pool);
+                        return pool;
+                    });
+            var scope = new FactoryScope(new FactoryId("A"));
+            var acquired = fixture.service.begin(scope);
+            acquired.lease().close();
+            assertThrows(SQLException.class, created.getFirst()::getConnection);
+            assertThrows(FoundationException.class, () -> fixture.service.ddl(1, true));
+            assertEquals(1, created.size());
+            assertEquals(5, created.getFirst().attempts);
+            clock.addAndGet(TimeUnit.MILLISECONDS.toNanos(RequestDrivenDataSource.COOLDOWN_MILLIS));
+            fixture.service.reconcileInitializedPools();
+            assertEquals(1, created.size());
+            assertThrows(FoundationException.class, () -> fixture.service.ddl(1, true));
+            assertEquals(2, created.size());
+            assertEquals(5, created.get(1).attempts);
+            assertThrows(SQLException.class, created.getFirst()::getConnection);
+            assertEquals(5, created.getFirst().attempts);
+        }
+    }
+
     @Test
     void failedPhysicalProbeClosesUnpublishedPool() throws Exception {
         try (var fixture = fixture(); var pools = mockConstruction(RequestDrivenDataSource.class, (pool, context) ->

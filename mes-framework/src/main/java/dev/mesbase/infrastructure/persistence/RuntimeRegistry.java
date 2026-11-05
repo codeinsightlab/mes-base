@@ -31,6 +31,7 @@ public final class RuntimeRegistry implements AutoCloseable {
         int leases;
         boolean retired;
         boolean poolClosed;
+        boolean poolClosing;
 
         Runtime(FactoryId factoryId, DatasourceIdentity identity, long revision, DataSource datasource,
                 Runnable closePool, Set<Class<?>> mappers) {
@@ -46,12 +47,6 @@ public final class RuntimeRegistry implements AutoCloseable {
             }
         }
 
-        void drain() {
-            if (retired && leases == 0 && !poolClosed) {
-                closePool.run();
-                poolClosed = true;
-            }
-        }
     }
 
     public final class Lease implements AutoCloseable {
@@ -79,9 +74,9 @@ public final class RuntimeRegistry implements AutoCloseable {
                 if (!released) {
                     released = true;
                     runtime.leases--;
-                    tryDrain(runtime);
                 }
             }
+            tryDrain(runtime);
         }
     }
 
@@ -94,49 +89,45 @@ public final class RuntimeRegistry implements AutoCloseable {
     /**
      * A prepared pool transfers ownership only on success. Failed preparations are closed.
      */
-    public synchronized void registerDedicated(FactoryId factoryId, DatasourceIdentity identity, long revision,
-                                               DataSource datasource, Runnable closer, Set<Class<?>> mappers) {
+    public void registerDedicated(FactoryId factoryId, DatasourceIdentity identity, long revision,
+                                  DataSource datasource, Runnable closer, Set<Class<?>> mappers) {
         Objects.requireNonNull(factoryId);
         Objects.requireNonNull(identity);
         Objects.requireNonNull(datasource);
         Objects.requireNonNull(closer);
         Objects.requireNonNull(mappers);
-        if (ownedPools.contains(datasource)) throw new FoundationException(ErrorCode.CONFLICT);
-        if (revision < 1) {
-            closer.run();
-            throw new IllegalArgumentException("Invalid revision");
-        }
-        if (closed) {
-            closer.run();
-            throw new FoundationException(ErrorCode.CONFLICT);
-        }
-        var owner = dedicatedOwners.get(identity);
-        if ((owner != null && !owner.equals(factoryId)) || live.stream().anyMatch(runtime ->
-                !runtime.poolClosed && runtime.identity.equals(identity) && !runtime.factoryId.equals(factoryId))) {
-            closer.run();
-            throw new FoundationException(ErrorCode.CONFLICT);
-        }
-        Runtime previous = current.get(identity);
-        if (previous != null && previous.revision >= revision) {
-            closer.run();
-            throw new FoundationException(ErrorCode.CONFLICT);
-        }
-        Runtime replacement;
+        Runtime previous;
+        boolean closeRejected = true;
         try {
-            replacement = new Runtime(factoryId, identity, revision, datasource, closer, mappers);
+            synchronized (this) {
+                if (ownedPools.contains(datasource)) {
+                    closeRejected = false;
+                    throw new FoundationException(ErrorCode.CONFLICT);
+                }
+                if (revision < 1) throw new IllegalArgumentException("Invalid revision");
+                if (closed) throw new FoundationException(ErrorCode.CONFLICT);
+                var owner = dedicatedOwners.get(identity);
+                if ((owner != null && !owner.equals(factoryId)) || live.stream().anyMatch(runtime ->
+                        !runtime.poolClosed && runtime.identity.equals(identity) && !runtime.factoryId.equals(factoryId)))
+                    throw new FoundationException(ErrorCode.CONFLICT);
+                previous = current.get(identity);
+                if (previous != null && previous.revision >= revision) throw new FoundationException(ErrorCode.CONFLICT);
+                var replacement = new Runtime(factoryId, identity, revision, datasource, closer, mappers);
+                live.removeIf(runtime -> runtime.poolClosed);
+                live.add(replacement);
+                current.put(identity, replacement);
+                dedicatedOwners.put(identity, factoryId);
+                ownedPools.add(datasource);
+                closeRejected = false;
+                if (previous != null) previous.retired = true;
+            }
         } catch (RuntimeException | Error failure) {
-            closer.run();
+            if (closeRejected) {
+                try { closer.run(); } catch (RuntimeException | Error cleanup) { failure.addSuppressed(cleanup); }
+            }
             throw failure;
         }
-        live.removeIf(runtime -> runtime.poolClosed);
-        live.add(replacement);
-        current.put(identity, replacement);
-        dedicatedOwners.put(identity, factoryId);
-        ownedPools.add(datasource);
-        if (previous != null) {
-            previous.retired = true;
-            tryDrain(previous);
-        }
+        if (previous != null) tryDrain(previous);
     }
 
     public synchronized Set<Class<?>> mapperTypes() {
@@ -161,13 +152,14 @@ public final class RuntimeRegistry implements AutoCloseable {
     /**
      * Stop new acquisition; admitted leases remain valid until released, then the retired pool closes.
      */
-    public synchronized void retire(DatasourceIdentity identity) {
-        var runtime = current.remove(identity);
-        dedicatedOwners.remove(identity);
-        if (runtime != null) {
-            runtime.retired = true;
-            tryDrain(runtime);
+    public void retire(DatasourceIdentity identity) {
+        Runtime runtime;
+        synchronized (this) {
+            runtime = current.remove(identity);
+            dedicatedOwners.remove(identity);
+            if (runtime != null) runtime.retired = true;
         }
+        if (runtime != null) tryDrain(runtime);
     }
 
     public synchronized Lease acquireDedicated(BusinessRuntimeBinding binding) {
@@ -181,33 +173,53 @@ public final class RuntimeRegistry implements AutoCloseable {
         return new Lease(runtime);
     }
 
-    private void tryDrain(Runtime runtime) {
+    private void drain(Runtime runtime) {
+        synchronized (this) {
+            if (!runtime.retired || runtime.leases != 0 || runtime.poolClosed || runtime.poolClosing) return;
+            runtime.poolClosing = true;
+        }
+        boolean succeeded = false;
         try {
-            runtime.drain();
-        } catch (RuntimeException failure) {
-            // Publication/commit already succeeded; cleanup failure must not close the accepted replacement.
+            runtime.closePool.run();
+            succeeded = true;
+        } finally {
+            synchronized (this) {
+                runtime.poolClosed = succeeded;
+                runtime.poolClosing = false;
+            }
+        }
+    }
+
+    private void tryDrain(Runtime runtime) {
+        try { drain(runtime); }
+        catch (RuntimeException failure) {
             LOG.error("Retired pool cleanup pending identity={} revision={}", runtime.identity, runtime.revision, failure);
         }
     }
 
-    public synchronized void retryRetired() {
-        live.stream().filter(runtime -> runtime.retired).forEach(this::tryDrain);
-        live.removeIf(runtime -> runtime.poolClosed);
+    public void retryRetired() {
+        Set<Runtime> retired;
+        synchronized (this) { retired = new HashSet<>(live); }
+        retired.forEach(this::tryDrain);
+        synchronized (this) { live.removeIf(runtime -> runtime.poolClosed); }
     }
 
-    public synchronized void close() {
-        closed = true;
+    public void close() {
+        Set<Runtime> retiring;
+        synchronized (this) {
+            closed = true;
+            retiring = new HashSet<>(live);
+            retiring.forEach(runtime -> runtime.retired = true);
+            current.clear();
+        }
         RuntimeException failure = null;
-        for (Runtime runtime : live) {
-            runtime.retired = true;
-            try {
-                runtime.drain();
-            } catch (RuntimeException e) {
+        for (Runtime runtime : retiring) {
+            try { drain(runtime); }
+            catch (RuntimeException e) {
                 if (failure == null) failure = e;
                 else failure.addSuppressed(e);
             }
         }
-        current.clear();
         if (failure != null) throw failure;
     }
 }

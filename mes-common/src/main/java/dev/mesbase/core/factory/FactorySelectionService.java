@@ -30,14 +30,16 @@ public final class FactorySelectionService {
         return preferred.isPresent() ? preferred : catalog.defaultFactory().map(f -> select(actor, f.id()));
     }
 
-    public FactoryScope remember(AuthenticatedActor actor, FactoryId id) {
-        FactoryScope scope = select(actor, id);
-        preference.save(actor, id);
-        return scope;
-    }
-
     public List<Factory> options(int offset, int limit) {
         if (offset < 0 || limit < 1 || limit > 100) throw new FoundationException(ErrorCode.BAD_REQUEST);
         return catalog.enabled(offset, limit);
+    }
+
+    public FactoryPreference.Snapshot preference(AuthenticatedActor actor) { return preference.snapshot(actor); }
+
+    public FactoryScope remember(AuthenticatedActor actor, FactoryId id, long revision) {
+        var scope = select(actor, id);
+        preference.saveVersioned(actor, id, revision);
+        return scope;
     }
 }

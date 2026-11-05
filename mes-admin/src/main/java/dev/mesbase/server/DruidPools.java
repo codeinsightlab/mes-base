@@ -38,8 +38,8 @@ public final class DruidPools {
         return initialize(new DruidDataSource(), s, name, url, user, password);
     }
 
-    public static RequestDrivenDataSource createBusiness(Settings s, String name, String url, String user, String password) {
-        return initialize(new RequestDrivenDataSource(), s, name, url, user, password);
+    public static RequestDrivenDataSource createBusiness(Settings s, String name, String url, String user, String password, DatasourceRecovery recovery) {
+        return initialize(new RequestDrivenDataSource(recovery), s, name, url, user, password);
     }
 
     private static <T extends DruidDataSource> T initialize(T pool, Settings s, String name, String url, String user, String password) {

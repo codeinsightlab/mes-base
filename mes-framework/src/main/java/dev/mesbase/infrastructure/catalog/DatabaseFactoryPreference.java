@@ -30,18 +30,21 @@ public class DatabaseFactoryPreference implements FactoryPreference {
     }
 
     @Override
+    @Transactional(transactionManager = "masterTransactionManager", readOnly = true)
+    public Snapshot snapshot(AuthenticatedActor actor) {
+        var row = preferences.selectById(userId(actor));
+        if (row == null) return new Snapshot(Optional.empty(), 0);
+        return new Snapshot(Optional.of(new FactoryId(row.lastFactoryId())), row.revision());
+    }
+
+    @Override
     @Transactional(transactionManager = "masterTransactionManager", rollbackFor = Exception.class)
-    public void save(AuthenticatedActor actor, FactoryId factoryId) {
-        long userId = userId(actor);
-        int changed = preferences.save(new MfUserPreference(userId, factoryId.value()));
-        if (changed == 1 || changed == 2) {
-            return;
-        }
-        // MySQL may report zero for an unchanged upsert, depending on the driver setting.
-        if (changed == 0 && Optional.ofNullable(preferences.selectById(userId))
-                .map(MfUserPreference::lastFactoryId).filter(factoryId.value()::equals).isPresent()) {
-            return;
-        }
+    public void saveVersioned(AuthenticatedActor actor, FactoryId factoryId, long revision) {
+        if (revision < 0 || revision == Long.MAX_VALUE) throw new FoundationException(ErrorCode.BAD_REQUEST);
+        var row = new MfUserPreference(userId(actor), factoryId.value(), revision);
+        // Claim an absent row first, avoiding competing UPDATE-gap-lock -> INSERT upgrades.
+        if (revision == 0 && preferences.insertInitial(row) == 1) return;
+        if (preferences.updateVersioned(row) == 1) return;
         throw new FoundationException(ErrorCode.RESOURCE_CONFLICT);
     }
 

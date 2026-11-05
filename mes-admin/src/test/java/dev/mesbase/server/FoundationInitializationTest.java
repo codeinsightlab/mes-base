@@ -111,13 +111,35 @@ class FoundationInitializationTest {
     }
 
     @Test
+    void preferenceUsesVersionedWritesAndDoesNotResolveBrokenOldFactory() throws Exception {
+        addFactory("A"); addFactory("B");
+        var http = http("empty-role");
+        var actor = SecurityContextHolder.getContext().getAuthentication();
+        http.perform(get("/api/foundation/preference").header("X-Factory-Id", "deleted").principal(actor))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.revision").value("0"));
+        http.perform(put("/api/foundation/preference").header("X-Factory-Id", "deleted").principal(actor)
+                        .contentType("application/json").content("{\"factoryId\":\"B\",\"revision\":\"0\"}"))
+                .andExpect(status().isOk());
+        http.perform(put("/api/foundation/preference").principal(actor).contentType("application/json")
+                        .content("{\"factoryId\":\"A\",\"revision\":0}"))
+                .andExpect(status().isConflict());
+        http.perform(get("/api/foundation/preference").principal(actor))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.factoryId").value("B"))
+                .andExpect(jsonPath("$.revision").value("1"));
+        http.perform(put("/api/foundation/preference").principal(actor).contentType("application/json")
+                        .content("{\"factoryId\":\"A\"}"))
+                .andExpect(status().isBadRequest());
+        assertEquals(0, admissions.get());
+    }
+
+    @Test
     void factorySelectionDoesNotRequireDatasourceAndCanRecoverFromEmptyState() throws Exception {
         var http = http("empty-role");
         http.perform(get("/api/foundation/context")).andExpect(status().isOk());
         addFactory("unbound");
         http.perform(put("/api/foundation/preference").principal(
                                 SecurityContextHolder.getContext().getAuthentication())
-                        .contentType("application/json").content("{\"factoryId\":\"unbound\"}"))
+                        .contentType("application/json").content("{\"factoryId\":\"unbound\",\"revision\":0}"))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.factoryId").value("unbound"));
         http.perform(get("/api/foundation/context")).andExpect(status().isOk())
                 .andExpect(jsonPath("$.factoryId").value("unbound"));
@@ -133,6 +155,7 @@ class FoundationInitializationTest {
         addFactory("bound");
         factories.add(new Factory(new FactoryId("disabled"), "TEST ONLY", "disabled", "Disabled", FactoryStatus.DISABLED));
         var http = http("platform");
+        long preferenceRevision = 0;
         for (String oldFactory : List.of("disabled", "deleted")) {
             http.perform(get("/api/foundation/access").header("X-Factory-Id", oldFactory))
                     .andExpect(status().isUnprocessableEntity())
@@ -140,7 +163,7 @@ class FoundationInitializationTest {
             http.perform(get("/api/foundation/factories")).andExpect(status().isOk());
             http.perform(put("/api/foundation/preference")
                             .principal(SecurityContextHolder.getContext().getAuthentication())
-                            .contentType("application/json").content("{\"factoryId\":\"bound\"}"))
+                            .contentType("application/json").content("{\"factoryId\":\"bound\",\"revision\":" + preferenceRevision++ + "}"))
                     .andExpect(status().isOk());
         }
         assertEquals(0, admissions.get());

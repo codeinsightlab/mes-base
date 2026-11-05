@@ -182,11 +182,11 @@ class FoundationHttpTest {
 
     @Test
     void preferenceIsUxOnlyExplicitFactoryWinsAndUnknownFieldsAreRejected() throws Exception {
-        assertEquals(200, request("/api/foundation/preference", "preference-user", null, "PUT", "{\"factoryId\":\"A\"}").statusCode());
+        assertEquals(200, request("/api/foundation/preference", "preference-user", null, "PUT", "{\"factoryId\":\"A\",\"revision\":0}").statusCode());
         assertTrue(get("/api/foundation/context", "preference-user", null).body().contains("A"));
         assertTrue(get("/api/foundation/context", "preference-user", "B").body().contains("B"));
         error(get("/api/foundation/access", "preference-user", null), 403, "FORBIDDEN");
-        error(request("/api/foundation/preference", "preference-user", null, "PUT", "{\"factoryId\":\"A\",\"userId\":\"reader\"}"), 400, "BAD_REQUEST");
+        error(request("/api/foundation/preference", "preference-user", null, "PUT", "{\"factoryId\":\"A\",\"revision\":0,\"userId\":\"reader\"}"), 400, "BAD_REQUEST");
     }
 
     @Test

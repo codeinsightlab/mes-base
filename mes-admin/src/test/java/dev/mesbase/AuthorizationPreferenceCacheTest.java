@@ -71,7 +71,7 @@ class AuthorizationPreferenceCacheTest {
     void explicitFactoryOverridesValidPreference() {
         var prefs = new InMemoryFactoryPreference();
         var actor = new AuthenticatedActor("test-only-user");
-        prefs.save(actor, RuntimeFixture.A.factoryId());
+        prefs.saveVersioned(actor, RuntimeFixture.A.factoryId(), 0);
         var service = selection(prefs);
         assertEquals(Optional.of(RuntimeFixture.A), service.resolve(actor, Optional.empty()));
         assertEquals(Optional.of(RuntimeFixture.B), service.resolve(actor, Optional.of(RuntimeFixture.B.factoryId())));
@@ -83,7 +83,7 @@ class AuthorizationPreferenceCacheTest {
         var actor = new AuthenticatedActor("test-only-user");
         var service = selection(prefs);
         for (String id : List.of("C", "missing")) {
-            prefs.save(actor, new FactoryId(id));
+            prefs.saveVersioned(actor, new FactoryId(id), prefs.snapshot(actor).revision());
             assertTrue(service.resolve(actor, Optional.empty()).isEmpty());
             assertThrows(FoundationException.class, () -> service.resolve(actor, Optional.of(new FactoryId(id))));
         }
@@ -94,7 +94,7 @@ class AuthorizationPreferenceCacheTest {
         var prefs = new InMemoryFactoryPreference();
         var actor = new AuthenticatedActor("test-only-user");
         var service = selection(prefs);
-        assertEquals(RuntimeFixture.B, service.remember(actor, RuntimeFixture.B.factoryId()));
+        assertEquals(RuntimeFixture.B, service.remember(actor, RuntimeFixture.B.factoryId(), 0));
         assertFalse(new InMemoryRoleAuthorization().hasPermission(actor, RuntimeFixture.B, new Permission("foundation:access:read")));
         assertThrows(FoundationException.class, () -> service.options(0, 101));
     }

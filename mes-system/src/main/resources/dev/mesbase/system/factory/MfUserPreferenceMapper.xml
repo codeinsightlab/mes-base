@@ -5,13 +5,18 @@
         <constructor>
             <idArg column="user_id" javaType="java.lang.Long"/>
             <arg column="last_factory_id" javaType="java.lang.String"/>
+            <arg column="revision" javaType="_long"/>
         </constructor>
     </resultMap>
     <select id="selectById" resultMap="Preference">
-        SELECT user_id, last_factory_id FROM mf_user_preference WHERE user_id = #{userId}
+        SELECT user_id, last_factory_id, revision FROM mf_user_preference WHERE user_id = #{userId}
     </select>
-    <insert id="save">
-        INSERT INTO mf_user_preference(user_id, last_factory_id) VALUES(#{userId}, #{lastFactoryId})
-        ON DUPLICATE KEY UPDATE last_factory_id = #{lastFactoryId}
+    <update id="updateVersioned">
+        UPDATE mf_user_preference SET last_factory_id = #{lastFactoryId}, revision = revision + 1
+        WHERE user_id = #{userId} AND revision = #{revision}
+    </update>
+    <insert id="insertInitial">
+        INSERT IGNORE INTO mf_user_preference(user_id, last_factory_id, revision)
+        VALUES(#{userId}, #{lastFactoryId}, 1)
     </insert>
 </mapper>

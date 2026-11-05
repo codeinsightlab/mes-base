@@ -18,8 +18,10 @@ class RequestDrivenDataSourceTest {
         volatile CountDownLatch entered;
         volatile CountDownLatch release;
 
-        Pool(AtomicLong clock) {
-            super(clock::get);
+        Pool(AtomicLong clock) { this(new DatasourceRecovery(clock::get)); }
+
+        Pool(DatasourceRecovery recovery) {
+            super(recovery);
             setUrl("jdbc:h2:mem:" + UUID.randomUUID());
             setUsername("sa");
             setInitialSize(0);
@@ -45,6 +47,29 @@ class RequestDrivenDataSourceTest {
             }
             if (unavailable) throw new SQLException("TEST ONLY unavailable", "08001");
             return super.createPhysicalConnection();
+        }
+    }
+
+    @Test
+    void allPoolsOfOneSourceShareCooldownAndOneRecoveryBudget() throws Exception {
+        var clock = new AtomicLong();
+        var shared = new DatasourceRecovery(clock::get);
+        try (var runtime = new Pool(shared); var ddl = new Pool(shared)) {
+            runtime.unavailable = true; ddl.unavailable = true;
+            assertThrows(SQLException.class, runtime::getConnection);
+            assertThrows(SQLException.class, ddl::getConnection);
+            assertEquals(5, runtime.attempts.get());
+            assertEquals(0, ddl.attempts.get());
+            clock.addAndGet(TimeUnit.MILLISECONDS.toNanos(RequestDrivenDataSource.COOLDOWN_MILLIS));
+            assertEquals(0, ddl.attempts.get());
+            assertThrows(SQLException.class, ddl::getConnection);
+            assertThrows(SQLException.class, runtime::getConnection);
+            assertEquals(5, runtime.attempts.get());
+            assertEquals(5, ddl.attempts.get());
+            clock.addAndGet(TimeUnit.MILLISECONDS.toNanos(RequestDrivenDataSource.COOLDOWN_MILLIS));
+            runtime.unavailable = false;
+            try (var connection = runtime.getConnection()) { assertTrue(connection.isValid(1)); }
+            assertFalse(shared.cooling());
         }
     }
 
@@ -88,7 +113,8 @@ class RequestDrivenDataSourceTest {
 
     @Test
     void blockedAProbeDoesNotBlockBOrQueueMoreAProbes() throws Exception {
-        try (var a = new Pool(new AtomicLong()); var b = new Pool(new AtomicLong());
+        var shared = new DatasourceRecovery(new AtomicLong()::get);
+        try (var a = new Pool(shared); var ddlA = new Pool(shared); var b = new Pool(new AtomicLong());
              var worker = Executors.newSingleThreadExecutor()) {
             a.unavailable = true;
             a.entered = new CountDownLatch(1);
@@ -98,6 +124,8 @@ class RequestDrivenDataSourceTest {
                 assertTrue(a.entered.await(3, TimeUnit.SECONDS));
                 assertTimeoutPreemptively(java.time.Duration.ofSeconds(1), () -> {
                     assertThrows(SQLException.class, a::getConnection);
+                    assertThrows(SQLException.class, ddlA::getConnection);
+                    assertEquals(0, ddlA.attempts.get());
                     try (var connection = b.getConnection()) { assertTrue(connection.isValid(1)); }
                 });
                 assertEquals(1, a.attempts.get());
@@ -123,7 +151,7 @@ class RequestDrivenDataSourceTest {
     void businessFactoryDisablesBackgroundCreationAndPlatformFactoryKeepsItsSettings() throws Exception {
         var settings = new DruidPools.Settings(1, 1, 3, 250, 1000, 1000, 1000,
                 0, 1000, "SELECT 1", true, false, false, "stat");
-        try (var business = DruidPools.createBusiness(settings, "TEST_ONLY_business", "jdbc:h2:mem:" + UUID.randomUUID(), "sa", "");
+        try (var business = DruidPools.createBusiness(settings, "TEST_ONLY_business", "jdbc:h2:mem:" + UUID.randomUUID(), "sa", "", new DatasourceRecovery(System::nanoTime));
              var platform = DruidPools.create(settings, "TEST_ONLY_platform", "jdbc:h2:mem:" + UUID.randomUUID(), "sa", "")) {
             assertEquals(0, business.getCreateCount());
             assertEquals(0, business.getMinIdle());

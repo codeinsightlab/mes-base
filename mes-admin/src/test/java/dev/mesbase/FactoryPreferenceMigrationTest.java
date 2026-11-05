@@ -54,22 +54,79 @@ class FactoryPreferenceMigrationTest {
     }
 
     @Test
+    void simultaneousFirstWritesHaveOneWinnerAndOneVersionConflict() throws Exception {
+        var fixture = fixture();
+        fixture.jdbc().execute("CREATE TABLE mf_user_preference (user_id BIGINT PRIMARY KEY, last_factory_id VARCHAR(64) NOT NULL, revision BIGINT NOT NULL DEFAULT 0)");
+        var preference = new DatabaseFactoryPreference(fixture.sessions().getMapper(MfUserPreferenceMapper.class));
+        var gate = new java.util.concurrent.CyclicBarrier(2);
+        try (var workers = java.util.concurrent.Executors.newFixedThreadPool(2)) {
+            var results = new java.util.ArrayList<java.util.concurrent.Future<Boolean>>();
+            for (String id : List.of("A", "B")) results.add(workers.submit(() -> {
+                authenticate(7L, "concurrent");
+                try {
+                    gate.await(3, java.util.concurrent.TimeUnit.SECONDS);
+                    preference.saveVersioned(new AuthenticatedActor("concurrent"), new FactoryId(id), 0);
+                    return true;
+                } catch (FoundationException conflict) {
+                    assertEquals(dev.mesbase.core.error.ErrorCode.RESOURCE_CONFLICT, conflict.code());
+                    return false;
+                } finally { SecurityContextHolder.clearContext(); }
+            }));
+            int winners = 0;
+            for (var result : results) if (result.get(3, java.util.concurrent.TimeUnit.SECONDS)) winners++;
+            assertEquals(1, winners);
+        }
+        assertEquals(1L, fixture.jdbc().queryForObject("SELECT revision FROM mf_user_preference WHERE user_id=7", Long.class));
+    }
+
+    @Test
+    void revisionMigrationPreservesExistingPreferenceAndStartsAtZero() throws Exception {
+        var fixture = fixture();
+        fixture.jdbc().execute("CREATE TABLE mf_user_preference (user_id BIGINT PRIMARY KEY, last_factory_id VARCHAR(64) NOT NULL)");
+        fixture.jdbc().update("INSERT INTO mf_user_preference VALUES(7, 'A')");
+        try (var connection = fixture.jdbc().getDataSource().getConnection()) {
+            org.springframework.jdbc.datasource.init.ScriptUtils.executeSqlScript(connection,
+                    new org.springframework.core.io.ClassPathResource("db/center/V2__factory_preference_revision.sql"));
+        }
+        assertEquals("A", fixture.jdbc().queryForObject("SELECT last_factory_id FROM mf_user_preference WHERE user_id=7", String.class));
+        assertEquals(0L, fixture.jdbc().queryForObject("SELECT revision FROM mf_user_preference WHERE user_id=7", Long.class));
+    }
+
+    @Test
+    void versionedPreferenceRejectsLateWritesAndProtectsAgainstSameValueAba() throws Exception {
+        var fixture = fixture();
+        fixture.jdbc().execute("CREATE TABLE mf_user_preference (user_id BIGINT PRIMARY KEY, last_factory_id VARCHAR(64) NOT NULL, revision BIGINT NOT NULL DEFAULT 0)");
+        var preference = new DatabaseFactoryPreference(fixture.sessions().getMapper(MfUserPreferenceMapper.class));
+        authenticate(7L, "versioned");
+        var actor = new AuthenticatedActor("versioned");
+        long old = preference.snapshot(actor).revision();
+        preference.saveVersioned(actor, new FactoryId("B"), old);
+        assertThrows(FoundationException.class, () -> preference.saveVersioned(actor, new FactoryId("A"), old));
+        assertEquals(Optional.of(new FactoryId("B")), preference.lastFactory(actor));
+        preference.saveVersioned(actor, new FactoryId("A"), 1);
+        preference.saveVersioned(actor, new FactoryId("B"), 2);
+        assertThrows(FoundationException.class, () -> preference.saveVersioned(actor, new FactoryId("A"), 1));
+        assertEquals(3, preference.snapshot(actor).revision());
+        assertEquals(Optional.of(new FactoryId("B")), preference.lastFactory(actor));
+    }
+
+    @Test
     void persistedPreferenceUsesStableAuthenticatedIdAndSurvivesAdapterReplacement() throws Exception {
         var fixture = fixture();
         fixture.jdbc()
-                .execute("CREATE TABLE mf_user_preference (user_id BIGINT PRIMARY KEY, last_factory_id VARCHAR(64) NOT NULL)");
+                .execute("CREATE TABLE mf_user_preference (user_id BIGINT PRIMARY KEY, last_factory_id VARCHAR(64) NOT NULL, revision BIGINT NOT NULL DEFAULT 0)");
         var mapper = fixture.sessions().getMapper(MfUserPreferenceMapper.class);
         var preference = new DatabaseFactoryPreference(mapper);
         authenticate(7L, "original");
-        preference.save(new AuthenticatedActor("original"), new FactoryId("10"));
-        preference.save(new AuthenticatedActor("original"), new FactoryId("2"));
+        preference.saveVersioned(new AuthenticatedActor("original"), new FactoryId("10"), 0);
+        preference.saveVersioned(new AuthenticatedActor("original"), new FactoryId("2"), 1);
         authenticate(7L, "renamed");
         assertEquals(Optional.of(new FactoryId("2")),
                 new DatabaseFactoryPreference(mapper).lastFactory(new AuthenticatedActor("renamed")));
         authenticate(8L, "other");
         assertTrue(preference.lastFactory(new AuthenticatedActor("other")).isEmpty());
         assertThrows(FoundationException.class,
-                () -> preference.save(new AuthenticatedActor("renamed"), new FactoryId("10")));
+                () -> preference.saveVersioned(new AuthenticatedActor("renamed"), new FactoryId("10"), 0));
         SecurityContextHolder.clearContext();
         assertThrows(FoundationException.class,
                 () -> preference.lastFactory(new AuthenticatedActor("other")));
@@ -80,7 +137,7 @@ class FactoryPreferenceMigrationTest {
     void preferenceIsProxiedByMasterTransactionsAndRollbackDoesNotChangeSavedValue() throws Exception {
         var fixture = fixture();
         fixture.jdbc()
-                .execute("CREATE TABLE mf_user_preference (user_id BIGINT PRIMARY KEY, last_factory_id VARCHAR(64) NOT NULL)");
+                .execute("CREATE TABLE mf_user_preference (user_id BIGINT PRIMARY KEY, last_factory_id VARCHAR(64) NOT NULL, revision BIGINT NOT NULL DEFAULT 0)");
         try (var context = new AnnotationConfigApplicationContext()) {
             context.registerBean(MfUserPreferenceMapper.class,
                     () -> fixture.sessions().getMapper(MfUserPreferenceMapper.class));
@@ -92,10 +149,10 @@ class FactoryPreferenceMigrationTest {
             assertTrue(AopUtils.isAopProxy(preference));
             authenticate(7L, "owner");
             var actor = new AuthenticatedActor("owner");
-            preference.save(actor, new FactoryId("10"));
+            preference.saveVersioned(actor, new FactoryId("10"), 0);
             var transaction = new TransactionTemplate(context.getBean(PlatformTransactionManager.class));
             assertThrows(IllegalStateException.class, () -> transaction.execute(status -> {
-                preference.save(actor, new FactoryId("2"));
+                preference.saveVersioned(actor, new FactoryId("2"), 1);
                 throw new IllegalStateException("TEST ONLY rollback");
             }));
             assertEquals(Optional.of(new FactoryId("10")), preference.lastFactory(actor));
@@ -159,11 +216,11 @@ class FactoryPreferenceMigrationTest {
         var selection = new FactorySelectionService(catalog, preferences);
         assertEquals("2", selection.resolve(actor, Optional.empty()).orElseThrow().factoryId().value());
         assertTrue(preferences.lastFactory(actor).isEmpty());
-        preferences.save(actor, ten.id());
+        preferences.saveVersioned(actor, ten.id(), 0);
         assertEquals("10", selection.resolve(actor, Optional.empty()).orElseThrow().factoryId().value());
         assertEquals("2", selection.resolve(actor, Optional.of(two.id())).orElseThrow().factoryId().value());
         for (String invalid : List.of("missing", "1")) {
-            preferences.save(actor, new FactoryId(invalid));
+            preferences.saveVersioned(actor, new FactoryId(invalid), preferences.snapshot(actor).revision());
             assertEquals("2", selection.resolve(actor, Optional.empty()).orElseThrow().factoryId().value());
         }
         assertFalse(new InMemoryRoleAuthorization().hasPermission(

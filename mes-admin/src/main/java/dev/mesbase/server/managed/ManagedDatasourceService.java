@@ -18,7 +18,7 @@ import dev.mesbase.infrastructure.persistence.PlatformPersistence;
 import dev.mesbase.infrastructure.persistence.RuntimeRegistry;
 import dev.mesbase.platform.execution.FactoryIntegrationContext;
 import dev.mesbase.server.DruidPools;
-import dev.mesbase.server.RequestDrivenDataSource;
+import dev.mesbase.server.DatasourceRecovery;
 import dev.mesbase.system.factory.FactoryExecutionMetadata;
 import dev.mesbase.system.factory.ManagedDatasource;
 import dev.mesbase.system.factory.ManagedDatasourceMapper;
@@ -108,9 +108,9 @@ public class ManagedDatasourceService {
     private final LongSupplier nanoTime;
     private static final class Preparation {
         final ReentrantLock lock = new ReentrantLock();
-        long failedRevision;
-        long retryAfter;
     }
+    private record RecoveryKey(DatasourceIdentity identity, long revision) {}
+    private final ConcurrentHashMap<RecoveryKey, DatasourceRecovery> recoveries = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<DatasourceIdentity, Preparation> preparations = new ConcurrentHashMap<>();
     private final PlatformPersistence persistence;
 
@@ -475,12 +475,11 @@ public class ManagedDatasourceService {
         }
         var preparation = lockPreparation(identity(id));
         try {
-            checkCooldown(preparation, row.revision());
+            checkCooldown(identity(id), row.revision());
             var result = generateDdl(row, file);
-            preparation.failedRevision = 0;
             return result;
         } catch (RuntimeException failure) {
-            rememberConnectionFailure(preparation, row.revision(), failure);
+            rememberConnectionFailure(identity(id), row.revision(), failure);
             throw failure;
         } finally {
             preparation.lock.unlock();
@@ -489,7 +488,7 @@ public class ManagedDatasourceService {
 
     private DdlView generateDdl(ManagedDatasource row, Path file) {
         long id = row.datasourceId();
-        var pool = DruidPools.createBusiness(settings, "ddl-managed-" + id, row.jdbcUrl(), row.dbUsername(), cipher.decrypt(row.passwordCipher()));
+        var pool = DruidPools.createBusiness(settings, "ddl-managed-" + id, row.jdbcUrl(), row.dbUsername(), cipher.decrypt(row.passwordCipher()), recovery(identity(id), row.revision()));
         try {
             if (physicalIdentity(pool).equals(physicalIdentity(platform)))
                 throw new FoundationException(ErrorCode.RESOURCE_CONFLICT);
@@ -567,9 +566,9 @@ public class ManagedDatasourceService {
         var preparation = lockPreparation(binding.datasourceIdentity());
         try {
             if (registry.contains(binding)) return registry.acquireDedicated(binding);
-            checkCooldown(preparation, binding.revision());
+            checkCooldown(binding.datasourceIdentity(), binding.revision());
             var pool = DruidPools.createBusiness(settings, "business-managed-" + source.datasourceId() + "-r" + source.revision(),
-                    source.jdbcUrl(), source.dbUsername(), cipher.decrypt(source.passwordCipher()));
+                    source.jdbcUrl(), source.dbUsername(), cipher.decrypt(source.passwordCipher()), recovery(binding.datasourceIdentity(), binding.revision()));
             var closed = new AtomicBoolean();
             Runnable closeCandidate = () -> {
                 if (closed.compareAndSet(false, true)) {
@@ -592,21 +591,25 @@ public class ManagedDatasourceService {
                             .anyMatch(e -> !e.getKey().identity().equals(binding.datasourceIdentity())
                                     && e.getValue().equals(database)))
                         throw new FoundationException(ErrorCode.RESOURCE_CONFLICT);
+                    physical.put(version, database);
+                }
+                try {
                     registry.registerDedicated(binding.factoryId(), binding.datasourceIdentity(), binding.revision(), pool, () -> {
                         closeCandidate.run();
                         physical.remove(version);
                     }, mappers);
                     transferred = true;
-                    physical.put(version, database);
+                } catch (RuntimeException | Error failure) {
+                    physical.remove(version);
+                    throw failure;
                 }
                 initialized.put(source.datasourceId(), binding);
-                preparation.failedRevision = 0;
                 return registry.acquireDedicated(binding);
             } finally {
                 if (!transferred) closeCandidate.run();
             }
         } catch (RuntimeException failure) {
-            rememberConnectionFailure(preparation, binding.revision(), failure);
+            rememberConnectionFailure(binding.datasourceIdentity(), binding.revision(), failure);
             throw failure;
         } finally {
             preparation.lock.unlock();
@@ -626,17 +629,21 @@ public class ManagedDatasourceService {
         return preparation;
     }
 
-    private void checkCooldown(Preparation preparation, long revision) {
-        if (preparation.failedRevision == revision && nanoTime.getAsLong() - preparation.retryAfter < 0)
-            throw new FoundationException(ErrorCode.RUNTIME_NOT_CONFIGURED);
+    private DatasourceRecovery recovery(DatasourceIdentity identity, long revision) {
+        return recoveries.computeIfAbsent(new RecoveryKey(identity, revision),
+                unused -> new DatasourceRecovery(identity + " revision=" + revision, nanoTime));
     }
 
-    private void rememberConnectionFailure(Preparation preparation, long revision, RuntimeException failure) {
-        // Configuration/ownership conflicts are not connection failures.
+    private void checkCooldown(DatasourceIdentity identity, long revision) {
+        try { recovery(identity, revision).check(); }
+        catch (SQLException failure) { throw new FoundationException(ErrorCode.RUNTIME_NOT_CONFIGURED, failure); }
+    }
+
+    private void rememberConnectionFailure(DatasourceIdentity identity, long revision, RuntimeException failure) {
         for (Throwable cause = failure; cause != null; cause = cause.getCause()) {
+            if (cause instanceof DatasourceRecovery.Unavailable) return;
             if (cause instanceof SQLException) {
-                preparation.failedRevision = revision;
-                preparation.retryAfter = nanoTime.getAsLong() + TimeUnit.MILLISECONDS.toNanos(RequestDrivenDataSource.COOLDOWN_MILLIS);
+                recovery(identity, revision).failed();
                 break;
             }
         }
@@ -646,13 +653,15 @@ public class ManagedDatasourceService {
         return factories.byDatasources(List.of(id)).stream().map(ManagedFactory::factoryId).toList();
     }
 
-    private void retire(long id) {
+    private void retire(long id) { retire(id, null); }
+
+    private void retire(long id, BusinessRuntimeBinding expected) {
         var preparation = preparations.computeIfAbsent(identity(id), unused -> new Preparation());
         preparation.lock.lock();
         try {
+            if (expected != null && !expected.equals(initialized.get(id))) return;
             registry.retire(identity(id));
             initialized.remove(id);
-            preparation.failedRevision = 0;
         } finally {
             preparation.lock.unlock();
         }
@@ -676,9 +685,7 @@ public class ManagedDatasourceService {
                     && f.factoryId().equals(old.factoryId().value()) && "ENABLED".equals(f.status()))
                     && configurations.stream().anyMatch(d -> d.datasourceId() == id
                     && d.revision() == old.revision() && "ENABLED".equals(d.status()));
-            if (!valid) synchronized (this) {
-                if (old.equals(initialized.get(id))) retire(id);
-            }
+            if (!valid) retire(id, old);
         }
     }
 

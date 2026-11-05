@@ -8,5 +8,6 @@ import org.apache.ibatis.annotations.Param;
 public interface MfUserPreferenceMapper {
     MfUserPreference selectById(@Param("userId") long userId);
 
-    int save(MfUserPreference preference);
+    int updateVersioned(MfUserPreference preference);
+    int insertInitial(MfUserPreference preference);
 }
