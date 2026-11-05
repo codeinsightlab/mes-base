@@ -35,7 +35,14 @@ public final class DruidPools {
     }
 
     public static DruidDataSource create(Settings s, String name, String url, String user, String password) {
-        var pool = new DruidDataSource();
+        return initialize(new DruidDataSource(), s, name, url, user, password);
+    }
+
+    public static RequestDrivenDataSource createBusiness(Settings s, String name, String url, String user, String password) {
+        return initialize(new RequestDrivenDataSource(), s, name, url, user, password);
+    }
+
+    private static <T extends DruidDataSource> T initialize(T pool, Settings s, String name, String url, String user, String password) {
         pool.setName(name);
         pool.setUrl(url);
         pool.setUsername(user);
@@ -53,6 +60,19 @@ public final class DruidPools {
         pool.setTestWhileIdle(s.testWhileIdle());
         pool.setTestOnBorrow(s.testOnBorrow());
         pool.setTestOnReturn(s.testOnReturn());
+        if (pool instanceof RequestDrivenDataSource) {
+            pool.setInitialSize(0);
+            pool.setMinIdle(0);
+            pool.setKeepAlive(false);
+            pool.setAsyncInit(false);
+            pool.setTestWhileIdle(false);
+            pool.setTestOnBorrow(true);
+            pool.setTestOnReturn(false);
+            pool.setBreakAfterAcquireFailure(true);
+            pool.setConnectionErrorRetryAttempts(0);
+            pool.setFailFast(true);
+            pool.setValidationQueryTimeout(Math.max(1, (s.connectTimeout() + 999) / 1000));
+        }
         try {
             if (s.filters() == null || !s.filters().matches("(stat|wall)(,(stat|wall))*"))
                 throw new IllegalArgumentException("Only registered Druid filters allowed");

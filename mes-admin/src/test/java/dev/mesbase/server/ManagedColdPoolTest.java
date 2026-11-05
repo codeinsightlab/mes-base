@@ -60,6 +60,10 @@ class ManagedColdPoolTest {
     }
 
     private Fixture fixture() throws Exception {
+        return fixture(System::nanoTime);
+    }
+
+    private Fixture fixture(java.util.function.LongSupplier clock) throws Exception {
         var center = new DriverManagerDataSource("jdbc:h2:mem:" + UUID.randomUUID() + ";MODE=MySQL;DB_CLOSE_DELAY=-1", "sa", "");
         var jdbc = new JdbcTemplate(center);
         jdbc.execute("CREATE TABLE mf_factory(factory_id VARCHAR(64),enterprise_id VARCHAR(64),factory_code VARCHAR(32),factory_name VARCHAR(64),datasource_id BIGINT,status VARCHAR(16),revision BIGINT,runtime_mode VARCHAR(16) DEFAULT 'LOCAL',erp_provider VARCHAR(128),erp_config_ref VARCHAR(128),integration_revision BIGINT DEFAULT 1,integration_locked BOOLEAN DEFAULT TRUE)");
@@ -72,7 +76,7 @@ class ManagedColdPoolTest {
         when(platform.getConnection()).thenAnswer(call -> probe("center"));
         var settings = new DruidPools.Settings(0, 0, 5, 1000, 1000, 1000, 1000, 0, 1000, "SELECT 1", false, false, false, "stat");
         var service = new ManagedDatasourceService(persistence, persistence.mapper(ManagedDatasourceMapper.class), persistence.mapper(ManagedFactoryMapper.class), mock(DatasourcePasswordCipher.class), registry, platform, settings,
-                Set.of(), Path.of("target/TEST-ONLY-unused-ddl"), RoutingCacheFixture.cache(persistence));
+                Set.of(), Path.of("target/TEST-ONLY-unused-ddl"), RoutingCacheFixture.cache(persistence), new dev.mesbase.server.managed.FactoryIntegrationRegistry(new org.springframework.core.env.StandardEnvironment()), clock);
         return new Fixture(jdbc, service, registry);
     }
 
@@ -98,7 +102,7 @@ class ManagedColdPoolTest {
                 tasks.add(workers.submit(() -> {
                     var request = new MockHttpServletRequest();
                     RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(request));
-                    try (var construction = mockConstruction(DruidDataSource.class, (pool, context) -> {
+                    try (var construction = mockConstruction(RequestDrivenDataSource.class, (pool, context) -> {
                         created.add(pool);
                         when(pool.getConnection()).thenAnswer(call -> probe("business-A"));
                     })) {
@@ -128,7 +132,7 @@ class ManagedColdPoolTest {
 
     @Test
     void oldColdSnapshotDoesNotCreateHistoricalPoolAfterNewVersionIsActive() throws Exception {
-        try (var fixture = fixture(); var pools = mockConstruction(DruidDataSource.class, (pool, context) ->
+        try (var fixture = fixture(); var pools = mockConstruction(RequestDrivenDataSource.class, (pool, context) ->
                 when(pool.getConnection()).thenAnswer(call -> probe("business-A")))) {
             var request = new MockHttpServletRequest();
             RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(request));
@@ -150,7 +154,7 @@ class ManagedColdPoolTest {
 
     @Test
     void sameVersionReadmissionCreatesFreshPoolAndOldPoolDrainsIndependently() throws Exception {
-        try (var fixture = fixture(); var pools = mockConstruction(DruidDataSource.class, (pool, context) ->
+        try (var fixture = fixture(); var pools = mockConstruction(RequestDrivenDataSource.class, (pool, context) ->
                 when(pool.getConnection()).thenAnswer(call -> probe("business-A")))) {
             var scope = new FactoryScope(new FactoryId("A"));
             var oldRequest = new MockHttpServletRequest();
@@ -187,7 +191,7 @@ class ManagedColdPoolTest {
 
     @Test
     void failedRetiredCloseIsRetriedWithoutClosingActiveReplacement() throws Exception {
-        try (var fixture = fixture(); var pools = mockConstruction(DruidDataSource.class, (pool, context) ->
+        try (var fixture = fixture(); var pools = mockConstruction(RequestDrivenDataSource.class, (pool, context) ->
                 when(pool.getConnection()).thenAnswer(call -> probe("business-A")))) {
             var scope = new FactoryScope(new FactoryId("A"));
             var acquired = fixture.service.begin(scope);
@@ -207,8 +211,71 @@ class ManagedColdPoolTest {
     }
 
     @Test
+    void coldFailureIsRememberedUntilNextRequestAfterCooldown() throws Exception {
+        var clock = new java.util.concurrent.atomic.AtomicLong();
+        var unavailable = new java.util.concurrent.atomic.AtomicBoolean(true);
+        try (var fixture = fixture(clock::get); var pools = mockConstruction(RequestDrivenDataSource.class, (pool, context) ->
+                when(pool.getConnection()).thenAnswer(call -> {
+                    if (unavailable.get()) throw new SQLException("TEST ONLY outage");
+                    return probe("business-A");
+                }))) {
+            var scope = new FactoryScope(new FactoryId("A"));
+            assertThrows(FoundationException.class, () -> fixture.service.begin(scope));
+            for (int i = 0; i < 5; i++) assertThrows(FoundationException.class, () -> fixture.service.begin(scope));
+            assertThrows(FoundationException.class, () -> fixture.service.ddl(1, true));
+            assertEquals(1, pools.constructed().size());
+            clock.addAndGet(TimeUnit.MILLISECONDS.toNanos(RequestDrivenDataSource.COOLDOWN_MILLIS));
+            unavailable.set(false);
+            fixture.service.reconcileInitializedPools();
+            assertEquals(1, pools.constructed().size());
+            var recovered = fixture.service.begin(scope);
+            recovered.lease().close();
+            assertEquals(2, pools.constructed().size());
+        }
+    }
+
+    @Test
+    void coldSourcesWithCollidingOldLockHashesPrepareIndependently() throws Exception {
+        long other = java.util.stream.LongStream.range(2, 1000)
+                .filter(id -> Math.floorMod(identityHash(id), 64) == Math.floorMod(identityHash(1), 64))
+                .findFirst().orElseThrow();
+        try (var fixture = fixture(); var workers = Executors.newFixedThreadPool(2)) {
+            fixture.jdbc.update("INSERT INTO mf_factory(factory_id,enterprise_id,factory_code,factory_name,datasource_id,status,revision) VALUES('B','TEST ONLY','B','Fixture',?,'ENABLED',1)", other);
+            fixture.jdbc.update("INSERT INTO mf_datasource VALUES(?,'TEST ONLY','invalid.test',3306,'TEST_ONLY_B','TEST_ONLY','CIPHER','ENABLED',1)", other);
+            var entered = new CountDownLatch(1);
+            var release = new CountDownLatch(1);
+            var a = workers.submit(() -> {
+                try (var pools = mockConstruction(RequestDrivenDataSource.class, (pool, context) ->
+                        when(pool.getConnection()).thenAnswer(call -> {
+                            entered.countDown();
+                            if (!release.await(10, TimeUnit.SECONDS)) throw new SQLException("TEST ONLY gate timeout");
+                            throw new SQLException("TEST ONLY A outage");
+                        }))) {
+                    assertThrows(FoundationException.class, () -> fixture.service.begin(new FactoryScope(new FactoryId("A"))));
+                }
+            });
+            try {
+                assertTrue(entered.await(5, TimeUnit.SECONDS));
+                var b = workers.submit(() -> {
+                    try (var pools = mockConstruction(RequestDrivenDataSource.class, (pool, context) ->
+                            when(pool.getConnection()).thenAnswer(call -> probe("business-B")))) {
+                        var acquired = fixture.service.begin(new FactoryScope(new FactoryId("B")));
+                        acquired.lease().close();
+                    }
+                });
+                b.get(2, TimeUnit.SECONDS);
+            } finally { release.countDown(); }
+            a.get(3, TimeUnit.SECONDS);
+        }
+    }
+
+    private static int identityHash(long id) {
+        return new DatasourceIdentity("managed-" + id).hashCode();
+    }
+
+    @Test
     void failedPhysicalProbeClosesUnpublishedPool() throws Exception {
-        try (var fixture = fixture(); var pools = mockConstruction(DruidDataSource.class, (pool, context) ->
+        try (var fixture = fixture(); var pools = mockConstruction(RequestDrivenDataSource.class, (pool, context) ->
                 when(pool.getConnection()).thenThrow(new SQLException("TEST ONLY unavailable database")))) {
             assertThrows(FoundationException.class, () -> fixture.service.begin(new FactoryScope(new FactoryId("A"))));
             assertEquals(1, pools.constructed().size());
