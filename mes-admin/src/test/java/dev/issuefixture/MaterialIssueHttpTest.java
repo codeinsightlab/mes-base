@@ -296,6 +296,8 @@ class MaterialIssueHttpTest {
                 jdbc.execute("ALTER TABLE mes_execution_path ADD execution_code VARCHAR(2048)");
                 jdbc.execute("CREATE UNIQUE INDEX uk_path_execution_code ON mes_execution_path(execution_code)");
                 jdbc.execute("ALTER TABLE mes_execution_path ALTER COLUMN id BIGINT AUTO_INCREMENT");
+                jdbc.execute("ALTER TABLE wm_stock_document ADD supplier_name VARCHAR(200)");
+                jdbc.execute("ALTER TABLE wm_stock_document ADD supplier_document_no VARCHAR(128)");
                 // TEST ONLY H2 equivalent of V81; existing routed rows retain their identities.
                 jdbc.execute("ALTER TABLE workorder ALTER COLUMN routing_id DROP NOT NULL");
                 jdbc.execute("ALTER TABLE mes_production_execution ALTER COLUMN routing_id DROP NOT NULL");

@@ -387,7 +387,7 @@ public class StockDocumentService {
         String documentNo = autoCodes.getBusinessDocNo(header.ruleCode(), category);
         return businessTransactions.execute(status -> {
             var draft = createDraft(new StockDocumentModels.Create(header.direction(), header.documentType(), header.reason(),
-                    header.remark(), header.sourceWorkorderId(), header.sourceExecutionCode(), header.ruleCode()), documentNo);
+                    header.remark(), header.sourceWorkorderId(), header.sourceExecutionCode(), header.ruleCode(), header.supplierName(), header.supplierDocumentNo()), documentNo);
             Long id = draft.document().getId();
             for (StockDocumentModels.AggregateLine item : command.items()) {
                 var latest = require(id);
@@ -410,7 +410,7 @@ public class StockDocumentService {
                 || !Objects.equals(current.getDocumentType(), header.documentType())
                 || !Objects.equals(current.getDirection(), header.direction()))
             ParameterChecks.reject(ErrorCode.STOCK_DOCUMENT_CONFLICT);
-        edit(id, new StockDocumentModels.Edit(header.expectedRevision(), header.reason(), header.remark()));
+        edit(id, new StockDocumentModels.Edit(header.expectedRevision(), header.reason(), header.remark(), header.supplierName(), header.supplierDocumentNo()));
         var existing = rows(id);
         var retained = new HashSet<Long>();
         for (StockDocumentModels.AggregateLine item : command.items()) {
@@ -443,7 +443,7 @@ public class StockDocumentService {
         validate(new StockDocumentModels.Create(command.header().direction(), command.header()
                 .documentType(), command.header().reason(),
                 command.header().remark(), command.header().sourceWorkorderId(), command.header().sourceExecutionCode(),
-                command.header().ruleCode()));
+                command.header().ruleCode(), command.header().supplierName(), command.header().supplierDocumentNo()));
         requireDirection(command.header().direction(), type(command.header().documentType()));
         for (StockDocumentModels.AggregateLine item : command.items()) {
             if (item == null || item.stockId() == null || item.materialId() == null || item.warehouseId() == null
@@ -510,6 +510,7 @@ public class StockDocumentService {
         row.setStatus(StockDocumentStatus.DRAFT.getValue());
         row.setReason(command.reason());
         row.setRemark(command.remark());
+        purchaseSupplier(row, command.supplierName(), command.supplierDocumentNo());
         row.setSourceWorkorderId(command.sourceWorkorderId());
         row.setSourceExecutionCode(command.sourceExecutionCode());
         row.setRevision(0L);
@@ -525,6 +526,7 @@ public class StockDocumentService {
         sources.localCreation();
         row.setReason(command.reason());
         row.setRemark(command.remark());
+        purchaseSupplier(row, command.supplierName(), command.supplierDocumentNo());
         save(row);
         return detail(id);
     }
@@ -667,6 +669,12 @@ public class StockDocumentService {
         sources.localCreation();
         var purpose = type(row.getDocumentType());
         if (!purpose.isApprovalAvailable()) ParameterChecks.reject(ErrorCode.STOCK_DOCUMENT_SOURCE_PENDING);
+        if (purpose == StockDocumentType.PURCHASE_RECEIPT) {
+            // V1 direct receipt: this document is the receiving basis; a purchase order is optional in future.
+            if (StringUtils.isBlank(row.getSupplierName()) || row.getSourceWorkorderId() != null
+                    || row.getSourceExecutionCode() != null)
+                ParameterChecks.reject(ErrorCode.BAD_REQUEST, new SafeBusinessMessage("采购入库请填写供应商，不得关联生产工单或执行"));
+        }
         var detail = rows(id);
         if (detail.isEmpty()) ParameterChecks.reject(ErrorCode.STOCK_DOCUMENT_CONFLICT);
         if (purpose.isQualityReceipt()) {
@@ -862,6 +870,16 @@ public class StockDocumentService {
             return fact.getTransferQty();
         }
         return null;
+    }
+
+    private static void purchaseSupplier(WmStockDocumentEntity row, String name, String documentNo) {
+        if (type(row.getDocumentType()) != StockDocumentType.PURCHASE_RECEIPT) {
+            if (StringUtils.isNotBlank(name) || StringUtils.isNotBlank(documentNo))
+                ParameterChecks.reject(ErrorCode.BAD_REQUEST, new SafeBusinessMessage("供应商信息仅适用于采购入库"));
+            return;
+        }
+        row.setSupplierName(StringUtils.trimToNull(name));
+        row.setSupplierDocumentNo(StringUtils.trimToNull(documentNo));
     }
 
     private void validateIdentity(WmStockDocumentLineEntity line, BigDecimal remaining, boolean checkQuantity) {

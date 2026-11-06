@@ -9,7 +9,8 @@ DB = ROOT / 'mes-admin/src/main/resources/db'
 
 class FlywayInitDistributionTest(unittest.TestCase):
     def test_only_current_chains_are_distributed(self):
-        self.assertEqual({'center/V1__init.sql', 'business/V1__init.sql'},
+        self.assertEqual({'center/V1__init.sql', 'center/V2__factory_preference_revision.sql',
+                          'business/V1__init.sql', 'business/V86__direct_purchase_receipt.sql'},
                          {str(p.relative_to(DB)) for p in DB.rglob('*.sql')})
         java = ROOT / 'mes-admin/src/main/java/dev/mesbase/server/schema'
         self.assertEqual([], list(java.glob('V*__*.java')))
@@ -20,7 +21,8 @@ class FlywayInitDistributionTest(unittest.TestCase):
             self.assertIsNone(re.search(r'^\s*(DROP|TRUNCATE|DELETE|REPLACE|USE)\b', sql, re.I | re.M), p)
             self.assertIsNone(re.search(r'\bCREATE\s+(DATABASE|SCHEMA|USER)\b', sql, re.I), p)
             self.assertNotRegex(sql, r'(?i)AUTO_INCREMENT\s*=\s*\d+')
-            self.assertIn('SET FOREIGN_KEY_CHECKS = @mes_init_foreign_key_checks;', sql)
+            if p.name == 'V1__init.sql':
+                self.assertIn('SET FOREIGN_KEY_CHECKS = @mes_init_foreign_key_checks;', sql)
 
     def test_seeds_are_product_catalog_only(self):
         center = (DB / 'center/V1__init.sql').read_text()

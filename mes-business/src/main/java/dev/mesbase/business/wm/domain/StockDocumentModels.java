@@ -27,11 +27,16 @@ public final class StockDocumentModels {
 
     public record Create(String direction, @NotBlank String documentType, @NotBlank @Size(max = 500) String reason,
                          @Size(max = 500) String remark, Long sourceWorkorderId, String sourceExecutionCode,
-                         @Size(max = 64) String ruleCode) {
+                         @Size(max = 64) String ruleCode, @Size(max = 200) String supplierName,
+                         @Size(max = 128) String supplierDocumentNo) {
+        public Create(String direction, String documentType, String reason, String remark, Long sourceWorkorderId,
+                      String sourceExecutionCode, String ruleCode) {
+            this(direction, documentType, reason, remark, sourceWorkorderId, sourceExecutionCode, ruleCode, null, null);
+        }
+
         public Create(String documentType, String reason, String remark, Long sourceWorkorderId,
                       String sourceExecutionCode, String ruleCode) {
-            this(StockDocumentType.from(documentType) == null ? null : StockDocumentType.from(documentType)
-                            .getDirection().getValue(),
+            this(directionForType(documentType),
                     documentType, reason, remark, sourceWorkorderId, sourceExecutionCode, ruleCode);
         }
 
@@ -45,11 +50,17 @@ public final class StockDocumentModels {
                                   @NotBlank @Size(max = 500) String reason,
                                   @Size(max = 500) String remark, Long sourceWorkorderId,
                                   String sourceExecutionCode, @Size(max = 64) String ruleCode,
-                                  Long expectedRevision) {
+                                  Long expectedRevision, @Size(max = 200) String supplierName,
+                                  @Size(max = 128) String supplierDocumentNo) {
+        public AggregateHeader(String direction, String documentType, String reason, String remark,
+                               Long sourceWorkorderId, String sourceExecutionCode, String ruleCode,
+                               Long expectedRevision) {
+            this(direction, documentType, reason, remark, sourceWorkorderId, sourceExecutionCode, ruleCode, expectedRevision, null, null);
+        }
+
         public AggregateHeader(String documentType, String reason, String remark, Long sourceWorkorderId,
                                String sourceExecutionCode, String ruleCode, Long expectedRevision) {
-            this(StockDocumentType.from(documentType) == null ? null : StockDocumentType.from(documentType)
-                            .getDirection().getValue(),
+            this(directionForType(documentType),
                     documentType, reason, remark, sourceWorkorderId, sourceExecutionCode, ruleCode, expectedRevision);
         }
     }
@@ -78,7 +89,11 @@ public final class StockDocumentModels {
     }
 
     public record Edit(@NotNull Long expectedRevision, @NotBlank @Size(max = 500) String reason,
-                       @Size(max = 500) String remark) {
+                       @Size(max = 500) String remark, @Size(max = 200) String supplierName,
+                       @Size(max = 128) String supplierDocumentNo) {
+        public Edit(Long expectedRevision, String reason, String remark) {
+            this(expectedRevision, reason, remark, null, null);
+        }
     }
 
     public record Line(@NotNull Long expectedRevision, @NotNull Long stockId,

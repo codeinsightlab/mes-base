@@ -13,6 +13,10 @@ public class WmStockDocumentEntity {
 
     private String status;
 
+    private String supplierName;
+
+    private String supplierDocumentNo;
+
     private String reason;
 
     private String remark;
@@ -185,9 +189,13 @@ public class WmStockDocumentEntity {
         this.revision = revision;
     }
 
-    public String getCreateRequestId() { return createRequestId; }
+    public String getCreateRequestId() {
+        return createRequestId;
+    }
 
-    public void setCreateRequestId(String value) { createRequestId = value; }
+    public void setCreateRequestId(String value) {
+        createRequestId = value;
+    }
 
     public String getPostRequestId() {
         return postRequestId;
@@ -213,6 +221,22 @@ public class WmStockDocumentEntity {
         this.sourceExecutionCode = sourceExecutionCode;
     }
 
+
+    public String getSupplierName() {
+        return supplierName;
+    }
+
+    public void setSupplierName(String value) {
+        supplierName = value;
+    }
+
+    public String getSupplierDocumentNo() {
+        return supplierDocumentNo;
+    }
+
+    public void setSupplierDocumentNo(String value) {
+        supplierDocumentNo = value;
+    }
 
     public String getSourceRequestJson() {
         return sourceRequestJson;

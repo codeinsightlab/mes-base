@@ -7,6 +7,8 @@
     <result column="document_type" jdbcType="VARCHAR" property="documentType" />
     <result column="direction" jdbcType="VARCHAR" property="direction" />
     <result column="status" jdbcType="VARCHAR" property="status" />
+    <result column="supplier_name" jdbcType="VARCHAR" property="supplierName" />
+    <result column="supplier_document_no" jdbcType="VARCHAR" property="supplierDocumentNo" />
     <result column="reason" jdbcType="VARCHAR" property="reason" />
     <result column="remark" jdbcType="VARCHAR" property="remark" />
     <result column="source_workorder_id" jdbcType="BIGINT" property="sourceWorkorderId" />
@@ -86,7 +88,7 @@
     </where>
   </sql>
   <sql id="Base_Column_List">
-    id, document_no, document_type, direction, status, reason, remark, source_workorder_id, create_by,
+    id, document_no, document_type, direction, status, reason, supplier_name, supplier_document_no, remark, source_workorder_id, create_by,
     create_time, update_by, update_time, posted_by, posted_at, cancelled_by, cancelled_at,
     revision, create_request_id, post_request_id, post_request_hash, source_execution_code
   </sql>
@@ -137,14 +139,14 @@
   </delete>
   <insert id="insert" keyColumn="id" keyProperty="id" parameterType="dev.mesbase.business.wm.domain.WmStockDocumentEntity" useGeneratedKeys="true">
     insert into wm_stock_document (document_no, document_type, direction, status,
-      reason, remark, source_workorder_id,
+      reason, supplier_name, supplier_document_no, remark, source_workorder_id,
       create_by, create_time, update_by,
       update_time, posted_by, posted_at,
       cancelled_by, cancelled_at, revision,
       create_request_id, post_request_id, post_request_hash, source_execution_code, source_request_json
       )
     values (#{documentNo,jdbcType=VARCHAR}, #{documentType,jdbcType=VARCHAR}, #{direction,jdbcType=VARCHAR}, #{status,jdbcType=VARCHAR},
-      #{reason,jdbcType=VARCHAR}, #{remark,jdbcType=VARCHAR}, #{sourceWorkorderId,jdbcType=BIGINT},
+      #{reason,jdbcType=VARCHAR}, #{supplierName,jdbcType=VARCHAR}, #{supplierDocumentNo,jdbcType=VARCHAR}, #{remark,jdbcType=VARCHAR}, #{sourceWorkorderId,jdbcType=BIGINT},
       #{createBy,jdbcType=VARCHAR}, #{createTime,jdbcType=TIMESTAMP}, #{updateBy,jdbcType=VARCHAR},
       #{updateTime,jdbcType=TIMESTAMP}, #{postedBy,jdbcType=BIGINT}, #{postedAt,jdbcType=TIMESTAMP},
       #{cancelledBy,jdbcType=BIGINT}, #{cancelledAt,jdbcType=TIMESTAMP}, #{revision,jdbcType=BIGINT},
@@ -169,6 +171,8 @@
       <if test="reason != null">
         reason,
       </if>
+      <if test="supplierName != null">supplier_name,</if>
+      <if test="supplierDocumentNo != null">supplier_document_no,</if>
       <if test="remark != null">
         remark,
       </if>
@@ -234,6 +238,8 @@
       <if test="reason != null">
         #{reason,jdbcType=VARCHAR},
       </if>
+      <if test="supplierName != null">#{supplierName,jdbcType=VARCHAR},</if>
+      <if test="supplierDocumentNo != null">#{supplierDocumentNo,jdbcType=VARCHAR},</if>
       <if test="remark != null">
         #{remark,jdbcType=VARCHAR},
       </if>
@@ -311,6 +317,8 @@
       <if test="row.reason != null">
         reason = #{row.reason,jdbcType=VARCHAR},
       </if>
+      <if test="row.supplierName != null">supplier_name = #{row.supplierName,jdbcType=VARCHAR},</if>
+      <if test="row.supplierDocumentNo != null">supplier_document_no = #{row.supplierDocumentNo,jdbcType=VARCHAR},</if>
       <if test="row.remark != null">
         remark = #{row.remark,jdbcType=VARCHAR},
       </if>
@@ -372,6 +380,8 @@
       direction = #{row.direction,jdbcType=VARCHAR},
       status = #{row.status,jdbcType=VARCHAR},
       reason = #{row.reason,jdbcType=VARCHAR},
+      supplier_name = #{row.supplierName,jdbcType=VARCHAR},
+      supplier_document_no = #{row.supplierDocumentNo,jdbcType=VARCHAR},
       remark = #{row.remark,jdbcType=VARCHAR},
       source_workorder_id = #{row.sourceWorkorderId,jdbcType=BIGINT},
       create_by = #{row.createBy,jdbcType=VARCHAR},
@@ -399,6 +409,8 @@
       direction = #{row.direction,jdbcType=VARCHAR},
       status = #{row.status,jdbcType=VARCHAR},
       reason = #{row.reason,jdbcType=VARCHAR},
+      supplier_name = #{row.supplierName,jdbcType=VARCHAR},
+      supplier_document_no = #{row.supplierDocumentNo,jdbcType=VARCHAR},
       remark = #{row.remark,jdbcType=VARCHAR},
       source_workorder_id = #{row.sourceWorkorderId,jdbcType=BIGINT},
       create_by = #{row.createBy,jdbcType=VARCHAR},
@@ -435,6 +447,8 @@
       <if test="reason != null">
         reason = #{reason,jdbcType=VARCHAR},
       </if>
+      <if test="supplierName != null">supplier_name = #{supplierName,jdbcType=VARCHAR},</if>
+      <if test="supplierDocumentNo != null">supplier_document_no = #{supplierDocumentNo,jdbcType=VARCHAR},</if>
       <if test="remark != null">
         remark = #{remark,jdbcType=VARCHAR},
       </if>
@@ -493,6 +507,8 @@
       direction = #{direction,jdbcType=VARCHAR},
       status = #{status,jdbcType=VARCHAR},
       reason = #{reason,jdbcType=VARCHAR},
+      supplier_name = #{supplierName,jdbcType=VARCHAR},
+      supplier_document_no = #{supplierDocumentNo,jdbcType=VARCHAR},
       remark = #{remark,jdbcType=VARCHAR},
       source_workorder_id = #{sourceWorkorderId,jdbcType=BIGINT},
       create_by = #{createBy,jdbcType=VARCHAR},
@@ -517,6 +533,8 @@ where id = #{id,jdbcType=BIGINT}
       direction = #{direction,jdbcType=VARCHAR},
       status = #{status,jdbcType=VARCHAR},
       reason = #{reason,jdbcType=VARCHAR},
+      supplier_name = #{supplierName,jdbcType=VARCHAR},
+      supplier_document_no = #{supplierDocumentNo,jdbcType=VARCHAR},
       remark = #{remark,jdbcType=VARCHAR},
       source_workorder_id = #{sourceWorkorderId,jdbcType=BIGINT},
       create_by = #{createBy,jdbcType=VARCHAR},

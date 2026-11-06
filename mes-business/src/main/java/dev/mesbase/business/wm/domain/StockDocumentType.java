@@ -7,7 +7,7 @@ import java.util.Map;
  * Business purpose is distinct from the receipt/issue direction.
  */
 public enum StockDocumentType {
-    PURCHASE_RECEIPT("PURCHASE_RECEIPT", StockDocumentDirection.IN, "采购入库", "供应商交货", "采购订单、收货单", false),
+    PURCHASE_RECEIPT("PURCHASE_RECEIPT", StockDocumentDirection.IN, "采购入库", "供应商直接交货", "供应商、实物清点及送货凭据（无需采购订单）", true),
     PRODUCTION_RECEIPT("PRODUCTION_RECEIPT", StockDocumentDirection.IN, "生产完工入库", "工单生产完成", "工单、Execution、有效报工及质量数量依据", true),
     OUTSOURCE_RECEIPT("OUTSOURCE_RECEIPT", StockDocumentDirection.IN, "委外加工入库", "外协厂加工完成", "委外单、委外发料记录", false),
     MATERIAL_RETURN_RECEIPT("MATERIAL_RETURN_RECEIPT", StockDocumentDirection.IN, "退料入库", "生产领料后退回", "原领料单、工单", false),

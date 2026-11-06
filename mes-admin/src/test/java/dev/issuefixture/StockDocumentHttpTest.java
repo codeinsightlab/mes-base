@@ -321,7 +321,7 @@ class StockDocumentHttpTest {
                     .andExpect(status().isOk())
                     .andReturn().getResponse().getContentAsString());
             assertEquals(10, catalog.size());
-            for (String type : List.of("PURCHASE_RECEIPT", "OUTSOURCE_RECEIPT", "MATERIAL_RETURN_RECEIPT", "REWORK_RECEIPT", "SALES_RETURN_RECEIPT")) {
+            for (String type : List.of("OUTSOURCE_RECEIPT", "MATERIAL_RETURN_RECEIPT", "REWORK_RECEIPT", "SALES_RETURN_RECEIPT")) {
                 var draft = create(m, type, null).get("document");
                 String id = draft.get("id").asText();
                 assertEquals("DRAFT", draft.get("status").asText());
