@@ -19,7 +19,7 @@ public final class DatasourceRecovery {
     }
     @FunctionalInterface
     public interface Borrow { DruidPooledConnection get() throws SQLException; }
-    private final ReentrantLock probe = new ReentrantLock();
+    private final ReentrantLock probe = new ReentrantLock(true);
     private final LongSupplier nanoTime;
     private final String identity;
     private volatile boolean cooling;
@@ -46,10 +46,17 @@ public final class DatasourceRecovery {
         }
     }
 
-    public DruidPooledConnection recover(Borrow borrow, BooleanSupplier abort) throws SQLException {
+    public DruidPooledConnection recover(Borrow borrow, BooleanSupplier abort, long waitMillis) throws SQLException {
         check();
-        if (!probe.tryLock())
-            throw new Unavailable("Business datasource connection probe in progress");
+        try {
+            if (!probe.tryLock(Math.max(1, waitMillis), TimeUnit.MILLISECONDS)) {
+                check();
+                throw new Unavailable("Business datasource connection acquisition timed out");
+            }
+        } catch (InterruptedException failure) {
+            Thread.currentThread().interrupt();
+            throw new Unavailable("Business datasource connection acquisition interrupted", failure);
+        }
         try {
             check();
             SQLException last = null;

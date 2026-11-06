@@ -3,6 +3,7 @@ package dev.mesbase.server;
 import com.alibaba.druid.pool.DruidDataSource;
 import com.alibaba.druid.pool.DruidPooledConnection;
 import java.sql.SQLException;
+import java.util.concurrent.TimeUnit;
 
 /** Business connections are replenished by borrowers, never by a background reconnect loop. */
 public class RequestDrivenDataSource extends DruidDataSource {
@@ -19,25 +20,31 @@ public class RequestDrivenDataSource extends DruidDataSource {
 
     @Override
     public DruidPooledConnection getConnection(long maxWaitMillis) throws SQLException {
+        long started = System.nanoTime();
+        long budget = Math.max(1, maxWaitMillis);
         recovery.check();
         init();
-        // Healthy pools retain concurrent borrowing. There is no creator thread to race the retry budget.
-        if (!recovery.cooling() && getPoolingCount() > 0) {
-            try {
-                return super.getConnection(1);
-            } catch (SQLException failure) {
-                if (isClosed()) throw failure;
-                // Stale idle connections have been discarded; recover using the same bounded probe.
-            }
-        }
-        if (!recovery.cooling() && getActiveCount() >= getMaxActive())
-            return super.getConnection(Math.max(1, maxWaitMillis));
+        // Coordinate acquisition, not connection use. Waiters recheck the pool and circuit after
+        // the current borrower finishes; ordinary cold start/expansion is not an outage.
         return recovery.recover(() -> {
+            if (!recovery.cooling() && getPoolingCount() > 0) {
+                try {
+                    return super.getConnection(1);
+                } catch (SQLException failure) {
+                    if (isClosed() || Thread.currentThread().isInterrupted()) throw failure;
+                    // Druid discarded stale idle connections. Use this same attempt to replace them.
+                }
+            }
             if (getPoolingCount() == 0 && getActiveCount() < getMaxActive()) {
                 var physical = createPhysicalConnection();
                 if (!put(physical)) physical.getPhysicalConnection().close();
             }
-            return super.getConnection(1);
-        }, () -> isClosed() || Thread.currentThread().isInterrupted() || getActiveCount() >= getMaxActive());
+            return super.getConnection(remainingWait(started, budget));
+        }, () -> isClosed() || Thread.currentThread().isInterrupted() || getActiveCount() >= getMaxActive(),
+                remainingWait(started, budget));
+    }
+
+    private static long remainingWait(long started, long budget) {
+        return Math.max(1, budget - TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - started));
     }
 }
