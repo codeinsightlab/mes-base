@@ -157,7 +157,9 @@ class PurchaseReceiptMySqlTest {
         c.registerBean(ProductionQuantityService.class, () -> mock(ProductionQuantityService.class));
         c.registerBean(QualityTreatmentService.class, () -> mock(QualityTreatmentService.class));
         c.registerBean(ExecutionPathService.class, () -> mock(ExecutionPathService.class));
-        c.register(WarehouseIntegration.class, BusinessSourceRules.class, MaterialQuantityRules.class, StockReferenceRules.class, LocalStockService.class, StockDocumentService.class, WmInventoryServiceImpl.class);
+        c.register(WarehouseIntegration.class, BusinessSourceRules.class, MaterialQuantityRules.class, StockReferenceRules.class, LocalStockService.class, dev.mesbase.business.purchase.service.impl.PurchaseSupplierServiceImpl.class,
+                dev.mesbase.business.purchase.service.impl.PurchaseReferencePriceServiceImpl.class,
+                dev.mesbase.business.purchase.service.impl.PurchaseReceiptPricing.class, StockDocumentService.class, WmInventoryServiceImpl.class);
         c.refresh();
         return new Fixture(c, db, registry, failure);
     }
@@ -176,12 +178,12 @@ class PurchaseReceiptMySqlTest {
     }
 
     static StockDocumentModels.AggregateLine line(Stock s, String quantity) {
-        return new StockDocumentModels.AggregateLine(null, s.id, s.material, s.warehouse, s.unit, s.batch, null, new BigDecimal(quantity), "QA counted delivery");
+        return new StockDocumentModels.AggregateLine(null, s.id, s.material, s.warehouse, s.unit, s.batch, null, new BigDecimal(quantity), "QA counted delivery", new BigDecimal("1.234567"));
     }
 
     static StockDocumentModels.Detail draft(StockDocumentService service, String tag,
-                                            List<StockDocumentModels.AggregateLine> lines) {
-        return actor(() -> service.createAggregate(new StockDocumentModels.AggregateSave(new StockDocumentModels.AggregateHeader("IN", "PURCHASE_RECEIPT", tag, null, null, null, "PURCHASE_RECEIPT", null, "QA Supplier", tag), lines)));
+                                            List<StockDocumentModels.AggregateLine> lines, Long supplierId) {
+        return actor(() -> service.createAggregate(new StockDocumentModels.AggregateSave(new StockDocumentModels.AggregateHeader("IN", "PURCHASE_RECEIPT", tag, null, null, null, "PURCHASE_RECEIPT", null, "QA Supplier", tag, supplierId, java.time.LocalDate.of(2026, 11, 6), "CNY"), lines)));
     }
 
     static BigDecimal balance(Fixture f, Stock s) {
@@ -197,6 +199,8 @@ class PurchaseReceiptMySqlTest {
         try (var f = context(); var pool = Executors.newFixedThreadPool(2)) {
             var service = f.context.getBean(StockDocumentService.class);
             String tag = "QA_PURCHASE_" + UUID.randomUUID().toString().substring(0, 8);
+            var supplier = actor(() -> f.context.getBean(dev.mesbase.business.purchase.service.IPurchaseSupplierService.class)
+                    .insert(new dev.mesbase.business.purchase.domain.PurchaseSupplierCreateCommand(tag, "QA Supplier", null, null, null, "ENABLED", tag)));
             var materials = f.db.queryForList("SELECT m.id,m.unit_id FROM material m JOIN unit_measure u ON u.id=m.unit_id WHERE m.status='ENABLED' AND u.status='ENABLED' ORDER BY m.id LIMIT 2");
             long warehouse = f.db.queryForObject("SELECT id FROM wm_warehouse WHERE status='ENABLED' AND source='LOCAL' ORDER BY id LIMIT 1", Long.class);
             var a = stock(f, ((Number) materials.get(0).get("id")).longValue(), ((Number) materials.get(0)
@@ -204,7 +208,7 @@ class PurchaseReceiptMySqlTest {
             var b = stock(f, ((Number) materials.get(1).get("id")).longValue(), ((Number) materials.get(1)
                     .get("unit_id")).longValue(), warehouse, tag + "_B");
             var c = stock(f, a.material, a.unit, warehouse, tag + "_C");
-            var doc = draft(service, tag, List.of(line(a, "7"), line(b, "11"), line(c, "5")));
+            var doc = draft(service, tag, List.of(line(a, "7"), line(b, "11"), line(c, "5")), supplier.getId());
             assertEquals(0, balance(f, a).signum());
             assertEquals(0, balance(f, b).signum());
             assertEquals(0, actions(f, doc.document().getId()));
@@ -223,7 +227,7 @@ class PurchaseReceiptMySqlTest {
             assertEquals(0, new BigDecimal("11").compareTo(balance(f, b)));
             assertEquals(0, new BigDecimal("5").compareTo(balance(f, c)));
             assertEquals(3, actions(f, doc.document().getId()));
-            var rollback = draft(service, tag + "_ROLLBACK", List.of(line(a, "2"), line(b, "3")));
+            var rollback = draft(service, tag + "_ROLLBACK", List.of(line(a, "2"), line(b, "3")), supplier.getId());
             f.failure.remaining.set(2);
             assertThrows(RuntimeException.class, () -> actor(() -> service.approve(rollback.document()
                     .getId(), new StockDocumentModels.Post(UUID.randomUUID().toString(), rollback.document()
@@ -240,7 +244,7 @@ class PurchaseReceiptMySqlTest {
             assertThrows(RuntimeException.class, () -> actor(() -> service.approve(doc.document()
                     .getId(), new StockDocumentModels.Post(UUID.randomUUID().toString(), doc.document()
                     .getRevision()))));
-            var report = Path.of(".local/knowledge/purchase-receipt/mysql-evidence-" + tag + ".txt");
+            var report = Path.of(".local/knowledge/purchase-price-v1/mysql-regression-" + tag + ".txt");
             Files.createDirectories(report.getParent());
             String evidence = "database=mes_base_dev_perf_test factory=" + FACTORY + "\ntag=" + tag + "\nposted=" + doc.document()
                     .getId() + " number=" + doc.document()

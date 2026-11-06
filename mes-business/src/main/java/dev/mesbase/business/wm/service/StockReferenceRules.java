@@ -37,6 +37,7 @@ public class StockReferenceRules {
     private final MesWorkorderMaterialMapper demand;
     private final WorkorderMapper workorders;
     private final WmStockDocumentLineMapper documentLines;
+    private final dev.mesbase.business.purchase.dao.PurchaseReferencePriceMapper quotes;
     private final MaterialMapper materials;
     private final WmWarehouseMapper warehouses;
     private final WmInventoryMapper inventories;
@@ -45,7 +46,9 @@ public class StockReferenceRules {
     public StockReferenceRules(MaterialMapper materials, WmWarehouseMapper warehouses, WmInventoryMapper inventories,
                                WmStockActionMapper actions,
                                MesWorkorderMaterialMapper demand, WmStockDocumentLineMapper documentLines,
-                               WorkorderMapper workorders) {
+                               WorkorderMapper workorders,
+                               dev.mesbase.business.purchase.dao.PurchaseReferencePriceMapper quotes) {
+        this.quotes = quotes;
         this.workorders = workorders;
         this.documentLines = documentLines;
         this.demand = demand;
@@ -187,6 +190,9 @@ public class StockReferenceRules {
 
     public void deletingMaterials(List<Long> ids) {
         lockMaterials(ids);
+        var quote = new dev.mesbase.business.purchase.domain.PurchaseReferencePriceExample();
+        quote.createCriteria().andMaterialIdIn(ids);
+        if (quotes.countByExample(quote) > 0) throw new FoundationException(ErrorCode.MATERIAL_INVENTORY_REFERENCED);
         var demandFilter = new MesWorkorderMaterialExample();
         demandFilter.createCriteria().andMaterialIdIn(ids);
         if (demand.countByExample(demandFilter) > 0)

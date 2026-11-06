@@ -172,7 +172,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
  * TEST ONLY: real generated SQL, HTTP authorization and transactions; two separate H2 databases.
  */
 class MaterialIssueHttpTest {
-    static final Set<Class<?>> MAPPERS = Set.of(MesMaterialIssueInputMapper.class, ProductionInputExtraMapper.class, MaterialBomMapper.class, MaterialBomItemMapper.class, MaterialBomCopyMapper.class, ProductionDefectListExtraMapper.class, StockDocumentExtraMapper.class, OperationDefectTypeMapper.class, DefectStatisticsExtraMapper.class, WmStockDocumentMapper.class, WmStockDocumentLineMapper.class, MesWorkorderCancellationMapper.class, WmWarehouseErpExtraMapper.class, MesQualityReleaseMapper.class, MesWarehouseAcceptanceMapper.class, MesExecutionCompletionMapper.class, MesWorkorderMaterialMapper.class, WmStockActionMapper.class, MesExecutionAssignmentMapper.class, MesProductionScanActivityMapper.class, WmInventoryMapper.class, MesProductionReceiptMapper.class, ProductionReceiptQueryMapper.class, MesProductionDefectMapper.class, MesQualityTreatmentMapper.class, WorkstationMapper.class, MesProductionReportMapper.class, ProductionQuantityMapper.class, MesExecutionPathMapper.class, MesExecutionPathNodeMapper.class, WorkorderErpExtraMapper.class, WorkOrderExtraMapper.class, RoutingNodeMapper.class, RoutingEdgeMapper.class, OperationMapper.class, MesProductionExecutionMapper.class, MaterialMapper.class, UnitMeasureMapper.class, WmWarehouseMapper.class, RoutingMapper.class, RoutingProductMapper.class, WorkorderMapper.class);
+    static final Set<Class<?>> MAPPERS = Set.of(dev.mesbase.business.purchase.dao.PurchaseReferencePriceQueryMapper.class, dev.mesbase.business.purchase.dao.PurchaseSupplierMapper.class, dev.mesbase.business.purchase.dao.PurchaseReferencePriceMapper.class, MesMaterialIssueInputMapper.class, ProductionInputExtraMapper.class, MaterialBomMapper.class, MaterialBomItemMapper.class, MaterialBomCopyMapper.class, ProductionDefectListExtraMapper.class, StockDocumentExtraMapper.class, OperationDefectTypeMapper.class, DefectStatisticsExtraMapper.class, WmStockDocumentMapper.class, WmStockDocumentLineMapper.class, MesWorkorderCancellationMapper.class, WmWarehouseErpExtraMapper.class, MesQualityReleaseMapper.class, MesWarehouseAcceptanceMapper.class, MesExecutionCompletionMapper.class, MesWorkorderMaterialMapper.class, WmStockActionMapper.class, MesExecutionAssignmentMapper.class, MesProductionScanActivityMapper.class, WmInventoryMapper.class, MesProductionReceiptMapper.class, ProductionReceiptQueryMapper.class, MesProductionDefectMapper.class, MesQualityTreatmentMapper.class, WorkstationMapper.class, MesProductionReportMapper.class, ProductionQuantityMapper.class, MesExecutionPathMapper.class, MesExecutionPathNodeMapper.class, WorkorderErpExtraMapper.class, WorkOrderExtraMapper.class, RoutingNodeMapper.class, RoutingEdgeMapper.class, OperationMapper.class, MesProductionExecutionMapper.class, MaterialMapper.class, UnitMeasureMapper.class, WmWarehouseMapper.class, RoutingMapper.class, RoutingProductMapper.class, WorkorderMapper.class);
 
     static class Fixture implements AutoCloseable {
         final RuntimeRegistry registry = new RuntimeRegistry();
@@ -298,6 +298,13 @@ class MaterialIssueHttpTest {
                 jdbc.execute("ALTER TABLE mes_execution_path ALTER COLUMN id BIGINT AUTO_INCREMENT");
                 jdbc.execute("ALTER TABLE wm_stock_document ADD supplier_name VARCHAR(200)");
                 jdbc.execute("ALTER TABLE wm_stock_document ADD supplier_document_no VARCHAR(128)");
+                jdbc.execute("CREATE TABLE purchase_supplier (id BIGINT AUTO_INCREMENT PRIMARY KEY, code VARCHAR(64) NOT NULL UNIQUE,name VARCHAR(200) NOT NULL,contact_person VARCHAR(100),contact_phone VARCHAR(64),address VARCHAR(500),status VARCHAR(16) NOT NULL,remark VARCHAR(500),created_by BIGINT NOT NULL,created_at TIMESTAMP NOT NULL,updated_by BIGINT NOT NULL,updated_at TIMESTAMP NOT NULL)");
+                jdbc.execute("CREATE TABLE purchase_reference_price (id BIGINT AUTO_INCREMENT PRIMARY KEY,supplier_id BIGINT NOT NULL,material_id BIGINT NOT NULL,unit_id BIGINT NOT NULL,unit_price DECIMAL(20,6) NOT NULL,currency VARCHAR(3) NOT NULL,effective_date DATE NOT NULL,created_by BIGINT NOT NULL,created_at TIMESTAMP NOT NULL,remark VARCHAR(500))");
+                for (String column : List.of("supplier_id BIGINT", "business_date DATE", "currency VARCHAR(3)"))
+                    jdbc.execute("ALTER TABLE wm_stock_document ADD " + column);
+                for (String column : List.of("reference_price_id BIGINT", "reference_unit_price DECIMAL(20,6)", "unit_price DECIMAL(20,6)", "amount DECIMAL(32,2)"))
+                    jdbc.execute("ALTER TABLE wm_stock_document_line ADD " + column);
+                jdbc.update("INSERT INTO purchase_supplier(id,code,name,status,created_by,created_at,updated_by,updated_at) VALUES(1,'TEST','TEST Supplier','ENABLED',1,CURRENT_TIMESTAMP,1,CURRENT_TIMESTAMP),(2,'TEST2','Supplier Two','ENABLED',1,CURRENT_TIMESTAMP,1,CURRENT_TIMESTAMP)");
                 // TEST ONLY H2 equivalent of V81; existing routed rows retain their identities.
                 jdbc.execute("ALTER TABLE workorder ALTER COLUMN routing_id DROP NOT NULL");
                 jdbc.execute("ALTER TABLE mes_production_execution ALTER COLUMN routing_id DROP NOT NULL");
@@ -335,7 +342,9 @@ class MaterialIssueHttpTest {
     @EnableWebMvc
     @EnableWebSecurity
     @EnableTransactionManagement
-    @Import({ProductionInboundService.class, ProductionInboundController.class, MaterialBomService.class, StockDocumentOwnedTransactionsHttpTest.GuardedCenter.class, MaterialQuantityRules.class, WorkOrderCompletionService.class, StockDocumentService.class, StockDocumentController.class, WorkOrderCancellationService.class, WorkOrderCancellationController.class, BusinessSourceRules.class, StockReferenceRules.class, ProductionCompletionService.class, ProductionCompletionController.class, WarehouseAcceptanceService.class, WarehouseAcceptanceController.class, QualityReleaseService.class, QualityReleaseController.class, WorkorderMaterialService.class, WorkorderMaterialController.class, LocalStockController.class, WmStockActionController.class, WmStockActionServiceImpl.class, LocalStockService.class, QualityTreatmentService.class, MaterialIssueInputFacts.class, ProductionQuantityService.class, ProductionQuantityErrorAdvice.class, ExecutionQualityReferenceQueryImpl.class, ProductionExecutionQueryService.class, ProductionChainLocks.class, ExecutionPathService.class, ExecutionActionController.class, WorkorderErpFacts.class, WarehouseIntegration.class, MaterialIssueVoidService.class, ProductionExecutionRules.class, ProductionIdentityService.class, MesProductionExecutionServiceImpl.class, MesProductionExecutionController.class, ProductionIdentityController.class, WorkOrderController.class, WorkOrderService.class, RoutingReferenceRules.class, FoundationErrorAdvice.class})
+    @Import({dev.mesbase.business.purchase.controller.PurchaseSupplierController.class, dev.mesbase.business.purchase.controller.PurchaseReferencePriceController.class, dev.mesbase.business.purchase.controller.PurchaseReceiptPriceController.class, ProductionInboundService.class, ProductionInboundController.class, MaterialBomService.class, StockDocumentOwnedTransactionsHttpTest.GuardedCenter.class, MaterialQuantityRules.class, WorkOrderCompletionService.class, dev.mesbase.business.purchase.service.impl.PurchaseSupplierServiceImpl.class,
+            dev.mesbase.business.purchase.service.impl.PurchaseReferencePriceServiceImpl.class,
+            dev.mesbase.business.purchase.service.impl.PurchaseReceiptPricing.class, StockDocumentService.class, StockDocumentController.class, WorkOrderCancellationService.class, WorkOrderCancellationController.class, BusinessSourceRules.class, StockReferenceRules.class, ProductionCompletionService.class, ProductionCompletionController.class, WarehouseAcceptanceService.class, WarehouseAcceptanceController.class, QualityReleaseService.class, QualityReleaseController.class, WorkorderMaterialService.class, WorkorderMaterialController.class, LocalStockController.class, WmStockActionController.class, WmStockActionServiceImpl.class, LocalStockService.class, QualityTreatmentService.class, MaterialIssueInputFacts.class, ProductionQuantityService.class, ProductionQuantityErrorAdvice.class, ExecutionQualityReferenceQueryImpl.class, ProductionExecutionQueryService.class, ProductionChainLocks.class, ExecutionPathService.class, ExecutionActionController.class, WorkorderErpFacts.class, WarehouseIntegration.class, MaterialIssueVoidService.class, ProductionExecutionRules.class, ProductionIdentityService.class, MesProductionExecutionServiceImpl.class, MesProductionExecutionController.class, ProductionIdentityController.class, WorkOrderController.class, WorkOrderService.class, RoutingReferenceRules.class, FoundationErrorAdvice.class})
     static class Web implements WebMvcConfigurer {
         @Autowired
         private AuthorizationService authorization;
@@ -633,6 +642,21 @@ class MaterialIssueHttpTest {
         @Bean
         OperationMapper beanOperationMapper(SqlSessionFactory f) {
             return new SqlSessionTemplate(f).getMapper(OperationMapper.class);
+        }
+
+        @Bean
+        dev.mesbase.business.purchase.dao.PurchaseReferencePriceQueryMapper priceNames(SqlSessionFactory f) {
+            return new SqlSessionTemplate(f).getMapper(dev.mesbase.business.purchase.dao.PurchaseReferencePriceQueryMapper.class);
+        }
+
+        @Bean
+        dev.mesbase.business.purchase.dao.PurchaseSupplierMapper suppliers(SqlSessionFactory f) {
+            return new SqlSessionTemplate(f).getMapper(dev.mesbase.business.purchase.dao.PurchaseSupplierMapper.class);
+        }
+
+        @Bean
+        dev.mesbase.business.purchase.dao.PurchaseReferencePriceMapper prices(SqlSessionFactory f) {
+            return new SqlSessionTemplate(f).getMapper(dev.mesbase.business.purchase.dao.PurchaseReferencePriceMapper.class);
         }
 
         @Bean

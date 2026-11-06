@@ -10,6 +10,7 @@ import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.Size;
 import jakarta.validation.Valid;
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.List;
 
 /**
@@ -28,7 +29,14 @@ public final class StockDocumentModels {
     public record Create(String direction, @NotBlank String documentType, @NotBlank @Size(max = 500) String reason,
                          @Size(max = 500) String remark, Long sourceWorkorderId, String sourceExecutionCode,
                          @Size(max = 64) String ruleCode, @Size(max = 200) String supplierName,
-                         @Size(max = 128) String supplierDocumentNo) {
+                         @Size(max = 128) String supplierDocumentNo, Long supplierId, LocalDate businessDate,
+                         String currency) {
+        public Create(String direction, String documentType, String reason, String remark, Long sourceWorkorderId,
+                      String sourceExecutionCode, String ruleCode, String supplierName, String supplierDocumentNo) {
+            this(direction, documentType, reason, remark, sourceWorkorderId, sourceExecutionCode, ruleCode,
+                    supplierName, supplierDocumentNo, null, null, null);
+        }
+
         public Create(String direction, String documentType, String reason, String remark, Long sourceWorkorderId,
                       String sourceExecutionCode, String ruleCode) {
             this(direction, documentType, reason, remark, sourceWorkorderId, sourceExecutionCode, ruleCode, null, null);
@@ -51,7 +59,15 @@ public final class StockDocumentModels {
                                   @Size(max = 500) String remark, Long sourceWorkorderId,
                                   String sourceExecutionCode, @Size(max = 64) String ruleCode,
                                   Long expectedRevision, @Size(max = 200) String supplierName,
-                                  @Size(max = 128) String supplierDocumentNo) {
+                                  @Size(max = 128) String supplierDocumentNo, Long supplierId, LocalDate businessDate,
+                                  String currency) {
+        public AggregateHeader(String direction, String documentType, String reason, String remark,
+                               Long sourceWorkorderId, String sourceExecutionCode, String ruleCode,
+                               Long expectedRevision, String supplierName, String supplierDocumentNo) {
+            this(direction, documentType, reason, remark, sourceWorkorderId, sourceExecutionCode, ruleCode,
+                    expectedRevision, supplierName, supplierDocumentNo, null, null, null);
+        }
+
         public AggregateHeader(String direction, String documentType, String reason, String remark,
                                Long sourceWorkorderId, String sourceExecutionCode, String ruleCode,
                                Long expectedRevision) {
@@ -69,7 +85,11 @@ public final class StockDocumentModels {
                                 @NotNull Long warehouseId, @NotNull Long unitId,
                                 @Size(max = 128) String batchNo, @Size(max = 64) String binCode,
                                 @NotNull @Positive @Digits(integer = 14, fraction = 6) BigDecimal quantity,
-                                @Size(max = 500) String remark) {
+                                @Size(max = 500) String remark, BigDecimal unitPrice) {
+        public AggregateLine(Long id, Long stockId, Long materialId, Long warehouseId, Long unitId,
+                             String batchNo, String binCode, BigDecimal quantity, String remark) {
+            this(id, stockId, materialId, warehouseId, unitId, batchNo, binCode, quantity, remark, null);
+        }
     }
 
     public record ProductionIssueIntent(@NotBlank @Size(max = 36) String requestId,
@@ -90,7 +110,13 @@ public final class StockDocumentModels {
 
     public record Edit(@NotNull Long expectedRevision, @NotBlank @Size(max = 500) String reason,
                        @Size(max = 500) String remark, @Size(max = 200) String supplierName,
-                       @Size(max = 128) String supplierDocumentNo) {
+                       @Size(max = 128) String supplierDocumentNo, Long supplierId, LocalDate businessDate,
+                       String currency) {
+        public Edit(Long expectedRevision, String reason, String remark, String supplierName,
+                    String supplierDocumentNo) {
+            this(expectedRevision, reason, remark, supplierName, supplierDocumentNo, null, null, null);
+        }
+
         public Edit(Long expectedRevision, String reason, String remark) {
             this(expectedRevision, reason, remark, null, null);
         }
@@ -100,7 +126,11 @@ public final class StockDocumentModels {
                        @NotNull Long materialId, @NotNull Long warehouseId, @NotNull Long unitId,
                        @Size(max = 128) String batchNo, @Size(max = 64) String binCode,
                        @NotNull @Positive @Digits(integer = 14, fraction = 6) BigDecimal quantity,
-                       @Size(max = 500) String remark) {
+                       @Size(max = 500) String remark, BigDecimal unitPrice) {
+        public Line(Long expectedRevision, Long stockId, Long materialId, Long warehouseId, Long unitId,
+                    String batchNo, String binCode, BigDecimal quantity, String remark) {
+            this(expectedRevision, stockId, materialId, warehouseId, unitId, batchNo, binCode, quantity, remark, null);
+        }
     }
 
     public record Version(@NotNull Long expectedRevision) {

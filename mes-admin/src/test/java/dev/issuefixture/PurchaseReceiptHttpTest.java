@@ -15,11 +15,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class PurchaseReceiptHttpTest {
     static String create(String supplier, String items) {
         return "{\"header\":{\"direction\":\"IN\",\"documentType\":\"PURCHASE_RECEIPT\",\"reason\":\"TEST ONLY direct delivery\",\"ruleCode\":\"PURCHASE_RECEIPT\",\"supplierName\":\"" + supplier
-                + "\",\"supplierDocumentNo\":\"TEST-DELIVERY\"},\"items\":[" + items + "]}";
+                + "\",\"supplierId\":\"1\",\"businessDate\":\"2026-11-06\",\"currency\":\"CNY\",\"supplierDocumentNo\":\"TEST-DELIVERY\"},\"items\":[" + items + "]}";
     }
 
     static String item(String stock, String batch, String quantity) {
-        return "{\"stockId\":\"" + stock + "\",\"materialId\":\"1\",\"warehouseId\":\"1\",\"unitId\":\"1\",\"batchNo\":\"" + batch + "\",\"binCode\":\"BIN1\",\"quantity\":\"" + quantity + "\"}";
+        return "{\"stockId\":\"" + stock + "\",\"materialId\":\"1\",\"warehouseId\":\"1\",\"unitId\":\"1\",\"batchNo\":\"" + batch + "\",\"binCode\":\"BIN1\",\"quantity\":\"" + quantity + "\",\"unitPrice\":\"1.234567\"}";
     }
 
     @Test
@@ -64,11 +64,8 @@ class PurchaseReceiptHttpTest {
             var m = MaterialIssueHttpTest.mvc(c);
             var db = ProductionInputHttpTest.db(c);
             db.update("UPDATE wm_inventory SET quantity=0,available_quantity=0 WHERE id=1");
-            var draft = StockDocumentHttpTest.JSON.readTree(m.perform(full(post(StockDocumentHttpTest.ROOT + "/aggregate"))
-                            .content(create("", item("1", "L001", "2")))).andExpect(status().isOk()).andReturn().getResponse()
-                    .getContentAsString()).get("document");
-            m.perform(full(post(StockDocumentHttpTest.ROOT + "/" + draft.get("id").asText() + "/actions/approve"))
-                            .content(StockDocumentHttpTest.intent(UUID.randomUUID().toString(), draft.get("revision").asInt())))
+            m.perform(full(post(StockDocumentHttpTest.ROOT + "/aggregate"))
+                            .content(create("", item("1", "L001", "2")).replace("\"supplierId\":\"1\"", "\"supplierId\":null")))
                     .andExpect(status().isBadRequest());
             m.perform(full(post(StockDocumentHttpTest.ROOT + "/aggregate")).content(create("TEST", item("1", "L001", "-1"))))
                     .andExpect(status().isBadRequest());
@@ -95,7 +92,7 @@ class PurchaseReceiptHttpTest {
             var changed = StockDocumentHttpTest.JSON.readTree(m.perform(full(put(StockDocumentHttpTest.ROOT + "/" + document.get("id")
                             .asText()))
                             .content("{\"expectedRevision\":" + document.get("revision")
-                                    .asText() + ",\"reason\":\"updated delivery\",\"supplierName\":\"Supplier Two\",\"supplierDocumentNo\":\"DELIVERY-TWO\"}"))
+                                    .asText() + ",\"reason\":\"updated delivery\",\"supplierName\":\"IGNORED\",\"supplierId\":\"2\",\"businessDate\":\"2026-11-06\",\"currency\":\"CNY\",\"supplierDocumentNo\":\"DELIVERY-TWO\"}"))
                     .andExpect(status().isOk()).andReturn().getResponse().getContentAsString()).get("document");
             assertEquals("Supplier Two", changed.get("supplierName").asText());
             assertEquals("DELIVERY-TWO", changed.get("supplierDocumentNo").asText());

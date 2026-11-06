@@ -106,7 +106,7 @@ class P1MaterialUnitTest {
             var empty = new StaticListableBeanFactory();
             units = new MaterialUnitRules(mapper(MaterialMapper.class), mapper(UnitMeasureMapper.class), mapper(WmInventoryMapper.class),
                     mapper(WmStockActionMapper.class), mapper(WmStockDocumentLineMapper.class), mapper(MesWorkorderMaterialMapper.class),
-                    mapper(RoutingProductMapper.class), mapper(WorkorderMapper.class), mapper(MesProductionExecutionMapper.class), empty.getBeanProvider(MaterialBomService.class));
+                    mapper(RoutingProductMapper.class), mapper(WorkorderMapper.class), mapper(MesProductionExecutionMapper.class), empty.getBeanProvider(MaterialBomService.class), mock(dev.mesbase.business.purchase.dao.PurchaseReferencePriceMapper.class));
             var rules = new BasicDataRules(mapper(MaterialMapper.class), mapper(MaterialCategoryMapper.class), mapper(UnitMeasureMapper.class),
                     mapper(WorkstationMapper.class), mapper(WorkshopMapper.class), mapper(SafetyStockMapper.class), empty.getBeanProvider(RoutingReferenceRules.class),
                     mock(EquipmentReferenceRules.class), empty.getBeanProvider(StockReferenceRules.class), units, empty.getBeanProvider(MaterialBomService.class));
@@ -116,7 +116,7 @@ class P1MaterialUnitTest {
                     .getValidator(),
                     mock(BusinessCacheProcessor.class)), manager);
             references = new StockReferenceRules(mapper(MaterialMapper.class), mock(WmWarehouseMapper.class), mapper(WmInventoryMapper.class),
-                    mapper(WmStockActionMapper.class), mapper(MesWorkorderMaterialMapper.class), mapper(WmStockDocumentLineMapper.class), mock(WorkorderMapper.class));
+                    mapper(WmStockActionMapper.class), mapper(MesWorkorderMaterialMapper.class), mapper(WmStockDocumentLineMapper.class), mock(WorkorderMapper.class), mock(dev.mesbase.business.purchase.dao.PurchaseReferencePriceMapper.class));
             db.jdbc.update("INSERT INTO unit_measure(id,code,name,status) VALUES(1,'TEST_KG','kg','ENABLED'),(2,'TEST_PCS','pcs','ENABLED')");
             db.jdbc.update("INSERT INTO material(id,code,name,unit_id,status) VALUES(1,'TEST_M','TEST material',1,'ENABLED')");
         }

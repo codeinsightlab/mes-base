@@ -32,6 +32,7 @@ import org.springframework.beans.factory.ObjectProvider;
 @Component
 @ConditionalOnProperty(name = "mes.business.enabled", havingValue = "true")
 public class MaterialUnitRules {
+    private final dev.mesbase.business.purchase.dao.PurchaseReferencePriceMapper quotes;
     private final MaterialMapper materials;
     private final ObjectProvider<MaterialBomService> bom;
     private final UnitMeasureMapper units;
@@ -47,7 +48,9 @@ public class MaterialUnitRules {
                              WmStockActionMapper actions, WmStockDocumentLineMapper documents,
                              MesWorkorderMaterialMapper demands,
                              RoutingProductMapper products, WorkorderMapper orders,
-                             MesProductionExecutionMapper executions, ObjectProvider<MaterialBomService> bom) {
+                             MesProductionExecutionMapper executions, ObjectProvider<MaterialBomService> bom,
+                             dev.mesbase.business.purchase.dao.PurchaseReferencePriceMapper quotes) {
+        this.quotes = quotes;
         this.bom = bom;
         this.materials = materials;
         this.units = units;
@@ -72,6 +75,9 @@ public class MaterialUnitRules {
     public void changingUnit(MaterialEntity before, Long next) {
         if (Objects.equals(before.getUnitId(), next)) return;
         Long id = before.getId();
+        var quote = new dev.mesbase.business.purchase.domain.PurchaseReferencePriceExample();
+        quote.createCriteria().andMaterialIdEqualTo(id);
+        if (quotes.countByExample(quote) > 0) conflict();
         var composition = bom.getIfAvailable();
         if (composition != null) composition.protectMaterials(List.of(id));
         var stock = new WmInventoryExample();
@@ -106,6 +112,9 @@ public class MaterialUnitRules {
         var composition = bom.getIfAvailable();
         if (composition != null) composition.protectUnits(ids);
         ids.stream().sorted().forEach(this::lockUnit);
+        var quote = new dev.mesbase.business.purchase.domain.PurchaseReferencePriceExample();
+        quote.createCriteria().andUnitIdIn(ids);
+        if (quotes.countByExample(quote) > 0) conflict();
         var material = new MaterialExample();
         material.createCriteria().andUnitIdIn(ids);
         var action = new WmStockActionExample();

@@ -1,4 +1,3 @@
-// MES-CODEGEN: MyBatis Generator standard single-table persistence.
 package dev.mesbase.business.wm.domain;
 
 import java.math.BigDecimal;
@@ -142,5 +141,45 @@ public class WmStockDocumentLineEntity {
 
     public void setDemandLineId(Long demandLineId) {
         this.demandLineId = demandLineId;
+    }
+
+    private Long referencePriceId;
+
+    public Long getReferencePriceId() {
+        return referencePriceId;
+    }
+
+    public void setReferencePriceId(Long value) {
+        this.referencePriceId = value;
+    }
+
+    private BigDecimal referenceUnitPrice;
+
+    public BigDecimal getReferenceUnitPrice() {
+        return referenceUnitPrice;
+    }
+
+    public void setReferenceUnitPrice(BigDecimal value) {
+        this.referenceUnitPrice = value;
+    }
+
+    private BigDecimal unitPrice;
+
+    public BigDecimal getUnitPrice() {
+        return unitPrice;
+    }
+
+    public void setUnitPrice(BigDecimal value) {
+        this.unitPrice = value;
+    }
+
+    private BigDecimal amount;
+
+    public BigDecimal getAmount() {
+        return amount;
+    }
+
+    public void setAmount(BigDecimal value) {
+        this.amount = value;
     }
 }

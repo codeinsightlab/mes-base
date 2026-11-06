@@ -94,6 +94,11 @@ public class WmStockDocumentExample {
             criteria.add(new Criterion(condition, value1, value2));
         }
 
+        public Criteria andSupplierIdEqualTo(Long value) {
+            addCriterion("supplier_id =", value, "supplierId");
+            return (Criteria) this;
+        }
+
         public Criteria andIdIsNull() {
             addCriterion("id is null");
             return (Criteria) this;

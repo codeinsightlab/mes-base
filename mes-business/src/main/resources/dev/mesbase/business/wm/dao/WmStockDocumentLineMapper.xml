@@ -12,6 +12,10 @@
     <result column="bin_code" jdbcType="VARCHAR" property="binCode" />
     <result column="unit_id" jdbcType="BIGINT" property="unitId" />
     <result column="quantity" jdbcType="DECIMAL" property="quantity" />
+    <result column="reference_price_id" jdbcType="BIGINT" property="referencePriceId" />
+    <result column="reference_unit_price" jdbcType="DECIMAL" property="referenceUnitPrice" />
+    <result column="unit_price" jdbcType="DECIMAL" property="unitPrice" />
+    <result column="amount" jdbcType="DECIMAL" property="amount" />
     <result column="remark" jdbcType="VARCHAR" property="remark" />
     <result column="stock_action_id" jdbcType="VARCHAR" property="stockActionId" />
     <result column="revision" jdbcType="BIGINT" property="revision" />
@@ -77,7 +81,7 @@
   </sql>
   <sql id="Base_Column_List">
     id, document_id, line_no, material_id, warehouse_id, stock_id, batch_no, bin_code,
-    unit_id, quantity, remark, stock_action_id, revision, demand_line_id
+    unit_id, quantity, reference_price_id, reference_unit_price, unit_price, amount, remark, stock_action_id, revision, demand_line_id
   </sql>
   <select id="selectByExample" parameterType="dev.mesbase.business.wm.domain.WmStockDocumentLineExample" resultMap="BaseResultMap">
     select
@@ -109,12 +113,12 @@
   <insert id="insert" keyColumn="id" keyProperty="id" parameterType="dev.mesbase.business.wm.domain.WmStockDocumentLineEntity" useGeneratedKeys="true">
     insert into wm_stock_document_line (document_id, line_no, material_id,
       warehouse_id, stock_id, batch_no,
-      bin_code, unit_id, quantity,
+      bin_code, unit_id, quantity, reference_price_id, reference_unit_price, unit_price, amount,
       remark, stock_action_id, revision,
       demand_line_id)
     values (#{documentId,jdbcType=BIGINT}, #{lineNo,jdbcType=INTEGER}, #{materialId,jdbcType=BIGINT},
       #{warehouseId,jdbcType=BIGINT}, #{stockId,jdbcType=BIGINT}, #{batchNo,jdbcType=VARCHAR},
-      #{binCode,jdbcType=VARCHAR}, #{unitId,jdbcType=BIGINT}, #{quantity,jdbcType=DECIMAL},
+      #{binCode,jdbcType=VARCHAR}, #{unitId,jdbcType=BIGINT}, #{quantity,jdbcType=DECIMAL}, #{referencePriceId,jdbcType=BIGINT}, #{referenceUnitPrice,jdbcType=DECIMAL}, #{unitPrice,jdbcType=DECIMAL}, #{amount,jdbcType=DECIMAL},
       #{remark,jdbcType=VARCHAR}, #{stockActionId,jdbcType=VARCHAR}, #{revision,jdbcType=BIGINT},
       #{demandLineId,jdbcType=BIGINT})
   </insert>
@@ -147,6 +151,18 @@
       </if>
       <if test="quantity != null">
         quantity,
+      </if>
+      <if test="referencePriceId != null">
+        reference_price_id,
+      </if>
+      <if test="referenceUnitPrice != null">
+        reference_unit_price,
+      </if>
+      <if test="unitPrice != null">
+        unit_price,
+      </if>
+      <if test="amount != null">
+        amount,
       </if>
       <if test="remark != null">
         remark,
@@ -188,6 +204,18 @@
       </if>
       <if test="quantity != null">
         #{quantity,jdbcType=DECIMAL},
+      </if>
+      <if test="referencePriceId != null">
+        #{referencePriceId,jdbcType=BIGINT},
+      </if>
+      <if test="referenceUnitPrice != null">
+        #{referenceUnitPrice,jdbcType=DECIMAL},
+      </if>
+      <if test="unitPrice != null">
+        #{unitPrice,jdbcType=DECIMAL},
+      </if>
+      <if test="amount != null">
+        #{amount,jdbcType=DECIMAL},
       </if>
       <if test="remark != null">
         #{remark,jdbcType=VARCHAR},
@@ -242,6 +270,18 @@
       <if test="row.quantity != null">
         quantity = #{row.quantity,jdbcType=DECIMAL},
       </if>
+      <if test="row.referencePriceId != null">
+        reference_price_id = #{row.referencePriceId,jdbcType=BIGINT},
+      </if>
+      <if test="row.referenceUnitPrice != null">
+        reference_unit_price = #{row.referenceUnitPrice,jdbcType=DECIMAL},
+      </if>
+      <if test="row.unitPrice != null">
+        unit_price = #{row.unitPrice,jdbcType=DECIMAL},
+      </if>
+      <if test="row.amount != null">
+        amount = #{row.amount,jdbcType=DECIMAL},
+      </if>
       <if test="row.remark != null">
         remark = #{row.remark,jdbcType=VARCHAR},
       </if>
@@ -271,6 +311,10 @@
       bin_code = #{row.binCode,jdbcType=VARCHAR},
       unit_id = #{row.unitId,jdbcType=BIGINT},
       quantity = #{row.quantity,jdbcType=DECIMAL},
+      reference_price_id = #{row.referencePriceId,jdbcType=BIGINT},
+      reference_unit_price = #{row.referenceUnitPrice,jdbcType=DECIMAL},
+      unit_price = #{row.unitPrice,jdbcType=DECIMAL},
+      amount = #{row.amount,jdbcType=DECIMAL},
       remark = #{row.remark,jdbcType=VARCHAR},
       stock_action_id = #{row.stockActionId,jdbcType=VARCHAR},
       revision = #{row.revision,jdbcType=BIGINT},
@@ -309,6 +353,18 @@
       <if test="quantity != null">
         quantity = #{quantity,jdbcType=DECIMAL},
       </if>
+      <if test="referencePriceId != null">
+        reference_price_id = #{referencePriceId,jdbcType=BIGINT},
+      </if>
+      <if test="referenceUnitPrice != null">
+        reference_unit_price = #{referenceUnitPrice,jdbcType=DECIMAL},
+      </if>
+      <if test="unitPrice != null">
+        unit_price = #{unitPrice,jdbcType=DECIMAL},
+      </if>
+      <if test="amount != null">
+        amount = #{amount,jdbcType=DECIMAL},
+      </if>
       <if test="remark != null">
         remark = #{remark,jdbcType=VARCHAR},
       </if>
@@ -335,6 +391,10 @@
       bin_code = #{binCode,jdbcType=VARCHAR},
       unit_id = #{unitId,jdbcType=BIGINT},
       quantity = #{quantity,jdbcType=DECIMAL},
+      reference_price_id = #{referencePriceId,jdbcType=BIGINT},
+      reference_unit_price = #{referenceUnitPrice,jdbcType=DECIMAL},
+      unit_price = #{unitPrice,jdbcType=DECIMAL},
+      amount = #{amount,jdbcType=DECIMAL},
       remark = #{remark,jdbcType=VARCHAR},
       stock_action_id = #{stockActionId,jdbcType=VARCHAR},
       revision = #{revision,jdbcType=BIGINT},

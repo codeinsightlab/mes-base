@@ -95,6 +95,7 @@ import tools.jackson.databind.ObjectMapper;
 @Transactional(transactionManager = "businessTransactionManager", isolation = Isolation.READ_COMMITTED, rollbackFor = Exception.class)
 public class StockDocumentService {
     private static final Logger LOG = LoggerFactory.getLogger(StockDocumentService.class);
+    private final dev.mesbase.business.purchase.service.impl.PurchaseReceiptPricing purchasing;
     private final WmStockDocumentMapper documents;
     private final ObjectProvider<MaterialIssueInputFacts> inputFacts;
     private final ExecutionPathService executionPaths;
@@ -133,7 +134,9 @@ public class StockDocumentService {
                                 AutoCodeNumbering autoCodes,
                                 DictDataLookup documentTypeDictionary,
                                 PlatformPersistence center,
-                                @Qualifier("businessTransactionManager") PlatformTransactionManager businessManager) {
+                                @Qualifier("businessTransactionManager") PlatformTransactionManager businessManager,
+                                dev.mesbase.business.purchase.service.impl.PurchaseReceiptPricing purchasing) {
+        this.purchasing = purchasing;
         this.autoCodes = autoCodes;
         this.documentTypeDictionary = documentTypeDictionary;
         this.center = center;
@@ -387,7 +390,7 @@ public class StockDocumentService {
         String documentNo = autoCodes.getBusinessDocNo(header.ruleCode(), category);
         return businessTransactions.execute(status -> {
             var draft = createDraft(new StockDocumentModels.Create(header.direction(), header.documentType(), header.reason(),
-                    header.remark(), header.sourceWorkorderId(), header.sourceExecutionCode(), header.ruleCode(), header.supplierName(), header.supplierDocumentNo()), documentNo);
+                    header.remark(), header.sourceWorkorderId(), header.sourceExecutionCode(), header.ruleCode(), header.supplierName(), header.supplierDocumentNo(), header.supplierId(), header.businessDate(), header.currency()), documentNo);
             Long id = draft.document().getId();
             for (StockDocumentModels.AggregateLine item : command.items()) {
                 var latest = require(id);
@@ -410,7 +413,7 @@ public class StockDocumentService {
                 || !Objects.equals(current.getDocumentType(), header.documentType())
                 || !Objects.equals(current.getDirection(), header.direction()))
             ParameterChecks.reject(ErrorCode.STOCK_DOCUMENT_CONFLICT);
-        edit(id, new StockDocumentModels.Edit(header.expectedRevision(), header.reason(), header.remark(), header.supplierName(), header.supplierDocumentNo()));
+        edit(id, new StockDocumentModels.Edit(header.expectedRevision(), header.reason(), header.remark(), header.supplierName(), header.supplierDocumentNo(), header.supplierId(), header.businessDate(), header.currency()));
         var existing = rows(id);
         var retained = new HashSet<Long>();
         for (StockDocumentModels.AggregateLine item : command.items()) {
@@ -430,7 +433,7 @@ public class StockDocumentService {
 
     private static StockDocumentModels.Line lineCommand(Long revision, StockDocumentModels.AggregateLine item) {
         return new StockDocumentModels.Line(revision, item.stockId(), item.materialId(), item.warehouseId(),
-                item.unitId(), item.batchNo(), item.binCode(), item.quantity(), item.remark());
+                item.unitId(), item.batchNo(), item.binCode(), item.quantity(), item.remark(), item.unitPrice());
     }
 
     private void validateAggregate(StockDocumentModels.AggregateSave command, boolean creating) {
@@ -443,7 +446,9 @@ public class StockDocumentService {
         validate(new StockDocumentModels.Create(command.header().direction(), command.header()
                 .documentType(), command.header().reason(),
                 command.header().remark(), command.header().sourceWorkorderId(), command.header().sourceExecutionCode(),
-                command.header().ruleCode(), command.header().supplierName(), command.header().supplierDocumentNo()));
+                command.header().ruleCode(), command.header().supplierName(), command.header()
+                .supplierDocumentNo(), command.header().supplierId(), command.header().businessDate(), command.header()
+                .currency()));
         requireDirection(command.header().direction(), type(command.header().documentType()));
         for (StockDocumentModels.AggregateLine item : command.items()) {
             if (item == null || item.stockId() == null || item.materialId() == null || item.warehouseId() == null
@@ -510,7 +515,7 @@ public class StockDocumentService {
         row.setStatus(StockDocumentStatus.DRAFT.getValue());
         row.setReason(command.reason());
         row.setRemark(command.remark());
-        purchaseSupplier(row, command.supplierName(), command.supplierDocumentNo());
+        purchaseSupplier(row, command.supplierName(), command.supplierDocumentNo(), command.supplierId(), command.businessDate(), command.currency());
         row.setSourceWorkorderId(command.sourceWorkorderId());
         row.setSourceExecutionCode(command.sourceExecutionCode());
         row.setRevision(0L);
@@ -526,7 +531,15 @@ public class StockDocumentService {
         sources.localCreation();
         row.setReason(command.reason());
         row.setRemark(command.remark());
-        purchaseSupplier(row, command.supplierName(), command.supplierDocumentNo());
+        purchaseSupplier(row, command.supplierName(), command.supplierDocumentNo(), command.supplierId(), command.businessDate(), command.currency());
+        if (type(row.getDocumentType()) == StockDocumentType.PURCHASE_RECEIPT) {
+            // Existing document limit is 100; same transaction, first failure aborts the entire edit.
+            for (var line : rows(id)) {
+                purchasing.line(row, line, line.getUnitPrice());
+                line.setRevision(line.getRevision() + 1);
+                if (lines.updateByPrimaryKey(line) != 1) ParameterChecks.reject(ErrorCode.STOCK_DOCUMENT_CONFLICT);
+            }
+        }
         save(row);
         return detail(id);
     }
@@ -571,6 +584,10 @@ public class StockDocumentService {
         line.setQuantity(command.quantity());
         line.setRemark(command.remark());
         validateIdentity(line, settlement(header, line), !unchanged);
+        if (type(header.getDocumentType()) == StockDocumentType.PURCHASE_RECEIPT)
+            purchasing.line(header, line, command.unitPrice());
+        else if (command.unitPrice() != null)
+            ParameterChecks.reject(ErrorCode.BAD_REQUEST, new SafeBusinessMessage("成交价格仅适用于采购入库"));
         if ((lineId == null ? lines.insert(line) : lines.updateByPrimaryKey(line)) != 1)
             ParameterChecks.reject(ErrorCode.STOCK_DOCUMENT_CONFLICT);
         save(header);
@@ -677,6 +694,7 @@ public class StockDocumentService {
         }
         var detail = rows(id);
         if (detail.isEmpty()) ParameterChecks.reject(ErrorCode.STOCK_DOCUMENT_CONFLICT);
+        if (purpose == StockDocumentType.PURCHASE_RECEIPT) purchasing.validatePosted(row, detail);
         if (purpose.isQualityReceipt()) {
             var fact = qualityEvents.selectByPrimaryKey(command.requestId());
             if (fact == null || !Action.TRANSFER_WAREHOUSE.getValue().equals(fact.getActionType())
@@ -872,13 +890,14 @@ public class StockDocumentService {
         return null;
     }
 
-    private static void purchaseSupplier(WmStockDocumentEntity row, String name, String documentNo) {
+    private void purchaseSupplier(WmStockDocumentEntity row, String name, String documentNo, Long supplierId,
+                                  java.time.LocalDate date, String currency) {
         if (type(row.getDocumentType()) != StockDocumentType.PURCHASE_RECEIPT) {
-            if (StringUtils.isNotBlank(name) || StringUtils.isNotBlank(documentNo))
+            if (StringUtils.isNotBlank(name) || StringUtils.isNotBlank(documentNo) || supplierId != null || date != null || currency != null)
                 ParameterChecks.reject(ErrorCode.BAD_REQUEST, new SafeBusinessMessage("供应商信息仅适用于采购入库"));
             return;
         }
-        row.setSupplierName(StringUtils.trimToNull(name));
+        purchasing.header(row, supplierId, date, currency);
         row.setSupplierDocumentNo(StringUtils.trimToNull(documentNo));
     }
 

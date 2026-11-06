@@ -187,7 +187,7 @@ class MaterialSyncHttpTest {
             return new MaterialUnitRules(materials, units, mock(WmInventoryMapper.class),
                     mock(WmStockActionMapper.class), mock(WmStockDocumentLineMapper.class),
                     mock(MesWorkorderMaterialMapper.class),
-                    mock(RoutingProductMapper.class), mock(WorkorderMapper.class), mock(MesProductionExecutionMapper.class), boms);
+                    mock(RoutingProductMapper.class), mock(WorkorderMapper.class), mock(MesProductionExecutionMapper.class), boms, mock(dev.mesbase.business.purchase.dao.PurchaseReferencePriceMapper.class));
         }
 
         @Bean

@@ -246,4 +246,33 @@ public class WmStockDocumentEntity {
         this.sourceRequestJson = sourceRequestJson;
     }
 
+    private Long supplierId;
+
+    public Long getSupplierId() {
+        return supplierId;
+    }
+
+    public void setSupplierId(Long value) {
+        this.supplierId = value;
+    }
+
+    private java.time.LocalDate businessDate;
+
+    public java.time.LocalDate getBusinessDate() {
+        return businessDate;
+    }
+
+    public void setBusinessDate(java.time.LocalDate value) {
+        this.businessDate = value;
+    }
+
+    private String currency;
+
+    public String getCurrency() {
+        return currency;
+    }
+
+    public void setCurrency(String value) {
+        this.currency = value;
+    }
 }

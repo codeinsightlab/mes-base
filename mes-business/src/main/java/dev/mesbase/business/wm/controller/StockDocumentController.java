@@ -273,7 +273,7 @@ public class StockDocumentController {
     public Detail create(@Valid @RequestBody StockDocumentModels.Create command) {
         if (command.ruleCode() == null || command.ruleCode().isBlank())
             throw new FoundationException(ErrorCode.BAD_REQUEST);
-        command = new StockDocumentModels.Create(fixedDirection(command.direction()), command.documentType(), command.reason(), command.remark(), command.sourceWorkorderId(), command.sourceExecutionCode(), command.ruleCode(), command.supplierName(), command.supplierDocumentNo());
+        command = new StockDocumentModels.Create(fixedDirection(command.direction()), command.documentType(), command.reason(), command.remark(), command.sourceWorkorderId(), command.sourceExecutionCode(), command.ruleCode(), command.supplierName(), command.supplierDocumentNo(), command.supplierId(), command.businessDate(), command.currency());
         return view(service.create(command));
     }
 
@@ -445,7 +445,7 @@ public class StockDocumentController {
         var h = command.header();
         return new StockDocumentModels.AggregateSave(new StockDocumentModels.AggregateHeader(fixedDirection(h.direction()),
                 h.documentType(), h.reason(), h.remark(), h.sourceWorkorderId(), h.sourceExecutionCode(), h.ruleCode(),
-                h.expectedRevision(), h.supplierName(), h.supplierDocumentNo()), command.items(), command.productionIssue());
+                h.expectedRevision(), h.supplierName(), h.supplierDocumentNo(), h.supplierId(), h.businessDate(), h.currency()), command.items(), command.productionIssue());
     }
 
     private static Header view(WmStockDocumentEntity row) {
@@ -461,7 +461,8 @@ public class StockDocumentController {
     }
 
     public record Header(String id, String documentNo, String direction, String documentType, String status,
-                         String supplierName, String supplierDocumentNo,
+                         String supplierName, String supplierDocumentNo, String supplierId,
+                         java.time.LocalDate businessDate, String currency,
                          String reason,
                          String remark, String sourceWorkorderId, String sourceExecutionCode,
                          String createBy,
@@ -473,7 +474,8 @@ public class StockDocumentController {
 
     public record Line(String id, String documentId, int lineNo, String materialId, String warehouseId,
                        String stockId, String batchNo, String binCode, String unitId, String quantity,
-                       String remark, String stockActionId, String revision, String demandLineId) {
+                       String remark, String stockActionId, String revision, String demandLineId,
+                       String referencePriceId, String referenceUnitPrice, String unitPrice, String amount) {
     }
 
     public record QualitySource(String sourceDeclarationId, String sourceTreatmentId,
