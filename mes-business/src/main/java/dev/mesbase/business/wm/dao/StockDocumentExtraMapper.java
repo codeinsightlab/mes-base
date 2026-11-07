@@ -4,7 +4,7 @@ import java.math.BigDecimal;
 import org.apache.ibatis.annotations.Param;
 
 public interface StockDocumentExtraMapper {
-    java.util.List<dev.mesbase.business.wm.domain.WmStockDocumentEntity> selectByStock(
+    java.util.List<dev.mesbase.business.wm.domain.WmStockDocumentEntity> selectByLineFilters(
             @Param("query") dev.mesbase.business.wm.domain.StockDocumentModels.Query query);
 
     record LineLabel(Long lineId, String materialCode, String materialName, String warehouseCode,

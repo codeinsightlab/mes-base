@@ -64,7 +64,8 @@ public class StockDocumentController {
     @GetMapping
     @EndpointAccess(EndpointAccess.Kind.AUTHENTICATED)
     public Page page(@ModelAttribute StockDocumentModels.Query query) {
-        query = new StockDocumentModels.Query(fixedDirection(query.direction()), query.documentType(), query.status(), query.documentNo(), query.offset(), query.limit(), query.stockId());
+        query = new StockDocumentModels.Query(fixedDirection(query.direction()), query.documentType(), query.status(), query.documentNo(), query.offset(), query.limit(), query.stockId(),
+                query.materialId(), query.batchNo(), query.binCode());
         if (!hasPermission(PERMISSION + "list")) {
             if (!StockDocumentDirection.OUT.getValue().equals(query.direction())
                     || query.documentType() != null && !StockDocumentType.MATERIAL_ISSUE.getValue()
@@ -72,7 +73,7 @@ public class StockDocumentController {
                 throw new FoundationException(ErrorCode.FORBIDDEN);
             requirePermission("business:mes:material:issue:list");
             query = new StockDocumentModels.Query(StockDocumentDirection.OUT.getValue(), StockDocumentType.MATERIAL_ISSUE.getValue(), query.status(),
-                    query.documentNo(), query.offset(), query.limit(), query.stockId());
+                    query.documentNo(), query.offset(), query.limit(), query.stockId(), query.materialId(), query.batchNo(), query.binCode());
         }
         var page = service.page(query);
         return BeanConversions.convertPage(page, Page.class);

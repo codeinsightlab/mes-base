@@ -10,6 +10,7 @@ import dev.mesbase.common.utils.StringUtils;
 import dev.mesbase.common.utils.bean.BeanValidators;
 import dev.mesbase.core.error.ErrorCode;
 import dev.mesbase.core.error.FoundationException;
+import dev.mesbase.core.error.SafeBusinessMessage;
 import dev.mesbase.system.domain.SysConfig;
 import dev.mesbase.system.mapper.SysConfigMapper;
 import dev.mesbase.system.service.ISysConfigService;
@@ -30,6 +31,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 @ConditionalOnProperty(name = "mes.system.enabled", havingValue = "true")
 public class SysConfigServiceImpl implements ISysConfigService {
+    private static final String SEARCH_SELECT_LIMIT_KEY = "sys.ui.searchSelect.limit";
     @Autowired
     private Validator contractValidator;
     @Autowired
@@ -42,7 +44,7 @@ public class SysConfigServiceImpl implements ISysConfigService {
 
     @Override
     public String selectClientConfigByKey(String key) {
-        if (!Set.of("sys.account.captchaOnOff", "sys.index.skinName", "sys.account.registerUser", "sys.user.avatar.maxSize")
+        if (!Set.of("sys.account.captchaOnOff", "sys.index.skinName", "sys.account.registerUser", "sys.user.avatar.maxSize", SEARCH_SELECT_LIMIT_KEY)
                 .contains(key)
                 && !permissions.grantedPlatform(SecurityUtils.getUsername(), "system:config:query"))
             throw new FoundationException(ErrorCode.FORBIDDEN);
@@ -128,6 +130,7 @@ public class SysConfigServiceImpl implements ISysConfigService {
     @Override
     @Transactional(transactionManager = "masterTransactionManager", rollbackFor = Exception.class)
     public int insertConfig(SysConfig config) {
+        validateSearchSelectLimit(config);
         BeanValidators.validateWithException(contractValidator, config);
         int row = configMapper.insertConfig(config);
         if (row > 0) {
@@ -145,6 +148,7 @@ public class SysConfigServiceImpl implements ISysConfigService {
     @Override
     @Transactional(transactionManager = "masterTransactionManager", rollbackFor = Exception.class)
     public int updateConfig(SysConfig config) {
+        validateSearchSelectLimit(config);
         BeanValidators.validateWithException(contractValidator, config);
         var previous = selectConfigById(config.getConfigId());
         if (previous == null) throw new FoundationException(ErrorCode.NOT_FOUND);
@@ -154,6 +158,15 @@ public class SysConfigServiceImpl implements ISysConfigService {
             settingsCache.invalidate(getCacheKey(config.getConfigKey()));
         }
         return row;
+    }
+
+    private void validateSearchSelectLimit(SysConfig config) {
+        if (!SEARCH_SELECT_LIMIT_KEY.equals(config.getConfigKey())) return;
+        String value = config.getConfigValue();
+        if (value == null || !value.matches("[1-9][0-9]{0,2}") || Integer.parseInt(value) > 100) {
+            throw new FoundationException(ErrorCode.BAD_REQUEST,
+                    new SafeBusinessMessage("检索选择框候选数量必须是1到100之间的整数"));
+        }
     }
 
     /**

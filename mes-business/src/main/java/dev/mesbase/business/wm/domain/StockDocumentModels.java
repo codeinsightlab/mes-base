@@ -140,7 +140,11 @@ public final class StockDocumentModels {
     }
 
     public record Query(String direction, String documentType, String status, String documentNo, Integer offset,
-                        Integer limit, Long stockId) {
+                        Integer limit, Long stockId, Long materialId, String batchNo, String binCode) {
+        public Query(String direction, String documentType, String status, String documentNo, Integer offset,
+                     Integer limit, Long stockId) {
+            this(direction, documentType, status, documentNo, offset, limit, stockId, null, null, null);
+        }
         public Query(String direction, String documentType, String status, String documentNo, Integer offset, Integer limit) {
             this(direction, documentType, status, documentNo, offset, limit, null);
         }

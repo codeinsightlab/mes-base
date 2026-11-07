@@ -194,9 +194,17 @@ public class StockDocumentService {
         }
         if (q.stockId() != null && q.stockId() <= 0)
             ParameterChecks.reject(ErrorCode.BAD_REQUEST, new SafeBusinessMessage("库存筛选标识无效"));
+        if (q.materialId() != null && q.materialId() <= 0)
+            ParameterChecks.reject(ErrorCode.BAD_REQUEST, new SafeBusinessMessage("材料筛选标识无效"));
+        if (q.batchNo() != null && q.batchNo().length() > 128)
+            ParameterChecks.reject(ErrorCode.BAD_REQUEST, new SafeBusinessMessage("批次号筛选不能超过128个字符"));
+        if (q.binCode() != null && q.binCode().length() > 64)
+            ParameterChecks.reject(ErrorCode.BAD_REQUEST, new SafeBusinessMessage("库位筛选不能超过64个字符"));
+        boolean lineFiltered = q.stockId() != null || q.materialId() != null
+                || StringUtils.isNotBlank(q.batchNo()) || StringUtils.isNotBlank(q.binCode());
         f.setOrderByClause("id desc");
         try (var page = PageHelper.offsetPage(offset, limit)) {
-            var rows = q.stockId() == null ? documents.selectByExampleWithBLOBs(f) : inbound.selectByStock(q);
+            var rows = lineFiltered ? inbound.selectByLineFilters(q) : documents.selectByExampleWithBLOBs(f);
             return new StockDocumentModels.Page(List.copyOf(rows), page.getTotal(), offset, limit);
         }
     }

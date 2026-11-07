@@ -111,6 +111,52 @@ class StockDocumentHttpTest {
     }
 
     @Test
+    void lineFiltersMatchOneLineAndDeduplicateBeforePaginationInBothDirections() throws Exception {
+        try (var context = ProductionInputHttpTest.context()) {
+            var mvc = MaterialIssueHttpTest.mvc(context);
+            var db = ProductionInputHttpTest.db(context);
+            for (var type : List.of("OTHER_RECEIPT", "OTHER_ISSUE")) {
+                String root = StockDocumentType.from(type).isReceipt() ? ROOT : OUT_ROOT;
+                String first = create(mvc, type, null).get("document").get("id").asText();
+                String second = create(mvc, type, null).get("document").get("id").asText();
+                String split = create(mvc, type, null).get("document").get("id").asText();
+                for (var id : List.of(first, second, split)) {
+                    mvc.perform(full(post(root + "/" + id + "/lines")).content(line("0", "1", "L001", "1")))
+                            .andExpect(status().isOk());
+                    mvc.perform(full(post(root + "/" + id + "/lines")).content(line("1", "1", "L001", "2")))
+                            .andExpect(status().isOk());
+                }
+                // Read-only query fixture: separate rows must not be combined into one match.
+                db.update("UPDATE wm_stock_document_line SET material_id=99,batch_no='L002',bin_code='BIN2' WHERE document_id=? AND line_no=2", Long.valueOf(split));
+                var page = JSON.readTree(mvc.perform(full(get(root).param("materialId", "1").param("batchNo", "001")
+                                .param("binCode", "IN1").param("limit", "1")))
+                        .andExpect(status().isOk()).andReturn().getResponse().getContentAsString());
+                assertEquals(3, page.get("total").asInt());
+                assertEquals(split, page.get("items").get(0).get("id").asText());
+                var next = JSON.readTree(mvc.perform(full(get(root).param("materialId", "1").param("batchNo", "001")
+                                .param("binCode", "IN1").param("limit", "1").param("offset", "1")))
+                        .andExpect(status().isOk()).andReturn().getResponse().getContentAsString());
+                assertEquals(3, next.get("total").asInt());
+                assertEquals(second, next.get("items").get(0).get("id").asText());
+                for (var mismatch : List.of(get(root).param("materialId", "1").param("batchNo", "L002"),
+                        get(root).param("materialId", "1").param("binCode", "BIN2"),
+                        get(root).param("materialId", "99").param("batchNo", "L001"),
+                        get(root).param("stockId", "2").param("materialId", "1").param("batchNo", "L001"))) {
+                    var empty = JSON.readTree(mvc.perform(full(mismatch)).andExpect(status().isOk())
+                            .andReturn().getResponse().getContentAsString());
+                    assertEquals(0, empty.get("total").asInt());
+                }
+                var batchOnly = JSON.readTree(mvc.perform(full(get(root).param("batchNo", "002")))
+                        .andExpect(status().isOk()).andReturn().getResponse().getContentAsString());
+                assertEquals(1, batchOnly.get("total").asInt());
+                mvc.perform(full(get(root).param("materialId", "0"))).andExpect(status().isBadRequest());
+                mvc.perform(full(get(root).param("batchNo", "x".repeat(129)))).andExpect(status().isBadRequest());
+                mvc.perform(full(get(root).param("binCode", "x".repeat(65)))).andExpect(status().isBadRequest());
+            }
+        }
+    }
+
+    @Test
     void inventoryUnitLabelsAreReadOnlyAndFactoryScoped() throws Exception {
         try (var context = ProductionInputHttpTest.context(StockTransferHttpTest.TransferConfig.class)) {
             var mvc = MaterialIssueHttpTest.mvc(context);

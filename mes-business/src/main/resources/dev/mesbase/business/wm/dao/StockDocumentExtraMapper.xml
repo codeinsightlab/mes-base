@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="dev.mesbase.business.wm.dao.StockDocumentExtraMapper">
- <select id="selectByStock" resultMap="dev.mesbase.business.wm.dao.WmStockDocumentMapper.ResultMapWithBLOBs">
+ <select id="selectByLineFilters" resultMap="dev.mesbase.business.wm.dao.WmStockDocumentMapper.ResultMapWithBLOBs">
   SELECT <include refid="dev.mesbase.business.wm.dao.WmStockDocumentMapper.Base_Column_List"/>,
          <include refid="dev.mesbase.business.wm.dao.WmStockDocumentMapper.Blob_Column_List"/>
   FROM wm_stock_document d
@@ -10,8 +10,13 @@
   <if test="query.status != null and query.status.trim().length() > 0">AND d.status=#{query.status}</if>
   <if test="query.documentNo != null and query.documentNo.trim().length() > 0">AND d.document_no LIKE CONCAT('%',#{query.documentNo},'%')</if>
   AND EXISTS (
-   SELECT 1 FROM wm_stock_document_line l JOIN wm_inventory s ON s.id=l.stock_id
-   WHERE l.document_id=d.id AND s.id=#{query.stockId}
+   SELECT 1 FROM wm_stock_document_line l
+   <if test="query.stockId != null">JOIN wm_inventory s ON s.id=l.stock_id</if>
+   WHERE l.document_id=d.id
+   <if test="query.stockId != null">AND s.id=#{query.stockId}</if>
+   <if test="query.materialId != null">AND l.material_id=#{query.materialId}</if>
+   <if test="query.batchNo != null and query.batchNo.trim().length() > 0">AND l.batch_no LIKE CONCAT('%',#{query.batchNo},'%')</if>
+   <if test="query.binCode != null and query.binCode.trim().length() > 0">AND l.bin_code LIKE CONCAT('%',#{query.binCode},'%')</if>
   )
   ORDER BY d.id DESC
  </select>
