@@ -192,9 +192,12 @@ public class StockDocumentService {
                 ParameterChecks.reject(ErrorCode.BAD_REQUEST, new SafeBusinessMessage("单据编号筛选不能超过64个字符"));
             c.andDocumentNoLike("%" + q.documentNo() + "%");
         }
+        if (q.stockId() != null && q.stockId() <= 0)
+            ParameterChecks.reject(ErrorCode.BAD_REQUEST, new SafeBusinessMessage("库存筛选标识无效"));
         f.setOrderByClause("id desc");
         try (var page = PageHelper.offsetPage(offset, limit)) {
-            return new StockDocumentModels.Page(List.copyOf(documents.selectByExampleWithBLOBs(f)), page.getTotal(), offset, limit);
+            var rows = q.stockId() == null ? documents.selectByExampleWithBLOBs(f) : inbound.selectByStock(q);
+            return new StockDocumentModels.Page(List.copyOf(rows), page.getTotal(), offset, limit);
         }
     }
 

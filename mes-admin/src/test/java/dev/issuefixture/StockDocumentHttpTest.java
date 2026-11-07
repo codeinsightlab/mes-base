@@ -67,6 +67,50 @@ class StockDocumentHttpTest {
     }
 
     @Test
+    void stockScopeMatchesCompleteIdentityBeforePaginationWithoutDuplicatingDocuments() throws Exception {
+        try (var context = ProductionInputHttpTest.context()) {
+            var mvc = MaterialIssueHttpTest.mvc(context);
+            var db = ProductionInputHttpTest.db(context);
+            String first = create(mvc, "OTHER_RECEIPT", null).get("document").get("id").asText();
+            add(mvc, first, "0", "1", "L001", "3");
+            add(mvc, first, "1", "1", "L001", "2");
+            String second = create(mvc, "OTHER_RECEIPT", null).get("document").get("id").asText();
+            add(mvc, second, "0", "1", "L001", "1");
+            String other = create(mvc, "OTHER_RECEIPT", null).get("document").get("id").asText();
+            add(mvc, other, "0", "1", "L001", "1");
+            db.update("UPDATE wm_stock_document_line SET stock_id=999999, bin_code='OTHER' WHERE document_id=?", Long.valueOf(other));
+            var page = JSON.readTree(mvc.perform(full(get(ROOT).param("stockId", "1").param("limit", "1")))
+                    .andExpect(status().isOk()).andReturn().getResponse().getContentAsString());
+            assertEquals(2, page.get("total").asInt());
+            assertEquals(second, page.get("items").get(0).get("id").asText());
+            var next = JSON.readTree(mvc.perform(full(get(ROOT).param("stockId", "1").param("limit", "1").param("offset", "1")))
+                    .andExpect(status().isOk()).andReturn().getResponse().getContentAsString());
+            assertEquals(2, next.get("total").asInt());
+            assertEquals(first, next.get("items").get(0).get("id").asText());
+            var filtered = JSON.readTree(mvc.perform(full(get(ROOT).param("stockId", "1")
+                            .param("documentType", "OTHER_RECEIPT").param("status", "DRAFT")
+                            .param("documentNo", db.queryForObject("SELECT document_no FROM wm_stock_document WHERE id=?", String.class, Long.valueOf(second)))))
+                    .andExpect(status().isOk()).andReturn().getResponse().getContentAsString());
+            assertEquals(1, filtered.get("total").asInt());
+            assertEquals(second, filtered.get("items").get(0).get("id").asText());
+            String outbound = create(mvc, "OTHER_ISSUE", null).get("document").get("id").asText();
+            addOut(mvc, outbound, "0", "1", "L001", "1");
+            var out = JSON.readTree(mvc.perform(full(get(OUT_ROOT).param("stockId", "1")))
+                    .andExpect(status().isOk()).andReturn().getResponse().getContentAsString());
+            assertEquals(1, out.get("total").asInt());
+            assertEquals(outbound, out.get("items").get(0).get("id").asText());
+            var otherFactory = JSON.readTree(mvc.perform(get(ROOT).param("stockId", "1")
+                            .header("Authorization", "Bearer FULL").header("X-Factory-Id", "B"))
+                    .andExpect(status().isOk()).andReturn().getResponse().getContentAsString());
+            assertEquals(0, otherFactory.get("total").asInt());
+            mvc.perform(full(get(ROOT).param("stockId", "0"))).andExpect(status().isBadRequest());
+            var missing = JSON.readTree(mvc.perform(full(get(ROOT).param("stockId", "999999")))
+                    .andExpect(status().isOk()).andReturn().getResponse().getContentAsString());
+            assertEquals(0, missing.get("total").asInt());
+        }
+    }
+
+    @Test
     void inventoryUnitLabelsAreReadOnlyAndFactoryScoped() throws Exception {
         try (var context = ProductionInputHttpTest.context(StockTransferHttpTest.TransferConfig.class)) {
             var mvc = MaterialIssueHttpTest.mvc(context);

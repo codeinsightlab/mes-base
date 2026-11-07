@@ -1,6 +1,20 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="dev.mesbase.business.wm.dao.StockDocumentExtraMapper">
+ <select id="selectByStock" resultMap="dev.mesbase.business.wm.dao.WmStockDocumentMapper.ResultMapWithBLOBs">
+  SELECT <include refid="dev.mesbase.business.wm.dao.WmStockDocumentMapper.Base_Column_List"/>,
+         <include refid="dev.mesbase.business.wm.dao.WmStockDocumentMapper.Blob_Column_List"/>
+  FROM wm_stock_document d
+  WHERE d.direction=#{query.direction}
+  <if test="query.documentType != null and query.documentType.trim().length() > 0">AND d.document_type=#{query.documentType}</if>
+  <if test="query.status != null and query.status.trim().length() > 0">AND d.status=#{query.status}</if>
+  <if test="query.documentNo != null and query.documentNo.trim().length() > 0">AND d.document_no LIKE CONCAT('%',#{query.documentNo},'%')</if>
+  AND EXISTS (
+   SELECT 1 FROM wm_stock_document_line l JOIN wm_inventory s ON s.id=l.stock_id
+   WHERE l.document_id=d.id AND s.id=#{query.stockId}
+  )
+  ORDER BY d.id DESC
+ </select>
  <select id="lineLabels" resultType="dev.mesbase.business.wm.dao.StockDocumentExtraMapper$LineLabel">
   SELECT l.id AS lineId,m.code AS materialCode,m.name AS materialName,
          w.code AS warehouseCode,w.name AS warehouseName,w.source AS warehouseSource,u.name AS unitName
