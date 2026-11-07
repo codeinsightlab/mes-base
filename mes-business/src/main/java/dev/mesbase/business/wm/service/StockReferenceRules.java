@@ -39,6 +39,7 @@ public class StockReferenceRules {
     private final WmStockDocumentLineMapper documentLines;
     private final dev.mesbase.business.purchase.dao.PurchaseReferencePriceMapper quotes;
     private final MaterialMapper materials;
+    private final dev.mesbase.business.basic.dao.UnitMeasureMapper units;
     private final WmWarehouseMapper warehouses;
     private final WmInventoryMapper inventories;
     private final WmStockActionMapper actions;
@@ -47,7 +48,9 @@ public class StockReferenceRules {
                                WmStockActionMapper actions,
                                MesWorkorderMaterialMapper demand, WmStockDocumentLineMapper documentLines,
                                WorkorderMapper workorders,
-                               dev.mesbase.business.purchase.dao.PurchaseReferencePriceMapper quotes) {
+                               dev.mesbase.business.purchase.dao.PurchaseReferencePriceMapper quotes,
+                               dev.mesbase.business.basic.dao.UnitMeasureMapper units) {
+        this.units = units;
         this.quotes = quotes;
         this.workorders = workorders;
         this.documentLines = documentLines;
@@ -148,6 +151,26 @@ public class StockReferenceRules {
         }
         if (filterLockedRows.size() != ids.size())
             throw new FoundationException(ErrorCode.STOCK_REFERENCE_INVALID);
+    }
+
+    public List<dev.mesbase.business.wm.domain.WmInventoryUnitLabel> unitLabels(List<WmInventoryEntity> rows) {
+        if (rows.isEmpty()) return List.of();
+        var materialFilter = new MaterialExample();
+        materialFilter.createCriteria()
+                .andIdIn(rows.stream().map(WmInventoryEntity::getMaterialId).distinct().toList());
+        var materialRows = materials.selectByExample(materialFilter);
+        var unitIds = materialRows.stream().map(MaterialEntity::getUnitId).filter(java.util.Objects::nonNull).distinct()
+                .toList();
+        var unitNames = new java.util.HashMap<Long, String>();
+        if (!unitIds.isEmpty()) {
+            var filter = new dev.mesbase.business.basic.domain.UnitMeasureExample();
+            filter.createCriteria().andIdIn(unitIds);
+            units.selectByExample(filter).forEach(unit -> unitNames.put(unit.getId(), unit.getName()));
+        }
+        var materialUnits = new java.util.HashMap<Long, String>();
+        materialRows.forEach(material -> materialUnits.put(material.getId(), unitNames.get(material.getUnitId())));
+        return rows.stream().map(row -> new dev.mesbase.business.wm.domain.WmInventoryUnitLabel(row.getId(),
+                materialUnits.get(row.getMaterialId()))).toList();
     }
 
     public List<WmInventoryItem> describe(List<WmInventoryEntity> rows) {

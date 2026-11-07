@@ -67,6 +67,33 @@ class StockDocumentHttpTest {
     }
 
     @Test
+    void inventoryUnitLabelsAreReadOnlyAndFactoryScoped() throws Exception {
+        try (var context = ProductionInputHttpTest.context(StockTransferHttpTest.TransferConfig.class)) {
+            var mvc = MaterialIssueHttpTest.mvc(context);
+            var db = ProductionInputHttpTest.db(context);
+            var before = db.queryForObject("SELECT quantity FROM wm_inventory WHERE id=1", BigDecimal.class);
+            String path = "/api/wm/wm-inventory/unit-labels";
+            var labels = JSON.readTree(mvc.perform(full(get(path).param("stockIds", "1")))
+                    .andExpect(status().isOk()).andReturn().getResponse().getContentAsString());
+            assertEquals("1", labels.get(0).get("stockId").asText());
+            assertEquals("千克", labels.get(0).get("unitName").asText());
+            var other = context.getBean(MaterialIssueHttpTest.Fixture.class).business.get("B");
+            other.update("UPDATE unit_measure SET name='另一个工厂单位' WHERE id=1");
+            var second = JSON.readTree(mvc.perform(get(path).param("stockIds", "1")
+                            .header("Authorization", "Bearer FULL").header("X-Factory-Id", "B"))
+                    .andExpect(status().isOk()).andReturn().getResponse().getContentAsString());
+            assertEquals("另一个工厂单位", second.get(0).get("unitName").asText());
+            mvc.perform(get(path).param("stockIds", "1").header("Authorization", "Bearer ISSUE_QUERY")
+                    .header("X-Factory-Id", "A")).andExpect(status().isForbidden());
+            mvc.perform(full(get(path).param("stockIds", java.util.stream.LongStream.rangeClosed(1, 101)
+                            .mapToObj(Long::toString).collect(java.util.stream.Collectors.joining(",")))))
+                    .andExpect(status().isBadRequest());
+            assertEquals(0, before.compareTo(db.queryForObject("SELECT quantity FROM wm_inventory WHERE id=1", BigDecimal.class)));
+            assertEquals(0, db.queryForObject("SELECT COUNT(*) FROM wm_stock_action", Integer.class));
+        }
+    }
+
+    @Test
     void lineLabelsAreReadOnlyScopedAndDirectionBound() throws Exception {
         try (var context = ProductionInputHttpTest.context()) {
             var mvc = MaterialIssueHttpTest.mvc(context);

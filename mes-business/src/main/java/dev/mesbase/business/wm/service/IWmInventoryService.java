@@ -20,6 +20,8 @@ import dev.mesbase.framework.sync.SyncCoordinator;
 public interface IWmInventoryService {
     WmInventoryPage selectPage(WmInventoryQueryDto query);
 
+    List<dev.mesbase.business.wm.domain.WmInventoryUnitLabel> unitLabels(List<Long> stockIds);
+
     WmInventoryEntity selectById(Long id);
 
     WmInventoryItem selectDetail(Long id);

@@ -127,6 +127,17 @@ public class WmInventoryServiceImpl implements IWmInventoryService {
 
     @Override
     @Transactional(transactionManager = "businessTransactionManager", readOnly = true)
+    public List<dev.mesbase.business.wm.domain.WmInventoryUnitLabel> unitLabels(List<Long> stockIds) {
+        if (stockIds == null || stockIds.isEmpty() || stockIds.size() > 100 || stockIds.stream()
+                .anyMatch(Objects::isNull))
+            throw new FoundationException(ErrorCode.BAD_REQUEST);
+        var filter = new WmInventoryExample();
+        filter.createCriteria().andIdIn(stockIds.stream().distinct().toList());
+        return rules.unitLabels(mapper.selectByExample(filter));
+    }
+
+    @Override
+    @Transactional(transactionManager = "businessTransactionManager", readOnly = true)
     @BusinessCache(business = WmInventoryResource.PREFIX,
             type = BusinessCache.Type.DETAIL)
     public WmInventoryEntity selectById(Long id) {
