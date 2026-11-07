@@ -27,6 +27,8 @@
     <result column="reason" jdbcType="VARCHAR" property="reason" />
     <result column="document_line_id" jdbcType="BIGINT" property="documentLineId" />
     <result column="operation_id" jdbcType="VARCHAR" property="operationId" />
+    <result column="document_type" jdbcType="VARCHAR" property="documentType" />
+    <result column="document_direction" jdbcType="VARCHAR" property="documentDirection" />
   </resultMap>
   <sql id="Example_Where_Clause">
     <where>
@@ -92,9 +94,18 @@
     available_after, source_type, source_id, reference_action_id, execution_code, operator_user_id,
     occurred_at, recorded_at, reason, document_line_id, operation_id
   </sql>
+  <sql id="Document_Projection">
+    , (select d.document_type from wm_stock_document_line l
+       join wm_stock_document d on d.id = l.document_id
+       where l.id = wm_stock_action.document_line_id and l.stock_action_id = wm_stock_action.id) as document_type
+    , (select d.direction from wm_stock_document_line l
+       join wm_stock_document d on d.id = l.document_id
+       where l.id = wm_stock_action.document_line_id and l.stock_action_id = wm_stock_action.id) as document_direction
+  </sql>
   <select id="selectByExample" parameterType="dev.mesbase.business.wm.domain.WmStockActionExample" resultMap="BaseResultMap">
     select
     <include refid="Base_Column_List" />
+    <include refid="Document_Projection" />
     from wm_stock_action
     <if test="_parameter != null">
       <include refid="Example_Where_Clause" />
@@ -106,6 +117,7 @@
   <select id="selectByPrimaryKey" parameterType="String" resultMap="BaseResultMap">
     select
     <include refid="Base_Column_List" />
+    <include refid="Document_Projection" />
     from wm_stock_action
     where id = #{id,jdbcType=VARCHAR}
   </select>

@@ -30,7 +30,9 @@ public record WmStockActionVo(
         LocalDateTime recordedAt,
         String reason,
         String documentLineId,
-        String operationId
+        String operationId,
+        String documentType,
+        String documentDirection
 ) {
 }
 

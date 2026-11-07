@@ -54,6 +54,19 @@ public class WmStockActionEntity {
 
     private String operationId;
 
+    /** Read-only projection from the formally linked stock document; never persisted in the action. */
+    private String documentType;
+
+    private String documentDirection;
+
+    public String getDocumentType() { return documentType; }
+
+    public void setDocumentType(String documentType) { this.documentType = documentType; }
+
+    public String getDocumentDirection() { return documentDirection; }
+
+    public void setDocumentDirection(String documentDirection) { this.documentDirection = documentDirection; }
+
     public String getId() {
         return id;
     }

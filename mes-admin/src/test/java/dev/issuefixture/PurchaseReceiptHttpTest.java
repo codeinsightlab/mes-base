@@ -47,6 +47,21 @@ class PurchaseReceiptHttpTest {
                 m.perform(full(post(StockDocumentHttpTest.ROOT + "/" + id + "/actions/approve")).content(intent))
                         .andExpect(status().isOk());
             StockDocumentHttpTest.balance(db, "2");
+            var ledger = StockDocumentHttpTest.JSON.readTree(m.perform(full(get("/api/wm/wm-stock-action")).param("stockId", "1"))
+                    .andExpect(status().isOk()).andReturn().getResponse().getContentAsString());
+            assertEquals(1, ledger.get("total").asInt());
+            var action = ledger.get("items").get(0);
+            assertEquals("OTHER_RECEIPT", action.get("actionType").asText());
+            assertEquals("PURCHASE_RECEIPT", action.get("documentType").asText());
+            assertEquals("IN", action.get("documentDirection").asText());
+            var actionDetail = StockDocumentHttpTest.JSON.readTree(m.perform(full(get("/api/wm/wm-stock-action/" + action.get("id").asText())))
+                    .andExpect(status().isOk()).andReturn().getResponse().getContentAsString());
+            assertEquals("PURCHASE_RECEIPT", actionDetail.get("documentType").asText());
+            var otherLedger = StockDocumentHttpTest.JSON.readTree(m.perform(get("/api/wm/wm-stock-action")
+                            .header("Authorization", "Bearer FULL").header("X-Factory-Id", "B").param("stockId", "1"))
+                    .andExpect(status().isOk()).andReturn().getResponse().getContentAsString());
+            assertEquals(0, otherLedger.get("total").asInt());
+
             assertEquals(0, new java.math.BigDecimal("3").compareTo(db.queryForObject("SELECT quantity FROM wm_inventory WHERE id=9", java.math.BigDecimal.class)));
             assertEquals(2, db.queryForObject("SELECT COUNT(*) FROM wm_stock_action WHERE document_line_id IS NOT NULL", Integer.class));
             assertEquals(beforeB, c.getBean(MaterialIssueHttpTest.Fixture.class).business.get("B")
