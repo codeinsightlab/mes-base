@@ -200,6 +200,15 @@ public class StockDocumentService {
 
 
     @Transactional(transactionManager = "businessTransactionManager", readOnly = true)
+    public List<StockDocumentExtraMapper.LineLabel> lineLabels(Long id, String direction, boolean materialIssueOnly) {
+        var document = require(id);
+        if (!Objects.equals(direction, document.getDirection())
+                || materialIssueOnly && !StockDocumentType.MATERIAL_ISSUE.getValue().equals(document.getDocumentType()))
+            throw new FoundationException(ErrorCode.NOT_FOUND);
+        return inbound.lineLabels(id);
+    }
+
+    @Transactional(transactionManager = "businessTransactionManager", readOnly = true)
     public Detail detail(Long id) {
         var row = require(id);
         var purpose = StockDocumentType.from(row.getDocumentType());

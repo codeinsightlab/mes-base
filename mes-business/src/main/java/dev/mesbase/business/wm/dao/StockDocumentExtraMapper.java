@@ -4,6 +4,12 @@ import java.math.BigDecimal;
 import org.apache.ibatis.annotations.Param;
 
 public interface StockDocumentExtraMapper {
+    record LineLabel(Long lineId, String materialCode, String materialName, String warehouseCode,
+                     String warehouseName, String warehouseSource, String unitName) {
+    }
+
+    java.util.List<LineLabel> lineLabels(@Param("id") Long id);
+
     Long pairedDocumentId(@Param("id") Long id);
 
     String latestInboundAuditId(@Param("executionCode") String executionCode);

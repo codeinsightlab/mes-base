@@ -196,6 +196,25 @@ public class StockDocumentController {
         return view(detail);
     }
 
+    public record LineLabel(String lineId, String materialCode, String materialName, String warehouseCode,
+                            String warehouseName, String warehouseSource, String unitName) {
+    }
+
+    @GetMapping("/{id}/line-labels")
+    @EndpointAccess(EndpointAccess.Kind.AUTHENTICATED)
+    public List<LineLabel> lineLabels(@PathVariable Long id,
+                                      @RequestParam(required = false) String direction,
+                                      @RequestParam(required = false) String documentType) {
+        boolean materialIssueOnly = !hasPermission(PERMISSION + "query");
+        if (materialIssueOnly) {
+            if (!StockDocumentType.MATERIAL_ISSUE.getValue().equals(documentType))
+                throw new FoundationException(ErrorCode.FORBIDDEN);
+            requirePermission("business:mes:material:issue:item:list");
+        }
+        return service.lineLabels(id, fixedDirection(direction), materialIssueOnly).stream()
+                .map(row -> BeanConversions.convert(row, LineLabel.class)).toList();
+    }
+
     @GetMapping("/{id}/lines")
     @EndpointAccess(EndpointAccess.Kind.AUTHENTICATED)
     public List<Line> lines(@PathVariable Long id,

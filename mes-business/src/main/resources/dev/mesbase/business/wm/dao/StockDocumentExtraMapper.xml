@@ -1,6 +1,15 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="dev.mesbase.business.wm.dao.StockDocumentExtraMapper">
+ <select id="lineLabels" resultType="dev.mesbase.business.wm.dao.StockDocumentExtraMapper$LineLabel">
+  SELECT l.id AS lineId,m.code AS materialCode,m.name AS materialName,
+         w.code AS warehouseCode,w.name AS warehouseName,w.source AS warehouseSource,u.name AS unitName
+  FROM wm_stock_document_line l
+  LEFT JOIN material m ON m.id=l.material_id
+  LEFT JOIN wm_warehouse w ON w.id=l.warehouse_id
+  LEFT JOIN unit_measure u ON u.id=l.unit_id
+  WHERE l.document_id=#{id} ORDER BY l.line_no,l.id
+ </select>
  <select id="pairedDocumentId" resultType="long">SELECT p.id FROM wm_stock_document d JOIN wm_stock_document p ON p.id=d.paired_document_id WHERE d.id=#{id}</select>
  <sql id="formalInboundBindings">
   <bind name="postedStatus" value="@dev.mesbase.business.wm.domain.StockDocumentStatus@POSTED.getValue()"/>

@@ -67,6 +67,35 @@ class StockDocumentHttpTest {
     }
 
     @Test
+    void lineLabelsAreReadOnlyScopedAndDirectionBound() throws Exception {
+        try (var context = ProductionInputHttpTest.context()) {
+            var mvc = MaterialIssueHttpTest.mvc(context);
+            var db = ProductionInputHttpTest.db(context);
+            var before = db.queryForObject("SELECT quantity FROM wm_inventory WHERE id=1", BigDecimal.class);
+            String id = create(mvc, "OTHER_RECEIPT", null).get("document").get("id").asText();
+            add(mvc, id, "0", "1", "L001", "3");
+            var labels = JSON.readTree(mvc.perform(full(get(ROOT + "/" + id + "/line-labels")))
+                    .andExpect(status().isOk()).andReturn().getResponse().getContentAsString());
+            assertEquals(1, labels.size());
+            assertEquals(db.queryForObject("SELECT name FROM material WHERE id=1", String.class),
+                    labels.get(0).get("materialName").asText());
+            assertEquals(db.queryForObject("SELECT code FROM material WHERE id=1", String.class),
+                    labels.get(0).get("materialCode").asText());
+            assertEquals(db.queryForObject("SELECT name FROM wm_warehouse WHERE id=1", String.class),
+                    labels.get(0).get("warehouseName").asText());
+            assertEquals("千克", labels.get(0).get("unitName").asText());
+            assertTrue(labels.get(0).get("lineId").isTextual());
+            assertEquals(0, before.compareTo(db.queryForObject("SELECT quantity FROM wm_inventory WHERE id=1", BigDecimal.class)));
+            assertEquals(0, db.queryForObject("SELECT COUNT(*) FROM wm_stock_action", Integer.class));
+            mvc.perform(full(get(OUT_ROOT + "/" + id + "/line-labels"))).andExpect(status().isNotFound());
+            mvc.perform(get(ROOT + "/" + id + "/line-labels").header("Authorization", "Bearer FULL")
+                    .header("X-Factory-Id", "B")).andExpect(status().isNotFound());
+            mvc.perform(get(ROOT + "/" + id + "/line-labels").header("Authorization", "Bearer ISSUE_QUERY")
+                    .header("X-Factory-Id", "A")).andExpect(status().isForbidden());
+        }
+    }
+
+    @Test
     void aggregateSaveCreatesHeaderAndItemsAtomically() throws Exception {
         try (var c = ProductionInputHttpTest.context()) {
             var mvc = MaterialIssueHttpTest.mvc(c);
