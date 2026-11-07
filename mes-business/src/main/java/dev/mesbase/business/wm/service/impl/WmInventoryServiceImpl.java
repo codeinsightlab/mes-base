@@ -1,6 +1,7 @@
 package dev.mesbase.business.wm.service.impl;
 
 import dev.mesbase.common.validation.ParameterChecks;
+import dev.mesbase.common.utils.StringUtils;
 import dev.mesbase.business.production.service.BusinessSourceRules;
 import dev.mesbase.business.shared.enums.BusinessSource;
 
@@ -98,6 +99,9 @@ public class WmInventoryServiceImpl implements IWmInventoryService {
         }
         if (query.warehouseId() != null) {
             criteria.andWarehouseIdEqualTo(query.warehouseId());
+        }
+        if (StringUtils.isNotEmpty(query.batchNo())) {
+            criteria.andBatchNoLike("%" + query.batchNo() + "%");
         }
         if (query.quantity() != null) {
             criteria.andQuantityEqualTo(query.quantity());

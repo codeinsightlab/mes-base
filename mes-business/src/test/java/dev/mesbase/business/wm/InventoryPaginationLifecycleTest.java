@@ -39,11 +39,31 @@ class InventoryPaginationLifecycleTest {
     private final WmInventoryServiceImpl service = new WmInventoryServiceImpl(mapper,
             new DefaultListableBeanFactory().getBeanProvider(WmInventoryQueryPort.class),
             null, null, null, null, rules, null, Mockito.mock(BusinessSourceRules.class));
-    private final WmInventoryQueryDto query = new WmInventoryQueryDto(1, 1, null, null, null, null, null, null);
+    private final WmInventoryQueryDto query = new WmInventoryQueryDto(1, 1, null, null, null, null, null, null, null);
 
     @AfterEach
     void clearTestThread() {
         PageHelper.clearPage();
+    }
+
+    @Test
+    void batchSearchCombinesWithMaterialWarehouseAndStatusBeforePagination() {
+        when(mapper.selectByExample(any(WmInventoryExample.class))).thenAnswer(call -> {
+            WmInventoryExample example = call.getArgument(0);
+            var filters = example.getOredCriteria().getFirst().getAllCriteria();
+            assertEquals(List.of("material_id =", "warehouse_id =", "batch_no like", "status like"),
+                    filters.stream().map(WmInventoryExample.Criterion::getCondition).toList());
+            assertEquals(List.of(10L, 20L, "%LOT-001%", "%ENABLED%"),
+                    filters.stream().map(WmInventoryExample.Criterion::getValue).toList());
+            assertEquals("id desc", example.getOrderByClause());
+            PageHelper.getLocalPage().setTotal(2);
+            return List.of();
+        });
+        when(rules.describe(List.of())).thenReturn(List.of());
+        var result = service.selectPage(new WmInventoryQueryDto(1, 1, 10L, 20L,
+                null, null, "ENABLED", null, "LOT-001"));
+        assertEquals(2, result.total());
+        assertEquals(1, result.offset());
     }
 
     @Test

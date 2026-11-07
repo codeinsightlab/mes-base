@@ -18,7 +18,8 @@ public record WmInventoryQueryDto(
         @Digits(integer = 14, fraction = 4) BigDecimal quantity,
         @Digits(integer = 14, fraction = 4) BigDecimal availableQuantity,
         @Size(max = 16) String status,
-        @Size(max = 500) String remark
+        @Size(max = 500) String remark,
+        @Size(max = 128) String batchNo
 ) implements BusinessCacheQuery {
     @Override
     public int cacheOffset() {
