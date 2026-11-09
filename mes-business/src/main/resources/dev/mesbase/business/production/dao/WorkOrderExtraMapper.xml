@@ -41,7 +41,6 @@
  <select id="countUnaccountedInputs" resultType="long">
     <bind name="enumPosted" value="@dev.mesbase.business.wm.domain.StockDocumentStatus@POSTED.getValue()"/>
     <bind name="enumFullyReceived" value="@dev.mesbase.business.production.domain.ProductionExecutionStatus@FULLY_RECEIVED.getValue()"/>
-    <bind name="enumReversal" value="@dev.mesbase.business.wm.domain.StockActionType@REVERSAL.getValue()"/>
     <bind name="enumProductionInput" value="@dev.mesbase.business.production.domain.ProductionInputKind@PRODUCTION_INPUT.getValue()"/>
     <bind name="enumMaterialIssue" value="@dev.mesbase.business.wm.domain.StockDocumentType@MATERIAL_ISSUE.getValue()"/>
   SELECT COUNT(d.id) FROM wm_stock_document d
@@ -49,9 +48,6 @@
   LEFT JOIN mes_production_execution e ON e.execution_code=d.source_execution_code AND e.workorder_id=d.source_workorder_id
   WHERE d.source_workorder_id=#{id} AND d.document_type=#{enumMaterialIssue} AND d.status=#{enumPosted}
     AND (d.source_execution_code IS NOT NULL OR d.source_request_json IS NOT NULL OR f.id IS NOT NULL)
-    AND (NOT EXISTS(SELECT 1 FROM wm_stock_document_line l WHERE l.document_id=d.id)
-      OR EXISTS(SELECT 1 FROM wm_stock_document_line l WHERE l.document_id=d.id
-        AND NOT EXISTS(SELECT 1 FROM wm_stock_action r WHERE r.reference_action_id=l.stock_action_id AND r.action_type=#{enumReversal})))
     AND (f.id IS NULL OR f.input_kind!=#{enumProductionInput} OR f.confirmed_at IS NULL
          OR f.stock_applied!=TRUE OR f.execution_code!=d.source_execution_code OR e.id IS NULL OR e.status!=#{enumFullyReceived})
  </select>
@@ -80,13 +76,10 @@
  </select>
   <select id="countBlockingIssues" resultType="long">
     <bind name="enumCancelled" value="@dev.mesbase.business.wm.domain.StockDocumentStatus@CANCELLED.getValue()"/>
-    <bind name="enumReversal" value="@dev.mesbase.business.wm.domain.StockActionType@REVERSAL.getValue()"/>
+    <bind name="enumReversed" value="@dev.mesbase.business.wm.domain.StockDocumentStatus@REVERSED.getValue()"/>
     <bind name="enumMaterialIssue" value="@dev.mesbase.business.wm.domain.StockDocumentType@MATERIAL_ISSUE.getValue()"/>
     SELECT COUNT(*) FROM wm_stock_document d
-    WHERE d.source_workorder_id=#{workorderId} AND d.document_type=#{enumMaterialIssue} AND d.status!=#{enumCancelled}
-      AND (NOT EXISTS(SELECT 1 FROM wm_stock_document_line l WHERE l.document_id=d.id)
-        OR EXISTS(SELECT 1 FROM wm_stock_document_line l
-          WHERE l.document_id=d.id AND NOT EXISTS(SELECT 1 FROM wm_stock_action r
-            WHERE r.reference_action_id=l.stock_action_id AND r.action_type=#{enumReversal})))
+    WHERE d.source_workorder_id=#{workorderId} AND d.document_type=#{enumMaterialIssue}
+      AND d.status NOT IN (#{enumCancelled},#{enumReversed})
   </select>
 </mapper>

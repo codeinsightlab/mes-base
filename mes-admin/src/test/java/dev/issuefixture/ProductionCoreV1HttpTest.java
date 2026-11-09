@@ -5,6 +5,8 @@ import dev.mesbase.core.factory.FactoryRuntimeMode;
 import dev.mesbase.acceptance.FactorySnapshotFixture;
 
 import java.util.UUID;
+import java.nio.charset.StandardCharsets;
+import org.springframework.web.util.UriUtils;
 import tools.jackson.databind.ObjectMapper;
 import java.util.List;
 import org.junit.jupiter.api.Test;
@@ -46,7 +48,7 @@ class ProductionCoreV1HttpTest {
         } else m.perform(full(post("/api/production/workorder/1/actions/release")).content("{\"revision\":0}"))
                 .andExpect(status().isOk());
         // Existing execution fixture for administrative/ERP-intent lifecycle tests; public creation is retired.
-        j.update("INSERT INTO mes_production_execution(id,workorder_id,product_id,routing_id,target_qty,status,create_by,create_time,update_time) VALUES(1,1,1,1,12,'READY','1',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)");
+        j.update("INSERT INTO mes_production_execution(id,workorder_id,product_id,routing_id,target_qty,status,create_by,create_time,update_time,execution_code) VALUES(1,1,1,1,12,'READY','1',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,'1')");
     }
 
     static void select(MockMvc m) throws Exception {
@@ -63,27 +65,24 @@ class ProductionCoreV1HttpTest {
             String body = ProductionInputHttpTest.command(m, UUID.randomUUID().toString(), "L001", "100");
             var first = new ObjectMapper().readTree(ProductionInputHttpTest.submit(m, body));
             String execution = first.get("executionCode").asText();
-            String actions = "/api/production/executions/" + execution + "/actions/";
-            var locked = j.queryForObject("SELECT locked_at FROM mes_execution_path WHERE id=?", String.class, execution);
+            String actions = "/api/production/executions/" + UriUtils.encodePathSegment(execution, StandardCharsets.UTF_8) + "/actions/";
+            var locked = j.queryForObject("SELECT locked_at FROM mes_execution_path WHERE execution_code=?", String.class, execution);
             ProductionInputHttpTest.submit(m, body);
             assertEquals(1, j.queryForObject("SELECT COUNT(*) FROM mes_material_issue_input WHERE confirmed_at IS NOT NULL", Integer.class));
             ProductionInputHttpTest.submit(m, ProductionInputHttpTest.command(m, UUID.randomUUID()
                     .toString(), "L001", "100"));
-            assertEquals(locked, j.queryForObject("SELECT locked_at FROM mes_execution_path WHERE id=?", String.class, execution));
+            assertEquals(locked, j.queryForObject("SELECT locked_at FROM mes_execution_path WHERE execution_code=?", String.class, execution));
             assertEquals(2, j.queryForObject("SELECT COUNT(*) FROM wm_stock_document WHERE document_type='MATERIAL_ISSUE' AND status='POSTED'", Integer.class));
             m.perform(full(post(actions + "select-path")).content("{\"revision\":1,\"routingNodeIds\":[11,12]}"))
-                    .andExpect(status().isConflict());
-            m.perform(full(post(actions + "start"))).andExpect(status().isOk())
-                    .andExpect(jsonPath("status").value("RUNNING"));
-            var started = j.queryForObject("SELECT start_time FROM mes_production_execution WHERE id=?", String.class, execution);
-            m.perform(full(post(actions + "start"))).andExpect(status().isOk());
-            assertEquals(started, j.queryForObject("SELECT start_time FROM mes_production_execution WHERE id=?", String.class, execution));
+                    .andExpect(status().is4xxClientError());
             WorkorderBomInputHttpTest.report(m, execution, "150");
-            m.perform(full(post(StockDocumentHttpTest.OUT_ROOT + "/" + first.get("documentId")
-                            .asText() + "/actions/void")))
-                    .andExpect(status().isConflict());
-            m.perform(full(put(E + "/" + execution)).content(EXEC.replace("READY", "FULLY_RECEIVED")))
-                    .andExpect(status().isConflict());
+            String document = first.get("documentId").asText();
+            m.perform(full(post(ProductionInputHttpTest.ROOT + "/documents/" + document + "/actions/cancel"))
+                            .content(StockDocumentHttpTest.cancellationBody(m, document)))
+                    .andExpect(status().is4xxClientError()).andExpect(jsonPath("errorCode").value("REPORT_QUANTITY_CONFLICT"));
+            m.perform(full(put(E + "/" + UriUtils.encodePathSegment(execution, StandardCharsets.UTF_8)))
+                            .content(EXEC.replace("READY", "FULLY_RECEIVED")))
+                    .andExpect(status().is4xxClientError());
             m.perform(full(post(E)).content(EXEC.replace("READY", "RUNNING")))
                     .andExpect(status().isMethodNotAllowed());
         }

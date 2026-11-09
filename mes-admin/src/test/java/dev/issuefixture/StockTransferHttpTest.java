@@ -35,6 +35,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
@@ -209,8 +210,15 @@ class StockTransferHttpTest {
             mvc.perform(full(post(in + "/actions/reconcile-void"))).andExpect(status().isNotFound());
             assertEquals(1, db.queryForObject("SELECT COUNT(*) FROM wm_stock_action", Integer.class));
             mvc.perform(full(get(out + "/production-input-basis"))).andExpect(status().isOk());
-            mvc.perform(full(post(out + "/actions/void"))).andExpect(status().isOk());
-            mvc.perform(full(post(out + "/actions/reconcile-void"))).andExpect(status().isOk());
+            mvc.perform(full(post(out + "/actions/void"))).andExpect(status().isNotFound());
+            mvc.perform(full(post(out + "/actions/reconcile-void"))).andExpect(status().isNotFound());
+            String reversal = StockDocumentHttpTest.cancellationBody(mvc, id);
+            mvc.perform(full(post(out + "/actions/cancel"))
+                            .content(reversal))
+                    .andExpect(status().isForbidden());
+            mvc.perform(full(post(ProductionInputHttpTest.ROOT + "/documents/" + id + "/actions/cancel"))
+                            .content(reversal))
+                    .andExpect(status().isOk()).andExpect(jsonPath("document.status").value("REVERSED"));
             var raw = StockDocumentHttpTest.create(mvc, "OTHER_RECEIPT", null);
             String unknown = raw.get("document").get("id").asText();
             db.update("UPDATE wm_stock_document SET document_type='MATERIAL_ISSUE' WHERE id=?", unknown);
@@ -219,6 +227,10 @@ class StockTransferHttpTest {
                     .andExpect(status().isNotFound());
             mvc.perform(full(post("/api/wm/inbound-documents/" + unknown + "/actions/reconcile-void")))
                     .andExpect(status().isNotFound());
+            mvc.perform(full(post("/api/wm/inbound-documents/" + unknown + "/actions/cancel"))
+                            .content(StockDocumentHttpTest.cancellationBody(mvc, unknown, "IN",
+                                    UUID.randomUUID().toString(), "TEST ONLY malformed inbound type")))
+                    .andExpect(status().isUnprocessableEntity());
             mvc.perform(full(get("/api/wm/inbound-documents/" + unknown + "/production-input-basis")))
                     .andExpect(status().isNotFound());
             db.update("UPDATE wm_stock_document SET document_type='UNRECOGNIZED' WHERE id=?", unknown);
@@ -273,6 +285,40 @@ class StockTransferHttpTest {
             balance(db, "3", "12");
             mvc.perform(full(get("/api/wm/inbound-documents")).param("direction", "OUT"))
                     .andExpect(status().isBadRequest());
+        }
+    }
+
+    @Test
+    void reversingBothTransferSidesIsAtomicAndIdempotent() throws Exception {
+        try (var c = ProductionInputHttpTest.context(StockDocumentOwnedTransactionsHttpTest.GuardedCenter.class, TransferConfig.class)) {
+            var db = ProductionInputHttpTest.db(c);
+            var mvc = MaterialIssueHttpTest.mvc(c);
+            seed(db);
+            var pair = create(mvc, save(UUID.randomUUID().toString(), "10"));
+            String documentId = id(pair);
+            mvc.perform(full(post(ROOT + "/" + documentId + "/actions/approve"))
+                    .content(postBody(pair, UUID.randomUUID().toString()))).andExpect(status().isOk());
+            var posted = JSON.readTree(mvc.perform(full(get(ROOT + "/" + documentId))).andExpect(status().isOk())
+                    .andReturn().getResponse().getContentAsString());
+            String reverse = "{\"expectedRevision\":\"" + posted.get("outbound").get("document").get("revision").asText()
+                    + "\",\"requestId\":\"" + UUID.randomUUID() + "\",\"reason\":\"TEST ONLY transfer reversal\"}";
+            db.execute("ALTER TABLE wm_stock_action ADD CONSTRAINT fail_transfer_inbound_reversal CHECK(stock_id<>3 OR action_type<>'REVERSAL')");
+            mvc.perform(full(post(ROOT + "/" + documentId + "/actions/reverse")).content(reverse))
+                    .andExpect(status().is5xxServerError());
+            assertEquals(2, db.queryForObject("SELECT COUNT(*) FROM wm_stock_document WHERE status='POSTED'", Integer.class));
+            assertEquals(0, db.queryForObject("SELECT COUNT(*) FROM wm_stock_action WHERE action_type='REVERSAL'", Integer.class));
+            balance(db, "1", "9990");
+            balance(db, "3", "10");
+            db.execute("ALTER TABLE wm_stock_action DROP CONSTRAINT fail_transfer_inbound_reversal");
+            var reversed = JSON.readTree(mvc.perform(full(post(ROOT + "/" + documentId + "/actions/reverse"))
+                    .content(reverse)).andExpect(status().isOk()).andReturn().getResponse().getContentAsString());
+            assertEquals("REVERSED", reversed.get("outbound").get("document").get("status").asText());
+            assertEquals("REVERSED", reversed.get("inbound").get("document").get("status").asText());
+            mvc.perform(full(post(ROOT + "/" + documentId + "/actions/reverse")).content(reverse))
+                    .andExpect(status().isOk());
+            assertEquals(2, db.queryForObject("SELECT COUNT(*) FROM wm_stock_action WHERE action_type='REVERSAL'", Integer.class));
+            balance(db, "1", "10000");
+            balance(db, "3", "0");
         }
     }
 

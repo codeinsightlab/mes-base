@@ -52,9 +52,4 @@ public class LocalStockController {
         return WmStockActionController.toView(service.execute(StockActionType.CORRECTION, input));
     }
 
-    @PostMapping("/return")
-    @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED, permission = "business:wm:stock:return")
-    public WmStockActionVo returnMaterial(@Valid @RequestBody StockCommand input) {
-        return WmStockActionController.toView(service.execute(StockActionType.RETURN, input));
-    }
 }

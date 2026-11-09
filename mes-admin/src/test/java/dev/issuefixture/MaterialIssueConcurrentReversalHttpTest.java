@@ -18,19 +18,18 @@ import tools.jackson.databind.ObjectMapper;
 
 import static dev.issuefixture.ProductionCoreV1HttpTest.full;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
  * Deterministic isolated H2 regression: both callers read before competing for the real lock.
  */
-class MaterialIssueConcurrentVoidHttpTest {
+class MaterialIssueConcurrentReversalHttpTest {
     @Configuration
     @EnableAspectJAutoProxy(proxyTargetClass = true)
     static class GateConfig {
         @Bean
-        LockGate materialIssueVoidLockGate() {
+        LockGate materialIssueCancellationLockGate() {
             return new LockGate();
         }
     }
@@ -40,19 +39,19 @@ class MaterialIssueConcurrentVoidHttpTest {
         final AtomicBoolean enabled = new AtomicBoolean();
         final CountDownLatch readers = new CountDownLatch(2);
 
-        @Around("execution(* dev.mesbase.business.production.service.ProductionExecutionRules.lock(..))")
+        @Around("execution(* dev.mesbase.business.production.service.ProductionChainLocks.execution(..))")
         Object waitForBothReaders(ProceedingJoinPoint invocation) throws Throwable {
             if (enabled.get()) {
                 readers.countDown();
                 if (!readers.await(10, TimeUnit.SECONDS))
-                    throw new IllegalStateException("Both void requests must reach the execution lock");
+                    throw new IllegalStateException("Both cancellation requests must reach the execution lock");
             }
             return invocation.proceed();
         }
     }
 
     @Test
-    void twoVoidRequestsReuseOneCancellationAndReverseStockOnce() throws Exception {
+    void twoConcurrentCancellationRequestsReplayOneReversal() throws Exception {
         try (var context = ProductionInputHttpTest.context(GateConfig.class);
              var pool = Executors.newFixedThreadPool(2)) {
             var mvc = MaterialIssueHttpTest.mvc(context);
@@ -61,19 +60,22 @@ class MaterialIssueConcurrentVoidHttpTest {
             JsonNode input = json.readTree(ProductionInputHttpTest.submit(mvc,
                     ProductionInputHttpTest.command(mvc, UUID.randomUUID().toString(), "L001", "10")));
             String document = input.get("documentId").asText();
+            String body = StockDocumentHttpTest.cancellationBody(mvc, document, "OUT", UUID.randomUUID().toString(),
+                    "TEST ONLY concurrent cancellation");
             var gate = context.getBean(LockGate.class);
             gate.enabled.set(true);
-            var first = pool.submit(() -> mvc.perform(full(post(StockDocumentHttpTest.OUT_ROOT + "/" + document + "/actions/void")))
+            var first = pool.submit(() -> mvc.perform(full(post(ProductionInputHttpTest.ROOT + "/documents/" + document + "/actions/cancel")).content(body))
                     .andExpect(status().isOk()).andReturn().getResponse().getContentAsString());
-            var second = pool.submit(() -> mvc.perform(full(post(StockDocumentHttpTest.OUT_ROOT + "/" + document + "/actions/void")))
+            var second = pool.submit(() -> mvc.perform(full(post(ProductionInputHttpTest.ROOT + "/documents/" + document + "/actions/cancel")).content(body))
                     .andExpect(status().isOk()).andReturn().getResponse().getContentAsString());
             var a = json.readTree(first.get(15, TimeUnit.SECONDS));
             var b = json.readTree(second.get(15, TimeUnit.SECONDS));
             assertEquals(0, gate.readers.getCount());
-            assertEquals("SUCCEEDED", a.get("voidResultStatus").asText());
-            assertEquals("SUCCEEDED", b.get("voidResultStatus").asText());
-            assertTrue(a.get("voidOperationId").isTextual());
-            assertEquals(a.get("voidOperationId").asText(), b.get("voidOperationId").asText());
+            assertEquals("REVERSED", a.get("document").get("status").asText());
+            assertEquals("REVERSED", b.get("document").get("status").asText());
+            assertEquals(StockDocumentHttpTest.JSON.readTree(body).get("requestId").asText(),
+                    a.get("document").get("reversalRequestId").asText());
+            assertEquals(a.get("document").get("reversalRequestId").asText(), b.get("document").get("reversalRequestId").asText());
             assertEquals(1, db.queryForObject("SELECT COUNT(*) FROM wm_stock_action WHERE action_type='REVERSAL'", Integer.class));
             assertEquals(0, new BigDecimal("10000").compareTo(db.queryForObject("SELECT quantity FROM wm_inventory WHERE id=1", BigDecimal.class)));
             assertEquals(false, db.queryForObject("SELECT stock_applied FROM mes_material_issue_input WHERE document_id=?", Boolean.class, document));

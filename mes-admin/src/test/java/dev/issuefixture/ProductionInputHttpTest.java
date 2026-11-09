@@ -47,7 +47,7 @@ class ProductionInputHttpTest {
     static final String ROOT = "/api/production/input";
 
     @Configuration
-    @Import({ProductionCombinationService.class, ProductionCombinationController.class, ProductionInputController.class, ProductionInputService.class, ProductionReportHttpTest.Extra.class,
+    @Import({ProductionCombinationService.class, ProductionCombinationController.class, ProductionInputController.class, ProductionInputService.class, dev.mesbase.business.wm.service.StockDocumentReversalService.class, ProductionReportHttpTest.Extra.class,
             ProductionInboundController.class,
             ProductionInboundService.class})
     static class Extra {

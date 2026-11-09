@@ -29,6 +29,18 @@
   LEFT JOIN unit_measure u ON u.id=l.unit_id
   WHERE l.document_id=#{id} ORDER BY l.line_no,l.id
  </select>
+ <select id="stockMovements" resultType="dev.mesbase.business.wm.domain.StockDocumentModels$StockMovement">
+  SELECT a.id AS id, a.document_line_id AS documentLineId, a.action_type AS actionType,
+         a.quantity_delta AS quantityDelta, a.occurred_at AS occurredAt,
+         a.reference_action_id AS referenceActionId, a.operation_id AS operationId,
+         a.stock_id AS stockId, a.batch_no AS batchNo, a.bin_code AS binCode,
+         a.operator_user_id AS operatorUserId, a.reason AS reason
+  FROM wm_stock_action a
+  JOIN wm_stock_document_line l ON l.id=a.document_line_id AND l.document_id=#{id}
+  WHERE a.source_id=CAST(#{id} AS CHAR)
+    AND a.source_type IN ('MATERIAL_ISSUE','OTHER_ISSUE','OTHER_RECEIPT')
+  ORDER BY a.occurred_at,a.recorded_at,a.id
+ </select>
  <select id="pairedDocumentId" resultType="long">SELECT p.id FROM wm_stock_document d JOIN wm_stock_document p ON p.id=d.paired_document_id WHERE d.id=#{id}</select>
  <sql id="formalInboundBindings">
   <bind name="postedStatus" value="@dev.mesbase.business.wm.domain.StockDocumentStatus@POSTED.getValue()"/>
@@ -60,7 +72,6 @@
   AND a.quantity_after-a.quantity_before=l.quantity AND a.available_after-a.available_before=l.quantity
   AND a.operator_user_id=d.posted_by AND a.request_hash=d.post_request_hash
   AND a.reference_action_id IS NULL
-  AND NOT EXISTS (SELECT 1 FROM wm_stock_action reversal WHERE reversal.reference_action_id=a.id)
   AND (SELECT COUNT(*) FROM wm_stock_action duplicate_action WHERE duplicate_action.document_line_id=l.id)=1
   AND a.stock_id=l.stock_id AND a.material_id=l.material_id
   AND a.warehouse_id=l.warehouse_id AND a.unit_id=l.unit_id

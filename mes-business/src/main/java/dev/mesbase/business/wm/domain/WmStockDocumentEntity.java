@@ -39,6 +39,16 @@ public class WmStockDocumentEntity {
 
     private LocalDateTime cancelledAt;
 
+    private Long reversedBy;
+
+    private LocalDateTime reversedAt;
+
+    private String reversalReason;
+
+    private String reversalRequestId;
+
+    private String reversalRequestHash;
+
     private Long revision;
 
     private String createRequestId;
@@ -179,6 +189,46 @@ public class WmStockDocumentEntity {
 
     public void setCancelledAt(LocalDateTime cancelledAt) {
         this.cancelledAt = cancelledAt;
+    }
+
+    public Long getReversedBy() {
+        return reversedBy;
+    }
+
+    public void setReversedBy(Long reversedBy) {
+        this.reversedBy = reversedBy;
+    }
+
+    public LocalDateTime getReversedAt() {
+        return reversedAt;
+    }
+
+    public void setReversedAt(LocalDateTime reversedAt) {
+        this.reversedAt = reversedAt;
+    }
+
+    public String getReversalReason() {
+        return reversalReason;
+    }
+
+    public void setReversalReason(String reversalReason) {
+        this.reversalReason = reversalReason;
+    }
+
+    public String getReversalRequestId() {
+        return reversalRequestId;
+    }
+
+    public void setReversalRequestId(String reversalRequestId) {
+        this.reversalRequestId = reversalRequestId;
+    }
+
+    public String getReversalRequestHash() {
+        return reversalRequestHash;
+    }
+
+    public void setReversalRequestHash(String reversalRequestHash) {
+        this.reversalRequestHash = reversalRequestHash;
     }
 
     public Long getRevision() {

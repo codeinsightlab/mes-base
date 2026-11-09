@@ -20,7 +20,6 @@ public interface ProductionInputExtraMapper {
 
     long unlinkedDemandLines(@Param("workorderId") Long workorderId);
 
-    List<String> reversalIds(@Param("documentId") Long documentId);
 
     boolean hasFormalInput(@Param("workorderId") Long workorderId);
 

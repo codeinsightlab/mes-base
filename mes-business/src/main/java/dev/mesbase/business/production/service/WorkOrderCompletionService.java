@@ -142,6 +142,7 @@ public class WorkOrderCompletionService {
                 .filter(document -> document.getSourceExecutionCode() != null || document.getSourceRequestJson() != null)
                 .anyMatch(document ->
                         !StockDocumentStatus.CANCELLED.getValue().equals(document.getStatus())
-                                && !StockDocumentStatus.POSTED.getValue().equals(document.getStatus()));
+                                && !StockDocumentStatus.POSTED.getValue().equals(document.getStatus())
+                                && !StockDocumentStatus.REVERSED.getValue().equals(document.getStatus()));
     }
 }

@@ -90,7 +90,8 @@ class ProductionCombinationLifecycleHttpTest {
             assertEquals(1, j.queryForObject("SELECT COUNT(*) FROM mes_execution_completion WHERE execution_code=?", Integer.class, execution));
             assertEquals(0, new BigDecimal("50").compareTo(j.queryForObject("SELECT SUM(output_qty) FROM mes_material_issue_input WHERE stock_applied=TRUE", BigDecimal.class)));
             var before = j.queryForList("SELECT * FROM wm_stock_action ORDER BY id");
-            m.perform(full(post(StockDocumentHttpTest.OUT_ROOT + "/" + document + "/actions/void")))
+            m.perform(full(post(ProductionInputHttpTest.ROOT + "/documents/" + document + "/actions/cancel"))
+                            .content(StockDocumentHttpTest.cancellationBody(m, String.valueOf(document))))
                     .andExpect(status().isConflict());
             assertEquals(before, j.queryForList("SELECT * FROM wm_stock_action ORDER BY id"));
             m.perform(full(get("/api/production/combinations/calculate")).param("code", code))
@@ -120,20 +121,25 @@ class ProductionCombinationLifecycleHttpTest {
             long document = input.get("documentId").asLong();
             String request = UUID.randomUUID().toString();
             var back = new LinkedHashMap<String, Object>(Map.of("requestId", request, "stockId", "1", "quantity", "5", "expectedQuantity", "20", "expectedAvailable", "20", "reason", "TEST ONLY line return", "documentId", document));
-            m.perform(full(post("/api/wm/local-stock/return")).content(json.writeValueAsString(back)))
+            m.perform(full(post(ProductionInputHttpTest.ROOT + "/documents/" + document + "/returns")).content(json.writeValueAsString(back)))
                     .andExpect(status().isBadRequest());
             long line = j.queryForObject("SELECT id FROM wm_stock_document_line WHERE document_id=? AND demand_line_id=1", Long.class, document);
             back.put("documentLineId", line);
             for (int retry = 0; retry < 2; retry++)
-                m.perform(full(post("/api/wm/local-stock/return")).content(json.writeValueAsString(back)))
+                m.perform(full(post(ProductionInputHttpTest.ROOT + "/documents/" + document + "/returns")).content(json.writeValueAsString(back)))
                         .andExpect(status().isOk());
             assertEquals(0, new BigDecimal("25").compareTo(j.queryForObject("SELECT quantity FROM wm_inventory WHERE id=1", BigDecimal.class)));
-            var response = m.perform(full(post(StockDocumentHttpTest.OUT_ROOT + "/" + document + "/actions/void")))
+            String documentId = String.valueOf(document);
+            String cancellationBody = StockDocumentHttpTest.cancellationBody(m, documentId);
+            var response = m.perform(full(post(ProductionInputHttpTest.ROOT + "/documents/" + documentId + "/actions/cancel"))
+                            .content(cancellationBody))
                     .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
-            m.perform(full(post(StockDocumentHttpTest.OUT_ROOT + "/" + document + "/actions/void")))
+            m.perform(full(post(ProductionInputHttpTest.ROOT + "/documents/" + documentId + "/actions/cancel"))
+                            .content(cancellationBody))
                     .andExpect(status().isOk())
-                    .andExpect(jsonPath("voidOperationId").value(json.readTree(response).get("voidOperationId")
-                            .asText()));
+                    .andExpect(jsonPath("document.status").value("REVERSED"))
+                    .andExpect(jsonPath("document.reversalRequestId").value(json.readTree(response)
+                            .get("document").get("reversalRequestId").asText()));
             assertEquals(0, new BigDecimal("120").compareTo(j.queryForObject("SELECT quantity FROM wm_inventory WHERE id=1", BigDecimal.class)));
             assertEquals(2, j.queryForObject("SELECT COUNT(*) FROM wm_stock_action WHERE action_type='REVERSAL'", Integer.class));
             assertEquals(1, j.queryForObject("SELECT COUNT(DISTINCT operation_id) FROM wm_stock_action WHERE action_type='REVERSAL'", Integer.class));

@@ -60,21 +60,24 @@ class LocalWarehouseHttpTest {
             balance(j, "600");
             String requestId = UUID.randomUUID().toString();
             String request = body(requestId, "20", "600", document);
-            m.perform(ProductionCoreV1HttpTest.full(post(ROOT + "return")).content(request)).andExpect(status().isOk());
-            m.perform(ProductionCoreV1HttpTest.full(post(ROOT + "return"))
+            m.perform(ProductionCoreV1HttpTest.full(post(ProductionInputHttpTest.ROOT + "/documents/" + document + "/returns")).content(request)).andExpect(status().isOk());
+            m.perform(ProductionCoreV1HttpTest.full(post(ProductionInputHttpTest.ROOT + "/documents/" + document + "/returns"))
                     .content(body(requestId, "20", "600", issue))).andExpect(status().isOk());
             balance(j, "620");
             apply(m, "loss", "5", "620");
             balance(j, "615");
             assertEquals(5, j.queryForObject("SELECT COUNT(*) FROM wm_stock_action", Integer.class));
             assertEquals(0, j.queryForObject("SELECT COUNT(*) FROM wm_stock_action WHERE quantity_after<>quantity_before+quantity_delta OR available_after<>available_before+available_delta OR operator_user_id IS NULL", Integer.class));
-            m.perform(ProductionCoreV1HttpTest.full(post(ROOT + "return"))
+            m.perform(ProductionCoreV1HttpTest.full(post(ProductionInputHttpTest.ROOT + "/documents/" + document + "/returns"))
                             .content(body(UUID.randomUUID().toString(), "181", "615", document)))
                     .andExpect(status().isConflict());
-            m.perform(ProductionCoreV1HttpTest.full(post(StockDocumentHttpTest.OUT_ROOT + "/" + document + "/actions/void")))
+            String cancellationBody = StockDocumentHttpTest.cancellationBody(m, document);
+            m.perform(ProductionCoreV1HttpTest.full(post(ProductionInputHttpTest.ROOT + "/documents/" + document + "/actions/cancel"))
+                            .content(cancellationBody))
                     .andExpect(status().isOk());
             balance(j, "795");
-            m.perform(ProductionCoreV1HttpTest.full(post(StockDocumentHttpTest.OUT_ROOT + "/" + document + "/actions/void")))
+            m.perform(ProductionCoreV1HttpTest.full(post(ProductionInputHttpTest.ROOT + "/documents/" + document + "/actions/cancel"))
+                            .content(cancellationBody))
                     .andExpect(status().isOk());
             balance(j, "795");
             assertEquals(6, j.queryForObject("SELECT COUNT(*) FROM wm_stock_action", Integer.class));
@@ -217,12 +220,13 @@ class LocalWarehouseHttpTest {
                 String document = result.get("documentId").asText();
                 if (changedIdentity) {
                     j.update("UPDATE wm_inventory SET bin_code='TEST_TAMPERED_BIN' WHERE id=1");
-                    m.perform(ProductionCoreV1HttpTest.full(post(StockDocumentHttpTest.OUT_ROOT + "/" + document + "/actions/void")))
+                    m.perform(ProductionCoreV1HttpTest.full(post(ProductionInputHttpTest.ROOT + "/documents/" + document + "/actions/cancel"))
+                                    .content(StockDocumentHttpTest.cancellationBody(m, document)))
                             .andExpect(status().isConflict());
                 } else {
-                    j.update("UPDATE mes_production_execution SET start_time=CURRENT_TIMESTAMP WHERE id=?", result.get("executionCode")
-                            .asLong());
-                    m.perform(ProductionCoreV1HttpTest.full(post(ROOT + "return"))
+                    j.update("UPDATE mes_production_execution SET start_time=CURRENT_TIMESTAMP WHERE execution_code=?", result.get("executionCode")
+                            .asText());
+                    m.perform(ProductionCoreV1HttpTest.full(post(ProductionInputHttpTest.ROOT + "/documents/" + document + "/returns"))
                                     .content(body(UUID.randomUUID().toString(), "20", "9800", document)))
                             .andExpect(status().isConflict());
                 }

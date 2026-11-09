@@ -275,6 +275,7 @@ public class ProductionCompletionService {
         // LOCAL posting and reversal commit atomically; a draft or unknown document state still blocks closure.
         return documents.stream().anyMatch(document ->
                 !StockDocumentStatus.CANCELLED.getValue().equals(document.getStatus())
-                        && !StockDocumentStatus.POSTED.getValue().equals(document.getStatus()));
+                        && !StockDocumentStatus.POSTED.getValue().equals(document.getStatus())
+                        && !StockDocumentStatus.REVERSED.getValue().equals(document.getStatus()));
     }
 }

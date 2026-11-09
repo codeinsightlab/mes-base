@@ -15,7 +15,6 @@ import dev.mesbase.business.directory.service.BusinessDirectoryService;
 import dev.mesbase.business.integration.warehouse.WarehouseIntegration;
 import dev.mesbase.business.issue.dao.MesMaterialIssueInputMapper;
 import dev.mesbase.business.issue.service.MaterialIssueInputFacts;
-import dev.mesbase.business.issue.service.MaterialIssueVoidService;
 import dev.mesbase.business.production.controller.ExecutionActionController;
 import dev.mesbase.business.production.controller.MesProductionExecutionController;
 import dev.mesbase.business.production.controller.ProductionCompletionController;
@@ -263,6 +262,12 @@ class MaterialIssueHttpTest {
                 for (String column : List.of("bom_id BIGINT", "bom_base_qty DECIMAL(20,6)", "bom_component_qty DECIMAL(20,6)", "output_unit_id BIGINT", "frozen_at TIMESTAMP(6)"))
                     jdbc.execute("ALTER TABLE mes_workorder_material ADD " + column);
                 jdbc.execute("ALTER TABLE wm_stock_document ADD source_request_json TEXT");
+                jdbc.execute("ALTER TABLE wm_stock_document ADD reversed_by BIGINT");
+                jdbc.execute("ALTER TABLE wm_stock_document ADD reversed_at TIMESTAMP(6)");
+                jdbc.execute("ALTER TABLE wm_stock_document ADD reversal_reason VARCHAR(500)");
+                jdbc.execute("ALTER TABLE wm_stock_document ADD reversal_request_id VARCHAR(36)");
+                jdbc.execute("ALTER TABLE wm_stock_document ADD reversal_request_hash CHAR(64)");
+                jdbc.execute("ALTER TABLE wm_stock_document ADD CONSTRAINT uk_stock_document_reversal_request UNIQUE(reversal_request_id)");
                 jdbc.execute("ALTER TABLE wm_stock_document ADD CONSTRAINT uk_stock_document_request_identity UNIQUE(post_request_id)");
                 // TEST ONLY: these fresh fixture objects are explicitly local; no production migration default.
                 jdbc.execute("ALTER TABLE workorder ALTER COLUMN source SET DEFAULT 'LOCAL'");
@@ -344,7 +349,7 @@ class MaterialIssueHttpTest {
     @EnableTransactionManagement
     @Import({dev.mesbase.business.purchase.controller.PurchaseSupplierController.class, dev.mesbase.business.purchase.controller.PurchaseReferencePriceController.class, dev.mesbase.business.purchase.controller.PurchaseReceiptPriceController.class, ProductionInboundService.class, ProductionInboundController.class, MaterialBomService.class, StockDocumentOwnedTransactionsHttpTest.GuardedCenter.class, MaterialQuantityRules.class, WorkOrderCompletionService.class, dev.mesbase.business.purchase.service.impl.PurchaseSupplierServiceImpl.class,
             dev.mesbase.business.purchase.service.impl.PurchaseReferencePriceServiceImpl.class,
-            dev.mesbase.business.purchase.service.impl.PurchaseReceiptPricing.class, StockDocumentService.class, StockDocumentController.class, WorkOrderCancellationService.class, WorkOrderCancellationController.class, BusinessSourceRules.class, StockReferenceRules.class, ProductionCompletionService.class, ProductionCompletionController.class, WarehouseAcceptanceService.class, WarehouseAcceptanceController.class, QualityReleaseService.class, QualityReleaseController.class, WorkorderMaterialService.class, WorkorderMaterialController.class, LocalStockController.class, WmStockActionController.class, WmStockActionServiceImpl.class, LocalStockService.class, QualityTreatmentService.class, MaterialIssueInputFacts.class, ProductionQuantityService.class, ProductionQuantityErrorAdvice.class, ExecutionQualityReferenceQueryImpl.class, ProductionExecutionQueryService.class, ProductionChainLocks.class, ExecutionPathService.class, ExecutionActionController.class, WorkorderErpFacts.class, WarehouseIntegration.class, MaterialIssueVoidService.class, ProductionExecutionRules.class, ProductionIdentityService.class, MesProductionExecutionServiceImpl.class, MesProductionExecutionController.class, ProductionIdentityController.class, WorkOrderController.class, WorkOrderService.class, RoutingReferenceRules.class, FoundationErrorAdvice.class})
+            dev.mesbase.business.purchase.service.impl.PurchaseReceiptPricing.class, StockDocumentService.class, dev.mesbase.business.wm.service.StockDocumentReversalService.class, StockDocumentController.class, WorkOrderCancellationService.class, WorkOrderCancellationController.class, BusinessSourceRules.class, StockReferenceRules.class, ProductionCompletionService.class, ProductionCompletionController.class, WarehouseAcceptanceService.class, WarehouseAcceptanceController.class, QualityReleaseService.class, QualityReleaseController.class, WorkorderMaterialService.class, WorkorderMaterialController.class, LocalStockController.class, WmStockActionController.class, WmStockActionServiceImpl.class, LocalStockService.class, QualityTreatmentService.class, MaterialIssueInputFacts.class, ProductionQuantityService.class, ProductionQuantityErrorAdvice.class, ExecutionQualityReferenceQueryImpl.class, ProductionExecutionQueryService.class, ProductionChainLocks.class, ExecutionPathService.class, ExecutionActionController.class, WorkorderErpFacts.class, WarehouseIntegration.class, ProductionExecutionRules.class, ProductionIdentityService.class, MesProductionExecutionServiceImpl.class, MesProductionExecutionController.class, ProductionIdentityController.class, WorkOrderController.class, WorkOrderService.class, RoutingReferenceRules.class, FoundationErrorAdvice.class})
     static class Web implements WebMvcConfigurer {
         @Autowired
         private AuthorizationService authorization;

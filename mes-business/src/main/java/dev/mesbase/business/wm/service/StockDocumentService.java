@@ -4,6 +4,7 @@ import com.github.pagehelper.PageHelper;
 import dev.mesbase.business.basic.dao.MaterialMapper;
 import dev.mesbase.business.basic.dao.UnitMeasureMapper;
 import dev.mesbase.business.integration.production.ProductionSupply.Calculation;
+import dev.mesbase.business.integration.warehouse.ErpActionResult.Mode;
 import dev.mesbase.business.issue.service.MaterialIssueInputFacts;
 import dev.mesbase.business.production.dao.MesProductionExecutionMapper;
 import dev.mesbase.business.production.dao.MesProductionReceiptMapper;
@@ -182,7 +183,8 @@ public class StockDocumentService {
         }
         c.andDirectionEqualTo(q.direction());
         if (StringUtils.isNotBlank(q.status())) {
-            if (!List.of(StockDocumentStatus.DRAFT.getValue(), StockDocumentStatus.POSTED.getValue(), StockDocumentStatus.CANCELLED.getValue())
+            if (!List.of(StockDocumentStatus.DRAFT.getValue(), StockDocumentStatus.POSTED.getValue(),
+                    StockDocumentStatus.CANCELLED.getValue(), StockDocumentStatus.REVERSED.getValue())
                     .contains(q.status()))
                 ParameterChecks.reject(ErrorCode.BAD_REQUEST, new SafeBusinessMessage("单据状态筛选值无效，请重新选择"));
             c.andStatusEqualTo(q.status());
@@ -250,7 +252,8 @@ public class StockDocumentService {
                 materialIssueBasisError = "领料投入依据读取失败，原单据及明细仍可查看，暂不能审核";
             }
         }
-        return new Detail(row, rows(id), qualitySource, materialIssueBasis, materialIssueBasisError);
+        return new Detail(row, rows(id), inbound.stockMovements(id), qualitySource, materialIssueBasis,
+                materialIssueBasisError);
     }
 
     @Transactional(transactionManager = "businessTransactionManager", readOnly = true)
@@ -290,13 +293,6 @@ public class StockDocumentService {
             bomBase = material.getBomBaseQty();
             bomComponent = material.getBomComponentQty();
         }
-        String voidOperationId = null;
-        String voidResultStatus = null;
-        var reversal = inputFacts.getObject().recordedReversal(documentId);
-        if (reversal != null) {
-            voidOperationId = reversal.getId();
-            voidResultStatus = "VOIDED";
-        }
         if (combination != null) {
             var order = orders.selectByPrimaryKey(combination.workorderId());
             String code = null;
@@ -305,7 +301,7 @@ public class StockDocumentService {
                     input.getExecutionCode(), combination.workorderId(), code, input.getOutputQty(), null,
                     null, null, null, null, null, bomId, null, null, pathRevision, selectedNodes,
                     input.getBusinessOccurredAt(), input.getConfirmedAt(), input.getStockApplied(),
-                    voidOperationId, voidResultStatus, pathError, combination.combinationId(), combination.allocations());
+                    pathError, combination.combinationId(), combination.allocations());
         }
         return new ProductionInputBasis(input.getId(), input.getInputKind(), input.getSourceMode(),
                 input.getExecutionCode(), calculation.order().workorderId(), calculation.order().workorderCode(),
@@ -314,7 +310,7 @@ public class StockDocumentService {
                 calculation.stock().unitId(), calculation.stock().lotCode(),
                 bomId, bomBase, bomComponent, pathRevision, selectedNodes,
                 input.getBusinessOccurredAt(), input.getConfirmedAt(), input.getStockApplied(),
-                voidOperationId, voidResultStatus, pathError, null, List.of());
+                pathError, null, List.of());
     }
 
     public record ProductionInputBasis(String requestId, String inputKind, String sourceMode,
@@ -324,8 +320,7 @@ public class StockDocumentService {
                                        Long bomId, BigDecimal bomBaseQty, BigDecimal bomComponentQty,
                                        Integer pathRevision, List<Long> routingNodeIds,
                                        LocalDateTime businessOccurredAt,
-                                       LocalDateTime confirmedAt, Boolean stockApplied,
-                                       String voidOperationId, String voidResultStatus, String pathError,
+                                       LocalDateTime confirmedAt, Boolean stockApplied, String pathError,
                                        Long combinationId, List<Allocation> allocations) {
     }
 
@@ -564,7 +559,7 @@ public class StockDocumentService {
         return detail(id);
     }
 
-    public Detail cancel(Long id, StockDocumentModels.Version command) {
+    public Detail cancelDraft(Long id, StockDocumentModels.Version command) {
         validate(command);
         var row = lock(id);
         draft(row, command.expectedRevision());
@@ -624,16 +619,6 @@ public class StockDocumentService {
         requireLine(documentId, lineId);
         if (lines.deleteByPrimaryKey(lineId) != 1) ParameterChecks.reject(ErrorCode.STOCK_DOCUMENT_CONFLICT);
         save(row);
-    }
-
-    /**
-     * Lock the unified issue header after its work order and execution locks have been acquired.
-     */
-    public WmStockDocumentEntity lockMaterialIssueForVoid(Long documentId) {
-        var row = lock(documentId);
-        if (!StockDocumentType.MATERIAL_ISSUE.getValue().equals(row.getDocumentType()))
-            throw new FoundationException(ErrorCode.STOCK_DOCUMENT_CONFLICT);
-        return row;
     }
 
     public Detail approve(Long id, StockDocumentModels.Post command) {

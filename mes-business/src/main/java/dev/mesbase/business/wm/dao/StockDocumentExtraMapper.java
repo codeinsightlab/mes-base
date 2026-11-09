@@ -13,6 +13,9 @@ public interface StockDocumentExtraMapper {
 
     java.util.List<LineLabel> lineLabels(@Param("id") Long id);
 
+    java.util.List<dev.mesbase.business.wm.domain.StockDocumentModels.StockMovement> stockMovements(
+            @Param("id") Long id);
+
     Long pairedDocumentId(@Param("id") Long id);
 
     String latestInboundAuditId(@Param("executionCode") String executionCode);

@@ -64,4 +64,10 @@ public class StockTransferController {
     public Detail cancel(@PathVariable Long id, @Valid @RequestBody StockDocumentModels.Version command) {
         return BeanConversions.convert(service.cancel(id, command), Detail.class);
     }
+
+    @PostMapping("/{id}/actions/reverse")
+    @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED, permission = PERMISSION + "cancel")
+    public Detail reverse(@PathVariable Long id, @Valid @RequestBody StockDocumentModels.Cancellation command) {
+        return BeanConversions.convert(service.reverse(id, command), Detail.class);
+    }
 }

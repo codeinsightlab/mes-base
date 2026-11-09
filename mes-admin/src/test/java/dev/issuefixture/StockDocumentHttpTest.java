@@ -62,6 +62,20 @@ class StockDocumentHttpTest {
         return "{\"requestId\":\"" + uuid + "\",\"expectedRevision\":\"" + revision + "\"}";
     }
 
+    static String cancellationBody(MockMvc m, String id, String direction, String requestId, String reason)
+            throws Exception {
+        String root = "IN".equals(direction) ? ROOT : OUT_ROOT;
+        var detail = JSON.readTree(m.perform(full(get(root + "/" + id))).andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString());
+        String revision = detail.get("document").get("revision").asText();
+        return "{\"expectedRevision\":\"" + revision + "\",\"requestId\":\"" + requestId
+                + "\",\"reason\":\"" + reason + "\"}";
+    }
+
+    static String cancellationBody(MockMvc m, String id) throws Exception {
+        return cancellationBody(m, id, "OUT", UUID.randomUUID().toString(), "TEST ONLY cancellation");
+    }
+
     static void balance(JdbcTemplate j, String value) {
         assertEquals(0, new BigDecimal(value).compareTo(j.queryForObject("SELECT quantity FROM wm_inventory WHERE id=1", BigDecimal.class)));
     }

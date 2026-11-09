@@ -23,6 +23,11 @@
     <result column="posted_at" jdbcType="TIMESTAMP" property="postedAt" />
     <result column="cancelled_by" jdbcType="BIGINT" property="cancelledBy" />
     <result column="cancelled_at" jdbcType="TIMESTAMP" property="cancelledAt" />
+    <result column="reversed_by" jdbcType="BIGINT" property="reversedBy" />
+    <result column="reversed_at" jdbcType="TIMESTAMP" property="reversedAt" />
+    <result column="reversal_reason" jdbcType="VARCHAR" property="reversalReason" />
+    <result column="reversal_request_id" jdbcType="VARCHAR" property="reversalRequestId" />
+    <result column="reversal_request_hash" jdbcType="CHAR" property="reversalRequestHash" />
     <result column="revision" jdbcType="BIGINT" property="revision" />
     <result column="create_request_id" jdbcType="VARCHAR" property="createRequestId" />
     <result column="post_request_id" jdbcType="VARCHAR" property="postRequestId" />
@@ -93,6 +98,7 @@
   <sql id="Base_Column_List">
     id, document_no, document_type, direction, status, reason, supplier_name, supplier_document_no, supplier_id, business_date, currency, remark, source_workorder_id, create_by,
     create_time, update_by, update_time, posted_by, posted_at, cancelled_by, cancelled_at,
+    reversed_by, reversed_at, reversal_reason, reversal_request_id, reversal_request_hash,
     revision, create_request_id, post_request_id, post_request_hash, source_execution_code
   </sql>
   <sql id="Blob_Column_List">
@@ -361,6 +367,11 @@
       <if test="row.cancelledAt != null">
         cancelled_at = #{row.cancelledAt,jdbcType=TIMESTAMP},
       </if>
+      <if test="row.reversedBy != null">reversed_by = #{row.reversedBy,jdbcType=BIGINT},</if>
+      <if test="row.reversedAt != null">reversed_at = #{row.reversedAt,jdbcType=TIMESTAMP},</if>
+      <if test="row.reversalReason != null">reversal_reason = #{row.reversalReason,jdbcType=VARCHAR},</if>
+      <if test="row.reversalRequestId != null">reversal_request_id = #{row.reversalRequestId,jdbcType=VARCHAR},</if>
+      <if test="row.reversalRequestHash != null">reversal_request_hash = #{row.reversalRequestHash,jdbcType=CHAR},</if>
       <if test="row.revision != null">
         revision = #{row.revision,jdbcType=BIGINT},
       </if>
@@ -407,6 +418,11 @@
       posted_at = #{row.postedAt,jdbcType=TIMESTAMP},
       cancelled_by = #{row.cancelledBy,jdbcType=BIGINT},
       cancelled_at = #{row.cancelledAt,jdbcType=TIMESTAMP},
+      reversed_by = #{row.reversedBy,jdbcType=BIGINT},
+      reversed_at = #{row.reversedAt,jdbcType=TIMESTAMP},
+      reversal_reason = #{row.reversalReason,jdbcType=VARCHAR},
+      reversal_request_id = #{row.reversalRequestId,jdbcType=VARCHAR},
+      reversal_request_hash = #{row.reversalRequestHash,jdbcType=CHAR},
       revision = #{row.revision,jdbcType=BIGINT},
       create_request_id = #{row.createRequestId,jdbcType=VARCHAR}, post_request_id = #{row.postRequestId,jdbcType=VARCHAR},
       post_request_hash = #{row.postRequestHash,jdbcType=CHAR},
@@ -439,6 +455,11 @@
       posted_at = #{row.postedAt,jdbcType=TIMESTAMP},
       cancelled_by = #{row.cancelledBy,jdbcType=BIGINT},
       cancelled_at = #{row.cancelledAt,jdbcType=TIMESTAMP},
+      reversed_by = #{row.reversedBy,jdbcType=BIGINT},
+      reversed_at = #{row.reversedAt,jdbcType=TIMESTAMP},
+      reversal_reason = #{row.reversalReason,jdbcType=VARCHAR},
+      reversal_request_id = #{row.reversalRequestId,jdbcType=VARCHAR},
+      reversal_request_hash = #{row.reversalRequestHash,jdbcType=CHAR},
       revision = #{row.revision,jdbcType=BIGINT},
       create_request_id = #{row.createRequestId,jdbcType=VARCHAR}, post_request_id = #{row.postRequestId,jdbcType=VARCHAR},
       post_request_hash = #{row.postRequestHash,jdbcType=CHAR},
@@ -500,6 +521,11 @@
       <if test="cancelledAt != null">
         cancelled_at = #{cancelledAt,jdbcType=TIMESTAMP},
       </if>
+      <if test="reversedBy != null">reversed_by = #{reversedBy,jdbcType=BIGINT},</if>
+      <if test="reversedAt != null">reversed_at = #{reversedAt,jdbcType=TIMESTAMP},</if>
+      <if test="reversalReason != null">reversal_reason = #{reversalReason,jdbcType=VARCHAR},</if>
+      <if test="reversalRequestId != null">reversal_request_id = #{reversalRequestId,jdbcType=VARCHAR},</if>
+      <if test="reversalRequestHash != null">reversal_request_hash = #{reversalRequestHash,jdbcType=CHAR},</if>
       <if test="revision != null">
         revision = #{revision,jdbcType=BIGINT},
       </if>
@@ -543,6 +569,11 @@
       posted_at = #{postedAt,jdbcType=TIMESTAMP},
       cancelled_by = #{cancelledBy,jdbcType=BIGINT},
       cancelled_at = #{cancelledAt,jdbcType=TIMESTAMP},
+      reversed_by = #{reversedBy,jdbcType=BIGINT},
+      reversed_at = #{reversedAt,jdbcType=TIMESTAMP},
+      reversal_reason = #{reversalReason,jdbcType=VARCHAR},
+      reversal_request_id = #{reversalRequestId,jdbcType=VARCHAR},
+      reversal_request_hash = #{reversalRequestHash,jdbcType=CHAR},
       revision = #{revision,jdbcType=BIGINT},
       create_request_id = #{createRequestId,jdbcType=VARCHAR}, post_request_id = #{postRequestId,jdbcType=VARCHAR},
       post_request_hash = #{postRequestHash,jdbcType=CHAR},
@@ -572,6 +603,11 @@ where id = #{id,jdbcType=BIGINT}
       posted_at = #{postedAt,jdbcType=TIMESTAMP},
       cancelled_by = #{cancelledBy,jdbcType=BIGINT},
       cancelled_at = #{cancelledAt,jdbcType=TIMESTAMP},
+      reversed_by = #{reversedBy,jdbcType=BIGINT},
+      reversed_at = #{reversedAt,jdbcType=TIMESTAMP},
+      reversal_reason = #{reversalReason,jdbcType=VARCHAR},
+      reversal_request_id = #{reversalRequestId,jdbcType=VARCHAR},
+      reversal_request_hash = #{reversalRequestHash,jdbcType=CHAR},
       revision = #{revision,jdbcType=BIGINT},
       create_request_id = #{createRequestId,jdbcType=VARCHAR}, post_request_id = #{postRequestId,jdbcType=VARCHAR},
       post_request_hash = #{postRequestHash,jdbcType=CHAR},

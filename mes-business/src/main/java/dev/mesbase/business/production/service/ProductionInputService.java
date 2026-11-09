@@ -5,10 +5,14 @@ import dev.mesbase.business.issue.domain.MesMaterialIssueInputEntity;
 import dev.mesbase.business.issue.service.MaterialIssueInputFacts.CombinationInput;
 import dev.mesbase.business.issue.service.MaterialIssueInputFacts;
 import dev.mesbase.business.production.dao.MesProductionExecutionMapper;
+import dev.mesbase.business.production.dao.MesProductionReceiptMapper;
+import dev.mesbase.business.production.dao.MesProductionReportMapper;
 import dev.mesbase.business.production.dao.ProductionInputExtraMapper;
 import dev.mesbase.business.production.dao.WorkorderMapper;
 import dev.mesbase.business.production.domain.MesProductionExecutionCreateCommand;
 import dev.mesbase.business.production.domain.MesProductionExecutionResource;
+import dev.mesbase.business.production.domain.MesProductionReceiptExample;
+import dev.mesbase.business.production.domain.MesProductionReportExample;
 import dev.mesbase.business.production.domain.ProductionCombinationModels.Confirm;
 import dev.mesbase.business.production.domain.ProductionCombinationModels;
 import dev.mesbase.business.production.domain.ProductionQrCode;
@@ -17,8 +21,17 @@ import dev.mesbase.business.production.domain.ProductionInputKind;
 import dev.mesbase.business.production.domain.RoutingDetail;
 import dev.mesbase.business.production.service.ExecutionPathService.PathModel;
 import dev.mesbase.business.wm.domain.StockDocumentDirection;
+import dev.mesbase.business.wm.domain.StockDocumentModels;
+import dev.mesbase.business.wm.domain.StockDocumentStatus;
 import dev.mesbase.business.wm.domain.StockDocumentType;
+import dev.mesbase.business.wm.domain.StockActionType;
+import dev.mesbase.business.wm.domain.StockCommand;
+import dev.mesbase.business.wm.domain.WmStockActionEntity;
+import dev.mesbase.business.wm.service.LocalStockService;
 import dev.mesbase.business.wm.service.StockDocumentService;
+import dev.mesbase.business.wm.service.StockDocumentReversalService;
+import dev.mesbase.business.quality.dao.MesProductionDefectMapper;
+import dev.mesbase.business.quality.domain.MesProductionDefectExample;
 import dev.mesbase.common.utils.RequestFingerprint;
 import dev.mesbase.common.utils.SecurityUtils;
 import dev.mesbase.common.validation.ParameterChecks;
@@ -33,12 +46,14 @@ import dev.mesbase.infrastructure.cache.annotation.BusinessCacheEvict;
 import dev.mesbase.platform.execution.FactoryContext;
 import dev.mesbase.system.service.AutoCodeNumbering;
 import dev.mesbase.system.service.AutoCodeRuleType;
+
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
+
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.dao.DuplicateKeyException;
@@ -74,15 +89,21 @@ public class ProductionInputService {
 
     private final ProductionCombinationService combinations;
     private final StockDocumentService documents;
+    private final StockDocumentReversalService reversals;
     private final MaterialIssueInputFacts facts;
     private final ProductionInputExtraMapper inputQueries;
     private final ProductionChainLocks locks;
     private final IMesProductionExecutionService executions;
     private final MesProductionExecutionMapper executionMapper;
+    private final MesProductionReportMapper reports;
+    private final MesProductionDefectMapper defects;
+    private final MesProductionReceiptMapper receipts;
+    private final LocalStockService stock;
     private final WorkorderMapper orders;
     private final ExecutionPathService paths;
     private final IRoutingService routings;
     private final MaterialQuantityRules quantityRules;
+    private final ProductionQuantityService productionQuantities;
     private final AuthorizationService authorization;
     private final AutoCodeNumbering autoCodes;
     private final BusinessCacheProcessor caches;
@@ -90,26 +111,35 @@ public class ProductionInputService {
     private final ObjectMapper json = new ObjectMapper();
 
     public ProductionInputService(ProductionCombinationService combinations, StockDocumentService documents,
+                                  StockDocumentReversalService reversals,
                                   MaterialIssueInputFacts facts, ProductionInputExtraMapper inputQueries,
                                   ProductionChainLocks locks,
                                   IMesProductionExecutionService executions,
-                                  MesProductionExecutionMapper executionMapper, WorkorderMapper orders,
+                                  MesProductionExecutionMapper executionMapper, MesProductionReportMapper reports,
+                                  MesProductionDefectMapper defects, MesProductionReceiptMapper receipts,
+                                  LocalStockService stock, WorkorderMapper orders,
                                   ExecutionPathService paths, IRoutingService routings,
-                                  MaterialQuantityRules quantityRules,
+                                  MaterialQuantityRules quantityRules, ProductionQuantityService productionQuantities,
                                   AuthorizationService authorization, AutoCodeNumbering autoCodes,
                                   BusinessCacheProcessor caches,
                                   @Qualifier("businessTransactionManager") PlatformTransactionManager manager) {
         this.combinations = combinations;
         this.documents = documents;
+        this.reversals = reversals;
         this.facts = facts;
         this.inputQueries = inputQueries;
         this.locks = locks;
         this.executions = executions;
         this.executionMapper = executionMapper;
+        this.reports = reports;
+        this.defects = defects;
+        this.receipts = receipts;
+        this.stock = stock;
         this.orders = orders;
         this.paths = paths;
         this.routings = routings;
         this.quantityRules = quantityRules;
+        this.productionQuantities = productionQuantities;
         this.authorization = authorization;
         this.autoCodes = autoCodes;
         this.caches = caches;
@@ -134,6 +164,89 @@ public class ProductionInputService {
 
     public void requireDocumentPermission() {
         permit("business:mes:material:issue:update");
+    }
+
+    @Transactional(transactionManager = "businessTransactionManager", propagation = Propagation.NOT_SUPPORTED)
+    public StockDocumentModels.Detail reverseMaterialIssue(Long documentId,
+                                                           StockDocumentModels.Cancellation command) {
+        permit("business:mes:material:issue:void");
+        if (documentId == null || command == null)
+            ParameterChecks.reject(ErrorCode.BAD_REQUEST);
+        return transaction.execute(status -> reverseMaterialIssueInTransaction(documentId, command));
+    }
+
+    @Transactional(transactionManager = "businessTransactionManager", propagation = Propagation.NOT_SUPPORTED)
+    public WmStockActionEntity returnMaterialIssue(Long documentId, StockCommand command) {
+        permit("business:wm:stock:return");
+        if (documentId == null || command == null || !Objects.equals(documentId, command.documentId()))
+            ParameterChecks.reject(ErrorCode.BAD_REQUEST,
+                    new SafeBusinessMessage("生产退料必须指定原领料单"));
+        return transaction.execute(status -> returnMaterialIssueInTransaction(documentId, command));
+    }
+
+    private WmStockActionEntity returnMaterialIssueInTransaction(Long documentId, StockCommand command) {
+        var document = documents.detail(documentId).document();
+        if (!StockDocumentType.MATERIAL_ISSUE.getValue().equals(document.getDocumentType())
+                || !StockDocumentStatus.POSTED.getValue().equals(document.getStatus())
+                || document.getSourceExecutionCode() == null)
+            ParameterChecks.reject(ErrorCode.STOCK_DOCUMENT_CONFLICT);
+        var input = facts.find(documentId);
+        if (input == null || input.getConfirmedAt() == null
+                || !dev.mesbase.business.integration.warehouse.ErpActionResult.Mode.LOCAL_ONLY.getValue()
+                .equals(input.getSourceMode())
+                || !Objects.equals(document.getSourceExecutionCode(), input.getExecutionCode()))
+            ParameterChecks.reject(ErrorCode.STOCK_DOCUMENT_SOURCE_PENDING);
+        if (!Boolean.TRUE.equals(input.getStockApplied()))
+            ParameterChecks.reject(ErrorCode.STOCK_DOCUMENT_CONFLICT);
+        var execution = locks.execution(input.getExecutionCode());
+        if (!Objects.equals(document.getSourceWorkorderId(), execution.getWorkorderId()))
+            ParameterChecks.reject(ErrorCode.STOCK_DOCUMENT_CONFLICT);
+        var current = documents.detail(documentId).document();
+        if (!StockDocumentStatus.POSTED.getValue().equals(current.getStatus())
+                || !Objects.equals(current.getSourceExecutionCode(), input.getExecutionCode()))
+            ParameterChecks.reject(ErrorCode.STOCK_DOCUMENT_CONFLICT);
+        var reportFilter = new MesProductionReportExample();
+        reportFilter.createCriteria().andExecutionCodeEqualTo(input.getExecutionCode());
+        var defectFilter = new MesProductionDefectExample();
+        defectFilter.createCriteria().andExecutionCodeEqualTo(input.getExecutionCode());
+        var receiptFilter = new MesProductionReceiptExample();
+        receiptFilter.createCriteria().andExecutionCodeEqualTo(input.getExecutionCode());
+        if (execution.getStartTime() != null || reports.countByExample(reportFilter) != 0
+                || defects.countByExample(defectFilter) != 0 || receipts.countByExample(receiptFilter) != 0)
+            ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
+        return stock.execute(StockActionType.RETURN, command);
+    }
+
+    private StockDocumentModels.Detail reverseMaterialIssueInTransaction(Long documentId,
+                                                                         StockDocumentModels.Cancellation command) {
+        var detail = documents.detail(documentId);
+        var document = detail.document();
+        if (!StockDocumentType.MATERIAL_ISSUE.getValue().equals(document.getDocumentType()))
+            throw new FoundationException(ErrorCode.FORBIDDEN);
+        if (StockDocumentStatus.REVERSED.getValue().equals(document.getStatus())) {
+            reversals.reverse(documentId, command);
+            return documents.detail(documentId);
+        }
+        if (!StockDocumentStatus.POSTED.getValue().equals(document.getStatus()))
+            ParameterChecks.reject(ErrorCode.STOCK_DOCUMENT_CONFLICT);
+        var input = facts.find(documentId);
+        if (input == null || input.getConfirmedAt() == null
+                || !dev.mesbase.business.integration.warehouse.ErpActionResult.Mode.LOCAL_ONLY.getValue()
+                .equals(input.getSourceMode())
+                || !Objects.equals(document.getSourceExecutionCode(), input.getExecutionCode()))
+            ParameterChecks.reject(ErrorCode.STOCK_DOCUMENT_SOURCE_PENDING);
+        if (!Boolean.TRUE.equals(input.getStockApplied()))
+            ParameterChecks.reject(ErrorCode.STOCK_DOCUMENT_CONFLICT);
+        var execution = locks.execution(input.getExecutionCode());
+        if (!Objects.equals(document.getSourceWorkorderId(), execution.getWorkorderId()))
+            ParameterChecks.reject(ErrorCode.STOCK_DOCUMENT_CONFLICT);
+        input.setStockApplied(false);
+        if (facts.updateStockApplication(input) != 1)
+            ParameterChecks.reject(ErrorCode.STOCK_DOCUMENT_CONFLICT);
+        productionQuantities.validateInputReduction(input.getExecutionCode());
+        reversals.reverse(documentId, command);
+        caches.evict(MesProductionExecutionResource.PREFIX, BusinessCacheEvict.Scope.LIST_AND_DETAIL);
+        return documents.detail(documentId);
     }
 
     private void permit(String permission) {

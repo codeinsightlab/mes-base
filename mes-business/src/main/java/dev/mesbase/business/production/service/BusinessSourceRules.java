@@ -200,6 +200,13 @@ public class BusinessSourceRules {
         if (warehouse.getSource() != null) required(warehouse.getSource());
     }
 
+    public void frozenLocalWarehouse(Long warehouseId) {
+        var warehouse = warehouses.selectByPrimaryKey(warehouseId);
+        if (warehouse == null || BusinessSource.EXTERNAL == BusinessSource.from(warehouse.getSource()))
+            ParameterChecks.reject(ErrorCode.BUSINESS_SOURCE_CONFLICT);
+        if (warehouse.getSource() != null) required(warehouse.getSource());
+    }
+
     public static void binding(String provider, String key, Long revision) {
         var snapshot = FactoryIntegrationContext.required();
         if (!Objects.equals(provider, snapshot.erpType()) || !Objects.equals(key, snapshot.configurationRef())

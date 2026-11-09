@@ -23,7 +23,6 @@
             resultType="dev.mesbase.business.production.domain.ProductionReportModels$ExecutionSummary">
     <bind name="enumLocalOnly" value="@dev.mesbase.business.integration.warehouse.ErpActionResult$Mode@LOCAL_ONLY.getValue()"/>
     <bind name="enumPosted" value="@dev.mesbase.business.wm.domain.StockDocumentStatus@POSTED.getValue()"/>
-    <bind name="enumReversal" value="@dev.mesbase.business.wm.domain.StockActionType@REVERSAL.getValue()"/>
     <bind name="enumProductionInput" value="@dev.mesbase.business.production.domain.ProductionInputKind@PRODUCTION_INPUT.getValue()"/>
     <bind name="enumMaterialIssue" value="@dev.mesbase.business.wm.domain.StockDocumentType@MATERIAL_ISSUE.getValue()"/>
         <bind name="inputSUBMITTING" value="@dev.mesbase.business.issue.domain.MaterialIssueSubmissionStatus@SUBMITTING.getValue()"/>
@@ -36,9 +35,7 @@
         e.target_qty AS targetQty,p.path_status AS pathStatus,
         CASE WHEN e.routing_id IS NULL THEN NULL ELSE COALESCE(SUM(r.quantity_delta),0) END AS lastNodeReportedQty,
         COALESCE((SELECT SUM(f.output_qty) FROM mes_material_issue_input f JOIN wm_stock_document d ON d.id=f.document_id AND d.source_execution_code=f.execution_code WHERE f.execution_code=e.execution_code AND f.input_kind=#{enumProductionInput} AND f.confirmed_at IS NOT NULL AND f.stock_applied=TRUE
-        AND f.source_mode=#{enumLocalOnly} AND d.document_type=#{enumMaterialIssue} AND d.status=#{enumPosted}
-        AND NOT EXISTS(SELECT 1 FROM wm_stock_document_line original_line JOIN wm_stock_action reversal ON reversal.reference_action_id=original_line.stock_action_id
-          WHERE original_line.document_id=f.document_id AND reversal.action_type=#{enumReversal})),0) AS productionInputQty
+        AND f.source_mode=#{enumLocalOnly} AND d.document_type=#{enumMaterialIssue} AND d.status=#{enumPosted}),0) AS productionInputQty
         FROM mes_production_execution e LEFT JOIN mes_execution_path p ON p.execution_code=e.execution_code
         LEFT JOIN mes_execution_path_node n ON n.execution_code=e.execution_code
         AND n.sequence_no=(SELECT MAX(last.sequence_no) FROM mes_execution_path_node last WHERE last.execution_code=e.execution_code)
@@ -50,13 +47,10 @@
     <sql id="InputBalanceFrom">
     <bind name="enumLocalOnly" value="@dev.mesbase.business.integration.warehouse.ErpActionResult$Mode@LOCAL_ONLY.getValue()"/>
     <bind name="enumPosted" value="@dev.mesbase.business.wm.domain.StockDocumentStatus@POSTED.getValue()"/>
-    <bind name="enumReversal" value="@dev.mesbase.business.wm.domain.StockActionType@REVERSAL.getValue()"/>
     <bind name="enumProductionInput" value="@dev.mesbase.business.production.domain.ProductionInputKind@PRODUCTION_INPUT.getValue()"/>
     <bind name="enumMaterialIssue" value="@dev.mesbase.business.wm.domain.StockDocumentType@MATERIAL_ISSUE.getValue()"/>
         FROM mes_material_issue_input f JOIN wm_stock_document d ON d.id=f.document_id AND d.source_execution_code=f.execution_code WHERE f.input_kind=#{enumProductionInput} AND f.confirmed_at IS NOT NULL AND f.stock_applied=TRUE
         AND f.source_mode=#{enumLocalOnly} AND d.document_type=#{enumMaterialIssue} AND d.status=#{enumPosted}
-        AND NOT EXISTS(SELECT 1 FROM wm_stock_document_line original_line JOIN wm_stock_action reversal ON reversal.reference_action_id=original_line.stock_action_id
-          WHERE original_line.document_id=f.document_id AND reversal.action_type=#{enumReversal})
     </sql>
     <select id="inputBalance" resultType="dev.mesbase.business.production.domain.ProductionInputBalance">
         SELECT COALESCE(SUM(f.output_qty),0) AS confirmedQty, CAST(0 AS DECIMAL(20,6)) AS reservedQty

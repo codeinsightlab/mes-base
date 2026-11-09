@@ -136,6 +136,10 @@ public final class StockDocumentModels {
     public record Version(@NotNull Long expectedRevision) {
     }
 
+    public record Cancellation(@NotNull Long expectedRevision, @Size(max = 36) String requestId,
+                               @Size(max = 500) String reason) {
+    }
+
     public record Post(@NotBlank String requestId, @NotNull Long expectedRevision) {
     }
 
@@ -166,8 +170,18 @@ public final class StockDocumentModels {
     }
 
     public record Detail(WmStockDocumentEntity document, List<WmStockDocumentLineEntity> lines,
-                         QualitySource qualitySource, MaterialIssueBasis materialIssueBasis,
+                         List<StockMovement> stockMovements, QualitySource qualitySource, MaterialIssueBasis materialIssueBasis,
                          String materialIssueBasisError) {
+        public Detail(WmStockDocumentEntity document, List<WmStockDocumentLineEntity> lines,
+                      QualitySource qualitySource, MaterialIssueBasis materialIssueBasis,
+                      String materialIssueBasisError) {
+            this(document, lines, List.of(), qualitySource, materialIssueBasis, materialIssueBasisError);
+        }
+    }
+
+    public record StockMovement(String id, Long documentLineId, String actionType, BigDecimal quantityDelta,
+                                java.time.LocalDateTime occurredAt, String referenceActionId, String operationId,
+                                Long stockId, String batchNo, String binCode, Long operatorUserId, String reason) {
     }
 
     /**

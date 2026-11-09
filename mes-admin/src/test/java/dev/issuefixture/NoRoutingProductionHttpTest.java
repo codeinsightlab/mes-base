@@ -128,7 +128,9 @@ class NoRoutingProductionHttpTest {
                     .andExpect(status().is4xxClientError());
             assertEquals(documents, db.queryForObject("SELECT COUNT(*) FROM wm_stock_document", Long.class));
             assertEquals(0, BigDecimal.ONE.compareTo(db.queryForObject("SELECT quantity FROM wm_inventory WHERE id=?", BigDecimal.class, outputStock)));
-            mvc.perform(full(post("/api/wm/outbound-documents/" + first.get("documentId").asText() + "/actions/void")))
+            String document = first.get("documentId").asText();
+            mvc.perform(full(post(ProductionInputHttpTest.ROOT + "/documents/" + document + "/actions/cancel"))
+                            .content(StockDocumentHttpTest.cancellationBody(mvc, document)))
                     .andExpect(status().isConflict());
             // Later master-data publication does not rewrite this execution's frozen no-routing basis.
             db.update("INSERT INTO routing_product(routing_id,material_id) VALUES(1,99)");

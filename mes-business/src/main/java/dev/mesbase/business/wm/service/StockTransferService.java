@@ -90,6 +90,7 @@ public class StockTransferService {
     }
 
     private final StockDocumentService documents;
+    private final StockDocumentReversalService reversals;
     private final WmStockDocumentMapper headers;
     private final WmStockDocumentLineMapper lines;
     private final StockDocumentExtraMapper links;
@@ -104,7 +105,8 @@ public class StockTransferService {
     private final Validator validator;
     private final TransactionTemplate transactions;
 
-    public StockTransferService(StockDocumentService documents, WmStockDocumentMapper headers,
+    public StockTransferService(StockDocumentService documents, StockDocumentReversalService reversals,
+                                WmStockDocumentMapper headers,
                                 WmStockDocumentLineMapper lines, StockDocumentExtraMapper links,
                                 WmInventoryMapper inventories, IWmInventoryService inventoryService,
                                 StockReferenceRules stockReferences,
@@ -112,6 +114,7 @@ public class StockTransferService {
                                 BusinessSourceRules sources, AutoCodeNumbering numbering, Validator validator,
                                 @Qualifier("businessTransactionManager") PlatformTransactionManager manager) {
         this.documents = documents;
+        this.reversals = reversals;
         this.headers = headers;
         this.lines = lines;
         this.links = links;
@@ -198,9 +201,42 @@ public class StockTransferService {
         validate(command);
         var pair = lockPair(id);
         draft(pair.outbound().document(), command.expectedRevision());
-        documents.cancel(id, command);
-        documents.cancel(pair.inbound().document().getId(), new StockDocumentModels.Version(pair.inbound().document()
+        documents.cancelDraft(id, command);
+        documents.cancelDraft(pair.inbound().document().getId(), new StockDocumentModels.Version(pair.inbound().document()
                 .getRevision()));
+        return detail(id);
+    }
+
+    public Detail reverse(Long id, StockDocumentModels.Cancellation command) {
+        validate(command);
+        uuid(command.requestId());
+        var pair = lockPair(id);
+        var outbound = pair.outbound().document();
+        var inbound = pair.inbound().document();
+        boolean replay = StockDocumentStatus.REVERSED.getValue().equals(outbound.getStatus())
+                && StockDocumentStatus.REVERSED.getValue().equals(inbound.getStatus());
+        if (!replay && (!StockDocumentStatus.POSTED.getValue().equals(outbound.getStatus())
+                || !StockDocumentStatus.POSTED.getValue().equals(inbound.getStatus())
+                || !Objects.equals(outbound.getRevision(), command.expectedRevision()))) reject();
+        if (StockDocumentStatus.REVERSED.getValue().equals(outbound.getStatus())
+                != StockDocumentStatus.REVERSED.getValue().equals(inbound.getStatus())) reject();
+
+        var all = new ArrayList<WmStockDocumentLineEntity>();
+        all.addAll(pair.outbound().lines());
+        all.addAll(pair.inbound().lines());
+        if (all.isEmpty()) reject();
+        quantities.lockForWrite(all.stream().map(WmStockDocumentLineEntity::getMaterialId).distinct().sorted()
+                .toList());
+        stockReferences.lockInventoryReferences(all.stream().map(WmStockDocumentLineEntity::getMaterialId).distinct()
+                        .sorted().toList(),
+                all.stream().map(WmStockDocumentLineEntity::getWarehouseId).distinct().sorted().toList());
+        all.stream().map(WmStockDocumentLineEntity::getStockId).distinct().sorted().forEach(stock::lock);
+
+        reversals.reverse(outbound.getId(), command);
+        String pairedRequestId = UUID.nameUUIDFromBytes((command.requestId() + ":transfer:" + inbound.getId())
+                .getBytes(StandardCharsets.UTF_8)).toString();
+        reversals.reverse(inbound.getId(), new StockDocumentModels.Cancellation(inbound.getRevision(),
+                pairedRequestId, command.reason()));
         return detail(id);
     }
 

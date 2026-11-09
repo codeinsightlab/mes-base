@@ -143,7 +143,6 @@
       AND (SELECT COUNT(*) FROM wm_stock_document_line other_line WHERE other_line.document_id=d.id)=1
       AND (SELECT COUNT(*) FROM wm_stock_action other_action WHERE other_action.document_line_id=l.id)=1
       AND (SELECT COUNT(*) FROM mes_quality_treatment other_event WHERE other_event.stock_document_id=d.id)=1
-      AND NOT EXISTS (SELECT 1 FROM wm_stock_action reverse_action WHERE reverse_action.reference_action_id=a.id)
       THEN 1 ELSE 0 END) AS validCount
     FROM mes_quality_treatment t
     LEFT JOIN wm_stock_document d ON d.id=t.stock_document_id

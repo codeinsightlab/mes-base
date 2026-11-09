@@ -37,7 +37,6 @@
             AND l.material_id = #{materialId} AND l.unit_id = #{unitId} AND l.quantity > 0
             AND s.status = #{enabled} AND s.quantity > 0
             AND COALESCE(s.available_quantity, s.quantity) > 0
-            AND NOT EXISTS(SELECT 1 FROM wm_stock_action reversal WHERE reversal.reference_action_id = a.id)
             AND l.warehouse_id IN
             <foreach collection="warehouseIds" item="warehouseId" open="(" separator="," close=")">#{warehouseId}</foreach>
         ORDER BY d.id DESC, l.id DESC

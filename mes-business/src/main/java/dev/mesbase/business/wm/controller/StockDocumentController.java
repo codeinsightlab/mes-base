@@ -1,17 +1,16 @@
 package dev.mesbase.business.wm.controller;
 
-import dev.mesbase.business.issue.domain.MaterialIssueSubmissionStatus;
-import dev.mesbase.business.issue.service.MaterialIssueVoidService.Result;
-import dev.mesbase.business.issue.service.MaterialIssueVoidService;
 import dev.mesbase.business.wm.domain.StockDocumentDirection;
 import dev.mesbase.business.wm.domain.StockDocumentModels;
 import dev.mesbase.business.wm.domain.StockDocumentType;
 import dev.mesbase.business.wm.domain.WmStockDocumentEntity;
 import dev.mesbase.business.wm.domain.WmStockDocumentLineEntity;
 import dev.mesbase.business.wm.service.StockDocumentService;
+import dev.mesbase.business.wm.service.StockDocumentReversalService;
 import dev.mesbase.common.exception.ServiceException;
 import dev.mesbase.common.utils.SecurityUtils;
 import dev.mesbase.common.utils.bean.BeanConversions;
+import dev.mesbase.common.validation.ParameterChecks;
 import dev.mesbase.core.error.ErrorCode;
 import dev.mesbase.core.error.FoundationException;
 import dev.mesbase.core.security.AuthenticatedActor;
@@ -46,18 +45,19 @@ import org.springframework.web.bind.annotation.RestController;
 public class StockDocumentController {
     private static final String PERMISSION = "business:wm:stock:document:";
     private final StockDocumentService service;
+    private final StockDocumentReversalService reversals;
     private final HttpServletRequest request;
     private final AutoCodeNumbering autoCodes;
-    private final MaterialIssueVoidService issueVoid;
     private final AuthorizationService authorization;
 
-    public StockDocumentController(StockDocumentService service, AutoCodeNumbering autoCodes,
-                                   MaterialIssueVoidService issueVoid, AuthorizationService authorization,
+    public StockDocumentController(StockDocumentService service, StockDocumentReversalService reversals,
+                                   AutoCodeNumbering autoCodes,
+                                   AuthorizationService authorization,
                                    HttpServletRequest request) {
         this.request = request;
         this.service = service;
+        this.reversals = reversals;
         this.autoCodes = autoCodes;
-        this.issueVoid = issueVoid;
         this.authorization = authorization;
     }
 
@@ -191,9 +191,12 @@ public class StockDocumentController {
         requireDirectionIfPresent(detail, direction);
         if (!stockQuery && !StockDocumentType.MATERIAL_ISSUE.getValue().equals(detail.document().getDocumentType()))
             throw new FoundationException(ErrorCode.NOT_FOUND);
-        if (!stockQuery && !hasPermission("business:mes:material:issue:item:list"))
-            detail = new StockDocumentModels.Detail(detail.document(), List.of(), detail.qualitySource(),
+        if (!stockQuery) {
+            var visibleLines = hasPermission("business:mes:material:issue:item:list")
+                    ? detail.lines() : List.<WmStockDocumentLineEntity>of();
+            detail = new StockDocumentModels.Detail(detail.document(), visibleLines, List.of(), detail.qualitySource(),
                     detail.materialIssueBasis(), detail.materialIssueBasisError());
+        }
         return view(detail);
     }
 
@@ -279,8 +282,7 @@ public class StockDocumentController {
                                        String bomId, String bomBaseQty, String bomComponentQty,
                                        String pathRevision, List<String> routingNodeIds,
                                        LocalDateTime businessOccurredAt,
-                                       LocalDateTime confirmedAt, Boolean stockApplied,
-                                       String voidOperationId, String voidResultStatus, String pathError,
+                                       LocalDateTime confirmedAt, Boolean stockApplied, String pathError,
                                        String combinationId, List<ProductionAllocation> allocations) {
     }
 
@@ -321,11 +323,24 @@ public class StockDocumentController {
     @PostMapping("/{id}/actions/cancel")
     @EndpointAccess(EndpointAccess.Kind.AUTHENTICATED)
     public Detail cancel(@PathVariable Long id, @RequestParam(required = false) String direction,
-                         @Valid @RequestBody StockDocumentModels.Version command) {
-        requireResource(id);
-        requireDirectionIfPresent(service.detail(id), direction);
+                         @Valid @RequestBody StockDocumentModels.Cancellation command) {
+        var detail = service.detail(id);
+        var document = detail.document();
+        requireDirectionIfPresent(detail, direction);
+        var type = StockDocumentType.from(document.getDocumentType());
+        if (type == null || !Objects.equals(type.getDirection().getValue(), document.getDirection()))
+            ParameterChecks.reject(ErrorCode.STOCK_DOCUMENT_SOURCE_PENDING);
+        if (type.isTransfer()) throw new FoundationException(ErrorCode.FORBIDDEN);
+        if ("DRAFT".equals(document.getStatus())) {
+            requirePermission(PERMISSION + "cancel");
+            return view(service.cancelDraft(id, new StockDocumentModels.Version(command.expectedRevision())));
+        }
+        if (!StockDocumentType.OTHER_ISSUE.getValue().equals(document.getDocumentType())
+                && !StockDocumentType.OTHER_RECEIPT.getValue().equals(document.getDocumentType()))
+            throw new FoundationException(ErrorCode.FORBIDDEN);
         requirePermission(PERMISSION + "cancel");
-        return view(service.cancel(id, command));
+        reversals.reverse(id, command);
+        return view(service.detail(id));
     }
 
     @PostMapping("/{id}/actions/approve")
@@ -336,44 +351,6 @@ public class StockDocumentController {
         requireDirectionIfPresent(service.detail(id), direction);
         requirePermission(PERMISSION + "post");
         return view(service.approve(id, command));
-    }
-
-    @PostMapping("/{id}/actions/void")
-    @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED, permission = "business:mes:material:issue:void")
-    public MaterialIssueVoidResult voidMaterialIssue(@PathVariable Long id,
-                                                     @RequestParam(required = false) String direction) {
-        requireOutboundAction();
-        requireDirectionIfPresent(service.detail(id), direction);
-        return materialIssueVoidResult(issueVoid.cancel(id));
-    }
-
-    @PostMapping("/{id}/actions/reconcile-void")
-    @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED, permission = "business:mes:material:issue:void")
-    public MaterialIssueVoidResult reconcileMaterialIssueVoid(@PathVariable Long id,
-                                                              @RequestParam(required = false) String direction) {
-        requireOutboundAction();
-        requireDirectionIfPresent(service.detail(id), direction);
-        return materialIssueVoidResult(issueVoid.reconcile(id));
-    }
-
-    private MaterialIssueVoidResult materialIssueVoidResult(Result result) {
-        return new MaterialIssueVoidResult(result.documentId(), result.documentStatus(), result.productionInputStatus(),
-                result.voidOperationId(), result.voidResultStatus(), result.voidRequestedAt(),
-                result.voidFinishedAt(), voidMessage(result));
-    }
-
-    private String voidMessage(Result result) {
-        if (MaterialIssueSubmissionStatus.SUCCEEDED.getValue().equals(result.voidResultStatus()))
-            return "本地撤销与库存反向事务已完成";
-        if (MaterialIssueSubmissionStatus.UNKNOWN.getValue().equals(result.voidResultStatus()))
-            return "本地撤销结果待恢复";
-        return null;
-    }
-
-    public record MaterialIssueVoidResult(String documentId, String documentStatus, String productionInputStatus,
-                                          String voidOperationId, String voidResultStatus,
-                                          LocalDateTime voidRequestedAt, LocalDateTime voidFinishedAt,
-                                          String message) {
     }
 
     @PostMapping("/{id}/lines")
@@ -422,7 +399,7 @@ public class StockDocumentController {
                 b.remaining().toPlainString());
     }
 
-    private static Detail view(StockDocumentModels.Detail detail) {
+    public static Detail view(StockDocumentModels.Detail detail) {
         return BeanConversions.convert(detail, Detail.class);
     }
 
@@ -488,7 +465,8 @@ public class StockDocumentController {
                          String createBy,
                          LocalDateTime createTime,
                          String updateBy, LocalDateTime updateTime, String postedBy, LocalDateTime postedAt,
-                         String cancelledBy, LocalDateTime cancelledAt, String revision, String postRequestId,
+                         String cancelledBy, LocalDateTime cancelledAt, String reversedBy, LocalDateTime reversedAt,
+                         String reversalReason, String reversalRequestId, String revision, String postRequestId,
                          String createRequestId) {
     }
 
@@ -502,11 +480,16 @@ public class StockDocumentController {
                                 String sourceQualityExecutionCode) {
     }
 
+    public record StockMovement(String id, String documentLineId, String actionType, String quantityDelta,
+                                LocalDateTime occurredAt, String referenceActionId, String operationId,
+                                String stockId, String batchNo, String binCode, String operatorUserId, String reason) {
+    }
+
     public record MaterialIssueBasis(String requestId, String code, String workorderId, String outputQty,
                                      String routingId, List<String> routingNodeIds) {
     }
 
-    public record Detail(Header document, List<Line> lines, QualitySource qualitySource,
+    public record Detail(Header document, List<Line> lines, List<StockMovement> stockMovements, QualitySource qualitySource,
                          MaterialIssueBasis materialIssueBasis, String materialIssueBasisError) {
     }
 
