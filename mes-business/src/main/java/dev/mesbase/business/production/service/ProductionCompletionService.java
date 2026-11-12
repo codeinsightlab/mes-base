@@ -213,8 +213,9 @@ public class ProductionCompletionService {
         unresolved.createCriteria().andSourceExecutionCodeEqualTo(execution.getExecutionCode())
                 .andDocumentTypeEqualTo(StockDocumentType.MATERIAL_ISSUE.getValue());
         if (hasPendingIssues(issues.selectByExample(unresolved))) return "相关领料仍有未决状态，请核实原请求";
-        if (inbound.invalidProductionInboundLines(execution.getExecutionCode()) > 0) return "正式生产入库明细与库存动作不一致";
-        var output = projection.confirmedInputQty();
+        if (inbound.invalidProductionInboundLines(execution.getExecutionCode()) > 0)
+            return "正式生产入库明细与库存动作不一致";
+        var output = projection.productionInputQty();
         if (execution.getRoutingId() != null) output = projection.nodes().getLast().effectiveOutputQty();
         if (received.compareTo(output) < 0) return "正常品尚未全部正式入库";
         if (received.compareTo(output) > 0) return "正常品正式入库超过当前有效产出，须核实数量异常";
@@ -251,7 +252,8 @@ public class ProductionCompletionService {
         row.setReceiptQty(BigDecimal.ZERO);
         row.setAcceptedQty(received);
         row.setBasisHash(ProductionClosureRules.hash(projection.routingId(), projection.pathStatus(),
-                projection.confirmedInputQty(), projection.nodes().stream()
+                projection.confirmedInputQty(), projection.productionInputQty(), projection.materialReturnQty(), projection.nodes()
+                        .stream()
                         .map(node -> List.of(node.routingNodeId(), ProductionClosureRules.number(node.reportedQty()),
                                 ProductionClosureRules.number(node.effectiveOutputQty()),
                                 ProductionClosureRules.number(node.netDefectQty()),

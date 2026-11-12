@@ -6,6 +6,7 @@ import dev.mesbase.business.directory.service.BusinessDirectoryService;
 import dev.mesbase.business.production.dao.MesExecutionPathNodeMapper;
 import dev.mesbase.business.production.dao.MesProductionExecutionMapper;
 import dev.mesbase.business.production.dao.ProductionQuantityMapper;
+import dev.mesbase.business.production.dao.ProductionInputExtraMapper;
 import dev.mesbase.business.production.dao.WorkorderMapper;
 import dev.mesbase.business.production.domain.ExecutionPathStatus;
 import dev.mesbase.business.production.domain.MesExecutionPathNodeEntity;
@@ -13,6 +14,9 @@ import dev.mesbase.business.production.domain.MesExecutionPathNodeExample;
 import dev.mesbase.business.production.domain.MesProductionExecutionEntity;
 import dev.mesbase.business.production.domain.ProductionExecutionStatus;
 import dev.mesbase.business.production.domain.ProductionInputBalance;
+import dev.mesbase.business.production.domain.ProductionCombinationPlanner;
+import dev.mesbase.business.production.domain.ProductionReportModels.MaterialReturnBalance;
+import dev.mesbase.business.wm.domain.StockCommand;
 import dev.mesbase.business.production.domain.ProductionQualityPendingException;
 import dev.mesbase.business.production.domain.ProductionQuantityConflictException;
 import dev.mesbase.business.production.domain.ProductionReportModels.ExecutionPage;
@@ -35,6 +39,7 @@ import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.LinkedHashMap;
 import java.util.Objects;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
@@ -55,11 +60,14 @@ public class ProductionQuantityService {
     private final BusinessDirectoryService directory;
     private final ProductionDefectQuantityQuery defects;
     private final StockDocumentExtraMapper inbound;
+    private final ProductionInputExtraMapper inputFacts;
 
     public ProductionQuantityService(MesProductionExecutionMapper executions, ExecutionPathService paths,
                                      MesExecutionPathNodeMapper pathNodes, ProductionQuantityMapper quantities,
                                      BusinessDirectoryService directory, ProductionDefectQuantityQuery defects,
-                                     WorkorderMapper orders, StockDocumentExtraMapper inbound) {
+                                     WorkorderMapper orders, StockDocumentExtraMapper inbound,
+                                     ProductionInputExtraMapper inputFacts) {
+        this.inputFacts = inputFacts;
         this.inbound = inbound;
         this.orders = orders;
         this.executions = executions;
@@ -109,10 +117,10 @@ public class ProductionQuantityService {
         if (execution == null) throw new FoundationException(ErrorCode.EXECUTION_NOT_FOUND);
         if (execution.getRoutingId() == null) {
             var balance = quantities.inputBalance(executionCode);
-            var input = balance.usableQty();
+            var input = retainedInput(balance.usableQty(), materialBalances(List.of(executionCode)));
             if (input == null || input.signum() < 0) ParameterChecks.reject(ErrorCode.REPORT_PATH_REQUIRED);
             return new ExecutionQuantity(executionCode, execution.getWorkorderId(), null, execution.getTargetQty(),
-                    null, false, "无工艺工单无需工序报工，按正式领料确认量办理成品入库", List.of(), null,
+                    null, false, "无工艺工单无需工序报工，按扣除退料影响后的正式投入办理成品入库", List.of(), null,
                     input, balance.confirmedQty(), balance.reservedQty(), execution.getProductId());
         }
         return load(executionCode, execution, paths.view(executionCode));
@@ -125,7 +133,7 @@ public class ProductionQuantityService {
     private ExecutionQuantity load(String executionCode, MesProductionExecutionEntity execution, PathModel model,
                                    Supplier<List<MesExecutionPathNodeEntity>> selectedRows) {
         var balance = quantities.inputBalance(executionCode);
-        var inputQty = balance.usableQty();
+        var inputQty = retainedInput(balance.usableQty(), materialBalances(List.of(executionCode)));
         if (inputQty == null || inputQty.signum() < 0) ParameterChecks.reject(ErrorCode.REPORT_PATH_REQUIRED);
         if (model.path() == null)
             return new ExecutionQuantity(executionCode, execution.getWorkorderId(), execution.getRoutingId(), execution.getTargetQty(), ExecutionPathStatus.UNSELECTED.getValue(), false, "执行尚未选择实际路径", List.of(), label(model.routing()), inputQty, balance.confirmedQty(), balance.reservedQty(), execution.getProductId());
@@ -204,10 +212,74 @@ public class ProductionQuantityService {
             rows = List.copyOf(quantities.workorderQuantities(workorderId));
             total = page.getTotal();
         }
+        if (!rows.isEmpty()) {
+            var returns = materialBalances(rows.stream().map(ExecutionSummary::executionCode).toList()).stream()
+                    .collect(Collectors.groupingBy(MaterialReturnBalance::executionCode));
+            rows = rows.stream().map(row -> new ExecutionSummary(row.executionCode(), row.workorderId(),
+                            row.routingId(), row.targetQty(), row.pathStatus(), row.lastNodeReportedQty(),
+                            retainedInput(row.productionInputQty(), returns.getOrDefault(row.executionCode(), List.of()))))
+                    .toList();
+        }
         var labels = directory.routingLabels(rows.stream().map(ExecutionSummary::routingId).filter(Objects::nonNull)
                         .toList()).entrySet()
                 .stream().collect(Collectors.toMap(entry -> entry.getKey(), entry -> label(entry.getValue())));
         return new ExecutionPage(rows, total, offset, limit, labels);
+    }
+
+    private List<MaterialReturnBalance> materialBalances(List<String> codes) {
+        var rows = inputFacts.executionMaterialBalances(codes);
+        if (rows.size() > 10000) ParameterChecks.reject(ErrorCode.REPORT_QUANTITY_CONFLICT);
+        return rows;
+    }
+
+    private static BigDecimal retainedInput(BigDecimal confirmed, List<MaterialReturnBalance> rows) {
+        if (rows.stream().allMatch(r -> r.returnCount() == 0)) return confirmed;
+        var demands = new LinkedHashMap<Long, MaterialReturnBalance>();
+        for (var row : rows) {
+            if (row.invalidCount() != 0 || row.demandLineId() == null || row.outputPrecision() == null
+                    || row.issuedQty() == null || row.issuedQty().signum() <= 0
+                    || row.returnedQty().signum() < 0 || row.returnedQty().compareTo(row.issuedQty()) > 0)
+                ParameterChecks.reject(ErrorCode.REPORT_QUANTITY_CONFLICT);
+            demands.merge(row.demandLineId(), row, (a, b) -> new MaterialReturnBalance(a.executionCode(),
+                    null, null, null, a.demandLineId(), a.issuedQty().add(b.issuedQty()),
+                    a.returnedQty()
+                            .add(b.returnedQty()), a.outputPrecision(), a.invalidCount() + b.invalidCount(), a.requiredQty(), a.plannedQty(),
+                    a.allocationCount() + b.allocationCount(), a.returnCount() + b.returnCount()));
+        }
+        return ProductionCombinationPlanner.retainedOutput(confirmed, List.copyOf(demands.values()));
+    }
+
+    /**
+     * Called before writing RETURN, under the caller's common WorkOrder -> Execution lock.
+     */
+    public void validateMaterialReturn(String code, StockCommand command) {
+        var rows = materialBalances(List.of(code));
+        var candidates = rows.stream().filter(r -> Objects.equals(r.documentId(), command.documentId())
+                        && Objects.equals(r.stockId(), command.stockId())
+                        && (command.documentLineId() == null || Objects.equals(r.lineId(), command.documentLineId())))
+                .toList();
+        if (candidates.size() != 1 || command.quantity() == null || command.quantity().signum() <= 0)
+            ParameterChecks.reject(ErrorCode.BAD_REQUEST);
+        var selected = candidates.getFirst();
+        if (selected.returnedQty().add(command.quantity()).compareTo(selected.issuedQty()) > 0)
+            ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
+        var projected = rows.stream().map(r -> r == selected ? new MaterialReturnBalance(r.executionCode(),
+                        r.documentId(), r.lineId(), r.stockId(), r.demandLineId(), r.issuedQty(),
+                        r.returnedQty()
+                                .add(command.quantity()), r.outputPrecision(), r.invalidCount(), r.requiredQty(), r.plannedQty(), r.allocationCount(), r.returnCount() + 1) : r)
+                .toList();
+        var current = getExecutionQuantities(code);
+        if (inbound.invalidProductionInboundLines(code) > 0 || inbound.formalProductionInbound(code).signum() > 0)
+            ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
+        var input = retainedInput(current.confirmedInputQty().subtract(current.reservedInputQty()), projected);
+        var after = project(new ExecutionQuantity(current.executionCode(), current.workorderId(), current.routingId(),
+                current.targetQty(), current.pathStatus(), current.writable(), current.boundary(), current.nodes(),
+                current.routingLabel(), input, current.confirmedInputQty(), current.reservedInputQty(), current.productId()));
+        if (after.nodes().stream().anyMatch(n -> n.historicalConflict() || n.unverifiedDefectQty().signum() > 0)
+                || inbound.invalidProductionInboundLines(code) > 0
+                || inbound.formalProductionInbound(code).compareTo(after.routingId() == null ? input
+                : after.nodes().getLast().effectiveOutputQty()) > 0)
+            ParameterChecks.reject(ErrorCode.REPORT_QUANTITY_CONFLICT);
     }
 
     public static ExecutionQuantity project(ExecutionQuantity view) {
@@ -315,7 +387,7 @@ public class ProductionQuantityService {
     public void validateInputReduction(String executionCode) {
         var view = getExecutionQuantities(executionCode);
         if (view.routingId() == null && (inbound.invalidProductionInboundLines(executionCode) > 0
-                || inbound.formalProductionInbound(executionCode).compareTo(view.confirmedInputQty()) > 0))
+                || inbound.formalProductionInbound(executionCode).compareTo(view.productionInputQty()) > 0))
             throw new FoundationException(ErrorCode.REPORT_QUANTITY_CONFLICT);
         if (view.nodes().stream().anyMatch(n -> n.historicalConflict() || n.unverifiedDefectQty().signum() > 0))
             throw new FoundationException(ErrorCode.REPORT_QUANTITY_CONFLICT);

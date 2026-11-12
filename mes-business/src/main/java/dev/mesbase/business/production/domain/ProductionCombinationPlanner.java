@@ -84,7 +84,69 @@ public final class ProductionCombinationPlanner {
     }
 
     private static BigInteger roundedMaterial(Demand demand, BigInteger output, BigInteger plan) {
-        return scaled(demand.totalRequiredQty()).multiply(output).multiply(TWO).add(plan).divide(plan.multiply(TWO));
+        return roundedMaterial(scaled(demand.totalRequiredQty()), output, plan);
+    }
+
+    private static BigInteger roundedMaterial(BigInteger required, BigInteger output, BigInteger plan) {
+        return required.multiply(output).multiply(TWO).add(plan).divide(plan.multiply(TWO));
+    }
+
+    /**
+     * Invert frozen work-order requirements in output units, using the existing material rounding.
+     * Actual allocations preserve a bounded cumulative-rounding shortfall, never an arbitrary material shortage.
+     * The caller aggregates locations/documents by the frozen demand line, never across executions.
+     */
+    public static BigDecimal retainedOutput(BigDecimal confirmed,
+                                            List<ProductionReportModels.MaterialReturnBalance> materials) {
+        if (materials.isEmpty()) return confirmed;
+        if (materials.getFirst().outputPrecision() == null)
+            throw new FoundationException(ErrorCode.REPORT_QUANTITY_CONFLICT);
+        int precision = materials.getFirst().outputPrecision();
+        if (precision < 0 || precision > 6 || confirmed.signum() <= 0)
+            throw new FoundationException(ErrorCode.REPORT_QUANTITY_CONFLICT);
+        var plan = scaled(confirmed);
+        var step = quantum(precision);
+        if (plan.remainder(step).signum() != 0)
+            throw new FoundationException(ErrorCode.REPORT_QUANTITY_CONFLICT);
+        for (var material : materials) {
+            if (material.invalidCount() != 0 || material.demandLineId() == null
+                    || material.outputPrecision() == null || material.outputPrecision() != precision
+                    || material.issuedQty() == null || material.issuedQty().signum() <= 0
+                    || material.returnedQty() == null || material.returnedQty().signum() < 0
+                    || material.returnedQty().compareTo(material.issuedQty()) > 0
+                    || material.requiredQty() == null || material.requiredQty().signum() <= 0
+                    || material.plannedQty() == null || material.plannedQty().signum() <= 0
+                    || material.allocationCount() <= 0)
+                throw new FoundationException(ErrorCode.REPORT_QUANTITY_CONFLICT);
+        }
+        var roundingOffsets = materials.stream().map(m -> {
+            var expected = roundedMaterial(scaled(m.requiredQty()), plan, scaled(m.plannedQty()));
+            var offset = scaled(m.issuedQty()).subtract(expected).min(ZERO);
+            if (offset.negate().compareTo(BigInteger.valueOf(m.allocationCount())) > 0)
+                throw new FoundationException(ErrorCode.REPORT_QUANTITY_CONFLICT);
+            return offset;
+        }).toList();
+        if (materials.stream().anyMatch(m -> m.returnedQty().compareTo(m.issuedQty()) == 0))
+            return BigDecimal.ZERO;
+        var low = ZERO;
+        var high = plan.divide(step);
+        while (low.compareTo(high) < 0) {
+            var middle = low.add(high).add(ONE).divide(TWO);
+            var output = middle.multiply(step);
+            boolean supported = true;
+            for (int i = 0; i < materials.size(); i++) {
+                var m = materials.get(i);
+                var required = roundedMaterial(scaled(m.requiredQty()), output, scaled(m.plannedQty()))
+                        .add(roundingOffsets.get(i)).max(ZERO);
+                if (required.compareTo(scaled(m.issuedQty().subtract(m.returnedQty()))) > 0) {
+                    supported = false;
+                    break;
+                }
+            }
+            if (supported) low = middle;
+            else high = middle.subtract(ONE);
+        }
+        return decimal(low.multiply(step));
     }
 
     private static BigInteger quantum(int precision) {

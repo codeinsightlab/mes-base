@@ -104,7 +104,7 @@ public class WorkOrderCompletionService {
                 if (inbound.invalidProductionInboundLines(execution.getExecutionCode()) > 0)
                     return "正式生产入库明细与库存动作不一致";
                 var received = inbound.formalProductionInbound(execution.getExecutionCode());
-                BigDecimal output = projection.confirmedInputQty();
+                BigDecimal output = projection.productionInputQty();
                 if (execution.getRoutingId() != null) output = projection.nodes().getLast().effectiveOutputQty();
                 if (received.compareTo(output) != 0)
                     return "执行正常品入库与有效产出不一致";

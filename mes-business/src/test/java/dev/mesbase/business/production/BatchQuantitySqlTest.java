@@ -29,10 +29,10 @@ class BatchQuantitySqlTest {
             s.execute("CREATE TABLE wm_stock_action(id VARCHAR(36),reference_action_id VARCHAR(36),action_type VARCHAR(24))");
             s.execute("INSERT INTO mes_execution_path_node VALUES(1,11),(2,11),(2,12),(3,11)");
             s.execute("INSERT INTO mes_production_report VALUES(1,11,100),(1,11,-4),(2,11,200),(2,99,999),(3,11,9999)");
-            s.execute("INSERT INTO wm_stock_document VALUES(1,1,'MATERIAL_ISSUE','POSTED'),(2,1,'MATERIAL_ISSUE','POSTED'),(3,2,'MATERIAL_ISSUE','POSTED'),(4,2,'MATERIAL_ISSUE','DRAFT'),(5,2,'MATERIAL_ISSUE','POSTED'),(6,2,'MATERIAL_ISSUE','POSTED')");
+            s.execute("INSERT INTO wm_stock_document VALUES(1,1,'MATERIAL_ISSUE','POSTED'),(2,1,'MATERIAL_ISSUE','POSTED'),(3,2,'MATERIAL_ISSUE','POSTED'),(4,2,'MATERIAL_ISSUE','DRAFT'),(5,2,'MATERIAL_ISSUE','POSTED'),(6,2,'MATERIAL_ISSUE','REVERSED')");
             s.execute("INSERT INTO wm_stock_document_line VALUES(6,6,'original-6')");
             s.execute("INSERT INTO wm_stock_action VALUES('reversal-6','original-6','REVERSAL')");
-            s.execute("INSERT INTO mes_material_issue_input VALUES(1,1,'PRODUCTION_INPUT',CURRENT_TIMESTAMP,'LOCAL_ONLY',100,TRUE),(1,2,'PRODUCTION_INPUT',CURRENT_TIMESTAMP,'LOCAL_ONLY',3,TRUE),(2,3,'PRODUCTION_INPUT',CURRENT_TIMESTAMP,'LOCAL_ONLY',7,TRUE),(2,4,'PRODUCTION_INPUT',CURRENT_TIMESTAMP,'LOCAL_ONLY',999,FALSE),(2,5,'PRODUCTION_INPUT',CURRENT_TIMESTAMP,'CONNECTED',888,TRUE),(2,6,'PRODUCTION_INPUT',CURRENT_TIMESTAMP,'LOCAL_ONLY',10000,TRUE)");
+            s.execute("INSERT INTO mes_material_issue_input VALUES(1,1,'PRODUCTION_INPUT',CURRENT_TIMESTAMP,'LOCAL_ONLY',100,TRUE),(1,2,'PRODUCTION_INPUT',CURRENT_TIMESTAMP,'LOCAL_ONLY',3,TRUE),(2,3,'PRODUCTION_INPUT',CURRENT_TIMESTAMP,'LOCAL_ONLY',7,TRUE),(2,4,'PRODUCTION_INPUT',CURRENT_TIMESTAMP,'LOCAL_ONLY',999,FALSE),(2,5,'PRODUCTION_INPUT',CURRENT_TIMESTAMP,'CONNECTED',888,TRUE),(2,6,'PRODUCTION_INPUT',CURRENT_TIMESTAMP,'LOCAL_ONLY',10000,FALSE)");
         }
         var config = new Configuration(new Environment("fixture", new JdbcTransactionFactory(), new UnpooledDataSource("org.h2.Driver", url, null)));
         config.addMapper(ProductionQuantityMapper.class);

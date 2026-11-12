@@ -41,7 +41,7 @@ public final class ProductionReportViews {
                             String targetQty,
                             String pathStatus, boolean writable, String boundary, List<Node> nodes,
                             String routingLabel, String productionInputQty, String confirmedInputQty,
-                            String reservedInputQty, String productId) {
+                            String reservedInputQty, String productId, String materialReturnQty) {
     }
 
     public record Summary(String executionCode, String workorderId, String routingId,
@@ -63,7 +63,7 @@ public final class ProductionReportViews {
         return new Execution(v.executionCode(), id(v.workorderId()), id(v.routingId()), decimal(v.targetQty()),
                 v.pathStatus(), v.writable(), v.boundary(), v.nodes().stream()
                 .map(n -> node(n, ProductionQuantityService.positiveReportBlockReason(v, n.routingNodeId())))
-                .toList(), v.routingLabel(), decimal(v.productionInputQty()), decimal(v.confirmedInputQty()), decimal(v.reservedInputQty()), id(v.productId()));
+                .toList(), v.routingLabel(), decimal(v.productionInputQty()), decimal(v.confirmedInputQty()), decimal(v.reservedInputQty()), id(v.productId()), decimal(v.materialReturnQty()));
     }
 
     public static Node node(NodeQuantity n) {

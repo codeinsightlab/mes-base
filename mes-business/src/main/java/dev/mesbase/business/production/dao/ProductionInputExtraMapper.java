@@ -1,6 +1,7 @@
 package dev.mesbase.business.production.dao;
 
 import dev.mesbase.business.production.domain.ProductionInputQuota;
+import dev.mesbase.business.production.domain.ProductionReportModels.MaterialReturnBalance;
 import java.math.BigDecimal;
 import java.util.List;
 import org.apache.ibatis.annotations.Param;
@@ -17,6 +18,8 @@ public interface ProductionInputExtraMapper {
     BigDecimal confirmedExecutionOutput(@Param("executionCode") String executionCode);
 
     List<DemandIssued> issuedByDemand(@Param("workorderId") Long workorderId);
+
+    List<MaterialReturnBalance> executionMaterialBalances(@Param("executionCodes") List<String> executionCodes);
 
     long unlinkedDemandLines(@Param("workorderId") Long workorderId);
 

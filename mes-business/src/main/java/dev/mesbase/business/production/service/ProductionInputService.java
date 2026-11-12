@@ -28,6 +28,7 @@ import dev.mesbase.business.wm.domain.StockActionType;
 import dev.mesbase.business.wm.domain.StockCommand;
 import dev.mesbase.business.wm.domain.WmStockActionEntity;
 import dev.mesbase.business.wm.service.LocalStockService;
+import dev.mesbase.business.wm.dao.WmStockActionMapper;
 import dev.mesbase.business.wm.service.StockDocumentService;
 import dev.mesbase.business.wm.service.StockDocumentReversalService;
 import dev.mesbase.business.quality.dao.MesProductionDefectMapper;
@@ -98,6 +99,7 @@ public class ProductionInputService {
     private final MesProductionReportMapper reports;
     private final MesProductionDefectMapper defects;
     private final MesProductionReceiptMapper receipts;
+    private final WmStockActionMapper stockActions;
     private final LocalStockService stock;
     private final WorkorderMapper orders;
     private final ExecutionPathService paths;
@@ -117,6 +119,7 @@ public class ProductionInputService {
                                   IMesProductionExecutionService executions,
                                   MesProductionExecutionMapper executionMapper, MesProductionReportMapper reports,
                                   MesProductionDefectMapper defects, MesProductionReceiptMapper receipts,
+                                  WmStockActionMapper stockActions,
                                   LocalStockService stock, WorkorderMapper orders,
                                   ExecutionPathService paths, IRoutingService routings,
                                   MaterialQuantityRules quantityRules, ProductionQuantityService productionQuantities,
@@ -134,6 +137,7 @@ public class ProductionInputService {
         this.reports = reports;
         this.defects = defects;
         this.receipts = receipts;
+        this.stockActions = stockActions;
         this.stock = stock;
         this.orders = orders;
         this.paths = paths;
@@ -214,6 +218,8 @@ public class ProductionInputService {
         if (execution.getStartTime() != null || reports.countByExample(reportFilter) != 0
                 || defects.countByExample(defectFilter) != 0 || receipts.countByExample(receiptFilter) != 0)
             ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
+        if (stockActions.selectByPrimaryKey(command.requestId()) == null)
+            productionQuantities.validateMaterialReturn(input.getExecutionCode(), command);
         return stock.execute(StockActionType.RETURN, command);
     }
 

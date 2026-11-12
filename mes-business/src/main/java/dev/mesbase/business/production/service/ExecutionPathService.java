@@ -32,6 +32,7 @@ import java.util.Set;
 import java.util.Objects;
 import java.time.LocalDateTime;
 import org.springframework.stereotype.Service;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.annotation.Isolation;
@@ -53,6 +54,7 @@ public class ExecutionPathService {
     private final BusinessDirectoryService references;
     private final RoutingEdgeMapper edges;
     private final MesMaterialIssueInputMapper inputs;
+    private final ObjectProvider<ProductionQuantityService> quantities;
 
     public ExecutionPathService(ProductionChainLocks locks, ProductionExecutionRules rules,
                                 MesExecutionPathMapper paths,
@@ -60,7 +62,9 @@ public class ExecutionPathService {
                                 RoutingNodeMapper nodes, RoutingEdgeMapper edges,
                                 MesMaterialIssueInputMapper inputs,
                                 BusinessDirectoryService references,
-                                ExecutionQualityReferenceQuery quality) {
+                                ExecutionQualityReferenceQuery quality,
+                                ObjectProvider<ProductionQuantityService> quantities) {
+        this.quantities = quantities;
         this.quality = quality;
         this.locks = locks;
         this.rules = rules;
@@ -244,6 +248,8 @@ public class ExecutionPathService {
                     .equals(fact.getSourceMode()) || !"PRODUCTION_INPUT".equals(fact.getInputKind()))
                 ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
         }
+        if (quantities.getObject().getExecutionQuantities(id).productionInputQty().signum() <= 0)
+            ParameterChecks.reject(ErrorCode.REPORT_QUANTITY_CONFLICT);
         if (ProductionExecutionStatus.RUNNING.getValue().equals(e.getStatus())) return e;
         e.setStatus(ProductionExecutionStatus.RUNNING.getValue());
         e.setStartTime(LocalDateTime.now());

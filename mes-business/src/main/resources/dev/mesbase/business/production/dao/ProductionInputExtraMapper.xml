@@ -1,6 +1,60 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="dev.mesbase.business.production.dao.ProductionInputExtraMapper">
+  <select id="executionMaterialBalances" resultType="dev.mesbase.business.production.domain.ProductionReportModels$MaterialReturnBalance">
+    <bind name="posted" value="@dev.mesbase.business.wm.domain.StockDocumentStatus@POSTED.getValue()"/>
+    <bind name="issueType" value="@dev.mesbase.business.wm.domain.StockDocumentType@MATERIAL_ISSUE.getValue()"/>
+    <bind name="issueSource" value="@dev.mesbase.business.wm.domain.StockSourceType@MATERIAL_ISSUE.getValue()"/>
+    <bind name="issueAction" value="@dev.mesbase.business.wm.domain.StockActionType@ISSUE.getValue()"/>
+    <bind name="returnAction" value="@dev.mesbase.business.wm.domain.StockActionType@RETURN.getValue()"/>
+    <bind name="productionInput" value="@dev.mesbase.business.production.domain.ProductionInputKind@PRODUCTION_INPUT.getValue()"/>
+    <bind name="localOnly" value="@dev.mesbase.business.integration.warehouse.ErpActionResult$Mode@LOCAL_ONLY.getValue()"/>
+    SELECT f.execution_code AS executionCode, d.id AS documentId, l.id AS lineId, l.stock_id AS stockId,
+           l.demand_line_id AS demandLineId, l.quantity AS issuedQty,
+           COALESCE(r.returned_qty,0) AS returnedQty,
+           CASE WHEN u.must_be_whole_number=1 THEN 0 ELSE u.quantity_precision END AS outputPrecision,
+           COALESCE(r.invalid_count,0) + CASE WHEN
+             e.workorder_id=d.source_workorder_id AND w.material_frozen_at IS NOT NULL
+             AND q.workorder_id=e.workorder_id AND q.material_id=l.material_id AND q.unit_id=l.unit_id
+             AND q.total_required_qty&gt;0 AND l.quantity&gt;0
+             AND a.document_line_id=l.id AND a.execution_code=f.execution_code
+             AND a.source_type=#{issueSource} AND a.source_id=CAST(d.id AS CHAR)
+             AND a.operation_id=d.post_request_id AND a.action_type=#{issueAction}
+             AND a.quantity_delta=-l.quantity AND a.stock_id=l.stock_id
+             AND a.material_id=l.material_id AND a.warehouse_id=l.warehouse_id AND a.unit_id=l.unit_id
+             AND (a.batch_no=l.batch_no OR (a.batch_no IS NULL AND l.batch_no IS NULL))
+             AND (a.bin_code=l.bin_code OR (a.bin_code IS NULL AND l.bin_code IS NULL))
+             THEN 0 ELSE 1 END AS invalidCount,
+           q.total_required_qty AS requiredQty, q.planned_qty AS plannedQty, 1 AS allocationCount, COALESCE(r.return_count,0) AS returnCount
+    FROM mes_material_issue_input f
+    JOIN wm_stock_document d ON d.id=f.document_id AND d.source_execution_code=f.execution_code
+    JOIN wm_stock_document_line l ON l.document_id=d.id
+    JOIN mes_production_execution e ON e.execution_code=f.execution_code
+    JOIN workorder w ON w.id=e.workorder_id
+    LEFT JOIN mes_workorder_material q ON q.id=l.demand_line_id
+    LEFT JOIN material m ON m.id=e.product_id
+    LEFT JOIN unit_measure u ON u.id=m.unit_id
+    LEFT JOIN wm_stock_action a ON a.id=l.stock_action_id
+    LEFT JOIN (
+      SELECT t.reference_action_id, SUM(t.quantity_delta) AS returned_qty, COUNT(*) AS return_count,
+             SUM(CASE WHEN t.quantity_delta&gt;0 AND t.execution_code=o.execution_code
+               AND t.source_type=o.source_type AND t.source_id=o.source_id
+               AND t.stock_id=o.stock_id AND t.material_id=o.material_id
+               AND t.warehouse_id=o.warehouse_id AND t.unit_id=o.unit_id
+               AND (t.batch_no=o.batch_no OR (t.batch_no IS NULL AND o.batch_no IS NULL))
+               AND (t.bin_code=o.bin_code OR (t.bin_code IS NULL AND o.bin_code IS NULL))
+               THEN 0 ELSE 1 END) AS invalid_count
+      FROM wm_stock_action t JOIN wm_stock_action o ON o.id=t.reference_action_id
+      WHERE t.action_type=#{returnAction} AND o.execution_code IN
+      <foreach collection="executionCodes" item="code" open="(" separator="," close=")">#{code}</foreach>
+      GROUP BY t.reference_action_id
+    ) r ON r.reference_action_id=l.stock_action_id
+    WHERE f.input_kind=#{productionInput} AND f.confirmed_at IS NOT NULL AND f.stock_applied=TRUE
+      AND f.source_mode=#{localOnly} AND d.document_type=#{issueType} AND d.status=#{posted}
+      AND f.execution_code IN
+      <foreach collection="executionCodes" item="code" open="(" separator="," close=")">#{code}</foreach>
+    ORDER BY e.id,d.id,l.id LIMIT 10001
+  </select>
   <sql id="EffectiveMesInput">
     <bind name="enumLocalOnly" value="@dev.mesbase.business.integration.warehouse.ErpActionResult$Mode@LOCAL_ONLY.getValue()"/>
     <bind name="enumPosted" value="@dev.mesbase.business.wm.domain.StockDocumentStatus@POSTED.getValue()"/>

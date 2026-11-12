@@ -13,6 +13,8 @@ public final class ProductionCompletionBalance {
     public static String blockedReason(ExecutionQuantity quantities) {
         if (quantities.confirmedInputQty().signum() <= 0 || quantities.reservedInputQty().signum() != 0)
             return "缺少正式投入或仍有未决投产意图";
+        if (quantities.productionInputQty().signum() <= 0 || quantities.materialReturnQty().signum() < 0)
+            return "退料后没有有效生产投入或投入数量异常，不能完全入库";
         if (quantities.routingId() == null) {
             if (!quantities.nodes().isEmpty()) return "无工艺执行存在不一致的工序数量";
             return null;
@@ -24,7 +26,8 @@ public final class ProductionCompletionBalance {
         BigDecimal loss = quantities.nodes().stream().map(n -> n.netDefectQty())
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
         BigDecimal output = quantities.nodes().getLast().effectiveOutputQty();
-        return quantities.confirmedInputQty().compareTo(output.add(loss)) == 0 ? null
-                : "投入数量不等于末道有效报工与最终不良损失之和，不能完工";
+        return quantities.confirmedInputQty()
+                .compareTo(output.add(loss).add(quantities.materialReturnQty())) == 0 ? null
+                : "确认投入不等于末道有效产出、净不良损失与退料折合数量之和，不能完工";
     }
 }

@@ -184,7 +184,7 @@ public class StockDocumentService {
         c.andDirectionEqualTo(q.direction());
         if (StringUtils.isNotBlank(q.status())) {
             if (!List.of(StockDocumentStatus.DRAFT.getValue(), StockDocumentStatus.POSTED.getValue(),
-                    StockDocumentStatus.CANCELLED.getValue(), StockDocumentStatus.REVERSED.getValue())
+                            StockDocumentStatus.CANCELLED.getValue(), StockDocumentStatus.REVERSED.getValue())
                     .contains(q.status()))
                 ParameterChecks.reject(ErrorCode.BAD_REQUEST, new SafeBusinessMessage("单据状态筛选值无效，请重新选择"));
             c.andStatusEqualTo(q.status());
@@ -799,7 +799,7 @@ public class StockDocumentService {
         var effective = projection.nodes().isEmpty() ? BigDecimal.ZERO : projection.nodes().getLast()
                 .effectiveOutputQty();
         boolean reportingRequired = execution.getRoutingId() != null;
-        if (!reportingRequired) effective = projection.confirmedInputQty();
+        if (!reportingRequired) effective = projection.productionInputQty();
         var received = inbound.netProductionInbound(executionCode);
         var remaining = effective.subtract(received);
         String blocked = null;
@@ -810,7 +810,7 @@ public class StockDocumentService {
         else if (reportingRequired && (!ExecutionPathStatus.LOCKED.getValue()
                 .equals(projection.pathStatus()) || projection.nodes().isEmpty()))
             blocked = "实际生产路径尚未锁定";
-        else if (projection.confirmedInputQty().signum() <= 0 || projection.reservedInputQty().signum() > 0)
+        else if (projection.productionInputQty().signum() <= 0 || projection.reservedInputQty().signum() > 0)
             blocked = "缺少正式投入或仍有未决投产意图";
         else if (projection.nodes().stream().anyMatch(node -> node.unverifiedDefectQty().signum() > 0)
                 || basis.declarations().stream()

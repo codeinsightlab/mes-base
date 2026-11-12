@@ -15,6 +15,16 @@ import java.util.Map;
 import java.util.UUID;
 
 public final class ProductionReportModels {
+    /**
+     * Original formal issue allocations and their referenced returns; never an additional quantity ledger.
+     */
+    public record MaterialReturnBalance(String executionCode, Long documentId, Long lineId, Long stockId,
+                                        Long demandLineId, BigDecimal issuedQty, BigDecimal returnedQty,
+                                        Integer outputPrecision, long invalidCount, BigDecimal requiredQty,
+                                        BigDecimal plannedQty,
+                                        long allocationCount, long returnCount) {
+    }
+
     private ProductionReportModels() {
     }
 
@@ -89,6 +99,9 @@ public final class ProductionReportModels {
                                     BigDecimal targetQty, String pathStatus, boolean writable, String boundary,
                                     List<NodeQuantity> nodes, String routingLabel, BigDecimal productionInputQty,
                                     BigDecimal confirmedInputQty, BigDecimal reservedInputQty, Long productId) {
+        public BigDecimal materialReturnQty() {
+            return confirmedInputQty.subtract(reservedInputQty).subtract(productionInputQty);
+        }
     }
 
     public record ExecutionSummary(String executionCode, Long workorderId, Long routingId,
