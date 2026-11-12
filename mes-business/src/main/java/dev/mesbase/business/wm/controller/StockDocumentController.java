@@ -3,6 +3,7 @@ package dev.mesbase.business.wm.controller;
 import dev.mesbase.business.wm.domain.StockDocumentDirection;
 import dev.mesbase.business.wm.domain.StockDocumentModels;
 import dev.mesbase.business.wm.domain.StockDocumentType;
+import dev.mesbase.business.wm.domain.StockDocumentStatus;
 import dev.mesbase.business.wm.domain.WmStockDocumentEntity;
 import dev.mesbase.business.wm.domain.WmStockDocumentLineEntity;
 import dev.mesbase.business.wm.service.StockDocumentService;
@@ -331,7 +332,7 @@ public class StockDocumentController {
         if (type == null || !Objects.equals(type.getDirection().getValue(), document.getDirection()))
             ParameterChecks.reject(ErrorCode.STOCK_DOCUMENT_SOURCE_PENDING);
         if (type.isTransfer()) throw new FoundationException(ErrorCode.FORBIDDEN);
-        if ("DRAFT".equals(document.getStatus())) {
+        if (StockDocumentStatus.DRAFT.getValue().equals(document.getStatus())) {
             requirePermission(PERMISSION + "cancel");
             return view(service.cancelDraft(id, new StockDocumentModels.Version(command.expectedRevision())));
         }
@@ -489,7 +490,8 @@ public class StockDocumentController {
                                      String routingId, List<String> routingNodeIds) {
     }
 
-    public record Detail(Header document, List<Line> lines, List<StockMovement> stockMovements, QualitySource qualitySource,
+    public record Detail(Header document, List<Line> lines, List<StockMovement> stockMovements,
+                         QualitySource qualitySource,
                          MaterialIssueBasis materialIssueBasis, String materialIssueBasisError) {
     }
 

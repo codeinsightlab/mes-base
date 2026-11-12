@@ -134,11 +134,15 @@ class ProductionReportingHttpTest {
             assertEquals(0, j.queryForObject("SELECT COUNT(*) FROM mes_production_report", Integer.class));
             m.perform(get(ROOT + "/context").header("Authorization", "Bearer CRUD").header("X-Factory-Id", "A")
                     .param("executionCode", "1")).andExpect(status().isForbidden());
-            for (String code : List.of("EXE:1", "", "9223372036854775808", "ERP:1"))
+            // Context is an exact executionCode read, not a scan/parser or a numeric resource-ID endpoint.
+            // A missing required parameter is invalid; a present key with no matching execution is not found.
+            m.perform(ProductionCoreV1HttpTest.full(get(ROOT + "/context")))
+                    .andExpect(status().isBadRequest());
+            for (String code : List.of("EXE:1", "", "9223372036854775808", "ERP:1", "999", " 1 "))
                 m.perform(ProductionCoreV1HttpTest.full(get(ROOT + "/context").param("executionCode", code)))
-                        .andExpect(status().isBadRequest());
-            m.perform(ProductionCoreV1HttpTest.full(get(ROOT + "/context").param("executionCode", "999")))
-                    .andExpect(status().isNotFound());
+                        .andExpect(status().isNotFound())
+                        .andExpect(jsonPath("errorCode").value("EXECUTION_NOT_FOUND"));
+            assertEquals(0, j.queryForObject("SELECT COUNT(*) FROM mes_production_report", Integer.class));
             j.update("DELETE FROM mes_operation_user");
             m.perform(ProductionCoreV1HttpTest.full(get(ROOT + "/context").param("executionCode", "1")))
                     .andExpect(status().isOk()).andExpect(jsonPath("candidates[0].status").value("NO_CAPABILITY"));

@@ -12,6 +12,7 @@ import dev.mesbase.business.purchase.domain.PurchaseSupplierResource;
 import dev.mesbase.business.purchase.domain.PurchaseSupplierUpdateCommand;
 import dev.mesbase.business.purchase.service.IPurchaseSupplierService;
 import dev.mesbase.common.validation.ParameterChecks;
+import dev.mesbase.business.shared.enums.EnableStatus;
 import dev.mesbase.core.error.ErrorCode;
 import dev.mesbase.core.error.FoundationException;
 import dev.mesbase.infrastructure.cache.annotation.BusinessCache;
@@ -171,13 +172,14 @@ public class PurchaseSupplierServiceImpl implements IPurchaseSupplierService {
         if (id == null) PurchasePriceRules.reject("供应商不能为空");
         var row = mapper.selectByPrimaryKeyForUpdate(id);
         if (row == null) throw new FoundationException(ErrorCode.NOT_FOUND);
-        if (enabled && !"ENABLED".equals(row.getStatus())) PurchasePriceRules.reject("请选择启用的供应商");
+        if (enabled && !EnableStatus.ENABLED.getValue().equals(row.getStatus()))
+            PurchasePriceRules.reject("请选择启用的供应商");
         return row;
     }
 
     private static void validate(String code, String name, String status) {
         if (code == null || code.isBlank() || code.length() > 64 || name == null || name.isBlank() || name.length() > 200
-                || !("ENABLED".equals(status) || "DISABLED".equals(status)))
+                || !(EnableStatus.ENABLED.getValue().equals(status) || EnableStatus.DISABLED.getValue().equals(status)))
             PurchasePriceRules.reject("供应商编码、名称或状态无效");
     }
 

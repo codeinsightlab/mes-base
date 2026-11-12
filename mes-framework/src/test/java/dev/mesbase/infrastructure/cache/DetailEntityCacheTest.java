@@ -1,6 +1,7 @@
 package dev.mesbase.infrastructure.cache;
 
 import dev.mesbase.common.cache.DetailEntityCache;
+import dev.mesbase.common.cache.DetailCacheKeys;
 
 import dev.mesbase.common.core.redis.RedisCache;
 import java.util.function.Function;
@@ -78,7 +79,9 @@ class DetailEntityCacheTest {
             return Map.of(3L, new TestEntity(3L, "C", "丙", null));
         });
         assertEquals(2, calls.get());
-        assertEquals(Set.of("factory:A:operation:detail:MQ", "factory:A:operation:detail:Mg", "factory:A:operation:detail:Mw"), memory.values.keySet());
+        assertEquals("factory:A:operation:detail:1", DetailCacheKeys.detail("factory:A:operation", 1L));
+        assertEquals(Set.of(DetailCacheKeys.detail("factory:A:operation", 1L),
+                DetailCacheKeys.detail("factory:A:operation", 2L), DetailCacheKeys.detail("factory:A:operation", 3L)), memory.values.keySet());
         assertEquals(Map.of(), getAll(cache, "factory:A:operation", List.of(), ids -> {
             throw new AssertionError("empty lookup queried database");
         }));

@@ -2,6 +2,7 @@ package dev.mesbase.business.production;
 
 import dev.mesbase.business.production.domain.RoutingEntity;
 import java.sql.DriverManager;
+import java.sql.PreparedStatement;
 import java.util.List;
 import java.util.Map;
 import org.apache.ibatis.builder.xml.XMLMapperBuilder;
@@ -69,7 +70,7 @@ class WorkOrderEnumSqlTest {
     }
 
     @Test
-    void blockingIssueQueryRequiresEveryOriginalLineToBeReversed() throws Exception {
+    void blockingIssuesFollowFormalDocumentLifecycleAndKeepUnfinalizedReversalsBlocking() throws Exception {
         BoundSql sql = configuration().getMappedStatement(
                         "dev.mesbase.business.production.dao.WorkOrderExtraMapper.countBlockingIssues")
                 .getBoundSql(Map.of("workorderId", 1L));
@@ -79,7 +80,7 @@ class WorkOrderEnumSqlTest {
             statement.execute("CREATE TABLE wm_stock_document(id BIGINT,source_workorder_id BIGINT,document_type VARCHAR(30),status VARCHAR(30))");
             statement.execute("CREATE TABLE wm_stock_document_line(id BIGINT,document_id BIGINT,stock_action_id VARCHAR(64))");
             statement.execute("CREATE TABLE wm_stock_action(id VARCHAR(64),reference_action_id VARCHAR(64),action_type VARCHAR(30))");
-            statement.execute("INSERT INTO wm_stock_document VALUES (1,1,'MATERIAL_ISSUE','DRAFT'),(2,1,'MATERIAL_ISSUE','POSTED'),(3,1,'MATERIAL_ISSUE','POSTED'),(4,1,'MATERIAL_ISSUE','POSTED'),(5,1,'MATERIAL_ISSUE','POSTED'),(6,2,'MATERIAL_ISSUE','DRAFT')");
+            statement.execute("INSERT INTO wm_stock_document VALUES (1,1,'MATERIAL_ISSUE','DRAFT'),(2,1,'MATERIAL_ISSUE','REVERSED'),(3,1,'MATERIAL_ISSUE','POSTED'),(4,1,'MATERIAL_ISSUE','CANCELLED'),(5,1,'MATERIAL_ISSUE','POSTED'),(6,2,'MATERIAL_ISSUE','DRAFT'),(7,1,'OTHER_ISSUE','POSTED'),(8,1,'MATERIAL_ISSUE','UNRECOGNIZED')");
             statement.execute("INSERT INTO wm_stock_document_line VALUES (2,2,'A2'),(3,3,'A3'),(4,4,'A4'),(5,5,'A5'),(6,5,'A6')");
             statement.execute("INSERT INTO wm_stock_action VALUES ('R2','A2','REVERSAL'),('R5','A5','REVERSAL')");
             try (var query = connection.prepareStatement(sql.getSql())) {
@@ -87,16 +88,24 @@ class WorkOrderEnumSqlTest {
                     String name = sql.getParameterMappings().get(index).getProperty();
                     query.setObject(index + 1, sql.hasAdditionalParameter(name) ? sql.getAdditionalParameter(name) : 1L);
                 }
-                try (var result = query.executeQuery()) {
-                    result.next();
-                    assertEquals(4, result.getLong(1));
-                }
+                // Draft, posted, partially reversed and unknown states remain blocking.
+                // Other work orders/types and formally cancelled/reversed documents are excluded.
+                assertBlockingCount(query, 4);
                 statement.execute("INSERT INTO wm_stock_action VALUES ('R6','A6','REVERSAL')");
-                try (var result = query.executeQuery()) {
-                    result.next();
-                    assertEquals(3, result.getLong(1));
-                }
+                // Even all reverse actions do not substitute for the formal document transition.
+                assertBlockingCount(query, 4);
+                statement.execute("UPDATE wm_stock_document SET status='REVERSED' WHERE id=5");
+                assertBlockingCount(query, 3);
+                statement.execute("UPDATE wm_stock_document SET status='CANCELLED' WHERE id=1");
+                assertBlockingCount(query, 2);
             }
+        }
+    }
+
+    private static void assertBlockingCount(PreparedStatement query, long expected) throws Exception {
+        try (var result = query.executeQuery()) {
+            org.junit.jupiter.api.Assertions.assertTrue(result.next());
+            assertEquals(expected, result.getLong(1));
         }
     }
 }

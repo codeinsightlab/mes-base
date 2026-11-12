@@ -11,6 +11,7 @@ import dev.mesbase.business.purchase.domain.PurchaseReferencePriceQueryDto;
 import dev.mesbase.business.purchase.domain.PurchaseReferencePriceResource;
 import dev.mesbase.business.purchase.service.IPurchaseReferencePriceService;
 import dev.mesbase.common.validation.ParameterChecks;
+import dev.mesbase.business.shared.enums.EnableStatus;
 import dev.mesbase.core.error.ErrorCode;
 import dev.mesbase.core.error.FoundationException;
 import dev.mesbase.infrastructure.cache.annotation.BusinessCache;
@@ -101,11 +102,12 @@ public class PurchaseReferencePriceServiceImpl implements IPurchaseReferencePric
         sources.localCreation();
         suppliers.lock(input.supplierId(), true);
         var material = materials.selectByPrimaryKeyForUpdate(input.materialId());
-        if (material == null || !"ENABLED".equals(material.getStatus())
+        if (material == null || !EnableStatus.ENABLED.getValue().equals(material.getStatus())
                 || !java.util.Objects.equals(material.getUnitId(), input.unitId()))
             PurchasePriceRules.reject("请选择启用的物料，并使用其基本单位报价");
         var unit = units.selectByPrimaryKeyForUpdate(input.unitId());
-        if (unit == null || !"ENABLED".equals(unit.getStatus())) PurchasePriceRules.reject("报价基本单位必须启用");
+        if (unit == null || !EnableStatus.ENABLED.getValue().equals(unit.getStatus()))
+            PurchasePriceRules.reject("报价基本单位必须启用");
         if (input.effectiveDate() == null) PurchasePriceRules.reject("报价生效日期不能为空");
         PurchasePriceRules.currency(input.currency());
         PurchasePriceRules.price(input.unitPrice(), input.remark());

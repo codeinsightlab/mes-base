@@ -31,7 +31,8 @@ public class BomTreePlans {
     public record Plan(String root, List<Node> nodes) {
     }
 
-    public record Change(String key, String action, boolean ancestor, String version, List<Line> before, List<Line> after) {
+    public record Change(String key, String action, boolean ancestor, String version, List<Line> before,
+                         List<Line> after) {
     }
 
     public record Preview(String hash, List<Change> changes, Plan original, Plan proposed, int createdVersions,
@@ -144,7 +145,8 @@ public class BomTreePlans {
     }
 
     private State analyze(Plan p, boolean lock) {
-        require(p != null && p.nodes() != null && !p.nodes().isEmpty() && p.nodes().size() <= MaterialBomService.MAX_BOMS);
+        require(p != null && p.nodes() != null && !p.nodes().isEmpty() && p.nodes()
+                .size() <= MaterialBomService.MAX_BOMS);
         Map<String, Node> nodes = new LinkedHashMap<>();
         Set<Long> materials = new TreeSet<>();
         int lines = 0;
@@ -170,7 +172,7 @@ public class BomTreePlans {
         var used = new HashMap<List<String>, String>();
         var aliases = new HashMap<String, String>();
         var childIdentities = new HashMap<String, String>();
-        var occupied = new HashMap<List<String>,Set<String>>();
+        var occupied = new HashMap<List<String>, Set<String>>();
         for (var k : order) {
             var n = nodes.get(k);
             String version = n.version();
@@ -180,7 +182,7 @@ public class BomTreePlans {
             if (n.source() != null) {
                 var b = lock ? bom.lock(n.source()) : bom.selectById(n.source());
                 require(Objects.equals(b.getRevision(), n.revision()) && b.getProductId() == id(n.product()) && b.getCode()
-                        .equals(n.code()) && !"DISABLED".equals(b.getStatus()));
+                        .equals(n.code()) && !MaterialBomStatus.DISABLED.getValue().equals(b.getStatus()));
                 before = rows(b.getId()).stream().map(BomTreePlans::line).toList();
                 var mapped = n.lines().stream()
                         .map(l -> new Line(l.material(), plain(l.quantity()), l.sort(), l.child() == null ? null : Objects.toString(nodes.get(l.child())
@@ -189,7 +191,8 @@ public class BomTreePlans {
                         || !Objects.equals(n.remark(), b.getRemark()) || !n.version().equals(b.getVersion());
                 boolean newChild = n.lines().stream().anyMatch(l -> changed.contains(l.child()));
                 if (!localChange && !newChild) action = "REUSE";
-                else if (k.equals(p.root()) && "DRAFT".equals(b.getStatus()) && !referenced(b.getId())) action = "EDIT";
+                else if (k.equals(p.root()) && MaterialBomStatus.DRAFT.getValue()
+                        .equals(b.getStatus()) && !referenced(b.getId())) action = "EDIT";
                 else action = "COPY";
                 ancestor = action.equals("COPY") && newChild && !localChange;
                 if (action.equals("COPY") && version.equals(b.getVersion())) {
@@ -231,7 +234,11 @@ public class BomTreePlans {
         while (true) {
             number = number.add(java.math.BigInteger.ONE);
             var tail = number.toString();
-            if (tail.length() > 32) { prefix = label + "-r"; number = java.math.BigInteger.ONE; continue; }
+            if (tail.length() > 32) {
+                prefix = label + "-r";
+                number = java.math.BigInteger.ONE;
+                continue;
+            }
             var candidate = prefix.substring(0, Math.min(prefix.length(), 32 - tail.length())) + tail;
             if (existing.contains(candidate)) continue;
             var prior = used.get(List.of(n.product(), n.code(), candidate));
