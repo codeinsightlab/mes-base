@@ -98,7 +98,7 @@ class ProductionReportingHttpTest {
     }
 
     @Test
-    void pendingQualityCandidateAndPostShareTheSameNodeBoundary() throws Exception {
+    void unassessedQualityCandidateAndPostUseRemainingFlowAllowance() throws Exception {
         try (var c = context()) {
             var m = MaterialIssueHttpTest.mvc(c);
             var j = db(c);
@@ -113,11 +113,12 @@ class ProductionReportingHttpTest {
             m.perform(ProductionCoreV1HttpTest.full(get(ROOT + "/context").param("executionCode", "1")))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("candidates[0].status").value("AVAILABLE"))
-                    .andExpect(jsonPath("candidates[1].status").value("QUALITY_PENDING"))
-                    .andExpect(jsonPath("candidates[2].status").value("QUALITY_PENDING"));
+                    .andExpect(jsonPath("candidates[1].status").value("AVAILABLE"))
+                    .andExpect(jsonPath("candidates[2].status").value("NO_QUANTITY"));
             m.perform(ProductionCoreV1HttpTest.full(post(ROOT)).content(body(11, "1"))).andExpect(status().isOk());
-            m.perform(ProductionCoreV1HttpTest.full(post(ROOT)).content(body(12, "1"))).andExpect(status().isConflict())
-                    .andExpect(jsonPath("errorCode").value("QUALITY_ATTRIBUTION_REQUIRED"));
+            m.perform(ProductionCoreV1HttpTest.full(post(ROOT)).content(body(13, "1"))).andExpect(status().isConflict());
+            m.perform(ProductionCoreV1HttpTest.full(post(ROOT)).content(body(12, "4"))).andExpect(status().isOk());
+            m.perform(ProductionCoreV1HttpTest.full(post(ROOT)).content(body(12, "1"))).andExpect(status().isConflict());
         }
     }
 

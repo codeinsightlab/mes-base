@@ -307,7 +307,7 @@ public class ProductionQuantityService {
             if (n.historicalOverrunQty().compareTo(old.historicalOverrunQty()) > 0 || n.routingNodeId()
                     .equals(nodeId) && delta.signum() > 0 && n.reportedQty().compareTo(n.inputQty()) > 0)
                 throw new ProductionQuantityConflictException(n.routingNodeId(), i == 0 ? null : after.nodes()
-                        .get(i - 1).routingNodeId(), n.inputQty(), n.reportedQty(), n.netDefectQty());
+                        .get(i - 1).routingNodeId(), n.inputQty(), n.reportedQty(), n.netDefectQty().add(n.unverifiedDefectQty()));
         }
     }
 
@@ -348,7 +348,8 @@ public class ProductionQuantityService {
                 direct = direct.add(defectDelta);
                 found = true;
             }
-            var netDefect = direct.subtract(node.returnedQty());
+            // Valid unassessed declarations reserve flow conservatively; OVERLAP is excluded from direct.
+            var netDefect = direct.add(node.unverifiedDefectQty()).subtract(node.returnedQty());
             if (next.signum() < 0 || defect.signum() < 0 || direct.signum() < 0 || node.returnedQty()
                     .signum() < 0 || netDefect.signum() < 0 || next.compareTo(netDefect) < 0)
                 throw new ProductionQuantityConflictException(node.routingNodeId(), upstream, input, next, netDefect);
@@ -361,9 +362,7 @@ public class ProductionQuantityService {
             upstream = node.routingNodeId();
         }
         if (nodeId != null && !found) ParameterChecks.reject(ErrorCode.REPORT_PATH_REQUIRED);
-        return new ExecutionQuantity(view.executionCode(), view.workorderId(), view.routingId(), view.targetQty(), view.pathStatus(), view.writable(), result.stream()
-                .anyMatch(n -> n.unverifiedDefectQty()
-                        .signum() > 0) ? "存在待核实不良；从受影响工序起禁止新增正向报工，请核实质量记录，后续流转保持质量门禁" : view.boundary(), List.copyOf(result), view.routingLabel(), view.productionInputQty(), view.confirmedInputQty(), view.reservedInputQty(), view.productId());
+        return new ExecutionQuantity(view.executionCode(), view.workorderId(), view.routingId(), view.targetQty(), view.pathStatus(), view.writable(), view.boundary(), List.copyOf(result), view.routingLabel(), view.productionInputQty(), view.confirmedInputQty(), view.reservedInputQty(), view.productId());
     }
 
     /**
@@ -371,15 +370,10 @@ public class ProductionQuantityService {
      */
     public static String positiveReportBlockReason(ExecutionQuantity view, Long nodeId) {
         if (!ExecutionPathStatus.LOCKED.getValue().equals(view.pathStatus())) return "实际路径尚未锁定";
-        NodeQuantity affected = null;
+        // Invalid quality facts are rejected by the strict fact loader. Legal unassessed
+        // facts consume flow quantity, rather than blocking all remaining normal reports.
         for (var n : view.nodes()) {
-            if (affected == null && n.unverifiedDefectQty().signum() > 0) affected = n;
-            if (n.routingNodeId().equals(nodeId)) {
-                if (affected == null) return null;
-                return "工序 " + affected.code() + " · " + affected.name() + " 存在待核实不良 "
-                        + affected.unverifiedDefectQty()
-                        .toPlainString() + "；当前工序受其影响，须先核实质量记录再新增报工。";
-            }
+            if (n.routingNodeId().equals(nodeId)) return null;
         }
         throw new FoundationException(ErrorCode.REPORT_PATH_REQUIRED);
     }
