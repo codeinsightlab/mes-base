@@ -19,6 +19,19 @@
           AND r.id = #{reportId}
         GROUP BY r.id, r.quantity_delta
     </select>
+    <select id="hasEffectiveReports" resultType="boolean">
+        SELECT COUNT(*) &gt; 0
+        FROM mes_production_report r
+        WHERE r.execution_code = #{executionCode}
+          AND r.record_type = 'REPORT'
+          AND r.quantity_delta + COALESCE((
+              SELECT SUM(a.quantity_delta)
+              FROM mes_production_report a
+              WHERE a.reference_report_id = r.id
+                AND a.execution_code = r.execution_code
+                AND a.routing_node_id = r.routing_node_id
+          ), 0) != 0
+    </select>
     <select id="workorderQuantities"
             resultType="dev.mesbase.business.production.domain.ProductionReportModels$ExecutionSummary">
     <bind name="enumLocalOnly" value="@dev.mesbase.business.integration.warehouse.ErpActionResult$Mode@LOCAL_ONLY.getValue()"/>

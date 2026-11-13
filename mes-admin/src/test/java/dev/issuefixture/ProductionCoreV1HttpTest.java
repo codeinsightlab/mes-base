@@ -77,9 +77,16 @@ class ProductionCoreV1HttpTest {
                     .andExpect(status().is4xxClientError());
             WorkorderBomInputHttpTest.report(m, execution, "150");
             String document = first.get("documentId").asText();
+            var inputFacts = j.queryForList("SELECT * FROM mes_material_issue_input ORDER BY id");
+            var stockFacts = j.queryForList("SELECT * FROM wm_stock_action ORDER BY id");
+            var reports = j.queryForList("SELECT * FROM mes_production_report ORDER BY id");
             m.perform(full(post(ProductionInputHttpTest.ROOT + "/documents/" + document + "/actions/cancel"))
                             .content(StockDocumentHttpTest.cancellationBody(m, document)))
-                    .andExpect(status().is4xxClientError()).andExpect(jsonPath("errorCode").value("REPORT_QUANTITY_CONFLICT"));
+                    .andExpect(status().isConflict()).andExpect(jsonPath("errorCode").value("RESOURCE_CONFLICT"));
+            assertEquals(inputFacts, j.queryForList("SELECT * FROM mes_material_issue_input ORDER BY id"));
+            assertEquals(stockFacts, j.queryForList("SELECT * FROM wm_stock_action ORDER BY id"));
+            assertEquals(reports, j.queryForList("SELECT * FROM mes_production_report ORDER BY id"));
+            assertEquals("POSTED", j.queryForObject("SELECT status FROM wm_stock_document WHERE id=?", String.class, document));
             m.perform(full(put(E + "/" + UriUtils.encodePathSegment(execution, StandardCharsets.UTF_8)))
                             .content(EXEC.replace("READY", "FULLY_RECEIVED")))
                     .andExpect(status().is4xxClientError());

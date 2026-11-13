@@ -7,6 +7,7 @@ import dev.mesbase.business.issue.service.MaterialIssueInputFacts;
 import dev.mesbase.business.production.dao.MesProductionExecutionMapper;
 import dev.mesbase.business.production.dao.MesProductionReceiptMapper;
 import dev.mesbase.business.production.dao.MesProductionReportMapper;
+import dev.mesbase.business.production.dao.ProductionQuantityMapper;
 import dev.mesbase.business.production.dao.ProductionInputExtraMapper;
 import dev.mesbase.business.production.dao.WorkorderMapper;
 import dev.mesbase.business.production.domain.MesProductionExecutionCreateCommand;
@@ -32,7 +33,9 @@ import dev.mesbase.business.wm.dao.WmStockActionMapper;
 import dev.mesbase.business.wm.service.StockDocumentService;
 import dev.mesbase.business.wm.service.StockDocumentReversalService;
 import dev.mesbase.business.quality.dao.MesProductionDefectMapper;
+import dev.mesbase.business.quality.dao.ProductionDefectListExtraMapper;
 import dev.mesbase.business.quality.domain.MesProductionDefectExample;
+import dev.mesbase.business.wm.dao.StockDocumentExtraMapper;
 import dev.mesbase.common.utils.RequestFingerprint;
 import dev.mesbase.common.utils.SecurityUtils;
 import dev.mesbase.common.validation.ParameterChecks;
@@ -99,6 +102,9 @@ public class ProductionInputService {
     private final MesProductionReportMapper reports;
     private final MesProductionDefectMapper defects;
     private final MesProductionReceiptMapper receipts;
+    private final ProductionQuantityMapper reportFacts;
+    private final ProductionDefectListExtraMapper qualityFacts;
+    private final StockDocumentExtraMapper stockFacts;
     private final WmStockActionMapper stockActions;
     private final LocalStockService stock;
     private final WorkorderMapper orders;
@@ -119,6 +125,9 @@ public class ProductionInputService {
                                   IMesProductionExecutionService executions,
                                   MesProductionExecutionMapper executionMapper, MesProductionReportMapper reports,
                                   MesProductionDefectMapper defects, MesProductionReceiptMapper receipts,
+                                  ProductionQuantityMapper reportFacts,
+                                  ProductionDefectListExtraMapper qualityFacts,
+                                  StockDocumentExtraMapper stockFacts,
                                   WmStockActionMapper stockActions,
                                   LocalStockService stock, WorkorderMapper orders,
                                   ExecutionPathService paths, IRoutingService routings,
@@ -137,6 +146,9 @@ public class ProductionInputService {
         this.reports = reports;
         this.defects = defects;
         this.receipts = receipts;
+        this.reportFacts = reportFacts;
+        this.qualityFacts = qualityFacts;
+        this.stockFacts = stockFacts;
         this.stockActions = stockActions;
         this.stock = stock;
         this.orders = orders;
@@ -209,18 +221,30 @@ public class ProductionInputService {
         if (!StockDocumentStatus.POSTED.getValue().equals(current.getStatus())
                 || !Objects.equals(current.getSourceExecutionCode(), input.getExecutionCode()))
             ParameterChecks.reject(ErrorCode.STOCK_DOCUMENT_CONFLICT);
-        var reportFilter = new MesProductionReportExample();
-        reportFilter.createCriteria().andExecutionCodeEqualTo(input.getExecutionCode());
-        var defectFilter = new MesProductionDefectExample();
-        defectFilter.createCriteria().andExecutionCodeEqualTo(input.getExecutionCode());
-        var receiptFilter = new MesProductionReceiptExample();
-        receiptFilter.createCriteria().andExecutionCodeEqualTo(input.getExecutionCode());
-        if (execution.getStartTime() != null || reports.countByExample(reportFilter) != 0
-                || defects.countByExample(defectFilter) != 0 || receipts.countByExample(receiptFilter) != 0)
-            ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
+        requireNoProductionFactsForReturn(input.getExecutionCode(), execution.getStartTime() != null);
         if (stockActions.selectByPrimaryKey(command.requestId()) == null)
             productionQuantities.validateMaterialReturn(input.getExecutionCode(), command);
         return stock.execute(StockActionType.RETURN, command);
+    }
+
+    private void requireNoProductionFactsForReturn(String executionCode, boolean executionStarted) {
+        var reportFilter = new MesProductionReportExample();
+        reportFilter.createCriteria().andExecutionCodeEqualTo(executionCode);
+        var defectFilter = new MesProductionDefectExample();
+        defectFilter.createCriteria().andExecutionCodeEqualTo(executionCode);
+        var receiptFilter = new MesProductionReceiptExample();
+        receiptFilter.createCriteria().andExecutionCodeEqualTo(executionCode);
+        if (executionStarted || reports.countByExample(reportFilter) != 0
+                || defects.countByExample(defectFilter) != 0 || receipts.countByExample(receiptFilter) != 0)
+            ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
+    }
+
+    private void requireNoEffectiveDownstreamFacts(String executionCode) {
+        if (reportFacts.hasEffectiveReports(executionCode)
+                || qualityFacts.hasEffectiveFacts(executionCode)
+                || stockFacts.invalidProductionInboundLines(executionCode) > 0
+                || stockFacts.formalProductionInbound(executionCode).signum() > 0)
+            ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
     }
 
     private StockDocumentModels.Detail reverseMaterialIssueInTransaction(Long documentId,
@@ -246,6 +270,7 @@ public class ProductionInputService {
         var execution = locks.execution(input.getExecutionCode());
         if (!Objects.equals(document.getSourceWorkorderId(), execution.getWorkorderId()))
             ParameterChecks.reject(ErrorCode.STOCK_DOCUMENT_CONFLICT);
+        requireNoEffectiveDownstreamFacts(input.getExecutionCode());
         input.setStockApplied(false);
         if (facts.updateStockApplication(input) != 1)
             ParameterChecks.reject(ErrorCode.STOCK_DOCUMENT_CONFLICT);

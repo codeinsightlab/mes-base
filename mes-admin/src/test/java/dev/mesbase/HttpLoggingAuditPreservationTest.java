@@ -101,7 +101,7 @@ class HttpLoggingAuditPreservationTest {
         var redis = mock(StringRedisTemplate.class);
         @SuppressWarnings("unchecked") ValueOperations<String, String> values = mock(ValueOperations.class);
         when(redis.opsForValue()).thenReturn(values);
-        var env = new MockEnvironment().withProperty("mes.platform.url", "jdbc:test-only:audit");
+        var env = new MockEnvironment().withProperty("mes.platform.url", "jdbc:h2:mem:TEST_ONLY_AUDIT");
         var user = new SysUser();
         user.setUserId(42L);
         user.setUserName("TEST_ONLY_USER");

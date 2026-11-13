@@ -23,5 +23,7 @@ public interface ProductionQuantityMapper {
 
     Balance originalBalance(@Param("executionCode") String executionCode, @Param("reportId") Long reportId);
 
+    boolean hasEffectiveReports(@Param("executionCode") String executionCode);
+
     List<ExecutionSummary> workorderQuantities(@Param("workorderId") Long workorderId);
 }
