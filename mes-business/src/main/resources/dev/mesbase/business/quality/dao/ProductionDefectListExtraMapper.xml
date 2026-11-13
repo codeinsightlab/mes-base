@@ -110,9 +110,14 @@
       AND a.quantity_after-a.quantity_before=l.quantity
       AND a.available_after-a.available_before=l.quantity
       AND a.operator_user_id=d.posted_by AND a.request_hash=d.post_request_hash
+      <!-- Byte length preserves exact text despite fixed-width BINARY padding; only bin may be null. -->
       AND CAST(a.batch_no AS BINARY(512))=CAST(l.batch_no AS BINARY(512))
+      AND OCTET_LENGTH(a.batch_no)=OCTET_LENGTH(l.batch_no)
       AND CAST(l.batch_no AS BINARY(512))=CAST(e.batch_no AS BINARY(512))
-      AND (a.bin_code=l.bin_code OR (a.bin_code IS NULL AND l.bin_code IS NULL))
+      AND OCTET_LENGTH(l.batch_no)=OCTET_LENGTH(e.batch_no)
+      AND ((CAST(a.bin_code AS BINARY(256))=CAST(l.bin_code AS BINARY(256))
+        AND OCTET_LENGTH(a.bin_code)=OCTET_LENGTH(l.bin_code))
+        OR (a.bin_code IS NULL AND l.bin_code IS NULL))
       AND (SELECT COUNT(*) FROM wm_stock_document_line other_line WHERE other_line.document_id=d.id)=1
       AND (SELECT COUNT(*) FROM wm_stock_action other_action WHERE other_action.document_line_id=l.id)=1
       AND (SELECT COUNT(*) FROM mes_quality_treatment other_event WHERE other_event.stock_document_id=d.id)=1

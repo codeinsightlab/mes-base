@@ -20,15 +20,26 @@
             AND a.operation_id = d.post_request_id
             AND a.stock_id = l.stock_id AND a.material_id = l.material_id AND a.unit_id = l.unit_id
             AND a.warehouse_id = l.warehouse_id AND a.quantity_delta = l.quantity
-            AND a.batch_no = l.batch_no AND (a.bin_code = l.bin_code OR (a.bin_code IS NULL AND l.bin_code IS NULL))
+            <!-- Byte length preserves exact text despite fixed-width BINARY padding; only bin may be null. -->
+            AND CAST(a.batch_no AS BINARY(512)) = CAST(l.batch_no AS BINARY(512))
+            AND OCTET_LENGTH(a.batch_no) = OCTET_LENGTH(l.batch_no)
+            AND ((CAST(a.bin_code AS BINARY(256)) = CAST(l.bin_code AS BINARY(256))
+                AND OCTET_LENGTH(a.bin_code) = OCTET_LENGTH(l.bin_code))
+                OR (a.bin_code IS NULL AND l.bin_code IS NULL))
         JOIN mes_production_execution e ON e.execution_code = d.source_execution_code AND e.execution_code = a.execution_code
-            AND e.product_id = l.material_id AND e.batch_no = l.batch_no
+            AND e.product_id = l.material_id
+            AND CAST(e.batch_no AS BINARY(512)) = CAST(l.batch_no AS BINARY(512))
+            AND OCTET_LENGTH(e.batch_no) = OCTET_LENGTH(l.batch_no)
         JOIN workorder o ON o.id = e.workorder_id AND o.product_id = e.product_id AND o.source = #{local}
         JOIN material_bom b ON b.id = o.bom_id AND o.bom_id = #{bomId}
           AND o.material_frozen_at IS NOT NULL AND b.product_id = l.material_id AND b.unit_id = l.unit_id
         JOIN wm_inventory s ON s.id = l.stock_id AND s.material_id = l.material_id
-            AND s.warehouse_id = l.warehouse_id AND s.batch_no = l.batch_no
-            AND (s.bin_code = l.bin_code OR (s.bin_code IS NULL AND l.bin_code IS NULL))
+            AND s.warehouse_id = l.warehouse_id
+            AND CAST(s.batch_no AS BINARY(512)) = CAST(l.batch_no AS BINARY(512))
+            AND OCTET_LENGTH(s.batch_no) = OCTET_LENGTH(l.batch_no)
+            AND ((CAST(s.bin_code AS BINARY(256)) = CAST(l.bin_code AS BINARY(256))
+                AND OCTET_LENGTH(s.bin_code) = OCTET_LENGTH(l.bin_code))
+                OR (s.bin_code IS NULL AND l.bin_code IS NULL))
         JOIN wm_warehouse w ON w.id = s.warehouse_id AND w.status = #{enabled} AND w.source = #{local}
         JOIN material m ON m.id = l.material_id AND m.unit_id = l.unit_id AND m.status = #{enabled}
         JOIN unit_measure u ON u.id = l.unit_id AND u.status = #{enabled}

@@ -22,8 +22,13 @@
              AND a.operation_id=d.post_request_id AND a.action_type=#{issueAction}
              AND a.quantity_delta=-l.quantity AND a.stock_id=l.stock_id
              AND a.material_id=l.material_id AND a.warehouse_id=l.warehouse_id AND a.unit_id=l.unit_id
-             AND (a.batch_no=l.batch_no OR (a.batch_no IS NULL AND l.batch_no IS NULL))
-             AND (a.bin_code=l.bin_code OR (a.bin_code IS NULL AND l.bin_code IS NULL))
+             <!-- Preserve nullable identity fields and distinguish fixed-width BINARY padding. -->
+             AND ((CAST(a.batch_no AS BINARY(512))=CAST(l.batch_no AS BINARY(512))
+               AND OCTET_LENGTH(a.batch_no)=OCTET_LENGTH(l.batch_no))
+               OR (a.batch_no IS NULL AND l.batch_no IS NULL))
+             AND ((CAST(a.bin_code AS BINARY(256))=CAST(l.bin_code AS BINARY(256))
+               AND OCTET_LENGTH(a.bin_code)=OCTET_LENGTH(l.bin_code))
+               OR (a.bin_code IS NULL AND l.bin_code IS NULL))
              THEN 0 ELSE 1 END AS invalidCount,
            q.total_required_qty AS requiredQty, q.planned_qty AS plannedQty, 1 AS allocationCount, COALESCE(r.return_count,0) AS returnCount
     FROM mes_material_issue_input f
@@ -41,8 +46,12 @@
                AND t.source_type=o.source_type AND t.source_id=o.source_id
                AND t.stock_id=o.stock_id AND t.material_id=o.material_id
                AND t.warehouse_id=o.warehouse_id AND t.unit_id=o.unit_id
-               AND (t.batch_no=o.batch_no OR (t.batch_no IS NULL AND o.batch_no IS NULL))
-               AND (t.bin_code=o.bin_code OR (t.bin_code IS NULL AND o.bin_code IS NULL))
+               AND ((CAST(t.batch_no AS BINARY(512))=CAST(o.batch_no AS BINARY(512))
+                 AND OCTET_LENGTH(t.batch_no)=OCTET_LENGTH(o.batch_no))
+                 OR (t.batch_no IS NULL AND o.batch_no IS NULL))
+               AND ((CAST(t.bin_code AS BINARY(256))=CAST(o.bin_code AS BINARY(256))
+                 AND OCTET_LENGTH(t.bin_code)=OCTET_LENGTH(o.bin_code))
+                 OR (t.bin_code IS NULL AND o.bin_code IS NULL))
                THEN 0 ELSE 1 END) AS invalid_count
       FROM wm_stock_action t JOIN wm_stock_action o ON o.id=t.reference_action_id
       WHERE t.action_type=#{returnAction} AND o.execution_code IN

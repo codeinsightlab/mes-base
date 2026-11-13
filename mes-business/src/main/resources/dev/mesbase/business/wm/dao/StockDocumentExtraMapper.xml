@@ -78,9 +78,14 @@
   AND (SELECT COUNT(*) FROM wm_stock_action duplicate_action WHERE duplicate_action.document_line_id=l.id)=1
   AND a.stock_id=l.stock_id AND a.material_id=l.material_id
   AND a.warehouse_id=l.warehouse_id AND a.unit_id=l.unit_id
+  <!-- Byte length preserves exact text despite fixed-width BINARY padding; only bin may be null. -->
   AND CAST(a.batch_no AS BINARY(512))=CAST(l.batch_no AS BINARY(512))
+  AND OCTET_LENGTH(a.batch_no)=OCTET_LENGTH(l.batch_no)
   AND CAST(l.batch_no AS BINARY(512))=CAST(e.batch_no AS BINARY(512))
-  AND (a.bin_code=l.bin_code OR (a.bin_code IS NULL AND l.bin_code IS NULL))
+  AND OCTET_LENGTH(l.batch_no)=OCTET_LENGTH(e.batch_no)
+  AND ((CAST(a.bin_code AS BINARY(256))=CAST(l.bin_code AS BINARY(256))
+    AND OCTET_LENGTH(a.bin_code)=OCTET_LENGTH(l.bin_code))
+    OR (a.bin_code IS NULL AND l.bin_code IS NULL))
  </sql>
  <select id="formalProductionInbound" resultType="java.math.BigDecimal">
   SELECT COALESCE(SUM(l.quantity),0) <include refid="formalInboundJoins"/>
