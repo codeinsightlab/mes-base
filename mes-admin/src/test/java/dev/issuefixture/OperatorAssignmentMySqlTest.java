@@ -3,6 +3,7 @@ package dev.issuefixture;
 import com.github.pagehelper.PageInterceptor;
 import dev.mesbase.acceptance.AcceptanceBusinessDatabase;
 import dev.mesbase.business.production.dao.OperationMapper;
+import dev.mesbase.business.production.dao.MesOperatorQualificationMapper;
 import dev.mesbase.business.production.dao.RoutingMapper;
 import dev.mesbase.business.production.dao.WorkorderMapper;
 import dev.mesbase.business.wm.dao.WmStockDocumentMapper;
@@ -66,7 +67,7 @@ class OperatorAssignmentMySqlTest {
         var source = AcceptanceBusinessDatabase.source();
         var config = new Configuration(new Environment("LIVE SIMPLE_B ROLLBACK ONLY", new JdbcTransactionFactory(), source));
         for (var mapper : MaterialIssueHttpTest.MAPPERS) config.addMapper(mapper);
-        for (var mapper : List.of(OperationMapper.class, MesOperationUserMapper.class, MesExecutionAssignmentMapper.class))
+        for (var mapper : List.of(OperationMapper.class, MesOperationUserMapper.class, MesOperatorQualificationMapper.class, MesExecutionAssignmentMapper.class))
             if (!config.hasMapper(mapper)) config.addMapper(mapper);
         var sessions = new SqlSessionFactoryBuilder().build(config);
         Map<?, ?> root = new Yaml().load(Files.readString(Path.of("mes-admin/src/main/resources/application-dev.yml")));
@@ -106,7 +107,7 @@ class OperatorAssignmentMySqlTest {
             var assignments = session.getMapper(MesExecutionAssignmentMapper.class);
             var executions = session.getMapper(MesProductionExecutionMapper.class);
             var locks = new ProductionChainLocks(session.getMapper(WorkorderMapper.class), executions, session.getMapper(WmStockDocumentMapper.class));
-            var rules = new OperatorQualificationRules(session.getMapper(OperationMapper.class), session.getMapper(RoutingNodeMapper.class), executions, caps, directory, locks);
+            var rules = new OperatorQualificationRules(session.getMapper(OperationMapper.class), session.getMapper(RoutingNodeMapper.class), executions, caps, directory, locks, session.getMapper(MesOperatorQualificationMapper.class));
             var capability = new MesOperationUserServiceImpl(caps, rules);
             var assignment = new MesExecutionAssignmentServiceImpl(assignments, rules);
             var eligibility = new ReportOperatorEligibilityService(rules, assignments);

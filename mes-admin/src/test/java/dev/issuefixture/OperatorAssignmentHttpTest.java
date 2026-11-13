@@ -1,6 +1,10 @@
 package dev.issuefixture;
 
 import dev.mesbase.business.production.controller.MesOperationUserController;
+import dev.mesbase.business.production.controller.MesOperatorQualificationController;
+import dev.mesbase.business.production.dao.MesOperatorQualificationMapper;
+import dev.mesbase.business.production.dao.OperatorQualificationExtraMapper;
+import dev.mesbase.business.production.service.impl.MesOperatorQualificationServiceImpl;
 import dev.mesbase.business.production.controller.MesExecutionAssignmentController;
 import dev.mesbase.business.production.controller.OperatorDirectoryController;
 import dev.mesbase.business.production.dao.MesOperationUserMapper;
@@ -50,7 +54,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  */
 class OperatorAssignmentHttpTest {
     @Configuration
-    @Import({MesOperationUserServiceImpl.class, MesExecutionAssignmentServiceImpl.class, MesOperationUserController.class,
+    @Import({MesOperatorQualificationController.class, MesOperatorQualificationServiceImpl.class, MesOperationUserServiceImpl.class, MesExecutionAssignmentServiceImpl.class, MesOperationUserController.class,
             MesExecutionAssignmentController.class, OperatorQualificationRules.class, ReportOperatorEligibilityService.class,
             OperatorCandidateService.class, OperatorDirectoryController.class})
     static class Extra {
@@ -58,6 +62,22 @@ class OperatorAssignmentHttpTest {
         MesOperationUserMapper capabilities(SqlSessionFactory sessions) {
             sessions.getConfiguration().addMapper(MesOperationUserMapper.class);
             return new SqlSessionTemplate(sessions).getMapper(MesOperationUserMapper.class);
+        }
+
+        @Bean
+        MesOperatorQualificationMapper qualificationSettings(SqlSessionFactory sessions,
+                                                             MaterialIssueHttpTest.Fixture fixture) throws Exception {
+            String ddl = Files.readString(Path.of("mes-admin/src/main/resources/db/business/V89__operator_all_qualification.sql"));
+            for (var jdbc : fixture.business.values()) jdbc.execute(ddl.substring(0, ddl.indexOf(") ENGINE=")) + ")");
+            sessions.getConfiguration().addMapper(MesOperatorQualificationMapper.class);
+            return new SqlSessionTemplate(sessions).getMapper(MesOperatorQualificationMapper.class);
+        }
+
+        @Bean
+        OperatorQualificationExtraMapper qualificationQueries(SqlSessionFactory sessions,
+                                                              MesOperatorQualificationMapper settings) {
+            sessions.getConfiguration().addMapper(OperatorQualificationExtraMapper.class);
+            return new SqlSessionTemplate(sessions).getMapper(OperatorQualificationExtraMapper.class);
         }
 
         @Bean
@@ -87,12 +107,44 @@ class OperatorAssignmentHttpTest {
         for (var jdbc : c.getBean(MaterialIssueHttpTest.Fixture.class).business.values()) {
             jdbc.update("INSERT INTO operation(id,code,name,status,sort,revision) VALUES(1,'DRILL','钻孔','ENABLED',0,0),(2,'TURN','车削','ENABLED',0,0)");
             jdbc.update("INSERT INTO routing_node(id,routing_id,node_code,operation_id,operation_code,operation_name,is_key,display_order) VALUES(1,1,'A',1,'DRILL','钻孔',TRUE,0),(2,1,'B',1,'DRILL','钻孔',TRUE,1),(3,2,'WRONG',1,'DRILL','钻孔',TRUE,0)");
-            jdbc.update("INSERT INTO mes_production_execution(id,workorder_id,product_id,routing_id,target_qty,status) VALUES(1,1,1,1,100,'READY'),(2,1,1,1,100,'FULLY_RECEIVED')");
+            jdbc.update("INSERT INTO mes_production_execution(id,execution_code,workorder_id,product_id,routing_id,target_qty,status) VALUES(1,'1',1,1,1,100,'READY'),(2,'2',1,1,1,100,'FULLY_RECEIVED')");
         }
         return c;
     }
 
     static final String C = "/api/production/mes-operation-user", A = "/api/production/mes-execution-assignment";
+
+    @Test
+    void allSettingsUseFormalHttpPermissionsRevisionAndFactoryScope() throws Exception {
+        try (var c = context()) {
+            var http = MaterialIssueHttpTest.mvc(c);
+            String root = "/api/production/operator-qualifications/";
+            http.perform(full(post(C), "A").content("{\"operationId\":1,\"userId\":1}")).andExpect(status().isOk());
+            var jdbc = c.getBean(MaterialIssueHttpTest.Fixture.class).business.get("A");
+            var original = jdbc.queryForMap("SELECT * FROM mes_operation_user WHERE user_id=1");
+            http.perform(post(root + "1/all").header("Authorization", "Bearer CRUD").header("X-Factory-Id", "A")
+                    .contentType("application/json").content("{\"revision\":0}")).andExpect(status().isForbidden());
+            http.perform(full(post(root + "1/all"), "A").content("{\"revision\":0}")).andExpect(status().isNoContent());
+            http.perform(full(get(root + "1"), "A")).andExpect(status().isOk())
+                    .andExpect(jsonPath("allOperations").value(true)).andExpect(jsonPath("revision").value(1))
+                    .andExpect(jsonPath("explicitTotal").value(1));
+            http.perform(full(get(root + "1"), "B")).andExpect(status().isOk())
+                    .andExpect(jsonPath("allOperations").value(false));
+            http.perform(full(get("/api/production/operator-candidates?operationId=2"), "A")).andExpect(status().isOk())
+                    .andExpect(jsonPath("total").value(1)).andExpect(jsonPath("items[0].id").value("1"));
+            http.perform(full(post(root + "1/all"), "A").content("{\"revision\":0}")).andExpect(status().isConflict());
+            http.perform(full(delete(root + "1/all"), "A").content("{\"revision\":1}"))
+                    .andExpect(status().isNoContent());
+            http.perform(full(get(root + "1"), "A")).andExpect(status().isOk())
+                    .andExpect(jsonPath("allOperations").value(false)).andExpect(jsonPath("revision").value(2));
+            assertEquals(original, jdbc.queryForMap("SELECT * FROM mes_operation_user WHERE user_id=1"));
+            http.perform(full(post(root + "999/all"), "A").content("{\"revision\":0}"))
+                    .andExpect(status().isUnprocessableEntity());
+            jdbc.update("INSERT INTO mes_operator_qualification VALUES(999,TRUE,1,1,CURRENT_TIMESTAMP,1,CURRENT_TIMESTAMP)");
+            http.perform(full(delete(root + "999/all"), "A").content("{\"revision\":1}"))
+                    .andExpect(status().isNoContent());
+        }
+    }
 
     @Test
     void readyExecutionWithPlanningAssignmentsCannotBeDeletedOrChangeRouting() throws Exception {

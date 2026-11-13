@@ -1,6 +1,7 @@
 package dev.mesbase.business.production;
 
 import dev.mesbase.business.production.dao.OperationMapper;
+import dev.mesbase.business.production.dao.MesOperatorQualificationMapper;
 import dev.mesbase.business.production.dao.RoutingNodeMapper;
 import dev.mesbase.business.production.dao.MesProductionExecutionMapper;
 import dev.mesbase.business.production.dao.MesOperationUserMapper;
@@ -64,9 +65,15 @@ class OperatorQualificationTest {
     MesExecutionAssignmentMapper assignments = mock(MesExecutionAssignmentMapper.class);
     OperationUserDirectory users = mock(OperationUserDirectory.class);
     ProductionChainLocks locks = mock(ProductionChainLocks.class);
-    OperatorQualificationRules rules = new OperatorQualificationRules(operations, nodes, executions, capabilities, users, locks);
+    OperatorQualificationRules rules = new OperatorQualificationRules(operations, nodes, executions, capabilities, users, locks, mock(MesOperatorQualificationMapper.class));
     ReportOperatorEligibilityService eligibility = new ReportOperatorEligibilityService(rules, assignments);
     MesProductionExecutionEntity execution;
+
+    private static MesOperationUserEntity capability() {
+        var row = new MesOperationUserEntity();
+        row.setOperationId(10L);
+        return row;
+    }
 
     @BeforeEach
     void prepare() {
@@ -108,7 +115,7 @@ class OperatorQualificationTest {
     @ParameterizedTest
     @CsvSource({"false,false,false,false", "true,false,false,true", "false,true,true,false", "true,true,false,false", "true,true,true,true"})
     void completeEligibilityMatrix(boolean capable, boolean hasAssignments, boolean assigned, boolean allowed) {
-        when(capabilities.countByExample(any(MesOperationUserExample.class))).thenReturn(capable ? 1L : 0L);
+        when(capabilities.selectByExample(any(MesOperationUserExample.class))).thenReturn(capable ? List.of(capability()) : List.of());
         when(assignments.countByExample(any(MesExecutionAssignmentExample.class))).thenReturn(hasAssignments ? 1L : 0L, assigned ? 1L : 0L);
         if (allowed) assertDoesNotThrow(() -> eligibility.requireEligible("40", 20L, 1L));
         else assertThrows(FoundationException.class, () -> eligibility.requireEligible("40", 20L, 1L));
@@ -118,7 +125,7 @@ class OperatorQualificationTest {
     void cancellingCapabilityAndLastAssignmentTakesEffectOnNextCall() {
         var capable = new AtomicBoolean(true);
         var assigned = new AtomicBoolean(true);
-        when(capabilities.countByExample(any())).thenAnswer(i -> capable.get() ? 1L : 0L);
+        when(capabilities.selectByExample(any())).thenAnswer(i -> capable.get() ? List.of(capability()) : List.of());
         when(assignments.countByExample(any())).thenAnswer(i -> assigned.get() ? 1L : 0L);
         eligibility.requireEligible("40", 20L, 1L);
         capable.set(false);
@@ -131,7 +138,7 @@ class OperatorQualificationTest {
 
     @Test
     void repeatedOperationNodesRemainIndependent() {
-        when(capabilities.countByExample(any())).thenReturn(1L);
+        when(capabilities.selectByExample(any())).thenReturn(List.of(capability()));
         when(assignments.countByExample(any())).thenAnswer(i -> {
             MesExecutionAssignmentExample e = i.getArgument(0);
             var cs = e.getOredCriteria().getFirst().getAllCriteria();
@@ -170,7 +177,7 @@ class OperatorQualificationTest {
 
     @Test
     void failedQueryNeverAllowsReporting() {
-        when(capabilities.countByExample(any())).thenThrow(new IllegalStateException("TEST_ONLY query failure"));
+        when(capabilities.selectByExample(any())).thenThrow(new IllegalStateException("TEST_ONLY query failure"));
         assertThrows(IllegalStateException.class, () -> eligibility.requireEligible("40", 20L, 1L));
     }
 
@@ -204,14 +211,14 @@ class OperatorQualificationTest {
 
     @Test
     void duplicateAssignmentIsSafeConflict() {
-        when(capabilities.countByExample(any())).thenReturn(1L);
+        when(capabilities.selectByExample(any())).thenReturn(List.of(capability()));
         when(assignments.insert(any())).thenThrow(new DuplicateKeyException("TEST_ONLY"));
         assertEquals(ErrorCode.RESOURCE_CONFLICT, assertThrows(FoundationException.class, () -> new MesExecutionAssignmentServiceImpl(assignments, rules).insert(new MesExecutionAssignmentCreateCommand("40", 20L, 1L, null))).code());
     }
 
     @Test
     void successfulAssignmentHasTrustedAudit() {
-        when(capabilities.countByExample(any())).thenReturn(1L);
+        when(capabilities.selectByExample(any())).thenReturn(List.of(capability()));
         when(assignments.insert(any())).thenAnswer(i -> {
             MesExecutionAssignmentEntity row = i.getArgument(0);
             assertEquals(99L, row.getAssignedBy());
