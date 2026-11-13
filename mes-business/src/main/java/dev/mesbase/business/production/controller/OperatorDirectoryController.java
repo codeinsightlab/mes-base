@@ -29,7 +29,7 @@ public class OperatorDirectoryController {
     public record UserPage(List<Option> items, long total, int offset, int limit) implements PageData<Option> {
     }
 
-    public record CandidatePage(List<Option> items, int nextOffset, boolean hasMore) {
+    public record CandidatePage(List<Option> items, int nextOffset, boolean hasMore, long total) {
     }
 
     public record Node(String id, String operationId, String code, String name) {

@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="dev.mesbase.business.production.dao.OperatorQualificationExtraMapper">
+  <!-- UNION deduplicates identities before keyset scanning. No independent source pagination. -->
+  <select id="candidateUserIds" resultType="java.lang.Long">
+    SELECT user_id FROM (
+      SELECT user_id FROM mes_operation_user WHERE operation_id = #{operationId}
+      UNION
+      SELECT user_id FROM mes_operator_qualification WHERE all_operations = TRUE
+    ) candidates
+    <if test="before != null">WHERE user_id &lt; #{before}</if>
+    ORDER BY user_id DESC LIMIT 100
+  </select>
+  <select id="explicitOperations" resultType="dev.mesbase.business.production.domain.OperatorQualificationSummary$ExplicitOperation">
+    SELECT r.operation_id AS operationId, o.code, o.name, o.status
+    FROM mes_operation_user r LEFT JOIN operation o ON o.id = r.operation_id
+    WHERE r.user_id = #{userId} ORDER BY r.operation_id
+  </select>
+  <select id="enabledExplicitCount" resultType="long">
+    <bind name="enabled" value="@dev.mesbase.business.shared.enums.EnableStatus@ENABLED.getValue()"/>
+    SELECT COUNT(*) FROM mes_operation_user r JOIN operation o ON o.id = r.operation_id
+    WHERE r.user_id = #{userId} AND o.status = #{enabled}
+  </select>
+</mapper>

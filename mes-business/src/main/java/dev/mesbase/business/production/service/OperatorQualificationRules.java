@@ -1,6 +1,8 @@
 package dev.mesbase.business.production.service;
 
 import dev.mesbase.business.production.dao.MesOperationUserMapper;
+import dev.mesbase.business.production.dao.MesOperatorQualificationMapper;
+import java.util.Set;
 import dev.mesbase.business.production.dao.MesProductionExecutionMapper;
 import dev.mesbase.business.production.dao.OperationMapper;
 import dev.mesbase.business.production.dao.RoutingNodeMapper;
@@ -34,11 +36,14 @@ public class OperatorQualificationRules {
     private final MesProductionExecutionMapper executions;
     private final MesOperationUserMapper capabilities;
     private final OperationUserDirectory users;
+    private final MesOperatorQualificationMapper qualifications;
     private final ProductionChainLocks locks;
 
     public OperatorQualificationRules(OperationMapper operations, RoutingNodeMapper nodes,
                                       MesProductionExecutionMapper executions, MesOperationUserMapper capabilities,
-                                      OperationUserDirectory users, ProductionChainLocks locks) {
+                                      OperationUserDirectory users, ProductionChainLocks locks,
+                                      MesOperatorQualificationMapper qualifications) {
+        this.qualifications = qualifications;
         this.operations = operations;
         this.nodes = nodes;
         this.executions = executions;
@@ -99,9 +104,7 @@ public class OperatorQualificationRules {
 
     public void requireCapability(Long operationId, Long userId) {
         capability(operationId, userId);
-        var filter = new MesOperationUserExample();
-        filter.createCriteria().andOperationIdEqualTo(operationId).andUserIdEqualTo(userId);
-        if (capabilities.countByExample(filter) == 0)
+        if (!capableOperationIds(List.of(operationId), userId).contains(operationId))
             throw new FoundationException(ErrorCode.OPERATOR_CAPABILITY_REQUIRED);
     }
 
@@ -121,15 +124,24 @@ public class OperatorQualificationRules {
         var opFilter = new OperationExample();
         opFilter.createCriteria().andIdIn(ids).andStatusEqualTo(EnableStatus.ENABLED.getValue());
         var enabled = operations.selectByExample(opFilter).stream().map(row -> row.getId()).collect(Collectors.toSet());
-        var capFilter = new MesOperationUserExample();
-        capFilter.createCriteria().andOperationIdIn(ids).andUserIdEqualTo(userId);
-        var capable = capabilities.selectByExample(capFilter).stream().map(row -> row.getOperationId())
-                .collect(Collectors.toSet());
+        var capable = capableOperationIds(ids, userId);
         for (Long id : ids) {
             if (!enabled.contains(id)) failures.put(id, ErrorCode.ROUTING_REFERENCE_INVALID);
             else if (!capable.contains(id)) failures.put(id, ErrorCode.OPERATOR_CAPABILITY_REQUIRED);
         }
         return failures;
+    }
+
+    /**
+     * Identity and enabled-operation checks stay with the caller; both read paths share this grant rule.
+     */
+    private Set<Long> capableOperationIds(List<Long> operationIds, Long userId) {
+        var setting = qualifications.selectByPrimaryKey(userId);
+        if (setting != null && Boolean.TRUE.equals(setting.getAllOperations())) return Set.copyOf(operationIds);
+        var filter = new MesOperationUserExample();
+        filter.createCriteria().andOperationIdIn(operationIds).andUserIdEqualTo(userId);
+        return capabilities.selectByExample(filter).stream().map(row -> row.getOperationId())
+                .collect(Collectors.toSet());
     }
 
     public static void requireMutable(MesProductionExecutionEntity execution) {

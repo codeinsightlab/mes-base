@@ -2,14 +2,14 @@ package dev.mesbase.business.production.service;
 
 import com.github.pagehelper.Page;
 import com.github.pagehelper.PageHelper;
-import dev.mesbase.business.production.dao.MesOperationUserMapper;
+import dev.mesbase.business.production.dao.OperatorQualificationExtraMapper;
+import java.util.ArrayList;
+import java.util.Comparator;
 import dev.mesbase.business.production.dao.MesProductionExecutionMapper;
 import dev.mesbase.business.production.dao.RoutingNodeMapper;
 import dev.mesbase.business.production.domain.RoutingNodeExample;
 import dev.mesbase.business.production.domain.RoutingNodeEntity;
 import dev.mesbase.platform.execution.FactoryContext;
-import dev.mesbase.business.production.domain.MesOperationUserEntity;
-import dev.mesbase.business.production.domain.MesOperationUserExample;
 import dev.mesbase.system.production.OperationUserDirectoryMapper.UserOption;
 import dev.mesbase.core.error.ErrorCode;
 import dev.mesbase.core.error.FoundationException;
@@ -22,12 +22,12 @@ import org.springframework.transaction.annotation.Transactional;
 @ConditionalOnProperty(name = "mes.business.enabled", havingValue = "true")
 public class OperatorCandidateService {
     private final OperationUserDirectory directory;
-    private final MesOperationUserMapper capabilities;
+    private final OperatorQualificationExtraMapper capabilities;
     private final OperatorQualificationRules rules;
     private final MesProductionExecutionMapper executions;
     private final RoutingNodeMapper nodes;
 
-    public OperatorCandidateService(OperationUserDirectory directory, MesOperationUserMapper capabilities,
+    public OperatorCandidateService(OperationUserDirectory directory, OperatorQualificationExtraMapper capabilities,
                                     OperatorQualificationRules rules, MesProductionExecutionMapper executions,
                                     RoutingNodeMapper nodes) {
         this.executions = executions;
@@ -60,26 +60,34 @@ public class OperatorCandidateService {
         }
     }
 
-    /**
-     * Cursor advances over capability rows; inactive/revoked identities are excluded from returned candidates.
-     */
-    public record CandidatePage(List<UserOption> items, int nextOffset, boolean hasMore) {
+    public record CandidatePage(List<UserOption> items, int nextOffset, boolean hasMore, long total) {
     }
 
+    /**
+     * Exact cross-database pagination: scan the deduplicated business identities in batches of 100,
+     * validate each batch against the center, then apply the public offset to valid users only.
+     * Full scanning is necessary for an exact valid-user total; memory stays bounded to one batch + page.
+     */
     @Transactional(transactionManager = "businessTransactionManager", readOnly = true)
     public CandidatePage candidates(Long operationId, int offset) {
         if (offset < 0) throw new FoundationException(ErrorCode.BAD_REQUEST);
         rules.operation(operationId);
-        var filter = new MesOperationUserExample();
-        filter.createCriteria().andOperationIdEqualTo(operationId);
-        filter.setOrderByClause("id desc");
-        List<MesOperationUserEntity> rows;
-        long total;
-        try (Page<MesOperationUserEntity> page = PageHelper.offsetPage(offset, 100)) {
-            rows = capabilities.selectByExample(filter);
-            total = page.getTotal();
+        var items = new ArrayList<UserOption>();
+        long total = 0;
+        Long before = null;
+        while (true) {
+            var ids = capabilities.candidateUserIds(operationId, before);
+            if (ids.isEmpty()) break;
+            var valid = directory.validUsers(ids).stream()
+                    .sorted(Comparator.comparing(UserOption::id).reversed()).toList();
+            for (var user : valid) {
+                if (total >= offset && items.size() < 100) items.add(user);
+                total++;
+            }
+            before = ids.getLast();
+            if (ids.size() < 100) break;
         }
-        return new CandidatePage(directory.validUsers(rows.stream().map(MesOperationUserEntity::getUserId).toList()),
-                offset + rows.size(), offset + rows.size() < total);
+        int next = offset + items.size();
+        return new CandidatePage(List.copyOf(items), next, next < total, total);
     }
 }
