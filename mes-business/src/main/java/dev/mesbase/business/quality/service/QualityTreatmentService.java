@@ -54,6 +54,7 @@ import dev.mesbase.business.quality.domain.QualityTreatmentModels.RequestKind;
 
 import java.util.UUID;
 import java.util.stream.Collectors;
+import java.util.function.Consumer;
 
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -65,7 +66,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @ConditionalOnProperty(name = "mes.business.enabled", havingValue = "true")
-@Transactional(transactionManager = "businessTransactionManager", readOnly = true)
+@Transactional(transactionManager = "businessTransactionManager", readOnly = true,
+        isolation = Isolation.REPEATABLE_READ)
 public class QualityTreatmentService {
     private final ProductionDefectListExtraMapper receiptProofs;
 
@@ -148,10 +150,22 @@ public class QualityTreatmentService {
         return new EventPage(rows, total, offset, limit, users);
     }
 
+    public List<CurrentFact> currentFacts(List<String> executions, String declaration, List<Long> ids) {
+        return new CurrentQualityFacts(receiptProofs).read(executions, declaration, ids);
+    }
+
+    public void scanCurrentFacts(List<String> executions, Consumer<List<CurrentFact>> consumer) {
+        new CurrentQualityFacts(receiptProofs).scan(executions, null, null, consumer);
+    }
+
+    public List<CurrentFact> interpretFacts(List<QualityTreatmentModels.Declaration> declarations) {
+        return new CurrentQualityFacts(receiptProofs).interpret(declarations);
+    }
+
     private CurrentFact current(String declaration) {
         if (StringUtils.isBlank(declaration))
             ParameterChecks.reject(ErrorCode.BAD_REQUEST, new SafeBusinessMessage("不良申报ID不能为空"));
-        var rows = receiptProofs.selectCurrentFacts(null, declaration);
+        var rows = currentFacts(null, declaration, null);
         if (rows.size() != 1) ParameterChecks.reject(ErrorCode.QUALITY_TREATMENT_CONFLICT);
         return rows.getFirst();
     }
@@ -217,14 +231,19 @@ public class QualityTreatmentService {
      * Called under the common inbound chain lock after all posted facts are visible.
      */
     public String receiptBlockReason(String execution) {
-        var current = receiptProofs.selectCurrentFacts(List.of(execution), null);
-        for (var fact : current) {
-            var summary = fact.summary(false);
-            if (summary.state() == State.UNRESOLVED) return "不良申报或历史处置数量待核实";
-            if (summary.attribution() == Attribution.UNVERIFIED) return "存在待核实不良申报";
-            if (summary.attribution() == Attribution.INDEPENDENT && summary.pendingDispositionQty().signum() != 0)
-                return "有效不良尚未全部正式入仓";
-        }
+        var reason = new String[1];
+        scanCurrentFacts(List.of(execution), facts -> {
+            for (var fact : facts) {
+                if (reason[0] != null) return;
+                var summary = fact.summary(false);
+                if (summary.state() == State.UNRESOLVED) reason[0] = "不良申报或历史处置数量待核实";
+                else if (summary.attribution() == Attribution.UNVERIFIED) reason[0] = "存在待核实不良申报";
+                else if (summary.attribution() == Attribution.INDEPENDENT && summary.pendingDispositionQty()
+                        .signum() != 0)
+                    reason[0] = "有效不良尚未全部正式入仓";
+            }
+        });
+        if (reason[0] != null) return reason[0];
         if (receiptProofs.invalidCurrentReceipts(execution) > 0)
             return "不良入仓缺少唯一有效的正式单据、明细或库存动作";
         return null;
@@ -234,7 +253,7 @@ public class QualityTreatmentService {
     }
 
     public ProductionBasis productionBasis(String execution) {
-        var summaries = receiptProofs.selectCurrentFacts(List.of(execution), null).stream()
+        var summaries = currentFacts(List.of(execution), null, null).stream()
                 .map(fact -> fact.summary(true)).toList();
         return new ProductionBasis(summaries, () -> new Iterator<>() {
             private List<String> chunk = List.of();
@@ -272,27 +291,25 @@ public class QualityTreatmentService {
             ParameterChecks.reject(ErrorCode.QUALITY_TREATMENT_CONFLICT);
         var ids = executions.stream().distinct().toList();
         if (ids.isEmpty()) return Map.of();
-        var grouped = receiptProofs.selectCurrentFacts(ids, null).stream()
-                .collect(Collectors.groupingBy(CurrentFact::executionCode));
+        var totals = new LinkedHashMap<String, Map<Long, BigDecimal[]>>();
+        for (var id : ids) totals.put(id, new HashMap<>());
+        scanCurrentFacts(ids, facts -> {
+            for (var fact : facts) {
+                var summary = fact.summary(true);
+                var nodes = totals.get(fact.executionCode());
+                var value = nodes.computeIfAbsent(fact.routingNodeId(), node -> new BigDecimal[]{ZERO, ZERO, ZERO, ZERO});
+                value[0] = value[0].add(fact.defectQty());
+                if (summary.attribution() == Attribution.INDEPENDENT) {
+                    value[3] = value[3].add(fact.defectQty());
+                    value[1] = value[1].add(summary.returnedQty());
+                } else if (summary.attribution() == Attribution.UNVERIFIED) value[2] = value[2].add(fact.defectQty());
+            }
+        });
         var result = new LinkedHashMap<String, List<NodeTotal>>();
-        for (var id : ids) result.put(id, nodeTotalsRows(grouped.getOrDefault(id, List.of())));
+        totals.forEach((execution, nodes) -> result.put(execution, nodes.entrySet().stream()
+                .map(entry -> new NodeTotal(entry.getKey(), entry.getValue()[0], entry.getValue()[1],
+                        entry.getValue()[2], entry.getValue()[3])).toList()));
         return Map.copyOf(result);
-    }
-
-    private List<NodeTotal> nodeTotalsRows(List<CurrentFact> facts) {
-        var totals = new HashMap<Long, BigDecimal[]>();
-        for (var fact : facts) {
-            var s = fact.summary(true);
-            var v = totals.computeIfAbsent(fact.routingNodeId(), n -> new BigDecimal[]{ZERO, ZERO, ZERO, ZERO});
-            v[0] = v[0].add(fact.defectQty());
-            if (s.attribution() == Attribution.INDEPENDENT) {
-                v[3] = v[3].add(fact.defectQty());
-                v[1] = v[1].add(s.returnedQty());
-            } else if (s.attribution() == Attribution.UNVERIFIED) v[2] = v[2].add(fact.defectQty());
-        }
-        return totals.entrySet().stream()
-                .map(e -> new NodeTotal(e.getKey(), e.getValue()[0], e.getValue()[1], e.getValue()[2], e.getValue()[3]))
-                .toList();
     }
 
     void assertMutable(MesProductionDefectEntity before) {
@@ -301,11 +318,14 @@ public class QualityTreatmentService {
         filter.createCriteria().andDeclarationIdEqualTo(before.getDeclarationId())
                 .andActionTypeNotEqualTo(Action.ASSESS.getValue());
         if (events.countByExample(filter) > 0) ParameterChecks.reject(ErrorCode.QUALITY_TREATMENT_CONFLICT);
-        for (var fact : receiptProofs.selectCurrentFacts(List.of(before.getExecutionCode()), null)) {
-            var s = fact.summary(true);
-            if (s.attribution() == Attribution.OVERLAP && before.getDeclarationId().equals(s.relatedDeclarationId()))
-                ParameterChecks.reject(ErrorCode.QUALITY_TREATMENT_CONFLICT);
-        }
+        scanCurrentFacts(List.of(before.getExecutionCode()), facts -> {
+            for (var fact : facts) {
+                var summary = fact.summary(true);
+                if (summary.attribution() == Attribution.OVERLAP && before.getDeclarationId()
+                        .equals(summary.relatedDeclarationId()))
+                    ParameterChecks.reject(ErrorCode.QUALITY_TREATMENT_CONFLICT);
+            }
+        });
     }
 
     /**

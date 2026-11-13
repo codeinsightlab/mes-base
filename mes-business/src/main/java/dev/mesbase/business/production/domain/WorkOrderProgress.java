@@ -1,6 +1,7 @@
 package dev.mesbase.business.production.domain;
 
 import dev.mesbase.common.core.page.PageData;
+import dev.mesbase.business.quality.domain.QualityTreatmentModels.Declaration;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -23,9 +24,12 @@ public final class WorkOrderProgress {
                              long invalidCount, LocalDateTime lastCompletedAt) {
     }
 
-    public record Quality(Long workorderId, BigDecimal declaredQty, String attribution,
-                          BigDecimal returnedQty, BigDecimal transferredQty, long invalidActions,
+    public record Quality(Long workorderId, Long declarationRowId, String declarationId, Integer revision,
+                          String executionCode, Long routingNodeId, BigDecimal defectQty, String recordAction,
                           String executionStatus) {
+        public Declaration declaration() {
+            return new Declaration(declarationRowId, declarationId, revision, executionCode, routingNodeId, defectQty, recordAction);
+        }
     }
 
     /**

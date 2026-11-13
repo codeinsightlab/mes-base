@@ -216,16 +216,16 @@ class ProductionQualityLifecycleHttpTest {
             // The second actual production input must preserve the earlier quality/report facts.
             ProductionInputHttpTest.submit(m, ProductionInputHttpTest.command(m, UUID.randomUUID()
                     .toString(), "L001", "1"));
-            m.perform(full(post("/api/production/executions/" + execution + "/actions/start"), "A"))
+            m.perform(full(post("/api/production/executions/{execution}/actions/start", execution), "A"))
                     .andExpect(status().isOk()).andExpect(jsonPath("status").value("RUNNING"));
             m.perform(full(post("/api/production/reports/supplements"), "A")
                             .content(ProductionReportHttpTest.supplement(11, "2")
                                     .replace("\"executionCode\":\"1\"", "\"executionCode\":\"" + execution + "\"")))
                     .andExpect(status().isOk());
-            m.perform(full(get("/api/production/report-quantities/executions/" + execution), "A"))
+            m.perform(full(get("/api/production/report-quantities/executions/{execution}", execution), "A"))
                     .andExpect(jsonPath("nodes[0].reportedQty").value("6.000000"))
                     .andExpect(jsonPath("nodes[0].qualityIntegrated").value(true));
-            m.perform(full(put(E + "/" + execution), "A").content(UPDATE.replace("READY", "FULLY_RECEIVED")))
+            m.perform(full(put(E + "/{execution}", execution), "A").content(UPDATE.replace("READY", "FULLY_RECEIVED")))
                     .andExpect(status().isConflict());
         }
     }

@@ -112,7 +112,7 @@ class WorkOrderProgressMySqlTest {
                     var quality = mapper.quality(ids);
                     assertTrue(quality.stream().allMatch(t -> ids.contains(t.workorderId())));
                     assertTrue(quality.stream()
-                            .allMatch(t -> t.declaredQty() != null && t.transferredQty() != null && t.returnedQty() != null));
+                            .allMatch(t -> t.declarationRowId() != null && t.declarationRowId() > 0));
                     System.out.println("SIMPLE_B workorder progress: total=" + total + ", page=" + orders.size() + ", completedOrders=" + totals.size());
                 }
             }
@@ -140,7 +140,7 @@ class WorkOrderProgressMySqlTest {
                 var quality = mapper.quality(qualityOrderIds);
                 assertTrue(quality.stream().allMatch(row -> qualityOrderIds.contains(row.workorderId())));
                 assertTrue(quality.stream()
-                        .allMatch(row -> row.declaredQty() != null && row.returnedQty() != null));
+                        .allMatch(row -> row.declarationRowId() != null && row.declarationRowId() > 0));
                 System.out.println("SIMPLE_B current quality declarations read=" + quality.size());
             }
             session.rollback();

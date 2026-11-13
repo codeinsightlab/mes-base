@@ -31,6 +31,8 @@ import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import java.util.function.Consumer;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -40,6 +42,11 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.Mockito.mockStatic;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
@@ -52,9 +59,19 @@ class QualityTreatmentProjectionTest {
     private final MesQualityTreatmentMapper events = mock(MesQualityTreatmentMapper.class);
     private final ProductionDefectListExtraMapper mapper = mock(ProductionDefectListExtraMapper.class);
     private final BusinessDirectoryService directory = mock(BusinessDirectoryService.class);
-    private final QualityTreatmentService service = new QualityTreatmentService(defects, events,
+    private final QualityTreatmentService service = spy(new QualityTreatmentService(defects, events,
             mock(ProductionChainLocks.class), mock(ExecutionPathService.class),
-            mock(ProductionQuantityService.class), directory, mapper, mock(MaterialQuantityRules.class));
+            mock(ProductionQuantityService.class), directory, mapper, mock(MaterialQuantityRules.class)));
+
+    @BeforeEach
+    void aggregateUsesTheStreamingReaderContract() {
+        doAnswer(invocation -> {
+            List<String> executions = invocation.getArgument(0);
+            Consumer<List<CurrentFact>> consumer = invocation.getArgument(1);
+            consumer.accept(service.currentFacts(executions, null, null));
+            return null;
+        }).when(service).scanCurrentFacts(anyList(), any());
+    }
 
     static CurrentFact fact(String id, String execution, long assessments, String attribution, long invalid) {
         return new CurrentFact(id, 1, execution, 11L, BigDecimal.TEN, "CREATE", assessments,
@@ -65,7 +82,7 @@ class QualityTreatmentProjectionTest {
     @ValueSource(ints = {999, 1000, 1001})
     void legalCurrentDeclarationsAreNotLimitedByHistoryBudget(int count) {
         var facts = IntStream.range(0, count).mapToObj(i -> fact("d" + i, "1", 1, "INDEPENDENT", 0)).toList();
-        when(mapper.selectCurrentFacts(List.of("1"), null)).thenReturn(facts);
+        doReturn(facts).when(service).currentFacts(List.of("1"), null, null);
         assertEquals(0, BigDecimal.TEN.multiply(BigDecimal.valueOf(count))
                 .compareTo(service.nodeTotals("1").getFirst().directDefectQty()));
         verifyNoInteractions(events, defects, directory);
@@ -75,10 +92,11 @@ class QualityTreatmentProjectionTest {
     void batchHasNoSharedDeclarationBudgetAndMatchesSingles() {
         var first = IntStream.range(0, 600).mapToObj(i -> fact("a" + i, "1", 1, "INDEPENDENT", 0)).toList();
         var second = IntStream.range(0, 600).mapToObj(i -> fact("b" + i, "2", 0, null, 0)).toList();
-        when(mapper.selectCurrentFacts(List.of("1"), null)).thenReturn(first);
-        when(mapper.selectCurrentFacts(List.of("2"), null)).thenReturn(second);
-        when(mapper.selectCurrentFacts(List.of("1", "2"), null)).thenReturn(
-                Stream.concat(first.stream(), second.stream()).toList());
+        doReturn(first).when(service).currentFacts(List.of("1"), null, null);
+        doReturn(second).when(service).currentFacts(List.of("2"), null, null);
+        doReturn(
+                Stream.concat(first.stream(), second.stream()).toList()).when(service)
+                .currentFacts(List.of("1", "2"), null, null);
         var batch = service.nodeTotalsBatch(List.of("1", "2"));
         assertEquals(service.nodeTotals("1"), batch.get("1"));
         assertEquals(service.nodeTotals("2"), batch.get("2"));
@@ -102,10 +120,10 @@ class QualityTreatmentProjectionTest {
 
     @Test
     void summaryDoesNotReadDisplayHistoryOrDirectoryAndDatabaseFailureEscapes() {
-        when(mapper.selectCurrentFacts(null, "d")).thenReturn(List.of(fact("d", "1", 1, "INDEPENDENT", 0)));
+        doReturn(List.of(fact("d", "1", 1, "INDEPENDENT", 0))).when(service).currentFacts(null, "d", null);
         assertEquals(State.PENDING, service.details("d").summary().state());
         verifyNoInteractions(events, directory, defects);
-        when(mapper.selectCurrentFacts(null, "d")).thenThrow(new IllegalStateException("database unavailable"));
+        doThrow(new IllegalStateException("database unavailable")).when(service).currentFacts(null, "d", null);
         assertThrows(IllegalStateException.class, () -> service.details("d"));
     }
 
@@ -113,7 +131,7 @@ class QualityTreatmentProjectionTest {
     void receiptClosureStillRequiresUniqueFormalProofAndPropagatesFailures() {
         var closed = new CurrentFact("d", 1, "1", 11L, BigDecimal.TEN, "CREATE", 1,
                 "INDEPENDENT", null, "证据", BigDecimal.ZERO, BigDecimal.TEN, 0, 0);
-        when(mapper.selectCurrentFacts(List.of("1"), null)).thenReturn(List.of(closed));
+        doReturn(List.of(closed)).when(service).currentFacts(List.of("1"), null, null);
         when(mapper.invalidCurrentReceipts("1")).thenReturn(1L);
         assertTrue(service.receiptBlockReason("1").contains("唯一有效"));
         when(mapper.invalidCurrentReceipts("1")).thenReturn(0L);
@@ -124,7 +142,7 @@ class QualityTreatmentProjectionTest {
 
     @Test
     void pagedAuditIdentitiesKeepTheOriginalJsonAndDigest() {
-        when(mapper.selectCurrentFacts(List.of("1"), null)).thenReturn(List.of());
+        doReturn(List.of()).when(service).currentFacts(List.of("1"), null, null);
         var original = IntStream.range(0, 1201).mapToObj(i -> "T:" + String.format("%05d", i)).toList();
         when(mapper.selectFactIdentities("1")).thenAnswer(invocation -> {
             var page = PageHelper.getLocalPage();
@@ -146,9 +164,9 @@ class QualityTreatmentProjectionTest {
         when(events.countByExample(any())).thenReturn(0L);
         var overlap = new CurrentFact("dependent", 7, "1", 11L, BigDecimal.ONE, "REVISE", 1,
                 "OVERLAP", "target", "证据", BigDecimal.ZERO, BigDecimal.ZERO, 0, 0);
-        when(mapper.selectCurrentFacts(List.of("1"), null)).thenReturn(List.of(overlap));
+        doReturn(List.of(overlap)).when(service).currentFacts(List.of("1"), null, null);
         assertThrows(FoundationException.class, () -> service.assertMutable(before));
-        when(mapper.selectCurrentFacts(List.of("1"), null)).thenReturn(List.of());
+        doReturn(List.of()).when(service).currentFacts(List.of("1"), null, null);
         service.assertMutable(before);
     }
 

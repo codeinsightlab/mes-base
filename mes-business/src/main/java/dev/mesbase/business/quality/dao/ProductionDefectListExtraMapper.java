@@ -3,15 +3,24 @@ package dev.mesbase.business.quality.dao;
 import dev.mesbase.business.quality.domain.ProductionDefectModels.ListContext;
 import dev.mesbase.business.quality.domain.QualityTreatmentModels.ReceiptProof;
 import java.util.List;
-import dev.mesbase.business.quality.domain.QualityTreatmentModels.CurrentFact;
+import dev.mesbase.business.quality.domain.QualityTreatmentModels.Declaration;
+import dev.mesbase.business.quality.domain.QualityTreatmentModels.Event;
 import org.apache.ibatis.annotations.Param;
 
 /**
  * Current version projections, immutable proof reads and page-scoped display references.
  */
 public interface ProductionDefectListExtraMapper {
-    List<CurrentFact> selectCurrentFacts(@Param("executionCodes") List<String> executionCodes,
-                                         @Param("declarationId") String declarationId);
+    List<Declaration> selectDeclarations(@Param("executionCodes") List<String> executionCodes,
+                                         @Param("declarationId") String declarationId, @Param("ids") List<Long> ids,
+                                         @Param("declarationIds") List<String> declarationIds,
+                                         @Param("afterId") long afterId,
+                                         @Param("limit") int limit);
+
+    List<Event> selectEvents(@Param("ids") List<Long> ids, @Param("afterId") String afterId,
+                             @Param("limit") int limit);
+
+    boolean hasEffectiveFacts(@Param("executionCode") String executionCode);
 
     List<String> selectFactIdentities(@Param("executionCode") String executionCode);
 
@@ -21,5 +30,4 @@ public interface ProductionDefectListExtraMapper {
 
     List<ListContext> selectContexts(@Param("ids") List<Long> ids);
 
-    List<CurrentFact> selectCurrentFactsByIds(@Param("ids") List<Long> ids);
 }

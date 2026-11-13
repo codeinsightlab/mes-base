@@ -11,8 +11,9 @@ import dev.mesbase.business.production.domain.WorkOrderProgress.Quality;
 import dev.mesbase.business.production.domain.WorkOrderProgress.Query;
 import dev.mesbase.business.production.domain.WorkOrderStatus;
 import dev.mesbase.business.production.domain.ProductionExecutionStatus;
-import dev.mesbase.business.quality.domain.DefectRecordAction;
-import dev.mesbase.business.quality.domain.ProductionDefectModels.Processing;
+import dev.mesbase.business.quality.service.QualityTreatmentService;
+import dev.mesbase.business.quality.domain.QualityTreatmentModels.CurrentFact;
+import java.util.HashMap;
 import dev.mesbase.business.quality.domain.QualityTreatmentModels.Attribution;
 import dev.mesbase.business.quality.domain.QualityTreatmentModels.State;
 import dev.mesbase.common.utils.StringUtils;
@@ -35,9 +36,39 @@ import org.springframework.transaction.annotation.Transactional;
 public class WorkOrderProgressQueryService {
     private final WorkOrderProgressExtraMapper mapper;
 
-    public WorkOrderProgressQueryService(WorkOrderProgressExtraMapper mapper) {
+    private final QualityTreatmentService treatments;
+
+    public WorkOrderProgressQueryService(WorkOrderProgressExtraMapper mapper, QualityTreatmentService treatments) {
         this.mapper = mapper;
+        this.treatments = treatments;
     }
+
+    private static final class QualityTotals {
+        private BigDecimal untreated = BigDecimal.ZERO;
+        private BigDecimal returned = BigDecimal.ZERO;
+        private BigDecimal transferred = BigDecimal.ZERO;
+        private BigDecimal unverified = BigDecimal.ZERO;
+        private BigDecimal completedLoss = BigDecimal.ZERO;
+        private boolean resolved = true;
+
+        private void add(CurrentFact fact, String executionStatus) {
+            var summary = fact.summary(false);
+            if (summary.state() == State.VOIDED) return;
+            if (summary.state() == State.UNRESOLVED) {
+                resolved = false;
+                return;
+            }
+            if (summary.attribution() == Attribution.UNVERIFIED) unverified = unverified.add(fact.defectQty());
+            else if (summary.attribution() == Attribution.INDEPENDENT) {
+                untreated = untreated.add(summary.pendingDispositionQty());
+                returned = returned.add(summary.returnedQty());
+                transferred = transferred.add(summary.transferredQty());
+                if (ProductionExecutionStatus.FULLY_RECEIVED.getValue().equals(executionStatus))
+                    completedLoss = completedLoss.add(summary.netDefectQty());
+            }
+        }
+    }
+
 
     @Transactional(transactionManager = "businessTransactionManager", readOnly = true,
             isolation = Isolation.REPEATABLE_READ)
@@ -61,14 +92,32 @@ public class WorkOrderProgressQueryService {
         if (rows.isEmpty()) return new Page(List.of(), total, offset, limit);
         var completions = mapper.completions(rows.stream().map(Order::id).toList()).stream()
                 .collect(Collectors.toMap(Completion::workorderId, Function.identity()));
-        var quality = mapper.quality(rows.stream().map(Order::id).toList()).stream()
-                .collect(Collectors.groupingBy(Quality::workorderId));
+        var quality = new HashMap<Long, QualityTotals>();
+        var workorders = rows.stream().map(Order::id).toList();
+        int qualityOffset = 0;
+        while (true) {
+            List<Quality> references;
+            try (var page = PageHelper.offsetPage(qualityOffset, 250, false)) {
+                references = List.copyOf(mapper.quality(workorders));
+            }
+            if (references.isEmpty()) break;
+            var facts = treatments.interpretFacts(references.stream().map(Quality::declaration).toList())
+                    .stream().collect(Collectors.toMap(CurrentFact::declarationId, Function.identity()));
+            for (var reference : references) {
+                var fact = facts.get(reference.declarationId());
+                if (fact == null) throw new FoundationException(ErrorCode.QUALITY_DATA_INVALID);
+                quality.computeIfAbsent(reference.workorderId(), id -> new QualityTotals())
+                        .add(fact, reference.executionStatus());
+            }
+            qualityOffset += references.size();
+            if (references.size() < 250) break;
+        }
         return new Page(rows.stream().map(row -> progress(row, completions.get(row.id()),
-                        quality.getOrDefault(row.id(), List.of())))
+                        quality.getOrDefault(row.id(), new QualityTotals())))
                 .toList(), total, offset, limit);
     }
 
-    private static Progress progress(Order order, Completion completion, List<Quality> quality) {
+    private static Progress progress(Order order, Completion completion, QualityTotals quality) {
         String issue = null;
         BigDecimal completed = BigDecimal.ZERO;
         if (completion != null) {
@@ -81,29 +130,11 @@ public class WorkOrderProgressQueryService {
         if (order.plannedQty() == null || order.plannedQty().signum() <= 0)
             issue = "计划数量无效，无法计算完成率";
         BigDecimal received = completed;
-        BigDecimal completedLoss = BigDecimal.ZERO;
+        BigDecimal completedLoss = quality.completedLoss;
         BigDecimal percent = null, gap = null;
-        BigDecimal untreated = BigDecimal.ZERO, returned = BigDecimal.ZERO,
-                unverified = BigDecimal.ZERO, transferred = BigDecimal.ZERO;
-        boolean qualityResolved = true;
-        for (var fact : quality) {
-            var attribution = Attribution.UNVERIFIED;
-            if (fact.attribution() != null) attribution = Attribution.find(fact.attribution());
-            var processing = Processing.read(DefectRecordAction.CREATE.getValue(), attribution,
-                    fact.declaredQty(), fact.returnedQty(), fact.transferredQty(), fact.invalidActions());
-            if (processing.state() == State.UNRESOLVED) {
-                qualityResolved = false;
-                continue;
-            }
-            if (attribution == Attribution.UNVERIFIED) unverified = unverified.add(fact.declaredQty());
-            else if (attribution == Attribution.INDEPENDENT) {
-                untreated = untreated.add(processing.pendingDispositionQty());
-                returned = returned.add(processing.returnedQty());
-                transferred = transferred.add(processing.transferredQty());
-                if (ProductionExecutionStatus.FULLY_RECEIVED.getValue().equals(fact.executionStatus()))
-                    completedLoss = completedLoss.add(fact.declaredQty().subtract(processing.returnedQty()));
-            }
-        }
+        BigDecimal untreated = quality.untreated, returned = quality.returned,
+                unverified = quality.unverified, transferred = quality.transferred;
+        boolean qualityResolved = quality.resolved;
         if (!qualityResolved) {
             untreated = returned = unverified = transferred = null;
             issue = issue == null ? "质量处置数量待确认" : issue + "；质量处置数量待确认";

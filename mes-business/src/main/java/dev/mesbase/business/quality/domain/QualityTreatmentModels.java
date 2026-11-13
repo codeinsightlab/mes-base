@@ -9,6 +9,7 @@ import java.math.BigDecimal;
 import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Objects;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -156,6 +157,91 @@ public final class QualityTreatmentModels {
         return ReceiptState.PARTIAL;
     }
 
+    public record Declaration(Long id, String declarationId, Integer revision, String executionCode,
+                              Long routingNodeId, BigDecimal defectQty, String recordAction) {
+    }
+
+    public record Event(String id, String declarationId, Integer revision, String executionCode,
+                        Long routingNodeId, String action, String attribution, String relatedDeclarationId,
+                        String basis, BigDecimal returnedQty, BigDecimal transferredQty, String ownerDeclarationId) {
+    }
+
+    /**
+     * Incremental interpretation of raw facts; the reader can page arbitrarily long event histories.
+     */
+    public static final class FactBuilder {
+        private final Declaration declaration;
+        private long assessments, invalid, unknown;
+        private String attribution, related, basis;
+        private BigDecimal returned = BigDecimal.ZERO, transferred = BigDecimal.ZERO;
+
+        public FactBuilder(Declaration declaration) {
+            this.declaration = declaration;
+        }
+
+        public void accept(Event event) {
+            if (!Objects.equals(declaration.declarationId(), event.declarationId())
+                    || !Objects.equals(declaration.revision(), event.revision())
+                    || declaration.executionCode() == null || !Objects.equals(declaration.executionCode(), event.executionCode())
+                    || declaration.routingNodeId() == null || !Objects.equals(declaration.routingNodeId(), event.routingNodeId()))
+                invalid++;
+            if (!Action.recognizes(event.action())) {
+                unknown++;
+                invalid++;
+                return;
+            }
+            if (event.returnedQty() == null || event.transferredQty() == null) {
+                invalid++;
+                return;
+            }
+            if (event.returnedQty().signum() < 0 || event.transferredQty().signum() < 0) invalid++;
+            switch (Action.from(event.action())) {
+                case ASSESS -> {
+                    assessments++;
+                    attribution = event.attribution();
+                    related = event.relatedDeclarationId();
+                    basis = event.basis();
+                    var type = Attribution.find(attribution);
+                    if (type == null || type == Attribution.UNVERIFIED || basis == null || basis.isBlank()
+                            || type == Attribution.INDEPENDENT && related != null
+                            || type == Attribution.OVERLAP && (related == null || related.equals(declaration.declarationId()))
+                            || event.returnedQty().signum() != 0 || event.transferredQty().signum() != 0) invalid++;
+                }
+                case RETURN_NODE -> {
+                    returned = returned.add(event.returnedQty());
+                    if (event.returnedQty().signum() <= 0 || event.transferredQty().signum() != 0) invalid++;
+                }
+                case TRANSFER_WAREHOUSE -> {
+                    transferred = transferred.add(event.transferredQty());
+                    if (event.transferredQty().signum() <= 0 || event.returnedQty().signum() != 0) invalid++;
+                }
+            }
+        }
+
+        public CurrentFact build(Map<String, CurrentFact> relatedFacts) {
+            long errors = invalid;
+            if (assessments == 1 && Attribution.OVERLAP.getValue().equals(attribution)) {
+                var target = relatedFacts.get(related);
+                if (target == null || target.summary(false).state() == State.UNRESOLVED
+                        || target.summary(false).state() == State.VOIDED
+                        || target.summary(false).attribution() != Attribution.INDEPENDENT
+                        || !Objects.equals(target.executionCode(), declaration.executionCode())
+                        || declaration.defectQty() == null || target.defectQty().compareTo(declaration.defectQty()) < 0)
+                    errors++;
+            }
+            int revision = 0;
+            if (declaration.revision() != null) revision = declaration.revision();
+            if (declaration.executionCode() == null || declaration.routingNodeId() == null) errors++;
+            return new CurrentFact(declaration.declarationId(), revision, declaration.executionCode(), declaration.routingNodeId(),
+                    declaration.defectQty(), declaration.recordAction(), assessments, attribution, related, basis,
+                    returned, transferred, errors, unknown);
+        }
+
+        public String relatedDeclarationId() {
+            return related;
+        }
+    }
+
     /**
      * One latest declaration and its corresponding version facts, never display history.
      */
@@ -174,7 +260,7 @@ public final class QualityTreatmentModels {
                 related = relatedDeclarationId;
                 assessmentBasis = basis;
             }
-            long invalid = invalidFacts;
+            long invalid = invalidFacts + unknownActions;
             if (revision < 1) invalid++;
             if (assessmentCount > 1 || assessmentCount == 1 && type == Attribution.UNVERIFIED) invalid++;
             var processing = Processing.read(recordAction, type, defectQty,
@@ -184,7 +270,7 @@ public final class QualityTreatmentModels {
                 throw new FoundationException(ErrorCode.QUALITY_TREATMENT_CONFLICT);
             BigDecimal net = null;
             if (processing.state() != State.UNRESOLVED)
-                net = type == Attribution.INDEPENDENT ? defectQty.subtract(returnedQty) : BigDecimal.ZERO;
+                net = processing.state() != State.VOIDED && type == Attribution.INDEPENDENT ? defectQty.subtract(returnedQty) : BigDecimal.ZERO;
             return new Summary(declarationId, revision, executionCode, routingNodeId, defectQty, type,
                     related, assessmentBasis, processing.pendingDispositionQty(), net, processing.state(),
                     recordAction, processing.returnedQty(), processing.transferredQty(),

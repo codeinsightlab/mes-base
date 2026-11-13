@@ -60,7 +60,8 @@ class LocalWarehouseHttpTest {
             balance(j, "600");
             String requestId = UUID.randomUUID().toString();
             String request = body(requestId, "20", "600", document);
-            m.perform(ProductionCoreV1HttpTest.full(post(ProductionInputHttpTest.ROOT + "/documents/" + document + "/returns")).content(request)).andExpect(status().isOk());
+            m.perform(ProductionCoreV1HttpTest.full(post(ProductionInputHttpTest.ROOT + "/documents/" + document + "/returns"))
+                    .content(request)).andExpect(status().isOk());
             m.perform(ProductionCoreV1HttpTest.full(post(ProductionInputHttpTest.ROOT + "/documents/" + document + "/returns"))
                     .content(body(requestId, "20", "600", issue))).andExpect(status().isOk());
             balance(j, "620");
@@ -88,6 +89,28 @@ class LocalWarehouseHttpTest {
                     .andExpect(status().isMethodNotAllowed());
             m.perform(ProductionCoreV1HttpTest.full(delete("/api/wm/wm-stock-action")).content("[]"))
                     .andExpect(status().isMethodNotAllowed());
+        }
+    }
+
+    @Test
+    void signedCorrectionsUseOneLedgerAndRejectZeroOrInsufficientBalances() throws Exception {
+        try (var context = ProductionInputHttpTest.context()) {
+            var db = ProductionInputHttpTest.db(context);
+            var mvc = MaterialIssueHttpTest.mvc(context);
+            apply(mvc, "correction", "5", "10000");
+            apply(mvc, "correction", "-3", "10005");
+            balance(db, "10002");
+            mvc.perform(ProductionCoreV1HttpTest.full(post(ROOT + "correction"))
+                            .content(body(UUID.randomUUID().toString(), "0", "10002", null)))
+                    .andExpect(status().isBadRequest());
+            mvc.perform(ProductionCoreV1HttpTest.full(post(ROOT + "correction"))
+                            .content(body(UUID.randomUUID().toString(), "-10003", "10002", null)))
+                    .andExpect(status().isConflict());
+            balance(db, "10002");
+            assertEquals(2, db.queryForObject(
+                    "SELECT COUNT(*) FROM wm_stock_action WHERE action_type='CORRECTION'", Integer.class));
+            assertEquals(0, new BigDecimal("2").compareTo(db.queryForObject(
+                    "SELECT SUM(quantity_delta) FROM wm_stock_action", BigDecimal.class)));
         }
     }
 

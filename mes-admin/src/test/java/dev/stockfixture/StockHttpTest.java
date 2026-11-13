@@ -3,6 +3,8 @@ package dev.stockfixture;
 import com.github.pagehelper.PageInterceptor;
 import dev.mesbase.acceptance.FactorySnapshotFixture;
 import dev.mesbase.business.basic.dao.MaterialMapper;
+import dev.mesbase.business.basic.dao.UnitMeasureMapper;
+import dev.mesbase.business.purchase.dao.PurchaseReferencePriceMapper;
 import dev.mesbase.business.directory.service.BusinessDirectoryService;
 import dev.mesbase.business.integration.warehouse.WarehouseIntegration;
 import dev.mesbase.business.production.dao.MesProductionReceiptMapper;
@@ -111,7 +113,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * TEST ONLY: real generated SQL, HTTP authorization and transactions; two separate H2 databases.
  */
 class StockHttpTest {
-    static final Set<Class<?>> MAPPERS = Set.of(WorkorderMapper.class, WmStockDocumentLineMapper.class, WmWarehouseErpExtraMapper.class, MesWorkorderMaterialMapper.class, WmStockActionMapper.class, MaterialMapper.class, WmWarehouseMapper.class, WmInventoryMapper.class);
+    static final Set<Class<?>> MAPPERS = Set.of(PurchaseReferencePriceMapper.class, UnitMeasureMapper.class, WorkorderMapper.class, WmStockDocumentLineMapper.class, WmWarehouseErpExtraMapper.class, MesWorkorderMaterialMapper.class, WmStockActionMapper.class, MaterialMapper.class, WmWarehouseMapper.class, WmInventoryMapper.class);
 
     static class Fixture implements AutoCloseable {
         final RuntimeRegistry registry = new RuntimeRegistry();
@@ -250,6 +252,16 @@ class StockHttpTest {
             return new SqlSessionTemplate(f).getMapper(WmStockActionMapper.class);
         }
 
+
+        @Bean
+        PurchaseReferencePriceMapper quotes(SqlSessionFactory f) {
+            return new SqlSessionTemplate(f).getMapper(PurchaseReferencePriceMapper.class);
+        }
+
+        @Bean
+        UnitMeasureMapper units(SqlSessionFactory f) {
+            return new SqlSessionTemplate(f).getMapper(UnitMeasureMapper.class);
+        }
 
         @Bean
         MaterialMapper materials(SqlSessionFactory f) {

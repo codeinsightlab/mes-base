@@ -75,7 +75,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @ConditionalOnProperty(name = "mes.business.enabled", havingValue = "true")
-@Transactional(transactionManager = "businessTransactionManager", readOnly = true)
+@Transactional(transactionManager = "businessTransactionManager", readOnly = true,
+        isolation = Isolation.REPEATABLE_READ)
 public class ProductionDefectService {
     private final ObjectProvider<AuthorizationService> authorization;
     private final ObjectProvider<OperationDefectTypeService> defectTypes;
@@ -370,7 +371,7 @@ public class ProductionDefectService {
                 .collect(Collectors.toMap(ListContext::declarationId, value -> value));
         var states = new HashMap<String, Processing>();
         if (!rows.isEmpty()) {
-            var totals = listQueries.selectCurrentFactsByIds(rows.stream().map(MesProductionDefectEntity::getId)
+            var totals = treatments.currentFacts(null, null, rows.stream().map(MesProductionDefectEntity::getId)
                             .toList())
                     .stream().collect(Collectors.toMap(CurrentFact::declarationId, t -> t));
             for (var row : rows) {

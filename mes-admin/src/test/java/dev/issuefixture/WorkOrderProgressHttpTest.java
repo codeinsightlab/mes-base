@@ -66,7 +66,7 @@ class WorkOrderProgressHttpTest {
 
     private static void treatment(JdbcTemplate jdbc, String declaration, int revision, String action,
                                   String attribution, String returned) {
-        jdbc.update("INSERT INTO mes_quality_treatment(id,request_hash,declaration_id,declaration_revision,execution_code,routing_node_id,action_type,attribution_type,returned_qty,operator_user_id,recorded_at,reason) VALUES(?,?,?,?,1,11,?,?,?,1,CURRENT_TIMESTAMP,'TEST ONLY')",
+        jdbc.update("INSERT INTO mes_quality_treatment(id,request_hash,declaration_id,declaration_revision,execution_code,routing_node_id,action_type,attribution_type,returned_qty,basis,operator_user_id,recorded_at,reason) VALUES(?,?,?,?,1,11,?,?,?,'TEST ONLY confirmed assessment',1,CURRENT_TIMESTAMP,'TEST ONLY')",
                 UUID.randomUUID()
                         .toString(), "t".repeat(64), declaration, revision, action, attribution, returned);
     }
@@ -88,6 +88,7 @@ class WorkOrderProgressHttpTest {
                     .toString(), "t".repeat(64), "independent");
             declaration(jdbc, "overlap", 1, "CREATE", "2");
             treatment(jdbc, "overlap", 1, "ASSESS", "OVERLAP");
+            jdbc.update("UPDATE mes_quality_treatment SET related_declaration_id='independent' WHERE declaration_id='overlap'");
             declaration(jdbc, "unverified", 1, "CREATE", "3");
             mvc.perform(ProductionReportHttpTest.full(get(URL), "A")).andExpect(status().isOk())
                     .andExpect(jsonPath("items[0].qualityUntreatedQty").value("0.000000"))
@@ -95,6 +96,7 @@ class WorkOrderProgressHttpTest {
                     .andExpect(jsonPath("items[0].qualityTransferredQty").value("6.000000"))
                     .andExpect(jsonPath("items[0].qualityUnverifiedQty").value("3.000000"))
                     .andExpect(jsonPath("items[0].pendingCompletionQty").value("4.000000"));
+            declaration(jdbc, "overlap", 2, "VOID", "2");
             declaration(jdbc, "independent", 2, "VOID", "10");
             mvc.perform(ProductionReportHttpTest.full(get(URL), "A")).andExpect(status().isOk())
                     .andExpect(jsonPath("items[0].qualityTransferredQty").value("0"));

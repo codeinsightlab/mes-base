@@ -47,10 +47,12 @@ import java.util.stream.Collectors;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.annotation.Isolation;
 
 @Service
 @ConditionalOnProperty(name = "mes.business.enabled", havingValue = "true")
-@Transactional(transactionManager = "businessTransactionManager", readOnly = true)
+@Transactional(transactionManager = "businessTransactionManager", readOnly = true,
+        isolation = Isolation.REPEATABLE_READ)
 public class ProductionQuantityService {
     private final MesProductionExecutionMapper executions;
     private final WorkorderMapper orders;
@@ -307,7 +309,8 @@ public class ProductionQuantityService {
             if (n.historicalOverrunQty().compareTo(old.historicalOverrunQty()) > 0 || n.routingNodeId()
                     .equals(nodeId) && delta.signum() > 0 && n.reportedQty().compareTo(n.inputQty()) > 0)
                 throw new ProductionQuantityConflictException(n.routingNodeId(), i == 0 ? null : after.nodes()
-                        .get(i - 1).routingNodeId(), n.inputQty(), n.reportedQty(), n.netDefectQty().add(n.unverifiedDefectQty()));
+                        .get(i - 1).routingNodeId(), n.inputQty(), n.reportedQty(), n.netDefectQty()
+                        .add(n.unverifiedDefectQty()));
         }
     }
 

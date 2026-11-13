@@ -2,6 +2,7 @@ package dev.mesbase.business.quality.service;
 
 import dev.mesbase.business.quality.dao.ProductionDefectListExtraMapper;
 import dev.mesbase.business.quality.domain.QualityTreatmentModels.State;
+import dev.mesbase.business.quality.domain.QualityTreatmentModels.CurrentFact;
 import java.sql.DriverManager;
 import java.util.List;
 import java.util.HashMap;
@@ -21,6 +22,11 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class CurrentQualityFactsSqlTest {
+    private static List<CurrentFact> reader(
+            ProductionDefectListExtraMapper mapper, List<String> executions, String declaration) {
+        return new CurrentQualityFacts(mapper).read(executions, declaration, null);
+    }
+
     private SqlSession database(int declarations, int transfers) throws Exception {
         String url = "jdbc:h2:mem:" + UUID.randomUUID() + ";MODE=MySQL;DB_CLOSE_DELAY=-1";
         try (var c = DriverManager.getConnection(url); var s = c.createStatement()) {
@@ -45,11 +51,11 @@ class CurrentQualityFactsSqlTest {
     void latestDeclarationsAndBatchAreNotCapped(int count) throws Exception {
         try (var session = database(count, 0)) {
             var mapper = session.getMapper(ProductionDefectListExtraMapper.class);
-            var all = mapper.selectCurrentFacts(List.of("1", "2"), null);
+            var all = reader(mapper, List.of("1", "2"), null);
             assertEquals(count, all.size());
             assertTrue(all.stream().allMatch(f -> f.summary(true).state() == State.PENDING));
-            assertEquals(all.size(), mapper.selectCurrentFacts(List.of("1"), null)
-                    .size() + mapper.selectCurrentFacts(List.of("2"), null).size());
+            assertEquals(all.size(), reader(mapper, List.of("1"), null)
+                    .size() + reader(mapper, List.of("2"), null).size());
         }
     }
 
@@ -57,7 +63,7 @@ class CurrentQualityFactsSqlTest {
     @ValueSource(ints = {4999, 5000, 5001})
     void correspondingEventsAreAggregatedWithoutEntityBudget(int events) throws Exception {
         try (var session = database(1, events - 1)) {
-            var fact = session.getMapper(ProductionDefectListExtraMapper.class).selectCurrentFacts(null, "d0")
+            var fact = reader(session.getMapper(ProductionDefectListExtraMapper.class), null, "d0")
                     .getFirst();
             assertEquals(0, fact.summary(true).pendingDispositionQty().signum());
             assertEquals(State.TRANSFERRED, fact.summary(true).state());
@@ -69,12 +75,12 @@ class CurrentQualityFactsSqlTest {
         try (var session = database(3, 0); var s = session.getConnection().createStatement()) {
             s.execute("INSERT INTO mes_production_defect VALUES(10,'d0',2,1,11,2,'REVISE'),(11,'d1',2,2,11,1,'VOID')");
             var mapper = session.getMapper(ProductionDefectListExtraMapper.class);
-            var rows = mapper.selectCurrentFacts(List.of("1", "2"), null);
+            var rows = reader(mapper, List.of("1", "2"), null);
             assertEquals(2, rows.size());
-            assertEquals(State.UNVERIFIED, mapper.selectCurrentFacts(null, "d0").getFirst().summary(true).state());
+            assertEquals(State.UNVERIFIED, reader(mapper, null, "d0").getFirst().summary(true).state());
             s.execute("INSERT INTO mes_quality_treatment VALUES('bad','d0',2,999,11,'UNRECOGNIZED',NULL,NULL,NULL,0,0)");
             session.clearCache();
-            assertEquals(State.UNRESOLVED, mapper.selectCurrentFacts(null, "d0").getFirst().summary(false).state());
+            assertEquals(State.UNRESOLVED, reader(mapper, null, "d0").getFirst().summary(false).state());
         }
     }
 
@@ -87,13 +93,15 @@ class CurrentQualityFactsSqlTest {
                     statement.execute("INSERT INTO mes_quality_treatment VALUES('r" + revision + "','d0'," + revision + ",1,11,'ASSESS','INDEPENDENT',NULL,'证据',0,0)");
             }
             var mapper = session.getMapper(ProductionDefectListExtraMapper.class);
-            assertEquals(1, mapper.selectCurrentFacts(List.of("1"), null).size());
-            assertEquals(State.UNVERIFIED, mapper.selectCurrentFacts(null, "d0").getFirst().summary(true).state());
+            assertEquals(1, reader(mapper, List.of("1"), null).size());
+            assertEquals(State.UNVERIFIED, reader(mapper, null, "d0").getFirst().summary(true).state());
             var parameters = new HashMap<String, Object>();
             parameters.put("executionCodes", null);
             parameters.put("declarationId", "d0");
+            parameters.put("afterId", -1L);
+            parameters.put("limit", 250);
             var mapped = session.getConfiguration()
-                    .getMappedStatement(ProductionDefectListExtraMapper.class.getName() + ".selectCurrentFacts");
+                    .getMappedStatement(ProductionDefectListExtraMapper.class.getName() + ".selectDeclarations");
             var bound = mapped.getBoundSql(parameters);
             try (var explain = session.getConnection().prepareStatement("EXPLAIN " + bound.getSql())) {
                 new DefaultParameterHandler(mapped, parameters, bound).setParameters(explain);
@@ -101,7 +109,7 @@ class CurrentQualityFactsSqlTest {
                     assertTrue(result.next());
                     String plan = result.getString(1);
                     assertTrue(plan.contains("DEFECT_REVISION"));
-                    assertTrue(plan.contains("TREATMENT_DECLARATION"));
+
                     System.out.println("B3 isolated H2 EXPLAIN: " + plan);
                 }
             }
@@ -113,11 +121,11 @@ class CurrentQualityFactsSqlTest {
         try (var session = database(1, 0); var s = session.getConnection().createStatement()) {
             s.execute("INSERT INTO mes_quality_treatment VALUES('dup','d0',1,1,11,'ASSESS','INDEPENDENT',NULL,'证据',0,0)");
             var mapper = session.getMapper(ProductionDefectListExtraMapper.class);
-            assertEquals(State.UNRESOLVED, mapper.selectCurrentFacts(null, "d0").getFirst().summary(false).state());
+            assertEquals(State.UNRESOLVED, reader(mapper, null, "d0").getFirst().summary(false).state());
             s.execute("DELETE FROM mes_quality_treatment WHERE id='dup'");
             s.execute("UPDATE mes_quality_treatment SET routing_node_id=999 WHERE id='a0'");
             session.clearCache();
-            assertEquals(State.UNRESOLVED, mapper.selectCurrentFacts(null, "d0").getFirst().summary(false).state());
+            assertEquals(State.UNRESOLVED, reader(mapper, null, "d0").getFirst().summary(false).state());
         }
     }
 
@@ -126,10 +134,10 @@ class CurrentQualityFactsSqlTest {
         try (var session = database(3, 0); var statement = session.getConnection().createStatement()) {
             statement.execute("UPDATE mes_quality_treatment SET attribution_type='OVERLAP',related_declaration_id='d0' WHERE id='a2'");
             var mapper = session.getMapper(ProductionDefectListExtraMapper.class);
-            assertEquals(State.OVERLAP, mapper.selectCurrentFacts(null, "d2").getFirst().summary(true).state());
+            assertEquals(State.OVERLAP, reader(mapper, null, "d2").getFirst().summary(true).state());
             statement.execute("UPDATE mes_quality_treatment SET related_declaration_id='d1' WHERE id='a2'");
             session.clearCache();
-            assertEquals(State.UNRESOLVED, mapper.selectCurrentFacts(null, "d2").getFirst().summary(false).state());
+            assertEquals(State.UNRESOLVED, reader(mapper, null, "d2").getFirst().summary(false).state());
         }
     }
 
@@ -138,10 +146,10 @@ class CurrentQualityFactsSqlTest {
         try (var session = database(1, 0); var statement = session.getConnection().createStatement()) {
             statement.execute("UPDATE mes_quality_treatment SET action_type='assess' WHERE id='a0'");
             var mapper = session.getMapper(ProductionDefectListExtraMapper.class);
-            assertEquals(State.UNRESOLVED, mapper.selectCurrentFacts(null, "d0").getFirst().summary(false).state());
+            assertEquals(State.UNRESOLVED, reader(mapper, null, "d0").getFirst().summary(false).state());
             statement.execute("UPDATE mes_production_defect SET record_action='void' WHERE id=0");
             session.clearCache();
-            assertEquals(1, mapper.selectCurrentFacts(List.of("1"), null).size());
+            assertEquals(1, reader(mapper, List.of("1"), null).size());
             for (String id : List.of("A", "a", "z"))
                 statement.execute("INSERT INTO mes_quality_treatment VALUES('" + id + "','d0',1,1,11,'ASSESS','INDEPENDENT',NULL,'证据',0,0)");
             session.clearCache();
