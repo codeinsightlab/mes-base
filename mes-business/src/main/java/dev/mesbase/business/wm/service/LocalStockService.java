@@ -185,11 +185,8 @@ public class LocalStockService {
         var stock = lock(line.getStockId());
         sources.warehouse(BusinessSource.LOCAL.getValue(), stock.getWarehouseId());
         var material = materials.selectByPrimaryKey(stock.getMaterialId());
-        if (!Objects.equals(stock.getMaterialId(), line.getMaterialId())
-                || !Objects.equals(stock.getWarehouseId(), line.getWarehouseId())
-                || !Objects.equals(stock.getBatchNo(), line.getBatchNo())
-                || !Objects.equals(stock.getBinCode(), line.getBinCode())
-                || material == null || !Objects.equals(material.getUnitId(), line.getUnitId()))
+        if (material == null || !StockActionRuleRegistry.StockIdentity.from(stock, material.getUnitId())
+                .equals(StockActionRuleRegistry.StockIdentity.from(line)))
             ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
         if (rule.direction() == StockDocumentDirection.OUT && (stock.getQuantity().compareTo(line.getQuantity()) < 0
                 || available(stock).compareTo(line.getQuantity()) < 0))
@@ -233,42 +230,66 @@ public class LocalStockService {
                 .equals(warehouse.getStatus())
                 || !EnableStatus.ENABLED.getValue().equals(unit.getStatus()))
             ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
-        BigDecimal before = stock.getQuantity(), avail = available(stock);
-        BigDecimal after = before.add(delta), availableAfter = avail.add(delta);
-        validateBalances(after, availableAfter);
-        var a = new WmStockActionEntity();
-        a.setId(id);
-        a.setRequestHash(hash);
-        a.setDocumentLineId(documentLineId);
-        a.setOperationId(operationId);
-        a.setStockId(stock.getId());
-        a.setMaterialId(stock.getMaterialId());
-        a.setUnitId(unit.getId());
-        a.setWarehouseId(stock.getWarehouseId());
-        a.setBatchNo(stock.getBatchNo());
-        a.setBinCode(stock.getBinCode());
-        a.setActionType(type.getValue());
-        a.setQuantityDelta(delta);
-        a.setAvailableDelta(delta);
-        a.setQuantityBefore(before);
-        a.setQuantityAfter(after);
-        a.setAvailableBefore(avail);
-        a.setAvailableAfter(availableAfter);
-        a.setSourceType(sourceType.getValue());
-        a.setSourceId(sourceId);
-        a.setReferenceActionId(reference);
-        a.setExecutionCode(execution);
-        a.setOperatorUserId(actor);
-        a.setOccurredAt(LocalDateTime.now());
-        a.setRecordedAt(a.getOccurredAt());
-        a.setReason(reason);
-        stock.setQuantity(after);
-        stock.setAvailableQuantity(availableAfter);
+        var balance = StockBalanceSnapshot.after(stock, delta);
+        validateBalances(balance.quantityAfter(), balance.availableAfter());
+        LocalDateTime changedAt = LocalDateTime.now();
+        var write = new StockActionWrite(id, hash, documentLineId, operationId, type, delta, sourceType, sourceId,
+                reference, execution, actor, reason);
+        var action = write.toEntity(stock, unit.getId(), balance, changedAt);
+        stock.setQuantity(balance.quantityAfter());
+        stock.setAvailableQuantity(balance.availableAfter());
         stock.setUpdateBy(actor.toString());
-        stock.setUpdateTime(a.getRecordedAt());
-        if (inventory.updateByPrimaryKey(stock) != 1 || actions.insert(a) != 1)
+        stock.setUpdateTime(changedAt);
+        if (inventory.updateByPrimaryKey(stock) != 1 || actions.insert(action) != 1)
             ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
-        return a;
+        return action;
+    }
+
+    private record StockBalanceSnapshot(BigDecimal quantityBefore, BigDecimal availableBefore,
+                                        BigDecimal quantityAfter, BigDecimal availableAfter) {
+        private static StockBalanceSnapshot after(WmInventoryEntity stock, BigDecimal delta) {
+            BigDecimal quantityBefore = stock.getQuantity();
+            BigDecimal availableBefore = available(stock);
+            return new StockBalanceSnapshot(quantityBefore, availableBefore, quantityBefore.add(delta),
+                    availableBefore.add(delta));
+        }
+    }
+
+    /** Explicit persistence whitelist for one stock ledger fact; avoids reflective copying into a write entity. */
+    private record StockActionWrite(String id, String requestHash, Long documentLineId, String operationId,
+                                    StockActionType type, BigDecimal delta, StockSourceType sourceType,
+                                    String sourceId, String referenceActionId, String executionCode,
+                                    Long actor, String reason) {
+        private WmStockActionEntity toEntity(WmInventoryEntity stock, Long unitId, StockBalanceSnapshot balance,
+                                             LocalDateTime changedAt) {
+            var action = new WmStockActionEntity();
+            action.setId(id);
+            action.setRequestHash(requestHash);
+            action.setDocumentLineId(documentLineId);
+            action.setOperationId(operationId);
+            action.setStockId(stock.getId());
+            action.setMaterialId(stock.getMaterialId());
+            action.setUnitId(unitId);
+            action.setWarehouseId(stock.getWarehouseId());
+            action.setBatchNo(stock.getBatchNo());
+            action.setBinCode(stock.getBinCode());
+            action.setActionType(type.getValue());
+            action.setQuantityDelta(delta);
+            action.setAvailableDelta(delta);
+            action.setQuantityBefore(balance.quantityBefore());
+            action.setQuantityAfter(balance.quantityAfter());
+            action.setAvailableBefore(balance.availableBefore());
+            action.setAvailableAfter(balance.availableAfter());
+            action.setSourceType(sourceType.getValue());
+            action.setSourceId(sourceId);
+            action.setReferenceActionId(referenceActionId);
+            action.setExecutionCode(executionCode);
+            action.setOperatorUserId(actor);
+            action.setOccurredAt(changedAt);
+            action.setRecordedAt(changedAt);
+            action.setReason(reason);
+            return action;
+        }
     }
 
     private WmStockActionEntity replay(String id, String hash) {
@@ -284,12 +305,8 @@ public class LocalStockService {
 
     private void identity(WmInventoryEntity stock, WmStockDocumentLineEntity line) {
         var material = materials.selectByPrimaryKey(stock.getMaterialId());
-        if (!Objects.equals(stock.getId(), line.getStockId())
-                || !Objects.equals(stock.getMaterialId(), line.getMaterialId())
-                || !Objects.equals(stock.getWarehouseId(), line.getWarehouseId())
-                || !Objects.equals(stock.getBatchNo(), line.getBatchNo())
-                || !Objects.equals(stock.getBinCode(), line.getBinCode())
-                || material == null || !Objects.equals(material.getUnitId(), line.getUnitId()))
+        if (material == null || !StockActionRuleRegistry.StockIdentity.from(stock, material.getUnitId())
+                .equals(StockActionRuleRegistry.StockIdentity.from(line)))
             ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
     }
 

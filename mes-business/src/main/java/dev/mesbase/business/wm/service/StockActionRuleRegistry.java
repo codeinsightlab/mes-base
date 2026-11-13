@@ -20,6 +20,7 @@ import dev.mesbase.common.validation.ParameterChecks;
 import dev.mesbase.core.error.ErrorCode;
 import dev.mesbase.core.error.FoundationException;
 import dev.mesbase.core.error.SafeBusinessMessage;
+
 import java.math.BigDecimal;
 import java.util.Objects;
 
@@ -52,6 +53,24 @@ final class StockActionRuleRegistry {
 
     private static void invalidType() {
         ParameterChecks.reject(ErrorCode.BAD_REQUEST, new SafeBusinessMessage("库存动作类型无效"));
+    }
+
+    record StockIdentity(Long stockId, Long materialId, Long warehouseId, Long unitId, String batchNo,
+                         String binCode) {
+        static StockIdentity from(WmStockDocumentLineEntity line) {
+            return new StockIdentity(line.getStockId(), line.getMaterialId(), line.getWarehouseId(), line.getUnitId(),
+                    line.getBatchNo(), line.getBinCode());
+        }
+
+        static StockIdentity from(WmStockActionEntity action) {
+            return new StockIdentity(action.getStockId(), action.getMaterialId(), action.getWarehouseId(),
+                    action.getUnitId(), action.getBatchNo(), action.getBinCode());
+        }
+
+        static StockIdentity from(WmInventoryEntity stock, Long unitId) {
+            return new StockIdentity(stock.getId(), stock.getMaterialId(), stock.getWarehouseId(), unitId,
+                    stock.getBatchNo(), stock.getBinCode());
+        }
     }
 
     interface Rule {
@@ -146,23 +165,30 @@ final class StockActionRuleRegistry {
                     .findFirst().orElseThrow(() -> new FoundationException(ErrorCode.RESOURCE_CONFLICT));
             if (line.getStockActionId() == null) ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
             var original = actions.selectByPrimaryKey(line.getStockActionId());
+            validateOriginalIssue(document, line, stock, original);
+            validateReturnableQuantity(original, line, command.quantity());
+            return new Plan(command.quantity(), StockSourceType.MATERIAL_ISSUE, document.getId().toString(),
+                    original.getId(), document.getSourceExecutionCode(), line);
+        }
+
+        private static void validateOriginalIssue(WmStockDocumentEntity document, WmStockDocumentLineEntity line,
+                                                  WmInventoryEntity stock, WmStockActionEntity original) {
             if (original == null || !StockActionType.ISSUE.getValue().equals(original.getActionType())
                     || !Objects.equals(original.getSourceId(), document.getId().toString())
                     || !Objects.equals(original.getDocumentLineId(), line.getId())
                     || !Objects.equals(original.getStockId(), stock.getId())
-                    || !Objects.equals(original.getMaterialId(), line.getMaterialId())
-                    || !Objects.equals(original.getWarehouseId(), line.getWarehouseId())
-                    || !Objects.equals(original.getUnitId(), line.getUnitId())
-                    || !Objects.equals(original.getBatchNo(), line.getBatchNo())
-                    || !Objects.equals(original.getBinCode(), line.getBinCode())
+                    || !StockIdentity.from(original).equals(StockIdentity.from(line))
                     || original.getQuantityDelta() == null || original.getQuantityDelta().signum() >= 0
-                    || original.getQuantityDelta().abs().compareTo(line.getQuantity()) != 0
-                    || actions.sumReturns(original.getId(), StockActionType.REVERSAL.getValue()).signum() != 0
-                    || actions.sumReturns(original.getId(), StockActionType.RETURN.getValue())
-                    .add(command.quantity()).compareTo(line.getQuantity()) > 0)
+                    || original.getQuantityDelta().abs().compareTo(line.getQuantity()) != 0)
                 ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
-            return new Plan(command.quantity(), StockSourceType.MATERIAL_ISSUE, document.getId().toString(),
-                    original.getId(), document.getSourceExecutionCode(), line);
+        }
+
+        private void validateReturnableQuantity(WmStockActionEntity original, WmStockDocumentLineEntity line,
+                                                BigDecimal quantity) {
+            if (actions.sumReturns(original.getId(), StockActionType.REVERSAL.getValue()).signum() != 0
+                    || actions.sumReturns(original.getId(), StockActionType.RETURN.getValue())
+                    .add(quantity).compareTo(line.getQuantity()) > 0)
+                ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
         }
     }
 
@@ -199,33 +225,59 @@ final class StockActionRuleRegistry {
             if (document == null || document.getId() == null || line == null || original == null)
                 ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
             var posting = DocumentPostingRule.resolve(document.getDirection(), document.getDocumentType());
-            if (line.getQuantity() == null || line.getQuantity().signum() <= 0
-                    || !Objects.equals(document.getId(), line.getDocumentId())
+            if (line.getQuantity() == null || line.getQuantity().signum() <= 0)
+                ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
+            validateDocumentLineReference(document, line, original);
+            validatePostedAction(document, line, original, posting);
+            validateExecutionIdentity(document, original);
+            validatePostedQuantity(line, original, posting);
+            BigDecimal remaining = remainingQuantity(original, posting, returned);
+            return new DocumentReversalPlan(remaining.negate(), posting.sourceType(), original.getSourceId(),
+                    original.getId(), original.getExecutionCode());
+        }
+
+        private static void validateDocumentLineReference(WmStockDocumentEntity document,
+                                                          WmStockDocumentLineEntity line,
+                                                          WmStockActionEntity original) {
+            if (!Objects.equals(document.getId(), line.getDocumentId())
                     || !Objects.equals(line.getStockActionId(), original.getId())
-                    || !Objects.equals(original.getActionType(), posting.actionType().getValue())
+                    || !Objects.equals(original.getDocumentLineId(), line.getId()))
+                ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
+        }
+
+        private static void validatePostedAction(WmStockDocumentEntity document, WmStockDocumentLineEntity line,
+                                                 WmStockActionEntity original, DocumentPostingRule posting) {
+            if (!Objects.equals(original.getActionType(), posting.actionType().getValue())
                     || !Objects.equals(original.getSourceType(), posting.sourceType().getValue())
                     || !Objects.equals(original.getSourceId(), document.getId().toString())
-                    || !Objects.equals(original.getDocumentLineId(), line.getId())
-                    || !Objects.equals(original.getStockId(), line.getStockId())
-                    || !Objects.equals(original.getMaterialId(), line.getMaterialId())
-                    || !Objects.equals(original.getWarehouseId(), line.getWarehouseId())
-                    || !Objects.equals(original.getUnitId(), line.getUnitId())
-                    || !Objects.equals(original.getBatchNo(), line.getBatchNo())
-                    || !Objects.equals(original.getBinCode(), line.getBinCode())
-                    || (document.getSourceExecutionCode() != null
-                    && !Objects.equals(original.getExecutionCode(), document.getSourceExecutionCode()))
-                    || original.getQuantityDelta() == null
-                    || original.getQuantityDelta().compareTo(posting.delta(line.getQuantity())) != 0
-                    || returned == null || returned.signum() < 0
-                    || (returned.signum() != 0 && posting.actionType() != StockActionType.ISSUE))
+                    || !StockIdentity.from(original).equals(StockIdentity.from(line)))
                 ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
+        }
 
+        private static void validateExecutionIdentity(WmStockDocumentEntity document,
+                                                      WmStockActionEntity original) {
+            if (document.getSourceExecutionCode() != null
+                    && !Objects.equals(original.getExecutionCode(), document.getSourceExecutionCode()))
+                ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
+        }
+
+        private static void validatePostedQuantity(WmStockDocumentLineEntity line, WmStockActionEntity original,
+                                                   DocumentPostingRule posting) {
+            if (original.getQuantityDelta() == null
+                    || original.getQuantityDelta().compareTo(posting.delta(line.getQuantity())) != 0)
+                ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
+        }
+
+        private static BigDecimal remainingQuantity(WmStockActionEntity original, DocumentPostingRule posting,
+                                                    BigDecimal returned) {
+            if (returned == null || returned.signum() < 0
+                    || returned.signum() != 0 && posting.actionType() != StockActionType.ISSUE)
+                ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
             BigDecimal remaining = original.getQuantityDelta().add(returned);
             if (remaining.signum() != 0
                     && remaining.signum() != original.getQuantityDelta().signum())
                 ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT);
-            return new DocumentReversalPlan(remaining.negate(), posting.sourceType(), original.getSourceId(),
-                    original.getId(), original.getExecutionCode());
+            return remaining;
         }
     }
 
