@@ -14,6 +14,7 @@ import dev.mesbase.business.production.domain.WorkorderEntity;
 import dev.mesbase.business.quality.service.QualityTreatmentService;
 import dev.mesbase.business.shared.enums.BusinessSource;
 import dev.mesbase.business.wm.dao.StockDocumentExtraMapper;
+import dev.mesbase.business.wm.dao.StockDocumentExtraMapper.ProductionInboundSummary;
 import dev.mesbase.business.wm.dao.WmStockDocumentMapper;
 import dev.mesbase.business.wm.domain.StockDocumentStatus;
 import dev.mesbase.business.wm.domain.StockDocumentType;
@@ -24,6 +25,9 @@ import dev.mesbase.core.error.FoundationException;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
@@ -90,6 +94,7 @@ public class WorkOrderCompletionService {
                 rows = List.copyOf(executions.selectByExample(filter));
             }
             if (rows.isEmpty()) break;
+            Map<String, ProductionInboundSummary> inboundByCode = null;
             for (var execution : rows) {
                 if (!ProductionExecutionStatus.FULLY_RECEIVED.getValue().equals(execution.getStatus()))
                     return "工单仍有未完全入库的执行";
@@ -101,9 +106,20 @@ public class WorkOrderCompletionService {
                     return "执行存在历史数量超额，须核实数量异常";
                 var reason = ProductionCompletionBalance.blockedReason(projection);
                 if (reason != null) return reason;
-                if (inbound.invalidProductionInboundLines(execution.getExecutionCode()) > 0)
+                // Load once, only when this page first reaches the original receipt-proof boundary.
+                if (inboundByCode == null) {
+                    var codes = rows.stream().map(MesProductionExecutionEntity::getExecutionCode).toList();
+                    inboundByCode = inbound.productionInboundSummaries(codes).stream()
+                            .collect(Collectors.toMap(ProductionInboundSummary::executionCode, Function.identity()));
+                }
+                // No aggregate row means no posted receipt, matching the scalar queries' zero result.
+                var proof = inboundByCode.getOrDefault(execution.getExecutionCode(),
+                        new ProductionInboundSummary(execution.getExecutionCode(), BigDecimal.ZERO, 0));
+                if (proof.invalidCount() > 0)
                     return "正式生产入库明细与库存动作不一致";
-                var received = inbound.formalProductionInbound(execution.getExecutionCode());
+                if (proof.receivedQty() == null)
+                    throw new FoundationException(ErrorCode.PRODUCTION_CLOSURE_CONFLICT);
+                var received = proof.receivedQty();
                 BigDecimal output = projection.productionInputQty();
                 if (execution.getRoutingId() != null) output = projection.nodes().getLast().effectiveOutputQty();
                 if (received.compareTo(output) != 0)

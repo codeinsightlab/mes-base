@@ -24,6 +24,12 @@ public interface StockDocumentExtraMapper {
 
     long invalidProductionInboundLines(@Param("executionCode") String executionCode);
 
+    record ProductionInboundSummary(String executionCode, BigDecimal receivedQty, long invalidCount) {
+    }
+
+    java.util.List<ProductionInboundSummary> productionInboundSummaries(
+            @Param("executionCodes") java.util.List<String> executionCodes);
+
     BigDecimal netProductionInboundForOrder(@Param("workorderId") Long workorderId);
 
     BigDecimal netProductionInbound(@Param("executionCode") String executionCode);

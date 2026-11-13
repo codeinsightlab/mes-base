@@ -52,14 +52,17 @@
   <bind name="receiptSourceType" value="@dev.mesbase.business.wm.domain.StockSourceType@OTHER_RECEIPT.getValue()"/>
   <bind name="localSource" value="@dev.mesbase.business.shared.enums.BusinessSource@LOCAL.getValue()"/>
  </sql>
- <sql id="formalInboundJoins">
-  <include refid="formalInboundBindings"/>
+ <sql id="formalInboundRelations">
   FROM wm_stock_document d LEFT JOIN wm_stock_document_line l ON l.document_id=d.id
   LEFT JOIN wm_stock_action a ON a.id=l.stock_action_id
   LEFT JOIN mes_production_execution e ON e.execution_code=d.source_execution_code
   LEFT JOIN workorder o ON o.id=e.workorder_id
   LEFT JOIN material m ON m.id=e.product_id
   LEFT JOIN wm_warehouse w ON w.id=l.warehouse_id
+ </sql>
+ <sql id="formalInboundJoins">
+  <include refid="formalInboundBindings"/>
+  <include refid="formalInboundRelations"/>
   WHERE d.source_execution_code=#{executionCode} AND d.status=#{postedStatus} AND d.document_type=#{productionReceiptType}
  </sql>
  <sql id="formalInboundMatches">
@@ -68,7 +71,7 @@
   AND e.product_id=o.product_id AND l.material_id=e.product_id AND l.unit_id=m.unit_id AND l.quantity&gt;0
   AND d.source_workorder_id IS NULL AND d.post_request_id IS NOT NULL
   AND d.post_request_hash IS NOT NULL AND d.posted_by IS NOT NULL AND d.posted_at IS NOT NULL
-  AND a.id IS NOT NULL AND a.document_line_id=l.id AND a.execution_code=#{executionCode}
+  AND a.id IS NOT NULL AND a.document_line_id=l.id AND a.execution_code=d.source_execution_code
   AND a.operation_id=d.post_request_id AND a.source_type=#{receiptSourceType}
   AND a.source_id=CONCAT('',d.id) AND a.action_type=#{receiptActionType}
   AND a.quantity_delta=l.quantity AND a.available_delta=l.quantity
@@ -94,6 +97,21 @@
  <select id="invalidProductionInboundLines" resultType="long">
   SELECT COUNT(*) <include refid="formalInboundJoins"/>
   AND NOT (COALESCE((<include refid="formalInboundMatches"/>),FALSE))
+ </select>
+ <select id="productionInboundSummaries" resultType="dev.mesbase.business.wm.dao.StockDocumentExtraMapper$ProductionInboundSummary">
+  <include refid="formalInboundBindings"/>
+  SELECT checked.execution_code AS executionCode,
+         COALESCE(SUM(CASE WHEN checked.is_valid=1 THEN checked.quantity ELSE 0 END),0) AS receivedQty,
+         SUM(CASE WHEN checked.is_valid=1 THEN 0 ELSE 1 END) AS invalidCount
+  FROM (
+   SELECT d.source_execution_code AS execution_code,l.quantity,
+          CASE WHEN (<include refid="formalInboundMatches"/>) THEN 1 ELSE 0 END AS is_valid
+   <include refid="formalInboundRelations"/>
+   WHERE d.status=#{postedStatus} AND d.document_type=#{productionReceiptType}
+     AND d.source_execution_code IN
+     <foreach collection="executionCodes" item="code" open="(" separator="," close=")">#{code}</foreach>
+  ) checked
+  GROUP BY checked.execution_code
  </select>
  <select id="latestInboundAuditId" resultType="string">
   <include refid="formalInboundBindings"/>
