@@ -1,5 +1,6 @@
 package dev.mesbase.business.basic.domain;
 
+import java.util.Optional;
 import java.math.BigDecimal;
 
 /**
@@ -10,8 +11,8 @@ public record MaterialBomItemRow(Long id, Long bomId, Long materialId, BigDecima
                                  String specification, String unitName, String childBomCode, String childBomVersion) {
     public static MaterialBomItemRow of(MaterialBomItemEntity row, MaterialEntity material, UnitMeasureEntity unit,
                                         MaterialBomEntity childBom) {
-        String childCode = childBom == null ? null : childBom.getCode();
-        String childVersion = childBom == null ? null : childBom.getVersion();
+        String childCode = Optional.ofNullable(childBom).map(MaterialBomEntity::getCode).orElse(null);
+        String childVersion = Optional.ofNullable(childBom).map(MaterialBomEntity::getVersion).orElse(null);
         if (material == null || unit == null) {
             return new MaterialBomItemRow(row.getId(), row.getBomId(), row.getMaterialId(), row.getQuantity(),
                     row.getUnitId(), row.getChildBomId(), row.getSort(), null, null, null, null, childCode, childVersion);

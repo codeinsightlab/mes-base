@@ -1,6 +1,7 @@
 package dev.mesbase;
 
 import dev.MesBaseApplication;
+import dev.mesbase.server.HttpLoggingBusinessProbe;
 import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.spi.ILoggingEvent;
@@ -91,11 +92,7 @@ class HttpLoggingHttpTest {
         @EndpointAccess(EndpointAccess.Kind.PUBLIC)
         String log(@PathVariable String kind) throws InterruptedException {
             if (kind.equals("slow")) Thread.sleep(700);
-            if (kind.equals("bad-request")) throw new FoundationException(ErrorCode.BAD_REQUEST);
-            if (kind.equals("unauthenticated")) throw new FoundationException(ErrorCode.UNAUTHENTICATED);
-            if (kind.equals("business-401")) throw new ServiceException("TEST ONLY expected authentication", 401);
-            if (kind.equals("business")) throw new ServiceException("TEST ONLY expected validation");
-            if (kind.equals("known")) throw new FoundationException(ErrorCode.UNPROCESSABLE);
+            HttpLoggingBusinessProbe.reject(kind);
             if (kind.equals("system"))
                 throw new IllegalStateException("TEST ONLY unexpected", new IOException("TEST ONLY original cause"));
             LoggerFactory.getLogger(TestController.class).info("TEST ONLY application event");
@@ -278,7 +275,7 @@ class HttpLoggingHttpTest {
         assertNull(event.getThrowableProxy());
         assertTrue(event.getFormattedMessage().contains("exception=" + type.getName()));
         assertTrue(event.getFormattedMessage()
-                .contains("origin=at " + TestController.class.getName() + ".log(HttpLoggingHttpTest.java:"));
+                .contains("origin=at " + HttpLoggingBusinessProbe.class.getName() + ".reject(HttpLoggingBusinessProbe.java:"));
         assertTrue(!event.getFormattedMessage().contains("requestId="));
     }
 

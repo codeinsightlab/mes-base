@@ -1,8 +1,15 @@
 package dev.mesbase.business.production.service;
 
+import java.security.NoSuchAlgorithmException;
+import java.util.HexFormat;
+import dev.mesbase.business.production.domain.RoutingEntity;
+import java.math.BigDecimal;
+import org.springframework.transaction.annotation.Propagation;
+import java.util.Optional;
 import dev.mesbase.business.basic.dao.MaterialBomMapper;
 import dev.mesbase.business.basic.dao.MaterialMapper;
 import dev.mesbase.business.basic.domain.MaterialBomEntity;
+import dev.mesbase.business.basic.domain.MaterialEntity;
 import dev.mesbase.business.basic.domain.MaterialBomExplosion;
 import dev.mesbase.business.basic.domain.MaterialBomStatus;
 import dev.mesbase.business.basic.service.MaterialBomService;
@@ -84,7 +91,7 @@ public class WorkOrderBomBuildService {
                 List.copyOf(problems));
     }
 
-    @Transactional(transactionManager = "businessTransactionManager", propagation = org.springframework.transaction.annotation.Propagation.NOT_SUPPORTED)
+    @Transactional(transactionManager = "businessTransactionManager", propagation = Propagation.NOT_SUPPORTED)
     public WorkOrderBomBuildModels.Result confirm(WorkOrderBomBuildModels.PreviewRequest request,
                                                   WorkOrderBomBuildModels.Confirm command) {
         if (command == null) throw new FoundationException(ErrorCode.BAD_REQUEST);
@@ -128,7 +135,7 @@ public class WorkOrderBomBuildService {
                     choice.routingId(), choice.plannedStartAt(), choice.plannedEndAt(), null, null, choice.remark(),
                     null, ruleCode, material);
             records.add(new BomBuildOrder(values, pending.path(), pending.parentPath(),
-                    pending.sourceLineId() == null ? null : Long.valueOf(pending.sourceLineId())));
+                    Optional.ofNullable(pending.sourceLineId()).map(Long::valueOf).orElse(null)));
         }
         String buildId = UUID.randomUUID().toString();
         var created = workOrders.createBomBuild(new BomBuildCommand(buildId, command.requestId(), requestHash,
@@ -152,7 +159,7 @@ public class WorkOrderBomBuildService {
 
     private WorkOrderBomBuildModels.OrderPreview appendOrder(String path, String parentPath, Long sourceLineId,
                                                              Long productId, String code, String name,
-                                                             java.math.BigDecimal quantity, MaterialBomEntity version,
+                                                             BigDecimal quantity, MaterialBomEntity version,
                                                              List<MaterialBomExplosion.Node> tree,
                                                              List<WorkOrderBomBuildModels.OrderPreview> orders,
                                                              List<WorkOrderBomBuildModels.Problem> problems) {
@@ -180,8 +187,8 @@ public class WorkOrderBomBuildService {
             }
         }
         var product = materials.selectByPrimaryKey(productId);
-        var rule = product == null ? null : product.getWorkOrderRuleCode();
-        var routes = (productId == null ? List.<dev.mesbase.business.production.domain.RoutingEntity>of()
+        var rule = Optional.ofNullable(product).map(MaterialEntity::getWorkOrderRuleCode).orElse(null);
+        var routes = (productId == null ? List.<RoutingEntity>of()
                 : workOrders.applicableRoutings(productId, "")).stream().map(r -> new WorkOrderBomBuildModels.Route(
                 r.getId().toString(), r.getCode(), r.getName(), r.getVersion())).toList();
         String selectedRoute = routes.size() == 1 ? routes.getFirst().id() : null;
@@ -190,9 +197,12 @@ public class WorkOrderBomBuildService {
                         Objects.toString(node.materialId(), null), node.code(), node.name(), Objects.toString(node.unitId(), null), node.quantity(),
                         node.componentQty(), node.baseQty())).toList();
         var preview = new WorkOrderBomBuildModels.OrderPreview(path, parentPath,
-                sourceLineId == null ? null : sourceLineId.toString(), Objects.toString(productId, null), code, name, quantity,
-                version == null ? null : version.getId().toString(), version == null ? null : version.getCode(),
-                version == null ? null : version.getVersion(), version == null ? null : version.getRevision(), rule,
+                Objects.toString(sourceLineId, null), Objects.toString(productId, null), code, name, quantity,
+                Optional.ofNullable(version).map(value -> value.getId().toString())
+                        .orElse(null), Optional.ofNullable(version).map(MaterialBomEntity::getCode).orElse(null),
+                Optional.ofNullable(version).map(MaterialBomEntity::getVersion)
+                        .orElse(null), Optional.ofNullable(version).map(MaterialBomEntity::getRevision)
+                .orElse(null), rule,
                 selectedRoute, routes, materialLines, List.copyOf(issues));
         orders.add(preview);
         problems.addAll(issues);
@@ -230,9 +240,9 @@ public class WorkOrderBomBuildService {
 
     private static String hash(String value) {
         try {
-            return java.util.HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256")
+            return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256")
                     .digest(value.getBytes(StandardCharsets.UTF_8)));
-        } catch (java.security.NoSuchAlgorithmException failure) {
+        } catch (NoSuchAlgorithmException failure) {
             throw new IllegalStateException(failure);
         }
     }

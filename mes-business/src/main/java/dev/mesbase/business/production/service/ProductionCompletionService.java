@@ -193,8 +193,14 @@ public class ProductionCompletionService {
         var existing = completions.selectByPrimaryKey(command.requestId());
         String hash = ProductionClosureRules.hash(id, command.expectedBasisHash(), command.reason(), ProductionClosureRules.actor());
         if (existing != null && Objects.equals(id, existing.getExecutionCode())
-                && Objects.equals(existing.getOperatorUserId(), ProductionClosureRules.actor())
-                && hash.equals(existing.getRequestHash())) return existing;
+                && Objects.equals(existing.getOperatorUserId(), ProductionClosureRules.actor())) {
+            if (hash.equals(existing.getRequestHash())) return existing;
+            // Pre-code requests froze the numeric local identity. Never rewrite that fingerprint.
+            var execution = executions.selectByCode(id);
+            if (execution != null && ProductionClosureRules.hash(execution.getId(), command.expectedBasisHash(),
+                    command.reason(), ProductionClosureRules.actor()).equals(existing.getRequestHash()))
+                return existing;
+        }
         if (existing != null) ParameterChecks.reject(ErrorCode.PRODUCTION_CLOSURE_CONFLICT);
         throw new ProductionClosureBlockedException("手动完工已停用；生产及不良入库审核后按统一规则自动收尾");
     }

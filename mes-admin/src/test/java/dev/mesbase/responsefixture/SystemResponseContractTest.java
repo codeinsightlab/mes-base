@@ -92,6 +92,10 @@ class SystemResponseContractTest {
             emptyExpected.putNull("senderId");
             emptyExpected.putNull("recipientId");
         }
+        if (empty instanceof SysAutoCodeRule) {
+            emptyExpected.putNull("ruleType");
+            emptyExpected.putNull("factoryId");
+        }
         assertEquals(emptyExpected, json.valueToTree(convert.apply(empty)));
         assertEquals(null, convert.apply(null));
         T source = sample(type);
@@ -105,7 +109,13 @@ class SystemResponseContractTest {
         if (source instanceof SysMenu menu) menu.setChildren(List.of(sample(SysMenu.class)));
         if (source instanceof TreeSelect tree) tree.setChildren(List.of(sample(TreeSelect.class)));
         JsonNode actual = json.valueToTree(convert.apply(source));
-        assertEquals(json.valueToTree(LegacySystemViews.project(source)), actual);
+        ObjectNode expected = json.valueToTree(LegacySystemViews.project(source));
+        if (source instanceof SysAutoCodeRule rule) {
+            expected.put("ruleType", rule.getRuleType());
+            expected.put("factoryId", rule.getFactoryId());
+            assertTrue(actual.path("factoryId").isTextual());
+        }
+        assertEquals(expected, actual);
         rejectInternalFields(actual);
     }
 

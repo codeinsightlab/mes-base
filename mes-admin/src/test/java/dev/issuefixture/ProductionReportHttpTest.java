@@ -110,6 +110,9 @@ class ProductionReportHttpTest {
             var m = MaterialIssueHttpTest.mvc(c);
             var jdbc = c.getBean(MaterialIssueHttpTest.Fixture.class).business.get("A");
             long original = add(m, 11, "4");
+            // An active declaration makes quantity reads require the treatment table.
+            jdbc.update("INSERT INTO mes_production_defect(declaration_id,revision_no,record_action,execution_code,affected_node_id,defect_qty,waste_category,defect_reason,request_key,request_fingerprint,reported_by,occurred_at,recorded_by,recorded_at) VALUES(?,1,'CREATE','1',11,1,'PROCESS','TEST ONLY outage fixture',?,?,1,CURRENT_TIMESTAMP,1,CURRENT_TIMESTAMP)",
+                    UUID.randomUUID().toString(), UUID.randomUUID().toString(), "d".repeat(64));
             // A quantity outage remains a failure for quantity reads, but is unrelated to historical ledger access.
             jdbc.execute("ALTER TABLE mes_quality_treatment RENAME TO unavailable_quality_ledger_fixture");
             m.perform(full(get("/api/production/report-quantities/executions/1"), "A"))

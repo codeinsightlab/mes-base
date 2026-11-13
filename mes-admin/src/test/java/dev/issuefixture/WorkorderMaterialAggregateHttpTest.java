@@ -33,6 +33,7 @@ class WorkorderMaterialAggregateHttpTest {
     }
 
     private static void seed(JdbcTemplate db) {
+        db.update("INSERT INTO material(id,code,name,unit_id,status) VALUES(97,'TEST-ADDED','TEST ONLY manually added material',1,'ENABLED')");
         db.update("INSERT INTO material(id,code,name,unit_id,status) VALUES(98,'TEST-COMPONENT','TEST ONLY second component',1,'ENABLED')");
         db.update("INSERT INTO material_bom(id,code,version,product_id,base_qty,unit_id,status,revision,created_by,created_at,is_default) VALUES(2,'TEST-MULTI','1',99,1,1,'PUBLISHED',1,1,CURRENT_TIMESTAMP,0)");
         // A missing lower-level version must not invalidate this stage's two valid direct components.
@@ -130,7 +131,7 @@ class WorkorderMaterialAggregateHttpTest {
             seed(db);
             var mvc = MaterialIssueHttpTest.mvc(context);
             var first = material(List.of(line("21", "1", "7", true), line("22", "98", "9", false),
-                    line(null, "98", "5", true)));
+                    line(null, "97", "5", true)));
             var created = mvc.perform(full(post("/api/production/workorder"))
                     .content(JSON.writeValueAsString(command("3", first)))).andExpect(status().isOk()).andReturn();
             var id = JSON.readTree(created.getResponse().getContentAsString()).path("workorder").path("id").asString();

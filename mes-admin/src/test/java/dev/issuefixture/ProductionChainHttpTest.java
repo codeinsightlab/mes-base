@@ -32,7 +32,8 @@ class ProductionChainHttpTest {
         try (var c = MaterialIssueHttpTest.context(); var pool = Executors.newFixedThreadPool(2)) {
             var m = MaterialIssueHttpTest.mvc(c);
             var start = new CountDownLatch(1);
-            String body = WorkorderMaterialFixture.command(c.getBean(MaterialIssueHttpTest.Fixture.class).business.get("A"), DEMAND.replace("QA_DEMAND", "WO1").replace("}", ",\"revision\":0}"), 1L);
+            String body = WorkorderMaterialFixture.command(c.getBean(MaterialIssueHttpTest.Fixture.class).business.get("A"), DEMAND.replace("QA_DEMAND", "WO1")
+                    .replace("}", ",\"revision\":0}"), 1L);
             var first = pool.submit(() -> {
                 start.await();
                 return m.perform(full(put(W + "/1"), "A").content(body)).andReturn().getResponse().getStatus();
@@ -54,7 +55,8 @@ class ProductionChainHttpTest {
         try (var c = MaterialIssueHttpTest.context()) {
             var m = MaterialIssueHttpTest.mvc(c);
             var a = c.getBean(MaterialIssueHttpTest.Fixture.class).business.get("A");
-            m.perform(full(post(W), "A").content(WorkorderMaterialFixture.command(a, DEMAND, null))).andExpect(status().isOk())
+            m.perform(full(post(W), "A").content(WorkorderMaterialFixture.command(a, DEMAND, null)))
+                    .andExpect(status().isOk())
                     .andExpect(jsonPath("batches").doesNotExist())
                     .andExpect(jsonPath("allocation.executionCount").value(0))
                     .andExpect(jsonPath("allocation.remainingTargetQty").value("1000.000000"));
@@ -97,7 +99,7 @@ class ProductionChainHttpTest {
             String one = "{\"workorderId\":\"1\",\"routingId\":\"1\",\"targetQty\":\"400\",\"status\":\"READY\"}";
             String two = one.replace("\"routingId\":\"1\"", "\"routingId\":\"3\"").replace("400", "300");
             // Existing fixture executions only; new executions are created by formal BOM input.
-            a.update("INSERT INTO mes_production_execution(id,workorder_id,product_id,routing_id,target_qty,status) VALUES(1,1,1,1,400,'READY'),(2,1,1,3,300,'READY')");
+            a.update("INSERT INTO mes_production_execution(id,execution_code,workorder_id,product_id,routing_id,target_qty,status) VALUES(1,'1',1,1,1,400,'READY'),(2,'2',1,1,3,300,'READY')");
             m.perform(full(get(W + "/1/allocation"), "A")).andExpect(status().isOk())
                     .andExpect(jsonPath("allocatedTargetQty").value("700.000000"))
                     .andExpect(jsonPath("remainingTargetQty").value("300.000000"))
@@ -136,7 +138,8 @@ class ProductionChainHttpTest {
                     .andExpect(jsonPath("batches").doesNotExist());
             m.perform(full(put(W + "/1"), "A").content(WorkorderMaterialFixture.command(a, DEMAND.replace("QA_DEMAND", "WO1")
                     .replace("}", ",\"revision\":0}"), 1L))).andExpect(status().isOk());
-            m.perform(full(post(W), "A").content(WorkorderMaterialFixture.command(a, DEMAND, null))).andExpect(status().isOk());
+            m.perform(full(post(W), "A").content(WorkorderMaterialFixture.command(a, DEMAND, null)))
+                    .andExpect(status().isOk());
             m.perform(full(delete(W + "/2"), "A").content("{\"revision\":0}"))
                     .andExpect(status().isNoContent());
             m.perform(full(get(W), "A")).andExpect(status().isOk());
@@ -144,7 +147,7 @@ class ProductionChainHttpTest {
                     .andExpect(status().isOk());
             m.perform(full(post(E), "A").content("{\"workorderId\":\"1\",\"routingId\":\"1\",\"targetQty\":\"3\",\"status\":\"READY\"}"))
                     .andExpect(status().isMethodNotAllowed());
-            a.update("INSERT INTO mes_production_execution(id,workorder_id,product_id,routing_id,target_qty,status) VALUES(1,1,1,1,3,'READY')");
+            a.update("INSERT INTO mes_production_execution(id,execution_code,workorder_id,product_id,routing_id,target_qty,status) VALUES(1,'1',1,1,1,3,'READY')");
             m.perform(full(get(E + "/1"), "A")).andExpect(status().isOk());
 
         }

@@ -109,7 +109,16 @@ class FormalInputProductionHttpTest {
                     .andExpect(jsonPath("canComplete").doesNotExist());
             var q = QualityWorkflowHttpTest.quantities(http);
             QualityWorkflowHttpTest.amount(q.path("nodes").get(1), "unverifiedDefectQty", "10");
-            QualityWorkflowHttpTest.amount(q.path("nodes").get(4), "effectiveOutputQty", "90");
+            QualityWorkflowHttpTest.amount(q.path("nodes").get(1), "reportedQty", "100");
+            QualityWorkflowHttpTest.amount(q.path("nodes").get(1), "directDefectQty", "10");
+            QualityWorkflowHttpTest.amount(q.path("nodes").get(1), "effectiveOutputQty", "80");
+            QualityWorkflowHttpTest.amount(q.path("nodes").get(2), "inputQty", "80");
+            QualityWorkflowHttpTest.amount(q.path("nodes").get(2), "historicalOverrunQty", "10");
+            QualityWorkflowHttpTest.amount(q.path("nodes").get(4), "effectiveOutputQty", "80");
+            assertEquals("RUNNING", ProductionWarehouseFixture.db(c).queryForObject(
+                    "SELECT status FROM mes_production_execution WHERE id=1", String.class));
+            assertEquals(0, ProductionWarehouseFixture.db(c).queryForObject(
+                    "SELECT COUNT(*) FROM mes_execution_completion", Integer.class));
         }
     }
 

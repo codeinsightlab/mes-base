@@ -1,17 +1,44 @@
 package dev.mesbase.business.basic.service;
 
+import dev.mesbase.platform.execution.FactoryContext;
+import java.math.BigInteger;
+import dev.mesbase.common.validation.ParameterChecks;
 import com.fasterxml.jackson.annotation.JsonFormat;
-import dev.mesbase.business.basic.dao.*;
-import dev.mesbase.business.basic.domain.*;
+import dev.mesbase.business.basic.dao.BomPlanReceiptMapper;
+import dev.mesbase.business.basic.dao.MaterialBomItemMapper;
+import dev.mesbase.business.basic.domain.MaterialBomCopyCommand;
+import dev.mesbase.business.basic.domain.MaterialBomCreateCommand;
+import dev.mesbase.business.basic.domain.MaterialBomEntity;
+import dev.mesbase.business.basic.domain.MaterialBomItemCreateCommand;
+import dev.mesbase.business.basic.domain.MaterialBomItemEntity;
+import dev.mesbase.business.basic.domain.MaterialBomItemExample;
+import dev.mesbase.business.basic.domain.MaterialBomItemUpdateCommand;
+import dev.mesbase.business.basic.domain.MaterialBomStatus;
+import dev.mesbase.business.basic.domain.MaterialBomUpdateCommand;
 import dev.mesbase.common.utils.SecurityUtils;
-import dev.mesbase.core.error.*;
+import dev.mesbase.core.error.ErrorCode;
+import dev.mesbase.core.error.FoundationException;
+import dev.mesbase.core.error.SafeBusinessMessage;
 import java.math.BigDecimal;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.HexFormat;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.Set;
+import java.util.TreeSet;
+import java.util.UUID;
 import java.util.stream.Collectors;
 import java.security.MessageDigest;
 import org.springframework.stereotype.Service;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
-import org.springframework.transaction.annotation.*;
+import org.springframework.transaction.annotation.Isolation;
+import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.databind.json.JsonMapper;
 
 @Service
@@ -54,7 +81,7 @@ public class BomTreePlans {
 
     private static void require(boolean ok) {
         if (!ok)
-            dev.mesbase.common.validation.ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT, new SafeBusinessMessage("结构、版本号或修订号冲突，请核对后重新预览"));
+            ParameterChecks.reject(ErrorCode.RESOURCE_CONFLICT, new SafeBusinessMessage("结构、版本号或修订号冲突，请核对后重新预览"));
     }
 
     private static long id(String value) {
@@ -185,8 +212,8 @@ public class BomTreePlans {
                         .equals(n.code()) && !MaterialBomStatus.DISABLED.getValue().equals(b.getStatus()));
                 before = rows(b.getId()).stream().map(BomTreePlans::line).toList();
                 var mapped = n.lines().stream()
-                        .map(l -> new Line(l.material(), plain(l.quantity()), l.sort(), l.child() == null ? null : Objects.toString(nodes.get(l.child())
-                                .source(), null))).toList();
+                        .map(l -> new Line(l.material(), plain(l.quantity()), l.sort(), Optional.ofNullable(l.child())
+                                .map(key -> Objects.toString(nodes.get(key).source(), null)).orElse(null))).toList();
                 boolean localChange = !before.equals(mapped) || n.base().compareTo(b.getBaseQty()) != 0
                         || !Objects.equals(n.remark(), b.getRemark()) || !n.version().equals(b.getVersion());
                 boolean newChild = n.lines().stream().anyMatch(l -> changed.contains(l.child()));
@@ -230,13 +257,13 @@ public class BomTreePlans {
         int suffix = label.length();
         while (suffix > 0 && label.charAt(suffix - 1) >= '0' && label.charAt(suffix - 1) <= '9') suffix--;
         var prefix = suffix == label.length() ? label + "-r" : label.substring(0, suffix);
-        var number = suffix == label.length() ? java.math.BigInteger.ONE : new java.math.BigInteger(label.substring(suffix));
+        var number = suffix == label.length() ? BigInteger.ONE : new BigInteger(label.substring(suffix));
         while (true) {
-            number = number.add(java.math.BigInteger.ONE);
+            number = number.add(BigInteger.ONE);
             var tail = number.toString();
             if (tail.length() > 32) {
                 prefix = label + "-r";
-                number = java.math.BigInteger.ONE;
+                number = BigInteger.ONE;
                 continue;
             }
             var candidate = prefix.substring(0, Math.min(prefix.length(), 32 - tail.length())) + tail;
@@ -280,7 +307,7 @@ public class BomTreePlans {
                 var old = prior.remove(l.material());
                 if (old == null) inserts++;
                 else {
-                    var child = l.child() == null ? null : s.nodes.get(l.child());
+                    var child = Optional.ofNullable(l.child()).map(s.nodes::get).orElse(null);
                     boolean sameChild = child == null ? old.child() == null : Objects.equals(old.child(), Objects.toString(child.source(), null))
                             && s.changes.stream()
                             .anyMatch(ch -> ch.key().equals(child.key()) && ch.action().equals("REUSE"));
@@ -294,7 +321,7 @@ public class BomTreePlans {
             return new Node(n.key(), n.source(), n.revision(), n.product(), n.code(), change.version(),
                     n.base(), n.remark(), n.lines());
         }).toList());
-        return new Preview(hash(List.of(dev.mesbase.platform.execution.FactoryContext.required().factoryId()
+        return new Preview(hash(List.of(FactoryContext.required().factoryId()
                 .toString(), p, original, s.changes)), s.changes, original, proposed, creates, edits, inserts, updates, deletes);
     }
 

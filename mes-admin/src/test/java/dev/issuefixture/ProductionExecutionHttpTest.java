@@ -1,6 +1,10 @@
 package dev.issuefixture;
 
 import java.util.UUID;
+import java.util.List;
+import java.net.URI;
+import java.nio.charset.StandardCharsets;
+import org.springframework.web.util.UriUtils;
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.ObjectMapper;
 
@@ -32,15 +36,18 @@ class ProductionExecutionHttpTest {
             assertEquals(0, j.queryForObject("SELECT COUNT(*) FROM mes_production_execution", Integer.class));
             var result = JSON.readTree(ProductionInputHttpTest.submit(m,
                     ProductionInputHttpTest.command(m, UUID.randomUUID().toString(), "L001", "12.12")));
-            String id = result.get("executionCode").asText();
+            String code = result.get("executionCode").asText();
+            String id = UriUtils.encodePathSegment(code, StandardCharsets.UTF_8);
             var before = j.queryForList("SELECT * FROM mes_production_execution ORDER BY id");
-            m.perform(full(get(E + "/" + id))).andExpect(status().isOk()).andExpect(jsonPath("productId").value("99"));
-            m.perform(full(get("/api/production/identity/" + id))).andExpect(status().isOk())
+            m.perform(full(get(URI.create(E + "/" + id)))).andExpect(status().isOk())
+                    .andExpect(jsonPath("productId").value("99"));
+            m.perform(full(get(URI.create("/api/production/identity/" + id)))).andExpect(status().isOk())
                     .andExpect(jsonPath("qrCode").value(result.get("code").asText()))
                     .andExpect(jsonPath("productCode").value("P1"));
             assertEquals(before, j.queryForList("SELECT * FROM mes_production_execution ORDER BY id"));
             assertEquals(1, j.queryForObject("SELECT COUNT(*) FROM mes_material_issue_input WHERE confirmed_at IS NOT NULL", Integer.class));
-            m.perform(ProductionReportHttpTest.full(get(E + "/" + id), "B")).andExpect(status().isNotFound());
+            m.perform(ProductionReportHttpTest.full(get(URI.create(E + "/" + id)), "B"))
+                    .andExpect(status().isNotFound());
         }
     }
 
@@ -48,15 +55,17 @@ class ProductionExecutionHttpTest {
     void ordinaryEditingCannotRewriteIdentityStatusOrReduceAnExecutionWithOfficialInput() throws Exception {
         try (var c = ProductionInputHttpTest.context()) {
             var m = MaterialIssueHttpTest.mvc(c);
-            String id = JSON.readTree(ProductionInputHttpTest.submit(m,
+            String code = JSON.readTree(ProductionInputHttpTest.submit(m,
                             ProductionInputHttpTest.command(m, UUID.randomUUID().toString(), "L001", "12.12")))
                     .get("executionCode").asText();
-            m.perform(full(put(E + "/" + id)).content(CREATE.replace("12.12", "10"))).andExpect(status().isConflict());
-            m.perform(full(put(E + "/" + id)).content(CREATE.replace("READY", "RUNNING")))
+            String id = UriUtils.encodePathSegment(code, StandardCharsets.UTF_8);
+            m.perform(full(put(URI.create(E + "/" + id))).content(CREATE.replace("12.12", "10")))
                     .andExpect(status().isConflict());
-            m.perform(full(put(E + "/" + id)).content(CREATE.replace("\"status\"", "\"remark\":\"TEST ONLY metadata\",\"status\"")))
+            m.perform(full(put(URI.create(E + "/" + id))).content(CREATE.replace("READY", "RUNNING")))
+                    .andExpect(status().isConflict());
+            m.perform(full(put(URI.create(E + "/" + id))).content(CREATE.replace("\"status\"", "\"remark\":\"TEST ONLY metadata\",\"status\"")))
                     .andExpect(status().isOk()).andExpect(jsonPath("remark").value("TEST ONLY metadata"));
-            m.perform(full(delete(E)).content("[" + id + "]")).andExpect(status().isConflict());
+            m.perform(full(delete(E)).content(JSON.writeValueAsString(List.of(code)))).andExpect(status().isConflict());
         }
     }
 
@@ -64,16 +73,18 @@ class ProductionExecutionHttpTest {
     void crudPermissionDoesNotAuthorizeMutationOrInventAProductionIdentity() throws Exception {
         try (var c = ProductionInputHttpTest.context()) {
             var m = MaterialIssueHttpTest.mvc(c);
-            String id = JSON.readTree(ProductionInputHttpTest.submit(m,
+            String code = JSON.readTree(ProductionInputHttpTest.submit(m,
                             ProductionInputHttpTest.command(m, UUID.randomUUID().toString(), "L001", "12.12")))
                     .get("executionCode").asText();
-            m.perform(put(E + "/" + id).header("Authorization", "Bearer CRUD").header("X-Factory-Id", "A")
+            String id = UriUtils.encodePathSegment(code, StandardCharsets.UTF_8);
+            m.perform(put(URI.create(E + "/" + id)).header("Authorization", "Bearer CRUD").header("X-Factory-Id", "A")
                     .contentType("application/json").content(CREATE)).andExpect(status().isForbidden());
             m.perform(delete(E).header("Authorization", "Bearer CRUD").header("X-Factory-Id", "A")
-                    .contentType("application/json").content("[" + id + "]")).andExpect(status().isForbidden());
+                            .contentType("application/json").content(JSON.writeValueAsString(List.of(code))))
+                    .andExpect(status().isForbidden());
             m.perform(full(get("/api/production/identity")).param("code", "EXE:" + id))
                     .andExpect(status().isBadRequest());
-            m.perform(get("/api/production/identity/" + id)).andExpect(status().isForbidden());
+            m.perform(get(URI.create("/api/production/identity/" + id))).andExpect(status().isForbidden());
         }
     }
 }

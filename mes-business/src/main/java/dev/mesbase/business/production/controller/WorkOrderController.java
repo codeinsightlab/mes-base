@@ -60,8 +60,11 @@ public class WorkOrderController {
     }
 
     public record BomBuildCreatedOrderView(String path, String parentPath, String sourceBomLineId,
-                                           String bomId, Long bomRevision, DetailView workorder) { }
-    public record BomBuildResultView(String buildId, List<BomBuildCreatedOrderView> orders) { }
+                                           String bomId, Long bomRevision, DetailView workorder) {
+    }
+
+    public record BomBuildResultView(String buildId, List<BomBuildCreatedOrderView> orders) {
+    }
 
     public record SummaryView(OrderView workorder, String productCode, String productName,
                               String routingCode, Integer routingVersion, AllocationView allocation,
@@ -75,7 +78,8 @@ public class WorkOrderController {
     public record PageView(List<SummaryView> items, long total, int offset, int limit) {
     }
 
-    public record NumberingRule(String ruleCode, String ruleName, String prefix) { }
+    public record NumberingRule(String ruleCode, String ruleName, String prefix) {
+    }
 
     @GetMapping("/workorder/numbering-rules")
     @EndpointAccess(value = EndpointAccess.Kind.AUTHORIZED, permission = "workorder:create")
@@ -138,10 +142,10 @@ public class WorkOrderController {
         var result = bomBuilds.confirm(input.source(), input.confirmation());
         return new BomBuildResultView(result.buildId(), result.orders().stream().map(detail -> {
             var order = detail.workorder();
-            return new BomBuildCreatedOrderView(order.getBomBuildPath(), order.getBomBuildParentWorkorderId() == null
-                    ? null : order.getBomBuildParentWorkorderId().toString(), order.getBomBuildSourceLineId() == null
-                    ? null : order.getBomBuildSourceLineId().toString(), order.getBomId() == null
-                    ? null : order.getBomId().toString(), order.getBomRevision(), view(detail));
+            return new BomBuildCreatedOrderView(order.getBomBuildPath(),
+                    Objects.toString(order.getBomBuildParentWorkorderId(), null),
+                    Objects.toString(order.getBomBuildSourceLineId(), null), Objects.toString(order.getBomId(), null),
+                    order.getBomRevision(), view(detail));
         }).toList());
     }
 

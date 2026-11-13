@@ -1,6 +1,9 @@
 package dev.issuefixture;
 
 import java.math.BigDecimal;
+import java.net.URI;
+import java.nio.charset.StandardCharsets;
+import org.springframework.web.util.UriUtils;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CyclicBarrier;
@@ -75,21 +78,24 @@ class LocalFullChainV23HttpTest {
             var frozen = j.queryForList("SELECT id,request_hash,calculation_json FROM mes_material_issue_input WHERE document_id=?", input.get("documentId")
                     .asString());
             LocalWarehouseHttpTest.balance(j, "100");
+            String returns = ProductionInputHttpTest.ROOT + "/documents/" + input.get("documentId")
+                    .asString() + "/returns";
             String body = LocalWarehouseHttpTest.body(UUID.randomUUID().toString(), "20", "100", input.get("documentId")
                     .asString());
-            m.perform(ProductionCoreV1HttpTest.full(post(LocalWarehouseHttpTest.ROOT + "return")).content(body))
+            m.perform(ProductionCoreV1HttpTest.full(post(returns)).content(body))
                     .andExpect(status().isOk());
-            m.perform(ProductionCoreV1HttpTest.full(post(LocalWarehouseHttpTest.ROOT + "return")).content(body))
+            m.perform(ProductionCoreV1HttpTest.full(post(returns)).content(body))
                     .andExpect(status().isOk());
             ProductionInputHttpTest.submit(m, inputBody);
             LocalWarehouseHttpTest.balance(j, "120");
             assertEquals(frozen, j.queryForList("SELECT id,request_hash,calculation_json FROM mes_material_issue_input WHERE document_id=?", input.get("documentId")
                     .asString()));
-            var q = new ObjectMapper().readTree(m.perform(ProductionCoreV1HttpTest.full(get("/api/production/report-quantities/executions/" + input.get("executionCode")
-                            .asString())))
+            var q = new ObjectMapper().readTree(m.perform(ProductionCoreV1HttpTest.full(get(URI.create("/api/production/report-quantities/executions/" + UriUtils.encodePathSegment(input.get("executionCode")
+                            .asString(), StandardCharsets.UTF_8)))))
                     .andExpect(status().isOk()).andReturn().getResponse().getContentAsString());
-            assertTrue(new BigDecimal(q.get("productionInputQty").asString()).compareTo(new BigDecimal("50")) <= 0);
-            m.perform(ProductionCoreV1HttpTest.full(post(LocalWarehouseHttpTest.ROOT + "return"))
+            assertEquals(0, new BigDecimal("40").compareTo(new BigDecimal(q.get("productionInputQty").asString())));
+            assertEquals(0, new BigDecimal("50").compareTo(new BigDecimal(q.get("confirmedInputQty").asString())));
+            m.perform(ProductionCoreV1HttpTest.full(post(returns))
                             .content(LocalWarehouseHttpTest.body(UUID.randomUUID()
                                     .toString(), "81", "120", input.get("documentId")
                                     .asString())))

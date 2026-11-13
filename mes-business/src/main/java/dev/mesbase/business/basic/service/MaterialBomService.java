@@ -1,5 +1,6 @@
 package dev.mesbase.business.basic.service;
 
+import java.util.Optional;
 import com.github.pagehelper.PageHelper;
 import dev.mesbase.business.basic.dao.MaterialBomItemMapper;
 import dev.mesbase.business.basic.dao.MaterialBomCopyMapper;
@@ -278,7 +279,8 @@ public class MaterialBomService {
             }
             var result = rows.stream()
                     .map(row -> MaterialBomItemRow.of(row, materialMap.get(row.getMaterialId()),
-                            unitMap.get(row.getUnitId()), row.getChildBomId() == null ? null : childBomMap.get(row.getChildBomId())))
+                            unitMap.get(row.getUnitId()), Optional.ofNullable(row.getChildBomId()).map(childBomMap::get)
+                                    .orElse(null)))
                     .toList();
             return new MaterialBomItemPage(result, total, q.cacheOffset(), q.cacheLimit());
         }
@@ -340,7 +342,8 @@ public class MaterialBomService {
         if (child != null) {
             var version = boms.selectByPrimaryKeyForUpdate(child);
             if (version == null || !Objects.equals(version.getProductId(), materialId)
-                    || !List.of(MaterialBomStatus.PUBLISHED.getValue(), MaterialBomStatus.DRAFT.getValue()).contains(version.getStatus()) || Objects.equals(child, parent.getId())) conflict();
+                    || !List.of(MaterialBomStatus.PUBLISHED.getValue(), MaterialBomStatus.DRAFT.getValue())
+                    .contains(version.getStatus()) || Objects.equals(child, parent.getId())) conflict();
         }
         row.setMaterialId(materialId);
         row.setUnitId(material.getUnitId());
@@ -602,10 +605,10 @@ public class MaterialBomService {
         }
     }
 
-    private void checkDraftPath(Long id, Map<Long,List<MaterialBomItemEntity>> edges, Set<Long> path, int[] visits) {
+    private void checkDraftPath(Long id, Map<Long, List<MaterialBomItemEntity>> edges, Set<Long> path, int[] visits) {
         if (!path.add(id)) ParameterChecks.reject(ErrorCode.MATERIAL_BOM_CYCLE);
         if (path.size() > MAX_DEPTH) ParameterChecks.reject(ErrorCode.MATERIAL_BOM_BUDGET);
-        for (var edge : edges.getOrDefault(id,List.of())) {
+        for (var edge : edges.getOrDefault(id, List.of())) {
             if (++visits[0] > MAX_LINES) ParameterChecks.reject(ErrorCode.MATERIAL_BOM_BUDGET);
             if (edge.getChildBomId() != null) checkDraftPath(edge.getChildBomId(), edges, path, visits);
         }
@@ -621,7 +624,7 @@ public class MaterialBomService {
     }
 
     record GraphData(Map<Long, MaterialBomEntity> versions, List<MaterialBomItemEntity> lines,
-                             Map<Long, MaterialEntity> materials, Map<Long, UnitMeasureEntity> units) {
+                     Map<Long, MaterialEntity> materials, Map<Long, UnitMeasureEntity> units) {
     }
 
     GraphData loadGraph(Long id) {
@@ -725,7 +728,9 @@ public class MaterialBomService {
             }
             result.add(new MaterialBomGraph.Node(childPath, material.getId(), material.getCode(), material.getName(),
                     quantity.setScale(6, RoundingMode.HALF_UP), unit.getName(), line.getChildBomId(),
-                    childBom == null ? null : childBom.getCode(), childBom == null ? null : childBom.getVersion(), children));
+                    Optional.ofNullable(childBom).map(MaterialBomEntity::getCode)
+                            .orElse(null), Optional.ofNullable(childBom).map(MaterialBomEntity::getVersion)
+                    .orElse(null), children));
         }
         ancestors.remove(id);
         return result;
@@ -757,7 +762,8 @@ public class MaterialBomService {
             if (rows.size() != batch.size() || rows.stream().anyMatch(m -> m.getUnitId() == null)) conflict();
             var uf = new UnitMeasureExample();
             uf.createCriteria().andIdIn(rows.stream().map(MaterialEntity::getUnitId).distinct().toList());
-            var unitMap = units.selectByExample(uf).stream().collect(Collectors.toMap(UnitMeasureEntity::getId, Function.identity()));
+            var unitMap = units.selectByExample(uf).stream()
+                    .collect(Collectors.toMap(UnitMeasureEntity::getId, Function.identity()));
             var materialMap = rows.stream().collect(Collectors.toMap(MaterialEntity::getId, Function.identity()));
             rows.forEach(m -> checkDirectMaterial(m.getId(), m.getUnitId(), materialMap, unitMap));
         }

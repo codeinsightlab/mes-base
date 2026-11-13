@@ -1,5 +1,6 @@
 package dev.mesbase.business.production.service;
 
+import java.util.ArrayList;
 import com.github.pagehelper.Page;
 import com.github.pagehelper.PageHelper;
 import dev.mesbase.business.basic.dao.MaterialMapper;
@@ -268,7 +269,7 @@ public class WorkOrderService {
                 || command.requestHash() == null) throw new FoundationException(ErrorCode.WORKORDER_INVALID);
         var existing = bomBuildReplay(command.requestId(), command.requestHash());
         if (existing != null) return existing.orders();
-        var codes = new java.util.ArrayList<String>();
+        var codes = new ArrayList<String>();
         for (var item : command.orders()) {
             if (item == null || item.values() == null || item.path() == null || item.path().isBlank())
                 throw new FoundationException(ErrorCode.WORKORDER_INVALID);
@@ -283,10 +284,10 @@ public class WorkOrderService {
                 var replay = orders.selectByBomBuildRequestId(command.requestId());
                 if (replay != null) return existingBomBuild(replay, command.requestHash());
                 var idsByPath = new HashMap<String, Long>();
-                var result = new java.util.ArrayList<WorkOrderModels.Detail>();
+                var result = new ArrayList<WorkOrderModels.Detail>();
                 for (int i = 0; i < command.orders().size(); i++) {
                     var item = command.orders().get(i);
-                    Long parentId = item.parentPath() == null ? null : idsByPath.get(item.parentPath());
+                    Long parentId = Optional.ofNullable(item.parentPath()).map(idsByPath::get).orElse(null);
                     if (item.parentPath() != null && parentId == null)
                         throw new FoundationException(ErrorCode.WORKORDER_INVALID);
                     var link = new BomBuildLink(command.buildId(), parentId, item.sourceLineId(), item.path(),

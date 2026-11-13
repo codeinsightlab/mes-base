@@ -2,6 +2,9 @@ package dev.issuefixture;
 
 import dev.mesbase.business.production.domain.ProductionClosureRules;
 import java.math.BigDecimal;
+import java.net.URI;
+import java.nio.charset.StandardCharsets;
+import org.springframework.web.util.UriUtils;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CyclicBarrier;
@@ -379,23 +382,37 @@ class ProductionCompletionHttpTest {
         }
     }
 
-    @Test
-    void retiredManualCommandOnlyReplaysExactHistoricalIdentity() throws Exception {
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    void retiredManualCommandOnlyReplaysExactHistoricalIdentity(boolean numericIdentity) throws Exception {
         try (var c = ProductionWarehouseFixture.context()) {
             var m = MaterialIssueHttpTest.mvc(c);
             var j = ProductionWarehouseFixture.db(c);
             String request = UUID.randomUUID()
                     .toString(), basis = "f".repeat(64), reason = "TEST ONLY historical complete";
-            String hash = ProductionClosureRules.hash(1L, basis, reason, 1L);
-            j.update("INSERT INTO mes_execution_completion(id,execution_code,effective_qty,released_qty,receipt_qty,accepted_qty,basis_hash,request_hash,operator_user_id,recorded_at,reason) VALUES(?,1,100,0,0,0,?,?,1,CURRENT_TIMESTAMP,?)", request, basis, hash, reason);
+            String code = "TEST-WO:MAT#HISTORICAL";
+            j.update("UPDATE mes_production_execution SET execution_code=? WHERE id=1", code);
+            Object frozenIdentity = code;
+            if (numericIdentity) frozenIdentity = 1L;
+            String hash = ProductionClosureRules.hash(frozenIdentity, basis, reason, 1L);
+            j.update("INSERT INTO mes_execution_completion(id,execution_code,effective_qty,released_qty,receipt_qty,accepted_qty,basis_hash,request_hash,operator_user_id,recorded_at,reason) VALUES(?,?,100,0,0,0,?,?,1,CURRENT_TIMESTAMP,?)", request, code, basis, hash, reason);
             j.update("UPDATE mes_production_execution SET status='FULLY_RECEIVED',end_time=CURRENT_TIMESTAMP WHERE id=1");
             String body = "{\"requestId\":\"" + request + "\",\"expectedBasisHash\":\"" + basis + "\",\"reason\":\"" + reason + "\"}";
-            m.perform(full(post("/api/production/executions/1/actions/complete")).content(body))
+            var original = j.queryForMap("SELECT * FROM mes_execution_completion WHERE id=?", request);
+            var endpoint = URI.create("/api/production/executions/" + UriUtils.encodePathSegment(code, StandardCharsets.UTF_8) + "/actions/complete");
+            m.perform(full(post(endpoint)).content(body))
                     .andExpect(status().isOk()).andExpect(jsonPath("id").value(request));
-            m.perform(full(post("/api/production/executions/1/actions/complete")).content(body.replace(reason, "TEST ONLY altered")))
+            m.perform(full(post(endpoint)).content(body.replace(reason, "TEST ONLY altered")))
                     .andExpect(status().isConflict());
             m.perform(full(post("/api/production/executions/2/actions/complete")).content(body))
                     .andExpect(status().isConflict());
+            m.perform(full(post(endpoint)).content(body.replace(basis, "e".repeat(64))))
+                    .andExpect(status().isConflict());
+            m.perform(full(post(endpoint)).content(body.replace(request, UUID.randomUUID().toString())))
+                    .andExpect(status().isConflict());
+            assertEquals(original, j.queryForMap("SELECT * FROM mes_execution_completion WHERE id=?", request));
+            j.update("UPDATE mes_execution_completion SET operator_user_id=2 WHERE id=?", request);
+            m.perform(full(post(endpoint)).content(body)).andExpect(status().isConflict());
             assertEquals(1, j.queryForObject("SELECT COUNT(*) FROM mes_execution_completion", Integer.class));
         }
     }

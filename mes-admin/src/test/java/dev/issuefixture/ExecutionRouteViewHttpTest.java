@@ -15,7 +15,7 @@ class ExecutionRouteViewHttpTest {
         try (var context = ProductionReportHttpTest.context()) {
             var jdbc = context.getBean(MaterialIssueHttpTest.Fixture.class).business.get("A");
             jdbc.update("INSERT INTO routing_node(id,routing_id,node_code,operation_id,operation_code,operation_name,display_order,is_key) VALUES(21,2,'V2-A',1,'O1','第二版节点',0,false)");
-            jdbc.update("INSERT INTO mes_production_execution(id,workorder_id,product_id,routing_id,target_qty,status) VALUES(3,1,1,2,10,'READY')");
+            jdbc.update("INSERT INTO mes_production_execution(id,execution_code,workorder_id,product_id,routing_id,target_qty,status) VALUES(3,'3',1,1,2,10,'READY')");
             var mvc = MaterialIssueHttpTest.mvc(context);
             mvc.perform(ProductionReportHttpTest.full(get("/api/production/executions/1/path"), "A"))
                     .andExpect(status().isOk()).andExpect(jsonPath("executionCode").value("1"))
